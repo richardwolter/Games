@@ -1,0 +1,137 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/pre_match_setup/pre_match_setup.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/pre_match_setup/bench_drop_area.gd" id="2"]
+
+[node name="PreMatchSetup" type="Control"]
+layout_mode = 3
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 32
+
+[node name="MainRow" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Sidebar" type="VBoxContainer" parent="MarginContainer/MainRow"]
+layout_mode = 2
+size_flags_horizontal = 0
+custom_minimum_size = Vector2(340, 0)
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+autowrap_mode = 2
+text = "Pre-Match Setup"
+
+[node name="FormationBox" type="VBoxContainer" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Label" type="Label" parent="MarginContainer/MainRow/Sidebar/FormationBox"]
+layout_mode = 2
+text = "Formation"
+
+[node name="FormationOption" type="OptionButton" parent="MarginContainer/MainRow/Sidebar/FormationBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+size_flags_horizontal = 3
+
+[node name="CaptainBox" type="VBoxContainer" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Label" type="Label" parent="MarginContainer/MainRow/Sidebar/CaptainBox"]
+layout_mode = 2
+text = "Captain"
+
+[node name="CaptainOption" type="OptionButton" parent="MarginContainer/MainRow/Sidebar/CaptainBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+size_flags_horizontal = 3
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+text = "Lineup: 0/11 filled"
+
+[node name="Spacer" type="Control" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ActionBox" type="VBoxContainer" parent="MarginContainer/MainRow/Sidebar"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AutoFillButton" type="Button" parent="MarginContainer/MainRow/Sidebar/ActionBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+text = "Auto-Fill Empty Slots"
+
+[node name="PlayMatchButton" type="Button" parent="MarginContainer/MainRow/Sidebar/ActionBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+disabled = true
+text = "Play Match"
+
+[node name="BackButton" type="Button" parent="MarginContainer/MainRow/Sidebar/ActionBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+text = "Back to Club Management"
+
+[node name="MainArea" type="VBoxContainer" parent="MarginContainer/MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="PitchPanel" type="PanelContainer" parent="MarginContainer/MainRow/MainArea"]
+layout_mode = 2
+size_flags_vertical = 0
+custom_minimum_size = Vector2(0, 460)
+
+[node name="PitchContainer" type="VBoxContainer" parent="MarginContainer/MainRow/MainArea/PitchPanel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="BenchPanel" type="PanelContainer" parent="MarginContainer/MainRow/MainArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2")
+
+[node name="BenchVBox" type="VBoxContainer" parent="MarginContainer/MainRow/MainArea/BenchPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SearchRow" type="HBoxContainer" parent="MarginContainer/MainRow/MainArea/BenchPanel/BenchVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SearchEdit" type="LineEdit" parent="MarginContainer/MainRow/MainArea/BenchPanel/BenchVBox/SearchRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search bench by name or position..."
+
+[node name="BenchScroll" type="ScrollContainer" parent="MarginContainer/MainRow/MainArea/BenchPanel/BenchVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BenchContainer" type="VBoxContainer" parent="MarginContainer/MainRow/MainArea/BenchPanel/BenchVBox/BenchScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12

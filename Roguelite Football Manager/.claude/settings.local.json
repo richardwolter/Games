@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where godot *)",
+      "mcp__godot-ai__editor_state",
+      "mcp__godot-ai__project_run",
+      "mcp__godot-ai__editor_manage",
+      "mcp__godot-ai__editor_screenshot",
+      "mcp__godot-ai__logs_read",
+      "mcp__godot-ai__project_manage",
+      "mcp__godot-ai__scene_open"
+    ]
+  }
+}

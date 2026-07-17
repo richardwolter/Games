@@ -1,0 +1,96 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/club_creation/club_creation.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/club_creation/badge_preview.gd" id="2"]
+
+[node name="ClubCreation" type="Control"]
+layout_mode = 3
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 64
+theme_override_constants/margin_top = 56
+theme_override_constants/margin_right = 64
+theme_override_constants/margin_bottom = 56
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "Create Your Club"
+
+[node name="NameRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/NameRow"]
+layout_mode = 2
+text = "Club Name:"
+
+[node name="NameEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/NameRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "e.g. Rivertown FC"
+
+[node name="ColorsRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="PrimaryColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ColorsRow"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/ColorsRow/PrimaryColumn"]
+layout_mode = 2
+text = "Primary Color"
+
+[node name="PrimaryPicker" type="ColorPickerButton" parent="MarginContainer/VBoxContainer/ColorsRow/PrimaryColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 56)
+color = Color(0.1, 0.25, 0.8, 1)
+
+[node name="SecondaryColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ColorsRow"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/ColorsRow/SecondaryColumn"]
+layout_mode = 2
+text = "Secondary Color"
+
+[node name="SecondaryPicker" type="ColorPickerButton" parent="MarginContainer/VBoxContainer/ColorsRow/SecondaryColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 56)
+color = Color(1, 1, 1, 1)
+
+[node name="BadgeRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="BadgePreview" type="Control" parent="MarginContainer/VBoxContainer/BadgeRow"]
+custom_minimum_size = Vector2(176, 176)
+layout_mode = 2
+script = ExtResource("2")
+
+[node name="RerollButton" type="Button" parent="MarginContainer/VBoxContainer/BadgeRow"]
+layout_mode = 2
+size_flags_vertical = 4
+text = "Reroll Badge Shape"
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = ""
+
+[node name="CreateButton" type="Button" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Create Club"
