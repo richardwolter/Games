@@ -1,0 +1,268 @@
+# Semi-Secret Wars — Balance
+
+Stores gameplay values. Every gameplay value should eventually live here instead of in source code (see [AI_Development_Guide.md](AI_Development_Guide.md) §8, §11).
+
+> **Updated 2026-07-15 (rebalance pass):** Hero stat differentiation, synergy system, XP economy tuning, and swarm density increase. Previous gates (LV 10 / LV 25) require re-verification with new economy. Unit scenes and stage configs are the source of truth.
+>
+> **Updated 2026-07-15 (swarmier pass):** Spawn throughput and on-screen caps raised ×1.5 for a denser "swarmy" feel; minion damage and XP value cut ÷1.5 to hold the chip-damage and XP budgets (and thus the LV 20/LV 25 gates) constant. Verified in-engine — see Swarm and Stage gates sections below.
+>
+> **Added 2026-07-16 (role system + formation bonuses):** Role assignment (TANK/BURST/CONTROL) at prep screen with proximity-based formation bonuses. Emerges from role pairings: same-role clustering ×1.1 damage; Tank+Burst opposition ×1.15 multiplier each; mixed trio (3+ roles) ×0.05 cooldown. Applied to all damage (combat + abilities) and cooldown timers. Verified: UI rendering, hero spawning with role intact, formation bonus calculation on each frame. Existing balance gates (LV 10/LV 25) and Lone Wolf/Synergy systems unaffected (role bonuses are separate multiplier tier).
+
+## Combat stats (updated 2026-07-16 fixed roles pass)
+
+### Heroes (hero-specific base stats + scaling)
+
+| Hero | Role | Base HP | Base Damage | HP per upgrade | Damage per upgrade | Attack Speed scale | Attack interval | Detect range | Move speed |
+|---|---|---|---|---|---|---|---|---|---|
+| Thundaar | TANK | 120 | 10 | +20 | +1.5 | ×0.97 | 0.7s | 90 | 75 |
+| Artemis | BURST | 65 | 6 | +12 | +2.5 | ×0.93 | 0.32s | 90 | 115 |
+
+**Stat differentiation:** Thundaar (TANK) is durable and slow — high base HP and damage but slower attack and movement. Artemis (BURST) is fragile and fast — lower HP but high damage scaling, fast attack, and rapid repositioning. Roles are now **fixed per hero** (Thundaar always TANK, Artemis always BURST) and determined at spawn via hero name, not a prep-screen choice.
+
+### Minions & Villains
+
+| Unit | HP | Damage | Attack interval | Attack range | Detect range | Move speed | XP value |
+|---|---|---|---|---|---|---|---|
+| Minion (Stage 1) | 10 | 1.0 | 0.8s | 18 | 70 | per stage config | 2 |
+| Elite Minion (Stage 2) | 14 | 1.3 | 0.8s | 18 | 80 | per stage config | 2 |
+| Ranged Minion (Stage 3, placeholder) | 12 | 1.2 | 1.0s | 100 | 60 | 85 | 2 |
+| Brute Minion (Stage 3, placeholder) | 18 | 1.8 | 0.8s | 18 | 70 | 80 | 3 |
+| Villain (Dark Mage) | 1500 | 0 (no attack) | — | — | — | 0 (stationary) | — |
+| Villain (Berserker) | 2000 | 12 | 1.1s | 26 | 120 | 80 (3s charge / 1.5s recover) | — |
+| Villain (Mech Robot, placeholder) | 2500 | 14 | 0.9s | 40 | 100 | 0 (stationary, melee only) | — |
+
+Minion HP/damage/xp were halved and body_radius shrunk (art pass — smaller sprites reads better at swarm density); hero gained `knockback_chance 0.1` / `knockback_distance 40` / `knockback_splash_damage 6` (contact knockback, not ability-only).
+
+**2026-07-15 swarmier pass:** minion/elite damage and XP value cut a further ÷1.5 (1.5→1.0, 2→1.3; xp_value 8→5) to offset the ×1.5 spawn-throughput increase below — see Swarm section for the full rationale and in-engine re-verification.
+
+**2026-07-16 minimum-swarm-XP pass (Designer feedback — swarm kills should be minimal, runs are long enough to farm many of them):** removed the density bonus entirely (previously +1 XP per active minion on field, capped +30 — this compounded XP *upward* with swarm size, the opposite of the intent) and cut base `xp_value` further: Minion/Elite/Ranged 5–6→2, Brute 7→3. A minion kill is now a flat, small value regardless of how many minions are on screen or how long the run has been going; meaningful progression should come from sustained kill volume, objective captures, and (eventually) villain kills rather than swarm-density scaling. Not yet re-verified against the stage gates below — expect the LV 19–26 duo win bands in the sweep section to shift upward; re-run `balance_sweep.gd` before treating those numbers as current.
+
+## Hero abilities (verified in-engine 2026-07-15 — functional, not tuned)
+
+Auto-cast on cooldown whenever an enemy is in detect range. Confirmed firing correctly in a live run (Stomp's cooldown ticked down after landing a hit; Clone spawned, taunted, and its HUD cooldown displayed); damage/cooldown values themselves are still a first pass, not tuned against the stage gates.
+
+| Hero | Ability | Cooldown | Effect |
+|---|---|---|---|
+| Thundaar | Stomp | 3.5s (starts once it lands a hit) | 26 dmg + 100px knockback to every enemy within 70px; expanding shockwave-ring VFX on landing |
+| Artemis | Clone | 8s | Spawns a stationary copy of herself (same HP/dmg/attack stats) 40px to her side (not stacked on top of her) for 2s; taunts enemies within 90px of it and fights back |
+
+## Swarm (per-stage, continuous XP farm)
+
+The swarm is a continuous, escalating farm (not finite waves). Win = defeat the villain; lose = all heroes die. See the incremental-loop intent in [Game_Design_Bible.md](Game_Design_Bible.md) §16. Values live in `config/stage_N_config.tres`.
+
+| Value | Stage 1 | Stage 2 | Notes |
+|---|---|---|---|
+| Swarm cap (start) | 18 | 21 | Max simultaneously active minions at run start (×1.5, swarmier pass) |
+| Spawn interval | 2.8s | 3.2s | Time between spawn ticks (unchanged) |
+| Spawn batch | 3 | 3 | Minions spawned per tick (2→3, ×1.5 throughput, swarmier pass) |
+| Escalate every | 12s | 12s | Cap grows over time so the farm intensifies |
+| Escalate step | +4 | +4 | Cap increase per escalation (3→4, ×1.5 rounded, swarmier pass) |
+| Max cap | 60 | 72 | Ceiling on active minions (40/48→60/72, ×1.5, swarmier pass) |
+| Minion speed | 105 | 115 | Stage 1/Elite speeds unchanged |
+| Spawn points | 6, ≥350px apart | 6, ≥350px apart | Swarm pours from multiple randomized points on the villain half |
+
+**Hunting/intercept:** minions re-evaluate their hunt goal every 0.3s, targeting a point `intercept_lead = 160px` ahead of the nearest hero (toward the villain), plus their per-minion cluster offset.
+
+**Chip-damage model (why throughput is the knob):** every minion that reaches melee lands ≥1 hit before dying (its first attack has no cooldown), so each kill costs the party HP regardless of hero DPS. Party HP pool ÷ chip-per-kill = a hard budget of total kills a run can absorb. Spawn throughput bounds how fast the swarm forces those kills, so it — not the cap — decides whether the party's HP outlasts the travel + villain burn.
+
+**2026-07-15 regression, caught and fixed:** an in-progress experiment (bigger swarm + deploy phase + fog of war) had left cap/interval at 60–70 → 220–260 with a 0.25s interval — ~22× the verified throughput. Re-run in-engine: a LV14/LV17 party (above the old LV10 gate) wiped completely without denting the villain. Rescaled cap/interval/batch back to match the original verified throughput; re-run confirmed the party held near-full HP through sustained combat and engaged the villain.
+
+**2026-07-15 swarmier pass (Designer request — "more swarmy" feel):** spawn throughput (batch) and all caps raised ×1.5 for a denser on-screen swarm; minion damage and XP value cut ÷1.5 in the same pass (see Combat stats) so total per-run chip-damage and XP budgets are unchanged — density-bonus XP (`+1/active minion, capped +30`) already saturated below the old max caps, so it doesn't compound further. Re-verified in-engine: a LV 20 synergy duo cleared Stage 1 at ~26s-equivalent sim time with 188/220 (Thundaar) and 119/145 (Artemis) HP — matching the pre-swarmier-pass gate below (205/220, 125.5/145) within noise — and won outright shortly after (170/220, 114/145 final), with active-minion counts and kill counts markedly higher throughout (up to 30 active, 109 kills vs. the prior lower-density run).
+
+## Stage 3: Mech Robot ability (placeholder, added 2026-07-16)
+
+Stationary villain (like Dark Mage) that also fights back in melee (unlike Dark Mage) and periodically drops a slow zone on the nearest hero:
+
+| Value | Current | Notes |
+|---|---|---|
+| Zone interval | 5s | Time between slow-zone casts |
+| Zone duration | 4s | How long a dropped zone lasts |
+| Zone radius | 60px | Any hero inside is affected |
+| Slow factor | ×0.7 | Multiplies move speed and attack rate while inside |
+
+Implementation: `Combatant.apply_slow(duration, factor)` (new shared method, additive — default `_slow_factor = 1.0` / `_slow_t = 0` means no existing unit behavior changed) drives both movement speed and attack-cooldown decay via `_effective_rate_mult()`. See `scenes/combat/combatant.gd`, `scenes/villain/mech_robot.gd`, `scenes/villain/abilities/slow_zone.gd`.
+
+Swarm: hybrid mix of Ranged + Brute minions, 50/50 split per spawn tick (`MinionSpawner._pick_minion_scene`, driven by `minion_type = "hybrid_stage3"` in `stage_3_config.tres`).
+
+## Poison Lake (Stage 1 hazard)
+
+| Value | Current | Notes |
+|---|---|---|
+| Lake DPS | 8 HP/s | `lake_dps` on `StageField`; affects **all** units inside (heroes and minions); no slow (Designer choice 2026-07-15) |
+| Avoidance margin | body clearance + 50px | Units start skirting the shore this far out; soft avoid — pursuit of a target in/behind the lake can drag them through |
+| Hazard XP | none | Poison kills grant no killer XP credit |
+
+Verified: 8 dps drain matches (190 → 173.9 HP over 2s); a goal straight through the lake routes around it (27/191 frames brushing the shore vs. 214 wading pre-tune).
+
+## Synergy System (two-hero bonuses)
+
+When both heroes are alive and within **200px** of each other:
+- **Damage multiplier:** ×1.15 to both heroes (synergy builds reward coordination)
+- **Cooldown reduction:** −0.3s on all hero ability cooldowns (Stomp 3.5s → 3.2s; Clone 8s → 7.7s)
+- **XP multiplier:** ×1.25 to all XP earned (kills + captures)
+
+**Design intent:** Forces 2-3 hero roster thinking, makes duo combos exponentially more powerful than solo carry, creates "breaking the game" moment with optimized synergy builds at high levels.
+
+## Formation Bonuses (role-based proximity bonuses)
+
+Heroes are assigned a role at prep screen: **TANK** (high HP), **BURST** (high DPS), or **CONTROL** (utility). Formation bonuses activate when heroes with specific role combinations are nearby, recalculated each frame based on proximity.
+
+| Bonus | Roles | Distance | Effect | Notes |
+|---|---|---|---|---|
+| Same-role cluster | 2+ same role | 150px | ×1.1 damage to that role | Encourages stacking like-heroes; rewards focused team composition |
+| Tank+Burst opposition | TANK + BURST | 200px | Tank ×1.15 HP, Burst ×1.15 damage | Complements Synergy system; creates Tank-tank-Burst triangle with bonus on each pair |
+| Mixed trio | 3+ different roles | 180px | +0.05s cooldown reduction | Only applies when 3+ heroes with 3 distinct roles cluster; bridges gap for 3-hero parties |
+
+**Multiplier stacking:** Formation bonuses are *independent* of Synergy (two-hero proximity) and Lone Wolf (single-hero compensation). All multipliers compose: a Tank+Burst pair both within Synergy range AND formation range applies both bonuses to damage/cooldown. XP multiplier is Synergy-only (no formation XP bonus).
+
+**Design intent:** Gives meaningful gameplay choice at party select (what roles to pick), creates emergent tactics (spread vs. cluster, role priorities), extends balance to 3-hero parties (mixed trio bonus) without requiring new ability unlocks.
+
+## Objectives (hold-to-capture)
+
+| Value | Current | Notes |
+|---|---|---|
+| Capture time | 5s | Uncontested hero-presence time to fully capture |
+| Capture radius | 80px | A hero within this range captures |
+| Contest radius | 45px | A hostile within this range pauses progress (no reset) |
+| Farm bonus | 20 | One-time XP bonus granted on capture (increased from 15, split evenly among living heroes) |
+
+Current build: one objective on the lane. Captures grant synergy XP multiplier if both heroes participate.
+
+## Heroes
+
+| Hero | Base Stats | Abilities |
+|---|---|---|
+| Thundaar | see Combat stats (hero placeholder) | TBD |
+| Artemis | see Combat stats (hero placeholder) | TBD |
+
+## Enemy Stats
+
+**Villains**
+
+| Villain | Base Stats | Abilities |
+|---|---|---|
+| Dark Mage (Stage 1) | 1500 HP, no attack | Summons minions (per stage config) |
+| Berserker (Stage 2) | 2000 HP, 12 dmg / 1.1s, speed 80 | Pursues nearest hero; 3s charge / 1.5s recover cycle; summons elite minions |
+
+**Minions:** base minion (Stage 1) and Elite Minion (Stage 2) — see Combat stats. Long-term target scales toward thousands per battlefield at higher levels.
+
+## Experience & Upgrades (player-directed)
+
+XP is the upgrade currency — players spend it directly on per-hero stat upgrades between runs (no automatic level bumps). A hero's displayed "LV" = total upgrades purchased.
+
+**XP sources** (with synergy multiplier; no density bonus — see 2026-07-16 pass above)
+
+| Source | Base XP | Notes |
+|---|---|---|
+| Minion kill (base) | 2–3 (killer) + 50% assist | Flat per `xp_value` (Minion/Elite/Ranged 2, Brute 3) regardless of swarm size or run length; killing-blow hero banks the full value, every other **living** hero banks 50% (rounded up) |
+| Synergy multiplier | ×1.25 to all | Applied when both heroes within 200px and alive |
+| Objective capture | 20, split | Split evenly among living heroes (rounded up); synergy multiplier applies |
+
+**Effective XP examples:**
+- Solo minion kill: 2 XP (3 for Brute)
+- Minion kill, duo in synergy: 2 × 1.25 = 3 XP per hero (killer, rounded down), assist ~1 XP
+- Objective capture (duo, synergy): (20 ÷ 2) × 1.25 = 12.5 → 13 XP each
+
+**Upgrade catalog** (cost = `base × 1.25^owned`, rounded up)
+
+| Upgrade | Base cost | Effect per purchase | Hero scaling |
+|---|---|---|---|
+| Max HP | 30 | +15 max HP base | ×(hero hp_scale ÷ 15) |
+| Damage | 42 | +2 damage base | ×(hero damage_scale ÷ 2) |
+| Attack Speed | 36 | ×0.95 attack interval (multiplicative) | ×(hero attack_speed_scale ^ owned) |
+| Move Speed | 24 | +6 move speed | no hero scaling (same for all) |
+
+**Rebalance rationale (2026-07-15 rebalance):** Lower base costs (HP 30→25, DMG 40→35, AS 35→30, MS 25→20) make early progression faster; XP density bonus rewards surviving swarm pressure; synergy multiplier forces 2-hero teams and creates exponential scaling moments. Expected party income ≈ 300–400 XP/run with density + synergy multipliers (estimate; requires in-engine re-verification).
+
+**Progression tuning (2026-07-16):** Base upgrade costs increased by ×1.2 (HP 25→30, DMG 35→42, AS 30→36, MS 20→24) to slow progression speed. Keeps XP farming rewarding (same 300–400 XP/run economy) while reducing level gain per run (~4 levels → ~1.5 levels), targeting 8-10 runs per stage to comfortably clear instead of 5. XP sources unchanged; this tuning does not affect balance gates (which were verified against current XP income, not costs). Re-verification sweep pending.
+
+XP is banked to disk (`user://save.json`) live on each kill/capture and kept in full even on a wipe — every run contributes. F12 = dev save reset.
+
+## Stage gates (verified in-engine 2026-07-15 rebalance pass)
+
+Verified with instrumented runs (builds set via GameState, battles observed to completion at 5× time scale):
+
+| Party | Stage 1 (Dark Mage) | Stage 2 (Berserker) |
+|---|---|---|
+| 1 × LV 8 (Thundaar solo, 3 DMG/3 HP/1 AS/1 MS) | **VICTORY** — razor-thin (6/180 HP left, villain reached ~5%) | — |
+| 2 × LV 20 (5/5/5/5 split, synergy active) | **VICTORY** — comfortable (205/220, 125.5/145 HP, ~26s sim) | — |
+| 2 × LV 25 (9/9/5/2 split, synergy active) | — | **VICTORY** — comfortable (276/300 Thundaar, 55/193 Artemis, ~30s@5×) |
+
+**Key findings:**
+- **Solo LV 8 is now a nail-biter win, not a loss** — density-bonus XP and lower upgrade costs pushed the baseline up faster than the plan's LV-8-loses projection. This is still "so close" (villain at ~5% HP, hero nearly dead) so the farm-more signal reads clearly; treat LV 8 solo as the practical floor rather than tightening further.
+- **Synergy duo at LV 20 trivializes Stage 1** — near-full HP win in ~26s of 5×-scaled combat, confirming the +15% damage / XP / cooldown-reduction stack compounds quickly once both heroes stay paired.
+- **Stage 2 at LV 25 shows real tank/DPS asymmetry** — Thundaar (tank) finished near full HP while Artemis (DPS) dropped to ~28%, exactly the differentiated-role behavior the hero stat split was designed to produce.
+- Ability unlocks (LV 15 Stomp-stun / Clone-damage, LV 20 Shockwave / Dash) fire correctly in these runs (both test builds were ≥ LV 20) but individual ability contribution wasn't isolated — future balance passes should A/B with abilities unlocked vs. locked to quantify their share of the win margin.
+
+**Not yet re-verified:** LV 12–15 duo (expected: Stage 1 comfortable win, first ability-passive unlock), LV 15–20 duo on Stage 2 (expected: competitive/struggle before second-ability unlock). These fill the gap between the floor (LV 8 solo) and the two confirmed comfortable-win points above.
+
+## Comprehensive sweep (automated, 2026-07-16)
+
+Full-matrix verification: solo + duo, LV 0–30, all 3 stages (186 runs), each capped at **60 simulated seconds** (a tighter, standardized window vs. the ad-hoc 5×-scale manual runs above — not directly comparable to the "razor-thin win"/"~26s sim" language in the section above, which likely measured wall-clock at 5× rather than sim-seconds). Builds use an even 4-way stat split per level (e.g. LV 20 = 5/5/5/5), heroes deployed immediately at the default spawn point, no manual priority tuning. Raw per-run data: `BALANCE_SWEEP_RESULTS.json`.
+
+### Stage 1 (Dark Mage)
+
+| Party | Result |
+|---|---|
+| Solo (Thundaar) | **Never wins within the 60s cap, LV 0–30.** Villain damage climbs steadily at high levels (LV 29: villain to 824/1500) but solo can't close it out in the window. |
+| Duo (synergy) | First win at **LV 19** (58.4s — a near-miss-turned-win). Wins consistently from **LV 22 onward**. LV 21 alone timed out just short (villain at 76.6/1500 — bad luck on spawn RNG, not a real wall). |
+
+### Stage 2 (Berserker)
+
+| Party | Result |
+|---|---|
+| Solo (Thundaar) | **Loses at every level, LV 0–30** (full wipe each time). Villain damage improves with level (LV 30: villain to 778/2000) but solo never survives long enough to finish it. |
+| Duo (synergy) | One early win at **LV 10** (noisy — surrounded by losses at LV 11–14, likely spawn-RNG dependent at that low a level). Wins consistently from **LV 15 onward**, with three notable near-miss losses at **LV 20** (villain 60.5/2000), **LV 24** (villain 361.5/2000), and **LV 28** (villain 25.5/2000) — all close enough that these read as run-to-run variance, not a real difficulty wall. |
+
+### Stage 3 (Mech Robot — new, unbalanced placeholder)
+
+| Party | Result |
+|---|---|
+| Solo (Thundaar) | **Never wins, LV 0–30.** Frequently dies outright from LV 6 up; villain only reaches ~1714/2500 (31% damaged) even at LV 30. Confirms Stage 3 is currently tuned far too hard for solo — expected, since stats are first-pass placeholders. |
+| Duo (synergy) | No wins before **LV 20**. LV 20–25 is a genuine contested band (mix of wins/losses/near-timeouts — LV 25 timed out with the villain at just 11.7/2500 HP). Wins consistently from **LV 26 onward**. |
+
+**Key findings (pre-Lone-Wolf-buff):**
+- **Solo is not viable at any level 0–30 on any stage under this stricter cap.** Every prior "solo win" reference in this doc was almost certainly a much longer real-world run (5× scale, no time cap) — the demo's actual solo experience within a reasonable play session may be weaker than previously assumed.
+- **Duo progression is coherent across all 3 stages**: Stage 1 ~LV 19–22, Stage 2 ~LV 15 (with an outlier LV 10), Stage 3 ~LV 20–26. Difficulty ordering (Stage 1 < Stage 2 ≈ Stage 3) holds, though Stage 3's placeholder stats land it slightly harder than Stage 2 rather than a clean step up — reasonable for a first pass, worth a tuning look before treating Stage 3 as demo-ready.
+- **Stage 2 and 3 both show a handful of "just barely lost" runs scattered through their win bands** (villain HP in the low single digits to low hundreds at time of loss/timeout). This is likely spawn-point/RNG variance rather than a structural wall, but is worth a multi-seed re-run at those specific levels before concluding anything is broken.
+- **Stage 3's Mech Robot + hybrid minions are functioning as designed** (villain fights back in melee, slow-zone ability fires and applies the movement/attack debuff, ranged+brute minions both spawn) — the difficulty numbers above reflect first-pass placeholder stats, not a mechanical bug.
+
+## Lone Wolf buff (2026-07-16 — makes solo wins possible)
+
+The sweep above showed solo never closing out a win within the 60s cap at any level on any stage. Rather than buff all heroes (which would trivialize duo), added a **Lone Wolf** bonus: a standing compensation buff for a true 1-hero roster, cached once at spawn from `GameState.selected_heroes().size() == 1` — mutually exclusive with the existing dynamic Synergy system (which requires an ally), so **duo balance is completely untouched** by this change.
+
+| Value | Current |
+|---|---|
+| Max HP multiplier | ×1.8 |
+| Damage multiplier | ×1.75 |
+| Ability cooldown reduction | −0.4s (vs. synergy's −0.3s) |
+
+Implementation: `scenes/heroes/hero.gd` — `_is_lone_wolf` set once in `_configure()` (drives the HP multiplier at spawn); `_update_synergy()` applies the damage multiplier / cooldown reduction through the same `_synergy_damage_mult` / `_synergy_cooldown_reduction` fields the Synergy system already uses (has_ally and is_lone_wolf are mutually exclusive, so no double-dipping). The XP density-bonus check (`_synergy_damage_mult > 1.0`) also now grants the synergy XP multiplier to Lone Wolf runs — an intentional side benefit, not a bug.
+
+**Tuning process:** started at HP ×1.5 / DMG ×1.4 / CD −0.3s (roughly matching synergy's magnitude), spot-checked, then iterated up twice based on results before landing here. Full re-sweep (93 runs: solo × LV 0–30 × all 3 stages) with final values:
+
+| Stage | Solo result |
+|---|---|
+| Stage 1 (Dark Mage) | **Still never wins, LV 0–30** — but trending hard toward one: villain down to 314.5/1500 (79% damaged) by LV 30, vs. never breaking 45% pre-buff. |
+| Stage 2 (Berserker) | **Wins consistently from LV 21** (10/10 wins, LV 21–30). |
+| Stage 3 (Mech Robot) | **Still never wins, LV 0–30** — also trending hard: villain down to 384.5/2500 (85% damaged) by LV 30, vs. ~31% pre-buff. |
+
+**Why Stage 1 resists pure stat buffs where Stage 2/3 don't:** Dark Mage flees when a hero closes in (`flee_distance = 260`) and every `teleport_interval = 10s` blinks to a new spot and resummons a fresh burst of minions there. A lone hero's chase progress gets reset roughly every 10 sim-seconds and has to fight through a new minion burst before it can resume pressing the villain — structurally different from Berserker (actively chases, stands and fights) and Mech Robot (stationary, melees back), where raw stat increases convert directly into sustained damage windows. Buffing Lone Wolf further would eventually brute-force a Stage 1 win too, but the diminishing returns and the already-large multipliers (×1.8 HP / ×1.75 DMG) suggested stopping here and flagging the mechanic instead of the numbers.
+
+**Open item for Designer:** Stage 1 is currently the *hardest* stage to solo despite being the first stage — the opposite of the intended difficulty curve. Two paths forward: (a) tune Dark Mage's kiting specifically for solo (e.g. shorter `teleport_interval` cooldown between resummons scaled by party size, or a smaller `teleport_minion_count` when only one hero is present), or (b) accept Stage 1 as solo-unwinnable by design and lean into "duo unlocks Stage 1, solo is a Stage-2-only curiosity" — inconsistent with the current stage-gating (Stage 2 unlocks only after beating Stage 1), so (a) is likely the better direction if solo progression through the stage order matters.
+
+## Economy
+
+Reward types beyond Experience: TBD. Values: TBD.
+
+## Skill Trees
+
+Node layout, upgrade costs, unlock conditions: all TBD.
+
+## Damage Formulas
+
+TBD.
+
+## Progression
+
+Level progression curve: TBD.

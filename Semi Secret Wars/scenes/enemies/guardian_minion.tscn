@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/guardian_minion.gd" id="1_guardian"]
+
+[node name="GuardianMinion" type="Node2D"]
+script = ExtResource("1_guardian")
+max_hp = 55.0
+damage = 3.0
+attack_interval = 0.9
+attack_range = 22.0
+detect_range = 90.0
+move_speed = 0.0
+body_color = Color(0.4, 0.1, 0.1, 1)
+body_radius = 16.0
+xp_value = 5

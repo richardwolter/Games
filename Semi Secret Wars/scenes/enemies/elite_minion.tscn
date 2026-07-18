@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/elite_minion.gd" id="1_elite"]
+
+[node name="EliteMinion" type="Node2D"]
+script = ExtResource("1_elite")
+max_hp = 14.0
+damage = 3.5
+attack_interval = 0.8
+attack_range = 18.0
+detect_range = 80.0
+move_speed = 100.0
+body_color = Color(0.749, 0.247, 0.247, 1)
+body_radius = 11.0
+xp_value = 2
+intercept_lead = 90.0

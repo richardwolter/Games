@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/brute_minion.gd" id="1_brute"]
+
+[node name="BruteMinion" type="Node2D"]
+script = ExtResource("1_brute")
+max_hp = 18.0
+damage = 2.8
+attack_interval = 0.8
+attack_range = 18.0
+detect_range = 70.0
+move_speed = 80.0
+body_color = Color(0.5, 0.3, 0.15, 1)
+body_radius = 13.0
+xp_value = 3
+intercept_lead = 100.0

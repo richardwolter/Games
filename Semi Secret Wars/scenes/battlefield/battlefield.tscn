@@ -1,0 +1,202 @@
+[gd_scene format=3 uid="uid://bcmqk3uv32afy"]
+
+[ext_resource type="Script" uid="uid://cam5xi0ah8ma1" path="res://scenes/battlefield/stage_field.gd" id="1_field"]
+[ext_resource type="Texture2D" uid="uid://dxx2ctncv4lym" path="res://assets/sprites/Forest.svg" id="1_forest"]
+[ext_resource type="Texture2D" uid="uid://c1kgk7eg8fy2" path="res://assets/sprites/Mountain.svg" id="1_mountain"]
+[ext_resource type="Script" uid="uid://b240137ytduhu" path="res://scenes/battlefield/battle_marker.gd" id="2_marker"]
+[ext_resource type="Script" uid="uid://2ydxc1f7nu5r" path="res://scenes/battlefield/battle_camera.gd" id="3_camera"]
+[ext_resource type="Script" uid="uid://ddh37lkx8n4vv" path="res://scenes/enemies/minion_spawner.gd" id="4_spawner"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/minion.tscn" id="5_minion"]
+[ext_resource type="PackedScene" path="res://scenes/heroes/hero.tscn" id="6_hero"]
+[ext_resource type="Script" uid="uid://br6qto10yyb8l" path="res://scenes/battle/battle_manager.gd" id="8_bmgr"]
+[ext_resource type="Script" uid="uid://dwipbbd404qyn" path="res://scenes/battle/battle_hud.gd" id="8_yttjq"]
+[ext_resource type="PackedScene" path="res://scenes/objectives/objective.tscn" id="9_obj"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/guardian_minion.tscn" id="13_guardian"]
+[ext_resource type="Script" uid="uid://c6ptg81cqt8nh" path="res://scenes/battle/results_screen.gd" id="10_res"]
+[ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="11_theme"]
+[ext_resource type="Script" uid="uid://cectdxkyr1f50" path="res://scenes/battlefield/fog_of_war.gd" id="12_fog"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vhpfill"]
+bg_color = Color(0.776471, 0.239216, 0.239216, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.231373, 0.231373, 0.231373, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 9
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_objfill"]
+bg_color = Color(0.831373, 0.627451, 0.0901961, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.231373, 0.231373, 0.231373, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 9
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 8
+
+[node name="Battlefield" type="Node2D" unique_id=1381028598]
+
+[node name="Field" type="Node2D" parent="." unique_id=1647632262]
+script = ExtResource("1_field")
+obstacle_kinds = null
+mountain_texture = ExtResource("1_mountain")
+forest_texture = ExtResource("1_forest")
+
+[node name="Markers" type="Node2D" parent="." unique_id=1929882409]
+
+[node name="HeroSpawn" type="Node2D" parent="Markers" unique_id=1950027853]
+position = Vector2(-1500, -600)
+script = ExtResource("2_marker")
+label = "HERO SPAWN"
+color = Color(0.353, 0.659, 0.353, 1)
+marker_size = 28.0
+
+[node name="Objective" parent="." unique_id=620107133 instance=ExtResource("9_obj")]
+
+[node name="Objective2" parent="." unique_id=620107134 instance=ExtResource("9_obj")]
+objective_index = 1
+label = "OBJECTIVE 2"
+
+[node name="ObjectiveGuardian" parent="." instance=ExtResource("13_guardian")]
+
+[node name="ObjectiveGuardian2" parent="." instance=ExtResource("13_guardian")]
+objective_index = 1
+
+[node name="MinionSpawner" type="Node2D" parent="." unique_id=558197951]
+script = ExtResource("4_spawner")
+minion_scene = ExtResource("5_minion")
+
+[node name="Heroes" type="Node2D" parent="." unique_id=1317581930]
+
+[node name="BattleCamera" type="Camera2D" parent="." unique_id=891754858]
+zoom = Vector2(0.85, 0.85)
+script = ExtResource("3_camera")
+pan_limits = Vector2(2300, 1300)
+
+[node name="FogOfWar" type="Node2D" parent="." unique_id=767241069]
+script = ExtResource("12_fog")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1557977316]
+script = ExtResource("8_yttjq")
+villain_hp_label_path = NodePath("VillainPanel/VBox/VillainHPLabel")
+villain_hp_bar_path = NodePath("VillainPanel/VBox/VillainHPBar")
+objective_label_path = NodePath("ObjectivePanel/VBox/ObjectiveLabel")
+objective_bar_path = NodePath("ObjectivePanel/VBox/ObjectiveBar")
+run_xp_label_path = NodePath("RunXPPanel/RunXPLabel")
+timer_label_path = NodePath("TimerPanel/TimerLabel")
+buff_panel_path = NodePath("ObjectiveBuffPanel")
+buff_label_path = NodePath("ObjectiveBuffPanel/BuffLabel")
+back_button_path = NodePath("BackButton")
+
+[node name="BackButton" type="Button" parent="HUD"]
+offset_left = 16.0
+offset_top = 60.0
+offset_right = 136.0
+offset_bottom = 96.0
+theme = ExtResource("11_theme")
+text = "PREP MENU"
+
+[node name="TimerPanel" type="PanelContainer" parent="HUD" unique_id=1963841780]
+offset_left = 940.0
+offset_top = 10.0
+offset_right = 1090.0
+theme = ExtResource("11_theme")
+
+[node name="TimerLabel" type="Label" parent="HUD/TimerPanel" unique_id=295362692]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = "00:00"
+
+[node name="VillainPanel" type="PanelContainer" parent="HUD" unique_id=1963841776]
+offset_left = 1380.0
+offset_top = 10.0
+offset_right = 1690.0
+theme = ExtResource("11_theme")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VillainPanel" unique_id=1963841777]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="VillainHPLabel" type="Label" parent="HUD/VillainPanel/VBox" unique_id=1562596619]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "DARK MAGE HP: 100%"
+
+[node name="VillainHPBar" type="ProgressBar" parent="HUD/VillainPanel/VBox" unique_id=1562596620]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_vhpfill")
+max_value = 1.0
+value = 1.0
+show_percentage = false
+
+[node name="HeroPanelsRoot" type="HBoxContainer" parent="HUD" unique_id=301251669]
+offset_left = 16.0
+offset_top = 900.0
+theme = ExtResource("11_theme")
+theme_override_constants/separation = 12
+
+[node name="ObjectivePanel" type="PanelContainer" parent="HUD" unique_id=1963841778]
+offset_left = 800.0
+offset_top = 1010.0
+offset_right = 1000.0
+theme = ExtResource("11_theme")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/ObjectivePanel" unique_id=3123456780]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ObjectiveLabel" type="Label" parent="HUD/ObjectivePanel/VBox" unique_id=257850757]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "OBJECTIVE: 0%"
+
+[node name="ObjectiveBar" type="ProgressBar" parent="HUD/ObjectivePanel/VBox" unique_id=3123456781]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_objfill")
+max_value = 1.0
+value = 0.0
+show_percentage = false
+
+[node name="ObjectiveBuffPanel" type="PanelContainer" parent="HUD" unique_id=3123456790]
+visible = false
+offset_left = 800.0
+offset_top = 950.0
+offset_right = 1000.0
+theme = ExtResource("11_theme")
+
+[node name="BuffLabel" type="Label" parent="HUD/ObjectiveBuffPanel" unique_id=3123456791]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = "BUFF: XP+ 0:10"
+
+[node name="RunXPPanel" type="PanelContainer" parent="HUD" unique_id=1963841779]
+offset_left = 16.0
+offset_top = 10.0
+theme = ExtResource("11_theme")
+
+[node name="RunXPLabel" type="Label" parent="HUD/RunXPPanel" unique_id=295362691]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "XP: 0"
+
+[node name="ResultsScreen" type="CanvasLayer" parent="." unique_id=1698667453]
+script = ExtResource("10_res")
+
+[node name="BattleManager" type="Node" parent="." unique_id=253697223]
+script = ExtResource("8_bmgr")
+spawner_path = NodePath("../MinionSpawner")
+results_screen_path = NodePath("../ResultsScreen")
+heroes_root_path = NodePath("../Heroes")
+hero_scene = ExtResource("6_hero")
+hud_path = NodePath("../HUD")
+hero_spawn_marker_path = NodePath("../Markers/HeroSpawn")

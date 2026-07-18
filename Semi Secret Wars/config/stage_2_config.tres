@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="StageConfig" format=3]
+[ext_resource type="Script" path="res://config/stage_config.gd" id="1_stage"]
+
+[resource]
+script = ExtResource("1_stage")
+stage_id = "stage_2"
+stage_name = "Stage 2: Berserker"
+villain_type = "berserker"
+minion_type = "elite_minion"
+swarm_cap_start = 63
+escalate_every = 12.0
+escalate_step = 4
+swarm_max_cap = 216
+minion_speed = 115.0
+spawn_interval = 1.1
+spawn_batch = 6
+field_preset = "default"

@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/hero_panel_ui.gd" id="1_script"]
+[ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="2_theme"]
+
+[node name="HeroPanelUI" type="PanelContainer"]
+custom_minimum_size = Vector2(240, 126)
+theme = ExtResource("2_theme")
+script = ExtResource("1_script")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+theme_override_constants/separation = 6
+
+[node name="NameLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Hero Name"
+theme_override_font_sizes/font_size = 22
+
+[node name="LevelLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "LV 1"
+theme_override_font_sizes/font_size = 17
+
+[node name="HPBar" type="ProgressBar" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+max_value = 100.0
+value = 50.0
+show_percentage = false
+
+[node name="CooldownLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "READY"
+theme_override_font_sizes/font_size = 15
+
+[node name="CooldownBar" type="ProgressBar" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+max_value = 1.0
+value = 1.0
+show_percentage = false
+
+[node name="BuffLabel" type="RichTextLabel" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
+theme_override_font_sizes/normal_font_size = 13

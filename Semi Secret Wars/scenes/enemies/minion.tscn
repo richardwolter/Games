@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/minion.gd" id="1_minion"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Minion-Dark-Mage.png" id="2_sprite"]
+
+[node name="Minion" type="Node2D"]
+script = ExtResource("1_minion")
+sprite_texture = ExtResource("2_sprite")
+max_hp = 20.0
+damage = 3.0
+attack_interval = 0.8
+attack_range = 18.0
+detect_range = 70.0
+xp_value = 2
+move_speed = 90.0
+body_color = Color(0.753, 0.314, 0.302, 1)
+body_radius = 9.0
+sprite_scale = 1.6
+bob_amplitude = 3.0
+bob_speed = 6.0

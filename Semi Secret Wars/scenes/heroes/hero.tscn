@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/heroes/hero.gd" id="1_hero"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Thundaar.png" id="2_sprite"]
+
+[node name="Hero" type="Node2D"]
+script = ExtResource("1_hero")
+sprite_texture = ExtResource("2_sprite")
+max_hp = 100.0
+damage = 12.0
+attack_interval = 0.5
+attack_range = 26.0
+detect_range = 90.0
+move_speed = 95.0
+knockback_chance = 0.1
+knockback_distance = 40.0
+knockback_splash_damage = 6.0
+body_radius = 18.0
+sprite_scale = 1.6
+bob_amplitude = 3.0
+bob_speed = 5.0
