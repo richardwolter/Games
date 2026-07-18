@@ -96,10 +96,10 @@ func _calculate_territory(movement_system: PlayerMovementSystem, is_home: bool) 
 	var total_attacking_x = 0.0
 
 	## Attacking team players in opponent's half (pushed forward)
-	for player_id in attacking_lineup:
-		if player_id == null:
+	for i in range(attacking_lineup.size()):
+		if attacking_lineup[i] == null:
 			continue
-		var pos = movement_system.get_player_position(player_id)
+		var pos = movement_system.get_player_position(is_home, i)
 		if pos == Vector2.ZERO:
 			continue
 		total_attacking_x += pos.x
@@ -109,10 +109,10 @@ func _calculate_territory(movement_system: PlayerMovementSystem, is_home: bool) 
 			attacking_in_opponent_half += 1
 
 	## Defending team players in their own half (retreated)
-	for player_id in defending_lineup:
-		if player_id == null:
+	for i in range(defending_lineup.size()):
+		if defending_lineup[i] == null:
 			continue
-		var pos = movement_system.get_player_position(player_id)
+		var pos = movement_system.get_player_position(not is_home, i)
 		if pos == Vector2.ZERO:
 			continue
 

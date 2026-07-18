@@ -9,7 +9,9 @@
       "mcp__godot-ai__logs_read",
       "mcp__godot-ai__project_manage",
       "mcp__godot-ai__scene_open",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit -m 'Fix: PressureSystem.get_player_position\\(\\) call signature *)"
     ]
   }
 }
