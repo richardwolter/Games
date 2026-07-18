@@ -212,6 +212,12 @@ func get_player_position(is_home: bool, slot_index: int) -> Vector2:
 			return positions[player].world_position
 	return Vector2.ZERO
 
+## Public accessor for the fielded lineup Arrays — used by systems (e.g.
+## PressureSystem's territory calculation) that need to iterate lineup slots
+## alongside get_player_position() without reaching into private state.
+func get_lineup(is_home: bool) -> Array:
+	return _home_lineup if is_home else _away_lineup
+
 ## True if the home side is currently attacking the right-hand goal (flips at
 ## half-time) — single source of truth so MatchDecisionEngine's goal-distance
 ## checks always agree with what's actually being rendered.

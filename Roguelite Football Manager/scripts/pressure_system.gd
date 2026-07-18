@@ -82,8 +82,8 @@ func _calculate_territory(movement_system: PlayerMovementSystem, is_home: bool) 
 	## - Average x-position of all fielded players
 	## Returns 0-100 representing dominance in opponent territory.
 
-	var home_lineup = movement_system.home_lineup
-	var away_lineup = movement_system.away_lineup
+	var home_lineup = movement_system.get_lineup(true)
+	var away_lineup = movement_system.get_lineup(false)
 	var attacking_lineup = home_lineup if is_home else away_lineup
 	var defending_lineup = away_lineup if is_home else home_lineup
 
