@@ -195,19 +195,18 @@ func update_team_states(delta_seconds: float) -> void:
 		tactical_system.apply_modifiers(away_state, home_formation, away_formation, false)
 
 	## Calculate pressure for each team (uses territory calculation if movement_system available)
+	## Milestone 18 Phase 3's chance_generator/chance_resolver (pressure-driven abstract
+	## shots) is disabled here: MatchDecisionEngine (Milestone 17) is the sole source of
+	## truth for shots, resolving them from real per-frame positions. Running both meant
+	## two independent systems each called record_shot_result(), producing goals with no
+	## matching shot/animation and a scorer who might not be the actual ball carrier.
+	## pressure_level is still tracked (available for future UI/narrative use) but no
+	## longer feeds shot generation.
 	if pressure_system and movement_system_ref:
 		var home_pressure = pressure_system.calculate_pressure(home_state, movement_system_ref, true)
 		var away_pressure = pressure_system.calculate_pressure(away_state, movement_system_ref, false)
-		# Store pressure for later use by chance generator (Phase 3)
 		home_state.pressure_level = home_pressure
 		away_state.pressure_level = away_pressure
-
-		## Milestone 18 Phase 3: Generate chances based on pressure
-		if chance_generator:
-			chance_generator.update(home_pressure, away_pressure, home_lineup, away_lineup, match_time_seconds, delta_seconds)
-
-	## Auto-resolve chances that have expired (per Designer decision: chances stay live 10-30s)
-	_auto_resolve_expired_chances()
 
 func _decay(lineup: Array) -> void:
 	for player in lineup:
@@ -266,33 +265,3 @@ func apply_match_event(event_type: String, is_home: bool, player: Player, severi
 			events.append("%d' INJURY: %s (%s) needs attention" % [minute, player.player_name, team_name])
 			momentum_system.apply_event(team_state, "injury_own_player")
 
-## Auto-resolve chances that have expired (duration exceeded without being taken).
-func _auto_resolve_expired_chances() -> void:
-	if not chance_generator or not chance_resolver:
-		return
-
-	## Check home team chances
-	var home_chances = chance_generator.get_active_chances(true)
-	var expired_home: Array[Chance] = []
-	for chance in home_chances:
-		if chance.is_expired(match_time_seconds) and not chance.taken:
-			var outcome = chance_resolver.resolve_chance(chance, self)
-			record_shot_result(true, chance.striker, outcome)
-			chance.take()
-			expired_home.append(chance)
-
-	for chance in expired_home:
-		home_chances.erase(chance)
-
-	## Check away team chances
-	var away_chances = chance_generator.get_active_chances(false)
-	var expired_away: Array[Chance] = []
-	for chance in away_chances:
-		if chance.is_expired(match_time_seconds) and not chance.taken:
-			var outcome = chance_resolver.resolve_chance(chance, self)
-			record_shot_result(false, chance.striker, outcome)
-			chance.take()
-			expired_away.append(chance)
-
-	for chance in expired_away:
-		away_chances.erase(chance)

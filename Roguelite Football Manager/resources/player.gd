@@ -20,18 +20,5 @@ enum Position { GK, CB, FB, DM, CM, CAM, WING, ST }
 
 const OFF_POSITION_PENALTY := 0.8
 
-func is_natural_position(position: Position) -> bool:
-	return positions.has(position)
-
-func get_effective_stats(position: Position) -> Dictionary:
-	var multiplier: float = 1.0 if is_natural_position(position) else OFF_POSITION_PENALTY
-	return {
-		"speed": speed * multiplier,
-		"strength": strength * multiplier,
-		"kick": kick * multiplier,
-		"passing": passing * multiplier,
-		"stamina": stamina * multiplier,
-	}
-
 func get_overall() -> float:
 	return (speed + strength + kick + passing + stamina) / 5.0

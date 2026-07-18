@@ -448,7 +448,7 @@ func _on_change_formation_pressed() -> void:
 	var current_index: int = -1
 	for i in _formations.size():
 		new_formation_option.add_item(_formations[i].formation_name)
-		if _formations[i] == _match.home_formation:
+		if _formations[i].formation_name == _match.home_formation.formation_name:
 			current_index = i
 	new_formation_option.select(max(current_index, 0))
 	_pending_formation = _formations[max(current_index, 0)]

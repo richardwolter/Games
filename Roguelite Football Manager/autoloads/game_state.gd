@@ -9,7 +9,7 @@ var squad: Array[Player] = []
 
 ## Pre-match setup state.
 var formation: Formation = null
-var lineup: Array = []  # Player or null, index-aligned with formation.slots
+var lineup: Array[Player] = []  # Player or null, index-aligned with formation.slots
 var captain: Player = null
 
 ## Result of the most recently played match (transient, not persisted in saves).
@@ -41,6 +41,13 @@ func create_club(club_name: String, primary_color: Color, secondary_color: Color
 	data.secondary_color = secondary_color
 	data.badge_shape = badge_shape
 	club = data
+	# A new club discards any prior squad, so pre-match setup state referencing
+	# the old squad's players would otherwise dangle.
+	formation = null
+	lineup = []
+	captain = null
+	pending_opponent = {}
+	last_match_result = null
 	club_created.emit(club)
 	return club
 
@@ -82,8 +89,8 @@ func set_captain(player: Player) -> void:
 	captain = player
 	lineup_changed.emit()
 
-func get_bench() -> Array:
-	var bench: Array = []
+func get_bench() -> Array[Player]:
+	var bench: Array[Player] = []
 	for player in squad:
 		if not lineup.has(player):
 			bench.append(player)

@@ -1,5 +1,5 @@
 class_name Chance
-extends Resource
+extends RefCounted
 
 ## Represents a live chance in the match.
 ## Spawned when pressure crosses a threshold, expires if not taken in time.

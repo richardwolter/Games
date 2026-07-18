@@ -19,7 +19,9 @@ var aggression: float = 50.0  # 0-100, likelihood of fouls/cards; modified by ta
 var pressure_level: float = 50.0  # 0-100, drives chance generation
 
 ## Tactical identity (set at match start or changed mid-match)
-var tactical_style: String = "Solid Attack"  # One of: "High Press", "Possession", "Counter Attack", "Park The Bus", "Long Ball"
+## Default must be one of TacticalSystem's 5 recognized styles below, or
+## apply_modifiers() silently no-ops and the team gets zero tactical effect.
+var tactical_style: String = "Possession"  # One of: "High Press", "Possession", "Counter Attack", "Park The Bus", "Long Ball"
 
 ## Recent event history (for momentum calculation and combo bonuses)
 var recent_events: Array[String] = []  # Event type strings, added newest-first, pruned over time

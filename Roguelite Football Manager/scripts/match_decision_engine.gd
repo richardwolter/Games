@@ -117,7 +117,7 @@ var _last_carrier: Player = null
 var _decision_timer: float = 0.0
 var _decision_interval: float = DECISION_INTERVAL_MIN
 var _tackle_timer: float = 0.0
-var _processed_events: Array = []  # Track processed events to avoid duplicates
+var _processed_event_count: int = 0  # How many of EventSystem.recent_match_events we've already applied
 
 func _init(ball_state: BallState, match_state: LiveMatchState, movement_system: PlayerMovementSystem,
 		possession_system: PossessionSystem, grass_rect: Rect2) -> void:
@@ -210,16 +210,20 @@ func _update_tackle_pressure(delta: float, is_home: bool, carrier: Player, carri
 	if _match_state.event_system:
 		var defending_team_state = _match_state.away_state if is_home else _match_state.home_state
 		_match_state.event_system.check_tackle_event(not is_home, defender, carrier, defending_team_state, TACKLE_ATTEMPT_INTERVAL)
-		## Wire up event consequences
-		for event_dict in _match_state.event_system.recent_match_events:
-			if event_dict not in _processed_events:
-				var event_type = event_dict.get("type", "")
-				var player = event_dict.get("player")
-				var event_is_home = event_dict.get("is_home", false)
-				if player and event_type:
-					var severity = "yellow" if event_type == "yellow_card" else "red" if event_type == "red_card" else "injury"
-					_match_state.apply_match_event(event_type, event_is_home, player, severity)
-				_processed_events.append(event_dict)
+		## Wire up event consequences. recent_match_events only ever grows via
+		## append(), so a processed-count cursor is both correct (no false
+		## "duplicate" drops for two structurally-identical events, e.g. the
+		## same player fouling twice) and bounded (no full-array rescan).
+		var all_events: Array = _match_state.event_system.recent_match_events
+		for i in range(_processed_event_count, all_events.size()):
+			var event_dict = all_events[i]
+			var event_type = event_dict.get("type", "")
+			var player = event_dict.get("player")
+			var event_is_home = event_dict.get("is_home", false)
+			if player and event_type:
+				var severity = "yellow" if event_type == "yellow_card" else "red" if event_type == "red_card" else "injury"
+				_match_state.apply_match_event(event_type, event_is_home, player, severity)
+		_processed_event_count = all_events.size()
 
 ## Evaluate shoot / pass / dribble for the current carrier. Doing nothing
 ## here means "keep dribbling" — PlayerMovementSystem already drives the

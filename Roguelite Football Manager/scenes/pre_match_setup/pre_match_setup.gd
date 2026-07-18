@@ -41,7 +41,14 @@ func _ready() -> void:
 	if GameState.formation == null:
 		GameState.set_formation(_formations[0])
 	else:
-		var index: int = _formations.find(GameState.formation)
+		# _formations are freshly-built instances each time (FormationLibrary.get_all()),
+		# so comparing by reference against GameState.formation would always miss after
+		# the first pick — compare by name instead.
+		var index: int = -1
+		for i in _formations.size():
+			if _formations[i].formation_name == GameState.formation.formation_name:
+				index = i
+				break
 		formation_option.select(max(index, 0))
 	_refresh()
 
