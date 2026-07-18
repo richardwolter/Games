@@ -59,6 +59,9 @@ var _decision_engine: MatchDecisionEngine = null
 ## Goal celebration system.
 var _celebration: GoalCelebrationSystem = null
 
+## Throw-in/corner/goal-kick restarts (Dead Ball Rules milestone).
+var _dead_ball: DeadBallSystem = null
+
 ## Track if we're at half-time waiting for player confirmation.
 var _at_half_time_pause: bool = false
 
@@ -66,6 +69,10 @@ var _at_half_time_pause: bool = false
 var _is_playing: bool = false
 var _speed_multiplier: float = 1.0
 var _minute_accumulator: float = 0.0
+
+## Milestone 18: periodic team state updates (momentum, possession, territory, etc)
+const TEAM_STATE_UPDATE_INTERVAL := 3.0  # Update every 3 real seconds
+var _team_state_accumulator: float = 0.0
 
 func _ready() -> void:
 	var opponent: Dictionary = GameState.pending_opponent
@@ -87,9 +94,14 @@ func _ready() -> void:
 	_movement_system = PlayerMovementSystem.new(_match.home_formation, _match.home_lineup, _match.away_formation, _match.away_lineup, _match.ball_state, pitch_view.get_grass_rect())
 	_possession_system = PossessionSystem.new(_match.ball_state, _match, _movement_system)
 	_decision_engine = MatchDecisionEngine.new(_match.ball_state, _match, _movement_system, _possession_system, pitch_view.get_grass_rect())
+
+	## Milestone 18: Wire player movement system to match state for territory calculation
+	_match.set_movement_system(_movement_system)
 	_flow_engine.half_time_reached.connect(_on_half_time_reached)
 	_decision_engine.shot_taken.connect(_on_shot_taken)
 	_decision_engine.pass_started.connect(_on_pass_started)
+	_dead_ball = DeadBallSystem.new()
+	_dead_ball.restart_taken.connect(_on_dead_ball_restart_taken)
 	_match.substitution_made.connect(_on_substitution_made_movement)
 	_match.formation_changed.connect(_on_formation_changed_movement)
 
@@ -170,6 +182,15 @@ func _on_substitution_made(slot_index: int, incoming: Player, _outgoing: Player)
 
 func _on_formation_changed() -> void:
 	pitch_view.update_formation(_match.home_formation, _match.home_lineup)
+
+## A throw-in/corner/goal-kick was just played — reuse the passer's kick
+## flourish (animate_pass, not play_kick: play_kick also drives its own
+## goal-directed ball tween, which would fight the restart's real receiver-
+## directed flight already under way via BallState.start_pass). No dedicated
+## restart animation exists in the asset pack, per Designer sign-off — only
+## the ball's flight distinguishes the three restarts.
+func _on_dead_ball_restart_taken(is_home: bool, taker: Player) -> void:
+	pitch_view.animate_pass(is_home, taker, null, Vector2.ZERO, Vector2.ZERO, 0.0)
 
 ## Start a goal celebration sequence. Simulation keeps running underneath —
 ## per Designer's call, a goal shouldn't halt the match, just show a brief
@@ -258,6 +279,7 @@ func _process(delta: float) -> void:
 
 	_decision_engine.update(scaled_delta)
 	_possession_system.update(scaled_delta)
+	_dead_ball.update(_match.ball_state, _match, _movement_system)
 	_movement_system.update(scaled_delta)
 	pitch_view.update_player_positions(_movement_system)
 	pitch_view.update_ball_state(_match.ball_state)
@@ -266,6 +288,12 @@ func _process(delta: float) -> void:
 	while _minute_accumulator >= SIM_SECONDS_PER_SIM_MINUTE and _is_playing and not _at_half_time_pause:
 		_minute_accumulator -= SIM_SECONDS_PER_SIM_MINUTE
 		_advance_one_minute()
+
+	## Milestone 18: periodic team state updates (momentum, possession, territory)
+	_team_state_accumulator += scaled_delta
+	if _team_state_accumulator >= TEAM_STATE_UPDATE_INTERVAL:
+		_team_state_accumulator -= TEAM_STATE_UPDATE_INTERVAL
+		_match.update_team_states(TEAM_STATE_UPDATE_INTERVAL)  # Pass the actual update interval, not scaled delta
 
 func _on_play_pause_pressed() -> void:
 	## Handle half-time resume.

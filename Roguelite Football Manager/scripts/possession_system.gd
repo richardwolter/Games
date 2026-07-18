@@ -11,6 +11,14 @@ extends RefCounted
 ## independent and reads as a smooth glide rather than a per-minute snap.
 const BALL_FOLLOW_RATE := 10.0
 
+## The ball trails slightly ahead of the carrier's movement direction rather
+## than sitting glued to their center point, and gets a small rhythmic touch
+## bobble — real dribbling knocks the ball a short distance away each touch,
+## it doesn't stay pinned to the feet.
+const FOOT_OFFSET_DISTANCE := 18.0
+const TOUCH_BOBBLE_AMPLITUDE := 6.0
+const TOUCH_BOBBLE_FREQUENCY := 2.2
+
 ## Loose-ball (nobody in control) rolling friction — fraction of velocity
 ## retained per second, so a rebound/turnover ball visibly rolls a little
 ## before someone picks it up instead of freezing in place.
@@ -44,6 +52,11 @@ func _init(ball_state: BallState, match_state: LiveMatchState, movement_system: 
 ## simulated minute) so the ball visibly glides between players, flies on a
 ## pass, and rolls when loose, instead of snapping in discrete jumps.
 func update(delta: float) -> void:
+	## DeadBallSystem owns the ball entirely while a throw-in/corner/goal-kick
+	## restart is being taken (walk to spot, play the restart) — normal loose-
+	## ball roll/pickup would otherwise fight over the same ball position.
+	if _ball_state.dead_ball_active:
+		return
 	if _ball_state.pass_in_flight:
 		_update_pass_flight(delta)
 	elif _ball_state.possession_player != null:
@@ -61,10 +74,20 @@ func _follow_carrier(delta: float) -> void:
 	if idx == -1:
 		return
 	var carrier_pos: Vector2 = _movement_system.get_player_position(is_home, idx)
+	var carrier_vel: Vector2 = _movement_system.get_player_velocity(is_home, idx)
+
+	## Trail the ball slightly ahead of the carrier's movement direction
+	## (or a fixed forward nudge while stationary) plus a small rhythmic
+	## bobble, so it reads as being knocked along at the feet rather than
+	## pinned dead-center to the player.
+	var facing: Vector2 = carrier_vel.normalized() if carrier_vel.length() > 1.0 else Vector2.RIGHT
+	var bobble: float = sin(Time.get_ticks_msec() * 0.001 * TAU * TOUCH_BOBBLE_FREQUENCY) * TOUCH_BOBBLE_AMPLITUDE
+	var foot_target: Vector2 = carrier_pos + facing * FOOT_OFFSET_DISTANCE + facing.orthogonal() * bobble
+
 	## Exponential smoothing: framerate-independent, always converges without
 	## ever fully "catching up" in one frame — reads as a smooth glide.
 	var t: float = 1.0 - exp(-BALL_FOLLOW_RATE * delta)
-	_ball_state.position = _ball_state.position.lerp(carrier_pos, t)
+	_ball_state.position = _ball_state.position.lerp(foot_target, t)
 
 ## Interpolate the ball along its pass flight (set up by
 ## MatchDecisionEngine.start_pass) and resolve the outcome on arrival —
@@ -83,6 +106,10 @@ func _resolve_pass_arrival() -> void:
 	if _ball_state.pass_success:
 		_ball_state.set_possession(_ball_state.pass_is_home, _ball_state.pass_target_player)
 	else:
+		## The interceptor touched the ball to cut the pass out, even though
+		## nobody "has" it yet — record that touch so an out-of-bounds roll
+		## right after an interception is credited to the right side.
+		_ball_state.record_touch(not _ball_state.pass_is_home, _ball_state.pass_interceptor)
 		_ball_state.loose_ball()
 		_ball_state.velocity = Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0))
 
@@ -106,6 +133,13 @@ func _update_loose_ball(delta: float) -> void:
 ## 50/50) resolve via a physical-duel weighted roll instead of always going
 ## to whoever's a half-step closer.
 func _check_loose_ball_pickup() -> void:
+	## A ball that has already left the grass rect is out of play, awaiting
+	## DeadBallSystem to classify and place the restart — it must not be
+	## contestable, or a player standing right at the touchline could "win"
+	## it the instant it crosses (their PICKUP_RADIUS reaches slightly past
+	## the line) before the restart is ever recognized.
+	if not _movement_system.get_grass_rect().has_point(_ball_state.position):
+		return
 	var candidates: Array = _find_players_near_ball()
 	if candidates.is_empty():
 		return
@@ -151,11 +185,14 @@ func _find_players_near_ball() -> Array:
 				found.append({"is_home": is_home, "player": player, "dist": dist})
 	return found
 
-## Handle a shot attempt from MatchDecisionEngine. Sends the ball toward
-## goal and leaves it as a loose ball near the goalmouth for either side to
-## contest — a save/miss doesn't hand possession to a fixed team, it creates
-## a scramble.
-func on_shot_attempt(is_home: bool, shooter: Player, _outcome: String) -> void:
+## Handle a shot attempt from MatchDecisionEngine. GOAL keeps the previous
+## "loose ball near the goalmouth" placement (the kickoff restart that
+## follows a goal takes over immediately, so it's never actually contested).
+## SAVED/OFF_TARGET now send the ball just past the byline so the generic
+## out-of-bounds rule in DeadBallSystem resolves it: a keeper's touch
+## (SAVED) hands the corner to the attacking side; an untouched miss
+## (OFF_TARGET) leaves the shooter as last touch, so it's a goal kick.
+func on_shot_attempt(is_home: bool, shooter: Player, outcome: String, keeper: Player = null) -> void:
 	if shooter == null:
 		return
 
@@ -164,16 +201,28 @@ func on_shot_attempt(is_home: bool, shooter: Player, _outcome: String) -> void:
 	if shooter_index == -1:
 		return
 
+	if outcome == "SAVED" and keeper != null:
+		_ball_state.record_touch(not is_home, keeper)
+
 	var target_pos: Vector2
-	if is_home:
-		target_pos = Vector2(_ball_state.position.x + 400, _ball_state.position.y)  ## Right side goal.
+	if outcome == "GOAL":
+		target_pos = Vector2(_ball_state.position.x + (400 if is_home else -400), _ball_state.position.y)
 	else:
-		target_pos = Vector2(_ball_state.position.x - 400, _ball_state.position.y)  ## Left side goal.
+		target_pos = Vector2(_possession_byline_x(is_home), _ball_state.position.y)
 
 	## The ball travels toward goal with the shot (the pitch view's own kick
-	## tween handles the visual flight); once it lands, it's a loose ball
-	## near the goalmouth for either side to contest.
+	## tween handles the visual flight); once it lands, it's a loose ball —
+	## either a genuine goalmouth scramble (GOAL, about to be superseded by
+	## the kickoff restart) or just past the line for DeadBallSystem to pick up.
 	_ball_state.position = target_pos
 	_ball_state.set_in_air(true)
 	_ball_state.loose_ball()
 	_ball_state.velocity = Vector2(randf_range(-40.0, 40.0), randf_range(-60.0, 60.0))
+
+## A miss/save that goes out sends the ball a small distance past the
+## attacking end's byline (the exact overshoot doesn't matter — DeadBallSystem
+## only needs the ball outside the grass rect to classify the restart).
+func _possession_byline_x(is_home: bool) -> float:
+	var grass_rect: Rect2 = _movement_system.get_grass_rect()
+	var attacks_right: bool = _movement_system.home_attacks_right() if is_home else not _movement_system.home_attacks_right()
+	return grass_rect.end.x + 10.0 if attacks_right else grass_rect.position.x - 10.0

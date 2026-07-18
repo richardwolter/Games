@@ -18,7 +18,7 @@ const BALL_TRACKING_RADIUS := 380.0
 ## Ball carrier's forward-dribble target: how far ahead (world units) of
 ## their current position to aim each frame, re-issued every frame so it
 ## acts as a continuous forward drive rather than a one-shot destination.
-const DRIBBLE_ADVANCE_STEP := 60.0
+const DRIBBLE_ADVANCE_STEP := 75.0
 ## Lateral wander amplitude (world units) layered on the carrier's dribble.
 const DRIBBLE_WANDER := 12.0
 ## Minimum distance (world units) any player's target is kept from the
@@ -28,24 +28,104 @@ const PITCH_EDGE_MARGIN := 20.0
 ## Off-ball attacking spacing: teammates within this radius of each other
 ## push apart, so support runners spread into open passing lanes instead of
 ## clumping around the ball carrier.
-const SEPARATION_RADIUS := 90.0
-const SEPARATION_STRENGTH := 40.0
+const SEPARATION_RADIUS := 110.0
+const SEPARATION_STRENGTH := 55.0
 
-## How far an off-ball attacker will bias forward (toward the opponent's
-## goal) from their formation slot while their team has the ball, to offer
-## a forward passing option rather than sitting flat.
-const FORWARD_SUPPORT_BIAS := 50.0
+## How far an off-ball attacker pushes forward (toward the opponent's goal)
+## from their formation slot while their team has the ball, by slot category
+## — bigger for further-forward roles so the team commits real numbers into
+## the attacking third to create chances, not just a uniform nudge. This is
+## the team's attacking shape and applies regardless of where the ball
+## currently is (see ATTACK_BALL_PULL below for the small ball-side nudge
+## layered on top).
+const ATTACK_PUSH_BY_CATEGORY: Dictionary = {
+	Formation.SlotCategory.DEF: 200.0,
+	Formation.SlotCategory.MID: 280.0,
+	Formation.SlotCategory.FWD: 310.0,
+}
+## How much support runners lean toward the ball's side of the pitch on top
+## of their attacking-shape target — kept small so the team occupies the
+## whole width/depth of the attacking third instead of the whole shape
+## collapsing onto wherever the ball happens to be. Trimmed further (and
+## width stretch tightened) so the team reads as organized lines/blocks
+## moving together rather than everyone drifting individually and leaving
+## gaps in the shape.
+const ATTACK_BALL_PULL := 0.06
+## Off-ball attackers stretch wider from the pitch's vertical center than
+## their formation slot would alone, so wide players hug the touchlines and
+## open up the pitch instead of everyone bunching toward the middle. Kept
+## modest so the line stays a coherent block rather than spreading thin.
+const ATTACK_WIDTH_STRETCH := 1.15
+
+## Box-crashing: once the carrier is both deep in the final third and out
+## wide (a crossing position), other attacking (MID/FWD) teammates abandon
+## the normal width-stretched shape and instead crowd the six-yard/penalty
+## area to be there for a cutback or cross — the actual chance-creation
+## moment, not just general attacking shape.
+const CROSS_ZONE_DEPTH := 320.0
+const CROSS_ZONE_WIDE_Y := 140.0
+## How far in front of the goal line the crowding attackers aim for, and
+## the lateral spread between them (near post / center / far post) so they
+## don't all converge on the exact same spot.
+const BOX_CRASH_DEPTH := 90.0
+const BOX_CRASH_WIDTH_SPREAD := 110.0
+## Collective advance: on top of the fixed per-category push above, the
+## whole team (defenders included) steps further forward as their own
+## carrier gets deeper into the attacking half — attacking is a team-wide
+## commitment, not just the forwards holding a fixed high line while
+## everyone else stays home. Mirrors DEFENSIVE_LINE_MAX_PUSH's shape but for
+## the side that has the ball.
+const ATTACK_LINE_MAX_PUSH := 170.0
 
 ## Defending: a marker only picks up an opposing attacker within this range
 ## of their own formation slot — keeps markers from abandoning their zone
 ## for an opponent on the far side of the pitch.
-const MARKING_RADIUS := 260.0
+const MARKING_RADIUS := 320.0
 ## How much a marker leans from their formation slot toward their mark
 ## (0 = ignore mark and hold shape, 1 = stand exactly on the mark).
-const MARKING_BLEND := 0.55
-## Only the single nearest defender presses the ball/carrier tightly within
-## this range; everyone else holds shape or marks (see _update_team).
-const PRESSING_RADIUS := 220.0
+const MARKING_BLEND := 0.5
+## Only the single nearest (non-GK) defender presses the ball/carrier
+## tightly within this range; everyone else covers a mark or a passing
+## lane instead of swarming the ball (see _update_team / _update_presser).
+## The range itself grows (up to PRESSING_RADIUS_ATTACK_BONUS extra) the
+## further forward the team's press line has already pushed, so a team
+## already pressing high commits to actually closing the ball down out in
+## the opponent's half instead of only engaging once it drifts back deep.
+const PRESSING_RADIUS := 260.0
+const PRESSING_RADIUS_ATTACK_BONUS := 160.0
+
+## How far a marker sits toward its own goal from a straight man-mark, so
+## non-pressing defenders shade goal-side of their opponent (cutting the
+## direct pass/run) instead of standing exactly on top of them.
+const MARK_GOAL_SIDE_BIAS := 35.0
+
+## Defensive block push: how far (world units) the whole out-of-possession
+## team's reference shape shifts toward the opponent's goal as the ball
+## moves further into the team's own attacking half — encourages winning
+## the ball back high up the pitch (pressing) rather than only engaging
+## once play reaches deep inside the team's own half.
+const DEFENSIVE_LINE_MAX_PUSH := 160.0
+
+## Goalkeeper containment: GK never leaves this radius of their own goal
+## line/box, and is excluded from pressing/marking entirely. Lateral
+## tracking is scaled by how close the ball is to goal (GK_ACTIVE_RANGE) —
+## a keeper stays centered/goal-protective while the ball is out in
+## midfield or the opponent's half, and only actively shifts across the
+## line once the ball is genuinely dangerous, near their own box.
+const GK_BOX_DEPTH := 90.0
+const GK_LATERAL_RANGE := 140.0
+const GK_ACTIVE_RANGE := 320.0
+## Minimum lateral tracking even when the ball is far away, so the keeper
+## still leans very slightly rather than standing dead-still on the spot.
+const GK_MIN_TRACKING := 0.15
+
+## Press-assignment stickiness: once a defender is pressing, another
+## teammate only takes over once they're this much closer to the ball, and
+## not before PRESS_MIN_HOLD_TIME has passed — without this, two similarly-
+## placed defenders could swap the presser role every frame, reading as
+## indecisive jitter instead of one player committing to close the ball down.
+const PRESS_STICKINESS_MARGIN := 40.0
+const PRESS_MIN_HOLD_TIME := 0.6
 
 ## Steering acceleration cap (world units/sec^2) — velocity turns toward the
 ## desired heading at this rate each frame instead of snapping instantly, so
@@ -80,6 +160,20 @@ var _home_attacks_right: bool = true
 ## Celebration mode state.
 var _celebrating_team: int = -1  # -1 = none, 0 = away, 1 = home
 var _celebration_goal_pos: Vector2 = Vector2.ZERO
+
+## Sticky press-assignment state, per side (see PRESS_STICKINESS_MARGIN).
+var _home_presser: Player = null
+var _away_presser: Player = null
+var _home_press_hold: float = 0.0
+var _away_press_hold: float = 0.0
+
+## Dead-ball restart override (see DeadBallSystem): while set, the taker
+## walks straight to the restart spot instead of following their normal
+## role logic; every other player keeps reacting normally (marking/support
+## runs), per Designer's call that only the taker should be scripted.
+var _dead_ball_taker: Player = null
+var _dead_ball_target: Vector2 = Vector2.ZERO
+var _dead_ball_awarded_home: bool = true
 
 func _init(home_formation: Formation, home_lineup: Array, away_formation: Formation, away_lineup: Array, ball_state: BallState, grass_rect: Rect2) -> void:
 	_home_formation = home_formation
@@ -123,6 +217,45 @@ func get_player_position(is_home: bool, slot_index: int) -> Vector2:
 ## checks always agree with what's actually being rendered.
 func home_attacks_right() -> bool:
 	return _home_attacks_right
+
+## The pitch's world-space grass bounds, for callers (e.g. DeadBallSystem,
+## PossessionSystem's byline placement) that need the same boundary this
+## system already clamps movement targets to.
+func get_grass_rect() -> Rect2:
+	return _grass_rect
+
+## Called by DeadBallSystem once a taker is chosen for a throw-in/corner/
+## goal-kick: that single player heads straight for the restart spot every
+## frame instead of their normal role target, until `clear_dead_ball_taker`
+## is called (restart played, or a new one overrides it).
+func set_dead_ball_taker(taker: Player, target_pos: Vector2, awarded_home: bool) -> void:
+	_dead_ball_taker = taker
+	_dead_ball_target = target_pos
+	_dead_ball_awarded_home = awarded_home
+
+func clear_dead_ball_taker() -> void:
+	_dead_ball_taker = null
+
+## True once the current taker has actually reached the restart spot, so
+## DeadBallSystem knows when to move from "walking" to "playing it".
+func dead_ball_taker_arrived(is_home: bool) -> bool:
+	if _dead_ball_taker == null:
+		return false
+	var positions: Dictionary = _home_positions if is_home else _away_positions
+	if not positions.has(_dead_ball_taker):
+		return true
+	return positions[_dead_ball_taker].world_position.distance_to(_dead_ball_target) <= ARRIVAL_RADIUS
+
+## Return current velocity (world units/sec) for a given player, used to
+## offset the ball toward the direction the carrier is actually moving.
+func get_player_velocity(is_home: bool, slot_index: int) -> Vector2:
+	var positions: Dictionary = _home_positions if is_home else _away_positions
+	var lineup: Array = _home_lineup if is_home else _away_lineup
+	if slot_index >= 0 and slot_index < lineup.size():
+		var player: Player = lineup[slot_index]
+		if player != null and positions.has(player):
+			return positions[player].velocity
+	return Vector2.ZERO
 
 ## Get movement speed for a player (0-1 normalized).
 func get_player_movement_speed(is_home: bool, slot_index: int) -> float:
@@ -208,18 +341,56 @@ func _update_team(is_home: bool, delta: float) -> void:
 	var positions: Dictionary = _home_positions if is_home else _away_positions
 	var lineup: Array = _home_lineup if is_home else _away_lineup
 	var formation_positions: Array = _home_formation_positions if is_home else _away_formation_positions
+	var formation: Formation = _home_formation if is_home else _away_formation
 
 	## Check if celebrating.
 	var team_celebrating: bool = is_celebrating(is_home)
 
 	## Determine team role based on ball possession or celebration state.
-	var team_has_ball: bool = _ball_state.possession_team == is_home if _ball_state.possession_team != null else false
+	## While a dead-ball restart is pending, nobody technically "possesses"
+	## the ball (BallState.possession_team is null) — treat the side it's
+	## being awarded to as the attacking team anyway, so their off-ball
+	## players push into support-run shape and the other side drops into a
+	## defensive shape ahead of the restart, instead of both sides freezing
+	## in a neutral stance until the ball is actually kicked.
+	var team_has_ball: bool
+	if _ball_state.dead_ball_active:
+		team_has_ball = _dead_ball_awarded_home == is_home
+	else:
+		team_has_ball = _ball_state.possession_team == is_home if _ball_state.possession_team != null else false
 	var team_role: PlayerPositionState.Role
 	if team_celebrating:
 		team_role = PlayerPositionState.Role.CELEBRATING
 	else:
 		team_role = PlayerPositionState.Role.ATTACKING if team_has_ball else PlayerPositionState.Role.DEFENDING
 	var carrier: Player = _ball_state.possession_player
+	## Nobody has the ball and it's not a pass in flight — a genuine loose
+	## ball both sides should actively chase down, not just hold a pressing
+	## stand-off distance from (see the defending branch below).
+	var ball_loose: bool = _ball_state.is_loose()
+	var presser: Player = null
+	## How far the defensive block pushes toward the opponent's goal this
+	## frame — more push the further the ball already is into this team's
+	## own attacking half, so the team engages/presses high rather than
+	## only when the ball reaches deep inside their own half.
+	var press_shift: float = 0.0
+	## Collective forward advance while attacking — the whole team (not just
+	## forwards) steps up together as their own carrier progresses upfield.
+	var attack_shift: float = 0.0
+	## True once the carrier is deep in the final third and out wide — a
+	## crossing position where the priority shifts from holding attacking
+	## shape to crowding the box for the actual chance.
+	var is_crossing_situation: bool = false
+	if not team_celebrating and not team_has_ball:
+		presser = _update_presser(is_home, positions, formation, delta)
+		press_shift = _line_shift(is_home, DEFENSIVE_LINE_MAX_PUSH)
+	elif not team_celebrating and team_has_ball:
+		attack_shift = _line_shift(is_home, ATTACK_LINE_MAX_PUSH)
+		if carrier != null and positions.has(carrier):
+			var carrier_pos: Vector2 = positions[carrier].world_position
+			var goal_dist: float = carrier_pos.distance_to(_opponent_goal_pos(is_home))
+			var wide_offset: float = absf(carrier_pos.y - _grass_rect.get_center().y)
+			is_crossing_situation = goal_dist < CROSS_ZONE_DEPTH and wide_offset > CROSS_ZONE_WIDE_Y
 
 	for i in lineup.size():
 		var player: Player = lineup[i]
@@ -235,7 +406,19 @@ func _update_team(is_home: bool, delta: float) -> void:
 		## Compute target position based on state.
 		var target: Vector2 = formation_pos
 		var is_receiving_pass: bool = _ball_state.pass_in_flight and _ball_state.pass_target_player == player and _ball_state.pass_is_home == is_home
-		if team_celebrating:
+		var is_gk: bool = formation.slots[i] == Formation.SlotCategory.GK
+		if player == _dead_ball_taker:
+			## Taking a throw-in/corner/goal-kick: walk straight to the
+			## restart spot, overriding every other role (GK included — a
+			## goal kick's taker IS the GK). DeadBallSystem clears this once
+			## the restart is played.
+			target = _dead_ball_target
+		elif is_gk and not team_celebrating:
+			## Goalkeeper never joins pressing/marking/support-run logic —
+			## stays in the box, tracking the ball laterally with a small
+			## forward creep for shots/crosses, and never leaves the goal area.
+			target = _gk_target(is_home, formation_pos)
+		elif team_celebrating:
 			## During celebration, converge toward goal or stay compact.
 			if _celebrating_team == (1 if is_home else 0):
 				## Celebrating team: move toward attacking goal area.
@@ -258,17 +441,34 @@ func _update_team(is_home: bool, delta: float) -> void:
 			target = state.world_position + Vector2(attack_dir * DRIBBLE_ADVANCE_STEP, wander)
 			target.x = clamp(target.x, _grass_rect.position.x + PITCH_EDGE_MARGIN, _grass_rect.end.x - PITCH_EDGE_MARGIN)
 			target.y = clamp(target.y, _grass_rect.position.y + PITCH_EDGE_MARGIN, _grass_rect.end.y - PITCH_EDGE_MARGIN)
+		elif team_has_ball and is_crossing_situation and formation.slots[i] in [Formation.SlotCategory.MID, Formation.SlotCategory.FWD]:
+			## The carrier is in a wide, deep crossing position — the priority
+			## shifts from holding attacking shape to crowding the box for
+			## the actual chance. Spread candidates across near post /
+			## center / far post instead of everyone converging on the same
+			## spot.
+			var opp_goal_pos: Vector2 = _opponent_goal_pos(is_home)
+			var team_attacks_right_box: bool = _home_attacks_right if is_home else not _home_attacks_right
+			var attack_dir_box: float = 1.0 if team_attacks_right_box else -1.0
+			var lane: float = float(i % 3) - 1.0  ## -1, 0, 1 across the box.
+			var box_target: Vector2 = Vector2(opp_goal_pos.x - attack_dir_box * BOX_CRASH_DEPTH, opp_goal_pos.y + lane * BOX_CRASH_WIDTH_SPREAD)
+			target = box_target + _separation_offset(is_home, player, state.world_position)
 		elif team_has_ball:
-			## Support runs: offer a passing option rather than clumping on
-			## the carrier — bias forward from the formation slot (a lane
-			## ahead of the ball) and separate from nearby teammates so the
-			## team spreads into open space instead of bunching up.
+			## Support runs: the team occupies an attacking shape — pushed
+			## forward by category (defenders creep up, forwards commit into
+			## the box) and stretched wider than formation-flat so the whole
+			## width of the pitch is used to create chances, with only a
+			## small lean toward the ball's side layered on top instead of
+			## the whole team collapsing onto wherever the ball currently is.
 			var team_attacks_right: bool = _home_attacks_right if is_home else not _home_attacks_right
 			var attack_dir: float = 1.0 if team_attacks_right else -1.0
-			var support_anchor: Vector2 = formation_pos + Vector2(attack_dir * FORWARD_SUPPORT_BIAS, 0.0)
-			var ball_distance: float = state.world_position.distance_to(_ball_state.position)
-			if ball_distance < BALL_TRACKING_RADIUS:
-				support_anchor = _ball_state.position.lerp(support_anchor, 0.55)
+			var push: float = ATTACK_PUSH_BY_CATEGORY.get(formation.slots[i], 90.0)
+			var center_y: float = _grass_rect.get_center().y
+			var stretched_y: float = center_y + (formation_pos.y - center_y) * ATTACK_WIDTH_STRETCH
+			var support_anchor: Vector2 = Vector2(formation_pos.x + attack_dir * push + attack_shift, stretched_y)
+			support_anchor = support_anchor.lerp(_ball_state.position, ATTACK_BALL_PULL)
+			if player == _ball_state.likely_receiver:
+				support_anchor = _ball_state.position.lerp(support_anchor, 0.6)
 			target = support_anchor + _separation_offset(is_home, player, state.world_position)
 			target.x = clamp(target.x, _grass_rect.position.x + PITCH_EDGE_MARGIN, _grass_rect.end.x - PITCH_EDGE_MARGIN)
 			target.y = clamp(target.y, _grass_rect.position.y + PITCH_EDGE_MARGIN, _grass_rect.end.y - PITCH_EDGE_MARGIN)
@@ -277,16 +477,35 @@ func _update_team(is_home: bool, delta: float) -> void:
 			## tightly; everyone else marks the nearest dangerous opponent
 			## near their own zone, or holds formation shape if no one's
 			## close enough to be a threat yet.
+			var pressed_formation_pos: Vector2 = formation_pos + Vector2(press_shift, 0.0)
 			var ball_distance: float = state.world_position.distance_to(_ball_state.position)
-			var is_closest_defender: bool = _is_closest_teammate_to_ball(is_home, player, lineup, positions)
-			if is_closest_defender and ball_distance < PRESSING_RADIUS:
-				target = _ball_state.position.lerp(formation_pos, 0.35)
+			var is_closest_defender: bool = player == presser
+			## A team already pressing high (press_shift near its cap) gets a
+			## longer pressing leash, so the presser actually chases the ball
+			## down out in the opponent's half instead of only engaging once
+			## it comes back within a fixed short radius.
+			var pressing_radius: float = PRESSING_RADIUS + (absf(press_shift) / DEFENSIVE_LINE_MAX_PUSH) * PRESSING_RADIUS_ATTACK_BONUS
+			if is_closest_defender and ball_loose:
+				## A genuine loose ball (rebound, turnover, miscontrol) is a
+				## real 50/50 to win, not a shaped press on a moving carrier
+				## — go straight at it at full effort instead of holding a
+				## pressing stand-off distance or waiting for it to enter
+				## pressing_radius, which otherwise left loose balls with
+				## nobody actually closing in from either side.
+				target = _ball_state.position
+			elif is_closest_defender and ball_distance < pressing_radius:
+				target = _ball_state.position.lerp(pressed_formation_pos, 0.35)
 			else:
-				var mark_pos: Vector2 = _nearest_opponent_position(is_home, formation_pos)
-				if mark_pos != Vector2.INF and formation_pos.distance_to(mark_pos) < MARKING_RADIUS:
-					target = formation_pos.lerp(mark_pos, MARKING_BLEND)
+				var mark_pos: Vector2 = _nearest_opponent_position(is_home, pressed_formation_pos)
+				if mark_pos != Vector2.INF and pressed_formation_pos.distance_to(mark_pos) < MARKING_RADIUS:
+					var own_goal_pos: Vector2 = _own_goal_pos(is_home)
+					var goal_side_mark: Vector2 = mark_pos + (own_goal_pos - mark_pos).normalized() * MARK_GOAL_SIDE_BIAS
+					target = pressed_formation_pos.lerp(goal_side_mark, MARKING_BLEND)
 				elif ball_distance < BALL_TRACKING_RADIUS:
-					target = _ball_state.position.lerp(formation_pos, 0.2)
+					target = _ball_state.position.lerp(pressed_formation_pos, 0.2)
+				else:
+					target = pressed_formation_pos
+				target += _separation_offset(is_home, player, state.world_position)
 
 		state.set_target(target, state.role)
 
@@ -322,18 +541,93 @@ func _separation_offset(is_home: bool, player: Player, from_pos: Vector2) -> Vec
 			offset += to_self.normalized() * (SEPARATION_RADIUS - dist) / SEPARATION_RADIUS * SEPARATION_STRENGTH
 	return offset
 
-## True if this player is the closest teammate (on their own side) to the
-## ball — used so only one defender presses tightly while the rest mark or
-## hold shape, instead of the whole team swarming the ball carrier.
-func _is_closest_teammate_to_ball(is_home: bool, player: Player, lineup: Array, positions: Dictionary) -> bool:
-	var self_dist: float = positions[player].world_position.distance_to(_ball_state.position)
+## This team's own goal-mouth position — used to shade markers goal-side of
+## their opponent rather than standing exactly on top of them.
+func _own_goal_pos(is_home: bool) -> Vector2:
+	var team_attacks_right: bool = _home_attacks_right if is_home else not _home_attacks_right
+	var goal_x: float = _grass_rect.position.x if team_attacks_right else _grass_rect.end.x
+	return Vector2(goal_x, _grass_rect.get_center().y)
+
+## The goal this team is attacking — used to detect a crossing situation
+## (carrier close to and wide of this goal) so teammates know to crowd the
+## box rather than hold general attacking shape.
+func _opponent_goal_pos(is_home: bool) -> Vector2:
+	var team_attacks_right: bool = _home_attacks_right if is_home else not _home_attacks_right
+	var goal_x: float = _grass_rect.end.x if team_attacks_right else _grass_rect.position.x
+	return Vector2(goal_x, _grass_rect.get_center().y)
+
+## Goalkeeper target: stays anchored to their formation slot (already close
+## to their own goal line), only creeping toward the ball laterally and a
+## short distance forward, clamped to a small box around the goal line so
+## they never join outfield pressing/marking/dribbling.
+func _gk_target(is_home: bool, formation_pos: Vector2) -> Vector2:
+	var team_attacks_right: bool = _home_attacks_right if is_home else not _home_attacks_right
+	var goal_x: float = _grass_rect.position.x if team_attacks_right else _grass_rect.end.x
+	var forward_dir: float = 1.0 if team_attacks_right else -1.0
+	var ball_depth: float = absf(_ball_state.position.x - goal_x)
+	## Danger scales from GK_MIN_TRACKING (ball far away — stay centered) up
+	## to 1.0 (ball right on top of the box — track it closely).
+	var danger: float = lerp(1.0, GK_MIN_TRACKING, clamp(ball_depth / GK_ACTIVE_RANGE, 0.0, 1.0))
+	var target_y: float = lerp(formation_pos.y, clamp(_ball_state.position.y, formation_pos.y - GK_LATERAL_RANGE, formation_pos.y + GK_LATERAL_RANGE), danger)
+	var forward_creep: float = clamp(ball_depth * 0.08, 0.0, GK_BOX_DEPTH)
+	return Vector2(goal_x + forward_dir * forward_creep, target_y)
+
+## How far (world units, signed toward the opponent's goal) this team's whole
+## shape should push up the pitch this frame — scales with how deep the ball
+## already is into the team's own attacking half, capped at `max_push`, and
+## zero once the ball is in the team's own defensive half. Shared by both
+## sides of the ball: the defending team uses it to press higher once the
+## ball is already advanced (DEFENSIVE_LINE_MAX_PUSH), and the attacking
+## team uses it so the whole side — defenders included — steps forward
+## together as their own carrier advances (ATTACK_LINE_MAX_PUSH), instead of
+## only the forwards holding a fixed high line.
+func _line_shift(is_home: bool, max_push: float) -> float:
+	var team_attacks_right: bool = _home_attacks_right if is_home else not _home_attacks_right
+	var attack_dir: float = 1.0 if team_attacks_right else -1.0
+	var center_x: float = _grass_rect.get_center().x
+	var ball_progress: float = ((_ball_state.position.x - center_x) / (_grass_rect.size.x / 2.0)) * attack_dir
+	return clamp(ball_progress, 0.0, 1.0) * max_push * attack_dir
+
+## Sticky version of "nearest teammate to the ball": keeps the current
+## presser unless a teammate is now closer by more than
+## PRESS_STICKINESS_MARGIN, or the current presser has held the role for at
+## least PRESS_MIN_HOLD_TIME. Prevents two similarly-placed defenders from
+## swapping the pressing role every frame.
+func _update_presser(is_home: bool, positions: Dictionary, formation: Formation, delta: float) -> Player:
+	var lineup: Array = _home_lineup if is_home else _away_lineup
+	var current: Player = _home_presser if is_home else _away_presser
+	var hold: float = _home_press_hold if is_home else _away_press_hold
+
+	var nearest: Player = null
+	var nearest_dist: float = INF
+	var current_dist: float = INF
 	for i in lineup.size():
-		var other: Player = lineup[i]
-		if other == null or other == player or not positions.has(other):
+		var player: Player = lineup[i]
+		if player == null or not positions.has(player) or formation.slots[i] == Formation.SlotCategory.GK:
 			continue
-		if positions[other].world_position.distance_to(_ball_state.position) < self_dist:
-			return false
-	return true
+		var dist: float = positions[player].world_position.distance_to(_ball_state.position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = player
+		if player == current:
+			current_dist = dist
+
+	if current == null or not positions.has(current):
+		current = nearest
+		hold = 0.0
+	elif hold >= PRESS_MIN_HOLD_TIME and current_dist > nearest_dist + PRESS_STICKINESS_MARGIN:
+		current = nearest
+		hold = 0.0
+	else:
+		hold += delta
+
+	if is_home:
+		_home_presser = current
+		_home_press_hold = hold
+	else:
+		_away_presser = current
+		_away_press_hold = hold
+	return current
 
 ## Nearest opposing outfield player's current position to a given point, for
 ## man-marking — returns Vector2.INF if the opposing side has nobody fielded.

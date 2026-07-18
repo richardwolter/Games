@@ -42,6 +42,27 @@ var pass_duration: float = 0.0
 var pass_success: bool = false
 var pass_interceptor: Player = null
 
+## Best current pass candidate for the carrier, refreshed every decision tick
+## by MatchDecisionEngine regardless of whether a pass actually fires this
+## tick — lets PlayerMovementSystem bias that specific player's support run
+## a beat before the pass is thrown, instead of only reacting once the ball
+## is already in flight.
+var likely_receiver: Player = null
+
+## Last team/player to actually touch the ball (Milestone: Dead Ball Rules).
+## Updated on every `set_possession` (a genuine touch) and, for touches that
+## don't hand over possession — a goalkeeper parrying a shot behind for a
+## corner — via `record_touch` directly. `DeadBallSystem` uses this to decide
+## who a throw-in/corner/goal-kick is awarded to once the ball leaves the
+## pitch, per the real out-of-bounds rule ("last touch" determines it).
+var last_touch_team = null
+var last_touch_player: Player = null
+
+## True while a throw-in/corner/goal-kick restart is being taken —
+## DeadBallSystem owns the ball's position/possession entirely during this
+## window, so PossessionSystem's normal loose-ball roll/pickup must not run.
+var dead_ball_active: bool = false
+
 func _init(start_pos: Vector2 = Vector2.ZERO) -> void:
 	position = start_pos
 	in_air = false
@@ -49,11 +70,16 @@ func _init(start_pos: Vector2 = Vector2.ZERO) -> void:
 	possession_player = null
 	velocity = Vector2.ZERO
 
+func record_touch(team_is_home: bool, player: Player) -> void:
+	last_touch_team = team_is_home
+	last_touch_player = player
+
 func set_possession(team_is_home: bool, player: Player) -> void:
 	possession_team = team_is_home
 	possession_player = player
 	in_air = false
 	pass_in_flight = false
+	record_touch(team_is_home, player)
 
 func loose_ball() -> void:
 	possession_team = null

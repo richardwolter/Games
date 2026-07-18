@@ -26,9 +26,16 @@ const DECISION_INTERVAL_MAX := 1.6
 
 ## Real-distance shooting gate (world units from the goal mouth) and the
 ## continuous quality falloff across it (replaces the old 3-step Zone enum).
-const SHOOTING_RANGE := 260.0
-const SHOT_CHANCE_BASE := 0.06
-const SHOT_CHANCE_PROXIMITY_BONUS := 0.30
+## Widened and made much more eager than the original pass-first tuning —
+## players should take a shot whenever a real chance is on, not just as a
+## last resort after every pass option is exhausted.
+const SHOOTING_RANGE := 300.0
+const SHOT_CHANCE_BASE := 0.14
+const SHOT_CHANCE_PROXIMITY_BONUS := 0.55
+## Extra shot chance when the carrier has a clear sight of goal (no
+## defender within PRESSURE_RANGE) — a genuine chance should usually be
+## taken, not passed up just because a shorter pass was also available.
+const SHOT_CHANCE_OPEN_BONUS := 0.25
 const SHOT_QUALITY_MIN := 1.0
 const SHOT_QUALITY_MAX := 2.2
 
@@ -40,15 +47,40 @@ const TACKLE_ATTEMPT_INTERVAL := 1.4
 ## A carrier within this distance of the nearest opponent is "under
 ## pressure" and more likely to look for a pass than hold the ball.
 const PRESSURE_RANGE := 90.0
-const PASS_CHANCE_BASE := 0.30
+const PASS_CHANCE_BASE := 0.55
 const PASS_CHANCE_PRESSURE_BONUS := 0.25
+## Extra pass bias while the carrier is in their own half — real buildup
+## goes through midfield via passing, not a solo run from the back; only
+## the attacking third should realistically favor holding/dribbling.
+const PASS_CHANCE_OWN_HALF_BONUS := 0.25
+## When the nearest opponent is further than this, the carrier has a real
+## lane open toward goal — cuts the pass chance so they actually drive into
+## that space and carry it themselves instead of passing it away on sight
+## of an open opponent's half, matching a player's instinct to run at goal
+## when nobody's in front of them.
+const OPEN_LANE_RANGE := 170.0
+const OPEN_LANE_PASS_REDUCTION := 0.35
 
 ## Receiver candidate selection (ported from the old PassSystem, fixed to
 ## use the side's real current attack direction instead of assuming home
 ## always attacks right — that broke at half-time under the old system).
 const PASS_MIN_DISTANCE := 60.0
-const PASS_MAX_DISTANCE := 750.0
-const POSITION_WEIGHT_FORWARD := 1.5
+## Trimmed from 750 — the old range let a far but slightly-more-forward
+## option out-weigh a much closer, equally-open teammate. Realistic passes
+## are mostly short-to-medium; a genuine long switch is now rare rather
+## than routine.
+const PASS_MAX_DISTANCE := 480.0
+## Distance decay is now a steeper power curve (favors close options much
+## more strongly than plain inverse-distance did) so proximity dominates
+## the choice, and "how forward" is a *directness ratio*
+## (forward_progress / distance, i.e. how directly ahead the candidate is,
+## not raw world-unit progress) so it no longer scales up with distance and
+## make far options look artificially better. A candidate level with or
+## behind the passer is multiplied down hard instead, so a nearby covering
+## teammate doesn't beat a close forward option just by being closer still.
+const DISTANCE_DECAY_EXPONENT := 1.6
+const FORWARD_DIRECTNESS_WEIGHT := 2.5
+const BACKWARD_PASS_PENALTY := 0.12
 
 ## Ball-flight pacing for a completed/intercepted pass.
 const PASS_SPEED := 550.0
@@ -85,6 +117,7 @@ var _last_carrier: Player = null
 var _decision_timer: float = 0.0
 var _decision_interval: float = DECISION_INTERVAL_MIN
 var _tackle_timer: float = 0.0
+var _processed_events: Array = []  # Track processed events to avoid duplicates
 
 func _init(ball_state: BallState, match_state: LiveMatchState, movement_system: PlayerMovementSystem,
 		possession_system: PossessionSystem, grass_rect: Rect2) -> void:
@@ -98,7 +131,7 @@ func _init(ball_state: BallState, match_state: LiveMatchState, movement_system: 
 ## ball (loose ball, pass in flight) — those states resolve themselves via
 ## PossessionSystem; this only acts once someone is carrying.
 func update(delta: float) -> void:
-	if _match_state.finished or _ball_state.pass_in_flight:
+	if _match_state.finished or _ball_state.pass_in_flight or _ball_state.dead_ball_active:
 		return
 
 	var carrier: Player = _ball_state.possession_player
@@ -135,6 +168,7 @@ func _reset_decision_state() -> void:
 	_decision_timer = 0.0
 	_decision_interval = randf_range(DECISION_INTERVAL_MIN, DECISION_INTERVAL_MAX)
 	_tackle_timer = 0.0
+	_ball_state.likely_receiver = null
 
 ## Nearest real opposing defender presses the carrier: while within
 ## TACKLE_RANGE, rolls a contest every TACKLE_ATTEMPT_INTERVAL. A win hands
@@ -172,6 +206,21 @@ func _update_tackle_pressure(delta: float, is_home: bool, carrier: Player, carri
 		_ball_state.set_possession(not is_home, defender)
 		_reset_decision_state()
 
+	## Phase 4: Check for tackle-related events (fouls, cards, injuries)
+	if _match_state.event_system:
+		var defending_team_state = _match_state.away_state if is_home else _match_state.home_state
+		_match_state.event_system.check_tackle_event(not is_home, defender, carrier, defending_team_state, TACKLE_ATTEMPT_INTERVAL)
+		## Wire up event consequences
+		for event_dict in _match_state.event_system.recent_match_events:
+			if event_dict not in _processed_events:
+				var event_type = event_dict.get("type", "")
+				var player = event_dict.get("player")
+				var event_is_home = event_dict.get("is_home", false)
+				if player and event_type:
+					var severity = "yellow" if event_type == "yellow_card" else "red" if event_type == "red_card" else "injury"
+					_match_state.apply_match_event(event_type, event_is_home, player, severity)
+				_processed_events.append(event_dict)
+
 ## Evaluate shoot / pass / dribble for the current carrier. Doing nothing
 ## here means "keep dribbling" — PlayerMovementSystem already drives the
 ## carrier forward every frame by default.
@@ -180,24 +229,34 @@ func _make_decision(is_home: bool, carrier: Player, carrier_idx: int, carrier_po
 	var carrier_slot: Formation.SlotCategory = formation.slots[carrier_idx]
 	var carrier_condition_mult: float = _condition_multiplier(_match_state.get_condition(carrier))
 
-	var goal_pos: Vector2 = _goal_target_pos(is_home)
-	var dist_to_goal: float = carrier_pos.distance_to(goal_pos)
-	if dist_to_goal <= SHOOTING_RANGE:
-		var proximity: float = 1.0 - clamp(dist_to_goal / SHOOTING_RANGE, 0.0, 1.0)
-		if randf() < SHOT_CHANCE_BASE + proximity * SHOT_CHANCE_PROXIMITY_BONUS:
-			_take_shot(is_home, carrier, carrier_slot, carrier_condition_mult, proximity)
-			return
-
 	var opp_lineup: Array = _match_state.away_lineup if is_home else _match_state.home_lineup
 	var nearest_opp: Dictionary = _nearest_opponent(opp_lineup, not is_home, carrier_pos)
 	var under_pressure: bool = not nearest_opp.is_empty() and nearest_opp["dist"] < PRESSURE_RANGE
 
+	var goal_pos: Vector2 = _goal_target_pos(is_home)
+	var dist_to_goal: float = carrier_pos.distance_to(goal_pos)
+	if dist_to_goal <= SHOOTING_RANGE:
+		var proximity: float = 1.0 - clamp(dist_to_goal / SHOOTING_RANGE, 0.0, 1.0)
+		var shot_chance: float = SHOT_CHANCE_BASE + proximity * SHOT_CHANCE_PROXIMITY_BONUS + (SHOT_CHANCE_OPEN_BONUS if not under_pressure else 0.0)
+		if randf() < shot_chance:
+			_take_shot(is_home, carrier, carrier_slot, carrier_condition_mult, proximity)
+			return
+
 	var receiver: Player = _select_pass_candidate(is_home, lineup, formation, carrier, carrier_pos)
+	## Keep the ball's "likely receiver" hint fresh every tick, even on ticks
+	## that end up dribbling — lets off-ball movement anticipate the pass a
+	## beat early instead of only reacting once the ball is actually in flight.
+	_ball_state.likely_receiver = receiver
 	if receiver == null:
 		return
 
+	var team_attacks_right: bool = _movement_system.home_attacks_right() if is_home else not _movement_system.home_attacks_right()
+	var own_half: bool = (carrier_pos.x < _grass_rect.get_center().x) == team_attacks_right
+	var has_open_lane: bool = nearest_opp.is_empty() or nearest_opp["dist"] > OPEN_LANE_RANGE
 	var pass_bias: float = 0.5 + (carrier.passing / 100.0)
-	var pass_chance: float = clamp((PASS_CHANCE_BASE + (PASS_CHANCE_PRESSURE_BONUS if under_pressure else 0.0)) * pass_bias, 0.05, 0.9)
+	var pass_chance: float = clamp((PASS_CHANCE_BASE + (PASS_CHANCE_PRESSURE_BONUS if under_pressure else 0.0)
+		+ (PASS_CHANCE_OWN_HALF_BONUS if own_half else 0.0)
+		- (OPEN_LANE_PASS_REDUCTION if has_open_lane else 0.0)) * pass_bias, 0.05, 0.92)
 	if randf() < pass_chance:
 		_attempt_pass(is_home, carrier, carrier_slot, receiver, carrier_pos, lineup)
 
@@ -223,7 +282,7 @@ func _take_shot(is_home: bool, shooter: Player, shooter_slot: Formation.SlotCate
 	else:
 		outcome = "OFF_TARGET"
 
-	_possession_system.on_shot_attempt(is_home, shooter, outcome)
+	_possession_system.on_shot_attempt(is_home, shooter, outcome, keeper)
 	shot_taken.emit(is_home, shooter, outcome)
 	_last_carrier = null
 
@@ -283,9 +342,12 @@ func _check_interception(is_home: bool, start_pos: Vector2, end_pos: Vector2, pa
 	return {"success": true}
 
 ## Weighted-random receiver among fielded teammates in a realistic passing
-## window — forward-progress weighting uses the side's *current* attack
-## direction (fixes a bug in the old PassSystem, which assumed home always
-## attacks right and so mis-weighted every pass after half-time).
+## window — forward-progress is measured relative to the passer's own
+## position along the side's *current* attack direction (fixes a bug in the
+## old PassSystem, which assumed home always attacks right and so
+## mis-weighted every pass after half-time), so a teammate level with or
+## behind the passer is heavily discounted rather than winning on proximity
+## alone.
 func _select_pass_candidate(is_home: bool, lineup: Array, formation: Formation, passer: Player, passer_pos: Vector2) -> Player:
 	var team_attacks_right: bool = _movement_system.home_attacks_right() if is_home else not _movement_system.home_attacks_right()
 	var candidates: Array = []
@@ -300,10 +362,18 @@ func _select_pass_candidate(is_home: bool, lineup: Array, formation: Formation, 
 		var distance: float = passer_pos.distance_to(candidate_pos)
 		if distance < PASS_MIN_DISTANCE or distance > PASS_MAX_DISTANCE:
 			continue
-		var forward_progress: float = candidate_pos.x if team_attacks_right else -candidate_pos.x
-		var weight: float = 1.0 / (distance + 1.0) * (1.0 + forward_progress * POSITION_WEIGHT_FORWARD / 1000.0)
+		var forward_progress: float = (candidate_pos.x - passer_pos.x) * (1.0 if team_attacks_right else -1.0)
+		var weight: float = 1.0 / pow(distance + 1.0, DISTANCE_DECAY_EXPONENT)
+		if forward_progress > 0.0:
+			weight *= 1.0 + (forward_progress / distance) * FORWARD_DIRECTNESS_WEIGHT
+		else:
+			weight *= BACKWARD_PASS_PENALTY
 		candidates.append(candidate)
-		weights.append(max(weight, 0.1))
+		## No artificial floor here — weight is always strictly positive from
+		## the formula above, and a floor large enough to matter at these
+		## distance-decay magnitudes would flatten out the very distance/
+		## direction differentiation this is meant to produce.
+		weights.append(weight)
 
 	if candidates.is_empty():
 		return null

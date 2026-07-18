@@ -4,7 +4,7 @@
 
 ## Current Milestone
 
-None active — Milestone 17 implemented, **awaiting Designer verification** (verified via `godot-ai` automated testing this session — full synthetic matches, half-time transition, subs, and formation changes all ran cleanly with no script errors; not yet reviewed live by Designer for feel/balance).
+Milestone 18 in progress — Phases 1–4: Foundational State, Momentum, Tactical, Pressure, & Chance Generation/Resolution Systems, Event System. All systems wired and ready for verification (not yet tested in-engine).
 
 ## Completed Milestones
 
@@ -83,6 +83,34 @@ None active — Milestone 17 implemented, **awaiting Designer verification** (ve
 16. Live Match: possession-duel engine (`MatchEngine` rewrite) — implemented same era as Milestone 13, not written up at the time; backfilled here. Replaced the original independent-Poisson-per-side model with discrete per-minute "duels" between whole-team attack/defense averages advancing an abstract `Zone` (MIDFIELD→ATTACKING_THIRD→BOX→BREAKAWAY). **Fully superseded by Milestone 17 below** — `MatchEngine` and this duel/zone model are deleted, not just modified.
 
 17. Live Match: unified real-time match engine — implemented, **awaiting Designer verification** (verified via `godot-ai` this session; not yet reviewed live by Designer).
+
+18. Live Match: momentum + team state + tactical + pressure systems (Phases 1–2 of unified narrative engine) — implemented, **awaiting Designer verification in-engine**.
+    - **Context:** M17's engine is position-driven (individual shot/pass/dribble decisions), but design calls for momentum/pressure driving match narrative — higher-level team behavior flowing from events, not isolation. Phases 1–2 establish foundational state and tactical/pressure systems that later phases (chance generation, events) will build on.
+    - **Phase 1 - Foundational State & Momentum:**
+      - New `resources/team_match_state.gd` (`TeamMatchState`): per-team hidden state (momentum, possession %, territory %, confidence, organization, physical energy, aggression, tactical style, pass chain, recent events, pressure level).
+      - New `scripts/momentum_system.gd` (`MomentumSystem`): applies momentum changes on events (goal ±35/30, save +8, tackle/interception +4/+5, pass chain +1.5 per pass, turnovers −8, cards −5/−20); decays naturally each periodic update; updates team characteristics (confidence, organization, physical energy) based on momentum and match state.
+      - `resources/live_match_state.gd`: added team states, momentum system, `update_team_states(delta)` method (called every 3 real-time seconds from live_match.gd), momentum applied on goal/save events via record_shot_result, pass chains reset on turnovers.
+      - `scenes/live_match/live_match.gd`: added periodic team-state update (every 3s, scaled by speed multiplier).
+      - Possession tracking: each team accumulates possession_time_seconds while holding the ball; possession_pct recalculated each update as (time / total) × 100.
+    - **Phase 2 - Tactical & Pressure Systems:**
+      - New `scripts/tactical_system.gd` (`TacticalSystem`): defines the 5 tactical styles (High Press, Possession, Counter Attack, Park The Bus, Long Ball) with modifier tables for organization, aggression, confidence, possession %, pass completion, interception, tackle, shot chance, and fatigue. Each style modifies how pressure builds and how chances are generated.
+      - New `scripts/pressure_system.gd` (`PressureSystem`): calculates continuous pressure (0–100) from weighted average of momentum (30%), possession (25%), territory (25%), and tactical base (20%). Territory calculated from fielded player positions (attacking players in opponent's half vs defending players in own half). Pressure thresholds spawn chances (40%→small, 60%→good, 80%→big, 90%→clear-cut) with xG values (first-pass: 0.05–0.95).
+      - `resources/live_match_state.gd`: added `tactical_system`, `pressure_system`, `movement_system_ref` (for territory calculation), `set_movement_system()` method, tactical modifiers + pressure calculation called each periodic update.
+      - `scenes/live_match/live_match.gd`: wired movement system reference to match state for territory calculation.
+    - **Phase 3 - Chance Generation & Resolution:**
+      - New `resources/chance.gd` (`Chance`): data object representing a live chance (chance_type, xG, striker, spawn_time, duration 10–30s, taken flag).
+      - New `scripts/chance_generator.gd` (`ChanceGenerator`): spawns one chance per pressure threshold crossing (40%/60%/80%/90%) + bonus Big chances every 15s if pressure sustained >80% (Designer decision Option C). Pre-selects highest-rated forward/striker as shooter. Tracks active chances per team, expires when duration exceeded.
+      - New `scripts/chance_resolver.gd` (`ChanceResolver`): resolves chance → GOAL/SAVED/OFF_TARGET via `goal_probability = xG × striker_quality / goalkeeper_defense` (condition-scaled Kick/Strength stats). SAVED vs OFF_TARGET split favors higher Kick strikers.
+      - `resources/live_match_state.gd`: added `chance_generator`, `chance_resolver`, `match_time_seconds` (for expiry tracking). `update_team_states()` calls chance generator each update. New `_auto_resolve_expired_chances()` resolves chances whose duration exceeded.
+      - `scenes/live_match/live_match.gd`: track match_time_seconds during periodic updates.
+      - **Designer decisions (Phase 3):** Option C (threshold + sustained bonus), Option B (pre-select highest-rated striker), Option B (10–30s duration, auto-resolve on expiry; allows delay but expires if not taken). Manual chance trigger UI deferred to Phase 5.
+    - **Phase 4 - Event System (Fouls, Cards, Injuries):** implemented, **awaiting Designer verification in-engine**.
+      - New `scripts/event_system.gd` (`EventSystem`): tracks discipline per player, triggers fouls/cards on tackles based on aggression/pressure, injuries on high-intensity contacts.
+      - Yellow card: first foul per player (−5 momentum); Red card: second foul (−20 momentum, ejection). Injury: −10 momentum.
+      - `scripts/match_decision_engine.gd`: integrated tackle event checking after each tackle contest.
+      - `resources/live_match_state.gd`: added `apply_match_event()` to log events and apply momentum penalties.
+      - See PHASE_4_SUMMARY.md and BALANCE.md "Event System" for full details.
+    - **Not yet implemented:** UI indicators (momentum bar, pressure gauge, chance highlights, Phase 5), player ejection/injury enforcement (Phase 5), commentary system (Phase 5). See PHASE_1_SUMMARY.md/PHASE_2_SUMMARY.md/PHASE_3_SUMMARY.md/PHASE_4_SUMMARY.md for phase breakdowns.
     - **Context:** Designer feedback — the live match "feels very odd and unnatural," wanting to actually watch passing, players positioning to receive the ball, ball disputes, and possession recovery unfold rather than glance at a result. Investigation found Milestones 13/14/16 had built two disconnected simulations: `MatchEngine` (invisible per-minute duel/zone dice roll) actually decided the score, while `PlayerMovementSystem`/`PossessionSystem`/the old `PassSystem` was a decorative layer picking its own passes via an independent per-minute RNG with no relationship to what `MatchEngine` did that minute — confirmed by reading both systems, they shared no resolution logic. Also found `pitch_prototype.gd`'s `animate_pass()` was a no-op stub (no visible ball-flight arc ever existed), and `PlayerMovementSystem` recomputed a fresh heuristic target every frame with no persistent steering, causing visible jitter. Designer sign-off: full replacement, not a patch — one system where real positions/stats are the only source of truth for both the visuals and the score, at real-time pacing with speed control instead of a ~31-second dice roll.
     - New `scripts/match_decision_engine.gd` (`MatchDecisionEngine`, `class_name`): single source of truth for shots/passes/tackles/interceptions, replacing `resources/match_engine.gd` and `scripts/pass_system.gd` (both deleted). Carrier decisions (shoot/pass/dribble), tackle contests, and pass-interception rolls all use real player positions (`PlayerMovementSystem.get_player_position`) and per-player (not team-average) condition-scaled stat contests. See BALANCE.md "Live Match Simulation" for every formula/constant.
     - `resources/ball_state.gd`: added pass-in-flight state (`pass_in_flight`, `pass_target_player`, `pass_start_pos`/`pass_end_pos`, `pass_elapsed`/`pass_duration`, `pass_success`, `pass_interceptor`) and a `start_pass()` entry point, so a pass is a real timed event with a resolved outcome instead of an instant carrier reassignment.
