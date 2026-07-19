@@ -10,9 +10,11 @@ extends CanvasLayer
 
 signal picked(boon_id: String)
 
-const PAGE_COLOR := Color("f4efe1f0")
-const INK_COLOR := Color("2c2c2c")
-const ACCENT := Color("b08a3e")
+## Palette shared with the sibling battle overlay (ResultsScreen) — single
+## source so the two screens can't drift apart visually.
+const PAGE_COLOR := ResultsScreen.PAGE_COLOR
+const INK_COLOR := ResultsScreen.INK_COLOR
+const ACCENT := ResultsScreen.UNLOCK_COLOR
 
 var _picked := false
 

@@ -1,77 +1,89 @@
 extends Node
-## GameState autoload — persistent hero progression for the incremental loop.
+## GameState autoload — persistent META progression for the hybrid-roguelite loop.
 ##
-## Holds each hero's banked XP and purchased upgrades, saved to user://save.json
-## between runs (and on every purchase). XP is the currency: players spend it
-## directly on stat upgrades with rising costs — no automatic level bumps (see
-## DECISIONS.md "Progression is player-directed"). Values mirror BALANCE.md.
+## Milestone 2: retired the old persistent per-hero stat grind (flat XP-bought
+## upgrades + skill-tree ability nodes, saved to user://save.json). Runs no
+## longer bank permanent stats — a hero always starts a run at its flat base
+## stats (see Hero._configure) and grows only through in-run boons (RunState),
+## which reset every run. What persists here instead is the META layer: a
+## currency earned per run, spent (in a later milestone) to unlock new heroes
+## and relics into the pool. See IMPLEMENTATION_PLAN.md M2 / DECISIONS.md.
 ##
-## Dev helper: F12 wipes the save and reloads the battle.
+## Dev helper: F12 does a full reset (save + in-run state + persisted fog) and
+## returns to the prep menu — see full_reset().
 
 const SAVE_PATH := "user://save.json"
+const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
+const FOG_DIR := "user://fog"
 
-## Upgrade catalog: cost_base rises by cost_growth per owned copy.
-## effect_per describes one purchase (interval is multiplicative).
-const UPGRADES := {
-	"max_hp": {"label": "Max HP", "cost_base": 30, "effect_per": 15.0},
-	"damage": {"label": "Damage", "cost_base": 42, "effect_per": 2.0},
-	"attack_speed": {"label": "Attack Speed", "cost_base": 36, "effect_per": 0.95},
-	"move_speed": {"label": "Move Speed", "cost_base": 24, "effect_per": 6.0},
-}
-const COST_GROWTH := 1.25
-## Skill tree: each stat branch is a linear chain capped at this many nodes.
-const BRANCH_CAP := 10
-## Ability nodes on the skill tree, bought explicitly with XP once enough
-## total branch points are spent (replaces the old automatic LV15/LV20 gates).
-## "base" unlocks the hero's signature ability (Stomp/Clone) itself; "passive"
-## additionally requires "base" owned; "active" additionally requires
-## "passive" owned. Costs are a first-pass guess — flagged for tuning in
-## BALANCE.md.
-const ABILITY_NODES := {
-	"base": {"cost": 75, "requires_points": 5},
-	"passive": {"cost": 150, "requires_points": 15},
-	"active": {"cost": 250, "requires_points": 20},
-}
-## Save schema version. v2 = skill tree (fresh start: pre-tree upgrades are
-## discarded on load; banked XP is kept).
-const SAVE_VERSION := 2
+## Gold awarded at run end (spent on permanent ability mods at prep). Scales with
+## levels cleared this run — deeper runs pay more — with a win bonus on top and a
+## floor so even a level-1 wipe pays something. First pass, tune in BALANCE.md.
+const GOLD_PER_LEVEL := 10
+const GOLD_WIN_BONUS := 15
+const GOLD_MIN := 5
+
 ## Fraction of a kill's XP every *other* living hero banks (killer gets 100%),
 ## so tanks/screeners progress even without landing killing blows.
 const KILL_ASSIST_SHARE := 0.5
+
+## Save schema version. v3 = hybrid roguelite (persistent stat grind removed).
+## v4 = gameplay-loop rework (run = chain of levels; gold + owned ability mods;
+## stage_1_won/stage select retired). Any save below this is discarded on load —
+## a clean break the Designer approved rather than migrating old data forward.
+const SAVE_VERSION := 4
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
 const HERO_CATALOG := {
 	"THUNDAAR": {"color": Color(0.29, 0.471, 0.753)},
 	"ARTEMIS": {"color": Color(0.816, 0.435, 0.627)},
+	"WARDEN": {"color": Color(0.25, 0.62, 0.60)},
+	"BEACON": {"color": Color(0.88, 0.72, 0.30)},
 }
 
 ## Battlefield priorities a hero can be assigned pre-battle (GDD §11).
-## SUPPORT_ALLIES is deferred until support abilities exist (see DECISIONS.md).
+## SUPPORT_ALLIES un-deferred in Milestone 5 now that a support hero (BEACON)
+## with an ally-buff ability (Rally) exists.
 const PRIORITIES := {
 	"CAPTURE_OBJECTIVES": "Capture Objectives",
 	"ATTACK_VILLAIN": "Attack Villain",
+	"ATTACK_MINIONS": "Attack Minions",
+	"SUPPORT_ALLIES": "Support Allies",
 }
 
-## heroes[name] = {"xp": int, "upgrades": {stat: int}}
-var heroes := {}
-## party[name] = {"selected": bool, "priority": String} — set on the prep screen.
-## (role is now fixed per hero and set in Hero._configure, not here)
+## party[name] = {"priority": String, "support_target": String} — set on the
+## prep screen. support_target only matters while priority is SUPPORT_ALLIES:
+## "" means follow the nearest living ally (default); otherwise it names one
+## specific drafted hero to shadow instead.
+## (role is now fixed per hero and set in Hero._configure, not here). Which
+## heroes are actually fielded this run is a draft pick, not a persisted
+## setting — see RunState.party (Milestone 3).
 var party := {}
-## XP gained per hero in the current run (for the results screen).
+## XP gained per hero in the current run (for the results screen — display only,
+## not currency; in-run power comes from RunState's level/boon track).
 var run_xp := {}
-## Progression: has the player beaten Stage 1 (unlocks Stage 2)?
-var stage_1_won := false
-## Transient stage selection for the next battle ("" = scene default).
-## Set by the stage-select UI (upcoming) and balance tests; not persisted.
-var stage_override := ""
+
+## -- Meta progression ---------------------------------------------------------
+
+## Persistent currency spent at the ability shop on permanent per-hero mods.
+var gold := 0
+## Ability-mod ids bought and owned forever (AbilityMods catalog). Applied at
+## spawn in Hero._apply_owned_ability_mods.
+var owned_mods: Array = []
+## Heroes currently available for the party/draft. Defaults to every hero
+## that exists in code today; new heroes added to HERO_CATALOG in a future
+## milestone start locked out of this list until unlocked.
+var unlocked_heroes: Array = HERO_CATALOG.keys()
+## Relic ids available for the run-boon pool (scaffolding for a later
+## milestone — no relics exist yet, so this stays empty).
+var unlocked_relics: Array = []
 
 func _ready() -> void:
 	load_game()
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F12:
-		reset_save()
-		get_tree().reload_current_scene()
+		full_reset()
 
 ## -- Run flow ---------------------------------------------------------------
 
@@ -80,23 +92,25 @@ func start_run() -> void:
 
 ## -- Party / priorities -------------------------------------------------------
 
+## Sensible default priority per hero (most push the villain; the support
+## defaults to shadowing the party so its aura lands out of the box).
+const DEFAULT_PRIORITY := {"BEACON": "SUPPORT_ALLIES"}
+
 func party_of(hero_name: String) -> Dictionary:
 	if not party.has(hero_name):
-		party[hero_name] = {"selected": true, "priority": "ATTACK_VILLAIN"}
+		party[hero_name] = {
+			"priority": DEFAULT_PRIORITY.get(hero_name, "ATTACK_VILLAIN"),
+			"support_target": "",
+		}
 	return party[hero_name]
-
-func set_selected(hero_name: String, selected: bool) -> void:
-	party_of(hero_name).selected = selected
 
 func set_priority(hero_name: String, priority: String) -> void:
 	party_of(hero_name).priority = priority
 
-func selected_heroes() -> Array:
-	var out := []
-	for hero_name in HERO_CATALOG:
-		if party_of(hero_name).selected:
-			out.append(hero_name)
-	return out
+## Which specific ally `hero_name` should shadow while on SUPPORT_ALLIES
+## priority ("" = nearest living ally, the default).
+func set_support_target(hero_name: String, target: String) -> void:
+	party_of(hero_name).support_target = target
 
 ## Kill XP: killer banks the full value; every other living hero banks the
 ## assist share (rounded up), so XP flows to the whole party (BALANCE.md).
@@ -107,97 +121,72 @@ func award_kill_xp(killer: Node, amount: int) -> void:
 		if h != killer and h is Hero:
 			add_xp(h.hero_name, assist)
 
+## Single chokepoint for all run XP (kills + objectives): tracks this run's
+## per-hero total for the results screen and feeds the in-run level track
+## (RunState), which is what actually grows a hero's power now.
 func add_xp(hero_name: String, amount: int) -> void:
 	if amount <= 0:
 		return
-	var h := _hero(hero_name)
-	h.xp += amount
 	run_xp[hero_name] = int(run_xp.get(hero_name, 0)) + amount
-	# Feed the roguelite in-run level track (Milestone 1). This is the single
-	# chokepoint for both kill and objective XP, so RunState sees every gain.
 	RunState.record_xp(hero_name, amount)
 
-## -- Upgrades ---------------------------------------------------------------
+## -- Meta currency / unlocks --------------------------------------------------
 
-func owned(hero_name: String, stat: String) -> int:
-	return int(_hero(hero_name).upgrades.get(stat, 0))
+func award_gold(amount: int) -> void:
+	gold += amount
+	save_game()
 
-func cost(hero_name: String, stat: String) -> int:
-	var base := int(UPGRADES[stat].cost_base)
-	return int(ceil(base * pow(COST_GROWTH, owned(hero_name, stat))))
+## Gold payout for a finished run: scales with levels cleared, +bonus on a win,
+## never below GOLD_MIN. `levels_cleared` is how many levels the run beat.
+func gold_for_run(win: bool, levels_cleared: int) -> int:
+	var payout := GOLD_PER_LEVEL * maxi(levels_cleared, 0) + (GOLD_WIN_BONUS if win else 0)
+	return maxi(payout, GOLD_MIN)
 
-func xp_of(hero_name: String) -> int:
-	return int(_hero(hero_name).xp)
+func has_mod(id: String) -> bool:
+	return id in owned_mods
 
-func buy(hero_name: String, stat: String) -> bool:
-	var h := _hero(hero_name)
-	var c := cost(hero_name, stat)
-	if h.xp < c or owned(hero_name, stat) >= BRANCH_CAP:
+## Buys a permanent ability mod if affordable and not already owned. Returns
+## true on success. Saves immediately.
+func buy_mod(id: String) -> bool:
+	if id in owned_mods:
 		return false
-	h.xp -= c
-	h.upgrades[stat] = owned(hero_name, stat) + 1
+	var cost := int(AbilityMods.def(id).get("cost", 0))
+	if AbilityMods.def(id).is_empty() or gold < cost:
+		return false
+	gold -= cost
+	owned_mods.append(id)
 	save_game()
 	return true
 
-## -- Skill tree ability nodes -------------------------------------------------
+func is_hero_unlocked(hero_name: String) -> bool:
+	return hero_name in unlocked_heroes
 
-func ability_owned(hero_name: String, id: String) -> bool:
-	return id in (_hero(hero_name).abilities as Array)
+func unlock_hero(hero_name: String) -> void:
+	if hero_name not in unlocked_heroes:
+		unlocked_heroes.append(hero_name)
+		save_game()
 
-func ability_cost(id: String) -> int:
-	return int(ABILITY_NODES[id].cost)
+func is_relic_unlocked(id: String) -> bool:
+	return id in unlocked_relics
 
-## Prerequisites met (points milestone + chain order), ignoring XP.
-func ability_unlocked(hero_name: String, id: String) -> bool:
-	if level_of(hero_name) < int(ABILITY_NODES[id].requires_points):
-		return false
-	if id == "passive" and not ability_owned(hero_name, "base"):
-		return false
-	if id == "active" and not ability_owned(hero_name, "passive"):
-		return false
-	return true
-
-func ability_available(hero_name: String, id: String) -> bool:
-	return not ability_owned(hero_name, id) \
-			and ability_unlocked(hero_name, id) \
-			and xp_of(hero_name) >= ability_cost(id)
-
-func buy_ability(hero_name: String, id: String) -> bool:
-	if not ability_available(hero_name, id):
-		return false
-	var h := _hero(hero_name)
-	h.xp -= ability_cost(id)
-	(h.abilities as Array).append(id)
-	save_game()
-	return true
-
-## Total purchases — the hero's effective "level" for display.
-func level_of(hero_name: String) -> int:
-	var total := 0
-	for stat in _hero(hero_name).upgrades:
-		total += int(_hero(hero_name).upgrades[stat])
-	return total
-
-## -- Stat application (used by Hero on spawn) --------------------------------
-
-func bonus_max_hp(hero_name: String) -> float:
-	return owned(hero_name, "max_hp") * float(UPGRADES.max_hp.effect_per)
-
-func bonus_damage(hero_name: String) -> float:
-	return owned(hero_name, "damage") * float(UPGRADES.damage.effect_per)
-
-func attack_interval_mult(hero_name: String) -> float:
-	return pow(float(UPGRADES.attack_speed.effect_per), owned(hero_name, "attack_speed"))
-
-func bonus_move_speed(hero_name: String) -> float:
-	return owned(hero_name, "move_speed") * float(UPGRADES.move_speed.effect_per)
+func unlock_relic(id: String) -> void:
+	if id not in unlocked_relics:
+		unlocked_relics.append(id)
+		save_game()
 
 ## -- Persistence -------------------------------------------------------------
 
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
-		f.store_string(JSON.stringify({"version": SAVE_VERSION, "heroes": heroes, "party": party, "stage_1_won": stage_1_won}))
+		f.store_string(JSON.stringify({
+			"version": SAVE_VERSION,
+			"party": party,
+			"gold": gold,
+			"owned_mods": owned_mods,
+			"unlocked_heroes": unlocked_heroes,
+			"unlocked_relics": unlocked_relics,
+		}))
 
 func load_game() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
@@ -206,30 +195,57 @@ func load_game() -> void:
 	if f == null:
 		return
 	var data: Variant = JSON.parse_string(f.get_as_text())
-	if data is Dictionary:
-		heroes = data.get("heroes", {})
-		party = data.get("party", {})
-		stage_1_won = data.get("stage_1_won", false)
-		# Pre-skill-tree save (v1): fresh start — keep banked XP, drop the old
-		# flat upgrade purchases so everything is re-bought on the tree.
-		if int(data.get("version", 1)) < SAVE_VERSION:
-			for hero_name in heroes:
-				heroes[hero_name].upgrades = {}
-				heroes[hero_name].abilities = []
+	if not (data is Dictionary):
+		return
+	if int(data.get("version", 1)) < SAVE_VERSION:
+		# Pre-v3 save (the old persistent stat grind): a clean break, not a
+		# migration — Designer-approved wipe (see DECISIONS.md). Leave every
+		# var at its fresh-start default.
+		return
+	party = data.get("party", {})
+	gold = int(data.get("gold", 0))
+	owned_mods = data.get("owned_mods", [])
+	var saved_heroes: Variant = data.get("unlocked_heroes", null)
+	if saved_heroes is Array and not (saved_heroes as Array).is_empty():
+		unlocked_heroes = saved_heroes
+	unlocked_relics = data.get("unlocked_relics", [])
 
 func reset_save() -> void:
-	heroes = {}
 	party = {}
 	run_xp = {}
-	stage_1_won = false
-	stage_override = ""
+	gold = 0
+	owned_mods = []
+	unlocked_heroes = HERO_CATALOG.keys()
+	unlocked_relics = []
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
-func _hero(hero_name: String) -> Dictionary:
-	if not heroes.has(hero_name):
-		heroes[hero_name] = {"xp": 0, "upgrades": {}, "abilities": []}
-	elif not heroes[hero_name].has("abilities"):
-		# Entries written directly (balance_sweep) or from older data.
-		heroes[hero_name].abilities = []
-	return heroes[hero_name]
+## Full dev reset: wipes the save (this GameState autoload), the in-run chain
+## state (RunState — current_level/hp_carry/dead/levels/boons/draft), and the
+## persisted per-level fog-of-war ("progress is knowledge" — a stale fog PNG
+## would make a "fresh" Level 1 open pre-explored), then returns to the prep
+## menu so the player always lands somewhere clean regardless of where they
+## pressed F12 (mid-battle, results screen, etc). reset_save() alone used to
+## be wired to F12 but only wiped this autoload — RunState and fog survived,
+## so a "reset" from mid-run silently kept the old level/HP/fog state.
+func full_reset() -> void:
+	reset_save()
+	RunState.start_run()
+	RunState.party.clear()
+	RunState.draft_offer.clear()
+	_clear_fog_dir()
+	get_tree().paused = false
+	get_tree().change_scene_to_file(PREP_MENU)
+
+func _clear_fog_dir() -> void:
+	var abs_path := ProjectSettings.globalize_path(FOG_DIR)
+	var dir := DirAccess.open(abs_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir():
+			dir.remove(file_name)
+		file_name = dir.get_next()
+	dir.list_dir_end()

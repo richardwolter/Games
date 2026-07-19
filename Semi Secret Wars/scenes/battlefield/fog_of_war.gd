@@ -43,6 +43,7 @@ var _visible_cells: Array[Vector2i] = []
 
 func _ready() -> void:
 	z_index = 20
+	add_to_group("fog")
 	_field = get_tree().get_first_node_in_group("field")
 	# Cover the whole notebook page (field blob + the page border that
 	# StageField._draw_page uses).
@@ -52,6 +53,10 @@ func _ready() -> void:
 	# R = ever explored, G = inside a hero's current vision bubble this tick.
 	_img = Image.create(_grid_size.x, _grid_size.y, false, Image.FORMAT_RG8)
 	_img.fill(Color.BLACK)
+	# Persistent fog: reload ground this level's heroes explored on prior runs
+	# (progress-is-knowledge). Only the explored (R) channel survives; live
+	# vision (G) is always recomputed from scratch this run.
+	_load_explored()
 	_tex = ImageTexture.create_from_image(_img)
 
 	var sprite := Sprite2D.new()
@@ -117,3 +122,39 @@ func _stamp(world_pos: Vector2, explored_only := false) -> void:
 				_img.set_pixel(x, y, col)
 				if not explored_only:
 					_visible_cells.append(Vector2i(x, y))
+
+## -- Persistence (per level) --------------------------------------------------
+
+const FOG_DIR := "user://fog"
+
+func _fog_path() -> String:
+	return "%s/level_%d.png" % [FOG_DIR, RunState.current_level]
+
+## Restores the explored (R) channel from disk into _img. No-op during headless
+## balance sweeps (no player-facing fog, and it avoids disk churn per sim run).
+func _load_explored() -> void:
+	if RunState.headless:
+		return
+	var path := _fog_path()
+	if not FileAccess.file_exists(path):
+		return
+	var saved := Image.load_from_file(path)
+	if saved == null or saved.get_size() != _img.get_size():
+		return
+	for y in _grid_size.y:
+		for x in _grid_size.x:
+			if saved.get_pixel(x, y).r > 0.5:
+				_img.set_pixel(x, y, Color(1.0, _img.get_pixel(x, y).g, 0.0))
+
+## Persists the explored (R) channel as an L8 PNG (format-safe for save_png).
+## Called by BattleManager at battle end so the map stays revealed next run.
+func save_explored() -> void:
+	if RunState.headless:
+		return
+	DirAccess.make_dir_recursive_absolute(FOG_DIR)
+	var out := Image.create(_grid_size.x, _grid_size.y, false, Image.FORMAT_L8)
+	for y in _grid_size.y:
+		for x in _grid_size.x:
+			var v := 1.0 if _img.get_pixel(x, y).r > 0.5 else 0.0
+			out.set_pixel(x, y, Color(v, v, v))
+	out.save_png(_fog_path())

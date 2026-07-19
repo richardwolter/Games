@@ -47,12 +47,14 @@ func set_focused(focused: bool) -> void:
 	else:
 		name_label.remove_theme_color_override("font_color")
 
-func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = []) -> void:
+func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], intent: String = "") -> void:
 	if name_label == null or level_label == null or hp_bar == null or cooldown_indicator == null:
 		return
 
 	name_label.text = hero_name_in
-	level_label.text = "LV %d" % level
+	# Level line doubles as the live intent readout (what the hero is doing now),
+	# so the pre-battle priority/pairing choices are legible during the fight.
+	level_label.text = "LV %d  ·  %s" % [level, intent] if intent != "" else "LV %d" % level
 	hp_bar.max_value = max_hp
 	hp_bar.value = current_hp
 

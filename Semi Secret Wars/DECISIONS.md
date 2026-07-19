@@ -2,6 +2,24 @@
 
 Records important project decisions and why they were made.
 
+## 2026-07-18 — Gameplay-loop rework: the run is a chain of fixed levels
+
+**Decision:** Reworked the core loop around seven ratified choices (Designer). The **run** (a chain of levels), not a single battle, is the unit of play.
+
+1. **Fixed authored layouts** (not per-battle randomization) — a level is the same field every time so it becomes familiar; randomization is deleted from `StageField`, geometry lives in `LevelLayout` resources.
+2. **Persistent fog, permanent per level** — explored ground stays revealed forever (`user://fog/level_N.png`). This *is* the "progress is knowledge" pillar.
+3. **Fixed lair + reactive villain** — the villain sits dormant at an authored lair until the party closes in, then runs its existing per-villain behavior. Location is learnable; the fight stays dynamic.
+4. **Fixed gates, timed escalating waves** — swarm pours from authored edges (learnable direction), keeping the swarm feel while tying it to map knowledge.
+5. **Focus ping** — the one in-battle player verb: 3 charges, click to bias the party toward a spot for 5s, refunds on objective capture. Deliberately minimal so the battle stays "off the player's hands."
+6. **Permanent per-hero ability tradeoff nodes** — gold buys upgrades that are owned forever, each with a real downside. Two currencies: XP (in-run boons, reset) and gold (permanent mods).
+7. **Raw HP carryover + permadeath, no heal/revive yet** — survivors carry HP into the next level, the dead stay dead; relief mechanics deferred until the attrition is felt in play.
+
+**Reason:** The prior single-battle roguelite had nothing that made a level *familiar* and nothing to spend meta-currency on. The rework makes replay meaningful through map mastery + a growing permanent kit, and every run restarts at level 1 (progress is knowledge + gold, not stage unlocks).
+
+**Alternatives considered:** nest-based aggro spawning (vs. timed gates); permanent-terrain-only fog (vs. everything); roaming villain (vs. fixed lair); re-issue-priority verb (vs. ping); consumable per-run loadout (vs. permanent mods). All recorded in the plan.
+
+**Impact:** Sequenced as a 6-phase vertical slice validated in-engine per phase. Retired: `StageField.randomize_*`, `GameState.stage_1_won`/`stage_override`, prep stage-select, `meta_currency` (→ `gold`). Save schema → v4. See PRODUCTION.md current milestone.
+
 ## 2026-07-14 — PRODUCTION.md as top-priority source of truth
 
 **Decision:** Use `PRODUCTION.md` (not `PROJECT_STATE.md`) as the top-priority document for current project state.
@@ -203,3 +221,57 @@ Records important project decisions and why they were made.
 ## 2026-07-14 — Dev runs windowed
 
 **Decision:** During development the game runs windowed at 1280×720 (`window mode` = windowed, `window_width/height_override` = 1280×720) so runs don't take over the screen; the base design resolution stays 1920×1080. Fullscreen remains the intended shipping default and will be applied at export / a Settings milestone (backlogged), not the current dev config. Two polish follow-ups logged in BACKLOG: the engine-gray area outside the notebook page is visible at some zooms (needs a proper backdrop/clear color), and an in-game fullscreen/windowed toggle + resolution options belong in a later Settings milestone.
+
+## 2026-07-18 — Design direction: hybrid roguelite + light-touch agency
+
+**Decision:** Following a genre-research design report (autobattler/swarm/MOBA/roguelite design space), the project's north star is **hybrid roguelite progression** — per-run builds that RESET each run, plus meta-progression that unlocks new *heroes/relics/options* into the pool rather than flat permanent power — and **light-touch in-battle agency** (mostly watch-it-unfold, with a few timed manual inputs).
+
+**Reason:** The shipped build (pre-this-session) was structurally an incremental farm-and-grow game (persistent per-hero stat purchases saved to disk), not a roguelite, despite the pitch. Richard reviewed the report and ratified this direction to close that gap.
+
+**Alternatives considered:** True run-based roguelite (everything resets, no meta layer) — rejected, throws away the unlock-progression hook. Keep the persistent-grow model and reframe the pitch around it — rejected, doesn't match the intended fantasy.
+
+**Impact:** `IMPLEMENTATION_PLAN.md` (new) lays out the milestone sequence (M1–M10) this drives. Supersedes the "Demo progression: XP/level only, no skill tree" and "Progression is player-directed" decisions above for anything persistent — those still describe how progression *felt* pre-M2, but the persistence model they describe is retired (see the M2 entry below).
+
+## 2026-07-18 — M1: RunState split from GameState (in-run vs. persistent)
+
+**Decision:** New `RunState` autoload (`scenes/run/run_state.gd`) owns everything that resets every run: per-hero in-run level/XP and picked boons. `GameState` (unchanged name) keeps only what persists across runs.
+
+**Reason:** Cleanest way to implement the hybrid-roguelite split without conflating "this run's power" with "the account's unlocks" in one dictionary.
+
+**Implementation:** XP flows through the existing single chokepoint `GameState.add_xp()` into `RunState.record_xp()`. On a level crossing, `RunState.hero_leveled` fires; `BattleManager` pauses the tree and shows a 1-of-3 boon pick (`scenes/battle/level_up_screen.gd`), applied live via `Hero.apply_run_boon()`. A `RunState.headless` flag (set by `balance_sweep.gd`) suppresses the pause/emit for automated runs.
+
+**Impact:** Boon catalog lives in `scripts/boons.gd` (~6 boons: Power/Vitality/Haste/Swiftness/Fortune/Ferocity), all direct base-stat multipliers so they compose with existing synergy/formation multipliers without new combat call sites.
+
+## 2026-07-18 — M2: Persistent stat grind retired → meta-currency + unlock shop
+
+**Decision:** Removed the old XP-bought permanent stat upgrades and skill-tree ability nodes entirely. A hero always spawns at flat `HERO_STATS` base values (see BALANCE.md); all growth is in-run boons (M1). Run end awards **meta-currency** (win 15 / loss 5) toward unlocking new heroes/relics into the pool — nothing to unlock yet (all 2-then-4 heroes were always available; content arrives with future milestones). Save schema bumped to **v3**, and any save below v3 is **discarded on load**, not migrated (Designer-approved clean wipe).
+
+**Reason:** The persistent stat grind was the core thing preventing the game from reading as a roguelite (see the 2026-07-18 direction decision above). The skill-tree UI was repurposed into `scenes/prep/unlock_shop_page.gd` (`UnlockShopPage`) rather than deleted outright — same "spend currency on a page" shape, new content.
+
+**Balance-relevant call made during implementation (flagged, not separately confirmed with Designer):** hero abilities became **intrinsic** — every hero has its full ability kit (both auto-cast tiers) from the start of every run, since the old base/passive/active unlock gating was itself part of the persistent grind being removed. This is a real power increase vs. the pre-M2 "LV0" hero.
+
+**Impact:** `Hero._configure()` no longer reads any `GameState.bonus_*`/`owned()`/`ability_owned()` — those methods no longer exist. `balance_sweep.gd`'s methodology changed from "seed persistent stats before spawn" to "grant `RunState` boon picks to the spawned hero" (`_grant_power`); **old `BALANCE_SWEEP_RESULTS.json` numbers are stale** and not comparable post-M2. A fresh sweep + tuning pass is an open follow-up, not yet done.
+
+## 2026-07-18 — M5 sequenced before M3; party cap set to 3-of-4
+
+**Decision:** Milestone 5 (add a Controller and Support hero, growing the roster to 4) was done *before* Milestone 3 (draft a subset of the roster each run), reversing the original plan order. The party cap for the future draft is **3 of 4** heroes fielded per run.
+
+**Reason:** A draft is a hollow, untestable choice with only 2 heroes — there's nothing to leave out. Doing M5 first makes M3's draft an immediate, real "which role do I sacrifice this run" decision. Party cap of 3 (vs. 2 or 4) was chosen to force that genuine composition tension rather than "just take everyone."
+
+**Impact:** `IMPLEMENTATION_PLAN.md`'s milestone order is amended accordingly. M3 (draft step) is next up and will enforce the 3-hero cap; it is not enforced anywhere yet (today's prep screen still lets all 4 be selected).
+
+## 2026-07-18 — WARDEN (Controller) + BEACON (Support) added, placeholder names
+
+**Decision:** Two new heroes were added to reach the 4-hero roster: **WARDEN** (CONTROL role, ranged) auto-casts **Ensnare** (roots the nearest enemy cluster, reusing `Combatant.apply_stun`); **BEACON** (SUPPORT role) auto-casts **Rally** (timed damage + attack-speed buff to nearby allies, reusing `apply_damage_boost`/`apply_atk_speed_boost`) and defaults to the newly un-deferred `SUPPORT_ALLIES` priority. **WARDEN/BEACON are working/placeholder names** — Richard has not locked final hero names yet; renaming is a cheap catalog-key change whenever he decides.
+
+**Reason:** Designer-selected abilities from a shortlist grounded in primitives already in the codebase (see the two AskUserQuestion rounds in-session). Un-deferring `SUPPORT_ALLIES` (previously blocked on "no support abilities exist" — see the 2026-07-14 Prep screen decision) was a direct consequence of BEACON existing.
+
+**Impact:** Ranged-hero configuration was generalized from an `if hero_name == "ARTEMIS"` special-case into data (`HERO_STATS` `is_ranged`/`attack_range` keys), read generically in `Hero._configure()` — the deeper fix rather than stacking a second special-case for WARDEN. Formation/synergy bonuses were *not* extended to reward CONTROL/SUPPORT pairings this pass (only same-role and mixed-trio bonuses apply to them) — real 4-role named synergies are Milestone 6.
+
+## 2026-07-18 — Ability visual feedback: status ring + cast-name callout
+
+**Decision:** Added two visual-feedback mechanisms so ability procs are trackable in real-time play (Designer feedback: couldn't keep up with what fired during a normal-speed run). (1) A floating "ABILITY NAME!" text callout above the caster on every hero-ability proc (Stomp/Clone/Shockwave/Dash/Ensnare/Rally). (2) A colored status ring on **any** `Combatant` (not just heroes) affected by a stun/slow/buff/shield — cyan/violet/gold/light-blue respectively.
+
+**Reason:** Direct Designer request after playtesting M5. The status ring was deliberately built into the shared `Combatant` base rather than per-ability, so it's a systemic fix, not six bespoke ones.
+
+**Impact (bonus, unplanned):** because the ring lives on `Combatant`, it retroactively made the Stage 3 Mech Robot's slow-zone ability and the existing objective party-wide reward buffs visible for the first time — both previously had zero per-unit visual feedback beyond a HUD chip/banner.

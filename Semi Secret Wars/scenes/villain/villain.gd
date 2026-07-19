@@ -24,6 +24,14 @@ extends Combatant
 ## Radius of the ring minions are placed on around him after a teleport.
 @export var summon_radius := 90.0
 @export var summon_minion_speed := 90.0
+## Dormant at the lair until a hero comes within this radius (just inside fog
+## vision so he's visible the moment he wakes). See Combatant.is_alerted().
+@export var aggro_radius := 350.0
+## Leash: fleeing and teleporting stay within this radius of the authored lair,
+## so a chasing party's progress isn't reset by a blink across the map (fixed-lair
+## rework — the old free-roaming teleport made the Dark Mage structurally
+## un-catchable; see BALANCE.md).
+@export var leash_radius := 520.0
 
 ## How often (seconds) the flee goal is re-evaluated. Cheap, throttled like
 ## Minion/Berserker's hunt ticks.
@@ -33,6 +41,10 @@ const MINION_SCENE_PATH := "res://scenes/enemies/minion.tscn"
 var _flee_cd := 0.0
 var _teleport_cd := 0.0
 var _minion_scene: PackedScene = null
+## The authored lair (captured before the villain starts moving); the leash
+## anchors here. StageField.villain_pos tracks his LIVE position, so we can't
+## read it later as the lair.
+var _lair := Vector2.ZERO
 
 func _configure() -> void:
 	self_group = "hostiles"
@@ -41,13 +53,20 @@ func _configure() -> void:
 	label_text = villain_name
 	if _field != null:
 		global_position = _field.villain_pos
+	_lair = global_position
+	villain_aggro_radius = aggro_radius
 	_teleport_cd = teleport_interval
 	_minion_scene = load(MINION_SCENE_PATH)
 
 func _process(delta: float) -> void:
-	super(delta)
 	if _dying:
+		super(delta)  # let the death fade finish
 		return
+	# Dormant at the lair until the party closes in — no teleport, no resummon,
+	# no kiting. The lair is the learnable destination.
+	if not is_alerted():
+		return
+	super(delta)
 
 	_teleport_cd -= delta
 	if _teleport_cd <= 0.0:
@@ -73,7 +92,16 @@ func _update_flee_goal() -> void:
 		return
 	if away.length() < 1.0:
 		away = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0))
-	set_goal(global_position + away.normalized() * flee_distance)
+	# Leash the retreat to the lair area so he juke-dances near his lair instead
+	# of fleeing across the whole field (which reset a chasing party's progress).
+	set_goal(_clamp_to_leash(global_position + away.normalized() * flee_distance))
+
+## Clamps a point to within leash_radius of the lair.
+func _clamp_to_leash(p: Vector2) -> Vector2:
+	var off := p - _lair
+	if off.length() > leash_radius:
+		return _lair + off.normalized() * leash_radius
+	return p
 
 ## Blinks to a nearby clear spot and resummons a fresh burst of minions there.
 func _teleport_and_summon() -> void:
@@ -103,6 +131,9 @@ func _find_teleport_spot() -> Vector2:
 		var a := randf() * TAU
 		var p := global_position + Vector2(cos(a), sin(a)) * d
 		if (p / (_field.field_radius - Vector2(body_radius, body_radius))).length_squared() > 1.0:
+			continue
+		# Leash: never blink outside the lair area (keeps him catchable).
+		if p.distance_to(_lair) > leash_radius:
 			continue
 		if _field.in_lake(p):
 			continue

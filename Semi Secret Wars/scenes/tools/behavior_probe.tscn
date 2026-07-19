@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://ceoc77l182r3g"]
+
+[ext_resource type="Script" path="res://scenes/tools/behavior_probe.gd" id="1_probe"]
+
+[node name="BehaviorProbe" type="Node"]
+script = ExtResource("1_probe")

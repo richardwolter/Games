@@ -16,10 +16,6 @@ extends Node2D
 @export var minion_speed := 90.0
 ## Radius of the random spread around each spawn point.
 @export var spawn_spread := 160.0
-## Number of spawn points randomly placed on the villain half at battle start.
-@export var spawn_point_count := 6
-## Minimum distance between spawn points, so they spread across the half.
-@export var spawn_point_separation := 350.0
 ## Radius of the random spread around the swarm's far-side goal.
 @export var goal_spread := 360.0
 ## The active cap grows by escalate_step every escalate_every seconds, up to max_cap.
@@ -48,44 +44,21 @@ var _spawn_points: Array[Vector2] = []
 func _ready() -> void:
 	_field = get_tree().get_first_node_in_group("field")
 	_cap = float(swarm_cap)
-	_generate_spawn_points()
+	_load_spawn_gates()
 
-## Randomly place spawn points anywhere on the field, inside the field
-## ellipse and clear of obstacles and the Poison Lake. Rejection-sampled;
-## falls back to villain_pos so spawning never breaks on a crowded field.
-func _generate_spawn_points() -> void:
+## Load this level's authored spawn gates (StageField.spawn_gates, from the
+## LevelLayout). Waves pour from these known, learnable edges instead of random
+## points — the swarm feel stays, but the player can learn where it comes from.
+## Falls back to the villain lair for an unauthored level (no gates yet).
+func _load_spawn_gates() -> void:
 	_spawn_points.clear()
 	if _field == null:
 		return
-	for i in spawn_point_count:
-		var placed := false
-		for attempt in 40:
-			var p := Vector2(
-				randf_range(-_field.field_radius.x * 0.85, _field.field_radius.x * 0.85),
-				randf_range(-_field.field_radius.y * 0.85, _field.field_radius.y * 0.85))
-			if (p / _field.field_radius).length_squared() > 1.0:
-				continue
-			if _field.in_lake(p) or not _clear_of_obstacles(p):
-				continue
-			if not _clear_of_other_points(p):
-				continue
-			_spawn_points.append(p)
-			placed = true
-			break
-		if not placed:
-			_spawn_points.append(_field.villain_pos)
-
-func _clear_of_obstacles(p: Vector2) -> bool:
-	for o in _field.obstacles:
-		if p.distance_to(Vector2(o.x, o.y)) < o.z + spawn_spread:
-			return false
-	return true
-
-func _clear_of_other_points(p: Vector2) -> bool:
-	for existing in _spawn_points:
-		if p.distance_to(existing) < spawn_point_separation:
-			return false
-	return true
+	if not _field.spawn_gates.is_empty():
+		for g in _field.spawn_gates:
+			_spawn_points.append(g)
+	else:
+		_spawn_points.append(_field.villain_pos)
 
 func apply_stage_config(config: StageConfig) -> void:
 	swarm_cap = config.swarm_cap_start

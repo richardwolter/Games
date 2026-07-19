@@ -18,24 +18,11 @@ extends Node2D
 @export var field_radius := Vector2(2000.0, 1000.0)
 @export var hero_spawn := Vector2(-1500.0, -600.0)
 @export var villain_pos := Vector2(1420.0, 640.0)
-## Minimum distance the villain must spawn from every hero, so he lands just
-## outside each hero's vision bubble (fog_of_war.gd vision_radius = 400) rather
-## than deep in fog or in plain sight.
-@export var villain_min_clearance := 450.0
-## Editor-preview fallback only; overwritten at runtime by randomize_objectives().
+## Editor-preview fallback only; overwritten at runtime by apply_layout().
 @export var objective_pos := Vector2(-1200.0, 560.0)
-## How many objectives to place on the field.
-@export var objective_count := 2
-## Minimum clearance an objective point must keep from obstacles/lake.
-@export var objective_obstacle_margin := 60.0
-## Minimum distance an objective must keep from hero_spawn and villain_pos,
-## so it's never trivially on top of either.
-@export var objective_endpoint_clearance := 500.0
-## Minimum distance between objectives, so two rolls don't land on top of each other.
-@export var objective_min_spacing := 400.0
 ## Blocking obstacles: (x, y) center + z = radius. Units steer around these.
-## Editor-preview fallback only; positions overwritten at runtime by
-## randomize_obstacles() (radius and obstacle_kinds stay index-aligned).
+## Editor-preview fallback only; positions come from the LevelLayout at runtime
+## (apply_layout keeps radius and obstacle_kinds index-aligned).
 @export var obstacles: Array[Vector3] = [
 	Vector3(-310.0, -240.0, 130.0),
 	Vector3(400.0, 130.0, 110.0),
@@ -43,10 +30,6 @@ extends Node2D
 	Vector3(900.0, -350.0, 140.0),
 	Vector3(100.0, 620.0, 100.0),
 ]
-## Minimum clearance an obstacle must keep from hero_spawn/villain_pos and
-## from every other obstacle, when rerolled each run.
-@export var obstacle_endpoint_clearance := 300.0
-@export var obstacle_min_spacing := 250.0
 ## Sprite kind per obstacle above (index-aligned): "mountain" or "forest".
 ## Falls back to the placeholder blob+label for any index without a match.
 @export var obstacle_kinds: Array[String] = ["mountain", "forest", "mountain", "forest", "mountain"]
@@ -61,17 +44,12 @@ extends Node2D
 ]
 ## Poison Lakes: damage-over-time hazard for all units inside (heroes and
 ## minions). (x, y) center + z = x-radius; y-radius is z * lake_radius_ratio.
-## Editor-preview fallback only; positions overwritten at runtime by
-## randomize_lakes().
+## Editor-preview fallback only; positions come from the LevelLayout at runtime.
 @export var lakes: Array[Vector3] = [
 	Vector3(840.0, 420.0, 260.0),
 	Vector3(-500.0, -450.0, 220.0),
 ]
 @export var lake_radius_ratio := 0.5
-## Minimum clearance a lake must keep from hero_spawn/villain_pos/obstacles
-## and from every other lake, when rerolled each run.
-@export var lake_endpoint_clearance := 400.0
-@export var lake_min_spacing := 350.0
 ## HP drained per second while a unit is inside a lake (provisional, see BALANCE.md).
 @export var lake_dps := 8.0
 
@@ -83,10 +61,13 @@ extends Node2D
 ## The deploy zone is anchored here.
 var default_hero_spawn := Vector2.ZERO
 
-## Rolled fresh each battle by randomize_objectives(); Objective nodes read
-## their position from here by index. Falls back to objective_pos (editor
-## preview / before the first roll) if empty.
+## Objective points for this level; Objective/Guardian nodes read their position
+## from here by index. Populated by apply_layout() (editor-preview fallback:
+## objective_pos) — no longer rolled per battle.
 var objective_positions: Array[Vector2] = []
+## Minion spawn gates for this level (authored in the LevelLayout). Read by the
+## MinionSpawner in Phase 3; empty until a layout is applied.
+var spawn_gates: Array[Vector2] = []
 
 @export_group("Notebook Page")
 @export var page_color := Color("f4efe1")
@@ -113,145 +94,36 @@ var objective_positions: Array[Vector2] = []
 
 func _ready() -> void:
 	add_to_group("field")
-	default_hero_spawn = hero_spawn
 	if not Engine.is_editor_hint():
-		randomize_obstacles()
-		randomize_lakes()
-		randomize_objectives()
+		_load_layout_for_current_level()
+	default_hero_spawn = hero_spawn
 	queue_redraw()
 
-## Rerolls each obstacle's (x, y) in place, keeping its radius and
-## obstacle_kinds index-aligned. Clear of hero_spawn/villain_pos and of every
-## other obstacle already placed, so every battle's terrain is new.
-func randomize_obstacles() -> void:
-	var placed: Array[Vector2] = []
-	for i in obstacles.size():
-		var radius := obstacles[i].z
-		var p := _random_ring_point(radius, obstacle_endpoint_clearance, obstacle_min_spacing, placed, [])
-		obstacles[i] = Vector3(p.x, p.y, radius)
-		placed.append(p)
-
-## Rerolls each lake's (x, y) in place, keeping its radius. Clear of
-## hero_spawn/villain_pos, of obstacles, and of every other lake already
-## placed, so the hazard layout is new each battle.
-func randomize_lakes() -> void:
-	var placed: Array[Vector2] = []
-	for i in lakes.size():
-		var radius := lakes[i].z
-		var p := _random_ring_point(radius, lake_endpoint_clearance, lake_min_spacing, placed, obstacles)
-		lakes[i] = Vector3(p.x, p.y, radius)
-		placed.append(p)
-
-## Rejection-samples a point inside the field ellipse, clear of hero_spawn/
-## villain_pos (by `endpoint_clearance`), of every point in `placed` (by
-## `spacing`), and of every obstacle in `avoid_obstacles` (by radius + spacing).
-func _random_ring_point(radius: float, endpoint_clearance: float, spacing: float, placed: Array[Vector2], avoid_obstacles: Array[Vector3]) -> Vector2:
-	for _attempt in 200:
-		var p := Vector2(
-			randf_range(-field_radius.x, field_radius.x),
-			randf_range(-field_radius.y, field_radius.y))
-		if (p / (field_radius - Vector2(radius, radius))).length_squared() > 0.85:
-			continue
-		if p.distance_to(hero_spawn) < endpoint_clearance + radius:
-			continue
-		if p.distance_to(villain_pos) < endpoint_clearance + radius:
-			continue
-		var blocked := false
-		for a in placed:
-			if p.distance_to(a) < spacing + radius:
-				blocked = true
-				break
-		if not blocked:
-			for o in avoid_obstacles:
-				if p.distance_to(Vector2(o.x, o.y)) < o.z + radius + spacing * 0.5:
-					blocked = true
-					break
-		if blocked:
-			continue
-		return p
-	return Vector2.ZERO
-
-## Rolls objective_count viable points, clear of obstacles/lake, apart from
-## hero_spawn/villain_pos, and apart from each other, so every battle places
-## the objectives somewhere new instead of the same authored spot.
-func randomize_objectives() -> void:
-	objective_positions.clear()
-	var anchors: Array[Vector2] = [hero_spawn, villain_pos]
-	for i in objective_count:
-		var p := _random_viable_point(anchors)
-		objective_positions.append(p)
-		anchors.append(p)
-
-## Rejection-samples a point inside the field ellipse that clears every
-## obstacle/lake margin and keeps its distance from `anchors`.
-func _random_viable_point(anchors: Array[Vector2]) -> Vector2:
-	for _attempt in 200:
-		var p := Vector2(
-			randf_range(-field_radius.x, field_radius.x),
-			randf_range(-field_radius.y, field_radius.y))
-		if (p / field_radius).length_squared() > 0.85:
-			continue
-		if in_lake(p):
-			continue
-		var blocked := false
-		for o in obstacles:
-			if p.distance_to(Vector2(o.x, o.y)) < o.z + objective_obstacle_margin:
-				blocked = true
-				break
-		if blocked:
-			continue
-		if p.distance_to(hero_spawn) < objective_endpoint_clearance:
-			continue
-		if p.distance_to(villain_pos) < objective_endpoint_clearance:
-			continue
-		var too_close := false
-		for a in anchors:
-			if a == hero_spawn or a == villain_pos:
-				continue
-			if p.distance_to(a) < objective_min_spacing:
-				too_close = true
-				break
-		if too_close:
-			continue
-		return p
-	return objective_pos
-
-## Rolls villain_pos fresh each battle: a uniformly random point on the field
-## (clear of obstacles/lake) that sits just outside every hero's initial
-## vision bubble (villain_min_clearance), rather than always the single
-## farthest point from the party. Called once deploy positions are known.
-## Falls back to the farthest-point search if no point clears every hero by
-## villain_min_clearance (e.g. a tiny field or a tightly packed party).
-func randomize_villain_pos(hero_positions: Array[Vector2]) -> void:
-	if hero_positions.is_empty():
+## Loads the authored LevelLayout for RunState.current_level and applies it.
+## Keeps the exported editor-preview fallbacks if no layout file exists for the
+## level (so an unauthored level or the editor still renders something).
+func _load_layout_for_current_level() -> void:
+	var path := "res://config/level_%d_layout.tres" % RunState.current_level
+	if not ResourceLoader.exists(path):
+		push_warning("No LevelLayout at %s — using StageField editor fallbacks." % path)
 		return
-	var candidates: Array[Vector2] = []
-	var best := villain_pos
-	var best_score := -1.0
-	for _attempt in 200:
-		var p := Vector2(
-			randf_range(-field_radius.x, field_radius.x),
-			randf_range(-field_radius.y, field_radius.y))
-		if (p / field_radius).length_squared() > 0.85:
-			continue
-		if in_lake(p):
-			continue
-		var blocked := false
-		for o in obstacles:
-			if p.distance_to(Vector2(o.x, o.y)) < o.z + objective_obstacle_margin:
-				blocked = true
-				break
-		if blocked:
-			continue
-		var score := INF
-		for h in hero_positions:
-			score = minf(score, p.distance_to(h))
-		if score > best_score:
-			best_score = score
-			best = p
-		if score >= villain_min_clearance:
-			candidates.append(p)
-	villain_pos = candidates.pick_random() if not candidates.is_empty() else best
+	var layout: LevelLayout = load(path)
+	if layout != null:
+		apply_layout(layout)
+
+## Copies an authored layout into this field's live geometry. Called before any
+## objective/guardian/villain reads a position (all resolve in their own _ready,
+## which runs after this node's _ready in tree order — Field is the first child).
+func apply_layout(layout: LevelLayout) -> void:
+	hero_spawn = layout.deploy_anchor
+	villain_pos = layout.villain_lair
+	obstacles = layout.obstacles.duplicate()
+	obstacle_kinds = layout.obstacle_kinds.duplicate()
+	lakes = layout.lakes.duplicate()
+	scenery = layout.scenery.duplicate()
+	objective_positions = layout.objective_positions.duplicate()
+	spawn_gates = layout.spawn_gates.duplicate()
+	queue_redraw()
 
 ## Deployment: move the run's hero spawn to the player-chosen point.
 ## Units read hero_spawn live (heroes spawn there; the swarm marches on it),

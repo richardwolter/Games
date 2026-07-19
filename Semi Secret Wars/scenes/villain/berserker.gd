@@ -9,6 +9,9 @@ extends Combatant
 
 @export var charge_duration := 3.0
 @export var recover_duration := 1.5
+## Dormant at the lair until a hero comes within this radius (just inside fog
+## vision so he's visible the moment he wakes). See Combatant.is_alerted().
+@export var aggro_radius := 350.0
 
 ## How often (seconds) the field-wide hunt goal is re-evaluated.
 const HUNT_INTERVAL := 0.3
@@ -24,12 +27,17 @@ func _configure() -> void:
 	label_text = "BERSERKER"
 	if _field != null:
 		global_position = _field.villain_pos
+	villain_aggro_radius = aggro_radius
 	_phase_timer = charge_duration
 
 func _process(delta: float) -> void:
-	super(delta)
 	if _dying:
+		super(delta)  # let the death fade finish
 		return
+	# Dormant at the lair until the party closes in — no charge, no hunt.
+	if not is_alerted():
+		return
+	super(delta)
 
 	_phase_timer -= delta
 	if _phase_timer <= 0.0:

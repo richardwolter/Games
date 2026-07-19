@@ -92,6 +92,11 @@ var _dying := false
 var _death_t := 0.0
 var _heading := Vector2.ZERO
 var _in_lake := false
+## Villain dormancy (gameplay-loop rework): while > 0 the unit stays inert at
+## its lair until a hero enters this radius or it takes a hit — see is_alerted().
+## 0 = not dormant, always active (heroes, minions). Set in a villain's _configure.
+var villain_aggro_radius := 0.0
+var _alerted := false
 ## Seconds remaining stunned (movement/attacks paused). 0 = not stunned.
 var _stun_t := 0.0
 ## Seconds remaining slowed (movement/attack rate scaled by _slow_factor). 0 = not slowed.
@@ -108,11 +113,34 @@ var _xp_boost_t := 0.0
 var _xp_boost_mult := 1.0
 ## Absorbs the next N instances of damage entirely (e.g. objective reward shield).
 var shield_charges := 0
+## Brief colored ring around this unit — visual confirmation that a status
+## effect (stun/slow/buff/shield) just landed on it, so ability procs read
+## clearly during fast real-time play instead of only showing up as a HUD
+## buff chip. Triggered automatically by the apply_* methods below; shared by
+## every Combatant (heroes, minions, villains) so any future status source
+## gets this for free. Last effect wins if two land the same frame — a
+## legibility aid, not a stacking effect queue.
+var _status_flash_t := 0.0
+var _status_flash_color := Color.WHITE
+const STATUS_STUN_COLOR := Color(0.65, 0.95, 1.0, 0.95)
+const STATUS_SLOW_COLOR := Color(0.55, 0.45, 0.85, 0.9)
+const STATUS_BUFF_COLOR := Color(0.9, 0.75, 0.25, 0.9)
+const STATUS_SHIELD_COLOR := Color(0.6, 0.85, 0.95, 0.9)
+## Fixed flash length for apply_shield, which has no duration of its own
+## (a charge count, not a timer) — just a short "you got shielded" pulse.
+const STATUS_SHIELD_FLASH_TIME := 0.4
 ## Sprite art faces left by default; flips to face right when moving/aiming that way.
 var _facing_x := -1.0
 ## Cached push-apart vector from same-group neighbors, refreshed at RETARGET_INTERVAL
 ## (like target acquisition) so it stays cheap with hundreds of active minions.
 var _separation := Vector2.ZERO
+## When true, recompute the separation vector EVERY frame instead of on the
+## throttled retarget tick. Set by Hero (there are only ≤3 of them, so the cost
+## is trivial) — a per-frame recompute self-limits as the overlap shrinks, so
+## bodies converge to their min spacing instead of overshooting on a stale,
+## oversized push and bouncing back. Minions leave this false to keep the swarm
+## cheap (see DECISIONS.md swarm scaling).
+var separation_per_frame := false
 
 ## Subclass hook: set self_group / enemy_group / label_text / spawn position / goal.
 func _configure() -> void:
@@ -158,11 +186,17 @@ func _process(delta: float) -> void:
 	_speed_boost_t = maxf(_speed_boost_t - delta, 0.0)
 	_atk_speed_boost_t = maxf(_atk_speed_boost_t - delta, 0.0)
 	_xp_boost_t = maxf(_xp_boost_t - delta, 0.0)
+	_status_flash_t = maxf(_status_flash_t - delta, 0.0)
 
 	_retarget_cd -= delta
 	if _retarget_cd <= 0.0:
 		_retarget_cd = RETARGET_INTERVAL
 		_acquire_target()
+		if not separation_per_frame:
+			_update_separation()
+	# Heroes recompute separation every frame so the push tracks the current
+	# overlap and can't overshoot into a bounce (see separation_per_frame).
+	if separation_per_frame:
 		_update_separation()
 
 	if _target != null and (not is_instance_valid(_target) or _target._dying):
@@ -201,6 +235,7 @@ func take_damage(amount: float, attacker: Combatant = null) -> void:
 		return
 	hp -= amount
 	_flash = FLASH_TIME
+	_alerted = true  # a dormant villain wakes the instant it's struck (e.g. ranged poke)
 	if hp <= 0.0:
 		if attacker != null and is_instance_valid(attacker):
 			attacker._on_kill(self)
@@ -218,12 +253,33 @@ func _take_hazard_damage(amount: float) -> void:
 func _on_kill(_victim: Combatant) -> void:
 	pass
 
+## Villain dormancy gate: true once a hero has entered villain_aggro_radius, or
+## the unit has been hit (take_damage latches _alerted). Non-dormant units
+## (villain_aggro_radius == 0) are always alerted. Latches — never goes back to
+## sleep. Villains call this in _process to stay inert at their lair until the
+## party closes in (fixed-lair reactive design).
+func is_alerted() -> bool:
+	if _alerted:
+		return true
+	if villain_aggro_radius <= 0.0:
+		_alerted = true
+		return true
+	var r2 := villain_aggro_radius * villain_aggro_radius
+	for h in get_tree().get_nodes_in_group("heroes"):
+		if is_instance_valid(h) and not h._dying \
+				and global_position.distance_squared_to(h.global_position) <= r2:
+			_alerted = true
+			return true
+	return false
+
 ## Pauses this unit's movement/attacks for `duration` seconds (e.g. Thundaar's
 ## upgraded Stomp). Only extends the stun, never shortens an existing one.
 func apply_stun(duration: float) -> void:
 	if _dying:
 		return
 	_stun_t = maxf(_stun_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_STUN_COLOR
 
 ## Scales this unit's effective move speed and attack rate by `factor` for
 ## `duration` seconds (e.g. Stage 3 Mech Robot's slow zone). Only extends the
@@ -234,6 +290,8 @@ func apply_slow(duration: float, factor: float) -> void:
 	if _slow_t <= 0.0 or factor < _slow_factor:
 		_slow_factor = factor
 	_slow_t = maxf(_slow_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_SLOW_COLOR
 
 ## 1.0 normally; the slow factor while _slow_t is active, combined with any
 ## active objective attack-speed boost. Multiplies attack cooldown decay.
@@ -265,22 +323,32 @@ func xp_mult() -> float:
 func apply_damage_boost(duration: float, mult: float) -> void:
 	_dmg_boost_mult = mult if _dmg_boost_t <= 0.0 else maxf(_dmg_boost_mult, mult)
 	_dmg_boost_t = maxf(_dmg_boost_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_BUFF_COLOR
 
 func apply_speed_boost(duration: float, mult: float) -> void:
 	_speed_boost_mult = mult if _speed_boost_t <= 0.0 else maxf(_speed_boost_mult, mult)
 	_speed_boost_t = maxf(_speed_boost_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_BUFF_COLOR
 
 func apply_atk_speed_boost(duration: float, mult: float) -> void:
 	_atk_speed_boost_mult = mult if _atk_speed_boost_t <= 0.0 else maxf(_atk_speed_boost_mult, mult)
 	_atk_speed_boost_t = maxf(_atk_speed_boost_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_BUFF_COLOR
 
 func apply_xp_boost(duration: float, mult: float) -> void:
 	_xp_boost_mult = mult if _xp_boost_t <= 0.0 else maxf(_xp_boost_mult, mult)
 	_xp_boost_t = maxf(_xp_boost_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_BUFF_COLOR
 
 ## Absorbs the next `count` instances of damage entirely (e.g. objective reward shield).
 func apply_shield(count: int) -> void:
 	shield_charges += count
+	_status_flash_t = maxf(_status_flash_t, STATUS_SHIELD_FLASH_TIME)
+	_status_flash_color = STATUS_SHIELD_COLOR
 
 ## Shoves this unit back along `direction`, damaging any of its own group
 ## caught in the knockback's path (e.g. minions punting into other minions).
@@ -360,10 +428,19 @@ func _spawn_ground_splash(parent: Node) -> void:
 	tw.tween_property(splash, "modulate:a", 0.0, 0.8)
 	tw.tween_callback(splash.queue_free)
 
+## Scoring hook for _acquire_target: lower score = more preferred. The base
+## Combatant scores purely by squared distance (nearest wins), which is exactly
+## the old behavior — minions, guardians, the villain, and HeroClone all keep
+## it. Hero overrides this to fold in focus-fire / execute / threat / role
+## preferences among the candidates within detect_range.
+func _target_score(_node: Combatant, dist_sq: float) -> float:
+	return dist_sq
+
 func _acquire_target() -> void:
-	var nearest: Combatant = null
+	var best_target: Combatant = null
 	# Squared distances: heroes scan the whole swarm, so skip per-candidate sqrt.
-	var best := detect_range * detect_range
+	var range_sq := detect_range * detect_range
+	var best_score := INF
 	var taunter: Combatant = null
 	var taunter_best := INF
 	for node in get_tree().get_nodes_in_group(enemy_group):
@@ -375,10 +452,12 @@ func _acquire_target() -> void:
 		if node.is_taunting and dist <= node.taunt_radius * node.taunt_radius and dist < taunter_best:
 			taunter_best = dist
 			taunter = node
-		if dist <= best:
-			best = dist
-			nearest = node
-	_target = taunter if taunter != null else nearest
+		if dist <= range_sq:
+			var score := _target_score(node, dist)
+			if score < best_score:
+				best_score = score
+				best_target = node
+	_target = taunter if taunter != null else best_target
 
 ## Pushes overlapping same-group neighbors apart (e.g. a pile of minions
 ## crowding the same hero, or heroes bunched at deploy) so bodies don't stack.
@@ -472,6 +551,8 @@ func _draw() -> void:
 		draw_circle(offset, body_radius, Color(0.45, 0.85, 0.35, 0.3))
 	if _flash > 0.0:
 		draw_circle(offset, body_radius, Color(1.0, 1.0, 1.0, (_flash / FLASH_TIME) * 0.7))
+	if _status_flash_t > 0.0:
+		draw_arc(offset, body_radius + 5.0, 0.0, TAU, 24, _status_flash_color, 3.0, true)
 	if hp < max_hp and not _dying:
 		_draw_health_bar(offset)
 	if label_text != "":

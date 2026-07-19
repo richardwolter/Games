@@ -2,22 +2,94 @@
 
 Stores gameplay values. Every gameplay value should eventually live here instead of in source code (see [AI_Development_Guide.md](AI_Development_Guide.md) §8, §11).
 
+> **⚠ Updated 2026-07-18 (gameplay-loop rework — balance UNVERIFIED):** the run is now a chain of levels; heroes carry HP/boons/levels across levels, so difficulty compounds within a run in a way the old per-battle gates never modeled. New first-pass tunables introduced this pass, all flagged for a tuning pass (Level 1's swarm/layout since re-tuned — see the Level 1 whole-run sweep section below; Level 2/3 still carry the pre-rework numbers untouched):
+> - **Gold payout** (`GameState`): `GOLD_PER_LEVEL 10`, `GOLD_WIN_BONUS 15`, `GOLD_MIN 5` (scales with levels cleared).
+> - **Ability mods** (`scripts/ability_mods.gd`): 8 permanent per-hero tradeoffs, costs 45–60g, up/down magnitudes first-pass (e.g. Seismic Stomp radius ×1.6 / cooldown +1.5s; Glass Arrows dmg ×1.30 / HP ×0.80).
+> - **Focus ping** (`scenes/battle/focus_ping.gd`): 3 charges, 5s lifetime, 320px influence radius, `SCORE_FOCUS_PING 260` targeting weight.
+> - **Villain dormancy** (`Combatant.villain_aggro_radius`): 350px on all three villains (just inside fog vision 400 so they're seen on waking).
+> - **Dark Mage leash** (`villain.gd leash_radius 520`): fixes the prior "un-catchable teleporter" flag — he now juke-teleports only within his lair area, so a chasing party's progress isn't reset. Confirmed in the Level 1 sweep below: he's now reliably found and finished off.
+> - **Lone-deploy boon** (`BattleManager.LONE_DEPLOY_DISTANCE 550`): a 2+ hero party member placed >550px from every ally gets a free boon. Distinct from the solo-roster **Lone Wolf** standing buff (they don't stack — Lone Wolf is size-1 only), but the interaction of both being "reward isolation" wants a look.
+
+## Whole-run balance sweep (2026-07-18) — methodology + Level 1 findings
+
+**`balance_sweep.gd` reworked** for the new loop: it no longer injects a power level (the old model granted boons directly to simulate a persistent-upgrade axis that no longer exists). It now plays whole **run attempts** — the same way a real player would, chaining battlefield scene loads on each win — for every solo hero (worst case once a run is down to one survivor) and every 3-of-4 trio (`RunState.PARTY_CAP`, what a real player drafts), 4 trials each, at 10× sim speed. `scenes/tools/balance_sweep_runner.gd/.tscn` is the entry point (`godot --headless … res://scenes/tools/balance_sweep_runner.tscn`); full per-trial detail lands in `BALANCE_SWEEP_RESULTS.json`, a console summary prints per party comp. New companion tool: `scenes/tools/death_curve_probe.gd/.tscn` — a single instrumented run that prints hero HP%/level, swarm count, and villain HP%/alert-state every few sim seconds, for diagnosing *where* a run dies rather than just whether it did.
+
+**Initial sweep result: 0% clear rate across all 8 party comps.** Every comp — including the tankiest solo (Thundaar) and every trio — wiped at Level 1, in 29–76 sim-seconds. The `death_curve_probe` trace explained why: Level 1's original layout placed the deploy point and the villain's fixed lair at opposite corners of the field (~3170px apart) — at Thundaar's 75px/s move speed that's ~42s of pure travel, all of it under continuous chip damage from the escalating gate swarm, *before the party could even reach the (now-fixed, dormant) villain*. By the time the villain woke, a solo Thundaar was already down to ~38% HP; the ambient swarm (not the villain or his teleport-summon burst) was the dominant killer throughout. This is a structural mismatch introduced by the rework, not a code bug: Level 1's swarm throughput was tuned (through several "swarmier" passes, see below) assuming heroes arrive **already pre-buffed** with injected power (the old sweep's methodology, and — in real play — the old model's persistent multi-run stat grind); the new model requires a **zero-boon** party to survive *and* level up live, in one continuous encounter, and the old numbers never accounted for that cold start.
+
+**Fix (Level 1 only):**
+
+| Value | Before | After | Why |
+|---|---|---|---|
+| `level_1_layout.tres` deploy_anchor → villain_lair distance | ~3170px | ~1945px | Halves the pure-exposure travel window before the party can start actually fighting the villain |
+| `stage_1_config.tres` swarm_cap_start | 18 | 10 | Cold-start party faces a much smaller initial swarm |
+| `stage_1_config.tres` escalate_step | +4 | +2 | Gentler cap growth over a long fight |
+| `stage_1_config.tres` escalate_every | 12s | 16s | The dominant lever for *trios*, which run longer (70–90s) than a buffed solo — slows late-fight density growth specifically |
+| `stage_1_config.tres` spawn_batch | 3 | 2 | Lower per-tick throughput |
+| `stage_1_config.tres` spawn_interval | 2.8s | 3.3s | Lower throughput |
+| `stage_1_config.tres` swarm_max_cap | 60 | 40 | Lower ceiling for very long fights |
+
+Each change was validated with `death_curve_probe` between iterations (travel-distance fix alone took a solo Thundaar death from 67%-villain-HP-remaining to 5%; the escalation-rate fix then flipped several near-misses into wins) before committing to a full re-sweep.
+
+**Sweep result after the fix** (32 trials, 150s level cap — an earlier 90s cap was too short and falsely counted a couple of genuinely-winnable trio fights as timeouts; corrected before trusting these numbers):
+
+| Party | Level 1 clear rate | Avg sim time | Notes |
+|---|---|---|---|
+| Thundaar (solo) | **100%** (4/4) | 81.9s | Lone Wolf ×1.8 HP/×1.75 dmg carries this hard; then 0% at Level 2 (untouched, see below) |
+| Artemis / WARDEN / BEACON (solo) | 0% (0/4) | 28–39s | A fragile hero alone dies fast — matches "dangerous to go alone" by design; no standing buff besides Lone Wolf helps here since it's the same buff Thundaar gets, just less HP to multiply |
+| Thundaar+Artemis+WARDEN | **50%** (2/4) | 78.8s | Genuine coin-flip variance — the target shape for an onboarding level |
+| Thundaar+Artemis+BEACON | 0% (0/4) | 88.0s | Close (right at the tail), Artemis dies early and consistently (~t=20–30s) in every trio trial — glass-cannon by design (65 HP, lowest of all 4), not a bug |
+| Thundaar+WARDEN+BEACON | 0% (0/4) | 81.4s | Also close |
+| Artemis+WARDEN+BEACON (no tank) | 0% (0/4) | 43.8s | Expected — no tank in the comp at all |
+
+**Read on this:** the fix took Level 1 from *literally unbeatable* to a real, tense curve — comps anchored by Thundaar consistently reach the tail of a long fight (78–88s) with the villain nearly dead, comps without him don't get that far. Not chasing every comp to a high clear rate deliberately — a level a player will replay many times shouldn't be free, and "some comps/some luck" clearing is enough for forward run progress to exist. If a future pass wants trio clear rates higher across the board, the same levers apply (throughput/escalation), but pushing further risks trivializing Thundaar-solo, which is already at the ceiling.
+
+**Known follow-up, not done this pass:** Level 2 (Berserker) and Level 3 (Mech Robot) still carry their original layouts/swarm numbers untouched — confirmed still too hard (Thundaar solo, arriving at Level 2 with real leftover HP/boons from a Level 1 win, cleared it 0/4 times, avg 18.7s). They need the exact same methodology: a `death_curve_probe` pass to find the actual failure mode (may not be the same "travel distance" issue — Berserker/Mech Robot are melee-aggressive rather than Dark Mage's dormant-summoner pattern), then targeted layout/throughput tuning, then a re-sweep to confirm.
+
+
 > **Updated 2026-07-15 (rebalance pass):** Hero stat differentiation, synergy system, XP economy tuning, and swarm density increase. Previous gates (LV 10 / LV 25) require re-verification with new economy. Unit scenes and stage configs are the source of truth.
 >
 > **Updated 2026-07-15 (swarmier pass):** Spawn throughput and on-screen caps raised ×1.5 for a denser "swarmy" feel; minion damage and XP value cut ÷1.5 to hold the chip-damage and XP budgets (and thus the LV 20/LV 25 gates) constant. Verified in-engine — see Swarm and Stage gates sections below.
 >
 > **Added 2026-07-16 (role system + formation bonuses):** Role assignment (TANK/BURST/CONTROL) at prep screen with proximity-based formation bonuses. Emerges from role pairings: same-role clustering ×1.1 damage; Tank+Burst opposition ×1.15 multiplier each; mixed trio (3+ roles) ×0.05 cooldown. Applied to all damage (combat + abilities) and cooldown timers. Verified: UI rendering, hero spawning with role intact, formation bonus calculation on each frame. Existing balance gates (LV 10/LV 25) and Lone Wolf/Synergy systems unaffected (role bonuses are separate multiplier tier).
+>
+> **⚠ Updated 2026-07-18 (M2 — persistent stat grind retired, hybrid roguelite):** Everything below that references "upgrades," "LV" as a persistent purchase count, or the old stage win gates (LV 10/LV 19–26/LV 25 etc.) describes the **pre-M2 model and is stale**. Heroes now always spawn at the flat base stats in the table below; there is no more per-upgrade scaling. Hero abilities are **intrinsic** (full kit from run start) instead of gated behind skill-tree points. Power now comes from in-run boon picks (see "Run boons" section) and, later, meta-unlocked relics. **`BALANCE_SWEEP_RESULTS.json` and every stage win-gate number in this file predate this change and are not comparable** — a fresh `balance_sweep.gd` run + tuning pass is an open follow-up (tracked in BACKLOG.md). Sections are left in place as historical reference for swarm/minion/villain tuning, which M2 did not touch.
 
-## Combat stats (updated 2026-07-16 fixed roles pass)
+## Combat stats (updated 2026-07-18 — flat base stats, M2)
 
-### Heroes (hero-specific base stats + scaling)
+### Heroes (flat base stats — no persistent per-upgrade scaling; see M2 flag above)
 
-| Hero | Role | Base HP | Base Damage | HP per upgrade | Damage per upgrade | Attack Speed scale | Attack interval | Detect range | Move speed |
-|---|---|---|---|---|---|---|---|---|---|
-| Thundaar | TANK | 120 | 10 | +20 | +1.5 | ×0.97 | 0.7s | 90 | 75 |
-| Artemis | BURST | 65 | 6 | +12 | +2.5 | ×0.93 | 0.32s | 90 | 115 |
+| Hero | Role | Base HP | Base Damage | Attack interval | Attack range | Ranged? | Move speed |
+|---|---|---|---|---|---|---|---|
+| Thundaar | TANK | 120 | 10 | 0.7s | 26 (melee default) | No | 75 |
+| Artemis | BURST | 65 | 6 | 0.32s | 160 | Yes | 115 |
+| WARDEN | CONTROL | 85 | 7 | 0.55s | 120 | Yes | 90 |
+| BEACON | SUPPORT | 95 | 6 | 0.6s | 26 (melee default) | No | 95 |
 
-**Stat differentiation:** Thundaar (TANK) is durable and slow — high base HP and damage but slower attack and movement. Artemis (BURST) is fragile and fast — lower HP but high damage scaling, fast attack, and rapid repositioning. Roles are now **fixed per hero** (Thundaar always TANK, Artemis always BURST) and determined at spawn via hero name, not a prep-screen choice.
+**Stat differentiation:** Thundaar (TANK) is durable and slow. Artemis (BURST) is fragile, fast-attacking, ranged DPS. WARDEN (CONTROL) is a squishier ranged controller — its value is Ensnare, not raw damage. BEACON (SUPPORT) has modest HP/low personal damage — its value is Rally's party buff. Roles are **fixed per hero**, determined at spawn via hero name. All four are first-pass values, not tuned against fresh stage gates (see M2 flag above).
+
+## Run boons (M1 — in-run leveling, resets every run)
+
+Each hero levels up independently from farmed XP (rising curve: `40 × 1.35^level` XP per level, `RunState.xp_needed`). On level-up the battle pauses and offers 1-of-3 boon picks from this catalog (`scripts/boons.gd`); picks are permanent for the current run only and apply as a direct multiplier to the hero's live stats.
+
+| Boon | Effect |
+|---|---|
+| Power | +15% Damage |
+| Vitality | +15% Max HP |
+| Haste | −10% Attack interval |
+| Swiftness | +12% Move speed |
+| Fortune | +20% XP gained |
+| Ferocity | +8% Damage, +8% attack speed (both, smaller each) |
+
+First-pass values — not yet tuned against real playtests of the new model.
+
+## Meta-currency (M2 — persistent, wiped 2026-07-18 save schema v3)
+
+| Value | Amount |
+|---|---|
+| Awarded on run win | 15 |
+| Awarded on run loss | 5 |
+
+Spent (once real content exists — currently nothing to buy) at the unlock shop to add new heroes/relics to the pool. First-pass values.
 
 ### Minions & Villains
 
@@ -37,29 +109,35 @@ Minion HP/damage/xp were halved and body_radius shrunk (art pass — smaller spr
 
 **2026-07-16 minimum-swarm-XP pass (Designer feedback — swarm kills should be minimal, runs are long enough to farm many of them):** removed the density bonus entirely (previously +1 XP per active minion on field, capped +30 — this compounded XP *upward* with swarm size, the opposite of the intent) and cut base `xp_value` further: Minion/Elite/Ranged 5–6→2, Brute 7→3. A minion kill is now a flat, small value regardless of how many minions are on screen or how long the run has been going; meaningful progression should come from sustained kill volume, objective captures, and (eventually) villain kills rather than swarm-density scaling. Not yet re-verified against the stage gates below — expect the LV 19–26 duo win bands in the sweep section to shift upward; re-run `balance_sweep.gd` before treating those numbers as current.
 
-## Hero abilities (verified in-engine 2026-07-15 — functional, not tuned)
+## Hero abilities (updated 2026-07-18 — intrinsic kit, M2/M5)
 
-Auto-cast on cooldown whenever an enemy is in detect range. Confirmed firing correctly in a live run (Stomp's cooldown ticked down after landing a hit; Clone spawned, taunted, and its HUD cooldown displayed); damage/cooldown values themselves are still a first pass, not tuned against the stage gates.
+Auto-cast on cooldown whenever an enemy is in detect range (Rally needs no enemy — casts proactively). **As of M2, every hero has its full ability kit from the start of every run** — the old skill-tree gating (base/passive/active unlock tiers bought with XP) is gone; Thundaar's stun-on-Stomp and Artemis's Clone-damage-boost are now always active. Damage/cooldown values are still a first pass, not tuned against fresh stage gates (see M2 flag above). All ability procs show a floating "ABILITY NAME!" callout above the caster and a colored status ring on affected units (cyan=stun, violet=slow, gold=buff, light-blue=shield) — see DECISIONS.md 2026-07-18 "Ability visual feedback."
 
 | Hero | Ability | Cooldown | Effect |
 |---|---|---|---|
-| Thundaar | Stomp | 3.5s (starts once it lands a hit) | 26 dmg + 100px knockback to every enemy within 70px; expanding shockwave-ring VFX on landing |
-| Artemis | Clone | 8s | Spawns a stationary copy of herself (same HP/dmg/attack stats) 40px to her side (not stacked on top of her) for 2s; taunts enemies within 90px of it and fights back |
+| Thundaar | Stomp | 3.5s (starts once it lands a hit) | 26 dmg + 100px knockback + stun (0.5s) to every enemy within 70px; expanding shockwave-ring VFX on landing |
+| Thundaar | Shockwave (2nd ability) | 5s | Wide line in front of him (180px range × 60px half-width), 40 dmg + 80px knockback |
+| Artemis | Clone | 8s | Spawns a stationary copy of herself (+50% damage) 40px to her side for 2s; taunts enemies within 90px and fights back |
+| Artemis | Dash (2nd ability) | 6s | Dashes toward the nearest enemy cluster, hitting up to 5 targets with escalating damage (+3/target) |
+| WARDEN | Ensnare | 6s (starts once it catches something) | Roots every enemy within 95px of the current target (cluster anchor) for 1.2s |
+| BEACON | Rally | 7s | Grants every hero within 180px (self included) +15% damage and +20% attack speed for 4s |
 
 ## Swarm (per-stage, continuous XP farm)
 
 The swarm is a continuous, escalating farm (not finite waves). Win = defeat the villain; lose = all heroes die. See the incremental-loop intent in [Game_Design_Bible.md](Game_Design_Bible.md) §16. Values live in `config/stage_N_config.tres`.
 
-| Value | Stage 1 | Stage 2 | Notes |
-|---|---|---|---|
-| Swarm cap (start) | 18 | 21 | Max simultaneously active minions at run start (×1.5, swarmier pass) |
-| Spawn interval | 2.8s | 3.2s | Time between spawn ticks (unchanged) |
-| Spawn batch | 3 | 3 | Minions spawned per tick (2→3, ×1.5 throughput, swarmier pass) |
-| Escalate every | 12s | 12s | Cap grows over time so the farm intensifies |
-| Escalate step | +4 | +4 | Cap increase per escalation (3→4, ×1.5 rounded, swarmier pass) |
-| Max cap | 60 | 72 | Ceiling on active minions (40/48→60/72, ×1.5, swarmier pass) |
-| Minion speed | 105 | 115 | Stage 1/Elite speeds unchanged |
-| Spawn points | 6, ≥350px apart | 6, ≥350px apart | Swarm pours from multiple randomized points on the villain half |
+**⚠ Stage 1 re-tuned 2026-07-18** for the gameplay-loop rework's cold-start (zero-boon) survivability — see the whole-run sweep section above for the full before/after and rationale. **Stage 2/3 still carry the pre-rework "swarmier pass" numbers, unverified and confirmed too hard** (0/4 clears in the sweep) — due the same treatment before trusting them.
+
+| Value | Stage 1 (2026-07-18) | Stage 2 (unverified) | Stage 3 (unverified) | Notes |
+|---|---|---|---|---|
+| Swarm cap (start) | 10 | 21 | 24 | Max simultaneously active minions at run start |
+| Spawn interval | 3.3s | 3.2s | 3.0s | Time between spawn ticks |
+| Spawn batch | 2 | 3 | 3 | Minions spawned per tick |
+| Escalate every | 16s | 12s | 12s | Cap grows over time so the farm intensifies |
+| Escalate step | +2 | +4 | +4 | Cap increase per escalation |
+| Max cap | 40 | 72 | 80 | Ceiling on active minions |
+| Minion speed | 105 | 115 | 82 | Ranged+Brute hybrid mix, Stage 3 |
+| Spawn points | 4 authored gates | 4 authored gates | 4 authored gates | All three levels already read `spawn_gates` from their `level_N_layout.tres` (fixed-layout rework, Phase 6) — Stage 2/3 spawn correctly, they just carry the OLD throughput numbers (this table's Stage 2/3 columns), unverified against a cold-start party |
 
 **Hunting/intercept:** minions re-evaluate their hunt goal every 0.3s, targeting a point `intercept_lead = 160px` ahead of the nearest hero (toward the villain), plus their per-minion cluster offset.
 

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="LevelLayout" format=3]
+
+[ext_resource type="Script" path="res://config/level_layout.gd" id="1_layout"]
+
+[resource]
+script = ExtResource("1_layout")
+level_id = "level_3"
+deploy_anchor = Vector2(-1550, 0)
+villain_lair = Vector2(1550, 0)
+obstacles = Array[Vector3]([Vector3(-150, -450, 130), Vector3(150, 450, 130), Vector3(-650, 250, 120), Vector3(650, -250, 120), Vector3(0, 0, 160)])
+obstacle_kinds = Array[String](["mountain", "mountain", "forest", "forest", "mountain"])
+lakes = Array[Vector3]([Vector3(-500, -550, 220), Vector3(500, 550, 220)])
+scenery = Array[Vector3]([Vector3(-1200, 500, 100), Vector3(1200, -500, 100), Vector3(0, -750, 95), Vector3(0, 750, 95)])
+objective_positions = Array[Vector2]([Vector2(-400, 650), Vector2(400, -650)])
+spawn_gates = Array[Vector2]([Vector2(1750, 300), Vector2(1750, -300), Vector2(900, 800), Vector2(900, -800)])

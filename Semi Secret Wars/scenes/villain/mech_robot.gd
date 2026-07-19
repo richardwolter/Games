@@ -8,6 +8,9 @@ extends Combatant
 ## same as Dark Mage/Berserker; this class only owns the direct-fight + ability.
 
 @export var villain_name := "MECH ROBOT"
+## Dormant at the lair until a hero comes within this radius (just inside fog
+## vision so it's visible the moment it wakes). See Combatant.is_alerted().
+@export var aggro_radius := 350.0
 ## How often (seconds) a slow zone is dropped on the nearest hero.
 @export var zone_interval := 5.0
 @export var zone_duration := 4.0
@@ -26,12 +29,17 @@ func _configure() -> void:
 	label_text = villain_name
 	if _field != null:
 		global_position = _field.villain_pos
+	villain_aggro_radius = aggro_radius
 	_zone_cd = zone_interval
 
 func _process(delta: float) -> void:
-	super(delta)
 	if _dying:
+		super(delta)  # let the death fade finish
 		return
+	# Dormant at the lair until the party closes in — no melee, no slow zones.
+	if not is_alerted():
+		return
+	super(delta)
 	_zone_cd -= delta
 	if _zone_cd <= 0.0:
 		_zone_cd = zone_interval

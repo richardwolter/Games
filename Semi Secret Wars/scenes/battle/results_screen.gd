@@ -3,12 +3,17 @@ extends CanvasLayer
 ## Slim post-run results overlay: outcome + XP gained per hero, then back to the
 ## prep menu (where all upgrading/party setup now happens).
 
+## Shared battle-overlay palette (also referenced by LevelUpScreen) so the
+## in-battle overlays stay visually in sync from one place.
+const PAGE_COLOR := Color("f4efe1f0")
+const INK_COLOR := Color("2c2c2c")
 const UNLOCK_COLOR := Color("b08a3e")
 
 var _panel: PanelContainer
 var _title: Label
 var _unlock_banner: Label
 var _lines: Label
+var _footer: Label
 
 func _ready() -> void:
 	visible = false
@@ -17,8 +22,8 @@ func _ready() -> void:
 	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("f4efe1f0")
-	style.border_color = Color("2c2c2c")
+	style.bg_color = PAGE_COLOR
+	style.border_color = INK_COLOR
 	style.set_border_width_all(3)
 	style.set_content_margin_all(28)
 	_panel.add_theme_stylebox_override("panel", style)
@@ -38,24 +43,37 @@ func _ready() -> void:
 	_lines = _label("", 20)
 	_lines.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_lines)
-	var footer := _label("Press R to return to preparation", 18)
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(footer)
+	_footer = _label("Press R to return to preparation", 18)
+	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_footer)
 
-func show_results(win: bool, unlocked_stage: bool = false) -> void:
-	_title.text = "VICTORY!  Stage cleared" if win else "DEFEAT"
-	_unlock_banner.visible = unlocked_stage
+## Outcome overlay. next_level > 0 means a chaining win (advance into that level
+## on R, no payout shown); otherwise the run is over (loss or run complete) and
+## the meta-currency payout is shown, with R returning to prep.
+func show_results(win: bool, currency_awarded: int = 0, next_level: int = 0) -> void:
+	var advancing := next_level > 0
+	if advancing:
+		_title.text = "LEVEL %d CLEARED!" % (next_level - 1)
+		_unlock_banner.text = "Advancing to Level %d…" % next_level
+		_unlock_banner.visible = true
+	else:
+		_title.text = "VICTORY!  Run complete" if win else "DEFEAT"
+		_unlock_banner.visible = false
 	var lines := ""
+	if not advancing:
+		lines += "Gold +%d\n\n" % currency_awarded
 	for hero_name in GameState.HERO_CATALOG:
 		var gained := int(GameState.run_xp.get(hero_name, 0))
-		if gained > 0 or GameState.party_of(hero_name).selected:
-			lines += "%s  +%d XP   (banked: %d)\n" % [hero_name, gained, GameState.xp_of(hero_name)]
+		if gained > 0 or RunState.is_selected(hero_name):
+			var tag := "  (fallen)" if RunState.is_dead(hero_name) else ""
+			lines += "%s  +%d XP   (LV %d)%s\n" % [hero_name, gained, RunState.level_of(hero_name), tag]
 	_lines.text = lines.strip_edges()
+	_footer.text = "Press R for LEVEL %d" % next_level if advancing else "Press R to return to preparation"
 	visible = true
 
 func _label(text: String, size: int) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", Color("2c2c2c"))
+	l.add_theme_color_override("font_color", INK_COLOR)
 	return l
