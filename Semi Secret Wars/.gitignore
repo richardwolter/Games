@@ -1,5 +1,5 @@
 ﻿.godot/
 .claude/worktrees/
 *.translation
-export_presets.cfg
 *.import
+build/
