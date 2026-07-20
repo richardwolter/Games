@@ -139,7 +139,7 @@ var _rallying := false
 
 ## Detect range while actively pushing the villain (ATTACK_VILLAIN, and
 ## CAPTURE_OBJECTIVES once its objectives are done). Must clear the villain's
-## own flee_distance (see villain.gd) with margin, otherwise he kites just
+## own flee_distance (see dark_mage.gd) with margin, otherwise he kites just
 ## outside detect range and _acquire_target keeps dropping him as _target
 ## before a hero ever gets close enough to land a hit.
 const VILLAIN_ENGAGE_RANGE := 320.0

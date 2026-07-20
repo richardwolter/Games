@@ -1,15 +1,11 @@
-class_name Villain
-extends Combatant
-## The stage villain (Stage 1: Dark Mage), as a beatable HP target.
-##
-## Reuses Combatant for health, health bar, damage and death; never attacks
-## (summoner + HP target — see DECISIONS.md). Kites slowly away from the
-## nearest hero, and every teleport_interval seconds blinks to a nearby clear
-## spot and summons a fresh burst of minions around himself — turns him from
-## a passive HP bag into a moving target that punishes standing still near
-## him. Stats come from villain.tscn.
+class_name DarkMage
+extends Villain
+## Dark Mage: never attacks (summoner + HP target — see DECISIONS.md). Kites
+## slowly away from the nearest hero, and every teleport_interval seconds
+## blinks to a nearby clear spot and summons a fresh burst of minions around
+## himself — turns him from a passive HP bag into a moving target that
+## punishes standing still near him. Stats come from dark_mage.tscn.
 
-@export var villain_name := "DARK MAGE"
 ## Kiting: he retreats from the nearest hero until this far away, then stops.
 @export var flee_distance := 260.0
 ## How often (seconds) he blinks to a nearby spot and resummons minions.
@@ -24,9 +20,6 @@ extends Combatant
 ## Radius of the ring minions are placed on around him after a teleport.
 @export var summon_radius := 90.0
 @export var summon_minion_speed := 90.0
-## Dormant at the lair until a hero comes within this radius (just inside fog
-## vision so he's visible the moment he wakes). See Combatant.is_alerted().
-@export var aggro_radius := 350.0
 ## Leash: fleeing and teleporting stay within this radius of the authored lair,
 ## so a chasing party's progress isn't reset by a blink across the map (fixed-lair
 ## rework — the old free-roaming teleport made the Dark Mage structurally
@@ -59,29 +52,15 @@ var _projectile_scene: PackedScene = null
 var _lair := Vector2.ZERO
 
 func _configure() -> void:
-	self_group = "hostiles"
+	super()
 	enemy_group = ""  # does not attack this milestone
-	add_to_group("villains")
-	label_text = villain_name
-	if _field != null:
-		global_position = _field.villain_pos
 	_lair = global_position
-	villain_aggro_radius = aggro_radius
 	_teleport_cd = teleport_interval
 	_shoot_cd = shoot_interval
 	_minion_scene = load(MINION_SCENE_PATH)
 	_projectile_scene = load(PROJECTILE_SCENE_PATH)
 
-func _process(delta: float) -> void:
-	if _dying:
-		super(delta)  # let the death fade finish
-		return
-	# Dormant at the lair until the party closes in — no teleport, no resummon,
-	# no kiting. The lair is the learnable destination.
-	if not is_alerted():
-		return
-	super(delta)
-
+func _villain_process(delta: float) -> void:
 	_teleport_cd -= delta
 	if _teleport_cd <= 0.0:
 		_teleport_cd = teleport_interval
@@ -209,16 +188,3 @@ func _shoot_nearest_hero() -> void:
 	proj.color = body_color
 	proj.global_position = global_position
 	get_parent().add_child(proj)
-
-## Nearest living hero at any distance (kiting is field-wide, unlike detect).
-func _nearest_hero() -> Combatant:
-	var nearest: Combatant = null
-	var best := INF
-	for node in get_tree().get_nodes_in_group("heroes"):
-		if not is_instance_valid(node) or node._dying:
-			continue
-		var dist := global_position.distance_squared_to(node.global_position)
-		if dist < best:
-			best = dist
-			nearest = node
-	return nearest

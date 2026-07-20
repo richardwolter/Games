@@ -4,6 +4,7 @@
 
 [node name="MechRobot" type="Node2D"]
 script = ExtResource("1_mech")
+villain_name = "MECH ROBOT"
 max_hp = 1050.0
 damage = 12.0
 attack_interval = 0.9

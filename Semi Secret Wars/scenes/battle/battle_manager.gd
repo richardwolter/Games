@@ -205,7 +205,7 @@ func _spawn_villain(config: StageConfig) -> void:
 		"mech_robot":
 			villain_scene = load("res://scenes/villain/mech_robot.tscn")
 		_:
-			villain_scene = load("res://scenes/villain/villain.tscn")
+			villain_scene = load("res://scenes/villain/dark_mage.tscn")
 	if villain_scene != null:
 		var v = villain_scene.instantiate()
 		# Set before add_child so Combatant._ready's `hp = max_hp` (which runs

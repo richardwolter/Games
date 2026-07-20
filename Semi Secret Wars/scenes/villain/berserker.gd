@@ -1,6 +1,6 @@
 class_name Berserker
-extends Combatant
-## Stage 2 villain: mobile, aggressive, high HP. Phases between charging and recovery.
+extends Villain
+## Mobile, aggressive, high HP. Phases between charging and recovery.
 ##
 ## Berserker is the opposite of Dark Mage (stationary). He actively pursues the nearest
 ## hero with a charge/recovery cycle: charges 3s (pursues + attacks), then recovers 1.5s
@@ -9,9 +9,6 @@ extends Combatant
 
 @export var charge_duration := 3.0
 @export var recover_duration := 1.5
-## Dormant at the lair until a hero comes within this radius (just inside fog
-## vision so he's visible the moment he wakes). See Combatant.is_alerted().
-@export var aggro_radius := 350.0
 
 ## How often (seconds) the field-wide hunt goal is re-evaluated.
 const HUNT_INTERVAL := 0.3
@@ -21,24 +18,11 @@ var _phase_timer := 0.0
 var _hunt_cd := 0.0
 
 func _configure() -> void:
-	self_group = "hostiles"
+	super()
 	enemy_group = "heroes"
-	add_to_group("villains")
-	label_text = "BERSERKER"
-	if _field != null:
-		global_position = _field.villain_pos
-	villain_aggro_radius = aggro_radius
 	_phase_timer = charge_duration
 
-func _process(delta: float) -> void:
-	if _dying:
-		super(delta)  # let the death fade finish
-		return
-	# Dormant at the lair until the party closes in — no charge, no hunt.
-	if not is_alerted():
-		return
-	super(delta)
-
+func _villain_process(delta: float) -> void:
 	_phase_timer -= delta
 	if _phase_timer <= 0.0:
 		_charge_phase = not _charge_phase
@@ -80,16 +64,3 @@ func _engage(delta: float) -> void:
 		_lunge = to_target.normalized() * LUNGE_DIST
 		_target.take_damage(damage, self)
 		_attack_cd = attack_interval
-
-## Nearest living hero at any distance (hunting is field-wide, unlike detect).
-func _nearest_hero() -> Combatant:
-	var nearest: Combatant = null
-	var best := INF
-	for node in get_tree().get_nodes_in_group("heroes"):
-		if not is_instance_valid(node) or node._dying:
-			continue
-		var dist := global_position.distance_squared_to(node.global_position)
-		if dist < best:
-			best = dist
-			nearest = node
-	return nearest
