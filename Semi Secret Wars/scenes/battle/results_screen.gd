@@ -4,9 +4,12 @@ extends CanvasLayer
 ## prep menu (where all upgrading/party setup now happens).
 
 ## Shared battle-overlay palette (also referenced by LevelUpScreen) so the
-## in-battle overlays stay visually in sync from one place.
+## in-battle overlays stay visually in sync from one place. BORDER_COLOR
+## matches the prep screens' card/ink borders (prep_menu.gd / PrepPage
+## INK_COLOR) — overlays are modal notebook pages, same family as prep.
 const PAGE_COLOR := Color("f4efe1f0")
 const INK_COLOR := Color("2c2c2c")
+const BORDER_COLOR := Color("161412")
 const UNLOCK_COLOR := Color("b08a3e")
 
 var _panel: PanelContainer
@@ -23,7 +26,7 @@ func _ready() -> void:
 	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var style := StyleBoxFlat.new()
 	style.bg_color = PAGE_COLOR
-	style.border_color = INK_COLOR
+	style.border_color = BORDER_COLOR
 	style.set_border_width_all(3)
 	style.set_content_margin_all(28)
 	_panel.add_theme_stylebox_override("panel", style)
@@ -35,7 +38,7 @@ func _ready() -> void:
 	_title = _label("", 44)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_title)
-	_unlock_banner = _label("STAGE 2 UNLOCKED!", 26)
+	_unlock_banner = _label("", 26)
 	_unlock_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_unlock_banner.add_theme_color_override("font_color", UNLOCK_COLOR)
 	_unlock_banner.visible = false

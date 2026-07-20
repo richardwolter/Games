@@ -22,17 +22,17 @@ extends Node2D
 ## soft hand-drawn fog edge; smaller cells cost more per reveal stamp.
 @export var cell_size := 32.0
 @export var fog_color := Color(0.36, 0.35, 0.33)
-## Fog opacity over unexplored ground (<1 so the page faintly shows through,
-## like heavy pencil shading rather than ink). V1 default; V2's lane
-## (lane_battlefield.tscn) overrides this to 1.0 — fully opaque, so obstacles/
-## spawn points/scenery stay completely hidden until a hero has actually been
-## there, not just dimly visible through the wash.
+## Fog opacity over unexplored ground. battlefield.tscn sets this to 1.0 —
+## fully opaque, so obstacles/spawn points/scenery stay completely hidden
+## until a hero has actually been there, not just dimly visible through the
+## wash. (<1 would let the page faintly show through, like heavy pencil
+## shading rather than ink.)
 @export var fog_alpha := 0.88
-## Softer wash over explored-but-not-currently-visible ground so it reads
-## between clear (live hero vision) and full fog (unexplored). V1 default;
-## V2 overrides this to 0.0 (Designer, 2026-07-19: "revealed if the player has
-## already run through it, only new territory is hidden") — once explored,
-## ground stays fully clear forever, whether or not a hero is watching it now.
+## Wash over explored-but-not-currently-visible ground. battlefield.tscn sets
+## this to 0.0 (Designer, 2026-07-19: "revealed if the player has already run
+## through it, only new territory is hidden") — once explored, ground stays
+## fully clear forever, whether or not a hero is watching it now. (>0 would
+## read as a softer in-between wash instead.)
 @export var memory_alpha := 0.30
 ## Seconds between explored-grid reveal stamps (unit visibility is per-frame).
 @export var reveal_interval := 0.15
@@ -135,7 +135,7 @@ const FOG_DIR := "user://fog"
 
 ## Fog persists to GameState's fog dir, one PNG per level.
 func _fog_path() -> String:
-	return "%s/level_%d.png" % [GameState.fog_dir(), RunState.current_level]
+	return "%s/level_%d.png" % [GameState.FOG_DIR, RunState.current_level]
 
 ## Restores the explored (R) channel from disk into _img. No-op during headless
 ## balance sweeps (no player-facing fog, and it avoids disk churn per sim run).
@@ -158,7 +158,7 @@ func _load_explored() -> void:
 func save_explored() -> void:
 	if RunState.headless:
 		return
-	DirAccess.make_dir_recursive_absolute(GameState.fog_dir())
+	DirAccess.make_dir_recursive_absolute(GameState.FOG_DIR)
 	var out := Image.create(_grid_size.x, _grid_size.y, false, Image.FORMAT_L8)
 	for y in _grid_size.y:
 		for x in _grid_size.x:

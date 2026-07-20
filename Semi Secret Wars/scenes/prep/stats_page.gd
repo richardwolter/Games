@@ -1,6 +1,6 @@
 class_name StatsPage
 extends Control
-## V2's STATS page — spends the shared BANKED XP pool (GameState.banked_xp) on
+## The STATS page — spends the shared BANKED XP pool (GameState.banked_xp) on
 ## permanent, repeatable raw stat upgrades (StatUpgrades: HP/Damage/Attack
 ## Speed) for whichever hero the player chooses. Separate currency and
 ## separate page from ABILITIES (which spends gold) — Designer, 2026-07-19:
@@ -9,7 +9,7 @@ extends Control
 ##
 ## Unlike AbilityMods/AbilityTiers (bought once), each stat here can be bought
 ## repeatedly per hero; cost rises with prior purchases (StatUpgrades.cost_for).
-## Modeled visually on AbilitiesPage/UnlockShopPage (same card/column layout).
+## Modeled visually on AbilitiesPage (same card/column layout).
 
 signal closed
 
@@ -80,7 +80,7 @@ func _hero_column(hero_name: String) -> VBoxContainer:
 	return col
 
 ## Current effective HP/Damage/Attack Speed for `hero_name` — base stat (times
-## the V2 base multiplier, same as Hero._configure) with every purchased
+## the base multiplier, same as Hero._configure) with every purchased
 ## StatUpgrade level folded in, same formula as Hero._apply_stat_upgrades()
 ## uses at spawn. Ability mods (a separate, gold-spent currency/page) aren't
 ## included — this reflects only what THIS page's purchases changed.
@@ -89,8 +89,8 @@ func _effective_stats_text(hero_name: String) -> String:
 	var hp := float(stats.get("base_hp", 100.0))
 	var dmg := float(stats.get("base_damage", 10.0))
 	var atk_interval := float(stats.get("attack_interval", 0.5))
-	hp *= Hero.V2_HP_MULT
-	dmg *= Hero.V2_DAMAGE_MULT
+	hp *= Hero.BASE_HP_MULT
+	dmg *= Hero.BASE_DAMAGE_MULT
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
 	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
 	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")

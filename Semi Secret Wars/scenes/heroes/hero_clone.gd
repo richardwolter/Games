@@ -12,9 +12,9 @@ extends Combatant
 var caster: Combatant = null
 var follow_offset := Vector2.ZERO
 
-## Formation checks (Hero._update_formation) read .role off every member of
-## the "heroes" group; the clone copies its caster's role so it participates
-## like a normal party member instead of erroring as a missing property.
+## Copies its caster's role (set by Hero._try_clone) so it has the same shape
+## as a real party member (e.g. ROLE_COLORS lookups) instead of erroring as a
+## missing property.
 var role := "TANK"
 
 ## How often (seconds) the follow-goal is refreshed, matching the pattern

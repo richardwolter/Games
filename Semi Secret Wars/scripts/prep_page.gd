@@ -2,7 +2,7 @@ class_name PrepPage
 extends Control
 
 ## Ruled notebook-paper background, matching the battlefield's page draw
-## (stage_field.gd _draw_page) so the prep screen reads as the same world.
+## (lane_field.gd _draw_page) so the prep screen reads as the same world.
 
 const PAGE_COLOR := Color("f4efe1")
 const RULE_COLOR := Color("aac4dd")

@@ -1,10 +1,10 @@
 class_name AbilityTiers
 extends RefCounted
-## Permanent ability-tier unlocks bought with gold (V2 grind progression).
+## Permanent ability-tier unlocks bought with gold.
 ##
 ## Maps onto the three flags Hero._configure already reads (_base_unlocked,
-## _passive_unlocked, _active_unlocked) — V1 sets all three unconditionally;
-## V2 gates tiers 2-3 behind these purchases (tier 1, the signature ability,
+## _passive_unlocked, _active_unlocked) — tiers 2-3 are gated behind these
+## purchases (tier 1, the signature ability,
 ## is free — see GameState.has_tier). Same owned-forever pattern as
 ## AbilityMods, but sequential: tier 3 requires tier 2 already owned.
 ##

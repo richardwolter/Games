@@ -15,6 +15,12 @@ var deploy_band_x_min: float = -2900.0
 var deploy_band_x_max: float = -2300.0
 ## Authored destructible spawn points ((x,y)=pos, z=HP), read by LaneSpawner.
 var lane_spawn_points: Array[Vector3] = []
+## Lane ("top"/"bottom") each spawn point above belongs to, index-aligned —
+## see LevelLayout.spawn_point_lanes.
+var lane_spawn_point_lanes: Array[String] = []
+## Lane each objective belongs to ("top"/"bottom"/"" = both), index-aligned
+## with objective_positions — see LevelLayout.objective_lanes.
+var lane_objective_lanes: Array[String] = []
 ## Purely decorative dressing outside the lane rect — not steered around, not
 ## clamped against. (x, y) center + z = radius. Index-aligned with border_decor_kinds.
 ## Hand-placed EXTRAS layered on top of the procedural band below (e.g. a hero
@@ -25,6 +31,79 @@ var border_decor_kinds: Array[String] = []
 
 var hero_spawn := Vector2(-1500.0, -600.0)
 var villain_pos := Vector2(1420.0, 640.0)
+## The dividing line between the top and bottom lanes (Designer, 2026-07-20:
+## split the lane in two so heroes/minions spread instead of clustering on one
+## spot). Fixed at lane center — lanes are a behavioral zone, not a hard wall,
+## so this never needs to vary per level.
+const LANE_SPLIT_Y := 0.0
+## How close to the villain (in x) the lane split actually ends — inside this
+## band a unit's y is left unclamped so top and bottom can converge on one
+## villain fight; everywhere else (Designer, 2026-07-20: "merge should be
+## right before the villain, not in the middle of the lane") a unit is held
+## hard to its own lane's half.
+const LANE_MERGE_ZONE_WIDTH := 500.0
+## Small buffer past the split line so a clamped unit doesn't ride the exact
+## boundary and jitter across it every frame as steering nudges it back and forth.
+const LANE_CLAMP_MARGIN := 20.0
+
+## Which lane a point belongs to — "top" (y < split) or "bottom" (y >= split).
+## Used both for deploy-position lane assignment (Hero._configure) and as the
+## fallback for spawn points/objectives with no explicit lane tag.
+func lane_of(pos: Vector2) -> String:
+	return "top" if pos.y < LANE_SPLIT_Y else "bottom"
+
+## X coordinate where the lane split ends and top/bottom are free to converge.
+func lane_merge_x() -> float:
+	return villain_pos.x - LANE_MERGE_ZONE_WIDTH
+
+## True when at least one living real Hero (HeroClone excluded — it has no
+## `lane` of its own) is currently assigned to `lane_value`. Used to detect a
+## collapsed lane (its whole Duo wiped out).
+func lane_has_living_hero(lane_value: String) -> bool:
+	for node in get_tree().get_nodes_in_group("heroes"):
+		if node is Hero and is_instance_valid(node) and not node._dying and (node as Hero).lane == lane_value:
+			return true
+	return false
+
+## Which lanes have EVER had a hero deploy into them this battle — set by
+## Hero._configure via mark_lane_populated. Distinguishes "this lane's
+## defenders died" (should merge) from "nobody was ever deployed here"
+## (an uneven/one-sided deploy — should NOT merge, or every hero would read
+## the un-deployed lane as instantly collapsed and every lane restriction
+## would silently turn off from the opening frame).
+var _lane_populated := {"top": false, "bottom": false}
+
+func mark_lane_populated(lane_value: String) -> void:
+	_lane_populated[lane_value] = true
+
+## True once a lane that DID have heroes assigned to it has since lost all of
+## them (Designer, 2026-07-20: "lane separation breaks because of the
+## assigned duo's death") — at that point the two lanes are effectively one
+## battlefield: both the movement clamp (clamp_to_lane) and hero target-lane
+## filtering (Hero._lane_ok) stand down everywhere, not just near the villain.
+## A lane nobody was ever deployed to does NOT trigger this on its own.
+func lanes_merged() -> bool:
+	for lane_value in _lane_populated:
+		if _lane_populated[lane_value] and not lane_has_living_hero(lane_value):
+			return true
+	return false
+
+## Hard-clamps `pos` to stay on `lane_value`'s own side of the split, UNLESS
+## pos.x has already reached the merge zone near the villain, or the lanes
+## have collapsed (lanes_merged()) — called every frame by any lane-restricted
+## unit (Hero, Minion) after its normal movement step, so steering/goals can
+## never walk it across into the other lane's territory before the merge
+## point/collapse. `lane_value` == "" (unrestricted units, e.g. HeroClone) is
+## a no-op.
+func clamp_to_lane(pos: Vector2, lane_value: String) -> Vector2:
+	if lane_value == "" or pos.x >= lane_merge_x() or lanes_merged():
+		return pos
+	if lane_value == "top":
+		pos.y = minf(pos.y, -LANE_CLAMP_MARGIN)
+	else:
+		pos.y = maxf(pos.y, LANE_CLAMP_MARGIN)
+	return pos
+
 ## Derived from lane_length/lane_half_height (see apply_lane_layout) — sizes
 ## the reused FogOfWar/page grids, not an authored ellipse.
 var field_radius := Vector2(2000.0, 1000.0)
@@ -195,7 +274,9 @@ func apply_lane_layout(layout: LevelLayout) -> void:
 	scenery = layout.scenery.duplicate()
 	scenery_kinds = layout.scenery_kinds.duplicate()
 	objective_positions = layout.objective_positions.duplicate()
+	lane_objective_lanes = layout.objective_lanes.duplicate()
 	lane_spawn_points = layout.spawn_points.duplicate()
+	lane_spawn_point_lanes = layout.spawn_point_lanes.duplicate()
 	border_decor = layout.border_decor.duplicate()
 	border_decor_kinds = layout.border_decor_kinds.duplicate()
 	# The lane is centered on the origin; field_radius is its half-extents so the
@@ -574,6 +655,26 @@ func _draw_deploy_band() -> void:
 			Vector2(deploy_band_x_max, lane_half_height),
 			Color(0.30, 0.55, 0.30, 0.7), 3.0, true)
 	_draw_label(Vector2((deploy_band_x_min + deploy_band_x_max) * 0.5, -lane_half_height + 30.0), "DEPLOY")
+	_draw_lane_divider()
+
+## Dashed centerline marking the top/bottom lane split — drawn across the
+## deploy band (so it's clear which half a hero is being dropped into) and all
+## the way up to the merge zone right before the villain lair, matching the
+## actual movement clamp in clamp_to_lane (Designer, 2026-07-20: "merge should
+## be right before the villain, not in the middle of the lane").
+func _draw_lane_divider() -> void:
+	var x_start := deploy_band_x_min
+	var x_end := lane_merge_x()
+	var dash := 24.0
+	var gap := 16.0
+	var x := x_start
+	while x < x_end:
+		var seg_end: float = minf(x + dash, x_end)
+		draw_line(Vector2(x, LANE_SPLIT_Y), Vector2(seg_end, LANE_SPLIT_Y),
+				Color(outline_color, 0.45), 2.5, true)
+		x += dash + gap
+	_draw_label(Vector2(deploy_band_x_min + 40.0, LANE_SPLIT_Y - 12.0), "TOP LANE")
+	_draw_label(Vector2(deploy_band_x_min + 40.0, LANE_SPLIT_Y + 22.0), "BOTTOM LANE")
 
 func _draw_lair() -> void:
 	draw_arc(villain_pos, 70.0, 0.0, TAU, 28, Color(0.55, 0.2, 0.55, 0.9), 4.0, true)

@@ -107,6 +107,20 @@ func set_ko() -> void:
 	if cooldown_bar != null:
 		cooldown_bar.value = 0
 	cooldown_indicator.text = "DOWN"
+
+## Second-Duo-wave hero not on the field yet (still counting down to its
+## staggered arrival) — distinct from set_ko() so waiting doesn't read as
+## dead. No _ko-style latch: called every frame while waiting, since the
+## countdown text needs to keep updating.
+func set_incoming(seconds_left: float) -> void:
+	if name_label == null or level_label == null or hp_bar == null or cooldown_indicator == null:
+		return
+	name_label.text = hero_name
+	level_label.text = "ARRIVES IN %ds" % int(ceil(seconds_left))
+	hp_bar.value = hp_bar.max_value if hp_bar.max_value > 0 else 100
+	if cooldown_bar != null:
+		cooldown_bar.value = 0
+	cooldown_indicator.text = "—"
 	cooldown_indicator.add_theme_color_override("font_color", Color("c63d3d"))
 	if cooldown_bar2 != null:
 		cooldown_bar2.value = 0

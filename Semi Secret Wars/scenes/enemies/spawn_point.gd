@@ -1,6 +1,6 @@
 class_name LaneSpawnPoint
 extends Combatant
-## A destructible minion spawn point on a V2 lane (the core new mechanic).
+## A destructible minion spawn point on the lane (a core mechanic).
 ##
 ## Extends Combatant purely to inherit HP, damage intake, the health bar, the
 ## `died` signal, and — by joining the "hostiles" group heroes target — automatic
@@ -9,6 +9,10 @@ extends Combatant
 ## permanently retires it (stops its waves) when it dies.
 
 var _spawn_at := Vector2.ZERO
+## Lane ("top"/"bottom") this gate belongs to — set by LaneSpawner right after
+## creation (see LevelLayout.spawn_point_lanes). Read by Hero._nearest_spawn_point
+## so heroes commit to their own lane's gates.
+var lane := ""
 
 ## Called by LaneSpawner before add_child(), like Minion.setup().
 func setup(pos: Vector2, hp: float) -> void:

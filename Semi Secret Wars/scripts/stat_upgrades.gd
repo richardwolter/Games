@@ -1,7 +1,7 @@
 class_name StatUpgrades
 extends RefCounted
-## Permanent, repeatable per-hero stat upgrades bought with banked XP (V2 grind
-## progression) — the "raw stats" track, separate from AbilityMods/AbilityTiers
+## Permanent, repeatable per-hero stat upgrades bought with banked XP —
+## the "raw stats" track, separate from AbilityMods/AbilityTiers
 ## (which both spend gold). Unlike those catalogs (bought once), each of these
 ## can be bought repeatedly per hero; cost rises with how many times that hero
 ## has already bought it — see GameState.stat_purchase_count/buy_stat_upgrade.

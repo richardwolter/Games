@@ -7,10 +7,13 @@ extends CanvasLayer
 @export var hero_panels_root_path: NodePath = "HeroPanelsRoot"
 @export var objective_label_path: NodePath = "ObjectiveLabel"
 @export var objective_bar_path: NodePath = "ObjectiveBar"
+## The panel wrapping the objective label + bar — hidden entirely on levels
+## that author no objectives (all current lanes), so the HUD doesn't carry a
+## dead panel; get_node_or_null keeps it optional.
+@export var objective_panel_path: NodePath = "ObjectivePanel"
 @export var run_xp_label_path: NodePath = "RunXPLabel"
-## Optional — only V2's lane_battlefield.tscn authors this node (live gold
-## drip, GameState.bank_gold). Left unset in V1's battlefield.tscn, where gold
-## never changes mid-battle anyway; get_node_or_null keeps this a no-op there.
+## Live gold drip (GameState.bank_gold — per-kill/per-gate payouts land
+## mid-battle); get_node_or_null keeps this optional.
 @export var gold_label_path: NodePath = "GoldPanel/GoldLabel"
 @export var timer_label_path: NodePath = "TimerPanel/TimerLabel"
 @export var buff_panel_path: NodePath = "ObjectiveBuffPanel"
@@ -26,6 +29,7 @@ var _villain_seen := false
 var _hero_panels_root: Node
 var _objective_label: Label
 var _objective_bar: ProgressBar
+var _objective_panel: Control
 var _run_xp_label: Label
 var _gold_label: Label
 var _timer_label: Label
@@ -42,21 +46,56 @@ var _buff_color := Color.WHITE
 var _buff_t := 0.0
 var _buff_duration := 0.0
 
+## Second-Duo-wave arrival countdown chip — built in code (no .tscn node for
+## it) since it's new and small; polls BattleManager.duo_b_seconds_remaining()
+## every frame so the player can watch the timer against the live fight.
+var _duo_b_label: Label
+
+## Named Duo synergy banner — one per Duo, shown while that Duo has at least
+## one live spawned hero. Built in code like _duo_b_label (no .tscn node for
+## it); purely presentational (see DuoSynergies), no gameplay effect of its own.
+var _duo_synergy_labels: Array[Label] = []
+
 func _ready() -> void:
 	_villain_hp_label = get_node(villain_hp_label_path)
 	_villain_hp_bar = get_node(villain_hp_bar_path)
 	_hero_panels_root = get_node(hero_panels_root_path)
 	_objective_label = get_node(objective_label_path)
 	_objective_bar = get_node(objective_bar_path)
+	_objective_panel = get_node_or_null(objective_panel_path)
 	_run_xp_label = get_node(run_xp_label_path)
 	_gold_label = get_node_or_null(gold_label_path)
 	_timer_label = get_node(timer_label_path)
 	_buff_panel = get_node(buff_panel_path)
 	_buff_label = get_node(buff_label_path)
 	get_node(back_button_path).pressed.connect(_on_back_pressed)
+	_build_duo_b_label()
+	_build_duo_synergy_labels()
+
+func _build_duo_synergy_labels() -> void:
+	for i in 2:
+		var label := Label.new()
+		label.add_theme_font_size_override("font_size", 16)
+		label.add_theme_color_override("font_color", Color("6fa8dc"))
+		label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		label.position.y = 120.0 + i * 22.0
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.visible = false
+		add_child(label)
+		_duo_synergy_labels.append(label)
+
+func _build_duo_b_label() -> void:
+	_duo_b_label = Label.new()
+	_duo_b_label.add_theme_font_size_override("font_size", 22)
+	_duo_b_label.add_theme_color_override("font_color", Color("b8860b"))
+	_duo_b_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_duo_b_label.position.y = 96.0
+	_duo_b_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_duo_b_label.visible = false
+	add_child(_duo_b_label)
 
 func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file(GameState.prep_scene())
+	get_tree().change_scene_to_file(GameState.PREP_MENU)
 
 func _process(delta: float) -> void:
 	_update_villain_hp()
@@ -66,6 +105,41 @@ func _process(delta: float) -> void:
 	_update_hero_panels()
 	_update_timer(delta)
 	_update_objective_buff(delta)
+	_update_duo_b_countdown()
+	_update_duo_synergy_labels()
+
+## Shows each Duo's named synergy banner while that Duo has at least one
+## live hero on the field — reads GameState.duo_pairings (persistent Duo
+## identity) rather than deriving pairs from who's alive, so a Duo with one
+## fallen member still shows its name as long as its partner fights on.
+func _update_duo_synergy_labels() -> void:
+	var alive_names: Array = []
+	for h in get_tree().get_nodes_in_group("heroes"):
+		if h is Hero:
+			alive_names.append(h.hero_name)
+	var duos: Array = GameState.duo_pairings
+	for i in _duo_synergy_labels.size():
+		var label := _duo_synergy_labels[i]
+		if i >= duos.size() or not (duos[i] is Array) or (duos[i] as Array).size() != 2:
+			label.visible = false
+			continue
+		var duo: Array = duos[i]
+		if duo[0] not in alive_names and duo[1] not in alive_names:
+			label.visible = false
+			continue
+		var d := DuoSynergies.def_for_heroes(duo[0], duo[1])
+		if d.is_empty():
+			label.visible = false
+			continue
+		label.text = "DUO %s: %s" % ["A" if i == 0 else "B", d.get("name", "")]
+		label.visible = true
+
+func _update_duo_b_countdown() -> void:
+	var bm := get_tree().get_first_node_in_group("battle_manager")
+	var remaining: float = bm.duo_b_seconds_remaining() if bm != null else -1.0
+	_duo_b_label.visible = remaining > 0.0
+	if remaining > 0.0:
+		_duo_b_label.text = "2ND DUO ARRIVES IN %ds" % int(ceil(remaining))
 
 ## Shows the objective-completion reward banner with a live countdown.
 ## `duration` <= 0 means an instant/permanent grant (e.g. the shield charges)
@@ -131,7 +205,7 @@ func _update_run_xp() -> void:
 		total += int(x)
 	_run_xp_label.text = "XP: %d" % total
 
-## Live gold total, so the V2 per-kill/per-gate drip (GameState.bank_gold) is
+## Live gold total, so the per-kill/per-gate drip (GameState.bank_gold) is
 ## visible as it happens rather than only showing up back at prep.
 func _update_gold() -> void:
 	if _gold_label == null:
@@ -140,6 +214,8 @@ func _update_gold() -> void:
 
 func _update_objective() -> void:
 	var objs = get_tree().get_nodes_in_group("objectives")
+	if _objective_panel != null:
+		_objective_panel.visible = not objs.is_empty()
 	if objs.is_empty():
 		_objective_label.text = ""
 		return
@@ -183,6 +259,8 @@ func _update_hero_panels() -> void:
 	if cam != null:
 		followed = cam.follow_target()
 
+	var bm := get_tree().get_first_node_in_group("battle_manager")
+
 	for hero_name in _hero_panels:
 		var panel = _hero_panels[hero_name]
 		if hero_name in alive:
@@ -191,6 +269,9 @@ func _update_hero_panels() -> void:
 			# that actually changes mid-battle, not a persistent one that never did.
 			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent(), h.ability_name(), h.second_ability_name(), h.second_ability_cooldown, h.second_ability_cooldown_max())
 			panel.set_focused(followed == h)
+		elif bm != null and bm.has_method("is_hero_incoming") and bm.is_hero_incoming(hero_name):
+			panel.set_incoming(bm.duo_b_seconds_remaining())
+			panel.set_focused(false)
 		else:
 			panel.set_ko()
 			panel.set_focused(false)

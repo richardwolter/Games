@@ -14,16 +14,8 @@ extends Node
 
 const SAVE_PATH := "user://save.json"
 const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
+const BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
 const FOG_DIR := "user://fog"
-
-func save_path() -> String:
-	return SAVE_PATH
-
-func fog_dir() -> String:
-	return FOG_DIR
-
-func prep_scene() -> String:
-	return PREP_MENU
 
 ## Gold awarded at run end (spent on permanent ability mods at prep). Scales with
 ## levels cleared this run — deeper runs pay more — with a win bonus on top and a
@@ -41,9 +33,10 @@ const KILL_ASSIST_SHARE := 0.5
 ## stage_1_won/stage select retired). v5 = V2 grind progression (career
 ## achievements + ability tiers). v6 = banked_xp changed from per-hero
 ## Dictionary to a single shared int pool (Designer, 2026-07-19: "XP shared
-## between all heroes"). Any save below this is discarded on load — a clean
-## break the Designer approved rather than migrating old data forward.
-const SAVE_VERSION := 6
+## between all heroes"). v7 = Duo system (duo_pairings added — see
+## duo_of/set_duo_pairings). Any save below this is discarded on load — a
+## clean break the Designer approved rather than migrating old data forward.
+const SAVE_VERSION := 7
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
 const HERO_CATALOG := {
@@ -53,24 +46,6 @@ const HERO_CATALOG := {
 	"BEACON": {"color": Color(0.88, 0.72, 0.30)},
 }
 
-## Battlefield priorities a hero can be assigned pre-battle (GDD §11).
-## SUPPORT_ALLIES un-deferred in Milestone 5 now that a support hero (BEACON)
-## with an ally-buff ability (Rally) exists.
-const PRIORITIES := {
-	"CAPTURE_OBJECTIVES": "Capture Objectives",
-	"ATTACK_VILLAIN": "Attack Villain",
-	"ATTACK_MINIONS": "Attack Minions",
-	"SUPPORT_ALLIES": "Support Allies",
-}
-
-## party[name] = {"priority": String, "support_target": String} — set on the
-## prep screen. support_target only matters while priority is SUPPORT_ALLIES:
-## "" means follow the nearest living ally (default); otherwise it names one
-## specific drafted hero to shadow instead.
-## (role is now fixed per hero and set in Hero._configure, not here). Which
-## heroes are actually fielded this run is a draft pick, not a persisted
-## setting — see RunState.party (Milestone 3).
-var party := {}
 ## XP gained per hero in the current run (for the results screen — display only,
 ## not currency; in-run power comes from RunState's level/boon track).
 var run_xp := {}
@@ -82,23 +57,26 @@ var gold := 0
 ## Ability-mod ids bought and owned forever (AbilityMods catalog). Applied at
 ## spawn in Hero._apply_owned_ability_mods.
 var owned_mods: Array = []
-## Ability-tier ids bought and owned forever (AbilityTiers catalog, V2 only —
-## "<HERO>_2"/"<HERO>_3"). Tier-gates the three flags Hero._configure sets
-## unconditionally for V1. See has_tier/buy_tier.
+## Ability-tier ids bought and owned forever (AbilityTiers catalog —
+## "<HERO>_2"/"<HERO>_3"). Tier-gates the ability flags Hero._configure sets.
+## See has_tier/buy_tier.
 var owned_ability_tiers: Array = []
-## Heroes currently available for the party/draft. Starts with THUNDAAR alone
-## and unlocks the rest through career achievements (see _reset_state_defaults).
-var unlocked_heroes: Array = ["THUNDAAR"]
+## Heroes currently available for the party/draft. Starts with the full
+## roster unlocked (Designer, 2026-07-20: need all 4 heroes day-one to test
+## the Duo system — both pairing combinations and staggered deploy need 4
+## live heroes). Achievement-gated unlocking (see _check_achievements) stays
+## wired up underneath but is a no-op while everyone starts unlocked.
+var unlocked_heroes: Array = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
 ## Relic ids available for the run-boon pool (scaffolding for a later
 ## milestone — no relics exist yet, so this stays empty).
 var unlocked_relics: Array = []
 
-## Lifetime V2 career counters (minions_killed, gates_destroyed,
-## best_villain_damage_pct, runs_played), accumulated across every V2 run, win
+## Lifetime career counters (minions_killed, gates_destroyed,
+## best_villain_damage_pct, runs_played), accumulated across every run, win
 ## or lose. Drives Achievements hero unlocks — see record_career/record_career_max.
 var career := {}
 
-## Persistent XP currency (V2 grind), shared across the whole roster like gold.
+## Persistent XP currency, shared across the whole roster like gold.
 ## Every point of XP any hero earns banks here permanently (see add_xp) — it is
 ## NEVER reset by a new run starting; the only two ways it changes are being
 ## earned or being spent (buy_stat_upgrade) on any hero's permanent raw stat
@@ -108,6 +86,33 @@ var banked_xp := 0
 ## bought for that hero. Drives both StatUpgrades.cost_for's scaling and the
 ## stat bonus applied at spawn (Hero._apply_stat_upgrades).
 var stat_purchases: Dictionary = {}
+
+## -- Duo pairings ---------------------------------------------------------
+
+## Persistent Duo pairing: an Array of exactly 2 Duos, each an Array of exactly
+## 2 distinct hero names covering the current 4-hero roster with no overlap.
+## Set from the prep screen's Pairings panel (PrepMenu._on_pairing_chip_pressed)
+## and read at deploy time to sequence the two Duos onto the field
+## (DeployController/BattleManager). Empty/invalid means "not paired yet" —
+## callers must check has_valid_duo_pairings before relying on it.
+var duo_pairings: Array = []
+
+## How many seconds after the first-deployed Duo lands the second Duo
+## arrives. Set (and remembered run-to-run) via the deploy screen's stepper
+## (DeployController) so the player can tune arrival timing across attempts —
+## "play with the timer to find the best moment" — rather than re-deciding it
+## fresh every run. Persisted; not reset by start_run() or a new level.
+const DUO_B_DELAY_MIN := 0.0
+const DUO_B_DELAY_MAX := 30.0
+const DUO_B_DELAY_DEFAULT := 10.0
+var duo_b_delay_seconds: float = DUO_B_DELAY_DEFAULT
+
+## Clamps and persists a new deploy-stagger value. Saves immediately, same as
+## the other prep-screen dials (buy_mod/buy_tier/set_duo_pairings) — this one
+## just changes via a stepper instead of a purchase.
+func set_duo_b_delay(seconds: float) -> void:
+	duo_b_delay_seconds = clampf(seconds, DUO_B_DELAY_MIN, DUO_B_DELAY_MAX)
+	save_game()
 
 func _ready() -> void:
 	load_game()
@@ -120,16 +125,6 @@ func _input(event: InputEvent) -> void:
 
 func start_run() -> void:
 	run_xp.clear()
-
-## -- Party / priorities -------------------------------------------------------
-
-func party_of(hero_name: String) -> Dictionary:
-	if not party.has(hero_name):
-		party[hero_name] = {
-			"priority": "ATTACK_VILLAIN",
-			"support_target": "",
-		}
-	return party[hero_name]
 
 ## Kill XP: killer banks the full value; every other living hero banks the
 ## assist share (rounded up), so XP flows to the whole party (BALANCE.md).
@@ -206,7 +201,7 @@ func unlock_relic(id: String) -> void:
 		unlocked_relics.append(id)
 		save_game()
 
-## -- Career stats / achievements (V2 grind) -----------------------------------
+## -- Career stats / achievements ----------------------------------------------
 
 ## Increments without saving to disk — this fires per-kill/per-gate against a
 ## 50-minion swarm, so a save here would thrash file I/O the same way a per-kill
@@ -232,7 +227,7 @@ func _check_achievements() -> void:
 		if float(career.get(d.get("stat", ""), 0)) >= float(d.get("threshold", 0)):
 			unlock_hero(hero_name)  # saves immediately — the achievement is safe on crash
 
-## -- Ability tiers (V2 grind) --------------------------------------------------
+## -- Ability tiers -------------------------------------------------------------
 
 ## Tier 1 (the signature ability — Stomp/Clone/Ensnare/Rally) is free the
 ## moment a hero is unlocked; tiers 2-3 are gold-gated (AbilityTiers catalog).
@@ -260,7 +255,7 @@ func buy_tier(id: String) -> bool:
 	save_game()
 	return true
 
-## -- Raw stat upgrades (V2 grind) ----------------------------------------------
+## -- Raw stat upgrades ---------------------------------------------------------
 
 func stat_purchase_count(hero_name: String, stat_id: String) -> int:
 	return int(stat_purchases.get(hero_name, {}).get(stat_id, 0))
@@ -280,14 +275,65 @@ func buy_stat_upgrade(hero_name: String, stat_id: String) -> bool:
 	save_game()
 	return true
 
+## -- Duo pairings -------------------------------------------------------------
+
+## The paired partner of `hero_name`, or "" if unpaired/pairings invalid.
+func duo_of(hero_name: String) -> String:
+	for duo in duo_pairings:
+		if not (duo is Array):
+			continue
+		if hero_name in duo:
+			for h in duo:
+				if h != hero_name:
+					return h
+	return ""
+
+## Whether `hero_name` leads its Duo — a pure player choice (Designer,
+## 2026-07-20: "tank always leads does not work anymore ... this should be a
+## player decision"), NOT derived from role. Leader is whichever hero was
+## dropped in that Duo's first (left/A) pairing slot — see
+## PrepMenu._sync_party_from_slots, which builds each pair as [slot_0, slot_1]
+## in drop order. False for an unpaired hero (matches Hero._duo_leader's
+## "no partner = irrelevant" default).
+func is_duo_leader(hero_name: String) -> bool:
+	for duo in duo_pairings:
+		if duo is Array and (duo as Array).size() == 2 and duo[0] == hero_name:
+			return true
+	return false
+
+## True when duo_pairings is exactly 2 Duos of 2 distinct heroes each,
+## together covering `roster` (order-independent) with no repeats.
+func has_valid_duo_pairings(roster: Array) -> bool:
+	if duo_pairings.size() != 2:
+		return false
+	var seen: Array = []
+	for duo in duo_pairings:
+		if not (duo is Array) or (duo as Array).size() != 2:
+			return false
+		for h in duo:
+			if h in seen:
+				return false
+			seen.append(h)
+	var sorted_seen: Array = seen.duplicate()
+	sorted_seen.sort()
+	var sorted_roster: Array = roster.duplicate()
+	sorted_roster.sort()
+	return sorted_seen == sorted_roster
+
+## Sets the Duo pairing (see has_valid_duo_pairings for the expected shape)
+## and saves immediately — a deliberate, infrequent player action, same as
+## buy_mod/buy_tier. Pass [] to clear.
+func set_duo_pairings(pairs: Array) -> void:
+	duo_pairings = pairs
+	save_game()
+
 ## -- Persistence -------------------------------------------------------------
 
 func save_game() -> void:
-	var f := FileAccess.open(save_path(), FileAccess.WRITE)
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify({
 			"version": SAVE_VERSION,
-			"party": party,
 			"gold": gold,
 			"owned_mods": owned_mods,
 			"unlocked_heroes": unlocked_heroes,
@@ -296,12 +342,14 @@ func save_game() -> void:
 			"owned_ability_tiers": owned_ability_tiers,
 			"banked_xp": banked_xp,
 			"stat_purchases": stat_purchases,
+			"duo_pairings": duo_pairings,
+			"duo_b_delay_seconds": duo_b_delay_seconds,
 		}))
 
 func load_game() -> void:
-	if not FileAccess.file_exists(save_path()):
+	if not FileAccess.file_exists(SAVE_PATH):
 		return
-	var f := FileAccess.open(save_path(), FileAccess.READ)
+	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if f == null:
 		return
 	var data: Variant = JSON.parse_string(f.get_as_text())
@@ -312,7 +360,6 @@ func load_game() -> void:
 		# migration — Designer-approved wipe (see DECISIONS.md). Leave every
 		# var at its fresh-start default.
 		return
-	party = data.get("party", {})
 	gold = int(data.get("gold", 0))
 	owned_mods = data.get("owned_mods", [])
 	var saved_heroes: Variant = data.get("unlocked_heroes", null)
@@ -323,25 +370,28 @@ func load_game() -> void:
 	owned_ability_tiers = data.get("owned_ability_tiers", [])
 	banked_xp = int(data.get("banked_xp", 0))
 	stat_purchases = data.get("stat_purchases", {})
+	duo_pairings = data.get("duo_pairings", [])
+	duo_b_delay_seconds = float(data.get("duo_b_delay_seconds", DUO_B_DELAY_DEFAULT))
 
 ## Resets the in-memory persistent vars to fresh-start defaults WITHOUT deleting
 ## the save file.
 func _reset_state_defaults() -> void:
-	party = {}
 	run_xp = {}
 	gold = 0
 	owned_mods = []
 	owned_ability_tiers = []
 	banked_xp = 0
 	stat_purchases = {}
-	unlocked_heroes = ["THUNDAAR"]
+	duo_pairings = []
+	duo_b_delay_seconds = DUO_B_DELAY_DEFAULT
+	unlocked_heroes = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
 	unlocked_relics = []
 	career = {}
 
 func reset_save() -> void:
 	_reset_state_defaults()
-	if FileAccess.file_exists(save_path()):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path()))
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
 ## Full dev reset: wipes the save (this GameState autoload), the in-run chain
 ## state (RunState — current_level/hp_carry/dead/levels/boons/draft), and the
@@ -358,10 +408,10 @@ func full_reset() -> void:
 	RunState.draft_offer.clear()
 	_clear_fog_dir()
 	get_tree().paused = false
-	get_tree().change_scene_to_file(prep_scene())
+	get_tree().change_scene_to_file(PREP_MENU)
 
 func _clear_fog_dir() -> void:
-	var abs_path := ProjectSettings.globalize_path(fog_dir())
+	var abs_path := ProjectSettings.globalize_path(FOG_DIR)
 	var dir := DirAccess.open(abs_path)
 	if dir == null:
 		return

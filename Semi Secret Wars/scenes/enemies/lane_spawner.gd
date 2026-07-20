@@ -1,14 +1,14 @@
 class_name LaneSpawner
 extends Node2D
-## V2 lane swarm spawner: same escalating cap/batch loop as MinionSpawner, but
-## waves pour from DESTRUCTIBLE spawn points distributed along the lane rather
-## than from fixed edge gates. Destroying a point permanently stops its waves;
+## Lane swarm spawner: an escalating cap/batch loop whose waves pour from
+## DESTRUCTIBLE spawn points distributed along the lane.
+## Destroying a point permanently stops its waves;
 ## all points destroyed is half the level-clear condition (villain dead is the
 ## other half — see BattleManager).
 
 signal points_cleared  ## Emitted the moment the last spawn point is destroyed.
 
-## Gold drip (V2 grind economy) — banked immediately via GameState.bank_gold,
+## Gold drip — banked immediately via GameState.bank_gold,
 ## which does NOT save to disk (per-kill saves would thrash file I/O against a
 ## 50-minion swarm). Flushed by the save_game() inside the eventual
 ## award_gold() call at BattleManager._end(). First-pass values — flag for
@@ -34,6 +34,12 @@ var battle_started := false
 
 var _field: LaneField
 var _points: Array[LaneSpawnPoint] = []
+## Lane ("top"/"bottom") each entry in _points belongs to, index-aligned —
+## resolved once at spawn-point creation from LaneField's authored tags
+## (falls back to sign-of-y for an untagged point). Kept in lockstep with
+## _points (both erased together in _on_point_died) so a point's lane can be
+## looked up by its index without a second lookup pass at every minion spawn.
+var _point_lanes: Array[String] = []
 var _active := 0
 var _cap := 0.0
 var _spawn_timer := 0.0
@@ -49,14 +55,21 @@ func _ready() -> void:
 ## Instantiate one destructible LaneSpawnPoint per authored point and hold it.
 func _spawn_spawn_points() -> void:
 	_points.clear()
+	_point_lanes.clear()
 	if _field == null:
 		return
-	for p in _field.lane_spawn_points:
+	for i in _field.lane_spawn_points.size():
+		var p: Vector3 = _field.lane_spawn_points[i]
 		var sp := LaneSpawnPoint.new()
 		sp.setup(Vector2(p.x, p.y), p.z)
+		# Use the authored (x,y), not sp.global_position — _configure() (which
+		# sets global_position from _spawn_at) doesn't run until add_child below.
+		var tag := _field.lane_spawn_point_lanes[i] if i < _field.lane_spawn_point_lanes.size() else ""
+		sp.lane = tag if tag != "" else _field.lane_of(Vector2(p.x, p.y))
 		add_child(sp)
 		sp.died.connect(_on_point_died.bind(sp))
 		_points.append(sp)
+		_point_lanes.append(sp.lane)
 		# Register as a hard blocker so heroes steer around / can't stand on the
 		# gate — Combatant separation only applies within the same self_group,
 		# so a hero would otherwise walk straight into it. Approaching units'
@@ -122,7 +135,8 @@ func _spawn_one() -> void:
 	var m := scene.instantiate()
 	var offset := _random_disc(goal_spread)
 	# Spawn from a living point; march LEFT onto the deploy band the heroes hold.
-	var point: LaneSpawnPoint = _points.pick_random()
+	var point_index := randi() % _points.size()
+	var point: LaneSpawnPoint = _points[point_index]
 	# Spawn just outside the gate's own hard-collision radius, not inside it —
 	# spawn_spread (30) is smaller than the gate's body_radius (44), so a plain
 	# disc offset would land every minion inside the gate's collision, which
@@ -135,7 +149,8 @@ func _spawn_one() -> void:
 		point.global_position + _random_ring(min_r, min_r + spawn_spread),
 		_field.hero_spawn + offset,
 		offset * 0.6,
-		minion_speed)
+		minion_speed,
+		_point_lanes[point_index])
 	add_child(m)
 	m.tree_exited.connect(_on_minion_removed)
 	m.died.connect(_on_minion_killed)
@@ -149,6 +164,9 @@ func _pick_minion_scene() -> PackedScene:
 ## A spawn point was destroyed — retire it permanently; fire points_cleared when
 ## the last one falls.
 func _on_point_died(_who: Combatant, point: LaneSpawnPoint) -> void:
+	var idx := _points.find(point)
+	if idx != -1:
+		_point_lanes.remove_at(idx)
 	_points.erase(point)
 	if _field != null:
 		_field.unregister_dynamic_obstacle(point.global_position, point.body_radius)

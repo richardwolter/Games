@@ -1,14 +1,11 @@
 class_name AbilitiesPage
 extends Control
-## V2's single ABILITIES page — merges two gold-spending catalogs that used to
+## The single ABILITIES page — merges two gold-spending catalogs that used to
 ## live on separate pages (Designer, 2026-07-19: "put abilities and ability
 ## shop in the same page, those use gold"): AbilityTiers (tier 2/3 unlocks,
 ## sequential) and AbilityMods (the 8 stat/geometry tradeoffs, independent
 ## purchases — see scripts/ability_mods.gd). One hero column per drafted hero:
 ## tier cards first, then that hero's mod cards underneath.
-##
-## V1 keeps its original separate UnlockShopPage (scenes/prep/unlock_shop_page.gd)
-## untouched — V1 has no ability tiers to merge in.
 
 signal closed
 

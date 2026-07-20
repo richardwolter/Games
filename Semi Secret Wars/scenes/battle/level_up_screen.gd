@@ -14,6 +14,7 @@ signal picked(boon_id: String)
 ## source so the two screens can't drift apart visually.
 const PAGE_COLOR := ResultsScreen.PAGE_COLOR
 const INK_COLOR := ResultsScreen.INK_COLOR
+const BORDER_COLOR := ResultsScreen.BORDER_COLOR
 const ACCENT := ResultsScreen.UNLOCK_COLOR
 
 var _picked := false
@@ -30,7 +31,7 @@ func setup(hero_name: String, offer: Array) -> void:
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var style := StyleBoxFlat.new()
 	style.bg_color = PAGE_COLOR
-	style.border_color = INK_COLOR
+	style.border_color = BORDER_COLOR
 	style.set_border_width_all(3)
 	style.set_content_margin_all(28)
 	panel.add_theme_stylebox_override("panel", style)

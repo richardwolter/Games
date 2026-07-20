@@ -15,37 +15,64 @@ extends Combatant
 ##    distance), only trading blows with minions that wander into that
 ##    same range.
 ## Purchased upgrades (GameState) apply on spawn.
+##
+## Duo behavior (2026-07-20, unified 2026-07-20, leader/follower layer added
+## 2026-07-20): each hero behaves identically regardless of WHICH hero it's
+## paired with — no partner-role tweaks (that per-partner-role matrix caused
+## Warden's targeting bug and was removed). A confirmed Duo pairing
+## (GameState.duo_pairings) has exactly two effects: (1) the generic Duo Bonus
+## (DUO_* consts, _update_duo_bonus) — a damage/cooldown/XP multiplier scaled
+## by leader-vs-follower, a pure player choice (which Duo slot the hero was
+## dropped in — see GameState.is_duo_leader, NOT role); (2) an optional per-hero
+## leader/follower behavior (THUNDAAR_LEADER_*/ARTEMIS_LEADER_* consts,
+## _bodyguard_target/_role_bonus's BURST case) keyed ONLY on (hero_name,
+## leader-vs-follower) — never on the partner's identity, so this second layer
+## can't grow into the same conflict. Currently: THUNDAAR leads = attack speed
+## (balance-qa 2026-07-20: was also +damage, cut back — compounded with the
+## generic Duo Bonus for a ~10x-everyone-else's DPS swing), follows =
+## bodyguards the leader; ARTEMIS leads = HP + faster
+## Clone, follows = focus-fires the leader's target. WARDEN/BEACON have no
+## extra layer yet (generic Duo Bonus only).
+##  THUNDAAR (TANK)    — walks toward the biggest threat and stomps everything close.
+##  ARTEMIS  (BURST)   — kites at max range, focuses low-HP targets.
+##  WARDEN   (CONTROL) — ensnares the densest cluster near the front line.
+##  BEACON   (SUPPORT) — follows its partner and pulses Rally when both are engaged.
 
 @export var hero_name := "HERO"
 ## Small offset so party members stand side by side, not overlapping.
 @export var lateral := Vector2.ZERO
+## Hero behavior mode: currently only ATTACK_VILLAIN (default, push the lane)
+## or CAPTURE_OBJECTIVES (hold objectives, then push) are implemented.
+## SUPPORT_ALLIES (Duo-driven leashing) and ATTACK_MINIONS (farm) were removed
+## 2026-07-20 when Duo cohesion and lane splits made them redundant.
 @export var priority := "ATTACK_VILLAIN"
-## SUPPORT_ALLIES targeting: which specific ally to shadow ("" = nearest living
-## ally, the default). Set by BattleManager at spawn from
-## GameState.party_of(hero_name).support_target. Ignored by every other
-## priority.
-@export var support_target := ""
 
-## Formation bonuses (proximity-based role interactions)
-const FORMATION_SAME_ROLE_DIST := 150.0
-const FORMATION_SAME_ROLE_DAMAGE := 1.1
-const FORMATION_OPPOSITE_ROLE_DIST := 200.0
-const FORMATION_OPPOSITE_ROLE_TANK_HP := 1.15
-const FORMATION_OPPOSITE_ROLE_BURST_DAMAGE := 1.15
-const FORMATION_OPPOSITE_ROLE_MULT := 1.15
-## Symmetric opposite-role pairings so no comp is structurally denied a pair
-## bonus (was TANK+BURST only, which forced a Thundaar pick). Each entry maps a
-## role to its partner role and which stat ("hp"/"damage") the pair grants THIS
-## role: the durable/utility side takes HP, the damage side takes damage, all
-## ×FORMATION_OPPOSITE_ROLE_MULT. Pairs are mutual (both sides listed).
-const FORMATION_PAIRS := {
-	"TANK": {"BURST": "hp"},
-	"BURST": {"TANK": "damage", "SUPPORT": "damage"},
-	"CONTROL": {"SUPPORT": "damage"},
-	"SUPPORT": {"CONTROL": "hp", "BURST": "hp"},
-}
-const FORMATION_MIXED_TRIO_DIST := 180.0
-const FORMATION_MIXED_TRIO_COOLDOWN := 0.05
+## Duo Bonus (explicit pairing bonus, leader/follower scaled)
+## Only applies when this hero is in a confirmed Duo pairing with a live partner
+## within range. Replaces the old Synergy + Formation systems (which were
+## opportunistic + role-based); now entirely deterministic on pairing status.
+const DUO_DISTANCE := 200.0
+const DUO_LEADER_DAMAGE_MULT := 1.15
+const DUO_LEADER_COOLDOWN_REDUCTION := 0.3
+const DUO_LEADER_XP_MULT := 1.25
+const DUO_FOLLOWER_DAMAGE_MULT := 1.10
+const DUO_FOLLOWER_COOLDOWN_REDUCTION := 0.2
+const DUO_FOLLOWER_XP_MULT := 1.15
+
+## Per-hero Duo leader/follower behavior (2026-07-20+): a second, additive
+## layer on top of the generic Duo Bonus above. Keyed ONLY on (hero_name,
+## leader-vs-follower) — never on the partner's specific identity/role — so
+## the matrix stays small (4 heroes × 2 states, most left at "no extra
+## behavior") and can't reintroduce the partner-role conflict matrix that
+## caused Warden's targeting bug (see DECISIONS.md). Tunable independently of
+## DUO_LEADER_*/DUO_FOLLOWER_* above. Undefined hero/state combos (currently
+## WARDEN, BEACON) get the generic Duo Bonus only.
+const THUNDAAR_LEADER_ATK_SPEED_MULT := 1.20
+const ARTEMIS_LEADER_HP_MULT := 1.25
+const ARTEMIS_LEADER_CLONE_COOLDOWN_MULT := 0.75
+## Follower BURST (Artemis) target-score bonus for whatever the Duo leader is
+## currently fighting — mirrors the SCORE_* weighting scale used elsewhere.
+const SCORE_ARTEMIS_FOLLOWER_FOCUS_LEADER := 140.0
 
 ## Thundaar's Stomp: auto-casts on cooldown whenever an enemy is in range,
 ## hitting everything within STOMP_RADIUS for damage + knockback.
@@ -103,27 +130,12 @@ const VILLAIN_TRACK_INTERVAL := 0.3
 ## staleness window.
 const VILLAIN_SPOTTED_TRACK_INTERVAL := 0.1
 
-## SUPPORT_ALLIES priority: how often the support re-checks its distance to the
-## party (so Rally lands). Solo fallback pushes the villain.
-const SUPPORT_TRACK_INTERVAL := 0.3
-## SUPPORT_ALLIES leash band: the support only re-paths toward its partner when
-## it has drifted past this far — inside the band it fights as a free individual
-## (its own target selection + the SCORE_SUPPORT_GUARD bias keep it useful near
-## the party). Set to the loose end of the range (past SYNERGY_DISTANCE 200 and
-## RALLY_RADIUS 180) so it ranges to clear minions and reads as a peer, not a
-## shadow — accepting that at the band's edge it can briefly drop synergy/Rally.
-const SUPPORT_LEASH_DIST := 260.0
-
-## When following an ally/support target, stop this far off its body instead of
-## aiming at its exact position — parking on top of it just feeds the
-## separation push and makes the follower jitter. Kept small (well inside
-## RALLY_RADIUS 180) so the aura still covers, but past the two bodies' radii
-## so they don't overlap.
+## When following a Duo partner (see _standoff_point/the cohesion block in
+## _process), stop this far off its body instead of aiming at its exact
+## position — parking on top of it just feeds the separation push and makes
+## the follower jitter. Kept small (well inside RALLY_RADIUS 180) so the aura
+## still covers, but past the two bodies' radii so they don't overlap.
 const FOLLOW_STANDOFF := 46.0
-## Chip-display threshold for SUPPORT_ALLIES's "FOLLOWING" buff chip — close
-## enough to the chosen support target that Rally's aura is realistically
-## landing. Kept inside SYNERGY_DISTANCE (200).
-const FOLLOW_CHIP_DIST := 140.0
 
 ## Rally-to-ally: while on objective duty (not yet pushing the villain) with
 ## no threat in sight, a hero heads toward the nearest ally that IS currently
@@ -144,14 +156,28 @@ var _rallying := false
 ## before a hero ever gets close enough to land a hit.
 const VILLAIN_ENGAGE_RANGE := 320.0
 
-## V2 lane structure only: destructible minion spawn points ("spawn_points"
-## group) are empty in V1, so this is a no-op there. Killing a spawn point
+## Destructible minion spawn points ("spawn_points" group). Killing one
 ## permanently stops its waves, which matters more than any single minion or
 ## even the still-dormant villain — locked at a wide range like the villain
 ## push, and outscores everything else in _target_score, so heroes go destroy
-## the swarm's source instead of just farming whatever wanders past.
+## the swarm's source instead of just farming whatever wanders past. (Except
+## something already in melee/firing range, or an ordinary minion that's
+## simply closer than the gate right now — see the nearby-swarm interrupt and
+## the "on the way" check in _acquire_target, both of which run first.)
 const SPAWN_POINT_ENGAGE_RANGE := 500.0
 const SCORE_SPAWN_POINT_PRIORITY := 400.0
+
+## Nearby swarm interrupt (Designer, 2026-07-20: "heroes are ignoring minions
+## and taking unnecessary damage" — the spawn-point/villain locks above were
+## absolute, so a hero would walk right past an adjacent minion already
+## hitting them to beeline a gate 480px away). A hostile within this bubble is
+## already blocking the path or actively engaging, so it's swatted first; the
+## long-range lock resumes on its own next retarget tick once it's dead (see
+## _acquire_target). Scales off attack_range (floored) so a ranged hero's
+## naturally wider engagement bubble also clears more of the swarm on the way,
+## not just melee heroes standing on top of a minion.
+const NEARBY_THREAT_INTERRUPT_MULT := 1.5
+const NEARBY_THREAT_INTERRUPT_MIN := 90.0
 
 ## CAPTURE_OBJECTIVES search behavior: the hero only knows the objective's
 ## general area (a point randomized within this radius of the true spot) and
@@ -199,11 +225,45 @@ const CONFUSE_HALF_WIDTH := 90.0
 const CONFUSE_DURATION := 3.0
 const CONFUSE_MIN_TARGETS := 2
 
-## Synergy system: two-hero bonuses when both alive and within this distance.
-const SYNERGY_DISTANCE := 200.0
-const SYNERGY_DAMAGE_MULT := 1.15
-const SYNERGY_COOLDOWN_REDUCTION := 0.3
-const SYNERGY_XP_MULT := 1.25
+## -- Duo partner behavior (2026-07-20) ----------------------------------------
+## Static role-per-hero table (mirrors the hero_name match in _configure) so a
+## partner's role can be looked up from GameState.duo_of() alone — no need for
+## the partner to have spawned yet (staggered Duo deploy means it often hasn't).
+const ROLE_BY_HERO := {
+	"THUNDAAR": "TANK",
+	"ARTEMIS": "BURST",
+	"WARDEN": "CONTROL",
+	"BEACON": "SUPPORT",
+}
+## One-sentence base rule per hero (see class doc) — surfaced on the prep
+## screen's hero cards so the role/Duo-composition decision is informed
+## without needing to read this file. Kept in sync with the class doc bullets.
+const ROLE_DESCRIPTIONS := {
+	"THUNDAAR": "Walks toward the biggest threat and stomps everything close.",
+	"ARTEMIS": "Kites at max range, focuses low-HP targets.",
+	"WARDEN": "Ensnares the densest cluster near the front line.",
+	"BEACON": "Follows its partner and pulses Rally when both are engaged.",
+}
+## Duo cohesion (Designer, 2026-07-20): "DUOs should stick together and share
+## a goal; heroes should not go solo, only after his DUO perished." Which of
+## the pair leads a push vs. follows is a pure player choice now (see
+## GameState.is_duo_leader — whichever hero was dropped in the Duo's left/A
+## slot leads), not derived from role.
+## How far the follower can drift from the leader before re-pathing back in —
+## tighter than the old generic SUPPORT_LEASH_DIST (260) so pairing reads as
+## visibly "together" on the field, not just loosely in the same area.
+const DUO_LEASH_DIST := 160.0
+const DUO_TRACK_INTERVAL := 0.3
+
+## Role-identity colors for the battlefield ring + name-tag (see _draw and
+## the label_text assignment in _configure) — lets a role be read at a
+## glance without opening a hero panel.
+const ROLE_COLORS := {
+	"TANK": Color("4a86c8"),
+	"BURST": Color("d1495b"),
+	"CONTROL": Color("2fa39b"),
+	"SUPPORT": Color("e0a83e"),
+}
 
 ## Target-scoring weights (Hero._target_score). The base score is the raw
 ## distance to a candidate in pixels (nearer = preferred, matching the old
@@ -240,7 +300,7 @@ const BURST_THREAT_MULT := 0.4
 ## of _target). Bonus per additional enemy neighbor within that radius.
 const SCORE_CONTROL_CLUSTER := 45.0
 ## SUPPORT is low-aggression: it only meaningfully prefers whatever is attacking
-## the ally it's pledged to protect (its support_target, else nearest ally).
+## its confirmed Duo partner (else nearest ally if unpaired).
 const SCORE_SUPPORT_GUARD := 220.0
 ## Focus ping (player command): strong target-selection pull toward enemies near
 ## an active ping, fading with distance to the ping (see _focus_ping_bonus). Sized
@@ -254,12 +314,12 @@ const SCORE_FOCUS_PING := 260.0
 ## Optional ranged keys (Milestone 5): `is_ranged` + `attack_range` make a hero
 ## fire a Projectile instead of meleeing — read generically in _configure (no
 ## per-hero special-casing). `attack_interval` overrides the hero.tscn default.
-## Heroes start significantly weaker than the old V1 tuned baseline. The
-## grindier redeploy-lane loop assumes a slow climb via boons/mods, not day-one
-## power level. Applied on top of HERO_STATS in _configure — the table itself
-## is untouched.
-const V2_HP_MULT := 0.5
-const V2_DAMAGE_MULT := 0.5
+## Global hero-power tuning: the grindy lane loop assumes a slow climb via
+## boons/mods/upgrades, not day-one power. Applied on top of HERO_STATS in
+## _configure — the table itself is untouched. The prep and STATS pages mirror
+## these so displayed stats match what actually spawns.
+const BASE_HP_MULT := 0.5
+const BASE_DAMAGE_MULT := 0.5
 
 const HERO_STATS: Dictionary = {
 	"THUNDAAR": {
@@ -306,6 +366,15 @@ const ARTEMIS_ATTACK_RANGE := 160.0
 ## Fixed role per hero (TANK, BURST, CONTROL) — set in _configure based on hero_name.
 var role := "CONTROL"
 
+## Lane ("top"/"bottom") this hero is fighting in — set once at spawn from its
+## deploy y-position (LaneField.lane_of), never recomputed (Designer,
+## 2026-07-20: split the lane so heroes/minions spread across two fronts
+## instead of clustering on one spot). Filters which spawn points/objectives
+## this hero will path to (_nearest_spawn_point/_nearest_uncaptured_objective)
+## — the villain push itself stays a single shared goal, so lanes naturally
+## converge near the lair rather than needing a hard wall.
+var lane := "top"
+
 ## Ability-mod scalars (Phase 5 gold shop). Default identity; owned mods adjust
 ## these in _apply_ability_mod(), and the ability code reads them in place of the
 ## raw constants. Permanent per-hero tradeoffs, applied once at _configure.
@@ -318,6 +387,21 @@ var ensnare_stun_mult := 1.0
 var rally_radius_mult := 1.0
 var rally_cooldown_add := 0.0
 
+## Duo partner state — _partner_role is the confirmed Duo partner's role ("" if
+## unpaired), computed once at spawn from the static ROLE_BY_HERO table — cheap
+## and available even before the partner itself has spawned (staggered
+## deploy). Only ever checked for "" vs. not-"" (paired at all) — nothing
+## branches on the partner's SPECIFIC role value (see class doc).
+var _partner_role := ""
+## True when this hero leads its Duo — a pure player choice (see
+## GameState.is_duo_leader, read once at spawn) — or has no confirmed partner
+## at all — the latter case makes leader status irrelevant (the cohesion block
+## in _process is gated on _partner_role != "" anyway), so defaulting true
+## here is just "don't follow anyone" for an unpaired hero.
+var _duo_leader := true
+## Re-check cadence for the Duo cohesion leash (see _process).
+var _duo_track_cd := 0.0
+
 var _objective: Node2D = null
 var _objective_spotted := false
 var _pushed_on := false
@@ -328,43 +412,26 @@ var _stomp_flash_t := 0.0
 var _ensnare_flash_t := 0.0
 var _ensnare_flash_center := Vector2.ZERO
 var _villain_track_cd := 0.0
-var _support_track_cd := 0.0
-## ATTACK_MINIONS: re-aim cadence at the nearest live hostile (same one-shot-goal
-## pattern as the villain/support tracking timers).
-var _minion_track_cd := 0.0
 ## Set once the villain has come within detect range at least once (i.e. the
 ## hero has actually seen/engaged him), so tracking can get more aggressive.
 var _villain_spotted := false
-var _synergy_damage_mult := 1.0
-var _synergy_cooldown_reduction := 0.0
+## Duo Bonus (recomputed each frame — see _update_duo_bonus): active only when
+## paired with a live, confirmed Duo partner within DUO_DISTANCE. Replaces the
+## old separate Synergy (opportunistic proximity) + Formation (role-based)
+## systems with one deterministic, pairing-driven bonus.
+var _duo_damage_mult := 1.0
+var _duo_cooldown_reduction := 0.0
+var _duo_xp_mult := 1.0
+var _duo_bonus_active := false
 ## Run-scoped ability cooldown reduction from signature boons (RunState). Stacks
-## additively with the synergy/formation reductions at every ability recast.
+## additively with the Duo Bonus reduction at every ability recast.
 var _boon_cooldown_reduction := 0.0
 ## Run-scoped XP multiplier from the "Fortune" boon (RunState). Permanent for
 ## the current run; stacks multiplicatively with the timed objective XP boost.
 var _run_xp_mult := 1.0
-## Formation bonuses (recomputed each frame based on nearby hero roles)
-var _formation_hp_mult := 1.0
-var _formation_damage_mult := 1.0
-var _formation_cooldown_reduction := 0.0
-## Which specific formation bonus is active (for HUD display; multiple mults
-## above can come from different sources, so these disambiguate for the panel).
-var _formation_same_role_active := false
-var _formation_opposite_tank_active := false
-var _formation_opposite_burst_active := false
-## Generic pair-bonus flag for HUD display of the non-TANK/BURST pairs
-## (CONTROL+SUPPORT, BURST+SUPPORT); the two flags above stay for their
-## existing GUARD+/BURST+ labels and any TANK/BURST-specific reads.
-var _formation_opposite_active := false
-var _formation_trio_active := false
-## Max HP before the opposite-role GUARD+ bonus, captured once at spawn so the
-## proximity-driven bonus has a stable amount to add/remove from as allies
-## move in and out of range (rather than compounding off a moving target).
+## Max HP captured once at spawn (before any run-boon HP gains), used as the
+## base for boon HP-percent math (_apply_run_boon).
 var _base_max_hp := 0.0
-## Extra max HP currently granted by GUARD+; tracked so entering/leaving range
-## adjusts both max_hp and hp by exactly this amount, preserving true damage
-## taken instead of free-healing or hard-clamping HP away.
-var _formation_bonus_hp := 0.0
 ## Level gates cached at spawn (level doesn't change mid-battle).
 var _base_unlocked := false
 var _passive_unlocked := false
@@ -409,28 +476,12 @@ func ability_cooldown_max() -> float:
 func second_ability_cooldown_max() -> float:
 	return maxf(ABILITY_INFO.get(hero_name, {}).get("cd2", 1.0), 0.001)
 
-## Currently active synergy/formation buffs, for the hero panel's buff row.
+## Currently active buffs (Duo Bonus + timed boosts), for the hero panel's buff row.
 ## Each entry is {text: String, color: Color}; empty when nothing is active.
 func active_buffs() -> Array:
 	var buffs: Array = []
-	if _synergy_damage_mult > 1.0:
-		buffs.append({"text": "SYNERGY", "color": Color("6fa8dc")})
-	# Distinct chip when actually near the chosen support target (vs. the
-	# generic SYNERGY that any nearby ally grants), so the bond reads at a glance.
-	if priority == "SUPPORT_ALLIES" and support_target != "":
-		var target := _support_target_node()
-		if target != null and global_position.distance_to(target.global_position) <= FOLLOW_CHIP_DIST:
-			buffs.append({"text": "FOLLOWING", "color": Color("5cc98a")})
-	if _formation_same_role_active:
-		buffs.append({"text": "ROLE DMG+", "color": Color("e08a3e")})
-	if _formation_opposite_tank_active:
-		buffs.append({"text": "GUARD+", "color": Color("5c9a5c")})
-	if _formation_opposite_burst_active:
-		buffs.append({"text": "BURST+", "color": Color("c0392b")})
-	if _formation_opposite_active:
-		buffs.append({"text": "PAIR+", "color": Color("5c9ac9")})
-	if _formation_trio_active:
-		buffs.append({"text": "TRIO CD", "color": Color("d4c04a")})
+	if _duo_bonus_active:
+		buffs.append({"text": "DUO+", "color": Color("6fa8dc")})
 	if _dmg_boost_t > 0.0:
 		buffs.append({"text": "DMG+", "color": Color("c0392b")})
 	if _speed_boost_t > 0.0:
@@ -448,17 +499,10 @@ func active_buffs() -> Array:
 ## battle plays out. Derived entirely from existing state (no new bookkeeping).
 func current_intent() -> String:
 	match priority:
-		"SUPPORT_ALLIES":
-			# Buffing the party while an ally is alive; solo it falls back to the
-			# villain push (see the SUPPORT_ALLIES block in _process).
-			return "SUPPORTING" if _nearest_ally() != null else "PUSHING"
 		"CAPTURE_OBJECTIVES":
 			if not _pushed_on and _objective != null:
 				return "CAPTURING" if _objective_spotted else "SEARCHING"
 			return "PUSHING"
-		"ATTACK_MINIONS":
-			# Trading blows with a minion vs. moving to the next one to farm.
-			return "FARMING" if _target != null and is_instance_valid(_target) else "HUNTING"
 		_:  # ATTACK_VILLAIN (and any default)
 			if _target != null and is_instance_valid(_target) and _target.is_in_group("villains"):
 				return "ATTACKING"
@@ -467,7 +511,6 @@ func current_intent() -> String:
 func _configure() -> void:
 	self_group = "heroes"
 	enemy_group = "hostiles"
-	label_text = hero_name
 	# Heroes recompute separation every frame (there are only ≤3) so they settle
 	# at a stable spacing instead of bouncing off a stale push — matters most for
 	# a support hero trying to hold beside its target ally (see Combatant).
@@ -478,6 +521,20 @@ func _configure() -> void:
 		"ARTEMIS": role = "BURST"
 		"WARDEN": role = "CONTROL"
 		"BEACON": role = "SUPPORT"
+	# Role tag on the field name-tag (Designer, 2026-07-20: "roles should be
+	# visually clear") — paired with the role-colored ring in _draw().
+	label_text = "%s · %s" % [hero_name, role]
+	# Duo partner role (see class doc + ROLE_BY_HERO) — computed before the
+	# priority match block below since BEACON's tweak changes `priority`
+	# itself, which that block reads.
+	_partner_role = ROLE_BY_HERO.get(GameState.duo_of(hero_name), "")
+	if _partner_role != "":
+		# Leader/follower is a pure player choice now (Designer, 2026-07-20:
+		# "tank always leads does not work anymore ... this should be a player
+		# decision, even when it does not seem to make sense") — see
+		# GameState.is_duo_leader (which slot the player dropped this hero
+		# into) and the cohesion block in _process.
+		_duo_leader = GameState.is_duo_leader(hero_name)
 	# Apply hero-specific flat base stats (Milestone 2: no persistent scaling —
 	# a run always starts here; growth comes only from in-run boons).
 	if hero_name in HERO_STATS:
@@ -494,14 +551,21 @@ func _configure() -> void:
 			is_ranged = true
 			attack_range = float(stats.get("attack_range", attack_range))
 			projectile_scene = ARTEMIS_PROJECTILE_SCENE
-	max_hp *= V2_HP_MULT
-	damage *= V2_DAMAGE_MULT
+	max_hp *= BASE_HP_MULT
+	damage *= BASE_DAMAGE_MULT
 	# Permanent ability mods bought with gold (Phase 5). Applied here, before
 	# Combatant sets hp = max_hp, so HP-changing mods land at full HP; run boons
 	# (in-run, reset each run) still stack on top of this via apply_run_boon.
 	_apply_owned_ability_mods()
 	# Permanent raw-stat upgrades bought with banked XP (grind progression).
 	_apply_stat_upgrades()
+	# Duo leader/follower behavior, HP half (see THUNDAAR_LEADER_ATK_SPEED_MULT
+	# doc comment for the full table): Artemis gets a flat HP bump while
+	# leading her Duo, applied once here like a base stat (before _base_max_hp
+	# is captured) rather than dynamically, since leader/follower is fixed for
+	# the whole battle once spawned.
+	if hero_name == "ARTEMIS" and _partner_role != "" and _duo_leader:
+		max_hp *= ARTEMIS_LEADER_HP_MULT
 	_base_max_hp = max_hp
 	# Tier-gates the passive upgrade and the LV20 ultimate behind gold
 	# purchases (AbilityTiers); tier 1 (the signature ability) is always
@@ -511,6 +575,8 @@ func _configure() -> void:
 	_active_unlocked = GameState.has_tier(hero_name, 3)
 	# Spawn at the funnel; default goal is the villain's corner.
 	global_position = _field.hero_spawn + lateral
+	lane = _field.lane_of(global_position)
+	_field.mark_lane_populated(lane)
 	set_goal(_villain_goal())
 	# Priority-specific behavior.
 	match priority:
@@ -522,19 +588,6 @@ func _configure() -> void:
 			# 2026-07-14) so this priority "only fights what blocks the way"
 			# instead of aggroing every minion within the wide villain range.
 			detect_range = attack_range * 1.3
-		"ATTACK_MINIONS":
-			# Hunt the swarm for XP — the farm priority (GDD's "Attack Minions").
-			# Full-reach detect range (a ranged hero should aggro out to its own
-			# attack_range, not the tighter melee default) and a live re-goal onto
-			# the nearest hostile (see the ATTACK_MINIONS tracking block in
-			# _process). Never pushes the villain or takes objectives.
-			detect_range = maxf(detect_range, attack_range * 1.1)
-		"SUPPORT_ALLIES":
-			# Range with the party (see the _process tracking block): a wide detect
-			# range so a support inside the leash band actively engages minions
-			# ("importantly killing minions"), not just orbiting its partner.
-			# Falls back to the villain push when solo.
-			detect_range = attack_range * 2.0
 		"CAPTURE_OBJECTIVES":
 			# Tight engagement range while on objective duty: this hero is on a
 			# mission to the objective, not free to get dragged off chasing
@@ -554,12 +607,19 @@ func _configure() -> void:
 				detect_range = attack_range * 1.3
 
 func _process(delta: float) -> void:
-	# Update synergy state before calling super (which applies combat).
-	_update_synergy()
-	_update_formation()
+	# Update Duo Bonus state before calling super (which applies combat).
+	_update_duo_bonus()
 	super(delta)
 	if _dying:
 		return
+	# Hold to this hero's own lane half until the merge zone right before the
+	# villain (Designer, 2026-07-20: lanes shouldn't merge mid-lane) — runs
+	# after super()'s own movement/steering step so nothing above (including
+	# Duo cohesion following a partner in the other lane) can walk a hero
+	# across the split before then; the follower just holds at the boundary
+	# nearest its leader instead of crossing.
+	if lane != "":
+		global_position = _field.clamp_to_lane(global_position, lane)
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
 
@@ -643,52 +703,10 @@ func _process(delta: float) -> void:
 	elif _rallying:
 		_rallying = false
 
-	# SUPPORT_ALLIES: fight alongside the party as an individual, not glued to
-	# its hip. Re-path toward the chosen support target (or, absent one / if it's
-	# dead, the nearest living ally) ONLY when drifted past SUPPORT_LEASH_DIST;
-	# inside that band, let normal target selection / _advance_goal drive it (the
-	# SCORE_SUPPORT_GUARD bias already pulls its fire toward whatever is hitting
-	# its partner) and, with nothing to fight, drift toward the ally's actual
-	# fight via _find_engaged_ally so it doesn't idle. No allies at all (solo) →
-	# fall through to the villain push below so the support still contributes.
-	if priority == "SUPPORT_ALLIES":
-		_support_track_cd -= delta
-		if _support_track_cd <= 0.0:
-			_support_track_cd = SUPPORT_TRACK_INTERVAL
-			var ally: Combatant = _support_target_node() if support_target != "" else null
-			if ally == null:
-				ally = _nearest_ally()
-			if ally == null:
-				set_goal(_villain_goal())
-			elif global_position.distance_to(ally.global_position) > SUPPORT_LEASH_DIST:
-				# Drifted too far — close the gap back into the band.
-				set_goal(_standoff_point(ally))
-			elif _target == null:
-				# In-band and idle: move toward the ally's fight, else hold near it.
-				var engaged := _find_engaged_ally()
-				set_goal((engaged if engaged != null else ally).global_position)
-
-	# ATTACK_MINIONS (farm): keep walking into the swarm by re-goaling onto the
-	# nearest live minion so the hero always has something to chase and farm,
-	# rather than beelining a stale point. When the field is momentarily clear of
-	# minions, drift toward the villain goal so the battle can still resolve (the
-	# hero never actually engages him — the leash detect_range keeps him off).
-	if priority == "ATTACK_MINIONS":
-		_minion_track_cd -= delta
-		if _minion_track_cd <= 0.0:
-			_minion_track_cd = VILLAIN_TRACK_INTERVAL
-			var prey := _nearest_hostile()
-			if prey != null:
-				set_goal(prey.global_position)
-			else:
-				set_goal(_villain_goal())
-
 	# While pushing toward the villain (not holding at an uncaptured
-	# objective, not shadowing the party as support, and not farming the
-	# swarm), keep re-aiming at his live position so kiting/teleports don't
+	# objective), keep re-aiming at his live position so kiting/teleports don't
 	# leave heroes marching on his original spawn point.
-	if (_objective == null or _pushed_on) and priority != "SUPPORT_ALLIES" \
-			and priority != "ATTACK_MINIONS":
+	if _objective == null or _pushed_on:
 		# Arms aggressive re-tracking at the villain-lock range (the range at
 		# which _acquire_target will actually grab him), not detect_range —
 		# detect_range is now just the tight minion leash.
@@ -697,18 +715,47 @@ func _process(delta: float) -> void:
 		_villain_track_cd -= delta
 		if _villain_track_cd <= 0.0:
 			_villain_track_cd = VILLAIN_SPOTTED_TRACK_INTERVAL if _villain_spotted else VILLAIN_TRACK_INTERVAL
-			# V2 lane structure: keep pushing forward toward the villain by
-			# default — only divert onto a spawn point once it's within view
-			# (SPAWN_POINT_ENGAGE_RANGE, same radius _acquire_target uses to
-			# actually attack one), so heroes don't beeline across the whole
-			# lane for a gate nowhere near their path. (No-op in V1 —
-			# _nearest_spawn_point() is always null there.)
+			# Keep pushing forward toward the villain by default — only divert
+			# onto a spawn point once it's within view (SPAWN_POINT_ENGAGE_RANGE,
+			# same radius _acquire_target uses to actually attack one), so heroes
+			# don't beeline across the whole lane for a gate nowhere near their
+			# path.
 			var spawn_point := _nearest_spawn_point()
 			if spawn_point != null and global_position.distance_squared_to(spawn_point.global_position) \
 					<= SPAWN_POINT_ENGAGE_RANGE * SPAWN_POINT_ENGAGE_RANGE:
 				set_goal(spawn_point.global_position)
 			else:
 				set_goal(_villain_goal())
+
+	# Duo cohesion (2026-07-20, Designer): a paired hero is never really
+	# "solo" while its Duo partner is alive — the follower (whichever hero the
+	# player didn't drop in the Duo's leader slot — see GameState.is_duo_leader)
+	# overrides every priority-driven wander goal set above with "stay near/on
+	# the leader"
+	# instead. The leader is untouched and still drives the push exactly as
+	# before Duos existed. Neither this nor any block above ever touches
+	# `goal` while the hero has a live combat target — Combatant only moves
+	# toward `goal` when idle — so this never interrupts an actual fight,
+	# only where a hero wanders when it has nothing to hit. The instant the
+	# partner dies, _duo_partner_node() returns null and this block simply
+	# stops firing — the hero falls straight back to its own priority's
+	# solo behavior above with no extra bookkeeping needed.
+	if _partner_role != "" and not _duo_leader and _target == null and not _is_capturing():
+		var duo_partner := _duo_partner_node()
+		if duo_partner != null:
+			_duo_track_cd -= delta
+			if _duo_track_cd <= 0.0:
+				_duo_track_cd = DUO_TRACK_INTERVAL
+				if global_position.distance_to(duo_partner.global_position) > DUO_LEASH_DIST:
+					set_goal(_standoff_point(duo_partner))
+				elif duo_partner._target != null and is_instance_valid(duo_partner._target) and not duo_partner._target._dying:
+					# In leash range with nothing of our own to fight: pile onto
+					# whatever the leader is fighting instead of standing idle.
+					set_goal(duo_partner._target.global_position)
+				else:
+					# Both idle: share the leader's exact goal instead of each
+					# independently computing a slightly different one.
+					set_goal(duo_partner.goal)
 
 	# Focus ping (player command) overrides the wandering goal set by the priority
 	# blocks above: while a ping is live, head toward it. Combatant only advances
@@ -751,18 +798,31 @@ func _process(delta: float) -> void:
 				"BEACON":
 					_try_confuse()
 
-## Closest uncaptured objective to `from` (e.g. this hero's spawn point).
+## Closest uncaptured objective to `from` (e.g. this hero's spawn point) that
+## this hero's lane may capture — untagged/unmatched objectives ("" in
+## LevelLayout.objective_lanes) are open to either lane.
 func _nearest_uncaptured_objective(from: Vector2) -> Node2D:
 	var best: Node2D = null
 	var best_d := INF
 	for o in get_tree().get_nodes_in_group("objectives"):
 		if o.is_captured:
 			continue
+		var obj_lane := _objective_lane(o)
+		if obj_lane != "" and obj_lane != lane:
+			continue
 		var d := from.distance_squared_to(o.global_position)
 		if d < best_d:
 			best_d = d
 			best = o
 	return best
+
+## Lane an Objective node is restricted to ("" = open to both), read via its
+## own objective_index (LaneField.objective_positions/objective_lanes).
+func _objective_lane(o: Node2D) -> String:
+	if _field == null or not ("objective_index" in o):
+		return ""
+	var i: int = o.objective_index
+	return _field.lane_objective_lanes[i] if i < _field.lane_objective_lanes.size() else ""
 
 ## Heads toward a random point within OBJECTIVE_SEARCH_FUZZ of the (not yet
 ## spotted) objective's true position, so the hero searches its general area
@@ -801,38 +861,16 @@ func _standoff_point(ally: Combatant) -> Vector2:
 		away = Vector2(_facing_x, 0.0)
 	return ally.global_position + away.normalized() * FOLLOW_STANDOFF
 
-## This hero's live support-target node (by name), or null if unset / dead.
-func _support_target_node() -> Hero:
-	if support_target == "":
-		return null
-	for node in get_tree().get_nodes_in_group("heroes"):
-		if node is Hero and not node._dying and node.hero_name == support_target:
-			return node
-	return null
-
-## Nearest live real party member (excludes temporary HeroClone summons), for
-## the SUPPORT_ALLIES follow behavior. Null when this is the only hero left.
+## Nearest live real party member (excludes temporary HeroClone summons) —
+## used by the SUPPORT role's guard bonus and TANK's peel fallback. Null when
+## this is the only hero left.
 func _nearest_ally() -> Combatant:
 	var best: Combatant = null
 	var best_d := INF
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if node == self or not (node is Hero) or not is_instance_valid(node) or node._dying:
 			continue
-		var d := global_position.distance_squared_to(node.global_position)
-		if d < best_d:
-			best_d = d
-			best = node
-	return best
-
-## Nearest live minion (enemy_group — excludes the villain, who lives in the
-## "villains" group), for the ATTACK_MINIONS farm re-goal. Null when the swarm
-## is momentarily clear.
-## Nearest living V2 spawn point ("spawn_points" group; empty/no-op in V1).
-func _nearest_spawn_point() -> Combatant:
-	var best: Combatant = null
-	var best_d := INF
-	for node in get_tree().get_nodes_in_group("spawn_points"):
-		if not is_instance_valid(node) or node._dying:
+		if not _ally_lane_ok(node as Hero):
 			continue
 		var d := global_position.distance_squared_to(node.global_position)
 		if d < best_d:
@@ -840,11 +878,91 @@ func _nearest_spawn_point() -> Combatant:
 			best = node
 	return best
 
-func _nearest_hostile() -> Combatant:
+## Nearest living spawn point ("spawn_points" group) IN THIS HERO'S LANE (Designer,
+## 2026-07-20: split the lane so heroes commit to their own half instead of
+## dogpiling one spot). Uses the shared _lane_ok filter, so it opens up at the
+## merge zone / once the lanes have collapsed, same as combat targeting.
+## Otherwise returns null once this lane's own gates are all down even if the
+## other lane still has some — a hero doesn't cross over to help clear the
+## other lane's gates while both lanes are still separately held.
+func _nearest_spawn_point() -> Combatant:
+	var best: Combatant = null
+	var best_d := INF
+	for node in get_tree().get_nodes_in_group("spawn_points"):
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		var d := global_position.distance_squared_to(node.global_position)
+		if d < best_d:
+			best_d = d
+			best = node
+	return best
+
+## Nearest hostile within the nearby-swarm-interrupt bubble (see
+## NEARBY_THREAT_INTERRUPT_MULT doc comment), or null if the bubble is clear.
+## Deliberately scans the same enemy_group as normal targeting (which already
+## includes spawn points, since LaneSpawnPoint joins "hostiles") — if a spawn
+## point itself is the closest thing in the bubble, returning it here is just
+## the existing spawn-point lock re-affirmed, not a special case.
+func _nearby_threat() -> Combatant:
+	var radius := maxf(attack_range * NEARBY_THREAT_INTERRUPT_MULT, NEARBY_THREAT_INTERRUPT_MIN)
+	var best: Combatant = null
+	var best_d := radius * radius
+	for node in get_tree().get_nodes_in_group(enemy_group):
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		var d := global_position.distance_squared_to(node.global_position)
+		if d <= best_d:
+			best_d = d
+			best = node
+	return best
+
+## Lane filter (see Combatant._lane_ok doc + LaneField.clamp_to_lane): a hero
+## only aggros on hostiles in its own lane, UNLESS this hero has reached the
+## merge zone right before the villain, the lanes have collapsed (either
+## side's Duo wiped — LaneField.lanes_merged), or the candidate itself has no
+## lane of its own (e.g. the villain — never in "hostiles"/enemy_group anyway,
+## but a defensive no-op if that ever changes).
+func _lane_ok(node: Combatant) -> bool:
+	if lane == "" or _field == null:
+		return true
+	if global_position.x >= _field.lane_merge_x() or _field.lanes_merged():
+		return true
+	# LaneSpawnPoint exposes `lane`; Minion exposes `_lane` (private, since it
+	# also drives its own hunt-target filtering) — check both rather than
+	# unifying the name, so each class's existing property stays private
+	# where it already was.
+	var node_lane := ""
+	if "lane" in node:
+		node_lane = node.lane
+	elif "_lane" in node:
+		node_lane = node._lane
+	else:
+		return true
+	return node_lane == "" or node_lane == lane
+
+## Same lane rule as _lane_ok, but for another Hero (ally-facing behavior —
+## Rally, peel, rally-to-ally) instead of a hostile: same lane, the merge
+## zone, or a collapsed lane all clear it.
+func _ally_lane_ok(node: Hero) -> bool:
+	if lane == "" or _field == null:
+		return true
+	if global_position.x >= _field.lane_merge_x() or _field.lanes_merged():
+		return true
+	return node.lane == lane
+
+## Nearest ORDINARY minion — enemy_group minus spawn points and the villain —
+## for comparing against a locked spawn-point/villain distance (see
+## _acquire_target's "on the way" check). Unlike _nearby_threat, deliberately
+## excludes the very things it's being compared against, so a hero already
+## standing at the gate/villain doesn't "prefer" re-targeting the thing it's
+## already locked onto.
+func _nearest_minion() -> Combatant:
 	var best: Combatant = null
 	var best_d := INF
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		if node.is_in_group("spawn_points") or node.is_in_group("villains"):
 			continue
 		var d := global_position.distance_squared_to(node.global_position)
 		if d < best_d:
@@ -859,6 +977,8 @@ func _find_engaged_ally() -> Combatant:
 	var best_d := INF
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if node == self or not is_instance_valid(node) or node._dying:
+			continue
+		if node is Hero and not _ally_lane_ok(node as Hero):
 			continue
 		if node._target == null or not is_instance_valid(node._target) or node._target._dying:
 			continue
@@ -882,18 +1002,20 @@ func _is_capturing() -> bool:
 ## distance) instead of the tight minion leash detect_range now holds. A farming
 ## or party-shadowing hero returns false, so it isn't yanked onto the villain
 ## from across the field. (CAPTURE_OBJECTIVES sets _pushed_on true both mid-run
-## and at spawn when no objectives remain; SUPPORT falls back to the push solo.)
+## and at spawn when no objectives remain.)
 func _is_pushing_villain() -> bool:
 	match priority:
-		"ATTACK_MINIONS": return false
-		"SUPPORT_ALLIES": return _nearest_ally() == null
 		"CAPTURE_OBJECTIVES": return _pushed_on
 		_: return true  # ATTACK_VILLAIN (and any default)
 
-## Heroes target the villain over any minion whenever he's within range, so a
-## hero standing on top of him doesn't get pulled off onto whichever minion
-## happens to be a step closer. Pushers lock him out to VILLAIN_ENGAGE_RANGE
-## (past his flee distance); everyone else only grabs him within detect_range.
+## Heroes target the villain over any minion whenever he's within range —
+## UNLESS an ordinary minion sits genuinely closer than he does right now, in
+## which case that minion wins instead (Designer, 2026-07-20: heroes were
+## tunnel-visioning past minions "on the way" and eating free damage). Pushers
+## lock him out to VILLAIN_ENGAGE_RANGE (past his flee distance); everyone
+## else only grabs him within detect_range. (Also see the nearby-swarm
+## interrupt above, which runs first and catches anything already adjacent
+## regardless of any lock.)
 func _acquire_target() -> void:
 	# Player command: a ping on the villain locks him as the target regardless of
 	# range — the party commits to him even from across the field (see item 6).
@@ -901,19 +1023,51 @@ func _acquire_target() -> void:
 	if pinged_villain != null:
 		_target = pinged_villain
 		return
-	# V2 lane structure: a live spawn point within engage range beats both the
-	# villain and any ordinary minion (see SPAWN_POINT_ENGAGE_RANGE doc comment).
-	var spawn_point := _nearest_spawn_point()
-	if spawn_point != null and global_position.distance_squared_to(spawn_point.global_position) \
-			<= SPAWN_POINT_ENGAGE_RANGE * SPAWN_POINT_ENGAGE_RANGE:
-		_target = spawn_point
+	# Nearby swarm interrupt — see NEARBY_THREAT_INTERRUPT_MULT doc comment.
+	# Runs BEFORE bodyguard below (balance-qa finding, 2026-07-20): bodyguard
+	# has no range cap, so without this a following Thundaar could walk past
+	# something adjacent to go intercept whatever's hitting a leader clear
+	# across the map — the exact tunnel-vision failure mode this bubble exists
+	# to prevent, just via a different lock.
+	var nearby_threat := _nearby_threat()
+	if nearby_threat != null:
+		_target = nearby_threat
 		return
+	# Duo follower bodyguard (Thundaar only) — see _bodyguard_target. No range
+	# cap by design (defend the leader wherever they are), but only after the
+	# adjacency check above has first claim on anything already in the way.
+	var bodyguard_target := _bodyguard_target()
+	if bodyguard_target != null:
+		_target = bodyguard_target
+		return
+	# A live spawn point within engage range beats both the villain and any
+	# ordinary minion (see SPAWN_POINT_ENGAGE_RANGE doc comment) — UNLESS an
+	# ordinary minion sits closer than the gate itself, in which case it's
+	# genuinely "on the way": swing at it in passing rather than marching past
+	# it to a gate that's further off anyway (Designer, 2026-07-20 — the tight
+	# NEARBY_THREAT bubble above alone wasn't catching minions still closing
+	# distance, just ones already adjacent).
+	var spawn_point := _nearest_spawn_point()
+	if spawn_point != null:
+		var d_gate := global_position.distance_squared_to(spawn_point.global_position)
+		if d_gate <= SPAWN_POINT_ENGAGE_RANGE * SPAWN_POINT_ENGAGE_RANGE:
+			var minion := _nearest_minion()
+			if minion != null and global_position.distance_squared_to(minion.global_position) < d_gate:
+				_target = minion
+				return
+			_target = spawn_point
+			return
 	var villain_range := VILLAIN_ENGAGE_RANGE if _is_pushing_villain() else detect_range
 	for node in get_tree().get_nodes_in_group("villains"):
 		if not is_instance_valid(node) or node._dying:
 			continue
-		if global_position.distance_squared_to(node.global_position) <= villain_range * villain_range:
-			_target = node
+		var d_villain := global_position.distance_squared_to(node.global_position)
+		if d_villain <= villain_range * villain_range:
+			var minion := _nearest_minion()
+			if minion != null and global_position.distance_squared_to(minion.global_position) < d_villain:
+				_target = minion
+			else:
+				_target = node
 			return
 	super()
 
@@ -976,10 +1130,10 @@ func _focus_fire_bonus(node: Combatant) -> float:
 
 ## Execute: full SCORE_EXECUTE for a candidate this hero could finish within
 ## SCORE_EXECUTE_HITS of its own hits, fading linearly to 0 at that HP threshold.
-## Uses this hero's effective (synergy/formation/boon-scaled) damage so the
+## Uses this hero's effective (Duo Bonus/mod/boon-scaled) damage so the
 ## judgement matches the damage it will actually deal.
 func _execute_bonus(node: Combatant) -> float:
-	var per_hit := damage * _synergy_damage_mult * _formation_damage_mult * damage_mult()
+	var per_hit := damage * _duo_damage_mult * damage_mult()
 	if per_hit <= 0.0:
 		return 0.0
 	var threshold := per_hit * SCORE_EXECUTE_HITS
@@ -996,10 +1150,10 @@ func _threat_bonus(node: Combatant) -> float:
 	return bonus
 
 ## Role tactics layer: each role nudges targeting toward what that role should
-## do. BURST needs no term here — its bias is the execute/threat multipliers
-## applied in _target_score. TANK peels onto the endangered ally's attacker,
-## CONTROL seeks the densest cluster (best Ensnare anchor), SUPPORT guards the
-## ally it's pledged to.
+## do. TANK peels onto the endangered ally's attacker, CONTROL seeks the
+## densest cluster (best Ensnare anchor), SUPPORT guards the ally it's
+## pledged to, BURST otherwise relies purely on the execute/threat multipliers
+## applied in _target_score (its Duo-follower nudge below is the one exception).
 func _role_bonus(node: Combatant) -> float:
 	match role:
 		"TANK":
@@ -1009,25 +1163,52 @@ func _role_bonus(node: Combatant) -> float:
 			var ally := _weakest_ally()
 			if ally == null:
 				return 0.0
+			var peel_radius := TANK_PEEL_RADIUS
 			var d := node.global_position.distance_to(ally.global_position)
-			if d >= TANK_PEEL_RADIUS:
+			if d >= peel_radius:
 				return 0.0
-			return SCORE_TANK_PEEL * (1.0 - d / TANK_PEEL_RADIUS)
+			return SCORE_TANK_PEEL * (1.0 - d / peel_radius)
 		"CONTROL":
 			# Prefer the candidate with the most enemy neighbors within
 			# ENSNARE_RADIUS, so _target (Ensnare's anchor) roots a full pack.
 			return SCORE_CONTROL_CLUSTER * _enemy_neighbors(node)
 		"SUPPORT":
-			# Low aggression: only really cares about whatever is attacking the
-			# ally it's protecting (its support_target, else nearest ally).
-			var guarded: Combatant = _support_target_node()
+			# Low aggression: only really cares about whatever is attacking its
+			# confirmed Duo partner (2026-07-20: hero-to-hero links are only ever
+			# Duo-driven now, not a separate support_target field), falling back
+			# to the nearest ally if unpaired.
+			var guarded: Combatant = _duo_partner_node()
 			if guarded == null:
 				guarded = _nearest_ally()
 			if guarded != null and node._target == guarded:
 				return SCORE_SUPPORT_GUARD
 			return 0.0
+		"BURST":
+			# Duo follower focus-fire (Artemis only, 2026-07-20): lean toward
+			# whatever the Duo leader is currently fighting instead of picking
+			# independently — see THUNDAAR_LEADER_ATK_SPEED_MULT doc comment
+			# for the full leader/follower table. A nudge (not a hard override
+			# like the TANK bodyguard), so execute/threat can still win out.
+			if hero_name == "ARTEMIS" and _partner_role != "" and not _duo_leader:
+				var leader := _duo_partner_node()
+				if leader != null and leader._target == node:
+					return SCORE_ARTEMIS_FOLLOWER_FOCUS_LEADER
+			return 0.0
 		_:
 			return 0.0
+
+## Live node of this hero's confirmed Duo partner (GameState.duo_pairings), or
+## null if unpaired, the partner hasn't spawned yet (staggered deploy), or it
+## has since died. Only used by the generic leader/follower cohesion goal (see
+## _process) — no per-hero behavior reads the partner's live state.
+func _duo_partner_node() -> Hero:
+	var partner_name := GameState.duo_of(hero_name)
+	if partner_name == "":
+		return null
+	for node in get_tree().get_nodes_in_group("heroes"):
+		if node is Hero and node.hero_name == partner_name and is_instance_valid(node) and not node._dying:
+			return node
+	return null
 
 ## Living real party member (not a clone) with the lowest HP fraction, for the
 ## TANK peel. Null when this tank is the only real hero left.
@@ -1036,6 +1217,8 @@ func _weakest_ally() -> Hero:
 	var best_frac := INF
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if node == self or not (node is Hero) or not is_instance_valid(node) or node._dying:
+			continue
+		if not _ally_lane_ok(node as Hero):
 			continue
 		var frac: float = node.hp / node.max_hp if node.max_hp > 0.0 else 1.0
 		if frac < best_frac:
@@ -1048,14 +1231,14 @@ func _weakest_ally() -> Hero:
 func _enemy_neighbors(node: Combatant) -> int:
 	var count := 0
 	for e in get_tree().get_nodes_in_group(enemy_group):
-		if e == node or not is_instance_valid(e) or e._dying:
+		if e == node or not is_instance_valid(e) or e._dying or not _lane_ok(e):
 			continue
 		if e.global_position.distance_to(node.global_position) <= ENSNARE_RADIUS:
 			count += 1
 	return count
 
-## Apply synergy damage multiplier to actual damage dealt. Also widens melee
-## reach against a spawn point: LaneSpawnPoint (V2 only) is a hard obstacle
+## Apply Duo Bonus damage multiplier to actual damage dealt. Also widens melee
+## reach against a spawn point: LaneSpawnPoint is a hard obstacle
 ## (see LaneField.dynamic_obstacles), so the field's collision clamp already
 ## pins every unit's center at `target.body_radius + _collision_radius()` away
 ## from it — for a melee hero that floor (~73px) sits past the base 26px
@@ -1064,7 +1247,7 @@ func _enemy_neighbors(node: Combatant) -> int:
 ## already). Widening attack_range to match the forced stand-off distance lets
 ## melee heroes hit from the ring they're already standing at, not "inside" it.
 func _engage(delta: float) -> void:
-	var scaled_damage := damage * _synergy_damage_mult * _formation_damage_mult * damage_mult()
+	var scaled_damage := damage * _duo_damage_mult * damage_mult()
 	var original_damage := damage
 	var original_range := attack_range
 	damage = scaled_damage
@@ -1106,18 +1289,18 @@ func _try_stomp() -> void:
 	var stomp_r := STOMP_RADIUS * stomp_radius_mult  # Seismic Stomp mod widens this
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		var to_node: Vector2 = node.global_position - global_position
 		if to_node.length() <= stomp_r:
 			hit = true
-			node.take_damage(STOMP_DAMAGE * _synergy_damage_mult * _formation_damage_mult * damage_mult(), self)
+			node.take_damage(STOMP_DAMAGE * _duo_damage_mult * damage_mult(), self)
 			if is_instance_valid(node) and not node._dying:
 				node.apply_knockback(to_node.normalized(), STOMP_KNOCKBACK, 0.0, self)
 				if _passive_unlocked:
 					node.apply_stun(STOMP_STUN_DURATION)
 	if hit:
-		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _synergy_cooldown_reduction - _formation_cooldown_reduction - _boon_cooldown_reduction
+		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction
 		_ability_cd = maxf(cooldown, 0.1)
 		_stomp_flash_t = STOMP_FLASH_TIME
 		_show_cast_label("STOMP!", STOMP_FLASH_COLOR)
@@ -1133,13 +1316,13 @@ func _try_ensnare() -> void:
 	var ensnare_r := ENSNARE_RADIUS * ensnare_radius_mult  # Wide Snare mod widens this
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		if node.global_position.distance_to(anchor) <= ensnare_r:
 			node.apply_stun(ENSNARE_STUN_DURATION * ensnare_stun_mult)
 			hit = true
 	if hit:
-		_ability_cd = maxf(ENSNARE_COOLDOWN - _synergy_cooldown_reduction - _formation_cooldown_reduction - _boon_cooldown_reduction, 0.1)
+		_ability_cd = maxf(ENSNARE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
 		_ensnare_flash_t = ENSNARE_FLASH_TIME
 		_ensnare_flash_center = anchor
 		_show_cast_label("ENSNARE!", ENSNARE_FLASH_COLOR)
@@ -1162,12 +1345,14 @@ func _try_rally() -> void:
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
 			continue
+		if node is Hero and not _ally_lane_ok(node as Hero):
+			continue
 		if global_position.distance_to(node.global_position) <= rally_r:
 			node.apply_damage_boost(RALLY_DURATION, RALLY_DMG_MULT)
 			node.apply_atk_speed_boost(RALLY_DURATION, RALLY_ATK_MULT)
 			buffed = true
 	if buffed:
-		_ability_cd = maxf(RALLY_COOLDOWN + rally_cooldown_add - _synergy_cooldown_reduction - _formation_cooldown_reduction - _boon_cooldown_reduction, 0.1)
+		_ability_cd = maxf(RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
 		_show_cast_label("RALLY!", STATUS_BUFF_COLOR)
 
 ## True when any hero within RALLY_RADIUS (self included) currently has a live
@@ -1176,6 +1361,8 @@ func _party_in_combat() -> bool:
 	var rally_r := RALLY_RADIUS * rally_radius_mult
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
+			continue
+		if node is Hero and not _ally_lane_ok(node as Hero):
 			continue
 		if global_position.distance_to(node.global_position) > rally_r:
 			continue
@@ -1188,6 +1375,18 @@ func _party_in_combat() -> bool:
 ## anchor, converted to this node's local space), each while its flash runs.
 func _draw() -> void:
 	super()
+	# Role ring (Designer, 2026-07-20: "roles should be visually clear") — a
+	# thin colored ring just outside the body, distinct per role, paired with
+	# the "NAME · ROLE" tag set on label_text in _configure.
+	var role_color: Color = ROLE_COLORS.get(role, Color.WHITE)
+	draw_arc(Vector2.ZERO, body_radius + 6.0, 0.0, TAU, 24, role_color, 3.0, true)
+	# Duo link line: a faint line connecting live Duo partners so the pairing
+	# — and the cohesion behavior it drives — reads at a glance on the field.
+	# Only the leader draws it (both would just overlap the same segment).
+	if _partner_role != "" and _duo_leader:
+		var duo_partner := _duo_partner_node()
+		if duo_partner != null:
+			draw_line(Vector2.ZERO, to_local(duo_partner.global_position), Color(role_color, 0.35), 2.0, true)
 	if _stomp_flash_t > 0.0:
 		var p := 1.0 - _stomp_flash_t / STOMP_FLASH_TIME
 		var ring_color := STOMP_FLASH_COLOR
@@ -1209,7 +1408,11 @@ func _try_clone() -> void:
 		# Fan multiple clones to alternating sides so they don't stack on one spot.
 		var side := 1.0 if i % 2 == 0 else -1.0
 		_spawn_clone(side * (1.0 + float(i / 2)))
-	var cooldown := CLONE_COOLDOWN - _synergy_cooldown_reduction - _formation_cooldown_reduction - _boon_cooldown_reduction
+	var cooldown := CLONE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction
+	# Duo leader/follower layer: Clone recharges faster while Artemis leads
+	# her Duo (see THUNDAAR_LEADER_ATK_SPEED_MULT doc comment for the table).
+	if _partner_role != "" and _duo_leader:
+		cooldown *= ARTEMIS_LEADER_CLONE_COOLDOWN_MULT
 	_ability_cd = maxf(cooldown, 0.1)
 	_show_cast_label("CLONE!", body_color)
 
@@ -1218,7 +1421,7 @@ func _spawn_clone(spread: float) -> void:
 	var clone := CLONE_SCENE.instantiate()
 	clone.label_text = hero_name + " Clone"
 	clone.max_hp = max_hp * clone_hp_mult
-	var clone_damage_mult := _synergy_damage_mult * _formation_damage_mult * damage_mult() * (CLONE_DAMAGE_BOOST if _passive_unlocked else 1.0)
+	var clone_damage_mult := _duo_damage_mult * damage_mult() * (CLONE_DAMAGE_BOOST if _passive_unlocked else 1.0)
 	clone.damage = damage * clone_damage_mult
 	clone.attack_interval = attack_interval
 	clone.attack_range = attack_range
@@ -1252,7 +1455,7 @@ func _try_shockwave() -> void:
 	var dir := (_target.global_position - global_position).normalized()
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		var to_node: Vector2 = node.global_position - global_position
 		var forward := to_node.dot(dir)
@@ -1262,11 +1465,11 @@ func _try_shockwave() -> void:
 		if lateral_dist > SHOCKWAVE_HALF_WIDTH:
 			continue
 		hit = true
-		node.take_damage(SHOCKWAVE_DAMAGE * _synergy_damage_mult * _formation_damage_mult * damage_mult(), self)
+		node.take_damage(SHOCKWAVE_DAMAGE * _duo_damage_mult * damage_mult(), self)
 		if is_instance_valid(node) and not node._dying:
 			node.apply_knockback(dir, SHOCKWAVE_KNOCKBACK, 0.0, self)
 	if hit:
-		_second_ability_cd = maxf(SHOCKWAVE_COOLDOWN - _synergy_cooldown_reduction - _formation_cooldown_reduction, 0.1)
+		_second_ability_cd = maxf(SHOCKWAVE_COOLDOWN - _duo_cooldown_reduction, 0.1)
 		_show_cast_label("SHOCKWAVE!", Color(1.0, 0.6, 0.2))
 
 ## Confuse (ultimate, BEACON): projects a cone of light toward the nearest
@@ -1286,7 +1489,7 @@ func _try_confuse() -> void:
 	var dir := (aim.global_position - global_position).normalized()
 	var caught: Array[Combatant] = []
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		if node.is_in_group("villains"):
 			continue  # Bosses are immune to Confuse.
@@ -1302,16 +1505,17 @@ func _try_confuse() -> void:
 		return
 	for node in caught:
 		node.apply_confusion(CONFUSE_DURATION)
-	_second_ability_cd = maxf(CONFUSE_COOLDOWN - _synergy_cooldown_reduction - _formation_cooldown_reduction, 0.1)
+	_second_ability_cd = maxf(CONFUSE_COOLDOWN - _duo_cooldown_reduction, 0.1)
 	_show_cast_label("CONFUSE!", STATUS_CONFUSE_COLOR)
 
 ## Nearest living member of `group` to this hero, at any distance (unlike the
-## detect-range _acquire_target). Used to aim Confuse when BEACON is idle.
+## detect-range _acquire_target). Used to aim Confuse when BEACON is idle —
+## lane-filtered like every other enemy-facing scan (see _lane_ok).
 func _nearest_in_group(group: String) -> Combatant:
 	var nearest: Combatant = null
 	var best := INF
 	for node in get_tree().get_nodes_in_group(group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		var dist: float = global_position.distance_squared_to(node.global_position)
 		if dist < best:
@@ -1333,7 +1537,7 @@ func _try_multishot() -> void:
 		return
 	var candidates: Array[Combatant] = []
 	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		if global_position.distance_squared_to(node.global_position) <= MULTISHOT_RANGE * MULTISHOT_RANGE:
 			candidates.append(node)
@@ -1346,7 +1550,7 @@ func _try_multishot() -> void:
 		_fire_multishot_arrow(node)
 		hit_count += 1
 	if hit_count > 0:
-		_second_ability_cd = maxf(MULTISHOT_COOLDOWN - _synergy_cooldown_reduction - _formation_cooldown_reduction, 0.1)
+		_second_ability_cd = maxf(MULTISHOT_COOLDOWN - _duo_cooldown_reduction, 0.1)
 		_show_cast_label("MULTISHOT!", Color(0.9, 0.5, 0.8))
 
 ## Spawns one Multishot arrow at `victim` — same Projectile scene/behavior as
@@ -1354,7 +1558,7 @@ func _try_multishot() -> void:
 ## instead of a full attack hit.
 func _fire_multishot_arrow(victim: Combatant) -> void:
 	var proj: Projectile = ARTEMIS_PROJECTILE_SCENE.instantiate()
-	proj.damage = damage * MULTISHOT_DAMAGE_MULT * _synergy_damage_mult * _formation_damage_mult * damage_mult()
+	proj.damage = damage * MULTISHOT_DAMAGE_MULT * _duo_damage_mult * damage_mult()
 	proj.attacker = self
 	proj.target = victim
 	proj.enemy_group = _effective_enemy_group()
@@ -1364,102 +1568,69 @@ func _fire_multishot_arrow(victim: Combatant) -> void:
 	proj.global_position = global_position
 	get_parent().add_child(proj)
 
-## Check synergy: if another living hero is nearby, apply bonuses.
-func _update_synergy() -> void:
-	var has_ally := false
-	for node in get_tree().get_nodes_in_group("heroes"):
-		if node != self and is_instance_valid(node) and not node._dying:
-			if global_position.distance_to(node.global_position) <= SYNERGY_DISTANCE:
-				has_ally = true
-				break
-	if has_ally:
-		_synergy_damage_mult = SYNERGY_DAMAGE_MULT
-		_synergy_cooldown_reduction = SYNERGY_COOLDOWN_REDUCTION
+## Duo Bonus: active only when this hero has a confirmed Duo partner
+## (GameState.duo_pairings) who is alive and within DUO_DISTANCE — no
+## opportunistic "any nearby hero" trigger and no role-based formation math,
+## just pairing + proximity. Leader/follower (_duo_leader, a player choice set
+## once at spawn) scales the bonus so the two Duo slots aren't perfectly
+## symmetric, without introducing any per-hero special case.
+func _update_duo_bonus() -> void:
+	_duo_bonus_active = false
+	if _partner_role != "":
+		var partner := _duo_partner_node()
+		if partner != null and global_position.distance_to(partner.global_position) <= DUO_DISTANCE:
+			_duo_bonus_active = true
+
+	if _duo_bonus_active:
+		if _duo_leader:
+			_duo_damage_mult = DUO_LEADER_DAMAGE_MULT
+			_duo_cooldown_reduction = DUO_LEADER_COOLDOWN_REDUCTION
+			_duo_xp_mult = DUO_LEADER_XP_MULT
+		else:
+			_duo_damage_mult = DUO_FOLLOWER_DAMAGE_MULT
+			_duo_cooldown_reduction = DUO_FOLLOWER_COOLDOWN_REDUCTION
+			_duo_xp_mult = DUO_FOLLOWER_XP_MULT
 	else:
-		_synergy_damage_mult = 1.0
-		_synergy_cooldown_reduction = 0.0
+		_duo_damage_mult = 1.0
+		_duo_cooldown_reduction = 0.0
+		_duo_xp_mult = 1.0
 
-## Check formation bonuses: calculate role-based bonuses based on nearby heroes.
-func _update_formation() -> void:
-	_formation_hp_mult = 1.0
-	_formation_damage_mult = 1.0
-	_formation_cooldown_reduction = 0.0
-	_formation_same_role_active = false
-	_formation_opposite_tank_active = false
-	_formation_opposite_burst_active = false
-	_formation_opposite_active = false
-	_formation_trio_active = false
+## Duo leader/follower layer: Thundaar attacks faster while leading his Duo.
+## An identity trait of leading (not proximity-gated like the generic Duo
+## Bonus above) — stays on for the whole battle once paired, same as
+## _duo_leader itself. Damage-only note (balance-qa pass, 2026-07-20): an
+## earlier version also multiplied damage here, which compounded with the
+## generic Duo Bonus's own leader damage mult (1.15×1.15=32%) for a personal
+## DPS swing roughly 10x every other hero's leader/follower gap — cut back to
+## attack-speed only so Thundaar's leading identity is still real (~+25% DPS
+## swing) without dwarfing Artemis/Warden/Beacon's.
+func _effective_atk_rate_mult() -> float:
+	var m := super._effective_atk_rate_mult()
+	if hero_name == "THUNDAAR" and _partner_role != "" and _duo_leader:
+		m *= THUNDAAR_LEADER_ATK_SPEED_MULT
+	return m
 
-	var nearby_heroes = []
-	var same_role_count = 0
-
-	for node in get_tree().get_nodes_in_group("heroes"):
-		if node != self and is_instance_valid(node) and not node._dying:
-			nearby_heroes.append(node)
-
-	# Check for same-role cluster (2+ of same role within 150px)
-	for hero in nearby_heroes:
-		if global_position.distance_to(hero.global_position) <= FORMATION_SAME_ROLE_DIST:
-			if hero.role == role:
-				same_role_count += 1
-
-	if same_role_count >= 1:  # At least one other of same role nearby
-		_formation_damage_mult = FORMATION_SAME_ROLE_DAMAGE
-		_formation_same_role_active = true
-
-	# Check for opposite-role pairing within 200px. Data-driven via
-	# FORMATION_PAIRS so every role has a partner (not just TANK+BURST); first
-	# match wins (break) so a hero never stacks two pair bonuses.
-	var my_pairs: Dictionary = FORMATION_PAIRS.get(role, {})
-	for hero in nearby_heroes:
-		if global_position.distance_to(hero.global_position) <= FORMATION_OPPOSITE_ROLE_DIST:
-			if my_pairs.has(hero.role):
-				var stat: String = my_pairs[hero.role]
-				if stat == "hp":
-					_formation_hp_mult = FORMATION_OPPOSITE_ROLE_MULT
-				else:
-					_formation_damage_mult = FORMATION_OPPOSITE_ROLE_MULT
-				# Keep the TANK/BURST-specific flags for their existing HUD
-				# labels; other pairs use the generic flag.
-				if role == "TANK":
-					_formation_opposite_tank_active = true
-				elif role == "BURST" and hero.role == "TANK":
-					_formation_opposite_burst_active = true
-				else:
-					_formation_opposite_active = true
-				break
-
-	# Check for mixed trio (3+ heroes with different roles within 180px)
-	if nearby_heroes.size() >= 2:
-		var role_set: Array[String] = [role]
-		var mixed_in_range = 1
-		for hero in nearby_heroes:
-			if global_position.distance_to(hero.global_position) <= FORMATION_MIXED_TRIO_DIST:
-				if not role_set.has(hero.role):
-					role_set.append(hero.role)
-				mixed_in_range += 1
-		if role_set.size() >= 3 and mixed_in_range >= 3:
-			_formation_cooldown_reduction = FORMATION_MIXED_TRIO_COOLDOWN
-			_formation_trio_active = true
-
-	# Apply GUARD+ to max_hp/hp by the exact delta so entering/leaving range
-	# adds or removes only the bonus amount, never touching real damage taken.
-	var target_bonus_hp := _base_max_hp * (_formation_hp_mult - 1.0)
-	if not is_equal_approx(target_bonus_hp, _formation_bonus_hp):
-		var delta := target_bonus_hp - _formation_bonus_hp
-		_formation_bonus_hp = target_bonus_hp
-		max_hp += delta
-		hp = clampf(hp + delta, 1.0, max_hp)
+## Duo follower bodyguard (Thundaar only, 2026-07-20): while following,
+## always defend the Duo leader over any other engagement — returns whatever
+## is currently attacking the leader, or null if nothing is (callers fall
+## through to normal target acquisition/scoring in that case).
+func _bodyguard_target() -> Combatant:
+	if hero_name != "THUNDAAR" or _partner_role == "" or _duo_leader:
+		return null
+	var leader := _duo_partner_node()
+	if leader == null:
+		return null
+	for node in get_tree().get_nodes_in_group(enemy_group):
+		if is_instance_valid(node) and not node._dying and node._target == leader:
+			return node
+	return null
 
 ## Killing blows earn XP (banked immediately — kept even on a wipe); the rest
 ## of the party banks an assist share so tanks/screeners progress too.
-## Synergy multiplier: both heroes earn bonus XP when in range.
+## Duo Bonus multiplier: both heroes earn bonus XP while paired and in range.
 func _on_kill(victim: Combatant) -> void:
 	var xp_amount := victim.xp_value
-	# Synergy multiplier.
-	if _synergy_damage_mult > 1.0:
-		xp_amount = int(xp_amount * SYNERGY_XP_MULT)
-	xp_amount = int(xp_amount * xp_mult() * _run_xp_mult)
+	xp_amount = int(xp_amount * _duo_xp_mult * xp_mult() * _run_xp_mult)
 	GameState.award_kill_xp(self, xp_amount)
 
 ## Run-scoped XP multiplier (Fortune boon): applied to kill XP in _on_kill and
@@ -1475,9 +1646,9 @@ func _apply_owned_ability_mods() -> void:
 		if AbilityMods.def(id).get("hero", "") == hero_name:
 			_apply_ability_mod(id)
 
-## Permanent raw-stat upgrades bought with banked XP (V2 grind, StatUpgrades
-## catalog) — flat stacking per purchase (1.0 + effect * purchases), applied on
-## top of the V2 base multipliers/ability mods, before _base_max_hp is captured.
+## Permanent raw-stat upgrades bought with banked XP (StatUpgrades catalog) —
+## flat stacking per purchase (1.0 + effect * purchases), applied on
+## top of the base multipliers/ability mods, before _base_max_hp is captured.
 ## Attack Speed reduces attack_interval (lower = faster) rather than scaling it up.
 func _apply_stat_upgrades() -> void:
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
@@ -1520,8 +1691,8 @@ func _apply_ability_mod(id: String) -> void:
 			# max_hp *= 0.75
 
 ## Applies a run boon (RunState / Boons catalog) live to this hero. Boons are
-## direct base-stat changes so they compose with the synergy/formation
-## multipliers already applied in _engage and the ability functions. Permanent
+## direct base-stat changes so they compose with the Duo Bonus multiplier
+## already applied in _engage and the ability functions. Permanent
 ## for the current run; reset when the next run spawns a fresh hero.
 func apply_run_boon(id: String) -> void:
 	var d := Boons.def(id)
@@ -1531,11 +1702,6 @@ func apply_run_boon(id: String) -> void:
 		"damage_mult":
 			damage *= float(d.value)
 		"max_hp_mult":
-			# Multiply the formation-free base (not max_hp, which may include a
-			# live GUARD+ bonus — scaling that would permanently bake part of a
-			# temporary proximity buff into the base) and grant/heal the same
-			# absolute gain; _update_formation re-derives its bonus off the new
-			# base on the next frame.
 			var gain: float = _base_max_hp * (float(d.value) - 1.0)
 			_base_max_hp *= float(d.value)
 			max_hp += gain

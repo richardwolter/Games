@@ -11,6 +11,7 @@ deploy_band_x_min = -2900.0
 deploy_band_x_max = -2300.0
 villain_lair = Vector2(2900, 0)
 spawn_points = Array[Vector3]([Vector3(-1100, -180, 340), Vector3(-100, 220, 400), Vector3(900, -220, 480), Vector3(1900, 200, 560)])
+spawn_point_lanes = Array[String](["top", "bottom", "top", "bottom"])
 obstacles = Array[Vector3]([Vector3(-700, 300, 120), Vector3(500, -280, 110), Vector3(1500, 260, 120), Vector3(2400, -260, 140), Vector3(-2000, -300, 70), Vector3(750, 300, 65), Vector3(1150, 200, 60)])
 obstacle_kinds = Array[String](["mountain", "forest", "mountain", "spaceship", "rock1", "rock2", "sword"])
 lakes = Array[Vector3]([Vector3(200, 240, 170)])

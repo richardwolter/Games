@@ -1,6 +1,6 @@
 class_name BloodLayer
 extends Node2D
-## V2 lane structure only: permanent bloodstains where minions die, baked into
+## Permanent bloodstains where minions die, baked into
 ## a persistent per-level image on disk (same load/bake/save pattern as
 ## FogOfWar's explored-terrain grid) so the battlefield reads bloodier with
 ## every run instead of resetting clean each time. Individual death-splash
@@ -8,7 +8,7 @@ extends Node2D
 ## separate, permanent layer underneath them.
 ##
 ## Drawn as a plain alpha-blended Sprite2D (no shader needed, unlike fog's two-
-## channel wash) — placed as "Field"'s next sibling in lane_battlefield.tscn so
+## channel wash) — placed as "Field"'s next sibling in battlefield.tscn so
 ## tree order alone puts it above the lane floor and below spawned units.
 
 @export var stain_radius := 16.0

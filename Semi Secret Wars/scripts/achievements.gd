@@ -1,9 +1,9 @@
 class_name Achievements
 extends RefCounted
-## Cumulative career achievements (V2 grind progression) — mirrors the
-## AbilityMods/Boons static-catalog pattern. Each entry unlocks one hero once a
-## lifetime GameState.career counter crosses its threshold. Counters accumulate
-## across every V2 run, win or lose (see GameState.record_career).
+## Cumulative career achievements — mirrors the AbilityMods/Boons
+## static-catalog pattern. Each entry unlocks one hero once a lifetime
+## GameState.career counter crosses its threshold. Counters accumulate
+## across every run, win or lose (see GameState.record_career).
 ##
 ## First-pass thresholds — tune against real swarm throughput (BALANCE.md).
 

@@ -33,7 +33,7 @@ extends Camera2D
 ## sets this from its geometry. Zero disables clamping.
 @export var pan_limits := Vector2.ZERO
 ## World point pan_limits are measured around, if different from center_point
-## (e.g. V2's long lane starts the view over the deploy band but the pan clamp
+## (e.g. the long lane starts the view over the deploy band but the pan clamp
 ## should be centered on the lane's own middle so both ends are reachable).
 ## Only used when use_pan_center is true (pan_center itself may legitimately be
 ## Vector2.ZERO, so a bool flag distinguishes "unset" from "centered at origin").

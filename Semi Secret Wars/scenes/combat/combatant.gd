@@ -509,6 +509,11 @@ func _spawn_ground_splash(parent: Node) -> void:
 func _target_score(_node: Combatant, dist_sq: float) -> float:
 	return dist_sq
 
+## Lane filter hook (Hero overrides this to restrict candidates to its own
+## lane — see LaneField.clamp_to_lane doc). No-op for every other Combatant.
+func _lane_ok(_node: Combatant) -> bool:
+	return true
+
 func _acquire_target() -> void:
 	var best_target: Combatant = null
 	# Squared distances: heroes scan the whole swarm, so skip per-candidate sqrt.
@@ -519,7 +524,7 @@ func _acquire_target() -> void:
 	# While confused, hunt own group instead of the enemy group (BEACON Confuse).
 	var confused := _confused_t > 0.0
 	for node in get_tree().get_nodes_in_group(_effective_enemy_group()):
-		if node == self or not is_instance_valid(node) or node._dying:
+		if node == self or not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		var dist := global_position.distance_squared_to(node.global_position)
 		# Taunt only overrides targeting for enemies already within the
@@ -541,6 +546,11 @@ func _acquire_target() -> void:
 func _update_separation() -> void:
 	_separation = Vector2.ZERO
 	if self_group == "":
+		return
+	# Only push apart while idle/repositioning — mid-fight overlap is expected
+	# and acceptable (melee bodies naturally cluster on a target), and pushing
+	# through it is what read as heroes shoving each other around in combat.
+	if _target != null:
 		return
 	for node in get_tree().get_nodes_in_group(self_group):
 		if node == self or not is_instance_valid(node) or node._dying:

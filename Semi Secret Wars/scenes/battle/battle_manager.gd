@@ -12,10 +12,8 @@ extends Node
 ##  - LOSS = every party hero has fallen (permadeath).
 ##  - No focus ping, no priorities, no lone-deploy boon.
 
-const LANE_BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
-
-## Carryover heal, mirrored from V1 (a survivor recovers this fraction of missing
-## HP before it carries into the next level; dead stay dead).
+## Carryover heal: a survivor recovers this fraction of missing HP before it
+## carries into the next level; dead stay dead.
 const CLEAR_HEAL_MISSING_FRACTION := 0.5
 
 const OBJECTIVE_BOOST_DURATION := 10.0
@@ -48,8 +46,18 @@ var _exhausted: Dictionary = {}
 var _levelup_queue: Array[String] = []
 var _levelup_screen: LevelUpScreen = null
 
+## Second-deploy-wave state (Duo staggered arrival). -1.0 = no wave pending
+## (either it already landed or there was only ever one wave); >= 0.0 counts
+## down in _process. BattleHUD reads duo_b_seconds_remaining() to show the
+## countdown so the player can watch it and correlate with how the fight
+## unfolds — see DeployController's stepper for where the delay is chosen.
+var _second_wave_names: Array = []
+var _second_wave_positions: Array = []
+var _second_wave_remaining := -1.0
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("battle_manager")
 	GameState.start_run()
 	RunState.hero_leveled.connect(_on_hero_leveled)
 	stage_id = "stage_%d" % RunState.current_level
@@ -74,7 +82,9 @@ func _ready() -> void:
 
 	_deploy = DeployController.new()
 	_deploy.field = _field
-	_deploy.hero_names = RunState.living_party()
+	var duos := _compute_duos()
+	_deploy.duo_a = duos.a
+	_deploy.duo_b = duos.b
 	_deploy.deploy_chosen.connect(_on_deploy_chosen)
 	get_parent().add_child.call_deferred(_deploy)
 
@@ -87,14 +97,55 @@ func _apply_stage_config(stage: String) -> void:
 	_spawner.apply_stage_config(config)
 	_stage_config = config
 
-## All heroes placed and START BATTLE pressed: spawn each at its chosen band
-## point (same order as RunState.living_party(), which DeployController
-## was seeded with) and release the swarm.
-func _on_deploy_chosen(positions: Array) -> void:
-	var names := RunState.living_party()
-	for i in names.size():
-		_spawn_hero(names[i], positions[i])
+## Splits RunState.living_party() into the two authored Duos
+## (GameState.duo_pairings), each filtered to living members only. A hero
+## who isn't in either persisted Duo (stale/empty pairing data) falls back
+## into Duo A so nobody silently drops from deploy — DeployController itself
+## collapses to a single wave whenever one side ends up empty.
+func _compute_duos() -> Dictionary:
+	var living := RunState.living_party()
+	var duo_a_names: Array = GameState.duo_pairings[0] if GameState.duo_pairings.size() > 0 else []
+	var duo_b_names: Array = GameState.duo_pairings[1] if GameState.duo_pairings.size() > 1 else []
+	var a: Array = []
+	var b: Array = []
+	for hero_name in living:
+		if hero_name in duo_b_names and hero_name not in duo_a_names:
+			b.append(hero_name)
+		else:
+			a.append(hero_name)
+	return {"a": a, "b": b}
+
+## First wave spawns immediately and releases the swarm; the second wave (if
+## any) is held and counted down in _process, landing `delay` seconds later
+## at its own chosen positions — see DeployController.
+func _on_deploy_chosen(payload: Dictionary) -> void:
+	var first_names: Array = payload.get("first_names", [])
+	var first_positions: Array = payload.get("first_positions", [])
+	for i in first_names.size():
+		_spawn_hero(first_names[i], first_positions[i])
+
+	_second_wave_names = payload.get("second_names", [])
+	_second_wave_positions = payload.get("second_positions", [])
+	_second_wave_remaining = float(payload.get("delay", 0.0)) if not _second_wave_names.is_empty() else -1.0
+
 	_spawner.begin_battle()
+
+func _spawn_second_wave() -> void:
+	for i in _second_wave_names.size():
+		_spawn_hero(_second_wave_names[i], _second_wave_positions[i])
+	_second_wave_names = []
+	_second_wave_positions = []
+	_second_wave_remaining = -1.0
+
+## Seconds left until the second Duo lands, or -1.0 if none is pending —
+## BattleHUD polls this every frame to show the countdown.
+func duo_b_seconds_remaining() -> float:
+	return _second_wave_remaining
+
+## True while `hero_name` is queued for the second wave but hasn't landed
+## yet — BattleHUD uses this to show "ARRIVES IN Xs" instead of a false KO.
+func is_hero_incoming(hero_name: String) -> bool:
+	return hero_name in _second_wave_names
 
 func _spawn_hero(hero_name: String, pos: Vector2) -> void:
 	var root := get_node(heroes_root_path)
@@ -102,12 +153,10 @@ func _spawn_hero(hero_name: String, pos: Vector2) -> void:
 	h.hero_name = hero_name
 	h.body_color = GameState.HERO_CATALOG[hero_name].color
 	h.lateral = pos - _field.hero_spawn
-	# V2 has no priority/support-target pickers (lane_prep_menu.gd: "heroes just
-	# push the lane") — leave `priority` at Hero's own default ("ATTACK_VILLAIN").
-	# Reading GameState.party_of() here (a V1 system) previously leaked BEACON's
-	# V1 DEFAULT_PRIORITY of SUPPORT_ALLIES into V2, with no UI to ever change it
-	# away from that default — Beacon would leash to/follow the nearest ally
-	# instead of pushing the lane like every other hero ("glued" behavior).
+	# No priority picker exists — every hero leaves `priority` at Hero's own
+	# default (ATTACK_VILLAIN). SUPPORT_ALLIES/ATTACK_MINIONS and the old
+	# GameState.party_of()/support_target picker were removed (2026-07-20):
+	# hero-to-hero links are Duo-driven only now (see Hero class doc).
 	root.add_child(h)
 	for boon_id in RunState.boons.get(hero_name, []):
 		h.apply_run_boon(boon_id)
@@ -141,17 +190,21 @@ func _check_win() -> void:
 	if not _over and _villain_dead and _points_cleared:
 		_end(true)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _over:
 		if Input.is_key_pressed(KEY_R):
 			get_tree().paused = false
-			get_tree().change_scene_to_file(LANE_BATTLEFIELD if _advance_to_next else GameState.prep_scene())
+			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
 		return
 	if _levelup_screen != null:
 		return
 	if not _levelup_queue.is_empty():
 		_show_next_levelup()
 		return
+	if _second_wave_remaining > 0.0:
+		_second_wave_remaining = maxf(_second_wave_remaining - delta, 0.0)
+		if _second_wave_remaining <= 0.0:
+			_spawn_second_wave()
 	# Single source of truth for the villain's live position (shared field state).
 	if _villain != null and is_instance_valid(_villain) and not _villain._dying:
 		_field.villain_pos = _villain.global_position
@@ -251,7 +304,7 @@ func _find_living_hero(hero_name: String) -> Hero:
 
 func _end(win: bool) -> void:
 	_over = true
-	# Career stat (V2 grind achievements): how much of this level's villain HP
+	# Career stat (achievements): how much of this level's villain HP
 	# got chipped away, win or lose. Recorded here (not just on the terminal
 	# _end call) so a mid-run level clear's villain damage still counts toward
 	# the running best.

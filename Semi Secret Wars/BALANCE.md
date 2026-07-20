@@ -412,36 +412,43 @@ Swarm: hybrid mix of Ranged + Brute minions, 50/50 split per spawn tick (`Minion
 
 Verified: 8 dps drain matches (190 → 173.9 HP over 2s); a goal straight through the lake routes around it (27/191 frames brushing the shore vs. 214 wading pre-tune).
 
-## Synergy System (two-hero bonuses)
+## Duo Bonus System (2026-07-20 — replaces Synergy + Formation below)
 
-When both heroes are alive and within **200px** of each other:
-- **Damage multiplier:** ×1.15 to both heroes (synergy builds reward coordination)
-- **Cooldown reduction:** −0.3s on all hero ability cooldowns (Stomp 3.5s → 3.2s; Clone 8s → 7.7s)
-- **XP multiplier:** ×1.25 to all XP earned (kills + captures)
+> **⚠ First-pass numbers, not yet balance-swept** (no lane-shaped sweep harness exists — see DECISIONS.md balance-qa pass, 2026-07-20). Replaces the old opportunistic Synergy (any nearby ally) and role-based Formation (proximity stat auras) systems entirely — see DECISIONS.md for why. The "No-tank viability pass" and pairing-table history below is kept for record but **`FORMATION_PAIRS` no longer exists in code** — treat that section as historical, not current mechanics.
 
-**Design intent:** Forces 2-3 hero roster thinking, makes duo combos exponentially more powerful than solo carry, creates "breaking the game" moment with optimized synergy builds at high levels.
+Active only when a hero has a **confirmed Duo partner** (`GameState.duo_pairings`, set via the prep screen's drag-and-drop pairing panel — not just "any ally nearby"), that partner is alive, and both are within **200px** (`DUO_DISTANCE`, `hero.gd`):
 
-## Formation Bonuses (role-based proximity bonuses)
+| | Damage | Cooldown reduction | XP |
+|---|---|---|---|
+| **Leader** | ×1.15 | −0.3s | ×1.25 |
+| **Follower** | ×1.10 | −0.2s | ×1.15 |
 
-Heroes are assigned a role at prep screen: **TANK** (high HP), **BURST** (high DPS), or **CONTROL** (utility). Formation bonuses activate when heroes with specific role combinations are nearby, recalculated each frame based on proximity.
+**Leader/follower is a pure player choice, not role-derived:** whichever hero is dropped in a Duo's left/A prep-menu slot leads; right/B follows (`GameState.is_duo_leader`). Explicitly *not* "TANK always leads" — the Designer called this out as not fitting the new design; leading with an unconventional pick (e.g. Beacon) is meant to be a real, experimentable choice, not a wasted one.
 
-| Bonus | Roles | Distance | Effect | Notes |
-|---|---|---|---|---|
-| Same-role cluster | 2+ same role | 150px | ×1.1 damage to that role | Encourages stacking like-heroes; rewards focused team composition |
-| Opposite-role pair | see pair table | 200px | ×1.15 to one stat per side | First match wins (no stacking two pairs). See pairing table below. |
-| Mixed trio | 3+ different roles | 180px | +0.05s cooldown reduction | Only applies when 3+ heroes with 3 distinct roles cluster; bridges gap for 3-hero parties |
+**Per-hero leader/follower behavior (additive, on top of the table above — see [hero.gd](scenes/heroes/hero.gd)):**
 
-**Opposite-role pairings (data-driven, `FORMATION_PAIRS` in [hero.gd](scenes/heroes/hero.gd)):** every role has at least one partner, so no comp is structurally denied a pair bonus (was TANK+BURST-only, which forced a Thundaar pick — see "No-tank viability" note below). The durable/utility side of each pair takes HP, the damage side takes damage:
+| Hero | Leading | Following |
+|---|---|---|
+| THUNDAAR | ×1.20 attack speed only (`THUNDAAR_LEADER_ATK_SPEED_MULT`) | Bodyguard — hard-targets whatever is attacking the Duo leader, overriding normal target scoring |
+| ARTEMIS | ×1.25 max HP, ×0.75 Clone cooldown (`ARTEMIS_LEADER_HP_MULT`/`_CLONE_COOLDOWN_MULT`) | Focus-fires the leader's current target (a target-score nudge, not a hard override — execute/threat can still win out) |
+| WARDEN | *(none yet — generic Duo Bonus only)* | *(none yet)* |
+| BEACON | *(none yet — generic Duo Bonus only)* | *(none yet)* |
 
-| Pair | Effect (each side) |
-|---|---|
-| TANK + BURST | Tank ×1.15 HP, Burst ×1.15 damage |
-| CONTROL + SUPPORT | Control ×1.15 damage, Support ×1.15 HP |
-| BURST + SUPPORT | Burst ×1.15 damage, Support ×1.15 HP |
+**Design constraint (deliberate, see DECISIONS.md):** this per-hero layer is keyed ONLY on `(hero_name, leader-vs-follower)` — never on the specific partner's identity. An earlier version keyed behavior on the *partner's* role (e.g. Warden's Ensnare anchor switching depending on whether her partner was TANK/BURST/SUPPORT) and it visibly conflicted with itself; that version was removed entirely rather than patched.
 
-**Multiplier stacking:** Formation bonuses are *independent* of Synergy (two-hero proximity) and Lone Wolf (single-hero compensation). All multipliers compose: an opposite-role pair both within Synergy range AND formation range applies both bonuses to damage/cooldown. XP multiplier is Synergy-only (no formation XP bonus).
+### balance-qa pass 1 findings (2026-07-20)
 
-**Design intent:** Gives meaningful gameplay choice at party select (what roles to pick), creates emergent tactics (spread vs. cluster, role priorities), extends balance to 3-hero parties (mixed trio bonus) without requiring new ability unlocks.
+**Finding 1 — fixed:** Thundaar's leader bonus originally stacked `×1.15 damage` on top of the generic Duo Bonus's own `×1.15` leader damage (compounding to `×1.3225`) plus `×1.20` attack speed — a personal DPS swing of **+44%** (leading vs. following), roughly 10x every other hero's ~+4.5% generic-only swing. Cut back to attack-speed only: leading DPS now **~+20-25%** over following — still a real identity trait, no longer dwarfing the rest of the roster. `THUNDAAR_LEADER_DAMAGE_MULT` deleted.
+
+**Finding 2 — fixed:** `Hero._acquire_target()` checked Thundaar's bodyguard override (no range cap — defends the leader however far away) *before* the nearby-swarm-interrupt bubble added the same session. A following Thundaar could walk past an adjacent spawn point/minion to intercept whatever was hitting a leader across the map — the exact tunnel-vision failure mode the interrupt exists to prevent, reintroduced via a different lock. Reordered: nearby-swarm-interrupt now runs first.
+
+**Finding 3 — open, needs a Designer call:** Warden/Beacon still have no per-hero leader/follower layer at all, while a Thundaar- or Artemis-containing Duo does. This compounds the pre-existing no-tank-comp weakness (see "No-tank viability pass" below) rather than just being neutral unfinished content. Two options: (a) give Warden/Beacon a comparable-magnitude layer before the next sweep, or (b) explicitly decide the no-tank comp should stay weakest. Not resolved this pass.
+
+**Still open for the eventual sweep:** are the base Duo Bonus leader/follower gaps (+15%/+10% damage etc.) the right magnitude at all — none of this has been tested in motion, only computed by arithmetic on the live constants.
+
+## Synergy System / Formation Bonuses (RETIRED 2026-07-20 — history only, not current mechanics)
+
+The two systems below were unified into the Duo Bonus system above. Kept for record (the "No-tank viability pass" changes still apply to current tuning — Clone/Ensnare cooldown values are live).
 
 ### No-tank viability pass (2026-07-19)
 
@@ -466,7 +473,7 @@ Heroes are assigned a role at prep screen: **TANK** (high HP), **BURST** (high D
 | Contest radius | 45px | A hostile within this range pauses progress (no reset) |
 | Farm bonus | 20 | One-time XP bonus granted on capture (increased from 15, split evenly among living heroes) |
 
-Current build: one objective on the lane. Captures grant synergy XP multiplier if both heroes participate.
+Current build: one objective on the lane. Captures grant the Duo Bonus XP multiplier (see Duo Bonus System above) if both heroes of a confirmed Duo participate.
 
 ## Heroes
 

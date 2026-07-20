@@ -13,7 +13,7 @@ extends Resource
 
 @export var level_id: String = "lane_1"
 
-## Lane dimensions. A wide, short rectangle — the whole point of V2.
+## Lane dimensions. A wide, short rectangle — the whole point of the lane structure.
 @export var lane_length: float = 6000.0
 @export var lane_half_height: float = 450.0
 
@@ -30,6 +30,11 @@ extends Resource
 ## Destructible minion spawn points: (x, y) center + z = HP. Each becomes a
 ## LaneSpawnPoint the heroes can destroy to permanently stop its waves.
 @export var spawn_points: Array[Vector3] = []
+## Lane each spawn point above belongs to ("top"/"bottom"), index-aligned with
+## spawn_points — lets a level deliberately differ top vs bottom (minion mix,
+## pacing) while total difficulty stays designer-balanced across both. Falls
+## back to sign-of-y if an index is missing/empty (see LaneField.lane_of).
+@export var spawn_point_lanes: Array[String] = []
 
 ## Blocking obstacles: (x, y) center + z = radius. Index-aligned with obstacle_kinds.
 @export var obstacles: Array[Vector3] = []
@@ -42,8 +47,12 @@ extends Resource
 ## Sprite kind per scenery entry above (index-aligned): e.g. "smudge".
 @export var scenery_kinds: Array[String] = []
 ## Objective points (index-aligned with CaptureObjective.objective_index).
-## Authored sparsely in V2 — whether hold-to-capture suits a lane is TBD.
+## Authored sparsely for now — whether hold-to-capture suits a lane is TBD.
+## (The HUD hides its objective panel on levels that author none.)
 @export var objective_positions: Array[Vector2] = []
+## Lane each objective above belongs to ("top"/"bottom"/"" = both lanes may
+## capture it), index-aligned with objective_positions.
+@export var objective_lanes: Array[String] = []
 
 ## Hand-placed EXTRAS dressing OUTSIDE the lane rect, layered on top of
 ## LaneField's procedural tree band (LaneField._build_border_band()) — the

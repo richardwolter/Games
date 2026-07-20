@@ -2,6 +2,43 @@
 
 Records important project decisions and why they were made.
 
+## 2026-07-20 — balance-qa pass 1 on the Duo system: Thundaar's leader bonus de-stacked, bodyguard reordered
+
+**Decision:** First `balance-qa` skill pass on the new Duo setup (arithmetic/inspection only — no lane-shaped sweep harness exists yet). Three findings, two acted on:
+
+1. **Thundaar's leader bonus was ~10x every other hero's leader/follower swing** (+44% personal DPS vs. ~+4.5% for Artemis/Warden/Beacon) because his per-hero damage mult compounded multiplicatively with the generic Duo Bonus's own leader damage mult, on top of a separate attack-speed mult. Cut to attack-speed only (`THUNDAAR_LEADER_DAMAGE_MULT` deleted) — leading now roughly +20-25% DPS over following, a real but no longer dominant identity trait.
+2. **Bodyguard (Thundaar following) had no range cap and was checked before the nearby-swarm-interrupt** added the same session — a following Thundaar could ignore an adjacent spawn point/minion to intercept whatever was hitting a leader clear across the map, reintroducing the exact tunnel-vision bug just fixed via a different lock. Reordered so the interrupt runs first.
+3. **Warden/Beacon still have no per-hero leader/follower layer**, compounding the pre-existing no-tank-comp weakness. Left open — needs a Designer call between giving them a comparable layer vs. explicitly accepting the no-tank comp stays weakest.
+
+**Reason:** Finding 1 risked collapsing "who should lead" into "always Thundaar if available," directly against the stated goal that leader choice should be genuinely experimentable. Finding 2 was a straightforward regression of the previous session's own fix. Both approved for immediate action ("go ahead"); Finding 3 explicitly deferred since it's a comp-viability call, not a number to pick unilaterally.
+
+**Impact:** Still **first-pass, unswept** — see BALANCE.md's Duo Bonus System section for the updated table and the full finding writeups. No lane-shaped sweep harness exists (deleted with V1 — Part C6 planned work); everything here is arithmetic on live constants, not observed combat.
+
+## 2026-07-20 — Duo system: Synergy+Formation unified, leader/follower is a player choice, per-partner-role tweaks removed
+
+**Decision (four related changes, same session):**
+
+1. **Synergy (any nearby ally) and Formation (role-based proximity auras) unified into one "Duo Bonus"** that only fires for a *confirmed* Duo pairing (set at the prep screen), not any two heroes standing near each other. Leader gets +15% damage/−0.3s cooldown/+25% XP; follower gets +10%/−0.2s/+15%.
+2. **Leader/follower is a pure player choice, not derived from role.** Originally the lower-ranked role always led (TANK > BURST > CONTROL > SUPPORT, so Thundaar always led any pairing he was in). Replaced with `GameState.is_duo_leader()`: whichever hero is dropped in a Duo's left/A prep-menu slot leads.
+3. **A small per-hero leader/follower behavior layer added on top**, keyed only on `(hero_name, leader-vs-follower)`: THUNDAAR leading gains attack speed + damage, following he bodyguards the leader (hard target override); ARTEMIS leading gains HP + faster Clone, following she focus-fires the leader's target (soft nudge). WARDEN/BEACON have none yet.
+4. **An earlier, broader version of (3) was built and then removed the same session.** It keyed behavior on the *partner's* role instead (e.g. Warden's Ensnare anchor switched depending on whether her partner was TANK/BURST/SUPPORT, and her cluster-search separately biased toward a SUPPORT partner's position) — this caused Warden's targeting to visibly conflict with itself. Ripped out entirely rather than patched.
+
+**Reason:** Direct Designer feedback across the session. On (1)/(2): "tank always leads does not work anymore ... this should be a player decision, even when it does not seem to make sense, experimentation is good." On (3)/(4): "It is fixing leader and follower to specific heroes... It should not have a specific behavior for each hero, It should be a behavior that matches other heroes without having to completely adapt individually. This should be the norm for DUO synergy, to reduce scope creep on project" — followed by an explicit reversal once the per-hero *leader/follower* layer (not per-*partner*) was proposed: "Per-hero seems interesting and strategy driven. But it should not conflict with DUO generic behavior... Everything should feel cohesive and implementable." The distinction that survived: per-hero behavior keyed on this hero's own leader/follower status is fine; per-hero behavior keyed on the *partner's* identity/role is not — the latter is what caused the conflict.
+
+**Implementation:** `hero.gd` — `_update_duo_bonus()` replaces the old `_update_synergy()`/`_update_formation()`; `DUO_LEADER_*`/`DUO_FOLLOWER_*` consts replace `SYNERGY_*`/`FORMATION_*`; `FORMATION_PAIRS` deleted. `_apply_duo_partner_tweaks()`, the Ensnare partner-anchor switch, and Warden's cluster-search partner bias all deleted. New: `THUNDAAR_LEADER_*`/`ARTEMIS_LEADER_*` consts, `_bodyguard_target()`, `_role_bonus`'s BURST follower case. `game_state.gd` — new `is_duo_leader()`. `prep_menu.gd` — Duo slots now show LEADER/FOLLOWER before a hero is dropped (slot position, not computed after fill). See BALANCE.md (Duo Bonus System section, first-pass numbers) and PRODUCTION.md (current milestone) for full detail.
+
+**Impact:** No numbers here have been through a balance sweep — flagged as the very next piece of work (`balance-qa` skill pass).
+
+## 2026-07-20 — Hero targeting: minions "on the way" now interrupt a locked spawn point/villain
+
+**Decision:** The spawn-point (`SPAWN_POINT_ENGAGE_RANGE` 500px) and villain (`VILLAIN_ENGAGE_RANGE`) target locks were absolute distance checks — a hero within range would beeline the lock regardless of what it walked past. Added two checks in `Hero._acquire_target()`, both ahead of the locks: (a) a tight "already adjacent" bubble (`attack_range × 1.5`, floored at 90px) that always wins; (b) a broader "on the way" check — an ordinary minion (excluding spawn points/villains) closer to the hero than the currently-locked gate/villain wins instead.
+
+**Reason:** Direct Designer report — "heroes are just ignoring some minions and taking unnecessary damage" because of over-focus on spawn points, then specifically flagged after a first (bubble-only) fix that Warden was still beelining a gate. The bubble-only fix caught adjacent minions but not ones still closing distance — the "on the way" comparison closed that gap. Designer-confirmed working after the second fix.
+
+**Implementation:** `hero.gd` — new `_nearby_threat()` and `_nearest_minion()` (the latter explicitly excludes `spawn_points`/`villains` groups, so a hero already standing at a lock target doesn't "prefer" re-targeting the thing it's already on).
+
+**Impact:** Not yet balance-swept — may change spawn-point clear times and effective swarm damage taken en route; flagged for the same upcoming `balance-qa` pass as the Duo Bonus numbers.
+
 ## 2026-07-19 — Party cap removed: players can deploy every unlocked hero
 
 **Decision:** Removed `RunState.PARTY_CAP` (was 3) entirely. Every unlocked hero can now be drafted and deployed in the same run — no "leave one out" constraint.

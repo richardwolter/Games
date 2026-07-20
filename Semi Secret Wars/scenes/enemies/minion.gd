@@ -28,13 +28,20 @@ var _exit_pos := Vector2.ZERO
 var _swarm_offset := Vector2.ZERO
 var _hunting := false
 var _hunt_cd := 0.0
+## Lane ("top"/"bottom") this minion's spawn point belongs to (Designer,
+## 2026-07-20: lane split) — set by LaneSpawner via setup(). Restricts
+## _nearest_hero() to that lane's heroes so the swarm doesn't drain across to
+## whichever lane happens to be softer; falls back to any living hero once
+## this lane has none left (the "lanes merge" collapse behavior).
+var _lane := ""
 
 ## Called by the spawner right after instantiation, before add_child().
-func setup(spawn_pos: Vector2, exit_pos: Vector2, swarm_offset: Vector2, move_speed_value: float) -> void:
+func setup(spawn_pos: Vector2, exit_pos: Vector2, swarm_offset: Vector2, move_speed_value: float, lane_value := "") -> void:
 	_spawn_pos = spawn_pos
 	_exit_pos = exit_pos
 	_swarm_offset = swarm_offset
 	move_speed = move_speed_value
+	_lane = lane_value
 
 func _configure() -> void:
 	self_group = "hostiles"
@@ -49,6 +56,12 @@ func _process(delta: float) -> void:
 	super(delta)
 	if _dying:
 		return
+	# Hold to this minion's own spawn lane until the merge zone right before
+	# the villain, same rule and boundary as Hero (Designer, 2026-07-20) — a
+	# minion chasing a hero across the split just holds at the boundary
+	# instead of crossing into the other lane's territory.
+	if _lane != "":
+		global_position = _field.clamp_to_lane(global_position, _lane)
 	_hunt_cd -= delta
 	if _hunt_cd > 0.0:
 		return
@@ -79,6 +92,19 @@ func _process(delta: float) -> void:
 		_hunting = false
 		set_goal(_exit_pos)
 
+## Lane filter for detect-range engagement (Combatant._acquire_target) —
+## mirrors Hero._lane_ok so a minion can't lock onto a hero across the
+## boundary gap either, not just fail to hunt toward one at long range.
+func _lane_ok(node: Combatant) -> bool:
+	if _lane == "" or _field == null:
+		return true
+	if global_position.x >= _field.lane_merge_x() or _field.lanes_merged():
+		return true
+	if not ("lane" in node):
+		return true
+	var node_lane: String = node.lane
+	return node_lane == "" or node_lane == _lane
+
 ## Nearest living same-group minion (a confused minion's walk-toward victim).
 func _nearest_confused_mate() -> Combatant:
 	var nearest: Combatant = null
@@ -93,11 +119,29 @@ func _nearest_confused_mate() -> Combatant:
 	return nearest
 
 ## Nearest living hero at any distance (hunting is field-wide, unlike detect).
+## Restricted to this minion's own lane UNLESS either lane's Duo has been
+## wiped (LaneField.lanes_merged — Designer, 2026-07-20: lane separation
+## breaks with the assigned duo's death). Deliberately does NOT fall back to
+## the other lane just because this minion's own lane currently has no living
+## hero — a lane the player never deployed anyone into isn't "collapsed", and
+## falling back there would pull minions across the (still-held) boundary
+## toward a hero they can't actually reach until the merge zone, reading as
+## "focusing on the wrong lane". Returns null in that case — same as a hero
+## with no live target, the minion just idles/drifts to the funnel exit.
 func _nearest_hero() -> Combatant:
+	if _lane == "" or (_field != null and _field.lanes_merged()):
+		return _nearest_hero_in_lane("")
+	return _nearest_hero_in_lane(_lane)
+
+func _nearest_hero_in_lane(lane_filter: String) -> Combatant:
 	var nearest: Combatant = null
 	var best := INF
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
+			continue
+		# HeroClone has no lane of its own (short-lived, always spawns beside
+		# its caster) — only real Heroes are lane-filtered.
+		if lane_filter != "" and node is Hero and (node as Hero).lane != lane_filter:
 			continue
 		var dist := global_position.distance_squared_to(node.global_position)
 		if dist < best:
