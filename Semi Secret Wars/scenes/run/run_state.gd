@@ -32,7 +32,7 @@ var headless := false
 
 ## Which level of the run we're on (1-based). A run is a chain of levels; a win
 ## advances this, a loss resets the whole run to level 1 (gameplay-loop rework).
-## LaneField reads it to pick which authored LaneLayout to load.
+## LaneField reads it to pick which authored LevelLayout to load.
 var current_level := 1
 ## hero_name -> {"level": int, "xp": int, "xp_to_next": int}
 var levels := {}

@@ -1,6 +1,6 @@
 [gd_scene load_steps=27 format=3]
 
-[ext_resource type="Script" path="res://v2/battlefield/lane_field.gd" id="1_field"]
+[ext_resource type="Script" path="res://scenes/battlefield/lane_field.gd" id="1_field"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Forest.svg" id="1_forest"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Mountain.svg" id="1_mountain"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Destroyed-Spaceship.png" id="1_spaceship"]
@@ -14,16 +14,16 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/Plant.png" id="1_plant"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Mushroom.png" id="1_mushroom"]
 [ext_resource type="Script" path="res://scenes/battlefield/battle_camera.gd" id="3_camera"]
-[ext_resource type="Script" path="res://v2/enemies/lane_spawner.gd" id="4_spawner"]
+[ext_resource type="Script" path="res://scenes/enemies/lane_spawner.gd" id="4_spawner"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/minion.tscn" id="5_minion"]
 [ext_resource type="PackedScene" path="res://scenes/heroes/hero.tscn" id="6_hero"]
-[ext_resource type="Script" path="res://v2/battle/lane_battle_manager.gd" id="8_bmgr"]
+[ext_resource type="Script" path="res://scenes/battle/battle_manager.gd" id="8_bmgr"]
 [ext_resource type="Script" path="res://scenes/battle/battle_hud.gd" id="8_hud"]
 [ext_resource type="Script" path="res://scenes/battle/results_screen.gd" id="10_res"]
 [ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="11_theme"]
 [ext_resource type="Script" path="res://scenes/battlefield/fog_of_war.gd" id="12_fog"]
-[ext_resource type="Script" path="res://v2/battlefield/blood_layer.gd" id="13_blood"]
-[ext_resource type="Script" path="res://v2/battlefield/lane_foreground.gd" id="14_foreground"]
+[ext_resource type="Script" path="res://scenes/battlefield/blood_layer.gd" id="13_blood"]
+[ext_resource type="Script" path="res://scenes/battlefield/lane_foreground.gd" id="14_foreground"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vhpfill"]
 bg_color = Color(0.776471, 0.239216, 0.239216, 1)

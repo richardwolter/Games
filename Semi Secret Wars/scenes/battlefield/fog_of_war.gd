@@ -133,8 +133,7 @@ func _stamp(world_pos: Vector2, explored_only := false) -> void:
 
 const FOG_DIR := "user://fog"
 
-## Fog persists to GameState's fog dir, which is V1's user://fog or, in the V2
-## lane-test build, user://fog_v2 — so V2 exploration never overwrites V1's maps.
+## Fog persists to GameState's fog dir, one PNG per level.
 func _fog_path() -> String:
 	return "%s/level_%d.png" % [GameState.fog_dir(), RunState.current_level]
 

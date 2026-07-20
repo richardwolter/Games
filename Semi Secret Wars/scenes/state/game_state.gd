@@ -13,7 +13,7 @@ extends Node
 ## returns to the prep menu — see full_reset().
 
 const SAVE_PATH := "user://save.json"
-const PREP_MENU := "res://v2/prep/lane_prep_menu.tscn"
+const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
 const FOG_DIR := "user://fog"
 
 func save_path() -> String:
@@ -164,7 +164,7 @@ func award_gold(amount: int) -> void:
 ## Increments gold WITHOUT saving to disk — the per-kill/per-gate drip
 ## (LaneSpawner) against a 50-minion swarm would thrash file I/O if it saved
 ## every time like award_gold() does. Flushed by the save_game() inside the
-## eventual award_gold() call at LaneBattleManager._end().
+## eventual award_gold() call at BattleManager._end().
 func bank_gold(amount: int) -> void:
 	gold += amount
 

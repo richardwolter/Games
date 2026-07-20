@@ -1,19 +1,18 @@
-class_name LaneBattleManager
+class_name BattleManager
 extends Node
-## V2 lane battle resolution (forked from BattleManager, keeping its proven
-## boon/level-up, objective, gold, HP-carryover and level-chaining parts).
+## Lane battle resolution: boon/level-up, objectives, gold, HP-carryover and
+## level-chaining.
 ##
-## Structural differences from V1:
-##  - One-shot deploy phase like V1 (LaneDeployController), but constrained to
-##    the fixed deploy band instead of the whole open field. The swarm stays
-##    frozen until every hero is placed and START BATTLE is pressed.
-##  - No mid-battle respawn (Designer, 2026-07-19: removed) — a hero that dies
-##    is down for the rest of the run, same finality as V1.
+##  - One-shot deploy phase (DeployController), constrained to the fixed
+##    deploy band. The swarm stays frozen until every hero is placed and
+##    START BATTLE is pressed.
+##  - No mid-battle respawn (Designer, 2026-07-19: removed) — a hero that
+##    dies is down for the rest of the run.
 ##  - WIN = villain dead AND every destructible spawn point destroyed.
 ##  - LOSS = every party hero has fallen (permadeath).
 ##  - No focus ping, no priorities, no lone-deploy boon.
 
-const LANE_BATTLEFIELD := "res://v2/battlefield/lane_battlefield.tscn"
+const LANE_BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
 
 ## Carryover heal, mirrored from V1 (a survivor recovers this fraction of missing
 ## HP before it carries into the next level; dead stay dead).
@@ -39,7 +38,7 @@ var _hud: BattleHUD
 var _villain: Combatant
 var _field: LaneField
 var _stage_config: StageConfig
-var _deploy: LaneDeployController
+var _deploy: DeployController
 var _over := false
 var _advance_to_next := false
 var _villain_dead := false
@@ -73,19 +72,14 @@ func _ready() -> void:
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
-	_deploy = LaneDeployController.new()
+	_deploy = DeployController.new()
 	_deploy.field = _field
 	_deploy.hero_names = RunState.living_party()
 	_deploy.deploy_chosen.connect(_on_deploy_chosen)
 	get_parent().add_child.call_deferred(_deploy)
 
 func _apply_stage_config(stage: String) -> void:
-	# V2-specific config first (bigger swarms without rebalancing V1's shared
-	# config — see v2/config/lane_*_stage_config.tres, named after the level
-	# number to match lane_*_layout.tres); fall back to the shared one if a
-	# V2-specific config hasn't been authored for this stage.
-	var v2_path := "res://v2/config/lane_%s_stage_config.tres" % stage.trim_prefix("stage_")
-	var config_path := v2_path if ResourceLoader.exists(v2_path) else "res://config/%s_config.tres" % stage
+	var config_path := "res://config/%s_config.tres" % stage
 	var config = load(config_path)
 	if config == null:
 		push_error("Failed to load stage config: %s" % config_path)
@@ -94,7 +88,7 @@ func _apply_stage_config(stage: String) -> void:
 	_stage_config = config
 
 ## All heroes placed and START BATTLE pressed: spawn each at its chosen band
-## point (same order as RunState.living_party(), which LaneDeployController
+## point (same order as RunState.living_party(), which DeployController
 ## was seeded with) and release the swarm.
 func _on_deploy_chosen(positions: Array) -> void:
 	var names := RunState.living_party()
@@ -304,6 +298,5 @@ func _record_carryover() -> void:
 			RunState.carry_hp(hero_name, minf(healed, h.max_hp))
 
 func _level_exists(n: int) -> bool:
-	var has_stage_config := ResourceLoader.exists("res://v2/config/lane_%d_stage_config.tres" % n) \
-			or ResourceLoader.exists("res://config/stage_%d_config.tres" % n)
-	return ResourceLoader.exists("res://v2/config/lane_%d_layout.tres" % n) and has_stage_config
+	var has_stage_config := ResourceLoader.exists("res://config/stage_%d_config.tres" % n)
+	return ResourceLoader.exists("res://config/level_%d_layout.tres" % n) and has_stage_config

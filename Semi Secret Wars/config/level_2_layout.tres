@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="LaneLayout" format=3]
+[gd_resource type="Resource" script_class="LevelLayout" format=3]
 
-[ext_resource type="Script" path="res://v2/config/lane_layout.gd" id="1_layout"]
+[ext_resource type="Script" path="res://config/level_layout.gd" id="1_layout"]
 
 [resource]
 script = ExtResource("1_layout")

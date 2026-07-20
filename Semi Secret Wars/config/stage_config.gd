@@ -31,5 +31,5 @@ extends Resource
 ## Multiplier applied to the villain's authored max_hp (villain.tscn) at spawn.
 ## Additive field (default 1.0 = untouched) — V1 stage configs never set this,
 ## so V1 behavior is unaffected. Used by V2's stage configs to raise villain HP
-## without editing the shared villain.tscn (see LaneBattleManager._spawn_villain).
+## without editing the shared villain.tscn (see BattleManager._spawn_villain).
 @export var villain_hp_mult: float = 1.0

@@ -56,7 +56,6 @@ func _ready() -> void:
 	get_node(back_button_path).pressed.connect(_on_back_pressed)
 
 func _on_back_pressed() -> void:
-	# Routes to the V2 lane prep menu when the lane-test build is active, else V1.
 	get_tree().change_scene_to_file(GameState.prep_scene())
 
 func _process(delta: float) -> void:

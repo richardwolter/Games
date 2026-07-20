@@ -1,13 +1,10 @@
-class_name LanePrepMenu
+class_name PrepMenu
 extends Control
-## V2 (lane-structure) prep screen — the parallel testing build's entry point.
-##
-## Deliberately leaner than the old V1 PrepMenu: party draft + gold/ability
-## shop only. No priority/support-target pickers — heroes just push the lane,
-## which is why the reused Hero code needs no priority changes. START loads
-## the lane battlefield.
+## The prep screen — party draft + gold/ability shop, then START into the
+## lane battlefield. No priority/support-target pickers — heroes just push
+## the lane.
 
-const LANE_BATTLEFIELD := "res://v2/battlefield/lane_battlefield.tscn"
+const LANE_BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
 
 var _start_button: Button
 var _currency_label: Label
@@ -35,7 +32,7 @@ func _build_ui() -> void:
 	add_child(root)
 	_main = root
 
-	var title := _label("SEMI-SECRET WARS — V2 LANE TEST", 36)
+	var title := _label("SEMI-SECRET WARS", 36)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 

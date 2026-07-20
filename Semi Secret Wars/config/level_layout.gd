@@ -1,9 +1,7 @@
-class_name LaneLayout
+class_name LevelLayout
 extends Resource
-## Authored, fixed geometry for one V2 LANE level (parallel testing build).
+## Authored, fixed geometry for one level: a narrow horizontal lane.
 ##
-## V2's structural thesis: the battlefield is a narrow horizontal lane instead of
-## V1's wide open ellipse (see config/level_layout.gd for the V1 equivalent).
 ## Heroes deploy from a fixed band at the LEFT end and push RIGHT toward the
 ## villain's lair. Minion spawn points are distributed ALONG the lane and are
 ## destructible — killing one permanently stops its waves.

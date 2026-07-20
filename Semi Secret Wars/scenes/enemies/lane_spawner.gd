@@ -4,14 +4,14 @@ extends Node2D
 ## waves pour from DESTRUCTIBLE spawn points distributed along the lane rather
 ## than from fixed edge gates. Destroying a point permanently stops its waves;
 ## all points destroyed is half the level-clear condition (villain dead is the
-## other half — see LaneBattleManager).
+## other half — see BattleManager).
 
 signal points_cleared  ## Emitted the moment the last spawn point is destroyed.
 
 ## Gold drip (V2 grind economy) — banked immediately via GameState.bank_gold,
 ## which does NOT save to disk (per-kill saves would thrash file I/O against a
 ## 50-minion swarm). Flushed by the save_game() inside the eventual
-## award_gold() call at LaneBattleManager._end(). First-pass values — flag for
+## award_gold() call at BattleManager._end(). First-pass values — flag for
 ## tuning in BALANCE.md.
 const GOLD_PER_KILL := 0.5
 const GOLD_PER_GATE := 15

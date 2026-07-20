@@ -1,13 +1,13 @@
 @tool
 class_name LaneField
 extends Node2D
-## The lane battlefield: a narrow horizontal lane (LaneLayout) — layout data +
+## The lane battlefield: a narrow horizontal lane (LevelLayout) — layout data +
 ## rendering. Single source of truth for field geometry — named locations
 ## (hero spawn, villain, destructible spawn points), blocking obstacles,
 ## decorative scenery, and the Poison Lake. Units query this node (group
 ## "field") for spawn/goal points and steer around its obstacles.
 
-## Lane dimensions (copied from the LaneLayout at runtime).
+## Lane dimensions (copied from the LevelLayout at runtime).
 var lane_length: float = 6000.0
 var lane_half_height: float = 450.0
 ## Fixed deploy band at the lane's left end.
@@ -29,7 +29,7 @@ var villain_pos := Vector2(1420.0, 640.0)
 ## the reused FogOfWar/page grids, not an authored ellipse.
 var field_radius := Vector2(2000.0, 1000.0)
 ## Blocking obstacles: (x, y) center + z = radius. Units steer around these.
-## Positions come from the LaneLayout at runtime (apply_lane_layout keeps
+## Positions come from the LevelLayout at runtime (apply_lane_layout keeps
 ## radius and obstacle_kinds index-aligned).
 var obstacles: Array[Vector3] = []
 ## Sprite kind per obstacle above (index-aligned): "mountain" or "forest".
@@ -66,7 +66,7 @@ var lakes: Array[Vector3] = []
 var default_hero_spawn := Vector2.ZERO
 
 ## Objective points for this level; Objective/Guardian nodes read their position
-## from here by index. Dormant — no LaneLayout currently authors these.
+## from here by index. Dormant — no LevelLayout currently authors these.
 var objective_positions: Array[Vector2] = []
 
 ## Runtime-registered blockers with the same collision treatment as `obstacles`
@@ -171,18 +171,18 @@ func _ready() -> void:
 	queue_redraw()
 
 func _load_lane_layout() -> void:
-	var path := "res://v2/config/lane_%d_layout.tres" % RunState.current_level
+	var path := "res://config/level_%d_layout.tres" % RunState.current_level
 	if not ResourceLoader.exists(path):
-		push_warning("No LaneLayout at %s — using LaneField defaults." % path)
+		push_warning("No LevelLayout at %s — using LaneField defaults." % path)
 		return
-	var layout: LaneLayout = load(path)
+	var layout: LevelLayout = load(path)
 	if layout != null:
 		apply_lane_layout(layout)
 
 ## Copies an authored lane into this field's live geometry. hero_spawn anchors at
 ## the deploy band center (the shared point the swarm marches on); villain_pos is
 ## the lair. field_radius is sized to the lane so the reused fog/page cover it.
-func apply_lane_layout(layout: LaneLayout) -> void:
+func apply_lane_layout(layout: LevelLayout) -> void:
 	lane_length = layout.lane_length
 	lane_half_height = layout.lane_half_height
 	deploy_band_x_min = layout.deploy_band_x_min
@@ -208,7 +208,7 @@ func apply_lane_layout(layout: LaneLayout) -> void:
 ## Generates the continuous tree band (both sides) and the sparse ground
 ## scatter, deterministically from the level id so the same lane always looks
 ## the same (consistent with the fixed-layout / persistent-fog thesis — see
-## LaneLayout's header comment). Rebuilt whenever the lane geometry changes.
+## LevelLayout's header comment). Rebuilt whenever the lane geometry changes.
 func _build_border_band() -> void:
 	_band_top.clear()
 	_band_bottom.clear()

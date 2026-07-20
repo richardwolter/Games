@@ -1,4 +1,4 @@
-class_name LaneDeployController
+class_name DeployController
 extends Node2D
 ## V2's pre-battle placement phase: click to place every drafted hero inside
 ## the fixed deploy band, then press START BATTLE to commit.
@@ -7,14 +7,14 @@ extends Node2D
 ## constrained to LaneField's authored deploy band instead of the whole open
 ## field. Replaces the old persistent live-redeploy verb (Designer, 2026-07-19:
 ## remove mid-battle respawn) — a hero that dies mid-battle is now permanently
-## down for the run, same finality as V1 (see LaneBattleManager._on_hero_died).
+## down for the run, same finality as V1 (see BattleManager._on_hero_died).
 ##
 ## Camera controls (wheel zoom, edge/WASD pan) stay live during placement, same
 ## as V1, so the player can scout the lane before committing.
 
 signal deploy_chosen(positions: Array)
 
-## Injected by LaneBattleManager before entering the tree.
+## Injected by BattleManager before entering the tree.
 var field: LaneField
 var hero_names: Array = []
 

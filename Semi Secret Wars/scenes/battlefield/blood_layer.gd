@@ -86,7 +86,7 @@ func _load() -> void:
 		return
 	_img = saved
 
-## Called by LaneBattleManager at battle end so accumulated stains survive
+## Called by BattleManager at battle end so accumulated stains survive
 ## into the next visit to this level, forever (not just this run).
 func save() -> void:
 	if RunState.headless or _img == null:
