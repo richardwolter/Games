@@ -2,6 +2,86 @@
 
 Records important project decisions and why they were made.
 
+## 2026-07-19 — Party cap removed: players can deploy every unlocked hero
+
+**Decision:** Removed `RunState.PARTY_CAP` (was 3) entirely. Every unlocked hero can now be drafted and deployed in the same run — no "leave one out" constraint.
+
+**Reason:** Direct Designer request. This reverses the 2026-07-18 "party cap set to 3-of-4" decision (below) — the composition-tension goal that motivated that cap no longer holds for what's wanted from this build.
+
+**Implementation:** `run_state.gd` — deleted `PARTY_CAP`; `roll_draft_offer()` now offers and auto-selects every unlocked hero instead of a random `PARTY_CAP+1` subset; `toggle_selected()` no longer caps additions. `prep_menu.gd` (V1) and `lane_prep_menu.gd` (V2) — checkbox disable logic dropped its cap clause. `balance_sweep.gd`'s `PARTY_COMPS` (a hardcoded trio list, not driven by the constant) was left as-is, but its stale "what a real player drafts" comment was corrected — it's a partial-roster coverage set now, not the default composition; a full 4-hero comp isn't in the sweep yet.
+
+**Impact:** Every existing balance-sweep result, and the "3-of-4 forces a real choice" framing in the 2026-07-18 entry below, is superseded for what a real player actually fields. No sweep re-run this pass — flagged as a follow-up.
+
+## 2026-07-19 — Artemis: Dash replaced with Multishot; no movement-type abilities going forward
+
+**Decision:** Swapped Artemis's LV20 ultimate from **Dash** (a short reposition that hits enemies along the way) to **Multishot** — a stationary volley of up to 5 arrows at the nearest enemies within range, reusing the same `Projectile` her basic attack fires. Kept Dash's cooldown/target-count budget; each arrow deals 0.6× a normal hit since several can land at once.
+
+**Reason:** Direct Designer request — movement-type abilities are ruled out as a standing constraint on future ability design ("it inbalances the game"), not just a one-off swap.
+
+**Impact:** `hero.gd` — `DASH_*` constants replaced by `MULTISHOT_*`; `_try_dash()`/its hit logic replaced by `_try_multishot()`/`_fire_multishot_arrow()`; `ABILITY_INFO`/cast label updated. `ability_tiers.gd` — the `ARTEMIS_3` shop entry renamed Dash→Multishot. Not yet balance-swept.
+
+## 2026-07-19 — V2: mid-battle respawn removed, one-shot deploy phase added
+
+**Decision:** V2's persistent live-redeploy verb (each hero on its own timer, up to `MAX_LIVES 3` deploys per level, `RESPAWN_COOLDOWN 20s` after a death) is retired. In its place: a one-shot pre-battle phase — click every drafted hero into the fixed deploy band, then press a **START BATTLE** button — after which the swarm releases and there is no more redeploy. A hero that dies mid-battle is down for good (permadeath), same finality as V1.
+
+**Reason:** Direct Designer request, immediately following the grind-progression pass (see the entry below). Live-redeploy and the new "grindy, high-stakes run" direction were pulling in opposite directions — a respawn safety net softens exactly the stakes the achievement/tier grind is trying to create.
+
+**Implementation:** `v2/battle/lane_deploy_controller.gd` rewritten in place (same class slot) from the timer/lives controller into a placement controller modeled on V1's `scenes/battle/deploy_controller.gd`, constrained to `LaneField`'s authored deploy band instead of the whole open field, with an explicit START BATTLE button (V1 auto-commits on the last hero placed; V2 doesn't, since the Designer specifically asked for a deliberate confirm step). `LaneBattleManager` no longer starts the spawner in `_ready()` — it waits for the button's `deploy_chosen` signal. Hero death now calls the existing `_on_hero_exhausted` directly (no lives bookkeeping in between), which already fed into `RunState.mark_dead` — so permadeath was already run-scoped, not level-scoped, with zero new code needed for that part.
+
+**Impact:** `MAX_LIVES`/`RESPAWN_COOLDOWN`/`INITIAL_STAGGER` and the `_first_deploy_done` carried-HP-on-first-deploy tracking are gone (every deploy is now the only deploy, so the carried-HP logic always applies unconditionally). Verified headless against the real `lane_battlefield.tscn`: swarm frozen pre-start, no hero spawned before commit, whole party spawns together on START, and a killed hero is immediately exhausted with the level ending in a loss the instant the last hero falls. V1 untouched — scoped entirely to `v2/battle/`.
+
+## 2026-07-19 — V2 grind progression: hero unlocks, ability tiers, drip economy, Lone Wolf removed for V2
+
+**Decision:** Implemented the approved plan turning V2 from "a shorter V1" into the deliberately grindy build: a fresh V2 save starts with only THUNDAAR unlocked (was the full 4-hero roster, same as V1); the rest unlock via cumulative career achievements (kills/gates/villain-damage%) that persist across every run, win or lose. The three intrinsic ability flags V1 grants for free are now gold-gated per hero in V2 (tier 1/signature free, tier 2/passive 40g, tier 3/ultimate 70g, sequential). Gold now drips per-kill (0.5g) and per-gate (15g) in addition to the existing run-end payout. **Lone Wolf (the solo-hero ×1.8 HP/×1.75 dmg/−0.4s cooldown compensation buff) is removed entirely for V2** — gated at `hero.gd:518` on `not GameState.v2_mode` — since every early V2 run *is* solo Thundaar and the buff directly fought the new "Level 1 needs ~3 upgraded heroes" design goal.
+
+**Reason:** Direct Designer request (this session) — V2 needed its own progression shape, not V1's loop with bigger numbers. Lone Wolf specifically: "it does not make sense anymore" once V2 starts every player at solo-THUNDAAR-only — a buff designed to make solo viable was actively undermining the intended early-game difficulty wall.
+
+**Knock-on effect (flagged, not separately tuned):** `Hero._on_kill` grants `SYNERGY_XP_MULT` (1.25×) whenever `_synergy_damage_mult > 1.0`, which Lone Wolf previously satisfied for a solo hero. Removing Lone Wolf therefore also removes the solo XP bonus in V2 — consistent with the grindier direction, but it makes early solo runs slower to level, which sits underneath the achievement thresholds below. Not addressed this pass; needs a real playtest before the thresholds are trusted.
+
+**Everything stays additive/gated, per the established V2 pattern:** new `StageConfig.villain_hp_mult` field defaults to 1.0 (V1 `.tres` files never set it); new `v2/config/lane_*_stage_config.tres` mean V1's shared `config/stage_*_config.tres` were never touched; `Hero._configure()`'s tier-gating and Lone Wolf gating both branch on `GameState.v2_mode`, so V1 keeps its unconditional `_base/_passive/_active_unlocked = true` and its original `_is_lone_wolf` condition byte-for-byte.
+
+**Known gaps surfaced, not invented away:** WARDEN has no coded LV20 ultimate at all today (`ABILITY_INFO["WARDEN"].name2 == ""` in `hero.gd`), and neither Ensnare nor Rally read `_passive_unlocked` — so `WARDEN_2`/`WARDEN_3`/`BEACON_2` currently sell tiers with no observable in-game effect. This predates this pass (same gap exists dormant in V1) but is now a real gold purchase in the new shop; flagged rather than patched, since inventing the missing mechanic wasn't part of the approved plan.
+
+**Impact:** Save schema → **v5** (adds `career`, `owned_ability_tiers`; old saves wipe clean, consistent with every prior schema break). New files: `scripts/achievements.gd`, `scripts/ability_tiers.gd`, `v2/prep/ability_tier_page.gd`, `v2/config/lane_{1,2,3}_stage_config.tres`. See PRODUCTION.md (current milestone) and BALANCE.md for the specific tuning numbers (achievement thresholds, tier costs, gold drip rates, L1 villain HP/gate HP raise).
+
+## 2026-07-19 — Difficulty pass: hero stat rebase + BEACON ultimate + harder swarm/villains
+
+**Decision:** Game played too easy after the MVP pass. (1) Rebased all four heroes onto a Designer-authored stat table (see BALANCE.md "Difficulty pass"). (2) Gave BEACON its first second-ability — **Confuse**, a cone of light that makes caught minions attack each other for 3s (villains immune). (3) Raised swarm density (`swarm_max_cap` +30%, `spawn_batch` 2→3) and bumped villains ~+20-25% HP/dmg.
+
+**Reason:** Direct Designer request. Confuse was wired into the existing second-ability slot (auto-cast, like Shockwave/Dash) rather than a new player verb, keeping the "one in-battle verb = focus ping" constraint intact and requiring zero HUD/input changes. Confusion is a new systemic `Combatant` status (`_confused_t`/`apply_confusion`/`_effective_enemy_group`), so any future confusion source reuses it; the status ring shows it for free. Villain immunity prevents trivializing a boss.
+
+**Accepted tradeoff — WARDEN DMG 9→6:** the Designer's table reverses the same-day WARDEN buff (see next entry) that fixed the no-burst comp on L3. Applied verbatim as instructed. Consequence confirmed in the re-sweep: the no-burst THUNDAAR+WARDEN+BEACON comp collapses to ~0% full-run even with mods. **Flagged for a Designer call** (revisit WARDEN, or accept that a no-hard-burst trio isn't meant to clear). Tank comps with mods land at ~37-50% full-run (at/above the 20-30% target); the no-tank comp stays correctly locked out.
+
+## 2026-07-19 — WARDEN damage buff to fix L3 flatline for low-DPS comps
+
+**Decision:** Raised WARDEN's base damage 7 → 9 (`HERO_STATS` in `scenes/heroes/hero.gd`) rather than retargeting Ensnare onto villains or cutting Mech Robot HP further.
+
+**Reason:** The whole-run sweep showed THUNDAAR+WARDEN+BEACON — a comp with no burst hero — clearing L2 fine (62%) but flatlining at L3 (0/5): a zero-damage-output comp can't beat a raw HP check like the Mech Robot regardless of survivability. Two other candidate fixes were investigated and ruled out first: a previously-documented travel-time gap for Warden comps through L2's chokepoint (re-probed, no longer present — that finding predates later tuning), and Ensnare providing indirect DPS by locking the villain down (checked the code — Ensnare anchors on Warden's current attack target, usually a minion, so it rarely reaches the villain). Villain-HP cuts were rejected as the fix because L2/L3 are already cleared 50–100% by the higher-DPS trios; cutting further risks trivializing those. Designer chose the direct stat buff over a targeting-logic change (keeps the fix scoped to numbers, not new mechanics).
+
+**Impact:** Re-swept 8 trials/comp: THUNDAAR+WARDEN+BEACON L3 0%→66%, full-run 0%→50%. No other comp regressed outside the already-documented L2 noise band (±30pts/8 trials). See BALANCE.md "L2/L3 centering for low-DPS comps."
+
+## 2026-07-19 — Tank is no longer a mandatory pick
+
+**Decision:** The tankless trio (Artemis+WARDEN+BEACON) must be viable, not a guaranteed loss. Fixed via **ability cadence + formation symmetry**, not flat stat buffs: `CLONE_DURATION` 2.0→3.5s and `ENSNARE_COOLDOWN` 6.0→4.5s (both in `scenes/heroes/hero.gd`), plus generalizing the formation opposite-role bonus from a hardcoded TANK+BURST branch into a data-driven `FORMATION_PAIRS` table that also grants CONTROL+SUPPORT and BURST+SUPPORT pairs.
+
+**Reason:** Every sweep locked the no-tank comp at 0% Level-1 clear, so Thundaar was effectively required and the GDD's "draft 3-of-4" decision was fake. Diagnosis showed the barrier was structural, not stats — party HP was already comparable (245 vs 270). Three systems denied the comp a frontline: the swarm hunts nearest-hero (nobody holds the line without a tank), the only role-pair formation bonus was TANK+BURST (unfireable without a tank), and the sole taunt (Artemis's Clone) held only 25% uptime. The fix targets those three directly rather than inflating squishy HP, which would have blurred the role identities.
+
+**Alternatives considered:** giving BEACON's Rally a taunt (rejected — invents a mechanic not in the design docs); changing minion targeting (rejected — ripples into every comp and level at once); flat stat buffs (rejected — erodes role differentiation). Designer chose the Clone+Ensnare+formation route.
+
+**Impact:** Re-sweep put tankless Level-1 clear at 62–87% (from 0%) with no Thundaar-trio regression. Level 2/3 tankless clears stay gated by the separate stale-numbers pass. See BALANCE.md "No-tank viability pass (2026-07-19)."
+
+## 2026-07-18 — On-clear heal (partially reverses "no heal" from the rework)
+
+**Decision:** When a party clears a level, each surviving hero recovers **50% of its missing HP** before that HP carries into the next level (`CLEAR_HEAL_MISSING_FRACTION = 0.5` in `scenes/battle/battle_manager.gd`, applied in `_record_carryover()`). The dead still stay dead — permadeath is unchanged; only survivors heal.
+
+**Reason:** The Level 2 balance pass found that pure stage/villain/layout tuning could not give Level 2 the same clear-curve as Level 1. Unlike Level 1 (always entered fresh at full HP), Level 2 is entered **depleted**: the chained-probe diagnosis showed survivors reaching Level 2 at ~36% HP, and trios often arriving as a lone survivor (squishies die during Level 1). With raw HP carryover and no heal, the only way to make Level 2 winnable was to trivialize the Berserker for a fresh fight the run never actually sees. A partial heal fixes the root cause and scales to Level 3.
+
+**This revises rework decision #7** ("Raw HP carryover + permadeath, *no heal/revive yet*") — the "yet" is now partially resolved: heal for survivors is in; revive for the fallen remains deferred.
+
+**Alternatives considered (Designer chose the heal):** (a) tune Level 2 for the depleted reality (would make a fresh Berserker a pushover); (b) accept low Level 2 clear rates as a hard gate. Heal form also chosen by Designer from: restore-to-60%-max, flat +40%-max, and the selected 50%-of-missing (scales with how hurt a hero is, never fully tops off).
+
+**Impact:** Load-bearing change for the Level 2 pass — the Berserker/swarm cuts only work because a healed party can act on them. Safe against the spawn path, which already re-clamps carried HP to `[1, max_hp]`. See BALANCE.md "Level 2 (Berserker) findings."
+
 ## 2026-07-18 — Gameplay-loop rework: the run is a chain of fixed levels
 
 **Decision:** Reworked the core loop around seven ratified choices (Designer). The **run** (a chain of levels), not a single battle, is the unit of play.
@@ -267,6 +347,20 @@ Records important project decisions and why they were made.
 **Reason:** Designer-selected abilities from a shortlist grounded in primitives already in the codebase (see the two AskUserQuestion rounds in-session). Un-deferring `SUPPORT_ALLIES` (previously blocked on "no support abilities exist" — see the 2026-07-14 Prep screen decision) was a direct consequence of BEACON existing.
 
 **Impact:** Ranged-hero configuration was generalized from an `if hero_name == "ARTEMIS"` special-case into data (`HERO_STATS` `is_ranged`/`attack_range` keys), read generically in `Hero._configure()` — the deeper fix rather than stacking a second special-case for WARDEN. Formation/synergy bonuses were *not* extended to reward CONTROL/SUPPORT pairings this pass (only same-role and mixed-trio bonuses apply to them) — real 4-role named synergies are Milestone 6.
+
+## 2026-07-18 — Design-testing playtest fixes (six items)
+
+**Decision:** A Designer playtest of the run-as-a-chain loop surfaced six behavioral/feel problems, all fixed in the same pass:
+1. **Support-ally leash band.** `SUPPORT_ALLIES` previously re-goaled onto a fixed 46px standoff point every 0.3s — an unconditional hard tether. Replaced with a **260px leash band** (`Hero.SUPPORT_LEASH_DIST`): the support only re-paths toward its partner when it drifts past that distance; inside the band it fights as a free individual (own target selection + the existing `SCORE_SUPPORT_GUARD` bias). Its `detect_range` was also widened (`attack_range * 1.5` → `* 2.0`) so it meaningfully clears minions rather than just orbiting.
+2. **Objective-capture commitment.** A hero that had spotted an objective could still be pulled off it — the rally-to-ally block didn't check whether a capture was in progress, and combat drift (chasing a target that wandered into range) could walk it off the point, silently stranding `Objective.progress` (which never decays). Added `Hero._is_capturing()`; gated rally-to-ally on it and added a re-assert-goal anchor while inside `capture_radius`. The hero still fights whatever's in range (needed to clear `contested`), it just won't wander off. Focus ping still overrides, unchanged — "unless overwritten by player command" was an explicit part of the ask.
+3. **Move speed compression.** 75/90/95/115 (Thundaar/WARDEN/BEACON/Artemis, 1.53× spread) → 88/95/98/102 (1.16×). The wide spread was stringing the party out across the field instead of fighting together.
+4. **Poison Lake: one damage instance, not a drain.** Was 8 HP/s continuous (`lake_dps`) while inside; now a single **6-damage hit on entry** (`lake_damage`, edge-triggered off `Combatant._in_lake`'s false→true transition), silent until the unit fully exits and re-enters. Avoidance steering was also strengthened (clearance +50px/1.3 strength → +90px/1.6) so units skirt the shore rather than clip it as often.
+5. **Deploy-phase readability.** The placement ghost cursor was a generic green/red ring with hero identity only in a far-off top-center hint label. Now tinted the current hero's own catalog color (when legal) with the hero's name drawn at the cursor.
+6. **Focus ping on the villain = commit order.** A ping dropped on the villain previously only nudged *target selection* toward minions near it — `_acquire_target`'s villain branch never consulted the ping, and the movement override chased the ping's *static* point, so a party pinged onto a teleporting villain marched to a stale spot. Added `Hero._ping_targets_villain()`: when the ping lands within `FocusPing.PING_RADIUS` of a live villain, every hero **locks him as target regardless of range** and re-goals to his **live** position (`_villain_goal()`, tracking teleports) for the ping's lifetime — deliberately overriding `_is_pushing_villain()` gating, so even a farming/support hero commits when pinged on the villain.
+
+**Reason:** Direct Designer feedback from playtesting, not derived balance work. Items 3 and 4 double as real balance levers (move speed and hazard cost both feed the run-sweep math), so a full whole-run re-sweep was run to confirm neither regressed — see BALANCE.md "Design-testing fixes" section for the before/after table. Result: no comp regressed; every Thundaar-anchored trio moved from a coin-flip or 0% to 75–100%, and the no-tank trio picked up its first win.
+
+**Impact:** `scenes/heroes/hero.gd` (items 1/2/3/6), `scenes/combat/combatant.gd` + `scenes/battlefield/stage_field.gd` (item 4, `lake_dps` renamed `lake_damage`), `scenes/battle/deploy_controller.gd` (item 5). Verified: a clean headless project boot (no compile errors), a temporary probe scene exercising the support-leash/capture-commit/ping-lock paths end-to-end (deleted after verification, per the existing `behavior_probe.gd`/`death_curve_probe.gd` convention), and the full balance re-sweep above.
 
 ## 2026-07-18 — Ability visual feedback: status ring + cast-name callout
 

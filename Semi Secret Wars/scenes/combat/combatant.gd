@@ -54,12 +54,34 @@ signal died(who: Combatant)
 @export var outline_width := 3.0
 @export var bob_amplitude := 3.0
 @export var bob_speed := 5.0
+## White hit-flash overlay on take_damage. Off for static structures (e.g.
+## LaneSpawnPoint) where the flash reads as flicker rather than a hit reaction.
+@export var flash_on_hit := true
+## Pinned structure (e.g. LaneSpawnPoint): skips separation and the
+## obstacle/field clamp in _process entirely. Without this, a unit that
+## registers itself as a dynamic_obstacle (as LaneSpawnPoint does, so other
+## units steer around it) sees its own entry at distance 0 every frame and
+## gets shoved body_radius*2 sideways by clamp_out_of_obstacles' zero-distance
+## fallback — briefly rendering at the shoved position before being pinned
+## back, a one-frame position pop.
+@export var is_pinned := false
 
 const RETARGET_INTERVAL := 0.25
 const FLASH_TIME := 0.12
 const DEATH_TIME := 0.2
 const LUNGE_DIST := 8.0
 const LUNGE_RETURN := 60.0
+## Ranged units (is_ranged) back away once the target closes inside this
+## fraction of attack_range, instead of standing still and letting melee
+## enemies walk right up next to them — they'd rather shoot from afar than
+## get cornered at point-blank. Leaves a stable no-move band between this and
+## attack_range so kiting doesn't oscillate.
+const RANGED_STANDOFF_FRACTION := 0.6
+## Same soft paper-cutout alpha as the border decor's near-camera tree row
+## (see LaneForeground.near_row_alpha) — applied to every sprite-textured unit
+## so heroes/minions read as part of the same visual treatment as the
+## environment art, instead of drawing fully opaque.
+const SPRITE_ALPHA := 0.92
 ## Extra breathing room beyond the two bodies' radii before separation kicks in.
 const SEPARATION_MARGIN := 4.0
 ## How fast overlapping units are pushed apart, in px/sec.
@@ -102,6 +124,9 @@ var _stun_t := 0.0
 ## Seconds remaining slowed (movement/attack rate scaled by _slow_factor). 0 = not slowed.
 var _slow_t := 0.0
 var _slow_factor := 1.0
+## Seconds remaining confused (targets own group instead of the enemy group).
+## 0 = not confused. Applied by BEACON's Confuse ultimate (minions only).
+var _confused_t := 0.0
 ## Timed party-wide buffs (e.g. objective-completion rewards); see apply_damage_boost etc.
 var _dmg_boost_t := 0.0
 var _dmg_boost_mult := 1.0
@@ -126,6 +151,7 @@ const STATUS_STUN_COLOR := Color(0.65, 0.95, 1.0, 0.95)
 const STATUS_SLOW_COLOR := Color(0.55, 0.45, 0.85, 0.9)
 const STATUS_BUFF_COLOR := Color(0.9, 0.75, 0.25, 0.9)
 const STATUS_SHIELD_COLOR := Color(0.6, 0.85, 0.95, 0.9)
+const STATUS_CONFUSE_COLOR := Color(0.95, 0.4, 0.85, 0.95)
 ## Fixed flash length for apply_shield, which has no duration of its own
 ## (a charge count, not a timer) — just a short "you got shielded" pulse.
 const STATUS_SHIELD_FLASH_TIME := 0.4
@@ -145,6 +171,16 @@ var separation_per_frame := false
 ## Subclass hook: set self_group / enemy_group / label_text / spawn position / goal.
 func _configure() -> void:
 	pass
+
+## Radius to use for hard-obstacle clamping (clamp_out_of_obstacles/clamp_inside_field).
+## body_radius alone under-reports how much space a unit actually occupies
+## on screen when sprite_texture draws bigger than the hitbox (draw size is
+## body_radius * 2 * sprite_scale — see _draw), which reads as clipping into
+## solid blockers (mountains, spawn gates) even though centers never touch.
+func _collision_radius() -> float:
+	if sprite_texture != null:
+		return maxf(body_radius, body_radius * sprite_scale)
+	return body_radius
 
 ## Subclass hook: called once when the unit reaches its goal.
 func _on_goal_reached() -> void:
@@ -182,6 +218,7 @@ func _process(delta: float) -> void:
 	_lunge = _lunge.move_toward(Vector2.ZERO, LUNGE_RETURN * delta)
 	_stun_t = maxf(_stun_t - delta, 0.0)
 	_slow_t = maxf(_slow_t - delta, 0.0)
+	_confused_t = maxf(_confused_t - delta, 0.0)
 	_dmg_boost_t = maxf(_dmg_boost_t - delta, 0.0)
 	_speed_boost_t = maxf(_speed_boost_t - delta, 0.0)
 	_atk_speed_boost_t = maxf(_atk_speed_boost_t - delta, 0.0)
@@ -213,16 +250,23 @@ func _process(delta: float) -> void:
 	if absf(facing_dir_x) > 0.5:
 		_facing_x = signf(facing_dir_x)
 
-	if _separation != Vector2.ZERO:
-		global_position += _separation.limit_length(SEPARATION_SPEED * delta)
+	if not is_pinned:
+		if _separation != Vector2.ZERO:
+			global_position += _separation.limit_length(SEPARATION_SPEED * delta)
 
-	if _field != null:
-		# Steering is only a hint — hard-clamp so units never clip obstacle cores.
-		global_position = _field.clamp_out_of_obstacles(global_position, body_radius)
-		global_position = _field.clamp_inside_field(global_position, body_radius)
-		_in_lake = _field.in_lake(global_position)
-		if _in_lake:
-			_take_hazard_damage(_field.lake_dps * delta)
+		if _field != null:
+			# Steering is only a hint — hard-clamp so units never clip obstacle cores.
+			global_position = _field.clamp_out_of_obstacles(global_position, _collision_radius())
+			global_position = _field.clamp_inside_field(global_position, _collision_radius())
+			# Poison Lake: one damage instance per entry, not a continuous drain —
+			# fire a single hit on the outside→inside transition, then stay quiet
+			# until the unit fully exits and re-enters. Makes clipping a lake a
+			# minor, avoidable cost instead of a death sentence for anything that
+			# lingers.
+			var was_in_lake := _in_lake
+			_in_lake = _field.in_lake(global_position)
+			if _in_lake and not was_in_lake:
+				_take_hazard_damage(_field.lake_damage)
 
 	queue_redraw()
 
@@ -231,10 +275,12 @@ func take_damage(amount: float, attacker: Combatant = null) -> void:
 		return
 	if shield_charges > 0:
 		shield_charges -= 1
-		_flash = FLASH_TIME
+		if flash_on_hit:
+			_flash = FLASH_TIME
 		return
 	hp -= amount
-	_flash = FLASH_TIME
+	if flash_on_hit:
+		_flash = FLASH_TIME
 	_alerted = true  # a dormant villain wakes the instant it's struck (e.g. ranged poke)
 	if hp <= 0.0:
 		if attacker != null and is_instance_valid(attacker):
@@ -292,6 +338,24 @@ func apply_slow(duration: float, factor: float) -> void:
 	_slow_t = maxf(_slow_t, duration)
 	_status_flash_t = maxf(_status_flash_t, duration)
 	_status_flash_color = STATUS_SLOW_COLOR
+
+## Confuses this unit for `duration` seconds — it targets and attacks its own
+## group instead of the enemy group (BEACON's Confuse ultimate; minions only).
+## Extend-don't-stack, like apply_slow. Clears the current target so it re-picks
+## a same-group victim next scan.
+func apply_confusion(duration: float) -> void:
+	if _dying:
+		return
+	_confused_t = maxf(_confused_t, duration)
+	_target = null
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_CONFUSE_COLOR
+
+## The group this unit currently treats as its enemies — normally enemy_group,
+## but its own self_group while confused so it turns on its neighbors. Used by
+## both target acquisition and projectile spawning.
+func _effective_enemy_group() -> String:
+	return self_group if _confused_t > 0.0 else enemy_group
 
 ## 1.0 normally; the slow factor while _slow_t is active, combined with any
 ## active objective attack-speed boost. Multiplies attack cooldown decay.
@@ -356,11 +420,20 @@ func apply_knockback(direction: Vector2, distance: float, splash_damage: float, 
 	if _dying:
 		return
 	var from := global_position
-	var to := from + direction * distance
-	if _field != null:
-		to = _field.clamp_out_of_obstacles(to, body_radius)
-		to = _field.clamp_inside_field(to, body_radius)
-	global_position = to
+	var to := from
+	# Pinned structures (e.g. LaneSpawnPoint) skip displacement entirely — same
+	# contract as the general per-frame clamp below in _process. Without this,
+	# clamp_out_of_obstacles still ran on `to` even when distance was forced to
+	# 0 by a caller, and a pinned point is registered as its OWN dynamic_obstacle
+	# at that exact position, so the zero-distance self-collision fallback
+	# shoved it body_radius*2 sideways for that one write — a one-frame
+	# position pop that read as the sprite blinking a duplicate beside itself.
+	if not is_pinned:
+		to = from + direction * distance
+		if _field != null:
+			to = _field.clamp_out_of_obstacles(to, _collision_radius())
+			to = _field.clamp_inside_field(to, _collision_radius())
+		global_position = to
 	if self_group == "":
 		return
 	for node in get_tree().get_nodes_in_group(self_group):
@@ -443,13 +516,16 @@ func _acquire_target() -> void:
 	var best_score := INF
 	var taunter: Combatant = null
 	var taunter_best := INF
-	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying:
+	# While confused, hunt own group instead of the enemy group (BEACON Confuse).
+	var confused := _confused_t > 0.0
+	for node in get_tree().get_nodes_in_group(_effective_enemy_group()):
+		if node == self or not is_instance_valid(node) or node._dying:
 			continue
 		var dist := global_position.distance_squared_to(node.global_position)
 		# Taunt only overrides targeting for enemies already within the
 		# taunting unit's own taunt_radius; farther enemies are untouched.
-		if node.is_taunting and dist <= node.taunt_radius * node.taunt_radius and dist < taunter_best:
+		# Confused units ignore taunts — they're busy fighting their own kind.
+		if not confused and node.is_taunting and dist <= node.taunt_radius * node.taunt_radius and dist < taunter_best:
 			taunter_best = dist
 			taunter = node
 		if dist <= range_sq:
@@ -483,7 +559,16 @@ func _engage(delta: float) -> void:
 	var dist := to_target.length()
 	if dist > attack_range:
 		global_position += _steer(to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
-	elif _attack_cd <= 0.0:
+	elif is_ranged and not _target.is_pinned and dist < attack_range * RANGED_STANDOFF_FRACTION:
+		# Kite: keep shooting (below) while backing off, rather than freezing
+		# in place and letting the enemy close to melee range regardless.
+		# Excludes pinned targets (e.g. LaneSpawnPoint, is_pinned=true, never
+		# moves) — retreating from a target that can never close the gap back
+		# just re-triggers the dist > attack_range approach every other cycle,
+		# and steer_around's obstacle avoidance turns that oscillation into a
+		# slow orbit around the structure instead of a stable stand-off.
+		global_position += _steer(-to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
+	if dist <= attack_range and _attack_cd <= 0.0:
 		_lunge = to_target.normalized() * LUNGE_DIST
 		var victim := _target
 		_attack_cd = attack_interval
@@ -499,7 +584,7 @@ func _fire_projectile(victim: Combatant) -> void:
 	proj.damage = damage * damage_mult()
 	proj.attacker = self
 	proj.target = victim
-	proj.enemy_group = enemy_group
+	proj.enemy_group = _effective_enemy_group()
 	proj.speed = projectile_speed
 	proj.max_range = projectile_range
 	proj.color = body_color
@@ -521,7 +606,7 @@ func _advance_goal(delta: float) -> void:
 ## instead of frame-to-frame jitter.
 func _steer(desired: Vector2, delta: float) -> Vector2:
 	if _field != null:
-		desired = _field.steer_around(global_position, desired, body_radius + 8.0)
+		desired = _field.steer_around(global_position, desired, _collision_radius() + 8.0)
 	if desired.length() < 0.01:
 		return desired
 	if _heading == Vector2.ZERO:
@@ -545,7 +630,7 @@ func _draw() -> void:
 		var draw_size := tex_size * scale_factor
 		# Art faces left by default; turn in place on its own axis when facing right.
 		draw_set_transform(offset, 0.0, Vector2(-_facing_x, 1.0))
-		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false)
+		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, SPRITE_ALPHA))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if _in_lake:
 		draw_circle(offset, body_radius, Color(0.45, 0.85, 0.35, 0.3))

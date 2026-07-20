@@ -14,6 +14,8 @@ var level_label: Label
 var hp_bar: ProgressBar
 var cooldown_indicator: Label
 var cooldown_bar: ProgressBar
+var cooldown_indicator2: Label
+var cooldown_bar2: ProgressBar
 var buff_label: RichTextLabel
 var _ko := false
 var _focused := false
@@ -24,6 +26,8 @@ func _ready() -> void:
 	hp_bar = find_child("HPBar", true, false) as ProgressBar
 	cooldown_indicator = find_child("CooldownLabel", true, false) as Label
 	cooldown_bar = find_child("CooldownBar", true, false) as ProgressBar
+	cooldown_indicator2 = find_child("CooldownLabel2", true, false) as Label
+	cooldown_bar2 = find_child("CooldownBar2", true, false) as ProgressBar
 	buff_label = find_child("BuffLabel", true, false) as RichTextLabel
 	# The panel itself is the click target; children must not swallow the click.
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -47,7 +51,7 @@ func set_focused(focused: bool) -> void:
 	else:
 		name_label.remove_theme_color_override("font_color")
 
-func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], intent: String = "") -> void:
+func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], intent: String = "", ability_name: String = "", second_name: String = "", second_remaining: float = 0.0, second_max: float = 1.0) -> void:
 	if name_label == null or level_label == null or hp_bar == null or cooldown_indicator == null:
 		return
 
@@ -58,16 +62,15 @@ func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: i
 	hp_bar.max_value = max_hp
 	hp_bar.value = current_hp
 
-	if cooldown_bar != null:
-		var fraction := 1.0 - clampf(cooldown_remaining / maxf(cooldown_max, 0.001), 0.0, 1.0)
-		cooldown_bar.value = fraction
+	_set_cooldown_row(cooldown_indicator, cooldown_bar, ability_name, cooldown_remaining, cooldown_max)
 
-	if cooldown_remaining > 0.0:
-		cooldown_indicator.text = "COOLDOWN: %.1f" % cooldown_remaining
-		cooldown_indicator.add_theme_color_override("font_color", Color("b08a3e"))
-	else:
-		cooldown_indicator.text = "READY"
-		cooldown_indicator.add_theme_color_override("font_color", Color("5c7a3f"))
+	# Second ability row (LV20 Shockwave/Multishot); heroes without one hide it.
+	if cooldown_indicator2 != null and cooldown_bar2 != null:
+		var has_second := second_name != ""
+		cooldown_indicator2.visible = has_second
+		cooldown_bar2.visible = has_second
+		if has_second:
+			_set_cooldown_row(cooldown_indicator2, cooldown_bar2, second_name, second_remaining, second_max)
 
 	if buff_label != null:
 		if buffs.is_empty():
@@ -83,6 +86,19 @@ func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: i
 			# instead of overlapping.
 			buff_label.text = "\n".join(parts)
 
+## Fills one ability cooldown label+bar: "NAME  READY" when up, "NAME  2.1"
+## while cooling, in the shared gold/green palette.
+func _set_cooldown_row(label: Label, bar: ProgressBar, ability_name: String, remaining: float, cd_max: float) -> void:
+	var prefix := ("%s  " % ability_name) if ability_name != "" else ""
+	if bar != null:
+		bar.value = 1.0 - clampf(remaining / maxf(cd_max, 0.001), 0.0, 1.0)
+	if remaining > 0.0:
+		label.text = "%s%.1f" % [prefix, remaining]
+		label.add_theme_color_override("font_color", Color("b08a3e"))
+	else:
+		label.text = "%sREADY" % prefix
+		label.add_theme_color_override("font_color", Color("5c7a3f"))
+
 func set_ko() -> void:
 	if _ko or cooldown_indicator == null:
 		return
@@ -92,6 +108,11 @@ func set_ko() -> void:
 		cooldown_bar.value = 0
 	cooldown_indicator.text = "DOWN"
 	cooldown_indicator.add_theme_color_override("font_color", Color("c63d3d"))
+	if cooldown_bar2 != null:
+		cooldown_bar2.value = 0
+	if cooldown_indicator2 != null and cooldown_indicator2.visible:
+		cooldown_indicator2.text = "DOWN"
+		cooldown_indicator2.add_theme_color_override("font_color", Color("c63d3d"))
 	if buff_label != null:
 		buff_label.text = ""
 	modulate = Color(0.72, 0.72, 0.72, 0.85)

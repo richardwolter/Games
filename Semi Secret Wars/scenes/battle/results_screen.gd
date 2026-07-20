@@ -66,7 +66,11 @@ func show_results(win: bool, currency_awarded: int = 0, next_level: int = 0) -> 
 		var gained := int(GameState.run_xp.get(hero_name, 0))
 		if gained > 0 or RunState.is_selected(hero_name):
 			var tag := "  (fallen)" if RunState.is_dead(hero_name) else ""
-			lines += "%s  +%d XP   (LV %d)%s\n" % [hero_name, gained, RunState.level_of(hero_name), tag]
+			# Boons picked, not a "level" — RunState's XP track just gates boon
+			# picks in-run; it isn't the persistent hero level (shown on prep).
+			var boon_count: int = RunState.boons.get(hero_name, []).size()
+			var boon_word := "boon" if boon_count == 1 else "boons"
+			lines += "%s  +%d XP   (%d %s)%s\n" % [hero_name, gained, boon_count, boon_word, tag]
 	_lines.text = lines.strip_edges()
 	_footer.text = "Press R for LEVEL %d" % next_level if advancing else "Press R to return to preparation"
 	visible = true

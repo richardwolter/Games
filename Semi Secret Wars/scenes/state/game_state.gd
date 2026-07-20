@@ -16,6 +16,30 @@ const SAVE_PATH := "user://save.json"
 const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
 const FOG_DIR := "user://fog"
 
+## V2 (lane-structure) parallel testing build. When true, persistence resolves to
+## its OWN save file + fog dir and the prep scene is the lane prep menu, so V2's
+## grindier economy never touches V1 data. Purely additive: with v2_mode false,
+## every path below is byte-identical to V1's. Set/cleared by the prep menus.
+var v2_mode := false
+const SAVE_PATH_V2 := "user://save_v2.json"
+const FOG_DIR_V2 := "user://fog_v2"
+const PREP_MENU_V2 := "res://v2/prep/lane_prep_menu.tscn"
+
+func save_path() -> String:
+	return SAVE_PATH_V2 if v2_mode else SAVE_PATH
+
+func fog_dir() -> String:
+	return FOG_DIR_V2 if v2_mode else FOG_DIR
+
+func prep_scene() -> String:
+	return PREP_MENU_V2 if v2_mode else PREP_MENU
+
+## Switch persistence context (V1 <-> V2) and reload that context's save file.
+func set_v2_mode(on: bool) -> void:
+	v2_mode = on
+	_reset_state_defaults()
+	load_game()
+
 ## Gold awarded at run end (spent on permanent ability mods at prep). Scales with
 ## levels cleared this run — deeper runs pay more — with a win bonus on top and a
 ## floor so even a level-1 wipe pays something. First pass, tune in BALANCE.md.
@@ -29,9 +53,12 @@ const KILL_ASSIST_SHARE := 0.5
 
 ## Save schema version. v3 = hybrid roguelite (persistent stat grind removed).
 ## v4 = gameplay-loop rework (run = chain of levels; gold + owned ability mods;
-## stage_1_won/stage select retired). Any save below this is discarded on load —
-## a clean break the Designer approved rather than migrating old data forward.
-const SAVE_VERSION := 4
+## stage_1_won/stage select retired). v5 = V2 grind progression (career
+## achievements + ability tiers). v6 = banked_xp changed from per-hero
+## Dictionary to a single shared int pool (Designer, 2026-07-19: "XP shared
+## between all heroes"). Any save below this is discarded on load — a clean
+## break the Designer approved rather than migrating old data forward.
+const SAVE_VERSION := 6
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
 const HERO_CATALOG := {
@@ -70,13 +97,34 @@ var gold := 0
 ## Ability-mod ids bought and owned forever (AbilityMods catalog). Applied at
 ## spawn in Hero._apply_owned_ability_mods.
 var owned_mods: Array = []
+## Ability-tier ids bought and owned forever (AbilityTiers catalog, V2 only —
+## "<HERO>_2"/"<HERO>_3"). Tier-gates the three flags Hero._configure sets
+## unconditionally for V1. See has_tier/buy_tier.
+var owned_ability_tiers: Array = []
 ## Heroes currently available for the party/draft. Defaults to every hero
-## that exists in code today; new heroes added to HERO_CATALOG in a future
-## milestone start locked out of this list until unlocked.
+## that exists in code today (V1); V2 starts with THUNDAAR alone and unlocks
+## the rest through career achievements (see _reset_state_defaults, which is
+## where the v2_mode-dependent default actually applies).
 var unlocked_heroes: Array = HERO_CATALOG.keys()
 ## Relic ids available for the run-boon pool (scaffolding for a later
 ## milestone — no relics exist yet, so this stays empty).
 var unlocked_relics: Array = []
+
+## Lifetime V2 career counters (minions_killed, gates_destroyed,
+## best_villain_damage_pct, runs_played), accumulated across every V2 run, win
+## or lose. Drives Achievements hero unlocks — see record_career/record_career_max.
+var career := {}
+
+## Persistent XP currency (V2 grind), shared across the whole roster like gold.
+## Every point of XP any hero earns banks here permanently (see add_xp) — it is
+## NEVER reset by a new run starting; the only two ways it changes are being
+## earned or being spent (buy_stat_upgrade) on any hero's permanent raw stat
+## upgrades (StatUpgrades). Separate pool from gold, which spends on abilities.
+var banked_xp := 0
+## hero_name -> {stat_id: purchases int} — how many times each stat has been
+## bought for that hero. Drives both StatUpgrades.cost_for's scaling and the
+## stat bonus applied at spawn (Hero._apply_stat_upgrades).
+var stat_purchases: Dictionary = {}
 
 func _ready() -> void:
 	load_game()
@@ -123,18 +171,33 @@ func award_kill_xp(killer: Node, amount: int) -> void:
 
 ## Single chokepoint for all run XP (kills + objectives): tracks this run's
 ## per-hero total for the results screen and feeds the in-run level track
-## (RunState), which is what actually grows a hero's power now.
+## (RunState), which is what actually grows a hero's power now. In V2, every
+## point also banks permanently into the shared persistent currency
+## (banked_xp) — unlike run_xp/RunState's level track (which reset every run
+## by design, since in-run boons are meant to be temporary), banked_xp only
+## ever changes by being earned here or spent (buy_stat_upgrade), and isn't
+## tied to which hero earned it — the player spends it on any hero from the
+## STATS shop. V1 untouched (v2_mode false).
 func add_xp(hero_name: String, amount: int) -> void:
 	if amount <= 0:
 		return
 	run_xp[hero_name] = int(run_xp.get(hero_name, 0)) + amount
 	RunState.record_xp(hero_name, amount)
+	if v2_mode:
+		banked_xp += amount
 
 ## -- Meta currency / unlocks --------------------------------------------------
 
 func award_gold(amount: int) -> void:
 	gold += amount
 	save_game()
+
+## Increments gold WITHOUT saving to disk — the per-kill/per-gate drip
+## (LaneSpawner) against a 50-minion swarm would thrash file I/O if it saved
+## every time like award_gold() does. Flushed by the save_game() inside the
+## eventual award_gold() call at LaneBattleManager._end().
+func bank_gold(amount: int) -> void:
+	gold += amount
 
 ## Gold payout for a finished run: scales with levels cleared, +bonus on a win,
 ## never below GOLD_MIN. `levels_cleared` is how many levels the run beat.
@@ -174,10 +237,84 @@ func unlock_relic(id: String) -> void:
 		unlocked_relics.append(id)
 		save_game()
 
+## -- Career stats / achievements (V2 grind) -----------------------------------
+
+## Increments without saving to disk — this fires per-kill/per-gate against a
+## 50-minion swarm, so a save here would thrash file I/O the same way a per-kill
+## award_gold() would (see bank_gold). Persisted by the eventual save_game()
+## at run end, or immediately the moment an achievement unlocks a hero.
+func record_career(stat: String, amount: int) -> void:
+	career[stat] = int(career.get(stat, 0)) + amount
+	_check_achievements()
+
+## Like record_career, but keeps the running maximum instead of summing (e.g.
+## best_villain_damage_pct across every level/run attempted).
+func record_career_max(stat: String, value: float) -> void:
+	if value > float(career.get(stat, 0.0)):
+		career[stat] = value
+		_check_achievements()
+
+func _check_achievements() -> void:
+	for id in Achievements.ids():
+		var d := Achievements.def(id)
+		var hero_name: String = d.get("unlocks_hero", "")
+		if hero_name == "" or is_hero_unlocked(hero_name):
+			continue
+		if float(career.get(d.get("stat", ""), 0)) >= float(d.get("threshold", 0)):
+			unlock_hero(hero_name)  # saves immediately — the achievement is safe on crash
+
+## -- Ability tiers (V2 grind) --------------------------------------------------
+
+## Tier 1 (the signature ability — Stomp/Clone/Ensnare/Rally) is free the
+## moment a hero is unlocked; tiers 2-3 are gold-gated (AbilityTiers catalog).
+func has_tier(hero_name: String, tier: int) -> bool:
+	if tier <= 1:
+		return true
+	return "%s_%d" % [hero_name, tier] in owned_ability_tiers
+
+## Buys an ability tier if affordable, not already owned, and its prerequisite
+## (the previous tier) is owned. Returns true on success. Saves immediately —
+## a deliberate, infrequent player action, same as buy_mod.
+func buy_tier(id: String) -> bool:
+	if id in owned_ability_tiers:
+		return false
+	var d := AbilityTiers.def(id)
+	if d.is_empty():
+		return false
+	if not AbilityTiers.prereq_met(id):
+		return false
+	var cost := int(d.get("cost", 0))
+	if gold < cost:
+		return false
+	gold -= cost
+	owned_ability_tiers.append(id)
+	save_game()
+	return true
+
+## -- Raw stat upgrades (V2 grind) ----------------------------------------------
+
+func stat_purchase_count(hero_name: String, stat_id: String) -> int:
+	return int(stat_purchases.get(hero_name, {}).get(stat_id, 0))
+
+## Buys one more level of a raw stat upgrade for a hero (cost rises with prior
+## purchases — see StatUpgrades.cost_for). Returns true on success. Saves
+## immediately, same as buy_mod/buy_tier.
+func buy_stat_upgrade(hero_name: String, stat_id: String) -> bool:
+	var count := stat_purchase_count(hero_name, stat_id)
+	var cost := StatUpgrades.cost_for(stat_id, count)
+	if cost <= 0 or banked_xp < cost:
+		return false
+	banked_xp -= cost
+	if not stat_purchases.has(hero_name):
+		stat_purchases[hero_name] = {}
+	stat_purchases[hero_name][stat_id] = count + 1
+	save_game()
+	return true
+
 ## -- Persistence -------------------------------------------------------------
 
 func save_game() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path(), FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify({
 			"version": SAVE_VERSION,
@@ -186,12 +323,16 @@ func save_game() -> void:
 			"owned_mods": owned_mods,
 			"unlocked_heroes": unlocked_heroes,
 			"unlocked_relics": unlocked_relics,
+			"career": career,
+			"owned_ability_tiers": owned_ability_tiers,
+			"banked_xp": banked_xp,
+			"stat_purchases": stat_purchases,
 		}))
 
 func load_game() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path()):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path(), FileAccess.READ)
 	if f == null:
 		return
 	var data: Variant = JSON.parse_string(f.get_as_text())
@@ -209,16 +350,31 @@ func load_game() -> void:
 	if saved_heroes is Array and not (saved_heroes as Array).is_empty():
 		unlocked_heroes = saved_heroes
 	unlocked_relics = data.get("unlocked_relics", [])
+	career = data.get("career", {})
+	owned_ability_tiers = data.get("owned_ability_tiers", [])
+	banked_xp = int(data.get("banked_xp", 0))
+	stat_purchases = data.get("stat_purchases", {})
 
-func reset_save() -> void:
+## Resets the in-memory persistent vars to fresh-start defaults WITHOUT deleting
+## the save file (used by set_v2_mode before loading the other context's file).
+func _reset_state_defaults() -> void:
 	party = {}
 	run_xp = {}
 	gold = 0
 	owned_mods = []
-	unlocked_heroes = HERO_CATALOG.keys()
+	owned_ability_tiers = []
+	banked_xp = 0
+	stat_purchases = {}
+	# V2 is the grind: start with THUNDAAR alone and unlock the rest through
+	# career achievements. V1 keeps its full-roster default untouched.
+	unlocked_heroes = ["THUNDAAR"] if v2_mode else HERO_CATALOG.keys()
 	unlocked_relics = []
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	career = {}
+
+func reset_save() -> void:
+	_reset_state_defaults()
+	if FileAccess.file_exists(save_path()):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path()))
 
 ## Full dev reset: wipes the save (this GameState autoload), the in-run chain
 ## state (RunState — current_level/hp_carry/dead/levels/boons/draft), and the
@@ -235,10 +391,10 @@ func full_reset() -> void:
 	RunState.draft_offer.clear()
 	_clear_fog_dir()
 	get_tree().paused = false
-	get_tree().change_scene_to_file(PREP_MENU)
+	get_tree().change_scene_to_file(prep_scene())
 
 func _clear_fog_dir() -> void:
-	var abs_path := ProjectSettings.globalize_path(FOG_DIR)
+	var abs_path := ProjectSettings.globalize_path(fog_dir())
 	var dir := DirAccess.open(abs_path)
 	if dir == null:
 		return

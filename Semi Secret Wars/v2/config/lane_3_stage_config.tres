@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="StageConfig" format=3]
+[ext_resource type="Script" path="res://config/stage_config.gd" id="1_stage"]
+
+[resource]
+script = ExtResource("1_stage")
+stage_id = "stage_3"
+stage_name = "Stage 3: Mech Robot"
+villain_type = "mech_robot"
+minion_type = "hybrid_stage3"
+swarm_cap_start = 20
+escalate_every = 14.0
+escalate_step = 2
+swarm_max_cap = 110
+minion_speed = 82.0
+spawn_interval = 1.8
+spawn_batch = 5
+field_preset = "default"
+villain_hp_mult = 1.4

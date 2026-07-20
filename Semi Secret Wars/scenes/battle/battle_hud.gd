@@ -8,6 +8,10 @@ extends CanvasLayer
 @export var objective_label_path: NodePath = "ObjectiveLabel"
 @export var objective_bar_path: NodePath = "ObjectiveBar"
 @export var run_xp_label_path: NodePath = "RunXPLabel"
+## Optional — only V2's lane_battlefield.tscn authors this node (live gold
+## drip, GameState.bank_gold). Left unset in V1's battlefield.tscn, where gold
+## never changes mid-battle anyway; get_node_or_null keeps this a no-op there.
+@export var gold_label_path: NodePath = "GoldPanel/GoldLabel"
 @export var timer_label_path: NodePath = "TimerPanel/TimerLabel"
 @export var buff_panel_path: NodePath = "ObjectiveBuffPanel"
 @export var buff_label_path: NodePath = "ObjectiveBuffPanel/BuffLabel"
@@ -25,6 +29,7 @@ var _hero_panels_root: Node
 var _objective_label: Label
 var _objective_bar: ProgressBar
 var _run_xp_label: Label
+var _gold_label: Label
 var _timer_label: Label
 var _elapsed := 0.0
 var _hero_panels: Dictionary = {}  # hero_name -> panel_node
@@ -46,17 +51,20 @@ func _ready() -> void:
 	_objective_label = get_node(objective_label_path)
 	_objective_bar = get_node(objective_bar_path)
 	_run_xp_label = get_node(run_xp_label_path)
+	_gold_label = get_node_or_null(gold_label_path)
 	_timer_label = get_node(timer_label_path)
 	_buff_panel = get_node(buff_panel_path)
 	_buff_label = get_node(buff_label_path)
 	get_node(back_button_path).pressed.connect(_on_back_pressed)
 
 func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file(PREP_MENU)
+	# Routes to the V2 lane prep menu when the lane-test build is active, else V1.
+	get_tree().change_scene_to_file(GameState.prep_scene())
 
 func _process(delta: float) -> void:
 	_update_villain_hp()
 	_update_run_xp()
+	_update_gold()
 	_update_objective()
 	_update_hero_panels()
 	_update_timer(delta)
@@ -126,6 +134,13 @@ func _update_run_xp() -> void:
 		total += int(x)
 	_run_xp_label.text = "XP: %d" % total
 
+## Live gold total, so the V2 per-kill/per-gate drip (GameState.bank_gold) is
+## visible as it happens rather than only showing up back at prep.
+func _update_gold() -> void:
+	if _gold_label == null:
+		return
+	_gold_label.text = "GOLD: %d" % GameState.gold
+
 func _update_objective() -> void:
 	var objs = get_tree().get_nodes_in_group("objectives")
 	if objs.is_empty():
@@ -177,7 +192,7 @@ func _update_hero_panels() -> void:
 			var h = alive[hero_name]
 			# In-run level (Milestone 2): the panel now shows the roguelite level
 			# that actually changes mid-battle, not a persistent one that never did.
-			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent())
+			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent(), h.ability_name(), h.second_ability_name(), h.second_ability_cooldown, h.second_ability_cooldown_max())
 			panel.set_focused(followed == h)
 		else:
 			panel.set_ko()

@@ -33,14 +33,26 @@ extends Combatant
 ## un-catchable; see BALANCE.md).
 @export var leash_radius := 520.0
 
+## Weak ranged poke: fires a travel-time Projectile at the nearest hero every
+## shoot_interval. Kept separate from Combatant's built-in engage/target system
+## (enemy_group stays "") so it doesn't fight the flee-goal movement above —
+## he still kites while lobbing bolts.
+@export var shoot_interval := 1.0
+@export var shoot_damage := 4.0
+@export var shoot_speed := 420.0
+@export var shoot_range := 600.0
+
 ## How often (seconds) the flee goal is re-evaluated. Cheap, throttled like
 ## Minion/Berserker's hunt ticks.
 const FLEE_INTERVAL := 0.3
 const MINION_SCENE_PATH := "res://scenes/enemies/minion.tscn"
+const PROJECTILE_SCENE_PATH := "res://scenes/combat/projectile.tscn"
 
 var _flee_cd := 0.0
 var _teleport_cd := 0.0
+var _shoot_cd := 0.0
 var _minion_scene: PackedScene = null
+var _projectile_scene: PackedScene = null
 ## The authored lair (captured before the villain starts moving); the leash
 ## anchors here. StageField.villain_pos tracks his LIVE position, so we can't
 ## read it later as the lair.
@@ -56,7 +68,9 @@ func _configure() -> void:
 	_lair = global_position
 	villain_aggro_radius = aggro_radius
 	_teleport_cd = teleport_interval
+	_shoot_cd = shoot_interval
 	_minion_scene = load(MINION_SCENE_PATH)
+	_projectile_scene = load(PROJECTILE_SCENE_PATH)
 
 func _process(delta: float) -> void:
 	if _dying:
@@ -77,6 +91,11 @@ func _process(delta: float) -> void:
 	if _flee_cd <= 0.0:
 		_flee_cd = FLEE_INTERVAL
 		_update_flee_goal()
+
+	_shoot_cd -= delta
+	if _shoot_cd <= 0.0:
+		_shoot_cd = shoot_interval
+		_shoot_nearest_hero()
 
 ## Sets a retreat goal directly away from the nearest hero, once it's closer
 ## than flee_distance. _advance_goal (Combatant) handles the actual slow
@@ -171,6 +190,25 @@ func _summon_minions(at: Vector2) -> void:
 		var offset := Vector2(cos(a), sin(a)) * summon_radius
 		m.setup(at + offset, _field.hero_spawn + offset, offset * 0.6, summon_minion_speed)
 		get_parent().add_child(m)
+
+## Fires a weak Projectile at the nearest hero, field-wide like the flee/summon
+## targeting above (not gated by attack_range/detect_range).
+func _shoot_nearest_hero() -> void:
+	if _projectile_scene == null or get_parent() == null:
+		return
+	var hero := _nearest_hero()
+	if hero == null:
+		return
+	var proj: Projectile = _projectile_scene.instantiate()
+	proj.damage = shoot_damage
+	proj.attacker = self
+	proj.target = hero
+	proj.enemy_group = "heroes"
+	proj.speed = shoot_speed
+	proj.max_range = shoot_range
+	proj.color = body_color
+	proj.global_position = global_position
+	get_parent().add_child(proj)
 
 ## Nearest living hero at any distance (kiting is field-wide, unlike detect).
 func _nearest_hero() -> Combatant:

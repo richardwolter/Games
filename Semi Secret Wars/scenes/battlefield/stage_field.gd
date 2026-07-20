@@ -35,6 +35,10 @@ extends Node2D
 @export var obstacle_kinds: Array[String] = ["mountain", "forest", "mountain", "forest", "mountain"]
 @export var mountain_texture: Texture2D
 @export var forest_texture: Texture2D
+@export var spaceship_texture: Texture2D
+@export var rock1_texture: Texture2D
+@export var rock2_texture: Texture2D
+@export var sword_texture: Texture2D
 ## Decorative only — no gameplay effect.
 @export var scenery: Array[Vector3] = [
 	Vector3(130.0, -570.0, 95.0),
@@ -42,16 +46,23 @@ extends Node2D
 	Vector3(1250.0, -100.0, 110.0),
 	Vector3(-1300.0, -350.0, 100.0),
 ]
-## Poison Lakes: damage-over-time hazard for all units inside (heroes and
-## minions). (x, y) center + z = x-radius; y-radius is z * lake_radius_ratio.
+## Sprite kind per scenery entry above (index-aligned): "smudge". Falls back to
+## the placeholder blob+label for any index without a match.
+@export var scenery_kinds: Array[String] = []
+@export var smudge_texture: Texture2D
+@export var mushroom_texture: Texture2D
+## Poison Lakes: entry-hazard for all units inside (heroes and minions). (x, y)
+## center + z = x-radius; y-radius is z * lake_radius_ratio.
 ## Editor-preview fallback only; positions come from the LevelLayout at runtime.
 @export var lakes: Array[Vector3] = [
 	Vector3(840.0, 420.0, 260.0),
 	Vector3(-500.0, -450.0, 220.0),
 ]
 @export var lake_radius_ratio := 0.5
-## HP drained per second while a unit is inside a lake (provisional, see BALANCE.md).
-@export var lake_dps := 8.0
+## HP lost per lake ENTRY — a single hit on crossing the shore, not a per-second
+## drain (Combatant edge-triggers this on the outside→inside transition). Light
+## enough that briefly clipping a lake is a minor cost, not lethal.
+@export var lake_damage := 6.0
 
 @export_group("Deployment")
 ## Obstacle clearance for deployment: the party spreads ±~72px side by side.
@@ -68,6 +79,26 @@ var objective_positions: Array[Vector2] = []
 ## Minion spawn gates for this level (authored in the LevelLayout). Read by the
 ## MinionSpawner in Phase 3; empty until a layout is applied.
 var spawn_gates: Array[Vector2] = []
+## Spawn gates are unmovable structures, not just points: blocked like obstacles
+## so heroes can't stand on top of (or walk straight over) the swarm's source.
+@export var spawn_gate_radius := 70.0
+
+## Runtime-registered blockers with the same collision treatment as `obstacles`
+## (steer_around, clamp_out_of_obstacles) but not authored/drawn like them —
+## for units that exist only at runtime, e.g. V2's LaneSpawnPoint gates
+## (LaneSpawner registers/unregisters as points spawn in and die). (x, y)
+## center + z = radius, same convention as `obstacles`.
+var dynamic_obstacles: Array[Vector3] = []
+
+func register_dynamic_obstacle(pos: Vector2, radius: float) -> void:
+	dynamic_obstacles.append(Vector3(pos.x, pos.y, radius))
+
+func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
+	for i in dynamic_obstacles.size():
+		var o := dynamic_obstacles[i]
+		if o.x == pos.x and o.y == pos.y and o.z == radius:
+			dynamic_obstacles.remove_at(i)
+			return
 
 @export_group("Notebook Page")
 @export var page_color := Color("f4efe1")
@@ -142,6 +173,12 @@ func is_valid_deploy_point(p: Vector2) -> bool:
 	for o in obstacles:
 		if p.distance_to(Vector2(o.x, o.y)) < o.z + deploy_obstacle_margin:
 			return false
+	for g in spawn_gates:
+		if p.distance_to(g) < spawn_gate_radius + deploy_obstacle_margin:
+			return false
+	for o in dynamic_obstacles:
+		if p.distance_to(Vector2(o.x, o.y)) < o.z + deploy_obstacle_margin:
+			return false
 	return true
 
 ## Steering helper: adjust a desired direction to avoid blocking obstacles.
@@ -150,13 +187,18 @@ func is_valid_deploy_point(p: Vector2) -> bool:
 func steer_around(pos: Vector2, desired: Vector2, clearance: float) -> Vector2:
 	for o in obstacles:
 		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
-	# Avoid the Poison Lakes: extra margin so units start skirting well before
-	# the shore. Slightly weaker than hard obstacles — combat pursuit of a
-	# target inside a lake can still drag a unit in.
+	for g in spawn_gates:
+		desired = _avoid(pos, desired, g, spawn_gate_radius, clearance, 1.5)
+	for o in dynamic_obstacles:
+		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
+	# Avoid the Poison Lakes: wide margin + near-obstacle strength so units skirt
+	# well before the shore and only rarely clip in. A combat pursuit can still
+	# drag a unit in, but that now costs a single ~6 HP entry hit, not a drain —
+	# a cheap, acceptable price for chasing a target across the water.
 	for l in lakes:
 		var lake_pos := Vector2(l.x, l.y)
 		var lake_radius := Vector2(l.z, l.z * lake_radius_ratio)
-		desired = _avoid(pos, desired, lake_pos, _lake_radius_toward(pos, lake_pos, lake_radius), clearance + 50.0, 1.3)
+		desired = _avoid(pos, desired, lake_pos, _lake_radius_toward(pos, lake_pos, lake_radius), clearance + 90.0, 1.6)
 	return desired.normalized() if desired.length() > 0.01 else desired
 
 ## Push `desired` around one circular blocker. `strength` scales the avoidance
@@ -207,6 +249,19 @@ func clamp_out_of_obstacles(pos: Vector2, body_radius: float) -> Vector2:
 		var dist := to_pos.length()
 		if dist < min_d:
 			pos = center + (to_pos / dist if dist > 0.001 else Vector2.RIGHT) * min_d
+	for g in spawn_gates:
+		var min_d2 := spawn_gate_radius + body_radius
+		var to_pos2 := pos - g
+		var dist2 := to_pos2.length()
+		if dist2 < min_d2:
+			pos = g + (to_pos2 / dist2 if dist2 > 0.001 else Vector2.RIGHT) * min_d2
+	for o in dynamic_obstacles:
+		var center3 := Vector2(o.x, o.y)
+		var min_d3 := o.z + body_radius
+		var to_pos3 := pos - center3
+		var dist3 := to_pos3.length()
+		if dist3 < min_d3:
+			pos = center3 + (to_pos3 / dist3 if dist3 > 0.001 else Vector2.RIGHT) * min_d3
 	return pos
 
 ## Hard collision: push a unit center back inside the field ellipse if it
@@ -224,9 +279,16 @@ func _draw() -> void:
 	_draw_page()
 	_draw_blob(Vector2.ZERO, field_radius, field_color, 40, 7.0, 0.05)
 	_draw_funnel()
-	for o in scenery:
-		_draw_blob(Vector2(o.x, o.y), Vector2(o.z, o.z * 0.55), scenery_color, 18, 5.0, 0.10)
-		_draw_label(Vector2(o.x, o.y), "SCENERY")
+	for i in scenery.size():
+		var s := scenery[i]
+		var skind := scenery_kinds[i] if i < scenery_kinds.size() else ""
+		var stex := _scenery_texture(skind)
+		if stex != null:
+			_draw_obstacle_sprite(Vector2(s.x, s.y), s.z, stex)
+		# No placeholder fallback — scenery is purely decorative (unlike
+		# obstacles/lakes/gates below, which block movement and so always need
+		# to be visible); an entry with no assigned sprite kind just draws
+		# nothing, same as border_decor/the procedural tree band.
 	for i in obstacles.size():
 		var o := obstacles[i]
 		var kind := obstacle_kinds[i] if i < obstacle_kinds.size() else ""
@@ -242,17 +304,29 @@ func _draw() -> void:
 		_draw_blob(lake_pos, lake_radius, lake_color, 24, 6.0, 0.10)
 		_draw_hatch(lake_pos, lake_radius)
 		_draw_label(lake_pos, "POISON LAKE")
+	for g in spawn_gates:
+		_draw_blob(g, Vector2(spawn_gate_radius, spawn_gate_radius * 0.6), obstacle_color, 14, 5.0, 0.12)
+		_draw_label(g, "SPAWN GATE")
 
 func _draw_page() -> void:
 	var half := field_radius + page_margin
 	var rect := Rect2(-half, half * 2.0)
 	draw_rect(rect, page_color, true)
-	var y := rect.position.y + rule_spacing
-	while y < rect.end.y:
-		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), rule_color, 1.5, true)
-		y += rule_spacing
+	_draw_ruled_lines(rect, rect, rule_color, 1.5)
 	var mx := rect.position.x + 56.0
 	draw_line(Vector2(mx, rect.position.y), Vector2(mx, rect.end.y), margin_color, 2.0, true)
+
+## Draws ruled-notebook horizontal lines clipped to `rect`, phased from
+## `page_rect`'s own grid (not `rect`'s position) so the pattern lines up
+## seamlessly whether it's drawn over the plain page or a filled area painted
+## on top of it later — e.g. V2's lane floor, which redraws these over its own
+## opaque fill so the ruled page shows through the lane, not just around it.
+func _draw_ruled_lines(rect: Rect2, page_rect: Rect2, color: Color, width: float) -> void:
+	var y := page_rect.position.y + rule_spacing
+	while y < rect.end.y:
+		if y >= rect.position.y:
+			draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), color, width, true)
+		y += rule_spacing
 
 ## Organic hand-drawn blob: ellipse with stable per-vertex wobble, inked with
 ## two overlapping outline passes (like a pen retracing its own line) so it
@@ -308,6 +382,24 @@ func _obstacle_texture(kind: String) -> Texture2D:
 			return mountain_texture
 		"forest":
 			return forest_texture
+		"spaceship":
+			return spaceship_texture
+		"rock1":
+			return rock1_texture
+		"rock2":
+			return rock2_texture
+		"sword":
+			return sword_texture
+		_:
+			return null
+
+## Scenery is non-blocking (no gameplay effect) but may still carry sprite art.
+func _scenery_texture(kind: String) -> Texture2D:
+	match kind:
+		"smudge":
+			return smudge_texture
+		"mushroom":
+			return mushroom_texture
 		_:
 			return null
 
@@ -320,6 +412,22 @@ func _draw_obstacle_sprite(center: Vector2, radius: float, tex: Texture2D) -> vo
 	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
 	var draw_size := tex_size * scale_factor
 	draw_texture_rect(tex, Rect2(center - draw_size * 0.5, draw_size), false)
+
+## Draws a prop standing on the ground: scaled to `height` (aspect preserved),
+## horizontally centered on `base.x` with its BOTTOM edge at `base.y`. Unlike
+## _draw_obstacle_sprite (center-anchored, sized off the blocking radius), this
+## gives tall art — trees, plants — a real ground line instead of floating it
+## around a center point. `tint` modulates for depth shading; `flip_h` mirrors.
+func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h := false, tint := Color.WHITE) -> void:
+	var tex_size := tex.get_size()
+	if tex_size.y <= 0.0:
+		return
+	var draw_size := Vector2(tex_size.x * (height / tex_size.y), height)
+	var rect := Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y), draw_size)
+	if flip_h:
+		# Negative width mirrors the texture in place (Godot flips on a negative extent).
+		rect = Rect2(rect.position + Vector2(draw_size.x, 0.0), Vector2(-draw_size.x, draw_size.y))
+	draw_texture_rect(tex, rect, false, tint)
 
 func _draw_label(at: Vector2, text: String) -> void:
 	var font := ThemeDB.fallback_font

@@ -67,6 +67,16 @@ func _build_card(id: String) -> Button:
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		btn.add_theme_color_override(c, INK_COLOR)
+	# Signature (hero-specific) boons get an accent border so the "your hero's
+	# own card" reads at a glance against the generic offers.
+	if d.has("hero"):
+		var sig_style := StyleBoxFlat.new()
+		sig_style.bg_color = PAGE_COLOR
+		sig_style.border_color = ACCENT
+		sig_style.set_border_width_all(3)
+		sig_style.set_content_margin_all(8)
+		for s in ["normal", "hover", "pressed", "focus"]:
+			btn.add_theme_stylebox_override(s, sig_style)
 	btn.pressed.connect(_on_pick.bind(id))
 	return btn
 

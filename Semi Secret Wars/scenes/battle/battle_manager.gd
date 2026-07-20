@@ -12,6 +12,13 @@ const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
 const BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
 const HERO_PANEL_SCENE := "res://scenes/battle/hero_panel_ui.tscn"
 
+## Fraction of MISSING HP a survivor recovers when clearing a level, applied to
+## the HP that carries into the next level (Designer decision 2026-07-18 — the
+## chained-run rework left survivors entering each level too depleted to fight,
+## since there was no heal). Dead heroes stay dead (permadeath). 0.5 = a
+## 36%-HP survivor resumes the next level at ~68%.
+const CLEAR_HEAL_MISSING_FRACTION := 0.5
+
 ## A hero deployed at least this far from EVERY ally is "going in alone" and
 ## gets a free boon (it's dangerous to go alone). Solo rosters are excluded —
 ## they already carry the standing Lone Wolf buff (see Hero), so it never stacks.
@@ -52,6 +59,16 @@ var _over := false
 var _advance_to_next := false
 ## False during the pre-battle deployment phase (no heroes on the field yet).
 var _deployed := false
+## The live deploy-phase overlay, if any. Normally frees ITSELF (see
+## DeployController._unhandled_input) once the player's final click emits
+## deploy_chosen — but a caller that drives _on_deploy_chosen directly instead
+## of through real input (balance_sweep.gd, which skips the deploy clicks
+## entirely) never fires that input path, leaving it a zombie that keeps
+## _process-ing (and holding a `field` reference) into the NEXT level, after
+## that field is freed — the source of the sweep's "previously freed"
+## script errors. BattleManager owns the free here so both paths are covered;
+## freeing an already-freeing node is a harmless no-op in Godot.
+var _deploy_controller: DeployController = null
 ## Heroes waiting for a level-up boon pick (Milestone 1). Processed one at a
 ## time; a hero can appear more than once if it gained several levels at once.
 var _levelup_queue: Array[String] = []
@@ -96,12 +113,20 @@ func _begin_deployment() -> void:
 	# (permadeath). On level 1 it equals the full draft.
 	dc.hero_names = RunState.living_party()
 	dc.deploy_chosen.connect(_on_deploy_chosen)
+	_deploy_controller = dc
 	# Same deferred-add dance as the villain: the battlefield root is still
 	# setting up its children while this _ready runs.
 	get_parent().add_child.call_deferred(dc)
 
 func _on_deploy_chosen(positions: Array) -> void:
 	_deployed = true
+	# See _deploy_controller's doc comment: guarantee it's gone the moment
+	# deployment resolves, regardless of whether the caller was a real click
+	# (which already queues its own free right after this signal fires) or a
+	# direct call that skips input entirely.
+	if _deploy_controller != null and is_instance_valid(_deploy_controller):
+		_deploy_controller.queue_free()
+	_deploy_controller = null
 	# hero_spawn becomes the centroid of the individually placed heroes: the
 	# swarm and villain summons still march on a single shared point
 	# (StageField.hero_spawn is read game-wide), while each hero spawns at
@@ -178,7 +203,7 @@ func _grant_lone_deploy_boons(names: Array, positions: Array, spawned: Array) ->
 				nearest = minf(nearest, positions[i].distance_to(positions[j]))
 		if nearest <= LONE_DEPLOY_DISTANCE:
 			continue
-		var offer := RunState.roll_offer()
+		var offer := RunState.roll_offer(names[i])
 		if offer.is_empty():
 			continue
 		var id: String = offer[0]
@@ -312,7 +337,7 @@ func _show_next_levelup() -> void:
 		var screen := LevelUpScreen.new()
 		_levelup_screen = screen
 		add_child(screen)
-		screen.setup(hero_name, RunState.roll_offer())
+		screen.setup(hero_name, RunState.roll_offer(hero_name))
 		screen.picked.connect(_on_boon_picked.bind(hero_name))
 		get_tree().paused = true
 		return
@@ -382,7 +407,9 @@ func _record_carryover() -> void:
 	var survivors := {}
 	for h in _living_real_heroes():
 		if is_instance_valid(h) and not h._dying:
-			survivors[h.hero_name] = h.hp
+			# On-clear recovery: restore a fraction of missing HP before carry.
+			var healed: float = h.hp + (h.max_hp - h.hp) * CLEAR_HEAL_MISSING_FRACTION
+			survivors[h.hero_name] = minf(healed, h.max_hp)
 	for hero_name in RunState.living_party():
 		if survivors.has(hero_name):
 			RunState.carry_hp(hero_name, survivors[hero_name])

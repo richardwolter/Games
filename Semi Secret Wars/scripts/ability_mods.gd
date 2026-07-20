@@ -4,10 +4,13 @@ extends RefCounted
 ##
 ## Unlike run-scoped boons (Boons/RunState, reset every run), these are bought
 ## once with GOLD at the prep screen and owned FOREVER (GameState.owned_mods).
-## Each carries a real DOWNSIDE next to its upside — the growing, quirky,
-## permanently-owned kit the Designer asked for. Data (name/cost/desc/hero)
-## lives here; the actual stat/ability effect lives in Hero._apply_ability_mod
-## (matched by id), where the tunable fields are — same split as Boons vs.
+## Each was originally designed with a real DOWNSIDE next to its upside; the
+## downsides are switched off for now (Designer, 2026-07-18: "remove negative
+## effects from ability upgrades for now") while Level 1 tightening is the
+## focus — see Hero._apply_ability_mod, where each downside line is commented
+## out rather than deleted so the tradeoff design can come back later. Data
+## (name/cost/desc/hero) lives here; the actual stat/ability effect lives in
+## Hero._apply_ability_mod (matched by id) — same split as Boons vs.
 ## Hero.apply_run_boon.
 ##
 ## First-pass values — flag for tuning in BALANCE.md.
@@ -16,38 +19,38 @@ const CATALOG := {
 	# THUNDAAR (TANK) --------------------------------------------------------
 	"seismic_stomp": {
 		"hero": "THUNDAAR", "name": "Seismic Stomp", "cost": 45,
-		"desc": "Stomp radius +60%\nbut cooldown +1.5s",
+		"desc": "Stomp radius +60%",
 	},
 	"iron_skin": {
 		"hero": "THUNDAAR", "name": "Iron Skin", "cost": 50,
-		"desc": "+25% Max HP\nbut -15% Move speed",
+		"desc": "+25% Max HP",
 	},
 	# ARTEMIS (BURST) --------------------------------------------------------
 	"twin_clone": {
 		"hero": "ARTEMIS", "name": "Twin Clone", "cost": 60,
-		"desc": "Clone spawns 2 copies\nbut each at 60% HP",
+		"desc": "Clone spawns 2 copies",
 	},
 	"glass_arrows": {
 		"hero": "ARTEMIS", "name": "Glass Arrows", "cost": 45,
-		"desc": "+30% Damage\nbut -20% Max HP",
+		"desc": "+30% Damage",
 	},
 	# WARDEN (CONTROL) -------------------------------------------------------
 	"wide_snare": {
 		"hero": "WARDEN", "name": "Wide Snare", "cost": 50,
-		"desc": "Ensnare radius +50%\nbut stun -30%",
+		"desc": "Ensnare radius +50%",
 	},
 	"overcharge": {
 		"hero": "WARDEN", "name": "Overcharge", "cost": 45,
-		"desc": "+25% Attack speed\nbut -15% Move speed",
+		"desc": "+25% Attack speed",
 	},
 	# BEACON (SUPPORT) -------------------------------------------------------
 	"mass_rally": {
 		"hero": "BEACON", "name": "Mass Rally", "cost": 55,
-		"desc": "Rally radius +50%\nbut cooldown +2s",
+		"desc": "Rally radius +50%",
 	},
 	"zealot": {
 		"hero": "BEACON", "name": "Zealot", "cost": 45,
-		"desc": "+40% Damage\nbut -25% Max HP",
+		"desc": "+40% Damage",
 	},
 }
 

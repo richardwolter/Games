@@ -4,7 +4,7 @@
 [ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="2_theme"]
 
 [node name="HeroPanelUI" type="PanelContainer"]
-custom_minimum_size = Vector2(240, 126)
+custom_minimum_size = Vector2(240, 168)
 theme = ExtResource("2_theme")
 script = ExtResource("1_script")
 
@@ -35,6 +35,18 @@ text = "READY"
 theme_override_font_sizes/font_size = 15
 
 [node name="CooldownBar" type="ProgressBar" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+max_value = 1.0
+value = 1.0
+show_percentage = false
+
+[node name="CooldownLabel2" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "READY"
+theme_override_font_sizes/font_size = 15
+
+[node name="CooldownBar2" type="ProgressBar" parent="VBoxContainer"]
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 max_value = 1.0

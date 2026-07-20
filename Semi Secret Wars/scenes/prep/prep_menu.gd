@@ -39,6 +39,10 @@ var _currency_label: Label
 var _hero_row: HBoxContainer
 
 func _ready() -> void:
+	# Landing on the V1 prep menu always restores the V1 persistence context
+	# (in case we returned here from the V2 lane-test build).
+	if GameState.v2_mode:
+		GameState.set_v2_mode(false)
 	# Milestone 3: re-roll the draft offer every time the prep screen loads
 	# (start of a new run, or returning here after a win/loss).
 	RunState.roll_draft_offer()
@@ -80,6 +84,18 @@ func _build_ui() -> void:
 	var footer := _label("Level 1 — the run begins here      (F12 = full reset)", 16)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(footer)
+
+	# Parallel testing build: jump to the V2 lane-structure prep (its own save).
+	var v2_btn := Button.new()
+	v2_btn.text = "V2 (LANE TEST)"
+	v2_btn.add_theme_font_size_override("font_size", 18)
+	v2_btn.pressed.connect(_on_open_v2)
+	root.add_child(v2_btn)
+
+## Enter the V2 lane-test build: switch to its save context, then load its prep.
+func _on_open_v2() -> void:
+	GameState.set_v2_mode(true)
+	get_tree().change_scene_to_file("res://v2/prep/lane_prep_menu.tscn")
 
 ## Meta-currency total + the single account-wide unlock-shop button
 ## (Milestone 2 — replaces the old per-hero UPGRADES button, since currency
@@ -174,10 +190,8 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 	var selected := CheckBox.new()
 	selected.text = hero_name
 	selected.button_pressed = RunState.is_selected(hero_name)
-	# Milestone 3: cap enforcement — once PARTY_CAP heroes are picked, the
-	# remaining unpicked (but offered) checkboxes disable rather than letting
-	# a new pick silently bump an existing one.
-	selected.disabled = not offered or (not RunState.is_selected(hero_name) and RunState.party.size() >= RunState.PARTY_CAP)
+	# Uncapped (Designer, 2026-07-19): every offered hero can be selected.
+	selected.disabled = not offered
 	selected.add_theme_font_size_override("font_size", 24)
 	for color_key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color"]:
 		selected.add_theme_color_override(color_key, Color("2c2c2c"))

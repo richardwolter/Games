@@ -29,9 +29,16 @@ extends Camera2D
 @export var pan_speed := 1100.0
 ## How close (px) the mouse must be to a viewport edge to edge-pan.
 @export var edge_margin := 24.0
-## Half-extents of the pannable area around center_point; the field root sets
-## this from its geometry. Zero disables clamping.
+## Half-extents of the pannable area around pan_clamp_center(); the field root
+## sets this from its geometry. Zero disables clamping.
 @export var pan_limits := Vector2.ZERO
+## World point pan_limits are measured around, if different from center_point
+## (e.g. V2's long lane starts the view over the deploy band but the pan clamp
+## should be centered on the lane's own middle so both ends are reachable).
+## Only used when use_pan_center is true (pan_center itself may legitimately be
+## Vector2.ZERO, so a bool flag distinguishes "unset" from "centered at origin").
+@export var use_pan_center := false
+@export var pan_center := Vector2.ZERO
 
 var _target_zoom := 1.0
 var _dragging := false
@@ -140,5 +147,6 @@ func _edge_pan_dir() -> Vector2:
 func _move_by(motion: Vector2) -> void:
 	var p := position + motion
 	if pan_limits != Vector2.ZERO:
-		p = p.clamp(center_point - pan_limits, center_point + pan_limits)
+		var clamp_center := pan_center if use_pan_center else center_point
+		p = p.clamp(clamp_center - pan_limits, clamp_center + pan_limits)
 	position = p

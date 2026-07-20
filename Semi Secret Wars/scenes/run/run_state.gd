@@ -16,13 +16,14 @@ signal hero_leveled(hero_name: String)
 ## Rising XP curve per in-run level. First-pass — tune in BALANCE.md.
 const XP_BASE := 40.0
 const XP_GROWTH := 1.35
+## Levels below this cost less XP, so the first few boon picks land faster
+## (Designer, 2026-07-18: "boons can be more frequent on first heroes' levels").
+## Growth resumes its normal trajectory from EARLY_LEVEL_CAP onward — this only
+## front-loads the curve, it doesn't shift the late-game pacing.
+const EARLY_LEVEL_CAP := 3
+const EARLY_LEVEL_DISCOUNT := 0.5
 ## How many boons are offered on each level-up.
 const OFFER_SIZE := 3
-
-## Milestone 3: max heroes fielded per run (DECISIONS.md "party cap set to
-## 3-of-4" — forces a real "who do I leave out" choice at the roster's
-## current size and stays meaningful as more heroes unlock later).
-const PARTY_CAP := 3
 
 ## Set true by the balance sweep so level-ups never emit / never pause for a UI
 ## pick — keeps automated runs comparable to pre-M1 balance data and stops the
@@ -89,9 +90,19 @@ func _track(hero_name: String) -> Dictionary:
 		levels[hero_name] = {"level": 0, "xp": 0, "xp_to_next": xp_needed(0)}
 	return levels[hero_name]
 
+## Multiplier applied to every XP threshold in the V2 lane-test build, making
+## level/boon growth markedly slower ("levels have to be more grindy"). 1.0 in
+## V1, so the V1 curve is untouched.
+const V2_XP_GRIND_MULT := 1.8
+
 ## XP required to go from `level` to `level + 1`.
 func xp_needed(level: int) -> int:
-	return int(round(XP_BASE * pow(XP_GROWTH, level)))
+	var needed := XP_BASE * pow(XP_GROWTH, level)
+	if level < EARLY_LEVEL_CAP:
+		needed *= EARLY_LEVEL_DISCOUNT
+	if GameState.v2_mode:
+		needed *= V2_XP_GRIND_MULT
+	return int(round(needed))
 
 ## Feed run XP for a hero; emits hero_leveled once per level crossed (unless
 ## headless). Multiple levels from a single big XP grant each fire separately.
@@ -120,29 +131,40 @@ func add_boon(hero_name: String, id: String) -> void:
 		boons[hero_name] = []
 	boons[hero_name].append(id)
 
-## Three distinct boon ids to offer on a level-up.
-func roll_offer() -> Array:
-	var pool := Boons.ids()
-	pool.shuffle()
-	return pool.slice(0, mini(OFFER_SIZE, pool.size()))
+## Boon ids to offer on a level-up (OFFER_SIZE cards). One slot is guaranteed to
+## be a signature boon for the levelling hero; the rest are generic. The final
+## order is shuffled so the signature card isn't always in the same position.
+## Falls back to a pure-generic offer when the hero has no signature boons.
+func roll_offer(hero_name: String = "") -> Array:
+	var generics := Boons.generic_ids()
+	generics.shuffle()
+	var signatures := Boons.for_hero(hero_name)
+	signatures.shuffle()
+
+	var offer: Array = []
+	if not signatures.is_empty():
+		offer.append(signatures[0])
+	for id in generics:
+		if offer.size() >= OFFER_SIZE:
+			break
+		offer.append(id)
+	offer.shuffle()
+	return offer
 
 ## -- Milestone 3: hero draft ---------------------------------------------------
 
 ## Re-rolls draft_offer from GameState.unlocked_heroes (called on every prep
-## screen load, per IMPLEMENTATION_PLAN.md M3). Offer size is PARTY_CAP + 1 so
-## there is always at least one real "who do I leave out" decision once more
-## than PARTY_CAP heroes are unlocked; today's 4-hero roster offers all four.
-## Carries over any previous picks that are still in the new offer, then fills
-## remaining slots (up to PARTY_CAP) from the new offer so the start button
-## isn't left disabled after a re-roll.
+## screen load, per IMPLEMENTATION_PLAN.md M3).
+##
+## Uncapped (Designer, 2026-07-19): the party cap is gone — every unlocked
+## hero is offered and defaults to selected, so a player fields their whole
+## roster unless they deliberately benches someone via toggle_selected. This
+## reverses the 2026-07-18 "3-of-4" cap decision (DECISIONS.md); see that
+## entry for the now-superseded "who do I leave out" reasoning.
 func roll_draft_offer() -> void:
-	var pool: Array = GameState.unlocked_heroes.duplicate()
-	pool.shuffle()
-	draft_offer = pool.slice(0, mini(PARTY_CAP + 1, pool.size()))
+	draft_offer = GameState.unlocked_heroes.duplicate()
 	party = party.filter(func(h: String) -> bool: return h in draft_offer)
 	for hero_name in draft_offer:
-		if party.size() >= PARTY_CAP:
-			break
 		if hero_name not in party:
 			party.append(hero_name)
 
@@ -152,10 +174,10 @@ func is_offered(hero_name: String) -> bool:
 func is_selected(hero_name: String) -> bool:
 	return hero_name in party
 
-## Select/deselect a hero for this run's party, capped at PARTY_CAP.
+## Select/deselect a hero for this run's party. Uncapped — see roll_draft_offer().
 func toggle_selected(hero_name: String, on: bool) -> void:
 	if on:
-		if hero_name not in party and party.size() < PARTY_CAP:
+		if hero_name not in party:
 			party.append(hero_name)
 	else:
 		party.erase(hero_name)

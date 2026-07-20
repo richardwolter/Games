@@ -36,6 +36,62 @@ const CATALOG := {
 		"name": "Ferocity", "desc": "+8% Dmg & atk speed",
 		"kind": "ferocity", "dmg": 1.08, "atk": 0.92,
 	},
+	# Signature boons — one guaranteed slot per level-up is drawn from the
+	# hero's own set (see RunState.roll_offer). Each carries a "hero" key
+	# (absent = generic, above) and is named for that hero's own ability. New
+	# kinds are handled in Hero.apply_run_boon, reusing the ability-mod scalars.
+	# THUNDAAR (TANK — Stomp) ------------------------------------------------
+	"seismic_focus": {
+		"hero": "THUNDAAR", "name": "Seismic Focus", "desc": "+40% Stomp radius",
+		"kind": "stomp_radius_mult", "value": 1.40,
+	},
+	"juggernaut": {
+		"hero": "THUNDAAR", "name": "Juggernaut", "desc": "+25% Max HP",
+		"kind": "max_hp_mult", "value": 1.25,
+	},
+	"aftershock": {
+		"hero": "THUNDAAR", "name": "Aftershock", "desc": "-1.0s Ability cooldown",
+		"kind": "ability_cooldown_reduction", "value": 1.0,
+	},
+	# ARTEMIS (BURST — Clone) ------------------------------------------------
+	"twin_focus": {
+		"hero": "ARTEMIS", "name": "Twin Focus", "desc": "Clone spawns +1 copy",
+		"kind": "clone_count_add", "value": 1,
+	},
+	"deadeye": {
+		"hero": "ARTEMIS", "name": "Deadeye", "desc": "+25% Damage",
+		"kind": "damage_mult", "value": 1.25,
+	},
+	"fleetfoot": {
+		"hero": "ARTEMIS", "name": "Fleetfoot", "desc": "-1.0s Ability cooldown",
+		"kind": "ability_cooldown_reduction", "value": 1.0,
+	},
+	# WARDEN (CONTROL — Ensnare) ---------------------------------------------
+	"wide_net": {
+		"hero": "WARDEN", "name": "Wide Net", "desc": "+40% Ensnare radius",
+		"kind": "ensnare_radius_mult", "value": 1.40,
+	},
+	"marksman": {
+		"hero": "WARDEN", "name": "Marksman", "desc": "+20% Damage",
+		"kind": "damage_mult", "value": 1.20,
+	},
+	"rapid_snare": {
+		"hero": "WARDEN", "name": "Rapid Snare", "desc": "-1.0s Ability cooldown",
+		"kind": "ability_cooldown_reduction", "value": 1.0,
+	},
+	# BEACON (SUPPORT — Rally) -----------------------------------------------
+	"broad_rally": {
+		"hero": "BEACON", "name": "Broad Rally", "desc": "+40% Rally radius",
+		"kind": "rally_radius_mult", "value": 1.40,
+	},
+	"inspire": {
+		"hero": "BEACON", "name": "Inspire", "desc": "+20% Damage",
+		"kind": "damage_mult", "value": 1.20,
+	},
+	"quick_rally": {
+		"hero": "BEACON", "name": "Quick Rally", "desc": "-1.0s Ability cooldown",
+		"kind": "ability_cooldown_reduction", "value": 1.0,
+	},
 }
 
 ## All boon ids (a fresh Array each call — safe for the caller to shuffle).
@@ -45,3 +101,14 @@ static func ids() -> Array:
 ## The definition dict for a boon id, or {} if unknown.
 static func def(id: String) -> Dictionary:
 	return CATALOG.get(id, {})
+
+## Generic (hero-agnostic) boon ids — the base pool every hero can draw.
+static func generic_ids() -> Array:
+	return CATALOG.keys().filter(func(id: String) -> bool:
+		return not CATALOG[id].has("hero"))
+
+## Signature boon ids for a given hero, in catalog order (mirrors
+## AbilityMods.for_hero). Empty if the hero has no signature boons.
+static func for_hero(hero_name: String) -> Array:
+	return CATALOG.keys().filter(func(id: String) -> bool:
+		return CATALOG[id].get("hero", "") == hero_name)
