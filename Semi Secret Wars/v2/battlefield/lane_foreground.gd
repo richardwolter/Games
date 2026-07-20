@@ -50,8 +50,8 @@ func _draw() -> void:
 	for e in _field.get_bottom_band():
 		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], near_row_alpha)
 
-## Duplicated (not shared) from StageField._draw_prop_sprite: this node isn't
-## a StageField, and draw_* calls can't cross canvas items — see file header.
+## Duplicated (not shared) from LaneField._draw_prop_sprite: this node isn't
+## a LaneField, and draw_* calls can't cross canvas items — see file header.
 func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h: bool, tint: Color, alpha: float) -> void:
 	var tex_size := tex.get_size()
 	if tex_size.y <= 0.0:
@@ -62,7 +62,7 @@ func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h: boo
 		rect = Rect2(rect.position + Vector2(draw_size.x, 0.0), Vector2(-draw_size.x, draw_size.y))
 	draw_texture_rect(tex, rect, false, Color(tint.r, tint.g, tint.b, tint.a * alpha))
 
-## Duplicated (not shared) from StageField._draw_obstacle_sprite, for
+## Duplicated (not shared) from LaneField._draw_obstacle_sprite, for
 ## border_decor's hand-placed extras (center + radius, not base-anchored).
 func _draw_center_sprite(center: Vector2, radius: float, tex: Texture2D) -> void:
 	var diameter := radius * 2.0

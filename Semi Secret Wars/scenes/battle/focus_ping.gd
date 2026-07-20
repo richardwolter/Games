@@ -29,7 +29,7 @@ var _pos := Vector2.INF
 var _active := false
 ## Free-running clock driving the idle pulse animation (see _draw).
 var _pulse_t := 0.0
-var _field: StageField
+var _field: LaneField
 var _label: Label
 
 func _ready() -> void:

@@ -11,7 +11,7 @@ extends Node2D
 ##
 ## Behavior: if an enemy is within detect range, engage it (close to attack range
 ## and attack on cooldown); otherwise steer toward `goal`, avoiding the field's
-## blocking obstacles (StageField.steer_around). Minions set heroes as their
+## blocking obstacles (LaneField.steer_around). Minions set heroes as their
 ## enemy group, so they naturally break off to attack heroes.
 
 signal died(who: Combatant)
@@ -102,7 +102,7 @@ var attack_cooldown: float:
 	get:
 		return _attack_cd
 var _goal_done := false
-var _field: StageField = null
+var _field: LaneField = null
 var _bob := 0.0
 var _bob_phase := 0.0
 var _target: Combatant = null

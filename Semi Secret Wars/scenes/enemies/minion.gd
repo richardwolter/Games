@@ -16,13 +16,12 @@ const HUNT_INTERVAL := 0.3
 ## How far ahead of the hero (toward the villain) the intercept point sits.
 @export var intercept_lead := 160.0
 
-## V2 lane structure only (GameState.v2_mode; false in V1, so no effect there —
-## Designer feedback 2026-07-19, "minions should be more aggressive"): commit
+## Designer feedback 2026-07-19, "minions should be more aggressive": commit
 ## to melee from farther out instead of only engaging once very close, and cut
 ## most of the intercept-ahead lead so the swarm beelines at heroes rather than
 ## reading as evasive/flanking.
-const V2_DETECT_RANGE_MULT := 2.2
-const V2_INTERCEPT_LEAD_MULT := 0.35
+const DETECT_RANGE_MULT := 2.2
+const INTERCEPT_LEAD_MULT := 0.35
 
 var _spawn_pos := Vector2.ZERO
 var _exit_pos := Vector2.ZERO
@@ -42,8 +41,7 @@ func _configure() -> void:
 	enemy_group = "heroes"
 	global_position = _spawn_pos
 	set_goal(_exit_pos)
-	if GameState.v2_mode:
-		detect_range *= V2_DETECT_RANGE_MULT
+	detect_range *= DETECT_RANGE_MULT
 	# Desync hunt ticks across the swarm (same idea as _retarget_cd stagger).
 	_hunt_cd = randf() * HUNT_INTERVAL
 
@@ -71,7 +69,7 @@ func _process(delta: float) -> void:
 		# Close in: the lead shrinks to zero so the goal converges on the hero
 		# itself — minions charge straight in and engagement takes over.
 		var lead := Vector2.ZERO
-		var lead_len := minf(intercept_lead * (V2_INTERCEPT_LEAD_MULT if GameState.v2_mode else 1.0), dist * 0.4)
+		var lead_len := minf(intercept_lead * INTERCEPT_LEAD_MULT, dist * 0.4)
 		var to_villain := _field.villain_pos - hero.global_position
 		if to_villain.length() > 1.0:
 			lead = to_villain.normalized() * minf(lead_len, to_villain.length())

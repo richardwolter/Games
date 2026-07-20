@@ -21,7 +21,7 @@ func _ready() -> void:
 	_refresh()
 
 func _build_ui() -> void:
-	var bg := PrepMenu.PrepPage.new()
+	var bg := PrepPage.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -128,7 +128,7 @@ func _card_base(owned: bool) -> PanelContainer:
 	var card := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(1, 1, 1, 0.7 if owned else 0.5)
-	style.border_color = PrepMenu.INK_COLOR
+	style.border_color = PrepPage.INK_COLOR
 	style.set_border_width_all(3)
 	style.set_content_margin_all(10)
 	style.set_corner_radius_all(2)

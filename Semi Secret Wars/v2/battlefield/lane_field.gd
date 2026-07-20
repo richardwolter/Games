@@ -1,12 +1,11 @@
 @tool
 class_name LaneField
-extends StageField
-## V2 lane battlefield: a narrow horizontal lane (LaneLayout) rather than V1's
-## open ellipse. Subclasses StageField so every Combatant — which types its
-## field as StageField and touches it only through the public steering/collision
-## API (steer_around, clamp_out_of_obstacles, in_lake, lake_damage, hero_spawn,
-## villain_pos) — works unchanged inside the lane. Only geometry, deploy validity,
-## the field-boundary clamp, and the draw are overridden.
+extends Node2D
+## The lane battlefield: a narrow horizontal lane (LaneLayout) — layout data +
+## rendering. Single source of truth for field geometry — named locations
+## (hero spawn, villain, destructible spawn points), blocking obstacles,
+## decorative scenery, and the Poison Lake. Units query this node (group
+## "field") for spawn/goal points and steer around its obstacles.
 
 ## Lane dimensions (copied from the LaneLayout at runtime).
 var lane_length: float = 6000.0
@@ -24,13 +23,99 @@ var lane_spawn_points: Array[Vector3] = []
 var border_decor: Array[Vector3] = []
 var border_decor_kinds: Array[String] = []
 
+var hero_spawn := Vector2(-1500.0, -600.0)
+var villain_pos := Vector2(1420.0, 640.0)
+## Derived from lane_length/lane_half_height (see apply_lane_layout) — sizes
+## the reused FogOfWar/page grids, not an authored ellipse.
+var field_radius := Vector2(2000.0, 1000.0)
+## Blocking obstacles: (x, y) center + z = radius. Units steer around these.
+## Positions come from the LaneLayout at runtime (apply_lane_layout keeps
+## radius and obstacle_kinds index-aligned).
+var obstacles: Array[Vector3] = []
+## Sprite kind per obstacle above (index-aligned): "mountain" or "forest".
+## Falls back to the placeholder blob+label for any index without a match.
+var obstacle_kinds: Array[String] = []
+@export var mountain_texture: Texture2D
+@export var forest_texture: Texture2D
+@export var spaceship_texture: Texture2D
+@export var rock1_texture: Texture2D
+@export var rock2_texture: Texture2D
+@export var sword_texture: Texture2D
+## Decorative only — no gameplay effect.
+var scenery: Array[Vector3] = []
+## Sprite kind per scenery entry above (index-aligned): "smudge". Falls back to
+## the placeholder blob+label for any index without a match.
+var scenery_kinds: Array[String] = []
+@export var smudge_texture: Texture2D
+@export var mushroom_texture: Texture2D
+## Poison Lakes: entry-hazard for all units inside (heroes and minions). (x, y)
+## center + z = x-radius; y-radius is z * lake_radius_ratio.
+var lakes: Array[Vector3] = []
+@export var lake_radius_ratio := 0.5
+## HP lost per lake ENTRY — a single hit on crossing the shore, not a per-second
+## drain (Combatant edge-triggers this on the outside→inside transition). Light
+## enough that briefly clipping a lake is a minor cost, not lethal.
+@export var lake_damage := 6.0
+
+@export_group("Deployment")
+## Obstacle clearance for deployment: the party spreads ±~72px side by side.
+@export var deploy_obstacle_margin := 80.0
+
+## The scene-authored spawn, captured before the player moves hero_spawn.
+## The deploy zone is anchored here.
+var default_hero_spawn := Vector2.ZERO
+
+## Objective points for this level; Objective/Guardian nodes read their position
+## from here by index. Dormant — no LaneLayout currently authors these.
+var objective_positions: Array[Vector2] = []
+
+## Runtime-registered blockers with the same collision treatment as `obstacles`
+## (steer_around, clamp_out_of_obstacles) but not authored/drawn like them —
+## for units that exist only at runtime, e.g. LaneSpawnPoint gates
+## (LaneSpawner registers/unregisters as points spawn in and die). (x, y)
+## center + z = radius, same convention as `obstacles`.
+var dynamic_obstacles: Array[Vector3] = []
+
+func register_dynamic_obstacle(pos: Vector2, radius: float) -> void:
+	dynamic_obstacles.append(Vector3(pos.x, pos.y, radius))
+
+func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
+	for i in dynamic_obstacles.size():
+		var o := dynamic_obstacles[i]
+		if o.x == pos.x and o.y == pos.y and o.z == radius:
+			dynamic_obstacles.remove_at(i)
+			return
+
+@export_group("Notebook Page")
+@export var page_color := Color("f4efe1")
+@export var rule_color := Color("aac4dd")
+@export var margin_color := Color("d98f8f")
+@export var rule_spacing := 40.0
+## Extra page margin beyond the field. Sized to comfortably cover the
+## deploy-phase camera (which recenters on hero_spawn, near the field's
+## edge) plus normal zoom-out, so panning never runs past the drawn page
+## into the engine's default background color.
+@export var page_margin := Vector2(900.0, 900.0)
+
+@export_group("Field Style")
+## All field shapes render fully transparent (no fill) with black pen
+## outlines, so the notebook page's ruled lines show through — matching the
+## hand-inked sprite art where identification is by outline shape + label,
+## not color.
+@export var field_color := Color("f4efe1", 0.0)
+@export var obstacle_color := Color("f4efe1", 0.0)
+@export var scenery_color := Color("f4efe1", 0.0)
+@export var lake_color := Color("f4efe1", 0.0)
+@export var outline_color := Color("161412")
+@export var outline_width := 4.0
+
 @export_group("Border Decor")
 @export var tree_bushy_texture: Texture2D
 @export var alien_tree_texture: Texture2D
 @export var alien_tree_thin_texture: Texture2D
 @export var plant_texture: Texture2D
-## mushroom_texture is inherited from StageField (shared with scenery's
-## "mushroom" kind — see _scenery_texture()) rather than redeclared here.
+## mushroom_texture (above) is shared with scenery's "mushroom" kind — see
+## _scenery_texture().
 
 @export_subgroup("Procedural Band")
 ## Average spacing between generated props along the band (before jitter) —
@@ -77,8 +162,6 @@ var _band_left: Array[Dictionary] = []
 var _band_right: Array[Dictionary] = []
 var _scatter: Array[Dictionary] = []
 
-## Overrides StageField._ready (which would load a V1 LevelLayout). Loads this
-## level's LaneLayout instead, then does the same group/redraw bookkeeping.
 func _ready() -> void:
 	add_to_group("field")
 	if not Engine.is_editor_hint():
@@ -116,8 +199,8 @@ func apply_lane_layout(layout: LaneLayout) -> void:
 	border_decor = layout.border_decor.duplicate()
 	border_decor_kinds = layout.border_decor_kinds.duplicate()
 	# The lane is centered on the origin; field_radius is its half-extents so the
-	# reused FogOfWar grid spans the whole lane (V2 no longer draws a page off
-	# this — see _draw()).
+	# reused FogOfWar grid spans the whole lane (the lane no longer draws a
+	# page off this — see _draw()).
 	field_radius = Vector2(lane_length * 0.5, lane_half_height)
 	_build_border_band()
 	queue_redraw()
@@ -285,7 +368,6 @@ func get_border_decor_entries() -> Array[Dictionary]:
 	return out
 
 ## Legal deploy point? Inside the fixed left-end band, clear of obstacles/lakes.
-## Reuses the parent's obstacle/lake checks; only the band + rect bounds differ.
 func is_valid_deploy_point(p: Vector2) -> bool:
 	if p.x < deploy_band_x_min or p.x > deploy_band_x_max:
 		return false
@@ -301,7 +383,82 @@ func is_valid_deploy_point(p: Vector2) -> bool:
 			return false
 	return true
 
-## Rectangular field-boundary clamp (overrides StageField's ellipse clamp).
+## Steering helper: adjust a desired direction to avoid blocking obstacles.
+## Combines radial pushback (don't penetrate) with a tangential slide (go
+## around) — pure pushback alone cancels out on head-on approaches.
+func steer_around(pos: Vector2, desired: Vector2, clearance: float) -> Vector2:
+	for o in obstacles:
+		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
+	for o in dynamic_obstacles:
+		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
+	# Avoid the Poison Lakes: wide margin + near-obstacle strength so units skirt
+	# well before the shore and only rarely clip in. A combat pursuit can still
+	# drag a unit in, but that now costs a single ~6 HP entry hit, not a drain —
+	# a cheap, acceptable price for chasing a target across the water.
+	for l in lakes:
+		var lake_pos := Vector2(l.x, l.y)
+		var lake_radius := Vector2(l.z, l.z * lake_radius_ratio)
+		desired = _avoid(pos, desired, lake_pos, _lake_radius_toward(pos, lake_pos, lake_radius), clearance + 90.0, 1.6)
+	return desired.normalized() if desired.length() > 0.01 else desired
+
+## Push `desired` around one circular blocker. `strength` scales the avoidance
+## (>=1 hard obstacle, <1 soft/hazard). Smoothstepped so the correction ramps
+## in gradually instead of kicking at the avoidance boundary (less jitter).
+func _avoid(pos: Vector2, desired: Vector2, center: Vector2, radius: float, clearance: float, strength: float) -> Vector2:
+	var avoid_r := radius + clearance
+	var to_obs := center - pos
+	var dist := to_obs.length()
+	if dist >= avoid_r:
+		return desired
+	# Ignore blockers behind us unless we're already inside the core.
+	if to_obs.dot(desired) <= 0.0 and dist > radius:
+		return desired
+	var away := -to_obs.normalized()
+	var tangent := away.orthogonal()
+	if tangent.dot(desired) < 0.0:
+		tangent = -tangent
+	var push := smoothstep(0.0, 1.0, (avoid_r - dist) / avoid_r)
+	return desired + (away + tangent) * push * strength
+
+## Is a point inside any Poison Lake ellipse?
+func in_lake(pos: Vector2) -> bool:
+	for l in lakes:
+		var d := (pos - Vector2(l.x, l.y)) / Vector2(l.z, l.z * lake_radius_ratio)
+		if d.length_squared() <= 1.0:
+			return true
+	return false
+
+## Effective lake radius along the direction from `lake_pos` toward `pos`, so
+## the elliptical lake can reuse the circular avoidance math.
+func _lake_radius_toward(pos: Vector2, lake_pos: Vector2, lake_radius: Vector2) -> float:
+	var dir := pos - lake_pos
+	if dir.length_squared() < 0.001:
+		return lake_radius.x
+	var a := dir.angle()
+	var rx := lake_radius.x
+	var ry := lake_radius.y
+	return (rx * ry) / sqrt(pow(ry * cos(a), 2.0) + pow(rx * sin(a), 2.0))
+
+## Hard collision: push a unit center out of any obstacle core it overlaps.
+## Steering is only a hint; this guarantees units never clip through obstacles.
+func clamp_out_of_obstacles(pos: Vector2, body_radius: float) -> Vector2:
+	for o in obstacles:
+		var center := Vector2(o.x, o.y)
+		var min_d := o.z + body_radius
+		var to_pos := pos - center
+		var dist := to_pos.length()
+		if dist < min_d:
+			pos = center + (to_pos / dist if dist > 0.001 else Vector2.RIGHT) * min_d
+	for o in dynamic_obstacles:
+		var center3 := Vector2(o.x, o.y)
+		var min_d3 := o.z + body_radius
+		var to_pos3 := pos - center3
+		var dist3 := to_pos3.length()
+		if dist3 < min_d3:
+			pos = center3 + (to_pos3 / dist3 if dist3 > 0.001 else Vector2.RIGHT) * min_d3
+	return pos
+
+## Rectangular field-boundary clamp.
 func clamp_inside_field(pos: Vector2, body_radius: float) -> Vector2:
 	var hx := lane_length * 0.5 - body_radius
 	var hy := lane_half_height - body_radius
@@ -310,12 +467,12 @@ func clamp_inside_field(pos: Vector2, body_radius: float) -> Vector2:
 	return pos
 
 func _draw() -> void:
-	# Notebook-page backdrop (V1's _draw_page): a cream, ruled-paper rect sized
-	# to field_radius + page_margin, covering the lane and its surround alike
-	# with the same fill + ruled lines — no separate lane floor is drawn on
-	# top, so the ground blends seamlessly and the lane's boundary is defined
-	# only by the tree band framing it (There Are No Orcs reference), not by
-	# a color seam or outline.
+	# Notebook-page backdrop: a cream, ruled-paper rect sized to field_radius +
+	# page_margin, covering the lane and its surround alike with the same fill
+	# + ruled lines — no separate lane floor is drawn on top, so the ground
+	# blends seamlessly and the lane's boundary is defined only by the tree
+	# band framing it (There Are No Orcs reference), not by a color seam or
+	# outline.
 	#
 	# The border band/scatter/hand-placed decor are drawn in LaneForeground
 	# instead of here — that node sits above FogOfWar (Designer, 2026-07-19:
@@ -331,7 +488,10 @@ func _draw() -> void:
 		var stex := _scenery_texture(skind)
 		if stex != null:
 			_draw_obstacle_sprite(Vector2(s.x, s.y), s.z, stex)
-		# No placeholder fallback — see StageField._draw() for why.
+		# No placeholder fallback — scenery is purely decorative (unlike
+		# obstacles/lakes below, which block movement and so always need to
+		# be visible); an entry with no assigned sprite kind just draws
+		# nothing, same as border_decor/the procedural tree band.
 	for i in obstacles.size():
 		var o := obstacles[i]
 		var kind := obstacle_kinds[i] if i < obstacle_kinds.size() else ""
@@ -348,6 +508,61 @@ func _draw() -> void:
 		_draw_hatch(lake_pos, lake_radius)
 		_draw_label(lake_pos, "POISON LAKE")
 	_draw_lair()
+
+func _draw_page() -> void:
+	var half := field_radius + page_margin
+	var rect := Rect2(-half, half * 2.0)
+	draw_rect(rect, page_color, true)
+	_draw_ruled_lines(rect, rect, rule_color, 1.5)
+	var mx := rect.position.x + 56.0
+	draw_line(Vector2(mx, rect.position.y), Vector2(mx, rect.end.y), margin_color, 2.0, true)
+
+## Draws ruled-notebook horizontal lines clipped to `rect`, phased from
+## `page_rect`'s own grid (not `rect`'s position) so the pattern lines up
+## seamlessly whether it's drawn over the plain page or a filled area painted
+## on top of it later.
+func _draw_ruled_lines(rect: Rect2, page_rect: Rect2, color: Color, width: float) -> void:
+	var y := page_rect.position.y + rule_spacing
+	while y < rect.end.y:
+		if y >= rect.position.y:
+			draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), color, width, true)
+		y += rule_spacing
+
+## Organic hand-drawn blob: ellipse with stable per-vertex wobble, inked with
+## two overlapping outline passes (like a pen retracing its own line) so it
+## reads as a hand-drawn stroke rather than a clean vector outline.
+func _draw_blob(center: Vector2, radius: Vector2, fill: Color, steps: int, wobble: float, wobble_freq: float) -> void:
+	var pts := _wobbled_points(center, radius, steps, wobble, wobble_freq, 0.0)
+	draw_colored_polygon(pts, fill)
+	_draw_ink_outline(pts)
+	var sketch := _wobbled_points(center, radius, steps, wobble * 1.6, wobble_freq * 1.7, 1.7)
+	sketch.append(sketch[0])
+	draw_polyline(sketch, Color(outline_color, 0.5), outline_width * 0.45, true)
+
+func _wobbled_points(center: Vector2, radius: Vector2, steps: int, wobble: float, wobble_freq: float, phase: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in steps:
+		var a := TAU * i / steps
+		var w := 1.0 + sin(a * 5.0 + phase + center.x * wobble_freq) * (wobble / 100.0) + cos(a * 3.0 + phase + center.y * wobble_freq) * (wobble / 140.0)
+		pts.append(center + Vector2(cos(a) * radius.x * w, sin(a) * radius.y * w))
+	return pts
+
+func _draw_ink_outline(pts: PackedVector2Array) -> void:
+	var outline := pts.duplicate()
+	outline.append(pts[0])
+	draw_polyline(outline, outline_color, outline_width, true)
+
+## Poison Lake hazard marking: black cross-hatch strokes over the paper fill
+## (comic-ink water texture), clipped to the lake's ellipse.
+func _draw_hatch(center: Vector2, radius: Vector2) -> void:
+	var step := 26.0
+	var hatch := Color(outline_color, 0.55)
+	var x := -radius.x
+	while x <= radius.x:
+		var h := sqrt(max(0.0, 1.0 - (x / radius.x) ** 2)) * radius.y
+		if h > 1.0:
+			draw_line(center + Vector2(x, -h), center + Vector2(x + h * 0.9, h * 0.1), hatch, 2.0, true)
+		x += step
 
 ## Tinted left-end band where heroes may (re)deploy.
 func _draw_deploy_band() -> void:
@@ -368,6 +583,33 @@ func _draw_lair() -> void:
 ## get_right_band()/get_bottom_band()/get_scatter()/get_border_decor_entries()
 ## and LaneForeground, which draws all of it above FogOfWar.
 
+func _obstacle_texture(kind: String) -> Texture2D:
+	match kind:
+		"mountain":
+			return mountain_texture
+		"forest":
+			return forest_texture
+		"spaceship":
+			return spaceship_texture
+		"rock1":
+			return rock1_texture
+		"rock2":
+			return rock2_texture
+		"sword":
+			return sword_texture
+		_:
+			return null
+
+## Scenery is non-blocking (no gameplay effect) but may still carry sprite art.
+func _scenery_texture(kind: String) -> Texture2D:
+	match kind:
+		"smudge":
+			return smudge_texture
+		"mushroom":
+			return mushroom_texture
+		_:
+			return null
+
 func _border_decor_texture(kind: String) -> Texture2D:
 	match kind:
 		"tree_bushy":
@@ -380,3 +622,34 @@ func _border_decor_texture(kind: String) -> Texture2D:
 			return plant_texture
 		_:
 			return null
+
+## Draws an obstacle's paper-cutout sprite centered on `center`, scaled so its
+## longest edge matches the obstacle's blocking diameter (2 * radius) —
+## same convention as Combatant's sprite_texture sizing.
+func _draw_obstacle_sprite(center: Vector2, radius: float, tex: Texture2D) -> void:
+	var diameter := radius * 2.0
+	var tex_size := tex.get_size()
+	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
+	var draw_size := tex_size * scale_factor
+	draw_texture_rect(tex, Rect2(center - draw_size * 0.5, draw_size), false)
+
+## Draws a prop standing on the ground: scaled to `height` (aspect preserved),
+## horizontally centered on `base.x` with its BOTTOM edge at `base.y`. Unlike
+## _draw_obstacle_sprite (center-anchored, sized off the blocking radius), this
+## gives tall art — trees, plants — a real ground line instead of floating it
+## around a center point. `tint` modulates for depth shading; `flip_h` mirrors.
+func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h := false, tint := Color.WHITE) -> void:
+	var tex_size := tex.get_size()
+	if tex_size.y <= 0.0:
+		return
+	var draw_size := Vector2(tex_size.x * (height / tex_size.y), height)
+	var rect := Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y), draw_size)
+	if flip_h:
+		# Negative width mirrors the texture in place (Godot flips on a negative extent).
+		rect = Rect2(rect.position + Vector2(draw_size.x, 0.0), Vector2(-draw_size.x, draw_size.y))
+	draw_texture_rect(tex, rect, false, tint)
+
+func _draw_label(at: Vector2, text: String) -> void:
+	var font := ThemeDB.fallback_font
+	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	draw_string(font, at + Vector2(-tw * 0.5, 5.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, outline_color)

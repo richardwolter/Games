@@ -11,7 +11,7 @@ extends Node2D
 signal captured(bonus: int)
 
 @export var label := "OBJECTIVE"
-## Index into StageField.objective_positions — which rolled point this instance takes.
+## Index into LaneField.objective_positions — which point this instance takes.
 @export var objective_index := 0
 @export var capture_radius := 80.0
 @export var contest_radius := 45.0
@@ -31,7 +31,7 @@ var contested := false
 
 func _ready() -> void:
 	# Positioned by the battlefield scene at the field's rolled objective point.
-	var field: StageField = get_tree().get_first_node_in_group("field")
+	var field: LaneField = get_tree().get_first_node_in_group("field")
 	if field != null:
 		if objective_index < field.objective_positions.size():
 			global_position = field.objective_positions[objective_index]

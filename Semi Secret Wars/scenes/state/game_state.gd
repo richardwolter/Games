@@ -13,32 +13,17 @@ extends Node
 ## returns to the prep menu — see full_reset().
 
 const SAVE_PATH := "user://save.json"
-const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
+const PREP_MENU := "res://v2/prep/lane_prep_menu.tscn"
 const FOG_DIR := "user://fog"
 
-## V2 (lane-structure) parallel testing build. When true, persistence resolves to
-## its OWN save file + fog dir and the prep scene is the lane prep menu, so V2's
-## grindier economy never touches V1 data. Purely additive: with v2_mode false,
-## every path below is byte-identical to V1's. Set/cleared by the prep menus.
-var v2_mode := false
-const SAVE_PATH_V2 := "user://save_v2.json"
-const FOG_DIR_V2 := "user://fog_v2"
-const PREP_MENU_V2 := "res://v2/prep/lane_prep_menu.tscn"
-
 func save_path() -> String:
-	return SAVE_PATH_V2 if v2_mode else SAVE_PATH
+	return SAVE_PATH
 
 func fog_dir() -> String:
-	return FOG_DIR_V2 if v2_mode else FOG_DIR
+	return FOG_DIR
 
 func prep_scene() -> String:
-	return PREP_MENU_V2 if v2_mode else PREP_MENU
-
-## Switch persistence context (V1 <-> V2) and reload that context's save file.
-func set_v2_mode(on: bool) -> void:
-	v2_mode = on
-	_reset_state_defaults()
-	load_game()
+	return PREP_MENU
 
 ## Gold awarded at run end (spent on permanent ability mods at prep). Scales with
 ## levels cleared this run — deeper runs pay more — with a win bonus on top and a
@@ -101,11 +86,9 @@ var owned_mods: Array = []
 ## "<HERO>_2"/"<HERO>_3"). Tier-gates the three flags Hero._configure sets
 ## unconditionally for V1. See has_tier/buy_tier.
 var owned_ability_tiers: Array = []
-## Heroes currently available for the party/draft. Defaults to every hero
-## that exists in code today (V1); V2 starts with THUNDAAR alone and unlocks
-## the rest through career achievements (see _reset_state_defaults, which is
-## where the v2_mode-dependent default actually applies).
-var unlocked_heroes: Array = HERO_CATALOG.keys()
+## Heroes currently available for the party/draft. Starts with THUNDAAR alone
+## and unlocks the rest through career achievements (see _reset_state_defaults).
+var unlocked_heroes: Array = ["THUNDAAR"]
 ## Relic ids available for the run-boon pool (scaffolding for a later
 ## milestone — no relics exist yet, so this stays empty).
 var unlocked_relics: Array = []
@@ -140,25 +123,13 @@ func start_run() -> void:
 
 ## -- Party / priorities -------------------------------------------------------
 
-## Sensible default priority per hero (most push the villain; the support
-## defaults to shadowing the party so its aura lands out of the box).
-const DEFAULT_PRIORITY := {"BEACON": "SUPPORT_ALLIES"}
-
 func party_of(hero_name: String) -> Dictionary:
 	if not party.has(hero_name):
 		party[hero_name] = {
-			"priority": DEFAULT_PRIORITY.get(hero_name, "ATTACK_VILLAIN"),
+			"priority": "ATTACK_VILLAIN",
 			"support_target": "",
 		}
 	return party[hero_name]
-
-func set_priority(hero_name: String, priority: String) -> void:
-	party_of(hero_name).priority = priority
-
-## Which specific ally `hero_name` should shadow while on SUPPORT_ALLIES
-## priority ("" = nearest living ally, the default).
-func set_support_target(hero_name: String, target: String) -> void:
-	party_of(hero_name).support_target = target
 
 ## Kill XP: killer banks the full value; every other living hero banks the
 ## assist share (rounded up), so XP flows to the whole party (BALANCE.md).
@@ -171,20 +142,18 @@ func award_kill_xp(killer: Node, amount: int) -> void:
 
 ## Single chokepoint for all run XP (kills + objectives): tracks this run's
 ## per-hero total for the results screen and feeds the in-run level track
-## (RunState), which is what actually grows a hero's power now. In V2, every
-## point also banks permanently into the shared persistent currency
-## (banked_xp) — unlike run_xp/RunState's level track (which reset every run
-## by design, since in-run boons are meant to be temporary), banked_xp only
-## ever changes by being earned here or spent (buy_stat_upgrade), and isn't
-## tied to which hero earned it — the player spends it on any hero from the
-## STATS shop. V1 untouched (v2_mode false).
+## (RunState), which is what actually grows a hero's power now. Every point
+## also banks permanently into the shared persistent currency (banked_xp) —
+## unlike run_xp/RunState's level track (which reset every run by design,
+## since in-run boons are meant to be temporary), banked_xp only ever changes
+## by being earned here or spent (buy_stat_upgrade), and isn't tied to which
+## hero earned it — the player spends it on any hero from the STATS shop.
 func add_xp(hero_name: String, amount: int) -> void:
 	if amount <= 0:
 		return
 	run_xp[hero_name] = int(run_xp.get(hero_name, 0)) + amount
 	RunState.record_xp(hero_name, amount)
-	if v2_mode:
-		banked_xp += amount
+	banked_xp += amount
 
 ## -- Meta currency / unlocks --------------------------------------------------
 
@@ -356,7 +325,7 @@ func load_game() -> void:
 	stat_purchases = data.get("stat_purchases", {})
 
 ## Resets the in-memory persistent vars to fresh-start defaults WITHOUT deleting
-## the save file (used by set_v2_mode before loading the other context's file).
+## the save file.
 func _reset_state_defaults() -> void:
 	party = {}
 	run_xp = {}
@@ -365,9 +334,7 @@ func _reset_state_defaults() -> void:
 	owned_ability_tiers = []
 	banked_xp = 0
 	stat_purchases = {}
-	# V2 is the grind: start with THUNDAAR alone and unlock the rest through
-	# career achievements. V1 keeps its full-roster default untouched.
-	unlocked_heroes = ["THUNDAAR"] if v2_mode else HERO_CATALOG.keys()
+	unlocked_heroes = ["THUNDAAR"]
 	unlocked_relics = []
 	career = {}
 

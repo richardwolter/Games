@@ -22,7 +22,7 @@ func _ready() -> void:
 	_refresh()
 
 func _build_ui() -> void:
-	var bg := PrepMenu.PrepPage.new()
+	var bg := PrepPage.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -89,9 +89,8 @@ func _effective_stats_text(hero_name: String) -> String:
 	var hp := float(stats.get("base_hp", 100.0))
 	var dmg := float(stats.get("base_damage", 10.0))
 	var atk_interval := float(stats.get("attack_interval", 0.5))
-	if GameState.v2_mode:
-		hp *= Hero.V2_HP_MULT
-		dmg *= Hero.V2_DAMAGE_MULT
+	hp *= Hero.V2_HP_MULT
+	dmg *= Hero.V2_DAMAGE_MULT
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
 	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
 	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")
@@ -110,7 +109,7 @@ func _stat_card(hero_name: String, stat_id: String) -> PanelContainer:
 	var card := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(1, 1, 1, 0.5)
-	style.border_color = PrepMenu.INK_COLOR
+	style.border_color = PrepPage.INK_COLOR
 	style.set_border_width_all(3)
 	style.set_content_margin_all(10)
 	style.set_corner_radius_all(2)

@@ -8,14 +8,14 @@ extends Combatant
 ## this dies (reusing CaptureObjective's existing contest logic, no changes
 ## needed there).
 
-## Index into StageField.objective_positions — which objective this guards.
+## Index into LaneField.objective_positions — which objective this guards.
 @export var objective_index := 0
 
 func _configure() -> void:
 	self_group = "hostiles"
 	enemy_group = "heroes"
 	label_text = "GUARDIAN"
-	var field: StageField = get_tree().get_first_node_in_group("field")
+	var field: LaneField = get_tree().get_first_node_in_group("field")
 	if field != null:
 		if objective_index < field.objective_positions.size():
 			global_position = field.objective_positions[objective_index]

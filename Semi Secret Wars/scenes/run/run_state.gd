@@ -32,7 +32,7 @@ var headless := false
 
 ## Which level of the run we're on (1-based). A run is a chain of levels; a win
 ## advances this, a loss resets the whole run to level 1 (gameplay-loop rework).
-## StageField reads it to pick which authored LevelLayout to load.
+## LaneField reads it to pick which authored LaneLayout to load.
 var current_level := 1
 ## hero_name -> {"level": int, "xp": int, "xp_to_next": int}
 var levels := {}
@@ -90,18 +90,16 @@ func _track(hero_name: String) -> Dictionary:
 		levels[hero_name] = {"level": 0, "xp": 0, "xp_to_next": xp_needed(0)}
 	return levels[hero_name]
 
-## Multiplier applied to every XP threshold in the V2 lane-test build, making
-## level/boon growth markedly slower ("levels have to be more grindy"). 1.0 in
-## V1, so the V1 curve is untouched.
-const V2_XP_GRIND_MULT := 1.8
+## Multiplier applied to every XP threshold, making level/boon growth markedly
+## slower ("levels have to be more grindy").
+const XP_GRIND_MULT := 1.8
 
 ## XP required to go from `level` to `level + 1`.
 func xp_needed(level: int) -> int:
 	var needed := XP_BASE * pow(XP_GROWTH, level)
 	if level < EARLY_LEVEL_CAP:
 		needed *= EARLY_LEVEL_DISCOUNT
-	if GameState.v2_mode:
-		needed *= V2_XP_GRIND_MULT
+	needed *= XP_GRIND_MULT
 	return int(round(needed))
 
 ## Feed run XP for a hero; emits hero_leveled once per level crossed (unless

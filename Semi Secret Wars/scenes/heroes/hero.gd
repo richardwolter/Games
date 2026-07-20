@@ -205,17 +205,6 @@ const SYNERGY_DAMAGE_MULT := 1.15
 const SYNERGY_COOLDOWN_REDUCTION := 0.3
 const SYNERGY_XP_MULT := 1.25
 
-## Lone Wolf: a single-hero roster has no ally to split aggro/damage with, so
-## it gets a standing compensation buff instead (a permanent stat bump, set
-## once at spawn from roster size — unlike synergy, this doesn't fluctuate
-## with a nearby ally, since a solo roster never has one). Makes solo runs
-## a possible (not guaranteed) win instead of never closing the gap; see
-## BALANCE.md "Comprehensive sweep" / "Lone Wolf" for the sweep that showed
-## solo never won within the standardized 60s test window pre-buff.
-const LONE_WOLF_HP_MULT := 1.8
-const LONE_WOLF_DAMAGE_MULT := 1.75
-const LONE_WOLF_COOLDOWN_REDUCTION := 0.4
-
 ## Target-scoring weights (Hero._target_score). The base score is the raw
 ## distance to a candidate in pixels (nearer = preferred, matching the old
 ## nearest-target behavior); each bonus below is subtracted, so it reads as
@@ -265,10 +254,9 @@ const SCORE_FOCUS_PING := 260.0
 ## Optional ranged keys (Milestone 5): `is_ranged` + `attack_range` make a hero
 ## fire a Projectile instead of meleeing — read generically in _configure (no
 ## per-hero special-casing). `attack_interval` overrides the hero.tscn default.
-## V2 lane structure only (GameState.v2_mode; false in V1, so no effect there):
-## heroes start significantly weaker than V1's tuned baseline. The grindier
-## redeploy-lane loop assumes a slow climb via boons/mods, not V1's day-one
-## power level. Applied on top of HERO_STATS in _configure — V1's table itself
+## Heroes start significantly weaker than the old V1 tuned baseline. The
+## grindier redeploy-lane loop assumes a slow climb via boons/mods, not day-one
+## power level. Applied on top of HERO_STATS in _configure — the table itself
 ## is untouched.
 const V2_HP_MULT := 0.5
 const V2_DAMAGE_MULT := 0.5
@@ -355,9 +343,6 @@ var _boon_cooldown_reduction := 0.0
 ## Run-scoped XP multiplier from the "Fortune" boon (RunState). Permanent for
 ## the current run; stacks multiplicatively with the timed objective XP boost.
 var _run_xp_mult := 1.0
-## Cached once at spawn: true when this hero is the only one in the roster
-## (never flips mid-run, unlike synergy's live ally-adjacency check).
-var _is_lone_wolf := false
 ## Formation bonuses (recomputed each frame based on nearby hero roles)
 var _formation_hp_mult := 1.0
 var _formation_damage_mult := 1.0
@@ -428,10 +413,7 @@ func second_ability_cooldown_max() -> float:
 ## Each entry is {text: String, color: Color}; empty when nothing is active.
 func active_buffs() -> Array:
 	var buffs: Array = []
-	if _is_lone_wolf:
-		if _synergy_damage_mult > 1.0:
-			buffs.append({"text": "LONE WOLF", "color": Color("9b59b6")})
-	elif _synergy_damage_mult > 1.0:
+	if _synergy_damage_mult > 1.0:
 		buffs.append({"text": "SYNERGY", "color": Color("6fa8dc")})
 	# Distinct chip when actually near the chosen support target (vs. the
 	# generic SYNERGY that any nearby ally grants), so the bond reads at a glance.
@@ -512,36 +494,21 @@ func _configure() -> void:
 			is_ranged = true
 			attack_range = float(stats.get("attack_range", attack_range))
 			projectile_scene = ARTEMIS_PROJECTILE_SCENE
-	if GameState.v2_mode:
-		max_hp *= V2_HP_MULT
-		damage *= V2_DAMAGE_MULT
-	# Lone Wolf (solo-hero compensation buff) removed for V2 (Designer,
-	# 2026-07-19): every early V2 run IS solo Thundaar, and the buff directly
-	# fought the "Level 1 needs 3 heroes" design goal. V1 keeps it byte-identical.
-	_is_lone_wolf = not GameState.v2_mode and RunState.selected_heroes().size() == 1
-	if _is_lone_wolf:
-		max_hp *= LONE_WOLF_HP_MULT
+	max_hp *= V2_HP_MULT
+	damage *= V2_DAMAGE_MULT
 	# Permanent ability mods bought with gold (Phase 5). Applied here, before
 	# Combatant sets hp = max_hp, so HP-changing mods land at full HP; run boons
 	# (in-run, reset each run) still stack on top of this via apply_run_boon.
 	_apply_owned_ability_mods()
-	# Permanent raw-stat upgrades bought with banked XP (V2 grind only).
-	if GameState.v2_mode:
-		_apply_stat_upgrades()
+	# Permanent raw-stat upgrades bought with banked XP (grind progression).
+	_apply_stat_upgrades()
 	_base_max_hp = max_hp
-	# Ability kit is intrinsic for V1 (Milestone 2) — every hero has its full
-	# ability set from the start of every run; power growth is in-run boons.
-	# V2 (grind progression) tier-gates the passive upgrade and the LV20
-	# ultimate behind gold purchases (AbilityTiers); tier 1 (the signature
-	# ability) is always free the moment a hero is unlocked.
-	if GameState.v2_mode:
-		_base_unlocked = true
-		_passive_unlocked = GameState.has_tier(hero_name, 2)
-		_active_unlocked = GameState.has_tier(hero_name, 3)
-	else:
-		_base_unlocked = true
-		_passive_unlocked = true
-		_active_unlocked = true
+	# Tier-gates the passive upgrade and the LV20 ultimate behind gold
+	# purchases (AbilityTiers); tier 1 (the signature ability) is always
+	# free the moment a hero is unlocked.
+	_base_unlocked = true
+	_passive_unlocked = GameState.has_tier(hero_name, 2)
+	_active_unlocked = GameState.has_tier(hero_name, 3)
 	# Spawn at the funnel; default goal is the villain's corner.
 	global_position = _field.hero_spawn + lateral
 	set_goal(_villain_goal())
@@ -1089,7 +1056,7 @@ func _enemy_neighbors(node: Combatant) -> int:
 
 ## Apply synergy damage multiplier to actual damage dealt. Also widens melee
 ## reach against a spawn point: LaneSpawnPoint (V2 only) is a hard obstacle
-## (see StageField.dynamic_obstacles), so the field's collision clamp already
+## (see LaneField.dynamic_obstacles), so the field's collision clamp already
 ## pins every unit's center at `target.body_radius + _collision_radius()` away
 ## from it — for a melee hero that floor (~73px) sits past the base 26px
 ## attack_range, so without this a melee hero gets walked up to the gate and
@@ -1408,9 +1375,6 @@ func _update_synergy() -> void:
 	if has_ally:
 		_synergy_damage_mult = SYNERGY_DAMAGE_MULT
 		_synergy_cooldown_reduction = SYNERGY_COOLDOWN_REDUCTION
-	elif _is_lone_wolf:
-		_synergy_damage_mult = LONE_WOLF_DAMAGE_MULT
-		_synergy_cooldown_reduction = LONE_WOLF_COOLDOWN_REDUCTION
 	else:
 		_synergy_damage_mult = 1.0
 		_synergy_cooldown_reduction = 0.0
@@ -1492,8 +1456,7 @@ func _update_formation() -> void:
 ## Synergy multiplier: both heroes earn bonus XP when in range.
 func _on_kill(victim: Combatant) -> void:
 	var xp_amount := victim.xp_value
-	# Synergy multiplier (also catches Lone Wolf's compensation buff, since
-	# both are mutually-exclusive states that raise _synergy_damage_mult above 1.0).
+	# Synergy multiplier.
 	if _synergy_damage_mult > 1.0:
 		xp_amount = int(xp_amount * SYNERGY_XP_MULT)
 	xp_amount = int(xp_amount * xp_mult() * _run_xp_mult)

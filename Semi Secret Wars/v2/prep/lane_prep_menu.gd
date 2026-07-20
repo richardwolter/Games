@@ -2,13 +2,12 @@ class_name LanePrepMenu
 extends Control
 ## V2 (lane-structure) prep screen — the parallel testing build's entry point.
 ##
-## Deliberately leaner than V1's PrepMenu: party draft + gold/ability shop only.
-## No priority/support-target pickers — V2 has no priorities (heroes just push
-## the lane), which is why the reused Hero code needs no priority changes. START
-## loads the lane battlefield; BACK TO V1 returns to the V1 prep menu.
+## Deliberately leaner than the old V1 PrepMenu: party draft + gold/ability
+## shop only. No priority/support-target pickers — heroes just push the lane,
+## which is why the reused Hero code needs no priority changes. START loads
+## the lane battlefield.
 
 const LANE_BATTLEFIELD := "res://v2/battlefield/lane_battlefield.tscn"
-const V1_PREP := "res://scenes/prep/prep_menu.tscn"
 
 var _start_button: Button
 var _currency_label: Label
@@ -19,16 +18,12 @@ var _abilities_page: AbilitiesPage
 var _stats_page: StatsPage
 
 func _ready() -> void:
-	# Ensure the V2 persistence context is active (a fresh load, or re-entry from
-	# a battle where it was already set — set_v2_mode is a no-op if already true).
-	if not GameState.v2_mode:
-		GameState.set_v2_mode(true)
 	RunState.roll_draft_offer()
 	_build_ui()
 	_refresh()
 
 func _build_ui() -> void:
-	var bg := PrepMenu.PrepPage.new()
+	var bg := PrepPage.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -64,9 +59,6 @@ func _build_ui() -> void:
 
 	_start_button = _button("START RUN", 30, _on_start)
 	root.add_child(_start_button)
-
-	var back_btn := _button("BACK TO V1", 18, _on_back_to_v1)
-	root.add_child(back_btn)
 
 	var footer := _label("Lane 1 — push right, destroy the spawn gates, reach the lair      (F12 = full reset)", 15)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -206,10 +198,6 @@ func _on_start() -> void:
 	RunState.start_run()
 	GameState.save_game()
 	get_tree().change_scene_to_file(LANE_BATTLEFIELD)
-
-func _on_back_to_v1() -> void:
-	GameState.set_v2_mode(false)
-	get_tree().change_scene_to_file(V1_PREP)
 
 func _refresh() -> void:
 	_start_button.disabled = RunState.selected_heroes().is_empty()

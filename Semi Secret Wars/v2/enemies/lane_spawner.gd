@@ -126,7 +126,7 @@ func _spawn_one() -> void:
 	# Spawn just outside the gate's own hard-collision radius, not inside it —
 	# spawn_spread (30) is smaller than the gate's body_radius (44), so a plain
 	# disc offset would land every minion inside the gate's collision, which
-	# the shared obstacle clamp (StageField.clamp_out_of_obstacles) then force-
+	# the shared obstacle clamp (LaneField.clamp_out_of_obstacles) then force-
 	# ejects the very next frame: a visible "collision pop" against its own
 	# spawn point every single spawn. A ring starting past that clamp floor
 	# keeps the crowd tight against the edge without ever needing correction.

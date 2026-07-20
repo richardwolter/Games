@@ -54,7 +54,7 @@ var _shoot_cd := 0.0
 var _minion_scene: PackedScene = null
 var _projectile_scene: PackedScene = null
 ## The authored lair (captured before the villain starts moving); the leash
-## anchors here. StageField.villain_pos tracks his LIVE position, so we can't
+## anchors here. LaneField.villain_pos tracks his LIVE position, so we can't
 ## read it later as the lair.
 var _lair := Vector2.ZERO
 

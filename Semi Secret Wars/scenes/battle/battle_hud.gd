@@ -17,8 +17,6 @@ extends CanvasLayer
 @export var buff_label_path: NodePath = "ObjectiveBuffPanel/BuffLabel"
 @export var back_button_path: NodePath = "BackButton"
 
-const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
-
 var hero_panel_scene: PackedScene
 
 var _villain_hp_label: Label

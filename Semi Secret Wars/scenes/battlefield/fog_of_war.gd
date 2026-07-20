@@ -37,7 +37,7 @@ extends Node2D
 ## Seconds between explored-grid reveal stamps (unit visibility is per-frame).
 @export var reveal_interval := 0.15
 
-var _field: StageField
+var _field: LaneField
 var _img: Image
 var _tex: ImageTexture
 var _grid_size := Vector2i.ZERO
@@ -52,7 +52,7 @@ func _ready() -> void:
 	add_to_group("fog")
 	_field = get_tree().get_first_node_in_group("field")
 	# Cover the whole notebook page (field blob + the page border that
-	# StageField._draw_page uses).
+	# LaneField._draw_page uses).
 	var half := _field.field_radius + _field.page_margin
 	_origin = -half
 	_grid_size = Vector2i((half * 2.0 / cell_size).ceil()) + Vector2i.ONE
