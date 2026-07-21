@@ -17,6 +17,10 @@ var cooldown_bar: ProgressBar
 var cooldown_indicator2: Label
 var cooldown_bar2: ProgressBar
 var buff_label: RichTextLabel
+## Live per-run readout: kills, XP gained, special-ability hit rate (see
+## GameState.hero_kills_run/hero_xp_run/hero_ability_pct_run). Prep menu shows
+## the lifetime equivalents — see PrepMenu._build_hero_card.
+var run_stats_label: Label
 var _ko := false
 var _focused := false
 
@@ -29,6 +33,7 @@ func _ready() -> void:
 	cooldown_indicator2 = find_child("CooldownLabel2", true, false) as Label
 	cooldown_bar2 = find_child("CooldownBar2", true, false) as ProgressBar
 	buff_label = find_child("BuffLabel", true, false) as RichTextLabel
+	run_stats_label = find_child("RunStatsLabel", true, false) as Label
 	# The panel itself is the click target; children must not swallow the click.
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	if hp_bar != null:
@@ -51,9 +56,14 @@ func set_focused(focused: bool) -> void:
 	else:
 		name_label.remove_theme_color_override("font_color")
 
-func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], intent: String = "", ability_name: String = "", second_name: String = "", second_remaining: float = 0.0, second_max: float = 1.0) -> void:
+func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], intent: String = "", ability_name: String = "", second_name: String = "", second_remaining: float = 0.0, second_max: float = 1.0, kills: int = 0, xp_gained: int = 0, ability_pct: float = -1.0) -> void:
 	if name_label == null or level_label == null or hp_bar == null or cooldown_indicator == null:
 		return
+
+	# Undo the grey-out set_incoming() applies while waiting on the deploy
+	# timer — without this the panel stayed dimmed forever once the hero
+	# actually arrived on the field (set_incoming's modulate was never reset).
+	modulate = Color.WHITE
 
 	name_label.text = hero_name_in
 	# Level line doubles as the live intent readout (what the hero is doing now),
@@ -85,6 +95,10 @@ func update_display(hero_name_in: String, level: int, current_hp: int, max_hp: i
 			# own a line, so fit_content grows the label's minimum height
 			# instead of overlapping.
 			buff_label.text = "\n".join(parts)
+
+	if run_stats_label != null:
+		var abl_text := "%d%%" % int(round(ability_pct)) if ability_pct >= 0.0 else "—"
+		run_stats_label.text = "KILLS %d  ·  XP %d  ·  ABL %s" % [kills, xp_gained, abl_text]
 
 ## Fills one ability cooldown label+bar: "NAME  READY" when up, "NAME  2.1"
 ## while cooling, in the shared gold/green palette.

@@ -267,7 +267,7 @@ func _update_hero_panels() -> void:
 			var h = alive[hero_name]
 			# In-run level (Milestone 2): the panel now shows the roguelite level
 			# that actually changes mid-battle, not a persistent one that never did.
-			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent(), h.ability_name(), h.second_ability_name(), h.second_ability_cooldown, h.second_ability_cooldown_max())
+			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent(), h.ability_name(), h.second_ability_name(), h.second_ability_cooldown, h.second_ability_cooldown_max(), GameState.hero_kills_run(hero_name), GameState.hero_xp_run(hero_name), GameState.hero_ability_pct_run(hero_name))
 			panel.set_focused(followed == h)
 		elif bm != null and bm.has_method("is_hero_incoming") and bm.is_hero_incoming(hero_name):
 			panel.set_incoming(bm.duo_b_seconds_remaining())

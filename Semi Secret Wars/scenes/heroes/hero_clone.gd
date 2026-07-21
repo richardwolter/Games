@@ -4,11 +4,16 @@ extends Combatant
 ## the caster's own stats, copied in by Hero._try_clone before add_child().
 ## Taunts nearby minions (Combatant.is_taunting) and fights back, then
 ## expires after life_span regardless of how much damage it's taken.
+##
+## Designer, 2026-07-20: the clone stays put where it's spawned instead of
+## tagging along after Artemis — it's a stationary decoy/taunt, not a second
+## mover. It's also confined to the caster's own lane (see `lane` +
+## _lane_ok below) so it never spawns on or fights into the opposite lane.
 
 @export var life_span := 2.0
 
-## Artemis herself; the clone tags along beside her (see follow_offset)
-## instead of standing still, so it reads as sticking with the party.
+## Artemis herself, kept only to identify the caster (e.g. for future hooks) —
+## the clone no longer moves toward it (see class doc).
 var caster: Combatant = null
 var follow_offset := Vector2.ZERO
 
@@ -17,11 +22,10 @@ var follow_offset := Vector2.ZERO
 ## missing property.
 var role := "TANK"
 
-## How often (seconds) the follow-goal is refreshed, matching the pattern
-## used for the hero->villain push-goal: goal is a one-shot snapshot, so a
-## moving target needs periodic re-set_goal, not just a live position.
-const FOLLOW_TRACK_INTERVAL := 0.3
-var _follow_track_cd := 0.0
+## Caster's lane, copied in by Hero._spawn_clone — restricts targeting via
+## _lane_ok below the same way Hero does, so a clone spawned in one lane
+## never taunts/attacks across into the other.
+var lane := ""
 
 func _configure() -> void:
 	self_group = "heroes"
@@ -35,8 +39,18 @@ func _process(delta: float) -> void:
 	if life_span <= 0.0:
 		_die()
 		return
-	if caster != null and is_instance_valid(caster):
-		_follow_track_cd -= delta
-		if _follow_track_cd <= 0.0:
-			_follow_track_cd = FOLLOW_TRACK_INTERVAL
-			set_goal(caster.global_position + follow_offset)
+
+## Same lane rule as Hero._lane_ok: only engage hostiles in the clone's own
+## lane, unless the candidate has no lane of its own or the lanes have
+## merged/collapsed.
+func _lane_ok(node: Combatant) -> bool:
+	if lane == "" or _field == null:
+		return true
+	if global_position.x >= _field.lane_merge_x() or _field.lanes_merged():
+		return true
+	var node_lane := ""
+	if "lane" in node:
+		node_lane = node.lane
+	elif "_lane" in node:
+		node_lane = node._lane
+	return node_lane == "" or node_lane == lane

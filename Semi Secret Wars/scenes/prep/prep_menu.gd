@@ -372,7 +372,20 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 
 	box.add_child(_label(_current_stats_text(hero_name), 13))
 
+	var lifetime_label := _label(_lifetime_stats_text(hero_name), 12)
+	lifetime_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lifetime_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
+	box.add_child(lifetime_label)
+
 	return card
+
+## Lifetime totals across every run (GameState.hero_stats) — separate from
+## the live per-run numbers shown on the battle hero card.
+func _lifetime_stats_text(hero_name: String) -> String:
+	var pct := GameState.hero_ability_pct_lifetime(hero_name)
+	var abl_text := "%d%%" % int(round(pct)) if pct >= 0.0 else "—"
+	return "KILLS %d  ·  XP %d  ·  ABL %s" % [
+		GameState.hero_kills_lifetime(hero_name), GameState.hero_xp_lifetime(hero_name), abl_text]
 
 ## Effective hero stats: base × the global base multipliers × permanent
 ## StatUpgrades purchases — the same formula hero.gd uses at spawn

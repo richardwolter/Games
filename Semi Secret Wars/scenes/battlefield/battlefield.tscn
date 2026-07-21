@@ -1,8 +1,6 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://scenes/battlefield/lane_field.gd" id="1_field"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Forest.svg" id="1_forest"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Mountain.svg" id="1_mountain"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Destroyed-Spaceship.png" id="1_spaceship"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Rock-1.png" id="1_rock1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Rock-2.png" id="1_rock2"]
@@ -53,8 +51,6 @@ corner_radius_bottom_left = 8
 
 [node name="Field" type="Node2D" parent="."]
 script = ExtResource("1_field")
-mountain_texture = ExtResource("1_mountain")
-forest_texture = ExtResource("1_forest")
 spaceship_texture = ExtResource("1_spaceship")
 rock1_texture = ExtResource("1_rock1")
 rock2_texture = ExtResource("1_rock2")

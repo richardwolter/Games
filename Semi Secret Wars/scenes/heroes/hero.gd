@@ -252,7 +252,7 @@ const ROLE_DESCRIPTIONS := {
 ## How far the follower can drift from the leader before re-pathing back in —
 ## tighter than the old generic SUPPORT_LEASH_DIST (260) so pairing reads as
 ## visibly "together" on the field, not just loosely in the same area.
-const DUO_LEASH_DIST := 160.0
+const DUO_LEASH_DIST := 90.0
 const DUO_TRACK_INTERVAL := 0.3
 
 ## Role-identity colors for the battlefield ring + name-tag (see _draw and
@@ -321,17 +321,22 @@ const SCORE_FOCUS_PING := 260.0
 const BASE_HP_MULT := 0.5
 const BASE_DAMAGE_MULT := 0.5
 
+## All heroes move at the same speed (Designer, 2026-07-20) — previously
+## per-hero speeds let Duo partners drift apart just from walking; a shared
+## speed plus the shortened DUO_LEASH_DIST keeps pairs visibly together.
+const HERO_MOVE_SPEED := 90.0
+
 const HERO_STATS: Dictionary = {
 	"THUNDAAR": {
 		"base_hp": 110,
 		"base_damage": 10,
 		"attack_interval": 0.7,
-		"move_speed": 90,
+		"move_speed": HERO_MOVE_SPEED,
 	},
 	"ARTEMIS": {
 		"base_hp": 80,
 		"base_damage": 6,
-		"move_speed": 100,
+		"move_speed": HERO_MOVE_SPEED,
 		"is_ranged": true,
 		"attack_interval": ARTEMIS_ATTACK_INTERVAL,
 		"attack_range": ARTEMIS_ATTACK_RANGE,
@@ -341,7 +346,7 @@ const HERO_STATS: Dictionary = {
 	"WARDEN": {
 		"base_hp": 90,
 		"base_damage": 6,
-		"move_speed": 90,
+		"move_speed": HERO_MOVE_SPEED,
 		"is_ranged": true,
 		"attack_interval": 0.6,
 		"attack_range": 120.0,
@@ -352,7 +357,7 @@ const HERO_STATS: Dictionary = {
 		"base_hp": 100,
 		"base_damage": 8,
 		"attack_interval": 0.6,
-		"move_speed": 90,
+		"move_speed": HERO_MOVE_SPEED,
 	},
 }
 
@@ -1299,6 +1304,7 @@ func _try_stomp() -> void:
 				node.apply_knockback(to_node.normalized(), STOMP_KNOCKBACK, 0.0, self)
 				if _passive_unlocked:
 					node.apply_stun(STOMP_STUN_DURATION)
+	GameState.record_ability_result(hero_name, hit)
 	if hit:
 		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction
 		_ability_cd = maxf(cooldown, 0.1)
@@ -1321,6 +1327,7 @@ func _try_ensnare() -> void:
 		if node.global_position.distance_to(anchor) <= ensnare_r:
 			node.apply_stun(ENSNARE_STUN_DURATION * ensnare_stun_mult)
 			hit = true
+	GameState.record_ability_result(hero_name, hit)
 	if hit:
 		_ability_cd = maxf(ENSNARE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
 		_ensnare_flash_t = ENSNARE_FLASH_TIME
@@ -1351,6 +1358,7 @@ func _try_rally() -> void:
 			node.apply_damage_boost(RALLY_DURATION, RALLY_DMG_MULT)
 			node.apply_atk_speed_boost(RALLY_DURATION, RALLY_ATK_MULT)
 			buffed = true
+	GameState.record_ability_result(hero_name, buffed)
 	if buffed:
 		_ability_cd = maxf(RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
 		_show_cast_label("RALLY!", STATUS_BUFF_COLOR)
@@ -1408,6 +1416,8 @@ func _try_clone() -> void:
 		# Fan multiple clones to alternating sides so they don't stack on one spot.
 		var side := 1.0 if i % 2 == 0 else -1.0
 		_spawn_clone(side * (1.0 + float(i / 2)))
+	# Clone always succeeds once it fires (no in-radius gate, unlike Stomp/Ensnare).
+	GameState.record_ability_result(hero_name, true)
 	var cooldown := CLONE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction
 	# Duo leader/follower layer: Clone recharges faster while Artemis leads
 	# her Duo (see THUNDAAR_LEADER_ATK_SPEED_MULT doc comment for the table).
@@ -1442,9 +1452,16 @@ func _spawn_clone(spread: float) -> void:
 	clone.life_span = CLONE_DURATION
 	clone.caster = self
 	clone.role = role
+	clone.lane = lane
+	# The clone stays fixed where it spawns (see HeroClone) — no collision with
+	# other units in either direction (doesn't push, can't be pushed/clamped).
+	clone.is_pinned = true
 	clone.follow_offset = Vector2(_facing_x * spread, 0.0) * CLONE_SPAWN_OFFSET
 	get_parent().add_child(clone)
-	clone.global_position = global_position + clone.follow_offset
+	var spawn_pos: Vector2 = global_position + clone.follow_offset
+	if lane != "" and _field != null:
+		spawn_pos = _field.clamp_to_lane(spawn_pos, lane)
+	clone.global_position = spawn_pos
 
 ## Shockwave (LV20 unlock, Thundaar): a wide line in front of him, hitting
 ## everything within SHOCKWAVE_RANGE / SHOCKWAVE_HALF_WIDTH for heavy damage
@@ -1468,6 +1485,7 @@ func _try_shockwave() -> void:
 		node.take_damage(SHOCKWAVE_DAMAGE * _duo_damage_mult * damage_mult(), self)
 		if is_instance_valid(node) and not node._dying:
 			node.apply_knockback(dir, SHOCKWAVE_KNOCKBACK, 0.0, self)
+	GameState.record_ability_result(hero_name, hit)
 	if hit:
 		_second_ability_cd = maxf(SHOCKWAVE_COOLDOWN - _duo_cooldown_reduction, 0.1)
 		_show_cast_label("SHOCKWAVE!", Color(1.0, 0.6, 0.2))
@@ -1501,6 +1519,7 @@ func _try_confuse() -> void:
 		if lateral_dist > CONFUSE_HALF_WIDTH:
 			continue
 		caught.append(node)
+	GameState.record_ability_result(hero_name, caught.size() >= CONFUSE_MIN_TARGETS)
 	if caught.size() < CONFUSE_MIN_TARGETS:
 		return
 	for node in caught:
@@ -1549,6 +1568,7 @@ func _try_multishot() -> void:
 			break
 		_fire_multishot_arrow(node)
 		hit_count += 1
+	GameState.record_ability_result(hero_name, hit_count > 0)
 	if hit_count > 0:
 		_second_ability_cd = maxf(MULTISHOT_COOLDOWN - _duo_cooldown_reduction, 0.1)
 		_show_cast_label("MULTISHOT!", Color(0.9, 0.5, 0.8))
@@ -1632,6 +1652,7 @@ func _on_kill(victim: Combatant) -> void:
 	var xp_amount := victim.xp_value
 	xp_amount = int(xp_amount * _duo_xp_mult * xp_mult() * _run_xp_mult)
 	GameState.award_kill_xp(self, xp_amount)
+	GameState.record_hero_kill(hero_name)
 
 ## Run-scoped XP multiplier (Fortune boon): applied to kill XP in _on_kill and
 ## to objective shares in BattleManager._on_objective_captured.

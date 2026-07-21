@@ -34,9 +34,11 @@ const KILL_ASSIST_SHARE := 0.5
 ## achievements + ability tiers). v6 = banked_xp changed from per-hero
 ## Dictionary to a single shared int pool (Designer, 2026-07-19: "XP shared
 ## between all heroes"). v7 = Duo system (duo_pairings added — see
-## duo_of/set_duo_pairings). Any save below this is discarded on load — a
-## clean break the Designer approved rather than migrating old data forward.
-const SAVE_VERSION := 7
+## duo_of/set_duo_pairings). v8 = per-hero lifetime stat tracking (hero_stats:
+## kills/xp/ability hit-rate — display-only, not spendable currency, separate
+## from the shared banked_xp pool). Any save below this is discarded on load —
+## a clean break the Designer approved rather than migrating old data forward.
+const SAVE_VERSION := 8
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
 const HERO_CATALOG := {
@@ -49,6 +51,15 @@ const HERO_CATALOG := {
 ## XP gained per hero in the current run (for the results screen — display only,
 ## not currency; in-run power comes from RunState's level/boon track).
 var run_xp := {}
+## Kill count per hero in the current run — display only (hero cards), reset
+## by start_run(). See record_hero_kill.
+var run_kills := {}
+## Special-ability cast attempts/successful-hits per hero in the current run —
+## display only (hero cards), reset by start_run(). "Successful" means the
+## cast actually affected an enemy (see record_ability_result); basic attacks
+## are excluded since they have no miss mechanic and would always read 100%.
+var run_ability_attempts := {}
+var run_ability_hits := {}
 
 ## -- Meta progression ---------------------------------------------------------
 
@@ -86,6 +97,70 @@ var banked_xp := 0
 ## bought for that hero. Drives both StatUpgrades.cost_for's scaling and the
 ## stat bonus applied at spawn (Hero._apply_stat_upgrades).
 var stat_purchases: Dictionary = {}
+
+## Lifetime per-hero stats, accumulated across every run (prep-menu display —
+## "Total kills", "Total XP gained", "Ability effectiveness"). hero_name ->
+## {"kills": int, "xp": int, "ability_attempts": int, "ability_hits": int}.
+## `xp` here is a separate running total from banked_xp — banked_xp is the
+## shared spendable currency (v6, per-hero tracking removed); this is purely
+## a lifetime counter for display, never spent. See record_hero_kill,
+## record_ability_result, add_xp.
+var hero_stats: Dictionary = {}
+
+func _hero_stat(hero_name: String) -> Dictionary:
+	if not hero_stats.has(hero_name):
+		hero_stats[hero_name] = {"kills": 0, "xp": 0, "ability_attempts": 0, "ability_hits": 0}
+	return hero_stats[hero_name]
+
+## Killing-blow credit only (matches award_kill_xp's killer-gets-full-XP rule
+## — assists don't count as a kill). Fires per-kill against a swarm, so no
+## save here (see record_career's same reasoning); persisted by the next
+## save_game() (run end, or any other persistent-state change).
+func record_hero_kill(hero_name: String) -> void:
+	_hero_stat(hero_name)["kills"] += 1
+	run_kills[hero_name] = int(run_kills.get(hero_name, 0)) + 1
+
+## Tracks one special-ability cast attempt and whether it actually landed on
+## an enemy (Hero._try_* already computes this locally — e.g. Ensnare's `hit`,
+## Rally's `buffed` — this just records it). Only call for casts that got past
+## the "nothing to aim at" guard; a cast that never fires at all isn't a miss,
+## it's a no-op. No save — same high-frequency reasoning as record_hero_kill.
+func record_ability_result(hero_name: String, success: bool) -> void:
+	var stat := _hero_stat(hero_name)
+	stat["ability_attempts"] += 1
+	run_ability_attempts[hero_name] = int(run_ability_attempts.get(hero_name, 0)) + 1
+	if success:
+		stat["ability_hits"] += 1
+		run_ability_hits[hero_name] = int(run_ability_hits.get(hero_name, 0)) + 1
+
+## -- Hero stat readouts (prep card = lifetime, battle card = current run) ----
+
+func hero_kills_lifetime(hero_name: String) -> int:
+	return int(hero_stats.get(hero_name, {}).get("kills", 0))
+
+func hero_kills_run(hero_name: String) -> int:
+	return int(run_kills.get(hero_name, 0))
+
+func hero_xp_lifetime(hero_name: String) -> int:
+	return int(hero_stats.get(hero_name, {}).get("xp", 0))
+
+func hero_xp_run(hero_name: String) -> int:
+	return int(run_xp.get(hero_name, 0))
+
+## -1.0 when no ability has been cast yet (nothing to divide) — callers should
+## show "—" rather than a misleading 0%.
+func hero_ability_pct_lifetime(hero_name: String) -> float:
+	var stat: Dictionary = hero_stats.get(hero_name, {})
+	var attempts := int(stat.get("ability_attempts", 0))
+	if attempts <= 0:
+		return -1.0
+	return 100.0 * int(stat.get("ability_hits", 0)) / attempts
+
+func hero_ability_pct_run(hero_name: String) -> float:
+	var attempts := int(run_ability_attempts.get(hero_name, 0))
+	if attempts <= 0:
+		return -1.0
+	return 100.0 * int(run_ability_hits.get(hero_name, 0)) / attempts
 
 ## -- Duo pairings ---------------------------------------------------------
 
@@ -125,6 +200,9 @@ func _input(event: InputEvent) -> void:
 
 func start_run() -> void:
 	run_xp.clear()
+	run_kills.clear()
+	run_ability_attempts.clear()
+	run_ability_hits.clear()
 
 ## Kill XP: killer banks the full value; every other living hero banks the
 ## assist share (rounded up), so XP flows to the whole party (BALANCE.md).
@@ -149,6 +227,7 @@ func add_xp(hero_name: String, amount: int) -> void:
 	run_xp[hero_name] = int(run_xp.get(hero_name, 0)) + amount
 	RunState.record_xp(hero_name, amount)
 	banked_xp += amount
+	_hero_stat(hero_name)["xp"] += amount
 
 ## -- Meta currency / unlocks --------------------------------------------------
 
@@ -344,6 +423,7 @@ func save_game() -> void:
 			"stat_purchases": stat_purchases,
 			"duo_pairings": duo_pairings,
 			"duo_b_delay_seconds": duo_b_delay_seconds,
+			"hero_stats": hero_stats,
 		}))
 
 func load_game() -> void:
@@ -372,11 +452,15 @@ func load_game() -> void:
 	stat_purchases = data.get("stat_purchases", {})
 	duo_pairings = data.get("duo_pairings", [])
 	duo_b_delay_seconds = float(data.get("duo_b_delay_seconds", DUO_B_DELAY_DEFAULT))
+	hero_stats = data.get("hero_stats", {})
 
 ## Resets the in-memory persistent vars to fresh-start defaults WITHOUT deleting
 ## the save file.
 func _reset_state_defaults() -> void:
 	run_xp = {}
+	run_kills = {}
+	run_ability_attempts = {}
+	run_ability_hits = {}
 	gold = 0
 	owned_mods = []
 	owned_ability_tiers = []
@@ -387,6 +471,7 @@ func _reset_state_defaults() -> void:
 	unlocked_heroes = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
 	unlocked_relics = []
 	career = {}
+	hero_stats = {}
 
 func reset_save() -> void:
 	_reset_state_defaults()

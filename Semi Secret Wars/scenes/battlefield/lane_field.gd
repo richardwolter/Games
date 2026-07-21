@@ -111,11 +111,9 @@ var field_radius := Vector2(2000.0, 1000.0)
 ## Positions come from the LevelLayout at runtime (apply_lane_layout keeps
 ## radius and obstacle_kinds index-aligned).
 var obstacles: Array[Vector3] = []
-## Sprite kind per obstacle above (index-aligned): "mountain" or "forest".
+## Sprite kind per obstacle above (index-aligned).
 ## Falls back to the placeholder blob+label for any index without a match.
 var obstacle_kinds: Array[String] = []
-@export var mountain_texture: Texture2D
-@export var forest_texture: Texture2D
 @export var spaceship_texture: Texture2D
 @export var rock1_texture: Texture2D
 @export var rock2_texture: Texture2D
@@ -686,10 +684,6 @@ func _draw_lair() -> void:
 
 func _obstacle_texture(kind: String) -> Texture2D:
 	match kind:
-		"mountain":
-			return mountain_texture
-		"forest":
-			return forest_texture
 		"spaceship":
 			return spaceship_texture
 		"rock1":

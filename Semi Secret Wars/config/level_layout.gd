@@ -38,7 +38,7 @@ extends Resource
 
 ## Blocking obstacles: (x, y) center + z = radius. Index-aligned with obstacle_kinds.
 @export var obstacles: Array[Vector3] = []
-## Sprite kind per obstacle ("mountain"/"forest"); "" falls back to blob+label.
+## Sprite kind per obstacle (e.g. "rock1"/"rock2"/"sword"); "" falls back to blob+label.
 @export var obstacle_kinds: Array[String] = []
 ## Poison Lakes: (x, y) center + z = x-radius (y-radius = z * lake_radius_ratio).
 @export var lakes: Array[Vector3] = []

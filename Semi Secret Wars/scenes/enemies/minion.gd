@@ -139,10 +139,17 @@ func _nearest_hero_in_lane(lane_filter: String) -> Combatant:
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
 			continue
-		# HeroClone has no lane of its own (short-lived, always spawns beside
-		# its caster) — only real Heroes are lane-filtered.
-		if lane_filter != "" and node is Hero and (node as Hero).lane != lane_filter:
-			continue
+		# HeroClone now carries its caster's lane too (see HeroClone.lane) —
+		# lane-filter it the same as a real Hero so minions don't hunt/path
+		# toward a clone stuck on the other side of the lane split.
+		if lane_filter != "":
+			var node_lane := ""
+			if node is Hero:
+				node_lane = (node as Hero).lane
+			elif node is HeroClone:
+				node_lane = (node as HeroClone).lane
+			if node_lane != "" and node_lane != lane_filter:
+				continue
 		var dist := global_position.distance_squared_to(node.global_position)
 		if dist < best:
 			best = dist

@@ -555,6 +555,10 @@ func _update_separation() -> void:
 	for node in get_tree().get_nodes_in_group(self_group):
 		if node == self or not is_instance_valid(node) or node._dying:
 			continue
+		# Pinned units (LaneSpawnPoint, HeroClone) have no collision at all —
+		# they don't push others around any more than they can be pushed.
+		if "is_pinned" in node and node.is_pinned:
+			continue
 		var diff: Vector2 = global_position - node.global_position
 		var min_dist: float = body_radius + node.body_radius + SEPARATION_MARGIN
 		var d := diff.length()
