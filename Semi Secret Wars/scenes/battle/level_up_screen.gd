@@ -1,9 +1,15 @@
 class_name LevelUpScreen
 extends CanvasLayer
-## In-run level-up overlay (Milestone 1): a hero levelled up — pause the battle
-## and offer 1 of 3 run boons for THAT hero. Emits `picked` with the chosen boon
-## id; BattleManager applies it live (Hero.apply_run_boon) and tears the overlay
-## down. Styling matches the notebook palette (see results_screen.gd / prep_menu.gd).
+## Start-of-level boon overlay (Designer, 2026-07-21: boons only at the start
+## of a level, one ability-focused pick per hero — replaces the old mid-battle
+## XP-level-up draft). BattleManager queues one of these per living hero in
+## _ready(), before deploy; each pauses the battle and offers every one of
+## that hero's ability boons (Boons.for_hero via RunState.roll_offer — no more
+## generic pool, so this is a straight pick-1-of-N, not "1 of 3"). Emits
+## `picked` with the chosen boon id; BattleManager records it into
+## RunState.boons (applied at spawn — see Hero.apply_run_boon /
+## BattleManager._spawn_hero) and tears the overlay down. Styling matches the
+## notebook palette (see results_screen.gd / prep_menu.gd).
 ##
 ## process_mode is ALWAYS so the buttons still take input while the tree is
 ## paused behind the overlay.
@@ -41,12 +47,12 @@ func setup(hero_name: String, offer: Array) -> void:
 	box.add_theme_constant_override("separation", 14)
 	panel.add_child(box)
 
-	var title := _label("%s — LEVEL %d!" % [hero_name, RunState.level_of(hero_name)], 40)
+	var title := _label("%s — LEVEL %d" % [hero_name, RunState.current_level], 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", ACCENT)
 	box.add_child(title)
 
-	var subtitle := _label("Choose a boon (this run only)", 20)
+	var subtitle := _label("Choose an ability boon (this run only)", 20)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(subtitle)
 
@@ -68,8 +74,9 @@ func _build_card(id: String) -> Button:
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		btn.add_theme_color_override(c, INK_COLOR)
-	# Signature (hero-specific) boons get an accent border so the "your hero's
-	# own card" reads at a glance against the generic offers.
+	# Every boon is hero-specific now (no more generic pool), so this accent
+	# border always applies — kept as a branch (rather than unconditional) in
+	# case a hero-agnostic boon ever returns.
 	if d.has("hero"):
 		var sig_style := StyleBoxFlat.new()
 		sig_style.bg_color = PAGE_COLOR

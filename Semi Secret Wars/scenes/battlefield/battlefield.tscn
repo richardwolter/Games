@@ -143,11 +143,11 @@ max_value = 1.0
 value = 1.0
 show_percentage = false
 
-[node name="HeroPanelsRoot" type="HBoxContainer" parent="HUD"]
+[node name="HeroPanelsRoot" type="VBoxContainer" parent="HUD"]
 offset_left = 16.0
-offset_top = 900.0
+offset_top = 110.0
 theme = ExtResource("11_theme")
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="ObjectivePanel" type="PanelContainer" parent="HUD"]
 offset_left = 800.0

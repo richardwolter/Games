@@ -398,9 +398,9 @@ func _current_stats_text(hero_name: String) -> String:
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
 	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
 	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")
-	var hp: float = float(stats.get("base_hp", 100)) * Hero.BASE_HP_MULT * (1.0 + float(StatUpgrades.def("hp").get("effect_per_purchase", 0.0)) * hp_n)
-	var dmg: float = float(stats.get("base_damage", 10)) * Hero.BASE_DAMAGE_MULT * (1.0 + float(StatUpgrades.def("damage").get("effect_per_purchase", 0.0)) * dmg_n)
-	atk_interval /= 1.0 + float(StatUpgrades.def("attack_speed").get("effect_per_purchase", 0.0)) * aspd_n
+	var hp: float = float(stats.get("base_hp", 100)) * Hero.BASE_HP_MULT + float(StatUpgrades.def("hp").get("effect_add", 0.0)) * hp_n
+	var dmg: float = float(stats.get("base_damage", 10)) * Hero.BASE_DAMAGE_MULT + float(StatUpgrades.def("damage").get("effect_add", 0.0)) * dmg_n
+	atk_interval = maxf(atk_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
 	return "HP %d  DMG %d  ATK %.2fs  SPD %d" % [
 		int(round(hp)), int(round(dmg)), atk_interval, int(stats.get("move_speed", 70))]
 

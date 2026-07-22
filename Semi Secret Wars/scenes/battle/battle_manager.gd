@@ -59,7 +59,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("battle_manager")
 	GameState.start_run()
-	RunState.hero_leveled.connect(_on_hero_leveled)
 	stage_id = "stage_%d" % RunState.current_level
 	_spawner = get_node(spawner_path)
 	_results = get_node(results_screen_path)
@@ -77,6 +76,16 @@ func _ready() -> void:
 
 	_hud.setup_heroes(RunState.living_party())
 	_spawn_villain(_stage_config)
+	# Boons only at the start of a level now (Designer, 2026-07-21): every
+	# living hero gets exactly one ability-boon pick here, queued through the
+	# same LevelUpScreen pause-and-pick flow the old mid-battle XP-level-up
+	# draft used. Drained by _process before the deploy phase becomes
+	# interactive (the tree pauses while _levelup_screen is showing, so
+	# DeployController — added below — can't be clicked until every hero has
+	# picked). _on_boon_picked records into RunState.boons even though no Hero
+	# node exists yet; _spawn_hero (below, via _on_deploy_chosen) replays every
+	# boon a hero owns this run onto the freshly spawned instance.
+	_levelup_queue.assign(RunState.living_party())
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
@@ -201,7 +210,12 @@ func _process(delta: float) -> void:
 	if not _levelup_queue.is_empty():
 		_show_next_levelup()
 		return
-	if _second_wave_remaining > 0.0:
+	# >= 0.0, not > 0.0: a Duo configured with a 0s delay starts
+	# _second_wave_remaining already at exactly 0.0 (see the assignment above),
+	# and the old `> 0.0` guard skipped this whole block forever in that case —
+	# the strict-positive check was meant to gate the *decrement*, not the
+	# one-time spawn check that must still fire when the delay is zero.
+	if _second_wave_remaining >= 0.0:
 		_second_wave_remaining = maxf(_second_wave_remaining - delta, 0.0)
 		if _second_wave_remaining <= 0.0:
 			_spawn_second_wave()
@@ -268,22 +282,23 @@ func _spawn_villain(config: StageConfig) -> void:
 		v.died.connect(_on_villain_died)
 		get_tree().get_first_node_in_group("field").get_parent().add_child.call_deferred(v)
 
-func _on_hero_leveled(hero_name: String) -> void:
-	_levelup_queue.append(hero_name)
-
+## Drains _levelup_queue one hero at a time, pausing on each pick. Queue is
+## populated once in _ready() from RunState.living_party() (dead heroes are
+## already excluded there) — unlike the old mid-battle version, no Hero node
+## exists yet at this point (boons are picked before deploy/spawn), so this no
+## longer re-checks _find_living_hero; RunState.boons is the source of truth
+## and _spawn_hero replays it onto every hero as it's created.
 func _show_next_levelup() -> void:
-	while not _levelup_queue.is_empty():
-		var hero_name: String = _levelup_queue.pop_front()
-		if _find_living_hero(hero_name) == null:
-			continue
-		var screen := LevelUpScreen.new()
-		_levelup_screen = screen
-		add_child(screen)
-		screen.setup(hero_name, RunState.roll_offer(hero_name))
-		screen.picked.connect(_on_boon_picked.bind(hero_name))
-		get_tree().paused = true
+	if _levelup_queue.is_empty():
+		get_tree().paused = false
 		return
-	get_tree().paused = false
+	var hero_name: String = _levelup_queue.pop_front()
+	var screen := LevelUpScreen.new()
+	_levelup_screen = screen
+	add_child(screen)
+	screen.setup(hero_name, RunState.roll_offer(hero_name))
+	screen.picked.connect(_on_boon_picked.bind(hero_name))
+	get_tree().paused = true
 
 func _on_boon_picked(boon_id: String, hero_name: String) -> void:
 	RunState.add_boon(hero_name, boon_id)

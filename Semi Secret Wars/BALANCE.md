@@ -2,6 +2,78 @@
 
 Stores gameplay values. Every gameplay value should eventually live here instead of in source code (see [AI_Development_Guide.md](AI_Development_Guide.md) §8, §11).
 
+## Boon rework — start-of-level, ability-only (2026-07-21)
+
+**Designer direction:** "give boons only at the start of a level, and make it only ability focused boons. Each hero gets one at the start of each level." Replaces the old mid-battle system where boons were offered every time a hero crossed an in-run XP-level threshold (pausing combat at unpredictable moments) from a mixed pool of generic stat boosts (Power/Vitality/Haste/Swiftness/Fortune/Ferocity) and hero-specific "signature" boons (some ability-focused, some just more damage/HP with an ability's name on them).
+
+**New flow:** at the start of each stage level (`BattleManager._ready`, before deploy), every living hero (`RunState.living_party()`) gets exactly one boon pick — the same pause-and-pick `LevelUpScreen` UI as before, but now offering only that hero's ability-focused boons (`Boons.for_hero`, no generic pool). Since dead heroes never re-enter `living_party()`, a fallen hero simply stops getting picks for the rest of the run. XP/kill tracking (`RunState.record_xp`/`level_of`) is unchanged and still drives the HUD's per-hero level display and the persistent `banked_xp` stat-upgrade currency — it just no longer gates or triggers boon offers.
+
+**New catalog — 2 ability-focused boons per hero** (`scripts/boons.gd`), replacing the old 3-per-hero mix (one of which was always a raw stat boost) and the 6 generics:
+
+| Hero | Boon | Effect |
+|---|---|---|
+| THUNDAAR | Seismic Focus | Stomp radius +45 |
+| THUNDAAR | Aftershock | Ability cooldown −1.0s |
+| ARTEMIS | Twin Focus | Clone count +1 |
+| ARTEMIS | Fleetfoot | Ability cooldown −1.0s |
+| WARDEN | Wide Net | Ensnare radius +50 |
+| WARDEN | Rapid Snare | Ability cooldown −1.0s |
+| BEACON | Broad Rally | Rally radius +90 |
+| BEACON | Quick Rally | Ability cooldown −1.0s |
+
+Every value is flat additive (continuing the 2026-07-21 additive-math rework below) and reuses the same `_add` scalar vars the gold ability mods drive (`hero.gd`) — a boon and a mod on the same hero simply stack on the same variable. The three now-dead `_mult` vars (`stomp_radius_mult`/`ensnare_radius_mult`/`rally_radius_mult`) were removed outright rather than left at a permanent identity 1.0 — nothing set them anymore once both mods and boons moved to the `_add` siblings.
+
+**Removed:** the 6 generic boons (Power/Vitality/Haste/Swiftness/Fortune/Ferocity) and the 4 non-ability signature boons (Juggernaut/Deadeye/Marksman/Inspire — flat stat boosts that happened to carry a hero's name). A hero now always picks between "bigger/more" (radius or count) and "faster" (ability cooldown) for the one ability that defines them, never a generic damage/HP number.
+
+**Not yet verified:** this is a structural change to when/what boons a player gets, not yet run through `balance_sweep.gd`. The old system could grant many boons to a fast-leveling hero within one long level (uncapped by XP curve); the new system caps it at exactly 3 boon picks per hero per full run (one per stage level) — a real reduction in total power a surviving hero can accumulate. **Recommend a sweep before trusting the L1/L2/L3 clear-rate targets (90%/60%/40%, 20–30% full-run) still hold** — total in-run power per hero is now lower and more predictable than before, which likely eases some fights and may re-open Level 2/3 tuning.
+
+## Additive-math rework (2026-07-21) — ability mods, Rally, and XP curve
+
+**Designer direction:** "avoid using % for upgrades and abilities, use added numbers for better understanding for players." Reference target: Thundaar's 5 dmg vs. a 10-HP minion (2 hits to kill) — a single +1 damage upgrade visibly and predictably 1-shots it. Every upgrade should read this cleanly: a player sees "+2 Damage" and immediately knows what changed, without doing % math against their current stat.
+
+**Scope:** gold-bought ability mods (`scripts/ability_mods.gd`), Rally's ability buff (`hero.gd`), and the in-run XP/level curve (`run_state.gd`). Hero base stats (below) and minion stats (`minion.tscn`/`elite_minion.tscn`/`ranged_minion.tscn`/`brute_minion.tscn`/`guardian_minion.tscn`) were audited and were **already** flat additive numbers — no change needed there.
+
+**Ability mods — percentages replaced with flat values** (`AbilityMods.CATALOG` desc + `Hero._apply_ability_mod`), magnitudes chosen to land close to the old %-of-base-stat value so total mod power is roughly preserved, pending a rebalance sweep:
+
+| Mod | Hero | Before | After |
+|---|---|---|---|
+| seismic_stomp | THUNDAAR | Stomp radius +60% (70px → 112px) | Stomp radius +45 |
+| iron_skin | THUNDAAR | +25% Max HP (110 → 137.5) | Max HP +30 |
+| twin_clone | ARTEMIS | Clone spawns 2 copies | Clone count +1 |
+| glass_arrows | ARTEMIS | +30% Damage (6 → 7.8) | Damage +2 |
+| wide_snare | WARDEN | Ensnare radius +50% (95px → 142.5px) | Ensnare radius +50 |
+| overcharge | WARDEN | +25% Attack speed (0.6s → 0.48s interval) | Attack interval −0.15s (0.6s → 0.45s) |
+| mass_rally | BEACON | Rally radius +50% (180px → 270px) | Rally radius +90 |
+| zealot | BEACON | +40% Damage (8 → 11.2) | Damage +3 |
+
+**Rally ability** (`hero.gd` `_try_rally`) — was `×1.15` damage / `×1.20` attack-speed multipliers (different raw effect per hero: e.g. +1.5 dmg for Thundaar vs. +0.9 dmg for Artemis at base stats). Now flat `RALLY_DMG_ADD 2.0` / `RALLY_ATK_INTERVAL_REDUCTION 0.2s`, computed per-target into the existing multiplicative boost API (`Combatant.apply_damage_boost`/`apply_atk_speed_boost` — kept multiplicative under the hood since that API is shared game-wide; only the player-facing magnitude is now flat and hero-independent).
+
+**XP/level curve** (`RunState.xp_needed`) — was exponential: `XP_BASE 40 × XP_GROWTH 1.35^level × XP_GRIND_MULT 1.8`, reaching ~9,200 XP by LV10 (opaque, hard to predict). Replaced with flat additive: `XP_STEP_BASE 30 + level × XP_STEP_PER_LEVEL 10`:
+
+| Level-up | Old (exponential) | New (additive) |
+|---|---|---|
+| LV0→1 | 36 | 30 |
+| LV1→2 | 60 | 40 |
+| LV2→3 | 102 | 50 |
+| LV3→4 | 172 | 60 |
+| LV4→5 | 288 | 70 |
+| LV8→9 | ~2,070 | 110 |
+| LV15→16 | (would be huge) | 180 |
+
+`EARLY_LEVEL_CAP`/`EARLY_LEVEL_DISCOUNT` (levels 0–2 cost half) kept unchanged, so the "boons come faster early" onboarding feel is preserved: LV0→1/1→2/2→3 are 15/20/25 XP.
+
+**Stat upgrades** (`scripts/stat_upgrades.gd`, the repeatable banked-XP track — separate from the once-each gold `AbilityMods` above) — was `effect_per_purchase` as a fraction (hp/damage 0.08 = 8%, attack_speed 0.05 = 5%), applied as `stat *= 1.0 + effect × purchases`. Same problem as ability mods: "Lv3 Damage" meant a different raw bonus per hero. Replaced with flat `effect_add` per purchase, applied as `stat += effect_add × purchases` (attack_speed subtracts from `attack_interval`, floored at 0.1s):
+
+| Stat | Before | After |
+|---|---|---|
+| Max HP | +8% per level (×purchases) | +8 per level |
+| Damage | +8% per level (×purchases) | +1 per level |
+| Attack Speed | +5% per level (÷ into interval) | −0.03s attack interval per level |
+
+Purchase cost curve (`base_cost` 20/25/30, `cost_growth` 1.15× per purchase) is unchanged — that's gold-sink pacing, not a player-facing upgrade description, so it wasn't in scope for the % → flat-number conversion. Every read site updated together: `Hero._apply_stat_upgrades` (the actual spawn-time effect), `StatsPage._effective_stats_text`/`_stat_card` (prep-screen preview + "+N per level" label), and `PrepMenu._current_stats_text` (hero-card preview) — all three previously duplicated the same multiplicative formula and are now in sync on the additive one.
+
+**Not yet verified:** this is a values-only re-expression, not yet run through `balance_sweep.gd`. Mod/stat-upgrade costs were kept as-is pending a rebalance sweep to confirm the flat values above land at similar power to their %-based predecessors and the run's overall clear-rate curve (target: L1 ~90% / L2 ~60% / L3 ~40%, 20–30% full-run for tank trios with mods) hasn't shifted. **Recommend a sweep + Designer playtest before trusting these numbers further** — particularly whether the new XP pacing (much faster than the old grind-multiplied curve) makes boons arrive too quickly late-run, and whether stacking flat stat-upgrade purchases (no more diminishing % returns against a rising base) changes late-run power scaling.
+
 > **⚠ Updated 2026-07-19 (visuals + ranged-behavior + roster pass, same session) — not yet balance-swept or played live:**
 >
 > **Artemis Dash → Multishot** (`hero.gd`): see DECISIONS.md — same 6s cooldown / 220px range / 5-target budget as Dash, each arrow at `MULTISHOT_DAMAGE_MULT 0.6`× a normal hit instead of Dash's escalating melee-range bonus damage. Different damage shape (guaranteed multi-hit vs. positional dive), unverified against the existing trio sweep numbers.

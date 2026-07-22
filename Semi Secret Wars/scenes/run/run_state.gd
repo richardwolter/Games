@@ -8,22 +8,32 @@ extends Node
 ## GameState / a future MetaState. See the design report + IMPLEMENTATION_PLAN.md.
 ##
 ## XP is fed in from GameState.add_xp (the single chokepoint for kill + objective
-## XP). When a hero crosses a level threshold, hero_leveled fires; BattleManager
-## listens, pauses the battle, and shows the 1-of-3 boon pick (LevelUpScreen).
+## XP) and still drives per-hero LEVEL/xp_to_next (shown on the battle HUD) and
+## the persistent banked_xp currency (stat upgrades) — but XP no longer grants
+## boons directly (Designer, 2026-07-21). Boons are now offered once per living
+## hero at the START of each stage level instead (see BattleManager._ready,
+## which queues RunState.living_party() into the same LevelUpScreen pick flow
+## `hero_leveled` used to drive). `hero_leveled` still fires on every XP
+## level-up — nothing currently listens to it, kept for future HUD feedback
+## (e.g. a "ding" effect) without needing to touch RunState again.
 
 signal hero_leveled(hero_name: String)
 
-## Rising XP curve per in-run level. First-pass — tune in BALANCE.md.
-const XP_BASE := 40.0
-const XP_GROWTH := 1.35
-## Levels below this cost less XP, so the first few boon picks land faster
-## (Designer, 2026-07-18: "boons can be more frequent on first heroes' levels").
-## Growth resumes its normal trajectory from EARLY_LEVEL_CAP onward — this only
-## front-loads the curve, it doesn't shift the late-game pacing.
+## Flat additive XP curve per in-run level (Designer, 2026-07-21: no
+## percentages/exponential growth on upgrades — a player should be able to
+## predict "the next level costs 10 more than this one" without doing math).
+## Replaces the old exponential curve (XP_BASE 40 * XP_GROWTH 1.35^level *
+## XP_GRIND_MULT 1.8, which reached ~9,200 XP by LV10 and read as opaque).
+const XP_STEP_BASE := 30.0
+const XP_STEP_PER_LEVEL := 10.0
+## Levels below this cost less XP, so a hero's first few HUD level-ups land
+## faster (Designer, 2026-07-18: originally "boons can be more frequent on
+## first heroes' levels" — boons no longer come from XP level-ups as of
+## 2026-07-21, see the class doc, but the early-levels-come-faster feel is
+## still worth keeping for the HUD's own pacing). Growth resumes its normal
+## trajectory from EARLY_LEVEL_CAP onward — this only front-loads the curve.
 const EARLY_LEVEL_CAP := 3
 const EARLY_LEVEL_DISCOUNT := 0.5
-## How many boons are offered on each level-up.
-const OFFER_SIZE := 3
 
 ## Set true by the balance sweep so level-ups never emit / never pause for a UI
 ## pick — keeps automated runs comparable to pre-M1 balance data and stops the
@@ -90,16 +100,11 @@ func _track(hero_name: String) -> Dictionary:
 		levels[hero_name] = {"level": 0, "xp": 0, "xp_to_next": xp_needed(0)}
 	return levels[hero_name]
 
-## Multiplier applied to every XP threshold, making level/boon growth markedly
-## slower ("levels have to be more grindy").
-const XP_GRIND_MULT := 1.8
-
 ## XP required to go from `level` to `level + 1`.
 func xp_needed(level: int) -> int:
-	var needed := XP_BASE * pow(XP_GROWTH, level)
+	var needed := XP_STEP_BASE + float(level) * XP_STEP_PER_LEVEL
 	if level < EARLY_LEVEL_CAP:
 		needed *= EARLY_LEVEL_DISCOUNT
-	needed *= XP_GRIND_MULT
 	return int(round(needed))
 
 ## Feed run XP for a hero; emits hero_leveled once per level crossed (unless
@@ -129,23 +134,12 @@ func add_boon(hero_name: String, id: String) -> void:
 		boons[hero_name] = []
 	boons[hero_name].append(id)
 
-## Boon ids to offer on a level-up (OFFER_SIZE cards). One slot is guaranteed to
-## be a signature boon for the levelling hero; the rest are generic. The final
-## order is shuffled so the signature card isn't always in the same position.
-## Falls back to a pure-generic offer when the hero has no signature boons.
+## Boon ids to offer this hero at the start of a level (Designer, 2026-07-21):
+## every one of that hero's ability-focused boons, shuffled — there is no more
+## generic pool, so this is simply "pick 1 of N" from Boons.for_hero (N=2 in
+## the current catalog: an ability-geometry boost and a cooldown reduction).
 func roll_offer(hero_name: String = "") -> Array:
-	var generics := Boons.generic_ids()
-	generics.shuffle()
-	var signatures := Boons.for_hero(hero_name)
-	signatures.shuffle()
-
-	var offer: Array = []
-	if not signatures.is_empty():
-		offer.append(signatures[0])
-	for id in generics:
-		if offer.size() >= OFFER_SIZE:
-			break
-		offer.append(id)
+	var offer := Boons.for_hero(hero_name)
 	offer.shuffle()
 	return offer
 

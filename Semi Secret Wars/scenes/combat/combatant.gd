@@ -82,6 +82,12 @@ const RANGED_STANDOFF_FRACTION := 0.6
 ## so heroes/minions read as part of the same visual treatment as the
 ## environment art, instead of drawing fully opaque.
 const SPRITE_ALPHA := 0.92
+
+## Overridable so a subclass can draw more transparent than the norm (e.g.
+## HeroClone, which needs to read as a distinct decoy rather than a second
+## copy of its caster). Defaults to the shared paper-cutout alpha above.
+func _sprite_alpha() -> float:
+	return SPRITE_ALPHA
 ## Extra breathing room beyond the two bodies' radii before separation kicks in.
 const SEPARATION_MARGIN := 4.0
 ## How fast overlapping units are pushed apart, in px/sec.
@@ -571,7 +577,14 @@ func _update_separation() -> void:
 func _engage(delta: float) -> void:
 	var to_target := _target.global_position - global_position
 	var dist := to_target.length()
-	if dist > attack_range:
+	# Pinned units (e.g. HeroClone) never approach or kite — is_pinned's contract
+	# is "never moves" everywhere else in this file, but this was the one path
+	# that missed the guard: a pinned unit with a target outside attack_range
+	# would still chase it here, visibly drifting off its spawn point whenever
+	# a minion wandered just out of reach.
+	if is_pinned:
+		pass
+	elif dist > attack_range:
 		global_position += _steer(to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
 	elif is_ranged and not _target.is_pinned and dist < attack_range * RANGED_STANDOFF_FRACTION:
 		# Kite: keep shooting (below) while backing off, rather than freezing
@@ -644,7 +657,7 @@ func _draw() -> void:
 		var draw_size := tex_size * scale_factor
 		# Art faces left by default; turn in place on its own axis when facing right.
 		draw_set_transform(offset, 0.0, Vector2(-_facing_x, 1.0))
-		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, SPRITE_ALPHA))
+		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, _sprite_alpha()))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if _in_lake:
 		draw_circle(offset, body_radius, Color(0.45, 0.85, 0.35, 0.3))

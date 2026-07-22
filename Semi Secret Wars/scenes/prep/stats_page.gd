@@ -94,10 +94,10 @@ func _effective_stats_text(hero_name: String) -> String:
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
 	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
 	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")
-	hp *= 1.0 + float(StatUpgrades.def("hp").get("effect_per_purchase", 0.0)) * hp_n
-	dmg *= 1.0 + float(StatUpgrades.def("damage").get("effect_per_purchase", 0.0)) * dmg_n
+	hp += float(StatUpgrades.def("hp").get("effect_add", 0.0)) * hp_n
+	dmg += float(StatUpgrades.def("damage").get("effect_add", 0.0)) * dmg_n
 	if aspd_n > 0:
-		atk_interval /= 1.0 + float(StatUpgrades.def("attack_speed").get("effect_per_purchase", 0.0)) * aspd_n
+		atk_interval = maxf(atk_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
 	return "HP %d   DMG %.1f   SPD %.2f/s" % [roundi(hp), dmg, 1.0 / atk_interval]
 
 func _stat_card(hero_name: String, stat_id: String) -> PanelContainer:
@@ -120,7 +120,10 @@ func _stat_card(hero_name: String, stat_id: String) -> PanelContainer:
 	card.add_child(box)
 
 	box.add_child(_label("%s (Lv %d)" % [d.get("label", stat_id), count], 16))
-	box.add_child(_label("+%d%% per level" % int(float(d.get("effect_per_purchase", 0.0)) * 100.0), 13))
+	var effect := float(d.get("effect_add", 0.0))
+	var effect_text := "-%.2fs attack interval per level" % effect if stat_id == "attack_speed" \
+			else "+%s per level" % (str(int(effect)) if effect == roundf(effect) else str(effect))
+	box.add_child(_label(effect_text, 13))
 
 	var buy := Button.new()
 	buy.text = "Buy — %d XP" % cost

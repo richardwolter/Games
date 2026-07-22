@@ -69,8 +69,10 @@ func show_results(win: bool, currency_awarded: int = 0, next_level: int = 0) -> 
 		var gained := int(GameState.run_xp.get(hero_name, 0))
 		if gained > 0 or RunState.is_selected(hero_name):
 			var tag := "  (fallen)" if RunState.is_dead(hero_name) else ""
-			# Boons picked, not a "level" — RunState's XP track just gates boon
-			# picks in-run; it isn't the persistent hero level (shown on prep).
+			# Boons picked, not a "level" — boons are granted once per living
+			# hero at the start of each stage level (Designer, 2026-07-21), no
+			# longer gated by RunState's XP track (which still exists for the
+			# HUD's per-hero level display, just doesn't drive boons anymore).
 			var boon_count: int = RunState.boons.get(hero_name, []).size()
 			var boon_word := "boon" if boon_count == 1 else "boons"
 			lines += "%s  +%d XP   (%d %s)%s\n" % [hero_name, gained, boon_count, boon_word, tag]

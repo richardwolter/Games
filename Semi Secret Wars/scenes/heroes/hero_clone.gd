@@ -27,9 +27,17 @@ var role := "TANK"
 ## never taunts/attacks across into the other.
 var lane := ""
 
+## Extra Alpha, on top of Combatant's default paper-cutout fade, distinguishes
+## the clone visually from the real Artemis (Designer, 2026-07-21) at a
+## glance instead of only by its stationary behavior.
+const CLONE_SPRITE_ALPHA := 0.55
+
 func _configure() -> void:
 	self_group = "heroes"
 	enemy_group = "hostiles"
+
+func _sprite_alpha() -> float:
+	return CLONE_SPRITE_ALPHA
 
 func _process(delta: float) -> void:
 	super(delta)

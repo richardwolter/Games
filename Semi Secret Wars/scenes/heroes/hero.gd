@@ -113,8 +113,13 @@ const ENSNARE_FLASH_COLOR := Color(0.4, 0.85, 0.8, 0.9)
 const RALLY_COOLDOWN := 7.0
 const RALLY_RADIUS := 180.0
 const RALLY_DURATION := 4.0
-const RALLY_DMG_MULT := 1.15
-const RALLY_ATK_MULT := 1.20
+## Flat additive Rally buff (Designer, 2026-07-21: no percentages on upgrades/
+## abilities — a player should read "+2 damage" and know exactly what that
+## means, regardless of which hero receives it). Converted to the underlying
+## multiplicative boost API per-buffed-hero in _try_rally, since that API
+## (Combatant.apply_damage_boost/apply_atk_speed_boost) is shared game-wide.
+const RALLY_DMG_ADD := 2.0
+const RALLY_ATK_INTERVAL_REDUCTION := 0.2
 
 ## Max contribution `lateral` makes to the villain-chase goal (keeps heroes
 ## from clumping on his exact point without dragging that goal way off him
@@ -129,13 +134,6 @@ const VILLAIN_TRACK_INTERVAL := 0.3
 ## so he can't shake them by kiting/teleporting just past the old interval's
 ## staleness window.
 const VILLAIN_SPOTTED_TRACK_INTERVAL := 0.1
-
-## When following a Duo partner (see _standoff_point/the cohesion block in
-## _process), stop this far off its body instead of aiming at its exact
-## position — parking on top of it just feeds the separation push and makes
-## the follower jitter. Kept small (well inside RALLY_RADIUS 180) so the aura
-## still covers, but past the two bodies' radii so they don't overlap.
-const FOLLOW_STANDOFF := 46.0
 
 ## Rally-to-ally: while on objective duty (not yet pushing the villain) with
 ## no threat in sight, a hero heads toward the nearest ally that IS currently
@@ -254,6 +252,11 @@ const ROLE_DESCRIPTIONS := {
 ## visibly "together" on the field, not just loosely in the same area.
 const DUO_LEASH_DIST := 90.0
 const DUO_TRACK_INTERVAL := 0.3
+## Extra distance a ranged SUPPORT follower hangs back behind its leader,
+## beyond the leader's own body — Designer, 2026-07-21: a ranged support
+## should stand behind whoever it's supporting, not glued flush against them
+## like a melee follower. Added on top of DUO_LEASH_DIST's own radius.
+const RANGED_SUPPORT_TRAIL_DIST := 70.0
 
 ## Role-identity colors for the battlefield ring + name-tag (see _draw and
 ## the label_text assignment in _configure) — lets a role be read at a
@@ -361,6 +364,19 @@ const HERO_STATS: Dictionary = {
 	},
 }
 
+## Per-hero sprite art (2026-07-21): hero.tscn hardcodes Thundaar.png as
+## sprite_texture (the only hero with real art until now), so every hero
+## rendered as Thundaar regardless of hero_name. Artemis/Warden/Beacon now
+## have their own hand-drawn sprites processed into the same papercut style
+## (cream torn-paper cutout, dark ink linework — see BALANCE.md/PRODUCTION.md
+## for the pipeline) and are swapped in per hero_name in _configure(); an
+## unlisted hero_name keeps whatever hero.tscn already set (Thundaar's).
+const HERO_SPRITES: Dictionary = {
+		"ARTEMIS": preload("res://assets/sprites/Artemis.png"),
+	"WARDEN": preload("res://assets/sprites/Warden.png"),
+	"BEACON": preload("res://assets/sprites/Beacon.png"),
+}
+
 ## Artemis: ranged attacker — fires an arrow (Projectile) instead of melee,
 ## with a much longer attack_range and faster base attack_interval than the
 ## shared hero.tscn default (0.5s / 26px), traded for lower HP/damage above.
@@ -380,16 +396,24 @@ var role := "CONTROL"
 ## converge near the lair rather than needing a hard wall.
 var lane := "top"
 
-## Ability-mod scalars (Phase 5 gold shop). Default identity; owned mods adjust
-## these in _apply_ability_mod(), and the ability code reads them in place of the
-## raw constants. Permanent per-hero tradeoffs, applied once at _configure.
-var stomp_radius_mult := 1.0
+## Ability-mod scalars (Phase 5 gold shop) + run-boon scalars (Boons catalog).
+## Default identity; owned mods adjust these in _apply_ability_mod(), boons in
+## apply_run_boon(), and the ability code reads them in place of the raw
+## constants. Permanent per-hero, ability mods applied once at _configure,
+## boons applied once per pick (see BattleManager). Every radius/count bonus
+## here is flat additive (Designer, 2026-07-21: no percentages on upgrades/
+## abilities) — a mod and a boon on the same hero simply stack on the same
+## `_add` var. `clone_hp_mult`/`ensnare_stun_mult` stay multiplicative: they're
+## only ever touched by the currently-disabled ability-mod downsides (see
+## _apply_ability_mod's commented-out lines) — kept at identity until that
+## tradeoff design returns.
+var stomp_radius_add := 0.0
 var stomp_cooldown_add := 0.0
 var clone_count := 1
 var clone_hp_mult := 1.0
-var ensnare_radius_mult := 1.0
+var ensnare_radius_add := 0.0
 var ensnare_stun_mult := 1.0
-var rally_radius_mult := 1.0
+var rally_radius_add := 0.0
 var rally_cooldown_add := 0.0
 
 ## Duo partner state — _partner_role is the confirmed Duo partner's role ("" if
@@ -526,6 +550,11 @@ func _configure() -> void:
 		"ARTEMIS": role = "BURST"
 		"WARDEN": role = "CONTROL"
 		"BEACON": role = "SUPPORT"
+	# Per-hero sprite art (see HERO_SPRITES doc) — hero.tscn's own
+	# sprite_texture (Thundaar's) is the fallback for any hero_name not in
+	# the dict.
+	if hero_name in HERO_SPRITES:
+		sprite_texture = HERO_SPRITES[hero_name]
 	# Role tag on the field name-tag (Designer, 2026-07-20: "roles should be
 	# visually clear") — paired with the role-colored ring in _draw().
 	label_text = "%s · %s" % [hero_name, role]
@@ -625,6 +654,31 @@ func _process(delta: float) -> void:
 	# nearest its leader instead of crossing.
 	if lane != "":
 		global_position = _field.clamp_to_lane(global_position, lane)
+
+	# Duo chain (Designer, 2026-07-21): the goal-based cohesion below only
+	# repositions a follower when it's idle/wandering, so two Duo members each
+	# absorbed in their own fight could still drift arbitrarily far apart —
+	# reported as "Duos separate too much." This is a hard position clamp
+	# instead: it runs every frame regardless of combat state and simply never
+	# lets the follower end up more than DUO_LEASH_DIST from a live leader,
+	# like a taut chain. Follower-only and position-only — the leader is never
+	# touched (no mutual pull) and _target/goal are untouched (no yanking
+	# either hero out of whatever it's doing; the follower just gets nudged
+	# back onto the chain).
+	if _partner_role != "" and not _duo_leader:
+		var _leash_leader := _duo_partner_node()
+		if _leash_leader != null:
+			# Ranged SUPPORT clamps to a point trailing behind the leader
+			# (see _duo_follow_anchor) instead of the leader's exact position,
+			# so the leash doesn't drag it up to melee range.
+			var _leash_anchor := _duo_follow_anchor(_leash_leader)
+			var _to_leader := _leash_anchor - global_position
+			var _leader_dist := _to_leader.length()
+			if _leader_dist > DUO_LEASH_DIST:
+				global_position += _to_leader / _leader_dist * (_leader_dist - DUO_LEASH_DIST)
+				if lane != "":
+					global_position = _field.clamp_to_lane(global_position, lane)
+
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
 
@@ -752,7 +806,7 @@ func _process(delta: float) -> void:
 			if _duo_track_cd <= 0.0:
 				_duo_track_cd = DUO_TRACK_INTERVAL
 				if global_position.distance_to(duo_partner.global_position) > DUO_LEASH_DIST:
-					set_goal(_standoff_point(duo_partner))
+					set_goal(_duo_follow_anchor(duo_partner))
 				elif duo_partner._target != null and is_instance_valid(duo_partner._target) and not duo_partner._target._dying:
 					# In leash range with nothing of our own to fight: pile onto
 					# whatever the leader is fighting instead of standing idle.
@@ -856,15 +910,19 @@ func _on_goal_reached() -> void:
 func _villain_goal() -> Vector2:
 	return _field.villain_pos + lateral.limit_length(VILLAIN_GOAL_LATERAL_CAP)
 
-## A point FOLLOW_STANDOFF away from `ally`, on this hero's side of it, so the
-## follower stops just off the body instead of ramming into it (which would
-## only feed the separation push and cause jitter). Falls back to a fixed
-## offset when the two happen to be exactly stacked.
-func _standoff_point(ally: Combatant) -> Vector2:
-	var away := global_position - ally.global_position
-	if away.length() < 0.01:
-		away = Vector2(_facing_x, 0.0)
-	return ally.global_position + away.normalized() * FOLLOW_STANDOFF
+## Where a Duo follower should sit relative to its leader. A ranged SUPPORT
+## follower trails behind the leader — on the side away from the villain/push
+## direction, at DUO_LEASH_DIST + RANGED_SUPPORT_TRAIL_DIST — instead of being
+## pulled flush against the leader's body like a melee follower (Designer,
+## 2026-07-21: "ranged support should stand behind the supported hero").
+## Falls back to the leader's exact position (the old behavior) for anyone
+## else, or if there's no villain position yet to derive "behind" from.
+func _duo_follow_anchor(leader: Hero) -> Vector2:
+	if is_ranged and role == "SUPPORT" and _field != null:
+		var away_dir := leader.global_position - _field.villain_pos
+		if away_dir.length() > 0.01:
+			return leader.global_position + away_dir.normalized() * (DUO_LEASH_DIST + RANGED_SUPPORT_TRAIL_DIST)
+	return leader.global_position
 
 ## Nearest live real party member (excludes temporary HeroClone summons) —
 ## used by the SUPPORT role's guard bonus and TANK's peel fallback. Null when
@@ -1291,7 +1349,7 @@ func _show_cast_label(text: String, color: Color) -> void:
 func _try_stomp() -> void:
 	if _target == null:
 		return
-	var stomp_r := STOMP_RADIUS * stomp_radius_mult  # Seismic Stomp mod widens this
+	var stomp_r := STOMP_RADIUS + stomp_radius_add  # Seismic Stomp mod/boon widens this
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
 		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
@@ -1319,7 +1377,7 @@ func _try_ensnare() -> void:
 	if _target == null or not is_instance_valid(_target):
 		return
 	var anchor: Vector2 = _target.global_position
-	var ensnare_r := ENSNARE_RADIUS * ensnare_radius_mult  # Wide Snare mod widens this
+	var ensnare_r := ENSNARE_RADIUS + ensnare_radius_add  # Wide Snare mod/boon widens this
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
 		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
@@ -1347,7 +1405,7 @@ func _try_ensnare() -> void:
 func _try_rally() -> void:
 	if not _party_in_combat():
 		return
-	var rally_r := RALLY_RADIUS * rally_radius_mult  # Mass Rally mod widens this
+	var rally_r := RALLY_RADIUS + rally_radius_add  # Mass Rally mod/boon widens this
 	var buffed := false
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
@@ -1355,8 +1413,16 @@ func _try_rally() -> void:
 		if node is Hero and not _ally_lane_ok(node as Hero):
 			continue
 		if global_position.distance_to(node.global_position) <= rally_r:
-			node.apply_damage_boost(RALLY_DURATION, RALLY_DMG_MULT)
-			node.apply_atk_speed_boost(RALLY_DURATION, RALLY_ATK_MULT)
+			# Flat +damage / +attack-speed, converted per-target to the boost
+			# API's multiplier so every hero gains the same RAW amount
+			# (RALLY_DMG_ADD/RALLY_ATK_INTERVAL_REDUCTION) instead of a %
+			# that reads differently depending on the target's base stats.
+			var node_damage: float = node.damage
+			var node_atk_interval: float = node.attack_interval
+			var dmg_mult: float = 1.0 + (RALLY_DMG_ADD / node_damage if node_damage > 0.0 else 0.0)
+			var atk_mult: float = node_atk_interval / maxf(node_atk_interval - RALLY_ATK_INTERVAL_REDUCTION, 0.05)
+			node.apply_damage_boost(RALLY_DURATION, dmg_mult)
+			node.apply_atk_speed_boost(RALLY_DURATION, atk_mult)
 			buffed = true
 	GameState.record_ability_result(hero_name, buffed)
 	if buffed:
@@ -1366,7 +1432,7 @@ func _try_rally() -> void:
 ## True when any hero within RALLY_RADIUS (self included) currently has a live
 ## enemy target — i.e. the cluster Rally would buff is actually fighting.
 func _party_in_combat() -> bool:
-	var rally_r := RALLY_RADIUS * rally_radius_mult
+	var rally_r := RALLY_RADIUS + rally_radius_add
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
 			continue
@@ -1399,12 +1465,12 @@ func _draw() -> void:
 		var p := 1.0 - _stomp_flash_t / STOMP_FLASH_TIME
 		var ring_color := STOMP_FLASH_COLOR
 		ring_color.a *= 1.0 - p
-		draw_arc(Vector2.ZERO, STOMP_RADIUS * stomp_radius_mult * p, 0.0, TAU, 32, ring_color, 4.0, true)
+		draw_arc(Vector2.ZERO, (STOMP_RADIUS + stomp_radius_add) * p, 0.0, TAU, 32, ring_color, 4.0, true)
 	if _ensnare_flash_t > 0.0:
 		var p := 1.0 - _ensnare_flash_t / ENSNARE_FLASH_TIME
 		var ring_color := ENSNARE_FLASH_COLOR
 		ring_color.a *= 1.0 - p
-		draw_arc(_ensnare_flash_center - global_position, ENSNARE_RADIUS * ensnare_radius_mult * (0.4 + 0.6 * p), 0.0, TAU, 32, ring_color, 4.0, true)
+		draw_arc(_ensnare_flash_center - global_position, (ENSNARE_RADIUS + ensnare_radius_add) * (0.4 + 0.6 * p), 0.0, TAU, 32, ring_color, 4.0, true)
 
 ## Clone: spawns clone_count temporary copies of Artemis's current stats that
 ## taunt and fight back for CLONE_DURATION, then expire (see HeroClone). Twin
@@ -1668,82 +1734,73 @@ func _apply_owned_ability_mods() -> void:
 			_apply_ability_mod(id)
 
 ## Permanent raw-stat upgrades bought with banked XP (StatUpgrades catalog) —
-## flat stacking per purchase (1.0 + effect * purchases), applied on
+## flat additive stacking per purchase (effect_add * purchases), applied on
 ## top of the base multipliers/ability mods, before _base_max_hp is captured.
-## Attack Speed reduces attack_interval (lower = faster) rather than scaling it up.
+## Attack Speed subtracts from attack_interval (lower = faster) rather than
+## dividing it, so "Lv3" always reads as "3 × the same flat amount faster".
 func _apply_stat_upgrades() -> void:
 	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
 	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
 	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")
-	max_hp *= 1.0 + float(StatUpgrades.def("hp").get("effect_per_purchase", 0.0)) * hp_n
-	damage *= 1.0 + float(StatUpgrades.def("damage").get("effect_per_purchase", 0.0)) * dmg_n
+	max_hp += float(StatUpgrades.def("hp").get("effect_add", 0.0)) * hp_n
+	damage += float(StatUpgrades.def("damage").get("effect_add", 0.0)) * dmg_n
 	if aspd_n > 0:
-		attack_interval /= 1.0 + float(StatUpgrades.def("attack_speed").get("effect_per_purchase", 0.0)) * aspd_n
+		attack_interval = maxf(attack_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
 
-## Effect of one ability mod. Stat tradeoffs touch base stats directly (like
-## boons); ability-geometry tradeoffs set the scalar vars the ability code reads.
+## Effect of one ability mod. All values are flat additive (Designer,
+## 2026-07-21: no percentages on upgrades/abilities — see AbilityMods.CATALOG
+## for the matching player-facing descriptions). Stat tradeoffs touch base
+## stats directly (like boons); ability-geometry tradeoffs add to the `_add`
+## scalar vars the ability code reads (see the var block above `role`).
 func _apply_ability_mod(id: String) -> void:
 	# Downsides disabled for now (Designer, 2026-07-18) — commented out, not
 	# deleted, so the tradeoff design can return once Level 1 tuning settles.
 	match id:
 		"seismic_stomp":
-			stomp_radius_mult *= 1.6
+			stomp_radius_add += 45.0
 			# stomp_cooldown_add += 1.5
 		"iron_skin":
-			max_hp *= 1.25
+			max_hp += 30.0
 			# move_speed *= 0.85
 		"twin_clone":
 			clone_count += 1
 			# clone_hp_mult *= 0.6
 		"glass_arrows":
-			damage *= 1.30
+			damage += 2.0
 			# max_hp *= 0.80
 		"wide_snare":
-			ensnare_radius_mult *= 1.5
+			ensnare_radius_add += 50.0
 			# ensnare_stun_mult *= 0.7
 		"overcharge":
-			attack_interval *= 0.80
+			attack_interval = maxf(attack_interval - 0.15, 0.1)
 			# move_speed *= 0.85
 		"mass_rally":
-			rally_radius_mult *= 1.5
+			rally_radius_add += 90.0
 			# rally_cooldown_add += 2.0
 		"zealot":
-			damage *= 1.40
+			damage += 3.0
 			# max_hp *= 0.75
 
-## Applies a run boon (RunState / Boons catalog) live to this hero. Boons are
-## direct base-stat changes so they compose with the Duo Bonus multiplier
-## already applied in _engage and the ability functions. Permanent
+## Applies a run boon (RunState / Boons catalog) to this hero — granted once
+## per living hero at the start of each level (Designer, 2026-07-21; see
+## BattleManager._ready), applied here either live (mid-level re-application
+## is a no-op path, kept for symmetry) or at spawn via _spawn_hero replaying
+## every boon this run has already picked. Every boon is ability-focused and
+## flat additive (see Boons class doc) — reuses the same `_add`/count/cooldown
+## scalar vars the gold ability mods drive (hero.gd's _apply_ability_mod), so
+## a boon and a mod on the same hero simply stack on the same var. Permanent
 ## for the current run; reset when the next run spawns a fresh hero.
 func apply_run_boon(id: String) -> void:
 	var d := Boons.def(id)
 	if d.is_empty():
 		return
 	match d.get("kind", ""):
-		"damage_mult":
-			damage *= float(d.value)
-		"max_hp_mult":
-			var gain: float = _base_max_hp * (float(d.value) - 1.0)
-			_base_max_hp *= float(d.value)
-			max_hp += gain
-			hp = minf(hp + gain, max_hp)
-		"atk_interval_mult":
-			attack_interval *= float(d.value)
-		"move_speed_mult":
-			move_speed *= float(d.value)
-		"xp_mult":
-			_run_xp_mult *= float(d.value)
-		"ferocity":
-			damage *= float(d.get("dmg", 1.0))
-			attack_interval *= float(d.get("atk", 1.0))
-		# Signature (hero-specific) boon kinds — reuse the same scalar vars the
-		# gold ability mods drive, so the ability code needs no new plumbing.
-		"stomp_radius_mult":
-			stomp_radius_mult *= float(d.value)
-		"ensnare_radius_mult":
-			ensnare_radius_mult *= float(d.value)
-		"rally_radius_mult":
-			rally_radius_mult *= float(d.value)
+		"stomp_radius_add":
+			stomp_radius_add += float(d.value)
+		"ensnare_radius_add":
+			ensnare_radius_add += float(d.value)
+		"rally_radius_add":
+			rally_radius_add += float(d.value)
 		"clone_count_add":
 			clone_count += int(d.value)
 		"ability_cooldown_reduction":
