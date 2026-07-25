@@ -76,31 +76,73 @@ const SCORE_ARTEMIS_FOLLOWER_FOCUS_LEADER := 140.0
 
 ## Thundaar's Stomp: auto-casts on cooldown whenever an enemy is in range,
 ## hitting everything within STOMP_RADIUS for damage + knockback.
-const STOMP_COOLDOWN := 3.5
+##
+## Ability-cadence pass (Designer, 2026-07-24): STOMP_KNOCKBACK used to exceed
+## STOMP_RADIUS (100 > 70), so a hit enemy was shoved OUTSIDE the stomp
+## circle, walked back in, and got shoved again — a perpetual repel loop that
+## was the real reason Thundaar "hardly gets swarmed," not the cooldown.
+## Knockback now stays inside the radius; cooldown/damage trimmed alongside it
+## since the old throughput (~44 power/sec, see BALANCE.md) was ~2.6x every
+## other signature ability.
+const STOMP_COOLDOWN := 5.0
 const STOMP_RADIUS := 70.0
-const STOMP_DAMAGE := 26.0
-const STOMP_KNOCKBACK := 100.0
+const STOMP_DAMAGE := 22.0
+const STOMP_KNOCKBACK := 45.0
 ## Ring VFX: how long the expanding-shockwave draw lasts after a landed stomp.
 const STOMP_FLASH_TIME := 0.25
 const STOMP_FLASH_COLOR := Color(1.0, 0.85, 0.3, 0.9)
+## Hand-drawn Stomp impact art, drawn by BattleFX.draw_burst in _draw.
+const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle.png")
+## BEACON+WARDEN "Searing Bind" Ultimate art + its own flash timer. Held on the
+## caster (like the Stomp/Ensnare flashes) rather than spawned as a node,
+## since the effect is instantaneous — nothing persists to own a scene.
+const SEARING_BURST := preload("res://assets/sprites/Searing_Bind.png")
+const SEARING_FLASH_TIME := 0.6
+## Bind art size per bound unit, as a multiple of that unit's collision radius
+## — big enough to wrap the body, small enough that a packed cluster still
+## reads as several separate binds.
+const SEARING_MARK_SIZE_MULT := 2.6
 
 ## Artemis's Clone: auto-casts on cooldown, spawning a temporary copy of
 ## herself (see HeroClone) that taunts and fights back for CLONE_DURATION.
+##
+## Ability-cadence pass (2026-07-24): base Clone throughput actually measured
+## lowest of the four signatures — what makes it feel dominant is
+## twin_focus (boon, +1) and twin_clone (mod, +1) BOTH stacking to 3
+## simultaneous clones. See MAX_CLONE_COUNT below for the fix; duration/
+## cooldown widened here so casts are rarer but each one is more present.
 const CLONE_SCENE := preload("res://scenes/heroes/hero_clone.tscn")
-const CLONE_COOLDOWN := 8.0
-const CLONE_DURATION := 3.5
+const CLONE_COOLDOWN := 9.0
+const CLONE_DURATION := 5.0
 const CLONE_TAUNT_RADIUS := 90.0
 ## Spawn offset so the clone appears beside Artemis (toward her facing) instead
 ## of stacked exactly on top of her, where it's indistinguishable at a glance.
 const CLONE_SPAWN_OFFSET := 40.0
+## Hard cap on simultaneous clones regardless of source (base 1 + twin_focus
+## boon + twin_clone mod would otherwise reach 3) — applied where clone_count
+## is consumed in _try_clone, not at the mod/boon sites, so both are covered
+## by one guard.
+const MAX_CLONE_COUNT := 2
 
 ## WARDEN's Ensnare (Controller signature): auto-casts on cooldown, rooting
 ## every enemy in a radius around the nearest threat (the current target,
-## used as a cluster proxy) so the DPS can focus the locked pack. First-pass
-## values — tune in BALANCE.md.
+## used as a cluster proxy) so the DPS can focus the locked pack.
+##
+## Ability-cadence pass (2026-07-24): Ensnare was the only signature ability
+## dealing literally zero damage (pure CC), which measured as the weakest
+## power/sec in the kit. Now also applies a flat vulnerability (Designer:
+## "all damage deals 2 more damage" — additive, not a %, matching the house
+## style set by RALLY_DMG_ADD) so Warden's contribution shows up in the
+## party's damage numbers instead of only in prevented damage. Stun duration
+## extended slightly so the party gets a real window to capitalize.
 const ENSNARE_COOLDOWN := 4.5
 const ENSNARE_RADIUS := 95.0
-const ENSNARE_STUN_DURATION := 1.2
+const ENSNARE_STUN_DURATION := 1.6
+const ENSNARE_VULN_DMG_ADD := 2.0
+## Tier-2 passive (previously unimplemented — see _passive_unlocked doc):
+## a stronger vulnerability add plus a wider root.
+const ENSNARE_PASSIVE_VULN_DMG_ADD := 3.0
+const ENSNARE_PASSIVE_RADIUS_ADD := 25.0
 ## Ring VFX reused from Stomp's flash treatment (see _draw).
 const ENSNARE_FLASH_TIME := 0.3
 const ENSNARE_FLASH_COLOR := Color(0.4, 0.85, 0.8, 0.9)
@@ -109,10 +151,15 @@ const ENSNARE_FLASH_COLOR := Color(0.4, 0.85, 0.8, 0.9)
 ## nearby ally (self included) a timed damage + attack-speed boost. Reuses the
 ## objective-reward buff primitives (Combatant.apply_damage_boost /
 ## apply_atk_speed_boost), so the buffed allies show DMG+/ATK SPD+ chips for
-## free via active_buffs(). First-pass values — tune in BALANCE.md.
-const RALLY_COOLDOWN := 7.0
+## free via active_buffs().
+##
+## Ability-cadence pass (2026-07-24): the old gate (_party_in_combat, any ally
+## with any live target) was true almost continuously in a swarm fight, so
+## Rally was constantly spent on trash. See _rally_worth_casting for the
+## stricter gate; duration/cooldown widened so a held cast pays off bigger.
+const RALLY_COOLDOWN := 8.0
 const RALLY_RADIUS := 180.0
-const RALLY_DURATION := 4.0
+const RALLY_DURATION := 5.0
 ## Flat additive Rally buff (Designer, 2026-07-21: no percentages on upgrades/
 ## abilities — a player should read "+2 damage" and know exactly what that
 ## means, regardless of which hero receives it). Converted to the underlying
@@ -120,6 +167,14 @@ const RALLY_DURATION := 4.0
 ## (Combatant.apply_damage_boost/apply_atk_speed_boost) is shared game-wide.
 const RALLY_DMG_ADD := 2.0
 const RALLY_ATK_INTERVAL_REDUCTION := 0.2
+## Rally only fires when the party is in a fight worth buffing — see
+## _rally_worth_casting. Any of: this many+ living enemies in radius, the
+## villain alerted, or an ally below this HP fraction.
+const RALLY_MIN_ENEMIES := 3
+const RALLY_LOW_HP_FRAC := 0.6
+## Tier-2 passive (previously unimplemented — see _passive_unlocked doc):
+## Rally also top-ups each buffed ally's HP.
+const RALLY_PASSIVE_HEAL := 8.0
 
 ## Max contribution `lateral` makes to the villain-chase goal (keeps heroes
 ## from clumping on his exact point without dragging that goal way off him
@@ -188,40 +243,29 @@ const OBJECTIVE_VIEW_RADIUS := 150.0
 
 ## Abilities are intrinsic hero kit (Milestone 2: no more persistent
 ## skill-tree gating) — every hero has its full ability set from the start
-## of every run; see _configure's unconditional _base/_passive/_active_unlocked.
+## of every run; see _configure's unconditional _base/_passive_unlocked.
+## (Solo LV20 "second abilities" — Shockwave/Multishot/Confuse — were retired
+## 2026-07-22 in favor of Duo Ultimates; see DuoUltimates/cast_duo_ultimate.)
 const STOMP_STUN_DURATION := 0.5
-const CLONE_DAMAGE_BOOST := 1.5  ## +50%, passive tree node.
+## NO LONGER APPLIED (2026-07-24, ability-cadence pass): _build_clone was
+## explicitly changed to strip this from clone damage — a clone should deal
+## Artemis's "regular" unbuffed damage, not an ability-boosted one. Left
+## un-deleted only so ability_tiers.gd's ARTEMIS_2 ("Mirror Image", 40g,
+## "Clone deals +50% damage") stays truthful about what it currently does —
+## nothing. FLAGGED, not fixed: this purchase is now dead, same bug class as
+## the WARDEN_2/BEACON_2 gap fixed earlier this pass. Needs a Designer call:
+## repurpose (e.g. onto Artemis's own damage) or pull from sale.
+const CLONE_DAMAGE_BOOST := 1.5  ## +50%, unused — see note above.
 
-## Thundaar's Shockwave (LV20 unlock): auto-casts on its own cooldown,
-## a wide line in front of him hitting everything within its reach.
-const SHOCKWAVE_COOLDOWN := 5.0
-const SHOCKWAVE_RANGE := 180.0
-const SHOCKWAVE_HALF_WIDTH := 60.0
-const SHOCKWAVE_DAMAGE := 40.0
-const SHOCKWAVE_KNOCKBACK := 80.0
-
-## Artemis's Multishot (LV20 unlock): auto-casts on its own cooldown, firing
-## a simultaneous volley of arrows (the same Projectile as her basic attack)
-## at up to MULTISHOT_MAX_TARGETS nearby enemies. Replaces the old Dash —
-## stationary by design (Designer call: movement-type abilities inbalance the
-## game), so it keeps Dash's cooldown/target-count budget without the reposition.
-const MULTISHOT_COOLDOWN := 6.0
-const MULTISHOT_RANGE := 220.0
-const MULTISHOT_MAX_TARGETS := 5
-## Each arrow deals less than a full hit since up to 5 land at once (a full-
-## damage 5-target volley would out-damage every other ultimate in the kit).
-const MULTISHOT_DAMAGE_MULT := 0.6
-
-## BEACON's Confuse (ultimate / second-ability slot): auto-casts on its own
-## cooldown, projecting a cone of light toward the nearest minion cluster.
-## Minions caught in the cone turn on each other for CONFUSE_DURATION seconds.
-## Villains are immune (see _try_confuse). Fires only when the cone catches
-## at least CONFUSE_MIN_TARGETS enemies, so a solo stray doesn't waste it.
-const CONFUSE_COOLDOWN := 12.0
-const CONFUSE_RANGE := 200.0
-const CONFUSE_HALF_WIDTH := 90.0
-const CONFUSE_DURATION := 3.0
-const CONFUSE_MIN_TARGETS := 2
+## Cooldown boons are flat-subtractive and stack unboundedly (aftershock/
+## fleetfoot/rapid_snare/quick_rally, each -1.0s, re-pickable across levels)
+## on top of the Duo leader/follower reduction, floored previously at only a
+## flat 0.1s — three boon picks + Duo leader could crush Stomp to a 0.2s
+## permanent damage aura. Ability-cadence pass (2026-07-24): floor every
+## re-arm at a fraction of its OWN base cooldown instead, so heavier
+## abilities can't be cooldown-boonstacked into a near-continuous aura while
+## lighter ones keep a sane minimum too.
+const ABILITY_COOLDOWN_FLOOR_FRAC := 0.4
 
 ## -- Duo partner behavior (2026-07-20) ----------------------------------------
 ## Static role-per-hero table (mirrors the hero_name match in _configure) so a
@@ -312,7 +356,8 @@ const SCORE_FOCUS_PING := 260.0
 
 ## Hero-specific flat base stats (Milestone 2: no more persistent per-purchase
 ## scaling — a hero always starts a run here; growth comes only from in-run
-## boons, see Hero.apply_run_boon / RunState).
+## permanent gold/XP purchases and the Duo Ultimate, not from per-hero boons
+## (that catalog was removed 2026-07-25 — see duo_ultimate_boons.gd).
 ##
 ## Optional ranged keys (Milestone 5): `is_ranged` + `attack_range` make a hero
 ## fire a Projectile instead of meleeing — read generically in _configure (no
@@ -376,6 +421,76 @@ const HERO_SPRITES: Dictionary = {
 	"WARDEN": preload("res://assets/sprites/Warden.png"),
 	"BEACON": preload("res://assets/sprites/Beacon.png"),
 }
+## hero.tscn's own sprite_texture default — the fallback for any hero_name not
+## in HERO_SPRITES (currently only Thundaar). Preloaded explicitly here so
+## DeployController's sprite ghost doesn't need a live Hero instance to know
+## which texture a not-yet-spawned hero will use.
+const THUNDAAR_SPRITE := preload("res://assets/sprites/Thundaar1.png")
+
+## Per-hero multiplier on top of hero.tscn's base sprite_scale (1.8) — lets
+## individual hero art run bigger without changing every hero's size
+## (Designer, 2026-07-25: Thundaar 2x, Warden 1.5x).
+const SPRITE_SCALE_MULT: Dictionary = {
+	"THUNDAAR": 1.7,
+	"WARDEN": 1.5,
+}
+
+## Which texture `hero_name` renders with once spawned — used by
+## DeployController for the pre-battle sprite ghost/preview.
+static func sprite_for(hero_name: String) -> Texture2D:
+	return HERO_SPRITES.get(hero_name, THUNDAAR_SPRITE)
+
+## Melee sword-hit SFX (Designer, 2026-07-24): the source file is 5 back-to-
+## back sword-stab recordings; picking a random start each swing gives some
+## variety instead of the exact same clip every hit. Playback is stopped
+## after SWORD_HIT_DURATION — comfortably under the ~1.1s smallest gap
+## between starts — so one hit's tail never bleeds into the next clip.
+const SWORD_HIT_SOUND := preload("res://assets/Sounds/Sword_Stabbing.wav")
+const SWORD_HIT_STARTS: Array[float] = [0.336, 1.79, 3.00, 4.19, 5.300]
+const SWORD_HIT_DURATION := 1.0
+
+## Plays once when a hero dies (Combatant._die -> _on_died). Ranged and melee
+## heroes both get this — only the sword-hit sound above is melee-only.
+const DEATH_SOUND := preload("res://assets/Sounds/Death_Hero.wav")
+## Clip has dead air up front; starting here lines the audible hit up with
+## the death FX instead of playing noticeably late (Designer, 2026-07-25).
+const DEATH_SOUND_START := 0.55
+
+## Fires on every landed melee hit (see Combatant._on_melee_hit doc — ranged
+## heroes never reach this since they take the projectile branch instead).
+## One-shot player outlives this call and frees itself, same convention as
+## Projectile._play_hit_sound.
+func _on_melee_hit(_victim: Combatant) -> void:
+	var start: float = SWORD_HIT_STARTS[randi() % SWORD_HIT_STARTS.size()]
+	var player := AudioStreamPlayer.new()
+	player.stream = SWORD_HIT_SOUND
+	# Default PAUSABLE would freeze this mid-clip if a pick screen/results
+	# popup pauses the tree right as it starts, then — since it's parented to
+	# root, which survives scene changes — resume audibly in whatever scene
+	# comes next once unpaused (Designer, 2026-07-25: reported for the death
+	# sound below; same root cause here).
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(player)
+	player.play(start)
+	var t := get_tree().create_timer(SWORD_HIT_DURATION)
+	t.timeout.connect(func():
+		if is_instance_valid(player):
+			player.stop()
+			player.queue_free())
+
+func _on_died() -> void:
+	var player := AudioStreamPlayer.new()
+	player.stream = DEATH_SOUND
+	# A hero's death is often what ends the battle, so this can start the same
+	# frame the results popup pauses the tree. Default PAUSABLE would freeze
+	# it mid-clip right there — and since it's parented to root (which
+	# survives the scene change to prep menu), unpausing later would resume
+	# it audibly in the wrong scene instead of finishing here (Designer,
+	# 2026-07-25: "death sound flowing to prep menu").
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(player)
+	player.play(DEATH_SOUND_START)
+	player.finished.connect(player.queue_free)
 
 ## Artemis: ranged attacker — fires an arrow (Projectile) instead of melee,
 ## with a much longer attack_range and faster base attack_interval than the
@@ -383,6 +498,34 @@ const HERO_SPRITES: Dictionary = {
 const ARTEMIS_PROJECTILE_SCENE := preload("res://scenes/combat/projectile.tscn")
 const ARTEMIS_ATTACK_INTERVAL := 0.4
 const ARTEMIS_ATTACK_RANGE := 160.0
+## Pre-rotated so the tip points along the projectile's default travel axis
+## (+X) — see assets/sprites/Arrow.png (source art, points up) vs this
+## (Designer, 2026-07-25).
+const ARTEMIS_ARROW_SPRITE := preload("res://assets/sprites/Arrow_Right.png")
+
+## WARDEN's shot art (Designer, 2026-07-25) — the Controller lobs a plant
+## rather than firing a dart, which also reads as the source of the ensnare.
+## Unlike the arrow this needs no pre-rotation: a plant has no tip, so it
+## looks correct at whatever angle the projectile travels.
+const WARDEN_PLANT_SPRITE := preload("res://assets/sprites/Plant.png")
+
+## Art size per hero, along the sprite's longest edge (Projectile.sprite_length).
+## The arrow is a thin dart and the plant a squat blob, so they can't share one
+## size and both look right — the plant runs smaller or it reads as a flying
+## bush next to a 22px-radius hero.
+const ARTEMIS_ARROW_LENGTH := 32.0
+const WARDEN_PLANT_LENGTH := 26.0
+
+## Only Artemis and Warden get sprite art on their shots — every other ranged
+## Combatant (Dark Mage's bolt, HeroClone's roaming shots) keeps Projectile's
+## plain line+circle placeholder.
+func _configure_projectile(proj: Projectile) -> void:
+	if hero_name == "ARTEMIS":
+		proj.sprite_texture = ARTEMIS_ARROW_SPRITE
+		proj.sprite_length = ARTEMIS_ARROW_LENGTH
+	elif hero_name == "WARDEN":
+		proj.sprite_texture = WARDEN_PLANT_SPRITE
+		proj.sprite_length = WARDEN_PLANT_LENGTH
 
 ## Fixed role per hero (TANK, BURST, CONTROL) — set in _configure based on hero_name.
 var role := "CONTROL"
@@ -396,11 +539,11 @@ var role := "CONTROL"
 ## converge near the lair rather than needing a hard wall.
 var lane := "top"
 
-## Ability-mod scalars (Phase 5 gold shop) + run-boon scalars (Boons catalog).
-## Default identity; owned mods adjust these in _apply_ability_mod(), boons in
-## apply_run_boon(), and the ability code reads them in place of the raw
-## constants. Permanent per-hero, ability mods applied once at _configure,
-## boons applied once per pick (see BattleManager). Every radius/count bonus
+## Ability-mod scalars (gold shop). Default identity; owned mods adjust these
+## in _apply_ability_mod() and the ability code reads them in place of the raw
+## constants. Permanent per-hero, applied once at _configure. Run-scoped picks
+## no longer write here at all — they target the Duo Ultimate instead
+## (DuoUltimateBoons, read at cast time). Every radius/count bonus
 ## here is flat additive (Designer, 2026-07-21: no percentages on upgrades/
 ## abilities) — a mod and a boon on the same hero simply stack on the same
 ## `_add` var. `clone_hp_mult`/`ensnare_stun_mult` stay multiplicative: they're
@@ -440,6 +583,13 @@ var _stomp_flash_t := 0.0
 ## root lands around the target, not the caster, so the ring is drawn there).
 var _ensnare_flash_t := 0.0
 var _ensnare_flash_center := Vector2.ZERO
+var _searing_flash_t := 0.0
+## World-space center of every enemy the bind actually caught this cast — the
+## art is stamped on EACH of them (Designer, 2026-07-25) instead of one big
+## burst over the cluster, so the sprite reads as "these units are bound".
+## (x, y) = world center, z = art size, taken from that unit's own body so a
+## brute wears a bigger bind than a minion.
+var _searing_flash_marks: Array[Vector3] = []
 var _villain_track_cd := 0.0
 ## Set once the villain has come within detect range at least once (i.e. the
 ## hero has actually seen/engaged him), so tracking can get more aggressive.
@@ -452,30 +602,48 @@ var _duo_damage_mult := 1.0
 var _duo_cooldown_reduction := 0.0
 var _duo_xp_mult := 1.0
 var _duo_bonus_active := false
-## Run-scoped ability cooldown reduction from signature boons (RunState). Stacks
-## additively with the Duo Bonus reduction at every ability recast.
-var _boon_cooldown_reduction := 0.0
+## Permanent ability cooldown reduction from the gold shop's cooldown mods
+## (AbilityMods: Rolling Quake / Fleetfoot / Rapid Snare / Quick Rally).
+## Stacks additively with the Duo Bonus reduction at every ability recast, and
+## is floored per-ability by ABILITY_COOLDOWN_FLOOR_FRAC.
+##
+## Was `_boon_cooldown_reduction`, driven by the per-hero run boons that were
+## deleted 2026-07-25 (see duo_ultimate_boons.gd class doc). Repurposed rather
+## than removed: all four signature abilities already subtracted it at their
+## cast sites, so moving the effect from boons to the shop needed no new
+## plumbing.
+var _ability_cooldown_reduction := 0.0
 ## Run-scoped XP multiplier from the "Fortune" boon (RunState). Permanent for
 ## the current run; stacks multiplicatively with the timed objective XP boost.
 var _run_xp_mult := 1.0
-## Max HP captured once at spawn (before any run-boon HP gains), used as the
-## base for boon HP-percent math (_apply_run_boon).
+## Max HP captured once at spawn, before any Duo Ultimate buff lands — the
+## stable baseline the Ultimate's hp_add is measured against.
 var _base_max_hp := 0.0
+## Permanent-build snapshots of damage/attack_interval — same "before any
+## Duo Ultimate ever runs" guarantee as _base_max_hp (captured at the same
+## point in _configure, right after mods/stat upgrades/leader mult land).
+## Clone reads these instead of the live damage/attack_interval/max_hp vars
+## so a clone is unaffected by Rally's temp boost, a Duo Ultimate's permanent
+## buff, or the Mirror Image tier-2 passive — see _build_clone doc
+## (ability-cadence pass, 2026-07-24: "clone should deal regular damage, not
+## be affected by abilities/ultimate").
+var _base_damage := 0.0
+var _base_attack_interval := 0.0
 ## Level gates cached at spawn (level doesn't change mid-battle).
 var _base_unlocked := false
 var _passive_unlocked := false
-var _active_unlocked := false
-var _second_ability_cd := 0.0
 
 ## Per-hero ability descriptor for the HUD — the display name + full cooldown of
-## the primary (auto) ability and the LV20 second ability (empty when the hero
-## has none). Single source so adding a hero is one entry, matching the same
-## data/effect split used by Boons/AbilityMods.
+## the primary (auto) ability. Single source so adding a hero is one entry,
+## matching the same data/effect split used by Boons/AbilityMods. The old LV20
+## solo "second ability" (name2/cd2) was retired 2026-07-22 — see class doc;
+## second_ability_name() now always returns "", which already hides the HUD's
+## second-ability row (HeroPanelUI.update_display).
 const ABILITY_INFO := {
-	"THUNDAAR": {"name": "STOMP", "cd": STOMP_COOLDOWN, "name2": "SHOCKWAVE", "cd2": SHOCKWAVE_COOLDOWN},
-	"ARTEMIS": {"name": "CLONE", "cd": CLONE_COOLDOWN, "name2": "MULTISHOT", "cd2": MULTISHOT_COOLDOWN},
-	"WARDEN": {"name": "ENSNARE", "cd": ENSNARE_COOLDOWN, "name2": "", "cd2": 0.0},
-	"BEACON": {"name": "RALLY", "cd": RALLY_COOLDOWN, "name2": "CONFUSE", "cd2": CONFUSE_COOLDOWN},
+	"THUNDAAR": {"name": "STOMP", "cd": STOMP_COOLDOWN},
+	"ARTEMIS": {"name": "CLONE", "cd": CLONE_COOLDOWN},
+	"WARDEN": {"name": "ENSNARE", "cd": ENSNARE_COOLDOWN},
+	"BEACON": {"name": "RALLY", "cd": RALLY_COOLDOWN},
 }
 
 ## Seconds until the hero's special ability (Stomp/Clone) is ready; 0 = ready.
@@ -483,27 +651,31 @@ var ability_cooldown: float:
 	get:
 		return maxf(_ability_cd, 0.0)
 
-## Seconds until the hero's LV20 second ability (Shockwave/Multishot) is ready; 0 =
-## ready. Meaningless for heroes with no second ability (see second_ability_name).
+## Retired with the LV20 solo second ability (2026-07-22) — always "ready"
+## (0.0). Kept only so battle_hud.gd's update_display call (which still takes
+## these params) doesn't need touching; second_ability_name() returning ""
+## already makes the HUD hide this row entirely.
 var second_ability_cooldown: float:
 	get:
-		return maxf(_second_ability_cd, 0.0)
+		return 0.0
 
 ## Display name of the hero's primary auto ability (STOMP/CLONE/…) for the HUD.
 func ability_name() -> String:
 	return ABILITY_INFO.get(hero_name, {}).get("name", "ABILITY")
 
-## Display name of the hero's LV20 second ability, or "" if it has none.
+## Always "" — solo LV20 second abilities were retired for Duo Ultimates
+## (2026-07-22). Kept as a stub so the HUD's existing has_second gate
+## (battle_hud.gd / hero_panel_ui.gd) still works with zero changes there.
 func second_ability_name() -> String:
-	return ABILITY_INFO.get(hero_name, {}).get("name2", "")
+	return ""
 
 ## Full cooldown duration for this hero's ability (HUD fill-fraction display).
 func ability_cooldown_max() -> float:
 	return ABILITY_INFO.get(hero_name, {}).get("cd", 1.0)
 
-## Full cooldown duration for the hero's second ability (HUD fill-fraction).
+## Stub — see second_ability_name().
 func second_ability_cooldown_max() -> float:
-	return maxf(ABILITY_INFO.get(hero_name, {}).get("cd2", 1.0), 0.001)
+	return 1.0
 
 ## Currently active buffs (Duo Bonus + timed boosts), for the hero panel's buff row.
 ## Each entry is {text: String, color: Color}; empty when nothing is active.
@@ -555,6 +727,7 @@ func _configure() -> void:
 	# the dict.
 	if hero_name in HERO_SPRITES:
 		sprite_texture = HERO_SPRITES[hero_name]
+	sprite_scale *= SPRITE_SCALE_MULT.get(hero_name, 1.0)
 	# Role tag on the field name-tag (Designer, 2026-07-20: "roles should be
 	# visually clear") — paired with the role-colored ring in _draw().
 	label_text = "%s · %s" % [hero_name, role]
@@ -588,8 +761,7 @@ func _configure() -> void:
 	max_hp *= BASE_HP_MULT
 	damage *= BASE_DAMAGE_MULT
 	# Permanent ability mods bought with gold (Phase 5). Applied here, before
-	# Combatant sets hp = max_hp, so HP-changing mods land at full HP; run boons
-	# (in-run, reset each run) still stack on top of this via apply_run_boon.
+	# Combatant sets hp = max_hp, so HP-changing mods land at full HP.
 	_apply_owned_ability_mods()
 	# Permanent raw-stat upgrades bought with banked XP (grind progression).
 	_apply_stat_upgrades()
@@ -601,12 +773,15 @@ func _configure() -> void:
 	if hero_name == "ARTEMIS" and _partner_role != "" and _duo_leader:
 		max_hp *= ARTEMIS_LEADER_HP_MULT
 	_base_max_hp = max_hp
-	# Tier-gates the passive upgrade and the LV20 ultimate behind gold
-	# purchases (AbilityTiers); tier 1 (the signature ability) is always
-	# free the moment a hero is unlocked.
+	_base_damage = damage
+	_base_attack_interval = attack_interval
+	# Tier-gates the passive upgrade behind a gold purchase (AbilityTiers);
+	# tier 1 (the signature ability) is always free the moment a hero is
+	# unlocked. Tier 3 / solo LV20 ultimates were retired (Designer,
+	# 2026-07-22: ultimates moved to Duo Ultimates — see DuoUltimates /
+	# Hero.cast_duo_ultimate) — _active_unlocked no longer exists.
 	_base_unlocked = true
 	_passive_unlocked = GameState.has_tier(hero_name, 2)
-	_active_unlocked = GameState.has_tier(hero_name, 3)
 	# Spawn at the funnel; default goal is the villain's corner.
 	global_position = _field.hero_spawn + lateral
 	lane = _field.lane_of(global_position)
@@ -681,6 +856,7 @@ func _process(delta: float) -> void:
 
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
+	_searing_flash_t = maxf(_searing_flash_t - delta, 0.0)
 
 	# Ranged heroes (Artemis) can lock onto a minion from well outside melee
 	# range and then never move again — super() only calls _advance_goal when
@@ -845,17 +1021,6 @@ func _process(delta: float) -> void:
 					_try_ensnare()
 				"BEACON":
 					_try_rally()
-
-	if _active_unlocked:
-		_second_ability_cd -= delta
-		if _second_ability_cd <= 0.0:
-			match hero_name:
-				"THUNDAAR":
-					_try_shockwave()
-				"ARTEMIS":
-					_try_multishot()
-				"BEACON":
-					_try_confuse()
 
 ## Closest uncaptured objective to `from` (e.g. this hero's spawn point) that
 ## this hero's lane may capture — untagged/unmatched objectives ("" in
@@ -1364,46 +1529,55 @@ func _try_stomp() -> void:
 					node.apply_stun(STOMP_STUN_DURATION)
 	GameState.record_ability_result(hero_name, hit)
 	if hit:
-		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction
-		_ability_cd = maxf(cooldown, 0.1)
+		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _duo_cooldown_reduction - _ability_cooldown_reduction
+		_ability_cd = maxf(cooldown, STOMP_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_stomp_flash_t = STOMP_FLASH_TIME
 		_show_cast_label("STOMP!", STOMP_FLASH_COLOR)
 
 ## Ensnare (WARDEN): roots every enemy within ENSNARE_RADIUS of the nearest
 ## threat (the current target, used as a cluster anchor) so the party can focus
-## the locked pack. Only starts its cooldown once it actually catches something,
-## so it fires the moment a cluster forms rather than on a fixed timer.
+## the locked pack, and (2026-07-24) makes them take flat extra damage from
+## everything while rooted — Ensnare's actual damage payoff, since roots alone
+## measured as the only zero-damage signature ability in the kit. Only starts
+## its cooldown once it actually catches something, so it fires the moment a
+## cluster forms rather than on a fixed timer.
 func _try_ensnare() -> void:
 	if _target == null or not is_instance_valid(_target):
 		return
 	var anchor: Vector2 = _target.global_position
 	var ensnare_r := ENSNARE_RADIUS + ensnare_radius_add  # Wide Snare mod/boon widens this
+	if _passive_unlocked:
+		ensnare_r += ENSNARE_PASSIVE_RADIUS_ADD
+	var vuln_add := ENSNARE_PASSIVE_VULN_DMG_ADD if _passive_unlocked else ENSNARE_VULN_DMG_ADD
 	var hit := false
 	for node in get_tree().get_nodes_in_group(enemy_group):
 		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
 			continue
 		if node.global_position.distance_to(anchor) <= ensnare_r:
-			node.apply_stun(ENSNARE_STUN_DURATION * ensnare_stun_mult)
+			var duration := ENSNARE_STUN_DURATION * ensnare_stun_mult
+			node.apply_stun(duration)
+			node.apply_vulnerability(duration, vuln_add)
 			hit = true
 	GameState.record_ability_result(hero_name, hit)
 	if hit:
-		_ability_cd = maxf(ENSNARE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
+		var cooldown := ENSNARE_COOLDOWN - _duo_cooldown_reduction - _ability_cooldown_reduction
+		_ability_cd = maxf(cooldown, ENSNARE_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_ensnare_flash_t = ENSNARE_FLASH_TIME
 		_ensnare_flash_center = anchor
 		_show_cast_label("ENSNARE!", ENSNARE_FLASH_COLOR)
 
 ## Rally (BEACON): grants every nearby ally (self included) a timed damage +
-## attack-speed boost. Reuses the objective-reward buff primitives, so buffed
-## allies surface DMG+/ATK SPD+ chips via active_buffs() for free.
+## attack-speed boost, and (2026-07-24 tier-2 passive) a flat heal. Reuses the
+## objective-reward buff primitives, so buffed allies surface DMG+/ATK SPD+
+## chips via active_buffs() for free.
 ##
-## Gated on the party actually being in a fight — at least one hero within
-## RALLY_RADIUS has a live target (self counts). Rally still fires proactively
-## the instant contact starts, but no longer burns its cooldown buffing an
-## empty field while the party marches, so it's genuinely ready when a fight
-## breaks out. Without this gate the caster's self-buff made it fire on cooldown
-## forever regardless of whether anything was happening.
+## Gated on the fight actually being worth buffing — see
+## _rally_worth_casting. Ability-cadence pass (2026-07-24): the old gate (any
+## hero in radius has any live target) was true almost continuously in a
+## swarm fight, so Rally was constantly spent on trash instead of held for
+## moments that matter.
 func _try_rally() -> void:
-	if not _party_in_combat():
+	if not _rally_worth_casting():
 		return
 	var rally_r := RALLY_RADIUS + rally_radius_add  # Mass Rally mod/boon widens this
 	var buffed := false
@@ -1423,16 +1597,32 @@ func _try_rally() -> void:
 			var atk_mult: float = node_atk_interval / maxf(node_atk_interval - RALLY_ATK_INTERVAL_REDUCTION, 0.05)
 			node.apply_damage_boost(RALLY_DURATION, dmg_mult)
 			node.apply_atk_speed_boost(RALLY_DURATION, atk_mult)
+			if _passive_unlocked:
+				node.hp = minf(node.hp + RALLY_PASSIVE_HEAL, node.max_hp)
 			buffed = true
 	GameState.record_ability_result(hero_name, buffed)
 	if buffed:
-		_ability_cd = maxf(RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _boon_cooldown_reduction, 0.1)
+		var cooldown := RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _ability_cooldown_reduction
+		_ability_cd = maxf(cooldown, RALLY_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_show_cast_label("RALLY!", STATUS_BUFF_COLOR)
 
-## True when any hero within RALLY_RADIUS (self included) currently has a live
-## enemy target — i.e. the cluster Rally would buff is actually fighting.
-func _party_in_combat() -> bool:
+## True when the fight within RALLY_RADIUS is worth burning Rally on: a real
+## cluster (>= RALLY_MIN_ENEMIES live enemies), the villain alerted, or an
+## ally low on HP — instead of the old "anyone has any target," which was
+## true almost continuously in a swarm fight and spent Rally on trash.
+func _rally_worth_casting() -> bool:
 	var rally_r := RALLY_RADIUS + rally_radius_add
+	var enemy_count := 0
+	for node in get_tree().get_nodes_in_group(enemy_group):
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		if global_position.distance_to(node.global_position) <= rally_r:
+			enemy_count += 1
+			if enemy_count >= RALLY_MIN_ENEMIES:
+				return true
+	for villain in get_tree().get_nodes_in_group("villains"):
+		if is_instance_valid(villain) and not villain._dying and villain.is_alerted():
+			return true
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
 			continue
@@ -1440,37 +1630,221 @@ func _party_in_combat() -> bool:
 			continue
 		if global_position.distance_to(node.global_position) > rally_r:
 			continue
-		if node._target != null and is_instance_valid(node._target) and not node._target._dying:
+		if node.max_hp > 0.0 and node.hp / node.max_hp <= RALLY_LOW_HP_FRAC:
 			return true
 	return false
+
+## -- Duo Ultimates (2026-07-22) ----------------------------------------------
+## Manually activated once per level from the Duo Ultimate bar (BattleHUD) —
+## see BattleManager.activate_ultimate, which picks whichever Duo member is
+## alive to be the caster (this method's `self`) and applies the level-long
+## buff (apply_permanent_buff) to every living member after this returns.
+## Replaces the old solo LV20 second abilities (Shockwave/Multishot/Confuse,
+## removed 2026-07-22) — see DuoUltimates for the catalog this dispatches on.
+
+const STOMP_WAVE_SCENE := preload("res://scenes/combat/duo/stomp_wave.tscn")
+const PLANT_TRAIL_SCENE := preload("res://scenes/combat/duo/plant_trail.tscn")
+const ARROW_BARRAGE_SCENE := preload("res://scenes/combat/duo/arrow_barrage.tscn")
+
+## Dispatches on DuoUltimates.def(pair_id).kind to one of the effect methods
+## below. `pair_id` is passed through to _ultimate_param so every effect can
+## read this run's DuoUltimateBoons on top of the catalog's flat base values.
+func cast_duo_ultimate(pair_id: String) -> void:
+	var d := DuoUltimates.def(pair_id)
+	if d.is_empty():
+		return
+	var params: Dictionary = d.get("params", {})
+	match d.get("kind", ""):
+		"stomp_wave":
+			_cast_stomp_wave(pair_id, params)
+		"plant_trail":
+			_cast_plant_trail(pair_id, params)
+		"exploding_clones":
+			_cast_exploding_clones(pair_id, params)
+		"arrow_barrage":
+			_cast_arrow_barrage(pair_id, params)
+		"roaming_clones":
+			_cast_roaming_clones(pair_id, params)
+		"ensnare_burn":
+			_cast_ensnare_burn(pair_id, params)
+	_show_cast_label("%s!" % d.get("name", "ULTIMATE").to_upper(), Color(0.95, 0.8, 0.3))
+
+## Base catalog value for `key` (DuoUltimates.def(pair_id).params) plus every
+## DuoUltimateBoons pick this run that targets it (RunState.duo_boon_total) —
+## the one place every effect method below reads a boon-scalable number from.
+## Neither catalog is ever mutated; this just sums the two at cast time.
+## Three layers summed onto one Ultimate params key, none of which mutates
+## another: the flat catalog baseline, this run's level-start picks, and the
+## permanent gold purchases (Designer, 2026-07-25 — Ultimates had no permanent
+## progression before DuoUltimateMods existed).
+func _ultimate_param(pair_id: String, params: Dictionary, key: String, default: float = 0.0) -> float:
+	return float(params.get(key, default)) \
+			+ RunState.duo_boon_total(pair_id, key) \
+			+ GameState.duo_mod_total(pair_id, key)
+
+## THUNDAAR+BEACON ("Seismic Advance"): a marching sequence of stomps — see
+## scenes/combat/duo/stomp_wave.gd for the actual step/damage/stun loop.
+func _cast_stomp_wave(pair_id: String, params: Dictionary) -> void:
+	var wave: StompWave = STOMP_WAVE_SCENE.instantiate()
+	wave.caster = self
+	wave.step_count = int(_ultimate_param(pair_id, params, "step_count", 4))
+	wave.step_interval = _ultimate_param(pair_id, params, "step_interval", 0.35)
+	wave.step_distance = _ultimate_param(pair_id, params, "step_distance", 80.0)
+	wave.step_radius = _ultimate_param(pair_id, params, "step_radius", 90.0)
+	wave.step_damage = _ultimate_param(pair_id, params, "step_damage", 30.0)
+	wave.step_stun = _ultimate_param(pair_id, params, "step_stun", 0.8)
+	get_parent().add_child(wave)
+	wave.global_position = global_position
+
+## THUNDAAR+WARDEN ("Verdant Path"): a trail of damaging/ensnaring plants —
+## see scenes/combat/duo/plant_trail.gd for the periodic tick loop.
+func _cast_plant_trail(pair_id: String, params: Dictionary) -> void:
+	var trail: PlantTrail = PLANT_TRAIL_SCENE.instantiate()
+	trail.caster = self
+	trail.plant_count = int(_ultimate_param(pair_id, params, "plant_count", 5))
+	trail.plant_spacing = _ultimate_param(pair_id, params, "plant_spacing", 60.0)
+	trail.plant_radius = _ultimate_param(pair_id, params, "plant_radius", 50.0)
+	trail.tick_damage = _ultimate_param(pair_id, params, "tick_damage", 6.0)
+	trail.tick_interval = _ultimate_param(pair_id, params, "tick_interval", 1.0)
+	trail.ensnare_duration = _ultimate_param(pair_id, params, "ensnare_duration", 1.0)
+	trail.trail_lifetime = _ultimate_param(pair_id, params, "trail_lifetime", 8.0)
+	get_parent().add_child(trail)
+	trail.global_position = global_position
+
+## THUNDAAR+ARTEMIS ("Volatile Duplicates"): taunting clones that explode the
+## instant they're hit — see HeroClone.explode_on_hit. Reuses the normal
+## Clone ability's own build/place helpers (_build_clone/_place_clone).
+func _cast_exploding_clones(pair_id: String, params: Dictionary) -> void:
+	var count := int(_ultimate_param(pair_id, params, "clone_count", 2))
+	var life_span := _ultimate_param(pair_id, params, "clone_life_span", 6.0)
+	var radius := _ultimate_param(pair_id, params, "explode_radius", 90.0)
+	# Ability-cadence pass (2026-07-24): explode_damage used to be applied raw
+	# (HeroClone._explode -> take_damage), bypassing _duo_damage_mult/
+	# damage_mult() that every other ultimate routes through — fixed here at
+	# the cast site since HeroClone has no caster-independent access to them.
+	var dmg := _ultimate_param(pair_id, params, "explode_damage", 40.0) * _duo_damage_mult * damage_mult()
+	for i in count:
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var clone := _build_clone(side * (1.0 + float(i / 2)), life_span)
+		clone.explode_on_hit = true
+		clone.explode_radius = radius
+		clone.explode_damage = dmg
+		_place_clone(clone)
+
+## ARTEMIS+WARDEN ("Hunting Duplicates"): clones that roam/chase minions and
+## ensnare on hit — see HeroClone.aggressive_roam/ensnare_on_hit.
+func _cast_roaming_clones(pair_id: String, params: Dictionary) -> void:
+	var count := int(_ultimate_param(pair_id, params, "clone_count", 2))
+	var life_span := _ultimate_param(pair_id, params, "clone_life_span", 8.0)
+	var ensnare_dur := _ultimate_param(pair_id, params, "ensnare_stun_duration", 1.0)
+	# Ability-cadence pass (2026-07-24): this ultimate had no damage number of
+	# its own — clone_damage_mult stacks on top of _build_clone's already-
+	# mult'd damage so the roaming hunters actually hit harder than a plain
+	# Clone cast, not just longer-lived.
+	var clone_dmg_mult := _ultimate_param(pair_id, params, "clone_damage_mult", 1.0)
+	for i in count:
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var clone := _build_clone(side * (1.0 + float(i / 2)), life_span)
+		clone.damage *= clone_dmg_mult
+		clone.aggressive_roam = true
+		clone.ensnare_on_hit = true
+		clone.ensnare_stun_duration = ensnare_dur
+		_place_clone(clone)
+
+## ARTEMIS+BEACON ("Piercing Volley"): a chaining arrow burst — see
+## scenes/combat/duo/arrow_barrage.gd for the instant-resolve/chain logic.
+func _cast_arrow_barrage(pair_id: String, params: Dictionary) -> void:
+	var barrage: ArrowBarrage = ARROW_BARRAGE_SCENE.instantiate()
+	barrage.caster = self
+	barrage.arrow_count = int(_ultimate_param(pair_id, params, "arrow_count", 6))
+	barrage.chain_count = int(_ultimate_param(pair_id, params, "chain_count", 2))
+	barrage.chain_damage_mult = _ultimate_param(pair_id, params, "chain_damage_mult", 0.5)
+	barrage.hit_range = _ultimate_param(pair_id, params, "range", 260.0)
+	barrage.arrow_damage = _ultimate_param(pair_id, params, "arrow_damage", 55.0)
+	get_parent().add_child(barrage)
+	barrage.global_position = global_position
+
+## WARDEN+BEACON ("Searing Bind"): instant ensnare + burn around the current
+## target (or nearest enemy if idle) — same aim-fallback idiom as the old
+## Confuse ultimate. No separate scene: purely a status application, like
+## Ensnare itself.
+func _cast_ensnare_burn(pair_id: String, params: Dictionary) -> void:
+	var aim: Combatant = _target
+	if aim == null or not is_instance_valid(aim):
+		aim = _nearest_in_group(enemy_group)
+	if aim == null:
+		return
+	var radius := _ultimate_param(pair_id, params, "radius", 110.0)
+	var ensnare_dur := _ultimate_param(pair_id, params, "ensnare_duration", 1.5)
+	var burn_dur := _ultimate_param(pair_id, params, "burn_duration", 30.0)
+	# Ability-cadence pass (2026-07-24): burn_dps used to be applied raw,
+	# bypassing _duo_damage_mult/damage_mult() that every other ultimate
+	# routes through (stomp_wave/plant_trail/arrow_barrage all do).
+	var burn_dps := _ultimate_param(pair_id, params, "burn_dps", 4.0) * _duo_damage_mult * damage_mult()
+	_searing_flash_marks.clear()
+	for node in get_tree().get_nodes_in_group(enemy_group):
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		if node.global_position.distance_to(aim.global_position) <= radius:
+			node.apply_stun(ensnare_dur)
+			node.apply_burn(burn_dur, burn_dps, self)
+			_searing_flash_marks.append(Vector3(node.global_position.x,
+					node.global_position.y,
+					node._collision_radius() * SEARING_MARK_SIZE_MULT))
+	# Until now this Ultimate had NO visual at all — it silently applied stun +
+	# burn, so the only feedback was enemies suddenly ticking down. Stamp the
+	# hand-drawn bind art on EVERY unit it caught (Designer, 2026-07-25) —
+	# one burst over the whole radius made it read as an area blast rather
+	# than a per-target root.
+	_searing_flash_t = SEARING_FLASH_TIME
+	queue_redraw()
+
+## Flat, level-long stat buff granted to both Duo members on Ultimate
+## activation (Designer, 2026-07-22). No timer/expiry needed: a fresh Hero
+## spawns at the next level with none of this — a one-off mutation of the live
+## instance's stats for the rest of THIS level.
+func apply_permanent_buff(dmg_add: float, atk_reduction: float, hp_add: float) -> void:
+	damage += dmg_add
+	attack_interval = maxf(attack_interval - atk_reduction, 0.1)
+	if hp_add != 0.0:
+		max_hp += hp_add
+		hp = minf(hp + hp_add, max_hp)
 
 ## Draws ability rings on top of the base Combatant art: Stomp's expanding
 ## shockwave (caster-centered) and Ensnare's root pulse (drawn at the cluster
 ## anchor, converted to this node's local space), each while its flash runs.
 func _draw() -> void:
 	super()
-	# Role ring (Designer, 2026-07-20: "roles should be visually clear") — a
-	# thin colored ring just outside the body, distinct per role, paired with
-	# the "NAME · ROLE" tag set on label_text in _configure.
-	var role_color: Color = ROLE_COLORS.get(role, Color.WHITE)
-	draw_arc(Vector2.ZERO, body_radius + 6.0, 0.0, TAU, 24, role_color, 3.0, true)
 	# Duo link line: a faint line connecting live Duo partners so the pairing
 	# — and the cohesion behavior it drives — reads at a glance on the field.
 	# Only the leader draws it (both would just overlap the same segment).
 	if _partner_role != "" and _duo_leader:
 		var duo_partner := _duo_partner_node()
 		if duo_partner != null:
+			var role_color: Color = ROLE_COLORS.get(role, Color.WHITE)
 			draw_line(Vector2.ZERO, to_local(duo_partner.global_position), Color(role_color, 0.35), 2.0, true)
 	if _stomp_flash_t > 0.0:
 		var p := 1.0 - _stomp_flash_t / STOMP_FLASH_TIME
-		var ring_color := STOMP_FLASH_COLOR
-		ring_color.a *= 1.0 - p
-		draw_arc(Vector2.ZERO, (STOMP_RADIUS + stomp_radius_add) * p, 0.0, TAU, 32, ring_color, 4.0, true)
+		# Hand-drawn impact burst expanding to the real Stomp radius, fading as
+		# it grows (Designer, 2026-07-25) — replaces the plain expanding arc.
+		# Scaled off (STOMP_RADIUS + stomp_radius_add) exactly like that arc
+		# was, so the VFX still reads as the true damage area rather than a
+		# decoration that drifts from it once mods widen the ability.
+		BattleFX.draw_burst(self, STOMP_BURST, Vector2.ZERO,
+				(STOMP_RADIUS + stomp_radius_add) * 2.0 * p, 1.0 - p)
 	if _ensnare_flash_t > 0.0:
 		var p := 1.0 - _ensnare_flash_t / ENSNARE_FLASH_TIME
 		var ring_color := ENSNARE_FLASH_COLOR
 		ring_color.a *= 1.0 - p
 		draw_arc(_ensnare_flash_center - global_position, (ENSNARE_RADIUS + ensnare_radius_add) * (0.4 + 0.6 * p), 0.0, TAU, 32, ring_color, 4.0, true)
+	if _searing_flash_t > 0.0:
+		# Snaps to full size immediately then fades, unlike the expanding
+		# Stomp burst — the bind lands on each target at once rather than
+		# travelling outward.
+		var bind_alpha := _searing_flash_t / SEARING_FLASH_TIME
+		for mark in _searing_flash_marks:
+			BattleFX.draw_burst(self, SEARING_BURST,
+					Vector2(mark.x, mark.y) - global_position, mark.z, bind_alpha)
 
 ## Clone: spawns clone_count temporary copies of Artemis's current stats that
 ## taunt and fight back for CLONE_DURATION, then expire (see HeroClone). Twin
@@ -1478,28 +1852,50 @@ func _draw() -> void:
 func _try_clone() -> void:
 	if _target == null:
 		return
-	for i in clone_count:
+	# Hard-capped regardless of how many sources raised clone_count (base 1 +
+	# twin_focus boon + twin_clone mod would otherwise reach 3) — see
+	# MAX_CLONE_COUNT doc.
+	for i in mini(clone_count, MAX_CLONE_COUNT):
 		# Fan multiple clones to alternating sides so they don't stack on one spot.
 		var side := 1.0 if i % 2 == 0 else -1.0
 		_spawn_clone(side * (1.0 + float(i / 2)))
 	# Clone always succeeds once it fires (no in-radius gate, unlike Stomp/Ensnare).
 	GameState.record_ability_result(hero_name, true)
-	var cooldown := CLONE_COOLDOWN - _duo_cooldown_reduction - _boon_cooldown_reduction
+	var cooldown := CLONE_COOLDOWN - _duo_cooldown_reduction - _ability_cooldown_reduction
 	# Duo leader/follower layer: Clone recharges faster while Artemis leads
 	# her Duo (see THUNDAAR_LEADER_ATK_SPEED_MULT doc comment for the table).
 	if _partner_role != "" and _duo_leader:
 		cooldown *= ARTEMIS_LEADER_CLONE_COOLDOWN_MULT
-	_ability_cd = maxf(cooldown, 0.1)
+	_ability_cd = maxf(cooldown, CLONE_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 	_show_cast_label("CLONE!", body_color)
 
-## Builds one clone offset to `spread` (in CLONE_SPAWN_OFFSET units, signed left/right).
-func _spawn_clone(spread: float) -> void:
-	var clone := CLONE_SCENE.instantiate()
+## Shared field-copy for a temporary Artemis-clone instance — used by both
+## the normal Clone ability (_spawn_clone below) and the Duo Ultimate variants
+## that spawn clones (THUNDAAR+ARTEMIS/ARTEMIS+WARDEN, see
+## cast_duo_ultimate). Returns the clone BEFORE add_child() so a caller can
+## set extra flags (aggressive_roam/explode_on_hit/ensnare_on_hit) that
+## HeroClone's own _configure() reads once it enters the tree — in
+## particular is_pinned is NOT set here; HeroClone._configure() derives it
+## from aggressive_roam, so a plain clone (that flag left false) still comes
+## out pinned exactly as before.
+## Ability-cadence pass (2026-07-24, Designer: "clones maybe should not be an
+## exact copy, but one that only deals regular damage instead of having
+## abilities and affected by ultimate"): builds off the PERMANENT-build
+## snapshots (_base_max_hp/_base_damage/_base_attack_interval — base stats +
+## owned ability mods + purchased stat upgrades, captured in _configure
+## before any Duo Ultimate ever runs) rather than the live damage/
+## attack_interval/max_hp vars, so a clone no longer inherits Rally's
+## temporary boost, a Duo Ultimate's permanent buff, or the Mirror Image
+## tier-2's +50% — it always hits like Artemis's plain, unbuffed auto-attack.
+## _duo_damage_mult stays: that's the live Duo-partner mechanic (not an
+## ability/ultimate), and it already scales her own regular attacks the same
+## way, so a clone matching it reads as consistent rather than "special."
+func _build_clone(spread: float, clone_life_span: float) -> HeroClone:
+	var clone: HeroClone = CLONE_SCENE.instantiate()
 	clone.label_text = hero_name + " Clone"
-	clone.max_hp = max_hp * clone_hp_mult
-	var clone_damage_mult := _duo_damage_mult * damage_mult() * (CLONE_DAMAGE_BOOST if _passive_unlocked else 1.0)
-	clone.damage = damage * clone_damage_mult
-	clone.attack_interval = attack_interval
+	clone.max_hp = _base_max_hp * clone_hp_mult
+	clone.damage = _base_damage * _duo_damage_mult
+	clone.attack_interval = _base_attack_interval
 	clone.attack_range = attack_range
 	clone.is_ranged = is_ranged
 	clone.projectile_scene = projectile_scene
@@ -1515,87 +1911,31 @@ func _spawn_clone(spread: float) -> void:
 	clone.body_color = body_color
 	clone.is_taunting = true
 	clone.taunt_radius = CLONE_TAUNT_RADIUS
-	clone.life_span = CLONE_DURATION
+	clone.life_span = clone_life_span
 	clone.caster = self
 	clone.role = role
 	clone.lane = lane
-	# The clone stays fixed where it spawns (see HeroClone) — no collision with
-	# other units in either direction (doesn't push, can't be pushed/clamped).
-	clone.is_pinned = true
 	clone.follow_offset = Vector2(_facing_x * spread, 0.0) * CLONE_SPAWN_OFFSET
+	return clone
+
+## Adds `clone` to the tree and places it beside this hero (its own
+## follow_offset, clamped into this hero's lane) — shared tail end for every
+## clone spawn path (_spawn_clone and the Duo Ultimate clone effects).
+func _place_clone(clone: HeroClone) -> void:
 	get_parent().add_child(clone)
 	var spawn_pos: Vector2 = global_position + clone.follow_offset
 	if lane != "" and _field != null:
 		spawn_pos = _field.clamp_to_lane(spawn_pos, lane)
 	clone.global_position = spawn_pos
 
-## Shockwave (LV20 unlock, Thundaar): a wide line in front of him, hitting
-## everything within SHOCKWAVE_RANGE / SHOCKWAVE_HALF_WIDTH for heavy damage
-## and knockback. Auto-casts toward the current target's direction.
-func _try_shockwave() -> void:
-	if _target == null:
-		return
-	var dir := (_target.global_position - global_position).normalized()
-	var hit := false
-	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
-			continue
-		var to_node: Vector2 = node.global_position - global_position
-		var forward := to_node.dot(dir)
-		if forward < 0.0 or forward > SHOCKWAVE_RANGE:
-			continue
-		var lateral_dist := (to_node - dir * forward).length()
-		if lateral_dist > SHOCKWAVE_HALF_WIDTH:
-			continue
-		hit = true
-		node.take_damage(SHOCKWAVE_DAMAGE * _duo_damage_mult * damage_mult(), self)
-		if is_instance_valid(node) and not node._dying:
-			node.apply_knockback(dir, SHOCKWAVE_KNOCKBACK, 0.0, self)
-	GameState.record_ability_result(hero_name, hit)
-	if hit:
-		_second_ability_cd = maxf(SHOCKWAVE_COOLDOWN - _duo_cooldown_reduction, 0.1)
-		_show_cast_label("SHOCKWAVE!", Color(1.0, 0.6, 0.2))
-
-## Confuse (ultimate, BEACON): projects a cone of light toward the nearest
-## enemy cluster. Every minion caught in the cone is confused for
-## CONFUSE_DURATION — it turns on its own kind. Villains are immune (a boss
-## can't be trivially neutralized). Fires only when the cone catches at least
-## CONFUSE_MIN_TARGETS eligible minions, and starts its cooldown only on a
-## landed cast (same pattern as Stomp). No damage — pure control.
-func _try_confuse() -> void:
-	# Aim at the current combat target, or the nearest enemy if idle, so the
-	# cone points into the swarm rather than off into empty space.
-	var aim: Combatant = _target
-	if aim == null or not is_instance_valid(aim):
-		aim = _nearest_in_group(enemy_group)
-	if aim == null:
-		return
-	var dir := (aim.global_position - global_position).normalized()
-	var caught: Array[Combatant] = []
-	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
-			continue
-		if node.is_in_group("villains"):
-			continue  # Bosses are immune to Confuse.
-		var to_node: Vector2 = node.global_position - global_position
-		var forward := to_node.dot(dir)
-		if forward < 0.0 or forward > CONFUSE_RANGE:
-			continue
-		var lateral_dist := (to_node - dir * forward).length()
-		if lateral_dist > CONFUSE_HALF_WIDTH:
-			continue
-		caught.append(node)
-	GameState.record_ability_result(hero_name, caught.size() >= CONFUSE_MIN_TARGETS)
-	if caught.size() < CONFUSE_MIN_TARGETS:
-		return
-	for node in caught:
-		node.apply_confusion(CONFUSE_DURATION)
-	_second_ability_cd = maxf(CONFUSE_COOLDOWN - _duo_cooldown_reduction, 0.1)
-	_show_cast_label("CONFUSE!", STATUS_CONFUSE_COLOR)
+## Builds one clone offset to `spread` (in CLONE_SPAWN_OFFSET units, signed left/right).
+func _spawn_clone(spread: float) -> void:
+	_place_clone(_build_clone(spread, CLONE_DURATION))
 
 ## Nearest living member of `group` to this hero, at any distance (unlike the
-## detect-range _acquire_target). Used to aim Confuse when BEACON is idle —
-## lane-filtered like every other enemy-facing scan (see _lane_ok).
+## detect-range _acquire_target) — lane-filtered like every other enemy-facing
+## scan (see _lane_ok). Reused by Duo Ultimate aiming (cast_duo_ultimate's
+## effect methods) when the caster has no live combat _target to aim from.
 func _nearest_in_group(group: String) -> Combatant:
 	var nearest: Combatant = null
 	var best := INF
@@ -1607,52 +1947,6 @@ func _nearest_in_group(group: String) -> Combatant:
 			best = dist
 			nearest = node
 	return nearest
-
-## Multishot (LV20 unlock, Artemis): fires a simultaneous volley of arrows —
-## the same Projectile her basic attack uses — at up to MULTISHOT_MAX_TARGETS
-## nearby enemies. Stationary (Designer call: no movement-type abilities), so
-## unlike the old Dash it never repositions the hero; range/target-count carry
-## over from Dash's budget, with each arrow doing reduced damage since several
-## can land at once.
-func _try_multishot() -> void:
-	if _target == null:
-		return
-	var to_target := _target.global_position - global_position
-	if to_target.length() > MULTISHOT_RANGE:
-		return
-	var candidates: Array[Combatant] = []
-	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
-			continue
-		if global_position.distance_squared_to(node.global_position) <= MULTISHOT_RANGE * MULTISHOT_RANGE:
-			candidates.append(node)
-	candidates.sort_custom(func(a, b):
-		return global_position.distance_squared_to(a.global_position) < global_position.distance_squared_to(b.global_position))
-	var hit_count := 0
-	for node in candidates:
-		if hit_count >= MULTISHOT_MAX_TARGETS:
-			break
-		_fire_multishot_arrow(node)
-		hit_count += 1
-	GameState.record_ability_result(hero_name, hit_count > 0)
-	if hit_count > 0:
-		_second_ability_cd = maxf(MULTISHOT_COOLDOWN - _duo_cooldown_reduction, 0.1)
-		_show_cast_label("MULTISHOT!", Color(0.9, 0.5, 0.8))
-
-## Spawns one Multishot arrow at `victim` — same Projectile scene/behavior as
-## Combatant._fire_projectile, but with the volley's reduced per-shot damage
-## instead of a full attack hit.
-func _fire_multishot_arrow(victim: Combatant) -> void:
-	var proj: Projectile = ARTEMIS_PROJECTILE_SCENE.instantiate()
-	proj.damage = damage * MULTISHOT_DAMAGE_MULT * _duo_damage_mult * damage_mult()
-	proj.attacker = self
-	proj.target = victim
-	proj.enemy_group = _effective_enemy_group()
-	proj.speed = projectile_speed
-	proj.max_range = MULTISHOT_RANGE
-	proj.color = body_color
-	proj.global_position = global_position
-	get_parent().add_child(proj)
 
 ## Duo Bonus: active only when this hero has a confirmed Duo partner
 ## (GameState.duo_pairings) who is alive and within DUO_DISTANCE — no
@@ -1759,49 +2053,28 @@ func _apply_ability_mod(id: String) -> void:
 		"seismic_stomp":
 			stomp_radius_add += 45.0
 			# stomp_cooldown_add += 1.5
-		"iron_skin":
-			max_hp += 30.0
-			# move_speed *= 0.85
 		"twin_clone":
 			clone_count += 1
 			# clone_hp_mult *= 0.6
-		"glass_arrows":
-			damage += 2.0
-			# max_hp *= 0.80
 		"wide_snare":
 			ensnare_radius_add += 50.0
 			# ensnare_stun_mult *= 0.7
-		"overcharge":
-			attack_interval = maxf(attack_interval - 0.15, 0.1)
-			# move_speed *= 0.85
 		"mass_rally":
 			rally_radius_add += 90.0
 			# rally_cooldown_add += 2.0
-		"zealot":
-			damage += 3.0
-			# max_hp *= 0.75
+		# Cooldown half of each hero's pair (Designer, 2026-07-25). All four
+		# feed the same _ability_cooldown_reduction scalar every signature
+		# ability already subtracts at recast, so a hero only ever owns the
+		# one that matches their ability and no cast site needed changing.
+		# The per-ability floor (ABILITY_COOLDOWN_FLOOR_FRAC) still caps how
+		# far this can go.
+		"rolling_quake", "fleetfoot", "rapid_snare", "quick_rally":
+			_ability_cooldown_reduction += 1.0
 
-## Applies a run boon (RunState / Boons catalog) to this hero — granted once
-## per living hero at the start of each level (Designer, 2026-07-21; see
-## BattleManager._ready), applied here either live (mid-level re-application
-## is a no-op path, kept for symmetry) or at spawn via _spawn_hero replaying
-## every boon this run has already picked. Every boon is ability-focused and
-## flat additive (see Boons class doc) — reuses the same `_add`/count/cooldown
-## scalar vars the gold ability mods drive (hero.gd's _apply_ability_mod), so
-## a boon and a mod on the same hero simply stack on the same var. Permanent
-## for the current run; reset when the next run spawns a fresh hero.
-func apply_run_boon(id: String) -> void:
-	var d := Boons.def(id)
-	if d.is_empty():
-		return
-	match d.get("kind", ""):
-		"stomp_radius_add":
-			stomp_radius_add += float(d.value)
-		"ensnare_radius_add":
-			ensnare_radius_add += float(d.value)
-		"rally_radius_add":
-			rally_radius_add += float(d.value)
-		"clone_count_add":
-			clone_count += int(d.value)
-		"ability_cooldown_reduction":
-			_boon_cooldown_reduction += float(d.value)
+# apply_run_boon() was removed 2026-07-25 along with the per-hero run-boon
+# catalog (scripts/boons.gd). Its five effect branches all wrote the same
+# scalars _apply_ability_mod already drives — which was the problem: four of
+# the eight boons were verbatim duplicates of gold mods. Run-scoped picks are
+# now Duo-Ultimate-only (DuoUltimateBoons), read at cast time via
+# _ultimate_param rather than applied to a Hero instance at spawn, so nothing
+# replaced this function.

@@ -115,56 +115,74 @@ func _flatten(groups: Array, clicks: Array[Vector2]) -> Dictionary:
 			positions.append(group_positions[j])
 	return {"names": names, "positions": positions}
 
+## Where the deploy cluster sits in the 1920x1080 design canvas. The top of
+## the screen is fully occupied by the battle HUD (RunXP/Gold at y10 left,
+## TimerPanel y10 centre, VillainPanel y10 right, BackButton y60, hero panels
+## from y110, and BattleHUD's code-built Duo banners at y96-142) — the deploy
+## controls used to be drawn as bare text at y24/64/104, straight into that
+## stack, which is why they were unreadable and got covered (Designer,
+## 2026-07-25). The bottom band is clear during placement.
+const PANEL_BOTTOM_MARGIN := 150.0
+## Above BattleHUD (its CanvasLayer is the default layer 0) but below
+## LevelUpScreen's modal overlay at layer 100, so a start-of-level boon pick
+## still takes precedence over the deploy chrome behind it.
+const DEPLOY_LAYER := 60
+
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
+	layer.layer = DEPLOY_LAYER
 	add_child(layer)
 
-	_hint = Label.new()
-	_hint.add_theme_font_size_override("font_size", 24)
-	_hint.add_theme_color_override("font_color", Color("2c2c2c"))
-	_hint.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_hint.position.y = 24.0
-	layer.add_child(_hint)
+	# One paper panel for the whole cluster. Bare ink text over the drawn
+	# battlefield was the visibility problem — the notebook panel gives it a
+	# background to read against, same as every other HUD element.
+	var frame := PanelContainer.new()
+	frame.add_theme_stylebox_override("panel", UIStyle.overlay_panel())
+	frame.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	frame.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	frame.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	frame.position.y = -PANEL_BOTTOM_MARGIN
+	# The panel overlays the field, and placement is a click on the field —
+	# so the background must not eat clicks. Buttons inside still receive
+	# theirs (they set their own filter), and _unhandled_input only ever sees
+	# what no Control consumed.
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(frame)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(col)
+
+	_hint = UIStyle.centered_label("", UIStyle.SIZE_SUBHEAD)
+	col.add_child(_hint)
 
 	if _has_two_waves():
 		var controls := HBoxContainer.new()
-		controls.set_anchors_preset(Control.PRESET_CENTER_TOP)
-		controls.position.y = 64.0
-		controls.add_theme_constant_override("separation", 12)
-		layer.add_child(controls)
+		controls.alignment = BoxContainer.ALIGNMENT_CENTER
+		controls.add_theme_constant_override("separation", 16)
+		controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(controls)
 
-		_swap_button = Button.new()
-		_swap_button.add_theme_font_size_override("font_size", 16)
-		_swap_button.pressed.connect(_on_swap_pressed)
+		_swap_button = UIStyle.button("", UIStyle.SIZE_SMALL, _on_swap_pressed)
 		controls.add_child(_swap_button)
 
-		var minus := Button.new()
-		minus.text = "-1s"
-		minus.add_theme_font_size_override("font_size", 16)
-		minus.pressed.connect(_on_delay_step.bind(-1.0))
-		controls.add_child(minus)
+		controls.add_child(UIStyle.button("-1s", UIStyle.SIZE_SMALL, _on_delay_step.bind(-1.0)))
 
-		_delay_label = Label.new()
-		_delay_label.add_theme_font_size_override("font_size", 16)
-		_delay_label.add_theme_color_override("font_color", Color("2c2c2c"))
+		_delay_label = UIStyle.label("", UIStyle.SIZE_BODY, UIStyle.GOLD)
+		_delay_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		controls.add_child(_delay_label)
 
-		var plus := Button.new()
-		plus.text = "+1s"
-		plus.add_theme_font_size_override("font_size", 16)
-		plus.pressed.connect(_on_delay_step.bind(1.0))
-		controls.add_child(plus)
+		controls.add_child(UIStyle.button("+1s", UIStyle.SIZE_SMALL, _on_delay_step.bind(1.0)))
 
 		_update_swap_button()
 		_update_delay_label()
 
-	_start_button = Button.new()
-	_start_button.text = "START BATTLE"
-	_start_button.add_theme_font_size_override("font_size", 22)
-	_start_button.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_start_button.position.y = 104.0 if _has_two_waves() else 64.0
-	_start_button.pressed.connect(_on_start_pressed)
-	layer.add_child(_start_button)
+	var start_row := CenterContainer.new()
+	start_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(start_row)
+	_start_button = UIStyle.button("START BATTLE", UIStyle.SIZE_SUBHEAD, _on_start_pressed)
+	start_row.add_child(_start_button)
 
 	_update_hint()
 
@@ -239,6 +257,25 @@ func _on_start_pressed() -> void:
 	})
 	queue_free()
 
+## Ghost sprite sizing mirrors Combatant._draw()'s sprite math (hero.tscn's
+## body_radius/sprite_scale defaults — heroes don't exist yet at deploy time
+## to read per-instance values from) so the preview matches the spawned size.
+const GHOST_BODY_RADIUS := 22.0
+const GHOST_SPRITE_SCALE := 1.8
+
+func _draw_hero_sprite(hero_name: String, pos: Vector2, alpha: float) -> void:
+	var texture := Hero.sprite_for(hero_name)
+	var diameter := GHOST_BODY_RADIUS * 2.0 * GHOST_SPRITE_SCALE
+	var tex_size := texture.get_size()
+	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
+	var draw_size := tex_size * scale_factor
+	# Art faces left by default (Combatant._draw doc); heroes push right from
+	# deploy, so match Combatant's moving-right flip (Vector2(-1, 1)) instead
+	# of drawing the unflipped, left-facing default.
+	draw_set_transform(pos, 0.0, Vector2(-1.0, 1.0))
+	draw_texture_rect(texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, alpha))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
 func _draw() -> void:
 	var groups := _ordered_groups()
 	var first_count := _first_wave_count()
@@ -248,22 +285,24 @@ func _draw() -> void:
 		var group: Array = groups[i]
 		var positions: Array[Vector2] = _positions_for_group(group, _placed[i])
 		for j in group.size():
-			var color: Color = GameState.HERO_CATALOG[group[j]].color
-			draw_circle(positions[j], 16.0, color)
 			draw_arc(positions[j], 16.0, 0.0, TAU, 24, Color.BLACK, 2.0, true)
+			_draw_hero_sprite(group[j], positions[j], 0.7)
 			if _has_two_waves():
 				var tag := "1ST" if i < first_count else "2ND"
-				var font := ThemeDB.fallback_font
-				var w := font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+				var font: Font = UIStyle.font() if UIStyle.font() != null else ThemeDB.fallback_font
+				var w := font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 				var at := positions[j] + Vector2(-w * 0.5, 30.0)
-				draw_string_outline(font, at, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 3, Color.BLACK)
-				draw_string(font, at, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+				draw_string_outline(font, at, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
+				draw_string(font, at, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
 	if _all_placed():
 		return
-	# Ghost marker(s) under the cursor for the Duo being placed next.
+	# Ghost marker(s) under the cursor for the Duo being placed next — a
+	# pulsing translucent silhouette of the hero's real sprite, so it reads
+	# as "not yet real" rather than a solid double of the spawned hero.
 	var current_group: Array = groups[_placed.size()]
 	var current_positions: Array[Vector2] = _positions_for_group(current_group, _cursor)
 	var c := (Color.WHITE if _valid else Color(0.75, 0.2, 0.2))
+	var pulse := 0.35 + 0.15 * sin(Time.get_ticks_msec() / 180.0)
 	draw_arc(_cursor, 40.0, 0.0, TAU, 32, c, 4.0, true)
 	draw_circle(_cursor, 6.0, c)
 	if not _valid:
@@ -272,8 +311,9 @@ func _draw() -> void:
 	for j in current_group.size():
 		var hero_name: String = current_group[j]
 		var hero_color: Color = GameState.HERO_CATALOG[hero_name].color
-		var font := ThemeDB.fallback_font
-		var size := 18
+		_draw_hero_sprite(hero_name, current_positions[j], pulse if _valid else pulse * 0.6)
+		var font: Font = UIStyle.font() if UIStyle.font() != null else ThemeDB.fallback_font
+		var size := 26
 		var w := font.get_string_size(hero_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		var at := current_positions[j] + Vector2(-w * 0.5, -48.0)
 		draw_string_outline(font, at, hero_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, Color.BLACK)

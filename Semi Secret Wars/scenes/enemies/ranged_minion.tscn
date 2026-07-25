@@ -2,13 +2,21 @@
 
 [ext_resource type="Script" path="res://scenes/enemies/ranged_minion.gd" id="1_ranged"]
 
+; The "needle man" (Minion2_Berserk). Designer, 2026-07-25: shoots more often
+; and stays further out. attack_interval 1.0 -> 0.5 doubles its rate of fire;
+; attack_range 100 -> 340 means it opens up from well outside melee, and
+; Combatant.RANGED_STANDOFF_FRACTION (0.6) makes it back away once a hero
+; closes inside ~204px, so it kites instead of being walked down.
+; detect_range is multiplied by Minion.DETECT_RANGE_MULT (2.2) at spawn, so
+; 200 here becomes 440 live — comfortably past attack_range so it engages at
+; its full reach rather than having to walk into range first.
 [node name="RangedMinion" type="Node2D"]
 script = ExtResource("1_ranged")
 max_hp = 12.0
 damage = 2.2
-attack_interval = 1.0
-attack_range = 100.0
-detect_range = 60.0
+attack_interval = 0.5
+attack_range = 340.0
+detect_range = 200.0
 move_speed = 85.0
 body_color = Color(0.3, 0.55, 0.75, 1)
 body_radius = 10.0

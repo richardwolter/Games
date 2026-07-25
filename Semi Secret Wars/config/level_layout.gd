@@ -42,6 +42,12 @@ extends Resource
 @export var obstacle_kinds: Array[String] = []
 ## Poison Lakes: (x, y) center + z = x-radius (y-radius = z * lake_radius_ratio).
 @export var lakes: Array[Vector3] = []
+## Spike pits (Designer, 2026-07-25): (x, y) center + z = radius. Circular
+## entry-hazards — same one-hit-per-entry rule as a lake (see
+## Combatant._physics_process), just rounder, smaller and nastier, and they
+## carry real art instead of a hatched blob. NOT blockers: a unit can walk
+## through one and pay for it, which is the point.
+@export var spike_pits: Array[Vector3] = []
 ## Decorative props: (x, y) center + z = radius. No gameplay effect.
 @export var scenery: Array[Vector3] = []
 ## Sprite kind per scenery entry above (index-aligned): e.g. "smudge".

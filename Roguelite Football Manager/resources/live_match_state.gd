@@ -42,6 +42,15 @@ var events: Array[String] = []
 var subs_used: int = 0
 var finished: bool = false
 
+## Milestone 20: accumulated match statistics (surfaced on the result screen).
+## Possession % is read from home_state/away_state.possession_pct (time-based).
+var home_shots: int = 0
+var away_shots: int = 0
+var home_shots_on_target: int = 0
+var away_shots_on_target: int = 0
+var home_xg: float = 0.0
+var away_xg: float = 0.0
+
 ## Ball state for possession/movement/decision systems.
 var ball_state: BallState = null
 
@@ -219,8 +228,21 @@ func _decay(lineup: Array) -> void:
 ## score/events on GOAL, always emits shot_attempt (so a visual layer can
 ## animate every attempt), and additionally emits goal_scored only for GOAL
 ## (unchanged contract from Milestone 12's pitch-view wiring).
-func record_shot_result(is_home: bool, shooter: Player, outcome: String) -> void:
+func record_shot_result(is_home: bool, shooter: Player, outcome: String, xg: float = 0.0) -> void:
 	var team_name: String = home_name if is_home else away_name
+
+	## Milestone 20: accumulate shot stats (on target = GOAL or SAVED).
+	var on_target: bool = outcome == "GOAL" or outcome == "SAVED"
+	if is_home:
+		home_shots += 1
+		home_xg += xg
+		if on_target:
+			home_shots_on_target += 1
+	else:
+		away_shots += 1
+		away_xg += xg
+		if on_target:
+			away_shots_on_target += 1
 
 	if outcome == "GOAL":
 		if is_home:

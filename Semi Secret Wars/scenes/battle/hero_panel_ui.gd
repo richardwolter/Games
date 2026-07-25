@@ -5,7 +5,7 @@ extends PanelContainer
 
 signal clicked(hero_name: String)
 
-const FOCUS_COLOR := Color("b08a3e")
+const FOCUS_COLOR := UIStyle.GOLD
 
 var hero_name := ""
 
@@ -108,10 +108,10 @@ func _set_cooldown_row(label: Label, bar: ProgressBar, ability_name: String, rem
 		bar.value = 1.0 - clampf(remaining / maxf(cd_max, 0.001), 0.0, 1.0)
 	if remaining > 0.0:
 		label.text = "%s%.1f" % [prefix, remaining]
-		label.add_theme_color_override("font_color", Color("b08a3e"))
+		label.add_theme_color_override("font_color", UIStyle.GOLD)
 	else:
 		label.text = "%sREADY" % prefix
-		label.add_theme_color_override("font_color", Color("5c7a3f"))
+		label.add_theme_color_override("font_color", UIStyle.GOOD)
 
 func set_ko() -> void:
 	if _ko or cooldown_indicator == null:
@@ -135,12 +135,12 @@ func set_incoming(seconds_left: float) -> void:
 	if cooldown_bar != null:
 		cooldown_bar.value = 0
 	cooldown_indicator.text = "—"
-	cooldown_indicator.add_theme_color_override("font_color", Color("c63d3d"))
+	cooldown_indicator.add_theme_color_override("font_color", UIStyle.DANGER)
 	if cooldown_bar2 != null:
 		cooldown_bar2.value = 0
 	if cooldown_indicator2 != null and cooldown_indicator2.visible:
 		cooldown_indicator2.text = "DOWN"
-		cooldown_indicator2.add_theme_color_override("font_color", Color("c63d3d"))
+		cooldown_indicator2.add_theme_color_override("font_color", UIStyle.DANGER)
 	if buff_label != null:
 		buff_label.text = ""
 	modulate = Color(0.72, 0.72, 0.72, 0.85)

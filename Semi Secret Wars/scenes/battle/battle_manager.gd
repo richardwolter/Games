@@ -11,6 +11,10 @@ extends Node
 ##  - WIN = villain dead AND every destructible spawn point destroyed.
 ##  - LOSS = every party hero has fallen (permadeath).
 ##  - No focus ping, no priorities, no lone-deploy boon.
+##  - Duo Ultimates (2026-07-22): activate_ultimate(pair_id), called from the
+##    Duo Ultimate bar's button (BattleHUD), manually casts that Duo's
+##    exclusive Ultimate once per level — see DuoUltimates/
+##    Hero.cast_duo_ultimate. Replaces the old solo LV20 second abilities.
 
 ## Carryover heal: a survivor recovers this fraction of missing HP before it
 ## carries into the next level; dead stay dead.
@@ -23,16 +27,23 @@ const OBJECTIVE_SPEED_BOOST_MULT := 1.10
 const OBJECTIVE_ATK_SPEED_BOOST_MULT := 1.10
 const OBJECTIVE_SHIELD_CHARGES := 5
 
+## Plays when a hero teleports onto the field (Designer, 2026-07-25: moved
+## off the deploy-click in favor of the actual arrival, so the sound lines
+## up with the teleport FX instead of firing at placement time).
+const DEPLOY_SOUND := preload("res://assets/Sounds/Deploy.wav")
+
 @export var spawner_path: NodePath
 @export var results_screen_path: NodePath
 @export var heroes_root_path: NodePath
 @export var hero_scene: PackedScene
 @export var hud_path: NodePath
+@export var music_path: NodePath
 @export var stage_id: String = "stage_1"
 
 var _spawner: LaneSpawner
 var _results: ResultsScreen
 var _hud: BattleHUD
+var _music: AudioStreamPlayer
 var _villain: Combatant
 var _field: LaneField
 var _stage_config: StageConfig
@@ -43,8 +54,17 @@ var _villain_dead := false
 var _points_cleared := false
 ## Party heroes who have fallen this level (permadeath — no mid-battle respawn).
 var _exhausted: Dictionary = {}
-var _levelup_queue: Array[String] = []
-var _levelup_screen: LevelUpScreen = null
+## Start-of-level pick queue (2026-07-22, generalized from the old hero-only
+## _levelup_queue): one entry per pending pick, {"kind": "hero"|"duo",
+## "key": <hero_name or DuoUltimates pair id>} — see _ready (populates it),
+## _show_next_pick (drains it one at a time, pausing on each), _process
+## (drives the drain).
+var _pick_queue: Array[Dictionary] = []
+var _pick_screen: LevelUpScreen = null
+## Duo Ultimates activated this level (pair id -> true). Resets naturally
+## every level since BattleManager itself is a fresh instance each scene
+## load — see activate_ultimate/can_activate_ultimate.
+var _ultimate_used: Dictionary = {}
 
 ## Second-deploy-wave state (Duo staggered arrival). -1.0 = no wave pending
 ## (either it already landed or there was only ever one wave); >= 0.0 counts
@@ -64,6 +84,16 @@ func _ready() -> void:
 	_results = get_node(results_screen_path)
 	_hud = get_node(hud_path)
 	_hud.hero_panel_scene = load("res://scenes/battle/hero_panel_ui.tscn")
+	_music = get_node(music_path)
+	# Pick screens (below) and the results screen both pause the tree; an
+	# AudioStreamPlayer's default PAUSABLE process_mode would mute it the
+	# instant that happens, so it needs to stay unaffected by pause.
+	_music.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Deferred: starting playback immediately here was getting silently
+	# killed by the engine partway through this function's heavy synchronous
+	# setup work below (villain/hero spawning) on some machines — deferring
+	# to the start of the next frame, after all of that has settled, avoids it.
+	_start_music.call_deferred()
 	_field = get_tree().get_first_node_in_group("field") as LaneField
 
 	_apply_stage_config(stage_id)
@@ -76,16 +106,20 @@ func _ready() -> void:
 
 	_hud.setup_heroes(RunState.living_party())
 	_spawn_villain(_stage_config)
-	# Boons only at the start of a level now (Designer, 2026-07-21): every
-	# living hero gets exactly one ability-boon pick here, queued through the
-	# same LevelUpScreen pause-and-pick flow the old mid-battle XP-level-up
-	# draft used. Drained by _process before the deploy phase becomes
-	# interactive (the tree pauses while _levelup_screen is showing, so
-	# DeployController — added below — can't be clicked until every hero has
-	# picked). _on_boon_picked records into RunState.boons even though no Hero
-	# node exists yet; _spawn_hero (below, via _on_deploy_chosen) replays every
-	# boon a hero owns this run onto the freshly spawned instance.
-	_levelup_queue.assign(RunState.living_party())
+	# Picks only at the start of a level (Designer, 2026-07-22), and only for
+	# Duo Ultimates (Designer, 2026-07-25 — the per-hero ability-boon round
+	# that used to run first was dropped along with its catalog; see
+	# duo_ultimate_boons.gd). Every Duo with a living member gets one
+	# Ultimate-boon pick, queued through the LevelUpScreen pause-and-pick
+	# flow and drained by _process before the deploy phase becomes
+	# interactive (the tree pauses while _pick_screen is showing, so
+	# DeployController — added below — can't be clicked until every pick is
+	# done). Picks record into RunState.duo_boons even though no Hero node
+	# exists yet, which is fine: Duo Ultimate boons are read live at cast
+	# time (Hero._ultimate_param), never applied to a Hero instance.
+	for pair_id in _living_duo_pair_ids():
+		_pick_queue.append({"kind": "duo", "key": pair_id})
+	_roll_monster()
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
@@ -105,6 +139,13 @@ func _apply_stage_config(stage: String) -> void:
 		return
 	_spawner.apply_stage_config(config)
 	_stage_config = config
+	# Per-stage music override (StageConfig.music). Safe to assign here even
+	# though playback is deferred: _ready() calls _start_music.call_deferred()
+	# BEFORE this function runs synchronously, so the stream is already swapped
+	# by the time the deferred call fires. Assigning it also means _start_music
+	# applies its loop fix-up to the RIGHT stream.
+	if config.music != null and _music != null:
+		_music.stream = config.music
 
 ## Splits RunState.living_party() into the two authored Duos
 ## (GameState.duo_pairings), each filtered to living members only. A hero
@@ -124,6 +165,22 @@ func _compute_duos() -> Dictionary:
 			a.append(hero_name)
 	return {"a": a, "b": b}
 
+## Every Duo (GameState.duo_pairings) with at least one living member this
+## level, as DuoUltimates pair ids — queues that Duo's Ultimate-boon pick and
+## decides which Ultimates the Duo Ultimate bar shows/allows activating this
+## level (a Duo with both members dead has nobody left to cast it).
+func _living_duo_pair_ids() -> Array:
+	var living := RunState.living_party()
+	var out: Array = []
+	for duo in GameState.duo_pairings:
+		if not (duo is Array) or (duo as Array).size() != 2:
+			continue
+		var a: String = duo[0]
+		var b: String = duo[1]
+		if a in living or b in living:
+			out.append(DuoUltimates.id_for_heroes(a, b))
+	return out
+
 ## First wave spawns immediately and releases the swarm; the second wave (if
 ## any) is held and counted down in _process, landing `delay` seconds later
 ## at its own chosen positions — see DeployController.
@@ -138,6 +195,10 @@ func _on_deploy_chosen(payload: Dictionary) -> void:
 	_second_wave_remaining = float(payload.get("delay", 0.0)) if not _second_wave_names.is_empty() else -1.0
 
 	_spawner.begin_battle()
+	# Boulders only start rolling once the party is actually on the field —
+	# during deploy the swarm is frozen and nothing should be taking hits.
+	_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
+	_boulders_live = true
 
 func _spawn_second_wave() -> void:
 	for i in _second_wave_names.size():
@@ -167,12 +228,34 @@ func _spawn_hero(hero_name: String, pos: Vector2) -> void:
 	# GameState.party_of()/support_target picker were removed (2026-07-20):
 	# hero-to-hero links are Duo-driven only now (see Hero class doc).
 	root.add_child(h)
-	for boon_id in RunState.boons.get(hero_name, []):
-		h.apply_run_boon(boon_id)
+	# No run-boon replay here any more (2026-07-25): the per-hero boon pool is
+	# gone, and the Duo Ultimate boons that replaced it are read at cast time
+	# rather than applied to the instance. Permanent gold/XP purchases still
+	# apply at spawn, inside Hero._configure.
 	var carried: float = RunState.carried_hp(hero_name)
 	if carried >= 0.0:
 		h.hp = clampf(carried, 1.0, h.max_hp)
 	h.died.connect(_on_hero_died.bind(hero_name))
+	_play_teleport_in(h, pos)
+
+## Deploy should read as the hero teleporting onto the field, not just
+## appearing — beam/ring/sparks (BattleFX) plus the hero itself materializing
+## in rather than popping fully-formed.
+func _play_teleport_in(h: Hero, pos: Vector2) -> void:
+	BattleFX.teleport_in(get_node(heroes_root_path), pos, GameState.HERO_CATALOG[h.hero_name].color)
+	var player := AudioStreamPlayer.new()
+	player.stream = DEPLOY_SOUND
+	# Same root-persists-across-pause bug as Hero._on_died — see its doc.
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().root.add_child(player)
+	player.play()
+	player.finished.connect(player.queue_free)
+	h.modulate.a = 0.0
+	h.scale = Vector2(1.4, 1.4)
+	var tw := h.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(h, "modulate:a", 1.0, 0.2)
+	tw.tween_property(h, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 ## A hero fell: no mid-battle respawn (Designer, 2026-07-19) — it's down for
 ## good this level (and, via _record_carryover -> RunState.mark_dead, for the
@@ -205,10 +288,10 @@ func _process(delta: float) -> void:
 			get_tree().paused = false
 			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
 		return
-	if _levelup_screen != null:
+	if _pick_screen != null:
 		return
-	if not _levelup_queue.is_empty():
-		_show_next_levelup()
+	if not _pick_queue.is_empty():
+		_show_next_pick()
 		return
 	# >= 0.0, not > 0.0: a Duo configured with a 0s delay starts
 	# _second_wave_remaining already at exactly 0.0 (see the assignment above),
@@ -222,6 +305,11 @@ func _process(delta: float) -> void:
 	# Single source of truth for the villain's live position (shared field state).
 	if _villain != null and is_instance_valid(_villain) and not _villain._dying:
 		_field.villain_pos = _villain.global_position
+	if _monster_countdown > 0.0:
+		_monster_countdown -= delta
+		if _monster_countdown <= 0.0:
+			_spawn_monster()
+	_tick_boulders(delta)
 
 func _on_objective_captured(bonus: int) -> void:
 	var heroes := _living_real_heroes()
@@ -282,43 +370,124 @@ func _spawn_villain(config: StageConfig) -> void:
 		v.died.connect(_on_villain_died)
 		get_tree().get_first_node_in_group("field").get_parent().add_child.call_deferred(v)
 
-## Drains _levelup_queue one hero at a time, pausing on each pick. Queue is
-## populated once in _ready() from RunState.living_party() (dead heroes are
-## already excluded there) — unlike the old mid-battle version, no Hero node
-## exists yet at this point (boons are picked before deploy/spawn), so this no
-## longer re-checks _find_living_hero; RunState.boons is the source of truth
-## and _spawn_hero replays it onto every hero as it's created.
-func _show_next_levelup() -> void:
-	if _levelup_queue.is_empty():
+## Drains _pick_queue one entry at a time, pausing on each pick. Queue is
+## populated once in _ready() from _living_duo_pair_ids() — every entry is a
+## Duo Ultimate-boon pick now that the per-hero round is gone. No Hero node
+## exists yet at this point (picks happen before deploy/spawn), which is fine:
+## RunState.duo_boons is the source of truth and Hero._ultimate_param reads it
+## live at cast time, so nothing has to be replayed onto a spawned hero.
+func _show_next_pick() -> void:
+	if _pick_queue.is_empty():
 		get_tree().paused = false
 		return
-	var hero_name: String = _levelup_queue.pop_front()
+	var entry: Dictionary = _pick_queue.pop_front()
 	var screen := LevelUpScreen.new()
-	_levelup_screen = screen
+	_pick_screen = screen
 	add_child(screen)
-	screen.setup(hero_name, RunState.roll_offer(hero_name))
-	screen.picked.connect(_on_boon_picked.bind(hero_name))
+	var pair_id: String = entry.get("key", "")
+	var names := pair_id.split("|")
+	var ult_name: String = DuoUltimates.def(pair_id).get("name", "ULTIMATE")
+	screen.setup(
+		"%s — %s" % [" + ".join(names), ult_name],
+		"Choose an Ultimate boon (this run only)",
+		RunState.roll_duo_offer(pair_id), DuoUltimateBoons.def)
+	screen.picked.connect(_on_pick_chosen.bind(entry))
 	get_tree().paused = true
 
-func _on_boon_picked(boon_id: String, hero_name: String) -> void:
-	RunState.add_boon(hero_name, boon_id)
-	var hero := _find_living_hero(hero_name)
-	if hero != null:
-		hero.apply_run_boon(boon_id)
-	if _levelup_screen != null:
-		_levelup_screen.queue_free()
-		_levelup_screen = null
-	if _levelup_queue.is_empty():
+func _on_pick_chosen(id: String, entry: Dictionary) -> void:
+	RunState.add_duo_boon(entry.get("key", ""), id)
+	if _pick_screen != null:
+		_pick_screen.queue_free()
+		_pick_screen = null
+	if _pick_queue.is_empty():
 		get_tree().paused = false
 
-func _find_living_hero(hero_name: String) -> Hero:
+# _find_living_hero() was removed 2026-07-25: its only caller was the per-hero
+# boon pick, which applied the chosen boon to an already-spawned hero. With
+# that round gone nothing needs to resolve a name to a live Hero here — the
+# Duo Ultimate path resolves its caster through _spawned_duo_members instead.
+
+## -- Duo Ultimates (2026-07-22) ----------------------------------------------
+
+## Manually activates `pair_id`'s Duo Ultimate — called by the Duo Ultimate
+## bar's ACTIVATE button (BattleHUD/DuoUltimateBar). Picks whichever Duo
+## member is alive and spawned to be the caster (the confirmed leader if
+## they're among the living, else whoever else is alive), casts the effect,
+## then applies the level-long buff (DuoUltimates.def's "buff") to every
+## living, spawned member. Once-per-level: returns false (no-op) if already
+## used or nobody from the Duo is currently on the field. Returns true on a
+## successful activation so the caller (button handler) knows to refresh.
+func activate_ultimate(pair_id: String) -> bool:
+	if not can_activate_ultimate(pair_id):
+		return false
+	var members := _spawned_duo_members(pair_id)
+	var caster: Hero = members[0]
+	for h in members:
+		if GameState.is_duo_leader(h.hero_name):
+			caster = h
+			break
+	caster.cast_duo_ultimate(pair_id)
+	var buff: Dictionary = DuoUltimates.def(pair_id).get("buff", {})
+	for h in members:
+		h.apply_permanent_buff(
+			float(buff.get("dmg_add", 0.0)),
+			float(buff.get("atk_reduction", 0.0)),
+			float(buff.get("hp_add", 0.0)))
+	_ultimate_used[pair_id] = true
+	return true
+
+## True while pair_id's Ultimate is still available this level (not yet used
+## AND at least one member is currently spawned+alive) — read every frame by
+## the Duo Ultimate bar to enable/grey its button.
+func can_activate_ultimate(pair_id: String) -> bool:
+	if _ultimate_used.get(pair_id, false):
+		return false
+	return not _spawned_duo_members(pair_id).is_empty()
+
+## Whether pair_id's Ultimate has already been used this level — distinct
+## from can_activate_ultimate, which also folds in "nobody from the Duo is
+## alive right now"; the Duo Ultimate bar uses both to tell "USED" apart from
+## a plain unavailable state.
+func is_ultimate_used(pair_id: String) -> bool:
+	return _ultimate_used.get(pair_id, false)
+
+## Living, currently-spawned Hero nodes whose hero_name is one of pair_id's
+## two (pair_id is always a sorted "NAME_A|NAME_B" — see
+## DuoUltimates.id_for_heroes — so this needs no GameState.duo_pairings
+## lookup of its own).
+func _spawned_duo_members(pair_id: String) -> Array[Hero]:
+	var names := pair_id.split("|")
+	var out: Array[Hero] = []
 	for h in get_tree().get_nodes_in_group("heroes"):
-		if h is Hero and h.hero_name == hero_name and is_instance_valid(h) and not h._dying:
-			return h
-	return null
+		if h is Hero and is_instance_valid(h) and not h._dying and h.hero_name in names:
+			out.append(h)
+	return out
+
+## Forces the stream to loop regardless of its import-time loop setting, then
+## starts playback. AudioStreamPlayer.finished doesn't fire for a looping
+## stream, so this is the only place loop needs to be configured.
+func _start_music() -> void:
+	if _music == null or _music.stream == null:
+		return
+	var stream := _music.stream
+	if stream is AudioStreamWAV:
+		# Godot 4.7.1: setting loop_mode without also fixing up loop_end (which
+		# defaults to -1 on a stream imported with looping disabled) corrupts
+		# the mixer for this stream — and takes down ALL audio process-wide
+		# from that point on, silently, with no error. loop_end must be an
+		# explicit sample count. Confirmed via Godot AI live-process bisection.
+		var wav := stream as AudioStreamWAV
+		wav.loop_begin = 0
+		wav.loop_end = int(round(wav.get_length() * wav.mix_rate))
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	elif stream is AudioStreamOggVorbis or stream is AudioStreamMP3:
+		stream.loop = true
+	_music.play()
 
 func _end(win: bool) -> void:
 	_over = true
+	if _music != null and is_instance_valid(_music):
+		_music.stop()
 	# Career stat (achievements): how much of this level's villain HP
 	# got chipped away, win or lose. Recorded here (not just on the terminal
 	# _end call) so a mid-run level clear's villain damage still counts toward
@@ -368,3 +537,87 @@ func _record_carryover() -> void:
 func _level_exists(n: int) -> bool:
 	var has_stage_config := ResourceLoader.exists("res://config/stage_%d_config.tres" % n)
 	return ResourceLoader.exists("res://config/level_%d_layout.tres" % n) and has_stage_config
+
+## -- Wandering Monster (2026-07-25) ------------------------------------------
+
+## The level it can crash. Designer: "a surprise enemy at level 2".
+const MONSTER_LEVEL := 2
+## Chance per visit to that level that it shows up at all. Designer: "spawns
+## randomly in a FEW runs" — rare enough that meeting it is an event, not a
+## mechanic the player plans around. First pass; tune in BALANCE.md.
+const MONSTER_CHANCE := 0.3
+## When it arrives, in seconds after the battle starts. Late enough that the
+## party is already committed to a fight, early enough to matter.
+const MONSTER_DELAY_RANGE := Vector2(25.0, 70.0)
+## Spawns this far ahead of the party (+x, toward the villain) so it comes at
+## them rather than materialising on top of them.
+const MONSTER_SPAWN_LEAD := 900.0
+
+const MONSTER_SCENE_PATH := "res://scenes/enemies/monster.tscn"
+
+## Seconds until the monster arrives; <= 0 means "not coming / already came".
+var _monster_countdown := 0.0
+
+## Rolls for the wandering monster. Called once from _ready.
+func _roll_monster() -> void:
+	if RunState.current_level != MONSTER_LEVEL or RunState.headless:
+		return
+	if randf() >= MONSTER_CHANCE:
+		return
+	_monster_countdown = randf_range(MONSTER_DELAY_RANGE.x, MONSTER_DELAY_RANGE.y)
+
+func _spawn_monster() -> void:
+	_monster_countdown = 0.0
+	if _over or _field == null:
+		return
+	var monster: Combatant = load(MONSTER_SCENE_PATH).instantiate()
+	# Arrive ahead of whichever hero is furthest along the lane, on that hero's
+	# side of the field — it should walk INTO the party, not spawn behind them
+	# where it would spend its whole 10s window catching up.
+	var front := _field.hero_spawn
+	for h in _living_real_heroes():
+		if h.global_position.x > front.x:
+			front = h.global_position
+	var x: float = minf(front.x + MONSTER_SPAWN_LEAD, _field.lane_length * 0.5 - 200.0)
+	var y: float = clampf(front.y, -_field.lane_half_height + 80.0, _field.lane_half_height - 80.0)
+	monster.global_position = Vector2(x, y)
+	_field.get_parent().add_child(monster)
+
+## -- Rolling Boulders (2026-07-25) -------------------------------------------
+
+## The level the Berserker hurls boulders down (Designer: "like berserk is
+## throwing them"). Same stage his lair sits on; every other level is unchanged.
+const BOULDER_LEVEL := 2
+const BOULDER_SCRIPT := preload("res://scenes/hazards/rolling_boulder.gd")
+## Seconds between throws — constant pressure, but with enough gap that a lane
+## is crossable between rocks.
+const BOULDER_INTERVAL_RANGE := Vector2(5.0, 9.0)
+## Random y offset inside the chosen lane half, so successive boulders don't
+## all track the same groove.
+const BOULDER_LANE_JITTER := 140.0
+
+var _boulder_cd := 0.0
+var _boulders_live := false
+
+func _tick_boulders(delta: float) -> void:
+	if not _boulders_live or RunState.current_level != BOULDER_LEVEL \
+			or RunState.headless or _field == null:
+		return
+	_boulder_cd -= delta
+	if _boulder_cd > 0.0:
+		return
+	_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
+	_spawn_boulder()
+
+func _spawn_boulder() -> void:
+	var boulder: Node2D = BOULDER_SCRIPT.new()
+	# Enters from the villain's end of the lane and rolls the full length past
+	# the deploy band before freeing itself.
+	var half_len := _field.lane_length * 0.5
+	# Centre of one lane half (top = -y, bottom = +y), jittered.
+	var lane_center := _field.lane_half_height * 0.5
+	var y: float = (-lane_center if randf() < 0.5 else lane_center) \
+			+ randf_range(-BOULDER_LANE_JITTER, BOULDER_LANE_JITTER)
+	boulder.despawn_x = -half_len - 200.0
+	_field.get_parent().add_child(boulder)
+	boulder.global_position = Vector2(half_len + 100.0, y)

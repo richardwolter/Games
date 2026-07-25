@@ -30,7 +30,24 @@ var border_decor: Array[Vector3] = []
 var border_decor_kinds: Array[String] = []
 
 var hero_spawn := Vector2(-1500.0, -600.0)
+## The villain's LIVE position — BattleManager overwrites this every frame
+## while he's alive (see its _process), so it is a moving point, not the lair.
+## Anything that needs the fixed structure must use `lair_pos` instead.
 var villain_pos := Vector2(1420.0, 640.0)
+## The authored lair anchor (LevelLayout.villain_lair) — static for the whole
+## level. Split out from villain_pos on 2026-07-25: the wrecked-spaceship lair
+## was being drawn at villain_pos, which meant the 300px wreck slid around the
+## battlefield following the villain as he moved.
+var lair_pos := Vector2(2900.0, 0.0)
+## Collision radius of the wrecked-ship lair. Its art draws at 2x this (the
+## shared _draw_obstacle_sprite convention), so 150 => a 300px wreck.
+const LAIR_RADIUS := 150.0
+## How far IN FRONT of the wreck (toward the incoming heroes, i.e. -x) the
+## villain stands (Designer, 2026-07-25: "the villain should spawn outside of
+## the spaceship"). Must clear the wreck's blocked zone for a hero
+## (LAIR_RADIUS + hero clamp radius ~67 = 217) so the party can actually reach
+## him rather than being held off by his own lair.
+const VILLAIN_LAIR_OFFSET := 300.0
 ## The dividing line between the top and bottom lanes (Designer, 2026-07-20:
 ## split the lane in two so heroes/minions spread instead of clustering on one
 ## spot). Fixed at lane center — lanes are a behavioral zone, not a hard wall,
@@ -114,7 +131,17 @@ var obstacles: Array[Vector3] = []
 ## Sprite kind per obstacle above (index-aligned).
 ## Falls back to the placeholder blob+label for any index without a match.
 var obstacle_kinds: Array[String] = []
+## OVAL footprint per obstacle above (index-aligned), as semi-axes (rx, ry) —
+## derived from the kind's art at load, never authored (Designer, 2026-07-25).
+## The .tres still authors one radius: that stays the SIZE knob, and this only
+## reshapes it, so the art/collision decoupling in ART_BIBLE is preserved.
+var obstacle_radii: Array[Vector2] = []
 @export var spaceship_texture: Texture2D
+## Alternate lair art per level (Designer, 2026-07-25) — the Berserker holes up
+## in a beast den, not a crashed ship. Picked by LAIR_TEXTURE_BY_LEVEL.
+@export var berserk_lair_texture: Texture2D
+## Obstacle kind "boulder" — a big collidable rock, heavier than rock1/rock2.
+@export var boulder_texture: Texture2D
 @export var rock1_texture: Texture2D
 @export var rock2_texture: Texture2D
 @export var sword_texture: Texture2D
@@ -125,6 +152,9 @@ var scenery: Array[Vector3] = []
 var scenery_kinds: Array[String] = []
 @export var smudge_texture: Texture2D
 @export var mushroom_texture: Texture2D
+## Scenery kind "paw_print" (Designer, 2026-07-25) — animal tracks crossing the
+## lane. Decorative only, like every other `scenery` entry.
+@export var paw_print_texture: Texture2D
 ## Poison Lakes: entry-hazard for all units inside (heroes and minions). (x, y)
 ## center + z = x-radius; y-radius is z * lake_radius_ratio.
 var lakes: Array[Vector3] = []
@@ -133,6 +163,14 @@ var lakes: Array[Vector3] = []
 ## drain (Combatant edge-triggers this on the outside→inside transition). Light
 ## enough that briefly clipping a lake is a minor cost, not lethal.
 @export var lake_damage := 6.0
+
+## Spike pits: (x, y) center + z = radius. Circular entry-hazard, same
+## one-hit-per-entry contract as a lake (Combatant edge-triggers both), but
+## smaller, rounder and harder-hitting — a lake is a wide area you skirt, a
+## spike pit is a nasty spot you step in. Not a blocker: units path over it.
+var spike_pits: Array[Vector3] = []
+@export var spike_texture: Texture2D
+@export var spike_damage := 14.0
 
 @export_group("Deployment")
 ## Obstacle clearance for deployment: the party spreads ±~72px side by side.
@@ -152,15 +190,23 @@ var objective_positions: Array[Vector2] = []
 ## (LaneSpawner registers/unregisters as points spawn in and die). (x, y)
 ## center + z = radius, same convention as `obstacles`.
 var dynamic_obstacles: Array[Vector3] = []
+## Oval footprint per dynamic obstacle (index-aligned), same contract as
+## obstacle_radii. Callers that don't supply one get a circle.
+var dynamic_obstacle_radii: Array[Vector2] = []
 
-func register_dynamic_obstacle(pos: Vector2, radius: float) -> void:
+func register_dynamic_obstacle(pos: Vector2, radius: float,
+		radii := Vector2.ZERO) -> void:
 	dynamic_obstacles.append(Vector3(pos.x, pos.y, radius))
+	dynamic_obstacle_radii.append(radii if radii.x > 0.0 else Vector2(radius, radius))
 
 func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
 	for i in dynamic_obstacles.size():
 		var o := dynamic_obstacles[i]
 		if o.x == pos.x and o.y == pos.y and o.z == radius:
 			dynamic_obstacles.remove_at(i)
+			# Index-aligned with the array above — must drop together.
+			if i < dynamic_obstacle_radii.size():
+				dynamic_obstacle_radii.remove_at(i)
 			return
 
 @export_group("Notebook Page")
@@ -182,7 +228,15 @@ func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
 @export var field_color := Color("f4efe1", 0.0)
 @export var obstacle_color := Color("f4efe1", 0.0)
 @export var scenery_color := Color("f4efe1", 0.0)
-@export var lake_color := Color("f4efe1", 0.0)
+## The Poison Lake is the ONE field shape that carries real colour (Designer,
+## 2026-07-25: "paint the poison lake purple, so it looks toxic"). Everything
+## else stays transparent-with-ink-outline so the page shows through; the lake
+## is a hazard that costs HP on entry, so it earns a colour the eye catches.
+## Translucent, so the ruled page still reads underneath like a wash of ink.
+@export var lake_color := Color(0.42, 0.16, 0.55, 0.34)
+## Outline + hatching for the lake, a darker/stronger version of the fill so
+## the shape still reads as hand-inked rather than a flat digital blob.
+@export var lake_ink_color := Color(0.30, 0.08, 0.42)
 @export var outline_color := Color("161412")
 @export var outline_width := 4.0
 
@@ -191,6 +245,9 @@ func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
 @export var alien_tree_texture: Texture2D
 @export var alien_tree_thin_texture: Texture2D
 @export var plant_texture: Texture2D
+## Stage 2's spectator stands (Designer, 2026-07-25) — one wide strip, tiled
+## along both long edges in place of the tree band. See _build_crowd_side.
+@export var crowd_texture: Texture2D
 ## mushroom_texture (above) is shared with scenery's "mushroom" kind — see
 ## _scenery_texture().
 
@@ -265,10 +322,25 @@ func apply_lane_layout(layout: LevelLayout) -> void:
 	deploy_band_x_min = layout.deploy_band_x_min
 	deploy_band_x_max = layout.deploy_band_x_max
 	hero_spawn = Vector2((deploy_band_x_min + deploy_band_x_max) * 0.5, 0.0)
-	villain_pos = layout.villain_lair
+	lair_pos = layout.villain_lair
+	# The villain starts OUTSIDE his ship, in front of it. villain_pos is only
+	# the SEED here — BattleManager takes it over as his live position once he
+	# spawns (Villain._configure reads it for the initial placement).
+	villain_pos = lair_pos + Vector2(-VILLAIN_LAIR_OFFSET, 0.0)
 	obstacles = layout.obstacles.duplicate()
 	obstacle_kinds = layout.obstacle_kinds.duplicate()
+	# The lair wreck is a real blocking obstacle (Designer, 2026-07-25), not
+	# scenery — appended here rather than authored into every layout so the
+	# lair can never drift out of sync with villain_lair. Going through
+	# `obstacles` means collision, steering, deploy validity and drawing all
+	# come from the existing pipeline for free. Safe against re-entry: the two
+	# arrays above are reassigned from the layout on every call, so repeated
+	# apply_lane_layout calls can't stack duplicate wrecks.
+	obstacles.append(Vector3(lair_pos.x, lair_pos.y, LAIR_RADIUS))
+	obstacle_kinds.append(_lair_kind())
+	_rebuild_obstacle_radii()
 	lakes = layout.lakes.duplicate()
+	spike_pits = layout.spike_pits.duplicate()
 	scenery = layout.scenery.duplicate()
 	scenery_kinds = layout.scenery_kinds.duplicate()
 	objective_positions = layout.objective_positions.duplicate()
@@ -300,16 +372,109 @@ func _build_border_band() -> void:
 	# the bottom (near, foreground) edge once camera framing is factored in —
 	# pull it in with a depth_scale < 1 so it doesn't read as floating way off
 	# in the page margin (Designer call). Bottom keeps the full depth spread.
-	_build_band_side(rng, _band_top, -1.0, top_depth_scale)
-	_build_band_side(rng, _band_bottom, 1.0)
+	# Stage 2 is an arena, not a forest (Designer, 2026-07-25): its long edges
+	# are lined with jeering spectator stands instead of the procedural tree
+	# band. Only the two LONG edges change — the end caps and scatter still
+	# come from the shared generator below, so the lane's ends still close off.
+	var crowd_edges: bool = crowd_texture != null and RunState.current_level == CROWD_BORDER_LEVEL
+	if crowd_edges:
+		_build_crowd_side(_band_top, -1.0)
+		_build_crowd_side(_band_bottom, 1.0)
+	else:
+		_build_band_side(rng, _band_top, -1.0, top_depth_scale)
+		_build_band_side(rng, _band_bottom, 1.0)
 	_build_end_cap(rng, _band_left, -1.0)
 	_build_end_cap(rng, _band_right, 1.0)
-	_build_scatter(rng, -1.0, top_depth_scale)
-	_build_scatter(rng, 1.0)
+	# Long-edge scatter is skipped under the stands (Designer, 2026-07-25:
+	# watch for overlap) — mushrooms sit at exactly the depth the crowd strip
+	# now occupies, so they'd render as litter stuck to the grandstand. The
+	# end-cap scatter stays: those run past the lane's ends, clear of it.
+	if not crowd_edges:
+		_build_scatter(rng, -1.0, top_depth_scale)
+		_build_scatter(rng, 1.0)
 	_build_end_cap_scatter(rng, -1.0)
 	_build_end_cap_scatter(rng, 1.0)
 
+## Level whose long edges are spectator stands instead of trees.
+const CROWD_BORDER_LEVEL := 2
+## Preferred rendered height of one crowd strip, in world units. The strip is
+## very wide and short, so it is sized by HEIGHT and tiled along x by its own
+## aspect. Only a CAP: the real height is whatever fits between the lane edge
+## and the furthest the camera can ever see (see _crowd_strip_height) — at 300
+## the top stands ran past that and were clipped even at full zoom-out
+## (Designer, 2026-07-25).
+const CROWD_HEIGHT := 300.0
+## Never squash the stands below this, even if the camera clearance is tiny —
+## better to clip a sliver than to render an unreadable smear.
+const CROWD_MIN_HEIGHT := 120.0
+## Overlap between consecutive tiles, as a fraction of tile width — hides the
+## seam where one hand-drawn strip meets the next.
+const CROWD_TILE_OVERLAP := 0.04
+
+## Tiles the crowd strip end to end along one long edge. Emits the same entry
+## shape as _build_band_side so LaneForeground draws it with no special case;
+## `flip` alternates so repeats do not read as one obviously repeated image.
+func _build_crowd_side(into: Array[Dictionary], side_sign: float) -> void:
+	var tex_size := crowd_texture.get_size()
+	if tex_size.y <= 0.0:
+		return
+	var height := _crowd_strip_height()
+	var tile_w: float = tex_size.x * (height / tex_size.y)
+	var step: float = tile_w * (1.0 - CROWD_TILE_OVERLAP)
+	if step <= 1.0:
+		return
+	# Props are base-anchored and grow upward (see _draw_prop_sprite), so the
+	# bottom edge needs its base pushed out by the strip height or the stands
+	# would lean back over the lane. Both sides then occupy exactly `height`
+	# outward of their lane edge — mirrored, not offset.
+	var y: float = side_sign * lane_half_height
+	if side_sign > 0.0:
+		y += height
+	# Start a full tile before the lane and run a full tile past its end, so
+	# the stands are unbroken from one end cap to the other with no partial
+	# tile visible at either extreme.
+	var x: float = -lane_length * 0.5 - tile_w
+	while x <= lane_length * 0.5 + tile_w:
+		into.append({
+			"pos": Vector2(x, y),
+			"height": height,
+			"tex": crowd_texture,
+			# No alternating mirror: the stands are directional art, so every
+			# other tile flipped read as "some right, some backwards"
+			# (Designer, 2026-07-25). Uniform orientation along each edge.
+			"flip": side_sign > 0.0,
+			# The bottom edge is the top edge turned a full 180° (both axes),
+			# so it mirrors across the lane instead of duplicating it.
+			"flip_v": side_sign > 0.0,
+			"tint": Color.WHITE,
+		})
+		x += step
+
+## Tallest a crowd strip can be drawn and still fit entirely on screen at the
+## widest view: half a viewport at zoom_min, plus how far the camera may pan
+## off-center, minus the lane half-height the strip starts from. Read off the
+## live BattleCamera so re-tuning zoom/pan can't silently re-clip the stands;
+## falls back to the CROWD_HEIGHT cap when there's no camera (editor, tests).
+func _crowd_strip_height() -> float:
+	if get_parent() == null:
+		return CROWD_HEIGHT
+	var cam := get_parent().get_node_or_null("BattleCamera") as BattleCamera
+	if cam == null or cam.zoom_min <= 0.0:
+		return CROWD_HEIGHT
+	var view_h := float(ProjectSettings.get_setting("display/window/size/viewport_height", 1080))
+	var clearance := view_h * 0.5 / cam.zoom_min + absf(cam.pan_limits.y) - lane_half_height
+	return clampf(clearance, CROWD_MIN_HEIGHT, CROWD_HEIGHT)
+
 const _BAND_SPECIES := ["tree_bushy", "tree_bushy", "alien_tree", "alien_tree_thin", "plant"]
+
+## Props render canopy-up (base-anchored, growing toward smaller y — see
+## LaneForeground._draw_prop_sprite) regardless of which side of the lane
+## they're on. On the bottom edge that means "up" points back toward the
+## lane, so a tall canopy can loom well past the split line unless its base
+## is pushed out to compensate; on the top edge "up" already points away
+## from the lane, so no compensation is needed there (Designer, 2026-07-25:
+## bottom lane read visually smaller/more cramped than top because of this).
+const BOTTOM_CANOPY_CLEARANCE := 40.0
 
 ## Builds one long-edge side's band (top: sign -1, bottom: sign +1) as a set
 ## of rows marching along x with jitter, so consecutive props overlap into a
@@ -324,7 +489,10 @@ func _build_band_side(rng: RandomNumberGenerator, out: Array[Dictionary], side_s
 		for row in band_row_count:
 			var entry: Dictionary = _band_row_entry(rng, row, depth_scale)
 			if not entry.is_empty():
-				entry["pos"] = Vector2(along + entry["pos"].x, side_sign * (lane_half_height + entry["pos"].y))
+				var depth: float = entry["pos"].y
+				if side_sign > 0.0:
+					depth += maxf(0.0, entry["height"] - BOTTOM_CANOPY_CLEARANCE)
+				entry["pos"] = Vector2(along + entry["pos"].x, side_sign * (lane_half_height + depth))
 				out.append(entry)
 		along += band_spacing + rng.randf_range(-band_jitter.x * 0.3, band_jitter.x * 0.3)
 
@@ -465,11 +633,27 @@ func is_valid_deploy_point(p: Vector2) -> bool:
 ## Steering helper: adjust a desired direction to avoid blocking obstacles.
 ## Combines radial pushback (don't penetrate) with a tangential slide (go
 ## around) — pure pushback alone cancels out on head-on approaches.
-func steer_around(pos: Vector2, desired: Vector2, clearance: float) -> Vector2:
-	for o in obstacles:
-		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
-	for o in dynamic_obstacles:
-		desired = _avoid(pos, desired, Vector2(o.x, o.y), o.z, clearance, 1.5)
+## `clearance` is the steering unit's own OVAL footprint; both it and each
+## blocker resolve to a radius along the approach, matching the hard clamp.
+func steer_around(pos: Vector2, desired: Vector2, clearance: Vector2) -> Vector2:
+	for i in obstacles.size():
+		var o := obstacles[i]
+		var center := Vector2(o.x, o.y)
+		var dir := pos - center
+		var obs_radii: Vector2 = obstacle_radii[i] if i < obstacle_radii.size() \
+				else Vector2(o.z, o.z)
+		desired = _avoid(pos, desired, center,
+				SpriteFootprint.radius_toward(obs_radii, dir),
+				SpriteFootprint.radius_toward(clearance, dir), 1.5)
+	for i in dynamic_obstacles.size():
+		var d := dynamic_obstacles[i]
+		var dcenter := Vector2(d.x, d.y)
+		var ddir := pos - dcenter
+		var dyn_radii: Vector2 = dynamic_obstacle_radii[i] \
+				if i < dynamic_obstacle_radii.size() else Vector2(d.z, d.z)
+		desired = _avoid(pos, desired, dcenter,
+				SpriteFootprint.radius_toward(dyn_radii, ddir),
+				SpriteFootprint.radius_toward(clearance, ddir), 1.5)
 	# Avoid the Poison Lakes: wide margin + near-obstacle strength so units skirt
 	# well before the shore and only rarely clip in. A combat pursuit can still
 	# drag a unit in, but that now costs a single ~6 HP entry hit, not a drain —
@@ -477,7 +661,9 @@ func steer_around(pos: Vector2, desired: Vector2, clearance: float) -> Vector2:
 	for l in lakes:
 		var lake_pos := Vector2(l.x, l.y)
 		var lake_radius := Vector2(l.z, l.z * lake_radius_ratio)
-		desired = _avoid(pos, desired, lake_pos, _lake_radius_toward(pos, lake_pos, lake_radius), clearance + 90.0, 1.6)
+		desired = _avoid(pos, desired, lake_pos,
+				_lake_radius_toward(pos, lake_pos, lake_radius),
+				SpriteFootprint.radius_toward(clearance, pos - lake_pos) + 90.0, 1.6)
 	return desired.normalized() if desired.length() > 0.01 else desired
 
 ## Push `desired` around one circular blocker. `strength` scales the avoidance
@@ -507,6 +693,15 @@ func in_lake(pos: Vector2) -> bool:
 			return true
 	return false
 
+## Spike pit containment — the pit equivalent of in_lake. Circular, so no
+## radius-ratio math. Returns the DAMAGE of the pit the point is inside (0.0
+## when clear), letting the caller edge-trigger it exactly like a lake.
+func in_spike_pit(pos: Vector2) -> bool:
+	for s in spike_pits:
+		if pos.distance_to(Vector2(s.x, s.y)) <= s.z:
+			return true
+	return false
+
 ## Effective lake radius along the direction from `lake_pos` toward `pos`, so
 ## the elliptical lake can reuse the circular avoidance math.
 func _lake_radius_toward(pos: Vector2, lake_pos: Vector2, lake_radius: Vector2) -> float:
@@ -520,27 +715,42 @@ func _lake_radius_toward(pos: Vector2, lake_pos: Vector2, lake_radius: Vector2) 
 
 ## Hard collision: push a unit center out of any obstacle core it overlaps.
 ## Steering is only a hint; this guarantees units never clip through obstacles.
-func clamp_out_of_obstacles(pos: Vector2, body_radius: float) -> Vector2:
-	for o in obstacles:
+## `radii` is the moving unit's OVAL footprint (Combatant._collision_radii).
+## Both sides are ellipses now, so each contributes its radius along the line
+## between the two centres — the same directional-radius trick the Poison Lake
+## already uses, rather than a new ellipse solver.
+func clamp_out_of_obstacles(pos: Vector2, radii: Vector2) -> Vector2:
+	for i in obstacles.size():
+		var o := obstacles[i]
 		var center := Vector2(o.x, o.y)
-		var min_d := o.z + body_radius
 		var to_pos := pos - center
 		var dist := to_pos.length()
+		var dir := to_pos / dist if dist > 0.001 else Vector2.RIGHT
+		var obs_radii: Vector2 = obstacle_radii[i] if i < obstacle_radii.size() \
+				else Vector2(o.z, o.z)
+		var min_d := SpriteFootprint.radius_toward(obs_radii, dir) \
+				+ SpriteFootprint.radius_toward(radii, dir)
 		if dist < min_d:
-			pos = center + (to_pos / dist if dist > 0.001 else Vector2.RIGHT) * min_d
-	for o in dynamic_obstacles:
-		var center3 := Vector2(o.x, o.y)
-		var min_d3 := o.z + body_radius
+			pos = center + dir * min_d
+	for i in dynamic_obstacles.size():
+		var d := dynamic_obstacles[i]
+		var center3 := Vector2(d.x, d.y)
 		var to_pos3 := pos - center3
 		var dist3 := to_pos3.length()
+		var dir3 := to_pos3 / dist3 if dist3 > 0.001 else Vector2.RIGHT
+		var dyn_radii: Vector2 = dynamic_obstacle_radii[i] \
+				if i < dynamic_obstacle_radii.size() else Vector2(d.z, d.z)
+		var min_d3 := SpriteFootprint.radius_toward(dyn_radii, dir3) \
+				+ SpriteFootprint.radius_toward(radii, dir3)
 		if dist3 < min_d3:
-			pos = center3 + (to_pos3 / dist3 if dist3 > 0.001 else Vector2.RIGHT) * min_d3
+			pos = center3 + dir3 * min_d3
 	return pos
 
-## Rectangular field-boundary clamp.
-func clamp_inside_field(pos: Vector2, body_radius: float) -> Vector2:
-	var hx := lane_length * 0.5 - body_radius
-	var hy := lane_half_height - body_radius
+## Rectangular field-boundary clamp. Axis-aligned, so the oval's own semi-axes
+## apply exactly — no directional radius needed.
+func clamp_inside_field(pos: Vector2, radii: Vector2) -> Vector2:
+	var hx := lane_length * 0.5 - radii.x
+	var hy := lane_half_height - radii.y
 	pos.x = clampf(pos.x, -hx, hx)
 	pos.y = clampf(pos.y, -hy, hy)
 	return pos
@@ -576,16 +786,23 @@ func _draw() -> void:
 		var kind := obstacle_kinds[i] if i < obstacle_kinds.size() else ""
 		var tex := _obstacle_texture(kind)
 		if tex != null:
-			_draw_obstacle_sprite(Vector2(o.x, o.y), o.z, tex)
+			_draw_obstacle_prop(kind, Vector2(o.x, o.y), o.z, tex)
 		else:
+			# Unlabelled placeholder blob (Designer, 2026-07-25 — no text on
+			# lane props). An obstacle with no sprite kind still has to be
+			# VISIBLE, since it blocks movement: the blob shape is the tell.
 			_draw_blob(Vector2(o.x, o.y), Vector2(o.z, o.z * 0.6), obstacle_color, 18, 5.0, 0.12)
-			_draw_label(Vector2(o.x, o.y), "OBSTACLE")
 	for l in lakes:
 		var lake_pos := Vector2(l.x, l.y)
 		var lake_radius := Vector2(l.z, l.z * lake_radius_ratio)
-		_draw_blob(lake_pos, lake_radius, lake_color, 24, 6.0, 0.10)
+		_draw_blob(lake_pos, lake_radius, lake_color, 24, 6.0, 0.10, lake_ink_color)
 		_draw_hatch(lake_pos, lake_radius)
-		_draw_label(lake_pos, "POISON LAKE")
+	# Spike pits carry real art, so unlike the lake they need no blob/hatch —
+	# the drawing IS the hazard marker. Same centred sizing as any obstacle
+	# sprite, so radius reads true to the damage zone.
+	for s in spike_pits:
+		if spike_texture != null:
+			_draw_obstacle_sprite(Vector2(s.x, s.y), s.z, spike_texture)
 	_draw_lair()
 
 func _draw_page() -> void:
@@ -610,13 +827,16 @@ func _draw_ruled_lines(rect: Rect2, page_rect: Rect2, color: Color, width: float
 ## Organic hand-drawn blob: ellipse with stable per-vertex wobble, inked with
 ## two overlapping outline passes (like a pen retracing its own line) so it
 ## reads as a hand-drawn stroke rather than a clean vector outline.
-func _draw_blob(center: Vector2, radius: Vector2, fill: Color, steps: int, wobble: float, wobble_freq: float) -> void:
+## `ink` overrides the pen colour for shapes that are not plain black-on-paper
+## (the Poison Lake — see lake_ink_color); everything else passes nothing and
+## keeps the shared outline_color.
+func _draw_blob(center: Vector2, radius: Vector2, fill: Color, steps: int, wobble: float, wobble_freq: float, ink: Color = outline_color) -> void:
 	var pts := _wobbled_points(center, radius, steps, wobble, wobble_freq, 0.0)
 	draw_colored_polygon(pts, fill)
-	_draw_ink_outline(pts)
+	_draw_ink_outline(pts, ink)
 	var sketch := _wobbled_points(center, radius, steps, wobble * 1.6, wobble_freq * 1.7, 1.7)
 	sketch.append(sketch[0])
-	draw_polyline(sketch, Color(outline_color, 0.5), outline_width * 0.45, true)
+	draw_polyline(sketch, Color(ink, 0.5), outline_width * 0.45, true)
 
 func _wobbled_points(center: Vector2, radius: Vector2, steps: int, wobble: float, wobble_freq: float, phase: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
@@ -626,16 +846,17 @@ func _wobbled_points(center: Vector2, radius: Vector2, steps: int, wobble: float
 		pts.append(center + Vector2(cos(a) * radius.x * w, sin(a) * radius.y * w))
 	return pts
 
-func _draw_ink_outline(pts: PackedVector2Array) -> void:
+func _draw_ink_outline(pts: PackedVector2Array, ink: Color = outline_color) -> void:
 	var outline := pts.duplicate()
 	outline.append(pts[0])
-	draw_polyline(outline, outline_color, outline_width, true)
+	draw_polyline(outline, ink, outline_width, true)
 
-## Poison Lake hazard marking: black cross-hatch strokes over the paper fill
-## (comic-ink water texture), clipped to the lake's ellipse.
+## Poison Lake hazard marking: cross-hatch strokes over the fill (comic-ink
+## water texture), clipped to the lake.s ellipse. Inked in lake_ink_color so
+## the hatching reads as part of the toxic wash rather than plain black.
 func _draw_hatch(center: Vector2, radius: Vector2) -> void:
 	var step := 26.0
-	var hatch := Color(outline_color, 0.55)
+	var hatch := Color(lake_ink_color, 0.6)
 	var x := -radius.x
 	while x <= radius.x:
 		var h := sqrt(max(0.0, 1.0 - (x / radius.x) ** 2)) * radius.y
@@ -674,22 +895,127 @@ func _draw_lane_divider() -> void:
 	_draw_label(Vector2(deploy_band_x_min + 40.0, LANE_SPLIT_Y - 12.0), "TOP LANE")
 	_draw_label(Vector2(deploy_band_x_min + 40.0, LANE_SPLIT_Y + 22.0), "BOTTOM LANE")
 
+## The villain's lair is the wrecked spaceship (Designer, 2026-07-25 — it used
+## to be an unexplained prop in mid-lane, wasting the best piece of set-
+## dressing art in the game on a spot that meant nothing). It is now a normal
+## entry in `obstacles` (see apply_lane_layout), so it is drawn by the obstacle
+## loop in _draw() and collides like any other blocker — no dedicated draw
+## call, and no chance of the art and the collider disagreeing.
+##
+## Blocking the lair is safe because the villain stands in FRONT of it
+## (VILLAIN_LAIR_OFFSET): the party still has a clear approach to him, they
+## just can't walk through his ship to get there.
+## Which lair art this level uses. Each villain gets his own structure
+## (Designer, 2026-07-25): the crashed ship reads as Dark Mage's, the Berserker
+## dens up in a beast lair. A level with no entry falls back to the wreck.
+const LAIR_KIND_BY_LEVEL := {
+	1: "spaceship",
+	2: "berserk_lair",
+}
+
+func _lair_kind() -> String:
+	return LAIR_KIND_BY_LEVEL.get(RunState.current_level, "spaceship")
+
 func _draw_lair() -> void:
-	draw_arc(villain_pos, 70.0, 0.0, TAU, 28, Color(0.55, 0.2, 0.55, 0.9), 4.0, true)
-	_draw_label(villain_pos + Vector2(0.0, -84.0), "VILLAIN LAIR")
+	# Only the no-texture fallback is left — without it a missing @export would
+	# leave the lair's blocker invisible, since the obstacle loop draws nothing
+	# for a kind whose texture is null.
+	if _obstacle_texture(_lair_kind()) == null:
+		draw_arc(lair_pos, LAIR_RADIUS, 0.0, TAU, 28, Color(0.55, 0.2, 0.55, 0.9), 4.0, true)
 
 ## Border decor is no longer drawn here — see get_top_band()/get_left_band()/
 ## get_right_band()/get_bottom_band()/get_scatter()/get_border_decor_entries()
 ## and LaneForeground, which draws all of it above FogOfWar.
 
+## Obstacle kinds that are TALL — art whose height is its character (a tree
+## reads wrong squashed into a circle the width of its own trunk). These draw
+## standing on the ground, like the border band's props; everything else
+## (rocks, wrecks, a sword stuck in the dirt) is squat and draws centred on
+## its collision circle. See _draw_obstacle_prop.
+const TALL_OBSTACLE_KINDS := ["tree_bushy", "alien_tree", "alien_tree_thin"]
+## Height of a tall obstacle as a multiple of its collision radius. The trunk
+## sits at the bottom of the collision circle, so the canopy overhangs — which
+## is what you want: units path around the trunk, not the leaves.
+const TALL_OBSTACLE_HEIGHT_MULT := 3.2
+
+## Per-kind ART size multiplier. This scales the DRAWN sprite only — the
+## collision circle stays exactly `radius`, so tuning how big something looks
+## can never re-open a path the lane-walkability check already cleared.
+## A sword stuck in the dirt is a slim thing and read oversized when drawn at
+## the full width of its blocking circle (Designer, 2026-07-25).
+const OBSTACLE_ART_SCALE := {
+	"sword": 0.72,
+}
+
+## Ground footprint of a TALL prop as a fraction of its collision radius.
+## A tree is NOT wrapped by its drawn art: the canopy is meant to overhang so
+## units path around the trunk (see TALL_OBSTACLE_HEIGHT_MULT above). So tall
+## kinds get a shadow-shaped oval on the floor — narrow across, flatter still
+## in depth — rather than an oval covering the leaves.
+const TALL_FOOTPRINT := Vector2(0.62, 0.42)
+
+## Rebuilds obstacle_radii from obstacle_kinds. Called after any edit to
+## `obstacles`/`obstacle_kinds` — the three arrays are index-aligned and every
+## collision path now reads the radii, so letting them drift would silently
+## restore circle collision for the mismatched tail.
+func _rebuild_obstacle_radii() -> void:
+	obstacle_radii.clear()
+	for i in obstacles.size():
+		var kind := obstacle_kinds[i] if i < obstacle_kinds.size() else ""
+		obstacle_radii.append(_footprint_for(kind, obstacles[i].z))
+
+## Oval semi-axes for one obstacle, mirroring how its kind is DRAWN so
+## collision and art agree (Designer, 2026-07-25).
+func _footprint_for(kind: String, radius: float) -> Vector2:
+	if kind in TALL_OBSTACLE_KINDS:
+		return Vector2(radius, radius) * TALL_FOOTPRINT
+	var tex := _obstacle_texture(kind)
+	if tex == null:
+		# No art: the drawn tell is _draw_blob's own squashed shape, so match it.
+		return Vector2(radius, radius * 0.6)
+	# Squat kinds draw centred with their longest edge spanning the diameter.
+	return SpriteFootprint.radii_for(tex, radius * 2.0)
+
+## Draws one obstacle with the anchoring its KIND deserves (Designer,
+## 2026-07-25: "proportionalize obstacles by what they are"). Collision is a
+## circle at `center` with `radius` either way — only the art changes.
+func _draw_obstacle_prop(kind: String, center: Vector2, radius: float, tex: Texture2D) -> void:
+	var art_radius: float = radius * float(OBSTACLE_ART_SCALE.get(kind, 1.0))
+	if kind in TALL_OBSTACLE_KINDS:
+		var height := art_radius * TALL_OBSTACLE_HEIGHT_MULT
+		var tex_size := tex.get_size()
+		if tex_size.y <= 0.0:
+			return
+		var draw_size := Vector2(tex_size.x * (height / tex_size.y), height)
+		# Base at the BOTTOM of the collision circle so the trunk meets the
+		# ground where the blocker actually is.
+		var base := center + Vector2(0.0, radius)
+		draw_texture_rect(tex, Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y),
+				draw_size), false)
+	else:
+		_draw_obstacle_sprite(center, art_radius, tex)
+
 func _obstacle_texture(kind: String) -> Texture2D:
 	match kind:
 		"spaceship":
 			return spaceship_texture
+		"berserk_lair":
+			return berserk_lair_texture
 		"rock1":
 			return rock1_texture
 		"rock2":
 			return rock2_texture
+		"boulder":
+			return boulder_texture
+		# Trees are legitimate in-lane blockers, not just border dressing —
+		# they reuse the border band's textures (Designer, 2026-07-25: more
+		# variety in what an obstacle can be).
+		"tree_bushy":
+			return tree_bushy_texture
+		"alien_tree":
+			return alien_tree_texture
+		"alien_tree_thin":
+			return alien_tree_thin_texture
 		"sword":
 			return sword_texture
 		_:
@@ -702,6 +1028,8 @@ func _scenery_texture(kind: String) -> Texture2D:
 			return smudge_texture
 		"mushroom":
 			return mushroom_texture
+		"paw_print":
+			return paw_print_texture
 		_:
 			return null
 
@@ -744,7 +1072,14 @@ func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h := f
 		rect = Rect2(rect.position + Vector2(draw_size.x, 0.0), Vector2(-draw_size.x, draw_size.y))
 	draw_texture_rect(tex, rect, false, tint)
 
+## The only in-world text left (Designer, 2026-07-25): the DEPLOY band and the
+## TOP/BOTTOM LANE markers. Those name ZONES, not entities — every hero,
+## villain, minion and prop label is gone — and they're what makes the lane
+## split legible, so they stayed. Handwritten font like the rest of the UI.
+const LABEL_SIZE := 22
+
 func _draw_label(at: Vector2, text: String) -> void:
-	var font := ThemeDB.fallback_font
-	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	draw_string(font, at + Vector2(-tw * 0.5, 5.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, outline_color)
+	var font: Font = UIStyle.font() if UIStyle.font() != null else ThemeDB.fallback_font
+	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE).x
+	draw_string(font, at + Vector2(-tw * 0.5, 5.0), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE, Color(outline_color, 0.7))

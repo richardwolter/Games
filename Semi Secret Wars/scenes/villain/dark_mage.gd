@@ -40,6 +40,12 @@ extends Villain
 const FLEE_INTERVAL := 0.3
 const MINION_SCENE_PATH := "res://scenes/enemies/minion.tscn"
 const PROJECTILE_SCENE_PATH := "res://scenes/combat/projectile.tscn"
+## Same hand-drawn papercut-style art pipeline as the hero sprites (see
+## Hero.HERO_SPRITES doc) — the cream torn-paper cutout + ink linework is
+## baked into the source PNG itself, so wiring it in is just setting
+## sprite_texture (Combatant._draw draws it with the same paper-cutout
+## treatment — alpha, facing flip, ground shadow — as every other sprite unit).
+const SPRITE := preload("res://assets/sprites/DarkMage1.png")
 
 var _flee_cd := 0.0
 var _teleport_cd := 0.0
@@ -54,6 +60,8 @@ var _lair := Vector2.ZERO
 func _configure() -> void:
 	super()
 	enemy_group = ""  # does not attack this milestone
+	sprite_texture = SPRITE
+	sprite_scale = 2.0
 	_lair = global_position
 	_teleport_cd = teleport_interval
 	_shoot_cd = shoot_interval

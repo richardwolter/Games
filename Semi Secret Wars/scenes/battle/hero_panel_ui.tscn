@@ -1,29 +1,50 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scenes/battle/hero_panel_ui.gd" id="1_script"]
-[ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="2_theme"]
 
+; Tighter margins than the project theme's default PanelContainer card. Four
+; of these stack down the left edge of a 1080-tall canvas, so the panel pays
+; for its own padding four times over — see the sizing note on HeroPanelUI.
+[sub_resource type="StyleBoxFlat" id="panel_hero"]
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+bg_color = Color(0.956863, 0.937255, 0.882353, 0.85)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 20
+corner_radius_bottom_right = 13
+corner_radius_bottom_left = 18
+
+; Text is a step below the global scale here (26/21/19/16 vs 32/24/20/17):
+; this is the densest UI in the game and four panels have to fit under
+; HeroPanelsRoot's y=110 start without running off the bottom of the canvas.
 [node name="HeroPanelUI" type="PanelContainer"]
-custom_minimum_size = Vector2(240, 168)
-theme = ExtResource("2_theme")
+custom_minimum_size = Vector2(330, 0)
+theme_override_styles/panel = SubResource("panel_hero")
 script = ExtResource("1_script")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="NameLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "Hero Name"
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 26
 
 [node name="LevelLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "LV 1"
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 21
 
 [node name="HPBar" type="ProgressBar" parent="VBoxContainer"]
-custom_minimum_size = Vector2(0, 22)
+custom_minimum_size = Vector2(0, 26)
 layout_mode = 2
 max_value = 100.0
 value = 50.0
@@ -32,10 +53,10 @@ show_percentage = false
 [node name="CooldownLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "READY"
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 19
 
 [node name="CooldownBar" type="ProgressBar" parent="VBoxContainer"]
-custom_minimum_size = Vector2(0, 10)
+custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 max_value = 1.0
 value = 1.0
@@ -44,26 +65,26 @@ show_percentage = false
 [node name="CooldownLabel2" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "READY"
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 19
 
 [node name="CooldownBar2" type="ProgressBar" parent="VBoxContainer"]
-custom_minimum_size = Vector2(0, 10)
+custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 max_value = 1.0
 value = 1.0
 show_percentage = false
 
 [node name="BuffLabel" type="RichTextLabel" parent="VBoxContainer"]
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 bbcode_enabled = true
 fit_content = true
 scroll_active = false
 autowrap_mode = 0
-theme_override_font_sizes/normal_font_size = 13
+theme_override_font_sizes/normal_font_size = 17
 
 [node name="RunStatsLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "KILLS 0  ·  XP 0  ·  ABL —"
-theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.4, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.172549, 0.172549, 0.172549, 0.6)

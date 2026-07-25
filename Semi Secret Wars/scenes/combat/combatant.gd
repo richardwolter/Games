@@ -54,6 +54,12 @@ signal died(who: Combatant)
 @export var outline_width := 3.0
 @export var bob_amplitude := 3.0
 @export var bob_speed := 5.0
+## Sideways shuffle while actually moving (South Park-style cutout walk) —
+## unlike bob_amplitude/bob_speed above, this only animates during real
+## movement (see _walking_this_frame) and eases out to 0 when idle instead
+## of running continuously.
+@export var sway_amplitude := 3.0
+@export var sway_speed := 9.0
 ## White hit-flash overlay on take_damage. Off for static structures (e.g.
 ## LaneSpawnPoint) where the flash reads as flicker rather than a hit reaction.
 @export var flash_on_hit := true
@@ -65,12 +71,24 @@ signal died(who: Combatant)
 ## fallback — briefly rendering at the shoved position before being pinned
 ## back, a one-frame position pop.
 @export var is_pinned := false
+## Multiplies death-FX size/count (bigger units get a bigger pop) — see
+## BattleFX.death_pop. 1.0 = normal minion/hero scale.
+@export var death_fx_scale := 1.0
+## Adds a debris explosion (shards + torn sprite chunks + flash ring) on top
+## of the normal death pop — set true for structures like LaneSpawnPoint.
+@export var death_debris := false
+## Whether death leaves a torn-sprite corpse scrap behind. Off for HeroClone —
+## a decoy/taunt with no real body, so a paper corpse of it reads as a bug.
+@export var leaves_corpse := true
 
 const RETARGET_INTERVAL := 0.25
 const FLASH_TIME := 0.12
 const DEATH_TIME := 0.2
 const LUNGE_DIST := 8.0
 const LUNGE_RETURN := 60.0
+## How fast the sideways sway fades in/out around actual movement, so
+## starting/stopping doesn't snap the offset — mirrors LUNGE_RETURN's role.
+const SWAY_ENVELOPE_SPEED := 6.0
 ## Ranged units (is_ranged) back away once the target closes inside this
 ## fraction of attack_range, instead of standing still and letting melee
 ## enemies walk right up next to them — they'd rather shoot from afar than
@@ -88,6 +106,8 @@ const SPRITE_ALPHA := 0.92
 ## copy of its caster). Defaults to the shared paper-cutout alpha above.
 func _sprite_alpha() -> float:
 	return SPRITE_ALPHA
+## Group containing EVERY Combatant on both sides — see _ready.
+const TARGETABLE_GROUP := "targetable"
 ## Extra breathing room beyond the two bodies' radii before separation kicks in.
 const SEPARATION_MARGIN := 4.0
 ## How fast overlapping units are pushed apart, in px/sec.
@@ -111,6 +131,9 @@ var _goal_done := false
 var _field: LaneField = null
 var _bob := 0.0
 var _bob_phase := 0.0
+var _sway := 0.0
+var _sway_phase := 0.0
+var _sway_envelope := 0.0
 var _target: Combatant = null
 var _attack_cd := 0.0
 var _retarget_cd := 0.0
@@ -118,8 +141,19 @@ var _flash := 0.0
 var _lunge := Vector2.ZERO
 var _dying := false
 var _death_t := 0.0
+## Direction the last hit came from (attacker -> self), used to bias the
+## death blood spray. Vector2.ZERO (no attacker, e.g. burn/hazard tick) falls
+## back to a straight-up spray in BattleFX.blood_spray.
+var _last_hit_dir := Vector2.ZERO
 var _heading := Vector2.ZERO
+## True for frames where _engage/_advance_goal actually moved this unit via
+## _steer — drives the sideways sway; reset every frame, set at each
+## global_position += _steer(...) call site.
+var _walking_this_frame := false
 var _in_lake := false
+## Edge-trigger latch for spike pits, mirroring _in_lake. Separate flag so an
+## overlapping lake and pit each get to fire once.
+var _on_spikes := false
 ## Villain dormancy (gameplay-loop rework): while > 0 the unit stays inert at
 ## its lair until a hero enters this radius or it takes a hit — see is_alerted().
 ## 0 = not dormant, always active (heroes, minions). Set in a villain's _configure.
@@ -133,6 +167,23 @@ var _slow_factor := 1.0
 ## Seconds remaining confused (targets own group instead of the enemy group).
 ## 0 = not confused. Applied by BEACON's Confuse ultimate (minions only).
 var _confused_t := 0.0
+## Seconds remaining of burn damage-over-time; 0 = not burning. Ticks once
+## every BURN_TICK_INTERVAL for _burn_dps * BURN_TICK_INTERVAL damage
+## (WARDEN+BEACON Duo Ultimate; also the THUNDAAR+WARDEN plant trail's
+## damage tick — see DuoUltimates). Damage goes through the normal
+## take_damage(attacker) path, so it credits kills/on-kill hooks normally.
+var _burn_t := 0.0
+var _burn_dps := 0.0
+var _burn_tick_cd := 0.0
+var _burn_src: Combatant = null
+const BURN_TICK_INTERVAL := 1.0
+
+## Seconds remaining vulnerable: incoming damage gets +_vuln_dmg_add added on
+## top (flat, not a %, per Designer — see ability-cadence pass BALANCE.md
+## 2026-07-24). 0 = not vulnerable. WARDEN's Ensnare payoff.
+var _vuln_t := 0.0
+var _vuln_dmg_add := 0.0
+
 ## Timed party-wide buffs (e.g. objective-completion rewards); see apply_damage_boost etc.
 var _dmg_boost_t := 0.0
 var _dmg_boost_mult := 1.0
@@ -158,11 +209,25 @@ const STATUS_SLOW_COLOR := Color(0.55, 0.45, 0.85, 0.9)
 const STATUS_BUFF_COLOR := Color(0.9, 0.75, 0.25, 0.9)
 const STATUS_SHIELD_COLOR := Color(0.6, 0.85, 0.95, 0.9)
 const STATUS_CONFUSE_COLOR := Color(0.95, 0.4, 0.85, 0.95)
+const STATUS_BURN_COLOR := Color(0.95, 0.45, 0.15, 0.95)
+const STATUS_VULN_COLOR := Color(0.9, 0.3, 0.35, 0.95)
 ## Fixed flash length for apply_shield, which has no duration of its own
 ## (a charge count, not a timer) — just a short "you got shielded" pulse.
 const STATUS_SHIELD_FLASH_TIME := 0.4
 ## Sprite art faces left by default; flips to face right when moving/aiming that way.
 var _facing_x := -1.0
+## Set true for art drawn facing RIGHT instead of the house convention above
+## (Designer, 2026-07-25: the Berserker's sprite is mirrored relative to every
+## other unit). Inverts the draw flip so the unit still LOOKS where it is
+## going — cheaper and safer than re-exporting the PNG, and self-documenting
+## at the call site.
+@export var sprite_faces_right := false
+
+## +1 when the source art already points the way the house convention expects,
+## -1 when it is mirrored. Multiplied into the draw flip and the corpse scrap
+## so both agree.
+func _art_dir() -> float:
+	return -1.0 if sprite_faces_right else 1.0
 ## Cached push-apart vector from same-group neighbors, refreshed at RETARGET_INTERVAL
 ## (like target acquisition) so it stays cheap with hundreds of active minions.
 var _separation := Vector2.ZERO
@@ -178,15 +243,30 @@ var separation_per_frame := false
 func _configure() -> void:
 	pass
 
-## Radius to use for hard-obstacle clamping (clamp_out_of_obstacles/clamp_inside_field).
-## body_radius alone under-reports how much space a unit actually occupies
-## on screen when sprite_texture draws bigger than the hitbox (draw size is
+## Oval footprint for hard-obstacle clamping (clamp_out_of_obstacles /
+## clamp_inside_field / steer_around), as semi-axes (rx, ry).
+##
+## body_radius alone under-reports how much space a unit occupies on screen when
+## sprite_texture draws bigger than the hitbox (draw size is
 ## body_radius * 2 * sprite_scale — see _draw), which reads as clipping into
-## solid blockers (mountains, spawn gates) even though centers never touch.
+## solid blockers even though centers never touch. But a single radius
+## OVER-reports just as badly: it spans the sprite's longest edge, so a tall
+## character's collision WIDTH was set by his height, padding included
+## (Designer, 2026-07-25). The oval hugs the drawn art instead — see
+## SpriteFootprint.
+func _collision_radii() -> Vector2:
+	if sprite_texture == null:
+		return Vector2(body_radius, body_radius)
+	var long_extent := body_radius * 2.0 * sprite_scale
+	var radii := SpriteFootprint.radii_for(sprite_texture, long_extent)
+	# Never shrink below the authored hitbox — body_radius is what attacks and
+	# separation are tuned against.
+	return radii.max(Vector2(body_radius, body_radius))
+
+## Scalar stand-in where a single number is unavoidable (status rings, FX).
 func _collision_radius() -> float:
-	if sprite_texture != null:
-		return maxf(body_radius, body_radius * sprite_scale)
-	return body_radius
+	var r := _collision_radii()
+	return maxf(r.x, r.y)
 
 ## Subclass hook: called once when the unit reaches its goal.
 func _on_goal_reached() -> void:
@@ -198,6 +278,13 @@ func _ready() -> void:
 	hp = max_hp
 	if self_group != "":
 		add_to_group(self_group)
+	# Every combat unit, regardless of side. Exists for units that attack
+	# ACROSS the normal hero/hostile split — currently only Monster, whose
+	# enemy_group is this (Designer, 2026-07-25: "attacks anything on its way,
+	# heroes and enemies included"). _find_target scans exactly one group, so
+	# a faction-agnostic attacker needs one group that contains everyone
+	# rather than a second scan loop bolted into the hot targeting path.
+	add_to_group(TARGETABLE_GROUP)
 	_bob_phase = randf() * TAU
 	# Desync retarget ticks so a big swarm's scans spread across frames.
 	_retarget_cd = randf() * RETARGET_INTERVAL
@@ -219,17 +306,33 @@ func _process(delta: float) -> void:
 
 	_bob_phase += bob_speed * delta
 	_bob = sin(_bob_phase) * bob_amplitude
+	_walking_this_frame = false
 	_attack_cd = maxf(_attack_cd - delta * _effective_atk_rate_mult(), 0.0)
 	_flash = maxf(_flash - delta, 0.0)
 	_lunge = _lunge.move_toward(Vector2.ZERO, LUNGE_RETURN * delta)
 	_stun_t = maxf(_stun_t - delta, 0.0)
 	_slow_t = maxf(_slow_t - delta, 0.0)
+	_vuln_t = maxf(_vuln_t - delta, 0.0)
+	if _vuln_t <= 0.0:
+		_vuln_dmg_add = 0.0
 	_confused_t = maxf(_confused_t - delta, 0.0)
 	_dmg_boost_t = maxf(_dmg_boost_t - delta, 0.0)
 	_speed_boost_t = maxf(_speed_boost_t - delta, 0.0)
 	_atk_speed_boost_t = maxf(_atk_speed_boost_t - delta, 0.0)
 	_xp_boost_t = maxf(_xp_boost_t - delta, 0.0)
 	_status_flash_t = maxf(_status_flash_t - delta, 0.0)
+
+	if _burn_t > 0.0:
+		_burn_t = maxf(_burn_t - delta, 0.0)
+		_burn_tick_cd -= delta
+		if _burn_tick_cd <= 0.0:
+			_burn_tick_cd += BURN_TICK_INTERVAL
+			take_damage(_burn_dps * BURN_TICK_INTERVAL, _burn_src)
+		if _burn_t <= 0.0:
+			_burn_dps = 0.0
+			_burn_src = null
+	else:
+		_burn_tick_cd = 0.0
 
 	_retarget_cd -= delta
 	if _retarget_cd <= 0.0:
@@ -262,8 +365,8 @@ func _process(delta: float) -> void:
 
 		if _field != null:
 			# Steering is only a hint — hard-clamp so units never clip obstacle cores.
-			global_position = _field.clamp_out_of_obstacles(global_position, _collision_radius())
-			global_position = _field.clamp_inside_field(global_position, _collision_radius())
+			global_position = _field.clamp_out_of_obstacles(global_position, _collision_radii())
+			global_position = _field.clamp_inside_field(global_position, _collision_radii())
 			# Poison Lake: one damage instance per entry, not a continuous drain —
 			# fire a single hit on the outside→inside transition, then stay quiet
 			# until the unit fully exits and re-enters. Makes clipping a lake a
@@ -273,6 +376,20 @@ func _process(delta: float) -> void:
 			_in_lake = _field.in_lake(global_position)
 			if _in_lake and not was_in_lake:
 				_take_hazard_damage(_field.lake_damage)
+			# Spike pits follow the same edge-triggered contract as the lake —
+			# one hit on entry, silent until the unit fully exits and steps back
+			# in. Tracked separately so standing in a lake doesn't suppress a
+			# spike hit (or vice versa) when the two overlap.
+			var was_on_spikes := _on_spikes
+			_on_spikes = _field.in_spike_pit(global_position)
+			if _on_spikes and not was_on_spikes:
+				_take_hazard_damage(_field.spike_damage)
+
+	var sway_target := 1.0 if _walking_this_frame else 0.0
+	_sway_envelope = move_toward(_sway_envelope, sway_target, SWAY_ENVELOPE_SPEED * delta)
+	if _walking_this_frame:
+		_sway_phase += sway_speed * delta
+	_sway = sin(_sway_phase) * sway_amplitude * _sway_envelope
 
 	queue_redraw()
 
@@ -284,10 +401,16 @@ func take_damage(amount: float, attacker: Combatant = null) -> void:
 		if flash_on_hit:
 			_flash = FLASH_TIME
 		return
+	if _vuln_t > 0.0:
+		amount += _vuln_dmg_add
 	hp -= amount
 	if flash_on_hit:
 		_flash = FLASH_TIME
 	_alerted = true  # a dormant villain wakes the instant it's struck (e.g. ranged poke)
+	if attacker != null and is_instance_valid(attacker):
+		var to_self := global_position - attacker.global_position
+		if to_self != Vector2.ZERO:
+			_last_hit_dir = to_self.normalized()
 	if hp <= 0.0:
 		if attacker != null and is_instance_valid(attacker):
 			attacker._on_kill(self)
@@ -356,6 +479,33 @@ func apply_confusion(duration: float) -> void:
 	_target = null
 	_status_flash_t = maxf(_status_flash_t, duration)
 	_status_flash_color = STATUS_CONFUSE_COLOR
+
+## Burns this unit for `duration` seconds, dealing `dps` damage/second (ticked
+## every BURN_TICK_INTERVAL — see _process) via the normal take_damage(src)
+## path. Extend-don't-stack duration like apply_slow; keeps the stronger
+## (higher) dps if reapplied mid-burn rather than averaging the two down.
+func apply_burn(duration: float, dps: float, src: Combatant = null) -> void:
+	if _dying:
+		return
+	if _burn_t <= 0.0 or dps > _burn_dps:
+		_burn_dps = dps
+	_burn_t = maxf(_burn_t, duration)
+	_burn_src = src
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_BURN_COLOR
+
+## Makes this unit take `dmg_add` extra flat damage per hit for `duration`
+## seconds (WARDEN's Ensnare payoff — a flat add, not a %, so it reads the
+## same regardless of the attacker's base damage). Extend-don't-stack
+## duration like apply_slow; keeps the stronger add if reapplied mid-window.
+func apply_vulnerability(duration: float, dmg_add: float) -> void:
+	if _dying:
+		return
+	if _vuln_t <= 0.0 or dmg_add > _vuln_dmg_add:
+		_vuln_dmg_add = dmg_add
+	_vuln_t = maxf(_vuln_t, duration)
+	_status_flash_t = maxf(_status_flash_t, duration)
+	_status_flash_color = STATUS_VULN_COLOR
 
 ## The group this unit currently treats as its enemies — normally enemy_group,
 ## but its own self_group while confused so it turns on its neighbors. Used by
@@ -437,8 +587,8 @@ func apply_knockback(direction: Vector2, distance: float, splash_damage: float, 
 	if not is_pinned:
 		to = from + direction * distance
 		if _field != null:
-			to = _field.clamp_out_of_obstacles(to, _collision_radius())
-			to = _field.clamp_inside_field(to, _collision_radius())
+			to = _field.clamp_out_of_obstacles(to, _collision_radii())
+			to = _field.clamp_inside_field(to, _collision_radii())
 		global_position = to
 	if self_group == "":
 		return
@@ -457,55 +607,31 @@ func _die() -> void:
 	if self_group != "":
 		remove_from_group(self_group)
 	_spawn_death_particles()
+	_on_died()
 	died.emit(self)
 
-## One-shot burst tinted to this unit's body color, added as a sibling so it
-## keeps playing after this node's queue_free() at the end of the death fade.
+## No-op by default; Hero overrides it for the death sound so minions,
+## villains, and HeroClone dying stays silent.
+func _on_died() -> void:
+	pass
+
+## Death FX, added as a sibling so it keeps playing after this node's
+## queue_free() at the end of the death fade. See scripts/battle_fx.gd for
+## the actual particle/scrap/debris construction — this is just the dispatch.
 func _spawn_death_particles() -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	var burst := CPUParticles2D.new()
-	burst.global_position = global_position
-	burst.emitting = false
-	burst.one_shot = true
-	burst.amount = 14
-	burst.lifetime = 0.5
-	burst.explosiveness = 1.0
-	burst.direction = Vector2.UP
-	burst.spread = 180.0
-	burst.gravity = Vector2(0, 260)
-	burst.initial_velocity_min = 60.0
-	burst.initial_velocity_max = 140.0
-	burst.scale_amount_min = 2.0
-	burst.scale_amount_max = 4.0
-	burst.color = body_color
-	parent.add_child(burst)
-	burst.emitting = true
-	var t := get_tree().create_timer(burst.lifetime + 0.1)
-	t.timeout.connect(burst.queue_free)
-	_spawn_ground_splash(parent)
-
-## Fading blob left on the ground under a death burst, so the particles read
-## as having splattered rather than just vanishing in midair.
-func _spawn_ground_splash(parent: Node) -> void:
-	var splash := Polygon2D.new()
-	var pts := PackedVector2Array()
-	var point_count := 10
-	for i in point_count:
-		var ang := TAU * float(i) / point_count
-		var r := body_radius * randf_range(0.6, 1.1)
-		pts.append(Vector2(cos(ang) * r, sin(ang) * r * 0.5))
-	splash.polygon = pts
-	splash.color = body_color
-	splash.color.a = 0.55
-	splash.global_position = global_position
-	parent.add_child(splash)
-	parent.move_child(splash, 0)
-	var tw := splash.create_tween()
-	tw.tween_interval(0.6)
-	tw.tween_property(splash, "modulate:a", 0.0, 0.8)
-	tw.tween_callback(splash.queue_free)
+	BattleFX.death_pop(parent, global_position, body_color, body_radius, death_fx_scale)
+	BattleFX.blood_spray(parent, global_position, _last_hit_dir, body_radius, death_fx_scale)
+	if sprite_texture != null and leaves_corpse:
+		BattleFX.paper_scrap(parent, global_position, sprite_texture, _facing_x * _art_dir(), body_radius, sprite_scale)
+	if death_debris:
+		BattleFX.debris_burst(parent, global_position, body_color, sprite_texture, body_radius)
+	BattleFX.ground_splash(parent, global_position, body_color, body_radius)
+	var blood := get_tree().get_first_node_in_group("blood")
+	if blood != null and blood.has_method("stain"):
+		blood.stain(global_position)
 
 ## Scoring hook for _acquire_target: lower score = more preferred. The base
 ## Combatant scores purely by squared distance (nearest wins), which is exactly
@@ -586,6 +712,7 @@ func _engage(delta: float) -> void:
 		pass
 	elif dist > attack_range:
 		global_position += _steer(to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
+		_walking_this_frame = true
 	elif is_ranged and not _target.is_pinned and dist < attack_range * RANGED_STANDOFF_FRACTION:
 		# Kite: keep shooting (below) while backing off, rather than freezing
 		# in place and letting the enemy close to melee range regardless.
@@ -595,6 +722,7 @@ func _engage(delta: float) -> void:
 		# and steer_around's obstacle avoidance turns that oscillation into a
 		# slow orbit around the structure instead of a stable stand-off.
 		global_position += _steer(-to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
+		_walking_this_frame = true
 	if dist <= attack_range and _attack_cd <= 0.0:
 		_lunge = to_target.normalized() * LUNGE_DIST
 		var victim := _target
@@ -603,8 +731,16 @@ func _engage(delta: float) -> void:
 			_fire_projectile(victim)
 		else:
 			victim.take_damage(damage * damage_mult(), self)
+			_on_melee_hit(victim)
 			if knockback_chance > 0.0 and not victim._dying and randf() < knockback_chance:
 				victim.apply_knockback(to_target.normalized(), knockback_distance, knockback_splash_damage, self)
+
+## Fires the instant a melee attack lands (the "else" branch above — ranged
+## units never reach it, since they take the _fire_projectile branch instead).
+## No-op by default; Hero overrides it for the sword-hit sound so minions and
+## villains landing their own melee hits stay silent.
+func _on_melee_hit(_victim: Combatant) -> void:
+	pass
 
 func _fire_projectile(victim: Combatant) -> void:
 	var proj: Projectile = projectile_scene.instantiate()
@@ -616,7 +752,14 @@ func _fire_projectile(victim: Combatant) -> void:
 	proj.max_range = projectile_range
 	proj.color = body_color
 	proj.global_position = global_position
+	_configure_projectile(proj)
 	get_parent().add_child(proj)
+
+## Subclass hook: last chance to tweak a just-built Projectile before it's
+## added to the tree (e.g. HeroClone.ensnare_on_hit setting on_hit_stun).
+## Every other ranged Combatant leaves this a no-op.
+func _configure_projectile(_proj: Projectile) -> void:
+	pass
 
 func _advance_goal(delta: float) -> void:
 	if _goal_done or goal == Vector2.INF or move_speed <= 0.0:
@@ -627,13 +770,15 @@ func _advance_goal(delta: float) -> void:
 		_on_goal_reached()
 		return
 	global_position += _steer(to_goal.normalized(), delta) * move_speed * _effective_move_mult() * delta
+	_walking_this_frame = true
 
 ## Desired direction adjusted to avoid the field's blocking obstacles, then
 ## eased against the previous heading so corrections read as smooth arcs
 ## instead of frame-to-frame jitter.
 func _steer(desired: Vector2, delta: float) -> Vector2:
 	if _field != null:
-		desired = _field.steer_around(global_position, desired, _collision_radius() + 8.0)
+		desired = _field.steer_around(global_position, desired,
+				_collision_radii() + Vector2(8.0, 8.0))
 	if desired.length() < 0.01:
 		return desired
 	if _heading == Vector2.ZERO:
@@ -642,8 +787,21 @@ func _steer(desired: Vector2, delta: float) -> Vector2:
 		_heading = _heading.slerp(desired, clampf(delta * 10.0, 0.0, 1.0)).normalized()
 	return _heading
 
+## Warm near-black ink wash for the ground shadow — matches the outline
+## family used for paper-cutout linework (see outline_color) rather than a
+## flat photographic black.
+const SHADOW_COLOR := Color(0.08, 0.07, 0.06)
+const SHADOW_ALPHA := 0.28
+## Flattened to read as a shadow cast on the ground plane, not a full circle.
+const SHADOW_SQUASH := 0.4
+
 func _draw() -> void:
-	var offset := Vector2(0.0, -_bob) + _lunge
+	var offset := Vector2(_sway, -_bob) + _lunge
+	# Ground-plane-only offset (no -_bob) so the shadow stays flat on the
+	# floor while the sprite bounces above it — that vertical gap between
+	# shadow and body is what reads as light from above instead of the unit
+	# being pasted flat onto the field.
+	_draw_ground_shadow(Vector2(_sway, 0.0) + _lunge)
 	# Units with sprite art carry their own paper-cutout backing baked into the
 	# image, so only draw the plain circle+outline backing as a fallback for
 	# units without sprite art (radius still matches body_radius for hit-testing).
@@ -656,7 +814,7 @@ func _draw() -> void:
 		var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
 		var draw_size := tex_size * scale_factor
 		# Art faces left by default; turn in place on its own axis when facing right.
-		draw_set_transform(offset, 0.0, Vector2(-_facing_x, 1.0))
+		draw_set_transform(offset, 0.0, Vector2(-_facing_x * _art_dir(), 1.0))
 		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, _sprite_alpha()))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if _in_lake:
@@ -664,15 +822,46 @@ func _draw() -> void:
 	if _flash > 0.0:
 		draw_circle(offset, body_radius, Color(1.0, 1.0, 1.0, (_flash / FLASH_TIME) * 0.7))
 	if _status_flash_t > 0.0:
-		draw_arc(offset, body_radius + 5.0, 0.0, TAU, 24, _status_flash_color, 3.0, true)
+		# _collision_radius(), not body_radius alone — a unit whose sprite
+		# renders bigger than its hitbox (Hero.SPRITE_SCALE_MULT) would
+		# otherwise get this status ring sitting inside its own art.
+		draw_arc(offset, _collision_radius() + 5.0, 0.0, TAU, 24, _status_flash_color, 3.0, true)
 	if hp < max_hp and not _dying:
 		_draw_health_bar(offset)
-	if label_text != "":
-		var font := ThemeDB.fallback_font
-		var fs := 15
-		var tw := font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, offset + Vector2(-tw * 0.5, -body_radius - 16.0), label_text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, outline_color)
+	# label_text is deliberately NOT drawn any more (Designer, 2026-07-25:
+	# names/texts removed from heroes, villains, minions and lane props — the
+	# sprite art identifies each unit now, and floating names cluttered a
+	# swarm fight). The field itself stays: BattleHUD reads the villain's
+	# label_text for its HP panel title, so it is still live data, just not
+	# rendered in world space.
+
+## Flattened ellipse drawn first (furthest back) so the sprite/body, hit-
+## flash, and status ring all composite over it.
+func _draw_ground_shadow(ground_offset: Vector2) -> void:
+	# Sprite art is drawn centered on this node's origin (see _draw below —
+	# draw_texture_rect's rect is centered at `offset`), so a shadow drawn at
+	# y=0 sits at the sprite's vertical midpoint (roughly chest-height on a
+	# humanoid) instead of under its feet. Drop it toward the sprite's bottom
+	# edge — the same diameter/scale math _draw uses below. Not the full half
+	# height: the source art carries transparent padding below the actual
+	# feet, so a full-height drop reads as floating; DROP_FRACTION pulls it
+	# in to sit right under the visible feet instead (Designer, 2026-07-25).
+	const DROP_FRACTION := 0.38
+	var drop := body_radius
+	if sprite_texture != null:
+		var diameter := body_radius * 2.0 * sprite_scale
+		var tex_size := sprite_texture.get_size()
+		var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
+		drop = tex_size.y * scale_factor * DROP_FRACTION
+	var center := ground_offset + Vector2(0.0, drop)
+	var pts := PackedVector2Array()
+	var point_count := 16
+	var rx := body_radius * 0.95
+	var ry := rx * SHADOW_SQUASH
+	for i in point_count:
+		var ang := TAU * float(i) / point_count
+		pts.append(center + Vector2(cos(ang) * rx, sin(ang) * ry))
+	draw_colored_polygon(pts, Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, SHADOW_ALPHA))
 
 func _draw_health_bar(offset: Vector2) -> void:
 	var w := body_radius * 2.0

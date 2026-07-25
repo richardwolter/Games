@@ -1,18 +1,22 @@
-[gd_resource type="Resource" script_class="StageConfig" format=3]
+[gd_resource type="Resource" script_class="StageConfig" load_steps=3 format=3]
 [ext_resource type="Script" path="res://config/stage_config.gd" id="1_stage"]
+; Level 1 reuses the title screen's theme so a fresh run plays one continuous
+; piece from the menu into the first battle (Designer, 2026-07-25).
+[ext_resource type="AudioStream" path="res://assets/Sounds/1stMenu.mp3" id="2_music"]
 
 [resource]
 script = ExtResource("1_stage")
+music = ExtResource("2_music")
 stage_id = "stage_1"
 stage_name = "Stage 1: Dark Mage"
 villain_type = "dark_mage"
 minion_type = "minion"
-swarm_cap_start = 14
+swarm_cap_start = 28
 escalate_every = 14.0
-escalate_step = 2
+escalate_step = 3
 swarm_max_cap = 90
 minion_speed = 105.0
-spawn_interval = 2.2
-spawn_batch = 5
+spawn_interval = 1.6
+spawn_batch = 8
 field_preset = "default"
-villain_hp_mult = 1.6
+villain_hp_mult = 2.2

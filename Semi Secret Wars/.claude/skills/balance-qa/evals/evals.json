@@ -1,0 +1,17 @@
+{
+  "skill_name": "balance-qa",
+  "evals": [
+    {
+      "id": 0,
+      "name": "wrong-lever-trap",
+      "prompt": "Level 1 feels like it takes forever before anything actually happens. Can you bump the heroes' move speed so they get to the fight faster?",
+      "expected_output": "Redirects from the hero-stat lever (last resort, affects everything) to diagnosing traversal/layout; should surface the ~5500px deploy-to-lair gap and note it exceeds the distance that structurally broke V1's L1; should not silently just edit move_speed."
+    },
+    {
+      "id": 1,
+      "name": "vague-too-easy",
+      "prompt": "Game feels too easy once I've bought a couple of upgrades. What should we change?",
+      "expected_output": "Refuses to tune toward the adjective; pins down WHICH part feels easy, asks for or proposes a diagnosis, notes nothing in the lane build has ever been swept and there is no harness, distinguishes structural vs tuning."
+    }
+  ]
+}

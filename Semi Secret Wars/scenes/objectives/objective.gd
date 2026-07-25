@@ -67,11 +67,8 @@ func _draw() -> void:
 	draw_polyline(o, outline_color, 3.0, true)
 	if not is_captured and progress > 0.0:
 		draw_arc(Vector2.ZERO, size + 8.0, -PI / 2.0, -PI / 2.0 + TAU * progress, 40, ring_color, 4.0, true)
-	var font := ThemeDB.fallback_font
-	var txt := label
-	if is_captured:
-		txt = label + " CAPTURED"
-	elif progress > 0.0:
-		txt = "%s %d%%" % [label, int(progress * 100.0)]
-	var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	draw_string(font, Vector2(-tw * 0.5, -size - 12.0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, outline_color)
+	# No floating "<name> 40%" text any more (Designer, 2026-07-25 — names and
+	# texts off lane props). Nothing is lost: the progress ring above already
+	# shows the fraction, `captured_color` shows the captured state, and
+	# BattleHUD's objective panel carries the written readout. `label` stays as
+	# data for that panel.

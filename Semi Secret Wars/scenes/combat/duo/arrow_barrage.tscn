@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/duo/arrow_barrage.gd" id="1_arrow_barrage"]
+
+[node name="ArrowBarrage" type="Node2D"]
+script = ExtResource("1_arrow_barrage")

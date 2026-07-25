@@ -1,21 +1,24 @@
 extends Node
 ## RunState autoload — transient per-run roguelite state (Milestone 1).
 ##
-## Holds each hero's in-run LEVEL + XP-toward-next and the run boons they've
-## picked. Everything here resets on start_run() and is NEVER saved to disk —
-## that is the whole point of the hybrid-roguelite direction: builds are
-## per-run and reset, while persistence (unlocked heroes/relics) lives in
-## GameState / a future MetaState. See the design report + IMPLEMENTATION_PLAN.md.
+## Holds each hero's in-run LEVEL + XP-toward-next and the run boons picked.
+## Everything here resets on start_run() and is NEVER saved to disk — that is
+## the whole point of the hybrid-roguelite direction: builds are per-run and
+## reset, while persistence (unlocked heroes/relics) lives in GameState / a
+## future MetaState. See the design report + IMPLEMENTATION_PLAN.md.
 ##
 ## XP is fed in from GameState.add_xp (the single chokepoint for kill + objective
 ## XP) and still drives per-hero LEVEL/xp_to_next (shown on the battle HUD) and
 ## the persistent banked_xp currency (stat upgrades) — but XP no longer grants
-## boons directly (Designer, 2026-07-21). Boons are now offered once per living
-## hero at the START of each stage level instead (see BattleManager._ready,
-## which queues RunState.living_party() into the same LevelUpScreen pick flow
-## `hero_leveled` used to drive). `hero_leveled` still fires on every XP
-## level-up — nothing currently listens to it, kept for future HUD feedback
-## (e.g. a "ding" effect) without needing to touch RunState again.
+## boons directly (Designer, 2026-07-21). Boons are offered at the START of each
+## stage level instead (see BattleManager._ready).
+##
+## As of 2026-07-25 the only run-scoped boon pool is `duo_boons` — one pick per
+## Duo, targeting that Duo's Ultimate. The per-hero pool that used to sit
+## alongside it was removed with its catalog; see duo_ultimate_boons.gd for why.
+## `hero_leveled` still fires on every XP level-up — nothing currently listens
+## to it, kept for future HUD feedback (e.g. a "ding" effect) without needing
+## to touch RunState again.
 
 signal hero_leveled(hero_name: String)
 
@@ -46,8 +49,13 @@ var headless := false
 var current_level := 1
 ## hero_name -> {"level": int, "xp": int, "xp_to_next": int}
 var levels := {}
-## hero_name -> Array[String] of picked boon ids (drives live effects + summary).
-var boons := {}
+## Duo Ultimate boons (2026-07-22): pair_id (DuoUltimates.id_for_heroes) ->
+## Array[String] of picked DuoUltimateBoons ids. This is the ONLY boon pool
+## now — the per-hero `boons` Dictionary was removed 2026-07-25 with the
+## hero-boon catalog it fed (see duo_ultimate_boons.gd class doc). Accumulates
+## across levels (never reset except by start_run); read at cast time via
+## duo_boon_total, never mutated elsewhere.
+var duo_boons := {}
 ## hero_name -> float HP a survivor carries INTO the next level (raw carryover,
 ## Designer decision — no heal/revive yet). Set at a level's win, read when the
 ## next level spawns the party. Cleared on start_run().
@@ -69,7 +77,7 @@ var party: Array = []
 func start_run() -> void:
 	current_level = 1
 	levels.clear()
-	boons.clear()
+	duo_boons.clear()
 	hp_carry.clear()
 	dead.clear()
 
@@ -129,19 +137,31 @@ func xp_fraction(hero_name: String) -> float:
 	var t := _track(hero_name)
 	return clampf(float(t.xp) / float(t.xp_to_next), 0.0, 1.0)
 
-func add_boon(hero_name: String, id: String) -> void:
-	if not boons.has(hero_name):
-		boons[hero_name] = []
-	boons[hero_name].append(id)
+func add_duo_boon(pair_id: String, id: String) -> void:
+	if not duo_boons.has(pair_id):
+		duo_boons[pair_id] = []
+	duo_boons[pair_id].append(id)
 
-## Boon ids to offer this hero at the start of a level (Designer, 2026-07-21):
-## every one of that hero's ability-focused boons, shuffled — there is no more
-## generic pool, so this is simply "pick 1 of N" from Boons.for_hero (N=2 in
-## the current catalog: an ability-geometry boost and a cooldown reduction).
-func roll_offer(hero_name: String = "") -> Array:
-	var offer := Boons.for_hero(hero_name)
+## Duo Ultimate boon ids to offer this Duo at the start of a level: all three
+## of its ultimate-boost options, shuffled — a straight pick-1-of-3.
+func roll_duo_offer(pair_id: String) -> Array:
+	var offer := DuoUltimateBoons.for_duo(pair_id)
 	offer.shuffle()
 	return offer
+
+## Sum of `value` across every owned DuoUltimateBoons entry for `pair_id`
+## whose `kind` matches — e.g. duo_boon_total("ARTEMIS|BEACON", "chain_count")
+## adds up every picked boon that targets chain_count (normally 0 or 1 picks,
+## but stacks correctly if a boon were ever picked twice). Read by
+## Hero.cast_duo_ultimate's effect methods on top of DuoUltimates.def's base
+## params value — this function never touches the base catalog.
+func duo_boon_total(pair_id: String, kind: String) -> float:
+	var total := 0.0
+	for id in duo_boons.get(pair_id, []):
+		var d := DuoUltimateBoons.def(id)
+		if d.get("kind", "") == kind:
+			total += float(d.get("value", 0.0))
+	return total
 
 ## -- Milestone 3: hero draft ---------------------------------------------------
 

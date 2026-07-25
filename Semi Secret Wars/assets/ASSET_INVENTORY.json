@@ -1,0 +1,318 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2026-07-25",
+    "scope": "Stages 1-2 (Level 3 deferred)",
+    "total_assets": 31
+  },
+  "assets": [
+    {
+      "filename": "Thundaar1.png",
+      "category": "hero",
+      "status": "✓ complete",
+      "used_by": "hero.gd:207 (HERO_SPRITES['THUNDAAR'])",
+      "notes": "sprite_scale 1.8, base anchor bottom-center, tank role"
+    },
+    {
+      "filename": "Artemis.png",
+      "category": "hero",
+      "status": "✓ complete",
+      "used_by": "hero.gd:208 (HERO_SPRITES['ARTEMIS'])",
+      "notes": "sprite_scale 1.8, base anchor bottom-center, DPS role, ranged"
+    },
+    {
+      "filename": "Warden.png",
+      "category": "hero",
+      "status": "✓ complete",
+      "used_by": "hero.gd:209 (HERO_SPRITES['WARDEN'])",
+      "notes": "sprite_scale 1.8, base anchor bottom-center, controller role, ranged"
+    },
+    {
+      "filename": "Beacon.png",
+      "category": "hero",
+      "status": "✓ complete",
+      "used_by": "hero.gd:206 (HERO_SPRITES['BEACON'])",
+      "notes": "sprite_scale 1.8, base anchor bottom-center, support role"
+    },
+    {
+      "filename": "DarkMage1.png",
+      "category": "villain",
+      "status": "✓ complete",
+      "used_by": "dark_mage.gd:48 (sprite_texture const)",
+      "notes": "Stage 1 villain, sprite_scale 1.8, teleporting mage"
+    },
+    {
+      "filename": "Berserk_Villain.png",
+      "category": "villain",
+      "status": "✓ complete",
+      "used_by": "berserker.gd:12 (sprite_texture const)",
+      "notes": "Stage 2 villain, sprite_scale 1.8, aggressive berserker"
+    },
+    {
+      "filename": "Minion-Dark-Mage.png",
+      "category": "minion",
+      "status": "✓ complete",
+      "used_by": "minion.gd:33 (SPRITE_VARIANTS_BY_LEVEL[1] variant 0)",
+      "notes": "Stage 1 swarm, melee minion, sprite_scale 1.8"
+    },
+    {
+      "filename": "MinionDarkMage2.png",
+      "category": "minion",
+      "status": "✓ complete",
+      "used_by": "minion.gd:34 (SPRITE_VARIANTS_BY_LEVEL[1] variant 1)",
+      "notes": "Stage 1 swarm, minion variant, sprite_scale 1.8"
+    },
+    {
+      "filename": "Berserk_Minion_1.png",
+      "category": "minion",
+      "status": "✓ complete",
+      "used_by": "minion.gd:41 (SPRITE_VARIANTS_BY_LEVEL[2] variant 0)",
+      "notes": "Stage 2 swarm, melee minion, sprite_scale 3.6 (doubled)"
+    },
+    {
+      "filename": "Minion2_Berserk.png",
+      "category": "minion",
+      "status": "✓ complete",
+      "used_by": "minion.gd:42 (SPRITE_VARIANTS_BY_LEVEL[2] ranged variant)",
+      "notes": "Stage 2 swarm, ranged shooter, sprite_scale 3.6"
+    },
+    {
+      "filename": "Rock-1.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 1, lane_field.gd:928",
+      "notes": "Squat obstacle, center-anchored, collision"
+    },
+    {
+      "filename": "Rock-2.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 2, lane_field.gd:930",
+      "notes": "Squat obstacle, center-anchored, collision"
+    },
+    {
+      "filename": "Sword-In-Ground.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 3, lane_field.gd:932",
+      "notes": "Squat obstacle, center-anchored, collision"
+    },
+    {
+      "filename": "Tree-Bushy.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 4, lane_field.gd:934",
+      "notes": "Tall obstacle, base-anchored at TALL_OBSTACLE_HEIGHT_MULT * radius"
+    },
+    {
+      "filename": "Alien-Tree.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 5, lane_field.gd:936",
+      "notes": "Tall obstacle, base-anchored"
+    },
+    {
+      "filename": "Alien-Tree-Thin.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 6, lane_field.gd:938",
+      "notes": "Tall obstacle, base-anchored"
+    },
+    {
+      "filename": "Boulder.png",
+      "category": "obstacle",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 7, lane_field.gd:940",
+      "notes": "Large squat obstacle, center-anchored"
+    },
+    {
+      "filename": "Destroyed-Spaceship.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "LaneField.LAIR_KIND_BY_LEVEL (fallback lair), lane_field.gd",
+      "notes": "Villain lair visual, drawn at lair_pos, radius ~150px → 300px rendered"
+    },
+    {
+      "filename": "Berserk_Lair.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "LaneField.LAIR_KIND_BY_LEVEL['berserker']",
+      "notes": "Stage 2 lair visual"
+    },
+    {
+      "filename": "Ground-Smudge.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 8, lane_field.gd:942",
+      "notes": "Non-collidable floor marks"
+    },
+    {
+      "filename": "Plant.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 9, lane_field.gd:944 (scenery); hero.gd:716 (Warden projectile)",
+      "notes": "Brush decoration; also used as Ensnare plant projectile"
+    },
+    {
+      "filename": "Mushroom.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 10, lane_field.gd:946",
+      "notes": "Ground scatter, non-collidable"
+    },
+    {
+      "filename": "Paw_Print_Smudge.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 11, (added 2026-07-25)",
+      "notes": "Animal track marks, non-collidable"
+    },
+    {
+      "filename": "Spike_Hazard.png",
+      "category": "hazard",
+      "status": "✓ complete",
+      "used_by": "battlefield.tscn ExtResource 12, spike_pits in level layouts",
+      "notes": "Spike pit visual, damage on entry"
+    },
+    {
+      "filename": "Stomp_Circle.png",
+      "category": "ability_vfx",
+      "status": "✓ complete",
+      "used_by": "hero.gd:95 (Thundaar Stomp AoE ring)",
+      "notes": "Ability effect ring drawn during Stomp execution"
+    },
+    {
+      "filename": "Searing_Bind.png",
+      "category": "ability_vfx",
+      "status": "✓ complete",
+      "used_by": "hero.gd:99 (Beacon/Warden Ultimate mark)",
+      "notes": "Ultimate ability marking visual"
+    },
+    {
+      "filename": "Arrow_Right.png",
+      "category": "ability_vfx",
+      "status": "✓ complete",
+      "used_by": "hero.gd:710 (Artemis arrow projectile)",
+      "notes": "Ranged attack projectile"
+    },
+    {
+      "filename": "Berserk_Minion2_Projectile.png",
+      "category": "ability_vfx",
+      "status": "✓ complete",
+      "used_by": "minion.gd (RangedMinion projectile, Stage 2)",
+      "notes": "Ranged minion syringe/projectile shot"
+    },
+    {
+      "filename": "Monster1.png",
+      "category": "unit",
+      "status": "✓ complete",
+      "used_by": "BattleManager._roll_monster (Stage 2 wandering monster)",
+      "notes": "Faction-agnostic roaming attacker, leaves after rampage duration"
+    },
+    {
+      "filename": "Berserk_Level_Borders.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "LaneField._build_border_band (Stage 2 border decor)",
+      "notes": "Crowd/edge art for stage 2 procedural border"
+    },
+    {
+      "filename": "Logo_Menu.png",
+      "category": "ui",
+      "status": "✓ complete",
+      "used_by": "TitleScreen or menu scene",
+      "notes": "Game logo/title visual"
+    },
+    {
+      "filename": "Button_StartRun.png",
+      "category": "ui",
+      "status": "✓ complete",
+      "used_by": "Menu button art",
+      "notes": "START RUN button visual"
+    },
+    {
+      "filename": "Buttons_New_Continue.png",
+      "category": "ui",
+      "status": "✓ complete",
+      "used_by": "TitleScreen buttons",
+      "notes": "NEW GAME / CONTINUE button art"
+    },
+    {
+      "filename": "Portal-Spawn.png",
+      "category": "scenery",
+      "status": "✓ complete",
+      "used_by": "spawn_point.gd:32 (sprite_texture preload)",
+      "notes": "Minion spawn gate visual. Verified in use 2026-07-25."
+    },
+    {
+      "filename": "Thundaar.png",
+      "category": "hero",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE — hero.tscn loads Thundaar1.png; only a historical comment at hero.gd:412 names this file",
+      "notes": "Verified zero runtime references 2026-07-25. Safe to delete."
+    },
+    {
+      "filename": "DarkMage.png",
+      "category": "villain",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE (old version, replaced by DarkMage1.png)",
+      "notes": "Legacy file — should be deleted"
+    },
+    {
+      "filename": "Arrow.png",
+      "category": "ability_vfx",
+      "status": "⚠ source art",
+      "used_by": "Not loaded at runtime; cited by hero.gd:502 as the source for Arrow_Right.png",
+      "notes": "KEEP. Unrotated original (points up); Arrow_Right.png is the pre-rotated shipping copy."
+    },
+    {
+      "filename": "Dark_Mage_1.png",
+      "category": "villain",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE — underscore-named duplicate of assets/sprites/DarkMage1.png",
+      "notes": "Legacy copy left in assets/ root. Confirm no references, then delete."
+    },
+    {
+      "filename": "Destroyed_Spaceship.png",
+      "category": "scenery",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE — underscore-named duplicate of assets/sprites/Destroyed-Spaceship.png",
+      "notes": "Legacy copy left in assets/ root. Confirm no references, then delete."
+    },
+    {
+      "filename": "Minion_Dark_Mage.png",
+      "category": "minion",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE — underscore-named duplicate of assets/sprites/Minion-Dark-Mage.png",
+      "notes": "Legacy copy left in assets/ root. Confirm no references, then delete."
+    },
+    {
+      "filename": "Portal_Spawn.png",
+      "category": "scenery",
+      "status": "⊘ stale/unused",
+      "used_by": "NONE — underscore-named duplicate of assets/sprites/Portal-Spawn.png",
+      "notes": "Legacy copy left in assets/ root. Confirm no references, then delete."
+    },
+    {
+      "filename": "Sprites.png",
+      "category": "uncategorised",
+      "status": "? unknown",
+      "used_by": "NOT FOUND in code search",
+      "notes": "Possibly a contact sheet / source atlas rather than a shipped asset. Designer to confirm."
+    },
+    {
+      "filename": "Verdant_Path.png",
+      "category": "ability_vfx",
+      "status": "✓ complete",
+      "used_by": "plant_trail.gd:68 (PLANT_ART preload)",
+      "notes": "Duo plant-trail art. Verified in use 2026-07-25."
+    },
+    {
+      "filename": "Lightning-Bolt.png",
+      "category": "ability_vfx",
+      "status": "? unknown",
+      "used_by": "NOT FOUND in code search",
+      "notes": "Exists on disk but no references found — audit/integrate or delete"
+    }
+  ]
+}

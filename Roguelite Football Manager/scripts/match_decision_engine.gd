@@ -13,7 +13,7 @@ extends RefCounted
 ## Emitted whenever a shot is resolved (including goals) — LiveMatchState
 ## listens to update score/events, matching the old shot_attempt contract so
 ## the rest of the UI (pitch kick animation, goal celebration) is unchanged.
-signal shot_taken(is_home: bool, shooter: Player, outcome: String)
+signal shot_taken(is_home: bool, shooter: Player, outcome: String, xg: float)
 ## Emitted when a pass is attempted (success or not known yet from the
 ## visual's perspective) so the pitch view can animate the ball flight.
 signal pass_started(is_home: bool, passer: Player, receiver: Player, start_pos: Vector2, end_pos: Vector2, duration: float)
@@ -36,8 +36,6 @@ const SHOT_CHANCE_PROXIMITY_BONUS := 0.55
 ## defender within PRESSURE_RANGE) — a genuine chance should usually be
 ## taken, not passed up just because a shorter pass was also available.
 const SHOT_CHANCE_OPEN_BONUS := 0.25
-const SHOT_QUALITY_MIN := 1.0
-const SHOT_QUALITY_MAX := 2.2
 
 ## Tackle contest: how close a defender must be to challenge, and how often
 ## they get to roll while they stay that close.
@@ -93,19 +91,33 @@ const PASS_MAX_DURATION_SEC := 1.6
 const INTERCEPTION_RADIUS := 55.0
 const PASS_LANE_SAFETY := 1.3
 
-## Shared rating weights, reused across defender/interceptor/tackle contests
-## and shot resolution — same blend as the old MatchEngine, now applied to
-## the specific players involved instead of a whole-team average.
-const DEFENSE_STRENGTH_WEIGHT := 0.6
-const DEFENSE_SPEED_WEIGHT := 0.4
-const RETENTION_STRENGTH_WEIGHT := 0.5
-const RETENTION_SPEED_WEIGHT := 0.3
-const RETENTION_PASSING_WEIGHT := 0.2
-const DEFENSE_FACTOR := 1.1
+## Player-vs-player rating blends (tackling, retention, finishing, keeper) now
+## live in MatchRatings — every contest below reads the same named rating.
+
+## Shot resolution: fraction of non-goal shots shown as "SAVED" vs
+## "OFF_TARGET" (flavor split only, no score effect).
 const SAVED_FRACTION := 0.6
 
-const CONDITION_FLOOR_MULTIPLIER := LiveMatchState.CONDITION_FLOOR_MULTIPLIER
-const STARTING_CONDITION := LiveMatchState.STARTING_CONDITION
+## xG shot model (Milestone 20). Chance quality is derived from the shot's real
+## geometry — the goal angle subtended between the posts and the distance —
+## then reduced by outfield defenders blocking the lane. Conversion to an
+## actual goal additionally scales by the shooter's finishing vs. the keeper's
+## shot-stopping. See BALANCE.md "Live Match Simulation".
+const GOAL_WIDTH_RATIO := 0.16   ## Goal mouth as a fraction of grass height — matches pitch_goals.gd.
+const XG_MAX := 0.9              ## Ceiling for a near, central, unblocked chance.
+const XG_MIN := 0.02             ## Floor so even a poor effort keeps a sliver of chance.
+const XG_ANGLE_REF := 1.0        ## Subtended goal angle (radians) mapping to a full-angle chance.
+const XG_DISTANCE_SCALE := 320.0 ## World-unit e-fold for distance decay.
+## Lane blocking: each outfield defender across the shot lane multiplies xG down.
+const XG_BLOCK_RADIUS := 38.0
+const XG_BLOCK_FACTOR := 0.7
+const XG_MAX_BLOCKERS := 3
+## Conversion multipliers (around 1.0) from finishing / keeper rating (0-100).
+const FINISH_MULT_BASE := 0.7
+const FINISH_MULT_SPAN := 0.5
+const KEEPER_MULT_BASE := 0.75
+const KEEPER_MULT_SPAN := 0.45
+const P_GOAL_CAP := 0.9
 
 var _ball_state: BallState
 var _match_state: LiveMatchState
@@ -195,11 +207,8 @@ func _update_tackle_pressure(delta: float, is_home: bool, carrier: Player, carri
 	var defender: Player = nearest["player"]
 	var defender_slot: Formation.SlotCategory = opp_formation.slots[nearest["idx"]]
 
-	var defender_rating: float = (_effective_stat(defender, defender_slot, "strength") * DEFENSE_STRENGTH_WEIGHT
-		+ _effective_stat(defender, defender_slot, "speed") * DEFENSE_SPEED_WEIGHT) * _condition_multiplier(_match_state.get_condition(defender))
-	var carrier_rating: float = (_effective_stat(carrier, carrier_slot, "strength") * RETENTION_STRENGTH_WEIGHT
-		+ _effective_stat(carrier, carrier_slot, "speed") * RETENTION_SPEED_WEIGHT
-		+ _effective_stat(carrier, carrier_slot, "passing") * RETENTION_PASSING_WEIGHT) * _condition_multiplier(_match_state.get_condition(carrier))
+	var defender_rating: float = MatchRatings.tackling(defender, defender_slot, _match_state.get_condition(defender))
+	var carrier_rating: float = MatchRatings.retention(carrier, carrier_slot, _match_state.get_condition(carrier))
 
 	var p_defender_wins: float = defender_rating / max(defender_rating + carrier_rating, 1.0)
 	if randf() < p_defender_wins:
@@ -231,7 +240,6 @@ func _update_tackle_pressure(delta: float, is_home: bool, carrier: Player, carri
 func _make_decision(is_home: bool, carrier: Player, carrier_idx: int, carrier_pos: Vector2, lineup: Array) -> void:
 	var formation: Formation = _match_state.home_formation if is_home else _match_state.away_formation
 	var carrier_slot: Formation.SlotCategory = formation.slots[carrier_idx]
-	var carrier_condition_mult: float = _condition_multiplier(_match_state.get_condition(carrier))
 
 	var opp_lineup: Array = _match_state.away_lineup if is_home else _match_state.home_lineup
 	var nearest_opp: Dictionary = _nearest_opponent(opp_lineup, not is_home, carrier_pos)
@@ -243,7 +251,7 @@ func _make_decision(is_home: bool, carrier: Player, carrier_idx: int, carrier_po
 		var proximity: float = 1.0 - clamp(dist_to_goal / SHOOTING_RANGE, 0.0, 1.0)
 		var shot_chance: float = SHOT_CHANCE_BASE + proximity * SHOT_CHANCE_PROXIMITY_BONUS + (SHOT_CHANCE_OPEN_BONUS if not under_pressure else 0.0)
 		if randf() < shot_chance:
-			_take_shot(is_home, carrier, carrier_slot, carrier_condition_mult, proximity)
+			_take_shot(is_home, carrier, carrier_slot, carrier_pos)
 			return
 
 	var receiver: Player = _select_pass_candidate(is_home, lineup, formation, carrier, carrier_pos)
@@ -264,20 +272,25 @@ func _make_decision(is_home: bool, carrier: Player, carrier_idx: int, carrier_po
 	if randf() < pass_chance:
 		_attempt_pass(is_home, carrier, carrier_slot, receiver, carrier_pos, lineup)
 
-func _take_shot(is_home: bool, shooter: Player, shooter_slot: Formation.SlotCategory, shooter_condition_mult: float, proximity: float) -> void:
+func _take_shot(is_home: bool, shooter: Player, shooter_slot: Formation.SlotCategory, shooter_pos: Vector2) -> void:
 	var keeper_formation: Formation = _match_state.away_formation if is_home else _match_state.home_formation
 	var keeper_lineup: Array = _match_state.away_lineup if is_home else _match_state.home_lineup
 	var keeper: Player = _pick_goalkeeper(keeper_formation, keeper_lineup)
 
-	var quality: float = lerp(SHOT_QUALITY_MIN, SHOT_QUALITY_MAX, proximity)
-	var shooter_kick: float = _effective_stat(shooter, shooter_slot, "kick") * shooter_condition_mult * quality
-	var keeper_strength: float = 0.0
+	## Chance quality (xG) from the shot's real geometry, reduced by blockers.
+	var xg: float = _shot_xg(is_home, shooter_pos)
+
+	## Conversion: chance quality scaled by finishing vs. keeper shot-stopping.
+	var finishing: float = MatchRatings.finishing(shooter, shooter_slot, _match_state.get_condition(shooter))
+	var finish_mult: float = FINISH_MULT_BASE + FINISH_MULT_SPAN * clamp(finishing / 100.0, 0.0, 1.0)
+	var keeper_mult: float = KEEPER_MULT_BASE
 	if keeper != null:
 		var keeper_idx: int = keeper_lineup.find(keeper)
 		var keeper_slot: Formation.SlotCategory = keeper_formation.slots[keeper_idx]
-		keeper_strength = _effective_stat(keeper, keeper_slot, "strength") * _condition_multiplier(_match_state.get_condition(keeper))
+		var keeper_stop: float = MatchRatings.keeper_rating(keeper, keeper_slot, _match_state.get_condition(keeper))
+		keeper_mult = KEEPER_MULT_BASE + KEEPER_MULT_SPAN * clamp(keeper_stop / 100.0, 0.0, 1.0)
 
-	var p_goal: float = shooter_kick / max(shooter_kick + keeper_strength * DEFENSE_FACTOR, 1.0)
+	var p_goal: float = clamp(xg * finish_mult / keeper_mult, XG_MIN, P_GOAL_CAP)
 	var outcome: String
 	if randf() < p_goal:
 		outcome = "GOAL"
@@ -287,15 +300,50 @@ func _take_shot(is_home: bool, shooter: Player, shooter_slot: Formation.SlotCate
 		outcome = "OFF_TARGET"
 
 	_possession_system.on_shot_attempt(is_home, shooter, outcome, keeper)
-	shot_taken.emit(is_home, shooter, outcome)
+	shot_taken.emit(is_home, shooter, outcome, xg)
 	_last_carrier = null
+
+## Geometric expected-goals (chance quality, 0..1) for a shot from shooter_pos
+## toward the attacked goal: a wider subtended goal angle and a shorter
+## distance raise it; outfield defenders across the lane cut it down.
+## Independent of who is shooting (that's the finishing/keeper conversion in
+## _take_shot), so the accumulated xG stat reflects chance quality — the
+## standard meaning of xG.
+func _shot_xg(is_home: bool, shooter_pos: Vector2) -> float:
+	var goal_pos: Vector2 = _goal_target_pos(is_home)
+	var half_goal: float = _grass_rect.size.y * GOAL_WIDTH_RATIO * 0.5
+	var post_a: Vector2 = Vector2(goal_pos.x, goal_pos.y - half_goal)
+	var post_b: Vector2 = Vector2(goal_pos.x, goal_pos.y + half_goal)
+	var subtended: float = absf((post_a - shooter_pos).angle_to(post_b - shooter_pos))
+	var angle_norm: float = clamp(subtended / XG_ANGLE_REF, 0.0, 1.0)
+	var dist_factor: float = exp(-shooter_pos.distance_to(goal_pos) / XG_DISTANCE_SCALE)
+	var xg: float = XG_MAX * angle_norm * dist_factor
+
+	var blockers: int = _count_lane_blockers(is_home, shooter_pos, goal_pos)
+	xg *= pow(XG_BLOCK_FACTOR, float(min(blockers, XG_MAX_BLOCKERS)))
+	return clamp(xg, XG_MIN, XG_MAX)
+
+## Outfield opponents (not the GK) standing across the shot lane between the
+## shooter and the goal mouth — each one dims the chance in _shot_xg.
+func _count_lane_blockers(is_home: bool, shooter_pos: Vector2, goal_pos: Vector2) -> int:
+	var opp_formation: Formation = _match_state.away_formation if is_home else _match_state.home_formation
+	var opp_lineup: Array = _match_state.away_lineup if is_home else _match_state.home_lineup
+	var count: int = 0
+	for i in opp_lineup.size():
+		var opponent: Player = opp_lineup[i]
+		if opponent == null or opp_formation.slots[i] == Formation.SlotCategory.GK:
+			continue
+		var pos: Vector2 = _movement_system.get_player_position(not is_home, i)
+		var projection: Dictionary = _point_segment_projection(pos, shooter_pos, goal_pos)
+		if projection["t"] > 0.05 and projection["t"] < 0.95 and projection["dist"] < XG_BLOCK_RADIUS:
+			count += 1
+	return count
 
 func _attempt_pass(is_home: bool, passer: Player, passer_slot: Formation.SlotCategory, receiver: Player, passer_pos: Vector2, lineup: Array) -> void:
 	var receiver_idx: int = lineup.find(receiver)
 	var receiver_pos: Vector2 = _movement_system.get_player_position(is_home, receiver_idx)
-	var passer_condition_mult: float = _condition_multiplier(_match_state.get_condition(passer))
 
-	var intercept_result: Dictionary = _check_interception(is_home, passer_pos, receiver_pos, passer, passer_slot, passer_condition_mult)
+	var intercept_result: Dictionary = _check_interception(is_home, passer_pos, receiver_pos, passer, passer_slot)
 	var success: bool = intercept_result.get("success", true)
 	var flight_end_pos: Vector2 = receiver_pos if success else intercept_result["intercept_pos"]
 	var interceptor: Player = null if success else intercept_result["interceptor"]
@@ -311,7 +359,7 @@ func _attempt_pass(is_home: bool, passer: Player, passer_slot: Formation.SlotCat
 ## out — the nearest-to-the-lane, highest-rated candidate rolls against the
 ## passer's own (position-adjusted, condition-scaled) Pass stat.
 func _check_interception(is_home: bool, start_pos: Vector2, end_pos: Vector2, passer: Player,
-		passer_slot: Formation.SlotCategory, passer_condition_mult: float) -> Dictionary:
+		passer_slot: Formation.SlotCategory) -> Dictionary:
 	var opp_formation: Formation = _match_state.away_formation if is_home else _match_state.home_formation
 	var opp_lineup: Array = _match_state.away_lineup if is_home else _match_state.home_lineup
 
@@ -328,8 +376,7 @@ func _check_interception(is_home: bool, start_pos: Vector2, end_pos: Vector2, pa
 		if lane_dist > INTERCEPTION_RADIUS:
 			continue
 		var closeness: float = 1.0 - (lane_dist / INTERCEPTION_RADIUS)
-		var defender_rating: float = (_effective_stat(opponent, opp_formation.slots[i], "strength") * DEFENSE_STRENGTH_WEIGHT
-			+ _effective_stat(opponent, opp_formation.slots[i], "speed") * DEFENSE_SPEED_WEIGHT) * _condition_multiplier(_match_state.get_condition(opponent))
+		var defender_rating: float = MatchRatings.tackling(opponent, opp_formation.slots[i], _match_state.get_condition(opponent))
 		var score: float = defender_rating * closeness
 		if score > best_score:
 			best_score = score
@@ -339,7 +386,7 @@ func _check_interception(is_home: bool, start_pos: Vector2, end_pos: Vector2, pa
 	if best_interceptor == null:
 		return {"success": true}
 
-	var passer_rating: float = _effective_stat(passer, passer_slot, "passing") * passer_condition_mult
+	var passer_rating: float = MatchRatings.passing_skill(passer, passer_slot, _match_state.get_condition(passer))
 	var p_intercept: float = best_score / max(best_score + passer_rating * PASS_LANE_SAFETY, 1.0)
 	if randf() < p_intercept:
 		return {"success": false, "interceptor": best_interceptor, "intercept_pos": start_pos.lerp(end_pos, best_t)}
@@ -416,12 +463,6 @@ func _pick_goalkeeper(formation: Formation, lineup: Array) -> Player:
 		if formation.slots[i] == Formation.SlotCategory.GK and lineup[i] != null:
 			return lineup[i]
 	return null
-
-func _effective_stat(player: Player, slot: Formation.SlotCategory, stat_name: String) -> float:
-	return PositionCompatibility.get_effective_stats(player, slot).get(stat_name, 0.0)
-
-func _condition_multiplier(condition: float) -> float:
-	return CONDITION_FLOOR_MULTIPLIER + (1.0 - CONDITION_FLOOR_MULTIPLIER) * (condition / STARTING_CONDITION)
 
 ## Closest point on segment a-b to `point`; returns both the distance and
 ## the projection parameter t (0=a, 1=b) so callers can place a result along

@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://scenes/battlefield/lane_field.gd" id="1_field"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Destroyed-Spaceship.png" id="1_spaceship"]
@@ -11,6 +11,11 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/Alien-Tree-Thin.png" id="1_alientreethin"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Plant.png" id="1_plant"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Mushroom.png" id="1_mushroom"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Lair.png" id="1_berserklair"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Boulder.png" id="1_boulder"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Paw_Print_Smudge.png" id="1_pawprint"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Spike_Hazard.png" id="1_spike"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Level_Borders.png" id="1_crowd"]
 [ext_resource type="Script" path="res://scenes/battlefield/battle_camera.gd" id="3_camera"]
 [ext_resource type="Script" path="res://scenes/enemies/lane_spawner.gd" id="4_spawner"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/minion.tscn" id="5_minion"]
@@ -18,10 +23,10 @@
 [ext_resource type="Script" path="res://scenes/battle/battle_manager.gd" id="8_bmgr"]
 [ext_resource type="Script" path="res://scenes/battle/battle_hud.gd" id="8_hud"]
 [ext_resource type="Script" path="res://scenes/battle/results_screen.gd" id="10_res"]
-[ext_resource type="Theme" path="res://scenes/battle/hud_theme.tres" id="11_theme"]
 [ext_resource type="Script" path="res://scenes/battlefield/fog_of_war.gd" id="12_fog"]
 [ext_resource type="Script" path="res://scenes/battlefield/blood_layer.gd" id="13_blood"]
 [ext_resource type="Script" path="res://scenes/battlefield/lane_foreground.gd" id="14_foreground"]
+[ext_resource type="AudioStream" path="res://assets/Sounds/469416__blockfighter298__war-behind-the-hills-v2.wav" id="15_music"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vhpfill"]
 bg_color = Color(0.776471, 0.239216, 0.239216, 1)
@@ -61,6 +66,11 @@ alien_tree_texture = ExtResource("1_alientree")
 alien_tree_thin_texture = ExtResource("1_alientreethin")
 plant_texture = ExtResource("1_plant")
 mushroom_texture = ExtResource("1_mushroom")
+berserk_lair_texture = ExtResource("1_berserklair")
+boulder_texture = ExtResource("1_boulder")
+paw_print_texture = ExtResource("1_pawprint")
+spike_texture = ExtResource("1_spike")
+crowd_texture = ExtResource("1_crowd")
 
 [node name="BloodLayer" type="Node2D" parent="."]
 script = ExtResource("13_blood")
@@ -103,28 +113,25 @@ back_button_path = NodePath("BackButton")
 [node name="BackButton" type="Button" parent="HUD"]
 offset_left = 16.0
 offset_top = 60.0
-offset_right = 136.0
-offset_bottom = 96.0
-theme = ExtResource("11_theme")
+offset_right = 230.0
+offset_bottom = 124.0
 text = "PREP MENU"
 
 [node name="TimerPanel" type="PanelContainer" parent="HUD"]
-offset_left = 940.0
+offset_left = 890.0
 offset_top = 10.0
-offset_right = 1090.0
-theme = ExtResource("11_theme")
+offset_right = 1150.0
 
 [node name="TimerLabel" type="Label" parent="HUD/TimerPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 horizontal_alignment = 1
 text = "00:00"
 
 [node name="VillainPanel" type="PanelContainer" parent="HUD"]
-offset_left = 1380.0
+offset_left = 1300.0
 offset_top = 10.0
-offset_right = 1690.0
-theme = ExtResource("11_theme")
+offset_right = 1740.0
 
 [node name="VBox" type="VBoxContainer" parent="HUD/VillainPanel"]
 layout_mode = 2
@@ -132,7 +139,7 @@ theme_override_constants/separation = 6
 
 [node name="VillainHPLabel" type="Label" parent="HUD/VillainPanel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 text = "VILLAIN HP: 100%"
 
 [node name="VillainHPBar" type="ProgressBar" parent="HUD/VillainPanel/VBox"]
@@ -146,14 +153,12 @@ show_percentage = false
 [node name="HeroPanelsRoot" type="VBoxContainer" parent="HUD"]
 offset_left = 16.0
 offset_top = 110.0
-theme = ExtResource("11_theme")
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="ObjectivePanel" type="PanelContainer" parent="HUD"]
-offset_left = 800.0
-offset_top = 1010.0
-offset_right = 1000.0
-theme = ExtResource("11_theme")
+offset_left = 740.0
+offset_top = 990.0
+offset_right = 1180.0
 
 [node name="VBox" type="VBoxContainer" parent="HUD/ObjectivePanel"]
 layout_mode = 2
@@ -161,7 +166,7 @@ theme_override_constants/separation = 6
 
 [node name="ObjectiveLabel" type="Label" parent="HUD/ObjectivePanel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 text = ""
 
 [node name="ObjectiveBar" type="ProgressBar" parent="HUD/ObjectivePanel/VBox"]
@@ -174,35 +179,32 @@ show_percentage = false
 
 [node name="ObjectiveBuffPanel" type="PanelContainer" parent="HUD"]
 visible = false
-offset_left = 800.0
-offset_top = 950.0
-offset_right = 1000.0
-theme = ExtResource("11_theme")
+offset_left = 740.0
+offset_top = 910.0
+offset_right = 1180.0
 
 [node name="BuffLabel" type="Label" parent="HUD/ObjectiveBuffPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 horizontal_alignment = 1
 text = "BUFF: XP+ 0:10"
 
 [node name="RunXPPanel" type="PanelContainer" parent="HUD"]
 offset_left = 16.0
 offset_top = 10.0
-theme = ExtResource("11_theme")
 
 [node name="RunXPLabel" type="Label" parent="HUD/RunXPPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 text = "XP: 0"
 
 [node name="GoldPanel" type="PanelContainer" parent="HUD"]
-offset_left = 200.0
+offset_left = 300.0
 offset_top = 10.0
-theme = ExtResource("11_theme")
 
 [node name="GoldLabel" type="Label" parent="HUD/GoldPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
 text = "GOLD: 0"
 
@@ -216,3 +218,7 @@ results_screen_path = NodePath("../ResultsScreen")
 heroes_root_path = NodePath("../Heroes")
 hero_scene = ExtResource("6_hero")
 hud_path = NodePath("../HUD")
+music_path = NodePath("../BattleMusic")
+
+[node name="BattleMusic" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("15_music")

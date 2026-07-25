@@ -1,0 +1,158 @@
+[gd_resource type="Theme" load_steps=9 format=3]
+
+; Project-wide default UI theme — the notebook/child's-comic language from
+; ART_BIBLE.md. Set as gui/theme/custom in project.godot, so EVERY Control in
+; the game inherits it without each scene wiring a theme.
+;
+; Numbers here mirror scripts/ui_style.gd (UIStyle). Change both together —
+; UIStyle is what code-built UI calls, this is what the editor previews and
+; what .tscn-authored Controls get. ui_boot.gd re-asserts the font at runtime.
+;
+; Sizes are design-canvas (1920x1080) pixels; the window runs 1280x720, so the
+; player sees everything at 0.67x. See UIStyle's type-scale doc comment.
+
+[ext_resource type="FontFile" path="res://assets/fonts/DrawFont.ttf" id="1_font"]
+
+[sub_resource type="StyleBoxFlat" id="button_normal"]
+content_margin_left = 22.0
+content_margin_top = 10.0
+content_margin_right = 22.0
+content_margin_bottom = 10.0
+bg_color = Color(0.956863, 0.937255, 0.882353, 0.94)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 13
+corner_radius_top_right = 18
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 17
+
+[sub_resource type="StyleBoxFlat" id="button_hover"]
+content_margin_left = 22.0
+content_margin_top = 10.0
+content_margin_right = 22.0
+content_margin_bottom = 10.0
+bg_color = Color(0.898039, 0.933333, 0.803922, 1)
+border_width_left = 6
+border_width_top = 6
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 17
+corner_radius_top_right = 13
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="button_pressed"]
+content_margin_left = 22.0
+content_margin_top = 13.0
+content_margin_right = 22.0
+content_margin_bottom = 7.0
+bg_color = Color(0.811765, 0.878431, 0.690196, 1)
+border_width_left = 6
+border_width_top = 6
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 20
+corner_radius_bottom_right = 13
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="button_disabled"]
+content_margin_left = 22.0
+content_margin_top = 10.0
+content_margin_right = 22.0
+content_margin_bottom = 10.0
+bg_color = Color(0.956863, 0.937255, 0.882353, 0.45)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.172549, 0.172549, 0.172549, 0.4)
+corner_radius_top_left = 13
+corner_radius_top_right = 18
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 17
+
+[sub_resource type="StyleBoxFlat" id="panel_page"]
+content_margin_left = 32.0
+content_margin_top = 24.0
+content_margin_right = 32.0
+content_margin_bottom = 24.0
+bg_color = Color(0.956863, 0.937255, 0.882353, 0.94)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 17
+corner_radius_bottom_right = 21
+corner_radius_bottom_left = 15
+
+[sub_resource type="StyleBoxFlat" id="panel_card"]
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+bg_color = Color(0.956863, 0.937255, 0.882353, 0.85)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 20
+corner_radius_bottom_right = 13
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="bar_bg"]
+bg_color = Color(0.956863, 0.937255, 0.882353, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 11
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="bar_fill"]
+bg_color = Color(0.639216, 0.752941, 0.435294, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.172549, 0.172549, 0.172549, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 11
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 10
+
+[resource]
+default_font = ExtResource("1_font")
+default_font_size = 24
+Button/colors/font_color = Color(0.172549, 0.172549, 0.172549, 1)
+Button/colors/font_hover_color = Color(0.172549, 0.172549, 0.172549, 1)
+Button/colors/font_pressed_color = Color(0.172549, 0.172549, 0.172549, 1)
+Button/colors/font_focus_color = Color(0.172549, 0.172549, 0.172549, 1)
+Button/colors/font_disabled_color = Color(0.172549, 0.172549, 0.172549, 0.45)
+Button/font_sizes/font_size = 24
+Button/styles/normal = SubResource("button_normal")
+Button/styles/hover = SubResource("button_hover")
+Button/styles/pressed = SubResource("button_pressed")
+Button/styles/focus = SubResource("button_hover")
+Button/styles/disabled = SubResource("button_disabled")
+Label/colors/font_color = Color(0.172549, 0.172549, 0.172549, 1)
+Label/font_sizes/font_size = 24
+RichTextLabel/colors/default_color = Color(0.172549, 0.172549, 0.172549, 1)
+RichTextLabel/font_sizes/normal_font_size = 20
+Panel/styles/panel = SubResource("panel_page")
+PanelContainer/styles/panel = SubResource("panel_card")
+PopupPanel/styles/panel = SubResource("panel_page")
+ProgressBar/styles/background = SubResource("bar_bg")
+ProgressBar/styles/fill = SubResource("bar_fill")

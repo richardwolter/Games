@@ -36,7 +36,8 @@ func _draw() -> void:
 	if _field == null:
 		return
 	for e in _field.get_top_band():
-		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], 1.0)
+		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], 1.0,
+				e.get("flip_v", false))
 	for e in _field.get_left_band():
 		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], 1.0)
 	for e in _field.get_right_band():
@@ -48,19 +49,36 @@ func _draw() -> void:
 	# Bottom band drawn last — nearest/tallest, and the one layer that
 	# actually needs to occlude units in front of it.
 	for e in _field.get_bottom_band():
-		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], near_row_alpha)
+		_draw_prop_sprite(e["pos"], e["height"], e["tex"], e["flip"], e["tint"], near_row_alpha,
+				e.get("flip_v", false))
 
 ## Duplicated (not shared) from LaneField._draw_prop_sprite: this node isn't
 ## a LaneField, and draw_* calls can't cross canvas items — see file header.
-func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h: bool, tint: Color, alpha: float) -> void:
+func _draw_prop_sprite(base: Vector2, height: float, tex: Texture2D, flip_h: bool, tint: Color, alpha: float, flip_v := false) -> void:
 	var tex_size := tex.get_size()
 	if tex_size.y <= 0.0:
 		return
 	var draw_size := Vector2(tex_size.x * (height / tex_size.y), height)
-	var rect := Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y), draw_size)
-	if flip_h:
-		rect = Rect2(rect.position + Vector2(draw_size.x, 0.0), Vector2(-draw_size.x, draw_size.y))
-	draw_texture_rect(tex, rect, false, Color(tint.r, tint.g, tint.b, tint.a * alpha))
+	var color := Color(tint.r, tint.g, tint.b, tint.a * alpha)
+	if not flip_h and not flip_v:
+		draw_texture_rect(tex, Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y),
+				draw_size), false, color)
+		return
+	# Mirrored via a draw transform rather than a negative-extent Rect2
+	# (Designer, 2026-07-25): the negative-size trick dropped tiles outright —
+	# every flipped crowd tile vanished, which is what left gaps along the top
+	# stands and made the fully-flipped bottom row disappear. A scaled
+	# transform draws a normal positive rect, so nothing can be culled.
+	#
+	# With scale.y = -1 the local rect has to start AT the base and run
+	# +height (world: base.y-height .. base.y); unflipped it starts at
+	# -height. Either way the strip covers the same world span.
+	var flip_scale := Vector2(-1.0 if flip_h else 1.0, -1.0 if flip_v else 1.0)
+	draw_set_transform(base, 0.0, flip_scale)
+	var local_top: float = 0.0 if flip_v else -draw_size.y
+	draw_texture_rect(tex, Rect2(-draw_size.x * 0.5, local_top, draw_size.x, draw_size.y),
+			false, color)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 ## Duplicated (not shared) from LaneField._draw_obstacle_sprite, for
 ## border_decor's hand-placed extras (center + radius, not base-anchored).

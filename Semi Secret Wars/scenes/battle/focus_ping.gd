@@ -42,7 +42,7 @@ func _ready() -> void:
 	add_child(layer)
 	_label = Label.new()
 	_label.add_theme_font_size_override("font_size", 20)
-	_label.add_theme_color_override("font_color", Color("2c2c2c"))
+	_label.add_theme_color_override("font_color", UIStyle.INK)
 	_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_label.position.y = -40.0
 	layer.add_child(_label)

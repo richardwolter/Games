@@ -23,6 +23,46 @@ const HUNT_INTERVAL := 0.3
 const DETECT_RANGE_MULT := 2.2
 const INTERCEPT_LEAD_MULT := 0.35
 
+## Cosmetic variety only (same stats/behavior) — each spawned minion picks one
+## of its stage's variants at random so the swarm doesn't read as one repeated
+## sprite. Keyed by RunState.current_level so a stage's swarm looks like it
+## belongs to that stage's villain (Designer, 2026-07-25: Berserk minion art).
+## A level with no entry falls back to LEVEL 1's set rather than drawing
+## nothing — stage 3 has no swarm art of its own yet.
+const SPRITE_VARIANTS_BY_LEVEL: Dictionary = {
+	1: [
+		preload("res://assets/sprites/Minion-Dark-Mage.png"),
+		preload("res://assets/sprites/MinionDarkMage2.png"),
+	],
+	# Stage 2's second variant (Minion2_Berserk) is NOT here: it's the syringe
+	# shooter and RangedMinion claims it exclusively, so the unit holding the
+	# needle is the one firing droplets (Designer, 2026-07-25).
+	2: [
+		preload("res://assets/sprites/Berserk_Minion_1.png"),
+	],
+}
+
+## Draw scale per level, applied alongside the sprite. Level 1 matches
+## minion.tscn.s long-standing 1.8; the Berserk swarm runs bigger because its
+## art reads smaller at the same scale (Designer, 2026-07-25).
+##
+## NOTE: this also widens collision — Combatant._collision_radius() is
+## body_radius * sprite_scale. At body_radius 10-13 and the level-2 scale that
+## is ~72-94px — the level-2 swarm now takes up real space and separates/pushes
+## accordingly. Worth watching if the lane starts feeling clogged; the fix
+## would be to decouple art scale from _collision_radius rather than shrink
+## the art back.
+const SPRITE_SCALE_BY_LEVEL: Dictionary = {
+	1: 1.8,
+	# Doubled again on 2026-07-25 (Designer: "2x bigger than current size") —
+	# 3.6 still read small next to the heroes.
+	2: 7.2,
+}
+
+## The variant list for the level currently being played.
+static func sprite_variants_for_level(level: int) -> Array:
+	return SPRITE_VARIANTS_BY_LEVEL.get(level, SPRITE_VARIANTS_BY_LEVEL[1])
+
 var _spawn_pos := Vector2.ZERO
 var _exit_pos := Vector2.ZERO
 var _swarm_offset := Vector2.ZERO
@@ -49,6 +89,22 @@ func _configure() -> void:
 	global_position = _spawn_pos
 	set_goal(_exit_pos)
 	detect_range *= DETECT_RANGE_MULT
+	# Any minion that hasn't been given art of its own takes its stage's swarm
+	# variant. This used to be gated to the base Minion class, which left every
+	# Elite/Brute/Ranged rendering as a placeholder circle — i.e. the ENTIRE
+	# swarm on stages 2 and 3, since those stages spawn only subclasses. The
+	# null check preserves the original intent (a subclass with real art of its
+	# own is never silently reskinned) without the collateral damage.
+	if sprite_texture == null:
+		var variants := sprite_variants_for_level(RunState.current_level)
+		sprite_texture = variants[randi() % variants.size()]
+		# Scale comes with the art. Only minion.tscn ever set sprite_scale
+		# (1.8); every subclass left it at the 1.0 default, so the stage-2/3
+		# swarm drew at barely half the size of a stage-1 minion using the
+		# same body_radius — that is why the Berserk minions read as too small
+		# (Designer, 2026-07-25). Setting it here keeps art and scale together
+		# so a new stage can't reintroduce the mismatch.
+		sprite_scale = SPRITE_SCALE_BY_LEVEL.get(RunState.current_level, 1.8)
 	# Desync hunt ticks across the swarm (same idea as _retarget_cd stagger).
 	_hunt_cd = randf() * HUNT_INTERVAL
 

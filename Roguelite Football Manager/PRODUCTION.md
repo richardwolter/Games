@@ -4,7 +4,7 @@
 
 ## Current Milestone
 
-Milestone 19 in progress — codebase review/bug-fix pass (see item 19 below). All fixes applied and ready for in-engine verification (not yet tested this session — no `godot` MCP connection).
+Milestone 20 implemented — xG shot model + match-stats readout (see item 20 below). This is the first milestone of a multi-milestone Match Simulation Overhaul roadmap (M20–M25); see the "Match Simulation Overhaul Roadmap" note after item 20 for the full plan. Not yet tested in-engine this session — no `godot` MCP connection.
 
 ## Completed Milestones
 
@@ -134,6 +134,21 @@ Milestone 19 in progress — codebase review/bug-fix pass (see item 19 below). A
     - `BALANCE.md` "Live Match Simulation": shot/pass constants and the movement system's paragraph had drifted significantly from the actual code (e.g. documented `SHOOTING_RANGE`=260 vs actual 300, `PASS_MAX_DISTANCE`=750 vs actual 480, several movement mechanics — box-crashing, per-category attack push, collective line advance — not documented at all). Rewrote both to match current constants/behavior.
     - **Not changed (flagged, left as-is):** `MatchFlowEngine` and `LiveMatchState` each independently track `minute`, kept in sync only by call order in `live_match.gd._advance_one_minute()` — currently consistent but fragile if either is ever advanced independently; a real fix (single authoritative clock) is a bigger structural change than this pass's scope.
 
+20. Match Simulation Overhaul, Milestone 1: xG shot model + match-stats readout — implemented, **awaiting Designer verification in-engine** (no `godot` MCP connection this session).
+    - **Context:** kicks off a 6-milestone roadmap (M20–M25) to elevate the M17 position-driven engine into one principled simulation, replacing ad-hoc dice rolls with research-grounded models (xG, xT, utility-based decisions) and finally wiring tactical style into real engine behavior. Investigation confirmed tactical style's *only* current mechanical effect is `tactical_style → aggression → foul frequency`; the M18 `TacticalSystem` modifier table is computed and discarded. Full roadmap and rationale recorded for continuity across sessions. This milestone replaces the old distance-only shot-quality lerp with a real xG model and adds the stat-tracking every later milestone will be validated against.
+    - New `scripts/match_ratings.gd` (`MatchRatings`, static, `class_name`): centralizes every player-vs-player rating blend (previously scattered `DEFENSE_*_WEIGHT`/`RETENTION_*_WEIGHT` constants duplicated across contest sites) into named formulas over the existing 5 stats — `tackling`, `retention`, `finishing`, `passing_skill`, `keeper_rating`, `composure` — each position-adjusted via `PositionCompatibility.get_effective_stats()` and condition-scaled. No new stored `Player` fields (Designer decision: derive from the 5 stats only).
+    - `scripts/match_decision_engine.gd`: tackle/interception contests migrated to call `MatchRatings` instead of inlined blends (behavior-preserving). `_take_shot` reworked into a two-stage **xG model**: `_shot_xg()` computes chance quality from real shot geometry (angle subtended between the two goalposts + exponential distance decay + a multiplicative penalty per outfield defender standing across the shot lane, capped at 3), independent of who's shooting; conversion to `p_goal` then scales that quality by the shooter's `finishing` vs. the keeper's `keeper_rating`. Replaces the old `SHOT_QUALITY_MIN/MAX` distance-only lerp. `shot_taken` signal gained an `xg: float` param (all call sites updated).
+    - `resources/live_match_state.gd`: `record_shot_result()` gained an `xg: float = 0.0` param (default keeps old 3-arg callers safe); accumulates `home_shots`/`away_shots`, `home_shots_on_target`/`away_shots_on_target` (GOAL or SAVED), `home_xg`/`away_xg` per side.
+    - `resources/match_result.gd`: added `home_shots`/`away_shots`/`home_shots_on_target`/`away_shots_on_target`/`home_xg`/`away_xg`/`home_possession`/`away_possession` fields (transient handoff, not a persisted-save concern).
+    - `scenes/live_match/live_match.gd`: sidebar gained a live Possession/Shots/xG readout (`_stats_label`, built in code under the subs line, no `.tscn` change needed), refreshed every `_refresh()`. `Continue` now carries the accumulated stats (plus time-based possession % from `TeamMatchState`) into the `MatchResult` handoff.
+    - `scenes/match_result/match_result.gd`: builds a 3-column stat table (home | stat name | away) under the score for Possession/Shots/On Target/xG, built in code (no `.tscn` change).
+    - `BALANCE.md`: added "Derived Match Ratings" subsection documenting the `MatchRatings` formulas; rewrote the shot-resolution paragraph for the new xG model (geometry → chance quality → finishing/keeper conversion) and added a "Match statistics" paragraph describing what's now accumulated and why (the objective yardstick for M21+).
+    - **Not yet done:** in-engine verification (no `godot` MCP connection this session) — needs a full 90' match run to confirm shot locations cluster sensibly and xG/goal counts land in believable ranges per the plan's verification section.
+
+### Match Simulation Overhaul Roadmap (M20–M25)
+
+Full plan recorded at the time of kickoff for cross-session continuity (originally written to a Claude Code plan file, summarized here): **M20** (this milestone) xG + stats. **M21** pitch value surface (xT-lite) + utility-based carrier decisions, replacing weighted-random passing. **M22** off-ball movement via a positioning value function, retiring the `ATTACK_PUSH_BY_CATEGORY`/box-crash constant soup in `player_movement_system.gd`. **M23** possession phases (build-up/progression/final-third/transition) + real tactical-style engine effects + a pre-match style picker (Designer decision: effects + picker now, live in-match commands deferred). **M24** free kicks, penalties, offside, and card/injury player-removal enforcement (Designer decision: in scope, not deferred). **M25** momentum repurposed as a UI bar + soft decision modifier (never an event source), deletion of the now-dead `chance_generator.gd`/`chance_resolver.gd`/`chance.gd`, and a balance/tuning pass using this milestone's stats as the yardstick. Each milestone ships independently playable and Designer-verified before the next, per CLAUDE.md's one-problem-per-milestone rule.
+
 ## Demo Scope
 
 TBD — full scope not yet defined beyond Milestone 1. To be expanded as milestones complete.
@@ -153,7 +168,7 @@ TBD — full scope not yet defined beyond Milestone 1. To be expanded as milesto
 
 - Tactical style list and mechanical effects (deferred out of Milestone 3)
 - Abstract pitch view with moving markers for the live match (deferred out of Milestone 5 — current milestone ships a text event feed only; pitch visuals need their own milestone once the sim engine is verified)
-- Live match condition/decision/tackle/interception/shot formulas (BALANCE.md "Live Match Simulation", rewritten for Milestone 17's `MatchDecisionEngine`) are first-pass placeholders, not yet Designer-verified in-engine for actual match feel/balance
+- Live match condition/decision/tackle/interception/shot formulas (BALANCE.md "Live Match Simulation", rewritten for Milestone 17's `MatchDecisionEngine`; shot resolution rewritten again for Milestone 20's xG model) are first-pass placeholders, not yet Designer-verified in-engine for actual match feel/balance
 - Real-time match pacing (`SIM_SECONDS_PER_SIM_MINUTE` = 3.3, ~5 real minutes per match at 1x) and the 1x/2x/4x speed options are first-pass placeholders — not yet Designer-verified for whether that's the right length for a roguelite played many matches per run
 
 ## Production Notes

@@ -1,91 +1,78 @@
 class_name LevelUpScreen
 extends CanvasLayer
-## Start-of-level boon overlay (Designer, 2026-07-21: boons only at the start
-## of a level, one ability-focused pick per hero — replaces the old mid-battle
-## XP-level-up draft). BattleManager queues one of these per living hero in
-## _ready(), before deploy; each pauses the battle and offers every one of
-## that hero's ability boons (Boons.for_hero via RunState.roll_offer — no more
-## generic pool, so this is a straight pick-1-of-N, not "1 of 3"). Emits
-## `picked` with the chosen boon id; BattleManager records it into
-## RunState.boons (applied at spawn — see Hero.apply_run_boon /
-## BattleManager._spawn_hero) and tears the overlay down. Styling matches the
-## notebook palette (see results_screen.gd / prep_menu.gd).
+## Start-of-level pick overlay: BattleManager queues one of these per living
+## Duo in _ready(), before deploy. Each pauses the battle and offers all three
+## of that Duo Ultimate's boons (DuoUltimateBoons — a straight pick-1-of-3).
+## Emits `picked` with the chosen id; BattleManager routes it to
+## RunState.add_duo_boon, then tears the overlay down.
+##
+## History: introduced 2026-07-21 for per-hero ability boons, generalized
+## 2026-07-22 to also drive the per-Duo round via a `def_resolver` Callable.
+## The per-hero round was dropped 2026-07-25 (see duo_ultimate_boons.gd), so
+## only the Duo catalog is left — `def_resolver` is kept because it costs
+## nothing and keeps the overlay catalog-agnostic.
+## Styling matches the notebook palette (see results_screen.gd / prep_menu.gd).
 ##
 ## process_mode is ALWAYS so the buttons still take input while the tree is
 ## paused behind the overlay.
 
-signal picked(boon_id: String)
+signal picked(id: String)
 
-## Palette shared with the sibling battle overlay (ResultsScreen) — single
-## source so the two screens can't drift apart visually.
-const PAGE_COLOR := ResultsScreen.PAGE_COLOR
-const INK_COLOR := ResultsScreen.INK_COLOR
-const BORDER_COLOR := ResultsScreen.BORDER_COLOR
-const ACCENT := ResultsScreen.UNLOCK_COLOR
+## Paper/ink/borders all come from UIStyle now (see UIStyle.overlay_panel and
+## UIStyle.card) — the only colour this screen still names for itself is the
+## pick accent, shared with ResultsScreen's unlock banner.
+const ACCENT := UIStyle.GOLD
 
 var _picked := false
+## Resolves an offered id to its {name, desc, ...} def. Only ever
+## DuoUltimateBoons.def today; see the class doc.
+var _def_resolver: Callable = DuoUltimateBoons.def
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 
-## Build the overlay for `hero_name` with the given boon id offer.
-func setup(hero_name: String, offer: Array) -> void:
+## Build the overlay with `title`/`subtitle` and one card per id in `offer`,
+## resolved through `def_resolver` (DuoUltimateBoons.def).
+func setup(title_text: String, subtitle_text: String, offer: Array, def_resolver: Callable) -> void:
+	_def_resolver = def_resolver
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	var style := StyleBoxFlat.new()
-	style.bg_color = PAGE_COLOR
-	style.border_color = BORDER_COLOR
-	style.set_border_width_all(3)
-	style.set_content_margin_all(28)
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UIStyle.overlay_panel())
 	add_child(panel)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 18)
 	panel.add_child(box)
 
-	var title := _label("%s — LEVEL %d" % [hero_name, RunState.current_level], 40)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", ACCENT)
-	box.add_child(title)
-
-	var subtitle := _label("Choose an ability boon (this run only)", 20)
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(subtitle)
+	box.add_child(UIStyle.centered_label(title_text, UIStyle.SIZE_TITLE, ACCENT))
+	box.add_child(UIStyle.centered_label(subtitle_text, UIStyle.SIZE_BODY))
 
 	var cards := HBoxContainer.new()
-	cards.add_theme_constant_override("separation", 16)
+	cards.add_theme_constant_override("separation", 22)
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(cards)
 
-	for id in offer:
-		cards.add_child(_build_card(id))
+	for i in offer.size():
+		cards.add_child(_build_card(offer[i], i))
 
-## One selectable boon card (a Button with name + description).
-func _build_card(id: String) -> Button:
-	var d := Boons.def(id)
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(220, 120)
-	btn.text = "%s\n\n%s" % [d.get("name", id), d.get("desc", "")]
-	btn.add_theme_font_size_override("font_size", 22)
+## One selectable card (a Button with name + description), resolved via
+## _def_resolver — catalog-agnostic. `variant`
+## just picks which hand-drawn corner wobble this card gets, so a row of
+## cards doesn't read as identical stamped rectangles.
+func _build_card(id: String, variant: int) -> Button:
+	var d: Dictionary = _def_resolver.call(id)
+	var btn := UIStyle.button("%s\n\n%s" % [d.get("name", id), d.get("desc", "")],
+			UIStyle.SIZE_SUBHEAD, _on_pick.bind(id))
+	btn.custom_minimum_size = Vector2(300, 170)
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
-	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		btn.add_theme_color_override(c, INK_COLOR)
-	# Every boon is hero-specific now (no more generic pool), so this accent
-	# border always applies — kept as a branch (rather than unconditional) in
-	# case a hero-agnostic boon ever returns.
-	if d.has("hero"):
-		var sig_style := StyleBoxFlat.new()
-		sig_style.bg_color = PAGE_COLOR
-		sig_style.border_color = ACCENT
-		sig_style.set_border_width_all(3)
-		sig_style.set_content_margin_all(8)
-		for s in ["normal", "hover", "pressed", "focus"]:
-			btn.add_theme_stylebox_override(s, sig_style)
-	btn.pressed.connect(_on_pick.bind(id))
+	# Every option in either catalog is always hero/Duo-specific (no generic
+	# pool on either side), so this accent border always applies.
+	var sig_style := UIStyle.card(ACCENT, 8, variant)
+	for s in ["normal", "hover", "pressed", "focus"]:
+		btn.add_theme_stylebox_override(s, sig_style)
 	return btn
 
 func _on_pick(id: String) -> void:
@@ -94,9 +81,3 @@ func _on_pick(id: String) -> void:
 	_picked = true
 	picked.emit(id)
 
-func _label(text: String, font_size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", INK_COLOR)
-	return l

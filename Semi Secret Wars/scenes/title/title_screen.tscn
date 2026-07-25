@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://vlpt7p83vopx"]
+
+[ext_resource type="Script" uid="uid://cam4jkcarstls" path="res://scenes/title/title_screen.gd" id="1_title"]
+[ext_resource type="AudioStream" uid="uid://cht2msg8j5gst" path="res://assets/Sounds/1stMenu.mp3" id="2_ynr0n"]
+
+[node name="TitleScreen" type="Control" unique_id=1863982801]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_title")
+
+[node name="AudioListener2D" type="AudioListener2D" parent="." unique_id=908530333]
+
+[node name="1StMenu" type="AudioStreamPlayer" parent="AudioListener2D" unique_id=44058526]
+stream = ExtResource("2_ynr0n")
+autoplay = true

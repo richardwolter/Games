@@ -30,32 +30,30 @@ func _build_ui() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	root.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	root.grow_vertical = Control.GROW_DIRECTION_BOTH
-	root.add_theme_constant_override("separation", 12)
+	root.add_theme_constant_override("separation", 18)
 	add_child(root)
 
-	var title := _label("STATS", 32)
+	var title := _label("STATS", UIStyle.SIZE_HEADING)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 
-	var note := _label("Every point of XP any hero earns banks permanently into one shared pool — it never resets between runs. Spend it here on any hero's repeatable raw stat upgrades; cost rises each time.", 13)
+	var note := _label("Every point of XP any hero earns banks permanently into one shared pool — it never resets between runs. Spend it here on any hero's repeatable raw stat upgrades; cost rises each time.", UIStyle.SIZE_TINY)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	note.custom_minimum_size = Vector2(560, 0)
+	note.custom_minimum_size = Vector2(900, 0)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(note)
 
-	_xp_label = _label("", 18)
+	_xp_label = _label("", UIStyle.SIZE_BODY)
 	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(_xp_label)
 
 	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 20)
+	cols.add_theme_constant_override("separation", 28)
 	cols.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_child(cols)
 	_grid = cols
 
-	var back := Button.new()
-	back.text = "BACK"
-	back.add_theme_font_size_override("font_size", 24)
+	var back := UIStyle.button("BACK", UIStyle.SIZE_SUBHEAD)
 	back.pressed.connect(func() -> void: closed.emit())
 	root.add_child(back)
 
@@ -67,12 +65,12 @@ func _rebuild_grid() -> void:
 
 func _hero_column(hero_name: String) -> VBoxContainer:
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
-	col.custom_minimum_size = Vector2(230, 0)
-	var head := _label(hero_name, 18)
+	col.add_theme_constant_override("separation", 10)
+	col.custom_minimum_size = Vector2(310, 0)
+	var head := _label(hero_name, UIStyle.SIZE_BODY)
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(head)
-	var stats_label := _label(_effective_stats_text(hero_name), 13)
+	var stats_label := _label(_effective_stats_text(hero_name), UIStyle.SIZE_TINY)
 	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(stats_label)
 	for id in StatUpgrades.ids():
@@ -103,31 +101,23 @@ func _effective_stats_text(hero_name: String) -> String:
 func _stat_card(hero_name: String, stat_id: String) -> PanelContainer:
 	var d := StatUpgrades.def(stat_id)
 	var count := GameState.stat_purchase_count(hero_name, stat_id)
-	var cost := StatUpgrades.cost_for(stat_id, count)
+	var cost := StatUpgrades.cost_for(hero_name, stat_id, count)
 	var xp: int = GameState.banked_xp
 
 	var card := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.5)
-	style.border_color = PrepPage.INK_COLOR
-	style.set_border_width_all(3)
-	style.set_content_margin_all(10)
-	style.set_corner_radius_all(2)
-	card.add_theme_stylebox_override("panel", style)
+	card.add_theme_stylebox_override("panel", UIStyle.card(UIStyle.INK, 10, stat_id.length()))
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 6)
 	card.add_child(box)
 
-	box.add_child(_label("%s (Lv %d)" % [d.get("label", stat_id), count], 16))
+	box.add_child(_label("%s (Lv %d)" % [d.get("label", stat_id), count], UIStyle.SIZE_SMALL))
 	var effect := float(d.get("effect_add", 0.0))
 	var effect_text := "-%.2fs attack interval per level" % effect if stat_id == "attack_speed" \
 			else "+%s per level" % (str(int(effect)) if effect == roundf(effect) else str(effect))
-	box.add_child(_label(effect_text, 13))
+	box.add_child(_label(effect_text, UIStyle.SIZE_TINY))
 
-	var buy := Button.new()
-	buy.text = "Buy — %d XP" % cost
-	buy.add_theme_font_size_override("font_size", 14)
+	var buy := UIStyle.button("Buy — %d XP" % cost, UIStyle.SIZE_SMALL)
 	buy.disabled = xp < cost
 	buy.pressed.connect(func() -> void:
 		if GameState.buy_stat_upgrade(hero_name, stat_id):
@@ -140,8 +130,4 @@ func _refresh() -> void:
 	_rebuild_grid()
 
 func _label(text: String, font_size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", Color("2c2c2c"))
-	return l
+	return UIStyle.label(text, font_size)

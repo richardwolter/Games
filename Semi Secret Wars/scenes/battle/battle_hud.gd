@@ -56,6 +56,10 @@ var _duo_b_label: Label
 ## it); purely presentational (see DuoSynergies), no gameplay effect of its own.
 var _duo_synergy_labels: Array[Label] = []
 
+## Duo Ultimate activation bar (2026-07-22) — the "DUO Cards UI" ACTIVATE
+## buttons live on. Built in code like _duo_b_label; see duo_ultimate_bar.gd.
+var _duo_ultimate_bar: DuoUltimateBar
+
 func _ready() -> void:
 	_villain_hp_label = get_node(villain_hp_label_path)
 	_villain_hp_bar = get_node(villain_hp_bar_path)
@@ -71,12 +75,16 @@ func _ready() -> void:
 	get_node(back_button_path).pressed.connect(_on_back_pressed)
 	_build_duo_b_label()
 	_build_duo_synergy_labels()
+	_build_duo_ultimate_bar()
+
+func _build_duo_ultimate_bar() -> void:
+	_duo_ultimate_bar = DuoUltimateBar.new()
+	add_child(_duo_ultimate_bar)
+	_duo_ultimate_bar.build_cards()
 
 func _build_duo_synergy_labels() -> void:
 	for i in 2:
-		var label := Label.new()
-		label.add_theme_font_size_override("font_size", 16)
-		label.add_theme_color_override("font_color", Color("6fa8dc"))
+		var label := UIStyle.label("", UIStyle.SIZE_SMALL, UIStyle.INFO)
 		label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 		label.position.y = 120.0 + i * 22.0
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -85,9 +93,7 @@ func _build_duo_synergy_labels() -> void:
 		_duo_synergy_labels.append(label)
 
 func _build_duo_b_label() -> void:
-	_duo_b_label = Label.new()
-	_duo_b_label.add_theme_font_size_override("font_size", 22)
-	_duo_b_label.add_theme_color_override("font_color", Color("b8860b"))
+	_duo_b_label = UIStyle.label("", UIStyle.SIZE_SUBHEAD, UIStyle.DUO_A)
 	_duo_b_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_duo_b_label.position.y = 96.0
 	_duo_b_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -107,6 +113,7 @@ func _process(delta: float) -> void:
 	_update_objective_buff(delta)
 	_update_duo_b_countdown()
 	_update_duo_synergy_labels()
+	_duo_ultimate_bar.refresh()
 
 ## Shows each Duo's named synergy banner while that Duo has at least one
 ## live hero on the field — reads GameState.duo_pairings (persistent Duo

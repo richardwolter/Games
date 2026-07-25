@@ -1,8 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dm4twxv1ldci"]
 
-[ext_resource type="Script" path="res://scenes/prep/prep_menu.gd" id="1_prep"]
+[ext_resource type="Script" uid="uid://c2u3bpfohxo4u" path="res://scenes/prep/prep_menu.gd" id="1_prep"]
+[ext_resource type="AudioStream" uid="uid://c43pycumc8hy0" path="res://assets/Sounds/Theme_Song_Menu.mp3" id="2_q3hhw"]
 
-[node name="PrepMenu" type="Control"]
+[node name="PrepMenu" type="Control" unique_id=451688472]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,3 +11,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_prep")
+
+[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="." unique_id=6425313]
+stream = ExtResource("2_q3hhw")
+autoplay = true

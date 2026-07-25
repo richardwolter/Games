@@ -73,9 +73,15 @@ func _spawn_spawn_points() -> void:
 		# Register as a hard blocker so heroes steer around / can't stand on the
 		# gate — Combatant separation only applies within the same self_group,
 		# so a hero would otherwise walk straight into it. Approaching units'
-		# own _collision_radius() (Combatant) adds clearance for oversized
+		# own _collision_radii() (Combatant) adds clearance for oversized
 		# sprite art on their end.
-		_field.register_dynamic_obstacle(sp.global_position, sp.body_radius)
+		#
+		# The oval is derived from the AUTHORED body_radius, not from the gate's
+		# much larger drawn size — the layouts were validated against gates
+		# blocking at radius 44 (ART_BIBLE), so reshaping that radius is safe
+		# while growing it could re-block a corridor.
+		_field.register_dynamic_obstacle(sp.global_position, sp.body_radius,
+				SpriteFootprint.radii_for(sp.sprite_texture, sp.body_radius * 2.0))
 
 func apply_stage_config(config: StageConfig) -> void:
 	swarm_cap = config.swarm_cap_start
@@ -102,6 +108,12 @@ func _load_minion_scene_b(minion_type: String) -> PackedScene:
 	match minion_type:
 		"hybrid_stage3":
 			return load("res://scenes/enemies/brute_minion.tscn")
+		# Stage 2 mixes in a shooter alongside its elites (Designer,
+		# 2026-07-25) — the berserk swarm shipped with two minion sprites and
+		# a projectile, which needs a ranged unit in the mix to appear at all.
+		# _pick_minion_scene rolls 50/50 between the two.
+		"elite_minion":
+			return load("res://scenes/enemies/ranged_minion.tscn")
 		_:
 			return null
 
@@ -186,9 +198,8 @@ func _on_minion_killed(who: Combatant) -> void:
 		var whole := int(_gold_accum)
 		GameState.bank_gold(whole)
 		_gold_accum -= whole
-	var blood := get_tree().get_first_node_in_group("blood")
-	if blood != null and blood.has_method("stain"):
-		blood.stain(who.global_position)
+	# Blood stain now applied by Combatant._spawn_death_particles for every
+	# unit (minions, gates, villains alike) — see scripts/battle_fx.gd.
 
 func current_cap() -> int:
 	return int(_cap)

@@ -2,6 +2,257 @@
 
 Stores gameplay values. Every gameplay value should eventually live here instead of in source code (see [AI_Development_Guide.md](AI_Development_Guide.md) §8, §11).
 
+## Player stat distribution + Clone rework pass (2026-07-24)
+
+**Designer report:** "Artemis still feels too strong, and is always the last
+to survive." Clones should not be an exact copy — regular damage only, not
+affected by abilities/ultimate.
+
+**Verified by inspection + spot-checked live via `game_eval`** — no automated
+sweep exists for the lane build (see prior pass above / `.claude/skills/
+balance-qa`). The compile/run and the specific mechanics below were confirmed
+in-engine; overall feel (does Artemis still dominate, is the new gold cost
+noticeable) is a Designer playtest call.
+
+### Diagnosis
+
+Artemis's `HERO_STATS` are the lowest-base "glass cannon" of the four by
+design (BALANCE.md's own prior note), but two systems compound on top of that
+design intent in a way that reverses it in practice:
+
+**1. Flat stat-upgrade effects are the same gold price for every hero, but a
+bigger % of Artemis's smaller base stats:**
+
+| Hero | HP | +8 HP = | Damage | +1 dmg = | Atk interval | −0.03s = |
+|---|---|---|---|---|---|---|
+| Thundaar | 55 | +14.5% | 5.0 | +20.0% | 0.7s | +4.3% DPS |
+| **Artemis** | **40** | **+20.0%** | **3.0** | **+33.3%** | **0.4s** | **+7.5% DPS** |
+| Warden | 45 | +17.8% | 3.0 | +33.3% | 0.6s | +5.0% DPS |
+| Beacon | 50 | +16.0% | 4.0 | +25.0% | 0.6s | +5.0% DPS |
+
+Same gold everywhere; Artemis (tied on damage, alone on the other two axes)
+gets the single biggest relative payoff per purchase of any hero.
+
+**2. Clone then copied that inflated *live* stat wholesale into a second
+unit** — `_build_clone` read Artemis's live `damage`/`max_hp`/`attack_interval`
+directly, so every stat purchase, every Rally boost, every Duo Ultimate
+permanent buff, and the Mirror Image tier-2's +50% all got duplicated into a
+taunting second body next to her. Investing in Artemis didn't just make her
+stronger — it doubled the payoff, since her clone scaled with the same
+snowballing investment.
+
+### Changes
+
+**1. Stat-upgrade cost now scales to each hero's own base stat**
+(`scripts/stat_upgrades.gd`) — the flat, no-% effects stay untouched (locked
+house rule, 2026-07-21), but `cost_for(hero_name, id, purchases)` now takes
+`hero_name` and multiplies `base_cost` by `hero_cost_mult`: a fixed reference
+per stat (95 HP / 7.5 dmg / 0.6s — the same numbers the file's own doc comment
+already cited as the tuning anchor) divided by that hero's actual base value.
+Below-reference stats cost more, above-reference cost less. Confirmed live:
+
+| Stat | Thundaar | Artemis | Warden | Beacon |
+|---|---|---|---|---|
+| HP (base 20g) | 17g | **24g** | 21g | 19g |
+| Damage (base 25g) | 19g | **31g** | 31g | 23g |
+| Attack Speed (base 30g) | 26g | **45g** | 30g | 30g |
+
+Both call sites (`GameState.buy_stat_upgrade`, `stats_page.gd`'s shop UI)
+updated to pass `hero_name` through.
+
+**2. Clone now builds off a permanent-baseline snapshot, not live stats**
+(`scenes/heroes/hero.gd`) — new `_base_damage`/`_base_attack_interval`
+(alongside the existing `_base_max_hp`), captured in `_configure()` right
+after owned ability mods + purchased stat upgrades land, before any Duo
+Ultimate can ever mutate `damage`/`attack_interval`/`max_hp`. `_build_clone`
+now reads these instead of the live vars, and drops `damage_mult()` (Rally's
+temp boost) and `CLONE_DAMAGE_BOOST` (Mirror Image tier-2's +50%) from the
+damage multiplier entirely. `_duo_damage_mult` (the live Duo-partner bonus)
+is kept — it's not an ability/ultimate, it's the same mechanic that scales
+her own regular attacks, so a clone matching it reads as consistent rather
+than exempt.
+
+Confirmed live via `game_eval`: with a simulated +50 Duo Ultimate permanent
+buff and an active 3x Rally boost, live Artemis damage went 3 → 53 raw → ×3
+further via Rally — her clone still dealt exactly 3, the unbuffed baseline.
+
+### Flagged, not fixed: Mirror Image (ARTEMIS_2) is now a dead purchase
+
+Stripping `CLONE_DAMAGE_BOOST` from clone damage means the 40g tier-2
+passive — literally described as "Clone deals +50% damage" — now does
+nothing. Same bug class as the WARDEN_2/BEACON_2 gap fixed in the prior pass,
+except this one I introduced deliberately by following the Designer's own
+explicit instruction to strip it, rather than an oversight — flagging per the
+"flag, don't silently reconcile" rule instead of quietly repurposing it
+myself. **Needs a Designer call:** repurpose it (e.g. onto Artemis's own live
+damage instead of the clone's) or pull it from sale.
+
+## Ability cadence + Duo Ultimate impact pass (2026-07-24)
+
+**Designer report:** ability trigger frequency should scale inversely with
+strength; Duo Ultimates need to be "really meaningful on the battlefield
+action." Specific complaints: Clone is very strong (a second hero), Ensnare is
+weak (pure control), Thundaar "hardly gets swarmed" (Stomp fires constantly),
+Rally only matters when timing happens to line up.
+
+**Verified by inspection only** — there is no automated balance sweep for the
+lane build (`balance_sweep.gd`/probes were deleted with V1; nothing in the
+lane build has ever been swept — see `.claude/skills/balance-qa/references/
+levers.md`). Every number below is code-traced arithmetic, not a simulated
+run. Constants confirmed live in-engine via `game_eval` after the edit
+(`STOMP_KNOCKBACK`/`STOMP_RADIUS`/`MAX_CLONE_COUNT`/cooldown-floor values all
+read back as intended); the game compiles and runs clean. The mechanics
+themselves — `apply_vulnerability` raising incoming damage by the flat add —
+were spot-checked in-engine (10 base dmg + 2 vuln = 12 taken, confirmed). Feel
+verification (does Thundaar now get meaningfully swarmed, do ultimates read as
+fight-turning, etc.) is a Designer playtest call, not something I can judge.
+
+**Diagnosis** — power-per-cast at 5 enemies in radius, minions ~5 dmg/1.0s,
+CC converted to damage-prevented so all four signatures are comparable:
+
+| Ability | Power/cast (old) | Cooldown (old) | Power/sec (old) |
+|---|---|---|---|
+| Stomp | ~154 | 3.5s | **44** |
+| Rally | ~120 | 7.0s | **17** |
+| Clone | ~66 | 8.0s | **8** |
+| Ensnare | ~30 (zero damage) | 4.5s | **6.7** |
+
+Four distinct failure modes needed four different levers:
+
+1. **`STOMP_KNOCKBACK` (100) exceeded `STOMP_RADIUS` (70)** — a hit enemy was
+   shoved outside the stomp circle, walked back in, got shoved again. That
+   perpetual repel loop — not the cooldown — is why Thundaar was un-swarmable.
+   Structural fix, not a number.
+2. **Clone measured 3rd but felt 1st.** Base throughput was 2nd-lowest; what
+   actually dominates is `twin_focus` (boon, +1) and `twin_clone` (mod, +1)
+   both stacking to 3 simultaneous clones. Fixed by capping the stack, not
+   slowing the base ability.
+3. **Ensnare was the only ability dealing zero damage**, and Warden's tier-2
+   passive didn't exist in code at all (a real gap — the gold tier bought
+   nothing observable). Same for Beacon's tier-2.
+4. **Rally's gate (`_party_in_combat`) fired on literally any live target**,
+   so in a swarm fight it was continuously spent on trash instead of held.
+
+**Designer calls made:** Warden's payoff is a flat additive vulnerability
+(+2 dmg/hit while rooted), not a %, matching the additive-math house style
+(`RALLY_DMG_ADD`). Rally holds for real fights. Ultimates should be
+fight-turning, ~5x current. Warden/Beacon tier-2 passives implemented now.
+
+### Changes — signature abilities (`scenes/heroes/hero.gd`)
+
+| Const | Old | New |
+|---|---|---|
+| `STOMP_KNOCKBACK` | 100.0 | **45.0** (now under `STOMP_RADIUS` 70 — the core fix) |
+| `STOMP_COOLDOWN` | 3.5 | **5.0** |
+| `STOMP_DAMAGE` | 26.0 | **22.0** |
+| `CLONE_COOLDOWN` | 8.0 | **9.0** |
+| `CLONE_DURATION` | 3.5 | **5.0** |
+| `MAX_CLONE_COUNT` (new) | — | **2**, hard cap regardless of boon+mod stacking |
+| `ENSNARE_STUN_DURATION` | 1.2 | **1.6** |
+| `ENSNARE_VULN_DMG_ADD` (new) | — | **2.0** flat, applied alongside the stun |
+| `RALLY_COOLDOWN` | 7.0 | **8.0** |
+| `RALLY_DURATION` | 4.0 | **5.0** |
+
+New: `Combatant.apply_vulnerability(duration, dmg_add)` — flat damage add
+while active, mirrors `apply_stun`/`apply_burn`'s extend-don't-stack pattern,
+own status-ring color. `_try_ensnare` calls it alongside `apply_stun`.
+
+`_rally_worth_casting` replaces `_party_in_combat`: fires only when
+`RALLY_MIN_ENEMIES` (3) enemies are in radius, OR the villain is alerted, OR
+an ally is below `RALLY_LOW_HP_FRAC` (60%) HP.
+
+**New tier-2 passives** (previously non-existent for these two):
+Warden — vulnerability add 2.0→**3.0**, radius +**25**. Beacon — Rally also
+heals each buffed ally **8 HP**.
+
+**Cooldown-boon stack fix:** cooldown boons/mods are flat-subtractive and
+stack unboundedly; the floor used to be a flat 0.1s, so 3 boon picks + a Duo
+leader could crush Stomp to a 0.2s permanent damage aura. New
+`ABILITY_COOLDOWN_FLOOR_FRAC := 0.4` floors every re-arm at 40% of that
+ability's own base cooldown instead (e.g. Stomp floors at 2.0s, not 0.1s) —
+confirmed live via `game_eval`.
+
+### Changes — Duo Ultimates (`scripts/duo_ultimates.gd`)
+
+~5x damage scaling plus three real bugs fixed (the tuning above doesn't land
+without them):
+
+| Ultimate | Param | Old | New |
+|---|---|---|---|
+| Seismic Advance | step_damage / step_count / step_radius | 30 / 4 / 90 | **90 / 5 / 100** |
+| Verdant Path | tick_damage | 6 | **16** |
+| Volatile Duplicates | explode_damage | 40 | **130** |
+| Piercing Volley | arrow_damage (new, was `caster.damage`) | ~3 (Artemis's live dmg) | **55** flat |
+| Hunting Duplicates | clone_life_span / clone_damage_mult (new) | 8 / — | **12 / 2.0x** |
+| Searing Bind | burn_dps / radius | 4 / 110 | **14 / 140** |
+
+Bugs fixed:
+- **Piercing Volley scaled off `caster.damage`** (Artemis's ~3 effective
+  damage) instead of a flat constant like every other ultimate — the whole
+  once-per-level cast dealt ~36 total. Now a flat `arrow_damage` param.
+- **Volatile Duplicates dealt zero if its clones were never attacked**
+  (`explode_on_hit` only fired on `take_damage`). `HeroClone._process` now
+  also detonates on `life_span` expiry.
+- **`explode_damage`/`burn_dps` bypassed `_duo_damage_mult`/`damage_mult()`**
+  while stomp_wave/plant_trail/arrow_barrage all apply both — fixed at the
+  `hero.gd` cast sites.
+
+**Correction to the approved plan:** the plan's item ③ ("`plant_trail.gd:62`
+breaks after the first plant hit, capping each enemy at one tick") was based
+on a misreading — that `break` only prevents a single enemy from being
+double-hit by *overlapping plants within the same tick*, which is correct,
+intended behavior (removing it would let an enemy standing at a 3-plant
+overlap take 3x damage per tick, a new bug, not a fix). Left unchanged;
+flagging this per the "flag, don't silently reconcile" rule rather than
+quietly diverging from the approved plan without note.
+
+**Risk:** Thundaar's ~45% power/sec cut is the single largest swing in this
+pass and lands on the tank the (unverified, pre-lane-build) L2/L3 targets were
+built around. If levels become unclearable, revert `STOMP_DAMAGE` to 26 first,
+then `STOMP_COOLDOWN` to 4.0 — keep `STOMP_KNOCKBACK` at 45, since that's the
+actual fix the Designer asked for and should be the last thing reverted. The
+~5x ultimate scaling also stacks on top of level-long buffs and cumulative Duo
+boons across all 3 levels — late-run ultimates will be substantially larger
+than the base figures above.
+
+## Duo Ultimates — replaces solo LV20 ultimates (2026-07-22)
+
+**Designer direction:** "each DUO have an exclusive Ultimate, and Heroes will no longer have an Ultimate by themselves, only DUO" — manually activated once per level from a button on a new Duo card UI, plus a per-Duo boon (picked at level start) that upgrades it.
+
+**Removed:** the solo LV20 "second ability" system — Thundaar's Shockwave, Artemis's Multishot, Beacon's Confuse (Warden never had one) — and their gold-shop tier-3 unlocks (`AbilityTiers` — `THUNDAAR_3`/`ARTEMIS_3`/`WARDEN_3`/`BEACON_3`). Tier-2 passives (Stomp-stun, Clone +50% damage) are untouched and still purchasable. `Hero._active_unlocked` and the `_try_shockwave`/`_try_multishot`/`_try_confuse` methods are gone from `hero.gd`; `ABILITY_INFO` no longer carries a `name2`/`cd2` — the HUD's second-ability row simply never shows now (`second_ability_name()` always returns `""`).
+
+**New: one exclusive Ultimate per Duo pairing** (`scripts/duo_ultimates.gd`, keyed by `DuoUltimates.id_for_heroes`), intrinsic (no gold/tier gate) and usable once per level via `BattleManager.activate_ultimate(pair_id)`, called from the new Duo Ultimate bar (`scenes/battle/duo_ultimate_bar.gd`, wired into `BattleHUD`). The caster is whichever Duo member is alive (leader preferred); the effect and the flat, level-long stat buff below both apply once activated:
+
+| Duo | Ultimate | Base effect | Level-long buff (both members) |
+|---|---|---|---|
+| THUNDAAR+BEACON | Seismic Advance | 4 forward stomps, 80px apart, each hitting a 90px radius for 30 dmg + 0.8s stun | +2 dmg, −0.1s attack interval |
+| THUNDAAR+WARDEN | Verdant Path | 5 plants, 60px apart, each ticking 6 dmg/s + 1.0s ensnare in a 50px radius for 8s | +30 HP, +2 dmg |
+| THUNDAAR+ARTEMIS | Volatile Duplicates | 2 taunting clones that explode (90px radius, 40 dmg) the instant they're hit | −0.3s attack interval, +2 dmg |
+| ARTEMIS+BEACON | Piercing Volley | 6 arrows within 260px, each chaining to 2 more enemies at 50% damage | −0.3s attack interval, +2 dmg |
+| ARTEMIS+WARDEN | Hunting Duplicates | 2 roaming (non-stationary) clones whose shots also ensnare (1.0s) | −0.3s attack interval, +30 HP |
+| WARDEN+BEACON | Searing Bind | Ensnare (1.5s) + burn (4 dmg/s for 30s) in a 110px radius around the current target | +4 dmg, +30 HP |
+
+Implementation notes: `stomp_wave`/`plant_trail`/`arrow_barrage` are new self-contained `Node2D` effect scenes (`scenes/combat/duo/`) that resolve over a few frames then free themselves — `arrow_barrage` resolves instantly (same "instant burst + flash" convention every other hero ability already uses; no real projectile travel simulated). The two clone-based Ultimates reuse the normal Clone ability's `Hero._build_clone`/`_place_clone` helpers with new `HeroClone` flags (`explode_on_hit`, `aggressive_roam`, `ensnare_on_hit`). A new `Combatant.apply_burn`/`_burn_t` status (ticking DoT, same "extend-don't-stack" pattern as `apply_slow`) backs the burn tick in both Searing Bind and Verdant Path's plants. "Forward" is always `Vector2.RIGHT` — the lane's established deploy→villain direction (same convention as the Duo deploy leader-in-front positioning).
+
+**New: per-Duo Ultimate boons** (`scripts/duo_ultimate_boons.gd`, 2 per Duo — 12 total), picked in a separate round at the start of each level (after the existing per-hero ability-boon picks), stored in `RunState.duo_boons` and read at cast time via `RunState.duo_boon_total(pair_id, kind)` — added on top of the catalog's flat base value, never mutating either catalog. Every boon targets exactly one params key, flat additive (same rule as everywhere else — see the additive-math rework below):
+
+| Duo | Boon | Effect |
+|---|---|---|
+| THUNDAAR+BEACON | Extra Stomps | +2 stomps in the sequence |
+| THUNDAAR+BEACON | Heavier Stomps | +15 damage per stomp |
+| THUNDAAR+WARDEN | Longer Trail | +3 plants in the trail |
+| THUNDAAR+WARDEN | Potent Plants | +4 damage per plant tick |
+| THUNDAAR+ARTEMIS | Extra Bomb | +1 exploding clone |
+| THUNDAAR+ARTEMIS | Bigger Blast | +20 explosion damage |
+| ARTEMIS+BEACON | Extra Chain | +1 chain (3 total) |
+| ARTEMIS+BEACON | Fuller Volley | +4 arrows in the barrage |
+| ARTEMIS+WARDEN | Extra Hunter | +1 roaming clone |
+| ARTEMIS+WARDEN | Longer Hunt | +4s clone lifetime |
+| WARDEN+BEACON | Longer Burn | +15s burn duration |
+| WARDEN+BEACON | Hotter Burn | +3 burn damage/sec |
+
+**Not yet verified:** every number above is a first-pass guess, not run through `balance_sweep.gd`. Duo Ultimates are a real, repeatable (once/level, so up to 3 uses/run) power addition on top of the already-existing Duo Bonus and per-hero boons — **recommend a full sweep before trusting the existing L1/L2/L3 clear-rate targets**, especially since the level-long stat buffs stack across all 3 levels of a run for a surviving Duo. Flagged risks to watch: THUNDAAR+ARTEMIS's exploding clones could double as a second (indirect) Stomp/Shockwave-tier burst; WARDEN+BEACON's 30s burn is long relative to most fights and may need a shorter duration or lower dps once seen live; the two roaming-clone/exploding-clone Ultimates were the least mechanically similar to anything pre-existing and deserve the closest playtest look.
+
 ## Boon rework — start-of-level, ability-only (2026-07-21)
 
 **Designer direction:** "give boons only at the start of a level, and make it only ability focused boons. Each hero gets one at the start of each level." Replaces the old mid-battle system where boons were offered every time a hero crossed an in-run XP-level threshold (pausing combat at unpredictable moments) from a mixed pool of generic stat boosts (Power/Vitality/Haste/Swiftness/Fortune/Ferocity) and hero-specific "signature" boons (some ability-focused, some just more damage/HP with an ability's name on them).
@@ -669,6 +920,39 @@ Implementation: `scenes/heroes/hero.gd` — `_is_lone_wolf` set once in `_config
 **Why Stage 1 resists pure stat buffs where Stage 2/3 don't:** Dark Mage flees when a hero closes in (`flee_distance = 260`) and every `teleport_interval = 10s` blinks to a new spot and resummons a fresh burst of minions there. A lone hero's chase progress gets reset roughly every 10 sim-seconds and has to fight through a new minion burst before it can resume pressing the villain — structurally different from Berserker (actively chases, stands and fights) and Mech Robot (stationary, melees back), where raw stat increases convert directly into sustained damage windows. Buffing Lone Wolf further would eventually brute-force a Stage 1 win too, but the diminishing returns and the already-large multipliers (×1.8 HP / ×1.75 DMG) suggested stopping here and flagging the mechanic instead of the numbers.
 
 **Open item for Designer:** Stage 1 is currently the *hardest* stage to solo despite being the first stage — the opposite of the intended difficulty curve. Two paths forward: (a) tune Dark Mage's kiting specifically for solo (e.g. shorter `teleport_interval` cooldown between resummons scaled by party size, or a smaller `teleport_minion_count` when only one hero is present), or (b) accept Stage 1 as solo-unwinnable by design and lean into "duo unlocks Stage 1, solo is a Stage-2-only curiosity" — inconsistent with the current stage-gating (Stage 2 unlocks only after beating Stage 1), so (a) is likely the better direction if solo progression through the stage order matters.
+
+## Level 1 Swarm Tuning (2026-07-25)
+
+**Designer report:** "Level 1 too easy, should take at least 10 runs to clear. Minions need to feel much more prevalent for a swarm vibe."
+
+**Verified in-engine:** Config changes applied; game loads and runs without errors. Visual feel (does the swarm now read as threatening, do playthroughs consistently take 10+ attempts) is a Designer playtest call.
+
+### Diagnosis
+
+**Failure mode:** Level 1 reads as too easy and lacks minion presence due to weak escalation and low spawn throughput.
+
+| Parameter | Before | After | Impact |
+|---|---|---|---|
+| `swarm_cap_start` | 14 | 28 | Initial minion cap doubled for immediate swarm presence |
+| `spawn_batch` | 5 | 8 | More minions per spawn event (+60%) |
+| `spawn_interval` | 2.2s | 1.6s | Faster spawning cadence (~36% more frequent) |
+| `escalate_step` | +2 | +3 | +50% stronger cap escalation per 14s interval |
+| `villain_hp_mult` | 1.6x | 2.2x | +37.5% villain durability — longer fights = more runs needed |
+
+**Reasoning:**
+- **Minion prevalence:** Starting cap of 14 is too low for a swarm aesthetic. Doubling to 28 + faster spawn interval (1.6s vs 2.2s) + larger batches (8 vs 5) achieves ~2.3× effective spawn rate early game, flooding the field with minions immediately.
+- **Difficulty escalation:** +50% escalation step (3 vs 2) + 37.5% villain durability increase means the villain survives longer and the swarm grows more aggressively, creating sustained pressure that forces multiple attempts.
+
+**Lever used:** Encounter config (per-level surgical change). Not hero stats or economy — problem is localized to Level 1's initial tuning, so higher levers are not needed.
+
+### Changes
+
+Edited `config/stage_1_config.tres`:
+- `swarm_cap_start`: 14 → 28
+- `spawn_batch`: 5 → 8
+- `spawn_interval`: 2.2 → 1.6
+- `escalate_step`: 2 → 3
+- `villain_hp_mult`: 1.6 → 2.2
 
 ## Economy
 

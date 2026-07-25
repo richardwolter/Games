@@ -28,6 +28,14 @@ extends Resource
 ## For future: field preset (stage-specific obstacles, layouts, etc.).
 @export var field_preset: String = "default"
 
+## Battle music for this stage, overriding battlefield.tscn's BattleMusic
+## stream (Designer, 2026-07-25: level 1 shares the start menu's song, so the
+## opening of a run carries one continuous theme from title through the first
+## fight). null = keep whatever the scene authored, which is what stages 2+ do.
+## Applied in BattleManager._apply_stage_config, which runs before the deferred
+## _start_music — see the comment there.
+@export var music: AudioStream = null
+
 ## Multiplier applied to the villain's authored max_hp (e.g. dark_mage.tscn)
 ## at spawn, without editing the shared scene (see BattleManager._spawn_villain).
 @export var villain_hp_mult: float = 1.0

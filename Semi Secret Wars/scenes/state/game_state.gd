@@ -72,6 +72,11 @@ var owned_mods: Array = []
 ## "<HERO>_2"/"<HERO>_3"). Tier-gates the ability flags Hero._configure sets.
 ## See has_tier/buy_tier.
 var owned_ability_tiers: Array = []
+## Permanent Duo Ultimate upgrade ids bought and owned forever
+## (DuoUltimateMods catalog; the id IS the pair id). Unlike owned_mods these
+## are never applied to a Hero instance — they're summed at cast time by
+## Hero._ultimate_param via duo_mod_total. See has_duo_mod/buy_duo_mod.
+var owned_duo_ultimate_mods: Array = []
 ## Heroes currently available for the party/draft. Starts with the full
 ## roster unlocked (Designer, 2026-07-20: need all 4 heroes day-one to test
 ## the Duo system — both pairing combinations and staggered deploy need 4
@@ -264,6 +269,36 @@ func buy_mod(id: String) -> bool:
 	save_game()
 	return true
 
+func has_duo_mod(id: String) -> bool:
+	return id in owned_duo_ultimate_mods
+
+## Buys a permanent Duo Ultimate upgrade if affordable and not already owned.
+## Returns true on success. Saves immediately. Mirrors buy_mod — the only
+## difference is which catalog prices it and which owned-list it lands in.
+func buy_duo_mod(id: String) -> bool:
+	if id in owned_duo_ultimate_mods:
+		return false
+	var d := DuoUltimateMods.def(id)
+	var cost := int(d.get("cost", 0))
+	if d.is_empty() or gold < cost:
+		return false
+	gold -= cost
+	owned_duo_ultimate_mods.append(id)
+	save_game()
+	return true
+
+## Sum of `value` across every OWNED DuoUltimateMods entry for `pair_id` whose
+## `kind` matches — the permanent counterpart to RunState.duo_boon_total, and
+## read by the same caller (Hero._ultimate_param) on top of the same base
+## params. Never touches the base catalog.
+func duo_mod_total(pair_id: String, kind: String) -> float:
+	var total := 0.0
+	for id in owned_duo_ultimate_mods:
+		var d := DuoUltimateMods.def(id)
+		if d.get("duo", "") == pair_id and d.get("kind", "") == kind:
+			total += float(d.get("value", 0.0))
+	return total
+
 func is_hero_unlocked(hero_name: String) -> bool:
 	return hero_name in unlocked_heroes
 
@@ -344,7 +379,7 @@ func stat_purchase_count(hero_name: String, stat_id: String) -> int:
 ## immediately, same as buy_mod/buy_tier.
 func buy_stat_upgrade(hero_name: String, stat_id: String) -> bool:
 	var count := stat_purchase_count(hero_name, stat_id)
-	var cost := StatUpgrades.cost_for(stat_id, count)
+	var cost := StatUpgrades.cost_for(hero_name, stat_id, count)
 	if cost <= 0 or banked_xp < cost:
 		return false
 	banked_xp -= cost
@@ -419,6 +454,7 @@ func save_game() -> void:
 			"unlocked_relics": unlocked_relics,
 			"career": career,
 			"owned_ability_tiers": owned_ability_tiers,
+			"owned_duo_ultimate_mods": owned_duo_ultimate_mods,
 			"banked_xp": banked_xp,
 			"stat_purchases": stat_purchases,
 			"duo_pairings": duo_pairings,
@@ -448,6 +484,7 @@ func load_game() -> void:
 	unlocked_relics = data.get("unlocked_relics", [])
 	career = data.get("career", {})
 	owned_ability_tiers = data.get("owned_ability_tiers", [])
+	owned_duo_ultimate_mods = data.get("owned_duo_ultimate_mods", [])
 	banked_xp = int(data.get("banked_xp", 0))
 	stat_purchases = data.get("stat_purchases", {})
 	duo_pairings = data.get("duo_pairings", [])
@@ -464,6 +501,7 @@ func _reset_state_defaults() -> void:
 	gold = 0
 	owned_mods = []
 	owned_ability_tiers = []
+	owned_duo_ultimate_mods = []
 	banked_xp = 0
 	stat_purchases = {}
 	duo_pairings = []

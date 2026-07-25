@@ -39,6 +39,11 @@ func _configure() -> void:
 	bob_amplitude = 0.0
 	flash_on_hit = false
 	is_pinned = true
+	# Gate death should read as a structure blowing up, not a minion popping —
+	# bigger burst plus debris shards/portal-art chunks/flash ring (see
+	# scripts/battle_fx.gd BattleFX.debris_burst).
+	death_fx_scale = 2.5
+	death_debris = true
 	# Inert structure: never moves, never attacks, never detects.
 	move_speed = 0.0
 	damage = 0.0

@@ -51,22 +51,48 @@ func _process(_delta: float) -> void:
 		_tex.update(_img)
 		_dirty = false
 
-## Stamps a soft round bloodstain at `world_pos`, alpha-blended onto whatever's
-## already there so overlapping deaths darken/pool instead of just overwriting.
+## Stamps a bloodstain at `world_pos`, alpha-blended onto whatever's already
+## there so overlapping deaths darken/pool instead of just overwriting.
+##
+## Ink-on-paper look (2026-07-24): a single perfectly circular soft-gradient
+## stain reads as a digital glow rather than ink soaking into paper. Instead,
+## layer a handful of smaller overlapping lobes offset around world_pos (an
+## irregular blot silhouette) plus a few tiny satellite speckles flicked
+## further out (spatter), each with a harder falloff than a plain linear ramp.
 func stain(world_pos: Vector2) -> void:
 	if _img == null:
 		return
-	var c := (world_pos - _origin) / cell_size
-	var r := stain_radius / cell_size
+	var lobes := randi_range(4, 6)
+	for i in lobes:
+		var ang := randf() * TAU
+		var dist := randf_range(0.0, stain_radius * 0.35)
+		var lobe_center := world_pos + Vector2(cos(ang), sin(ang)) * dist
+		var lobe_r := stain_radius * randf_range(0.55, 0.9)
+		_stamp_blob(lobe_center, lobe_r, stain_alpha)
+	var speckles := randi_range(3, 6)
+	for i in speckles:
+		var ang := randf() * TAU
+		var dist := stain_radius * randf_range(0.8, 2.2)
+		var speck_center := world_pos + Vector2(cos(ang), sin(ang)) * dist
+		var speck_r := stain_radius * randf_range(0.08, 0.22)
+		_stamp_blob(speck_center, speck_r, stain_alpha * randf_range(0.5, 0.85))
+	_dirty = true
+
+## Stamps one round lobe into the baked image with a squared (harder-edged)
+## falloff — steeper than a linear ramp so the edge reads as an ink boundary
+## rather than a soft gradient blur.
+func _stamp_blob(center: Vector2, radius: float, alpha: float) -> void:
+	var c := (center - _origin) / cell_size
+	var r := radius / cell_size
 	var r2 := r * r
 	for y in range(maxi(0, int(c.y - r)), mini(_grid_size.y, int(c.y + r) + 2)):
 		for x in range(maxi(0, int(c.x - r)), mini(_grid_size.x, int(c.x + r) + 2)):
 			var d2: float = Vector2(x + 0.5, y + 0.5).distance_squared_to(c)
 			if d2 <= r2:
-				var falloff := 1.0 - sqrt(d2) / r
-				var new_col := Color(stain_color.r, stain_color.g, stain_color.b, stain_alpha * falloff)
+				var t := 1.0 - sqrt(d2) / r
+				var falloff := t * t
+				var new_col := Color(stain_color.r, stain_color.g, stain_color.b, alpha * falloff)
 				_img.set_pixel(x, y, _img.get_pixel(x, y).blend(new_col))
-	_dirty = true
 
 ## -- Persistence (per level, accumulates forever — see FogOfWar for the pattern) --
 

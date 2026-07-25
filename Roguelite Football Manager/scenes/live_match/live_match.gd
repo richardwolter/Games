@@ -37,6 +37,8 @@ const SIM_SECONDS_PER_SIM_MINUTE := 3.3
 @onready var cancel_formation_button: Button = $MarginContainer/MainRow/MainArea/FormationPanel/FormationVBox/FormationButtonRow/CancelFormationButton
 
 var _match: LiveMatchState = null
+## Milestone 20: sidebar match-stats label, built in code (see _ready).
+var _stats_label: Label = null
 var _formations: Array = []
 var _pending_formation: Formation = null
 var _pending_lineup: Array = []
@@ -82,6 +84,12 @@ func _ready() -> void:
 		opponent.name, opponent.formation, opponent.lineup
 	)
 	header_label.text = "%s vs %s" % [_match.home_name, _match.away_name]
+
+	## Milestone 20: live match-stats readout in the sidebar (possession/shots/xG),
+	## created in code so no .tscn change is needed. Sits just under the subs line.
+	_stats_label = Label.new()
+	_stats_label.add_theme_font_size_override("font_size", 16)
+	subs_label.add_sibling(_stats_label)
 
 	pitch_view.configure(_match.home_formation, _match.home_lineup, _match.away_formation, _match.away_lineup)
 	_match.goal_scored.connect(_on_goal_scored)
@@ -146,8 +154,8 @@ func _on_half_time_reached() -> void:
 ## MatchDecisionEngine resolved a shot — record it (score/events) via
 ## LiveMatchState, which re-emits goal_scored/shot_attempt for the existing
 ## pitch-view/celebration wiring below.
-func _on_shot_taken(is_home: bool, shooter: Player, outcome: String) -> void:
-	_match.record_shot_result(is_home, shooter, outcome)
+func _on_shot_taken(is_home: bool, shooter: Player, outcome: String, xg: float) -> void:
+	_match.record_shot_result(is_home, shooter, outcome, xg)
 
 
 ## MatchDecisionEngine started a pass — animate the passer's strike; the
@@ -561,7 +569,21 @@ func _refresh() -> void:
 	minute_label.text = "Minute %s / %d'" % [display_min, LiveMatchState.MATCH_MINUTES]
 	subs_label.text = "Subs used: %d/%d" % [_match.subs_used, LiveMatchState.MAX_SUBS]
 	substitute_button.disabled = not _match.can_substitute()
+	_refresh_stats()
 	_rebuild_events()
+
+## Milestone 20: sidebar possession/shots/xG readout.
+func _refresh_stats() -> void:
+	if _stats_label == null:
+		return
+	var home_poss: int = int(round(_match.home_state.possession_pct)) if _match.home_state else 50
+	var away_poss: int = int(round(_match.away_state.possession_pct)) if _match.away_state else 50
+	_stats_label.text = "Possession: %d%% - %d%%\nShots: %d - %d  (SoT %d - %d)\nxG: %.2f - %.2f" % [
+		home_poss, away_poss,
+		_match.home_shots, _match.away_shots,
+		_match.home_shots_on_target, _match.away_shots_on_target,
+		_match.home_xg, _match.away_xg,
+	]
 
 func _rebuild_events() -> void:
 	for child in event_list.get_children():
@@ -579,6 +601,15 @@ func _on_continue_pressed() -> void:
 	result.away_name = _match.away_name
 	result.home_score = _match.home_score
 	result.away_score = _match.away_score
+	## Milestone 20: carry match stats through to the result screen.
+	result.home_shots = _match.home_shots
+	result.away_shots = _match.away_shots
+	result.home_shots_on_target = _match.home_shots_on_target
+	result.away_shots_on_target = _match.away_shots_on_target
+	result.home_xg = _match.home_xg
+	result.away_xg = _match.away_xg
+	result.home_possession = int(round(_match.home_state.possession_pct)) if _match.home_state else 50
+	result.away_possession = int(round(_match.away_state.possession_pct)) if _match.away_state else 50
 	GameState.last_match_result = result
 	GameState.finish_match(_match)
 	get_tree().change_scene_to_file("res://scenes/match_result/match_result.tscn")

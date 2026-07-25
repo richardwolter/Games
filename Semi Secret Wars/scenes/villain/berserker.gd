@@ -7,6 +7,10 @@ extends Villain
 ## (stays put, can still attack). This creates rhythm to the fight and makes him a
 ## mechanical threat, not just a DPS check. Damage is high but attack interval is long.
 
+## Hand-drawn villain art (Designer, 2026-07-25), same papercut treatment as
+## DarkMage1 — see Hero.HERO_SPRITES for the pipeline note.
+const SPRITE := preload("res://assets/sprites/Berserk_Villain.png")
+
 @export var charge_duration := 3.0
 @export var recover_duration := 1.5
 
@@ -20,6 +24,11 @@ var _hunt_cd := 0.0
 func _configure() -> void:
 	super()
 	enemy_group = "heroes"
+	sprite_texture = SPRITE
+	sprite_scale = 2.6
+	# This art is drawn facing right, unlike every other unit in the game
+	# (Designer, 2026-07-25) — see Combatant.sprite_faces_right.
+	sprite_faces_right = true
 	_phase_timer = charge_duration
 
 func _villain_process(delta: float) -> void:

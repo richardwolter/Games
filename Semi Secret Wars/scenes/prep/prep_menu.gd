@@ -8,7 +8,7 @@ extends Control
 ## slot IS the selection. A hero only deploys if it's paired (both slots of
 ## a Duo filled); an unplaced hero sits the run out. See _sync_party_from_slots.
 
-var _start_button: Button
+var _start_button: TextureButton
 var _currency_label: Label
 var _xp_label: Label
 var _hero_row: HBoxContainer
@@ -23,9 +23,16 @@ var _stats_page: StatsPage
 ## _sync_party_from_slots.
 var _pairing_section: VBoxContainer
 var _pairing_slots: Array = ["", "", "", ""]
-const DUO_A_COLOR := Color("b8860b")
-const DUO_B_COLOR := Color("2c8f7a")
-const SLOT_SIZE := Vector2(150, 70)
+
+## Hand-drawn texture replacing the plain "START RUN" button (Designer,
+## 2026-07-25). Cropped tight to the drawn label's bounding box within the
+## source PNG so the button isn't mostly transparent padding.
+const START_RUN_TEXTURE := preload("res://assets/Button_StartRun.png")
+const START_RUN_REGION := Rect2(60, 210, 1500, 640)
+const START_RUN_WIDTH := 360.0
+const DUO_A_COLOR := UIStyle.DUO_A
+const DUO_B_COLOR := UIStyle.DUO_B
+const SLOT_SIZE := Vector2(210, 100)
 
 ## A hero card that can be dragged onto a DuoSlot. Only the drag affordance is
 ## added here — selection/unlock UI stays in _build_hero_card, which builds
@@ -38,15 +45,9 @@ class DraggableHeroCard extends PanelContainer:
 		if hero_name == "":
 			return null
 		var preview := PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(swatch_color, 0.85)
-		style.set_content_margin_all(10)
-		preview.add_theme_stylebox_override("panel", style)
-		var lbl := Label.new()
-		lbl.text = hero_name
-		lbl.add_theme_font_size_override("font_size", 18)
-		lbl.add_theme_color_override("font_color", Color("2c2c2c"))
-		preview.add_child(lbl)
+		preview.add_theme_stylebox_override("panel",
+				UIStyle.panel(Color(swatch_color, 0.85), UIStyle.INK, 3, 10))
+		preview.add_child(UIStyle.label(hero_name, UIStyle.SIZE_BODY))
 		set_drag_preview(preview)
 		return {"hero_name": hero_name}
 
@@ -100,25 +101,23 @@ func _build_ui() -> void:
 	add_child(root)
 	_main = root
 
-	var title := _label("SEMI-SECRET WARS", 36)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(title)
+	root.add_child(UIStyle.centered_label("SEMI-SECRET WARS", UIStyle.SIZE_HEADING))
 
 	var meta_row := HBoxContainer.new()
 	meta_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	meta_row.add_theme_constant_override("separation", 16)
-	_currency_label = _label("", 18)
+	meta_row.add_theme_constant_override("separation", 22)
+	_currency_label = _label("", UIStyle.SIZE_BODY)
 	meta_row.add_child(_currency_label)
-	_xp_label = _label("", 18)
+	_xp_label = _label("", UIStyle.SIZE_BODY)
 	meta_row.add_child(_xp_label)
-	var abilities_btn := _button("ABILITIES", 18, _open_abilities)
+	var abilities_btn := _button("ABILITIES", UIStyle.SIZE_BODY, _open_abilities)
 	meta_row.add_child(abilities_btn)
-	var stats_btn := _button("STATS", 18, _open_stats)
+	var stats_btn := _button("STATS", UIStyle.SIZE_BODY, _open_stats)
 	meta_row.add_child(stats_btn)
 	root.add_child(meta_row)
 
 	_hero_row = HBoxContainer.new()
-	_hero_row.add_theme_constant_override("separation", 32)
+	_hero_row.add_theme_constant_override("separation", 24)
 	root.add_child(_hero_row)
 	_rebuild_hero_row()
 
@@ -127,10 +126,10 @@ func _build_ui() -> void:
 	root.add_child(_pairing_section)
 	_rebuild_pairing_panel()
 
-	_start_button = _button("START RUN", 30, _on_start)
+	_start_button = _texture_button(START_RUN_TEXTURE, START_RUN_REGION, _on_start)
 	root.add_child(_start_button)
 
-	var footer := _label("Level 1 — push right, destroy the spawn gates, defeat the villain      (F12 = full reset)", 15)
+	var footer := _label("Level 1 — push right, destroy the spawn gates, defeat the villain      (F12 = full reset)", UIStyle.SIZE_SMALL)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(footer)
 
@@ -152,7 +151,7 @@ func _rebuild_pairing_panel() -> void:
 	for child in _pairing_section.get_children():
 		child.queue_free()
 
-	var header := _label("DUO PAIRINGS — drag a hero into a slot to send it into battle. Left slot leads, right slot follows.", 20)
+	var header := _label("DUO PAIRINGS — drag a hero into a slot to send it into battle. Left slot leads, right slot follows.", UIStyle.SIZE_BODY)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pairing_section.add_child(header)
 
@@ -166,19 +165,19 @@ func _rebuild_pairing_panel() -> void:
 
 	var boxes := HBoxContainer.new()
 	boxes.alignment = BoxContainer.ALIGNMENT_CENTER
-	boxes.add_theme_constant_override("separation", 24)
+	boxes.add_theme_constant_override("separation", 32)
 	_pairing_section.add_child(boxes)
 	boxes.add_child(_build_duo_box(0, "DUO A", DUO_A_COLOR))
 	boxes.add_child(_build_duo_box(1, "DUO B", DUO_B_COLOR))
 
 	var unplaced := offered.filter(func(h: String) -> bool: return h not in _pairing_slots)
-	var hint2 := _label(_pairing_hint_text(unplaced), 14)
+	var hint2 := _label(_pairing_hint_text(unplaced), UIStyle.SIZE_SMALL)
 	hint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pairing_section.add_child(hint2)
 
 	if _pairing_slots.count("") < 4:
 		var center := CenterContainer.new()
-		center.add_child(_button("CLEAR PAIRING", 15, _on_reset_pairing))
+		center.add_child(_button("CLEAR PAIRING", UIStyle.SIZE_SMALL, _on_reset_pairing))
 		_pairing_section.add_child(center)
 
 func _pairing_hint_text(unplaced: Array) -> String:
@@ -190,21 +189,13 @@ func _pairing_hint_text(unplaced: Array) -> String:
 ## 2 DuoSlot drop targets side by side.
 func _build_duo_box(duo_index: int, title: String, color: Color) -> PanelContainer:
 	var box := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.5)
-	style.border_color = color
-	style.set_border_width_all(3)
-	style.set_content_margin_all(10)
-	box.add_theme_stylebox_override("panel", style)
+	box.add_theme_stylebox_override("panel", UIStyle.card(color, 10, duo_index))
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
 	box.add_child(col)
 
-	var label := _label(title, 16)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", color)
-	col.add_child(label)
+	col.add_child(UIStyle.centered_label(title, UIStyle.SIZE_SMALL, color))
 
 	var slots_row := HBoxContainer.new()
 	slots_row.add_theme_constant_override("separation", 8)
@@ -212,31 +203,34 @@ func _build_duo_box(duo_index: int, title: String, color: Color) -> PanelContain
 	slots_row.add_child(_build_duo_slot(duo_index, 0, color))
 	slots_row.add_child(_build_duo_slot(duo_index, 1, color))
 
-	col.add_child(_build_synergy_label(duo_index))
+	col.add_child(_build_ultimate_label(duo_index))
 
 	return box
 
-## Named Duo synergy chip: only shown once both slots of this Duo are filled
-## (see DuoSynergies — purely presentational, the effects already run
-## regardless of whether this label exists).
-func _build_synergy_label(duo_index: int) -> Control:
+## Duo Ultimate chip: only shown once both slots of this Duo are filled, since
+## the Ultimate is a property of the PAIR (DuoUltimates — one exclusive entry
+## per unordered hero pair). Shows the same name/desc the in-battle Duo
+## Ultimate bar will show, so the player picks a pairing knowing what it
+## unlocks (Designer, 2026-07-25).
+##
+## This replaced the DuoSynergies chip that used to sit here. The synergy
+## effects still run exactly as before — they were just never worth the space:
+## all six entries share one generic `_GENERIC_DESC` blurb, so the chip said
+## the same thing whatever you paired, while the Ultimate differs per pair and
+## is the actual reason to choose one pairing over another.
+func _build_ultimate_label(duo_index: int) -> Control:
 	var hero_a: String = _pairing_slots[duo_index * 2]
 	var hero_b: String = _pairing_slots[duo_index * 2 + 1]
 	if hero_a == "" or hero_b == "":
 		return Control.new()
-	var d := DuoSynergies.def_for_heroes(hero_a, hero_b)
+	var d := DuoUltimates.def(DuoUltimates.id_for_heroes(hero_a, hero_b))
 	if d.is_empty():
 		return Control.new()
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
-	var name_label := _label(d.get("name", ""), 15)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(name_label)
-	var desc_label := _label(d.get("desc", ""), 11)
-	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	desc_label.custom_minimum_size = Vector2(220, 0)
-	col.add_child(desc_label)
+	col.add_child(UIStyle.centered_label("DUO ULTIMATE", UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	col.add_child(UIStyle.centered_label(d.get("name", ""), UIStyle.SIZE_SMALL, UIStyle.GOLD))
+	col.add_child(UIStyle.wrapped_label(d.get("desc", ""), 400, UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
 	return col
 
 func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
@@ -258,29 +252,25 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 	# derived from which hero ends up there — labeling the slot up front is
 	# the whole point: the player sees the assignment before they drag.
 	var is_leader_slot := slot_index == 0
-	var style := StyleBoxFlat.new()
-	style.set_content_margin_all(6)
-	if hero_name != "":
-		style.bg_color = Color(GameState.HERO_CATALOG[hero_name].color, 0.6)
-		style.border_color = color
-		style.set_border_width_all(2)
-	else:
-		style.bg_color = Color(1, 1, 1, 0.25)
-		style.border_color = Color(color, 0.4)
-		style.set_border_width_all(1)
+	# Filled slots take the hero's own tint over paper; empty ones are a faint
+	# dashed-looking outline so the drop target reads as "not drawn in yet".
+	var style := (UIStyle.panel(Color(GameState.HERO_CATALOG[hero_name].color, 0.45),
+					color, 3, 6, slot_index)
+			if hero_name != ""
+			else UIStyle.panel(Color(UIStyle.PAGE_SOLID, 0.35), Color(color, 0.4), 2, 6, slot_index))
 	slot.add_theme_stylebox_override("panel", style)
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
 
 	var tag_row := CenterContainer.new()
-	var tag := _label("LEADER" if is_leader_slot else "FOLLOWER", 11)
-	tag.add_theme_color_override("font_color", Color("f4d35e") if is_leader_slot else Color("d6d6d6"))
-	tag_row.add_child(tag)
+	tag_row.add_child(UIStyle.label("LEADER" if is_leader_slot else "FOLLOWER",
+			UIStyle.SIZE_TINY, UIStyle.GOLD if is_leader_slot else UIStyle.INK_MUTED))
 	col.add_child(tag_row)
 
 	var center := CenterContainer.new()
-	center.add_child(_label(hero_name if hero_name != "" else "drop hero", 14))
+	center.add_child(UIStyle.label(hero_name if hero_name != "" else "drop hero",
+			UIStyle.SIZE_SMALL, UIStyle.INK if hero_name != "" else UIStyle.INK_MUTED))
 	col.add_child(center)
 
 	slot.add_child(col)
@@ -336,46 +326,27 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 	var card := DraggableHeroCard.new()
 	card.hero_name = hero_name
 	card.swatch_color = GameState.HERO_CATALOG[hero_name].color
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.6)
-	style.border_color = PrepPage.INK_COLOR
-	style.set_border_width_all(3)
-	style.set_content_margin_all(16)
-	card.add_theme_stylebox_override("panel", style)
+	card.add_theme_stylebox_override("panel", UIStyle.card(UIStyle.INK, 16, hero_name.length()))
 	if not offered:
-		card.modulate = Color(1, 1, 1, 0.4)
+		card.modulate = UIStyle.DIM
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
 
-	var swatch := ColorRect.new()
-	swatch.color = Color(GameState.HERO_CATALOG[hero_name].color, 0.6)
-	swatch.custom_minimum_size = Vector2(120, 60)
-	box.add_child(swatch)
+	# The hero's real battlefield sprite, not a colour swatch — the roster and
+	# the field now show literally the same drawing (UIStyle.hero_portrait).
+	box.add_child(UIStyle.hero_portrait(hero_name, Vector2(110, 78)))
 
-	var name_label := _label(hero_name, 22)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(name_label)
+	box.add_child(UIStyle.centered_label(hero_name, UIStyle.SIZE_SUBHEAD))
 
 	var role: String = Hero.ROLE_BY_HERO.get(hero_name, "")
-	var role_label := _label(role, 15)
-	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	role_label.add_theme_color_override("font_color", Hero.ROLE_COLORS.get(role, Color("2c2c2c")))
-	box.add_child(role_label)
-
-	var role_desc := _label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 12)
-	role_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	role_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	role_desc.custom_minimum_size = Vector2(140, 0)
-	box.add_child(role_desc)
-
-	box.add_child(_label(_current_stats_text(hero_name), 13))
-
-	var lifetime_label := _label(_lifetime_stats_text(hero_name), 12)
-	lifetime_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lifetime_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
-	box.add_child(lifetime_label)
+	box.add_child(UIStyle.centered_label(role, UIStyle.SIZE_SMALL,
+			Hero.ROLE_COLORS.get(role, UIStyle.INK)))
+	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
+	box.add_child(UIStyle.centered_label(_current_stats_text(hero_name), UIStyle.SIZE_TINY))
+	box.add_child(UIStyle.centered_label(_lifetime_stats_text(hero_name),
+			UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
 
 	return card
 
@@ -410,42 +381,29 @@ func _current_stats_text(hero_name: String) -> String:
 ## GameState.unlocked_heroes) — this card is purely informational.
 func _build_locked_hero_card(hero_name: String) -> PanelContainer:
 	var card := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.6)
-	style.border_color = PrepPage.INK_COLOR
-	style.set_border_width_all(3)
-	style.set_content_margin_all(16)
-	card.add_theme_stylebox_override("panel", style)
-	card.modulate = Color(1, 1, 1, 0.4)
+	card.add_theme_stylebox_override("panel", UIStyle.card(UIStyle.INK, 16, hero_name.length()))
+	card.modulate = UIStyle.DIM
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
 
-	var swatch := ColorRect.new()
-	swatch.color = Color(GameState.HERO_CATALOG[hero_name].color, 0.6)
-	swatch.custom_minimum_size = Vector2(120, 60)
-	box.add_child(swatch)
+	# Same portrait treatment as an unlocked card — the card-wide DIM modulate
+	# above is what reads as "locked", so the silhouette still teases the art.
+	box.add_child(UIStyle.hero_portrait(hero_name, Vector2(110, 78)))
 
-	box.add_child(_label("%s — LOCKED" % hero_name, 20))
+	box.add_child(UIStyle.centered_label("%s — LOCKED" % hero_name, UIStyle.SIZE_BODY))
 
 	var role: String = Hero.ROLE_BY_HERO.get(hero_name, "")
-	var role_label := _label(role, 15)
-	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	role_label.add_theme_color_override("font_color", Hero.ROLE_COLORS.get(role, Color("2c2c2c")))
-	box.add_child(role_label)
-
-	var role_desc := _label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 12)
-	role_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	role_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	role_desc.custom_minimum_size = Vector2(140, 0)
-	box.add_child(role_desc)
+	box.add_child(UIStyle.centered_label(role, UIStyle.SIZE_SMALL,
+			Hero.ROLE_COLORS.get(role, UIStyle.INK)))
+	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
 
 	var ach_id := Achievements.for_hero(hero_name)
 	if ach_id != "":
 		var d := Achievements.def(ach_id)
-		box.add_child(_label(d.get("name", ach_id), 15))
-		box.add_child(_label(_achievement_progress_text(d), 13))
+		box.add_child(UIStyle.centered_label(d.get("name", ach_id), UIStyle.SIZE_SMALL, UIStyle.GOLD))
+		box.add_child(UIStyle.centered_label(_achievement_progress_text(d), UIStyle.SIZE_TINY))
 	return card
 
 ## "84/150 minions" style progress line for a locked hero's achievement.
@@ -489,21 +447,19 @@ func _on_start() -> void:
 
 func _refresh() -> void:
 	_start_button.disabled = RunState.selected_heroes().is_empty()
+	_start_button.modulate = UIStyle.DIM if _start_button.disabled else Color.WHITE
 	if _currency_label != null:
 		_currency_label.text = "Gold: %d" % GameState.gold
 	if _xp_label != null:
 		_xp_label.text = "Banked XP: %d" % GameState.banked_xp
 
 func _label(text: String, font_size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", Color("2c2c2c"))
-	return l
+	return UIStyle.label(text, font_size)
 
 func _button(text: String, font_size: int, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", font_size)
-	b.pressed.connect(cb)
-	return b
+	return UIStyle.button(text, font_size, cb)
+
+## AtlasTexture crop of `texture` at `region`, scaled to a normal button size
+## (see START_RUN_TEXTURE/START_RUN_REGION doc).
+func _texture_button(texture: Texture2D, region: Rect2, cb: Callable) -> TextureButton:
+	return UIStyle.texture_button(texture, region, START_RUN_WIDTH, cb)
