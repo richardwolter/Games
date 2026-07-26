@@ -19,10 +19,12 @@ signal captured(bonus: int)
 ## One-time farm/XP bonus granted on capture (placeholder until Progression).
 @export var farm_bonus := 20
 @export var size := 22.0
-@export var color := Color("d4a017")
-@export var captured_color := Color("5aa85a")
-@export var ring_color := Color("3a8a3a")
-@export var outline_color := Color("2c2c2c")
+## Uncaptured objectives read as a prize (GOLD, the highlight pigment);
+## captured ones flip to the friendly FOREST the deploy band uses.
+@export var color := UIStyle.GOLD
+@export var captured_color := UIStyle.FOREST.lightened(0.15)
+@export var ring_color := UIStyle.FOREST
+@export var outline_color := UIStyle.INK
 
 var progress := 0.0
 var is_captured := false

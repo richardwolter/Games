@@ -68,10 +68,17 @@ const CATALOG := {
 	# THUNDAAR + ARTEMIS ------------------------------------------------------
 	"ARTEMIS|THUNDAAR": {
 		"name": "Volatile Duplicates",
-		"desc": "Summon taunting Artemis clones that explode in an AoE blast the instant they're hit (or when their taunt window ends).",
+		"desc": "Summon Artemis clones that detonate in an AoE blast on contact — or after a 2s fuse if nothing reaches them.",
 		"kind": "exploding_clones",
 		"params": {
-			"clone_count": 2, "clone_life_span": 6.0,
+			# clone_life_span is the FUSE, not a taunt window: 6.0 -> 2.0
+			# (Designer, 2026-07-26). Now that a clone detonates on contact
+			# rather than waiting to be attacked, the timer is only what
+			# happens when nothing comes — and six seconds of a bomb sitting
+			# inert is a once-per-level Ultimate spending most of its life
+			# doing nothing. The "Long Fuse" mod (+3s) still applies on top for
+			# players who want the clone to hold position longer.
+			"clone_count": 2, "clone_life_span": 2.0,
 			"explode_radius": 90.0, "explode_damage": 130.0,
 		},
 		"buff": {"atk_reduction": 0.3, "dmg_add": 2.0},

@@ -32,6 +32,16 @@ const OBJECTIVE_SHIELD_CHARGES := 5
 ## up with the teleport FX instead of firing at placement time).
 const DEPLOY_SOUND := preload("res://assets/Sounds/Deploy.wav")
 
+## End-of-level stingers (Designer, 2026-07-26). Played from _end(), which is
+## the single point BOTH outcomes pass through — including the mid-run level
+## clear that rolls straight into the next stage, so clearing level 1 on the
+## way to level 2 still gets its win sound.
+##
+## Full volume, unlike the in-fight callouts: _end() stops the battle music
+## first, so there is nothing left for these to compete with.
+const LEVEL_WIN_SOUND: AudioStream = preload("res://assets/Sounds/Level_Win.mp3")
+const LEVEL_DEFEAT_SOUND: AudioStream = preload("res://assets/Sounds/Level_Defeat.wav")
+
 @export var spawner_path: NodePath
 @export var results_screen_path: NodePath
 @export var heroes_root_path: NodePath
@@ -49,6 +59,9 @@ var _field: LaneField
 var _stage_config: StageConfig
 var _deploy: DeployController
 var _over := false
+## The win/defeat stinger, held so leaving the results screen can cut it off
+## (Designer, 2026-07-26) — see _end and _stop_end_stinger.
+var _end_stinger: AudioStreamPlayer = null
 var _advance_to_next := false
 var _villain_dead := false
 var _points_cleared := false
@@ -61,6 +74,10 @@ var _exhausted: Dictionary = {}
 ## (drives the drain).
 var _pick_queue: Array[Dictionary] = []
 var _pick_screen: LevelUpScreen = null
+## Duos already offered their pick this level — the two spawn waves each queue
+## for whoever landed, and this stops a Duo split across both waves (or a
+## re-entrant call) from being asked twice.
+var _picked_this_level: Array[String] = []
 ## Duo Ultimates activated this level (pair id -> true). Resets naturally
 ## every level since BattleManager itself is a fresh instance each scene
 ## load — see activate_ultimate/can_activate_ultimate.
@@ -74,6 +91,14 @@ var _ultimate_used: Dictionary = {}
 var _second_wave_names: Array = []
 var _second_wave_positions: Array = []
 var _second_wave_remaining := -1.0
+
+## A wave that has been placed and is waiting on its boon pick before it
+## actually spawns — see _on_deploy_chosen / _flush_pending_deploy.
+var _pending_names: Array = []
+var _pending_positions: Array = []
+## Set the first time a wave lands; gates the one-shot battle start (swarm
+## release, boulders) so a delayed second wave doesn't re-trigger it.
+var _battle_started := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -89,6 +114,10 @@ func _ready() -> void:
 	# AudioStreamPlayer's default PAUSABLE process_mode would mute it the
 	# instant that happens, so it needs to stay unaffected by pause.
 	_music.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Onto the Music bus so the Music slider trims it independently of combat
+	# SFX. Set here rather than in battlefield.tscn's inspector: the bus is
+	# created at runtime by AudioSettings, so the editor doesn't know its name.
+	_music.bus = AudioSettings.BUS_MUSIC
 	# Deferred: starting playback immediately here was getting silently
 	# killed by the engine partway through this function's heavy synchronous
 	# setup work below (villain/hero spawning) on some machines — deferring
@@ -106,19 +135,12 @@ func _ready() -> void:
 
 	_hud.setup_heroes(RunState.living_party())
 	_spawn_villain(_stage_config)
-	# Picks only at the start of a level (Designer, 2026-07-22), and only for
-	# Duo Ultimates (Designer, 2026-07-25 — the per-hero ability-boon round
-	# that used to run first was dropped along with its catalog; see
-	# duo_ultimate_boons.gd). Every Duo with a living member gets one
-	# Ultimate-boon pick, queued through the LevelUpScreen pause-and-pick
-	# flow and drained by _process before the deploy phase becomes
-	# interactive (the tree pauses while _pick_screen is showing, so
-	# DeployController — added below — can't be clicked until every pick is
-	# done). Picks record into RunState.duo_boons even though no Hero node
-	# exists yet, which is fine: Duo Ultimate boons are read live at cast
-	# time (Hero._ultimate_param), never applied to a Hero instance.
-	for pair_id in _living_duo_pair_ids():
-		_pick_queue.append({"kind": "duo", "key": pair_id})
+	# NOTE: boon picks are NOT queued here any more (Designer, 2026-07-26).
+	# Deploy now runs FIRST and each Duo's pick follows its own arrival on the
+	# field — see _on_deploy_chosen and _spawn_second_wave. Previously every
+	# pick was drained before deploy became interactive, which asked the player
+	# to choose Ultimate upgrades for Duos they hadn't placed yet, against a
+	# battlefield they hadn't seen.
 	_roll_monster()
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
@@ -165,52 +187,99 @@ func _compute_duos() -> Dictionary:
 			a.append(hero_name)
 	return {"a": a, "b": b}
 
-## Every Duo (GameState.duo_pairings) with at least one living member this
-## level, as DuoUltimates pair ids — queues that Duo's Ultimate-boon pick and
-## decides which Ultimates the Duo Ultimate bar shows/allows activating this
-## level (a Duo with both members dead has nobody left to cast it).
-func _living_duo_pair_ids() -> Array:
-	var living := RunState.living_party()
-	var out: Array = []
-	for duo in GameState.duo_pairings:
-		if not (duo is Array) or (duo as Array).size() != 2:
-			continue
-		var a: String = duo[0]
-		var b: String = duo[1]
-		if a in living or b in living:
-			out.append(DuoUltimates.id_for_heroes(a, b))
-	return out
-
 ## First wave spawns immediately and releases the swarm; the second wave (if
 ## any) is held and counted down in _process, landing `delay` seconds later
 ## at its own chosen positions — see DeployController.
 func _on_deploy_chosen(payload: Dictionary) -> void:
-	var first_names: Array = payload.get("first_names", [])
-	var first_positions: Array = payload.get("first_positions", [])
-	for i in first_names.size():
-		_spawn_hero(first_names[i], first_positions[i])
+	# Nothing spawns yet. The boon pick for this wave's Duo comes first and the
+	# teleport-in only fires once it's answered (Designer, 2026-07-26) — while
+	# the pick is up, DeployController keeps drawing the placed hero sprites, so
+	# the player chooses upgrades looking at their real formation rather than
+	# watching heroes materialise behind a modal they haven't dismissed.
+	_pending_names = payload.get("first_names", [])
+	_pending_positions = payload.get("first_positions", [])
 
 	_second_wave_names = payload.get("second_names", [])
 	_second_wave_positions = payload.get("second_positions", [])
 	_second_wave_remaining = float(payload.get("delay", 0.0)) if not _second_wave_names.is_empty() else -1.0
 
-	_spawner.begin_battle()
-	# Boulders only start rolling once the party is actually on the field —
-	# during deploy the swarm is frozen and nothing should be taking hits.
-	_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
-	_boulders_live = true
+	_queue_picks_for(_pending_names)
+	# No picks to make (every Duo here already picked this level) — deploy now
+	# rather than waiting for a queue that will never drain.
+	if _pick_queue.is_empty():
+		_flush_pending_deploy()
 
 func _spawn_second_wave() -> void:
-	for i in _second_wave_names.size():
-		_spawn_hero(_second_wave_names[i], _second_wave_positions[i])
+	# Same rule as the first wave: pick first, arrive after. A boon chosen for
+	# heroes who won't exist for another 10 seconds is a decision made blind.
+	_pending_names = _second_wave_names.duplicate()
+	_pending_positions = _second_wave_positions.duplicate()
 	_second_wave_names = []
 	_second_wave_positions = []
 	_second_wave_remaining = -1.0
+	_queue_picks_for(_pending_names)
+	if _pick_queue.is_empty():
+		_flush_pending_deploy()
+
+## Actually puts the pending wave on the field — the teleport-in FX, the sound,
+## and (on the first wave) releasing the swarm. Called once the wave's boon
+## picks have all been answered.
+func _flush_pending_deploy() -> void:
+	if _pending_names.is_empty():
+		return
+	var names := _pending_names
+	var positions := _pending_positions
+	_pending_names = []
+	_pending_positions = []
+	for i in names.size():
+		_spawn_hero(names[i], positions[i])
+	# Drop the placement markers for the heroes that just materialised, and
+	# retire the controller entirely once nothing is still pending.
+	if _deploy != null and is_instance_valid(_deploy):
+		_deploy.mark_spawned(names)
+		if _second_wave_names.is_empty():
+			_deploy.finish()
+	if not _battle_started:
+		_battle_started = true
+		_spawner.begin_battle()
+		# Boulders only start rolling once the party is actually on the field —
+		# during deploy the swarm is frozen and nothing should be taking hits.
+		_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
+		_boulders_live = true
+
+## Queues one Ultimate-boon pick per Duo represented in `hero_names`, skipping
+## any Duo that already picked this level. Picks record into RunState.duo_boons
+## and are read live at cast time (Hero._ultimate_param), never applied to a
+## Hero instance — so queueing them after the spawn is equivalent to before.
+func _queue_picks_for(hero_names: Array) -> void:
+	for duo in GameState.duo_pairings:
+		if not (duo is Array) or (duo as Array).size() != 2:
+			continue
+		var a: String = duo[0]
+		var b: String = duo[1]
+		if a not in hero_names and b not in hero_names:
+			continue
+		var pair_id := DuoUltimates.id_for_heroes(a, b)
+		if pair_id in _picked_this_level:
+			continue
+		_picked_this_level.append(pair_id)
+		_pick_queue.append({"kind": "duo", "key": pair_id})
 
 ## Seconds left until the second Duo lands, or -1.0 if none is pending —
 ## BattleHUD polls this every frame to show the countdown.
 func duo_b_seconds_remaining() -> float:
 	return _second_wave_remaining
+
+## True until the first wave actually lands — placement, plus the boon pick that
+## now sits between START BATTLE and the spawn. BattleHUD uses it to show each
+## hero's real card instead of a row of DOWN panels.
+##
+## Keyed off _battle_started rather than the DeployController's existence: that
+## node outlives the commit (it keeps drawing placement markers for a delayed
+## second wave), and while it's alive a held-back hero should read as "ARRIVES
+## IN Xs", not as still-being-placed.
+func is_deploy_phase() -> bool:
+	return not _battle_started
 
 ## True while `hero_name` is queued for the second wave but hasn't landed
 ## yet — BattleHUD uses this to show "ARRIVES IN Xs" instead of a false KO.
@@ -245,6 +314,7 @@ func _play_teleport_in(h: Hero, pos: Vector2) -> void:
 	BattleFX.teleport_in(get_node(heroes_root_path), pos, GameState.HERO_CATALOG[h.hero_name].color)
 	var player := AudioStreamPlayer.new()
 	player.stream = DEPLOY_SOUND
+	player.bus = AudioSettings.BUS_SFX
 	# Same root-persists-across-pause bug as Hero._on_died — see its doc.
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().root.add_child(player)
@@ -289,9 +359,25 @@ func _check_win() -> void:
 	if not _over and _villain_dead:
 		_end(true)
 
+## Cuts the win/defeat clip. Its player lives on the scene root (BattleSfx
+## parents there so effects outlive the node that fired them), which is exactly
+## why it needs an explicit stop: the root survives change_scene_to_file, so an
+## unstopped stinger keeps playing over the prep menu.
+func _stop_end_stinger() -> void:
+	if _end_stinger != null and is_instance_valid(_end_stinger):
+		_end_stinger.stop()
+		_end_stinger.queue_free()
+	_end_stinger = null
+
+## Covers every other way this scene can go away — BACK TO MENU from the HUD,
+## or a full reset — not just the R keypress on the results screen.
+func _exit_tree() -> void:
+	_stop_end_stinger()
+
 func _process(delta: float) -> void:
 	if _over:
 		if Input.is_key_pressed(KEY_R):
+			_stop_end_stinger()
 			get_tree().paused = false
 			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
 		return
@@ -332,23 +418,26 @@ func _apply_random_objective_bonus(heroes: Array) -> void:
 		0:
 			for h in heroes:
 				h.apply_xp_boost(OBJECTIVE_BOOST_DURATION, OBJECTIVE_XP_BOOST_MULT)
-			_hud.show_objective_buff("XP+", Color("6fcf6f"), OBJECTIVE_BOOST_DURATION)
+			# Banner colours come from the shared palette rather than five
+			# one-off hexes, so a buff chip matches the status ring the same
+			# buff draws on the hero.
+			_hud.show_objective_buff("XP+", UIStyle.GOOD, OBJECTIVE_BOOST_DURATION)
 		1:
 			for h in heroes:
 				h.apply_damage_boost(OBJECTIVE_BOOST_DURATION, OBJECTIVE_DAMAGE_BOOST_MULT)
-			_hud.show_objective_buff("DMG+", Color("c0392b"), OBJECTIVE_BOOST_DURATION)
+			_hud.show_objective_buff("DMG+", UIStyle.DANGER, OBJECTIVE_BOOST_DURATION)
 		2:
 			for h in heroes:
 				h.apply_speed_boost(OBJECTIVE_BOOST_DURATION, OBJECTIVE_SPEED_BOOST_MULT)
-			_hud.show_objective_buff("SPD+", Color("4aa3df"), OBJECTIVE_BOOST_DURATION)
+			_hud.show_objective_buff("SPD+", UIStyle.INFO, OBJECTIVE_BOOST_DURATION)
 		3:
 			for h in heroes:
 				h.apply_atk_speed_boost(OBJECTIVE_BOOST_DURATION, OBJECTIVE_ATK_SPEED_BOOST_MULT)
-			_hud.show_objective_buff("ATK SPD+", Color("e0b03e"), OBJECTIVE_BOOST_DURATION)
+			_hud.show_objective_buff("ATK SPD+", UIStyle.GOLD, OBJECTIVE_BOOST_DURATION)
 		4:
 			for h in heroes:
 				h.apply_shield(OBJECTIVE_SHIELD_CHARGES)
-			_hud.show_objective_buff("SHIELD x%d" % OBJECTIVE_SHIELD_CHARGES, Color("9bd1e5"), OBJECTIVE_BOOST_DURATION)
+			_hud.show_objective_buff("SHIELD x%d" % OBJECTIVE_SHIELD_CHARGES, Combatant.STATUS_SHIELD_COLOR, OBJECTIVE_BOOST_DURATION)
 
 func _living_real_heroes() -> Array:
 	var out := []
@@ -377,12 +466,12 @@ func _spawn_villain(config: StageConfig) -> void:
 		v.died.connect(_on_villain_died)
 		get_tree().get_first_node_in_group("field").get_parent().add_child.call_deferred(v)
 
-## Drains _pick_queue one entry at a time, pausing on each pick. Queue is
-## populated once in _ready() from _living_duo_pair_ids() — every entry is a
-## Duo Ultimate-boon pick now that the per-hero round is gone. No Hero node
-## exists yet at this point (picks happen before deploy/spawn), which is fine:
-## RunState.duo_boons is the source of truth and Hero._ultimate_param reads it
-## live at cast time, so nothing has to be replayed onto a spawned hero.
+## Drains _pick_queue one entry at a time, pausing on each pick. The queue is
+## filled by _queue_picks_for as each wave lands (2026-07-26) rather than up
+## front in _ready — every entry is a Duo Ultimate-boon pick now that the
+## per-hero round is gone. RunState.duo_boons is the source of truth and
+## Hero._ultimate_param reads it live at cast time, so a pick made after the
+## Duo spawned needs no replaying onto the instance.
 func _show_next_pick() -> void:
 	if _pick_queue.is_empty():
 		get_tree().paused = false
@@ -408,6 +497,9 @@ func _on_pick_chosen(id: String, entry: Dictionary) -> void:
 		_pick_screen = null
 	if _pick_queue.is_empty():
 		get_tree().paused = false
+		# Every pick for this wave is answered — NOW the heroes arrive. Unpause
+		# first so the teleport-in FX and its tween actually run.
+		_flush_pending_deploy()
 
 # _find_living_hero() was removed 2026-07-25: its only caller was the per-hero
 # boon pick, which applied the chosen boon to an already-spawned hero. With
@@ -495,6 +587,13 @@ func _end(win: bool) -> void:
 	_over = true
 	if _music != null and is_instance_valid(_music):
 		_music.stop()
+	# Both show_results() branches below pause the tree; BattleSfx's players are
+	# PROCESS_MODE_ALWAYS (see its doc), so the stinger plays over the paused
+	# results screen instead of being cut off the moment it appears. Kept in a
+	# field because the player is parented to the scene ROOT and would otherwise
+	# survive the scene change and bleed into the next screen — see
+	# _stop_end_stinger.
+	_end_stinger = BattleSfx.play_clip(self, LEVEL_WIN_SOUND if win else LEVEL_DEFEAT_SOUND)
 	# Career stat (achievements): how much of this level's villain HP
 	# got chipped away, win or lose. Recorded here (not just on the terminal
 	# _end call) so a mid-run level clear's villain damage still counts toward
@@ -514,9 +613,20 @@ func _end(win: bool) -> void:
 		if _level_exists(next_level):
 			RunState.current_level = next_level
 			_advance_to_next = true
+			# The one checkpoint: a cleared level is written to disk, so closing
+			# the game here and pressing CONTINUE resumes at next_level with
+			# this run's boons, XP, carried HP and casualties intact. Saved
+			# AFTER current_level advances and _record_carryover() runs, so the
+			# file describes the level about to be played, not the one just won.
+			RunState.save_run()
 			_results.show_results(true, 0, next_level)
 			get_tree().paused = true
 			return
+	# Terminal outcome — the run is over either way (final level cleared, or the
+	# party wiped), so the resumable file goes. Crucially this happens BEFORE
+	# the results screen is even readable, so a defeat can't be undone by
+	# quitting and pressing CONTINUE.
+	RunState.clear_run()
 	var levels_cleared := RunState.current_level if win else RunState.current_level - 1
 	var gold := GameState.gold_for_run(win, levels_cleared)
 	GameState.record_career("runs_played", 1)
@@ -539,7 +649,7 @@ func _record_carryover() -> void:
 		if hero_name in live_nodes:
 			var h = live_nodes[hero_name]
 			var healed: float = h.hp + (h.max_hp - h.hp) * CLEAR_HEAL_MISSING_FRACTION
-			RunState.carry_hp(hero_name, minf(healed, h.max_hp))
+			RunState.carry_hp(hero_name, minf(healed, h.max_hp), h.max_hp)
 
 func _level_exists(n: int) -> bool:
 	var has_stage_config := ResourceLoader.exists("res://config/stage_%d_config.tres" % n)

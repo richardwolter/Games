@@ -399,3 +399,126 @@ static func draw_burst(canvas: CanvasItem, tex: Texture2D, at: Vector2,
 	var draw_size := tex_size * (diameter / longest)
 	canvas.draw_texture_rect(tex, Rect2(at - draw_size * 0.5, draw_size), false,
 			Color(1.0, 1.0, 1.0, clampf(alpha, 0.0, 1.0)))
+
+## -- Unit rendering ----------------------------------------------------------
+## The one place a sprite-carrying unit is drawn: its ground shadow plus the
+## sprite itself, sized from body_radius/sprite_scale.
+##
+## Shared because there are TWO callers that must agree pixel for pixel —
+## Combatant._draw (the live unit) and DeployController (the deploy-phase
+## preview of a hero that hasn't spawned yet). They had drifted apart: the
+## preview drew a bare sprite with no shadow, so the ghost read as a floating
+## cutout and the hero that walked out of it looked like a different asset
+## (Designer, 2026-07-26). Sizing had already desynced once before, in the
+## other direction (see DeployController's GHOST_SPRITE_SCALE doc), which is
+## the reason this is now one function instead of two copies of the math.
+
+const SHADOW_COLOR := Color(0.08, 0.07, 0.06)
+const SHADOW_ALPHA := 0.28
+## Flattened to read as a shadow cast on the ground plane, not a full circle.
+const SHADOW_SQUASH := 0.4
+## Sprite art is drawn centred on the unit's origin, so a shadow at y=0 would
+## sit at the sprite's vertical midpoint (chest height) instead of under the
+## feet. This drops it toward the bottom edge — not the full half-height,
+## since the source art carries transparent padding below the actual feet and
+## a full drop reads as floating (Designer, 2026-07-25).
+const SHADOW_DROP_FRACTION := 0.38
+
+## Size the sprite occupies on screen: body_radius * 2 * sprite_scale along the
+## texture's longest edge. Callers that need the drawn height (the shadow drop)
+## use this too, so both derive from one formula.
+static func unit_draw_size(texture: Texture2D, body_radius: float, sprite_scale: float) -> Vector2:
+	if texture == null:
+		return Vector2.ZERO
+	var tex_size := texture.get_size()
+	var longest := maxf(tex_size.x, tex_size.y)
+	if longest <= 0.0:
+		return Vector2.ZERO
+	return tex_size * (body_radius * 2.0 * sprite_scale / longest)
+
+## Ground shadow only. `at` is the unit's ground-plane position — deliberately
+## separate from the sprite's position so a bobbing unit's shadow stays flat on
+## the floor while the body bounces above it; that gap is what reads as light
+## from above rather than a cutout pasted onto the field.
+## `alpha_mult` scales the shadow's own opacity — 1.0 for a real unit; the
+## deploy preview passes its ghost alpha so a translucent hero doesn't cast a
+## fully solid shadow.
+static func draw_unit_shadow(canvas: CanvasItem, texture: Texture2D, at: Vector2,
+		body_radius: float, sprite_scale: float, alpha_mult := 1.0) -> void:
+	var drop := body_radius
+	var draw_size := unit_draw_size(texture, body_radius, sprite_scale)
+	if draw_size != Vector2.ZERO:
+		drop = draw_size.y * SHADOW_DROP_FRACTION
+	var center := at + Vector2(0.0, drop)
+	var pts := PackedVector2Array()
+	var point_count := 16
+	var rx := body_radius * 0.95
+	var ry := rx * SHADOW_SQUASH
+	for i in point_count:
+		var ang := TAU * float(i) / point_count
+		pts.append(center + Vector2(cos(ang) * rx, sin(ang) * ry))
+	canvas.draw_colored_polygon(pts, Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b,
+			SHADOW_ALPHA * clampf(alpha_mult, 0.0, 1.0)))
+
+## The sprite itself. `art_dir` is the horizontal flip: the art faces left by
+## default, so a unit moving right passes -1 to turn it in place on its own
+## axis (see Combatant.sprite_faces_right for art drawn the other way round).
+##
+## `tint` multiplies the art's own colours. White (the default) draws the
+## sprite as authored; any other colour, drawn as a second pass over the first,
+## washes the whole silhouette in that hue — which is how the hit flash works
+## (Combatant._draw). Because the texture's alpha is respected, the wash lands
+## on exactly the drawn pixels and nothing else, so it follows the character's
+## outline instead of being a shape laid over it.
+static func draw_unit_sprite(canvas: CanvasItem, texture: Texture2D, at: Vector2,
+		body_radius: float, sprite_scale: float, art_dir: float, alpha: float,
+		tint: Color = Color.WHITE) -> void:
+	var draw_size := unit_draw_size(texture, body_radius, sprite_scale)
+	if draw_size == Vector2.ZERO:
+		return
+	canvas.draw_set_transform(at, 0.0, Vector2(art_dir, 1.0))
+	canvas.draw_texture_rect(texture, Rect2(-draw_size * 0.5, draw_size), false,
+			Color(tint.r, tint.g, tint.b, clampf(alpha, 0.0, 1.0)))
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+## Spawns a hand-drawn sprite at `pos` that holds for `duration` and fades out,
+## then frees itself. Unlike draw_burst (which a caller renders inside its OWN
+## _draw), this owns its lifetime — for effects whose source is gone the moment
+## they fire, like the Volatile Duplicates explosion: the clone calls _die() in
+## the same frame, so there is nothing left to draw the blast.
+##
+## `grow` is how much it expands over its life; 1.0 holds a constant size.
+static func burst_sprite(parent: Node, tex: Texture2D, pos: Vector2, diameter: float,
+		duration := 0.4, grow := 1.25) -> void:
+	if _headless() or parent == null or tex == null or diameter <= 0.0:
+		return
+	var node := _BurstSprite.new()
+	node.texture = tex
+	node.global_position = pos
+	node.diameter = diameter
+	node.duration = maxf(duration, 0.01)
+	node.grow = grow
+	parent.add_child(node)
+	_track(node)
+
+## Self-drawing, self-freeing one-shot for burst_sprite above.
+class _BurstSprite extends Node2D:
+	var texture: Texture2D = null
+	var diameter := 100.0
+	var duration := 0.4
+	var grow := 1.25
+	var _t := 0.0
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+		if _t >= duration:
+			queue_free()
+
+	func _draw() -> void:
+		var p := clampf(_t / duration, 0.0, 1.0)
+		# Snaps to near-full size then fades, rather than growing from nothing:
+		# a blast that starts at zero width is invisible for the frames that
+		# matter most (see Hero._draw_stomp_burst for the same correction).
+		BattleFX.draw_burst(self, texture, Vector2.ZERO,
+				diameter * lerpf(1.0, grow, p), 1.0 - p * p)

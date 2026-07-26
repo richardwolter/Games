@@ -91,6 +91,14 @@ signal died(who: Combatant)
 
 const RETARGET_INTERVAL := 0.25
 const FLASH_TIME := 0.12
+## Damage tint washed over the whole sprite on a hit (see _draw). CRIMSON, the
+## staff-gem red from the sprite palette, lifted a little so it still reads as
+## red where it lands on the art's black linework.
+const HIT_FLASH_COLOR := Color(0.95, 0.20, 0.18)
+## Peak opacity of that wash, at the instant of the hit. Not 1.0: fully
+## replacing the art with a red silhouette loses which unit was struck, and in
+## a swarm that's the one thing the flash exists to tell you.
+const HIT_FLASH_STRENGTH := 0.75
 const DEATH_TIME := 0.2
 const LUNGE_DIST := 8.0
 const LUNGE_RETURN := 60.0
@@ -224,13 +232,102 @@ var shield_charges := 0
 ## legibility aid, not a stacking effect queue.
 var _status_flash_t := 0.0
 var _status_flash_color := Color.WHITE
-const STATUS_STUN_COLOR := Color(0.65, 0.95, 1.0, 0.95)
-const STATUS_SLOW_COLOR := Color(0.55, 0.45, 0.85, 0.9)
-const STATUS_BUFF_COLOR := Color(0.9, 0.75, 0.25, 0.9)
-const STATUS_SHIELD_COLOR := Color(0.6, 0.85, 0.95, 0.9)
-const STATUS_CONFUSE_COLOR := Color(0.95, 0.4, 0.85, 0.95)
-const STATUS_BURN_COLOR := Color(0.95, 0.45, 0.15, 0.95)
-const STATUS_VULN_COLOR := Color(0.9, 0.3, 0.35, 0.95)
+## Status rings are drawn OVER sprite art, not on paper, so these are the one
+## place the pigments are used at full strength or lifted rather than darkened
+## — a ring has to survive being seen against black linework. Each still comes
+## from the sprite set (UIStyle): stun/shield off NAVY, slow and confuse off
+## VIOLET (the pigment the enemy art already owns, and both are things done TO
+## a unit by the enemy side), buff off CANARY, burn off EMBER, vulnerability
+## off CRIMSON.
+const STATUS_STUN_COLOR := Color(0.62, 0.70, 0.96, 0.95)
+const STATUS_SLOW_COLOR := Color(0.68, 0.42, 0.86, 0.9)
+const STATUS_BUFF_COLOR := Color(0.88, 0.86, 0.20, 0.9)
+const STATUS_SHIELD_COLOR := Color(0.55, 0.78, 0.96, 0.9)
+const STATUS_CONFUSE_COLOR := Color(0.86, 0.30, 0.84, 0.95)
+const STATUS_BURN_COLOR := Color(0.90, 0.35, 0.12, 0.95)
+const STATUS_VULN_COLOR := Color(0.84, 0.16, 0.16, 0.95)
+## Status tint strength, pulsing between these two while the status is up (see
+## _status_tint_alpha). Deliberately much weaker than HIT_FLASH_STRENGTH: a hit
+## flash is a single frame-or-two spike, whereas a stun can hold for seconds,
+## and washing a unit out for that long would cost the player the ability to
+## tell WHICH unit is stunned. The pulse is what says "still active" — a
+## constant tint at this strength reads as the sprite just being that colour.
+const STATUS_TINT_MIN := 0.22
+const STATUS_TINT_MAX := 0.5
+## Pulses per second of the status tint.
+const STATUS_TINT_PULSE_HZ := 1.6
+
+## Both tint passes (hit flash and status) are drawn at this multiple of the
+## sprite's own scale, so the colour spills a little past the silhouette
+## instead of stopping exactly at its edge (Designer, 2026-07-26). The fringe
+## is what makes a tint readable against the field: the art is mostly heavy
+## black linework, and a tint confined to the drawn pixels barely shifts those
+## — the part that reads is the halo just outside them. Kept small; push it far
+## and the sprite visibly swells on every hit.
+const TINT_OVERSCALE := 1.12
+
+## -- Ability overlay art (Designer, 2026-07-26) -------------------------------
+## Hand-drawn marks laid over (or above) this unit's own sprite while an
+## ability is affecting it. Each gets its OWN timer rather than sharing one
+## slot: an ensnare can hold for seconds while melee hits keep landing on the
+## same body, and a single slot would let each new hit wipe the wrap.
+##
+## All three size themselves off the unit's DRAWN height (BattleFX
+## .unit_draw_size), not body_radius — so the same art fits a small minion and
+## a 3x-scaled Dark Mage without per-unit tuning.
+##
+## The *_PAD numbers convert "fraction of the source canvas the drawing
+## actually covers" into a draw diameter, exactly like Hero.STOMP_BURST_PAD:
+## draw_burst fits the WHOLE texture (padding included) to the size it's given,
+## so art floating in a big transparent canvas needs scaling up to compensate.
+## They're estimates off the source images — tune if anything reads too big or
+## small.
+
+## Roots wrapping a stunned enemy — Warden's Ensnare.
+const ENSNARE_ART := preload("res://assets/sprites/Ensnare_Effect.png")
+const ENSNARE_ART_PAD := 1.15
+## Fraction of the unit's drawn height the wrap covers. Just over 1 so the
+## roots close around the silhouette rather than sitting inside it.
+const ENSNARE_ART_HEIGHT_FRAC := 1.1
+
+## Impact scratches over a unit that just took a melee hit. Brief by design —
+## it's a blink, not a state.
+const MELEE_HIT_ART := preload("res://assets/sprites/Melee_Hit.png")
+const MELEE_HIT_ART_PAD := 2.6
+const MELEE_HIT_ART_HEIGHT_FRAC := 0.85
+const MELEE_HIT_ART_TIME := 0.22
+
+## Beacon's Rally — hovers ABOVE a buffed hero rather than over its art, since
+## Rally is a boon and shouldn't obscure the unit it's helping.
+const RALLY_ART := preload("res://assets/sprites/Rally_Marker.png")
+const RALLY_ART_PAD := 1.25
+const RALLY_ART_HEIGHT_FRAC := 0.42
+## How far above the sprite's top edge the marker floats, as a fraction of the
+## unit's drawn height.
+const RALLY_ART_RISE := 0.62
+
+var _ensnare_art_t := 0.0
+var _ensnare_art_total := 0.0
+var _melee_hit_art_t := 0.0
+var _rally_art_t := 0.0
+var _rally_art_total := 0.0
+
+## Wraps this unit in Ensnare's roots for `duration`. Called on the TARGET by
+## whatever ensnared it (Hero._try_ensnare), not on the caster.
+func show_ensnare_art(duration: float) -> void:
+	_ensnare_art_total = maxf(duration, 0.01)
+	_ensnare_art_t = _ensnare_art_total
+
+## Blinks the melee-impact mark over this unit. Called on the victim by the
+## attacker's melee branch (see _attack_target).
+func show_melee_hit_art() -> void:
+	_melee_hit_art_t = MELEE_HIT_ART_TIME
+
+## Floats Rally's marker over this hero for `duration`.
+func show_rally_art(duration: float) -> void:
+	_rally_art_total = maxf(duration, 0.01)
+	_rally_art_t = _rally_art_total
+
 ## Fixed flash length for apply_shield, which has no duration of its own
 ## (a charge count, not a timer) — just a short "you got shielded" pulse.
 const STATUS_SHIELD_FLASH_TIME := 0.4
@@ -343,6 +440,9 @@ func _process(delta: float) -> void:
 	_atk_speed_boost_t = maxf(_atk_speed_boost_t - delta, 0.0)
 	_xp_boost_t = maxf(_xp_boost_t - delta, 0.0)
 	_status_flash_t = maxf(_status_flash_t - delta, 0.0)
+	_ensnare_art_t = maxf(_ensnare_art_t - delta, 0.0)
+	_melee_hit_art_t = maxf(_melee_hit_art_t - delta, 0.0)
+	_rally_art_t = maxf(_rally_art_t - delta, 0.0)
 
 	if _burn_t > 0.0:
 		_burn_t = maxf(_burn_t - delta, 0.0)
@@ -753,6 +853,12 @@ func _engage(delta: float) -> void:
 			_fire_projectile(victim)
 		else:
 			victim.take_damage(damage * damage_mult(), self)
+			# Impact mark on the VICTIM (Designer, 2026-07-26). Here rather than
+			# inside _on_melee_hit, which Hero overrides for its sword sound
+			# without calling super — so a minion or villain landing a melee hit
+			# would never have reached it.
+			if is_instance_valid(victim):
+				victim.show_melee_hit_art()
 			_on_melee_hit(victim)
 			if knockback_chance > 0.0 and not victim._dying and randf() < knockback_chance:
 				victim.apply_knockback(to_target.normalized(), knockback_distance, knockback_splash_damage, self)
@@ -809,14 +915,6 @@ func _steer(desired: Vector2, delta: float) -> Vector2:
 		_heading = _heading.slerp(desired, clampf(delta * 10.0, 0.0, 1.0)).normalized()
 	return _heading
 
-## Warm near-black ink wash for the ground shadow — matches the outline
-## family used for paper-cutout linework (see outline_color) rather than a
-## flat photographic black.
-const SHADOW_COLOR := Color(0.08, 0.07, 0.06)
-const SHADOW_ALPHA := 0.28
-## Flattened to read as a shadow cast on the ground plane, not a full circle.
-const SHADOW_SQUASH := 0.4
-
 func _draw() -> void:
 	var offset := Vector2(_sway, -_bob) + _lunge
 	# Ground-plane-only offset (no -_bob) so the shadow stays flat on the
@@ -831,23 +929,44 @@ func _draw() -> void:
 		draw_circle(offset, body_radius, body_color)
 		draw_arc(offset, body_radius, 0.0, TAU, 24, outline_color, outline_width, true)
 	if sprite_texture != null:
-		var diameter := body_radius * 2.0 * sprite_scale
-		var tex_size := sprite_texture.get_size()
-		var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
-		var draw_size := tex_size * scale_factor
-		# Art faces left by default; turn in place on its own axis when facing right.
-		draw_set_transform(offset, 0.0, Vector2(-_facing_x * _art_dir(), 1.0))
-		draw_texture_rect(sprite_texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, _sprite_alpha()))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		# Shared with DeployController's deploy-phase preview — see BattleFX's
+		# unit-rendering section for why this isn't inlined here any more.
+		BattleFX.draw_unit_sprite(self, sprite_texture, offset, body_radius, sprite_scale,
+				-_facing_x * _art_dir(), _sprite_alpha())
+		# Hit flash: the SAME sprite drawn again in red over itself (Designer,
+		# 2026-07-26). It used to be a white circle at body_radius, which read
+		# as a disc appearing next to the character rather than the character
+		# being hurt — body_radius is the hitbox, so on any sprite scaled up by
+		# SPRITE_SCALE_MULT the disc covered only the middle of the art. A
+		# tinted redraw follows the drawn silhouette exactly, whatever its size.
+		#
+		# Status tint FIRST, hit flash over it: a hit is instantaneous and must
+		# win the frame it happens on, while a status can hold for seconds.
+		# Reversed, a stun's steady wash would swallow every hit landed on it —
+		# which is exactly when the player most needs to see damage landing.
+		if _status_flash_t > 0.0:
+			# Status effects tint the SPRITE rather than drawing a ring around
+			# it (Designer, 2026-07-26), same treatment as the hit flash. The
+			# ring had the sizing problem the flash did — pinned to the hitbox
+			# radius, not the drawn art — and with several units stunned at
+			# once the field filled with loose circles that read as ground
+			# decals rather than as belonging to any particular unit.
+			_draw_tint(offset, _status_flash_color, _status_tint_alpha())
+		if _flash > 0.0:
+			_draw_tint(offset, HIT_FLASH_COLOR,
+					(_flash / FLASH_TIME) * HIT_FLASH_STRENGTH * _sprite_alpha())
+	else:
+		# Art-less units keep the old shapes — there is no silhouette to tint.
+		if _flash > 0.0:
+			draw_circle(offset, body_radius,
+					Color(HIT_FLASH_COLOR, (_flash / FLASH_TIME) * HIT_FLASH_STRENGTH))
+		if _status_flash_t > 0.0:
+			# _collision_radius(), not body_radius alone, so the ring clears the
+			# art of anything scaled up by Hero.SPRITE_SCALE_MULT.
+			draw_arc(offset, _collision_radius() + 5.0, 0.0, TAU, 24, _status_flash_color, 3.0, true)
 	if _in_lake:
 		draw_circle(offset, body_radius, Color(0.45, 0.85, 0.35, 0.3))
-	if _flash > 0.0:
-		draw_circle(offset, body_radius, Color(1.0, 1.0, 1.0, (_flash / FLASH_TIME) * 0.7))
-	if _status_flash_t > 0.0:
-		# _collision_radius(), not body_radius alone — a unit whose sprite
-		# renders bigger than its hitbox (Hero.SPRITE_SCALE_MULT) would
-		# otherwise get this status ring sitting inside its own art.
-		draw_arc(offset, _collision_radius() + 5.0, 0.0, TAU, 24, _status_flash_color, 3.0, true)
+	_draw_overlay_art(offset)
 	if hp < max_hp and not _dying:
 		_draw_health_bar(offset)
 	# label_text is deliberately NOT drawn any more (Designer, 2026-07-25:
@@ -857,33 +976,57 @@ func _draw() -> void:
 	# label_text for its HP panel title, so it is still live data, just not
 	# rendered in world space.
 
+## This unit's sprite height as actually drawn on screen — the size every
+## overlay scales itself against, so one piece of art fits every unit.
+func drawn_height() -> float:
+	var draw_size := BattleFX.unit_draw_size(sprite_texture, body_radius, sprite_scale)
+	return draw_size.y if draw_size.y > 0.0 else body_radius * 2.0
+
+## The ability marks laid over this unit — see the overlay-art block above.
+## Drawn AFTER the tints so a wrapped, tinted, freshly-hit minion still shows
+## its roots; they're line art rather than a wash, so they read on top.
+func _draw_overlay_art(offset: Vector2) -> void:
+	var height := drawn_height()
+	if _ensnare_art_t > 0.0:
+		# Holds full strength and fades only over the last stretch: the wrap is
+		# a STATE (this unit is rooted right now), not an impact, so it must not
+		# be brightest at the moment it lands and invisible thereafter.
+		BattleFX.draw_burst(self, ENSNARE_ART, offset,
+				height * ENSNARE_ART_HEIGHT_FRAC * ENSNARE_ART_PAD,
+				minf(_ensnare_art_t / maxf(_ensnare_art_total * 0.3, 0.01), 1.0))
+	if _rally_art_t > 0.0:
+		BattleFX.draw_burst(self, RALLY_ART, offset - Vector2(0.0, height * RALLY_ART_RISE),
+				height * RALLY_ART_HEIGHT_FRAC * RALLY_ART_PAD,
+				minf(_rally_art_t / maxf(_rally_art_total * 0.3, 0.01), 1.0))
+	if _melee_hit_art_t > 0.0:
+		BattleFX.draw_burst(self, MELEE_HIT_ART, offset,
+				height * MELEE_HIT_ART_HEIGHT_FRAC * MELEE_HIT_ART_PAD,
+				_melee_hit_art_t / MELEE_HIT_ART_TIME)
+
+## One coloured wash over this unit's sprite, drawn slightly larger than the
+## art (TINT_OVERSCALE) so it reads as a halo hugging the silhouette rather
+## than a recolour trapped inside it. Callers pass the final alpha; both the
+## hit flash and the status tint go through here so the two can't drift apart.
+func _draw_tint(offset: Vector2, color: Color, alpha: float) -> void:
+	if sprite_texture == null or alpha <= 0.0:
+		return
+	BattleFX.draw_unit_sprite(self, sprite_texture, offset, body_radius,
+			sprite_scale * TINT_OVERSCALE, -_facing_x * _art_dir(), alpha, color)
+
+## Opacity of the status tint this frame: a sine pulse between STATUS_TINT_MIN
+## and STATUS_TINT_MAX, scaled by the sprite's own alpha so a dying unit's
+## fade-out carries the tint down with it. Driven off engine time rather than a
+## per-unit phase, so a stunned pack pulses together and reads as one status
+## rather than as noise.
+func _status_tint_alpha() -> float:
+	var wave := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * TAU * STATUS_TINT_PULSE_HZ)
+	return lerpf(STATUS_TINT_MIN, STATUS_TINT_MAX, wave) * _sprite_alpha()
+
 ## Flattened ellipse drawn first (furthest back) so the sprite/body, hit-
-## flash, and status ring all composite over it.
+## flash, and status ring all composite over it. Body lives in BattleFX so the
+## deploy-phase preview draws the identical shadow.
 func _draw_ground_shadow(ground_offset: Vector2) -> void:
-	# Sprite art is drawn centered on this node's origin (see _draw below —
-	# draw_texture_rect's rect is centered at `offset`), so a shadow drawn at
-	# y=0 sits at the sprite's vertical midpoint (roughly chest-height on a
-	# humanoid) instead of under its feet. Drop it toward the sprite's bottom
-	# edge — the same diameter/scale math _draw uses below. Not the full half
-	# height: the source art carries transparent padding below the actual
-	# feet, so a full-height drop reads as floating; DROP_FRACTION pulls it
-	# in to sit right under the visible feet instead (Designer, 2026-07-25).
-	const DROP_FRACTION := 0.38
-	var drop := body_radius
-	if sprite_texture != null:
-		var diameter := body_radius * 2.0 * sprite_scale
-		var tex_size := sprite_texture.get_size()
-		var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
-		drop = tex_size.y * scale_factor * DROP_FRACTION
-	var center := ground_offset + Vector2(0.0, drop)
-	var pts := PackedVector2Array()
-	var point_count := 16
-	var rx := body_radius * 0.95
-	var ry := rx * SHADOW_SQUASH
-	for i in point_count:
-		var ang := TAU * float(i) / point_count
-		pts.append(center + Vector2(cos(ang) * rx, sin(ang) * ry))
-	draw_colored_polygon(pts, Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, SHADOW_ALPHA))
+	BattleFX.draw_unit_shadow(self, sprite_texture, ground_offset, body_radius, sprite_scale)
 
 func _draw_health_bar(offset: Vector2) -> void:
 	var w := body_radius * 2.0

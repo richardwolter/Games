@@ -79,7 +79,11 @@ func start_run() -> void:
 	levels.clear()
 	duo_boons.clear()
 	hp_carry.clear()
+	hp_carry_frac.clear()
 	dead.clear()
+	# Starting fresh discards any resumable run — see the persistence block at
+	# the bottom of this file.
+	clear_run()
 
 ## -- Run chaining: HP carryover + permadeath ---------------------------------
 
@@ -112,9 +116,22 @@ func mark_dead(hero_name: String) -> void:
 		dead.append(hero_name)
 	hp_carry.erase(hero_name)
 
-## Store a survivor's remaining HP to carry into the next level.
-func carry_hp(hero_name: String, hp: float) -> void:
+## Store a survivor's remaining HP to carry into the next level. `max_hp` is
+## kept alongside purely so the pre-deploy hero card can draw the right bar
+## fill before any Hero node exists to ask (see carried_fraction) — the raw
+## value stays the source of truth for the actual spawn.
+func carry_hp(hero_name: String, hp: float, max_hp: float = 0.0) -> void:
 	hp_carry[hero_name] = hp
+	if max_hp > 0.0:
+		hp_carry_frac[hero_name] = clampf(hp / max_hp, 0.0, 1.0)
+
+## hero_name -> 0..1 HP fraction carried in, for display before spawn.
+var hp_carry_frac := {}
+
+## Carried HP as a fraction of max, or 1.0 when this hero carries nothing in
+## (a fresh level-1 spawn arrives at full HP).
+func carried_fraction(hero_name: String) -> float:
+	return float(hp_carry_frac.get(hero_name, 1.0))
 
 ## Carried HP for a hero, or -1.0 if none (fresh spawn at full HP).
 func carried_hp(hero_name: String) -> float:
@@ -213,3 +230,79 @@ func toggle_selected(hero_name: String, on: bool) -> void:
 
 func selected_heroes() -> Array:
 	return party.duplicate()
+
+## -- Run persistence (Designer, 2026-07-26) -----------------------------------
+## A run in flight now survives closing the game: quit after clearing a level
+## and CONTINUE on the title screen drops you back into the level you had
+## reached, with your Duo boons, XP, carried HP and casualties intact.
+##
+## This is a deliberate narrowing of the "never saved to disk" rule in the class
+## doc above, NOT an abandonment of it. The rule exists so a build can't be
+## re-rolled or carried between runs; it was never meant to punish someone for
+## closing the window. So: the run file is written only at a level CLEAR, and
+## deleted the moment the run ends by any route — completed, wiped, or
+## abandoned. There is no way to reload it to undo a defeat, because a defeat
+## erases it before the results screen is even readable.
+##
+## Kept in its own file rather than in save.json: GameState.reset_save() wipes
+## that one, and a meta-progression reset is a different decision from
+## discarding an in-flight run.
+const RUN_SAVE_PATH := "user://run.json"
+const RUN_SAVE_VERSION := 1
+
+## True when the state currently in memory came from disk — i.e. there is a run
+## to resume. Set by _load_run at boot, cleared by clear_run/start_run.
+var resumable := false
+
+func _ready() -> void:
+	_load_run()
+
+## Writes the run as it stands. Called at a level clear (BattleManager._end),
+## which is the only checkpoint — mid-battle progress is deliberately not
+## captured, so quitting mid-fight resumes at the start of that level rather
+## than restoring a half-finished battle.
+func save_run() -> void:
+	var f := FileAccess.open(RUN_SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify({
+		"version": RUN_SAVE_VERSION,
+		"current_level": current_level,
+		"levels": levels,
+		"duo_boons": duo_boons,
+		"hp_carry": hp_carry,
+		"hp_carry_frac": hp_carry_frac,
+		"dead": dead,
+		"party": party,
+		"draft_offer": draft_offer,
+	}))
+	resumable = true
+
+## Drops the saved run. Called on every run-ending outcome — see class doc.
+func clear_run() -> void:
+	resumable = false
+	if FileAccess.file_exists(RUN_SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUN_SAVE_PATH))
+
+func _load_run() -> void:
+	if not FileAccess.file_exists(RUN_SAVE_PATH):
+		return
+	var f := FileAccess.open(RUN_SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var data: Variant = JSON.parse_string(f.get_as_text())
+	if not (data is Dictionary) or int(data.get("version", 0)) != RUN_SAVE_VERSION:
+		# Unreadable or from an older layout: drop it rather than resume half a
+		# run. Losing one interrupted run beats restoring a broken one.
+		clear_run()
+		return
+	current_level = int(data.get("current_level", 1))
+	levels = data.get("levels", {})
+	duo_boons = data.get("duo_boons", {})
+	hp_carry = data.get("hp_carry", {})
+	hp_carry_frac = data.get("hp_carry_frac", {})
+	dead = data.get("dead", [])
+	party = data.get("party", [])
+	draft_offer = data.get("draft_offer", [])
+	# A run with nobody in it can't be resumed into a battle — treat it as none.
+	resumable = not party.is_empty()

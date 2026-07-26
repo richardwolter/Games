@@ -82,5 +82,44 @@ func _on_pick(id: String) -> void:
 	if _picked:
 		return
 	_picked = true
+	_play_ultimate_preview(id)
 	picked.emit(id)
+
+## Plays the cast sound of the Ultimate the picked boon belongs to, so choosing
+## a boon gives a sensory idea of what it's upgrading (Designer, 2026-07-26).
+##
+## Routed by Ultimate KIND, not by boon id: every boon carries its `duo` pair
+## id, which resolves to one DuoUltimates entry, whose `kind` is the same key
+## the effect scenes dispatch on. So a new boon for an existing Ultimate
+## inherits the right sound automatically.
+##
+## Plays ONE pass of each clip, not the repeat counts the real casts use
+## (PlantTrail x2, ArrowBarrage x5) — that's the payoff for firing the
+## Ultimate; here it would run on well past the pick.
+func _play_ultimate_preview(boon_id: String) -> void:
+	var boon: Dictionary = _def_resolver.call(boon_id)
+	var pair_id: String = boon.get("duo", "")
+	if pair_id == "":
+		return
+	match DuoUltimates.def(pair_id).get("kind", ""):
+		"stomp_wave":
+			# The pound, not the shout (Designer, 2026-07-26): Seismic Advance
+			# is a sequence of impacts, and the boon being picked upgrades the
+			# impacts — the vocal callout says nothing about what changed.
+			BattleSfx.play_clip(self, Hero.SEISMIC_POUND_SOUND, Hero.seismic_pound_start(),
+					Hero.SEISMIC_POUND_DURATION)
+		"plant_trail":
+			BattleSfx.play_clip(self, PlantTrail.CAST_SOUND)
+		"arrow_barrage":
+			BattleSfx.play_clip(self, ArrowBarrage.CAST_SOUND)
+		"ensnare_burn":
+			BattleSfx.play_clip(self, Hero.SEARING_SOUND, Hero.SEARING_SOUND_START,
+					Hero.SEARING_SOUND_DURATION, Hero.SEARING_SOUND_VOLUME_DB)
+		"exploding_clones", "roaming_clones":
+			# Both summon clones, so both preview the summon (Designer,
+			# 2026-07-26). Not the explosion for the volatile pair: the boons
+			# on offer there scale the blast, but the summon is what the
+			# Ultimate does at the moment you press it.
+			BattleSfx.play_clip(self, Hero.CLONE_CREATION_SOUND,
+					Hero.CLONE_CREATION_START, Hero.CLONE_CREATION_DURATION)
 

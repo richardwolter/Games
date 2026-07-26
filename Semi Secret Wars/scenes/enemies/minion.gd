@@ -266,3 +266,31 @@ func _nearest_hero_in_lane(lane_filter: String) -> Combatant:
 func _on_goal_reached() -> void:
 	if not _hunting:
 		queue_free()
+
+## Minion death grunt (Designer, 2026-07-26): two takes, picked at random per
+## death so a wipe doesn't read as one repeated sample. Covers every Minion
+## subclass (Elite/Brute/Ranged) since they all inherit this override; the base
+## Combatant._on_died stays a no-op, so villains and clones remain silent.
+const DEATH_SOUNDS: Array[AudioStream] = [
+	preload("res://assets/Sounds/Minion_Death.wav"),
+	preload("res://assets/Sounds/Minion_Death2.wav"),
+]
+const DEATH_SOUND_GAP := 5.0
+const DEATH_SOUND_VOLUME_DB := -8.0
+
+## Rate limiter shared by EVERY minion, not per-instance: a minion only dies
+## once, so an instance timer would never suppress anything — the whole point
+## is that a swarm dying together plays ONE grunt, not thirty. Static, so it
+## survives individual minions being freed. Stored as an absolute engine
+## timestamp rather than a counted-down timer because minions have no
+## guaranteed _process to tick it; it carries across battle restarts, which
+## only means a death in the first 5s of a new battle may stay silent.
+static var _last_death_sound_ms := -1000000
+
+func _on_died() -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_death_sound_ms < int(DEATH_SOUND_GAP * 1000.0):
+		return
+	_last_death_sound_ms = now
+	BattleSfx.play_clip(self, DEATH_SOUNDS[randi() % DEATH_SOUNDS.size()], 0.0, 0.0,
+			DEATH_SOUND_VOLUME_DB)

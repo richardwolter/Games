@@ -50,11 +50,20 @@ const SAVE_VERSION := 9
 const MIN_LOADABLE_VERSION := 8
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
+## Each hero's identity colour — the swatch on its prep card, its deploy label,
+## the Duo chain line, its teleport-in FX. Taken from the dominant pigment of
+## that hero's own sprite (Designer, 2026-07-26), because these were invented
+## before the art existed and had drifted badly: Artemis was pink but is drawn
+## in forest green, Warden was teal but is drawn as brown bark. A hero's colour
+## is now the colour the player actually sees walking around the field.
+##
+## All four are mutually distinct, and none is UIStyle.VIOLET — that pigment
+## belongs to the Dark Mage and his minions, so nothing friendly wears it.
 const HERO_CATALOG := {
-	"THUNDAAR": {"color": Color(0.29, 0.471, 0.753)},
-	"ARTEMIS": {"color": Color(0.816, 0.435, 0.627)},
-	"WARDEN": {"color": Color(0.25, 0.62, 0.60)},
-	"BEACON": {"color": Color(0.88, 0.72, 0.30)},
+	"THUNDAAR": {"color": UIStyle.EMBER},   # tunic
+	"ARTEMIS": {"color": UIStyle.FOREST},   # scarf/hood
+	"WARDEN": {"color": UIStyle.BARK},      # bark body
+	"BEACON": {"color": UIStyle.LIME},      # robe
 }
 
 ## XP gained per hero in the current run (for the results screen — display only,

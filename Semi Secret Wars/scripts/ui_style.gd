@@ -16,42 +16,90 @@ extends RefCounted
 ##   - scripts/ui_boot.gd — autoload that injects the handwritten font at
 ##     runtime once the .ttf is present (see FONT_PATH).
 
+# -- Pigments -----------------------------------------------------------------
+## The crayon set the hand-drawn sprites are actually coloured with, sampled
+## from the art (Designer, 2026-07-26: "all colours should derive from sprite
+## colours"). Every palette entry below is one of these, a tint of one, or a
+## darkened version of one — so the UI and the field read as the same box of
+## pencils rather than two unrelated colour schemes.
+##
+## Where each was sampled:
+##   PAPER       the cream the sprites are drawn on (already the page colour)
+##   SOOT        the linework every sprite is outlined in — warm, not black
+##   EMBER       Thundaar's tunic
+##   NAVY        Thundaar's trousers
+##   CANARY      Thundaar's boot/belt accents
+##   FOREST      Artemis's scarf, Warden's leaves
+##   BARK        Artemis's quiver, Warden's bark, Beacon's sash
+##   GRAPHITE    Artemis's trousers, Thundaar's hammer head
+##   LIME        Beacon's robe
+##   LILAC       Beacon's face
+##   CRIMSON     the gem atop Beacon's staff
+##   VIOLET      the Dark Mage's robe and his minions — the ENEMY pigment, so
+##               nothing friendly should be coloured with it
+##
+## Raw pigments are for reference and for deriving; screens should use the
+## named palette entries below, not these.
+const PAPER := Color("f4efe1")
+const SOOT := Color("1f1c17")
+const EMBER := Color("c4401a")
+const NAVY := Color("232a8c")
+const CANARY := Color("e0dc1e")
+const FOREST := Color("1f7a33")
+const BARK := Color("6b4423")
+const GRAPHITE := Color("6e6e6e")
+const LIME := Color("b9d81f")
+const LILAC := Color("e9d8ee")
+const CRIMSON := Color("c01818")
+const VIOLET := Color("a3239e")
+
 # -- Palette ------------------------------------------------------------------
 
 ## Notebook page. PAGE_SOLID is the opaque paper the battlefield and prep
 ## screens draw; PAGE is the same colour at overlay opacity, for modal panels
 ## that sit on top of the battle.
-const PAGE_SOLID := Color("f4efe1")
+const PAGE_SOLID := PAPER
 const PAGE := Color("f4efe1f0")
 ## Translucent paper for cards laid ON a page — was Color(1,1,1,0.5) in four
 ## different files, which read as a grey-white sticker rather than paper.
 const CARD := Color("f4efe1a8")
 const CARD_STRONG := Color("f4efe1d0")
 
-## The one ink. Body text, outlines, borders — all of it.
-const INK := Color("2c2c2c")
+## The one ink. Body text, outlines, borders — all of it. SOOT rather than a
+## neutral grey: the sprite linework is a warm near-black, and UI drawn in a
+## cooler grey read as printed onto the page instead of drawn on it.
+const INK := SOOT
 ## Secondary/footnote text (lifetime stats, hints). Ink, just lighter.
 ## Alpha 0x99 -> 0xcc on 2026-07-26: at 60% the thin handwritten strokes on
 ## paper were the least readable text in the game. Still clearly secondary.
-const INK_MUTED := Color("2c2c2ccc")
-## Ruled lines and the red margin rule of the notebook page.
-const RULE := Color("aac4dd")
-const MARGIN := Color("d98f8f")
+const INK_MUTED := Color("1f1c17cc")
+## Ruled lines and the red margin rule of the notebook page — pale tints of
+## NAVY and EMBER, so even the stationery comes out of the same box.
+const RULE := Color("b7bedb")
+const MARGIN := Color("dc9d87")
 
-## Accents. GOLD is the highlight/pick colour (boons, focus, unlocks, Duo A),
-## TEAL the second Duo, and the three status colours read as pencil-crayon.
-const GOLD := Color("b08a3e")
-const TEAL := Color("2c8f7a")
-const DANGER := Color("c63d3d")
-const GOOD := Color("5c7a3f")
-const INFO := Color("6fa8dc")
+## Accents, each a sprite pigment adjusted only as far as legibility on cream
+## paper demands:
+##   GOLD   CANARY darkened — raw canary yellow on cream is nearly invisible.
+##          The highlight/pick colour (boons, focus, unlocks, Duo A).
+##   DANGER CRIMSON, the staff-gem red, used as-is.
+##   GOOD   FOREST, used as-is.
+##   INFO   NAVY lifted toward the page so it can be read as small text.
+const GOLD := Color("a8861a")
+const DANGER := CRIMSON
+const GOOD := FOREST
+const INFO := Color("5a6bc4")
 
+## The two Duos. Gold and navy are the furthest-apart pair in this pigment set
+## that BOTH stay legible on cream — deliberately not two hero colours, since a
+## Duo is a pair of heroes and must not look like either one of them.
 const DUO_A := GOLD
-const DUO_B := TEAL
+const DUO_B := NAVY
 
-## Progress-bar fill (pencil green), used by every bar that isn't semantically
-## coloured (villain HP, objective).
-const BAR_FILL := Color("a3c06f")
+## Progress-bar fill, used by every bar that isn't semantically coloured
+## (villain HP, objective). LIME darkened just enough to hold an edge against
+## the page it fills on.
+const BAR_FILL := Color("9cba28")
 
 # -- Type scale ---------------------------------------------------------------
 ## Named sizes so screens stop inventing 11/12/13/14/15/16/17/18/20/22/26/36/
@@ -164,14 +212,70 @@ static func wrapped_label(text: String, width: float, size: int = SIZE_TINY,
 	l.custom_minimum_size = Vector2(width, 0)
 	return l
 
+## Synthetic bold of the hand-drawn font. DrawFont.ttf ships as a single
+## weight, so there is no real bold face to load — FontVariation's embolden
+## thickens the existing outlines instead, which is what a hand-drawn font
+## going bold would look like anyway. Cached: one FontVariation shared by every
+## label that asks, rather than one per built card.
+static var _bold_font_cache: FontVariation = null
+const BOLD_EMBOLDEN := 0.6
+
+static func bold_font() -> FontVariation:
+	if _bold_font_cache == null:
+		_bold_font_cache = FontVariation.new()
+		_bold_font_cache.base_font = font()
+		_bold_font_cache.variation_embolden = BOLD_EMBOLDEN
+	return _bold_font_cache
+
+## Centered rich text with [b] wired to the synthetic bold above — for lines
+## that need part of themselves emphasised (a stat readout boldening its
+## numbers but not its labels). A plain Label would render the BBCode tags
+## literally, hence RichTextLabel.
+##
+## fit_content + no autowrap so it behaves like a Label in a VBox: the row
+## takes exactly the height of its one line.
+static func rich_stat_label(bbcode: String, size: int = SIZE_TINY, color: Color = INK) -> RichTextLabel:
+	var l := RichTextLabel.new()
+	l.bbcode_enabled = true
+	l.fit_content = true
+	l.scroll_active = false
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_font_size_override("normal_font_size", size)
+	l.add_theme_font_size_override("bold_font_size", size)
+	l.add_theme_font_override("bold_font", bold_font())
+	l.add_theme_color_override("default_color", color)
+	l.text = "[center]%s[/center]" % bbcode
+	return l
+
 static func button(text: String, size: int = SIZE_BODY, cb: Callable = Callable()) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", size)
+	add_click_sound(b)
 	if cb.is_valid():
 		b.pressed.connect(cb)
 	add_hover_wiggle(b)
 	return b
+
+## UI click (Designer, 2026-07-26). The source file opens with a sliver of dead
+## air, so playback starts past it — otherwise the click lands audibly late
+## against the press that triggered it.
+const CLICK_SOUND: AudioStream = preload("res://assets/Sounds/Button_Click.mp3")
+const CLICK_SOUND_START := 0.048
+
+## Wires the click sound to a button's press. Applied automatically by button()
+## and texture_button(); call it directly for any other BaseButton.
+##
+## Connected BEFORE the button's own callback, and that order is load-bearing:
+## half the buttons in this game change scene or free their own overlay, and
+## Godot fires `pressed` handlers in connection order — wired afterwards, the
+## sound would be requested from a node that had just left the tree, and
+## BattleSfx would (correctly) drop it. The player itself is parented to the
+## scene root, so it still finishes playing after the button is gone.
+static func add_click_sound(b: BaseButton) -> void:
+	b.pressed.connect(func() -> void:
+		BattleSfx.play_clip(b, CLICK_SOUND, CLICK_SOUND_START))
 
 ## Hover feedback: a small tilt-and-swell the moment the pointer lands, easing
 ## back out when it leaves (Designer, 2026-07-26: "buttons should have a
@@ -224,6 +328,7 @@ static func texture_button(texture: Texture2D, region: Rect2, target_width: floa
 	b.ignore_texture_size = true
 	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	b.custom_minimum_size = Vector2(target_width, target_width / (region.size.x / region.size.y))
+	add_click_sound(b)
 	if cb.is_valid():
 		b.pressed.connect(cb)
 	add_hover_wiggle(b)

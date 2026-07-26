@@ -13,7 +13,10 @@ extends Node2D
 
 @export var stain_radius := 16.0
 @export var stain_alpha := 0.4
-@export var stain_color := Color(0.42, 0.03, 0.03)
+## Same dried-blood red PrepPage bakes onto the menu page (UIStyle.CRIMSON,
+## the staff-gem pigment, deepened) — the two were separate literals that had
+## to be eyeballed into agreement.
+@export var stain_color := UIStyle.CRIMSON.darkened(0.5)
 ## Resolution of the baked stain image — finer than fog's 32px cells since
 ## individual stains are small and want a soft round edge.
 @export var cell_size := 8.0

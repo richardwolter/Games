@@ -26,8 +26,10 @@ var _pairing_slots: Array = ["", "", "", ""]
 
 ## Hand-drawn texture replacing the plain "START RUN" button (Designer,
 ## 2026-07-25). Cropped tight to the drawn label's bounding box within the
-## source PNG so the button isn't mostly transparent padding.
-const START_RUN_TEXTURE := preload("res://assets/Button_StartRun.png")
+## source PNG so the button isn't mostly transparent padding. Swapped to the
+## coloured version 2026-07-26 — same 1590x1152 canvas, so START_RUN_REGION
+## carries over; it assumes the redraw sits in the same place on that canvas.
+const START_RUN_TEXTURE := preload("res://assets/Button_StartRun_Color.png")
 const START_RUN_REGION := Rect2(60, 210, 1500, 640)
 const START_RUN_WIDTH := 360.0
 const DUO_A_COLOR := UIStyle.DUO_A
@@ -71,10 +73,30 @@ class DuoSlot extends PanelContainer:
 			on_clear.call(duo_index, slot_index)
 
 func _ready() -> void:
+	_setup_music()
 	RunState.roll_draft_offer()
 	_seed_pairing_slots()
 	_build_ui()
 	_refresh()
+
+## The prep theme lives in prep_menu.tscn, so neither of these can be set in
+## the inspector: the Music bus is created at runtime by AudioSettings, and the
+## process mode matters because SettingsPanel pauses the tree — a PAUSABLE
+## player would go silent the instant the player opened Settings to adjust the
+## music volume (Designer, 2026-07-26: music should keep playing while you
+## tweak, otherwise there's nothing to tune against).
+func _setup_music() -> void:
+	var music := get_node_or_null("AudioStreamPlayer2D") as AudioStreamPlayer2D
+	if music == null:
+		return
+	music.bus = AudioSettings.BUS_MUSIC
+	music.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Loop the theme rather than letting the screen fall silent after one pass —
+	# prep is a screen players sit on. Safe to set directly on an MP3 stream;
+	# only AudioStreamWAV needs the loop_begin/loop_end care BattleManager
+	# documents.
+	if music.stream is AudioStreamMP3:
+		(music.stream as AudioStreamMP3).loop = true
 
 ## Restores the Duo layout from GameState.duo_pairings (persists across prep
 ## visits) into the flat slot array the drag UI reads.
@@ -106,14 +128,20 @@ func _build_ui() -> void:
 	var meta_row := HBoxContainer.new()
 	meta_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	meta_row.add_theme_constant_override("separation", 22)
-	_currency_label = _label("", UIStyle.SIZE_BODY)
-	meta_row.add_child(_currency_label)
-	_xp_label = _label("", UIStyle.SIZE_BODY)
-	meta_row.add_child(_xp_label)
+	# Gold and banked XP are what the whole meta-progression is spent in, so
+	# they get accent-bordered chips instead of plain text in a row of buttons
+	# (Designer, 2026-07-26). Same treatment as the battle HUD's panels.
+	_currency_label = _label("", UIStyle.SIZE_SUBHEAD)
+	_currency_label.add_theme_color_override("font_color", UIStyle.GOLD)
+	meta_row.add_child(_resource_chip(_currency_label, UIStyle.GOLD))
+	_xp_label = _label("", UIStyle.SIZE_SUBHEAD)
+	_xp_label.add_theme_color_override("font_color", UIStyle.INFO)
+	meta_row.add_child(_resource_chip(_xp_label, UIStyle.INFO))
 	var abilities_btn := _button("ABILITIES", UIStyle.SIZE_BODY, _open_abilities)
 	meta_row.add_child(abilities_btn)
 	var stats_btn := _button("STATS", UIStyle.SIZE_BODY, _open_stats)
 	meta_row.add_child(stats_btn)
+	meta_row.add_child(_button("SETTINGS", UIStyle.SIZE_BODY, _open_settings))
 	root.add_child(meta_row)
 
 	_hero_row = HBoxContainer.new()
@@ -136,9 +164,14 @@ func _build_ui() -> void:
 	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	root.add_child(back_btn)
 
-	var footer := _label("Level 1 — push right, destroy the spawn gates, defeat the villain      (F12 = full reset)", UIStyle.SIZE_SMALL)
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(footer)
+
+## Accent-bordered paper chip around a resource readout. The label is kept as
+## a field by the caller (_refresh rewrites its text), so this only wraps it.
+func _resource_chip(label: Label, accent: Color) -> PanelContainer:
+	var chip := PanelContainer.new()
+	chip.add_theme_stylebox_override("panel", UIStyle.card(accent, 10))
+	chip.add_child(label)
+	return chip
 
 func _rebuild_hero_row() -> void:
 	for child in _hero_row.get_children():
@@ -158,10 +191,6 @@ func _rebuild_pairing_panel() -> void:
 	for child in _pairing_section.get_children():
 		child.queue_free()
 
-	var header := _label("DUO PAIRINGS — drag a hero into a slot to send it into battle. Left slot leads, right slot follows.", UIStyle.SIZE_BODY)
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pairing_section.add_child(header)
-
 	var offered: Array = RunState.draft_offer.duplicate()
 
 	# Drop any slot occupant that fell out of the offer (shouldn't normally
@@ -170,22 +199,39 @@ func _rebuild_pairing_panel() -> void:
 		if _pairing_slots[i] != "" and _pairing_slots[i] not in offered:
 			_pairing_slots[i] = ""
 
+	# Three columns so the panel stays short (Designer, 2026-07-26: the stacked
+	# header/hint/button rows were pushing the screen past its top and bottom
+	# edges): explanation left, the Duo boxes centered, status + CLEAR right.
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 24)
+	_pairing_section.add_child(row)
+
+	var explain := UIStyle.wrapped_label(
+			"Drag your heroes and pick your DUOs. Each DUO has its unique ultimate ability.",
+			240, UIStyle.SIZE_SMALL)
+	explain.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(explain)
+
 	var boxes := HBoxContainer.new()
 	boxes.alignment = BoxContainer.ALIGNMENT_CENTER
 	boxes.add_theme_constant_override("separation", 32)
-	_pairing_section.add_child(boxes)
+	row.add_child(boxes)
 	boxes.add_child(_build_duo_box(0, "DUO A", DUO_A_COLOR))
 	boxes.add_child(_build_duo_box(1, "DUO B", DUO_B_COLOR))
 
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 8)
+	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(side)
+
 	var unplaced := offered.filter(func(h: String) -> bool: return h not in _pairing_slots)
-	var hint2 := _label(_pairing_hint_text(unplaced), UIStyle.SIZE_SMALL)
-	hint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pairing_section.add_child(hint2)
+	side.add_child(UIStyle.wrapped_label(_pairing_hint_text(unplaced), 240, UIStyle.SIZE_SMALL))
 
 	if _pairing_slots.count("") < 4:
-		var center := CenterContainer.new()
-		center.add_child(_button("CLEAR PAIRING", UIStyle.SIZE_SMALL, _on_reset_pairing))
-		_pairing_section.add_child(center)
+		var clear_btn := _button("CLEAR PAIRING", UIStyle.SIZE_SMALL, _on_reset_pairing)
+		clear_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		side.add_child(clear_btn)
 
 func _pairing_hint_text(unplaced: Array) -> String:
 	if unplaced.is_empty():
@@ -220,11 +266,12 @@ func _build_duo_box(duo_index: int, title: String, color: Color) -> PanelContain
 ## Ultimate bar will show, so the player picks a pairing knowing what it
 ## unlocks (Designer, 2026-07-25).
 ##
-## This replaced the DuoSynergies chip that used to sit here. The synergy
-## effects still run exactly as before — they were just never worth the space:
-## all six entries share one generic `_GENERIC_DESC` blurb, so the chip said
-## the same thing whatever you paired, while the Ultimate differs per pair and
-## is the actual reason to choose one pairing over another.
+## This replaced the named-synergy chip that used to sit here. That catalog
+## (DuoSynergies) was deleted outright on 2026-07-26 once its last reader — the
+## battlefield's "DUO A: <name>" banner — was removed too: the names were never
+## used for anything, and all six shared one generic blurb. The generic Duo
+## Bonus mechanic in Hero (DUO_* consts, _update_duo_bonus) is untouched; it
+## never depended on that catalog.
 func _build_ultimate_label(duo_index: int) -> Control:
 	var hero_a: String = _pairing_slots[duo_index * 2]
 	var hero_b: String = _pairing_slots[duo_index * 2 + 1]
@@ -351,18 +398,40 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 	box.add_child(UIStyle.centered_label(role, UIStyle.SIZE_SMALL,
 			Hero.ROLE_COLORS.get(role, UIStyle.INK)))
 	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
-	box.add_child(UIStyle.centered_label(_current_stats_text(hero_name), UIStyle.SIZE_TINY))
-	box.add_child(UIStyle.centered_label(_lifetime_stats_text(hero_name),
-			UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	box.add_child(_build_stats_block(hero_name))
 
 	return card
+
+## The two stat lines on their own paper block, numbers bolded (Designer,
+## 2026-07-26). Both were plain tiny text sitting directly on the card, so the
+## values ran together with the role blurb above them; the inset panel gives
+## them an edge to read against and the embolden separates the numbers from
+## their labels at a glance.
+func _build_stats_block(hero_name: String) -> PanelContainer:
+	var block := PanelContainer.new()
+	# Slightly deeper than the card it sits on, so it reads as an inset panel
+	# rather than a second card floating on the first.
+	block.add_theme_stylebox_override("panel",
+			UIStyle.panel(Color(UIStyle.PAGE_SOLID, 0.55), UIStyle.INK_MUTED, 2, 8,
+					hero_name.length()))
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	block.add_child(col)
+
+	col.add_child(UIStyle.rich_stat_label(_current_stats_text(hero_name), UIStyle.SIZE_TINY))
+	col.add_child(UIStyle.rich_stat_label(_lifetime_stats_text(hero_name),
+			UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	return block
 
 ## Lifetime totals across every run (GameState.hero_stats) — separate from
 ## the live per-run numbers shown on the battle hero card.
 func _lifetime_stats_text(hero_name: String) -> String:
 	var pct := GameState.hero_ability_pct_lifetime(hero_name)
 	var abl_text := "%d%%" % int(round(pct)) if pct >= 0.0 else "—"
-	return "KILLS %d  ·  XP %d  ·  ABL %s" % [
+	# BBCode, not plain text — rendered by UIStyle.rich_stat_label so the values
+	# come out bold while their labels stay light.
+	return "KILLS [b]%d[/b]  ·  XP [b]%d[/b]  ·  ABL [b]%s[/b]" % [
 		GameState.hero_kills_lifetime(hero_name), GameState.hero_xp_lifetime(hero_name), abl_text]
 
 ## Effective hero stats: base × the global base multipliers × permanent
@@ -379,7 +448,8 @@ func _current_stats_text(hero_name: String) -> String:
 	var hp: float = float(stats.get("base_hp", 100)) * Hero.BASE_HP_MULT + float(StatUpgrades.def("hp").get("effect_add", 0.0)) * hp_n
 	var dmg: float = float(stats.get("base_damage", 10)) * Hero.BASE_DAMAGE_MULT + float(StatUpgrades.def("damage").get("effect_add", 0.0)) * dmg_n
 	atk_interval = maxf(atk_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
-	return "HP %d  DMG %d  ATK %.2fs  SPD %d" % [
+	# BBCode — see _lifetime_stats_text.
+	return "HP [b]%d[/b]  DMG [b]%d[/b]  ATK [b]%.2fs[/b]  SPD [b]%d[/b]" % [
 		int(round(hp)), int(round(dmg)), atk_interval, int(stats.get("move_speed", 70))]
 
 ## Card for a not-yet-unlocked hero: shows the achievement gating it (name +
@@ -421,6 +491,20 @@ func _achievement_progress_text(d: Dictionary) -> String:
 	if stat == "best_villain_damage_pct":
 		return "%d%% / %d%% villain damage" % [int(float(current) * 100.0), int(float(threshold) * 100.0)]
 	return "%d / %d %s" % [int(current), int(threshold), stat.replace("_", " ")]
+
+## Settings is a self-parenting overlay (SettingsPanel.open adds itself to the
+## scene root), so unlike the ABILITIES/STATS pages it doesn't hide _main or
+## need a close handler here — it draws over the prep screen and frees itself.
+func _open_settings() -> void:
+	SettingsPanel.toggle(self)
+
+## Escape opens Settings, matching the title screen. Not wired to BACK TO MENU:
+## Escape reaching for "leave the screen" while a player is mid-pairing would
+## be the one destructive reading of the key.
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_open_settings()
 
 func _open_abilities() -> void:
 	_main.visible = false

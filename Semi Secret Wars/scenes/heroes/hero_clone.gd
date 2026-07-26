@@ -67,6 +67,14 @@ var explode_on_hit := false
 var explode_radius := 0.0
 var explode_damage := 0.0
 var _exploded := false
+## Detonates on CONTACT, not only on being hit (Designer, 2026-07-26). Waiting
+## to be attacked meant the clone had to survive an enemy's whole attack
+## wind-up before it did anything — against slow attackers it just stood in the
+## middle of a pack doing nothing. Now a body touching it is enough.
+##
+## Extra reach on top of the two bodies' radii, so "touching" triggers at the
+## point they visually meet rather than only once they overlap.
+const CONTACT_PAD := 6.0
 
 func _configure() -> void:
 	self_group = "heroes"
@@ -77,12 +85,47 @@ func _configure() -> void:
 	if aggressive_roam:
 		detect_range *= AGGRESSIVE_DETECT_RANGE_MULT
 
+## -- Clones take no outside help (Designer, 2026-07-26) -----------------------
+## A clone is a snapshot of its caster taken at summon time, and nothing after
+## that should raise it: not Beacon's Rally, not an objective reward, not a
+## future buff source nobody has written yet.
+##
+## Overridden HERE, on the receiving end, rather than filtered at each buff's
+## own loop. Clones sit in the "heroes" group precisely so they taunt, get
+## targeted and are counted like heroes — which means every present and future
+## party-wide effect finds them by default. One no-op per boost is the only
+## version of this rule that a new buff source can't quietly bypass.
+##
+## Deliberately NOT extended to the debuff/hazard side (stun, slow, burn,
+## vulnerability, knockback): those still land, because a decoy that shrugs off
+## crowd control would be strictly better than the hero it is imitating.
+func apply_damage_boost(_duration: float, _mult: float) -> void:
+	pass
+
+func apply_speed_boost(_duration: float, _mult: float) -> void:
+	pass
+
+func apply_atk_speed_boost(_duration: float, _mult: float) -> void:
+	pass
+
+func apply_xp_boost(_duration: float, _mult: float) -> void:
+	pass
+
+func apply_shield(_count: int) -> void:
+	pass
+
 func _sprite_alpha() -> float:
 	return CLONE_SPRITE_ALPHA
 
 func _process(delta: float) -> void:
 	super(delta)
 	if _dying:
+		return
+	# Contact check before the fuse: a clone that something has already walked
+	# into should blow on the body, not wait out the rest of its timer.
+	if explode_on_hit and not _exploded and _enemy_in_contact():
+		_exploded = true
+		_explode()
 		return
 	life_span -= delta
 	if life_span <= 0.0:
@@ -95,6 +138,23 @@ func _process(delta: float) -> void:
 			return
 		_die()
 		return
+
+## True when any live enemy's body is touching this clone's. Lane-filtered like
+## every other enemy-facing scan (_lane_ok), so a clone can't be set off by
+## something in the other lane it could never actually hit.
+##
+## Uses _collision_radius() rather than body_radius on both sides: a unit whose
+## art renders bigger than its hitbox (Hero.SPRITE_SCALE_MULT, and the Dark
+## Mage at 3x) would otherwise have to visibly overlap the clone before this
+## registered as contact.
+func _enemy_in_contact() -> bool:
+	var reach := _collision_radius() + CONTACT_PAD
+	for node in get_tree().get_nodes_in_group(enemy_group):
+		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+			continue
+		if global_position.distance_to(node.global_position) <= reach + node._collision_radius():
+			return true
+	return false
 
 ## Shot art + ensnare-on-hit.
 ##
@@ -126,7 +186,27 @@ func take_damage(amount: float, attacker: Combatant = null) -> void:
 		_exploded = true
 		_explode()
 
+## Blast art (Designer, 2026-07-26). Spawned as a sibling through
+## BattleFX.burst_sprite rather than drawn by this node: _die() runs on the
+## line below, so there is nothing left here to draw it. PAD compensates for
+## the drawing covering about a third of its canvas — see the same pattern in
+## Hero.STOMP_BURST_PAD.
+const EXPLOSION_ART := preload("res://assets/sprites/Volatile_Duplicates_Explosion.png")
+const EXPLOSION_ART_PAD := 3.1
+
+## Detonation SFX (Designer, 2026-07-26). Played per blast, unlike the summon
+## sound's once-per-cast rule: clones detonate independently — one on contact
+## now, another on its fuse a second later — so each is its own event the
+## player needs to hear.
+const EXPLOSION_SOUND: AudioStream = preload("res://assets/Sounds/Clone_Explosion.wav")
+const EXPLOSION_VOLUME_DB := -5.0
+
 func _explode() -> void:
+	BattleSfx.play_clip(self, EXPLOSION_SOUND, 0.0, 0.0, EXPLOSION_VOLUME_DB)
+	# Sized off the REAL explode_radius so the blast art keeps matching the
+	# damage area when boons widen it.
+	BattleFX.burst_sprite(get_parent(), EXPLOSION_ART, global_position,
+			explode_radius * 2.0 * EXPLOSION_ART_PAD)
 	for node in get_tree().get_nodes_in_group(enemy_group):
 		if not is_instance_valid(node) or node._dying:
 			continue

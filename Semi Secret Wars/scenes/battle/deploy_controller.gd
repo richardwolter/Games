@@ -5,14 +5,18 @@ extends Node2D
 ##
 ## Duo-aware (2026-07-20): heroes are placed as two waves — the whole Duo
 ## that deploys first, then the whole other Duo, which arrives
-## `_delay_seconds` later. The player picks BOTH which Duo goes first (SWAP
-## ORDER, locked once placement starts) and how many seconds separate them
-## (the -/+ stepper, live-persisted to GameState.duo_b_delay_seconds so the
-## choice carries into the next run instead of resetting — the point is to
-## let the player experiment across attempts and settle on a timing that
-## reads well against how the fight unfolds). If only one Duo is fielded
-## (the other never got paired at prep), deploy collapses back to a single
-## wave — no swap/timer UI shown.
+## `_delay_seconds` later, set on the -/+ stepper (live-persisted to
+## GameState.duo_b_delay_seconds so the choice carries into the next run
+## instead of resetting — the point is to let the player experiment across
+## attempts and settle on a timing that reads well against how the fight
+## unfolds). 0s means both Duos land together. If only one Duo is fielded (the
+## other never got paired at prep), deploy collapses back to a single wave —
+## no timer UI shown.
+##
+## This phase now runs BEFORE the Ultimate-boon picks (Designer, 2026-07-26):
+## place, set the timing, press START BATTLE, and only then choose boons — with
+## a delayed Duo's pick held until it actually arrives. See
+## BattleManager._on_deploy_chosen / _spawn_second_wave.
 ##
 ## One click per Duo, not per hero (Designer, 2026-07-21: "no need to deploy
 ## each of the Duo's heroes" — pairing is already enforced everywhere else
@@ -43,16 +47,30 @@ var duo_b: Array = []
 ## than a stacked pair.
 const PAIR_OFFSET := 35.0
 
+## Duo A always places first now that the SWAP ORDER button is gone (Designer,
+## 2026-07-26) — placement order expresses the choice, so the toggle was a
+## second control for the same decision. Kept as a constant-in-spirit variable
+## so _ordered_groups keeps reading in the order it always did.
 var _first_is_a := true
 var _delay_seconds: float = 0.0
 ## One click position per placed Duo group (not per hero) — see _placements_for.
 var _placed: Array[Vector2] = []
 var _cursor := Vector2.ZERO
 var _valid := false
-var _hint: Label
 var _start_button: Button
-var _swap_button: Button
 var _delay_label: Label
+var _ui_layer: CanvasLayer
+
+## True once START BATTLE has been pressed. The node deliberately outlives that
+## press (Designer, 2026-07-26): the boon picks come next, and while they're up
+## the placed hero sprites stay on the field marking where everyone will land —
+## so the player chooses upgrades looking at their actual formation instead of
+## an empty lane. Its own UI hides, input stops, and BattleManager frees it
+## through finish() once every wave has really spawned.
+var _committed := false
+## Heroes that have now spawned for real, so their placement marker stops being
+## drawn — the live unit is standing there instead.
+var _spawned_names: Array = []
 
 func _ready() -> void:
 	z_index = 40
@@ -117,8 +135,8 @@ func _flatten(groups: Array, clicks: Array[Vector2]) -> Dictionary:
 
 ## Where the deploy cluster sits in the 1920x1080 design canvas. The top of
 ## the screen is fully occupied by the battle HUD (RunXP/Gold at y10 left,
-## TimerPanel y10 centre, VillainPanel y10 right, BackButton y60, hero panels
-## from y110, and BattleHUD's code-built Duo banners at y96-142) — the deploy
+## TimerPanel y10 centre, VillainPanel y10 right, BackButton/SETTINGS y60, hero
+## panels from y140, and BattleHUD's code-built Duo banners at y96-142) — the deploy
 ## controls used to be drawn as bare text at y24/64/104, straight into that
 ## stack, which is why they were unreadable and got covered (Designer,
 ## 2026-07-25). The bottom band is clear during placement.
@@ -132,6 +150,7 @@ func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = DEPLOY_LAYER
 	add_child(layer)
+	_ui_layer = layer
 
 	# One paper panel for the whole cluster. Bare ink text over the drawn
 	# battlefield was the visibility problem — the notebook panel gives it a
@@ -158,8 +177,14 @@ func _build_ui() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(col)
 
-	_hint = UIStyle.centered_label("", UIStyle.SIZE_BODY)
-	col.add_child(_hint)
+	# The whole explanation of this phase, in one fixed line. The old per-Duo
+	# "DEPLOYMENT — click the band to place X (1st wave, 1/2)" prompt under it
+	# was removed (Designer, 2026-07-26): it restated what the cursor ghost
+	# already shows, and the START BATTLE button enabling is a clearer "you are
+	# done" than a line of text saying so.
+	col.add_child(UIStyle.wrapped_label(
+			"Deploy DUO's on designated lane. You can choose if the 2nd DUO arrives later (0s is immediate deploy).",
+			760.0, UIStyle.SIZE_SMALL))
 
 	# Single-lane levels (a Duo was wiped earlier in the run — see
 	# LaneField.single_lane) play by different rules than the player has been
@@ -176,13 +201,9 @@ func _build_ui() -> void:
 		controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(controls)
 
-		# The timing row runs a step below the rest of the UI (Designer,
-		# 2026-07-26: the panel covers too much of the deploy space) — it's a
-		# dial the player sets once, not something they read at a glance
-		# mid-placement.
-		_swap_button = UIStyle.button("", UIStyle.SIZE_TINY, _on_swap_pressed)
-		controls.add_child(_swap_button)
-
+		# The SWAP ORDER button is gone (Designer, 2026-07-26). Which Duo goes
+		# first is already expressed by the order they're placed in, so the
+		# button was a second control for a choice the player was making anyway.
 		controls.add_child(UIStyle.button("-1s", UIStyle.SIZE_TINY, _on_delay_step.bind(-1.0)))
 
 		_delay_label = UIStyle.label("", UIStyle.SIZE_SMALL, UIStyle.GOLD)
@@ -191,7 +212,6 @@ func _build_ui() -> void:
 
 		controls.add_child(UIStyle.button("+1s", UIStyle.SIZE_TINY, _on_delay_step.bind(1.0)))
 
-		_update_swap_button()
 		_update_delay_label()
 
 	var start_row := CenterContainer.new()
@@ -201,17 +221,6 @@ func _build_ui() -> void:
 	start_row.add_child(_start_button)
 
 	_update_hint()
-
-func _on_swap_pressed() -> void:
-	if not _placed.is_empty():
-		return  # order locks the moment placement starts
-	_first_is_a = not _first_is_a
-	_update_swap_button()
-	_update_hint()
-
-func _update_swap_button() -> void:
-	_swap_button.text = "1ST: DUO A (swap)" if _first_is_a else "1ST: DUO B (swap)"
-	_swap_button.disabled = not _placed.is_empty()
 
 func _on_delay_step(amount: float) -> void:
 	_delay_seconds = clampf(_delay_seconds + amount, GameState.DUO_B_DELAY_MIN, GameState.DUO_B_DELAY_MAX)
@@ -224,37 +233,29 @@ func _update_delay_label() -> void:
 func _all_placed() -> bool:
 	return _placed.size() >= _ordered_groups().size()
 
+## START BATTLE only unlocks once every Duo has a spot. That enable/disable IS
+## the progress readout now that the running "place X next" line is gone.
 func _update_hint() -> void:
 	_start_button.disabled = not _all_placed()
-	var groups := _ordered_groups()
-	if _all_placed():
-		_hint.text = "All heroes placed — press START BATTLE"
-	else:
-		var current: Array = groups[_placed.size()]
-		var label := " + ".join(current)
-		var wave := "1st wave" if _placed.size() < _first_wave_count() else "2nd wave"
-		_hint.text = "DEPLOYMENT — click the band to place %s (%s, %d/%d)" % \
-				[label, wave, _placed.size() + 1, groups.size()]
 
 func _process(_delta: float) -> void:
 	if field == null or not is_instance_valid(field):
 		return
+	if _committed:
+		return  # placement is locked in; only the markers are still drawn
 	_cursor = get_global_mouse_position()
 	_valid = not _all_placed() and field.is_valid_deploy_point(_cursor)
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if field == null or not is_instance_valid(field) or _all_placed():
+	if _committed or field == null or not is_instance_valid(field) or _all_placed():
 		return
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
 		if field.is_valid_deploy_point(world):
 			get_viewport().set_input_as_handled()
-			var was_empty := _placed.is_empty()
 			_placed.append(world)
-			if was_empty and _has_two_waves():
-				_update_swap_button()  # first click locks the swap toggle
 			_update_hint()
 
 func _on_start_pressed() -> void:
@@ -264,6 +265,13 @@ func _on_start_pressed() -> void:
 	var first_count := _first_wave_count()
 	var first := _flatten(groups.slice(0, first_count), _placed.slice(0, first_count))
 	var second := _flatten(groups.slice(first_count, groups.size()), _placed.slice(first_count, _placed.size()))
+	# Hide the panel but stay alive — see _committed. BattleManager spawns the
+	# first wave only after its boon picks resolve and calls finish() when the
+	# last wave has landed.
+	_committed = true
+	if _ui_layer != null:
+		_ui_layer.visible = false
+	queue_redraw()
 	deploy_chosen.emit({
 		"first_names": first.names,
 		"first_positions": first.positions,
@@ -271,6 +279,16 @@ func _on_start_pressed() -> void:
 		"second_positions": second.positions,
 		"delay": _delay_seconds,
 	})
+
+## Stops drawing markers for heroes that have now really spawned.
+func mark_spawned(names: Array) -> void:
+	for n in names:
+		if n not in _spawned_names:
+			_spawned_names.append(n)
+	queue_redraw()
+
+## Called by BattleManager once every wave is on the field.
+func finish() -> void:
 	queue_free()
 
 ## Ghost sprite sizing mirrors Combatant._draw()'s sprite math (hero.tscn's
@@ -291,18 +309,22 @@ const GHOST_SPRITE_SCALE := 1.8
 func _ghost_scale(hero_name: String) -> float:
 	return GHOST_SPRITE_SCALE * float(Hero.SPRITE_SCALE_MULT.get(hero_name, 1.0))
 
+## Art faces left by default (Combatant._draw doc); heroes push right from
+## deploy, so this matches Combatant's moving-right flip rather than drawing
+## the unflipped, left-facing default.
+const GHOST_ART_DIR := -1.0
+
+## Draws a hero exactly as Combatant._draw would: ground shadow first, then the
+## sprite over it, through the same BattleFX helpers the live unit uses. The
+## ONLY thing that may differ is `alpha` — a hero being placed isn't on the
+## field yet, so the cursor ghost stays translucent and pulsing. Everything
+## else (size, flip, shadow shape and offset) is shared code, not a copy of the
+## math, so the preview can't drift from the spawned hero again.
 func _draw_hero_sprite(hero_name: String, pos: Vector2, alpha: float) -> void:
 	var texture := Hero.sprite_for(hero_name)
-	var diameter := GHOST_BODY_RADIUS * 2.0 * _ghost_scale(hero_name)
-	var tex_size := texture.get_size()
-	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
-	var draw_size := tex_size * scale_factor
-	# Art faces left by default (Combatant._draw doc); heroes push right from
-	# deploy, so match Combatant's moving-right flip (Vector2(-1, 1)) instead
-	# of drawing the unflipped, left-facing default.
-	draw_set_transform(pos, 0.0, Vector2(-1.0, 1.0))
-	draw_texture_rect(texture, Rect2(-draw_size * 0.5, draw_size), false, Color(1.0, 1.0, 1.0, alpha))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var scale := _ghost_scale(hero_name)
+	BattleFX.draw_unit_shadow(self, texture, pos, GHOST_BODY_RADIUS, scale, alpha)
+	BattleFX.draw_unit_sprite(self, texture, pos, GHOST_BODY_RADIUS, scale, GHOST_ART_DIR, alpha)
 
 func _draw() -> void:
 	var groups := _ordered_groups()
@@ -313,8 +335,17 @@ func _draw() -> void:
 		var group: Array = groups[i]
 		var positions: Array[Vector2] = _positions_for_group(group, _placed[i])
 		for j in group.size():
-			draw_arc(positions[j], 16.0, 0.0, TAU, 24, Color.BLACK, 2.0, true)
-			_draw_hero_sprite(group[j], positions[j], 0.7)
+			# Once a hero has really spawned its marker goes — the live unit is
+			# standing on that spot now, and two of it would read as a bug.
+			if group[j] in _spawned_names:
+				continue
+			# A placed hero is drawn exactly as it will look once the battle
+			# starts: full opacity, no marker ring under it (Designer,
+			# 2026-07-26). The old translucent-with-a-black-ring treatment made
+			# the committed placement read as a different unit from the one that
+			# then spawned there; the ground shadow is what anchors it now, the
+			# same as every other unit on the field.
+			_draw_hero_sprite(group[j], positions[j], 1.0)
 			if _has_two_waves():
 				var tag := "1ST" if i < first_count else "2ND"
 				var font: Font = UIStyle.font() if UIStyle.font() != null else ThemeDB.fallback_font
@@ -337,12 +368,8 @@ func _draw() -> void:
 		draw_line(_cursor + Vector2(-24, -24), _cursor + Vector2(24, 24), c, 4.0, true)
 		draw_line(_cursor + Vector2(-24, 24), _cursor + Vector2(24, -24), c, 4.0, true)
 	for j in current_group.size():
-		var hero_name: String = current_group[j]
-		var hero_color: Color = GameState.HERO_CATALOG[hero_name].color
-		_draw_hero_sprite(hero_name, current_positions[j], pulse if _valid else pulse * 0.6)
-		var font: Font = UIStyle.font() if UIStyle.font() != null else ThemeDB.fallback_font
-		var size := 26
-		var w := font.get_string_size(hero_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		var at := current_positions[j] + Vector2(-w * 0.5, -48.0)
-		draw_string_outline(font, at, hero_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, Color.BLACK)
-		draw_string(font, at, hero_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, hero_color if _valid else c)
+		# No floating hero name over the ghost: field units carry no name labels
+		# (Combatant._draw, Designer 2026-07-25), and the hint line above already
+		# says which Duo is being placed — so the name only existed here, on the
+		# one unit that isn't real yet.
+		_draw_hero_sprite(current_group[j], current_positions[j], pulse if _valid else pulse * 0.6)

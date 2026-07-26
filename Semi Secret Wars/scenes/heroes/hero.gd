@@ -89,8 +89,12 @@ const STOMP_RADIUS := 70.0
 const STOMP_DAMAGE := 22.0
 const STOMP_KNOCKBACK := 45.0
 ## Ring VFX: how long the expanding-shockwave draw lasts after a landed stomp.
-const STOMP_FLASH_TIME := 0.25
-const STOMP_FLASH_COLOR := Color(1.0, 0.85, 0.3, 0.9)
+## 0.25 -> 0.45 (Designer, 2026-07-26: the burst wasn't registering at all).
+## A quarter second is under a fifth of the time the Stomp's own cooldown gives
+## it, and in a busy swarm fight it passed as a flicker.
+const STOMP_FLASH_TIME := 0.45
+## CANARY, lifted — Thundaar's own accent pigment, drawn over the field.
+const STOMP_FLASH_COLOR := Color(0.94, 0.90, 0.22, 0.9)
 ## Hand-drawn Stomp impact art, drawn by BattleFX.draw_burst in _draw.
 const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle_Color.png")
 ## draw_burst fits the whole texture, and the colored art carries much more
@@ -105,6 +109,19 @@ const SEARING_BURST := preload("res://assets/sprites/Searing_Bind_Color.png")
 ## Padding compensation, same reason as STOMP_BURST_PAD above.
 const SEARING_BURST_PAD := 2.48
 const SEARING_FLASH_TIME := 0.6
+
+## Searing Bind's cast SFX (Designer, 2026-07-26): the 3.551-4.542s slice of a
+## 64.8s source file. The rest of that recording is a low-level sustained
+## sizzle, so the explicit window is what makes this a cast rather than a
+## minute of room tone.
+##
+## No negative volume offset here, unlike every other combat clip: this take
+## measures far quieter than the rest of the SFX set, and trimming it further
+## would put the cast under the fight instead of over it.
+const SEARING_SOUND: AudioStream = preload("res://assets/Sounds/Searing_Burn.wav")
+const SEARING_SOUND_START := 3.551
+const SEARING_SOUND_DURATION := 4.542 - 3.551
+const SEARING_SOUND_VOLUME_DB := 0.0
 ## Bind art size per bound unit, as a multiple of that unit's collision radius
 ## — big enough to wrap the body, small enough that a packed cluster still
 ## reads as several separate binds.
@@ -119,12 +136,53 @@ const SEARING_MARK_SIZE_MULT := 2.6
 ## simultaneous clones. See MAX_CLONE_COUNT below for the fix; duration/
 ## cooldown widened here so casts are rarer but each one is more present.
 const CLONE_SCENE := preload("res://scenes/heroes/hero_clone.tscn")
+
+## Clone art (Designer, 2026-07-26). The plain Clone ability uses the silhouette
+## archer; the ARTEMIS+THUNDAAR Ultimate's clones carry a visible bomb, so a
+## player can tell at a glance which kind is standing in front of them — the two
+## behave completely differently (one taunts, one detonates).
+##
+## Both drawings sit smaller on their shared 936x601 canvas than the hero art
+## does on its own, and draw fits the WHOLE canvas to the unit's size — hence a
+## multiplier on top of the caster's sprite_scale rather than reusing it raw.
+## Clone summon SFX (Designer, 2026-07-26). Played once per CAST, not once per
+## clone — see _play_clone_creation. The source file has dead air either side
+## of the take, hence the explicit slice.
+const CLONE_CREATION_SOUND: AudioStream = preload("res://assets/Sounds/Clone_Creation.wav")
+const CLONE_CREATION_START := 0.635
+const CLONE_CREATION_DURATION := 1.6 - 0.635
+const CLONE_CREATION_VOLUME_DB := -6.0
+
+## Every clone ability summons through here so the sound fires exactly once
+## however many bodies appear (Designer, 2026-07-26). Two clones spawning on
+## the same frame each playing the clip would phase into one louder, muddier
+## sound rather than reading as two summons — and the player already sees the
+## count.
+func _play_clone_creation() -> void:
+	BattleSfx.play_clip(self, CLONE_CREATION_SOUND, CLONE_CREATION_START,
+			CLONE_CREATION_DURATION, CLONE_CREATION_VOLUME_DB)
+
+const CLONE_ART := preload("res://assets/sprites/Artemis_Clone.png")
+const CLONE_ART_SCALE_MULT := 2.1
+const VOLATILE_CLONE_ART := preload("res://assets/sprites/Volatile_Duplicates.png")
+const VOLATILE_CLONE_ART_SCALE_MULT := 1.7
 const CLONE_COOLDOWN := 9.0
 const CLONE_DURATION := 5.0
 const CLONE_TAUNT_RADIUS := 90.0
 ## Spawn offset so the clone appears beside Artemis (toward her facing) instead
 ## of stacked exactly on top of her, where it's indistinguishable at a glance.
+## Now applied around DuoAim's chosen anchor rather than around Artemis herself
+## — see _place_clone.
 const CLONE_SPAWN_OFFSET := 40.0
+## How far from Artemis a clone may be placed when a better spot exists
+## (Designer, 2026-07-26: clones should appear somewhere strategic — near
+## minions, a spawn point or the villain — instead of always at her side).
+##
+## Deliberately shorter than her attack_range: a clone is a decoy that has to
+## pull aggro off HER, so it must land between Artemis and the fight, not
+## teleport across the lane into a pack she was never near. Also bounded by
+## HeroClone's own leash back to its caster.
+const CLONE_SPAWN_RANGE := 220.0
 ## Hard cap on simultaneous clones regardless of source (base 1 + twin_focus
 ## boon + twin_clone mod would otherwise reach 3) — applied where clone_count
 ## is consumed in _try_clone, not at the mod/boon sites, so both are covered
@@ -150,9 +208,18 @@ const ENSNARE_VULN_DMG_ADD := 2.0
 ## a stronger vulnerability add plus a wider root.
 const ENSNARE_PASSIVE_VULN_DMG_ADD := 3.0
 const ENSNARE_PASSIVE_RADIUS_ADD := 25.0
-## Ring VFX reused from Stomp's flash treatment (see _draw).
-const ENSNARE_FLASH_TIME := 0.3
-const ENSNARE_FLASH_COLOR := Color(0.4, 0.85, 0.8, 0.9)
+## Ensnare's ground burst, drawn at the cluster anchor the same way Stomp's is
+## drawn at the caster's feet (Designer, 2026-07-26) — replaces the plain
+## expanding draw_arc this used to be.
+const ENSNARE_BURST := preload("res://assets/sprites/Warden_Ensnare_Circle.png")
+## Padding compensation, same idea as STOMP_BURST_PAD: the drawing covers a bit
+## over half its canvas.
+const ENSNARE_BURST_PAD := 1.8
+const ENSNARE_FLASH_TIME := 0.45
+## FOREST, lifted for visibility over sprites — Ensnare is roots and Warden is
+## drawn in leaf green, so the ring matches what the ability actually is. (Was
+## a teal that existed only because Warden's old identity colour was teal.)
+const ENSNARE_FLASH_COLOR := Color(0.30, 0.76, 0.38, 0.9)
 
 ## BEACON's Rally (Support signature): auto-casts on cooldown, granting every
 ## nearby ally (self included) a timed damage + attack-speed boost. Reuses the
@@ -312,11 +379,15 @@ const RANGED_SUPPORT_TRAIL_DIST := 70.0
 ## Role-identity colors for the battlefield ring + name-tag (see _draw and
 ## the label_text assignment in _configure) — lets a role be read at a
 ## glance without opening a hero panel.
+## Role colours, kept as their own set rather than mirroring HERO_CATALOG: a
+## role is a category a future hero can join, so it must not be locked to one
+## hero's art. All four are still sprite pigments (UIStyle), just assigned by
+## what the role reads as rather than by who currently fills it.
 const ROLE_COLORS := {
-	"TANK": Color("4a86c8"),
-	"BURST": Color("d1495b"),
-	"CONTROL": Color("2fa39b"),
-	"SUPPORT": Color("e0a83e"),
+	"TANK": UIStyle.NAVY,
+	"BURST": UIStyle.CRIMSON,
+	"CONTROL": UIStyle.FOREST,
+	"SUPPORT": UIStyle.GOLD,
 }
 
 ## Target-scoring weights (Hero._target_score). The base score is the raw
@@ -473,6 +544,12 @@ const DEATH_SOUND := preload("res://assets/Sounds/Death_Hero.wav")
 ## the death FX instead of playing noticeably late (Designer, 2026-07-25).
 const DEATH_SOUND_START := 0.55
 
+## BEACON and ARTEMIS use their own death cry instead of the shared one above
+## (Designer, 2026-07-26); THUNDAAR and WARDEN keep DEATH_SOUND. Played from
+## 0.0 — unlike Death_Hero.wav, this clip has no dead air to skip past.
+const FEMALE_DEATH_SOUND: AudioStream = preload("res://assets/Sounds/Female_Defeat.wav")
+const FEMALE_DEATH_HEROES: Array[String] = ["BEACON", "ARTEMIS"]
+
 ## Thundaar's Stomp shout (Designer, 2026-07-25): the source file has other
 ## takes around it, so only the 0.893-2.709 slice is the shout we want — hence
 ## the explicit start + duration rather than playing the whole file. Fires on a
@@ -491,6 +568,52 @@ const STOMP_SHOUT_GAP := 10.0
 ## combat callout, not a one-off event like a hero death.
 const STOMP_SHOUT_VOLUME_DB := -8.0
 
+## The impact itself (Designer, 2026-07-26), separate from the shout above:
+## Thundaar's own Stomp plays it on a 5s gap, and Seismic Advance plays one per
+## landed step (see StompWave).
+##
+## The source file is 8.9s holding FOUR takes; a random one is picked per play
+## so a marching sequence doesn't read as the same sample looped. The take at
+## 5.00-6.25s is deliberately absent from this list — the Designer's shout sits
+## at 5.081-6.181, inside it, so playing that take would fire a vocal in the
+## middle of what should be a pure impact. Starts are the measured onsets of
+## the other three.
+const SEISMIC_POUND_SOUND: AudioStream = preload("res://assets/Sounds/Seismic_Pound.wav")
+const SEISMIC_POUND_STARTS: Array[float] = [0.68, 2.78, 6.98]
+## Each take runs ~1.1s before the next; cut just short of that so one pound
+## never bleeds into the following take in the file.
+const SEISMIC_POUND_DURATION := 1.05
+const SEISMIC_POUND_VOLUME_DB := -6.0
+## Thundaar's SOLO stomp pounds every Nth landed stomp (Designer, 2026-07-26).
+##
+## A COUNT, not a seconds gap like STOMP_SHOUT_GAP: the pound is the hit
+## landing, so it should track the ability's real rhythm rather than wall-clock
+## time. Under a 5s timer, a cooldown-boosted Thundaar stomping every ~2s went
+## quiet for entire stretches of stomping — exactly backwards. Counting instead
+## means the sound stays locked to a fixed share of hits however fast he swings.
+##
+## The shout stays on its own seconds-based gap: that one SHOULD stay sparse
+## regardless of cadence, which is the whole reason the two are separate.
+## Seismic Advance ignores both — every step of the Ultimate pounds.
+const STOMP_POUND_EVERY := 2
+
+## A random usable take's start offset. Static so StompWave can pull from the
+## same three without duplicating the timestamps.
+static func seismic_pound_start() -> float:
+	return SEISMIC_POUND_STARTS[randi() % SEISMIC_POUND_STARTS.size()]
+
+## WARDEN's Ensnare and BEACON's Rally callouts (Designer, 2026-07-26). Same
+## treatment as the Stomp shout above: fires only on a LANDED cast (the `hit`/
+## `buffed` branch), rate-limited on its own timer so cooldown boons can't turn
+## either into a continuous loop, and mixed under the rest for the same reason
+## — they're recurring combat sounds, not one-off events.
+const ENSNARE_SOUND: AudioStream = preload("res://assets/Sounds/Plant_Ensnare.wav")
+const ENSNARE_SOUND_GAP := 6.0
+const ENSNARE_SOUND_VOLUME_DB := -8.0
+const RALLY_SOUND: AudioStream = preload("res://assets/Sounds/RallyAura.wav")
+const RALLY_SOUND_GAP := 9.0
+const RALLY_SOUND_VOLUME_DB := -8.0
+
 ## Fires on every landed melee hit (see Combatant._on_melee_hit doc — ranged
 ## heroes never reach this since they take the projectile branch instead).
 ## One-shot player outlives this call and frees itself, same convention as
@@ -504,7 +627,10 @@ func _on_died() -> void:
 	# frame the results popup pauses the tree — see BattleSfx's doc on why the
 	# player it creates is PROCESS_MODE_ALWAYS (Designer, 2026-07-25: "death
 	# sound flowing to prep menu").
-	BattleSfx.play_clip(self, DEATH_SOUND, DEATH_SOUND_START)
+	if hero_name in FEMALE_DEATH_HEROES:
+		BattleSfx.play_clip(self, FEMALE_DEATH_SOUND)
+	else:
+		BattleSfx.play_clip(self, DEATH_SOUND, DEATH_SOUND_START)
 
 ## Artemis: ranged attacker — fires an arrow (Projectile) instead of melee,
 ## with a much longer attack_range and faster base attack_interval than the
@@ -603,6 +729,13 @@ var _stomp_flash_t := 0.0
 ## Rate limiter for the Stomp shout SFX only — see STOMP_SHOUT_GAP. Separate
 ## from _ability_cd so the ability's cadence and the shout's stay independent.
 var _stomp_shout_cd := 0.0
+## Landed stomps since this hero last pounded — see STOMP_POUND_EVERY. Starts
+## at the threshold so the FIRST stomp of a battle always sounds; a hero whose
+## opening stomp was silent reads as the ability not having a sound at all.
+var _stomps_since_pound := STOMP_POUND_EVERY
+## Same idea for the Ensnare / Rally callouts — see ENSNARE_SOUND_GAP.
+var _ensnare_sound_cd := 0.0
+var _rally_sound_cd := 0.0
 ## Ensnare ring VFX: timer + the world-space cluster anchor it played on (the
 ## root lands around the target, not the caster, so the ring is drawn there).
 var _ensnare_flash_t := 0.0
@@ -685,7 +818,12 @@ var second_ability_cooldown: float:
 
 ## Display name of the hero's primary auto ability (STOMP/CLONE/…) for the HUD.
 func ability_name() -> String:
-	return ABILITY_INFO.get(hero_name, {}).get("name", "ABILITY")
+	return ability_name_for(hero_name)
+
+## Same lookup without needing a live Hero — the deploy-phase card shows each
+## hero's ability before any of them have spawned (HeroPanelUI.set_predeploy).
+static func ability_name_for(hero: String) -> String:
+	return ABILITY_INFO.get(hero, {}).get("name", "ABILITY")
 
 ## Always "" — solo LV20 second abilities were retired for Duo Ultimates
 ## (2026-07-22). Kept as a stub so the HUD's existing has_second gate
@@ -879,6 +1017,8 @@ func _process(delta: float) -> void:
 					global_position = _field.clamp_to_lane(global_position, lane)
 
 	_stomp_shout_cd = maxf(_stomp_shout_cd - delta, 0.0)
+	_ensnare_sound_cd = maxf(_ensnare_sound_cd - delta, 0.0)
+	_rally_sound_cd = maxf(_rally_sound_cd - delta, 0.0)
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
 	_searing_flash_t = maxf(_searing_flash_t - delta, 0.0)
@@ -1558,6 +1698,14 @@ func _try_stomp() -> void:
 		_ability_cd = maxf(cooldown, STOMP_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_stomp_flash_t = STOMP_FLASH_TIME
 		_show_cast_label("STOMP!", STOMP_FLASH_COLOR)
+		# Impact and shout are limited independently — every 2nd stomp vs a 10s
+		# clock — so a stomp can land audibly without dragging the vocal along
+		# with it every time.
+		_stomps_since_pound += 1
+		if _stomps_since_pound >= STOMP_POUND_EVERY:
+			_stomps_since_pound = 0
+			BattleSfx.play_clip(self, SEISMIC_POUND_SOUND, seismic_pound_start(),
+					SEISMIC_POUND_DURATION, SEISMIC_POUND_VOLUME_DB)
 		if _stomp_shout_cd <= 0.0:
 			_stomp_shout_cd = STOMP_SHOUT_GAP
 			BattleSfx.play_clip(self, STOMP_SHOUT_SOUND, STOMP_SHOUT_START,
@@ -1586,6 +1734,10 @@ func _try_ensnare() -> void:
 			var duration := ENSNARE_STUN_DURATION * ensnare_stun_mult
 			node.apply_stun(duration)
 			node.apply_vulnerability(duration, vuln_add)
+			# Roots drawn on the caught unit itself, for exactly as long as the
+			# root lasts — so "which of these is actually held" is readable off
+			# the field instead of only off the stun timer.
+			node.show_ensnare_art(duration)
 			hit = true
 	GameState.record_ability_result(hero_name, hit)
 	if hit:
@@ -1594,6 +1746,9 @@ func _try_ensnare() -> void:
 		_ensnare_flash_t = ENSNARE_FLASH_TIME
 		_ensnare_flash_center = anchor
 		_show_cast_label("ENSNARE!", ENSNARE_FLASH_COLOR)
+		if _ensnare_sound_cd <= 0.0:
+			_ensnare_sound_cd = ENSNARE_SOUND_GAP
+			BattleSfx.play_clip(self, ENSNARE_SOUND, 0.0, 0.0, ENSNARE_SOUND_VOLUME_DB)
 
 ## Rally (BEACON): grants every nearby ally (self included) a timed damage +
 ## attack-speed boost, and (2026-07-24 tier-2 passive) a flat heal. Reuses the
@@ -1613,6 +1768,13 @@ func _try_rally() -> void:
 	for node in get_tree().get_nodes_in_group("heroes"):
 		if not is_instance_valid(node) or node._dying:
 			continue
+		# Clones take no outside help (see HeroClone's no-op boost overrides).
+		# Skipped explicitly rather than relying on those: the passive heal
+		# below writes node.hp directly, and a clone should not soak a Rally
+		# marker either. Also keeps clones out of the `buffed` result, so
+		# Rally's recorded hit-rate reflects real allies helped.
+		if node is HeroClone:
+			continue
 		if node is Hero and not _ally_lane_ok(node as Hero):
 			continue
 		if global_position.distance_to(node.global_position) <= rally_r:
@@ -1628,12 +1790,19 @@ func _try_rally() -> void:
 			node.apply_atk_speed_boost(RALLY_DURATION, atk_mult)
 			if _passive_unlocked:
 				node.hp = minf(node.hp + RALLY_PASSIVE_HEAL, node.max_hp)
+			# Marker over each buffed ally for the buff's own duration — Rally
+			# had no field visual at all before this, so the one ability that
+			# helps the whole party was invisible while it did it.
+			node.show_rally_art(RALLY_DURATION)
 			buffed = true
 	GameState.record_ability_result(hero_name, buffed)
 	if buffed:
 		var cooldown := RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _ability_cooldown_reduction
 		_ability_cd = maxf(cooldown, RALLY_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_show_cast_label("RALLY!", STATUS_BUFF_COLOR)
+		if _rally_sound_cd <= 0.0:
+			_rally_sound_cd = RALLY_SOUND_GAP
+			BattleSfx.play_clip(self, RALLY_SOUND, 0.0, 0.0, RALLY_SOUND_VOLUME_DB)
 
 ## True when the fight within RALLY_RADIUS is worth burning Rally on: a real
 ## cluster (>= RALLY_MIN_ENEMIES live enemies), the villain alerted, or an
@@ -1724,6 +1893,9 @@ func _cast_stomp_wave(pair_id: String, params: Dictionary) -> void:
 	wave.step_stun = _ultimate_param(pair_id, params, "step_stun", 0.8)
 	get_parent().add_child(wave)
 	wave.global_position = global_position
+	# Aim only once the wave is actually AT the cast point — DuoAim scores
+	# directions relative to its origin, and add_child() alone leaves it at 0,0.
+	wave._start()
 
 ## THUNDAAR+WARDEN ("Verdant Path"): a trail of damaging/ensnaring plants —
 ## see scenes/combat/duo/plant_trail.gd for the periodic tick loop.
@@ -1739,25 +1911,35 @@ func _cast_plant_trail(pair_id: String, params: Dictionary) -> void:
 	trail.trail_lifetime = _ultimate_param(pair_id, params, "trail_lifetime", 8.0)
 	get_parent().add_child(trail)
 	trail.global_position = global_position
+	# Same ordering requirement as the stomp wave above — aim from the real
+	# cast point, not from the origin.
+	trail._start()
 
 ## THUNDAAR+ARTEMIS ("Volatile Duplicates"): taunting clones that explode the
 ## instant they're hit — see HeroClone.explode_on_hit. Reuses the normal
 ## Clone ability's own build/place helpers (_build_clone/_place_clone).
 func _cast_exploding_clones(pair_id: String, params: Dictionary) -> void:
 	var count := int(_ultimate_param(pair_id, params, "clone_count", 2))
-	var life_span := _ultimate_param(pair_id, params, "clone_life_span", 6.0)
+	# Fallback fuse, matching the catalog's 2.0 — only used if the params dict
+	# ever arrives without the key.
+	var life_span := _ultimate_param(pair_id, params, "clone_life_span", 2.0)
 	var radius := _ultimate_param(pair_id, params, "explode_radius", 90.0)
 	# Ability-cadence pass (2026-07-24): explode_damage used to be applied raw
 	# (HeroClone._explode -> take_damage), bypassing _duo_damage_mult/
 	# damage_mult() that every other ultimate routes through — fixed here at
 	# the cast site since HeroClone has no caster-independent access to them.
 	var dmg := _ultimate_param(pair_id, params, "explode_damage", 40.0) * _duo_damage_mult * damage_mult()
+	_play_clone_creation()
 	for i in count:
 		var side := 1.0 if i % 2 == 0 else -1.0
 		var clone := _build_clone(side * (1.0 + float(i / 2)), life_span)
 		clone.explode_on_hit = true
 		clone.explode_radius = radius
 		clone.explode_damage = dmg
+		# Bomb-carrying variant, so a volatile clone doesn't look like a plain
+		# taunting one — see CLONE_ART.
+		clone.sprite_texture = VOLATILE_CLONE_ART
+		clone.sprite_scale = sprite_scale * VOLATILE_CLONE_ART_SCALE_MULT
 		_place_clone(clone)
 
 ## ARTEMIS+WARDEN ("Hunting Duplicates"): clones that roam/chase minions and
@@ -1771,6 +1953,7 @@ func _cast_roaming_clones(pair_id: String, params: Dictionary) -> void:
 	# mult'd damage so the roaming hunters actually hit harder than a plain
 	# Clone cast, not just longer-lived.
 	var clone_dmg_mult := _ultimate_param(pair_id, params, "clone_damage_mult", 1.0)
+	_play_clone_creation()
 	for i in count:
 		var side := 1.0 if i % 2 == 0 else -1.0
 		var clone := _build_clone(side * (1.0 + float(i / 2)), life_span)
@@ -1812,6 +1995,11 @@ func _cast_ensnare_burn(pair_id: String, params: Dictionary) -> void:
 	# bypassing _duo_damage_mult/damage_mult() that every other ultimate
 	# routes through (stomp_wave/plant_trail/arrow_barrage all do).
 	var burn_dps := _ultimate_param(pair_id, params, "burn_dps", 4.0) * _duo_damage_mult * damage_mult()
+	# Fires on the cast itself, not per bound target: the bind lands on every
+	# enemy in radius at once (see _searing_flash_marks below), so one sound is
+	# the event — a dozen overlapping copies would just be louder mush.
+	BattleSfx.play_clip(self, SEARING_SOUND, SEARING_SOUND_START,
+			SEARING_SOUND_DURATION, SEARING_SOUND_VOLUME_DB)
 	_searing_flash_marks.clear()
 	for node in get_tree().get_nodes_in_group(enemy_group):
 		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
@@ -1841,10 +2029,60 @@ func apply_permanent_buff(dmg_add: float, atk_reduction: float, hp_add: float) -
 		max_hp += hp_add
 		hp = minf(hp + hp_add, max_hp)
 
-## Draws ability rings on top of the base Combatant art: Stomp's expanding
-## shockwave (caster-centered) and Ensnare's root pulse (drawn at the cluster
-## anchor, converted to this node's local space), each while its flash runs.
+## Hand-drawn impact burst expanding to the real Stomp radius (Designer,
+## 2026-07-25), centred on the hero's FEET rather than his origin — sprites are
+## drawn centred on the origin, which is chest height on a humanoid, so a burst
+## there floated at his waist instead of cratering the ground he just hit.
+## Shares BattleFX's shadow drop, so the burst and the ground shadow sit on the
+## same spot.
+##
+## Sized off (STOMP_RADIUS + stomp_radius_add) so the VFX reads as the true
+## damage area rather than a decoration that drifts once mods widen it.
+func _draw_stomp_burst() -> void:
+	if _stomp_flash_t <= 0.0:
+		return
+	# Opens at 45% rather than from nothing, and fades on a curve rather than
+	# linearly. The old version scaled 0 -> full while alpha went 1 -> 0, which
+	# meant it was invisible at every size worth seeing: full opacity at zero
+	# width, full width at zero opacity.
+	var p := 1.0 - _stomp_flash_t / STOMP_FLASH_TIME
+	var diameter := (STOMP_RADIUS + stomp_radius_add) * 2.0 * STOMP_BURST_PAD * lerpf(0.45, 1.0, p)
+	BattleFX.draw_burst(self, STOMP_BURST, _feet_offset(), diameter, 1.0 - p * p)
+
+## Ensnare's ground burst, at the cluster anchor rather than on the caster —
+## Warden ensnares a pack somewhere out in front of him, so the mark belongs
+## where the roots came up. Same open-big-and-fade curve as the Stomp burst;
+## sized off the true (ENSNARE_RADIUS + ensnare_radius_add) so it keeps
+## matching the real catch area when mods widen it.
+func _draw_ensnare_burst() -> void:
+	if _ensnare_flash_t <= 0.0:
+		return
+	var p := 1.0 - _ensnare_flash_t / ENSNARE_FLASH_TIME
+	var diameter := (ENSNARE_RADIUS + ensnare_radius_add) * 2.0 * ENSNARE_BURST_PAD * lerpf(0.5, 1.0, p)
+	BattleFX.draw_burst(self, ENSNARE_BURST, _ensnare_flash_center - global_position,
+			diameter, 1.0 - p * p)
+
+## The point directly under this unit's drawn feet, in local space — the same
+## place BattleFX puts the ground shadow. Ground-plane only (no -_bob): an
+## effect on the floor must not bounce with the body above it.
+func _feet_offset() -> Vector2:
+	var draw_size := BattleFX.unit_draw_size(sprite_texture, body_radius, sprite_scale)
+	var drop := body_radius if draw_size == Vector2.ZERO \
+			else draw_size.y * BattleFX.SHADOW_DROP_FRACTION
+	return Vector2(_sway, 0.0) + _lunge + Vector2(0.0, drop)
+
+## Draws ability rings on top of the base Combatant art: Ensnare's root pulse
+## (drawn at the cluster anchor, converted to this node's local space) while
+## its flash runs. Stomp's burst is drawn under the hero instead — see
+## _draw_stomp_burst.
 func _draw() -> void:
+	# BEFORE super(), so the hero stands ON the shockwave instead of wearing it:
+	# it's an impact in the dirt under his feet, and drawn after super() the
+	# sprite it's supposed to be beneath was covering it (Designer, 2026-07-26).
+	_draw_stomp_burst()
+	# Ensnare's circle goes under the field too — it's roots erupting from the
+	# ground at the cluster, not a ring hung in the air over it.
+	_draw_ensnare_burst()
 	super()
 	# Duo link line: a faint line connecting live Duo partners so the pairing
 	# — and the cohesion behavior it drives — reads at a glance on the field.
@@ -1854,20 +2092,6 @@ func _draw() -> void:
 		if duo_partner != null:
 			var role_color: Color = ROLE_COLORS.get(role, Color.WHITE)
 			draw_line(Vector2.ZERO, to_local(duo_partner.global_position), Color(role_color, 0.35), 2.0, true)
-	if _stomp_flash_t > 0.0:
-		var p := 1.0 - _stomp_flash_t / STOMP_FLASH_TIME
-		# Hand-drawn impact burst expanding to the real Stomp radius, fading as
-		# it grows (Designer, 2026-07-25) — replaces the plain expanding arc.
-		# Scaled off (STOMP_RADIUS + stomp_radius_add) exactly like that arc
-		# was, so the VFX still reads as the true damage area rather than a
-		# decoration that drifts from it once mods widen the ability.
-		BattleFX.draw_burst(self, STOMP_BURST, Vector2.ZERO,
-				(STOMP_RADIUS + stomp_radius_add) * 2.0 * p * STOMP_BURST_PAD, 1.0 - p)
-	if _ensnare_flash_t > 0.0:
-		var p := 1.0 - _ensnare_flash_t / ENSNARE_FLASH_TIME
-		var ring_color := ENSNARE_FLASH_COLOR
-		ring_color.a *= 1.0 - p
-		draw_arc(_ensnare_flash_center - global_position, (ENSNARE_RADIUS + ensnare_radius_add) * (0.4 + 0.6 * p), 0.0, TAU, 32, ring_color, 4.0, true)
 	if _searing_flash_t > 0.0:
 		# Snaps to full size immediately then fades, unlike the expanding
 		# Stomp burst — the bind lands on each target at once rather than
@@ -1887,6 +2111,7 @@ func _try_clone() -> void:
 	# Hard-capped regardless of how many sources raised clone_count (base 1 +
 	# twin_focus boon + twin_clone mod would otherwise reach 3) — see
 	# MAX_CLONE_COUNT doc.
+	_play_clone_creation()
 	for i in mini(clone_count, MAX_CLONE_COUNT):
 		# Fan multiple clones to alternating sides so they don't stack on one spot.
 		var side := 1.0 if i % 2 == 0 else -1.0
@@ -1938,8 +2163,13 @@ func _build_clone(spread: float, clone_life_span: float) -> HeroClone:
 	clone.knockback_splash_damage = knockback_splash_damage
 	clone.move_speed = move_speed
 	clone.body_radius = body_radius
-	clone.sprite_texture = sprite_texture
-	clone.sprite_scale = sprite_scale
+	# Clones get their OWN art rather than copying the caster's (Designer,
+	# 2026-07-26) — a decoy that is pixel-identical to the hero it's decoying
+	# for is unreadable in a fight. CLONE_ART_SCALE_MULT compensates for the
+	# clone drawing covering roughly half its canvas where the hero art covers
+	# nearly all of its own, so the two end up the same size on screen.
+	clone.sprite_texture = CLONE_ART
+	clone.sprite_scale = sprite_scale * CLONE_ART_SCALE_MULT
 	clone.body_color = body_color
 	clone.is_taunting = true
 	clone.taunt_radius = CLONE_TAUNT_RADIUS
@@ -1955,7 +2185,19 @@ func _build_clone(spread: float, clone_life_span: float) -> HeroClone:
 ## clone spawn path (_spawn_clone and the Duo Ultimate clone effects).
 func _place_clone(clone: HeroClone) -> void:
 	get_parent().add_child(clone)
-	var spawn_pos: Vector2 = global_position + clone.follow_offset
+	# Anchor where the clone is actually worth standing rather than beside the
+	# caster (Designer, 2026-07-26). Every clone ability routes through here —
+	# plain Clone, Volatile Duplicates and Hunting Duplicates — so all three
+	# inherit this. The clone's own follow_offset is still added on top, which
+	# is what keeps a pair of clones fanned apart instead of stacked on one
+	# spot: DuoAim picks WHERE the group goes, the offset spreads its members.
+	# Scored against the radius THIS clone actually acts over: a taunting decoy
+	# wants bodies inside its taunt radius, an exploding one wants them inside
+	# its blast. Reading it off the clone keeps the three variants honest
+	# instead of scoring them all as if they were the plain one.
+	var presence := maxf(clone.taunt_radius, clone.explode_radius)
+	var anchor := DuoAim.best_spot(self, global_position, CLONE_SPAWN_RANGE, presence)
+	var spawn_pos: Vector2 = anchor + clone.follow_offset
 	if lane != "" and _field != null:
 		spawn_pos = _field.clamp_to_lane(spawn_pos, lane)
 	clone.global_position = spawn_pos

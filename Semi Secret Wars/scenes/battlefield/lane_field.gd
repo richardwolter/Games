@@ -228,9 +228,13 @@ func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
 			return
 
 @export_group("Notebook Page")
-@export var page_color := Color("f4efe1")
-@export var rule_color := Color("aac4dd")
-@export var margin_color := Color("d98f8f")
+## Page/rule/margin come straight from UIStyle rather than restating the hex
+## here — these were three literals that had to be kept in sync with the menu
+## screens by hand, and the notebook only works if the battlefield page and the
+## prep page are the same sheet of paper.
+@export var page_color := UIStyle.PAGE_SOLID
+@export var rule_color := UIStyle.RULE
+@export var margin_color := UIStyle.MARGIN
 @export var rule_spacing := 40.0
 ## Extra page margin beyond the field. Sized to comfortably cover the
 ## deploy-phase camera (which recenters on hero_spawn, near the field's
@@ -251,11 +255,16 @@ func unregister_dynamic_obstacle(pos: Vector2, radius: float) -> void:
 ## else stays transparent-with-ink-outline so the page shows through; the lake
 ## is a hazard that costs HP on entry, so it earns a colour the eye catches.
 ## Translucent, so the ruled page still reads underneath like a wash of ink.
-@export var lake_color := Color(0.42, 0.16, 0.55, 0.34)
+## Purple because it's toxic, and specifically UIStyle.VIOLET because that is
+## the pigment the enemy art is drawn in — the lake belongs to the enemy side
+## of the palette, and now says so.
+@export var lake_color := Color(UIStyle.VIOLET, 0.34)
 ## Outline + hatching for the lake, a darker/stronger version of the fill so
 ## the shape still reads as hand-inked rather than a flat digital blob.
-@export var lake_ink_color := Color(0.30, 0.08, 0.42)
-@export var outline_color := Color("161412")
+@export var lake_ink_color := UIStyle.VIOLET.darkened(0.45)
+## The pen every field shape is inked with — the sprites' own linework pigment,
+## a touch deeper than UI ink so field outlines hold up against the page.
+@export var outline_color := UIStyle.SOOT.darkened(0.15)
 @export var outline_width := 4.0
 
 @export_group("Border Decor")
@@ -323,6 +332,8 @@ func _ready() -> void:
 		# still empty.
 		single_lane = RunState.duo_wiped()
 	default_hero_spawn = hero_spawn
+	# One roll per battlefield load — see _marks_seed.
+	_marks_seed = randi()
 	_build_border_band()
 	queue_redraw()
 
@@ -840,6 +851,15 @@ func _draw() -> void:
 			_draw_obstacle_sprite(Vector2(s.x, s.y), s.z, spike_texture)
 	_draw_lair()
 
+## Reseeded every time a battlefield loads, so each level reads as a different
+## page out of the same notebook (Designer, 2026-07-26 — the menu's marks are
+## deliberately fixed, this one is deliberately not). Stored rather than rolled
+## inside _draw because _draw re-runs constantly; a fresh roll per frame would
+## make the scribbles crawl.
+var _marks_seed := 0
+## Preloaded by path, not by class_name — see PrepPage.PageMarksLib for why.
+const PageMarksLib := preload("res://scripts/page_marks.gd")
+
 func _draw_page() -> void:
 	var half := field_radius + page_margin
 	var rect := Rect2(-half, half * 2.0)
@@ -847,6 +867,16 @@ func _draw_page() -> void:
 	_draw_ruled_lines(rect, rect, rule_color, 1.5)
 	var mx := rect.position.x + 56.0
 	draw_line(Vector2(mx, rect.position.y), Vector2(mx, rect.end.y), margin_color, 2.0, true)
+	# Scribbles/stains/smudges over the rules but under everything else, so the
+	# page reads as used without ever sitting on top of a unit or a prop. No
+	# keep-out: unlike the menus there is no text to protect here.
+	#
+	# Density scales with page AREA — the lane is several times the size of a
+	# menu screen, and PageMarks' counts are authored per 1920x1080 page, so a
+	# flat count would leave a big field looking untouched.
+	var page_area := rect.size.x * rect.size.y
+	var density := clampf(page_area / (1920.0 * 1080.0), 1.0, 6.0)
+	PageMarksLib.draw_marks(self, rect, _marks_seed, 1.0, density)
 
 ## Draws ruled-notebook horizontal lines clipped to `rect`, phased from
 ## `page_rect`'s own grid (not `rect`'s position) so the pattern lines up
@@ -904,10 +934,11 @@ func _draw_deploy_band() -> void:
 	var rect := Rect2(
 		Vector2(deploy_band_x_min, -lane_half_height),
 		Vector2(deploy_band_x_max - deploy_band_x_min, lane_half_height * 2.0))
-	draw_rect(rect, Color(0.353, 0.659, 0.353, 0.12), true)
+	# FOREST: the friendly end of the palette, opposite the lake's enemy violet.
+	draw_rect(rect, Color(UIStyle.FOREST, 0.12), true)
 	draw_line(Vector2(deploy_band_x_max, -lane_half_height),
 			Vector2(deploy_band_x_max, lane_half_height),
-			Color(0.30, 0.55, 0.30, 0.7), 3.0, true)
+			Color(UIStyle.FOREST, 0.7), 3.0, true)
 	_draw_label(Vector2((deploy_band_x_min + deploy_band_x_max) * 0.5, -lane_half_height + 30.0), "DEPLOY")
 	_draw_lane_divider()
 
@@ -956,7 +987,8 @@ func _draw_lair() -> void:
 	# leave the lair's blocker invisible, since the obstacle loop draws nothing
 	# for a kind whose texture is null.
 	if _obstacle_texture(_lair_kind()) == null:
-		draw_arc(lair_pos, LAIR_RADIUS, 0.0, TAU, 28, Color(0.55, 0.2, 0.55, 0.9), 4.0, true)
+		# The lair is the villain's, so it wears the enemy pigment.
+		draw_arc(lair_pos, LAIR_RADIUS, 0.0, TAU, 28, Color(UIStyle.VIOLET, 0.9), 4.0, true)
 
 ## Border decor is no longer drawn here — see get_top_band()/get_left_band()/
 ## get_right_band()/get_bottom_band()/get_scatter()/get_border_decor_entries()

@@ -30,5 +30,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius, Color(0.3, 0.6, 0.9, 0.18))
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 32, Color(0.3, 0.6, 0.9, 0.5), 2.0, true)
+	# A villain ability, so it reads in the enemy pigment rather than the blue
+	# it used to share with friendly UI accents.
+	draw_circle(Vector2.ZERO, radius, Color(UIStyle.VIOLET, 0.18))
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 32, Color(UIStyle.VIOLET, 0.5), 2.0, true)

@@ -65,6 +65,36 @@ const SCENERY := [
 	# happened here", which is the whole point of the pass.
 	{"tex": TEX_SPACESHIP, "pos": Vector2(0.140, 0.995), "height": 150.0, "flip": false},
 	{"tex": TEX_MUSHROOM, "pos": Vector2(0.820, 0.99), "height": 50.0, "flip": true},
+
+	# -- Second pass (Designer, 2026-07-26: "spread more assets ... without
+	# interfering") -------------------------------------------------------
+	# Everything below still respects the 0.20..0.80 keep-out. The margins had
+	# gaps at the top and between the existing clusters, which read as two
+	# decorated strips rather than a page that continues past the UI.
+	#
+	# TOP band: the previous layout started at y 0.30, leaving the upper page
+	# bare behind the logo/title row. These fill it at small sizes so they read
+	# as distance rather than crowding the heading.
+	{"tex": TEX_MUSHROOM, "pos": Vector2(0.045, 0.12), "height": 44.0, "flip": true},
+	{"tex": TEX_ROCK_2, "pos": Vector2(0.165, 0.16), "height": 52.0, "flip": false},
+	{"tex": TEX_PLANT, "pos": Vector2(0.100, 0.21), "height": 70.0, "flip": false},
+	{"tex": TEX_ROCK_1, "pos": Vector2(0.925, 0.13), "height": 58.0, "flip": true},
+	{"tex": TEX_ALIEN_TREE_THIN, "pos": Vector2(0.835, 0.22), "height": 150.0, "flip": false},
+	{"tex": TEX_MUSHROOM, "pos": Vector2(0.975, 0.24), "height": 40.0, "flip": false},
+	# Filling the left strip's gaps.
+	{"tex": TEX_SWORD, "pos": Vector2(0.175, 0.55), "height": 95.0, "flip": true},
+	{"tex": TEX_ROCK_2, "pos": Vector2(0.020, 0.68), "height": 48.0, "flip": false},
+	{"tex": TEX_MUSHROOM, "pos": Vector2(0.155, 0.77), "height": 46.0, "flip": true},
+	{"tex": TEX_PLANT, "pos": Vector2(0.085, 0.72), "height": 66.0, "flip": true},
+	# Filling the right strip's gaps.
+	{"tex": TEX_ROCK_1, "pos": Vector2(0.815, 0.38), "height": 54.0, "flip": false},
+	{"tex": TEX_MUSHROOM, "pos": Vector2(0.980, 0.54), "height": 42.0, "flip": true},
+	{"tex": TEX_ROCK_2, "pos": Vector2(0.830, 0.80), "height": 60.0, "flip": true},
+	{"tex": TEX_PLANT, "pos": Vector2(0.955, 0.88), "height": 72.0, "flip": false},
+	# Bottom edge, outside the column.
+	{"tex": TEX_ROCK_1, "pos": Vector2(0.055, 0.97), "height": 50.0, "flip": true},
+	{"tex": TEX_SWORD, "pos": Vector2(0.755, 0.995), "height": 88.0, "flip": true},
+	{"tex": TEX_ROCK_2, "pos": Vector2(0.960, 0.99), "height": 46.0, "flip": false},
 ]
 
 ## Props sit slightly back from the UI — they're set dressing, not content, and
@@ -74,7 +104,10 @@ const SCENERY_ALPHA := 0.85
 # -- Bloodstains --------------------------------------------------------------
 
 ## Same ink-on-paper colour BloodLayer bakes onto the battlefield.
-const STAIN_COLOR := Color(0.42, 0.03, 0.03)
+## UIStyle.CRIMSON (the staff-gem red) at half value — written out as a literal
+## because a const initializer can't call .darkened(). Same colour BloodLayer
+## bakes onto the battlefield; keep the two in step by hand if CRIMSON moves.
+const STAIN_COLOR := Color("600c0c")
 
 ## Normalised stain centres with a design-pixel radius each. Kept to the
 ## margins for the same reason as the scenery, except the two faint ones under
@@ -83,7 +116,10 @@ const STAIN_COLOR := Color(0.42, 0.03, 0.03)
 ## was laid over it, which is exactly the intent.
 const STAINS := [
 	{"pos": Vector2(0.085, 0.20), "radius": 34.0, "alpha": 0.30},
-	{"pos": Vector2(0.155, 0.55), "radius": 22.0, "alpha": 0.24},
+	# The stain that used to sit at (0.155, 0.55) is gone (Designer,
+	# 2026-07-26): the Duo Pairings help text moved into that band when the
+	# pairing panel became three columns, and the blot sat directly behind the
+	# words. Stains are page dressing — text wins.
 	{"pos": Vector2(0.045, 0.72), "radius": 40.0, "alpha": 0.28},
 	{"pos": Vector2(0.925, 0.22), "radius": 28.0, "alpha": 0.26},
 	{"pos": Vector2(0.845, 0.68), "radius": 36.0, "alpha": 0.30},
@@ -97,6 +133,22 @@ const STAINS := [
 ## again on every resize, so the blot lobes/speckles must come out identical
 ## each time — re-seeding per draw is what keeps them stable.
 const STAIN_SEED := 20260725
+## Separate seed for the PageMarks pass, so tuning one set of marks doesn't
+## reshuffle the bloodstains that were already signed off.
+const MARKS_SEED := 20260726
+
+## Preloaded by PATH rather than referenced by its `class_name`: a brand-new
+## script isn't in Godot's global class cache until the editor rescans, so
+## `PageMarks.draw_marks(...)` fails to parse on a fresh checkout (or on the
+## first run after the file is added) with "Identifier not declared". preload
+## resolves at compile time from the path and never has that gap.
+const PageMarksLib := preload("res://scripts/page_marks.gd")
+
+## The horizontal band the centred UI column occupies on every menu screen.
+## Named constants now that both the prop layout and the scribble keep-out read
+## them — see SCENERY's doc for where 0.20..0.80 comes from.
+const UI_COLUMN_MIN_X := 0.20
+const UI_COLUMN_MAX_X := 0.80
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,11 +164,24 @@ func _draw() -> void:
 	var mx := size.x * 0.08
 	draw_line(Vector2(mx, 0), Vector2(mx, size.y), MARGIN_COLOR, 2.0, true)
 
-	# Order matters: stains soak into the paper (over the rules, under the
-	# props), props stand on top of them, UI draws over everything as a
+	# Order matters: marks and stains soak into the paper (over the rules, under
+	# the props), props stand on top of them, UI draws over everything as a
 	# sibling added after this node.
+	#
+	# FIXED seed for the menus — a notebook doesn't rearrange its own scribbles
+	# between visits, and _draw re-runs on every resize, so a random seed would
+	# make the marks crawl whenever the window changed. The battlefield passes a
+	# fresh one instead; see PageMarks.
+	PageMarksLib.draw_marks(self, rect, MARKS_SEED, _art_scale(), 1.0, _ui_keep_out())
 	_draw_stains()
 	_draw_scenery()
+
+## The centre band the UI column occupies — scribbles and smudges stay out of
+## it for the same reason SCENERY does: this page sits behind text that has to
+## stay readable. Same 0.20..0.80 measurement the prop layout uses.
+func _ui_keep_out() -> Rect2:
+	return Rect2(Vector2(size.x * UI_COLUMN_MIN_X, 0.0),
+			Vector2(size.x * (UI_COLUMN_MAX_X - UI_COLUMN_MIN_X), size.y))
 
 ## Uniform scale from the 1920x1080 design canvas, so prop heights and stain
 ## radii shrink together with the page instead of one drifting from the other.

@@ -51,11 +51,6 @@ var _buff_duration := 0.0
 ## every frame so the player can watch the timer against the live fight.
 var _duo_b_label: Label
 
-## Named Duo synergy banner — one per Duo, shown while that Duo has at least
-## one live spawned hero. Built in code like _duo_b_label (no .tscn node for
-## it); purely presentational (see DuoSynergies), no gameplay effect of its own.
-var _duo_synergy_labels: Array[Label] = []
-
 ## Duo Ultimate activation bar (2026-07-22) — the "DUO Cards UI" ACTIVATE
 ## buttons live on. Built in code like _duo_b_label; see duo_ultimate_bar.gd.
 var _duo_ultimate_bar: DuoUltimateBar
@@ -73,6 +68,11 @@ func _ready() -> void:
 	_buff_panel = get_node(buff_panel_path)
 	_buff_label = get_node(buff_label_path)
 	var back_btn: Button = get_node(back_button_path)
+	# Authored in battlefield.tscn rather than built by UIStyle.button, so the
+	# click sound and hover wiggle both have to be added by hand here. The sound
+	# goes on before _on_back_pressed for the connection-order reason in
+	# UIStyle.add_click_sound's doc.
+	UIStyle.add_click_sound(back_btn)
 	back_btn.pressed.connect(_on_back_pressed)
 	# Clickable at ANY point in the battle (Designer, 2026-07-26). The tree
 	# pauses for a level-up/boon pick and for the confirm prompt itself, and a
@@ -81,24 +81,75 @@ func _ready() -> void:
 	# button needs to stay live.
 	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	UIStyle.add_hover_wiggle(back_btn)
+	_build_settings_button(back_btn)
+	_emphasize_resource_panels()
 	_build_duo_b_label()
-	_build_duo_synergy_labels()
 	_build_duo_ultimate_bar()
+
+## Gold and XP are the two numbers a run is actually played for, and they were
+## reading as ordinary HUD text (Designer, 2026-07-26). Both get an accent
+## border and a size step up, matching the emphasis the prep menu gives the
+## same two values. Applied in code rather than in battlefield.tscn so the
+## treatment stays defined in one place alongside the prep-menu version.
+func _emphasize_resource_panels() -> void:
+	_style_resource_panel(_gold_label, UIStyle.GOLD)
+	_style_resource_panel(_run_xp_label, UIStyle.INFO)
+
+func _style_resource_panel(label: Label, accent: Color) -> void:
+	if label == null:
+		return
+	label.add_theme_font_size_override("font_size", UIStyle.SIZE_SUBHEAD)
+	label.add_theme_color_override("font_color", accent)
+	var panel := label.get_parent() as PanelContainer
+	if panel != null:
+		panel.add_theme_stylebox_override("panel", UIStyle.card(accent, 10))
+
+## ABANDON RUN + SETTINGS, both moved to the TOP-RIGHT corner (Designer,
+## 2026-07-26). They used to sit top-left where they crowded the hero panels
+## and the deploy band; the right edge below the villain panel is otherwise
+## empty and reads as the "menu" corner.
+##
+## SETTINGS is built here rather than authored into battlefield.tscn so both
+## buttons' layout lives in one place. Both anchor to the top-right and grow
+## leftward, so neither depends on the design canvas width being 1920.
+const MENU_BUTTON_WIDTH := 214.0
+const MENU_BUTTON_HEIGHT := 56.0
+const MENU_BUTTON_MARGIN := 16.0
+## Clear of the villain HP panel, which occupies the top-right down to ~y90.
+const MENU_BUTTON_TOP := 100.0
+
+func _build_settings_button(back_btn: Button) -> void:
+	_place_menu_button(back_btn, 0)
+	var btn := UIStyle.button("SETTINGS", UIStyle.SIZE_SMALL, _on_settings_pressed)
+	# Reachable during a level-up pick, which pauses the tree — same reason the
+	# abandon button opts out of pausing.
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(btn)
+	_place_menu_button(btn, 1)
+
+## Pins a menu button to the top-right corner, `row` steps down from the top.
+func _place_menu_button(btn: Control, row: int) -> void:
+	btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	btn.offset_right = -MENU_BUTTON_MARGIN
+	btn.offset_left = btn.offset_right - MENU_BUTTON_WIDTH
+	btn.offset_top = MENU_BUTTON_TOP + float(row) * (MENU_BUTTON_HEIGHT + 8.0)
+	btn.offset_bottom = btn.offset_top + MENU_BUTTON_HEIGHT
+
+func _on_settings_pressed() -> void:
+	SettingsPanel.toggle(self)
+
+## Escape opens/closes Settings mid-battle. SettingsPanel consumes Escape while
+## it's up (so the key closes it rather than re-firing this), and ConfirmPanel
+## does the same for the BACK TO MENU prompt.
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_on_settings_pressed()
 
 func _build_duo_ultimate_bar() -> void:
 	_duo_ultimate_bar = DuoUltimateBar.new()
 	add_child(_duo_ultimate_bar)
 	_duo_ultimate_bar.build_cards()
-
-func _build_duo_synergy_labels() -> void:
-	for i in 2:
-		var label := UIStyle.label("", UIStyle.SIZE_SMALL, UIStyle.INFO)
-		label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-		label.position.y = 120.0 + i * 22.0
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.visible = false
-		add_child(label)
-		_duo_synergy_labels.append(label)
 
 func _build_duo_b_label() -> void:
 	_duo_b_label = UIStyle.label("", UIStyle.SIZE_SUBHEAD, UIStyle.DUO_A)
@@ -118,6 +169,10 @@ func _on_back_pressed() -> void:
 			"ABANDON", _leave_to_prep)
 
 func _leave_to_prep() -> void:
+	# Abandoning is one of the run-ending outcomes, so the resumable save goes
+	# with it — otherwise CONTINUE would offer to resume the run the player just
+	# chose to throw away. start_run() clears the file itself (see RunState).
+	RunState.start_run()
 	# Unpause first: a prompt answered while a boon pick had the tree paused
 	# would otherwise carry that pause into the prep menu, freezing it.
 	get_tree().paused = false
@@ -132,34 +187,8 @@ func _process(delta: float) -> void:
 	_update_timer(delta)
 	_update_objective_buff(delta)
 	_update_duo_b_countdown()
-	_update_duo_synergy_labels()
 	_duo_ultimate_bar.refresh()
 
-## Shows each Duo's named synergy banner while that Duo has at least one
-## live hero on the field — reads GameState.duo_pairings (persistent Duo
-## identity) rather than deriving pairs from who's alive, so a Duo with one
-## fallen member still shows its name as long as its partner fights on.
-func _update_duo_synergy_labels() -> void:
-	var alive_names: Array = []
-	for h in get_tree().get_nodes_in_group("heroes"):
-		if h is Hero:
-			alive_names.append(h.hero_name)
-	var duos: Array = GameState.duo_pairings
-	for i in _duo_synergy_labels.size():
-		var label := _duo_synergy_labels[i]
-		if i >= duos.size() or not (duos[i] is Array) or (duos[i] as Array).size() != 2:
-			label.visible = false
-			continue
-		var duo: Array = duos[i]
-		if duo[0] not in alive_names and duo[1] not in alive_names:
-			label.visible = false
-			continue
-		var d := DuoSynergies.def_for_heroes(duo[0], duo[1])
-		if d.is_empty():
-			label.visible = false
-			continue
-		label.text = "DUO %s: %s" % ["A" if i == 0 else "B", d.get("name", "")]
-		label.visible = true
 
 func _update_duo_b_countdown() -> void:
 	var bm := get_tree().get_first_node_in_group("battle_manager")
@@ -296,6 +325,16 @@ func _update_hero_panels() -> void:
 			# that actually changes mid-battle, not a persistent one that never did.
 			panel.update_display(hero_name, RunState.level_of(hero_name), h.hp, h.max_hp, h.ability_cooldown, h.ability_cooldown_max(), h.active_buffs(), h.current_intent(), h.ability_name(), h.second_ability_name(), h.second_ability_cooldown, h.second_ability_cooldown_max(), GameState.hero_kills_run(hero_name), GameState.hero_xp_run(hero_name), GameState.hero_ability_pct_run(hero_name))
 			panel.set_focused(followed == h)
+		elif bm != null and bm.has_method("is_deploy_phase") and bm.is_deploy_phase():
+			# Nobody has spawned yet — show the card the player will be looking
+			# at all battle rather than a row of DOWN panels (Designer,
+			# 2026-07-26).
+			panel.set_predeploy(hero_name, RunState.level_of(hero_name),
+					RunState.carried_fraction(hero_name),
+					Hero.ability_name_for(hero_name),
+					GameState.hero_kills_run(hero_name), GameState.hero_xp_run(hero_name),
+					GameState.hero_ability_pct_run(hero_name))
+			panel.set_focused(false)
 		elif bm != null and bm.has_method("is_hero_incoming") and bm.is_hero_incoming(hero_name):
 			panel.set_incoming(bm.duo_b_seconds_remaining())
 			panel.set_focused(false)

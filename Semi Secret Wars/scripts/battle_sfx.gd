@@ -28,6 +28,10 @@ static func _make_player(caller: Node, stream: AudioStream, volume_db := 0.0) ->
 	var player := AudioStreamPlayer.new()
 	player.stream = stream
 	player.volume_db = volume_db
+	# Everything routed through here is an effect, so the Effects slider owns it
+	# (AudioSettings creates the bus at boot). Per-clip volume_db above is a mix
+	# offset on top of that, not a replacement for it.
+	player.bus = AudioSettings.BUS_SFX
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	caller.get_tree().root.add_child(player)
 	return player
@@ -37,15 +41,19 @@ static func _make_player(caller: Node, stream: AudioStream, volume_db := 0.0) ->
 ## only a slice of the source file is the sound we want — e.g. a shout that
 ## sits between two timestamps in a longer recording. `volume_db` is an offset
 ## from the file's own level (0 = as recorded, negative = quieter).
+## Returns the player so a caller that owns a LONG clip can stop it early —
+## see BattleManager's end-of-level stingers, which must not outlive the
+## results screen. Most callers ignore the return: a short one-shot frees
+## itself on `finished` and there is nothing to hold onto.
 static func play_clip(caller: Node, stream: AudioStream, start := 0.0, duration := 0.0,
-		volume_db := 0.0) -> void:
+		volume_db := 0.0) -> AudioStreamPlayer:
 	var player := _make_player(caller, stream, volume_db)
 	if player == null:
-		return
+		return null
 	player.play(start)
 	if duration <= 0.0:
 		player.finished.connect(player.queue_free)
-		return
+		return player
 	# Freed on the timer rather than on `finished`, since we're cutting the clip
 	# short — `finished` would only fire at the end of the whole file.
 	var t := caller.get_tree().create_timer(duration)
@@ -53,6 +61,7 @@ static func play_clip(caller: Node, stream: AudioStream, start := 0.0, duration 
 		if is_instance_valid(player):
 			player.stop()
 			player.queue_free())
+	return player
 
 ## Plays the whole of `stream` `times` times back to back (each repeat starts
 ## when the previous one ends, so this stretches over `times` * clip length).

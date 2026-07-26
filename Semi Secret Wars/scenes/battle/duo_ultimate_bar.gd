@@ -4,7 +4,7 @@ extends VBoxContainer
 ## pairing (GameState.duo_pairings), each showing that Duo's exclusive
 ## Ultimate name and an ACTIVATE button — the "DUO Cards UI" the manual
 ## Ultimate activation is triggered from. Built once by BattleHUD (in code,
-## like the existing _duo_b_label/_duo_synergy_labels — no separate .tscn
+## like the existing _duo_b_label — no separate .tscn
 ## needed for a plain code-built VBoxContainer); refreshed every frame
 ## (BattleHUD._process -> refresh()) to grey out/relabel a card once that
 ## Duo's Ultimate has been used this level (BattleManager.is_ultimate_used)

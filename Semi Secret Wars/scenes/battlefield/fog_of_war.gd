@@ -21,7 +21,9 @@ extends Node2D
 ## Explored-grid cell size in world px. Low res + linear filtering gives the
 ## soft hand-drawn fog edge; smaller cells cost more per reveal stamp.
 @export var cell_size := 32.0
-@export var fog_color := Color(0.36, 0.35, 0.33)
+## Pencil-shading grey over the unexplored page — the sprites' own ink pigment
+## lightened, so the fog reads as graphite laid over paper.
+@export var fog_color := UIStyle.SOOT.lightened(0.28)
 ## Fog opacity over unexplored ground. battlefield.tscn sets this to 1.0 —
 ## fully opaque, so obstacles/spawn points/scenery stay completely hidden
 ## until a hero has actually been there, not just dimly visible through the

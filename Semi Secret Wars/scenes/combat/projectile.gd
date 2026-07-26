@@ -85,6 +85,7 @@ func _process(delta: float) -> void:
 func _play_hit_sound() -> void:
 	var player := AudioStreamPlayer.new()
 	player.stream = HIT_SOUND
+	player.bus = AudioSettings.BUS_SFX
 	# Same root-persists-across-pause bug as Hero._on_died — see its doc.
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().root.add_child(player)

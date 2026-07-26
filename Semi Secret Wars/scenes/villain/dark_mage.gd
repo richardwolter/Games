@@ -62,6 +62,16 @@ const PROJECTILE_SCENE_PATH := "res://scenes/combat/projectile.tscn"
 ## Stage 1 villain art (Designer, 2026-07-25).
 const SPRITE := preload("res://assets/sprites/DarkMage_Color.png")
 
+## Blink sting (Designer, 2026-07-26): plays once when the party first wakes
+## him, then on every teleport after that. No rate limiter here, unlike the
+## hero ability callouts — teleport_interval already floors the cadence at 5s
+## and isn't reduced by anything, so the clip can't stack on itself.
+const TELEPORT_SOUND: AudioStream = preload("res://assets/Sounds/Dark_Mage_Teleport.ogg")
+## Louder than the hero ability callouts at -8 (Designer, 2026-07-26): those
+## are the party's own recurring chatter, this is the villain relocating behind
+## you and needs to cut through the fight.
+const TELEPORT_SOUND_VOLUME_DB := -2.0
+
 var _flee_cd := 0.0
 var _teleport_cd := 0.0
 var _shoot_cd := 0.0
@@ -71,6 +81,8 @@ var _projectile_scene: PackedScene = null
 ## anchors here. LaneField.villain_pos tracks his LIVE position, so we can't
 ## read it later as the lair.
 var _lair := Vector2.ZERO
+## Latches on the first _villain_process tick — see _villain_process.
+var _played_alert_sound := false
 
 func _configure() -> void:
 	super()
@@ -85,6 +97,16 @@ func _configure() -> void:
 	_projectile_scene = load(PROJECTILE_SCENE_PATH)
 
 func _villain_process(delta: float) -> void:
+	# Villain._process gates this method on is_alerted(), which latches, so the
+	# very first tick here IS the moment the party first detects him — no extra
+	# proximity check needed. (is_alerted also latches on being struck, so a
+	# ranged poke that wakes him from off-screen counts as the encounter too.)
+	# Can't collide with the teleport sound below: _teleport_cd starts at a full
+	# teleport_interval and only ticks down while alerted.
+	if not _played_alert_sound:
+		_played_alert_sound = true
+		BattleSfx.play_clip(self, TELEPORT_SOUND, 0.0, 0.0, TELEPORT_SOUND_VOLUME_DB)
+
 	_teleport_cd -= delta
 	if _teleport_cd <= 0.0:
 		_teleport_cd = teleport_interval
@@ -130,6 +152,7 @@ func _teleport_and_summon() -> void:
 	if _field == null:
 		return
 	var dest := _find_teleport_spot()
+	BattleSfx.play_clip(self, TELEPORT_SOUND, 0.0, 0.0, TELEPORT_SOUND_VOLUME_DB)
 	global_position = dest
 	goal = Vector2.INF
 	_summon_minions(dest)

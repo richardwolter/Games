@@ -65,32 +65,12 @@ func show_results(win: bool, currency_awarded: int = 0, next_level: int = 0) -> 
 		if gained > 0 or RunState.is_selected(hero_name):
 			var tag := "  (fallen)" if RunState.is_dead(hero_name) else ""
 			lines += "%s  +%d XP%s\n" % [hero_name, gained, tag]
-	# Boons are per-DUO now, not per-hero (2026-07-25 — the per-hero pool was
-	# removed), so they're summarised by pairing underneath the XP lines
-	# instead of as a count on each hero's row.
-	var duo_lines := _duo_boon_lines()
-	if duo_lines != "":
-		lines += "\n" + duo_lines
+	# The picked-boons summary that used to sit under the XP lines is gone
+	# (Designer, 2026-07-26): by the results screen the run is over or rolling
+	# on, and a list of what you already chose is a recap nobody acts on.
 	_lines.text = lines.strip_edges()
 	_footer.text = "Press R for LEVEL %d" % next_level if advancing else "Press R to return to preparation"
 	visible = true
-
-## One line per Duo that picked at least one Ultimate boon this run, naming the
-## boons rather than just counting them — with only one pick per Duo per level
-## the list stays short, and the names are what the player actually chose.
-func _duo_boon_lines() -> String:
-	var out := ""
-	for pair_id in RunState.duo_boons:
-		var picked: Array = RunState.duo_boons[pair_id]
-		if picked.is_empty():
-			continue
-		var names: Array[String] = []
-		for id in picked:
-			names.append(String(DuoUltimateBoons.def(id).get("name", id)))
-		var ult: String = DuoUltimates.def(pair_id).get("name", "Ultimate")
-		out += "%s — %s: %s\n" % [
-			" + ".join(String(pair_id).split("|")), ult, ", ".join(names)]
-	return out
 
 func _label(text: String, size: int) -> Label:
 	return UIStyle.label(text, size)
