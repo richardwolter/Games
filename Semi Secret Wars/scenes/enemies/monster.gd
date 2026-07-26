@@ -26,7 +26,7 @@ extends Combatant
 ## Spawning (chance, level, timing) lives in BattleManager — see MONSTER_CHANCE.
 ## First-pass stats are tuned in monster.tscn and flagged in BALANCE.md.
 
-const SPRITE := preload("res://assets/sprites/Monster1.png")
+const SPRITE := preload("res://assets/sprites/Monster1_Color.png")
 
 ## Seconds of rampage before it flees. Designer-specified.
 const RAMPAGE_DURATION := 10.0
@@ -52,7 +52,8 @@ func _configure() -> void:
 	add_to_group("hostiles")
 	enemy_group = TARGETABLE_GROUP
 	sprite_texture = SPRITE
-	sprite_scale = 2.4
+	# 2.4 x1.38 padding compensation for the colored art (2026-07-25).
+	sprite_scale = 3.31
 
 func _process(delta: float) -> void:
 	if _dying:

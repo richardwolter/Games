@@ -6,7 +6,7 @@
 script = ExtResource("1_layout")
 level_id = "lane_1"
 lane_length = 6000.0
-lane_half_height = 450.0
+lane_half_height = 400.0
 deploy_band_x_min = -2900.0
 deploy_band_x_max = -2300.0
 villain_lair = Vector2(2700, 0)

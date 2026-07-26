@@ -96,9 +96,21 @@ func _process(delta: float) -> void:
 		_die()
 		return
 
-## Ensnare-on-hit (ARTEMIS+WARDEN): every shot this clone fires also roots
-## its victim — see Combatant._fire_projectile / Projectile.on_hit_stun.
+## Shot art + ensnare-on-hit.
+##
+## A clone already copies its caster's stats, sprite and projectile_scene, but
+## NOT the caster's shot art — so a roaming clone fired Projectile's plain
+## line+circle placeholder while the real Artemis beside it fired arrows
+## (Designer, 2026-07-25). Delegating to the caster's own
+## Hero._configure_projectile fixes that at the source: the clone shoots
+## whatever its caster shoots, and a future hero with different shot art needs
+## no change here.
+##
+## Ensnare (ARTEMIS+WARDEN) is applied after, so it stacks on top of the art —
+## see Combatant._fire_projectile / Projectile.on_hit_stun.
 func _configure_projectile(proj: Projectile) -> void:
+	if caster != null and is_instance_valid(caster) and caster is Hero:
+		(caster as Hero)._configure_projectile(proj)
 	if ensnare_on_hit:
 		proj.on_hit_stun = ensnare_stun_duration
 

@@ -278,8 +278,15 @@ func _on_villain_died(_who: Combatant) -> void:
 	_villain_dead = true
 	_check_win()
 
+## The villain alone decides the level (Designer, 2026-07-25). Clearing every
+## spawn point used to be a second requirement, which meant a party that killed
+## the villain still had to go mop up gates before the level would end.
+##
+## _points_cleared is still tracked, just no longer part of this condition —
+## destroying gates keeps paying its career stat and gold (see
+## LaneSpawner._on_point_died), it simply isn't mandatory anymore.
 func _check_win() -> void:
-	if not _over and _villain_dead and _points_cleared:
+	if not _over and _villain_dead:
 		_end(true)
 
 func _process(delta: float) -> void:

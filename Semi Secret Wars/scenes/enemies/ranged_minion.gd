@@ -17,7 +17,7 @@ const PROJECTILE_SPRITE_BY_LEVEL: Dictionary = {
 ## so the syringe-carrying minion is the only one that fires (Designer,
 ## 2026-07-25). Levels without an entry keep whatever the base picked.
 const SPRITE_BY_LEVEL: Dictionary = {
-	2: preload("res://assets/sprites/Minion2_Berserk.png"),
+	2: preload("res://assets/sprites/Minion2_Berserk_Color.png"),
 }
 
 const PROJECTILE_SPRITE_LENGTH := 30.0
@@ -41,6 +41,12 @@ func _configure() -> void:
 	var own_sprite = SPRITE_BY_LEVEL.get(RunState.current_level, null)
 	if own_sprite != null:
 		sprite_texture = own_sprite
+		# Minion.SPRITE_SCALE_BY_LEVEL already folds in the padding
+		# compensation for the SMALL berserk minion's colored art (x1.38).
+		# This unit's own art needs x1.56, so correct for the difference
+		# rather than re-deriving the whole scale — otherwise the needle man
+		# would draw ~11% small relative to the swarm he spawns with.
+		sprite_scale *= 1.13
 
 func _configure_projectile(proj: Projectile) -> void:
 	var tex = PROJECTILE_SPRITE_BY_LEVEL.get(RunState.current_level, null)

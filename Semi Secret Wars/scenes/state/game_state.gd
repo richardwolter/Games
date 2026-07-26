@@ -14,6 +14,9 @@ extends Node
 
 const SAVE_PATH := "user://save.json"
 const PREP_MENU := "res://scenes/prep/prep_menu.tscn"
+## project.godot's run/main_scene — kept here too so the prep menu and the
+## battle HUD can route BACK to it without hardcoding the path twice.
+const TITLE_SCREEN := "res://scenes/title/title_screen.tscn"
 const BATTLEFIELD := "res://scenes/battlefield/battlefield.tscn"
 const FOG_DIR := "user://fog"
 
@@ -36,9 +39,15 @@ const KILL_ASSIST_SHARE := 0.5
 ## between all heroes"). v7 = Duo system (duo_pairings added — see
 ## duo_of/set_duo_pairings). v8 = per-hero lifetime stat tracking (hero_stats:
 ## kills/xp/ability hit-rate — display-only, not spendable currency, separate
-## from the shared banked_xp pool). Any save below this is discarded on load —
-## a clean break the Designer approved rather than migrating old data forward.
-const SAVE_VERSION := 8
+## from the shared banked_xp pool). v9 = skill trees (skill_ranks +
+## duo_ultimate_ranks replace the three flat purchase lists).
+##
+## v9 is the FIRST version that migrates instead of wiping: a v8 save loads and
+## has its ability purchases converted to tree ranks (Designer, 2026-07-26 —
+## see _migrate_purchases_to_tree). MIN_LOADABLE_VERSION is the real discard
+## floor; anything below it is still a clean break.
+const SAVE_VERSION := 9
+const MIN_LOADABLE_VERSION := 8
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
 const HERO_CATALOG := {
@@ -77,6 +86,18 @@ var owned_ability_tiers: Array = []
 ## are never applied to a Hero instance — they're summed at cast time by
 ## Hero._ultimate_param via duo_mod_total. See has_duo_mod/buy_duo_mod.
 var owned_duo_ultimate_mods: Array = []
+
+## SKILL TREE ranks (2026-07-26) — the gold shop's live data. Everything above
+## (owned_mods / owned_ability_tiers / owned_duo_ultimate_mods) is now LEGACY:
+## still loaded and still saved so an old save can be re-read, but converted
+## once by _migrate_purchases_to_tree and never priced or applied again.
+##
+## hero_name -> {node_id: int rank}. Signature-ability nodes only.
+var skill_ranks: Dictionary = {}
+## pair_id -> int rank, for the 4-rank Ultimate nodes. Keyed by PAIR, not hero,
+## because both heroes' trees show the same node and it must not be buyable
+## twice (see SkillTree.ULTIMATE_RANKS).
+var duo_ultimate_ranks: Dictionary = {}
 ## Heroes currently available for the party/draft. Starts with the full
 ## roster unlocked (Designer, 2026-07-20: need all 4 heroes day-one to test
 ## the Duo system — both pairing combinations and staggered deploy need 4
@@ -253,51 +274,130 @@ func gold_for_run(win: bool, levels_cleared: int) -> int:
 	var payout := GOLD_PER_LEVEL * maxi(levels_cleared, 0) + (GOLD_WIN_BONUS if win else 0)
 	return maxi(payout, GOLD_MIN)
 
-func has_mod(id: String) -> bool:
-	return id in owned_mods
+# has_mod/buy_mod, has_duo_mod/buy_duo_mod and duo_mod_total were removed
+# 2026-07-26 with the flat shop they served. Deleted rather than left dormant:
+# a second live purchase path would spend the same gold into owned_mods, where
+# the skill tree would never show it and _apply_skill_tree would never apply
+# it. The owned_* arrays themselves survive as migration input only — see
+# _migrate_purchases_to_tree. Their replacements: buy_skill_rank,
+# skill_rank/skill_unlocked, skill_total and duo_ultimate_total.
 
-## Buys a permanent ability mod if affordable and not already owned. Returns
-## true on success. Saves immediately.
-func buy_mod(id: String) -> bool:
-	if id in owned_mods:
+## -- Skill tree ----------------------------------------------------------------
+
+## Ranks owned of `id`. Ultimate nodes ignore `hero_name` — their ranks are
+## per-PAIR and shared by both trees that show them.
+func skill_rank(hero_name: String, id: String) -> int:
+	if SkillTree.def(id).get("ultimate", false):
+		return int(duo_ultimate_ranks.get(id, 0))
+	return int(skill_ranks.get(hero_name, {}).get(id, 0))
+
+## True when every prerequisite node of `id` has at least one rank. Ultimate
+## nodes have no prerequisites (SkillTree._ultimate_def) — they're gated by
+## price, not position.
+func skill_unlocked(hero_name: String, id: String) -> bool:
+	for req in SkillTree.def(id).get("requires", []):
+		if skill_rank(hero_name, req) <= 0:
+			return false
+	return true
+
+## Buys one rank of `id` for `hero_name` if it's unlocked, not maxed and
+## affordable. Returns true on success. Saves immediately — a deliberate,
+## infrequent player action, same as the buy_* calls it replaces.
+func buy_skill_rank(hero_name: String, id: String) -> bool:
+	var d := SkillTree.def(id)
+	if d.is_empty() or not skill_unlocked(hero_name, id):
 		return false
-	var cost := int(AbilityMods.def(id).get("cost", 0))
-	if AbilityMods.def(id).is_empty() or gold < cost:
+	var rank := skill_rank(hero_name, id)
+	var cost := SkillTree.cost_for(id, rank)
+	if cost < 0 or gold < cost:
 		return false
 	gold -= cost
-	owned_mods.append(id)
+	if d.get("ultimate", false):
+		duo_ultimate_ranks[id] = rank + 1
+	else:
+		if not skill_ranks.has(hero_name):
+			skill_ranks[hero_name] = {}
+		skill_ranks[hero_name][id] = rank + 1
 	save_game()
 	return true
 
-func has_duo_mod(id: String) -> bool:
-	return id in owned_duo_ultimate_mods
-
-## Buys a permanent Duo Ultimate upgrade if affordable and not already owned.
-## Returns true on success. Saves immediately. Mirrors buy_mod — the only
-## difference is which catalog prices it and which owned-list it lands in.
-func buy_duo_mod(id: String) -> bool:
-	if id in owned_duo_ultimate_mods:
-		return false
-	var d := DuoUltimateMods.def(id)
-	var cost := int(d.get("cost", 0))
-	if d.is_empty() or gold < cost:
-		return false
-	gold -= cost
-	owned_duo_ultimate_mods.append(id)
-	save_game()
-	return true
-
-## Sum of `value` across every OWNED DuoUltimateMods entry for `pair_id` whose
-## `kind` matches — the permanent counterpart to RunState.duo_boon_total, and
-## read by the same caller (Hero._ultimate_param) on top of the same base
-## params. Never touches the base catalog.
-func duo_mod_total(pair_id: String, kind: String) -> float:
+## Total effect of `kind` across every ranked signature node on this hero's
+## tree — `value * rank`, summed. A node can carry a SECOND effect via
+## kind_b/value_b (the capstones), counted here too. Read once at spawn by
+## Hero._apply_skill_tree.
+func skill_total(hero_name: String, kind: String) -> float:
 	var total := 0.0
-	for id in owned_duo_ultimate_mods:
-		var d := DuoUltimateMods.def(id)
-		if d.get("duo", "") == pair_id and d.get("kind", "") == kind:
-			total += float(d.get("value", 0.0))
+	for id in skill_ranks.get(hero_name, {}):
+		var d := SkillTree.def(id)
+		var rank: float = float(skill_ranks[hero_name][id])
+		if d.get("kind", "") == kind:
+			total += float(d.get("value", 0.0)) * rank
+		if d.get("kind_b", "") == kind:
+			total += float(d.get("value_b", 0.0)) * rank
 	return total
+
+## Permanent Ultimate upgrade total for a pair — the skill-tree replacement for
+## duo_mod_total, read by Hero._ultimate_param on top of the base params and
+## this run's boons. `value * rank`, so a maxed 4-rank node is 4x the old
+## buy-once mod.
+func duo_ultimate_total(pair_id: String, kind: String) -> float:
+	var rank := int(duo_ultimate_ranks.get(pair_id, 0))
+	if rank <= 0:
+		return 0.0
+	var d := SkillTree.def(pair_id)
+	if d.get("kind", "") != kind:
+		return 0.0
+	return float(d.get("value", 0.0)) * float(rank)
+
+## One-time conversion of a pre-skill-tree save's purchases into equivalent
+## ranks (Designer, 2026-07-26: nobody loses power or gold). Runs on load and
+## is idempotent — it only ever RAISES a rank to the level the old purchase
+## bought, so re-running it can't stack.
+##
+## The legacy lists are deliberately left intact rather than cleared: they cost
+## nothing to keep, and they're the only record of what a player owned if this
+## mapping ever needs revisiting.
+const LEGACY_MOD_TO_NODE := {
+	# Old flat mod -> the node ranks reproducing its effect. Stomp radius +45
+	# was one purchase; the tree sells it as 3 ranks of +15.
+	"seismic_stomp": {"node": "thundaar_reach_1", "rank": 3},
+	"rolling_quake": {"node": "thundaar_recover_1", "rank": 3},
+	"twin_clone": {"node": "artemis_count_1", "rank": 1},
+	"fleetfoot": {"node": "artemis_recover_1", "rank": 3},
+	"wide_snare": {"node": "warden_reach_1", "rank": 3},
+	"rapid_snare": {"node": "warden_recover_1", "rank": 3},
+	"mass_rally": {"node": "beacon_reach_1", "rank": 3},
+	"quick_rally": {"node": "beacon_recover_1", "rank": 3},
+}
+const LEGACY_TIER_TO_NODE := {
+	"THUNDAAR_2": "thundaar_passive",
+	"ARTEMIS_2": "artemis_passive",
+	"WARDEN_2": "warden_passive",
+	"BEACON_2": "beacon_passive",
+}
+
+func _migrate_purchases_to_tree() -> void:
+	for mod_id in owned_mods:
+		var m: Dictionary = LEGACY_MOD_TO_NODE.get(mod_id, {})
+		if m.is_empty():
+			continue
+		var hero: String = SkillTree.def(m["node"]).get("hero", "")
+		_raise_rank(hero, m["node"], int(m["rank"]))
+	for tier_id in owned_ability_tiers:
+		var node: String = LEGACY_TIER_TO_NODE.get(tier_id, "")
+		if node != "":
+			_raise_rank(SkillTree.def(node).get("hero", ""), node, 1)
+	# A bought-once Duo mod becomes rank 1 of its 4-rank Ultimate node.
+	for pair_id in owned_duo_ultimate_mods:
+		if int(duo_ultimate_ranks.get(pair_id, 0)) < 1:
+			duo_ultimate_ranks[pair_id] = 1
+
+func _raise_rank(hero_name: String, id: String, rank: int) -> void:
+	if hero_name == "":
+		return
+	if not skill_ranks.has(hero_name):
+		skill_ranks[hero_name] = {}
+	skill_ranks[hero_name][id] = maxi(int(skill_ranks[hero_name].get(id, 0)), rank)
 
 func is_hero_unlocked(hero_name: String) -> bool:
 	return hero_name in unlocked_heroes
@@ -344,30 +444,18 @@ func _check_achievements() -> void:
 ## -- Ability tiers -------------------------------------------------------------
 
 ## Tier 1 (the signature ability — Stomp/Clone/Ensnare/Rally) is free the
-## moment a hero is unlocked; tiers 2-3 are gold-gated (AbilityTiers catalog).
+## moment a hero is unlocked; tier 2 is now the tree's PASSIVE node rather than an
+## AbilityTiers purchase (2026-07-26). Kept as a function because Hero and the
+## tier-2 effect sites all ask this question — only what answers it moved.
 func has_tier(hero_name: String, tier: int) -> bool:
 	if tier <= 1:
 		return true
-	return "%s_%d" % [hero_name, tier] in owned_ability_tiers
+	if tier > 2:
+		return false
+	return skill_rank(hero_name, "%s_passive" % hero_name.to_lower()) > 0
 
-## Buys an ability tier if affordable, not already owned, and its prerequisite
-## (the previous tier) is owned. Returns true on success. Saves immediately —
-## a deliberate, infrequent player action, same as buy_mod.
-func buy_tier(id: String) -> bool:
-	if id in owned_ability_tiers:
-		return false
-	var d := AbilityTiers.def(id)
-	if d.is_empty():
-		return false
-	if not AbilityTiers.prereq_met(id):
-		return false
-	var cost := int(d.get("cost", 0))
-	if gold < cost:
-		return false
-	gold -= cost
-	owned_ability_tiers.append(id)
-	save_game()
-	return true
+# buy_tier was removed 2026-07-26 for the same reason as buy_mod above: the
+# passive is now a tree node, bought through buy_skill_rank.
 
 ## -- Raw stat upgrades ---------------------------------------------------------
 
@@ -460,6 +548,8 @@ func save_game() -> void:
 			"duo_pairings": duo_pairings,
 			"duo_b_delay_seconds": duo_b_delay_seconds,
 			"hero_stats": hero_stats,
+			"skill_ranks": skill_ranks,
+			"duo_ultimate_ranks": duo_ultimate_ranks,
 		}))
 
 func load_game() -> void:
@@ -471,7 +561,7 @@ func load_game() -> void:
 	var data: Variant = JSON.parse_string(f.get_as_text())
 	if not (data is Dictionary):
 		return
-	if int(data.get("version", 1)) < SAVE_VERSION:
+	if int(data.get("version", 1)) < MIN_LOADABLE_VERSION:
 		# Pre-v3 save (the old persistent stat grind): a clean break, not a
 		# migration — Designer-approved wipe (see DECISIONS.md). Leave every
 		# var at its fresh-start default.
@@ -490,6 +580,12 @@ func load_game() -> void:
 	duo_pairings = data.get("duo_pairings", [])
 	duo_b_delay_seconds = float(data.get("duo_b_delay_seconds", DUO_B_DELAY_DEFAULT))
 	hero_stats = data.get("hero_stats", {})
+	skill_ranks = data.get("skill_ranks", {})
+	duo_ultimate_ranks = data.get("duo_ultimate_ranks", {})
+	# A v8 save has no tree at all; a v9 save has one and this is a no-op
+	# (_raise_rank only ever raises). Runs unconditionally so the mapping also
+	# repairs a save written between a partial migration and now.
+	_migrate_purchases_to_tree()
 
 ## Resets the in-memory persistent vars to fresh-start defaults WITHOUT deleting
 ## the save file.
@@ -502,6 +598,8 @@ func _reset_state_defaults() -> void:
 	owned_mods = []
 	owned_ability_tiers = []
 	owned_duo_ultimate_mods = []
+	skill_ranks = {}
+	duo_ultimate_ranks = {}
 	banked_xp = 0
 	stat_purchases = {}
 	duo_pairings = []

@@ -6,10 +6,17 @@ extends Villain
 ## hero with a charge/recovery cycle: charges 3s (pursues + attacks), then recovers 1.5s
 ## (stays put, can still attack). This creates rhythm to the fight and makes him a
 ## mechanical threat, not just a DPS check. Damage is high but attack interval is long.
+##
+## Stat pass 2026-07-25 (Designer: tankier, harder-hitting, faster — see
+## berserker.tscn for the numbers and reasoning). The charge/recover rhythm is
+## what keeps him fair at these stats: he now moves faster than the heroes do,
+## so recovery windows are the ONLY time a hurt hero can open distance. Tune
+## recover_duration before touching move_speed if he ends up feeling
+## inescapable.
 
 ## Hand-drawn villain art (Designer, 2026-07-25), same papercut treatment as
 ## DarkMage1 — see Hero.HERO_SPRITES for the pipeline note.
-const SPRITE := preload("res://assets/sprites/Berserk_Villain.png")
+const SPRITE := preload("res://assets/sprites/Berserk_Villain_Color.png")
 
 @export var charge_duration := 3.0
 @export var recover_duration := 1.5
@@ -25,7 +32,9 @@ func _configure() -> void:
 	super()
 	enemy_group = "heroes"
 	sprite_texture = SPRITE
-	sprite_scale = 2.6
+	# 2.6 x1.49 padding compensation for the colored art (2026-07-25) — see
+	# Hero.SPRITE_SCALE_MULT. Keeps him the size he already was on screen.
+	sprite_scale = 3.87
 	# This art is drawn facing right, unlike every other unit in the game
 	# (Designer, 2026-07-25) — see Combatant.sprite_faces_right.
 	sprite_faces_right = true

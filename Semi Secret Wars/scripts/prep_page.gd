@@ -24,15 +24,15 @@ const RULE_SPACING := 42.0
 
 # -- Scenery ------------------------------------------------------------------
 
-const TEX_ROCK_1 := preload("res://assets/sprites/Rock-1.png")
-const TEX_ROCK_2 := preload("res://assets/sprites/Rock-2.png")
-const TEX_TREE_BUSHY := preload("res://assets/sprites/Tree-Bushy.png")
-const TEX_ALIEN_TREE := preload("res://assets/sprites/Alien-Tree.png")
-const TEX_ALIEN_TREE_THIN := preload("res://assets/sprites/Alien-Tree-Thin.png")
-const TEX_PLANT := preload("res://assets/sprites/Plant.png")
-const TEX_MUSHROOM := preload("res://assets/sprites/Mushroom.png")
-const TEX_SWORD := preload("res://assets/sprites/Sword-In-Ground.png")
-const TEX_SPACESHIP := preload("res://assets/sprites/Destroyed-Spaceship.png")
+const TEX_ROCK_1 := preload("res://assets/sprites/Rock-1_Color.png")
+const TEX_ROCK_2 := preload("res://assets/sprites/Rock-2_Color.png")
+const TEX_TREE_BUSHY := preload("res://assets/sprites/Tree-Bushy_Color.png")
+const TEX_ALIEN_TREE := preload("res://assets/sprites/Alien-Tree_Color.png")
+const TEX_ALIEN_TREE_THIN := preload("res://assets/sprites/Alien-Tree-Thin_Color.png")
+const TEX_PLANT := preload("res://assets/sprites/Plant_Color.png")
+const TEX_MUSHROOM := preload("res://assets/sprites/Mushroom_Color.png")
+const TEX_SWORD := preload("res://assets/sprites/Sword_Ground_Color.png")
+const TEX_SPACESHIP := preload("res://assets/sprites/Destroyed-Spaceship_Color.png")
 
 ## Hand-placed props, NOT scattered randomly — the page has to stay readable
 ## behind a centred UI column, and a random scatter would sooner or later put
@@ -134,7 +134,12 @@ func _draw_scenery() -> void:
 		if tex_size.y <= 0.0:
 			continue
 		var base: Vector2 = (prop["pos"] as Vector2) * size
-		var height: float = float(prop["height"]) * s
+		# The authored heights above assume the drawing fills its texture. The
+		# colored art (2026-07-25) carries transparent margin, so each prop's
+		# height is compensated by the same measured factors the battlefield
+		# uses — otherwise the same rock reads at two different sizes between
+		# the prep page and the lane.
+		var height: float = float(prop["height"]) * s * LaneField.art_pad_height(tex)
 		var draw_size := Vector2(tex_size.x * (height / tex_size.y), height)
 		var r := Rect2(base - Vector2(draw_size.x * 0.5, draw_size.y), draw_size)
 		if prop["flip"]:

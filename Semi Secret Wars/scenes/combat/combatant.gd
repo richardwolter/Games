@@ -42,6 +42,14 @@ signal died(who: Combatant)
 @export var projectile_speed := 500.0
 ## Max travel distance before an unfired-at-nothing projectile vanishes (miss).
 @export var projectile_range := 600.0
+## Per-unit overrides of the shared kiting rule below (see
+## RANGED_STANDOFF_FRACTION). A lower standoff fraction means the unit tolerates
+## an enemy getting closer before it backs off; a kite_speed_mult below 1.0
+## means it retreats slower than it advances, so a hero can actually run it down
+## (Designer, 2026-07-25: the syringe minion was kiting too hard to kill).
+## Negative standoff (< 0) uses the shared constant.
+@export var ranged_standoff_fraction := -1.0
+@export var kite_speed_mult := 1.0
 
 @export_group("Visual")
 @export var sprite_texture: Texture2D = null
@@ -106,6 +114,11 @@ const SPRITE_ALPHA := 0.92
 ## copy of its caster). Defaults to the shared paper-cutout alpha above.
 func _sprite_alpha() -> float:
 	return SPRITE_ALPHA
+
+## The kiting trigger distance for this unit, as a fraction of attack_range —
+## the per-unit ranged_standoff_fraction when set, otherwise the shared default.
+func _standoff_fraction() -> float:
+	return ranged_standoff_fraction if ranged_standoff_fraction >= 0.0 else RANGED_STANDOFF_FRACTION
 ## Group containing EVERY Combatant on both sides — see _ready.
 const TARGETABLE_GROUP := "targetable"
 ## Extra breathing room beyond the two bodies' radii before separation kicks in.
@@ -121,6 +134,13 @@ var label_text := ""
 const GOAL_REACHED_DIST := 14.0
 
 var hp := 0.0
+## Stage-level stat scaling, applied in _ready AFTER _configure() so it
+## composes on top of any per-variant tuning a subclass does there (e.g.
+## Minion.VARIANT_OVERRIDES). Set by the spawner BEFORE add_child(), same
+## contract as setup(). Lets one shared unit scene (ranged_minion.tscn is used
+## by stages 2 and 3 alike) be tuned per stage without forking the scene.
+var stat_hp_mult := 1.0
+var stat_damage_mult := 1.0
 ## Where this unit is heading when not fighting. Vector2.INF = no goal (idle).
 var goal := Vector2.INF
 
@@ -275,6 +295,8 @@ func _on_goal_reached() -> void:
 func _ready() -> void:
 	_field = get_tree().get_first_node_in_group("field")
 	_configure()
+	max_hp *= stat_hp_mult
+	damage *= stat_damage_mult
 	hp = max_hp
 	if self_group != "":
 		add_to_group(self_group)
@@ -713,7 +735,7 @@ func _engage(delta: float) -> void:
 	elif dist > attack_range:
 		global_position += _steer(to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
 		_walking_this_frame = true
-	elif is_ranged and not _target.is_pinned and dist < attack_range * RANGED_STANDOFF_FRACTION:
+	elif is_ranged and not _target.is_pinned and dist < attack_range * _standoff_fraction():
 		# Kite: keep shooting (below) while backing off, rather than freezing
 		# in place and letting the enemy close to melee range regardless.
 		# Excludes pinned targets (e.g. LaneSpawnPoint, is_pinned=true, never
@@ -721,7 +743,7 @@ func _engage(delta: float) -> void:
 		# just re-triggers the dist > attack_range approach every other cycle,
 		# and steer_around's obstacle avoidance turns that oscillation into a
 		# slow orbit around the structure instead of a stable stand-off.
-		global_position += _steer(-to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
+		global_position += _steer(-to_target.normalized(), delta) * move_speed * kite_speed_mult * _effective_move_mult() * delta
 		_walking_this_frame = true
 	if dist <= attack_range and _attack_cd <= 0.0:
 		_lunge = to_target.normalized() * LUNGE_DIST

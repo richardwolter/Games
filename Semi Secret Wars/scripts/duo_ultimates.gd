@@ -55,7 +55,11 @@ const CATALOG := {
 		"desc": "Lay a trail of plants down the lane that damage and ensnare minions & villains.",
 		"kind": "plant_trail",
 		"params": {
-			"plant_count": 5, "plant_spacing": 60.0, "plant_radius": 50.0,
+			# plant_radius 50 -> 75: the plants got 1.5x bigger art AND hitbox
+			# (Designer, 2026-07-25). Spacing is unchanged, so adjacent plants
+			# now overlap — the trail bites as a continuous strip rather than
+			# five separate pockets.
+			"plant_count": 5, "plant_spacing": 60.0, "plant_radius": 75.0,
 			"tick_damage": 16.0, "tick_interval": 1.0,
 			"ensnare_duration": 1.0, "trail_lifetime": 8.0,
 		},
@@ -80,6 +84,11 @@ const CATALOG := {
 		"params": {
 			"arrow_count": 6, "chain_count": 2, "chain_damage_mult": 0.5,
 			"range": 260.0, "arrow_damage": 55.0,
+			# The barrage fires waves across `duration` instead of resolving
+			# instantly (Designer, 2026-07-25). arrow_damage is the TOTAL per
+			# arrow across the whole barrage — ArrowBarrage divides it by the
+			# wave count — so this stays balance-neutral.
+			"duration": 10.0, "wave_interval": 0.5,
 		},
 		"buff": {"atk_reduction": 0.3, "dmg_add": 2.0},
 	},

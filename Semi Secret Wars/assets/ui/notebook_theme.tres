@@ -135,22 +135,22 @@ corner_radius_bottom_left = 10
 
 [resource]
 default_font = ExtResource("1_font")
-default_font_size = 24
+default_font_size = 27
 Button/colors/font_color = Color(0.172549, 0.172549, 0.172549, 1)
 Button/colors/font_hover_color = Color(0.172549, 0.172549, 0.172549, 1)
 Button/colors/font_pressed_color = Color(0.172549, 0.172549, 0.172549, 1)
 Button/colors/font_focus_color = Color(0.172549, 0.172549, 0.172549, 1)
 Button/colors/font_disabled_color = Color(0.172549, 0.172549, 0.172549, 0.45)
-Button/font_sizes/font_size = 24
+Button/font_sizes/font_size = 27
 Button/styles/normal = SubResource("button_normal")
 Button/styles/hover = SubResource("button_hover")
 Button/styles/pressed = SubResource("button_pressed")
 Button/styles/focus = SubResource("button_hover")
 Button/styles/disabled = SubResource("button_disabled")
 Label/colors/font_color = Color(0.172549, 0.172549, 0.172549, 1)
-Label/font_sizes/font_size = 24
+Label/font_sizes/font_size = 27
 RichTextLabel/colors/default_color = Color(0.172549, 0.172549, 0.172549, 1)
-RichTextLabel/font_sizes/normal_font_size = 20
+RichTextLabel/font_sizes/normal_font_size = 25
 Panel/styles/panel = SubResource("panel_page")
 PanelContainer/styles/panel = SubResource("panel_card")
 PopupPanel/styles/panel = SubResource("panel_page")

@@ -6,7 +6,7 @@ extends RefCounted
 ## Before this, everything collided as a circle whose diameter spanned the
 ## sprite's LONGEST image edge — transparent margin included. Two consequences:
 ## a tall character's collision width was set by his height (Thundaar's circle
-## was ~1.4x wider than he is), and a padded export like Berserk_Minion_1.png
+## was ~1.4x wider than he is), and a padded export like the berserk minion's
 ## (59% empty on its long edge) paid for all that empty space on the field.
 ##
 ## The oval instead hugs the opaque art, so collision tracks the drawing.

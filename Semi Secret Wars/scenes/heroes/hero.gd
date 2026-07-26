@@ -92,11 +92,18 @@ const STOMP_KNOCKBACK := 45.0
 const STOMP_FLASH_TIME := 0.25
 const STOMP_FLASH_COLOR := Color(1.0, 0.85, 0.3, 0.9)
 ## Hand-drawn Stomp impact art, drawn by BattleFX.draw_burst in _draw.
-const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle.png")
+const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle_Color.png")
+## draw_burst fits the whole texture, and the colored art carries much more
+## transparent margin than the original — without this the impact ring would
+## draw at 60% of the damage area it is supposed to match. Same reasoning as
+## LaneField.ART_PAD_COMPENSATION; StompWave applies the identical factor.
+const STOMP_BURST_PAD := 1.57
 ## BEACON+WARDEN "Searing Bind" Ultimate art + its own flash timer. Held on the
 ## caster (like the Stomp/Ensnare flashes) rather than spawned as a node,
 ## since the effect is instantaneous — nothing persists to own a scene.
-const SEARING_BURST := preload("res://assets/sprites/Searing_Bind.png")
+const SEARING_BURST := preload("res://assets/sprites/Searing_Bind_Color.png")
+## Padding compensation, same reason as STOMP_BURST_PAD above.
+const SEARING_BURST_PAD := 2.48
 const SEARING_FLASH_TIME := 0.6
 ## Bind art size per bound unit, as a multiple of that unit's collision radius
 ## — big enough to wrap the body, small enough that a packed cluster still
@@ -409,30 +416,40 @@ const HERO_STATS: Dictionary = {
 	},
 }
 
-## Per-hero sprite art (2026-07-21): hero.tscn hardcodes Thundaar.png as
-## sprite_texture (the only hero with real art until now), so every hero
-## rendered as Thundaar regardless of hero_name. Artemis/Warden/Beacon now
-## have their own hand-drawn sprites processed into the same papercut style
-## (cream torn-paper cutout, dark ink linework — see BALANCE.md/PRODUCTION.md
-## for the pipeline) and are swapped in per hero_name in _configure(); an
-## unlisted hero_name keeps whatever hero.tscn already set (Thundaar's).
+## Per-hero sprite art, swapped in per hero_name in _configure(). hero.tscn
+## sets Thundaar's art as its own sprite_texture default, so an unlisted
+## hero_name renders as Thundaar rather than as nothing.
+##
+## All four are hand-drawn in the shared papercut style (cream torn-paper
+## cutout, dark ink linework — see BALANCE.md/PRODUCTION.md for the pipeline).
+## THUNDAAR_SPRITE below and hero.tscn's sprite_texture must always name the
+## same file: the const is what DeployController's pre-spawn ghost reads.
 const HERO_SPRITES: Dictionary = {
-		"ARTEMIS": preload("res://assets/sprites/Artemis.png"),
-	"WARDEN": preload("res://assets/sprites/Warden.png"),
-	"BEACON": preload("res://assets/sprites/Beacon.png"),
+	"ARTEMIS": preload("res://assets/sprites/Artemis_Color.png"),
+	"WARDEN": preload("res://assets/sprites/Warden_Color.png"),
+	"BEACON": preload("res://assets/sprites/Beacon_Color.png"),
 }
 ## hero.tscn's own sprite_texture default — the fallback for any hero_name not
 ## in HERO_SPRITES (currently only Thundaar). Preloaded explicitly here so
 ## DeployController's sprite ghost doesn't need a live Hero instance to know
 ## which texture a not-yet-spawned hero will use.
-const THUNDAAR_SPRITE := preload("res://assets/sprites/Thundaar1.png")
+const THUNDAAR_SPRITE := preload("res://assets/sprites/Thundaar_Color.png")
 
 ## Per-hero multiplier on top of hero.tscn's base sprite_scale (1.8) — lets
 ## individual hero art run bigger without changing every hero's size
 ## (Designer, 2026-07-25: Thundaar 2x, Warden 1.5x).
+## Every value here now carries a padding-compensation factor on top of the
+## Designer's own size choice: the *_Color art (2026-07-25) sits on a uniform
+## canvas with far more transparent margin, and Combatant._draw fits the WHOLE
+## texture to body_radius * 2 * sprite_scale. Swapping the art 1:1 shrank the
+## heroes on screen (Thundaar to 73% of his previous size, Artemis/Beacon to
+## 64%); these restore the sizes that were already established.
+##   THUNDAAR 1.7 x1.375, WARDEN 1.5 x1.381, ARTEMIS x1.554, BEACON x1.558.
 const SPRITE_SCALE_MULT: Dictionary = {
-	"THUNDAAR": 1.7,
-	"WARDEN": 1.5,
+	"THUNDAAR": 2.34,
+	"WARDEN": 2.07,
+	"ARTEMIS": 1.55,
+	"BEACON": 1.56,
 }
 
 ## Which texture `hero_name` renders with once spawned — used by
@@ -456,41 +473,38 @@ const DEATH_SOUND := preload("res://assets/Sounds/Death_Hero.wav")
 ## the death FX instead of playing noticeably late (Designer, 2026-07-25).
 const DEATH_SOUND_START := 0.55
 
+## Thundaar's Stomp shout (Designer, 2026-07-25): the source file has other
+## takes around it, so only the 0.893-2.709 slice is the shout we want — hence
+## the explicit start + duration rather than playing the whole file. Fires on a
+## LANDED stomp only (see _try_stomp), so it tracks the ability's real cadence
+## instead of every attempted cast.
+const STOMP_SHOUT_SOUND := preload("res://assets/Sounds/Stomp_Shout.wav")
+const STOMP_SHOUT_START := 0.893
+const STOMP_SHOUT_DURATION := 2.709 - 0.893
+## Stomp fires far faster than this clip is long, so the shout is rate-limited
+## on its own timer independent of the ability cooldown — a stomp inside the
+## gap still lands and flashes, it just doesn't shout again (Designer,
+## 2026-07-25). Deliberately NOT reduced by cooldown boons: the point is that
+## the shout stays sparse however fast Stomp itself gets.
+const STOMP_SHOUT_GAP := 10.0
+## Quieter than the rest of the mix (Designer, 2026-07-25) — it's a recurring
+## combat callout, not a one-off event like a hero death.
+const STOMP_SHOUT_VOLUME_DB := -8.0
+
 ## Fires on every landed melee hit (see Combatant._on_melee_hit doc — ranged
 ## heroes never reach this since they take the projectile branch instead).
 ## One-shot player outlives this call and frees itself, same convention as
 ## Projectile._play_hit_sound.
 func _on_melee_hit(_victim: Combatant) -> void:
 	var start: float = SWORD_HIT_STARTS[randi() % SWORD_HIT_STARTS.size()]
-	var player := AudioStreamPlayer.new()
-	player.stream = SWORD_HIT_SOUND
-	# Default PAUSABLE would freeze this mid-clip if a pick screen/results
-	# popup pauses the tree right as it starts, then — since it's parented to
-	# root, which survives scene changes — resume audibly in whatever scene
-	# comes next once unpaused (Designer, 2026-07-25: reported for the death
-	# sound below; same root cause here).
-	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	get_tree().root.add_child(player)
-	player.play(start)
-	var t := get_tree().create_timer(SWORD_HIT_DURATION)
-	t.timeout.connect(func():
-		if is_instance_valid(player):
-			player.stop()
-			player.queue_free())
+	BattleSfx.play_clip(self, SWORD_HIT_SOUND, start, SWORD_HIT_DURATION)
 
 func _on_died() -> void:
-	var player := AudioStreamPlayer.new()
-	player.stream = DEATH_SOUND
 	# A hero's death is often what ends the battle, so this can start the same
-	# frame the results popup pauses the tree. Default PAUSABLE would freeze
-	# it mid-clip right there — and since it's parented to root (which
-	# survives the scene change to prep menu), unpausing later would resume
-	# it audibly in the wrong scene instead of finishing here (Designer,
-	# 2026-07-25: "death sound flowing to prep menu").
-	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	get_tree().root.add_child(player)
-	player.play(DEATH_SOUND_START)
-	player.finished.connect(player.queue_free)
+	# frame the results popup pauses the tree — see BattleSfx's doc on why the
+	# player it creates is PROCESS_MODE_ALWAYS (Designer, 2026-07-25: "death
+	# sound flowing to prep menu").
+	BattleSfx.play_clip(self, DEATH_SOUND, DEATH_SOUND_START)
 
 ## Artemis: ranged attacker — fires an arrow (Projectile) instead of melee,
 ## with a much longer attack_range and faster base attack_interval than the
@@ -498,27 +512,34 @@ func _on_died() -> void:
 const ARTEMIS_PROJECTILE_SCENE := preload("res://scenes/combat/projectile.tscn")
 const ARTEMIS_ATTACK_INTERVAL := 0.4
 const ARTEMIS_ATTACK_RANGE := 160.0
-## Pre-rotated so the tip points along the projectile's default travel axis
-## (+X) — see assets/sprites/Arrow.png (source art, points up) vs this
-## (Designer, 2026-07-25).
+## Pre-rotated in the source art so the tip points along the projectile's
+## default travel axis (+X) — hence the _Right suffix. Anything replacing this
+## file must keep that orientation or every arrow flies sideways.
 const ARTEMIS_ARROW_SPRITE := preload("res://assets/sprites/Arrow_Right.png")
 
 ## WARDEN's shot art (Designer, 2026-07-25) — the Controller lobs a plant
 ## rather than firing a dart, which also reads as the source of the ensnare.
 ## Unlike the arrow this needs no pre-rotation: a plant has no tip, so it
 ## looks correct at whatever angle the projectile travels.
-const WARDEN_PLANT_SPRITE := preload("res://assets/sprites/Plant.png")
+const WARDEN_PLANT_SPRITE := preload("res://assets/sprites/Plant_Color.png")
 
 ## Art size per hero, along the sprite's longest edge (Projectile.sprite_length).
 ## The arrow is a thin dart and the plant a squat blob, so they can't share one
 ## size and both look right — the plant runs smaller or it reads as a flying
 ## bush next to a 22px-radius hero.
 const ARTEMIS_ARROW_LENGTH := 32.0
-const WARDEN_PLANT_LENGTH := 26.0
+## 26 -> 52: Projectile.sprite_length fits the whole texture along its longest
+## edge, and Plant_Color's drawing covers only half its canvas — doubling keeps
+## the thrown plant the size it has always been on screen.
+const WARDEN_PLANT_LENGTH := 52.0
 
 ## Only Artemis and Warden get sprite art on their shots — every other ranged
-## Combatant (Dark Mage's bolt, HeroClone's roaming shots) keeps Projectile's
-## plain line+circle placeholder.
+## Combatant (e.g. Dark Mage's bolt) keeps Projectile's plain line+circle
+## placeholder.
+##
+## Also called by HeroClone._configure_projectile for a clone's own shots, so a
+## clone fires the same art as the hero it was cloned from rather than the
+## placeholder (Designer, 2026-07-25).
 func _configure_projectile(proj: Projectile) -> void:
 	if hero_name == "ARTEMIS":
 		proj.sprite_texture = ARTEMIS_ARROW_SPRITE
@@ -579,6 +600,9 @@ var _objective_spotted := false
 var _pushed_on := false
 var _ability_cd := 0.0
 var _stomp_flash_t := 0.0
+## Rate limiter for the Stomp shout SFX only — see STOMP_SHOUT_GAP. Separate
+## from _ability_cd so the ability's cadence and the shout's stay independent.
+var _stomp_shout_cd := 0.0
 ## Ensnare ring VFX: timer + the world-space cluster anchor it played on (the
 ## root lands around the target, not the caster, so the ring is drawn there).
 var _ensnare_flash_t := 0.0
@@ -760,9 +784,9 @@ func _configure() -> void:
 			projectile_scene = ARTEMIS_PROJECTILE_SCENE
 	max_hp *= BASE_HP_MULT
 	damage *= BASE_DAMAGE_MULT
-	# Permanent ability mods bought with gold (Phase 5). Applied here, before
-	# Combatant sets hp = max_hp, so HP-changing mods land at full HP.
-	_apply_owned_ability_mods()
+	# Permanent skill-tree ranks bought with gold. Applied here, before
+	# Combatant sets hp = max_hp, so any HP-touching node lands at full HP.
+	_apply_skill_tree()
 	# Permanent raw-stat upgrades bought with banked XP (grind progression).
 	_apply_stat_upgrades()
 	# Duo leader/follower behavior, HP half (see THUNDAAR_LEADER_ATK_SPEED_MULT
@@ -854,6 +878,7 @@ func _process(delta: float) -> void:
 				if lane != "":
 					global_position = _field.clamp_to_lane(global_position, lane)
 
+	_stomp_shout_cd = maxf(_stomp_shout_cd - delta, 0.0)
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
 	_searing_flash_t = maxf(_searing_flash_t - delta, 0.0)
@@ -1533,6 +1558,10 @@ func _try_stomp() -> void:
 		_ability_cd = maxf(cooldown, STOMP_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
 		_stomp_flash_t = STOMP_FLASH_TIME
 		_show_cast_label("STOMP!", STOMP_FLASH_COLOR)
+		if _stomp_shout_cd <= 0.0:
+			_stomp_shout_cd = STOMP_SHOUT_GAP
+			BattleSfx.play_clip(self, STOMP_SHOUT_SOUND, STOMP_SHOUT_START,
+					STOMP_SHOUT_DURATION, STOMP_SHOUT_VOLUME_DB)
 
 ## Ensnare (WARDEN): roots every enemy within ENSNARE_RADIUS of the nearest
 ## threat (the current target, used as a cluster anchor) so the party can focus
@@ -1680,7 +1709,7 @@ func cast_duo_ultimate(pair_id: String) -> void:
 func _ultimate_param(pair_id: String, params: Dictionary, key: String, default: float = 0.0) -> float:
 	return float(params.get(key, default)) \
 			+ RunState.duo_boon_total(pair_id, key) \
-			+ GameState.duo_mod_total(pair_id, key)
+			+ GameState.duo_ultimate_total(pair_id, key)
 
 ## THUNDAAR+BEACON ("Seismic Advance"): a marching sequence of stomps — see
 ## scenes/combat/duo/stomp_wave.gd for the actual step/damage/stun loop.
@@ -1761,6 +1790,8 @@ func _cast_arrow_barrage(pair_id: String, params: Dictionary) -> void:
 	barrage.chain_damage_mult = _ultimate_param(pair_id, params, "chain_damage_mult", 0.5)
 	barrage.hit_range = _ultimate_param(pair_id, params, "range", 260.0)
 	barrage.arrow_damage = _ultimate_param(pair_id, params, "arrow_damage", 55.0)
+	barrage.duration = _ultimate_param(pair_id, params, "duration", 10.0)
+	barrage.wave_interval = _ultimate_param(pair_id, params, "wave_interval", 0.5)
 	get_parent().add_child(barrage)
 	barrage.global_position = global_position
 
@@ -1831,7 +1862,7 @@ func _draw() -> void:
 		# was, so the VFX still reads as the true damage area rather than a
 		# decoration that drifts from it once mods widen the ability.
 		BattleFX.draw_burst(self, STOMP_BURST, Vector2.ZERO,
-				(STOMP_RADIUS + stomp_radius_add) * 2.0 * p, 1.0 - p)
+				(STOMP_RADIUS + stomp_radius_add) * 2.0 * p * STOMP_BURST_PAD, 1.0 - p)
 	if _ensnare_flash_t > 0.0:
 		var p := 1.0 - _ensnare_flash_t / ENSNARE_FLASH_TIME
 		var ring_color := ENSNARE_FLASH_COLOR
@@ -1844,7 +1875,8 @@ func _draw() -> void:
 		var bind_alpha := _searing_flash_t / SEARING_FLASH_TIME
 		for mark in _searing_flash_marks:
 			BattleFX.draw_burst(self, SEARING_BURST,
-					Vector2(mark.x, mark.y) - global_position, mark.z, bind_alpha)
+					Vector2(mark.x, mark.y) - global_position,
+					mark.z * SEARING_BURST_PAD, bind_alpha)
 
 ## Clone: spawns clone_count temporary copies of Artemis's current stats that
 ## taunt and fight back for CLONE_DURATION, then expire (see HeroClone). Twin
@@ -2019,13 +2051,23 @@ func _on_kill(victim: Combatant) -> void:
 func run_xp_mult() -> float:
 	return _run_xp_mult
 
-## Applies every permanent ability mod this hero owns (GameState.owned_mods,
-## bought with gold — see AbilityMods). Called once from _configure. Each mod is
-## a bought-once, owned-forever tradeoff (upside + downside).
-func _apply_owned_ability_mods() -> void:
-	for id in GameState.owned_mods:
-		if AbilityMods.def(id).get("hero", "") == hero_name:
-			_apply_ability_mod(id)
+## Applies this hero's SKILL TREE (2026-07-26) — every ranked node's
+## `value * rank`, summed per effect kind by GameState.skill_total and written
+## into the same scalars the old one-shot AbilityMods wrote. Called once from
+## _configure.
+##
+## Replaces _apply_owned_ability_mods/_apply_ability_mod, whose per-id `match`
+## can't express ranks. Nothing downstream changed: the ability code still
+## reads stomp_radius_add/clone_count/_ability_cooldown_reduction and doesn't
+## know or care that a tree now feeds them. The per-ability floor
+## (ABILITY_COOLDOWN_FLOOR_FRAC) still caps total cooldown reduction, which
+## matters more now that a maxed tree stacks several cooldown nodes.
+func _apply_skill_tree() -> void:
+	stomp_radius_add += GameState.skill_total(hero_name, "stomp_radius")
+	ensnare_radius_add += GameState.skill_total(hero_name, "ensnare_radius")
+	rally_radius_add += GameState.skill_total(hero_name, "rally_radius")
+	clone_count += int(GameState.skill_total(hero_name, "clone_count"))
+	_ability_cooldown_reduction += GameState.skill_total(hero_name, "ability_cooldown")
 
 ## Permanent raw-stat upgrades bought with banked XP (StatUpgrades catalog) —
 ## flat additive stacking per purchase (effect_add * purchases), applied on
@@ -2041,35 +2083,13 @@ func _apply_stat_upgrades() -> void:
 	if aspd_n > 0:
 		attack_interval = maxf(attack_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
 
-## Effect of one ability mod. All values are flat additive (Designer,
-## 2026-07-21: no percentages on upgrades/abilities — see AbilityMods.CATALOG
-## for the matching player-facing descriptions). Stat tradeoffs touch base
-## stats directly (like boons); ability-geometry tradeoffs add to the `_add`
-## scalar vars the ability code reads (see the var block above `role`).
-func _apply_ability_mod(id: String) -> void:
-	# Downsides disabled for now (Designer, 2026-07-18) — commented out, not
-	# deleted, so the tradeoff design can return once Level 1 tuning settles.
-	match id:
-		"seismic_stomp":
-			stomp_radius_add += 45.0
-			# stomp_cooldown_add += 1.5
-		"twin_clone":
-			clone_count += 1
-			# clone_hp_mult *= 0.6
-		"wide_snare":
-			ensnare_radius_add += 50.0
-			# ensnare_stun_mult *= 0.7
-		"mass_rally":
-			rally_radius_add += 90.0
-			# rally_cooldown_add += 2.0
-		# Cooldown half of each hero's pair (Designer, 2026-07-25). All four
-		# feed the same _ability_cooldown_reduction scalar every signature
-		# ability already subtracts at recast, so a hero only ever owns the
-		# one that matches their ability and no cast site needed changing.
-		# The per-ability floor (ABILITY_COOLDOWN_FLOOR_FRAC) still caps how
-		# far this can go.
-		"rolling_quake", "fleetfoot", "rapid_snare", "quick_rally":
-			_ability_cooldown_reduction += 1.0
+# _apply_ability_mod() was removed 2026-07-26 with the flat AbilityMods
+# catalog it switched on. Its five branches wrote exactly the scalars
+# _apply_skill_tree now sums ranks into — a per-id `match` cannot express "3
+# ranks of +15", which is the whole point of the tree. The disabled downside
+# lines (Designer, 2026-07-18) went with it; if that tradeoff design returns,
+# it belongs in the node data as a second kind_b/value_b pair, not as another
+# hardcoded branch.
 
 # apply_run_boon() was removed 2026-07-25 along with the per-hero run-boon
 # catalog (scripts/boons.gd). Its five effect branches all wrote the same

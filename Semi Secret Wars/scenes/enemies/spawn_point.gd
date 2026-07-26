@@ -29,8 +29,9 @@ func _configure() -> void:
 	# Code-driven visuals (no .tscn — LaneSpawner instantiates via .new()).
 	body_radius = 44.0
 	body_color = Color(0.60, 0.35, 0.65)
-	sprite_texture = preload("res://assets/sprites/Portal-Spawn.png")
-	sprite_scale = 2.0
+	sprite_texture = preload("res://assets/sprites/Portal-Spawn_Color.png")
+	# 2.0 x1.56 padding compensation for the colored art (2026-07-25).
+	sprite_scale = 3.11
 	# Static structure — no idle bob (Combatant's default sine-wave sprite offset),
 	# no hit-flash (reads as flicker against the portal art, not a hit reaction),
 	# and pinned (skips separation/obstacle-clamp, which would otherwise shove it

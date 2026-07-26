@@ -7,9 +7,15 @@ extends Node2D
 ## decorative scenery, and the Poison Lake. Units query this node (group
 ## "field") for spawn/goal points and steer around its obstacles.
 
-## Lane dimensions (copied from the LevelLayout at runtime).
+## Lane dimensions (copied from the LevelLayout at runtime). These defaults are
+## only the editor/no-layout fallback — every level's real values live in
+## config/level_*_layout.tres, so change those, not these.
+##
+## lane_half_height 450 -> 400 on 2026-07-26 (Designer: narrower lanes top and
+## bottom). It tightens the playable band by 100px total, so units crowd more
+## and have less room to spread out around each other.
 var lane_length: float = 6000.0
-var lane_half_height: float = 450.0
+var lane_half_height: float = 400.0
 ## Fixed deploy band at the lane's left end.
 var deploy_band_x_min: float = -2900.0
 var deploy_band_x_max: float = -2300.0
@@ -90,6 +96,16 @@ func lane_has_living_hero(lane_value: String) -> bool:
 ## would silently turn off from the opening frame).
 var _lane_populated := {"top": false, "bottom": false}
 
+## Level-long single-lane mode: set at load from RunState.duo_wiped() when a
+## whole Duo has already fallen earlier in the run (Designer, 2026-07-26 —
+## "if an entire DUO dies, the next level should be a single lane for the
+## remaining DUO"). It forces lanes_merged() true for the entire level, which
+## is exactly the state a mid-battle Duo wipe already produces: no y-clamping
+## to a half, no lane-filtered targeting, gates on both halves open to
+## everyone. The field keeps its authored full height and props — "single
+## lane" here is the behavioral split going away, not a narrower battlefield.
+var single_lane := false
+
 func mark_lane_populated(lane_value: String) -> void:
 	_lane_populated[lane_value] = true
 
@@ -100,6 +116,8 @@ func mark_lane_populated(lane_value: String) -> void:
 ## filtering (Hero._lane_ok) stand down everywhere, not just near the villain.
 ## A lane nobody was ever deployed to does NOT trigger this on its own.
 func lanes_merged() -> bool:
+	if single_lane:
+		return true
 	for lane_value in _lane_populated:
 		if _lane_populated[lane_value] and not lane_has_living_hero(lane_value):
 			return true
@@ -300,6 +318,10 @@ func _ready() -> void:
 	add_to_group("field")
 	if not Engine.is_editor_hint():
 		_load_lane_layout()
+		# Before anything spawns: heroes read it in _configure, minions and
+		# clones every frame, so the flag must be settled while the field is
+		# still empty.
+		single_lane = RunState.duo_wiped()
 	default_hero_spawn = hero_spawn
 	_build_border_band()
 	queue_redraw()
@@ -410,6 +432,9 @@ const CROWD_MIN_HEIGHT := 120.0
 ## Overlap between consecutive tiles, as a fraction of tile width — hides the
 ## seam where one hand-drawn strip meets the next.
 const CROWD_TILE_OVERLAP := 0.04
+## Transparent margin below the stands in Berserk_Level_Borders_Color1, as a
+## fraction of the texture height (72px of 612). See _build_crowd_side.
+const CROWD_ART_BASE_PAD := 0.118
 
 ## Tiles the crowd strip end to end along one long edge. Emits the same entry
 ## shape as _build_band_side so LaneForeground draws it with no special case;
@@ -418,7 +443,12 @@ func _build_crowd_side(into: Array[Dictionary], side_sign: float) -> void:
 	var tex_size := crowd_texture.get_size()
 	if tex_size.y <= 0.0:
 		return
-	var height := _crowd_strip_height()
+	# Compensation is applied AFTER the clamp on purpose: _crowd_strip_height
+	# limits how tall the stands may LOOK (camera clearance), and with padded
+	# art the drawn rect has to exceed that for the visible stands to land on
+	# it. Tile width follows from the same drawn height, so the seam overlap
+	# still lines up.
+	var height := _crowd_strip_height() * art_pad_height(crowd_texture)
 	var tile_w: float = tex_size.x * (height / tex_size.y)
 	var step: float = tile_w * (1.0 - CROWD_TILE_OVERLAP)
 	if step <= 1.0:
@@ -430,6 +460,11 @@ func _build_crowd_side(into: Array[Dictionary], side_sign: float) -> void:
 	var y: float = side_sign * lane_half_height
 	if side_sign > 0.0:
 		y += height
+	# Color1 carries an even ~12% transparent margin above and below the
+	# stands. Base-anchoring uses the texture's edge, not the drawing's, so
+	# without this the stands would hover that far off the lane edge with a
+	# visible gap. Pushed toward the lane on whichever side we're building.
+	y += -side_sign * CROWD_ART_BASE_PAD * height
 	# Start a full tile before the lane and run a full tile past its end, so
 	# the stands are unbroken from one end cap to the other with no partial
 	# tile visible at either extreme.
@@ -524,7 +559,7 @@ func _band_row_entry(rng: RandomNumberGenerator, row: int, depth_scale := 1.0) -
 	var tex := _border_decor_texture(kind)
 	if tex == null:
 		return {}
-	var height: float = rng.randf_range(band_height_range.x, band_height_range.y)
+	var height: float = rng.randf_range(band_height_range.x, band_height_range.y) * art_pad_height(tex)
 	if is_far:
 		height *= lerpf(1.0, band_far_height_scale, float(row) / maxf(1.0, band_row_count - 1.0))
 	var row_depth: float = lerpf(30.0, 140.0, float(row) / maxf(1.0, band_row_count - 1.0))
@@ -550,7 +585,7 @@ func _scatter_row_entry(rng: RandomNumberGenerator, depth_scale := 1.0) -> Dicti
 		return {}
 	return {
 		"pos": Vector2(rng.randf_range(-scatter_spacing * 0.4, scatter_spacing * 0.4), rng.randf_range(160.0, 260.0) * depth_scale),
-		"height": rng.randf_range(scatter_size_range.x, scatter_size_range.y),
+		"height": rng.randf_range(scatter_size_range.x, scatter_size_range.y) * art_pad_height(tex),
 		"tex": tex,
 		"flip": rng.randf() < 0.5,
 		"tint": Color.WHITE,
@@ -611,7 +646,7 @@ func get_border_decor_entries() -> Array[Dictionary]:
 		var kind := border_decor_kinds[i] if i < border_decor_kinds.size() else ""
 		var tex := _border_decor_texture(kind)
 		if tex != null:
-			out.append({"pos": Vector2(d.x, d.y), "radius": d.z, "tex": tex})
+			out.append({"pos": Vector2(d.x, d.y), "radius": d.z * art_pad_long(tex), "tex": tex})
 	return out
 
 ## Legal deploy point? Inside the fixed left-end band, clear of obstacles/lakes.
@@ -943,6 +978,50 @@ const TALL_OBSTACLE_HEIGHT_MULT := 3.2
 ## can never re-open a path the lane-walkability check already cleared.
 ## A sword stuck in the dirt is a slim thing and read oversized when drawn at
 ## the full width of its blocking circle (Designer, 2026-07-25).
+## Padding compensation for the 2026-07-25 *_Color art batch.
+##
+## The colored art ships on a uniform 936x601 canvas, so the drawing occupies
+## far less of its texture than the originals did (e.g. Rock-2 filled 92% of
+## its old canvas, 36% of the new one). Both draw helpers size off the RAW
+## texture — _draw_obstacle_sprite fits the longest edge, _draw_prop_sprite
+## fits the height — so a 1:1 swap would have shrunk every prop by a different
+## amount. These multipliers restore the on-screen size each prop had before
+## the swap; they are measured (old opaque fraction / new opaque fraction), not
+## eyeballed.
+##
+## "long" is for center-anchored sprites (_draw_obstacle_sprite), "height" for
+## base-anchored props (_draw_prop_sprite). A texture only needs the entries
+## for the paths it actually draws through; missing = 1.0 = no change. Trees
+## are absent on purpose: their art fills the new canvas vertically, so the
+## height-fit path already renders them unchanged.
+const ART_PAD_COMPENSATION := {
+	"res://assets/sprites/Rock-1_Color.png": {"long": 2.45, "height": 1.94},
+	"res://assets/sprites/Rock-2_Color.png": {"long": 2.59, "height": 1.67},
+	"res://assets/sprites/Sword_Ground_Color.png": {"long": 1.88, "height": 1.21},
+	"res://assets/sprites/Destroyed-Spaceship_Color.png": {"long": 1.56},
+	"res://assets/sprites/Berserk_Lair_Color.png": {"long": 1.38},
+	"res://assets/sprites/Spike_Hazard_Color.png": {"long": 2.09},
+	"res://assets/sprites/Mushroom_Color.png": {"long": 1.70, "height": 1.12},
+	# Berserk_Level_Borders_Color1 (the Designer's re-proportioned second pass,
+	# 2026-07-25): 2176x612 with the stands filling 76% of the height, against
+	# the original's 97%. The first _Color attempt sat at 34% and was left
+	# unwired for exactly that reason.
+	"res://assets/sprites/Berserk_Level_Borders_Color1.png": {"height": 1.27},
+	"res://assets/sprites/Plant_Color.png": {"long": 2.01, "height": 1.29},
+}
+
+## Compensation for a center-anchored (longest-edge) draw of `tex`.
+static func art_pad_long(tex: Texture2D) -> float:
+	if tex == null:
+		return 1.0
+	return float(ART_PAD_COMPENSATION.get(tex.resource_path, {}).get("long", 1.0))
+
+## Compensation for a base-anchored (height-fit) draw of `tex`.
+static func art_pad_height(tex: Texture2D) -> float:
+	if tex == null:
+		return 1.0
+	return float(ART_PAD_COMPENSATION.get(tex.resource_path, {}).get("height", 1.0))
+
 const OBSTACLE_ART_SCALE := {
 	"sword": 0.72,
 }
@@ -974,7 +1053,11 @@ func _footprint_for(kind: String, radius: float) -> Vector2:
 		# No art: the drawn tell is _draw_blob's own squashed shape, so match it.
 		return Vector2(radius, radius * 0.6)
 	# Squat kinds draw centred with their longest edge spanning the diameter.
-	return SpriteFootprint.radii_for(tex, radius * 2.0)
+	# The same padding compensation _draw_obstacle_sprite applies has to be fed
+	# in here: radii_for scales off the texture's OPAQUE fraction, so without
+	# it the colored art's padding would quietly shrink every squat obstacle's
+	# collision oval away from the art it's supposed to mirror.
+	return SpriteFootprint.radii_for(tex, radius * 2.0 * art_pad_long(tex))
 
 ## Draws one obstacle with the anchoring its KIND deserves (Designer,
 ## 2026-07-25: "proportionalize obstacles by what they are"). Collision is a
@@ -1050,7 +1133,9 @@ func _border_decor_texture(kind: String) -> Texture2D:
 ## longest edge matches the obstacle's blocking diameter (2 * radius) —
 ## same convention as Combatant's sprite_texture sizing.
 func _draw_obstacle_sprite(center: Vector2, radius: float, tex: Texture2D) -> void:
-	var diameter := radius * 2.0
+	# Padding compensation keeps the *drawing* spanning the diameter, rather
+	# than the drawing plus the colored art's transparent margin.
+	var diameter := radius * 2.0 * art_pad_long(tex)
 	var tex_size := tex.get_size()
 	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
 	var draw_size := tex_size * scale_factor

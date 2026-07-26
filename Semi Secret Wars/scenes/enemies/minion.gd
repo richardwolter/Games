@@ -31,14 +31,16 @@ const INTERCEPT_LEAD_MULT := 0.35
 ## nothing — stage 3 has no swarm art of its own yet.
 const SPRITE_VARIANTS_BY_LEVEL: Dictionary = {
 	1: [
-		preload("res://assets/sprites/Minion-Dark-Mage.png"),
-		preload("res://assets/sprites/MinionDarkMage2.png"),
+		# Variant 1 is the "big mage" — larger, tougher (see VARIANT_OVERRIDES);
+		# variant 0 is the ordinary stage-1 swarm minion.
+		preload("res://assets/sprites/Minion-Dark-Mage_Color.png"),
+		preload("res://assets/sprites/Minion2_Dark_Mage_Color.png"),
 	],
 	# Stage 2's second variant (Minion2_Berserk) is NOT here: it's the syringe
 	# shooter and RangedMinion claims it exclusively, so the unit holding the
 	# needle is the one firing droplets (Designer, 2026-07-25).
 	2: [
-		preload("res://assets/sprites/Berserk_Minion_1.png"),
+		preload("res://assets/sprites/Berserk_Minion_1_Color.png"),
 	],
 }
 
@@ -53,15 +55,48 @@ const SPRITE_VARIANTS_BY_LEVEL: Dictionary = {
 ## would be to decouple art scale from _collision_radius rather than shrink
 ## the art back.
 const SPRITE_SCALE_BY_LEVEL: Dictionary = {
-	1: 1.8,
+	# 1.8 -> 2.7 on 2026-07-25 (Designer: "level 1 minions should be 1.5x
+	# bigger"). See the collision note above — body_radius 11 * 2.7 is a ~30px
+	# footprint, still well under the level-2 swarm's.
+	1: 2.7,
 	# Doubled again on 2026-07-25 (Designer: "2x bigger than current size") —
-	# 3.6 still read small next to the heroes.
-	2: 7.2,
+	# 3.6 still read small next to the heroes. Then x1.38 padding compensation
+	# for Berserk_Minion_1_Color (see Hero.SPRITE_SCALE_MULT): 7.2 -> 9.95.
+	# NOTE this is the SMALL berserk minion's factor; RangedMinion's own art
+	# needs a different one and corrects for it in RangedMinion._configure.
+	2: 9.95,
+}
+
+## Per-variant stat/size overrides, keyed by the variant texture itself.
+## Normally a variant is cosmetic-only (see SPRITE_VARIANTS_BY_LEVEL); this is
+## the exception hatch for a variant the Designer wants to read as a *tougher*
+## unit rather than a reskin. Minion2_Dark_Mage_Color is the stage-1 "big
+## mage": drawn larger than its packmates with matching HP/damage so the size
+## difference is honest (Designer, 2026-07-25).
+##
+## Multipliers, applied on top of whatever the .tscn and the per-level scale
+## already set. Applied in _configure, i.e. before Combatant._ready does
+## `hp = max_hp`, so the HP bump is live from spawn.
+##
+## Keyed by resource_path, so this MUST be updated whenever the art it names is
+## replaced — a stale key silently degrades the big mage back into an ordinary
+## minion rather than erroring.
+const VARIANT_OVERRIDES: Dictionary = {
+	"res://assets/sprites/Minion2_Dark_Mage_Color.png": {
+		"scale": 1.35, "hp": 1.6, "damage": 1.4,
+	},
 }
 
 ## The variant list for the level currently being played.
 static func sprite_variants_for_level(level: int) -> Array:
 	return SPRITE_VARIANTS_BY_LEVEL.get(level, SPRITE_VARIANTS_BY_LEVEL[1])
+
+## Pins this minion to one specific variant instead of rolling at random, so a
+## summoner can ask for a known mix (DarkMage summons 3 small + 1 large — see
+## DarkMage._summon_minions). VARIANT_OVERRIDES still applies, so forcing the
+## big-mage art also gets its HP/damage/size. Set by the spawner BEFORE
+## add_child(), same contract as setup(). Null = roll normally.
+var forced_variant: Texture2D = null
 
 var _spawn_pos := Vector2.ZERO
 var _exit_pos := Vector2.ZERO
@@ -96,8 +131,11 @@ func _configure() -> void:
 	# null check preserves the original intent (a subclass with real art of its
 	# own is never silently reskinned) without the collateral damage.
 	if sprite_texture == null:
-		var variants := sprite_variants_for_level(RunState.current_level)
-		sprite_texture = variants[randi() % variants.size()]
+		if forced_variant != null:
+			sprite_texture = forced_variant
+		else:
+			var variants := sprite_variants_for_level(RunState.current_level)
+			sprite_texture = variants[randi() % variants.size()]
 		# Scale comes with the art. Only minion.tscn ever set sprite_scale
 		# (1.8); every subclass left it at the 1.0 default, so the stage-2/3
 		# swarm drew at barely half the size of a stage-1 minion using the
@@ -105,8 +143,20 @@ func _configure() -> void:
 		# (Designer, 2026-07-25). Setting it here keeps art and scale together
 		# so a new stage can't reintroduce the mismatch.
 		sprite_scale = SPRITE_SCALE_BY_LEVEL.get(RunState.current_level, 1.8)
+		_apply_variant_override(sprite_texture)
 	# Desync hunt ticks across the swarm (same idea as _retarget_cd stagger).
 	_hunt_cd = randf() * HUNT_INTERVAL
+
+## Applies VARIANT_OVERRIDES for the rolled art, if it has an entry.
+func _apply_variant_override(tex: Texture2D) -> void:
+	if tex == null:
+		return
+	var over: Dictionary = VARIANT_OVERRIDES.get(tex.resource_path, {})
+	if over.is_empty():
+		return
+	sprite_scale *= float(over.get("scale", 1.0))
+	max_hp *= float(over.get("hp", 1.0))
+	damage *= float(over.get("damage", 1.0))
 
 func _process(delta: float) -> void:
 	super(delta)

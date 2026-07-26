@@ -72,7 +72,15 @@ func _ready() -> void:
 	_timer_label = get_node(timer_label_path)
 	_buff_panel = get_node(buff_panel_path)
 	_buff_label = get_node(buff_label_path)
-	get_node(back_button_path).pressed.connect(_on_back_pressed)
+	var back_btn: Button = get_node(back_button_path)
+	back_btn.pressed.connect(_on_back_pressed)
+	# Clickable at ANY point in the battle (Designer, 2026-07-26). The tree
+	# pauses for a level-up/boon pick and for the confirm prompt itself, and a
+	# paused Button stops receiving input — so this one opts out of pausing.
+	# Its own CanvasLayer/HUD parent keeps default process mode; only the
+	# button needs to stay live.
+	back_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	UIStyle.add_hover_wiggle(back_btn)
 	_build_duo_b_label()
 	_build_duo_synergy_labels()
 	_build_duo_ultimate_bar()
@@ -100,7 +108,19 @@ func _build_duo_b_label() -> void:
 	_duo_b_label.visible = false
 	add_child(_duo_b_label)
 
+## Leaving mid-battle ABANDONS the run: nothing about this level is banked (no
+## gold payout, no level advance — BattleManager._end never runs), and run
+## state is reset when the next run starts. That's destructive enough to ask
+## first (Designer, 2026-07-26).
 func _on_back_pressed() -> void:
+	ConfirmPanel.ask(self, "ABANDON RUN?",
+			"Leaving now ends this run. Level progress, this battle's gold and any heroes still standing are lost. Permanent purchases (skill tree, stats) are kept.",
+			"ABANDON", _leave_to_prep)
+
+func _leave_to_prep() -> void:
+	# Unpause first: a prompt answered while a boon pick had the tree paused
+	# would otherwise carry that pause into the prep menu, freezing it.
+	get_tree().paused = false
 	get_tree().change_scene_to_file(GameState.PREP_MENU)
 
 func _process(delta: float) -> void:

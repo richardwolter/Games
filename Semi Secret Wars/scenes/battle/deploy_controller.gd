@@ -137,7 +137,11 @@ func _build_ui() -> void:
 	# battlefield was the visibility problem — the notebook panel gives it a
 	# background to read against, same as every other HUD element.
 	var frame := PanelContainer.new()
-	frame.add_theme_stylebox_override("panel", UIStyle.overlay_panel())
+	# Slimmer than the shared overlay_panel (margin 40 -> 14): this panel sits
+	# ON the deploy band the player is trying to click into, and at full modal
+	# padding it was covering too much of it (Designer, 2026-07-26). Same
+	# paper/ink/wobble, just tighter.
+	frame.add_theme_stylebox_override("panel", UIStyle.panel(UIStyle.PAGE, UIStyle.INK, 4, 14))
 	frame.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	frame.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	frame.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -150,12 +154,20 @@ func _build_ui() -> void:
 	layer.add_child(frame)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
+	col.add_theme_constant_override("separation", 6)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(col)
 
-	_hint = UIStyle.centered_label("", UIStyle.SIZE_SUBHEAD)
+	_hint = UIStyle.centered_label("", UIStyle.SIZE_BODY)
 	col.add_child(_hint)
+
+	# Single-lane levels (a Duo was wiped earlier in the run — see
+	# LaneField.single_lane) play by different rules than the player has been
+	# taught, so say so up front rather than letting them discover that lane
+	# discipline stopped mattering.
+	if field != null and field.single_lane:
+		col.add_child(UIStyle.centered_label(
+				"SINGLE LANE — your Duo holds the whole field", UIStyle.SIZE_SMALL, UIStyle.GOLD))
 
 	if _has_two_waves():
 		var controls := HBoxContainer.new()
@@ -164,16 +176,20 @@ func _build_ui() -> void:
 		controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(controls)
 
-		_swap_button = UIStyle.button("", UIStyle.SIZE_SMALL, _on_swap_pressed)
+		# The timing row runs a step below the rest of the UI (Designer,
+		# 2026-07-26: the panel covers too much of the deploy space) — it's a
+		# dial the player sets once, not something they read at a glance
+		# mid-placement.
+		_swap_button = UIStyle.button("", UIStyle.SIZE_TINY, _on_swap_pressed)
 		controls.add_child(_swap_button)
 
-		controls.add_child(UIStyle.button("-1s", UIStyle.SIZE_SMALL, _on_delay_step.bind(-1.0)))
+		controls.add_child(UIStyle.button("-1s", UIStyle.SIZE_TINY, _on_delay_step.bind(-1.0)))
 
-		_delay_label = UIStyle.label("", UIStyle.SIZE_BODY, UIStyle.GOLD)
+		_delay_label = UIStyle.label("", UIStyle.SIZE_SMALL, UIStyle.GOLD)
 		_delay_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		controls.add_child(_delay_label)
 
-		controls.add_child(UIStyle.button("+1s", UIStyle.SIZE_SMALL, _on_delay_step.bind(1.0)))
+		controls.add_child(UIStyle.button("+1s", UIStyle.SIZE_TINY, _on_delay_step.bind(1.0)))
 
 		_update_swap_button()
 		_update_delay_label()
@@ -181,7 +197,7 @@ func _build_ui() -> void:
 	var start_row := CenterContainer.new()
 	start_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(start_row)
-	_start_button = UIStyle.button("START BATTLE", UIStyle.SIZE_SUBHEAD, _on_start_pressed)
+	_start_button = UIStyle.button("START BATTLE", UIStyle.SIZE_BODY, _on_start_pressed)
 	start_row.add_child(_start_button)
 
 	_update_hint()
@@ -260,12 +276,24 @@ func _on_start_pressed() -> void:
 ## Ghost sprite sizing mirrors Combatant._draw()'s sprite math (hero.tscn's
 ## body_radius/sprite_scale defaults — heroes don't exist yet at deploy time
 ## to read per-instance values from) so the preview matches the spawned size.
+##
+## The base scale alone is NOT the spawned size: Hero._configure multiplies
+## sprite_scale by its per-hero SPRITE_SCALE_MULT entry (1.55-2.34, the
+## padding compensation for the *_Color art), so a ghost drawn at the raw 1.8
+## came out 35-57% smaller than the hero that then walked out of it (Designer,
+## 2026-07-26: "DUO deploy sprites should be the same size as real moving
+## ones"). Applying the same multiplier here is what keeps the two in step;
+## both sides read the one table in hero.gd, so a future art swap can't
+## desync them again.
 const GHOST_BODY_RADIUS := 22.0
 const GHOST_SPRITE_SCALE := 1.8
 
+func _ghost_scale(hero_name: String) -> float:
+	return GHOST_SPRITE_SCALE * float(Hero.SPRITE_SCALE_MULT.get(hero_name, 1.0))
+
 func _draw_hero_sprite(hero_name: String, pos: Vector2, alpha: float) -> void:
 	var texture := Hero.sprite_for(hero_name)
-	var diameter := GHOST_BODY_RADIUS * 2.0 * GHOST_SPRITE_SCALE
+	var diameter := GHOST_BODY_RADIUS * 2.0 * _ghost_scale(hero_name)
 	var tex_size := texture.get_size()
 	var scale_factor := diameter / maxf(tex_size.x, tex_size.y)
 	var draw_size := tex_size * scale_factor

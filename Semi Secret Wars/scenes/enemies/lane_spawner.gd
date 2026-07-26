@@ -2,9 +2,10 @@ class_name LaneSpawner
 extends Node2D
 ## Lane swarm spawner: an escalating cap/batch loop whose waves pour from
 ## DESTRUCTIBLE spawn points distributed along the lane.
-## Destroying a point permanently stops its waves;
-## all points destroyed is half the level-clear condition (villain dead is the
-## other half — see BattleManager).
+## Destroying a point permanently stops its waves.
+## Clearing every point USED to be half the level-clear condition; as of
+## 2026-07-25 killing the villain alone ends the level (see
+## BattleManager._check_win) and gates are an optional gold/stat objective.
 
 signal points_cleared  ## Emitted the moment the last spawn point is destroyed.
 
@@ -29,6 +30,13 @@ var _gold_accum := 0.0
 @export var escalate_step := 1
 @export var max_cap := 24
 
+## Spawn-point destruction SFX (Designer, 2026-07-25): only the 1.55-3.211
+## slice of the source file is the collapse we want, so it plays with an
+## explicit start + duration rather than the whole clip.
+const POINT_DESTROYED_SOUND := preload("res://assets/Sounds/Spawn_Point_Destruction.wav")
+const POINT_DESTROYED_START := 1.55
+const POINT_DESTROYED_DURATION := 3.211 - 1.55
+
 var kills := 0
 var battle_started := false
 
@@ -46,6 +54,12 @@ var _spawn_timer := 0.0
 var _escalate_timer := 0.0
 var _minion_scene_override: PackedScene = null
 var _minion_scene_override_b: PackedScene = null
+## Stage stat scaling (StageConfig). Gates are built in _ready, which can run
+## before BattleManager calls apply_stage_config, so the gate multiplier is
+## also applied retroactively there rather than only at construction.
+var _minion_hp_mult := 1.0
+var _minion_damage_mult := 1.0
+var _point_hp_mult := 1.0
 
 func _ready() -> void:
 	_field = get_tree().get_first_node_in_group("field") as LaneField
@@ -61,7 +75,7 @@ func _spawn_spawn_points() -> void:
 	for i in _field.lane_spawn_points.size():
 		var p: Vector3 = _field.lane_spawn_points[i]
 		var sp := LaneSpawnPoint.new()
-		sp.setup(Vector2(p.x, p.y), p.z)
+		sp.setup(Vector2(p.x, p.y), p.z * _point_hp_mult)
 		# Use the authored (x,y), not sp.global_position — _configure() (which
 		# sets global_position from _spawn_at) doesn't run until add_child below.
 		var tag := _field.lane_spawn_point_lanes[i] if i < _field.lane_spawn_point_lanes.size() else ""
@@ -94,6 +108,17 @@ func apply_stage_config(config: StageConfig) -> void:
 	_cap = float(swarm_cap)
 	_minion_scene_override = _load_minion_scene(config.minion_type)
 	_minion_scene_override_b = _load_minion_scene_b(config.minion_type)
+	_minion_hp_mult = config.minion_hp_mult
+	_minion_damage_mult = config.minion_damage_mult
+	# Gates built by an earlier _ready() already banked their HP — rescale them
+	# (max and current alike, they're untouched at this point) so the multiplier
+	# lands regardless of which node's _ready ran first.
+	if not is_equal_approx(_point_hp_mult, config.spawn_point_hp_mult):
+		var rescale := config.spawn_point_hp_mult / _point_hp_mult
+		for p in _points:
+			p.max_hp *= rescale
+			p.hp *= rescale
+	_point_hp_mult = config.spawn_point_hp_mult
 
 func _load_minion_scene(minion_type: String) -> PackedScene:
 	match minion_type:
@@ -157,6 +182,8 @@ func _spawn_one() -> void:
 	# spawn point every single spawn. A ring starting past that clamp floor
 	# keeps the crowd tight against the edge without ever needing correction.
 	var min_r: float = point.body_radius + m._collision_radius() + 2.0
+	m.stat_hp_mult = _minion_hp_mult
+	m.stat_damage_mult = _minion_damage_mult
 	m.setup(
 		point.global_position + _random_ring(min_r, min_r + spawn_spread),
 		_field.hero_spawn + offset,
@@ -182,6 +209,8 @@ func _on_point_died(_who: Combatant, point: LaneSpawnPoint) -> void:
 	_points.erase(point)
 	if _field != null:
 		_field.unregister_dynamic_obstacle(point.global_position, point.body_radius)
+	BattleSfx.play_clip(self, POINT_DESTROYED_SOUND, POINT_DESTROYED_START,
+			POINT_DESTROYED_DURATION)
 	GameState.record_career("gates_destroyed", 1)
 	GameState.bank_gold(GOLD_PER_GATE)
 	if _points.is_empty():

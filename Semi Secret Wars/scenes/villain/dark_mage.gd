@@ -9,11 +9,24 @@ extends Villain
 ## Kiting: he retreats from the nearest hero until this far away, then stops.
 @export var flee_distance := 260.0
 ## How often (seconds) he blinks to a nearby spot and resummons minions.
-@export var teleport_interval := 20.0
+## 20 -> 5 (Designer, 2026-07-25: harder Dark Mage). This is a large difficulty
+## swing, not just a cadence tweak — see BALANCE.md's note that a chasing
+## party's progress resets on every blink, and that each blink now also adds a
+## fresh summon burst. Effective minion pressure is ~4x what it was.
+@export var teleport_interval := 5.0
 ## Max distance a teleport can jump.
 @export var teleport_range := 400.0
-## Minions summoned around him on each teleport.
-@export var teleport_minion_count := 4
+## Minions summoned around him on each teleport: a mix of ordinary swarm
+## minions plus larger ones (the "big mage" variant, which
+## carries its own HP/damage bump via Minion.VARIANT_OVERRIDES). Designer,
+## 2026-07-25: "3 small and 1 large".
+@export var teleport_minion_count := 3
+@export var teleport_large_minion_count := 1
+
+## The two stage-1 swarm variants, requested explicitly rather than left to
+## Minion's random roll so the summon mix is always 3 small + 1 large.
+const SMALL_MINION_ART := preload("res://assets/sprites/Minion-Dark-Mage_Color.png")
+const LARGE_MINION_ART := preload("res://assets/sprites/Minion2_Dark_Mage_Color.png")
 ## Max distance a teleport destination may end up from the nearest hero —
 ## keeps him "in view" instead of vanishing off to some empty corner.
 @export var teleport_fov_radius := 700.0
@@ -30,7 +43,8 @@ extends Villain
 ## shoot_interval. Kept separate from Combatant's built-in engage/target system
 ## (enemy_group stays "") so it doesn't fight the flee-goal movement above —
 ## he still kites while lobbing bolts.
-@export var shoot_interval := 1.0
+## 1.0 -> 0.92 (Designer, 2026-07-25: "shoot 0.08s faster").
+@export var shoot_interval := 0.92
 @export var shoot_damage := 4.0
 @export var shoot_speed := 420.0
 @export var shoot_range := 600.0
@@ -45,7 +59,8 @@ const PROJECTILE_SCENE_PATH := "res://scenes/combat/projectile.tscn"
 ## baked into the source PNG itself, so wiring it in is just setting
 ## sprite_texture (Combatant._draw draws it with the same paper-cutout
 ## treatment — alpha, facing flip, ground shadow — as every other sprite unit).
-const SPRITE := preload("res://assets/sprites/DarkMage1.png")
+## Stage 1 villain art (Designer, 2026-07-25).
+const SPRITE := preload("res://assets/sprites/DarkMage_Color.png")
 
 var _flee_cd := 0.0
 var _teleport_cd := 0.0
@@ -61,7 +76,8 @@ func _configure() -> void:
 	super()
 	enemy_group = ""  # does not attack this milestone
 	sprite_texture = SPRITE
-	sprite_scale = 2.0
+	# 2.0 -> 3.0 (Designer, 2026-07-25: "Dark Mage should be 1.5x bigger").
+	sprite_scale = 3.0
 	_lair = global_position
 	_teleport_cd = teleport_interval
 	_shoot_cd = shoot_interval
@@ -171,9 +187,14 @@ func _find_teleport_spot() -> Vector2:
 func _summon_minions(at: Vector2) -> void:
 	if _minion_scene == null or _field == null:
 		return
-	for i in teleport_minion_count:
+	var total := teleport_minion_count + teleport_large_minion_count
+	if total <= 0:
+		return
+	for i in total:
 		var m := _minion_scene.instantiate()
-		var a := TAU * i / teleport_minion_count
+		# The larges take the tail of the ring; everything before them is small.
+		m.forced_variant = LARGE_MINION_ART if i >= teleport_minion_count else SMALL_MINION_ART
+		var a := TAU * i / total
 		var offset := Vector2(cos(a), sin(a)) * summon_radius
 		m.setup(at + offset, _field.hero_spawn + offset, offset * 0.6, summon_minion_speed)
 		get_parent().add_child(m)

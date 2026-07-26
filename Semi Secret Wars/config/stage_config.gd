@@ -36,6 +36,17 @@ extends Resource
 ## _start_music — see the comment there.
 @export var music: AudioStream = null
 
+## Multipliers applied to every swarm minion this stage spawns, on top of the
+## unit scene's authored stats (LaneSpawner._spawn_one -> Combatant.stat_*_mult).
+## Stage-level rather than per-scene because ranged_minion.tscn is shared
+## between stages 2 and 3.
+@export var minion_hp_mult: float = 1.0
+@export var minion_damage_mult: float = 1.0
+
+## Multiplier on each spawn gate's authored HP (the z of a LevelLayout
+## spawn_points entry), applied in LaneSpawner._spawn_spawn_points.
+@export var spawn_point_hp_mult: float = 1.0
+
 ## Multiplier applied to the villain's authored max_hp (e.g. dark_mage.tscn)
 ## at spawn, without editing the shared scene (see BattleManager._spawn_villain).
 @export var villain_hp_mult: float = 1.0

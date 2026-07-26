@@ -54,9 +54,12 @@ func _land_step() -> void:
 ## Hand-drawn stomp burst art, shared with THUNDAAR.s own Stomp (Designer,
 ## 2026-07-25) — this Ultimate IS a march of stomps, so it reads as the same
 ## impact repeated rather than a different effect.
-const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle.png")
+const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle_Color.png")
 
 func _draw() -> void:
 	if _flash_t > 0.0:
 		var p := 1.0 - _flash_t / FLASH_TIME
-		BattleFX.draw_burst(self, STOMP_BURST, Vector2.ZERO, step_radius * 2.0 * p, 1.0 - p)
+		# Hero.STOMP_BURST_PAD — padding compensation for the colored art, kept
+		# identical so both stomp VFX read at the same size.
+		BattleFX.draw_burst(self, STOMP_BURST, Vector2.ZERO,
+				step_radius * 2.0 * p * Hero.STOMP_BURST_PAD, 1.0 - p)

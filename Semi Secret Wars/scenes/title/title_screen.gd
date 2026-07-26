@@ -60,7 +60,20 @@ func _ready() -> void:
 func _has_progress() -> bool:
 	return GameState.gold > 0 or GameState.banked_xp > 0 or RunState.current_level > 1
 
+## NEW GAME wipes the save (gold, banked XP, skill trees, career stats), so it
+## asks first whenever there is anything to lose (Designer, 2026-07-26). On a
+## fresh install there is no save to destroy and the prompt would be noise, so
+## it starts straight away — the same _has_progress test the CONTINUE button
+## uses to decide whether a save is worth resuming.
 func _on_new_game() -> void:
+	if not _has_progress():
+		_start_new_game()
+		return
+	ConfirmPanel.ask(self, "DELETE SAVED GAME?",
+			"Starting a new game erases your saved progress: gold, banked XP, every skill-tree rank and your career stats. This cannot be undone.",
+			"DELETE & START", _start_new_game)
+
+func _start_new_game() -> void:
 	# full_reset() already routes to the prep menu itself (see its doc
 	# comment) — do not change_scene_to_file again here, the node calling
 	# this has already been removed from the tree by that point.

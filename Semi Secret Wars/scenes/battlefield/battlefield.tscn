@@ -1,21 +1,21 @@
 [gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://scenes/battlefield/lane_field.gd" id="1_field"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Destroyed-Spaceship.png" id="1_spaceship"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Rock-1.png" id="1_rock1"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Rock-2.png" id="1_rock2"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Sword-In-Ground.png" id="1_sword"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Destroyed-Spaceship_Color.png" id="1_spaceship"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Rock-1_Color.png" id="1_rock1"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Rock-2_Color.png" id="1_rock2"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Sword_Ground_Color.png" id="1_sword"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Ground-Smudge.png" id="1_smudge"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Tree-Bushy.png" id="1_treebushy"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Alien-Tree.png" id="1_alientree"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Alien-Tree-Thin.png" id="1_alientreethin"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Plant.png" id="1_plant"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Mushroom.png" id="1_mushroom"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Lair.png" id="1_berserklair"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Tree-Bushy_Color.png" id="1_treebushy"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Alien-Tree_Color.png" id="1_alientree"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Alien-Tree-Thin_Color.png" id="1_alientreethin"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Plant_Color.png" id="1_plant"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Mushroom_Color.png" id="1_mushroom"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Lair_Color.png" id="1_berserklair"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Boulder.png" id="1_boulder"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Paw_Print_Smudge.png" id="1_pawprint"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Spike_Hazard.png" id="1_spike"]
-[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Level_Borders.png" id="1_crowd"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Spike_Hazard_Color.png" id="1_spike"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Berserk_Level_Borders_Color1.png" id="1_crowd"]
 [ext_resource type="Script" path="res://scenes/battlefield/battle_camera.gd" id="3_camera"]
 [ext_resource type="Script" path="res://scenes/enemies/lane_spawner.gd" id="4_spawner"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/minion.tscn" id="5_minion"]
@@ -115,7 +115,7 @@ offset_left = 16.0
 offset_top = 60.0
 offset_right = 230.0
 offset_bottom = 124.0
-text = "PREP MENU"
+text = "Back to menu"
 
 [node name="TimerPanel" type="PanelContainer" parent="HUD"]
 offset_left = 890.0

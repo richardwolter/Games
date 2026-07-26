@@ -129,6 +129,13 @@ func _build_ui() -> void:
 	_start_button = _texture_button(START_RUN_TEXTURE, START_RUN_REGION, _on_start)
 	root.add_child(_start_button)
 
+	# Route back to the title screen (Designer, 2026-07-26). No confirmation
+	# here: prep changes (purchases, pairings) all save as they're made, so
+	# leaving this screen abandons nothing — unlike the battle's version.
+	var back_btn := _button("BACK TO MENU", UIStyle.SIZE_SMALL, _on_back_to_menu)
+	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	root.add_child(back_btn)
+
 	var footer := _label("Level 1 — push right, destroy the spawn gates, defeat the villain      (F12 = full reset)", UIStyle.SIZE_SMALL)
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(footer)
@@ -439,6 +446,9 @@ func _close_stats() -> void:
 	_main.visible = true
 	_rebuild_hero_row()  # banked XP may have changed — refresh the card display
 	_refresh()
+
+func _on_back_to_menu() -> void:
+	get_tree().change_scene_to_file(GameState.TITLE_SCREEN)
 
 func _on_start() -> void:
 	RunState.start_run()

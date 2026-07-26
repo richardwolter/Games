@@ -15,4 +15,11 @@ minion_speed = 115.0
 spawn_interval = 2.0
 spawn_batch = 5
 field_preset = "default"
-villain_hp_mult = 1.4
+; Difficulty pass 2026-07-26 (Designer: "level 2 way harder"). Swarm hits much
+; harder and takes a bit more killing; gates are a real objective instead of a
+; speed bump; the Berserker himself is tankier (see also berserker.tscn for his
+; aggression/damage pass).
+minion_hp_mult = 1.35
+minion_damage_mult = 1.7
+spawn_point_hp_mult = 1.9
+villain_hp_mult = 1.9

@@ -31,7 +31,9 @@ const CARD_STRONG := Color("f4efe1d0")
 ## The one ink. Body text, outlines, borders — all of it.
 const INK := Color("2c2c2c")
 ## Secondary/footnote text (lifetime stats, hints). Ink, just lighter.
-const INK_MUTED := Color("2c2c2c99")
+## Alpha 0x99 -> 0xcc on 2026-07-26: at 60% the thin handwritten strokes on
+## paper were the least readable text in the game. Still clearly secondary.
+const INK_MUTED := Color("2c2c2ccc")
 ## Ruled lines and the red margin rule of the notebook page.
 const RULE := Color("aac4dd")
 const MARGIN := Color("d98f8f")
@@ -61,12 +63,21 @@ const BAR_FILL := Color("a3c06f")
 ## read as unusably small (Designer, 2026-07-25). The scale below is sized so
 ## the SMALLEST step still clears ~11 real pixels at 720p; divide any of these
 ## by 1.5 to see what the player actually gets.
-const SIZE_TITLE := 56
-const SIZE_HEADING := 42
-const SIZE_SUBHEAD := 32
-const SIZE_BODY := 24
-const SIZE_SMALL := 20
-const SIZE_TINY := 17
+##
+## Second pass 2026-07-26 (Designer: "the font is not readable for small
+## text"). The handwritten face has thin, uneven strokes, so it needs more
+## pixels than a sans at the same nominal size — the bottom of the scale was
+## landing at ~11 real pixels, below where DrawFont's letterforms stay legible.
+## The small end moved up hardest (TINY 17 -> 22 = ~15 real px, SMALL 20 -> 25)
+## and the compression between steps was kept, so the hierarchy still reads.
+## If a screen overflows after this, give it room rather than shrinking text
+## back below TINY.
+const SIZE_TITLE := 58
+const SIZE_HEADING := 44
+const SIZE_SUBHEAD := 34
+const SIZE_BODY := 27
+const SIZE_SMALL := 25
+const SIZE_TINY := 22
 
 # -- Font ---------------------------------------------------------------------
 ## Handwritten display font (DrawFont, dafont.com — Designer, 2026-07-25).
@@ -159,7 +170,46 @@ static func button(text: String, size: int = SIZE_BODY, cb: Callable = Callable(
 	b.add_theme_font_size_override("font_size", size)
 	if cb.is_valid():
 		b.pressed.connect(cb)
+	add_hover_wiggle(b)
 	return b
+
+## Hover feedback: a small tilt-and-swell the moment the pointer lands, easing
+## back out when it leaves (Designer, 2026-07-26: "buttons should have a
+## mouse-over effect, at least make it wiggle a bit"). Hand-drawn UI already
+## implies a wobble, so the motion is a rotation rather than a colour change —
+## it reads as the paper being nudged.
+##
+## Applied automatically by button() and texture_button(); call it directly for
+## any other Control that should feel clickable.
+const HOVER_TILT_DEG := 1.6
+const HOVER_SCALE := 1.045
+const HOVER_TIME := 0.12
+
+static func add_hover_wiggle(c: Control) -> void:
+	# Rotation and scale both work off pivot_offset, which defaults to the
+	# top-left — without re-centring it every hover would swing the button
+	# around its own corner. Re-set on resize because the size is 0 here, at
+	# build time, and only becomes real once its container lays it out.
+	c.resized.connect(func() -> void: c.pivot_offset = c.size * 0.5)
+	c.mouse_entered.connect(func() -> void:
+		# A disabled button must not answer the pointer — wiggling one reads as
+		# "this does something" when it doesn't.
+		if c is Button and (c as Button).disabled:
+			return
+		_wiggle_to(c, HOVER_TILT_DEG, HOVER_SCALE))
+	c.mouse_exited.connect(func() -> void: _wiggle_to(c, 0.0, 1.0))
+
+static func _wiggle_to(c: Control, tilt_deg: float, scale_to: float) -> void:
+	if not is_instance_valid(c) or not c.is_inside_tree():
+		return
+	c.pivot_offset = c.size * 0.5
+	# One tween per hover, killing any in flight, so fast pointer sweeps across
+	# a row of buttons can't leave one stuck mid-tilt.
+	var tw := c.create_tween()
+	tw.set_parallel(true)
+	tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(c, "rotation", deg_to_rad(tilt_deg), HOVER_TIME)
+	tw.tween_property(c, "scale", Vector2.ONE * scale_to, HOVER_TIME)
 
 ## Hand-drawn button art cropped out of a shared sheet (the NEW GAME /
 ## CONTINUE / START RUN PNGs), scaled to `target_width` at the region's own
@@ -176,6 +226,7 @@ static func texture_button(texture: Texture2D, region: Rect2, target_width: floa
 	b.custom_minimum_size = Vector2(target_width, target_width / (region.size.x / region.size.y))
 	if cb.is_valid():
 		b.pressed.connect(cb)
+	add_hover_wiggle(b)
 	return b
 
 ## Hero portrait for menus — the actual in-battle sprite (Hero.sprite_for), so

@@ -87,6 +87,23 @@ func start_run() -> void:
 func living_party() -> Array:
 	return party.filter(func(h: String) -> bool: return h not in dead)
 
+## True once an ENTIRE authored Duo (GameState.duo_pairings) has been wiped
+## this run — both of its members are in `dead`. From the next level on, the
+## battlefield runs as ONE lane for the surviving Duo (Designer, 2026-07-26):
+## two heroes cannot hold two fronts, and the split was only ever there to
+## spread a four-hero party. LaneField reads this at load and forces
+## lanes_merged() for the whole level; see LaneField.single_lane.
+##
+## A Duo whose members were never drafted doesn't count — nobody died, so
+## neither name is in `dead`. Benched heroes likewise stay out of it.
+func duo_wiped() -> bool:
+	for duo in GameState.duo_pairings:
+		if not (duo is Array) or (duo as Array).size() != 2:
+			continue
+		if duo[0] in dead and duo[1] in dead:
+			return true
+	return false
+
 func is_dead(hero_name: String) -> bool:
 	return hero_name in dead
 

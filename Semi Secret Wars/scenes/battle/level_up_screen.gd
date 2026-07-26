@@ -44,14 +44,17 @@ func setup(title_text: String, subtitle_text: String, offer: Array, def_resolver
 	add_child(panel)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 18)
+	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
 
-	box.add_child(UIStyle.centered_label(title_text, UIStyle.SIZE_TITLE, ACCENT))
-	box.add_child(UIStyle.centered_label(subtitle_text, UIStyle.SIZE_BODY))
+	# Trimmed 2026-07-26 (Designer: "boon card should be a little bit
+	# smaller") — the heading drops a step and the card box below shrinks, so
+	# the pick covers less of the battlefield behind it.
+	box.add_child(UIStyle.centered_label(title_text, UIStyle.SIZE_HEADING, ACCENT))
+	box.add_child(UIStyle.centered_label(subtitle_text, UIStyle.SIZE_SMALL))
 
 	var cards := HBoxContainer.new()
-	cards.add_theme_constant_override("separation", 22)
+	cards.add_theme_constant_override("separation", 16)
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(cards)
 
@@ -65,8 +68,8 @@ func setup(title_text: String, subtitle_text: String, offer: Array, def_resolver
 func _build_card(id: String, variant: int) -> Button:
 	var d: Dictionary = _def_resolver.call(id)
 	var btn := UIStyle.button("%s\n\n%s" % [d.get("name", id), d.get("desc", "")],
-			UIStyle.SIZE_SUBHEAD, _on_pick.bind(id))
-	btn.custom_minimum_size = Vector2(300, 170)
+			UIStyle.SIZE_BODY, _on_pick.bind(id))
+	btn.custom_minimum_size = Vector2(240, 130)
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
 	# Every option in either catalog is always hero/Duo-specific (no generic
 	# pool on either side), so this accent border always applies.

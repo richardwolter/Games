@@ -17,7 +17,14 @@ damage = 2.2
 attack_interval = 0.5
 attack_range = 340.0
 detect_range = 200.0
-move_speed = 85.0
+move_speed = 65.0
+; Designer, 2026-07-25: it kited too hard to kill. Three changes, together:
+; move_speed 85 -> 65 (heroes run 95, so they now close in decisively);
+; ranged_standoff_fraction 0.6 (shared default) -> 0.3, so it only backs off
+; once a hero is inside ~102px instead of ~204px; and kite_speed_mult 0.5, so
+; its retreat is half-speed — a committed hero always catches it.
+ranged_standoff_fraction = 0.3
+kite_speed_mult = 0.5
 body_color = Color(0.3, 0.55, 0.75, 1)
 body_radius = 10.0
 xp_value = 2

@@ -5,13 +5,29 @@
 [node name="Berserker" type="Node2D"]
 script = ExtResource("1_berserker")
 villain_name = "BERSERKER"
-max_hp = 725.0
-damage = 10.0
+; Designer, 2026-07-25: "much tankier and damage dealer, should also move
+; fast." HP 725 -> 1600 (past Dark Mage's 1450, so he now reads as the durable
+; villain rather than the squishy one); damage 10 -> 24 per swing, kept on the
+; same slow 1.1s interval so he stays a heavy-hitter with telegraphed swings
+; instead of a fast grinder; move_speed 80 -> 135, which is ABOVE the hero
+; move speed of 95 — during a charge phase he now closes on and outruns a
+; fleeing hero instead of trailing behind one.
+; Difficulty pass 2026-07-26 (Designer: level 2 way harder — "berserk is more
+; aggressive and tanky"). HP 1600 -> 2000 before stage_2_config's villain_hp_mult
+; (1.4 -> 1.9), so effective HP goes 2240 -> 3800; damage 24 -> 32 on the same
+; telegraphed 1.1s swing; detect_range 120 -> 170 so he peels onto a passing
+; hero instead of walking by. Aggression comes from the phase rhythm: charge
+; 3.0 -> 4.5s and recover 1.5 -> 1.0s means he is pursuing ~82% of the time
+; instead of 67%, and the escape windows are shorter. That rhythm is the only
+; thing keeping him fair at move_speed 140 vs the hero's 95 — shorten recovery
+; further only if he still feels escapable.
+max_hp = 2000.0
+damage = 32.0
 attack_interval = 1.1
 attack_range = 26.0
-detect_range = 120.0
-move_speed = 80.0
+detect_range = 170.0
+move_speed = 140.0
 body_color = Color(0.851, 0.224, 0.224, 1)
 body_radius = 32.0
-charge_duration = 3.0
-recover_duration = 1.5
+charge_duration = 4.5
+recover_duration = 1.0
