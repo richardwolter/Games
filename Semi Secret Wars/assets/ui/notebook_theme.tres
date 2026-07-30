@@ -11,7 +11,7 @@
 ; Sizes are design-canvas (1920x1080) pixels; the window runs 1280x720, so the
 ; player sees everything at 0.67x. See UIStyle's type-scale doc comment.
 
-[ext_resource type="FontFile" path="res://assets/fonts/DrawFont.ttf" id="1_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/CaveatBrush-Regular.ttf" id="1_font"]
 
 [sub_resource type="StyleBoxFlat" id="button_normal"]
 content_margin_left = 22.0

@@ -286,9 +286,14 @@ const TINT_OVERSCALE := 1.12
 ## Roots wrapping a stunned enemy — Warden's Ensnare.
 const ENSNARE_ART := preload("res://assets/sprites/Ensnare_Effect.png")
 const ENSNARE_ART_PAD := 1.15
-## Fraction of the unit's drawn height the wrap covers. Just over 1 so the
-## roots close around the silhouette rather than sitting inside it.
-const ENSNARE_ART_HEIGHT_FRAC := 1.1
+## Fraction of the unit's drawn height the wrap covers.
+##
+## 1.1 -> 0.8 (Designer, 2026-07-26): drawn taller than the unit, the roots read
+## as an effect stamped over the sprite and buried the body they were supposed
+## to be holding — worse in a bound cluster, where neighbouring wraps overlapped
+## into one mass. Under 1 now, so the roots sit around the legs of the
+## silhouette and the unit stays the thing you look at.
+const ENSNARE_ART_HEIGHT_FRAC := 0.8
 
 ## Impact scratches over a unit that just took a melee hit. Brief by design —
 ## it's a blink, not a state.
@@ -830,9 +835,16 @@ func _engage(delta: float) -> void:
 	# that missed the guard: a pinned unit with a target outside attack_range
 	# would still chase it here, visibly drifting off its spawn point whenever
 	# a minion wandered just out of reach.
+	# Ranged units hold fire when an obstacle sits between them and the target
+	# (Designer, 2026-07-28) — the shot would just die in the rock, so instead
+	# fall through to the approach branch below and let _steer route around it.
+	# Pinned shooters (HeroClone, LaneSpawnPoint) can't reposition, so they
+	# simply wait for the target to step clear.
+	var blocked := is_ranged and projectile_scene != null and _field != null \
+			and not _field.has_line_of_sight(global_position, _target.global_position)
 	if is_pinned:
 		pass
-	elif dist > attack_range:
+	elif dist > attack_range or blocked:
 		global_position += _steer(to_target.normalized(), delta) * move_speed * _effective_move_mult() * delta
 		_walking_this_frame = true
 	elif is_ranged and not _target.is_pinned and dist < attack_range * _standoff_fraction():
@@ -845,7 +857,7 @@ func _engage(delta: float) -> void:
 		# slow orbit around the structure instead of a stable stand-off.
 		global_position += _steer(-to_target.normalized(), delta) * move_speed * kite_speed_mult * _effective_move_mult() * delta
 		_walking_this_frame = true
-	if dist <= attack_range and _attack_cd <= 0.0:
+	if dist <= attack_range and _attack_cd <= 0.0 and not blocked:
 		_lunge = to_target.normalized() * LUNGE_DIST
 		var victim := _target
 		_attack_cd = attack_interval

@@ -7,9 +7,9 @@
 ; for its own padding four times over — see the sizing note on HeroPanelUI.
 [sub_resource type="StyleBoxFlat" id="panel_hero"]
 content_margin_left = 14.0
-content_margin_top = 10.0
+content_margin_top = 8.0
 content_margin_right = 14.0
-content_margin_bottom = 10.0
+content_margin_bottom = 8.0
 bg_color = Color(0.956863, 0.937255, 0.882353, 0.85)
 border_width_left = 5
 border_width_top = 5
@@ -33,15 +33,39 @@ script = ExtResource("1_script")
 layout_mode = 1
 theme_override_constants/separation = 4
 
-[node name="NameLabel" type="Label" parent="VBoxContainer"]
+; Portrait + name share the card's top row. The portrait is flipped to face
+; RIGHT (HeroPanelUI.PORTRAIT_FACES_RIGHT) because that is the way the hero
+; faces on the field: LaneField puts the villain at the right edge and the
+; source art follows Combatant's face-left house convention.
+[node name="TopRow" type="HBoxContainer" parent="VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Portrait" type="TextureRect" parent="VBoxContainer/TopRow"]
+custom_minimum_size = Vector2(58, 58)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+flip_h = true
+
+[node name="NameLabel" type="Label" parent="VBoxContainer/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
 text = "Hero Name"
 theme_override_font_sizes/font_size = 26
 
-[node name="LevelLabel" type="Label" parent="VBoxContainer"]
+; Only ever visible for the staggered second-Duo-wave countdown
+; (HeroPanelUI.set_incoming) — the LV/intent line it used to carry was dropped
+; on 2026-07-26 once the portrait took over the top row.
+[node name="LevelLabel" type="RichTextLabel" parent="VBoxContainer"]
+visible = false
 layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "LV 1"
-theme_override_font_sizes/font_size = 21
 
 [node name="HPBar" type="ProgressBar" parent="VBoxContainer"]
 custom_minimum_size = Vector2(0, 26)
@@ -50,10 +74,13 @@ max_value = 100.0
 value = 50.0
 show_percentage = false
 
-[node name="CooldownLabel" type="Label" parent="VBoxContainer"]
+[node name="CooldownLabel" type="RichTextLabel" parent="VBoxContainer"]
 layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "READY"
-theme_override_font_sizes/font_size = 19
 
 [node name="CooldownBar" type="ProgressBar" parent="VBoxContainer"]
 custom_minimum_size = Vector2(0, 12)
@@ -62,10 +89,13 @@ max_value = 1.0
 value = 1.0
 show_percentage = false
 
-[node name="CooldownLabel2" type="Label" parent="VBoxContainer"]
+[node name="CooldownLabel2" type="RichTextLabel" parent="VBoxContainer"]
 layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "READY"
-theme_override_font_sizes/font_size = 19
 
 [node name="CooldownBar2" type="ProgressBar" parent="VBoxContainer"]
 custom_minimum_size = Vector2(0, 12)
@@ -83,8 +113,16 @@ scroll_active = false
 autowrap_mode = 0
 theme_override_font_sizes/normal_font_size = 17
 
-[node name="RunStatsLabel" type="Label" parent="VBoxContainer"]
+; RichTextLabel, not Label: the numbers are bold and the labels are not
+; (Designer, 2026-07-26), matching the prep menu's stat rows. The bold face is
+; UIStyle's synthetic FontVariation, wired up in HeroPanelUI._ready.
+[node name="RunStatsLabel" type="RichTextLabel" parent="VBoxContainer"]
 layout_mode = 2
-text = "KILLS 0  ·  XP 0  ·  ABL —"
-theme_override_font_sizes/font_size = 16
-theme_override_colors/font_color = Color(0.172549, 0.172549, 0.172549, 0.6)
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
+text = "KILLS [b]0[/b]  ·  XP [b]0[/b]"
+theme_override_font_sizes/normal_font_size = 16
+theme_override_font_sizes/bold_font_size = 16
+theme_override_colors/default_color = Color(0.172549, 0.172549, 0.172549, 0.6)

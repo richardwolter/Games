@@ -55,7 +55,7 @@ const CARD_MARGIN := 8.0
 ## Gap between the art box and the title stack inside a card's head row.
 const HEAD_SEPARATION := 8.0
 
-var _gold_label: Label
+var _gold_label: RichTextLabel
 var _tabs: HBoxContainer
 var _canvas: Control
 ## Hero whose tree is on screen. Defaults to the first unlocked hero.
@@ -91,7 +91,9 @@ func _build_ui() -> void:
 	var title := UIStyle.centered_label("ABILITIES", UIStyle.SIZE_HEADING)
 	root.add_child(title)
 
-	_gold_label = UIStyle.centered_label("", UIStyle.SIZE_SUBHEAD)
+	# Was plain ink body text — the one screen where gold is spent was also the
+	# one screen where it wasn't gold (Designer, 2026-07-26).
+	_gold_label = UIStyle.gold_label(0)
 	root.add_child(_gold_label)
 
 	_tabs = HBoxContainer.new()
@@ -126,7 +128,7 @@ func _on_tab_pressed(hero_name: String) -> void:
 	_refresh()
 
 func _refresh() -> void:
-	_gold_label.text = "Gold: %d" % GameState.gold
+	UIStyle.set_numeric_text(_gold_label, "GOLD: %d" % GameState.gold)
 	for tab in _tabs.get_children():
 		# The open tree's tab reads as pressed-in; the rest stay live.
 		(tab as Button).disabled = (tab as Button).text == _hero
@@ -260,11 +262,20 @@ func _node_card(id: String, ultimate: bool) -> PanelContainer:
 			UIStyle.INK if unlocked else UIStyle.INK_MUTED, inner))
 
 	if maxed:
-		box.add_child(UIStyle.label("● MAXED", UIStyle.SIZE_TINY, UIStyle.GOLD))
+		# DANGER red, not GOLD (Designer, 2026-07-26): gold is this page's colour
+		# for everything bought-and-good (rank pips, the rank line, met
+		# prerequisites), so "MAXED" in gold read as one more of those instead of
+		# as "stop, there is nothing left to buy here".
+		# "•", not "●": the geometric dot is absent from Caveat Brush and system
+		# font fallback is off, so it rendered as a tofu box (same fix as _pips).
+		box.add_child(UIStyle.label("• MAXED", UIStyle.SIZE_TINY, UIStyle.DANGER))
 	elif not unlocked:
 		box.add_child(UIStyle.label("Locked", UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
 	else:
-		var buy := UIStyle.button("Buy Lv%d — %dg" % [rank + 1, cost], UIStyle.SIZE_TINY)
+		# Compact: the theme's button padding made a three-digit cost overflow the
+		# node card — see UIStyle.COMPACT_BUTTON_PAD_X.
+		var buy := UIStyle.compact_button("Buy Lv%d — %dg" % [rank + 1, cost],
+				UIStyle.SIZE_TINY, Callable(), id.length())
 		buy.disabled = not affordable
 		buy.pressed.connect(func() -> void:
 			if GameState.buy_skill_rank(_hero, id):
@@ -282,8 +293,13 @@ func _node_card(id: String, ultimate: bool) -> PanelContainer:
 ## text vanished (Designer, 2026-07-26, immediately after the overlap fix).
 ## Wrapping alone already caps the width, which was the only thing clipping was
 ## meant to add.
-func _fitted_label(text: String, size: int, color: Color, width: float) -> Label:
-	var l := UIStyle.label(text, size, color)
+## RichTextLabel rather than Label: node names and descriptions carry the
+## numbers that ARE the upgrade ("+15s burn duration", "Buy Lv3"), and those
+## digits bold like every other number in the game (UIStyle.bold_numbers).
+## Wrapping is re-enabled after numeric_label turns it off — a tree card is a
+## fixed-width column and its description has to wrap inside it.
+func _fitted_label(text: String, size: int, color: Color, width: float) -> RichTextLabel:
+	var l := UIStyle.numeric_label(text, size, color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.custom_minimum_size = Vector2(width, 0)
 	l.size_flags_horizontal = Control.SIZE_FILL
@@ -314,5 +330,10 @@ func _art_box(d: Dictionary, ultimate: bool) -> Control:
 	return frame
 
 ## Rank readout — filled dots for bought ranks, hollow for the rest.
+##
+## Uses • / ° rather than the ● / ○ this shipped with (2026-07-28): the geometric
+## shapes are absent from Caveat Brush, and on an HTML5 export there is no system
+## font to silently borrow them from, so they came out as tofu boxes. These two
+## are in the face itself and read the same at pip size.
 func _pips(rank: int, max_rank: int) -> String:
-	return "●".repeat(rank) + "○".repeat(maxi(max_rank - rank, 0))
+	return "•".repeat(rank) + "°".repeat(maxi(max_rank - rank, 0))

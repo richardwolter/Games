@@ -142,10 +142,68 @@ func _build() -> void:
 	box.add_child(_build_slider_row("EFFECTS VOLUME", AudioSettings.effects,
 			AudioSettings.set_effects, true))
 
+	var display_row := HBoxContainer.new()
+	display_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	display_row.add_theme_constant_override("separation", 16)
+	box.add_child(display_row)
+	_fullscreen_button = UIStyle.button(_fullscreen_text(), UIStyle.SIZE_SUBHEAD,
+			_on_fullscreen_pressed)
+	display_row.add_child(_fullscreen_button)
+
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
 	box.add_child(row)
 	row.add_child(UIStyle.button("CLOSE", UIStyle.SIZE_SUBHEAD, close))
+	row.add_child(UIStyle.button("EXIT GAME", UIStyle.SIZE_SUBHEAD, _on_exit_pressed))
+
+## FULLSCREEN / WINDOWED toggle (Designer, 2026-07-27). On itch.io the embedded
+## canvas has no window chrome to go fullscreen with, so without this the player
+## has to leave the page to change it; on desktop it's the display option
+## BACKLOG has been carrying. DisplayServer, not the project setting — this
+## changes the live window, and is deliberately NOT persisted (a run that boots
+## into an unexpected display mode is worse than re-toggling it).
+var _fullscreen_button: Button
+
+func _is_fullscreen() -> bool:
+	var mode := DisplayServer.window_get_mode()
+	return mode == DisplayServer.WINDOW_MODE_FULLSCREEN \
+			or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+
+func _fullscreen_text() -> String:
+	return "WINDOWED" if _is_fullscreen() else "FULLSCREEN"
+
+func _on_fullscreen_pressed() -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if _is_fullscreen()
+			else DisplayServer.WINDOW_MODE_FULLSCREEN)
+	_fullscreen_button.text = _fullscreen_text()
+
+## EXIT GAME. Confirms first — it's reachable mid-battle, and the panel sits
+## right next to CLOSE. On desktop it quits the process; on web (itch.io)
+## quitting does nothing the player can see, so there it drops back to the title
+## screen instead, which is the "quit" a browser build can actually offer
+## without a page reload (Designer, 2026-07-27).
+func _on_exit_pressed() -> void:
+	var prompt := ConfirmPanel.ask(self, "EXIT GAME?",
+			"Leave the current run and quit. Progress since your last completed level is lost.",
+			"EXIT", _do_exit)
+	# ConfirmPanel's own layer (200) sits BELOW this panel's 210 — that ordering
+	# exists so a settings panel opened over a prompt wins (see LAYER), but a
+	# prompt WE opened has to be the one on top or it's invisible behind us.
+	prompt.layer = LAYER + 10
+
+func _do_exit() -> void:
+	if OS.has_feature("web"):
+		# The tree must NOT be restored to the paused state we found — that state
+		# belonged to the battle we're leaving, and a paused title screen is dead
+		# input. Cleared before the free so _exit_tree restores false.
+		_was_paused = false
+		var tree := get_tree()
+		close()
+		tree.paused = false
+		tree.change_scene_to_file(GameState.TITLE_SCREEN)
+		return
+	get_tree().quit()
 
 ## One labeled slider bound to an AudioSettings setter. The live "70%" readout
 ## is the only reason this needs a closure rather than a direct connect — the
@@ -160,7 +218,7 @@ func _build_slider_row(text: String, value: float, setter: Callable,
 	var name_label := UIStyle.label(text, UIStyle.SIZE_BODY)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(name_label)
-	var pct_label := UIStyle.label(_pct_text(value), UIStyle.SIZE_BODY, UIStyle.INK_MUTED)
+	var pct_label := UIStyle.numeric_label(_pct_text(value), UIStyle.SIZE_BODY, UIStyle.INK_MUTED)
 	header.add_child(pct_label)
 
 	var slider := HSlider.new()
@@ -175,7 +233,7 @@ func _build_slider_row(text: String, value: float, setter: Callable,
 	slider.focus_mode = Control.FOCUS_NONE
 	slider.value_changed.connect(func(v: float) -> void:
 		setter.call(v)
-		pct_label.text = _pct_text(v))
+		UIStyle.set_numeric_text(pct_label, _pct_text(v)))
 	# On release, not on every value change: a sample retriggered each step of
 	# a drag is a stutter, not a preview.
 	if preview_on_release:

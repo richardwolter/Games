@@ -102,13 +102,30 @@ const STOMP_BURST := preload("res://assets/sprites/Stomp_Circle_Color.png")
 ## draw at 60% of the damage area it is supposed to match. Same reasoning as
 ## LaneField.ART_PAD_COMPENSATION; StompWave applies the identical factor.
 const STOMP_BURST_PAD := 1.57
-## BEACON+WARDEN "Searing Bind" Ultimate art + its own flash timer. Held on the
-## caster (like the Stomp/Ensnare flashes) rather than spawned as a node,
-## since the effect is instantaneous — nothing persists to own a scene.
+## BEACON+WARDEN "Searing Bind" Ultimate art. Held on the caster (like the
+## Stomp/Ensnare flashes) rather than spawned as a node — the field is a few
+## floats and a hit-list, not enough to own a scene.
 const SEARING_BURST := preload("res://assets/sprites/Searing_Bind_Color.png")
 ## Padding compensation, same reason as STOMP_BURST_PAD above.
 const SEARING_BURST_PAD := 2.48
-const SEARING_FLASH_TIME := 0.6
+## How long the bind stays LIVE on the ground after the cast (Designer,
+## 2026-07-26). It was a single instantaneous snapshot of whoever happened to be
+## in radius; now it lingers and catches anything that walks in during the
+## window, which is what makes the bigger radius worth having.
+const SEARING_FIELD_TIME := 3.0
+## How long the art keeps blinking over a bound unit — the duration of the
+## effect it is marking (see the burn_duration param), so the mark disappears
+## when the burn does rather than on its own unrelated timer.
+const SEARING_MARK_TIME := 5.0
+## Blink cadence of that mark, in seconds per on/off cycle. Short on purpose
+## (Designer, 2026-07-26: "blinking over targets more often") — the old single
+## 0.6s fade read as one flash and was gone.
+const SEARING_BLINK_PERIOD := 0.24
+## Floor/ceiling of the blink so the mark never fully vanishes mid-effect (a
+## bound unit must stay legibly bound) and never sits at full opacity long
+## enough to hide the sprite under it.
+const SEARING_BLINK_MIN_ALPHA := 0.25
+const SEARING_BLINK_MAX_ALPHA := 0.95
 
 ## Searing Bind's cast SFX (Designer, 2026-07-26): the 3.551-4.542s slice of a
 ## 64.8s source file. The rest of that recording is a low-level sustained
@@ -167,7 +184,13 @@ const CLONE_ART_SCALE_MULT := 2.1
 const VOLATILE_CLONE_ART := preload("res://assets/sprites/Volatile_Duplicates.png")
 const VOLATILE_CLONE_ART_SCALE_MULT := 1.7
 const CLONE_COOLDOWN := 9.0
-const CLONE_DURATION := 5.0
+## Halved 2026-07-26 (Designer: clones should last much less). The solo Clone's
+## taunt window only — the two Ultimates that spawn clones pass their own
+## clone_life_span through _build_clone and are deliberately untouched (the
+## Volatile fuse and the Hunting Duplicates' long roam are what those Ultimates
+## ARE). Clone uptime against its 9s cooldown drops from ~55% to ~28%, so the
+## decoy is a moment of relief rather than a near-permanent extra body.
+const CLONE_DURATION := 2.5
 const CLONE_TAUNT_RADIUS := 90.0
 ## Spawn offset so the clone appears beside Artemis (toward her facing) instead
 ## of stacked exactly on top of her, where it's indistinguishable at a glance.
@@ -200,7 +223,10 @@ const MAX_CLONE_COUNT := 2
 ## style set by RALLY_DMG_ADD) so Warden's contribution shows up in the
 ## party's damage numbers instead of only in prevented damage. Stun duration
 ## extended slightly so the party gets a real window to capitalize.
-const ENSNARE_COOLDOWN := 4.5
+## 4.5 -> 5.2 -> 6.2 across two passes on 2026-07-26 (Designer, +0.7s then +1s):
+## the longer the gap between roots, the more of the swarm's advance a Warden
+## has to let through rather than holding the whole lane on permanent lockdown.
+const ENSNARE_COOLDOWN := 6.2
 const ENSNARE_RADIUS := 95.0
 const ENSNARE_STUN_DURATION := 1.6
 const ENSNARE_VULN_DMG_ADD := 2.0
@@ -351,14 +377,19 @@ const ROLE_BY_HERO := {
 	"WARDEN": "CONTROL",
 	"BEACON": "SUPPORT",
 }
-## One-sentence base rule per hero (see class doc) — surfaced on the prep
-## screen's hero cards so the role/Duo-composition decision is informed
-## without needing to read this file. Kept in sync with the class doc bullets.
+## One-sentence pitch per hero — surfaced on the prep screen's hero cards so the
+## Duo-composition decision is informed without needing to read this file.
+##
+## Designer copy, 2026-07-26. These used to describe each hero's targeting RULE
+## (who they walk at, who they focus); they now describe what the hero DOES,
+## matching the card's new attack-mode/ability line above them. The old
+## behavioural wording lives on in the class doc bullets, which is where it
+## belongs — the card is a pitch, not a spec.
 const ROLE_DESCRIPTIONS := {
-	"THUNDAAR": "Walks toward the biggest threat and stomps everything close.",
-	"ARTEMIS": "Kites at max range, focuses low-HP targets.",
-	"WARDEN": "Ensnares the densest cluster near the front line.",
-	"BEACON": "Follows its partner and pulses Rally when both are engaged.",
+	"THUNDAAR": "Stomps the ground dealing AoE damage.",
+	"ARTEMIS": "Shoots fast and creates clones.",
+	"WARDEN": "Traps enemies in vines.",
+	"BEACON": "Rallies DUO to battle.",
 }
 ## Duo cohesion (Designer, 2026-07-20): "DUOs should stick together and share
 ## a goal; heroes should not go solo, only after his DUO perished." Which of
@@ -740,13 +771,25 @@ var _rally_sound_cd := 0.0
 ## root lands around the target, not the caster, so the ring is drawn there).
 var _ensnare_flash_t := 0.0
 var _ensnare_flash_center := Vector2.ZERO
-var _searing_flash_t := 0.0
-## World-space center of every enemy the bind actually caught this cast — the
-## art is stamped on EACH of them (Designer, 2026-07-25) instead of one big
-## burst over the cluster, so the sprite reads as "these units are bound".
-## (x, y) = world center, z = art size, taken from that unit's own body so a
-## brute wears a bigger bind than a minion.
-var _searing_flash_marks: Array[Vector3] = []
+## Live Searing Bind field: a stationary circle at the cast's aim point that
+## keeps binding for SEARING_FIELD_TIME. Zero/negative _t means no field.
+var _searing_field_t := 0.0
+var _searing_field_center := Vector2.ZERO
+var _searing_field_radius := 0.0
+var _searing_field_ensnare := 0.0
+var _searing_field_burn_dur := 0.0
+var _searing_field_burn_dps := 0.0
+## Instance ids already bound by the CURRENT field. The bind hits each enemy
+## once and does not accumulate (Designer, 2026-07-26) — without this list a
+## unit standing in the field would be re-rooted and re-burned every frame.
+var _searing_field_hit: Dictionary = {}
+## One entry per bound enemy: {"node": Combatant, "size": float, "t": float}.
+## The art is stamped on EACH of them (Designer, 2026-07-25) instead of one big
+## burst over the cluster, so the sprite reads as "these units are bound", and
+## it tracks the node rather than a frozen position so the mark rides a unit
+## that is still moving. "size" comes from that unit's own body, so a brute
+## wears a bigger bind than a minion.
+var _searing_marks: Array[Dictionary] = []
 var _villain_track_cd := 0.0
 ## Set once the villain has come within detect range at least once (i.e. the
 ## hero has actually seen/engaged him), so tracking can get more aggressive.
@@ -824,6 +867,13 @@ func ability_name() -> String:
 ## hero's ability before any of them have spawned (HeroPanelUI.set_predeploy).
 static func ability_name_for(hero: String) -> String:
 	return ABILITY_INFO.get(hero, {}).get("name", "ABILITY")
+
+## "RANGED"/"MELEE" for the prep roster cards (Designer, 2026-07-26: a card
+## should say how a hero fights, not what role bucket they sit in). Reads the
+## same HERO_STATS.is_ranged key _configure does, so the card can never claim
+## a different attack mode than the hero actually spawns with.
+static func attack_mode_for(hero: String) -> String:
+	return "RANGED" if HERO_STATS.get(hero, {}).get("is_ranged", false) else "MELEE"
 
 ## Always "" — solo LV20 second abilities were retired for Duo Ultimates
 ## (2026-07-22). Kept as a stub so the HUD's existing has_second gate
@@ -1021,7 +1071,7 @@ func _process(delta: float) -> void:
 	_rally_sound_cd = maxf(_rally_sound_cd - delta, 0.0)
 	_stomp_flash_t = maxf(_stomp_flash_t - delta, 0.0)
 	_ensnare_flash_t = maxf(_ensnare_flash_t - delta, 0.0)
-	_searing_flash_t = maxf(_searing_flash_t - delta, 0.0)
+	_tick_searing_bind(delta)
 
 	# Ranged heroes (Artemis) can lock onto a minion from well outside melee
 	# range and then never move again — super() only calls _advance_goal when
@@ -1157,13 +1207,15 @@ func _process(delta: float) -> void:
 					# independently computing a slightly different one.
 					set_goal(duo_partner.goal)
 
-	# Focus ping (player command) overrides the wandering goal set by the priority
-	# blocks above: while a ping is live, head toward it. Combatant only advances
-	# `goal` when this hero has no combat target, so this rallies FREE heroes to
-	# the pinged spot without yanking anyone out of a fight — and _target_score
-	# already pulls target choice toward pinged enemies.
+	# Refocus marker (player command) overrides the wandering goal set by the
+	# priority blocks above: while THIS hero's Duo has a marker down, head toward
+	# it. Combatant only advances `goal` when this hero has no combat target, so
+	# this rallies FREE heroes to the marked spot without yanking anyone out of a
+	# fight — and _target_score already pulls target choice toward marked enemies.
+	# The other Duo's marker is none of this hero's business (FocusPing keys
+	# everything by pair_id).
 	var focus_ping := get_tree().get_first_node_in_group("focus_ping")
-	if focus_ping != null and focus_ping.has_active_ping():
+	if focus_ping != null and focus_ping.has_active_ping(hero_name):
 		# A ping dropped ON the villain is a "commit to the villain" order: chase
 		# his LIVE position (tracking teleports) rather than the static ping spot,
 		# and arm the aggressive re-track cadence. _acquire_target locks him as
@@ -1172,7 +1224,7 @@ func _process(delta: float) -> void:
 			_villain_spotted = true
 			set_goal(_villain_goal())
 		else:
-			set_goal(focus_ping.ping_pos())
+			set_goal(focus_ping.ping_pos(hero_name))
 
 	if _base_unlocked:
 		_ability_cd -= delta
@@ -1464,15 +1516,15 @@ func _acquire_target() -> void:
 			return
 	super()
 
-## Player command: the live villain when an active focus ping was dropped on him
-## (its point within PING_RADIUS of a villain body), else null. Drives both the
-## target lock in _acquire_target and the chase goal in _process — a pinged
-## villain is chased/attacked regardless of range, for the ping's lifetime.
+## Player command: the live villain when this hero's Duo dropped its refocus
+## marker on him (its point within PING_RADIUS of a villain body), else null.
+## Drives both the target lock in _acquire_target and the chase goal in _process
+## — a marked villain is chased/attacked regardless of range, for the level.
 func _ping_targets_villain() -> Combatant:
 	var ping := get_tree().get_first_node_in_group("focus_ping")
-	if ping == null or not ping.has_active_ping():
+	if ping == null or not ping.has_active_ping(hero_name):
 		return null
-	var p: Vector2 = ping.ping_pos()
+	var p: Vector2 = ping.ping_pos(hero_name)
 	for node in get_tree().get_nodes_in_group("villains"):
 		if not is_instance_valid(node) or node._dying:
 			continue
@@ -1497,15 +1549,16 @@ func _target_score(node: Combatant, dist_sq: float) -> float:
 		score -= SCORE_SPAWN_POINT_PRIORITY
 	return score
 
-## Focus ping (player command): bias target choice toward enemies near an active
-## ping, full bonus at the ping fading to 0 at its influence radius. Lets the
-## player commit the party's fire to a spot without micromanaging each hero.
+## Refocus marker (player command): bias target choice toward enemies near this
+## hero's OWN Duo marker, full bonus at the marker fading to 0 at its influence
+## radius. Lets the player commit one Duo's fire to a spot without micromanaging
+## each hero.
 func _focus_ping_bonus(node: Combatant) -> float:
 	var ping := get_tree().get_first_node_in_group("focus_ping")
-	if ping == null or not ping.has_active_ping():
+	if ping == null or not ping.has_active_ping(hero_name):
 		return 0.0
 	var influence: float = ping.influence_radius()
-	var d := node.global_position.distance_to(ping.ping_pos())
+	var d := node.global_position.distance_to(ping.ping_pos(hero_name))
 	if d >= influence:
 		return 0.0
 	return SCORE_FOCUS_PING * (1.0 - d / influence)
@@ -1692,7 +1745,6 @@ func _try_stomp() -> void:
 				node.apply_knockback(to_node.normalized(), STOMP_KNOCKBACK, 0.0, self)
 				if _passive_unlocked:
 					node.apply_stun(STOMP_STUN_DURATION)
-	GameState.record_ability_result(hero_name, hit)
 	if hit:
 		var cooldown := STOMP_COOLDOWN + stomp_cooldown_add - _duo_cooldown_reduction - _ability_cooldown_reduction
 		_ability_cd = maxf(cooldown, STOMP_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
@@ -1739,7 +1791,6 @@ func _try_ensnare() -> void:
 			# the field instead of only off the stun timer.
 			node.show_ensnare_art(duration)
 			hit = true
-	GameState.record_ability_result(hero_name, hit)
 	if hit:
 		var cooldown := ENSNARE_COOLDOWN - _duo_cooldown_reduction - _ability_cooldown_reduction
 		_ability_cd = maxf(cooldown, ENSNARE_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
@@ -1795,7 +1846,6 @@ func _try_rally() -> void:
 			# helps the whole party was invisible while it did it.
 			node.show_rally_art(RALLY_DURATION)
 			buffed = true
-	GameState.record_ability_result(hero_name, buffed)
 	if buffed:
 		var cooldown := RALLY_COOLDOWN + rally_cooldown_add - _duo_cooldown_reduction - _ability_cooldown_reduction
 		_ability_cd = maxf(cooldown, RALLY_COOLDOWN * ABILITY_COOLDOWN_FLOOR_FRAC)
@@ -1880,6 +1930,23 @@ func _ultimate_param(pair_id: String, params: Dictionary, key: String, default: 
 			+ RunState.duo_boon_total(pair_id, key) \
 			+ GameState.duo_ultimate_total(pair_id, key)
 
+## Parents a Duo Ultimate effect so it draws UNDER every unit on the field
+## (Designer, 2026-07-28: "its over everything now").
+##
+## The effects used to go into get_parent() — the caster's own container
+## (Heroes) — which sits after MinionSpawner and BloodLayer in battlefield.tscn.
+## Everything on the field shares z_index 0, so draw order is pure tree order and
+## an effect added there landed on top of every minion and hero in the fight.
+##
+## One z above LaneField.PAGE_Z and one below the props/units at 0, so the effect
+## lands between the paper and everything standing on it. LaneField splits the
+## page onto its own canvas item precisely to open this gap — see its
+## _paint_page. Tree order no longer matters, which is why this can keep the
+## effect parented to the caster's own container.
+func _add_ultimate_effect(node: Node2D) -> void:
+	node.z_index = LaneField.PAGE_Z + 1
+	get_parent().add_child(node)
+
 ## THUNDAAR+BEACON ("Seismic Advance"): a marching sequence of stomps — see
 ## scenes/combat/duo/stomp_wave.gd for the actual step/damage/stun loop.
 func _cast_stomp_wave(pair_id: String, params: Dictionary) -> void:
@@ -1891,7 +1958,7 @@ func _cast_stomp_wave(pair_id: String, params: Dictionary) -> void:
 	wave.step_radius = _ultimate_param(pair_id, params, "step_radius", 90.0)
 	wave.step_damage = _ultimate_param(pair_id, params, "step_damage", 30.0)
 	wave.step_stun = _ultimate_param(pair_id, params, "step_stun", 0.8)
-	get_parent().add_child(wave)
+	_add_ultimate_effect(wave)
 	wave.global_position = global_position
 	# Aim only once the wave is actually AT the cast point — DuoAim scores
 	# directions relative to its origin, and add_child() alone leaves it at 0,0.
@@ -1909,7 +1976,7 @@ func _cast_plant_trail(pair_id: String, params: Dictionary) -> void:
 	trail.tick_interval = _ultimate_param(pair_id, params, "tick_interval", 1.0)
 	trail.ensnare_duration = _ultimate_param(pair_id, params, "ensnare_duration", 1.0)
 	trail.trail_lifetime = _ultimate_param(pair_id, params, "trail_lifetime", 8.0)
-	get_parent().add_child(trail)
+	_add_ultimate_effect(trail)
 	trail.global_position = global_position
 	# Same ordering requirement as the stomp wave above — aim from the real
 	# cast point, not from the origin.
@@ -1975,47 +2042,82 @@ func _cast_arrow_barrage(pair_id: String, params: Dictionary) -> void:
 	barrage.arrow_damage = _ultimate_param(pair_id, params, "arrow_damage", 55.0)
 	barrage.duration = _ultimate_param(pair_id, params, "duration", 10.0)
 	barrage.wave_interval = _ultimate_param(pair_id, params, "wave_interval", 0.5)
-	get_parent().add_child(barrage)
+	_add_ultimate_effect(barrage)
 	barrage.global_position = global_position
 
-## WARDEN+BEACON ("Searing Bind"): instant ensnare + burn around the current
+## WARDEN+BEACON ("Searing Bind"): drops a burning field around the current
 ## target (or nearest enemy if idle) — same aim-fallback idiom as the old
-## Confuse ultimate. No separate scene: purely a status application, like
-## Ensnare itself.
+## Confuse ultimate. No separate scene: the field is state on the caster, like
+## Ensnare's own flash.
+##
+## Reworked 2026-07-26 (Designer). It used to be one instantaneous snapshot:
+## whoever stood in a small radius at the instant of the cast got rooted and
+## burned, and anything that walked in a frame later was untouched. Now the
+## cast only ARMS the field — _tick_searing_bind does the binding for the next
+## SEARING_FIELD_TIME seconds, so the swarm marching into it gets caught too.
+## Each enemy is still bound exactly once (_searing_field_hit).
 func _cast_ensnare_burn(pair_id: String, params: Dictionary) -> void:
 	var aim: Combatant = _target
 	if aim == null or not is_instance_valid(aim):
 		aim = _nearest_in_group(enemy_group)
 	if aim == null:
 		return
-	var radius := _ultimate_param(pair_id, params, "radius", 110.0)
-	var ensnare_dur := _ultimate_param(pair_id, params, "ensnare_duration", 1.5)
-	var burn_dur := _ultimate_param(pair_id, params, "burn_duration", 30.0)
+	# Fires on the cast itself, not per bound target: one cast is one event —
+	# a dozen overlapping copies as the field catches units would just be
+	# louder mush.
+	BattleSfx.play_clip(self, SEARING_SOUND, SEARING_SOUND_START,
+			SEARING_SOUND_DURATION, SEARING_SOUND_VOLUME_DB)
+	_searing_field_center = aim.global_position
+	_searing_field_radius = _ultimate_param(pair_id, params, "radius", 110.0)
+	_searing_field_ensnare = _ultimate_param(pair_id, params, "ensnare_duration", 1.5)
+	_searing_field_burn_dur = _ultimate_param(pair_id, params, "burn_duration", 5.0)
 	# Ability-cadence pass (2026-07-24): burn_dps used to be applied raw,
 	# bypassing _duo_damage_mult/damage_mult() that every other ultimate
 	# routes through (stomp_wave/plant_trail/arrow_barrage all do).
-	var burn_dps := _ultimate_param(pair_id, params, "burn_dps", 4.0) * _duo_damage_mult * damage_mult()
-	# Fires on the cast itself, not per bound target: the bind lands on every
-	# enemy in radius at once (see _searing_flash_marks below), so one sound is
-	# the event — a dozen overlapping copies would just be louder mush.
-	BattleSfx.play_clip(self, SEARING_SOUND, SEARING_SOUND_START,
-			SEARING_SOUND_DURATION, SEARING_SOUND_VOLUME_DB)
-	_searing_flash_marks.clear()
-	for node in get_tree().get_nodes_in_group(enemy_group):
-		if not is_instance_valid(node) or node._dying or not _lane_ok(node):
-			continue
-		if node.global_position.distance_to(aim.global_position) <= radius:
-			node.apply_stun(ensnare_dur)
-			node.apply_burn(burn_dur, burn_dps, self)
-			_searing_flash_marks.append(Vector3(node.global_position.x,
-					node.global_position.y,
-					node._collision_radius() * SEARING_MARK_SIZE_MULT))
-	# Until now this Ultimate had NO visual at all — it silently applied stun +
-	# burn, so the only feedback was enemies suddenly ticking down. Stamp the
-	# hand-drawn bind art on EVERY unit it caught (Designer, 2026-07-25) —
-	# one burst over the whole radius made it read as an area blast rather
-	# than a per-target root.
-	_searing_flash_t = SEARING_FLASH_TIME
+	_searing_field_burn_dps = _ultimate_param(pair_id, params, "burn_dps", 4.0) \
+			* _duo_damage_mult * damage_mult()
+	# A fresh cast is a fresh field: the previous one's hit-list is dropped so a
+	# unit that survived an earlier bind can be bound again by a later one.
+	_searing_field_hit.clear()
+	_searing_field_t = SEARING_FIELD_TIME
+	_tick_searing_bind(0.0)
+
+## Runs the live bind field and ages the blinking marks. Called every physics
+## frame; returns immediately when neither is active, which is the usual case.
+func _tick_searing_bind(delta: float) -> void:
+	if _searing_field_t > 0.0:
+		_searing_field_t -= delta
+		for node in get_tree().get_nodes_in_group(enemy_group):
+			if not is_instance_valid(node) or node._dying or not _lane_ok(node):
+				continue
+			if _searing_field_hit.has(node.get_instance_id()):
+				continue
+			if node.global_position.distance_to(_searing_field_center) > _searing_field_radius:
+				continue
+			_searing_field_hit[node.get_instance_id()] = true
+			node.apply_stun(_searing_field_ensnare)
+			node.apply_burn(_searing_field_burn_dur, _searing_field_burn_dps, self)
+			# Until the 2026-07-25 pass this Ultimate had NO visual at all — it
+			# silently applied stun + burn, so the only feedback was enemies
+			# suddenly ticking down. Stamp the hand-drawn bind art on EVERY unit
+			# it catches; one burst over the whole radius made it read as an
+			# area blast rather than a per-target root.
+			_searing_marks.append({
+				"node": node,
+				"size": node._collision_radius() * SEARING_MARK_SIZE_MULT,
+				"t": SEARING_MARK_TIME,
+			})
+
+	if _searing_marks.is_empty():
+		return
+	# Age the marks and drop the expired ones (and any whose unit died wearing
+	# one — the mark belongs to the body, not to the ground).
+	var kept: Array[Dictionary] = []
+	for mark in _searing_marks:
+		mark["t"] = mark["t"] - delta
+		if mark["t"] > 0.0 and is_instance_valid(mark["node"]):
+			kept.append(mark)
+	_searing_marks = kept
 	queue_redraw()
 
 ## Flat, level-long stat buff granted to both Duo members on Ultimate
@@ -2092,15 +2194,22 @@ func _draw() -> void:
 		if duo_partner != null:
 			var role_color: Color = ROLE_COLORS.get(role, Color.WHITE)
 			draw_line(Vector2.ZERO, to_local(duo_partner.global_position), Color(role_color, 0.35), 2.0, true)
-	if _searing_flash_t > 0.0:
-		# Snaps to full size immediately then fades, unlike the expanding
-		# Stomp burst — the bind lands on each target at once rather than
-		# travelling outward.
-		var bind_alpha := _searing_flash_t / SEARING_FLASH_TIME
-		for mark in _searing_flash_marks:
-			BattleFX.draw_burst(self, SEARING_BURST,
-					Vector2(mark.x, mark.y) - global_position,
-					mark.z * SEARING_BURST_PAD, bind_alpha)
+	# Full size immediately, then BLINKS for as long as the effect lasts, unlike
+	# the expanding Stomp burst — the bind lands on each target at once rather
+	# than travelling outward, and it has to keep saying "still bound".
+	for mark in _searing_marks:
+		var node: Node2D = mark["node"]
+		if not is_instance_valid(node):
+			continue
+		var life: float = mark["t"]
+		# Blink between MIN and MAX, then scaled by an overall fade over the last
+		# second so the mark leaves rather than being cut off mid-flash.
+		var pulse := 0.5 + 0.5 * sin(TAU * (SEARING_MARK_TIME - life) / SEARING_BLINK_PERIOD)
+		var bind_alpha: float = lerpf(SEARING_BLINK_MIN_ALPHA, SEARING_BLINK_MAX_ALPHA, pulse) \
+				* minf(life, 1.0)
+		BattleFX.draw_burst(self, SEARING_BURST,
+				node.global_position - global_position,
+				float(mark["size"]) * SEARING_BURST_PAD, bind_alpha)
 
 ## Clone: spawns clone_count temporary copies of Artemis's current stats that
 ## taunt and fight back for CLONE_DURATION, then expire (see HeroClone). Twin
@@ -2116,8 +2225,6 @@ func _try_clone() -> void:
 		# Fan multiple clones to alternating sides so they don't stack on one spot.
 		var side := 1.0 if i % 2 == 0 else -1.0
 		_spawn_clone(side * (1.0 + float(i / 2)))
-	# Clone always succeeds once it fires (no in-radius gate, unlike Stomp/Ensnare).
-	GameState.record_ability_result(hero_name, true)
 	var cooldown := CLONE_COOLDOWN - _duo_cooldown_reduction - _ability_cooldown_reduction
 	# Duo leader/follower layer: Clone recharges faster while Artemis leads
 	# her Duo (see THUNDAAR_LEADER_ATK_SPEED_MULT doc comment for the table).

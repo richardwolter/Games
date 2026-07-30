@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/tools/itch_background.gd" id="1_itchbg"]
+
+; Run this scene to bake res://assets/Itch_Background_2560x1440.png, then it
+; quits. Nothing in the game loads it — it exists only to regenerate the itch.io
+; page background from whatever the current page dressing looks like.
+[node name="ItchBackground" type="Node"]
+script = ExtResource("1_itchbg")

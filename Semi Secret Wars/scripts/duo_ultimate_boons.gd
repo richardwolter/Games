@@ -110,13 +110,16 @@ const CATALOG := {
 	# BEACON+WARDEN — Searing Bind (ensnare_burn) -----------------------------
 	# params: radius, ensnare_duration, burn_duration, burn_dps
 	#         (ensnare_duration -> DuoUltimateMods)
+	# Rescaled 2026-07-26 with the burn itself (30s@14dps -> 5s@45dps): +15s on
+	# a 5s burn was a 4x, and +3 dps on 45 was noise. Both now read as roughly
+	# the same +40% they always were.
 	"longer_burn": {
-		"duo": "BEACON|WARDEN", "name": "Longer Burn", "desc": "+15s burn duration",
-		"kind": "burn_duration", "value": 15.0,
+		"duo": "BEACON|WARDEN", "name": "Longer Burn", "desc": "+2s burn duration",
+		"kind": "burn_duration", "value": 2.0,
 	},
 	"hotter_burn": {
-		"duo": "BEACON|WARDEN", "name": "Hotter Burn", "desc": "+3 burn damage/sec",
-		"kind": "burn_dps", "value": 3.0,
+		"duo": "BEACON|WARDEN", "name": "Hotter Burn", "desc": "+18 burn damage/sec",
+		"kind": "burn_dps", "value": 18.0,
 	},
 	"wider_bind": {
 		"duo": "BEACON|WARDEN", "name": "Wider Bind", "desc": "+45 bind radius",

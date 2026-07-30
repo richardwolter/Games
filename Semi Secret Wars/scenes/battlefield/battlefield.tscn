@@ -122,10 +122,17 @@ offset_left = 890.0
 offset_top = 10.0
 offset_right = 1150.0
 
-[node name="TimerLabel" type="Label" parent="HUD/TimerPanel"]
+; RichTextLabel rather than Label, here and on every other HUD readout below:
+; the numbers in them are bolded per-digit via BBCode (UIStyle.bold_numbers),
+; which a plain Label renders as literal tags. Font size, colour and the
+; centering that used to be horizontal_alignment are all applied in code by
+; UIStyle.make_numeric — see BattleHUD._ready.
+[node name="TimerLabel" type="RichTextLabel" parent="HUD/TimerPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
-horizontal_alignment = 1
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "00:00"
 
 [node name="VillainPanel" type="PanelContainer" parent="HUD"]
@@ -137,9 +144,12 @@ offset_right = 1740.0
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="VillainHPLabel" type="Label" parent="HUD/VillainPanel/VBox"]
+[node name="VillainHPLabel" type="RichTextLabel" parent="HUD/VillainPanel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "VILLAIN HP: 100%"
 
 [node name="VillainHPBar" type="ProgressBar" parent="HUD/VillainPanel/VBox"]
@@ -152,8 +162,11 @@ show_percentage = false
 
 [node name="HeroPanelsRoot" type="VBoxContainer" parent="HUD"]
 offset_left = 16.0
-offset_top = 140.0
-theme_override_constants/separation = 8
+; 130, not 140: the two Duo groups each carry a REFOCUS button row now and the
+; column needs every pixel it can get down to the bottom of the 1080 canvas.
+; BackButton above ends at y=124, so this is as high as it can go.
+offset_top = 130.0
+theme_override_constants/separation = 6
 
 [node name="ObjectivePanel" type="PanelContainer" parent="HUD"]
 offset_left = 740.0
@@ -164,9 +177,14 @@ offset_right = 1180.0
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="ObjectiveLabel" type="Label" parent="HUD/ObjectivePanel/VBox"]
+; The one HUD readout that can hold several lines (one per objective), so it
+; keeps fit_content but is left to grow vertically.
+[node name="ObjectiveLabel" type="RichTextLabel" parent="HUD/ObjectivePanel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = ""
 
 [node name="ObjectiveBar" type="ProgressBar" parent="HUD/ObjectivePanel/VBox"]
@@ -183,29 +201,36 @@ offset_left = 740.0
 offset_top = 910.0
 offset_right = 1180.0
 
-[node name="BuffLabel" type="Label" parent="HUD/ObjectiveBuffPanel"]
+[node name="BuffLabel" type="RichTextLabel" parent="HUD/ObjectiveBuffPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
-horizontal_alignment = 1
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "BUFF: XP+ 0:10"
 
 [node name="RunXPPanel" type="PanelContainer" parent="HUD"]
 offset_left = 16.0
 offset_top = 10.0
 
-[node name="RunXPLabel" type="Label" parent="HUD/RunXPPanel"]
+[node name="RunXPLabel" type="RichTextLabel" parent="HUD/RunXPPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "XP: 0"
 
 [node name="GoldPanel" type="PanelContainer" parent="HUD"]
 offset_left = 300.0
 offset_top = 10.0
 
-[node name="GoldLabel" type="Label" parent="HUD/GoldPanel"]
+[node name="GoldLabel" type="RichTextLabel" parent="HUD/GoldPanel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
-theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 text = "GOLD: 0"
 
 [node name="ResultsScreen" type="CanvasLayer" parent="."]

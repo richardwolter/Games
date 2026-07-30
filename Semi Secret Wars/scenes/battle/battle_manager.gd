@@ -74,6 +74,9 @@ var _exhausted: Dictionary = {}
 ## (drives the drain).
 var _pick_queue: Array[Dictionary] = []
 var _pick_screen: LevelUpScreen = null
+## The start-of-level Duo reshuffle overlay, alive only between _ready and the
+## player confirming it — see _begin_deploy_setup.
+var _rearrange_screen: DuoRearrangeScreen = null
 ## Duos already offered their pick this level — the two spawn waves each queue
 ## for whoever landed, and this stops a Duo split across both waves (or a
 ## re-entrant call) from being asked twice.
@@ -82,6 +85,10 @@ var _picked_this_level: Array[String] = []
 ## every level since BattleManager itself is a fresh instance each scene
 ## load — see activate_ultimate/can_activate_ultimate.
 var _ultimate_used: Dictionary = {}
+## The per-Duo refocus marker layer, created as the first wave lands (see
+## _spawn_focus_ping). Heroes and the HUD both find it by its "focus_ping"
+## group; this reference only exists to keep _spawn_focus_ping idempotent.
+var _focus_ping: FocusPing = null
 
 ## Second-deploy-wave state (Duo staggered arrival). -1.0 = no wave pending
 ## (either it already landed or there was only ever one wave); >= 0.0 counts
@@ -145,8 +152,42 @@ func _ready() -> void:
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
+	_begin_deploy_setup()
+
+## Deploy entry point. On any level after the first, the player gets one chance
+## to reshuffle their Duos before placing anyone (Designer, 2026-07-28) — the
+## overlay must resolve BEFORE _compute_duos() below, since that's what feeds
+## DeployController its two waves.
+##
+## Level 1 skips it: the pairing was just chosen on the prep screen, so asking
+## again immediately is noise. A party down to one living hero skips it too —
+## there is nothing to exchange.
+func _begin_deploy_setup() -> void:
+	if RunState.current_level > 1 and RunState.living_party().size() >= 2 \
+			and GameState.duo_pairings.size() == 2:
+		var screen := DuoRearrangeScreen.new()
+		_rearrange_screen = screen
+		add_child(screen)
+		screen.setup(GameState.duo_pairings, RunState.dead)
+		screen.confirmed.connect(_on_rearrange_confirmed)
+		get_tree().paused = true
+		return
+	_spawn_deploy_controller()
+
+func _on_rearrange_confirmed() -> void:
+	if _rearrange_screen != null:
+		_rearrange_screen.queue_free()
+		_rearrange_screen = null
+	get_tree().paused = false
+	# The HUD built its Ultimate cards from the OLD pairing back in its _ready,
+	# before this overlay existed to change it — re-derive them now.
+	_hud.rebuild_duo_ultimate_bar()
+	_spawn_deploy_controller()
+
+func _spawn_deploy_controller() -> void:
 	_deploy = DeployController.new()
 	_deploy.field = _field
+	# Reads GameState.duo_pairings, so it must run after any reshuffle above.
 	var duos := _compute_duos()
 	_deploy.duo_a = duos.a
 	_deploy.duo_b = duos.b
@@ -241,11 +282,22 @@ func _flush_pending_deploy() -> void:
 			_deploy.finish()
 	if not _battle_started:
 		_battle_started = true
+		_spawn_focus_ping()
 		_spawner.begin_battle()
 		# Boulders only start rolling once the party is actually on the field —
 		# during deploy the swarm is frozen and nothing should be taking hits.
 		_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
 		_boulders_live = true
+
+## Creates the per-Duo refocus marker layer, once, as the first wave lands.
+## Parented next to the DeployController (battlefield root, world space) so its
+## draw sits in field coordinates. Deliberately NOT created during deploy: its
+## left-click would fight the placement clicks.
+func _spawn_focus_ping() -> void:
+	if _focus_ping != null and is_instance_valid(_focus_ping):
+		return
+	_focus_ping = FocusPing.new()
+	get_parent().add_child(_focus_ping)
 
 ## Queues one Ultimate-boon pick per Duo represented in `hero_names`, skipping
 ## any Duo that already picked this level. Picks record into RunState.duo_boons
@@ -381,7 +433,11 @@ func _process(delta: float) -> void:
 			get_tree().paused = false
 			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
 		return
-	if _pick_screen != null:
+	# Both start-of-level overlays freeze this loop, not just the boon pick.
+	# BattleManager runs PROCESS_MODE_ALWAYS, so without the reshuffle guard the
+	# monster countdown (and the second-wave timer) would keep draining behind a
+	# modal the player is still reading.
+	if _pick_screen != null or _rearrange_screen != null:
 		return
 	if not _pick_queue.is_empty():
 		_show_next_pick()
@@ -483,9 +539,10 @@ func _show_next_pick() -> void:
 	var pair_id: String = entry.get("key", "")
 	var names := pair_id.split("|")
 	var ult_name: String = DuoUltimates.def(pair_id).get("name", "ULTIMATE")
+	# Instruction first, subject second — see LevelUpScreen.setup's doc.
 	screen.setup(
-		"%s — %s" % [" + ".join(names), ult_name],
 		"Choose an Ultimate boon (this run only)",
+		"%s — %s" % [" + ".join(names), ult_name],
 		RunState.roll_duo_offer(pair_id), DuoUltimateBoons.def)
 	screen.picked.connect(_on_pick_chosen.bind(entry))
 	get_tree().paused = true
@@ -533,6 +590,9 @@ func activate_ultimate(pair_id: String) -> bool:
 			float(buff.get("atk_reduction", 0.0)),
 			float(buff.get("hp_add", 0.0)))
 	_ultimate_used[pair_id] = true
+	# Say it out loud (Designer, 2026-07-29: the activation was easy to miss —
+	# the only feedback was a button quietly relabelling itself to USED).
+	_hud.show_ultimate_used(pair_id, DuoUltimates.def(pair_id).get("name", "ULTIMATE"))
 	return true
 
 ## True while pair_id's Ultimate is still available this level (not yet used
@@ -651,7 +711,14 @@ func _record_carryover() -> void:
 			var healed: float = h.hp + (h.max_hp - h.hp) * CLEAR_HEAL_MISSING_FRACTION
 			RunState.carry_hp(hero_name, minf(healed, h.max_hp), h.max_hp)
 
+## Highest playable level in this build. Level 3's config files ship with the
+## project but are unfinished, so the itch.io demo build ends the run after
+## level 2 is cleared (Designer, 2026-07-26). Raise this to re-enable level 3.
+const LAST_PLAYABLE_LEVEL := 2
+
 func _level_exists(n: int) -> bool:
+	if n > LAST_PLAYABLE_LEVEL:
+		return false
 	var has_stage_config := ResourceLoader.exists("res://config/stage_%d_config.tres" % n)
 	return ResourceLoader.exists("res://config/level_%d_layout.tres" % n) and has_stage_config
 

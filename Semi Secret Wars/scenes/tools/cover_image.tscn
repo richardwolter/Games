@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/tools/cover_image.gd" id="1_cover"]
+
+; Run this scene to bake res://assets/Cover_630x500.png, then it quits. Nothing
+; in the game loads it — it exists only to regenerate the cover from whatever
+; the current art and page dressing look like.
+[node name="CoverImage" type="Node"]
+script = ExtResource("1_cover")

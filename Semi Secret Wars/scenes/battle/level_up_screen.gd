@@ -32,9 +32,15 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 
-## Build the overlay with `title`/`subtitle` and one card per id in `offer`,
-## resolved through `def_resolver` (DuoUltimateBoons.def).
-func setup(title_text: String, subtitle_text: String, offer: Array, def_resolver: Callable) -> void:
+## Build the overlay with the `prompt` on top, the `subject` it applies to
+## right below, and one card per id in `offer`, resolved through `def_resolver`
+## (DuoUltimateBoons.def).
+##
+## Order swapped 2026-07-28 (Designer): the Duo/Ultimate name used to sit on top
+## in gold and the "choose a boon" instruction underneath in small ink, which
+## buried the one line telling the player what to actually DO. The instruction
+## now leads at heading size, and the subject follows.
+func setup(prompt_text: String, subject_text: String, offer: Array, def_resolver: Callable) -> void:
 	_def_resolver = def_resolver
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
@@ -50,8 +56,15 @@ func setup(title_text: String, subtitle_text: String, offer: Array, def_resolver
 	# Trimmed 2026-07-26 (Designer: "boon card should be a little bit
 	# smaller") — the heading drops a step and the card box below shrinks, so
 	# the pick covers less of the battlefield behind it.
-	box.add_child(UIStyle.centered_label(title_text, UIStyle.SIZE_HEADING, ACCENT))
-	box.add_child(UIStyle.centered_label(subtitle_text, UIStyle.SIZE_SMALL))
+	# The instruction leads in plain INK — it is the line that must simply be
+	# read. The Duo/Ultimate name below is GOOD (forest #1f7a33), which keeps the
+	# two asks from 2026-07-28 from fighting each other: it is a genuinely
+	# different hue rather than a third shade of ink ("less monocolored"), but
+	# it is a DARK green, so its contrast on cream paper is close to INK's and
+	# nothing like the ACCENT gold (#a8861a) this originally used — that mid-tone
+	# on a light ground was the washed-out look in the first place.
+	box.add_child(UIStyle.numeric_label(prompt_text, UIStyle.SIZE_HEADING, UIStyle.INK, true))
+	box.add_child(UIStyle.numeric_label(subject_text, UIStyle.SIZE_SUBHEAD, UIStyle.GOOD, true))
 
 	var cards := HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 16)

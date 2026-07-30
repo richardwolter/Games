@@ -52,6 +52,12 @@ const LIME := Color("b9d81f")
 const LILAC := Color("e9d8ee")
 const CRIMSON := Color("c01818")
 const VIOLET := Color("a3239e")
+## Mustard — CANARY pushed warm and dark toward BARK. Not sampled from a sprite
+## like the rest: added 2026-07-26 because RALLY was asked for in mustard. Kept
+## with the pigments rather than the palette since it is a raw colour other
+## entries can derive from, and it stays inside the existing crayon set (it is
+## the yellow the sprites use, aged).
+const MUSTARD := Color("c19a1c")
 
 # -- Palette ------------------------------------------------------------------
 
@@ -96,6 +102,67 @@ const INFO := Color("5a6bc4")
 const DUO_A := GOLD
 const DUO_B := NAVY
 
+## Per-ABILITY identity colour (Designer, 2026-07-26). Keyed by the ability's
+## display name (Hero.ABILITY_INFO), not by hero: the colour belongs to STOMP,
+## and everywhere STOMP appears — the battle card's cooldown bar, the prep
+## menu's filled Duo slot — it is the same colour. Since each hero owns exactly
+## one ability today the two keyings coincide, but this way a second ability
+## does not inherit its owner's colour by accident.
+##
+## Green is excluded on purpose: the cooldown bar sits directly under the HP
+## bar, which is green at full health, and two green bars on one card read as
+## one control. Yellow is out for the same reason (HP's half-health colour) and
+## VIOLET because it is the enemy pigment — which rules out both casters' own
+## robe/scarf pigments, so CLONE and RALLY take the next colour off their
+## hero's art instead:
+##   STOMP    EMBER    Thundaar's tunic
+##   CLONE    INFO     the legible lift of NAVY, next to Artemis's trousers
+##   ENSNARE  BARK     Warden's bark
+##   RALLY    MUSTARD  Designer's call, 2026-07-26 (was the staff-gem red)
+const ABILITY_COLORS := {
+	"STOMP": EMBER,
+	"CLONE": INFO,
+	"ENSNARE": BARK,
+	"RALLY": MUSTARD,
+}
+## Fallback GOLD, so an unlisted ability still gets a non-green colour rather
+## than the theme default.
+static func ability_color(ability_name: String) -> Color:
+	return ABILITY_COLORS.get(ability_name, GOLD)
+
+## -- Currency ------------------------------------------------------------------
+## Gold and XP are the two things the player counts, and they were written five
+## different ways: "Gold: 40" in ink on the abilities page, "GOLD: 40" in gold
+## on the battle HUD, "Shared Banked XP: 40" a size smaller on the stats page,
+## plain body text on the results screen. One shape, one size, one colour each,
+## everywhere (Designer, 2026-07-26).
+##
+## GOLD_COLOR/XP_COLOR are aliases rather than new pigments — the point is that
+## every screen reaches for the SAME name, not that the colours changed.
+const GOLD_COLOR := GOLD
+const XP_COLOR := INFO
+## The size every currency readout is set at. SUBHEAD: these are headline
+## numbers on the screens that show them, not footnotes.
+const SIZE_CURRENCY := SIZE_SUBHEAD
+
+## "GOLD: 40" / "BANKED XP: 40" as a finished label — uppercase caption, value
+## after a colon, in that currency's colour at SIZE_CURRENCY. `caption` lets a
+## screen say BANKED XP (the persistent pool) vs XP (this run's gain) without
+## inventing its own typography for it.
+static func gold_label(amount: int, caption: String = "GOLD") -> RichTextLabel:
+	return numeric_label("%s: %d" % [caption, amount], SIZE_CURRENCY, GOLD_COLOR, true)
+
+static func xp_label(amount: int, caption: String = "XP") -> RichTextLabel:
+	return numeric_label("%s: %d" % [caption, amount], SIZE_CURRENCY, XP_COLOR, true)
+
+## The same pairing as BBCode, for the rich-text readouts that put a currency
+## inline in a sentence (the results screen's payout lines).
+static func gold_bbcode(text: String) -> String:
+	return "[b][color=#%s]%s[/color][/b]" % [GOLD_COLOR.to_html(false), text]
+
+static func xp_bbcode(text: String) -> String:
+	return "[b][color=#%s]%s[/color][/b]" % [XP_COLOR.to_html(false), text]
+
 ## Progress-bar fill, used by every bar that isn't semantically coloured
 ## (villain HP, objective). LIME darkened just enough to hold an edge against
 ## the page it fills on.
@@ -128,10 +195,22 @@ const SIZE_SMALL := 25
 const SIZE_TINY := 22
 
 # -- Font ---------------------------------------------------------------------
-## Handwritten display font (DrawFont, dafont.com — Designer, 2026-07-25).
+## Handwritten display font (Caveat Brush, Pablo Impallari / Google Fonts —
+## Designer, 2026-07-28). Replaced DrawFont, whose thin uneven strokes stayed
+## hard to read at the small end of the scale even after the 2026-07-26 size
+## bump. Caveat Brush is a brush-marker hand: heavier, more even strokes and
+## only lightly connected, so it keeps the notebook voice while surviving the
+## 0.67x canvas downscale.
+##
+## Licensed SIL OFL 1.1 (CaveatBrush-OFL.txt alongside the .ttf) — free to
+## embed and ship, unlike the Brush Script MT this was originally speced as.
+## Godot bakes the face into the .pck and renders it with its own TextServer,
+## so the HTML5 export looks identical to desktop and never touches the
+## browser's font stack.
+##
 ## Drop the .ttf at this exact path and every Control in the game picks it up
 ## via ui_boot.gd; until then the engine default is used and nothing breaks.
-const FONT_PATH := "res://assets/fonts/DrawFont.ttf"
+const FONT_PATH := "res://assets/fonts/CaveatBrush-Regular.ttf"
 
 static var _font_cache: Font = null
 static var _font_checked := false
@@ -227,6 +306,103 @@ static func bold_font() -> FontVariation:
 		_bold_font_cache.variation_embolden = BOLD_EMBOLDEN
 	return _bold_font_cache
 
+## -- Numeric readouts ----------------------------------------------------------
+## Every digit the player reads comes out bold (Designer, 2026-07-26). DrawFont
+## is a handwritten face whose "g" and "9" are near-identical at UI sizes, and
+## the same goes for 1/l and 0/O — emboldening the numbers is what tells the
+## player they are looking at a value and not a word.
+##
+## Godot cannot weight individual glyphs, so this is done with BBCode: a digit
+## run gets wrapped in [b]…[/b] and rendered by a RichTextLabel whose bold_font
+## is the synthetic FontVariation above. Plain Labels cannot do it at all, which
+## is why the readouts that show numbers are RichTextLabels now.
+##
+## Runs include separators that are part of the number — a decimal point, a
+## thousands comma, a clock colon — and a trailing percent sign, so "2.1",
+## "0:07" and "45%" each bold as one unit instead of fragmenting.
+##
+## IMPORTANT: pass PLAIN text only. Given a string that already contains BBCode
+## this would bold the digits inside the tags themselves (a #c19a1c colour code,
+## a font size) and corrupt them. Lines that are already hand-authored BBCode
+## bold their own numbers — see PrepMenu._current_stats_text.
+static func bold_numbers(text: String) -> String:
+	var out := ""
+	var i := 0
+	var n := text.length()
+	while i < n:
+		if not _is_digit(text[i]):
+			out += text[i]
+			i += 1
+			continue
+		var start := i
+		while i < n:
+			if _is_digit(text[i]):
+				i += 1
+			# A separator only stays inside the run when a digit follows it, so
+			# the period ending "Costs 40." is not swallowed into the number.
+			elif text[i] in [".", ",", ":"] and i + 1 < n and _is_digit(text[i + 1]):
+				i += 1
+			else:
+				break
+		if i < n and text[i] == "%":
+			i += 1
+		out += "[b]%s[/b]" % text.substr(start, i - start)
+	return out
+
+static func _is_digit(c: String) -> bool:
+	return c >= "0" and c <= "9"
+
+static func _has_digit(text: String) -> bool:
+	for i in text.length():
+		if _is_digit(text[i]):
+			return true
+	return false
+
+## A readout whose numbers bold themselves — the drop-in replacement for
+## UIStyle.label()/centered_label() anywhere the text contains a value. Set its
+## contents through set_numeric_text(), not .text, or the digits stay plain.
+static func numeric_label(text: String, size: int = SIZE_BODY, color: Color = INK,
+		centered := false) -> RichTextLabel:
+	var l := RichTextLabel.new()
+	l.bbcode_enabled = true
+	l.fit_content = true
+	l.scroll_active = false
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_font_size_override("normal_font_size", size)
+	l.add_theme_font_size_override("bold_font_size", size)
+	l.add_theme_font_override("bold_font", bold_font())
+	l.add_theme_color_override("default_color", color)
+	l.set_meta("centered", centered)
+	set_numeric_text(l, text)
+	return l
+
+## Rewrites a numeric_label's contents, re-bolding the digits. Also re-applies
+## the [center] wrapper, which is part of the text rather than a property and so
+## would be lost by a plain .text assignment.
+static func set_numeric_text(target: RichTextLabel, text: String) -> void:
+	if target == null:
+		return
+	var body := bold_numbers(text)
+	target.text = "[center]%s[/center]" % body if target.get_meta("centered", false) else body
+
+## Retrofits an already-built RichTextLabel (one authored in a .tscn) with the
+## bold font and sizes numeric_label sets up, so scene-authored readouts behave
+## like code-built ones.
+static func make_numeric(target: RichTextLabel, size: int, color: Color = INK,
+		centered := false) -> void:
+	if target == null:
+		return
+	target.bbcode_enabled = true
+	target.fit_content = true
+	target.scroll_active = false
+	target.autowrap_mode = TextServer.AUTOWRAP_OFF
+	target.add_theme_font_size_override("normal_font_size", size)
+	target.add_theme_font_size_override("bold_font_size", size)
+	target.add_theme_font_override("bold_font", bold_font())
+	target.add_theme_color_override("default_color", color)
+	target.set_meta("centered", centered)
+
 ## Centered rich text with [b] wired to the synthetic bold above — for lines
 ## that need part of themselves emphasised (a stat readout boldening its
 ## numbers but not its labels). A plain Label would render the BBCode tags
@@ -248,14 +424,69 @@ static func rich_stat_label(bbcode: String, size: int = SIZE_TINY, color: Color 
 	l.text = "[center]%s[/center]" % bbcode
 	return l
 
+## A Button cannot render BBCode, so a price button can't bold just its digits
+## the way a readout can. When the label contains a number the WHOLE button goes
+## bold instead (Designer's rule, 2026-07-26, applied as far as the widget
+## allows) — on a button like "Buy Lv3 — 60g" the number is the point of the
+## control anyway, so emboldening all of it reads as intended rather than as an
+## accident. Buttons with no digits are untouched.
 static func button(text: String, size: int = SIZE_BODY, cb: Callable = Callable()) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", size)
+	if _has_digit(text):
+		b.add_theme_font_override("font", bold_font())
 	add_click_sound(b)
 	if cb.is_valid():
 		b.pressed.connect(cb)
 	add_hover_wiggle(b)
+	return b
+
+## Side padding on a compact button, against the theme's 22. The theme value is
+## tuned for standalone menu buttons ("START BATTLE") with a whole screen to sit
+## in; inside a card it is pure overhead, and it was overflowing (Designer,
+## 2026-07-28: "fix text box to better fit text on stats and abilities upgrade
+## buttons").
+##
+## Measured, not guessed: at SIZE_TINY the widest real price label
+## ("Buy Lv10 — 240g") needs 136px of glyphs, so the theme's 22+22 pushed the
+## button's minimum to 207px inside a skill node whose usable width is 194 —
+## the card was forced wider than NODE_SIZE and broke the grid pitch it is
+## placed on. At 12+12 the same button needs 160 and fits with room to spare.
+const COMPACT_BUTTON_PAD_X := 12
+## Vertical padding goes UP, not down. Caveat Brush is a brush script whose
+## descenders and flourishes overshoot the font's reported descent, so at the
+## theme's 10 the tails of "y"/"g" grazed the border.
+const COMPACT_BUTTON_PAD_Y := 12
+
+## A button sized for life inside a card — same hand-drawn look and states as
+## UIStyle.button, tighter horizontally and slightly roomier vertically. Use it
+## for price/action chips in dense layouts (stat cards, skill-tree nodes);
+## standalone buttons should stay on the theme's own metrics.
+static func compact_button(text: String, size: int = SIZE_TINY,
+		cb: Callable = Callable(), variant: int = 0) -> Button:
+	var b := button(text, size, cb)
+	# Rebuilt from the palette rather than duplicated off the theme: a Button
+	# that is not in the tree yet cannot resolve theme styleboxes, and every
+	# caller here builds its button before parenting it.
+	var fills := {
+		"normal": Color(PAGE_SOLID, 0.94),
+		"hover": Color("e5eecd"),
+		"pressed": Color("cfe0b0"),
+		"disabled": Color(PAGE_SOLID, 0.45),
+	}
+	for state in fills:
+		var s := panel(fills[state], INK, 4, 0, variant)
+		s.content_margin_left = COMPACT_BUTTON_PAD_X
+		s.content_margin_right = COMPACT_BUTTON_PAD_X
+		s.content_margin_top = COMPACT_BUTTON_PAD_Y
+		s.content_margin_bottom = COMPACT_BUTTON_PAD_Y
+		if state == "disabled":
+			s.border_color = Color(INK, 0.4)
+		b.add_theme_stylebox_override(state, s)
+	# Focus reuses hover so keyboard focus reads the same as mouse-over, matching
+	# the theme's own Button/styles/focus = button_hover.
+	b.add_theme_stylebox_override("focus", b.get_theme_stylebox("hover"))
 	return b
 
 ## UI click (Designer, 2026-07-26). The source file opens with a sliver of dead

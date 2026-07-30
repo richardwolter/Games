@@ -50,8 +50,10 @@ const SPRITE_LENGTH := 32.0
 
 var _dir := Vector2.RIGHT
 var _traveled := 0.0
+var _field: LaneField = null
 
 func _ready() -> void:
+	_field = get_tree().get_first_node_in_group("field")
 	var aim_point := global_position + Vector2.RIGHT
 	if target != null and is_instance_valid(target):
 		aim_point = target.global_position
@@ -73,6 +75,13 @@ func _process(delta: float) -> void:
 			if on_hit_stun > 0.0 and is_instance_valid(victim) and not victim._dying:
 				victim.apply_stun(on_hit_stun)
 			_play_hit_sound()
+		queue_free()
+		return
+	# Scenery/obstacles are cover (Designer, 2026-07-28): a shot that runs into
+	# a rock, boulder or spawn-point gate dies there, silently and without
+	# damage — it reads as a miss, so no hit SFX. Checked after the enemy test
+	# so a unit standing flush against a rock is still hittable.
+	if _field != null and _field.blocks_projectile(global_position):
 		queue_free()
 		return
 	if _traveled >= max_range:

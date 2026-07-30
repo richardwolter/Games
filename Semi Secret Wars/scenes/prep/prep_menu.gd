@@ -9,8 +9,8 @@ extends Control
 ## a Duo filled); an unplaced hero sits the run out. See _sync_party_from_slots.
 
 var _start_button: TextureButton
-var _currency_label: Label
-var _xp_label: Label
+var _currency_label: RichTextLabel
+var _xp_label: RichTextLabel
 var _hero_row: HBoxContainer
 var _main: VBoxContainer
 var _abilities_page: AbilitiesPage
@@ -32,9 +32,19 @@ var _pairing_slots: Array = ["", "", "", ""]
 const START_RUN_TEXTURE := preload("res://assets/Button_StartRun_Color.png")
 const START_RUN_REGION := Rect2(60, 210, 1500, 640)
 const START_RUN_WIDTH := 360.0
-const DUO_A_COLOR := UIStyle.DUO_A
-const DUO_B_COLOR := UIStyle.DUO_B
+## Both Duo boxes are plain ink now (Designer, 2026-07-26: "no need to
+## differentiate Duos by colour for now"). The gold/navy pair they used to carry
+## competed with the colour that actually means something on this panel — the
+## hero's ability colour filling each occupied slot. UIStyle.DUO_A/DUO_B still
+## exist for the battle HUD's Duo B banner; this screen just stopped using them.
+const DUO_A_COLOR := UIStyle.INK
+const DUO_B_COLOR := UIStyle.INK
 const SLOT_SIZE := Vector2(210, 100)
+## Hero sprite inside a filled Duo slot. Sized to sit beside the name inside
+## SLOT_SIZE's 100px height with the LEADER/FOLLOWER tag still above it — the
+## row the Duo Ultimate caption gave up (see _build_ultimate_label) is what
+## makes the box tall enough to carry it.
+const PORTRAIT_SIZE := Vector2(52, 52)
 
 ## A hero card that can be dragged onto a DuoSlot. Only the drag affordance is
 ## added here — selection/unlock UI stays in _build_hero_card, which builds
@@ -131,16 +141,11 @@ func _build_ui() -> void:
 	# Gold and banked XP are what the whole meta-progression is spent in, so
 	# they get accent-bordered chips instead of plain text in a row of buttons
 	# (Designer, 2026-07-26). Same treatment as the battle HUD's panels.
-	_currency_label = _label("", UIStyle.SIZE_SUBHEAD)
-	_currency_label.add_theme_color_override("font_color", UIStyle.GOLD)
-	meta_row.add_child(_resource_chip(_currency_label, UIStyle.GOLD))
-	_xp_label = _label("", UIStyle.SIZE_SUBHEAD)
-	_xp_label.add_theme_color_override("font_color", UIStyle.INFO)
-	meta_row.add_child(_resource_chip(_xp_label, UIStyle.INFO))
-	var abilities_btn := _button("ABILITIES", UIStyle.SIZE_BODY, _open_abilities)
-	meta_row.add_child(abilities_btn)
-	var stats_btn := _button("STATS", UIStyle.SIZE_BODY, _open_stats)
-	meta_row.add_child(stats_btn)
+	_currency_label = UIStyle.gold_label(0)
+	meta_row.add_child(_resource_chip(_currency_label, UIStyle.GOLD_COLOR))
+	_xp_label = UIStyle.xp_label(0, "BANKED XP")
+	meta_row.add_child(_resource_chip(_xp_label, UIStyle.XP_COLOR))
+	meta_row.add_child(_button("HOW TO PLAY", UIStyle.SIZE_BODY, _open_how_to_play))
 	meta_row.add_child(_button("SETTINGS", UIStyle.SIZE_BODY, _open_settings))
 	root.add_child(meta_row)
 
@@ -154,8 +159,23 @@ func _build_ui() -> void:
 	root.add_child(_pairing_section)
 	_rebuild_pairing_panel()
 
+	# The two upgrade shops flank START RUN (Designer, 2026-07-28) — they're the
+	# meta-progression, not chrome, so they sit in the one row the player's eye
+	# already ends on instead of hiding among GOLD/XP/SETTINGS up top.
+	var launch_row := HBoxContainer.new()
+	launch_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	launch_row.add_theme_constant_override("separation", 28)
+	root.add_child(launch_row)
+
+	launch_row.add_child(_upgrade_button("UPGRADE\nABILITIES", "spend GOLD",
+			UIStyle.GOLD, 0, _open_abilities))
+
 	_start_button = _texture_button(START_RUN_TEXTURE, START_RUN_REGION, _on_start)
-	root.add_child(_start_button)
+	_start_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	launch_row.add_child(_start_button)
+
+	launch_row.add_child(_upgrade_button("UPGRADE\nSTATS", "spend XP",
+			UIStyle.XP_COLOR, 1, _open_stats))
 
 	# Route back to the title screen (Designer, 2026-07-26). No confirmation
 	# here: prep changes (purchases, pairings) all save as they're made, so
@@ -165,9 +185,90 @@ func _build_ui() -> void:
 	root.add_child(back_btn)
 
 
+## A big flanking shop button: accent-bordered card, two-line title, and a
+## caption naming the currency it spends. Built as a bare Button with its own
+## label stack parented inside (mouse-transparent) because Button.text is one
+## line and can't colour the caption differently from the title.
+## MINIMUM box, not the final one — _upgrade_button grows it to whatever the
+## text actually needs (see _upgrade_button_size). It stayed a hard 230x116 until
+## 2026-07-28, which is why the Caveat Brush switch broke it: three lines of that
+## face measure 121px tall against the 92 this box leaves once its border margin
+## is taken out, so "spend GOLD"/"spend XP" spilled through the bottom edge.
+const UPGRADE_BUTTON_SIZE := Vector2(230, 116)
+## Border inset on the upgrade cards, shared by the stylebox and the label stack
+## laid inside it — they must agree or the text sits on the border.
+const UPGRADE_BUTTON_PAD := 12
+
+func _upgrade_button(title: String, caption: String, accent: Color, variant: int,
+		cb: Callable) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = _upgrade_button_size(title, caption)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Same paper card as the resource chips, in the currency's own colour, so the
+	# button reads as "this is where that number goes".
+	var pad := UPGRADE_BUTTON_PAD
+	var style := UIStyle.panel(Color(accent, 0.14), accent, 4, pad, variant)
+	b.add_theme_stylebox_override("normal", style)
+	b.add_theme_stylebox_override("hover", UIStyle.panel(Color(accent, 0.3), accent, 4, pad, variant))
+	b.add_theme_stylebox_override("pressed", UIStyle.panel(Color(accent, 0.42), accent, 4, pad, variant))
+	b.add_theme_stylebox_override("focus", style)
+	UIStyle.add_click_sound(b)
+	UIStyle.add_hover_wiggle(b)
+	if cb.is_valid():
+		b.pressed.connect(cb)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Inset to match the stylebox's own content margin. A Button is not a
+	# container, so an anchored child is laid out against the RAW rect and knows
+	# nothing about that margin — without these offsets the text is free to sit
+	# on top of the hand-drawn border.
+	col.offset_left = UPGRADE_BUTTON_PAD
+	col.offset_top = UPGRADE_BUTTON_PAD
+	col.offset_right = -UPGRADE_BUTTON_PAD
+	col.offset_bottom = -UPGRADE_BUTTON_PAD
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", UPGRADE_BUTTON_LINE_GAP)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for line in title.split("\n"):
+		col.add_child(UIStyle.centered_label(line, UIStyle.SIZE_SUBHEAD, accent))
+	col.add_child(UIStyle.centered_label(caption, UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	b.add_child(col)
+	return b
+
+## Gap between the title lines and the caption inside an upgrade button.
+const UPGRADE_BUTTON_LINE_GAP := 2
+
+## The box this button needs to hold its own text, never smaller than the
+## authored UPGRADE_BUTTON_SIZE. Measured from the live font rather than
+## hardcoded, so swapping the face again resizes these buttons instead of
+## silently pushing their caption through the bottom border.
+##
+## Falls back to the authored size when UIStyle.font() is null (the .ttf not yet
+## imported) — the engine default is narrower than the hand face, so the authored
+## box is already generous in that case.
+func _upgrade_button_size(title: String, caption: String) -> Vector2:
+	var f := UIStyle.font()
+	if f == null:
+		return UPGRADE_BUTTON_SIZE
+	var lines: PackedStringArray = title.split("\n")
+	var text_w := 0.0
+	var text_h := 0.0
+	for line in lines:
+		text_w = maxf(text_w, f.get_string_size(line, HORIZONTAL_ALIGNMENT_CENTER,
+				-1, UIStyle.SIZE_SUBHEAD).x)
+		text_h += f.get_height(UIStyle.SIZE_SUBHEAD)
+	text_w = maxf(text_w, f.get_string_size(caption, HORIZONTAL_ALIGNMENT_CENTER,
+			-1, UIStyle.SIZE_TINY).x)
+	text_h += f.get_height(UIStyle.SIZE_TINY)
+	text_h += float(UPGRADE_BUTTON_LINE_GAP * lines.size())
+	var pad := float(UPGRADE_BUTTON_PAD) * 2.0
+	return Vector2(maxf(UPGRADE_BUTTON_SIZE.x, text_w + pad),
+			maxf(UPGRADE_BUTTON_SIZE.y, text_h + pad))
+
 ## Accent-bordered paper chip around a resource readout. The label is kept as
 ## a field by the caller (_refresh rewrites its text), so this only wraps it.
-func _resource_chip(label: Label, accent: Color) -> PanelContainer:
+func _resource_chip(label: Control, accent: Color) -> PanelContainer:
 	var chip := PanelContainer.new()
 	chip.add_theme_stylebox_override("panel", UIStyle.card(accent, 10))
 	chip.add_child(label)
@@ -207,11 +308,7 @@ func _rebuild_pairing_panel() -> void:
 	row.add_theme_constant_override("separation", 24)
 	_pairing_section.add_child(row)
 
-	var explain := UIStyle.wrapped_label(
-			"Drag your heroes and pick your DUOs. Each DUO has its unique ultimate ability.",
-			240, UIStyle.SIZE_SMALL)
-	explain.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(explain)
+	row.add_child(_pairing_instruction())
 
 	var boxes := HBoxContainer.new()
 	boxes.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -233,10 +330,58 @@ func _rebuild_pairing_panel() -> void:
 		clear_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		side.add_child(clear_btn)
 
+## The pair-your-Duos instruction, beside the Duo boxes.
+##
+## Was a bare wrapped label in body ink, which sat in the margin looking like a
+## caption and got skipped — a new player would stare at two empty Duo boxes
+## with no idea the hero row above was draggable (Designer, 2026-07-28: "give
+## clarity to the drag instruction ... for better player visibility").
+##
+## Now a bordered gold callout with the ACTION on its own line: the instruction
+## reads as a control the screen is giving you, and the one thing you have to do
+## is the first thing you see. Gold because that is this UI's "do something
+## here" colour everywhere else (boon picks, focus, unlocks).
+func _pairing_instruction() -> PanelContainer:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UIStyle.card(UIStyle.GOLD, 12, 2))
+	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	card.custom_minimum_size = Vector2(250, 0)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	card.add_child(col)
+
+	col.add_child(UIStyle.centered_label("DRAG TO PAIR", UIStyle.SIZE_SUBHEAD, UIStyle.GOLD))
+	col.add_child(UIStyle.wrapped_label(
+			"Pull a hero from the row above into a DUO slot below.",
+			214, UIStyle.SIZE_SMALL))
+	return card
+
+## Status text beside the Duo boxes. Leads with the blocking condition when there
+## is one — a run needs BOTH Duos (see _refresh), and "START RUN is greyed out"
+## is not something the player should have to infer from a dimmed button.
 func _pairing_hint_text(unplaced: Array) -> String:
+	if not _both_duos_ready():
+		var text := "Both DUOS must be filled to start a run."
+		# No tail when there is nobody left to place: that only happens with a
+		# roster too small to fill four slots, where naming names would be noise.
+		if not unplaced.is_empty():
+			text += "\nStill to place: %s" % ", ".join(unplaced)
+		return text
 	if unplaced.is_empty():
 		return "Every hero is placed."
 	return "Not deploying unless paired: %s" % ", ".join(unplaced)
+
+## Whether the pairing is complete enough to launch: TWO fully-filled Duos.
+##
+## Checked against duo_pairings rather than the party roster or
+## GameState.has_valid_duo_pairings(draft_offer): _sync_party_from_slots only ever
+## appends a Duo once BOTH its slots are filled, so a size of 2 here is exactly
+## "both Duos are ready" — and unlike the has_valid_duo_pairings form it does not
+## additionally demand that the pairing cover the whole offered roster, which
+## would break the moment a 5th hero is unlocked.
+func _both_duos_ready() -> bool:
+	return GameState.duo_pairings.size() == 2
 
 ## One Duo box: a colored-border panel labeled "DUO A"/"DUO B" containing its
 ## 2 DuoSlot drop targets side by side.
@@ -282,8 +427,16 @@ func _build_ultimate_label(duo_index: int) -> Control:
 		return Control.new()
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 2)
-	col.add_child(UIStyle.centered_label("DUO ULTIMATE", UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
-	col.add_child(UIStyle.centered_label(d.get("name", ""), UIStyle.SIZE_SMALL, UIStyle.GOLD))
+	# Caption and name share one line (Designer, 2026-07-26) — three stacked rows
+	# here is what was pushing the Duo box tall enough that the slots had no room
+	# for a portrait. The caption is a label for the name, so sitting beside it
+	# costs nothing and buys back a whole row.
+	var head := HBoxContainer.new()
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	head.add_theme_constant_override("separation", 8)
+	head.add_child(UIStyle.label("DUO ULTIMATE", UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	head.add_child(UIStyle.label(d.get("name", ""), UIStyle.SIZE_SMALL, UIStyle.GOLD))
+	col.add_child(head)
 	col.add_child(UIStyle.wrapped_label(d.get("desc", ""), 400, UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
 	return col
 
@@ -306,9 +459,12 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 	# derived from which hero ends up there — labeling the slot up front is
 	# the whole point: the player sees the assignment before they drag.
 	var is_leader_slot := slot_index == 0
-	# Filled slots take the hero's own tint over paper; empty ones are a faint
-	# dashed-looking outline so the drop target reads as "not drawn in yet".
-	var style := (UIStyle.panel(Color(GameState.HERO_CATALOG[hero_name].color, 0.45),
+	# Filled slots take the tint of that hero's ABILITY (Designer, 2026-07-26) —
+	# the same colour its cooldown bar will run in battle, so the pairing screen
+	# and the battle HUD agree on what each hero looks like. Empty ones are a
+	# faint dashed-looking outline so the drop target reads as "not drawn in yet".
+	var style := (UIStyle.panel(
+					Color(UIStyle.ability_color(Hero.ability_name_for(hero_name)), 0.45),
 					color, 3, 6, slot_index)
 			if hero_name != ""
 			else UIStyle.panel(Color(UIStyle.PAGE_SOLID, 0.35), Color(color, 0.4), 2, 6, slot_index))
@@ -322,9 +478,23 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 			UIStyle.SIZE_TINY, UIStyle.GOLD if is_leader_slot else UIStyle.INK_MUTED))
 	col.add_child(tag_row)
 
+	# A filled slot shows the hero's own sprite next to their name (Designer,
+	# 2026-07-26) — the same drawing the roster card above and the battle card
+	# use, so the player drags a picture and gets that picture back. Unflipped,
+	# matching the roster card: the battle card's mirror is about which way the
+	# hero faces on the field, which this screen doesn't depict.
 	var center := CenterContainer.new()
-	center.add_child(UIStyle.label(hero_name if hero_name != "" else "drop hero",
-			UIStyle.SIZE_SMALL, UIStyle.INK if hero_name != "" else UIStyle.INK_MUTED))
+	if hero_name != "":
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 8)
+		row.add_child(UIStyle.hero_portrait(hero_name, PORTRAIT_SIZE))
+		var name_label := UIStyle.label(hero_name, UIStyle.SIZE_SMALL)
+		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(name_label)
+		center.add_child(row)
+	else:
+		center.add_child(UIStyle.label("drop hero", UIStyle.SIZE_SMALL, UIStyle.INK_MUTED))
 	col.add_child(center)
 
 	slot.add_child(col)
@@ -394,13 +564,23 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 
 	box.add_child(UIStyle.centered_label(hero_name, UIStyle.SIZE_SUBHEAD))
 
-	var role: String = Hero.ROLE_BY_HERO.get(hero_name, "")
-	box.add_child(UIStyle.centered_label(role, UIStyle.SIZE_SMALL,
-			Hero.ROLE_COLORS.get(role, UIStyle.INK)))
+	box.add_child(_build_kit_label(hero_name))
 	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
 	box.add_child(_build_stats_block(hero_name))
 
 	return card
+
+## "RANGED · CLONE" — how the hero fights and what their ability is, replacing
+## the role tag the card used to carry (Designer, 2026-07-26: the role bucket
+## was a category, not information you act on when picking a party).
+##
+## Coloured with that hero's ABILITY colour, the same one their filled Duo slot
+## takes below and their cooldown bar takes in battle — one hero, one colour,
+## from the roster card through the pairing panel into the fight.
+func _build_kit_label(hero_name: String) -> Label:
+	var ability := Hero.ability_name_for(hero_name)
+	return UIStyle.centered_label("%s  ·  %s" % [Hero.attack_mode_for(hero_name), ability],
+			UIStyle.SIZE_SMALL, UIStyle.ability_color(ability))
 
 ## The two stat lines on their own paper block, numbers bolded (Designer,
 ## 2026-07-26). Both were plain tiny text sitting directly on the card, so the
@@ -427,12 +607,10 @@ func _build_stats_block(hero_name: String) -> PanelContainer:
 ## Lifetime totals across every run (GameState.hero_stats) — separate from
 ## the live per-run numbers shown on the battle hero card.
 func _lifetime_stats_text(hero_name: String) -> String:
-	var pct := GameState.hero_ability_pct_lifetime(hero_name)
-	var abl_text := "%d%%" % int(round(pct)) if pct >= 0.0 else "—"
 	# BBCode, not plain text — rendered by UIStyle.rich_stat_label so the values
 	# come out bold while their labels stay light.
-	return "KILLS [b]%d[/b]  ·  XP [b]%d[/b]  ·  ABL [b]%s[/b]" % [
-		GameState.hero_kills_lifetime(hero_name), GameState.hero_xp_lifetime(hero_name), abl_text]
+	return "KILLS [b]%d[/b]  ·  XP [b]%d[/b]" % [
+		GameState.hero_kills_lifetime(hero_name), GameState.hero_xp_lifetime(hero_name)]
 
 ## Effective hero stats: base × the global base multipliers × permanent
 ## StatUpgrades purchases — the same formula hero.gd uses at spawn
@@ -471,16 +649,14 @@ func _build_locked_hero_card(hero_name: String) -> PanelContainer:
 
 	box.add_child(UIStyle.centered_label("%s — LOCKED" % hero_name, UIStyle.SIZE_BODY))
 
-	var role: String = Hero.ROLE_BY_HERO.get(hero_name, "")
-	box.add_child(UIStyle.centered_label(role, UIStyle.SIZE_SMALL,
-			Hero.ROLE_COLORS.get(role, UIStyle.INK)))
+	box.add_child(_build_kit_label(hero_name))
 	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
 
 	var ach_id := Achievements.for_hero(hero_name)
 	if ach_id != "":
 		var d := Achievements.def(ach_id)
 		box.add_child(UIStyle.centered_label(d.get("name", ach_id), UIStyle.SIZE_SMALL, UIStyle.GOLD))
-		box.add_child(UIStyle.centered_label(_achievement_progress_text(d), UIStyle.SIZE_TINY))
+		box.add_child(UIStyle.numeric_label(_achievement_progress_text(d), UIStyle.SIZE_TINY, UIStyle.INK, true))
 	return card
 
 ## "84/150 minions" style progress line for a locked hero's achievement.
@@ -497,6 +673,10 @@ func _achievement_progress_text(d: Dictionary) -> String:
 ## need a close handler here — it draws over the prep screen and frees itself.
 func _open_settings() -> void:
 	SettingsPanel.toggle(self)
+
+## Same self-parenting overlay contract as Settings — see above.
+func _open_how_to_play() -> void:
+	HowToPlayPanel.toggle(self)
 
 ## Escape opens Settings, matching the title screen. Not wired to BACK TO MENU:
 ## Escape reaching for "leave the screen" while a player is mid-pairing would
@@ -540,12 +720,18 @@ func _on_start() -> void:
 	get_tree().change_scene_to_file(GameState.BATTLEFIELD)
 
 func _refresh() -> void:
-	_start_button.disabled = RunState.selected_heroes().is_empty()
+	# A run takes BOTH Duos (Designer, 2026-07-29: "new runs are allowing players
+	# to deploy with only one DUO setup"). The old test was "party isn't empty",
+	# which one filled Duo satisfies — the whole battle is built around two Duos
+	# (staggered arrival waves, per-Duo Ultimates and refocus, the start-of-level
+	# reshuffle, which all key off exactly two pairings), so launching with one
+	# leaves half those systems with nothing to act on.
+	_start_button.disabled = not _both_duos_ready()
 	_start_button.modulate = UIStyle.DIM if _start_button.disabled else Color.WHITE
 	if _currency_label != null:
-		_currency_label.text = "Gold: %d" % GameState.gold
+		UIStyle.set_numeric_text(_currency_label, "GOLD: %d" % GameState.gold)
 	if _xp_label != null:
-		_xp_label.text = "Banked XP: %d" % GameState.banked_xp
+		UIStyle.set_numeric_text(_xp_label, "BANKED XP: %d" % GameState.banked_xp)
 
 func _label(text: String, font_size: int) -> Label:
 	return UIStyle.label(text, font_size)

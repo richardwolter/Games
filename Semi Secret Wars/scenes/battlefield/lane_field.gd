@@ -175,6 +175,11 @@ var scenery_kinds: Array[String] = []
 @export var paw_print_texture: Texture2D
 ## Poison Lakes: entry-hazard for all units inside (heroes and minions). (x, y)
 ## center + z = x-radius; y-radius is z * lake_radius_ratio.
+##
+## Currently UNUSED: every level_*_layout.tres ships an empty `lakes` array
+## (Designer, 2026-07-26 — "remove the poison lakes for now"). The machinery
+## below (in_lake, the avoidance field, the purple hatched draw) is left intact
+## so putting them back is a data change, not a code change.
 var lakes: Array[Vector3] = []
 @export var lake_radius_ratio := 0.5
 ## HP lost per lake ENTRY — a single hit on crossing the shore, not a per-second
@@ -186,6 +191,10 @@ var lakes: Array[Vector3] = []
 ## one-hit-per-entry contract as a lake (Combatant edge-triggers both), but
 ## smaller, rounder and harder-hitting — a lake is a wide area you skirt, a
 ## spike pit is a nasty spot you step in. Not a blocker: units path over it.
+##
+## Level 2's hazard, and only level 2's (Designer, 2026-07-26): levels 1 and 3
+## ship an empty array, so the pits are what makes level 2 read as the nastier
+## ground rather than a hazard tax every level pays.
 var spike_pits: Array[Vector3] = []
 @export var spike_texture: Texture2D
 @export var spike_damage := 14.0
@@ -334,8 +343,9 @@ func _ready() -> void:
 	default_hero_spawn = hero_spawn
 	# One roll per battlefield load — see _marks_seed.
 	_marks_seed = randi()
+	_ensure_page_backdrop()
 	_build_border_band()
-	queue_redraw()
+	_redraw_field()
 
 func _load_lane_layout() -> void:
 	var path := "res://config/level_%d_layout.tres" % RunState.current_level
@@ -387,7 +397,7 @@ func apply_lane_layout(layout: LevelLayout) -> void:
 	# page off this — see _draw()).
 	field_radius = Vector2(lane_length * 0.5, lane_half_height)
 	_build_border_band()
-	queue_redraw()
+	_redraw_field()
 
 ## Generates the continuous tree band (both sides) and the sparse ground
 ## scatter, deterministically from the level id so the same lane always looks
@@ -792,6 +802,74 @@ func clamp_out_of_obstacles(pos: Vector2, radii: Vector2) -> Vector2:
 			pos = center3 + dir3 * min_d3
 	return pos
 
+## How far each end of a line-of-sight query is pulled in before testing
+## (see has_line_of_sight). A shooter or its target standing right against a
+## rock has its own centre-to-edge span clipping that rock, which without this
+## reads as "permanently blocked" and sends the shooter walking forever.
+const LOS_END_SLACK := 28.0
+
+## Does a projectile at `pos` overlap a blocking obstacle? Covers authored
+## `obstacles` and runtime `dynamic_obstacles` (Designer, 2026-07-28: shots are
+## stopped by the same things units can't walk through). Decorative `scenery`
+## and the flat hazards (lakes, spike pits) deliberately do NOT block — they're
+## ground, not cover.
+func blocks_projectile(pos: Vector2) -> bool:
+	for i in obstacles.size():
+		var o := obstacles[i]
+		var center := Vector2(o.x, o.y)
+		var radii: Vector2 = obstacle_radii[i] if i < obstacle_radii.size() \
+				else Vector2(o.z, o.z)
+		if _point_in_oval(pos, center, radii):
+			return true
+	for i in dynamic_obstacles.size():
+		var d := dynamic_obstacles[i]
+		var dcenter := Vector2(d.x, d.y)
+		var dradii: Vector2 = dynamic_obstacle_radii[i] \
+				if i < dynamic_obstacle_radii.size() else Vector2(d.z, d.z)
+		if _point_in_oval(pos, dcenter, dradii):
+			return true
+	return false
+
+## Can a straight shot from `from` reach `to` without crossing a blocker?
+## Used by ranged Combatants to hold fire (and reposition) instead of plinking
+## a rock. Same blocker set as blocks_projectile.
+func has_line_of_sight(from: Vector2, to: Vector2) -> bool:
+	var seg := to - from
+	var seg_len := seg.length()
+	if seg_len <= LOS_END_SLACK * 2.0:
+		return true
+	var dir := seg / seg_len
+	var a := from + dir * LOS_END_SLACK
+	var b := to - dir * LOS_END_SLACK
+	for i in obstacles.size():
+		var o := obstacles[i]
+		var radii: Vector2 = obstacle_radii[i] if i < obstacle_radii.size() \
+				else Vector2(o.z, o.z)
+		if _segment_hits_oval(a, b, Vector2(o.x, o.y), radii):
+			return false
+	for i in dynamic_obstacles.size():
+		var d := dynamic_obstacles[i]
+		var dradii: Vector2 = dynamic_obstacle_radii[i] \
+				if i < dynamic_obstacle_radii.size() else Vector2(d.z, d.z)
+		if _segment_hits_oval(a, b, Vector2(d.x, d.y), dradii):
+			return false
+	return true
+
+## Same directional-radius approximation the collision/steering code uses
+## (SpriteFootprint.radius_toward) rather than a separate ellipse solver, so a
+## shot is blocked by exactly the shape a unit is pushed out of.
+func _point_in_oval(pos: Vector2, center: Vector2, radii: Vector2) -> bool:
+	var to_pos := pos - center
+	var dist := to_pos.length()
+	if dist < 0.001:
+		return true
+	return dist <= SpriteFootprint.radius_toward(radii, to_pos / dist)
+
+func _segment_hits_oval(a: Vector2, b: Vector2, center: Vector2,
+		radii: Vector2) -> bool:
+	var closest := Geometry2D.get_closest_point_to_segment(center, a, b)
+	return _point_in_oval(closest, center, radii)
+
 ## Rectangular field-boundary clamp. Axis-aligned, so the oval's own semi-axes
 ## apply exactly — no directional radius needed.
 func clamp_inside_field(pos: Vector2, radii: Vector2) -> Vector2:
@@ -815,7 +893,10 @@ func _draw() -> void:
 	# territory, unlike obstacles/spawn points/in-lane scenery below, which
 	# stay hidden under this node's own z_index until a hero has actually
 	# been there).
-	_draw_page()
+	# The page itself is NOT drawn here any more — PageBackdrop paints it a layer
+	# below, so Ultimate effects can slot between paper and props. See _paint_page.
+	# The deploy band stays: it is translucent (alpha 0.12) ground marking, so an
+	# effect passing under it still reads through.
 	_draw_deploy_band()
 	for i in scenery.size():
 		var s := scenery[i]
@@ -851,6 +932,42 @@ func _draw() -> void:
 			_draw_obstacle_sprite(Vector2(s.x, s.y), s.z, spike_texture)
 	_draw_lair()
 
+## The canvas item the notebook page is painted on, one layer below this node so
+## Duo Ultimate effects can sit between the paper and the props — see
+## _paint_page. Created in code rather than authored in battlefield.tscn so the
+## layering travels with the script that depends on it.
+class PageBackdrop extends Node2D:
+	var field: LaneField
+
+	func _draw() -> void:
+		if field != null:
+			field._paint_page(self)
+
+## Absolute z of the three field layers. Children are z_as_relative by default
+## and LaneField itself sits at 0, so this resolves to -2 on the canvas.
+## Hero._add_ultimate_effect puts effects at PAGE_Z + 1.
+const PAGE_Z := -2
+
+var _page_backdrop: PageBackdrop = null
+
+## Both this node and its page layer. Every existing queue_redraw() site inside
+## LaneField goes through here — the page has to follow a layout change (a new
+## level resizes field_radius) or it would keep painting the previous lane's
+## paper under the new one.
+func _redraw_field() -> void:
+	queue_redraw()
+	if _page_backdrop != null:
+		_page_backdrop.queue_redraw()
+
+func _ensure_page_backdrop() -> void:
+	if _page_backdrop != null:
+		return
+	_page_backdrop = PageBackdrop.new()
+	_page_backdrop.name = "PageBackdrop"
+	_page_backdrop.field = self
+	_page_backdrop.z_index = PAGE_Z
+	add_child(_page_backdrop)
+
 ## Reseeded every time a battlefield loads, so each level reads as a different
 ## page out of the same notebook (Designer, 2026-07-26 — the menu's marks are
 ## deliberately fixed, this one is deliberately not). Stored rather than rolled
@@ -860,13 +977,25 @@ var _marks_seed := 0
 ## Preloaded by path, not by class_name — see PrepPage.PageMarksLib for why.
 const PageMarksLib := preload("res://scripts/page_marks.gd")
 
-func _draw_page() -> void:
+## The notebook page, painted onto `target` rather than onto this node.
+##
+## Split onto its own canvas item on 2026-07-28 so Duo Ultimate effects can draw
+## BEHIND the obstacles (Designer: "its over everything now"). Everything on the
+## field shares one z, so an effect pushed below the props was also pushed below
+## the paper they sit on — the page and the props were the same layer. They are
+## now two: PageBackdrop at z -2, effects at -1, props and units at 0.
+##
+## `target` is the PageBackdrop child. Godot's immediate-mode draw_* calls only
+## affect the CanvasItem currently inside its own _draw(), so this cannot paint
+## the child from LaneField._draw — the child calls this from ITS _draw and
+## passes itself in. Same trick LaneForeground uses in reverse.
+func _paint_page(target: CanvasItem) -> void:
 	var half := field_radius + page_margin
 	var rect := Rect2(-half, half * 2.0)
-	draw_rect(rect, page_color, true)
-	_draw_ruled_lines(rect, rect, rule_color, 1.5)
+	target.draw_rect(rect, page_color, true)
+	_draw_ruled_lines(target, rect, rect, rule_color, 1.5)
 	var mx := rect.position.x + 56.0
-	draw_line(Vector2(mx, rect.position.y), Vector2(mx, rect.end.y), margin_color, 2.0, true)
+	target.draw_line(Vector2(mx, rect.position.y), Vector2(mx, rect.end.y), margin_color, 2.0, true)
 	# Scribbles/stains/smudges over the rules but under everything else, so the
 	# page reads as used without ever sitting on top of a unit or a prop. No
 	# keep-out: unlike the menus there is no text to protect here.
@@ -876,17 +1005,18 @@ func _draw_page() -> void:
 	# flat count would leave a big field looking untouched.
 	var page_area := rect.size.x * rect.size.y
 	var density := clampf(page_area / (1920.0 * 1080.0), 1.0, 6.0)
-	PageMarksLib.draw_marks(self, rect, _marks_seed, 1.0, density)
+	PageMarksLib.draw_marks(target, rect, _marks_seed, 1.0, density)
 
 ## Draws ruled-notebook horizontal lines clipped to `rect`, phased from
 ## `page_rect`'s own grid (not `rect`'s position) so the pattern lines up
 ## seamlessly whether it's drawn over the plain page or a filled area painted
 ## on top of it later.
-func _draw_ruled_lines(rect: Rect2, page_rect: Rect2, color: Color, width: float) -> void:
+func _draw_ruled_lines(target: CanvasItem, rect: Rect2, page_rect: Rect2,
+		color: Color, width: float) -> void:
 	var y := page_rect.position.y + rule_spacing
 	while y < rect.end.y:
 		if y >= rect.position.y:
-			draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), color, width, true)
+			target.draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), color, width, true)
 		y += rule_spacing
 
 ## Organic hand-drawn blob: ellipse with stable per-vertex wobble, inked with

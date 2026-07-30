@@ -19,6 +19,13 @@ var step_radius := 90.0
 var step_damage := 30.0
 var step_stun := 0.8
 
+## HP returned to BOTH Duo members per unit this Ultimate kills (Designer,
+## 2026-07-26). Per kill, not per hit — the Ultimate rewards catching a packed
+## cluster, which is the same thing its marching shape already asks the player
+## to line up. Healing the partner too (not just Thundaar, who casts it) is the
+## point: it is a Duo Ultimate, so its payoff belongs to the pair.
+const HEAL_PER_KILL := 5.0
+
 ## Locked in once, in _ready — NOT re-evaluated per step. A wave that re-aimed
 ## as it went would curve after whatever survived it, which reads as a homing
 ## effect rather than a shockwave travelling in a straight line.
@@ -76,13 +83,32 @@ func _land_step() -> void:
 	if caster == null or not is_instance_valid(caster):
 		return
 	var dmg := step_damage * caster._duo_damage_mult * caster.damage_mult()
+	var kills := 0
 	for node in get_tree().get_nodes_in_group(caster.enemy_group):
 		if not is_instance_valid(node) or node._dying or not caster._lane_ok(node):
 			continue
 		if global_position.distance_to(node.global_position) <= step_radius:
 			node.take_damage(dmg, caster)
-			if is_instance_valid(node) and not node._dying:
+			# A unit that entered this branch alive and is now gone or dying was
+			# killed by THIS step — the pre-loop guard above already excluded
+			# anything that was dying before the wave touched it, so a kill here
+			# can't be double-counted by a later step.
+			if not is_instance_valid(node) or node._dying:
+				kills += 1
+			else:
 				node.apply_stun(step_stun)
+	if kills > 0:
+		_heal_duo(kills * HEAL_PER_KILL)
+
+## Splits the step's lifesteal to both Duo members — the caster and, when it is
+## alive and on the field, its partner (Hero._duo_partner_node). Each gets the
+## FULL amount rather than half: 5 HP per kill is the figure asked for, per
+## hero, not a pool to divide.
+func _heal_duo(amount: float) -> void:
+	for hero in [caster, caster._duo_partner_node()]:
+		if hero == null or not is_instance_valid(hero) or hero._dying:
+			continue
+		hero.hp = minf(hero.hp + amount, hero.max_hp)
 
 ## Hand-drawn stomp burst art, shared with THUNDAAR.s own Stomp (Designer,
 ## 2026-07-25) — this Ultimate IS a march of stomps, so it reads as the same

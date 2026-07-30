@@ -113,11 +113,18 @@ const CATALOG := {
 	# WARDEN + BEACON ---------------------------------------------------------
 	"BEACON|WARDEN": {
 		"name": "Searing Bind",
-		"desc": "Root nearby enemies and set them ablaze, dealing damage over 30s.",
+		"desc": "Burning ground for 3s: everything that enters is rooted and set ablaze for 5s.",
 		"kind": "ensnare_burn",
+		# Reworked 2026-07-26 (Designer) from a one-frame snapshot into a 3s
+		# field — see Hero._cast_ensnare_burn. The burn went 30s -> 5s and the
+		# dps up to match, so a bound enemy takes a comparable total (~225) but
+		# takes it NOW, inside the fight the cast was meant to swing, instead of
+		# ticking away for half a level. Radius up 140 -> 210 for the same
+		# reason the field exists: the ultimate should catch a swarm, not a
+		# huddle.
 		"params": {
-			"radius": 140.0, "ensnare_duration": 1.5,
-			"burn_duration": 30.0, "burn_dps": 14.0,
+			"radius": 210.0, "ensnare_duration": 1.5,
+			"burn_duration": 5.0, "burn_dps": 45.0,
 		},
 		"buff": {"dmg_add": 4.0, "hp_add": 30.0},
 	},

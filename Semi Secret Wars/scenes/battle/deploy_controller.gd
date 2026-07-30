@@ -58,7 +58,7 @@ var _placed: Array[Vector2] = []
 var _cursor := Vector2.ZERO
 var _valid := false
 var _start_button: Button
-var _delay_label: Label
+var _delay_label: RichTextLabel
 var _ui_layer: CanvasLayer
 
 ## True once START BATTLE has been pressed. The node deliberately outlives that
@@ -183,7 +183,7 @@ func _build_ui() -> void:
 	# already shows, and the START BATTLE button enabling is a clearer "you are
 	# done" than a line of text saying so.
 	col.add_child(UIStyle.wrapped_label(
-			"Deploy DUO's on designated lane. You can choose if the 2nd DUO arrives later (0s is immediate deploy).",
+			"Deploy DUO's on designated lane — one DUO per lane. You can choose if the 2nd DUO arrives later (0s is immediate deploy).",
 			760.0, UIStyle.SIZE_SMALL))
 
 	# Single-lane levels (a Duo was wiped earlier in the run — see
@@ -206,8 +206,8 @@ func _build_ui() -> void:
 		# button was a second control for a choice the player was making anyway.
 		controls.add_child(UIStyle.button("-1s", UIStyle.SIZE_TINY, _on_delay_step.bind(-1.0)))
 
-		_delay_label = UIStyle.label("", UIStyle.SIZE_SMALL, UIStyle.GOLD)
-		_delay_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_delay_label = UIStyle.numeric_label("", UIStyle.SIZE_SMALL, UIStyle.GOLD)
+		_delay_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		controls.add_child(_delay_label)
 
 		controls.add_child(UIStyle.button("+1s", UIStyle.SIZE_TINY, _on_delay_step.bind(1.0)))
@@ -228,7 +228,27 @@ func _on_delay_step(amount: float) -> void:
 	_update_delay_label()
 
 func _update_delay_label() -> void:
-	_delay_label.text = "2nd Duo arrives: %ds later" % int(round(_delay_seconds))
+	UIStyle.set_numeric_text(_delay_label, "2nd Duo arrives: %ds later" % int(round(_delay_seconds)))
+
+## One Duo per lane (Designer, 2026-07-27): the two Duos must split top/bottom,
+## so a point in a lane that already holds a placed Duo is not a legal deploy
+## spot. Only meaningful when two Duos are actually being fielded — on
+## single_lane levels (a Duo was wiped, LaneField.single_lane) there is only one
+## group to place and the lane divider no longer applies.
+func _lane_taken(p: Vector2) -> bool:
+	if field == null or field.single_lane or not _has_two_waves():
+		return false
+	var lane := field.lane_of(p)
+	for placed in _placed:
+		if field.lane_of(placed) == lane:
+			return true
+	return false
+
+## A point is placeable if it's inside the authored deploy band AND its lane is
+## still free — both gates, so the cursor ghost's red X and the click handler
+## can't disagree about what's legal.
+func _can_place_at(p: Vector2) -> bool:
+	return field.is_valid_deploy_point(p) and not _lane_taken(p)
 
 func _all_placed() -> bool:
 	return _placed.size() >= _ordered_groups().size()
@@ -244,7 +264,7 @@ func _process(_delta: float) -> void:
 	if _committed:
 		return  # placement is locked in; only the markers are still drawn
 	_cursor = get_global_mouse_position()
-	_valid = not _all_placed() and field.is_valid_deploy_point(_cursor)
+	_valid = not _all_placed() and _can_place_at(_cursor)
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -253,7 +273,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
-		if field.is_valid_deploy_point(world):
+		if _can_place_at(world):
 			get_viewport().set_input_as_handled()
 			_placed.append(world)
 			_update_hint()

@@ -15,13 +15,17 @@ run/main_scene="res://scenes/title/title_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[audio]
+
+general/default_playback_type.web=0
+
 [autoload]
 
 GameState="*res://scenes/state/game_state.gd"
 RunState="*res://scenes/run/run_state.gd"
-_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 UIBoot="*res://scripts/ui_boot.gd"
 AudioSettings="*res://scripts/audio_settings.gd"
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
 

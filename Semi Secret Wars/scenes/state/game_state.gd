@@ -72,12 +72,6 @@ var run_xp := {}
 ## Kill count per hero in the current run — display only (hero cards), reset
 ## by start_run(). See record_hero_kill.
 var run_kills := {}
-## Special-ability cast attempts/successful-hits per hero in the current run —
-## display only (hero cards), reset by start_run(). "Successful" means the
-## cast actually affected an enemy (see record_ability_result); basic attacks
-## are excluded since they have no miss mechanic and would always read 100%.
-var run_ability_attempts := {}
-var run_ability_hits := {}
 
 ## -- Meta progression ---------------------------------------------------------
 
@@ -134,17 +128,19 @@ var banked_xp := 0
 var stat_purchases: Dictionary = {}
 
 ## Lifetime per-hero stats, accumulated across every run (prep-menu display —
-## "Total kills", "Total XP gained", "Ability effectiveness"). hero_name ->
-## {"kills": int, "xp": int, "ability_attempts": int, "ability_hits": int}.
+## "Total kills", "Total XP gained"). hero_name -> {"kills": int, "xp": int}.
 ## `xp` here is a separate running total from banked_xp — banked_xp is the
 ## shared spendable currency (v6, per-hero tracking removed); this is purely
-## a lifetime counter for display, never spent. See record_hero_kill,
-## record_ability_result, add_xp.
+## a lifetime counter for display, never spent. See record_hero_kill, add_xp.
+##
+## Old saves may still carry ability_attempts/ability_hits keys from the retired
+## ability-effectiveness readout (dropped 2026-07-26); they are simply never
+## read, so no save migration is needed.
 var hero_stats: Dictionary = {}
 
 func _hero_stat(hero_name: String) -> Dictionary:
 	if not hero_stats.has(hero_name):
-		hero_stats[hero_name] = {"kills": 0, "xp": 0, "ability_attempts": 0, "ability_hits": 0}
+		hero_stats[hero_name] = {"kills": 0, "xp": 0}
 	return hero_stats[hero_name]
 
 ## Killing-blow credit only (matches award_kill_xp's killer-gets-full-XP rule
@@ -154,19 +150,6 @@ func _hero_stat(hero_name: String) -> Dictionary:
 func record_hero_kill(hero_name: String) -> void:
 	_hero_stat(hero_name)["kills"] += 1
 	run_kills[hero_name] = int(run_kills.get(hero_name, 0)) + 1
-
-## Tracks one special-ability cast attempt and whether it actually landed on
-## an enemy (Hero._try_* already computes this locally — e.g. Ensnare's `hit`,
-## Rally's `buffed` — this just records it). Only call for casts that got past
-## the "nothing to aim at" guard; a cast that never fires at all isn't a miss,
-## it's a no-op. No save — same high-frequency reasoning as record_hero_kill.
-func record_ability_result(hero_name: String, success: bool) -> void:
-	var stat := _hero_stat(hero_name)
-	stat["ability_attempts"] += 1
-	run_ability_attempts[hero_name] = int(run_ability_attempts.get(hero_name, 0)) + 1
-	if success:
-		stat["ability_hits"] += 1
-		run_ability_hits[hero_name] = int(run_ability_hits.get(hero_name, 0)) + 1
 
 ## -- Hero stat readouts (prep card = lifetime, battle card = current run) ----
 
@@ -181,21 +164,6 @@ func hero_xp_lifetime(hero_name: String) -> int:
 
 func hero_xp_run(hero_name: String) -> int:
 	return int(run_xp.get(hero_name, 0))
-
-## -1.0 when no ability has been cast yet (nothing to divide) — callers should
-## show "—" rather than a misleading 0%.
-func hero_ability_pct_lifetime(hero_name: String) -> float:
-	var stat: Dictionary = hero_stats.get(hero_name, {})
-	var attempts := int(stat.get("ability_attempts", 0))
-	if attempts <= 0:
-		return -1.0
-	return 100.0 * int(stat.get("ability_hits", 0)) / attempts
-
-func hero_ability_pct_run(hero_name: String) -> float:
-	var attempts := int(run_ability_attempts.get(hero_name, 0))
-	if attempts <= 0:
-		return -1.0
-	return 100.0 * int(run_ability_hits.get(hero_name, 0)) / attempts
 
 ## -- Duo pairings ---------------------------------------------------------
 
@@ -236,8 +204,6 @@ func _input(event: InputEvent) -> void:
 func start_run() -> void:
 	run_xp.clear()
 	run_kills.clear()
-	run_ability_attempts.clear()
-	run_ability_hits.clear()
 
 ## Kill XP: killer banks the full value; every other living hero banks the
 ## assist share (rounded up), so XP flows to the whole party (BALANCE.md).
@@ -601,8 +567,6 @@ func load_game() -> void:
 func _reset_state_defaults() -> void:
 	run_xp = {}
 	run_kills = {}
-	run_ability_attempts = {}
-	run_ability_hits = {}
 	gold = 0
 	owned_mods = []
 	owned_ability_tiers = []

@@ -9,9 +9,10 @@ extends Control
 const INK_COLOR := UIStyle.INK
 
 ## Hand-drawn logo replacing the plain text title (Designer, 2026-07-25).
-## Swapped to the coloured version 2026-07-26 — same 3024x2502 canvas, so the
-## sizing below is untouched.
-const LOGO_TEXTURE := preload("res://assets/Logo_Menu_Color.png")
+## Swapped to the coloured version 2026-07-26, then to the final wordmark
+## 2026-07-28 — the new canvas is 3024x2028 (wider than the old 3024x2502), so
+## the box height below drops to keep the art at its natural aspect.
+const LOGO_TEXTURE := preload("res://assets/sprites/Logo_Semi-Secret-Wars.png")
 
 ## NEW GAME / CONTINUE share one source PNG, stacked top/bottom in two equal
 ## halves — sliced into separate AtlasTexture regions below instead of two
@@ -39,10 +40,12 @@ func _ready() -> void:
 	logo.texture = LOGO_TEXTURE
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.custom_minimum_size = Vector2(640, 530)
+	logo.custom_minimum_size = Vector2(640, 429)
 	root.add_child(logo)
 
-	root.add_child(UIStyle.centered_label("Hero team-up Autobattler", UIStyle.SIZE_BODY))
+	# SUBHEAD, not BODY (Designer, 2026-07-26): under a 640-wide logo the tagline
+	# was reading as fine print rather than as the game's one-line pitch.
+	root.add_child(UIStyle.centered_label("Hero team-up Autobattler", UIStyle.SIZE_SUBHEAD))
 
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 24)
@@ -56,11 +59,18 @@ func _ready() -> void:
 		continue_btn.modulate = UIStyle.DIM
 	root.add_child(continue_btn)
 
-	var settings_btn := UIStyle.button("SETTINGS", UIStyle.SIZE_SMALL, _open_settings)
-	settings_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	root.add_child(settings_btn)
+	# SETTINGS and CREDITS share a row: both are secondary to the two art
+	# buttons above, and stacking them would push the version line off the
+	# bottom of the layout.
+	var minor_row := HBoxContainer.new()
+	minor_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	minor_row.add_theme_constant_override("separation", 18)
+	minor_row.add_child(UIStyle.button("HOW TO PLAY", UIStyle.SIZE_SMALL, _open_how_to_play))
+	minor_row.add_child(UIStyle.button("SETTINGS", UIStyle.SIZE_SMALL, _open_settings))
+	minor_row.add_child(UIStyle.button("CREDITS", UIStyle.SIZE_SMALL, _open_credits))
+	root.add_child(minor_row)
 
-	root.add_child(UIStyle.centered_label("v0.1 — demo build", UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
+	root.add_child(UIStyle.numeric_label("v0.1 — demo build", UIStyle.SIZE_TINY, UIStyle.INK_MUTED, true))
 
 	# The title music player lives in title_screen.tscn, so it can't be given a
 	# bus in the inspector (AudioSettings creates the buses at runtime) — route
@@ -78,9 +88,15 @@ func _ready() -> void:
 func _open_settings() -> void:
 	SettingsPanel.toggle(self)
 
+func _open_credits() -> void:
+	CreditsPanel.toggle(self)
+
+func _open_how_to_play() -> void:
+	HowToPlayPanel.toggle(self)
+
 ## Escape opens Settings from the title screen — there's nothing else for it to
-## back out to here. ConfirmPanel and SettingsPanel both consume Escape while
-## they're up, so this can't fire underneath either of them.
+## back out to here. ConfirmPanel, SettingsPanel and CreditsPanel all consume
+## Escape while they're up, so this can't fire underneath any of them.
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()

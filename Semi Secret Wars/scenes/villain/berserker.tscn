@@ -16,18 +16,33 @@ villain_name = "BERSERKER"
 ; aggressive and tanky"). HP 1600 -> 2000 before stage_2_config's villain_hp_mult
 ; (1.4 -> 1.9), so effective HP goes 2240 -> 3800; damage 24 -> 32 on the same
 ; telegraphed 1.1s swing; detect_range 120 -> 170 so he peels onto a passing
-; hero instead of walking by. Aggression comes from the phase rhythm: charge
-; 3.0 -> 4.5s and recover 1.5 -> 1.0s means he is pursuing ~82% of the time
-; instead of 67%, and the escape windows are shorter. That rhythm is the only
-; thing keeping him fair at move_speed 140 vs the hero's 95 — shorten recovery
-; further only if he still feels escapable.
+; hero instead of walking by.
+;
+; Freeze removal 2026-07-26 (Designer): the charge/recover cycle is gone — he
+; pursues 100% of the time now instead of 4.5s-in-5.5s (~82%). Two numbers move
+; with it, both sized off that duty cycle rather than guessed:
+;   move_speed 140 -> 115. His AVERAGE closing speed was 140 x 0.82 = 115; at
+;     100% uptime, 115 reproduces it exactly. Still above the hero's 90, so he
+;     runs down a fleeing hero — he just no longer does it in bursts.
+;   damage 32 -> 27. The swing itself never paused (he could attack during
+;     recovery), but he now spends materially more time standing in melee range
+;     because heroes no longer get a beat to peel off. ~15% off the swing pays
+;     for that extra in-range uptime, on the same telegraphed 1.1s interval the
+;     last two passes deliberately preserved.
+; HP is untouched: the ask was to balance his attacks, and his durability was
+; never what the freeze was paying for.
+;
+; Swing rate 2026-07-26 (Designer: "attack heroes more often"): attack_interval
+; 1.1 -> 0.8. This is the first pass that gives up the slow telegraph on
+; purpose — at 27 damage he goes from 24.5 to 33.8 damage/sec on a single
+; target, above even the 29.1 he did before the freeze came out. Damage is left
+; at 27 rather than dropped again to hold that line: the ask was more frequent
+; hits, and 0.8s is still slow enough to read as a wind-up rather than a grind.
 max_hp = 2000.0
-damage = 32.0
-attack_interval = 1.1
+damage = 27.0
+attack_interval = 0.8
 attack_range = 26.0
 detect_range = 170.0
-move_speed = 140.0
+move_speed = 115.0
 body_color = Color(0.851, 0.224, 0.224, 1)
 body_radius = 32.0
-charge_duration = 4.5
-recover_duration = 1.0
