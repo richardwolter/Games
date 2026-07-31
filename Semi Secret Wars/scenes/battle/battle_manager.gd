@@ -74,37 +74,28 @@ var _exhausted: Dictionary = {}
 ## (drives the drain).
 var _pick_queue: Array[Dictionary] = []
 var _pick_screen: LevelUpScreen = null
-## The start-of-level Duo reshuffle overlay, alive only between _ready and the
-## player confirming it — see _begin_deploy_setup.
-var _rearrange_screen: DuoRearrangeScreen = null
-## Duos already offered their pick this level — the two spawn waves each queue
-## for whoever landed, and this stops a Duo split across both waves (or a
-## re-entrant call) from being asked twice.
+## Duos already offered their pick this level — stops a re-entrant call from
+## asking the same Duo twice.
 var _picked_this_level: Array[String] = []
 ## Duo Ultimates activated this level (pair id -> true). Resets naturally
 ## every level since BattleManager itself is a fresh instance each scene
 ## load — see activate_ultimate/can_activate_ultimate.
 var _ultimate_used: Dictionary = {}
-## The per-Duo refocus marker layer, created as the first wave lands (see
+## The per-Duo refocus marker layer, created as the party lands (see
 ## _spawn_focus_ping). Heroes and the HUD both find it by its "focus_ping"
 ## group; this reference only exists to keep _spawn_focus_ping idempotent.
 var _focus_ping: FocusPing = null
 
-## Second-deploy-wave state (Duo staggered arrival). -1.0 = no wave pending
-## (either it already landed or there was only ever one wave); >= 0.0 counts
-## down in _process. BattleHUD reads duo_b_seconds_remaining() to show the
-## countdown so the player can watch it and correlate with how the fight
-## unfolds — see DeployController's stepper for where the delay is chosen.
-var _second_wave_names: Array = []
-var _second_wave_positions: Array = []
-var _second_wave_remaining := -1.0
-
-## A wave that has been placed and is waiting on its boon pick before it
-## actually spawns — see _on_deploy_chosen / _flush_pending_deploy.
+## The placed party, waiting on its boon picks before it actually spawns — see
+## _on_deploy_chosen / _flush_pending_deploy.
+##
+## There is no second wave any more (Designer, 2026-07-30): the staggered
+## Duo-arrival timer was removed along with the deploy stepper that set it, so
+## every placed hero lands in this one spawn. See DeployController's class doc.
 var _pending_names: Array = []
 var _pending_positions: Array = []
-## Set the first time a wave lands; gates the one-shot battle start (swarm
-## release, boulders) so a delayed second wave doesn't re-trigger it.
+## Set when the party lands; gates the one-shot battle start (swarm release,
+## boulders) against a re-entrant call.
 var _battle_started := false
 
 func _ready() -> void:
@@ -143,8 +134,8 @@ func _ready() -> void:
 	_hud.setup_heroes(RunState.living_party())
 	_spawn_villain(_stage_config)
 	# NOTE: boon picks are NOT queued here any more (Designer, 2026-07-26).
-	# Deploy now runs FIRST and each Duo's pick follows its own arrival on the
-	# field — see _on_deploy_chosen and _spawn_second_wave. Previously every
+	# Deploy now runs FIRST and the picks follow the party onto the field — see
+	# _on_deploy_chosen. Previously every
 	# pick was drained before deploy became interactive, which asked the player
 	# to choose Ultimate upgrades for Duos they hadn't placed yet, against a
 	# battlefield they hadn't seen.
@@ -152,42 +143,19 @@ func _ready() -> void:
 	# Swarm stays frozen (_spawner.begin_battle() deferred) until every hero is
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
-	_begin_deploy_setup()
-
-## Deploy entry point. On any level after the first, the player gets one chance
-## to reshuffle their Duos before placing anyone (Designer, 2026-07-28) — the
-## overlay must resolve BEFORE _compute_duos() below, since that's what feeds
-## DeployController its two waves.
-##
-## Level 1 skips it: the pairing was just chosen on the prep screen, so asking
-## again immediately is noise. A party down to one living hero skips it too —
-## there is nothing to exchange.
-func _begin_deploy_setup() -> void:
-	if RunState.current_level > 1 and RunState.living_party().size() >= 2 \
-			and GameState.duo_pairings.size() == 2:
-		var screen := DuoRearrangeScreen.new()
-		_rearrange_screen = screen
-		add_child(screen)
-		screen.setup(GameState.duo_pairings, RunState.dead)
-		screen.confirmed.connect(_on_rearrange_confirmed)
-		get_tree().paused = true
-		return
 	_spawn_deploy_controller()
 
-func _on_rearrange_confirmed() -> void:
-	if _rearrange_screen != null:
-		_rearrange_screen.queue_free()
-		_rearrange_screen = null
-	get_tree().paused = false
-	# The HUD built its Ultimate cards from the OLD pairing back in its _ready,
-	# before this overlay existed to change it — re-derive them now.
-	_hud.rebuild_duo_ultimate_bar()
-	_spawn_deploy_controller()
-
+## NOTE: the start-of-level Duo reshuffle (DuoRearrangeScreen, added 2026-07-28)
+## was removed entirely on 2026-07-30 — Designer: "lets remove the rearrange
+## DUO's mechanic as a whole, its not appealing to me". Pairings are chosen once,
+## at prep, and hold for the whole run; deploy now begins the moment the level
+## loads. Gone with it: the overlay itself, BattleHUD.rebuild_duo_ui (nothing can
+## change a pairing mid-run any more, so nothing needs re-deriving) and the
+## _process guard that froze this node while the overlay was up.
 func _spawn_deploy_controller() -> void:
 	_deploy = DeployController.new()
 	_deploy.field = _field
-	# Reads GameState.duo_pairings, so it must run after any reshuffle above.
+	# Reads GameState.duo_pairings, settled back at prep.
 	var duos := _compute_duos()
 	_deploy.duo_a = duos.a
 	_deploy.duo_b = duos.b
@@ -228,21 +196,16 @@ func _compute_duos() -> Dictionary:
 			a.append(hero_name)
 	return {"a": a, "b": b}
 
-## First wave spawns immediately and releases the swarm; the second wave (if
-## any) is held and counted down in _process, landing `delay` seconds later
-## at its own chosen positions — see DeployController.
+## The whole placed party spawns together and releases the swarm — see
+## DeployController.
 func _on_deploy_chosen(payload: Dictionary) -> void:
-	# Nothing spawns yet. The boon pick for this wave's Duo comes first and the
-	# teleport-in only fires once it's answered (Designer, 2026-07-26) — while
-	# the pick is up, DeployController keeps drawing the placed hero sprites, so
-	# the player chooses upgrades looking at their real formation rather than
-	# watching heroes materialise behind a modal they haven't dismissed.
-	_pending_names = payload.get("first_names", [])
-	_pending_positions = payload.get("first_positions", [])
-
-	_second_wave_names = payload.get("second_names", [])
-	_second_wave_positions = payload.get("second_positions", [])
-	_second_wave_remaining = float(payload.get("delay", 0.0)) if not _second_wave_names.is_empty() else -1.0
+	# Nothing spawns yet. The Duos' boon picks come first and the teleport-in
+	# only fires once they're answered (Designer, 2026-07-26) — while a pick is
+	# up, DeployController keeps drawing the placed hero sprites, so the player
+	# chooses upgrades looking at their real formation rather than watching
+	# heroes materialise behind a modal they haven't dismissed.
+	_pending_names = payload.get("names", [])
+	_pending_positions = payload.get("positions", [])
 
 	_queue_picks_for(_pending_names)
 	# No picks to make (every Duo here already picked this level) — deploy now
@@ -250,21 +213,8 @@ func _on_deploy_chosen(payload: Dictionary) -> void:
 	if _pick_queue.is_empty():
 		_flush_pending_deploy()
 
-func _spawn_second_wave() -> void:
-	# Same rule as the first wave: pick first, arrive after. A boon chosen for
-	# heroes who won't exist for another 10 seconds is a decision made blind.
-	_pending_names = _second_wave_names.duplicate()
-	_pending_positions = _second_wave_positions.duplicate()
-	_second_wave_names = []
-	_second_wave_positions = []
-	_second_wave_remaining = -1.0
-	_queue_picks_for(_pending_names)
-	if _pick_queue.is_empty():
-		_flush_pending_deploy()
-
-## Actually puts the pending wave on the field — the teleport-in FX, the sound,
-## and (on the first wave) releasing the swarm. Called once the wave's boon
-## picks have all been answered.
+## Actually puts the placed party on the field — the teleport-in FX, the sound,
+## and releasing the swarm. Called once the boon picks have all been answered.
 func _flush_pending_deploy() -> void:
 	if _pending_names.is_empty():
 		return
@@ -278,8 +228,7 @@ func _flush_pending_deploy() -> void:
 	# retire the controller entirely once nothing is still pending.
 	if _deploy != null and is_instance_valid(_deploy):
 		_deploy.mark_spawned(names)
-		if _second_wave_names.is_empty():
-			_deploy.finish()
+		_deploy.finish()
 	if not _battle_started:
 		_battle_started = true
 		_spawn_focus_ping()
@@ -289,7 +238,7 @@ func _flush_pending_deploy() -> void:
 		_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
 		_boulders_live = true
 
-## Creates the per-Duo refocus marker layer, once, as the first wave lands.
+## Creates the per-Duo refocus marker layer, once, as the party lands.
 ## Parented next to the DeployController (battlefield root, world space) so its
 ## draw sits in field coordinates. Deliberately NOT created during deploy: its
 ## left-click would fight the placement clicks.
@@ -317,26 +266,14 @@ func _queue_picks_for(hero_names: Array) -> void:
 		_picked_this_level.append(pair_id)
 		_pick_queue.append({"kind": "duo", "key": pair_id})
 
-## Seconds left until the second Duo lands, or -1.0 if none is pending —
-## BattleHUD polls this every frame to show the countdown.
-func duo_b_seconds_remaining() -> float:
-	return _second_wave_remaining
-
-## True until the first wave actually lands — placement, plus the boon pick that
-## now sits between START BATTLE and the spawn. BattleHUD uses it to show each
-## hero's real card instead of a row of DOWN panels.
+## True until the party actually lands — placement, plus the boon picks that sit
+## between START BATTLE and the spawn. BattleHUD uses it to show each hero's real
+## card instead of a row of DOWN panels.
 ##
 ## Keyed off _battle_started rather than the DeployController's existence: that
-## node outlives the commit (it keeps drawing placement markers for a delayed
-## second wave), and while it's alive a held-back hero should read as "ARRIVES
-## IN Xs", not as still-being-placed.
+## node outlives the commit by a frame while its markers are retired.
 func is_deploy_phase() -> bool:
 	return not _battle_started
-
-## True while `hero_name` is queued for the second wave but hasn't landed
-## yet — BattleHUD uses this to show "ARRIVES IN Xs" instead of a false KO.
-func is_hero_incoming(hero_name: String) -> bool:
-	return hero_name in _second_wave_names
 
 func _spawn_hero(hero_name: String, pos: Vector2) -> void:
 	var root := get_node(heroes_root_path)
@@ -433,24 +370,14 @@ func _process(delta: float) -> void:
 			get_tree().paused = false
 			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
 		return
-	# Both start-of-level overlays freeze this loop, not just the boon pick.
-	# BattleManager runs PROCESS_MODE_ALWAYS, so without the reshuffle guard the
-	# monster countdown (and the second-wave timer) would keep draining behind a
-	# modal the player is still reading.
-	if _pick_screen != null or _rearrange_screen != null:
+	# The boon pick freezes this loop. BattleManager runs PROCESS_MODE_ALWAYS, so
+	# without this guard the monster countdown would keep draining behind a modal
+	# the player is still reading.
+	if _pick_screen != null:
 		return
 	if not _pick_queue.is_empty():
 		_show_next_pick()
 		return
-	# >= 0.0, not > 0.0: a Duo configured with a 0s delay starts
-	# _second_wave_remaining already at exactly 0.0 (see the assignment above),
-	# and the old `> 0.0` guard skipped this whole block forever in that case —
-	# the strict-positive check was meant to gate the *decrement*, not the
-	# one-time spawn check that must still fire when the delay is zero.
-	if _second_wave_remaining >= 0.0:
-		_second_wave_remaining = maxf(_second_wave_remaining - delta, 0.0)
-		if _second_wave_remaining <= 0.0:
-			_spawn_second_wave()
 	# Single source of truth for the villain's live position (shared field state).
 	if _villain != null and is_instance_valid(_villain) and not _villain._dying:
 		_field.villain_pos = _villain.global_position
@@ -539,11 +466,8 @@ func _show_next_pick() -> void:
 	var pair_id: String = entry.get("key", "")
 	var names := pair_id.split("|")
 	var ult_name: String = DuoUltimates.def(pair_id).get("name", "ULTIMATE")
-	# Instruction first, subject second — see LevelUpScreen.setup's doc.
-	screen.setup(
-		"Choose an Ultimate boon (this run only)",
-		"%s — %s" % [" + ".join(names), ult_name],
-		RunState.roll_duo_offer(pair_id), DuoUltimateBoons.def)
+	# The two hero names are passed as SPRITES, not text — see LevelUpScreen.setup.
+	screen.setup(Array(names), ult_name, RunState.roll_duo_offer(pair_id), DuoUltimateBoons.def)
 	screen.picked.connect(_on_pick_chosen.bind(entry))
 	get_tree().paused = true
 
@@ -566,7 +490,7 @@ func _on_pick_chosen(id: String, entry: Dictionary) -> void:
 ## -- Duo Ultimates (2026-07-22) ----------------------------------------------
 
 ## Manually activates `pair_id`'s Duo Ultimate — called by the Duo Ultimate
-## bar's ACTIVATE button (BattleHUD/DuoUltimateBar). Picks whichever Duo
+## panel's ULTIMATE button (BattleHUD/DuoControlBar). Picks whichever Duo
 ## member is alive and spawned to be the caster (the confirmed leader if
 ## they're among the living, else whoever else is alive), casts the effect,
 ## then applies the level-long buff (DuoUltimates.def's "buff") to every
@@ -590,9 +514,10 @@ func activate_ultimate(pair_id: String) -> bool:
 			float(buff.get("atk_reduction", 0.0)),
 			float(buff.get("hp_add", 0.0)))
 	_ultimate_used[pair_id] = true
-	# Say it out loud (Designer, 2026-07-29: the activation was easy to miss —
-	# the only feedback was a button quietly relabelling itself to USED).
-	_hud.show_ultimate_used(pair_id, DuoUltimates.def(pair_id).get("name", "ULTIMATE"))
+	# No centre-screen announcement any more (Designer, 2026-07-30). The Ultimate
+	# itself is the feedback — the cast FX, its sound, and the DUO CONTROL button
+	# popping and fading to USED — and a heading-sized banner over the fight was
+	# covering the thing it was announcing.
 	return true
 
 ## True while pair_id's Ultimate is still available this level (not yet used

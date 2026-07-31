@@ -63,9 +63,9 @@ func _find_manager(node: Node) -> Node:
 			return found
 	return null
 
-## Fires BattleManager._on_deploy_chosen directly with the whole party in the
-## first wave, spread across the deploy band — same payload shape
-## DeployController builds from clicks.
+## Fires BattleManager._on_deploy_chosen directly with the whole party spread
+## across the deploy band — same payload shape DeployController builds from
+## clicks.
 func _auto_deploy(manager: Node) -> void:
 	var field: LaneField = manager._field
 	var names: Array = RunState.living_party()
@@ -76,10 +76,7 @@ func _auto_deploy(manager: Node) -> void:
 		var y: float = field.lane_half_height * (-0.5 if i % 2 == 0 else 0.5)
 		positions.append(Vector2(x + (i / 2) * 120.0, y))
 	manager._on_deploy_chosen({
-		"first_names": names,
-		"first_positions": positions,
-		"second_names": [],
-		"second_positions": [],
-		"delay": 0.0,
+		"names": names,
+		"positions": positions,
 	})
 	print("[debug_level2] auto-deployed %d heroes on level %d" % [names.size(), RunState.current_level])

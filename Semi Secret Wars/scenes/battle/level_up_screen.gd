@@ -32,15 +32,20 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 
-## Build the overlay with the `prompt` on top, the `subject` it applies to
-## right below, and one card per id in `offer`, resolved through `def_resolver`
-## (DuoUltimateBoons.def).
+## Portrait box for the two heroes flanking the Ultimate name.
+const HERO_ART := Vector2(96, 78)
+
+## Builds the overlay: the Duo's two hero sprites flanking their Ultimate's name
+## on top, the instruction under it, then one card per id in `offer`, resolved
+## through `def_resolver` (DuoUltimateBoons.def).
 ##
-## Order swapped 2026-07-28 (Designer): the Duo/Ultimate name used to sit on top
-## in gold and the "choose a boon" instruction underneath in small ink, which
-## buried the one line telling the player what to actually DO. The instruction
-## now leads at heading size, and the subject follows.
-func setup(prompt_text: String, subject_text: String, offer: Array, def_resolver: Callable) -> void:
+## Reworked 2026-07-30 (Designer, "lets have the ultimate boon cards be more
+## clear"): the header used to be two lines of text — a long instruction at
+## heading size over "THUNDAAR + BEACON — Seismic Advance". The hero NAMES are
+## gone; the two sprites say who this is faster and without reading, and with
+## them carrying that job the Ultimate's name gets the headline to itself.
+func setup(hero_names: Array, ultimate_name: String, offer: Array,
+		def_resolver: Callable) -> void:
 	_def_resolver = def_resolver
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
@@ -53,18 +58,13 @@ func setup(prompt_text: String, subject_text: String, offer: Array, def_resolver
 	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
 
-	# Trimmed 2026-07-26 (Designer: "boon card should be a little bit
-	# smaller") — the heading drops a step and the card box below shrinks, so
-	# the pick covers less of the battlefield behind it.
-	# The instruction leads in plain INK — it is the line that must simply be
-	# read. The Duo/Ultimate name below is GOOD (forest #1f7a33), which keeps the
-	# two asks from 2026-07-28 from fighting each other: it is a genuinely
-	# different hue rather than a third shade of ink ("less monocolored"), but
-	# it is a DARK green, so its contrast on cream paper is close to INK's and
-	# nothing like the ACCENT gold (#a8861a) this originally used — that mid-tone
-	# on a light ground was the washed-out look in the first place.
-	box.add_child(UIStyle.numeric_label(prompt_text, UIStyle.SIZE_HEADING, UIStyle.INK, true))
-	box.add_child(UIStyle.numeric_label(subject_text, UIStyle.SIZE_SUBHEAD, UIStyle.GOOD, true))
+	box.add_child(_build_header(hero_names, ultimate_name))
+
+	# The instruction under the header, in plain INK — it is the line that must
+	# simply be read, so it is deliberately the quietest thing on the page now
+	# that the Ultimate itself is the headline.
+	box.add_child(UIStyle.numeric_label("Choose a boon for the DUO ultimate.",
+			UIStyle.SIZE_SMALL, UIStyle.INK, true))
 
 	var cards := HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 16)
@@ -73,6 +73,24 @@ func setup(prompt_text: String, subject_text: String, offer: Array, def_resolver
 
 	for i in offer.size():
 		cards.add_child(_build_card(offer[i], i))
+
+## Hero sprite, Ultimate name, hero sprite — one row. The name is GOOD (forest
+## #1f7a33) rather than the ACCENT gold: on cream paper that mid-tone gold washes
+## out, while the dark green reads at close to INK's contrast and is still a
+## genuinely different hue from it (Designer, 2026-07-28: "less monocolored").
+func _build_header(hero_names: Array, ultimate_name: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 14)
+	if hero_names.size() > 0:
+		row.add_child(UIStyle.hero_portrait(String(hero_names[0]), HERO_ART))
+	var name_label := UIStyle.numeric_label(ultimate_name, UIStyle.SIZE_HEADING,
+			UIStyle.GOOD, true)
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(name_label)
+	if hero_names.size() > 1:
+		row.add_child(UIStyle.hero_portrait(String(hero_names[1]), HERO_ART))
+	return row
 
 ## One selectable card (a Button with name + description), resolved via
 ## _def_resolver — catalog-agnostic. `variant`

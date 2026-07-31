@@ -175,22 +175,10 @@ func hero_xp_run(hero_name: String) -> int:
 ## callers must check has_valid_duo_pairings before relying on it.
 var duo_pairings: Array = []
 
-## How many seconds after the first-deployed Duo lands the second Duo
-## arrives. Set (and remembered run-to-run) via the deploy screen's stepper
-## (DeployController) so the player can tune arrival timing across attempts —
-## "play with the timer to find the best moment" — rather than re-deciding it
-## fresh every run. Persisted; not reset by start_run() or a new level.
-const DUO_B_DELAY_MIN := 0.0
-const DUO_B_DELAY_MAX := 30.0
-const DUO_B_DELAY_DEFAULT := 10.0
-var duo_b_delay_seconds: float = DUO_B_DELAY_DEFAULT
-
-## Clamps and persists a new deploy-stagger value. Saves immediately, same as
-## the other prep-screen dials (buy_mod/buy_tier/set_duo_pairings) — this one
-## just changes via a stepper instead of a purchase.
-func set_duo_b_delay(seconds: float) -> void:
-	duo_b_delay_seconds = clampf(seconds, DUO_B_DELAY_MIN, DUO_B_DELAY_MAX)
-	save_game()
+## NOTE: duo_b_delay_seconds (the staggered second-Duo arrival timer) and its
+## set_duo_b_delay setter were removed on 2026-07-30 along with the whole
+## timed-deploy mechanic — see DeployController's class doc. Older saves may
+## still carry the key; it is ignored on load rather than migrated.
 
 func _ready() -> void:
 	load_game()
@@ -521,7 +509,6 @@ func save_game() -> void:
 			"banked_xp": banked_xp,
 			"stat_purchases": stat_purchases,
 			"duo_pairings": duo_pairings,
-			"duo_b_delay_seconds": duo_b_delay_seconds,
 			"hero_stats": hero_stats,
 			"skill_ranks": skill_ranks,
 			"duo_ultimate_ranks": duo_ultimate_ranks,
@@ -553,7 +540,6 @@ func load_game() -> void:
 	banked_xp = int(data.get("banked_xp", 0))
 	stat_purchases = data.get("stat_purchases", {})
 	duo_pairings = data.get("duo_pairings", [])
-	duo_b_delay_seconds = float(data.get("duo_b_delay_seconds", DUO_B_DELAY_DEFAULT))
 	hero_stats = data.get("hero_stats", {})
 	skill_ranks = data.get("skill_ranks", {})
 	duo_ultimate_ranks = data.get("duo_ultimate_ranks", {})
@@ -576,7 +562,6 @@ func _reset_state_defaults() -> void:
 	banked_xp = 0
 	stat_purchases = {}
 	duo_pairings = []
-	duo_b_delay_seconds = DUO_B_DELAY_DEFAULT
 	unlocked_heroes = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
 	unlocked_relics = []
 	career = {}

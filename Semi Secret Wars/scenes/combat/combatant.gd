@@ -350,6 +350,14 @@ var _facing_x := -1.0
 ## so both agree.
 func _art_dir() -> float:
 	return -1.0 if sprite_faces_right else 1.0
+
+## The horizontal flip the sprite is drawn with: negative mirrors the (face-left)
+## house art into facing right, so the unit LOOKS where it is going. Every place
+## that draws this unit's art goes through here — the live sprite, the status/hit
+## tint over it, and the corpse scrap (which takes the negation) — so a unit can
+## never die facing the opposite way from how it was just drawn.
+func _draw_flip() -> float:
+	return -_facing_x * _art_dir()
 ## Cached push-apart vector from same-group neighbors, refreshed at RETARGET_INTERVAL
 ## (like target acquisition) so it stays cheap with hundreds of active minions.
 var _separation := Vector2.ZERO
@@ -752,7 +760,7 @@ func _spawn_death_particles() -> void:
 	BattleFX.death_pop(parent, global_position, body_color, body_radius, death_fx_scale)
 	BattleFX.blood_spray(parent, global_position, _last_hit_dir, body_radius, death_fx_scale)
 	if sprite_texture != null and leaves_corpse:
-		BattleFX.paper_scrap(parent, global_position, sprite_texture, _facing_x * _art_dir(), body_radius, sprite_scale)
+		BattleFX.paper_scrap(parent, global_position, sprite_texture, -_draw_flip(), body_radius, sprite_scale)
 	if death_debris:
 		BattleFX.debris_burst(parent, global_position, body_color, sprite_texture, body_radius)
 	BattleFX.ground_splash(parent, global_position, body_color, body_radius)
@@ -944,7 +952,7 @@ func _draw() -> void:
 		# Shared with DeployController's deploy-phase preview — see BattleFX's
 		# unit-rendering section for why this isn't inlined here any more.
 		BattleFX.draw_unit_sprite(self, sprite_texture, offset, body_radius, sprite_scale,
-				-_facing_x * _art_dir(), _sprite_alpha())
+				_draw_flip(), _sprite_alpha())
 		# Hit flash: the SAME sprite drawn again in red over itself (Designer,
 		# 2026-07-26). It used to be a white circle at body_radius, which read
 		# as a disc appearing next to the character rather than the character
@@ -1023,7 +1031,7 @@ func _draw_tint(offset: Vector2, color: Color, alpha: float) -> void:
 	if sprite_texture == null or alpha <= 0.0:
 		return
 	BattleFX.draw_unit_sprite(self, sprite_texture, offset, body_radius,
-			sprite_scale * TINT_OVERSCALE, -_facing_x * _art_dir(), alpha, color)
+			sprite_scale * TINT_OVERSCALE, _draw_flip(), alpha, color)
 
 ## Opacity of the status tint this frame: a sine pulse between STATUS_TINT_MIN
 ## and STATUS_TINT_MAX, scaled by the sprite's own alpha so a dying unit's

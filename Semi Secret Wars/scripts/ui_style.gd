@@ -324,7 +324,7 @@ static func bold_font() -> FontVariation:
 ## IMPORTANT: pass PLAIN text only. Given a string that already contains BBCode
 ## this would bold the digits inside the tags themselves (a #c19a1c colour code,
 ## a font size) and corrupt them. Lines that are already hand-authored BBCode
-## bold their own numbers — see PrepMenu._current_stats_text.
+## bold their own numbers — see HeroDetailsPanel._attributes_block.
 static func bold_numbers(text: String) -> String:
 	var out := ""
 	var i := 0
@@ -568,9 +568,16 @@ static func texture_button(texture: Texture2D, region: Rect2, target_width: floa
 ## Hero portrait for menus — the actual in-battle sprite (Hero.sprite_for), so
 ## the roster art and the field art are literally the same drawing. Replaces
 ## the flat ColorRect swatches the prep cards used to show.
+##
+## Mirrored, like the battle card's portrait (HeroPanelUI.PORTRAIT_FACES_RIGHT):
+## a hero shown STILL always faces east (Designer, 2026-07-30) and the source art
+## follows Combatant's face-left house convention, so every menu that shows a
+## hero flips it. The live unit on the battlefield is deliberately not pinned —
+## it turns to face where it is going.
 static func hero_portrait(hero_name: String, box: Vector2 = Vector2(120, 96)) -> TextureRect:
 	var t := TextureRect.new()
 	t.texture = Hero.sprite_for(hero_name)
+	t.flip_h = true
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	t.custom_minimum_size = box

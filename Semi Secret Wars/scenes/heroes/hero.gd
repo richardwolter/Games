@@ -554,6 +554,17 @@ const SPRITE_SCALE_MULT: Dictionary = {
 	"BEACON": 1.56,
 }
 
+## Party-wide art boost on top of the per-hero table above (Designer,
+## 2026-07-30: "make hero sprites 1.3x bigger than current"). Kept as its own
+## factor rather than folded into SPRITE_SCALE_MULT's four numbers so the
+## per-hero relative sizing stays readable as the Designer's own choice plus its
+## documented padding compensation.
+##
+## PURELY visual: body_radius (the collision/footprint source — see
+## SpriteFootprint and Combatant._draw) is untouched, so heroes draw bigger
+## without changing how they collide, separate or get hit.
+const ART_SCALE_BOOST := 1.3
+
 ## Which texture `hero_name` renders with once spawned — used by
 ## DeployController for the pre-battle sprite ghost/preview.
 static func sprite_for(hero_name: String) -> Texture2D:
@@ -939,7 +950,13 @@ func _configure() -> void:
 	# the dict.
 	if hero_name in HERO_SPRITES:
 		sprite_texture = HERO_SPRITES[hero_name]
-	sprite_scale *= SPRITE_SCALE_MULT.get(hero_name, 1.0)
+	# NOTE: heroes are NOT pinned to a facing on the battlefield (Designer,
+	# 2026-07-30: "do not lock character sprite direction on battle, I asked only
+	# on HUD and menus"). A field unit turns to face where it is going and what it
+	# is shooting, the same as every other Combatant. The always-east rule applies
+	# to the STILL portraits only — HeroPanelUI.PORTRAIT_FACES_RIGHT and
+	# UIStyle.hero_portrait.
+	sprite_scale *= float(SPRITE_SCALE_MULT.get(hero_name, 1.0)) * ART_SCALE_BOOST
 	# Role tag on the field name-tag (Designer, 2026-07-20: "roles should be
 	# visually clear") — paired with the role-colored ring in _draw().
 	label_text = "%s · %s" % [hero_name, role]

@@ -12,9 +12,11 @@ var hero_name := ""
 var name_label: Label
 ## Hero art, mirrored to face the villain — see PORTRAIT_FACES_RIGHT.
 var portrait: TextureRect
-## Hidden except during the staggered second-wave countdown (set_incoming); the
-## old "LV n · intent" line was dropped on 2026-07-26 when the portrait moved
-## into the card's top row.
+## Always hidden now: the old "LV n · intent" line was dropped on 2026-07-26 when
+## the portrait moved into the card's top row, and its last remaining use — the
+## second-wave arrival countdown — went with the timed-deploy mechanic on
+## 2026-07-30. Kept wired up (the node still exists in hero_panel_ui.tscn) so the
+## card has a spare row to reuse rather than needing the scene re-authored.
 ## RichTextLabel, like both cooldown rows below: every readout on this card that
 ## can show a number bolds its digits (see UIStyle.bold_numbers).
 var level_label: RichTextLabel
@@ -24,17 +26,22 @@ var cooldown_bar: ProgressBar
 var cooldown_indicator2: RichTextLabel
 var cooldown_bar2: ProgressBar
 var buff_label: RichTextLabel
-## Live per-run readout: kills and XP gained (see GameState.hero_kills_run/
-## hero_xp_run). Prep menu shows the lifetime equivalents — see
-## PrepMenu._build_hero_card.
+## Was the live per-run KILLS/XP readout; hidden and unwritten since 2026-07-30
+## (see _ready). Per-run totals still live in GameState.hero_kills_run/
+## hero_xp_run and still show on the results screen; lifetime ones are on the
+## prep screen's HERO DETAILS page.
 var run_stats_label: RichTextLabel
 var _ko := false
 var _focused := false
 
 ## Heroes fight facing RIGHT: LaneField parks the villain at the right edge of
-## the field (villain_pos.x well past every deploy band) and the hero art
-## follows Combatant's face-left house convention, so the card mirrors it to
-## match what the player sees on the battlefield.
+## the field (villain_pos.x well past every deploy band) and the hero art follows
+## Combatant's face-left house convention, so the card mirrors it to match what
+## the player sees on the battlefield.
+##
+## A still portrait always faces east (Designer, 2026-07-30), unlike the live
+## unit, which turns to face what it is doing — see UIStyle.hero_portrait for the
+## menu-side half of the same rule.
 const PORTRAIT_FACES_RIGHT := true
 
 ## Font sizes the LevelLabel and the two cooldown rows carried in the .tscn
@@ -56,8 +63,6 @@ func _ready() -> void:
 	cooldown_bar2 = find_child("CooldownBar2", true, false) as ProgressBar
 	buff_label = find_child("BuffLabel", true, false) as RichTextLabel
 	run_stats_label = find_child("RunStatsLabel", true, false) as RichTextLabel
-	if run_stats_label != null:
-		run_stats_label.add_theme_font_override("bold_font", UIStyle.bold_font())
 	# Sizes moved off the .tscn nodes and into code with the RichTextLabel swap —
 	# a RichTextLabel needs them under normal_font_size/bold_font_size, plus the
 	# bold face itself, which UIStyle.make_numeric does in one call. The values
@@ -65,13 +70,14 @@ func _ready() -> void:
 	UIStyle.make_numeric(level_label, LEVEL_FONT_SIZE)
 	UIStyle.make_numeric(cooldown_indicator, COOLDOWN_FONT_SIZE)
 	UIStyle.make_numeric(cooldown_indicator2, COOLDOWN_FONT_SIZE)
-	# The buff row is single-line and clipped (see update_display): buffs sit side
-	# by side, and anything that doesn't fit is cut at the card edge rather than
-	# wrapping the card taller.
-	if buff_label != null:
-		buff_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		buff_label.fit_content = false
-		buff_label.clip_contents = true
+	# The buff row and the KILLS/XP row are both hidden outright (Designer,
+	# 2026-07-30). Hidden rather than deleted from hero_panel_ui.tscn so the nodes
+	# are still there if either readout is ever wanted back; nothing writes to
+	# either any more — see update_display.
+	for dead_row in [buff_label, run_stats_label]:
+		if dead_row != null:
+			dead_row.text = ""
+			dead_row.visible = false
 	# The panel itself is the click target; children must not swallow the click.
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	if hp_bar != null:
@@ -94,13 +100,12 @@ func set_focused(focused: bool) -> void:
 	else:
 		name_label.remove_theme_color_override("font_color")
 
-func update_display(hero_name_in: String, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, buffs: Array = [], ability_name: String = "", second_name: String = "", second_remaining: float = 0.0, second_max: float = 1.0, kills: int = 0, xp_gained: int = 0) -> void:
+func update_display(hero_name_in: String, current_hp: int, max_hp: int, cooldown_remaining: float, cooldown_max: float = 1.0, _buffs: Array = [], ability_name: String = "", second_name: String = "", second_remaining: float = 0.0, second_max: float = 1.0, _kills: int = 0, _xp_gained: int = 0) -> void:
 	if name_label == null or hp_bar == null or cooldown_indicator == null:
 		return
 
-	# Undo the grey-out set_incoming() applies while waiting on the deploy
-	# timer — without this the panel stayed dimmed forever once the hero
-	# actually arrived on the field (set_incoming's modulate was never reset).
+	# Undo the grey-out set_ko() applies, so a card can never stay dimmed once
+	# its hero is being displayed live again.
 	modulate = Color.WHITE
 
 	name_label.text = hero_name_in
@@ -121,25 +126,11 @@ func update_display(hero_name_in: String, current_hp: int, max_hp: int, cooldown
 		if has_second:
 			_set_cooldown_row(cooldown_indicator2, cooldown_bar2, second_name, second_remaining, second_max)
 
-	if buff_label != null:
-		if buffs.is_empty():
-			buff_label.text = ""
-		else:
-			var parts: Array[String] = []
-			for buff in buffs:
-				parts.append("[color=#%s]%s[/color]" % [(buff["color"] as Color).to_html(false), buff["text"]])
-			# Side by side on ONE row (Designer, 2026-07-29): stacking them a line
-			# each grew the card downward, and with four cards in two Duo groups
-			# there is no vertical room left to give — a third buff was pushing the
-			# bottom of the column off screen. Safe on this row specifically
-			# because _ready turns word-wrap off and clipping on, so a long buff
-			# list gets cut at the card edge instead of wrapping into extra lines.
-			buff_label.text = "   ".join(parts)
-
-	if run_stats_label != null:
-		# Values bold, labels plain (Designer, 2026-07-26) — same treatment as the
-		# prep menu's stat rows, see PrepMenu._current_stats_text.
-		run_stats_label.text = "KILLS [b]%d[/b]  ·  XP [b]%d[/b]" % [kills, xp_gained]
+	# NOTE: the KILLS / XP run readout was removed from the card on 2026-07-30
+	# (Designer) along with the buff row above — a battle card now carries the
+	# hero, their HP and their ability cooldown, and nothing else. The per-run
+	# totals are still tracked (GameState.hero_kills_run/hero_xp_run) and still
+	# shown on the results screen; only this row is gone.
 
 ## The hero's own battlefield art on the card, cached so the every-frame HUD
 ## refresh isn't reassigning the same texture. Sourced from Hero.sprite_for so
@@ -233,33 +224,14 @@ func set_ko() -> void:
 ## how they spawn.
 func set_predeploy(hero_name_in: String, hp_fraction: float,
 		ability_name_in: String, kills: int, xp_gained: int) -> void:
+	# kills/xp are passed through to keep BattleHUD's two call sites identical,
+	# even though update_display no longer draws them (see its tail note).
 	update_display(hero_name_in, int(round(clampf(hp_fraction, 0.0, 1.0) * 100.0)), 100,
 			0.0, 1.0, [], ability_name_in, "", 0.0, 1.0,
 			kills, xp_gained)
 
-## Second-Duo-wave hero not on the field yet (still counting down to its
-## staggered arrival) — distinct from set_ko() so waiting doesn't read as
-## dead. No _ko-style latch: called every frame while waiting, since the
-## countdown text needs to keep updating.
-func set_incoming(seconds_left: float) -> void:
-	if name_label == null or level_label == null or hp_bar == null or cooldown_indicator == null:
-		return
-	name_label.text = hero_name
-	_set_portrait(hero_name)
-	# The only surviving use of the old LV line: the arrival countdown needs a
-	# row of its own, and update_display hides it again once the hero lands.
-	level_label.visible = true
-	UIStyle.set_numeric_text(level_label, "ARRIVES IN %ds" % int(ceil(seconds_left)))
-	hp_bar.value = hp_bar.max_value if hp_bar.max_value > 0 else 100
-	if cooldown_bar != null:
-		cooldown_bar.value = 0
-	UIStyle.set_numeric_text(cooldown_indicator, "—")
-	cooldown_indicator.add_theme_color_override("default_color", UIStyle.DANGER)
-	if cooldown_bar2 != null:
-		cooldown_bar2.value = 0
-	if cooldown_indicator2 != null and cooldown_indicator2.visible:
-		UIStyle.set_numeric_text(cooldown_indicator2, "DOWN")
-		cooldown_indicator2.add_theme_color_override("default_color", UIStyle.DANGER)
-	if buff_label != null:
-		buff_label.text = ""
-	modulate = Color(0.72, 0.72, 0.72, 0.85)
+## NOTE: set_incoming() — the "ARRIVES IN Xs" state for a hero held back by the
+## staggered second deploy wave — was removed on 2026-07-30 with the timed-deploy
+## mechanic itself (see DeployController's class doc). Every placed hero is now on
+## the field the moment the battle starts, so a card is only ever live, pre-deploy
+## or KO.

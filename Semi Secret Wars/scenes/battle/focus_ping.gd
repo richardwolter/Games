@@ -3,8 +3,8 @@ extends Node2D
 ## The player's one in-battle command verb: a per-Duo "refocus here" marker.
 ##
 ## Each Duo gets exactly ONE refocus per level (Designer, 2026-07-29). Using it
-## is two clicks: press the REFOCUS button on that Duo's card (BattleHUD's
-## duo-grouped hero panels, which call arm()) to arm it, then left-click a spot
+## is two clicks: press that Duo's REFOCUS button on the DUO CONTROL panel
+## (DuoControlBar, which calls arm()) to arm it, then left-click a spot
 ## on the battlefield — empty ground, a knot of minions, the villain, anywhere
 ## inside the field ellipse. Right-click (or re-pressing the button) cancels an
 ## ARMED refocus without spending it.
@@ -23,9 +23,9 @@ extends Node2D
 ## can be committed once to a spot: a threat to crush, an objective to rush, a
 ## retreat to cover.
 ##
-## In group "focus_ping" so heroes query it each frame; created once the first
-## wave lands (BattleManager._flush_pending_deploy) so its clicks can never
-## collide with the deploy-placement clicks.
+## In group "focus_ping" so heroes query it each frame; created once the party
+## lands (BattleManager._flush_pending_deploy) so its clicks can never collide
+## with the deploy-placement clicks.
 
 ## Visual ring radius (world px). Also the "this ping is on the villain" test
 ## radius — see Hero._ping_targets_villain.
@@ -59,11 +59,11 @@ var _field: LaneField
 func _ready() -> void:
 	add_to_group("focus_ping")
 	# Above the fog (z 20), below the HUD CanvasLayer. Deploy (z 40) is gone by
-	# the time this exists (created once the first wave lands).
+	# the time this exists (created once the party lands).
 	z_index = 30
 	_field = get_tree().get_first_node_in_group("field")
 
-## -- Queried by DuoFocusBar (chip state) --------------------------------------
+## -- Queried by DuoControlBar (button state) --------------------------------
 
 ## Arms `pair_id` for the next battlefield click. Re-arming the already-armed
 ## Duo disarms it (the chip doubles as a cancel). No-op once spent.
@@ -79,7 +79,7 @@ func is_used(pair_id: String) -> bool:
 	return _used.get(pair_id, false)
 
 ## Seconds left on `pair_id`'s live marker, or 0.0 if it has none (never placed,
-## or already expired). Drives the countdown on the Duo card's REFOCUS button.
+## or already expired). Drives the countdown on the Duo's REFOCUS button.
 func seconds_remaining(pair_id: String) -> float:
 	return _timers.get(pair_id, 0.0)
 

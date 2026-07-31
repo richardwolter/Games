@@ -32,11 +32,12 @@ var _pairing_slots: Array = ["", "", "", ""]
 const START_RUN_TEXTURE := preload("res://assets/Button_StartRun_Color.png")
 const START_RUN_REGION := Rect2(60, 210, 1500, 640)
 const START_RUN_WIDTH := 360.0
-## Both Duo boxes are plain ink now (Designer, 2026-07-26: "no need to
-## differentiate Duos by colour for now"). The gold/navy pair they used to carry
-## competed with the colour that actually means something on this panel — the
-## hero's ability colour filling each occupied slot. UIStyle.DUO_A/DUO_B still
-## exist for the battle HUD's Duo B banner; this screen just stopped using them.
+## Both Duo boxes are plain ink — border and title alike (Designer, 2026-07-26,
+## reaffirmed 2026-07-30 after a one-round trial of the gold/navy pair). The Duo
+## colour competed with the colour that actually means something on this panel:
+## the hero's ability tint filling each occupied slot. UIStyle.DUO_A/DUO_B still
+## paint the two Duos apart in BATTLE (hero-card groups, Hero Control rows,
+## refocus markers); this screen just doesn't use them.
 const DUO_A_COLOR := UIStyle.INK
 const DUO_B_COLOR := UIStyle.INK
 const SLOT_SIZE := Vector2(210, 100)
@@ -133,23 +134,28 @@ func _build_ui() -> void:
 	add_child(root)
 	_main = root
 
-	root.add_child(UIStyle.centered_label("SEMI-SECRET WARS", UIStyle.SIZE_HEADING))
+	# One header row instead of two stacked ones (Designer, 2026-07-30): HOW TO
+	# PLAY and SETTINGS flank the logo, which buys back a whole row of vertical
+	# space for the roster and Duo boxes below and puts the two buttons in the
+	# empty margins beside the wordmark rather than under it.
+	#
+	# GOLD and BANKED XP are not up here at all any more — they moved down beside
+	# the shops that spend them, see _build_shop_column.
+	var header := HBoxContainer.new()
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_theme_constant_override("separation", 28)
+	header.add_child(_header_button("HOW TO PLAY", _open_how_to_play))
+	header.add_child(_build_logo())
+	header.add_child(_header_button("SETTINGS", _open_settings))
+	root.add_child(header)
 
-	var meta_row := HBoxContainer.new()
-	meta_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	meta_row.add_theme_constant_override("separation", 22)
-	# Gold and banked XP are what the whole meta-progression is spent in, so
-	# they get accent-bordered chips instead of plain text in a row of buttons
-	# (Designer, 2026-07-26). Same treatment as the battle HUD's panels.
-	_currency_label = UIStyle.gold_label(0)
-	meta_row.add_child(_resource_chip(_currency_label, UIStyle.GOLD_COLOR))
-	_xp_label = UIStyle.xp_label(0, "BANKED XP")
-	meta_row.add_child(_resource_chip(_xp_label, UIStyle.XP_COLOR))
-	meta_row.add_child(_button("HOW TO PLAY", UIStyle.SIZE_BODY, _open_how_to_play))
-	meta_row.add_child(_button("SETTINGS", UIStyle.SIZE_BODY, _open_settings))
-	root.add_child(meta_row)
-
+	# Centered (Designer, 2026-07-30): the roster is the row the eye starts on, and
+	# left-aligned it sat off-axis from the Duo boxes and START RUN below it. Both
+	# flags are needed — the VBox stretches this row to the widest child's width,
+	# so the HBox has to centre its own cards inside that width.
 	_hero_row = HBoxContainer.new()
+	_hero_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hero_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hero_row.add_theme_constant_override("separation", 24)
 	root.add_child(_hero_row)
 	_rebuild_hero_row()
@@ -167,15 +173,17 @@ func _build_ui() -> void:
 	launch_row.add_theme_constant_override("separation", 28)
 	root.add_child(launch_row)
 
-	launch_row.add_child(_upgrade_button("UPGRADE\nABILITIES", "spend GOLD",
-			UIStyle.GOLD, 0, _open_abilities))
+	_currency_label = UIStyle.gold_label(0)
+	launch_row.add_child(_build_shop_column(_currency_label, UIStyle.GOLD_COLOR,
+			_upgrade_button("UPGRADE\nABILITIES", "spend GOLD", UIStyle.GOLD, 0, _open_abilities)))
 
 	_start_button = _texture_button(START_RUN_TEXTURE, START_RUN_REGION, _on_start)
 	_start_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	launch_row.add_child(_start_button)
 
-	launch_row.add_child(_upgrade_button("UPGRADE\nSTATS", "spend XP",
-			UIStyle.XP_COLOR, 1, _open_stats))
+	_xp_label = UIStyle.xp_label(0, "BANKED XP")
+	launch_row.add_child(_build_shop_column(_xp_label, UIStyle.XP_COLOR,
+			_upgrade_button("UPGRADE\nSTATS", "spend XP", UIStyle.XP_COLOR, 1, _open_stats)))
 
 	# Route back to the title screen (Designer, 2026-07-26). No confirmation
 	# here: prep changes (purchases, pairings) all save as they're made, so
@@ -266,6 +274,60 @@ func _upgrade_button_size(title: String, caption: String) -> Vector2:
 	return Vector2(maxf(UPGRADE_BUTTON_SIZE.x, text_w + pad),
 			maxf(UPGRADE_BUTTON_SIZE.y, text_h + pad))
 
+## The hand-drawn wordmark at the top of prep (Designer, 2026-07-30), replacing
+## the plain "SEMI-SECRET WARS" text heading — the same art the title screen
+## opens on, so the two screens are visibly the same game.
+##
+## Much shorter than the title screen's 640x429 treatment: prep is a dense screen
+## with a roster, four Duo slots and three shop controls to fit under this, so the
+## logo is a banner here rather than the whole top half. Aspect-fit inside the
+## box, so the two never disagree about the art's proportions.
+const LOGO_TEXTURE := preload("res://assets/sprites/Logo_Semi-Secret-Wars.png")
+const LOGO_SIZE := Vector2(360, 120)
+
+## Width both header buttons are forced to. Without it the logo between them is
+## NOT centred on screen (Designer, 2026-07-30): "HOW TO PLAY" is far wider than
+## "SETTINGS", and an HBoxContainer centres its CONTENTS as a block — so the
+## logo sat off-axis by half the difference, and off-axis from the hero cards and
+## the Duo boxes below it, which are centred on the screen itself. Equal flanks
+## put the middle of the row at the middle of the row's contents.
+const HEADER_BUTTON_WIDTH := 260.0
+
+## A header button beside the logo. Vertically centred against it, so the two
+## sit on the wordmark's midline rather than on its top edge (an HBoxContainer
+## would otherwise stretch them to the logo's full height).
+func _header_button(text: String, cb: Callable) -> Button:
+	var b := _button(text, UIStyle.SIZE_BODY, cb)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.custom_minimum_size = Vector2(HEADER_BUTTON_WIDTH, 0)
+	return b
+
+func _build_logo() -> TextureRect:
+	var logo := TextureRect.new()
+	logo.texture = LOGO_TEXTURE
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size = LOGO_SIZE
+	return logo
+
+## A shop and the currency it spends, stacked as one unit (Designer, 2026-07-30):
+## the GOLD / BANKED XP chips used to sit in the top row among HOW TO PLAY and
+## SETTINGS, a screen away from the buttons that spend them, so "can I afford
+## anything?" meant looking in two places. Same chip, same accent — it just sits
+## directly above its own shop now, and the currency's colour ties the pair
+## together.
+func _build_shop_column(label: Control, accent: Color, shop: Button) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_theme_constant_override("separation", 8)
+	var chip := _resource_chip(label, accent)
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(chip)
+	shop.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(shop)
+	return col
+
 ## Accent-bordered paper chip around a resource readout. The label is kept as
 ## a field by the caller (_refresh rewrites its text), so this only wraps it.
 func _resource_chip(label: Control, accent: Color) -> PanelContainer:
@@ -300,9 +362,12 @@ func _rebuild_pairing_panel() -> void:
 		if _pairing_slots[i] != "" and _pairing_slots[i] not in offered:
 			_pairing_slots[i] = ""
 
-	# Three columns so the panel stays short (Designer, 2026-07-26: the stacked
-	# header/hint/button rows were pushing the screen past its top and bottom
-	# edges): explanation left, the Duo boxes centered, status + CLEAR right.
+	# The instruction callout on the left, the two Duo boxes in the middle — and a
+	# blank spacer of the callout's exact width on the right (Designer, 2026-07-30:
+	# the Duo boxes should be centred on the SCREEN). Without it the row centres
+	# callout+boxes as one block, which pushes the boxes right of centre by half
+	# the callout's width and leaves them off-axis from the logo, the hero row and
+	# START RUN — every other thing on this screen is centred.
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 24)
@@ -317,60 +382,63 @@ func _rebuild_pairing_panel() -> void:
 	boxes.add_child(_build_duo_box(0, "DUO A", DUO_A_COLOR))
 	boxes.add_child(_build_duo_box(1, "DUO B", DUO_B_COLOR))
 
-	var side := VBoxContainer.new()
-	side.add_theme_constant_override("separation", 8)
-	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(side)
+	var balance := Control.new()
+	balance.custom_minimum_size = Vector2(PAIRING_CARD_WIDTH, 0)
+	balance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(balance)
 
-	var unplaced := offered.filter(func(h: String) -> bool: return h not in _pairing_slots)
-	side.add_child(UIStyle.wrapped_label(_pairing_hint_text(unplaced), 240, UIStyle.SIZE_SMALL))
-
-	if _pairing_slots.count("") < 4:
-		var clear_btn := _button("CLEAR PAIRING", UIStyle.SIZE_SMALL, _on_reset_pairing)
-		clear_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		side.add_child(clear_btn)
-
-## The pair-your-Duos instruction, beside the Duo boxes.
+## The pairing callout beside the Duo boxes: what to do, and why you would care.
 ##
-## Was a bare wrapped label in body ink, which sat in the margin looking like a
-## caption and got skipped — a new player would stare at two empty Duo boxes
-## with no idea the hero row above was draggable (Designer, 2026-07-28: "give
-## clarity to the drag instruction ... for better player visibility").
+## It reads as a control the screen is giving you rather than a caption in the
+## margin — a new player would otherwise stare at two empty Duo boxes with no
+## idea the hero row above was draggable (Designer, 2026-07-28).
 ##
-## Now a bordered gold callout with the ACTION on its own line: the instruction
-## reads as a control the screen is giving you, and the one thing you have to do
-## is the first thing you see. Gold because that is this UI's "do something
-## here" colour everywhere else (boon picks, focus, unlocks).
+## EMBER red, not the gold it used to be (Designer, 2026-07-30): gold on this
+## screen already means "currency and the shop that spends it" (the GOLD chip,
+## UPGRADE ABILITIES), and a gold callout sitting between them read as a third
+## piece of that same UI. Red is unused on this screen and belongs to nothing
+## else here, so the one instruction stands apart from the economy around it.
+##
+## The body sells the REASON to pair rather than restating the mechanic, with
+## "ultimate abilities" emboldened in the same red as the payoff (Designer,
+## 2026-07-30) — which is why it is a BBCode label rather than a plain one.
+const PAIRING_ACCENT := UIStyle.EMBER
+## Width of the callout — also the width of the blank spacer mirroring it on the
+## far side of the Duo boxes, which is what keeps those boxes centred on screen
+## (see _rebuild_pairing_panel). The two must stay equal.
+const PAIRING_CARD_WIDTH := 280.0
+##
+## Two things that used to live here are gone (both Designer, 2026-07-30): the
+## "Both DUOS must be filled" / "Still to place" status line (four empty slots
+## and a dimmed START RUN say it without a sentence) and the CLEAR PAIRING button
+## (clicking a filled slot already empties it — see DuoSlot._gui_input — so the
+## button was a second way to do a thing the slots do).
 func _pairing_instruction() -> PanelContainer:
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UIStyle.card(UIStyle.GOLD, 12, 2))
+	card.add_theme_stylebox_override("panel", UIStyle.card(PAIRING_ACCENT, 12, 2))
 	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	card.custom_minimum_size = Vector2(250, 0)
+	card.custom_minimum_size = Vector2(PAIRING_CARD_WIDTH, 0)
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
 	card.add_child(col)
 
-	col.add_child(UIStyle.centered_label("DRAG TO PAIR", UIStyle.SIZE_SUBHEAD, UIStyle.GOLD))
-	col.add_child(UIStyle.wrapped_label(
-			"Pull a hero from the row above into a DUO slot below.",
-			214, UIStyle.SIZE_SMALL))
+	col.add_child(UIStyle.centered_label("DRAG HEROES TO DUO", UIStyle.SIZE_SUBHEAD,
+			PAIRING_ACCENT))
+	var body := UIStyle.rich_stat_label(
+			"Join heroes as a DUO and find out their [b][color=#%s]ultimate abilities[/color][/b]."
+					% PAIRING_ACCENT.to_html(false),
+			UIStyle.SIZE_SMALL)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.custom_minimum_size = Vector2(244, 0)
+	col.add_child(body)
 	return card
 
-## Status text beside the Duo boxes. Leads with the blocking condition when there
-## is one — a run needs BOTH Duos (see _refresh), and "START RUN is greyed out"
-## is not something the player should have to infer from a dimmed button.
-func _pairing_hint_text(unplaced: Array) -> String:
-	if not _both_duos_ready():
-		var text := "Both DUOS must be filled to start a run."
-		# No tail when there is nobody left to place: that only happens with a
-		# roster too small to fill four slots, where naming names would be noise.
-		if not unplaced.is_empty():
-			text += "\nStill to place: %s" % ", ".join(unplaced)
-		return text
-	if unplaced.is_empty():
-		return "Every hero is placed."
-	return "Not deploying unless paired: %s" % ", ".join(unplaced)
+## NOTE: _pairing_hint_text — the "Both DUOS must be filled" / "Still to place:"
+## status line — was removed on 2026-07-30 at the Designer's call. The empty
+## FRONT/BACK slots and the dimmed START RUN carry that information without a
+## sentence about it. _both_duos_ready below is unaffected; it is what actually
+## gates the run.
 
 ## Whether the pairing is complete enough to launch: TWO fully-filled Duos.
 ##
@@ -450,14 +518,19 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 	slot.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var hero_name: String = _pairing_slots[duo_index * 2 + slot_index]
-	# Leader/follower is a pure player choice now (Designer, 2026-07-20: "tank
-	# always leads does not work anymore ... this should be a player
-	# decision") — slot_index 0 (left/A) is always the Leader slot, 1 (right/B)
-	# always Follower; GameState.is_duo_leader reads this same slot order back
-	# from _sync_party_from_slots's [a, b] array, so this tag always matches
-	# what battle will actually do. Shown on the SLOT itself (even empty), not
-	# derived from which hero ends up there — labeling the slot up front is
-	# the whole point: the player sees the assignment before they drag.
+	# Which slot leads is a pure player choice (Designer, 2026-07-20: "tank always
+	# leads does not work anymore ... this should be a player decision") —
+	# slot_index 0 (left/A) is always the leading slot, 1 (right/B) the following
+	# one; GameState.is_duo_leader reads this same slot order back from
+	# _sync_party_from_slots's [a, b] array, so this tag always matches what battle
+	# will actually do. Shown on the SLOT itself (even empty), not derived from
+	# which hero ends up there — labeling the slot up front is the whole point:
+	# the player sees the assignment before they drag.
+	#
+	# Labelled FRONT/BACK rather than LEADER/FOLLOWER (Designer, 2026-07-30): that
+	# is literally where the two heroes deploy and stand — the leader spawns to the
+	# right, toward the villain, the follower behind them (DeployController.
+	# _positions_for_group) — so the tag now names the thing the player can see.
 	var is_leader_slot := slot_index == 0
 	# Filled slots take the tint of that hero's ABILITY (Designer, 2026-07-26) —
 	# the same colour its cooldown bar will run in battle, so the pairing screen
@@ -474,8 +547,8 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 	col.add_theme_constant_override("separation", 2)
 
 	var tag_row := CenterContainer.new()
-	tag_row.add_child(UIStyle.label("LEADER" if is_leader_slot else "FOLLOWER",
-			UIStyle.SIZE_TINY, UIStyle.GOLD if is_leader_slot else UIStyle.INK_MUTED))
+	tag_row.add_child(UIStyle.label("FRONT" if is_leader_slot else "BACK",
+			UIStyle.SIZE_TINY, UIStyle.INK if is_leader_slot else UIStyle.INK_MUTED))
 	col.add_child(tag_row)
 
 	# A filled slot shows the hero's own sprite next to their name (Designer,
@@ -494,7 +567,7 @@ func _build_duo_slot(duo_index: int, slot_index: int, color: Color) -> DuoSlot:
 		row.add_child(name_label)
 		center.add_child(row)
 	else:
-		center.add_child(UIStyle.label("drop hero", UIStyle.SIZE_SMALL, UIStyle.INK_MUTED))
+		center.add_child(UIStyle.label("drag hero here", UIStyle.SIZE_SMALL, UIStyle.INK_MUTED))
 	col.add_child(center)
 
 	slot.add_child(col)
@@ -539,11 +612,38 @@ func _sync_party_from_slots() -> void:
 	RunState.party = roster
 	GameState.set_duo_pairings(duos)
 
+## NOTE: the CLEAR PAIRING button that called this was removed on 2026-07-30 —
+## clicking a filled slot clears it (DuoSlot._gui_input -> _on_slot_clear), which
+## is the same job one slot at a time. Kept as the one call that empties ALL four
+## at once, for whatever next needs it.
 func _on_reset_pairing() -> void:
 	_pairing_slots = ["", "", "", ""]
 	_sync_party_from_slots()
 	_rebuild_pairing_panel()
 	_refresh()
+
+## The HERO DETAILS button every roster card carries (Designer, 2026-07-30).
+##
+## The attributes, kit line, role blurb and lifetime totals that used to be
+## printed on the card itself now live behind it (HeroDetailsPanel) — the card is
+## the thing you DRAG, so it only needs to be recognisable; the numbers are what
+## you read once while deciding, not every time you look at the row.
+##
+## Kept out of the drag gesture's way: a Button consumes its own clicks, so
+## pressing DETAILS never starts a drag, and dragging from anywhere else on the
+## card still works.
+func _build_details_row(hero_name: String) -> CenterContainer:
+	var center := CenterContainer.new()
+	center.add_child(UIStyle.compact_button("HERO DETAILS", UIStyle.SIZE_TINY,
+			_open_hero_details.bind(hero_name), hero_name.length()))
+	return center
+
+## Self-parenting overlay, same contract as Settings and How To Play — it draws
+## over the prep screen and frees itself, so there is nothing to hide or restore
+## here. Pressing DETAILS on another card while it is open switches the page to
+## that hero (see HeroDetailsPanel.open).
+func _open_hero_details(hero_name: String) -> void:
+	HeroDetailsPanel.open(self, hero_name)
 
 func _build_hero_card(hero_name: String) -> PanelContainer:
 	var offered := RunState.is_offered(hero_name)
@@ -563,73 +663,31 @@ func _build_hero_card(hero_name: String) -> PanelContainer:
 	box.add_child(UIStyle.hero_portrait(hero_name, Vector2(110, 78)))
 
 	box.add_child(UIStyle.centered_label(hero_name, UIStyle.SIZE_SUBHEAD))
-
 	box.add_child(_build_kit_label(hero_name))
-	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
-	box.add_child(_build_stats_block(hero_name))
+	box.add_child(_build_details_row(hero_name))
 
 	return card
 
-## "RANGED · CLONE" — how the hero fights and what their ability is, replacing
-## the role tag the card used to carry (Designer, 2026-07-26: the role bucket
-## was a category, not information you act on when picking a party).
+## "RANGED · CLONE" — how the hero fights and what their natural ability is
+## (Designer, 2026-07-26; restored to the card 2026-07-30 after a round without
+## it). It is the one line worth reading while you drag, which is why the STATS
+## block that used to sit under it stayed behind the HERO DETAILS button and this
+## did not.
 ##
 ## Coloured with that hero's ABILITY colour, the same one their filled Duo slot
-## takes below and their cooldown bar takes in battle — one hero, one colour,
-## from the roster card through the pairing panel into the fight.
+## takes below, their details page takes, and their cooldown bar takes in battle
+## — one hero, one colour, from the roster card into the fight.
 func _build_kit_label(hero_name: String) -> Label:
 	var ability := Hero.ability_name_for(hero_name)
 	return UIStyle.centered_label("%s  ·  %s" % [Hero.attack_mode_for(hero_name), ability],
 			UIStyle.SIZE_SMALL, UIStyle.ability_color(ability))
 
-## The two stat lines on their own paper block, numbers bolded (Designer,
-## 2026-07-26). Both were plain tiny text sitting directly on the card, so the
-## values ran together with the role blurb above them; the inset panel gives
-## them an edge to read against and the embolden separates the numbers from
-## their labels at a glance.
-func _build_stats_block(hero_name: String) -> PanelContainer:
-	var block := PanelContainer.new()
-	# Slightly deeper than the card it sits on, so it reads as an inset panel
-	# rather than a second card floating on the first.
-	block.add_theme_stylebox_override("panel",
-			UIStyle.panel(Color(UIStyle.PAGE_SOLID, 0.55), UIStyle.INK_MUTED, 2, 8,
-					hero_name.length()))
-
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 2)
-	block.add_child(col)
-
-	col.add_child(UIStyle.rich_stat_label(_current_stats_text(hero_name), UIStyle.SIZE_TINY))
-	col.add_child(UIStyle.rich_stat_label(_lifetime_stats_text(hero_name),
-			UIStyle.SIZE_TINY, UIStyle.INK_MUTED))
-	return block
-
-## Lifetime totals across every run (GameState.hero_stats) — separate from
-## the live per-run numbers shown on the battle hero card.
-func _lifetime_stats_text(hero_name: String) -> String:
-	# BBCode, not plain text — rendered by UIStyle.rich_stat_label so the values
-	# come out bold while their labels stay light.
-	return "KILLS [b]%d[/b]  ·  XP [b]%d[/b]" % [
-		GameState.hero_kills_lifetime(hero_name), GameState.hero_xp_lifetime(hero_name)]
-
-## Effective hero stats: base × the global base multipliers × permanent
-## StatUpgrades purchases — the same formula hero.gd uses at spawn
-## (_configure + _apply_stat_upgrades), so the card shows what will actually
-## hit the field, and matches the STATS page's numbers.
-func _current_stats_text(hero_name: String) -> String:
-	var stats: Dictionary = Hero.HERO_STATS.get(hero_name, {})
-	var atk_interval: float = Hero.ARTEMIS_ATTACK_INTERVAL if hero_name == "ARTEMIS" \
-			else float(stats.get("attack_interval", 0.5))
-	var hp_n := GameState.stat_purchase_count(hero_name, "hp")
-	var dmg_n := GameState.stat_purchase_count(hero_name, "damage")
-	var aspd_n := GameState.stat_purchase_count(hero_name, "attack_speed")
-	var hp: float = float(stats.get("base_hp", 100)) * Hero.BASE_HP_MULT + float(StatUpgrades.def("hp").get("effect_add", 0.0)) * hp_n
-	var dmg: float = float(stats.get("base_damage", 10)) * Hero.BASE_DAMAGE_MULT + float(StatUpgrades.def("damage").get("effect_add", 0.0)) * dmg_n
-	atk_interval = maxf(atk_interval - float(StatUpgrades.def("attack_speed").get("effect_add", 0.0)) * aspd_n, 0.1)
-	# BBCode — see _lifetime_stats_text.
-	return "HP [b]%d[/b]  DMG [b]%d[/b]  ATK [b]%.2fs[/b]  SPD [b]%d[/b]" % [
-		int(round(hp)), int(round(dmg)), atk_interval, int(stats.get("move_speed", 70))]
-
+## NOTE: _build_stats_block and its two text builders (the effective-stat line
+## and the lifetime KILLS/XP line) were removed from the card on 2026-07-30 —
+## they moved, unchanged in substance, into HeroDetailsPanel behind the card's
+## HERO DETAILS button; the effective-stat formula in particular now lives in
+## HeroDetailsPanel._attributes_block.
+##
 ## Card for a not-yet-unlocked hero: shows the achievement gating it (name +
 ## live career progress) instead of the draft/priority controls. Locked heroes
 ## already fall out of the draft automatically (RunState.roll_draft_offer reads
@@ -648,9 +706,10 @@ func _build_locked_hero_card(hero_name: String) -> PanelContainer:
 	box.add_child(UIStyle.hero_portrait(hero_name, Vector2(110, 78)))
 
 	box.add_child(UIStyle.centered_label("%s — LOCKED" % hero_name, UIStyle.SIZE_BODY))
-
 	box.add_child(_build_kit_label(hero_name))
-	box.add_child(UIStyle.wrapped_label(Hero.ROLE_DESCRIPTIONS.get(hero_name, ""), 210))
+	# Same DETAILS button an unlocked card gets: what a locked hero would bring is
+	# exactly the thing worth knowing before chasing their achievement.
+	box.add_child(_build_details_row(hero_name))
 
 	var ach_id := Achievements.for_hero(hero_name)
 	if ach_id != "":

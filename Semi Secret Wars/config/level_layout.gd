@@ -22,9 +22,20 @@ extends Resource
 @export var deploy_band_x_min: float = -2900.0
 @export var deploy_band_x_max: float = -2300.0
 
-## Fixed villain lair at the very end of the lane (near lane_length/2) — the
-## learnable destination, and the last thing standing once every spawn point
-## on the way is destroyed.
+## Fixed villain lair near the far end of the lane — the learnable destination,
+## and the last thing standing once every spawn point on the way is destroyed.
+##
+## Moved IN from x2700 to x2250 on all three levels (Designer, 2026-07-30: "I
+## cant see berserk lair at all, bring it closer to the end of lane division").
+## It was never off-screen by camera limits — the camera can pan past it — but
+## nothing ever took the player there: the villain walks out to meet the party
+## (villain_pos is his LIVE position and drives lane_merge_x), so the fight
+## resolves short of his lair, the level ends on his death, and the fog over the
+## far end never lifts. Pulling the lair toward where the fight actually happens
+## puts it inside the revealed area.
+##
+## Note this also moves the villain's START, since LaneField seeds villain_pos at
+## lair_pos - VILLAIN_LAIR_OFFSET: the approach is ~450px shorter than it was.
 @export var villain_lair: Vector2 = Vector2(2900.0, 0.0)
 
 ## Destructible minion spawn points: (x, y) center + z = HP. Each becomes a
