@@ -37,7 +37,6 @@ window/dpi/allow_hidpi=false
 
 common/physics_ticks_per_second=120
 common/physics_interpolation=true
-common/physics_ticks_per_second.web=60
 
 [rendering]
 
