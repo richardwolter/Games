@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BoxDef" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/box_def.gd" id="1_box"]
+[ext_resource type="Resource" path="res://data/objects/tire.tres" id="2_tire"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="3_crate"]
+[ext_resource type="Resource" path="res://data/objects/plank.tres" id="4_plank"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+
+[resource]
+script = ExtResource("1_box")
+display_name = "Bronze Booster"
+price = 40
+piece_count = 5
+pool = Array[Resource]([ExtResource("2_tire"), ExtResource("3_crate"), ExtResource("4_plank"), ExtResource("5_barrel")])
+weights = PackedFloat32Array(30, 30, 25, 15)
+color = Color(0.76, 0.5, 0.3, 1)

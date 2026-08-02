@@ -1,0 +1,113 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/world.gd" id="1_world"]
+[ext_resource type="Script" path="res://scripts/water_body.gd" id="2_water"]
+[ext_resource type="Script" path="res://scripts/camera_controller.gd" id="3_cam"]
+[ext_resource type="Texture2D" path="res://art/background.png" id="4_bg"]
+[ext_resource type="Script" path="res://scripts/backdrop.gd" id="5_backdrop"]
+[ext_resource type="Shader" path="res://shaders/water.gdshader" id="6_water"]
+[ext_resource type="Script" path="res://scripts/seabed_flora.gd" id="7_flora"]
+[ext_resource type="Script" path="res://scripts/sky_birds.gd" id="8_birds"]
+[ext_resource type="Script" path="res://scripts/fish_school.gd" id="9_fish"]
+
+[sub_resource type="RectangleShape2D" id="RectPlaceholder"]
+size = Vector2(40, 40)
+
+[sub_resource type="ShaderMaterial" id="MatWater"]
+shader = ExtResource("6_water")
+
+[node name="World" type="Node2D"]
+script = ExtResource("1_world")
+
+[node name="BackdropLayer" type="CanvasLayer" parent="."]
+layer = -100
+
+[node name="Sky" type="ColorRect" parent="BackdropLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.78, 0.255, 0.549, 1)
+mouse_filter = 2
+
+[node name="Backdrop" type="Sprite2D" parent="."]
+z_index = -100
+z_as_relative = false
+texture = ExtResource("4_bg")
+script = ExtResource("5_backdrop")
+
+; Just in front of the backdrop and behind everything else, so birds pass over
+; the painted range but never in front of the terrain or a piece in the air.
+[node name="Birds" type="Node2D" parent="."]
+z_index = -90
+z_as_relative = false
+script = ExtResource("8_birds")
+
+[node name="Terrain" type="Node2D" parent="."]
+
+; Sits above the seabed but below the water overlay (z 10), so the plants get
+; tinted by the water like everything else underwater. Kept out of Terrain
+; because world.gd frees that node's children on every rebuild.
+[node name="Flora" type="Node2D" parent="."]
+z_index = 1
+z_as_relative = false
+script = ExtResource("7_flora")
+
+; z 9: above the pieces (z 0, drawn late because Main/Objects comes after World)
+; but below the water overlay at z 10. So fish pass in front of a sunk crate,
+; and are still tinted by the water like everything else down there — which is
+; what stops them reading as stickers on the glass.
+[node name="Fish" type="Node2D" parent="."]
+z_index = 9
+z_as_relative = false
+script = ExtResource("9_fish")
+
+[node name="Water" type="Area2D" parent="."]
+script = ExtResource("2_water")
+surface_y = 300.0
+
+[node name="Shape" type="CollisionShape2D" parent="Water"]
+shape = SubResource("RectPlaceholder")
+
+; Drawn ON TOP of the bridge pieces and the truck (they live under Main/Objects
+; and Main/Vehicle, both of which come after World in the tree, so by default
+; they render in front of the water and a sunk crate looks like it is sitting on
+; the water rather than in it). The polygon is translucent, so raising it turns
+; the whole water body into the submerged tint - no per-object work, and the
+; foam line cuts across a floating piece at exactly the waterline.
+;
+; White: water.gdshader writes COLOR outright, so any tint here would be applied
+; twice. Its uniforms are the place to change the water's colour.
+[node name="Visual" type="Polygon2D" parent="Water"]
+z_index = 10
+z_as_relative = false
+material = SubResource("MatWater")
+color = Color(1, 1, 1, 1)
+
+[node name="Bounds" type="StaticBody2D" parent="."]
+collision_layer = 2
+collision_mask = 0
+
+[node name="LeftWall" type="CollisionShape2D" parent="Bounds"]
+shape = SubResource("RectPlaceholder")
+
+[node name="RightWall" type="CollisionShape2D" parent="Bounds"]
+shape = SubResource("RectPlaceholder")
+
+[node name="Ceiling" type="CollisionShape2D" parent="Bounds"]
+shape = SubResource("RectPlaceholder")
+
+[node name="Visual" type="Line2D" parent="Bounds"]
+width = 3.0
+default_color = Color(0.55, 0.7, 0.8, 0.25)
+
+; process_callback is PHYSICS because the project uses physics interpolation, and
+; Camera2D forces that mode anyway when it is on. Set here rather than left to be
+; overridden at load, so the engine does not warn about doing it for us — and so
+; the camera's clock matches the bodies it follows. See camera_controller.gd.
+[node name="Camera" type="Camera2D" parent="."]
+process_callback = 0
+position = Vector2(0, 300)
+zoom = Vector2(0.28, 0.28)
+script = ExtResource("3_cam")

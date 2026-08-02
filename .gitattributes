@@ -1,0 +1,12 @@
+# Godot writes LF and the editor rewrites whole files on save. Without this,
+# Windows checkouts store CRLF and every .tscn/.tres/.import touched by the
+# editor shows up as a whole-file diff.
+* text=auto eol=lf
+
+# Binary assets, so git never tries to normalize or diff them as text.
+*.png binary
+*.jpg binary
+*.wav binary
+*.mp3 binary
+*.gif binary
+*.zip binary

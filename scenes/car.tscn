@@ -1,0 +1,136 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/car.gd" id="1_car"]
+[ext_resource type="Script" path="res://scripts/wheel.gd" id="2_wheel"]
+[ext_resource type="Texture2D" path="res://art/car_body.png" id="3_body"]
+[ext_resource type="Texture2D" path="res://art/car_tire.png" id="4_tyre"]
+[ext_resource type="Script" path="res://scripts/driver.gd" id="5_driver"]
+[ext_resource type="Script" path="res://scripts/suspension_rig.gd" id="6_rig"]
+
+; Everything here is measured off car_body.png (715x339). Its empty wheel arches
+; are centred at art x 139 and 576 - symmetric about the middle - with a radius
+; of ~136 art px, and the axle line sits at art y 316.
+;
+; The wheelbase is pinned at 148 world units, unchanged from the pickup this
+; replaces, so the truck still occupies the same span of bridge. That fixes the
+; scale at 148/437 = 0.339, which makes the drawn arch 46 world units across.
+;
+; The TYRE is 38, deliberately smaller than its arch. The 8-unit difference is
+; the suspension travel made visible: at rest the wheel hangs low in the opening,
+; and over a bump it rises up into it. A tyre that exactly filled its arch would
+; have to be welded to the body to stay there, which is what it was before.
+;
+; MONSTER TRUCK. The proportion that makes the format read is the wheelbase
+; measured in tyre radii: 148/38 = 3.9, where the old pickup was 148/27 = 5.5.
+; Two consequences fall out of the physics and are intended, not accidental:
+; ground clearance goes up, so the truck climbs junk that used to stop it, and
+; the bodywork sits high on the wheels, so it tips more readily.
+[sub_resource type="RectangleShape2D" id="RectChassis"]
+size = Vector2(218, 58)
+
+[sub_resource type="CircleShape2D" id="CircleWheel"]
+radius = 38.0
+
+[sub_resource type="PhysicsMaterial" id="MatTyre"]
+friction = 1.5
+bounce = 0.05
+
+; Both numbers are rescaled by the tyre radius going 27 -> 38, so the truck
+; drives as the original pickup did and the only thing that actually changed is
+; the geometry. Top speed is max_wheel_speed * radius, so the cap comes down by
+; 27/38; tractive force is drive_torque / radius, so the torque goes up by
+; 38/27. Leaving them alone would have handed the new car a big speed increase
+; and a loss of climbing force at the same time.
+[node name="Car" type="Node2D"]
+script = ExtResource("1_car")
+drive_torque = 619000.0
+max_wheel_speed = 14.9
+
+; Mass is deliberately NOT scaled with the size. Four times the weight would
+; flatten bridges that used to hold, and every level is balanced against the
+; old truck - bigger geometry, same load on the span.
+[node name="Chassis" type="RigidBody2D" parent="."]
+mass = 60.0
+continuous_cd = 1
+
+; The box covers the solid bodywork only - rocker to roofline - which on this
+; truck starts 32 units above the axle line. It deliberately does not cover the
+; exposed chassis tubes underneath: those are drawn, not collidable, so the
+; truck can straddle a plank the way the art suggests it would.
+[node name="Shape" type="CollisionShape2D" parent="Chassis"]
+position = Vector2(0, -61)
+shape = SubResource("RectChassis")
+
+; The sprite's axle line is 146.5 art px below its centre, so at scale 0.339 the
+; centre has to sit 50 units above the Car origin for the arches to land on the
+; wheels.
+; Everything above the axles hangs off this, and this is sprung against the
+; chassis. The wheels are NOT under it - they stay with the chassis, so the gap
+; between tyre and arch opens and closes as the body works, which is the whole
+; visible point.
+[node name="SuspensionRig" type="Node2D" parent="Chassis"]
+script = ExtResource("6_rig")
+
+; Drawn BEFORE Body, so behind it. The cab glass is punched out of car_body.png
+; by tools/punch_cab_window.ps1, so he shows through the opening while the roof,
+; A-pillar, door and cage still cover him at the edges. In front he read as a
+; sticker stuck on the outside of the truck.
+;
+; He is purely cosmetic - no collider, no mass - and rides the sprung body; his
+; head then bobbles on top of that, so a landing throws the truck, the body and
+; his head in that order.
+[node name="Driver" type="Node2D" parent="Chassis/SuspensionRig"]
+script = ExtResource("5_driver")
+
+[node name="Body" type="Sprite2D" parent="Chassis/SuspensionRig"]
+position = Vector2(0, -50)
+scale = Vector2(0.339, 0.339)
+texture = ExtResource("3_body")
+
+[node name="WheelBack" type="RigidBody2D" parent="."]
+position = Vector2(-74, 0)
+mass = 7.0
+physics_material_override = SubResource("MatTyre")
+continuous_cd = 1
+script = ExtResource("2_wheel")
+radius = 38.0
+show_hub = false
+texture = ExtResource("4_tyre")
+
+[node name="Shape" type="CollisionShape2D" parent="WheelBack"]
+shape = SubResource("CircleWheel")
+
+[node name="WheelFront" type="RigidBody2D" parent="."]
+position = Vector2(74, 0)
+mass = 7.0
+physics_material_override = SubResource("MatTyre")
+continuous_cd = 1
+script = ExtResource("2_wheel")
+radius = 38.0
+show_hub = false
+texture = ExtResource("4_tyre")
+
+[node name="Shape" type="CollisionShape2D" parent="WheelFront"]
+shape = SubResource("CircleWheel")
+
+; The axles are rigid pins, and the springiness lives in SuspensionRig above.
+;
+; This was tried the honest way first: a GrooveJoint2D per corner to let the
+; wheel slide vertically, with a DampedSpringJoint2D across it. It does not work
+; in Godot's 2D solver. The groove stops transmitting drive between the bodies,
+; so the wheels never spin past about 1 rad/s against a 14.9 cap and the truck
+; travels 40 units in four seconds instead of 2200 - it just pogos on the spot.
+; Sweeping stiffness from 45k to 600k and damping from 2k to 80k changed the
+; bounce amplitude and nothing else; every configuration stalled.
+;
+; So the wheels stay welded and the *body* is sprung against them instead. The
+; ride is simulated where it is actually visible rather than in the solver.
+[node name="AxleBack" type="PinJoint2D" parent="."]
+position = Vector2(-74, 0)
+node_a = NodePath("../Chassis")
+node_b = NodePath("../WheelBack")
+
+[node name="AxleFront" type="PinJoint2D" parent="."]
+position = Vector2(74, 0)
+node_a = NodePath("../Chassis")
+node_b = NodePath("../WheelFront")

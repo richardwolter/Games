@@ -1,0 +1,262 @@
+﻿{
+    "_comment":  [
+                     "Every generated art asset, with the prompt, reference and seed that produced it.",
+                     "`tools/generate_art.ps1` reads this. A diff here shows exactly what changed.",
+                     "",
+                     "STYLE comes from `ref` + `denoise`, not from the prompt alone. Each asset starts",
+                     "from the matching prototype sprite (img2img), so the established viewing angle and",
+                     "flat cartoon look survive. denoise is the dial:",
+                     "  0.35-0.45  barely a repaint, keeps almost everything",
+                     "  0.55-0.65  restyles surface detail, keeps the shape",
+                     "  0.70       new design, same palette and outline weight        \u003c- house setting",
+                     "  0.80+      starts inventing structure in the empty margin, which LayerDiffuse",
+                     "             makes opaque and FUSES to the sprite. Not removable afterwards.",
+                     "",
+                     "SHADOWS are stripped everywhere - pieces float on water, nothing sits on ground.",
+                     "The prototype refs have one baked in, so it is removed from the reference too;",
+                     "otherwise img2img reproduces it faithfully and no negative prompt helps.",
+                     "",
+                     "CRITICAL: bridge_object.gd draws sprites with draw_texture_rect, which STRETCHES",
+                     "the texture to def.size. A fixed `target` must match the aspect of `size` in the",
+                     "matching data/objects/*.tres. `\"target\": \"native\"` skips resizing entirely and",
+                     "keeps the trimmed silhouette at full resolution, to be rescaled later.",
+                     "",
+                     "`gen` is the diffusion resolution and must be a multiple of 64 (LayerDiffuse",
+                     "asserts otherwise). `fit`: stretch fills the collision box, contain preserves",
+                     "aspect and centres - use contain for circle-shaped pieces."
+                 ],
+    "defaults":  {
+                     "model":  "sd_xl_base_1.0.safetensors",
+                     "steps":  20,
+                     "cfg":  8.0,
+                     "sampler":  "euler",
+                     "scheduler":  "normal",
+                     "transparent":  true,
+                     "ld_config":  "SDXL, Conv Injection",
+                     "ld_weight":  1.0,
+                     "denoise":  0.62,
+                     "deadzone":  145,
+                     "speckle":  0.25,
+                     "solo":  true,
+                     "strip_shadow":  true,
+                     "shadow_value":  0.60,
+                     "shadow_sat":  0.30,
+                     "target":  "native",
+                     "variants":  1,
+                     "style":  "flat 2D vector cartoon game sprite, bold uniform black outline, cel shaded with flat colour fills, simple chunky readable shapes, warm palette of mustard yellow and weathered wood brown and rusted steel grey, heavily weathered and aged, old and used and salvaged, rust streaks, chipped paint, scratches, grime and water stains, straight-on orthographic elevation, completely flat with no perspective, clean sticker art, 2D physics puzzle game asset",
+                     "negative":  "duplicate object, second object, ghost outline, double exposure, doubled edges, offset copy, halo, white fringe, stray fragments, legs, feet, stand, pedestal, drop shadow, cast shadow, ground shadow, reflection, photorealistic, realistic, photograph, 3d render, ray tracing, perspective, 3/4 view, isometric, foreshortening, tilted, angled view, depth of field, background, backdrop, scenery, ground, floor, gritty texture, noise, grain, sketch, pencil, ink hatching, monochrome, greyscale, text, watermark, signature, frame, border, blurry"
+                 },
+    "assets":  [
+                   {
+                       "name":  "crate",
+                       "out":  "art/crate.png",
+                       "ref":  "art_ref/crate.png",
+                       "prompt":  "a single square wooden shipping crate, old salvaged timber, rusted iron corner brackets, chipped paint and water stains, one cracked board",
+                       "gen":  [
+                                   768,
+                                   768
+                               ],
+                       "seed":  1011,
+                       "notes":  "crate.tres size 90x90 (square). APPROVED seed - 1010 invents a dark shadow bar under the crate, which is near-black and fused to the outline so it cannot be removed in post. The shadow-bar screen flags that case."
+                   },
+                   {
+                       "name":  "barrel",
+                       "out":  "art/barrel.png",
+                       "ref":  "art_ref/barrel_plastic.png",
+                       "prompt":  "a single blue plastic drum barrel seen end on, smooth glossy moulded plastic, perfectly circular, one round grey metal lid cap in the centre, scuffed and faded plastic, grime and water stains",
+                       "negative":  "hole, opening, hollow, donut, washer, ring, torus, tube, pipe end, wooden barrel, planks, staves, wood grain, timber, hoops, metal bands, grid, panel lines, straight lines, spokes, radial lines, segments, rivets, duplicate object, second object, ghost outline, double exposure, doubled edges, halo, white fringe, stray fragments, legs, feet, stand, drop shadow, cast shadow, reflection, photorealistic, realistic, photograph, 3d render, perspective, 3/4 view, tilted, background, scenery, ground, text, watermark, blurry",
+                       "gen":  [
+                                   768,
+                                   768
+                               ],
+                       "target":  [
+                                      640,
+                                      640
+                                  ],
+                       "fit":  "contain",
+                       "seed":  1020,
+                       "notes":  "PROCEDURAL, not generated - art_ref/barrel_plastic.png is drawn by tools/make_drum_ref.ps1 and passes straight through the cleanup/framing pipeline. Diffusion was abandoned for this piece: below 0.7 it returned the reference unchanged, above 0.7 it reintroduced wooden staves AND punched the grey lid out to alpha 0 (LayerDiffuse reads a light disc ringed in black as a washer). barrel.tres size 80x80 with a CIRCLE collider and bridge_object.gd draws circles at (size.x, size.x), so the art must be square - hence the fixed 640x640 target with contain.",
+                       "strip_shadow":  true,
+                       "denoise":  0.78,
+                       "generate":  false,
+                       "deadzone":  16
+                   },
+                   {
+                       "name":  "tire",
+                       "out":  "art/tire.png",
+                       "ref":  "art_ref/tire_depth.png",
+                       "prompt":  "a single chunky off-road tire, thick black rubber with deep blocky tread, pale cream rim ring around a dark hub, worn and scuffed rubber, dried mud",
+                       "seed":  1030,
+                       "notes":  "tire.tres size 70x70, CIRCLE collider. Keeps the prototype\u0027s three-quarter angle and structure. Reference is tire_depth.png - tools/add_rim_depth.ps1 finds the pale rim ring automatically and shades the hub cavity so the rim reads as recessed rather than a flat painted disc, then upscales 4x because the prototype cut is only 164x153. The diffusion pass at 0.35 is an upscale-and-render, not a redesign.",
+                       "gen":  [
+                                   768,
+                                   768
+                               ],
+                       "target":  [
+                                      640,
+                                      640
+                                  ],
+                       "fit":  "contain",
+                       "generate":  true,
+                       "deadzone":  145,
+                       "denoise":  0.35
+                   },
+                   {
+                       "name":  "plank",
+                       "out":  "art/plank.png",
+                       "ref":  "art_ref/plank_1.png",
+                       "prompt":  "a single long weathered wooden plank lying horizontally, grey split grain, rusted nail heads, rotted ends",
+                       "gen":  [
+                                   1024,
+                                   384
+                               ],
+                       "seed":  1001,
+                       "denoise":  0.5,
+                       "notes":  "plank.tres size 220x18 (aspect 12.22); this art is 12.87, a ~5% stretch that is imperceptible - the collider is deliberately NOT matched to the art here, because 220 units of span is a gameplay number and widening it would shift every level\u0027s difficulty. Generated on a TALL 1024x384 canvas even though the plank is 12:1 - at 1024x128 SDXL is far outside its training range and returns a hallucinated strip instead of a plank; the trim crops back to the real silhouette.",
+                       "target":  "native"
+                   },
+                   {
+                       "name":  "metal_beam",
+                       "out":  "art/beam.png",
+                       "ref":  "art_ref/beam.png",
+                       "prompt":  "a single steel I-beam lying horizontally, flat flange along the top, row of rusted bolt heads, orange rust streaks and pitting",
+                       "gen":  [
+                                   1024,
+                                   384
+                               ],
+                       "seed":  1040,
+                       "notes":  "metal_beam.tres height raised 26 -\u003e 29 as a compromise: the art is aspect 8.28, a 26-high collider would flatten it 17%, a 31-high one would match exactly but thicken the beam noticeably. 29 leaves under 8% squash for a 3-unit change. denoise 0.5, not the 0.62 default - at 0.62 the beam drifts photographic and glossy, losing the flat cartoon look.",
+                       "denoise":  0.5,
+                       "target":  "native"
+                   },
+                   {
+                       "name":  "girder",
+                       "out":  "art/girder.png",
+                       "ref":  "art_ref/girder.png",
+                       "prompt":  "a single long steel lattice girder lying horizontally, diagonal cross bracing truss, riveted plates, heavy rust and flaking paint",
+                       "gen":  [
+                                   1024,
+                                   384
+                               ],
+                       "seed":  1050,
+                       "notes":  "girder.tres size 520x34, the longest piece. Tall canvas as above."
+                   },
+                   {
+                       "name":  "pontoon",
+                       "out":  "art/pontoon.png",
+                       "ref":  "art_ref/pontoon.png",
+                       "prompt":  "a single floating pontoon, flat deck on top of sealed buoyancy cylinders, mooring cleats, faded paint, algae and waterline staining",
+                       "gen":  [
+                                   1024,
+                                   512
+                               ],
+                       "seed":  1060,
+                       "notes":  "pontoon.tres LEFT at 300x70 deliberately. The art is aspect 5.36 against the collider\u0027s 4.29, so it renders ~25 pct taller than drawn - but water_body.gd uses def.get_height() for submersion, so thinning the collider to match would change how the pontoon floats, not just how it looks. The prototype had the same stretch, so this is the existing look. denoise 0.5, not the 0.62 default - 0.62 sends painted metal glossy and photographic.",
+                       "denoise":  0.5,
+                       "target":  "native"
+                   },
+                   {
+                       "name":  "refrigerator",
+                       "out":  "art/refrigerator.png",
+                       "ref":  "art_ref/refrigerator.png",
+                       "prompt":  "a single old refrigerator standing upright, tall narrow body with rounded corners, long chrome handle, small dial on the door, yellowed enamel, dents, rust spots and grime",
+                       "seed":  1072,
+                       "notes":  "refrigerator.tres size is set FROM this art\u0027s aspect, not the other way round - draw_texture_rect stretches to def.size, so the collider matches the drawing instead of squashing it. Re-measure and update the .tres if this asset is ever regenerated at a different aspect.",
+                       "gen":  [
+                                   640,
+                                   1024
+                               ],
+                       "target":  "native"
+                   },
+                   {
+                       "name":  "car_body",
+                       "out":  "art/car_body.png",
+                       "ref":  "art_ref/truck_body.png",
+                       "prompt":  "a single monster truck body seen from the side, no wheels, two huge empty round wheel arch openings, compact boxy cab riding high on an exposed tubular steel chassis, coil-over shock absorbers and a differential visible underneath, short cargo bed, roll cage bar over the roof, chrome exhaust stack behind the cab, supercharger blower with air scoop poking through the hood, front push bar, mustard yellow paint, weathered steel and rust streaks, dented panels",
+                       "seed":  1094,
+                       "denoise":  0.5,
+                       "gen":  [
+                                   768,
+                                   576
+                               ],
+                       "target":  "native",
+                       "negative":  "wheels, tires, wheel inside the arch, filled wheel arch, round black disc, low ground clearance, sports car, blue paint, flame decals, stars, racing stripes, duplicate object, second vehicle, ghost outline, doubled edges, drop shadow, cast shadow, ground, road, photorealistic, 3d render, perspective, 3/4 view, angled view, text, watermark, background",
+                       "notes":  "Body only - car.tscn draws the tyres itself so they can spin, and a wheel baked into this sprite shows as a second stationary tyre behind the real one. Reference is art_ref/truck_body.png from tools/make_truck_ref.ps1, which exists to fix the anatomy. Now a MONSTER TRUCK: the number that makes the format read is the wheelbase measured in tyre radii - a pickup is ~5.5, this is 3.26. That means big tyres and a compact body riding high, not a short truck. Arches at 19% and 81% of the length with radius 19%, so they nearly touch the ends. denoise 0.5, not the 0.62 default - the arches have to survive as holes, and above ~0.55 the model fills them back in whatever the negative says. The negative names blue paint and flame decals because the format came from a reference photo painted that way and the model reaches for it; the palette here is the house mustard-and-rust.",
+                       "generate":  true
+                   },
+                   {
+                       "name":  "car_tire",
+                       "out":  "art/car_tire.png",
+                       "ref":  "art_ref/truck_tyre.png",
+                       "prompt":  "a single huge monster truck tire seen straight on from the side, thick black rubber with a very deep chunky paddle tread biting into the carcass, tall sidewall, small pale steel rim with eight lug nuts around a dark hub, worn scuffed rubber and dried mud",
+                       "seed":  1096,
+                       "denoise":  0.62,
+                       "gen":  [
+                                   640,
+                                   640
+                               ],
+                       "target":  [
+                                      640,
+                                      640
+                                  ],
+                       "fit":  "contain",
+                       "notes":  "MUST be a straight-on side view - art/tire.png is the same object at three-quarters and visibly wobbles when spun. The lug nuts are the asymmetry the eye tracks at speed; wheel.gd's show_hub is off now that the art has its own rim. Monster-truck proportions: rim at 0.38 of the tyre, not the 0.52 the pickup version used, which read as a road wheel. This sprite is drawn at radius 44 in car.tscn against a 148 wheelbase, so it fills a lot of screen - the tread blocks have to stay countable at that size or the rotation stops reading.",
+                       "generate":  true
+                   },
+                   {
+                       "name":  "driver_body",
+                       "out":  "art/driver_body.png",
+                       "ref":  "art_ref/driver_body.png",
+                       "prompt":  "a single man sitting in a driving position seen from the side, no head, headless, cut off at the neck, leaning back slightly in a seat, both arms reaching forward to grip a steering wheel, thighs forward and knees bent with feet down on the pedals, worn brown canvas work jacket, dark grey trousers, heavy black boot",
+                       "seed":  1120,
+                       "denoise":  0.5,
+                       "gen":  [
+                                   768,
+                                   768
+                               ],
+                       "target":  "native",
+                       "negative":  "head, face, hair, neck above the collar, standing, walking, running, lying down, full body portrait, second person, duplicate limbs, extra arms, extra legs, ghost outline, doubled edges, drop shadow, cast shadow, ground, chair, car interior, background, photorealistic, 3d render, front view, 3/4 view, text, watermark",
+                       "notes":  "Body only, no head - driver.gd draws the head as a separate node so it can bobble on its own spring, and a head baked in here would sit behind the bobbling one. The negative has to say 'headless' several ways or the model grows one back over the neck stub. The ref from tools/make_driver_ref.ps1 draws the far arm and far leg in darker shades before the near ones; without that back-to-front order the arm and torso merge into one brown blob and the seated pose stops reading. denoise 0.5 - the pose is the whole point and above that the model straightens the legs.",
+                       "generate":  true
+                   },
+                   {
+                       "name":  "driver_head",
+                       "out":  "art/driver_head.png",
+                       "ref":  "art_ref/driver_head.png",
+                       "prompt":  "a single man's head in profile facing right, short brown hair, plain face with one visible eye and ear, neck cut off flat at the bottom, calm expression",
+                       "seed":  1122,
+                       "denoise":  0.55,
+                       "gen":  [
+                                   640,
+                                   640
+                               ],
+                       "target":  "native",
+                       "negative":  "body, shoulders, torso, arms, hat, helmet, sunglasses, beard, second head, duplicate face, front view, 3/4 view, looking at viewer, ghost outline, doubled edges, drop shadow, cast shadow, background, photorealistic, 3d render, text, watermark",
+                       "notes":  "Separate from driver_body so driver.gd can bobble it. Must face RIGHT, the direction the truck drives. Drawn small in game - about 14 world units - so the readable features are the silhouette, the hairline and the nose, and nothing finer survives. The ref builds the head from two overlapping ellipses, hair-coloured high and skin low, so the crop between them is the hairline; drawing the hair as its own arc produced a sliver that read as a scar.",
+                       "generate":  true
+                   },
+                   {
+                       "name":  "background",
+                       "out":  "art/background.png",
+                       "prompt":  "a wide panoramic mountain range at sunset seen across a broad strait of water, layered ridgelines receding into haze, low sun sitting near the horizon, warm amber and orange sky fading up into deep purple, calm distant water along the horizon line, no foreground detail",
+                       "seed":  1080,
+                       "transparent":  false,
+                       "trim":  false,
+                       "solo":  false,
+                       "strip_shadow":  false,
+                       "denoise":  1.0,
+                       "notes":  "Backdrop. txt2img (no ref), opaque, no trim/solo/shadow-strip. Generated at 1536x640 and upscaled 1.875x to 2880x1200 - acceptable because a hazy distant backdrop has no fine detail to lose. The old target was sized by parallax maths; there is no parallax any more (scripts/backdrop.gd is a world-space sprite stretched per-axis onto the camera's limit rect), so the only thing that matters now is having enough resolution for the widest level and an aspect near the limit rect's, or the stretch shows.",
+                       "style":  "flat 2D vector cartoon game background, simple flat colour bands, clean silhouetted shapes, soft atmospheric haze between layers, muted painterly gradients, no outlines, wide panorama, low horizon",
+                       "negative":  "foreground objects, trees, buildings, people, boats, bridge, text, watermark, signature, frame, border, vignette, photorealistic, photograph, 3d render, blurry, noise, grain, heavy black outlines, cluttered detail",
+                       "gen":  [
+                                   1536,
+                                   640
+                               ],
+                       "target":  [
+                                      2880,
+                                      1200
+                                  ],
+                       "fit":  "stretch"
+                   }
+               ]
+}

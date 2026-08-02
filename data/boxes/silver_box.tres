@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BoxDef" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/box_def.gd" id="1_box"]
+[ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="3_crate"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="4_barrel"]
+[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="5_fridge"]
+[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="6_beam"]
+
+[resource]
+script = ExtResource("1_box")
+display_name = "Silver Booster"
+price = 70
+piece_count = 4
+pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_crate"), ExtResource("4_barrel"), ExtResource("5_fridge"), ExtResource("6_beam")])
+weights = PackedFloat32Array(25, 20, 20, 20, 15)
+color = Color(0.78, 0.8, 0.85, 1)

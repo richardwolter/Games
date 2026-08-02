@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/object_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://art/tire.png" id="2_art"]
+
+[resource]
+script = ExtResource("1_def")
+display_name = "Tire"
+shape = "circle"
+size = Vector2(70, 70)
+mass = 6.0
+buoyancy = 1.5
+friction = 1.2
+bounce = 0.45
+color = Color(0.16, 0.16, 0.18, 1)
+price = 7
+textures = Array[Texture2D]([ExtResource("2_art")])

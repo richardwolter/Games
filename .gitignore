@@ -1,0 +1,19 @@
+# Godot's import/cache directory. Regenerated on open.
+.godot/
+
+# Export paths are machine-specific, and the presets file is where a signing
+# password would end up if one were ever set.
+export_presets.cfg
+
+# Export output: the web build, its zip, and capture gifs. All reproducible.
+build/
+
+# Candidate images from tools/generate_art.ps1, written here rather than over
+# the real asset so prompts can be tried. Scratch by design, and 38M of it.
+art/_preview/
+
+# Machine-specific: absolute paths to a per-session scratchpad. Other .claude
+# files are shareable, this one is not.
+.claude/launch.json
+
+*.tmp
