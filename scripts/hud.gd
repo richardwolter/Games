@@ -54,6 +54,9 @@ var _money_label: Label
 ## The belt of owned pieces, left to right along the dock.
 var _piece_belt: HBoxContainer
 var _start_button: BaseButton
+## The slot START sits in, kept because SAVED BUILDS is parked over it and has to
+## follow it as the belt resizes.
+var _start_slot: Control
 ## The lettering layer, and the clip that reveals it left to right.
 var _start_fill: TextureRect
 var _start_fill_clip: Control
@@ -139,6 +142,10 @@ func build(
 
 	_dock = _build_panel()
 	root.add_child(_dock)
+	# After the dock, so the tab draws over it rather than under, and so the dock
+	# has a rect to be placed against.
+	root.add_child(_build_blueprints_button())
+	_place_blueprints_button.call_deferred()
 	root.add_child(_build_header())
 	root.add_child(_build_settings_button())
 	root.add_child(_build_banner())
@@ -162,6 +169,59 @@ func build(
 	UITheme.enliven(root)
 
 
+## How far above the dock's top edge SAVED BUILDS floats, and how big the plate
+## is. Deliberately smaller than anything in the dock: it sits over the strait
+## rather than in the workbench, so it has to read as a tab attached to the dock
+## and not as a piece of dock that came loose.
+const BLUEPRINTS_GAP := 5.0
+const BLUEPRINTS_SIZE := Vector2(96.0, 24.0)
+
+
+## SAVED BUILDS, floating above START rather than sitting in the dock row.
+##
+## It was the widest plate in the dock and it was taking that width from the
+## belt, which is the one section that actually needs it — the belt is elastic
+## and every fixed control beside it is a piece the player can't see. Lifting it
+## out gives the belt ~130px back and gives the two contextual plates room to
+## stop competing with it.
+##
+## Above START specifically because it is the only control that is neither
+## destructive nor a commitment: parked over the commitment, it is easy to find
+## when you want it and never on the way to anything else.
+func _build_blueprints_button() -> Control:
+	var builds := UITheme.plate_button(
+		"SAVED BUILDS", UITheme.ACCENT.darkened(0.42), BLUEPRINTS_SIZE
+	)
+	# Small type, not body: the plate is 24px tall and the label has to fit inside
+	# it rather than setting its height. A Button's minimum is the larger of its
+	# text and custom_minimum_size, so anything bigger here silently wins and the
+	# tab grows back into the size it was lifted out of.
+	builds.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	builds.tooltip_text = "Save this bridge to a slot, or bring a saved one back"
+	builds.pressed.connect(_open_blueprints)
+	_blueprints_button = builds
+	return builds
+
+
+## Park the tab centred over the START slot, just clear of the dock.
+##
+## Driven off the two rects rather than off constants, because the dock's height
+## and START's x both fall out of the layout — the dock centres its row, so the
+## slot moves whenever the belt gains or loses a piece. Hard-coding either put
+## the tab over the middle of the strait on a full belt.
+func _place_blueprints_button() -> void:
+	if _blueprints_button == null or _start_slot == null or _dock == null:
+		return
+	var slot := _start_slot.get_global_rect()
+	if slot.size.x <= 0.0:
+		return
+	_blueprints_button.size = BLUEPRINTS_SIZE
+	_blueprints_button.position = Vector2(
+		slot.position.x + (slot.size.x - BLUEPRINTS_SIZE.x) * 0.5,
+		_dock.get_global_rect().position.y - BLUEPRINTS_GAP - BLUEPRINTS_SIZE.y
+	)
+
+
 ## The dock spans the bottom edge, so the whole strait — both shores and the sky
 ## above them — is never covered by UI. Reading order runs left to right the way
 ## the turn does: who you are, what you can buy, what you own, what you do.
@@ -182,6 +242,10 @@ func _build_panel() -> Control:
 	row.add_theme_constant_override(&"separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(row)
+	# The row is centred, so START slides sideways whenever the belt gains or
+	# loses a piece — and the dock, being full-width, never emits resized for it.
+	# Following the row's own re-sort catches that as well as window resizes.
+	row.sort_children.connect(_place_blueprints_button)
 
 	row.add_child(_build_shop_button())
 	row.add_child(_build_piece_belt())
@@ -334,24 +398,6 @@ func _build_actions() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 8)
 
-	# Saved layouts sit immediately before Recall All, at the head of the group of
-	# controls that act on the bridge rather than on the crossing. Blue rather than
-	# the dock's wood and mustard: it is the only control here that is neither
-	# destructive nor a commitment, and it should not be reached for by reflex.
-	var builds := UITheme.plate_button(
-		"SAVED BUILDS", UITheme.ACCENT.darkened(0.42), Vector2(118, 0)
-	)
-	# Body size rather than the loud size the other plates wear: this is the
-	# longest label in the dock and the belt is what the width belongs to. A
-	# Button's minimum is the larger of its text and this, so it can't clip either
-	# way — the smaller type just stops it taking 40px it doesn't need.
-	builds.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE)
-	builds.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	builds.tooltip_text = "Save this bridge to a slot, or bring a saved one back"
-	builds.pressed.connect(_open_blueprints)
-	row.add_child(builds)
-	_blueprints_button = builds
-
 	# The placed count sits under Recall All rather than on START. It describes
 	# the bridge, and Recall All is the button that acts on the bridge — next to
 	# START it read as a caption for the crossing instead.
@@ -425,6 +471,7 @@ func _build_actions() -> Control:
 		_start_button.custom_minimum_size.y
 	)
 	row.add_child(slot)
+	_start_slot = slot
 
 	_start_fill_clip = Control.new()
 	_start_fill_clip.clip_contents = true
