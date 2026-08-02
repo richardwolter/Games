@@ -121,7 +121,7 @@ func _page_layout() -> Array[Piece]:
 		# The truck, parked at the head of the left shore looking across. It is
 		# the only thing in the picture with a face, so it goes where a reader's
 		# eye lands first and points at the gap.
-		Piece.new("car", 0.185, 0.470, 0.105, -4.0),
+		Piece.new("truck", 0.185, 0.462, 0.120, -4.0),
 
 		# Right shore: lighter, further off, more of it in the water than on it.
 		Piece.new("pontoon", 0.845, 0.600, 0.030, 5.0),
@@ -161,7 +161,7 @@ func _embed_layout() -> Array[Piece]:
 
 		# The truck, up on the first crate at the near end. Small, because the
 		# joke is the size of the gap in front of it.
-		Piece.new("car", 0.122, 0.484, 0.115, -5.0),
+		Piece.new("truck", 0.122, 0.474, 0.132, -5.0),
 	]
 
 
@@ -176,13 +176,10 @@ func _render(
 	var out := _cover(backdrop, size, waterline)
 
 	for piece: Piece in layout:
-		var sprite := Image.load_from_file(
-			ProjectSettings.globalize_path(ART + piece.art + ".png")
-		)
+		# "truck" is assembled rather than loaded — see _truck().
+		var sprite := _truck() if piece.art == "truck" else _load(ART + piece.art + ".png")
 		if sprite == null:
-			print("  missing sprite: %s" % piece.art)
 			continue
-		sprite.convert(Image.FORMAT_RGBA8)
 		_stamp(out, sprite, size, piece)
 
 	# After the pieces, never before. The water goes OVER them exactly as the
@@ -195,6 +192,127 @@ func _render(
 	var path := OUT_DIR + name
 	out.save_png(ProjectSettings.globalize_path(path))
 	print("%s  %dx%d  (%d pieces)" % [path, size.x, size.y, layout.size()])
+
+
+## The truck, assembled the way scenes/car.tscn assembles it.
+##
+## art/car.png is NOT this vehicle. It is the little pickup on the title logo and
+## it is the only place that sprite is still used — the truck the player actually
+## watches fall in the water is a monster truck built at runtime from car_body,
+## two car_tire, and a driver behind a punched-out cab window. Using car.png here
+## put a vehicle on the store page that appears nowhere in the game.
+##
+## Every measurement below is lifted from car.tscn and driver.gd rather than
+## eyeballed, so the proportion that makes the format read — the wheelbase
+## measured in tyre radii — survives. Change the scene and this has to follow;
+## there is no way to derive one from the other short of running the game.
+const TRUCK_PX := 4.0
+## Sprite scale and centre offset of the body, in world units.
+const BODY_SCALE := 0.339
+const BODY_AT := Vector2(0.0, -50.0)
+## Axle half-spacing, and the tyre's drawn diameter — radius 38, oversized 2% by
+## Wheel.SPRITE_OVERSCALE so the rubber covers its own collision circle.
+const AXLE_X := 74.0
+const TYRE_DIAMETER := 38.0 * 2.0 * 1.02
+## The driver, from driver.gd's own defaults. He is behind the body, showing
+## through the window punched in it — leave him out and the cab is a hole with
+## the sunset visible through it.
+const CAB_RECT := Rect2(-15.0, -97.0, 46.0, 35.0)
+const CAB_COLOUR := Color("2b2724")
+const DRIVER_AT := Vector2(20.0, -68.0)
+const DRIVER_SCALE := 0.073
+const DRIVER_VISIBLE := 0.62
+const HEAD_AT := Vector2(16.0, -74.0)
+const HEAD_RADIUS := 9.0
+const HEAD_SKIN := Color("e0a878")
+const HEAD_CAP := Color("d8892f")
+
+
+func _truck() -> Image:
+	# The bounding box, in world units: the body is wider than the axles and the
+	# tyres reach lower than anything else.
+	var half_body := Vector2(715.0, 339.0) * BODY_SCALE * 0.5
+	var left: float = -half_body.x
+	var top: float = BODY_AT.y - half_body.y
+	var bottom: float = TYRE_DIAMETER * 0.5
+	var canvas := Image.create_empty(
+		int(half_body.x * 2.0 * TRUCK_PX), int((bottom - top) * TRUCK_PX), false,
+		Image.FORMAT_RGBA8
+	)
+	# Where world (0,0) — the axle line, on the truck's centreline — lands.
+	var origin := Vector2(-left, -top) * TRUCK_PX
+
+	# 1. The cab interior, so the punched window shows upholstery and not sky.
+	_fill(canvas, CAB_RECT, origin)
+
+	# 2. The driver, cropped the way his Sprite2D's region crops him: only the
+	#    top of the drawing is ever above the door line.
+	var driver := _load(ART + "driver_body.png")
+	if driver != null:
+		var visible := Image.create_empty(
+			driver.get_width(), int(float(driver.get_height()) * DRIVER_VISIBLE),
+			false, Image.FORMAT_RGBA8
+		)
+		visible.blit_rect(
+			driver, Rect2i(0, 0, visible.get_width(), visible.get_height()), Vector2i.ZERO
+		)
+		_paste(
+			canvas, visible, origin + DRIVER_AT * TRUCK_PX,
+			DRIVER_SCALE * TRUCK_PX, 0.0, 0.0
+		)
+
+	# 3. His head, which is drawn in code rather than being a sprite. Two tones
+	#    on a disc: at the size this ends up on a store page the cap and the face
+	#    are all that survive of driver_head.gd anyway.
+	_head(canvas, origin + HEAD_AT * TRUCK_PX, HEAD_RADIUS * TRUCK_PX)
+
+	# 4. The bodywork, over the driver.
+	var body := _load(ART + "car_body.png")
+	if body != null:
+		_paste(
+			canvas, body, origin + BODY_AT * TRUCK_PX, BODY_SCALE * TRUCK_PX, 0.0, 0.0
+		)
+
+	# 5. The tyres last. In the scene the wheels are siblings that come after the
+	#    chassis, so they draw over the arches — which is what lets the body sit
+	#    down into them rather than in front of them.
+	var tyre := _load(ART + "car_tire.png")
+	if tyre != null:
+		var factor: float = TYRE_DIAMETER * TRUCK_PX / float(tyre.get_width())
+		for side in [-1.0, 1.0]:
+			_paste(
+				canvas, tyre, origin + Vector2(AXLE_X * side, 0.0) * TRUCK_PX,
+				factor, 0.0, 0.0
+			)
+	return canvas
+
+
+func _load(path: String) -> Image:
+	var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+	if image == null:
+		print("  missing: %s" % path)
+		return null
+	image.convert(Image.FORMAT_RGBA8)
+	return image
+
+
+## A flat rectangle given in world units, for the cab interior.
+func _fill(canvas: Image, rect: Rect2, origin: Vector2) -> void:
+	var from := origin + rect.position * TRUCK_PX
+	var to := origin + rect.end * TRUCK_PX
+	for y in range(maxi(int(from.y), 0), mini(int(to.y), canvas.get_height())):
+		for x in range(maxi(int(from.x), 0), mini(int(to.x), canvas.get_width())):
+			canvas.set_pixel(x, y, CAB_COLOUR)
+
+
+## The driver's head: a disc of face with the cap over the top of it.
+func _head(canvas: Image, centre: Vector2, radius: float) -> void:
+	var brim: float = centre.y - radius * 0.18
+	for y in range(maxi(int(centre.y - radius), 0), mini(int(centre.y + radius) + 1, canvas.get_height())):
+		for x in range(maxi(int(centre.x - radius), 0), mini(int(centre.x + radius) + 1, canvas.get_width())):
+			if Vector2(float(x), float(y)).distance_to(centre) > radius:
+				continue
+			canvas.set_pixel(x, y, HEAD_CAP if float(y) < brim else HEAD_SKIN)
 
 
 ## The backdrop scaled to cover the output, cropped so its horizon lands where
@@ -241,10 +359,28 @@ func _cover(backdrop: Image, size: Vector2i, waterline: float) -> Image:
 ## rotation into the source. Walking the source instead leaves unwritten pixels
 ## between the ones it lands on — a rotated sprite full of holes.
 func _stamp(dst: Image, src: Image, size: Vector2i, piece: Piece) -> void:
-	var wanted: float = piece.height * float(size.y)
-	var factor: float = wanted / float(src.get_height())
+	var factor: float = piece.height * float(size.y) / float(src.get_height())
+	_paste(
+		dst,
+		src,
+		Vector2(piece.at.x * float(size.x), piece.at.y * float(size.y)),
+		factor,
+		piece.angle,
+		piece.dim
+	)
+
+
+## Composite one image onto another, scaled and rotated about `centre`.
+##
+## Alpha is composited properly rather than assumed opaque, because this draws
+## both onto the finished backdrop AND onto the transparent canvas the truck is
+## assembled on — writing 1.0 alpha unconditionally, which is the shortcut that
+## works for the first case, turns the truck's bounding box into a solid block.
+func _paste(
+	dst: Image, src: Image, centre: Vector2, factor: float, angle: float, dim: float
+) -> void:
+	var bounds := Vector2i(dst.get_width(), dst.get_height())
 	var half := Vector2(float(src.get_width()), float(src.get_height())) * 0.5
-	var centre := Vector2(piece.at.x * float(size.x), piece.at.y * float(size.y))
 
 	# The destination box: the sprite's own corners, rotated, then bounded. A
 	# rotated rectangle needs more room than it started with, and clipping to the
@@ -254,13 +390,13 @@ func _stamp(dst: Image, src: Image, size: Vector2i, piece: Piece) -> void:
 		maxi(int(centre.x - reach), 0), maxi(int(centre.y - reach), 0)
 	)
 	var to := Vector2i(
-		mini(int(centre.x + reach), size.x - 1), mini(int(centre.y + reach), size.y - 1)
+		mini(int(centre.x + reach), bounds.x - 1), mini(int(centre.y + reach), bounds.y - 1)
 	)
 
 	# Inverse rotation, because the walk is destination to source.
-	var cos_a: float = cos(-piece.angle)
-	var sin_a: float = sin(-piece.angle)
-	var keep: float = 1.0 - clampf(piece.dim, 0.0, 1.0)
+	var cos_a: float = cos(-angle)
+	var sin_a: float = sin(-angle)
+	var keep: float = 1.0 - clampf(dim, 0.0, 1.0)
 
 	for y in range(from.y, to.y + 1):
 		for x in range(from.x, to.x + 1):
@@ -276,12 +412,21 @@ func _stamp(dst: Image, src: Image, size: Vector2i, piece: Piece) -> void:
 			if texel.a <= 0.004:
 				continue
 
-			# Distance dims a piece towards the water's own colour rather than
-			# towards black: these sit in front of a painted strait, and a grey
-			# barrel on blue-green water reads as a hole in the picture.
 			var under := dst.get_pixel(x, y)
-			var shade := texel.lerp(Color(under.r, under.g, under.b, texel.a), 1.0 - keep)
-			dst.set_pixel(x, y, under.lerp(Color(shade.r, shade.g, shade.b, 1.0), texel.a))
+			# Distance dims a piece towards whatever it sits on rather than
+			# towards black: these are in front of a painted strait, and a grey
+			# barrel on blue-green water reads as a hole in the picture.
+			var tint := texel
+			if keep < 1.0:
+				tint = texel.lerp(Color(under.r, under.g, under.b, texel.a), 1.0 - keep)
+			var alpha: float = texel.a + under.a * (1.0 - texel.a)
+			if alpha <= 0.0001:
+				continue
+			var rgb := (
+				Vector3(tint.r, tint.g, tint.b) * texel.a
+				+ Vector3(under.r, under.g, under.b) * under.a * (1.0 - texel.a)
+			) / alpha
+			dst.set_pixel(x, y, Color(rgb.x, rgb.y, rgb.z, alpha))
 
 
 ## Lay the strait over everything below the waterline.
