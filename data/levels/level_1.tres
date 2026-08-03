@@ -1,20 +1,24 @@
-[gd_resource type="Resource" script_class="LevelDef" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="LevelDef" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
 [ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
 [ext_resource type="Resource" path="res://data/objects/crate.tres" id="3_crate"]
 [ext_resource type="Resource" path="res://data/objects/barrel.tres" id="4_barrel"]
 [ext_resource type="Resource" path="res://data/objects/tire.tres" id="5_tire"]
-[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="6_beam"]
-[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="7_fridge"]
-[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="8_bronze"]
-[ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="9_silver"]
+[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="6_bronze"]
+[ext_resource type="Texture2D" path="res://art/background_city.png" id="7_city"]
 
 [resource]
 script = ExtResource("1_level")
-display_name = "1 — The Narrows"
-half_width = 1600.0
-max_depth = 600.0
-shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_crate"), ExtResource("4_barrel"), ExtResource("5_tire"), ExtResource("6_beam"), ExtResource("7_fridge")])
-shop_stock = PackedInt32Array(10, 8, 6, 6, 3, 2)
-boxes = Array[Resource]([ExtResource("8_bronze"), ExtResource("9_silver")])
+display_name = "1 — The City"
+half_width = 420.0
+max_depth = 260.0
+backdrop = ExtResource("7_city")
+backdrop_horizon = 0.5
+ground = 1
+life = 0
+reward_scale = 0.12
+attempt_floor = 24
+shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_crate"), ExtResource("4_barrel"), ExtResource("5_tire")])
+shop_stock = PackedInt32Array(8, 6, 5, 5)
+boxes = Array[Resource]([ExtResource("6_bronze")])

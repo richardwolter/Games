@@ -23,12 +23,6 @@ signal attempt_finished(result: Result, progress: float)
 ## Ignore stalling during the initial roll-out.
 @export var grace_seconds: float = 1.5
 @export var container_path: NodePath
-## How long the car may fail to gain ground before the engine winds down.
-##
-## Well under stall_seconds: the sound has to answer to what the car is visibly
-## doing, and a truck wedged against a barrel still revving for three and a half
-## seconds reads as the audio being broken rather than as the car being stuck.
-@export var engine_cut_seconds: float = 0.6
 
 var car: Car = null
 ## The truck sitting on the left shore between attempts. Not the same object as
@@ -41,14 +35,10 @@ var _container: Node2D
 var _best_x: float = 0.0
 var _stall_timer: float = 0.0
 var _elapsed: float = 0.0
-var _audio: Node
 
 
 func _ready() -> void:
 	_container = get_node(container_path) as Node2D
-	# Optional: the headless checks run without the autoload in some contexts,
-	# and a missing engine sound must not take the crossing down with it.
-	_audio = get_node_or_null(^"/root/Audio")
 
 
 ## Where the run starts and where it counts as finished. Set per level, since a
@@ -129,10 +119,6 @@ func start_crossing() -> void:
 ## otherwise build a parked truck and delete it again in the same call.
 func reset(re_park: bool = true) -> void:
 	is_running = false
-	# Hard stop, not a wind-down: this runs at the start of a new attempt, and a
-	# tail from the last one would play underneath the new pull-away.
-	if _audio != null:
-		_audio.cut_engine()
 	if is_instance_valid(car):
 		car.queue_free()
 	car = null
@@ -159,15 +145,6 @@ func _physics_process(delta: float) -> void:
 		(_best_x - progress_from_x) / maxf(goal_x - progress_from_x, 1.0), 0.0, 1.0
 	)
 
-	# The engine follows the car, not the clock: it pulls for as long as the car
-	# is making ground and winds down when it stops making ground or goes under.
-	# Coming back on is deliberate — a truck that shunts a crate aside and starts
-	# moving again should be heard to do it.
-	if pos.y > drown_y or _stall_timer > engine_cut_seconds:
-		_set_engine(false)
-	else:
-		_set_engine(true)
-
 	if pos.x >= goal_x and pos.y < drown_y:
 		_finish(Result.SUCCESS)
 	elif pos.y > drown_y:
@@ -176,18 +153,8 @@ func _physics_process(delta: float) -> void:
 		_finish(Result.STALLED)
 
 
-func _set_engine(running: bool) -> void:
-	if _audio == null:
-		return
-	if running:
-		_audio.start_engine()
-	else:
-		_audio.stop_engine()
-
-
 func _finish(result: Result) -> void:
 	is_running = false
-	_set_engine(false)
 	if is_instance_valid(car):
 		car.stop()
 	attempt_finished.emit(result, progress)

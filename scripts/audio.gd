@@ -17,9 +17,26 @@ extends Node
 ## snapping back to the opening theme on level 3 would read as a mistake. Adding
 ## a track is adding a line here.
 const TRACKS: Array[String] = [
+	"res://audio/Sax_Level1.mp3",
 	"res://audio/Song_Strait_Across.mp3",
-	"res://audio/Song_Level2.mp3",
+	# Levels 3 and 4 share this one, level 4 by the clamp above — hence the name.
+	"res://audio/Song_Level3_4.mp3",
 ]
+## Background noise for a level, by level index. A level with no entry plays
+## none, and the layer fades out when you leave one that had it.
+##
+## Ambience rides the MUSIC bus rather than the effects one. It is continuous
+## background the same way the soundtrack is — somebody who turns the music down
+## to work is asking for quiet, not for the traffic to keep going without the
+## sax — and it keeps the balance between the two fixed at whatever AMBIENCE_DB
+## says, instead of letting two sliders drift it.
+const AMBIENCE: Dictionary[int, String] = {
+	0: "res://audio/City_Noise.mp3",
+}
+## How far under the soundtrack the ambience sits. The track is the thing you are
+## meant to hear; this is the room it is played in.
+const AMBIENCE_DB := -22.0
+
 ## How long one track takes to give way to the next. Long enough that the change
 ## is a change of scene rather than an edit.
 const CROSSFADE := 1.6
@@ -55,41 +72,6 @@ const SOUND_OFFSETS: Dictionary = {
 const SFX_VOICES := 4
 const SFX_TRIM_DB := -8.0
 
-## The truck engine, played for as long as the car is pulling forward.
-const ENGINE := "res://audio/Truck_Acceleration.wav"
-## The stretch of the recording that repeats, picked by ear as the flattest part
-## of the pull — past 1.04 the revs are already easing off towards the wind-down
-## at 1.27, and it was that easing, replayed every cycle, that was audible as a
-## dip rather than as a constant engine.
-## Both loop points are in FRAMES, not seconds, and that is load-bearing.
-##
-## They were seconds, printed by the tool to five decimals and converted back
-## with a truncating int() — which lands one frame short of the frame the tool
-## actually chose. One frame is nothing in time and everything in signal: it is
-## the difference between the waveform continuing across the join and stepping
-## across it, and that step is the tick. Seconds cannot survive the round trip,
-## so the number that matters is the one that is stored.
-const ENGINE_LOOP_END_FRAMES := 45864
-## Where the loop returns to — NOT the start of the file.
-##
-## Looping the whole file was the "up, cut, up" problem: every pass replayed the
-## rev from idle, so instead of a truck driving you heard it pull away over and
-## over. The recording is an attack followed by a sustain, and only the sustain
-## may repeat: the file plays once from the top so the pull-away is heard
-## properly, and from then on it cycles this stretch, which is already at revs.
-##
-## 0.77 s was the timestamp read off the waveform; a few milliseconds is most of
-## a cycle at engine frequencies, so splicing there leaves a step that is heard
-## as a click on every pass. This is that point nudged 19 ms to the frame where
-## the waveform actually lines up with the join, across BOTH channels — found by
-## tools/find_engine_loop.gd, which prints this figure ready to paste. Re-run it
-## if the recording or the loop window ever changes.
-const ENGINE_LOOP_BEGIN_FRAMES := 34802
-## The engine is a foreground sound but it plays flat out for whole attempts, so
-## it gets its own trim rather than sitting at whatever level the file was cut at.
-## Well below the music's -11 in perceived terms: a rev held for thirty seconds
-## wears far faster than a track does.
-const ENGINE_TRIM_DB := -14.0
 const SETTINGS_PATH := "user://settings.cfg"
 
 ## Below this the slider is treated as off and the bus is muted outright —
@@ -103,11 +85,25 @@ const SILENCE_THRESHOLD := 0.005
 ## control that lies about where it is.
 const MUSIC_TRIM_DB := -11.0
 
-## 0..1, what the slider shows. Stored linear because that is what a volume
-## slider means to a person; the bus wants decibels and gets them on the way in.
-var master_volume: float = 0.7:
+## The two buses everything plays on, created at startup so there is no bus
+## layout resource to keep in step with this file.
+const MUSIC_BUS := &"Music"
+const SFX_BUS := &"SFX"
+
+## 0..1, what the sliders show. Stored linear because that is what a volume
+## slider means to a person; the buses want decibels and get them on the way in.
+##
+## Two of them rather than one master, because the two want different settings
+## far more often than they want the same one: the soundtrack is a long loop
+## somebody may well turn off entirely, while the clicks and the engine are
+## feedback they still need to hear. A single control could only ever mute both.
+var music_volume: float = 0.7:
 	set(value):
-		master_volume = clampf(value, 0.0, 1.0)
+		music_volume = clampf(value, 0.0, 1.0)
+		_apply_volume()
+var sfx_volume: float = 0.9:
+	set(value):
+		sfx_volume = clampf(value, 0.0, 1.0)
 		_apply_volume()
 
 ## Two music players, used alternately: one fades down while the other fades up.
@@ -120,16 +116,16 @@ var _active: int = 0
 var _track: String = ""
 var _fades: Array[Tween] = [null, null]
 
-var _engine: AudioStreamPlayer
 ## A ring of one-shot players and the streams they play.
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _sounds: Dictionary[StringName, AudioStream] = {}
-## Our own copy of the engine sample, because the loop is switched on and off on
-## the resource itself and that must not reach into the imported one.
-var _engine_sample: AudioStreamWAV
-## True once the loop has been released and the wind-down is playing out.
-var _engine_releasing: bool = false
+
+## The ambience layer, and what it is playing so a level change to a level with
+## the same noise doesn't restart it.
+var _ambience: AudioStreamPlayer = null
+var _ambience_path: String = ""
+var _ambience_fade: Tween = null
 
 
 func _ready() -> void:
@@ -137,14 +133,28 @@ func _ready() -> void:
 	# game doesn't cut the music the player is trying to set the level of.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+	_build_buses()
 	_load_settings()
-	_build_engine()
 	_build_voices()
+
+	_ambience = AudioStreamPlayer.new()
+	_ambience.name = "Ambience"
+	_ambience.bus = MUSIC_BUS
+	_ambience.volume_db = SILENT_DB
+	_ambience.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Same safety net the music players get, for a format that ignores its own
+	# loop flag. Silence in the background is not obviously a bug, which is what
+	# makes it worth catching.
+	_ambience.finished.connect(func() -> void:
+		if not _ambience_path.is_empty():
+			_ambience.play()
+	)
+	add_child(_ambience)
 
 	for i in 2:
 		var player := AudioStreamPlayer.new()
 		player.name = "Music%d" % i
-		player.bus = &"Master"
+		player.bus = MUSIC_BUS
 		player.volume_db = SILENT_DB
 		player.process_mode = Node.PROCESS_MODE_ALWAYS
 		# Safety net for any format that ignores its own loop flag.
@@ -158,35 +168,22 @@ func _ready() -> void:
 	# resuming at level 2 hears level 1's music fade in and straight back out.
 
 
-## The engine, set up to loop the pulling half of the recording.
+## Adds the Music and SFX buses under Master if they aren't there already.
 ##
-## The loop is set on the sample rather than by restarting the player from a
-## timer: an AudioStreamWAV loops inside the audio server, sample-accurate and
-## with no gap, whereas a `play()` called from _process lands on a frame boundary
-## and puts an audible seam in a sound that is supposed to be continuous.
-func _build_engine() -> void:
-	var loaded := load(ENGINE) as AudioStreamWAV
-	if loaded == null:
-		push_warning("No engine sound at %s; crossings run quiet." % ENGINE)
-		return
-	# Duplicated because stop_engine() switches loop_mode on the resource, and
-	# the imported sample is shared with anything else that ever loads it.
-	var sample := loaded.duplicate() as AudioStreamWAV
-	_engine_sample = sample
-	# LOOP_FORWARD plays from the top of the file and only starts cycling once it
-	# reaches loop_end, which is what gives the attack-then-sustain shape: the
-	# rev-up is heard once, the held note repeats.
-	sample.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	sample.loop_begin = ENGINE_LOOP_BEGIN_FRAMES
-	sample.loop_end = ENGINE_LOOP_END_FRAMES
-
-	_engine = AudioStreamPlayer.new()
-	_engine.name = "Engine"
-	_engine.bus = &"Master"
-	_engine.stream = sample
-	_engine.volume_db = ENGINE_TRIM_DB
-	_engine.finished.connect(func() -> void: _engine_releasing = false)
-	add_child(_engine)
+## Built in code rather than shipped as a bus layout resource: there are two of
+## them, they have no effects on them, and the only thing that ever reads their
+## names is this file. A .tres would be a second place to keep the same two
+## strings, and the kind that fails silently — a missing bus makes every player
+## that names it fall back to Master, which sounds fine and quietly ignores both
+## volume sliders.
+func _build_buses() -> void:
+	for name: StringName in [MUSIC_BUS, SFX_BUS]:
+		if AudioServer.get_bus_index(name) != -1:
+			continue
+		var index := AudioServer.bus_count
+		AudioServer.add_bus(index)
+		AudioServer.set_bus_name(index, name)
+		AudioServer.set_bus_send(index, &"Master")
 
 
 func _build_voices() -> void:
@@ -213,7 +210,7 @@ func _build_voices() -> void:
 	for i in SFX_VOICES:
 		var player := AudioStreamPlayer.new()
 		player.name = "Sfx%d" % i
-		player.bus = &"Master"
+		player.bus = SFX_BUS
 		player.volume_db = SFX_TRIM_DB
 		player.process_mode = Node.PROCESS_MODE_ALWAYS
 		add_child(player)
@@ -241,63 +238,46 @@ func play_sound(name: StringName, pitch_spread: float = 0.06) -> void:
 	player.play(float(SOUND_OFFSETS.get(name, 0.0)))
 
 
-## Start the engine, or leave it alone if it is already running.
-##
-## Idempotent on purpose: this is called every physics frame the car is gaining
-## ground, and a play() on each of those would restart the sample sixty times a
-## second — the engine has to sound like one continuous pull, not a stutter.
-##
-## Catching it mid-wind-down restarts from the top rather than resuming, which
-## is the right sound: a truck that has dropped its revs and then gets moving
-## again pulls away again, it doesn't resume at speed.
-func start_engine() -> void:
-	if _engine == null or _engine_sample == null:
-		return
-	if _engine.playing and not _engine_releasing:
-		return
-	_engine_sample.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	_engine_releasing = false
-	_engine.play()
-
-
-## Let the engine wind down instead of cutting it dead.
-##
-## The recording already contains the wind-down — it is everything after
-## ENGINE_LOOP_END_FRAMES, which is why the loop had to be cut short of it in the first
-## place. So releasing the engine is simply switching the loop off: playback
-## carries straight on out of the loop region and into the truck slowing to a
-## halt, then stops itself at the end of the file.
-##
-## Nothing is spliced and nothing is faded. The tail is the literal continuation
-## of the samples already playing, so there is no join to hear — which is worth
-## more than any crossfade between two clips would have been.
-func stop_engine() -> void:
-	if _engine == null or _engine_sample == null:
-		return
-	if not _engine.playing or _engine_releasing:
-		return
-	_engine_sample.loop_mode = AudioStreamWAV.LOOP_DISABLED
-	_engine_releasing = true
-
-
-## Kill the engine outright, wind-down and all. For starting a fresh attempt,
-## where a tail left over from the last one would play under the new pull-away.
-func cut_engine() -> void:
-	if _engine == null:
-		return
-	_engine.stop()
-	_engine_releasing = false
-
-
 ## Play the track belonging to a level, crossfading from whatever is playing.
 ##
 ## Called by the game when a level loads, and by the title screen with the level
 ## the save is sitting on — so somebody who has beaten level 1 and comes back to
 ## Continue is met by the music they left off with rather than the opening theme.
 func set_level_music(level_index: int) -> void:
+	# Ambience is keyed on the real index, NOT the clamped one the track uses:
+	# levels past the end of TRACKS deliberately keep the last track, and there is
+	# no equivalent reading for noise — level 4 is not in the city.
+	_set_ambience(String(AMBIENCE.get(level_index, "")))
 	if TRACKS.is_empty():
 		return
 	play_track(TRACKS[clampi(level_index, 0, TRACKS.size() - 1)])
+
+
+## Fade the background layer to `path`, or to silence when it is empty.
+func _set_ambience(path: String) -> void:
+	if _ambience == null or path == _ambience_path:
+		return
+	_ambience_path = path
+
+	if _ambience_fade != null and _ambience_fade.is_valid():
+		_ambience_fade.kill()
+	_ambience_fade = create_tween()
+
+	if path.is_empty():
+		_ambience_fade.tween_property(_ambience, ^"volume_db", SILENT_DB, CROSSFADE)
+		_ambience_fade.tween_callback(_ambience.stop)
+		return
+
+	var stream := load(path) as AudioStream
+	if stream == null:
+		push_warning("No ambience at %s; the level runs without it." % path)
+		return
+	if &"loop" in stream:
+		stream.set(&"loop", true)
+	_ambience.stream = stream
+	_ambience.volume_db = SILENT_DB
+	_ambience.play()
+	_ambience_fade.tween_property(_ambience, ^"volume_db", AMBIENCE_DB, CROSSFADE)
 
 
 func play_track(path: String) -> void:
@@ -369,9 +349,16 @@ func _on_finished(index: int) -> void:
 
 
 func _apply_volume() -> void:
-	var bus := AudioServer.get_bus_index(&"Master")
-	AudioServer.set_bus_mute(bus, master_volume < SILENCE_THRESHOLD)
-	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(master_volume, 0.0001)))
+	_set_bus(MUSIC_BUS, music_volume)
+	_set_bus(SFX_BUS, sfx_volume)
+
+
+func _set_bus(name: StringName, level: float) -> void:
+	var bus := AudioServer.get_bus_index(name)
+	if bus == -1:
+		return
+	AudioServer.set_bus_mute(bus, level < SILENCE_THRESHOLD)
+	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(level, 0.0001)))
 
 
 func _load_settings() -> void:
@@ -379,13 +366,21 @@ func _load_settings() -> void:
 	if config.load(SETTINGS_PATH) != OK:
 		_apply_volume()
 		return
-	master_volume = float(config.get_value("audio", "master_volume", master_volume))
+	# A file written before the split has only master_volume, and it is the level
+	# the player last chose — so it seeds both rather than being thrown away and
+	# resetting somebody's setting for them.
+	var legacy: float = float(config.get_value("audio", "master_volume", -1.0))
+	music_volume = float(config.get_value("audio", "music_volume",
+		legacy if legacy >= 0.0 else music_volume))
+	sfx_volume = float(config.get_value("audio", "sfx_volume",
+		legacy if legacy >= 0.0 else sfx_volume))
 
 
-## Called when the player lets go of the slider, not on every drag step — this
+## Called when the player lets go of a slider, not on every drag step — this
 ## writes a file, and a slider emits dozens of changes per second.
 func save_settings() -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
-	config.set_value("audio", "master_volume", master_volume)
+	config.set_value("audio", "music_volume", music_volume)
+	config.set_value("audio", "sfx_volume", sfx_volume)
 	config.save(SETTINGS_PATH)

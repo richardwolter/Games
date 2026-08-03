@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("1_def")
+tier = 3
 display_name = "Steel Girder"
 shape = "box"
 size = Vector2(520, 34)

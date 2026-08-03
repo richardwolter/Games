@@ -8,6 +8,11 @@
 extends Control
 
 const MAIN_SCENE := "res://scenes/main.tscn"
+## Where CONTINUE and NEW GAME both go: the player picks a strait before the game
+## scene is built, so nothing has to be torn down and reloaded if they change
+## their mind. The headless checks still jump straight to MAIN_SCENE, which is
+## why both constants live here.
+const SELECT_SCENE := "res://scenes/level_select.tscn"
 ## How tall the menu signs are drawn. Big enough to read as the painted objects
 ## they are, small enough to stay in the band of open water along the bottom
 ## without reaching up into the truck.
@@ -259,7 +264,11 @@ func _gap() -> Control:
 
 
 func _on_play_pressed() -> void:
-	get_tree().change_scene_to_file(MAIN_SCENE)
+	# Arriving from the menu, so the select screen's BACK belongs to the menu.
+	# Cleared here rather than trusted to have been cleared on the way out: a
+	# player who quits to the title mid-run would otherwise leave it set.
+	Campaign.return_to_game = false
+	get_tree().change_scene_to_file(SELECT_SCENE)
 
 
 func _on_settings_pressed() -> void:
@@ -275,6 +284,9 @@ func _on_new_game_pressed() -> void:
 		"NEW GAME",
 		func() -> void:
 			SaveGame.delete()
+			# Straight into level 1: a new game has nothing to choose between, and
+			# the select screen would show three locked cards and one PLAY button.
+			Campaign.requested_level = 0
 			get_tree().change_scene_to_file(MAIN_SCENE)
 	)
 

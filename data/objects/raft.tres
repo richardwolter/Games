@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/object_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://art/bridge_raft.png" id="2_art"]
+
+[resource]
+script = ExtResource("1_def")
+tier = 3
+display_name = "Raft"
+shape = "box"
+size = Vector2(460, 162)
+mass = 55.0
+buoyancy = 2.8
+friction = 0.85
+bounce = 0.0
+color = Color(0.35, 0.45, 0.58, 1)
+price = 130
+textures = Array[Texture2D]([ExtResource("2_art")])

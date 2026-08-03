@@ -37,6 +37,9 @@ var _attempt_active: bool = false:
 			_hud.build_locked = value
 ## Set by the headless checks, which must not write over a real save.
 var _testing: bool = false
+## Level index to open in the dev sandbox, or -1 for a normal run. See _ready().
+var _sandbox_level: int = -1
+var _sandbox_money: int = 5000
 
 
 func _ready() -> void:
@@ -56,6 +59,7 @@ func _ready() -> void:
 	_hud.recall_car_requested.connect(_on_recall_car_requested)
 	_hud.start_crossing_requested.connect(_on_start_crossing_requested)
 	_hud.next_level_requested.connect(_levels.advance)
+	_hud.level_select_requested.connect(_on_level_select_requested)
 
 	_manipulator.water = $World/Water
 	_manipulator.delete_requested.connect(_spawner.remove)
@@ -68,6 +72,20 @@ func _ready() -> void:
 
 	var args := OS.get_cmdline_user_args()
 	_testing = args.has("--smoke") or args.has("--carcheck")
+
+	# Dev sandbox: open a level directly, with money, and leave the save alone.
+	#   godot -- --sandbox=3 --money=5000
+	#
+	# It borrows _testing rather than adding a second flag, because what it wants
+	# is exactly what _testing already guarantees: nothing written to disk. Trying
+	# out level 4's pieces must not overwrite somebody's run.
+	_sandbox_level = -1
+	for arg: String in args:
+		if arg.begins_with("--sandbox="):
+			_sandbox_level = int(arg.substr(10))
+			_testing = true
+		elif arg.begins_with("--money="):
+			_sandbox_money = int(arg.substr(8))
 
 	_load_or_start()
 
@@ -92,7 +110,27 @@ func _ready() -> void:
 ## empties the strait, all of which the save then overwrites with what was
 ## actually left. Doing it the other way round would wipe the restored state.
 func _load_or_start() -> void:
+	if _sandbox_level >= 0:
+		_levels.load_level(_sandbox_level)
+		_levels.unlocked = _levels.levels.size()
+		_economy.add(_sandbox_money)
+		return
+
 	var data := {} if _testing else SaveGame.load_data()
+
+	# The select screen asked for a particular strait. The save holds each level
+	# separately, so this restores that one's bridge, pieces and shop if the
+	# player has been there before, and leaves a clean strait if they haven't.
+	var chosen := Campaign.requested_level
+	Campaign.requested_level = -1
+	if chosen >= 0:
+		_levels.load_level(chosen)
+		if not data.is_empty():
+			SaveGame.apply(
+				data, _levels, _economy, _inventory, _shop, _spawner, _blueprints
+			)
+		return
+
 	if data.is_empty():
 		_levels.load_level(0)
 		# No save means this is somebody's first turn, so teach it. Tied to the
@@ -252,11 +290,15 @@ func _on_level_loaded(_level: LevelDef, _index: int) -> void:
 	_attempt_active = false
 	_pre_crossing_layout.clear()
 	_camera.stop_following()
-	# Saved layouts don't survive a level change. A span shaped for one strait is
-	# meaningless in a wider one, and the pieces it was built from went back to the
-	# shop along with the rest of the level's inventory — so every slot would load
-	# as an empty strait. Cleared here rather than filtered at the point of use, so
-	# the panel never shows three rows that can't be pressed.
+	# Saved layouts belong to the strait they were taken in — a span shaped for one
+	# is meaningless in a wider one — so the arriving level starts with none, and
+	# SaveGame puts that level's own slots back if it has any. Cleared here rather
+	# than filtered at the point of use, so the panel never shows three rows that
+	# can't be pressed.
+	#
+	# This used to be the end of them: the slots were saved globally, so clearing
+	# them on the way out and autosaving on the way in wrote the empty set over the
+	# only copy. They now live in the level's bucket and survive the round trip.
 	_blueprints.clear_all()
 
 
@@ -366,6 +408,42 @@ func _on_load_blueprint(index: int) -> void:
 		save_now()
 
 
+## What the bridge the truck just drove onto cost, at shop prices. Lower wins.
+##
+## Shop price rather than an abstract tier score: it is the number the player was
+## already weighing up when they bought the piece, so "I crossed it for $240" is
+## a figure they can feel the size of and can go straight back to the shop and
+## try to beat. A separate points scale meant every bridge had two costs, and the
+## one being ranked was the one nothing else in the game mentioned.
+##
+## Priced from the whole layout, including pieces that came out of a booster pack
+## and were never paid for at the counter. The board is ranking the bridge, not
+## the receipt — and letting box pieces count as free would make the cheapest
+## bridge a question of gambling luck rather than of building.
+##
+## Counted from the layout captured when START was pressed, not from what is in
+## the water now — by the time an attempt finishes, pieces have sunk, been
+## knocked into the deep or been dragged along under the wheels, and the player
+## should be scored on the bridge they built rather than on the wreck it became.
+func _bridge_points() -> int:
+	var total := 0
+	for entry: Dictionary in _pre_crossing_layout:
+		var def := entry[&"def"] as ObjectDef
+		if def != null:
+			total += def.price
+	return total
+
+
+## Back to the select screen, with the run written down first: the strait, the
+## money and the standings are all worth keeping, and the player asked to change
+## levels rather than to throw anything away.
+func _on_level_select_requested() -> void:
+	save_now()
+	# So the select screen's BACK button comes back here rather than to the menu.
+	Campaign.return_to_game = true
+	get_tree().change_scene_to_file("res://scenes/level_select.tscn")
+
+
 func _on_crossing_started() -> void:
 	_pre_crossing_layout = _spawner.snapshot()
 	_attempt_active = true
@@ -378,7 +456,14 @@ func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> v
 	var succeeded := result == CrossingManager.Result.SUCCESS
 	var first_clear := succeeded and _levels.mark_cleared()
 	var settled := _economy.settle_attempt(succeeded, progress, first_clear)
-	_hud.report_crossing(result, progress, settled[0], settled[1])
+
+	# The leaderboard entry, and only for a crossing that actually finished: a
+	# bridge that dropped the truck at 90% cost salvage too, but it is not a
+	# solution and ranking it against ones that worked would put the cheapest
+	# failure at the top of the table.
+	var bridge := _bridge_points()
+	var rank := _levels.submit_bridge(bridge) if succeeded else 0
+	_hud.report_crossing(result, progress, settled[0], settled[1], bridge, rank)
 	if succeeded and not _levels.is_last():
 		_hud.offer_next_level()
 	elif succeeded:

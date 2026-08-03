@@ -31,8 +31,6 @@ extends Node2D
 @export var max_rotate_speed: float = 24.0
 ## Angular acceleration limit, same idea as grip_power.
 @export var twist_power: float = 240000.0
-## Mouse wheel / keyboard rotation step, in degrees.
-@export var rotate_step_degrees: float = 12.0
 
 @export var ghost_free_tint: Color = Color(0.75, 1.0, 0.75, 0.6)
 @export var ghost_blocked_tint: Color = Color(1.0, 0.5, 0.45, 0.6)
@@ -77,33 +75,17 @@ var _park_at: Vector2 = Vector2.INF
 var water: WaterBody = null
 
 
-## The wheel turns the held piece, and while a piece is held it must not ALSO
-## zoom the camera.
+## The wheel is the camera's, always — including while a piece is held.
 ##
-## This has to be _input rather than _unhandled_input, which is where it lived
-## and why the camera kept zooming anyway: both nodes were listening at the
-## unhandled stage, the camera is reached first, and by the time the manipulator
-## marked the event handled the zoom had already been applied. _input runs ahead
-## of the whole unhandled pass, so consuming it here actually stops the camera.
+## It used to rotate the held piece, which meant the one moment you most want to
+## zoom (lining a plank up against the gap it has to span) was the one moment you
+## couldn't. Rotation is Q and E, which spin continuously and are the better
+## control for it anyway; the wheel does one thing everywhere.
 ##
-## Only ever consumed while holding — with an empty hand the wheel is the zoom,
-## untouched. Q and E rotate as well, and are unaffected either way.
-func _input(event: InputEvent) -> void:
-	if held == null or locked or event is not InputEventMouseButton:
-		return
-	var mb := event as InputEventMouseButton
-	if not mb.pressed:
-		return
-	match mb.button_index:
-		MOUSE_BUTTON_WHEEL_UP:
-			_target_rotation -= deg_to_rad(rotate_step_degrees)
-		MOUSE_BUTTON_WHEEL_DOWN:
-			_target_rotation += deg_to_rad(rotate_step_degrees)
-		_:
-			return
-	get_viewport().set_input_as_handled()
-
-
+## There is deliberately no _input override here any more. Consuming the wheel
+## ahead of the unhandled pass was the only way to stop the camera zooming
+## underneath the rotation, and with nothing to consume, the camera simply sees
+## every wheel event.
 func _unhandled_input(event: InputEvent) -> void:
 	if locked:
 		return

@@ -17,6 +17,9 @@ signal place_requested(def: ObjectDef)
 signal buy_requested(def: ObjectDef)
 signal box_requested(box: BoxDef)
 signal next_level_requested()
+## Leave the strait for the select screen. Main saves before it changes scene —
+## the run is not being abandoned, just set down.
+signal level_select_requested()
 ## Take the car off the strait and put the bridge back the way it was.
 signal recall_car_requested()
 ## Run an attempt. Routed through Main rather than calling CrossingManager here,
@@ -36,6 +39,8 @@ const CHARGE_TINT := Color("3fbf4a")
 ## The settings knob in the top-right, and its inset from the screen edge.
 const SETTINGS_SIZE := Vector2(44, 40)
 const SETTINGS_MARGIN := 12.0
+## The LEVELS button beside it. Same height, wider, because it carries a word.
+const SELECT_SIZE := Vector2(96, 40)
 
 var _spawner: Node
 var _crossing: CrossingManager
@@ -44,6 +49,10 @@ var _inventory: Inventory
 var _shop: Shop
 var _levels: LevelManager
 var _blueprints: Blueprints
+## The online board. A child of the HUD rather than an autoload: it is only ever
+## read from the crossing panel, and its cache should live exactly as long as the
+## screen that shows it.
+var _boards: Leaderboard
 
 var _shop_menu: ShopMenu
 var _dock: Control
@@ -51,6 +60,10 @@ var _hints: Label
 var _header_strip: PanelContainer
 var _level_label: Label
 var _money_label: Label
+## The level's leaderboard standing, and the divider before it. Both hide
+## together on a level that has never been crossed.
+var _record_label: Label
+var _record_rule: ColorRect
 ## The belt of owned pieces, left to right along the dock.
 var _piece_belt: HBoxContainer
 var _start_button: BaseButton
@@ -152,6 +165,9 @@ func build(
 	_hints = _build_hints()
 	root.add_child(_hints)
 	root.add_child(_build_meter())
+
+	_boards = Leaderboard.new()
+	add_child(_boards)
 
 	_shop_menu = ShopMenu.new()
 	root.add_child(_shop_menu)
@@ -317,7 +333,35 @@ func _build_header() -> Control:
 	# and the one the shop is spending, so it gets the only colour on the plate.
 	_money_label.add_theme_color_override(&"font_color", UITheme.GOLD)
 	row.add_child(_money_label)
+
+	var record_rule := ColorRect.new()
+	record_rule.color = Color(UITheme.CREAM, 0.32)
+	record_rule.custom_minimum_size = Vector2(2, 22)
+	row.add_child(record_rule)
+
+	# The level's standing, so the target is on screen while you build rather than
+	# only in the banner after a run. Hidden until the level has been crossed
+	# once — "BEST —" on a level nobody has solved is a field with nothing in it.
+	_record_label = Label.new()
+	_record_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_record_label.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_TITLE)
+	_record_label.add_theme_color_override(&"font_color", UITheme.CREAM)
+	_record_label.tooltip_text = "Cheapest bridge that has crossed this level"
+	row.add_child(_record_label)
+	_record_rule = record_rule
 	return _header_strip
+
+
+## Show the level's best bridge, or hide the field if it has never been crossed.
+func _update_record_label() -> void:
+	if _record_label == null or _levels == null:
+		return
+	var best := _levels.bridge_record()
+	# Priced, because the score IS a shop price now. "BEST 240" beside a money
+	# readout showing $310 was two numbers in the same units pretending not to be.
+	_record_label.text = "BEST $%d" % best if best >= 0 else ""
+	_record_label.visible = best >= 0
+	_record_rule.visible = best >= 0
 
 
 ## Opposite corner to the level/money readout, in the other patch of open sky.
@@ -348,7 +392,28 @@ func _build_settings_button() -> Control:
 	button.pressed.connect(func() -> void:
 		_confirm_overlay = UITheme.settings(_dock.get_parent())
 	)
-	return button
+
+	# LEVELS sits immediately left of it, on the same plate and the same line.
+	# Changing strait used to be reachable only from the panel that appears after
+	# a crossing, which meant the one player who most wants out — somebody stuck
+	# on a level they cannot solve — was the one player with no way to leave.
+	var levels := UITheme.plate_button("LEVELS", UITheme.SLATE, SELECT_SIZE)
+	levels.tooltip_text = "Choose another strait"
+	levels.anchor_left = 1.0
+	levels.anchor_right = 1.0
+	levels.offset_right = -SETTINGS_MARGIN - SETTINGS_SIZE.x - 8.0
+	levels.offset_left = levels.offset_right - SELECT_SIZE.x
+	levels.offset_top = SETTINGS_MARGIN
+	levels.offset_bottom = SETTINGS_MARGIN + SELECT_SIZE.y
+	levels.pressed.connect(func() -> void: level_select_requested.emit())
+
+	# Both returned as one node, since the caller adds a single child.
+	var pair := Control.new()
+	pair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pair.add_child(button)
+	pair.add_child(levels)
+	return pair
 
 
 ## A frame-rate readout, off by default and toggled with F3.
@@ -641,8 +706,8 @@ func report_blueprint_loaded(index: int, placed: int, wanted: int) -> void:
 ## inside the panel, so it costs the dock no height at all.
 func _build_hints() -> Control:
 	var label := Label.new()
-	label.text = "drag to move  ·  Q/E or wheel to rotate  ·  right-click a piece to recall it" \
-		+ "  ·  middle-drag pans  ·  green fits, red is blocked"
+	label.text = "Q/E to rotate  ·  wheel to zoom  ·  right-click a piece to recall it" \
+		+ "  ·  middle-click to move  ·  green fits, red is blocked"
 	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -707,6 +772,7 @@ func _on_level_loaded(level: LevelDef, index: int) -> void:
 	# "1 — The Narrows" is twice as wide as the header strip can hold, and the
 	# name is decoration — the number is the thing you check. Full name on hover.
 	_level_label.text = "LVL %d" % (index + 1)
+	_update_record_label()
 	_header_strip.tooltip_text = level.display_name
 	_next_button.visible = false
 	_banner.text = ""
@@ -1200,7 +1266,14 @@ func _on_attempt_started() -> void:
 	_banner_timer = 0.0
 
 
-func report_crossing(result: int, progress: float, score: int, earned: int) -> void:
+func report_crossing(
+	result: int,
+	progress: float,
+	score: int,
+	earned: int,
+	bridge: int = 0,
+	rank: int = 0
+) -> void:
 	var pct := roundi(progress * 100.0)
 	# The record is the sentence the player is playing to hear, so it gets its own
 	# line rather than being buried inside the money figure it contributed to.
@@ -1209,10 +1282,14 @@ func report_crossing(result: int, progress: float, score: int, earned: int) -> v
 		record = "\nFURTHEST YET — record bonus $%d" % _economy.last_record_bonus
 	match result:
 		CrossingManager.Result.SUCCESS:
+			# The banner still fires, because the panel can be dismissed and the
+			# run's figures should not vanish with it.
+			_update_record_label()
 			_show_banner(
 				"MADE IT ACROSS — score %d, earned $%d%s" % [score, earned, record],
 				Color(0.55, 0.98, 0.55)
 			)
+			show_crossed_panel(bridge, rank, earned)
 		CrossingManager.Result.DROWNED:
 			_show_banner(
 				"SANK at %d%% — score %d, earned $%d%s" % [pct, score, earned, record],
@@ -1223,6 +1300,135 @@ func report_crossing(result: int, progress: float, score: int, earned: int) -> v
 				"STUCK at %d%% — score %d, earned $%d%s" % [pct, score, earned, record],
 				UITheme.MUSTARD
 			)
+
+
+## The crossing panel: what the bridge cost, where it stands, and the two things
+## worth doing next.
+##
+## A panel rather than another banner line, because a success is the one moment
+## the player has a decision to make — take the next strait, or stay and try to
+## do this one cheaper. A banner cannot ask that, and the NEXT button on its own
+## never said the second option existed.
+func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
+	var level_index := _levels.index
+	# No heading sign: the panel only appears on a crossing, so a line reading
+	# STRAIT CROSSED tells the player what they just watched happen.
+	var parts := UITheme.modal(
+		_dock.get_parent(), "", 420.0, "KEEP BUILDING"
+	)
+	_confirm_overlay = parts[0] as Control
+	var content := parts[1] as VBoxContainer
+
+	# The money is the headline. What the bridge cost and where it places are on
+	# the board below, where the number sits among the runs it is being ranked
+	# against — saying "2nd place" above a board that already shows it in second
+	# was the same fact twice.
+	var money := Label.new()
+	money.text = "Earned $%d" % earned
+	money.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	money.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_TITLE)
+	money.add_theme_color_override(&"font_color", UITheme.GOLD.darkened(0.25))
+	content.add_child(money)
+
+	var cost := Label.new()
+	cost.text = "Your bridge: $%d" % bridge
+	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cost.add_theme_color_override(&"font_color", UITheme.SUBTLE_TEXT)
+	content.add_child(cost)
+
+	_add_online_board(content, level_index, bridge)
+
+	# Only offered when there is somewhere to go. On the last level the campaign
+	# card takes over, and the panel is just the scoreboard.
+	#
+	# Green, not the panel's amber: everything else on this board is amber, so the
+	# one button that moves the game forward has nowhere to stand out from — and
+	# green is already the game's "this works, press it" colour on every BUY.
+	if not _levels.is_last():
+		var next := UITheme.plate_button("NEXT STRAIT", UITheme.GREEN, Vector2(0, 44))
+		next.pressed.connect(func() -> void:
+			_confirm_overlay.queue_free()
+			next_level_requested.emit()
+		)
+		content.add_child(next)
+
+	var select := UITheme.plate_button(
+		"LEVEL SELECT", UITheme.STEEL.darkened(0.34), Vector2(0, 38)
+	)
+	select.pressed.connect(func() -> void:
+		_confirm_overlay.queue_free()
+		level_select_requested.emit()
+	)
+	content.add_child(select)
+
+
+## The leaderboard, on the crossing panel: this strait, against everyone else.
+##
+## The only board there is now. There used to be a local table of your own past
+## runs above it, which answered a different question — "is this my best bridge"
+## — but asked the player to read two rankings of the same number and work out
+## which one counted. The header still carries your record for the level, so the
+## fact it provided has not gone anywhere.
+##
+## Nothing here is awaited by the panel. The section appears immediately, filled
+## with whatever was cached, and the rows change under the player a moment later
+## when the network answers.
+func _add_online_board(content: VBoxContainer, level_index: int, bridge: int) -> void:
+	if not Leaderboard.has_board(level_index):
+		return
+
+	# The callback is handed the table rather than closing over it: a lambda
+	# captures by value, and at the moment this one is built the table does not
+	# exist yet, so a captured reference would be null when it fired.
+	var table := UITheme.online_board_section(
+		content, _boards, level_index,
+		func(box: VBoxContainer) -> void: _post_crossing(box, level_index, bridge)
+	)
+
+	if not Leaderboard.player_name().is_empty():
+		_post_crossing(table, level_index, bridge)
+		return
+
+	# First crossing, no name yet. Ask for one — this is the moment the player has
+	# something worth putting a name on, and a board of strangers' initials with
+	# no way onto it is a worse introduction than a three-character question.
+	#
+	# Deferred so the prompt lands ON the result panel rather than racing it into
+	# the same frame, and so the board behind it is already drawing.
+	UITheme.refresh_online_board(table, _boards, level_index)
+	_ask_initials.call_deferred(table, level_index, bridge)
+
+
+## The one-time initials prompt, over the crossing panel.
+##
+## Declining is a real answer and costs nothing: the name field on the board
+## itself is still there, so a player who says "not now" can put their initials
+## in whenever they like, and will not be asked again by any crossing after this
+## one — the prompt is gated on the name being empty, not on a "seen it" flag.
+func _ask_initials(table: VBoxContainer, level_index: int, bridge: int) -> void:
+	if not is_instance_valid(table):
+		return
+	UITheme.initials_prompt(_dock.get_parent(), func(initials: String) -> void:
+		if initials.is_empty() or not is_instance_valid(table):
+			return
+		Leaderboard.set_player_name(initials)
+		# The board's own field was built while the name was still empty.
+		UITheme.sync_board_name(table)
+		_post_crossing(table, level_index, bridge)
+	)
+
+
+## Send this crossing, then show the board it landed in.
+##
+## Sequential rather than parallel: fetching while the entry is still in flight
+## reads the board without it, and the one row the player is looking for is
+## their own.
+func _post_crossing(table: VBoxContainer, level_index: int, bridge: int) -> void:
+	UITheme.draw_online_board(table, _boards, level_index, "Posting…")
+	await _boards.submit(level_index, bridge)
+	if not is_instance_valid(table):
+		return
+	UITheme.refresh_online_board(table, _boards, level_index)
 
 
 func offer_next_level() -> void:

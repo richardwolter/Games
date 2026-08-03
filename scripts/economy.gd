@@ -47,6 +47,12 @@ signal score_changed(score: int)
 ## should not set off a fanfare.
 const RECORD_EPSILON := 0.005
 
+## What the level being played pays, relative to the numbers above. Set by
+## LevelManager from the LevelDef; see LevelDef.reward_scale.
+var reward_scale: float = 1.0
+## The level's own per-attempt payout, or -1 to use `attempt_floor`.
+var level_attempt_floor: int = -1
+
 var money: int = 0
 ## Best score on the level being played. LevelManager resets it.
 var best_score: int = 0
@@ -98,19 +104,24 @@ func score_for(succeeded: bool, progress: float) -> int:
 ## Bank one attempt. Returns [score, money earned].
 func settle_attempt(succeeded: bool, progress: float, first_clear: bool) -> Array[int]:
 	var score := score_for(succeeded, progress)
-	var earned := attempt_floor + roundi(maxi(score - best_score, 0) * payout_per_score)
+	var floor_pay := level_attempt_floor if level_attempt_floor >= 0 else attempt_floor
+	var earned := floor_pay + roundi(
+		maxi(score - best_score, 0) * payout_per_score * reward_scale
+	)
 
 	# The distance record, paid on top and reported separately.
 	last_record_bonus = 0
 	var reached := 1.0 if succeeded else clampf(progress, 0.0, 1.0)
 	if reached > best_progress + RECORD_EPSILON:
 		var gained_percent := (reached - best_progress) * 100.0
-		last_record_bonus = record_bonus + roundi(gained_percent * record_bonus_per_percent)
+		last_record_bonus = roundi(
+			(record_bonus + gained_percent * record_bonus_per_percent) * reward_scale
+		)
 		earned += last_record_bonus
 	best_progress = maxf(best_progress, reached)
 
 	if first_clear:
-		earned += completion_bonus
+		earned += roundi(completion_bonus * reward_scale)
 	best_score = maxi(best_score, score)
 
 	add(earned)

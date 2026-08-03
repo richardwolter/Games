@@ -613,7 +613,12 @@ static func congratulations(
 ## own; this exists for panels whose contents need live game state and so can't
 ## live in this file at all. Returns [overlay, content] — the caller fills the
 ## content column and never touches the rest.
-static func modal(parent: Node, title: String, min_width: float = 380.0) -> Array:
+static func modal(
+	parent: Node,
+	title: String,
+	min_width: float = 380.0,
+	close_text: String = "CLOSE"
+) -> Array:
 	var overlay := Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -638,7 +643,10 @@ static func modal(parent: Node, title: String, min_width: float = 380.0) -> Arra
 	column.add_theme_constant_override(&"separation", 12)
 	frame.add_child(column)
 
-	column.add_child(sign_label(title))
+	# An empty title means no heading at all, for a panel whose contents already
+	# say what it is. A blank sign would still be a sign.
+	if not title.is_empty():
+		column.add_child(sign_label(title))
 
 	var leaf := PanelContainer.new()
 	paint(leaf, PaintedBox.board(CREAM, 0))
@@ -649,7 +657,7 @@ static func modal(parent: Node, title: String, min_width: float = 380.0) -> Arra
 	leaf.add_child(content)
 
 	var close := Button.new()
-	close.text = "CLOSE"
+	close.text = close_text
 	close.custom_minimum_size = Vector2(0, 40)
 	close.add_theme_stylebox_override(&"normal", box(MUSTARD))
 	close.pressed.connect(overlay.queue_free)
@@ -657,6 +665,315 @@ static func modal(parent: Node, title: String, min_width: float = 380.0) -> Arra
 
 	dismiss_on_outside_click(overlay, frame, overlay.queue_free)
 	return [overlay, content]
+
+
+## The online board: rank, initials, score.
+##
+## The only table in the game now. It replaced a local one that ranked your own
+## past runs on the same screen, in the same shape, by the same number — two
+## rankings of one figure, with nothing saying which was the real one. Your
+## personal record survives as the header readout, which is a fact rather than a
+## competition.
+##
+## Lower is better, so rank 1 is the smallest number on the board. It carries
+## names, can be empty for reasons other than "nobody has crossed yet", and the
+## run being highlighted is identified by initials rather than by score. Folding
+## those differences into one function made a widget with three meanings for
+## every argument.
+##
+## `note` replaces the table when there is no table to draw: offline, loading,
+## board not configured. The caller knows which, and the player deserves to.
+static func online_table(
+	parent: Control, entries: Array[Dictionary], mine: String = "", note: String = ""
+) -> void:
+	if entries.is_empty():
+		var empty := Label.new()
+		empty.text = note if not note.is_empty() else "No crossings yet."
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.add_theme_color_override(&"font_color", SUBTLE_TEXT)
+		parent.add_child(empty)
+		return
+
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override(&"h_separation", 14)
+	grid.add_theme_constant_override(&"v_separation", 4)
+	parent.add_child(grid)
+
+	# Only the first row with the player's initials is lit. The service keeps one
+	# entry per player, so there should only be one — but two players can pick
+	# the same three letters, and lighting both would tell each of them they are
+	# in two places at once.
+	var marked := false
+	for i in entries.size():
+		var entry := entries[i]
+		var name := str(entry.get("name", "???"))
+		var is_mine: bool = not marked and not mine.is_empty() and name == mine
+		marked = marked or is_mine
+
+		var place := Label.new()
+		place.text = "%d." % (i + 1)
+		place.custom_minimum_size = Vector2(28, 0)
+		place.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		grid.add_child(place)
+
+		var who := Label.new()
+		who.text = name
+		who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		who.add_theme_font_size_override(&"font_size", FONT_SIZE_LOUD)
+		grid.add_child(who)
+
+		var score := Label.new()
+		score.text = "$%d" % int(entry.get("score", 0))
+		score.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		score.add_theme_font_size_override(&"font_size", FONT_SIZE_LOUD)
+		grid.add_child(score)
+
+		# Your own row is the one the player came to find, so it is the only one at
+		# full ink AND the only one carrying weight. Everyone else recedes.
+		for cell: Label in [place, who, score]:
+			if is_mine:
+				bold(cell)
+			else:
+				cell.add_theme_color_override(&"font_color", SUBTLE_TEXT)
+
+
+## The online board as a section of some panel: a heading, a table that fills
+## itself in when the network answers, and the player's name under it. Returns
+## the table's box, so a caller that has just posted a score can redraw it.
+##
+## Lives here rather than in the HUD because two screens show this now — the
+## crossing panel and the level select — and they differ only in whether they
+## post a score first. The second copy would have been the moment the two boards
+## started disagreeing about what an empty board means.
+##
+## `on_named` is called with the table the first time the player completes a name
+## here, for the crossing panel, which has a score in hand and can now post it.
+## Once per section: the field stays editable afterwards, but the run only goes
+## up once.
+static func online_board_section(
+	content: VBoxContainer,
+	boards: Leaderboard,
+	level_index: int,
+	on_named: Callable = Callable()
+) -> VBoxContainer:
+	var heading := Label.new()
+	heading.text = "LEADERBOARD"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_color_override(&"font_color", SUBTLE_TEXT)
+	content.add_child(heading)
+
+	# Its own box, so a refresh can clear and rebuild the rows without taking the
+	# heading or anything below it with it.
+	var table := VBoxContainer.new()
+	table.add_theme_constant_override(&"separation", 4)
+	content.add_child(table)
+
+	_initials_row(content, boards, level_index, table, on_named)
+	return table
+
+
+## Puts a name into a section's field from outside, without re-firing the
+## callbacks that a keystroke would.
+##
+## For the first-crossing prompt, which sets the name in its own dialog and would
+## otherwise leave the field on the board behind it showing the old, empty value
+## — two controls disagreeing about the player's name on the same screen.
+static func sync_board_name(table: VBoxContainer) -> void:
+	if not is_instance_valid(table) or not table.has_meta(NAME_FIELD_META):
+		return
+	var field := table.get_meta(NAME_FIELD_META) as LineEdit
+	if is_instance_valid(field):
+		field.text = Leaderboard.player_name()
+
+
+## The section's name field, hung off the table so callers can reach it without
+## the section having to return two things everywhere.
+const NAME_FIELD_META := &"name_field"
+
+
+## The player's three arcade initials, on the board itself.
+##
+## Here rather than in the settings panel, which is where it started: the name
+## exists for exactly one purpose and this is the screen where that purpose is
+## visible. Somebody looking at a table of strangers' initials and wanting theirs
+## on it should not have to guess that the answer is behind the music button.
+##
+## Editing it redraws the table immediately, so the row that lights up as yours
+## follows what you typed. That is also the only feedback that the name took.
+static func _initials_row(
+	content: VBoxContainer,
+	boards: Leaderboard,
+	level_index: int,
+	table: VBoxContainer,
+	on_named: Callable
+) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_child(row)
+
+	var label := Label.new()
+	label.text = "Your name"
+	label.add_theme_color_override(&"font_color", SUBTLE_TEXT)
+	row.add_child(label)
+
+	var field := LineEdit.new()
+	field.max_length = 3
+	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field.placeholder_text = "AAA"
+	field.text = Leaderboard.player_name()
+	field.custom_minimum_size = Vector2(72, 0)
+	row.add_child(field)
+	table.set_meta(NAME_FIELD_META, field)
+
+	# One-element array so the lambda and its later calls share the same flag.
+	var posted := [false]
+	# Saved on every keystroke rather than behind an OK button: the field holds at
+	# most three characters and rejects everything else as it goes, so there is no
+	# half-typed state worth protecting and nothing a close could lose.
+	field.text_changed.connect(func(text: String) -> void:
+		var clean := Leaderboard.sanitize_initials(text)
+		if clean != text:
+			field.text = clean
+			field.caret_column = clean.length()
+		Leaderboard.set_player_name(clean)
+		if is_instance_valid(table):
+			draw_online_board(table, boards, level_index, "")
+		if clean.length() == 3 and not posted[0] and on_named.is_valid():
+			posted[0] = true
+			on_named.call(table)
+	)
+
+	# Renaming the entry already on the board happens when the player has FINISHED
+	# typing, not per keystroke — otherwise "RIW" sends three renames, and the
+	# board briefly carries "R" and "RI" as if they were somebody's initials.
+	# Enter and clicking away are the two ways of being finished.
+	var rename := func(_arg: Variant = null) -> void:
+		if not Leaderboard.needs_rename():
+			return
+		await boards.republish()
+		if is_instance_valid(table):
+			refresh_online_board(table, boards, level_index)
+	field.text_submitted.connect(rename)
+	field.focus_exited.connect(func() -> void: rename.call())
+
+
+## Draw the cached board, then redraw it when the fetch lands. `pending` is what
+## to say while there is nothing cached to show instead.
+##
+## Never awaited by a caller that needs the result — the panel is already on
+## screen, and the rows arrive under it.
+static func refresh_online_board(
+	table: VBoxContainer, boards: Leaderboard, level_index: int, pending: String = "Loading…"
+) -> void:
+	draw_online_board(table, boards, level_index, pending)
+	# Before the read, so the board comes back already carrying the new name. This
+	# is also the catch-up path: a rename that failed offline leaves the marker
+	# unmoved, and every board opened afterwards retries it. Costs one config read
+	# when there is nothing to do.
+	await boards.republish()
+	if not is_instance_valid(table):
+		return
+	var ok: bool = await boards.fetch(level_index)
+	if not is_instance_valid(table):
+		return
+	# A failed fetch leaves the cache alone, so this redraws the stale board
+	# rather than an error. The board being a minute old is not worth a message.
+	#
+	# The note only surfaces when there are no rows to draw, and the two reasons
+	# for that are completely different: a board nobody has posted to yet, and a
+	# board we couldn't reach. An empty board is the normal state of a new
+	# leaderboard, so reporting it as unavailable calls the first day of every
+	# leaderboard a fault. Passing "" lets online_table() say "No crossings yet".
+	draw_online_board(
+		table,
+		boards,
+		level_index,
+		"" if ok else "Board unavailable — you're still ranked locally."
+	)
+
+
+static func draw_online_board(
+	table: VBoxContainer, boards: Leaderboard, level_index: int, note: String
+) -> void:
+	# Removed before freeing, so the rebuilt rows don't share the container with
+	# the old ones for the frame it takes queue_free() to land.
+	for child: Node in table.get_children():
+		table.remove_child(child)
+		child.queue_free()
+	online_table(table, boards.cached(level_index), Leaderboard.player_name(), note)
+
+
+## Ask for three arcade initials, on the player's first crossing.
+##
+## It arrives on a result the player just earned, which is the one moment they
+## want their name on something — and the leaderboard behind it is a list of
+## strangers' initials that they have no obvious way onto until they have one.
+##
+## `on_done` receives the initials, or "" if they declined. Declining has to be
+## exactly as easy as agreeing: the name field on the board itself is still
+## there, so "not now" costs nothing and is never asked again by a later
+## crossing, because the prompt is gated on the name being empty.
+static func initials_prompt(parent: Node, on_done: Callable) -> Control:
+	var parts := modal(parent, "ENTER YOUR INITIALS", 360.0, "NOT NOW")
+	var overlay := parts[0] as Control
+	var content := parts[1] as VBoxContainer
+
+	var blurb := Label.new()
+	blurb.text = "Your best bridges go on the leaderboard."
+	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.add_theme_color_override(&"font_color", SUBTLE_TEXT)
+	content.add_child(blurb)
+
+	var field := LineEdit.new()
+	field.max_length = 3
+	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field.placeholder_text = "AAA"
+	field.custom_minimum_size = Vector2(0, 48)
+	field.add_theme_font_size_override(&"font_size", FONT_SIZE_TITLE)
+	content.add_child(field)
+
+	# Uppercase and strip anything that isn't a letter or digit as they type,
+	# rather than rejecting it on submit. The field should only ever be able to
+	# hold something valid, so there is no error state to explain.
+	field.text_changed.connect(func(text: String) -> void:
+		var clean := Leaderboard.sanitize_initials(text)
+		if clean != text:
+			field.text = clean
+			field.caret_column = clean.length()
+	)
+
+	# A one-element array, because a lambda captures a bool by value and every
+	# path below has to see the same "already answered" flag.
+	var answered := [false]
+
+	var confirm := plate_button("PUT ME ON THE BOARD", GREEN, Vector2(0, 44))
+	var submit := func() -> void:
+		var clean := Leaderboard.sanitize_initials(field.text)
+		if clean.is_empty():
+			return
+		answered[0] = true
+		overlay.queue_free()
+		on_done.call(clean)
+	confirm.pressed.connect(submit)
+	field.text_submitted.connect(func(_t: String) -> void: submit.call())
+	content.add_child(confirm)
+
+	# The modal's own close button means "not now", which is a decline and has to
+	# be reported as one — otherwise the caller waits forever for an answer that
+	# already happened. Covers the outside-click dismissal too, since that frees
+	# the same overlay. Guarded because queue_free() on the accepted path fires
+	# this as well, one frame after the real answer went out.
+	overlay.tree_exiting.connect(func() -> void:
+		if not answered[0]:
+			answered[0] = true
+			on_done.call("")
+	)
+
+	field.grab_focus()
+	return overlay
 
 
 ## The settings panel. Small, because there is exactly one setting.
@@ -708,41 +1025,12 @@ static func settings(parent: Node) -> Control:
 	inner.add_theme_constant_override(&"separation", 10)
 	leaf.add_child(inner)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 10)
-	inner.add_child(row)
-
-	var label := Label.new()
-	label.text = "Master volume"
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(label)
-
-	var readout := Label.new()
-	readout.custom_minimum_size = Vector2(46, 0)
-	readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(readout)
-
 	var audio := parent.get_node_or_null(^"/root/Audio")
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.01
-	slider.custom_minimum_size = Vector2(0, 24)
-	slider.value = float(audio.master_volume) if audio != null else 1.0
-	inner.add_child(slider)
-
-	readout.text = "%d%%" % roundi(slider.value * 100.0)
-	slider.value_changed.connect(func(value: float) -> void:
-		readout.text = "%d%%" % roundi(value * 100.0)
-		if audio != null:
-			audio.master_volume = value
-	)
-	# Written on release, not on every step: dragging a slider emits dozens of
-	# changes a second and each one would be a file write.
-	slider.drag_ended.connect(func(changed: bool) -> void:
-		if changed and audio != null:
-			audio.save_settings()
-	)
+	# Music and effects separately. One control could only ever mute both, and the
+	# two are wanted at different levels: the soundtrack is a long loop somebody
+	# may turn off outright, while the clicks and the engine are feedback.
+	var first := _volume_row(inner, audio, "Music", &"music_volume")
+	_volume_row(inner, audio, "Effects", &"sfx_volume")
 
 	# Also a button, not only a key. Browsers only enter fullscreen from a real
 	# user gesture, and a click is the gesture they never argue with — whereas a
@@ -770,8 +1058,50 @@ static func settings(parent: Node) -> Control:
 		overlay.queue_free()
 	)
 	enliven(overlay)
-	slider.grab_focus()
+	first.grab_focus()
 	return overlay
+
+
+## One labelled volume slider, reading and writing `property` on the Audio
+## autoload. Returns the slider, so the caller can hand it the focus.
+static func _volume_row(
+	parent: Control, audio: Node, title: String, property: StringName
+) -> HSlider:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 10)
+	parent.add_child(row)
+
+	var label := Label.new()
+	label.text = title
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+
+	var readout := Label.new()
+	readout.custom_minimum_size = Vector2(46, 0)
+	readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(readout)
+
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.01
+	slider.custom_minimum_size = Vector2(0, 24)
+	slider.value = float(audio.get(property)) if audio != null else 1.0
+	parent.add_child(slider)
+
+	readout.text = "%d%%" % roundi(slider.value * 100.0)
+	slider.value_changed.connect(func(value: float) -> void:
+		readout.text = "%d%%" % roundi(value * 100.0)
+		if audio != null:
+			audio.set(property, value)
+	)
+	# Written on release, not on every step: dragging a slider emits dozens of
+	# changes a second and each one would be a file write.
+	slider.drag_ended.connect(func(changed: bool) -> void:
+		if changed and audio != null:
+			audio.call(&"save_settings")
+	)
+	return slider
 
 
 ## Text drawn straight onto the world (over water and sky) needs its own outline
@@ -779,6 +1109,21 @@ static func settings(parent: Node) -> Control:
 static func outline(label: Label, size: int = 5) -> void:
 	label.add_theme_constant_override(&"outline_size", size)
 	label.add_theme_color_override(&"font_outline_color", INK)
+
+
+## Thickens a label's strokes, which is as close to bold as this project gets.
+##
+## There is no bold font here — the theme rides on the engine's default face and
+## adding a second font file for one row on one table is not a trade worth making.
+## An outline in the text's OWN colour grows every stroke outward instead, which
+## is what a bold weight mostly is at this size. Same trick the labels over the
+## water already use for legibility; here it is used for emphasis.
+##
+## `ink` must match the label's font colour, or this draws a halo rather than a
+## heavier letter.
+static func bold(label: Label, ink: Color = INK) -> void:
+	label.add_theme_constant_override(&"outline_size", 3)
+	label.add_theme_color_override(&"font_outline_color", ink)
 
 
 ## Sets a label's role in one call, so the panel code reads as layout only.

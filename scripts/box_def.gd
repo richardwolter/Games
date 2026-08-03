@@ -23,6 +23,14 @@ extends Resource
 
 @export var color: Color = Color("c08040")
 
+## The pack itself, shown in the shop. Left empty the row is just its tier
+## colour, which is what every tier looked like before the packs were drawn — so
+## a new tier still works the day it is added and gets its picture later.
+##
+## `color` stays load-bearing either way: it paints the row the pack sits on and
+## tints the opening flourish, so the two want to agree.
+@export var art: Texture2D = null
+
 
 ## Average shop value of one roll, used to sanity-check pricing and to show the
 ## player what the tier is worth without spoiling the individual odds.

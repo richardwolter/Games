@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
@@ -12,6 +12,8 @@
 [ext_resource type="Script" path="res://scripts/level_manager.gd" id="10_levels"]
 [ext_resource type="Resource" path="res://data/levels/level_1.tres" id="11_lv1"]
 [ext_resource type="Resource" path="res://data/levels/level_2.tres" id="12_lv2"]
+[ext_resource type="Resource" path="res://data/levels/level_3.tres" id="13_lv3"]
+[ext_resource type="Resource" path="res://data/levels/level_4.tres" id="14_lv4"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -46,7 +48,7 @@ script = ExtResource("9_shop")
 
 [node name="Levels" type="Node" parent="."]
 script = ExtResource("10_levels")
-levels = Array[Resource]([ExtResource("11_lv1"), ExtResource("12_lv2")])
+levels = Array[Resource]([ExtResource("11_lv1"), ExtResource("12_lv2"), ExtResource("13_lv3"), ExtResource("14_lv4")])
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("5_hud")

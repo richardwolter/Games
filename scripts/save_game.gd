@@ -18,7 +18,14 @@ extends RefCounted
 const PATH := "user://save.json"
 ## Bumped when the shape of the file changes incompatibly. A save from a
 ## different version is discarded rather than half-read.
-const VERSION := 1
+##
+## 2: the levels themselves changed shape. Level 1 went from a 1600-wide strait
+## to a 420-wide one and level 2 from 2400 to 900, so a version 1 save restores
+## a bridge built for water that no longer exists — pieces land outside the
+## walls, inside the seabed, or floating over dry shore. The file is still
+## readable; what it describes is not. Discarding it costs a returning player
+## their run once, which is the cheaper of the two bad outcomes.
+const VERSION := 2
 
 
 static func has_save() -> bool:
@@ -52,20 +59,115 @@ static func capture(
 	bridge: Array[Dictionary],
 	blueprints: Blueprints
 ) -> Dictionary:
+	# The straits the player is NOT currently standing in, carried through
+	# untouched. Read back off disk rather than held in memory: this is the only
+	# place that needs them, a save is already a file write, and a cached copy
+	# living across a scene change is a thing that can go stale behind you.
+	var buckets: Dictionary = {}
+	var previous: Variant = load_data().get("levels", {})
+	if previous is Dictionary:
+		buckets = (previous as Dictionary).duplicate(true)
+
+	buckets[str(levels.index)] = {
+		"bridge": bridge_to_json(bridge),
+		"inventory": _defs_to_paths(inventory.counts()),
+		"shop": _defs_to_paths(shop.remaining_all()),
+		"best_score": economy.best_score,
+		"best_progress": economy.best_progress,
+		# Added after VERSION 1 shipped. A key that simply isn't there reads back as
+		# "no slots", so this needed no version bump and no discarded saves.
+		"blueprints": blueprints.to_json(),
+	}
+
 	return {
 		"version": VERSION,
 		"level": levels.index,
 		"unlocked": levels.unlocked,
 		"money": economy.money,
-		"best_score": economy.best_score,
-		"best_progress": economy.best_progress,
-		"inventory": _defs_to_paths(inventory.counts()),
-		"shop": _defs_to_paths(shop.remaining_all()),
-		"bridge": bridge_to_json(bridge),
-		# Added after VERSION 1 shipped. A key that simply isn't there reads back as
-		# "no slots", so this needed no version bump and no discarded saves.
-		"blueprints": blueprints.to_json(),
+		# Same reasoning: a save without this has no leaderboard standings, which
+		# is exactly what a player who has never crossed anything should have.
+		# JSON object keys are strings, so the level index is stringified here and
+		# parsed back in apply().
+		"records": _records_to_json(levels.standings),
+		# What the numbers in `records` MEAN. See SCORE_BASIS.
+		"score_basis": SCORE_BASIS,
+		# One entry per strait the player has set foot in. See _bucket().
+		"levels": buckets,
 	}
+
+
+## Everything that belongs to ONE strait, keyed by level index as a string.
+##
+## The save used to hold a single copy of these at the top level, describing
+## whichever strait the player was last in. Stepping out to the level select and
+## coming back therefore worked, and going to a DIFFERENT strait and coming back
+## did not: the bridge, the pieces in hand and the shop's remaining stock were
+## all silently replaced by the new level's. A player who spent an hour on level
+## 2, dipped into level 1 to try something, and came back found level 2 empty.
+##
+## Keeping one bucket per level makes leaving and returning lossless in both
+## directions, and it is also what stops a returning player getting free
+## material: the pieces in the water are the ones they already bought, not a
+## fresh bridge on top of a restocked shop.
+##
+## Money, unlocks and standings stay global — none of them belong to a strait.
+##
+## Blueprint slots are in here, not out there, because a saved layout is a set of
+## positions in one particular strait and is nonsense in a wider one. They used
+## to be global and were cleared outright on every level change for exactly that
+## reason; now they simply come back with the strait they were taken in.
+static func _bucket(data: Dictionary, index: int) -> Dictionary:
+	var buckets: Variant = data.get("levels", null)
+	if buckets is Dictionary:
+		var found: Variant = (buckets as Dictionary).get(str(index), {})
+		return found if found is Dictionary else {}
+
+	# A save written before `levels` existed. Its top-level keys describe exactly
+	# one strait — the one it was sitting on — so they are read as that strait's
+	# bucket and every other level starts clean, which is what that save actually
+	# knew. Migrating in the reader rather than bumping VERSION, because the file
+	# is entirely readable and discarding a run over a reshuffle would be gratuitous.
+	if int(data.get("level", -1)) != index:
+		return {}
+	return {
+		"bridge": data.get("bridge", []),
+		"inventory": data.get("inventory", {}),
+		"shop": data.get("shop", {}),
+		"best_score": data.get("best_score", 0),
+		"best_progress": data.get("best_progress", 0.0),
+		"blueprints": data.get("blueprints", []),
+	}
+
+
+## What unit the standings are counted in. Bumped whenever a bridge's score
+## changes meaning, which is not the same event as the save changing shape:
+##
+## Standings used to be tier points, roughly 10-60 for a whole bridge, and are
+## now the bridge's shop price, in the hundreds. Both are integers and both load
+## fine, so nothing here is unreadable — but a table holding both ranks every old
+## run above every new one, permanently, and the record the header shows becomes
+## a target nobody can reach.
+##
+## Deliberately NOT a VERSION bump. The money, the pieces in hand and the bridge
+## in the water are all still exactly right; only the scoreboard is in the wrong
+## unit, and discarding somebody's entire run to fix a scoreboard is the more
+## expensive mistake. A save whose basis doesn't match loads with empty
+## standings and everything else intact.
+const SCORE_BASIS := "price"
+
+
+## The standings out of a save, or none if they were scored in an older unit.
+static func standings_of(data: Dictionary) -> Dictionary[int, PackedInt32Array]:
+	if str(data.get("score_basis", "")) != SCORE_BASIS:
+		return {}
+	return _records_from_json(data.get("records", {}))
+
+
+static func _records_to_json(records: Dictionary[int, PackedInt32Array]) -> Dictionary:
+	var out := {}
+	for index: int in records:
+		out[str(index)] = Array(records[index])
+	return out
 
 
 static func save(data: Dictionary) -> bool:
@@ -102,6 +204,14 @@ static func load_data() -> Dictionary:
 ## Puts a captured save back into the live systems. The caller must have loaded
 ## the right level first — that sets up the world, the shop's full stock and the
 ## piece pool this then overwrites.
+##
+## One path for every arrival, whether the player resumed where they left off or
+## picked a different strait off the select screen. There used to be two, and the
+## difference between them WAS the bug: the second one deliberately restored no
+## level state, because the save only ever held one strait's worth and it
+## belonged to somebody else's level. With per-level buckets there is nothing to
+## choose between — a strait the player has never entered simply has no bucket,
+## and the untouched fresh level stands.
 static func apply(
 	data: Dictionary,
 	levels: LevelManager,
@@ -112,20 +222,49 @@ static func apply(
 	blueprints: Blueprints
 ) -> void:
 	levels.unlocked = int(data.get("unlocked", 0))
+	levels.standings = standings_of(data)
 
 	# Set money by delta so the change signal fires and the dock updates; there
 	# is deliberately no setter on Economy, since nothing else may assign money.
 	economy.add(int(data.get("money", 0)) - economy.money)
-	economy.best_score = int(data.get("best_score", 0))
+
+	var here := _bucket(data, levels.index)
+	if here.is_empty():
+		# Never been here. The freshly loaded level is already correct — full shop,
+		# empty strait, no record, no saved layouts — so touching nothing is the
+		# restore.
+		return
+
+	economy.best_score = int(here.get("best_score", 0))
 	# Absent in saves written before distance records existed. Zero is the right
 	# reading of that: the next attempt sets the first record of the run.
-	economy.best_progress = float(data.get("best_progress", 0.0))
+	economy.best_progress = float(here.get("best_progress", 0.0))
 	economy.score_changed.emit(economy.best_score)
 
-	inventory.set_counts(_paths_to_defs(data.get("inventory", {})))
-	shop.set_remaining(_paths_to_defs(data.get("shop", {})))
-	spawner.restore(bridge_from_json(data.get("bridge", [])))
-	blueprints.from_json(data.get("blueprints", []))
+	inventory.set_counts(_paths_to_defs(here.get("inventory", {})))
+	shop.set_remaining(_paths_to_defs(here.get("shop", {})))
+	spawner.restore(bridge_from_json(here.get("bridge", [])))
+	blueprints.from_json(here.get("blueprints", []))
+
+
+static func _records_from_json(raw: Variant) -> Dictionary[int, PackedInt32Array]:
+	var out: Dictionary[int, PackedInt32Array] = {}
+	if raw is not Dictionary:
+		return out
+	for key: Variant in raw as Dictionary:
+		var entry: Variant = (raw as Dictionary)[key]
+		var table := PackedInt32Array()
+		# A save written before the table existed holds one number per level.
+		# Reading it as a one-entry board keeps the record somebody earned.
+		for points: int in (entry if entry is Array else [entry]):
+			# Zero or negative is a bridge of no pieces, which cannot have carried
+			# anything. Dropped rather than trusted.
+			if points > 0:
+				table.append(points)
+		table.sort()
+		if not table.is_empty():
+			out[int(key)] = table
+	return out
 
 
 static func _defs_to_paths(counts: Dictionary) -> Dictionary:

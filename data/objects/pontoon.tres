@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("1_def")
+tier = 2
 display_name = "Pontoon"
 shape = "box"
 size = Vector2(300, 70)

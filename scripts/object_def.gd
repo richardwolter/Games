@@ -6,6 +6,18 @@ extends Resource
 
 @export var display_name: String = "Object"
 
+## What class of salvage this is, and with it what a bridge made of it costs on
+## the leaderboard: 10 points for bronze, 20 silver, 30 gold, 40 deluxe.
+##
+## The tier is the level a piece is unlocked at, which is also the booster tier
+## that can roll it — junk you have had since level 1 is bronze, and the girder
+## and the container you only see on level 4 are deluxe. That keeps the scoring
+## honest about what it is measuring: a crossing built from four girders is a
+## richer solution than one built from four planks, and the leaderboard should
+## say so even though both used four pieces.
+enum Tier { BRONZE, SILVER, GOLD, DELUXE }
+@export var tier: Tier = Tier.BRONZE
+
 ## "box" uses size as width/height. "circle" uses size.x as the diameter.
 @export_enum("box", "circle") var shape: String = "box"
 @export var size: Vector2 = Vector2(100, 20)
@@ -43,6 +55,11 @@ func get_texture(variant: int) -> Texture2D:
 
 ## Shop price. Booster packs are tuned to beat this per piece, in exchange for
 ## not letting you choose — so keep this honest about how good the piece is.
+##
+## Doubles as the piece's leaderboard cost: a crossing is ranked by what the
+## bridge under it was worth, lowest total winning. That means this number is now
+## load-bearing twice over — pricing a strong piece too cheaply makes it both a
+## bargain in the shop and a free ride up the board.
 @export var price: int = 10
 
 

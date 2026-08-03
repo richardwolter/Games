@@ -1,22 +1,23 @@
-[gd_resource type="Resource" script_class="LevelDef" load_steps=12 format=3]
+[gd_resource type="Resource" script_class="LevelDef" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
 [ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
-[ext_resource type="Resource" path="res://data/objects/crate.tres" id="3_crate"]
-[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="4_barrel"]
-[ext_resource type="Resource" path="res://data/objects/tire.tres" id="5_tire"]
-[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="6_beam"]
-[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="7_fridge"]
+[ext_resource type="Resource" path="res://data/objects/tire.tres" id="3_tire"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="4_crate"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="6_fridge"]
+[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="7_beam"]
 [ext_resource type="Resource" path="res://data/objects/pontoon.tres" id="8_pontoon"]
-[ext_resource type="Resource" path="res://data/objects/girder.tres" id="9_girder"]
+[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="9_bronze"]
 [ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="10_silver"]
 [ext_resource type="Resource" path="res://data/boxes/gold_box.tres" id="11_gold"]
 
 [resource]
 script = ExtResource("1_level")
-display_name = "3 — The Sound"
-half_width = 3400.0
-max_depth = 950.0
-shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_crate"), ExtResource("4_barrel"), ExtResource("5_tire"), ExtResource("6_beam"), ExtResource("7_fridge"), ExtResource("8_pontoon"), ExtResource("9_girder")])
-shop_stock = PackedInt32Array(18, 12, 10, 10, 8, 4, 5, 3)
-boxes = Array[Resource]([ExtResource("10_silver"), ExtResource("11_gold")])
+display_name = "3 — The Narrows"
+half_width = 1800.0
+max_depth = 620.0
+reward_scale = 0.7
+shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge"), ExtResource("7_beam"), ExtResource("8_pontoon")])
+shop_stock = PackedInt32Array(16, 9, 12, 9, 4, 6, 4)
+boxes = Array[Resource]([ExtResource("9_bronze"), ExtResource("10_silver"), ExtResource("11_gold")])

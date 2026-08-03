@@ -36,6 +36,14 @@ const CARD_MIN := 152
 const CARD_MAX := 190
 ## Gap between cards, and between boxes.
 const GRID_GAP := 14
+## The booster card: how tall its pack picture is, and how wide the card is.
+##
+## Deliberately narrower than a piece card. A pack is a tall portrait and the
+## card carries almost no text now, so it wants height rather than width — and at
+## this width all four tiers stand across the 1280 canvas in one line with the
+## flow container never having to wrap them.
+const PACK_HEIGHT := 132.0
+const BOX_CARD_WIDTH := 132.0
 ## Height of the sprite well at the top of each card. This is the card's whole
 ## job — you pick a girder out of the shop by its shape — so it took most of the
 ## height the single row freed up.
@@ -253,8 +261,18 @@ func stock_for_level(level: LevelDef) -> void:
 		# Boosters side by side, not stacked. Three stacked rows cost 242px of
 		# height — a quarter of the panel — to say three short things that fit
 		# side by side in width the panel already had.
-		var boxes := HBoxContainer.new()
-		boxes.add_theme_constant_override(&"separation", GRID_GAP)
+		#
+		# A flow rather than a fixed row, because level 4 sells four tiers and four
+		# will not fit across 1280 once each carries its pack picture. Flowing puts
+		# them on two lines there and leaves every earlier level's single line
+		# exactly as it was.
+		var boxes := HFlowContainer.new()
+		boxes.add_theme_constant_override(&"h_separation", GRID_GAP)
+		boxes.add_theme_constant_override(&"v_separation", GRID_GAP)
+		# Centred, because the packs are narrow and the frame is as wide as the
+		# piece grid — left-aligned, one or two tiers sit in the corner of a mostly
+		# empty strip and read as the row having failed to fill.
+		boxes.alignment = FlowContainer.ALIGNMENT_CENTER
 		_box_column.add_child(boxes)
 		for box: BoxDef in level.boxes:
 			boxes.add_child(_build_box_row(box))
@@ -378,45 +396,68 @@ func _build_card(def: ObjectDef) -> Control:
 	return card
 
 
+## One booster tier, built the same way a piece card is: the goods, then what
+## they cost.
+##
+## The packs are drawn objects with their own tier name and their own metal on
+## them, so the panel says almost nothing. It used to be a full-width coloured bar
+## carrying the tier name in outlined caps and a line of value arithmetic, with a
+## thumbnail alongside — which put the loudest thing on the screen next to the one
+## element that was already doing the job. The bar is gone, the name is gone (it
+## is printed on the pack), the expected-value line is gone, and what is left is
+## the pack at four times the size on a lit tier-coloured well.
 func _build_box_row(box: BoxDef) -> Control:
-	# A booster pack arrives as a crate of salvage, so it gets the crate treatment
-	# — grain and bolts — in its own tier colour rather than a flat rectangle.
-	var row_panel := PanelContainer.new()
-	row_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.paint(row_panel, PaintedBox.board(box.color, 2))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 10)
-	row_panel.add_child(row)
+	var card := PanelContainer.new()
+	UITheme.paint(card, PaintedBox.board(UITheme.CREAM, 0))
+	card.custom_minimum_size = Vector2(BOX_CARD_WIDTH, 0)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 3)
+	card.add_child(column)
 
-	var text := VBoxContainer.new()
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override(&"separation", 0)
-	row.add_child(text)
+	# The well is tinted with the tier colour rather than the cards' dim cream:
+	# it is the only colour left on the card now that the bar has gone, and a
+	# bright ground behind foil and brushed metal is what makes them read as foil
+	# and brushed metal rather than as grey paper.
+	var well := PanelContainer.new()
+	var well_box := PaintedBox.board(box.color.lerp(UITheme.CREAM, 0.45), 0)
+	well_box.radius = UITheme.RADIUS
+	well_box.set_margins(6, 4)
+	well.add_theme_stylebox_override(&"panel", well_box)
+	well.custom_minimum_size = Vector2(0, PACK_HEIGHT)
+	column.add_child(well)
 
-	var name_label := Label.new()
-	name_label.text = box.display_name.to_upper()
-	name_label.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_LOUD)
-	# The row's fill is whatever colour the box def picked, which may be anything
-	# from gold to near-black, so the type is outlined cream and stays legible on
-	# all of them rather than being tuned per box.
-	name_label.add_theme_color_override(&"font_color", UITheme.CREAM)
-	UITheme.outline(name_label, 4)
-	text.add_child(name_label)
+	if box.art != null:
+		var pack := TextureRect.new()
+		pack.texture = box.art
+		pack.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pack.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pack.custom_minimum_size = Vector2(0, PACK_HEIGHT - 10)
+		well.add_child(pack)
+	else:
+		# No artwork yet: name the tier, since nothing else on the card does.
+		var fallback := Label.new()
+		fallback.text = box.display_name.to_upper()
+		fallback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fallback.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		fallback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		well.add_child(fallback)
 
-	var detail := Label.new()
-	detail.text = "%d random pieces  ·  about $%d of shop value" % [
-		box.piece_count, box.expected_value()
-	]
-	UITheme.as_caption(detail)
-	text.add_child(detail)
+	# The one fact the pack itself cannot show. Not "about $51 of shop value" —
+	# that asked the player to do arithmetic to decide whether to gamble, and the
+	# gamble is meant to be a shrug, not a calculation.
+	var count := Label.new()
+	count.text = "%d random pieces" % box.piece_count
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.as_caption(count)
+	column.add_child(count)
 
 	var buy := Button.new()
-	buy.custom_minimum_size = Vector2(104, 36)
+	buy.custom_minimum_size = Vector2(0, 34)
 	buy.add_theme_font_size_override(&"font_size", DETAIL_SIZE + 1)
 	buy.pressed.connect(func() -> void: box_requested.emit(box))
-	row.add_child(buy)
+	column.add_child(buy)
 	_box_buttons[box] = buy
-	return row_panel
+	return card
 
 
 ## A 1x1 texture, so a def with no artwork can still use the TextureRect path.
@@ -508,9 +549,21 @@ func _process(_delta: float) -> void:
 	# would let it scale to a size that then still runs behind the dock.
 	var room := Vector2(size.x - 32.0, size.y - DOCK_RESERVE - TOP_RESERVE - 16.0)
 	var fit: float = clampf(minf(room.x / wanted.x, room.y / wanted.y), 0.55, 1.0)
-	# The CenterContainer positions the frame from its unscaled rect, so the pivot
-	# has to be the frame's own centre or the shrink walks it off to one side.
-	_frame.pivot_offset = _frame.size * 0.5
+	# The CenterContainer positions the frame from its UNSCALED rect, so the pivot
+	# decides where the shrink pulls the panel towards. Centred horizontally, since
+	# the frame is never wider than the band and the container's centring is
+	# therefore honest on that axis.
+	#
+	# Pinned to the TOP vertically, which a centred pivot got wrong the moment a
+	# level stocked enough to matter. Once the unscaled frame is taller than the
+	# band, the container has nowhere to centre it and parks it at the top instead
+	# — and a centre pivot then lowers the shrunken panel by half of what it just
+	# saved, putting the last row of BUY buttons back off the bottom of the screen.
+	# That is exactly what level 4's nine pieces and four booster tiers did: 919
+	# units of panel, correctly scaled to 560, and still hanging past the edge.
+	# Pinning the top means the space the scale frees is always space at the
+	# bottom, where the dock is.
+	_frame.pivot_offset = Vector2(_frame.size.x * 0.5, 0.0)
 	if not is_equal_approx(_frame.scale.x, fit):
 		_frame.scale = Vector2(fit, fit)
 

@@ -34,6 +34,20 @@ const SEABED_PROFILE: Array[Vector2] = [
 	Vector2(1.0, 0.0),
 ]
 
+## Rock below the seabed that exists only so the camera has somewhere to go.
+##
+## The camera's bottom limit used to be the bottom of the terrain, which meant
+## the deepest water sat on the last row of pixels the view could reach — and the
+## HUD is drawn over that row, so the one part of the strait a player needs to
+## read when a piece sinks was the part covered by the toolbar. Extending the
+## world below the floor gives the pan somewhere to go: drag down and the deep
+## rises clear of the UI, with solid rock, not void, filling in underneath.
+##
+## Sized against the toolbar at the zoom levels this actually bites at, which is
+## zoomed out — at 0.3 zoom this is about 1500 screen pixels of slack, and none of
+## it is reachable by a piece, since build_area() still stops at max_depth.
+const DEEP_MARGIN := 500.0
+
 ## Spacing of the seabed's vertices. Fine enough to carry the roughness, coarse
 ## enough that the collision polygon's convex decomposition stays cheap.
 const SEABED_STEP := 40.0
@@ -55,6 +69,8 @@ const GROUND_SHADER := preload("res://shaders/ground.gdshader")
 
 var _half_width: float = 1600.0
 var _max_depth: float = 600.0
+var _ground: LevelDef.Ground = LevelDef.Ground.ROCK
+var _life: LevelDef.Life = LevelDef.Life.FULL
 ## The scene's own backdrop, remembered on first build so a level that sets one
 ## can be followed by a level that doesn't.
 var _default_backdrop: Texture2D = null
@@ -64,6 +80,8 @@ var _default_horizon: float = 0.55
 func build(level: LevelDef) -> void:
 	_half_width = level.half_width
 	_max_depth = level.max_depth
+	_ground = level.ground
+	_life = level.life
 
 	for child: Node in $Terrain.get_children():
 		child.free()  # Immediate: we're about to add replacements at the same spot.
@@ -92,7 +110,11 @@ func _stock_wildlife() -> void:
 		Vector2(camera.limit_left, camera.limit_top),
 		Vector2(camera.limit_right - camera.limit_left, SURFACE_Y - camera.limit_top)
 	), seed_value)
-	$Fish.populate(_seabed_points(), SURFACE_Y, _half_width, seed_value + 7)
+	# An empty bed is how both wildlife nodes are told to hold nothing: they clear
+	# what they have and return, so a concrete channel comes back empty even when
+	# the previous level was full of fish.
+	var bed := _seabed_points() if _life == LevelDef.Life.FULL else PackedVector2Array()
+	$Fish.populate(bed, SURFACE_Y, _half_width, seed_value + 7)
 
 
 ## Swap in this level's scenery, or leave the scene's own default alone.
@@ -164,7 +186,7 @@ func _seabed_points() -> PackedVector2Array:
 
 
 func _build_shore(centre_x: float) -> void:
-	var height := _max_depth + 400.0
+	var height := _max_depth + 400.0 + DEEP_MARGIN
 	var half := Vector2(SHORE_RUN * 0.5, height * 0.5)
 
 	var body := StaticBody2D.new()
@@ -201,11 +223,58 @@ func _ground_material(algae: float = 0.0) -> ShaderMaterial:
 	# controller rather than to fill rate. The `detail` uniform stays in the
 	# shader as the lever to reach for if a weak machine ever needs it.
 	mat.set_shader_parameter("detail", 1.0)
+	match _ground:
+		LevelDef.Ground.CONCRETE:
+			_make_concrete(mat)
+		LevelDef.Ground.DIRT:
+			_make_dirt(mat)
 	return mat
 
 
+## Repaint the ground shader as graded earth — a dirt track's cutting rather than
+## a poured channel or a natural strait.
+##
+## Built from the shader's dry-side palette rather than its wet one, which is the
+## whole difference from concrete: dirt does not change material at the waterline,
+## it just darkens, so the submerged colours here are the same browns a shade
+## down. Strata stay, faintly — earth in section does have bedding, it is simply
+## softer than rock's — and the veins come almost all the way out, since a cut
+## bank has no cracks to speak of. The grit is pushed up instead: loose dry soil
+## is the one thing here with visible texture.
+func _make_dirt(mat: ShaderMaterial) -> void:
+	mat.set_shader_parameter("rock_color", Color(0.54, 0.43, 0.30))
+	mat.set_shader_parameter("rock_deep_color", Color(0.24, 0.19, 0.14))
+	mat.set_shader_parameter("sand_color", Color(0.62, 0.50, 0.34))
+	mat.set_shader_parameter("sand_deep_color", Color(0.28, 0.22, 0.16))
+	mat.set_shader_parameter("crust_color", Color(0.75, 0.63, 0.43))
+	mat.set_shader_parameter("strata_strength", 0.03)
+	mat.set_shader_parameter("mottle_strength", 0.05)
+	mat.set_shader_parameter("vein_strength", 0.03)
+	mat.set_shader_parameter("grit_strength", 0.08)
+
+
+## Repaint the ground shader as poured concrete.
+##
+## Same shader, different palette — what has to go is the structure that reads as
+## stone, not the fine detail. Strata are the giveaway, since concrete has no
+## bedding planes, so they're flattened; the veins stay and become cracks, the one
+## rock feature concrete genuinely shares. Dry and wet sides land on nearly the
+## same grey: a poured channel doesn't change material at the waterline the way a
+## shore does, it just gets wet.
+func _make_concrete(mat: ShaderMaterial) -> void:
+	mat.set_shader_parameter("rock_color", Color(0.60, 0.60, 0.58))
+	mat.set_shader_parameter("rock_deep_color", Color(0.30, 0.30, 0.30))
+	mat.set_shader_parameter("sand_color", Color(0.68, 0.67, 0.64))
+	mat.set_shader_parameter("sand_deep_color", Color(0.33, 0.32, 0.31))
+	mat.set_shader_parameter("crust_color", Color(0.76, 0.75, 0.72))
+	mat.set_shader_parameter("strata_strength", 0.0)
+	mat.set_shader_parameter("mottle_strength", 0.045)
+	mat.set_shader_parameter("vein_strength", 0.13)
+	mat.set_shader_parameter("grit_strength", 0.045)
+
+
 func _build_seabed() -> void:
-	var floor_y := SURFACE_Y + _max_depth + 300.0
+	var floor_y := SURFACE_Y + _max_depth + 300.0 + DEEP_MARGIN
 	var bed := _seabed_points()
 	var outline := PackedVector2Array(bed)
 	outline.append(Vector2(_half_width, floor_y))
@@ -224,8 +293,14 @@ func _build_seabed() -> void:
 	visual.material = _ground_material()
 	body.add_child(visual)
 
-	_build_algae_crust(bed, body)
-	$Flora.build(bed, noise_seed_for_level(), SURFACE_Y)
+	if _life != LevelDef.Life.NONE:
+		_build_algae_crust(bed, body)
+	# Plants are the FULL step; an empty bed is how Flora is told to hold nothing.
+	$Flora.build(
+		bed if _life == LevelDef.Life.FULL else PackedVector2Array(),
+		noise_seed_for_level(),
+		SURFACE_Y
+	)
 
 
 ## A strip hugging the seabed line. A fragment cannot know where the top face of
@@ -346,14 +421,21 @@ func _frame_camera() -> void:
 	camera.limit_right = roundi(_half_width + SHORE_RUN)
 	# Ceiling the player can hold a piece at, and the floor the seabed is drawn to.
 	camera.limit_top = roundi(SURFACE_Y - HEADROOM)
-	camera.limit_bottom = roundi(SURFACE_Y + _max_depth + 300.0)
+	camera.limit_bottom = roundi(SURFACE_Y + _max_depth + 300.0 + DEEP_MARGIN)
 	camera.refit()
 
 	# The backdrop paints exactly the box the camera can reach, so there is no
 	# edge to find at any zoom or pan.
+	#
+	# DEEP_MARGIN is left out of the box on purpose. Backdrop scales itself to
+	# cover whatever it is given, so counting the margin would magnify the whole
+	# painting to fill 500 units of solid rock nobody can see through — and since
+	# the horizon stays welded to the water, the magnification would come out of
+	# the sky, hauling the scenery closer exactly as it was pushed away.
+	var painted_bottom := float(camera.limit_bottom) - DEEP_MARGIN
 	$Backdrop.fit_to(Rect2(
 		Vector2(camera.limit_left, camera.limit_top),
-		Vector2(camera.limit_right - camera.limit_left, camera.limit_bottom - camera.limit_top)
+		Vector2(camera.limit_right - camera.limit_left, painted_bottom - camera.limit_top)
 	), SURFACE_Y)
 
 

@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("1_def")
+tier = 1
 display_name = "Refrigerator"
 shape = "box"
 size = Vector2(107, 180)

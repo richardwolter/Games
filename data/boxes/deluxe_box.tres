@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BoxDef" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/box_def.gd" id="1_box"]
+[ext_resource type="Resource" path="res://data/objects/girder.tres" id="2_girder"]
+[ext_resource type="Resource" path="res://data/objects/container.tres" id="3_container"]
+[ext_resource type="Resource" path="res://data/objects/pontoon.tres" id="4_pontoon"]
+[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="5_beam"]
+
+[ext_resource type="Texture2D" path="res://art/ui/booster_deluxe.png" id="99_art"]
+
+[resource]
+script = ExtResource("1_box")
+display_name = "Deluxe Booster"
+price = 320
+piece_count = 4
+pool = Array[Resource]([ExtResource("2_girder"), ExtResource("3_container"), ExtResource("4_pontoon"), ExtResource("5_beam")])
+weights = PackedFloat32Array(30, 25, 25, 20)
+color = Color(0.62, 0.45, 0.85, 1)
+art = ExtResource("99_art")

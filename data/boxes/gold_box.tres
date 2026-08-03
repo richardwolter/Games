@@ -4,14 +4,16 @@
 [ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="2_beam"]
 [ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="3_fridge"]
 [ext_resource type="Resource" path="res://data/objects/pontoon.tres" id="4_pontoon"]
-[ext_resource type="Resource" path="res://data/objects/girder.tres" id="5_girder"]
-[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="6_barrel"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+
+[ext_resource type="Texture2D" path="res://art/ui/booster_gold.png" id="99_art"]
 
 [resource]
 script = ExtResource("1_box")
 display_name = "Gold Booster"
-price = 180
+price = 130
 piece_count = 4
-pool = Array[Resource]([ExtResource("2_beam"), ExtResource("3_fridge"), ExtResource("4_pontoon"), ExtResource("5_girder"), ExtResource("6_barrel")])
-weights = PackedFloat32Array(25, 15, 25, 20, 15)
+pool = Array[Resource]([ExtResource("2_beam"), ExtResource("3_fridge"), ExtResource("4_pontoon"), ExtResource("5_barrel")])
+weights = PackedFloat32Array(30, 20, 30, 20)
 color = Color(0.95, 0.82, 0.35, 1)
+art = ExtResource("99_art")
