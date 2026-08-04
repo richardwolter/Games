@@ -216,9 +216,12 @@ func _spawn(textures: Array[Array], rng: RandomNumberGenerator) -> Fish:
 	return fish
 
 
-## Piece positions for this frame, so the inner loop is arithmetic on a packed
-## array instead of a node cast and a global_position lookup per fish per piece.
+## Piece positions, so the inner loop is arithmetic on a packed array instead of
+## a node cast and a global_position lookup per fish per piece.
 var _piece_positions: PackedVector2Array = PackedVector2Array()
+## How often that list is rebuilt. See _process().
+const PIECE_REFRESH_HZ := 10.0
+var _piece_refresh: float = 0.0
 
 
 func _process(delta: float) -> void:
@@ -228,11 +231,20 @@ func _process(delta: float) -> void:
 	# Gathered once a frame rather than once per fish. With a full strait that is
 	# fourteen group queries and two thousand transform reads a frame turned into
 	# one query and a flat array walk.
-	_piece_positions.clear()
-	for piece: Node in get_tree().get_nodes_in_group(&"bridge_objects"):
-		var body := piece as Node2D
-		if body != null:
-			_piece_positions.append(body.global_position)
+	#
+	# And now not even once a frame. The group query allocates an Array of up to
+	# 140 nodes and each entry costs a cast and a global transform, all to feed a
+	# soft steering push away from scenery. Refreshed at PIECE_REFRESH_HZ instead:
+	# a position that is at most a tenth of a second stale cannot be seen in a
+	# fish's swimming, and this is the most expensive decorative loop in the game.
+	_piece_refresh -= delta
+	if _piece_refresh <= 0.0:
+		_piece_refresh = 1.0 / PIECE_REFRESH_HZ
+		_piece_positions.clear()
+		for piece: Node in get_tree().get_nodes_in_group(&"bridge_objects"):
+			var body := piece as Node2D
+			if body != null:
+				_piece_positions.append(body.global_position)
 
 	var t := float(Time.get_ticks_msec()) / 1000.0
 	for fish: Fish in _fish:
@@ -252,7 +264,13 @@ func _swim(fish: Fish, t: float, delta: float) -> void:
 	var fear_squared := fear_radius * fear_radius
 	for piece_at: Vector2 in _piece_positions:
 		var away: Vector2 = at - piece_at
-		# Squared first: the square root is the expensive part and most pieces in a
+		# Two compares before any arithmetic. This is the innermost loop in the
+		# game — fish times pieces, every frame — and in a full strait almost every
+		# pair is far apart on one axis alone. Rejecting on x before computing a
+		# length skips the multiplies for the overwhelming majority.
+		if absf(away.x) > fear_radius or absf(away.y) > fear_radius:
+			continue
+		# Squared next: the square root is the expensive part and most pieces in a
 		# full strait are nowhere near this fish.
 		var squared: float = away.length_squared()
 		if squared > fear_squared or squared < 0.000001:

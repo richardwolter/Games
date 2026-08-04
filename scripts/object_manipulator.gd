@@ -65,6 +65,11 @@ var locked: bool = false:
 ## Where on the body it was grabbed, in the body's local space.
 var _grab_offset: Vector2 = Vector2.ZERO
 var _target_rotation: float = 0.0
+## The reusable overlap query behind _has_room(), and whose RID it currently
+## excludes. Built on first use rather than in _ready() so the node keeps working
+## if it is ever instanced without a world.
+var _room_query: PhysicsShapeQueryParameters2D = null
+var _room_exclude_rid: RID = RID()
 ## Where a freshly bought piece waits before the player has moved the cursor off
 ## the shop panel. Vector2.INF means "follow the cursor", the normal case.
 var _park_at: Vector2 = Vector2.INF
@@ -169,8 +174,13 @@ func _physics_process(delta: float) -> void:
 	var spin_limit := twist_power / maxf(held.mass, 1.0)
 	held.angular_velocity = move_toward(held.angular_velocity, wanted_spin, spin_limit * delta)
 
-	can_place = _has_room(held)
-	held.modulate = ghost_free_tint if can_place else ghost_blocked_tint
+	var room := _has_room(held)
+	# Only on a change. Assigning modulate marks the canvas item dirty even when
+	# the colour is identical, and this runs every physics tick for the whole
+	# duration of a drag.
+	if room != can_place:
+		can_place = room
+		held.modulate = ghost_free_tint if can_place else ghost_blocked_tint
 
 
 ## Turns a follow stiffness into the velocity multiplier to use THIS step.
@@ -271,16 +281,28 @@ func _grab(obj: BridgeObject, world_position: Vector2) -> void:
 
 
 ## True if the piece could become solid where it currently is.
+##
+## The query object is built once and mutated, rather than allocated per call.
+## This runs every physics tick for the whole length of a drag, and a fresh
+## PhysicsShapeQueryParameters2D plus a fresh exclude Array every tick is garbage
+## produced at 60-120 Hz for a question whose shape never changes.
 func _has_room(obj: BridgeObject) -> bool:
 	if obj.shape == null:
 		return true
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = obj.shape
-	params.transform = obj.global_transform
-	params.collision_mask = BridgeObject.MASK_PLACED
-	params.exclude = [obj.get_rid()]
-	params.collide_with_areas = false
-	return get_world_2d().direct_space_state.intersect_shape(params, 1).is_empty()
+	if _room_query == null:
+		_room_query = PhysicsShapeQueryParameters2D.new()
+		_room_query.collision_mask = BridgeObject.MASK_PLACED
+		_room_query.collide_with_areas = false
+	# The exclude list is rebuilt only when the piece under the cursor changes,
+	# not per tick: assigning it converts a whole Array across the binding, and
+	# during a drag it is the same single RID for thousands of consecutive calls.
+	var rid := obj.get_rid()
+	if rid != _room_exclude_rid:
+		_room_exclude_rid = rid
+		_room_query.exclude = [rid]
+	_room_query.shape = obj.shape
+	_room_query.transform = obj.global_transform
+	return get_world_2d().direct_space_state.intersect_shape(_room_query, 1).is_empty()
 
 
 ## Put the piece down. Refuses unless there's physical room for it, so a drop can

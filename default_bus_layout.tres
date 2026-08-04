@@ -1,0 +1,38 @@
+; The audio buses, as a resource loaded at startup.
+;
+; These used to be created in code by Audio._build_buses(), which was the better
+; design on paper — two names in one file, no second place to keep in step — and
+; it produced total silence in the web export.
+;
+; AudioServer.add_bus() after the audio driver has started gives you a bus that
+; exists, reports the volume you set, is not muted, and routes nothing. The
+; mixer ran, playback positions advanced, every readout said the music was
+; playing, and the samples reaching the browser were digital zero. Moving the
+; same two buses here — so they exist before the driver starts — is the whole
+; fix. Desktop never cared either way, which is why it went unnoticed.
+;
+; Keep the names in step with MUSIC_BUS and SFX_BUS in scripts/audio.gd.
+; _build_buses() is still there and still creates anything missing, so a lost or
+; renamed copy of this file degrades to the old behaviour rather than to a crash.
+
+[gd_resource type="AudioBusLayout" format=3]
+
+[resource]
+bus/0/name = &"Master"
+bus/0/solo = false
+bus/0/mute = false
+bus/0/bypass_fx = false
+bus/0/volume_db = 0.0
+bus/0/send = &""
+bus/1/name = &"Music"
+bus/1/solo = false
+bus/1/mute = false
+bus/1/bypass_fx = false
+bus/1/volume_db = 0.0
+bus/1/send = &"Master"
+bus/2/name = &"SFX"
+bus/2/solo = false
+bus/2/mute = false
+bus/2/bypass_fx = false
+bus/2/volume_db = 0.0
+bus/2/send = &"Master"

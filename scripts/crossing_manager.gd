@@ -24,6 +24,9 @@ signal attempt_finished(result: Result, progress: float)
 @export var grace_seconds: float = 1.5
 @export var container_path: NodePath
 
+## Handed on to every truck this spawns, so its tyres can drip. Set by Main.
+var water: WaterBody = null
+
 var car: Car = null
 ## The truck sitting on the left shore between attempts. Not the same object as
 ## `car`: this one is frozen and has no collision, and never moves.
@@ -104,6 +107,7 @@ func start_crossing() -> void:
 	unpark()
 	car = CAR_SCENE.instantiate() as Car
 	car.position = start_position - Vector2(0, Car.RIDE_HEIGHT)
+	car.water = water
 	_container.add_child(car)
 	car.start()
 

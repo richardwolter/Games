@@ -183,6 +183,77 @@ static func plate_button(
 	return button
 
 
+## A camcorder, for the button that plays an attempt back.
+##
+## Drawn in code rather than loaded from art/, for the same reason the plates and
+## signs are: every painted surface in this game is generated, and a PNG here
+## would be the one piece of chrome that has to be re-exported when the palette
+## moves. It is a flat cream silhouette with an ink outline, which is what the
+## rest of the art is.
+##
+## Built once and kept. It is the same handful of pixels on every button that
+## asks for it, and rebuilding the image per button is work with no result.
+static var _camera_icon: Texture2D = null
+
+const CAMERA_SIZE := Vector2i(36, 24)
+## How thick the ink outline is, in pixels of the icon. One, not two: the stroke
+## lands on both sides of the edge, so one pixel here is a two-pixel line, and
+## two closed the cone up entirely.
+const CAMERA_OUTLINE := 1
+
+
+static func camera_icon() -> Texture2D:
+	if _camera_icon != null:
+		return _camera_icon
+
+	var image := Image.create_empty(CAMERA_SIZE.x, CAMERA_SIZE.y, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	for y in CAMERA_SIZE.y:
+		for x in CAMERA_SIZE.x:
+			var solid := _in_camera(x, y)
+			# A pixel is outline if it is within the outline width of the edge, on
+			# either side of it. Measuring both ways gives the shape a stroke that
+			# sits on the boundary rather than only inside it, so the cone's diagonal
+			# stays as heavy as the body's straight edges.
+			var edge := false
+			for dy in range(-CAMERA_OUTLINE, CAMERA_OUTLINE + 1):
+				for dx in range(-CAMERA_OUTLINE, CAMERA_OUTLINE + 1):
+					if _in_camera(x + dx, y + dy) != solid:
+						edge = true
+						break
+				if edge:
+					break
+			if edge:
+				image.set_pixel(x, y, INK)
+			elif solid:
+				image.set_pixel(x, y, CREAM)
+
+	# The reel, as a hole punched back to ink. A plain silhouette read as a
+	# signpost at button size; one round mark in the body is what makes it a
+	# camera at a glance.
+	var reel := Vector2(11.0, 12.0)
+	for y in CAMERA_SIZE.y:
+		for x in CAMERA_SIZE.x:
+			if Vector2(x, y).distance_to(reel) <= 3.6:
+				image.set_pixel(x, y, INK)
+
+	_camera_icon = ImageTexture.create_from_image(image)
+	return _camera_icon
+
+
+## The camcorder silhouette: a body, and a lens cone widening off its front.
+static func _in_camera(x: int, y: int) -> bool:
+	if x >= 2 and x <= 22 and y >= 5 and y <= 19:
+		return true
+	# The cone starts nearly as tall as the body and flares from there. Started
+	# narrow it read as a bowtie: the outline is drawn on both sides of the edge,
+	# so a cone only a few pixels tall at its root is entirely stroke.
+	if x >= 23 and x <= 33:
+		var t := float(x - 23) / 10.0
+		return float(y) >= lerpf(7.0, 2.0, t) and float(y) <= lerpf(17.0, 22.0, t)
+	return false
+
+
 ## A heading rendered on a painted tin sign, for the titles of the two modals.
 ## Panels are boards; the thing that names a board is a sign nailed to it.
 static func sign_label(text: String, fill: Color = MUSTARD) -> PanelContainer:
@@ -397,7 +468,20 @@ static func add_hover_motion(button: BaseButton) -> void:
 static func _scale_to(button: BaseButton, target: float) -> void:
 	if button.disabled:
 		target = 1.0
-	var running := button.get_meta(&"hover_tween", null) as Tween
+	# has_meta() first, rather than get_meta() with a null default. Object::get_meta
+	# only honours a default that is not Variant() — passing null falls through to
+	# ERR_FAIL_V, so the "safe" form printed an engine error on every button that
+	# had not been hovered yet.
+	#
+	# That was not cosmetic. Godot's web export routes every printed error through
+	# console.error, this is called from hover tweens on the main loop, and the
+	# threadless web build mixes audio on that same main thread. A per-frame flood
+	# of console.error starves the audio callback — which is why the browser build
+	# was completely silent while the desktop build, with real threads and a cheap
+	# console, was fine.
+	var running: Tween = null
+	if button.has_meta(&"hover_tween"):
+		running = button.get_meta(&"hover_tween") as Tween
 	if running != null and running.is_valid():
 		running.kill()
 	var tween := button.create_tween()

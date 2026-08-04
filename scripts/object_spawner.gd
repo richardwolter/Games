@@ -16,7 +16,12 @@ var spawn_area: Rect2 = Rect2(-1500, -820, 3000, 1900)
 ## tunnelling at speed — is refunded to stock rather than silently lost.
 var bounds: Rect2 = Rect2(-1800, -1100, 3600, 2600)
 ## Stops a very patient player from filling the strait until the physics chokes.
-@export var max_objects: int = 140
+## Raised from 140 after benchmarking: at 60Hz physics (the web rate) a full
+## strait settles at ~2.0ms per physics frame with ~200 live pieces, against a
+## 16.6ms budget. The strait itself saturates before the cap does — spawning 400
+## into the bench lattice leaves only ~190 in bounds — so this is headroom for
+## bigger levels rather than a number players will routinely hit.
+@export var max_objects: int = 250
 ## Where spawned objects are parented. Set in the scene.
 @export var container_path: NodePath
 
@@ -40,11 +45,65 @@ func spawn(def: ObjectDef, at: Vector2 = Vector2.INF, variant: int = -1) -> Brid
 	return obj
 
 
+## How many physics ticks between escape sweeps.
+##
+## The sweep walks every placed piece, so at the cap it was one global transform
+## read and rectangle test per piece every tick — tens of thousands a second — to
+## catch an event that happens rarely and is not time-critical. A piece that has
+## left the world is not coming back; noticing 8 ticks later is invisible, and the
+## walls do the actual containing.
+const SWEEP_EVERY := 8
+
+var _sweep_countdown: int = SWEEP_EVERY
+
+
+## Speeds no legitimate piece ever reaches, used to catch a body the solver has
+## thrown rather than one the player dropped hard. Release clamps a throw to
+## 600 px/s and 6 rad/s, so these are more than an order of magnitude clear of
+## anything the game itself produces.
+const SANE_SPEED := 20000.0
+const SANE_SPIN := 200.0
+
+
 func _physics_process(_delta: float) -> void:
+	_sweep_countdown -= 1
+	if _sweep_countdown > 0:
+		return
+	_sweep_countdown = SWEEP_EVERY
 	for child: Node in _container.get_children():
 		var obj := child as BridgeObject
-		if obj != null and not bounds.has_point(obj.global_position):
+		if obj == null:
+			continue
+		# Out of the world: refunded. has_point() is false for a NaN position too,
+		# which is the existing and correct catch for a piece the physics lost.
+		if not bounds.has_point(obj.global_position):
 			remove(obj)
+			continue
+		_sanitise(obj)
+
+
+## Pull a piece back from a velocity it cannot have earned.
+##
+## Deliberately does NOT delete. A piece that briefly stops dead is a small
+## oddity; a piece that vanishes out of the middle of a bridge the player spent
+## ten minutes on is the game breaking. Deletion stays reserved for a piece that
+## has actually left the world, which is unambiguous.
+##
+## The case this exists for is one body going non-finite and the solver spreading
+## it: velocity is where that shows up first, a step or two before the position
+## follows and the piece is lost for good.
+func _sanitise(obj: BridgeObject) -> void:
+	var v := obj.linear_velocity
+	var spin := obj.angular_velocity
+	var bad_v := not (is_finite(v.x) and is_finite(v.y)) or v.length() > SANE_SPEED
+	var bad_spin := not is_finite(spin) or absf(spin) > SANE_SPIN
+	if not (bad_v or bad_spin):
+		return
+	obj.linear_velocity = Vector2.ZERO
+	obj.angular_velocity = 0.0
+	# Not push_error: this is a recovery, not a failure, and it must not spam a
+	# release build's console every sweep if something is genuinely stuck.
+	push_warning("Piece had an impossible velocity (%s, %.1f); zeroed it" % [str(v), spin])
 
 
 ## Levels differ in width, so where a piece may exist changes with them.

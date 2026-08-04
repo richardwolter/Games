@@ -12,8 +12,9 @@
 ## does the job. It is a development tool, not a web server: single connection at
 ## a time, no security, no range requests, localhost only.
 ##
-## Godot's own threadless web build needs no COOP/COEP headers, which is the one
-## thing that would otherwise make a hand-rolled server insufficient.
+## It does send COOP/COEP, because the export is now a THREADED one and a threaded
+## Godot build will not start without cross-origin isolation — SharedArrayBuffer
+## is only exposed to an isolated page. See _send().
 extends SceneTree
 
 const ROOT := "res://build/web"
@@ -101,6 +102,15 @@ func _send(client: StreamPeerTCP, code: int, type: String, body: PackedByteArray
 		+ "Content-Type: %s\r\n" % type
 		+ "Content-Length: %d\r\n" % body.size()
 		+ "Cache-Control: no-store\r\n"
+		# Cross-origin isolation, which a THREADED web build cannot start without:
+		# SharedArrayBuffer is only exposed to an isolated page, and Godot's threaded
+		# export refuses to boot without it. Harmless for a threadless build, so
+		# these are sent unconditionally rather than made a mode.
+		#
+		# itch.io provides the same thing through its "SharedArrayBuffer support"
+		# checkbox; this is the local equivalent.
+		+ "Cross-Origin-Opener-Policy: same-origin\r\n"
+		+ "Cross-Origin-Embedder-Policy: require-corp\r\n"
 		+ "Connection: close\r\n\r\n"
 	)
 	client.put_data(header.to_utf8_buffer())

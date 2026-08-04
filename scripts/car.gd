@@ -24,12 +24,29 @@ const RIDE_HEIGHT := 38.0
 
 var driving: bool = false
 
+## The strait, so the tyres can drip after coming out of it. Set by whoever
+## spawns the truck; without it the wheels simply stay dry.
+var water: WaterBody = null
+
 var _throttle: float = 0.0
 var _wheels: Array[RigidBody2D] = []
+var _drips: Array[WheelDrip] = []
 
 
 func _ready() -> void:
 	_wheels = [$WheelBack, $WheelFront]
+	for wheel: RigidBody2D in _wheels:
+		_drips.append(WheelDrip.new(wheel, float(wheel.get(&"radius"))))
+
+
+## Dripping is decoration and runs on the render clock, not with the drive
+## torque. It also has to keep running on the replay's puppet truck, which has
+## its physics process switched off precisely so that nothing simulates it.
+func _process(delta: float) -> void:
+	if water == null:
+		return
+	for drip: WheelDrip in _drips:
+		drip.update(delta, water)
 
 
 func start() -> void:

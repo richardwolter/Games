@@ -34,31 +34,69 @@ func setup(d: ObjectDef, art_variant: int = -1) -> void:
 	mass = d.mass
 	add_to_group(&"bridge_objects")
 
-	var pm := PhysicsMaterial.new()
-	pm.friction = d.friction
-	pm.bounce = d.bounce
-	physics_material_override = pm
+	var shared := _shared_for(d)
+	physics_material_override = shared[0]
+	shape = shared[1]
+	buoyancy_points = shared[2]
 
-	if d.shape == "circle":
-		var circle := CircleShape2D.new()
-		circle.radius = d.size.x * 0.5
-		shape = circle
-	else:
-		var rect := RectangleShape2D.new()
-		rect.size = d.size
-		shape = rect
 	var cs := CollisionShape2D.new()
 	cs.shape = shape
 	add_child(cs)
 
+	queue_redraw()
+
+
+## The material, collision shape and buoyancy points for one def, built once and
+## handed to every piece of that kind.
+##
+## Every plank in the strait used to build its own identical PhysicsMaterial, its
+## own identical RectangleShape2D and its own identical four-point array. At the
+## 140 cap that is 420 resources describing about ten distinct things, all of it
+## allocated during restore() — which happens on every level load, every blueprint
+## load and after every crossing attempt.
+##
+## Sharing is safe because none of the three is ever written after setup(): the
+## manipulator only reads `shape` into a query, and the water only iterates
+## `buoyancy_points`. The physics server holds shapes by RID and sharing one
+## across bodies is the normal Godot pattern.
+##
+## IF YOU EVER NEED A PER-PIECE SHAPE — a piece that shrinks, deforms or is
+## resized at runtime — it must stop coming from here, or every piece of that kind
+## changes with it.
+static var _shared: Dictionary[ObjectDef, Array] = {}
+
+
+static func _shared_for(d: ObjectDef) -> Array:
+	var cached: Variant = _shared.get(d)
+	if cached != null:
+		return cached as Array
+
+	var pm := PhysicsMaterial.new()
+	pm.friction = d.friction
+	pm.bounce = d.bounce
+
+	var made: Shape2D
+	if d.shape == "circle":
+		var circle := CircleShape2D.new()
+		circle.radius = d.size.x * 0.5
+		made = circle
+	else:
+		var rect := RectangleShape2D.new()
+		rect.size = d.size
+		made = rect
+
+	# Spread to the quarter-extents rather than the corners: four points inside the
+	# body give a half-submerged plank righting torque without the ends popping.
 	var hw: float = d.size.x * 0.25
 	var hh: float = d.get_height() * 0.25
-	buoyancy_points = PackedVector2Array([
+	var points := PackedVector2Array([
 		Vector2(-hw, -hh), Vector2(hw, -hh),
 		Vector2(-hw, hh), Vector2(hw, hh),
 	])
 
-	queue_redraw()
+	var entry: Array = [pm, made, points]
+	_shared[d] = entry
+	return entry
 
 
 ## While held a piece passes through everything except the build bounds, so the

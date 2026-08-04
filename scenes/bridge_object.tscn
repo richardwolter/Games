@@ -4,7 +4,5 @@
 
 [node name="BridgeObject" type="RigidBody2D"]
 collision_mask = 3
-contact_monitor = true
-max_contacts_reported = 4
 continuous_cd = 1
 script = ExtResource("1_obj")

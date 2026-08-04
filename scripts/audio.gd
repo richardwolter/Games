@@ -48,7 +48,21 @@ const SOUNDS: Dictionary = {
 	&"piece_click": "res://audio/Piece_Click.wav",
 	&"piece_release": "res://audio/Piece_Release.wav",
 	&"ui_click": "res://audio/UI_Menu_Click.mp3",
+	&"water_splash": "res://audio/Water_Splashes.wav",
 }
+
+## Usable splashes inside Water_Splashes.wav, as (start, length) in seconds.
+##
+## The file is one long recording of many splashes with dead air and unusable
+## takes between them, so it is played as clips rather than as a sample: a
+## splash picks one of these at random and the player is stopped again at the
+## end of it. Three is enough that consecutive splashes rarely repeat, and with
+## the pitch spread on top they do not read as a loop.
+const SPLASH_CLIPS: Array[Vector2] = [
+	Vector2(3.388, 0.470),
+	Vector2(5.700, 0.300),
+	Vector2(10.321, 0.579),
+]
 ## Silence to skip at the front of each one-shot, in seconds.
 ##
 ## UI_Menu_Click.mp3 is padded with 156ms of nothing before the transient, so the
@@ -66,10 +80,11 @@ const SOUND_OFFSETS: Dictionary = {
 	&"piece_release": 0.0,
 }
 
-## How many one-shots can overlap. Four is enough for the fastest a person can
-## click and still leaves the tail of the last one audible; past that the extra
-## players are silent most of the session.
-const SFX_VOICES := 4
+## How many one-shots can overlap. Four covered the clicks, but splashes share
+## the same ring and a collapsing bridge puts several pieces through the water
+## at once — at four, the splashes cut each other off and took the click the
+## player had just made with them.
+const SFX_VOICES := 8
 const SFX_TRIM_DB := -8.0
 
 const SETTINGS_PATH := "user://settings.cfg"
@@ -119,6 +134,11 @@ var _fades: Array[Tween] = [null, null]
 ## A ring of one-shot players and the streams they play.
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
+## Bumped every time a voice is handed out. A clip's stop timer carries the
+## number it was started with and does nothing if it no longer matches, so a
+## clip that has already been cut short by a later sound on the same voice
+## cannot stop that later sound when its own timer comes round.
+var _voice_gen: PackedInt32Array = PackedInt32Array()
 var _sounds: Dictionary[StringName, AudioStream] = {}
 
 ## The ambience layer, and what it is playing so a level change to a level with
@@ -215,6 +235,7 @@ func _build_voices() -> void:
 		player.process_mode = Node.PROCESS_MODE_ALWAYS
 		add_child(player)
 		_voices.append(player)
+		_voice_gen.append(0)
 
 
 ## Fire a one-shot.
@@ -231,11 +252,53 @@ func play_sound(name: StringName, pitch_spread: float = 0.06) -> void:
 	var stream: AudioStream = _sounds.get(name)
 	if stream == null or _voices.is_empty():
 		return
-	var player := _voices[_next_voice]
-	_next_voice = (_next_voice + 1) % _voices.size()
+	var voice := _take_voice()
+	var player := _voices[voice]
 	player.stream = stream
+	player.volume_db = SFX_TRIM_DB
 	player.pitch_scale = 1.0 + randf_range(-pitch_spread, pitch_spread)
 	player.play(float(SOUND_OFFSETS.get(name, 0.0)))
+
+
+## Play one region of a longer file: `length` seconds starting `from` seconds in.
+##
+## For samples that are a recording of several takes rather than a single
+## effect — Water_Splashes.wav is one file of many splashes with dead air
+## between them. Playing from an offset is built in; stopping again is not, so
+## the player is stopped on a timer.
+##
+## `trim_db` is relative to the usual effects level, so a caller can make a
+## small splash quieter than a large one without knowing what that level is.
+func play_clip(name: StringName, from: float, length: float,
+		trim_db: float = 0.0, pitch_spread: float = 0.06) -> void:
+	var stream: AudioStream = _sounds.get(name)
+	if stream == null or _voices.is_empty() or length <= 0.0:
+		return
+	var voice := _take_voice()
+	var player := _voices[voice]
+	var generation := _voice_gen[voice]
+	player.stream = stream
+	player.volume_db = SFX_TRIM_DB + trim_db
+	var pitch := 1.0 + randf_range(-pitch_spread, pitch_spread)
+	player.pitch_scale = pitch
+	player.play(from)
+	# Pitch changes how long the region takes to play, so the timer is in real
+	# seconds rather than in stream seconds — otherwise a shot pitched down runs
+	# past its clip into whatever was recorded next.
+	get_tree().create_timer(length / pitch, true, false, true).timeout.connect(
+		func() -> void:
+			if _voice_gen[voice] == generation and player.playing:
+				player.stop()
+	)
+
+
+## Next player in the ring, with its generation bumped so any stop timer still
+## pending for the sound it was last playing is now stale.
+func _take_voice() -> int:
+	var voice := _next_voice
+	_next_voice = (_next_voice + 1) % _voices.size()
+	_voice_gen[voice] += 1
+	return voice
 
 
 ## Play the track belonging to a level, crossfading from whatever is playing.

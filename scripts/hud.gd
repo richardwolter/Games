@@ -13,6 +13,9 @@ extends CanvasLayer
 
 ## Take an owned piece out of stock and into the player's hand.
 signal place_requested(def: ObjectDef)
+## Shift-click on a belt card: empty that card's stock into the strait in one
+## go, rather than one piece at a time through the ghost-placement flow.
+signal place_all_requested(def: ObjectDef)
 ## Forwarded from the shop menu, so main.gd still wires to one place.
 signal buy_requested(def: ObjectDef)
 signal box_requested(box: BoxDef)
@@ -28,6 +31,10 @@ signal start_crossing_requested()
 ## Copy the bridge into one of the three layout slots, or put one back.
 signal save_blueprint_requested(index: int)
 signal load_blueprint_requested(index: int)
+## Watch the last attempt again. `record_video` also films it to a file.
+signal replay_requested(record_video: bool)
+## Cut a replay short — the SKIP button, or Escape.
+signal replay_skip_requested()
 
 ## Belt cards are square and uniform, so the row reads as a rack of parts.
 const CARD_SIZE := 62
@@ -41,6 +48,11 @@ const SETTINGS_SIZE := Vector2(44, 40)
 const SETTINGS_MARGIN := 12.0
 ## The LEVELS button beside it. Same height, wider, because it carries a word.
 const SELECT_SIZE := Vector2(96, 40)
+## SCORES, third along the same rail. Narrower than LEVELS: it is the least-used
+## of the three and the shorter word does not need the width.
+const SCORES_SIZE := Vector2(86, 40)
+## Gap between the three corner buttons.
+const CORNER_GAP := 8.0
 
 var _spawner: Node
 var _crossing: CrossingManager
@@ -99,13 +111,28 @@ var _placed_shown: int = -1
 ## Kept only so the first-run walkthrough can point at them.
 var _meter: Label
 var _meter_timer: float = 0.0
+## Longest frame since the meter last refreshed, in ms. Reset each 1Hz tick.
+var _worst_frame_ms: float = 0.0
 var _shop_button: BaseButton
 var _recall_button: BaseButton
 var _blueprints_button: BaseButton
+## The three top-right buttons as one node, so a replay can hide them together.
+var _corner: Control
+## REPLAY, beside SAVED BUILDS. Hidden until an attempt has actually been filmed.
+var _replay_button: BaseButton
+## The controls that appear over a running replay, and the SAVE VIDEO button on
+## it — which is missing entirely on a build with no browser to encode with.
+var _replay_bar: Control
+var _replay_save_button: BaseButton
 ## The saved-layouts panel while it is open, so its rows can be refreshed in
 ## place after a save without rebuilding the modal under the cursor.
 var _blueprints_panel: Control
 var _blueprint_rows: Array[Callable] = []
+## The slot Main just filed a winning bridge into, and how big it was. Read once
+## by the crossing panel and then cleared, so a panel reopened later doesn't
+## claim a save that happened two crossings ago.
+var _autosaved_slot: int = -1
+var _autosaved_pieces: int = 0
 var _root: Control
 ## The confirmation modal, while one is up. Escape dismisses it.
 var _confirm_overlay: Control
@@ -158,13 +185,17 @@ func build(
 	# After the dock, so the tab draws over it rather than under, and so the dock
 	# has a rect to be placed against.
 	root.add_child(_build_blueprints_button())
+	root.add_child(_build_replay_button())
 	_place_blueprints_button.call_deferred()
-	root.add_child(_build_header())
-	root.add_child(_build_settings_button())
+	_header_strip = _build_header()
+	root.add_child(_header_strip)
+	_corner = _build_settings_button()
+	root.add_child(_corner)
 	root.add_child(_build_banner())
 	_hints = _build_hints()
 	root.add_child(_hints)
 	root.add_child(_build_meter())
+	root.add_child(_build_replay_bar())
 
 	_boards = Leaderboard.new()
 	add_child(_boards)
@@ -191,6 +222,10 @@ func build(
 ## and not as a piece of dock that came loose.
 const BLUEPRINTS_GAP := 5.0
 const BLUEPRINTS_SIZE := Vector2(96.0, 24.0)
+## REPLAY, parked on the same strip immediately left of SAVED BUILDS. Same
+## height so the two read as one row of tabs rather than two loose plates.
+const REPLAY_SIZE := Vector2(76.0, 24.0)
+const REPLAY_GAP := 6.0
 
 
 ## SAVED BUILDS, floating above START rather than sitting in the dock row.
@@ -231,11 +266,135 @@ func _place_blueprints_button() -> void:
 	var slot := _start_slot.get_global_rect()
 	if slot.size.x <= 0.0:
 		return
+	var strip := _dock.get_global_rect().position.y - BLUEPRINTS_GAP - BLUEPRINTS_SIZE.y
 	_blueprints_button.size = BLUEPRINTS_SIZE
 	_blueprints_button.position = Vector2(
-		slot.position.x + (slot.size.x - BLUEPRINTS_SIZE.x) * 0.5,
-		_dock.get_global_rect().position.y - BLUEPRINTS_GAP - BLUEPRINTS_SIZE.y
+		slot.position.x + (slot.size.x - BLUEPRINTS_SIZE.x) * 0.5, strip
 	)
+	if _replay_button != null:
+		_replay_button.size = REPLAY_SIZE
+		_replay_button.position = Vector2(
+			_blueprints_button.position.x - REPLAY_GAP - REPLAY_SIZE.x, strip
+		)
+
+
+## REPLAY, on the same strip as SAVED BUILDS.
+##
+## Not in the dock and not on the crossing panel alone, because the attempt worth
+## watching again is usually the one that failed — a fridge pivoting a plank into
+## the water is the game working, and there is no panel after that, only a
+## banner. It lives beside the other tab because both are "things about the run
+## you just had" rather than things you build with.
+##
+## Hidden until there is something to watch, so it never offers a replay of
+## nothing.
+func _build_replay_button() -> Control:
+	var replay := UITheme.plate_button(
+		"REPLAY", UITheme.ACCENT.darkened(0.42), REPLAY_SIZE
+	)
+	replay.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	replay.tooltip_text = "Watch the last attempt again"
+	replay.visible = false
+	replay.pressed.connect(func() -> void: replay_requested.emit(false))
+	_replay_button = replay
+	return replay
+
+
+## The controls over a running replay: save it, or stop watching.
+##
+## Bottom centre, in the space the dock has just vacated. The top belongs to the
+## result banner, which is still up when a replay is started straight off the
+## back of an attempt — the two were centred on the same strip and printed over
+## each other.
+func _build_replay_bar() -> Control:
+	var bar := PanelContainer.new()
+	UITheme.paint(bar, PaintedBox.sign(UITheme.SLATE))
+	bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bar.position = Vector2(0, -20)
+	bar.visible = false
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 8)
+	bar.add_child(row)
+
+	var label := Label.new()
+	label.text = "REPLAY"
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_color_override(&"font_color", UITheme.CREAM)
+	row.add_child(label)
+
+	# Always here, even where it cannot work. Building it only on a browser meant
+	# the button was missing rather than refusing, and a missing control tells the
+	# player nothing — not that the feature exists, not why it isn't offered, not
+	# where it would be. It goes grey with the reason in its tooltip instead, and
+	# pressing it says the same thing out loud in the banner.
+	var blocked := VideoCapture.unavailable_reason()
+	_replay_save_button = UITheme.plate_button(
+		"SAVE VIDEO",
+		UITheme.GREEN if blocked.is_empty() else UITheme.STEEL.darkened(0.34),
+		Vector2(118, 30)
+	)
+	_replay_save_button.tooltip_text = (
+		"Play it again and download it as a video file" if blocked.is_empty() else blocked
+	)
+	_replay_save_button.pressed.connect(func() -> void: replay_requested.emit(true))
+	row.add_child(_replay_save_button)
+
+	var skip := UITheme.plate_button("SKIP", UITheme.STEEL.darkened(0.34), Vector2(74, 30))
+	skip.pressed.connect(func() -> void: replay_skip_requested.emit())
+	row.add_child(skip)
+
+	_replay_bar = bar
+	return bar
+
+
+## Whether there is a filmed attempt to watch. Main sets this; the tab appears
+## the moment a run ends and goes away when the recording does.
+func set_replay_available(available: bool) -> void:
+	if _replay_button != null:
+		_replay_button.visible = available
+
+
+## Clear the screen for a replay.
+##
+## Everything goes: dock, tabs, readouts, hints, banner. Partly because the
+## strait is the only thing worth looking at for those few seconds, and partly
+## because on the web the canvas is what gets filmed — a video of somebody's
+## bridge with a piece belt and a money counter across it is a screenshot of a
+## game, not a clip of a crossing.
+##
+## While filming, the bar goes too. It would otherwise be in the file, and a
+## SAVE VIDEO button baked into the video is the one thing that cannot be edited
+## out afterwards.
+func enter_replay_mode(recording: bool) -> void:
+	for node: Control in [_dock, _header_strip, _corner, _hints, _blueprints_button,
+			_replay_button]:
+		if node != null:
+			node.visible = false
+	# The banner survives an unrecorded replay: it is how a refused SAVE VIDEO
+	# explains itself, and the replay is the only thing on screen to explain it
+	# over. While filming it goes, along with everything else.
+	_banner.visible = not recording
+	_replay_bar.visible = not recording
+
+
+func exit_replay_mode(replay_available: bool) -> void:
+	for node: Control in [_dock, _header_strip, _corner, _hints, _banner]:
+		if node != null:
+			node.visible = true
+	_blueprints_button.visible = true
+	_replay_bar.visible = false
+	set_replay_available(replay_available)
+
+
+func report_video_saved() -> void:
+	_show_banner("Video saved — check your browser's downloads", UITheme.ACCENT)
+
+
+func report_video_failed(reason: String) -> void:
+	_show_banner(reason, UITheme.MUSTARD)
 
 
 ## The dock spans the bottom edge, so the whole strait — both shores and the sky
@@ -401,19 +560,64 @@ func _build_settings_button() -> Control:
 	levels.tooltip_text = "Choose another strait"
 	levels.anchor_left = 1.0
 	levels.anchor_right = 1.0
-	levels.offset_right = -SETTINGS_MARGIN - SETTINGS_SIZE.x - 8.0
+	levels.offset_right = -SETTINGS_MARGIN - SETTINGS_SIZE.x - CORNER_GAP
 	levels.offset_left = levels.offset_right - SELECT_SIZE.x
 	levels.offset_top = SETTINGS_MARGIN
 	levels.offset_bottom = SETTINGS_MARGIN + SELECT_SIZE.y
 	levels.pressed.connect(func() -> void: level_select_requested.emit())
 
-	# Both returned as one node, since the caller adds a single child.
-	var pair := Control.new()
-	pair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pair.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pair.add_child(button)
-	pair.add_child(levels)
-	return pair
+	# SCORES, left of LEVELS. The board used to exist in exactly two places: the
+	# panel that appears the moment you cross — which is also the moment you are
+	# least interested in reading a table — and the level select screen, which
+	# means leaving the strait to look at it. The number the board ranks is the
+	# price of the bridge you are building right now, so it wants to be readable
+	# while you are building it.
+	var scores := UITheme.plate_button("SCORES", UITheme.SLATE, SCORES_SIZE)
+	scores.tooltip_text = "This strait's leaderboard"
+	scores.anchor_left = 1.0
+	scores.anchor_right = 1.0
+	scores.offset_right = levels.offset_left - CORNER_GAP
+	scores.offset_left = scores.offset_right - SCORES_SIZE.x
+	scores.offset_top = SETTINGS_MARGIN
+	scores.offset_bottom = SETTINGS_MARGIN + SCORES_SIZE.y
+	scores.pressed.connect(_open_scoreboard)
+
+	# All three returned as one node, since the caller adds a single child.
+	var corner := Control.new()
+	corner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	corner.add_child(button)
+	corner.add_child(levels)
+	corner.add_child(scores)
+	return corner
+
+
+## The current strait's leaderboard, on demand.
+##
+## Built from the same section as the crossing panel and the select screen, so
+## there is one board in the game with one idea of what an empty one means. It
+## never posts — there is no crossing in hand to post — it only reads.
+func _open_scoreboard() -> void:
+	var parts := UITheme.modal(
+		_dock.get_parent(), _levels.level.display_name.to_upper(), 380.0
+	)
+	_confirm_overlay = parts[0] as Control
+	var content := parts[1] as VBoxContainer
+
+	if Leaderboard.has_board(_levels.index):
+		UITheme.refresh_online_board(
+			UITheme.online_board_section(content, _boards, _levels.index),
+			_boards,
+			_levels.index
+		)
+	else:
+		var none := Label.new()
+		none.text = "Leaderboard unavailable."
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		none.add_theme_color_override(&"font_color", UITheme.SUBTLE_TEXT)
+		content.add_child(none)
+
+	UITheme.enliven(_confirm_overlay)
 
 
 ## A frame-rate readout, off by default and toggled with F3.
@@ -689,6 +893,25 @@ func report_blueprint_saved(index: int, pieces: int) -> void:
 	)
 
 
+func report_bulk_placed(def: ObjectDef, placed: int) -> void:
+	_show_banner(
+		"Dropped %d %s into the strait" % [placed, def.display_name.to_lower()],
+		UITheme.ACCENT
+	)
+	_refresh_placed()
+
+
+## Main filed the bridge that just crossed into a slot on the player's behalf.
+##
+## No banner: the crossing's own banner is going up in the same frame and would
+## be overwritten by this, which is the less important of the two messages. It is
+## reported on the crossing panel instead, where the player is already looking.
+func report_build_autosaved(index: int, pieces: int) -> void:
+	_autosaved_slot = index
+	_autosaved_pieces = pieces
+	_refresh_blueprints()
+
+
 func report_blueprint_loaded(index: int, placed: int, wanted: int) -> void:
 	if placed < wanted:
 		_show_banner(
@@ -706,11 +929,17 @@ func report_blueprint_loaded(index: int, placed: int, wanted: int) -> void:
 ## inside the panel, so it costs the dock no height at all.
 func _build_hints() -> Control:
 	var label := Label.new()
-	label.text = "Q/E to rotate  ·  wheel to zoom  ·  right-click a piece to recall it" \
-		+ "  ·  middle-click to move  ·  green fits, red is blocked"
+	label.text = "Q/E rotate  ·  wheel zoom  ·  right-click recalls a piece" \
+		+ "  ·  shift-click a card drops the whole stack"
 	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Clipped rather than wrapped: on a narrow window a second line of hints would
+	# climb the strait.
+	label.offset_left = 12.0
+	label.offset_right = -12.0
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
 	label.add_theme_color_override(&"font_color", UITheme.CREAM)
@@ -798,8 +1027,19 @@ func _build_piece_card(def: ObjectDef) -> Control:
 	# min_width pads the slot a little wider than the plate so the short name
 	# underneath has somewhere to sit without crowding the plate's edge.
 	var button := UITheme.art_button("piece_blank", CARD_SIZE, CARD_SIZE + 10.0)
-	button.tooltip_text = "%s — %s" % [def.display_name, def.descriptor()]
-	button.pressed.connect(func() -> void: place_requested.emit(def))
+	button.tooltip_text = "%s — %s\nShift-click to drop every one you own" % [
+		def.display_name, def.descriptor()
+	]
+	# Shift places the whole stack at once. Read off the keyboard here rather than
+	# from a gui_input handler: `pressed` is what the button, its click sound and
+	# its hover motion are already wired to, and duplicating that plumbing to
+	# recover one modifier would mean two paths into placing a piece.
+	button.pressed.connect(func() -> void:
+		if Input.is_key_pressed(KEY_SHIFT):
+			place_all_requested.emit(def)
+		else:
+			place_requested.emit(def)
+	)
 	# Taking a piece out of stock is handling a piece, not pressing a menu
 	# button, and it sounds like the one you get when you grab a piece already
 	# in the water — which is the same action from the other direction.
@@ -826,6 +1066,12 @@ func _build_piece_card(def: ObjectDef) -> Control:
 	name_label.text = _short_name(def.display_name)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Backstop for the next long name somebody adds. The card is a fixed 62px and
+	# the label is centred inside it, so an oversized name does not shorten — it
+	# prints straight across the cards on either side. _short_name() handles the
+	# ones that exist; this makes sure the belt can never break that way again.
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_label.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
 	column.add_child(name_label)
 
@@ -924,6 +1170,10 @@ func _short_name(display_name: String) -> String:
 		"Metal Beam": return "Beam"
 		"Steel Girder": return "Girder"
 		"Refrigerator": return "Fridge"
+		# Two words at full size overran the 62px plate and printed across the
+		# cards on either side of it — the labels are centred and unclipped, so a
+		# long one does not truncate, it trespasses.
+		"Shipping Container": return "Container"
 		_: return display_name
 
 
@@ -943,33 +1193,46 @@ func _process(delta: float) -> void:
 	if _spawner == null:
 		return
 
-	# Always the piece count. Progress is told by the sign filling up, so putting
-	# a percentage here as well would be saying the same thing twice, in the one
-	# place that is meant to describe the bridge rather than the attempt.
-	var placed: int = _spawner.count()
-	_placed_label.text = "%d piece placed" if placed == 1 else "%d pieces placed"
-	_placed_label.text = _placed_label.text % placed
-
-	# The per-type badges are polled rather than driven by a signal, because there
-	# is no "a piece was placed" signal to hang them off — a piece enters the world
-	# through the spawner and reaches its resting place through physics. Polled at
-	# PLACED_POLL_HZ and short-circuited when the total hasn't moved, so the common
-	# case is an integer compare.
+	# The piece count is polled, not read every frame. count() walks the whole
+	# container, so at the 140 cap this was 140 node casts per rendered frame to
+	# produce a label that changes when the player drops something — a few times a
+	# minute. The poll below already existed for the per-type badges; the total now
+	# rides the same 6 Hz cadence instead of running 10x more often beside it.
+	#
+	# Progress is told by the sign filling up, so putting a percentage here as well
+	# would be saying the same thing twice, in the one place that is meant to
+	# describe the bridge rather than the attempt.
 	_placed_poll -= delta
 	if _placed_poll <= 0.0:
 		_placed_poll = 1.0 / PLACED_POLL_HZ
+		var placed: int = _spawner.count()
+		# The per-type badges are polled rather than driven by a signal, because
+		# there is no "a piece was placed" signal to hang them off — a piece enters
+		# the world through the spawner and reaches its resting place through
+		# physics. Short-circuited when the total hasn't moved, so the common case
+		# is an integer compare.
 		if placed != _placed_shown or _belt_locked != build_locked:
 			_placed_shown = placed
+			_placed_label.text = (
+				"%d piece placed" if placed == 1 else "%d pieces placed"
+			) % placed
 			_refresh_placed()
 	# Nothing in the strait means there is nothing to test, and a run off the end of
 	# the shore is just the car falling in the water — a result the player learns
 	# nothing from and which still costs them the wait. The dock says so by going
 	# dead rather than by refusing afterwards; Main still checks, because "placed"
 	# and "actually reaching the water" are not the same thing.
-	_start_button.disabled = _crossing.is_running or placed <= 0
-	_start_button.tooltip_text = (
-		"Put at least one piece in the water first" if placed <= 0 else ""
-	)
+	#
+	# Reads the polled count rather than a fresh one, and only writes on a change:
+	# setting `disabled` re-evaluates the button's style and setting tooltip_text
+	# touches the tooltip cache, both every frame, for a value that is the same
+	# from one minute to the next.
+	var start_dead := _crossing.is_running or _placed_shown <= 0
+	if start_dead != _start_button.disabled:
+		_start_button.disabled = start_dead
+		_start_button.tooltip_text = (
+			"Put at least one piece in the water first" if _placed_shown <= 0 else ""
+		)
 	# The belt goes dead for the length of an attempt: you cannot add to a bridge
 	# that is already being driven over. Driven from _process rather than from the
 	# start/finish signals so it can never be left locked by a path that ends an
@@ -983,12 +1246,29 @@ func _process(delta: float) -> void:
 		_refresh_blueprints()
 	_update_charge(delta)
 	_update_shop_nudge()
-	_remove_car_button.visible = is_instance_valid(_crossing.car)
+	var has_car := is_instance_valid(_crossing.car)
+	if has_car != _remove_car_button.visible:
+		_remove_car_button.visible = has_car
 
 	# The dock's height follows its contents, and the contents change when the
 	# contextual buttons appear, so the hint line is re-pinned rather than fixed.
-	_hints.offset_bottom = -(_dock.size.y + 16.0)
-	_hints.offset_top = _hints.offset_bottom - 18.0
+	# Only when it actually moved: writing an offset queues a resort of the
+	# control's anchors whether or not the number changed, and the dock's height
+	# changes only when a contextual button appears.
+	# Above the SAVED BUILDS tab, not level with it: the tab floats in this same
+	# strip over the START end of the dock, and the hint line used to run straight
+	# under it — one sentence with a button sitting in the middle of it.
+	var pinned := -(_dock.size.y + BLUEPRINTS_GAP + BLUEPRINTS_SIZE.y + 8.0)
+	if not is_equal_approx(pinned, _hints.offset_bottom):
+		_hints.offset_bottom = pinned
+		_hints.offset_top = pinned - 18.0
+
+	# Worst frame in the last second, tracked every frame because that is the only
+	# way to see it. Average fps hides exactly the thing being complained about: a
+	# bridge that runs at 60 and stalls for 90ms when a save lands reads as "60fps".
+	# One maxf per frame, and only while the meter is up.
+	if _meter != null and _meter.visible:
+		_worst_frame_ms = maxf(_worst_frame_ms, delta * 1000.0)
 
 	# Once a second, not every frame: a number that changes sixty times a second
 	# cannot be read, and formatting it that often is itself a cost.
@@ -996,14 +1276,35 @@ func _process(delta: float) -> void:
 		_meter_timer -= delta
 		if _meter_timer <= 0.0:
 			_meter_timer = 1.0
-			_meter.text = "%d fps · %d pieces" % [
-				Engine.get_frames_per_second(), _spawner.count()
-			]
+			_meter.text = _meter_text()
+			_worst_frame_ms = 0.0
 
 	if _banner_timer > 0.0:
 		_banner_timer -= delta
 		if _banner_timer <= 0.0:
 			_banner.text = ""
+
+
+## The F3 readout. Two lines, because the useful question is never "what is the
+## fps" — it is "which half is costing me", script or physics.
+##
+## worst is the number to watch while building: a hitch that lasts one frame does
+## not move the average at all, and hitches are what a player actually feels.
+## act/pairs answer whether the physics load is the bridge settling or the bridge
+## having settled — a still bridge should be nearly all asleep.
+func _meter_text() -> String:
+	var process_ms := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var physics_ms := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	return "%d fps · worst %.1fms · proc %.1f phys %.1f\n%d pieces · %d act · %d pairs · %d draws" % [
+		Engine.get_frames_per_second(),
+		_worst_frame_ms,
+		process_ms,
+		physics_ms,
+		_spawner.count(),
+		int(Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS)),
+		int(Performance.get_monitor(Performance.PHYSICS_2D_COLLISION_PAIRS)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+	]
 
 
 ## Escape backs out of a confirmation, matching the shop menu. It's consumed
@@ -1311,13 +1612,30 @@ func report_crossing(
 ## never said the second option existed.
 func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 	var level_index := _levels.index
-	# No heading sign: the panel only appears on a crossing, so a line reading
-	# STRAIT CROSSED tells the player what they just watched happen.
+	# The last strait gets its heading and its closing lines folded INTO this
+	# panel rather than a second card stacked on top of it. Two modals fired in
+	# the same frame put the congratulations board over the scoreboard the player
+	# had just earned a place on, and dismissing the top one left the bottom one
+	# sitting there looking like it had failed to close.
+	var finale := _levels.is_last()
+	# No heading sign otherwise: the panel only appears on a crossing, so a line
+	# reading STRAIT CROSSED tells the player what they just watched happen.
 	var parts := UITheme.modal(
-		_dock.get_parent(), "", 420.0, "KEEP BUILDING"
+		_dock.get_parent(),
+		"EVERY STRAIT CROSSED" if finale else "",
+		420.0,
+		"KEEP BUILDING"
 	)
 	_confirm_overlay = parts[0] as Control
 	var content := parts[1] as VBoxContainer
+
+	if finale:
+		var done := Label.new()
+		done.text = "You got the truck across every strait."
+		done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		done.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		done.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_LOUD)
+		content.add_child(done)
 
 	# The money is the headline. What the bridge cost and where it places are on
 	# the board below, where the number sits among the runs it is being ranked
@@ -1336,6 +1654,21 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 	cost.add_theme_color_override(&"font_color", UITheme.SUBTLE_TEXT)
 	content.add_child(cost)
 
+	# Where the bridge went, so the filing is something the player was told about
+	# rather than something they find later. Silent when this crossing was dearer
+	# than the one already in the slot — nothing was written, and saying so would
+	# be a line about an event that didn't happen.
+	if _autosaved_slot >= 0:
+		var kept := Label.new()
+		kept.text = "Saved to build slot %d (%d pieces)" % [
+			_autosaved_slot + 1, _autosaved_pieces
+		]
+		kept.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		kept.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+		kept.add_theme_color_override(&"font_color", UITheme.ACCENT.darkened(0.3))
+		content.add_child(kept)
+		_autosaved_slot = -1
+
 	_add_online_board(content, level_index, bridge)
 
 	# Only offered when there is somewhere to go. On the last level the campaign
@@ -1344,7 +1677,7 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 	# Green, not the panel's amber: everything else on this board is amber, so the
 	# one button that moves the game forward has nowhere to stand out from — and
 	# green is already the game's "this works, press it" colour on every BUY.
-	if not _levels.is_last():
+	if not finale:
 		var next := UITheme.plate_button("NEXT STRAIT", UITheme.GREEN, Vector2(0, 44))
 		next.pressed.connect(func() -> void:
 			_confirm_overlay.queue_free()
@@ -1352,14 +1685,54 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 		)
 		content.add_child(next)
 
+	# Watching the crossing you just made is the thing people do with a crossing
+	# they just made, and the panel is on screen the moment they want to. Only
+	# when there is film — a crossing longer than the recorder's cap has none.
+	if _replay_button != null and _replay_button.visible:
+		var watch := UITheme.plate_button(
+			"REPLAY AND SAVE", UITheme.ACCENT.darkened(0.42), Vector2(0, 38)
+		)
+		# The camera is here to break up a stack of four buttons that are otherwise
+		# the same painted plate with different words on it — the one people reach
+		# for after a good crossing should be findable without reading the panel.
+		watch.icon = UITheme.camera_icon()
+		watch.expand_icon = false
+		watch.add_theme_constant_override(&"h_separation", 10)
+		watch.tooltip_text = "Watch the attempt again, and download it as a video"
+		watch.pressed.connect(func() -> void:
+			_confirm_overlay.queue_free()
+			replay_requested.emit(false)
+		)
+		content.add_child(watch)
+
+	# The two ways off this panel that aren't "keep building", side by side, so a
+	# finished campaign doesn't grow a third full-width bar and push the board
+	# off a short viewport.
+	var exits := HBoxContainer.new()
+	exits.add_theme_constant_override(&"separation", 8)
+	content.add_child(exits)
+
 	var select := UITheme.plate_button(
 		"LEVEL SELECT", UITheme.STEEL.darkened(0.34), Vector2(0, 38)
 	)
+	select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	select.pressed.connect(func() -> void:
 		_confirm_overlay.queue_free()
 		level_select_requested.emit()
 	)
-	content.add_child(select)
+	exits.add_child(select)
+
+	# Only at the end of the campaign. Mid-run the way out is the settings knob;
+	# offering MAIN MENU after every crossing would put "stop playing" next to
+	# "play the next one" on the panel that exists to keep the run going.
+	if finale:
+		var menu := UITheme.plate_button("MAIN MENU", UITheme.AMBER, Vector2(0, 38))
+		menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		menu.pressed.connect(func() -> void:
+			_confirm_overlay.queue_free()
+			get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+		)
+		exits.add_child(menu)
 
 
 ## The leaderboard, on the crossing panel: this strait, against everyone else.

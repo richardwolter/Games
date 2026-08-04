@@ -20,6 +20,19 @@ const REPLAY_LINGER := 1.5
 ## it holds nothing but data and has no scene presence to configure.
 var _blueprints := Blueprints.new()
 
+## Films every attempt, and plays the last one back. Both made here for the same
+## reason Blueprints is: neither has anything in the scene to configure.
+##
+## The recorder is a child of Main so it gets a physics tick of its own. It runs
+## after the bodies it samples — node order in the tree decides that, and Main's
+## children are processed after the world's — so each sample is the state at the
+## end of the tick rather than halfway through it.
+var _recorder := AttemptRecorder.new()
+var _replay := ReplayPlayer.new()
+## True while a replay is being filmed to a video file, so the end of playback
+## knows whether there is a download to trigger.
+var _replay_recording: bool = false
+
 ## The bridge as it stood when the current attempt began.
 var _pre_crossing_layout: Array[Dictionary] = []
 ## True from the moment a car spawns until the bridge has been put back.
@@ -45,6 +58,14 @@ var _sandbox_money: int = 5000
 func _ready() -> void:
 	_blueprints.name = "Blueprints"
 	add_child(_blueprints)
+	_recorder.name = "AttemptRecorder"
+	add_child(_recorder)
+	# Added to the world rather than to Main, so the puppets sit in the same space
+	# as the terrain and the water they are being replayed over.
+	_replay.name = "ReplayPlayer"
+	_replay.water = $World/Water
+	_world.add_child(_replay)
+	_replay.finished.connect(_on_replay_finished)
 
 	_shop.setup(_economy, _inventory)
 	_levels.setup(_world, _shop, _economy, _inventory, _spawner, _crossing)
@@ -56,12 +77,16 @@ func _ready() -> void:
 	_hud.buy_requested.connect(_shop.buy)
 	_hud.box_requested.connect(_shop.buy_box)
 	_hud.place_requested.connect(_on_place_requested)
+	_hud.place_all_requested.connect(_on_place_all_requested)
 	_hud.recall_car_requested.connect(_on_recall_car_requested)
 	_hud.start_crossing_requested.connect(_on_start_crossing_requested)
 	_hud.next_level_requested.connect(_levels.advance)
 	_hud.level_select_requested.connect(_on_level_select_requested)
+	_hud.replay_requested.connect(_on_replay_requested)
+	_hud.replay_skip_requested.connect(_on_replay_skip_requested)
 
 	_manipulator.water = $World/Water
+	_crossing.water = $World/Water
 	_manipulator.delete_requested.connect(_spawner.remove)
 	_manipulator.release_blocked.connect(_hud.report_blocked)
 	_spawner.object_removed.connect(_inventory.add.bind(1))
@@ -71,7 +96,18 @@ func _ready() -> void:
 	_levels.level_loaded.connect(_on_level_loaded)
 
 	var args := OS.get_cmdline_user_args()
-	_testing = args.has("--smoke") or args.has("--carcheck")
+	_testing = args.has("--smoke") or args.has("--carcheck") or args.has("--bench")
+
+	# The persistence check needs the real save path — writing the file and reading
+	# it back IS what it tests — so it redirects the slot to a scratch file instead
+	# of borrowing _testing, which would switch off every write it means to check.
+	for arg: String in args:
+		if arg.begins_with("--savefile="):
+			SaveGame.path = "user://%s" % arg.substr(11)
+		elif arg == "--levelcheck":
+			_check_level = 2
+		elif arg.begins_with("--levelcheck="):
+			_check_level = int(arg.substr(13))
 
 	# Dev sandbox: open a level directly, with money, and leave the save alone.
 	#   godot -- --sandbox=3 --money=5000
@@ -102,6 +138,10 @@ func _ready() -> void:
 		_run_smoke_test()
 	elif args.has("--carcheck"):
 		_run_car_check()
+	elif args.has("--bench"):
+		_run_bench()
+	elif _check_level >= 0:
+		_run_level_check()
 
 
 ## Resume where the player left off, or start a fresh run if there's no save.
@@ -123,28 +163,25 @@ func _load_or_start() -> void:
 	# player has been there before, and leaves a clean strait if they haven't.
 	var chosen := Campaign.requested_level
 	Campaign.requested_level = -1
-	if chosen >= 0:
-		_levels.load_level(chosen)
-		if not data.is_empty():
-			SaveGame.apply(
-				data, _levels, _economy, _inventory, _shop, _spawner, _blueprints
-			)
-		return
+	_levels.load_level(chosen if chosen >= 0 else int(data.get("level", 0)))
+	if not data.is_empty():
+		SaveGame.apply(data, _levels, _economy, _inventory, _shop, _spawner, _blueprints)
 
-	if data.is_empty():
-		_levels.load_level(0)
-		# No save means this is somebody's first turn, so teach it. Tied to the
-		# absence of a save rather than to a "seen it" flag on purpose: the flag
-		# would have to live outside the save to be worth anything, and then
-		# starting a new game a month later would drop you in cold.
-		#
-		# Not during the headless checks, which have no way to dismiss it and
-		# would sit behind the overlay pressing buttons that never get the click.
-		if not _testing:
-			_hud.start_tutorial()
-		return
-	_levels.load_level(int(data.get("level", 0)))
-	SaveGame.apply(data, _levels, _economy, _inventory, _shop, _spawner, _blueprints)
+	# No save means this is somebody's first turn, so teach it. Tied to the
+	# absence of a save rather than to a "seen it" flag on purpose: the flag would
+	# have to live outside the save to be worth anything, and then starting a new
+	# game a month later would drop you in cold.
+	#
+	# Checked AFTER the level is loaded rather than inside a branch, which is what
+	# broke it: NEW GAME deletes the save and sets Campaign.requested_level, so it
+	# arrived down the "player picked a strait" path and returned before reaching
+	# this — the one player guaranteed to need the walkthrough was the only one who
+	# never saw it. The condition is about the save, not about how you got here.
+	#
+	# Not during the headless checks, which have no way to dismiss it and would sit
+	# behind the overlay pressing buttons that never get the click.
+	if data.is_empty() and not _testing:
+		_hud.start_tutorial()
 
 
 ## Ask for a save soon rather than right now.
@@ -159,7 +196,7 @@ func _load_or_start() -> void:
 ## second, and every path that could actually lose progress — a level change, a
 ## finished attempt, quitting — still calls save_now() directly. The worst case is
 ## a crash in the half-second after a drop, which loses one plank's position.
-const SAVE_DELAY := 0.5
+const SAVE_DELAY := 1.5
 
 var _save_due: float = -1.0
 
@@ -174,9 +211,17 @@ func _process(delta: float) -> void:
 	if _save_due < 0.0:
 		return
 	_save_due -= delta
-	if _save_due <= 0.0:
-		_save_due = -1.0
-		save_now()
+	if _save_due > 0.0:
+		return
+	# Never while a piece is in hand. A save walks the whole bridge and writes the
+	# file, and the one moment that hitch is guaranteed to be felt is mid-drag,
+	# when the piece is tracking the cursor every frame. Held back until release,
+	# which is itself a save trigger — so this delays the write rather than
+	# skipping it.
+	if _manipulator != null and _manipulator.held != null:
+		return
+	_save_due = -1.0
+	save_now()
 
 
 ## Saving is automatic and silent. It happens after anything that would hurt to
@@ -243,7 +288,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key := (event as InputEventKey).keycode
 	var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	if UITheme.is_fullscreen_key(key):
+	# Escape stops a replay before it does anything else, including leaving
+	# fullscreen: while a replay is up it is the only thing on screen, so it is
+	# the only thing Escape can sensibly mean.
+	if key == KEY_ESCAPE and _replay.is_playing:
+		_on_replay_skip_requested()
+		get_viewport().set_input_as_handled()
+	elif UITheme.is_fullscreen_key(key):
 		UITheme.toggle_fullscreen()
 		get_viewport().set_input_as_handled()
 	elif key == KEY_F3:
@@ -281,6 +332,51 @@ func _on_place_requested(def: ObjectDef) -> void:
 	_manipulator.grab_object(obj, true)
 
 
+## How far apart shift-placed pieces are laid out, and how many go in a row
+## before the next one starts above it. Wide enough that even the long beams land
+## clear of each other — pieces spawned inside one another are thrown apart by
+## the solver, which is the one way this could go visibly wrong.
+const BULK_STEP := Vector2(150.0, -110.0)
+const BULK_PER_ROW := 6
+
+
+## Shift-click on a belt card: tip that card's whole stock into the strait.
+##
+## Placed rather than held, because a hand holds one piece: the ghost-placement
+## flow is for putting a piece exactly where you want it, and the case this
+## exists for is the opposite one — twenty planks bought in a batch that all have
+## to come out of stock before any arranging can start, which was twenty clicks
+## and twenty drags of an object you were going to move again anyway.
+##
+## They come down in a loose stack above the middle of the view and fall, so they
+## land in a heap on whatever is under them. That is the intended result: it is a
+## pile of parts to work from, not a bridge.
+func _on_place_all_requested(def: ObjectDef) -> void:
+	if _attempt_active or _crossing.is_running:
+		return
+
+	# A piece already in hand would be left hovering while the stack rains down
+	# past it, and would then be dropped into the middle of the pile.
+	_manipulator.stash_held()
+
+	var centre := _camera.get_screen_center_position()
+	var placed := 0
+	while _inventory.count(def) > 0 and not _spawner.is_full():
+		if not _inventory.take(def):
+			break
+		var col := placed % BULK_PER_ROW
+		var row := placed / BULK_PER_ROW
+		var at := centre + Vector2(
+			(float(col) - float(BULK_PER_ROW - 1) * 0.5) * BULK_STEP.x,
+			-160.0 + float(row) * BULK_STEP.y
+		)
+		_spawner.spawn(def, at)
+		placed += 1
+
+	if placed > 0:
+		_hud.report_bulk_placed(def, placed)
+
+
 ## A level change cancels any pending restore. Without this, changing level during
 ## the post-attempt linger would rebuild the old level's bridge in the new strait.
 func _on_level_loaded(_level: LevelDef, _index: int) -> void:
@@ -300,6 +396,16 @@ func _on_level_loaded(_level: LevelDef, _index: int) -> void:
 	# them on the way out and autosaving on the way in wrote the empty set over the
 	# only copy. They now live in the level's bucket and survive the round trip.
 	_blueprints.clear_all()
+	_auto_slot = -1
+	_auto_bridge = 0
+
+	# The film goes with the strait it was shot in. Its puppets are placed in world
+	# coordinates, so replaying a run from The Narrows over The River would put a
+	# bridge in mid-air and drive a truck through the water beside it.
+	_stop_replay()
+	_finish_replay()
+	_recorder.discard()
+	_hud.set_replay_available(false)
 
 
 ## Every attempt starts from the bridge the player built, never from the state
@@ -375,6 +481,49 @@ func _on_save_blueprint(index: int) -> void:
 	_hud.report_blueprint_saved(index, bridge.size())
 
 
+## The slot this level's winning bridge was filed into, and what that bridge
+## cost. Both reset with the level: slots are per-level already, and a cost from
+## another strait is not a number to compare against.
+var _auto_slot: int = -1
+var _auto_bridge: int = 0
+
+
+## File the bridge that just got across into a saved-builds slot.
+##
+## A crossing is exactly the moment a layout becomes worth keeping, and it is
+## also the moment the player is least likely to think of it — the panel is up,
+## there is money on it, and NEXT STRAIT is right there. Coming back to a strait
+## to beat your own price and finding the bridge that set it already in a slot is
+## the whole point.
+##
+## An empty slot first, so this never eats a layout the player saved by hand. If
+## all three are full it claims the last one and then keeps that one for the rest
+## of the level — a player who has filled every slot deliberately loses at most
+## one of them, not a new one per crossing.
+##
+## Later crossings only overwrite when they were cheaper. The slot holds "the
+## best bridge that worked here", which is the same thing the leaderboard ranks;
+## replacing it with the most recent crossing would let a sloppier run quietly
+## delete the good one.
+func _autosave_winning_build(bridge_price: int) -> void:
+	if _pre_crossing_layout.is_empty():
+		return
+
+	if _auto_slot < 0:
+		for i in Blueprints.SLOTS:
+			if _blueprints.is_empty(i):
+				_auto_slot = i
+				break
+		if _auto_slot < 0:
+			_auto_slot = Blueprints.SLOTS - 1
+	elif bridge_price >= _auto_bridge:
+		return
+
+	_auto_bridge = bridge_price
+	_blueprints.store(_auto_slot, _levels.index, _pre_crossing_layout)
+	_hud.report_build_autosaved(_auto_slot, _pre_crossing_layout.size())
+
+
 ## Put a saved layout back in the water.
 ##
 ## Every piece in the strait is recalled to stock first, then the layout is
@@ -434,6 +583,91 @@ func _bridge_points() -> int:
 	return total
 
 
+## Watch the last attempt again, optionally filming it.
+##
+## Nothing about the live strait is touched. The replay hides the bridge and the
+## truck, puts inert copies of both on screen and drives them off the recording;
+## dismissing it puts the real ones back exactly where they were. That is the
+## whole reason it is a puppet show rather than a re-run — a replay must never be
+## able to cost the player the bridge they built.
+func _on_replay_requested(record_video: bool) -> void:
+	if _crossing.is_running or not _recorder.has_recording():
+		return
+
+	# Asked to film somewhere that cannot: say why and leave whatever is on screen
+	# alone. Restarting the replay to then not record it would look like the button
+	# had worked, and the player would sit through the whole thing waiting for a
+	# file that was never coming.
+	if record_video:
+		var blocked := VideoCapture.unavailable_reason()
+		if not blocked.is_empty():
+			_hud.report_video_failed(blocked)
+			if _replay.is_playing:
+				return
+
+	# Restarting from the beginning, whether or not one was already running: the
+	# SAVE VIDEO button is pressed *during* a replay, and it has to film the whole
+	# thing rather than join it wherever the player happened to press.
+	_stop_replay()
+
+	# Anything in hand would hang in mid-air over the replay, since the
+	# manipulator is not what gets hidden.
+	_manipulator.stash_held()
+
+	_replay_recording = record_video and VideoCapture.start()
+	if record_video and not _replay_recording and VideoCapture.is_supported():
+		# Supported, but the browser refused this particular attempt.
+		_hud.report_video_failed("The browser refused to start recording")
+
+	_hud.enter_replay_mode(_replay_recording)
+	_replay.play(_recorder, [$Objects as Node2D, $Vehicle as Node2D])
+	var target := _replay.follow_target()
+	if target != null:
+		_camera.follow(target)
+
+
+func _on_replay_skip_requested() -> void:
+	if not _replay.is_playing:
+		return
+	# A skipped replay produces no file. The player asked to stop watching, and
+	# handing them a truncated video of the part they chose not to see is not what
+	# "skip" means anywhere else.
+	if _replay_recording:
+		VideoCapture.cancel()
+		_replay_recording = false
+	_stop_replay()
+	_finish_replay()
+
+
+func _on_replay_finished() -> void:
+	if _replay_recording:
+		VideoCapture.stop_and_download("strait-across-%s" % Time.get_datetime_string_from_system(
+			false, false
+		).replace(":", "-"))
+		_replay_recording = false
+		_hud.report_video_saved()
+	_stop_replay()
+	_finish_replay()
+
+
+## Take the puppets down and give the camera back.
+##
+## Split from _finish_replay so that starting a second replay can tear the first
+## one down without flashing the dock back on between them.
+func _stop_replay() -> void:
+	if _replay.is_playing or _replay.get_child_count() > 0:
+		_replay.stop()
+	_camera.stop_following()
+
+
+func _finish_replay() -> void:
+	_hud.exit_replay_mode(_recorder.has_recording())
+	# Back onto the truck if one is still out there — a replay watched during the
+	# post-attempt linger should hand the camera back to the wreck it was on.
+	if is_instance_valid(_crossing.car):
+		_camera.follow(_crossing.car.chassis)
+
+
 ## Back to the select screen, with the run written down first: the strait, the
 ## money and the standings are all worth keeping, and the player asked to change
 ## levels rather than to throw anything away.
@@ -448,11 +682,22 @@ func _on_crossing_started() -> void:
 	_pre_crossing_layout = _spawner.snapshot()
 	_attempt_active = true
 	_camera.follow(_crossing.car.chassis)
+	# The previous run's film goes here rather than when the new one ends: a
+	# player who presses START and immediately changes their mind should not be
+	# left with a REPLAY tab pointing at a recording that no longer exists.
+	_hud.set_replay_available(false)
+	_recorder.start($Objects, _crossing.car)
 
 
 ## An attempt is a test, not a commitment: whatever the car knocked apart gets put
 ## back so the player can adjust one plank instead of rebuilding the span.
 func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> void:
+	# Before anything that builds UI: the crossing panel offers a WATCH button
+	# only when there is film, so the recorder has to have stopped and the HUD has
+	# to know about it by the time the panel is built.
+	_recorder.stop()
+	_hud.set_replay_available(_recorder.has_recording())
+
 	var succeeded := result == CrossingManager.Result.SUCCESS
 	var first_clear := succeeded and _levels.mark_cleared()
 	var settled := _economy.settle_attempt(succeeded, progress, first_clear)
@@ -463,11 +708,17 @@ func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> v
 	# failure at the top of the table.
 	var bridge := _bridge_points()
 	var rank := _levels.submit_bridge(bridge) if succeeded else 0
+	# Before the panel, not after: the panel names the slot the bridge went into,
+	# so the filing has to have happened by the time it is built.
+	if succeeded:
+		_autosave_winning_build(bridge)
+
 	_hud.report_crossing(result, progress, settled[0], settled[1], bridge, rank)
 	if succeeded and not _levels.is_last():
 		_hud.offer_next_level()
-	elif succeeded:
-		_hud.report_campaign_finished()
+	# The last strait's congratulations lives inside the crossing panel itself —
+	# see Hud.show_crossed_panel(). Firing report_campaign_finished() here as well
+	# stacked a second modal on top of it in the same frame.
 	if not _testing:
 		save_now()
 
@@ -476,9 +727,120 @@ func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> v
 	if _crossing.is_running or not _attempt_active:
 		return
 	_crossing.reset()
-	_camera.stop_following()
+	# Not while a replay is up. The bridge and the truck are hidden behind the
+	# puppets, so putting them back is invisible and harmless — but taking the
+	# camera off the replay's truck mid-crossing is not.
+	if not _replay.is_playing:
+		_camera.stop_following()
 	_spawner.restore(_pre_crossing_layout)
 	_attempt_active = false
+
+
+## Headless benchmark: fill a strait to the cap and measure what it costs.
+##
+##   godot --headless --quit-after 9000 res://scenes/main.tscn -- --bench --pfps=60
+##
+## Separate from --smoke because the two want opposite things. The smoke test
+## proves the game still works and therefore goes through the real buy/place path,
+## which the shop's stock limits cap at about 29 pieces — nowhere near the 140 the
+## strait allows, and performance questions only start being interesting near the
+## cap. This spawns straight into the world instead: no economy, no inventory,
+## deterministic positions, same count every run.
+##
+## --pfps overrides the physics rate so the web-relevant number (60) can be taken
+## on a desktop machine. Without it the desktop default of 120 is measured, which
+## is the wrong figure for the build players actually run.
+##
+## Prints one machine-readable line so two runs can be diffed without reading prose.
+func _run_bench() -> void:
+	var args := OS.get_cmdline_user_args()
+	var target: int = _spawner.max_objects
+	for arg: String in args:
+		if arg.begins_with("--pfps="):
+			Engine.physics_ticks_per_second = int(arg.substr(7))
+		elif arg.begins_with("--pieces="):
+			target = int(arg.substr(9))
+
+	var level := _levels.level
+	var area: Rect2 = _world.build_area()
+	var defs := _placeable_defs(level)
+	if defs.is_empty():
+		print("BENCH error=no placeable defs")
+		get_tree().quit(1)
+		return
+
+	# A deterministic lattice across the strait, cycling the level's own pieces so
+	# the mix is representative rather than 140 of the cheapest thing.
+	const COLUMNS := 14
+	var step := (area.size.x - 400.0) / float(COLUMNS)
+	var spawn_start := Time.get_ticks_usec()
+	for i in target:
+		var def: ObjectDef = defs[i % defs.size()]
+		_spawner.spawn(def, Vector2(
+			area.position.x + 200.0 + (i % COLUMNS) * step,
+			-200.0 - floorf(i / float(COLUMNS)) * 220.0
+		))
+	var spawn_ms := float(Time.get_ticks_usec() - spawn_start) / 1000.0
+	print("BENCH placed=%d pfps=%d spawn_ms=%.2f" % [
+		_spawner.count(), Engine.physics_ticks_per_second, spawn_ms
+	])
+
+	# Let the pile fall and settle. The interesting steady state is a bridge that
+	# has stopped moving, which is also the state a player spends most time in.
+	await get_tree().create_timer(8.0).timeout
+	var settled := await _sample(300)
+
+	# The restore spike, measured on its own. This is the single most expensive
+	# frame in normal play: it happens on every level load, every blueprint load,
+	# and after every crossing attempt, and it tears down and rebuilds the whole
+	# bridge inside one frame.
+	var layout: Array[Dictionary] = _spawner.snapshot()
+	var restore_start := Time.get_ticks_usec()
+	_spawner.restore(layout)
+	var restore_ms := float(Time.get_ticks_usec() - restore_start) / 1000.0
+	print("BENCH restore_ms=%.2f restored=%d" % [restore_ms, _spawner.count()])
+	await get_tree().create_timer(3.0).timeout
+
+	# Then the heaviest moment in the game: everything awake at once with the
+	# truck's own bodies and joints on top.
+	_crossing.start_crossing()
+	var driving := await _sample(240)
+	print("BENCH settled_phys_ms=%.3f settled_proc_ms=%.3f settled_act=%d settled_pairs=%d" % [
+		settled[0], settled[1], int(settled[2]), int(settled[3])
+	])
+	print("BENCH driving_phys_ms=%.3f driving_proc_ms=%.3f driving_act=%d driving_pairs=%d" % [
+		driving[0], driving[1], driving[2], driving[3]
+	])
+	print("BENCH worst_phys_ms=%.3f pieces=%d nodes=%d" % [
+		maxf(settled[4], driving[4]),
+		_spawner.count(),
+		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+	])
+	get_tree().quit()
+
+
+## Mean physics/process time and physics load over `ticks` physics frames, plus
+## the worst single physics frame seen. Returns
+## [phys_ms, proc_ms, active, pairs, worst_phys_ms].
+##
+## Sampled per physics frame rather than per rendered frame because the number
+## under test is the physics cost, and in headless the two rates differ.
+func _sample(ticks: int) -> Array:
+	var phys := 0.0
+	var proc := 0.0
+	var active := 0.0
+	var pairs := 0.0
+	var worst := 0.0
+	for i in ticks:
+		await get_tree().physics_frame
+		var this_phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		phys += this_phys
+		worst = maxf(worst, this_phys)
+		proc += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		active += Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS)
+		pairs += Performance.get_monitor(Performance.PHYSICS_2D_COLLISION_PAIRS)
+	var n := float(ticks)
+	return [phys / n, proc / n, active / n, pairs / n, worst]
 
 
 ## Headless sanity check: buy out a level's shop, gamble on a box, place the lot,
@@ -650,6 +1012,118 @@ func _run_smoke_test() -> void:
 		])
 		assert(_world.build_area().size.x > 0.0, "level built an empty build area")
 		assert(box.has_point(Vector2(_levels.level.goal_x(), 300.0)), "goal outside world")
+
+
+## Headless persistence check: a bridge must still be there when the player comes
+## back to the strait they built it in.
+##
+##   godot --headless --quit-after 4000 res://scenes/main.tscn -- \
+##       --levelcheck --savefile=save_levelcheck.json
+##
+## Deliberately goes through the real file rather than through capture() alone.
+## The bug this exists for lived in the difference between the two: every bucket
+## was correct in memory, and the write still dropped one.
+## Which leg of the check this scene is running. Static because the second leg is
+## a genuine scene reload — the same thing the level select does — and that is the
+## point: a returning player arrives in a brand new Main, holding nothing but the
+## file.
+static var _check_returning: bool = false
+
+## Which strait the check plays, from --levelcheck=N. -1 means it isn't running.
+static var _check_level: int = -1
+## How much of a bridge to build before leaving. Enough to be unmistakably there,
+## small enough to settle quickly.
+const CHECK_PIECES := 8
+
+
+func _run_level_check() -> void:
+	if _check_returning:
+		_finish_level_check()
+		return
+	SaveGame.delete()
+	_levels.load_level(_check_level)
+	_economy.add(4000)
+
+	# A bridge worth missing, spread out so the pieces settle instead of exploding.
+	var area: Rect2 = _world.build_area()
+	var step := (area.size.x - 400.0) / 8.0
+	var lane := 0
+	for def: ObjectDef in _levels.level.shop_pool:
+		while _shop.remaining(def) > 0 and _economy.can_afford(def.price) and lane < CHECK_PIECES:
+			assert(_shop.buy(def), "shop refused an affordable piece")
+			_on_place_requested(def)
+			if _manipulator.held == null:
+				continue
+			_manipulator.held.position = Vector2(area.position.x + 200.0 + lane * step, -200.0)
+			_manipulator.release(true)
+			lane += 1
+	var built: int = _spawner.count()
+	assert(built > 0, "level check placed nothing")
+	save_now()
+	print("LEVELCHECK built=%d on level=%d" % [built, _levels.index])
+
+	# Beat it and take the NEXT LEVEL button, which is the reported sequence. The
+	# crossing is driven by hand rather than actually driven: what is under test is
+	# what the finish does to the save, and a truck that falls short would never
+	# reach it. NEXT is pressed while the replay linger is still running, because
+	# that is when the button is on screen.
+	# A real attempt, so the car, the signals and the linger are the live ones. It
+	# does not matter whether the truck gets across: what the finish does to the
+	# save is the same either way, and a bridge of eight pieces will not span this.
+	await get_tree().create_timer(4.0).timeout
+	_on_start_crossing_requested()
+	assert(_crossing.is_running, "level check could not start a crossing")
+	await _crossing.attempt_finished
+	_levels.advance()
+	await get_tree().create_timer(REPLAY_LINGER + 0.5).timeout
+	save_now()
+	print("LEVELCHECK advanced to level=%d" % _levels.index)
+
+	# What a returning player would find. Read from disk, because that is all a
+	# fresh scene has: the bucket in memory being right is not the same thing.
+	var data := SaveGame.load_data()
+	assert(not data.is_empty(), "level check wrote a save it cannot read back")
+	var back: Array[Dictionary] = SaveGame.bridge_from_json(
+		SaveGame._bucket(data, _check_level).get("bridge", [])
+	)
+	print("LEVELCHECK left level=%d bridge on disk=%d/%d" % [_check_level, back.size(), built])
+	assert(back.size() == built, "leaving a level erased its bridge")
+
+	# And the level moved on to must not have inherited it.
+	var arrived: Array[Dictionary] = SaveGame.bridge_from_json(
+		SaveGame._bucket(data, _check_level + 1).get("bridge", [])
+	)
+	print("LEVELCHECK next level=%d bridge on disk=%d" % [_check_level + 1, arrived.size()])
+	assert(arrived.is_empty(), "the next level arrived with the last one's bridge")
+
+	# Now actually go back, the way a player does: out to the select screen and
+	# into level 3 again, which tears down this Main and builds a fresh one.
+	_check_expected = built
+	_check_returning = true
+	# What LEVEL SELECT does, minus the screen itself: write the run down, then ask
+	# for a strait. The select screen only reads the save, so skipping it changes
+	# nothing about what is under test.
+	save_now()
+	Campaign.requested_level = _check_level
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+## How many pieces the strait had when we left it.
+static var _check_expected: int = 0
+
+
+## The returning leg. By the time this runs, _load_or_start() has already loaded
+## the level and applied the save, so the strait either has the bridge back or it
+## does not.
+func _finish_level_check() -> void:
+	await get_tree().process_frame
+	print("LEVELCHECK returned to level=%d placed=%d/%d stock=%d" % [
+		_levels.index, _spawner.count(), _check_expected, _inventory.total()
+	])
+	assert(_levels.index == _check_level, "came back to the wrong strait")
+	assert(_spawner.count() == _check_expected, "the bridge was erased on the way back")
+	print("LEVELCHECK ok")
+	get_tree().quit()
 
 
 func _placeable_defs(level: LevelDef) -> Array[ObjectDef]:

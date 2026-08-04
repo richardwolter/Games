@@ -15,7 +15,10 @@
 class_name SaveGame
 extends RefCounted
 
-const PATH := "user://save.json"
+## Where the slot lives. A variable only so a headless check can point the whole
+## save system at a scratch file and exercise the real read/write path without
+## writing over somebody's run. Nothing in the game changes it.
+static var path: String = "user://save.json"
 ## Bumped when the shape of the file changes incompatibly. A save from a
 ## different version is discarded rather than half-read.
 ##
@@ -29,7 +32,7 @@ const VERSION := 2
 
 
 static func has_save() -> bool:
-	return FileAccess.file_exists(PATH)
+	return FileAccess.file_exists(path)
 
 
 ## Which level the save is sitting on, without restoring anything.
@@ -43,9 +46,15 @@ static func saved_level() -> int:
 
 
 static func delete() -> void:
+	# The in-memory buckets go with the file. Without this, NEW GAME deletes the
+	# save and the very next capture writes every old level's bridge, inventory
+	# and shop straight back out of the cache — the run would come back from the
+	# dead one autosave later.
+	_buckets = {}
+	_buckets_primed = false
 	if not has_save():
 		return
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 ## Gathers the whole game into one dictionary. `bridge` is passed in rather than
@@ -60,15 +69,24 @@ static func capture(
 	blueprints: Blueprints
 ) -> Dictionary:
 	# The straits the player is NOT currently standing in, carried through
-	# untouched. Read back off disk rather than held in memory: this is the only
-	# place that needs them, a save is already a file write, and a cached copy
-	# living across a scene change is a thing that can go stale behind you.
-	var buckets: Dictionary = {}
-	var previous: Variant = load_data().get("levels", {})
-	if previous is Dictionary:
-		buckets = (previous as Dictionary).duplicate(true)
+	# untouched, from memory.
+	#
+	# This used to re-read the whole save off disk and deep-copy every other
+	# level's bucket on EVERY capture — and a capture happens after every piece
+	# dropped and every piece recalled. On a full strait that is a file read, a
+	# JSON parse and a recursive copy of the entire save, half a second after each
+	# of the player's actions, on the main thread. It was the worst hitch in the
+	# game while building.
+	#
+	# The original reasoning was that a cache living across a scene change can go
+	# stale behind you. That only holds if something else writes the file, and
+	# nothing does: one process, one writer, and _buckets is updated here with
+	# exactly what is about to be written. delete() clears it so New Game cannot
+	# resurrect a bucket from the run that was just thrown away.
+	if not _buckets_primed:
+		_prime_buckets()
 
-	buckets[str(levels.index)] = {
+	_buckets[str(levels.index)] = {
 		"bridge": bridge_to_json(bridge),
 		"inventory": _defs_to_paths(inventory.counts()),
 		"shop": _defs_to_paths(shop.remaining_all()),
@@ -92,8 +110,23 @@ static func capture(
 		# What the numbers in `records` MEAN. See SCORE_BASIS.
 		"score_basis": SCORE_BASIS,
 		# One entry per strait the player has set foot in. See _bucket().
-		"levels": buckets,
+		"levels": _buckets,
 	}
+
+
+## Every level's bucket, as last written. See the note in capture().
+##
+## Static so it survives the scene change between straits — that change is
+## exactly when the other levels' state has to be carried across, and it is the
+## same process throughout.
+static var _buckets: Dictionary = {}
+static var _buckets_primed: bool = false
+
+
+static func _prime_buckets() -> void:
+	var previous: Variant = load_data().get("levels", {})
+	_buckets = (previous as Dictionary) if previous is Dictionary else {}
+	_buckets_primed = true
 
 
 ## Everything that belongs to ONE strait, keyed by level index as a string.
@@ -171,7 +204,7 @@ static func _records_to_json(records: Dictionary[int, PackedInt32Array]) -> Dict
 
 
 static func save(data: Dictionary) -> bool:
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("Could not write save: %s" % error_string(FileAccess.get_open_error()))
 		return false
@@ -185,7 +218,7 @@ static func save(data: Dictionary) -> bool:
 static func load_data() -> Dictionary:
 	if not has_save():
 		return {}
-	var file := FileAccess.open(PATH, FileAccess.READ)
+	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return {}
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
@@ -314,12 +347,21 @@ static func bridge_from_json(raw: Variant) -> Array[Dictionary]:
 		var def := _def_at(str(entry.get("def", "")))
 		if def == null:
 			continue
+		# A non-finite position or rotation is refused at the door rather than
+		# handed to the physics server. JSON can carry "nan" and "inf", a save can
+		# be hand-edited, and one NaN body poisons every body it touches through
+		# the solver — a single bad entry can take the whole bridge with it. The
+		# cost of dropping it is one missing piece.
+		var x := float(entry.get("x", 0.0))
+		var y := float(entry.get("y", 0.0))
+		var rotation := float(entry.get("rotation", 0.0))
+		if not (is_finite(x) and is_finite(y) and is_finite(rotation)):
+			push_warning("Save had a non-finite piece; dropping it")
+			continue
 		out.append({
 			&"def": def,
-			&"position": Vector2(
-				float(entry.get("x", 0.0)), float(entry.get("y", 0.0))
-			),
-			&"rotation": float(entry.get("rotation", 0.0)),
+			&"position": Vector2(x, y),
+			&"rotation": rotation,
 			&"variant": int(entry.get("variant", -1)),
 		})
 	return out
