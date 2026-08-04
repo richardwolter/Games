@@ -17,7 +17,7 @@ class_name BuildInfo
 extends RefCounted
 
 ## Rewritten on export. Do not edit by hand.
-const STAMP := "2026-08-03 1629"
+const STAMP := "2026-08-03 2342"
 
 
 static func version() -> String:
