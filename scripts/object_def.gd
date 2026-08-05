@@ -76,7 +76,9 @@ func get_height() -> float:
 ## 8 mass, a girder is 520 and 85. They're bands, not a scale, because the player
 ## needs "can this span the gap and will it stay up", not two decimal places.
 func descriptor() -> String:
-	return "%s · %s · %s" % [_span_word(), _weight_word(), _float_word()]
+	return "%s · %s · %s · %s" % [
+		_span_word(), _weight_word(), _float_word(), _grip_word()
+	]
 
 
 func _span_word() -> String:
@@ -115,3 +117,17 @@ func _float_word() -> String:
 	if buoyancy >= 1.0:
 		return "wallows"
 	return "sinks"
+
+
+## How well the truck's tyres bite on this. Worth its own word because friction
+## is now the difference between a deck that can be driven and one that can only
+## be looked at, and a player who cannot see it is choosing blind: the metal that
+## spans the gap is exactly the metal that will not let the truck climb.
+func _grip_word() -> String:
+	if friction >= 1.4:
+		return "grippy"
+	if friction >= 0.85:
+		return "good grip"
+	if friction >= 0.5:
+		return "smooth"
+	return "slippery"

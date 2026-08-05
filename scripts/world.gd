@@ -59,6 +59,19 @@ const SEABED_ROUGHNESS := 46.0
 ## Thickness of the algae strip laid along the top face of the rock.
 const ALGAE_DEPTH := 20.0
 
+## Grip of the ground itself. Both used to be left unset, which meant the run-up
+## and the seabed silently ran on the engine default while every bridge piece
+## carried an authored number — so the one surface the player cannot choose was
+## the one nobody had decided on.
+##
+## The shore is deliberately the grippiest thing in the game. The truck has to
+## pull away and climb the far bank the same way every attempt, or the bridge
+## stops being what is being tested. All the tuning pressure belongs on the
+## pieces in between.
+const SHORE_FRICTION := 1.0
+## Slightly less, and it matters rarely — a piece that has sunk sits on this.
+const SEABED_FRICTION := 0.9
+
 ## One shader for shore and seabed both: the join between two different ones was
 ## itself the seam. See shaders/ground.gdshader.
 const GROUND_SHADER := preload("res://shaders/ground.gdshader")
@@ -191,6 +204,7 @@ func _build_shore(centre_x: float) -> void:
 
 	var body := StaticBody2D.new()
 	body.position = Vector2(centre_x, SURFACE_Y + height * 0.5)
+	body.physics_material_override = _ground_physics(SHORE_FRICTION)
 	$Terrain.add_child(body)
 
 	var rect := RectangleShape2D.new()
@@ -207,6 +221,15 @@ func _build_shore(centre_x: float) -> void:
 	])
 	visual.material = _ground_material()
 	body.add_child(visual)
+
+
+## Grip for a piece of ground. Ground never bounces — a truck rebounding off the
+## bank would read as a bug, not as physics.
+func _ground_physics(friction: float) -> PhysicsMaterial:
+	var pm := PhysicsMaterial.new()
+	pm.friction = friction
+	pm.bounce = 0.0
+	return pm
 
 
 ## Shared setup for every piece of ground, so the shore and the seabed cannot
@@ -281,6 +304,7 @@ func _build_seabed() -> void:
 	outline.append(Vector2(-_half_width, floor_y))
 
 	var body := StaticBody2D.new()
+	body.physics_material_override = _ground_physics(SEABED_FRICTION)
 	$Terrain.add_child(body)
 
 	var shape := CollisionPolygon2D.new()
