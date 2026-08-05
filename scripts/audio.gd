@@ -80,6 +80,39 @@ const SOUND_OFFSETS: Dictionary = {
 	&"piece_release": 0.0,
 }
 
+## The truck's engine.
+const ENGINE := "res://audio/Truck_Acceleration.wav"
+
+## The loopable slice of it, in samples.
+##
+## The file is a one-shot acceleration take: a sweep that rises for a second and
+## a half and then dies away. Played whole it gives two seconds of engine and
+## then a silent truck, so what actually plays is a slice of the steady part on
+## repeat, with pitch doing the revving.
+##
+## Both numbers are measured, not chosen: tools/engine_loop_probe.gd finds the
+## longest stretch at a steady level and then picks the cut whose waveform lines
+## up with the start of it, so the join has no step in it to click. Re-run it if
+## the file is ever recut — a loop cut by eye clicks once every half second,
+## forever.
+const ENGINE_LOOP_BEGIN := 15468
+const ENGINE_LOOP_END := 39872
+
+## Where the engine sits. Below the one-shots, because it is not a one-shot: a
+## sound that plays continuously under everything for the length of a crossing
+## has to sit further back than one that flashes past, or it is all you hear.
+const ENGINE_DB := -14.0
+## Pitch bounds. Below the lower one a truck sounds like a boat; above the upper
+## one the sample's own noise floor starts whistling and it stops sounding like
+## a recording of an engine at all.
+const ENGINE_PITCH_MIN := 0.7
+const ENGINE_PITCH_MAX := 1.6
+## Ramps for the engine coming in and going out. Both short — the engine
+## starting is a thing that happens, not a thing that fades in over a bar — but
+## not zero: cutting a loop dead at full volume is a click at both ends.
+const ENGINE_FADE_IN := 0.25
+const ENGINE_FADE_OUT := 0.35
+
 ## How many one-shots can overlap. Four covered the clicks, but splashes share
 ## the same ring and a collapsing bridge puts several pieces through the water
 ## at once — at four, the splashes cut each other off and took the click the
@@ -147,6 +180,13 @@ var _ambience: AudioStreamPlayer = null
 var _ambience_path: String = ""
 var _ambience_fade: Tween = null
 
+## The engine, on its own player. It cannot go through the one-shot ring: that
+## forces every stream it holds to LOOP_DISABLED, and it round-robins, so a
+## collapsing bridge would put eight splashes through it and take the engine
+## with them.
+var _engine: AudioStreamPlayer = null
+var _engine_fade: Tween = null
+
 
 func _ready() -> void:
 	# Keeps playing while the tree is paused, so a settings menu that pauses the
@@ -156,6 +196,7 @@ func _ready() -> void:
 	_build_buses()
 	_load_settings()
 	_build_voices()
+	_build_engine()
 
 	_ambience = AudioStreamPlayer.new()
 	_ambience.name = "Ambience"
@@ -299,6 +340,82 @@ func _take_voice() -> int:
 	_next_voice = (_next_voice + 1) % _voices.size()
 	_voice_gen[voice] += 1
 	return voice
+
+
+func _build_engine() -> void:
+	if not ResourceLoader.exists(ENGINE):
+		push_warning("No engine sound at %s; the truck drives silently." % ENGINE)
+		return
+	var stream := load(ENGINE) as AudioStreamWAV
+	if stream == null:
+		push_warning("%s is not a WAV; the truck drives silently." % ENGINE)
+		return
+
+	# Duplicated before the loop is set on it. load() hands out the one cached
+	# copy of the resource, so setting a loop on it here would set it on every
+	# other use of the same file — and this one is being turned into something
+	# that never stops.
+	stream = stream.duplicate()
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = ENGINE_LOOP_BEGIN
+	stream.loop_end = mini(ENGINE_LOOP_END, int(stream.get_length() * stream.mix_rate))
+
+	_engine = AudioStreamPlayer.new()
+	_engine.name = "Engine"
+	_engine.bus = SFX_BUS
+	_engine.stream = stream
+	# Starts silent so the first fade has somewhere to come from. A looping
+	# player brought up at full volume starts on the sample's own attack, which
+	# is a click.
+	_engine.volume_db = SILENT_DB
+	add_child(_engine)
+
+
+## Start the engine, or leave it running if it already is.
+##
+## The loop is left to the mixer rather than restarted from `finished`: a sample
+## loop is sample-accurate inside the mix, while a restart on a signal happens
+## whenever the main loop next gets round to it — which on web is at the
+## browser's convenience and is exactly where a gap would open up.
+func engine_start() -> void:
+	if _engine == null:
+		return
+	if _engine_fade != null and _engine_fade.is_valid():
+		_engine_fade.kill()
+	if not _engine.playing:
+		_engine.volume_db = SILENT_DB
+		# From the loop's start rather than the file's, so the first pass is the
+		# same steady note as every pass after it.
+		_engine.play(float(ENGINE_LOOP_BEGIN) / _stream_rate())
+	_engine_fade = create_tween()
+	_engine_fade.tween_property(_engine, ^"volume_db", ENGINE_DB, ENGINE_FADE_IN)
+
+
+## Fade the engine out and stop it.
+func engine_stop() -> void:
+	if _engine == null or not _engine.playing:
+		return
+	if _engine_fade != null and _engine_fade.is_valid():
+		_engine_fade.kill()
+	_engine_fade = create_tween()
+	_engine_fade.tween_property(_engine, ^"volume_db", SILENT_DB, ENGINE_FADE_OUT)
+	_engine_fade.tween_callback(_engine.stop)
+
+
+## Set the revs. 1.0 is the recording's own pitch.
+##
+## Pitching a looped sample resamples the loop with it, so the join stays where
+## it is and stays seamless at any speed — none of the correction play_clip has
+## to do for its timers applies here.
+func engine_pitch(pitch: float) -> void:
+	if _engine == null:
+		return
+	_engine.pitch_scale = clampf(pitch, ENGINE_PITCH_MIN, ENGINE_PITCH_MAX)
+
+
+func _stream_rate() -> float:
+	var stream := _engine.stream as AudioStreamWAV
+	return float(stream.mix_rate) if stream != null else 44100.0
 
 
 ## Play the track belonging to a level, crossfading from whatever is playing.
