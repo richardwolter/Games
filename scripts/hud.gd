@@ -39,6 +39,8 @@ signal replay_skip_requested()
 ## Belt cards are square and uniform, so the row reads as a rack of parts.
 const CARD_SIZE := 62
 const ICON_SIZE := 26
+## Height of each of the two pill slots under a belt card (recall, then buy).
+const CARD_PILL_HEIGHT := 18
 ## How long a result banner stays up before it clears.
 const BANNER_HOLD := 4.0
 ## The colour the lettering fills with as the crossing advances.
@@ -76,6 +78,10 @@ var _money_label: Label
 ## together on a level that has never been crossed.
 var _record_label: Label
 var _record_rule: ColorRect
+## What the pieces in the water are worth, and the divider before it. Both hide
+## together while the strait is empty.
+var _bridge_label: Label
+var _bridge_rule: ColorRect
 ## The belt of owned pieces, left to right along the dock.
 var _piece_belt: HBoxContainer
 var _start_button: BaseButton
@@ -102,7 +108,6 @@ var _belt_locked: bool = false
 ## The belt reads this rather than the crossing's own is_running, which goes false
 ## a second and a half before building is actually allowed again.
 var build_locked: bool = false
-var _belt_heading: Label
 ## How often the per-type placed counts on the belt are re-read.
 const PLACED_POLL_HZ := 6.0
 var _placed_poll: float = 0.0
@@ -210,6 +215,10 @@ func build(
 
 	_economy.money_changed.connect(_on_money_changed)
 	_inventory.changed.connect(_refresh_pieces)
+	# What's left to sell is the one input to the belt's price bars that money and
+	# inventory don't cover: the last unit of a piece leaves stock at the same
+	# moment it enters inventory, but only this says the shelf is now empty.
+	_shop.stock_changed.connect(_refresh_buy)
 	_crossing.attempt_started.connect(_on_attempt_started)
 	_levels.level_loaded.connect(_on_level_loaded)
 
@@ -430,22 +439,17 @@ func _build_panel() -> Control:
 
 ## The belt is the dock's one elastic section: it takes whatever width the fixed
 ## controls leave, and the pieces sit at its left edge.
+##
+## No caption above it. The cards now carry a price as well as a count, and the
+## row of them needed that height more than the belt needed a label naming the
+## obvious. The locked state it used to announce is already on the cards
+## themselves — every one of them greys out for the length of an attempt.
 func _build_piece_belt() -> Control:
-	var column := VBoxContainer.new()
-	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	column.add_theme_constant_override(&"separation", 2)
-
-	# The belt's own caption says why it has gone dead, rather than leaving the
-	# player to guess at a row of greyed cards.
-	_belt_heading = Label.new()
-	UITheme.as_caption(_belt_heading)
-	column.add_child(_belt_heading)
-
 	_piece_belt = HBoxContainer.new()
+	_piece_belt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_piece_belt.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_piece_belt.add_theme_constant_override(&"separation", 6)
-	column.add_child(_piece_belt)
-	return column
+	return _piece_belt
 
 
 ## Level and money, pinned to the top-left corner rather than living in the dock.
@@ -508,6 +512,25 @@ func _build_header() -> Control:
 	_record_label.tooltip_text = "Cheapest bridge that has crossed this level"
 	row.add_child(_record_label)
 	_record_rule = record_rule
+
+	var bridge_rule := ColorRect.new()
+	bridge_rule.color = Color(UITheme.CREAM, 0.32)
+	bridge_rule.custom_minimum_size = Vector2(2, 22)
+	row.add_child(bridge_rule)
+
+	# What the bridge on screen is worth. The leaderboard ranks a crossing by the
+	# price of the pieces that made it, so this is the player's own score sitting
+	# beside the one they're chasing — without it they were aiming at BEST $N with
+	# no reading of where they currently stood.
+	_bridge_label = Label.new()
+	_bridge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_bridge_label.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_TITLE)
+	_bridge_label.add_theme_color_override(&"font_color", UITheme.CREAM)
+	_bridge_label.tooltip_text = (
+		"Total price of the pieces in the water — this is your score.\nCheaper is better."
+	)
+	row.add_child(_bridge_label)
+	_bridge_rule = bridge_rule
 	return _header_strip
 
 
@@ -521,6 +544,31 @@ func _update_record_label() -> void:
 	_record_label.text = "BEST $%d" % best if best >= 0 else ""
 	_record_label.visible = best >= 0
 	_record_rule.visible = best >= 0
+
+
+## Price up what is in the water, using the same sum Main scores a crossing with.
+## Iterates the placed counts rather than the belt rows, so a piece that came out
+## of a box and has no card still counts toward the bridge.
+func _update_bridge_label(counts: Dictionary[ObjectDef, int]) -> void:
+	if _bridge_label == null:
+		return
+	var value := 0
+	for def: ObjectDef in counts:
+		value += def.price * counts[def]
+	_bridge_label.text = "BRIDGE $%d" % value
+	# An empty strait has no bridge to price, and a field reading $0 is a field
+	# with nothing in it — same reason BEST hides on an uncrossed level.
+	_bridge_label.visible = value > 0
+	_bridge_rule.visible = value > 0
+	# Green while the bridge on screen would beat the level's record. Cheaper is
+	# better, so this says "you are winning" without a second number to compare.
+	var best: int = _levels.bridge_record() if _levels != null else -1
+	_bridge_label.add_theme_color_override(
+		&"font_color",
+		# GREEN_TEXT, not GREEN: the plate is dark, and the solid green is a fill
+		# colour that all but disappears against it.
+		UITheme.GREEN_TEXT if best >= 0 and value < best else UITheme.CREAM
+	)
 
 
 ## Opposite corner to the level/money readout, in the other patch of open sky.
@@ -1089,31 +1137,19 @@ func _build_piece_card(def: ObjectDef) -> Control:
 	# part of the card's own decoration, and players were not seeing it as a button
 	# at all. It is the only blue in the dock, and it means the same thing in each
 	# place it appears.
-	var strip := Control.new()
-	strip.custom_minimum_size = Vector2(0, 18)
-	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var recall := Button.new()
-	recall.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var recall_strip := _card_pill_strip(UITheme.ACCENT)
+	var recall: Button = recall_strip[&"button"]
 	recall.visible = false
-	recall.focus_mode = Control.FOCUS_NONE
-	recall.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
-	recall.add_theme_constant_override(&"outline_size", 0)
-	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
-		var shade := UITheme.ACCENT
-		if state == &"hover":
-			shade = UITheme.ACCENT.lightened(0.18)
-		elif state == &"pressed":
-			shade = UITheme.ACCENT.darkened(0.2)
-		elif state == &"disabled":
-			shade = UITheme.MUTE
-		recall.add_theme_stylebox_override(state, UITheme.pill(shade))
-	for state: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
-		recall.add_theme_color_override(state, UITheme.INK)
-	recall.add_theme_color_override(&"font_disabled_color", UITheme.MUTE_TEXT)
 	recall.pressed.connect(func() -> void: _on_recall_type_pressed(def))
 	UITheme.set_click_sound(recall, &"piece_click")
-	strip.add_child(recall)
+
+	# And the other direction: one more of this piece, without opening the shop.
+	# Buying was the most repeated action in a build and the only one that needed a
+	# modal to reach. Mustard, the shop's own buy colour, so spending money looks
+	# the same wherever you do it — and never blue, which in this dock means recall.
+	var buy_strip := _card_pill_strip(UITheme.MUSTARD)
+	var buy: Button = buy_strip[&"button"]
+	buy.pressed.connect(func() -> void: buy_requested.emit(def))
 
 	# The count is an ink pill in the top-right rather than a line of the card,
 	# so a row of cards reads as sprites first and numbers second.
@@ -1130,34 +1166,94 @@ func _build_piece_card(def: ObjectDef) -> Control:
 	button.add_child(count)
 
 	_piece_rows[def] = {
-		&"button": button, &"count": count, &"name": name_label, &"recall": recall
+		&"button": button, &"count": count, &"name": name_label,
+		&"recall": recall, &"buy": buy
 	}
 
-	# The card is the plate with its strip beneath. Returned as one column so the
-	# belt still lays out one child per piece.
+	# The card is the plate with its two strips beneath, price first: buying is the
+	# one that is always available and always says something, so it sits against
+	# the plate, and the recall bar — which only exists while pieces are out — hangs
+	# below it rather than shoving it around as it comes and goes. Returned as one
+	# column so the belt still lays out one child per piece.
 	var card := VBoxContainer.new()
 	card.add_theme_constant_override(&"separation", 2)
 	card.add_child(button)
-	card.add_child(strip)
+	card.add_child(buy_strip[&"strip"])
+	card.add_child(recall_strip[&"strip"])
 	return card
+
+
+## One fixed-height slot under a belt card holding a single pill button.
+##
+## The slot keeps its height whether or not its button is showing, so the dock
+## never changes shape as pieces come and go — and both strips are built the same
+## way so the pair reads as two halves of one control rather than two widgets that
+## happen to be stacked.
+func _card_pill_strip(shade: Color) -> Dictionary:
+	var strip := Control.new()
+	strip.custom_minimum_size = Vector2(0, CARD_PILL_HEIGHT)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var button := Button.new()
+	button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	button.add_theme_constant_override(&"outline_size", 0)
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+		var fill := shade
+		if state == &"hover":
+			fill = shade.lightened(0.18)
+		elif state == &"pressed":
+			fill = shade.darkened(0.2)
+		elif state == &"disabled":
+			fill = UITheme.MUTE
+		button.add_theme_stylebox_override(state, UITheme.pill(fill))
+	for state: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
+		button.add_theme_color_override(state, UITheme.INK)
+	button.add_theme_color_override(&"font_disabled_color", UITheme.MUTE_TEXT)
+	strip.add_child(button)
+	return {&"strip": strip, &"button": button}
 
 
 ## Bring every placed piece of one kind back to stock.
 ##
-## No confirmation, unlike Recall All. That one can undo an hour of fiddling in a
-## single click and there is no way back; this one is scoped to a material the
-## player is looking at, with the count on the button they pressed, and putting a
-## prompt in front of it would make the fast operation slower than dragging the
-## pieces out by hand — which is the thing it exists to replace.
+## Asks first, the same way Recall All does. The bar now sits at the bottom of a
+## card whose top half is a plate you click to place and whose middle is a pill you
+## click to buy — three targets in one column, all of them one click, and only this
+## one throws away work that took minutes to arrange. There is no undo, so the
+## prompt is the undo.
 func _on_recall_type_pressed(def: ObjectDef) -> void:
+	if build_locked:
+		return
+	var placed: int = _spawner.placed_counts().get(def, 0)
+	if placed <= 0:
+		return
+	_confirm_overlay = UITheme.confirm(
+		_dock.get_parent(),
+		"Recall all %s?\nThey go back to your stock." % _counted(def, placed),
+		"RECALL %d" % placed,
+		func() -> void: _recall_type(def)
+	)
+
+
+## "3 wooden planks", "1 tire". Every piece name in the game takes a plain -s, so
+## this stays a suffix rather than a table until one of them doesn't.
+func _counted(def: ObjectDef, n: int) -> String:
+	var noun := def.display_name.to_lower()
+	return "%d %s" % [n, noun if n == 1 else noun + "s"]
+
+
+func _recall_type(def: ObjectDef) -> void:
+	# Re-checked rather than trusting the count the prompt was raised with: the
+	# bridge is live physics and a piece can fall out of the world while the
+	# question is on screen.
 	if build_locked:
 		return
 	var recalled: int = _spawner.remove_all_of(def)
 	if recalled <= 0:
 		return
 	_show_banner(
-		"Recalled %d %s back to stock" % [recalled, def.display_name.to_lower()],
-		UITheme.MUSTARD
+		"Recalled %s back to stock" % _counted(def, recalled), UITheme.MUSTARD
 	)
 	_refresh_placed()
 
@@ -1360,6 +1456,9 @@ func _update_charge(delta: float) -> void:
 
 func _on_money_changed(_amount: int) -> void:
 	_money_label.text = "$%d" % _economy.money
+	# Affordability is per-card and every card has a price on it now, so the whole
+	# belt changes state on any money movement, not just on a purchase.
+	_refresh_buy()
 
 
 ## Price of the cheapest box this level sells, or 0 if it sells none.
@@ -1483,10 +1582,6 @@ func _dismiss_nudge() -> void:
 
 
 func _refresh_pieces() -> void:
-	_belt_heading.text = (
-		"CAR IS CROSSING · BELT LOCKED" if _belt_locked
-		else "YOUR PIECES · CLICK TO PLACE"
-	)
 	for def: ObjectDef in _piece_rows:
 		var n := _inventory.count(def)
 		var widgets: Dictionary = _piece_rows[def]
@@ -1511,13 +1606,48 @@ func _refresh_pieces() -> void:
 		name_label.add_theme_color_override(
 			&"font_color", UITheme.INK if n > 0 else UITheme.MUTE_TEXT
 		)
+	_refresh_buy()
 	_refresh_placed()
+
+
+## The price bar on every belt card. Unlike the placed counts above it, nothing
+## here has to be polled — money, stock and the level's pool all announce
+## themselves, so this runs only when one of them moves.
+func _refresh_buy() -> void:
+	var level := _levels.level
+	for def: ObjectDef in _piece_rows:
+		var buy: Button = _piece_rows[def][&"buy"]
+		# A card exists for every piece the level can hand you, boxes included, and
+		# a box's pool is not for sale at any price. Saying so on the card is the
+		# only way the belt can explain a piece with no price.
+		if level == null or not level.shop_pool.has(def):
+			buy.text = "FROM BOX"
+			buy.disabled = true
+			buy.tooltip_text = "%s only comes out of a box" % def.display_name
+			continue
+
+		var left: int = _shop.remaining(def)
+		if left <= 0:
+			buy.text = "SOLD OUT"
+			buy.disabled = true
+			buy.tooltip_text = "%s is sold out this level" % def.display_name
+			continue
+
+		var affordable: bool = _economy.can_afford(def.price)
+		# Same two words the shop menu uses for the same two states, so the belt is
+		# not a second dialect of the one that taught them.
+		buy.text = ("BUY $%d" if affordable else "NEED $%d") % def.price
+		buy.disabled = not affordable or _belt_locked
+		buy.tooltip_text = "Buy one %s — $%d · %d left this level" % [
+			def.display_name.to_lower(), def.price, left
+		]
 
 
 ## Updates the bottom-left badge on every belt card from what is actually in the
 ## strait. Locked for the length of an attempt, same as the rest of the belt.
 func _refresh_placed() -> void:
 	var counts: Dictionary[ObjectDef, int] = _spawner.placed_counts()
+	_update_bridge_label(counts)
 	for def: ObjectDef in _piece_rows:
 		var widgets: Dictionary = _piece_rows[def]
 		var recall: Button = widgets[&"recall"]
@@ -1541,9 +1671,7 @@ func _refresh_placed() -> void:
 			continue
 		recall.text = "Recall %d" % n
 		recall.disabled = build_locked
-		recall.tooltip_text = "Recall %d placed %s back to your stock" % [
-			n, def.display_name.to_lower()
-		]
+		recall.tooltip_text = "Recall %s back to your stock" % _counted(def, n)
 	_refresh_blueprints()
 
 
