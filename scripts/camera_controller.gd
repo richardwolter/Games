@@ -32,6 +32,12 @@ var _dragging: bool = false
 ## puts it somewhere the interpolator is about to overwrite, which shows up as the
 ## view snagging while you drag.
 var _pan_pending: Vector2 = Vector2.ZERO
+## Wheel zoom accumulated since the last physics step, and the world point the
+## cursor was over when it was rolled. Deferred for the same reason the pan is:
+## zoom moves the camera, and moving it between physics steps puts it somewhere
+## the interpolator overwrites.
+var _zoom_pending: float = 1.0
+var _zoom_anchor: Vector2 = Vector2.ZERO
 ## Zooming out further than this would put terrain edges on screen. Derived from
 ## the limits, so it changes with the level.
 var _min_zoom: float = 0.12
@@ -96,10 +102,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		match mb.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				if mb.pressed:
-					_apply_zoom(zoom_step)
+					_queue_zoom(zoom_step)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mb.pressed:
-					_apply_zoom(1.0 / zoom_step)
+					_queue_zoom(1.0 / zoom_step)
 			MOUSE_BUTTON_MIDDLE:
 				_dragging = mb.pressed
 				if _dragging:
@@ -108,9 +114,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pan_pending -= (event as InputEventMouseMotion).relative / zoom.x
 
 
-func _apply_zoom(factor: float) -> void:
-	var level := clampf(zoom.x * factor, _min_zoom, maxf(max_zoom, _min_zoom))
+## A wheel notch, held until the next physics step. The anchor is recorded here,
+## while the zoom the cursor was read under is still the current one.
+func _queue_zoom(factor: float) -> void:
+	_zoom_pending *= factor
+	_zoom_anchor = get_global_mouse_position()
+
+
+func _apply_zoom(factor: float, anchor := Vector2.INF) -> void:
+	var before := zoom.x
+	var level := clampf(before * factor, _min_zoom, maxf(max_zoom, _min_zoom))
 	zoom = Vector2(level, level)
+
+	# Zoom toward the cursor: keep whatever the mouse is over sitting still on
+	# screen, so zooming in on a piece at the far end of the strait doesn't also
+	# require panning back to it. Uses the achieved ratio rather than the
+	# requested factor, so a notch that hits the zoom limit doesn't slide the view
+	# sideways for nothing.
+	#
+	# Skipped while following the truck — there the camera's job is to frame the
+	# truck, and an anchor pull would only be fought back by the next lerp.
+	if anchor.is_finite() and not is_instance_valid(_follow_target):
+		position = anchor - (anchor - position) * (before / level)
+
 	_clamp_to_limits()
 
 
@@ -137,6 +163,10 @@ func _physics_process(delta: float) -> void:
 	if _pan_pending != Vector2.ZERO:
 		position += _pan_pending
 		_pan_pending = Vector2.ZERO
+
+	if not is_equal_approx(_zoom_pending, 1.0):
+		_apply_zoom(_zoom_pending, _zoom_anchor)
+		_zoom_pending = 1.0
 
 	var move := Vector2(
 		Input.get_axis(&"ui_left", &"ui_right"),
