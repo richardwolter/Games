@@ -22,3 +22,6 @@ art/_preview/
 # the tool that made them, and every one of them is a megabyte of PNG.
 tools/_*.png
 tools/_*.png.import
+
+# Python bytecode from the art tools.
+tools/__pycache__/
