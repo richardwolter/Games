@@ -32,11 +32,32 @@ func _ready() -> void:
 	_container = get_node(container_path) as Node2D
 
 
+## Handed out to every piece, so a rope can find the same piece again after the
+## bridge has been freed and rebuilt. Static rather than per-spawner because the
+## uid has to stay unique for as long as any snapshot holding it is alive, and a
+## snapshot outlives the strait it was taken in.
+static var _next_uid: int = 1
+
+
 ## variant picks which of the def's drawings the piece wears; -1 rolls a fresh
 ## one. Only restore() passes it, to put a bridge back as it looked.
-func spawn(def: ObjectDef, at: Vector2 = Vector2.INF, variant: int = -1) -> BridgeObject:
+##
+## `uid` is likewise only passed by restore(), which has to hand a rebuilt piece
+## the identity its ropes are still holding.
+## `flipped` is restore()'s too: a mirrored ramp that comes back facing the other
+## way after a crossing attempt is a bridge the player did not build.
+func spawn(
+	def: ObjectDef, at: Vector2 = Vector2.INF, variant: int = -1, uid: int = 0,
+	flipped: bool = false
+) -> BridgeObject:
 	var obj := OBJECT_SCENE.instantiate() as BridgeObject
-	obj.setup(def, variant)
+	obj.setup(def, variant, flipped)
+	if uid > 0:
+		obj.uid = uid
+		_next_uid = maxi(_next_uid, uid + 1)
+	else:
+		obj.uid = _next_uid
+		_next_uid += 1
 	var drop := at
 	if drop == Vector2.INF:
 		drop = spawn_position + Vector2(randf_range(-80.0, 80.0), randf_range(-40.0, 0.0))
@@ -191,13 +212,18 @@ func snapshot() -> Array[Dictionary]:
 				&"position": obj.global_position,
 				&"rotation": obj.global_rotation,
 				&"variant": obj.variant,
+				&"flipped": obj.flipped,
+				&"uid": obj.uid,
 			})
 	return out
 
 
 ## Puts the bridge back exactly as snapshot() found it. Nothing is refunded and
 ## nothing is charged — the pieces never left the player's bridge, conceptually.
-func restore(snap: Array[Dictionary]) -> void:
+##
+## Returns what it built, in order, so a caller holding something tied to these
+## pieces — the ropes — can find them again. Existing callers ignore it.
+func restore(snap: Array[Dictionary]) -> Array[BridgeObject]:
 	for child: Node in _container.get_children():
 		child.queue_free()
 	# Freeing is deferred, so the old bodies are still parented this frame.
@@ -205,15 +231,20 @@ func restore(snap: Array[Dictionary]) -> void:
 	for child: Node in _container.get_children():
 		_container.remove_child(child)
 
+	var built: Array[BridgeObject] = []
 	for entry: Dictionary in snap:
 		var obj := spawn(
 			entry[&"def"] as ObjectDef,
 			entry[&"position"] as Vector2,
-			entry[&"variant"] as int
+			entry[&"variant"] as int,
+			int(entry.get(&"uid", 0)),
+			bool(entry.get(&"flipped", false))
 		)
 		obj.rotation = entry[&"rotation"] as float
 		obj.linear_velocity = Vector2.ZERO
 		obj.angular_velocity = 0.0
+		built.append(obj)
+	return built
 
 
 ## Pieces actually in the strait.

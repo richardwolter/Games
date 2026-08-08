@@ -17,3 +17,8 @@ art/_preview/
 .claude/launch.json
 
 *.tmp
+
+# Screenshots and probe captures written by tools/*.gd. Reproducible by re-running
+# the tool that made them, and every one of them is a megabyte of PNG.
+tools/_*.png
+tools/_*.png.import

@@ -13,6 +13,9 @@ extends Control
 
 signal buy_requested(def: ObjectDef)
 signal box_requested(box: BoxDef)
+## Experimental only: a level of a SalvageUpgrades.Kind. Carried as an int so the
+## menu doesn't have to know the enum.
+signal upgrade_requested(kind: int)
 signal closed()
 
 ## Starting column count. The grid widens rather than growing a third row, so
@@ -63,6 +66,11 @@ const TOP_RESERVE := 14.0
 
 var _economy: Economy
 var _shop: Shop
+## The experimental truck upgrades. Null on a normal build, and the row that
+## shows them is then never built.
+var _upgrades: SalvageUpgrades
+## The BUY on each upgrade, and the line under it saying what it does next.
+var _upgrade_rows: Dictionary[int, Dictionary] = {}
 
 var _frame: PanelContainer
 ## This level's catalogue, kept so the grid can be reflowed without rebuilding.
@@ -78,9 +86,10 @@ var _box_buttons: Dictionary[BoxDef, Button] = {}
 var _flash: Label
 
 
-func setup(economy: Economy, shop: Shop) -> void:
+func setup(economy: Economy, shop: Shop, upgrades: SalvageUpgrades = null) -> void:
 	_economy = economy
 	_shop = shop
+	_upgrades = upgrades
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	# Hidden the menu must not eat clicks meant for the strait; open it must eat
@@ -95,6 +104,8 @@ func setup(economy: Economy, shop: Shop) -> void:
 
 	_economy.money_changed.connect(func(_amount: int) -> void: _refresh())
 	_shop.stock_changed.connect(_refresh)
+	if _upgrades != null:
+		_upgrades.changed.connect(_refresh)
 	_shop.box_opened.connect(_on_box_opened)
 	_shop.purchase_failed.connect(_on_purchase_failed)
 
@@ -103,6 +114,9 @@ func _build_chrome() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(UITheme.INK, 0.62)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Transparent to the mouse, so a click on the dimmed strait reaches this menu
+	# and closes it. A ColorRect stops input by default.
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dim)
 
 	# A CenterContainer rather than a centre anchor preset: the frame's height
@@ -125,6 +139,14 @@ func _build_chrome() -> void:
 	# this. The menu already tried to read as "that button expanded" by borrowing
 	# its accent colour; with the boards it borrows the material too, which is the
 	# part that was doing the work on the sign.
+	#
+	# NOT the kit's SALVAGE SHOP frame, which was tried here and cannot hold this
+	# panel: the title is painted across its top rail, and at seven cards this
+	# panel is five times the width the artwork was drawn at, so the lettering
+	# stretched with the rail. Its scrap-metal frame has the same problem in a
+	# different place — the pipework in its middle stretched into streaks. Either
+	# needs the shop to be roughly the width it was drawn at, or the header cut
+	# out as a sprite of its own.
 	UITheme.paint(frame, PaintedBox.board(UITheme.WOOD, 5))
 	# A floor, not a cap: a level stocking more than COLUMNS * ROWS pieces widens
 	# the grid past this and the frame follows.
@@ -163,6 +185,13 @@ func _build_chrome() -> void:
 	# one that gets you out of a stuck level. It is also the shorter section, so
 	# putting it on top costs the pieces nothing: the grid still gets every row it
 	# asked for, just lower down.
+	# The truck upgrades, on an experimental build. Built here rather than in
+	# stock_for_level(), which is rebuilt on every level load — these are the one
+	# thing in the shop that is not per level, and rebuilding them with the
+	# catalogue would say the opposite.
+	if _upgrades != null and Experimental.on():
+		body.add_child(_build_upgrade_row())
+
 	_box_column = VBoxContainer.new()
 	_box_column.add_theme_constant_override(&"separation", 6)
 	body.add_child(_box_column)
@@ -460,6 +489,99 @@ func _build_box_row(box: BoxDef) -> Control:
 	return card
 
 
+## EXPERIMENTAL — the battery truck's two upgrades.
+##
+## The first things in the shop that stay bought: a piece is spent and an upgrade
+## isn't, and both being on the same counter is the point. Levelled rather than
+## priced per unit, so what the player reads is "two more dunks" rather than a
+## percentage.
+func _build_upgrade_row() -> Control:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 6)
+	column.add_child(_heading("TRUCK UPGRADES"))
+
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override(&"h_separation", GRID_GAP)
+	row.add_theme_constant_override(&"v_separation", GRID_GAP)
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
+	column.add_child(row)
+
+	row.add_child(_build_upgrade_card(
+		SalvageUpgrades.Kind.CAPACITY,
+		"BATTERY",
+		"How long the electric truck can run before it stops."
+	))
+	row.add_child(_build_upgrade_card(
+		SalvageUpgrades.Kind.SEALING,
+		"WATER SEALING",
+		"How much charge a dunk in the strait costs."
+	))
+	return column
+
+
+func _build_upgrade_card(kind: int, title: String, blurb: String) -> Control:
+	var card := PanelContainer.new()
+	UITheme.paint(card, PaintedBox.board(UITheme.CREAM, 0))
+	card.custom_minimum_size = Vector2(CARD_MIN + 40, 0)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 3)
+	card.add_child(column)
+
+	var name_label := Label.new()
+	name_label.text = title
+	name_label.add_theme_font_size_override(&"font_size", NAME_SIZE)
+	column.add_child(name_label)
+
+	var about := Label.new()
+	about.text = blurb
+	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_as_detail(about)
+	column.add_child(about)
+
+	var level := Label.new()
+	_as_detail(level)
+	column.add_child(level)
+
+	var effect := Label.new()
+	effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_as_detail(effect)
+	column.add_child(effect)
+
+	var buy := Button.new()
+	buy.custom_minimum_size = Vector2(0, 34)
+	buy.add_theme_font_size_override(&"font_size", DETAIL_SIZE + 1)
+	buy.pressed.connect(func() -> void: upgrade_requested.emit(kind))
+	column.add_child(buy)
+
+	_upgrade_rows[kind] = {&"card": card, &"level": level, &"effect": effect, &"buy": buy}
+	return card
+
+
+func _refresh_upgrades() -> void:
+	if _upgrades == null:
+		return
+	for kind: int in _upgrade_rows:
+		var widgets: Dictionary = _upgrade_rows[kind]
+		var level: Label = widgets[&"level"]
+		var effect: Label = widgets[&"effect"]
+		var buy: Button = widgets[&"buy"]
+		var at := _upgrades.level_of(kind as SalvageUpgrades.Kind)
+		var cost := _upgrades.cost_of(kind as SalvageUpgrades.Kind)
+
+		level.text = "Level %d of %d" % [at, SalvageUpgrades.MAX_LEVEL]
+		effect.text = _upgrades.effect_of(kind as SalvageUpgrades.Kind)
+		if cost < 0:
+			buy.text = "MAXED"
+			buy.disabled = true
+		else:
+			var affordable := _economy.can_afford(cost)
+			buy.text = ("UPGRADE  $%d" if affordable else "NEED $%d") % cost
+			buy.disabled = not affordable
+		_set_buy_style(buy)
+		var card: PanelContainer = widgets[&"card"]
+		card.modulate = Color.WHITE if not buy.disabled else Color(1, 1, 1, 0.55)
+
+
 ## A 1x1 texture, so a def with no artwork can still use the TextureRect path.
 func _swatch(color: Color) -> Texture2D:
 	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
@@ -480,6 +602,9 @@ func _refresh() -> void:
 		var buy: Button = widgets[&"buy"]
 
 		stock.text = "sold out" if left <= 0 else "%d left" % left
+		# The plate on the pipe states the reason it can't be pressed, so a
+		# disabled card never needs a tooltip to explain itself. The word BUY is
+		# painted into the pipe and stays put; only the plate changes.
 		buy.disabled = left <= 0 or not affordable
 		# The button states the reason it can't be pressed, so a disabled card
 		# never needs a tooltip to explain itself.
@@ -494,6 +619,8 @@ func _refresh() -> void:
 		var card: PanelContainer = widgets[&"card"]
 		card.modulate = Color.WHITE if not buy.disabled else Color(1, 1, 1, 0.55)
 
+	_refresh_upgrades()
+
 	for box: BoxDef in _box_buttons:
 		var button := _box_buttons[box]
 		button.disabled = not _economy.can_afford(box.price)
@@ -503,6 +630,11 @@ func _refresh() -> void:
 
 ## Green means "this spends money and will work". Disabled buttons keep the
 ## theme's grey, so the colour alone carries the affordability read.
+##
+## The kit's painted BUY pipe was tried here and taken back out: at card width
+## the pipe is a thin bar, the price needed a plate bolted over one end to be
+## readable at all, and the three states this button carries — affordable, too
+## dear, sold out — have nowhere to go on a sprite with one word painted into it.
 func _set_buy_style(button: Button) -> void:
 	if button.disabled:
 		button.remove_theme_stylebox_override(&"normal")

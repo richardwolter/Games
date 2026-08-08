@@ -17,6 +17,14 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 const CARD := Vector2(276, 190)
 const ART_HEIGHT := 116.0
 const GAP := 16
+## How many cards stand across before the flow wraps. Four fits the 1280 canvas
+## with the frame's border either side.
+const CARDS_ACROSS := 4
+## The LEVEL SELECTION plate over the frame's top rail: how tall it is drawn, and
+## how far above the frame's content rect it sits. Negative — the content rect
+## starts inside the border, and the plate belongs on the border.
+const TITLE_HEIGHT := 46.0
+const TITLE_RISE := -50.0
 ## How far into the backdrop the card's crop reaches: 2.6 keeps roughly the
 ## middle two fifths of the picture's height. High enough that the scenery reads
 ## at card size, low enough that the crop is still a view rather than a texture.
@@ -83,9 +91,36 @@ func _build() -> void:
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(column)
 
-	var heading := CenterContainer.new()
-	column.add_child(heading)
-	heading.add_child(UITheme.sign_label("CHOOSE A STRAIT"))
+	# The kit's hazard-striped frame, which paints LEVEL SELECTION across its top
+	# rail — so the CHOOSE A STRAIT sign that used to head this screen is gone
+	# rather than repeated an inch under it. Its painted map and padlocks are cut
+	# out of the slice, so the black backdrop above shows through behind the
+	# cards.
+	var framed := CenterContainer.new()
+	column.add_child(framed)
+	var frame := PanelContainer.new()
+	frame.add_theme_stylebox_override(&"panel", UITheme.kit_box("frame_levels_lg"))
+	framed.add_child(frame)
+
+	# The title, drawn over the frame's top rail at its own size rather than
+	# painted into the rail. The rail stretches to whatever width four cards need
+	# — five times the width the artwork was drawn at — and lettering stretched
+	# with it. The slicer cuts the plate out of the frame and rebuilds the rail
+	# behind it, so this is the same picture, unstretched, at any panel width.
+	#
+	# Parented to the frame, which lays every child out to its CONTENT rect, so
+	# the offsets that lift the plate onto the border are negative.
+	var plate := Control.new()
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(plate)
+	var title := UITheme.kit_image("levels_title", TITLE_HEIGHT)
+	title.anchor_left = 0.5
+	title.anchor_right = 0.5
+	title.offset_left = -title.custom_minimum_size.x * 0.5
+	title.offset_right = title.custom_minimum_size.x * 0.5
+	title.offset_top = TITLE_RISE
+	title.offset_bottom = TITLE_RISE + TITLE_HEIGHT
+	plate.add_child(title)
 
 	# A flow, so a fifth level wraps onto a second line instead of running off
 	# the side of the screen the day one is added.
@@ -93,18 +128,29 @@ func _build() -> void:
 	row.add_theme_constant_override(&"h_separation", GAP)
 	row.add_theme_constant_override(&"v_separation", GAP)
 	row.alignment = FlowContainer.ALIGNMENT_CENTER
-	column.add_child(row)
+	# A flow inside a shrink-to-fit frame has no width of its own to wrap
+	# against, and wrapped every card onto its own line — one column of four,
+	# taller than the screen. The width is stated instead: four cards across, and
+	# a fifth level would wrap under them.
+	row.custom_minimum_size = Vector2(
+		mini(_levels.size(), CARDS_ACROSS) * CARD.x
+			+ (mini(_levels.size(), CARDS_ACROSS) - 1) * GAP,
+		0
+	)
+	frame.add_child(row)
 
 	for i in _levels.size():
 		row.add_child(_build_card(i))
 
 	var back := CenterContainer.new()
 	column.add_child(back)
-	# The button says where it goes, because from here those are two different
-	# places — back into the strait you stepped out of, or out to the menu.
+	# CLOSE when this screen was opened from a strait, in the mustard of every
+	# modal's Close: arriving here from the game, the map is a panel over the run
+	# and closing it is what the player means. From the title it is a screen
+	# rather than a panel, and the way out is named.
 	var button := UITheme.plate_button(
-		"BACK TO STRAIT" if Campaign.return_to_game else "MAIN MENU",
-		UITheme.STEEL.darkened(0.34),
+		"CLOSE" if Campaign.return_to_game else "MAIN MENU",
+		UITheme.MUSTARD if Campaign.return_to_game else UITheme.STEEL.darkened(0.34),
 		Vector2(220, 42)
 	)
 	button.pressed.connect(_on_back)
@@ -134,11 +180,16 @@ func _build_card(index: int) -> Control:
 
 	# The level's own backdrop, cropped to the card. A locked one is drained of
 	# colour rather than blanked: you can see the place, you have not been there.
-	var well := PanelContainer.new()
-	var well_box := PaintedBox.board(UITheme.CREAM_DIM, 0)
-	well_box.radius = UITheme.RADIUS
-	well_box.set_margins(4, 4)
-	well.add_theme_stylebox_override(&"panel", well_box)
+	#
+	# A plain Control rather than a PanelContainer, and the picture anchored to
+	# fill it rather than sized by a container. The well used to be a painted
+	# cream board with the art laid inside it, which left a band of card colour
+	# around the picture — and an UNEVEN one, because a painted box reserves
+	# different room on each side for the border and shadow it draws, so the
+	# picture sat up and to the left with a fat cream margin down the right and
+	# along the bottom. Nothing is drawn behind the art now, so there is no
+	# background left to show through and no margins to be uneven.
+	var well := Control.new()
 	well.custom_minimum_size = Vector2(0, ART_HEIGHT)
 	well.clip_contents = true
 	column.add_child(well)
@@ -146,8 +197,10 @@ func _build_card(index: int) -> Control:
 	var art := TextureRect.new()
 	art.texture = _snippet(level)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	# Covers the well and centres the overflow, so the picture is always
+	# full-bleed and always centred whatever shape the crop came out.
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	art.custom_minimum_size = Vector2(0, ART_HEIGHT - 8)
+	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# Opaque either way: darkened and cooled towards slate for a locked level, so
 	# the place is still legible but plainly not yours yet.
 	if not playable:
@@ -176,12 +229,18 @@ func _build_card(index: int) -> Control:
 	)
 	column.add_child(best)
 
-	var play := UITheme.plate_button(
-		"PLAY" if playable else "LOCKED",
-		UITheme.AMBER if playable else UITheme.STEEL.darkened(0.34),
-		Vector2(0, 36)
-	)
-	play.disabled = not playable
+	# The dock's own START CROSSING plank, so the control that starts a strait is
+	# the same object here as it is in the game. A locked card keeps the plate:
+	# the sign has its wording painted in and cannot say LOCKED.
+	var play: BaseButton
+	if playable:
+		play = UITheme.art_button("start_crossing", PLAY_HEIGHT)
+		play.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	else:
+		play = UITheme.plate_button(
+			"LOCKED", UITheme.STEEL.darkened(0.34), Vector2(0, PLAY_HEIGHT)
+		)
+		play.disabled = true
 	play.pressed.connect(_on_pick.bind(index))
 	column.add_child(play)
 
@@ -206,16 +265,22 @@ func _build_scores_row(index: int, crossed: bool) -> Control:
 		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return spacer
 
-	var scores := UITheme.plate_button(
-		"LEADERBOARD", UITheme.STEEL.darkened(0.34), Vector2(0, SCORES_HEIGHT)
-	)
+	# The kit's painted shield sign, the same control as SCORES in the game's
+	# corner — one leaderboard button wherever you meet it.
+	var scores := UITheme.kit_button("btn_leaderboard", SCORES_HEIGHT)
+	scores.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	scores.pressed.connect(_show_scores.bind(index))
 	return scores
 
 
 ## Shorter than PLAY. Looking at the board is the secondary thing to do on a card
-## whose whole purpose is to start a level.
-const SCORES_HEIGHT := 28.0
+## whose whole purpose is to start a level. Taller than the 28 the plain plate
+## used: the painted sign hangs a shield below its bar, and the bar is the part
+## that has to stay readable.
+const SCORES_HEIGHT := 44.0
+## The START CROSSING plank on a card. Taller than the plate it replaces: the
+## sign is a painted plank with a truck on it and goes illegible below this.
+const PLAY_HEIGHT := 64.0
 
 
 ## The leaderboard for one strait, without entering it.

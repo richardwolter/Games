@@ -7,6 +7,11 @@ const CAR_SCENE := preload("res://scenes/car.tscn")
 
 enum Result { SUCCESS, DROWNED, STALLED }
 
+## Which truck goes out. DIESEL is the game as it has always been; BATTERY is the
+## experimental one, which runs on a charge that the water eats. Only reachable on
+## an --experimental build — the picker that sets it isn't built otherwise.
+enum Truck { DIESEL, BATTERY }
+
 signal attempt_started()
 signal attempt_finished(result: Result, progress: float)
 
@@ -26,6 +31,13 @@ signal attempt_finished(result: Result, progress: float)
 
 ## Handed on to every truck this spawns, so its tyres can drip. Set by Main.
 var water: WaterBody = null
+
+var truck_type: Truck = Truck.DIESEL
+## This level's multiplier on drive torque and top speed. See LevelDef.truck_power.
+var truck_power: float = 1.0
+## The persistent upgrade store, for the battery it hands each electric truck.
+## Null on a default build, and then truck_type never leaves DIESEL either.
+var upgrades: SalvageUpgrades = null
 
 var car: Car = null
 ## The truck sitting on the left shore between attempts. Not the same object as
@@ -50,10 +62,14 @@ func _ready() -> void:
 ## Progress is measured across the water only — the run-up along the left shore
 ## is free distance and would otherwise show as 20-odd percent before the car has
 ## touched the bridge at all.
-func set_course(start: Vector2, goal: float) -> void:
+## `water_edge_x` is the near bank. It used to be inferred by mirroring the goal,
+## which stopped being the same thing once a level could put its goal up a hill
+## on the far side: the mirror landed behind the start line and the truck showed
+## progress before it had moved.
+func set_course(start: Vector2, goal: float, water_edge_x: float) -> void:
 	start_position = start
 	goal_x = goal
-	progress_from_x = -goal + 80.0
+	progress_from_x = water_edge_x
 	# The start line just moved, so the parked truck has to move with it. This is
 	# also what puts it on the shore in the first place, on the first level load.
 	if _container != null:
@@ -78,12 +94,26 @@ func park() -> void:
 		return
 	parked = CAR_SCENE.instantiate() as Car
 	parked.position = start_position - Vector2(0, Car.RIDE_HEIGHT)
+	# Paint only, never a live battery: the parked truck is frozen and nothing
+	# about it ticks. What it has to do is show which truck START will send.
+	parked.battery_powered = truck_type == Truck.BATTERY
 	_container.add_child(parked)
 	for body: PhysicsBody2D in _bodies_of(parked):
 		if body is RigidBody2D:
 			(body as RigidBody2D).freeze = true
 		body.collision_layer = 0
 		body.collision_mask = 0
+
+
+## Swap which truck goes out. Refused mid-attempt — the truck is already on the
+## bridge — and otherwise rebuilds the parked one, so the shore always shows the
+## thing START is going to send.
+func set_truck(kind: Truck) -> void:
+	if is_running or truck_type == kind:
+		return
+	truck_type = kind
+	unpark()
+	park()
 
 
 func unpark() -> void:
@@ -108,6 +138,14 @@ func start_crossing() -> void:
 	car = CAR_SCENE.instantiate() as Car
 	car.position = start_position - Vector2(0, Car.RIDE_HEIGHT)
 	car.water = water
+	# Before the tree, so the truck never spends a tick on the default figures.
+	car.drive_torque *= truck_power
+	car.max_wheel_speed *= truck_power
+	# Before it enters the tree: Car._ready() is what connects the splash, and it
+	# only does so for a truck that already has a battery to drain.
+	if truck_type == Truck.BATTERY and upgrades != null:
+		car.battery = upgrades.make_battery()
+		car.battery_powered = true
 	_container.add_child(car)
 	car.start()
 

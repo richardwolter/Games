@@ -190,11 +190,11 @@ func _build_menu() -> void:
 	quit.pressed.connect(func() -> void: get_tree().quit())
 	right.add_child(quit)
 
-	# No painted sign for this one on the sheet, so it takes the painted plate —
-	# the same control as the one in the corner of the game scene, so settings is
-	# one recognisable object wherever you meet it, rather than pretending to be
-	# part of the artwork.
-	var settings := UITheme.plate_button("SETTINGS", UITheme.SLATE, Vector2(160, 34))
+	# The kit's painted SETTINGS sign — the same control as the one in the corner
+	# of the game scene, so settings is one recognisable object wherever you meet
+	# it. Taller here than in that corner: this screen has the room, and the
+	# corner does not.
+	var settings := UITheme.kit_button("btn_settings", 38.0)
 	settings.pressed.connect(_on_settings_pressed)
 	var settings_row := HBoxContainer.new()
 	settings_row.alignment = BoxContainer.ALIGNMENT_CENTER

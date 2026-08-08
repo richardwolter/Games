@@ -71,6 +71,23 @@ func _initialize() -> void:
 	var h := image.get_height()
 	var new_w := int(round(w * factor))
 	var new_h := int(round(h * factor))
+
+	# `--aspect` is the fix for a STRETCHED backdrop, which is a different fault
+	# from a backdrop that is too close and needs a different lever.
+	#
+	# Backdrop.fit_to() scales x and y independently, so the painting is squashed
+	# to whatever shape the level's camera bounds are: a wide strait stretches the
+	# picture sideways and everything in it comes out fat. Nothing in the game can
+	# correct that, because the fit is what guarantees no visible edge — the only
+	# cure is to hand it a canvas already the right shape.
+	#
+	# The number to pass is the level's own bounds aspect, which
+	# tools/backdrop_aspect.gd works out from the LevelDef. Extra width is added
+	# as margin, never taken from the painting, so this can only ever push the
+	# subject further from the edges.
+	var aspect: float = float(args.get("aspect", 0.0))
+	if aspect > 0.0:
+		new_w = maxi(new_w, int(round(float(new_h) * aspect)))
 	# Horizontally centred; vertically placed so the horizon lands in the middle
 	# of the new canvas, which spends the added pixels on sky rather than on more
 	# of the foreground nobody sees.

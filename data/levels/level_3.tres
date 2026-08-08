@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelDef" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="LevelDef" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
 [ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
@@ -11,12 +11,20 @@
 [ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="9_bronze"]
 [ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="10_silver"]
 [ext_resource type="Resource" path="res://data/boxes/gold_box.tres" id="11_gold"]
+[ext_resource type="Texture2D" path="res://art/background_quarry.png" id="12_quarry"]
 
 [resource]
 script = ExtResource("1_level")
 display_name = "3 — The Narrows"
 half_width = 1800.0
 max_depth = 620.0
+backdrop = ExtResource("12_quarry")
+backdrop_horizon = 0.5
+plant_density = 0.35
+fish_density = 0.0
+pillar_width = 260.0
+pillar_rise = 70.0
+pillar_flare = 2.4
 reward_scale = 0.7
 shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge"), ExtResource("7_beam"), ExtResource("8_pontoon")])
 shop_stock = PackedInt32Array(16, 9, 12, 9, 4, 6, 4)

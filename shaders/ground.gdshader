@@ -37,6 +37,27 @@ uniform vec4 algae_color : source_color = vec4(0.26, 0.38, 0.26, 1.0);
 uniform float algae_mix : hint_range(0.0, 1.0) = 0.0;
 
 uniform float crust_depth = 26.0;
+// 1 when the mesh carries its own depth-below-its-top-face in its vertex
+// colour, which world.gd fills in for the banks.
+//
+// The crust is a sunlit skin on the top face of dry ground, and its depth used
+// to be measured from the WATERLINE. On a flat level those are the same line and
+// it worked. On a level whose far bank climbs, every fragment of the climb is
+// above the waterline, so the crust term saturated across the whole hill and
+// painted it one flat slab of crust colour — a pale mound with no rock in it,
+// sitting next to ground that had plenty.
+uniform float local_depth : hint_range(0.0, 1.0) = 0.0;
+// World units per unit of that colour. MUST MATCH World.DEPTH_IN_COLOUR.
+uniform float depth_in_colour = 4000.0;
+// 1 for ground that is dry because it stands ABOVE THE WATERLINE rather than
+// because it is beyond the bank.
+//
+// The wet/dry split is normally horizontal — |x| past the bank is dry — which is
+// the whole truth for a strait cut between two shores. A pillar standing in the
+// middle of the water is at x = 0, so by that measure every part of it is wet,
+// including the head in the open air. Keyed on height instead, it is wet up to
+// the waterline and dry above it, which is what a rock in water actually is.
+uniform float dry_by_height : hint_range(0.0, 1.0) = 0.0;
 uniform float strata_depth = 520.0;
 uniform float strata_strength = 0.055;
 // Kept low. An early version ran the mottling at 0.10 and the rock came out
@@ -52,6 +73,8 @@ uniform float fade_depth = 700.0;
 uniform float detail : hint_range(0.0, 1.0) = 1.0;
 
 varying vec2 world_pos;
+// Depth below this mesh's own top face, unpacked from the vertex colour.
+varying float mesh_depth;
 
 // Cheap hash noise. No texture, no setup, and at these amplitudes the pattern's
 // flaws are invisible.
@@ -72,6 +95,7 @@ float value_noise(vec2 p) {
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
+	mesh_depth = COLOR.r * depth_in_colour;
 }
 
 void fragment() {
@@ -84,6 +108,14 @@ void fragment() {
 		waterline_x - shore_blend,
 		waterline_x + shore_blend,
 		abs(world_pos.x) + wobble
+	);
+	// The same crossover turned on its side, for rock that stands out of the
+	// water rather than beside it. Wobbled by the same noise, so the tide line
+	// around a pillar is as ragged as the one along the banks.
+	shore_mix = mix(
+		shore_mix,
+		smoothstep(shore_blend * 0.25, -shore_blend * 0.25, below + wobble),
+		dry_by_height
 	);
 
 	vec4 shallow = mix(rock_color, sand_color, shore_mix);
@@ -134,8 +166,13 @@ void fragment() {
 
 	// Sunlit crust along the top of the dry ground, with a broken lower edge.
 	// Suppressed under water, where there is no sun to bake anything.
+	//
+	// Measured down from the ground's own top face where the mesh knows where
+	// that is, and from the waterline otherwise — the two agree on flat ground,
+	// and only the first is right on a hill.
+	float from_top = mix(below, mesh_depth, local_depth);
 	float crust_line = crust_depth * (0.55 + 0.9 * value_noise(world_pos * 0.02));
-	float crust = (1.0 - smoothstep(0.0, crust_line, below)) * shore_mix;
+	float crust = (1.0 - smoothstep(0.0, crust_line, from_top)) * shore_mix;
 	col = mix(col, crust_color, clamp(crust, 0.0, 1.0));
 
 	// Algae, on the strip world.gd lays along the seabed line. Thinned out as it

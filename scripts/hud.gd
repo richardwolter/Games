@@ -35,6 +35,11 @@ signal load_blueprint_requested(index: int)
 signal replay_requested(record_video: bool)
 ## Cut a replay short — the SKIP button, or Escape.
 signal replay_skip_requested()
+## Experimental only. Buy a level of a salvage upgrade (SalvageUpgrades.Kind), or
+## swap which truck goes out (CrossingManager.Truck). Both carry plain ints so the
+## HUD does not have to know either enum's shape.
+signal upgrade_requested(kind: int)
+signal truck_type_requested(kind: int)
 
 ## Belt cards are square and uniform, so the row reads as a rack of parts.
 const CARD_SIZE := 62
@@ -45,14 +50,24 @@ const CARD_PILL_HEIGHT := 18
 const BANNER_HOLD := 4.0
 ## The colour the lettering fills with as the crossing advances.
 const CHARGE_TINT := Color("3fbf4a")
-## The settings knob in the top-right, and its inset from the screen edge.
-const SETTINGS_SIZE := Vector2(44, 40)
+## The three painted signs on the top-right rail, and their inset from the screen
+## edge.
+##
+## Height, not size: the kit sprites carry their own wording and their own
+## proportions, and each one's width falls out of that. Kept to 26px because the
+## bars are nearly five times as wide as they are tall — at the 40px the plates
+## used, the three of them ate a third of the window across the top.
+const CORNER_HEIGHT := 26.0
+## The leaderboard sign is a shield with a bar hung off it, so it is half again
+## as tall for its width. Matched on the bar rather than on the whole sprite, or
+## it comes out a third narrower than the two beside it.
+const SCORES_HEIGHT := 34.0
+## How far the two plain bars drop so their lettering lines up with the
+## leaderboard's. Its bar sits at 0.536 of the sprite's height — measured, not
+## guessed, because the shield below it is what makes the sprite tall — so the
+## bars are dropped by the difference between the two centres.
+const BAR_DROP := SCORES_HEIGHT * 0.536 - CORNER_HEIGHT * 0.5
 const SETTINGS_MARGIN := 12.0
-## The LEVELS button beside it. Same height, wider, because it carries a word.
-const SELECT_SIZE := Vector2(96, 40)
-## SCORES, third along the same rail. Narrower than LEVELS: it is the least-used
-## of the three and the shorter word does not need the width.
-const SCORES_SIZE := Vector2(86, 40)
 ## Gap between the three corner buttons.
 const CORNER_GAP := 8.0
 
@@ -63,6 +78,23 @@ var _inventory: Inventory
 var _shop: Shop
 var _levels: LevelManager
 var _blueprints: Blueprints
+## The experimental systems. Present on every build, but nothing that reads them
+## is constructed unless Experimental.on().
+var _upgrades: SalvageUpgrades
+var _ropes: RopeManager
+## The truck picker, the charge gauge and the rope tab. All null on a normal
+## build, and every use of them is null-guarded rather than flag-checked twice.
+var _truck_button: Button
+var _battery_bar: ProgressBar
+var _battery_panel: Control
+var _rope_button: Button
+var _rope_label: Label
+## Rope count and allowance as the tab last showed them, so the poll is an
+## integer compare. The allowance is in here because it changes with the level and
+## nothing about the ropes themselves moves when it does — the tab read "0 / 1" on
+## a strait that allows two.
+var _rope_shown: int = -1
+var _rope_limit_shown: int = -1
 ## The online board. A child of the HUD rather than an autoload: it is only ever
 ## read from the crossing panel, and its cache should live exactly as long as the
 ## screen that shows it.
@@ -99,7 +131,8 @@ var _placed_label: Label
 ## fill that lurches backwards reads as a glitch rather than as a setback.
 var _shown_progress: float = 0.0
 var _remove_car_button: Button
-var _next_button: Button
+## A TextureButton, not a Button: it is a painted sign rather than a plate.
+var _next_button: BaseButton
 var _banner: Label
 var _banner_timer: float = 0.0
 ## True while an attempt is running, when nothing may be added to the bridge.
@@ -165,8 +198,12 @@ func build(
 	inventory: Inventory,
 	shop: Shop,
 	levels: LevelManager,
-	blueprints: Blueprints
+	blueprints: Blueprints,
+	upgrades: SalvageUpgrades = null,
+	ropes: RopeManager = null
 ) -> void:
+	_upgrades = upgrades
+	_ropes = ropes
 	_spawner = spawner
 	_crossing = crossing
 	_economy = economy
@@ -191,7 +228,9 @@ func build(
 	# has a rect to be placed against.
 	root.add_child(_build_blueprints_button())
 	root.add_child(_build_replay_button())
+	root.add_child(_build_contextual())
 	_place_blueprints_button.call_deferred()
+	_place_contextual.call_deferred()
 	_header_strip = _build_header()
 	root.add_child(_header_strip)
 	_corner = _build_settings_button()
@@ -207,9 +246,18 @@ func build(
 
 	_shop_menu = ShopMenu.new()
 	root.add_child(_shop_menu)
-	_shop_menu.setup(_economy, _shop)
+	_shop_menu.setup(_economy, _shop, _upgrades)
 	_shop_menu.buy_requested.connect(func(def: ObjectDef) -> void: buy_requested.emit(def))
 	_shop_menu.box_requested.connect(func(box: BoxDef) -> void: box_requested.emit(box))
+	_shop_menu.upgrade_requested.connect(func(kind: int) -> void: upgrade_requested.emit(kind))
+
+	if Experimental.on():
+		root.add_child(_build_battery_gauge())
+		root.add_child(_build_rope_tab())
+		_upgrades.changed.connect(_refresh_truck_button)
+		_ropes.changed.connect(_refresh_rope_tab)
+		_refresh_truck_button()
+		_refresh_rope_tab()
 
 	_nudge_dismissed = Prefs.get_flag(NUDGE_PREF)
 
@@ -230,10 +278,29 @@ func build(
 ## rather than in the workbench, so it has to read as a tab attached to the dock
 ## and not as a piece of dock that came loose.
 const BLUEPRINTS_GAP := 5.0
-const BLUEPRINTS_SIZE := Vector2(96.0, 24.0)
-## REPLAY, parked on the same strip immediately left of SAVED BUILDS. Same
-## height so the two read as one row of tabs rather than two loose plates.
-const REPLAY_SIZE := Vector2(76.0, 24.0)
+## Painted signs from the kit now, so the widths come from the artwork rather
+## than from a chosen rectangle — both are set in _build_*_button() below.
+const BLUEPRINTS_HEIGHT := 26.0
+## REPLAY & SAVE, parked on the same strip immediately left of SAVED BUILDS. Its
+## sprite is an arrow with a camera on it and is much taller for its width, so
+## the two tabs match on their bar rather than on their overall height.
+const REPLAY_HEIGHT := 44.0
+## The painted NEXT CROSSING signpost, centred over the water above the dock.
+## Bigger than the 34 it had wedged in the dock row, without becoming the
+## picture: at 86 the sign was reading as scenery rather than as a control.
+const NEXT_HEIGHT := 44.0
+## REMOVE CAR shares that place mid-attempt. Long and shallow, the opposite
+## shape, so the two never read as the same control in the same spot.
+const REMOVE_CAR_SIZE := Vector2(240.0, 30.0)
+## How far the contextual control floats above the hint line, and how tall that
+## line of small type is.
+const CONTEXTUAL_GAP := 8.0
+const HINT_LINE := 18.0
+var _blueprints_size := Vector2(96.0, BLUEPRINTS_HEIGHT)
+var _replay_size := Vector2(76.0, REPLAY_HEIGHT)
+## Whether NEXT CROSSING was up when a replay started, so leaving the replay puts
+## the screen back the way it was rather than guessing.
+var _next_shown: bool = false
 const REPLAY_GAP := 6.0
 
 
@@ -249,14 +316,8 @@ const REPLAY_GAP := 6.0
 ## destructive nor a commitment: parked over the commitment, it is easy to find
 ## when you want it and never on the way to anything else.
 func _build_blueprints_button() -> Control:
-	var builds := UITheme.plate_button(
-		"SAVED BUILDS", UITheme.ACCENT.darkened(0.42), BLUEPRINTS_SIZE
-	)
-	# Small type, not body: the plate is 24px tall and the label has to fit inside
-	# it rather than setting its height. A Button's minimum is the larger of its
-	# text and custom_minimum_size, so anything bigger here silently wins and the
-	# tab grows back into the size it was lifted out of.
-	builds.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	var builds := UITheme.kit_button("btn_saved_builds", BLUEPRINTS_HEIGHT)
+	_blueprints_size = UITheme.kit_size("btn_saved_builds", BLUEPRINTS_HEIGHT)
 	builds.tooltip_text = "Save this bridge to a slot, or bring a saved one back"
 	builds.pressed.connect(_open_blueprints)
 	_blueprints_button = builds
@@ -275,15 +336,90 @@ func _place_blueprints_button() -> void:
 	var slot := _start_slot.get_global_rect()
 	if slot.size.x <= 0.0:
 		return
-	var strip := _dock.get_global_rect().position.y - BLUEPRINTS_GAP - BLUEPRINTS_SIZE.y
-	_blueprints_button.size = BLUEPRINTS_SIZE
+	# The taller of the two tabs sets the strip, and the shorter one is centred on
+	# it. REPLAY & SAVE is an arrow with a camera on it and stands half again as
+	# tall as SAVED BUILDS; sharing a top or a bottom edge made the pair look like
+	# one had slipped.
+	var floor_y := _dock.get_global_rect().position.y - BLUEPRINTS_GAP
+	_blueprints_button.size = _blueprints_size
+	var tall: float = maxf(_blueprints_size.y, _replay_size.y)
 	_blueprints_button.position = Vector2(
-		slot.position.x + (slot.size.x - BLUEPRINTS_SIZE.x) * 0.5, strip
+		slot.position.x + (slot.size.x - _blueprints_size.x) * 0.5,
+		floor_y - tall + (tall - _blueprints_size.y) * 0.5
 	)
 	if _replay_button != null:
-		_replay_button.size = REPLAY_SIZE
+		_replay_button.size = _replay_size
 		_replay_button.position = Vector2(
-			_blueprints_button.position.x - REPLAY_GAP - REPLAY_SIZE.x, strip
+			_blueprints_button.position.x - REPLAY_GAP - _replay_size.x,
+			floor_y - tall + (tall - _replay_size.y) * 0.5
+		)
+
+
+## REMOVE CAR and NEXT CROSSING: the two contextual controls, on the strait
+## rather than in the dock.
+##
+## They share one place because at most one of them is ever up, and that place is
+## the middle of the band between the dock and the hint line — the widest empty
+## strip on the screen, and the one the eye is already on when an attempt ends.
+## In the dock they were a 126px plate wedged between the belt and START, which
+## is the worst seat in the house for the one control the game wants pressed
+## after a crossing.
+func _build_contextual() -> Control:
+	var strip := Control.new()
+	strip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Thin and wide, so it reads as a bar laid over the water rather than as a
+	# button that wandered out of the dock. It appears mid-attempt, when the
+	# player is watching the truck and not the chrome.
+	_remove_car_button = UITheme.plate_button(
+		"REMOVE CAR", UITheme.STEEL.darkened(0.34), REMOVE_CAR_SIZE
+	)
+	_remove_car_button.add_theme_font_size_override(
+		&"font_size", UITheme.FONT_SIZE_SMALL
+	)
+	_remove_car_button.pressed.connect(func() -> void: recall_car_requested.emit())
+	_remove_car_button.visible = false
+	strip.add_child(_remove_car_button)
+
+	# The painted signpost, pointing the way it sends you, and big: it is the
+	# reward for having got across, and the only thing on screen at that moment
+	# worth pressing.
+	_next_button = UITheme.kit_button("btn_next_crossing", NEXT_HEIGHT)
+	_next_button.pressed.connect(func() -> void: next_level_requested.emit())
+	_next_button.visible = false
+	strip.add_child(_next_button)
+	return strip
+
+
+## Centres whichever of the two is up in the band above the dock.
+##
+## Driven off the dock's live rect for the same reason the tabs are: the dock's
+## height follows its contents, so a constant here puts the bar through the
+## belt on one level and over the water on another.
+func _place_contextual() -> void:
+	if _dock == null or _next_button == null:
+		return
+	var top := _dock.get_global_rect().position.y
+	if top <= 0.0:
+		return
+	var width := get_viewport().get_visible_rect().size.x
+	# Built from the same terms the hint line is pinned with — dock, tab strip,
+	# hint — rather than read off the hint's rect: this runs on the dock's resort,
+	# which happens before the hints have been re-pinned, so the live rect is one
+	# layout out of date and put the sign inside the dock.
+	var band := (
+		top
+		- BLUEPRINTS_GAP
+		- maxf(_blueprints_size.y, _replay_size.y)
+		- 8.0
+		- HINT_LINE
+	)
+	for button: Control in [_next_button, _remove_car_button]:
+		var size := button.custom_minimum_size
+		button.size = size
+		button.position = Vector2(
+			(width - size.x) * 0.5, band - CONTEXTUAL_GAP - size.y
 		)
 
 
@@ -298,10 +434,8 @@ func _place_blueprints_button() -> void:
 ## Hidden until there is something to watch, so it never offers a replay of
 ## nothing.
 func _build_replay_button() -> Control:
-	var replay := UITheme.plate_button(
-		"REPLAY", UITheme.ACCENT.darkened(0.42), REPLAY_SIZE
-	)
-	replay.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	var replay := UITheme.kit_button("btn_replay_save", REPLAY_HEIGHT)
+	_replay_size = UITheme.kit_size("btn_replay_save", REPLAY_HEIGHT)
 	replay.tooltip_text = "Watch the last attempt again"
 	replay.visible = false
 	replay.pressed.connect(func() -> void: replay_requested.emit(false))
@@ -378,8 +512,13 @@ func set_replay_available(available: bool) -> void:
 ## SAVE VIDEO button baked into the video is the one thing that cannot be edited
 ## out afterwards.
 func enter_replay_mode(recording: bool) -> void:
+	# The contextual signpost goes too, and its state is remembered rather than
+	# recomputed: it is up exactly when the last attempt crossed, which is also
+	# when somebody is most likely to watch the replay — so without this the
+	# replay of the crossing has NEXT CROSSING standing in the middle of it.
+	_next_shown = _next_button.visible
 	for node: Control in [_dock, _header_strip, _corner, _hints, _blueprints_button,
-			_replay_button]:
+			_replay_button, _next_button, _remove_car_button]:
 		if node != null:
 			node.visible = false
 	# The banner survives an unrecorded replay: it is how a refused SAVE VIDEO
@@ -394,6 +533,8 @@ func exit_replay_mode(replay_available: bool) -> void:
 		if node != null:
 			node.visible = true
 	_blueprints_button.visible = true
+	# REMOVE CAR is left alone: _process puts it back the moment there is a car.
+	_next_button.visible = _next_shown
 	_replay_bar.visible = false
 	set_replay_available(replay_available)
 
@@ -430,6 +571,7 @@ func _build_panel() -> Control:
 	# loses a piece — and the dock, being full-width, never emits resized for it.
 	# Following the row's own re-sort catches that as well as window resizes.
 	row.sort_children.connect(_place_blueprints_button)
+	row.sort_children.connect(_place_contextual)
 
 	row.add_child(_build_shop_button())
 	row.add_child(_build_piece_belt())
@@ -575,14 +717,11 @@ func _update_bridge_label(counts: Dictionary[ObjectDef, int]) -> void:
 ## It's a control rather than a readout, so it doesn't belong beside them — and
 ## it's needed rarely enough that it has no business in the dock.
 func _build_settings_button() -> Control:
-	# The same dark plate as the level readout in the opposite corner, so the two
-	# corners are a matched pair rather than two unrelated objects. The word is
-	# spelled out instead of a gear glyph: the glyph rendered from the default
-	# font, which is the one thing on screen that isn't painted.
-	# A music note, because volume is the only setting there is — and the note is
-	# a shape rather than a word, which is what a corner button that is pressed
-	# once a session wants.
-	var button := UITheme.plate_button("", UITheme.SLATE, SETTINGS_SIZE, true)
+	# A painted sign from the kit, gear and word both drawn in. The plate it
+	# replaces carried a music note because a glyph would have been the one thing
+	# on screen that wasn't painted; the sign settles that by being painted.
+	var settings_size := UITheme.kit_size("btn_settings", CORNER_HEIGHT)
+	var button := UITheme.kit_button("btn_settings", CORNER_HEIGHT)
 	button.tooltip_text = "Settings"
 
 	# Anchored with explicit offsets rather than by setting `position` on a
@@ -593,9 +732,9 @@ func _build_settings_button() -> Control:
 	button.anchor_left = 1.0
 	button.anchor_right = 1.0
 	button.offset_right = -SETTINGS_MARGIN
-	button.offset_left = -SETTINGS_MARGIN - SETTINGS_SIZE.x
-	button.offset_top = SETTINGS_MARGIN
-	button.offset_bottom = SETTINGS_MARGIN + SETTINGS_SIZE.y
+	button.offset_left = -SETTINGS_MARGIN - settings_size.x
+	button.offset_top = SETTINGS_MARGIN + BAR_DROP
+	button.offset_bottom = SETTINGS_MARGIN + BAR_DROP + settings_size.y
 	button.pressed.connect(func() -> void:
 		_confirm_overlay = UITheme.settings(_dock.get_parent())
 	)
@@ -604,14 +743,15 @@ func _build_settings_button() -> Control:
 	# Changing strait used to be reachable only from the panel that appears after
 	# a crossing, which meant the one player who most wants out — somebody stuck
 	# on a level they cannot solve — was the one player with no way to leave.
-	var levels := UITheme.plate_button("LEVELS", UITheme.SLATE, SELECT_SIZE)
+	var select_size := UITheme.kit_size("btn_level_selection", CORNER_HEIGHT)
+	var levels := UITheme.kit_button("btn_level_selection", CORNER_HEIGHT)
 	levels.tooltip_text = "Choose another strait"
 	levels.anchor_left = 1.0
 	levels.anchor_right = 1.0
-	levels.offset_right = -SETTINGS_MARGIN - SETTINGS_SIZE.x - CORNER_GAP
-	levels.offset_left = levels.offset_right - SELECT_SIZE.x
-	levels.offset_top = SETTINGS_MARGIN
-	levels.offset_bottom = SETTINGS_MARGIN + SELECT_SIZE.y
+	levels.offset_right = -SETTINGS_MARGIN - settings_size.x - CORNER_GAP
+	levels.offset_left = levels.offset_right - select_size.x
+	levels.offset_top = SETTINGS_MARGIN + BAR_DROP
+	levels.offset_bottom = SETTINGS_MARGIN + BAR_DROP + select_size.y
 	levels.pressed.connect(func() -> void: level_select_requested.emit())
 
 	# SCORES, left of LEVELS. The board used to exist in exactly two places: the
@@ -620,14 +760,18 @@ func _build_settings_button() -> Control:
 	# means leaving the strait to look at it. The number the board ranks is the
 	# price of the bridge you are building right now, so it wants to be readable
 	# while you are building it.
-	var scores := UITheme.plate_button("SCORES", UITheme.SLATE, SCORES_SIZE)
+	var scores_size := UITheme.kit_size("btn_leaderboard", SCORES_HEIGHT)
+	var scores := UITheme.kit_button("btn_leaderboard", SCORES_HEIGHT)
 	scores.tooltip_text = "This strait's leaderboard"
 	scores.anchor_left = 1.0
 	scores.anchor_right = 1.0
 	scores.offset_right = levels.offset_left - CORNER_GAP
-	scores.offset_left = scores.offset_right - SCORES_SIZE.x
+	scores.offset_left = scores.offset_right - scores_size.x
+	# Hung from the window's own margin, and the two plain bars are dropped by
+	# BAR_DROP to line up with THIS one's bar — the shield makes this sprite
+	# taller and puts its bar lower than a top-aligned bar would sit.
 	scores.offset_top = SETTINGS_MARGIN
-	scores.offset_bottom = SETTINGS_MARGIN + SCORES_SIZE.y
+	scores.offset_bottom = SETTINGS_MARGIN + scores_size.y
 	scores.pressed.connect(_open_scoreboard)
 
 	# All three returned as one node, since the caller adds a single child.
@@ -681,7 +825,7 @@ func _build_meter() -> Control:
 	_meter.anchor_right = 1.0
 	_meter.offset_left = -140.0
 	_meter.offset_right = -12.0
-	_meter.offset_top = SETTINGS_MARGIN + SETTINGS_SIZE.y + 6.0
+	_meter.offset_top = SETTINGS_MARGIN + SCORES_HEIGHT + 6.0
 	_meter.offset_bottom = _meter.offset_top + 20.0
 	_meter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_meter.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
@@ -735,35 +879,19 @@ func _build_actions() -> Control:
 	UITheme.as_caption(_placed_label)
 	recall_column.add_child(_placed_label)
 
-	# Both of these are contextual, so they share one slot: at most one is ever
-	# up, and when neither is the dock simply doesn't have a gap there.
-	var contextual := VBoxContainer.new()
-	contextual.add_theme_constant_override(&"separation", 4)
-	row.add_child(contextual)
+	# The truck picker, on experimental builds only. Beside the contextual slot
+	# rather than next to START: it decides what START sends, which is a thing you
+	# set once and then forget, not part of the press itself.
+	if Experimental.on():
+		_truck_button = UITheme.plate_button("DIESEL", UITheme.STEEL.darkened(0.34), Vector2(104, 0))
+		_truck_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_truck_button.pressed.connect(_on_truck_pressed)
+		row.add_child(_truck_button)
 
-	# Both are painted plates now. They sit between hand-painted signs, and a flat
-	# grey rectangle in that gap was the weakest thing in the dock.
-	#
-	# Steel for REMOVE CAR and gold for NEXT LEVEL: one takes something off the
-	# strait, the other is the reward for having got across it, and they occupy
-	# the same slot — so the colour has to say which one is up without being read.
-	_remove_car_button = UITheme.plate_button(
-		"REMOVE CAR", UITheme.STEEL.darkened(0.34), Vector2(126, 0)
-	)
-	_remove_car_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_remove_car_button.pressed.connect(func() -> void: recall_car_requested.emit())
-	_remove_car_button.visible = false
-	contextual.add_child(_remove_car_button)
-
-	# No arrow: the default font has no glyph for → and Godot logs a missing-glyph
-	# error every time the button is drawn.
-	_next_button = UITheme.plate_button(
-		"NEXT LEVEL", UITheme.AMBER, Vector2(126, 0)
-	)
-	_next_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_next_button.pressed.connect(func() -> void: next_level_requested.emit())
-	_next_button.visible = false
-	contextual.add_child(_next_button)
+	# REMOVE CAR and NEXT CROSSING used to live here, in a slot of their own
+	# between the belt and START. They are on the strait now, centred above the
+	# dock — see _build_contextual(). Taking them out of the row also stops START
+	# sliding sideways every time one of them appears.
 
 	# The START slot is three layers in a plain Control, because the fill has to
 	# go BEHIND the sign and a TextureButton draws its own texture before its
@@ -803,6 +931,144 @@ func _build_actions() -> Control:
 	_start_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	slot.add_child(_start_button)
 	return row
+
+
+## EXPERIMENTAL — the battery truck and the rope.
+##
+## Everything from here to the end of this block is built only when
+## Experimental.on(). It is deliberately additive: nothing above it changes shape
+## on a normal build, so deleting this block and the flag is all it takes to drop
+## either idea if it doesn't work out.
+
+
+## For the headless check, which has to be able to prove the picker ISN'T there
+## on a normal build.
+func truck_button() -> Button:
+	return _truck_button
+
+
+func _on_truck_pressed() -> void:
+	if _upgrades == null or build_locked or _crossing.is_running:
+		return
+	truck_type_requested.emit(
+		CrossingManager.Truck.DIESEL
+		if _upgrades.truck_type == CrossingManager.Truck.BATTERY
+		else CrossingManager.Truck.BATTERY
+	)
+
+
+func _refresh_truck_button() -> void:
+	if _truck_button == null or _upgrades == null:
+		return
+	var electric: bool = _upgrades.truck_type == CrossingManager.Truck.BATTERY
+	_truck_button.text = "BATTERY" if electric else "DIESEL"
+	_truck_button.tooltip_text = (
+		"Battery truck — %d charge, %d per dunk. Click for the diesel."
+		% [int(_upgrades.capacity()), roundi(_upgrades.splash_drain())]
+		if electric else
+		"Diesel truck — no charge to run out. Click for the battery one."
+	)
+	UITheme.repaint_plate(
+		_truck_button, UITheme.ACCENT if electric else UITheme.STEEL.darkened(0.34)
+	)
+
+
+## The charge readout, under the level/money strip in the top-left. Only up while
+## an electric truck is actually out on the strait — between attempts there is no
+## charge to report, and a bar sitting at full is a bar nobody reads.
+func _build_battery_gauge() -> Control:
+	var panel := PanelContainer.new()
+	UITheme.paint(panel, PaintedBox.sign(UITheme.SLATE))
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(12, 64)
+	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override(&"separation", 8)
+	panel.add_child(row)
+
+	var label := Label.new()
+	label.text = "CHARGE"
+	UITheme.as_caption(label)
+	row.add_child(label)
+
+	_battery_bar = ProgressBar.new()
+	_battery_bar.custom_minimum_size = Vector2(120, 14)
+	_battery_bar.show_percentage = false
+	_battery_bar.min_value = 0.0
+	_battery_bar.max_value = 1.0
+	row.add_child(_battery_bar)
+
+	_battery_panel = panel
+	return panel
+
+
+## Green down to a quarter, then red — the point where the run stops being about
+## the bridge and starts being about whether the truck gets there at all.
+func _update_battery_gauge() -> void:
+	if _battery_panel == null:
+		return
+	var car: Car = _crossing.car
+	var live := is_instance_valid(car) and car.battery != null
+	if live != _battery_panel.visible:
+		_battery_panel.visible = live
+	if not live:
+		return
+	var fraction := car.battery.fraction()
+	_battery_bar.value = fraction
+	_battery_bar.modulate = Color.WHITE if fraction > 0.25 else Color(1.0, 0.55, 0.5)
+
+
+## ROPE, on the same strip as SAVED BUILDS and REPLAY. A toggle, not a purchase:
+## arming it turns the next two clicks into a rope, and the price depends on how
+## far apart those two clicks land.
+func _build_rope_tab() -> Control:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 2)
+	column.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	# Clear of the charge gauge above it, which is painted and has a border of its
+	# own — at 104 the two plates touched while a battery truck was out.
+	column.position = Vector2(12, 118)
+
+	# Still a plate: there is no rope sign in the kit, and this one is a toggle
+	# whose colour carries its armed state, which painted art cannot do.
+	_rope_button = UITheme.plate_button(
+		"ROPE", UITheme.ACCENT.darkened(0.42), Vector2(76.0, 24.0)
+	)
+	_rope_button.add_theme_font_size_override(&"font_size", UITheme.FONT_SIZE_SMALL)
+	_rope_button.pressed.connect(_on_rope_pressed)
+	column.add_child(_rope_button)
+
+	_rope_label = Label.new()
+	UITheme.as_caption(_rope_label)
+	column.add_child(_rope_label)
+	return column
+
+
+func _on_rope_pressed() -> void:
+	if _ropes == null or build_locked:
+		return
+	_ropes.arming = not _ropes.arming
+	_refresh_rope_tab()
+
+
+func _refresh_rope_tab() -> void:
+	if _rope_button == null or _ropes == null:
+		return
+	var armed := _ropes.arming
+	_rope_button.text = "TYING" if armed else "ROPE"
+	UITheme.repaint_plate(
+		_rope_button, UITheme.GREEN if armed else UITheme.ACCENT.darkened(0.42)
+	)
+	_rope_button.disabled = build_locked
+	_rope_shown = _ropes.count()
+	_rope_limit_shown = _ropes.limit()
+	_rope_label.text = "%d / %d ropes" % [_rope_shown, _rope_limit_shown]
+	_rope_button.tooltip_text = (
+		"Click two pieces to tie them together — $%.2f per unit of rope, right-click to cut one"
+		% RopeManager.COST_PER_UNIT
+	)
 
 
 ## The saved-layouts panel: three slots, each with a SAVE and a LOAD.
@@ -977,7 +1243,8 @@ func report_blueprint_loaded(index: int, placed: int, wanted: int) -> void:
 ## inside the panel, so it costs the dock no height at all.
 func _build_hints() -> Control:
 	var label := Label.new()
-	label.text = "Q/E rotate  ·  wheel zoom  ·  right-click recalls a piece" \
+	label.text = "Q/E rotate  ·  F flips  ·  wheel zoom" \
+		+ "  ·  right-click recalls a piece" \
 		+ "  ·  shift-click a card drops the whole stack"
 	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -1342,6 +1609,16 @@ func _process(delta: float) -> void:
 		_refresh_blueprints()
 	_update_charge(delta)
 	_update_shop_nudge()
+	_update_battery_gauge()
+	# The rope tab tracks the build lock and the count. Compared as integers rather
+	# than by formatting the label every frame — a rope is lost silently when the
+	# piece it was tied to is recalled, so there is no signal to hang this on.
+	if _rope_button != null and (
+		_rope_button.disabled != build_locked
+		or _ropes.count() != _rope_shown
+		or _ropes.limit() != _rope_limit_shown
+	):
+		_refresh_rope_tab()
 	var has_car := is_instance_valid(_crossing.car)
 	if has_car != _remove_car_button.visible:
 		_remove_car_button.visible = has_car
@@ -1354,7 +1631,9 @@ func _process(delta: float) -> void:
 	# Above the SAVED BUILDS tab, not level with it: the tab floats in this same
 	# strip over the START end of the dock, and the hint line used to run straight
 	# under it — one sentence with a button sitting in the middle of it.
-	var pinned := -(_dock.size.y + BLUEPRINTS_GAP + BLUEPRINTS_SIZE.y + 8.0)
+	var pinned := -(
+		_dock.size.y + BLUEPRINTS_GAP + maxf(_blueprints_size.y, _replay_size.y) + 8.0
+	)
 	if not is_equal_approx(pinned, _hints.offset_bottom):
 		_hints.offset_bottom = pinned
 		_hints.offset_top = pinned - 18.0
@@ -1701,7 +1980,8 @@ func report_crossing(
 	score: int,
 	earned: int,
 	bridge: int = 0,
-	rank: int = 0
+	rank: int = 0,
+	flat: bool = false
 ) -> void:
 	var pct := roundi(progress * 100.0)
 	# The record is the sentence the player is playing to hear, so it gets its own
@@ -1725,8 +2005,12 @@ func report_crossing(
 				Color(0.98, 0.6, 0.5)
 			)
 		_:
+			# A truck that stopped because the charge ran out looks identical to one
+			# that stopped because it was wedged, and the two call for opposite
+			# fixes — a bigger battery against a better bridge.
 			_show_banner(
-				"STUCK at %d%% — score %d, earned $%d%s" % [pct, score, earned, record],
+				("FLAT BATTERY at %d%%" if flat else "STUCK at %d%%")
+					% pct + " — score %d, earned $%d%s" % [score, earned, record],
 				UITheme.MUSTARD
 			)
 
@@ -1752,7 +2036,8 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 		_dock.get_parent(),
 		"EVERY STRAIT CROSSED" if finale else "",
 		420.0,
-		"KEEP BUILDING"
+		"KEEP BUILDING",
+		"btn_keep_building"
 	)
 	_confirm_overlay = parts[0] as Control
 	var content := parts[1] as VBoxContainer
@@ -1802,11 +2087,13 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 	# Only offered when there is somewhere to go. On the last level the campaign
 	# card takes over, and the panel is just the scoreboard.
 	#
-	# Green, not the panel's amber: everything else on this board is amber, so the
-	# one button that moves the game forward has nowhere to stand out from — and
-	# green is already the game's "this works, press it" colour on every BUY.
+	# A painted signpost pointing right, which is where the next strait is. The
+	# green plate it replaces was standing out by colour alone; the arrow says the
+	# same thing by shape. Its wording is painted in, so the game calls this NEXT
+	# CROSSING everywhere now rather than NEXT STRAIT.
 	if not finale:
-		var next := UITheme.plate_button("NEXT STRAIT", UITheme.GREEN, Vector2(0, 44))
+		var next := UITheme.kit_button("btn_next_crossing", 48.0)
+		next.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		next.pressed.connect(func() -> void:
 			_confirm_overlay.queue_free()
 			next_level_requested.emit()
@@ -1817,15 +2104,11 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 	# they just made, and the panel is on screen the moment they want to. Only
 	# when there is film — a crossing longer than the recorder's cap has none.
 	if _replay_button != null and _replay_button.visible:
-		var watch := UITheme.plate_button(
-			"REPLAY AND SAVE", UITheme.ACCENT.darkened(0.42), Vector2(0, 38)
-		)
-		# The camera is here to break up a stack of four buttons that are otherwise
-		# the same painted plate with different words on it — the one people reach
-		# for after a good crossing should be findable without reading the panel.
-		watch.icon = UITheme.camera_icon()
-		watch.expand_icon = false
-		watch.add_theme_constant_override(&"h_separation", 10)
+		# The painted sign carries its own camera, which is what the drawn icon was
+		# doing here: breaking up a stack of buttons that were otherwise the same
+		# plate with different words on it.
+		var watch := UITheme.kit_button("btn_replay_save", 62.0)
+		watch.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		watch.tooltip_text = "Watch the attempt again, and download it as a video"
 		watch.pressed.connect(func() -> void:
 			_confirm_overlay.queue_free()
@@ -1833,22 +2116,14 @@ func show_crossed_panel(bridge: int, rank: int, earned: int) -> void:
 		)
 		content.add_child(watch)
 
-	# The two ways off this panel that aren't "keep building", side by side, so a
-	# finished campaign doesn't grow a third full-width bar and push the board
-	# off a short viewport.
+	# The way off this panel that isn't "keep building". LEVEL SELECT used to sit
+	# here too and is gone: the same control is on the corner rail behind this
+	# panel, in every scene, and a second copy of it on the one panel that exists
+	# to keep the run going was pointing at the door.
 	var exits := HBoxContainer.new()
 	exits.add_theme_constant_override(&"separation", 8)
+	exits.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_child(exits)
-
-	var select := UITheme.plate_button(
-		"LEVEL SELECT", UITheme.STEEL.darkened(0.34), Vector2(0, 38)
-	)
-	select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	select.pressed.connect(func() -> void:
-		_confirm_overlay.queue_free()
-		level_select_requested.emit()
-	)
-	exits.add_child(select)
 
 	# Only at the end of the campaign. Mid-run the way out is the settings knob;
 	# offering MAIN MENU after every crossing would put "stop playing" next to
@@ -1957,6 +2232,12 @@ func report_no_bridge() -> void:
 
 func report_blocked() -> void:
 	_show_banner("No room there — the piece won't fit", Color(0.98, 0.6, 0.5))
+
+
+## The same banner, for a refusal that can say what it was. Used by the rope,
+## whose reasons are all different from each other.
+func report_blocked_reason(reason: String) -> void:
+	_show_banner(reason, UITheme.MUSTARD)
 
 
 func _show_banner(text: String, color: Color) -> void:

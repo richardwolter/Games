@@ -60,13 +60,21 @@ static func delete() -> void:
 ## Gathers the whole game into one dictionary. `bridge` is passed in rather than
 ## read from the spawner, because during a crossing attempt the pieces on screen
 ## are mid-collapse and the layout worth keeping is the one from before the car.
+## `upgrades` and `ropes` are the experimental systems, and they are captured
+## whether or not the --experimental flag is on. That is deliberate and it is the
+## single most important decision about how the flag works: a player who tries the
+## flag, buys upgrades and ties ropes, and then launches the game normally must not
+## have all of it deleted by the first autosave. The flag gates the UI and the
+## behaviour; it never gates persistence.
 static func capture(
 	levels: LevelManager,
 	economy: Economy,
 	inventory: Inventory,
 	shop: Shop,
 	bridge: Array[Dictionary],
-	blueprints: Blueprints
+	blueprints: Blueprints,
+	upgrades: SalvageUpgrades = null,
+	ropes: RopeManager = null
 ) -> Dictionary:
 	# The straits the player is NOT currently standing in, carried through
 	# untouched, from memory.
@@ -86,8 +94,18 @@ static func capture(
 	if not _buckets_primed:
 		_prime_buckets()
 
+	# The pieces that will actually be written, which is not always every piece
+	# handed in: bridge_to_json drops anything whose .tres has gone. Ropes are
+	# stored as indices into this array, so they have to be numbered against the
+	# filtered version or one missing piece silently re-ties every rope after it to
+	# the wrong thing.
+	var kept := _kept_bridge(bridge)
+
 	_buckets[str(levels.index)] = {
-		"bridge": bridge_to_json(bridge),
+		"bridge": bridge_to_json(kept),
+		# Absent on a save from before ropes existed, which reads back as none —
+		# exactly what such a save means.
+		"ropes": ropes.to_json(kept) if ropes != null else [],
 		"inventory": _defs_to_paths(inventory.counts()),
 		"shop": _defs_to_paths(shop.remaining_all()),
 		"best_score": economy.best_score,
@@ -107,6 +125,10 @@ static func capture(
 		# JSON object keys are strings, so the level index is stringified here and
 		# parsed back in apply().
 		"records": _records_to_json(levels.standings),
+		# Global, like money and unlocks: an upgrade bought in one strait is still
+		# bought in the next one. That is the whole difference between an upgrade
+		# and the pieces in Inventory, which a level load empties.
+		"salvage": upgrades.to_json() if upgrades != null else {},
 		# What the numbers in `records` MEAN. See SCORE_BASIS.
 		"score_basis": SCORE_BASIS,
 		# One entry per strait the player has set foot in. See _bucket().
@@ -252,10 +274,20 @@ static func apply(
 	inventory: Inventory,
 	shop: Shop,
 	spawner: Node,
-	blueprints: Blueprints
+	blueprints: Blueprints,
+	upgrades: SalvageUpgrades = null,
+	ropes: RopeManager = null
 ) -> void:
 	levels.unlocked = int(data.get("unlocked", 0))
 	levels.standings = standings_of(data)
+
+	# Before the bucket, and before the early return below it. A player who has
+	# never set foot in the strait they are currently standing in gets no bucket and
+	# leaves this function at that return — anything global read after it would load
+	# for everyone except exactly those players, which is the kind of bug that shows
+	# up once and is never reproducible.
+	if upgrades != null:
+		upgrades.from_json(data.get("salvage", {}))
 
 	# Set money by delta so the change signal fires and the dock updates; there
 	# is deliberately no setter on Economy, since nothing else may assign money.
@@ -276,7 +308,15 @@ static func apply(
 
 	inventory.set_counts(_paths_to_defs(here.get("inventory", {})))
 	shop.set_remaining(_paths_to_defs(here.get("shop", {})))
-	spawner.restore(bridge_from_json(here.get("bridge", [])))
+	# The ropes are tied onto what restore() actually built, matched back to the
+	# positions they held in the file — see the note on bridge_from_json.
+	var layout := bridge_from_json(here.get("bridge", []))
+	var placed: Array[BridgeObject] = spawner.restore(layout)
+	if ropes != null:
+		var by_index := {}
+		for i: int in mini(layout.size(), placed.size()):
+			by_index[int(layout[i].get(&"index", i))] = placed[i]
+		ropes.from_json(here.get("ropes", []), by_index)
 	blueprints.from_json(here.get("blueprints", []))
 
 
@@ -319,6 +359,17 @@ static func _paths_to_defs(by_path: Variant) -> Dictionary[ObjectDef, int]:
 	return out
 
 
+## The entries bridge_to_json would keep, in order. Split out so ropes can be
+## numbered against the same list that is about to be written.
+static func _kept_bridge(bridge: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Dictionary in bridge:
+		var def := entry.get(&"def") as ObjectDef
+		if def != null and not def.resource_path.is_empty():
+			out.append(entry)
+	return out
+
+
 static func bridge_to_json(bridge: Array[Dictionary]) -> Array:
 	var out := []
 	for entry: Dictionary in bridge:
@@ -332,15 +383,22 @@ static func bridge_to_json(bridge: Array[Dictionary]) -> Array:
 			"y": at.y,
 			"rotation": entry.get(&"rotation", 0.0),
 			"variant": entry.get(&"variant", -1),
+			"flipped": entry.get(&"flipped", false),
 		})
 	return out
 
 
+## Each entry carries the position it held in the saved array, under &"index".
+## Ropes are stored as indices into that array and entries here can be dropped, so
+## without it a single bad piece re-ties every rope after it one place along. The
+## spawner reads the keys it knows and ignores this one.
 static func bridge_from_json(raw: Variant) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if raw is not Array:
 		return out
+	var index := -1
 	for item: Variant in (raw as Array):
+		index += 1
 		if item is not Dictionary:
 			continue
 		var entry := item as Dictionary
@@ -363,6 +421,10 @@ static func bridge_from_json(raw: Variant) -> Array[Dictionary]:
 			&"position": Vector2(x, y),
 			&"rotation": rotation,
 			&"variant": int(entry.get("variant", -1)),
+			# Missing in every save written before pieces could be mirrored, which
+			# is the right default for all of them.
+			&"flipped": bool(entry.get("flipped", false)),
+			&"index": index,
 		})
 	return out
 

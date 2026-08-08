@@ -19,8 +19,23 @@ enum Tier { BRONZE, SILVER, GOLD, DELUXE }
 @export var tier: Tier = Tier.BRONZE
 
 ## "box" uses size as width/height. "circle" uses size.x as the diameter.
-@export_enum("box", "circle") var shape: String = "box"
+## "polygon" uses size as the box the outline is stretched to fill.
+@export_enum("box", "circle", "polygon") var shape: String = "box"
 @export var size: Vector2 = Vector2(100, 20)
+
+## The outline, for "polygon" pieces only. Points are in a unit box centred on
+## zero — (-0.5, -0.5) is the top-left corner of `size` — so `size` alone decides
+## how big the piece is and the outline never has to be retraced to resize it.
+##
+## Traced from the artwork rather than authored, by the tool that cuts the piece
+## out (tools/make_ramp.gd). A shape that is neither a box nor a circle only earns
+## its complexity if the collision actually follows the drawing: the point of the
+## ramp is that the truck runs up the curve, and a rectangle around it would be a
+## crate wearing a picture of a ramp.
+##
+## May be concave. BridgeObject decomposes it into convex parts, which is what the
+## physics server needs.
+@export var polygon: PackedVector2Array = PackedVector2Array()
 
 @export var mass: float = 10.0
 
@@ -66,6 +81,21 @@ func get_texture(variant: int) -> Texture2D:
 ## Vertical extent used to work out how submerged a sample point is.
 func get_height() -> float:
 	return size.x if shape == "circle" else size.y
+
+
+## The outline in local pixels, ready to hand to a shape or to draw. `mirrored`
+## returns it flipped left-to-right, which is how a piece with a handedness — a
+## ramp — faces the other way.
+func polygon_points(mirrored: bool = false) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(polygon.size())
+	for i in polygon.size():
+		# Reversed as well as negated: mirroring a polygon reverses its winding,
+		# and a convex decomposition fed clockwise points where it expects
+		# counter-clockwise gives back parts that are inside out.
+		var point := polygon[polygon.size() - 1 - i] if mirrored else polygon[i]
+		out[i] = Vector2(-point.x if mirrored else point.x, point.y) * size
+	return out
 
 
 ## A three-word read of what this piece is physically like, e.g.

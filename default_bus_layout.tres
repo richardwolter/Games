@@ -1,41 +1,10 @@
-; The audio buses, as a resource loaded at startup.
-;
-; These used to be created in code by Audio._build_buses(), which was the better
-; design on paper — two names in one file, no second place to keep in step — and
-; it produced total silence in the web export.
-;
-; AudioServer.add_bus() after the audio driver has started gives you a bus that
-; exists, reports the volume you set, is not muted, and routes nothing. The
-; mixer ran, playback positions advanced, every readout said the music was
-; playing, and the samples reaching the browser were digital zero. Moving the
-; same two buses here — so they exist before the driver starts — is the whole
-; fix. Desktop never cared either way, which is why it went unnoticed.
-;
-; Keep the names in step with MUSIC_BUS and SFX_BUS in scripts/audio.gd.
-; _build_buses() is still there and still creates anything missing, so a lost or
-; renamed copy of this file degrades to the old behaviour rather than to a crash.
-;
-; The limiter on Master is the headroom. Music sits at -11dB and effects at -8,
-; which leaves room for a few overlapping one-shots but not for the engine, which
-; plays continuously underneath them for the length of a crossing. The worst case
-; is a bridge collapsing: engine, a dozen splashes and the music all summing at
-; once, which is also the moment the player most wants to hear. The limiter turns
-; that from clipping into a shove.
-
-[gd_resource type="AudioBusLayout" load_steps=2 format=3]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://vckayfn5ncnq"]
 
 [sub_resource type="AudioEffectLimiter" id="AudioEffectLimiter_master"]
 ceiling_db = -0.5
 threshold_db = -1.5
-soft_clip_db = 2.0
 
 [resource]
-bus/0/name = &"Master"
-bus/0/solo = false
-bus/0/mute = false
-bus/0/bypass_fx = false
-bus/0/volume_db = 0.0
-bus/0/send = &""
 bus/0/effect/0/effect = SubResource("AudioEffectLimiter_master")
 bus/0/effect/0/enabled = true
 bus/1/name = &"Music"

@@ -66,6 +66,14 @@ var driving: bool = false
 ## spawns the truck; without it the wheels simply stay dry.
 var water: WaterBody = null
 
+## The charge, on the electric truck. Null is the ordinary diesel one, and every
+## path below is then exactly what it always was. Set before the truck enters the
+## tree, so _ready() can wire the splash.
+var battery: Battery = null
+## Paint only. Set on the parked truck too, which never gets a live battery — the
+## shore has to show which truck START is about to send.
+var battery_powered: bool = false
+
 var _throttle: float = 0.0
 var _wheels: Array[RigidBody2D] = []
 var _radii: PackedFloat32Array = PackedFloat32Array()
@@ -96,6 +104,14 @@ func _ready() -> void:
 		wheel.max_contacts_reported = 4
 		wheel.contact_monitor = true
 		_last_angles.append(wheel.rotation)
+
+	_tint_for_power()
+	# The chassis going in the water is what costs a battery truck its charge.
+	# The chassis specifically, not the wheels: the tyres are in and out of the
+	# strait constantly on any bridge worth driving over, and draining on those
+	# would make the whole idea unplayable rather than tense.
+	if battery != null and water != null:
+		water.body_entered.connect(_on_water_entered)
 
 
 ## Dripping is decoration and runs on the render clock, not with the drive
@@ -192,7 +208,25 @@ func stop() -> void:
 ## A truck is usually removed rather than stopped — a failed attempt is cleared
 ## away, a replay ends and its puppets go — and the engine player outlives it, so
 ## it has to be handed back or it runs on over an empty strait.
+## A cold blue-green wash over the whole truck. Placeholder paint rather than a
+## second car scene: park(), _bodies_of() and the replay's puppets all assume one
+## truck scene, and a variant .tscn would have to be kept in step with every one
+## of them for what is currently a colour.
+func _tint_for_power() -> void:
+	if chassis != null:
+		chassis.modulate = Color(0.72, 0.94, 0.98) if battery_powered else Color.WHITE
+
+
+func _on_water_entered(body: Node) -> void:
+	if battery != null and body == chassis:
+		battery.take_splash()
+
+
 func _exit_tree() -> void:
+	# The water outlives the truck — a truck is freed after every attempt — so the
+	# connection has to be handed back or the signal keeps a dead node alive.
+	if battery != null and water != null and water.body_entered.is_connected(_on_water_entered):
+		water.body_entered.disconnect(_on_water_entered)
 	if not _engine_on:
 		return
 	_engine_on = false
@@ -204,6 +238,17 @@ func _exit_tree() -> void:
 func _physics_process(delta: float) -> void:
 	if not driving:
 		return
+
+	# Flat means no drive, not an instant end to the attempt. The truck coasts,
+	# rolls back down whatever it was climbing, and the crossing manager's stall
+	# timer calls it — which is both the funnier outcome and one that needs no new
+	# result code, no new banner and no new branch anywhere else.
+	if battery != null:
+		battery.tick(delta)
+		if battery.is_empty():
+			_throttle = 0.0
+			return
+
 	_throttle = minf(_throttle + delta / spin_up_time, 1.0)
 	var truck_speed := chassis.linear_velocity.x
 	for i: int in _wheels.size():

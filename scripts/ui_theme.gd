@@ -116,6 +116,84 @@ static func art_button_by_width(name: String, width: float) -> TextureButton:
 	return art_button(name, height)
 
 
+## The painted UI kit, cut from the two UI_Elements sheets by
+## tools/slice_ui_kit.gd. Separate from ART_DIR because these are 9-patch pieces
+## with their wording painted in, where art/ui/ holds whole signs.
+const KIT_DIR := "res://art/ui/kit/"
+
+## How much of each kit frame is border rather than middle, in source pixels,
+## as left/top/right/bottom. Measured from the slices; the settings frame is
+## widest on the right and top because its gear overhangs that corner.
+const KIT_PATCH := {
+	"frame_settings_lg": Vector4i(28, 40, 44, 30),
+	"frame_shop_lg": Vector4i(42, 48, 42, 40),
+	"frame_levels_lg": Vector4i(24, 36, 24, 26),
+}
+## Extra clearance between a frame's border and its contents, on top of the
+## patch. Without it text sits against the rivets.
+const KIT_PAD := Vector4i(10, 8, 10, 10)
+
+
+## A painted frame from the kit as a PanelContainer background.
+##
+## StyleBoxTexture rather than NinePatchRect: a stylebox is what PanelContainer
+## already takes, so the panel keeps sizing itself to its contents and the frame
+## follows. Only the flat runs stretch — corners, bolts, the gear and the painted
+## headers keep the size they were drawn at.
+static func kit_box(name: String) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = load(KIT_DIR + name + ".png") as Texture2D
+	var patch: Vector4i = KIT_PATCH.get(name, Vector4i(16, 16, 16, 16))
+	sb.texture_margin_left = patch.x
+	sb.texture_margin_top = patch.y
+	sb.texture_margin_right = patch.z
+	sb.texture_margin_bottom = patch.w
+	sb.content_margin_left = patch.x + KIT_PAD.x
+	sb.content_margin_top = patch.y + KIT_PAD.y
+	sb.content_margin_right = patch.z + KIT_PAD.z
+	sb.content_margin_bottom = patch.w + KIT_PAD.w
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	return sb
+
+
+## A kit button: the artwork is the whole control, wording included.
+##
+## Sized from a target height, so each sign keeps its own proportions — the
+## leaderboard shield makes that sprite half again as tall for its width as the
+## plain bars beside it, and forcing a common rectangle would squash it.
+static func kit_button(name: String, height: float) -> TextureButton:
+	var button := TextureButton.new()
+	var texture := load(KIT_DIR + name + ".png") as Texture2D
+	button.texture_normal = texture
+	button.ignore_texture_size = true
+	button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	button.custom_minimum_size = kit_size(name, height)
+	return button
+
+
+## A kit sprite as a picture rather than a control — the title plates that sit
+## over a frame's border.
+static func kit_image(name: String, height: float) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = load(KIT_DIR + name + ".png") as Texture2D
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.custom_minimum_size = kit_size(name, height)
+	return rect
+
+
+## What a kit sprite measures at a given height. Callers that position by offset
+## rather than by container need the width before the button exists.
+static func kit_size(name: String, height: float) -> Vector2:
+	var texture := load(KIT_DIR + name + ".png") as Texture2D
+	if texture == null:
+		return Vector2(height, height)
+	var size := texture.get_size()
+	return Vector2(roundf(height * size.x / size.y), height)
+
+
 ## A piece of the painted sheet used as a picture rather than as a control,
 ## sized from a target height the way art_button() is.
 static func art_image(name: String, height: float) -> TextureRect:
@@ -181,6 +259,19 @@ static func plate_button(
 	button.add_theme_constant_override(&"outline_size", 4)
 	button.add_theme_color_override(&"font_outline_color", INK)
 	return button
+
+
+## Recolour a plate in place, for a button whose colour carries its state — the
+## truck picker and the rope toggle. Rebuilding the button instead would drop its
+## hover motion and its place in the row.
+static func repaint_plate(button: Button, fill: Color) -> void:
+	for state: StringName in [&"normal", &"hover", &"pressed", &"focus"]:
+		var shade := fill
+		if state == &"hover":
+			shade = fill.lightened(0.16)
+		elif state == &"pressed":
+			shade = fill.darkened(0.16)
+		button.add_theme_stylebox_override(state, PaintedBox.plate(shade))
 
 
 ## A camcorder, for the button that plays an attempt back.
@@ -502,6 +593,14 @@ static func _scale_to(button: BaseButton, target: float) -> void:
 static func dismiss_on_outside_click(
 	overlay: Control, frame: Control, on_dismiss: Callable
 ) -> void:
+	# The dimming rectangle has to let clicks through to the overlay under it.
+	# A ColorRect stops mouse input by default, like every Control, so the dim
+	# swallowed every click outside the panel and this handler never ran once:
+	# the modals took Escape and the Close button, and clicking away did nothing.
+	for child in overlay.get_children():
+		if child is ColorRect:
+			(child as ColorRect).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	overlay.gui_input.connect(func(event: InputEvent) -> void:
 		if event is not InputEventMouseButton:
 			return
@@ -701,7 +800,8 @@ static func modal(
 	parent: Node,
 	title: String,
 	min_width: float = 380.0,
-	close_text: String = "CLOSE"
+	close_text: String = "CLOSE",
+	close_art: String = ""
 ) -> Array:
 	var overlay := Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -740,10 +840,19 @@ static func modal(
 	content.add_theme_constant_override(&"separation", 10)
 	leaf.add_child(content)
 
-	var close := Button.new()
-	close.text = close_text
-	close.custom_minimum_size = Vector2(0, 40)
-	close.add_theme_stylebox_override(&"normal", box(MUSTARD))
+	# A painted kit sign when one exists for this wording, and the plain mustard
+	# bar otherwise. The art carries its own word, so the two forms can't be
+	# swapped freely — only a caller whose close_text matches a sprite may ask.
+	var close: BaseButton
+	if close_art.is_empty():
+		var plain := Button.new()
+		plain.text = close_text
+		plain.custom_minimum_size = Vector2(0, 40)
+		plain.add_theme_stylebox_override(&"normal", box(MUSTARD))
+		close = plain
+	else:
+		close = kit_button(close_art, 40.0)
+		close.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	close.pressed.connect(overlay.queue_free)
 	column.add_child(close)
 
@@ -1086,11 +1195,12 @@ static func settings(parent: Node) -> Control:
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(centre)
 
-	# A stacked board, so the panel reads as planks nailed together the way the
-	# dock does — the settings are the same object as everything else on screen.
+	# The kit's own settings frame, which is drawn with exactly the two sliders
+	# this panel has and a gear on the corner. The painted boards it replaces are
+	# still what every other modal uses.
 	var frame := PanelContainer.new()
-	frame.custom_minimum_size = Vector2(380, 0)
-	paint(frame, PaintedBox.board(WOOD, 4))
+	frame.custom_minimum_size = Vector2(420, 0)
+	frame.add_theme_stylebox_override(&"panel", kit_box("frame_settings_lg"))
 	centre.add_child(frame)
 
 	var column := VBoxContainer.new()
@@ -1155,14 +1265,19 @@ static func _volume_row(
 	row.add_theme_constant_override(&"separation", 10)
 	parent.add_child(row)
 
+	# A size up from body text, and both figures the same size. These two rows are
+	# the whole panel; at body size they read as a caption for the sliders rather
+	# than as the names of the two things being set.
 	var label := Label.new()
 	label.text = title
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override(&"font_size", FONT_SIZE_LOUD)
 	row.add_child(label)
 
 	var readout := Label.new()
-	readout.custom_minimum_size = Vector2(46, 0)
+	readout.custom_minimum_size = Vector2(52, 0)
 	readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	readout.add_theme_font_size_override(&"font_size", FONT_SIZE_LOUD)
 	row.add_child(readout)
 
 	var slider := HSlider.new()

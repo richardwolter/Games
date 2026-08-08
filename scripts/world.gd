@@ -9,8 +9,13 @@ extends Node2D
 const SURFACE_Y := 300.0
 ## How far inland each shore extends past the water's edge.
 const SHORE_RUN := 1400.0
-## Ceiling height, i.e. how far above the surface you can hold a piece.
+## Ceiling height, i.e. how far above the highest shore you can hold a piece. On a
+## level with a lifted far shore the whole ceiling moves up with it, so the room to
+## work in above the landing is the same as on a flat level.
 const HEADROOM := 1220.0
+## Flat ground kept beyond the top of a climb, so the truck lands on a plateau
+## rather than on the crest itself.
+const SLOPE_PLATEAU := 700.0
 ## Spacing of the waterline's vertices. The shader's shortest wave is ~215 units
 ## long, so this samples it about nine times.
 const SURFACE_STEP := 24.0
@@ -48,6 +53,30 @@ const SEABED_PROFILE: Array[Vector2] = [
 ## it is reachable by a piece, since build_area() still stops at max_depth.
 const DEEP_MARGIN := 500.0
 
+## World units per unit of vertex colour, for the depth a bank's mesh carries to
+## the ground shader. Colour channels are clamped to 0..1, and a bank is over two
+## thousand units deep, so the depth is divided by this going in and multiplied by
+## it again in the shader. ground.gdshader has to agree with this number.
+const DEPTH_IN_COLOUR := 4000.0
+
+## Vertical spacing of a pillar's silhouette vertices. Fine enough to carry a
+## crevice, coarse enough that the convex decomposition of the collision polygon
+## stays cheap — the same trade the seabed makes.
+const PILLAR_STEP := 34.0
+## Peak-to-peak relief on a pillar's face, in world units. This IS collision:
+## pieces catch on the ledges, so it is kept well under the pillar's own width.
+const PILLAR_RELIEF := 44.0
+## How far a pillar's foot is buried below the seabed line, so it reads as rock
+## the strait was cut around rather than as a column stood on the floor.
+const PILLAR_ROOT := 220.0
+
+## What a fully planted, fully stocked strait looks like. The scene's own values,
+## named here because a level's plant_density and fish_density are shares OF
+## these — reading them off the node at runtime would mean the first level to
+## scale them down became the new full.
+const FLORA_DENSITY := 0.8
+const FISH_DENSITY := 1.6
+
 ## Spacing of the seabed's vertices. Fine enough to carry the roughness, coarse
 ## enough that the collision polygon's convex decomposition stays cheap.
 const SEABED_STEP := 40.0
@@ -82,8 +111,20 @@ const GROUND_SHADER := preload("res://shaders/ground.gdshader")
 
 var _half_width: float = 1600.0
 var _max_depth: float = 600.0
+## Height of the far shore's top above the waterline. 0 on a flat level.
+var _far_lift: float = 0.0
+## Horizontal distance that lift is spread over. 0 on a flat level.
+var _slope_run: float = 0.0
+## How far inland the banks reach. SHORE_RUN, unless a climb needs more room.
+var _shore_run: float = SHORE_RUN
+## Height of the near shore's lip above the waterline, and the run it climbs over.
+## Both 0 on a level without a launch ramp.
+var _near_rise: float = 0.0
+var _near_ramp_run: float = 0.0
 var _ground: LevelDef.Ground = LevelDef.Ground.ROCK
 var _life: LevelDef.Life = LevelDef.Life.FULL
+var _plant_density: float = 1.0
+var _fish_density: float = 1.0
 ## The scene's own backdrop, remembered on first build so a level that sets one
 ## can be followed by a level that doesn't.
 var _default_backdrop: Texture2D = null
@@ -93,17 +134,28 @@ var _default_horizon: float = 0.55
 func build(level: LevelDef) -> void:
 	_half_width = level.half_width
 	_max_depth = level.max_depth
+	_far_lift = maxf(level.far_shore_lift, 0.0)
+	_slope_run = level.far_slope_run()
+	_near_rise = maxf(level.near_ramp_rise, 0.0)
+	_near_ramp_run = maxf(level.near_ramp_run, 0.0) if _near_rise > 0.0 else 0.0
+	# The near bank has to reach behind the truck's spawn, which a ramp pushes back.
+	_shore_run = maxf(SHORE_RUN, _slope_run + SLOPE_PLATEAU)
+	_shore_run = maxf(_shore_run, _near_ramp_run + LevelDef.NEAR_RUNUP + 200.0)
 	_ground = level.ground
 	_life = level.life
+	_plant_density = clampf(level.plant_density, 0.0, 1.0)
+	_fish_density = clampf(level.fish_density, 0.0, 1.0)
 
 	for child: Node in $Terrain.get_children():
 		child.free()  # Immediate: we're about to add replacements at the same spot.
 
 	# Before _frame_camera(), which is what fits the backdrop to the new bounds.
 	_dress_backdrop(level)
-	_build_shore(-_half_width - SHORE_RUN * 0.5)
-	_build_shore(_half_width + SHORE_RUN * 0.5)
+	_build_shore(-_half_width, -_half_width - _shore_run, false)
+	_build_shore(_half_width, _half_width + _shore_run, true)
 	_build_seabed()
+	_build_pillar(level)
+	_build_seabed_prop(level)
 	_shape_water()
 	_shape_bounds()
 	_frame_camera()
@@ -126,7 +178,11 @@ func _stock_wildlife() -> void:
 	# An empty bed is how both wildlife nodes are told to hold nothing: they clear
 	# what they have and return, so a concrete channel comes back empty even when
 	# the previous level was full of fish.
-	var bed := _seabed_points() if _life == LevelDef.Life.FULL else PackedVector2Array()
+	# A level that wants no fish gets the same empty bed a concrete channel gets,
+	# rather than a school of zero: populate() clears what it holds and returns.
+	var bed := _seabed_points() if _life == LevelDef.Life.FULL \
+		and _fish_density > 0.0 else PackedVector2Array()
+	$Fish.density = FISH_DENSITY * _fish_density
 	$Fish.populate(bed, SURFACE_Y, _half_width, seed_value + 7)
 
 
@@ -198,29 +254,105 @@ func _seabed_points() -> PackedVector2Array:
 	return out
 
 
-func _build_shore(centre_x: float) -> void:
-	var height := _max_depth + 400.0 + DEEP_MARGIN
-	var half := Vector2(SHORE_RUN * 0.5, height * 0.5)
+## One bank, built from its own top line rather than as a rectangle, so a shore
+## that rises is one continuous piece of ground instead of a step.
+##
+## `rising` is the far bank of a lifted level: its top starts at the waterline,
+## where the seabed already arrives, and climbs inland to the level's full lift.
+## Everything is world-space — the ground shader reads world coordinates to decide
+## wet from dry, so the body sits at the origin and the polygon carries the shape.
+func _build_shore(inner_x: float, outer_x: float, rising: bool) -> void:
+	var floor_y := SURFACE_Y + _max_depth + 400.0 + DEEP_MARGIN
+
+	var top := PackedVector2Array()
+	var steps := maxi(int(_shore_run / SEABED_STEP), 8)
+	for i in steps + 1:
+		var x: float = lerpf(inner_x, outer_x, float(i) / float(steps))
+		top.append(Vector2(x, _shore_top_y(x) if rising else _near_top_y(x)))
+
+	var outline := PackedVector2Array(top)
+	outline.append(Vector2(outer_x, floor_y))
+	outline.append(Vector2(inner_x, floor_y))
+	# The bank has to be wound the same way whichever side it is on, or the convex
+	# decomposition gets a polygon turned inside out.
+	if inner_x > outer_x:
+		outline.reverse()
 
 	var body := StaticBody2D.new()
-	body.position = Vector2(centre_x, SURFACE_Y + height * 0.5)
 	body.physics_material_override = _ground_physics(SHORE_FRICTION)
 	$Terrain.add_child(body)
 
-	var rect := RectangleShape2D.new()
-	rect.size = half * 2.0
-	var shape := CollisionShape2D.new()
-	shape.shape = rect
+	var shape := CollisionPolygon2D.new()
+	shape.polygon = outline
 	body.add_child(shape)
 
 	var visual := Polygon2D.new()
 	visual.color = Color.WHITE  # ground.gdshader writes COLOR outright.
-	visual.polygon = PackedVector2Array([
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y),
-	])
-	visual.material = _ground_material()
+	visual.polygon = outline
+	# Each vertex carries how far it sits below this bank's own top face, which is
+	# the only way the shader can put the sunlit crust on the top of a hill
+	# rather than at the waterline.
+	#
+	# Carried in the vertex COLOUR, scaled by DEPTH_IN_COLOUR. UV was the obvious
+	# channel and does not work: a Polygon2D with no texture does not deliver its
+	# uv array to the shader, so every fragment read UV.y as zero and the hill
+	# stayed one flat slab. The colour is free instead — ground.gdshader writes
+	# COLOR outright in fragment(), so nothing else is reading it.
+	var tint := PackedColorArray()
+	for point: Vector2 in outline:
+		var top_y: float = _shore_top_y(point.x) if rising else _near_top_y(point.x)
+		tint.append(Color((point.y - top_y) / DEPTH_IN_COLOUR, 0.0, 0.0, 1.0))
+	visual.vertex_colors = tint
+
+	var mat := _ground_material()
+	mat.set_shader_parameter("local_depth", 1.0)
+	visual.material = mat
 	body.add_child(visual)
+
+
+## Height of the far bank at a horizontal position: the waterline at the water's
+## edge, climbing to the full lift over the slope's run and flat from there on.
+##
+## Smoothstep rather than a straight ramp because the two ends are what sell it as
+## ground: a linear slope meets the water and the plateau at hard creases, and a
+## truck hitting the toe of it at speed launches off the crease. This rolls into
+## both. The grade is fixed, so a bigger lift makes a longer hill, not a steeper
+## one — the climb should be a longer test of the bridge's approach, never a wall
+## the truck simply cannot get up.
+func _shore_top_y(x: float) -> float:
+	if _far_lift <= 0.0:
+		return SURFACE_Y
+	var t: float = clampf((x - _half_width) / maxf(_slope_run, 1.0), 0.0, 1.0)
+	return SURFACE_Y - _far_lift * smoothstep(0.0, 1.0, t)
+
+
+## Height of the near bank at a horizontal position: flat until the ramp's foot,
+## then climbing to the lip that sits exactly at the water's edge.
+##
+## Quadratic rather than the far bank's smoothstep, because only one of the two
+## ends wants rounding. The foot has to be flat or the truck trips into the ramp
+## at speed; the lip has to be the ramp's steepest point, since that is the angle
+## the truck leaves at, and smoothing it would level the launch off to nothing.
+func _near_top_y(x: float) -> float:
+	if _near_rise <= 0.0 or _near_ramp_run <= 0.0:
+		return SURFACE_Y
+	var t: float = clampf((x + _half_width + _near_ramp_run) / _near_ramp_run, 0.0, 1.0)
+	return SURFACE_Y - _near_rise * t * t
+
+
+## The highest ground on the level, above the waterline. Either bank can be the
+## one that is up, so the ceiling and the build box ask this rather than assuming
+## it is the far one.
+func _high_ground() -> float:
+	return maxf(_far_lift, _near_rise)
+
+
+## Top of the world: HEADROOM above the highest ground, which on a lifted level is
+## the far bank rather than the waterline. Everything that used to say
+## `SURFACE_Y - HEADROOM` asks this instead, so the ceiling, the walls, the build
+## box and the camera cannot disagree about where the top is.
+func _ceiling_y() -> float:
+	return SURFACE_Y - _high_ground() - HEADROOM
 
 
 ## Grip for a piece of ground. Ground never bounces — a truck rebounding off the
@@ -320,11 +452,197 @@ func _build_seabed() -> void:
 	if _life != LevelDef.Life.NONE:
 		_build_algae_crust(bed, body)
 	# Plants are the FULL step; an empty bed is how Flora is told to hold nothing.
+	# The level's own share is applied on top, so a strait can be sparsely planted
+	# without being bare. Set before build(), which reads it while walking the bed.
+	$Flora.density = FLORA_DENSITY * _plant_density
 	$Flora.build(
 		bed if _life == LevelDef.Life.FULL else PackedVector2Array(),
 		noise_seed_for_level(),
 		SURFACE_Y
 	)
+
+
+## A rock pillar standing in the middle of the strait, if the level asks for one.
+##
+## Built as GROUND, not as a prop: same polygon-and-shader recipe as the banks
+## and the seabed, same palette, same veins and grit, and the same crust baked
+## along its head where it stands in the sun. That is what makes it read as part
+## of the strait rather than as an object dropped into it — a sprite would have
+## to be redrawn for every biome, and would still be a different material from
+## the rock it is standing on.
+##
+## The two sides are generated independently from the level's own noise, so the
+## silhouette is never symmetrical and never smooth: that is where the crevices
+## come from. The shader's veins draw the cracks on the face.
+func _build_pillar(level: LevelDef) -> void:
+	if level.pillar_width <= 0.0:
+		return
+
+	var head_y := SURFACE_Y - level.pillar_rise
+	# Down to the seabed and then well past it, so the pillar is rooted in the
+	# floor rather than balanced on top of it. A rock that meets the ground in a
+	# visible seam reads as two objects.
+	var foot_y := _seabed_y_at(0.0) + PILLAR_ROOT
+
+	var noise := FastNoiseLite.new()
+	noise.seed = noise_seed_for_level() + 4801
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 1.0 / 190.0
+	noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	noise.fractal_octaves = 3
+
+	var steps := maxi(int((foot_y - head_y) / PILLAR_STEP), 6)
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		var y: float = lerpf(head_y, foot_y, t)
+		# Flares towards the foot, on a curve rather than a straight taper: rock
+		# spreads where it meets the bed and stands nearly plumb above that.
+		var half: float = level.pillar_width * 0.5 \
+			* lerpf(1.0, maxf(level.pillar_flare, 1.0), t * t)
+		# Fade the roughness out at the very top, so the head is a face somebody
+		# could land a bridge on rather than a row of spikes, and at the very
+		# bottom, where it is buried in the seabed anyway.
+		var edge: float = smoothstep(0.0, 0.12, t) * smoothstep(0.0, 0.06, 1.0 - t)
+		left.append(Vector2(
+			-half - _pillar_relief(noise, y, 0.0) * edge, y
+		))
+		right.append(Vector2(
+			half + _pillar_relief(noise, y, 517.0) * edge, y
+		))
+
+	var outline := PackedVector2Array()
+	for point: Vector2 in left:
+		outline.append(point)
+	for i in range(right.size() - 1, -1, -1):
+		outline.append(right[i])
+
+	var body := StaticBody2D.new()
+	body.name = "Pillar"
+	body.physics_material_override = _ground_physics(SHORE_FRICTION)
+	$Terrain.add_child(body)
+
+	var shape := CollisionPolygon2D.new()
+	shape.build_mode = CollisionPolygon2D.BUILD_SOLIDS
+	shape.polygon = outline
+	body.add_child(shape)
+
+	var visual := Polygon2D.new()
+	visual.color = Color.WHITE  # ground.gdshader writes COLOR outright.
+	visual.polygon = outline
+	# Depth below the pillar's own head, so the crust caps it the way it caps a
+	# bank. Without this the crust would be measured from the waterline and the
+	# whole standing part would come out one flat slab — the same fault the
+	# lifted bank had.
+	var tint := PackedColorArray()
+	for point: Vector2 in outline:
+		tint.append(Color((point.y - head_y) / DEPTH_IN_COLOUR, 0.0, 0.0, 1.0))
+	visual.vertex_colors = tint
+
+	var mat := _ground_material()
+	mat.set_shader_parameter("local_depth", 1.0)
+	# Wet below the waterline, dry above it. The shader's usual test is |x| past
+	# the bank, and a pillar stands at x = 0 — wet by that measure all the way to
+	# its head, which is standing in the open air.
+	mat.set_shader_parameter("dry_by_height", 1.0)
+	visual.material = mat
+	body.add_child(visual)
+
+
+## One side's departure from the pillar's nominal width at a given height.
+##
+## Always positive — it only ever adds rock — because a pillar whose sides can
+## bite inwards pinches itself in two at the waist. The second, sharper term is
+## what makes the crevices: a ridged noise raised to a power spends most of its
+## range near zero and then jumps, so the face is mostly gentle with occasional
+## deep clefts rather than uniformly lumpy.
+func _pillar_relief(noise: FastNoiseLite, y: float, offset: float) -> float:
+	var broad: float = noise.get_noise_1d(y + offset) * PILLAR_RELIEF
+	var cleft: float = noise.get_noise_1d(y * 3.1 + offset + 2000.0)
+	return broad + pow(maxf(cleft, 0.0), 3.0) * PILLAR_RELIEF * 2.4
+
+
+## The level's one big seabed object, if it has one: drawn, and solid.
+##
+## Sized by the WATER COLUMN rather than by a scale in the level file. The thing
+## has to stand on the floor and stop just under the surface, and both of those
+## move with the level's depth and its seabed profile — a fixed scale would be
+## right on one level and either buried or sticking out of the water on the next.
+## So the height is taken from the gap between the two and the picture is fitted
+## to it, which also means the level designer places it by saying WHERE, not how
+## big.
+func _build_seabed_prop(level: LevelDef) -> void:
+	if level.seabed_prop == null:
+		return
+	var texture := level.seabed_prop
+	var art := Vector2(texture.get_width(), texture.get_height())
+	if art.x <= 0.0 or art.y <= 0.0:
+		return
+
+	var x: float = clampf(level.seabed_prop_at, -1.0, 1.0) * _half_width
+	var floor_y := _seabed_y_at(x)
+	var top_y := SURFACE_Y + maxf(level.seabed_prop_clearance, 0.0)
+	# The water column, then whatever fraction of it the level wants. Shrinking
+	# happens here rather than by scaling the node, so the base stays on the
+	# floor and only the top comes down.
+	var height := (floor_y - top_y) * clampf(level.seabed_prop_scale, 0.1, 1.0)
+	if height <= 0.0:
+		push_warning("Seabed prop has no room to stand in; skipped.")
+		return
+	var size := Vector2(art.x / art.y * height, height)
+
+	var prop := Node2D.new()
+	prop.name = "SeabedProp"
+	# Its own base sits on the floor, so the node is positioned by the CENTRE of
+	# the box the picture fills.
+	prop.position = Vector2(x, floor_y - height * 0.5)
+	# No z_index of its own. Added to Terrain AFTER the seabed, so it draws over
+	# the rock it stands on, and left on the default layer so a piece leaning
+	# against it is not painted over by it. The water's own tint sits at 10 and
+	# still washes over the lot, which is what makes it read as underwater.
+	$Terrain.add_child(prop)
+
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = true
+	sprite.scale = size / art
+	prop.add_child(sprite)
+
+	if level.seabed_prop_polygon.size() < 3:
+		push_warning("Seabed prop has no collision polygon; it is scenery only.")
+		return
+
+	var body := StaticBody2D.new()
+	# Slippery, and it does not bounce. This is drowned wood under a rock crust:
+	# a deck built on it should be able to slide off, and a piece that pings off
+	# it would read as rubber.
+	body.physics_material_override = _ground_physics(0.6)
+	prop.add_child(body)
+
+	var outline := PackedVector2Array()
+	for point: Vector2 in level.seabed_prop_polygon:
+		outline.append(point * size)
+	var shape := CollisionPolygon2D.new()
+	# The traced outline is concave — a trunk on a wide base — and SOLID is what
+	# makes CollisionPolygon2D decompose it rather than treat it as a hollow ring.
+	shape.build_mode = CollisionPolygon2D.BUILD_SOLIDS
+	shape.polygon = outline
+	body.add_child(shape)
+
+
+## Where the seabed's top face sits at one x, roughness included — the same line
+## the floor is actually built from, sampled rather than recomputed, so a prop
+## cannot end up hovering over it or buried in it.
+func _seabed_y_at(x: float) -> float:
+	var bed := _seabed_points()
+	if bed.is_empty():
+		return SURFACE_Y + _max_depth
+	var best := bed[0]
+	for point: Vector2 in bed:
+		if absf(point.x - x) < absf(best.x - x):
+			best = point
+	return best.y
 
 
 ## A strip hugging the seabed line. A fragment cannot know where the top face of
@@ -408,30 +726,34 @@ func _shape_water() -> void:
 ## Invisible box the player can't drag a piece out of. Sits just outside the
 ## water so a piece can still be nudged flush against either shore.
 func _shape_bounds() -> void:
-	var wall_x := _half_width + 20.0
+	var left_x := -_half_width - 20.0
+	var right_x := _far_edge_x() + 20.0
+	var wall_height := SURFACE_Y - _ceiling_y() + 20.0
 	var wall := RectangleShape2D.new()
-	wall.size = Vector2(40, HEADROOM + 20.0)
-	var wall_y := SURFACE_Y - HEADROOM * 0.5
+	wall.size = Vector2(40, wall_height)
+	var wall_y := SURFACE_Y - wall_height * 0.5 + 10.0
 
 	var left: CollisionShape2D = $Bounds/LeftWall
 	left.shape = wall
-	left.position = Vector2(-wall_x, wall_y)
+	left.position = Vector2(left_x, wall_y)
 
 	var right: CollisionShape2D = $Bounds/RightWall
 	right.shape = wall
-	right.position = Vector2(wall_x, wall_y)
+	right.position = Vector2(right_x, wall_y)
 
 	var ceiling := RectangleShape2D.new()
-	ceiling.size = Vector2(_half_width * 2.0 + 80.0, 40)
+	ceiling.size = Vector2(right_x - left_x + 40.0, 40)
 	var top: CollisionShape2D = $Bounds/Ceiling
 	top.shape = ceiling
-	top.position = Vector2(0, SURFACE_Y - HEADROOM)
+	top.position = Vector2((left_x + right_x) * 0.5, _ceiling_y())
 
+	# The outline traces the ground it stands on: down to the water on the near
+	# side, down to the clifftop on the far one.
 	$Bounds/Visual.points = PackedVector2Array([
-		Vector2(-_half_width, SURFACE_Y),
-		Vector2(-_half_width, SURFACE_Y - HEADROOM),
-		Vector2(_half_width, SURFACE_Y - HEADROOM),
-		Vector2(_half_width, SURFACE_Y),
+		Vector2(-_half_width, SURFACE_Y - _near_rise),
+		Vector2(-_half_width, _ceiling_y()),
+		Vector2(_far_edge_x(), _ceiling_y()),
+		Vector2(_far_edge_x(), SURFACE_Y - _far_lift),
 	])
 
 
@@ -441,10 +763,10 @@ func _shape_bounds() -> void:
 func _frame_camera() -> void:
 	camera.position = Vector2(0, SURFACE_Y)
 	# Shores run SHORE_RUN inland from each bank, so this is the terrain's edge.
-	camera.limit_left = roundi(-_half_width - SHORE_RUN)
-	camera.limit_right = roundi(_half_width + SHORE_RUN)
+	camera.limit_left = roundi(-_half_width - _shore_run)
+	camera.limit_right = roundi(_half_width + _shore_run)
 	# Ceiling the player can hold a piece at, and the floor the seabed is drawn to.
-	camera.limit_top = roundi(SURFACE_Y - HEADROOM)
+	camera.limit_top = roundi(_ceiling_y())
 	camera.limit_bottom = roundi(SURFACE_Y + _max_depth + 300.0 + DEEP_MARGIN)
 	camera.refit()
 
@@ -463,11 +785,27 @@ func _frame_camera() -> void:
 	), SURFACE_Y)
 
 
+## Outer edge of the far shore — the last ground the truck can be standing on.
+func shore_edge_x() -> float:
+	return _half_width + _shore_run
+
+
+## Far end of the buildable strait: the water's edge on a flat level, the top of
+## the cliff on a lifted one.
+##
+## The face has to be INSIDE the box the player works in. A cliff the pieces stop
+## short of is a wall the player can only look at — the whole point of lifting the
+## far bank is that the bridge has to be built up against it and over its lip.
+func _far_edge_x() -> float:
+	return _half_width + _slope_run
+
+
 ## Box the construction systems may operate in: inside the walls, above the floor.
 func build_area() -> Rect2:
+	var left := -_half_width + 60.0
 	return Rect2(
-		Vector2(-_half_width + 60.0, SURFACE_Y - HEADROOM + 60.0),
-		Vector2(_half_width * 2.0 - 120.0, HEADROOM + _max_depth - 120.0)
+		Vector2(left, _ceiling_y() + 60.0),
+		Vector2(_far_edge_x() - 60.0 - left, HEADROOM + _high_ground() + _max_depth - 120.0)
 	)
 
 
@@ -475,6 +813,7 @@ func build_area() -> Rect2:
 ## refunded rather than silently lost.
 func escape_bounds() -> Rect2:
 	return Rect2(
-		Vector2(-_half_width - 300.0, SURFACE_Y - HEADROOM - 300.0),
-		Vector2(_half_width * 2.0 + 600.0, HEADROOM + _max_depth + 900.0)
+		Vector2(-_half_width - 300.0, _ceiling_y() - 300.0),
+		Vector2(_far_edge_x() + 300.0 + _half_width + 300.0,
+			HEADROOM + _far_lift + _max_depth + 900.0)
 	)

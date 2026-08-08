@@ -79,6 +79,12 @@ var _park_at: Vector2 = Vector2.INF
 ## world it moves things around in, and it should stay that way.
 var water: WaterBody = null
 
+## The rope system, on an experimental build. Null in a normal one, and the
+## checks below are then a single null compare. While rope mode is armed the
+## clicks belong to it: tying a rope means clicking ON a piece, which is exactly
+## the gesture that otherwise picks one up.
+var ropes: RopeManager = null
+
 
 ## The wheel is the camera's, always — including while a piece is held.
 ##
@@ -93,6 +99,11 @@ var water: WaterBody = null
 ## every wheel event.
 func _unhandled_input(event: InputEvent) -> void:
 	if locked:
+		return
+	# Checked outright rather than left to input ordering. _unhandled_input is
+	# delivered in reverse tree order, which is a fragile thing to hang a mode on —
+	# moving a node in main.tscn would silently give the clicks back.
+	if ropes != null and ropes.arming:
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -118,8 +129,28 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif _recall_at(get_global_mouse_position()):
 					get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if (event as InputEventKey).keycode == KEY_X:
+		var key := (event as InputEventKey).keycode
+		if key == KEY_X:
 			stash_held()
+		elif key == KEY_F:
+			flip_held()
+
+
+## Mirror the held piece left-to-right.
+##
+## Only while held, like rotation: flipping a piece already wedged into a bridge
+## would swap a shape for a different one inside its neighbours, and the solver's
+## answer to that is to fire everything apart.
+func flip_held() -> void:
+	if held == null or not is_instance_valid(held):
+		return
+	held.set_flipped(not held.flipped)
+	# The grab point mirrors with the piece. It is a point in the piece's own
+	# space, so the wood that was under the cursor is now at -x — and without
+	# this the piece lurches sideways by twice the offset the moment it flips,
+	# which reads as the flip having thrown it rather than turned it.
+	_grab_offset.x = -_grab_offset.x
+	UITheme.play(&"piece_click")
 
 
 ## Return the held piece to stock. Main does the refunding; this only has to get
@@ -221,6 +252,12 @@ func _recall_at(world_position: Vector2) -> bool:
 	UITheme.play(&"piece_click")
 	delete_requested.emit(piece)
 	return true
+
+
+## What piece the cursor is on, for anything outside this node that has to ask
+## the same question. There is exactly one definition of it and this is it.
+func piece_at(world_position: Vector2) -> BridgeObject:
+	return _piece_at(world_position)
 
 
 ## The topmost placed piece under a point, or null.

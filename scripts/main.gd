@@ -29,12 +29,23 @@ var _blueprints := Blueprints.new()
 ## end of the tick rather than halfway through it.
 var _recorder := AttemptRecorder.new()
 var _replay := ReplayPlayer.new()
+
+## The experimental battery-truck upgrades, and the ropes in the strait. Both are
+## built on every run, flag or no flag: the flag decides whether the player can
+## reach them, not whether their state is kept. See SaveGame.capture().
+##
+## Upgrades are a child of Main and are deliberately untouched by a level load —
+## that is what makes them survive changing strait, where the pieces do not.
+var _upgrades := SalvageUpgrades.new()
+var _ropes := RopeManager.new()
 ## True while a replay is being filmed to a video file, so the end of playback
 ## knows whether there is a download to trigger.
 var _replay_recording: bool = false
 
-## The bridge as it stood when the current attempt began.
+## The bridge as it stood when the current attempt began, and the ropes that were
+## tied across it. Always restored together — see _restore_bridge().
 var _pre_crossing_layout: Array[Dictionary] = []
+var _pre_crossing_ropes: Array[Dictionary] = []
 ## True from the moment a car spawns until the bridge has been put back.
 ##
 ## The manipulator is locked for exactly this window, so building and attempting
@@ -48,11 +59,15 @@ var _attempt_active: bool = false:
 			_manipulator.locked = value
 		if _hud != null:
 			_hud.build_locked = value
+		if _ropes != null:
+			_ropes.locked = value
 ## Set by the headless checks, which must not write over a real save.
 var _testing: bool = false
 ## Level index to open in the dev sandbox, or -1 for a normal run. See _ready().
 var _sandbox_level: int = -1
 var _sandbox_money: int = 5000
+## Set by --expcheck, the headless check over the experimental systems.
+var _expcheck: bool = false
 
 
 func _ready() -> void:
@@ -67,9 +82,27 @@ func _ready() -> void:
 	_world.add_child(_replay)
 	_replay.finished.connect(_on_replay_finished)
 
+	_upgrades.name = "SalvageUpgrades"
+	add_child(_upgrades)
+	# In the world, beside the pieces rather than among them. NOT under $Objects,
+	# which is the spawner's container: discard_all() frees every child of it on a
+	# level change, and it does not check what they are — the rope manager was
+	# deleted out from under the game on the first level load.
+	_ropes.name = "Ropes"
+	_ropes.economy = _economy
+	_ropes.levels = _levels
+	_ropes.manipulator = _manipulator
+	_world.add_child(_ropes)
+	_manipulator.ropes = _ropes
+	_crossing.upgrades = _upgrades
+	_crossing.truck_type = _upgrades.truck_type as CrossingManager.Truck
+
 	_shop.setup(_economy, _inventory)
 	_levels.setup(_world, _shop, _economy, _inventory, _spawner, _crossing)
-	_hud.build(_spawner, _crossing, _economy, _inventory, _shop, _levels, _blueprints)
+	_hud.build(
+		_spawner, _crossing, _economy, _inventory, _shop, _levels, _blueprints,
+		_upgrades, _ropes
+	)
 
 	_hud.save_blueprint_requested.connect(_on_save_blueprint)
 	_hud.load_blueprint_requested.connect(_on_load_blueprint)
@@ -84,12 +117,19 @@ func _ready() -> void:
 	_hud.level_select_requested.connect(_on_level_select_requested)
 	_hud.replay_requested.connect(_on_replay_requested)
 	_hud.replay_skip_requested.connect(_on_replay_skip_requested)
+	_hud.upgrade_requested.connect(_on_upgrade_requested)
+	_hud.truck_type_requested.connect(_on_truck_type_requested)
+
+	_ropes.placement_failed.connect(_hud.report_blocked_reason)
 
 	_manipulator.water = $World/Water
 	_crossing.water = $World/Water
 	_manipulator.delete_requested.connect(_spawner.remove)
 	_manipulator.release_blocked.connect(_hud.report_blocked)
 	_spawner.object_removed.connect(_inventory.add.bind(1))
+	# A piece can be recalled out from under a rope at any moment, and a joint
+	# pointing at a freed body is the one way this can take the whole bridge down.
+	_spawner.object_removed.connect(func(_def: ObjectDef) -> void: _ropes.prune())
 	_crossing.attempt_started.connect(_on_crossing_started)
 	_crossing.attempt_finished.connect(_on_crossing_finished)
 	_levels.campaign_finished.connect(_hud.report_campaign_finished)
@@ -104,6 +144,13 @@ func _ready() -> void:
 	for arg: String in args:
 		if arg.begins_with("--savefile="):
 			SaveGame.path = "user://%s" % arg.substr(11)
+		elif arg == Experimental.FLAG:
+			# Read through Experimental.on() rather than from here — this branch only
+			# keeps the loop an honest list of every flag the game takes.
+			pass
+		elif arg == "--expcheck":
+			_expcheck = true
+			_testing = true
 		elif arg == "--levelcheck":
 			_check_level = 2
 		elif arg.begins_with("--levelcheck="):
@@ -128,6 +175,8 @@ func _ready() -> void:
 	# Connected only after the restore, so the level load inside _load_or_start()
 	# can't autosave its blank slate over the file it's about to read.
 	if not _testing:
+		_ropes.changed.connect(request_save)
+		_upgrades.changed.connect(request_save)
 		_shop.stock_changed.connect(request_save)
 		_blueprints.changed.connect(request_save)
 		_levels.level_loaded.connect(func(_lv: LevelDef, _i: int) -> void: save_now())
@@ -142,6 +191,8 @@ func _ready() -> void:
 		_run_bench()
 	elif _check_level >= 0:
 		_run_level_check()
+	elif _expcheck:
+		_run_exp_check()
 
 
 ## Resume where the player left off, or start a fresh run if there's no save.
@@ -165,7 +216,11 @@ func _load_or_start() -> void:
 	Campaign.requested_level = -1
 	_levels.load_level(chosen if chosen >= 0 else int(data.get("level", 0)))
 	if not data.is_empty():
-		SaveGame.apply(data, _levels, _economy, _inventory, _shop, _spawner, _blueprints)
+		SaveGame.apply(
+			data, _levels, _economy, _inventory, _shop, _spawner, _blueprints,
+			_upgrades, _ropes
+		)
+		_crossing.set_truck(_upgrades.truck_type as CrossingManager.Truck)
 
 	# No save means this is somebody's first turn, so teach it. Tied to the
 	# absence of a save rather than to a "seen it" flag on purpose: the flag would
@@ -182,6 +237,21 @@ func _load_or_start() -> void:
 	# behind the overlay pressing buttons that never get the click.
 	if data.is_empty() and not _testing:
 		_hud.start_tutorial()
+
+
+## Put the bridge back the way it was when START was pressed — pieces and the
+## ropes tied across them, together.
+##
+## One function rather than two calls at each of the three places that undo an
+## attempt (a restart, REMOVE CAR, and the linger after a result). Restoring the
+## pieces without the ropes is a silent, partial correctness that would show up on
+## one of those paths and not the others.
+func _restore_bridge() -> void:
+	var placed: Array[BridgeObject] = _spawner.restore(_pre_crossing_layout)
+	var by_uid := {}
+	for obj: BridgeObject in placed:
+		by_uid[obj.uid] = obj
+	_ropes.restore(_pre_crossing_ropes, by_uid)
 
 
 ## Ask for a save soon rather than right now.
@@ -246,7 +316,9 @@ func save_now() -> void:
 		_pre_crossing_layout if _attempt_active else _spawner.snapshot()
 	)
 	SaveGame.save(
-		SaveGame.capture(_levels, _economy, _inventory, _shop, bridge, _blueprints)
+		SaveGame.capture(
+			_levels, _economy, _inventory, _shop, bridge, _blueprints, _upgrades, _ropes
+		)
 	)
 
 
@@ -377,6 +449,21 @@ func _on_place_all_requested(def: ObjectDef) -> void:
 		_hud.report_bulk_placed(def, placed)
 
 
+func _on_upgrade_requested(kind: int) -> void:
+	if not _upgrades.buy(kind as SalvageUpgrades.Kind, _economy):
+		_hud.report_blocked_reason("Not enough salvage money for that upgrade")
+
+
+## Swapping trucks between attempts. The choice is global — it belongs to the
+## player, not to the strait — so it goes into the upgrade store and is saved with
+## it rather than being reset on the next level.
+func _on_truck_type_requested(kind: int) -> void:
+	if _attempt_active or _crossing.is_running:
+		return
+	_crossing.set_truck(kind as CrossingManager.Truck)
+	_upgrades.set_truck(kind)
+
+
 ## A level change cancels any pending restore. Without this, changing level during
 ## the post-attempt linger would rebuild the old level's bridge in the new strait.
 func _on_level_loaded(_level: LevelDef, _index: int) -> void:
@@ -385,6 +472,10 @@ func _on_level_loaded(_level: LevelDef, _index: int) -> void:
 		audio.set_level_music(_index)
 	_attempt_active = false
 	_pre_crossing_layout.clear()
+	_pre_crossing_ropes.clear()
+	# The pieces the ropes were tied to have already been thrown away with the old
+	# strait, so a rope carried across would be tied to nothing.
+	_ropes.clear_all()
 	_camera.stop_following()
 	# Saved layouts belong to the strait they were taken in — a span shaped for one
 	# is meaningless in a wider one — so the arriving level starts with none, and
@@ -432,7 +523,7 @@ func _on_start_crossing_requested() -> void:
 	if _attempt_active:
 		_crossing.reset()
 		_camera.stop_following()
-		_spawner.restore(_pre_crossing_layout)
+		_restore_bridge()
 		_attempt_active = false
 	_crossing.start_crossing()
 
@@ -464,7 +555,7 @@ func _on_recall_car_requested() -> void:
 	_crossing.reset()
 	_camera.stop_following()
 	if _attempt_active:
-		_spawner.restore(_pre_crossing_layout)
+		_restore_bridge()
 		_attempt_active = false
 
 
@@ -492,7 +583,7 @@ var _auto_bridge: int = 0
 ##
 ## A crossing is exactly the moment a layout becomes worth keeping, and it is
 ## also the moment the player is least likely to think of it — the panel is up,
-## there is money on it, and NEXT STRAIT is right there. Coming back to a strait
+## there is money on it, and NEXT CROSSING is right there. Coming back to a strait
 ## to beat your own price and finding the bridge that set it already in a slot is
 ## the whole point.
 ##
@@ -544,6 +635,11 @@ func _on_load_blueprint(index: int) -> void:
 	_manipulator.stash_held()
 	# Refunds every placed piece, so the stock below is the full pool.
 	_spawner.clear_all()
+	# A saved layout holds pieces and nothing else, so the ropes tied across the
+	# bridge being replaced have nothing left to hold. Not refunded: the pieces
+	# were, and refunding both would make LOAD a way of printing money.
+	var cut := _ropes.count()
+	_ropes.clear_all()
 
 	var layout: Array[Dictionary] = []
 	for entry: Dictionary in (data["bridge"] as Array):
@@ -553,6 +649,10 @@ func _on_load_blueprint(index: int) -> void:
 
 	var wanted: int = (data["bridge"] as Array).size()
 	_hud.report_blueprint_loaded(index, layout.size(), wanted)
+	if cut > 0:
+		_hud.report_blocked_reason(
+			"%d rope%s cut — a saved build has no ropes in it" % [cut, "" if cut == 1 else "s"]
+		)
 	if not _testing:
 		save_now()
 
@@ -580,6 +680,12 @@ func _bridge_points() -> int:
 		var def := entry[&"def"] as ObjectDef
 		if def != null:
 			total += def.price
+	# Ropes are part of what the bridge cost. A roped span is strictly better than
+	# the same span without one, so leaving them out of the price would put every
+	# roped run above every unroped one on a board that ranks by how little you
+	# spent.
+	for entry: Dictionary in _pre_crossing_ropes:
+		total += int(entry.get(&"cost", 0))
 	return total
 
 
@@ -680,6 +786,7 @@ func _on_level_select_requested() -> void:
 
 func _on_crossing_started() -> void:
 	_pre_crossing_layout = _spawner.snapshot()
+	_pre_crossing_ropes = _ropes.snapshot()
 	_attempt_active = true
 	_camera.follow(_crossing.car.chassis)
 	# The previous run's film goes here rather than when the new one ends: a
@@ -713,7 +820,14 @@ func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> v
 	if succeeded:
 		_autosave_winning_build(bridge)
 
-	_hud.report_crossing(result, progress, settled[0], settled[1], bridge, rank)
+	# Read here, before the linger frees the truck: by the time the banner would
+	# want it, there is no car left to ask.
+	var flat := (
+		is_instance_valid(_crossing.car)
+		and _crossing.car.battery != null
+		and _crossing.car.battery.is_empty()
+	)
+	_hud.report_crossing(result, progress, settled[0], settled[1], bridge, rank, flat)
 	if succeeded and not _levels.is_last():
 		_hud.offer_next_level()
 	# The last strait's congratulations lives inside the crossing panel itself —
@@ -732,7 +846,7 @@ func _on_crossing_finished(result: CrossingManager.Result, progress: float) -> v
 	# camera off the replay's truck mid-crossing is not.
 	if not _replay.is_playing:
 		_camera.stop_following()
-	_spawner.restore(_pre_crossing_layout)
+	_restore_bridge()
 	_attempt_active = false
 
 
@@ -1011,7 +1125,164 @@ func _run_smoke_test() -> void:
 			start.x, _levels.level.goal_x()
 		])
 		assert(_world.build_area().size.x > 0.0, "level built an empty build area")
-		assert(box.has_point(Vector2(_levels.level.goal_x(), 300.0)), "goal outside world")
+		# The goal sits on the far shore, which reaches past the piece bounds — on a
+		# lifted level it is up the hill — so it is checked against the ground, and
+		# the box only against the water's edge it belongs to.
+		assert(box.has_point(Vector2(_levels.level.half_width, 300.0)), "water edge outside world")
+		assert(
+			_levels.level.goal_x() < _world.shore_edge_x(),
+			"goal line is past the end of the far shore"
+		)
+
+
+## Headless check over the two experimental systems.
+##
+##   godot --headless --quit-after 4000 res://scenes/main.tscn -- \
+##       --experimental --expcheck --savefile=save_expcheck.json
+##
+## Run it WITHOUT --experimental too: the first assertion is that with the flag
+## off none of this exists, which is the promise the flag makes to a normal run.
+func _run_exp_check() -> void:
+	print("EXPCHECK experimental=%s" % Experimental.on())
+	if not Experimental.on():
+		assert(_hud.truck_button() == null, "truck picker was built without the flag")
+		print("EXPCHECK off: no experimental UI. done")
+		get_tree().quit()
+		return
+
+	_levels.load_level(0)
+	_economy.add(9000)
+
+	# --- Upgrades ------------------------------------------------------------
+	var base_capacity := _upgrades.capacity()
+	var base_splash := _upgrades.splash_drain()
+	assert(_upgrades.buy(SalvageUpgrades.Kind.CAPACITY, _economy), "could not buy capacity")
+	assert(_upgrades.buy(SalvageUpgrades.Kind.SEALING, _economy), "could not buy sealing")
+	assert(_upgrades.capacity() > base_capacity, "capacity upgrade changed nothing")
+	assert(_upgrades.splash_drain() < base_splash, "sealing upgrade changed nothing")
+	assert(_upgrades.splash_drain() > 0.0, "sealing made water free")
+	print("EXPCHECK capacity %.0f -> %.0f, splash %.1f -> %.1f" % [
+		base_capacity, _upgrades.capacity(), base_splash, _upgrades.splash_drain()
+	])
+
+	# The round trip in memory, then the one thing a level change must not do.
+	var levels_before := _upgrades.capacity_level
+	_levels.load_level(1)
+	assert(_upgrades.capacity_level == levels_before, "a level load ate the upgrades")
+	assert(_inventory.total() == 0, "a level load kept the pieces")
+	_levels.load_level(0)
+	_economy.add(9000)
+
+	# --- Ropes ---------------------------------------------------------------
+	var area: Rect2 = _world.build_area()
+	var def: ObjectDef = _levels.level.shop_pool[0]
+	var a: BridgeObject = _spawner.spawn(def, Vector2(area.get_center().x - 120.0, -200.0))
+	var b: BridgeObject = _spawner.spawn(def, Vector2(area.get_center().x + 120.0, -200.0))
+	assert(a.uid != b.uid and a.uid > 0, "pieces did not get distinct uids")
+
+	# Through the real two-click path, so the price, the limit and the refund are
+	# the ones a player meets. The physics frames are what put the two bodies into
+	# the space — the click test is a point query, and a body added this frame is
+	# not in the world yet.
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var before := _economy.money
+	_ropes.try_point(a.global_position)
+	_ropes.try_point(b.global_position)
+	assert(_ropes.count() == 1, "the two-click path placed no rope")
+	assert(_economy.money < before, "placing a rope cost nothing")
+	var rope: Rope = _ropes.ropes()[0]
+	assert(rope.joint != null, "rope built no joint")
+	assert(not rope.joint.disable_collision, "roped pieces would fall through each other")
+	assert(
+		rope.joint.get_node_or_null(rope.joint.node_a) == a
+		and rope.joint.get_node_or_null(rope.joint.node_b) == b,
+		"the joint is not tied to the two pieces"
+	)
+	# The anchors come out of the joint's transform, so this is the one thing that
+	# silently goes wrong: a sign error puts anchor B on the far side of anchor A
+	# and the rope pulls the pieces together instead of holding them apart.
+	var anchor_b := rope.joint.global_transform * Vector2(0, rope.joint.length)
+	assert(
+		anchor_b.distance_to(b.global_position) < 1.0,
+		"the joint's second anchor is not on the second piece"
+	)
+
+	# The refund is the whole cost, and only the rope's.
+	_ropes.remove_rope(rope)
+	assert(_ropes.count() == 0, "rope was not cut")
+	assert(_economy.money == before, "cutting a rope did not refund exactly its cost")
+
+	# The ration. Level 1 allows exactly one, so the second is refused.
+	_ropes.try_point(a.global_position)
+	_ropes.try_point(b.global_position)
+	assert(_ropes.count() == 1, "the first rope of the level was refused")
+	var money := _economy.money
+	_ropes.try_point(a.global_position)
+	_ropes.try_point(b.global_position)
+	assert(_ropes.count() == 1, "level %d allowed a second rope" % _levels.index)
+	assert(_economy.money == money, "a refused rope still took the money")
+
+	# The snapshot cycle: the pieces are freed and rebuilt, and the rope has to
+	# find the same two again.
+	_pre_crossing_layout = _spawner.snapshot()
+	_pre_crossing_ropes = _ropes.snapshot()
+	assert(_pre_crossing_ropes.size() == 1, "the rope was not snapshotted")
+	_restore_bridge()
+	assert(_ropes.count() == 1, "the rope did not survive a restore")
+	assert(_ropes.ropes()[0].alive(), "the restored rope is tied to nothing")
+	print("EXPCHECK rope survived the snapshot cycle")
+
+	# --- The save, through JSON --------------------------------------------
+	var captured := SaveGame.capture(
+		_levels, _economy, _inventory, _shop, _spawner.snapshot(), _blueprints,
+		_upgrades, _ropes
+	)
+	var round_trip: Variant = JSON.parse_string(JSON.stringify(captured))
+	assert(round_trip is Dictionary, "the save is not JSON-serialisable")
+	var reloaded := round_trip as Dictionary
+	_upgrades.capacity_level = 0
+	_upgrades.sealing_level = 0
+	SaveGame.apply(
+		reloaded, _levels, _economy, _inventory, _shop, _spawner, _blueprints,
+		_upgrades, _ropes
+	)
+	assert(_upgrades.capacity_level == 1, "upgrades did not come back out of the save")
+	assert(_ropes.count() == 1, "the rope did not come back out of the save")
+	print("EXPCHECK save round trip kept %d rope and capacity level %d" % [
+		_ropes.count(), _upgrades.capacity_level
+	])
+
+	# --- The battery -------------------------------------------------------
+	var battery := _upgrades.make_battery()
+	var full := battery.fraction()
+	battery.tick(1.0)
+	assert(battery.fraction() < full, "the battery does not bleed while driving")
+	var before_splash := battery.charge
+	battery.take_splash()
+	var one_dunk := before_splash - battery.charge
+	assert(one_dunk > 0.0, "a dunk cost nothing")
+	# The cooldown, which is what stops a bobbing chassis emptying it in a second.
+	battery.take_splash()
+	assert(
+		is_equal_approx(before_splash - battery.charge, one_dunk),
+		"a second dunk landed inside the cooldown"
+	)
+
+	# A flat battery must end the attempt through the ordinary stall path.
+	_crossing.set_truck(CrossingManager.Truck.BATTERY)
+	_crossing.start_crossing()
+	assert(_crossing.car.battery != null, "the electric truck went out with no battery")
+	_crossing.car.battery.charge = 0.0
+	var outcome: Array = await _crossing.attempt_finished
+	assert(
+		outcome[0] == CrossingManager.Result.STALLED,
+		"a flat battery finished as %s, not STALLED" % outcome[0]
+	)
+	print("EXPCHECK flat battery finished as STALLED at %.0f%%" % (float(outcome[1]) * 100.0))
+
+	print("EXPCHECK done")
+	get_tree().quit()
 
 
 ## Headless persistence check: a bridge must still be there when the player comes

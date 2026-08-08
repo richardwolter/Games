@@ -75,7 +75,8 @@ func load_level(new_index: int) -> void:
 
 	_world.build(level)
 	_spawner.set_area(_world.build_area(), _world.escape_bounds())
-	_crossing.set_course(level.car_start(), level.goal_x())
+	_crossing.truck_power = level.truck_power
+	_crossing.set_course(level.car_start(), level.goal_x(), -level.half_width)
 	_shop.open_for(level)
 	_economy.reward_scale = level.reward_scale
 	_economy.level_attempt_floor = level.attempt_floor

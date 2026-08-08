@@ -19,9 +19,33 @@ extends Node
 const TRACKS: Array[String] = [
 	"res://audio/Sax_Level1.mp3",
 	"res://audio/Song_Strait_Across.mp3",
-	# Levels 3 and 4 share this one, level 4 by the clamp above — hence the name.
+	# Named for the two levels it used to cover; level 4 has its own set below, so
+	# these days it is level 3's, and every level past the end of PLAYLISTS and this
+	# list falls back to it by the clamp.
 	"res://audio/Song_Level3_4.mp3",
 ]
+## Levels whose music is a set of tracks rather than one, by level index.
+##
+## Checked before TRACKS. The tracks play through in the order given and then
+## start over from the first — two short pieces alternating read as one longer
+## piece, where either on its own would be an obvious ninety-second loop.
+const PLAYLISTS: Dictionary[int, Array] = {
+	3: [
+		"res://audio/Song_Level4_A.mp3",
+		"res://audio/Song_Level4_B.mp3",
+	],
+	4: [
+		"res://audio/Song_Level5_A.mp3",
+		"res://audio/Song_Level5_B.mp3",
+	],
+	# Two halves of a duet: the hummed melody comes back answered by a second
+	# voice, which is the whole reason this level's music is a pair rather than
+	# one track on repeat.
+	5: [
+		"res://audio/Song_Level6_A.mp3",
+		"res://audio/Song_Level6_B.mp3",
+	],
+}
 ## Background noise for a level, by level index. A level with no entry plays
 ## none, and the layer fades out when you leave one that had it.
 ##
@@ -42,6 +66,16 @@ const AMBIENCE_DB := -22.0
 const CROSSFADE := 1.6
 ## Effectively silence for a fading track. -80 is Godot's floor.
 const SILENT_DB := -60.0
+## How far before the end of a playlist track the next one starts, and how long
+## the two overlap for. Short — this is a join between two takes of the same
+## piece, not a change of scene — but not zero.
+##
+## The handover is driven off the playback position rather than off `finished`,
+## which is what closes the gap: `finished` arrives after the stream has already
+## run out, so the earliest the next track could start is a frame into silence,
+## and on web that frame is whenever the browser gets round to it. Starting early
+## and overlapping means there is never a moment with nothing playing.
+const PLAYLIST_JOIN := 0.8
 ## One-shot effects, by name. Loaded once at startup — these fire on a click, and
 ## a load() on the click is a hitch exactly when the game should feel immediate.
 const SOUNDS: Dictionary = {
@@ -133,6 +167,18 @@ const SILENCE_THRESHOLD := 0.005
 ## control that lies about where it is.
 const MUSIC_TRIM_DB := -11.0
 
+## Per-track adjustments to that trim, in dB. Positive is louder.
+##
+## The tracks are not mixed to a common level — they were made at different
+## times by different means — and one trim for all of them means the quiet ones
+## sit under the effects while the loud ones cover them. Correcting it here
+## rather than by re-encoding the file keeps the correction visible and
+## reversible: the number says what is being done and to which track.
+const TRACK_TRIM_DB: Dictionary[String, float] = {
+	"res://audio/Song_Level5_A.mp3": 5.0,
+	"res://audio/Song_Level5_B.mp3": 5.0,
+}
+
 ## The two buses everything plays on, created at startup so there is no bus
 ## layout resource to keep in step with this file.
 const MUSIC_BUS := &"Music"
@@ -163,6 +209,10 @@ var _active: int = 0
 ## rather than restarting it.
 var _track: String = ""
 var _fades: Array[Tween] = [null, null]
+## The set of tracks the current level cycles through, and where in it we are.
+## Empty when the level plays a single looping track, which is the usual case.
+var _playlist: Array = []
+var _playlist_index: int = 0
 
 ## A ring of one-shot players and the streams they play.
 var _voices: Array[AudioStreamPlayer] = []
@@ -428,9 +478,43 @@ func set_level_music(level_index: int) -> void:
 	# levels past the end of TRACKS deliberately keep the last track, and there is
 	# no equivalent reading for noise — level 4 is not in the city.
 	_set_ambience(String(AMBIENCE.get(level_index, "")))
+	if PLAYLISTS.has(level_index):
+		play_playlist(PLAYLISTS[level_index])
+		return
 	if TRACKS.is_empty():
 		return
+	_playlist = []
 	play_track(TRACKS[clampi(level_index, 0, TRACKS.size() - 1)])
+
+
+## Watches the running playlist track and hands over to the next one just before
+## it ends. Does nothing at all on a level playing a single looping track, which
+## is most of them.
+func _process(_delta: float) -> void:
+	if _playlist.is_empty() or _players.is_empty():
+		return
+	var player := _players[_active]
+	if not player.playing or player.stream == null:
+		return
+	var length := player.stream.get_length()
+	# A stream that does not know its own length cannot be timed; those fall back
+	# to the `finished` handover, which still works, just with a seam.
+	if length <= 0.0:
+		return
+	if length - player.get_playback_position() > PLAYLIST_JOIN:
+		return
+	_advance_playlist(PLAYLIST_JOIN)
+
+
+## Move to the next track in the set. `fade` is the overlap: the length of the
+## join when there is still something playing to join from, near enough zero when
+## the outgoing track has already run out.
+func _advance_playlist(fade: float) -> void:
+	_playlist_index = (_playlist_index + 1) % _playlist.size()
+	# Cleared so a one-track playlist, which would be asking for the track that is
+	# already `_track`, still starts again instead of falling silent.
+	_track = ""
+	play_track(_playlist[_playlist_index], fade)
 
 
 ## Fade the background layer to `path`, or to silence when it is empty.
@@ -460,7 +544,23 @@ func _set_ambience(path: String) -> void:
 	_ambience_fade.tween_property(_ambience, ^"volume_db", AMBIENCE_DB, CROSSFADE)
 
 
-func play_track(path: String) -> void:
+## Start cycling through a set of tracks, crossfading in from whatever is playing.
+##
+## Asking for the set that is already running is free, so a scene reload does not
+## drop the player back to the first track.
+func play_playlist(paths: Array) -> void:
+	if paths.is_empty() or paths == _playlist:
+		return
+	_playlist = paths
+	_playlist_index = 0
+	play_track(_playlist[0])
+
+
+## `fade` is how long the handover takes. The default is a crossfade between two
+## tracks that are both playing; a playlist advancing has nothing to fade from,
+## since the outgoing track has just ended, and passes something near zero so the
+## next one starts rather than swelling in.
+func play_track(path: String, fade: float = CROSSFADE) -> void:
 	if _players.size() < 2 or path == _track:
 		return
 	var stream := load(path) as AudioStream
@@ -470,8 +570,16 @@ func play_track(path: String) -> void:
 	# MP3 and Ogg both carry their own loop flag, and setting it is what makes
 	# the loop seamless — restarting from `finished` leaves an audible gap the
 	# length of one frame.
+	#
+	# A playlist track is the exception: it has to end for the next one to get its
+	# turn, so the flag comes off and `finished` is what advances the set. The
+	# stream is duplicated first, because load() hands out one shared copy and
+	# clearing the flag on it would clear it for anything else playing the file.
+	var looping := _playlist.is_empty()
 	if &"loop" in stream:
-		stream.set(&"loop", true)
+		if not looping:
+			stream = stream.duplicate()
+		stream.set(&"loop", looping)
 
 	var outgoing := _active
 	var incoming := 1 - _active
@@ -485,9 +593,15 @@ func play_track(path: String) -> void:
 
 	# First track of the session has nothing to fade from, so it comes up on its
 	# own rather than waiting out a handover against silence.
-	_fade(incoming, MUSIC_TRIM_DB, CROSSFADE)
+	_fade(incoming, _level_for(path), fade)
 	if _players[outgoing].playing:
-		_fade(outgoing, SILENT_DB, CROSSFADE, true)
+		_fade(outgoing, SILENT_DB, fade, true)
+
+
+## How loud a given track plays: the common trim, plus whatever that one track
+## needs on top of it.
+func _level_for(path: String) -> float:
+	return MUSIC_TRIM_DB + float(TRACK_TRIM_DB.get(path, 0.0))
 
 
 ## Ramps one player's volume, replacing any ramp already running on it — two
@@ -504,12 +618,22 @@ func _fade(index: int, to_db: float, seconds: float, stop_after: bool = false) -
 	_fades[index] = tween
 
 
-## Restart if the stream ever ends despite the loop flag. Only the track that is
-## currently supposed to be playing — the other player finishing is just the tail
-## of a crossfade.
+## A track ending. On a single-track level that should not have happened at all,
+## and restarting is the safety net for a format that ignores its own loop flag.
+##
+## On a playlist it means _process did not get there first — a stream with no
+## usable length, or a frame long enough to overshoot the join. The next track
+## still starts, just without the overlap to hide the seam.
+##
+## Only for the track that is currently supposed to be playing — the other player
+## finishing is just the tail of a crossfade.
 func _on_finished(index: int) -> void:
-	if index == _active:
+	if index != _active:
+		return
+	if _playlist.is_empty():
 		_players[index].play()
+		return
+	_advance_playlist(0.05)
 
 
 ## KNOWN, HARMLESS EXIT NOISE. Quitting prints:

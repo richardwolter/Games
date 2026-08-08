@@ -1,6 +1,15 @@
 ## Turns the painted forest valley into a usable backdrop.
 ##
 ##   godot --headless --script tools/make_forest_backdrop.gd
+##   godot --headless --script tools/pad_backdrop.gd -- \
+##       --in=art/background_forest.png --out=art/background_forest.png \
+##       --factor=1.0 --aspect=3.443 --horizon=0.5 --feather=760 --slice=430
+##
+## BOTH steps, in that order. This one cuts the valley at its shoreline and paints
+## the water; the pad step widens the canvas to the shape level 4's camera bounds
+## want. Level 4 is the widest strait in the game, and unpadded the painting is
+## stretched sideways by more than two — every tree twice as wide as it was drawn.
+## The aspect comes from tools/backdrop_aspect.gd.
 ##
 ## The source is a complete landscape: forested slopes, a waterfall, and a flat
 ## meadow filling the whole bottom third with foreground rocks and pine trunks

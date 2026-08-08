@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelDef" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="LevelDef" load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
 [ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
@@ -16,6 +16,8 @@
 [ext_resource type="Resource" path="res://data/boxes/deluxe_box.tres" id="14_deluxe"]
 [ext_resource type="Texture2D" uid="uid://uie18pqgmm0q" path="res://art/background_forest.png" id="15_forest"]
 
+[ext_resource type="Texture2D" path="res://art/dead_tree.png" id="16_tree"]
+
 [resource]
 script = ExtResource("1_level")
 display_name = "4 — The River"
@@ -23,6 +25,11 @@ half_width = 2800.0
 max_depth = 900.0
 backdrop = ExtResource("15_forest")
 backdrop_horizon = 0.5
+seabed_prop = ExtResource("16_tree")
+seabed_prop_polygon = PackedVector2Array(-0.1936, -0.358, -0.4021, -0.2273, -0.4106, -0.2273, -0.4149, -0.1364, -0.4149, 0.1193, -0.3383, 0.2443, -0.3383, 0.2727, -0.066, 0.1591, -0.0404, 0.1591, 0.0319, 0.3864, 0.3681, 0.3864, 0.4106, 0.0455, 0.4149, 0.0455, 0.3851, -0.3636, 0.3851, -0.3693, -0.1936, -0.3864)
+seabed_prop_at = 0.0
+seabed_prop_clearance = 40.0
+seabed_prop_scale = 0.667
 reward_scale = 1.0
 shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge"), ExtResource("7_beam"), ExtResource("8_pontoon"), ExtResource("9_girder"), ExtResource("10_container")])
 shop_stock = PackedInt32Array(20, 11, 14, 11, 5, 8, 6, 5, 3)
