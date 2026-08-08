@@ -28,6 +28,9 @@ signal recall_car_requested()
 ## Run an attempt. Routed through Main rather than calling CrossingManager here,
 ## because a start may first have to undo the attempt before it.
 signal start_crossing_requested()
+## CHARGE! — the one boost the truck gets per attempt. The plate on the left edge
+## and the space bar both come through here.
+signal charge_requested()
 ## Copy the bridge into one of the three layout slots, or put one back.
 signal save_blueprint_requested(index: int)
 signal load_blueprint_requested(index: int)
@@ -133,6 +136,11 @@ var _shown_progress: float = 0.0
 var _remove_car_button: Button
 ## A TextureButton, not a Button: it is a painted sign rather than a plate.
 var _next_button: BaseButton
+## CHARGE!, on the left edge, up only while a truck is out, and which of its
+## three states it is currently showing — kept so the plate is only restyled when
+## the state actually changes rather than every frame of every attempt.
+var _charge_button: TextureButton
+var _charge_state: String = ""
 var _banner: Label
 var _banner_timer: float = 0.0
 ## True while an attempt is running, when nothing may be added to the bridge.
@@ -236,6 +244,7 @@ func build(
 	_corner = _build_settings_button()
 	root.add_child(_corner)
 	root.add_child(_build_banner())
+	root.add_child(_build_charge_button())
 	_hints = _build_hints()
 	root.add_child(_hints)
 	root.add_child(_build_meter())
@@ -572,6 +581,7 @@ func _build_panel() -> Control:
 	# Following the row's own re-sort catches that as well as window resizes.
 	row.sort_children.connect(_place_blueprints_button)
 	row.sort_children.connect(_place_contextual)
+	row.sort_children.connect(_place_charge_plate)
 
 	row.add_child(_build_shop_button())
 	row.add_child(_build_piece_belt())
@@ -1262,6 +1272,105 @@ func _build_hints() -> Control:
 	return label
 
 
+## CHARGE!, and where it sits.
+##
+## OVER THE SALVAGE SHOP SIGN, which is free real estate for exactly as long as
+## the plate is up: the shop is dead for the whole of an attempt, so the slot it
+## occupies is the one piece of dock that has nothing to say while the truck is
+## driving. It started out in the middle of the left edge, which put it over the
+## water — and the water is where the truck and the bridge are.
+##
+## A painted plate rather than a lettered one, cut from the sheet by
+## tools/make_charge_button.py. Both states carry their own wording — the lit one
+## says CHARGE!, the dark one CHARGE! USED — so nothing here writes text.
+##
+## Sized to stand a little proud of the dock rather than to fit inside it: the
+## shop sign is 66 tall in a 102-tall dock, and a plate that filled the slot
+## exactly would read as part of the woodwork instead of as something that just
+## appeared on top of it.
+const CHARGE_HEIGHT := 108.0
+## Lit while the boost actually runs. Small: the plate is already a picture of a
+## flamethrower going off, and anything stronger reads as a highlight bug.
+const CHARGE_LIT := Color(1.18, 1.12, 1.02)
+
+
+func _build_charge_button() -> Control:
+	var button := UITheme.art_button("charge", CHARGE_HEIGHT)
+	# The spent plate hangs off `disabled`, so the swap is one flag rather than a
+	# texture assignment, and Godot never greys the artwork itself — the second
+	# drawing IS the "no" state, and it says so in words.
+	button.texture_disabled = load("res://art/ui/charge_used.png") as Texture2D
+
+	button.size = button.custom_minimum_size
+	# Never takes focus, or the space bar would be pressing whatever the UI
+	# happened to have focused rather than firing the charge.
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = "One burst of speed per crossing — or press Space"
+	button.visible = false
+	button.pressed.connect(func() -> void: charge_requested.emit())
+	_charge_button = button
+	_place_charge_plate.call_deferred()
+	return button
+
+
+## Centres the plate on the shop sign.
+##
+## Driven off the sign's live rect for the same reason the tabs and the
+## contextual bar are: the dock's row is centred, so the sign moves sideways
+## whenever the belt gains or loses a piece, and any constant here would be wrong
+## on the next level.
+func _place_charge_plate() -> void:
+	if _charge_button == null or _shop_button == null:
+		return
+	var slot := _shop_button.get_global_rect()
+	if slot.size == Vector2.ZERO:
+		return
+	var size: Vector2 = _charge_button.custom_minimum_size
+	_charge_button.size = size
+	_charge_button.position = slot.get_center() - size * 0.5
+
+
+## Up for the whole attempt, not only while it can be spent.
+##
+## Not to be confused with _update_charge() further down, which is the START
+## sign's progress fill and predates the mechanic taking the word.
+##
+## A control that vanishes the moment it is used leaves the player wondering
+## whether they pressed it. It stays put and changes plate instead: lit while
+## there is a charge to spend, and the painted CHARGE! USED once there is not.
+func _update_charge_plate() -> void:
+	if _charge_button == null:
+		return
+	var car: Car = _crossing.car
+	var live := _crossing.is_running and is_instance_valid(car)
+	if live != _charge_button.visible:
+		_charge_button.visible = live
+	if not live:
+		return
+
+	var state := "ready"
+	if car.charge_active():
+		state = "charging"
+	elif car.charge_used:
+		state = "spent"
+	if state == _charge_state:
+		return
+	_charge_state = state
+	# Disabled only once it is gone. While the boost runs the plate stays lit and
+	# live — the flame on it is the feedback, and greying it the instant it fires
+	# would read as a control that broke rather than one that worked.
+	_charge_button.disabled = state == "spent"
+	_charge_button.modulate = CHARGE_LIT if state == "charging" else Color.WHITE
+
+
+func _charge_ready_to_press() -> bool:
+	# The tracked state, not `disabled`: the plate stays live while the boost runs
+	# so the player can see it working, and a key press then has to be refused by
+	# something other than the greying.
+	return _charge_button != null and _charge_button.visible \
+		and _charge_state == "ready"
+
+
 func _build_banner() -> Control:
 	_banner = Label.new()
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -1608,6 +1717,7 @@ func _process(delta: float) -> void:
 		_refresh_pieces()
 		_refresh_blueprints()
 	_update_charge(delta)
+	_update_charge_plate()
 	_update_shop_nudge()
 	_update_battery_gauge()
 	# The rope tab tracks the build lock and the count. Compared as integers rather
@@ -1685,12 +1795,24 @@ func _meter_text() -> String:
 ## Escape backs out of a confirmation, matching the shop menu. It's consumed
 ## here so it can't also drop the window out of fullscreen on the way past.
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_instance_valid(_confirm_overlay):
+	if not (event is InputEventKey and event.pressed and not event.is_echo()):
 		return
-	if event is InputEventKey and event.pressed and not event.is_echo():
-		if (event as InputEventKey).keycode == KEY_ESCAPE:
-			_confirm_overlay.queue_free()
-			get_viewport().set_input_as_handled()
+	var key := (event as InputEventKey).keycode
+
+	# Space fires the charge from wherever the mouse is. It reads the plate's own
+	# state rather than asking the crossing, so the key and the button can never
+	# disagree about whether there is anything to spend.
+	if key == KEY_SPACE and _charge_ready_to_press():
+		# The plate's own click comes from enliven(); a key press has to ask for
+		# it, or firing the charge from the keyboard is silent.
+		UITheme.play(&"ui_click")
+		charge_requested.emit()
+		get_viewport().set_input_as_handled()
+		return
+
+	if key == KEY_ESCAPE and is_instance_valid(_confirm_overlay):
+		_confirm_overlay.queue_free()
+		get_viewport().set_input_as_handled()
 
 
 ## Drives the START button's fill from crossing progress.

@@ -42,6 +42,43 @@ const RIDE_HEIGHT := 38.0
 @export var slip_range: float = 260.0
 @export_range(0.0, 1.0, 0.05) var spin_torque_floor: float = 0.15
 
+## CHARGE! — the one shove the player gets per attempt.
+##
+## A multiplier on drive torque with the speed cap lifted to match, applied to
+## BOTH wheels. Torque rather than a straight push on the chassis, so the boost
+## still has to go through the tyres: charging on a steel deck spins the wheels
+## and gets you nothing, which keeps the surface rules the game already has
+## worth caring about.
+##
+## The cap has to move with the torque. Extra torque under an unchanged cap only
+## reaches the same top speed sooner, which is a fine thing to feel for half a
+## second and nothing at all on a bridge you are already crawling across.
+@export var charge_seconds: float = 2.5
+@export var charge_torque_multiplier: float = 2.4
+@export var charge_speed_multiplier: float = 1.35
+## Seconds the boost takes to arrive, and to leave. Both non-zero on purpose: a
+## step change in torque on a truck standing on a bridge made of barrels is a
+## shove that can throw the bridge rather than the truck.
+@export var charge_ramp: float = 0.25
+@export var charge_fade: float = 0.8
+
+## Airborne thrust, in multiples of the truck's own weight. Above 1.0 the rocket
+## beats gravity, so a charge spent at the top of a jump visibly lifts rather
+## than merely falling more slowly — which is the difference between reading as a
+## rocket and reading as a bug.
+@export var charge_air_thrust: float = 1.15
+## How far off level the thrust may point, either way. See _rocket().
+@export var charge_air_cone_degrees: float = 40.0
+
+## How hard the nose is held down while charging, as a rate: the fraction of the
+## chassis's pitch-up spin cancelled per second.
+##
+## Needed because the drive is a couple. Torque on a wheel pushes back through
+## the axle pin into the chassis, and on a truck with this much ground clearance
+## the boost simply stands it up and loops it over backwards — a wheelie is
+## funny once and is not what the button is for. See _hold_nose_down().
+@export var nose_hold_rate: float = 9.0
+
 ## Pitch the engine sound plays at with the wheels stopped and with them at
 ## their cap. Under 1.0 at rest because the recording is of a truck already
 ## moving, so its own pitch is somewhere in the middle of the range.
@@ -59,6 +96,7 @@ const REV_SMOOTHING := 8.0
 const REV_WINDOW := 0.05
 
 @onready var chassis: RigidBody2D = $Chassis
+@onready var exhaust: ExhaustFlame = $Chassis/SuspensionRig/Exhaust
 
 var driving: bool = false
 
@@ -74,7 +112,21 @@ var battery: Battery = null
 ## shore has to show which truck START is about to send.
 var battery_powered: bool = false
 
+## The charge, spent or not. Per attempt without a timer to reset, because a
+## truck is built fresh for every attempt and thrown away at the end of it — the
+## "once per crossing" rule is the object's lifetime, not a rule anything has to
+## enforce.
+var charge_used: bool = false
+
 var _throttle: float = 0.0
+## Seconds of boost left to run.
+var _charge_left: float = 0.0
+## What the whole truck weighs, in newtons — every body's mass against the
+## project's gravity. The rocket is quoted in multiples of it, so the thrust
+## follows the truck if it is ever made heavier and the export keeps meaning what
+## it says. Worked out once, in _ready(), rather than read off ProjectSettings on
+## every tick of every boost.
+var _weight: float = 0.0
 var _wheels: Array[RigidBody2D] = []
 var _radii: PackedFloat32Array = PackedFloat32Array()
 var _drips: Array[WheelDrip] = []
@@ -104,6 +156,11 @@ func _ready() -> void:
 		wheel.max_contacts_reported = 4
 		wheel.contact_monitor = true
 		_last_angles.append(wheel.rotation)
+
+	var gravity := float(ProjectSettings.get_setting("physics/2d/default_gravity", 980.0))
+	_weight = chassis.mass * gravity
+	for wheel: RigidBody2D in _wheels:
+		_weight += wheel.mass * gravity
 
 	_tint_for_power()
 	# The chassis going in the water is what costs a battery truck its charge.
@@ -200,6 +257,38 @@ func start() -> void:
 	driving = true
 
 
+## Can the player still spend the charge? False on a truck that is not driving,
+## one that has already used it, and one whose battery has run flat — there is
+## nothing to boost when the motor is off.
+func charge_ready() -> bool:
+	return driving and not charge_used and (battery == null or not battery.is_empty())
+
+
+func charge_active() -> bool:
+	return _charge_left > 0.0
+
+
+## Is either tyre touching anything? The charge already asks this per wheel to
+## choose between drive and thrust; this is the same question for anything that
+## only needs to know whether the truck is currently flying.
+func is_grounded() -> bool:
+	for wheel: RigidBody2D in _wheels:
+		if not wheel.get_colliding_bodies().is_empty():
+			return true
+	return false
+
+
+## Spend it. Returns false if there was nothing to spend, so the caller can tell
+## a press that did something from one that did not.
+func trigger_charge() -> bool:
+	if not charge_ready():
+		return false
+	charge_used = true
+	_charge_left = charge_seconds
+	exhaust.light()
+	return true
+
+
 func stop() -> void:
 	driving = false
 	_throttle = 0.0
@@ -239,6 +328,10 @@ func _physics_process(delta: float) -> void:
 	if not driving:
 		return
 
+	# Ticked before the battery is checked, so a charge spent on the last of the
+	# power runs its course rather than freezing half-used when the motor cuts.
+	var boost := _charge_level(delta)
+
 	# Flat means no drive, not an instant end to the attempt. The truck coasts,
 	# rolls back down whatever it was climbing, and the crossing manager's stall
 	# timer calls it — which is both the funnier outcome and one that needs no new
@@ -250,15 +343,110 @@ func _physics_process(delta: float) -> void:
 			return
 
 	_throttle = minf(_throttle + delta / spin_up_time, 1.0)
+	var torque := drive_torque * lerpf(1.0, charge_torque_multiplier, boost)
+	var speed_cap := max_wheel_speed * lerpf(1.0, charge_speed_multiplier, boost)
 	var truck_speed := chassis.linear_velocity.x
 	for i: int in _wheels.size():
 		var wheel: RigidBody2D = _wheels[i]
-		if wheel.angular_velocity >= max_wheel_speed:
+		if wheel.angular_velocity >= speed_cap:
 			continue
 		var traction := _traction(wheel, _radii[i], truck_speed)
 		if traction <= 0.0:
 			continue
-		wheel.apply_torque(drive_torque * _throttle * traction)
+		wheel.apply_torque(torque * _throttle * traction)
+
+	if boost > 0.0:
+		# What the charge does depends on what the truck is standing on, and the
+		# two cases are opposites: on the ground it is drive that has to be kept
+		# from standing the truck up, in the air it is thrust with nothing to
+		# drive against at all.
+		var back_down := not _wheels[0].get_colliding_bodies().is_empty()
+		var front_down := not _wheels[1].get_colliding_bodies().is_empty()
+		if not back_down and not front_down:
+			_rocket(boost)
+		elif back_down and not front_down:
+			_hold_nose_down(boost)
+
+
+## How much of the charge is on this tick, 0..1, and spends it as it goes.
+##
+## Eased in and out rather than switched. The truck is usually standing on
+## something loose when the button is pressed, and a step change in drive torque
+## kicks the deck out from under it — the boost should throw the TRUCK.
+func _charge_level(delta: float) -> float:
+	if _charge_left <= 0.0:
+		return 0.0
+	_charge_left = maxf(_charge_left - delta, 0.0)
+	# The flame is put out from here rather than from a timer of its own, so the
+	# fire is showing exactly while there is boost being applied — including when
+	# a boost ends early because the truck was freed or the battery died.
+	if _charge_left <= 0.0:
+		exhaust.douse()
+	var elapsed := charge_seconds - _charge_left
+	var rise := clampf(elapsed / maxf(charge_ramp, 0.001), 0.0, 1.0)
+	var fall := clampf(_charge_left / maxf(charge_fade, 0.001), 0.0, 1.0)
+	return smoothstep(0.0, 1.0, minf(rise, fall))
+
+
+## Holds the front wheel down while the charge is on.
+##
+## The drive is a couple: torque into a wheel comes back through the axle pin as
+## an equal torque on the chassis, trying to rotate the truck about the wheel it
+## is driving. At normal power the truck's own weight settles that argument; at
+## 2.4x it does not, and a monster truck with this much clearance stands up and
+## loops itself over backwards the moment the button is pressed.
+##
+## What is applied is a brake on the pitch, not a fixed attitude: it cancels the
+## rate at which the nose is rising and does nothing else. Holding an attitude
+## instead would fight the ground — a truck climbing a ramp is nose-up because
+## the ramp is, and levelling it there would rip the wheels off the surface.
+##
+## Called only with the front off the ground and the back on it, which is what a
+## wheelie is. With both wheels in the air this would be a reaction wheel — free
+## rotation from nothing, mid-jump — so that case gets the rocket instead.
+func _hold_nose_down(boost: float) -> void:
+	# Nose-up is NEGATIVE rotation: positive turns +x towards +y, and +y is down,
+	# so lifting the front is the other way round. Already coming down needs no
+	# help — and pushing on it there would plant the nose rather than settle it.
+	if chassis.angular_velocity >= 0.0:
+		return
+	# Through the inertia, so the hold is a rate — "kill this much of the spin per
+	# second" — and stays that rate if the chassis is ever resized. Read off the
+	# server because RigidBody2D.inertia is 0 while it is computed from the shape,
+	# which it is here.
+	var inertia := float(PhysicsServer2D.body_get_param(
+		chassis.get_rid(), PhysicsServer2D.BODY_PARAM_INERTIA
+	))
+	chassis.apply_torque(-chassis.angular_velocity * inertia * nose_hold_rate * boost)
+
+
+## The charge with both wheels off the ground: a rocket.
+##
+## Wheel torque is worth nothing in the air — _traction() already returns zero
+## there, on purpose, because a wheel spun up mid-jump lands at speed and kicks
+## the truck sideways. So a charge spent off a ramp used to be a charge thrown
+## away, at the exact moment the player most wanted it. This makes the airborne
+## case its own thing rather than a dead one.
+##
+## Thrust runs along the truck's own nose, so what the boost does depends on how
+## it left the ramp: level, it is distance; nose-up, it is height. That is the
+## interesting version — the player aims it by how they build the take-off.
+##
+## Two limits on that, both because the alternative is a mechanic that punishes
+## you for using it. The angle is clamped to a cone about level, so a truck
+## kicked hard nose-up is not fired straight into the sky and dropped; and a
+## truck facing backwards gets nothing at all, since a rocket that fires you back
+## into the strait you are trying to cross is not a boost.
+##
+## Applied at the centre of mass, so it adds no spin of its own. The truck keeps
+## whatever tumble the ramp gave it — the rocket moves it, it does not fly it.
+func _rocket(boost: float) -> void:
+	var facing := wrapf(chassis.rotation, -PI, PI)
+	if absf(facing) > PI * 0.5:
+		return
+	var cone := deg_to_rad(charge_air_cone_degrees)
+	var thrust := Vector2.RIGHT.rotated(clampf(facing, -cone, cone))
+	chassis.apply_central_force(thrust * charge_air_thrust * _weight * boost)
 
 
 ## What fraction of full torque this wheel can actually put down, from what it is

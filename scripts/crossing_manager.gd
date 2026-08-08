@@ -157,6 +157,13 @@ func start_crossing() -> void:
 	attempt_started.emit()
 
 
+## Spend the truck's one charge. False when there is no truck out to spend it, or
+## when it has already been spent, so the HUD can tell a press that did something
+## from one that did not.
+func trigger_charge() -> bool:
+	return is_running and is_instance_valid(car) and car.trigger_charge()
+
+
 ## `re_park` is false only when a crossing is about to launch, which would
 ## otherwise build a parked truck and delete it again in the same call.
 func reset(re_park: bool = true) -> void:

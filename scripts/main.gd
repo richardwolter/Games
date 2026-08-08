@@ -113,6 +113,7 @@ func _ready() -> void:
 	_hud.place_all_requested.connect(_on_place_all_requested)
 	_hud.recall_car_requested.connect(_on_recall_car_requested)
 	_hud.start_crossing_requested.connect(_on_start_crossing_requested)
+	_hud.charge_requested.connect(_on_charge_requested)
 	_hud.next_level_requested.connect(_levels.advance)
 	_hud.level_select_requested.connect(_on_level_select_requested)
 	_hud.replay_requested.connect(_on_replay_requested)
@@ -341,16 +342,45 @@ func _exit_tree() -> void:
 ## gets to. The baseline for every other number in the game: if the car can't
 ## reach the water under its own power, no score is meaningful.
 ## Run with:  godot --headless --quit-after 1200 -- --carcheck
+## Also the one place CHARGE! can be measured. The boost is fired a second in,
+## and what comes out is the speed it bought and the worst nose-up angle it cost
+## — the two numbers the mechanic lives or dies by, and neither of them is
+## visible from a smoke test that only asks whether the truck got across.
 func _run_car_check() -> void:
 	_crossing.start_crossing()
-	for i in 12:
-		await get_tree().create_timer(0.5).timeout
-		if not is_instance_valid(_crossing.car):
+	var charged := false
+	var peak_speed := 0.0
+	var worst_pitch := 0.0
+	for i in 60:
+		await get_tree().create_timer(0.1).timeout
+		# Measured on the shore only. Once the run is over the truck is usually in
+		# the water, where it rolls freely and every angle it reaches says
+		# something about the strait rather than about the charge.
+		if not is_instance_valid(_crossing.car) or not _crossing.is_running:
 			break
-		var p := _crossing.car.chassis.global_position
-		print("t=%.1f  x=%.0f  y=%.0f  progress=%.2f  running=%s" % [
-			(i + 1) * 0.5, p.x, p.y, _crossing.progress, _crossing.is_running
-		])
+		var car := _crossing.car
+		var p := car.chassis.global_position
+		if not charged and i >= 10:
+			charged = _crossing.trigger_charge()
+			print("charge fired at t=%.1f  x=%.0f" % [(i + 1) * 0.1, p.x])
+		peak_speed = maxf(peak_speed, car.chassis.linear_velocity.x)
+		# Nose-up is negative rotation — see Car._hold_nose_down(). Only counted
+		# with a wheel on the ground: a truck off a ramp rotates freely, and on
+		# level 6 that reads as 99 degrees of "wheelie" that is really just
+		# flight. What is being measured here is the drive standing the truck up,
+		# which can only happen while the truck is standing on something.
+		if car.is_grounded():
+			worst_pitch = maxf(worst_pitch, -wrapf(car.chassis.rotation, -PI, PI))
+		if i % 5 == 4:
+			print("t=%.1f  x=%.0f  y=%.0f  progress=%.2f  running=%s" % [
+				(i + 1) * 0.1, p.x, p.y, _crossing.progress, _crossing.is_running
+			])
+	print("peak speed=%.0f  worst nose-up=%.1f deg" % [
+		peak_speed, rad_to_deg(worst_pitch)
+	])
+	# Half a right angle. Past that the truck is on its back wheels rather than
+	# merely light on the front, and the next thing it does is land on its roof.
+	assert(worst_pitch < 0.8, "the charge stood the truck up on its back wheels")
 
 
 ## The prototype has no menus, so fullscreen needs a keyboard escape hatch or you
@@ -526,6 +556,15 @@ func _on_start_crossing_requested() -> void:
 		_restore_bridge()
 		_attempt_active = false
 	_crossing.start_crossing()
+
+
+## CHARGE! — the one boost per attempt, from the plate or from the space bar.
+##
+## Routed through here like every other HUD signal even though it has one line to
+## say: the HUD does not hold the truck, and a press that arrives a frame after a
+## crossing ends has to land somewhere that knows there is no truck to boost.
+func _on_charge_requested() -> void:
+	_crossing.trigger_charge()
 
 
 ## Is there at least one piece actually down in the strait?
@@ -1028,7 +1067,13 @@ func _run_smoke_test() -> void:
 
 	var placed_before: int = _spawner.count()
 	_crossing.start_crossing()
+	# CHARGE! is once per attempt, and the truck that owns it is built fresh for
+	# each one — so a second press has to be refused, and the refusal has to come
+	# from the truck rather than from a flag somebody has to remember to clear.
+	assert(_crossing.trigger_charge(), "charge refused on a fresh truck")
+	assert(not _crossing.trigger_charge(), "the charge could be spent twice")
 	var outcome: Array = await _crossing.attempt_finished
+	assert(not _crossing.trigger_charge(), "charge fired with no attempt running")
 	print("crossing result=%d progress=%.2f money=%d best=%d" % [
 		outcome[0], outcome[1], _economy.money, _economy.best_score
 	])

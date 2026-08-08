@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/car.gd" id="1_car"]
 [ext_resource type="Script" path="res://scripts/wheel.gd" id="2_wheel"]
@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://art/car_tire.png" id="4_tyre"]
 [ext_resource type="Script" path="res://scripts/driver.gd" id="5_driver"]
 [ext_resource type="Script" path="res://scripts/suspension_rig.gd" id="6_rig"]
+[ext_resource type="Script" path="res://scripts/exhaust_flame.gd" id="7_exhaust"]
 
 ; Everything here is measured off car_body.png (715x339). Its empty wheel arches
 ; are centred at art x 139 and 576 - symmetric about the middle - with a radius
@@ -86,6 +87,33 @@ script = ExtResource("5_driver")
 position = Vector2(0, -50)
 scale = Vector2(0.339, 0.339)
 texture = ExtResource("3_body")
+
+; The stack, and the flame CHARGE! lights in it. Drawn AFTER Body, so on top of
+; it: it is bolted to the outside of the truck, not seen through a window.
+;
+; Placed BESIDE the painted stack rather than on it, and stood on the rear deck
+; so it reads as a pipe coming up out of the bed. All three numbers are measured
+; off car_body.png rather than eyeballed, in the chassis frame the body sprite
+; already works in (art centre 357.5,169.5, scale 0.339, sprite at y -50):
+;
+;   painted stack   world x -44 to -30, top at y -107
+;   rear deck top   world y -59.3 from x -70 back to -46
+;
+; So the pipe is 24 wide sitting at x -57, which puts its right edge just clear
+; of the painted stack, and its foot lands on y -60 - ON the yellow, not over it.
+;
+; SCALED UNEVENLY, which is the one liberty taken here. The drawn pipe is squat:
+; at a uniform scale, a pipe long enough to reach the deck from anywhere near the
+; painted stack's height comes out 56 units wide, four times the width of the
+; stack beside it. Stretching it half again vertically buys the length without
+; the width, and costs nothing visible - it is a straight tube, and fire is tall.
+;
+; Under SuspensionRig with the Driver and the Body, so the stack works with the
+; sprung body rather than staying rigid with the axles.
+[node name="Exhaust" type="AnimatedSprite2D" parent="Chassis/SuspensionRig"]
+position = Vector2(-57, -88)
+scale = Vector2(0.3, 0.45)
+script = ExtResource("7_exhaust")
 
 [node name="WheelBack" type="RigidBody2D" parent="."]
 position = Vector2(-74, 0)
