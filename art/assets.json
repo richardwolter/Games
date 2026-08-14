@@ -139,7 +139,7 @@
                                    384
                                ],
                        "seed":  1050,
-                       "notes":  "girder.tres size 520x34, the longest piece. Tall canvas as above."
+                       "notes":  "girder.tres size 520x34, the longest piece. Tall canvas as above. This seed leaves a soft grey drop shadow under the bottom flange that strip_shadow does not catch (it is bluish, not neutral, so it passes the shadow_sat test). art/girder.png was cleaned by hand after generation - flood fill from the canvas edge over everything the black outline does not enclose, then the emptied rows cropped off the bottom. Regenerating from this seed will bring the shadow back and needs the same pass."
                    },
                    {
                        "name":  "pontoon",

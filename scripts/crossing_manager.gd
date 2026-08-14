@@ -23,8 +23,15 @@ signal attempt_finished(result: Result, progress: float)
 @export var drown_y: float = 420.0
 ## 0% progress line — the near water's edge, not where the car spawns.
 @export var progress_from_x: float = -1600.0
-## Give up if the car hasn't gained ground for this long.
+## Give up if the car has sat still — not merely stopped gaining ground — this long.
 @export var stall_seconds: float = 3.5
+## How far the chassis may drift from where it settled and still count as still.
+## Wide enough that idling on a bobbing raft isn't mistaken for driving.
+@export var stall_radius: float = 24.0
+## Speeds under these still count as parked. A truck cartwheeling on the spot is
+## going nowhere by position alone, but it is still a run worth watching.
+@export var stall_speed: float = 40.0
+@export var stall_spin: float = 1.0
 ## Ignore stalling during the initial roll-out.
 @export var grace_seconds: float = 1.5
 @export var container_path: NodePath
@@ -48,6 +55,8 @@ var progress: float = 0.0
 
 var _container: Node2D
 var _best_x: float = 0.0
+## Where the chassis was when it last moved a real distance, for the stall check.
+var _still_anchor: Vector2 = Vector2.ZERO
 var _stall_timer: float = 0.0
 var _elapsed: float = 0.0
 
@@ -150,6 +159,7 @@ func start_crossing() -> void:
 	car.start()
 
 	_best_x = start_position.x
+	_still_anchor = car.chassis.global_position
 	_stall_timer = 0.0
 	_elapsed = 0.0
 	progress = 0.0
@@ -186,6 +196,18 @@ func _physics_process(delta: float) -> void:
 
 	if pos.x > _best_x:
 		_best_x = pos.x
+
+	# Stalling is measured as "hasn't moved", not "hasn't gained ground". A truck
+	# that gets flung backwards, lands on its roof and rocks its way onward is
+	# having exactly the kind of run this game is about, and losing ground for a
+	# few seconds should not end it. Only genuinely parked ends it.
+	if pos.distance_to(_still_anchor) > stall_radius:
+		_still_anchor = pos
+		_stall_timer = 0.0
+	elif (
+		car.chassis.linear_velocity.length() > stall_speed
+		or absf(car.chassis.angular_velocity) > stall_spin
+	):
 		_stall_timer = 0.0
 	else:
 		_stall_timer += delta
@@ -198,7 +220,7 @@ func _physics_process(delta: float) -> void:
 		_finish(Result.SUCCESS)
 	elif pos.y > drown_y:
 		_finish(Result.DROWNED)
-	elif _elapsed > grace_seconds and (_stall_timer > stall_seconds or car.is_flipped()):
+	elif _elapsed > grace_seconds and _stall_timer > stall_seconds:
 		_finish(Result.STALLED)
 
 

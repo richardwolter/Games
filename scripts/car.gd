@@ -127,6 +127,9 @@ var _charge_left: float = 0.0
 ## it says. Worked out once, in _ready(), rather than read off ProjectSettings on
 ## every tick of every boost.
 var _weight: float = 0.0
+## Total mass of every body in the truck. Used to split the rocket's thrust in
+## proportion to mass, so it adds no spin of its own — see _rocket().
+var _mass: float = 0.0
 var _wheels: Array[RigidBody2D] = []
 var _radii: PackedFloat32Array = PackedFloat32Array()
 var _drips: Array[WheelDrip] = []
@@ -158,9 +161,10 @@ func _ready() -> void:
 		_last_angles.append(wheel.rotation)
 
 	var gravity := float(ProjectSettings.get_setting("physics/2d/default_gravity", 980.0))
-	_weight = chassis.mass * gravity
+	_mass = chassis.mass
 	for wheel: RigidBody2D in _wheels:
-		_weight += wheel.mass * gravity
+		_mass += wheel.mass
+	_weight = _mass * gravity
 
 	_tint_for_power()
 	# The chassis going in the water is what costs a battery truck its charge.
@@ -438,15 +442,30 @@ func _hold_nose_down(boost: float) -> void:
 ## truck facing backwards gets nothing at all, since a rocket that fires you back
 ## into the strait you are trying to cross is not a boost.
 ##
-## Applied at the centre of mass, so it adds no spin of its own. The truck keeps
-## whatever tumble the ramp gave it — the rocket moves it, it does not fly it.
+## Adds no spin of its own. The truck keeps whatever tumble the ramp gave it —
+## the rocket moves it, it does not fly it.
+##
+## Getting that right means spreading the thrust over every body rather than
+## shoving the chassis. The truck is chassis plus two wheels pinned to it, and
+## its real centre of mass sits below the chassis's own, down among the wheels.
+## A central force on the chassis alone is therefore off-centre for the truck as
+## a whole: it acts above the pivot and pitches the nose down, every time, which
+## is the opposite of what a player firing off a ramp is asking for.
+##
+## Split by mass, each share applied centrally to its own body, the parts all
+## accelerate identically — so the joints have nothing to pull against and the
+## net effect is pure translation through the true centre of mass.
 func _rocket(boost: float) -> void:
 	var facing := wrapf(chassis.rotation, -PI, PI)
 	if absf(facing) > PI * 0.5:
 		return
 	var cone := deg_to_rad(charge_air_cone_degrees)
 	var thrust := Vector2.RIGHT.rotated(clampf(facing, -cone, cone))
-	chassis.apply_central_force(thrust * charge_air_thrust * _weight * boost)
+	# Per unit of mass, so each body's share is its own mass times this.
+	var accel := thrust * charge_air_thrust * _weight * boost / _mass
+	chassis.apply_central_force(accel * chassis.mass)
+	for wheel: RigidBody2D in _wheels:
+		wheel.apply_central_force(accel * wheel.mass)
 
 
 ## What fraction of full torque this wheel can actually put down, from what it is
@@ -478,8 +497,3 @@ func _traction(wheel: RigidBody2D, radius: float, truck_speed: float) -> float:
 		var over := clampf((slip - slip_tolerance) / slip_range, 0.0, 1.0)
 		factor *= lerpf(1.0, spin_torque_floor, over)
 	return factor
-
-
-## True once the car is tipped far enough that it isn't driving anywhere.
-func is_flipped() -> bool:
-	return absf(wrapf(chassis.rotation, -PI, PI)) > 2.0
