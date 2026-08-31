@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://ivdadvtk1uvs"
+path="res://.godot/imported/ship-cargo-a.obj-92fc5963c6af3853a2b7d47c2c6b67b5.mesh"
+
+[deps]
+
+files=["res://.godot/imported/ship-cargo-a.obj-92fc5963c6af3853a2b7d47c2c6b67b5.mesh"]
+
+source_file="res://assets/kenney_watercraft-pack/Models/OBJ format/ship-cargo-a.obj"
+dest_files=["res://.godot/imported/ship-cargo-a.obj-92fc5963c6af3853a2b7d47c2c6b67b5.mesh", "res://.godot/imported/ship-cargo-a.obj-92fc5963c6af3853a2b7d47c2c6b67b5.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

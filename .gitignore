@@ -1,0 +1,21 @@
+# Godot 4 auto-generated
+.godot/
+/android/
+
+# Exported builds
+/build/
+*.exe
+*.pck
+*.zip
+
+# Headless test output
+/tools/last_*.log
+/tools/shot.png
+
+# Slicer check-my-work pictures. The catalogues they describe are committed; these are not.
+/assets/sliced_*.png
+/assets/pigeon_contact.png
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db

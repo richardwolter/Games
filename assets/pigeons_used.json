@@ -1,0 +1,4 @@
+{
+	"comment": "Rows of assets/pigeons.json the flock draws from, chosen off tools/pigeon_contact.gd's picture. Browns and tans (rows 2 and 6) are deliberately left out.",
+	"rows": [1, 3, 4, 5, 7, 8, 9]
+}
