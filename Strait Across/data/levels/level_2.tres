@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="LevelDef" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
+[ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
+[ext_resource type="Resource" path="res://data/objects/tire.tres" id="3_tire"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="4_crate"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="6_fridge"]
+[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="7_bronze"]
+[ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="8_silver"]
+[ext_resource type="Texture2D" path="res://art/background_outskirts.png" id="9_outskirts"]
+
+[resource]
+script = ExtResource("1_level")
+display_name = "2 — City Outskirts"
+half_width = 900.0
+max_depth = 400.0
+backdrop = ExtResource("9_outskirts")
+backdrop_horizon = 0.5
+ground = 2
+life = 1
+reward_scale = 0.35
+shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge")])
+shop_stock = PackedInt32Array(12, 7, 9, 7, 3)
+boxes = Array[Resource]([ExtResource("7_bronze"), ExtResource("8_silver")])

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/object_def.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://art/girder.png" id="2_art"]
+
+[resource]
+script = ExtResource("1_def")
+tier = 3
+display_name = "Steel Girder"
+shape = "box"
+size = Vector2(520, 34)
+mass = 85.0
+buoyancy = 0.25
+friction = 0.35
+bounce = 0.0
+color = Color(0.42, 0.46, 0.55, 1)
+price = 110
+textures = Array[Texture2D]([ExtResource("2_art")])

@@ -1,0 +1,57 @@
+[gd_scene format=3 uid="uid://b1qt2obygon0h"]
+
+[ext_resource type="Script" uid="uid://bxg8vo2jsqlxg" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
+[ext_resource type="Script" uid="uid://duh3nem06j28s" path="res://scripts/object_spawner.gd" id="3_spawner"]
+[ext_resource type="Script" uid="uid://dh01q5tv0c4fu" path="res://scripts/object_manipulator.gd" id="4_manip"]
+[ext_resource type="Script" uid="uid://bfldx45bpm5ye" path="res://scripts/hud.gd" id="5_hud"]
+[ext_resource type="Script" uid="uid://b24x4bt4i6d5d" path="res://scripts/crossing_manager.gd" id="6_cross"]
+[ext_resource type="Script" uid="uid://b5ndxvbbfkjru" path="res://scripts/economy.gd" id="7_econ"]
+[ext_resource type="Script" uid="uid://coi37l12gnqui" path="res://scripts/inventory.gd" id="8_inv"]
+[ext_resource type="Script" uid="uid://cmwxyoahmguow" path="res://scripts/shop.gd" id="9_shop"]
+[ext_resource type="Script" uid="uid://cgdib51hgfgu1" path="res://scripts/level_def.gd" id="10_jkv2x"]
+[ext_resource type="Script" uid="uid://dayd65xhsko3q" path="res://scripts/level_manager.gd" id="10_levels"]
+[ext_resource type="Resource" path="res://data/levels/level_1.tres" id="11_lv1"]
+[ext_resource type="Resource" path="res://data/levels/level_2.tres" id="12_lv2"]
+[ext_resource type="Resource" path="res://data/levels/level_3.tres" id="13_lv3"]
+[ext_resource type="Resource" path="res://data/levels/level_4.tres" id="14_lv4"]
+[ext_resource type="Resource" path="res://data/levels/level_5.tres" id="14_lv5"]
+[ext_resource type="Resource" path="res://data/levels/level_6.tres" id="15_lv6"]
+
+[node name="Main" type="Node2D" unique_id=802875084]
+script = ExtResource("1_main")
+
+[node name="World" parent="." unique_id=1159655110 instance=ExtResource("2_world")]
+
+[node name="Objects" type="Node2D" parent="." unique_id=466196113]
+
+[node name="Construction" type="Node2D" parent="." unique_id=259516288]
+
+[node name="ObjectSpawner" type="Node" parent="Construction" unique_id=12144594]
+script = ExtResource("3_spawner")
+container_path = NodePath("../../Objects")
+
+[node name="ObjectManipulator" type="Node2D" parent="Construction" unique_id=1094981767]
+script = ExtResource("4_manip")
+
+[node name="Vehicle" type="Node2D" parent="." unique_id=1509859384]
+
+[node name="Crossing" type="Node" parent="." unique_id=1816236202]
+script = ExtResource("6_cross")
+container_path = NodePath("../Vehicle")
+
+[node name="Economy" type="Node" parent="." unique_id=755034549]
+script = ExtResource("7_econ")
+
+[node name="Inventory" type="Node" parent="." unique_id=320200418]
+script = ExtResource("8_inv")
+
+[node name="Shop" type="Node" parent="." unique_id=203263338]
+script = ExtResource("9_shop")
+
+[node name="Levels" type="Node" parent="." unique_id=1274921547]
+script = ExtResource("10_levels")
+levels = Array[ExtResource("10_jkv2x")]([ExtResource("11_lv1"), ExtResource("12_lv2"), ExtResource("13_lv3"), ExtResource("14_lv4"), ExtResource("14_lv5"), ExtResource("15_lv6")])
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1208417708]
+script = ExtResource("5_hud")
