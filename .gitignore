@@ -1,0 +1,13 @@
+# Godot's import/cache directory. Regenerated on open.
+.godot/
+
+# Export output. Reproducible, and some of it is over GitHub's file size limit.
+build/
+_builds/
+*.exe
+*.pck
+*.zip
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db

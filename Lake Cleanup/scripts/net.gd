@@ -1,0 +1,984 @@
+## The cast net: the only way rubbish leaves the water.
+##
+## Press inside your range and the net flies out to that point; keep holding and it comes
+## straight back, sweeping everything within its radius toward the island; let go and it
+## stops where it is. One press-drag-release is a whole cast — pressing again on a net
+## left out on the water carries on reeling it. That is the whole verb, and every net upgrade buys one
+## axis of it — how far you can throw, how wide it sweeps, how heavy a piece it can lift,
+## how fast it comes back, and how much it can carry in one cast.
+##
+## No physics, like everything else here. The net is a point in tile space moved along a
+## line, and what it catches is a query against the tile field.
+##
+## The node itself sits at the origin and everything is drawn in world coordinates: the
+## net, the line to the rod, and the cluster of junk being dragged are three things at
+## different places that have to stay welded together, and giving the node a position
+## would mean subtracting it back out three times.
+class_name CastNet
+extends Node2D
+
+## Emitted when the net reaches the angler with a catch aboard. The lake decides what
+## happens to it; the net does not know the yard exists.
+signal landed(cargo: PackedInt32Array)
+
+## A pigeon the net closed on, in world coordinates. Paid for on the spot rather than
+## carried home: a bird is not cargo, and it is certainly not going in the yard.
+signal caught_bird(at: Vector2)
+
+enum State { IDLE, FLYING, SETTLED, REELING }
+
+## Tiles per second on the way out. Faster than any reel — the throw is not the part of
+## the cast the player is meant to wait through.
+const CAST_SPEED := 26.0
+
+## Seconds between the rings a hauled net leaves behind it. Close enough that the trail
+## reads as continuous disturbance and far enough apart that the rings can be told from one
+## another as they spread.
+const DRAG_RIPPLE := 0.13
+
+## How close to the rod counts as home, in tiles.
+const HOME_DISTANCE := 0.35
+
+## How far past the swept radius the drawn rim sits, in tiles. Small: the rim is the edge
+## of the mesh and the sweep is what the mesh encloses, so anything more than the thickness
+## of the twine is the net promising reach it does not have.
+const MOUTH_EDGE := 0.15
+
+## How many layers deep a cast works. The net comes down from above: it closes on what is
+## floating first, everywhere it can reach, and only then takes what that was sitting on.
+## Each layer is a fresh pass over the top of the stacks, never a reach past a piece too
+## heavy to lift — a cast cannot pull a bag out from under a fridge.
+const SWEEP_LAYERS := 2
+
+## How the net purses as it comes in: over the last `CLOSE_SHARE` of the haul, never less
+## than `CLOSE_LEAST` tiles of it.
+##
+## A share of the throw rather than a fixed distance out. A cast net closes over the length
+## of the pull, and the pull is however far it was thrown — so a fixed number of tiles is
+## most of a short cast and the tail end of a long one, which is exactly backwards from how
+## it reads. A net that snapped shut in the last stride would be a net doing it for the look
+## of the thing.
+##
+## The sweep closes with it. The drawn mouth is the promise and the swept radius is what is
+## kept, and the two have to be one number or the net is lying again — so a cast does its
+## catching out on the water and comes home holding what it has, which is also the honest
+## way round for the player: reel from where the junk is, not from your feet.
+const CLOSE_SHARE := 0.85
+const CLOSE_LEAST := 3.0
+
+## Where it is finished, in tiles from the rod. Short of the rod itself rather than at it:
+## a purse that only completes at the moment the net lands is a purse whose last frame is
+## never seen. This leaves the net hanging shut for the last stride of the haul, which is
+## the picture the whole sequence was drawn for.
+const CLOSE_END := 1.4
+
+## How much a full hold drags its heels, as extra curve on the way shut. Junk is what stops
+## a purse pulling tight: a bag with six fridges in it comes in fat and gathers late, and an
+## empty one draws in from the off. Gentle, because it is a lag and not a wall — too much of
+## it and a loaded net spends the whole haul in its first frame.
+##
+## A curve rather than a ceiling. Capping how far a loaded net could close was the obvious
+## way to do it and the wrong one — it stopped the animation as well as the sweep, so with
+## anything in the hold the last frames could not be reached at all. This way a loaded net
+## shrinks less over the whole haul, which is the point, and still shuts at the end, which
+## it has to: a net does not land still open.
+const LOAD_LAG := 1.3
+
+## How big the net is drawn by the time it reaches the rod, against its size out on the
+## water. Perspective, roughly: the lake is seen from a way up and a long way off, and a net
+## eight feet across is a reasonable thing to be lying on the water out there and an absurd
+## thing to be dangling off the end of a rod next to a person half its height.
+##
+## It is only the drawing. The swept radius is not touched — and it does not need to be,
+## because by the time this bites the net is a bag hanging clear of the surface, and a rim
+## on the water is not a promise a net out of the water is making.
+const HOME_SIZE := 0.42
+
+## How much of a cast, as a fraction, is the throw rather than the haul. Only `cast_progress`
+## uses it, and only the camera uses that.
+const THROW_SHARE := 0.34
+
+## Only for the blocked-in net drawn when the art is missing: how much of its width is left
+## once it is shut. With the sheets loaded this comes off the drawing instead.
+const CLOSE_TO := 0.3
+
+## How much tighter than the mouth itself the catch bunches as it shuts. Past the shrinking
+## of the mouth, so a full net arrives as a knot of junk rather than a scale model of the
+## same spread.
+const CLOSE_BUNCH := 0.55
+
+## The haul does not use the drag sheet.
+##
+## Those frames are pictures of a bag held up out of the water on a line, drawn for a game
+## looking at a net from the side. Every way of laying them down — flattening them, spreading
+## them, shearing them over, capping how tall they are drawn, hanging them from somewhere
+## other than their rim — is a way of arguing with what the picture is of, and the net went
+## on rising out of the lake as it was pulled. So the haul keeps the net the cast landed:
+## the flat one lying on the water, closing by getting smaller. It is the pose the player
+## has been looking at since the splash, and it is the only one that is in the lake.
+##
+## The sheet is still loaded and still cut. `art_sheet` lends it out, and a hauled net is
+## one animation away from wanting it again.
+
+## The drawn net. Cut from the two sheets by tools/slice_net.gd, which also measures each
+## frame's rim — where the drawing is widest — because that is the line that belongs on the
+## water and the width the sweep is scaled against.
+const ART := "res://assets/net_frames.json"
+
+## Which frame of each sequence is the net lying fully open on the water, and how much the
+## frame is squashed towards the plane at each end of the sequence.
+##
+## Every other frame is measured against the open one, so a frame carries how wide it is as
+## a fraction of its own sequence's open net rather than as pixels of whichever sheet it was
+## drawn on — which is what lets the drag borrow its first frame from the landing.
+##
+## The squash is the drag's alone. Its later frames are drawn as a bag hanging off a line,
+## which is what a net looks like lifted out of the water by a crane and not what one looks
+## like being pulled across it. Flattening them as they close lays the bag back down on the
+## surface: the rim stays where it was, and the body of the net comes down onto the plane
+## with it. The landing and the throws were drawn already foreshortened and are left alone.
+const SEQUENCES := {
+	&"cast_far": {"open": -1, "flatten": [1.0, 1.0]},
+	&"cast_near": {"open": -1, "flatten": [1.0, 1.0]},
+	&"land": {"open": -1, "flatten": [1.0, 1.0]},
+	&"drag": {"open": 0, "flatten": [1.0, 1.0]},
+}
+
+## Past this fraction of the rod's reach, a throw is a far one and uses the long sequence.
+const FAR_THROW := 0.55
+
+## How long the landing sequence takes to play, in seconds. It runs once and holds.
+const LAND_TIME := 0.34
+
+## How far up into the bag the catch is gathered as the net shuts, as a fraction of the
+## drawn frame's height, and how much of it still shows through the mesh at the end.
+##
+## Up, not down. The frame hangs from its rim, and on a closed bag the rim is the ring of
+## weights at the bottom — so anything pushed below that point is under the net rather than
+## in it, which is what the clutch used to do. The inside of the bag is the tube above the
+## weights, and that is where a load of junk actually sits.
+const CATCH_INSIDE := 0.16
+const CATCH_HIDDEN := 0.5
+
+## How tightly the catch bunches in the mouth, as a fraction of it. Under 1 so the load
+## reads as a clutch of junk gathered into the middle of the mesh rather than a ring of
+## pieces pinned round the rim.
+const CATCH_SPREAD := 0.62
+
+## How high the pile of catch may stand out of the mouth, as a fraction of the mouth's own
+## width, and how many pieces sit in one layer of it.
+##
+## A cap rather than a step per piece. Stacking a fixed distance per row is fine for the
+## three pieces the starting net holds and turns a full late-game haul into a tower of junk
+## standing a net and a half above the water, which reads as a pile the net is under rather
+## than a load it is carrying. Capping the rise means a bigger haul packs tighter instead of
+## climbing, which is what a bag of rubbish actually does.
+const CATCH_RISE := 0.34
+const CATCH_LAYER := 3
+
+## How big a piece in the mouth is drawn, and the least it shrinks to when the net is full.
+##
+## The catch has to fit in the mouth it is drawn in, and the mouth does not grow with the
+## haul — the hold does. Shrinking the pieces a little as the load grows is what keeps a
+## full net looking like a full net rather than like a heap with a net somewhere under it.
+const CATCH_SCALE := 0.7
+const CATCH_PACKED := 0.62
+
+## How many spokes the range ring is drawn from. It is also how finely the ring follows the
+## island and the bank, so it is a resolution rather than a smoothness.
+const RING_SPOKES := 72
+## How far along a spoke the ring steps while looking for the first place a cast stops
+## being legal, in tiles.
+const RING_STEP := 0.2
+
+## How the range ring is drawn. The rim is dashed — `RING_DASH` spokes on, then the same
+## number off — because a solid line at this size reads as a puddle on the water, while a
+## broken one reads as a limit. `RING_TICK` is how far the marks stand off it, which is what
+## turns a shape into a boundary with an inside and an outside.
+const RING_DASH := 3
+const RING_TICK := 7.0
+
+## The aiming marker: what a throw at the pointer would look like before it is thrown.
+## Green-white for a spot that can be reached, warm for one that cannot.
+const AIM_OK := Color(0.86, 0.97, 0.88)
+const AIM_NO := Color(1.0, 0.62, 0.50)
+
+## How visible the ring is with the net stowed, and with it out on the water. It stays up
+## while a cast is in the air: knowing where you may throw next is worth as much as knowing
+## where you may throw now, and a ring that vanishes the moment you use it teaches nothing.
+const RING_READY := 0.42
+const RING_BUSY := 0.16
+
+## Set from the lake's upgrade levels at cast time, so a cast runs on the numbers the
+## player had when they paid for them.
+##
+## The width is a real distance in tiles rather than a count of rings. A whole-numbered
+## radius steps the mouth from one tile straight to five and then to thirteen, which on
+## screen is a cast that doubles in size every purchase; a fraction of a tile buys a
+## noticeably wider mesh without ever swallowing the view.
+var radius: float = 0.7
+var power: int = 0
+var range_tiles: float = 6.0
+var reel_speed: float = 3.0
+var hold: int = 3
+
+## Wired up by lake.gd. The net reads the tile field directly rather than asking the lake
+## to fetch for it — it is the thing doing the catching.
+var grid: LakeGrid
+var splash: WaterSplash
+## The noises. Optional — a net with no sound board still fishes.
+var sfx: Sfx
+var angler: Angler
+## The birds. Optional — with no flock the net simply catches rubbish.
+var flock: Flock
+
+var state: int = State.IDLE
+## Where the net is, in tile coordinates, and where it is heading while flying.
+var tile_pos := Vector2.ZERO
+var target := Vector2.ZERO
+## Def indices caught this cast, dragged in behind the net.
+var catch := PackedInt32Array()
+
+## True while the player is holding the button. Reeling only happens while it is.
+var _pulling: bool = false
+var _time: float = 0.0
+
+## The castable area, as a closed world polygon, and the state it was worked out for. It is
+## a walk over the shore and the island, so it is rebuilt when the angler moves or the rod
+## gets longer rather than every frame.
+var _ring := PackedVector2Array()
+var _ring_from := Vector2.INF
+var _ring_range: float = -1.0
+
+## Fixed seed, reset every draw, so the catch scatters the same way from one frame to the
+## next. A load that reshuffles itself sixty times a second is a load that is boiling.
+var _scatter := RandomNumberGenerator.new()
+
+## The cut sheet, and each sequence as `{frames, open}` — its frames in playing order and
+## the rim width of whichever of them is the net fully open. Empty when the art is missing,
+## which is what drops the whole node back to drawing the net as an ellipse.
+var _sheet: Texture2D
+var _art := {}
+
+## Where a cast started and how far it had to go, so the throw can be animated against how
+## much of it is left. Set when it is thrown, the way the flock does for a bird in flight.
+var _cast_from := Vector2.ZERO
+var _cast_span: float = 1.0
+
+## How long the net has been down, for the landing sequence.
+var _settled_age: float = 0.0
+
+## How far the net is pursed, 0 wide open and 1 drawn in, and how near the rod it has come
+## on the same scale. Worked out once a frame and kept here, because the drawing, the swept
+## radius and the wash the lake plays all ask for them and have to get the same answer.
+##
+## They are held rather than recomputed when the player stops pulling. A net let go of
+## halfway in is a net sitting half gathered on the water — it does not spring back open,
+## and it certainly does not spring back to the size it was thrown at. Both are cleared by
+## the next cast, which is the thing that really does open it again.
+var shut: float = 0.0
+var near: float = 0.0
+
+
+func _ready() -> void:
+	position = Vector2.ZERO
+	if angler != null:
+		tile_pos = angler.tile_pos
+	_load_art()
+
+
+## Read the cut sheets. False means no art, and every drawing below falls back to the
+## blocked-in ellipse the net was before there were any pictures of one — the same bargain
+## the flock strikes with its own sheet.
+func _load_art() -> bool:
+	var text := FileAccess.get_file_as_string(ART)
+	if text.is_empty():
+		return false
+	var book: Dictionary = JSON.parse_string(text)
+	if book == null or not book.has("sequences"):
+		return false
+	_sheet = Art.texture(book["sheet"])
+	if _sheet == null:
+		return false
+
+	for name: String in book["sequences"]:
+		if not SEQUENCES.has(StringName(name)):
+			continue
+		var frames: Array = []
+		for cell: Dictionary in book["sequences"][name]:
+			var box: Array = cell["region"]
+			var region := Rect2(
+				float(box[0]), float(box[1]), float(box[2]), float(box[3])
+			)
+			frames.append({
+				"region": region,
+				"rim": float(cell["rim_width"]),
+				# Where in its own box the rim sits, as a fraction of the height. The net
+				# hangs from this: on a bag pulled shut it is down at the knot, and on a
+				# circle seen from above it is across the middle.
+				"hang": (float(cell["rim_y"]) - region.position.y) / maxf(region.size.y, 1.0),
+			})
+		if frames.is_empty():
+			continue
+		# How wide each frame is against its own sequence's open net. Once a frame carries
+		# that, it can be drawn at the right size next to a frame off the other sheet, which
+		# is drawn at a different scale entirely.
+		var open := float(
+			(frames[int(SEQUENCES[StringName(name)]["open"])] as Dictionary)["rim"]
+		)
+		for frame: Dictionary in frames:
+			frame["ratio"] = float(frame["rim"]) / maxf(open, 1.0)
+		_art[StringName(name)] = {"frames": frames}
+
+	_compose_drag()
+	return not _art.is_empty()
+
+
+## Start the haul from the net as it lies on the water, not from the drawing of a perfect
+## circle.
+##
+## The drag sheet opens with the net seen from straight above, which is a fine picture and
+## the wrong one here: the game is looking at the lake from the side, and the frame the
+## player has been staring at since the cast landed is the flat one at the end of the
+## landing. Beginning the pull on anything else is a jump. So the drag plays the landed net
+## first and picks the sheet up from its second frame, where the mouth has started to lift.
+func _compose_drag() -> void:
+	if not _art.has(&"drag") or not _art.has(&"land"):
+		return
+	var land: Array = (_art[&"land"] as Dictionary)["frames"]
+	var drag: Array = (_art[&"drag"] as Dictionary)["frames"]
+	if drag.size() < 2 or land.is_empty():
+		return
+	var made: Array = [land[land.size() - 1]]
+	for i in range(1, drag.size()):
+		made.append(drag[i])
+	(_art[&"drag"] as Dictionary)["frames"] = made
+
+
+## Space left in this cast. The lake also caps this against the yard, so a full yard stops
+## the net catching rather than throwing the catch away.
+func room_left() -> int:
+	return maxi(hold - catch.size(), 0)
+
+
+## Is this world point a legal cast? Inside the range ring, and on the lake rather than on
+## the island or the bank — a net thrown onto dry land is not a mistake worth simulating.
+func can_cast_to(where: Vector2) -> bool:
+	if state != State.IDLE or angler == null:
+		return false
+	var tile := Iso.world_to_tile(where)
+	if tile.distance_to(angler.tile_pos) > range_tiles:
+		return false
+	if Iso.island_fraction(tile.x, tile.y) < 1.0:
+		return false
+	return Iso.shore_fraction(tile.x, tile.y) < 1.0
+
+
+func cast_to(where: Vector2) -> bool:
+	if not can_cast_to(where):
+		return false
+	target = Iso.world_to_tile(where)
+	_cast_from = tile_pos
+	_cast_span = maxf(_cast_from.distance_to(target), 0.001)
+	shut = 0.0
+	near = 0.0
+	tile_pos = angler.tile_pos
+	catch.resize(0)
+	state = State.FLYING
+	return true
+
+
+## The player's button. Held is the only thing that moves a settled net.
+func set_pulling(pulling: bool) -> void:
+	_pulling = pulling
+	if pulling and state == State.SETTLED:
+		state = State.REELING
+	elif not pulling and state == State.REELING:
+		state = State.SETTLED
+
+
+## Where the net is on screen, bobbing on the same swell as everything else afloat.
+func world_pos() -> Vector2:
+	var at := Iso.tile_to_world(tile_pos.x, tile_pos.y)
+	at.y += LakeGrid._swell(at.x, _time * LakeGrid.WAVE_SPEED) * LakeGrid.WAVE_AMPLITUDE
+	return at
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	if state == State.SETTLED or state == State.REELING:
+		_settled_age += delta
+	# Before the sweep, so what is caught this frame is caught by a net as shut as the one
+	# that will be drawn at the end of it.
+	match state:
+		State.REELING:
+			near = _home()
+			shut = _purse()
+		State.SETTLED:
+			pass
+		_:
+			near = 0.0
+			shut = 0.0
+	match state:
+		State.FLYING:
+			_advance_towards(target, CAST_SPEED, delta)
+			if tile_pos.distance_to(target) < 0.05:
+				tile_pos = target
+				# Still holding the button that threw it: the cast is one gesture, so it
+				# starts coming back the moment it lands rather than waiting for a second
+				# click. Letting go before it lands leaves it settled, as it always did.
+				state = State.REELING if _pulling else State.SETTLED
+				_settled_age = 0.0
+				if splash != null:
+					splash.splash(world_pos(), 0.45)
+					# The ring the landing pushes out, on top of the crown's own: this is
+					# the one that is still spreading a second later.
+					splash.ripple(world_pos(), mouth_extent() * 1.2)
+				if sfx != null:
+					sfx.play_splash(0.45)
+		State.REELING:
+			_advance_towards(angler.tile_pos, reel_speed, delta)
+			_sweep()
+			# Dragged, not carried: the water it is pulled through keeps letting go of it.
+			if splash != null:
+				splash.wake(self, world_pos(), mouth_extent() * 0.85, DRAG_RIPPLE)
+			if tile_pos.distance_to(angler.tile_pos) < HOME_DISTANCE:
+				_come_home()
+		State.SETTLED:
+			pass
+		_:
+			# Idle rides along with the angler, so the range ring and the stowed net are
+			# always drawn where they are actually thrown from.
+			if angler != null:
+				tile_pos = angler.tile_pos
+	queue_redraw()
+
+
+func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
+	var gap := to - tile_pos
+	var step := speed * delta
+	if gap.length() <= step:
+		tile_pos = to
+		return
+	tile_pos += gap.normalized() * step
+
+
+## One frame of sweeping.
+##
+## Three passes over the same tiles, in the order a net actually closes. The birds sitting
+## on the water go first, because a bird is on top of everything by definition and costs
+## the cast nothing. Then everything floating, across the whole width of the mouth. Only
+## once there is nothing left on the surface does it bite into what is underneath — which
+## is what makes a cast read as scooping a patch clean rather than picking one thing off
+## each tile it crosses and leaving the patch looking untouched.
+##
+## Nearest first within each pass, so the mouth closes from the middle out.
+func _sweep() -> void:
+	if grid == null or room_left() <= 0:
+		return
+	var here := grid.tile_at(Iso.tile_to_world(tile_pos.x, tile_pos.y))
+	if here < 0:
+		return
+	var reach := _sorted_reach(here)
+
+	if flock != null:
+		for index in reach:
+			var perched := flock.bird_on(index)
+			if perched >= 0:
+				caught_bird.emit(flock.take(perched))
+
+	for layer in SWEEP_LAYERS:
+		_take_from(reach)
+
+
+## The tiles the mouth covers, nearest to the net first. Sorted on tile-space distance from
+## where the net actually is rather than from the tile it is standing on, so the order does
+## not jump as the net crosses a tile edge.
+func _sorted_reach(here: int) -> Array[int]:
+	var out: Array[int] = []
+	for index in grid.tiles_within(here, sweep_radius()):
+		out.append(index)
+	var from := tile_pos
+	out.sort_custom(
+		func(a: int, b: int) -> bool:
+			return (
+				Vector2(grid.tile_of(a)).distance_squared_to(from)
+				< Vector2(grid.tile_of(b)).distance_squared_to(from)
+			)
+	)
+	return out
+
+
+## One layer: every tile in turn gives up whatever is on top of it, if the net is strong
+## enough to lift it and there is room left in the cast.
+func _take_from(reach: Array[int]) -> void:
+	for index in reach:
+		if room_left() <= 0:
+			return
+		var k := grid.reachable_slot(index, 1, power)
+		if k < 0:
+			continue
+		var at := grid.surface_pos(index)
+		var def := grid.def_at(index, k)
+		catch.append(grid.take(index, k))
+		var weight := clampf(0.2 + def.size.x / 40.0, 0.0, 0.85)
+		if splash != null:
+			# Inside the mouth, always. A piece's drawn position carries the drift it was
+			# scattered with, and a crown of water blooming outside the ring the player is
+			# holding reads as the net catching things it visibly did not touch.
+			splash.splash(_within_mouth(at), weight)
+		if sfx != null:
+			sfx.play_splash(weight)
+			sfx.play_catch()
+
+
+func _come_home() -> void:
+	state = State.IDLE
+	tile_pos = angler.tile_pos
+	var lot := catch.duplicate()
+	catch.resize(0)
+	if not lot.is_empty():
+		landed.emit(lot)
+
+
+## How shut the net is, 0 wide open and 1 drawn in.
+func closed() -> float:
+	return shut
+
+
+## Work it out: only on the way home, because a cast flies out and sits open and it is the
+## pull that closes it.
+func _purse() -> float:
+	# Bent by what it is carrying, so a laden net holds its width most of the way and
+	# gathers late. Measured against what the cast could hold, so full is full whether the
+	# hold is three pieces or eleven.
+	var load := clampf(float(catch.size()) / maxf(float(hold), 1.0), 0.0, 1.0)
+	return pow(_home(), 1.0 + LOAD_LAG * load)
+
+
+## How far through the last stretch of the haul the net is, 0 out on the water and 1 at the
+## rod. Distance only — what the net is carrying bends how far it has pursed, but not how
+## near it has got, and the drawing's own size follows the second of those.
+func _home() -> float:
+	if state != State.REELING or angler == null:
+		return 0.0
+	var gap := tile_pos.distance_to(angler.tile_pos)
+	# Measured against the throw, so the mouth starts drawing in at the same point of every
+	# haul rather than at the same distance from the angler's boots.
+	var from := maxf(_cast_span * CLOSE_SHARE, maxf(CLOSE_LEAST, CLOSE_END + 1.0))
+	var t := clampf((from - gap) / maxf(from - CLOSE_END, 0.001), 0.0, 1.0)
+	# Eased, so nothing starts happening on a corner.
+	return t * t * (3.0 - 2.0 * t)
+
+
+## The radius the sweep is actually run at, in tiles: the net's width, less however far it
+## has pursed shut.
+##
+## With the art loaded the shrink is read off the drawing rather than guessed. Each drag
+## frame's rim was measured against the open net's, so the water the net closes over closes
+## at exactly the rate the picture of it does — snapped to the frame on screen, not eased
+## past it, because the whole point is that the two are the same thing.
+func sweep_radius() -> float:
+	return radius * _purse_scale()
+
+
+## How wide the net is against its open self, from how far it has pursed. The sweep and the
+## drawing both go through this, which is what keeps the ring the player is holding and the
+## net they can see the same size.
+func _purse_scale() -> float:
+	return lerpf(1.0, CLOSE_TO, shut)
+
+
+## The cut sheet, and one frame off it, for anything else that wants to draw a net.
+##
+## The ferry's skimmer is a net too, and it was a green quadrilateral. Lending it these
+## rather than giving it a loader of its own keeps one catalogue and one texture: there is
+## no second net in this game, only a second thing dragging one.
+func art_sheet() -> Texture2D:
+	return _sheet
+
+
+## A frame by name and index, or an empty dictionary if there is no art. A negative index
+## counts back from the end, so "the open one" is -1 without the caller counting frames.
+func art_frame(name: StringName, index: int) -> Dictionary:
+	if not _art.has(name):
+		return {}
+	var frames: Array = (_art[name] as Dictionary)["frames"]
+	return frames[posmod(index, frames.size())]
+
+
+## How far through a whole cast the net is: 0 as it leaves the rod, 1 as it comes back to
+## it. One number for the gesture rather than one per state, because the camera wants to
+## push in across the lot of it and does not care which half it is watching.
+##
+## The throw is worth a third of it and the haul the rest. A cast flies out in a moment and
+## comes back over several seconds, so splitting it evenly would spend most of the push on
+## the part that is already over.
+func cast_progress() -> float:
+	match state:
+		State.FLYING:
+			return THROW_SHARE * clampf(
+				_cast_from.distance_to(tile_pos) / _cast_span, 0.0, 1.0
+			)
+		State.SETTLED, State.REELING:
+			# Off the held reading, so letting go of the button does not throw the camera
+			# back out to where the cast started.
+			return THROW_SHARE + (1.0 - THROW_SHARE) * near
+	return 0.0
+
+
+## Which frame of a sequence is showing, for `through` running 0 to 1 across it.
+func _frame_at(name: StringName, through: float) -> int:
+	var frames: Array = (_art[name] as Dictionary)["frames"]
+	return clampi(int(through * float(frames.size())), 0, frames.size() - 1)
+
+
+## The sequence the net is in and how far through it is, or an empty name when there is
+## nothing to draw — the net stowed, or no art to draw it with.
+func _pose() -> Array:
+	if _art.is_empty():
+		return [&"", 0.0]
+	match state:
+		State.FLYING:
+			var far := _cast_span > range_tiles * FAR_THROW
+			var gone := _cast_from.distance_to(tile_pos) / _cast_span
+			return [&"cast_far" if far else &"cast_near", clampf(gone, 0.0, 1.0)]
+		State.SETTLED:
+			# A net that has been hauled and let go stays as it was hauled to. Only one that
+			# has never been pulled is still lying open where it landed.
+			if shut > 0.001:
+				return [&"land", 1.0]
+			return [&"land", clampf(_settled_age / LAND_TIME, 0.0, 1.0)]
+		State.REELING:
+			# The landed net, held. What closing looks like is `_draw_span` bringing it in,
+			# not another picture.
+			return [&"land", 1.0]
+	return [&"", 0.0]
+
+
+## How big one frame is drawn and where the water crosses it: its size in world pixels, and
+## how far down that box the surface line sits.
+##
+## One place, because the drawing, the line's end and the catch all have to agree about it
+## and they were each working it out again. `span` is how wide the rim should end up.
+func _frame_box(name: StringName, index: int, span: float) -> Array:
+	var frame: Dictionary = (_art[name] as Dictionary)["frames"][index]
+	var region: Rect2 = frame["region"]
+
+	# Sized so the rim lands where the frame says it should: `span` wide at full open, and
+	# whatever fraction of that this frame is drawn at. Going through the ratio rather than
+	# straight from the pixels is what lets one sequence hold frames off both sheets.
+	var scale := span * float(frame["ratio"]) / maxf(float(frame["rim"]), 1.0)
+	var size := Vector2(region.size.x * scale, region.size.y * scale * _squash(name, index))
+	return [size, float(frame["hang"])]
+
+
+## Draw one frame of a sequence, with the water crossing it where `_frame_box` says.
+func _draw_frame(name: StringName, through: float, at: Vector2, span: float, tint: Color) -> void:
+	var index := _frame_at(name, through)
+	var box := _frame_box(name, index, span)
+	var size: Vector2 = box[0]
+	var region: Rect2 = (_art[name] as Dictionary)["frames"][index]["region"]
+
+	# Centred on the mouth: the mouth is what the sweep is measured from, so the drawing
+	# sits over it rather than off to one side of it.
+	var hang := Vector2(size.x * 0.5, size.y * float(box[1]))
+	draw_texture_rect_region(_sheet, Rect2(at - hang, size), region, tint)
+
+
+## How much this frame is flattened onto the plane, from its sequence's own pair.
+##
+## Rooted rather than run straight across, so most of the flattening has happened by the
+## middle of the sequence. Those middle frames are the tall thin ones, and they are the whole
+## reason for this: spread evenly, they were still standing up like a net on a hook when the
+## net they belong to is being dragged over water.
+func _squash(name: StringName, index: int) -> float:
+	var frames: Array = (_art[name] as Dictionary)["frames"]
+	var flatten: Array = SEQUENCES[name]["flatten"]
+	var through := float(index) / maxf(float(frames.size() - 1), 1.0)
+	return lerpf(float(flatten[0]), float(flatten[1]), sqrt(through))
+
+
+## Where the line from the rod meets the net: the top of the picture, which on a hauled net
+## is the top of the bag standing out of the water and on a landed one is the near edge of
+## a mouth lying flat in it.
+func _line_end(at: Vector2) -> Vector2:
+	return at - Vector2(0.0, _frame_height() * _hang_of(_pose()))
+
+
+## How tall the frame showing right now is drawn, in world pixels, and how far down it the
+## water sits. Both come up wherever something has to be placed against the picture rather
+## than against the lake — the top of the bag for the line, the inside of it for the catch.
+func _frame_height() -> float:
+	var pose := _pose()
+	if pose[0] == &"":
+		return 0.0
+	return float(_frame_box(pose[0], _frame_at(pose[0], pose[1]), _draw_span())[0].y)
+
+
+func _hang_of(pose: Array) -> float:
+	if pose[0] == &"":
+		return 0.0
+	return float(_frame_box(pose[0], _frame_at(pose[0], pose[1]), _draw_span())[1])
+
+
+## How far the mouth reaches on screen, along its long axis. Derived from the radius the
+## sweep is actually run with, so the two cannot drift apart.
+func mouth_extent() -> float:
+	return Iso.tile_circle_extent(sweep_radius() + MOUTH_EDGE)
+
+
+## The same, for a net that is wide open. What the drawing is scaled against.
+##
+## It has to be this one and not the shrinking one. A frame is drawn at its own rim ratio,
+## and the swept radius is already that same ratio off the full width — so scaling the
+## picture against the shrunken mouth applies the closing twice, and the net drew itself
+## shut about four times faster than the water it was closing over.
+func open_extent() -> float:
+	return Iso.tile_circle_extent(radius + MOUTH_EDGE)
+
+
+## How wide the drawing is laid out, rim to rim, before the frame's own ratio narrows it:
+## the open mouth, brought down towards the rod as the net comes in. Everything placed
+## against the picture goes through this, so the net, the line's end and the catch inside it
+## all shrink together instead of coming apart at the last stride.
+func _draw_span() -> float:
+	return open_extent() * 2.0 * _purse_scale() * lerpf(1.0, HOME_SIZE, near)
+
+
+## A point pulled inside the net's mouth, along the line from the mouth's middle. Points
+## already inside come back untouched.
+func _within_mouth(at: Vector2) -> Vector2:
+	var centre := world_pos()
+	var span := mouth_extent()
+	var gap := at - centre
+	# Measured in a space where the mouth is a unit circle, which is the only way to ask
+	# "how far out of an ellipse is this" without solving anything.
+	var out := Vector2(gap.x / span, gap.y / (span * 0.5)).length()
+	if out <= 1.0:
+		return at
+	return centre + gap / out
+
+
+## How far a throw in this direction actually gets, in tile coordinates: stepped out from
+## the angler until the range runs out or the water does. `towards` need not be normalised.
+##
+## This is the one place that answers "how far can I throw that way", and both the ring and
+## the aiming marker are built on it, so the drawn edge and the marker cannot disagree with
+## each other or with `can_cast_to`.
+func _reach_along(towards: Vector2) -> Vector2:
+	var from := angler.tile_pos
+	if towards.length_squared() < 0.000001:
+		return from
+	var step := towards.normalized() * RING_STEP
+	var reach := from
+	var out := from + step
+	while out.distance_to(from) <= range_tiles:
+		if Iso.island_fraction(out.x, out.y) < 1.0:
+			break
+		if Iso.shore_fraction(out.x, out.y) >= 1.0:
+			break
+		reach = out
+		out += step
+	return reach
+
+
+## Where the player may throw, as a closed world polygon: a circle in tile space, each
+## spoke cut short at the first point along it that `can_cast_to` would refuse. The island
+## and the bank take bites out of it, which is the whole reason it is walked rather than
+## drawn as an ellipse — a ring that runs over dry land is a ring that lies.
+func _cast_ring() -> PackedVector2Array:
+	if angler == null:
+		return PackedVector2Array()
+	var from := angler.tile_pos
+	if _ring_range == range_tiles and _ring_from.distance_to(from) < 0.001:
+		return _ring
+	_ring_from = from
+	_ring_range = range_tiles
+
+	_ring = PackedVector2Array()
+	for i in RING_SPOKES + 1:
+		var angle := TAU * float(i) / float(RING_SPOKES)
+		var reach := _reach_along(Vector2(cos(angle), sin(angle)))
+		_ring.append(Iso.tile_to_world(reach.x, reach.y))
+	return _ring
+
+
+## The pointer, answered before anything is thrown: a ghost of the mouth where the cast
+## would land, and — when the pointer is past what the rod can do — a second marker at the
+## furthest point in that direction that would actually take, with a line joining the two.
+##
+## The whole point of it is that the range stops being something you learn by throwing.
+func _draw_aim() -> void:
+	var pointer := get_global_mouse_position()
+	var legal := can_cast_to(pointer)
+	var tint := AIM_OK if legal else AIM_NO
+	var span := mouth_extent()
+
+	# The mouth as it would land: the same ellipse the net draws, so what is promised here
+	# is the shape that turns up.
+	var ghost := PackedVector2Array()
+	for i in 25:
+		var angle := TAU * float(i) / 24.0
+		ghost.append(pointer + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
+	draw_polyline(ghost, Color(tint.r, tint.g, tint.b, 0.5 if legal else 0.35), 1.5)
+
+	if legal:
+		return
+
+	# Out of reach: show where the throw would stop instead, so the pointer being refused
+	# is an answer rather than a nothing.
+	var reach := _reach_along(Iso.world_to_tile(pointer) - angler.tile_pos)
+	var stop := Iso.tile_to_world(reach.x, reach.y)
+	draw_line(stop, pointer, Color(tint.r, tint.g, tint.b, 0.28), 1.0)
+	var mark := PackedVector2Array()
+	for i in 25:
+		var angle := TAU * float(i) / 24.0
+		mark.append(stop + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
+	draw_polyline(mark, Color(AIM_OK.r, AIM_OK.g, AIM_OK.b, 0.45), 1.5)
+
+
+## The edge of what the angler can reach, at `strength` of full visibility.
+##
+## A filled area, a dashed rim, and ticks standing off it. All three because one is not
+## enough: the fill says which side is water once the island has bitten a crescent out of
+## the shape, the dashes say the line is a rule rather than a thing floating there, and the
+## ticks give the rule a direction.
+func _draw_range(strength: float) -> void:
+	var ring := _cast_ring()
+	if ring.size() < 3 or strength <= 0.01:
+		return
+	var pale := Color(0.93, 0.98, 1.0)
+	draw_colored_polygon(ring, Color(pale.r, pale.g, pale.b, 0.055 * strength))
+
+	var centre := Iso.tile_to_world(angler.tile_pos.x, angler.tile_pos.y)
+	var i := 0
+	while i < RING_SPOKES:
+		var run := PackedVector2Array()
+		for step in RING_DASH + 1:
+			run.append(ring[mini(i + step, ring.size() - 1)])
+		draw_polyline(run, Color(pale.r, pale.g, pale.b, 0.75 * strength), 2.0)
+		# One tick at the middle of each dash, pointing straight out from the angler. The
+		# ring is walked, so its edge is not always where an ellipse would put it, and the
+		# outward direction has to come from the two points either side of the mark.
+		var mark: Vector2 = ring[mini(i + RING_DASH / 2, ring.size() - 1)]
+		var out := (mark - centre).normalized()
+		draw_line(
+			mark, mark + out * RING_TICK,
+			Color(pale.r, pale.g, pale.b, 0.5 * strength), 1.5
+		)
+		i += RING_DASH * 2
+
+
+## The range ring, the line, the net, and whatever is being dragged in it.
+func _draw() -> void:
+	if angler == null:
+		return
+	var ink := Color(0.11, 0.09, 0.1)
+
+	# The range ring. It is the one piece of UI that has to be on the water rather than in
+	# the HUD: what you can reach is a place.
+	_draw_range(RING_READY if state == State.IDLE else RING_BUSY)
+	if state == State.IDLE:
+		_draw_aim()
+		return
+
+	var at := world_pos()
+	var tip := angler.rod_tip()
+	var mouth := mouth_extent()
+	var pose := _pose()
+	var drawn: StringName = pose[0]
+
+	# The line, sagging between the rod and the net. A straight segment reads as a wire;
+	# the sag is what makes it string. It ends at the top of the bag once there is one,
+	# because the art draws its own hanging line up there and meeting it is free.
+	var end := _line_end(at) if drawn != &"" else at
+	var line := PackedVector2Array()
+	# The sag is the slack line's, and a line under a haul has no slack in it: it comes taut
+	# and straight the moment the player starts pulling, which is also what stops it reading
+	# as a cable strung through the air over a net hanging off it.
+	var sag := minf(tip.distance_to(end) * 0.12, 26.0) * (1.0 - shut)
+	for i in 13:
+		var t := float(i) / 12.0
+		line.append(tip.lerp(end, t) + Vector2(0.0, sin(t * PI) * sag))
+	draw_polyline(line, Color(0.90, 0.92, 0.88, 0.75), 1.5)
+
+	# The catch always goes under the net, open mouth or closed bag. The whole read of a
+	# netted load is that the junk is inside the mesh, and junk drawn over the mesh is junk
+	# sitting on top of a picture of a net — which is what a landed net used to look like.
+	# The drawing is a line net over a keyed mask, so what is behind it still shows through.
+	#
+	# Up into the body of the bag rather than down past its weights: the junk is what the
+	# net is holding, so it belongs in the tube above the rim it hangs from.
+	_draw_catch(
+		at - Vector2(0.0, _frame_height() * CATCH_INSIDE * shut),
+		mouth * lerpf(1.0, HOME_SIZE, near)
+	)
+	if drawn != &"":
+		_draw_net(drawn, pose[1], at, mouth, ink)
+	else:
+		_draw_mesh(at, mouth, ink)
+
+
+## The net itself. One frame of whichever sequence it is in, tinted to the lake's ink: the
+## sheets are line drawings keyed to a mask, so the colour is the game's rather than the
+## paper's.
+func _draw_net(name: StringName, through: float, at: Vector2, mouth: float, ink: Color) -> void:
+	_draw_frame(name, through, at, _draw_span(), Color(ink.r, ink.g, ink.b, 0.92))
+
+
+## The net as it was drawn before there were any pictures of one: an ellipse in the tiles'
+## 2:1 ratio with two crossed families of strings over it. Still here because the art can
+## be missing, and a game that will not run without its assets is a game with a fuse in it.
+func _draw_mesh(at: Vector2, mouth: float, ink: Color) -> void:
+	var rim := PackedVector2Array()
+	for i in 33:
+		var angle := TAU * float(i) / 32.0
+		rim.append(at + Vector2(cos(angle) * mouth, sin(angle) * mouth * 0.5))
+	draw_colored_polygon(rim, Color(0.30, 0.36, 0.30, 0.30))
+	draw_polyline(rim, ink, 1.6)
+	for i in 4:
+		var t := (float(i) + 0.5) / 4.0
+		var x := lerpf(-mouth, mouth, t)
+		var h := sqrt(maxf(1.0 - pow(x / mouth, 2.0), 0.0)) * mouth * 0.5
+		draw_line(at + Vector2(x, -h), at + Vector2(x, h), Color(0.20, 0.26, 0.22, 0.5), 1.0)
+
+
+## What it has caught, riding in the mouth.
+##
+## Scattered into a clutch rather than spaced evenly round the rim: junk dragged through
+## water gathers, and an even ring reads as a diagram of a catch instead of a catch. As the
+## net shuts the clutch is pulled tighter and fades a little — the caller has already lifted
+## it into the bag by then, and the mesh in front of it does the rest. Drawn back to front,
+## so near pieces overlap far ones.
+func _draw_catch(at: Vector2, mouth: float) -> void:
+	if catch.is_empty() or grid == null:
+		return
+	_scatter.seed = 20707
+	# The pile is packed into the mouth rather than stacked out of it: however many pieces
+	# are aboard, they share the same cap of headroom and are drawn a little smaller as the
+	# load grows. A haul is a bulging net, not a column.
+	var layers := ceili(float(catch.size()) / float(CATCH_LAYER))
+	var step := mouth * CATCH_RISE / float(maxi(layers, 1))
+	var packed := CATCH_SCALE * clampf(
+		sqrt(float(CATCH_LAYER * 2) / float(maxi(catch.size(), 1))), CATCH_PACKED, 1.0
+	)
+	var spots: Array[Vector2] = []
+	for i in catch.size():
+		var angle := _scatter.randf_range(0.0, TAU)
+		# Square-rooted, so the scatter is even over the area rather than crowding the
+		# middle, and then pulled in: the mesh gathers what is in it.
+		var out := sqrt(_scatter.randf()) * CATCH_SPREAD * lerpf(1.0, CLOSE_BUNCH, shut)
+		spots.append(
+			at + Vector2(cos(angle) * mouth, sin(angle) * mouth * 0.5) * out
+			- Vector2(0.0, float(i / CATCH_LAYER) * step)
+		)
+	var order: Array[int] = []
+	for i in catch.size():
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return spots[a].y < spots[b].y)
+	var seen := lerpf(1.0, CATCH_HIDDEN, shut)
+	for i in order:
+		draw_set_transform(spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(packed, packed))
+		grid.defs[catch[i]].stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

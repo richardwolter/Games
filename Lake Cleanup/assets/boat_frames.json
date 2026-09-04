@@ -1,0 +1,7 @@
+{
+	"azimuth": 45.0,
+	"elevation": 30.0,
+	"frame": 128,
+	"frames": 16,
+	"model": "res://assets/kenney_watercraft-pack/Models/GLB format/ship-cargo-c.glb"
+}

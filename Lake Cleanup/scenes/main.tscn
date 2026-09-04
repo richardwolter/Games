@@ -1,0 +1,416 @@
+[gd_scene format=3 uid="uid://bbatr8tydqqjq"]
+
+[ext_resource type="Script" uid="uid://c8dvm3ah4ayol" path="res://scripts/lake.gd" id="1_lake"]
+[ext_resource type="Script" uid="uid://by7mgnwiq13j8" path="res://scripts/lake_grid.gd" id="2_grid"]
+[ext_resource type="Script" uid="uid://c81wn351wyv3i" path="res://scripts/boat.gd" id="3_boat"]
+[ext_resource type="Script" uid="uid://sh2hw1cd06nx" path="res://scripts/player.gd" id="4_player"]
+[ext_resource type="Script" uid="uid://bcgg76ymsrjxn" path="res://scripts/net.gd" id="5_net"]
+[ext_resource type="Script" uid="uid://3ru7hm5tyfr7" path="res://scripts/store.gd" id="6_yard"]
+[ext_resource type="Script" uid="uid://0dfb4r7tnuco" path="res://scripts/shed_room.gd" id="7_shed"]
+[ext_resource type="AudioStream" uid="uid://cu7ddrxgbwk0u" path="res://assets/music_goin.mp3" id="8_music"]
+[ext_resource type="Script" uid="uid://bcda8vbtl133t" path="res://scripts/hud_skin.gd" id="9_skin"]
+[ext_resource type="Script" uid="uid://dr22ekyjmso6u" path="res://scripts/shop_skin.gd" id="10_shop"]
+[ext_resource type="Script" uid="uid://bomnr6avmr21a" path="res://scripts/ui_button.gd" id="11_uibtn"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shop"]
+bg_color = Color(0.0862745, 0.101961, 0.0980392, 0.93)
+border_width_left = 2
+border_color = Color(0.35, 0.45, 0.4, 0.65)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_room"]
+bg_color = Color(0.0784314, 0.0705882, 0.0666667, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.35, 0.3, 0.24, 0.8)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="Main" type="Node2D" unique_id=1244283495]
+script = ExtResource("1_lake")
+
+[node name="Sky" type="CanvasLayer" parent="." unique_id=1533730482]
+layer = -1
+
+[node name="Fill" type="ColorRect" parent="Sky" unique_id=1748589341]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.501961, 0.541176, 0.498039, 1)
+
+[node name="Camera" type="Camera2D" parent="." unique_id=1548062958]
+
+[node name="Grid" type="Node2D" parent="." unique_id=70592840]
+script = ExtResource("2_grid")
+
+[node name="Yard" type="Node2D" parent="." unique_id=1551623021]
+z_index = 4
+z_as_relative = false
+script = ExtResource("6_yard")
+
+[node name="Net" type="Node2D" parent="." unique_id=1547268498]
+z_index = 8
+z_as_relative = false
+script = ExtResource("5_net")
+
+[node name="Angler" type="Node2D" parent="." unique_id=1208032103]
+z_index = 9
+z_as_relative = false
+script = ExtResource("4_player")
+
+[node name="Boat" type="Node2D" parent="." unique_id=436802794]
+z_index = 12
+z_as_relative = false
+script = ExtResource("3_boat")
+
+[node name="Music" type="AudioStreamPlayer" parent="." unique_id=1071933407]
+unique_name_in_owner = true
+stream = ExtResource("8_music")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1179505305]
+
+[node name="Skin" type="Control" parent="HUD" unique_id=811370621]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("9_skin")
+
+[node name="ShopSkin" type="Control" parent="HUD" unique_id=256962590]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("10_shop")
+
+[node name="Shop" type="PanelContainer" parent="HUD" unique_id=250635760]
+unique_name_in_owner = true
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -540.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_shop")
+
+[node name="Pad" type="MarginContainer" parent="HUD/Shop" unique_id=1440220835]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="Scroll" type="ScrollContainer" parent="HUD/Shop/Pad" unique_id=1328404353]
+layout_mode = 2
+mouse_filter = 2
+horizontal_scroll_mode = 0
+
+[node name="Panel" type="VBoxContainer" parent="HUD/Shop/Pad/Scroll" unique_id=2104529172]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 7
+
+[node name="Title" type="Label" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1243445050]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "The shed"
+
+[node name="NetHeading" type="Label" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=758226909]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "— The net —"
+
+[node name="BuyNetWidth" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1891862288]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Net width"
+
+[node name="BuyNetStrength" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1290348208]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Net strength"
+
+[node name="BuyNetRange" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1580284411]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Cast range"
+
+[node name="BuyReel" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=251713259]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Line speed"
+
+[node name="BuyNetHold" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=637752022]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Net haul"
+
+[node name="BoatHeading" type="Label" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=388897534]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "— The ferry —"
+
+[node name="BuyBoatSpeed" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=3803034]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Ferry speed"
+
+[node name="BuyCargo" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1445496285]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Ferry hold"
+
+[node name="BuySkimmer" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1845377555]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Skimmer"
+
+[node name="BuyFleet" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1164979095]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Extra ferry"
+
+[node name="DecorHeading" type="Label" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1171863293]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "— The shed itself —"
+
+[node name="OpenShed" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=243345811]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Decorate the shed"
+
+[node name="SendNow" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=352158593]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Send the ferry now"
+
+[node name="AutoFerry" type="CheckButton" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1015291935]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+button_pressed = true
+text = "Run the ferry automatically"
+
+[node name="CloseMenu" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=927932067]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Back to the water  (E)"
+
+[node name="OpenSettings" type="Button" parent="HUD" unique_id=2029636317]
+unique_name_in_owner = true
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -196.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = 54.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Settings"
+
+[node name="Settings" type="PanelContainer" parent="HUD" unique_id=603249598]
+unique_name_in_owner = true
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -270.0
+offset_top = -210.0
+offset_right = 270.0
+offset_bottom = 210.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_shop")
+
+[node name="Pad" type="MarginContainer" parent="HUD/Settings" unique_id=58232507]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Lines" type="VBoxContainer" parent="HUD/Settings/Pad" unique_id=414264453]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 9
+
+[node name="Title" type="Label" parent="HUD/Settings/Pad/Lines" unique_id=98978410]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Settings"
+
+[node name="MusicOn" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=1566196849]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+button_pressed = true
+text = "Music  (M)"
+
+[node name="MusicLevel" type="HSlider" parent="HUD/Settings/Pad/Lines" unique_id=872247912]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 0.75
+
+[node name="SfxOn" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=1675231646]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+button_pressed = true
+text = "Sound effects"
+
+[node name="SfxLevel" type="HSlider" parent="HUD/Settings/Pad/Lines" unique_id=1781900292]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 0.8
+
+[node name="Fullscreen" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=29343585]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+button_pressed = true
+text = "Fullscreen  (F11)"
+
+[node name="SaveNow" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=630510786]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Save the run  (F5)"
+
+[node name="LoadNow" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=7533017]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Load the last save  (F9)"
+
+[node name="WipeSave" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=1209604824]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Start the lake over  (F6)"
+
+[node name="Spacer" type="Control" parent="HUD/Settings/Pad/Lines" unique_id=729344977]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="QuitGame" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=1506550388]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.76, 1)
+theme_override_font_sizes/font_size = 21
+text = "Save and quit"
+
+[node name="Shed" type="PanelContainer" parent="HUD" unique_id=1665550222]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_room")
+
+[node name="Pad" type="MarginContainer" parent="HUD/Shed" unique_id=2128322125]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="Lines" type="VBoxContainer" parent="HUD/Shed/Pad" unique_id=896773045]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="HUD/Shed/Pad/Lines" unique_id=542759504]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "The shed"
+
+[node name="Note" type="Label" parent="HUD/Shed/Pad/Lines" unique_id=287324612]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Drag a find out of the inventory and onto the floor.  Drag it off the floor to put it away.  The cross in the corner goes back to the water."
+
+[node name="Room" type="Control" parent="HUD/Shed/Pad/Lines" unique_id=885567547]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 560)
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("7_shed")
+
+[node name="OpenUpgrades" type="Control" parent="HUD/Shed/Pad/Lines" unique_id=1542424527]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+script = ExtResource("11_uibtn")
+
+[node name="CloseShed" type="Button" parent="HUD/Shed/Pad/Lines" unique_id=1673590209]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Back to the water"
