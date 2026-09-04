@@ -183,8 +183,10 @@ func _stage_build() -> void:
 	# The ferry is there from the first minute — catching does not pay, so a player
 	# without one could never earn their way to it — but it starts slow and small.
 	_check(_boat.visible, "the ferry is there from the start", "")
-	_check(is_equal_approx(_boat.speed, 3.0) and _boat.capacity == 4,
-		"the starting ferry is the slow small one",
+	_check(
+		is_equal_approx(_boat.speed, float(_main.call(&"boat_speed")))
+			and _boat.capacity == int(_main.call(&"boat_cargo")),
+		"the starting ferry is the unupgraded one",
 		"%.1f tiles/s, carries %d" % [_boat.speed, _boat.capacity])
 	_check(_boat.skim_radius < 0, "it has no skimmer fitted",
 		"radius %d" % _boat.skim_radius)

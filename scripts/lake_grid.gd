@@ -45,6 +45,29 @@ const ANCHOR_SPAN := 8192.0
 const WAVE_AMPLITUDE := 5.0
 const WAVE_SPEED := 1.0
 
+## How far a floating piece wanders off its anchor, in pixels. Mirrors `sway` in
+## rubbish.gdshader, which is where the movement actually happens — this side of it exists
+## so the game can still say where a piece is.
+const SWAY := 3.2
+
+## The ring of disturbed water around a floating piece: how wide it is against the piece,
+## how far it breathes in and out, how long one breath takes in seconds, and how dark it is
+## drawn against the water.
+##
+## Something floating displaces water, and without this every piece in the lake sits on the
+## surface like a sticker on glass. It is a ring rather than a plate under the art: a filled
+## shape at this size reads as a grey box behind everything, which is what the plate under
+## each piece used to look like before it was taken out.
+const RIPPLE_SPAN := 1.15
+const RIPPLE_BREATH := 0.16
+const RIPPLE_TIME := 2.6
+const RIPPLE_ALPHA := 0.16
+
+## Most rings drawn at once. The rest of the lake goes without: past a hundred or so the
+## water is a mass of them and the cost is real, so the ones near the middle of the view
+## carry the effect for everybody.
+const RIPPLE_MOST := 140
+
 ## Def index per slot, bottom-first. One entry per tile, indexed ty * Iso.COLS + tx; dry
 ## land is an empty stack.
 var stacks: Array[PackedInt32Array] = []
@@ -100,6 +123,8 @@ var _emerging := PackedInt32Array()
 ## Pieces with a real sprite, which cannot go in the soup. Drawn the old way, one at a
 ## time, on a layer of their own.
 var _sprites: SpriteLayer
+## The ring layer, and the pieces it is currently drawing rings for.
+var _ripples: RippleLayer
 
 ## The atlas's solid-white block, as texture coordinates. Cached: every untextured quad in
 ## the soup samples it, and it never moves.
@@ -139,7 +164,59 @@ class SpriteLayer extends Node2D:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## The rings of disturbed water round the floating rubbish.
+##
+## Its own layer, under the junk, because it is the one thing about a floating piece that
+## has to be redrawn every frame: the geometry of the lake is static and rocked by the
+## vertex shader, and a ring that breathes cannot be. Bounded rather than complete — a lake
+## of eighteen thousand rings is both unreadable and not free — so it draws a spread of what
+## is on screen and lets the rest of the water carry the idea.
+class RippleLayer extends Node2D:
+	var grid: LakeGrid
+	var pieces: PackedInt32Array = PackedInt32Array()
+	var _time: float = 0.0
+
+	func set_pieces(list: PackedInt32Array) -> void:
+		pieces = list
+		set_process(not pieces.is_empty())
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		_time += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		for index: int in pieces:
+			var stack := grid.stacks[index]
+			if stack.is_empty():
+				continue
+			var at := grid.surface_pos(index)
+			var def := grid.defs[stack[stack.size() - 1]]
+			# Off the piece's own place on the water, so no two rings breathe together —
+			# in step, a field of them pulses like a warning light.
+			var phase := _time * TAU / LakeGrid.RIPPLE_TIME + at.x * 0.02 + at.y * 0.013
+			var breath := 1.0 + sin(phase) * LakeGrid.RIPPLE_BREATH
+			var wide := def.size.x * grid.swing[index] * LakeGrid.RIPPLE_SPAN * breath
+			# Flat on the plane, in the tiles own 2:1, so the ring lies in the water rather
+			# than standing up in it.
+			var ring := PackedVector2Array()
+			for i in 13:
+				var angle := TAU * float(i) / 12.0
+				ring.append(at + Vector2(cos(angle) * wide * 0.5, sin(angle) * wide * 0.25))
+			# Faintest at the top of the breath: a ring spreading is a ring going.
+			var fade := LakeGrid.RIPPLE_ALPHA * (1.0 - sin(phase) * 0.35)
+			draw_polyline(ring, Color(0.86, 0.94, 0.96, fade), 1.0)
+
+
 func _ready() -> void:
+	_ripples = RippleLayer.new()
+	_ripples.name = &"Ripples"
+	_ripples.grid = self
+	# Under the rubbish: the ring is the water the piece is sitting in.
+	_ripples.z_index = -1
+	_ripples.set_process(false)
+	add_child(_ripples)
+
 	_sprites = SpriteLayer.new()
 	_sprites.name = &"Sprites"
 	_sprites.grid = self
@@ -385,7 +462,7 @@ func surface_still(index: int) -> Vector2:
 func surface_pos(index: int) -> Vector2:
 	var at := surface_still(index)
 	at.y += _swell(at.x, _time * WAVE_SPEED) * WAVE_AMPLITUDE
-	return at
+	return at + _sway(at.x, _time * WAVE_SPEED)
 
 
 ## Take a piece out. Whatever is under it becomes the tile's visible piece, and rises into
@@ -437,6 +514,13 @@ func piece_count() -> int:
 
 static func _swell(x: float, t: float) -> float:
 	return sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38
+
+
+## The wander of a floating piece, in pixels off its anchor. Mirrors the vertex shader's
+## `sway` term exactly: if the two drift apart, the ripple around a piece and the splash
+## when it is netted stop happening where the piece is drawn.
+static func _sway(x: float, t: float) -> Vector2:
+	return Vector2(sin(t * 0.53 + x * 0.017), cos(t * 0.41 + x * 0.023) * 0.5) * SWAY
 
 
 func _process(delta: float) -> void:
@@ -527,6 +611,7 @@ func _rebuild() -> void:
 	_mesh_indices.resize(0)
 	drawn_pieces = 0
 	var textured: Array[int] = []
+	var afloat := PackedInt32Array()
 
 	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
 	var lo := view.position - pad
@@ -544,6 +629,7 @@ func _rebuild() -> void:
 			var at := surface_still(index)
 			if at.x < lo.x or at.x > hi.x or at.y < lo.y or at.y > hi.y:
 				continue
+			afloat.append(index)
 			var def := defs[stack[stack.size() - 1]]
 			if def.sprite != null:
 				textured.append(index)
@@ -552,6 +638,20 @@ func _rebuild() -> void:
 			drawn_pieces += 1
 
 	_sprites.set_pieces(textured)
+	_ripples.set_pieces(_spread_over(afloat, RIPPLE_MOST))
+
+
+## A bounded sample of a list, taken evenly across it rather than off the front. Off the
+## front would put every ring in one corner of the screen, which is worse than none: what
+## is wanted is rubbish sitting in water everywhere the eye lands.
+func _spread_over(list: PackedInt32Array, most: int) -> PackedInt32Array:
+	if list.size() <= most:
+		return list
+	var out := PackedInt32Array()
+	var stride := float(list.size()) / float(most)
+	for i in most:
+		out.append(list[int(float(i) * stride)])
+	return out
 
 
 ## One piece, as triangles. Mirrors TrashDef.stamp_iso — the same footprint, body and top

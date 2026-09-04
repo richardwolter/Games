@@ -59,6 +59,23 @@ const RETRIGGER_DELAY := 0.22
 ## gets the flat ring a side view could never show.
 const RING_SPREAD := 1.6
 
+## How long a ripple takes to spread and go, in seconds. Far longer than a crown: a crown is
+## the impact and a ripple is the water still telling you about it afterwards.
+const RIPPLE_LIFE := 1.15
+
+## How far a ripple grows, as a multiple of the width it was born at. The ring the crown
+## already draws is the impact spreading; this is the swell going on out across the lake, so
+## it travels further and lives longer than that one.
+const RIPPLE_GROWTH := 2.6
+
+## Most opaque a ripple line ever is. Faint on purpose — a lake with hard white rings on it
+## looks like a puddle in the rain, and what is wanted is the surface being disturbed enough
+## to stop reading as a painted floor.
+const RIPPLE_ALPHA := 0.3
+
+## Hard ceiling on live ripples, the same bargain the drops strike.
+const MAX_RIPPLES := 90
+
 ## Live drops, as parallel arrays. Swap-removed on death, so the live range is
 ## always the front of each array and there are no holes to skip.
 var _drop_pos := PackedVector2Array()
@@ -75,7 +92,15 @@ var _crown_at := PackedVector2Array()
 var _crown_age := PackedFloat32Array()
 var _crown_span := PackedFloat32Array()
 
+## Live ripples: where on the plane, how far along, and how wide at birth.
+var _ripple_at := PackedVector2Array()
+var _ripple_age := PackedFloat32Array()
+var _ripple_span := PackedFloat32Array()
+
 var _last_splash: Dictionary[int, float] = {}
+## When each body last shed a ripple, so a trail is spaced by time rather than by how often
+## its owner remembers to ask.
+var _last_ripple: Dictionary[int, float] = {}
 
 
 func _ready() -> void:
@@ -126,6 +151,36 @@ func drip(at: Vector2, vel: Vector2, size: float, life: float) -> void:
 	_drop_size.append(size)
 	set_process(true)
 	queue_redraw()
+
+
+## One ring of disturbed water, spreading flat on the surface from `at`. `span` is how wide
+## it starts, in world pixels — the mouth of a net, the beam of a hull.
+##
+## No crown, no drops: this is not something hitting the water, it is water that has been
+## pushed. Everything dragged across the lake leaves these, which is the difference between
+## a surface and a floor.
+func ripple(at: Vector2, span: float) -> void:
+	if _ripple_age.size() >= MAX_RIPPLES:
+		return
+	_ripple_at.append(at)
+	_ripple_age.append(0.0)
+	_ripple_span.append(maxf(span, 4.0))
+	set_process(true)
+	queue_redraw()
+
+
+## A trail of them behind something moving: one ripple every `every` seconds, per body.
+##
+## The spacing lives here rather than in the callers because it is the same spacing for all
+## of them, and because a net and a boat both want to say "I am ploughing through the lake"
+## once a frame and have the water work out what that is worth.
+func wake(body: Object, at: Vector2, span: float, every: float = 0.16) -> void:
+	var id := body.get_instance_id()
+	var now := float(Time.get_ticks_msec()) * 0.001
+	if now - float(_last_ripple.get(id, -99.0)) < every:
+		return
+	_last_ripple[id] = now
+	ripple(at, span)
 
 
 ## Splash for a body that has just crossed the surface, if it was moving fast
@@ -190,16 +245,48 @@ func _process(delta: float) -> void:
 		_crown_age[c] = age
 		c += 1
 
+	var r := 0
+	while r < _ripple_age.size():
+		var age := _ripple_age[r] + delta
+		if age >= RIPPLE_LIFE:
+			var last := _ripple_age.size() - 1
+			_ripple_at[r] = _ripple_at[last]
+			_ripple_age[r] = _ripple_age[last]
+			_ripple_span[r] = _ripple_span[last]
+			_ripple_at.resize(last)
+			_ripple_age.resize(last)
+			_ripple_span.resize(last)
+			continue
+		_ripple_age[r] = age
+		r += 1
+
 	queue_redraw()
-	if _drop_life.is_empty() and _crown_age.is_empty():
+	if _drop_life.is_empty() and _crown_age.is_empty() and _ripple_age.is_empty():
 		set_process(false)
 		# The cooldown table is the one thing here that would otherwise grow for the
 		# life of the session, and with nothing splashing there is nothing whose
 		# cooldown can still matter.
 		_last_splash.clear()
+		_last_ripple.clear()
 
 
 func _draw() -> void:
+	# Under the crowns and the drops: a ripple is the surface itself, and the splash is
+	# something happening on top of it.
+	for r in _ripple_age.size():
+		var t := _ripple_age[r] / RIPPLE_LIFE
+		# Out fast and then coasting, the way a ring of water actually leaves what made it.
+		var out := 1.0 - (1.0 - t) * (1.0 - t)
+		var wide := _ripple_span[r] * lerpf(1.0, RIPPLE_GROWTH, out)
+		if wide < 2.0:
+			continue
+		# In over the first fifth so a ring does not appear at full strength on top of the
+		# thing that made it, then away for the rest of its life.
+		var alpha := minf(t * 5.0, 1.0) * (1.0 - t) * (1.0 - t) * RIPPLE_ALPHA
+		var ring := _ellipse(_ripple_at[r], Vector2(wide, wide * 0.5))
+		ring.append(ring[0])
+		draw_polyline(ring, Color(FOAM, alpha), 1.5)
+
 	for c in _crown_age.size():
 		var t := _crown_age[c] / CROWN_LIFE
 		var span := _crown_span[c]

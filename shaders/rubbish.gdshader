@@ -17,6 +17,12 @@ render_mode blend_mix;
 uniform float wave_amplitude = 5.0;
 uniform float wave_speed = 1.0;
 
+// How far a floating piece wanders off its anchor, in pixels. Rubbish on open water is not
+// pinned: it turns on the surface and slides about with it, and a lake where every piece
+// only ever moves straight up and down reads as a field of pegs. Mirrors LakeGrid._sway —
+// the CPU needs the same number to know where a piece is for its ripple and its splash.
+uniform float sway = 3.2;
+
 // How wide a span of world the packed anchor covers, centred on zero. Mirrors
 // LakeGrid.ANCHOR_SPAN.
 uniform float anchor_span = 8192.0;
@@ -57,6 +63,10 @@ void vertex() {
 
 	float t = TIME * wave_speed;
 	VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
+	// The wander. Two slow waves at different rates, off the same anchor, so neighbouring
+	// pieces are never in step and nothing in the lake travels in a straight line.
+	VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
+	VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
 
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.

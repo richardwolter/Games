@@ -87,6 +87,31 @@ const PAN_RELEASE := 3.2
 ## bar that flatters itself is a progress bar nobody believes twice.
 const FILTH_BITE := 0.62
 
+## How far the filth on one tile spreads into the water around it, in tiles.
+##
+## Junk does not stain only the square it floats on, and a map without this reads as a
+## chessboard of clean and dirty squares. Wide enough that clearing one piece off open water
+## leaves a soft hole rather than a pixel, and narrow enough that clearing a bay is a change
+## you can see from the boat.
+const FILTH_BLUR := 3
+
+## How much spread filth counts as water at its filthiest, as a fraction of the worst the
+## lake has anywhere on the day it is built. Under one, so the dirty half of a fresh lake
+## reads as uniformly foul rather than as a heat map of where the junk happens to be dense.
+const FILTH_FULL := 0.7
+
+## How sharply the map falls away from filthy. Over one, so water with a little junk near
+## it is nearly clean rather than half green: the lake's own figure is bent the other way
+## (`FILTH_BITE`, under one) because a meter that moves early is encouraging, and a patch of
+## water that goes green because there is rubbish two boat-lengths away is a lie about where
+## the player has been. Cleared water is blue, and the green is where the junk still is.
+const FILTH_EDGE := 1.9
+
+## Seconds between rebuilds of the map, at most. It is a moment of work on a grid this size
+## and none of it has to be frame-exact, but a cast landing ten pieces should not pay for it
+## ten times.
+const FILTH_REMAP := 0.2
+
 ## The island's colours, and how far in from the waterline the grass starts, in tiles.
 const SAND := Color(0.78, 0.70, 0.50)
 const SAND_WET := Color(0.66, 0.58, 0.41)
@@ -110,6 +135,13 @@ const DETAIL_ZOOM := 0.5
 
 ## What netting a pigeon pays.
 const BIRD_BONUS := 26.0
+
+## What a piece pays at a merchant: a flat fee for anything landed, plus what its filth is
+## worth. The flat half is why the first hour pays at all — a hold of mugs used to be four
+## sludge a lap — and it is also what stops a late hold of clocks and urns from being worth
+## ten early laps, which is where the run used to stop needing upgrades.
+const PIECE_BASE_PAY := 4.0
+const PIECE_FILTH_PAY := 9.0
 
 ## How close to the shed the angler has to stand to open it, in tiles.
 const SHOP_RANGE := 3.2
@@ -318,6 +350,15 @@ var _wiping: bool = false
 var _save_note: String = ""
 var _save_note_for: float = 0.0
 
+## The per-tile filth map handed to the water shader, its texture, and what the filthiest
+## water in the lake was worth on the day it was built. Rebuilt on a timer whenever
+## something has come out of the water.
+var _filth_map: Image
+var _filth_texture: ImageTexture
+var _filth_ref: float = 0.0
+var _filth_stale: bool = false
+var _filth_remap_in: float = 0.0
+
 var _filth_total: float = 1.0
 var _filth_left: float = 1.0
 
@@ -371,9 +412,14 @@ var _sparkle_at: float = 0.0
 ##
 ## Fractions rather than whole rings. A radius counted in whole tiles goes 1, 5, 13, 29
 ## tiles a cast — every purchase doubles the mouth and by the third one the net is a
-## dragnet. Under half a tile a level, the same five purchases run 1, 5, 9, 13, 21.
+## dragnet.
+##
+## The step starts small and grows: the first couple of levels are a slightly bigger mouth
+## rather than a new net, so the early game is still a game of aiming, and the levels bought
+## late are the ones that feel like money well spent.
 func net_radius() -> float:
-	return 0.7 + 0.45 * float(net_width_level)
+	var level := float(net_width_level)
+	return 0.6 + 0.22 * level + 0.03 * level * level
 
 
 ## The heaviest TrashDef.tier the net can lift.
@@ -387,29 +433,32 @@ func net_power() -> int:
 ## the first upgrade, which made the boat pointless and the lake small — but it accelerates,
 ## because a track whose price multiplies while its reach only adds is a track that is worth
 ## less every time you buy it. The squared term is what keeps the late levels worth the
-## money: 3.4 tiles at the start, 12.5 by level five, past twenty by level eight.
+## money — but gently: 3.4 tiles at the start, 10.4 by level five, 16.8 by level eight. It
+## used to pass twenty by level eight, which is most of the basin from the bank, and a rod
+## that reaches the far shore is a rod that has retired the boat.
 func net_range() -> float:
 	var level := float(net_range_level)
-	return 3.4 + 1.15 * level + 0.16 * level * level
+	return 3.4 + 0.95 * level + 0.09 * level * level
 
 
 ## How fast the net comes home, in tiles per second.
 func reel_speed() -> float:
-	return 2.6 + 0.9 * float(reel_level)
+	var level := float(reel_level)
+	return 2.4 + 0.7 * level + 0.06 * level * level
 
 
 ## How many pieces one cast can bring in.
 func net_hold() -> int:
-	return 3 + 2 * net_hold_level
+	return 3 + net_hold_level + (net_hold_level * net_hold_level) / 4
 
 
 ## Ferry speed, in tiles per second.
 func boat_speed() -> float:
-	return 3.0 + 1.1 * float(boat_speed_level)
+	return 4.2 + 1.3 * float(boat_speed_level)
 
 
 func boat_cargo() -> int:
-	return 4 + 3 * cargo_level
+	return 6 + 4 * cargo_level
 
 
 ## How wide the skimmer bites as it sails, in tiles out from the hull. Below zero is no
@@ -426,12 +475,12 @@ func skim_power() -> int:
 
 ## Odds that a piece the skimmer passes over actually comes up. A net dragged behind a
 ## moving hull is a chance at a piece rather than a certainty, and most of what the
-## skimmer upgrade buys is that chance going up — the first one fitted misses four times
-## out of five, and even a maxed one lets some slip underneath.
+## skimmer upgrade buys is that chance going up — the first one fitted still misses most of
+## what it passes, and even a maxed one lets some slip underneath.
 func skim_chance() -> float:
 	if skimmer_level < 1:
 		return 0.0
-	return minf(0.18 + 0.11 * float(skimmer_level - 1), 0.85)
+	return minf(0.30 + 0.10 * float(skimmer_level - 1), 0.90)
 
 
 ## Deck space the skimmer gets on top of the hold, so a ferry loaded to the brim out of
@@ -503,6 +552,7 @@ func _ready() -> void:
 	_filth_total = maxf(_grid.filth_left(), 0.001)
 	_filth_left = _filth_total
 	pollution = 1.0
+	_build_filth_map()
 
 	_bounds = _outline_bounds(shore)
 	_view_zoom = VIEW_ZOOM
@@ -1350,6 +1400,7 @@ func _on_net_landed(cargo: PackedInt32Array) -> void:
 		if def.keepsake:
 			_keep(def)
 			_filth_left = maxf(_filth_left - def.pollution, 0.0)
+			_filth_stale = true
 			caught += 1
 			continue
 		_haul.send(
@@ -1357,6 +1408,7 @@ func _on_net_landed(cargo: PackedInt32Array) -> void:
 		)
 		slot += 1
 		_filth_left = maxf(_filth_left - def.pollution, 0.0)
+		_filth_stale = true
 		caught += 1
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 
@@ -1401,7 +1453,7 @@ func _keep(def: TrashDef) -> void:
 ## second case is counted below, because it left the lake when the skimmer took it.
 func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 	for i in cargo.size():
-		sludge += _grid.defs[cargo[i]].pollution * 10.0
+		sludge += PIECE_BASE_PAY + _grid.defs[cargo[i]].pollution * PIECE_FILTH_PAY
 		sold_count += 1
 	sold_by_kind[kind] += cargo.size()
 
@@ -1412,27 +1464,37 @@ func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 func _on_skimmed(def_index: int) -> void:
 	_filth_left = maxf(_filth_left - _grid.defs[def_index].pollution, 0.0)
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
+	_filth_stale = true
 	caught += 1
 
 
 ## What each track costs: the price of its first level, and what each level multiplies the
 ## next one by.
 ##
+## The net's tracks start dearer and climb slower than they used to. At 1.7 a level the
+## first two purchases were small change and the eighth cost more than the rest of the run
+## put together, so the shed stopped being worth walking into halfway through. Starting
+## higher and multiplying by about 1.5 keeps every level roughly the same number of laps
+## apart, which is the only way a track stays worth buying to the end.
+##
 ## The extra hull is the other end of the same scale: it is a second round of the lake
 ## running at once, which no single-boat upgrade can match, so it starts high and triples.
 const PRICES := {
-	&"net_width": [15.0, 1.7],
-	&"net_strength": [15.0, 1.7],
+	&"net_width": [22.0, 1.52],
+	&"net_strength": [22.0, 1.52],
 	# Cheaper and flatter than the tracks either side of it. Range buys no catch rate and no
 	# money — it buys not having to walk — so at the shared 1.7 it was the one upgrade that
 	# priced itself out of the game before it got good.
-	&"net_range": [12.0, 1.42],
-	&"reel": [15.0, 1.7],
-	&"net_hold": [15.0, 1.7],
-	&"boat_speed": [15.0, 1.7],
-	&"cargo": [15.0, 1.7],
-	&"skimmer": [15.0, 1.7],
-	&"fleet": [240.0, 3.0],
+	&"net_range": [16.0, 1.34],
+	&"reel": [22.0, 1.52],
+	&"net_hold": [22.0, 1.52],
+	# The ferry is the tap the whole economy runs from, so its two tracks start cheap and
+	# climb slower than the net's: a player who is waiting on money can always buy their
+	# way out of waiting.
+	&"boat_speed": [14.0, 1.42],
+	&"cargo": [14.0, 1.42],
+	&"skimmer": [26.0, 1.48],
+	&"fleet": [200.0, 2.6],
 }
 
 
@@ -1672,6 +1734,7 @@ func _net_wash() -> float:
 
 func _process(delta: float) -> void:
 	_fade_radio(delta)
+	_remap_filth(delta)
 	# The camera follows the angler rather than being panned: the arrow keys are theirs
 	# now, and a view that has to be driven separately from the character is two jobs for
 	# one pair of hands. While a cast is out it drifts off them and onto the net.
@@ -1758,6 +1821,103 @@ func _visible_world_rect() -> Rect2:
 	# what a zoom of 1 would have shown.
 	var size := get_viewport_rect().size / _camera.zoom
 	return Rect2(_camera.global_position - size * 0.5, size)
+
+
+## Rebuild the filth map if something has left the lake since the last one, and no more
+## often than FILTH_REMAP.
+func _remap_filth(delta: float) -> void:
+	_filth_remap_in -= delta
+	if not _filth_stale or _filth_remap_in > 0.0:
+		return
+	_filth_stale = false
+	_filth_remap_in = FILTH_REMAP
+	_build_filth_map()
+
+
+## The filth map: how foul the water is on each tile of the basin, spread out into the water
+## around each piece, one texel per tile for the water shader to read.
+##
+## This is what makes cleaning visible. The meter at the top of the screen is the whole lake
+## averaged, and averages are the enemy of feedback: five casts that clear the water in front
+## of the player move it by a percent, and the water in front of the player is what they are
+## looking at. With the map, that water goes blue while the next bay is still soup.
+##
+## Built whole rather than patched where a cast landed. The spread means one piece touches a
+## disc of tiles and several pieces overlap on the same one, so taking a piece out has to
+## subtract its share from everywhere it was staining — which is either a second field of
+## bookkeeping or one sweep of a grid the size of a postage stamp. It is the postage stamp.
+func _build_filth_map() -> void:
+	var cols := Iso.COLS
+	var rows := Iso.ROWS
+	var raw := PackedFloat32Array()
+	raw.resize(cols * rows)
+	for index in _grid.stacks.size():
+		var stack := _grid.stacks[index]
+		if stack.is_empty():
+			continue
+		var total := 0.0
+		for k in stack.size():
+			total += _grid.defs[stack[k]].pollution
+		raw[index] = total
+
+	# Separable, so the spread costs two passes of a line rather than one of a disc. A box
+	# blur and not a gaussian: at this size the difference cannot be seen, and the sums are
+	# running ones, so how far it is spread costs nothing.
+	var blurred := _blur_filth(_blur_filth(raw, cols, rows, true), cols, rows, false)
+
+	# What counts as filthiest, taken once off the untouched lake. Renormalising on every
+	# rebuild would leave the last piece of junk in the water sitting in a puddle as foul as
+	# opening day, and the lake would never look finished.
+	if _filth_ref <= 0.0:
+		var worst := 0.0
+		for i in blurred.size():
+			worst = maxf(worst, blurred[i])
+		_filth_ref = maxf(worst * FILTH_FULL, 0.001)
+
+	var pixels := PackedByteArray()
+	pixels.resize(cols * rows)
+	for i in blurred.size():
+		var here := pow(clampf(blurred[i] / _filth_ref, 0.0, 1.0), FILTH_EDGE)
+		pixels[i] = int(round(here * 255.0))
+
+	if _filth_map == null:
+		_filth_map = Image.create_from_data(cols, rows, false, Image.FORMAT_R8, pixels)
+		_filth_texture = ImageTexture.create_from_image(_filth_map)
+	else:
+		_filth_map.set_data(cols, rows, false, Image.FORMAT_R8, pixels)
+		_filth_texture.update(_filth_map)
+
+	if _water_material != null:
+		_water_material.set_shader_parameter(&"filth_map", _filth_texture)
+		_water_material.set_shader_parameter(&"filth_tiles", Vector2(cols, rows))
+		_water_material.set_shader_parameter(&"filth_mapped", 1.0)
+
+
+## One pass of the spread, along the rows or down the columns. A sliding window, so how far
+## the filth reaches does not appear in the cost.
+func _blur_filth(
+	src: PackedFloat32Array, cols: int, rows: int, along: bool
+) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(src.size())
+	var span := FILTH_BLUR
+	var width := float(span * 2 + 1)
+	var outer := rows if along else cols
+	var inner := cols if along else rows
+	for a in outer:
+		var sum := 0.0
+		for i in range(-span, span + 1):
+			sum += src[_filth_at(cols, a, clampi(i, 0, inner - 1), along)]
+		for b in inner:
+			out[_filth_at(cols, a, b, along)] = sum / width
+			sum -= src[_filth_at(cols, a, clampi(b - span, 0, inner - 1), along)]
+			sum += src[_filth_at(cols, a, clampi(b + span + 1, 0, inner - 1), along)]
+	return out
+
+
+## Where one cell of the map lives, for whichever way the pass is running.
+func _filth_at(cols: int, a: int, b: int, along: bool) -> int:
+	return a * cols + b if along else b * cols + a
 
 
 ## The lake clearing up is the progress bar, so the shader gets the meter directly rather
@@ -2032,6 +2192,7 @@ func load_game() -> bool:
 	# that the build already worked out, and the field is the truth.
 	_filth_left = _grid.filth_left()
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
+	_filth_stale = true
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_note_save("loaded")
 	return true

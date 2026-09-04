@@ -47,10 +47,25 @@ uniform float band_strength = 0.075;
 uniform float foam_band = 0.055;
 
 // 0 clean, 1 filthy. Adds a flat scum tint on top of the depth gradient and kills the
-// band contrast, so a dirty lake looks opaque as well as brown — murk is a loss of
+// band contrast, so a dirty lake looks opaque as well as green — murk is a loss of
 // clarity, not just a hue change.
+//
+// The whole lake's figure, and the fallback: what the water does where there is no map.
 uniform float pollution = 1.0;
-uniform vec4 scum_color : source_color = vec4(0.35, 0.31, 0.16, 1.0);
+uniform vec4 scum_color : source_color = vec4(0.25, 0.36, 0.15, 1.0);
+
+// Filth per tile, one texel per tile of the basin, red channel only. This is what makes
+// cleaning a patch of lake visible: the meter at the top of the screen is the whole lake's
+// average, and a player who has just spent five casts clearing the water in front of them
+// wants that water to be clear — not one percent bluer everywhere.
+//
+// Sampled linearly, so the map's tile grid does not show through as squares: what is wanted
+// is the boundary between clean and filthy water, soft, wherever the junk happens to stop.
+uniform sampler2D filth_map : filter_linear, repeat_disable;
+uniform vec2 filth_tiles = vec2(92.0, 92.0);
+// 0 to ignore the map and shade off `pollution` alone, 1 to read it. The lake sets this
+// once the map exists; without it a missing texture would read as a spotless lake.
+uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 
 // 0 for a lake with work left in it, 1 for one that has none. The reward for finishing:
 // the crests the water already has are let go wider and brighter, and a second, much
@@ -107,6 +122,11 @@ void fragment() {
 
 	vec4 col = mix(shallow_color, deep_color, smoothstep(0.15, 0.85, d));
 
+	// How filthy this water is, here. Everything below reads this instead of the lake's
+	// own figure, which is what lets one bay be clean while the next is still soup.
+	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
+	float filth = mix(pollution, local, filth_mapped);
+
 	// Bands, warped in phase rather than in position — pushing the pattern around by a
 	// function of the other axis is exactly "bend these lines", and it costs one term.
 	// Run against the isometric grain rather than screen-horizontally, so the surface
@@ -119,12 +139,12 @@ void fragment() {
 	float fine = sin((across - warp * 0.6) * 0.055 - TIME * 0.9);
 	float bands = streak * 0.7 + fine * 0.3;
 	// Bands fade with filth: in a polluted lake, light does not get far at all.
-	col.rgb += bands * band_strength * (1.0 - pollution * 0.75);
+	col.rgb += bands * band_strength * (1.0 - filth * 0.75);
 
 	// Glints: the sharp crests of the same pattern, and the thing that makes a flat
 	// plane read as moving water rather than as painted floor. A cleaned lake takes them
 	// lower down the wave and harder, so more of the surface is a crest.
-	float glint = smoothstep(mix(0.86, 0.83, sparkle), 1.0, bands) * (1.0 - pollution * 0.8);
+	float glint = smoothstep(mix(0.86, 0.83, sparkle), 1.0, bands) * (1.0 - filth * 0.8);
 	col.rgb += glint * (0.22 + sparkle * 0.06);
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
@@ -143,17 +163,17 @@ void fragment() {
 
 	// Scum. Strongest in the shallows where the muck collects, and it takes opacity
 	// with it.
-	float scum = pollution * mix(1.0, 0.7, d);
+	float scum = filth * mix(1.0, 0.7, d);
 	col.rgb = mix(col.rgb, scum_color.rgb, scum * 0.75);
 	col.a = clamp(col.a + scum * 0.2, 0.0, 1.0);
 
 	// Foam collar against the bank, wobbling so the line is not a clean stencil edge.
 	float lap = 1.0 + 0.35 * sin(along * 0.02 + TIME * 1.4);
-	float foam = smoothstep(1.0 - foam_band * lap, 1.0, s) * (1.0 - pollution * 0.6);
+	float foam = smoothstep(1.0 - foam_band * lap, 1.0, s) * (1.0 - filth * 0.6);
 	// And the same collar around the island, read from the other side: 1 on its beach,
 	// falling off outward.
 	float isl_foam = (1.0 - smoothstep(1.0, 1.0 + foam_band * 4.0 * lap, isl))
-		* (1.0 - pollution * 0.6);
+		* (1.0 - filth * 0.6);
 	foam = max(foam, isl_foam);
 	col = mix(col, foam_color, clamp(foam, 0.0, 1.0) * foam_color.a);
 

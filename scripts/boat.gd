@@ -37,10 +37,30 @@ const RIDE_HEIGHT := 7.0
 
 ## The wake, in stern-lengths and hull-widths: how far back it reaches, how wide it opens,
 ## how many ripples are in it and how fast they shed backwards down it.
-const WAKE_LONG := 1.9
-const WAKE_WIDE := 0.62
-const WAKE_RIPPLES := 4
+const WAKE_LONG := 2.2
+const WAKE_WIDE := 0.68
+const WAKE_RIPPLES := 7
 const WAKE_SPEED_OFF := 0.55
+
+## How many slabs the disturbed water behind the hull is built from.
+##
+## One flat polygon was a cone: a hard-edged triangle of pale grey laid on the lake, with a
+## visible line down each side where it stopped being water. Stacking shorter, wider, fainter
+## slabs gives the same shape an edge that runs out instead of ending, which is what lets it
+## sit in the surface rather than on it.
+const WAKE_LAYERS := 4
+
+## How far a ripple's ends may wander from where an even, symmetrical one would put them, as
+## a fraction of its own width, and how much its width and its speed may vary from its
+## neighbours'. A wake is water falling off a hull, and water does not queue.
+const WAKE_WANDER := 0.34
+const WAKE_VARY := 0.3
+
+## How far each ripple bows back towards the stern across its own span, as a fraction of its
+## width. A wake ripple is an arc trailing from the hull, not a chevron: the straight-line
+## vee read as a machined part, and two of them one behind the other read as a chevron
+## pattern rather than as water.
+const WAKE_BOW := 0.42
 
 ## The skimmer's mouth, as a fraction of the hull's beam at radius zero and per level after
 ## it, and how far back off the hull it hangs. Small and tucked in: it is a net on a frame
@@ -56,6 +76,10 @@ const SKIM_TRAIL := HULL_LENGTH * 0.5 * SKIM_BEHIND / TILE_REACH
 
 ## How often a boat under way throws spray off its bow, in seconds, and how big. Small: it is
 ## a work boat at walking pace, not a speedboat.
+## Seconds between the rings a hull leaves in the water under way. Slower than the net's:
+## the boat is bigger, its rings are wider, and packed any tighter they merge into a band.
+const HULL_RIPPLE := 0.22
+
 const BOW_SPRAY := 0.34
 const BOW_SPRAY_SIZE := 0.22
 
@@ -98,7 +122,7 @@ const ARRIVE_DISTANCE := 0.25
 
 ## Seconds spent alongside at each end. Long enough to read as loading and unloading rather
 ## than as a boat teleporting through its own destination.
-const DWELL := 1.1
+const DWELL := 0.7
 
 ## How far out the ferry roams when it has to go round something, as a fraction of the
 ## shore radius. Inside the waterline, outside everything else.
@@ -120,8 +144,8 @@ const ISLAND_BERTH := 2.15
 const SKIM_STEP := 0.6
 
 ## Set from the lake's upgrade levels when a run starts. Speed is in tiles per second.
-var speed: float = 3.0
-var capacity: int = 4
+var speed: float = 4.2
+var capacity: int = 6
 ## Tiles out from the hull the skimmer bites. Below zero is a boat with no skimmer fitted,
 ## which is what every ferry starts as.
 var skim_radius: int = -1
@@ -331,6 +355,11 @@ func _process(delta: float) -> void:
 
 	_place()
 	_throw_spray(delta)
+	# The wake drawn under the hull is the boat's own; this is what it leaves behind in the
+	# lake, on the same water everything else disturbs.
+	if splash != null and _under_way():
+		splash.wake(self, position + _screen_heading() * -HULL_LENGTH * 0.5,
+			HULL_WIDTH * 1.1, HULL_RIPPLE)
 	queue_redraw()
 
 
@@ -737,42 +766,90 @@ func _under_way() -> bool:
 	return state == State.SAILING or state == State.RETURNING
 
 
-## The wake: a widening wedge off the stern with ripples shedding backwards down it.
+## The wake: disturbed water off the stern with arcs shedding backwards down it.
 ##
 ## The wedge alone was still: correct in shape and dead as a photograph, which under a moving
 ## hull reads as a grey plate the boat is sitting on. What makes water look like water is
-## that it keeps arriving — so the ripples are spaced along the wedge and slid backwards with
+## that it keeps arriving — so the arcs are spaced along the wedge and slid backwards with
 ## time, each fading as it goes, and a new one appears at the stern as the last one dies.
+##
+## Everything that made the old one look machined is gone. One hard polygon has become a
+## stack of fainter ones, so the wake has no outline; the chevrons have become arcs that bow
+## back the way water peels off a hull; and every arc gets its own width, its own drift and
+## its own offset off the centreline, so no two are the same shape and the pattern never
+## repeats down the length of it. The jitter is hashed off the arc's own index rather than
+## drawn from `_rng`, because it has to be the same jitter every frame — rolled fresh, the
+## wake boils.
 func _draw_wake(half_l: float, half_w: float, along: Vector2, across: Vector2) -> void:
 	var stern := -along * half_l * 0.85
 	var length := half_l * WAKE_LONG
-	draw_colored_polygon(
-		PackedVector2Array([
-			stern + across * half_w * 0.22, stern - across * half_w * 0.22,
-			stern - along * length - across * half_w * WAKE_WIDE,
-			stern - along * length + across * half_w * WAKE_WIDE
-		]),
-		Color(1.0, 1.0, 1.0, 0.08)
-	)
+
+	# The disturbed water, as overlapping slabs rather than one wedge: each shorter and
+	# wider and fainter than the last, so the sides fray out into the lake instead of
+	# ending on a line. Off-centre by a little, because a hull throws more water one side
+	# than the other and a perfectly balanced wake is the tell that this is geometry.
+	for layer in WAKE_LAYERS:
+		var t := float(layer) / float(WAKE_LAYERS - 1)
+		var reach := length * lerpf(1.0, 0.34, t)
+		var wide := half_w * WAKE_WIDE * lerpf(0.72, 1.35, t)
+		var skew := across * half_w * 0.16 * (_wake_noise(layer, 3.1) * 2.0 - 1.0)
+		var tail := stern - along * reach + skew
+		draw_colored_polygon(
+			PackedVector2Array([
+				stern + across * half_w * 0.2,
+				stern - across * half_w * 0.2,
+				tail - across * wide,
+				tail + across * wide,
+			]),
+			Color(1.0, 1.0, 1.0, 0.035)
+		)
 
 	for i in WAKE_RIPPLES:
-		# Each ripple's own place along the wedge, sliding back and wrapping round.
-		var down := fposmod(
-			float(i) / float(WAKE_RIPPLES) + _time * WAKE_SPEED_OFF, 1.0
-		)
-		var at := stern - along * (length * down)
+		# Each arc's own place along the wedge, sliding back and wrapping round, at its own
+		# pace so the spacing between them keeps changing.
+		var pace := lerpf(1.0 - WAKE_VARY, 1.0 + WAKE_VARY, _wake_noise(i, 7.7))
+		var speed := WAKE_SPEED_OFF * pace
+		var down := fposmod(float(i) / float(WAKE_RIPPLES) + _time * speed, 1.0)
 		var wide := half_w * lerpf(0.3, WAKE_WIDE, down)
+		wide *= lerpf(1.0 - WAKE_VARY, 1.0 + WAKE_VARY, _wake_noise(i, 1.3))
+		var at := stern - along * (length * down)
+		# Off the centreline, and by a different amount at each end: this is the one thing
+		# that stops a row of arcs reading as a stencil.
+		at += across * wide * WAKE_WANDER * (_wake_noise(i, 2.9) * 2.0 - 1.0)
+		var left := wide * lerpf(1.0 - WAKE_WANDER, 1.0 + WAKE_WANDER, _wake_noise(i, 5.2))
+		var right := wide * lerpf(1.0 - WAKE_WANDER, 1.0 + WAKE_WANDER, _wake_noise(i, 8.6))
 		# Fades in off the stern and out at the tail, so neither end pops.
-		var fade := sin(down * PI) * 0.24
-		# A chevron pointing the way the boat went, which is what a wake is made of.
+		var fade := sin(down * PI) * 0.2 * lerpf(0.7, 1.2, _wake_noise(i, 4.4))
 		draw_polyline(
-			PackedVector2Array([
-				at - across * wide,
-				at + along * wide * 0.5,
-				at + across * wide
-			]),
-			Color(1.0, 1.0, 1.0, fade), 1.5
+			_wake_arc(at, along, across, left, right), Color(1.0, 1.0, 1.0, fade), 1.5
 		)
+
+
+## One arc of the wake: a curve bowing back towards the stern, longer on one side than the
+## other. Built point by point rather than as a polyline through three corners, because the
+## corners were what read as a chevron.
+func _wake_arc(
+	at: Vector2, along: Vector2, across: Vector2, left: float, right: float
+) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var steps := 8
+	for step in steps + 1:
+		# -1 at the left tip, 0 on the centreline, 1 at the right.
+		var u := lerpf(-1.0, 1.0, float(step) / float(steps))
+		var reach := left if u < 0.0 else right
+		# Squared, so the arc is flat through the middle and turns hard at the tips, which
+		# is the shape water peeling off a hull actually leaves.
+		out.append(
+			at + across * u * reach + along * (1.0 - u * u) * maxf(left, right) * WAKE_BOW
+		)
+	return out
+
+
+## Fixed noise for the wake, 0 to 1, from an arc's index and a salt. Hashed rather than
+## random: the same arc has to come out the same shape every frame it is drawn.
+func _wake_noise(i: int, salt: float) -> float:
+	var h := sin(float(i) * 12.9898 + salt * 78.233 + float(rng_seed) * 0.017) * 43758.5453
+	return fposmod(h, 1.0)
 
 
 ## The skimmer: the angler's own net, lying open on the water and trailing off the stern.

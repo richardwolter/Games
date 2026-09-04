@@ -31,6 +31,11 @@ enum State { IDLE, FLYING, SETTLED, REELING }
 ## the cast the player is meant to wait through.
 const CAST_SPEED := 26.0
 
+## Seconds between the rings a hauled net leaves behind it. Close enough that the trail
+## reads as continuous disturbance and far enough apart that the rings can be told from one
+## another as they spread.
+const DRAG_RIPPLE := 0.13
+
 ## How close to the rod counts as home, in tiles.
 const HOME_DISTANCE := 0.35
 
@@ -102,6 +107,19 @@ const CLOSE_TO := 0.3
 ## same spread.
 const CLOSE_BUNCH := 0.55
 
+## The haul does not use the drag sheet.
+##
+## Those frames are pictures of a bag held up out of the water on a line, drawn for a game
+## looking at a net from the side. Every way of laying them down — flattening them, spreading
+## them, shearing them over, capping how tall they are drawn, hanging them from somewhere
+## other than their rim — is a way of arguing with what the picture is of, and the net went
+## on rising out of the lake as it was pulled. So the haul keeps the net the cast landed:
+## the flat one lying on the water, closing by getting smaller. It is the pose the player
+## has been looking at since the splash, and it is the only one that is in the lake.
+##
+## The sheet is still loaded and still cut. `art_sheet` lends it out, and a hauled net is
+## one animation away from wanting it again.
+
 ## The drawn net. Cut from the two sheets by tools/slice_net.gd, which also measures each
 ## frame's rim — where the drawing is widest — because that is the line that belongs on the
 ## water and the width the sweep is scaled against.
@@ -123,7 +141,7 @@ const SEQUENCES := {
 	&"cast_far": {"open": -1, "flatten": [1.0, 1.0]},
 	&"cast_near": {"open": -1, "flatten": [1.0, 1.0]},
 	&"land": {"open": -1, "flatten": [1.0, 1.0]},
-	&"drag": {"open": 0, "flatten": [1.0, 0.3]},
+	&"drag": {"open": 0, "flatten": [1.0, 1.0]},
 }
 
 ## Past this fraction of the rod's reach, a throw is a far one and uses the long sequence.
@@ -146,6 +164,25 @@ const CATCH_HIDDEN := 0.5
 ## reads as a clutch of junk gathered into the middle of the mesh rather than a ring of
 ## pieces pinned round the rim.
 const CATCH_SPREAD := 0.62
+
+## How high the pile of catch may stand out of the mouth, as a fraction of the mouth's own
+## width, and how many pieces sit in one layer of it.
+##
+## A cap rather than a step per piece. Stacking a fixed distance per row is fine for the
+## three pieces the starting net holds and turns a full late-game haul into a tower of junk
+## standing a net and a half above the water, which reads as a pile the net is under rather
+## than a load it is carrying. Capping the rise means a bigger haul packs tighter instead of
+## climbing, which is what a bag of rubbish actually does.
+const CATCH_RISE := 0.34
+const CATCH_LAYER := 3
+
+## How big a piece in the mouth is drawn, and the least it shrinks to when the net is full.
+##
+## The catch has to fit in the mouth it is drawn in, and the mouth does not grow with the
+## haul — the hold does. Shrinking the pieces a little as the load grows is what keeps a
+## full net looking like a full net rather than like a heap with a net somewhere under it.
+const CATCH_SCALE := 0.7
+const CATCH_PACKED := 0.62
 
 ## How many spokes the range ring is drawn from. It is also how finely the ring follows the
 ## island and the bank, so it is a resolution rather than a smoothness.
@@ -394,11 +431,17 @@ func _process(delta: float) -> void:
 				_settled_age = 0.0
 				if splash != null:
 					splash.splash(world_pos(), 0.45)
+					# The ring the landing pushes out, on top of the crown's own: this is
+					# the one that is still spreading a second later.
+					splash.ripple(world_pos(), mouth_extent() * 1.2)
 				if sfx != null:
 					sfx.play_splash(0.45)
 		State.REELING:
 			_advance_towards(angler.tile_pos, reel_speed, delta)
 			_sweep()
+			# Dragged, not carried: the water it is pulled through keeps letting go of it.
+			if splash != null:
+				splash.wake(self, world_pos(), mouth_extent() * 0.85, DRAG_RIPPLE)
 			if tile_pos.distance_to(angler.tile_pos) < HOME_DISTANCE:
 				_come_home()
 		State.SETTLED:
@@ -536,10 +579,14 @@ func _home() -> float:
 ## at exactly the rate the picture of it does — snapped to the frame on screen, not eased
 ## past it, because the whole point is that the two are the same thing.
 func sweep_radius() -> float:
-	if shut > 0.0 and _art.has(&"drag"):
-		var frames: Array = (_art[&"drag"] as Dictionary)["frames"]
-		return radius * float((frames[_frame_at(&"drag", shut)] as Dictionary)["ratio"])
-	return radius * lerpf(1.0, CLOSE_TO, shut)
+	return radius * _purse_scale()
+
+
+## How wide the net is against its open self, from how far it has pursed. The sweep and the
+## drawing both go through this, which is what keeps the ring the player is holding and the
+## net they can see the same size.
+func _purse_scale() -> float:
+	return lerpf(1.0, CLOSE_TO, shut)
 
 
 ## The cut sheet, and one frame off it, for anything else that wants to draw a net.
@@ -600,24 +647,22 @@ func _pose() -> Array:
 			# A net that has been hauled and let go stays as it was hauled to. Only one that
 			# has never been pulled is still lying open where it landed.
 			if shut > 0.001:
-				return [&"drag", shut]
+				return [&"land", 1.0]
 			return [&"land", clampf(_settled_age / LAND_TIME, 0.0, 1.0)]
 		State.REELING:
-			# Straight to the drag: its first frame is the open net anyway, so a haul that
-			# starts the instant the net lands does not skip anything.
-			return [&"drag", closed()]
+			# The landed net, held. What closing looks like is `_draw_span` bringing it in,
+			# not another picture.
+			return [&"land", 1.0]
 	return [&"", 0.0]
 
 
-## Draw one frame of a sequence, centred on its rim at `at`.
+## How big one frame is drawn and where the water crosses it: its size in world pixels, and
+## how far down that box the surface line sits.
 ##
-## Everything is scaled off the rim rather than off the picture's box: the box is whatever
-## the artist drew round the net, and the rim is the part that has to sit on the swept
-## radius. `span` is how wide that rim should end up in world pixels.
-func _draw_frame(name: StringName, through: float, at: Vector2, span: float, tint: Color) -> void:
-	var frames: Array = (_art[name] as Dictionary)["frames"]
-	var index := _frame_at(name, through)
-	var frame: Dictionary = frames[index]
+## One place, because the drawing, the line's end and the catch all have to agree about it
+## and they were each working it out again. `span` is how wide the rim should end up.
+func _frame_box(name: StringName, index: int, span: float) -> Array:
+	var frame: Dictionary = (_art[name] as Dictionary)["frames"][index]
 	var region: Rect2 = frame["region"]
 
 	# Sized so the rim lands where the frame says it should: `span` wide at full open, and
@@ -625,7 +670,19 @@ func _draw_frame(name: StringName, through: float, at: Vector2, span: float, tin
 	# straight from the pixels is what lets one sequence hold frames off both sheets.
 	var scale := span * float(frame["ratio"]) / maxf(float(frame["rim"]), 1.0)
 	var size := Vector2(region.size.x * scale, region.size.y * scale * _squash(name, index))
-	var hang := Vector2(size.x * 0.5, size.y * float(frame["hang"]))
+	return [size, float(frame["hang"])]
+
+
+## Draw one frame of a sequence, with the water crossing it where `_frame_box` says.
+func _draw_frame(name: StringName, through: float, at: Vector2, span: float, tint: Color) -> void:
+	var index := _frame_at(name, through)
+	var box := _frame_box(name, index, span)
+	var size: Vector2 = box[0]
+	var region: Rect2 = (_art[name] as Dictionary)["frames"][index]["region"]
+
+	# Centred on the mouth: the mouth is what the sweep is measured from, so the drawing
+	# sits over it rather than off to one side of it.
+	var hang := Vector2(size.x * 0.5, size.y * float(box[1]))
 	draw_texture_rect_region(_sheet, Rect2(at - hang, size), region, tint)
 
 
@@ -642,31 +699,27 @@ func _squash(name: StringName, index: int) -> float:
 	return lerpf(float(flatten[0]), float(flatten[1]), sqrt(through))
 
 
-## Where the line from the rod meets the net: the top of the bag once it is hanging off
-## one, and the middle of the mouth while it is still lying open on the water.
+## Where the line from the rod meets the net: the top of the picture, which on a hauled net
+## is the top of the bag standing out of the water and on a landed one is the near edge of
+## a mouth lying flat in it.
 func _line_end(at: Vector2) -> Vector2:
 	return at - Vector2(0.0, _frame_height() * _hang_of(_pose()))
 
 
-## How tall the frame showing right now is drawn, in world pixels, and where its rim sits
-## in it. Both come up wherever something has to be placed against the picture rather than
-## against the water — the top of the bag for the line, the inside of it for the catch.
+## How tall the frame showing right now is drawn, in world pixels, and how far down it the
+## water sits. Both come up wherever something has to be placed against the picture rather
+## than against the lake — the top of the bag for the line, the inside of it for the catch.
 func _frame_height() -> float:
 	var pose := _pose()
 	if pose[0] == &"":
 		return 0.0
-	var index := _frame_at(pose[0], pose[1])
-	var frame: Dictionary = (_art[pose[0]] as Dictionary)["frames"][index]
-	var region: Rect2 = frame["region"]
-	var scale := _draw_span() * float(frame["ratio"]) / maxf(float(frame["rim"]), 1.0)
-	return region.size.y * scale * _squash(pose[0], index)
+	return float(_frame_box(pose[0], _frame_at(pose[0], pose[1]), _draw_span())[0].y)
 
 
 func _hang_of(pose: Array) -> float:
 	if pose[0] == &"":
 		return 0.0
-	var frame: Dictionary = (_art[pose[0]] as Dictionary)["frames"][_frame_at(pose[0], pose[1])]
-	return float(frame["hang"])
+	return float(_frame_box(pose[0], _frame_at(pose[0], pose[1]), _draw_span())[1])
 
 
 ## How far the mouth reaches on screen, along its long axis. Derived from the radius the
@@ -690,7 +743,7 @@ func open_extent() -> float:
 ## against the picture goes through this, so the net, the line's end and the catch inside it
 ## all shrink together instead of coming apart at the last stride.
 func _draw_span() -> float:
-	return open_extent() * 2.0 * lerpf(1.0, HOME_SIZE, near)
+	return open_extent() * 2.0 * _purse_scale() * lerpf(1.0, HOME_SIZE, near)
 
 
 ## A point pulled inside the net's mouth, along the line from the mouth's middle. Points
@@ -841,29 +894,30 @@ func _draw() -> void:
 	# because the art draws its own hanging line up there and meeting it is free.
 	var end := _line_end(at) if drawn != &"" else at
 	var line := PackedVector2Array()
-	var sag := minf(tip.distance_to(end) * 0.12, 26.0)
+	# The sag is the slack line's, and a line under a haul has no slack in it: it comes taut
+	# and straight the moment the player starts pulling, which is also what stops it reading
+	# as a cable strung through the air over a net hanging off it.
+	var sag := minf(tip.distance_to(end) * 0.12, 26.0) * (1.0 - shut)
 	for i in 13:
 		var t := float(i) / 12.0
 		line.append(tip.lerp(end, t) + Vector2(0.0, sin(t * PI) * sag))
 	draw_polyline(line, Color(0.90, 0.92, 0.88, 0.75), 1.5)
 
-	# The catch goes under the net while it is being hauled: the whole read of a closing
-	# net is that the junk is inside it, and junk drawn over the mesh is junk sitting on
-	# top of a picture of a net. Open on the water it goes over, where it can be seen.
-	if shut > 0.0 and drawn != &"":
-		# Up into the body of the bag rather than down past its weights: the junk is what
-		# the net is holding, so it belongs in the tube above the rim it hangs from.
-		_draw_catch(
-			at - Vector2(0.0, _frame_height() * CATCH_INSIDE * shut),
-			mouth * lerpf(1.0, HOME_SIZE, near)
-		)
+	# The catch always goes under the net, open mouth or closed bag. The whole read of a
+	# netted load is that the junk is inside the mesh, and junk drawn over the mesh is junk
+	# sitting on top of a picture of a net — which is what a landed net used to look like.
+	# The drawing is a line net over a keyed mask, so what is behind it still shows through.
+	#
+	# Up into the body of the bag rather than down past its weights: the junk is what the
+	# net is holding, so it belongs in the tube above the rim it hangs from.
+	_draw_catch(
+		at - Vector2(0.0, _frame_height() * CATCH_INSIDE * shut),
+		mouth * lerpf(1.0, HOME_SIZE, near)
+	)
+	if drawn != &"":
 		_draw_net(drawn, pose[1], at, mouth, ink)
 	else:
-		if drawn != &"":
-			_draw_net(drawn, pose[1], at, mouth, ink)
-		else:
-			_draw_mesh(at, mouth, ink)
-		_draw_catch(at, mouth)
+		_draw_mesh(at, mouth, ink)
 
 
 ## The net itself. One frame of whichever sequence it is in, tinted to the lake's ink: the
@@ -901,6 +955,14 @@ func _draw_catch(at: Vector2, mouth: float) -> void:
 	if catch.is_empty() or grid == null:
 		return
 	_scatter.seed = 20707
+	# The pile is packed into the mouth rather than stacked out of it: however many pieces
+	# are aboard, they share the same cap of headroom and are drawn a little smaller as the
+	# load grows. A haul is a bulging net, not a column.
+	var layers := ceili(float(catch.size()) / float(CATCH_LAYER))
+	var step := mouth * CATCH_RISE / float(maxi(layers, 1))
+	var packed := CATCH_SCALE * clampf(
+		sqrt(float(CATCH_LAYER * 2) / float(maxi(catch.size(), 1))), CATCH_PACKED, 1.0
+	)
 	var spots: Array[Vector2] = []
 	for i in catch.size():
 		var angle := _scatter.randf_range(0.0, TAU)
@@ -909,7 +971,7 @@ func _draw_catch(at: Vector2, mouth: float) -> void:
 		var out := sqrt(_scatter.randf()) * CATCH_SPREAD * lerpf(1.0, CLOSE_BUNCH, shut)
 		spots.append(
 			at + Vector2(cos(angle) * mouth, sin(angle) * mouth * 0.5) * out
-			- Vector2(0.0, float(i / 3) * lerpf(3.0, 5.0, shut))
+			- Vector2(0.0, float(i / CATCH_LAYER) * step)
 		)
 	var order: Array[int] = []
 	for i in catch.size():
@@ -917,6 +979,6 @@ func _draw_catch(at: Vector2, mouth: float) -> void:
 	order.sort_custom(func(a: int, b: int) -> bool: return spots[a].y < spots[b].y)
 	var seen := lerpf(1.0, CATCH_HIDDEN, shut)
 	for i in order:
-		draw_set_transform(spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(0.7, 0.7))
+		draw_set_transform(spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(packed, packed))
 		grid.defs[catch[i]].stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
