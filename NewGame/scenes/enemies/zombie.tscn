@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://iqu6t0o3p6r9a"]
+
+[ext_resource type="Script" path="res://scenes/enemies/zombie.gd" id="1_zombie"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_zombie"]
+radius = 14.0
+
+[node name="Zombie" type="Area2D"]
+script = ExtResource("1_zombie")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_zombie")

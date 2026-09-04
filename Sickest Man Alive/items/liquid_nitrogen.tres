@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="Item" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"statuses"
+target = 0
+phase = 2
+op = 3
+value = {
+"freeze": 1.0
+}
+id = &"nitrogen_freeze"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"trail_enabled"
+target = 0
+phase = 2
+op = 2
+value = true
+id = &"nitrogen_trail"
+
+[sub_resource type="Resource" id="mod_3"]
+script = ExtResource("2_mod")
+stat = &"trail_length"
+target = 0
+phase = 0
+op = 0
+value = 10
+id = &"nitrogen_trail_len"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"tint"
+target = 0
+phase = 3
+op = 4
+value = Color(0.45, 0.8, 1.0, 1)
+id = &"nitrogen_tint"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Liquid Nitrogen"
+description = "Shots freeze the small ones solid and bog the big ones down."
+pedestal_color = Color(0.45, 0.8, 1.0, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_3"), SubResource("mod_2")])

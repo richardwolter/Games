@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AttackStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/attack_stats.gd" id="1_attack"]
+
+[resource]
+script = ExtResource("1_attack")
+damage = 5.0
+knockback = 240.0
+crit_chance = 0.05
+crit_multiplier = 2.0
+attack_rate = 1.8
+arc_degrees = 118.0
+reach = 132.0
+swing_time = 0.14
+statuses = {}
+tint = Color(1, 0.55, 0.5, 1)

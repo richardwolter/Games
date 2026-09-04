@@ -1,0 +1,43 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/enemy.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://src/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Shader" path="res://src/enemy_body.gdshader" id="3_body"]
+[ext_resource type="Texture2D" path="res://art/enemies/virus.png" id="4_virus"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_enemy"]
+shader = ExtResource("3_body")
+shader_parameter/damage = 0.0
+shader_parameter/flash = 0.0
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/status_tint = Color(0.6, 0.2, 0.8, 1)
+shader_parameter/status_amount = 0.0
+shader_parameter/cell_scale = 6.5
+shader_parameter/chip_start = 0.62
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 13.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 13.0
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 16
+script = ExtResource("1_enemy")
+
+[node name="Art" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_enemy")
+texture = ExtResource("4_virus")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Hurtbox" type="Area2D" parent="." groups=["enemies"]]
+collision_layer = 2
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")

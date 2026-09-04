@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="Item" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"shot_count"
+target = 0
+phase = 0
+op = 0
+value = 2
+id = &"split_count"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"damage"
+target = 0
+phase = 1
+op = 1
+value = 0.7
+id = &"split_damage"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"spread_degrees"
+target = 0
+phase = 2
+op = 2
+value = 16.0
+id = &"split_spread"
+
+[sub_resource type="Resource" id="mod_3"]
+script = ExtResource("2_mod")
+stat = &"tint"
+target = 0
+phase = 3
+op = 4
+value = Color(0.45, 0.95, 0.5, 1)
+id = &"split_tint"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Split Dose"
+description = "Three needles per press, each one weaker."
+pedestal_color = Color(0.5, 0.95, 0.55, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_2"), SubResource("mod_3")])

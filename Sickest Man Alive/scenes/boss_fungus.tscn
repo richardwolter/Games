@@ -1,0 +1,65 @@
+[gd_scene load_steps=7 format=3]
+
+; The bloom: a fungus grown past the point of being one creature. It braces and
+; fires a beam down the line it braced along, and it seeds smaller fungi that
+; fight exactly like the ordinary bestiary ones.
+;
+; Both of those arrive with src/boss_fungus.gd. Until then this runs the plain
+; CHARGER off src/enemy.gd -- the bracing rhythm the beam will be hung on is
+; already that behaviour, so the fight is recognisable from the first commit and
+; the script swap changes what the windup RELEASES, not what it looks like.
+
+[ext_resource type="Script" path="res://src/enemy.gd" id="1_fungus"]
+[ext_resource type="Script" path="res://src/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Shader" path="res://src/enemy_body.gdshader" id="3_body"]
+[ext_resource type="Texture2D" path="res://art/enemies/fungus.png" id="4_fungus"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fungus"]
+shader = ExtResource("3_body")
+shader_parameter/damage = 0.0
+shader_parameter/flash = 0.0
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/status_tint = Color(0.6, 0.2, 0.8, 1)
+shader_parameter/status_amount = 0.0
+shader_parameter/cell_scale = 9.0
+shader_parameter/chip_start = 0.72
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_fungus"]
+radius = 46.0
+
+[node name="BossFungus" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 16
+script = ExtResource("1_fungus")
+behavior = 2
+max_health = 420.0
+move_speed = 44.0
+charge_windup = 0.8
+charge_time = 0.5
+charge_rest = 1.6
+charge_speed_mult = 4.5
+charge_range = 620.0
+contact_damage = 1.0
+radius = 46.0
+body_color = Color(0.78, 0.92, 0.7, 1)
+art_facing = 1.0
+sprite_height = 230.0
+flash_strength = 0.14
+is_large = true
+dna_value = 20
+
+[node name="Art" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_fungus")
+texture = ExtResource("4_fungus")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_fungus")
+
+[node name="Hurtbox" type="Area2D" parent="." groups=["enemies"]]
+collision_layer = 2
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_fungus")

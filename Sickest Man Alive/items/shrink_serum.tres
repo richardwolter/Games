@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="Item" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"max_health"
+target = 3
+phase = 0
+op = 0
+value = -1
+id = &"shrink_hp"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"size_scale"
+target = 3
+phase = 1
+op = 1
+value = 0.7
+id = &"shrink_size"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"move_speed"
+target = 3
+phase = 1
+op = 1
+value = 1.25
+id = &"shrink_speed"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Shrink Serum"
+description = "The suit drops a size. Faster, smaller, one less heart."
+pedestal_color = Color(0.7, 0.5, 0.95, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_2")])

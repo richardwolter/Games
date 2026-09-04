@@ -1,0 +1,57 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/boss.gd" id="1_boss"]
+[ext_resource type="Script" path="res://src/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Resource" path="res://config/boss_shot.tres" id="3_shot"]
+[ext_resource type="Shader" path="res://src/enemy_body.gdshader" id="4_body"]
+[ext_resource type="Texture2D" path="res://art/enemies/worm.png" id="5_worm"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_boss"]
+shader = ExtResource("4_body")
+shader_parameter/damage = 0.0
+shader_parameter/flash = 0.0
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/status_tint = Color(0.6, 0.2, 0.8, 1)
+shader_parameter/status_amount = 0.0
+shader_parameter/cell_scale = 9.0
+shader_parameter/chip_start = 0.72
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 40.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 40.0
+
+[node name="Boss" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 16
+script = ExtResource("1_boss")
+max_health = 460.0
+move_speed = 52.0
+contact_damage = 1.0
+radius = 40.0
+body_color = Color(0.85, 0.62, 0.72, 1)
+art_facing = 1.0
+sprite_height = 210.0
+flash_strength = 0.14
+is_large = true
+dna_value = 20
+shot_stats = ExtResource("3_shot")
+ring_count = 14
+shot_interval = 1.15
+
+[node name="Art" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_boss")
+texture = ExtResource("5_worm")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Hurtbox" type="Area2D" parent="." groups=["enemies"]]
+collision_layer = 2
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")

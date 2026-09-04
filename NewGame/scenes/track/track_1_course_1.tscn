@@ -1,0 +1,157 @@
+[gd_scene load_steps=16 format=3 uid="uid://fqs4r7l0m3o6x"]
+
+[ext_resource type="Script" path="res://scenes/track/track_manager.gd" id="1_manager"]
+[ext_resource type="PackedScene" path="res://scenes/track/checkpoint.tscn" id="2_checkpoint"]
+[ext_resource type="PackedScene" path="res://scenes/track/goal_zone.tscn" id="3_goal"]
+[ext_resource type="PackedScene" path="res://scenes/charging/charging_station.tscn" id="4_station"]
+[ext_resource type="PackedScene" path="res://scenes/hud/game_hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/zombie.tscn" id="6_zombie"]
+[ext_resource type="Script" path="res://scenes/iso/iso_ground.gd" id="7_ground"]
+[ext_resource type="Texture2D" path="res://art/generated/road_tile.png" id="8_roadtex"]
+[ext_resource type="Script" path="res://scenes/track/track_camera.gd" id="9_camera"]
+[ext_resource type="PackedScene" path="res://scenes/track/prop_fence.tscn" id="10_fence"]
+[ext_resource type="PackedScene" path="res://scenes/track/prop_tree.tscn" id="11_tree"]
+[ext_resource type="PackedScene" path="res://scenes/track/prop_barrel.tscn" id="12_barrel"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_topwall"]
+size = Vector2(2400, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_botwall"]
+size = Vector2(2400, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_endwall"]
+size = Vector2(20, 220)
+
+[node name="Track1Course1" type="Node2D"]
+script = ExtResource("1_manager")
+car_start_position = Vector2(60, 0)
+track_id = "track_1"
+course_id = "course_1"
+spark_reward = 50
+
+[node name="IsoWorld" type="Node2D" parent="."]
+
+[node name="Ground" type="Node2D" parent="IsoWorld"]
+script = ExtResource("7_ground")
+tile_texture = ExtResource("8_roadtex")
+track_start_x = 0.0
+track_end_x = 2400.0
+corridor_half_width = 110.0
+
+[node name="Actors" type="Node2D" parent="IsoWorld" groups=["iso_actors"]]
+y_sort_enabled = true
+
+[node name="Fence1" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(150, -150)
+
+[node name="Fence2" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(450, -150)
+
+[node name="Fence3" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(750, -150)
+
+[node name="Fence4" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(1050, -150)
+
+[node name="Fence5" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(1350, -150)
+
+[node name="Fence6" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(1650, -150)
+
+[node name="Fence7" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(1950, -150)
+
+[node name="Fence8" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(2250, -150)
+
+[node name="Fence9" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(300, 150)
+
+[node name="Fence10" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(900, 150)
+
+[node name="Fence11" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(1500, 150)
+
+[node name="Fence12" parent="IsoWorld/Actors" instance=ExtResource("10_fence")]
+world_position = Vector2(2100, 150)
+
+[node name="Tree1" parent="IsoWorld/Actors" instance=ExtResource("11_tree")]
+world_position = Vector2(500, -170)
+
+[node name="Tree2" parent="IsoWorld/Actors" instance=ExtResource("11_tree")]
+world_position = Vector2(1200, 170)
+
+[node name="Tree3" parent="IsoWorld/Actors" instance=ExtResource("11_tree")]
+world_position = Vector2(2000, -170)
+
+[node name="Barrel1" parent="IsoWorld/Actors" instance=ExtResource("12_barrel")]
+world_position = Vector2(800, 170)
+
+[node name="Barrel2" parent="IsoWorld/Actors" instance=ExtResource("12_barrel")]
+world_position = Vector2(1700, -170)
+
+[node name="TrackCamera" type="Camera2D" parent="."]
+script = ExtResource("9_camera")
+zoom = Vector2(1.4, 1.4)
+position_smoothing_enabled = true
+position_smoothing_speed = 6.0
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="TopWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(1100, -110)
+
+[node name="TopWallShape" type="CollisionShape2D" parent="Walls/TopWall"]
+shape = SubResource("RectangleShape2D_topwall")
+
+[node name="BottomWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(1100, 110)
+
+[node name="BottomWallShape" type="CollisionShape2D" parent="Walls/BottomWall"]
+shape = SubResource("RectangleShape2D_botwall")
+
+[node name="EndWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(2300, 0)
+
+[node name="EndWallShape" type="CollisionShape2D" parent="Walls/EndWall"]
+shape = SubResource("RectangleShape2D_endwall")
+
+[node name="Checkpoint1" parent="." instance=ExtResource("2_checkpoint")]
+position = Vector2(600, 0)
+checkpoint_index = 0
+
+[node name="Checkpoint2" parent="." instance=ExtResource("2_checkpoint")]
+position = Vector2(1300, 0)
+checkpoint_index = 1
+
+[node name="Checkpoint3" parent="." instance=ExtResource("2_checkpoint")]
+position = Vector2(1900, 0)
+checkpoint_index = 2
+
+[node name="ChargingStation1" parent="." instance=ExtResource("4_station")]
+position = Vector2(950, 60)
+station_id = "station_1"
+charge_rate_base = 10.0
+
+[node name="GoalZone" parent="." instance=ExtResource("3_goal")]
+position = Vector2(2250, 0)
+
+[node name="Zombie1" parent="." instance=ExtResource("6_zombie")]
+position = Vector2(350, -20)
+wander_range = 40.0
+
+[node name="Zombie2" parent="." instance=ExtResource("6_zombie")]
+position = Vector2(820, 30)
+wander_range = 50.0
+
+[node name="Zombie3" parent="." instance=ExtResource("6_zombie")]
+position = Vector2(1600, -10)
+wander_range = 45.0
+
+[node name="Zombie4" parent="." instance=ExtResource("6_zombie")]
+position = Vector2(2050, 20)
+wander_range = 40.0
+
+[node name="GameHUD" parent="." instance=ExtResource("5_hud")]

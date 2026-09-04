@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="Item" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"scale_mult"
+target = 0
+phase = 1
+op = 1
+value = 1.45
+id = &"broken_scale"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"speed"
+target = 0
+phase = 1
+op = 1
+value = 1.35
+id = &"broken_speed"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"spread_random"
+target = 0
+phase = 0
+op = 0
+value = 11.0
+id = &"broken_spread"
+
+[sub_resource type="Resource" id="mod_3"]
+script = ExtResource("2_mod")
+stat = &"tint"
+target = 0
+phase = 3
+op = 4
+value = Color(0.85, 0.75, 0.5, 1)
+id = &"broken_tint"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Broken Needle"
+description = "Bigger, faster shots out of a bent needle. It no longer goes where you point it."
+pedestal_color = Color(0.85, 0.75, 0.5, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_2"), SubResource("mod_3")])

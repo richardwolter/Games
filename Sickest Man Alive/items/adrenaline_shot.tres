@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="Item" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"attack_rate"
+target = 2
+phase = 1
+op = 1
+value = 1.4
+id = &"adrenaline_rate"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"move_speed"
+target = 3
+phase = 1
+op = 1
+value = 1.15
+id = &"adrenaline_speed"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"tint"
+target = 0
+phase = 3
+op = 4
+value = Color(0.98, 0.9, 0.25, 1)
+id = &"adrenaline_tint"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Adrenaline Shot"
+description = "Everything speeds up. Both weapons, and you."
+pedestal_color = Color(0.95, 0.85, 0.25, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_2")])

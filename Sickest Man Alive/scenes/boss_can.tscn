@@ -1,0 +1,73 @@
+[gd_scene load_steps=6 format=3]
+
+; The pressurised infection: an aerosol can the size of a room fitting, running
+; the ordinary ROLLER cycle at boss scale. No script of its own -- Enemy's
+; walk/tip/roll/rise/spray machine already IS this fight, and a subclass would
+; only be a second copy of numbers that belong in the inspector.
+;
+; It is drawn rather than textured (Enemy hides the sprite for ROLLER and paints
+; the can in _draw_can), so the Art node exists purely to carry the shader
+; material -- Enemy._ready duplicates it for the hit flash and the crack state
+; and would crash on a node without one.
+
+[ext_resource type="Script" path="res://src/enemy.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://src/hurtbox.gd" id="2_hurtbox"]
+[ext_resource type="Shader" path="res://src/enemy_body.gdshader" id="3_body"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_can"]
+shader = ExtResource("3_body")
+shader_parameter/damage = 0.0
+shader_parameter/flash = 0.0
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/status_tint = Color(0.6, 0.2, 0.8, 1)
+shader_parameter/status_amount = 0.0
+shader_parameter/cell_scale = 9.0
+shader_parameter/chip_start = 0.72
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_can"]
+radius = 60.0
+
+[node name="BossCan" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 16
+script = ExtResource("1_enemy")
+behavior = 5
+max_health = 400.0
+move_speed = 64.0
+contact_damage = 2.0
+radius = 60.0
+body_color = Color(1, 1, 1, 1)
+art_facing = 0.0
+sprite_height = 272.0
+flash_strength = 0.14
+is_large = true
+dna_value = 20
+can_size = Vector2(122, 272)
+can_body = Color(0.78, 0.55, 0.5, 1)
+can_cap = Color(0.85, 0.24, 0.2, 1)
+roll_walk_time = 1.1
+roll_tip_time = 0.36
+roll_time = 2.1
+roll_rise_time = 0.4
+roll_spray_time = 1.6
+roll_walk_mult = 0.5
+roll_speed_mult = 2.9
+roll_fume_life = 7.0
+roll_fume_interval = 0.08
+roll_shove = 1500.0
+roll_shove_range = 170.0
+
+[node name="Art" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_can")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_can")
+
+[node name="Hurtbox" type="Area2D" parent="." groups=["enemies"]]
+collision_layer = 2
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_can")

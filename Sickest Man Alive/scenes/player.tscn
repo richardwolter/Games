@@ -1,0 +1,49 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://src/player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/rigs/kid.tscn" id="9_rig"]
+[ext_resource type="Script" path="res://src/loadout.gd" id="2_loadout"]
+[ext_resource type="Script" path="res://src/weapon_ranged.gd" id="3_ranged"]
+[ext_resource type="Script" path="res://src/weapon_melee.gd" id="4_melee"]
+[ext_resource type="Script" path="res://src/hurtbox.gd" id="5_hurtbox"]
+[ext_resource type="Resource" path="res://config/base_ranged.tres" id="6_base_ranged"]
+[ext_resource type="Resource" path="res://config/base_melee.tres" id="7_base_melee"]
+[ext_resource type="Resource" path="res://config/base_player.tres" id="8_base_player"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 14.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 14.0
+
+[node name="Player" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 16
+script = ExtResource("1_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Rig" parent="." instance=ExtResource("9_rig")]
+position = Vector2(0, 16)
+
+[node name="Loadout" type="Node" parent="."]
+script = ExtResource("2_loadout")
+base_ranged = ExtResource("6_base_ranged")
+base_melee = ExtResource("7_base_melee")
+base_player = ExtResource("8_base_player")
+
+[node name="WeaponRanged" type="Node2D" parent="."]
+script = ExtResource("3_ranged")
+
+[node name="WeaponMelee" type="Node2D" parent="."]
+script = ExtResource("4_melee")
+
+[node name="Hurtbox" type="Area2D" parent="." groups=["player"]]
+collision_layer = 1
+collision_mask = 0
+monitoring = false
+script = ExtResource("5_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")

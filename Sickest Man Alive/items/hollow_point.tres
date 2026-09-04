@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="Item" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/item.gd" id="1_item"]
+[ext_resource type="Script" path="res://src/stat_modifier.gd" id="2_mod"]
+
+[sub_resource type="Resource" id="mod_0"]
+script = ExtResource("2_mod")
+stat = &"pierce_count"
+target = 0
+phase = 0
+op = 0
+value = 2
+id = &"hollow_pierce"
+
+[sub_resource type="Resource" id="mod_1"]
+script = ExtResource("2_mod")
+stat = &"scale_mult"
+target = 0
+phase = 1
+op = 1
+value = 0.8
+id = &"hollow_scale"
+
+[sub_resource type="Resource" id="mod_2"]
+script = ExtResource("2_mod")
+stat = &"tint"
+target = 0
+phase = 3
+op = 4
+value = Color(0.75, 0.95, 1.0, 1)
+id = &"hollow_tint"
+
+[resource]
+script = ExtResource("1_item")
+display_name = "Hollow Point"
+description = "Smaller needle, goes through two more of them."
+pedestal_color = Color(0.6, 0.85, 0.95, 1)
+modifiers = Array[ExtResource("2_mod")]([SubResource("mod_0"), SubResource("mod_1"), SubResource("mod_2")])

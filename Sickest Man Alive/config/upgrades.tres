@@ -1,0 +1,188 @@
+[gd_resource type="Resource" script_class="UpgradeTable" format=3 uid="uid://b1pwlb5iybaqd"]
+
+[ext_resource type="Script" uid="uid://crhxndgw38bxw" path="res://src/upgrade_table.gd" id="1_table"]
+[ext_resource type="Script" uid="uid://cuj3iciucrfve" path="res://src/item_upgrades.gd" id="2_entry"]
+[ext_resource type="Script" uid="uid://ulp5olip0dv0" path="res://src/upgrade_level.gd" id="3_level"]
+[ext_resource type="Script" uid="uid://c0vgt6uhr67sa" path="res://src/stat_modifier.gd" id="4_mod"]
+
+[sub_resource type="Resource" id="Resource_t51bt"]
+script = ExtResource("4_mod")
+stat = &"pierce_count"
+value = 1
+id = &"hollow_point_u1_pierce_count_0"
+
+[sub_resource type="Resource" id="Resource_hmksd"]
+script = ExtResource("3_level")
+summary = "The needle goes through +1 enemy"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_t51bt")])
+
+[sub_resource type="Resource" id="Resource_b84kr"]
+script = ExtResource("4_mod")
+phase = 1
+op = 1
+value = 1.25
+id = &"hollow_point_u2_damage_0"
+
+[sub_resource type="Resource" id="Resource_xoxqn"]
+script = ExtResource("3_level")
+summary = "A quarter more damage out of the syringe."
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_b84kr")])
+
+[sub_resource type="Resource" id="Resource_irn23"]
+script = ExtResource("4_mod")
+stat = &"statuses"
+phase = 2
+op = 3
+value = {
+"poison": 1.0
+}
+id = &"hollow_point_u3_statuses_0"
+
+[sub_resource type="Resource" id="Resource_v2nv1"]
+script = ExtResource("3_level")
+summary = "The hollow needle carries something in it now: shots poison."
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_irn23")])
+
+[sub_resource type="Resource" id="entry_hollow_point"]
+script = ExtResource("2_entry")
+item_path = "res://items/hollow_point.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_hmksd"), SubResource("Resource_xoxqn"), SubResource("Resource_v2nv1")])
+
+[sub_resource type="Resource" id="Resource_o8057"]
+script = ExtResource("4_mod")
+value = 1.0
+id = &"rusty_needle_u1_damage_0"
+
+[sub_resource type="Resource" id="Resource_ab64s"]
+script = ExtResource("3_level")
+summary = "Increase Damage +1"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_o8057")])
+
+[sub_resource type="Resource" id="entry_rusty_needle"]
+script = ExtResource("2_entry")
+item_path = "res://items/rusty_needle.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_ab64s")])
+
+[sub_resource type="Resource" id="Resource_pbbok"]
+script = ExtResource("4_mod")
+stat = &"reach"
+value = 3.0
+id = &"adrenaline_shot_u1_reach_0"
+
+[sub_resource type="Resource" id="Resource_0cvko"]
+script = ExtResource("3_level")
+summary = "Increase range +3"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_pbbok")])
+
+[sub_resource type="Resource" id="Resource_uvmfk"]
+script = ExtResource("2_entry")
+item_path = "res://items/adrenaline_shot.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_0cvko")])
+
+[sub_resource type="Resource" id="Resource_7m13e"]
+script = ExtResource("4_mod")
+value = 1.0
+id = &"split_dose_u1_damage_0"
+
+[sub_resource type="Resource" id="Resource_whwlg"]
+script = ExtResource("3_level")
+summary = "Increased damage +1"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_7m13e")])
+
+[sub_resource type="Resource" id="Resource_grxd2"]
+script = ExtResource("2_entry")
+item_path = "res://items/split_dose.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_whwlg")])
+
+[sub_resource type="Resource" id="Resource_v81xb"]
+script = ExtResource("4_mod")
+stat = &"reach"
+target = 1
+id = &"scalpel_grind_u1_reach_0"
+
+[sub_resource type="Resource" id="Resource_xjnx1"]
+script = ExtResource("3_level")
+summary = "Increase range +2"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_v81xb")])
+
+[sub_resource type="Resource" id="Resource_61b53"]
+script = ExtResource("2_entry")
+item_path = "res://items/scalpel_grind.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_xjnx1")])
+
+[sub_resource type="Resource" id="Resource_3okvl"]
+script = ExtResource("2_entry")
+item_path = "res://items/shrink_serum.tres"
+
+[sub_resource type="Resource" id="Resource_v2vws"]
+script = ExtResource("4_mod")
+stat = &"max_health"
+target = 3
+value = 2
+id = &"arm_mutation_u1_max_health_0"
+
+[sub_resource type="Resource" id="Resource_4cp8c"]
+script = ExtResource("3_level")
+summary = "Increase Health +2"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_v2vws")])
+
+[sub_resource type="Resource" id="Resource_sd2ws"]
+script = ExtResource("2_entry")
+item_path = "res://items/arm_mutation.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_4cp8c")])
+
+[sub_resource type="Resource" id="Resource_8rhhw"]
+script = ExtResource("4_mod")
+stat = &"speed"
+target = 1
+id = &"scalpelrang_u1_speed_0"
+
+[sub_resource type="Resource" id="Resource_1r3d6"]
+script = ExtResource("3_level")
+summary = "Increase Scalpelrang Speed +2"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_8rhhw")])
+
+[sub_resource type="Resource" id="Resource_6b1ot"]
+script = ExtResource("2_entry")
+item_path = "res://items/scalpelrang.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_1r3d6")])
+
+[sub_resource type="Resource" id="Resource_ctltt"]
+script = ExtResource("4_mod")
+value = 2.0
+id = &"broken_needle_u1_damage_0"
+
+[sub_resource type="Resource" id="Resource_qvkdb"]
+script = ExtResource("3_level")
+summary = "Increase Damage +2"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_ctltt")])
+
+[sub_resource type="Resource" id="Resource_sd2lh"]
+script = ExtResource("2_entry")
+item_path = "res://items/broken_needle.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_qvkdb")])
+
+[sub_resource type="Resource" id="Resource_smodp"]
+script = ExtResource("4_mod")
+stat = &"statuses"
+target = 1
+phase = 2
+op = 3
+value = {
+"freeze": 1.0
+}
+id = &"liquid_nitrogen_u1_statuses_0"
+
+[sub_resource type="Resource" id="Resource_m1y4v"]
+script = ExtResource("3_level")
+summary = "Attacks apply freeze +1"
+modifiers = Array[ExtResource("4_mod")]([SubResource("Resource_smodp")])
+
+[sub_resource type="Resource" id="Resource_angij"]
+script = ExtResource("2_entry")
+item_path = "res://items/liquid_nitrogen.tres"
+levels = Array[ExtResource("3_level")]([SubResource("Resource_m1y4v")])
+
+[resource]
+script = ExtResource("1_table")
+entries = Array[ExtResource("2_entry")]([SubResource("entry_hollow_point"), SubResource("entry_rusty_needle"), SubResource("Resource_uvmfk"), SubResource("Resource_grxd2"), SubResource("Resource_61b53"), SubResource("Resource_3okvl"), SubResource("Resource_sd2ws"), SubResource("Resource_6b1ot"), SubResource("Resource_sd2lh"), SubResource("Resource_angij")])

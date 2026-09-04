@@ -1,0 +1,155 @@
+﻿{
+    "source":  "art/kid.png",
+    "source_size":  [
+                        515,
+                        989
+                    ],
+    "parts":  [
+                  {
+                      "name":  "leg_r",
+                      "file":  "leg_r.png",
+                      "size":  [
+                                   187,
+                                   396
+                               ],
+                      "pivot":  [
+                                    60.1,
+                                    32.0
+                                ],
+                      "anchor":  [
+                                     296.1,
+                                     625.0
+                                 ],
+                      "parent":  "torso",
+                      "z":  0
+                  },
+                  {
+                      "name":  "leg_l",
+                      "file":  "leg_l.png",
+                      "size":  [
+                                   197,
+                                   396
+                               ],
+                      "pivot":  [
+                                    116.7,
+                                    32.0
+                                ],
+                      "anchor":  [
+                                     177.7,
+                                     625.0
+                                 ],
+                      "parent":  "torso",
+                      "z":  1
+                  },
+                  {
+                      "name":  "arm_r",
+                      "file":  "arm_r.png",
+                      "size":  [
+                                   150,
+                                   416
+                               ],
+                      "pivot":  [
+                                    13.5,
+                                    39.9
+                                ],
+                      "anchor":  [
+                                     378.5,
+                                     365.9
+                                 ],
+                      "parent":  "torso",
+                      "z":  2
+                  },
+                  {
+                      "name":  "torso",
+                      "file":  "torso.png",
+                      "size":  [
+                                   449,
+                                   624
+                               ],
+                      "pivot":  [
+                                    180.8,
+                                    529.1
+                                ],
+                      "anchor":  [
+                                     231.8,
+                                     618.1
+                                 ],
+                      "parent":  "root",
+                      "z":  3
+                  },
+                  {
+                      "name":  "arm_l",
+                      "file":  "arm_l.png",
+                      "size":  [
+                                   147,
+                                   416
+                               ],
+                      "pivot":  [
+                                    115.9,
+                                    39.9
+                                ],
+                      "anchor":  [
+                                     115.9,
+                                     365.9
+                                 ],
+                      "parent":  "torso",
+                      "z":  4
+                  },
+                  {
+                      "name":  "head",
+                      "file":  "head.png",
+                      "size":  [
+                                   362,
+                                   347
+                               ],
+                      "pivot":  [
+                                    196.6,
+                                    316.5
+                                ],
+                      "anchor":  [
+                                     226.6,
+                                     316.5
+                                 ],
+                      "parent":  "torso",
+                      "z":  5
+                  }
+              ],
+    "attachments":  [
+                        {
+                            "name":  "syringe_gun",
+                            "file":  "art/weapons/syringe_gun.png",
+                            "parent":  "arm_r",
+                            "grip":  [
+                                         87.6,
+                                         294.8
+                                     ],
+                            "pivot":  [
+                                          0.150,
+                                          0.700
+                                      ],
+                            "rotation":  1.5708,
+                            "scale":  1.05,
+                            "z":  -1,
+                            "muzzle":  [
+                                           0.995,
+                                           0.360
+                                       ]
+                        },
+                        {
+                            "name":  "scalpel_sword",
+                            "file":  "art/weapons/scalpel_sword.png",
+                            "parent":  "arm_l",
+                            "grip":  [
+                                         -65.9,
+                                         294.8
+                                     ],
+                            "pivot":  [
+                                          0.090,
+                                          0.500
+                                      ],
+                            "rotation":  -1.90,
+                            "scale":  1.02,
+                            "z":  -1
+                        }
+                    ]
+}

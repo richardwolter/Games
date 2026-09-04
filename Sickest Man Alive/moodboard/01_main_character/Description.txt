@@ -1,0 +1,12 @@
+A teenager, around 16 years old, wearing an "old tech" suit that is a mix of space exploration and medical equipment, and it has liquid capsules on the back, that feed his syringe gun through tubes. The teenager also carries an oversized scalpel as a Sword. 
+
+There is no decision if male or female, its opened for defining what fits best and looks better. 
+
+Gameplay Characteristics that should be thought out for visuals
+- Player will be able to decide if he fights only melee weapons (2 scalpel swords) melee and range (Scalpel sword + Syringe Gun) or only range (2 Syringe guns). Weapons in hand should be interchangeable. 
+- Player grabs item upgrades and modifiers that can change weapons visual characteristics and mechanics, so visual aspects on the weapons should be modular like fluid colors, scalpel handle and tip. 
+
+Technical necessities
+- Each body part of the character should be a separate layer that can be rigged with an animation skeleton
+- Transparent background with careful cropping so there is no visual noise
+

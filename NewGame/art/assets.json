@@ -1,0 +1,60 @@
+{
+  "_comment": [
+    "Every generated asset in this project, with the exact prompt and seed that",
+    "produced it. Regenerating one asset or all of them is one command, and a",
+    "diff on this file shows precisely what changed about the art.",
+    "",
+    "Sizes here are GENERATION sizes and must be multiples of 64 (LayerDiffuse",
+    "fails to decode otherwise). The 'target' field is the final size the asset",
+    "is downscaled to for the game - see art/SPECS.md for where each comes from."
+  ],
+
+  "defaults": {
+    "model": "sd_xl_base_1.0.safetensors",
+    "steps": 30,
+    "cfg": 6.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "transparent": true,
+    "negative": "drop shadow, cast shadow, ground shadow, reflection, background, backdrop, scenery, text, watermark, signature, frame, border, blurry, jpeg artifacts, multiple objects"
+  },
+
+  "assets": [
+    {
+      "name": "rock_floor",
+      "out": "art/tiles/rock_floor.png",
+      "prompt": "isometric diamond ground tile, cracked grey rock and rubble surface, top-down 2:1 isometric projection, painted game art, even flat lighting, seamless edges",
+      "width": 1024,
+      "height": 512,
+      "target": [440, 220],
+      "transparent": true,
+      "seed": 101,
+      "post": "diamond_tile",
+      "notes": "2:1 diamond, corners at edge midpoints. Upper-left edge must tile against lower-right. No feather on diamond edges."
+    },
+    {
+      "name": "water",
+      "out": "art/tiles/water.png",
+      "prompt": "isometric diamond water tile, shallow rippling water surface, teal and blue, top-down 2:1 isometric projection, painted game art, even flat lighting, seamless edges",
+      "width": 1024,
+      "height": 512,
+      "target": [440, 220],
+      "transparent": true,
+      "seed": 102,
+      "post": "diamond_tile",
+      "notes": "Same diamond spec as rock_floor. See caveat in SPECS.md - iso_ground.gd takes one texture per corridor, so rock+water together needs a code change."
+    },
+    {
+      "name": "background",
+      "out": "art/background.png",
+      "prompt": "distant post-apocalyptic horizon, hazy sky, faded hills and ruined skyline, muted desaturated palette, painted game backdrop, no foreground detail",
+      "width": 1024,
+      "height": 1024,
+      "target": [1024, 1024],
+      "transparent": false,
+      "seed": 103,
+      "post": "tile_both_axes",
+      "notes": "Must tile seamlessly in BOTH axes - the camera drifts diagonally as the car moves along the corridor."
+    }
+  ]
+}

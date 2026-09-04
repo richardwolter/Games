@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="AttackStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/attack_stats.gd" id="1_attack"]
+
+[resource]
+script = ExtResource("1_attack")
+damage = 0.0
+knockback = 90.0
+crit_chance = 0.0
+attack_rate = 0.5
+speed = 260.0
+lifetime = 3.0
+pierce_count = 0
+shot_count = 1
+statuses = {
+"jam": 1.0
+}
+tint = Color(1.0, 0.58, 0.06, 1)
+scale_mult = 0.8
+trail_enabled = true
+trail_length = 8
+glow_energy = 0.55

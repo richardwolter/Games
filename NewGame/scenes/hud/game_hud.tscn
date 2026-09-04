@@ -1,0 +1,97 @@
+[gd_scene load_steps=2 format=3 uid="uid://gqt5s8m1n4p7y"]
+
+[ext_resource type="Script" path="res://scenes/hud/game_hud.gd" id="1_hud"]
+
+[node name="GameHUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Margin" type="MarginContainer" parent="."]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 320.0
+offset_bottom = 160.0
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BatteryBar" type="ProgressBar" parent="Margin/VBox"]
+custom_minimum_size = Vector2(280, 28)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="BatteryLabel" type="Label" parent="Margin/VBox/BatteryBar"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -12.0
+offset_right = 20.0
+offset_bottom = 12.0
+text = "100%"
+horizontal_alignment = 1
+
+[node name="SpeedLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+text = "Speed: 0"
+
+[node name="TimerLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+text = "Time: 0.0s"
+
+[node name="CheckpointLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+text = "Checkpoints: 0/0"
+
+[node name="ChargingPrompt" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+modulate = Color(0.3, 1, 0.9, 1)
+text = "Charging..."
+
+[node name="LowBatteryWarning" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 0, 0, 0.15)
+
+[node name="ResultsPanel" type="Panel" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -80.0
+offset_right = 160.0
+offset_bottom = 80.0
+
+[node name="VBox" type="VBoxContainer" parent="ResultsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
+alignment = 1
+
+[node name="ResultsLabel" type="Label" parent="ResultsPanel/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Course Complete!"
+
+[node name="RestartHint" type="Label" parent="ResultsPanel/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Press ESC to restart"

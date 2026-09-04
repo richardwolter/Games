@@ -1,0 +1,406 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2540" height="5390" viewBox="0 0 2540 5390" font-family="Segoe UI, sans-serif">
+<rect width="2540" height="5390" fill="#12100f"/>
+<g stroke="#221e1c" stroke-width="1">
+<line x1="130" y1="0" x2="130" y2="5390"/>
+<line x1="320" y1="0" x2="320" y2="5390"/>
+<line x1="510" y1="0" x2="510" y2="5390"/>
+<line x1="700" y1="0" x2="700" y2="5390"/>
+<line x1="890" y1="0" x2="890" y2="5390"/>
+<line x1="1080" y1="0" x2="1080" y2="5390"/>
+<line x1="1270" y1="0" x2="1270" y2="5390"/>
+<line x1="1460" y1="0" x2="1460" y2="5390"/>
+<line x1="1650" y1="0" x2="1650" y2="5390"/>
+<line x1="1840" y1="0" x2="1840" y2="5390"/>
+<line x1="2030" y1="0" x2="2030" y2="5390"/>
+<line x1="2220" y1="0" x2="2220" y2="5390"/>
+<line x1="2410" y1="0" x2="2410" y2="5390"/>
+<line x1="0" y1="130" x2="2540" y2="130"/>
+<line x1="0" y1="320" x2="2540" y2="320"/>
+<line x1="0" y1="510" x2="2540" y2="510"/>
+<line x1="0" y1="700" x2="2540" y2="700"/>
+<line x1="0" y1="890" x2="2540" y2="890"/>
+<line x1="0" y1="1080" x2="2540" y2="1080"/>
+<line x1="0" y1="1270" x2="2540" y2="1270"/>
+<line x1="0" y1="1460" x2="2540" y2="1460"/>
+<line x1="0" y1="1650" x2="2540" y2="1650"/>
+<line x1="0" y1="1840" x2="2540" y2="1840"/>
+<line x1="0" y1="2030" x2="2540" y2="2030"/>
+<line x1="0" y1="2220" x2="2540" y2="2220"/>
+<line x1="0" y1="2410" x2="2540" y2="2410"/>
+<line x1="0" y1="2600" x2="2540" y2="2600"/>
+<line x1="0" y1="2790" x2="2540" y2="2790"/>
+<line x1="0" y1="2980" x2="2540" y2="2980"/>
+<line x1="0" y1="3170" x2="2540" y2="3170"/>
+<line x1="0" y1="3360" x2="2540" y2="3360"/>
+<line x1="0" y1="3550" x2="2540" y2="3550"/>
+<line x1="0" y1="3740" x2="2540" y2="3740"/>
+<line x1="0" y1="3930" x2="2540" y2="3930"/>
+<line x1="0" y1="4120" x2="2540" y2="4120"/>
+<line x1="0" y1="4310" x2="2540" y2="4310"/>
+<line x1="0" y1="4500" x2="2540" y2="4500"/>
+<line x1="0" y1="4690" x2="2540" y2="4690"/>
+<line x1="0" y1="4880" x2="2540" y2="4880"/>
+<line x1="0" y1="5070" x2="2540" y2="5070"/>
+<line x1="0" y1="5260" x2="2540" y2="5260"/>
+</g>
+<g stroke-linecap="round">
+<line x1="1270" y1="2030" x2="1270" y2="1840" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1270.0" cy="1935.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="1840" x2="1080" y2="1650" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="1745.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="1840" x2="1460" y2="1650" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="1745.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="1650" x2="1270" y2="1460" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="1555.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="1650" x2="1270" y2="1460" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="1555.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="1460" x2="1270" y2="1270" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1270.0" cy="1365.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="1270" x2="1080" y2="1080" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="1175.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="1270" x2="1460" y2="1080" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="1175.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="1080" x2="1270" y2="890" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="985.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="1080" x2="1270" y2="890" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="985.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="890" x2="1080" y2="700" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="795.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="890" x2="1460" y2="700" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="795.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="700" x2="1270" y2="510" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="605.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="700" x2="1270" y2="510" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="605.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="510" x2="1080" y2="320" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="415.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="510" x2="1460" y2="320" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="415.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="320" x2="1270" y2="130" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="225.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="320" x2="1270" y2="130" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="225.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2030" x2="1080" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="2030" x2="1460" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="2220" x2="1270" y2="2410" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="2315.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="2220" x2="1270" y2="2410" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="2315.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2410" x2="1270" y2="2600" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1270.0" cy="2505.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2600" x2="1270" y2="2790" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1270.0" cy="2695.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2790" x2="1080" y2="2980" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="2885.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="2790" x2="1460" y2="2980" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="2885.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="2980" x2="1270" y2="3170" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="3075.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="2980" x2="1270" y2="3170" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="3075.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="3170" x2="1080" y2="3360" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="3265.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="3170" x2="1460" y2="3360" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="3265.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="3360" x2="1270" y2="3550" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="3455.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="3360" x2="1270" y2="3550" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="3455.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="3550" x2="1080" y2="3740" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="3645.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="3550" x2="1460" y2="3740" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="3645.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="3740" x2="1270" y2="3930" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="3835.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="3740" x2="1270" y2="3930" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="3835.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="3930" x2="1080" y2="4120" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1175.0" cy="4025.0" r="4" fill="#c8863c"/>
+<line x1="1270" y1="3930" x2="1460" y2="4120" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1365.0" cy="4025.0" r="4" fill="#c8863c"/>
+<line x1="1080" y1="4120" x2="1270" y2="4310" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1175.0" cy="4215.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="4120" x2="1270" y2="4310" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1365.0" cy="4215.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2030" x2="890" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1080.0" cy="2030.0" r="4" fill="#4a4340"/>
+<line x1="890" y1="2030" x2="700" y2="1840" stroke="#c8863c" stroke-width="5"/>
+<circle cx="795.0" cy="1935.0" r="4" fill="#c8863c"/>
+<line x1="890" y1="2030" x2="700" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="795.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="700" y1="1840" x2="510" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="605.0" cy="1935.0" r="4" fill="#4a4340"/>
+<line x1="700" y1="2220" x2="510" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="605.0" cy="2125.0" r="4" fill="#4a4340"/>
+<line x1="510" y1="2030" x2="320" y2="1840" stroke="#c8863c" stroke-width="5"/>
+<circle cx="415.0" cy="1935.0" r="4" fill="#c8863c"/>
+<line x1="510" y1="2030" x2="320" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="415.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="320" y1="1840" x2="130" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="225.0" cy="1935.0" r="4" fill="#4a4340"/>
+<line x1="320" y1="2220" x2="130" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="225.0" cy="2125.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="2030" x2="1650" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1460.0" cy="2030.0" r="4" fill="#4a4340"/>
+<line x1="1650" y1="2030" x2="1840" y2="1840" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1745.0" cy="1935.0" r="4" fill="#c8863c"/>
+<line x1="1650" y1="2030" x2="1840" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1745.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="1840" y1="1840" x2="2030" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1935.0" cy="1935.0" r="4" fill="#4a4340"/>
+<line x1="1840" y1="2220" x2="2030" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1935.0" cy="2125.0" r="4" fill="#4a4340"/>
+<line x1="2030" y1="2030" x2="2220" y2="1840" stroke="#c8863c" stroke-width="5"/>
+<circle cx="2125.0" cy="1935.0" r="4" fill="#c8863c"/>
+<line x1="2030" y1="2030" x2="2220" y2="2220" stroke="#c8863c" stroke-width="5"/>
+<circle cx="2125.0" cy="2125.0" r="4" fill="#c8863c"/>
+<line x1="2220" y1="1840" x2="2410" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="2315.0" cy="1935.0" r="4" fill="#4a4340"/>
+<line x1="2220" y1="2220" x2="2410" y2="2030" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="2315.0" cy="2125.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="4310" x2="890" y2="4500" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1080.0" cy="4405.0" r="4" fill="#4a4340"/>
+<line x1="890" y1="4500" x2="700" y2="4690" stroke="#c8863c" stroke-width="5"/>
+<circle cx="795.0" cy="4595.0" r="4" fill="#c8863c"/>
+<line x1="890" y1="4500" x2="1080" y2="4690" stroke="#c8863c" stroke-width="5"/>
+<circle cx="985.0" cy="4595.0" r="4" fill="#c8863c"/>
+<line x1="700" y1="4690" x2="890" y2="4880" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="795.0" cy="4785.0" r="4" fill="#4a4340"/>
+<line x1="1080" y1="4690" x2="890" y2="4880" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="985.0" cy="4785.0" r="4" fill="#4a4340"/>
+<line x1="890" y1="4880" x2="700" y2="5070" stroke="#c8863c" stroke-width="5"/>
+<circle cx="795.0" cy="4975.0" r="4" fill="#c8863c"/>
+<line x1="890" y1="4880" x2="1080" y2="5070" stroke="#c8863c" stroke-width="5"/>
+<circle cx="985.0" cy="4975.0" r="4" fill="#c8863c"/>
+<line x1="700" y1="5070" x2="890" y2="5260" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="795.0" cy="5165.0" r="4" fill="#4a4340"/>
+<line x1="1080" y1="5070" x2="890" y2="5260" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="985.0" cy="5165.0" r="4" fill="#4a4340"/>
+<line x1="1270" y1="4310" x2="1650" y2="4500" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1460.0" cy="4405.0" r="4" fill="#4a4340"/>
+<line x1="1650" y1="4500" x2="1840" y2="4690" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1745.0" cy="4595.0" r="4" fill="#c8863c"/>
+<line x1="1650" y1="4500" x2="1460" y2="4690" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1555.0" cy="4595.0" r="4" fill="#c8863c"/>
+<line x1="1840" y1="4690" x2="1650" y2="4880" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1745.0" cy="4785.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="4690" x2="1650" y2="4880" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1555.0" cy="4785.0" r="4" fill="#4a4340"/>
+<line x1="1650" y1="4880" x2="1840" y2="5070" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1745.0" cy="4975.0" r="4" fill="#c8863c"/>
+<line x1="1650" y1="4880" x2="1460" y2="5070" stroke="#c8863c" stroke-width="5"/>
+<circle cx="1555.0" cy="4975.0" r="4" fill="#c8863c"/>
+<line x1="1840" y1="5070" x2="1650" y2="5260" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1745.0" cy="5165.0" r="4" fill="#4a4340"/>
+<line x1="1460" y1="5070" x2="1650" y2="5260" stroke="#4a4340" stroke-width="3.5"/>
+<circle cx="1555.0" cy="5165.0" r="4" fill="#4a4340"/>
+</g>
+<rect x="1206" y="1788" width="128" height="104" rx="10" fill="#a87070" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="1838" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Base of Throat</text>
+<text x="1270" y="1857" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1016" y="1598" width="128" height="104" rx="10" fill="#b28580" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="1648" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Trachea</text>
+<text x="1080" y="1667" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1396" y="1598" width="128" height="104" rx="10" fill="#9e6675" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="1648" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Thyroid</text>
+<text x="1460" y="1667" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1206" y="1408" width="128" height="104" rx="10" fill="#ad7570" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="1458" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Larynx</text>
+<text x="1270" y="1477" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1206" y="1218" width="128" height="104" rx="10" fill="#bd7070" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<circle cx="1270" cy="1270" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1270" y="1268" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Mouth</text>
+<text x="1270" y="1287" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1016" y="1028" width="128" height="104" rx="10" fill="#c76b70" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="1078" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Tongue</text>
+<text x="1080" y="1097" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1396" y="1028" width="128" height="104" rx="10" fill="#b28f8a" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<circle cx="1460" cy="1080" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1460" y="1078" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Nasal Cavity</text>
+<text x="1460" y="1097" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1206" y="838" width="128" height="104" rx="10" fill="#ad998f" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="888" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Sinus</text>
+<text x="1270" y="907" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1016" y="648" width="128" height="104" rx="10" fill="#bdb8a3" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="698" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Cranium</text>
+<text x="1080" y="717" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1384" y="637" width="152" height="126" rx="26" fill="#ccadb2" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="698" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Brain</text>
+<text x="1460" y="717" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1206" y="458" width="128" height="104" rx="10" fill="#b8b29e" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="508" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Crown</text>
+<text x="1270" y="527" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1016" y="268" width="128" height="104" rx="10" fill="#a89e8f" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<circle cx="1080" cy="320" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1080" y="318" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Inner Ear</text>
+<text x="1080" y="337" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1396" y="268" width="128" height="104" rx="10" fill="#a89e8f" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<circle cx="1460" cy="320" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1460" y="318" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Inner Ear</text>
+<text x="1460" y="337" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1194" y="67" width="152" height="126" rx="26" fill="#9475b8" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="128" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Pineal Gland</text>
+<text x="1270" y="147" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1206" y="1978" width="128" height="104" rx="10" fill="#b2ad99" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Sternum</text>
+<text x="1270" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1004" y="2157" width="152" height="126" rx="26" fill="#d98c99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Lung</text>
+<text x="1080" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1384" y="2157" width="152" height="126" rx="26" fill="#d98c99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Lung</text>
+<text x="1460" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1194" y="2347" width="152" height="126" rx="26" fill="#b84c57" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="2408" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Pericardium</text>
+<text x="1270" y="2427" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1194" y="2537" width="152" height="126" rx="26" fill="#cc2e3d" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="2598" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Heart</text>
+<text x="1270" y="2617" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1206" y="2738" width="128" height="104" rx="10" fill="#a3706b" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="2788" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Diaphragm</text>
+<text x="1270" y="2807" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1004" y="2917" width="152" height="126" rx="26" fill="#80476b" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="2978" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Spleen</text>
+<text x="1080" y="2997" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1384" y="2917" width="152" height="126" rx="26" fill="#c2a870" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="2978" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Pancreas</text>
+<text x="1460" y="2997" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1194" y="3107" width="152" height="126" rx="26" fill="#b89e4c" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="3168" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Stomach</text>
+<text x="1270" y="3187" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1004" y="3297" width="152" height="126" rx="26" fill="#8c4038" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="3358" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Liver</text>
+<text x="1080" y="3377" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1384" y="3297" width="152" height="126" rx="26" fill="#854c47" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="3358" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Kidney</text>
+<text x="1460" y="3377" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1194" y="3487" width="152" height="126" rx="26" fill="#c28f6b" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="3548" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Duodenum</text>
+<text x="1270" y="3567" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1004" y="3677" width="152" height="126" rx="26" fill="#c79473" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="3738" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Small Intestine</text>
+<text x="1080" y="3757" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1384" y="3677" width="152" height="126" rx="26" fill="#b28566" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="3738" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Large Intestine</text>
+<text x="1460" y="3757" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1194" y="3867" width="152" height="126" rx="26" fill="#c79473" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="3928" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Intestines</text>
+<text x="1270" y="3947" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1004" y="4057" width="152" height="126" rx="26" fill="#b8b880" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="4118" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Bladder</text>
+<text x="1080" y="4137" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1384" y="4057" width="152" height="126" rx="26" fill="#99705c" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<circle cx="1460" cy="4120" r="92" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1460" y="4118" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Rectum</text>
+<text x="1460" y="4137" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">cavern</text>
+<rect x="1206" y="4258" width="128" height="104" rx="10" fill="#ada894" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1270" y="4308" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Pelvis</text>
+<text x="1270" y="4327" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="826" y="1978" width="128" height="104" rx="10" fill="#9e6b66" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="890" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Shoulder</text>
+<text x="890" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="616" y="1809" width="168" height="62" rx="31" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="700" y="1838" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Humerus</text>
+<text x="700" y="1857" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="616" y="2189" width="168" height="62" rx="31" fill="#995757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="700" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Biceps</text>
+<text x="700" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="446" y="1978" width="128" height="104" rx="10" fill="#a38070" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="510" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Elbow</text>
+<text x="510" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="236" y="1809" width="168" height="62" rx="31" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="320" y="1838" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Radius</text>
+<text x="320" y="1857" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="236" y="2189" width="168" height="62" rx="31" fill="#945757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="320" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Forearm</text>
+<text x="320" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="66" y="1978" width="128" height="104" rx="10" fill="#8f5c57" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<circle cx="130" cy="2030" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="130" y="2116" fill="#5ad0c0" font-size="15" text-anchor="middle">no item</text>
+<text x="130" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Hand</text>
+<text x="130" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1586" y="1978" width="128" height="104" rx="10" fill="#9e6b66" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1650" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Shoulder</text>
+<text x="1650" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1756" y="1809" width="168" height="62" rx="31" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1840" y="1838" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Humerus</text>
+<text x="1840" y="1857" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1756" y="2189" width="168" height="62" rx="31" fill="#995757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1840" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Biceps</text>
+<text x="1840" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1966" y="1978" width="128" height="104" rx="10" fill="#a38070" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="2030" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Elbow</text>
+<text x="2030" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="2136" y="1809" width="168" height="62" rx="31" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="2220" y="1838" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Radius</text>
+<text x="2220" y="1857" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="2136" y="2189" width="168" height="62" rx="31" fill="#945757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="2220" y="2218" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Forearm</text>
+<text x="2220" y="2237" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="2346" y="1978" width="128" height="104" rx="10" fill="#8f5c57" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<circle cx="2410" cy="2030" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="2410" y="2116" fill="#5ad0c0" font-size="15" text-anchor="middle">no item</text>
+<text x="2410" y="2028" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Hand</text>
+<text x="2410" y="2047" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="826" y="4448" width="128" height="104" rx="10" fill="#a38f7a" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="890" y="4498" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Hip</text>
+<text x="890" y="4517" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="669" y="4606" width="62" height="168" rx="84" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="700" y="4688" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Femur</text>
+<text x="700" y="4707" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1049" y="4606" width="62" height="168" rx="84" fill="#945757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="4688" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Quadriceps</text>
+<text x="1080" y="4707" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="826" y="4828" width="128" height="104" rx="10" fill="#a38f7a" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="890" y="4878" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Knee</text>
+<text x="890" y="4897" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="669" y="4986" width="62" height="168" rx="84" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="700" y="5068" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Tibia</text>
+<text x="700" y="5087" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1049" y="4986" width="62" height="168" rx="84" fill="#8f5757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1080" y="5068" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Calf</text>
+<text x="1080" y="5087" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="826" y="5208" width="128" height="104" rx="10" fill="#8a5c57" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<circle cx="890" cy="5260" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="890" y="5346" fill="#5ad0c0" font-size="15" text-anchor="middle">no item</text>
+<text x="890" y="5258" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Left Foot</text>
+<text x="890" y="5277" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1586" y="4448" width="128" height="104" rx="10" fill="#a38f7a" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1650" y="4498" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Hip</text>
+<text x="1650" y="4517" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1809" y="4606" width="62" height="168" rx="84" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1840" y="4688" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Femur</text>
+<text x="1840" y="4707" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1429" y="4606" width="62" height="168" rx="84" fill="#945757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="4688" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Quadriceps</text>
+<text x="1460" y="4707" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1586" y="4828" width="128" height="104" rx="10" fill="#a38f7a" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<text x="1650" y="4878" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Knee</text>
+<text x="1650" y="4897" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<rect x="1809" y="4986" width="62" height="168" rx="84" fill="#b2ad99" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1840" y="5068" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Tibia</text>
+<text x="1840" y="5087" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1429" y="4986" width="62" height="168" rx="84" fill="#8f5757" fill-opacity="0.88" stroke="#8a7f76" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1460" y="5068" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Calf</text>
+<text x="1460" y="5087" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">lane</text>
+<rect x="1586" y="5208" width="128" height="104" rx="10" fill="#8a5c57" fill-opacity="0.88" stroke="#f0e6d8" stroke-width="2.5"/>
+<circle cx="1650" cy="5260" r="80" fill="none" stroke="#5ad0c0" stroke-width="3" stroke-dasharray="6 6"/>
+<text x="1650" y="5346" fill="#5ad0c0" font-size="15" text-anchor="middle">no item</text>
+<text x="1650" y="5258" fill="#15100e" font-size="17" font-weight="600" text-anchor="middle">Right Foot</text>
+<text x="1650" y="5277" fill="#2a1f1b" font-size="13" text-anchor="middle" opacity="0.75">chamber</text>
+<g transform="translate(70,40)">
+<rect x="-16" y="-28" width="470" height="176" rx="12" fill="#1b1715" stroke="#3a3330"/>
+<text x="0" y="0" fill="#f0e6d8" font-size="22" font-weight="700">The Uncle — floor map</text>
+<rect x="0" y="19" width="22" height="14" rx="4" fill="#f0e6d8"/>
+<text x="32" y="30" fill="#cfc4b8" font-size="15">solid outline = spine (always reachable; boss + exits live here)</text>
+<rect x="0" y="46" width="22" height="14" rx="4" fill="#8a7f76"/>
+<text x="32" y="57" fill="#cfc4b8" font-size="15">dashed outline = fork branch (sealed if you pick the other side)</text>
+<rect x="0" y="73" width="22" height="14" rx="4" fill="#c8863c"/>
+<text x="32" y="84" fill="#cfc4b8" font-size="15">orange edge = fork door (exclusive choice)</text>
+<rect x="0" y="100" width="22" height="14" rx="4" fill="#5ad0c0"/>
+<text x="32" y="111" fill="#cfc4b8" font-size="15">teal ring = possible entry wound</text>
+<text x="0" y="146" fill="#8a7f76" font-size="14">60 rooms · 76 doors · 17 forks · shape: lane / chamber / cavern</text>
+</g>
+</svg>

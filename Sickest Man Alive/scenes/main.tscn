@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://cl2fv8f1gano4"]
+
+[ext_resource type="Script" uid="uid://d1tfjxj86gpf0" path="res://src/run_manager.gd" id="1_run"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://w585b8ke30fy" path="res://src/minimap.gd" id="3_minimap"]
+[ext_resource type="Script" path="res://src/damage_vignette.gd" id="4_vignette"]
+
+[node name="Main" type="Node2D" unique_id=1719866057]
+script = ExtResource("1_run")
+
+[node name="RoomHost" type="Node2D" parent="." unique_id=334402772]
+
+[node name="Player" parent="." unique_id=1221428472 instance=ExtResource("2_player")]
+position = Vector2(590, 310)
+safe_margin = 0.001
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=86279444]
+
+[node name="DamageVignette" type="Control" parent="HUD" unique_id=339104772]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("4_vignette")
+
+[node name="Readout" type="Label" parent="HUD" unique_id=1761248652]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 640.0
+offset_bottom = 160.0
+
+[node name="Health" type="Label" parent="HUD" unique_id=526983038]
+offset_left = 16.0
+offset_top = 168.0
+offset_right = 400.0
+offset_bottom = 196.0
+
+[node name="Dna" type="Label" parent="HUD" unique_id=616050621]
+offset_left = 200.0
+offset_top = 168.0
+offset_right = 520.0
+offset_bottom = 196.0
+text = "DNA 0"
+
+[node name="Banner" type="Label" parent="HUD" unique_id=616050620]
+offset_left = 16.0
+offset_top = 196.0
+offset_right = 700.0
+offset_bottom = 224.0
+
+[node name="Hint" type="Label" parent="HUD" unique_id=616330834]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -44.0
+offset_right = 800.0
+offset_bottom = -16.0
+grow_vertical = 0
+text = "WASD move / mouse aim / hold LMB or push right stick to fire / SPACE = debug grant item"
+
+[node name="RunTimer" type="Label" parent="HUD" unique_id=812430011]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 248.0
+offset_right = -16.0
+offset_bottom = 276.0
+grow_horizontal = 0
+horizontal_alignment = 2
+text = "00:00"
+
+[node name="Minimap" type="Control" parent="HUD" unique_id=521080928]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -180.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 316.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("3_minimap")
