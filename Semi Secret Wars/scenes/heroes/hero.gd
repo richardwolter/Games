@@ -399,13 +399,24 @@ const ROLE_DESCRIPTIONS := {
 ## How far the follower can drift from the leader before re-pathing back in —
 ## tighter than the old generic SUPPORT_LEASH_DIST (260) so pairing reads as
 ## visibly "together" on the field, not just loosely in the same area.
-const DUO_LEASH_DIST := 90.0
+##
+## Loosened 90 -> 180 (Designer, 2026-07-31: "extend leash between DUOs, they
+## should stick together but have more freedom of movement for both heroes").
+## Still well under the old 260, so a pair still reads as a pair, but each hero
+## now has room to pick its own target and reposition without the hard snap-back
+## in _process yanking it off mid-approach.
+const DUO_LEASH_DIST := 180.0
 const DUO_TRACK_INTERVAL := 0.3
 ## Extra distance a ranged SUPPORT follower hangs back behind its leader,
 ## beyond the leader's own body — Designer, 2026-07-21: a ranged support
 ## should stand behind whoever it's supporting, not glued flush against them
-## like a melee follower. Added on top of DUO_LEASH_DIST's own radius.
-const RANGED_SUPPORT_TRAIL_DIST := 70.0
+## like a melee follower.
+##
+## Absolute standoff, not "DUO_LEASH_DIST + 70" as it was written before — when
+## the leash was loosened to 180 (2026-07-31) that formula would have pushed
+## ranged supports to 250 behind the leader AND given them 180 of slack on top.
+## 160 is exactly where they stood under the old 90 leash; only the slack grew.
+const RANGED_SUPPORT_TRAIL_DIST := 160.0
 
 ## Role-identity colors for the battlefield ring + name-tag (see _draw and
 ## the label_text assignment in _configure) — lets a role be read at a
@@ -1311,7 +1322,7 @@ func _villain_goal() -> Vector2:
 
 ## Where a Duo follower should sit relative to its leader. A ranged SUPPORT
 ## follower trails behind the leader — on the side away from the villain/push
-## direction, at DUO_LEASH_DIST + RANGED_SUPPORT_TRAIL_DIST — instead of being
+## direction, at RANGED_SUPPORT_TRAIL_DIST — instead of being
 ## pulled flush against the leader's body like a melee follower (Designer,
 ## 2026-07-21: "ranged support should stand behind the supported hero").
 ## Falls back to the leader's exact position (the old behavior) for anyone
@@ -1320,7 +1331,7 @@ func _duo_follow_anchor(leader: Hero) -> Vector2:
 	if is_ranged and role == "SUPPORT" and _field != null:
 		var away_dir := leader.global_position - _field.villain_pos
 		if away_dir.length() > 0.01:
-			return leader.global_position + away_dir.normalized() * (DUO_LEASH_DIST + RANGED_SUPPORT_TRAIL_DIST)
+			return leader.global_position + away_dir.normalized() * RANGED_SUPPORT_TRAIL_DIST
 	return leader.global_position
 
 ## Nearest live real party member (excludes temporary HeroClone summons) —

@@ -74,6 +74,8 @@ var _exhausted: Dictionary = {}
 ## (drives the drain).
 var _pick_queue: Array[Dictionary] = []
 var _pick_screen: LevelUpScreen = null
+## True while the first-boon explanation card is up — see _show_next_pick.
+var _boon_hint_up := false
 ## Duos already offered their pick this level — stops a re-entrant call from
 ## asking the same Duo twice.
 var _picked_this_level: Array[String] = []
@@ -132,7 +134,11 @@ func _ready() -> void:
 		_points_cleared = true
 
 	_hud.setup_heroes(RunState.living_party())
-	_spawn_villain(_stage_config)
+	# The tutorial level has no villain (see level_0_layout.tres) — it is one Duo
+	# against one gate, and a boss standing at the end of the lane would be a
+	# threat the lesson never explains and the party never reaches.
+	if not Tutorial.in_battle():
+		_spawn_villain(_stage_config)
 	# NOTE: boon picks are NOT queued here any more (Designer, 2026-07-26).
 	# Deploy now runs FIRST and the picks follow the party onto the field — see
 	# _on_deploy_chosen. Previously every
@@ -144,6 +150,9 @@ func _ready() -> void:
 	# placed and the player presses START BATTLE — see _on_deploy_chosen.
 
 	_spawn_deploy_controller()
+	# Deferred so the deploy UI and the HUD exist behind the popup — the player
+	# should be reading the explanation against the real screen it describes.
+	_tutorial_open.call_deferred()
 
 ## NOTE: the start-of-level Duo reshuffle (DuoRearrangeScreen, added 2026-07-28)
 ## was removed entirely on 2026-07-30 — Designer: "lets remove the rearrange
@@ -207,7 +216,10 @@ func _on_deploy_chosen(payload: Dictionary) -> void:
 	_pending_names = payload.get("names", [])
 	_pending_positions = payload.get("positions", [])
 
-	_queue_picks_for(_pending_names)
+	# No boon picks in the tutorial: Ultimate UPGRADES are a layer above the
+	# Ultimate itself, which the player is still meeting for the first time.
+	if not Tutorial.in_battle():
+		_queue_picks_for(_pending_names)
 	# No picks to make (every Duo here already picked this level) — deploy now
 	# rather than waiting for a queue that will never drain.
 	if _pick_queue.is_empty():
@@ -237,6 +249,9 @@ func _flush_pending_deploy() -> void:
 		# during deploy the swarm is frozen and nothing should be taking hits.
 		_boulder_cd = randf_range(BOULDER_INTERVAL_RANGE.x, BOULDER_INTERVAL_RANGE.y)
 		_boulders_live = true
+		# The party has landed and the swarm is live: freeze again and hand the
+		# player their two verbs before anything can go wrong.
+		_tutorial_controls.call_deferred()
 
 ## Creates the per-Duo refocus marker layer, once, as the party lands.
 ## Parented next to the DeployController (battlefield root, world space) so its
@@ -365,7 +380,9 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	if _over:
-		if Input.is_key_pressed(KEY_R):
+		# R is the results screen's "again" key; the tutorial has no results
+		# screen, and its own popups own the exit from here.
+		if Input.is_key_pressed(KEY_R) and not Tutorial.in_battle():
 			_stop_end_stinger()
 			get_tree().paused = false
 			get_tree().change_scene_to_file(GameState.BATTLEFIELD if _advance_to_next else GameState.PREP_MENU)
@@ -374,6 +391,11 @@ func _process(delta: float) -> void:
 	# without this guard the monster countdown would keep draining behind a modal
 	# the player is still reading.
 	if _pick_screen != null:
+		return
+	# This node is PROCESS_MODE_ALWAYS, so it keeps ticking while the boon-hint
+	# card has the tree frozen — without this guard the drain below would build
+	# the pick screen behind the card that is still explaining it.
+	if _boon_hint_up:
 		return
 	if not _pick_queue.is_empty():
 		_show_next_pick()
@@ -459,6 +481,21 @@ func _show_next_pick() -> void:
 	if _pick_queue.is_empty():
 		get_tree().paused = false
 		return
+	# One last tutorial beat, on the very first boon the player is ever offered
+	# (Designer, 2026-07-31). Shown BEFORE the pick screen is built, so the card
+	# isn't explaining something already covered by a modal — the pick resumes
+	# from _process the frame after the card closes.
+	if Tutorial.consume_boon_hint():
+		_boon_hint_up = true
+		TutorialDirector.run(self, [
+			{
+				"title": "PICK A BOON",
+				"body": "Each level, every DUO picks one BOON — an upgrade to its "
+					+ "ULTIMATE that lasts the rest of the run.",
+				"align": "center",
+			},
+		], _on_boon_hint_closed)
+		return
 	var entry: Dictionary = _pick_queue.pop_front()
 	var screen := LevelUpScreen.new()
 	_pick_screen = screen
@@ -470,6 +507,11 @@ func _show_next_pick() -> void:
 	screen.setup(Array(names), ult_name, RunState.roll_duo_offer(pair_id), DuoUltimateBoons.def)
 	screen.picked.connect(_on_pick_chosen.bind(entry))
 	get_tree().paused = true
+
+## The boon card closed: let _process resume draining the queue, which now
+## builds the real pick screen.
+func _on_boon_hint_closed() -> void:
+	_boon_hint_up = false
 
 func _on_pick_chosen(id: String, entry: Dictionary) -> void:
 	RunState.add_duo_boon(entry.get("key", ""), id)
@@ -572,6 +614,12 @@ func _end(win: bool) -> void:
 	_over = true
 	if _music != null and is_instance_valid(_music):
 		_music.stop()
+	# The tutorial's defeat is authored, not earned — it takes its own exit
+	# before any of the run-ending bookkeeping below (gold, career stats, the
+	# results screen, clearing the resumable run) can treat it as a real wipe.
+	if Tutorial.in_battle():
+		_tutorial_defeat()
+		return
 	# Both show_results() branches below pause the tree; BattleSfx's players are
 	# PROCESS_MODE_ALWAYS (see its doc), so the stinger plays over the paused
 	# results screen instead of being cut off the moment it appears. Kept in a
@@ -618,6 +666,114 @@ func _end(win: bool) -> void:
 	GameState.award_gold(gold)  # single save_game() flush for this run's banked gold/xp + career stats
 	_results.show_results(win, gold, 0)
 	get_tree().paused = true
+
+## -- Tutorial beats (Designer, 2026-07-31) ------------------------------------
+##
+## Three freezes in the battle — the opening (what a Duo is, where you may
+## deploy), the controls (Ultimate + Refocus, once the party is on the field),
+## and the loss — plus the one-shot two-lane explanation that lands on the FIRST
+## REAL battle instead. Every popup here is TutorialDirector; see its class doc
+## for the freeze/skip contract.
+
+## Opening freeze. Also covers the two-lane beat, which belongs to level 1 and
+## is therefore not a tutorial-level branch at all.
+func _tutorial_open() -> void:
+	if Tutorial.in_battle():
+		TutorialDirector.run(self, [
+			{
+				"title": "THIS IS A DUO",
+				"body": "DUOs fight together and possess a unique ULTIMATE ability.",
+				"portraits": Tutorial.STARTING_DUO,
+				"align": "center",
+			},
+			{
+				"title": "DEPLOY YOUR DUO",
+				"body": "Click anywhere inside the marked deploy area to place your "
+					+ "DUO, then press START BATTLE.",
+				"align": "center",
+			},
+		])
+		return
+	if Tutorial.consume_two_lane_hint():
+		TutorialDirector.run(self, [
+			{
+				"title": "TWO LANES",
+				"body": "With two DUOs on the field the lane splits in two — TOP and "
+					+ "BOTTOM, one for each DUO. Each DUO holds its own lane and its "
+					+ "own spawn gates, so place them accordingly.",
+				"align": "top",
+			},
+		])
+
+## Controls freeze, fired the moment the party lands. Spotlights the real DUO
+## CONTROL panel so the player is looking at the buttons while they're described
+## rather than hunting for them afterwards.
+func _tutorial_controls() -> void:
+	if not Tutorial.in_battle():
+		return
+	var bar: Control = _hud.duo_control() if _hud != null else null
+	TutorialDirector.run(self, _tutorial_control_steps(bar), _tutorial_close_in)
+
+## The rear ambush starts only once the explaining is over (Designer,
+## 2026-07-31: the tutorial "should end quickly right after all tutorial pop ups
+## have been handled") — everything before this is the player reading, and the
+## fight they're being shown should still look winnable while they read it.
+func _tutorial_close_in() -> void:
+	if _spawner != null and is_instance_valid(_spawner):
+		_spawner.begin_tutorial_ambush()
+
+func _tutorial_control_steps(bar: Control) -> Array:
+	return [
+		{
+			"title": "DUO CONTROL",
+			"body": "Your DUO fights on its own. This panel is how you command it.",
+			"focus": bar,
+		},
+		{
+			"title": "ULTIMATE",
+			"body": "Click ULTIMATE to unleash the DUO's shared ability. Once per "
+				+ "level — spend it where it counts.",
+			"focus": bar,
+		},
+		{
+			"title": "REFOCUS",
+			"body": "Click REFOCUS, then click a spot on the battlefield to send "
+				+ "that DUO there. Also once per level.",
+			"focus": bar,
+		},
+	]
+
+## The scripted loss. Replaces the whole normal defeat path — no results screen,
+## no gold payout, no run wipe: the tutorial is not a run the player lost, it is
+## the setup for the one they're about to start.
+func _tutorial_defeat() -> void:
+	TutorialDirector.run(self, [
+		{
+			# Title-only, in red and a size up: the line IS the beat, so it gets
+			# the card to itself with nothing under it but the button (Designer,
+			# 2026-07-31). No SKIP here — the battle is already lost by now.
+			"title": "Let's summon some friends.",
+			"title_color": UIStyle.CRIMSON,
+			"title_size": UIStyle.SIZE_HEADING,
+			"align": "center",
+			"button": "SUMMON",
+			"no_skip": true,
+		},
+	], _tutorial_friends)
+
+## The reveal, on its own freeze so the roster change gets its own beat.
+func _tutorial_friends() -> void:
+	Tutorial.unlock_friends()
+	TutorialDirector.run(self, [
+		{
+			"title": "THEY JOINED THE FIGHT",
+			"body": "WARDEN and BEACON have joined you. Four heroes means TWO DUOs — "
+				+ "and two Ultimates.",
+			"portraits": Tutorial.FRIENDS,
+			"align": "center",
+			"button": "TO THE PREP MENU",
+		},
+	], Tutorial.to_prep)
 
 ## Records survivors' carried HP + marks the fallen. With no mid-battle
 ## respawn, a party hero is either exhausted (dead, permanently) or still on

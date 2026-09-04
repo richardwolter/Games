@@ -46,7 +46,12 @@ const KILL_ASSIST_SHARE := 0.5
 ## has its ability purchases converted to tree ranks (Designer, 2026-07-26 —
 ## see _migrate_purchases_to_tree). MIN_LOADABLE_VERSION is the real discard
 ## floor; anything below it is still a clean break.
-const SAVE_VERSION := 9
+## v10 = the tutorial (2026-07-31): adds `tutorial_done`, and a FRESH save now
+## unlocks only Thundaar and Artemis until the tutorial hands over the other
+## two. Any save written before v10 loads with tutorial_done defaulted TRUE — an
+## existing player is mid-progression and must never be dropped into the
+## tutorial, nor have their roster taken away.
+const SAVE_VERSION := 10
 const MIN_LOADABLE_VERSION := 8
 
 ## Roster catalog: display order, colors. Grows as heroes are added.
@@ -106,7 +111,20 @@ var duo_ultimate_ranks: Dictionary = {}
 ## the Duo system — both pairing combinations and staggered deploy need 4
 ## live heroes). Achievement-gated unlocking (see _check_achievements) stays
 ## wired up underneath but is a no-op while everyone starts unlocked.
-var unlocked_heroes: Array = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
+##
+## As of the tutorial (2026-07-31) this default is the STARTING PAIR, not the
+## full roster: a new player meets Thundaar and Artemis alone in level 0 and is
+## given Warden and Beacon at the tutorial's "let's summon some friends" beat
+## (Tutorial.unlock_friends). Old saves keep whatever they had — see load_game —
+## and skipping the tutorial hands over all four at once.
+## (Spelled out rather than read from Tutorial.STARTING_DUO: this autoload is
+## registered BEFORE that one, so the singleton does not exist yet at the moment
+## this initializer runs. Keep the two lists in step.)
+var unlocked_heroes: Array = ["THUNDAAR", "ARTEMIS"]
+## Whether the new-player tutorial has been played (or skipped). The one
+## persistent bit of the tutorial; everything else about it is session state on
+## the Tutorial autoload.
+var tutorial_done := false
 ## Relic ids available for the run-boon pool (scaffolding for a later
 ## milestone — no relics exist yet, so this stays empty).
 var unlocked_relics: Array = []
@@ -512,6 +530,7 @@ func save_game() -> void:
 			"hero_stats": hero_stats,
 			"skill_ranks": skill_ranks,
 			"duo_ultimate_ranks": duo_ultimate_ranks,
+			"tutorial_done": tutorial_done,
 		}))
 
 func load_game() -> void:
@@ -543,6 +562,9 @@ func load_game() -> void:
 	hero_stats = data.get("hero_stats", {})
 	skill_ranks = data.get("skill_ranks", {})
 	duo_ultimate_ranks = data.get("duo_ultimate_ranks", {})
+	# Defaults TRUE on purpose: a save without this key predates the tutorial, so
+	# its owner is an existing player who must not be sent through it.
+	tutorial_done = bool(data.get("tutorial_done", true))
 	# A v8 save has no tree at all; a v9 save has one and this is a no-op
 	# (_raise_rank only ever raises). Runs unconditionally so the mapping also
 	# repairs a save written between a partial migration and now.
@@ -562,7 +584,8 @@ func _reset_state_defaults() -> void:
 	banked_xp = 0
 	stat_purchases = {}
 	duo_pairings = []
-	unlocked_heroes = ["THUNDAAR", "ARTEMIS", "WARDEN", "BEACON"]
+	unlocked_heroes = ["THUNDAAR", "ARTEMIS"]
+	tutorial_done = false
 	unlocked_relics = []
 	career = {}
 	hero_stats = {}
@@ -587,6 +610,13 @@ func full_reset() -> void:
 	RunState.draft_offer.clear()
 	_clear_fog_dir()
 	get_tree().paused = false
+	# A wiped save is a brand-new player by definition, so this lands in the
+	# tutorial rather than the prep menu (which a two-hero roster couldn't even
+	# launch from — START RUN wants two full Duos). Tutorial.begin() does its own
+	# scene change, so nothing follows it here.
+	if not tutorial_done:
+		Tutorial.begin()
+		return
 	get_tree().change_scene_to_file(PREP_MENU)
 
 func _clear_fog_dir() -> void:

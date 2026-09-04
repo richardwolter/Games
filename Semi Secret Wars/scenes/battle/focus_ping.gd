@@ -137,9 +137,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.button_index != MOUSE_BUTTON_LEFT:
 		return
 	var world: Vector2 = get_canvas_transform().affine_inverse() * event.position
-	# Ignore clicks off the field ellipse (e.g. panning past the page edge) —
-	# the refocus stays armed so a misclick costs nothing.
-	if _field != null and (world / _field.field_radius).length_squared() > 1.0:
+	# Ignore clicks off the lane (e.g. panning past the page edge) — the refocus
+	# stays armed so a misclick costs nothing.
+	#
+	# Tested against the lane RECTANGLE, not the ellipse it used to use
+	# (Designer, 2026-07-31: "refocus is not working on the tutorial").
+	# field_radius is the lane's half-EXTENTS, so an ellipse of the same radii
+	# cuts the corners off the actual playable rect: a click at the deploy band's
+	# own top edge failed the test and silently did nothing. It bit hardest on
+	# the short tutorial lane, where the deploy band is a large fraction of the
+	# half-length, but the dead corners existed on every level.
+	if _field != null and (absf(world.x) > _field.field_radius.x
+			or absf(world.y) > _field.field_radius.y):
 		return
 	get_viewport().set_input_as_handled()
 	_pings[_armed] = world

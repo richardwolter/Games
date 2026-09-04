@@ -212,6 +212,11 @@ func _build_duo_control() -> void:
 	_duo_control = DuoControlBar.new()
 	add_child(_duo_control)
 
+## The DUO CONTROL panel, for the tutorial to spotlight (BattleManager's
+## controls beat). Null before the HUD has built itself.
+func duo_control() -> Control:
+	return _duo_control
+
 ## Gap between the bottom hero card and the Hero Control panel — close enough
 ## that the controls read as belonging to the cards above them, not as a separate
 ## panel parked at the bottom of the screen (Designer, 2026-07-30).

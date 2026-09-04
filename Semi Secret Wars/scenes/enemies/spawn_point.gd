@@ -14,10 +14,29 @@ var _spawn_at := Vector2.ZERO
 ## so heroes commit to their own lane's gates.
 var lane := ""
 
+## HP this gate can never be damaged below (0 = destructible, every normal
+## level). The TUTORIAL sets it: level 0 is a scripted loss (Designer,
+## 2026-07-31: "they must not succeed at any circumstance"), and an escalating
+## swarm alone doesn't guarantee that — a well-timed Ultimate can burst a gate
+## down before the swarm has grown. Floored, the gate visibly takes damage and
+## its bar drains toward the last sliver, so the Duo reads as *nearly* strong
+## enough, which is the exact feeling the beat after it needs.
+##
+## See LaneSpawner.TUTORIAL_GATE_FLOOR for the value.
+var hp_floor := 0.0
+
 ## Called by LaneSpawner before add_child(), like Minion.setup().
 func setup(pos: Vector2, hp: float) -> void:
 	_spawn_at = pos
 	max_hp = hp
+
+## Clamps incoming damage to what the floor allows before the base class can
+## apply it — Combatant.take_damage calls _die() the moment hp hits 0, so the
+## clamp cannot be done after the fact.
+func take_damage(amount: float, attacker: Combatant = null) -> void:
+	if hp_floor > 0.0:
+		amount = minf(amount, maxf(hp - hp_floor, 0.0))
+	super(amount, attacker)
 
 func _configure() -> void:
 	# "hostiles" so heroes (enemy_group == "hostiles") target and attack it.

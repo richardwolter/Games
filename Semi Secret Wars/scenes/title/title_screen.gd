@@ -122,8 +122,9 @@ func _on_new_game() -> void:
 			"Start New Game", _start_new_game, "Cancel")
 
 func _start_new_game() -> void:
-	# full_reset() already routes to the prep menu itself (see its doc
-	# comment) — do not change_scene_to_file again here, the node calling
+	# full_reset() routes itself — into the TUTORIAL for a wiped save (which is
+	# what this always produces), or to the prep menu once the tutorial has been
+	# played. Either way do not change_scene_to_file again here: the node calling
 	# this has already been removed from the tree by that point.
 	GameState.full_reset()
 

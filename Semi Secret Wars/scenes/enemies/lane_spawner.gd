@@ -18,6 +18,11 @@ const GOLD_PER_KILL := 0.5
 const GOLD_PER_GATE := 15
 var _gold_accum := 0.0
 
+## Fraction of its max HP the tutorial gate can never be pushed below, so level
+## 0 stays the scripted loss it is written as. Low enough that the bar reads as
+## "almost" rather than as an obviously invincible target.
+const TUTORIAL_GATE_FLOOR := 0.06
+
 @export var minion_scene: PackedScene  ## Fallback if no config is applied.
 @export var swarm_cap := 6
 @export var spawn_interval := 0.5
@@ -76,6 +81,9 @@ func _spawn_spawn_points() -> void:
 		var p: Vector3 = _field.lane_spawn_points[i]
 		var sp := LaneSpawnPoint.new()
 		sp.setup(Vector2(p.x, p.y), p.z * _point_hp_mult)
+		# The tutorial's one gate cannot be destroyed — see LaneSpawnPoint.hp_floor.
+		if Tutorial.in_battle():
+			sp.hp_floor = sp.max_hp * TUTORIAL_GATE_FLOOR
 		# Use the authored (x,y), not sp.global_position — _configure() (which
 		# sets global_position from _spawn_at) doesn't run until add_child below.
 		var tag := _field.lane_spawn_point_lanes[i] if i < _field.lane_spawn_point_lanes.size() else ""
@@ -152,6 +160,7 @@ func points_remaining() -> int:
 func _process(delta: float) -> void:
 	if not battle_started or minion_scene == null or _field == null:
 		return
+	_tick_ambush(delta)
 	# No living spawn point can produce minions — the swarm source is dead.
 	if _points.is_empty():
 		return
@@ -194,6 +203,67 @@ func _spawn_one() -> void:
 	m.tree_exited.connect(_on_minion_removed)
 	m.died.connect(_on_minion_killed)
 	_active += 1
+
+## -- Tutorial rear ambush (Designer, 2026-07-31) ------------------------------
+##
+## "Send some minions from the back of the lane so they feel swarmed and can't
+## control the spawn point." Waves that enter BEHIND the deploy band and march
+## right, straight through the party, while the gate keeps pushing from the
+## front — the pincer is what makes the scripted loss land as being overwhelmed
+## rather than as slowly losing a fair fight.
+##
+## Deliberately NOT counted against `_cap`/`_active`: the swarm cap governs how
+## much the GATE may have on the field, and an ambusher stealing one of those
+## slots would relieve the front-line pressure it is supposed to add to.
+## The first wave is late enough that the Duo gets to reach the gate and put
+## real damage into it (the fight the tutorial promises) before the lane closes
+## behind them.
+const AMBUSH_FIRST_DELAY := 6.0
+const AMBUSH_INTERVAL := 5.0
+const AMBUSH_COUNT := 5
+## Fraction of the lane's half-height ambushers may enter across, so they arrive
+## spread out instead of single file.
+const AMBUSH_SPREAD := 0.8
+
+var _ambush_live := false
+var _ambush_cd := 0.0
+
+## Starts the ambush. Called once, when the tutorial's last explanation closes
+## and the fight is finally the player's to lose (BattleManager).
+func begin_tutorial_ambush() -> void:
+	_ambush_live = true
+	_ambush_cd = AMBUSH_FIRST_DELAY
+
+func _tick_ambush(delta: float) -> void:
+	if not _ambush_live or _field == null or _points.is_empty():
+		return
+	_ambush_cd -= delta
+	if _ambush_cd > 0.0:
+		return
+	_ambush_cd = AMBUSH_INTERVAL
+	for i in AMBUSH_COUNT:
+		_spawn_behind()
+
+## One ambusher, entering at the lane's left edge and marching toward the gate —
+## so its path runs straight over the party rather than stopping where they were
+## deployed.
+func _spawn_behind() -> void:
+	var scene := _pick_minion_scene()
+	if scene == null:
+		return
+	var m := scene.instantiate()
+	var y := randf_range(-_field.lane_half_height * AMBUSH_SPREAD,
+			_field.lane_half_height * AMBUSH_SPREAD)
+	# Inside the lane rect, not past it: units outside get clamped back in, which
+	# would bunch the whole wave onto the boundary.
+	var from := Vector2(-_field.field_radius.x + 40.0, y)
+	var offset := _random_disc(goal_spread)
+	m.stat_hp_mult = _minion_hp_mult
+	m.stat_damage_mult = _minion_damage_mult
+	m.setup(from, _points[0].global_position + offset, offset * 0.6, minion_speed, "")
+	add_child(m)
+	m.died.connect(_on_minion_killed)
+	# No tree_exited hookup on purpose — see the _active note above.
 
 func _pick_minion_scene() -> PackedScene:
 	if _minion_scene_override_b != null:

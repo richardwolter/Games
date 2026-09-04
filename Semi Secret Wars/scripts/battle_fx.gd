@@ -32,6 +32,25 @@ static var _live := 0
 const MAX_CLUTTER := 300
 static var _clutter: Array[Node] = []
 
+## Absolute z every permanent ground piece (blood splash, paper scrap, debris
+## shard) draws at: one above the page, one below the units standing on it —
+## the same slot Hero._add_ultimate_effect uses (Designer, 2026-07-31: "blood
+## scattered on the battlefield should always be under sprites").
+##
+## move_child(0) alone was not enough: clutter is parented to the container of
+## whoever died (Heroes / Minions / …), so a hero splash still landed on top of
+## every minion in an earlier container. z_index makes tree order irrelevant.
+## Clutter nodes are z_as_relative and their containers sit at 0, so this
+## resolves to PAGE_Z + 1 on the canvas.
+const GROUND_CLUTTER_Z := LaneField.PAGE_Z + 1
+
+## Sinks one permanent ground piece beneath every unit and registers it as
+## clutter — the shared tail of _ink_blob / paper_scrap / debris shards.
+static func _sink_clutter(parent: Node, node: CanvasItem) -> void:
+	node.z_index = GROUND_CLUTTER_Z
+	parent.move_child(node, 0)
+	_track_clutter(node)
+
 static func _headless() -> bool:
 	return Engine.get_main_loop() == null or RunState.headless
 
@@ -171,8 +190,7 @@ static func _ink_blob(parent: Node, pos: Vector2, color: Color, radius: float) -
 	splash.color.a = 0.6
 	splash.global_position = pos
 	parent.add_child(splash)
-	parent.move_child(splash, 0)
-	_track_clutter(splash)
+	_sink_clutter(parent, splash)
 
 ## Cached (built once, reused forever) small speck texture: a few overlapping
 ## off-center soft blobs baked into one image, so each blood particle reads as
@@ -213,8 +231,7 @@ static func paper_scrap(parent: Node, pos: Vector2, texture: Texture2D, facing: 
 	scrap.diameter = radius * 2.0 * art_scale
 	scrap.facing = facing
 	parent.add_child(scrap)
-	parent.move_child(scrap, 0)
-	_track_clutter(scrap)
+	_sink_clutter(parent, scrap)
 
 ## -- Spawn gate destruction --------------------------------------------------
 
@@ -235,8 +252,7 @@ static func debris_burst(parent: Node, pos: Vector2, color: Color, texture: Text
 		shard.throw_dist = randf_range(120.0, 320.0)
 		shard.size = randf_range(6.0, 16.0)
 		parent.add_child(shard)
-		parent.move_child(shard, 0)
-		_track_clutter(shard)
+		_sink_clutter(parent, shard)
 	if texture != null:
 		for i in 3:
 			paper_scrap(parent, pos + Vector2(randf_range(-12, 12), randf_range(-12, 12)), texture, 1.0 if i % 2 == 0 else -1.0, radius, 1.6)

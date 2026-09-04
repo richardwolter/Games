@@ -148,10 +148,9 @@ func refresh() -> void:
 	_refresh_ultimates()
 	_refresh_refocus()
 
-## Three Ultimate states: ULTIMATE (usable now), USED (already activated this
-## level), UNAVAILABLE (unused, but nobody from the Duo is currently spawned and
-## alive to cast it). A newly used button also kicks off its one-shot spend
-## animation.
+## Two Ultimate labels: ULTIMATE while unspent (greyed out when nobody from the
+## Duo is spawned and alive to cast it) and USED once activated this level. A
+## newly used button also kicks off its one-shot spend animation.
 func _refresh_ultimates() -> void:
 	var bm := get_tree().get_first_node_in_group("battle_manager")
 	for pair_id in _ultimate_buttons:
@@ -166,10 +165,14 @@ func _refresh_ultimates() -> void:
 			if not _ultimate_spent_shown.get(pair_id, false):
 				_ultimate_spent_shown[pair_id] = true
 				_play_spend(button)
-		elif not button.disabled:
-			button.text = "ULTIMATE"
 		else:
-			button.text = "UNAVAILABLE"
+			# Always just "ULTIMATE" while it's unspent (Designer, 2026-07-31).
+			# It used to read "UNAVAILABLE" whenever the Duo had nobody spawned
+			# and alive to cast it — which during deploy is EVERY level's opening
+			# state, so the player's first sight of their Ultimate was the word
+			# "unavailable". The button is still disabled in that state; it just
+			# says what it is instead of complaining.
+			button.text = "ULTIMATE"
 
 ## Four REFOCUS states: "REFOCUS" (ready), "CLICK A SPOT" (armed, waiting on the
 ## battlefield click), a live countdown while the marker is on the field, and

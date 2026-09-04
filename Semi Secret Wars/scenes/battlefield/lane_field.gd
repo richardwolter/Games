@@ -339,7 +339,10 @@ func _ready() -> void:
 		# Before anything spawns: heroes read it in _configure, minions and
 		# clones every frame, so the flag must be settled while the field is
 		# still empty.
-		single_lane = RunState.duo_wiped()
+		# The tutorial fields ONE Duo, so there is no second lane to hold — the
+		# split would just be an unexplained wall down a lane whose whole job is
+		# to teach the basics.
+		single_lane = RunState.duo_wiped() or Tutorial.in_battle()
 	default_hero_spawn = hero_spawn
 	# One roll per battlefield load — see _marks_seed.
 	_marks_seed = randi()
@@ -379,8 +382,12 @@ func apply_lane_layout(layout: LevelLayout) -> void:
 	# come from the existing pipeline for free. Safe against re-entry: the two
 	# arrays above are reassigned from the layout on every call, so repeated
 	# apply_lane_layout calls can't stack duplicate wrecks.
-	obstacles.append(Vector3(lair_pos.x, lair_pos.y, LAIR_RADIUS))
-	obstacle_kinds.append(_lair_kind())
+	# ...unless the level has no villain to house (LevelLayout.has_lair — the
+	# tutorial). _draw_lair reads the same flag.
+	_has_lair = layout.has_lair
+	if _has_lair:
+		obstacles.append(Vector3(lair_pos.x, lair_pos.y, LAIR_RADIUS))
+		obstacle_kinds.append(_lair_kind())
 	_rebuild_obstacle_radii()
 	lakes = layout.lakes.duplicate()
 	spike_pits = layout.spike_pits.duplicate()
@@ -396,6 +403,7 @@ func apply_lane_layout(layout: LevelLayout) -> void:
 	# reused FogOfWar grid spans the whole lane (the lane no longer draws a
 	# page off this — see _draw()).
 	field_radius = Vector2(lane_length * 0.5, lane_half_height)
+	_frame_camera()
 	_build_border_band()
 	_redraw_field()
 
@@ -1112,7 +1120,59 @@ const LAIR_KIND_BY_LEVEL := {
 func _lair_kind() -> String:
 	return LAIR_KIND_BY_LEVEL.get(RunState.current_level, "spaceship")
 
+## Horizontal pan slack beyond the lane's own half-length, so the camera stops
+## just short of the page edge on a full-size lane. Matches the 2400 that was
+## hand-authored on BattleCamera in battlefield.tscn back when every lane was
+## 6000 long (3000 - 600).
+const CAMERA_PAN_INSET := 600.0
+
+## Points the camera at THIS lane's deploy band and sizes its pan box to THIS
+## lane's length (Designer, 2026-07-31: the tutorial opened far to the left of
+## its deploy area).
+##
+## battlefield.tscn authored center_point = (-2600, 0) and pan_limits.x = 2400,
+## both derived by hand from the 6000-long lane every level shared. The tutorial
+## lane is 2600 long with its deploy band at x -925, so the authored values put
+## the opening view a full screen off to the left of anything the player owns —
+## and the pan box (±2400 around origin) didn't even contain the lane.
+##
+## Deriving both from the layout reproduces the authored numbers exactly for the
+## three full-size lanes, with ONE deliberate difference: pan_limits.x is now at
+## least far enough to reach the deploy band, which at the old 2400 it was not —
+## the camera opened at -2600 and could never pan back to where it started.
+func _frame_camera() -> void:
+	# Found among this node's siblings rather than by group: _ready fires
+	# bottom-up in tree order and the Field sits ABOVE BattleCamera in
+	# battlefield.tscn, so the camera has not joined its group yet at the moment
+	# apply_lane_layout runs. Setting center_point before its _ready is fine —
+	# that _ready is what copies center_point into position.
+	var cam: BattleCamera = null
+	var parent := get_parent()
+	if parent != null:
+		for sibling in parent.get_children():
+			if sibling is BattleCamera:
+				cam = sibling
+				break
+	if cam == null:
+		cam = get_tree().get_first_node_in_group("battle_camera") as BattleCamera
+	if cam == null:
+		return
+	cam.center_point = hero_spawn
+	cam.use_pan_center = true
+	cam.pan_center = Vector2.ZERO
+	cam.pan_limits = Vector2(
+			maxf(lane_length * 0.5 - CAMERA_PAN_INSET, absf(hero_spawn.x)),
+			cam.pan_limits.y)
+	cam.position = cam.center_point
+
+## Whether this level houses a villain at all (LevelLayout.has_lair). Set by
+## apply_lane_layout; the editor/no-layout fallback keeps the lair, which is
+## what every real level except the tutorial wants.
+var _has_lair := true
+
 func _draw_lair() -> void:
+	if not _has_lair:
+		return
 	# Only the no-texture fallback is left — without it a missing @export would
 	# leave the lair's blocker invisible, since the obstacle loop draws nothing
 	# for a kind whose texture is null.

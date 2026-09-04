@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="StageConfig" load_steps=2 format=3]
+[ext_resource type="Script" path="res://config/stage_config.gd" id="1_stage"]
+
+; TUTORIAL (level 0). Deliberately unwinnable — see Tutorial (autoload) and
+; LaneSpawner.tutorial_gate_floor. The swarm starts small enough that the Duo
+; gets to feel effective for the first half-minute (they need to see their
+; attacks and the Ultimate WORK), then escalates hard so the loss lands on its
+; own rather than on a timer.
+;
+; villain_type is never read: BattleManager skips _spawn_villain entirely on the
+; tutorial level. It is left at the default only because StageConfig requires a
+; value for it.
+[resource]
+script = ExtResource("1_stage")
+stage_id = "stage_0"
+stage_name = "Tutorial"
+villain_type = "dark_mage"
+minion_type = "minion"
+; Front-line pressure from the gate. It is only half the fight — the rest
+; arrives BEHIND the party once the explanations are done (LaneSpawner's
+; AMBUSH_* block), which is what actually ends the tutorial.
+;
+; The two heroes have NO upgrades of any kind (a fresh save has bought nothing,
+; and level 0 offers no boons), so minion damage stays scaled down: at full
+; strength they died in ten seconds, before they had even reached the gate. The
+; COUNT is what escalates instead, so the loss reads as being swarmed.
+swarm_cap_start = 6
+escalate_every = 5.0
+escalate_step = 3
+swarm_max_cap = 34
+minion_speed = 100.0
+spawn_interval = 0.9
+spawn_batch = 2
+minion_hp_mult = 0.8
+minion_damage_mult = 0.5
+field_preset = "default"
+villain_hp_mult = 1.0

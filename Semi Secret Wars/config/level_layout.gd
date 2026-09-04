@@ -36,7 +36,24 @@ extends Resource
 ##
 ## Note this also moves the villain's START, since LaneField seeds villain_pos at
 ## lair_pos - VILLAIN_LAIR_OFFSET: the approach is ~450px shorter than it was.
+##
+## Nudged back out to x2450 on all three levels (Designer, 2026-07-31: "bring
+## villain lairs a little bit to the right"). The obstacles that ended up within
+## a hero's width of the wreck's LAIR_RADIUS (150) were moved with it — a rock
+## sitting ~50px off the lair edge is a slot a hero can be steered into and not
+## fit through. Rule of thumb when re-placing anything near the lair: keep
+## edge-to-edge clearance above ~135px (the hero clamp diameter).
 @export var villain_lair: Vector2 = Vector2(2900.0, 0.0)
+
+## Whether the villain's lair structure exists on this level at all. False only
+## for the tutorial (level 0), which has no villain: the wreck would be a
+## landmark promising a fight that never comes, and it is also a blocker, so
+## drawing it would wall off the end of a lane nobody needs to reach.
+##
+## villain_lair above is still read when this is false — LaneField seeds
+## villain_pos from it and that point is what heroes push toward — it simply
+## isn't drawn or registered as an obstacle. See LaneField.apply_lane_layout.
+@export var has_lair: bool = true
 
 ## Destructible minion spawn points: (x, y) center + z = HP. Each becomes a
 ## LaneSpawnPoint the heroes can destroy to permanently stop its waves.

@@ -8,8 +8,9 @@ extends Node2D
 ## separate, permanent layer underneath them.
 ##
 ## Drawn as a plain alpha-blended Sprite2D (no shader needed, unlike fog's two-
-## channel wash) — placed as "Field"'s next sibling in battlefield.tscn so
-## tree order alone puts it above the lane floor and below spawned units.
+## channel wash) — placed as "Field"'s next sibling in battlefield.tscn and
+## drawn at BattleFX.GROUND_CLUTTER_Z, above the lane floor and below every
+## unit (z, not tree order — see the sprite setup in _ready).
 
 @export var stain_radius := 16.0
 @export var stain_alpha := 0.4
@@ -47,6 +48,12 @@ func _ready() -> void:
 	sprite.position = _origin
 	sprite.scale = Vector2(cell_size, cell_size)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	# Explicit ground z rather than relying on this node sitting before the unit
+	# containers in battlefield.tscn — same slot the fading clutter splashes use
+	# (BattleFX.GROUND_CLUTTER_Z), so blood is always under sprites no matter
+	# what gets reordered. Stains still read below clutter: same z, earlier in
+	# the tree.
+	sprite.z_index = BattleFX.GROUND_CLUTTER_Z
 	add_child(sprite)
 
 func _process(_delta: float) -> void:

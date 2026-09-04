@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="LevelLayout" format=3]
+
+[ext_resource type="Script" path="res://config/level_layout.gd" id="1_layout"]
+
+; TUTORIAL LANE (level 0). Short — 2600 against the usual 6000 — so the single
+; spawn gate at the centre is visible from the deploy band and the whole lesson
+; happens inside one screen of battlefield. One gate, no villain, no hazards, no
+; objectives: every mechanic the tutorial does NOT explain is absent from it.
+;
+; has_lair is false: there is no villain here, so the wrecked-ship structure
+; would be a landmark promising a fight that never comes. villain_lair itself is
+; still authored because LaneField seeds villain_pos from it, and that point is
+; what heroes push toward (Hero's ATTACK_VILLAIN goal) — it just isn't drawn or
+; blocked. Keep it at the lane's far end so the push direction reads as "right".
+[resource]
+script = ExtResource("1_layout")
+level_id = "lane_tutorial"
+lane_length = 2600.0
+lane_half_height = 400.0
+deploy_band_x_min = -1150.0
+deploy_band_x_max = -700.0
+villain_lair = Vector2(1150, 0)
+has_lair = false
+spawn_points = Array[Vector3]([Vector3(0, 0, 900)])
+spawn_point_lanes = Array[String]([""])
+obstacles = Array[Vector3]([Vector3(-500, -250, 50), Vector3(-450, 260, 48), Vector3(550, -240, 52), Vector3(600, 250, 45)])
+obstacle_kinds = Array[String](["rock1", "rock2", "rock2", "tree_bushy"])
+lakes = Array[Vector3]([])
+spike_pits = Array[Vector3]([])
+scenery = Array[Vector3]([Vector3(-800, 150, 15), Vector3(-200, -320, 14), Vector3(300, 330, 16), Vector3(850, -180, 13)])
+scenery_kinds = Array[String](["smudge", "smudge", "paw_print", "smudge"])
+objective_positions = Array[Vector2]([])
+border_decor = Array[Vector3]([])
+border_decor_kinds = Array[String]([])

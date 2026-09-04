@@ -42,7 +42,7 @@ var duo_b: Array = []
 
 ## Half the left/right spacing between two paired heroes placed on the same
 ## click (one PAIR_OFFSET left of the click, one right of it) — comfortably
-## inside the Duo chain leash (hero.gd DUO_LEASH_DIST 90) so they start well
+## inside the Duo chain leash (hero.gd DUO_LEASH_DIST 180) so they start well
 ## within it, but far enough apart to read as two distinct heroes rather
 ## than a stacked pair.
 const PAIR_OFFSET := 35.0
@@ -105,9 +105,22 @@ func _positions_for_group(group: Array, click: Vector2) -> Array[Vector2]:
 	if group.size() < 2:
 		return [click] as Array[Vector2]
 	var offset := Vector2(PAIR_OFFSET, 0.0)
-	if GameState.is_duo_leader(group[0]):
-		return [click + offset, click - offset] as Array[Vector2]
-	return [click - offset, click + offset] as Array[Vector2]
+	if group.size() == 2:
+		if GameState.is_duo_leader(group[0]):
+			return [click + offset, click - offset] as Array[Vector2]
+		return [click - offset, click + offset] as Array[Vector2]
+	# More than a pair: only possible from a degenerate pairing state — e.g. a
+	# save whose duo_pairings holds ONE Duo while four heroes are rostered, which
+	# BattleManager._compute_duos resolves by dropping the unpaired heroes into
+	# Duo A. This used to return two positions for a four-hero group and crash
+	# both _draw and _flatten on the third index. Spread them evenly instead:
+	# the formation is wrong-looking, but the level is playable and the prep
+	# screen repairs the pairing on the next visit.
+	var out: Array[Vector2] = []
+	var span := PAIR_OFFSET * 2.0
+	for i in group.size():
+		out.append(click + Vector2((float(i) - (group.size() - 1) * 0.5) * span, 0.0))
+	return out
 
 ## Flattened hero names/positions across every placed group, in order —
 ## deploy_chosen's payload (and BattleManager) still work per-hero. `clicks`
@@ -182,15 +195,21 @@ func _build_ui() -> void:
 	# was removed (Designer, 2026-07-26): it restated what the cursor ghost
 	# already shows, and the START BATTLE button enabling is a clearer "you are
 	# done" than a line of text saying so.
+	# The tutorial has one Duo and no lane split, and lanes are not explained
+	# until the first real battle (Designer, 2026-07-31) — so its hint says
+	# nothing about them.
 	col.add_child(UIStyle.wrapped_label(
-			"Deploy DUO's on designated lane — one DUO per lane.",
+			"Click inside the deploy area to place your DUO." if Tutorial.in_battle()
+			else "Deploy DUO's on designated lane — one DUO per lane.",
 			760.0, UIStyle.SIZE_SMALL))
 
 	# Single-lane levels (a Duo was wiped earlier in the run — see
 	# LaneField.single_lane) play by different rules than the player has been
 	# taught, so say so up front rather than letting them discover that lane
-	# discipline stopped mattering.
-	if field != null and field.single_lane:
+	# discipline stopped mattering. Not in the tutorial, which is single-lane
+	# only because it has one Duo: naming the exception teaches the rule
+	# backwards, before the rule itself has been introduced.
+	if field != null and field.single_lane and not Tutorial.in_battle():
 		col.add_child(UIStyle.centered_label(
 				"SINGLE LANE — your Duo holds the whole field", UIStyle.SIZE_SMALL, UIStyle.GOLD))
 

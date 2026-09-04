@@ -22,6 +22,11 @@ var _stats_page: StatsPage
 ## GameState.duo_pairings from whichever Duos are fully filled — see
 ## _sync_party_from_slots.
 var _pairing_section: VBoxContainer
+## Held for the tutorial tour, which reveals the page one section at a time —
+## see _run_tutorial_tour.
+var _gold_column: Control
+var _xp_column: Control
+var _back_button: Button
 var _pairing_slots: Array = ["", "", "", ""]
 
 ## Hand-drawn texture replacing the plain "START RUN" button (Designer,
@@ -89,6 +94,8 @@ func _ready() -> void:
 	_seed_pairing_slots()
 	_build_ui()
 	_refresh()
+	if Tutorial.phase == Tutorial.Phase.PREP:
+		_run_tutorial_tour()
 
 ## The prep theme lives in prep_menu.tscn, so neither of these can be set in
 ## the inspector: the Music bus is created at runtime by AudioSettings, and the
@@ -174,23 +181,25 @@ func _build_ui() -> void:
 	root.add_child(launch_row)
 
 	_currency_label = UIStyle.gold_label(0)
-	launch_row.add_child(_build_shop_column(_currency_label, UIStyle.GOLD_COLOR,
-			_upgrade_button("UPGRADE\nABILITIES", "spend GOLD", UIStyle.GOLD, 0, _open_abilities)))
+	_gold_column = _build_shop_column(_currency_label, UIStyle.GOLD_COLOR,
+			_upgrade_button("UPGRADE\nABILITIES", "spend GOLD", UIStyle.GOLD, 0, _open_abilities))
+	launch_row.add_child(_gold_column)
 
 	_start_button = _texture_button(START_RUN_TEXTURE, START_RUN_REGION, _on_start)
 	_start_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	launch_row.add_child(_start_button)
 
 	_xp_label = UIStyle.xp_label(0, "BANKED XP")
-	launch_row.add_child(_build_shop_column(_xp_label, UIStyle.XP_COLOR,
-			_upgrade_button("UPGRADE\nSTATS", "spend XP", UIStyle.XP_COLOR, 1, _open_stats)))
+	_xp_column = _build_shop_column(_xp_label, UIStyle.XP_COLOR,
+			_upgrade_button("UPGRADE\nSTATS", "spend XP", UIStyle.XP_COLOR, 1, _open_stats))
+	launch_row.add_child(_xp_column)
 
 	# Route back to the title screen (Designer, 2026-07-26). No confirmation
 	# here: prep changes (purchases, pairings) all save as they're made, so
 	# leaving this screen abandons nothing — unlike the battle's version.
-	var back_btn := _button("BACK TO MENU", UIStyle.SIZE_SMALL, _on_back_to_menu)
-	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	root.add_child(back_btn)
+	_back_button = _button("BACK TO MENU", UIStyle.SIZE_SMALL, _on_back_to_menu)
+	_back_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	root.add_child(_back_button)
 
 
 ## A big flanking shop button: accent-bordered card, two-line title, and a
@@ -770,10 +779,88 @@ func _close_stats() -> void:
 	_rebuild_hero_row()  # banked XP may have changed — refresh the card display
 	_refresh()
 
+## -- Tutorial tour (Designer, 2026-07-31) -------------------------------------
+##
+## "Lets have the UI show to the player as we are explaining, so there isnt too
+## much on the screen at first": the page builds in full, then everything below
+## the header is hidden and revealed one section at a time, each with its own
+## popup. The reveal order is the order a player will actually use them —
+## who you have, what you can spend on them, then the pairing that gates START.
+##
+## Each step reveals its section BEFORE the popup opens, so the spotlight has
+## something to land on (TutorialDirector re-measures every frame, which is what
+## makes revealing and spotlighting in the same frame safe).
+##
+## Nothing here is bought: this is a tour, not a shopping trip (Designer). The
+## one interactive step is the pairing, because START RUN is gated on it and the
+## player would otherwise meet that gate with no explanation.
+func _run_tutorial_tour() -> void:
+	for section in [_hero_row, _gold_column, _xp_column, _pairing_section,
+			_start_button, _back_button]:
+		if section != null:
+			section.visible = false
+	_tour_heroes()
+
+func _tour_heroes() -> void:
+	_hero_row.visible = true
+	TutorialDirector.run(self, [
+		{
+			"title": "YOUR HEROES",
+			"body": "These are your heroes. Click on their details to learn more.",
+			"focus": _hero_row,
+		},
+	], _tour_abilities)
+
+func _tour_abilities() -> void:
+	_gold_column.visible = true
+	TutorialDirector.run(self, [
+		{
+			"title": "ABILITY UPGRADES",
+			"body": "GOLD is earned by fighting, and spent here on permanent ability "
+				+ "upgrades for your heroes.",
+			"focus": _gold_column,
+		},
+	], _tour_stats)
+
+func _tour_stats() -> void:
+	_xp_column.visible = true
+	TutorialDirector.run(self, [
+		{
+			"title": "STAT UPGRADES",
+			"body": "XP is banked from every kill, shared across heroes, and spent "
+				+ "here on permanent stats.",
+			"focus": _xp_column,
+		},
+	], _tour_pairing)
+
+func _tour_pairing() -> void:
+	_pairing_section.visible = true
+	_start_button.visible = true
+	_back_button.visible = true
+	TutorialDirector.run(self, [
+		{
+			"title": "BUILD YOUR DUOS",
+			"body": "Thundaar and Artemis are already paired. Drag WARDEN and BEACON "
+				+ "into the second DUO — every pair unlocks its own ULTIMATE, so who "
+				+ "you put together decides what you can unleash.",
+			"focus": _pairing_section,
+		},
+		{
+			"title": "THEN START THE RUN",
+			"body": "START RUN lights up once both DUOs are filled. Good luck.",
+			"focus": _start_button,
+		},
+	])
+
 func _on_back_to_menu() -> void:
 	get_tree().change_scene_to_file(GameState.TITLE_SCREEN)
 
 func _on_start() -> void:
+	# Closing the tutorial: from here on this is a normal prep screen, and the
+	# battle about to load owes the player only the two-lane explanation
+	# (Tutorial.consume_two_lane_hint, read by BattleManager).
+	if Tutorial.phase == Tutorial.Phase.PREP:
+		Tutorial.complete()
 	RunState.start_run()
 	GameState.save_game()
 	get_tree().change_scene_to_file(GameState.BATTLEFIELD)

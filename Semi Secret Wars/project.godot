@@ -23,6 +23,7 @@ general/default_playback_type.web=0
 
 GameState="*res://scenes/state/game_state.gd"
 RunState="*res://scenes/run/run_state.gd"
+Tutorial="*res://scenes/tutorial/tutorial_state.gd"
 UIBoot="*res://scripts/ui_boot.gd"
 AudioSettings="*res://scripts/audio_settings.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
