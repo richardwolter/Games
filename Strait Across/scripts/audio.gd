@@ -45,6 +45,12 @@ const PLAYLISTS: Dictionary[int, Array] = {
 		"res://audio/Song_Level6_A.mp3",
 		"res://audio/Song_Level6_B.mp3",
 	],
+	# One track, entered here rather than in TRACKS because that list is indexed by
+	# level and stops at 3 — a seventh entry would mean inventing three levels'
+	# worth of songs to hold the place. A single-track playlist simply repeats.
+	6: [
+		"res://audio/Song_Level7.mp3",
+	],
 }
 ## Background noise for a level, by level index. A level with no entry plays
 ## none, and the layer fades out when you leave one that had it.
@@ -177,6 +183,8 @@ const MUSIC_TRIM_DB := -11.0
 const TRACK_TRIM_DB: Dictionary[String, float] = {
 	"res://audio/Song_Level5_A.mp3": 5.0,
 	"res://audio/Song_Level5_B.mp3": 5.0,
+	# Measured at -11.4 LUFS against level 6's -14.8, so it comes down to meet it.
+	"res://audio/Song_Level7.mp3": -3.4,
 }
 
 ## The two buses everything plays on, created at startup so there is no bus

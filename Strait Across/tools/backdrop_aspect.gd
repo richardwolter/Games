@@ -48,6 +48,10 @@ func _report(name: String, level: LevelDef, world: GDScript) -> void:
 	shore_run = maxf(shore_run, near_run + LevelDef.NEAR_RUNUP + 200.0)
 
 	var high_ground: float = maxf(level.far_shore_lift, level.near_ramp_rise)
+	# A cave's roof stands in for the headroom, and the camera is then let a
+	# little past it so the rock is visible rather than being the top row.
+	if level.cave_roof > 0.0:
+		headroom = level.cave_roof + world.get(&"ROOF_VIEW")
 	var ceiling: float = surface - high_ground - headroom
 	var painted_bottom: float = surface + level.max_depth + 300.0
 

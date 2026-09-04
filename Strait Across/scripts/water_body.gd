@@ -9,8 +9,19 @@ extends Area2D
 @export var angular_drag: float = 5.0
 
 ## Sideways jostle, so a fresh drop nudges its neighbours instead of the water
-## feeling like glue. Kept small.
+## feeling like glue. Kept small. Positive pushes towards the far shore.
 @export var current_strength: float = 0.0
+
+## Where that current comes from, and how far it carries. Zero reach — the
+## default — makes the current uniform across the whole strait, which is what it
+## has always been.
+##
+## With a reach set, the current instead radiates from `current_origin_x` and
+## fades to nothing at the edge of its range, always pushing AWAY from that point.
+## That is a waterfall: the water it dumps has to go somewhere, and where it goes
+## is outwards, hardest right under the fall.
+@export var current_origin_x: float = 0.0
+@export var current_reach: float = 0.0
 
 ## Draws the splashes. A child node rather than something this file does itself:
 ## buoyancy is physics and runs on the physics clock, splashes are decoration and
@@ -108,6 +119,7 @@ func _physics_process(_delta: float) -> void:
 	# and a Vector2 build per sample point that can only ever produce zero. Decided
 	# once per tick rather than per point.
 	var has_current := not is_zero_approx(current_strength)
+	var local_current := has_current and current_reach > 0.0
 
 	for body: BridgeObject in _submerged:
 		if not is_instance_valid(body) or body.is_held or body.def == null:
@@ -123,6 +135,22 @@ func _physics_process(_delta: float) -> void:
 		var height: float = body.def.get_height()
 		var origin := body.global_position
 
+		# One push per body rather than per sample point: the falloff is over
+		# hundreds of units and a plank is not long enough for its two ends to be
+		# in meaningfully different water, so working it out per point would be the
+		# same number computed a dozen times.
+		var push := current_strength
+		if local_current:
+			var offset := origin.x - current_origin_x
+			var near := 1.0 - clampf(absf(offset) / current_reach, 0.0, 1.0)
+			# Squared, matching the churn the water shader draws, so what the player
+			# sees on the surface is where the piece actually gets shoved.
+			# A piece parked dead under the fall has no side to be pushed to, so it
+			# is sent back down the strait — the fall is at a bank, and outwards
+			# from a bank means away from it.
+			var away := signf(offset) if not is_zero_approx(offset) else -1.0
+			push = current_strength * near * near * away
+
 		for local_point: Vector2 in points:
 			var world_point := body.to_global(local_point)
 			var depth := world_point.y - surface_y
@@ -130,7 +158,7 @@ func _physics_process(_delta: float) -> void:
 				continue
 			var submersion := clampf(depth / height, 0.0, 1.0)
 			body.apply_force(
-				Vector2(current_strength * submersion, -full_force * submersion)
+				Vector2(push * submersion, -full_force * submersion)
 				if has_current
 				else Vector2(0.0, -full_force * submersion),
 				world_point - origin

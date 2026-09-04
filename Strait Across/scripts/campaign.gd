@@ -15,6 +15,8 @@ const PATHS: Array[String] = [
 	"res://data/levels/level_4.tres",
 	"res://data/levels/level_5.tres",
 	"res://data/levels/level_6.tres",
+	"res://data/levels/level_7.tres",
+	"res://data/levels/level_8.tres",
 ]
 
 ## Which level the player picked on the select screen, or -1 to resume the save.

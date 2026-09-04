@@ -70,6 +70,33 @@ const PILLAR_RELIEF := 44.0
 ## the strait was cut around rather than as a column stood on the floor.
 const PILLAR_ROOT := 220.0
 
+## How thick the cave roof is drawn. Only its underside is ever seen, so this is
+## just enough rock that the band above the strait never runs out before the
+## camera's top limit does.
+const ROOF_THICKNESS := 1400.0
+## Peak-to-peak relief on the roof's underside. Like the pillar's, this IS
+## collision. It only ever adds rock UPWARD, away from the strait: the lowest
+## point of the roof has to stay the ceiling plane the player is already stopped
+## at, or there is rock hanging below a wall they cannot drag a piece through.
+const ROOF_RELIEF := 190.0
+## Horizontal spacing of the roof's underside vertices.
+const ROOF_STEP := 46.0
+## How much rock the camera is allowed to see above the ceiling plane. Without
+## this the view stops exactly at the underside and the roof is a hard edge along
+## the top of the screen rather than something the strait is inside of.
+const ROOF_VIEW := 420.0
+## How far a stalactite is buried up into the roof, for the same reason a pillar's
+## foot is buried in the seabed: a visible seam reads as two objects.
+const ROOF_ROOT := 180.0
+## Depth the roof and its stalactites are painted at, on top of their own.
+##
+## The ground shader lightens towards a mesh's exposed face, because on a bank
+## that face is the sunlit top. A cave roof's exposed face is its underside, and
+## light does not reach it: painted at its true depth of zero the whole lid came
+## out the pale tan of a beach, which is the one colour a cave cannot be. Pushing
+## it past the shader's fade_depth hands back the dark rock underneath.
+const ROOF_GLOOM := 640.0
+
 ## What a fully planted, fully stocked strait looks like. The scene's own values,
 ## named here because a level's plant_density and fish_density are shares OF
 ## these — reading them off the node at runtime would mean the first level to
@@ -104,6 +131,10 @@ const SEABED_FRICTION := 0.9
 ## One shader for shore and seabed both: the join between two different ones was
 ## itself the seam. See shaders/ground.gdshader.
 const GROUND_SHADER := preload("res://shaders/ground.gdshader")
+## Preloaded rather than reached by class name, matching the shader above: the
+## headless tools run scenes without the editor's class cache, and there a script
+## known only by its class_name is a parse error.
+const WATERFALL := preload("res://scripts/waterfall.gd")
 
 @onready var water: Area2D = $Water
 # Untyped: the camera script has no class_name and `refit()` is its own method.
@@ -121,6 +152,13 @@ var _shore_run: float = SHORE_RUN
 ## Both 0 on a level without a launch ramp.
 var _near_rise: float = 0.0
 var _near_ramp_run: float = 0.0
+## Height of the cave roof above the highest ground, or 0 for open sky. When set
+## it stands in for HEADROOM everywhere, so the roof and the invisible ceiling the
+## player already had are the same plane.
+var _roof: float = 0.0
+## Noise for the roof's underside, kept between calls and dropped on every build
+## so a new level re-seeds it. Null until the first level with a roof asks.
+var _roof_noise: FastNoiseLite = null
 var _ground: LevelDef.Ground = LevelDef.Ground.ROCK
 var _life: LevelDef.Life = LevelDef.Life.FULL
 var _plant_density: float = 1.0
@@ -141,6 +179,8 @@ func build(level: LevelDef) -> void:
 	# The near bank has to reach behind the truck's spawn, which a ramp pushes back.
 	_shore_run = maxf(SHORE_RUN, _slope_run + SLOPE_PLATEAU)
 	_shore_run = maxf(_shore_run, _near_ramp_run + LevelDef.NEAR_RUNUP + 200.0)
+	_roof = maxf(level.cave_roof, 0.0)
+	_roof_noise = null
 	_ground = level.ground
 	_life = level.life
 	_plant_density = clampf(level.plant_density, 0.0, 1.0)
@@ -155,8 +195,13 @@ func build(level: LevelDef) -> void:
 	_build_shore(_half_width, _half_width + _shore_run, true)
 	_build_seabed()
 	_build_pillar(level)
+	_build_roof()
+	_build_stalactite(level)
 	_build_seabed_prop(level)
 	_shape_water()
+	# After the water: the fall's churn is a parameter on the water's own shader,
+	# and its push is a setting on the water body.
+	_build_waterfall(level)
 	_shape_bounds()
 	_frame_camera()
 	# After the camera, which is what decides how much sky there is to fly in.
@@ -171,10 +216,15 @@ func build(level: LevelDef) -> void:
 ## seabed the flora was just planted along, so they can't swim through rock.
 func _stock_wildlife() -> void:
 	var seed_value := noise_seed_for_level()
-	$Birds.populate(Rect2(
-		Vector2(camera.limit_left, camera.limit_top),
-		Vector2(camera.limit_right - camera.limit_left, SURFACE_Y - camera.limit_top)
-	), seed_value)
+	# An empty box is how Birds is told to hold nothing, and a roofed level is the
+	# one case that wants it: gulls circling under a cave ceiling read as a bug.
+	$Birds.populate(
+		Rect2() if _roof > 0.0 else Rect2(
+			Vector2(camera.limit_left, camera.limit_top),
+			Vector2(camera.limit_right - camera.limit_left, SURFACE_Y - camera.limit_top)
+		),
+		seed_value
+	)
 	# An empty bed is how both wildlife nodes are told to hold nothing: they clear
 	# what they have and return, so a concrete channel comes back empty even when
 	# the previous level was full of fish.
@@ -352,7 +402,14 @@ func _high_ground() -> float:
 ## `SURFACE_Y - HEADROOM` asks this instead, so the ceiling, the walls, the build
 ## box and the camera cannot disagree about where the top is.
 func _ceiling_y() -> float:
-	return SURFACE_Y - _high_ground() - HEADROOM
+	return SURFACE_Y - _high_ground() - _headroom()
+
+
+## How much room there is above the highest ground. HEADROOM on an open level,
+## and the roof's own height in a cave — asked for rather than assumed, so the
+## build box, the walls, the camera and the rock all shorten together.
+func _headroom() -> float:
+	return _roof if _roof > 0.0 else HEADROOM
 
 
 ## Grip for a piece of ground. Ground never bounces — a truck rebounding off the
@@ -478,11 +535,14 @@ func _build_pillar(level: LevelDef) -> void:
 	if level.pillar_width <= 0.0:
 		return
 
+	var at_x: float = clampf(level.pillar_at, -1.0, 1.0) * _half_width
 	var head_y := SURFACE_Y - level.pillar_rise
 	# Down to the seabed and then well past it, so the pillar is rooted in the
 	# floor rather than balanced on top of it. A rock that meets the ground in a
-	# visible seam reads as two objects.
-	var foot_y := _seabed_y_at(0.0) + PILLAR_ROOT
+	# visible seam reads as two objects. Asked for at the pillar's own x, or one
+	# standing off-centre would be rooted at the depth of the middle and left
+	# hanging over the shelf it actually stands on.
+	var foot_y := _seabed_y_at(at_x) + PILLAR_ROOT
 
 	var noise := FastNoiseLite.new()
 	noise.seed = noise_seed_for_level() + 4801
@@ -501,15 +561,21 @@ func _build_pillar(level: LevelDef) -> void:
 		# spreads where it meets the bed and stands nearly plumb above that.
 		var half: float = level.pillar_width * 0.5 \
 			* lerpf(1.0, maxf(level.pillar_flare, 1.0), t * t)
+		# A tapered head closes to a tip instead of ending in a face, which is the
+		# difference between a rock somebody could bridge from and a stalagmite.
+		# Never quite to zero: a polygon that meets itself is a degenerate shape
+		# the collision decomposition has to be handed anyway.
+		if level.pillar_taper > 0.0:
+			half *= lerpf(0.06, 1.0, smoothstep(0.0, level.pillar_taper, t))
 		# Fade the roughness out at the very top, so the head is a face somebody
 		# could land a bridge on rather than a row of spikes, and at the very
 		# bottom, where it is buried in the seabed anyway.
 		var edge: float = smoothstep(0.0, 0.12, t) * smoothstep(0.0, 0.06, 1.0 - t)
 		left.append(Vector2(
-			-half - _pillar_relief(noise, y, 0.0) * edge, y
+			at_x - half - _pillar_relief(noise, y, 0.0) * edge, y
 		))
 		right.append(Vector2(
-			half + _pillar_relief(noise, y, 517.0) * edge, y
+			at_x + half + _pillar_relief(noise, y, 517.0) * edge, y
 		))
 
 	var outline := PackedVector2Array()
@@ -543,8 +609,8 @@ func _build_pillar(level: LevelDef) -> void:
 	var mat := _ground_material()
 	mat.set_shader_parameter("local_depth", 1.0)
 	# Wet below the waterline, dry above it. The shader's usual test is |x| past
-	# the bank, and a pillar stands at x = 0 — wet by that measure all the way to
-	# its head, which is standing in the open air.
+	# the bank, and a pillar stands inside the strait wherever it is put — wet by
+	# that measure all the way to its head, which is standing in the open air.
 	mat.set_shader_parameter("dry_by_height", 1.0)
 	visual.material = mat
 	body.add_child(visual)
@@ -561,6 +627,176 @@ func _pillar_relief(noise: FastNoiseLite, y: float, offset: float) -> float:
 	var broad: float = noise.get_noise_1d(y + offset) * PILLAR_RELIEF
 	var cleft: float = noise.get_noise_1d(y * 3.1 + offset + 2000.0)
 	return broad + pow(maxf(cleft, 0.0), 3.0) * PILLAR_RELIEF * 2.4
+
+
+## The rock lid over the strait, if the level asks for one.
+##
+## Same ground recipe as the banks and the pillar, hung the other way up. The
+## underside is the only face anybody sees, so that is the one carrying the
+## noise; everything above it is filler that runs past the top of the camera.
+##
+## Depth for the shader is measured DOWN from the underside, not from the
+## waterline: rock gets darker the further into it you look, and in a roof
+## "further in" is upward. Without that the whole slab comes out one flat tone,
+## which is the same fault the lifted bank and the pillar both had.
+func _build_roof() -> void:
+	if _roof <= 0.0:
+		return
+
+	var left_x := -_half_width - _shore_run - 200.0
+	var right_x := _half_width + _shore_run + 200.0
+	var top_y := _ceiling_y() - ROOF_THICKNESS
+
+	var outline := PackedVector2Array()
+	var tint := PackedColorArray()
+	var steps := maxi(int((right_x - left_x) / ROOF_STEP), 8)
+	for i in steps + 1:
+		var x: float = lerpf(left_x, right_x, float(i) / float(steps))
+		var y := _roof_y_at(x)
+		outline.append(Vector2(x, y))
+		tint.append(_gloom(0.0))
+	outline.append(Vector2(right_x, top_y))
+	tint.append(_gloom(_ceiling_y() - top_y))
+	outline.append(Vector2(left_x, top_y))
+	tint.append(_gloom(_ceiling_y() - top_y))
+
+	var body := StaticBody2D.new()
+	body.name = "Roof"
+	body.physics_material_override = _ground_physics(SHORE_FRICTION)
+	$Terrain.add_child(body)
+
+	var shape := CollisionPolygon2D.new()
+	shape.build_mode = CollisionPolygon2D.BUILD_SOLIDS
+	shape.polygon = outline
+	body.add_child(shape)
+
+	body.add_child(_rock_visual(outline, tint))
+
+
+## Underside of the roof at a given x. Never below the ceiling plane — see
+## ROOF_RELIEF.
+##
+## The noise is built once per level rather than per vertex: the stalactite asks
+## this too, and it is called a few hundred times a build.
+func _roof_y_at(x: float) -> float:
+	if _roof_noise == null:
+		_roof_noise = FastNoiseLite.new()
+		_roof_noise.seed = noise_seed_for_level() + 9301
+		_roof_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		_roof_noise.frequency = 1.0 / 260.0
+		_roof_noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+		_roof_noise.fractal_octaves = 3
+	return _ceiling_y() - absf(_roof_noise.get_noise_1d(x)) * ROOF_RELIEF
+
+
+## A rock spike hanging from that roof, if the level asks for one.
+##
+## The pillar's polygon walk, inverted: widest where it meets the roof, tapering
+## to a tip at the bottom, roughened down both sides from the level's own noise.
+## Rooted up inside the slab so the two read as one piece of rock.
+func _build_stalactite(level: LevelDef) -> void:
+	if _roof <= 0.0 or level.stalactite_width <= 0.0:
+		return
+
+	var at_x: float = clampf(level.stalactite_at, -1.0, 1.0) * _half_width
+	var root_y := _roof_y_at(at_x) - ROOF_ROOT
+	var tip_y := _ceiling_y() + maxf(level.stalactite_drop, 40.0)
+
+	var noise := FastNoiseLite.new()
+	noise.seed = noise_seed_for_level() + 6607
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 1.0 / 190.0
+	noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	noise.fractal_octaves = 3
+
+	var steps := maxi(int((tip_y - root_y) / PILLAR_STEP), 6)
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for i in steps + 1:
+		var t := float(i) / float(steps)  # 0 at the roof, 1 at the tip.
+		var y: float = lerpf(root_y, tip_y, t)
+		# Squared, so it holds most of its width for most of the drop and then
+		# closes quickly — a spike, rather than a cone.
+		var half: float = level.stalactite_width * 0.5 * (1.0 - t * t)
+		# Roughness out of the tip as well as out of the root: a few units of
+		# noise on a point that is nearly closed is a burr, not a crevice.
+		var edge: float = smoothstep(0.0, 0.10, t) * smoothstep(0.0, 0.25, 1.0 - t)
+		left.append(Vector2(at_x - half - _pillar_relief(noise, y, 0.0) * edge, y))
+		right.append(Vector2(at_x + half + _pillar_relief(noise, y, 517.0) * edge, y))
+
+	var outline := PackedVector2Array()
+	for point: Vector2 in left:
+		outline.append(point)
+	for i in range(right.size() - 1, -1, -1):
+		outline.append(right[i])
+
+	var tint := PackedColorArray()
+	for point: Vector2 in outline:
+		tint.append(_gloom(tip_y - point.y))
+
+	var body := StaticBody2D.new()
+	body.name = "Stalactite"
+	body.physics_material_override = _ground_physics(SHORE_FRICTION)
+	$Terrain.add_child(body)
+
+	var shape := CollisionPolygon2D.new()
+	shape.build_mode = CollisionPolygon2D.BUILD_SOLIDS
+	shape.polygon = outline
+	body.add_child(shape)
+
+	body.add_child(_rock_visual(outline, tint))
+
+
+## A vertex colour for hanging rock: its own depth into the mesh, plus the gloom
+## that keeps a cave from being lit like a beach.
+func _gloom(depth: float) -> Color:
+	return Color((depth + ROOF_GLOOM) / DEPTH_IN_COLOUR, 0.0, 0.0, 1.0)
+
+
+## The drawn half of a piece of hanging rock: the ground shader, told to take its
+## depth from the mesh rather than from the waterline, and to stay dry.
+##
+## Shared by the roof and the stalactite because they are the same material and
+## because getting either of those two flags wrong is invisible until the level
+## is on screen — a roof shaded as if it were underwater is a green ceiling.
+func _rock_visual(outline: PackedVector2Array, tint: PackedColorArray) -> Polygon2D:
+	var visual := Polygon2D.new()
+	visual.color = Color.WHITE  # ground.gdshader writes COLOR outright.
+	visual.polygon = outline
+	visual.vertex_colors = tint
+	var mat := _ground_material()
+	mat.set_shader_parameter("local_depth", 1.0)
+	# The shader picks its colours from two things, and for hanging rock both of
+	# them answer the wrong question.
+	#
+	# It takes light-to-dark from how far BELOW the waterline a fragment is: rock
+	# a thousand units up is as far from the water as it gets, so the lid came out
+	# the palest colour in the palette. And it takes rock-or-sand from which side
+	# of the waterline the fragment is on, so the whole roof was scored as dry
+	# bank — beach, overhead, in a cave.
+	#
+	# Both are switched off rather than worked around. A waterline the mesh can
+	# never be past keeps it on the rock palette, and collapsing that palette onto
+	# its own deep end paints it at the far end of the light range everywhere.
+	# What is left is unlit stone with the strata and veins still in it, which is
+	# what a cave roof is.
+	mat.set_shader_parameter("dry_by_height", 0.0)
+	mat.set_shader_parameter("waterline_x", 1.0e9)
+	mat.set_shader_parameter("rock_color", _shader_value(mat, "rock_deep_color"))
+	mat.set_shader_parameter("crust_depth", 0.0)
+	visual.material = mat
+	return visual
+
+
+## A shader parameter's current value, falling back to the shader's own default
+## when the material has not overridden it. _ground_material() only sets the
+## parameters a biome changes, so asking a ROCK level for its deep colours comes
+## back null without this.
+func _shader_value(mat: ShaderMaterial, name: String) -> Variant:
+	var value: Variant = mat.get_shader_parameter(name)
+	if value != null:
+		return value
+	return RenderingServer.shader_get_parameter_default(mat.shader.get_rid(), name)
 
 
 ## The level's one big seabed object, if it has one: drawn, and solid.
@@ -723,6 +959,56 @@ func _shape_water() -> void:
 		mat.set_shader_parameter("half_width", _half_width)
 
 
+## How far out from the cliff face the fall's column stands, as a fraction of the
+## face's run. Far enough out that the water is clear of the rock and reads as
+## falling in front of it, close enough that it is obviously coming off this bank.
+const FALL_STANDOFF := 0.35
+
+
+## The waterfall off the far cliff, if the level asks for one: the drawn column,
+## the churn on the water it lands in, and the current that churn implies.
+##
+## All three are set from the same x, so there is no way for the picture and the
+## physics to end up describing different waterfalls.
+func _build_waterfall(level: LevelDef) -> void:
+	var mat := ($Water/Visual as Polygon2D).material as ShaderMaterial
+
+	if level.waterfall_width <= 0.0 or _far_lift <= 0.0:
+		if mat != null:
+			mat.set_shader_parameter("churn_reach", 0.0)
+			mat.set_shader_parameter("churn_strength", 0.0)
+		(water as WaterBody).current_strength = 0.0
+		(water as WaterBody).current_reach = 0.0
+		return
+
+	var at_x := _half_width + _slope_run * FALL_STANDOFF
+	var fall := WATERFALL.new()  # Untyped: class_name Waterfall is not in scope headless.
+	fall.name = "Waterfall"
+	# In front of the terrain and the flora, behind the fish and the water overlay:
+	# the fall pours down the face of the rock, so being drawn behind that rock
+	# would hide it completely.
+	fall.z_index = 2
+	fall.z_as_relative = false
+	fall.position = Vector2(at_x, 0.0)
+	# Off the lip of the face at this point, not off the clifftop inland — the
+	# water leaves the rock where the rock ends.
+	fall.top_y = _shore_top_y(at_x)
+	fall.surface_y = SURFACE_Y
+	fall.width = level.waterfall_width
+	fall.lean = level.waterfall_width * 0.6
+	$Terrain.add_child(fall)
+
+	if mat != null:
+		mat.set_shader_parameter("churn_x", at_x - fall.lean)
+		mat.set_shader_parameter("churn_reach", level.waterfall_reach)
+		mat.set_shader_parameter("churn_strength", 1.0)
+
+	var body := water as WaterBody
+	body.current_strength = level.waterfall_push
+	body.current_origin_x = at_x - fall.lean
+	body.current_reach = level.waterfall_reach
+
+
 ## Invisible box the player can't drag a piece out of. Sits just outside the
 ## water so a piece can still be nudged flush against either shore.
 func _shape_bounds() -> void:
@@ -766,7 +1052,9 @@ func _frame_camera() -> void:
 	camera.limit_left = roundi(-_half_width - _shore_run)
 	camera.limit_right = roundi(_half_width + _shore_run)
 	# Ceiling the player can hold a piece at, and the floor the seabed is drawn to.
-	camera.limit_top = roundi(_ceiling_y())
+	# In a cave the view goes a little past the ceiling, or the roof's underside is
+	# the top row of pixels and the strait reads as cut off rather than enclosed.
+	camera.limit_top = roundi(_ceiling_y() - (ROOF_VIEW if _roof > 0.0 else 0.0))
 	camera.limit_bottom = roundi(SURFACE_Y + _max_depth + 300.0 + DEEP_MARGIN)
 	camera.refit()
 
@@ -805,7 +1093,7 @@ func build_area() -> Rect2:
 	var left := -_half_width + 60.0
 	return Rect2(
 		Vector2(left, _ceiling_y() + 60.0),
-		Vector2(_far_edge_x() - 60.0 - left, HEADROOM + _high_ground() + _max_depth - 120.0)
+		Vector2(_far_edge_x() - 60.0 - left, _headroom() + _high_ground() + _max_depth - 120.0)
 	)
 
 
@@ -815,5 +1103,5 @@ func escape_bounds() -> Rect2:
 	return Rect2(
 		Vector2(-_half_width - 300.0, _ceiling_y() - 300.0),
 		Vector2(_far_edge_x() + 300.0 + _half_width + 300.0,
-			HEADROOM + _far_lift + _max_depth + 900.0)
+			_headroom() + _far_lift + _max_depth + 900.0)
 	)

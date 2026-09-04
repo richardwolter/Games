@@ -139,6 +139,19 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	_testing = args.has("--smoke") or args.has("--carcheck") or args.has("--bench")
 
+	# Anything driving the game from a tool script cannot write the save, whether
+	# or not it remembered to pass a flag.
+	#
+	# Every tool in tools/ that photographs or exercises the game is documented as
+	# taking --sandbox, and --sandbox already blocks the write. The hole is that it
+	# is documentation: a tool run without it loads the player's real save, drives
+	# the game somewhere, and writes that back over a run somebody cares about.
+	# There is no undo for that, and "remember the flag" is not a guard.
+	#
+	# A --script launch is never a player, so it is never allowed to save.
+	if OS.get_cmdline_args().has("--script"):
+		_testing = true
+
 	# The persistence check needs the real save path — writing the file and reading
 	# it back IS what it tests — so it redirects the slot to a scratch file instead
 	# of borrowing _testing, which would switch off every write it means to check.

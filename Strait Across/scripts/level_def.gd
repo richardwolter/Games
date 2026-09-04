@@ -120,13 +120,74 @@ enum Life { NONE, MOSS, FULL }
 ## the problem — a strait with a pillar in it is two short spans instead of one
 ## long one, for anybody who can reach it.
 @export var pillar_width: float = 0.0
+## Where it stands, as a fraction of half_width. 0 — the default — is mid-strait,
+## which is where every pillar has stood up to now. Offsetting it is what lets a
+## level put a stalagmite and a stalactite in the same strait without the two
+## meeting in the middle.
+@export_range(-1.0, 1.0) var pillar_at: float = 0.0
 ## How far its head stands above the waterline. Negative leaves it submerged,
 ## which makes it a hazard rather than a foundation.
 @export var pillar_rise: float = 60.0
+## How much of the pillar's height, from the head down, narrows to a point. 0 —
+## the default — is the flat-topped rock every level up to now, wide enough to
+## land a span on. Raise it and the same rock becomes a stalagmite: nothing can
+## be balanced on the tip, so a pillar the player used to aim for turns into a
+## spike they have to build over.
+@export_range(0.0, 1.0) var pillar_taper: float = 0.0
 ## How much wider the foot is than the head, as a multiplier. A pillar that goes
 ## down straight reads as a column somebody poured; rock in water is undercut at
 ## the top and buttressed at the bottom.
 @export var pillar_flare: float = 2.2
+
+
+## Height of a solid rock roof over the strait, measured above the highest ground
+## the way World.HEADROOM is. Zero — the default — is open sky, which is every
+## level up to now.
+##
+## This REPLACES the headroom rather than sitting inside it: the ceiling the
+## player already could not drag a piece past becomes visible rock, and the whole
+## build box shortens with it. That is the point of a cave — the strait stops
+## being a floor problem and becomes a floor-and-lid problem, because a stack tall
+## enough to bridge from is a stack that hits the roof, and a truck launched off a
+## ramp has somewhere to bang its head.
+##
+## Keep it well above the truck's own height or the level is unplayable rather
+## than tight.
+@export var cave_roof: float = 0.0
+
+## A rock spike hanging from that roof, as its width where it meets the rock.
+## Zero is a bare roof. Ignored without a roof to hang from.
+##
+## The mirror of the pillar in every sense: same ground, same shader, same noise,
+## grown downward instead of up. What it does to the level is different, though —
+## a stalagmite is something to build over, a stalactite is something to build
+## UNDER, and the gap between the two is the level.
+@export var stalactite_width: float = 0.0
+## How far its tip hangs below the roof.
+@export var stalactite_drop: float = 400.0
+## Where it hangs, as a fraction of half_width. 0 is mid-strait, which is where
+## the pillar already stands, so a level with both usually offsets this.
+@export_range(-1.0, 1.0) var stalactite_at: float = -0.35
+
+
+## A waterfall pouring off the far bank into the strait, as the width of its
+## column where it lands. Zero — the default — is a dry cliff, which is every
+## level up to now. Ignored without a lifted far shore: water has to fall from
+## somewhere.
+##
+## It is not scenery. The water it dumps pushes floating pieces back down the
+## strait, hardest right under the fall and fading to nothing at
+## `waterfall_reach`, and the surface churns over exactly that range so the shove
+## is something the player can see before they feel it. The effect on the level is
+## that the far bank — already the hardest place to build, on a lifted level —
+## will not hold a loose float still.
+@export var waterfall_width: float = 0.0
+## How far down the strait the churn and the push carry.
+@export var waterfall_reach: float = 900.0
+## Force per submerged sample point directly under the fall. Small numbers move
+## a barrel and leave a girder alone, which is the intent — the current sorts the
+## light pieces from the heavy ones.
+@export var waterfall_push: float = 260.0
 
 
 ## One large thing standing on the seabed — a drowned tree, a wreck, whatever the

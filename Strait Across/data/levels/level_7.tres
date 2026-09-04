@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="LevelDef" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
+[ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
+[ext_resource type="Resource" path="res://data/objects/tire.tres" id="3_tire"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="4_crate"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="6_fridge"]
+[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="7_beam"]
+[ext_resource type="Resource" path="res://data/objects/pontoon.tres" id="8_pontoon"]
+[ext_resource type="Resource" path="res://data/objects/girder.tres" id="9_girder"]
+[ext_resource type="Resource" path="res://data/objects/container.tres" id="10_container"]
+[ext_resource type="Resource" path="res://data/objects/ramp.tres" id="11_ramp"]
+[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="15_bronze"]
+[ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="12_silver"]
+[ext_resource type="Resource" path="res://data/boxes/gold_box.tres" id="13_gold"]
+[ext_resource type="Resource" path="res://data/boxes/deluxe_box.tres" id="14_deluxe"]
+
+[ext_resource type="Texture2D" path="res://art/background_cave.png" id="20_cave"]
+
+[resource]
+script = ExtResource("1_level")
+display_name = "7 — The Cavern"
+half_width = 1700.0
+max_depth = 700.0
+ground = 0
+life = 1
+plant_density = 0.0
+fish_density = 0.0
+cave_roof = 620.0
+stalactite_width = 300.0
+stalactite_drop = 400.0
+stalactite_at = 0.25
+pillar_at = -0.39
+pillar_width = 230.0
+pillar_rise = 210.0
+pillar_flare = 2.4
+pillar_taper = 0.45
+backdrop = ExtResource("20_cave")
+backdrop_horizon = 0.5
+reward_scale = 1.7
+shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge"), ExtResource("7_beam"), ExtResource("8_pontoon"), ExtResource("9_girder"), ExtResource("10_container"), ExtResource("11_ramp")])
+shop_stock = PackedInt32Array(18, 8, 12, 10, 6, 10, 8, 6, 4, 2)
+boxes = Array[Resource]([ExtResource("15_bronze"), ExtResource("12_silver"), ExtResource("13_gold"), ExtResource("14_deluxe")])

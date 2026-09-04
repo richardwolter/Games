@@ -17,6 +17,8 @@
 [ext_resource type="Resource" path="res://data/levels/level_4.tres" id="14_lv4"]
 [ext_resource type="Resource" path="res://data/levels/level_5.tres" id="14_lv5"]
 [ext_resource type="Resource" path="res://data/levels/level_6.tres" id="15_lv6"]
+[ext_resource type="Resource" path="res://data/levels/level_7.tres" id="16_lv7"]
+[ext_resource type="Resource" path="res://data/levels/level_8.tres" id="17_lv8"]
 
 [node name="Main" type="Node2D" unique_id=802875084]
 script = ExtResource("1_main")
@@ -51,7 +53,7 @@ script = ExtResource("9_shop")
 
 [node name="Levels" type="Node" parent="." unique_id=1274921547]
 script = ExtResource("10_levels")
-levels = Array[ExtResource("10_jkv2x")]([ExtResource("11_lv1"), ExtResource("12_lv2"), ExtResource("13_lv3"), ExtResource("14_lv4"), ExtResource("14_lv5"), ExtResource("15_lv6")])
+levels = Array[ExtResource("10_jkv2x")]([ExtResource("11_lv1"), ExtResource("12_lv2"), ExtResource("13_lv3"), ExtResource("14_lv4"), ExtResource("14_lv5"), ExtResource("15_lv6"), ExtResource("16_lv7"), ExtResource("17_lv8")])
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1208417708]
 script = ExtResource("5_hud")

@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="LevelDef" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/level_def.gd" id="1_level"]
+[ext_resource type="Resource" path="res://data/objects/plank.tres" id="2_plank"]
+[ext_resource type="Resource" path="res://data/objects/tire.tres" id="3_tire"]
+[ext_resource type="Resource" path="res://data/objects/crate.tres" id="4_crate"]
+[ext_resource type="Resource" path="res://data/objects/barrel.tres" id="5_barrel"]
+[ext_resource type="Resource" path="res://data/objects/refrigerator.tres" id="6_fridge"]
+[ext_resource type="Resource" path="res://data/objects/metal_beam.tres" id="7_beam"]
+[ext_resource type="Resource" path="res://data/objects/pontoon.tres" id="8_pontoon"]
+[ext_resource type="Resource" path="res://data/objects/girder.tres" id="9_girder"]
+[ext_resource type="Resource" path="res://data/objects/container.tres" id="10_container"]
+[ext_resource type="Resource" path="res://data/objects/ramp.tres" id="11_ramp"]
+[ext_resource type="Resource" path="res://data/boxes/bronze_box.tres" id="15_bronze"]
+[ext_resource type="Resource" path="res://data/boxes/silver_box.tres" id="12_silver"]
+[ext_resource type="Resource" path="res://data/boxes/gold_box.tres" id="13_gold"]
+[ext_resource type="Resource" path="res://data/boxes/deluxe_box.tres" id="14_deluxe"]
+
+[ext_resource type="Texture2D" path="res://art/background_forest.png" id="20_forest"]
+
+[resource]
+script = ExtResource("1_level")
+display_name = "8 — The Falls"
+half_width = 1900.0
+max_depth = 760.0
+far_shore_lift = 340.0
+truck_power = 1.5
+ground = 0
+life = 2
+plant_density = 1.0
+fish_density = 1.0
+waterfall_width = 190.0
+waterfall_reach = 1100.0
+waterfall_push = 300.0
+backdrop = ExtResource("20_forest")
+backdrop_horizon = 0.5
+reward_scale = 1.85
+shop_pool = Array[Resource]([ExtResource("2_plank"), ExtResource("3_tire"), ExtResource("4_crate"), ExtResource("5_barrel"), ExtResource("6_fridge"), ExtResource("7_beam"), ExtResource("8_pontoon"), ExtResource("9_girder"), ExtResource("10_container"), ExtResource("11_ramp")])
+shop_stock = PackedInt32Array(20, 8, 14, 12, 6, 12, 9, 8, 5, 3)
+boxes = Array[Resource]([ExtResource("15_bronze"), ExtResource("12_silver"), ExtResource("13_gold"), ExtResource("14_deluxe")])
