@@ -5,7 +5,7 @@
 This is a monorepo holding 5 independent Godot 4.7+ game prototypes under development by Richard Wolter. Each game is at a different stage; this document covers shared knowledge, decisions, and tools that span across them.
 
 **Projects:**
-- **Lake Cleanup** — incremental lake-cleaning game, 2D side-view, ComfyUI-generated art
+- **Lake Cleanup** — incremental lake-cleaning game, 2D isometric tile field, ComfyUI-generated art
 - **Strait Across** — physics bridge-builder, levels + shop + surprise boxes, 2D
 - **Sickest Man Alive** — twisted roguelite in a shrinking kid's body, top-down twin-stick
 - **Semi Secret Wars** — (status: active, CLAUDE.md at `Semi Secret Wars/CLAUDE.md`)
@@ -71,7 +71,7 @@ Games/
 - **Executable Path**: The Desktop Godot in `C:\Program Files\` is the one that runs. `Documents/Godot/` is broken; don't use it.
 
 ### Physics & Simulation Gotchas
-- **Lake Cleanup** abandoned physics (`RigidBody2D`, `Area2D` buoyancy, collision) after several failed designs. Now uses a fixed grid of columns with discrete item stacks — no physics at all. Keep one representation always (layout OR simulation, not both).
+- **Lake Cleanup** abandoned physics (`RigidBody2D`, `Area2D` buoyancy, collision) after several failed designs. Now an isometric tile field where each tile holds a stack — no physics at all. Keep one representation always (layout OR simulation, not both).
 - **Strait Across** uses full 2D physics for bridge pieces; test harness is at `tools/test_grab.tscn`, stepped by `_physics_process` (~1s per test, 25 checks). `GDScript` errors inside coroutines abort silently and leave the tree spinning (looks like a hang).
 
 ### Logging & Debugging
@@ -91,7 +91,7 @@ Games/
 
 ### Sprite & Asset Data
 - **Asset JSON Format**: Spritesheets are paired with `.json` metadata (name, frames, animations).
-- **Scale Authoring**: Sprites are authored for specific grid/world size. Lake Cleanup: 26px columns, 22px slots, 145px bottle max. Stride is not negotiable per object; layout size determines what fits.
+- **Scale Authoring**: Sprites are authored for specific grid/world size. Lake Cleanup: isometric tiles, 64x32px (2:1). Stride is not negotiable per object; layout size determines what fits.
 
 ---
 
@@ -109,10 +109,10 @@ Games/
 - **Manual verb**: Hold-to-haul discrete `TrashObject`s (progress ring, rate = strength ÷ haul_cost).
 - **Idle drain**: A single continuous `pollution` float is what machines and drones reduce while idle.
 - **Why**: You cannot idle-drain individual objects without it feeling arbitrary; a bare meter is a progress bar with a button.
-- **Visual Link**: `pollution` drives the water shader directly — lake clearing up IS the progress bar.
+- **Visual Link**: lake clearing up IS the progress bar. Since the per-tile filth map, the shader's colour reads that map, local to each tile, not `pollution` directly — see `Lake Cleanup/CLAUDE.md` for the current split.
 
 ### Physics-Free Grid Layout (Lake Cleanup)
-- **Structure**: Basin 4 screens wide (`HALF_WIDTH=2400`, `MAX_DEPTH=620`), 26px columns, 22px slots, fixed stackable items.
+- **Structure**: an isometric tile field (see `Lake Cleanup/scripts/iso.gd`), each tile holding a stack of fixed items.
 - **Reachability**: Only the top of each stack is harvestable — depth gating is spatial, not rule-enforced.
 - **No Overlap Bugs**: One representation (layout) eliminates physics-era problems: overlap explosions, sleeping bodies ignoring force, collapsed heaps.
 - **Why Matters**: Don't re-introduce physics later thinking you'll "fix it differently" — the grid learned lessons.

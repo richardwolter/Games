@@ -34,7 +34,7 @@ Why two layers? You cannot idle-drain individual objects without it feeling arbi
 
 **Idle layer**: Continuous `pollution` float is what machines reduce passively.
 
-**Visual link**: `pollution` directly drives the water shader. The lake clearing up **IS** the progress bar — not a separate number.
+**Visual link**: the lake clearing up **IS** the progress bar — not a separate number. As of the per-tile filth map (`Lake._build_filth_map`), the water shader's colour reads that map, not `pollution` directly: a bay just cleared reads blue on the spot while the next one over is still soup. `pollution` is the map's fallback (read only where `filth_mapped` is 0, i.e. before the first map build) and still drives `sparkle` at the finished state.
 
 ### Progression
 Treat it as a deliverable, not polish: the clean state must **gain density** (plants, surfacing fish, birds, clarity) — Richard flagged this as the weakest part of the loop.

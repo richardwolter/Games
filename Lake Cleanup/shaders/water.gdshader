@@ -34,9 +34,35 @@ uniform vec2 basin_radius = vec2(40.0, 34.0);
 uniform vec2 island_centre = vec2(46.0, 46.0);
 uniform vec2 island_radius = vec2(4.6, 3.9);
 
-uniform vec4 shallow_color : source_color = vec4(0.24, 0.55, 0.66, 0.92);
-uniform vec4 deep_color : source_color = vec4(0.05, 0.16, 0.28, 0.98);
-uniform vec4 foam_color : source_color = vec4(0.72, 0.88, 0.92, 0.55);
+// How far the drawn water is carried past the waterline, in tiles, so it laps over the
+// first of the sand instead of stopping on a tile edge.
+//
+// Deliberately not part of the shore maths above: those mirror Iso and must not drift from
+// it, because the walking, the casting and the ferry all read the same functions. This is a
+// drawing offset laid on top of them — the shore has not moved, the water is just drawn a
+// little further up the beach. The polygon this shader runs on is grown to match.
+uniform float shore_lap = 0.45;
+
+// Water colors derived from master palette (scripts/palette.gd, resources/palette.tres).
+// Clean lake uses water_clean (#6482a0, RGB(100, 130, 160)).
+// Dirty lake blends toward water_dirty (#5c767d, RGB(92, 118, 125)).
+//
+// Defaults provided here; at runtime these are set by the lake script from the palette.
+uniform vec4 water_clean : source_color = vec4(0.39, 0.51, 0.63, 1.0);  // #6482a0
+uniform vec4 water_dirty : source_color = vec4(0.36, 0.46, 0.49, 1.0);   // #5c767d
+uniform vec4 foam_color : source_color = vec4(0.96, 0.99, 1.0, 0.75);
+
+// How hard the base colour and the scum bend toward filthy, on top of whatever `filth`
+// already reads at this pixel (map-local where the map is live, `pollution` where it is
+// not — see `filth` below). 1.0 leaves that reading alone; the map's own FILTH_EDGE
+// already shapes it, so this is a second, optional twist on top rather than the primary
+// shaping. Higher pulls blue in faster once a tile is even a little clear.
+//
+// Used to bend the un-mapped `pollution` value directly, which is why it used to sit at
+// 6.0 — high enough to fight FILTH_BITE's own bend (lake.gd) on top of it. That compounded
+// with the map live: pow(pow(0.7, 0.62), 6) reads almost spotless at 30% still in the
+// water. Left low now that this reads `filth`, which is local and not pre-bent.
+uniform float color_bite : hint_range(1.0, 10.0) = 1.4;
 
 uniform float wave_speed = 1.0;
 // How far the band pattern is pushed around by the warp. This is what stops it
@@ -44,20 +70,21 @@ uniform float wave_speed = 1.0;
 uniform float warp_strength = 26.0;
 uniform float band_strength = 0.075;
 // Width of the foam collar, as a fraction of the way in from the shore.
-uniform float foam_band = 0.055;
+uniform float foam_band = 0.026;
 
 // 0 clean, 1 filthy. Adds a flat scum tint on top of the depth gradient and kills the
 // band contrast, so a dirty lake looks opaque as well as green — murk is a loss of
 // clarity, not just a hue change.
 //
 // The whole lake's figure, and the fallback: what the water does where there is no map.
+// Everything below reads `filth`, not this directly — see `filth` below.
 uniform float pollution = 1.0;
-uniform vec4 scum_color : source_color = vec4(0.25, 0.36, 0.15, 1.0);
 
 // Filth per tile, one texel per tile of the basin, red channel only. This is what makes
-// cleaning a patch of lake visible: the meter at the top of the screen is the whole lake's
-// average, and a player who has just spent five casts clearing the water in front of them
-// wants that water to be clear — not one percent bluer everywhere.
+// cleaning a patch of lake visible AND what colours the water: the base colour, the scum
+// film and the band/glint/foam fade all read this, local, instead of the lake's whole-basin
+// average — a bay just cleared reads blue while the next one over is still soup, and a
+// tile never goes green just because the meter upstairs has not moved much yet.
 //
 // Sampled linearly, so the map's tile grid does not show through as squares: what is wanted
 // is the boundary between clean and filthy water, soft, wherever the junk happens to stop.
@@ -84,7 +111,7 @@ vec2 world_to_tile(vec2 p) {
 
 // Mirrors Iso.shore_fraction: 0 in the middle, 1 on the waterline.
 float shore_fraction(vec2 tile) {
-	vec2 d = (tile - basin_centre) / basin_radius;
+	vec2 d = (tile - basin_centre) / (basin_radius + vec2(shore_lap));
 	float r = length(d);
 	if (r < 0.0001) {
 		return 0.0;
@@ -95,14 +122,20 @@ float shore_fraction(vec2 tile) {
 }
 
 // Mirrors Iso.island_fraction: under 1 is on the island.
+//
+// Wobble raised from (0.04, 0.02) and a third term added (see iso.gd for the reasoning —
+// this has to move in step with it or the shaded shore and the drawn one part ways). Still
+// short of the basin's own (0.09, 0.05): a shape this small at that amplitude comes out a
+// star, not a coastline.
 float island_fraction(vec2 tile) {
-	vec2 d = (tile - island_centre) / island_radius;
+	vec2 d = (tile - island_centre) / max(island_radius - vec2(shore_lap), vec2(0.5));
 	float r = length(d);
 	if (r < 0.0001) {
 		return 0.0;
 	}
 	float angle = atan(d.y, d.x);
-	float wobble = 1.0 + 0.11 * sin(angle * 3.0 + 0.7) + 0.06 * sin(angle * 5.0 - 0.4);
+	float wobble = 1.0 + 0.07 * sin(angle * 3.0 + 0.7) + 0.035 * sin(angle * 5.0 - 0.4)
+		+ 0.02 * sin(angle * 7.0 + 2.1);
 	return r / wobble;
 }
 
@@ -116,16 +149,35 @@ void fragment() {
 	// Mirrors Iso.depth_at: 0 at the bank, 1 over the deepest water.
 	float d = sqrt(max(1.0 - s, 0.0));
 	// The island stands in the deepest part of the basin, so the water has to shoal up to
-	// it as well as down from the outer bank.
+	// it as well as down from the outer bank. Widened from 2.1: the old range shoaled up
+	// in barely a tile, which read as a shelf dropped straight off rather than sloping —
+	// the same abruptness the island's foam ring had.
 	float isl = island_fraction(tile);
-	d *= smoothstep(1.0, 2.1, isl);
+	d *= smoothstep(1.0, 2.6, isl);
 
-	vec4 col = mix(shallow_color, deep_color, smoothstep(0.15, 0.85, d));
-
-	// How filthy this water is, here. Everything below reads this instead of the lake's
-	// own figure, which is what lets one bay be clean while the next is still soup.
+	// How filthy this water is, here. Read before the colour so the colour can be built
+	// from it: local where the map is live (a bay just cleared is blue while the next one
+	// over is still soup), `pollution` where it is not.
 	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
 	float filth = mix(pollution, local, filth_mapped);
+
+	// Derive water colors from the filth here, not the lake's whole-basin average: a clean
+	// bay reads blue on the spot instead of waiting for the meter upstairs to catch up.
+	// Shallow water is lighter/brighter, deep water is darker.
+	//
+	// color_t is also what the scum below fades on: scum is a green muck film on top
+	// of this gradient, and if it kept fading on raw `filth` while the gradient underneath
+	// it fades on color_t, the muck would go on painting the water green for most of the
+	// range regardless of how blue the water under it had already become — the two have to
+	// agree on how early "clean" arrives.
+	float color_t = pow(filth, color_bite);
+	vec4 base_color = mix(water_clean, water_dirty, color_t);
+	vec4 shallow_color = mix(base_color, vec4(1.0), 0.2);
+	shallow_color.a = 0.92;
+	vec4 deep_color = vec4(base_color.rgb * 0.6, 0.98);
+	vec4 scum_color = mix(water_dirty, vec4(0.25, 0.36, 0.15, 1.0), color_t);
+
+	vec4 col = mix(shallow_color, deep_color, smoothstep(0.15, 0.85, d));
 
 	// Bands, warped in phase rather than in position — pushing the pattern around by a
 	// function of the other axis is exactly "bend these lines", and it costs one term.
@@ -163,16 +215,23 @@ void fragment() {
 
 	// Scum. Strongest in the shallows where the muck collects, and it takes opacity
 	// with it.
-	float scum = filth * mix(1.0, 0.7, d);
+	float scum = color_t * mix(1.0, 0.7, d);
 	col.rgb = mix(col.rgb, scum_color.rgb, scum * 0.75);
 	col.a = clamp(col.a + scum * 0.2, 0.0, 1.0);
 
 	// Foam collar against the bank, wobbling so the line is not a clean stencil edge.
 	float lap = 1.0 + 0.35 * sin(along * 0.02 + TIME * 1.4);
 	float foam = smoothstep(1.0 - foam_band * lap, 1.0, s) * (1.0 - filth * 0.6);
-	// And the same collar around the island, read from the other side: 1 on its beach,
-	// falling off outward.
-	float isl_foam = (1.0 - smoothstep(1.0, 1.0 + foam_band * 4.0 * lap, isl))
+	// And the same collar round the island, read from the other side: 1 on its beach, falling
+	// off outward. Half again as wide as the bank's rather than exactly it — the island's
+	// own wobble is smaller (it has to stay a coastline, not a star, at a shape this size),
+	// so a collar the same width as the bank's still read as a hard ring where the bank's
+	// did not. The extra width is what the shape can't carry on its own.
+	//
+	// Drawn here rather than over the tiles, so that the foam and the shoaling either side of
+	// it are the same ring. Drawn on the ground it was a second ring just inside this one,
+	// and two rings a few pixels apart read as a seam, not as a shore.
+	float isl_foam = (1.0 - smoothstep(1.0, 1.0 + foam_band * lap * 1.5, isl))
 		* (1.0 - filth * 0.6);
 	foam = max(foam, isl_foam);
 	col = mix(col, foam_color, clamp(foam, 0.0, 1.0) * foam_color.a);
