@@ -16,6 +16,11 @@
 ##   godot --path . res://tools/bench_frames.tscn
 extends Node
 
+## Where the result goes as well as to stdout. The Godot build here is a GUI one, so `print`
+## reaches nothing when the run is started from a shell — same reason test_lake.gd keeps a
+## log. Overwritten each run, so the file is always the last bench and never a pile of them.
+const LOG_PATH := "res://tools/last_bench.log"
+
 const WARMUP := 90
 const SAMPLES := 600
 
@@ -61,10 +66,18 @@ func _process(_delta: float) -> void:
 	for t in sorted:
 		if t > 20.0:
 			spikes += 1
-	print("frames %d  mean %.2f ms  median %.2f  p95 %.2f  p99 %.2f  worst %.2f  over-20ms %d (%.1f%%)" % [
+	var line := "frames %d  mean %.2f ms  median %.2f  p95 %.2f  p99 %.2f  worst %.2f  over-20ms %d (%.1f%%)" % [
 		sorted.size(), total / sorted.size(), sorted[sorted.size() / 2],
 		sorted[int(sorted.size() * 0.95)], sorted[int(sorted.size() * 0.99)],
 		sorted[sorted.size() - 1], spikes, 100.0 * float(spikes) / float(sorted.size())
-	])
-	print("grid rebuilds: ", (_main.get_node(^"Grid")).get("rebuilds"))
+	]
+	var rebuilds := "grid rebuilds: %s" % (_main.get_node(^"Grid")).get("rebuilds")
+	print(line)
+	print(rebuilds)
+	var log := FileAccess.open(LOG_PATH, FileAccess.WRITE)
+	if log != null:
+		log.store_line(OS.get_environment("BENCH_LABEL"))
+		log.store_line(line)
+		log.store_line(rebuilds)
+		log.close()
 	get_tree().quit()

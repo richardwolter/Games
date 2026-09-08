@@ -28,6 +28,18 @@ const SCALE := 2.0
 const SPRITE := 32.0
 const FACE := 16.0
 
+## How far short of the face/side boundary a clipped quad's UV is pulled back, in source
+## pixels at the pack's own resolution.
+##
+## Found by rendering a low skirt against an earth-sided tile and comparing pixel colour to
+## the source image row by row: the boundary itself sampled true, but a solid extra source
+## row of the tile's own dirt still showed past it, on every one of them. Nearest filtering
+## rounds a fragment to the nearer texel, and a UV sitting exactly on the boundary rounds to
+## either side of it by the width of half a texel — for a fragment unlucky enough to land
+## past the middle of the last kept row, that is the first row of dirt. One row of headroom
+## is enough that no rounding reaches across it.
+const SEAM_GUARD := 6.0
+
 ## How far above the sand the grass sits, in screen pixels.
 ##
 ## The pack's tiles are not all the same height — grass is a full cube and sand is a slab —
@@ -35,7 +47,18 @@ const FACE := 16.0
 ## when it is drawn, so every top face lands on one plane. This is what is deliberately put
 ## back: a lawn wants an edge to catch the light, and a lawn exactly level with the beach
 ## reads as a colour change rather than as ground. It was 24 by accident, which was a ledge.
-const GRASS_LIFT := 4.0
+##
+## Four was as good as nothing. The tile in front is drawn after this one and its top face
+## covers everything below its own plane, so a lawn lifted by less than a few pixels has its
+## side face painted out by the beach and the two come out level — the turf reading as if it
+## were the lower of the two. What is seen is exactly this many pixels of the grass tile's
+## own side standing above the sand, so this is the height of the step, not a nudge towards
+## one.
+##
+## Three. Eight was a proper kerb once the batches were put in height order and the step
+## actually showed — a lawn on a plinth. What is wanted is the line a lawn's edge catches,
+## which is about as thin as it can be and still be there.
+const GRASS_LIFT := 0.1
 
 ## Which slices go where.
 ##
@@ -50,13 +73,57 @@ const GRASS_LIFT := 4.0
 const GRASS_YARD := [1, 2, 19]
 const GRASS_ROUGH := [18, 20, 21]
 
-## How wide a patch of one grass tile is, in tiles.
+## The border pool: what a lawn tile takes when the tile past it is sand.
+##
+## The plain grass tiles are a cube with a flat-cut face — nothing stands proud of the
+## diamond's own edge — and on the two front sides, south-east and south-west, that edge is
+## also where the lawn ends. A straight cut against sand reads as a cut picture there, not as
+## turf, because there is no silhouette to catch the eye before the sand starts. The back two
+## sides get away with it because the pack draws a few blades leaning up over those edges;
+## the front two do not.
+##
+## These four are low tufted mounds instead, bushy on every side including the front two, and
+## with no bare-earth side to clash with the flat sand next to them — see
+## `tools/tile_sides.gd`. Border tiles are picked from this pool at random rather than one
+## fixed tile, same as the open lawn, so the seam does not repeat itself in a visible pattern.
+##
+## One pool, not two. The pack's tufted mounds are all light — measured, not eyeballed, see
+## `tools/tile_color_check.gd` — and nothing in it is dark enough to sit next to
+## GRASS_ROUGH without standing out worse than a cut edge does. GRASS_YARD and GRASS_ROUGH
+## stay apart everywhere else; only the border, where there is no darker tile to keep them
+## apart with, shares this one.
+const GRASS_BORDER := [37, 38, 43, 45]
+
+## Why the pack's joining pieces are not used.
+##
+## The pack has grass tops with sand worn through them, and they look like the answer to a
+## lawn meeting a beach. They are not. `tools/tile_edges.gd` reads the sand off each tile's
+## four sides, and what the set turns out to be is a corner set: sand along two adjacent
+## sides, along three, or over the whole top. There is no tile with sand along exactly one
+## side, which is what a straight run of shoreline is made of and most of the shoreline is.
+##
+## So a fitted edge can only ever be fitted at the turns, and the straights between them stay
+## plain — a border that starts and stops. On top of that the joining pieces are all the
+## lighter grass, so the mainland's darker lawn would change colour wherever it met the sand.
+## Plain grass to the tile edge is the honest version of what this pack can do.
+
+## How wide a patch of one grass tile is, in tiles, and how far a patch's middle is allowed to
+## wander off the lattice, as a fraction of that width.
 ##
 ## Grass used to be picked per tile, which on ground made of one repeated diamond is a
-## shimmer: every square a different texture, and no square part of anything. Picked per
-## patch instead, a texture holds across a few tiles and the lawn has areas to it rather than
-## a different square everywhere you look.
-const GRASS_PATCH := 3.0
+## shimmer: every square a different texture, and no square part of anything. Then it was
+## picked per `floor(tx / 3)` square, which is worse in its own way: those squares are squares
+## in tile space, so on screen they are diamonds, all the same size, all lined up — a
+## checkerboard laid over the lawn at forty-five degrees, which is exactly what a lawn does
+## not have.
+##
+## A patch is now the ground nearest one of a set of scattered points, measured on the screen
+## rather than in tile space. Round-ish areas of uneven size with wandering borders, and no
+## two the same. The points are rolled from the lattice cell they belong to and the SEED, so
+## the same lawn comes up every run and adding ground in one place does not move a patch
+## anywhere else.
+@export var grass_patch: float = 4.0
+@export_range(0.0, 0.5) var grass_patch_wander: float = 0.42
 
 ## How far out of the water the beach reaches, in tiles, and how far the grass past it runs
 ## before the outer ring takes over.
@@ -94,6 +161,37 @@ const LAP := Iso.WATER_LAP_TILES
 ## sand stopped, and the half-sand tiles read as dirt patches in the lawn. Ground that runs
 ## out under the water at one end and under the turf at the other does not want either.
 const SAND := 67
+
+## The fringe that hangs over the sand: where the strips are, how many there are, and how
+## they sit against the tile they hang off.
+##
+## A grass tile is drawn as a rectangle cut off a hair below its top face (see
+## `_add_tile_quad`'s `skirt`), and that cut is a horizontal line. Worse, it is the *same*
+## horizontal line on every grass tile: the lift the tile is raised by and the height of its
+## own face cancel out, so the cut always lands at `mid.y + TILE_H * 0.5` whatever picture the
+## tile took. A shoreline of them is one unbroken horizontal edge repeated per tile, and at a
+## low camera angle that is what reads as a cut picture rather than as turf.
+##
+## The strips are blades drawn past that cut and over the sand tile in front, one of
+## `FRINGE_COUNT` silhouettes picked per tile by the same stable hash everything else here
+## uses. They are generated, not from the pack — `_pipeline/tools/generate_fringe.py` — but
+## their colours are sampled off the pack's own border tiles, so nothing in them can be a
+## green the pack does not have.
+##
+## Why a hanging strip and not another pool of whole tiles: a tile's blades stop at the tile's
+## own edge, which is the line being broken. Only something drawn past the edge, over the
+## ground in front, actually crosses it.
+const FRINGE := "res://assets/fringe/fringe_%d.png"
+const FRINGE_COUNT := 8
+
+## How much of a strip is above the cut and how much hangs below, in source pixels. Must match
+## `OVERLAP` and `HANG` in the generator: the strip is placed by these, not measured.
+##
+## The rows above the cut are the join. A strip starting exactly at the edge shows a seam of
+## its own wherever a blade's colour differs from the tile's last row; starting a couple of
+## rows up puts that join inside the lawn where nothing is looking.
+const FRINGE_OVERLAP := 5.0
+const FRINGE_HANG := 12.0
 
 ## How far in from the island's waterline the grass starts, in tiles. Everything outside it
 ## is beach.
@@ -154,6 +252,18 @@ const SINK_REACH := Iso.SHELF_TILES
 ## the water going darker is what says the bed is dropping away, and the geometry only has to
 ## agree with it rather than announce it.
 const SINK_STEP := 2.0
+
+## How the drop is spread across the shelf, as the power the distance out is raised to.
+##
+## One is a ramp of even slope, which starts the bed falling away the moment it leaves the
+## beach: the first drowned row, the one right against the island and the one most looked at,
+## is already below the sand it continues. Above one the fall is slow at the top and steepens
+## outwards — the near rows sit up close to the beach's own level and carry the shore out flat
+## before it drops, which is what a shore does.
+##
+## Kept low enough that the outermost step stays under the six pixels of a sand slab's side.
+## At 2.2 tiles of shelf and two pixels a row, the last step at this power is about three.
+const SINK_EASE := 2.0
 
 ## How much of the water's colour is mixed into the sand at the top of the shelf and at the
 ## bottom of it, and the colour itself.
@@ -260,6 +370,10 @@ var _dirty: bool = true
 ## Mesh data per slice: indices, points, uvs, colors
 var _mesh_data: Dictionary = {}  # slice -> {indices, points, uvs, colors}
 
+## The slices in submission order, lowest ground first. Filled on the first draw. See
+## `_slice_order`.
+var _order: Array = []
+
 ## Slice number to picture. Filled before the first draw rather than as the tiles come up:
 ## asking for a texture in the middle of `_draw` hands back a blank while the loader is
 ## still busy with everything else the lake opens with, and a blank texture draws as a
@@ -279,6 +393,12 @@ var _standing: Dictionary = {}
 ## than assumed: the pack draws a slab and a cube in the same size of cell, and drawing both
 ## from the cell's corner is what put the lawn two dozen pixels above the sand.
 var _face_top: Dictionary = {}
+
+## The fringe strips, and one batch of geometry per strip. Kept apart from `_mesh_data`
+## because they are not ground: they are drawn after every slice, over whatever the ground
+## put down, and they take no part in `_slice_order`.
+var _fringe_art: Array = []
+var _fringe_data: Array = []
 
 ## How far out of the water a tile is, in tiles. `shore_fraction` is a fraction of the
 ## radius in that tile's own direction, so it is scaled back up by the radius it came from
@@ -336,6 +456,14 @@ func _ready() -> void:
 			"uvs": PackedVector2Array(),
 			"colors": PackedColorArray()
 		}
+	for i in FRINGE_COUNT:
+		_fringe_art.append(load(FRINGE % i) as Texture2D)
+		_fringe_data.append({
+			"indices": PackedInt32Array(),
+			"points": PackedVector2Array(),
+			"uvs": PackedVector2Array(),
+			"colors": PackedColorArray()
+		})
 	_sow()
 	_dirty = true
 	queue_redraw()
@@ -448,8 +576,23 @@ func _draw() -> void:
 	if _dirty:
 		_rebuild()
 
-	# Submit triangle arrays per slice
-	for slice: int in _mesh_data.keys():
+	# One batch per slice, lowest ground first.
+	#
+	# Batching by slice is what makes forty thousand tiles a handful of draw calls, and it is
+	# also the one thing that breaks painter's order: every tile of a slice goes down together,
+	# so which slice is submitted first decides which ground covers which, and the back-to-front
+	# order `_rebuild` so carefully builds only holds *within* a slice.
+	#
+	# The sand used to be submitted last, for no better reason than being last into the
+	# dictionary, and a sand tile's whole quad — its side included — painted over the lawn in
+	# front of it. A beach standing on top of the turf it runs into.
+	#
+	# Ordered by how high off the plane a slice is drawn instead: sand, then grass. Ground can
+	# only ever be covered by ground above it, which is the part of painter's order that
+	# matters here. Tiles at the same height still go down in whatever order their slices
+	# happen to sit in, and that is sound as long as everything at one height is one flat
+	# surface — see `_slice_lift`.
+	for slice: int in _slice_order():
 		var data = _mesh_data[slice]
 		if data["indices"].is_empty():
 			continue
@@ -464,6 +607,24 @@ func _draw() -> void:
 			_art[slice].get_rid()
 		)
 
+	# The fringe last, over every slice: it hangs off a grass tile and onto the sand tile in
+	# front, so it has to be drawn after both of them whichever order their slices went down
+	# in. Still before the props — a tuft of grass does not hang over a tree trunk.
+	for i in _fringe_data.size():
+		var fringe: Dictionary = _fringe_data[i]
+		if fringe["indices"].is_empty():
+			continue
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(),
+			fringe["indices"],
+			fringe["points"],
+			fringe["colors"],
+			fringe["uvs"],
+			PackedInt32Array(),
+			PackedFloat32Array(),
+			_fringe_art[i].get_rid()
+		)
+
 	# Props and drowning are still drawn per-tile (optimization can come later)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
@@ -474,6 +635,10 @@ func _draw() -> void:
 			if ty < span.position.y or ty > span.end.y:
 				continue
 			var mid := Iso.tile_to_world(float(tx) + 0.5, float(ty) + 0.5)
+			# On the same surface the tile under it was drawn at. A tree standing at the
+			# plane on turf lifted by GRASS_LIFT is a tree buried to the ankles.
+			if _kind_at(float(tx) + 0.5, float(ty) + 0.5) == Kind.GRASS:
+				mid.y -= GRASS_LIFT
 			_plant(Vector2i(tx, ty), mid)
 
 
@@ -485,6 +650,11 @@ func _rebuild() -> void:
 		_mesh_data[slice]["points"].resize(0)
 		_mesh_data[slice]["uvs"].resize(0)
 		_mesh_data[slice]["colors"].resize(0)
+	for fringe: Dictionary in _fringe_data:
+		fringe["indices"].resize(0)
+		fringe["points"].resize(0)
+		fringe["uvs"].resize(0)
+		fringe["colors"].resize(0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
@@ -509,7 +679,9 @@ func _rebuild() -> void:
 			if layer == Layer.ISLAND_DEEP:
 				var sunk := _sunk_by(Vector2(float(tx) + 0.5, float(ty) + 0.5))
 				var deep := clampf(sunk / SINK_REACH, 0.0, 1.0)
-				lift -= sunk * SINK_STEP
+				# Eased rather than straight, so the rows nearest the island keep the beach's
+				# height and the fall is spent further out. See SINK_EASE.
+				lift -= pow(deep, SINK_EASE) * SINK_REACH * SINK_STEP
 				# See DISSOLVE_JITTER. Offset from `_pick`'s and `_wander`'s own sampling
 				# points so it doesn't just retrace their pattern.
 				var jitter := (_hash(tx + 11.0, ty - 7.0) - 0.5) * 2.0 * DISSOLVE_JITTER
@@ -518,22 +690,71 @@ func _rebuild() -> void:
 				)
 				tint = Color.WHITE.lerp(Color(SINK_TINT, 0.0), fade)
 
-			_add_tile_quad(slice, mid, lift, tint)
+			# The grass keeps only as much of its own side as the step it stands on. See
+			# `skirt`. The sand keeps all of its: a drowned row needs its side to close the
+			# gap to the row in front of it, and the outer ring's last row is a real edge.
+			var skirt := GRASS_LIFT if slice != SAND else INF
+			_add_tile_quad(slice, mid, lift, tint, skirt)
+			if slice != SAND:
+				_add_fringe(tx, ty, mid)
 
 
-func _add_tile_quad(slice: int, mid: Vector2, lift: float, tint: Color) -> void:
+## One tile into the batch, at the size it was drawn.
+##
+## `lift` is how far above the tile's own diamond the picture's first opaque row starts: the
+## empty part of the cell above the top face, plus whatever the caller wants added or taken
+## off. It moves the quad, it does not resize it — the quad is always `SPRITE * SCALE` square,
+## because that is the size the pack drew the tile at and any other size is a stretch.
+##
+## Getting that wrong is what put a 32x32 cube inside a 64x32 diamond box: the top face came
+## out squashed, and because each slice has its own `_face_top`, tiles with different empty
+## headroom were squashed by different amounts. That read as grass at different heights in the
+## middle of the lawn, which is not a height at all, it is a scale.
+##
+## `skirt` is how much of the tile's side to keep below its top face, in screen pixels, or
+## INF for all of it. Height and side are two different things and the lawn needs them apart:
+## the pack draws every grass tile as a cube with thirteen source pixels of earth under the
+## turf, so a lawn drawn whole stands a twenty-six pixel wall over the beach in front of it
+## however little it is lifted. Moving the tile does not change that wall — the wall is the
+## picture. Cutting the quad off `skirt` below the face is what makes the step the height it
+## is asked to be, and the rest of the cube is simply not drawn.
+func _add_tile_quad(
+	slice: int, mid: Vector2, lift: float, tint: Color, skirt: float = INF
+) -> void:
 	var data: Dictionary = _mesh_data[slice]
 	var tex: Texture2D = _art[slice]
 	if tex == null:
 		return
 
-	# Quad corners in screen space
+	# Quad corners in screen space. The top edge sits `lift` above the diamond's top corner;
+	# the rest hangs down from there at native size, cut short by `skirt`.
 	var half_w: float = Iso.TILE_W * 0.5
-	var half_h: float = Iso.TILE_H * 0.5 + lift
-	var tl: Vector2 = mid - Vector2(half_w, half_h)
-	var tr: Vector2 = mid + Vector2(half_w, -half_h)
-	var br: Vector2 = mid + Vector2(half_w, half_h)
-	var bl: Vector2 = mid + Vector2(-half_w, half_h)
+	var top: float = mid.y - Iso.TILE_H * 0.5 - lift
+	var full: float = SPRITE * SCALE
+	# Where the top face stops and the side of the cube starts, measured down from the top of
+	# the quad: the empty rows above the face, then the face itself.
+	var face_end: float = (_face_top[slice] + FACE) * SCALE
+	# skirt is how far past the face the quad is allowed to reach; it does not pull the edge
+	# back above the face, so a caller cannot ask for less than the face alone.
+	var bottom: float = top + clampf(face_end + skirt, 0.0, full)
+	var tl := Vector2(mid.x - half_w, top)
+	var tr := Vector2(mid.x + half_w, top)
+	var br := Vector2(mid.x + half_w, bottom)
+	var bl := Vector2(mid.x - half_w, bottom)
+	# The picture is cropped with the quad, not squeezed into it — except right at a skirt cut
+	# short enough to land near the face/side boundary, where the row sampled is pulled back by
+	# SEAM_GUARD so the sampler's own texel rounding can never reach across into the dirt on the
+	# far side of it. The polygon's own edge stays where it was worked out above, so the tile
+	# still meets the ground at the right place; only the last sliver of the picture is
+	# stretched the extra distance to reach it, which one almost-flat row of pixels does not
+	# show.
+	#
+	# Only where the quad is actually short of the sprite's own bottom. The sand's own skirt
+	# runs to the true edge of the picture — a drowned row closing the gap to the tile in
+	# front of it, or the outer ring's real edge — and pulling that back would open the same
+	# kind of gap this is meant to close.
+	var guard := SEAM_GUARD if bottom < top + full else 0.0
+	var v: float = (bottom - top - guard) / full
 
 	var base_idx: int = data["points"].size()
 	data["points"].append(tl)
@@ -541,11 +762,11 @@ func _add_tile_quad(slice: int, mid: Vector2, lift: float, tint: Color) -> void:
 	data["points"].append(br)
 	data["points"].append(bl)
 
-	# UVs: full texture
+	# UVs: the whole width, and as far down the picture as the quad reaches.
 	data["uvs"].append(Vector2(0, 0))
 	data["uvs"].append(Vector2(1, 0))
-	data["uvs"].append(Vector2(1, 1))
-	data["uvs"].append(Vector2(0, 1))
+	data["uvs"].append(Vector2(1, v))
+	data["uvs"].append(Vector2(0, v))
 
 	# Colors
 	data["colors"].append(tint)
@@ -554,6 +775,63 @@ func _add_tile_quad(slice: int, mid: Vector2, lift: float, tint: Color) -> void:
 	data["colors"].append(tint)
 
 	# Two triangles
+	data["indices"].append(base_idx + 0)
+	data["indices"].append(base_idx + 1)
+	data["indices"].append(base_idx + 2)
+	data["indices"].append(base_idx + 0)
+	data["indices"].append(base_idx + 2)
+	data["indices"].append(base_idx + 3)
+
+
+## The fringe on one grass tile: blades hanging past its cut edge and onto the sand in front.
+##
+## Only where there is sand in front. The cut edge runs the whole width of the tile, but only
+## the half of it with a beach under it is a line anybody sees — the other half is covered by
+## the next tile of lawn. `+tx` is the south-east step on the screen and `+ty` the south-west
+## one (see `Iso.tile_to_world`), so those two neighbours are the two front edges, and a
+## strip is emitted per edge rather than per tile. Hanging a full-width strip off a tile with
+## grass on one side would drape blades over that lawn, which reads as a smear.
+##
+## Both halves come out of one picture: the left half of a strip is the south-west edge and
+## the right half the south-east, so a tile with sand on both sides gets a single silhouette
+## across the whole of its front rather than two unrelated ones meeting at the corner.
+##
+## `mid.y + TILE_H * 0.5` is where every grass tile's quad is cut, worked out in `FRINGE`'s
+## block. If the fringe ever floats off the edge or sinks into it, that is the number that
+## moved, not this one.
+func _add_fringe(tx: int, ty: int, mid: Vector2) -> void:
+	var se := _kind_at(float(tx) + 1.5, float(ty) + 0.5) == Kind.SAND
+	var sw := _kind_at(float(tx) + 0.5, float(ty) + 1.5) == Kind.SAND
+	if not se and not sw:
+		return
+	var pick := int(_hash(float(tx) * 7.7 + 13.0, float(ty) * 4.3 - 5.0) * float(FRINGE_COUNT))
+	var data: Dictionary = _fringe_data[pick % FRINGE_COUNT]
+	var top := mid.y + Iso.TILE_H * 0.5 - FRINGE_OVERLAP * SCALE
+	var bottom := top + (FRINGE_OVERLAP + FRINGE_HANG) * SCALE
+	if sw:
+		_add_fringe_half(data, mid.x - Iso.TILE_W * 0.5, mid.x, 0.0, 0.5, top, bottom)
+	if se:
+		_add_fringe_half(data, mid.x, mid.x + Iso.TILE_W * 0.5, 0.5, 1.0, top, bottom)
+
+
+## One half of a strip into its batch, at the size it was drawn: a quad the width of half a
+## tile, taking the matching half of the picture. No stretching anywhere — the strips are
+## authored one tile wide at the pack's own resolution.
+func _add_fringe_half(
+	data: Dictionary, left: float, right: float, u0: float, u1: float,
+	top: float, bottom: float
+) -> void:
+	var base_idx: int = data["points"].size()
+	data["points"].append(Vector2(left, top))
+	data["points"].append(Vector2(right, top))
+	data["points"].append(Vector2(right, bottom))
+	data["points"].append(Vector2(left, bottom))
+	data["uvs"].append(Vector2(u0, 0.0))
+	data["uvs"].append(Vector2(u1, 0.0))
+	data["uvs"].append(Vector2(u1, 1.0))
+	data["uvs"].append(Vector2(u0, 1.0))
+	for _i in 4:
+		data["colors"].append(Color.WHITE)
 	data["indices"].append(base_idx + 0)
 	data["indices"].append(base_idx + 1)
 	data["indices"].append(base_idx + 2)
@@ -676,12 +954,12 @@ func _wander(at: Vector2) -> float:
 	return (coarse * 0.36 + fine * 0.28) * EDGE_WANDER
 
 
+
 ## Which tile a spot gets, or 0 for nothing drawn.
 ##
-## One picture for sand and one pool of pictures for grass, and nothing in between. The pack
-## has pieces for the join — grass tops with sand worn through one side — and they were used
-## here until it was plain that a lawn edged in half-sand tiles reads as a lawn with dirt
-## patches in it rather than as a lawn meeting a beach.
+## One picture for sand and a pool of pictures for the grass, and nothing in between: the
+## lawn runs to the tile edge and the beach starts at the next one. The pack's joining
+## pieces are not used, and the block above `grass_patch` says why.
 func _slice_at(tx: float, ty: float, rng: RandomNumberGenerator) -> int:
 	var kind := _kind_at(tx, ty)
 	if kind == Kind.NONE or kind == Kind.WATER:
@@ -689,22 +967,90 @@ func _slice_at(tx: float, ty: float, rng: RandomNumberGenerator) -> int:
 
 	if kind == Kind.SAND:
 		return SAND
+	if _borders_sand(tx, ty):
+		return _pick(GRASS_BORDER, tx, ty, rng)
 	return _pick(GRASS_YARD if layer != Layer.OUTSIDE else GRASS_ROUGH, tx, ty, rng)
+
+
+## Whether a grass tile has sand on any of the four sides it can be seen from. See
+## `GRASS_BORDER`.
+func _borders_sand(tx: float, ty: float) -> bool:
+	return (
+		_kind_at(tx - 1.0, ty) == Kind.SAND
+		or _kind_at(tx, ty - 1.0) == Kind.SAND
+		or _kind_at(tx + 1.0, ty) == Kind.SAND
+		or _kind_at(tx, ty + 1.0) == Kind.SAND
+	)
 
 
 ## Every slice this node can draw, so they are all in hand before the first frame.
 func _every_slice() -> Array:
 	var out: Array = GRASS_YARD.duplicate()
 	out.append_array(GRASS_ROUGH)
+	out.append_array(GRASS_BORDER)
 	out.append(SAND)
 	return out
+
+
+## How far off the plane a slice's ground is drawn, in screen pixels. The grass stands on a
+## step; the sand is the plane. Keep this agreeing with what `_rebuild` adds to `lift`.
+func _slice_lift(slice: int) -> float:
+	return 0.0 if slice == SAND else GRASS_LIFT
+
+
+## The slices in the order they are submitted: lowest ground first, so anything drawn later
+## can only be ground standing above what is already down. See `_draw`.
+##
+## Worked out once and kept, because it cannot change while the node lives and `_draw` runs
+## on every redraw.
+func _slice_order() -> Array:
+	if _order.is_empty():
+		_order = _mesh_data.keys()
+		_order.sort_custom(func(a: int, b: int) -> bool:
+			return _slice_lift(a) < _slice_lift(b)
+		)
+	return _order
 
 
 ## One of a set, chosen by where the tile is rather than by how far into the draw we are, so
 ## adding ground somewhere does not reshuffle the ground everywhere else.
 func _pick(of: Array, tx: float, ty: float, _rng: RandomNumberGenerator) -> int:
-	var patch := Vector2(floor(tx / GRASS_PATCH), floor(ty / GRASS_PATCH))
+	var patch := _patch_of(tx, ty)
 	return of[int(_hash(patch.x, patch.y) * float(of.size())) % of.size()]
+
+
+## Which patch of one texture a spot belongs to, as the lattice cell of the scattered point
+## it is nearest. See `grass_patch`.
+##
+## Nearest on screen, not in tile space. A tile step across is twice a tile step down, so a
+## circle drawn with tile distance comes out as a diamond twice as tall as it should be, and
+## patches measured that way are the diamonds this was meant to get rid of. Measuring the
+## real distance between the two tiles' middles is what makes a patch a patch of ground
+## rather than a patch of grid.
+##
+## Only the nine cells around this one are looked at. A point can only wander by
+## `grass_patch_wander` of a cell, well under half, so nothing outside those nine can be
+## nearer than the nearest of them.
+func _patch_of(tx: float, ty: float) -> Vector2:
+	var size := maxf(grass_patch, 1.0)
+	var home := Vector2(floor(tx / size), floor(ty / size))
+	var here := Iso.tile_to_world(tx, ty)
+	var best := home
+	var best_d := INF
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var cell := home + Vector2(float(dx), float(dy))
+			# Rolled off two different corners of the cell so the two axes wander apart
+			# rather than together, which would only slide the lattice about.
+			var jitter := Vector2(
+				_hash(cell.x, cell.y) - 0.5, _hash(cell.y + 31.0, cell.x - 17.0) - 0.5
+			)
+			var point := (cell + Vector2(0.5, 0.5) + jitter * 2.0 * grass_patch_wander) * size
+			var d := here.distance_squared_to(Iso.tile_to_world(point.x, point.y))
+			if d < best_d:
+				best_d = d
+				best = cell
+	return best
 
 
 ## A stable number in 0..1 for a spot on the plane.
