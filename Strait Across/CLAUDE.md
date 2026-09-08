@@ -678,3 +678,16 @@ First:
 6. Wait for approval before implementing it.
 
 The goal is to develop this game iteratively with the human designer, keeping scope small and validating the fun before adding complexity.
+
+---
+
+## Before You Start
+1. Read root `CLAUDE.md` for shared Godot setup, anti-patterns, vigilance rule
+2. Check GitHub Issues (filter by `project:strait-across`)
+3. Water and physics are locked (Richard tested); progression/shop numbers can shift
+4. If finding contradiction: stop and name it (see root CLAUDE.md vigilance rule)
+
+## See Also
+- Root `CLAUDE.md` — shared knowledge, Godot gotchas, vigilance rule
+- `Lake Cleanup/CLAUDE.md` — sister project (shares water shader)
+- `Sickest Man Alive/CLAUDE.md` — other active game
