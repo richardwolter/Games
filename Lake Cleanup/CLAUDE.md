@@ -13,9 +13,9 @@ Your job is to build the game incrementally with clean architecture and testable
 **Lake Cleanup** — an incremental idle/active hybrid where the player manages a lake's restoration.
 
 ### Setting
-- Single lake, side-view cross-section
+- Single lake, isometric (2:1) tile field seen from above at an angle — see `scripts/iso.gd`
 - 2D, `gl_compatibility` renderer
-- 120Hz physics (**no physics at all** — see Architecture below)
+- No physics at all (see Architecture below)
 
 ### Verbs
 **Manual (active)**:
@@ -61,13 +61,11 @@ Every physics-era bug came from the seam between thousands of drawn pieces and a
 Keeping one representation (layout instead of physics) eliminates these entirely.
 
 ### The Grid
-- **Basin**: 4 screens wide (`HALF_WIDTH = 2400`, `MAX_DEPTH = 620`), split into 26px columns
-- **Stack structure**: Each column is a stack of 22px slots, each holding a trash item ID
-- **Built once** from a fixed seed with heaviest items at the bed
-- **Reachability**: Only the top of each stack is harvestable
-  - "Skim light rubbish first, upgrade to reach deeper" is spatial, not rule-enforced
-  - Depth gating is where the trash is, not in code
-- **Settling**: Taking a piece shifts the stack down, eases one per-column `settle` float per frame
+- **Basin**: an isometric tile field (`Iso.COLS = Iso.ROWS = 92`), an ellipse of tiles inside it —
+  see `scripts/iso.gd`. Superseded the earlier column-stack description below; the lessons
+  (one representation, no physics) carried over, the geometry did not.
+- **Reachability**: only the top of what a tile holds is harvestable — spatial, not
+  rule-enforced. "Skim light rubbish first, upgrade to reach deeper" still holds.
 
 ### Item Data
 - `TrashDef` now holds: sprite, size, pollution value, haul_cost, tier, lightness (sort key, not force)
@@ -84,29 +82,35 @@ Keeping one representation (layout instead of physics) eliminates these entirely
 
 ---
 
-## Art Pipeline: ComfyUI Generation
+## Art Pipeline: Pixel Art Isometric
 
-### Photo Cutouts → Generated Art
-An earlier session (notes: `~/Downloads/lake-cleanup-game-notes.md`) planned **photo-cutouts** from EBC-licensed stock but switched to **ComfyUI generation**.
+### Current Direction: Cohesive Pixel Art
+Lake Cleanup's visual target is **cohesive pixel art isometric**, all assets from a single visual voice. This is the settled direction for the vertical slice.
 
-**Why the switch**:
-- EBC license reply blocked the photo path
-- Hand-masking cost ~10 min per object
-- Yielded only 6–8 usable objects from one 1170×700 photo
-- Sprite cap: ~145px per bottle (no headroom for larger items)
+### Asset Sourcing
+**Base + Retouch Pipeline**:
+- Use CC0 pixel art packs as base (e.g., Kenney, Forest Isometric Pack Free)
+- Programmatic retouching: recolor to palette, scale, shadow, alignment
+- No ComfyUI generation or photoreal elements in the vertical slice
 
-**Generated art lives in**: `_pipeline/tools/generate_art.ps1` (PowerShell)
+**Why this choice**:
+- Earlier attempts at photoreal + illustrated water split the visual voice
+- Cohesive pixel art reads as a single game and scales to any resolution
+- Palette-driven recolor keeps all assets aligned
+- Faster iteration than ComfyUI + hand-masking
 
-### Art Thesis (Kept)
-Photoreal garbage against flat illustrated water, flat-overcast wet mud-caked lighting — the **style shift itself is the reward**. Only the sourcing changed.
+### Master Palette
+All visuals (ground, water, UI, furniture) derive from a **master palette extracted from Forest Isometric Pack** (see issue #3). This ensures consistency by construction, not by manual matching.
 
-**How to apply**: Don't re-raise the EBC email or consider the four pre-generated asset packs. The current pipeline is settled.
+**Palette lives in**: `resources/palette.gd` and `resources/palette.tres` (to be created per issue #3)
+
+### Archive
+- The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
+- Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.
 
 ### Scale Authoring
-Sprites are authored for specific grid/world size. **Stride is not negotiable**:
-- 26px columns, 22px slots per column, 145px bottle max
-- Layout size determines what fits
-- Changing sprite scale breaks the grid assumptions
+Sprites are authored for the isometric tile size (`Iso.TILE_W = 64`, `Iso.TILE_H = 32`). Changing
+sprite scale breaks the grid assumptions.
 
 ---
 
