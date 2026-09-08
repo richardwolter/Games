@@ -55,18 +55,46 @@ const SWAY := 3.2
 ## drawn against the water.
 ##
 ## Something floating displaces water, and without this every piece in the lake sits on the
-## surface like a sticker on glass. It is a ring rather than a plate under the art: a filled
-## shape at this size reads as a grey box behind everything, which is what the plate under
-## each piece used to look like before it was taken out.
-const RIPPLE_SPAN := 1.15
-const RIPPLE_BREATH := 0.16
+## surface like a sticker on glass.
+const RIPPLE_SPAN := 1.30
+const RIPPLE_BREATH := 0.24
 const RIPPLE_TIME := 2.6
-const RIPPLE_ALPHA := 0.16
+const RIPPLE_ALPHA := 0.26
+
+## The second ring, further out and fainter, a beat behind the first. One ring is an
+## outline drawn round a piece; two rings arriving in sequence is water leaving it.
+const RIPPLE_OUTER := 1.55
+const RIPPLE_OUTER_FADE := 0.55
+const RIPPLE_OUTER_LAG := PI * 0.6
+
+## The shadow under a floating piece: how wide against the piece, how dark, and how far
+## down the plane it is pushed so it shows past the near edge of the art.
+##
+## There used to be a plate under each piece and it was taken out. This is not that plate:
+## that one was *pale*, cut from the atlas's white block, so it lightened the water into a
+## grey box. A shadow darkens towards the deep water, never towards grey — and it is pushed
+## down the plane, so what the eye actually sees is a crescent past the near edge of the
+## art rather than a disc the art is sitting in the middle of.
+const SHADOW_SPAN := 1.0
+const SHADOW_ALPHA := 0.15
+const SHADOW_DROP := 0.22
+const SHADOW_COLOUR := Color(0.03, 0.08, 0.11, 1.0)
+
+## How many shadows there is room for. Everything on screen gets one — unlike the rings,
+## which are sampled — so this is the worst case the view cull can hand over rather than a
+## budget. The geometry for it is taken once at startup and written over every rebuild.
+const SHADOW_MOST := 6000
+
+## How far behind itself a piece trails its outer ring, against the ring's own width. Taken
+## from which way the sway is carrying it, so the two rings go out of true in the direction
+## of travel and read as a wake rather than as a target.
+const RIPPLE_WAKE := 0.18
+const RIPPLE_WAKE_LOOK := 0.35
 
 ## Most rings drawn at once. The rest of the lake goes without: past a hundred or so the
 ## water is a mass of them and the cost is real, so the ones near the middle of the view
 ## carry the effect for everybody.
-const RIPPLE_MOST := 140
+const RIPPLE_MOST := 110
 
 ## Def index per slot, bottom-first. One entry per tile, indexed ty * Iso.COLS + tx; dry
 ## land is an empty stack.
@@ -103,6 +131,19 @@ var view := Rect2()
 var drawn_pieces: int = 0
 var rebuilds: int = 0
 
+## What asked for those rebuilds. Only the perf overlay reads these, and they are here
+## because the first guess at why the lake was hitching was wrong: the cost was obvious
+## and the cause was not, and a counter per reason is cheaper than another guess.
+var from_view: int = 0
+var from_detail: int = 0
+var from_patch: int = 0
+
+## How long the last rebuild took, in milliseconds, and how many tiles it walked to do it.
+## The overlay's, same as the counters above: what a rebuild costs is the number the whole
+## question turns on, and inferring it from frame time is how the last guess went wrong.
+var rebuild_ms: float = 0.0
+var walked: int = 0
+
 ## The triangle soup every visible piece lives in. Rebuilt only when something that is not
 ## the bob has changed.
 var _mesh_points := PackedVector2Array()
@@ -110,6 +151,38 @@ var _mesh_uvs := PackedVector2Array()
 var _mesh_colors := PackedColorArray()
 var _mesh_indices := PackedInt32Array()
 var _dirty: bool = true
+
+## How far into the mesh arrays a rebuild has written: vertices, and indices. The arrays
+## are sized to the worst case up front and written into by index, then cut back to what
+## was used — the same trick the shadow layer already plays, and for the same reason.
+## Appending grew three Packed arrays a few thousand times per rebuild, and that was most
+## of what a rebuild cost.
+var _fill: int = 0
+var _tri: int = 0
+
+## The most vertices one piece can take. Mirrors the branches in `_stamp`: four for a piece
+## with art on it, and four quads for the blocked-in fallback at full detail.
+const PIECE_VERTS := 16
+
+## Where each tile's vertices sit in the soup, and how many it has. -1 for a tile the last
+## rebuild did not stamp — empty, culled, or drawn by the sprite layer instead.
+##
+## This is what lets a piece being taken, or one rising into place, rewrite its own corner
+## of the soup instead of forcing the whole thing to be laid out again. The net takes a
+## handful of pieces a second and a rising piece moves every frame; before this, each of
+## those re-stamped every visible piece in the lake, which is a few thousand of them for
+## the sake of one.
+var _slot_base := PackedInt32Array()
+var _slot_len := PackedInt32Array()
+
+## Which shadow in the shadow layer belongs to each tile, so a patch can move a piece's
+## shadow with it. -1 for a tile that has none.
+var _shadow_at := PackedInt32Array()
+
+## Where `_quad` writes. -1 to append, which is what a rebuild does; anything else is a
+## patch overwriting one tile's vertices in place. The winding never changes, so a patch
+## leaves `_mesh_indices` alone.
+var _write_at: int = -1
 
 ## False when the view is zoomed far enough out that a piece is a few pixels across. Drops
 ## the two parts of a piece that are then invisible anyway.
@@ -125,6 +198,7 @@ var _emerging := PackedInt32Array()
 var _sprites: SpriteLayer
 ## The ring layer, and the pieces it is currently drawing rings for.
 var _ripples: RippleLayer
+var _shadows: ShadowLayer
 
 ## The atlas's solid-white block, as texture coordinates. Cached: every untextured quad in
 ## the soup samples it, and it never moves.
@@ -171,44 +245,283 @@ class SpriteLayer extends Node2D:
 ## vertex shader, and a ring that breathes cannot be. Bounded rather than complete — a lake
 ## of eighteen thousand rings is both unreadable and not free — so it draws a spread of what
 ## is on screen and lets the rest of the water carry the idea.
+## The shadows every floating piece throws on the water.
+##
+## Its own layer, under both the rings and the rubbish, and built once per rebuild out of the
+## same view-culled list the soup uses — one triangle array, every piece on screen, not the
+## hundred-odd the rings can afford.
+##
+## What moves it is shaders/shadow.gdshader, which takes the wander and leaves the bob. A
+## shadow that rises and falls with the thing casting it is the exact tell that the thing is
+## a sticker rather than something floating; a shadow that sits still while its mug drifts
+## off it is the same tell from the other side. So the geometry stays static and the GPU
+## slides each shadow along its piece's own sway, off the anchor packed into its vertices.
+class ShadowLayer extends Node2D:
+	var grid: LakeGrid
+
+	var _points := PackedVector2Array()
+	var _colors := PackedColorArray()
+	var _indices := PackedInt32Array()
+	var _count: int = 0
+
+	## Six points to a shadow: a hexagon flattened into the plane's own 2:1. Six rather than
+	## a diamond because a diamond has a visible point on it at this size, and rather than
+	## the twelve the rings use because there are one of those for every hundred of these.
+	const CORNERS := 6
+
+	## The corner offsets, worked out once. `cos` and `sin` per corner per piece per rebuild
+	## is a few hundred thousand calls on a full screen, and the answer is always the same
+	## six numbers.
+	static var _ring: PackedVector2Array = _build_ring()
+
+	static func _build_ring() -> PackedVector2Array:
+		var out := PackedVector2Array()
+		for i in CORNERS:
+			var angle := TAU * float(i) / float(CORNERS)
+			out.append(Vector2(cos(angle) * 0.5, sin(angle) * 0.25))
+		return out
+
+	## Room for `most` shadows, taken once. The arrays are sized to the worst case and then
+	## written into by index: this runs for every piece on screen on every rebuild, and
+	## appending to three Packed arrays that many times is the difference between the lake
+	## drawing itself and the lake being rebuilt.
+	func reserve(most: int) -> void:
+		var verts := most * (CORNERS + 1)
+		_points.resize(verts)
+		_colors.resize(verts)
+		_indices.resize(most * CORNERS * 3)
+		_dress()
+		for piece in most:
+			var middle := piece * (CORNERS + 1)
+			var at := piece * CORNERS * 3
+			for i in CORNERS:
+				_indices[at + i * 3] = middle
+				_indices[at + i * 3 + 1] = middle + 1 + i
+				_indices[at + i * 3 + 2] = middle + 1 + (i + 1) % CORNERS
+
+	## The shader that does the moving, and the colour it draws in. Taken once: a material
+	## per rebuild would be a new resource sixty times a second in a lake being cleared.
+	func _dress() -> void:
+		var shade := LakeGrid.SHADOW_COLOUR
+		shade.a = LakeGrid.SHADOW_ALPHA
+		var skin := ShaderMaterial.new()
+		skin.shader = load("res://shaders/shadow.gdshader") as Shader
+		skin.set_shader_parameter("sway", LakeGrid.SWAY)
+		skin.set_shader_parameter("wave_speed", LakeGrid.WAVE_SPEED)
+		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
+		skin.set_shader_parameter("shade", shade)
+		material = skin
+
+	## One shadow, written in place. Called from the rebuild's own walk over the lake, so
+	## the pieces are visited once rather than once for the soup and again for this.
+	##
+	## The vertex colour is not a colour here: it carries the piece's anchor for the shader
+	## to read, the same packing the rubbish soup uses, and what a shadow is actually drawn
+	## in is a uniform. Written per corner rather than once at startup because the anchor
+	## belongs to the piece, and which piece sits in which slot changes every rebuild.
+	func add(at: Vector2, size: Vector2, swing: float) -> int:
+		var slot := _count
+		if not write(slot, at, size, swing):
+			return -1
+		_count += 1
+		return slot
+
+	## One shadow written into a slot that already exists, so a piece taken or rising can
+	## move its own shadow without the whole layer being laid out again. Mirrors the soup's
+	## `_restamp`: the two have to move together, or a piece parts company with its shadow.
+	func write(slot: int, at: Vector2, size: Vector2, swing: float) -> bool:
+		var middle := slot * (CORNERS + 1)
+		if slot < 0 or middle + CORNERS >= _points.size():
+			return false
+		var centre := Vector2(at.x, at.y + size.y * LakeGrid.SHADOW_DROP)
+		var wide := size.x * swing * LakeGrid.SHADOW_SPAN
+		var anchor := LakeGrid.pack_anchor(at.x, 0.0, 1.0)
+		_points[middle] = centre
+		_colors[middle] = anchor
+		for i in CORNERS:
+			_points[middle + 1 + i] = centre + _ring[i] * wide
+			_colors[middle + 1 + i] = anchor
+		return true
+
+	## Collapse a shadow to a point. Its slot stays where it is — the ones after it are in
+	## use — and its triangles come out with no area, so nothing is drawn.
+	func blank(slot: int) -> void:
+		var middle := slot * (CORNERS + 1)
+		if slot < 0 or middle + CORNERS >= _points.size():
+			return
+		for i in CORNERS + 1:
+			_points[middle + i] = Vector2.ZERO
+
+	func begin() -> void:
+		_count = 0
+
+	func finish() -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _count <= 0:
+			return
+		# Only the part that was written this rebuild. The arrays keep their full length so
+		# nothing is reallocated; the slice is what gets submitted.
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(),
+			_indices.slice(0, _count * CORNERS * 3),
+			_points.slice(0, _count * (CORNERS + 1)),
+			_colors.slice(0, _count * (CORNERS + 1))
+		)
+
+
+## The rings the floating junk sits in.
+##
+## Every ring moves every frame — it breathes on its own phase and rides the same drift the
+## piece does — so there is nothing here to cache between frames. What there was to fix is
+## how the movement got onto the screen: a ring used to be a fresh thirteen-point array with
+## a cosine and a sine per point, handed to its own `draw_polyline`. At a hundred and ten
+## pieces that was two hundred and twenty allocations, near three thousand trig calls and
+## two hundred and twenty draw commands, sixty times a second, and it cost more frames than
+## anything else in the game.
+##
+## Now the ring shape is worked out once (`UNIT`, a unit circle in the tile's own 2:1) and
+## every ring is that shape moved and scaled; the segments all go into two buffers that are
+## allocated once and rewritten in place; and each buffer goes to the screen in a single
+## multiline call. Same picture, two draw commands.
 class RippleLayer extends Node2D:
+	## The ring, as offsets from its middle at width 1. Twelve segments, so thirteen points
+	## with the last one back on the first.
+	const RING_POINTS := 13
+	const RING_SEGMENTS := RING_POINTS - 1
+
+	## The inner ring is drawn heavier than the wake behind it, and a multiline carries one
+	## width for the whole call — which is why there are two buffers rather than one.
+	const INNER_WIDE := 1.4
+	const OUTER_WIDE := 1.0
+
+	static var UNIT: PackedVector2Array = _unit_ring()
+
 	var grid: LakeGrid
 	var pieces: PackedInt32Array = PackedInt32Array()
 	var _time: float = 0.0
 
+	## Segment endpoints and their colours: two points per segment and one colour per
+	## segment, which is the shape a multiline wants. Sized to the piece list, then written
+	## over every frame.
+	var _inner: PackedVector2Array = PackedVector2Array()
+	var _inner_ink: PackedColorArray = PackedColorArray()
+	var _outer: PackedVector2Array = PackedVector2Array()
+	var _outer_ink: PackedColorArray = PackedColorArray()
+
+	static func _unit_ring() -> PackedVector2Array:
+		var ring := PackedVector2Array()
+		ring.resize(RING_POINTS)
+		for i in RING_POINTS:
+			var angle := TAU * float(i) / float(RING_SEGMENTS)
+			ring[i] = Vector2(cos(angle) * 0.5, sin(angle) * 0.25)
+		return ring
+
 	func set_pieces(list: PackedInt32Array) -> void:
 		pieces = list
 		set_process(not pieces.is_empty())
+		# Room for every piece to draw both its rings. Resized only when the float set
+		# changes size, which is what a rebuild is for.
+		var room := pieces.size() * RING_SEGMENTS * 2
+		if _inner.size() != room:
+			_inner.resize(room)
+			_inner_ink.resize(room / 2)
+			_outer.resize(room)
+			_outer_ink.resize(room / 2)
 		queue_redraw()
 
 	func _process(delta: float) -> void:
 		_time += delta
 		queue_redraw()
 
+	## One ring into a buffer: twelve segments, each written as its two endpoints so the
+	## whole field can go out as one disconnected multiline.
+	static func _lay(
+		into: PackedVector2Array, ink: PackedColorArray, at: int,
+		middle: Vector2, wide: float, tint: Color
+	) -> void:
+		var span := Vector2(wide, wide)
+		for i in RING_SEGMENTS:
+			var a := at + i * 2
+			into[a] = middle + UNIT[i] * span
+			into[a + 1] = middle + UNIT[i + 1] * span
+			ink[at / 2 + i] = tint
+
 	func _draw() -> void:
+		var clock := grid.wave_time()
+		var laid := 0
 		for index: int in pieces:
 			var stack := grid.stacks[index]
 			if stack.is_empty():
 				continue
-			var at := grid.surface_pos(index)
+			# Still water plus the drift, and deliberately *not* the bob. `surface_pos`
+			# includes the swell, so the ring used to heave up and down with the piece it
+			# was drawn around — a disturbance in the water that rises with the thing
+			# floating in it is the whole reason the lake read as stickers on glass.
+			var still := grid.surface_still(index)
+			var at := still + LakeGrid._sway(still.x, clock)
 			var def := grid.defs[stack[stack.size() - 1]]
 			# Off the piece's own place on the water, so no two rings breathe together —
 			# in step, a field of them pulses like a warning light.
 			var phase := _time * TAU / LakeGrid.RIPPLE_TIME + at.x * 0.02 + at.y * 0.013
 			var breath := 1.0 + sin(phase) * LakeGrid.RIPPLE_BREATH
 			var wide := def.size.x * grid.swing[index] * LakeGrid.RIPPLE_SPAN * breath
-			# Flat on the plane, in the tiles own 2:1, so the ring lies in the water rather
-			# than standing up in it.
-			var ring := PackedVector2Array()
-			for i in 13:
-				var angle := TAU * float(i) / 12.0
-				ring.append(at + Vector2(cos(angle) * wide * 0.5, sin(angle) * wide * 0.25))
+
 			# Faintest at the top of the breath: a ring spreading is a ring going.
 			var fade := LakeGrid.RIPPLE_ALPHA * (1.0 - sin(phase) * 0.35)
-			draw_polyline(ring, Color(0.86, 0.94, 0.96, fade), 1.0)
+			_lay(_inner, _inner_ink, laid, at, wide, Color(0.86, 0.94, 0.96, fade))
+
+			# And the one behind it, pushed back along the drift so the pair reads as a
+			# wake rather than as a pair of circles round a target.
+			var drift := (
+				LakeGrid._sway(still.x, clock)
+				- LakeGrid._sway(still.x, clock - LakeGrid.RIPPLE_WAKE_LOOK)
+			)
+			var trail := at
+			if drift.length() > 0.05:
+				trail -= drift.normalized() * wide * LakeGrid.RIPPLE_WAKE
+			var out_phase := phase + LakeGrid.RIPPLE_OUTER_LAG
+			var out_wide := (
+				def.size.x * grid.swing[index] * LakeGrid.RIPPLE_SPAN * LakeGrid.RIPPLE_OUTER
+				* (1.0 + sin(out_phase) * LakeGrid.RIPPLE_BREATH)
+			)
+			var out_fade := (
+				LakeGrid.RIPPLE_ALPHA * LakeGrid.RIPPLE_OUTER_FADE
+				* (1.0 - sin(out_phase) * 0.35)
+			)
+			_lay(
+				_outer, _outer_ink, laid, trail, out_wide,
+				Color(0.86, 0.94, 0.96, out_fade)
+			)
+			laid += RING_SEGMENTS * 2
+
+		if laid <= 0:
+			return
+		# Only the part written this frame. The buffers keep their length so nothing is
+		# reallocated; the slice is what gets submitted — the same bargain the shadow
+		# layer above strikes.
+		if laid == _inner.size():
+			draw_multiline_colors(_inner, _inner_ink, INNER_WIDE)
+			draw_multiline_colors(_outer, _outer_ink, OUTER_WIDE)
+			return
+		draw_multiline_colors(
+			_inner.slice(0, laid), _inner_ink.slice(0, laid / 2), INNER_WIDE
+		)
+		draw_multiline_colors(
+			_outer.slice(0, laid), _outer_ink.slice(0, laid / 2), OUTER_WIDE
+		)
 
 
 func _ready() -> void:
+	_shadows = ShadowLayer.new()
+	_shadows.name = &"Shadows"
+	_shadows.grid = self
+	# Under the rings, which are under the rubbish.
+	_shadows.z_index = -2
+	_shadows.reserve(SHADOW_MOST)
+	add_child(_shadows)
+
 	_ripples = RippleLayer.new()
 	_ripples.name = &"Ripples"
 	_ripples.grid = self
@@ -232,7 +545,7 @@ func _ready() -> void:
 ## frame, which is the thing all of this is here to avoid. Rounding to a couple of tiles
 ## and padding by the same amount means the view only counts as moved once it has really
 ## moved, and the extra margin is already inside the cull.
-const VIEW_SNAP := 128.0
+const VIEW_SNAP := 160.0
 
 
 func set_view(to: Rect2) -> void:
@@ -245,6 +558,7 @@ func set_view(to: Rect2) -> void:
 		return
 	view = coarse
 	_dirty = true
+	from_view += 1
 	queue_redraw()
 
 
@@ -256,6 +570,7 @@ func set_detailed(on: bool) -> void:
 		return
 	_detailed = on
 	_dirty = true
+	from_detail += 1
 	queue_redraw()
 
 
@@ -325,7 +640,13 @@ func tile_at(where: Vector2) -> int:
 ## a list sorted by lightness: light rubbish on top, heavy tiers underneath. That order is
 ## what makes the progression legible — you clear the surface layer, and what you find
 ## beneath it is the tier you cannot lift yet.
-func build(from_defs: Array[TrashDef], lake_seed: int) -> void:
+## Lay the field out.
+##
+## `fill` says whether to put anything in it. A lake with nothing floating on it is a real
+## thing to want — the second level's water carries only what its yards make, and a basin
+## seeded with muck it can never sell would be eight thousand tiles of scenery the player
+## is invited to fish out of a fight.
+func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> void:
 	defs = from_defs
 	if sheets != null:
 		_white_uv = sheets.uv_of(sheets.white)
@@ -357,7 +678,7 @@ func build(from_defs: Array[TrashDef], lake_seed: int) -> void:
 			var stack := PackedInt32Array()
 			emerge[index] = 0.0
 			_reroll_pose(index)
-			if not Iso.in_lake(tx, ty):
+			if not fill or not Iso.floats_here(tx, ty):
 				stacks[index] = stack
 				continue
 			var slots := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
@@ -475,8 +796,7 @@ func take(index: int, k: int) -> int:
 		if not _emerging.has(index):
 			_emerging.append(index)
 		_reroll_pose(index)
-	_dirty = true
-	queue_redraw()
+	_restamp(index)
 	return def_index
 
 
@@ -487,8 +807,7 @@ func insert(index: int, k: int, def_index: int) -> void:
 	var stack := stacks[index]
 	stack.insert(clampi(k, 0, stack.size()), def_index)
 	stacks[index] = stack
-	_dirty = true
-	queue_redraw()
+	_restamp(index)
 
 
 func def_at(index: int, k: int) -> TrashDef:
@@ -510,6 +829,12 @@ func piece_count() -> int:
 	for index in stacks.size():
 		total += stacks[index].size()
 	return total
+
+
+## The clock the wave terms are read at. The ripple layer needs the same one the geometry
+## is rocked with, and `_time` is this object's own business.
+func wave_time() -> float:
+	return _time * WAVE_SPEED
 
 
 static func _swell(x: float, t: float) -> float:
@@ -535,10 +860,11 @@ func _process(delta: float) -> void:
 		emerge[index] = maxf(emerge[index] - step, 0.0)
 		if emerge[index] > 0.0:
 			still_rising.append(index)
+		# A rising piece is the one thing whose geometry actually changes between frames —
+		# and it is one tile's worth of it, so it rewrites its own corner of the soup
+		# rather than asking for the whole lake to be laid out again.
+		_restamp(index)
 	_emerging = still_rising
-	# A rising piece is the one thing whose geometry actually changes between frames.
-	_dirty = true
-	queue_redraw()
 
 
 ## The visible tiles, as a range of the tile field. The cull is arithmetic: the view
@@ -604,19 +930,32 @@ func atlas_rid() -> RID:
 ## is what keeps that true without becoming a trap when the generated art lands.
 func _rebuild() -> void:
 	_dirty = false
+	_write_at = -1
 	rebuilds += 1
-	_mesh_points.resize(0)
-	_mesh_uvs.resize(0)
-	_mesh_colors.resize(0)
-	_mesh_indices.resize(0)
+	var began := Time.get_ticks_usec()
+	_fill = 0
+	_tri = 0
+	if _slot_base.size() != stacks.size():
+		_slot_base.resize(stacks.size())
+		_slot_len.resize(stacks.size())
+		_shadow_at.resize(stacks.size())
+	_slot_base.fill(-1)
+	_slot_len.fill(0)
+	_shadow_at.fill(-1)
 	drawn_pieces = 0
 	var textured: Array[int] = []
 	var afloat := PackedInt32Array()
+	_shadows.begin()
 
 	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
 	var lo := view.position - pad
 	var hi := view.position + view.size + pad
 	var box := _visible_tile_box()
+
+	# Room for the worst the walk below could ask for, taken in one go. The walk then
+	# writes by index and the arrays are cut back to what was actually used, so a rebuild
+	# costs two resizes rather than one allocation per piece.
+	_reserve(box.size.x * box.size.y * PIECE_VERTS)
 
 	# Row by row, near-tile last: tile-confined pieces come out in painter's order, and a
 	# triangle array keeps the order it was given.
@@ -631,14 +970,39 @@ func _rebuild() -> void:
 				continue
 			afloat.append(index)
 			var def := defs[stack[stack.size() - 1]]
+			_shadow_at[index] = _shadows.add(at, def.size, swing[index])
 			if def.sprite != null:
 				textured.append(index)
 				continue
+			var base := _fill
 			_stamp(def, at, index)
+			_slot_base[index] = base
+			_slot_len[index] = _fill - base
 			drawn_pieces += 1
 
+	# Down to what was used. What is submitted has to be exactly the geometry that was
+	# laid down — the tail of the reservation is uninitialised, and drawing it would be a
+	# spray of triangles through the origin.
+	_mesh_points.resize(_fill)
+	_mesh_uvs.resize(_fill)
+	_mesh_colors.resize(_fill)
+	_mesh_indices.resize(_tri)
+
 	_sprites.set_pieces(textured)
+	_shadows.finish()
 	_ripples.set_pieces(_spread_over(afloat, RIPPLE_MOST))
+	walked = box.size.x * box.size.y
+	rebuild_ms = float(Time.get_ticks_usec() - began) / 1000.0
+
+
+## Room for `verts` vertices in the soup, and the indices that many needs. Grown only —
+## the arrays are cut back to the used length at the end of every rebuild, so this is
+## where they get their size back.
+func _reserve(verts: int) -> void:
+	_mesh_points.resize(verts)
+	_mesh_uvs.resize(verts)
+	_mesh_colors.resize(verts)
+	_mesh_indices.resize(verts / 4 * 6)
 
 
 ## A bounded sample of a list, taken evenly across it rather than off the front. Off the
@@ -661,6 +1025,81 @@ func _spread_over(list: PackedInt32Array, most: int) -> PackedInt32Array:
 ##
 ## The anchor goes into every vertex's UV, which is what the bob shader reads. It is not a
 ## texture coordinate and nothing samples it.
+## Rewrite one tile's vertices where they already sit, instead of laying the whole soup
+## out again.
+##
+## The two things that change during play — a piece taken, and the piece under it rising
+## into place — touch one tile each and leave every other piece exactly where it was. A
+## full rebuild for either of those was re-stamping a few thousand pieces to move one, and
+## that is what the net's cast and drag were hitching on.
+##
+## Falls back to a full rebuild whenever the tile's new contents will not fit the space
+## the old ones were given: a different vertex count means the whole soup after this tile
+## shifts, and shifting it is a rebuild by another name.
+func _restamp(index: int) -> void:
+	# A rebuild is already coming this frame; it will draw the new state anyway.
+	if _dirty:
+		return
+	if index < 0 or index >= _slot_base.size():
+		return
+	queue_redraw()
+
+	var stack: PackedInt32Array = stacks[index]
+	var base := _slot_base[index]
+	if base < 0:
+		# Not in the soup: culled, or drawn by the sprite layer. Nothing to patch, and if
+		# it now has something to show it needs room made for it.
+		if not stack.is_empty():
+			_dirty = true
+			from_patch += 1
+		return
+
+	var span := _slot_len[index]
+	if stack.is_empty():
+		_blank_slot(base, span)
+		_shadows.blank(_shadow_at[index])
+		_shadows.queue_redraw()
+		_slot_base[index] = -1
+		_slot_len[index] = 0
+		_shadow_at[index] = -1
+		drawn_pieces -= 1
+		return
+
+	var def := defs[stack[stack.size() - 1]]
+	if def.sprite != null or _stamp_len(def) != span:
+		_dirty = true
+		from_patch += 1
+		return
+
+	var at := surface_still(index)
+	_write_at = base
+	_stamp(def, at, index)
+	_write_at = -1
+
+	# The shadow moves with the piece. A rising piece whose shadow stayed put would look
+	# like it had come off its own footing.
+	if _shadows.write(_shadow_at[index], at, def.size, swing[index]):
+		_shadows.queue_redraw()
+
+
+## How many vertices `_stamp` will lay down for a piece. Mirrors the branches in `_stamp`
+## — if a shape is added there, its corners have to be counted here or a patch will write
+## past the space the tile was given.
+func _stamp_len(def: TrashDef) -> int:
+	if def.atlas != null:
+		return 4
+	return 16 if _detailed else 8
+
+
+## Collapse a tile's vertices to a point, so its triangles have no area and nothing is
+## rasterised. Cheaper and safer than cutting them out of the arrays, which would shift
+## every index after them.
+func _blank_slot(base: int, span: int) -> void:
+	for i in span:
+		_mesh_points[base + i] = Vector2.ZERO
+		_mesh_colors[base + i] = Color(0.0, 0.0, 0.0, 0.0)
+
+
 func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 	var lean := tilt[index]
 	if def.atlas != null:
@@ -732,18 +1171,40 @@ func _quad(
 	a: Vector2, b: Vector2, c: Vector2, d: Vector2, grey: float, alpha: float,
 	anchor: Vector2, uv: Rect2
 ) -> void:
-	var base := _mesh_points.size()
-	_mesh_points.append_array(PackedVector2Array([a, b, c, d]))
-	_mesh_uvs.append_array(PackedVector2Array([
-		uv.position, uv.position + Vector2(uv.size.x, 0.0),
-		uv.position + uv.size, uv.position + Vector2(0.0, uv.size.y)
-	]))
 	var packed := pack_anchor(anchor.x, grey, alpha)
+	# Where this quad goes: over one tile's own vertices when patching, on the end of what
+	# the rebuild has laid down so far otherwise. Written element by element rather than
+	# through a temporary array, because a temporary here is one heap allocation per piece
+	# per rebuild and there are thousands of pieces.
+	var base := _write_at if _write_at >= 0 else _fill
+
+	_mesh_points[base] = a
+	_mesh_points[base + 1] = b
+	_mesh_points[base + 2] = c
+	_mesh_points[base + 3] = d
+
+	_mesh_uvs[base] = uv.position
+	_mesh_uvs[base + 1] = uv.position + Vector2(uv.size.x, 0.0)
+	_mesh_uvs[base + 2] = uv.position + uv.size
+	_mesh_uvs[base + 3] = uv.position + Vector2(0.0, uv.size.y)
+
 	for i in 4:
-		_mesh_colors.append(packed)
-	_mesh_indices.append_array(
-		PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3])
-	)
+		_mesh_colors[base + i] = packed
+
+	# Patching one tile in place. The vertices it is overwriting were wound by an earlier
+	# rebuild and the winding has not changed, so the indices are already right.
+	if _write_at >= 0:
+		_write_at += 4
+		return
+
+	_mesh_indices[_tri] = base
+	_mesh_indices[_tri + 1] = base + 1
+	_mesh_indices[_tri + 2] = base + 2
+	_mesh_indices[_tri + 3] = base
+	_mesh_indices[_tri + 4] = base + 2
+	_mesh_indices[_tri + 5] = base + 3
+	_fill += 4
+	_tri += 6
 
 
 ## The anchor's x, the grey and the alpha, folded into one vertex colour. Mirrors the

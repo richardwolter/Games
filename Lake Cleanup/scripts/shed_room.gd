@@ -11,6 +11,9 @@
 class_name ShedRoom
 extends Control
 
+const Style := preload("res://scripts/style.gd")
+const DogArt := preload("res://scripts/dog_art.gd")
+
 ## The grid things are placed on, in source pixels, and how far the room is blown up.
 ##
 ## Half the 16 px grid the art was drawn on. Furniture is not drawn to whole cells — a
@@ -20,23 +23,134 @@ extends Control
 const CELL := 8
 const ZOOM := 3
 
-## The floor, in cells.
-const COLS := 30
-const ROWS := 20
+## The most a source pixel is ever blown up. The room fills the screen now, so the floor is
+## allowed to grow into it rather than stopping at the size it was when it lived in a panel.
+const ZOOM_MOST := 6
+
+## The floor, in cells. Roughly doubled (600 -> 1176 cells) at the same aspect ratio, so more
+## finds can stand at once. `_floor_rect()` below only centres the floor in whatever room is
+## left after the inventory list — it does not scale or scroll a floor bigger than that space,
+## so this needs an in-editor check against the panel it actually renders into: unverified
+## from here.
+const COLS := 42
+const ROWS := 28
 
 ## How wide the inventory column down the right is, in pixels, and how tall one row of it
 ## is. A row holds one find: its picture and its name.
-const LIST_WIDTH := 260
+const LIST_WIDTH := 210
 const ROW_HEIGHT := 56
 
-## Gap between the room and the list.
-const GUTTER := 24
+## Gap between the room and the list, and the margin around the lot inside the panel.
+const GUTTER := 14
+const MARGIN := 8.0
+
+## How far the inventory column fades back while a find is being carried. The list sits over
+## part of the floor and a player placing furniture is looking at the floor, not at the list
+## they have already taken the piece out of.
+const LIST_BUSY := 0.25
+
+
+## The close cross: how big it is drawn, and how far above the inventory column it sits.
+const CLOSE_SIDE := 34.0
+const CLOSE_LIFT := 10.0
+
+## The dog, when it happens to be in.
+##
+## It is in the shed about half the time the player walks in, because a dog that is always
+## exactly where you left it is furniture. When it is in, it mooches from one clear patch of
+## floor to another — unless there is a pet bed out, in which case it goes straight to the
+## bed and stays there.
+const DOG_ODDS := 0.55
+
+## How tall the dog draws, in floor cells, and how fast it walks across them.
+##
+## Set against the player rather than picked: outdoors the angler is forty pixels and the dog
+## twenty-two, and this is what puts the same pair of animals in this room at the same ratio
+## once the player's own height has been snapped to whole pixels of art.
+const DOG_TALL := 2.75
+const DOG_SPEED := 2.6
+
+## The longest step allowed in one frame, in cells. See the delta clamp in `_process`.
+const DOG_STEP_MOST := 0.6
+
+## How long the dog keeps doing one thing, in seconds, and how long it settles for when it
+## has found the bed.
+const DOG_MOOD_LEAST := 2.5
+const DOG_MOOD_MOST := 7.0
+const DOG_BED_SLEEP := 22.0
+
+## The piece the dog treats as its own. The catalogue name rather than the title, so
+## renaming the find in scripts/find_names.gd does not quietly take the dog's bed away.
+const DOG_BED := &"furniture_44"
+
+## How many cells deep a piece's foot is — the part of it actually standing on the floor.
+const BASE_CELLS := 1
 
 ## How wide a floorboard is, in source pixels. The boards are the room, not the grid: the
 ## grid is half this and drawing a line every four screen pixels reads as corduroy.
 const BOARD := 16
 
+## The door in the back wall: how wide it is against its own height, how much of the wall it
+## stands in, and where along the wall it sits.
+##
+## Sized off the wall rather than off the floor grid, because a door is a shape and not a
+## number of cells: five cells across a forty-eight pixel wall came out wider than it was
+## tall, which reads as a hatch lying on its side.
+##
+## The lake has the player walk up to a hut and press a key; inside, the same hut had no way
+## in and no way out but a cross in the corner. The door is where they came in, and it is
+## what the room is oriented around — the wall is the north side, so the door is in it.
+const DOOR_WIDE := 0.58
+const DOOR_TALL := 0.94
+const DOOR_ALONG := 0.5
+
+## The door's colours: planks, its frame, and the dark of the gap under it.
+const DOOR_FACE := Color(0.42, 0.29, 0.19)
+const DOOR_LIT := Color(0.52, 0.37, 0.24)
+const DOOR_FRAME := Color(0.24, 0.17, 0.12)
+
+## The player, indoors: the cut sheet they are drawn from, how tall they draw in cells, how
+## fast they walk across them, and the longest step one frame may take.
+##
+## The height is what is asked for and the drawing rounds it to whole pixels of art, so this
+## moves in steps: at the room's usual zoom, 3.1 cells came out as a figure forty pixels tall
+## standing beside a dog thirty-eight, which is a child next to a labrador. 4.4 lands on the
+## next step up and puts the two back in the proportion they have on the island.
+##
+## Then 4.4 read as a giant in a room whose furniture is drawn at house scale, so it is down
+## by a third again: 3.4 is 4.4 over 1.3, and the rounding still lands it on a clean whole
+## number of screen pixels per pixel of art.
+##
+## The same sheet the lake draws them from — three views and a six-frame stride — read here
+## rather than borrowed off the Angler node, because that node walks an island: its rules are
+## a shoreline and a hut footprint, and none of that is in this room.
+const YOU_ART := "res://assets/character.json"
+const YOU_TALL := 3.4
+const YOU_SPEED := 7.0
+const YOU_STEP_MOST := 0.7
+
+## Seconds a frame of the walk and the idle are held. The lake's own numbers, so the figure
+## moves the same indoors as out.
+const YOU_IDLE_FRAME := 0.24
+const YOU_WALK_FRAME := 0.1
+
+## How far the player stands in front of the door when the room opens, in cells. Just onto
+## the floor: they have come through it, not out of the wall.
+const YOU_ENTRY := 2.0
+
+## How close the player and the dog may get in here, in cells: a cell is eight source pixels
+## and the two of them are about two cells wide at the feet.
+##
+## Kept indoors only. Outside, the two walk through each other — the island is small and an
+## animal that pushes back out there is an animal in the way — but a room is a room, and a dog
+## you shove through the wardrobe is worse than one you have to step round.
+const ROOM_PERSONAL := 1.6
+
 signal changed
+
+## The cross in the corner. The room is the whole screen now, so the way out is a button on
+## the room rather than a bar of panel underneath it.
+signal close_asked
 
 ## The art, and the two arrays this screen is a view of. Both are owned by lake.gd — the
 ## room edits `decor` in place rather than keeping a copy, so what is on screen and what
@@ -54,11 +168,540 @@ var carrying: StringName = &""
 var _carried_from: int = -1
 var _pointer := Vector2.ZERO
 var _scroll: float = 0.0
+var _close: CloseButton
+
+## The dog: whether it is in at all, where it is standing in cells, and what it is up to.
+## See `_dog_think`.
+var _dog_here: bool = false
+var _dog_at := Vector2.ZERO
+var _dog_target := Vector2.ZERO
+var _dog_state: StringName = &"idle"
+var _dog_age: float = 0.0
+var _dog_mood: float = 0.0
+var _dog_left: bool = false
+var _dog_rng := RandomNumberGenerator.new()
+
+## The player in the room: where they stand in cells, which way they face, how long they
+## have been walking (nought when still), and how long the room has been open — which is
+## what the idle cycle is counted off.
+var _you_at := Vector2.ZERO
+var _you_left: bool = false
+var _you_facing := Vector2(0.0, 1.0)
+var _you_step: float = 0.0
+var _you_age: float = 0.0
+
+## The sheet the player is drawn from, and the same sheet turned over for the walks that go
+## the other way. Loaded once, and null when the art is missing — in which case the room
+## draws no player rather than a box.
+var _you_sheet: Texture2D
+var _you_mirror: Texture2D
+var _you_sheet_wide: float = 0.0
+var _you_poses := {}
+
+## The hat, toned to match the sheet. See `_load_you`.
+var _you_hat: Texture2D
+
+## How tall the figure draws inside its cell, and where its feet sit in that cell. See
+## `_load_you`.
+var _you_ink_tall: float = 20.0
+var _you_ink_foot: float = 26.0
+
+## Cells something is standing on, rebuilt when `decor` changes. Rugs are not in it: a dog
+## may walk on a rug, and a room full of rugs it refuses to cross is a room it cannot leave.
+var _blocked := {}
+var _blocked_for: int = 0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Nearest, for the whole room. Everything drawn in here is pixel art blown up by a whole
+	# number — the floor grid, the furniture, the dog, the player — and the default bilinear
+	# filter softens all of it. Nothing in this screen is ever drawn smaller than it was
+	# painted, which is the case nearest handles badly, so it can go on the Control itself.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_process_input(false)
+	_close = CloseButton.new()
+	_close.name = &"CloseRoom"
+	_close.tint = Style.INK
+	_close.pressed.connect(func() -> void: close_asked.emit())
+	add_child(_close)
+	_dog_rng.randomize()
+	_load_you()
+	# The dog only runs while the room is on screen: it is a picture of a room, and nothing
+	# in it is happening while nobody is looking at it.
+	visibility_changed.connect(_room_shown)
+	set_process(false)
+
+
+## The room came on screen, or went off it.
+##
+## Whether the dog is in is rolled here rather than kept: it is decided each time the player
+## opens the shed, which is what makes walking in and finding it asleep on the bed feel like
+## finding it rather than like checking on it.
+func _room_shown() -> void:
+	var showing := is_visible_in_tree()
+	set_process(showing)
+	if not showing:
+		return
+	# Stood just inside the door, facing the room: they have walked in, not been placed.
+	var door := _door_span()
+	_you_at = Vector2((door.x + door.y) * 0.5, YOU_ENTRY)
+	_you_facing = Vector2(0.0, 1.0)
+	_you_step = 0.0
+	_you_age = 0.0
+
+	_dog_here = DogArt.ready() and _dog_rng.randf() < DOG_ODDS
+	if not _dog_here:
+		return
+	# On the bed already when there is one, rather than walking over to it while the player
+	# watches: the door opening is not an event the dog got up for.
+	var bed := _bed_cell()
+	_dog_at = bed if bed != Vector2.INF else _dog_somewhere()
+	_dog_target = _dog_at
+	_dog_age = 0.0
+	_dog_mood = 0.0
+	_dog_think()
+
+
+func _process(delta: float) -> void:
+	# One long frame is one slow frame. A hitch, or the window coming back after being
+	# minimised, hands this whatever delta it likes, and speed times that is a dog that
+	# jumps across the room.
+	delta = minf(delta, 0.1)
+	_walk_you(delta)
+	if not _dog_here:
+		queue_redraw()
+		return
+	_dog_age += delta
+	_dog_mood -= delta
+	# Furniture can be put down on top of the dog, which leaves it standing inside a
+	# wardrobe with every step out of it refused. Nobody sees it move — the piece is over it
+	# — and a dog wedged in a cupboard for the rest of the session is worse than one that
+	# turns up a foot to the left.
+	if not _dog_may_stand(_dog_at):
+		_dog_at = _dog_somewhere()
+		_dog_target = _dog_at
+	if _dog_state == &"walk":
+		if _dog_walk(delta) or _dog_mood <= 0.0:
+			_dog_think()
+	elif _dog_mood <= 0.0:
+		_dog_think()
+	queue_redraw()
+
+
+## Read the player's cut sheet. Nothing drawn if it is missing, which is the same bargain
+## every other drawn thing here strikes with its art.
+func _load_you() -> void:
+	var text := FileAccess.get_file_as_string(YOU_ART)
+	if text.is_empty():
+		return
+	var book: Dictionary = JSON.parse_string(text)
+	if book == null or not book.has("poses"):
+		return
+	var image := Art.image(book["sheet"])
+	if image == null:
+		return
+	# Toned once, here, rather than through a material. The lake puts the angler behind
+	# shaders/figure.gdshader; this room draws its floor, its furniture, the dog, the player
+	# and the inventory list on one canvas item, so a material would take the whole screen
+	# with it. Same arithmetic, same numbers — see Style.figure_tone.
+	image = _toned(image)
+	_you_sheet = ImageTexture.create_from_image(image)
+	# The hat goes through the same tone as the figure under it, for the same reason.
+	var hat := Art.image(Angler.HAT_ART)
+	if hat != null:
+		_you_hat = ImageTexture.create_from_image(_toned(hat))
+	_you_sheet_wide = float(image.get_width())
+	var turned := Image.create_from_data(
+		image.get_width(), image.get_height(), false, image.get_format(), image.get_data()
+	)
+	turned.flip_x()
+	_you_mirror = ImageTexture.create_from_image(turned)
+	for name: String in book["poses"]:
+		var frames: Array = []
+		for cell: Dictionary in book["poses"][name]:
+			var region: Array = cell["region"]
+			var ink: Array = cell["ink"]
+			frames.append({
+				"region": Rect2(region[0], region[1], region[2], region[3]),
+				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
+				"head": float(cell.get("head", 0.0)),
+			})
+		_you_poses[StringName(name)] = frames
+
+	# What the figure measures inside its cell, taken from one frame and used for every one
+	# of them. The cell is mostly air — twelve pixels of character in thirty-two — so scaling
+	# a frame to its cell drew the player at a third of the size they should be, which is how
+	# they ended up shorter than the dog. Taken once rather than per frame for the same
+	# reason player.gd does: the drawing breathes inside its cell, and measuring each frame
+	# makes the figure pulse.
+	if _you_poses.has(&"idle_front"):
+		var first: Dictionary = (_you_poses[&"idle_front"] as Array)[0]
+		var ink: Rect2 = first["ink"]
+		_you_ink_tall = maxf(ink.size.y, 1.0)
+		_you_ink_foot = ink.position.y + ink.size.y
+
+
+## A copy of the sheet with the game's own light on it. See Style.figure_tone.
+##
+## Once, at load: the sheet is 192 pixels square and this walks all of it, which is nothing
+## done once and would be silly done per frame.
+func _toned(art: Image) -> Image:
+	var out := Image.create(art.get_width(), art.get_height(), false, Image.FORMAT_RGBA8)
+	for y in art.get_height():
+		for x in art.get_width():
+			var pixel := art.get_pixel(x, y)
+			# Cleared pixels are left cleared. The sheet is keyed art and anything written
+			# into its transparent margin comes back as a halo the moment it is drawn.
+			if pixel.a <= 0.0:
+				out.set_pixel(x, y, pixel)
+				continue
+			out.set_pixel(x, y, Style.figure_tone(pixel))
+	return out
+
+
+## Where the door stands, in cells across the floor: its two edges. Worked back from the
+## drawn width so that walking in front of the door and standing in the doorway are the same
+## place, however the room is zoomed.
+func _door_span() -> Vector2:
+	var middle := float(COLS) * DOOR_ALONG
+	var wide := _door_size().x / maxf(float(CELL) * _zoom(), 1.0)
+	return Vector2(middle - wide * 0.5, middle + wide * 0.5)
+
+
+## How big the door is drawn, in pixels: as tall as the wall allows, and proportioned from
+## that.
+func _door_size() -> Vector2:
+	var wall := float(BOARD * ZOOM)
+	var tall := wall * DOOR_TALL
+	return Vector2(tall * DOOR_WIDE, tall)
+
+
+## Walk the player about the room.
+##
+## Screen space, not tile space: this is a room seen flat on, so pressing right walks right
+## and there is no projection to undo. Blocked cells are the furniture's, the same ones the
+## dog is kept out of, and a refused step is tried on each axis alone so walking into the
+## side of a wardrobe slides along it instead of stopping dead.
+func _walk_you(delta: float) -> void:
+	_you_age += delta
+	var push := Vector2(
+		Input.get_axis(&"walk_left", &"walk_right"),
+		Input.get_axis(&"walk_up", &"walk_down")
+	)
+	if push == Vector2.ZERO or not carrying.is_empty():
+		_you_step = 0.0
+		return
+	_you_step += delta
+	_you_facing = push.normalized()
+	if absf(push.x) > 0.001:
+		_you_left = push.x < 0.0
+	var step := push.normalized() * minf(YOU_SPEED * delta, YOU_STEP_MOST)
+	var wanted := _you_at + step
+	if _you_may_stand(wanted):
+		_you_at = wanted
+		return
+	if absf(step.x) > 0.0001 and _you_may_stand(_you_at + Vector2(step.x, 0.0)):
+		_you_at += Vector2(step.x, 0.0)
+	elif absf(step.y) > 0.0001 and _you_may_stand(_you_at + Vector2(0.0, step.y)):
+		_you_at += Vector2(0.0, step.y)
+
+
+## May the player stand here? The floor, the furniture, and the dog.
+func _you_may_stand(where: Vector2) -> bool:
+	if not _dog_here:
+		return _dog_may_stand(where)
+	return _clear_of(where, _you_at, _dog_at)
+
+
+## Which of the three drawn views the player is showing, and whether it wants mirroring.
+##
+## Flat on rather than projected, so the rule is simply which way the push leaned: mostly
+## sideways is the side row, and the rest is the front or the back.
+func _you_view() -> Array:
+	if absf(_you_facing.x) >= absf(_you_facing.y):
+		return [&"side", _you_left]
+	return [&"front" if _you_facing.y > 0.0 else &"back", false]
+
+
+## The player, standing on the floor of the room.
+func _draw_you(floor_box: Rect2) -> void:
+	if _you_sheet == null:
+		return
+	var step := float(CELL * _zoom())
+	var at := floor_box.position + _you_at * step
+	var tall := YOU_TALL * step
+
+	var ring := PackedVector2Array()
+	for i in 13:
+		var angle := TAU * float(i) / 12.0
+		ring.append(at + Vector2(cos(angle) * tall * 0.26, sin(angle) * tall * 0.11))
+	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
+
+	var view := _you_view()
+	var walking := _you_step > 0.0
+	var pose := StringName("%s_%s" % ["walk" if walking else "idle", view[0]])
+	if not _you_poses.has(pose):
+		return
+	var frames: Array = _you_poses[pose]
+	var held := YOU_WALK_FRAME if walking else YOU_IDLE_FRAME
+	var frame: Dictionary = frames[posmod(int(_you_age / held), frames.size())]
+	var region: Rect2 = frame["region"]
+	# Scaled by how tall the figure is inside its cell, not by the cell: the cell is mostly
+	# air. Placed by the cell all the same — its foot line on the spot the player stands —
+	# so every frame lands where the artist put it and the walk does not bob about.
+	#
+	# Whole source pixels, like the lake draws them: a fraction of a pixel is what made the
+	# angler look out of focus out there, and this room is nothing but blown-up pixel art.
+	var scale := maxf(1.0, roundf(tall / _you_ink_tall))
+	# What the figure actually comes out as, which is not what was asked for: the scale is
+	# snapped to whole pixels, so a request for 49.6 draws 40. Everything hung on the figure is
+	# measured against this and not against `tall` — the hat was sized against the request and
+	# came out a quarter too wide for the head it sits on, which is why the angler indoors and
+	# the angler outdoors were not wearing the same hat.
+	var drawn := _you_ink_tall * scale
+	var size := region.size * scale
+	var box := Rect2(
+		at - Vector2(size.x * 0.5, _you_ink_foot * scale), size
+	)
+	if bool(view[1]):
+		draw_texture_rect_region(
+			_you_mirror, box,
+			Rect2(
+				Vector2(_you_sheet_wide - region.position.x - region.size.x, region.position.y),
+				region.size
+			)
+		)
+	else:
+		draw_texture_rect_region(_you_sheet, box, region)
+	_draw_you_hat(box, frame["ink"], float(frame["head"]), scale, drawn, view)
+
+
+## A length rounded onto the figure's own pixel grid, the same as the lake does it: the hat
+## is drawn geometry sitting on blown-up pixel art, and smooth edges on it are what would
+## look wrong.
+func _on_grid(px: float, scale: float) -> float:
+	return roundf(px / scale) * scale
+
+
+## The straw hat, indoors.
+##
+## The same picture the lake hangs on the angler, off the same constants, so it is one hat the
+## character wears rather than two that have to be kept looking alike. Only the size it is
+## measured against changes: Angler.HEIGHT in world pixels out there, and how tall the figure
+## is drawn on this floor at this zoom in here.
+func _draw_you_hat(
+	box: Rect2, ink: Rect2, head_at: float, scale: float, drawn: float, view: Array
+) -> void:
+	if _you_hat == null:
+		return
+	var head := box.position.y + ink.position.y * scale
+	# Over the head the slicer measured, the same as the lake does it.
+	var middle := (
+		box.position.x
+		+ box.size.x * 0.5
+		+ head_at * scale * (-1.0 if bool(view[1]) else 1.0)
+	)
+	var art := _you_hat.get_size()
+	var wide := maxf(scale, _on_grid(drawn * Angler.HAT_WIDE, scale))
+	var span := Vector2(wide, _on_grid(wide * art.y / maxf(art.x, 1.0), scale))
+	# The same per-view lift the lake gives it, so it is one hat in both places.
+	var line := head + _on_grid(drawn * Angler.HAT_SIT, scale) + Angler.lift_of(view) * scale
+	draw_texture_rect(
+		_you_hat, Rect2(Vector2(middle - span.x * 0.5, line - span.y), span), false
+	)
+
+
+## The way in, drawn into the back wall: a frame, a door inside it, and a handle.
+func _draw_door(wall: Rect2, floor_box: Rect2, ink: Color) -> void:
+	if wall.size.y <= 2.0:
+		return
+	var step := float(CELL * _zoom())
+	var span := _door_span()
+	var size := _door_size()
+	var frame := Rect2(
+		Vector2(
+			floor_box.position.x + span.x * step,
+			maxf(wall.end.y - size.y, wall.position.y)
+		),
+		Vector2(size.x, minf(size.y, wall.size.y))
+	)
+	draw_rect(frame, DOOR_FRAME)
+	var leaf := frame.grow(-maxf(2.0, frame.size.x * 0.06))
+	draw_rect(leaf, DOOR_FACE)
+	# Boards down the door, which is what tells it apart from a dark rectangle in a wall.
+	var boards := 4
+	for i in range(1, boards):
+		var x := leaf.position.x + leaf.size.x * float(i) / float(boards)
+		draw_line(Vector2(x, leaf.position.y), Vector2(x, leaf.end.y), DOOR_LIT, 1.0)
+	draw_rect(leaf, ink, false, 1.5)
+	draw_circle(
+		Vector2(leaf.end.x - leaf.size.x * 0.16, leaf.position.y + leaf.size.y * 0.55),
+		maxf(1.5, leaf.size.x * 0.05), Style.GOLD
+	)
+
+
+## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
+##
+## The bed outranks everything else when there is one out and the dog is not already on it,
+## because a pet bed the dog ignores is a joke at the player's expense — they went and found
+## it in the lake.
+func _dog_think() -> void:
+	_dog_age = 0.0
+	var bed := _bed_cell()
+	if bed != Vector2.INF:
+		# A bed in the room settles it. It used to be a coin flip each time the dog thought,
+		# so a player who had gone and found the bed in the lake and put it out watched the
+		# animal mooch about beside it half the afternoon. If there is a bed, the dog is on
+		# the bed; the mooching is what a room without one gets.
+		if _dog_at.distance_to(bed) <= 0.6:
+			_dog_state = &"sleep"
+			_dog_mood = DOG_BED_SLEEP
+		else:
+			_dog_state = &"walk"
+			_dog_target = bed
+			_dog_mood = DOG_MOOD_MOST
+		return
+	var roll := _dog_rng.randf()
+	_dog_mood = _dog_rng.randf_range(DOG_MOOD_LEAST, DOG_MOOD_MOST)
+	if roll < 0.45:
+		_dog_state = &"walk"
+		_dog_target = _dog_somewhere()
+	elif roll < 0.65:
+		_dog_state = &"idle"
+	elif roll < 0.85:
+		_dog_state = &"laid"
+	else:
+		_dog_state = &"sleep"
+
+
+## One step towards the target. True once it is there, or once it is stuck.
+##
+## The step is refused if the cell it would put the dog in is standing on something. Refused
+## outright rather than slid along, and then a new target is picked: a dog nosing along the
+## side of a wardrobe looking for a way round reads as a bug, where a dog changing its mind
+## reads as a dog.
+func _dog_walk(delta: float) -> bool:
+	var gap := _dog_target - _dog_at
+	if gap.length() <= 0.25:
+		return true
+	var step := gap.normalized() * minf(DOG_SPEED * delta, DOG_STEP_MOST)
+	if absf(step.x) > 0.0001:
+		_dog_left = step.x < 0.0
+	var wanted := _dog_at + step
+	if _clear_of(wanted, _dog_at, _you_at):
+		_dog_at = wanted
+		return _dog_at.distance_to(_dog_target) <= 0.25
+	return true
+
+
+## Somewhere on the floor with nothing on it.
+func _dog_somewhere() -> Vector2:
+	for _try in 24:
+		var where := Vector2(
+			_dog_rng.randf_range(1.0, float(COLS) - 1.0),
+			_dog_rng.randf_range(1.0, float(ROWS) - 1.0)
+		)
+		if _dog_may_stand(where):
+			return where
+	return _dog_at
+
+
+## May the dog stand with its feet on this cell? Inside the floor, and not on furniture.
+func _dog_may_stand(where: Vector2) -> bool:
+	if where.x < 0.5 or where.y < 0.5 or where.x > float(COLS) - 0.5 or where.y > float(ROWS) - 0.5:
+		return false
+	return not _taken().has(Vector2i(int(where.x), int(where.y)))
+
+
+## The same question, asked by one of the two things that walk about in here, with the other
+## one counted as furniture.
+##
+## Tight, like the rule outdoors: the dog is meant to be able to come and stand beside you,
+## and only walking through you is refused. Enforced only on somebody not already inside the
+## other — a chair put down on the pair of them, or a dog that padded up while the room was
+## being rearranged, must not leave either of them pinned.
+func _clear_of(where: Vector2, from: Vector2, other: Vector2) -> bool:
+	if not _dog_may_stand(where):
+		return false
+	if from.distance_to(other) < ROOM_PERSONAL:
+		return true
+	return where.distance_to(other) >= ROOM_PERSONAL
+
+
+## Where the pet bed is standing, in cells, or INF for a room without one.
+func _bed_cell() -> Vector2:
+	for row: Dictionary in decor:
+		if StringName(row["piece"]) != DOG_BED:
+			continue
+		var span := span_of(DOG_BED)
+		return Vector2(
+			float(int(row["cell"][0])) + float(span.x) * 0.5,
+			float(int(row["cell"][1])) + float(span.y) * 0.5
+		)
+	return Vector2.INF
+
+
+## Every cell something is standing on, rebuilt only when the room's contents change.
+##
+## Rugs are left out on purpose — they are the floor as far as anything walking is concerned
+## — and so is the pet bed, which the dog is supposed to end up on top of.
+##
+## Only the foot of a piece blocks. A bookcase is drawn tall because it is seen from the
+## front, but the part of it standing on the boards is the bottom strip; blocking its whole
+## picture put an invisible wall in the air behind every piece in the room.
+func _taken() -> Dictionary:
+	var key := decor.hash()
+	if key == _blocked_for:
+		return _blocked
+	_blocked_for = key
+	_blocked = {}
+	for row: Dictionary in decor:
+		var piece := StringName(row["piece"])
+		if piece == DOG_BED or (sheets != null and sheets.lies_flat(piece)):
+			continue
+		var span := span_of(piece)
+		var cell := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
+		var base := mini(BASE_CELLS, span.y)
+		for x in span.x:
+			for y in base:
+				_blocked[cell + Vector2i(x, span.y - 1 - y)] = true
+	return _blocked
+
+
+## The dog, on the floor, at whatever size the room is drawn.
+##
+## On its own shadow, the way everything else in this game that stands on a surface is: the
+## room is drawn flat and a dog with nothing under it hovers over the boards.
+func _draw_dog(floor_box: Rect2) -> void:
+	if not _dog_here:
+		return
+	var step := CELL * _zoom()
+	var at := floor_box.position + _dog_at * float(step)
+	var tall := DOG_TALL * float(step)
+	var ring := PackedVector2Array()
+	var wide := tall * (0.34 if _dog_state == &"sleep" or _dog_state == &"laid" else 0.44)
+	for i in 13:
+		var angle := TAU * float(i) / 12.0
+		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.42))
+	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
+	DogArt.stamp(
+		self, _dog_state, DogArt.frame_at(_dog_state, _dog_age), at, tall, _dog_left
+	)
+
+
+## The cross, pinned to the top corner of the inventory column. Worked out from the same
+## rectangle the list is drawn in rather than anchored to the control, so the two move
+## together when the room is resized and the cross is never left out over the floor.
+func _place_close() -> void:
+	if _close == null:
+		return
+	var list := _list_rect()
+	_close.size = Vector2(CLOSE_SIDE, CLOSE_SIDE)
+	_close.position = Vector2(
+		list.end.x - CLOSE_SIDE,
+		maxf(list.position.y - CLOSE_SIDE - CLOSE_LIFT, 0.0)
+	)
 
 
 ## Everything unlocked that is not already standing in the room.
@@ -77,7 +720,7 @@ func in_store() -> Array[String]:
 func cell_at(where: Vector2) -> Vector2i:
 	var floor_at := where - _floor_origin()
 	return Vector2i(
-		int(floor(floor_at.x / float(CELL * ZOOM))), int(floor(floor_at.y / float(CELL * ZOOM)))
+		int(floor(floor_at.x / (CELL * _zoom()))), int(floor(floor_at.y / (CELL * _zoom())))
 	)
 
 
@@ -243,9 +886,11 @@ func _listed_at(where: Vector2) -> String:
 	return store[index]
 
 
-## What a find is called, falling back to its catalogue key.
+## What a find is called, or nothing. It used to fall back to the catalogue key, which put
+## "furniture_07" in the inventory — worse than no name at all, because it reads as a bug
+## rather than as a thing.
 func title_of(piece: String) -> String:
-	return String(titles.get(piece, piece))
+	return String(titles.get(piece, ""))
 
 
 func _over_floor(where: Vector2) -> bool:
@@ -256,38 +901,89 @@ func _floor_origin() -> Vector2:
 	return _floor_rect().position
 
 
-func _floor_rect() -> Rect2:
-	var span := Vector2(float(COLS * CELL * ZOOM), float(ROWS * CELL * ZOOM))
-	var room := Vector2(size.x - float(LIST_WIDTH + GUTTER), size.y)
-	return Rect2(((room - span) * 0.5).floor().max(Vector2(16.0, 16.0)), span)
+## How big a source pixel is drawn, worked out from the room rather than fixed at three.
+##
+## Fixed, the floor was 1008x672 whatever it was given, so in a panel narrower than that it
+## ran off its own control and under the inventory column, and in a taller one it left the
+## room floating. Fitted, the whole grid is always on screen and always clear of the list.
+## Kept whole: this is pixel art, and a floorboard drawn at 2.4 pixels a pixel shimmers.
+##
+## The ceiling is ZOOM_MOST rather than ZOOM now that the room has the screen to itself
+## instead of a panel inside it: at three the floor sat in the middle of a lot of nothing.
+func _zoom() -> float:
+	var room := _room_rect()
+	var fit := mini(
+		int(room.size.x) / (COLS * CELL), int(room.size.y) / (ROWS * CELL)
+	)
+	return float(clampi(fit, 1, ZOOM_MOST))
 
 
-func _list_rect() -> Rect2:
+## Everything the room may draw into: the control, less the strip along the top the back
+## wall stands in, less the inventory column down the right.
+##
+## The wall used to be drawn at a negative y, above the control's own top edge, where it
+## covered the two labels above it in the panel. A Control that draws outside itself cannot
+## be laid out beside anything, so the wall is given room here instead.
+func _room_rect() -> Rect2:
+	var wall := float(BOARD * ZOOM)
 	return Rect2(
-		Vector2(size.x - float(LIST_WIDTH), 72.0),
-		Vector2(float(LIST_WIDTH), maxf(size.y - 96.0, 0.0))
+		Vector2(MARGIN, wall + MARGIN),
+		Vector2(
+			maxf(size.x - float(LIST_WIDTH + GUTTER) - MARGIN * 2.0, 1.0),
+			maxf(size.y - wall - MARGIN * 2.0, 1.0)
+		)
+	)
+
+
+## The floor sits against the inventory column rather than in the middle of whatever is left
+## over, so a find comes out of the list and goes down a few pixels away instead of being
+## carried across an empty room to get there. The two are then centred as one block, so the
+## pair is in the middle of the panel even though neither half is.
+func _floor_rect() -> Rect2:
+	var step := CELL * _zoom()
+	var span := Vector2(float(COLS) * step, float(ROWS) * step)
+	var room := _room_rect()
+	var block := span.x + GUTTER + float(LIST_WIDTH)
+	var left := MARGIN + maxf(size.x - MARGIN * 2.0 - block, 0.0) * 0.5
+	return Rect2(
+		Vector2(left, room.position.y + (room.size.y - span.y) * 0.5).floor(), span
+	)
+
+
+## The inventory column, squared up with the floor beside it rather than with the panel: two
+## things at the same height read as one row, and the list no longer starts above the room
+## and ends below it.
+func _list_rect() -> Rect2:
+	var floor_box := _floor_rect()
+	return Rect2(
+		Vector2(floor_box.end.x + GUTTER, floor_box.position.y),
+		Vector2(float(LIST_WIDTH), floor_box.size.y)
 	)
 
 
 func _draw() -> void:
 	if sheets == null:
 		return
+	_place_close()
 	var ink := Color(0.11, 0.09, 0.1)
+
 	var floor_box := _floor_rect()
 
 	# The room: a back wall standing above the floor, so the space has a direction and the
 	# furniture has something to be against.
+	var wall_tall := float(BOARD * ZOOM)
 	var wall := Rect2(
-		floor_box.position - Vector2(0.0, float(BOARD * ZOOM)),
-		Vector2(floor_box.size.x, float(BOARD * ZOOM))
+		Vector2(floor_box.position.x, maxf(floor_box.position.y - wall_tall, 0.0)),
+		Vector2(floor_box.size.x, minf(wall_tall, floor_box.position.y))
 	)
 	draw_rect(wall, Color(0.30, 0.26, 0.24))
+	_draw_door(wall, floor_box, ink)
 	draw_rect(wall, ink, false, 2.0)
 
 	# Floorboards, run the long way, with a seam every other cell. Drawn rather than
 	# authored, like everything else in this game.
 	draw_rect(floor_box, Color(0.47, 0.36, 0.26))
-	var board := float(BOARD * ZOOM)
+	var board := BOARD * _zoom()
 	var boards := int(ceil(floor_box.size.y / board))
 	for row in boards:
 		var y := floor_box.position.y + float(row) * board
@@ -305,27 +1001,54 @@ func _draw() -> void:
 	# player should be able to see what it is snapping to.
 	if not carrying.is_empty():
 		for col in range(1, COLS):
-			var x := floor_box.position.x + float(col * CELL * ZOOM)
+			var x := floor_box.position.x + float(col) * CELL * _zoom()
 			draw_line(
 				Vector2(x, floor_box.position.y), Vector2(x, floor_box.end.y),
 				Color(1.0, 1.0, 1.0, 0.05), 1.0
 			)
 		for row_line in range(1, ROWS):
-			var y := floor_box.position.y + float(row_line * CELL * ZOOM)
+			var y := floor_box.position.y + float(row_line) * CELL * _zoom()
 			draw_line(
 				Vector2(floor_box.position.x, y), Vector2(floor_box.end.x, y),
 				Color(1.0, 1.0, 1.0, 0.05), 1.0
 			)
 
-	# What is in the room, laid down before it is stood on.
+	# What is in the room, laid down before it is stood on. The dog goes in among them
+	# rather than over the lot: it is drawn the moment the room reaches something standing
+	# further back than the dog is, so it passes behind a wardrobe and in front of a chair
+	# instead of sliding over both.
+	var dog_drawn := not _dog_here
+	var dog_foot := _dog_at.y
+	# The player is sorted into the room the same way the dog is, by whose feet are further
+	# down the floor. Two of them now, so the test is written once and asked twice.
+	var you_drawn := _you_sheet == null
 	for i: int in _stacking():
 		var row: Dictionary = decor[i]
+		var piece := StringName(row["piece"])
+		# The bed is the exception: a dog asleep in its own basket is in the basket, so the
+		# basket goes down first and the dog on top of it, whatever the feet say.
+		var own_bed := piece == DOG_BED and _dog_at.distance_to(_bed_cell()) <= 1.2
+		if not dog_drawn and not own_bed and not sheets.lies_flat(piece):
+			var foot := float(int(row["cell"][1]) + span_of(piece).y)
+			if foot > dog_foot:
+				_draw_dog(floor_box)
+				dog_drawn = true
+		if not you_drawn and not sheets.lies_flat(piece):
+			var stands := float(int(row["cell"][1]) + span_of(piece).y)
+			if stands > _you_at.y:
+				_draw_you(floor_box)
+				you_drawn = true
 		_stamp_piece(
-			StringName(row["piece"]),
+			piece,
 			floor_box.position + Vector2(
-				float(int(row["cell"][0]) * CELL * ZOOM), float(int(row["cell"][1]) * CELL * ZOOM)
+				float(int(row["cell"][0])) * CELL * _zoom(),
+				float(int(row["cell"][1])) * CELL * _zoom()
 			)
 		)
+	if not dog_drawn:
+		_draw_dog(floor_box)
+	if not you_drawn:
+		_draw_you(floor_box)
 
 	_draw_list(ink)
 
@@ -336,16 +1059,17 @@ func _draw() -> void:
 			var cell := _drop_cell(carrying)
 			var fits := can_place(carrying, cell)
 			var at := floor_box.position + Vector2(
-				float(cell.x * CELL * ZOOM), float(cell.y * CELL * ZOOM)
+				float(cell.x) * CELL * _zoom(), float(cell.y) * CELL * _zoom()
 			)
 			draw_rect(
-				Rect2(at, Vector2(span) * float(CELL * ZOOM)),
-				Color(0.4, 0.9, 0.5, 0.20) if fits else Color(0.9, 0.3, 0.3, 0.20)
+				Rect2(at, Vector2(span) * CELL * _zoom()),
+				Color(Style.SAFE.r, Style.SAFE.g, Style.SAFE.b, 0.20) if fits
+				else Color(Style.DANGER.r, Style.DANGER.g, Style.DANGER.b, 0.20)
 			)
 			_stamp_piece(carrying, at, Color(1.0, 1.0, 1.0, 0.85 if fits else 0.5))
 		else:
 			_stamp_piece(
-				carrying, _pointer - sheets.region_of(carrying).size * float(ZOOM) * 0.5,
+				carrying, _pointer - sheets.region_of(carrying).size * _zoom() * 0.5,
 				Color(1.0, 1.0, 1.0, 0.75)
 			)
 
@@ -353,47 +1077,72 @@ func _draw() -> void:
 ## The store down the right: everything found and not yet standing anywhere.
 func _draw_list(ink: Color) -> void:
 	var list := _list_rect()
-	draw_rect(list.grow(8.0), Color(0.10, 0.12, 0.11, 0.65))
-	draw_rect(list.grow(8.0), ink, false, 1.5)
+	# Faded back while something is being carried, so the floor under it can be seen and
+	# aimed at. It is still there to drop onto; it is just no longer in front.
+	var lit := LIST_BUSY if not carrying.is_empty() else 1.0
+	draw_rect(list.grow(8.0), Style.scrim(Style.SCRIM * lit))
+	draw_rect(list.grow(8.0), Color(ink.r, ink.g, ink.b, ink.a * lit), false, 1.5)
 
 	var store := in_store()
-	var font := ThemeDB.fallback_font
-	draw_string(
-		font, list.position + Vector2(4.0, -18.0),
-		"Shed inventory  (%d)" % store.size(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18
+	Style.write(
+		self,
+		"Shed inventory  (%d)" % store.size(),
+		Style.TEXT_SMALL,
+		list.position + Vector2(4.0, -10.0),
+		Style.INK,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		Rect2(),
+		lit
 	)
 	if store.is_empty():
-		draw_string(
-			font, list.position + Vector2(8.0, 28.0), "Nothing kept yet.",
-			HORIZONTAL_ALIGNMENT_LEFT, int(list.size.x) - 16, 15, Color(0.8, 0.8, 0.8, 0.7)
+		Style.write(
+			self,
+			"Nothing kept yet.",
+			Style.TEXT_SMALL,
+			list.position + Vector2(8.0, 28.0),
+			Style.INK_DIM,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			Rect2(),
+			lit
 		)
 		return
 
 	for i in store.size():
 		var top := list.position.y + float(i * ROW_HEIGHT) - _scroll
-		if top + float(ROW_HEIGHT) < list.position.y or top > list.end.y:
+		# Whole rows only. A row that starts inside the column and ends outside it used to be
+		# drawn in full, so the last one hung below the panel with its name in mid-air.
+		if top < list.position.y or top + float(ROW_HEIGHT) > list.end.y:
 			continue
 		var box := Rect2(list.position.x, top, list.size.x, float(ROW_HEIGHT) - 4.0)
-		draw_rect(box, Color(1.0, 1.0, 1.0, 0.05))
+		draw_rect(box, Color(Style.WOOD_LIT.r, Style.WOOD_LIT.g, Style.WOOD_LIT.b, 0.10 * lit))
 		var region := sheets.alt_region_of(StringName(store[i]))
 		# Fitted into the row rather than drawn at its own size: a wardrobe and a mug both
 		# have to read as one line of a list.
 		var fit := minf(
-			(float(ROW_HEIGHT) - 12.0) / maxf(region.size.x, region.size.y), float(ZOOM)
+			(float(ROW_HEIGHT) - 12.0) / maxf(region.size.x, region.size.y), _zoom()
 		)
 		draw_texture_rect_region(
 			sheets.atlas,
-			Rect2(box.position + Vector2(8.0, 6.0), region.size * fit), region, Color.WHITE
+			Rect2(box.position + Vector2(8.0, 6.0), region.size * fit), region,
+			Color(1.0, 1.0, 1.0, lit)
 		)
-		draw_string(
-			font, box.position + Vector2(64.0, 30.0), title_of(store[i]),
-			HORIZONTAL_ALIGNMENT_LEFT, int(box.size.x) - 72, 15
-		)
+		var title := title_of(store[i])
+		if not title.is_empty():
+			Style.write(
+				self,
+				title,
+				Style.TEXT_SMALL,
+				box.position + Vector2(64.0, 30.0),
+				Style.INK,
+				HORIZONTAL_ALIGNMENT_LEFT,
+				Rect2(),
+				lit
+			)
 
 
 ## One piece of furniture, in its cleaned-up palette, standing with its corner at a point.
 func _stamp_piece(piece: StringName, at: Vector2, tint: Color = Color.WHITE) -> void:
 	var region := sheets.alt_region_of(piece)
 	draw_texture_rect_region(
-		sheets.atlas, Rect2(at, region.size * float(ZOOM)), region, tint
+		sheets.atlas, Rect2(at, region.size * _zoom()), region, tint
 	)

@@ -10,30 +10,28 @@
 class_name ShopSkin
 extends Control
 
+const Style := preload("res://scripts/style.gd")
+
 const ART := "res://assets/shop.json"
 
-## How much of the window the board takes, and the largest it may be drawn. It is a tall
-## board and the window is wide, so its height is what is fitted and its width follows.
-const BOARD_SHARE := 0.86
-const BOARD_WIDEST := 620.0
-
-## A row's height as a fraction of the board's width, and the gap between two of them. Taken
-## off the art's own proportions rather than its pixels, so the board can be any size.
+## The board, in rows rather than in fractions of the sheet's own painting.
 ##
-## Sized to fit every upgrade rather than to match the five the board is painted with. At the
-## drawn size only eight fitted, and the ninth — the extra ferry, the most expensive thing in
-## the game — fell off the bottom and simply was not for sale.
-const ROW_TALL := 0.064
-const ROW_GAP := 0.010
+## It used to be sized to the proportions of the picture it was cut from, so its width came
+## out of an artwork and its rows out of that width — a row's text size was a fraction of a
+## board size that was a fraction of a window. Three multiplications between "how big is this
+## writing" and any number anyone chose. Now the row is the unit: one row is as tall as it
+## needs to be for its text and its icon, and the board is however tall its rows come to.
+const ROW_TALL := 56.0
+const ROW_GAP := 6.0
+const BOARD_WIDE := 720.0
+const BOARD_PAD := 22.0
 
-## Where the rows start down the board, and how far in from its sides they sit.
-const ROWS_TOP := 0.155
-const ROWS_LEFT := 0.055
-const ROWS_RIGHT := 0.055
-
-## How wide the icon tile and the price tag are, as fractions of a row's height and of the
-## rows' full width.
-const ICON_WIDE := 1.08
+## The columns, left to right: the icon tile, the name, the value tablet, the price tag. The
+## three after the icon are given fixed shares of what is left, so every row breaks in the
+## same place down the board instead of each one breaking where its own words end.
+const NAME_SHARE := 0.46
+const VALUE_SHARE := 0.30
+const PRICE_SHARE := 0.24
 
 ## How much of an icon slot a lent picture fills, before its own `fill` adjusts it. Over one,
 ## because the lent pictures are sprites with their own margin baked in — a ferry sits in the
@@ -41,37 +39,34 @@ const ICON_WIDE := 1.08
 ## the size of the drawn icons beside them.
 const ICON_INSET := 1.3
 
-## The tile a lent picture is set into, matched to the ones the board is painted with: a dark
-## panel, a warm border, and an outline round the outside.
-const TILE_FACE := Color(0.17, 0.13, 0.10)
-const TILE_EDGE := Color(0.56, 0.40, 0.25)
-const TILE_INK := Color(0.10, 0.08, 0.06)
+## How far in from a tile's edge its picture is kept, as a fraction of the tile.
 const TILE_BORDER := 0.075
 
-## The price tag, drawn rather than stretched out of the sheet. The art's own tag carries a
-## price painted on it and its ends carry brackets, and no amount of slicing that gets a
-## readable number onto it at this size — so it is rebuilt in the board's own colours, where
-## the contrast between the face and the ink can simply be chosen.
-const TAG_FACE := Color(0.85, 0.70, 0.47)
-const TAG_LIT := Color(0.93, 0.81, 0.60)
-const TAG_EDGE := Color(0.42, 0.28, 0.17)
-const TAG_INK := Color(0.16, 0.10, 0.05)
-const TAG_OFF := Color(0.55, 0.46, 0.36)
-const PRICE_WIDE := 0.24
+## The tile a picture is set into, and the price tag it is sold by. Both are the game's own
+## wood and the game's own tag colour; the board is no longer a photograph of a shop.
+const TILE_FACE := Style.WOOD_DEEP
+const TILE_EDGE := Style.WOOD_LIT
+const TILE_INK := Style.SEAM
+const TAG_FACE := Style.TAG
+const TAG_LIT := Style.TAG_LIT
+const TAG_EDGE := Style.GOLD_DEEP
+const TAG_INK := Style.INK_DARK
+const TAG_OFF := Style.TAG_OFF
 
-## Where the value column starts, as a fraction of the plate's width.
-const VALUE_AT := 0.45
-
-## The corner cross, as a fraction of the board's height.
-const CLOSE_SIZE := 0.062
-
-## Text sizes, as fractions of a row's height.
-const NAME_TEXT := 0.34
-const VALUE_TEXT := 0.30
-const PRICE_TEXT := 0.34
+## The heading over the rows, and the corner cross.
+const TITLE := "Upgrades"
+const CLOSE_SIZE := 34.0
 
 ## Emitted when a row is clicked and the player can afford it. The lake decides what
 ## happens; this does not know what an upgrade is.
+## How long the sparkle over a bought upgrade's icon lasts, how far above the icon it
+## reaches, and how many points it is made of. Short and small on purpose: it is a receipt
+## for a click the player already made, not an event.
+const SPARKLE_TIME := 0.7
+const SPARKLE_RISE := 34.0
+const SPARKLE_POINTS := 7
+
+
 signal bought(key: StringName)
 
 ## The player asking to be out of here: the corner cross, or a click on the wood around the
@@ -93,8 +88,18 @@ var icons := {}
 var _sheet: Texture2D
 var _pieces := {}
 var _board := Rect2()
+var _board_rows: int = -1
 var _row_boxes: Array[Rect2] = []
 var _hovered: int = -1
+
+## The row whose upgrade has just been bought, and how long the sparkle over its icon has
+## left to run. -1 is nobody.
+var _sparkling: StringName = &""
+var _sparkle: float = 0.0
+
+## What the last painted board was made of: the rows' own contents and whatever the mouse
+## is over.
+var _painted: int = 0
 
 ## The cross in the board's top corner. Made here rather than put in the scene because it is
 ## hung off the board's own rectangle, and only this knows where that is.
@@ -109,6 +114,15 @@ func _ready() -> void:
 	add_child(_close)
 	resized.connect(_lay_out)
 	_lay_out()
+
+
+## Light up the icon of a row that has just been bought. Called by the lake when a purchase
+## actually lands, so a click that could not be afforded sparkles at nobody.
+func cheer(key: StringName) -> void:
+	_sparkling = key
+	_sparkle = SPARKLE_TIME
+	set_process(true)
+	queue_redraw()
 
 
 func _load_art() -> bool:
@@ -128,24 +142,46 @@ func _load_art() -> bool:
 	return true
 
 
-## The board, centred, as tall as it can be and shaped as the art is.
+## The board, centred, as big as its rows come to.
+##
+## Sized to the content rather than to the window: nine upgrades make a board of a certain
+## height and that is the height it is. The row that used to fall off the bottom — the extra
+## ferry, the most expensive thing in the game, simply not for sale — cannot, because the
+## board is built downwards from the rows rather than the rows crammed into a board.
 func _lay_out() -> void:
-	if not _pieces.has(&"panel"):
-		return
-	var art: Rect2 = _pieces[&"panel"]
-	var tall := minf(size.y * BOARD_SHARE, BOARD_WIDEST * art.size.y / art.size.x)
-	var wide := tall * art.size.x / art.size.y
-	_board = Rect2((size.x - wide) * 0.5, (size.y - tall) * 0.5, wide, tall)
+	var count := maxi(rows.size(), 1)
+	var head := float(Style.TEXT_TITLE) + BOARD_PAD
+	var tall := head + float(count) * ROW_TALL + float(count - 1) * ROW_GAP + BOARD_PAD * 2.0
+	var wide := minf(BOARD_WIDE, size.x - 40.0)
+	tall = minf(tall, size.y - 40.0)
+	_board = Rect2(
+		floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall
+	)
 	if _close != null:
-		var box := tall * CLOSE_SIZE
 		# Just inside the top right corner of the board, where a window's close is.
-		_close.position = Vector2(_board.end.x - box * 1.35, _board.position.y + box * 0.35)
-		_close.size = Vector2(box, box)
+		_close.position = Vector2(
+			_board.end.x - CLOSE_SIZE - BOARD_PAD * 0.5, _board.position.y + BOARD_PAD * 0.5
+		)
+		_close.size = Vector2(CLOSE_SIZE, CLOSE_SIZE)
 	queue_redraw()
 
 
-func _process(_delta: float) -> void:
-	queue_redraw()
+func _process(delta: float) -> void:
+	if _sparkle > 0.0:
+		_sparkle = maxf(_sparkle - delta, 0.0)
+		if _sparkle <= 0.0:
+			_sparkling = &""
+		queue_redraw()
+	# The rows are set from outside, and how many there are is what the board is sized by.
+	if _board_rows != rows.size():
+		_board_rows = rows.size()
+		_lay_out()
+	# Only when the board would come out different. The lake hands over a fresh `rows`
+	# every frame the menu is open, but its contents only change when a level or the purse
+	# does — and repainting a board of nine priced rows to put back the same nine prices is
+	# the most expensive way to do nothing.
+	if _painted != _paint_key():
+		queue_redraw()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -179,129 +215,108 @@ func _row_under(at: Vector2) -> int:
 	return -1
 
 
+func _paint_key() -> int:
+	return hash([rows.hash(), _hovered, roundi(_sparkle * 120.0)])
+
+
 func _draw() -> void:
-	if _sheet == null or _board.size.x <= 0.0:
+	_painted = _paint_key()
+	if _board.size.x <= 0.0:
 		return
 	# Everything behind the board dimmed, so the board is a thing in front of the lake
 	# rather than a sticker on it.
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.05, 0.05, 0.55))
+	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 
-	var art: Rect2 = _pieces[&"panel"]
-	var scale := _board.size.x / art.size.x
-	if _pieces.has(&"board"):
-		var board: Rect2 = _pieces[&"board"]
-		draw_texture_rect_region(
-			_sheet,
-			Rect2(
-				_board.position + Vector2(0.0, (board.position.y - art.position.y) * scale),
-				board.size * scale
-			),
-			board
-		)
-	else:
-		draw_texture_rect_region(_sheet, _board, art)
-
-	# The interior papered over with bare wood, so the five rows the board is painted with
-	# do not ghost under the ones actually being offered.
-	if _pieces.has(&"inner") and _pieces.has(&"board_fill"):
-		var inner: Rect2 = _pieces[&"inner"]
-		draw_texture_rect_region(
-			_sheet,
-			Rect2(
-				_board.position + (inner.position - art.position) * scale,
-				inner.size * scale
-			),
-			_pieces[&"board_fill"]
-		)
-
-	_draw_rows(scale)
-	_draw_banner(scale)
-
-
-## The ribbon, drawn last so it hangs over the board's top edge as it does on the sheet.
-func _draw_banner(scale: float) -> void:
-	if not _pieces.has(&"banner"):
-		return
-	var art: Rect2 = _pieces[&"panel"]
-	var banner: Rect2 = _pieces[&"banner"]
-	var box := Rect2(
-		_board.position + (banner.position - art.position) * scale, banner.size * scale
+	# A plank panel, the same one the settings and the shed stand on. The painted board this
+	# replaces was a picture of a shop with five rows and a title on it, so every live row
+	# had to be papered over the top of a drawn one.
+	Style.plaque(self, _board, Style.WOOD)
+	Style.write(
+		self,
+		TITLE,
+		Style.TEXT_TITLE,
+		Vector2(0.0, _board.position.y + BOARD_PAD + float(Style.TEXT_TITLE) * 0.8),
+		Style.INK,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		_board
 	)
-	# No title written over it: the ribbon is painted with one, and this board is the shed.
-	draw_texture_rect_region(_sheet, box, banner)
+	_draw_rows()
 
 
-func _draw_rows(scale: float) -> void:
+func _draw_rows() -> void:
 	_row_boxes.clear()
-	var left := _board.position.x + _board.size.x * ROWS_LEFT
-	var wide := _board.size.x * (1.0 - ROWS_LEFT - ROWS_RIGHT)
-	var tall := _board.size.x * ROW_TALL
-	var step := tall + _board.size.x * ROW_GAP
-	var top := _board.position.y + _board.size.y * ROWS_TOP
+	var left := _board.position.x + BOARD_PAD
+	var wide := _board.size.x - BOARD_PAD * 2.0
+	var top := _board.position.y + BOARD_PAD * 2.0 + float(Style.TEXT_TITLE)
 
-	var font := get_theme_default_font()
 	for i in rows.size():
 		var row: Dictionary = rows[i]
-		var box := Rect2(left, top + step * float(i), wide, tall)
-		if box.position.y + box.size.y > _board.position.y + _board.size.y:
+		var box := Rect2(left, top + (ROW_TALL + ROW_GAP) * float(i), wide, ROW_TALL)
+		if box.end.y > _board.end.y - BOARD_PAD:
 			break
 		_row_boxes.append(box)
 
-		var icon_wide := tall * ICON_WIDE
-		var plate := Rect2(
-			box.position.x + icon_wide, box.position.y, box.size.x - icon_wide, box.size.y
-		)
+		var afford := bool(row.get("afford", false))
+		var lit := _hovered == i and afford
 		# A row the player cannot afford is drawn back rather than hidden: the point of a
 		# shop is knowing what is coming.
-		var tint := Color.WHITE if bool(row.get("afford", false)) else Color(0.62, 0.6, 0.58)
-		if _hovered == i and bool(row.get("afford", false)):
-			tint = Color(1.15, 1.15, 1.12)
+		var tint := Color.WHITE if afford else Style.INK_DIM
+		if lit:
+			tint = Style.HOVER_WASH
+		var ink := Style.INK if afford else Style.INK_DIM
 
-		_draw_slice(plate, &"row_cap_l", &"row_fill", &"row_cap_r", tint)
-		# Square, and as tall as the tile is drawn on the sheet against its row.
-		var side := tall * ICON_WIDE
-		var slot := Rect2(box.position + Vector2(0.0, (tall - side) * 0.5), Vector2(side, side))
+		# The row's own plate, so a row reads as one thing and the gap between two of them
+		# reads as the gap between two things.
+		Style.plaque(self, box, Style.WOOD_LIT if lit else Style.WOOD_DEEP)
+
+		# The icon, in a tile as tall as the row.
+		var slot := Rect2(box.position + Vector2(4.0, 4.0), Vector2(ROW_TALL - 8.0, ROW_TALL - 8.0))
 		var icon := int(row.get("icon", -1))
 		if icon >= 0 and _pieces.has(StringName("icon%d" % icon)):
+			_draw_tile(slot, tint)
 			draw_texture_rect_region(
-				_sheet, slot, _pieces[StringName("icon%d" % icon)], tint
+				_sheet, slot.grow(-slot.size.x * TILE_BORDER * 1.4),
+				_pieces[StringName("icon%d" % icon)], tint
 			)
 		elif icons.has(StringName(row.get("key", ""))):
 			_draw_lent_icon(icons[StringName(row["key"])], slot, tint)
 
-		var price := Rect2(
-			plate.position.x + plate.size.x * (1.0 - PRICE_WIDE),
-			plate.position.y + plate.size.y * 0.15,
-			plate.size.x * PRICE_WIDE, plate.size.y * 0.7
+		if _sparkle > 0.0 and StringName(row.get("key", "")) == _sparkling:
+			_draw_sparkle(slot)
+
+		# The three columns, each starting where it starts on every other row.
+		var rest := box.size.x - ROW_TALL - 8.0
+		var name_at := box.position.x + ROW_TALL + 4.0
+		var value_at := name_at + rest * NAME_SHARE
+		var price_at := value_at + rest * VALUE_SHARE
+		var middle := box.position.y + (ROW_TALL + float(Style.TEXT_BODY) * 0.62) * 0.5
+
+		Style.write(
+			self, String(row.get("name", "")), Style.TEXT_BODY, Vector2(name_at, middle), ink
 		)
 
-		var pale := Color(0.96, 0.94, 0.90) if bool(row.get("afford", false)) 			else Color(0.72, 0.70, 0.67)
-		var pad := plate.size.x * 0.035
-		_write(
-			font, String(row.get("name", "")), int(tall * NAME_TEXT),
-			plate.position + Vector2(pad, plate.size.y * 0.5), pale
-		)
-		# The value on a slab of its own. The plate's middle is stretched wood with a
-		# gradient across it, and pale text laid straight onto that came out smeared —
-		# a flat panel behind the figure is the difference between a number you read and
-		# one you squint at.
+		# The value on a slab of its own: the plank behind it is grained, and a figure laid
+		# straight onto that is a figure you squint at.
 		var value := String(row.get("value", ""))
-		var value_high := int(tall * VALUE_TEXT)
-		var value_span := font.get_string_size(
-			value, HORIZONTAL_ALIGNMENT_LEFT, -1.0, value_high
-		)
-		var tablet := Rect2(
-			plate.position + Vector2(plate.size.x * VALUE_AT - pad, plate.size.y * 0.16),
-			Vector2(value_span.x + pad * 2.0, plate.size.y * 0.68)
-		)
-		draw_rect(tablet, Color(0.06, 0.05, 0.05, 0.5))
-		_write(
-			font, value, value_high,
-			plate.position + Vector2(plate.size.x * VALUE_AT, plate.size.y * 0.5), pale
-		)
+		if not value.is_empty():
+			var span := Style.measure(value, Style.TEXT_SMALL)
+			var tablet := Rect2(
+				Vector2(value_at, box.position.y + 10.0),
+				Vector2(minf(span.x + 20.0, rest * VALUE_SHARE - 10.0), ROW_TALL - 20.0)
+			)
+			draw_rect(tablet, Style.scrim(Style.SCRIM_LIGHT))
+			Style.write(
+				self, value, Style.TEXT_SMALL,
+				Vector2(0.0, box.position.y + (ROW_TALL + float(Style.TEXT_SMALL) * 0.62) * 0.5),
+				ink, HORIZONTAL_ALIGNMENT_CENTER, tablet
+			)
+
 		_draw_tag(
-			price, String(row.get("cost", "")), font, int(tall * PRICE_TEXT),
-			bool(row.get("afford", false)), _hovered == i
+			Rect2(
+				Vector2(price_at, box.position.y + 8.0),
+				Vector2(rest * PRICE_SHARE, ROW_TALL - 16.0)
+			),
+			String(row.get("cost", "")), Style.TEXT_BODY, afford, lit
 		)
 
 
@@ -341,12 +356,52 @@ func _draw_lent_icon(lent: Dictionary, slot: Rect2, tint: Color) -> void:
 	_draw_glyph(StringName(lent.get("glyph", "")), slot, tint)
 
 
-## The bordered square the board's own icons sit in.
+## The bordered square the board's own icons sit in — the same plaque as every other piece
+## of wood in the game, sunk rather than raised so a picture reads as set into the board.
+## A handful of four-pointed stars rising off a bought upgrade's icon and fading out.
+##
+## Drawn from the icon's own square rather than from a fixed point, so it sits over whichever
+## row was bought wherever that row happens to be on the board. The stars are the same shape
+## the game draws everywhere else: two crossed spindles, which read as a sparkle at eight
+## pixels where a circle reads as a dot.
+func _draw_sparkle(slot: Rect2) -> void:
+	var through := 1.0 - clampf(_sparkle / SPARKLE_TIME, 0.0, 1.0)
+	var out := smoothstep(0.0, 1.0, through)
+	var fade := 1.0 - smoothstep(0.5, 1.0, through)
+	var middle := slot.position + slot.size * 0.5
+	for i in SPARKLE_POINTS:
+		# Thrown out of the icon on its own bearing rather than laid out in a row: a line of
+		# identical stars reads as a border, which is what the first pass looked like.
+		var turn := PI * (0.12 + 0.76 * float(i) / float(SPARKLE_POINTS - 1))
+		var reach := SPARKLE_RISE * (0.55 + 0.45 * float((i * 3) % SPARKLE_POINTS)
+			/ float(SPARKLE_POINTS - 1))
+		var at := middle + Vector2(-cos(turn), -sin(turn)) * reach * out
+		# Biggest halfway out, so each one flares and goes rather than simply shrinking.
+		var flare := sin(clampf(through, 0.0, 1.0) * PI)
+		var side := (3.0 + 4.0 * float(i % 3) * 0.5) * (0.45 + 0.55 * flare)
+		_star(at, side, Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, fade))
+
+
+## One four-pointed star: a tall spindle and a wide one, crossed.
+func _star(at: Vector2, side: float, tint: Color) -> void:
+	draw_colored_polygon(
+		PackedVector2Array([
+			at + Vector2(0.0, -side), at + Vector2(side * 0.34, 0.0),
+			at + Vector2(0.0, side), at + Vector2(-side * 0.34, 0.0)
+		]),
+		tint
+	)
+	draw_colored_polygon(
+		PackedVector2Array([
+			at + Vector2(-side, 0.0), at + Vector2(0.0, -side * 0.34),
+			at + Vector2(side, 0.0), at + Vector2(0.0, side * 0.34)
+		]),
+		tint
+	)
+
+
 func _draw_tile(slot: Rect2, tint: Color) -> void:
-	var edge := slot.size.x * TILE_BORDER
-	draw_rect(slot, Color(TILE_INK.r, TILE_INK.g, TILE_INK.b, tint.a))
-	draw_rect(slot.grow(-edge * 0.4), TILE_EDGE * Color(tint.r, tint.g, tint.b, 1.0))
-	draw_rect(slot.grow(-edge * 1.4), TILE_FACE)
+	Style.plaque(self, slot, TILE_FACE, tint.a)
 
 
 ## The mark that says what a picture of a ferry means: an arrow up for going faster, a plus
@@ -355,10 +410,10 @@ func _draw_tile(slot: Rect2, tint: Color) -> void:
 func _draw_glyph(glyph: StringName, slot: Rect2, tint: Color) -> void:
 	var side := slot.size.x * 0.3
 	var at := slot.position + slot.size - Vector2(side * 0.85, side * 0.85)
-	var gold := Color(0.98, 0.82, 0.35, tint.a)
+	var gold := Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, tint.a)
 	match glyph:
 		&"arrow":
-			var green := Color(0.55, 0.86, 0.45, tint.a)
+			var green := Color(Style.SAFE.r, Style.SAFE.g, Style.SAFE.b, tint.a)
 			draw_colored_polygon(
 				PackedVector2Array([
 					at + Vector2(0.0, -side * 0.5),
@@ -383,72 +438,23 @@ func _draw_glyph(glyph: StringName, slot: Rect2, tint: Color) -> void:
 
 
 ## The price, on a tag built here rather than cut from the sheet.
-func _draw_tag(
-	box: Rect2, cost: String, font: Font, height: int, afford: bool, lit: bool
-) -> void:
+func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -> void:
 	if cost.is_empty():
 		return
-	var span := font.get_string_size(cost, HORIZONTAL_ALIGNMENT_LEFT, -1.0, height)
+	var span := Style.measure(cost, height)
 	# Shrunk onto the number with a margin, so a four-figure price and a two-figure one both
 	# sit in the middle of their own tag rather than one rattling around a fixed box.
 	var wide := minf(span.x + float(height) * 1.2, box.size.x)
 	var tag := Rect2(
 		box.position + Vector2((box.size.x - wide) * 0.5, 0.0), Vector2(wide, box.size.y)
 	)
-	draw_rect(tag.grow(1.0), TAG_EDGE)
-	draw_rect(tag, (TAG_LIT if lit else TAG_FACE) if afford else TAG_OFF)
-	draw_string(
-		font,
-		tag.position + Vector2(
-			(tag.size.x - span.x) * 0.5, tag.size.y * 0.5 + float(height) * 0.34
-		),
-		cost, HORIZONTAL_ALIGNMENT_LEFT, -1.0, height,
-		TAG_INK if afford else Color(0.25, 0.21, 0.17)
-	)
-
-
-## A plate or a tag drawn at any width: its two end caps at their own size, and a slab of
-## its middle stretched between them.
-##
-## Drawn this way and not stretched whole because the art's own middle has words painted on
-## it — the row it was drawn as says "Width (Lvl 12)" and the tag says a price from a game
-## nobody is playing. Stretching those puts them under every live line on the board.
-func _draw_slice(
-	box: Rect2, left: StringName, fill: StringName, right: StringName, tint: Color
-) -> void:
-	if not _pieces.has(left) or not _pieces.has(fill) or not _pieces.has(right):
-		return
-	var cap_l: Rect2 = _pieces[left]
-	var cap_r: Rect2 = _pieces[right]
-	# The caps keep their proportions against the row's height, so a taller row has
-	# proportionally wider ends rather than stretched ones.
-	var scale := box.size.y / cap_l.size.y
-	var wide_l := minf(cap_l.size.x * scale, box.size.x * 0.4)
-	var wide_r := minf(cap_r.size.x * scale, box.size.x * 0.4)
-	draw_texture_rect_region(
-		_sheet, Rect2(box.position, Vector2(wide_l, box.size.y)), cap_l, tint
-	)
-	draw_texture_rect_region(
-		_sheet,
-		Rect2(
-			box.position + Vector2(box.size.x - wide_r, 0.0), Vector2(wide_r, box.size.y)
-		),
-		cap_r, tint
-	)
-	var middle := box.size.x - wide_l - wide_r
-	if middle > 0.0:
-		draw_texture_rect_region(
-			_sheet,
-			Rect2(box.position + Vector2(wide_l, 0.0), Vector2(middle, box.size.y)),
-			_pieces[fill], tint
-		)
-
-
-## One line of text, sitting on a point rather than hanging from it.
-func _write(font: Font, text: String, height: int, at: Vector2, tint: Color) -> void:
-	if text.is_empty():
-		return
-	draw_string(
-		font, at + Vector2(0.0, float(height) * 0.34), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1.0, height, tint
+	Style.plaque(self, tag, (TAG_LIT if lit else TAG_FACE) if afford else TAG_OFF)
+	Style.write(
+		self,
+		cost,
+		height,
+		Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
+		TAG_INK if afford else Style.INK_DARK.lerp(TAG_OFF, 0.45),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		tag
 	)

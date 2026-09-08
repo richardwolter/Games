@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Chew toy"
+material = 3
+piece = &"small_22"
+size = Vector2(18, 10)
+pollution = 1.4
+haul_cost = 0.9
+tier = 1
+lightness = 1.6
+block_color = Color(0.24, 0.22, 0.24, 1)

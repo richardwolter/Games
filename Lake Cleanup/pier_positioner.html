@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pier Positioner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #222;
+      color: #fff;
+      font-family: monospace;
+      overflow: hidden;
+    }
+
+    #container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #canvas-wrapper {
+      flex: 1;
+      position: relative;
+      overflow: auto;
+      background: #111;
+      border-bottom: 2px solid #444;
+    }
+
+    #canvas {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+
+    .pier {
+      position: absolute;
+      cursor: grab;
+      border: 2px solid #0f0;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.9;
+      transition: opacity 0.1s;
+    }
+
+    .pier:hover {
+      opacity: 1;
+      border-color: #0ff;
+    }
+
+    .pier.dragging {
+      opacity: 1;
+      z-index: 1000;
+    }
+
+    #info {
+      background: #1a1a1a;
+      padding: 15px;
+      border-top: 2px solid #444;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .pier-info {
+      padding: 8px;
+      margin: 5px 0;
+      background: #2a2a2a;
+      border-left: 3px solid #0f0;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .pier-info.plastic { border-left-color: #6aa; }
+    .pier-info.timber { border-left-color: #a86; }
+    .pier-info.metal { border-left-color: #aaa; }
+    .pier-info.rubber { border-left-color: #444; }
+
+    #upload-zone {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #upload-zone.active {
+      pointer-events: all;
+      opacity: 1;
+    }
+
+    #buttons {
+      background: #1a1a1a;
+      padding: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #0a4;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #0f6;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    label {
+      background: #0a4;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-weight: bold;
+      display: inline-block;
+    }
+
+    label:hover {
+      background: #0f6;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="canvas-wrapper">
+      <div id="canvas"></div>
+      <div id="upload-zone">Drag lake screenshot here</div>
+    </div>
+    <div id="buttons">
+      <label>📤 Load Screenshot <input type="file" id="screenshot-input" accept="image/*"></label>
+      <button onclick="copyCoordinates()">📋 Copy Tile Coords</button>
+      <button onclick="resetPositions()">🔄 Reset</button>
+    </div>
+    <div id="info">
+      <div style="color: #888; font-size: 11px; margin-bottom: 10px;">
+        Drag piers to position. Coordinates show pixel pos and calculated tile coords.
+      </div>
+      <div id="pier-list"></div>
+    </div>
+  </div>
+
+  <script>
+    // Iso constants from Lake Cleanup
+    const TILE_W = 64.0;
+    const TILE_H = 32.0;
+    const CENTRE = { x: 46.0, y: 46.0 };
+    const RADIUS = { x: 40.0, y: 34.0 };
+
+    const piers = {
+      plastic: { name: 'PLASTIC', x: 100, y: 100, width: 100, height: 80, color: '#6aa' },
+      timber: { name: 'TIMBER', x: 600, y: 150, width: 100, height: 80, color: '#a86' },
+      metal: { name: 'METAL', x: 600, y: 450, width: 100, height: 80, color: '#aaa' },
+      rubber: { name: 'RUBBER', x: 100, y: 450, width: 100, height: 80, color: '#444' }
+    };
+
+    let dragging = null;
+    let dragOffset = { x: 0, y: 0 };
+    let backgroundWidth = 1;
+    let backgroundHeight = 1;
+
+    // Iso.world_to_tile equivalent
+    function worldToTile(worldX, worldY) {
+      const a = worldX / (TILE_W * 0.5);
+      const b = worldY / (TILE_H * 0.5);
+      return {
+        x: (b + a) * 0.5,
+        y: (b - a) * 0.5
+      };
+    }
+
+    // Convert screen coordinates to world space (simple scaling)
+    function screenToWorld(screenX, screenY, canvasWidth, canvasHeight) {
+      const scaleX = backgroundWidth / canvasWidth;
+      const scaleY = backgroundHeight / canvasHeight;
+      return {
+        x: screenX * scaleX,
+        y: screenY * scaleY
+      };
+    }
+
+    function createPierElement(key, pier) {
+      const el = document.createElement('div');
+      el.className = `pier ${key}`;
+      el.style.width = pier.width + 'px';
+      el.style.height = pier.height + 'px';
+      el.style.left = pier.x + 'px';
+      el.style.top = pier.y + 'px';
+      el.style.borderColor = pier.color;
+      el.dataset.key = key;
+
+      el.addEventListener('mousedown', startDrag);
+      document.getElementById('canvas').appendChild(el);
+    }
+
+    function startDrag(e) {
+      if (e.button !== 0) return;
+      dragging = e.target;
+      dragging.classList.add('dragging');
+
+      const rect = dragging.getBoundingClientRect();
+      dragOffset.x = e.clientX - rect.left;
+      dragOffset.y = e.clientY - rect.top;
+
+      document.addEventListener('mousemove', doDrag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+
+    function doDrag(e) {
+      if (!dragging) return;
+
+      const canvas = document.getElementById('canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+
+      let x = e.clientX - canvasRect.left - dragOffset.x;
+      let y = e.clientY - canvasRect.top - dragOffset.y;
+
+      x = Math.max(0, Math.min(x, canvasRect.width - dragging.offsetWidth));
+      y = Math.max(0, Math.min(y, canvasRect.height - dragging.offsetHeight));
+
+      dragging.style.left = x + 'px';
+      dragging.style.top = y + 'px';
+
+      updateInfo();
+    }
+
+    function stopDrag() {
+      if (dragging) {
+        dragging.classList.remove('dragging');
+        dragging = null;
+      }
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+
+    function updateInfo() {
+      const canvas = document.getElementById('canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      const list = document.getElementById('pier-list');
+      list.innerHTML = '';
+
+      for (const key in piers) {
+        const el = document.querySelector(`.pier[data-key="${key}"]`);
+        if (!el) continue;
+
+        const pixelX = parseFloat(el.style.left) + el.offsetWidth / 2;
+        const pixelY = parseFloat(el.style.top) + el.offsetHeight / 2;
+
+        const world = screenToWorld(pixelX, pixelY, canvasRect.width, canvasRect.height);
+        const tile = worldToTile(world.x, world.y);
+
+        const info = document.createElement('div');
+        info.className = `pier-info ${key}`;
+        info.innerHTML = `
+          <strong>${piers[key].name}</strong><br>
+          Pixel: (${pixelX.toFixed(0)}, ${pixelY.toFixed(0)})<br>
+          Tile: Vector2(${tile.x.toFixed(2)}, ${tile.y.toFixed(2)})
+        `;
+        list.appendChild(info);
+      }
+    }
+
+    function copyCoordinates() {
+      const canvas = document.getElementById('canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      let text = '';
+
+      for (const key in piers) {
+        const el = document.querySelector(`.pier[data-key="${key}"]`);
+        if (!el) continue;
+
+        const pixelX = parseFloat(el.style.left) + el.offsetWidth / 2;
+        const pixelY = parseFloat(el.style.top) + el.offsetHeight / 2;
+
+        const world = screenToWorld(pixelX, pixelY, canvasRect.width, canvasRect.height);
+        const tile = worldToTile(world.x, world.y);
+
+        text += `${piers[key].name}: Vector2(${tile.x.toFixed(2)}, ${tile.y.toFixed(2)})\n`;
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Coordinates copied to clipboard!');
+      });
+    }
+
+    function resetPositions() {
+      for (const key in piers) {
+        const el = document.querySelector(`.pier[data-key="${key}"]`);
+        if (el) {
+          el.style.left = piers[key].x + 'px';
+          el.style.top = piers[key].y + 'px';
+        }
+      }
+      updateInfo();
+    }
+
+    function initPiers() {
+      for (const key in piers) {
+        createPierElement(key, piers[key]);
+      }
+      updateInfo();
+    }
+
+    // Screenshot upload
+    document.getElementById('screenshot-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          backgroundWidth = img.width;
+          backgroundHeight = img.height;
+          document.getElementById('canvas').style.backgroundImage = `url('${event.target.result}')`;
+          document.getElementById('upload-zone').classList.remove('active');
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Drag-and-drop
+    const uploadZone = document.getElementById('upload-zone');
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('active');
+    });
+
+    document.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('active');
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('active');
+
+      const files = e.dataTransfer.files;
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              backgroundWidth = img.width;
+              backgroundHeight = img.height;
+              document.getElementById('canvas').style.backgroundImage = `url('${event.target.result}')`;
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    });
+
+    // Init
+    window.addEventListener('load', initPiers);
+  </script>
+</body>
+</html>

@@ -15,6 +15,8 @@
 class_name Yard
 extends Node2D
 
+const Style := preload("res://scripts/style.gd")
+
 ## How many pieces the pile is drawn from, at most. Past this the yard is a wall of junk
 ## either way, and the draw cost of a late-game store is not worth paying.
 const MAX_DRAWN := 24
@@ -23,16 +25,22 @@ const MAX_DRAWN := 24
 const CRATE := Vector2(84.0, 42.0)
 const CRATE_TALL := 26.0
 
+## The crate's shadow: how much bigger than its footprint it is drawn, and how far down the
+## screen it sits. Barely either — it is a box on the ground, and the shadow is the sliver of
+## it the sun does not reach rather than a halo.
+const SHADOW_SPREAD := 1.0
+const SHADOW_DROP := 3.0
+
 ## How many pieces fill it to the brim. Past this the heap simply stops rising — the crate is
 ## a picture of how the run is going, not a second cap on it.
 const CRATE_FULL := 40
 
 ## The crate's colours: the planks, the shadowed inside, and the lines between boards.
-const WOOD := Color(0.55, 0.39, 0.24)
-const WOOD_LIT := Color(0.66, 0.48, 0.30)
-const WOOD_DARK := Color(0.38, 0.26, 0.16)
-const INSIDE := Color(0.20, 0.15, 0.11)
-const CRATE_INK := Color(0.13, 0.10, 0.08)
+const WOOD := Style.CRATE
+const WOOD_LIT := Style.CRATE_LIT
+const WOOD_DARK := Style.CRATE_DARK
+const INSIDE := Style.CRATE_IN
+const CRATE_INK := Style.SEAM
 
 
 ## Def indices waiting to be sold, oldest first. No limit: a lake's worth of rubbish can
@@ -91,8 +99,11 @@ func _draw() -> void:
 	var half := CRATE * 0.5
 	var lift := Vector2(0.0, -CRATE_TALL)
 
-	# The ground it stands on, and the inside of the box seen over the near wall.
-	_diamond(Vector2.ZERO, CRATE * 1.06, Color(0.0, 0.0, 0.0, 0.18))
+	# The ground it stands on, and the inside of the box seen over the near wall. The shadow
+	# is the crate's own footprint — a square on the plane, which is this diamond on screen —
+	# rather than a soft pool bigger than the box: nothing else here casts one of those, and
+	# a crate is a box sitting flat on the sand.
+	_diamond(Vector2(0.0, SHADOW_DROP), CRATE * SHADOW_SPREAD, Color(0.0, 0.0, 0.0, 0.22))
 	draw_colored_polygon(
 		PackedVector2Array([
 			Vector2(0.0, -half.y), Vector2(half.x, 0.0),

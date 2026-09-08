@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Teapot"
+material = 2
+piece = &"small_57"
+size = Vector2(21, 15)
+pollution = 3.4
+haul_cost = 3.0
+tier = 3
+lightness = 0.6
+block_color = Color(0.5, 0.5, 0.55, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Tin plate"
+material = 2
+piece = &"small_36"
+size = Vector2(18, 13)
+pollution = 0.6
+haul_cost = 0.5
+tier = 0
+lightness = 1.9
+block_color = Color(0.66, 0.68, 0.72, 1)

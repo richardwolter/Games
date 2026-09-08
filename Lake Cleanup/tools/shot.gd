@@ -6,6 +6,10 @@
 ##   godot --path . res://tools/shot.tscn
 extends Node
 
+## The catalogue of what a find is called. Same preload the lake uses — find_names.gd has no
+## class_name, deliberately.
+const FindNames := preload("res://scripts/find_names.gd")
+
 const SETTLE_FRAMES := 30
 const OUT_PATH := "res://tools/shot.png"
 
@@ -127,8 +131,13 @@ func _process(_delta: float) -> void:
 			var found: Array[String] = []
 			var room := _main.get_node(^"HUD/Shed/Pad/Lines/Room") as ShedRoom
 			var names: PackedStringArray = room.sheets.by_sheet["furniture"]
-			for i in mini(names.size(), 14):
-				found.append(names[i])
+			for name: String in names:
+				# Named pieces only, the way the lake deals them: the slicer keeps a couple of
+				# offcuts that are not furniture and have nothing to call them, and a shot of
+				# the room with those in the list is a shot of something the player never sees.
+				if found.size() >= 14 or FindNames.of(name).is_empty():
+					continue
+				found.append(name)
 			_main.set(&"unlocked", found)
 			_main.call(&"_set_shed", true)
 			# A rug with things standing on it, which is the placement this pass is for.
@@ -216,6 +225,30 @@ func _process(_delta: float) -> void:
 		var skin := _main.get_node(^"HUD/Skin")
 		if _frames == 3:
 			skin.set(&"_shown", 1.0)
+	if OS.get_cmdline_user_args().has("find") and _frames == 3:
+		# A find held up, caught part way through its hold. The card is queued the way the
+		# lake queues it — through _keep — so what is shot is the real thing rather than a
+		# posed copy of it.
+		var grid2 := _main.get_node(^"Grid") as LakeGrid
+		for def: TrashDef in grid2.defs:
+			if def.keepsake:
+				_main.call(&"_keep", def)
+				break
+		var trophy := _main.get_node(^"Finds/Trophy") as Trophy
+		if trophy != null:
+			# Just past the pop, where the shine is still bright and the piece is full size.
+			trophy.set(&"_age", Trophy.RISE + 0.25)
+	if OS.get_cmdline_user_args().has("pigeon") and _frames == 3:
+		# The pigeon pop-up, caught while it is fully in. Popped the way the lake pops it and
+		# then wound on past the slide, so what is shot is the held pose rather than a frame
+		# of the animation that happens to be on screen when the shutter goes.
+		var pigeon := _main.get_node(^"Pigeon/PigeonPop") as PigeonPop
+		if pigeon != null:
+			pigeon.pop(26)
+			pigeon.set(&"_age", PigeonPop.RISE + PigeonPop.HOLD * 0.5)
+			# Frozen there. The pop is over in under a second and the shutter goes twenty-odd
+			# frames later, so left running it would have slid back out before the picture.
+			pigeon.set_process(false)
 	if _frames < SETTLE_FRAMES:
 		return
 	var shot := get_viewport().get_texture().get_image()

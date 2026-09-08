@@ -25,9 +25,22 @@ const ALT_KEY := "furniture"
 ## a second one.
 const WHITE_SIZE := 8
 
-## What counts as a rug: covers almost all of its own box, and is bigger than a doormat.
-const FLAT_FILL := 0.93
-const FLAT_AREA := 900
+## The pieces that get a mirrored twin blitted into the atlas, named with MIRROR_SUFFIX.
+##
+## The sheet only ever draws a side-on chair facing one way, so a room laid out with them
+## all faces the same direction. Flipping is free here — the same pixels, once more, the
+## other way round — and a mirrored chair is a separate find with its own name, so the
+## collection grows by two rather than the shed quietly drawing a chair backwards.
+const MIRRORED := ["furniture_03", "furniture_05"]
+
+## What a mirrored twin is called: the original's name with this on the end.
+const MIRROR_SUFFIX := "_r"
+
+## What counts as a floor covering, matched against the piece's name in find_names.gd. The
+## art has names, so there is nothing to infer: a rug is a rug because it is called one.
+const FLAT_WORDS := ["rug", "mat"]
+
+const NAMES := preload("res://scripts/find_names.gd")
 
 var atlas: ImageTexture
 
@@ -54,6 +67,10 @@ var by_sheet := {}
 var white := Rect2()
 
 var _size := Vector2.ONE
+
+## Piece name -> which sheet it came off, for the mirror pass to file its twins alongside
+## their originals.
+var _sheet_of := {}
 
 
 ## Read the catalogue and build the atlas. False means the art is missing or unreadable,
@@ -110,8 +127,6 @@ func load_all() -> bool:
 		Rect2i(white_offset, Vector2i(WHITE_SIZE, WHITE_SIZE)), Color(1.0, 1.0, 1.0, 1.0)
 	)
 
-	atlas = ImageTexture.create_from_image(sheet_image)
-	_size = Vector2(float(width), float(height))
 	# The middle of the white block, not its edge: sampling on a seam picks up whatever is
 	# next to it once the texture is filtered or the view is zoomed.
 	white = Rect2(
@@ -146,8 +161,78 @@ func load_all() -> bool:
 		var listed: PackedStringArray = by_sheet.get(key, PackedStringArray())
 		listed.append(name)
 		by_sheet[key] = listed
+		_sheet_of[name] = key
 
+	sheet_image = _add_mirrors(sheet_image)
+	atlas = ImageTexture.create_from_image(sheet_image)
+	_size = Vector2(sheet_image.get_width(), sheet_image.get_height())
 	return not regions.is_empty()
+
+
+## Blit a flipped copy of every piece in MIRRORED onto the end of the atlas, in both
+## palettes, and register it as a piece of its own.
+##
+## Done here rather than in the slicer because there is nothing to slice: the mirror is the
+## original's pixels read backwards, and putting it in the catalogue would mean a second
+## copy of the art on disk that has to be kept in step with the first.
+##
+## Returns the image to build the atlas from — a taller one when there was anything to
+## mirror, and the one it was handed when there was not.
+func _add_mirrors(sheet_image: Image) -> Image:
+	var wanted: Array[String] = []
+	for name: String in MIRRORED:
+		if regions.has(name):
+			wanted.append(name)
+	if wanted.is_empty():
+		return sheet_image
+
+	var strip_top := sheet_image.get_height()
+	var strip_high := 0
+	var strip_wide := 0
+	for name: String in wanted:
+		var box := regions[name] as Rect2
+		strip_wide += int(box.size.x)
+		strip_high = maxi(strip_high, int(box.size.y))
+
+	# The grimy row and the cleaned row, one under the other, so a twin's two regions sit
+	# a fixed distance apart the same way the two sheets do.
+	var grown := Image.create_empty(
+		maxi(sheet_image.get_width(), strip_wide),
+		strip_top + strip_high * 2,
+		false,
+		Image.FORMAT_RGBA8
+	)
+	grown.fill(Color(0.0, 0.0, 0.0, 0.0))
+	grown.blit_rect(sheet_image, Rect2i(Vector2i.ZERO, sheet_image.get_size()), Vector2i.ZERO)
+
+	var at := 0
+	for name: String in wanted:
+		var box := regions[name] as Rect2
+		var twin := name + MIRROR_SUFFIX
+		var grimy := grown.get_region(Rect2i(box))
+		grimy.flip_x()
+		grown.blit_rect(
+			grimy, Rect2i(Vector2i.ZERO, grimy.get_size()), Vector2i(at, strip_top)
+		)
+		var clean := grown.get_region(Rect2i(alt_regions[name] as Rect2))
+		clean.flip_x()
+		grown.blit_rect(
+			clean, Rect2i(Vector2i.ZERO, clean.get_size()), Vector2i(at, strip_top + strip_high)
+		)
+		regions[twin] = Rect2(float(at), float(strip_top), box.size.x, box.size.y)
+		alt_regions[twin] = Rect2(
+			float(at), float(strip_top + strip_high), box.size.x, box.size.y
+		)
+		cells[twin] = cells[name]
+		fill[twin] = fill[name]
+		names.append(twin)
+		var key := String(_sheet_of.get(name, ALT_KEY))
+		var listed: PackedStringArray = by_sheet.get(key, PackedStringArray())
+		listed.append(twin)
+		by_sheet[key] = listed
+		_sheet_of[twin] = key
+		at += int(box.size.x)
+	return grown
 
 
 func has(name: StringName) -> bool:
@@ -184,13 +269,15 @@ func footprint(name: StringName, cell: int) -> Vector2i:
 
 ## Does this piece lie on the floor rather than stand on it?
 ##
-## Worked out from the art rather than written down: a rug is big and solid all the way to
-## its edges, which nothing that stands on legs is. It only decides drawing order — what
-## goes under what — so a wrong guess costs a rug drawn over a chair, not a rule the player
-## runs into.
+## Read off the find's own name rather than guessed from the pixels: a rug drawn with a
+## fringe or a hole in the middle does not fill its box, and guessing gave it a collider and
+## drew it over the armchair standing on it. Anything called a rug or a mat is floor.
 func lies_flat(name: StringName) -> bool:
-	var box := region_of(name).size
-	return fill_of(name) >= FLAT_FILL and box.x * box.y >= FLAT_AREA
+	var title := NAMES.of(String(name)).to_lower()
+	for word: String in FLAT_WORDS:
+		if title.contains(word):
+			return true
+	return false
 
 
 ## A pixel rectangle as texture coordinates. What the batched lake surface hands the GPU.

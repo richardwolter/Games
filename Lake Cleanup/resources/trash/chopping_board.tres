@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Telephone"
+material = 1
+piece = &"small_26"
+size = Vector2(20, 18)
+pollution = 2.0
+haul_cost = 1.1
+tier = 2
+lightness = 1.4
+block_color = Color(0.6, 0.48, 0.3, 1)

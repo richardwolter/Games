@@ -106,6 +106,10 @@ func _physics_process(_delta: float) -> void:
 			_stage_shed()
 		16:
 			_stage_pigeons()
+		17:
+			_stage_ending()
+		18:
+			_stage_ending_on_load()
 		_:
 			pass
 
@@ -121,6 +125,43 @@ func _deep_tile() -> int:
 	return _grid.index_of(
 		int(Iso.CENTRE.x), int(Iso.CENTRE.y + Iso.ISLAND_RADIUS.y + 4.0)
 	)
+
+
+## Open water with something in it, within casting distance of wherever the angler is
+## standing.
+##
+## Every tile inside the ring is looked at, not a line of them. It used to walk one ray
+## straight out from the island's middle, which worked while the lake started a step off the
+## beach: now the rubbish is held clear of the island's drowned sand, and a single ray can
+## easily cross nothing but empty shallows before it runs out of cast — so the harness threw
+## into open water and proved nothing.
+##
+## The furthest such tile rather than the nearest, so the haul home is long enough to watch.
+func _water_near_angler() -> Vector2:
+	var reach := _net.range_tiles - 0.2
+	var here := _angler.tile_pos
+	var best := Vector2.INF
+	var best_span := -1.0
+	var fallback := Vector2.INF
+	for tx in range(int(here.x - reach) - 1, int(here.x + reach) + 2):
+		for ty in range(int(here.y - reach) - 1, int(here.y + reach) + 2):
+			var tile := Vector2(float(tx) + 0.5, float(ty) + 0.5)
+			var span := here.distance_to(tile)
+			if span > reach:
+				continue
+			if Iso.island_fraction(tile.x, tile.y) <= 1.05:
+				continue
+			if Iso.shore_fraction(tile.x, tile.y) >= 0.95:
+				continue
+			var where := Iso.tile_to_world(tile.x, tile.y)
+			if fallback == Vector2.INF:
+				fallback = where
+			var cell := _grid.tile_at(where)
+			if cell >= 0 and _grid.height_of(cell) > 0 and span > best_span:
+				best_span = span
+				best = where
+	return best if best != Vector2.INF else fallback
+
 
 
 ## The basin: filled tile by tile, deeper water holding more, sorted light over heavy, no
@@ -141,6 +182,12 @@ func _stage_build() -> void:
 	# The flock is turned off for the rest of the harness: birds arriving in the middle of
 	# a cast would be a lovely bug to chase.
 	_flock.spawning = false
+	# So is the dog, for the same reason and then some: it takes rubbish out of the water and
+	# puts it in the yard on its own clock, which is exactly what half of these checks are
+	# counting. scripts/dog.gd has a watcher of its own — tools/dog_watch.gd.
+	var dog := _main.get_node_or_null(^"Dog")
+	if dog != null:
+		dog.set_process(false)
 
 	_check(_grid.piece_count() > 1000, "the basin is filled with rubbish",
 		"%d pieces over %d tiles" % [_grid.piece_count(), _grid.tile_count()])
@@ -167,9 +214,25 @@ func _stage_build() -> void:
 	_main.call(&"_zoom_by", 1000.0)
 	_check(is_equal_approx(cam.zoom.x, 1.8), "zooming in stops at the near limit",
 		"%.3f" % cam.zoom.x)
+	# The far end is worked out from the window rather than written down, so it is asked of
+	# the game and then checked against the basin, which is what the limit is really about.
+	#
+	# Not "the whole lake fits" any more. The view is deliberately held in past that (see
+	# `Lake.ZOOM_OUT_PULL`): a zoom that fits the whole basin is a zoom at which a bottle is
+	# three pixels. What has to hold is that pulling back still shows most of the lake and
+	# stops there — the wheel can neither lose the lake nor turn it into a map.
 	_main.call(&"_zoom_by", 0.0001)
-	_check(is_equal_approx(cam.zoom.x, 0.22), "zooming out stops at the far limit",
-		"%.3f" % cam.zoom.x)
+	var fit: float = _main.call(&"_fit_zoom")
+	_check(is_equal_approx(cam.zoom.x, fit), "zooming out stops at the far limit",
+		"%.3f, fit %.3f" % [cam.zoom.x, fit])
+	var span := Iso.basin_extent() * cam.zoom.x
+	var view := _main.get_viewport_rect().size
+	var shown := minf(view.x / span.x, view.y / span.y)
+	_check(shown >= 1.0 / Lake.ZOOM_OUT_PULL - 0.01,
+		"and most of the lake is on screen there",
+		"%.2f of it, wanted %.2f (lake %.0fx%.0f in %.0fx%.0f)" % [
+			shown, 1.0 / Lake.ZOOM_OUT_PULL, span.x, span.y, view.x, view.y
+		])
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -198,6 +261,12 @@ func _stage_build() -> void:
 	_advance()
 
 
+## How far the angler has to have walked before the walking checks are made, in tiles. Past
+## the shed's own range, so "they are no longer at the shed" is a fact about the walk rather
+## than about how many frames the machine managed while the key was down.
+const WALK_CLEAR := 4.0
+
+
 ## Walking: the keys move the angler, and the island's edge stops them.
 func _stage_walk() -> void:
 	if _in_stage == 1:
@@ -220,14 +289,27 @@ func _stage_walk() -> void:
 			)
 
 		_walk_from = _angler.tile_pos
-		Input.action_press(&"walk_down")
+		# Across, rather than down or up. The crate is parked south-east of the middle —
+		# straight down the screen from where the angler starts — and the hut is straight up
+		# from it, so either of those walks wedges them against something a tile out, and
+		# every check after that is really a check on the obstacle. Across is clear water.
+		Input.action_press(&"walk_left")
 		return
-	if _in_stage < 90:
+	# Held until the angler has actually got somewhere, not for a fixed count of frames. The
+	# figure walks on wall-clock time and the harness counts frames, so how far ninety of them
+	# carried it depended on how fast the machine was running that day: the same code walked
+	# 1.3 tiles one run and 1.7 the next, and the check that it is clear of the shed sat right
+	# between the two.
+	var gone := _angler.tile_pos.distance_to(_walk_from)
+	if gone < WALK_CLEAR and _in_stage < 600:
 		return
-	Input.action_release(&"walk_down")
+	Input.action_release(&"walk_left")
 	_check(_angler.tile_pos.distance_to(_walk_from) > 0.5, "the keys walk the angler",
 		"%.2f tiles from %s" % [_angler.tile_pos.distance_to(_walk_from), str(_walk_from)])
-	_check(Iso.island_fraction(_angler.tile_pos.x, _angler.tile_pos.y) < 1.0,
+	# The waterline plus the one step past it the walking rule allows — the last step off the
+	# grass is into the shallows on purpose (Angler.WALK_LIMIT), and the drawing now sinks the
+	# boots into the water when it is taken. Anything beyond that is a swim.
+	_check(Iso.island_fraction(_angler.tile_pos.x, _angler.tile_pos.y) <= Angler.WALK_LIMIT,
 		"walking never leaves the island",
 		"%.3f of the way out" % Iso.island_fraction(_angler.tile_pos.x, _angler.tile_pos.y))
 	_check(not bool(_main.call(&"_at_shed")), "walking off takes them away from the shed", "")
@@ -235,8 +317,35 @@ func _stage_walk() -> void:
 
 
 ## Casting: refused beyond range, and it flies and settles inside it.
+## Put the angler on the beach, facing open water.
+##
+## The island is sixteen tiles across now, and the first net reaches three and a half: from
+## where a run starts, in the middle by the shed, there is no water within a cast of anybody.
+## Walking to the shore is what a player does before their first throw, and this is the
+## harness doing the same rather than pretending the lake comes to the island.
+func _stand_on_the_shore() -> void:
+	var best := _angler.tile_pos
+	var best_out := -1.0
+	for i in 16:
+		var angle := TAU * float(i) / 16.0
+		var dir := Vector2(cos(angle), sin(angle))
+		var walked := 0.0
+		var last := Vector2.INF
+		while walked < Iso.ISLAND_RADIUS.x + 4.0:
+			walked += 0.25
+			var at := Iso.ISLAND_CENTRE + dir * walked
+			if bool(_angler.call(&"_can_stand", at)):
+				last = at
+		if last != Vector2.INF and last.distance_to(Iso.ISLAND_CENTRE) > best_out:
+			best_out = last.distance_to(Iso.ISLAND_CENTRE)
+			best = last
+	_angler.tile_pos = best
+	_angler.call(&"_place")
+
+
 func _stage_cast() -> void:
 	if _in_stage == 1:
+		_stand_on_the_shore()
 		# Out past the far bank, which is well beyond any starting cast.
 		var far := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y + Iso.RADIUS.y * 0.9)
 		_check(not _net.can_cast_to(far), "a cast beyond range is refused", "")
@@ -249,35 +358,39 @@ func _stage_cast() -> void:
 
 		_pieces_before = _grid.piece_count()
 		_filth_before = float(_main.get(&"pollution"))
-		var near := Iso.tile_to_world(
-			_angler.tile_pos.x, _angler.tile_pos.y + float(Iso.MAX_SLOTS) * 0.42
-		)
+		var near := _water_near_angler()
 		_check(_net.can_cast_to(near), "water inside the ring can be cast at", "")
 		_main.call(&"_cast_at", near)
 		_check(_net.state == CastNet.State.FLYING, "the cast is in the air", "")
 		return
 	if _net.state == CastNet.State.FLYING and _in_stage < 200:
 		return
-	_check(_net.state == CastNet.State.SETTLED, "the net settles on the water",
+	# Nothing is held down any more: a net that has finished its flight is already on its
+	# way back with whatever it landed on.
+	_check(_net.state == CastNet.State.REELING, "the net reels itself in from where it lands",
 		"after %d frames" % _in_stage)
-	_check(_net.catch.is_empty(), "a settled net has caught nothing yet", "")
 	_advance()
 
 
-## Reeling: held, it comes home; what it drags in fills the yard and cleans the lake.
+## Reeling: it comes home on its own; what it drags in fills the yard and cleans the lake.
+## Pausing it — which is what a panel opened over the water does — stops it where it is.
 func _stage_reel() -> void:
 	if _in_stage == 1:
 		_net.set_pulling(false)
 		_check(_net.state == CastNet.State.SETTLED,
-			"letting go leaves the net where it is", "")
+			"pausing the net leaves it where it is", "")
 		_net.set_pulling(true)
-		_check(_net.state == CastNet.State.REELING, "holding the button reels it in", "")
+		_check(_net.state == CastNet.State.REELING, "letting it go again reels it in", "")
 		return
 	if _net.state == CastNet.State.REELING and _in_stage < 400:
 		return
 	_net.set_pulling(false)
 	_check(_net.state == CastNet.State.IDLE, "the net comes home",
 		"after %d frames" % _in_stage)
+	# The catch is thrown to the yard rather than teleported into it, so the pile is a
+	# second behind the net. Waiting for the throw to land is part of the check.
+	if _yard.held.is_empty() and _in_stage < 600:
+		return
 	_check(_yard.held.size() > 0, "the catch landed in the yard",
 		"%d pieces" % _yard.held.size())
 	_check(_grid.piece_count() < _pieces_before, "the catch left the lake",
@@ -289,24 +402,26 @@ func _stage_reel() -> void:
 	_advance()
 
 
-## The hard cap: a full yard means there is nowhere for a catch to go, so there is nothing
-## to cast for.
+## The yard does not fill up any more.
+##
+## It used to be a hard cap that stopped the net, and this stage used to prove that. The
+## cap was taken out on purpose — it made the player stand on the bank watching a boat —
+## so what is checked here now is the opposite: a deep pile changes nothing about whether
+## the net will go out.
 func _stage_yard_cap() -> void:
-	_yard.capacity = _yard.held.size()
-	_check(_yard.is_full() and _yard.room_left() == 0, "the yard fills up", "")
-	var where := Iso.tile_to_world(
-		_angler.tile_pos.x, _angler.tile_pos.y + float(Iso.MAX_SLOTS) * 0.42
-	)
+	var piled := _yard.held.size()
+	for i in 200:
+		_yard.put(0)
+	_check(_yard.held.size() == piled + 200, "the yard takes everything it is given",
+		"%d pieces" % _yard.held.size())
+
+	var where := _water_near_angler()
 	_check(_net.can_cast_to(where), "that water is still in range", "")
 	_main.call(&"_cast_at", where)
-	_check(_net.state == CastNet.State.IDLE, "a full yard stops the net going out", "")
-
-	# Room again, and it casts again. The cap is a pause, not a wall.
-	_yard.capacity = _yard.held.size() + 4
-	_main.call(&"_cast_at", where)
-	_check(_net.state == CastNet.State.FLYING, "space in the yard lets it cast again", "")
+	_check(_net.state == CastNet.State.FLYING, "a deep pile does not stop the net", "")
 	_net.state = CastNet.State.IDLE
 	_net.catch.resize(0)
+	_yard.held.resize(piled)
 	_advance()
 
 
@@ -345,6 +460,18 @@ func _stage_draw_batch() -> void:
 	_check(_grid.rebuilds == _rebuilds_before,
 		"a still lake is not rebuilt every frame",
 		"%d rebuilds over %d frames" % [_grid.rebuilds - _rebuilds_before, _in_stage])
+
+	# Taking a piece rewrites that tile's corner of the soup rather than laying the whole
+	# thing out again. This is what the net's cast and drag were hitching on: a handful of
+	# pieces a second, each of them re-stamping every piece in the lake.
+	var lifted := _deep_tile()
+	var deep_enough := _grid.stacks[lifted].size() > 1
+	_rebuilds_before = _grid.rebuilds
+	_grid.take(lifted, _grid.top_slot(lifted))
+	_check(deep_enough and _grid.rebuilds == _rebuilds_before,
+		"taking a piece patches the batch instead of rebuilding it",
+		"%d rebuilds" % (_grid.rebuilds - _rebuilds_before))
+	_rebuilds_before = _grid.rebuilds
 
 	# Zooming out far enough drops the details that are then sub-pixel.
 	var detailed_pieces := _grid.drawn_pieces
@@ -555,7 +682,6 @@ func _stage_skimmer() -> void:
 		# One material only, so every single thing the skimmer brings up on this run has
 		# to be that material or the filter is broken.
 		_skim_kind = TrashDef.Kind.TIMBER
-		_yard.capacity = 40
 		for i in 4:
 			_yard.put(_def_of(_skim_kind))
 		# Wound right up, so the run finishes inside the harness's frame budget and the
@@ -640,11 +766,8 @@ func _stage_fleet() -> void:
 ## lands, release stops it. No second click anywhere in that.
 func _stage_one_gesture() -> void:
 	if _in_stage == 1:
-		_yard.capacity = 60
 		_main.set(&"pollution", 1.0)
-		var near := Iso.tile_to_world(
-			_angler.tile_pos.x, _angler.tile_pos.y + float(Iso.MAX_SLOTS) * 0.42
-		)
+		var near := _water_near_angler()
 		_main.call(&"_cast_at", near)
 		_net.set_pulling(true)
 		_check(_net.state == CastNet.State.FLYING, "the press throws the net", "")
@@ -672,7 +795,6 @@ func _stage_save() -> void:
 	# hull's cargo is landed back in the yard by a load, which would muddy the count.
 	for boat: Boat in _main.get(&"_boats") as Array:
 		boat.cargo.resize(0)
-	_yard.capacity = 60
 	for i in 3:
 		_yard.put(_def_of(TrashDef.Kind.PLASTIC))
 	_main.set(&"sludge", 4321.0)
@@ -713,10 +835,13 @@ func _stage_save() -> void:
 ## the shed. The logbook lives in it rather than in the shop.
 func _stage_settings() -> void:
 	var settings := _main.get_node(^"HUD/Settings") as Control
-	var shop := _main.get_node(^"HUD/Shop") as Control
+	# The shop the player sees is the drawn board, not the panel of buttons behind it: the
+	# panel is kept in the tree for its numbers and is deliberately never shown.
+	var shop := _main.get_node(^"HUD/ShopSkin") as Control
 	_check(not settings.visible, "the settings panel starts closed", "")
+	var shop_panel := _main.get_node(^"HUD/Shop") as Control
 	_check(settings.find_child("SaveNow", true, false) != null
-		and shop.find_child("SaveNow", true, false) == null,
+		and shop_panel.find_child("SaveNow", true, false) == null,
 		"the logbook is in the settings, not in the shed", "")
 
 	_press_escape()
@@ -954,14 +1079,13 @@ func _stage_shed() -> void:
 			break
 	if find == null or sheets == null:
 		_check(false, "there is a find to test with", "")
-		_finish()
+		_advance()
 		return
 
 	# Landing one is what keeps it, and it must not reach the pile or a merchant.
 	var unlocked: Array = _main.get(&"unlocked")
 	unlocked.clear()
 	_yard.held.resize(0)
-	_yard.capacity = 20
 	_main.call(&"_on_net_landed", PackedInt32Array([find_index, find_index]))
 	_check(unlocked.size() == 1 and String(unlocked[0]) == String(find.piece),
 		"a find is kept, once, however many turn up",
@@ -1051,7 +1175,7 @@ func _stage_pigeons() -> void:
 	)
 	_check(book != null and book.has("cells"), "the pigeon sheet was cut", "")
 	if book == null:
-		_finish()
+		_advance()
 		return
 
 	var sheet: Array = book["size"]
@@ -1127,6 +1251,103 @@ func _stage_pigeons() -> void:
 		"%d left" % _flock.droppings.size())
 
 	_flock.spawning = false
+	_advance()
+
+
+## The end of the run.
+##
+## The bug this stage exists for: the meter is a float that has had eighteen thousand
+## subtractions done to it, so it lands a fraction above zero rather than on it. The
+## ending used to be wired to that float reaching zero exactly, which it never does — a
+## player who cleaned the whole lake got an empty bar and no ending. So the trigger is set
+## up here the way it really arrives: a lake with nothing in it and a meter still carrying
+## its dust.
+func _stage_ending() -> void:
+	if _in_stage == 1:
+		# Nearly clean, but not: a few pieces left and a meter reading nothing. The ending
+		# must not fire, and the player must be told what is left.
+		for index in _grid.stacks.size():
+			var stack := _grid.stacks[index]
+			if not stack.is_empty():
+				stack.resize(0)
+				_grid.stacks[index] = stack
+		_grid.insert(_deep_tile(), 0, 0)
+		_grid.insert(_deep_tile(), 0, 0)
+		_main.set(&"_filth_left", 0.0004 * float(_main.get(&"_filth_total")))
+		_main.set(&"_clean_check_in", 0.0)
+		return
+	if _in_stage == 40:
+		_check(not bool(_main.get(&"_cleaned")),
+			"a lake with pieces left in it is not finished, whatever the meter says", "")
+		_check(_main.call(&"_last_pieces_line") != "",
+			"and the player is told how much is still out there",
+			"%s" % _main.call(&"_last_pieces_line"))
+		# And now it really is empty, with the same float dust on the meter.
+		var stack := _grid.stacks[_deep_tile()]
+		stack.resize(0)
+		_grid.stacks[_deep_tile()] = stack
+		_main.set(&"_clean_check_in", 0.0)
+		return
+	if _in_stage < 80:
+		return
+	_check(_grid.piece_count() == 0, "the lake is empty", "")
+	_check(bool(_main.get(&"_cleaned")),
+		"an empty lake ends the run even with dust left on the meter", "")
+	_check(is_zero_approx(float(_main.get(&"pollution"))),
+		"and the meter is put to zero rather than left near it",
+		"%.6f" % float(_main.get(&"pollution")))
+	_check(_main.get_node_or_null(^"Farewell") != null,
+		"the closing words are on screen", "")
+	_check(not _angler.can_walk, "which holds the angler where they stand", "")
+	_check(_main.call(&"_last_pieces_line") == "",
+		"and the note about leftovers is gone", "")
+	_advance()
+
+
+## The ending of a run that was saved on its last catch and opened again.
+##
+## The second half of the same bug. Loading a save used to set "this run is finished" from
+## the piece count alone, which is not the same fact as "the player has been thanked" — so
+## a lake finished and reopened came back with the flag already set, the words still owed,
+## and no way left to say them. A player who cleaned the whole basin and quit got nothing
+## but a bright lake and silence.
+func _stage_ending_on_load() -> void:
+	if _in_stage == 1:
+		# Put the closing words away and forget they were ever shown: what is being tested
+		# is a finished lake arriving from disk, not one finishing in front of us.
+		# Dismissed through the game's own door rather than by reaching in and nulling the
+		# reference: the lake forgets the screen in _drop_farewell, and a test that forgets
+		# it some other way is testing its own bookkeeping.
+		var over := _main.get_node_or_null(^"Farewell")
+		if over != null:
+			_main.call(&"_drop_farewell")
+			over.free()
+		_main.set(&"_farewell_shown", true)
+		_main.set(&"_cleaned", false)
+		_check(bool(_main.call(&"save_game")), "a finished lake can be saved", "")
+		# And now something else entirely is in memory, so the load has work to do.
+		_main.set(&"_cleaned", true)
+		_grid.insert(_deep_tile(), 0, 0)
+		_check(bool(_main.call(&"load_game")), "and read back", "")
+		_check(_grid.piece_count() == 0, "the lake comes back empty",
+			"%d pieces" % _grid.piece_count())
+		_check(not bool(_main.get(&"_cleaned")),
+			"a loaded lake has not dealt with its ending yet, finished or not", "")
+		_main.set(&"_clean_check_in", 0.0)
+		return
+	if _in_stage < 40:
+		return
+	_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
+	_check(_main.get_node_or_null(^"Farewell") != null,
+		"and the words the run was owed are on screen", "")
+	# Said once already, and said again: the way on to the second lake is a door on this
+	# screen, so a finished lake that showed its ending last week and refuses to show it
+	# again is a lake with nothing to do on it and no way off it.
+	_check(bool(_main.get(&"_farewell_shown")),
+		"a lake that was already finished offers its ending again", "")
+	_check(String(_main.call(&"_next_scene")) != "",
+		"and it carries the door on to the next lake",
+		"%s" % _main.call(&"_next_scene"))
 	_finish()
 
 

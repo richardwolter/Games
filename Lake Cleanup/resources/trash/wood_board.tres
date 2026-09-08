@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Wood board"
+material = 1
+piece = &"small_56"
+size = Vector2(14, 11)
+pollution = 1.0
+haul_cost = 0.6
+tier = 0
+lightness = 1.8
+block_color = Color(0.55, 0.4, 0.27, 1)

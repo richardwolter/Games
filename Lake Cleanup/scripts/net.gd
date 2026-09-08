@@ -25,7 +25,20 @@ signal landed(cargo: PackedInt32Array)
 ## carried home: a bird is not cargo, and it is certainly not going in the yard.
 signal caught_bird(at: Vector2)
 
+## A charm the net closed on, as a CharmField.Kind. Like a bird, it never becomes cargo:
+## it goes straight to the box on the island the moment the mouth shuts on it.
+signal caught_charm(kind: int)
+
+## A lit cast has landed and been left there: where it is, how far it reaches, and what is
+## on it. The net itself is already back in the angler's hands by the time this is heard —
+## whoever is listening owns the thing on the water now.
+signal left_behind(tile: Vector2, radius: float, fire: bool, ice: bool)
+
 enum State { IDLE, FLYING, SETTLED, REELING }
+
+## The two things that can be put on the net itself. Both at once is allowed and is the
+## point: a net carrying fire and ice burns what it is already holding still.
+enum Charm { FIRE, ICE }
 
 ## Tiles per second on the way out. Faster than any reel — the throw is not the part of
 ## the cast the player is meant to wait through.
@@ -184,30 +197,15 @@ const CATCH_LAYER := 3
 const CATCH_SCALE := 0.7
 const CATCH_PACKED := 0.62
 
-## How many spokes the range ring is drawn from. It is also how finely the ring follows the
-## island and the bank, so it is a resolution rather than a smoothness.
-const RING_SPOKES := 72
-## How far along a spoke the ring steps while looking for the first place a cast stops
-## being legal, in tiles.
+## How far a throw steps while looking for the first place along it that a cast stops being
+## legal, in tiles. `_reach_along` walks in these, and the aiming marker is what it feeds.
 const RING_STEP := 0.2
 
-## How the range ring is drawn. The rim is dashed — `RING_DASH` spokes on, then the same
-## number off — because a solid line at this size reads as a puddle on the water, while a
-## broken one reads as a limit. `RING_TICK` is how far the marks stand off it, which is what
-## turns a shape into a boundary with an inside and an outside.
-const RING_DASH := 3
-const RING_TICK := 7.0
-
 ## The aiming marker: what a throw at the pointer would look like before it is thrown.
-## Green-white for a spot that can be reached, warm for one that cannot.
+## Green-white where the throw would take, red where it would not — over the island, or out
+## past what the rod can reach.
 const AIM_OK := Color(0.86, 0.97, 0.88)
-const AIM_NO := Color(1.0, 0.62, 0.50)
-
-## How visible the ring is with the net stowed, and with it out on the water. It stays up
-## while a cast is in the air: knowing where you may throw next is worth as much as knowing
-## where you may throw now, and a ring that vanishes the moment you use it teaches nothing.
-const RING_READY := 0.42
-const RING_BUSY := 0.16
+const AIM_NO := Color(0.92, 0.25, 0.22)
 
 ## Set from the lake's upgrade levels at cast time, so a cast runs on the numbers the
 ## player had when they paid for them.
@@ -232,6 +230,15 @@ var angler: Angler
 ## The birds. Optional — with no flock the net simply catches rubbish.
 var flock: Flock
 
+## The charms floating on the water, when there are any. Null in the first lake, which is
+## what keeps every charm-shaped branch below out of that game entirely.
+var charms: CharmField
+
+## Seconds of fire and of ice left on the net, indexed by Charm. Two independent clocks
+## rather than one enchantment slot: catching ice while the net is already burning should
+## give a net that does both, not a net that has forgotten how to burn.
+var charm_left := PackedFloat32Array([0.0, 0.0])
+
 var state: int = State.IDLE
 ## Where the net is, in tile coordinates, and where it is heading while flying.
 var tile_pos := Vector2.ZERO
@@ -239,16 +246,12 @@ var target := Vector2.ZERO
 ## Def indices caught this cast, dragged in behind the net.
 var catch := PackedInt32Array()
 
-## True while the player is holding the button. Reeling only happens while it is.
-var _pulling: bool = false
+## Whether the net is allowed to reel. A thrown net pulls itself in, so this is true for
+## the whole of an ordinary cast — what turns it off is the game being paused over the
+## water: a panel opened mid-drag stops the net where it is and lets it go again when the
+## panel closes.
+var _pulling: bool = true
 var _time: float = 0.0
-
-## The castable area, as a closed world polygon, and the state it was worked out for. It is
-## a walk over the shore and the island, so it is rebuilt when the angler moves or the rod
-## gets longer rather than every frame.
-var _ring := PackedVector2Array()
-var _ring_from := Vector2.INF
-var _ring_range: float = -1.0
 
 ## Fixed seed, reset every draw, so the catch scatters the same way from one frame to the
 ## next. A load that reshuffles itself sixty times a second is a load that is boiling.
@@ -267,6 +270,12 @@ var _cast_span: float = 1.0
 
 ## How long the net has been down, for the landing sequence.
 var _settled_age: float = 0.0
+
+## Where the pointer, the angler and the charm were when the idle picture was last painted.
+## See `_repaint`.
+var _aim_was := Vector2.INF
+var _idle_was := Vector2.INF
+var _lit_was := false
 
 ## How far the net is pursed, 0 wide open and 1 drawn in, and how near the rod it has come
 ## on the same scale. Worked out once a frame and kept here, because the drawing, the swept
@@ -361,6 +370,47 @@ func room_left() -> int:
 	return maxi(hold - catch.size(), 0)
 
 
+## Put fire or ice on the net for a while. Extends whichever clock it names and leaves the
+## other one alone.
+func enchant(which: int, seconds: float) -> void:
+	if which < 0 or which >= charm_left.size():
+		return
+	charm_left[which] = maxf(charm_left[which], 0.0) + seconds
+	queue_redraw()
+
+
+## Seconds left of one enchantment.
+func charm_for(which: int) -> float:
+	if which < 0 or which >= charm_left.size():
+		return 0.0
+	return maxf(charm_left[which], 0.0)
+
+
+## How far a laid net's fire or ice reaches, in tiles.
+##
+## A fixed patch of water, and a small one. It was a multiple of the net's own mouth, which
+## made it grow with every width upgrade until a single cast covered most of the basin and
+## there was nothing to decide — a weapon that lands everywhere is not placed, it is just
+## switched on. Fixed and small means the player picks the spot: across the mouth of the
+## channel the swarm is using, or in front of the shed, or nowhere useful.
+##
+## It does not scale with net width on purpose. Width is how much rubbish a cast gathers,
+## and buying a bigger scoop should not quietly turn the map off.
+const FIELD_TILES := 1.7
+
+
+func field_radius() -> float:
+	return FIELD_TILES
+
+
+## Is anything on the net? While this is true the cast is placed rather than dragged: it
+## flies out, lands, and stays where it landed doing its work until it is thrown somewhere
+## else. Nothing about that is a mode the player has to select — it is what having a lit
+## net means.
+func enchanted() -> bool:
+	return charm_left[Charm.FIRE] > 0.0 or charm_left[Charm.ICE] > 0.0
+
+
 ## Is this world point a legal cast? Inside the range ring, and on the lake rather than on
 ## the island or the bank — a net thrown onto dry land is not a mistake worth simulating.
 func can_cast_to(where: Vector2) -> bool:
@@ -374,21 +424,46 @@ func can_cast_to(where: Vector2) -> bool:
 	return Iso.shore_fraction(tile.x, tile.y) < 1.0
 
 
-func cast_to(where: Vector2) -> bool:
+## Throw the net.
+##
+## `laying` is the difference between the two things a lit net can do. An ordinary cast is
+## an ordinary cast whatever is burning on the twine: it goes out, it drags, it comes home
+## with what it caught. A laying cast is the one that gets left behind. Keeping them on
+## separate buttons is what stops fire and ice taking the game away from the player for
+## twelve seconds at a time — the lake still has to be cleaned during a fight, and it is the
+## only thing paying for the fight.
+func cast_to(where: Vector2, laying: bool = false) -> bool:
 	if not can_cast_to(where):
 		return false
+	# Laying is not throwing. There is no flight to watch and nothing coming back, so the
+	# net goes down where it was asked for and the angler never leaves the rod alone: the
+	# animation belongs to the cast that drags, and playing it here only delayed the thing
+	# the player clicked for.
+	if laying and enchanted():
+		target = Iso.world_to_tile(where)
+		tile_pos = target
+		_leave_it_there()
+		return true
 	target = Iso.world_to_tile(where)
-	_cast_from = tile_pos
+	# From the rod, not from wherever the net happens to be lying. An idle net rides the
+	# angler, so for an ordinary cast these are the same point; for a lit net being thrown
+	# on from where it settled, the rod is the one the throw is measured from.
+	_cast_from = angler.tile_pos
 	_cast_span = maxf(_cast_from.distance_to(target), 0.001)
 	shut = 0.0
 	near = 0.0
 	tile_pos = angler.tile_pos
 	catch.resize(0)
+	# A cast is one gesture from the throw to the catch coming out of the water. Nothing
+	# has to be held down for the second half of it.
+	_pulling = true
 	state = State.FLYING
 	return true
 
 
-## The player's button. Held is the only thing that moves a settled net.
+## Stop the net where it is, or let it carry on. Not the throw button any more — the net
+## reels itself — but the pause the panels and the endings put on it, and the second click
+## that starts a net the player deliberately left sitting.
 func set_pulling(pulling: bool) -> void:
 	_pulling = pulling
 	if pulling and state == State.SETTLED:
@@ -406,6 +481,7 @@ func world_pos() -> Vector2:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_burn_down(delta)
 	if state == State.SETTLED or state == State.REELING:
 		_settled_age += delta
 	# Before the sweep, so what is caught this frame is caught by a net as shut as the one
@@ -424,9 +500,9 @@ func _process(delta: float) -> void:
 			_advance_towards(target, CAST_SPEED, delta)
 			if tile_pos.distance_to(target) < 0.05:
 				tile_pos = target
-				# Still holding the button that threw it: the cast is one gesture, so it
-				# starts coming back the moment it lands rather than waiting for a second
-				# click. Letting go before it lands leaves it settled, as it always did.
+				# The cast is one gesture: it starts coming back the moment it lands. Only
+				# a pause put on the net from outside — a panel over the water — leaves it
+				# sitting there instead.
 				state = State.REELING if _pulling else State.SETTLED
 				_settled_age = 0.0
 				if splash != null:
@@ -451,7 +527,65 @@ func _process(delta: float) -> void:
 			# always drawn where they are actually thrown from.
 			if angler != null:
 				tile_pos = angler.tile_pos
+	_repaint()
+
+
+## Ask for a repaint, but not while the idle picture is standing still.
+##
+## Every other state animates — the net flies, the mouth shuts, the catch rides up the line
+## — so those redraw every frame and should. Idle draws a range ring round the angler and a
+## ghost mouth under the pointer, and neither of those moves unless the angler or the mouse
+## does. Standing on the dock deciding where to cast is the most common thing in the game,
+## and it used to repaint the ring sixty times a second.
+func _repaint() -> void:
+	if state == State.IDLE:
+		var aim := get_global_mouse_position()
+		var lit := enchanted()
+		if (
+			aim.is_equal_approx(_aim_was)
+			and tile_pos.is_equal_approx(_idle_was)
+			and lit == _lit_was
+		):
+			return
+		_aim_was = aim
+		_idle_was = tile_pos
+		_lit_was = lit
 	queue_redraw()
+
+
+## Put a lit net down and stand back up with an empty one.
+##
+## The whole of "the net is left where it was cast". What is on the water afterwards is not
+## this node's business — it is a thing the siege owns and draws — and this one is free to
+## be used again on the next click.
+func _leave_it_there() -> void:
+	var where := tile_pos
+	if splash != null:
+		# Sized to the patch that is about to start burning rather than to the net's mouth:
+		# the water reacts to what was put down, and what was put down is a field.
+		splash.splash(world_pos(), 0.45)
+		splash.ripple(world_pos(), Iso.tile_circle_extent(field_radius()))
+	if sfx != null:
+		sfx.play_splash(0.45)
+	state = State.IDLE
+	_settled_age = 0.0
+	shut = 0.0
+	near = 0.0
+	catch.resize(0)
+	tile_pos = angler.tile_pos
+	left_behind.emit(
+		where, field_radius(), charm_left[Charm.FIRE] > 0.0, charm_left[Charm.ICE] > 0.0
+	)
+
+
+## The enchantments burning down.
+func _burn_down(delta: float) -> void:
+	var was := enchanted()
+	for which in charm_left.size():
+		if charm_left[which] > 0.0:
+			charm_left[which] = maxf(charm_left[which] - delta, 0.0)
+	if was and not enchanted():
+		queue_redraw()
 
 
 func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
@@ -474,19 +608,41 @@ func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
 ##
 ## Nearest first within each pass, so the mouth closes from the middle out.
 func _sweep() -> void:
-	if grid == null or room_left() <= 0:
+	if grid == null:
 		return
 	var here := grid.tile_at(Iso.tile_to_world(tile_pos.x, tile_pos.y))
 	if here < 0:
 		return
 	var reach := _sorted_reach(here)
 
+	# Every bird sat inside the mouth, without exception: a perched pigeon is on top of
+	# everything, the hold has no say in it, and one left bobbing inside the ring the player
+	# just closed reads as the net passing through it.
 	if flock != null:
-		for index in reach:
-			var perched := flock.bird_on(index)
-			if perched >= 0:
-				caught_bird.emit(flock.take(perched))
+		for perched in flock.perched_near(tile_pos, sweep_radius()):
+			caught_bird.emit(flock.take(perched))
 
+	# Charms, on the same terms as the birds: on top of everything, free to lift, and gone
+	# from the water the instant the mouth passes over them. They are the whole reason the
+	# second lake is worth casting into, so nothing about the net's strength or its hold
+	# gets a say in whether one is picked up.
+	if charms != null:
+		for index in reach:
+			var floating := charms.charm_on(index)
+			if floating >= 0:
+				var kind := charms.take(floating)
+				if splash != null:
+					splash.splash(_within_mouth(grid.surface_pos(index)), 0.4)
+				if sfx != null:
+					sfx.play_catch()
+				caught_charm.emit(kind)
+
+	# Only the rubbish is limited by what the net can hold. A bird and a charm are lifted
+	# off the surface by a net that is already full, which is why the hold is not checked
+	# until here: a cast that swept over a charm and left it floating because it had three
+	# lumps of tar in it would read as the net being broken.
+	if room_left() <= 0:
+		return
 	for layer in SWEEP_LAYERS:
 		_take_from(reach)
 
@@ -783,27 +939,6 @@ func _reach_along(towards: Vector2) -> Vector2:
 	return reach
 
 
-## Where the player may throw, as a closed world polygon: a circle in tile space, each
-## spoke cut short at the first point along it that `can_cast_to` would refuse. The island
-## and the bank take bites out of it, which is the whole reason it is walked rather than
-## drawn as an ellipse — a ring that runs over dry land is a ring that lies.
-func _cast_ring() -> PackedVector2Array:
-	if angler == null:
-		return PackedVector2Array()
-	var from := angler.tile_pos
-	if _ring_range == range_tiles and _ring_from.distance_to(from) < 0.001:
-		return _ring
-	_ring_from = from
-	_ring_range = range_tiles
-
-	_ring = PackedVector2Array()
-	for i in RING_SPOKES + 1:
-		var angle := TAU * float(i) / float(RING_SPOKES)
-		var reach := _reach_along(Vector2(cos(angle), sin(angle)))
-		_ring.append(Iso.tile_to_world(reach.x, reach.y))
-	return _ring
-
-
 ## The pointer, answered before anything is thrown: a ghost of the mouth where the cast
 ## would land, and — when the pointer is past what the rod can do — a second marker at the
 ## furthest point in that direction that would actually take, with a line joining the two.
@@ -812,30 +947,25 @@ func _cast_ring() -> PackedVector2Array:
 func _draw_aim() -> void:
 	var pointer := get_global_mouse_position()
 	var legal := can_cast_to(pointer)
-	var tint := AIM_OK if legal else AIM_NO
 	var span := mouth_extent()
 
-	# The mouth as it would land: the same ellipse the net draws, so what is promised here
-	# is the shape that turns up.
+	# A lit net has two casts in it, so the preview shows both: the mouth this click would
+	# scoop with, and inside it the patch the other button would leave burning. Neither
+	# replaces the other, because neither action replaces the other.
+	if legal and enchanted():
+		_draw_lay_ghost(pointer)
+
+	# The mouth as it would land, or a red ring saying it would not land at all. One ring
+	# either way, at the pointer: an earlier version added a second one out where a refused
+	# throw would have stopped, and that pale mark drifting about over the island and over
+	# the angler was the white circle that had to go. The refusal itself is worth showing —
+	# a click that does nothing is worse than a click the game says no to.
+	var tint := AIM_OK if legal else AIM_NO
 	var ghost := PackedVector2Array()
 	for i in 25:
 		var angle := TAU * float(i) / 24.0
 		ghost.append(pointer + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
-	draw_polyline(ghost, Color(tint.r, tint.g, tint.b, 0.5 if legal else 0.35), 1.5)
-
-	if legal:
-		return
-
-	# Out of reach: show where the throw would stop instead, so the pointer being refused
-	# is an answer rather than a nothing.
-	var reach := _reach_along(Iso.world_to_tile(pointer) - angler.tile_pos)
-	var stop := Iso.tile_to_world(reach.x, reach.y)
-	draw_line(stop, pointer, Color(tint.r, tint.g, tint.b, 0.28), 1.0)
-	var mark := PackedVector2Array()
-	for i in 25:
-		var angle := TAU * float(i) / 24.0
-		mark.append(stop + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
-	draw_polyline(mark, Color(AIM_OK.r, AIM_OK.g, AIM_OK.b, 0.45), 1.5)
+	draw_polyline(ghost, Color(tint.r, tint.g, tint.b, 0.5 if legal else 0.8), 1.5)
 
 
 ## The edge of what the angler can reach, at `strength` of full visibility.
@@ -844,30 +974,36 @@ func _draw_aim() -> void:
 ## enough: the fill says which side is water once the island has bitten a crescent out of
 ## the shape, the dashes say the line is a rule rather than a thing floating there, and the
 ## ticks give the rule a direction.
-func _draw_range(strength: float) -> void:
-	var ring := _cast_ring()
-	if ring.size() < 3 or strength <= 0.01:
-		return
-	var pale := Color(0.93, 0.98, 1.0)
-	draw_colored_polygon(ring, Color(pale.r, pale.g, pale.b, 0.055 * strength))
+## Where a laid net would go, drawn under the aim so the two readings are one picture: a
+## small dashed disc in the charm's colours, the size of the patch that would actually burn.
+func _draw_lay_ghost(pointer: Vector2) -> void:
+	var tint := _charm_tint()
+	var reach := Iso.tile_circle_extent(field_radius())
+	var ring := PackedVector2Array()
+	for i in 33:
+		var angle := TAU * float(i % 32) / 32.0
+		ring.append(pointer + Vector2(cos(angle) * reach, sin(angle) * reach * 0.55))
+	draw_colored_polygon(ring, Color(tint.r, tint.g, tint.b, 0.10))
+	# Dashed, so it reads as a plan rather than as something already on the water.
+	for i in 16:
+		var from := ring[i * 2]
+		var to := ring[i * 2 + 1]
+		draw_line(from, to, Color(tint.r, tint.g, tint.b, 0.75), 1.6)
 
-	var centre := Iso.tile_to_world(angler.tile_pos.x, angler.tile_pos.y)
-	var i := 0
-	while i < RING_SPOKES:
-		var run := PackedVector2Array()
-		for step in RING_DASH + 1:
-			run.append(ring[mini(i + step, ring.size() - 1)])
-		draw_polyline(run, Color(pale.r, pale.g, pale.b, 0.75 * strength), 2.0)
-		# One tick at the middle of each dash, pointing straight out from the angler. The
-		# ring is walked, so its edge is not always where an ellipse would put it, and the
-		# outward direction has to come from the two points either side of the mark.
-		var mark: Vector2 = ring[mini(i + RING_DASH / 2, ring.size() - 1)]
-		var out := (mark - centre).normalized()
-		draw_line(
-			mark, mark + out * RING_TICK,
-			Color(pale.r, pale.g, pale.b, 0.5 * strength), 1.5
-		)
-		i += RING_DASH * 2
+
+## What colour the net is wearing: warm for fire, cold for ice, and the two mixed when it
+## carries both.
+func _charm_tint() -> Color:
+	var fire := charm_left[Charm.FIRE] > 0.0
+	var ice := charm_left[Charm.ICE] > 0.0
+	if fire and ice:
+		return Color(1.0, 0.72, 0.62)
+	if fire:
+		return Color(1.0, 0.60, 0.28)
+	if ice:
+		return Color(0.62, 0.92, 1.0)
+	return AIM_OK
+
 
 
 ## The range ring, the line, the net, and whatever is being dragged in it.
@@ -876,9 +1012,11 @@ func _draw() -> void:
 		return
 	var ink := Color(0.11, 0.09, 0.1)
 
-	# The range ring. It is the one piece of UI that has to be on the water rather than in
-	# the HUD: what you can reach is a place.
-	_draw_range(RING_READY if state == State.IDLE else RING_BUSY)
+	# No range ring. It was a pale dashed circle round the angler at all times, and a marking
+	# the player stands inside every second of the game stops being information and becomes
+	# scenery — scenery that says "user interface" over a lake drawn by hand. What can be
+	# reached is still shown, at the moment it is being asked: see `_draw_aim`, which marks
+	# the pointer and, when the pointer is out of range, the furthest point along the way.
 	if state == State.IDLE:
 		_draw_aim()
 		return

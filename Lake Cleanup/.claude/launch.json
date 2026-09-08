@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Godot Lake Cleanup",
+      "runtimeExecutable": "godot",
+      "runtimeArgs": ["--path", ".", "-d"],
+      "port": 6007
+    }
+  ]
+}

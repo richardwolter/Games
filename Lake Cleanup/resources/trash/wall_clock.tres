@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Wall clock"
+material = 2
+piece = &"small_08"
+size = Vector2(20, 20)
+pollution = 3.2
+haul_cost = 2.6
+tier = 2
+lightness = 0.45
+block_color = Color(0.62, 0.63, 0.66, 1)

@@ -16,6 +16,12 @@
 ## the cell grouping over-joined — one cutting at lines of empty pixels, one guessing a
 ## boundary where two items genuinely touch.
 ##
+## The catalogue in assets/pieces.json has been corrected by hand since it was last cut:
+## the pieces nobody wanted are gone, and the toilet region was narrowed onto the one bowl
+## the slicer had welded to its neighbour. Re-running this overwrites all of that, and the
+## piece names are positional, so a re-slice also renumbers everything scripts/find_names.gd
+## is keyed on. Cut a fresh sheet with it; do not re-cut the ones already in the game.
+##
 ## Run it with:
 ##   godot --headless --path . --script res://tools/slice_sheets.gd
 extends SceneTree
@@ -35,6 +41,15 @@ const JOIN_PIXELS := 7
 ## A box this thin in either direction is an offcut of something bigger — a lamp stem, a
 ## stove flue — rather than an item, and is welded back onto whatever it stands against.
 const SLIVER_SIDE := 13
+
+## How much bigger than a sliver its neighbour has to be before the sliver is welded onto it.
+##
+## Without it, a row of small things that touch each other welds itself into one long piece:
+## four frying pans hung handle to handle came out as a single sixty-four pixel item, and the
+## lake floated it as one enormous pan. A sliver is an offcut of something — a pole, a stem,
+## a flue — so what it belongs to is properly bigger than it is. Two of anything the same
+## size are two things.
+const WELD_BIGGER := 2.0
 
 ## Anything at or under this alpha is background. Not zero: these sheets have a few pixels
 ## of near-transparent fringe, and treating those as solid welds neighbouring items.
@@ -251,10 +266,13 @@ func _weld_slivers(boxes: Array[Rect2i]) -> Array[Rect2i]:
 				continue
 			var best := -1
 			var best_area := 0
+			var own: int = out[i].size.x * out[i].size.y
 			for j in out.size():
 				if i == j or not out[i].grow(1).intersects(out[j]):
 					continue
 				var area: int = out[j].size.x * out[j].size.y
+				if float(area) < float(own) * WELD_BIGGER:
+					continue
 				if area > best_area:
 					best_area = area
 					best = j

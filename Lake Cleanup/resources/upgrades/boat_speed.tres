@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="UpgradeTrack" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/upgrade_track.gd" id="1_track"]
+
+[resource]
+script = ExtResource("1_track")
+price_base = 14.0
+price_mult = 1.35
+level_cap = 18
+curve_a = 4.2
+curve_b = 1.3
+curve_c = 0.025
+value_cap = 35.7
+is_integer = false

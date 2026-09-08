@@ -18,14 +18,26 @@
 ## This script owns none of that work. It builds the basin, wires the four things that do
 ## (angler, net, yard, ferry) to each other and to the grid, and is the one place the
 ## meter and the purse move.
+##
+## Named so the harness can read the numbers that decide how the view behaves —
+## `tools/test_lake.gd` checks the zoom against `ZOOM_OUT_PULL` — rather than keeping its
+## own copy of them, which is the sort of copy that goes stale without anything failing.
+class_name Lake
 extends Node2D
+
+## Where the UI's colours, sizes and font are decided. See scripts/style.gd.
+const Style := preload("res://scripts/style.gd")
+
+## Master palette colors. See scripts/palette.gd and resources/palette.tres.
+const Palette := preload("res://scripts/palette.gd")
+
+## What the finds are called. See scripts/find_names.gd.
+const FindNames := preload("res://scripts/find_names.gd")
 
 ## The lake is laid out from this, once, at load. Same seed, same lake, every run — which
 ## is what makes a tuning pass a comparison rather than a new roll of the dice.
 const LAKE_SEED := 20260817
 
-## How far past the waterline the bank is drawn, in tiles.
-const BANK_MARGIN := 9.0
 
 ## How far back the view sits to begin with. Isometric, so the basin is twice as wide as
 ## it is tall on screen.
@@ -35,8 +47,61 @@ const VIEW_ZOOM := 0.62
 ## at a readable zoom, so the two ends are doing different jobs: zoomed in is where the
 ## player aims a cast, zoomed out is where they read the basin as a whole and decide which
 ## side of the island to walk to.
+## Zoomed in is a hard number; zoomed out is the whole lake and not one pixel further.
+##
+## It used to be a hard number too, at 0.22, and that let the player pull back until the
+## basin was a green stain in the middle of a screen of grass — nothing to read and nothing
+## to decide. The far end is now whatever zoom fits the waterline inside the window, worked
+## out from the basin and the window rather than written down, so it frames the same lake on
+## any screen. MIN_ZOOM stays as the floor under that, for a window too small to fit it.
 const MIN_ZOOM := 0.22
 const MAX_ZOOM := 1.8
+
+## How much room is left round the lake at that far end, as a fraction of the basin. A
+## shoreline drawn hard against the edge of the window reads as cropped.
+const ZOOM_FIT_MARGIN := 0.04
+
+## How much bank the far end of the zoom shows past the waterline, in tiles.
+##
+## The lake and the four piers on it, and nothing else worth pulling back for. A pier stands
+## `Dropoff.PIER_OUT` past the waterline and is most of a hundred pixels wide from there, so
+## this is that plus enough air to keep it off the edge of the window.
+##
+## It has been further out. Thirteen tiles showed the wood behind the bank, which sounded
+## like more of the place and read as a lake going away from you — the boats got small, the
+## piers got small, and the thing the player is actually doing sat in the middle of a lot of
+## scenery.
+const ZOOM_OUT_TILES := 4.0
+
+## And then held in by this much again: the far end of the wheel is this multiple of the zoom
+## that would fit the lake and its piers exactly.
+##
+## Over one, so the view stops before the whole basin is on screen. The lake is bigger than a
+## window at any size worth reading it at, and a zoom that fits all of it is a zoom at which
+## a bottle is three pixels — the whole-lake view is a map, and this is a game about looking
+## at the water in front of you.
+const ZOOM_OUT_PULL := 1.68
+
+## And the same for the drag: the view may be pushed this fraction of the way out to where
+## the ground runs out, rather than all of it.
+##
+## The far corners of the ground are wood and nothing else — no lake, no piers, nothing to
+## do — so a drag that reaches them is a drag that takes the player away from the game and
+## makes them come back.
+const DRAG_PULL := 1.5
+
+## What is behind everything, where there is no ground drawn: the `Sky` layer's fill, which
+## sits under the whole scene and used to be a flat grey.
+##
+## Woodland, so the far distance past the last of the trees is more of the same rather than
+## the inside of a window. That is what makes the edge of the ground a non-question, at any
+## zoom and any shape of window, for nothing.
+##
+## Chasing it with more ground does not work. The view at the far end of the zoom is wider
+## than any ring worth drawing — the tall test window alone wants ground half again as far
+## out as the trees ever reach — so the ring grows, and the props with it, and the edge is
+## still one drag away.
+const BEYOND := Color(0.16, 0.22, 0.14)
 ## Per wheel notch. Multiplicative, so a notch is the same felt step at either end.
 const ZOOM_STEP := 1.12
 
@@ -105,43 +170,29 @@ const FILTH_FULL := 0.7
 ## (`FILTH_BITE`, under one) because a meter that moves early is encouraging, and a patch of
 ## water that goes green because there is rubbish two boat-lengths away is a lie about where
 ## the player has been. Cleared water is blue, and the green is where the junk still is.
-const FILTH_EDGE := 1.9
+##
+## Eased back from 1.9 when the map started measuring each tile against its own capacity
+## rather than against the worst tile in the lake: the readings now sit near the top of the
+## range instead of down in its tail, and at 1.9 a tile with four of its nine pieces left
+## came up cleaner than it is.
+const FILTH_EDGE := 1.35
 
 ## Seconds between rebuilds of the map, at most. It is a moment of work on a grid this size
 ## and none of it has to be frame-exact, but a cast landing ten pieces should not pay for it
 ## ten times.
 const FILTH_REMAP := 0.2
 
-## The island's colours, and how far in from the waterline the grass starts, in tiles.
-const SAND := Color(0.78, 0.70, 0.50)
-const SAND_WET := Color(0.66, 0.58, 0.41)
-const PEBBLE := Color(0.58, 0.54, 0.46)
-const GRASS := Color(0.36, 0.45, 0.27)
-const GRASS_DARK := Color(0.28, 0.36, 0.21)
-const TUFT := Color(0.44, 0.54, 0.31)
-const SHORE_INK := Color(0.16, 0.14, 0.11, 0.55)
-const GRASS_IN := -1.1
 
-## How many specks go into the sand-to-grass edge and over the ground, and how far either
-## side of the edge they may stray, in tiles.
-const EDGE_SPECKS := 150
-const EDGE_RAGGED := 0.45
-const GROUND_SPECKS := 620
 
 ## Below this zoom the rubbish drops its footprint and its outline. A piece is about
 ## twenty pixels across, so under half zoom those two details are a pixel wide and cost
 ## half the geometry on screen for nothing.
 const DETAIL_ZOOM := 0.5
 
-## What netting a pigeon pays.
-const BIRD_BONUS := 26.0
-
-## What a piece pays at a merchant: a flat fee for anything landed, plus what its filth is
-## worth. The flat half is why the first hour pays at all — a hold of mugs used to be four
-## sludge a lap — and it is also what stops a late hold of clocks and urns from being worth
-## ten early laps, which is where the run used to stop needing upgrades.
-const PIECE_BASE_PAY := 4.0
-const PIECE_FILTH_PAY := 9.0
+## What netting a pigeon pays, and what a piece pays at a merchant — a flat fee for
+## anything landed, plus what its filth is worth. Lives in resources/economy.tres (see
+## `EconomyConfig`) now, loaded into `_economy` by `_load_upgrades()`.
+var _economy: EconomyConfig
 
 ## How close to the shed the angler has to stand to open it, in tiles.
 const SHOP_RANGE := 3.2
@@ -152,13 +203,32 @@ const SHOP_RANGE := 3.2
 ## and the lake reads as a lake full of things rather than a lake full of one size. The two
 ## limits are only there for the extremes: a four-pixel crumb has to be visible at all, and
 ## a bed has to leave room for the water around it.
+## The window was 15 to 46, which sounded wide and was not: the furniture sheet's middling
+## cell is 32 pixels on its longest side, so every cell of 31 or more came out at exactly 46
+## and the whole catalogue of beds, wardrobes and sofas drew at one size. Widened to 11-68 —
+## six times between the smallest crumb and the biggest bed instead of three. Sixty-eight is
+## about a tile wide: the size of the ferry, well under the shed, which is as far as this
+## should go before a wardrobe starts eating the tiles either side of it.
 const SPRITE_SCALE := 1.5
-const SPRITE_SMALLEST := 15.0
-const SPRITE_LARGEST := 46.0
+const SPRITE_SMALLEST := 11.0
+const SPRITE_LARGEST := 68.0
 
-## Hulls the lake will hold. Three ferries working one yard is already more loading than
-## the yard produces, and a fourth would be a purchase that changes nothing.
-const MAX_BOATS := 3
+## Hulls the lake will hold. Used to read 3, on the theory that three ferries working one
+## yard was already more loading than the yard produces — 2026-09 playtest says otherwise
+## (see docs/balance/2026-09-06.md): the yard sat thousands deep the whole run. Raised to 5;
+## `fleet`'s own `.tres` gates how many of those are actually for sale.
+const MAX_BOATS := 5
+
+## What the first skimmer fitted brings up. The track walks from here to a certainty at
+## its last level.
+const SKIM_FIRST_CHANCE := 0.30
+
+## Per-track price curve, value curve, and level cap now live in `resources/upgrades/*.tres`
+## (see `UpgradeTrack`) for every track except `skimmer`, whose payoff is a chance curve
+## rather than this price-and-value shape — it keeps its own entry here.
+const MAX_LEVELS := {
+	&"skimmer": 10,
+}
 
 ## How loud the music is when it is turned right up, in decibels, and how far down "off"
 ## is. Silence is a volume rather than a stopped player: a track that keeps running while
@@ -204,14 +274,97 @@ const CLOSE_INSET := 12.0
 ## save is written on its own timer rather than on every change: a purchase or a sale can
 ## happen several times a second, and the field is the biggest thing in the file.
 const SAVE_PATH := "user://lake_cleanup.save"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 4
 const AUTOSAVE_EVERY := 20.0
+
+## What every piece in a version 3 save is called now.
+##
+## The sheet slicer used to weld a row of small things that touch into one item — four frying
+## pans hung handle to handle came out as a single piece — and fixing that added pieces to
+## the catalogue, which renumbered every name after them. A save stores what it found and
+## what is out in the shed by name, so without this a shed decorated before the re-cut comes
+## back with everything one piece along: the dresser is a mirror and the bookcase is a clock.
+##
+## Built by matching the old boxes to the new ones by area, once, offline; only the names
+## that actually moved are listed. Version 3 saves are migrated through it on load, which is
+## the whole reason the version went up rather than the old saves being refused.
+## What the sheets call a turned-over copy of a piece. See `_recut_name`.
+const MIRROR_SUFFIX := "_r"
+
+const RECUT_RENAMES := {
+	"small_45": &"small_48",
+	"small_46": &"small_49",
+	"small_47": &"small_50",
+	"small_48": &"small_51",
+	"small_49": &"small_52",
+	"small_50": &"small_53",
+	"small_51": &"small_54",
+	"small_52": &"small_55",
+	"small_53": &"small_56",
+	"small_54": &"small_57",
+	"small_55": &"small_58",
+	"small_56": &"small_59",
+	"small_57": &"small_60",
+	"small_58": &"small_61",
+	"small_59": &"small_62",
+	"small_60": &"small_63",
+	"furniture_10": &"furniture_11",
+	"furniture_11": &"furniture_12",
+	"furniture_12": &"furniture_13",
+	"furniture_13": &"furniture_14",
+	"furniture_14": &"furniture_15",
+	"furniture_15": &"furniture_16",
+	"furniture_16": &"furniture_17",
+	"furniture_17": &"furniture_18",
+	"furniture_18": &"furniture_19",
+	"furniture_19": &"furniture_20",
+	"furniture_20": &"furniture_21",
+	"furniture_21": &"furniture_22",
+	"furniture_22": &"furniture_23",
+	"furniture_23": &"furniture_24",
+	"furniture_24": &"furniture_25",
+	"furniture_25": &"furniture_26",
+	"furniture_26": &"furniture_27",
+	"furniture_27": &"furniture_28",
+	"furniture_28": &"furniture_29",
+	"furniture_29": &"furniture_30",
+	"furniture_30": &"furniture_31",
+	"furniture_31": &"furniture_32",
+	"furniture_32": &"furniture_33",
+	"furniture_33": &"furniture_34",
+	"furniture_34": &"furniture_35",
+	"furniture_35": &"furniture_36",
+	"furniture_36": &"furniture_37",
+	"furniture_37": &"furniture_38",
+	"furniture_38": &"furniture_39",
+	"furniture_39": &"furniture_40",
+	"furniture_40": &"furniture_41",
+	"furniture_41": &"furniture_42",
+	"furniture_42": &"furniture_43",
+	"furniture_43": &"furniture_44",
+	"furniture_44": &"furniture_45",
+	"furniture_45": &"furniture_46",
+	"furniture_46": &"furniture_47",
+	"furniture_47": &"furniture_48",
+	"furniture_48": &"furniture_49",
+	"furniture_49": &"furniture_50",
+}
+
+
 
 ## Where this run is saved, and whether it picks up where the last one left off. Both are
 ## settable before the scene enters the tree, which is how the test harness runs against a
 ## save file of its own instead of the player's.
 var save_path: String = SAVE_PATH
 var autoload_save: bool = true
+
+## Set by the settings door, and true for exactly one scene load: the level being walked
+## into starts from nothing rather than from its own save.
+##
+## Static because it has to survive the scene change that carries it — the node that sets
+## it is gone by the time the node that reads it is built. Cleared as soon as it is read,
+## so a level loaded any other way is the saved one again.
+static var start_fresh: bool = false
 
 ## 0 clean, 1 filthy. The one number the shader, the HUD, and every upgrade agree on.
 var pollution: float = 1.0
@@ -304,6 +457,7 @@ var _angler_was := Vector2.INF
 var _shed_art: Texture2D
 
 var _splash: WaterSplash
+var _prints: Footprints
 var _sfx: Sfx
 
 ## The indoors half of the music: the same song through a wall, on its own player. Both
@@ -323,6 +477,9 @@ var _boats: Array[Boat] = []
 var _angler: Angler
 var _net: CastNet
 var _yard: Yard
+
+## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
+var _dog: Dog
 var _water_material: ShaderMaterial
 ## The rubbish's own material, so the filth on it can be pushed with the water's.
 var _grime_material: ShaderMaterial
@@ -341,6 +498,14 @@ var _bounds := Rect2()
 var _menu_open: bool = false
 var _settings_open: bool = false
 var _shed_open: bool = false
+
+## Every purchasable track but `skimmer`, loaded from resources/upgrades/*.tres. Keyed by
+## the same StringName used throughout the shop (`&"net_width"`, `&"cargo"`, ...).
+const UPGRADE_ORDER := [
+	"net_width", "net_strength", "net_range", "reel", "net_hold",
+	"boat_speed", "cargo", "fleet",
+]
+var _upgrades: Dictionary = {}
 
 ## Seconds until the next autosave, and what the HUD says about the last one.
 var _autosave_in: float = AUTOSAVE_EVERY
@@ -362,10 +527,35 @@ var _filth_remap_in: float = 0.0
 var _filth_total: float = 1.0
 var _filth_left: float = 1.0
 
+## Whether the player has ever been thanked for this lake. Kept for the record and for old
+## saves; it does not gate the closing screen any more.
+##
+## It used to. Showing the words once ever sounds like good manners and was a trap: the way
+## on to the second lake is a door on that screen, so a player who cleaned the basin, read
+## the words, and came back later found a finished lake with nothing to do on it and no way
+## off it. A finished lake now offers its ending whenever it is opened — once per sitting,
+## because the run is only finished once — and the door is therefore always there.
+##
 ## The end of the run. `_cleaned` is the lake having nothing left in it, which is what the
 ## water is lit by; `_farewell_shown` is whether the player has been thanked, which happens
 ## once per save rather than once per session.
 var _cleaned: bool = false
+## Seconds until the next "is the lake empty" walk. See _look_for_the_end.
+var _clean_check_in: float = 0.0
+## What that walk found still floating, once the meter is on the floor. -1 before it has
+## been asked. This is the difference between a lake that is finished and one that is only
+## finished to two decimal places, and the player cannot see it without being told.
+var _left_over: int = -1
+## The card that holds a new find up. Built once and kept: it shows one find at a time and
+## queues the rest, so it has to outlive any one of them.
+var _trophy: Trophy
+
+## The pigeon pop-up, and the roll that decides whether a catch gets one. A half: often enough
+## to be part of what netting a bird is, rare enough that it is not a receipt.
+var _pigeon: PigeonPop
+const POP_ODDS := 0.5
+var _pop_rng := RandomNumberGenerator.new()
+
 var _farewell_shown: bool = false
 var _farewell: Farewell
 ## How far the sparkle has come up, 0 to 1. Eased rather than switched so the lake brightens
@@ -389,7 +579,6 @@ var _sparkle_at: float = 0.0
 @onready var _room: ShedRoom = %Room
 @onready var _open_shed: Button = %OpenShed
 @onready var _open_upgrades: UiButton = %OpenUpgrades
-@onready var _close_shed: Button = %CloseShed
 @onready var _settings: PanelContainer = %Settings
 @onready var _open_settings: Button = %OpenSettings
 @onready var _fullscreen: CheckButton = %Fullscreen
@@ -402,8 +591,26 @@ var _sparkle_at: float = 0.0
 @onready var _save_now: Button = %SaveNow
 @onready var _load_now: Button = %LoadNow
 @onready var _wipe_save: Button = %WipeSave
+@onready var _swap_level: Button = %SwapLevel
 @onready var _send_now: Button = %SendNow
 @onready var _auto_ferry: CheckButton = %AutoFerry
+
+
+## Loads every track's price and value curve from resources/upgrades/*.tres, and what
+## selling pays from resources/economy.tres. Called once from _ready — a balance pass
+## edits those files, not this function.
+func _load_upgrades() -> void:
+	for id in UPGRADE_ORDER:
+		var path := "res://resources/upgrades/%s.tres" % id
+		var res: Resource = load(path)
+		if res == null:
+			push_error("Lake: missing %s" % path)
+			continue
+		_upgrades[StringName(id)] = res
+	_economy = load("res://resources/economy.tres") as EconomyConfig
+	if _economy == null:
+		push_error("Lake: missing res://resources/economy.tres")
+		_economy = EconomyConfig.new()
 
 
 ## How far out from its own tile a cast sweeps, in tiles. Level 0 is a single tile: the net
@@ -416,15 +623,15 @@ var _sparkle_at: float = 0.0
 ##
 ## The step starts small and grows: the first couple of levels are a slightly bigger mouth
 ## rather than a new net, so the early game is still a game of aiming, and the levels bought
-## late are the ones that feel like money well spent.
+## late are the ones that feel like money well spent. Numbers live in
+## resources/upgrades/net_width.tres.
 func net_radius() -> float:
-	var level := float(net_width_level)
-	return 0.6 + 0.22 * level + 0.03 * level * level
+	return _upgrades[&"net_width"].value(net_width_level)
 
 
-## The heaviest TrashDef.tier the net can lift.
+## The heaviest TrashDef.tier the net can lift. resources/upgrades/net_strength.tres.
 func net_power() -> int:
-	return net_strength_level
+	return int(_upgrades[&"net_strength"].value(net_strength_level))
 
 
 ## How far the angler can throw, in tiles.
@@ -433,44 +640,41 @@ func net_power() -> int:
 ## the first upgrade, which made the boat pointless and the lake small — but it accelerates,
 ## because a track whose price multiplies while its reach only adds is a track that is worth
 ## less every time you buy it. The squared term is what keeps the late levels worth the
-## money — but gently: 3.4 tiles at the start, 10.4 by level five, 16.8 by level eight. It
-## used to pass twenty by level eight, which is most of the basin from the bank, and a rod
-## that reaches the far shore is a rod that has retired the boat.
+## money. Numbers live in resources/upgrades/net_range.tres.
 func net_range() -> float:
-	var level := float(net_range_level)
-	return 3.4 + 0.95 * level + 0.09 * level * level
+	return _upgrades[&"net_range"].value(net_range_level)
 
 
-## How fast the net comes home, in tiles per second.
+## How fast the net comes home, in tiles per second. resources/upgrades/reel.tres.
 func reel_speed() -> float:
-	var level := float(reel_level)
-	return 2.4 + 0.7 * level + 0.06 * level * level
+	return _upgrades[&"reel"].value(reel_level)
 
 
-## How many pieces one cast can bring in.
+## How many pieces one cast can bring in. resources/upgrades/net_hold.tres.
 func net_hold() -> int:
-	return 3 + net_hold_level + (net_hold_level * net_hold_level) / 4
+	return int(_upgrades[&"net_hold"].value(net_hold_level))
 
 
-## Ferry speed, in tiles per second.
+## Ferry speed, in tiles per second. resources/upgrades/boat_speed.tres.
 func boat_speed() -> float:
-	return 4.2 + 1.3 * float(boat_speed_level)
+	return _upgrades[&"boat_speed"].value(boat_speed_level)
 
 
+## resources/upgrades/cargo.tres.
 func boat_cargo() -> int:
-	return 6 + 4 * cargo_level
+	return int(_upgrades[&"cargo"].value(cargo_level))
 
 
 ## How wide the skimmer bites as it sails, in tiles out from the hull. Below zero is no
 ## skimmer fitted, which is what every ferry starts as.
 func skim_radius() -> int:
-	return skimmer_level - 1
+	return _skim_level() - 1
 
 
 ## The heaviest tier the skimmer can lift. Deliberately behind the net: the boat catching
 ## what the player cannot yet catch by hand would read as the game playing itself.
 func skim_power() -> int:
-	return maxi(skimmer_level - 1, 0) / 2
+	return maxi(_skim_level() - 1, 0) / 2
 
 
 ## Odds that a piece the skimmer passes over actually comes up. A net dragged behind a
@@ -478,31 +682,43 @@ func skim_power() -> int:
 ## skimmer upgrade buys is that chance going up — the first one fitted still misses most of
 ## what it passes, and even a maxed one lets some slip underneath.
 func skim_chance() -> float:
-	if skimmer_level < 1:
+	var level := _skim_level()
+	if level < 1:
 		return 0.0
-	return minf(0.30 + 0.10 * float(skimmer_level - 1), 0.90)
+	var top := float(MAX_LEVELS[&"skimmer"])
+	return clampf(lerpf(SKIM_FIRST_CHANCE, 1.0, float(level - 1) / (top - 1.0)), 0.0, 1.0)
 
 
 ## Deck space the skimmer gets on top of the hold, so a ferry loaded to the brim out of
 ## the yard can still fish on the way.
 func skim_hold() -> int:
-	return 2 * skimmer_level
+	return _skim_level()
 
 
 ## How many slots down the skimmer digs for the material it is running out. More than one,
 ## always: it is looking for one material in particular, and on the way to the sawmill most
 ## of what is floating on top is not timber.
 func skim_depth() -> int:
-	return 1 + skimmer_level
+	return 1 + _skim_level()
+
+
+## The level the skimmer numbers are read at: what was bought, held to the top of the
+## track, so a save written before the cap cannot run a skimmer past the end of it.
+func _skim_level() -> int:
+	return mini(skimmer_level, MAX_LEVELS[&"skimmer"])
 
 
 func _ready() -> void:
+	($Sky/Fill as ColorRect).color = BEYOND
+	_pop_rng.randomize()
+	_load_upgrades()
 	_grid = $Grid as LakeGrid
 	_camera = $Camera as Camera2D
 	_boats = [$Boat as Boat]
 	_angler = $Angler as Angler
 	_net = $Net as CastNet
 	_yard = $Yard as Yard
+	_dog = $Dog as Dog
 
 	var shore := Iso.shore_outline()
 	_shape_bank()
@@ -533,6 +749,13 @@ func _ready() -> void:
 	_splash.z_as_relative = false
 	add_child(_splash)
 
+	_prints = Footprints.new()
+	_prints.name = &"Footprints"
+	# Over the ground, under whoever is walking on it.
+	_prints.z_index = 4
+	_prints.z_as_relative = false
+	add_child(_prints)
+
 	_grid.z_index = 5
 	_grid.z_as_relative = false
 	# The rubbish bobs on the GPU. That is what lets its geometry be built once and left
@@ -547,12 +770,15 @@ func _ready() -> void:
 	if not _sheets.load_all():
 		_sheets = null
 	_grid.sheets = _sheets
-	_grid.build(_all_defs(), LAKE_SEED)
+	_grid.build(_all_defs(), _level_seed(), _fills_the_lake())
 	_hide_treasures()
 	_filth_total = maxf(_grid.filth_left(), 0.001)
 	_filth_left = _filth_total
 	pollution = 1.0
 	_build_filth_map()
+
+	_build_trophy()
+	_build_pigeon_pop()
 
 	_bounds = _outline_bounds(shore)
 	_view_zoom = VIEW_ZOOM
@@ -562,11 +788,31 @@ func _ready() -> void:
 	# The yard sits beside the shed, far enough off it that the pile does not grow through
 	# the roof.
 	_yard.grid = _grid
+	# The dog needs the water to fish out of, somebody to be pleased to see, and the crate
+	# to put things in. What happens to what it brings back is the lake's business, not the
+	# dog's, so it hands the piece over and forgets about it.
+	_dog.grid = _grid
+	_dog.angler = _angler
+	_dog.fetched.connect(_dog_brought_back)
+	_dog.petted.connect(func() -> void:
+		if _sfx != null:
+			_sfx.play_bought()
+	)
 	# Clear of the shed and clear of where the angler stands: a crate you spawn inside is a
 	# crate you have to walk out of before you can see it.
+	# One layer over the walker band that means "past the hut, short of the crate", so
+	# somebody standing north of the crate is drawn behind it. See `_sort_walkers`.
+	_yard.z_index = CRATE_LAYER
 	_yard.position = Iso.tile_to_world(
 		Iso.ISLAND_CENTRE.x + 2.7, Iso.ISLAND_CENTRE.y + 2.7
 	)
+	# Told after the crate has been put somewhere, not before: the dog walks to this, and a
+	# crate whose position is still the origin sends it to the top left corner of the world
+	# to drop things in the water.
+	_dog.crate_tile = Vector2(Iso.ISLAND_CENTRE.x + 2.7, Iso.ISLAND_CENTRE.y + 2.7)
+	# The angler is told as well, but for the opposite reason: the dog walks to the crate and
+	# the player walks round it.
+	_angler.crate_tile = _dog.crate_tile
 
 	# The flock sits between the floating rubbish and the splashes: birds are on the water,
 	# and a splash is on top of everything.
@@ -581,6 +827,10 @@ func _ready() -> void:
 
 	_net.grid = _grid
 	_net.splash = _splash
+	_angler.splash = _splash
+	_dog.splash = _splash
+	_angler.prints = _prints
+	_dog.prints = _prints
 	_net.sfx = _sfx
 	_net.angler = _angler
 	_net.flock = _flock
@@ -608,7 +858,7 @@ func _ready() -> void:
 	# The room shows the finds by the names the defs give them rather than by their
 	# catalogue keys: "furniture_07" is not something anybody pulled out of a lake.
 	for def: TrashDef in _grid.defs:
-		if def.keepsake:
+		if def.keepsake and not def.display_name.is_empty():
 			_room.titles[String(def.piece)] = def.display_name
 	_shop_skin.bought.connect(_buy)
 	# Pictures for the rows the upgrades board was not drawn with: the ferry's own baked
@@ -629,8 +879,13 @@ func _ready() -> void:
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
 	_open_shed.pressed.connect(_set_shed.bind(true))
-	_close_shed.pressed.connect(_set_shed.bind(false))
+	_room.close_asked.connect(_set_shed.bind(false))
 	_open_settings.pressed.connect(_set_settings.bind(true))
+	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
+	# fills the screen now, and a settings panel drawn beneath that is a settings panel
+	# nobody can see or press.
+	_settings.get_parent().move_child(_settings, -1)
+	_settings.get_parent().move_child(_open_settings, -1)
 	_fullscreen.toggled.connect(_set_fullscreen)
 	_music_on.toggled.connect(_set_music)
 	_music_level.value_changed.connect(_set_music_level)
@@ -641,51 +896,107 @@ func _ready() -> void:
 	_save_now.pressed.connect(save_game)
 	_load_now.pressed.connect(load_game)
 	_wipe_save.pressed.connect(wipe_save)
+	_swap_level.text = _other_level_name()
+	_swap_level.pressed.connect(_swap_levels)
 	_send_now.pressed.connect(_send_ferry)
 	_auto_ferry.toggled.connect(_set_auto_ferry)
 	_close_menu.pressed.connect(_set_menu.bind(false))
 	_shop_skin.close_asked.connect(_set_menu.bind(false))
 	_pin_close(_settings, _set_settings.bind(false))
-	_pin_close(_shed, _set_shed.bind(false))
+	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
+	# the whole screen — so its own cross sits over the top of the inventory column, where
+	# the thing it closes actually is. See ShedRoom.
+	_polish_panel_controls()
 	_set_menu(false)
 	_fullscreen.button_pressed = _is_fullscreen()
 	_start_music()
 	_set_settings(false)
 	_set_shed(false)
 	_push_water_colours()
-	if autoload_save:
+	if autoload_save and not start_fresh:
 		load_game()
+	start_fresh = false
 
 
 ## The bank: the land the lake sits in, drawn as the shore ring grown outward. Two flat
 ## shapes, not a heightmap — nothing walks on it and nothing is hidden behind it.
+## The seams a second level hangs off.
+##
+## Level two is a scene that inherits this one and a script that extends this file, so the
+## HUD, the shop, the shed, the ferry and the net all come across without being copied.
+## What follows is the whole of what it is allowed to change: what the field is built from,
+## what happens when the field is empty, what goes in the save, and what the keyboard does
+## first. Each one has the level-one answer as its body, so this file on its own behaves
+## exactly as it did before they existed.
+
+## Which lake this is. The seed is in the save and checked on load, so a save from one
+## level can never be read into the other.
+func _level_seed() -> int:
+	return LAKE_SEED
+
+
+## Does this lake start with rubbish floating on it? The first one is the rubbish; the
+## second one is what its yards make and nothing else.
+func _fills_the_lake() -> bool:
+	return true
+
+
+## What this level is called, for the save file and nothing else.
+func level_name() -> String:
+	return "lake"
+
+
+## The last piece has come out of the water. Level one calls that an ending.
+func _on_lake_cleaned() -> void:
+	_farewell_shown = true
+	_show_farewell()
+
+
+## Anything the level wants kept, added to the dictionary on its way to disk.
+func _save_extra(_save: Dictionary) -> void:
+	pass
+
+
+## And read back out of it. Called after everything common has been applied.
+func _load_extra(_save: Dictionary) -> void:
+	pass
+
+
+## First refusal on a key or a click. True means the level dealt with it.
+func _extra_input(_event: InputEvent) -> bool:
+	return false
+
+
+## The land the lake sits in: the bank around the waterline and the wide ring of ground
+## past it, both laid as pixel-art tiles. See scripts/ground.gd, which decides what goes
+## where from the same basin shape the water shader reads.
+##
+## It used to be three flat polygons with a few thousand hand-thrown specks over them. The
+## specks were there to make smooth fills read as ground next to pixel-art rubbish; tiles
+## are ground, so the specks went with the fills.
 func _shape_bank() -> void:
-	var grass := Polygon2D.new()
-	grass.name = &"Bank"
-	grass.polygon = Iso.shore_outline(BANK_MARGIN)
-	grass.color = Color(0.34, 0.39, 0.28)
-	grass.z_index = 0
-	grass.z_as_relative = false
-	add_child(grass)
+	var ground := Ground.new()
+	ground.name = &"Ground"
+	ground.layer = Ground.Layer.OUTSIDE
+	add_child(ground)
 
-	# A mud collar just outside the waterline, so the water does not meet the grass on a
-	# hard line. The lake's edge is the one place the eye goes first.
-	var mud := Polygon2D.new()
-	mud.name = &"Shore"
-	mud.polygon = Iso.shore_outline(1.4)
-	mud.color = Color(0.42, 0.38, 0.29)
-	mud.z_index = 1
-	mud.z_as_relative = false
-	add_child(mud)
+	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
+		ground.visible = false
+
+## How far the drawn water is carried past the waterline, in tiles — about sixteen screen
+## pixels, which is a tile's worth of wet sand.
+##
+## Drawing only. Nothing in Iso moves, so the angler walks where they always did and the
+## rubbish floats where it always did; the water is simply painted a little way up the beach
+## instead of stopping on the tile edge under it. Mirrored by `shore_lap` in the shader,
+## which has to agree or the paint and its polygon part company.
+const SHORE_LAP := 0.45
 
 
-## Build the water's visible polygon: the lake's surface, flat on the plane. The shader
-## works out depth per pixel from the tile under it, so the polygon carries no depth
-## information of its own and needs no interior vertices.
-func _shape_water(shore: PackedVector2Array) -> void:
+func _shape_water(_shore: PackedVector2Array) -> void:
 	var visual := Polygon2D.new()
 	visual.name = &"WaterVisual"
-	visual.polygon = shore
+	visual.polygon = Iso.shore_outline(SHORE_LAP)
 	visual.z_index = 2
 	visual.z_as_relative = false
 	_water_material = ShaderMaterial.new()
@@ -696,122 +1007,81 @@ func _shape_water(shore: PackedVector2Array) -> void:
 	_water_material.set_shader_parameter(&"basin_radius", Iso.RADIUS)
 	_water_material.set_shader_parameter(&"island_centre", Iso.ISLAND_CENTRE)
 	_water_material.set_shader_parameter(&"island_radius", Iso.ISLAND_RADIUS)
+	_water_material.set_shader_parameter(&"shore_lap", SHORE_LAP)
+
+	# Load colors from master palette, with fallback defaults
+	var palette := load("res://resources/palette.tres") as Resource
+	if palette != null:
+		var water_clean = palette.get(&"water_clean")
+		var water_dirty = palette.get(&"water_dirty")
+		if water_clean != null:
+			_water_material.set_shader_parameter(&"water_clean", water_clean)
+		if water_dirty != null:
+			_water_material.set_shader_parameter(&"water_dirty", water_dirty)
+	else:
+		# Fallback: use default palette colors if file not found
+		_water_material.set_shader_parameter(&"water_clean", Color(0.39, 0.51, 0.63, 1.0))
+		_water_material.set_shader_parameter(&"water_dirty", Color(0.36, 0.46, 0.49, 1.0))
+
 	visual.material = _water_material
 	add_child(visual)
 
 
-## The island: sand, grass, and the shed the upgrades are bought in.
+## The layers the angler and the dog are put on, and the two things they can stand behind.
+##
+## Five numbers rather than the two the game had, because sorting by hand needs somewhere to
+## put a walker between the hut and the crate — see `_sort_walkers`. Everything else on the
+## island is under all of these: the water is 2, the sand and its scatter 3.
+const BEHIND_SHED := 5
+
+## How far past the hut's front line something has to stand before it counts as behind it,
+## in world pixels.
+##
+## Walking up against the front wall put the angler's feet within a pixel of that line, and
+## the flip that followed swallowed the top of the hat into the hut while the boots were
+## still out on the grass. The walking rule already keeps anyone out of the footprint, so
+## this slack costs nothing: nobody can stand in the strip it gives away.
+const SHED_BEHIND_SLACK := 6.0
+const SHED_LAYER := 6
+const BEHIND_CRATE := 7
+const CRATE_LAYER := 8
+const IN_FRONT := 9
+
+
+## The island: its beach and grass, tiled the same way the bank is, and the shed the
+## upgrades are bought in.
 ##
 ## Drawn over the water polygon rather than cut out of it, because the water's outline is
 ## one generated ring and putting a hole in it would mean triangulating an annulus for a
 ## shape nothing ever moves. The shader shoals the water up to the beach so the join does
 ## not read as a sticker on deep water.
 func _shape_island() -> void:
-	var sand := Polygon2D.new()
-	sand.name = &"IslandSand"
-	sand.polygon = Iso.island_outline()
-	sand.color = SAND
-	sand.z_index = 3
-	sand.z_as_relative = false
-	add_child(sand)
+	# The island's own ground, over the water, and the sand that walks out under the lake
+	# around it, below the water. Two nodes because which side of the water a thing is drawn
+	# on is the whole of what makes it look submerged.
+	var shallows := Ground.new()
+	shallows.name = &"IslandShallows"
+	shallows.layer = Ground.Layer.ISLAND_DEEP
+	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
+		shallows.visible = false
+	add_child(shallows)
 
-	var grass := Polygon2D.new()
-	grass.name = &"IslandGrass"
-	grass.polygon = Iso.island_outline(GRASS_IN)
-	grass.color = GRASS
-	grass.z_index = 3
-	grass.z_as_relative = false
-	add_child(grass)
-
-	# The detail over the two flat fills. Drawn rather than another polygon because what it
-	# is drawing is scatter — speckles, tufts, a broken edge — and a polygon cannot be
-	# speckled.
-	var detail := Node2D.new()
-	detail.name = &"IslandDetail"
-	detail.z_index = 3
-	detail.z_as_relative = false
-	detail.draw.connect(_draw_island.bind(detail))
-	add_child(detail)
-	detail.queue_redraw()
+	var ground := Ground.new()
+	ground.name = &"IslandGround"
+	ground.layer = Ground.Layer.ISLAND
+	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
+		ground.visible = false
+	add_child(ground)
 
 	_island = Node2D.new()
 	_island.name = &"IslandShed"
-	_island.z_index = 4
+	# Above the layer a walker gets when it is behind the hut, and below the one it gets
+	# when it is past it. See `_sort_walkers`.
+	_island.z_index = SHED_LAYER
 	_island.z_as_relative = false
 	_island.draw.connect(_draw_shed)
 	add_child(_island)
 	_island.queue_redraw()
-
-
-## The island's surface: a wet ring at the waterline, a broken edge between sand and grass,
-## and a scatter of pebbles and tufts over both.
-##
-## All of it is diamonds lying on the plane rather than dots, and all of it is drawn once
-## from a fixed seed. The point is to meet the drawn shed halfway: the hut is pixel art with
-## a hard outline and visible grain, and it was standing on two smooth vector blobs. Chunky
-## speckles at a consistent size read as the same kind of picture without anybody having to
-## paint an island.
-func _draw_island(on: Node2D) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 8812
-
-	# Wet sand where the water has been, just inside the waterline: filled to the edge, cut
-	# back to a ring with dry sand, and then the grass laid over again — the ring's inner
-	# cut reaches past the treeline and would otherwise bury the whole lawn under beach.
-	on.draw_colored_polygon(Iso.island_outline(), SAND_WET)
-	on.draw_colored_polygon(Iso.island_outline(-0.4), SAND)
-	on.draw_colored_polygon(Iso.island_outline(GRASS_IN), GRASS)
-
-	# The edge between sand and grass, broken up. Diamonds either side of the line, grass
-	# ones out on the sand and sand ones in on the grass, so the boundary reads as ragged
-	# turf rather than as a cut.
-	for i in EDGE_SPECKS:
-		var angle := TAU * float(i) / float(EDGE_SPECKS)
-		for k in 3:
-			var off := rng.randf_range(-EDGE_RAGGED, EDGE_RAGGED)
-			var at := Iso.island_point(angle + rng.randf_range(-0.02, 0.02), GRASS_IN + off)
-			_speck(on, at, rng.randf_range(0.7, 1.3), GRASS if off > 0.0 else SAND)
-
-	# Pebbles on the beach and tufts on the grass, both thrown at the island and kept only
-	# where they landed on the right ground. Rejecting is shorter than working out where the
-	# ring is at every angle, and the ring is a wobble rather than a circle.
-	for i in GROUND_SPECKS:
-		var angle := rng.randf_range(0.0, TAU)
-		var out := sqrt(rng.randf())
-		var tile := Iso.ISLAND_CENTRE + Vector2(
-			cos(angle) * Iso.ISLAND_RADIUS.x * out, sin(angle) * Iso.ISLAND_RADIUS.y * out
-		)
-		if Iso.in_shed(tile.x, tile.y):
-			continue
-		var edge := Iso.island_fraction(tile.x, tile.y)
-		if edge > 0.99:
-			continue
-		var at := Iso.tile_to_world(tile.x, tile.y)
-		# The grass starts a little in from the waterline; the same fraction says which.
-		if edge > 0.76:
-			_speck(on, at, rng.randf_range(0.5, 1.0), PEBBLE if rng.randf() < 0.5 else SAND_WET)
-		else:
-			_speck(on, at, rng.randf_range(0.6, 1.2), TUFT if rng.randf() < 0.6 else GRASS_DARK)
-
-	# And an outline round the whole thing, which is the one thing the shed has that a
-	# polygon never does.
-	var rim := Iso.island_outline()
-	var closed := rim.duplicate()
-	closed.append(rim[0])
-	on.draw_polyline(closed, SHORE_INK, 1.6)
-
-
-## One speck of ground: a small diamond, so it lies on the plane like everything else here.
-func _speck(on: Node2D, at: Vector2, scale: float, tint: Color) -> void:
-	var wide := Iso.TILE_W * 0.075 * scale
-	var tall := Iso.TILE_H * 0.075 * scale
-	on.draw_colored_polygon(
-		PackedVector2Array([
-			at + Vector2(0.0, -tall), at + Vector2(wide, 0.0),
-			at + Vector2(0.0, tall), at + Vector2(-wide, 0.0)
-		]),
-		tint
-	)
 
 
 ## The four merchants on the bank, one per material, spread a quarter of the lake apart.
@@ -835,7 +1105,10 @@ func _shape_dropoffs() -> void:
 		# Just inside the waterline, so the hull has water under it when it arrives.
 		stop.berth = Iso.basin_point(row[1] as float, 0.92)
 		stop.name = StringName("Dropoff" + stop.kind_name())
-		stop.z_index = 4
+		# Above the rubbish (5), not below it: a yard stands on the bank and the water in
+		# front of it is where the junk is. At 4 the piers were drawn under every bottle
+		# floating near the shore.
+		stop.z_index = 6
 		stop.z_as_relative = false
 		add_child(stop)
 		_dropoffs.append(stop)
@@ -850,58 +1123,45 @@ func _outline_bounds(outline: PackedVector2Array) -> Rect2:
 	return box
 
 
-## The starting junk set: fifteen kinds, across five tiers and all four materials.
+## The dog dropped something in the crate.
 ##
-## Every material spans a range of tiers on purpose. If plastic were all tier 0 and metal
-## all tier 4, the four yards would come into play one after another as the net got
-## stronger and three of them would be dead weight for the first hour. Spread this way,
-## every run has something for most of the yards from the start, and what changes with a
-## stronger net is which of each material you can lift.
+## The same two things a cast does: the yard is heavier and the lake is one piece cleaner.
+## Deliberately not worth money on its own — the crate still has to be ferried — so the dog
+## is a slow trickle of work done rather than a second income.
+func _dog_brought_back(def_index: int) -> void:
+	_yard.put(def_index)
+	_filth_stale = true
+	if _sfx != null:
+		_sfx.play_catch()
+
+
+## The starting junk set, one `.tres` per kind under `resources/trash/`. The numbers live
+## in those files now — open one in the Inspector to retune it, no code edit needed.
 ##
-## `lightness` only sorts the stacks — light near the surface, heavy at the bottom. It is
-## not a force any more, and nothing solves for it.
+## TRASH_ORDER is also the save format: a save's stacks store an *index* into this list,
+## not a name (see lake_grid.gd's `restore`), so an existing save breaks if an entry here
+## is reordered or removed. Add new kinds at the end only.
+const TRASH_ORDER := [
+	"mug", "jar", "bottle", "fish_bowl",
+	"shelf_board", "book", "chopping_board", "crate",
+	"tin_plate", "cooking_pot", "teapot", "wall_clock",
+	"rubber_duck", "chew_toy", "ball", "urn",
+	"painting_portrait", "painting_landscape", "wood_board", "wire_hanger",
+	"stock_pot", "metal_cup", "tin_can_a", "tin_can_b", "tin_can_c",
+]
+
 func _default_defs() -> Array[TrashDef]:
-	var p := TrashDef.Kind.PLASTIC
-	var w := TrashDef.Kind.TIMBER
-	var m := TrashDef.Kind.METAL
-	var r := TrashDef.Kind.RUBBER
-	return [
-		_def("Mug", p, Vector2(13.0, 15.0), 2.4, 0.4, 0.15, 0,
-			Color(0.90, 0.87, 0.80), &"small_49"),
-		_def("Jar", p, Vector2(14.0, 18.0), 2.3, 0.6, 0.2, 0,
-			Color(0.86, 0.84, 0.80), &"small_55"),
-		_def("Bottle", p, Vector2(10.0, 21.0), 2.0, 0.9, 0.3, 0,
-			Color(0.80, 0.85, 0.76), &"small_28"),
-		_def("Fish bowl", p, Vector2(17.0, 19.0), 1.4, 1.6, 1.0, 2,
-			Color(0.74, 0.66, 0.34), &"small_25"),
-
-		_def("Shelf board", w, Vector2(26.0, 9.0), 1.75, 1.2, 0.7, 0,
-			Color(0.55, 0.44, 0.30), &"small_44"),
-		_def("Book", w, Vector2(20.0, 12.0), 1.6, 1.8, 0.9, 1,
-			Color(0.62, 0.50, 0.32), &"small_30"),
-		_def("Chopping board", w, Vector2(20.0, 18.0), 1.4, 2.0, 1.1, 2,
-			Color(0.60, 0.48, 0.30), &"small_26"),
-		_def("Crate", w, Vector2(22.0, 17.0), 1.2, 2.2, 1.4, 3,
-			Color(0.78, 0.70, 0.24), &"small_16"),
-
-		_def("Tin plate", m, Vector2(18.0, 13.0), 1.9, 0.6, 0.5, 0,
-			Color(0.66, 0.68, 0.72), &"small_36"),
-		_def("Cooking pot", m, Vector2(18.0, 18.0), 0.8, 3.2, 2.6, 2,
-			Color(0.42, 0.36, 0.30), &"small_32"),
-		_def("Teapot", m, Vector2(21.0, 15.0), 0.6, 3.4, 3.0, 3,
-			Color(0.50, 0.50, 0.55), &"small_54"),
-		_def("Wall clock", m, Vector2(20.0, 20.0), 0.45, 4.5, 4.2, 4,
-			Color(0.62, 0.63, 0.66), &"small_08"),
-
-		_def("Rubber duck", r, Vector2(19.0, 15.0), 2.1, 1.0, 0.5, 0,
-			Color(0.26, 0.25, 0.26), &"small_06"),
-		_def("Chew toy", r, Vector2(18.0, 10.0), 1.6, 1.4, 0.9, 1,
-			Color(0.24, 0.22, 0.24), &"small_22"),
-		_def("Ball", r, Vector2(14.0, 15.0), 1.05, 2.6, 1.8, 2,
-			Color(0.20, 0.19, 0.20), &"small_31"),
-		_def("Urn", r, Vector2(16.0, 18.0), 0.5, 3.8, 3.2, 4,
-			Color(0.18, 0.17, 0.19), &"small_24"),
-	]
+	var defs: Array[TrashDef] = []
+	for id in TRASH_ORDER:
+		var path := "res://resources/trash/%s.tres" % id
+		var res: Resource = load(path)
+		if res == null:
+			push_error("Lake: missing %s" % path)
+			continue
+		# Duplicated so every call (a fresh level, a restart) gets its own instance rather
+		# than sharing the one `load()` caches — `_dress` mutates atlas/region/size on it.
+		defs.append(res.duplicate() as TrashDef)
+	return defs
 
 
 ## Every def the lake is built from: the rubbish above, and one entry per piece of
@@ -916,6 +1176,13 @@ func _all_defs() -> Array[TrashDef]:
 		_dress(all)
 		return all
 	for name: String in _sheets.by_sheet["furniture"] as PackedStringArray:
+		# Nameless pieces are not furniture. The sheet slicer keeps anything big enough to be
+		# an item, and a couple of what it keeps are offcuts — a dark cross a dozen pixels
+		# across, a sliver off the side of a bookcase — which have no entry in
+		# scripts/find_names.gd because there is nothing to call them. Dealt as treasure they
+		# turned up in the lake as a find the player carried home and could not name.
+		if _pretty(name).is_empty():
+			continue
 		var cells := _sheets.cells_of(name)
 		var bulk := cells.x * cells.y
 		var find := _def(
@@ -940,10 +1207,11 @@ func _all_defs() -> Array[TrashDef]:
 ## spread over the basin and none of them is on the surface waiting to be scooped.
 func _hide_treasures() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = LAKE_SEED ^ 0x5EED
+	rng.seed = _level_seed() ^ 0x5EED
 	for i in _grid.defs.size():
 		if not _grid.defs[i].keepsake:
 			continue
+		var planted := false
 		for attempt in 40:
 			var tx := rng.randi_range(2, Iso.COLS - 3)
 			var ty := rng.randi_range(2, Iso.ROWS - 3)
@@ -952,7 +1220,30 @@ func _hide_treasures() -> void:
 			if height < 3:
 				continue
 			_grid.insert(index, maxi(height - 1 - rng.randi_range(0, 2), 0), i)
+			planted = true
 			break
+		if not planted:
+			_plant_anywhere(i)
+
+
+## Put a find somewhere — anywhere — after the random darts all missed.
+##
+## Forty throws at tiles with three things on them is a fast way to place a find in a full
+## lake and no guarantee at all in a sparse one: a run where the darts all landed on thin
+## water dropped that find out of the game, and a collection that cannot be completed in a
+## run is worse than one hidden somewhere obvious. The deepest stack on the board is the
+## nearest thing to where it wanted to go, and the middle of it is still a dig.
+func _plant_anywhere(def_index: int) -> void:
+	var best := -1
+	var deepest := -1
+	for index in _grid.stacks.size():
+		var height := _grid.height_of(index)
+		if height > deepest:
+			deepest = height
+			best = index
+	if best < 0:
+		return
+	_grid.insert(best, maxi(deepest - 1, 0), def_index)
 
 
 ## Everything found so far, as catalogue names. One of each, in the order it came out.
@@ -960,10 +1251,14 @@ func found() -> Array[String]:
 	return unlocked
 
 
-## A catalogue name as something to read. Naming the art by hand is a job for later; the
-## catalogue is laid out to take those names when they are written.
+## A catalogue name as something to read, or nothing at all.
+##
+## The names are written down in scripts/find_names.gd. Empty for a piece that has not been
+## named rather than a stand-in: "Find 07" is not something anybody pulled out of a lake,
+## and every screen that shows a find now checks for the empty string and draws the picture
+## on its own instead.
 func _pretty(name: String) -> String:
-	return "Find %s" % name.get_slice("_", 1)
+	return FindNames.of(name)
 
 
 ## Point every def at its picture, and take its drawn size from the art rather than from
@@ -1007,6 +1302,8 @@ func _def(
 ## Casting, reeling, zooming, and the shed door. Four inputs, and no two of them mean the
 ## same thing at the same time.
 func _unhandled_input(event: InputEvent) -> void:
+	if _extra_input(event):
+		return
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
 		match key.keycode:
@@ -1021,6 +1318,20 @@ func _unhandled_input(event: InputEvent) -> void:
 					_set_menu(false)
 				elif _at_shed():
 					_set_shed(true)
+				elif _dog != null and _dog.within_reach(_angler.tile_pos):
+					# Standing next to the dog with nothing else under the key: the same
+					# button that opens the shed says hello.
+					_dog.pet()
+				return
+			KEY_ESCAPE:
+				# One key backing out of whatever is open, innermost first: the shed, then
+				# the shop board, and only on open water does it mean the settings.
+				if _shed_open:
+					_set_shed(false)
+				elif _menu_open:
+					_set_menu(false)
+				else:
+					_set_settings(not _settings_open)
 				return
 			KEY_F11:
 				_fullscreen.button_pressed = not _is_fullscreen()
@@ -1066,11 +1377,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	# The wheel zooms about the cursor, so the thing the player is pointing at is the
 	# thing that stays put. Zooming about the screen's middle makes reaching a corner of
 	# the lake a game of chasing it back.
+	#
+	# Guarded against any panel being open: this is _unhandled_input, so a wheel event over a
+	# panel's own controls never reaches here — but the settings panel and the shop board
+	# don't cover the whole screen, so a wheel turned over the exposed lake behind either one
+	# used to zoom the lake out from under an open menu. The shed panel already covers nearly
+	# everything, so this was likely never reachable from there, but it costs nothing to guard
+	# uniformly rather than per-panel.
+	if _settings_open or _menu_open or _shed_open:
+		return
 	if click.pressed and click.button_index == MOUSE_BUTTON_WHEEL_UP:
 		_zoom_by(ZOOM_STEP)
 		return
 	if click.pressed and click.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		_zoom_by(1.0 / ZOOM_STEP)
+		return
+
+	# The right button lays a lit net: the cast goes out, stays where it lands, and burns
+	# or freezes there. It does nothing at all with an unlit net, which is why it is the
+	# second button — the first one is the game, and this is the thing the charms buy.
+	if click.button_index == MOUSE_BUTTON_RIGHT:
+		if click.pressed and _net.state == CastNet.State.IDLE and _net.enchanted():
+			_cast_at(get_global_mouse_position(), true)
 		return
 
 	if click.button_index != MOUSE_BUTTON_LEFT:
@@ -1086,13 +1414,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_set_shed(false)
 		return
 
+	# Letting go is not part of the gesture any more: the net reels itself in from wherever
+	# it lands, and a cast is one click rather than a click held down for the length of a
+	# drag across the basin.
 	if not click.pressed:
-		_net.set_pulling(false)
 		return
 
-	# One gesture: press to throw, hold to reel it back, release to stop. The press is
-	# recorded as a pull either way, so a fresh cast starts reeling the instant it lands
-	# instead of asking for a second click.
+	# Click to throw. A click on a net already down starts it moving again — the only way
+	# it can be sitting still is a panel that was opened over it — and a click on one that
+	# is already coming home is left alone.
 	if _net.state == CastNet.State.IDLE:
 		_cast_at(get_global_mouse_position())
 	_net.set_pulling(true)
@@ -1100,11 +1430,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Throw the net, on the numbers the player has now. The only cap is the net's own hold —
 ## the yard takes whatever comes back, however much of it there is.
-func _cast_at(where: Vector2) -> void:
+func _cast_at(where: Vector2, laying: bool = false) -> void:
 	_push_net_numbers()
 	if _net.hold <= 0:
 		return
-	if _net.cast_to(where):
+	if _net.cast_to(where, laying):
 		# Watching the cast is worth more than whatever the player had panned over to look
 		# at, and they can always pan back.
 		_pan_yielded = true
@@ -1117,7 +1447,7 @@ func _at_shed() -> bool:
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
 func _zoom_by(factor: float) -> void:
-	var wanted := clampf(_view_zoom * factor, MIN_ZOOM, MAX_ZOOM)
+	var wanted := clampf(_view_zoom * factor, _fit_zoom(), MAX_ZOOM)
 	if is_equal_approx(wanted, _view_zoom):
 		return
 	# Worked out from the camera's own mapping rather than by reading the mouse again
@@ -1134,8 +1464,27 @@ func _zoom_by(factor: float) -> void:
 ## Write the camera's zoom: what the player set, leaned on by whatever a cast in progress
 ## is asking for, and kept inside the same limits the wheel obeys.
 func _push_zoom() -> void:
-	var wanted := clampf(_view_zoom * _cast_push, MIN_ZOOM, MAX_ZOOM)
+	# Clamped on the way out as well as when the wheel turns: the window can be resized under
+	# a view that was already as far out as it went, and the far end is a fact about the
+	# window.
+	_view_zoom = clampf(_view_zoom, _fit_zoom(), MAX_ZOOM)
+	var wanted := clampf(_view_zoom * _cast_push, _fit_zoom(), MAX_ZOOM)
 	_camera.zoom = Vector2(wanted, wanted)
+
+
+## The furthest out the view may go: the zoom at which the whole waterline sits inside the
+## window with a margin round it.
+##
+## Never past MIN_ZOOM, which is the floor for a window so small or so odd a shape that
+## fitting the lake into it would mean drawing the basin at a size nothing on it is legible
+## at. Fitted rather than filled — the long axis is what runs out first, and cropping the
+## ends off the lake is the thing this is here to stop.
+func _fit_zoom() -> float:
+	var span := Iso.basin_extent(ZOOM_OUT_TILES) * (1.0 + ZOOM_FIT_MARGIN)
+	var view := get_viewport_rect().size
+	if span.x <= 0.0 or span.y <= 0.0:
+		return MIN_ZOOM
+	return maxf(minf(view.x / span.x, view.y / span.y) * ZOOM_OUT_PULL, MIN_ZOOM)
 
 
 func _set_menu(open: bool) -> void:
@@ -1158,6 +1507,10 @@ func _set_menu(open: bool) -> void:
 func _set_shed(open: bool) -> void:
 	_shed_open = open
 	_shed.visible = open
+	# The way to the shop sits in the corner beside Settings rather than on the shed's own
+	# floor, so it is out of the way of both picking a find and putting it down. It is not a
+	# child of the panel any more, so its own visibility has to be said here.
+	_open_upgrades.visible = open
 	if open:
 		_shop.visible = false
 		_menu_open = false
@@ -1178,11 +1531,151 @@ func _set_shed(open: bool) -> void:
 func _set_settings(open: bool) -> void:
 	_settings_open = open
 	_settings.visible = open
-	_open_settings.visible = not open and not _shed_open
-	if open:
-		_shed.visible = false
-		_shed_open = false
+	# Available on every screen except itself now, not just when the shed happens to be
+	# closed — the shed check here was dead in practice anyway (nothing re-ran this when the
+	# shed opened or closed on its own), and the button being covered while the shed was open
+	# was really a draw-order issue, fixed in the scene: OpenSettings is now the last of the
+	# HUD's overlay children, so it draws and takes input above the shed panel too.
+	_open_settings.visible = not open
+	# Settings lies over whatever was already on screen rather than clearing it. It used to
+	# shut the shed on the way in, which left the room gone, the lake's own readouts still
+	# hidden behind it, and nothing to press: opening settings from the decoration screen
+	# emptied the screen. What is underneath is none of this panel's business.
 	_hold_the_angler()
+
+
+## The settings and shed panels are stock Godot controls (Button, CheckButton, HSlider) in
+## the engine's default theme. Styled here with WoodUI's pieces — the wood-plank kit Richard
+## gave as a style reference for this pass — so a settings checkbox reads as part of the same
+## plank panel as its background rather than a grey engine default glued on. Bungee replaces
+## RubbishFont2 here too, per the font swap asked for in the same message as the reference.
+##
+## Written once, at startup, over a fixed list of nodes, rather than as a Theme resource:
+## a Theme's own file format is easy to get subtly wrong unseen, where this fails loudly
+## per-control if a name is off instead of silently across the whole scene.
+##
+## Every scene Control in the game now, not just settings — including the shop panel's own
+## buttons, which no player sees (the drawn board replaces it) but which would otherwise be
+## the one corner of the scene still in the engine default. The drawn surfaces do not pass
+## through here at all; they read the same constants directly out of style.gd.
+## The labels the sweep reaches as well as the buttons. By full path, not by `%Title`: three
+## panels each have a node called Title and a unique name can only point at one of them.
+const _PANEL_LABELS := [
+	"HUD/Shop/Pad/Scroll/Panel/Title",
+	"HUD/Shop/Pad/Scroll/Panel/NetHeading",
+	"HUD/Shop/Pad/Scroll/Panel/BoatHeading",
+	"HUD/Shop/Pad/Scroll/Panel/DecorHeading",
+	"HUD/Settings/Pad/Lines/Title",
+	"HUD/Shed/Pad/Lines/Title",
+	"HUD/Shed/Pad/Lines/Note",
+]
+
+## The two buttons that undo something. They used to be marked out three ways at once — a
+## taller box, a bigger face, a colour of their own — which is two ways more than a warning
+## needs. The colour is the one that stays.
+const _PANEL_WARNINGS := ["%WipeSave", "%QuitGame"]
+
+
+func _polish_panel_controls() -> void:
+	var font := Style.font()
+	# Settings only. The shed has no panel behind it any more — it is the room, drawn edge
+	# to edge, and a plank frame round a room is a frame round a picture of planks.
+	_settings.add_theme_stylebox_override(
+		"panel", WoodUI.panel_style(6, WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 1)
+	)
+	_settings.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var normal := WoodUI.panel_style(4, WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 2)
+	var hover := WoodUI.panel_style(
+		4, WoodUI.PLANK_LIGHT, WoodUI.PLANK_LIGHT.lightened(0.2), WoodUI.PLANK, 2
+	)
+	var pressed := WoodUI.panel_style(4, WoodUI.PLANK_DARK, WoodUI.PLANK, WoodUI.SEAM, 2)
+	var nodes: Array[Control] = [_open_settings]
+	for path in [
+		"%MusicOn", "%SfxOn", "%Fullscreen", "%SaveNow", "%LoadNow", "%WipeSave",
+		"%SwapLevel", "%QuitGame",
+		"%BuyNetWidth", "%BuyNetStrength", "%BuyNetRange", "%BuyReel", "%BuyNetHold",
+		"%BuyBoatSpeed", "%BuyCargo", "%BuySkimmer", "%BuyFleet",
+		"%OpenShed", "%SendNow", "%AutoFerry", "%CloseMenu",
+	]:
+		var node := get_node_or_null(path) as Control
+		if node != null:
+			nodes.append(node)
+	for path in _PANEL_LABELS:
+		var label := get_node_or_null(path) as Control
+		if label != null:
+			nodes.append(label)
+	var warnings: Array[Control] = []
+	for path in _PANEL_WARNINGS:
+		var node := get_node_or_null(path) as Control
+		if node != null:
+			warnings.append(node)
+	for node in nodes:
+		if font != null:
+			node.add_theme_font_override("font", font)
+		var ink := Style.DANGER.lerp(Style.INK, 0.35) if node in warnings else Style.INK
+		node.add_theme_color_override("font_color", ink)
+		# The sweep owns the size as well as the colour, so the scene no longer carries
+		# sixty per-node overrides that nothing keeps in step with each other.
+		var size_px := Style.TEXT_BODY
+		if node.name == &"Title":
+			size_px = Style.TEXT_TITLE
+		elif String(node.name).ends_with("Heading"):
+			size_px = Style.TEXT_HEAD
+		elif node.name == &"Note":
+			size_px = Style.TEXT_SMALL
+		node.add_theme_font_size_override("font_size", size_px)
+		node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		if node is BaseButton:
+			node.add_theme_stylebox_override("normal", normal)
+			node.add_theme_stylebox_override("hover", hover)
+			node.add_theme_stylebox_override("pressed", pressed)
+			node.add_theme_stylebox_override("focus", hover)
+		if node is CheckButton:
+			node.add_theme_icon_override("on", WoodUI.switch_icon(true))
+			node.add_theme_icon_override("off", WoodUI.switch_icon(false))
+	for path in ["%MusicLevel", "%SfxLevel"]:
+		var slider := get_node_or_null(path) as HSlider
+		if slider == null:
+			continue
+		slider.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		slider.add_theme_stylebox_override("slider", WoodUI.slider_groove())
+		slider.add_theme_stylebox_override("grabber_area", WoodUI.slider_fill())
+		slider.add_theme_stylebox_override("grabber_area_highlight", WoodUI.slider_fill())
+		var thumb := WoodUI.slider_thumb()
+		slider.add_theme_icon_override("grabber", thumb)
+		slider.add_theme_icon_override("grabber_highlight", thumb)
+		slider.add_theme_icon_override("grabber_disabled", thumb)
+
+
+## When to start asking whether the lake is finished, as a fraction of the filth it was
+## built with, and how often to ask once it is that close.
+##
+## The meter cannot be the trigger on its own. It is a float that has had eighteen thousand
+## subtractions done to it, and eighteen thousand subtractions do not land on zero — they
+## land a millionth above it, which is a bar that reads empty and a game that never ends.
+## So the meter reading nothing is the cue to ask the field, and the field is what answers.
+const CLEAN_ENOUGH := 0.001
+const CLEAN_CHECK_EVERY := 0.5
+
+
+## Is it over yet?
+##
+## Only asked while the meter is on the floor, and only twice a second even then, because
+## the answer means walking every stack in the basin. Both of those are why the question is
+## cheap enough to keep asking rather than being wired to the last piece landing — a piece
+## can leave the lake by the net, by the skimmer, or by burning, and an ending that has to
+## be remembered by every one of those is an ending that will be forgotten by the next one.
+func _look_for_the_end(delta: float) -> void:
+	if _cleaned:
+		return
+	if _filth_left > _filth_total * CLEAN_ENOUGH:
+		return
+	_clean_check_in -= delta
+	if _clean_check_in > 0.0:
+		return
+	_clean_check_in = CLEAN_CHECK_EVERY
+	_left_over = _grid.piece_count() if _grid != null else 0
+	_check_cleaned()
 
 
 ## Has the last piece come out of the water?
@@ -1195,11 +1688,13 @@ func _check_cleaned() -> void:
 	if _cleaned or _grid == null or _grid.piece_count() > 0:
 		return
 	_cleaned = true
+	# The remainder is float dust from thousands of subtractions, and the lake is empty:
+	# the meter is allowed to say so now that the field has been asked.
+	_filth_left = 0.0
+	pollution = 0.0
 	if _sfx != null:
-		_sfx.play_chime()
-	if not _farewell_shown:
-		_farewell_shown = true
-		_show_farewell()
+		_sfx.play_found()
+	_on_lake_cleaned()
 	# The moment is worth keeping without waiting for the autosave to come round.
 	save_game()
 
@@ -1210,6 +1705,11 @@ func _show_farewell() -> void:
 		return
 	_farewell = Farewell.new()
 	_farewell.dismissed.connect(_drop_farewell)
+	# A cleaned lake is not the end of the game any more, only the end of the quiet part.
+	var onward := _next_scene()
+	if onward != "":
+		_farewell.offer_onward()
+		_farewell.onward.connect(_go_onward.bind(onward))
 	# Its own layer, above the HUD rather than beside it: the closing words are the one thing
 	# in the game that everything else — the island, the meter, the money — goes behind.
 	var over := CanvasLayer.new()
@@ -1222,6 +1722,19 @@ func _show_farewell() -> void:
 
 ## The player has read it. Let go of it at once rather than when it finishes fading, so the
 ## angler gets their legs back on the click rather than half a second after it.
+## Where the ending leads, or an empty string for a level that is the last one.
+func _next_scene() -> String:
+	return "res://scenes/siege.tscn"
+
+
+## Take the door. The run is written first: what carries into the next level is read back
+## out of the save, so the save has to be the finished one before the scene goes away.
+func _go_onward(scene: String) -> void:
+	save_game()
+	_farewell = null
+	get_tree().change_scene_to_file(scene)
+
+
 func _drop_farewell() -> void:
 	_farewell = null
 	_hold_the_angler()
@@ -1257,8 +1770,10 @@ func _hold_the_angler() -> void:
 		or _farewell != null
 	)
 	_angler.can_walk = not busy
-	if busy:
-		_net.set_pulling(false)
+	# The net is held where it is for as long as the panel is up, and goes back to reeling
+	# itself in the moment the water is in front of the player again. Nothing is held down,
+	# so nothing is dropped by opening the shed mid-cast.
+	_net.set_pulling(not busy)
 
 
 ## The music: one long track, looped, started the moment the lake is, and started twice.
@@ -1427,11 +1942,46 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 ## any merchant buys, and it was never part of the lake's filth — so the meter does not
 ## move for it either.
 func _on_bird_caught(at: Vector2) -> void:
-	sludge += BIRD_BONUS
+	sludge += _economy.bird_bonus
 	birds_caught += 1
 	if _splash != null:
 		_splash.splash(at, 0.55)
-	_note_save("A pigeon! %d sludge" % roundi(BIRD_BONUS))
+	# And, on some catches, the bird itself: the head in the corner and the coo that goes with
+	# it, both off the one roll. They are halves of the same joke — a coo with no bird is a
+	# noise from nowhere, and a bird with no coo is a picture — so either both happen or
+	# neither does. The money is not part of the bargain and arrives every time.
+	if _pop_rng.randf() >= POP_ODDS:
+		return
+	if _pigeon != null:
+		_pigeon.pop(roundi(_economy.bird_bonus))
+	if _sfx != null:
+		_sfx.play_coo()
+
+
+## The pigeon in the corner, on its own layer just under the finds card: a bird is worth a
+## laugh and a decoration is worth a look, and when both land at once the decoration wins.
+func _build_pigeon_pop() -> void:
+	_pigeon = PigeonPop.new()
+	_pigeon.name = &"PigeonPop"
+	var over := CanvasLayer.new()
+	over.name = &"Pigeon"
+	over.layer = 18
+	over.add_child(_pigeon)
+	add_child(over)
+
+
+## The card that holds a new find up, on its own layer just under the ending's. Above the
+## HUD, because a wardrobe coming out of the lake outranks the meter for two seconds, and
+## below the farewell, because the end of the run outranks everything.
+func _build_trophy() -> void:
+	_trophy = Trophy.new()
+	_trophy.name = &"Trophy"
+	_trophy.sheets = _sheets
+	var over := CanvasLayer.new()
+	over.name = &"Finds"
+	over.layer = 19
+	over.add_child(_trophy)
+	add_child(over)
 
 
 ## Put a find on the shed's shelf. Once each: the lake holds one of every piece, and a
@@ -1442,7 +1992,16 @@ func _keep(def: TrashDef) -> void:
 	if name.is_empty() or unlocked.has(name):
 		return
 	unlocked.append(name)
-	_note_save("%s — it can go in the shed" % def.display_name)
+	_note_save(
+		"Something for the shed" if def.display_name.is_empty()
+		else "%s — it can go in the shed" % def.display_name
+	)
+	# Held up in the middle of the screen as well as written in the corner. The shed is two
+	# clicks away, so without this the player never sees what they found.
+	if _trophy != null:
+		_trophy.show_find(def.piece, def.display_name)
+	if _sfx != null:
+		_sfx.play_chime()
 
 
 ## The ferry landing a load at one of the four merchants. The purse moves here and nowhere
@@ -1453,7 +2012,7 @@ func _keep(def: TrashDef) -> void:
 ## second case is counted below, because it left the lake when the skimmer took it.
 func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 	for i in cargo.size():
-		sludge += PIECE_BASE_PAY + _grid.defs[cargo[i]].pollution * PIECE_FILTH_PAY
+		sludge += _economy.piece_base_pay + _grid.defs[cargo[i]].pollution * _economy.piece_filth_pay
 		sold_count += 1
 	sold_by_kind[kind] += cargo.size()
 
@@ -1468,34 +2027,30 @@ func _on_skimmed(def_index: int) -> void:
 	caught += 1
 
 
-## What each track costs: the price of its first level, and what each level multiplies the
-## next one by.
-##
-## The net's tracks start dearer and climb slower than they used to. At 1.7 a level the
-## first two purchases were small change and the eighth cost more than the rest of the run
-## put together, so the shed stopped being worth walking into halfway through. Starting
-## higher and multiplying by about 1.5 keeps every level roughly the same number of laps
-## apart, which is the only way a track stays worth buying to the end.
-##
-## The extra hull is the other end of the same scale: it is a second round of the lake
-## running at once, which no single-boat upgrade can match, so it starts high and triples.
+## What `skimmer` costs: the price of its first level, and what each level multiplies the
+## next one by. Every other track's price lives in its own resources/upgrades/*.tres now.
 const PRICES := {
-	&"net_width": [22.0, 1.52],
-	&"net_strength": [22.0, 1.52],
-	# Cheaper and flatter than the tracks either side of it. Range buys no catch rate and no
-	# money — it buys not having to walk — so at the shared 1.7 it was the one upgrade that
-	# priced itself out of the game before it got good.
-	&"net_range": [16.0, 1.34],
-	&"reel": [22.0, 1.52],
-	&"net_hold": [22.0, 1.52],
-	# The ferry is the tap the whole economy runs from, so its two tracks start cheap and
-	# climb slower than the net's: a player who is waiting on money can always buy their
-	# way out of waiting.
-	&"boat_speed": [14.0, 1.42],
-	&"cargo": [14.0, 1.42],
 	&"skimmer": [26.0, 1.48],
-	&"fleet": [200.0, 2.6],
 }
+
+
+## Every track the shop sells, in the order the board lists them. The rows themselves carry
+## a name and a picture as well, but the HUD only wants to count them, and counting them
+## should not mean formatting nine lines of text every frame.
+const TRACKS := [
+	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
+	&"boat_speed", &"cargo", &"skimmer", &"fleet",
+]
+
+
+## How many upgrades could be bought right now. Drawn on the HUD's upgrades button, so that
+## money worth spending says so on the way in rather than only once the board is open.
+func _affordable() -> int:
+	var count := 0
+	for key: StringName in TRACKS:
+		if not is_maxed(key) and sludge >= cost_of(key):
+			count += 1
+	return count
 
 
 ## Every upgrade as one row of the drawn board: what it is, what it does now, what the next
@@ -1515,13 +2070,13 @@ func _shop_rows() -> Array:
 		[&"cargo", -1, "Ferry hold", "%d aboard" % boat_cargo()],
 		[&"skimmer", -1, "Skimmer", (
 			"off" if skimmer_level <= 0
-			else "%d tiles, %d%%" % [_tiles_in_radius(float(skim_radius())), roundi(skim_chance() * 100.0)]
+			else "%d items, %d%%" % [skim_hold(), roundi(skim_chance() * 100.0)]
 		)],
 		[&"fleet", -1, "Extra ferry", "%d in the water" % fleet_size()],
 	]
 	for line: Array in listed:
 		var key: StringName = line[0]
-		var full := key == &"fleet" and fleet_size() >= MAX_BOATS
+		var full := is_maxed(key)
 		var price := cost_of(key)
 		out.append({
 			"key": key,
@@ -1529,8 +2084,9 @@ func _shop_rows() -> Array:
 			"name": "%s (Lvl %d)" % [line[2], _level_of(key)],
 			"value": line[3],
 			# No brackets: the tag is painted with a pair of its own, and its end caps are
-			# what get drawn either side of this.
-			"cost": "—" if full else "$%d" % roundi(price),
+			# what get drawn either side of this. A track with nothing left to sell says so
+			# in a word: a dash reads as a price that failed to print.
+			"cost": "Max" if full else "$%d" % roundi(price),
 			"afford": not full and sludge >= price,
 		})
 	return out
@@ -1558,10 +2114,44 @@ func _push_net_numbers() -> void:
 	_net.hold = net_hold()
 
 
+## The other level, as a scene and as the words on the button that goes there. The lake is
+## level one, so its door leads to the siege; the siege overrides both halves.
+##
+## Not the same door as the ending: that one is earned and only opens once the water is
+## clean. This one is a way to walk between the two lakes at any time, which is what makes
+## either of them worth looking at twice.
+func _other_level_scene() -> String:
+	return "res://scenes/siege.tscn"
+
+
+func _other_level_name() -> String:
+	return "Go to the siege  (level 2, fresh)"
+
+
+## Take the door. The level left is written on the way out — the siege reads the first
+## lake's save for the upgrades a player arrives with, so it has to be the finished one —
+## and the level walked into is built from scratch rather than from its own save.
+func _swap_levels() -> void:
+	save_game()
+	start_fresh = true
+	get_tree().change_scene_to_file(_other_level_scene())
+
+
 ## Cost of the next level on a track.
 func cost_of(what: StringName) -> float:
+	var track: UpgradeTrack = _upgrades.get(what)
+	if track != null:
+		return track.cost(_level_of(what))
 	var price: Array = PRICES[what]
 	return float(price[0]) * pow(float(price[1]), float(_level_of(what)))
+
+
+## Where a track stops. resources/upgrades/*.tres for everything but `skimmer`.
+func _level_cap(what: StringName) -> int:
+	var track: UpgradeTrack = _upgrades.get(what)
+	if track != null:
+		return track.level_cap
+	return int(MAX_LEVELS.get(what, 0))
 
 
 func _level_of(what: StringName) -> int:
@@ -1588,8 +2178,19 @@ func _level_of(what: StringName) -> int:
 			return 0
 
 
+## Whether a track has sold everything it has. The board, the old buttons and the buy
+## itself all ask here, so the three cannot disagree about what is still for sale.
+func is_maxed(what: StringName) -> bool:
+	return _level_of(what) >= _level_cap(what)
+
+
+## One track's level out of a save, held to what the track now sells.
+func _saved_level(levels: Dictionary, what: StringName) -> int:
+	return clampi(int(levels.get(String(what), 0)), 0, _level_cap(what))
+
+
 func _buy(what: StringName) -> void:
-	if what == &"fleet" and fleet_size() >= MAX_BOATS:
+	if is_maxed(what):
 		return
 	var price := cost_of(what)
 	if sludge < price:
@@ -1615,6 +2216,12 @@ func _buy(what: StringName) -> void:
 		&"fleet":
 			fleet_level += 1
 			_add_boat()
+	# After the level goes on, not before: the sound is the purchase landing, and a buy that
+	# fell through above has already returned without making one. The sparkle over the row's
+	# own icon is the same receipt for the eye.
+	if _sfx != null:
+		_sfx.play_bought()
+	_shop_skin.cheer(what)
 	_push_net_numbers()
 	_push_boat_numbers()
 
@@ -1766,9 +2373,7 @@ func _process(delta: float) -> void:
 		else _camera.position.lerp(_watching(), clampf(FOLLOW_SPEED * delta, 0.0, 1.0))
 	)
 
-	if _filth_left <= 0.0:
-		pollution = 0.0
-		_check_cleaned()
+	_look_for_the_end(delta)
 
 	_save_note_for = maxf(_save_note_for - delta, 0.0)
 	_autosave_in -= delta
@@ -1789,7 +2394,57 @@ func _process(delta: float) -> void:
 	_push_water_colours()
 	_push_engine()
 	_update_hud()
+	_sort_walkers()
 	_island.queue_redraw()
+
+
+## Which of the two solid things on the island the angler and the dog are currently behind.
+##
+## Everything here is drawn on fixed layers rather than sorted by depth — the water, the
+## sand, the shed, the boat, each with a number — and the two things that walk about were
+## given a number over the top of all of it, so the angler stood in front of the shed while
+## standing behind it. Godot's own y-sorting would want every one of these on one layer with
+## its own origin at its feet, which the polygons and the drawn scatter are not.
+##
+## So the walkers are sorted by hand, and only against the two things they can actually go
+## behind: the hut and the crate. Three bands, because there are two obstacles at different
+## depths — behind both, between them, and in front of both — and the layers of the hut and
+## the crate were spread apart to leave room for the middle one.
+func _sort_walkers() -> void:
+	if _angler != null:
+		_angler.z_index = _walker_layer(_angler.position)
+	if _dog != null:
+		_dog.z_index = _walker_layer(_dog.position)
+
+
+## The layer for something standing here. See `_sort_walkers`.
+##
+## Demoted only by an obstacle it is actually behind rather than by depth alone: the dog
+## swims out into the top half of the lake, which is north of the hut and nowhere near it,
+## and a rule that read depth on its own put the animal underneath the floating rubbish.
+func _walker_layer(at: Vector2) -> int:
+	var shed := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
+	var shed_wide := (Iso.SHED_FOOT.x + Iso.SHED_FOOT.y) * Iso.TILE_W * 0.5
+	if at.y < _shed_front() - SHED_BEHIND_SLACK and absf(at.x - shed.x) < shed_wide * 0.5:
+		return BEHIND_SHED
+	var crate_front := _yard.position.y + Yard.CRATE.y * 0.5
+	if at.y < crate_front and absf(at.x - _yard.position.x) < Yard.CRATE.x * 0.5:
+		return BEHIND_CRATE
+	return IN_FRONT
+
+
+## The world y of the near edge of the shed's footprint.
+##
+## The footprint is an ellipse in tile space and the screen runs down `x + y`, so its
+## nearest point is the one that makes that sum largest, which for radii a and b is
+## `sqrt(a² + b²)` past the middle. Worth the line: taking the ellipse's southern pole
+## instead puts the line a third of a tile short, and a third of a tile is the difference
+## between standing behind the hut and standing through it.
+func _shed_front() -> float:
+	var reach := sqrt(
+		Iso.SHED_FOOT.x * Iso.SHED_FOOT.x + Iso.SHED_FOOT.y * Iso.SHED_FOOT.y
+	)
+	return (Iso.ISLAND_CENTRE.x + Iso.ISLAND_CENTRE.y + reach) * Iso.TILE_H * 0.5
 
 
 ## Where the view wants to be: the angler, drawn out towards the net while one is in the
@@ -1805,15 +2460,77 @@ func _watching() -> Vector2:
 	) + _pan
 
 
-## Keep the camera over the lake. The margin lets the bank show around the edges rather
-## than stopping the view exactly at the waterline.
+## Keep the camera over the ground.
+##
+## Not over the lake, as it used to be: the window is cleared to grey, the ground stops at
+## `Ground.OUTER_OUT` tiles past the waterline, and anything past that is grey. So what is
+## clamped is not where the camera stands but what it can see — the whole visible rectangle
+## is kept inside the ground, and the camera is only allowed as far as that leaves it.
+##
+## When the view is wider than the ground itself — which it can be at the far end of the
+## zoom on a wide window — there is no position that hides the edge, so it sits in the middle
+## and shows the same amount on both sides rather than all of it down one.
+##
+## The box below only bounds the view inside the ring's own bounding rectangle, and the ring
+## is an ellipse: it falls well short of that rectangle's corners the same way a circle falls
+## short of the square drawn around it. A window box-clamped this way still shows its own
+## four corners past the last tree, so `_pulled_to_forest` checks those corners directly,
+## against the ground itself, and pulls the camera the rest of the way in if the box was not
+## enough.
 func _clamped_view(at: Vector2) -> Vector2:
-	var margin := Vector2(Iso.TILE_W, Iso.TILE_H) * BANK_MARGIN
-	var box := _bounds.grow_individual(margin.x, margin.y, margin.x, margin.y)
-	return Vector2(
-		clampf(at.x, box.position.x, box.position.x + box.size.x),
-		clampf(at.y, box.position.y, box.position.y + box.size.y)
+	var ground := Iso.basin_extent(Ground.OUTER_OUT) * 0.5
+	var middle := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+	var half := get_viewport_rect().size / _camera.zoom * 0.5
+	var room := (ground - half) / DRAG_PULL
+	var boxed := Vector2(
+		middle.x + clampf(at.x - middle.x, -maxf(room.x, 0.0), maxf(room.x, 0.0)),
+		middle.y + clampf(at.y - middle.y, -maxf(room.y, 0.0), maxf(room.y, 0.0))
 	)
+	return _pulled_to_forest(boxed, middle, half)
+
+
+## How many tiles of forest a screen corner has to have solidly under it, short of
+## `Ground.OUTER_OUT` where the ground itself runs out. Past `Ground.WOOD_FULL` (19), so a
+## corner pulled in to clear this is a corner sitting in full canopy, not on the bare last row
+## of sand.
+const CORNER_MARGIN := 4.0
+
+
+## How far out of the water the furthest of the view's four actual corners is, in tiles.
+## `_clamped_view`'s box only ever checks the view's edges against the ring's bounding box;
+## this checks the corners themselves against the ground, which is the shape that is actually
+## drawn.
+func _worst_corner_out(pos: Vector2, half: Vector2) -> float:
+	var worst := -INF
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			var corner := pos + Vector2(half.x * sx, half.y * sy)
+			var tile := Iso.world_to_tile(corner)
+			worst = maxf(worst, Ground.out_of_water(tile.x, tile.y))
+	return worst
+
+
+## Pulls `pos` straight back towards `middle` until all four corners of a `half`-sized view
+## centred there have forest under them.
+##
+## A straight-line pull rather than an independent one per axis: a corner is the combination
+## of both, and pulling only the axis that offended it would let the other one drift back out
+## as soon as this ran again. Bisected rather than solved, because the boundary it is aiming
+## at is the wobbly, elliptical one `Ground.out_of_water` actually draws, not a shape with a
+## closed-form edge.
+func _pulled_to_forest(pos: Vector2, middle: Vector2, half: Vector2) -> Vector2:
+	var limit := Ground.OUTER_OUT - CORNER_MARGIN
+	if _worst_corner_out(pos, half) <= limit:
+		return pos
+	var lo := 0.0
+	var hi := 1.0
+	for _i in 12:
+		var mid := (lo + hi) * 0.5
+		if _worst_corner_out(middle.lerp(pos, mid), half) <= limit:
+			lo = mid
+		else:
+			hi = mid
+	return middle.lerp(pos, lo)
 
 
 func _visible_world_rect() -> Rect2:
@@ -1858,7 +2575,16 @@ func _build_filth_map() -> void:
 		var total := 0.0
 		for k in stack.size():
 			total += _grid.defs[stack[k]].pollution
-		raw[index] = total
+		# Divided by what this tile could hold, not left as a sum. A shore tile has room for
+		# one piece where a deep one has room for nine, so a sum measured against the worst
+		# deep tile said the shore was clean on opening day — the water at the bank came up
+		# blue before the player had touched it. As a fraction of its own capacity, a full
+		# tile is a full tile wherever it is, and the whole lake starts foul.
+		var tile := _grid.tile_of(index)
+		var slots := maxf(
+			float(maxi(int(Iso.depth_at(tile.x, tile.y) * float(Iso.MAX_SLOTS)), 1)), 1.0
+		)
+		raw[index] = total / slots
 
 	# Separable, so the spread costs two passes of a line rather than one of a disc. A box
 	# blur and not a gaussian: at this size the difference cannot be seen, and the sums are
@@ -1945,6 +2671,12 @@ func _update_hud() -> void:
 	_skin.pollution = pollution
 	_skin.money = sludge
 	_skin.stock = _yard.held.size()
+	var affordable := _affordable()
+	_skin.available = affordable
+	# And on the shed's copy of the same button, which is the only one on screen while the
+	# player is inside.
+	_open_upgrades.note = "%d available" % affordable
+	_skin.hint = _last_pieces_line()
 	_load_now.disabled = not has_save()
 
 	if not _menu_open:
@@ -1973,9 +2705,8 @@ func _update_hud() -> void:
 		[_buy_boat_speed, &"boat_speed"], [_buy_cargo, &"cargo"],
 		[_buy_skimmer, &"skimmer"], [_buy_fleet, &"fleet"]
 	]:
-		(pair[0] as Button).disabled = sludge < cost_of(pair[1] as StringName)
-	if fleet_size() >= MAX_BOATS:
-		_buy_fleet.disabled = true
+		var key: StringName = pair[1]
+		(pair[0] as Button).disabled = is_maxed(key) or sludge < cost_of(key)
 
 	_buy_boat_speed.text = "Ferry speed %d  —  %.1f tiles/s  (%d)" % [
 		boat_speed_level, boat_speed(), roundi(cost_of(&"boat_speed"))
@@ -1986,7 +2717,7 @@ func _update_hud() -> void:
 	_buy_skimmer.text = "Skimmer %d  —  %s  (%d)" % [
 		skimmer_level,
 		"not fitted" if skim_radius() < 0
-			else "%d tiles, %d deep, tier %d, %d%% of what it passes, +%d deck" % [
+			else "%d tiles, %d deep, tier %d, %d%% of what it passes, %d items" % [
 				_tiles_in_radius(skim_radius()), skim_depth(), skim_power(),
 				roundi(skim_chance() * 100.0), skim_hold()
 			],
@@ -2005,6 +2736,21 @@ func _update_hud() -> void:
 	]
 	_send_now.disabled = not _any_boat_docked() or _yard.held.is_empty()
 
+
+
+## The one thing a filth meter cannot say: how much is left when the answer is "nearly
+## nothing".
+##
+## The meter is weighted by how dirty a piece is, so the last hundred cups read as an empty
+## bar, and a player looking at an empty bar and no ending has been told the lake is clean
+## by the only thing in the game that tells them anything. This is what says otherwise —
+## and it only appears once the bar is on the floor, so it is never noise.
+func _last_pieces_line() -> String:
+	if _cleaned or _left_over <= 0:
+		return ""
+	if _left_over == 1:
+		return "One last piece is still out there"
+	return "%d pieces still out there" % _left_over
 
 
 ## The fleet in one line: the lone ferry reads as it always did, and a fleet reads as a
@@ -2055,9 +2801,10 @@ func save_game() -> bool:
 	for boat in _boats:
 		afloat.append_array(boat.cargo)
 
-	file.store_var({
+	var save := {
 		"version": SAVE_VERSION,
-		"seed": LAKE_SEED,
+		"seed": _level_seed(),
+		"level": level_name(),
 		"sludge": sludge,
 		"levels": {
 			"net_width": net_width_level, "net_strength": net_strength_level,
@@ -2084,7 +2831,9 @@ func save_game() -> bool:
 		"decor": decor,
 		"afloat": afloat,
 		"stacks": _grid.stacks,
-	}, true)
+	}
+	_save_extra(save)
+	file.store_var(save, true)
 	file.close()
 	_note_save("saved")
 	return true
@@ -2092,6 +2841,34 @@ func save_game() -> bool:
 
 func has_save() -> bool:
 	return FileAccess.file_exists(save_path)
+
+
+## A version 3 save with every renamed piece renamed. See RECUT_RENAMES.
+func _rename_recut(save: Dictionary) -> Dictionary:
+	var out := save.duplicate(true)
+	var finds: Array = []
+	for name: String in out.get("unlocked", []) as Array:
+		finds.append(_recut_name(name))
+	out["unlocked"] = finds
+	var placed: Array = []
+	for row: Dictionary in out.get("decor", []) as Array:
+		var kept := row.duplicate(true)
+		kept["piece"] = _recut_name(String(row.get("piece", "")))
+		placed.append(kept)
+	out["decor"] = placed
+	return out
+
+
+## One piece's new name, mirrored copies included.
+##
+## Sheets registers a turned-over copy of some pieces as `<name>_r`, and a save holds those
+## by that name like any other. The rename table is written against the pieces themselves,
+## so the suffix comes off, the name is looked up, and it goes back on.
+func _recut_name(name: String) -> String:
+	if name.ends_with(MIRROR_SUFFIX):
+		var base := name.substr(0, name.length() - MIRROR_SUFFIX.length())
+		return String(RECUT_RENAMES.get(base, base)) + MIRROR_SUFFIX
+	return String(RECUT_RENAMES.get(name, name))
 
 
 ## Read a run back. Anything wrong with the file — missing, from another lake, from an
@@ -2105,22 +2882,29 @@ func load_game() -> bool:
 	var raw: Variant = file.get_var(true)
 	file.close()
 	var save := raw as Dictionary
-	if save == null or int(save.get("version", 0)) != SAVE_VERSION 			or int(save.get("seed", 0)) != LAKE_SEED:
+	var written := 0 if save == null else int(save.get("version", 0))
+	if save == null or (written != SAVE_VERSION and written != SAVE_VERSION - 1) 			or int(save.get("seed", 0)) != _level_seed():
 		_note_save("the save is from another build — ignored")
 		return false
+	# A version 3 save calls its finds by their pre-re-cut names. See RECUT_RENAMES.
+	if written == SAVE_VERSION - 1:
+		save = _rename_recut(save)
 	if not _grid.restore(save.get("stacks", []) as Array):
 		_note_save("the save does not fit this lake — ignored")
 		return false
 
+	# Held to the caps on the way in. A save written before a track had a top level can
+	# carry a number the shop no longer sells, and every number in the game is read off
+	# these fields.
 	var levels := save.get("levels", {}) as Dictionary
-	net_width_level = int(levels.get("net_width", 0))
-	net_strength_level = int(levels.get("net_strength", 0))
-	net_range_level = int(levels.get("net_range", 0))
-	reel_level = int(levels.get("reel", 0))
-	net_hold_level = int(levels.get("net_hold", 0))
-	boat_speed_level = int(levels.get("boat_speed", 0))
-	cargo_level = int(levels.get("cargo", 0))
-	skimmer_level = int(levels.get("skimmer", 0))
+	net_width_level = _saved_level(levels, &"net_width")
+	net_strength_level = _saved_level(levels, &"net_strength")
+	net_range_level = _saved_level(levels, &"net_range")
+	reel_level = _saved_level(levels, &"reel")
+	net_hold_level = _saved_level(levels, &"net_hold")
+	boat_speed_level = _saved_level(levels, &"boat_speed")
+	cargo_level = _saved_level(levels, &"cargo")
+	skimmer_level = _saved_level(levels, &"skimmer")
 
 	sludge = float(save.get("sludge", 0.0))
 	caught = int(save.get("caught", 0))
@@ -2132,6 +2916,11 @@ func load_game() -> bool:
 	# re-cutting the sheets renames pieces, and that must not take a save down with it.
 	unlocked.clear()
 	for name: String in save.get("unlocked", []) as Array:
+		# And anything the game no longer offers is dropped too: a save written while the
+		# nameless offcuts were still findable holds them, and a shelf with an unnameable
+		# thing on it is worse than a shelf with a gap.
+		if _pretty(name).is_empty():
+			continue
 		if _sheets == null or _sheets.has(StringName(name)):
 			unlocked.append(name)
 	decor.clear()
@@ -2148,7 +2937,7 @@ func load_game() -> bool:
 	# whatever was aboard goes back on the pile it was loaded from, so nothing is quietly
 	# thrown away by saving mid-run.
 	_yard.held = PackedInt32Array(save.get("yard_held", PackedInt32Array()))
-	var wanted := mini(int(levels.get("fleet", 0)), MAX_BOATS - 1)
+	var wanted := _saved_level(levels, &"fleet")
 	while fleet_level < wanted:
 		fleet_level += 1
 		_add_boat()
@@ -2170,8 +2959,20 @@ func load_game() -> bool:
 	# and lit that way from the first frame rather than brightening as if it had just
 	# happened. The thanks are not repeated: they were earned once.
 	_farewell_shown = bool(save.get("farewell", false))
-	_cleaned = _grid.piece_count() == 0
-	_sparkle_at = 1.0 if _cleaned else 0.0
+	# An empty lake and a finished run are two different facts, and loading one must not
+	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
+	# setting it from the piece count alone swallowed the ending of every run that was saved
+	# on its last catch and reopened: the words were owed, the flag said they were not, and
+	# the game sat there with an empty meter and nothing to say.
+	#
+	# The lit water is the part that really is about the piece count, so it is read from
+	# that directly rather than through the flag.
+	var empty := _grid.piece_count() == 0
+	# Never carried in from the file. `_cleaned` means "the ending has been dealt with in
+	# this sitting", and a sitting that has just started has dealt with nothing — so a
+	# finished lake is worked out again from the field a frame later, and says so again.
+	_cleaned = false
+	_sparkle_at = 1.0 if empty else 0.0
 	_sfx_level.value = clampf(float(save.get("sfx_level", _sfx_level.value)), 0.0, 1.0)
 	_sfx_on.button_pressed = bool(save.get("sfx", true))
 	_push_sfx()
@@ -2181,6 +2982,8 @@ func load_game() -> bool:
 	_auto_ferry.button_pressed = bool(save.get("auto_ferry", true))
 	_set_auto_ferry(_auto_ferry.button_pressed)
 	_angler.stand_at(save.get("angler", _angler.tile_pos) as Vector2)
+	if _trophy != null:
+		_trophy.clear()
 	_net.set_pulling(false)
 	_net.state = CastNet.State.IDLE
 	_net.catch.resize(0)
@@ -2194,6 +2997,7 @@ func load_game() -> bool:
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 	_filth_stale = true
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
+	_load_extra(save)
 	_note_save("loaded")
 	return true
 
@@ -2246,6 +3050,12 @@ func _tiles_in_radius(radius: float) -> int:
 	return count
 
 
+## How much of the shed's walking footprint its shadow covers. Well under one: the footprint
+## is sized to keep the angler clear of the whole hut, roof included, and the shadow wants to
+## be the ground under the walls.
+const SHED_SHADOW := 0.74
+
+
 ## The shed, and the prompt over it when the angler is close enough to use it.
 ##
 ## The same hut that is drawn on the shed button, cut out of it by tools/slice_shed.gd. One
@@ -2254,16 +3064,22 @@ func _tiles_in_radius(radius: float) -> int:
 func _draw_shed() -> void:
 	var at := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
 
-	# Footprint first, so the hut has something to stand on rather than floating. Drawn to
-	# the same ellipse the angler is kept out of, so what looks solid is what is solid.
+	# Footprint first, so the hut has something to stand on rather than floating. Drawn
+	# inside the ellipse the angler is kept out of rather than on it: the walking rule has to
+	# clear the eaves and the porch, and a shadow drawn out to that line was a dark pool
+	# reaching well past the walls. What is under the hut is what should be dark.
+	# Square, like the hut standing on it, and like the crate's. An ellipse was what the
+	# walking rule is — a hut is not round, and a round shadow under a square building reads
+	# as a puddle it happens to be parked in.
+	var half := Iso.SHED_FOOT * SHED_SHADOW
 	var ring := PackedVector2Array()
-	for i in 25:
-		var angle := TAU * float(i) / 24.0
-		var tile := Iso.ISLAND_CENTRE + Vector2(
-			cos(angle) * Iso.SHED_FOOT.x, sin(angle) * Iso.SHED_FOOT.y
-		)
+	for corner: Vector2 in [
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+		Vector2(half.x, half.y), Vector2(-half.x, half.y)
+	]:
+		var tile := Iso.ISLAND_CENTRE + corner
 		ring.append(Iso.tile_to_world(tile.x, tile.y))
-	_island.draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
+	_island.draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.11))
 
 	if _shed_art != null:
 		# Standing on the footprint rather than centred on it: the hut's own base is the
@@ -2320,4 +3136,3 @@ func _draw_shed_lamp(at: Vector2) -> void:
 	var over := at + Vector2(0.0, -Iso.SHED_TALL - 10.0)
 	_island.draw_circle(over, 7.0, Color(1.0, 0.92, 0.62, 0.9))
 	_island.draw_circle(over, 12.0, Color(1.0, 0.92, 0.62, 0.25))
-

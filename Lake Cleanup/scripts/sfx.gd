@@ -31,14 +31,29 @@ const VOICES := 8
 ## island and heard from a window, so they sit a long way under. They were all mixed as if
 ## they happened in the same place, and a crate being filled somewhere behind you should not
 ## be the loudest thing in the game.
-const SPLASH_DB := -6.0
-const CATCH_DB := -8.0
-const POP_DB := -22.0
+## Water, and one piece going into the net. The catch fires once per item lifted — a wide net
+## over a full patch is a dozen of them in a second — so it sits well under everything else;
+## it is texture, not an event.
+const SPLASH_DB := -8.0
+const CATCH_DB := -15.0
+## A piece landing in the crate. Up from -22, where it was a tick you had to know about: this
+## is the moment work turns into stock, and it is the one sound in the haul worth hearing.
+const POP_DB := -11.0
 const HORN_DB := -12.0
 const ENGINE_DB := -26.0
 const DRAG_DB := -13.0
 const WINGS_DB := -9.0
+## The pigeon in the corner. Louder than the wingbeats and louder than a catch: it fires on a
+## quarter of the birds, it is the punchline of the pop-up, and a coo that has to be listened
+## for is not one.
+const COO_DB := -2.0
 const CHIME_DB := -10.0
+## The upgrade board. Close, like everything else that happens under the player's hands,
+## and a shade under the catch: it is heard once a purchase rather than once a cast.
+const BOUGHT_DB := -9.0
+## A find held up. Softer than a purchase: it is a thing being shown to the player rather
+## than a thing they did.
+const FOUND_DB := -10.0
 
 ## What the player's slider means, in decibels, from all the way down to all the way up.
 ## The top is above unity because the mix has to carry over the music, and every sound here
@@ -64,7 +79,13 @@ var _horn: AudioStreamWAV
 var _engine: AudioStreamWAV
 var _drag: AudioStreamWAV
 var _wings: AudioStreamWAV
+var _coo: AudioStreamWAV
 var _chime: AudioStreamWAV
+var _bought: AudioStreamWAV
+var _found: AudioStreamWAV
+
+## The bird's own player, kept out of the pool. See `_ready`.
+var _coo_player: AudioStreamPlayer
 
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
@@ -112,6 +133,17 @@ func _ready() -> void:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
 		_voices.append(voice)
+	# The coo gets a player nobody else can take.
+	#
+	# It went through the pool, and the pool is round-robin: a cast that closes on a pigeon
+	# almost always closes on a dozen pieces of rubbish in the same sweep, and each of those
+	# fires a catch. Eight voices later the coo's own voice had been handed to a bottle and
+	# the bird was cut off a hundredth of a second in — which is why it played most times and
+	# vanished the rest.
+	_coo_player = AudioStreamPlayer.new()
+	_coo_player.stream = _coo
+	add_child(_coo_player)
+
 	_engine_player = AudioStreamPlayer.new()
 	_engine_player.stream = _engine
 	_engine_player.volume_db = ENGINE_FLOOR
@@ -205,9 +237,31 @@ func play_chime() -> void:
 	_fire(_chime, CHIME_DB, 1.0)
 
 
+## A find coming up out of the water: wood, then the metal in it catching the light.
+func play_found() -> void:
+	_fire(_found, FOUND_DB, _rng.randf_range(0.98, 1.03))
+
+
+## An upgrade bought. Coins first, then the thing they were spent on lighting up.
+func play_bought() -> void:
+	_fire(_bought, BOUGHT_DB, _rng.randf_range(0.97, 1.04))
+
+
 ## A pigeon going over: three or four wingbeats, close enough to hear the air in them.
 func play_wings() -> void:
 	_fire(_wings, WINGS_DB, _rng.randf_range(0.92, 1.1))
+
+
+## The same bird, saying so: once for every pigeon lifted out of the lake.
+##
+## On its own player rather than through the pool, so the rubbish coming up in the same sweep
+## cannot take the voice out from under it.
+func play_coo() -> void:
+	if _coo_player == null or _coo == null or not on:
+		return
+	_coo_player.volume_db = COO_DB + _trim()
+	_coo_player.pitch_scale = _rng.randf_range(0.94, 1.08)
+	_coo_player.play()
 
 
 ## The net being hauled through the water. `effort` is how much water it is moving — a wide
@@ -246,7 +300,10 @@ func _build() -> void:
 	_engine = _make_engine()
 	_drag = _make_drag()
 	_wings = _make_wings()
+	_coo = _make_coo()
 	_chime = _make_chime()
+	_bought = _make_bought()
+	_found = _make_found()
 
 
 ## Water, as filtered noise: a bright spike of spray that dies almost at once over a low
@@ -425,27 +482,20 @@ func _make_engine() -> AudioStreamWAV:
 	return _to_wav(out, true)
 
 
-## Water being pushed by something dragged through it.
+## Water being pushed by something dragged through it. Aquatic version: deeper resonance,
+## more undulation, less scratching. Built for flowing water feel instead of material drag.
 ##
-## The first version was two one-pole filters and a swell, and it came out sounding like
-## something being sanded. Two reasons, both fixed here. A single one-pole leaves a great
-## deal of high end behind — six decibels an octave is barely a slope — so the hiss that
-## should be under the water was sitting on top of it; this cascades four of them, which
-## takes the top off properly and leaves a body of low noise that moves. And the old swell
-## was two sine waves beating against each other at four and a bit hertz, which is slow
-## enough to hear as a wobble and regular enough to hear as a machine. Water does not keep
-## time, so the swell is now three waves at unrelated rates, none of them fast.
-##
-## Loops, and like the engine it is faded across the seam, because filtered noise never
-## joins up with itself.
+## Deep cascaded filter (8 poles) for body, shallow 2-pole for surface splash. More weight
+## on low end and swell amplitude. Five unrelated swell waves instead of three, wider range,
+## so the motion reads as water moving rather than a machine wobbling.
 func _make_drag() -> AudioStreamWAV:
 	var length := 0.9
 	var count := int(length * RATE)
 	var out := PackedFloat32Array()
 	out.resize(count)
 
-	# Four poles for the body, two for the surface just above it.
-	var deep := [0.0, 0.0, 0.0, 0.0]
+	# Eight poles for deep water resonance, two for surface shimmer. Deep end dominates.
+	var deep := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 	var near := [0.0, 0.0]
 	var peak := 0.0
 	for i in count:
@@ -453,26 +503,29 @@ func _make_drag() -> AudioStreamWAV:
 		var noise := _rng.randf_range(-1.0, 1.0)
 		var body := noise
 		for k in deep.size():
-			deep[k] = lerpf(deep[k], body, 0.05)
+			deep[k] = lerpf(deep[k], body, 0.03)  # Slower cascade = deeper tone
 			body = deep[k]
 		var surface := noise
 		for k in near.size():
-			near[k] = lerpf(near[k], surface, 0.16)
+			near[k] = lerpf(near[k], surface, 0.12)  # Less sharp surface
 			surface = near[k]
 
-		# Three rates that do not divide into each other, so it never settles into a beat.
+		# Five unrelated swell waves: broader undulation, more aquatic motion.
 		var swell := (
-			0.74
-			+ 0.14 * sin(TAU * 1.111 * t)
-			+ 0.08 * sin(TAU * 2.222 * t + 1.7)
-			+ 0.04 * sin(TAU * 3.333 * t + 0.4)
+			0.68
+			+ 0.16 * sin(TAU * 0.777 * t)       # Added slower wave
+			+ 0.11 * sin(TAU * 1.333 * t + 0.8)
+			+ 0.09 * sin(TAU * 2.111 * t + 1.5)
+			+ 0.06 * sin(TAU * 3.444 * t + 0.3)
+			+ 0.04 * sin(TAU * 4.889 * t + 2.1) # Added high swell
 		)
 		var seam := clampf(t / 0.1, 0.0, 1.0) * clampf((length - t) / 0.1, 0.0, 1.0)
-		out[i] = (body * 6.5 + surface * 0.9) * swell * seam
+		# Heavier on body (8x), lighter on surface (0.4x) to suppress scraping
+		out[i] = (body * 8.0 + surface * 0.4) * swell * seam
 		peak = maxf(peak, absf(out[i]))
 	if peak > 0.0001:
 		for i in count:
-			out[i] = out[i] / peak * 0.8
+			out[i] = out[i] / peak * 0.75
 	return _to_wav(out, true)
 
 
@@ -506,6 +559,54 @@ func _make_wings() -> AudioStreamWAV:
 	if peak > 0.0001:
 		for i in count:
 			out[i] = out[i] / peak * 0.7
+	return _to_wav(out, false)
+
+
+## The coo: "pru".
+##
+## A pigeon is a small resonant tube, so this is a voiced note rather than a filtered noise
+## the way the wings are: a low tone that bends down through the first third of the word and
+## then holds, with a shallow flutter across the middle of it — that flutter is the r, and
+## without it the sound is a hoot rather than a bird. Two partials and a weak third, because
+## the throat is short and there is very little bright in it.
+##
+## The breath of noise across the front is the p. It is most of what makes the word land as a
+## consonant rather than as a note fading in.
+func _make_coo() -> AudioStreamWAV:
+	var length := 0.32
+	var count := int(length * RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+
+	var root := 520.0
+	var throat := _resonator(900.0, 900.0)
+	var phase := 0.0
+	var peak := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		# Down a tone and a half over the first third, then level: a coo falls and settles,
+		# and one that keeps falling reads as a slide whistle.
+		var bend := lerpf(1.0, 0.86, minf(t / (length * 0.34), 1.0))
+		# The roll in the middle of the word, faded in and out so it is a flutter in the
+		# note rather than a wobble laid over the whole of it.
+		var roll := sin(TAU * 22.0 * t) * 0.03 * sin(clampf(t / length, 0.0, 1.0) * PI)
+		phase += TAU * root * bend * (1.0 + roll) / RATE
+		var voice := sin(phase) + sin(phase * 2.0) * 0.34 + sin(phase * 3.0) * 0.08
+		# Up quickly, and held for most of the word rather than dropped: this was an
+		# exp(-t*5.5) tail once, which put nearly all of the sound in the first fiftieth of a
+		# second and left the coo itself a whisper.
+		var swell := minf(t / 0.012, 1.0) * clampf((length - t) / (length * 0.45), 0.0, 1.0)
+		# The p: a puff of throat-coloured noise, over almost before it starts. Kept well
+		# under the voice — it used to be half as loud again as the note, and since the whole
+		# sound is normalised to its own loudest sample, that one click was setting the level
+		# and squashing everything behind it. The word came out three times quieter than a
+		# catch and nobody could hear it.
+		var puff := _ring(throat, _rng.randf_range(-1.0, 1.0)) * exp(-t * 110.0) * 0.12
+		out[i] = voice * swell * 0.42 + puff
+		peak = maxf(peak, absf(out[i]))
+	if peak > 0.0001:
+		for i in count:
+			out[i] = out[i] / peak * 0.8
 	return _to_wav(out, false)
 
 
@@ -547,6 +648,130 @@ func _make_chime() -> AudioStreamWAV:
 		# as hit rather than switched on.
 		var strike := _rng.randf_range(-1.0, 1.0) * exp(-t * 220.0) * 0.16
 		out[i] = (note * 0.5 + strike) * swell
+		peak = maxf(peak, absf(out[i]))
+	if peak > 0.0001:
+		for i in count:
+			out[i] = out[i] / peak * 0.8
+	return _to_wav(out, false)
+
+
+## Money, then sparkle: what a purchase sounds like from the two ends of it.
+##
+## The coins are struck metal, so they are built the way the bell is — partials at ratios
+## that do not divide, dying fast — but small, bright and detuned from each other, and thrown
+## three at once a few dozen milliseconds apart. Coins do not land together, and three
+## identical clinks in a row is a machine counting rather than money moving.
+##
+## The sparkle over the top is a handful of very short high grains climbing from the coins
+## up out of the top of the mix. Rising is the whole trick: a purchase is a thing getting
+## better, and a scale that goes up reads as that before the player has thought about it.
+## They start under the coins and finish alone, which is what stops the two halves sounding
+## like two sounds played at once.
+func _make_bought() -> AudioStreamWAV:
+	var length := 0.9
+	var count := int(length * RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+
+	# When each coin lands, what it is worth in the mix, and how high it rings. Struck
+	# small metal, and no two of them the same size. Pitched down from where this started:
+	# up around two kilohertz it was a till receipt rather than coins, and money is a
+	# heavier sound than that.
+	var coins := [[0.0, 1.0, 1.0], [0.052, 0.85, 1.19], [0.113, 0.7, 0.91]]
+	# Ratio and loudness of the partials in one coin. Inharmonic, like the chime's, but
+	# packed closer together and gone in a fifth of the time.
+	var rings := [[1.0, 1.0], [1.71, 0.6], [2.43, 0.34], [3.19, 0.16]]
+	# The sparkle: eight grains from just above the coins to the top of what the rate can
+	# carry, spread over the second half of the sound.
+	var grains := 8
+	var peak := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var sample := 0.0
+
+		for coin: Array in coins:
+			var age := t - float(coin[0])
+			if age < 0.0:
+				continue
+			var root := 1560.0 * float(coin[2])
+			var note := 0.0
+			for ring: Array in rings:
+				note += sin(TAU * root * float(ring[0]) * age) * float(ring[1])
+			# The tick of one edge hitting another, over in a couple of milliseconds. It is
+			# what makes a coin a coin rather than a whistle.
+			var tick := _rng.randf_range(-1.0, 1.0) * exp(-age * 700.0) * 0.5
+			sample += (note * 0.34 + tick) * exp(-age * 28.0) * float(coin[1])
+
+		for g in grains:
+			var step := float(g) / float(grains - 1)
+			var when := 0.06 + step * 0.42
+			var age := t - when
+			if age < 0.0:
+				continue
+			# Just under two octaves of climb, on a curve rather than a straight line, so the
+			# run leans upward instead of walking. It starts below the coins ring rather
+			# than above it, so the sparkle grows out of the money instead of sitting on it.
+			var note := 1750.0 * pow(2.0, step * 1.9)
+			# Quieter as they go up: the top of the run is a shimmer, not a whistle, and the
+			# ear hears the high ones louder than they are.
+			var loud := lerpf(0.5, 0.2, step)
+			sample += sin(TAU * note * age) * exp(-age * 22.0) * loud
+
+		# Off the very top and the very bottom, so it sits on the mix rather than over it.
+		var swell := minf(t / 0.002, 1.0) * clampf((length - t) / 0.2, 0.0, 1.0)
+		out[i] = sample * swell * 0.5
+		peak = maxf(peak, absf(out[i]))
+	if peak > 0.0001:
+		for i in count:
+			out[i] = out[i] / peak * 0.8
+	return _to_wav(out, false)
+
+
+## A find: a wooden knock with a metal glow growing out of it.
+##
+## The furniture in this lake is timber and metal, and both are in the sound. The wood is
+## the front of it — a low box resonance with a knuckle of noise on the front, dead inside a
+## third of a second, because wood does not ring. The metal is the opposite and is what the
+## card is really doing: two close partials that swell in rather than being struck, beating
+## slowly against each other, and still there a second later.
+##
+## The swell is the whole reason this is not the purchase sound. Money lands; a thing coming
+## up out of a lake and catching the light does not land, it arrives.
+func _make_found() -> AudioStreamWAV:
+	var length := 1.5
+	var count := int(length * RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+
+	# The box: a low fundamental with the two partials a struck plank actually has, none of
+	# them ringing for long.
+	var wood := [[196.0, 1.0, 13.0], [301.0, 0.5, 17.0], [452.0, 0.22, 24.0]]
+	# The metal: a fifth apart, each detuned from its neighbour by a couple of hertz so the
+	# pair drifts in and out of each other instead of sitting still.
+	var metal := [[784.0, 0.55], [787.0, 0.42], [1176.0, 0.3], [1181.5, 0.22]]
+	var peak := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var sample := 0.0
+
+		for part: Array in wood:
+			sample += (
+				sin(TAU * float(part[0]) * t) * float(part[1]) * exp(-t * float(part[2]))
+			) * 0.5
+		# The knuckle on the front of the knock. Gone in three milliseconds, and what makes
+		# it wood being hit rather than a low note being played.
+		sample += _rng.randf_range(-1.0, 1.0) * exp(-t * 320.0) * 0.35
+
+		# Grows over a fifth of a second and then lets go slowly, so the metal is a light
+		# coming up rather than a second thing being struck.
+		var bloom := clampf(t / 0.2, 0.0, 1.0) * exp(-maxf(t - 0.2, 0.0) * 2.4)
+		var ring := 0.0
+		for part: Array in metal:
+			ring += sin(TAU * float(part[0]) * t) * float(part[1])
+		sample += ring * bloom * 0.3
+
+		var swell := minf(t / 0.002, 1.0) * clampf((length - t) / 0.3, 0.0, 1.0)
+		out[i] = sample * swell * 0.5
 		peak = maxf(peak, absf(out[i]))
 	if peak > 0.0001:
 		for i in count:

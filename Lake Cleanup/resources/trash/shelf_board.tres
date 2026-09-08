@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Pots and Pans"
+material = 1
+piece = &"small_44"
+size = Vector2(26, 9)
+pollution = 1.2
+haul_cost = 0.7
+tier = 0
+lightness = 1.75
+block_color = Color(0.55, 0.44, 0.3, 1)

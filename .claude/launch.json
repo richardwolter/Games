@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Godot Lake Cleanup",
+      "runtimeExecutable": "C:\\Users\\Administrador\\Documents\\Games\\Godot_v4.7.1-stable_win64.exe",
+      "runtimeArgs": ["--path", "Lake Cleanup"],
+      "port": 6007
+    }
+  ]
+}

@@ -18,9 +18,17 @@ const LINES := [
 	"Thanks for playing!",
 ]
 
-## The display face, and how far to fall back if it is missing. A missing font should cost
-## the look of the screen, not the screen.
-const FONT := "res://assets/RubbishFont2-Regular.ttf"
+## And under them, the door out of the peace. Only drawn when the screen is given one — the
+## end of the last level is still an end, and should not be a corridor.
+const ONWARD_HINT := "Something is stirring in the water."
+const ONWARD_LABEL := "Face it"
+
+## The padding around the door's label. Its text size comes off the shared ladder.
+const ONWARD_PAD := Vector2(34.0, 16.0)
+## How far below the second line the door sits, as a multiple of its own text size.
+const ONWARD_DROP := 3.2
+
+const Style := preload("res://scripts/style.gd")
 
 ## How long the words take to arrive, and how long they take to go once dismissed. Slow in,
 ## because it is the end of a long job and the end of a long job is not a pop-up; quicker
@@ -32,32 +40,41 @@ const FADE_OUT := 0.5
 ## cursor would otherwise click the screen away before reading a word of it.
 const SETTLE := 0.6
 
-## Text sizes as a fraction of the window's height, and the gap between the lines as a
-## fraction of the first one's size.
-const FIRST_SIZE := 0.068
-const SECOND_SIZE := 0.050
+## The gap between the lines, as a fraction of the first one's size. The sizes themselves
+## come off the shared ladder.
 const GAP := 1.5
 
 ## How dark the lake goes behind the words. Enough to read against, nowhere near enough to
 ## hide what the player has just finished — the sparkle is the other half of this ending.
-const WASH := 0.55
+const WASH := Style.SCRIM
 
 ## Emitted once the screen has faded out and is on its way to being freed, so the lake can
 ## give the angler their legs back.
 signal dismissed
+
+## Emitted when the player takes the door onward instead of closing the screen. The lake
+## does the scene change; this only says which of the two was clicked.
+signal onward
+
+## The words actually shown. Defaults to LINES, and is set to something else by a level
+## whose ending is not the cleaned lake.
+var lines: Array = LINES
 
 var _font: Font
 ## 0 to 1 on the way in, and back to 0 on the way out.
 var _shown: float = 0.0
 var _leaving: bool = false
 var _age: float = 0.0
+## Whether there is anywhere to go on to, and where the button was last drawn so a click
+## can be tested against the same rectangle the player was looking at.
+var _has_onward: bool = false
+var _onward_rect := Rect2()
+var _onward_hot: bool = false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_font = load(FONT) as Font
-	if _font == null:
-		_font = ThemeDB.fallback_font
+	_font = Style.font()
 	# Sized by hand rather than by anchors: the parent is a CanvasLayer, and a Control whose
 	# parent is not a Control is not laid out by anyone. It has to keep up with the window
 	# itself.
@@ -86,6 +103,21 @@ func _process(delta: float) -> void:
 			queue_free()
 
 
+## Offer the way on. Called before the screen is added to the tree.
+func offer_onward() -> void:
+	_has_onward = true
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
+
+
+## The player has taken the door. Fades the same way a dismissal does, so the words leave
+## the lake rather than being cut off it, and the lake changes scene when they have.
+func take_onward() -> void:
+	if _leaving or _age < SETTLE:
+		return
+	_leaving = true
+	onward.emit()
+
+
 ## The player has read it. Called by the click, and safe to call twice.
 func dismiss() -> void:
 	if _leaving or _age < SETTLE:
@@ -95,10 +127,22 @@ func dismiss() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	var moved := event as InputEventMouseMotion
+	if moved != null:
+		var over := _has_onward and _onward_rect.has_point(moved.position)
+		if over != _onward_hot:
+			_onward_hot = over
+			queue_redraw()
+		return
 	var click := event as InputEventMouseButton
 	if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
 		return
 	accept_event()
+	# The door is a rectangle inside the screen, and the screen is dismissed by clicking
+	# anywhere else on it. Testing the door first is what keeps the two apart.
+	if _has_onward and _onward_rect.has_point(click.position):
+		take_onward()
+		return
 	dismiss()
 
 
@@ -108,12 +152,12 @@ func _draw() -> void:
 	# Eased so the words do not arrive at a constant rate, which reads as a machine doing
 	# it. In fast, then a long settle.
 	var fade := 1.0 - pow(1.0 - _shown, 3.0)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.03, WASH * fade))
+	Style.dim(self, Rect2(Vector2.ZERO, size), WASH, fade)
 
-	var first := maxf(size.y * FIRST_SIZE, 15.0)
-	var second := maxf(size.y * SECOND_SIZE, 13.0)
-	var ink := Color(0.96, 0.94, 0.87, fade)
-	var shade := Color(0.0, 0.0, 0.0, 0.55 * fade)
+	var first := float(Style.TEXT_TITLE)
+	var second := float(Style.TEXT_HEAD)
+	var ink := Color(Style.INK.r, Style.INK.g, Style.INK.b, fade)
+	var shade := Color(Style.SHADE.r, Style.SHADE.g, Style.SHADE.b, Style.SHADE.a * fade)
 
 	# The pair is centred as a block rather than each line on its own row, so the gap
 	# between them belongs to the words and not to the window.
@@ -124,20 +168,40 @@ func _draw() -> void:
 	# Lifted a little as it arrives: the words settle onto the lake rather than appearing
 	# on it.
 	top += (1.0 - fade) * size.y * 0.03
-	_line(LINES[0], int(first), top + first, ink, shade)
-	_line(LINES[1], int(second), top + first + first * GAP, ink, shade)
+	_line(String(lines[0]), int(first), top + first, ink, shade)
+	var second_baseline := top + first + first * GAP
+	_line(String(lines[1]), int(second), second_baseline, ink, shade)
+	if _has_onward:
+		_draw_onward(second_baseline, float(Style.TEXT_BODY), fade, shade)
+
+
+## The way on: a line of warning, and a box under it to click. Drawn rather than built from
+## a Button for the same reason the rest of this screen is — one screen from a different
+## game is one too many.
+func _draw_onward(under: float, height: float, fade: float, shade: Color) -> void:
+	var warn := Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, fade * 0.9)
+	_line(ONWARD_HINT, int(height), under + height * 1.9, warn, shade)
+
+	var wide := Style.measure(ONWARD_LABEL, int(height)).x
+	var box := Vector2(wide, height) + ONWARD_PAD * 2.0
+	_onward_rect = Rect2(
+		Vector2((size.x - box.x) * 0.5, under + height * ONWARD_DROP), box
+	)
+	var lit := 0.22 if _onward_hot else 0.12
+	var face := Style.DANGER.darkened(0.5)
+	Style.plaque(self, _onward_rect, Color(face.r, face.g, face.b, minf(1.0, 0.55 + lit)), fade)
+	_line(
+		ONWARD_LABEL, int(height),
+		_onward_rect.position.y + ONWARD_PAD.y + height * 0.82,
+		Color(Style.INK.r, Style.INK.g, Style.INK.b, fade), shade
+	)
 
 
 ## One line, centred, with a shadow under it. The shadow is what lets pale text sit over
 ## bright water without a panel behind it.
 func _line(text: String, height: int, baseline: float, ink: Color, shade: Color) -> void:
-	var wide := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, height).x
-	var at := Vector2((size.x - wide) * 0.5, baseline)
-	var drop := maxf(float(height) * 0.06, 1.0)
-	_font.draw_string(
-		get_canvas_item(), at + Vector2(drop, drop), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1.0, height, shade
-	)
-	_font.draw_string(
-		get_canvas_item(), at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, height, ink
+	Style.write(
+		self, text, height, Vector2(0.0, baseline),
+		Color(ink.r, ink.g, ink.b, 1.0), HORIZONTAL_ALIGNMENT_CENTER,
+		Rect2(0.0, baseline, size.x, 1.0), ink.a
 	)

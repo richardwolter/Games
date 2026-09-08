@@ -30,6 +30,12 @@ const MOST_BIRDS := 14
 ## How often the flock counts itself and decides whether to call more in or send some away.
 const RETHINK := 2.5
 
+## Where a bird starts to fade as it crosses the shore, and where it is gone, as fractions of
+## the lake's own edge. Just past the waterline: the bank is drawn land and a bird over it is
+## fine for a moment, but nothing should be drawn out in the void past it.
+const BANK_FADE := 1.0
+const BANK_GONE := 1.12
+
 ## Flight, in world pixels a second, and how high a bird arcs on the way to a perch.
 const FLY_SPEED := 150.0
 const ARC_HEIGHT := 34.0
@@ -86,12 +92,19 @@ var droppings: Array = []
 var spawning: bool = true
 
 var _sheet: Texture2D
-## Row index -> its three frames, as atlas rectangles.
+## Row index -> its three frames in the air, as atlas rectangles.
 var _frames := {}
+
+## Row index -> the same bird's standing frames. Empty for a row the sheet has none for,
+## which falls back to the flight cycle.
+var _still := {}
 var _rows: Array[int] = []
 
 var _time: float = 0.0
 var _rethink: float = 0.0
+
+## Whether the flock that should already be here has been put here. See `settle`.
+var _settled: bool = false
 var _rng := RandomNumberGenerator.new()
 
 ## When wings were last heard, on this node's own clock.
@@ -117,16 +130,20 @@ func _load_art() -> bool:
 	if _sheet == null:
 		return false
 
-	# Only the first block of each row: those are the three frames of one bird. The other
-	# blocks on the sheet are the same birds standing still, at two canvas sizes.
+	# The first block of each row is the three frames of a bird in the air, wings out. The
+	# second is the same bird standing: a perched pigeon shuffles, it does not hover in place
+	# over the mug it is sitting on, which is what drawing the flight cycle at a slower frame
+	# rate looked like. Later blocks are the same again at other canvas sizes and unused.
 	for cell: Dictionary in book["cells"]:
-		if int(cell["block"]) != 0 or int(cell["row"]) == 0:
+		var block := int(cell["block"])
+		if int(cell["row"]) == 0 or block > 1:
 			continue
 		var row := int(cell["row"])
-		if not _frames.has(row):
-			_frames[row] = []
+		var into := _frames if block == 0 else _still
+		if not into.has(row):
+			into[row] = []
 		var box: Array = cell["region"]
-		(_frames[row] as Array).append(
+		(into[row] as Array).append(
 			Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3]))
 		)
 
@@ -159,6 +176,26 @@ func bird_on(tile: int) -> int:
 		if bird["state"] == State.PERCHED and int(bird["tile"]) == tile:
 			return i
 	return -1
+
+
+## Every bird sat within `radius` tiles of a point, highest index first so a caller may
+## take them all without its own indices shifting under it.
+##
+## Asked in tile space rather than by tile index: the net's mouth is a circle of a radius
+## that changes as it purses, and the ring of tiles it covers is that circle rounded to
+## whole tiles. A bird on the tile the rounding dropped was a bird sitting visibly inside
+## the net that the net went straight past.
+func perched_near(from: Vector2, radius: float) -> Array[int]:
+	var out: Array[int] = []
+	if grid == null:
+		return out
+	for i in range(birds.size() - 1, -1, -1):
+		var bird: Dictionary = birds[i]
+		if int(bird["state"]) != State.PERCHED:
+			continue
+		if Vector2(grid.tile_of(int(bird["tile"]))).distance_to(from) <= radius:
+			out.append(i)
+	return out
 
 
 ## Take a bird out of the flock — the net has it. Returns where it was, for the splash.
@@ -202,9 +239,44 @@ func add_bird(perch: int = -1) -> bool:
 	return true
 
 
+## Fill the lake with the birds it should already have, sitting down.
+##
+## The flock is built to grow: one bird called in every RETHINK seconds, each flying in from
+## nine hundred pixels off screen. That is right while the game is running and wrong at the
+## moment it starts — a lake thick with rubbish opened on an empty sky and took most of a
+## minute to look inhabited. This is that minute, done at once: every bird the water can
+## support, already perched, with its rest clock part way through so they do not all get up
+## and leave together.
+##
+## Runs once, on the first frame the grid is there to be asked. Nothing calls it twice: after
+## that the flock keeps itself up in its own time.
+func settle() -> void:
+	if _settled or grid == null or _rows.is_empty():
+		return
+	var want := target_count()
+	# Not yet: on the first frame the grid exists but has not been filled, so the lake it is
+	# asked about is empty and wants no birds at all. Marking the flock settled there is how
+	# it stayed empty for the whole run.
+	if want <= 0:
+		return
+	_settled = true
+	while birds.size() < want:
+		if not add_bird():
+			break
+		var bird: Dictionary = birds[birds.size() - 1]
+		# Landed rather than arriving: the flight is the part that has already happened.
+		bird["state"] = State.PERCHED
+		bird["at"] = bird["to"]
+		bird["travel"] = 1.0
+		bird["rest"] = _rng.randf_range(0.0, PERCH_MAX)
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	_time += delta
 	if grid != null:
+		if not _settled:
+			settle()
 		_rethink -= delta
 		if _rethink <= 0.0:
 			_rethink = RETHINK
@@ -214,7 +286,10 @@ func _process(delta: float) -> void:
 		if not _step(birds[i], delta):
 			birds.remove_at(i)
 	_fade_droppings(delta)
-	queue_redraw()
+	# Nothing on the water, nothing to repaint. Birds and their mess both animate, so a
+	# flock that has any is worth a frame; an empty sky over a clean lake is not.
+	if not birds.is_empty() or not droppings.is_empty():
+		queue_redraw()
 
 
 ## Call birds in or send them away, so the flock matches the water it is over.
@@ -358,17 +433,37 @@ func _maybe_poop(bird: Dictionary, delta: float, chance: float = POOP_CHANCE) ->
 	if _rng.randf() > chance * delta:
 		return
 	var at: Vector2 = bird["at"]
-	var tile := Iso.world_to_tile(at)
-	var on_land := Iso.island_fraction(tile.x, tile.y) <= 1.0
 	var flying := int(bird["state"]) != State.PERCHED
+	# Where it lands, not where the bird is: a flying bird is drawn lifted off the water by
+	# the arc of its flight, and asking the question at the sprite rather than under it put
+	# the answer most of a tile north of the splat. On the south bank that is the difference
+	# between a lake and the empty ground past it — which is what left a scatter of grey dots
+	# under the map after every cast, since a cast sends birds away and they went on dropping
+	# all the way out.
+	var ground := at + Vector2(0.0, ARC_HEIGHT if flying else 0.0)
+	var tile := Iso.world_to_tile(ground)
+	# Nothing dropped where the bird itself is not drawn. See `_over_water`.
+	if Iso.shore_fraction(tile.x, tile.y) >= BANK_GONE:
+		return
+	var on_land := Iso.island_fraction(tile.x, tile.y) <= 1.0
 	var on_angler := angler != null and angler.tile_pos.distance_to(tile) < 1.0
-	var fall := ARC_HEIGHT if flying else 0.0
 	droppings.append({
-		"at": angler.position - position if on_angler else at + Vector2(0.0, fall),
+		"at": angler.position - position if on_angler else ground,
 		"born": _time,
 		"on_angler": on_angler,
 		"on_land": on_land,
 	})
+
+
+## How much of a bird is drawn at this spot on the plane: all of it over the lake, none of it
+## past the bank, and a short fade between the two so nothing pops.
+##
+## Measured at the bird's shadow rather than at the bird, because the shadow is where it
+## actually is — the drawing is lifted off the water by the arc of its flight.
+func _over_water(ground: Vector2) -> float:
+	var tile := Iso.world_to_tile(ground)
+	var out := Iso.shore_fraction(tile.x, tile.y)
+	return clampf((BANK_GONE - out) / maxf(BANK_GONE - BANK_FADE, 0.001), 0.0, 1.0)
 
 
 ## How long this splat sticks: on the angler it wears off, on the water it washes off, on
@@ -390,6 +485,13 @@ func _fade_droppings(_delta: float) -> void:
 			splat["at"] = angler.position - position + Vector2(0.0, -18.0)
 
 
+## The frames to draw a bird from: standing when it is sat on something, flying otherwise.
+func _cycle_of(row: int, state: int) -> Array:
+	if state == State.PERCHED and _still.has(row):
+		return _still[row]
+	return _frames[row]
+
+
 func _draw() -> void:
 	for splat: Dictionary in droppings:
 		var life := _splat_life(splat)
@@ -406,19 +508,28 @@ func _draw() -> void:
 	if _sheet == null:
 		return
 	for bird: Dictionary in birds:
-		var frames: Array = _frames[int(bird["row"])]
+		var frames: Array = _cycle_of(int(bird["row"]), int(bird["state"]))
 		var frame: Rect2 = frames[posmod(int(bird["phase"]), frames.size())]
 		var at: Vector2 = bird["at"]
 		var span := frame.size * SCALE
+		var ground := Vector2(at.x, at.y + sin(float(bird["travel"]) * PI) * ARC_HEIGHT)
+
+		# Faded out at the bank. A bird arrives from nine hundred pixels beyond the shore and
+		# leaves for eleven hundred more, and every one of those pixels used to be drawn: a
+		# cast that cleared enough rubbish to send three birds away put three grey specks and
+		# their shadows sailing out over the bank and off into the nothing beyond it, which
+		# read as the game leaking particles rather than as birds going home.
+		var fade := _over_water(ground)
+		if fade <= 0.0:
+			continue
 
 		if int(bird["state"]) != State.PERCHED:
 			# A shadow on the water under a flying bird, which is what says it is above the
 			# lake rather than floating on it.
-			var ground := Vector2(at.x, at.y + sin(float(bird["travel"]) * PI) * ARC_HEIGHT)
-			draw_circle(ground, span.x * 0.3, Color(0.0, 0.0, 0.0, 0.16))
+			draw_circle(ground, span.x * 0.3, Color(0.0, 0.0, 0.0, 0.16 * fade))
 
 		var facing := float(bird["facing"])
 		var box := Rect2(at - Vector2(span.x * 0.5, span.y), span)
 		if facing < 0.0:
 			box = Rect2(box.position + Vector2(span.x, 0.0), Vector2(-span.x, span.y))
-		draw_texture_rect_region(_sheet, box, frame)
+		draw_texture_rect_region(_sheet, box, frame, Color(1.0, 1.0, 1.0, fade))

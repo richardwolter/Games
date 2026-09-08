@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Fish bowl"
+material = 0
+piece = &"small_25"
+size = Vector2(17, 19)
+pollution = 1.6
+haul_cost = 1.0
+tier = 2
+lightness = 1.4
+block_color = Color(0.74, 0.66, 0.34, 1)

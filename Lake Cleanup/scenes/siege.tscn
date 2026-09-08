@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://c1siege0lake2"]
+
+[ext_resource type="PackedScene" uid="uid://bbatr8tydqqjq" path="res://scenes/main.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/siege.gd" id="2_siege"]
+
+[node name="Main" instance=ExtResource("1_base")]
+script = ExtResource("2_siege")

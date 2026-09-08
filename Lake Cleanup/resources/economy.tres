@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EconomyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/economy_config.gd" id="1_economy"]
+
+[resource]
+script = ExtResource("1_economy")
+piece_base_pay = 2.5
+piece_filth_pay = 6.0
+bird_bonus = 26.0

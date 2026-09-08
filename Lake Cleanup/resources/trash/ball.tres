@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Closed book"
+material = 3
+piece = &"small_31"
+size = Vector2(14, 15)
+pollution = 2.6
+haul_cost = 1.8
+tier = 2
+lightness = 1.05
+block_color = Color(0.2, 0.19, 0.2, 1)

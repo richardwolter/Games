@@ -26,7 +26,19 @@ signal sold(cargo: PackedInt32Array, kind: int)
 ## because that is the moment it left the lake — selling it later is a separate event.
 signal skimmed(def_index: int)
 
-enum State { DOCKED, LOADING, SAILING, UNLOADING, RETURNING }
+enum State { DOCKED, LOADING, SAILING, UNLOADING, RETURNING, PATROL }
+
+## Where an unled patrol wanders: how far out in the basin one leg may end, as a fraction
+## of the way to the shore, and how far round the lake it may go. Ranges rather than
+## numbers, because a hull that walks the same ring at the same rate is a clock, and the
+## water it is not on is always the same water.
+const PATROL_INSET := Vector2(0.30, 0.85)
+const PATROL_STEP := Vector2(0.5, 2.2)
+
+## How far the point a hull has been sent to has to move before it turns for the new one, in
+## tiles. Without it a boat chasing something that is itself moving spends every frame
+## replanning and never commits to a heading.
+const PATROL_REPLAN := 2.5
 
 ## Matches the swell in lake_grid.gd and the surface motion in the shader.
 const WAVE_AMPLITUDE := 5.0
@@ -129,14 +141,19 @@ const DWELL := 0.7
 const RING := 0.84
 
 ## How far clear of the island a leg has to stay, in island_fraction. 1.0 is the beach.
-const ISLAND_CLEAR := 1.7
+##
+## All three of these are multiples of the island's radius, so growing the island grew the
+## room the ferry left round it by the same factor — and a bend that swings wide of a bigger
+## island is a longer trip for the same crossing. Pulled back in (from 1.7 / 2.6 / 2.15) so
+## the ferry keeps about the same distance in tiles off the beach as it did before.
+const ISLAND_CLEAR := 1.25
 
 ## How far out a bend round the island swings, and how far out the dock is approached from,
 ## in the same units. Both are comfortably outside ISLAND_CLEAR: a waypoint sitting exactly
 ## on the limit makes the chords either side of it dip below the limit, and the leg gets
 ## split again for no gain.
-const ISLAND_BEND := 2.6
-const ISLAND_BERTH := 2.15
+const ISLAND_BEND := 1.72
+const ISLAND_BERTH := 1.44
 
 ## How often a moving skimmer gets a go at the water, in tiles travelled. Rolling once per
 ## frame would make the catch rate depend on the frame rate, which is the kind of bug that
@@ -174,6 +191,26 @@ var skim_hold: int = 0
 
 ## Whether it sets off on its own as soon as there is something to carry.
 var auto_ferry: bool = true
+
+## Set while the boat has nothing to ferry and should be out on the water anyway.
+##
+## The siege turns this on. There is no rubbish in that lake and so nothing to carry, and a
+## fleet moored all afternoon behind a fight is three boats pretending to be scenery — but
+## the guns ammo loads are on these hulls, so where they are is the whole of what they are
+## worth. A patrolling boat circles the island and takes its gun with it.
+var patrol: bool = false
+
+## Where the patrol has been told to go, in tiles, or INF for "your own business".
+##
+## The boat does not know what a monster is and should not: it is a hull with a gun on it
+## and a lake to cross. Something that does know — the siege — points it at water worth
+## being on, and moves the point as the fight moves. With nothing pointing it anywhere it
+## wanders the basin on its own.
+var patrol_at := Vector2.INF
+
+## The point the current leg was planned for, so a target that has drifted can be told from
+## one that has not.
+var _patrol_aim := Vector2.INF
 
 var state: int = State.DOCKED
 ## What is aboard, as def indices.
@@ -221,6 +258,9 @@ var _time: float = 0.0
 ## Counts down to the next puff of spray off the bow.
 var _spray_in: float = 0.0
 var _dwell: float = 0.0
+
+## What the last painted hull was made of, while it is sitting still. See `_repaint`.
+var _painted: int = 0
 var _skim_travel: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
@@ -333,8 +373,19 @@ func _process(delta: float) -> void:
 
 	match state:
 		State.DOCKED:
-			if auto_ferry:
-				dispatch()
+			# Ferrying first: a hull with something to carry carries it, and only a hull
+			# with nothing to do goes wandering.
+			if auto_ferry and dispatch():
+				pass
+			elif patrol:
+				_next_patrol()
+		State.PATROL:
+			if not patrol:
+				_head_home()
+			elif _patrol_moved():
+				_next_patrol()
+			elif _sail(delta):
+				_next_patrol()
 		State.LOADING:
 			_dwell -= delta
 			if _dwell <= 0.0:
@@ -360,7 +411,24 @@ func _process(delta: float) -> void:
 	if splash != null and _under_way():
 		splash.wake(self, position + _screen_heading() * -HULL_LENGTH * 0.5,
 			HULL_WIDTH * 1.1, HULL_RIPPLE)
-	queue_redraw()
+	_repaint()
+
+
+## Repaint while the hull is moving, and otherwise only when its picture would differ.
+##
+## A hull under way has a wake that runs on the clock, so it earns its frame. A hull tied up
+## at a yard does not: it is a silhouette and a load, and both of those sit still. The bob
+## on the swell moves the node rather than the drawing, so it costs nothing to skip.
+func _repaint() -> void:
+	if _under_way():
+		queue_redraw()
+		return
+	var key := hash([
+		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round()
+	])
+	if key != _painted:
+		_painted = key
+		queue_redraw()
 
 
 ## Spray off the bow while under way. The same splash the net and the falling rubbish make,
@@ -401,6 +469,40 @@ func _next_stop() -> void:
 	target = _route.pop_front()
 	_legs = _plan_legs(tile_pos, dropoffs[target].berth)
 	state = State.SAILING
+
+
+## Has the water it was sent to moved out from under it?
+func _patrol_moved() -> bool:
+	if patrol_at == Vector2.INF:
+		return false
+	return _patrol_aim == Vector2.INF or patrol_at.distance_to(_patrol_aim) > PATROL_REPLAN
+
+
+## Off to the next bit of water. One leg at a time rather than a planned lap, so a boat that
+## is told to stop patrolling stops at the end of the leg it is on instead of finishing a
+## circuit nobody asked for — and so a hull can be turned towards something the moment
+## there is something to turn towards.
+func _next_patrol() -> void:
+	target = -1
+	_patrol_aim = patrol_at
+	var to := patrol_at if patrol_at != Vector2.INF else _wander_to()
+	_legs = _plan_legs(tile_pos, to)
+	state = State.PATROL
+
+
+## Somewhere else on the basin, chosen loosely. Both the angle it moves round by and how
+## far out it ends are rolled, so an idle fleet drifts about the lake instead of tracing a
+## ring at a fixed rate.
+func _wander_to() -> Vector2:
+	for attempt in 8:
+		var angle := (
+			Iso.basin_angle(tile_pos)
+			+ _rng.randf_range(PATROL_STEP.x, PATROL_STEP.y) * (1.0 if _rng.randf() < 0.75 else -1.0)
+		)
+		var to := Iso.basin_point(angle, _rng.randf_range(PATROL_INSET.x, PATROL_INSET.y))
+		if Iso.in_lake(int(to.x), int(to.y)):
+			return to
+	return Iso.basin_point(Iso.basin_angle(tile_pos) + 1.0, 0.55)
 
 
 func _head_home() -> void:
@@ -687,6 +789,9 @@ static func _swell(x: float, t: float) -> float:
 ## the second from the first. tools/bake_boat.gd renders the model once per heading through
 ## the same camera the game's projection describes, and this picks the frame.
 func _draw() -> void:
+	_painted = hash([
+		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round()
+	])
 	var ink := Color(0.11, 0.09, 0.1)
 	var half_l := HULL_LENGTH * 0.5
 	var half_w := HULL_WIDTH * 0.5
@@ -763,7 +868,9 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 
 ## Under way, as opposed to sitting at a berth or a merchant with the engine idling.
 func _under_way() -> bool:
-	return state == State.SAILING or state == State.RETURNING
+	return (
+		state == State.SAILING or state == State.RETURNING or state == State.PATROL
+	)
 
 
 ## The wake: disturbed water off the stern with arcs shedding backwards down it.

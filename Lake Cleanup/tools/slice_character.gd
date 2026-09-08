@@ -89,6 +89,13 @@ func _init() -> void:
 						ink.position.x - box.position.x, ink.position.y - box.position.y,
 						ink.size.x, ink.size.y
 					],
+					# And where the head is across the cell, which is not the same question.
+					# The angler wears a hat the game draws on rather than a hat painted into
+					# the sheet, and the hat has to sit on the head: the figure is centred in
+					# its cell from the front and stands a pixel right of centre from the back
+					# and the side, so a hat hung on one number is wrong in two views out of
+					# three. See `_head_middle`.
+					"head": _head_middle(atlas, box, ink),
 				})
 			poses["%s_%s" % [of["name"], ROWS[row]]] = frames
 		y += image.get_height()
@@ -129,6 +136,26 @@ func _ink(atlas: Image, cell: Rect2i) -> Rect2i:
 	if high.x < low.x or high.y < low.y:
 		return Rect2i()
 	return Rect2i(low, high - low + Vector2i.ONE)
+
+
+## How far the head sits from the middle of its cell, in source pixels, right being positive.
+##
+## Measured off the top third of the figure rather than off the whole of it: the ink box is
+## pulled about by an outstretched arm or a leg mid-stride, and what a hat has to agree with
+## is the head. A third is enough to be all head and no shoulders on a twenty-pixel figure.
+func _head_middle(atlas: Image, cell: Rect2i, ink: Rect2i) -> float:
+	var deep := maxi(ink.size.y / 3, 3)
+	var low := cell.position.x + cell.size.x
+	var high := cell.position.x - 1
+	for y in range(ink.position.y, mini(ink.position.y + deep, cell.position.y + cell.size.y)):
+		for x in range(cell.position.x, cell.position.x + cell.size.x):
+			if atlas.get_pixel(x, y).a < INK_ALPHA:
+				continue
+			low = mini(low, x)
+			high = maxi(high, x)
+	if high < low:
+		return 0.0
+	return (float(low) + float(high) + 1.0) * 0.5 - (float(cell.position.x) + float(cell.size.x) * 0.5)
 
 
 ## The atlas blown up over a grey, with the cell grid on it and every measured ink box.

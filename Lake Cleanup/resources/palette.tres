@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Palette" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/palette.gd" id="1_palette"]
+
+[resource]
+script = ExtResource("1_palette")
+grass_light = Color(0.427, 0.529, 0.251, 1)
+grass_dark = Color(0.196, 0.341, 0.114, 1)
+sand = Color(0.91, 0.804, 0.592, 1)
+wood = Color(0.541, 0.235, 0.141, 1)
+leaf = Color(0.294, 0.424, 0.18, 1)
+water_dirty = Color(0.118, 0.275, 0.082, 1)
+water_clean = Color(0.353, 0.525, 0.678, 1)
+ui_neutral = Color(0.427, 0.529, 0.251, 1)
+ui_accent = Color(0.541, 0.235, 0.141, 1)

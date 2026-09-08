@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Painting"
+material = 1
+piece = &"small_09"
+size = Vector2(12, 14)
+pollution = 1.4
+haul_cost = 0.8
+tier = 1
+lightness = 1.7
+block_color = Color(0.46, 0.34, 0.24, 1)

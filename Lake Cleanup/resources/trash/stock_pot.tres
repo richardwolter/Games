@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Cooking pot"
+material = 2
+piece = &"small_33"
+size = Vector2(14, 13)
+pollution = 3.4
+haul_cost = 2.8
+tier = 3
+lightness = 1.0
+block_color = Color(0.34, 0.28, 0.26, 1)
