@@ -137,72 +137,48 @@ However, randomness should remain important.
 
 ---
 
-# 4. Factories
+# 4. Levels & Economy
 
-Factories are the primary incremental system.
+**UPDATE (2026-07-29): Sections §4–5 (Factories/Donations) are stale.** See §4–5 New Economy below.
 
-Each factory produces a category of objects.
+Strait Across uses a **level-based progression with purchased pieces and surprise boxes**, not factories/donations.
 
-Example categories:
+### Level Progression
 
-* Wood Factory
-* Scrap Factory
-* Plastic Factory
-* Metal Factory
-* Floating Object Factory
-* Construction Factory
-* Weird Stuff Factory
+* Each level spans a wider/deeper strait (`data/levels/`)
+* Crossing the strait unlocks the next level
+* A near-miss still pays money (distance-based rewards)
 
-Factories should have upgrade levels.
+### Economy: Money & Shop
 
-Upgrading a factory may:
+**Currency**: Money is earned only from crossing attempts, scored on distance reached.
 
-* unlock new object types
-* increase object quality
-* increase object size
-* improve structural strength
-* improve buoyancy
-* increase production speed
-* increase the probability of useful objects
-* unlock rare objects
+**Resources**: Pieces are bought from a shop with **per-level stock counts**.
+* Stock limits are the constraint (not a piece-count budget or randomised shop)
+* Stock is per-level, not global
+* Example: Level 1 shop offers 10× Wood Crate, 5× Metal Beam, 3× Pontoon
+* Level 2 shop offers different stock
 
-Avoid excessive complexity during the prototype.
+**Money Carryover**: Money carries between levels. Unplaced pieces and the bridge do NOT.
 
-For the first prototype, implement **one or two factories** with a small number of object types.
+**Toolbox Logic**: Deliberate purchasing decisions + gambling build the toolbox.
+
+### Surprise Boxes (The Gamble)
+
+Boxes (bronze/silver/gold) are cheaper per-piece than the shop but offer no choice.
+* Player picks a rarity, gets random pieces of that rarity
+* Boxes ignore per-level stock limits (can spawn pieces beyond what the shop has)
+* Gambling pressure: "I need this specific beam, do I trust the box?"
 
 ---
 
-# 5. Donations
+# 5. Design Rationale
 
-Donations are the primary resource used for incremental progression.
+**Why this over donations/factories?**
 
-The player receives donations from strangers.
+Richard wanted the toolbox to come from deliberate purchasing decisions plus gambling, not idle factory output. This encourages player agency (shop planning) while keeping randomness (boxes) important.
 
-For the prototype, this can initially be extremely simple.
-
-Example:
-
-A button:
-
-**ASK FOR DONATIONS**
-
-Pressing it generates a small amount of money/resources.
-
-Later, this system can become more interesting:
-
-* passive donations
-* random donors
-* donation events
-* generous donors
-* suspicious donors
-* donation multipliers
-* donation milestones
-
-But these are NOT required for the first prototype.
-
-The important thing is establishing the economic loop:
-
-**Donations → Factory → Better Objects → Better Bridge → Better Rewards**
+The level structure (wider strait = more challenge) combines with shop stock limits to create progression: you can't just buy the perfect setup, you have to adapt to what's available.
 
 ---
 

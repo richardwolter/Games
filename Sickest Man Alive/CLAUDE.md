@@ -1,0 +1,124 @@
+# Sickest Man Alive — Twisted Roguelite Prototype
+
+## Role
+
+You are the lead programmer and technical designer for a roguelite game prototype being developed in **Godot 4.7.1**.
+
+Your job is to build incrementally with clean architecture, testable systems, and locked design decisions. When a design decision is required, explain options briefly and ask before proceeding.
+
+---
+
+## Game Concept
+
+**"Sickest Man Alive"** — a twisted-cartoon roguelite where a teenager in a shrinking suit fights bacteria inside their sick uncle's body.
+
+References: Binding of Isaac, Enter the Gungeon, Brotato, Vampire Survivors.
+
+### The Suit & Shrinking
+- Teenager (~16 years old) in an "old tech" suit mixing space exploration and medical equipment.
+- The suit has **partial head coverage** (modular breathing mask, goggled, both worn and stowed positions).
+- **Shrinking is a pure stat** (`PlayerStats.size_scale`) for the prototype, not traversal gating or macro/micro scene swap. Those are scope bombs; revisit only after fun is proven.
+- The suit is **worn in from the first frame** and does not degrade further during a run.
+
+### Combat
+- Two auto-firing weapons: melee scalpel (proximity trigger), ranged syringe (always).
+- Twin-stick aim, automatic firing.
+- Contact damage plus enemy projectiles.
+- Run target: 20–40 minutes.
+
+### Progression
+- **Between-run currency**: DNA (permanent per-item upgrade levels).
+- **In-run structure**: Isaac-continuous — organ rooms, pick item and keep walking.
+- **No hub inside a run** — run structure is seamless. A shop is a room *type* ("Pharmacy"), never a separate scene/state while a run is live.
+- **Between-run prep menu**: `scenes/prep.tscn` is the boot scene. START swaps to run. Death/escape shows results panel whose CONTINUE swaps back to prep. It never coexists with a run.
+
+### The Floor: Anatomically Fixed
+The floor is **a fixed human body, not a random dungeon**:
+- 23 named body parts on an orthogonal grid (`src/body_plan.gd`)
+- Adjacency is derived from coordinates — **anatomy IS connectivity**, a limb is a chain
+- Example: hand → forearm → upper arm → shoulder → lungs
+- Entry is always a hand or foot
+- Random: entry extremity, which organ infection nested in, cache placement — never the body shape itself
+
+---
+
+## Architecture Invariants
+
+**Richard's framing: An item is data, never behavior.**
+
+### Order-Independent Stat Pipeline
+Items are `.tres` holding `StatModifier` lists. `Loadout` is the **only place stats resolve**, recomputed **fully from scratch every time**.
+
+**Why**: `MULTIPLY` and `BLEND` have no clean inverse; chained `lerp(0.5)` is not associative, so pickup order would matter if we applied incrementally. Full recompute guarantees order-independence.
+
+**Pipeline Rules**:
+1. Phase, then priority, then stable `id` tie-break (Godot `Array.sort_custom` is not stable)
+2. `BLEND` aggregates as mean, not pairwise chaining
+3. `Op.APPEND` is a fenced escape hatch (`StatModifier.APPENDABLE`) — adding a stat to that list must be conscious
+4. **Validation**: Run `tools/test_pipeline.gd` (headless) after any pipeline change — treat it as the regression gate
+
+### DNA Economy & Calibration
+**Generated body**: ~49 combat cells, ~800 enemies (not 15/120 as older plans suggested).
+
+**Payout bands** (1 : 1.6 : 1.9 from kills alone, nowhere near the 1 : 2.5 : 4.5 design asks for):
+- Separation comes from two event bonuses
+- `BOSS_KILL_BONUS = 300`, `ESCAPE_BONUS = 425` against per-kill value of 1
+- Robust to how much floor the player walks (no pickup magnet)
+
+**Upgrade Authoring**: Richard writes upgrades himself in the **Upgrade Forge** bottom panel (`addons/upgrade_forge/`), which writes `config/upgrades.tres`.
+- Stat dropdowns derive live from `AttackStats`/`PlayerStats` via `get_property_list()`
+- Adding an `@export` stat makes it authorable with no dock change
+- Operations filtered by stat type; pipeline phase derived from operation
+- **In-phase ADD/MULTIPLY pair cannot be authored** (breaks order-independence)
+
+**Test Harness**: `tools/test_dna.gd` re-derives payout bands from real generated maps. If wave maths in `Room._plan_waves` change, `_enemies_in` in that test must change with it.
+
+---
+
+## Character & Art Handoff
+
+**Main Character (Settled 2026-08-10):**
+- Teenager, ~16, in old-tech suit
+- Gender: artist's call
+- Style: believable proportions, stylised surfaces (between cartoon and realistic, NOT chunky big-headed)
+- Suit worn-in from frame 1, doesn't degrade further
+- Partial head coverage: modular breathing mask, goggles, worn/stowed layers
+- Plated suit in key art is first pass, not the design — artist redesigns, keeps only the kit
+
+**Design References**: `ART_BIBLE.md` is deliberately not cited. Old `art/kid*.png` sprites and `art_ref/` are placeholders, not references.
+
+**Handoff Pipeline**:
+- `moodboard/` folder (numbered per subject) with `MOODBOARD.md` (editable brief) and `moodboard.html` (self-contained artifact, generated by scratchpad script, do not hand-edit)
+- `.gdignore` in moodboard keeps Godot from importing
+- Every reference has TAKE and IGNORE lists (IGNORE half is more important)
+- Export presets: Windows and Web (Web single-threaded for itch.io, no COOP/COEP headers)
+- Builds land in `Documents/Games/_builds/`
+- Windows App Control blocks unsigned exes from agent shell — verify exports via web build or `--headless` instead
+
+---
+
+## Dialogue & Pause (Future)
+When dialogue/NPC arrives: `get_tree().paused` plus one CanvasLayer (no scene swap, no state enum). NPCs and clue system are out of the vertical slice entirely.
+
+---
+
+## Validation Gates
+- **Visual**: Richard tests visuals/feel himself (do not screenshot-hunt)
+- **Code compiles and runs**: verify in Godot Editor
+- **Pipeline order-independence**: pass `tools/test_pipeline.gd` headless before merge
+- **Slice validation**: six items visibly stack, player can describe build by room 3
+
+---
+
+## Before You Start
+1. Read root `CLAUDE.md` for shared Godot setup, anti-patterns, vigilance rule
+2. Check GitHub Issues (filter by `project:sickest-man-alive`)
+3. If editing design: update this CLAUDE.md and close stale issues
+4. If finding contradiction: stop and name it (see root CLAUDE.md vigilance rule)
+
+---
+
+## See Also
+- Root `CLAUDE.md` — shared knowledge across all projects
+- `Semi Secret Wars/CLAUDE.md` — other active game
+- `Roguelite Football Manager/CLAUDE.md` — other active game
