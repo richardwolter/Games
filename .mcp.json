@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "godot-lake-cleanup": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Lake Cleanup"
+      ]
+    },
+    "godot-strait-across": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Strait Across"
+      ]
+    },
+    "godot-sickest-man-alive": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Sickest Man Alive"
+      ]
+    },
+    "godot-semi-secret-wars": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Semi Secret Wars"
+      ]
+    },
+    "godot-rfm": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Roguelite Football Manager"
+      ]
+    }
+  }
+}
