@@ -218,7 +218,14 @@ const SHELF_TILES := 2.2
 ## How far a rubbish tile is kept past the end of that shelf, in tiles. A piece is drawn a
 ## good deal wider than the tile it sits on, and one sitting exactly on the last row of sand
 ## overlaps it.
-const SHELF_CLEAR := 0.5
+##
+## Was 0.5, which held the ring a full half tile off sand that has already faded to nothing
+## by then — the island sat in a moat of clean water it had not been cleaned out of. At 0.1
+## the nearest rubbish is 2.3 tiles out: still clear of the drawn sand, close enough that the
+## island reads as something the filth has washed up against rather than something it keeps
+## away from. The overlap this guards against is a few pixels of a sprite over the faintest
+## end of the shelf, which is what a piece of junk aground at the water's edge looks like.
+const SHELF_CLEAR := 0.1
 
 
 ## How far past the water's edge a spot is, in tiles: negative under the island, zero at the

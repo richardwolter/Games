@@ -144,16 +144,32 @@ const RING := 0.84
 ##
 ## All three of these are multiples of the island's radius, so growing the island grew the
 ## room the ferry left round it by the same factor — and a bend that swings wide of a bigger
-## island is a longer trip for the same crossing. Pulled back in (from 1.7 / 2.6 / 2.15) so
-## the ferry keeps about the same distance in tiles off the beach as it did before.
-const ISLAND_CLEAR := 1.25
+## island is a longer trip for the same crossing.
+##
+## 1.0 is the waterline, not the edge of what the island looks like. The island's sand keeps
+## going under the lake for `Iso.SHELF_TILES` — 2.2 tiles — and fades out there, and that
+## faded sand is what the eye reads as the island. At 1.25 this left 1.85 tiles, which ended
+## inside the sand: the ferry crossed the shelf on every run past. At 1.43 it is 3.2 tiles,
+## which is the sand plus a lane of open water wide enough to read as one.
+##
+## Deliberately inside where the rubbish starts (`Iso.SHELF_CLEAR`, 2.3 tiles out): the lane
+## the ferry keeps is over the near edge of the rubbish ring, and a skimmer fitted to it
+## fishes that edge on the way past. Clearance here is about the picture — a boat crossing a
+## beach — not about the water being empty.
+const ISLAND_CLEAR := 1.43
 
 ## How far out a bend round the island swings, and how far out the dock is approached from,
 ## in the same units. Both are comfortably outside ISLAND_CLEAR: a waypoint sitting exactly
 ## on the limit makes the chords either side of it dip below the limit, and the leg gets
 ## split again for no gain.
+##
+## The berth moved out with the clearance; the bend did not have to. At 2.1 tiles outside
+## `ISLAND_CLEAR` it is still comfortably clear of it, and swinging it wider only bought a
+## longer trip: 1.80 put the worst run home at 1.32 times the direct distance against 1.30
+## here, and pulling it in to 1.58 traded a hundredth of that back for six corners instead of
+## four.
 const ISLAND_BEND := 1.72
-const ISLAND_BERTH := 1.44
+const ISLAND_BERTH := 1.57
 
 ## How often a moving skimmer gets a go at the water, in tiles travelled. Rolling once per
 ## frame would make the catch rate depend on the frame rate, which is the kind of bug that
@@ -654,14 +670,14 @@ func _plan_legs(from: Vector2, to: Vector2) -> Array[Vector2]:
 	# the bend has to be bent, and the ferry arrives home sideways after four corrections.
 	var points: Array[Vector2] = []
 	var start := from
-	if from.is_equal_approx(dock):
+	if from.distance_to(dock) < ARRIVE_DISTANCE:
 		start = _dock_approach()
 		points.append(start)
 	var finish := to
 	var tail: Array[Vector2] = []
-	if to.is_equal_approx(dock):
+	if to.distance_to(dock) < ARRIVE_DISTANCE:
 		finish = _dock_approach()
-		tail.append(dock)
+		tail.append(to)
 
 	points.append_array(_split_leg(start, finish))
 	points.append_array(tail)
@@ -762,13 +778,29 @@ func _tidy(from: Vector2, legs: Array[Vector2]) -> Array[Vector2]:
 ## send the empty ferry home by way of three quarters of the lake: the destination itself
 ## failed the test, so the leg split until it ran out of recursion. A leg only has to stay
 ## as clear of the island as the places it is joining already are.
+## Whether a leg keeps `ISLAND_CLEAR` all the way along it.
+##
+## Only `from` may lower the limit, and only because the boat is already there: a ferry
+## leaving the dock is inside the clearance by definition and has to be allowed to drive out
+## of it. `to` may not, and neither may any point sampled in between.
+##
+## That asymmetry is the whole fix. The limit used to be the smallest of the two ends, which
+## sounds even-handed and is not: `_smooth` asks whether a corner it has *invented* is clear,
+## passes that corner as `to`, and a corner far enough inside the island answered its own
+## question. The planner was pulling waypoints onto the shed and approving them for being
+## there — a run home from the north yard went 1.7 tiles inland.
+##
+## The dock is the one destination that may lower it as well, because the dock is tucked
+## against the beach and cannot be reached from outside the clearance at all. That is safe
+## for the same reason the invented corners are not: the dock is a fixed point the level put
+## there, so letting a leg run in as close as the dock itself never licenses anything nearer
+## than the dock. A run that comes in straight, like the yard due south of it, stays one leg;
+## one that would cut the corner still has to bend, because the sampled points along it are
+## judged against the dock's own distance and not against their own.
 func _leg_is_clear(from: Vector2, to: Vector2) -> bool:
-	var limit := minf(
-		ISLAND_CLEAR,
-		minf(
-			Iso.island_fraction(from.x, from.y), Iso.island_fraction(to.x, to.y)
-		)
-	)
+	var limit := minf(ISLAND_CLEAR, Iso.island_fraction(from.x, from.y))
+	if to.distance_to(dock) < ARRIVE_DISTANCE:
+		limit = minf(limit, Iso.island_fraction(to.x, to.y))
 	for i in 17:
 		var at := from.lerp(to, float(i) / 16.0)
 		if Iso.island_fraction(at.x, at.y) < limit - 0.001:
