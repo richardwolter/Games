@@ -96,6 +96,36 @@ const RIPPLE_WAKE_LOOK := 0.35
 ## carry the effect for everybody.
 const RIPPLE_MOST := 110
 
+## What the basin's fill draws on for a slot, once depth has decided how many slots a tile
+## gets. See `build`.
+##
+## `MATERIAL_QUOTA` is not tuned by feel: it is `Plastic, Timber, Metal, Rubber`, measured
+## off the lake this replaced (`tools/measure_fill.gd`, one run, logged) so the four yards
+## keep the mix of work they had before this changed what fills a stack. Changing which
+## piece lands where should not quietly change which yard gets the traffic.
+const MATERIAL_QUOTA := [0.24, 0.21, 0.42, 0.13]
+
+## How wide a band of the lightness range is drawn from at one depth, as a fraction of the
+## full range end to end.
+##
+## This is what replaced sorting the whole basin into one line from lightest to heaviest.
+## A tile's depth still points at a rough weight class — see `up` in `build` — but the
+## band is wide enough that which piece within it turns up is not the same piece every
+## time, and not obviously the next one down from its neighbour either. Narrower and every
+## tile at a depth reads as the same again; wider and the band stops meaning anything, which
+## is `FRINGE_BAIT` below rather than the general case.
+const FILL_BAND := 0.55
+
+## How often a slot ignores its depth's band entirely and draws from the material's whole
+## range instead.
+##
+## Without this, nothing heavy ever floats near the surface, which is exactly the
+## in-sequence read this was meant to break: skim long enough and the shape of what is
+## left still gives away the schedule. A rare heavy piece sitting where a tool cannot yet
+## reach it is a landmark instead — something to want the upgrade for — as long as it stays
+## rare enough that it reads as a find and not as the new normal.
+const FILL_BAIT_CHANCE := 0.06
+
 ## Def index per slot, bottom-first. One entry per tile, indexed ty * Iso.COLS + tx; dry
 ## land is an empty stack.
 var stacks: Array[PackedInt32Array] = []
@@ -117,6 +147,16 @@ var facing := PackedByteArray()
 var emerge := PackedFloat32Array()
 
 var defs: Array[TrashDef] = []
+
+## The non-keepsake defs, split by material and each sorted by lightness. What `build`
+## draws a slot's piece from: the quota picks one of these four, the band narrows it, and
+## sorted order is what makes "narrows it" a contiguous slice rather than a filter over
+## the whole list every slot.
+var _by_material: Array = [[], [], [], []]
+
+## The lightest and heaviest a slot can ask for, across every material together, so a
+## depth's band means the same weight class whichever material the quota happens to draw.
+var _lightness_span := Vector2(0.0, 1.0)
 
 ## The art. With no atlas every piece falls back to the blocked-in quad it used to be, so
 ## the lake still runs with assets/ missing.
@@ -636,10 +676,13 @@ func tile_at(where: Vector2) -> int:
 
 ## Fill the basin, once, from a fixed seed. Same seed, same lake, every run.
 ##
-## A tile's stack is as deep as the water under it, and the kinds are chosen by depth from
-## a list sorted by lightness: light rubbish on top, heavy tiers underneath. That order is
-## what makes the progression legible — you clear the surface layer, and what you find
-## beneath it is the tier you cannot lift yet.
+## A tile's stack is as deep as the water under it, and its depth still points a slot at a
+## rough weight class — heavier towards the floor, lighter towards the surface — but no
+## longer at one piece off one sorted line. That line was a schedule: clear the surface and
+## what came up next was always the next entry down it, so a run of skimming told you
+## exactly what tier was coming before you got there. See `_roll_piece` for what replaced
+## it and `MATERIAL_QUOTA`/`FILL_BAND`/`FILL_BAIT_CHANCE` for the numbers it turns on.
+##
 ## Lay the field out.
 ##
 ## `fill` says whether to put anything in it. A lake with nothing floating on it is a real
@@ -663,14 +706,18 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 
 	# The one-off finds are not part of the fill. They are planted afterwards, one of each,
 	# and a fill that dealt them out would put a wardrobe on every third tile.
-	var lightest_first: Array[int] = []
+	_by_material = [[], [], [], []]
+	var lightest := INF
+	var heaviest := -INF
 	for i in defs.size():
 		if defs[i].keepsake:
 			continue
-		lightest_first.append(i)
-	lightest_first.sort_custom(
-		func(a: int, b: int) -> bool: return defs[a].lightness > defs[b].lightness
-	)
+		_by_material[defs[i].material].append(i)
+		lightest = minf(lightest, defs[i].lightness)
+		heaviest = maxf(heaviest, defs[i].lightness)
+	for pool: Array in _by_material:
+		pool.sort_custom(func(a: int, b: int) -> bool: return defs[a].lightness < defs[b].lightness)
+	_lightness_span = Vector2(heaviest, lightest)  # x: floor end, y: surface end
 
 	for ty in Iso.ROWS:
 		for tx in Iso.COLS:
@@ -683,22 +730,57 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 				continue
 			var slots := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
 			for k in slots:
-				# 0 at the floor, 1 at the surface. Inverted against the list, which is
-				# lightest-first, so the bottom of the stack gets the heaviest end of it.
+				# 0 at the floor, 1 at the surface.
 				var up := float(k) / maxf(float(slots - 1), 1.0)
-				# The jitter is wide on purpose. A tight one makes every tile at the same
-				# depth show the same piece, and the lake reads as wallpaper rather than
-				# as rubbish.
-				var pick := int(
-					(1.0 - up) * float(lightest_first.size() - 1)
-					+ _rng.randf_range(-4.5, 4.5)
-				)
-				stack.append(lightest_first[clampi(pick, 0, lightest_first.size() - 1)])
+				stack.append(_roll_piece(up))
 			stacks[index] = stack
 
 	_emerging.resize(0)
 	_dirty = true
 	queue_redraw()
+
+
+## One slot's piece: a material by `MATERIAL_QUOTA`, then a weight within it by `up` and
+## `FILL_BAND` — or, `FILL_BAIT_CHANCE` of the time, any weight the material has at all.
+##
+## Quota first, band second, deliberately not the other way round. Banding first and then
+## asking which materials are actually in that band would answer "what's heavy here" before
+## "how much metal does the whole lake need", and a band with only one material in it would
+## silently spend that tile's quota-share regardless — plastic has nothing heavier than a
+## jug, so every deep slot would starve it. Asking the quota first and then narrowing what
+## it drew keeps the four yards' traffic what `MATERIAL_QUOTA` says even where a material's
+## whole range sits at one end of the lake.
+func _roll_piece(up: float) -> int:
+	var roll := _rng.randf()
+	var material := MATERIAL_QUOTA.size() - 1
+	var at := 0.0
+	for m in MATERIAL_QUOTA.size():
+		at += MATERIAL_QUOTA[m]
+		if roll < at and not _by_material[m].is_empty():
+			material = m
+			break
+	var pool: Array = _by_material[material]
+	if pool.is_empty():
+		pool = _by_material.filter(func(p: Array) -> bool: return not p.is_empty())[0]
+	if _rng.randf() < FILL_BAIT_CHANCE:
+		return pool[_rng.randi_range(0, pool.size() - 1)]
+
+	# `up` runs floor (0) to surface (1); `_lightness_span` runs the same way, heaviest
+	# first. A band this wide either end of the target simply clips against the pool's own
+	# ends rather than wrapping, which is what keeps the deepest slots from occasionally
+	# fishing up the lightest thing the material has.
+	var span := _lightness_span.y - _lightness_span.x
+	var target := _lightness_span.x + up * span
+	var half := FILL_BAND * span * 0.5
+	var lo := target - half
+	var hi := target + half
+	var band: Array[int] = []
+	for idx: int in pool:
+		if defs[idx].lightness >= lo and defs[idx].lightness <= hi:
+			band.append(idx)
+	if band.is_empty():
+		return pool[_rng.randi_range(0, pool.size() - 1)]
+	return band[_rng.randi_range(0, band.size() - 1)]
 
 
 ## Put a saved field back. The stacks are the only part of the lake that is not implied by

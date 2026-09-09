@@ -65,12 +65,20 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   see `scripts/iso.gd`. Superseded the earlier column-stack description below; the lessons
   (one representation, no physics) carried over, the geometry did not.
 - **Reachability**: only the top of what a tile holds is harvestable — spatial, not
-  rule-enforced. "Skim light rubbish first, upgrade to reach deeper" still holds.
+  rule-enforced. "Skim light rubbish first, upgrade to reach deeper" is a *trend*, not a
+  schedule (see below) — depth still points a stack at a rough weight class, but no
+  longer at one piece off one line sorted lightest to heaviest.
 
 ### Item Data
-- `TrashDef` now holds: sprite, size, pollution value, haul_cost, tier, lightness (sort key, not force)
+- `TrashDef` now holds: sprite, size, pollution value, haul_cost, tier, lightness (weight class, not force)
 - No physics-derived properties
-- **Lightness** determines sort order when reordering the stack — heavy items sink naturally over time
+- **Lightness** used to be a sort key for the whole basin's fill — every stack drawn from
+  one line, lightest on top, heaviest at the floor. That read as a schedule: skim long
+  enough and the next tier down was always the very next entry. `LakeGrid._roll_piece`
+  replaced it — a material by `MATERIAL_QUOTA`, then a lightness band around the slot's
+  depth (`FILL_BAND`), with `FILL_BAIT_CHANCE` of slots ignoring the band so a rare heavy
+  piece can float near the surface as a landmark rather than a hazard. Material quota is
+  measured off the old fill, not guessed, so the four yards keep the traffic they had.
 
 ### Why Layout is Better Than Physics
 1. One source of truth (layout) prevents overlap bugs
