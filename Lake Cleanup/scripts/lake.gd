@@ -31,8 +31,6 @@ const Style := preload("res://scripts/style.gd")
 ## Master palette colors. See scripts/palette.gd and resources/palette.tres.
 const Palette := preload("res://scripts/palette.gd")
 
-## What the finds are called. See scripts/find_names.gd.
-const FindNames := preload("res://scripts/find_names.gd")
 
 ## The lake is laid out from this, once, at load. Same seed, same lake, every run — which
 ## is what makes a tuning pass a comparison rather than a new roll of the dice.
@@ -274,81 +272,9 @@ const CLOSE_INSET := 12.0
 ## save is written on its own timer rather than on every change: a purchase or a sale can
 ## happen several times a second, and the field is the biggest thing in the file.
 const SAVE_PATH := "user://lake_cleanup.save"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 const AUTOSAVE_EVERY := 20.0
 
-## What every piece in a version 3 save is called now.
-##
-## The sheet slicer used to weld a row of small things that touch into one item — four frying
-## pans hung handle to handle came out as a single piece — and fixing that added pieces to
-## the catalogue, which renumbered every name after them. A save stores what it found and
-## what is out in the shed by name, so without this a shed decorated before the re-cut comes
-## back with everything one piece along: the dresser is a mirror and the bookcase is a clock.
-##
-## Built by matching the old boxes to the new ones by area, once, offline; only the names
-## that actually moved are listed. Version 3 saves are migrated through it on load, which is
-## the whole reason the version went up rather than the old saves being refused.
-## What the sheets call a turned-over copy of a piece. See `_recut_name`.
-const MIRROR_SUFFIX := "_r"
-
-const RECUT_RENAMES := {
-	"small_45": &"small_48",
-	"small_46": &"small_49",
-	"small_47": &"small_50",
-	"small_48": &"small_51",
-	"small_49": &"small_52",
-	"small_50": &"small_53",
-	"small_51": &"small_54",
-	"small_52": &"small_55",
-	"small_53": &"small_56",
-	"small_54": &"small_57",
-	"small_55": &"small_58",
-	"small_56": &"small_59",
-	"small_57": &"small_60",
-	"small_58": &"small_61",
-	"small_59": &"small_62",
-	"small_60": &"small_63",
-	"furniture_10": &"furniture_11",
-	"furniture_11": &"furniture_12",
-	"furniture_12": &"furniture_13",
-	"furniture_13": &"furniture_14",
-	"furniture_14": &"furniture_15",
-	"furniture_15": &"furniture_16",
-	"furniture_16": &"furniture_17",
-	"furniture_17": &"furniture_18",
-	"furniture_18": &"furniture_19",
-	"furniture_19": &"furniture_20",
-	"furniture_20": &"furniture_21",
-	"furniture_21": &"furniture_22",
-	"furniture_22": &"furniture_23",
-	"furniture_23": &"furniture_24",
-	"furniture_24": &"furniture_25",
-	"furniture_25": &"furniture_26",
-	"furniture_26": &"furniture_27",
-	"furniture_27": &"furniture_28",
-	"furniture_28": &"furniture_29",
-	"furniture_29": &"furniture_30",
-	"furniture_30": &"furniture_31",
-	"furniture_31": &"furniture_32",
-	"furniture_32": &"furniture_33",
-	"furniture_33": &"furniture_34",
-	"furniture_34": &"furniture_35",
-	"furniture_35": &"furniture_36",
-	"furniture_36": &"furniture_37",
-	"furniture_37": &"furniture_38",
-	"furniture_38": &"furniture_39",
-	"furniture_39": &"furniture_40",
-	"furniture_40": &"furniture_41",
-	"furniture_41": &"furniture_42",
-	"furniture_42": &"furniture_43",
-	"furniture_43": &"furniture_44",
-	"furniture_44": &"furniture_45",
-	"furniture_45": &"furniture_46",
-	"furniture_46": &"furniture_47",
-	"furniture_47": &"furniture_48",
-	"furniture_48": &"furniture_49",
-	"furniture_49": &"furniture_50",
-}
 
 
 
@@ -481,8 +407,6 @@ var _yard: Yard
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
 var _water_material: ShaderMaterial
-## The rubbish's own material, so the filth on it can be pushed with the water's.
-var _grime_material: ShaderMaterial
 
 ## The island's shed. A drawn node with nothing else to do.
 var _island: Node2D
@@ -765,7 +689,6 @@ func _ready() -> void:
 	bob.set_shader_parameter(&"wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 	bob.set_shader_parameter(&"wave_speed", LakeGrid.WAVE_SPEED)
 	_grid.material = bob
-	_grime_material = bob
 	_sheets = Sheets.new()
 	if not _sheets.load_all():
 		_sheets = null
@@ -1142,12 +1065,13 @@ func _dog_brought_back(def_index: int) -> void:
 ## not a name (see lake_grid.gd's `restore`), so an existing save breaks if an entry here
 ## is reordered or removed. Add new kinds at the end only.
 const TRASH_ORDER := [
-	"mug", "jar", "bottle", "fish_bowl",
-	"shelf_board", "book", "chopping_board", "crate",
-	"tin_plate", "cooking_pot", "teapot", "wall_clock",
-	"rubber_duck", "chew_toy", "ball", "urn",
-	"painting_portrait", "painting_landscape", "wood_board", "wire_hanger",
-	"stock_pot", "metal_cup", "tin_can_a", "tin_can_b", "tin_can_c",
+	"metal_can1", "metal_can2", "metal_can3", "metal_can4",
+	"metal_hanger", "metal_pan", "metal_phone", "metal_pot",
+	"metal_support", "metal_teapot", "plastic_bowl", "plastic_cup1",
+	"plastic_cup2", "plastic_mug", "plastic_plate", "plastic_sheet",
+	"plastic_wrap", "rubber_ball", "rubber_bone", "rubber_disk",
+	"rubber_duck", "rubber_tire", "wood_box1", "wood_box2",
+	"wood_painting1", "wood_painting2", "wood_piece",
 ]
 
 func _default_defs() -> Array[TrashDef]:
@@ -1172,15 +1096,15 @@ func _default_defs() -> Array[TrashDef]:
 ## from the art rather than written out, and a new sheet is new things to find.
 func _all_defs() -> Array[TrashDef]:
 	var all := _default_defs()
-	if _sheets == null or not _sheets.by_sheet.has("furniture"):
+	if _sheets == null or not _sheets.by_sheet.has("decor_dirty"):
 		_dress(all)
 		return all
-	for name: String in _sheets.by_sheet["furniture"] as PackedStringArray:
-		# Nameless pieces are not furniture. The sheet slicer keeps anything big enough to be
-		# an item, and a couple of what it keeps are offcuts — a dark cross a dozen pixels
-		# across, a sliver off the side of a bookcase — which have no entry in
-		# scripts/find_names.gd because there is nothing to call them. Dealt as treasure they
-		# turned up in the lake as a find the player carried home and could not name.
+	for name: String in _sheets.by_sheet["decor_dirty"] as PackedStringArray:
+		# Nameless pieces are not finds. Every decoration is named in tools/decor_sets.json
+		# by hand, so this should never fire now — it fired when the collection was cut off a
+		# sprite sheet by a slicer that kept anything big enough to be an item, offcuts
+		# included, and a nameless offcut dealt as treasure turned up in the lake as a find
+		# the player carried home and could not name. Kept as the gate that stops that.
 		if _pretty(name).is_empty():
 			continue
 		var cells := _sheets.cells_of(name)
@@ -1194,7 +1118,11 @@ func _all_defs() -> Array[TrashDef]:
 			clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
 		)
 		find.keepsake = true
-		all.append(find)
+		# One def per copy, not one def hidden several times: `_hide_treasures` plants one of
+		# each keepsake def, and every copy has to be its own object in the water with its own
+		# hiding place. Four chairs in one corner is a stack, not a set.
+		for copy in _sheets.copies_of(StringName(name)):
+			all.append(find if copy == 0 else find.duplicate() as TrashDef)
 	_dress(all)
 	return all
 
@@ -1253,12 +1181,12 @@ func found() -> Array[String]:
 
 ## A catalogue name as something to read, or nothing at all.
 ##
-## The names are written down in scripts/find_names.gd. Empty for a piece that has not been
-## named rather than a stand-in: "Find 07" is not something anybody pulled out of a lake,
-## and every screen that shows a find now checks for the empty string and draws the picture
-## on its own instead.
+## The names are baked into assets/pieces.json beside the rectangles, from the authored
+## table in tools/decor_sets.json. Empty for a piece that has not been named rather than a
+## stand-in: "Find 07" is not something anybody pulled out of a lake, and every screen that
+## shows a find checks for the empty string and draws the picture on its own instead.
 func _pretty(name: String) -> String:
-	return FindNames.of(name)
+	return "" if _sheets == null else _sheets.title_of(StringName(name))
 
 
 ## Point every def at its picture, and take its drawn size from the art rather than from
@@ -1989,7 +1917,16 @@ func _build_trophy() -> void:
 ## showing the player twice in their inventory.
 func _keep(def: TrashDef) -> void:
 	var name := String(def.piece)
-	if name.is_empty() or unlocked.has(name):
+	if name.is_empty():
+		return
+	# Kept up to the number that were hidden. It used to be one of anything, which was the
+	# same rule as "one of each was planted"; now the chairs come four to a set, and the
+	# shelf has to hold four of them without holding a fifth that was never in the water.
+	var held := 0
+	for kept: String in unlocked:
+		if kept == name:
+			held += 1
+	if _sheets != null and held >= _sheets.copies_of(StringName(name)):
 		return
 	unlocked.append(name)
 	_note_save(
@@ -2662,9 +2599,6 @@ func _push_water_colours() -> void:
 		_sparkle_at, 1.0 if _cleaned else 0.0, SPARKLE_RISE * get_process_delta_time()
 	)
 	_water_material.set_shader_parameter(&"sparkle", _sparkle_at)
-	# The junk wears the same filth the water does. It is floating in it.
-	if _grime_material != null:
-		_grime_material.set_shader_parameter(&"grime", shown)
 
 
 func _update_hud() -> void:
@@ -2843,34 +2777,6 @@ func has_save() -> bool:
 	return FileAccess.file_exists(save_path)
 
 
-## A version 3 save with every renamed piece renamed. See RECUT_RENAMES.
-func _rename_recut(save: Dictionary) -> Dictionary:
-	var out := save.duplicate(true)
-	var finds: Array = []
-	for name: String in out.get("unlocked", []) as Array:
-		finds.append(_recut_name(name))
-	out["unlocked"] = finds
-	var placed: Array = []
-	for row: Dictionary in out.get("decor", []) as Array:
-		var kept := row.duplicate(true)
-		kept["piece"] = _recut_name(String(row.get("piece", "")))
-		placed.append(kept)
-	out["decor"] = placed
-	return out
-
-
-## One piece's new name, mirrored copies included.
-##
-## Sheets registers a turned-over copy of some pieces as `<name>_r`, and a save holds those
-## by that name like any other. The rename table is written against the pieces themselves,
-## so the suffix comes off, the name is looked up, and it goes back on.
-func _recut_name(name: String) -> String:
-	if name.ends_with(MIRROR_SUFFIX):
-		var base := name.substr(0, name.length() - MIRROR_SUFFIX.length())
-		return String(RECUT_RENAMES.get(base, base)) + MIRROR_SUFFIX
-	return String(RECUT_RENAMES.get(name, name))
-
-
 ## Read a run back. Anything wrong with the file — missing, from another lake, from an
 ## older layout — leaves the fresh game alone rather than half-applying itself.
 func load_game() -> bool:
@@ -2883,12 +2789,9 @@ func load_game() -> bool:
 	file.close()
 	var save := raw as Dictionary
 	var written := 0 if save == null else int(save.get("version", 0))
-	if save == null or (written != SAVE_VERSION and written != SAVE_VERSION - 1) 			or int(save.get("seed", 0)) != _level_seed():
+	if save == null or written != SAVE_VERSION 			or int(save.get("seed", 0)) != _level_seed():
 		_note_save("the save is from another build — ignored")
 		return false
-	# A version 3 save calls its finds by their pre-re-cut names. See RECUT_RENAMES.
-	if written == SAVE_VERSION - 1:
-		save = _rename_recut(save)
 	if not _grid.restore(save.get("stacks", []) as Array):
 		_note_save("the save does not fit this lake — ignored")
 		return false
@@ -2931,6 +2834,9 @@ func load_game() -> bool:
 		decor.append({
 			"piece": name,
 			"cell": [int((row["cell"] as Array)[0]), int((row["cell"] as Array)[1])],
+			# Which way round it was left standing, and whether its fire was lit. A piece
+			# with one face reads as 0 whatever is in the file. See ShedRoom._row_view.
+			"view": int(row.get("view", 0)),
 		})
 
 	# The fleet is rebuilt to the size that was bought, and every hull comes home empty:

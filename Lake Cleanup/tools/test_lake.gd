@@ -954,13 +954,16 @@ func _stage_art() -> void:
 			outside += 1
 	_check(outside == 0, "every region lies inside the atlas", "%d do not" % outside)
 
+	# Counted by name rather than by def: a find with several copies has a def each, and
+	# what has to match the planting is how many distinct finds there are.
 	var undressed := 0
-	var keepsakes := 0
+	var keepsake_names := {}
 	for def: TrashDef in _grid.defs:
 		if String(def.piece).is_empty() or def.atlas == null:
 			undressed += 1
 		if def.keepsake:
-			keepsakes += 1
+			keepsake_names[String(def.piece)] = true
+	var keepsakes := keepsake_names.size()
 	_check(undressed == 0, "every def is pointed at a picture",
 		"%d are not" % undressed)
 	_check(keepsakes > 0, "there are finds to find", "%d of them" % keepsakes)
@@ -1032,7 +1035,12 @@ func _stage_art() -> void:
 	_check(worst < 0.2, "the anchor survives the vertex colour",
 		"%.3f px at worst" % worst)
 
-	# One of each find, planted in the water, and none of them on offer to the skimmer.
+	# Every find planted in the water as many times as the catalogue asks for, and none of
+	# them on offer to the skimmer.
+	#
+	# It used to be one of each, flat. The chairs come four to a set now — a dining table
+	# with one chair at it is not a room anybody lives in — so the number to expect is the
+	# catalogue's, per name, and "one" is only still the answer for everything else.
 	var counts := {}
 	var keepsake_tile := -1
 	var keepsake_slot := -1
@@ -1044,13 +1052,21 @@ func _stage_art() -> void:
 			counts[String(def.piece)] = int(counts.get(String(def.piece), 0)) + 1
 			keepsake_tile = index
 			keepsake_slot = k
-	var doubled := 0
+	var miscounted := ""
 	for name: String in counts:
-		if int(counts[name]) != 1:
-			doubled += 1
-	_check(counts.size() == keepsakes and doubled == 0,
-		"one of every find is hidden in the lake",
-		"%d planted, %d of them more than once" % [counts.size(), doubled])
+		var wanted := sheets.copies_of(StringName(name))
+		if int(counts[name]) != wanted:
+			miscounted = "%s: %d planted, %d wanted" % [name, int(counts[name]), wanted]
+			break
+	var planted := 0
+	for name: String in counts:
+		planted += int(counts[name])
+	_check(counts.size() == keepsakes and miscounted.is_empty(),
+		"every find is hidden in the lake as many times as the catalogue asks",
+		"%d names, %d planted%s" % [
+			counts.size(), planted,
+			"" if miscounted.is_empty() else " — " + miscounted
+		])
 
 	if keepsake_tile >= 0:
 		# Dig straight to it with a net strong enough for anything, then ask again as the
@@ -1093,6 +1109,51 @@ func _stage_shed() -> void:
 	_check(_yard.held.is_empty(), "a find never joins the pile to be sold",
 		"%d in the yard" % _yard.held.size())
 
+	# A find that comes in fours comes in fours, and stops at four.
+	#
+	# "Kept once, however many turn up" was the rule for every find until the chairs, and it
+	# is still the rule for the number the catalogue asks for — the cap just is not one any
+	# more. Netting the same chair five times has to leave four on the shelf: four is a
+	# dining set, five is a bug that would let a player farm one tile for furniture.
+	var many := ""
+	for name: String in sheets.names:
+		if sheets.copies_of(StringName(name)) > 1:
+			many = name
+			break
+	if many.is_empty():
+		_check(false, "there is a find that comes in more than one", "")
+	else:
+		var wanted := sheets.copies_of(StringName(many))
+		var many_index := -1
+		for i in _grid.defs.size():
+			if String(_grid.defs[i].piece) == many:
+				many_index = i
+				break
+		unlocked.clear()
+		for attempt in wanted + 1:
+			_main.call(&"_on_net_landed", PackedInt32Array([many_index]))
+		var held := 0
+		for kept: String in unlocked:
+			if kept == many:
+				held += 1
+		_check(held == wanted, "a find that comes in fours is kept four times and no more",
+			"%s: %d kept of %d" % [many, held, wanted])
+
+		# And the shelf counts them rather than matching by name: standing one chair down
+		# must not take the other three off the list with it.
+		var many_decor: Array = _main.get(&"decor")
+		many_decor.clear()
+		room.unlocked = unlocked as Array[String]
+		room.decor = many_decor
+		var before := room.in_store().size()
+		room.place(StringName(many), Vector2i(1, 1))
+		_check(room.in_store().size() == before - 1,
+			"and standing one of them down leaves the rest on the shelf",
+			"%d listed, %d after one was placed" % [before, room.in_store().size()])
+		many_decor.clear()
+		unlocked.clear()
+		_main.call(&"_on_net_landed", PackedInt32Array([find_index]))
+
 	# The room.
 	var decor: Array = _main.get(&"decor")
 	decor.clear()
@@ -1111,20 +1172,71 @@ func _stage_shed() -> void:
 	# 27 pixels across is three cells of eight and not four.
 	# Measured in pixels rather than as a fraction: the smallest pieces are a few pixels
 	# across and are always going to round up to the one cell nothing can be smaller than.
+	#
+	# Measured against the view the shed actually stands, not against the piece's picture in
+	# the lake. Those were the same drawing twice until the decoration art; now a sofa is
+	# 22 px on its side in the water and 49 head-on in the room, and reading the floor it
+	# takes up off the wrong one of those is the bug this check exists to catch.
 	var worst := 0.0
 	var worst_name := ""
 	for name: String in sheets.names:
-		var art := sheets.region_of(StringName(name)).size
-		var cells := room.span_of(StringName(name))
-		var off := maxf(
-			absf(float(cells.x * ShedRoom.CELL) - art.x),
-			absf(float(cells.y * ShedRoom.CELL) - art.y)
-		)
-		if off > worst:
-			worst = off
-			worst_name = name
+		for view in sheets.view_count(StringName(name)):
+			var art := sheets.view_region_of(StringName(name), view).size
+			var cells := room.span_of(StringName(name), view)
+			var off := maxf(
+				absf(float(cells.x * ShedRoom.CELL) - art.x),
+				absf(float(cells.y * ShedRoom.CELL) - art.y)
+			)
+			if off > worst:
+				worst = off
+				worst_name = "%s/%s" % [name, sheets.role_of(StringName(name), view)]
 	_check(worst <= float(ShedRoom.CELL), "a footprint fits the thing standing in it",
 		"%s is %.0f px out of %d" % [worst_name, worst, ShedRoom.CELL])
+
+	# Every set is a set of something: a piece with more than one face has to say which
+	# verb turns it, or the shed has art it cannot show. The authored table in
+	# tools/decor_sets.json is where that is said, and this is the gate on it.
+	var mute := ""
+	for name: String in sheets.names:
+		if sheets.view_count(StringName(name)) > 1 				and sheets.kind_of(StringName(name)) == Sheets.Set.SINGLE:
+			mute = name
+			break
+	_check(mute.is_empty(), "every piece with more than one face says what turns it", mute)
+
+	# And the two verbs are exclusive: R turns a chair and E works a switch, and a piece
+	# that answered both would answer whichever was asked first.
+	var both := ""
+	for name: String in sheets.names:
+		if sheets.turnable(StringName(name)) and sheets.switchable(StringName(name)):
+			both = name
+			break
+	_check(both.is_empty(), "and nothing is both turned and switched", both)
+
+	# R has to arrive as a key, not as a method call. The room reads keys in
+	# `_unhandled_key_input` because `_gui_input` only ever sees them on the Control that
+	# holds focus — and this room never takes focus, so the first cut of the turn verb was
+	# wired somewhere no key could reach. Calling `turn_carried()` here would pass against
+	# that bug, so the event goes through the viewport the way a player's does.
+	var turner := ""
+	for name: String in sheets.names:
+		if sheets.turnable(StringName(name)):
+			turner = name
+			break
+	if turner.is_empty():
+		_check(false, "there is something in the catalogue that turns", "")
+	else:
+		_main.call(&"_set_shed", true)
+		room.carrying = StringName(turner)
+		room.set(&"_carry_view", 0)
+		var press := InputEventKey.new()
+		press.keycode = KEY_R
+		press.pressed = true
+		room.get_viewport().push_input(press)
+		_check(int(room.get(&"_carry_view")) == 1,
+			"pressing R turns the piece in hand",
+			"%s stayed on view %d" % [turner, int(room.get(&"_carry_view"))])
+		room.carrying = &""
+		_main.call(&"_set_shed", false)
 
 	# Rugs go down first so the chair can stand on them.
 	var rug := ""

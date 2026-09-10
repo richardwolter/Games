@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Rubber duck"
+material = 3
+piece = &"small_06"
+size = Vector2(19, 15)
+pollution = 1.0
+haul_cost = 0.5
+tier = 0
+lightness = 2.1
+block_color = Color(0.26, 0.25, 0.26, 1)

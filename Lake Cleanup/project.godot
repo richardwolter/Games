@@ -24,6 +24,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/dpi/allow_hidpi=false
 
+[dotnet]
+
+project/assembly_name="Lake Cleanup"
+
 [input]
 
 walk_left={

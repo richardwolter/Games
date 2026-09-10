@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Rubber Disk"
+material = 3
+piece = &"rubber_disk"
+size = Vector2(12.8, 8.0)
+pollution = 1.6
+haul_cost = 0.56
+tier = 0
+lightness = 2.8
+block_color = Color(0.5, 0.44, 0.58, 1)

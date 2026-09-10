@@ -454,6 +454,10 @@ func cast_to(where: Vector2, laying: bool = false) -> bool:
 	near = 0.0
 	tile_pos = angler.tile_pos
 	catch.resize(0)
+	# The angler's own throw — a no-op on the first sheet, and on the second sheet only ever
+	# a flourish: the net still flies on this same line at this same speed either way, see
+	# Angler.start_cast().
+	angler.start_cast()
 	# A cast is one gesture from the throw to the catch coming out of the water. Nothing
 	# has to be held down for the second half of it.
 	_pulling = true

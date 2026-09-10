@@ -19,8 +19,12 @@
 ## The catalogue in assets/pieces.json has been corrected by hand since it was last cut:
 ## the pieces nobody wanted are gone, and the toilet region was narrowed onto the one bowl
 ## the slicer had welded to its neighbour. Re-running this overwrites all of that, and the
-## piece names are positional, so a re-slice also renumbers everything scripts/find_names.gd
-## is keyed on. Cut a fresh sheet with it; do not re-cut the ones already in the game.
+## piece names are positional, so a re-slice also renumbers every save keyed on them. Cut a
+## fresh sheet with it; do not re-cut the ones already in the game.
+##
+## It also owns only its own half of the catalogue's contents and writes the whole file, so
+## a re-run drops the decoration pieces and the lake_objects sheet, neither of which is cut
+## here. Run tools/build_decor.py afterwards to put the decoration half back.
 ##
 ## Run it with:
 ##   godot --headless --path . --script res://tools/slice_sheets.gd
@@ -81,12 +85,14 @@ const SEAM_FRACTION := 0.5
 ## a seam. This is what takes the kitchen run apart into its cabinets.
 const FORCE_CELLS := 5
 
-## The sheets, and the prefix their pieces are named with. State2 is deliberately absent:
-## it is the same layout in a second palette, so it reuses State1's regions rather than
-## being cut again.
+## The sheets, and the prefix their pieces are named with.
+##
+## The TopDownHouse furniture pair is gone from here. Those two sheets were the collection —
+## one grimy layout and the same layout in a clean palette — and the decoration art
+## replaced both: it draws its finds twice at different sizes, packs them offline, and is
+## authored piece by piece rather than guessed at by a slicer. See tools/build_decor.py.
 const SHEETS := [
 	{"file": "res://assets/TopDownHouse_SmallItems.png", "key": "small"},
-	{"file": "res://assets/TopDownHouse_FurnitureState1.png", "key": "furniture"},
 ]
 
 

@@ -27,27 +27,6 @@ uniform float sway = 3.2;
 // LakeGrid.ANCHOR_SPAN.
 uniform float anchor_span = 8192.0;
 
-// How filthy the lake is, 0 to 1, and what the filth on a piece looks like.
-//
-// Smudges, not a wash. Tinting every pixel by the same amount is the obvious way to do this
-// and it does not read as dirt at all — it reads as somebody turning the brightness down,
-// which is exactly what the first version looked like. Real muck is patchy: it collects in
-// some places and misses others, and the clean parts next to it are what make the dirty
-// parts look dirty.
-//
-// So the filth is laid on through a noise field, thresholded so most of a piece stays as it
-// was drawn, and seeded per piece so no two are marked alike. Handed the same reading the
-// water is painted with, so the junk clears up as the lake does.
-uniform float grime = 1.0;
-uniform vec4 grime_color : source_color = vec4(0.26, 0.28, 0.18, 1.0);
-// How dark a smudge gets where it is thickest, and how much of a piece is under one at all.
-uniform float grime_soak = 0.72;
-uniform float grime_cover = 0.42;
-// How large the patches are. Smaller is finer speckle; larger is a few big stains.
-uniform float grime_grain = 5.5;
-
-varying float grime_seed;
-
 void vertex() {
 	// The piece's own anchor position is packed into the red and green channels as one
 	// sixteen-bit number, and the colour it should actually be drawn in is the grey level
@@ -71,42 +50,13 @@ void vertex() {
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.
 	COLOR = vec4(vec3(COLOR.b), COLOR.a);
-
-	// The anchor doubles as the piece's identity: every corner of one piece gets the same
-	// number, and no two pieces in the lake share one. That is what stops the whole basin
-	// wearing the same stain in the same place.
-	grime_seed = fract(x * 0.0137) * 10.0;
-}
-
-// Value noise, the cheap way: a hash at each corner of the cell and a smooth blend between
-// them. Two octaves, because one alone is too regular to pass for muck.
-float hash(vec2 at) {
-	return fract(sin(dot(at, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise(vec2 at) {
-	vec2 cell = floor(at);
-	vec2 into = fract(at);
-	into = into * into * (3.0 - 2.0 * into);
-	return mix(
-		mix(hash(cell), hash(cell + vec2(1.0, 0.0)), into.x),
-		mix(hash(cell + vec2(0.0, 1.0)), hash(cell + vec2(1.0, 1.0)), into.x),
-		into.y
-	);
 }
 
 void fragment() {
-	vec4 col = texture(TEXTURE, UV) * COLOR;
-
-	// The atlas is one big sheet, so UV alone would run the pattern straight across every
-	// piece on it. Offsetting by the seed gives each its own patch of the field.
-	vec2 at = UV * (256.0 * grime_grain) + vec2(grime_seed * 37.0, grime_seed * 11.0);
-	float muck = noise(at) * 0.65 + noise(at * 2.3 + 4.0) * 0.35;
-	// Thresholded, so most of the piece is left alone and what is left reads as a stain
-	// rather than as a filter.
-	float stain = smoothstep(1.0 - grime_cover, 1.0 - grime_cover * 0.35, muck) * grime;
-	col.rgb = mix(col.rgb, grime_color.rgb * (col.rgb + 0.35), stain * grime_soak);
-	COLOR = col;
+	// The grime used to be painted on here, as a per-piece noise stain. The art carries
+	// its own grime now (see art_source/LakeObjects.psd), so this just samples the atlas —
+	// nothing left to do but keep the piece riding the bob from vertex().
+	COLOR = texture(TEXTURE, UV) * COLOR;
 }
 
 

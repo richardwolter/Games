@@ -82,12 +82,18 @@ Games/
 
 ## Shared Art Pipeline
 
-### Photo Cutouts → ComfyUI
-**Lake Cleanup** originally planned photo-cutouts of real trash (from EBC-licensed stock) but switched to ComfyUI generation (`_pipeline/tools/generate_art.ps1`):
-- **Why**: EBC license reply blocked, hand-masking cost ~10 min/object, yielded only 6–8 objects, source capped sprites at 145px.
-- **How It Works**: Prompt-based generation of photoreal garbage against flat illustrated water, flat-overcast lighting.
-- **Thesis Kept**: The style shift (photoreal trash + flat water) remains the reward.
-- **How to Apply**: Don't re-raise photo sourcing; the current pipeline is settled.
+### Cohesive Pixel Art (current)
+**Lake Cleanup** tried photo-cutouts of real trash, then ComfyUI-generated photoreal trash
+against flat illustrated water (`_pipeline/tools/generate_art.ps1`). Both are archived; the
+settled direction is cohesive pixel art isometric, all assets from one visual voice (CC0
+packs like Forest Isometric Pack as base, master palette extracted from it, programmatic
+recolor). See `Lake Cleanup/CLAUDE.md` for the full pipeline.
+- **Why**: photo-cutouts blocked on licensing and cost ~10 min/object hand-masking; the
+  later photoreal-trash + illustrated-water split the visual voice across two styles.
+  Cohesive pixel art reads as one game and iterates faster than ComfyUI + hand-masking.
+- **How to Apply**: Don't re-raise photo sourcing or ComfyUI generation for Lake Cleanup;
+  the pixel-art pipeline is settled. `generate_art.ps1` stays in the repo as an archived
+  tool, not a live one.
 
 ### Sprite & Asset Data
 - **Asset JSON Format**: Spritesheets are paired with `.json` metadata (name, frames, animations).
@@ -183,7 +189,7 @@ Games/
 
 ### PowerShell Pipeline Scripts
 Located in `_pipeline/tools/`:
-- `generate_art.ps1` — ComfyUI prompt-based sprite generation (Lake Cleanup)
+- `generate_art.ps1` — archived ComfyUI sprite generation (Lake Cleanup, not in use)
 - Build & slice tools (per-project, see individual CLAUDE.md files)
 
 ### Test Harnesses

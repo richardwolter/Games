@@ -21,3 +21,8 @@
 # Editor / OS noise
 .DS_Store
 Thumbs.db
+*.bak
+__pycache__/
+
+# Summer Engine local-only state (SummerGit, caches, locks)
+.summer/local/

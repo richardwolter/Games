@@ -1,1746 +1,2544 @@
 {
-	"cell": 16,
-	"pieces": [
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.585,
-			"name": "small_00",
-			"region": [
-				116,
-				0,
-				9,
-				15
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.786,
-			"name": "small_01",
-			"region": [
-				4,
-				1,
-				8,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.762,
-			"name": "small_02",
-			"region": [
-				101,
-				1,
-				6,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.483,
-			"name": "small_03",
-			"region": [
-				17,
-				3,
-				13,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.483,
-			"name": "small_04",
-			"region": [
-				33,
-				3,
-				13,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.798,
-			"name": "small_05",
-			"region": [
-				53,
-				3,
-				7,
-				12
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.626,
-			"name": "small_06",
-			"region": [
-				66,
-				6,
-				11,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.9,
-			"name": "small_07",
-			"region": [
-				84,
-				10,
-				8,
-				5
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.822,
-			"name": "small_08",
-			"region": [
-				80,
-				16,
-				15,
-				15
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.976,
-			"name": "small_09",
-			"region": [
-				2,
-				17,
-				12,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.643,
-			"name": "small_10",
-			"region": [
-				113,
-				17,
-				11,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.977,
-			"name": "small_11",
-			"region": [
-				16,
-				19,
-				16,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.885,
-			"name": "small_12",
-			"region": [
-				66,
-				19,
-				13,
-				12
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.716,
-			"name": "small_13",
-			"region": [
-				99,
-				20,
-				8,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.901,
-			"name": "small_14",
-			"region": [
-				36,
-				22,
-				9,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.688,
-			"name": "small_15",
-			"region": [
-				53,
-				23,
-				8,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.984,
-			"name": "small_16",
-			"region": [
-				112,
-				32,
-				16,
-				16
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.972,
-			"name": "small_17",
-			"region": [
-				98,
-				35,
-				12,
-				12
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.813,
-			"name": "small_18",
-			"region": [
-				20,
-				39,
-				8,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.829,
-			"name": "small_19",
-			"region": [
-				51,
-				40,
-				10,
-				7
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.829,
-			"name": "small_20",
-			"region": [
-				67,
-				40,
-				10,
-				7
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.829,
-			"name": "small_21",
-			"region": [
-				83,
-				40,
-				10,
-				7
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.758,
-			"name": "small_22",
-			"region": [
-				3,
-				41,
-				11,
-				6
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.75,
-			"name": "small_23",
-			"region": [
-				38,
-				43,
-				4,
-				4
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.733,
-			"name": "small_24",
-			"region": [
-				84,
-				48,
-				10,
-				15
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.81,
-			"name": "small_25",
-			"region": [
-				50,
-				51,
-				14,
-				12
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.705,
-			"name": "small_26",
-			"region": [
-				98,
-				51,
-				13,
-				12
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.289,
-			"name": "small_27",
-			"region": [
-				115,
-				51,
-				10,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.709,
-			"name": "small_28",
-			"region": [
-				39,
-				52,
-				5,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.8,
-			"name": "small_29",
-			"region": [
-				68,
-				52,
-				10,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.966,
-			"name": "small_30",
-			"region": [
-				3,
-				55,
-				11,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.964,
-			"name": "small_31",
-			"region": [
-				20,
-				55,
-				7,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.813,
-			"name": "small_32",
-			"region": [
-				65,
-				66,
-				14,
-				13
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.813,
-			"name": "small_33",
-			"region": [
-				81,
-				66,
-				14,
-				13
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.813,
-			"name": "small_34",
-			"region": [
-				97,
-				66,
-				14,
-				13
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.813,
-			"name": "small_35",
-			"region": [
-				113,
-				66,
-				14,
-				13
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.857,
-			"name": "small_36",
-			"region": [
-				1,
-				71,
-				14,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.857,
-			"name": "small_37",
-			"region": [
-				17,
-				71,
-				14,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.857,
-			"name": "small_38",
-			"region": [
-				34,
-				71,
-				14,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.857,
-			"name": "small_39",
-			"region": [
-				49,
-				71,
-				14,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.844,
-			"name": "small_40",
-			"region": [
-				5,
-				84,
-				7,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.844,
-			"name": "small_41",
-			"region": [
-				21,
-				84,
-				7,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.844,
-			"name": "small_42",
-			"region": [
-				37,
-				84,
-				7,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.844,
-			"name": "small_43",
-			"region": [
-				53,
-				84,
-				7,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.742,
-			"name": "small_44",
-			"region": [
-				64,
-				87,
-				16,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.742,
-			"name": "small_45",
-			"region": [
-				80,
-				87,
-				16,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.742,
-			"name": "small_46",
-			"region": [
-				96,
-				87,
-				16,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.742,
-			"name": "small_47",
-			"region": [
-				112,
-				87,
-				16,
-				8
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.653,
-			"name": "small_48",
-			"region": [
-				5,
-				97,
-				7,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.653,
-			"name": "small_49",
-			"region": [
-				21,
-				97,
-				7,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.653,
-			"name": "small_50",
-			"region": [
-				37,
-				97,
-				7,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.653,
-			"name": "small_51",
-			"region": [
-				53,
-				97,
-				7,
-				14
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.711,
-			"name": "small_52",
-			"region": [
-				68,
-				102,
-				10,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.711,
-			"name": "small_53",
-			"region": [
-				84,
-				102,
-				10,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.711,
-			"name": "small_54",
-			"region": [
-				100,
-				102,
-				10,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.711,
-			"name": "small_55",
-			"region": [
-				116,
-				102,
-				10,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.974,
-			"name": "small_56",
-			"region": [
-				97,
-				116,
-				14,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.602,
-			"name": "small_57",
-			"region": [
-				112,
-				116,
-				16,
-				11
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.926,
-			"name": "small_58",
-			"region": [
-				5,
-				118,
-				6,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.926,
-			"name": "small_59",
-			"region": [
-				21,
-				118,
-				6,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.926,
-			"name": "small_60",
-			"region": [
-				37,
-				118,
-				6,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.926,
-			"name": "small_61",
-			"region": [
-				53,
-				118,
-				6,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.736,
-			"name": "small_62",
-			"region": [
-				68,
-				118,
-				8,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.817,
-			"name": "small_63",
-			"region": [
-				81,
-				118,
-				14,
-				9
-			],
-			"sheet": "small"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.768,
-			"name": "furniture_00",
-			"region": [
-				176,
-				2,
-				16,
-				14
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.912,
-			"name": "furniture_01",
-			"region": [
-				32,
-				3,
-				13,
-				27
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.825,
-			"name": "furniture_02",
-			"region": [
-				81,
-				4,
-				14,
-				27
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.595,
-			"name": "furniture_03",
-			"region": [
-				96,
-				4,
-				15,
-				28
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.796,
-			"name": "furniture_04",
-			"region": [
-				128,
-				4,
-				16,
-				27
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.595,
-			"name": "furniture_05",
-			"region": [
-				144,
-				4,
-				15,
-				28
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.87,
-			"name": "furniture_06",
-			"region": [
-				6,
-				5,
-				20,
-				23
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.927,
-			"name": "furniture_07",
-			"region": [
-				48,
-				5,
-				29,
-				25
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.85,
-			"name": "furniture_08",
-			"region": [
-				113,
-				10,
-				14,
-				21
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.804,
-			"name": "furniture_09",
-			"region": [
-				160,
-				10,
-				16,
-				21
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.483,
-			"name": "furniture_10",
-			"region": [
-				178,
-				16,
-				12,
-				10
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				1
-			],
-			"fill": 0.75,
-			"name": "furniture_11",
-			"region": [
-				193,
-				16,
-				14,
-				16
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				2
-			],
-			"fill": 0.712,
-			"name": "furniture_12",
-			"region": [
-				1,
-				32,
-				46,
-				30
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				2
-			],
-			"fill": 0.975,
-			"name": "furniture_13",
-			"region": [
-				160,
-				32,
-				48,
-				32
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.901,
-			"name": "furniture_14",
-			"region": [
-				113,
-				33,
-				15,
-				31
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				1
-			],
-			"fill": 0.901,
-			"name": "furniture_15",
-			"region": [
-				128,
-				33,
-				31,
-				15
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.943,
-			"name": "furniture_16",
-			"region": [
-				49,
-				35,
-				30,
-				28
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.746,
-			"name": "furniture_17",
-			"region": [
-				84,
-				44,
-				24,
-				19
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				1
-			],
-			"fill": 0.818,
-			"name": "furniture_18",
-			"region": [
-				133,
-				50,
-				22,
-				12
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.828,
-			"name": "furniture_19",
-			"region": [
-				1,
-				64,
-				30,
-				46
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				3
-			],
-			"fill": 0.962,
-			"name": "furniture_20",
-			"region": [
-				33,
-				64,
-				46,
-				47
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				3
-			],
-			"fill": 0.977,
-			"name": "furniture_21",
-			"region": [
-				80,
-				64,
-				12,
-				48
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				4
-			],
-			"fill": 0.634,
-			"name": "furniture_22",
-			"region": [
-				144,
-				64,
-				19,
-				64
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.975,
-			"name": "furniture_23",
-			"region": [
-				168,
-				64,
-				32,
-				48
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				3
-			],
-			"fill": 0.915,
-			"name": "furniture_24",
-			"region": [
-				97,
-				66,
-				46,
-				45
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.81,
-			"name": "furniture_25",
-			"region": [
-				70,
-				112,
-				21,
-				46
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				3
-			],
-			"fill": 0.41,
-			"name": "furniture_26",
-			"region": [
-				97,
-				112,
-				15,
-				46
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				3
-			],
-			"fill": 0.933,
-			"name": "furniture_27",
-			"region": [
-				32,
-				114,
-				16,
-				41
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.989,
-			"name": "furniture_28",
-			"region": [
-				116,
-				114,
-				24,
-				44
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				3
-			],
-			"fill": 0.354,
-			"name": "furniture_29",
-			"region": [
-				49,
-				116,
-				14,
-				44
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.904,
-			"name": "furniture_30",
-			"region": [
-				4,
-				117,
-				25,
-				35
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.791,
-			"name": "furniture_31",
-			"region": [
-				176,
-				117,
-				23,
-				36
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.903,
-			"name": "furniture_32",
-			"region": [
-				148,
-				128,
-				24,
-				24
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.794,
-			"name": "furniture_33",
-			"region": [
-				144,
-				160,
-				32,
-				32
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				4,
-				2
-			],
-			"fill": 0.84,
-			"name": "furniture_34",
-			"region": [
-				88,
-				161,
-				49,
-				31
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.787,
-			"name": "furniture_35",
-			"region": [
-				176,
-				164,
-				32,
-				28
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				4,
-				2
-			],
-			"fill": 0.817,
-			"name": "furniture_36",
-			"region": [
-				24,
-				167,
-				49,
-				25
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.643,
-			"name": "furniture_37",
-			"region": [
-				3,
-				168,
-				10,
-				23
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				3
-			],
-			"fill": 0.95,
-			"name": "furniture_38",
-			"region": [
-				65,
-				192,
-				30,
-				43
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				5,
-				3
-			],
-			"fill": 0.968,
-			"name": "furniture_39",
-			"region": [
-				96,
-				192,
-				80,
-				43
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				4
-			],
-			"fill": 0.882,
-			"name": "furniture_40",
-			"region": [
-				176,
-				193,
-				32,
-				63
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				4
-			],
-			"fill": 0.93,
-			"name": "furniture_41",
-			"region": [
-				35,
-				196,
-				26,
-				55
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				4
-			],
-			"fill": 0.86,
-			"name": "furniture_42",
-			"region": [
-				0,
-				197,
-				22,
-				55
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				1
-			],
-			"fill": 0.646,
-			"name": "furniture_43",
-			"region": [
-				68,
-				241,
-				24,
-				14
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				1
-			],
-			"fill": 0.92,
-			"name": "furniture_44",
-			"region": [
-				99,
-				241,
-				27,
-				13
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				3
-			],
-			"fill": 0.648,
-			"name": "furniture_45",
-			"region": [
-				128,
-				243,
-				48,
-				45
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.514,
-			"name": "furniture_46",
-			"region": [
-				23,
-				258,
-				19,
-				29
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				1,
-				2
-			],
-			"fill": 0.585,
-			"name": "furniture_47",
-			"region": [
-				2,
-				261,
-				13,
-				23
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.74,
-			"name": "furniture_48",
-			"region": [
-				177,
-				262,
-				30,
-				25
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				3,
-				2
-			],
-			"fill": 0.821,
-			"name": "furniture_49",
-			"region": [
-				82,
-				264,
-				42,
-				23
-			],
-			"sheet": "furniture"
-		},
-		{
-			"cells": [
-				2,
-				2
-			],
-			"fill": 0.536,
-			"name": "furniture_50",
-			"region": [
-				51,
-				265,
-				25,
-				22
-			],
-			"sheet": "furniture"
-		}
-	],
-	"sheets": {
-		"furniture": {
-			"file": "res://assets/TopDownHouse_FurnitureState1.png",
-			"size": [
-				208,
-				288
-			]
-		},
-		"small": {
-			"file": "res://assets/TopDownHouse_SmallItems.png",
-			"size": [
-				128,
-				128
-			]
-		}
-	}
+ "cell": 16,
+ "pieces": [
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.585,
+   "name": "small_00",
+   "region": [
+    116,
+    0,
+    9,
+    15
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.786,
+   "name": "small_01",
+   "region": [
+    4,
+    1,
+    8,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.762,
+   "name": "small_02",
+   "region": [
+    101,
+    1,
+    6,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.483,
+   "name": "small_03",
+   "region": [
+    17,
+    3,
+    13,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.483,
+   "name": "small_04",
+   "region": [
+    33,
+    3,
+    13,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.798,
+   "name": "small_05",
+   "region": [
+    53,
+    3,
+    7,
+    12
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.626,
+   "name": "small_06",
+   "region": [
+    66,
+    6,
+    11,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.9,
+   "name": "small_07",
+   "region": [
+    84,
+    10,
+    8,
+    5
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.822,
+   "name": "small_08",
+   "region": [
+    80,
+    16,
+    15,
+    15
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.976,
+   "name": "small_09",
+   "region": [
+    2,
+    17,
+    12,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.643,
+   "name": "small_10",
+   "region": [
+    113,
+    17,
+    11,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.977,
+   "name": "small_11",
+   "region": [
+    16,
+    19,
+    16,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.885,
+   "name": "small_12",
+   "region": [
+    66,
+    19,
+    13,
+    12
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.716,
+   "name": "small_13",
+   "region": [
+    99,
+    20,
+    8,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.901,
+   "name": "small_14",
+   "region": [
+    36,
+    22,
+    9,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.688,
+   "name": "small_15",
+   "region": [
+    53,
+    23,
+    8,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.984,
+   "name": "small_16",
+   "region": [
+    112,
+    32,
+    16,
+    16
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.972,
+   "name": "small_17",
+   "region": [
+    98,
+    35,
+    12,
+    12
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.813,
+   "name": "small_18",
+   "region": [
+    20,
+    39,
+    8,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.829,
+   "name": "small_19",
+   "region": [
+    51,
+    40,
+    10,
+    7
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.829,
+   "name": "small_20",
+   "region": [
+    67,
+    40,
+    10,
+    7
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.829,
+   "name": "small_21",
+   "region": [
+    83,
+    40,
+    10,
+    7
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.758,
+   "name": "small_22",
+   "region": [
+    3,
+    41,
+    11,
+    6
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.75,
+   "name": "small_23",
+   "region": [
+    38,
+    43,
+    4,
+    4
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.733,
+   "name": "small_24",
+   "region": [
+    84,
+    48,
+    10,
+    15
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.81,
+   "name": "small_25",
+   "region": [
+    50,
+    51,
+    14,
+    12
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.705,
+   "name": "small_26",
+   "region": [
+    98,
+    51,
+    13,
+    12
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.289,
+   "name": "small_27",
+   "region": [
+    115,
+    51,
+    10,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.709,
+   "name": "small_28",
+   "region": [
+    39,
+    52,
+    5,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.8,
+   "name": "small_29",
+   "region": [
+    68,
+    52,
+    10,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.966,
+   "name": "small_30",
+   "region": [
+    3,
+    55,
+    11,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.964,
+   "name": "small_31",
+   "region": [
+    20,
+    55,
+    7,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.813,
+   "name": "small_32",
+   "region": [
+    65,
+    66,
+    14,
+    13
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.813,
+   "name": "small_33",
+   "region": [
+    81,
+    66,
+    14,
+    13
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.813,
+   "name": "small_34",
+   "region": [
+    97,
+    66,
+    14,
+    13
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.813,
+   "name": "small_35",
+   "region": [
+    113,
+    66,
+    14,
+    13
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.857,
+   "name": "small_36",
+   "region": [
+    1,
+    71,
+    14,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.857,
+   "name": "small_37",
+   "region": [
+    17,
+    71,
+    14,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.857,
+   "name": "small_38",
+   "region": [
+    34,
+    71,
+    14,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.857,
+   "name": "small_39",
+   "region": [
+    49,
+    71,
+    14,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.844,
+   "name": "small_40",
+   "region": [
+    5,
+    84,
+    7,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.844,
+   "name": "small_41",
+   "region": [
+    21,
+    84,
+    7,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.844,
+   "name": "small_42",
+   "region": [
+    37,
+    84,
+    7,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.844,
+   "name": "small_43",
+   "region": [
+    53,
+    84,
+    7,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.742,
+   "name": "small_44",
+   "region": [
+    64,
+    87,
+    16,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.742,
+   "name": "small_45",
+   "region": [
+    80,
+    87,
+    16,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.742,
+   "name": "small_46",
+   "region": [
+    96,
+    87,
+    16,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.742,
+   "name": "small_47",
+   "region": [
+    112,
+    87,
+    16,
+    8
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.653,
+   "name": "small_48",
+   "region": [
+    5,
+    97,
+    7,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.653,
+   "name": "small_49",
+   "region": [
+    21,
+    97,
+    7,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.653,
+   "name": "small_50",
+   "region": [
+    37,
+    97,
+    7,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.653,
+   "name": "small_51",
+   "region": [
+    53,
+    97,
+    7,
+    14
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.711,
+   "name": "small_52",
+   "region": [
+    68,
+    102,
+    10,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.711,
+   "name": "small_53",
+   "region": [
+    84,
+    102,
+    10,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.711,
+   "name": "small_54",
+   "region": [
+    100,
+    102,
+    10,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.711,
+   "name": "small_55",
+   "region": [
+    116,
+    102,
+    10,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.974,
+   "name": "small_56",
+   "region": [
+    97,
+    116,
+    14,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.602,
+   "name": "small_57",
+   "region": [
+    112,
+    116,
+    16,
+    11
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.926,
+   "name": "small_58",
+   "region": [
+    5,
+    118,
+    6,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.926,
+   "name": "small_59",
+   "region": [
+    21,
+    118,
+    6,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.926,
+   "name": "small_60",
+   "region": [
+    37,
+    118,
+    6,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.926,
+   "name": "small_61",
+   "region": [
+    53,
+    118,
+    6,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.736,
+   "name": "small_62",
+   "region": [
+    68,
+    118,
+    8,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "fill": 0.817,
+   "name": "small_63",
+   "region": [
+    81,
+    118,
+    14,
+    9
+   ],
+   "sheet": "small"
+  },
+  {
+   "display_name": "Wood Box2",
+   "fill": 0.988,
+   "name": "wood_box2",
+   "region": [
+    0,
+    0,
+    16,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Timber"
+  },
+  {
+   "display_name": "Wood Painting1",
+   "fill": 0.976,
+   "name": "wood_painting1",
+   "region": [
+    17,
+    0,
+    12,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Timber"
+  },
+  {
+   "display_name": "Plastic Cup2",
+   "fill": 0.653,
+   "name": "plastic_cup2",
+   "region": [
+    30,
+    0,
+    7,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Metal Pot",
+   "fill": 0.813,
+   "name": "metal_pot",
+   "region": [
+    38,
+    0,
+    14,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Wood Box1",
+   "fill": 0.972,
+   "name": "wood_box1",
+   "region": [
+    53,
+    0,
+    12,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Timber"
+  },
+  {
+   "display_name": "Wood Piece",
+   "fill": 0.885,
+   "name": "wood_piece",
+   "region": [
+    66,
+    0,
+    13,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Timber"
+  },
+  {
+   "display_name": "Metal Phone",
+   "fill": 0.705,
+   "name": "metal_phone",
+   "region": [
+    80,
+    0,
+    13,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Wood Painting2",
+   "fill": 0.977,
+   "name": "wood_painting2",
+   "region": [
+    94,
+    0,
+    16,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Timber"
+  },
+  {
+   "display_name": "Metal Support",
+   "fill": 0.483,
+   "name": "metal_support",
+   "region": [
+    111,
+    0,
+    13,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Metal Teapot",
+   "fill": 0.608,
+   "name": "metal_teapot",
+   "region": [
+    125,
+    0,
+    16,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Plastic Cup1",
+   "fill": 0.844,
+   "name": "plastic_cup1",
+   "region": [
+    142,
+    0,
+    7,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Metal Can4",
+   "fill": 0.926,
+   "name": "metal_can4",
+   "region": [
+    150,
+    0,
+    6,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Metal Can3",
+   "fill": 0.926,
+   "name": "metal_can3",
+   "region": [
+    157,
+    0,
+    6,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Metal Can2",
+   "fill": 0.926,
+   "name": "metal_can2",
+   "region": [
+    164,
+    0,
+    6,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Metal Can1",
+   "fill": 0.926,
+   "name": "metal_can1",
+   "region": [
+    171,
+    0,
+    6,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Metal Hanger",
+   "fill": 0.289,
+   "name": "metal_hanger",
+   "region": [
+    178,
+    0,
+    10,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Plastic Mug",
+   "fill": 0.711,
+   "name": "plastic_mug",
+   "region": [
+    189,
+    0,
+    10,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Plastic Sheet",
+   "fill": 0.901,
+   "name": "plastic_sheet",
+   "region": [
+    200,
+    0,
+    9,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Rubber Duck",
+   "fill": 0.626,
+   "name": "rubber_duck",
+   "region": [
+    210,
+    0,
+    11,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "display_name": "Metal Pan",
+   "fill": 0.742,
+   "name": "metal_pan",
+   "region": [
+    222,
+    0,
+    16,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "display_name": "Plastic Plate",
+   "fill": 0.857,
+   "name": "plastic_plate",
+   "region": [
+    239,
+    0,
+    14,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Plastic Wrap",
+   "fill": 0.688,
+   "name": "plastic_wrap",
+   "region": [
+    0,
+    17,
+    8,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Rubber Tire",
+   "fill": 0.75,
+   "name": "rubber_tire",
+   "region": [
+    9,
+    17,
+    14,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "display_name": "Rubber Ball",
+   "fill": 0.812,
+   "name": "rubber_ball",
+   "region": [
+    24,
+    17,
+    8,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "display_name": "Plastic Bowl",
+   "fill": 0.829,
+   "name": "plastic_bowl",
+   "region": [
+    33,
+    17,
+    10,
+    7
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "display_name": "Rubber Bone",
+   "fill": 0.758,
+   "name": "rubber_bone",
+   "region": [
+    44,
+    17,
+    11,
+    6
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "display_name": "Rubber Disk",
+   "fill": 0.9,
+   "name": "rubber_disk",
+   "region": [
+    56,
+    17,
+    8,
+    5
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     73,
+     227,
+     49,
+     25
+    ],
+    [
+     65,
+     2,
+     22,
+     55
+    ],
+    [
+     104,
+     160,
+     49,
+     31
+    ],
+    [
+     89,
+     2,
+     22,
+     55
+    ]
+   ],
+   "cells": [
+    2,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.881,
+   "name": "decor_sofa",
+   "region": [
+    37,
+    2,
+    22,
+    55
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Sofa"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     52,
+     160,
+     32,
+     32
+    ],
+    [
+     134,
+     115,
+     23,
+     36
+    ],
+    [
+     98,
+     195,
+     32,
+     28
+    ],
+    [
+     159,
+     115,
+     23,
+     36
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.836,
+   "name": "decor_loveseat",
+   "region": [
+    153,
+    67,
+    32,
+    32
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Armchair"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     227,
+     16,
+     27
+    ],
+    [
+     132,
+     195,
+     15,
+     28
+    ],
+    [
+     110,
+     256,
+     16,
+     21
+    ],
+    [
+     149,
+     195,
+     15,
+     28
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 4,
+   "fill": 0.681,
+   "name": "decor_dining_chair",
+   "region": [
+    29,
+    114,
+    15,
+    28
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dining chair"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     20,
+     227,
+     14,
+     27
+    ],
+    [
+     166,
+     195,
+     15,
+     28
+    ],
+    [
+     128,
+     256,
+     14,
+     21
+    ],
+    [
+     183,
+     195,
+     15,
+     28
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 4,
+   "fill": 0.937,
+   "name": "decor_kitchen_chair",
+   "region": [
+    102,
+    114,
+    14,
+    27
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Kitchen chair"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     184,
+     115,
+     25,
+     35
+    ],
+    [
+     116,
+     115,
+     16,
+     41
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.946,
+   "name": "decor_dresser",
+   "region": [
+    126,
+    67,
+    25,
+    35
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dresser"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     20,
+     256,
+     20,
+     23
+    ],
+    [
+     36,
+     227,
+     15,
+     27
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.952,
+   "name": "decor_nightstand",
+   "region": [
+    233,
+    114,
+    20,
+    23
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Nightstand"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     110,
+     67,
+     46,
+     45
+    ],
+    [
+     141,
+     2,
+     16,
+     48
+    ]
+   ],
+   "cells": [
+    3,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.945,
+   "name": "decor_bookcase_drawers",
+   "region": [
+    2,
+    67,
+    46,
+    45
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Bookcase"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     207,
+     2,
+     46,
+     47
+    ],
+    [
+     159,
+     2,
+     12,
+     48
+    ]
+   ],
+   "cells": [
+    3,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.997,
+   "name": "decor_bookcase_tall",
+   "region": [
+    123,
+    2,
+    46,
+    47
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Tall bookcase"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     172,
+     160,
+     48,
+     30
+    ],
+    [
+     2,
+     67,
+     30,
+     46
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.986,
+   "name": "decor_big_table",
+   "region": [
+    171,
+    2,
+    30,
+    46
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dining table"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     195,
+     46,
+     30
+    ],
+    [
+     34,
+     67,
+     30,
+     46
+    ]
+   ],
+   "cells": [
+    3,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.985,
+   "name": "decor_old_table",
+   "region": [
+    187,
+    67,
+    46,
+    30
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Old table"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     228,
+     227,
+     16,
+     24
+    ],
+    [
+     124,
+     227,
+     16,
+     25
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.961,
+   "name": "decor_side_desk",
+   "region": [
+    197,
+    114,
+    16,
+    24
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Side desk"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     115,
+     80,
+     43
+    ],
+    [
+     2,
+     2,
+     32,
+     63
+    ]
+   ],
+   "cells": [
+    3,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.858,
+   "name": "decor_kitchen_counter",
+   "region": [
+    2,
+    2,
+    33,
+    63
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Kitchen counter"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     86,
+     160,
+     16,
+     32
+    ],
+    [
+     200,
+     195,
+     22,
+     28
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.643,
+   "name": "decor_toilet",
+   "region": [
+    46,
+    114,
+    22,
+    28
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Toilet"
+  },
+  {
+   "alt_roles": [
+    "wide",
+    "long"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     160,
+     48,
+     33
+    ],
+    [
+     173,
+     2,
+     32,
+     48
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.975,
+   "name": "decor_big_rug",
+   "region": [
+    89,
+    2,
+    32,
+    48
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Big rug"
+  },
+  {
+   "alt_roles": [
+    "long",
+    "wide"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     155,
+     160,
+     15,
+     31
+    ],
+    [
+     170,
+     256,
+     31,
+     15
+    ]
+   ],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.948,
+   "name": "decor_old_rug",
+   "region": [
+    96,
+    145,
+    31,
+    15
+   ],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Runner rug"
+  },
+  {
+   "alt_roles": [
+    "off",
+    "on"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     142,
+     227,
+     24,
+     25
+    ],
+    [
+     168,
+     227,
+     26,
+     25
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.911,
+   "name": "decor_fireplace",
+   "region": [
+    118,
+    114,
+    25,
+    26
+   ],
+   "set": "STATE",
+   "sheet": "decor_dirty",
+   "title": "Fireplace"
+  },
+  {
+   "alt_roles": [
+    "shut",
+    "open"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     113,
+     2,
+     26,
+     55
+    ],
+    [
+     36,
+     2,
+     27,
+     60
+    ]
+   ],
+   "cells": [
+    2,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.952,
+   "name": "decor_fridge",
+   "region": [
+    61,
+    2,
+    26,
+    55
+   ],
+   "set": "STATE",
+   "sheet": "decor_dirty",
+   "title": "Fridge"
+  },
+  {
+   "alt_roles": [
+    "round",
+    "oval"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     203,
+     256,
+     27,
+     13
+    ],
+    [
+     2,
+     282,
+     27,
+     13
+    ]
+   ],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.943,
+   "name": "decor_pet_bed",
+   "region": [
+    129,
+    145,
+    27,
+    13
+   ],
+   "set": "VARIANT",
+   "sheet": "decor_dirty",
+   "title": "Pet bed"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     53,
+     227,
+     18,
+     26
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.793,
+   "name": "decor_lamp",
+   "region": [
+    145,
+    114,
+    18,
+    26
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Table lamp"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     66,
+     67,
+     19,
+     46
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.507,
+   "name": "decor_standing_lamp",
+   "region": [
+    203,
+    2,
+    19,
+    46
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Floor lamp"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     87,
+     67,
+     21,
+     46
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.811,
+   "name": "decor_old_clock",
+   "region": [
+    224,
+    2,
+    21,
+    46
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Old clock"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     158,
+     67,
+     16,
+     44
+    ]
+   ],
+   "cells": [
+    1,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.51,
+   "name": "decor_coat_hanger",
+   "region": [
+    50,
+    67,
+    16,
+    44
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Coat hanger"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     176,
+     67,
+     24,
+     44
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.994,
+   "name": "decor_mirror",
+   "region": [
+    68,
+    67,
+    24,
+    44
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Standing mirror"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     84,
+     115,
+     30,
+     43
+    ]
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.982,
+   "name": "decor_stove",
+   "region": [
+    94,
+    67,
+    30,
+    43
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Stove"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     196,
+     227,
+     30,
+     25
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.812,
+   "name": "decor_vynil_player",
+   "region": [
+    165,
+    114,
+    30,
+    25
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Record player"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     50,
+     195,
+     19,
+     29
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.539,
+   "name": "decor_bath_sink",
+   "region": [
+    235,
+    67,
+    19,
+    29
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Bathroom sink"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     42,
+     256,
+     42,
+     23
+    ]
+   ],
+   "cells": [
+    3,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.891,
+   "name": "decor_bathtub",
+   "region": [
+    2,
+    145,
+    42,
+    23
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Bathtub"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     71,
+     195,
+     25,
+     29
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.574,
+   "name": "decor_iron_board",
+   "region": [
+    2,
+    114,
+    25,
+    29
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Ironing board"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     144,
+     256,
+     24,
+     19
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.904,
+   "name": "decor_center_table",
+   "region": [
+    70,
+    145,
+    24,
+    19
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Coffee table"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     256,
+     16,
+     24
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.62,
+   "name": "decor_game_table",
+   "region": [
+    215,
+    114,
+    16,
+    24
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Card table"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     224,
+     195,
+     30,
+     28
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.993,
+   "name": "decor_tiny_bookcase",
+   "region": [
+    70,
+    114,
+    30,
+    28
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Small bookcase"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     31,
+     282,
+     22,
+     12
+    ]
+   ],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.826,
+   "name": "decor_oval_rug",
+   "region": [
+    158,
+    145,
+    22,
+    12
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Oval rug"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     86,
+     256,
+     10,
+     23
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.613,
+   "name": "decor_flower_pot",
+   "region": [
+    46,
+    145,
+    10,
+    23
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Flower pot"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     98,
+     256,
+     10,
+     23
+    ]
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.657,
+   "name": "decor_plant_pot",
+   "region": [
+    58,
+    145,
+    10,
+    23
+   ],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Potted plant"
+  }
+ ],
+ "sheets": {
+  "decor_clean": {
+   "file": "res://assets/decor_clean.png",
+   "size": [
+    256,
+    297
+   ]
+  },
+  "decor_dirty": {
+   "file": "res://assets/decor_dirty.png",
+   "size": [
+    256,
+    170
+   ]
+  },
+  "lake_objects": {
+   "file": "res://assets/lake_objects.png"
+  },
+  "small": {
+   "file": "res://assets/TopDownHouse_SmallItems.png",
+   "size": [
+    128,
+    128
+   ]
+  }
+ }
 }

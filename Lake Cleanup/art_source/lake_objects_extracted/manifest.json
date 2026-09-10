@@ -1,0 +1,532 @@
+{
+  "source": "art_source/LakeObjects.psd",
+  "canvas": [
+    1024,
+    768
+  ],
+  "layers": [
+    {
+      "name": "Wood Box2",
+      "slug": "wood_box2",
+      "group_path": [
+        "Objects Done",
+        "Wood"
+      ],
+      "bbox": [
+        480,
+        355,
+        496,
+        371
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "file": "wood_box2.png"
+    },
+    {
+      "name": "Wood Box1",
+      "slug": "wood_box1",
+      "group_path": [
+        "Objects Done",
+        "Wood"
+      ],
+      "bbox": [
+        466,
+        358,
+        478,
+        370
+      ],
+      "size": [
+        12,
+        12
+      ],
+      "file": "wood_box1.png"
+    },
+    {
+      "name": "Wood Painting2",
+      "slug": "wood_painting2",
+      "group_path": [
+        "Objects Done",
+        "Wood"
+      ],
+      "bbox": [
+        472,
+        340,
+        488,
+        351
+      ],
+      "size": [
+        16,
+        11
+      ],
+      "file": "wood_painting2.png"
+    },
+    {
+      "name": "Wood Painting1",
+      "slug": "wood_painting1",
+      "group_path": [
+        "Objects Done",
+        "Wood"
+      ],
+      "bbox": [
+        458,
+        338,
+        470,
+        352
+      ],
+      "size": [
+        12,
+        14
+      ],
+      "file": "wood_painting1.png"
+    },
+    {
+      "name": "Wood Piece",
+      "slug": "wood_piece",
+      "group_path": [
+        "Objects Done",
+        "Wood"
+      ],
+      "bbox": [
+        451,
+        358,
+        464,
+        370
+      ],
+      "size": [
+        13,
+        12
+      ],
+      "file": "wood_piece.png"
+    },
+    {
+      "name": "Metal Pot",
+      "slug": "metal_pot",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        520,
+        357,
+        534,
+        370
+      ],
+      "size": [
+        14,
+        13
+      ],
+      "file": "metal_pot.png"
+    },
+    {
+      "name": "Metal Pan",
+      "slug": "metal_pan",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        534,
+        374,
+        550,
+        382
+      ],
+      "size": [
+        16,
+        8
+      ],
+      "file": "metal_pan.png"
+    },
+    {
+      "name": "Metal Can4",
+      "slug": "metal_can4",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        559,
+        329,
+        565,
+        338
+      ],
+      "size": [
+        6,
+        9
+      ],
+      "file": "metal_can4.png"
+    },
+    {
+      "name": "Metal Can3",
+      "slug": "metal_can3",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        543,
+        329,
+        549,
+        338
+      ],
+      "size": [
+        6,
+        9
+      ],
+      "file": "metal_can3.png"
+    },
+    {
+      "name": "Metal Can2",
+      "slug": "metal_can2",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        527,
+        329,
+        533,
+        338
+      ],
+      "size": [
+        6,
+        9
+      ],
+      "file": "metal_can2.png"
+    },
+    {
+      "name": "Metal Can1",
+      "slug": "metal_can1",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        511,
+        329,
+        517,
+        338
+      ],
+      "size": [
+        6,
+        9
+      ],
+      "file": "metal_can1.png"
+    },
+    {
+      "name": "Metal Support",
+      "slug": "metal_support",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        519,
+        342,
+        532,
+        353
+      ],
+      "size": [
+        13,
+        11
+      ],
+      "file": "metal_support.png"
+    },
+    {
+      "name": "Metal Phone",
+      "slug": "metal_phone",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        537,
+        341,
+        550,
+        353
+      ],
+      "size": [
+        13,
+        12
+      ],
+      "file": "metal_phone.png"
+    },
+    {
+      "name": "Metal Hanger",
+      "slug": "metal_hanger",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        554,
+        341,
+        564,
+        350
+      ],
+      "size": [
+        10,
+        9
+      ],
+      "file": "metal_hanger.png"
+    },
+    {
+      "name": "Metal Teapot",
+      "slug": "metal_teapot",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "bbox": [
+        553,
+        357,
+        569,
+        368
+      ],
+      "size": [
+        16,
+        11
+      ],
+      "file": "metal_teapot.png"
+    },
+    {
+      "name": "Plastic Plate",
+      "slug": "plastic_plate",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        528,
+        431,
+        542,
+        439
+      ],
+      "size": [
+        14,
+        8
+      ],
+      "file": "plastic_plate.png"
+    },
+    {
+      "name": "Plastic Cup2",
+      "slug": "plastic_cup2",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        515,
+        427,
+        522,
+        441
+      ],
+      "size": [
+        7,
+        14
+      ],
+      "file": "plastic_cup2.png"
+    },
+    {
+      "name": "Plastic Cup1",
+      "slug": "plastic_cup1",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        515,
+        414,
+        522,
+        425
+      ],
+      "size": [
+        7,
+        11
+      ],
+      "file": "plastic_cup1.png"
+    },
+    {
+      "name": "Plastic Mug",
+      "slug": "plastic_mug",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        546,
+        431,
+        556,
+        440
+      ],
+      "size": [
+        10,
+        9
+      ],
+      "file": "plastic_mug.png"
+    },
+    {
+      "name": "Plastic Sheet",
+      "slug": "plastic_sheet",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        546,
+        417,
+        555,
+        426
+      ],
+      "size": [
+        9,
+        9
+      ],
+      "file": "plastic_sheet.png"
+    },
+    {
+      "name": "Plastic Bowl",
+      "slug": "plastic_bowl",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        561,
+        435,
+        571,
+        442
+      ],
+      "size": [
+        10,
+        7
+      ],
+      "file": "plastic_bowl.png"
+    },
+    {
+      "name": "Plastic Wrap",
+      "slug": "plastic_wrap",
+      "group_path": [
+        "Objects Done",
+        "Plastic"
+      ],
+      "bbox": [
+        563,
+        418,
+        571,
+        426
+      ],
+      "size": [
+        8,
+        8
+      ],
+      "file": "plastic_wrap.png"
+    },
+    {
+      "name": "Rubber Disk",
+      "slug": "rubber_disk",
+      "group_path": [
+        "Objects Done",
+        "Rubber"
+      ],
+      "bbox": [
+        479,
+        414,
+        487,
+        419
+      ],
+      "size": [
+        8,
+        5
+      ],
+      "file": "rubber_disk.png"
+    },
+    {
+      "name": "Rubber Duck",
+      "slug": "rubber_duck",
+      "group_path": [
+        "Objects Done",
+        "Rubber"
+      ],
+      "bbox": [
+        461,
+        410,
+        472,
+        419
+      ],
+      "size": [
+        11,
+        9
+      ],
+      "file": "rubber_duck.png"
+    },
+    {
+      "name": "Rubber Tire",
+      "slug": "rubber_tire",
+      "group_path": [
+        "Objects Done",
+        "Rubber"
+      ],
+      "bbox": [
+        468,
+        435,
+        482,
+        443
+      ],
+      "size": [
+        14,
+        8
+      ],
+      "file": "rubber_tire.png"
+    },
+    {
+      "name": "Rubber Bone",
+      "slug": "rubber_bone",
+      "group_path": [
+        "Objects Done",
+        "Rubber"
+      ],
+      "bbox": [
+        462,
+        425,
+        473,
+        431
+      ],
+      "size": [
+        11,
+        6
+      ],
+      "file": "rubber_bone.png"
+    },
+    {
+      "name": "Rubber Ball",
+      "slug": "rubber_ball",
+      "group_path": [
+        "Objects Done",
+        "Rubber"
+      ],
+      "bbox": [
+        479,
+        423,
+        487,
+        431
+      ],
+      "size": [
+        8,
+        8
+      ],
+      "file": "rubber_ball.png"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "Metal Sheet",
+      "group_path": [
+        "Objects Done",
+        "Metal"
+      ],
+      "reason": "empty bbox"
+    }
+  ]
+}

@@ -28,6 +28,26 @@ const EMERGE_SPEED := 90.0
 ## How far under the waterline a freshly exposed piece starts.
 const EMERGE_DROP := 16.0
 
+## How many slots below the top of a stack a keepsake still shows through, and how bright
+## its glitter is at the top of a stack against the deepest slot that shows.
+##
+## The finds stay buried — see `_hide_treasures` in lake.gd, which plants them a couple of
+## slots down on purpose — so the glitter is not a map of where they are. It is the last
+## bit of the dig: a shimmer through the muck when one is nearly up, and the full glint
+## once the piece above it comes off. A player who has learnt to read it is digging with a
+## reason rather than skimming at random, which is the difference between a lake and a
+## progress bar.
+const GLINT_REACH := 3
+const GLINT_BRIGHT := 0.55
+const GLINT_FAINT := 0.10
+
+## The colour a find glitters, how far the glitter spreads past the piece, how fast it
+## breathes, and how many specks turn around an uncovered one.
+const GLINT_TINT := Color(1.0, 0.84, 0.35)
+const GLINT_SPAN := 1.45
+const GLINT_BREATH := 2.3
+const GLINT_SPECKS := 5
+
 ## How far a floating piece may be turned, in radians, how far it may drift off the middle
 ## of its own tile, as a fraction of a tile, and how much bigger or smaller than its drawn
 ## size it may ride. Rubbish in water lies every which way, and this is what stops eight
@@ -239,6 +259,7 @@ var _sprites: SpriteLayer
 ## The ring layer, and the pieces it is currently drawing rings for.
 var _ripples: RippleLayer
 var _shadows: ShadowLayer
+var _glints: GlintLayer
 
 ## The atlas's solid-white block, as texture coordinates. Cached: every untextured quad in
 ## the soup samples it, and it never moves.
@@ -276,6 +297,66 @@ class SpriteLayer extends Node2D:
 			draw_set_transform(grid.surface_pos(index), grid.tilt[index], Vector2.ONE)
 			grid.defs[stack[stack.size() - 1]].stamp_iso(self)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The golden glitter round a find.
+##
+## Above the rubbish rather than under it, because it has to be visible while the find
+## itself is not: a piece three slots down is behind whatever is sitting on top of it, and
+## a glow drawn underneath that is a glow nobody sees. Faint enough at depth that it reads
+## as light coming up through the water rather than as an outline.
+##
+## Fed one entry per find on screen: the tile it is on, and how many slots down it is.
+class GlintLayer extends Node2D:
+	var grid: LakeGrid
+	var finds: Array[Vector2i] = []
+	var age: float = 0.0
+
+	func set_finds(list: Array[Vector2i]) -> void:
+		finds = list
+		set_process(not finds.is_empty())
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		age += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		for find: Vector2i in finds:
+			var index := find.x
+			var sunk := find.y
+			var stack := grid.stacks[index]
+			if stack.is_empty():
+				continue
+			var at := grid.surface_pos(index)
+			# The piece it belongs to when it is up, and whatever is covering it when it is
+			# not: either way the glitter is sized off what is drawn on that tile, so it
+			# never spills across the neighbours.
+			var def := grid.defs[stack[stack.size() - 1]]
+			var span := maxf(def.size.x, def.size.y) * grid.swing[index] * GLINT_SPAN
+			var lit := lerpf(
+				GLINT_BRIGHT, GLINT_FAINT,
+				clampf(float(sunk) / float(GLINT_REACH), 0.0, 1.0)
+			)
+			# Out of step tile by tile, so a basin with several finds in it does not pulse
+			# like a set of indicator lights.
+			var beat := 0.5 + 0.5 * sin(age * GLINT_BREATH + float(index) * 0.7)
+			var glow := GLINT_TINT
+			glow.a = lit * (0.55 + 0.45 * beat)
+			draw_circle(at, span * 0.5, glow)
+
+			if sunk > 0:
+				continue
+			# Specks, on the uncovered one only. A buried find shimmers; an uncovered one
+			# is the thing the net is for, and the specks are what says so.
+			var speck := GLINT_TINT
+			speck.a = lit * (0.35 + 0.65 * beat)
+			for n in GLINT_SPECKS:
+				var turn := age * 0.8 + TAU * float(n) / float(GLINT_SPECKS)
+				draw_circle(
+					at + Vector2(cos(turn), sin(turn) * 0.5) * span * 0.55,
+					maxf(span * 0.06, 1.0), speck
+				)
 
 
 ## The rings of disturbed water round the floating rubbish.
@@ -575,6 +656,14 @@ func _ready() -> void:
 	_sprites.grid = self
 	_sprites.set_process(false)
 	add_child(_sprites)
+
+	_glints = GlintLayer.new()
+	_glints.name = &"Glints"
+	_glints.grid = self
+	# Over the rubbish: a find under two mugs still has to catch the eye.
+	_glints.z_index = 1
+	_glints.set_process(false)
+	add_child(_glints)
 
 
 ## How coarsely the view rectangle is rounded before it counts as having moved, in world
@@ -892,6 +981,22 @@ func insert(index: int, k: int, def_index: int) -> void:
 	_restamp(index)
 
 
+## How far down the nearest find is in a stack, or -1 for a stack with none near the top.
+##
+## Only the top GLINT_REACH slots are looked at: a find at the bottom of a full stack is
+## not something the player can do anything about yet, and a lake that glitters everywhere
+## says nothing. Walked from the top down, so a stack with two finds in it reports the one
+## that is closer to being dug out.
+func _glint_at(stack: PackedInt32Array) -> int:
+	var top := stack.size() - 1
+	var k := top
+	while k >= 0 and k > top - 1 - GLINT_REACH:
+		if defs[stack[k]].keepsake:
+			return top - k
+		k -= 1
+	return -1
+
+
 func def_at(index: int, k: int) -> TrashDef:
 	return defs[stacks[index][k]]
 
@@ -1027,6 +1132,7 @@ func _rebuild() -> void:
 	drawn_pieces = 0
 	var textured: Array[int] = []
 	var afloat := PackedInt32Array()
+	var glinting: Array[Vector2i] = []
 	_shadows.begin()
 
 	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
@@ -1051,6 +1157,9 @@ func _rebuild() -> void:
 			if at.x < lo.x or at.x > hi.x or at.y < lo.y or at.y > hi.y:
 				continue
 			afloat.append(index)
+			var glint := _glint_at(stack)
+			if glint >= 0:
+				glinting.append(Vector2i(index, glint))
 			var def := defs[stack[stack.size() - 1]]
 			_shadow_at[index] = _shadows.add(at, def.size, swing[index])
 			if def.sprite != null:
@@ -1071,6 +1180,7 @@ func _rebuild() -> void:
 	_mesh_indices.resize(_tri)
 
 	_sprites.set_pieces(textured)
+	_glints.set_finds(glinting)
 	_shadows.finish()
 	_ripples.set_pieces(_spread_over(afloat, RIPPLE_MOST))
 	walked = box.size.x * box.size.y

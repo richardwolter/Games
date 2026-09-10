@@ -1,4 +1,4 @@
-## The art: three packed sheets, cut into named pieces, welded into one texture.
+## The art: several packed sheets, cut into named pieces, welded into one texture.
 ##
 ## Everything drawn in this game that is not a polygon comes from here — the rubbish
 ## floating in the lake, the pile in the yard, the load on the ferry, and the furniture the
@@ -6,41 +6,46 @@
 ## visible surface as a single triangle array, and a triangle array carries exactly one
 ## texture. Two atlases would be two draw calls and the door open to twenty.
 ##
-## The regions themselves are not worked out here. tools/slice_sheets.gd cuts the sheets
-## offline and writes assets/pieces.json; this reads that, blits the sheets into one image,
-## and offsets every region into the combined space.
+## The regions themselves are not worked out here. tools/slice_sheets.gd cuts the rubbish
+## sheets and tools/build_decor.py packs the decoration ones, both offline, both writing
+## assets/pieces.json; this reads that, blits the sheets into one image, and offsets every
+## region into the combined space.
 class_name Sheets
 extends RefCounted
 
 const CATALOGUE := "res://assets/pieces.json"
 
-## The furniture sheet has a second palette — the same items, drawn as if cleaned up. The
-## lake shows the grimy one and the shed shows the restored one, which is the whole story
-## of the game in two pictures.
-const ALT_SHEET := "res://assets/TopDownHouse_FurnitureState2.png"
-const ALT_KEY := "furniture"
+## The lake shows a find grimy and the shed shows it restored, which is the whole story of
+## the game in two pictures. Those two are no longer the same picture twice: the decoration
+## art draws the grimy version once and the restored one as several views — a chair from
+## the front, the side and the back — at their own sizes. So a piece carries a rectangle on
+## its own sheet and a list of rectangles on the restored one, and the catalogue says which
+## sheet each of those is on rather than this file assuming a parallel copy.
 
 ## A block of solid white is packed into the atlas so untextured geometry — the ring of
 ## disturbed water each piece sits in — can be drawn by the same batch instead of needing
 ## a second one.
 const WHITE_SIZE := 8
 
-## The pieces that get a mirrored twin blitted into the atlas, named with MIRROR_SUFFIX.
-##
-## The sheet only ever draws a side-on chair facing one way, so a room laid out with them
-## all faces the same direction. Flipping is free here — the same pixels, once more, the
-## other way round — and a mirrored chair is a separate find with its own name, so the
-## collection grows by two rather than the shed quietly drawing a chair backwards.
-const MIRRORED := ["furniture_03", "furniture_05"]
-
-## What a mirrored twin is called: the original's name with this on the end.
-const MIRROR_SUFFIX := "_r"
-
-## What counts as a floor covering, matched against the piece's name in find_names.gd. The
-## art has names, so there is nothing to infer: a rug is a rug because it is called one.
+## What counts as a floor covering, matched against the piece's title. The art has names, so
+## there is nothing to infer: a rug is a rug because it is called one.
 const FLAT_WORDS := ["rug", "mat"]
 
-const NAMES := preload("res://scripts/find_names.gd")
+## What a set of views means, and so which verb the shed offers for it.
+##
+## Several sprites under one name are three different mechanics wearing the same shape, and
+## nothing in the pixels tells them apart — see tools/decor_sets.json, where a person says
+## which is which.
+enum Set {
+	## One view. Nothing to cycle.
+	SINGLE,
+	## The same piece from several sides. R turns it while it is being carried.
+	ROTATE,
+	## Several styles of the same thing. R picks one. Not a rotation.
+	VARIANT,
+	## The same piece doing two things. E toggles it where it stands.
+	STATE,
+}
 
 var atlas: ImageTexture
 
@@ -48,8 +53,37 @@ var atlas: ImageTexture
 var regions := {}
 
 ## Piece name -> its rectangle in the cleaned-up palette, where one exists. Falls back to
-## the grimy region for anything that is not furniture.
+## the grimy region for anything that is not a decoration.
+##
+## The first of `views` — a piece's default face, which is what anything that does not care
+## about views (the trophy shelf, an inventory row) wants.
 var alt_regions := {}
+
+## Piece name -> every restored view of it, in cycle order. One entry for a piece that has
+## only the one.
+##
+## The order is the authored one: front, side, back, and the flipped side last where the
+## art gets one, which reads as turning a chair a quarter at a time. See
+## tools/decor_sets.json.
+var views := {}
+
+## Piece name -> what each view is called, alongside `views`. `on` and `off` for the
+## fireplace, `shut` and `open` for the fridge, `round` and `oval` for the pet beds.
+var roles := {}
+
+## Piece name -> which Set it is, and so what R and E do with it.
+var kinds := {}
+
+## Piece name -> how many of it are hidden in the lake, and so how many the shed may hold.
+## One for everything but the chairs. See tools/decor_sets.json.
+var copies := {}
+
+## Piece name -> what to call it on screen.
+##
+## Baked into the catalogue by tools/build_decor.py from the authored table, rather than
+## kept in a second file keyed on slicer output. A reward the game cannot name is a reward
+## the player cannot want, and a name that lives next to the rectangle cannot drift from it.
+var titles := {}
 
 ## Piece name -> its size on the drawing grid, in whole 16 px cells. A rounded-up hint from
 ## the catalogue; the shed lays out on a finer grid of its own through `footprint`.
@@ -67,10 +101,6 @@ var by_sheet := {}
 var white := Rect2()
 
 var _size := Vector2.ONE
-
-## Piece name -> which sheet it came off, for the mirror pass to file its twins alongside
-## their originals.
-var _sheet_of := {}
 
 
 ## Read the catalogue and build the atlas. False means the art is missing or unreadable,
@@ -101,15 +131,6 @@ func load_all() -> bool:
 		width = maxi(width, image.get_width())
 		height += image.get_height()
 
-	# The cleaned-up palette, laid in under the rest and indexed against the grimy sheet's
-	# own regions: the two are the same picture twice.
-	var alt := Art.image(ALT_SHEET)
-	var alt_offset := Vector2i(0, height)
-	if alt != null:
-		alt.convert(Image.FORMAT_RGBA8)
-		width = maxi(width, alt.get_width())
-		height += alt.get_height()
-
 	var white_offset := Vector2i(0, height)
 	height += WHITE_SIZE
 	width = maxi(width, WHITE_SIZE)
@@ -121,8 +142,6 @@ func load_all() -> bool:
 		sheet_image.blit_rect(
 			image, Rect2i(Vector2i.ZERO, image.get_size()), offsets[key] as Vector2i
 		)
-	if alt != null:
-		sheet_image.blit_rect(alt, Rect2i(Vector2i.ZERO, alt.get_size()), alt_offset)
 	sheet_image.fill_rect(
 		Rect2i(white_offset, Vector2i(WHITE_SIZE, WHITE_SIZE)), Color(1.0, 1.0, 1.0, 1.0)
 	)
@@ -145,12 +164,27 @@ func load_all() -> bool:
 			float(box[2]), float(box[3])
 		)
 		regions[name] = region
-		alt_regions[name] = region
-		if alt != null and key == ALT_KEY:
-			alt_regions[name] = Rect2(
-				float(box[0]) + float(alt_offset.x), float(box[1]) + float(alt_offset.y),
-				float(box[2]), float(box[3])
-			)
+
+		# The restored views, each on whatever sheet the catalogue puts it on and at its own
+		# size. A piece with none — the rubbish, which is never restored — stands as itself.
+		var faces: Array[Rect2] = []
+		var alt_key := String(entry.get("alt_sheet", ""))
+		if offsets.has(alt_key):
+			var alt_offset: Vector2i = offsets[alt_key]
+			for view: Array in entry.get("alt_views", []) as Array:
+				faces.append(Rect2(
+					float(view[0]) + float(alt_offset.x), float(view[1]) + float(alt_offset.y),
+					float(view[2]), float(view[3])
+				))
+		if faces.is_empty():
+			faces.append(region)
+		views[name] = faces
+		alt_regions[name] = faces[0]
+		roles[name] = PackedStringArray(entry.get("alt_roles", ["front"]))
+		kinds[name] = _set_of(String(entry.get("set", "SINGLE")))
+		copies[name] = maxi(int(entry.get("copies", 1)), 1)
+		titles[name] = String(entry.get("title", ""))
+
 		cells[name] = Vector2i(
 			maxi(int(ceil(float(box[2]) / cell)), 1), maxi(int(ceil(float(box[3]) / cell)), 1)
 		)
@@ -161,78 +195,10 @@ func load_all() -> bool:
 		var listed: PackedStringArray = by_sheet.get(key, PackedStringArray())
 		listed.append(name)
 		by_sheet[key] = listed
-		_sheet_of[name] = key
 
-	sheet_image = _add_mirrors(sheet_image)
 	atlas = ImageTexture.create_from_image(sheet_image)
 	_size = Vector2(sheet_image.get_width(), sheet_image.get_height())
 	return not regions.is_empty()
-
-
-## Blit a flipped copy of every piece in MIRRORED onto the end of the atlas, in both
-## palettes, and register it as a piece of its own.
-##
-## Done here rather than in the slicer because there is nothing to slice: the mirror is the
-## original's pixels read backwards, and putting it in the catalogue would mean a second
-## copy of the art on disk that has to be kept in step with the first.
-##
-## Returns the image to build the atlas from — a taller one when there was anything to
-## mirror, and the one it was handed when there was not.
-func _add_mirrors(sheet_image: Image) -> Image:
-	var wanted: Array[String] = []
-	for name: String in MIRRORED:
-		if regions.has(name):
-			wanted.append(name)
-	if wanted.is_empty():
-		return sheet_image
-
-	var strip_top := sheet_image.get_height()
-	var strip_high := 0
-	var strip_wide := 0
-	for name: String in wanted:
-		var box := regions[name] as Rect2
-		strip_wide += int(box.size.x)
-		strip_high = maxi(strip_high, int(box.size.y))
-
-	# The grimy row and the cleaned row, one under the other, so a twin's two regions sit
-	# a fixed distance apart the same way the two sheets do.
-	var grown := Image.create_empty(
-		maxi(sheet_image.get_width(), strip_wide),
-		strip_top + strip_high * 2,
-		false,
-		Image.FORMAT_RGBA8
-	)
-	grown.fill(Color(0.0, 0.0, 0.0, 0.0))
-	grown.blit_rect(sheet_image, Rect2i(Vector2i.ZERO, sheet_image.get_size()), Vector2i.ZERO)
-
-	var at := 0
-	for name: String in wanted:
-		var box := regions[name] as Rect2
-		var twin := name + MIRROR_SUFFIX
-		var grimy := grown.get_region(Rect2i(box))
-		grimy.flip_x()
-		grown.blit_rect(
-			grimy, Rect2i(Vector2i.ZERO, grimy.get_size()), Vector2i(at, strip_top)
-		)
-		var clean := grown.get_region(Rect2i(alt_regions[name] as Rect2))
-		clean.flip_x()
-		grown.blit_rect(
-			clean, Rect2i(Vector2i.ZERO, clean.get_size()), Vector2i(at, strip_top + strip_high)
-		)
-		regions[twin] = Rect2(float(at), float(strip_top), box.size.x, box.size.y)
-		alt_regions[twin] = Rect2(
-			float(at), float(strip_top + strip_high), box.size.x, box.size.y
-		)
-		cells[twin] = cells[name]
-		fill[twin] = fill[name]
-		names.append(twin)
-		var key := String(_sheet_of.get(name, ALT_KEY))
-		var listed: PackedStringArray = by_sheet.get(key, PackedStringArray())
-		listed.append(twin)
-		by_sheet[key] = listed
-		_sheet_of[twin] = key
-		at += int(box.size.x)
-	return grown
 
 
 func has(name: StringName) -> bool:
@@ -245,6 +211,69 @@ func region_of(name: StringName) -> Rect2:
 
 func alt_region_of(name: StringName) -> Rect2:
 	return alt_regions.get(String(name), region_of(name)) as Rect2
+
+
+## The catalogue's word for a set, as a Set. Anything unrecognised is one view.
+func _set_of(word: String) -> Set:
+	match word:
+		"ROTATE":
+			return Set.ROTATE
+		"VARIANT":
+			return Set.VARIANT
+		"STATE":
+			return Set.STATE
+		_:
+			return Set.SINGLE
+
+
+## How many restored faces a piece has. One means there is nothing for R or E to do.
+func view_count(name: StringName) -> int:
+	var faces: Array = views.get(String(name), []) as Array
+	return maxi(faces.size(), 1)
+
+
+## One restored view of a piece, by index. Out-of-range wraps, so a caller can add one and
+## hand it straight back without knowing how long the cycle is.
+func view_region_of(name: StringName, view: int) -> Rect2:
+	var faces: Array = views.get(String(name), []) as Array
+	if faces.is_empty():
+		return alt_region_of(name)
+	return faces[posmod(view, faces.size())] as Rect2
+
+
+## What one view is called: `side`, `on`, `open`, `oval`.
+func role_of(name: StringName, view: int) -> StringName:
+	var list: PackedStringArray = roles.get(String(name), PackedStringArray())
+	if list.is_empty():
+		return &"front"
+	return StringName(list[posmod(view, list.size())])
+
+
+func kind_of(name: StringName) -> Set:
+	return kinds.get(String(name), Set.SINGLE) as Set
+
+
+## How many of this find there are to net. One for anything that does not say otherwise.
+func copies_of(name: StringName) -> int:
+	return maxi(int(copies.get(String(name), 1)), 1)
+
+
+## Can the player turn this piece while carrying it? Both R verbs, since picking a style and
+## turning a chair are the same gesture from the player's side.
+func turnable(name: StringName) -> bool:
+	var kind := kind_of(name)
+	return (kind == Set.ROTATE or kind == Set.VARIANT) and view_count(name) > 1
+
+
+## Can the player switch this piece on where it stands? The fireplace and the fridge.
+func switchable(name: StringName) -> bool:
+	return kind_of(name) == Set.STATE and view_count(name) > 1
+
+
+## What to call this piece on screen. Empty for anything with no name — the rubbish, which
+## is counted rather than collected.
+func title_of(name: StringName) -> String:
+	return String(titles.get(String(name), ""))
 
 
 func cells_of(name: StringName) -> Vector2i:
@@ -261,7 +290,20 @@ func fill_of(name: StringName) -> float:
 ## across is not two whole cells wide, and rounding it up leaves a cell of dead floor
 ## nobody can put anything in. Rounded to nearest, a footprint is the object.
 func footprint(name: StringName, cell: int) -> Vector2i:
-	var box := region_of(name).size
+	return _cells_across(region_of(name).size, cell)
+
+
+## The same, for one restored view.
+##
+## The shed has to ask this rather than `footprint`: a piece's grimy sprite and its restored
+## views are different pictures at different sizes now, and a sofa turned side-on is a third
+## of the width it is head-on. Measuring the floor it takes up off the lake's sprite left a
+## chair standing in a footprint drawn for a sofa.
+func footprint_view(name: StringName, view: int, cell: int) -> Vector2i:
+	return _cells_across(view_region_of(name, view).size, cell)
+
+
+func _cells_across(box: Vector2, cell: int) -> Vector2i:
 	return Vector2i(
 		maxi(int(round(box.x / float(cell))), 1), maxi(int(round(box.y / float(cell))), 1)
 	)
@@ -273,7 +315,7 @@ func footprint(name: StringName, cell: int) -> Vector2i:
 ## fringe or a hole in the middle does not fill its box, and guessing gave it a collider and
 ## drew it over the armchair standing on it. Anything called a rug or a mat is floor.
 func lies_flat(name: StringName) -> bool:
-	var title := NAMES.of(String(name)).to_lower()
+	var title := title_of(name).to_lower()
 	for word: String in FLAT_WORDS:
 		if title.contains(word):
 			return true

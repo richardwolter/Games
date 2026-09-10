@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Plastic Sheet"
+material = 0
+piece = &"plastic_sheet"
+size = Vector2(14.4, 14.4)
+pollution = 3.2
+haul_cost = 1.12
+tier = 1
+lightness = 2.4
+block_color = Color(0.85, 0.72, 0.25, 1)

@@ -6,10 +6,6 @@
 ##   godot --path . res://tools/shot.tscn
 extends Node
 
-## The catalogue of what a find is called. Same preload the lake uses — find_names.gd has no
-## class_name, deliberately.
-const FindNames := preload("res://scripts/find_names.gd")
-
 const SETTLE_FRAMES := 30
 const OUT_PATH := "res://tools/shot.png"
 
@@ -130,12 +126,12 @@ func _process(_delta: float) -> void:
 			# A handful of finds, so the room has something in it to look at.
 			var found: Array[String] = []
 			var room := _main.get_node(^"HUD/Shed/Pad/Lines/Room") as ShedRoom
-			var names: PackedStringArray = room.sheets.by_sheet["furniture"]
+			var names: PackedStringArray = room.sheets.by_sheet["decor_dirty"]
 			for name: String in names:
 				# Named pieces only, the way the lake deals them: the slicer keeps a couple of
 				# offcuts that are not furniture and have nothing to call them, and a shot of
 				# the room with those in the list is a shot of something the player never sees.
-				if found.size() >= 14 or FindNames.of(name).is_empty():
+				if found.size() >= 14 or room.sheets.title_of(StringName(name)).is_empty():
 					continue
 				found.append(name)
 			_main.set(&"unlocked", found)

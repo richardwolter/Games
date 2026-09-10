@@ -120,6 +120,73 @@ All visuals (ground, water, UI, furniture) derive from a **master palette extrac
 Sprites are authored for the isometric tile size (`Iso.TILE_W = 64`, `Iso.TILE_H = 32`). Changing
 sprite scale breaks the grid assumptions.
 
+### The Decoration Catalogue (the collection)
+The finds — the furniture the player nets and stands in the shed — come from
+`art_source/Decoration_Clean_Dirty` (a PSD, no extension). It holds two layer groups:
+`Decoration` (restored, as the shed shows it) and `Decoration Dirty` (grimy, as the lake
+shows it). 34 finds.
+
+**Pipeline** (all offline, run from the project root):
+1. `psd-extract` skill → `art_source/decoration_extracted/` (one PNG per layer + manifest).
+   `art_source/.gdignore` keeps these out of the Godot project.
+2. `tools/decor_sets.json` — the **authored** catalogue: titles, dirty↔clean pairing, set
+   kind, and slice rects.
+3. `tools/build_decor.py` → `assets/decor_clean.png`, `assets/decor_dirty.png`, and the
+   decor half of `assets/pieces.json`.
+
+**Why the table is authored, not detected**: a set is several sprites packed into *one*
+layer. Nothing in the pixels says whether the second sprite is the same chair turned
+sideways (`ROTATE`), a second style of the same thing (`VARIANT`), or the same fridge with
+its door open (`STATE`) — and those are three different mechanics. Gap detection finds the
+rectangles; only a person can say what they are.
+
+**Clean and dirty are no longer the same picture twice.** The retired TopDownHouse pair was
+one layout in two palettes, so `sheets.gd` read one rectangle against a parallel sheet. The
+decoration art draws each find grimy once and restored as several views at their own sizes
+(dirty sofa 22x55, clean sofa front 49 wide). So every piece carries its own rectangle on
+each sheet: `Sheets.views` / `view_region_of` / `footprint_view`. **The shed must measure
+footprints off the view it is standing, never off `region_of`** — that is the lake's sprite.
+
+**The invisible wall**: a layer's bounding box is not the object. The dirty `Bath Sink`
+layer is a 19x29 sink with an 8-pixel fleck 150 px away, giving a 172x86 box that draws as
+an invisible wall in the water — it covers what is behind it and eats clicks. `despeck` in
+`build_decor.py` fixes it by *distance*, not by size: the largest pixel island is the
+object, anything within `GLUE = 4` px joins it, the rest is a stray. A size threshold is
+the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
+
+### Shed Verbs (`scripts/shed_room.gd`)
+- **R** cycles the piece **in hand** — `ROTATE` views and `VARIANT` styles both. Only while
+  carrying: a placed piece is turned by picking it up again, so one gesture means one thing.
+  A three-view set (sofa, armchair, both chairs) gets a fourth face from a mirrored side,
+  baked into the sheet by the builder. Two-view sets are front and side as drawn.
+- **E** works a `STATE` piece the player is **standing at** (`REACH`), with an on-screen
+  prompt. Fireplace on/off, fridge open/shut. A lit piece draws a glow on the boards —
+  warm and wide for fire, weaker and whiter for the fridge. Drawn circles, not Light2D:
+  the room is one `_draw` on a Control.
+- The view a piece stands in persists in the `decor` row as `"view"`.
+- **Copies**: a find can be hidden more than once — `copies` in `decor_sets.json`, baked
+  into `pieces.json`, read via `Sheets.copies_of`. Both chairs are **4** (a dining table
+  with one chair at it is not a room anybody lives in); everything else is 1. Each copy is
+  its own def, its own hiding place in the lake, and its own row in `unlocked` — they share
+  one dirty sprite and are netted and stood separately. `_keep` caps at `copies_of`, and
+  `in_store()` **counts** rather than matching by name: matching emptied the shelf of all
+  four the moment the first was stood down.
+- `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
+
+### Golden Glitter (`LakeGrid.GlintLayer`)
+Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down). The
+glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shimmers faintly
+through the muck, and glints fully with turning specks once uncovered. Drawn *above* the
+rubbish, because the point is to be visible while the find itself is not.
+
+### Retired
+`assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
+names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the
+rectangles now). `SAVE_VERSION` is 5 and older saves are refused rather than migrated;
+`RECUT_RENAMES` and `tools/repair_save.gd` went with them. `tools/slice_sheets.gd` still
+cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
+`tools/build_decor.py` after any re-slice** or the decor half is lost.
+
 ---
 
 ## Godot/Windows Gotchas

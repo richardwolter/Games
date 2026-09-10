@@ -80,11 +80,40 @@ const DOG_MOOD_MOST := 7.0
 const DOG_BED_SLEEP := 22.0
 
 ## The piece the dog treats as its own. The catalogue name rather than the title, so
-## renaming the find in scripts/find_names.gd does not quietly take the dog's bed away.
-const DOG_BED := &"furniture_44"
+## renaming the find in tools/decor_sets.json does not quietly take the dog's bed away.
+##
+## One name covers both beds: the art draws two styles and the player picks which one it
+## stands as with R, so they are one find with two faces rather than two finds. See
+## Sheets.Set.VARIANT.
+const DOG_BED := &"decor_pet_bed"
 
 ## How many cells deep a piece's foot is — the part of it actually standing on the floor.
 const BASE_CELLS := 1
+
+## How close the player has to stand to work a switch, in cells, and how far above the
+## piece the prompt floats.
+##
+## A fireplace is lit by walking up to it, not by clicking it from across the room: the
+## room already has a drag gesture and a second meaning for the same click is how a player
+## ends up dragging the fridge every time they meant to open it.
+const REACH := 3.2
+const PROMPT_LIFT := 8.0
+
+## The glow a lit piece throws on the room, as a radius in cells and a colour.
+##
+## Drawn rather than lit: the room is one `_draw` on a Control and has no light nodes to
+## hang a Light2D off. Three rings of a soft additive colour read as a glow at this scale
+## and cost three `draw_circle` calls.
+const GLOW_RINGS := 3
+const FIRE_GLOW := Color(1.0, 0.55, 0.18, 0.13)
+const FIRE_REACH := 7.0
+## Weaker and much whiter: an open fridge is a bulb in a box, not a hearth.
+const FRIDGE_GLOW := Color(0.86, 0.93, 1.0, 0.06)
+const FRIDGE_REACH := 3.6
+
+## Which view a STATE piece is switched on in. Both state sets are authored off-then-on.
+const STATE_OFF := 0
+const STATE_ON := 1
 
 ## How wide a floorboard is, in source pixels. The boards are the room, not the grid: the
 ## grid is half this and drawing a line every four screen pixels reads as corduroy.
@@ -165,6 +194,11 @@ var decor: Array = []
 ## What is being dragged, as a piece name, and where it came from: the index it had in
 ## `decor`, or -1 when it was picked up off the inventory list.
 var carrying: StringName = &""
+
+## Which face the carried piece is being held in — an index into its views. Set from the
+## row it was lifted off so turning a chair, putting it down and picking it up again does
+## not quietly straighten it.
+var _carry_view: int = 0
 var _carried_from: int = -1
 var _pointer := Vector2.ZERO
 var _scroll: float = 0.0
@@ -634,7 +668,7 @@ func _bed_cell() -> Vector2:
 	for row: Dictionary in decor:
 		if StringName(row["piece"]) != DOG_BED:
 			continue
-		var span := span_of(DOG_BED)
+		var span := span_of(DOG_BED, _row_view(row))
 		return Vector2(
 			float(int(row["cell"][0])) + float(span.x) * 0.5,
 			float(int(row["cell"][1])) + float(span.y) * 0.5
@@ -660,7 +694,7 @@ func _taken() -> Dictionary:
 		var piece := StringName(row["piece"])
 		if piece == DOG_BED or (sheets != null and sheets.lies_flat(piece)):
 			continue
-		var span := span_of(piece)
+		var span := span_of(piece, _row_view(row))
 		var cell := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
 		var base := mini(BASE_CELLS, span.y)
 		for x in span.x:
@@ -705,14 +739,26 @@ func _place_close() -> void:
 
 
 ## Everything unlocked that is not already standing in the room.
+## What is on the shelf: everything found, less what is already standing in the room and
+## whatever is in hand.
+##
+## Counted rather than matched by name. The chairs come four to a set and each copy is its
+## own row in `unlocked`, so "is one of these on the floor?" would empty the shelf of all
+## four the moment the first one was stood down.
 func in_store() -> Array[String]:
-	var placed: Array[String] = []
+	var out := {}
 	for row: Dictionary in decor:
-		placed.append(String(row["piece"]))
+		var name := String(row["piece"])
+		out[name] = int(out.get(name, 0)) + 1
+	if not carrying.is_empty():
+		out[String(carrying)] = int(out.get(String(carrying), 0)) + 1
 	var left: Array[String] = []
 	for name: String in unlocked:
-		if not placed.has(name) and (carrying.is_empty() or String(carrying) != name):
-			left.append(name)
+		var standing := int(out.get(name, 0))
+		if standing > 0:
+			out[name] = standing - 1
+			continue
+		left.append(name)
 	return left
 
 
@@ -724,9 +770,15 @@ func cell_at(where: Vector2) -> Vector2i:
 	)
 
 
-## How many cells a piece takes up, on this room's grid.
-func span_of(piece: StringName) -> Vector2i:
-	return sheets.footprint(piece, CELL) if sheets != null else Vector2i.ONE
+## How many cells a piece takes up, on this room's grid, in the face it is standing in.
+func span_of(piece: StringName, view: int = 0) -> Vector2i:
+	return sheets.footprint_view(piece, view, CELL) if sheets != null else Vector2i.ONE
+
+
+## Which face a row of `decor` is standing in. Rows written before a piece had faces, and
+## rows for pieces that only ever had one, read as the first.
+func _row_view(row: Dictionary) -> int:
+	return int(row.get("view", 0))
 
 
 ## Can this piece stand with its top-left corner in this cell?
@@ -736,19 +788,74 @@ func span_of(piece: StringName) -> Vector2i:
 ## tucked under the edge, and a room where nothing may touch anything is a spreadsheet.
 ## What stops a pile of junk is the drawing order, not a refusal — rugs go down first, and
 ## everything else is stacked up the room from the back wall.
-func can_place(piece: StringName, cell: Vector2i, _ignore: int = -1) -> bool:
+func can_place(piece: StringName, cell: Vector2i, view: int = 0, _ignore: int = -1) -> bool:
 	if sheets == null:
 		return false
-	var span := span_of(piece)
+	var span := span_of(piece, view)
 	return cell.x >= 0 and cell.y >= 0 and cell.x + span.x <= COLS and cell.y + span.y <= ROWS
 
 
 ## Put a piece down, if it fits. The one way anything enters `decor`.
-func place(piece: StringName, cell: Vector2i) -> bool:
-	if not can_place(piece, cell):
+func place(piece: StringName, cell: Vector2i, view: int = 0) -> bool:
+	if not can_place(piece, cell, view):
 		return false
-	decor.append({"piece": String(piece), "cell": [cell.x, cell.y]})
+	decor.append({
+		"piece": String(piece),
+		"cell": [cell.x, cell.y],
+		"view": posmod(view, sheets.view_count(piece)) if sheets != null else 0,
+	})
 	changed.emit()
+	return true
+
+
+## Turn the piece in hand, or pick the next style of it. What R does.
+##
+## Only while carrying: a placed piece is turned by picking it up again, which keeps one
+## gesture for one thing and means a room cannot rearrange itself under the cursor.
+func turn_carried() -> void:
+	if carrying.is_empty() or sheets == null or not sheets.turnable(carrying):
+		return
+	_carry_view = posmod(_carry_view + 1, sheets.view_count(carrying))
+	queue_redraw()
+
+
+## The placed piece the player is standing close enough to work, as an index into `decor`,
+## or -1. Nearest first, so two switches side by side are not a coin toss.
+func _switch_near() -> int:
+	if sheets == null:
+		return -1
+	var best := -1
+	var best_gap := REACH
+	for i in decor.size():
+		var row: Dictionary = decor[i]
+		var piece := StringName(row["piece"])
+		if not sheets.switchable(piece):
+			continue
+		var span := span_of(piece, _row_view(row))
+		var middle := Vector2(
+			float(int(row["cell"][0])) + float(span.x) * 0.5,
+			float(int(row["cell"][1])) + float(span.y)
+		)
+		var gap := _you_at.distance_to(middle)
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+
+## Switch the piece the player is standing at: light the fire, open the fridge. What E does.
+##
+## The footprint is left alone on purpose. Both state sets are drawn the same size in both
+## faces, and re-measuring the floor under a piece the player is only looking at could
+## shove it out of a room it already fits in.
+func switch_near() -> bool:
+	var at := _switch_near()
+	if at < 0:
+		return false
+	var row: Dictionary = decor[at]
+	row["view"] = STATE_ON if _row_view(row) == STATE_OFF else STATE_OFF
+	changed.emit()
+	queue_redraw()
 	return true
 
 
@@ -758,6 +865,31 @@ func take_back(index: int) -> void:
 		return
 	decor.remove_at(index)
 	changed.emit()
+
+
+## R turns what is in hand, E works the switch the player is standing at.
+##
+## Not `_gui_input`: that only ever sees a key on the Control that holds focus, and this
+## room has never taken focus — it is dragged with the mouse and never typed into, so R
+## and E went nowhere at all. Not the input map either, because both are room verbs:
+## outside the shed the same keys mean nothing, and a placed fireplace is not something
+## the lake can light.
+##
+## `_unhandled_key_input` runs before the lake's own `_unhandled_input`, which is what puts
+## the fireplace ahead of the door: E lights the fire the player is standing at, and E
+## anywhere else in the room falls through to meaning "leave", the way it always has.
+## Escape still leaves from anywhere, including the hearth.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not is_visible_in_tree():
+		return
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_R:
+		turn_carried()
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_E and switch_near():
+		get_viewport().set_input_as_handled()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -796,6 +928,7 @@ func _pick_up() -> void:
 	if on_floor >= 0:
 		var row: Dictionary = decor[on_floor]
 		carrying = StringName(row["piece"])
+		_carry_view = _row_view(row)
 		_carried_from = on_floor
 		decor.remove_at(on_floor)
 		changed.emit()
@@ -803,6 +936,8 @@ func _pick_up() -> void:
 	var from_list := _listed_at(_pointer)
 	if not from_list.is_empty():
 		carrying = StringName(from_list)
+		# Out of the store it comes as drawn: front on, fire out, door shut.
+		_carry_view = 0
 		_carried_from = -1
 
 
@@ -813,10 +948,12 @@ func _put_down() -> void:
 	if carrying.is_empty():
 		return
 	var piece := carrying
+	var view := _carry_view
 	carrying = &""
+	_carry_view = 0
 	_carried_from = -1
 	if _over_floor(_pointer):
-		place(piece, _drop_cell(piece))
+		place(piece, _drop_cell(piece, view), view)
 	else:
 		# Back to the store, which is where anything not on the floor already is.
 		changed.emit()
@@ -824,8 +961,8 @@ func _put_down() -> void:
 
 ## The cell a dragged piece would land in: the piece is carried by its middle, which is
 ## where the cursor holds it, so the corner is half its span up and left of that.
-func _drop_cell(piece: StringName) -> Vector2i:
-	var span := span_of(piece)
+func _drop_cell(piece: StringName, view: int = 0) -> Vector2i:
+	var span := span_of(piece, view)
 	var middle := cell_at(_pointer)
 	return middle - Vector2i(span.x / 2, span.y / 2)
 
@@ -850,7 +987,7 @@ func _placed_at(where: Vector2) -> int:
 		var i: int = order[at_index]
 		var row: Dictionary = decor[i]
 		var at := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
-		if Rect2i(at, span_of(StringName(row["piece"]))).has_point(cell):
+		if Rect2i(at, span_of(StringName(row["piece"]), _row_view(row))).has_point(cell):
 			return i
 	return -1
 
@@ -867,8 +1004,8 @@ func _stacking() -> Array:
 			var flat_b := sheets.lies_flat(piece_b)
 			if flat_a != flat_b:
 				return flat_a
-			var foot_a: int = int(decor[a]["cell"][1]) + span_of(piece_a).y
-			var foot_b: int = int(decor[b]["cell"][1]) + span_of(piece_b).y
+			var foot_a: int = int(decor[a]["cell"][1]) + span_of(piece_a, _row_view(decor[a])).y
+			var foot_b: int = int(decor[b]["cell"][1]) + span_of(piece_b, _row_view(decor[b])).y
 			return foot_a < foot_b
 	)
 	return order
@@ -1013,6 +1150,10 @@ func _draw() -> void:
 				Color(1.0, 1.0, 1.0, 0.05), 1.0
 			)
 
+	# What the lit pieces throw on the boards. Under the furniture, so a fire washes the
+	# floor in front of the hearth rather than painting over the hearth itself.
+	_draw_glows(floor_box)
+
 	# What is in the room, laid down before it is stood on. The dog goes in among them
 	# rather than over the lot: it is drawn the moment the room reaches something standing
 	# further back than the dog is, so it passes behind a wardrobe and in front of a chair
@@ -1029,12 +1170,12 @@ func _draw() -> void:
 		# basket goes down first and the dog on top of it, whatever the feet say.
 		var own_bed := piece == DOG_BED and _dog_at.distance_to(_bed_cell()) <= 1.2
 		if not dog_drawn and not own_bed and not sheets.lies_flat(piece):
-			var foot := float(int(row["cell"][1]) + span_of(piece).y)
+			var foot := float(int(row["cell"][1]) + span_of(piece, _row_view(row)).y)
 			if foot > dog_foot:
 				_draw_dog(floor_box)
 				dog_drawn = true
 		if not you_drawn and not sheets.lies_flat(piece):
-			var stands := float(int(row["cell"][1]) + span_of(piece).y)
+			var stands := float(int(row["cell"][1]) + span_of(piece, _row_view(row)).y)
 			if stands > _you_at.y:
 				_draw_you(floor_box)
 				you_drawn = true
@@ -1043,21 +1184,23 @@ func _draw() -> void:
 			floor_box.position + Vector2(
 				float(int(row["cell"][0])) * CELL * _zoom(),
 				float(int(row["cell"][1])) * CELL * _zoom()
-			)
+			),
+			_row_view(row)
 		)
 	if not dog_drawn:
 		_draw_dog(floor_box)
 	if not you_drawn:
 		_draw_you(floor_box)
 
+	_draw_prompt(floor_box)
 	_draw_list(ink)
 
 	# The piece in hand, under the cursor, tinted by whether it can go where it is.
 	if not carrying.is_empty():
-		var span := span_of(carrying)
+		var span := span_of(carrying, _carry_view)
 		if _over_floor(_pointer):
-			var cell := _drop_cell(carrying)
-			var fits := can_place(carrying, cell)
+			var cell := _drop_cell(carrying, _carry_view)
+			var fits := can_place(carrying, cell, _carry_view)
 			var at := floor_box.position + Vector2(
 				float(cell.x) * CELL * _zoom(), float(cell.y) * CELL * _zoom()
 			)
@@ -1066,10 +1209,14 @@ func _draw() -> void:
 				Color(Style.SAFE.r, Style.SAFE.g, Style.SAFE.b, 0.20) if fits
 				else Color(Style.DANGER.r, Style.DANGER.g, Style.DANGER.b, 0.20)
 			)
-			_stamp_piece(carrying, at, Color(1.0, 1.0, 1.0, 0.85 if fits else 0.5))
+			_stamp_piece(
+				carrying, at, _carry_view, Color(1.0, 1.0, 1.0, 0.85 if fits else 0.5)
+			)
 		else:
 			_stamp_piece(
-				carrying, _pointer - sheets.region_of(carrying).size * _zoom() * 0.5,
+				carrying,
+				_pointer - sheets.view_region_of(carrying, _carry_view).size * _zoom() * 0.5,
+				_carry_view,
 				Color(1.0, 1.0, 1.0, 0.75)
 			)
 
@@ -1140,9 +1287,64 @@ func _draw_list(ink: Color) -> void:
 			)
 
 
-## One piece of furniture, in its cleaned-up palette, standing with its corner at a point.
-func _stamp_piece(piece: StringName, at: Vector2, tint: Color = Color.WHITE) -> void:
-	var region := sheets.alt_region_of(piece)
+## The light a switched-on piece spills onto the room.
+##
+## Three flat circles of a low-alpha colour, largest first. A real falloff wants a gradient
+## texture or a shader and this is a lamp in a shed: the rings land close enough that the
+## eye reads warmth coming off the hearth, which is the whole job.
+func _draw_glows(floor_box: Rect2) -> void:
+	if sheets == null:
+		return
+	for row: Dictionary in decor:
+		var piece := StringName(row["piece"])
+		if not sheets.switchable(piece) or _row_view(row) != STATE_ON:
+			continue
+		var tint := FIRE_GLOW
+		var reach := FIRE_REACH
+		if sheets.role_of(piece, _row_view(row)) == &"open":
+			tint = FRIDGE_GLOW
+			reach = FRIDGE_REACH
+		var span := span_of(piece, _row_view(row))
+		var middle := floor_box.position + Vector2(
+			(float(int(row["cell"][0])) + float(span.x) * 0.5) * CELL * _zoom(),
+			(float(int(row["cell"][1])) + float(span.y)) * CELL * _zoom()
+		)
+		for ring in GLOW_RINGS:
+			var out := reach * CELL * _zoom() * (1.0 - float(ring) / float(GLOW_RINGS + 1))
+			draw_circle(middle, out, tint)
+
+
+## The nudge over a switch the player is standing at. Nothing at all when they are not.
+##
+## The fireplace and the fridge are the only two things in the game worked by standing
+## rather than clicking, so there is no chance of learning the verb anywhere else: without
+## this the player walks past a fireplace they own and never finds out it lights.
+func _draw_prompt(floor_box: Rect2) -> void:
+	var at := _switch_near()
+	if at < 0:
+		return
+	var row: Dictionary = decor[at]
+	var piece := StringName(row["piece"])
+	var span := span_of(piece, _row_view(row))
+	var over := floor_box.position + Vector2(
+		(float(int(row["cell"][0])) + float(span.x) * 0.5) * CELL * _zoom(),
+		float(int(row["cell"][1])) * CELL * _zoom() - PROMPT_LIFT
+	)
+	var side := 18.0
+	var box := Rect2(over - Vector2(side, side) * 0.5, Vector2(side, side))
+	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.85))
+	draw_rect(box, Style.INK_DIM, false, 1.0)
+	Style.write(
+		self, "E", Style.TEXT_SMALL, box.position + Vector2(5.0, 14.0), Style.INK
+	)
+
+
+## One piece of furniture, in its cleaned-up palette, standing with its corner at a point,
+## in whichever face it is turned to.
+func _stamp_piece(
+	piece: StringName, at: Vector2, view: int = 0, tint: Color = Color.WHITE
+) -> void:
+	var region := sheets.view_region_of(piece, view)
 	draw_texture_rect_region(
 		sheets.atlas, Rect2(at, region.size * _zoom()), region, tint
 	)

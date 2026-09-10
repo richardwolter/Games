@@ -112,6 +112,16 @@ const HEIGHT := 40.0
 ## The cut sheets. tools/slice_character.gd writes them.
 const ART := "res://assets/character.json"
 
+## The second, still-judged sheet. tools/slice_character_v2.gd writes it from the PSD in
+## art_source/Character_Sprite_Sheet.psd. Toggled with TOGGLE_KEY rather than replacing ART
+## outright, so the old angler is never more than a keypress away while this one is on trial.
+const ART_V2 := "res://assets/character_v2.json"
+
+## Swaps the drawn angler between the two sheets, for judging the new one against the old
+## without a rebuild. Not wired to an input action in project.godot — this is a dev toggle
+## for one person's eyes, not a player-facing control.
+const TOGGLE_KEY := KEY_F9
+
 ## What takes the raw sheet's colour down into the game's own. Its numbers are uniforms, so
 ## they can be turned while the game is running.
 const TONE := "res://shaders/figure.gdshader"
@@ -129,6 +139,13 @@ const SIDE_FAVOUR := 0.5
 ## sheet is a six-frame stride and it has to keep up with the feet.
 const IDLE_FRAME := 0.24
 const WALK_FRAME := 0.1
+
+## Same idea for the second sheet's own cycles: a seventeen-frame run has more frames to get
+## through than the six-frame stride above, so it is held for less each, and the sixteen-frame
+## cast is played once — see CAST_FRAME's own note — not looped, so its rate only has to look
+## right for one pass.
+const RUN_FRAME_V2 := 0.05
+const CAST_FRAME_V2 := 0.04
 
 ## The straw hat: the picture of it, how wide it is drawn against the figure's height, and how
 ## far below the top of the head its brim sits.
@@ -224,6 +241,24 @@ var _hat: Texture2D
 var _sheet_wide: float = 0.0
 var _poses := {}
 
+## The second sheet, on trial against the one above. See ART_V2. No mirror texture — this one
+## draws all four compass directions itself, so there is nothing here for `_view()` to flip.
+var _sheet2: Texture2D
+var _poses2 := {}
+var _stand_tall2: float = 20.0
+var _stand_foot2: float = 26.0
+
+## Which sheet is currently drawn. Flipped by TOGGLE_KEY; see _toggle_sheet().
+var use_v2 := false
+
+## Edge-detects TOGGLE_KEY without an input action of its own — see TOGGLE_KEY.
+var _toggle_was_down := false
+
+## Seconds into the cast animation, or negative while none is playing. Only the second sheet
+## has one; see start_cast(). Counts up past the last frame rather than looping or resetting,
+## so "still in the last frame" is the same test as "still casting" — see _paint_key().
+var _cast_time := -1.0
+
 ## How tall the figure draws inside its cell and where its feet sit in it, taken once from
 ## one frame and used for every frame.
 ##
@@ -244,6 +279,7 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_wear_tone()
 	_load_art()
+	_load_art_v2()
 	stand_at(tile_pos)
 
 
@@ -332,6 +368,70 @@ func _load_art() -> bool:
 	return not _poses.is_empty()
 
 
+## Read the second sheet. Same bargain as _load_art(): empty on missing or broken art, and
+## use_v2 is left false so nothing tries to draw from an empty catalogue.
+func _load_art_v2() -> bool:
+	var text := FileAccess.get_file_as_string(ART_V2)
+	if text.is_empty():
+		return false
+	var book: Dictionary = JSON.parse_string(text)
+	if book == null or not book.has("poses"):
+		return false
+	var image := Art.image(book["sheet"])
+	if image == null:
+		return false
+	_sheet2 = ImageTexture.create_from_image(image)
+
+	for name: String in book["poses"]:
+		var frames: Array = []
+		for cell: Dictionary in book["poses"][name]:
+			var region: Array = cell["region"]
+			var ink: Array = cell["ink"]
+			frames.append({
+				"region": Rect2(region[0], region[1], region[2], region[3]),
+				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
+			})
+		_poses2[StringName(name)] = frames
+
+	# Registered against the first frame of standing facing the camera, same as the other
+	# sheet — see _load_art().
+	if _poses2.has(&"idle_south"):
+		var ink: Rect2 = ((_poses2[&"idle_south"] as Array)[0] as Dictionary)["ink"]
+		_stand_tall2 = maxf(ink.size.y, 1.0)
+		_stand_foot2 = ink.position.y + ink.size.y
+	return not _poses2.is_empty()
+
+
+## Which compass direction the second sheet should show — it draws all four itself, so this
+## only answers a name, never a mirror. See _view() for the three-row sheet's version.
+func _view2() -> StringName:
+	var on_screen := Vector2(facing.x - facing.y, (facing.x + facing.y) * 0.5)
+	if absf(on_screen.x) >= absf(on_screen.y) * SIDE_FAVOUR:
+		return &"west" if on_screen.x < 0.0 else &"east"
+	return &"south" if on_screen.y > 0.0 else &"north"
+
+
+## Starts the cast animation on the second sheet, played once and then held — see _cast_time
+## and _paint_key(). A no-op on the first sheet and while the second sheet's art is missing:
+## the net still flies and comes home exactly as it always has either way (see net.gd), this
+## only decides what the angler is shown holding while it does.
+func start_cast() -> void:
+	if use_v2 and not _poses2.is_empty():
+		_cast_time = 0.0
+
+
+## TOGGLE_KEY, edge-detected. Only flips onto the second sheet if it actually loaded, so a
+## missing or broken character_v2.json leaves the toggle inert rather than blanking the
+## angler.
+func _poll_toggle() -> void:
+	var down := Input.is_physical_key_pressed(TOGGLE_KEY)
+	if down and not _toggle_was_down and not _poses2.is_empty():
+		use_v2 = not use_v2
+		_cast_time = -1.0
+		queue_redraw()
+	_toggle_was_down = down
+
+
 ## Where the line is drawn from and where the net comes home to, in world space.
 ##
 ## Still called the rod tip, and there is still no rod: the sprite holds nothing, and drawing
@@ -348,6 +448,7 @@ func _place() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_poll_toggle()
 
 	# The arrows and WASD both feed these, which is what the walk_* actions are for. See
 	# the [input] block in project.godot.
@@ -360,8 +461,16 @@ func _process(delta: float) -> void:
 	if push == Vector2.ZERO:
 		_step = 0.0
 		_speed = move_toward(_speed, 0.0, ACCEL * delta)
+		if _cast_time >= 0.0:
+			_cast_time += delta
 		_repaint()
 		return
+
+	# Walking wins outright: once the angler moves, the cast is gone for the rest of this
+	# haul, not merely paused. See start_cast()'s note and the plan this came out of —
+	# holding the cast pose while the figure slides about with no stride under it read
+	# worse than just letting it go.
+	_cast_time = -1.0
 
 	# Read in screen space and turned into tile space, so "press right" walks right on
 	# screen rather than along a diagonal the player cannot see.
@@ -491,13 +600,37 @@ func _repaint() -> void:
 ## Which frame of which pose is currently showing, as one number.
 func _paint_key() -> int:
 	var walking := _step > 0.0
-	var held := WALK_FRAME if walking else IDLE_FRAME
 	# How deep the boots are is part of the picture too: stepping into the shallows changes
 	# what is drawn without changing which frame it is, and while they are in the water the
 	# rings round them move on their own clock.
 	var sunk := _wading()
 	var rings := int(_time / RIPPLE_STEP) if sunk > 0.0 else 0
+	if use_v2:
+		var pose: Dictionary = _pose_v2(walking)
+		return hash([true, pose["pose"], pose["index"], sunk, rings])
+	var held := WALK_FRAME if walking else IDLE_FRAME
 	return hash([walking, _view()[0], int(_time / held), sunk, rings])
+
+
+## The pose and frame index the second sheet is showing right now: idle, run, or the cast
+## once through and held — see start_cast() and _cast_time. Shared between _paint_key() and
+## _draw() so the two can never disagree about which frame that is.
+func _pose_v2(walking: bool) -> Dictionary:
+	var dir := _view2()
+	if _cast_time >= 0.0 and not walking:
+		var pose := StringName("cast_%s" % dir)
+		var frames: Array = _poses2.get(pose, [])
+		if not frames.is_empty():
+			return {"pose": pose, "index": mini(int(_cast_time / CAST_FRAME_V2), frames.size() - 1)}
+	if walking:
+		var pose := StringName("run_%s" % dir)
+		var frames: Array = _poses2.get(pose, [])
+		if not frames.is_empty():
+			return {"pose": pose, "index": posmod(int(_time / RUN_FRAME_V2), frames.size())}
+	var pose := StringName("idle_%s" % dir)
+	var frames: Array = _poses2.get(pose, [])
+	var index := posmod(int(_time / IDLE_FRAME), frames.size()) if not frames.is_empty() else 0
+	return {"pose": pose, "index": index}
 
 
 ## Rings of disturbed water round the feet, while any of the figure is under the surface.
@@ -551,6 +684,15 @@ func _draw() -> void:
 	# on the surface the boots are in, not on the boots.
 	_draw_ripples(sunk)
 
+	if use_v2:
+		_draw_v2(sunk, land_shift)
+	else:
+		_draw_v1(sunk, land_shift)
+
+
+## The first sheet: three drawn rows, one of them mirrored for the fourth direction, and a
+## hat drawn on top. See the module doc on _sheet/_mirror and _draw_hat().
+func _draw_v1(sunk: float, land_shift: float) -> void:
 	if _poses.is_empty():
 		_draw_blocked()
 		return
@@ -605,6 +747,47 @@ func _draw() -> void:
 
 	# Over the figure, and after it, because it is worn rather than drawn into the sheet.
 	_draw_hat(box, frame["ink"], float(frame["head"]), scale, view)
+
+
+## The second sheet: four drawn directions, no mirroring, and no hat drawn here — this one
+## paints its own, straight into the frame. See _load_art_v2() and _pose_v2().
+func _draw_v2(sunk: float, land_shift: float) -> void:
+	if _poses2.is_empty():
+		_draw_blocked()
+		return
+
+	var walking := _step > 0.0
+	var chosen: Dictionary = _pose_v2(walking)
+	var frames: Array = _poses2.get(chosen["pose"], [])
+	if frames.is_empty():
+		_draw_blocked()
+		return
+	var frame: Dictionary = frames[chosen["index"]]
+	var region: Rect2 = frame["region"]
+	var ink: Rect2 = frame["ink"]
+
+	# Same bargain as _draw_v1(): scale to whole source pixels off the figure's own height,
+	# not its cell, so a re-slice with more headroom cannot change how big the angler reads.
+	var scale := maxf(1.0, roundf(HEIGHT / _stand_tall2))
+
+	if sunk > 0.0:
+		region = Rect2(region.position, Vector2(region.size.x, maxf(region.size.y - sunk, 1.0)))
+
+	# Centred on the figure, not on the cell. The old sheet's cells were hand-authored with
+	# the body already in the middle of each one, so centring on the cell centred the body
+	# for free. This sheet's cells are not authored at all — tools/slice_character_v2.gd
+	# only has one strip per direction to divide evenly by its frame count, and an even
+	# split of a hand-trimmed strip does not land the body in the middle of what it hands
+	# back. That read as the whole figure sitting a little right of the tile on every frame
+	# of every animation, because every cell was the same amount too wide on the left.
+	# Centring on the frame's own ink box instead puts the same point of the body — its
+	# horizontal middle — under the origin no matter where the cell cut it.
+	var size := region.size * scale
+	var box := Rect2(
+		Vector2(-(ink.position.x + ink.size.x * 0.5) * scale, -_stand_foot2 * scale + land_shift),
+		size
+	)
+	draw_texture_rect_region(_sheet2, box, region)
 
 
 ## A length rounded onto the figure's own pixel grid.

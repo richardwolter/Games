@@ -1,0 +1,202 @@
+{
+  "source": "art_source/Character_Sprite_Sheet.psd",
+  "canvas": [
+    1088,
+    832
+  ],
+  "layers": [
+    {
+      "name": "Casting West",
+      "slug": "casting_west",
+      "group_path": [],
+      "bbox": [
+        18,
+        777,
+        1016,
+        822
+      ],
+      "size": [
+        998,
+        45
+      ],
+      "file": "casting_west.png"
+    },
+    {
+      "name": "Casting North",
+      "slug": "casting_north",
+      "group_path": [],
+      "bbox": [
+        16,
+        715,
+        1009,
+        757
+      ],
+      "size": [
+        993,
+        42
+      ],
+      "file": "casting_north.png"
+    },
+    {
+      "name": "Casting East",
+      "slug": "casting_east",
+      "group_path": [],
+      "bbox": [
+        18,
+        650,
+        1011,
+        694
+      ],
+      "size": [
+        993,
+        44
+      ],
+      "file": "casting_east.png"
+    },
+    {
+      "name": "Casting South",
+      "slug": "casting_south",
+      "group_path": [],
+      "bbox": [
+        14,
+        585,
+        1009,
+        630
+      ],
+      "size": [
+        995,
+        45
+      ],
+      "file": "casting_south.png"
+    },
+    {
+      "name": "Running West",
+      "slug": "running_west",
+      "group_path": [],
+      "bbox": [
+        17,
+        522,
+        1071,
+        566
+      ],
+      "size": [
+        1054,
+        44
+      ],
+      "file": "running_west.png"
+    },
+    {
+      "name": "Running North",
+      "slug": "running_north",
+      "group_path": [],
+      "bbox": [
+        17,
+        458,
+        1071,
+        501
+      ],
+      "size": [
+        1054,
+        43
+      ],
+      "file": "running_north.png"
+    },
+    {
+      "name": "Running East",
+      "slug": "running_east",
+      "group_path": [],
+      "bbox": [
+        18,
+        393,
+        1071,
+        438
+      ],
+      "size": [
+        1053,
+        45
+      ],
+      "file": "running_east.png"
+    },
+    {
+      "name": "Running South",
+      "slug": "running_south",
+      "group_path": [],
+      "bbox": [
+        15,
+        328,
+        1071,
+        375
+      ],
+      "size": [
+        1056,
+        47
+      ],
+      "file": "running_south.png"
+    },
+    {
+      "name": "Idle West",
+      "slug": "idle_west",
+      "group_path": [],
+      "bbox": [
+        17,
+        265,
+        560,
+        310
+      ],
+      "size": [
+        543,
+        45
+      ],
+      "file": "idle_west.png"
+    },
+    {
+      "name": "Idle East",
+      "slug": "idle_east",
+      "group_path": [],
+      "bbox": [
+        18,
+        137,
+        558,
+        183
+      ],
+      "size": [
+        540,
+        46
+      ],
+      "file": "idle_east.png"
+    },
+    {
+      "name": "Idle North",
+      "slug": "idle_north",
+      "group_path": [],
+      "bbox": [
+        17,
+        202,
+        562,
+        245
+      ],
+      "size": [
+        545,
+        43
+      ],
+      "file": "idle_north.png"
+    },
+    {
+      "name": "Idle South",
+      "slug": "idle_south",
+      "group_path": [],
+      "bbox": [
+        15,
+        72,
+        559,
+        117
+      ],
+      "size": [
+        544,
+        45
+      ],
+      "file": "idle_south.png"
+    }
+  ],
+  "skipped": []
+}
