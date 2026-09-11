@@ -100,18 +100,49 @@ const GRASS_ROUGH := [18, 20, 21]
 ## apart with, shares this one.
 const GRASS_BORDER := [37, 38, 43, 45]
 
-## Why the pack's joining pieces are not used.
+## The joining pieces: a mainland grass tile with sand on any side takes the tile whose top
+## face is sand along those sides, keyed by a four-bit mask — NW 1, NE 2, SE 4, SW 8, the
+## same side order `tools/tile_edges.gd` reads and the same tile-step mapping.
 ##
-## The pack has grass tops with sand worn through them, and they look like the answer to a
-## lawn meeting a beach. They are not. `tools/tile_edges.gd` reads the sand off each tile's
-## four sides, and what the set turns out to be is a corner set: sand along two adjacent
-## sides, along three, or over the whole top. There is no tile with sand along exactly one
-## side, which is what a straight run of shoreline is made of and most of the shoreline is.
+## The pack's set is a corner set: sand along two adjacent sides, or three. `tile_edges.log`
+## has the table. Two of its pieces are missing — the front corner (SE+SW) and the three-side
+## piece leaving grass on the NE only — and on a lake the lawn surrounds, the front corner is
+## the whole top stretch of shore. Those two are generated from the pack's own pixels by
+## `_pipeline/tools/generate_joins.py` (a face flipped or mirrored onto a plain cube) and live
+## in `assets/joins/`, numbered from JOIN_FIRST so they can sit in the same tables.
 ##
-## So a fitted edge can only ever be fitted at the turns, and the straights between them stay
-## plain — a border that starts and stops. On top of that the joining pieces are all the
-## lighter grass, so the mainland's darker lawn would change colour wherever it met the sand.
-## Plain grass to the tile edge is the honest version of what this pack can do.
+## There is no one-side piece, and most of a shoreline is one-side straights. By decision a
+## straight takes a two-side piece anyway — its second sand side is turned toward whichever
+## diagonal neighbour is sand, so the spill follows the curve of the beach rather than cutting
+## against it, and a back side where neither is. The joins are all the pack's lighter grass,
+## and against the mainland's darker lawn they read as a lighter verge, also by decision.
+## (Earlier the joins were left unused for both reasons and the straights took tufted mounds
+## and a hanging fringe instead; see git history for that version.)
+const JOIN_FIRST := 1001
+const JOIN_SESW := 1001
+const JOIN_NWSESW := 1002
+const JOIN_ART := {
+	JOIN_SESW: "res://assets/joins/join_sesw.png",
+	JOIN_NWSESW: "res://assets/joins/join_nwsesw.png",
+}
+const SIDE_NW := 1
+const SIDE_NE := 2
+const SIDE_SE := 4
+const SIDE_SW := 8
+## Mask to a pool of slices. Opposite pairs (NW+SE, NE+SW) do not occur on a curve of tiles
+## this wide, and take the nearest three-side piece if they ever do.
+const JOINS := {
+	SIDE_NW | SIDE_NE: [27],
+	SIDE_NE | SIDE_SE: [30],
+	SIDE_NW | SIDE_SW: [16, 26],
+	SIDE_SE | SIDE_SW: [JOIN_SESW],
+	SIDE_NW | SIDE_NE | SIDE_SW: [4],
+	SIDE_NE | SIDE_SE | SIDE_SW: [5],
+	SIDE_NW | SIDE_NE | SIDE_SE: [17],
+	SIDE_NW | SIDE_SE | SIDE_SW: [JOIN_NWSESW],
+	SIDE_NW | SIDE_SE: [17],
+	SIDE_NE | SIDE_SW: [4],
+}
 
 ## How wide a patch of one grass tile is, in tiles, and how far a patch's middle is allowed to
 ## wander off the lattice, as a fraction of that width.
@@ -398,7 +429,7 @@ func _ready() -> void:
 	z_index = 1
 	z_as_relative = false
 	for slice: int in _every_slice():
-		var tex := load(TILES % slice) as Texture2D
+		var tex := load(_slice_path(slice)) as Texture2D
 		_art[slice] = tex
 		_face_top[slice] = _top_of(tex)
 		_mesh_data[slice] = {
@@ -649,7 +680,10 @@ func _rebuild() -> void:
 			# `skirt`. The sand keeps all of its: the outer ring's last row is a real edge.
 			var skirt := GRASS_LIFT if slice != SAND else INF
 			_add_tile_quad(slice, mid, lift, Color.WHITE, skirt)
-			if slice != SAND:
+			# The fringe hangs off a lawn's cut edge onto the sand in front. A join tile
+			# carries its own sand up to that edge, so blades over it would be blades growing
+			# out of the beach.
+			if slice != SAND and not _is_join(slice):
 				_add_fringe(tx, ty, mid)
 
 
@@ -916,9 +950,10 @@ func _wander(at: Vector2) -> float:
 
 ## Which tile a spot gets, or 0 for nothing drawn.
 ##
-## One picture for sand and a pool of pictures for the grass, and nothing in between: the
-## lawn runs to the tile edge and the beach starts at the next one. The pack's joining
-## pieces are not used, and the block above `grass_patch` says why.
+## One picture for sand, a fitted join where the mainland's lawn meets it (see JOINS), and a
+## pool of pictures for the open grass. The island's yard keeps its plain edge and the tufted
+## mounds: its geometry is the reverse of the mainland's — sand outside the grass — and a kept
+## yard has a decided edge rather than a worn one.
 func _slice_at(tx: float, ty: float, rng: RandomNumberGenerator) -> int:
 	var kind := _kind_at(tx, ty)
 	if kind == Kind.NONE or kind == Kind.WATER:
@@ -926,9 +961,65 @@ func _slice_at(tx: float, ty: float, rng: RandomNumberGenerator) -> int:
 
 	if kind == Kind.SAND:
 		return SAND
+	if layer == Layer.OUTSIDE:
+		var sides := _sand_sides(tx, ty)
+		if sides == SIDE_NW | SIDE_NE | SIDE_SE | SIDE_SW:
+			return SAND
+		if sides != 0:
+			return _pick(JOINS[_join_mask(sides, tx, ty)], tx, ty, rng)
+		return _pick(GRASS_ROUGH, tx, ty, rng)
 	if _borders_sand(tx, ty):
 		return _pick(GRASS_BORDER, tx, ty, rng)
-	return _pick(GRASS_YARD if layer != Layer.OUTSIDE else GRASS_ROUGH, tx, ty, rng)
+	return _pick(GRASS_YARD, tx, ty, rng)
+
+
+## Which of a grass tile's four sides face sand, as a mask of SIDE_* bits.
+func _sand_sides(tx: float, ty: float) -> int:
+	var sides := 0
+	if _kind_at(tx - 1.0, ty) == Kind.SAND:
+		sides |= SIDE_NW
+	if _kind_at(tx, ty - 1.0) == Kind.SAND:
+		sides |= SIDE_NE
+	if _kind_at(tx + 1.0, ty) == Kind.SAND:
+		sides |= SIDE_SE
+	if _kind_at(tx, ty + 1.0) == Kind.SAND:
+		sides |= SIDE_SW
+	return sides
+
+
+## The mask JOINS is asked for, given the sides that actually face sand.
+##
+## A single side has no piece of its own, so it borrows a neighbour side: the one toward the
+## diagonal neighbour that is sand, so the spill leans into the beach's own curve, and
+## failing that a back side (NW or NE), which the tile behind partly hides.
+func _join_mask(sides: int, tx: float, ty: float) -> int:
+	if JOINS.has(sides):
+		return sides
+	match sides:
+		SIDE_NW:
+			return SIDE_NW | (SIDE_SW if _kind_at(tx - 1.0, ty + 1.0) == Kind.SAND else SIDE_NE)
+		SIDE_NE:
+			return SIDE_NE | (SIDE_SE if _kind_at(tx + 1.0, ty - 1.0) == Kind.SAND else SIDE_NW)
+		SIDE_SE:
+			return SIDE_SE | (SIDE_SW if _kind_at(tx + 1.0, ty + 1.0) == Kind.SAND else SIDE_NE)
+		SIDE_SW:
+			return SIDE_SW | (SIDE_SE if _kind_at(tx + 1.0, ty + 1.0) == Kind.SAND else SIDE_NW)
+	return SIDE_NW | SIDE_NE
+
+
+func _is_join(slice: int) -> bool:
+	if slice >= JOIN_FIRST:
+		return true
+	for pool: Array in JOINS.values():
+		if pool.has(slice):
+			return true
+	return false
+
+
+## Where a slice's picture is: the pack for its own numbers, `assets/joins/` for the
+## generated ones.
+func _slice_path(slice: int) -> String:
+	return JOIN_ART[slice] if JOIN_ART.has(slice) else TILES % slice
 
 
 ## Whether a grass tile has sand on any of the four sides it can be seen from. See
@@ -947,6 +1038,10 @@ func _every_slice() -> Array:
 	var out: Array = GRASS_YARD.duplicate()
 	out.append_array(GRASS_ROUGH)
 	out.append_array(GRASS_BORDER)
+	for pool: Array in JOINS.values():
+		for slice: int in pool:
+			if not out.has(slice):
+				out.append(slice)
 	out.append(SAND)
 	return out
 
@@ -973,8 +1068,19 @@ func _slice_order() -> Array:
 
 ## One of a set, chosen by where the tile is rather than by how far into the draw we are, so
 ## adding ground somewhere does not reshuffle the ground everywhere else.
+##
+## Along the edge between two patches the tile rolls for which patch it belongs to: a patch's
+## edge is otherwise a run of whole diamonds changing texture on one line, and a lawn's
+## patches do not have edges like that. One roll against the first neighbour that differs, so
+## a tile at a meeting of three patches is still one tile.
 func _pick(of: Array, tx: float, ty: float, _rng: RandomNumberGenerator) -> int:
 	var patch := _patch_of(tx, ty)
+	for step: Vector2 in [Vector2(-1, 0), Vector2(0, -1), Vector2(1, 0), Vector2(0, 1)]:
+		var beside := _patch_of(tx + step.x, ty + step.y)
+		if beside != patch:
+			if _hash(tx * 2.3 + 41.0, ty * 5.1 - 7.0) < 0.5:
+				patch = beside
+			break
 	return of[int(_hash(patch.x, patch.y) * float(of.size())) % of.size()]
 
 
