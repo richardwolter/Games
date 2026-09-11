@@ -297,7 +297,11 @@ vec3 ramp(float step_at, float state) {
 //   - the lip, solid on the sand side, ragged and breaking into bubbles on the water side
 //   - the wash, a thin broken line that surges out from the lip and runs back up to it
 //   - flecks left behind between the two, thinning out as they get further from the sand
-float shore_foam(float dist, float angle, float mean, float wide, float clock) {
+//
+// `murk` is the state of the water it lies on, 0 clean to 2 dirty: murk keeps the lip but
+// breaks up the wash and loses the flecks, so a filthy bank has a line of scum along it
+// rather than a clean lake's fizz. Whole segments and bubbles are dropped, never faded.
+float shore_foam(float dist, float angle, float mean, float wide, float clock, float murk) {
 	float t = clock * wave_speed;
 	float round_t = angle / TAU + 0.5;
 
@@ -314,7 +318,7 @@ float shore_foam(float dist, float angle, float mean, float wide, float clock) {
 
 	// The lip. Its last third, on the water side, keeps only the bubbles that rolled high.
 	float lip = step(dist, lip_w);
-	lip *= mix(1.0, step(0.35, grain), step(lip_w * 0.66, dist));
+	lip *= mix(1.0, step(0.35 + murk * 0.2, grain), step(lip_w * 0.66, dist));
 
 	// The wash: out at the bottom of the surge, back onto the lip at the top. Phase drifts
 	// round the shore so the whole bank is not breathing in time.
@@ -324,12 +328,12 @@ float shore_foam(float dist, float angle, float mean, float wide, float clock) {
 	float wash = step(abs(dist - wash_at), foam_line * wide * 0.5);
 	// Broken into segments, and fainter the further out it has run.
 	float segment = foam_hash(vec2(mod(floor(round_t * cells), cells), 7.0));
-	wash *= step(0.3, segment) * mix(1.0, 0.45, surge);
+	wash *= step(0.3 + murk * 0.25, segment) * mix(1.0, 0.45, surge);
 
 	// What the wash leaves behind as it draws back.
 	float between = step(lip_w, dist) * step(dist, wash_at);
 	float reach = clamp((dist - lip_w) / max(wash_at - lip_w, 0.001), 0.0, 1.0);
-	float fleck = between * step(0.84 + reach * 0.12, grain);
+	float fleck = between * step(0.84 + reach * 0.12 + murk * 0.1, grain);
 
 	return max(lip, max(wash * 0.75, fleck * 0.6));
 }
@@ -497,7 +501,7 @@ void fragment() {
 	vec2 bank_d = (foam_tile - basin_centre) / (basin_radius + vec2(shore_lap));
 	float bank_mean = (basin_radius.x + basin_radius.y) * 0.5 + shore_lap;
 	float bank_in = (1.0 - shore_fraction(foam_tile)) * bank_mean;
-	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0, clock);
+	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0, clock, state);
 
 	// Grime along the outer bank: blotches of scum caught in the shallowest water, under the
 	// foam. Driven by this water's own filth, so it goes as the washed-up rubbish is fetched
@@ -521,7 +525,7 @@ void fragment() {
 	vec2 isl_d = foam_tile - island_centre;
 	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
 	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
-	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5, clock));
+	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5, clock, state));
 
 	// And loose out on the open lake, kept a couple of tiles clear of both shores so it never
 	// tangles with the lip and the wash there.
