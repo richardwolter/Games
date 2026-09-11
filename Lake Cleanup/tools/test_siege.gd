@@ -802,8 +802,11 @@ func _check(passed: bool, name: String, detail: String) -> void:
 	_log("%s %s%s" % ["ok  " if passed else "FAIL", name, "  (%s)" % detail if detail != "" else ""])
 
 
+## Log the tally and leave, the way test_lake does. Without the quit the scene kept running
+## after its last check, so a headless run only ever ended when something killed it.
 func _done() -> void:
 	_log("test_siege: %d checks, %d failed" % [_ran, _failed])
+	get_tree().quit(1 if _failed > 0 else 0)
 
 
 func _log(line: String) -> void:
