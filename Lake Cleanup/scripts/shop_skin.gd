@@ -40,7 +40,8 @@ const BOARD_PAD := 14.0
 ## thing being sold — the net, the ferry, the dog — and the ribbon names it.
 const FRAME := 12.0
 const GRAIN_EVERY := 7.0
-const GRAIN_LONG := 26.0
+const GRAIN_LONG := 34.0
+const GLOW_LONG := 22.0
 const CHIPS := 3
 const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
@@ -416,23 +417,34 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 func _draw_frame(box: Rect2) -> void:
 	draw_rect(box.grow(1.0), Style.SEAM, true)
 	draw_rect(box, Style.FRAME, true)
-	draw_rect(Rect2(box.position, Vector2(box.size.x, 2.0)), Style.FRAME_LIT, true)
-	draw_rect(Rect2(box.position, Vector2(2.0, box.size.y)), Style.FRAME_LIT, true)
+	# Lit from the upper left, as the meter is: the bottom plank is the redder low tone,
+	# the top and left planks carry a broken highlight along their outer edge.
 	draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - 2.0), Vector2(box.size.x, 2.0)),
-		Style.FRAME_DEEP, true
+		Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)),
+		Style.FRAME_LOW, true
 	)
-	draw_rect(
-		Rect2(Vector2(box.end.x - 2.0, box.position.y), Vector2(2.0, box.size.y)),
-		Style.FRAME_DEEP, true
-	)
-	# Grain: short dark strokes running the length of each plank, staggered by a hash of
-	# where they are so the four sides do not repeat each other.
 	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
 	_grain(Rect2(box.position, Vector2(box.size.x, FRAME)), true, seed)
 	_grain(Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)), true, seed + 1)
 	_grain(Rect2(box.position, Vector2(FRAME, box.size.y)), false, seed + 2)
 	_grain(Rect2(Vector2(box.end.x - FRAME, box.position.y), Vector2(FRAME, box.size.y)), false, seed + 3)
+	_highlight(box.position, Vector2(box.size.x, 0.0), seed + 4)
+	_highlight(box.position, Vector2(0.0, box.size.y), seed + 5)
+	draw_rect(
+		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)),
+		Style.FRAME_DEEP, true
+	)
+	draw_rect(
+		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)),
+		Style.FRAME_DEEP, true
+	)
+	# The inset shadow where the wood meets the board face: two deep along the top and
+	# left, where the frame shades the face, one along the bottom and right.
+	var face := box.grow(-FRAME)
+	draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(face.size.x + 4.0, 2.0)), Style.FRAME_SHADOW, true)
+	draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(2.0, face.size.y + 4.0)), Style.FRAME_SHADOW, true)
+	draw_rect(Rect2(Vector2(face.position.x - 2.0, face.end.y + 1.0), Vector2(face.size.x + 4.0, 1.0)), Style.FRAME_SHADOW, true)
+	draw_rect(Rect2(Vector2(face.end.x + 1.0, face.position.y - 2.0), Vector2(1.0, face.size.y + 4.0)), Style.FRAME_SHADOW, true)
 	# Chips: small bites out of the outer edge, dark where the wood is gone.
 	for i in CHIPS:
 		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)
@@ -447,6 +459,27 @@ func _draw_frame(box: Rect2) -> void:
 			_chip(Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
 
 
+## The broken highlight the light lays along a plank's lit edge: runs of pale peach a
+## pixel in from the seam, gaps between, lengths off a hash so no two edges match.
+func _highlight(from: Vector2, along: Vector2, seed: int) -> void:
+	var length := along.length()
+	if length <= 0.0:
+		return
+	var dir := along / length
+	var inward := Vector2(1.0, 1.0)
+	var at := 3.0
+	var i := 0
+	while at < length - 3.0:
+		var h := hash(seed * 97 + i)
+		var run := 5.0 + float(h % 100) / 100.0 * (GLOW_LONG - 5.0)
+		var gap := 3.0 + float((h / 100) % 9)
+		var stop := minf(at + run, length - 3.0)
+		var lit := Style.FRAME_GLOW if h % 5 != 0 else Style.FRAME_LIT
+		draw_line(from + dir * at + inward, from + dir * stop + inward, lit, 1.0)
+		at = stop + gap
+		i += 1
+
+
 func _grain(plank: Rect2, across: bool, seed: int, deep: float = FRAME) -> void:
 	var length := plank.size.x if across else plank.size.y
 	var n := int(length / GRAIN_EVERY)
@@ -455,7 +488,7 @@ func _grain(plank: Rect2, across: bool, seed: int, deep: float = FRAME) -> void:
 		if h % 3 == 0:
 			continue
 		var at := (float(i) + 0.15 + 0.7 * float(h % 7) / 7.0) * GRAIN_EVERY
-		var run := 6.0 + float(h % 100) / 100.0 * (GRAIN_LONG - 6.0)
+		var run := 8.0 + float(h % 100) / 100.0 * (GRAIN_LONG - 8.0)
 		var lane := 2.5 + float((h / 7) % int(deep - 5.0))
 		var start: Vector2
 		var stop: Vector2
@@ -465,11 +498,11 @@ func _grain(plank: Rect2, across: bool, seed: int, deep: float = FRAME) -> void:
 		else:
 			start = plank.position + Vector2(lane, at)
 			stop = Vector2(start.x, minf(start.y + run, plank.end.y - 2.0))
+		# Two fibres for one: a dark streak, and a light one beside it on about a third.
 		draw_line(start, stop, Style.FRAME_GRAIN, 1.0)
-		if h % 4 == 0:
-			draw_line(start + Vector2(0.0, 1.0) if across else start + Vector2(1.0, 0.0),
-				stop + Vector2(0.0, 1.0) if across else stop + Vector2(1.0, 0.0),
-				Style.FRAME_LIT, 1.0)
+		if h % 3 == 1:
+			var step := Vector2(0.0, 1.0) if across else Vector2(1.0, 0.0)
+			draw_line(start + step, stop + step, Style.FRAME_GRAIN_LIT, 1.0)
 
 
 ## One bite out of the frame: the wood gone to a dark hollow with a lit lip.
@@ -479,23 +512,24 @@ func _chip(box: Rect2) -> void:
 
 
 func _draw_ribbon(box: Rect2, title: String) -> void:
-	# A plank of the same oak as the frame, over the top edge of it: seam, face, lit top
-	# and left, shaded bottom and right, grain along it, chips out of its edges. Cloth was
-	# tried — a bowed three-tone band, then one with tails — and read as a sticker.
+	# A plank of the same oak as the frame, over the top edge of it, lit the same way:
+	# seam, face, the broken highlight along its top and left, a deep line under it,
+	# grain along it, chips out of its edges. Cloth was tried — a bowed three-tone band,
+	# then one with tails — and read as a sticker.
 	draw_rect(box.grow(1.0), Style.SEAM, true)
 	draw_rect(box, Style.FRAME, true)
-	draw_rect(Rect2(box.position, Vector2(box.size.x, 2.0)), Style.FRAME_LIT, true)
-	draw_rect(Rect2(box.position, Vector2(2.0, box.size.y)), Style.FRAME_LIT, true)
 	draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - 2.0), Vector2(box.size.x, 2.0)),
+		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)),
 		Style.FRAME_DEEP, true
 	)
 	draw_rect(
-		Rect2(Vector2(box.end.x - 2.0, box.position.y), Vector2(2.0, box.size.y)),
+		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)),
 		Style.FRAME_DEEP, true
 	)
 	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
 	_grain(box, true, seed, box.size.y)
+	_highlight(box.position, Vector2(box.size.x, 0.0), seed + 4)
+	_highlight(box.position, Vector2(0.0, box.size.y), seed + 5)
 	# Chips out of the top and bottom edges and one out of each end.
 	for i in CHIPS:
 		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)

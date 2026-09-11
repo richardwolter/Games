@@ -78,10 +78,17 @@ const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
 const TAG := Color(0.31, 0.60, 0.75)
 const TAG_LIT := Color(0.40, 0.68, 0.82)
 const TAG_INK := Color(0.05, 0.17, 0.27)
-const FRAME := Color(0.44, 0.28, 0.19)
-const FRAME_LIT := Color(0.53, 0.35, 0.25)
-const FRAME_DEEP := Color(0.25, 0.16, 0.09)
-const FRAME_GRAIN := Color(0.13, 0.08, 0.04)
+## The frame's wood, read off the meter's frame sheet: the plank face, the redder lower
+## plank, the broken peach highlight along a lit edge, the outline, the inset shadow where
+## wood meets water, and the two grain tones.
+const FRAME := Color(0.62, 0.46, 0.36)
+const FRAME_LOW := Color(0.55, 0.33, 0.25)
+const FRAME_LIT := Color(0.71, 0.55, 0.45)
+const FRAME_GLOW := Color(0.86, 0.68, 0.58)
+const FRAME_DEEP := Color(0.26, 0.17, 0.11)
+const FRAME_SHADOW := Color(0.14, 0.07, 0.04)
+const FRAME_GRAIN := Color(0.48, 0.30, 0.22)
+const FRAME_GRAIN_LIT := Color(0.71, 0.55, 0.45)
 ## The title plank over each board is the frame's own oak; only its ink is its own.
 const RIBBON_INK := Color(0.94, 0.85, 0.75)
 
