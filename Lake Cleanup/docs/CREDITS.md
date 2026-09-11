@@ -35,9 +35,12 @@ or its licensing status changes — it should always reflect reality, not aspira
   this specific net art could be freely copied by others without legal recourse. Not a
   lawyer — flagging the facts, the keep-and-don't-disclose call stands as made.
 
-- **UI_Buttons.jpg, ui.png, shop.png, character.png (angler), shed.png** — AI-generated
-  placeholder. Flagged as feeling "ugly" — planned for a rework later (design/quality issue,
-  not a licensing one).
+- **UI_Buttons.jpg, ui.png, shed.png** — AI-generated placeholder. Flagged as feeling "ugly" —
+  planned for a rework later (design/quality issue, not a licensing one).
+
+- **character.png (angler)** — AI-generated with [PixelLab](https://pixellab.ai/), then
+  hand-fixed by Richard in `art_source/Character_Sprite_Sheet.psd`. Same AI-disclosure notes
+  as the net art above apply.
 
 ## Font
 

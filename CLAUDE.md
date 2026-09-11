@@ -72,7 +72,7 @@ Games/
 
 ### Physics & Simulation Gotchas
 - **Lake Cleanup** abandoned physics (`RigidBody2D`, `Area2D` buoyancy, collision) after several failed designs. Now an isometric tile field where each tile holds a stack — no physics at all. Keep one representation always (layout OR simulation, not both).
-- **Strait Across** uses full 2D physics for bridge pieces; test harness is at `tools/test_grab.tscn`, stepped by `_physics_process` (~1s per test, 25 checks). `GDScript` errors inside coroutines abort silently and leave the tree spinning (looks like a hang).
+- **Strait Across** uses full 2D physics for bridge pieces. It has no test harness — only one-off probe and screenshot scripts in `tools/`. `GDScript` errors inside coroutines abort silently and leave the tree spinning (looks like a hang).
 
 ### Logging & Debugging
 - `print` and `printerr` don't reach shell on GUI builds. Write to file instead: see Lake Cleanup's `tools/last_test.log` (flushed per line).
@@ -181,7 +181,7 @@ recolor). See `Lake Cleanup/CLAUDE.md` for the full pipeline.
 2. **Check GitHub Issues** for that project (filter by label + milestone).
 3. **If you edit code that affects design**: update CLAUDE.md and close stale issues.
 4. **If you find a contradiction**: point it out before proceeding.
-5. **Test harness**: Lake Cleanup (`tools/last_test.log`), Sickest Man Alive (`tools/test_pipeline.gd` headless).
+5. **Test harness**: Lake Cleanup (`tools/test_lake.tscn` / `tools/test_siege.tscn` headless), Sickest Man Alive (`tools/test_pipeline.gd` headless).
 
 ---
 
@@ -193,7 +193,7 @@ Located in `_pipeline/tools/`:
 - Build & slice tools (per-project, see individual CLAUDE.md files)
 
 ### Test Harnesses
-- **Lake Cleanup**: `tools/test_grab.tscn` (drag/haul mechanics, ~1s per test)
+- **Lake Cleanup**: `tools/test_lake.tscn` (the lake — `tools/last_test.log`) and `tools/test_siege.tscn` (the siege — `tools/last_siege_test.log`), both headless scenes
 - **Sickest Man Alive**: `tools/test_pipeline.gd` (stat order-independence, headless)
 - See project CLAUDE.md for invocation details.
 
