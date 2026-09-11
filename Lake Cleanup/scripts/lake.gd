@@ -150,43 +150,21 @@ const PAN_RELEASE := 3.2
 ## bar that flatters itself is a progress bar nobody believes twice.
 const FILTH_BITE := 0.62
 
-## How far the filth on one tile spreads into the water around it, in tiles.
+## How far the stain round a floating piece reaches, in tiles, and how it falls off.
 ##
-## Junk does not stain only the square it floats on, and a map without this reads as a
-## chessboard of clean and dirty squares. Wide enough that clearing one piece off open water
-## leaves a soft hole rather than a pixel, and narrow enough that clearing a bay is a change
-## you can see from the boat.
+## The map is a distance map from the rubbish: a tile with a piece on it is foul, and the
+## water round it is stained by how near it is to the nearest piece, down to clean at
+## FILTH_BLUR tiles out. Nothing else goes into it — not the piece's pollution value, not
+## the tile's capacity, not an average. It used to be an average (each tile's pollution
+## over its capacity, box-blurred three tiles): a lone piece over deep water averaged down
+## to near nothing and floated on blue, while the blur carried a full tile's green two
+## tiles out over empty water. Both are lies about where the junk is, and the water's
+## whole job is to say where the junk is.
+##
+## FILTH_FALL bends the falloff. Under one holds the stain up near the piece and drops it
+## late: at 0.6 the tile next to a piece still reads foul, two out reads murky, three clean.
 const FILTH_BLUR := 3
-
-## How far the filth is carried into the water that holds no rubbish, in tiles, before the
-## spread above runs.
-##
-## The band round the island (`Iso.SHELF_TILES` + `SHELF_CLEAR`) never has a piece on it, and
-## neither does the island. Left at nothing, those tiles read as clean water, and the blur
-## carried that clean out past the band: the island sat in a ring of blue on opening day, on
-## a lake that was foul everywhere else. Each tile with nothing to say now takes the foulest
-## of its neighbours that have something to say, and again, this many times — far enough to
-## cross the band, the blur's own reach past it, and the texture's linear sample at the
-## island's edge. So the ring is as dirty as the water it touches, and comes clean when
-## that water does, not before.
-const FILTH_FILL := 6
-
-## How much spread filth counts as water at its filthiest, as a fraction of the worst the
-## lake has anywhere on the day it is built. Under one, so the dirty half of a fresh lake
-## reads as uniformly foul rather than as a heat map of where the junk happens to be dense.
-const FILTH_FULL := 0.7
-
-## How sharply the map falls away from filthy. Over one, so water with a little junk near
-## it is nearly clean rather than half green: the lake's own figure is bent the other way
-## (`FILTH_BITE`, under one) because a meter that moves early is encouraging, and a patch of
-## water that goes green because there is rubbish two boat-lengths away is a lie about where
-## the player has been. Cleared water is blue, and the green is where the junk still is.
-##
-## Eased back from 1.9 when the map started measuring each tile against its own capacity
-## rather than against the worst tile in the lake: the readings now sit near the top of the
-## range instead of down in its tail, and at 1.9 a tile with four of its nine pieces left
-## came up cleaner than it is.
-const FILTH_EDGE := 1.35
+const FILTH_FALL := 0.6
 
 ## Seconds between rebuilds of the map, at most. It is a moment of work on a grid this size
 ## and none of it has to be frame-exact, but a cast landing ten pieces should not pay for it
@@ -471,12 +449,10 @@ var _wiping: bool = false
 var _save_note: String = ""
 var _save_note_for: float = 0.0
 
-## The per-tile filth map handed to the water shader, its texture, and what the filthiest
-## water in the lake was worth on the day it was built. Rebuilt on a timer whenever
-## something has come out of the water.
+## The per-tile filth map handed to the water shader, and its texture. Rebuilt on a timer
+## whenever something has come out of the water.
 var _filth_map: Image
 var _filth_texture: ImageTexture
-var _filth_ref: float = 0.0
 var _filth_stale: bool = false
 var _filth_remap_in: float = 0.0
 
@@ -2683,54 +2659,31 @@ func _remap_filth(delta: float) -> void:
 ## of the player move it by a percent, and the water in front of the player is what they are
 ## looking at. With the map, that water goes blue while the next bay is still soup.
 ##
-## Built whole rather than patched where a cast landed. The spread means one piece touches a
-## disc of tiles and several pieces overlap on the same one, so taking a piece out has to
-## subtract its share from everywhere it was staining — which is either a second field of
-## bookkeeping or one sweep of a grid the size of a postage stamp. It is the postage stamp.
+## Built whole rather than patched where a cast landed: it is a distance map, and taking a
+## piece out moves the nearest-piece distance of everything round it. One sweep of a grid
+## the size of a postage stamp is cheaper than the bookkeeping.
 func _build_filth_map() -> void:
 	var cols := Iso.COLS
 	var rows := Iso.ROWS
-	var raw := PackedFloat32Array()
-	raw.resize(cols * rows)
+	var far := float(FILTH_BLUR + 1)
+	var dist := PackedFloat32Array()
+	dist.resize(cols * rows)
+	dist.fill(far)
+	# The sources: every tile with a piece floating on it. Not the dry ones — litter on the
+	# beach is not in the water.
 	for index in _grid.stacks.size():
-		var stack := _grid.stacks[index]
-		if stack.is_empty():
+		if _grid.stacks[index].is_empty():
 			continue
-		var total := 0.0
-		for k in stack.size():
-			total += _grid.defs[stack[k]].pollution
-		# Divided by what this tile could hold, not left as a sum. A shore tile has room for
-		# one piece where a deep one has room for nine, so a sum measured against the worst
-		# deep tile said the shore was clean on opening day — the water at the bank came up
-		# blue before the player had touched it. As a fraction of its own capacity, a full
-		# tile is a full tile wherever it is, and the whole lake starts foul.
-		var tile := _grid.tile_of(index)
-		var slots := maxf(
-			float(maxi(int(Iso.depth_at(tile.x, tile.y) * float(Iso.MAX_SLOTS)), 1)), 1.0
-		)
-		raw[index] = total / slots
-
-	_fill_filth(raw, cols, rows)
-
-	# Separable, so the spread costs two passes of a line rather than one of a disc. A box
-	# blur and not a gaussian: at this size the difference cannot be seen, and the sums are
-	# running ones, so how far it is spread costs nothing.
-	var blurred := _blur_filth(_blur_filth(raw, cols, rows, true), cols, rows, false)
-
-	# What counts as filthiest, taken once off the untouched lake. Renormalising on every
-	# rebuild would leave the last piece of junk in the water sitting in a puddle as foul as
-	# opening day, and the lake would never look finished.
-	if _filth_ref <= 0.0:
-		var worst := 0.0
-		for i in blurred.size():
-			worst = maxf(worst, blurred[i])
-		_filth_ref = maxf(worst * FILTH_FULL, 0.001)
+		if index < _grid.dry.size() and _grid.dry[index] == 1:
+			continue
+		dist[index] = 0.0
+	_chamfer(dist, cols, rows)
 
 	var pixels := PackedByteArray()
 	pixels.resize(cols * rows)
-	for i in blurred.size():
-		var here := pow(clampf(blurred[i] / _filth_ref, 0.0, 1.0), FILTH_EDGE)
-		pixels[i] = int(round(here * 255.0))
+	for i in dist.size():
+		var near := clampf(1.0 - dist[i] / float(FILTH_BLUR), 0.0, 1.0)
+		pixels[i] = int(round(pow(near, FILTH_FALL) * 255.0))
 
 	# The grid keeps a copy for what it draws on the CPU — the ripple rings read the state
 	# of the water under their piece off it, the way the shader does off the texture.
@@ -2749,67 +2702,40 @@ func _build_filth_map() -> void:
 		_water_material.set_shader_parameter(&"filth_mapped", 1.0)
 
 
-## Carries the filth into the tiles that hold no rubbish and never will — the island and the
-## band round it — from the tiles beside them that do. See FILTH_FILL. In place.
-##
-## A tile with a say is one that can float a piece (`Iso.floats_here`) or has one on it
-## anyway (the strand). Everything else starts silent and takes the foulest neighbour that
-## is speaking, then speaks itself on the next round.
-func _fill_filth(raw: PackedFloat32Array, cols: int, rows: int) -> void:
-	var says := PackedByteArray()
-	says.resize(cols * rows)
-	for index in raw.size():
-		var here := _grid.tile_of(index)
-		var stack := _grid.stacks[index] if index < _grid.stacks.size() else PackedInt32Array()
-		if not stack.is_empty() or Iso.floats_here(here.x, here.y):
-			says[index] = 1
-	for _round in FILTH_FILL:
-		var next_says := says.duplicate()
-		for ty in rows:
-			for tx in cols:
-				var index := ty * cols + tx
-				if says[index] == 1:
-					continue
-				var loudest := -1.0
-				for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var nx := tx + step.x
-					var ny := ty + step.y
-					if nx < 0 or ny < 0 or nx >= cols or ny >= rows:
-						continue
-					var near := ny * cols + nx
-					if says[near] == 1:
-						loudest = maxf(loudest, raw[near])
-				if loudest >= 0.0:
-					raw[index] = loudest
-					next_says[index] = 1
-		says = next_says
-
-
-## One pass of the spread, along the rows or down the columns. A sliding window, so how far
-## the filth reaches does not appear in the cost.
-func _blur_filth(
-	src: PackedFloat32Array, cols: int, rows: int, along: bool
-) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(src.size())
-	var span := FILTH_BLUR
-	var width := float(span * 2 + 1)
-	var outer := rows if along else cols
-	var inner := cols if along else rows
-	for a in outer:
-		var sum := 0.0
-		for i in range(-span, span + 1):
-			sum += src[_filth_at(cols, a, clampi(i, 0, inner - 1), along)]
-		for b in inner:
-			out[_filth_at(cols, a, b, along)] = sum / width
-			sum -= src[_filth_at(cols, a, clampi(b - span, 0, inner - 1), along)]
-			sum += src[_filth_at(cols, a, clampi(b + span + 1, 0, inner - 1), along)]
-	return out
-
-
-## Where one cell of the map lives, for whichever way the pass is running.
-func _filth_at(cols: int, a: int, b: int, along: bool) -> int:
-	return a * cols + b if along else b * cols + a
+## Distance from every tile to the nearest source, in tiles, in place: `dist` comes in as 0
+## on the sources and something big everywhere else, and goes out as the distance. Two
+## sweeps of the grid, forwards then back, each cell taking the least of its already-swept
+## neighbours plus the step to them — a chamfer transform, which is the distance to within
+## a few per cent and costs eight looks a tile rather than a search.
+func _chamfer(dist: PackedFloat32Array, cols: int, rows: int) -> void:
+	const SIDE := 1.0
+	const CORNER := 1.4142
+	for ty in rows:
+		for tx in cols:
+			var i := ty * cols + tx
+			var d := dist[i]
+			if tx > 0:
+				d = minf(d, dist[i - 1] + SIDE)
+			if ty > 0:
+				d = minf(d, dist[i - cols] + SIDE)
+				if tx > 0:
+					d = minf(d, dist[i - cols - 1] + CORNER)
+				if tx < cols - 1:
+					d = minf(d, dist[i - cols + 1] + CORNER)
+			dist[i] = d
+	for ty in range(rows - 1, -1, -1):
+		for tx in range(cols - 1, -1, -1):
+			var i := ty * cols + tx
+			var d := dist[i]
+			if tx < cols - 1:
+				d = minf(d, dist[i + 1] + SIDE)
+			if ty < rows - 1:
+				d = minf(d, dist[i + cols] + SIDE)
+				if tx < cols - 1:
+					d = minf(d, dist[i + cols + 1] + CORNER)
+				if tx > 0:
+					d = minf(d, dist[i + cols - 1] + CORNER)
+			dist[i] = d
 
 
 ## The lake clearing up is the progress bar, so the shader gets the meter directly rather

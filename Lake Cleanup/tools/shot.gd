@@ -214,8 +214,24 @@ func _process(_delta: float) -> void:
 		var grid_c := _main.get_node(^"Grid") as LakeGrid
 		for i in grid_c.stacks.size():
 			grid_c.stacks[i] = PackedInt32Array()
+		grid_c.set(&"_dirty", true)
+		grid_c.queue_redraw()
 		_main.call(&"_build_filth_map")
 		_main.set(&"pollution", 0.0)
+	if OS.get_cmdline_user_args().has("half") and _frames == 3:
+		# One quadrant of the lake cleared — the south, which is the bottom of the screen —
+		# so the edge between cleaned water and junk can be looked at: the stain should stop
+		# where the pieces stop, and nowhere else.
+		var grid_h := _main.get_node(^"Grid") as LakeGrid
+		for i in grid_h.stacks.size():
+			var at := grid_h.tile_of(i)
+			if at.x > int(Iso.CENTRE.x) and at.y > int(Iso.CENTRE.y):
+				grid_h.stacks[i] = PackedInt32Array()
+		# The grid rebuilds its soup inside its own draw when flagged; asking for the rebuild
+		# from out here skipped every other draw of that frame, island included.
+		grid_h.set(&"_dirty", true)
+		grid_h.queue_redraw()
+		_main.call(&"_build_filth_map")
 	if OS.get_cmdline_user_args().has("shop") and _frames == 3:
 		# The upgrades board, with enough money that some rows are affordable and some are
 		# not — the two states are drawn differently and both want looking at.

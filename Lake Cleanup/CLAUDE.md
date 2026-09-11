@@ -122,9 +122,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **Colours**: the water body outputs only palette swatches — three five-step ramps
   (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands and
   sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
-  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, after
-  a drifting blob noise (`murk_blotch`, `murk_wobble`) pushes the filth up or down — so the
-  edges wander and patches of the neighbouring state spill across, instead of flat rings.
+  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, read
+  straight off the map.
   The water is opaque. Foam keeps its own shapes and soft alpha.
 - **No dither, by decision**: a per-pixel Bayer dither was tried and rejected — grainy open
   water, lone dirty pixels in cleaned bays, shimmer under camera motion.
@@ -154,11 +153,16 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   to the light step, gathered under the sun by `sun_lean`) drew pale strips across clean
   water, and the loose foam streaks riding the swell drew white ones. Both removed, uniforms
   and all. Bands stay; shore foam stays; the finished-lake sparkle stays.
-- **Filth round the island**: the holdoff band holds no rubbish, so the raw map is zero there
-  and the blur carried that clean outward — a ring of blue against a foul lake on day one.
-  `Lake._fill_filth` (`FILTH_FILL` rounds) copies the foulest speaking neighbour into every
-  silent tile before the blur. A weighted-average blur was tried first and rejected: it still
-  left the ring murky rather than as foul as the water beside it.
+- **The filth map is a distance from the rubbish** (`Lake._build_filth_map`, `_chamfer`):
+  a tile with a piece on it is foul, the stain falls off to clean at `FILTH_BLUR` (3) tiles,
+  bent by `FILTH_FALL`. Presence only — no pollution values, no capacity, no averaging. The
+  rule, by decision: **water touching objects looks grimy, water with no objects looks
+  clean**, and the rubbish-free band round the island is a plain clean ring. Rejected on the
+  way here: a pollution-over-capacity box blur (lone pieces floated on blue, green spread
+  over empty water), a weighted blur, and a fill that made the island's band foul.
+- **No blotch noise, no stagger** in the shader (`murk_blotch`, `murk_wobble`, `state_spread`
+  are gone): state contours are the map's own. Blobs of the wrong state were read as water
+  leaking from under the island.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the
