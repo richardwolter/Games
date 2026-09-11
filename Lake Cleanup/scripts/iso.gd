@@ -15,21 +15,6 @@ extends RefCounted
 const TILE_W := 64.0
 const TILE_H := 32.0
 
-## The art-pixel snap for things that move, in world pixels; 0 is off. Set by lake.gd (F4)
-## to `Lake.ART_PIXEL`, on trial: the camera is snapped to whole screen pixels, but the
-## angler, dog, boat and the rubbish on the swell glide between art pixels, and against the
-## water's fixed pixel grid that reads as shimmer. Snapped, they step a whole art pixel at a
-## time, the way a low-res render would draw them. Only where a thing is drawn moves —
-## `tile_pos` and everything that reads it stay smooth.
-static var art_snap: float = 0.0
-
-
-## Where a moving thing at `at` is drawn: on the art-pixel grid when `art_snap` is on.
-static func drawn(at: Vector2) -> Vector2:
-	if art_snap <= 0.0:
-		return at
-	return (at / art_snap).round() * art_snap
-
 ## The tile field. Square, so the basin can be an ellipse inside it without the projection
 ## favouring one diagonal.
 const COLS := 92

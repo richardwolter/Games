@@ -1312,13 +1312,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F11:
 				_fullscreen.button_pressed = not _is_fullscreen()
 				return
-			KEY_F4:
-				# On trial: moving things drawn on the art-pixel grid, to compare by eye.
-				Iso.art_snap = 0.0 if Iso.art_snap > 0.0 else ART_PIXEL
-				_grid.set_art_snap(Iso.art_snap)
-				_angler._place()
-				_note_save("pixel snap on" if Iso.art_snap > 0.0 else "pixel snap off")
-				return
 			KEY_M:
 				_music_on.button_pressed = not _music_on.button_pressed
 				return
@@ -2577,12 +2570,9 @@ func _shed_front() -> float:
 ## The net's tile position rather than its drawn one, which rides the swell — a camera that
 ## bobs with the water is a camera nobody asked for.
 func _watching() -> Vector2:
-	# Off the angler's tile position, not their node: the node is drawn on the art-pixel grid
-	# when the snap is on (see `Iso.art_snap`), and a camera chasing that would step with it.
-	var angler := Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	if _cast_look <= 0.001:
-		return angler + _pan
-	return angler.lerp(
+		return _angler.position + _pan
+	return _angler.position.lerp(
 		Iso.tile_to_world(_net.tile_pos.x, _net.tile_pos.y), _cast_look
 	) + _pan
 

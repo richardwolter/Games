@@ -1156,16 +1156,6 @@ func set_view(to: Rect2) -> void:
 const BUILT_MARGIN := 0.5
 
 
-## The art-pixel snap on the swell the rubbish, its shadows and its foam ride, in world
-## pixels; 0 is off. On trial, see `Iso.art_snap`. All three layers take the same value or
-## the shadows and collars slide a pixel off their pieces.
-func set_art_snap(px: float) -> void:
-	for layer: CanvasItem in [self, _shadows, _foam]:
-		var skin := layer.material as ShaderMaterial
-		if skin != null:
-			skin.set_shader_parameter("snap_px", px)
-
-
 ## The floating pieces of the last rebuild that are inside `box` (plus the cull's pad), for
 ## the ripple rings — which are a bounded sample and so have to be taken from what is on
 ## screen, not from the margin, or zoomed in most of them would be out of sight.

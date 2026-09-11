@@ -738,7 +738,7 @@ func _leave_print() -> void:
 
 
 func _place() -> void:
-	position = Iso.drawn(Iso.tile_to_world(tile_pos.x, tile_pos.y))
+	position = Iso.tile_to_world(tile_pos.x, tile_pos.y)
 
 
 ## Which animation is showing, worked out from what the dog is doing rather than stored, so
