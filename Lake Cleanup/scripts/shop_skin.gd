@@ -50,7 +50,7 @@ const RIBBON_ARC := 4.0
 ## How much of its slot each board's sprite fills. The net is a wide flat thing and fills
 ## the slot at 0.7; the ferry is a small square frame with air round the hull and needs
 ## more than the slot to come out the size of the dog beside it.
-const SPRITE_FILL := {&"net": 0.7, &"boat": 1.35, &"dog": 1.0}
+const SPRITE_FILL := {&"net": 0.7, &"boat": 1.35, &"dog": 0.8}
 
 ## The ferry on its board is under way: the bow wake it leaves in the lake runs beside it
 ## and the hull bobs a couple of pixels on a slow swell. The wake is laid exactly as the
@@ -62,13 +62,21 @@ const BOB_HZ := 0.4
 ## A faint white halo behind every head, so a black net and a dark hull read against a
 ## dark board: stepped ellipses, outermost first, each `HALO_ALPHA` white, the outer one
 ## the picture grown by `HALO_GROW`.
-const HALO_ALPHA := [0.04, 0.07, 0.10]
+const HALO_ALPHA := [0.012, 0.02, 0.03]
 const HALO_GROW := 0.34
 
 ## The net on its board is thrown over a catch: drawn black, so the rubbish the lake lends
 ## (`sprites[&"catch"]`, a list of `{sheet, region}`) shows through the mesh. Where each
 ## piece lies, as a fraction of the net's drawn size from its middle, and how big.
 const NET_INK := Color(0.08, 0.07, 0.07, 0.92)
+
+## The net on the water wanders a pixel or two, as a floating piece does, and wears the
+## lake's foam collar where it cuts the surface — how far it wanders, how fast, and where
+## across the picture the waterline runs (a fraction of its height from the top).
+const NET_SWAY := Vector2(2.0, 1.0)
+const NET_SWAY_HZ := Vector2(0.084, 0.065)
+const NET_WATERLINE := 0.78
+const NET_COLLAR := 0.86
 const CATCH_AT := [Vector2(-0.22, 0.05), Vector2(0.08, -0.12), Vector2(0.24, 0.14)]
 const CATCH_SCALE := 2.0
 
@@ -133,6 +141,10 @@ var _hovered: int = -1
 var _wake: HullFoam
 var _hull: Sprite2D
 var _wake_heading := Vector2.RIGHT
+
+## The net's foam collar, and where the swell has the net this frame.
+var _collar: WaterlineFoam
+var _sway_px := Vector2i.ZERO
 var _bob_age: float = 0.0
 var _bob_px: int = 0
 
@@ -172,6 +184,10 @@ func _ready() -> void:
 	_hull.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_hull.visible = false
 	add_child(_hull)
+	_collar = WaterlineFoam.new()
+	_collar.z_index = 0
+	_collar.visible = false
+	add_child(_collar)
 	_lay_out()
 
 
@@ -259,6 +275,13 @@ func _process(delta: float) -> void:
 		var bob := roundi(sin(_bob_age * TAU * BOB_HZ) * BOB_PX)
 		if bob != _bob_px:
 			_bob_px = bob
+			queue_redraw()
+		var sway := Vector2i(
+			roundi(sin(_bob_age * TAU * NET_SWAY_HZ.x) * NET_SWAY.x),
+			roundi(cos(_bob_age * TAU * NET_SWAY_HZ.y) * NET_SWAY.y)
+		)
+		if sway != _sway_px:
+			_sway_px = sway
 			queue_redraw()
 		_wake.lay(_wake_heading, 1.0, delta)
 	_dog_age += delta
@@ -517,6 +540,8 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 		if board == &"boat":
 			_wake.visible = false
 			_hull.visible = false
+		elif board == &"net":
+			_collar.visible = false
 		return
 	var region: Rect2 = lent["region"]
 	var scale := minf(slot.size.x / region.size.x, slot.size.y / region.size.y) * fill
@@ -544,12 +569,21 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_hull.scale = box.size / region.size
 			_hull.visible = visible
 		&"net":
+			# The net and its catch ride the swell together; the collar is a node of its
+			# own laid on the waterline across the picture, drawn after the board face.
+			box.position += Vector2(_sway_px)
+			var here := middle + Vector2(_sway_px)
+			var cut_y := box.position.y + box.size.y * NET_WATERLINE
+			var half := box.size.x * NET_COLLAR * 0.5
+			_collar.position = Vector2(here.x, cut_y)
+			_collar.lay(Vector2(-half, 0.0), Vector2(half, 0.0))
+			_collar.visible = visible
 			# The catch first, then the net over it in black.
 			for i in mini(CATCH_AT.size(), (sprites.get(&"catch", []) as Array).size()):
 				var piece: Dictionary = sprites[&"catch"][i]
 				var art: Rect2 = piece["region"]
 				var size := art.size * CATCH_SCALE
-				var at := middle + (CATCH_AT[i] as Vector2) * drawn - size * 0.5
+				var at := here + (CATCH_AT[i] as Vector2) * drawn - size * 0.5
 				draw_texture_rect_region(piece["sheet"], Rect2(at, size), art)
 			draw_texture_rect_region(sheet, box, region, NET_INK)
 		_:
