@@ -34,14 +34,10 @@ const BOARDS_WIDE := 900.0
 const BOARD_GAP := 44.0
 const BOARD_PAD := 14.0
 
-## The oak round each board, cut like the meter's frame: grain lines along each plank
-## (`GRAIN_EVERY` apart, `GRAIN_LONG` at most) and a few chips out of the outer edge
-## (`CHIPS` a side). The ribbon and sprite sit at the head of it. The sprite is the
+## The oak round each board, cut like the meter's frame (`Style.plank` and friends draw
+## the wood) with a few chips out of the outer edge (`CHIPS` a side). The ribbon and sprite sit at the head of it. The sprite is the
 ## thing being sold — the net, the ferry, the dog — and the ribbon names it.
 const FRAME := 12.0
-const GRAIN_EVERY := 7.0
-const GRAIN_LONG := 34.0
-const GLOW_LONG := 22.0
 const CHIPS := 3
 const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
@@ -424,12 +420,12 @@ func _draw_frame(box: Rect2) -> void:
 		Style.FRAME_LOW, true
 	)
 	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
-	_grain(Rect2(box.position, Vector2(box.size.x, FRAME)), true, seed)
-	_grain(Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)), true, seed + 1)
-	_grain(Rect2(box.position, Vector2(FRAME, box.size.y)), false, seed + 2)
-	_grain(Rect2(Vector2(box.end.x - FRAME, box.position.y), Vector2(FRAME, box.size.y)), false, seed + 3)
-	_highlight(box.position, Vector2(box.size.x, 0.0), seed + 4)
-	_highlight(box.position, Vector2(0.0, box.size.y), seed + 5)
+	Style.grain(self, Rect2(box.position, Vector2(box.size.x, FRAME)), true, seed)
+	Style.grain(self, Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)), true, seed + 1)
+	Style.grain(self, Rect2(box.position, Vector2(FRAME, box.size.y)), false, seed + 2)
+	Style.grain(self, Rect2(Vector2(box.end.x - FRAME, box.position.y), Vector2(FRAME, box.size.y)), false, seed + 3)
+	Style.highlight(self, box.position, Vector2(box.size.x, 0.0), seed + 4)
+	Style.highlight(self, box.position, Vector2(0.0, box.size.y), seed + 5)
 	draw_rect(
 		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)),
 		Style.FRAME_DEEP, true
@@ -452,95 +448,30 @@ func _draw_frame(box: Rect2) -> void:
 		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
 		var y := box.position.y + box.size.y * along
 		var x := box.position.x + box.size.x * (1.0 - along)
-		_chip(Rect2(box.position.x - 1.0, y, deep, wide))
-		_chip(Rect2(box.end.x + 1.0 - deep, y - wide * 0.4, deep, wide))
+		Style.chip(self, Rect2(box.position.x - 1.0, y, deep, wide))
+		Style.chip(self, Rect2(box.end.x + 1.0 - deep, y - wide * 0.4, deep, wide))
 		if i % 2 == 0:
-			_chip(Rect2(x, box.position.y - 1.0, wide, deep))
-			_chip(Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
-
-
-## The broken highlight the light lays along a plank's lit edge: runs of pale peach a
-## pixel in from the seam, gaps between, lengths off a hash so no two edges match.
-func _highlight(from: Vector2, along: Vector2, seed: int) -> void:
-	var length := along.length()
-	if length <= 0.0:
-		return
-	var dir := along / length
-	var inward := Vector2(1.0, 1.0)
-	var at := 3.0
-	var i := 0
-	while at < length - 3.0:
-		var h := hash(seed * 97 + i)
-		var run := 5.0 + float(h % 100) / 100.0 * (GLOW_LONG - 5.0)
-		var gap := 3.0 + float((h / 100) % 9)
-		var stop := minf(at + run, length - 3.0)
-		var lit := Style.FRAME_GLOW if h % 5 != 0 else Style.FRAME_LIT
-		draw_line(from + dir * at + inward, from + dir * stop + inward, lit, 1.0)
-		at = stop + gap
-		i += 1
-
-
-func _grain(plank: Rect2, across: bool, seed: int, deep: float = FRAME) -> void:
-	var length := plank.size.x if across else plank.size.y
-	var n := int(length / GRAIN_EVERY)
-	for i in n:
-		var h := hash(seed * 131 + i)
-		if h % 3 == 0:
-			continue
-		var at := (float(i) + 0.15 + 0.7 * float(h % 7) / 7.0) * GRAIN_EVERY
-		var run := 8.0 + float(h % 100) / 100.0 * (GRAIN_LONG - 8.0)
-		var lane := 2.5 + float((h / 7) % int(deep - 5.0))
-		var start: Vector2
-		var stop: Vector2
-		if across:
-			start = plank.position + Vector2(at, lane)
-			stop = Vector2(minf(start.x + run, plank.end.x - 2.0), start.y)
-		else:
-			start = plank.position + Vector2(lane, at)
-			stop = Vector2(start.x, minf(start.y + run, plank.end.y - 2.0))
-		# Two fibres for one: a dark streak, and a light one beside it on about a third.
-		draw_line(start, stop, Style.FRAME_GRAIN, 1.0)
-		if h % 3 == 1:
-			var step := Vector2(0.0, 1.0) if across else Vector2(1.0, 0.0)
-			draw_line(start + step, stop + step, Style.FRAME_GRAIN_LIT, 1.0)
-
-
-## One bite out of the frame: the wood gone to a dark hollow with a lit lip.
-func _chip(box: Rect2) -> void:
-	draw_rect(box, Style.scrim(Style.SCRIM_HEAVY), true)
-	draw_rect(box.grow(-1.0), Style.SEAM, true)
+			Style.chip(self, Rect2(x, box.position.y - 1.0, wide, deep))
+			Style.chip(self, Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
 
 
 func _draw_ribbon(box: Rect2, title: String) -> void:
-	# A plank of the same oak as the frame, over the top edge of it, lit the same way:
-	# seam, face, the broken highlight along its top and left, a deep line under it,
-	# grain along it, chips out of its edges. Cloth was tried — a bowed three-tone band,
-	# then one with tails — and read as a sticker.
-	draw_rect(box.grow(1.0), Style.SEAM, true)
-	draw_rect(box, Style.FRAME, true)
-	draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)),
-		Style.FRAME_DEEP, true
-	)
-	draw_rect(
-		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)),
-		Style.FRAME_DEEP, true
-	)
+	# A plank of the same oak as the frame, over the top edge of it, lit the same way, with
+	# chips out of its edges. Cloth was tried — a bowed three-tone band, then one with
+	# tails — and read as a sticker.
 	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
-	_grain(box, true, seed, box.size.y)
-	_highlight(box.position, Vector2(box.size.x, 0.0), seed + 4)
-	_highlight(box.position, Vector2(0.0, box.size.y), seed + 5)
+	Style.plank(self, box, seed)
 	# Chips out of the top and bottom edges and one out of each end.
 	for i in CHIPS:
 		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)
 		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
 		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
 		var x := box.position.x + box.size.x * along
-		_chip(Rect2(x, box.position.y - 1.0, wide, deep))
-		_chip(Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+		Style.chip(self, Rect2(x, box.position.y - 1.0, wide, deep))
+		Style.chip(self, Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
 	var y := box.position.y + box.size.y * 0.4
-	_chip(Rect2(box.position.x - 1.0, y, 4.0, 8.0))
-	_chip(Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
+	Style.chip(self, Rect2(box.position.x - 1.0, y, 4.0, 8.0))
+	Style.chip(self, Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
 
 	Style.write(
 		self, title, Style.TEXT_HEAD,
@@ -716,8 +647,9 @@ func _clipped(box: Rect2, c: float) -> PackedVector2Array:
 	])
 
 
-## The price, on a clean-water tag shrunk onto the number, so a five-figure price and a two-figure
-## one both sit in the middle of their own tag rather than one rattling around a fixed box.
+## The price, on an oak tag shrunk onto the number in the money plate's gold, so a cost
+## and a purse read as one substance — and a five-figure price and a two-figure one both
+## sit in the middle of their own tag rather than one rattling around a fixed box.
 func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -> void:
 	if cost.is_empty():
 		return
@@ -726,11 +658,20 @@ func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -
 	var tag := Rect2(
 		box.position + Vector2(box.size.x - wide, 0.0), Vector2(wide, box.size.y)
 	)
-	_plate(tag, (Style.TAG_LIT if lit else Style.TAG) if afford else Style.BOARD)
+	var face := Style.FRAME if afford else Style.FRAME_LOW
+	if lit:
+		face = Color(
+			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
+		)
+	_plate(tag, face)
+	Style.highlight(
+		self, tag.position + Vector2(CLIP, 0.0), Vector2(tag.size.x - CLIP * 2.0, 0.0),
+		int(tag.position.x)
+	)
 	Style.write(
 		self, cost, height,
 		Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
-		Style.TAG_INK if afford else Style.BOARD_INK_DIM,
+		Style.PRICE_INK if afford else Style.PRICE_INK.lerp(Style.FRAME_LOW, 0.5),
 		HORIZONTAL_ALIGNMENT_CENTER, tag
 	)
 

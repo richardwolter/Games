@@ -75,9 +75,9 @@ const BOARD_ROW := Color(0.25, 0.41, 0.47)
 const BOARD_ROW_OFF := Color(0.22, 0.35, 0.25)
 const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
-const TAG := Color(0.31, 0.60, 0.75)
-const TAG_LIT := Color(0.40, 0.68, 0.82)
-const TAG_INK := Color(0.05, 0.17, 0.27)
+## The price on its tag is the money plate's own figure colour, so a cost and a purse read
+## as the same substance.
+const PRICE_INK := Color(0.985, 0.87, 0.58)
 ## The frame's wood, read off the meter's frame sheet: the plank face, the redder lower
 ## plank, the broken peach highlight along a lit edge, the outline, the inset shadow where
 ## wood meets water, and the two grain tones.
@@ -421,3 +421,85 @@ static func dim(on: CanvasItem, box: Rect2, weight: float, fade: float = 1.0) ->
 	if fade <= 0.0:
 		return
 	on.draw_rect(box, scrim(weight * fade), true)
+
+
+# ---------------------------------------------------------------------------------------
+# Meter wood
+# ---------------------------------------------------------------------------------------
+
+## The planks the upgrades boards and the corner cross are made of, drawn as the meter's
+## frame is painted. One place, so the boards and the cross cannot be two woods.
+const GRAIN_EVERY := 7.0
+const GRAIN_LONG := 34.0
+const GLOW_LONG := 22.0
+const PLANK_DEEP := 12.0
+
+
+## A plank: seam, face, the broken highlight along its top and left, a deep line under it
+## and down its right, grain along it. `seed` picks the grain so two planks never match.
+static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME) -> void:
+	on.draw_rect(box.grow(1.0), SEAM, true)
+	on.draw_rect(box, face, true)
+	grain(on, box, true, seed, box.size.y)
+	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4)
+	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5)
+	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_DEEP, true)
+	on.draw_rect(Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)), FRAME_DEEP, true)
+
+
+## The broken highlight the light lays along a plank's lit edge: runs of pale peach a
+## pixel in from the seam, gaps between, lengths off a hash so no two edges match.
+static func highlight(on: CanvasItem, from: Vector2, along: Vector2, seed: int) -> void:
+	var length := along.length()
+	if length <= 0.0:
+		return
+	var dir := along / length
+	var inward := Vector2(1.0, 1.0)
+	var at := 3.0
+	var i := 0
+	while at < length - 3.0:
+		var h := hash(seed * 97 + i)
+		var run := 5.0 + float(h % 100) / 100.0 * (GLOW_LONG - 5.0)
+		var gap := 3.0 + float((h / 100) % 9)
+		var stop := minf(at + run, length - 3.0)
+		var lit := FRAME_GLOW if h % 5 != 0 else FRAME_LIT
+		on.draw_line(from + dir * at + inward, from + dir * stop + inward, lit, 1.0)
+		at = stop + gap
+		i += 1
+
+
+## Grain: streaks running the length of a plank, staggered by a hash so no two planks
+## repeat. A dark fibre, and a light one beside it on about a third of them.
+static func grain(on: CanvasItem, plank_box: Rect2, across: bool, seed: int, deep: float = PLANK_DEEP) -> void:
+	var length := plank_box.size.x if across else plank_box.size.y
+	var lanes := maxi(int(deep - 5.0), 1)
+	var n := int(length / GRAIN_EVERY)
+	for i in n:
+		var h := hash(seed * 131 + i)
+		if h % 3 == 0:
+			continue
+		var at := (float(i) + 0.15 + 0.7 * float(h % 7) / 7.0) * GRAIN_EVERY
+		var run := 8.0 + float(h % 100) / 100.0 * (GRAIN_LONG - 8.0)
+		var lane := 2.5 + float((h / 7) % lanes)
+		var start: Vector2
+		var stop: Vector2
+		if across:
+			start = plank_box.position + Vector2(at, lane)
+			stop = Vector2(minf(start.x + run, plank_box.end.x - 2.0), start.y)
+		else:
+			start = plank_box.position + Vector2(lane, at)
+			stop = Vector2(start.x, minf(start.y + run, plank_box.end.y - 2.0))
+		on.draw_line(start, stop, FRAME_GRAIN, 1.0)
+		if h % 3 == 1:
+			var step := Vector2(0.0, 1.0) if across else Vector2(1.0, 0.0)
+			on.draw_line(start + step, stop + step, FRAME_GRAIN_LIT, 1.0)
+
+
+## One bite out of a plank's edge: a dark rim round a hollow, and a lit lip along the
+## hollow's lower edge where the light catches the broken wood. The rim is what keeps it
+## from reading as a missing pixel.
+static func chip(on: CanvasItem, box: Rect2) -> void:
+	on.draw_rect(box.grow(1.0), FRAME_DEEP, true)
+	on.draw_rect(box, FRAME_SHADOW, true)
+	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_GLOW, true)
+
