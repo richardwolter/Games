@@ -87,7 +87,7 @@ const ROUGH_FIRST := 4
 ## replaced (2.8): the dog walks the beach to `Dog.BEACH_WALK` (3.0) and the litter lies
 ## up it to `Iso.BEACH_LITTER` (2.4), so the beach at its narrowest — this less
 ## `wander_amp` — has to stay past 3.5 or the dog fetches off the lawn.
-const SAND_OUT := 5.0
+const SAND_OUT := 5.3
 
 ## How far the line between beach and lawn wanders off the ellipse underneath it, in tiles,
 ## how wide its bays are in world pixels, and how much of the wander is the finer second
@@ -112,21 +112,26 @@ const WANDER_FINE := 0.3
 ## A patch is now the ground nearest one of a set of scattered points, measured on the
 ## screen, and — since the shader — decided per pixel rather than per tile, so a patch's
 ## border is a curve through the tiles rather than a run of diamond edges.
-const PATCH_SIZE := 4.0
-const PATCH_WANDER := 0.42
+const PATCH_SIZE := 4.5
+const PATCH_WANDER := 0.3
 
 ## The blades hanging off the lawn's cut edge over the beach, drawn per pixel by the shader.
 ## Mode 1 hangs them straight down the screen where the beach is below the lawn; mode 2
 ## points them along the edge's normal wherever it faces. Depth in art pixels, share of
 ## columns carrying one. The island has none: a kept yard, a clean lip only.
+##
+## Short and a little sparse, and no lip under the mainland's edge: the turf's own
+## overhang and the blades are all the edge wants, and the dark line under it read as a
+## kerb. Settled by eye through the F4 tuner (2026-09-11), the numbers here are its picks.
 const FRINGE_MODE := 1
-const FRINGE_DEPTH := 4.0
-const FRINGE_SHARE := 0.7
+const FRINGE_DEPTH := 2.0
+const FRINGE_SHARE := 0.6
+const LIP := false
 
 ## The tufts on the beach just past the line: the pack's Leaves, sparse, within this many
 ## tiles of the lawn, each at its own sub-tile offset so none of them line up with the grid.
-const TUFT_SHARE := 0.22
-const TUFT_REACH := 1.5
+const TUFT_SHARE := 0.36
+const TUFT_REACH := 0.9
 
 ## How far in from the island's waterline the grass starts, in tiles. Everything outside it
 ## is beach.
@@ -258,7 +263,7 @@ var patch_wander: float = PATCH_WANDER
 var fringe_mode: int = FRINGE_MODE
 var fringe_depth: float = FRINGE_DEPTH
 var fringe_share: float = FRINGE_SHARE
-var lip: bool = true
+var lip: bool = LIP
 var tuft_share: float = TUFT_SHARE
 var tuft_reach: float = TUFT_REACH
 
