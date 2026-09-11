@@ -62,7 +62,7 @@ const BOB_HZ := 0.4
 ## A faint white halo behind every head, so a black net and a dark hull read against a
 ## dark board: stepped ellipses, outermost first, each `HALO_ALPHA` white, the outer one
 ## the picture grown by `HALO_GROW`.
-const HALO_ALPHA := [0.012, 0.02, 0.03]
+const HALO_ALPHA := [0.006, 0.011, 0.017]
 const HALO_GROW := 0.34
 
 ## The net on its board is thrown over a catch: drawn black, so the rubbish the lake lends
@@ -142,8 +142,11 @@ var _wake: HullFoam
 var _hull: Sprite2D
 var _wake_heading := Vector2.RIGHT
 
-## The net's foam collar, and where the swell has the net this frame.
+## The net's foam collar, the net over it, and where the swell has them this frame. The
+## net is a node for the same reason the hull is: the collar has to lie under the mesh,
+## and a child draws after this control, so the mesh must be a later child still.
 var _collar: WaterlineFoam
+var _mesh: Sprite2D
 var _sway_px := Vector2i.ZERO
 var _bob_age: float = 0.0
 var _bob_px: int = 0
@@ -188,6 +191,13 @@ func _ready() -> void:
 	_collar.z_index = 0
 	_collar.visible = false
 	add_child(_collar)
+	_mesh = Sprite2D.new()
+	_mesh.region_enabled = true
+	_mesh.centered = false
+	_mesh.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_mesh.modulate = NET_INK
+	_mesh.visible = false
+	add_child(_mesh)
 	_lay_out()
 
 
@@ -542,6 +552,7 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_hull.visible = false
 		elif board == &"net":
 			_collar.visible = false
+			_mesh.visible = false
 		return
 	var region: Rect2 = lent["region"]
 	var scale := minf(slot.size.x / region.size.x, slot.size.y / region.size.y) * fill
@@ -578,14 +589,19 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_collar.position = Vector2(here.x, cut_y)
 			_collar.lay(Vector2(-half, 0.0), Vector2(half, 0.0))
 			_collar.visible = visible
-			# The catch first, then the net over it in black.
+			# The catch here, under everything; then the collar; then the net, black, over
+			# both, so the foam is round the mesh and not across it.
 			for i in mini(CATCH_AT.size(), (sprites.get(&"catch", []) as Array).size()):
 				var piece: Dictionary = sprites[&"catch"][i]
 				var art: Rect2 = piece["region"]
 				var size := art.size * CATCH_SCALE
 				var at := here + (CATCH_AT[i] as Vector2) * drawn - size * 0.5
 				draw_texture_rect_region(piece["sheet"], Rect2(at, size), art)
-			draw_texture_rect_region(sheet, box, region, NET_INK)
+			_mesh.texture = sheet
+			_mesh.region_rect = region
+			_mesh.position = box.position
+			_mesh.scale = box.size / region.size
+			_mesh.visible = visible
 		_:
 			draw_texture_rect_region(sheet, box, region)
 
