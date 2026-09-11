@@ -89,13 +89,12 @@ Wanted:
 
 ## 4. The angler
 
-**Status: real art, thin.** `assets/character.json` — 6 poses (idle and walk, in front, back
-and side), 192 px cells.
+**Status: real art.** `assets/character.json` — idle (9), run (17) and cast (16) in four
+directions, straw hat painted in.
 
 Wanted:
 
-- **Cast, hold, reel and haul-in poses.** The character currently walks and idles only, while
-  doing all the fishing off-model.
+- **Hold, reel and haul-in poses.** The cast loops while the net comes home.
 - A **carrying** pose for hauling a find up the beach.
 
 ## 5. The lake and the shore — all drawn in code today

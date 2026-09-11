@@ -170,7 +170,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   wobble small; the map decides where the junk is, the noise only makes the edge breathe.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
-- Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`.
+- Not yet converted to pixel art (pending, still live): `splash_foam`, `splash_specks`
+  (`water_splash.gd`), `glint.gdshader` (`LakeGrid.GlintLayer`).
 - **The pollution meter is art, not the water shader** (`hud_skin.gd` `_build_meter`,
   `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
   `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
@@ -195,6 +196,16 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   clean water, murky-to-clean, sand-and-bag); clean water won. No row icons, by decision.
   The painted `assets/shop.png` / `shop.json` / `tools/slice_shop.gd` are gone. Rows carry a
   `board` key from `Lake._shop_rows`; a track added to `TRACKS` needs one.
+
+### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
+One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
+psd-extract left in `art_source/character_extracted/` (source `Character_Sprite_Sheet.psd`).
+Four real directions (south/north/east/west), `idle` 9, `run` 17, `cast` 16 frames; the straw
+hat is painted in. Frames are centred on their ink, not their cell (cells are an even split
+of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
+- **Retired, by decision** (2026-09-11): the first angler (three rows + mirrored side, 6
+  poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
+  marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
@@ -318,7 +329,7 @@ The regular rubbish (not finds) is drawn from two sheets:
 (`lake.gd`), and a `SAVE_VERSION` bump. Saved stacks hold indices into the whole def list and
 the finds come after the rubbish in it, so appending rubbish moves every find's index.
 `size` in a `.tres` is only the no-art fallback: `Lake._dress` draws a piece at its pixel
-size × `SPRITE_SCALE` (1.5), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
+size × `SPRITE_SCALE` (2.0), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
 
 ### Retired
 `assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
@@ -366,7 +377,8 @@ Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking
 ### Logging & Debugging
 - `print` and `printerr` don't reach shell on GUI Godot builds (Desktop is GUI-based)
 - **Write to file**: headless harness writes `tools/last_test.log`, flushed per line
-- Test harness for drag mechanics: `tools/test_grab.tscn`, stepped by `_physics_process` (~1s per test, 25 checks)
+- Test harnesses: `tools/test_lake.tscn` (the lake: heap, angler, net, yard, save, art —
+  `tools/last_test.log`) and `tools/test_siege.tscn` (the siege — `tools/last_siege_test.log`)
 
 ### GDScript Coroutines
 - Errors inside coroutines abort **silently** and leave the tree spinning
@@ -385,7 +397,7 @@ Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking
 - `scripts/boat.gd` — net animation and interaction
 - `scripts/water_splash.gd` — ripple feedback on haul/placement
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
-- `shaders/pixel.gdshaderinc` — shared pixel grid, Bayer dither, stepped time
+- `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
 - `scripts/sfx.gd` — audio for haul, settling, collection
 
 ---
@@ -394,7 +406,7 @@ Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking
 1. Read root `CLAUDE.md` for shared Godot setup, anti-patterns, vigilance rule
 2. Check GitHub Issues (filter by `project:lake-cleanup`)
 3. Water and drag feel are locked (Richard tested); progression numbers can shift
-4. If editing grid layout or physics: test with `tools/test_grab.tscn`
+4. If editing grid layout or the angler: run `tools/test_lake.tscn` headless
 5. If finding contradiction: stop and name it (see root CLAUDE.md vigilance rule)
 
 ---
