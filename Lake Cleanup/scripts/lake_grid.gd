@@ -744,8 +744,13 @@ class ShadowLayer extends Node2D:
 		_uvs[base + 1] = box.position + Vector2(box.size.x, 0.0)
 		_uvs[base + 2] = box.position + box.size
 		_uvs[base + 3] = box.position + Vector2(0.0, box.size.y)
+		# Blue and alpha carry which corner this is, so the shader can read where in its
+		# own quad a fragment sits and round the shadow's corners off — see `local` there.
 		for i in CORNERS:
-			_colors[base + i] = anchor
+			var c := anchor
+			c.b = 1.0 if i == 1 or i == 2 else 0.0
+			c.a = 1.0 if i >= 2 else 0.0
+			_colors[base + i] = c
 		return true
 
 	## Collapse a shadow to a point. Its slot stays where it is — the ones after it are in

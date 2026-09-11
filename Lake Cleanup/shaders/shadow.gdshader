@@ -29,6 +29,16 @@ uniform vec4 shade : source_color = vec4(0.03, 0.08, 0.11, 0.16);
 // water under it is not flat. Two rings of taps, a cross and its diagonals, at two radii.
 uniform float soften = 2.2;
 
+// How far in from the quad's edge the shadow starts fading toward its corners, 0 to 1 of the
+// half-width. A boxy piece — a crate, a fridge — fills its quad, and a squashed box with
+// four hard corners under it reads as a slab it is standing on rather than a shadow on
+// water. The mask is a rounded superellipse: the flat sides are barely touched, the corners
+// are cut off soft.
+uniform float round_off = 0.55;
+
+// Where in its own quad this fragment is, 0 to 1 across and down.
+varying vec2 local;
+
 void vertex() {
 	// The piece's anchor x, packed into red and green as one sixteen-bit number by
 	// LakeGrid.pack_anchor. Per piece, not per vertex: every corner of one shadow reads the
@@ -36,6 +46,7 @@ void vertex() {
 	float high = floor(COLOR.r * 255.0 + 0.5);
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
+	local = COLOR.ba;
 
 	// The top anchor value is reserved for a piece lying on the beach, whose shadow stays put
 	// like the piece does. See LakeGrid.DRY_ANCHOR.
@@ -68,5 +79,10 @@ void fragment() {
 		+ texture(TEXTURE, UV - d * 0.7).a
 		+ texture(TEXTURE, UV + vec2(d.x, -d.y) * 0.7).a
 		+ texture(TEXTURE, UV - vec2(d.x, -d.y) * 0.7).a;
-	COLOR = vec4(shade.rgb, shade.a * a / 14.0);
+	// Rounded off toward the corners. A superellipse of power 3 sits between a square and a
+	// circle: the middle of each side keeps nearly all of the shadow, the corners lose it.
+	vec2 q = abs(local * 2.0 - 1.0);
+	float edge = pow(q.x * q.x * q.x + q.y * q.y * q.y, 1.0 / 3.0);
+	float mask = 1.0 - smoothstep(1.0 - round_off, 1.05, edge);
+	COLOR = vec4(shade.rgb, shade.a * a / 14.0 * mask);
 }
