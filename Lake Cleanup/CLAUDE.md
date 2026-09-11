@@ -141,8 +141,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   size order (44 px mirror -> 88, 55 px sofa -> 55), which `test_lake` guards. Carried pieces
   (dog/boat/net) stay fractional.
 - **Motion**: pattern animation runs on `stepped_time(TIME, pixel_fps)` (default 8 fps). The
-  **swell** (what open foam and foam collars ride) keeps real `TIME` because the rubbish rides
-  it smoothly; open foam's swell offset is rounded to whole pixels instead.
+  **swell** the foam collars ride keeps real `TIME` because the rubbish rides it smoothly.
+- **No open-water foam, by decision**: the loose white streaks riding the swell over the open
+  lake were removed (Sep 2026) — they read as lines through clean water. Shore foam stays.
+- **Filth map holes**: `Lake._build_filth_map` blurs a weighted average — a tile that cannot
+  hold rubbish (the holdoff band round the island, the island itself) takes the mean of its
+  neighbours instead of counting as clean. Otherwise the island wears a ring of blue water on
+  opening day.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the
@@ -306,7 +311,7 @@ cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 - `scripts/player.gd` — boat position, net control, haul feedback
 - `scripts/boat.gd` — net animation and interaction
 - `scripts/water_splash.gd` — ripple feedback on haul/placement
-- `shaders/water.gdshader` — pixel-art lake surface: palette ramps, dithered filth/depth, shore and open foam
+- `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, Bayer dither, stepped time
 - `scripts/sfx.gd` — audio for haul, settling, collection
 

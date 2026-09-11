@@ -19,9 +19,7 @@
 //     grain on open water, left lone green pixels in cleaned bays, and shimmered under a
 //     moving camera. Clean, murky and dirty are the same idea one level up — two cutoffs on
 //     the local filth — and the filth map's blur keeps those contours the size of bays
-//   - pattern animation ticks at `pixel_fps`. The swell open foam rides keeps real TIME,
-//     because the rubbish riding the same swell moves smoothly — only it is rounded to whole
-//     pixels, so the foam stays on the grid as it is carried
+//   - pattern animation ticks at `pixel_fps`
 //
 // Three effects, cheapest first:
 //   - a depth gradient from the shore function, so the shallows read as shallow
@@ -148,22 +146,6 @@ uniform float glint_steps = 2.2;
 uniform float foam_lip = 0.28;
 uniform float foam_wash = 0.55;
 uniform float foam_line = 0.09;
-
-// The same foam, loose out on open water: short, thin, broken streaks scattered over the lake,
-// each one growing, holding and falling apart before turning up somewhere else. See open_foam().
-// `open_foam_chance` is the share of cells holding one at any moment, `open_foam_cell` how big a
-// cell is in world pixels (with the 2:1 squash taken out), `open_foam_thick` how thick a streak
-// is in those same units, and `open_foam_life` how long one lasts, in seconds.
-uniform float open_foam_chance = 5.00;
-uniform float open_foam_cell = 150.0;
-uniform float open_foam_thick = 3.3;
-uniform float open_foam_life = 8.0;
-uniform float open_foam_strength = 9.55;
-
-// The swell the floating rubbish rides, so loose foam rides it too. Mirrors
-// LakeGrid.WAVE_AMPLITUDE and LakeGrid.SWAY, like foam.gdshader and rubbish.gdshader.
-uniform float swell_amplitude = 5.0;
-uniform float swell_sway = 3.2;
 
 // The grime caught along the outer bank: what colour it is and how solid, and how far out from
 // the bank's edge it reaches at most, in tiles. Scaled by the water's filth, so it goes as
@@ -341,62 +323,6 @@ float shore_foam(float dist, float angle, float mean, float wide, float clock, f
 	return max(lip, max(wash * 0.75, fleck * 0.6));
 }
 
-// A streak of foam out on open water, 0 to 1, at a spot already snapped to foam pixels.
-//
-// The lake is cut into cells, and a few of them hold one streak each, placed off the cell's
-// middle so the cells never show as a grid. Worked in a space with the isometric squash taken
-// out, so a streak lies flat on the water rather than standing up on the screen. Every life a
-// cell rolls again — whether it holds a streak, where, which way and how bent — so the foam
-// wanders about the lake rather than blinking on and off in the same places.
-//
-// Same language as the shore foam: hard edges, broken into segments, no gradients.
-float open_foam(vec2 at, float clock) {
-	vec2 plane = vec2(at.x, at.y * 2.0);
-	vec2 cell = floor(plane / open_foam_cell);
-	float first = foam_hash(cell + vec2(3.1, 9.7));
-
-	// Each cell on its own clock, so the whole lake does not bloom at once.
-	float cell_clock = clock / open_foam_life + first;
-	float life = fract(cell_clock);
-	vec2 roll = cell + vec2(floor(cell_clock) * 17.3, floor(cell_clock) * 5.9);
-	if (foam_hash(roll) > open_foam_chance) {
-		return 0.0;
-	}
-	float h_x = foam_hash(roll + vec2(1.0, 0.0));
-	float h_y = foam_hash(roll + vec2(0.0, 1.0));
-	float h_turn = foam_hash(roll + vec2(2.0, 3.0));
-	float h_bend = foam_hash(roll + vec2(5.0, 1.0));
-	float h_len = foam_hash(roll + vec2(4.0, 7.0));
-
-	// Off the middle, but by less than a cell's half minus the longest streak, so none reaches
-	// across into a neighbour and gets cut off by the cell edge.
-	vec2 middle = (cell + 0.5 + (vec2(h_x, h_y) - 0.5) * 0.3) * open_foam_cell;
-	vec2 local = plane - middle;
-	// Mostly along the iso grain, turned a little either way, and drifting slowly as it lives.
-	float turn = (h_turn - 0.5) * 0.9;
-	local = mat2(vec2(cos(turn), -sin(turn)), vec2(sin(turn), cos(turn))) * local;
-	local.x -= life * 6.0;
-
-	float half_len = open_foam_cell * (0.12 + h_len * 0.13);
-	// Grows from the middle out, holds, then shortens away: a crest forming and breaking.
-	float grown = half_len * sin(life * PI);
-	float along = abs(local.x) / max(grown, 0.001);
-	if (along >= 1.0) {
-		return 0.0;
-	}
-
-	// A shallow arc, thickest in the middle and drawn to a point at the ends.
-	float bend = (h_bend - 0.5) * 0.02;
-	float off = local.y + local.x * local.x * bend;
-	float thick = open_foam_thick * sqrt(1.0 - along * along);
-	float line = step(abs(off), thick);
-
-	// Broken into segments a few foam pixels long, and thinned further as it falls apart.
-	float segment = foam_hash(roll + vec2(floor(local.x / (foam_pixel * 3.0)), 11.0));
-	line *= step(0.25 + max(life - 0.6, 0.0) * 1.2, segment);
-	return line;
-}
-
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
@@ -531,29 +457,9 @@ void fragment() {
 	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
 	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.0, clock, state));
 
-	// And loose out on the open lake, kept a couple of tiles clear of both shores so it never
-	// tangles with the lip and the wash there.
-	float open_room = step(2.0, bank_in) * step(2.5, isl_out);
-	// Riding the swell: the same bob and wander rubbish.gdshader gives a floating piece, taken
-	// off the lookup so the streak is carried by it. Keyed to this spot's own x where a piece
-	// uses its anchor's, which is the same wave laid continuously under the whole lake.
-	//
-	// Real TIME, not the stepped clock: the rubbish rides this smoothly, and foam that ticked
-	// behind it would jitter against every piece it passes. Rounded to whole pixels instead, so
-	// the streak is carried a pixel at a time and never lands between two.
-	float swell_t = TIME * wave_speed;
-	vec2 swell = vec2(
-		sin(swell_t * 0.53 + px.x * 0.017) * swell_sway,
-		(sin(px.x * 0.011 + swell_t) * 0.62 + sin(px.x * 0.029 - swell_t * 1.7) * 0.38)
-			* swell_amplitude
-			+ cos(swell_t * 0.41 + px.x * 0.023) * swell_sway * 0.5
-	);
-	vec2 foam_at = px - floor(swell / foam_pixel + 0.5) * foam_pixel;
-	// Thinned with the state of the water it lies on: a crest of white on open water is a
-	// clean-water thing, and murk breaks fewer of them. Fewer, not fainter — a faint streak
-	// is a smear, and the streaks are drawn either whole or not at all.
-	float open_keep = step(state * 0.35, foam_hash(floor(foam_at / open_foam_cell) + vec2(2.0, 8.0)));
-	foam = max(foam, open_foam(foam_at, clock) * open_foam_strength * open_room * open_keep);
+	// There used to be loose foam out on the open lake here — short white streaks riding the
+	// swell. Taken out by decision: white lines running through clean water read as a
+	// distraction rather than as weather.
 
 	// Dirty water keeps its foam, it just goes the colour of what it is churning: foam that
 	// faded out with the filth left the filthy lake, the one the player starts on, with no

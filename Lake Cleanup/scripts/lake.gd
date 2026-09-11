@@ -2681,8 +2681,18 @@ func _build_filth_map() -> void:
 	var rows := Iso.ROWS
 	var raw := PackedFloat32Array()
 	raw.resize(cols * rows)
+	# Which tiles have a say. A tile that can hold rubbish speaks for itself, full or empty;
+	# one that cannot — the holdoff band round the island, the island itself, the bank's
+	# last row — says nothing and takes the average of the water round it. Without this the
+	# band round the island read as zero filth, and the lake wore a ring of clean blue water
+	# against the beach on opening day, before a single piece had been lifted.
+	var weight := PackedFloat32Array()
+	weight.resize(cols * rows)
 	for index in _grid.stacks.size():
 		var stack := _grid.stacks[index]
+		var here := _grid.tile_of(index)
+		if not stack.is_empty() or Iso.floats_here(here.x, here.y):
+			weight[index] = 1.0
 		if stack.is_empty():
 			continue
 		var total := 0.0
@@ -2701,8 +2711,13 @@ func _build_filth_map() -> void:
 
 	# Separable, so the spread costs two passes of a line rather than one of a disc. A box
 	# blur and not a gaussian: at this size the difference cannot be seen, and the sums are
-	# running ones, so how far it is spread costs nothing.
+	# running ones, so how far it is spread costs nothing. Weighted: the filth and the weight
+	# are spread the same way and divided, so a tile with no say of its own takes the mean
+	# of the tiles round it that have one, rather than dragging them towards clean.
 	var blurred := _blur_filth(_blur_filth(raw, cols, rows, true), cols, rows, false)
+	var spread := _blur_filth(_blur_filth(weight, cols, rows, true), cols, rows, false)
+	for i in blurred.size():
+		blurred[i] = blurred[i] / spread[i] if spread[i] > 0.0001 else 0.0
 
 	# What counts as filthiest, taken once off the untouched lake. Renormalising on every
 	# rebuild would leave the last piece of junk in the water sitting in a puddle as foul as
