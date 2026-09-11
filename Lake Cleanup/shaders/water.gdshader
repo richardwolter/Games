@@ -132,6 +132,9 @@ uniform float warp_strength = 26.0;
 // one keeps them a dithered shimmer between neighbouring steps rather than stripes of a
 // different colour.
 uniform float band_steps = 0.7;
+// The least the bands swing the shade on foul water, in steps. Over half, or the swing
+// never crosses a step and foul water sits still.
+uniform float dirty_bands = 0.55;
 
 // The foam line against the sand, all in tiles measured in from the edge the water is drawn
 // to. `foam_lip` is how deep the solid lip is on average, `foam_wash` how far past it the
@@ -361,8 +364,11 @@ void fragment() {
 	// Second layer, finer and drifting the other way, to break up the first.
 	float fine = sin((across - warp * 0.6) * 0.055 - clock * 0.9);
 	float bands = streak * 0.7 + fine * 0.3;
-	// Bands fade with filth: in a polluted lake, light does not get far at all.
-	shade += bands * band_steps * (1.0 - filth * 0.75);
+	// Bands fade with filth: in a polluted lake, light does not get far at all. Not to
+	// nothing, though: below half a step the swing never crosses a step and the water sits
+	// dead still, which is what foul water round the island did while the cleaner water
+	// outside it kept moving. `dirty_bands` is the floor.
+	shade += bands * max(band_steps * (1.0 - filth * 0.75), dirty_bands);
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
 	// near their peaks, which is a scatter of moving points rather than a sheen. Costs
