@@ -21,7 +21,7 @@ const LOG_PATH := "res://tools/last_test.log"
 ## not being played. The shop boards are a menu, and a menu that let clicks through onto the
 ## water behind it would cast the net while the player was shopping. Buttons are exempt
 ## everywhere — the engine's own and the drawn ones (`UiButton`, `CloseButton`).
-const CLICK_EATERS := ["Shop", "ShopSkin", "Settings", "Shed", "Room"]
+const CLICK_EATERS := ["Shop", "ShopSkin", "Settings", "Shed", "Room", "GroundTuner"]
 
 ## The harness's own save file, so a test run never touches the player's.
 const SAVE_PATH := "user://test_lake.save"

@@ -661,6 +661,7 @@ func _ready() -> void:
 	_shape_water(shore)
 	_shape_island()
 	_shape_dropoffs()
+	_tune_ground()
 
 	_shed_art = Art.texture("res://assets/shed.png")
 
@@ -924,7 +925,7 @@ func _extra_input(_event: InputEvent) -> bool:
 
 
 ## The land the lake sits in: the bank around the waterline and the wide ring of ground
-## past it, both laid as pixel-art tiles. See scripts/ground.gd, which decides what goes
+## past it, both drawn from pixel-art tiles. See scripts/ground.gd, which decides what goes
 ## where from the same basin shape the water shader reads.
 ##
 ## It used to be three flat polygons with a few thousand hand-thrown specks over them. The
@@ -936,9 +937,24 @@ func _shape_bank() -> void:
 	ground.layer = Ground.Layer.OUTSIDE
 	ground.day = _day
 	add_child(ground)
+	_grounds.append(ground)
 
 	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
 		ground.visible = false
+
+
+## Both layers of ground, for the tuner.
+var _grounds: Array[Ground] = []
+
+
+## The ground's sliders, F4, debug builds only. See GroundTuner.
+func _tune_ground() -> void:
+	if not OS.is_debug_build():
+		return
+	var tuner := GroundTuner.new()
+	tuner.name = &"GroundTuner"
+	tuner.grounds = _grounds
+	add_child(tuner)
 
 ## How far the drawn water is carried past the waterline, in tiles — about sixteen screen
 ## pixels, which is a tile's worth of wet sand.
@@ -1029,6 +1045,7 @@ func _shape_island() -> void:
 	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
 		ground.visible = false
 	add_child(ground)
+	_grounds.append(ground)
 
 	_island = Node2D.new()
 	_island.name = &"IslandShed"

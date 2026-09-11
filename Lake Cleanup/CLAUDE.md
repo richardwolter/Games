@@ -137,14 +137,30 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   angler, dog, boat and the rubbish's swell on the art-pixel grid, and Richard judged the game
   much better with it off (commit `91cc581`, reverted). The low-res SubViewport would give the
   same stepped motion, so it is not pursued either. Don't re-raise.
-- **Ground edge** (`ground.gd` `BLEND`): the mainland lawn meets the beach through a mixed
-  band ~2 tiles either side of the line, each tile rolling by stable hash between rough
-  grass, tufted mounds (`GRASS_BORDER`), sand-with-tufts cubes (`SAND_TUFTED`) and plain
-  sand, weighted by distance across the line. **The pack's grass/sand join tiles are
-  rejected, by decision** (tried 2026-09-11, plus two generated corner pieces): their sand
-  stops on each tile's diagonal and a shore of them reads as a staircase of cuts. Don't
-  re-raise. The island keeps its plain yard edge. Grass patch edges roll a hash between
-  the two adjoining patches so they are ragged (`_pick`).
+- **The ground is drawn per pixel, not per tile** (`shaders/ground.gdshader`, issue #17,
+  2026-09-11): each `Ground` layer is one `Polygon2D` with the shader on it; every pixel works
+  out its tile, whether it is lawn or beach (`coverage` — `out_of_water` less `beach_width`
+  less value-noise `wander`), which lawn patch it is in (per-pixel Voronoi, `patch_size`),
+  and so which texel of the pack's top faces to show off a 7-cell strip (sand, yard pool,
+  rough pool). The lawn/beach line and the patch borders are therefore curves stepped at art
+  pixels, the same way `water.gdshader` cuts the island coast. The front tiles' turf
+  overhang (the pack draws its grass leaning back over the rear diamond edges, rows 0-2
+  above `GRASS_FACE_ROW` 3) is composited per pixel so the lawn stays bushy and its far
+  edge ragged; the near edge gets a 1 art-px `lip` and per-pixel `fringe` blades hanging
+  over the sand (mode 1 straight down, mode 2 along the curve's normal). The island: same
+  shader, no wander, no fringe, lip only. Cube sides are not drawn at all (`GRASS_LIFT`,
+  skirts, `_face_top` gone). **`Ground.coverage_at`/`kind_at` mirror the shader** — the props
+  (trees, rocks, leaves, and the sparse beach tufts within `TUFT_REACH` of the line at
+  sub-tile offsets) are laid by them; the two must move together.
+  **Retired, by decision**: the mixed `BLEND` band, `GRASS_BORDER` mounds, `SAND_TUFTED`
+  cubes, the generated fringe strips (`assets/fringe`, `generate_fringe.py`), the per-tile
+  batched mesh, and the pack's grass/sand join tiles (tried 2026-09-11, a corner set that
+  reads as a staircase of cuts). A line drawn by choosing whole tiles is a staircase
+  whatever the tiles; don't go back to tile picking for the edge.
+  **Tuning**: F4 in a debug build opens `GroundTuner` (sliders for every ground uniform,
+  values written to `user://ground_tune.log`); bake picks into `Ground`'s constants. The
+  beach cannot go under `beach_width - wander_amp` = 3.5 tiles (`Dog.BEACH_WALK`,
+  `Iso.BEACH_LITTER` count on sand there).
 - **Sprite scale**: rubbish, finds (`SPRITE_SCALE`) and pigeons (`Flock.SCALE`) draw at 2.0.
   A piece under `SPRITE_SMALLEST` scales up by whole steps. The ~15 big finds over 34 px art
   keep an exact fractional cap to `SPRITE_LARGEST` (68) — rounding their scales inverted the
