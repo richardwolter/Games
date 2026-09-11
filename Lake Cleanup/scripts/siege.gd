@@ -781,10 +781,14 @@ func _carry_over() -> void:
 		fleet_level += 1
 		_add_boat()
 
-	_music_level.value = clampf(float(save.get("music_level", _music_level.value)), 0.0, 1.0)
-	_music_on.button_pressed = bool(save.get("music", true))
-	_sfx_level.value = clampf(float(save.get("sfx_level", _sfx_level.value)), 0.0, 1.0)
-	_sfx_on.button_pressed = bool(save.get("sfx", true))
+	# Through the settings board, like the lake's own load does: the stock sliders and check
+	# boxes these used to set are gone (see SettingsSkin).
+	_settings.music_level = clampf(
+		float(save.get("music_level", _settings.music_level)), 0.0, 1.0
+	)
+	_settings.music_on = bool(save.get("music", true))
+	_settings.sfx_level = clampf(float(save.get("sfx_level", _settings.sfx_level)), 0.0, 1.0)
+	_settings.sfx_on = bool(save.get("sfx", true))
 	_push_music()
 	_push_sfx()
 
