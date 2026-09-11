@@ -168,7 +168,7 @@ const SHADOW_SPAN := 1.0
 ## and a silhouette laid down on it has to be squashed to the same degree or it stands up
 ## behind the piece like a second copy of it.
 const SHADOW_SQUASH := 0.5
-const SHADOW_ALPHA := 0.15
+const SHADOW_ALPHA := 0.11
 const SHADOW_DROP := 0.22
 const SHADOW_COLOUR := Color(0.03, 0.08, 0.11, 1.0)
 
