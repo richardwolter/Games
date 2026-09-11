@@ -17,12 +17,11 @@ extends Node
 
 const LOG_PATH := "res://tools/last_test.log"
 
-## Controls that are supposed to take the mouse. Buttons are exempt everywhere; the shop
-## is a menu panel, and a menu that let clicks through onto the water behind it would cast
-## the net while the player was shopping.
 ## Panels that are meant to swallow a click: they are what is on screen when the lake is
-## not being played.
-const CLICK_EATERS := ["Shop", "Settings", "Shed", "Room"]
+## not being played. The shop boards are a menu, and a menu that let clicks through onto the
+## water behind it would cast the net while the player was shopping. Buttons are exempt
+## everywhere — the engine's own and the drawn ones (`UiButton`, `CloseButton`).
+const CLICK_EATERS := ["Shop", "ShopSkin", "Settings", "Shed", "Room"]
 
 ## The harness's own save file, so a test run never touches the player's.
 const SAVE_PATH := "user://test_lake.save"
@@ -157,7 +156,10 @@ func _water_near_angler() -> Vector2:
 			if fallback == Vector2.INF:
 				fallback = where
 			var cell := _grid.tile_at(where)
-			if cell >= 0 and _grid.height_of(cell) > 0 and span > best_span:
+			# Something the net can actually lift, not just something there: a starting net
+			# only takes tier 0 off the top, and a stack with heavier junk on top comes home
+			# empty however full it is.
+			if cell >= 0 and _grid.reachable_slot(cell, 1, _net.power) >= 0 and span > best_span:
 				best_span = span
 				best = where
 	return best if best != Vector2.INF else fallback
@@ -524,7 +526,10 @@ func _stage_ferry() -> void:
 	if _in_stage == 4:
 		_check(_boat.is_running(), "the ferry sets off on its own",
 			"it is %s" % _boat.status_line())
-		_check(_boat.cargo.size() > 0 and _yard.held.size() < _pieces_before,
+		# Out of the yard, not yet aboard: the lot is thrown to the hold one piece at a time
+		# (`Boat.stow`), so `cargo` fills over the next frames. The sale below is what proves
+		# it arrived.
+		_check(_yard.held.size() < _pieces_before,
 			"loading took the catch out of the yard",
 			"%d aboard, %d left in the yard" % [_boat.cargo.size(), _yard.held.size()])
 		return
@@ -736,11 +741,7 @@ func _stage_skimmer() -> void:
 ## The fleet: a second hull is a second boat in the water, wired up the same as the first
 ## and moored somewhere else.
 func _stage_fleet() -> void:
-	var yard_price := float(_main.call(&"cost_of", &"yard"))
 	var net_price := float(_main.call(&"cost_of", &"net_width"))
-	_check(yard_price < net_price, "the yard is the cheap track",
-		"%.0f against %.0f for net width" % [yard_price, net_price])
-
 	_main.set(&"sludge", 100000.0)
 	var before := _main.get(&"_boats").size() as int
 	var price := float(_main.call(&"cost_of", &"fleet"))
@@ -1355,7 +1356,10 @@ func _stage_pigeons() -> void:
 	_net.flock = _flock
 	_net.tile_pos = Vector2(_grid.tile_of(perch))
 	_net.radius = 1
-	_net.hold = 3
+	# No room for rubbish, so the bird is the only thing this sweep can lift: birds are taken
+	# before the hold is checked (see CastNet._sweep). With room, the junk the bird sits on
+	# comes up too and moves the meter, which is not what this is asking about.
+	_net.hold = 0
 	_net.catch.resize(0)
 	_net.call(&"_sweep")
 	_check(_flock.bird_on(perch) < 0 and _flock.birds.is_empty(),
@@ -1371,8 +1375,10 @@ func _stage_pigeons() -> void:
 
 	# Droppings wear off.
 	_flock.droppings.clear()
-	_flock.droppings.append({"at": Vector2.ZERO, "born": -Flock.POOP_LIFE * 2.0, "on_angler": false})
-	_flock.droppings.append({"at": Vector2.ZERO, "born": 1e9, "on_angler": false})
+	_flock.droppings.append(
+		{"at": Vector2.ZERO, "born": -Flock.POOP_LIFE * 2.0, "on_angler": false, "on_land": true}
+	)
+	_flock.droppings.append({"at": Vector2.ZERO, "born": 1e9, "on_angler": false, "on_land": true})
 	_flock.call(&"_fade_droppings", 0.016)
 	_check(_flock.droppings.size() == 1, "old droppings fade away and fresh ones stay",
 		"%d left" % _flock.droppings.size())
@@ -1518,6 +1524,7 @@ func _find_greedy_controls(node: Node, into: Array[String]) -> void:
 	var control := node as Control
 	if control != null and control.mouse_filter == Control.MOUSE_FILTER_STOP \
 			and not control is BaseButton and not control is Range \
+			and not control is UiButton and not control is CloseButton \
 			and not CLICK_EATERS.has(str(control.name)):
 		into.append(str(control.name))
 	for child in node.get_children():

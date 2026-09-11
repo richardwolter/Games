@@ -32,6 +32,9 @@ var _cold: Node2D
 var _caught_lot: int = 0
 var _patrol_from := Vector2.INF
 var _hunted := Vector2.INF
+## Where the charm-cast stage put its charm, so the check after the cast can tell it apart
+## from any the yards make meanwhile.
+var _charm_born := Vector2.INF
 
 var _stage: int = 0
 var _in_stage: int = 0
@@ -153,7 +156,8 @@ func _stage_build() -> void:
 func _stage_charm_cast() -> void:
 	if _sub == 0:
 		var where := _water_near_angler()
-		_check(_charms.add_charm(CharmField.Kind.FIRE, Iso.world_to_tile(where)),
+		_charm_born = Iso.world_to_tile(where)
+		_check(_charms.add_charm(CharmField.Kind.FIRE, _charm_born),
 			"a yard can start making a charm", "")
 		_check(_charms.charms.size() == 1, "and it comes up where the yard is", "")
 		# A charm is not a charm the moment it exists. The yard has to push it up through
@@ -177,6 +181,7 @@ func _stage_charm_cast() -> void:
 		var where := Iso.tile_to_world(risen.x, risen.y)
 		_check(_charms.charm_on(_grid.tile_at(where)) == 0,
 			"and then the net can see it", "tile %d" % _grid.tile_at(where))
+		_stand_facing(risen)
 		_main.call(&"_cast_at", where)
 		_net.set_pulling(true)
 		_check(_net.state == CastNet.State.FLYING, "the cast is in the air", "")
@@ -185,7 +190,11 @@ func _stage_charm_cast() -> void:
 	if _net.state != CastNet.State.IDLE and _in_stage < 1600:
 		return
 	_net.set_pulling(false)
-	_check(_charms.charms.is_empty(), "the cast took the charm off the water", "")
+	# This charm, not every charm: the siege's quiet phase switches the yards back on
+	# (`Siege._run_waves`), so others can surface at the spouts while the net is out.
+	_check(_charms.charms.all(
+			func(c: Dictionary) -> bool: return Vector2(c["born"]) != _charm_born
+		), "the cast took the charm off the water", "%d others afloat" % _charms.charms.size())
 	_check(_box.slots.size() == 1 and _box.slots[0] == CharmField.Kind.FIRE,
 		"and it went into the box", "%s" % [_box.slots])
 	_check(not _box.running or _box.slots.is_empty(),
@@ -357,6 +366,7 @@ func _stage_fire_and_ice() -> void:
 			# out, it drags, it comes home. There is nothing in this water but charms, so
 			# it comes home empty — what matters is that it went and came back rather than
 			# being turned into a placement the player did not ask for.
+			_stand_facing(Iso.CENTRE)
 			_main.call(&"_cast_at", _water_near_angler())
 			_net.set_pulling(true)
 			_sub = 5
@@ -627,6 +637,28 @@ func _stage_waves() -> void:
 			_check(_laid.nets.is_empty(),
 				"with nothing still burning in an empty lake", "")
 			_advance()
+
+
+## Put the angler as far out on the beach as they can stand, on the side facing `tile`.
+##
+## The island is sixteen tiles across and the first net reaches three and a half, so from the
+## middle by the shed nothing on the water is within a cast. A player walks down to the shore
+## before throwing; the harness does the same rather than pretending the lake comes to them.
+## A target at the island's own centre has no direction, so it faces south.
+func _stand_facing(tile: Vector2) -> void:
+	var dir := tile - Iso.ISLAND_CENTRE
+	if dir.length() < 0.001:
+		dir = Vector2(0.0, 1.0)
+	dir = dir.normalized()
+	var last := _angler.tile_pos
+	var walked := 0.0
+	while walked < Iso.ISLAND_RADIUS.x + 4.0:
+		walked += 0.25
+		var at := Iso.ISLAND_CENTRE + dir * walked
+		if bool(_angler.call(&"_can_stand", at)):
+			last = at
+	_angler.tile_pos = last
+	_angler.call(&"_place")
 
 
 ## Open water within casting distance of the angler, with something in it. Same problem and
