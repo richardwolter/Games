@@ -386,7 +386,7 @@ func _draw_switch(box: Rect2, line: Dictionary) -> void:
 		Vector2(track.end.x - thumb_wide - 1.0 if on else track.position.x + 1.0, track.position.y + 1.0),
 		Vector2(thumb_wide, SWITCH_TALL - 2.0)
 	)
-	Style.plank(self, thumb, int(track.position.y))
+	Style.plank(self, thumb, int(track.position.y), Style.FRAME, 2.0)
 
 
 func _state_of(key: StringName) -> bool:
@@ -418,7 +418,7 @@ func _draw_slider(box: Rect2, line: Dictionary) -> void:
 		Vector2(groove.position.x + groove.size.x * level - THUMB_WIDE * 0.5, box.position.y + 2.0),
 		Vector2(THUMB_WIDE, box.size.y - 4.0)
 	)
-	Style.plank(self, thumb, int(groove.position.y) + key.hash() % 97)
+	Style.plank(self, thumb, int(groove.position.y) + key.hash() % 97, Style.FRAME, 2.0)
 
 
 ## A button row: the plate is the button.
@@ -431,7 +431,7 @@ func _draw_button(box: Rect2, line: Dictionary) -> void:
 	if oak:
 		# The save and quit buttons are planks like the frame: grained, lit along the top,
 		# a chip or two out of the edge.
-		Style.plank(self, box, int(box.position.y) * 13 + key.hash() % 89, face)
+		Style.plank(self, box, int(box.position.y) * 13 + key.hash() % 89, face, Style.CLIP)
 		var seed := int(box.position.y) + key.hash() % 31
 		var chip_wide := 5.0 + float(seed % 3)
 		Style.chip(self, Rect2(box.position.x + box.size.x * (0.2 + 0.5 * float(seed % 7) / 7.0), box.position.y - 1.0, chip_wide, 3.0))

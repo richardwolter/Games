@@ -449,14 +449,19 @@ const PLANK_DEEP := 12.0
 
 ## A plank: seam, face, the broken highlight along its top and left, a deep line under it
 ## and down its right, grain along it. `seed` picks the grain so two planks never match.
-static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME) -> void:
-	on.draw_rect(box.grow(1.0), SEAM, true)
-	on.draw_rect(box, face, true)
-	grain(on, box, true, seed, box.size.y)
-	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4)
-	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5)
-	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_DEEP, true)
-	on.draw_rect(Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)), FRAME_DEEP, true)
+## `clip` cuts a step off each corner, for a plank that is a button rather than a frame.
+static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME, clip: float = 0.0) -> void:
+	if clip > 0.0:
+		on.draw_colored_polygon(clipped(box.grow(1.0), clip), SEAM)
+		on.draw_colored_polygon(clipped(box, clip), face)
+	else:
+		on.draw_rect(box.grow(1.0), SEAM, true)
+		on.draw_rect(box, face, true)
+	grain(on, box.grow(-clip * 0.5), true, seed, box.size.y - clip)
+	highlight(on, box.position + Vector2(clip, 0.0), Vector2(box.size.x - clip * 2.0, 0.0), seed + 4)
+	highlight(on, box.position + Vector2(0.0, clip), Vector2(0.0, box.size.y - clip * 2.0), seed + 5)
+	on.draw_rect(Rect2(Vector2(box.position.x + clip, box.end.y - 1.0), Vector2(box.size.x - clip * 2.0, 1.0)), FRAME_DEEP, true)
+	on.draw_rect(Rect2(Vector2(box.end.x - 1.0, box.position.y + clip), Vector2(1.0, box.size.y - clip * 2.0)), FRAME_DEEP, true)
 
 
 ## The broken highlight the light lays along a plank's lit edge: runs of pale peach a

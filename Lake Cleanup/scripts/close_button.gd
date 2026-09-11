@@ -52,7 +52,7 @@ func _draw() -> void:
 	var face := Style.FRAME
 	if _hovered:
 		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
-	Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y), face)
+	Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y), face, Style.CLIP)
 	var arm := side * ARM
 	var thick := maxf(side * STROKE, 2.0)
 	draw_line(middle - Vector2(arm, arm), middle + Vector2(arm, arm), ink, thick, true)
