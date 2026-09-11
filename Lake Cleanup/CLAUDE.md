@@ -122,8 +122,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **Colours**: the water body outputs only palette swatches — three five-step ramps
   (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands and
   sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
-  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, read
-  straight off the map.
+  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, after
+  a small drifting blob noise (`murk_blotch`, `murk_wobble` 0.1) and a shade stagger
+  (`state_spread` 0.1) so the contours breathe instead of sitting still.
   The water is opaque. Foam keeps its own shapes and soft alpha.
 - **No dither, by decision**: a per-pixel Bayer dither was tried and rejected — grainy open
   water, lone dirty pixels in cleaned bays, shimmer under camera motion.
@@ -160,9 +161,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   clean**, and the rubbish-free band round the island is a plain clean ring. Rejected on the
   way here: a pollution-over-capacity box blur (lone pieces floated on blue, green spread
   over empty water), a weighted blur, and a fill that made the island's band foul.
-- **No blotch noise, no stagger** in the shader (`murk_blotch`, `murk_wobble`, `state_spread`
-  are gone): state contours are the map's own. Blobs of the wrong state were read as water
-  leaking from under the island.
+- **Blotch noise and stagger, low** (`murk_wobble` 0.1, `state_spread` 0.1): removed once
+  because at 0.28 the blobs read as water leaking from under the island, then put back at
+  under half that (2026-09-11) because with the cutoffs read straight off the map the
+  contours round the island sat dead still while the bands rippled across them. Keep the
+  wobble small; the map decides where the junk is, the noise only makes the edge breathe.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the

@@ -93,12 +93,23 @@ uniform vec4 water_murky_light : source_color = vec4(0.55, 0.66, 0.58, 1.0);
 uniform float murky_at : hint_range(0.0, 1.0) = 0.3;
 uniform float dirty_at : hint_range(0.0, 1.0) = 0.65;
 
-// The cutoffs are read straight off the map. There used to be a drifting blob noise pushing
-// the filth either way before them, and a stagger that flipped dark troughs before bright
-// crests, both to keep the contours from drawing as rings. Taken out by decision: they put
-// patches of green over water with nothing on it and patches of blue under floating junk,
-// and the water's one job is to say where the junk is. The map itself is a distance from
-// the rubbish now, so its contours follow the rubbish rather than a bay-sized blur.
+// What keeps those two cutoffs from drawing as rings. `murk_blotch` is how wide a patch of
+// murk is, in world pixels with the isometric squash taken out. `murk_wobble` is how far, in
+// filth, a patch pushes the water either side of where the map says it is: the edges wander
+// and breathe, and a little of each state spills across into the next. Two noises — a slow
+// broad one that bends the contour, a finer one that breaks it — or the edge is wavy but
+// still one line. `state_spread` staggers the flip by shade: the dark troughs of the wave
+// bands go over to the filthier ramp a little before the bright crests, so the boundary is
+// a band of moving streaks rather than a line every colour changes on together.
+//
+// These were taken out once (the map is a distance from the rubbish now, and at 0.28 wobble
+// the blotches put green over water with nothing on it and blue under floating junk) and
+// put back at less than half that, by decision: with the cutoffs read off the map alone the
+// contours round the island sat dead still while the bands rippled across them, and a ring
+// that does not move reads as paint. The spill at this strength is a few pixels.
+uniform float murk_blotch = 48.0;
+uniform float murk_wobble : hint_range(0.0, 0.5) = 0.1;
+uniform float state_spread : hint_range(0.0, 0.5) = 0.1;
 
 // Foam's body on clean water and what it goes to on filthy water, palette `foam` and
 // `foam_dirty`. The alpha is how solid the foam is laid over the water.
@@ -387,8 +398,20 @@ void fragment() {
 	// Onto the nearest step: solid areas, hard edges.
 	float step_at = clamp(floor(shade + 0.5), 0.0, 4.0);
 
-	// Which ramp: clean, murky or dirty, off the map alone.
-	float state = step(murky_at, color_t) + step(dirty_at, color_t);
+	// The murk, drifting: patches that push this water up or down the filth before the
+	// cutoffs read it. Flat on the water (the 2:1 squash taken out), crawling along the iso
+	// grain on the stepped clock. Centred on zero, so where the map is well inside one state
+	// nothing changes and the wobble lives only along the edges.
+	vec2 murk_at = vec2(px.x, px.y * 2.0) / max(murk_blotch, 1.0);
+	murk_at += vec2(clock * 0.05, clock * 0.025);
+	float broad = blob_noise(murk_at * 0.5 + vec2(7.3, 2.1)) - 0.5;
+	float narrow = blob_noise(murk_at * 1.7 - vec2(3.9, 5.4)) - 0.5;
+	float murk = (broad * 0.6 + narrow * 0.4) * 2.0 * murk_wobble;
+	float state_t = clamp(color_t + murk, 0.0, 1.0);
+	// Which ramp, staggered by the shade: deep water (0) flips earliest, light (4) latest, on
+	// the shade before it is rounded so the mix runs finer than the steps do.
+	float lean = (shade - 2.0) * 0.5 * state_spread;
+	float state = step(murky_at + lean, state_t) + step(dirty_at + lean, state_t);
 	vec3 col = ramp(step_at, state);
 
 	// The foam line along both shores.
