@@ -381,6 +381,16 @@ var _face_top: Dictionary = {}
 var _fringe_art: Array = []
 var _fringe_data: Array = []
 
+## The props' atlas, where each picture is in it, where each prop stands, and the one batch
+## they and their shadows are drawn from. See `_pack_props` and `_lay_props`.
+var _prop_atlas: ImageTexture
+var _prop_uv: Dictionary = {}
+var _placed: Array = []
+var _prop_points := PackedVector2Array()
+var _prop_uvs := PackedVector2Array()
+var _prop_colors := PackedColorArray()
+var _prop_indices := PackedInt32Array()
+
 ## How far out of the water a tile is, in tiles. `shore_fraction` is a fraction of the
 ## radius in that tile's own direction, so it is scaled back up by the radius it came from
 ## rather than by an average of the two.
@@ -434,6 +444,7 @@ func _ready() -> void:
 			"colors": PackedColorArray()
 		})
 	_sow()
+	_pack_props()
 	_dirty = true
 	queue_redraw()
 
@@ -613,21 +624,22 @@ func _draw() -> void:
 			_fringe_art[i].get_rid()
 		)
 
-	# Props and drowning are still drawn per-tile (optimization can come later)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = SEED
-	var span := _span()
-	for s in range((span.position.x + span.position.y), (span.end.x + span.end.y) + 1):
-		for tx in range(span.position.x, span.end.x + 1):
-			var ty := s - tx
-			if ty < span.position.y or ty > span.end.y:
-				continue
-			var mid := Iso.tile_to_world(float(tx) + 0.5, float(ty) + 0.5)
-			# On the same surface the tile under it was drawn at. A tree standing at the
-			# plane on turf lifted by GRASS_LIFT is a tree buried to the ankles.
-			if _kind_at(float(tx) + 0.5, float(ty) + 0.5) == Kind.GRASS:
-				mid.y -= GRASS_LIFT
-			_plant(Vector2i(tx, ty), mid)
+	# The props last, all of them in one batch: every tree, rock and tuft and every shadow
+	# they throw, in painter's order, off one atlas. They used to be a draw call each — two
+	# with the shadow — and a wood of a few thousand was nearly six thousand draw calls a
+	# frame, which was most of what a frame cost.
+	_lay_props()
+	if not _prop_indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(),
+			_prop_indices,
+			_prop_points,
+			_prop_colors,
+			_prop_uvs,
+			PackedInt32Array(),
+			PackedFloat32Array(),
+			_prop_atlas.get_rid()
+		)
 
 
 func _rebuild() -> void:
@@ -819,14 +831,16 @@ func _add_fringe_half(
 ##
 ## Sat on the plane by their feet, not their middles: everything in the pack is drawn as a
 ## thing standing on the ground, and hanging it by the centre would bury half of every trunk.
-func _plant(cell: Vector2i, mid: Vector2) -> void:
-	if not _props.has(cell):
-		return
-	for art: Texture2D in _props[cell]:
-		var size := Vector2(art.get_width(), art.get_height()) * SCALE
-		var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
-		_lay_shadow(art, size)
-		draw_texture_rect(art, box, false)
+func _plant(mid: Vector2, art: Texture2D) -> void:
+	var size := Vector2(art.get_width(), art.get_height()) * SCALE
+	var uv: Rect2 = _prop_uv[art]
+	_lay_shadow(mid, size, uv)
+	var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+	_prop_quad(
+		Transform2D.IDENTITY,
+		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
+		uv, Color.WHITE
+	)
 
 
 ## A tree's or a rock's shadow: the same picture again, laid out on the ground away from the
@@ -837,18 +851,115 @@ func _plant(cell: Vector2i, mid: Vector2) -> void:
 ## below asks for a fresh bake when the sun has moved enough to be worth one. Over a ten
 ## minute day that is a handful of rebuilds, against sixty a second for a shadow nobody can
 ## see moving anyway.
-func _lay_shadow(art: Texture2D, size: Vector2) -> void:
+##
+## Hinged at the prop's own foot, `mid` plus half a tile down, which is where `_plant` stands
+## the picture. It was hinged at the layer's origin once, and every shadow in the wood came
+## out stacked on top of each other in one black streak at the corner of the tile field.
+func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2) -> void:
 	if day == null:
 		return
-	# The foot of the picture, which is where the shadow is hinged: the props are sat on the
-	# plane by their feet in `_plant`, and a shadow hinged anywhere else slides out from
-	# under its own tree.
-	var foot := Vector2(0.0, Iso.TILE_H * 0.5)
-	draw_set_transform_matrix(Shade.lying(foot, day.lean, day.stretch))
-	draw_texture_rect(
-		art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false, Shade.tint(day.ink)
+	var foot := mid + Vector2(0.0, Iso.TILE_H * 0.5)
+	var lie := Shade.lying(foot, day.lean, day.stretch)
+	var box := Rect2(Vector2(-size.x * 0.5, -size.y), size)
+	_prop_quad(
+		lie,
+		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
+		uv, Shade.tint(day.ink)
 	)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## One picture into the prop batch: four corners (top-left, top-right, bottom-right,
+## bottom-left) put through `xform`, the atlas rectangle, and the colour it is multiplied by.
+func _prop_quad(xform: Transform2D, corners: Array, uv: Rect2, tint: Color) -> void:
+	var base := _prop_points.size()
+	for corner: Vector2 in corners:
+		_prop_points.append(xform * corner)
+		_prop_colors.append(tint)
+	_prop_uvs.append(uv.position)
+	_prop_uvs.append(Vector2(uv.end.x, uv.position.y))
+	_prop_uvs.append(uv.end)
+	_prop_uvs.append(Vector2(uv.position.x, uv.end.y))
+	_prop_indices.append_array(
+		PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3])
+	)
+
+
+## Lay every prop and its shadow into the batch, for the sun as it is now.
+func _lay_props() -> void:
+	_prop_points.resize(0)
+	_prop_uvs.resize(0)
+	_prop_colors.resize(0)
+	_prop_indices.resize(0)
+	if _props.is_empty():
+		return
+	if _placed.is_empty():
+		_place_props()
+	for i in range(0, _placed.size(), 2):
+		_plant(_placed[i], _placed[i + 1])
+
+
+## Where each prop stands, in painter's order, as flat pairs of foot point and picture. The
+## walk over the whole ground and its `_kind_at` per tile is paid once, not on every bake.
+func _place_props() -> void:
+	var span := _span()
+	for s in range((span.position.x + span.position.y), (span.end.x + span.end.y) + 1):
+		for tx in range(span.position.x, span.end.x + 1):
+			var ty := s - tx
+			if ty < span.position.y or ty > span.end.y:
+				continue
+			var cell := Vector2i(tx, ty)
+			if not _props.has(cell):
+				continue
+			var mid := Iso.tile_to_world(float(tx) + 0.5, float(ty) + 0.5)
+			# On the same surface the tile under it was drawn at. A tree standing at the
+			# plane on turf lifted by GRASS_LIFT is a tree buried to the ankles.
+			if _kind_at(float(tx) + 0.5, float(ty) + 0.5) == Kind.GRASS:
+				mid.y -= GRASS_LIFT
+			for art: Texture2D in _props[cell]:
+				_placed.append(mid)
+				_placed.append(art)
+
+
+## Every picture a prop uses, packed into one texture so the whole wood is one batch.
+##
+## Shelf packing with a transparent gutter round each picture: the layer draws nearest, and
+## a gutter means no sample at a picture's edge can land on its neighbour.
+const ATLAS_WIDE := 1024
+const ATLAS_GUTTER := 2
+
+
+func _pack_props() -> void:
+	var arts: Array[Texture2D] = []
+	for list: Array in _props.values():
+		for art: Texture2D in list:
+			if not arts.has(art):
+				arts.append(art)
+	arts.sort_custom(func(a: Texture2D, b: Texture2D) -> bool: return a.get_height() > b.get_height())
+	var spots: Array[Vector2i] = []
+	var x := ATLAS_GUTTER
+	var y := ATLAS_GUTTER
+	var shelf := 0
+	for art in arts:
+		if x + art.get_width() + ATLAS_GUTTER > ATLAS_WIDE:
+			x = ATLAS_GUTTER
+			y += shelf + ATLAS_GUTTER
+			shelf = 0
+		spots.append(Vector2i(x, y))
+		x += art.get_width() + ATLAS_GUTTER
+		shelf = maxi(shelf, art.get_height())
+	var tall := y + shelf + ATLAS_GUTTER
+	var sheet := Image.create_empty(ATLAS_WIDE, maxi(tall, 1), false, Image.FORMAT_RGBA8)
+	for i in arts.size():
+		var img := arts[i].get_image()
+		if img.is_compressed():
+			img.decompress()
+		img.convert(Image.FORMAT_RGBA8)
+		sheet.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), spots[i])
+		_prop_uv[arts[i]] = Rect2(
+			Vector2(spots[i]) / Vector2(sheet.get_size()),
+			Vector2(img.get_size()) / Vector2(sheet.get_size())
+		)
+	_prop_atlas = ImageTexture.create_from_image(sheet)
 
 
 ## The first row of a picture that has anything in it, in source pixels. The top face starts
