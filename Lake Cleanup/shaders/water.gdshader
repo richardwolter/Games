@@ -95,7 +95,13 @@ uniform float dirty_at : hint_range(0.0, 1.0) = 0.65;
 // side. Two noises rather than one — a slow broad one that bends the contour, a finer one
 // that breaks it — or the edge is wavy but still one line.
 uniform float murk_blotch = 48.0;
-uniform float murk_wobble : hint_range(0.0, 0.5) = 0.16;
+uniform float murk_wobble : hint_range(0.0, 0.5) = 0.22;
+
+// And the flip staggered by shade: the dark troughs of the wave bands go over to the
+// filthier ramp this much filth before the bright crests do. With every step flipping at
+// once the edge was one line however much it wobbled — every colour changed on it together.
+// Staggered, the boundary is a band of moving streaks in which both ramps are drawn.
+uniform float state_spread : hint_range(0.0, 0.3) = 0.1;
 
 // Foam's body on clean water and what it goes to on filthy water, palette `foam` and
 // `foam_dirty`. The alpha is how solid the foam is laid over the water.
@@ -427,7 +433,6 @@ void fragment() {
 	float narrow = blob_noise(murk_at * 1.7 - vec2(3.9, 5.4)) - 0.5;
 	float murk = (broad * 0.6 + narrow * 0.4) * 2.0 * murk_wobble;
 	float state_t = clamp(color_t + murk, 0.0, 1.0);
-	float state = step(murky_at, state_t) + step(dirty_at, state_t);
 
 	// Position on the ramp: the shallows up at step 3, the deep water down at step 0.
 	float shade = mix(3.0, 0.0, smoothstep(0.15, 0.85, d));
@@ -475,6 +480,10 @@ void fragment() {
 
 	// Onto the nearest step: solid areas, hard edges.
 	float step_at = clamp(floor(shade + 0.5), 0.0, 4.0);
+
+	// Which ramp, staggered by the step: deep water (0) flips earliest, light (4) latest.
+	float lean = (step_at - 2.0) * 0.5 * state_spread;
+	float state = step(murky_at + lean, state_t) + step(dirty_at + lean, state_t);
 	vec3 col = ramp(step_at, state);
 
 	// The foam line along both shores.
