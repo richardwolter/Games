@@ -648,17 +648,47 @@ func _draw_stock() -> void:
 	)
 
 
-## The recycle mark off the box's front: three chevron arrows chasing round a triangle, in
-## the box's blue with a lit edge. Drawn rather than cut from the box art, which is eleven
-## pixels of it at an isometric slant.
+## The recycle mark off the box's front: three chevron arrows chasing round a triangle,
+## carved into the plank — a round recess first, then the mark cut into it: a dark edge
+## where the cut faces away from the light (up and left), a lit edge where it catches it
+## (down and right), and the blue in the groove between. Drawn rather than cut from the box
+## art, which is eleven pixels of it at an isometric slant.
 func _draw_recycle_mark(box: Rect2) -> void:
 	var middle := box.position + box.size * 0.5
-	var reach := box.size.x * 0.46
+	var recess := box.size.x * 0.56
+	draw_circle(middle, recess + 1.0, Style.SEAM)
+	draw_circle(middle, recess, Style.BOX_DEEP)
+	# The recess's own lip: dark along its upper inside, lit along its lower.
+	draw_arc(middle, recess - 0.5, PI * 1.05, PI * 1.95, 12, Style.BOX_HOLLOW, 1.5)
+	draw_arc(middle, recess - 0.5, PI * 0.05, PI * 0.95, 12, Style.BOX_LIT, 1.0)
+	var shapes := _recycle_shapes(box)
+	for shape: PackedVector2Array in shapes:
+		var lit := PackedVector2Array()
+		var dark := PackedVector2Array()
+		for at in shape:
+			lit.append(at + Vector2(1.0, 1.0))
+			dark.append(at - Vector2(1.0, 1.0))
+		draw_colored_polygon(lit, Style.BOX_LIT)
+		draw_colored_polygon(dark, Style.SEAM)
+	for shape: PackedVector2Array in shapes:
+		draw_colored_polygon(shape, Style.BOX_BLUE)
+	# A pale glint down the right side of each arm, where the groove's far wall is lit.
+	for shape: PackedVector2Array in shapes:
+		var inner := PackedVector2Array()
+		for at in shape:
+			inner.append(at + Vector2(0.5, 0.5))
+		draw_polyline(inner, Color(Style.BOX_BLUE_LIT.r, Style.BOX_BLUE_LIT.g, Style.BOX_BLUE_LIT.b, 0.6), 1.0)
+
+
+## The mark's three arms and heads as polygons, in the box given.
+func _recycle_shapes(box: Rect2) -> Array:
+	var middle := box.position + box.size * 0.5
+	var reach := box.size.x * 0.40
 	var thick := maxf(box.size.x * 0.16, 2.0)
+	var out: Array = []
 	for i in 3:
 		var a := -PI * 0.5 + TAU * float(i) / 3.0
 		var b := a + TAU / 3.0 - 0.55
-		# The arm: a short arc from a to b, as a strip.
 		var strip := PackedVector2Array()
 		var steps := 6
 		for k in steps + 1:
@@ -667,22 +697,17 @@ func _draw_recycle_mark(box: Rect2) -> void:
 		for k in steps + 1:
 			var t := lerpf(b, a, float(k) / float(steps))
 			strip.append(middle + Vector2(cos(t), sin(t)) * (reach + thick * 0.5))
-		draw_colored_polygon(strip, Style.BOX_BLUE)
-		# The lit outer edge of the arm.
-		var edge := PackedVector2Array()
-		for k in steps + 1:
-			var t := lerpf(a, b, float(k) / float(steps))
-			edge.append(middle + Vector2(cos(t), sin(t)) * (reach + thick * 0.5 - 0.5))
-		draw_polyline(edge, Style.BOX_BLUE_LIT, 1.0)
-		# The head: a triangle at the arm's end, pointing on round.
+		out.append(strip)
 		var tip := middle + Vector2(cos(b), sin(b)) * reach
 		var on := Vector2(-sin(b), cos(b))
-		var out := Vector2(cos(b), sin(b))
-		draw_colored_polygon(PackedVector2Array([
+		var away := Vector2(cos(b), sin(b))
+		out.append(PackedVector2Array([
 			tip + on * thick * 1.3,
-			tip + out * thick * 1.1,
-			tip - out * thick * 1.1,
-		]), Style.BOX_BLUE_LIT)
+			tip + away * thick * 1.1,
+			tip - away * thick * 1.1,
+		]))
+	return out
+
 
 
 
