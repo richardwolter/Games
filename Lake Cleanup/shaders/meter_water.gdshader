@@ -47,5 +47,8 @@ void fragment() {
 	if (!in_track) {
 		through = 0.0;
 	}
-	COLOR = mix(murky, clean, through);
+	// The clean sheet lies over the murky one by its own alpha rather than replacing it:
+	// it is painted a row shorter top and bottom and with a rounded left end, and a
+	// straight swap showed the screen through those pixels once the seam reached them.
+	COLOR = mix(murky, clean, through * clean.a);
 }
