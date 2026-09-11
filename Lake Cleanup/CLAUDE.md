@@ -133,8 +133,10 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   (`_zoom_level`, `_near_level`, `_far_level`). The drawn camera is snapped to whole screen
   pixels via `Camera2D.offset` (`_snap_camera`); the logical position stays smooth. The cast
   lean-in zoom (`CAST_PUSH`) was removed for this — no level is close enough.
-  Moving objects still glide between art pixels; a low-res SubViewport would fix that but
-  needs every UI CanvasLayer pulled out of `Main` — not done.
+  Moving objects glide between art pixels, **by decision** (2026-09-11): an F4 trial drew the
+  angler, dog, boat and the rubbish's swell on the art-pixel grid, and Richard judged the game
+  much better with it off (commit `91cc581`, reverted). The low-res SubViewport would give the
+  same stepped motion, so it is not pursued either. Don't re-raise.
 - **Ground edge** (`ground.gd` `BLEND`): the mainland lawn meets the beach through a mixed
   band ~2 tiles either side of the line, each tile rolling by stable hash between rough
   grass, tufted mounds (`GRASS_BORDER`), sand-with-tufts cubes (`SAND_TUFTED`) and plain
