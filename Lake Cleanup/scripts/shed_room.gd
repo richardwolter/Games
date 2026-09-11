@@ -13,6 +13,7 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 const DogArt := preload("res://scripts/dog_art.gd")
+const ShedShelf := preload("res://scripts/shed_shelf.gd")
 
 ## The grid things are placed on, in source pixels, and how far the room is blown up.
 ##
@@ -39,6 +40,22 @@ const ROWS := 28
 ## is. A row holds one find: its picture and its name.
 const LIST_WIDTH := 210
 const ROW_HEIGHT := 56
+
+## The shelf is a board of the shop's oak, standing beside the room rather than drawn into
+## its wall. Frame thickness, chips per edge, the title plank's height and how far it
+## overhangs the frame at each end, the pad inside the face, the gap between rows, and the
+## lane the scrollbar runs down.
+##
+## The board grows *outwards* from the column the room already leaves free, so dressing it
+## costs the floor nothing. Its right edge is clamped to the panel in `_board_rect`.
+const SHELF_FRAME := 10.0
+const SHELF_CHIPS := 3
+const SHELF_RIBBON := 30.0
+const SHELF_OVERHANG := 8.0
+const SHELF_PAD := 8.0
+const SHELF_ROW_GAP := 4.0
+const SHELF_BAR := 8.0
+const SHELF_BAR_GAP := 4.0
 
 ## Gap between the room and the list, and the margin around the lot inside the panel.
 const GUTTER := 14
@@ -232,6 +249,7 @@ var _carried_from: int = -1
 var _pointer := Vector2.ZERO
 var _scroll: float = 0.0
 var _close: CloseButton
+var _shelf: ShedShelf
 
 ## The dog: whether it is in at all, where it is standing in cells, and what it is up to.
 ## See `_dog_think`.
@@ -281,6 +299,20 @@ func _ready() -> void:
 	_close.tint = Style.INK
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
+	# Under the close cross but over the room, and blind to the mouse: the shelf is drawn
+	# by a node of its own only so it can be faded as one, and every click on it is still
+	# picked up by the room, against the same rects the shelf was handed.
+	_shelf = ShedShelf.new()
+	_shelf.name = &"Shelf"
+	_shelf.frame_thick = SHELF_FRAME
+	_shelf.chips = SHELF_CHIPS
+	_shelf.row_gap = SHELF_ROW_GAP
+	_shelf.bar_wide = SHELF_BAR
+	_shelf.bar_gap = SHELF_BAR_GAP
+	_shelf.row_height = float(ROW_HEIGHT)
+	_shelf.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_shelf)
+	move_child(_shelf, 0)
 	_dog_rng.randomize()
 	_load_you()
 	# The dog only runs while the room is on screen: it is a picture of a room, and nothing
@@ -982,7 +1014,7 @@ func _drop_cell(piece: StringName, view: int = 0) -> Vector2i:
 
 func _scroll_by(amount: float) -> void:
 	var rows := in_store().size()
-	var span := maxf(float(rows * ROW_HEIGHT) - (size.y - 96.0), 0.0)
+	var span := maxf(float(rows * ROW_HEIGHT) - _list_rect().size.y, 0.0)
 	_scroll = clampf(_scroll + amount, 0.0, span)
 	queue_redraw()
 
@@ -1104,10 +1136,42 @@ func _floor_rect() -> Rect2:
 ## things at the same height read as one row, and the list no longer starts above the room
 ## and ends below it.
 func _list_rect() -> Rect2:
+	var board := _board_rect()
+	var face := board.grow(-SHELF_FRAME)
+	var rows := Rect2(
+		face.position + Vector2(SHELF_PAD, SHELF_PAD),
+		face.size - Vector2(SHELF_PAD * 2.0 + SHELF_BAR + SHELF_BAR_GAP, SHELF_PAD * 2.0)
+	)
+	# The scrollbar's lane is taken whether or not there is anything to scroll, so a row
+	# does not change width the moment the shelf fills up.
+	return Rect2(rows.position, Vector2(maxf(rows.size.x, 1.0), maxf(rows.size.y, 1.0)))
+
+
+## The shelf board itself: the column the room leaves free, grown outwards by the frame.
+##
+## Growing outwards rather than inwards is the whole point — the floor and the room rect are
+## sized off `LIST_WIDTH` alone, so the wood costs them nothing. The gutter absorbs the left
+## side; the right is clamped to the panel in case the panel is only just wide enough, and
+## the rows follow the clamp because `_list_rect` is derived from this.
+func _board_rect() -> Rect2:
 	var floor_box := _floor_rect()
-	return Rect2(
+	var column := Rect2(
 		Vector2(floor_box.end.x + GUTTER, floor_box.position.y),
 		Vector2(float(LIST_WIDTH), floor_box.size.y)
+	)
+	var board := column.grow(SHELF_FRAME)
+	var over := board.end.x - (size.x - 2.0)
+	if over > 0.0:
+		board.size.x = maxf(board.size.x - over, SHELF_FRAME * 2.0 + 8.0)
+	return board
+
+
+## The title plank, straddling the top edge of the frame and hanging over each end.
+func _ribbon_rect() -> Rect2:
+	var board := _board_rect()
+	return Rect2(
+		Vector2(board.position.x - SHELF_OVERHANG, board.position.y - SHELF_RIBBON * 0.5),
+		Vector2(board.size.x + SHELF_OVERHANG * 2.0, SHELF_RIBBON)
 	)
 
 
@@ -1237,7 +1301,6 @@ func _draw() -> void:
 	if sheets == null:
 		return
 	_place_close()
-	var ink := Color(0.11, 0.09, 0.1)
 
 	var floor_box := _floor_rect()
 
@@ -1329,7 +1392,7 @@ func _draw() -> void:
 		_draw_you(floor_box)
 
 	_draw_prompt(floor_box)
-	_draw_list(ink)
+	_dress_shelf()
 
 	# The piece in hand, under the cursor, tinted by whether it can go where it is.
 	if not carrying.is_empty():
@@ -1357,70 +1420,42 @@ func _draw() -> void:
 			)
 
 
-## The store down the right: everything found and not yet standing anywhere.
-func _draw_list(ink: Color) -> void:
-	var list := _list_rect()
+## Hand the shelf what it should paint.
+##
+## Measured here, in the room, so the rows the player sees are the rows `_listed_at` tests
+## against — one measurement, used twice, instead of two that can drift apart.
+func _dress_shelf() -> void:
+	if _shelf == null:
+		return
+	var store := in_store()
 	# Faded back while something is being carried, so the floor under it can be seen and
 	# aimed at. It is still there to drop onto; it is just no longer in front.
-	var lit := LIST_BUSY if not carrying.is_empty() else 1.0
-	draw_rect(list.grow(8.0), Style.scrim(Style.SCRIM * lit))
-	draw_rect(list.grow(8.0), Color(ink.r, ink.g, ink.b, ink.a * lit), false, 1.5)
+	_shelf.modulate.a = LIST_BUSY if not carrying.is_empty() else 1.0
+	_shelf.board = _board_rect()
+	_shelf.ribbon = _ribbon_rect()
+	_shelf.list = _list_rect()
+	_shelf.title = "Shed Decoration" if store.is_empty() else "Shed Decoration  (%d)" % store.size()
+	_shelf.atlas = sheets.atlas
+	_shelf.scroll = _scroll
+	_shelf.hovered = -1 if not carrying.is_empty() else _hovered_row()
+	var rows: Array[Dictionary] = []
+	for piece in store:
+		rows.append({
+			"region": sheets.alt_region_of(StringName(piece)),
+			"title": title_of(piece),
+		})
+	_shelf.rows = rows
+	_shelf.queue_redraw()
 
-	var store := in_store()
-	Style.write(
-		self,
-		"Shed inventory  (%d)" % store.size(),
-		Style.TEXT_SMALL,
-		list.position + Vector2(4.0, -10.0),
-		Style.INK,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		Rect2(),
-		lit
-	)
-	if store.is_empty():
-		Style.write(
-			self,
-			"Nothing kept yet.",
-			Style.TEXT_SMALL,
-			list.position + Vector2(8.0, 28.0),
-			Style.INK_DIM,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			Rect2(),
-			lit
-		)
-		return
 
-	for i in store.size():
-		var top := list.position.y + float(i * ROW_HEIGHT) - _scroll
-		# Whole rows only. A row that starts inside the column and ends outside it used to be
-		# drawn in full, so the last one hung below the panel with its name in mid-air.
-		if top < list.position.y or top + float(ROW_HEIGHT) > list.end.y:
-			continue
-		var box := Rect2(list.position.x, top, list.size.x, float(ROW_HEIGHT) - 4.0)
-		draw_rect(box, Color(Style.WOOD_LIT.r, Style.WOOD_LIT.g, Style.WOOD_LIT.b, 0.10 * lit))
-		var region := sheets.alt_region_of(StringName(store[i]))
-		# Fitted into the row rather than drawn at its own size: a wardrobe and a mug both
-		# have to read as one line of a list.
-		var fit := minf(
-			(float(ROW_HEIGHT) - 12.0) / maxf(region.size.x, region.size.y), _zoom()
-		)
-		draw_texture_rect_region(
-			sheets.atlas,
-			Rect2(box.position + Vector2(8.0, 6.0), region.size * fit), region,
-			Color(1.0, 1.0, 1.0, lit)
-		)
-		var title := title_of(store[i])
-		if not title.is_empty():
-			Style.write(
-				self,
-				title,
-				Style.TEXT_SMALL,
-				box.position + Vector2(64.0, 30.0),
-				Style.INK,
-				HORIZONTAL_ALIGNMENT_LEFT,
-				Rect2(),
-				lit
-			)
+## Which shelf row the pointer is over, or -1. The same arithmetic `_listed_at` picks with,
+## so the row that lights up is the row that gets picked up.
+func _hovered_row() -> int:
+	var list := _list_rect()
+	if not list.has_point(_pointer):
+		return -1
+	var index := int((_pointer.y - list.position.y + _scroll) / float(ROW_HEIGHT))
+	return index if index >= 0 and index < in_store().size() else -1
 
 
 ## The light a switched-on piece spills onto the room.

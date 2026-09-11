@@ -328,6 +328,32 @@ an invisible wall in the water — it covers what is behind it and eats clicks. 
 object, anything within `GLUE = 4` px joins it, the rest is a stray. A size threshold is
 the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 
+### The Shed's Shelf (`scripts/shed_shelf.gd`, 2026-09-11)
+The inventory column down the right of the shed is a drawn oak board, the same furniture as
+the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over
+the top edge reading "Shed Decoration" with the count, and one clipped `Style.plate` per
+find (clean sprite fitted left, name in `BOARD_INK`, `HOVER_WASH` under the pointer). The
+old scrim rectangle and its 1.5 px ink outline are gone.
+- **The board grows outwards**: `_board_rect` is the column `LIST_WIDTH`/`GUTTER` already
+  reserved, grown by `SHELF_FRAME`, clamped to the panel's right edge. `_room_rect` and
+  `_floor_rect` still size off `LIST_WIDTH` alone, so the wood costs the floor nothing.
+  `_list_rect` (the rows) is derived *from* the board, so a clamp moves rows and hit-testing
+  together.
+- **It is its own Control** only so `modulate.a` can fade the whole thing to `LIST_BUSY`
+  while a piece is carried. Threading an alpha through `Style.plank`/`grain`/`highlight`/
+  `chip` would put an extra argument on every shared drawing helper in the game. The shelf
+  holds no state: `ShedRoom._dress_shelf` hands it rects and rows each draw, measured once
+  and reused by `_listed_at`/`_hovered_row`, so drawn rows and clicked rows cannot drift.
+  It ignores the mouse; the room still takes every click.
+- **Overflow**: wheel scroll as before (`_scroll_by`, now against `_list_rect().size.y`, not
+  a guessed `size.y - 96`), whole rows only, plus a drawn track and plate thumb down the
+  face's right edge. A reading, not a handle — the lane is reserved whether or not anything
+  scrolls, so rows never change width.
+- Long names are cut with an ellipsis (`_draw_name`): `Style.write` has no clip box, and a
+  title running off the wood reads as a bug rather than as a long name.
+- **The frame and the title plank live in `style.gd`** (`Style.board_frame`,
+  `Style.board_ribbon`); `shop_skin.gd` now calls them. One wood, one place.
+
 ### Shed Verbs (`scripts/shed_room.gd`)
 - **R** cycles the piece **in hand** — `ROTATE` views and `VARIANT` styles both. Only while
   carrying: a placed piece is turned by picking it up again, so one gesture means one thing.

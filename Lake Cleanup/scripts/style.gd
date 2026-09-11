@@ -531,6 +531,83 @@ static func chip(on: CanvasItem, box: Rect2) -> void:
 	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_GLOW, true)
 
 
+## The oak frame round a drawn board, as the meter's is painted: a dark seam, the plank,
+## a lit top and left edge, a shaded bottom and right, grain along each side, and chips out
+## of the outer edge. `thick` is how wide the wood is; `chips` how many bites per edge.
+##
+## Lives here rather than in the shop, because the shop's boards, the settings board and the
+## shed's shelf are one piece of furniture drawn three times. Two copies would drift into
+## two woods the first time either was retuned.
+static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) -> void:
+	on.draw_rect(box.grow(1.0), SEAM, true)
+	on.draw_rect(box, FRAME, true)
+	# Lit from the upper left, as the meter is: the bottom plank is the redder low tone,
+	# the top and left planks carry a broken highlight along their outer edge.
+	on.draw_rect(
+		Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)),
+		FRAME_LOW, true
+	)
+	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
+	grain(on, Rect2(box.position, Vector2(box.size.x, thick)), true, seed)
+	grain(on, Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)), true, seed + 1)
+	grain(on, Rect2(box.position, Vector2(thick, box.size.y)), false, seed + 2)
+	grain(on, Rect2(Vector2(box.end.x - thick, box.position.y), Vector2(thick, box.size.y)), false, seed + 3)
+	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4)
+	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5)
+	on.draw_rect(
+		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_DEEP, true
+	)
+	on.draw_rect(
+		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)), FRAME_DEEP, true
+	)
+	# The inset shadow where the wood meets the board face: two deep along the top and
+	# left, where the frame shades the face, one along the bottom and right.
+	var face := box.grow(-thick)
+	on.draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(face.size.x + 4.0, 2.0)), FRAME_SHADOW, true)
+	on.draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(2.0, face.size.y + 4.0)), FRAME_SHADOW, true)
+	on.draw_rect(Rect2(Vector2(face.position.x - 2.0, face.end.y + 1.0), Vector2(face.size.x + 4.0, 1.0)), FRAME_SHADOW, true)
+	on.draw_rect(Rect2(Vector2(face.end.x + 1.0, face.position.y - 2.0), Vector2(1.0, face.size.y + 4.0)), FRAME_SHADOW, true)
+	# Chips: small bites out of the outer edge, dark where the wood is gone.
+	for i in chips:
+		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
+		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
+		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
+		var y := box.position.y + box.size.y * along
+		var x := box.position.x + box.size.x * (1.0 - along)
+		chip(on, Rect2(box.position.x - 1.0, y, deep, wide))
+		chip(on, Rect2(box.end.x + 1.0 - deep, y - wide * 0.4, deep, wide))
+		if i % 2 == 0:
+			chip(on, Rect2(x, box.position.y - 1.0, wide, deep))
+			chip(on, Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+
+
+## The title plank a board wears over its top edge. A plank of the same oak as the frame,
+## lit the same way, with chips out of its edges. Cloth was tried — a bowed three-tone band,
+## then one with tails — and read as a sticker.
+static func board_ribbon(
+	on: CanvasItem, box: Rect2, title: String, chips: int, size_px: int = TEXT_HEAD
+) -> void:
+	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
+	plank(on, box, seed)
+	# Chips out of the top and bottom edges and one out of each end.
+	for i in chips:
+		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
+		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
+		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
+		var x := box.position.x + box.size.x * along
+		chip(on, Rect2(x, box.position.y - 1.0, wide, deep))
+		chip(on, Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+	var y := box.position.y + box.size.y * 0.4
+	chip(on, Rect2(box.position.x - 1.0, y, 4.0, 8.0))
+	chip(on, Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
+
+	write(
+		on, title, size_px,
+		Vector2(0.0, box.position.y + (box.size.y + float(size_px) * 0.62) * 0.5),
+		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, box
+	)
+
+
 ## One step cut off each corner of a plate: the pixel-art round corner.
 const CLIP := 3.0
 

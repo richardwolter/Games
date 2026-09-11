@@ -407,76 +407,14 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		_draw_row(row, line, _hovered == i)
 
 
-## The oak frame, as the meter's is drawn: a dark seam, the plank, a lit top and left
-## edge, a shaded bottom and right, grain along each side, and chips out of the outer edge.
+## The board's oak frame and its title plank. Both are drawn by `Style`, so the shop's
+## boards, the settings board and the shed's shelf cannot become three woods.
 func _draw_frame(box: Rect2) -> void:
-	draw_rect(box.grow(1.0), Style.SEAM, true)
-	draw_rect(box, Style.FRAME, true)
-	# Lit from the upper left, as the meter is: the bottom plank is the redder low tone,
-	# the top and left planks carry a broken highlight along their outer edge.
-	draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)),
-		Style.FRAME_LOW, true
-	)
-	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
-	Style.grain(self, Rect2(box.position, Vector2(box.size.x, FRAME)), true, seed)
-	Style.grain(self, Rect2(Vector2(box.position.x, box.end.y - FRAME), Vector2(box.size.x, FRAME)), true, seed + 1)
-	Style.grain(self, Rect2(box.position, Vector2(FRAME, box.size.y)), false, seed + 2)
-	Style.grain(self, Rect2(Vector2(box.end.x - FRAME, box.position.y), Vector2(FRAME, box.size.y)), false, seed + 3)
-	Style.highlight(self, box.position, Vector2(box.size.x, 0.0), seed + 4)
-	Style.highlight(self, box.position, Vector2(0.0, box.size.y), seed + 5)
-	draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)),
-		Style.FRAME_DEEP, true
-	)
-	draw_rect(
-		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)),
-		Style.FRAME_DEEP, true
-	)
-	# The inset shadow where the wood meets the board face: two deep along the top and
-	# left, where the frame shades the face, one along the bottom and right.
-	var face := box.grow(-FRAME)
-	draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(face.size.x + 4.0, 2.0)), Style.FRAME_SHADOW, true)
-	draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(2.0, face.size.y + 4.0)), Style.FRAME_SHADOW, true)
-	draw_rect(Rect2(Vector2(face.position.x - 2.0, face.end.y + 1.0), Vector2(face.size.x + 4.0, 1.0)), Style.FRAME_SHADOW, true)
-	draw_rect(Rect2(Vector2(face.end.x + 1.0, face.position.y - 2.0), Vector2(1.0, face.size.y + 4.0)), Style.FRAME_SHADOW, true)
-	# Chips: small bites out of the outer edge, dark where the wood is gone.
-	for i in CHIPS:
-		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)
-		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
-		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
-		var y := box.position.y + box.size.y * along
-		var x := box.position.x + box.size.x * (1.0 - along)
-		Style.chip(self, Rect2(box.position.x - 1.0, y, deep, wide))
-		Style.chip(self, Rect2(box.end.x + 1.0 - deep, y - wide * 0.4, deep, wide))
-		if i % 2 == 0:
-			Style.chip(self, Rect2(x, box.position.y - 1.0, wide, deep))
-			Style.chip(self, Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+	Style.board_frame(self, box, FRAME, CHIPS)
 
 
 func _draw_ribbon(box: Rect2, title: String) -> void:
-	# A plank of the same oak as the frame, over the top edge of it, lit the same way, with
-	# chips out of its edges. Cloth was tried — a bowed three-tone band, then one with
-	# tails — and read as a sticker.
-	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
-	Style.plank(self, box, seed)
-	# Chips out of the top and bottom edges and one out of each end.
-	for i in CHIPS:
-		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)
-		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
-		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
-		var x := box.position.x + box.size.x * along
-		Style.chip(self, Rect2(x, box.position.y - 1.0, wide, deep))
-		Style.chip(self, Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
-	var y := box.position.y + box.size.y * 0.4
-	Style.chip(self, Rect2(box.position.x - 1.0, y, 4.0, 8.0))
-	Style.chip(self, Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
-
-	Style.write(
-		self, title, Style.TEXT_HEAD,
-		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_HEAD) * 0.62) * 0.5),
-		Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, box
-	)
+	Style.board_ribbon(self, box, title, CHIPS)
 
 
 func _draw_sprite(board: StringName, slot: Rect2) -> void:
