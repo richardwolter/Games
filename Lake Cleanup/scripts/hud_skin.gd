@@ -42,12 +42,12 @@ const SHINE_LIFT := 0.55
 ## The meter's art: the four sheets, all the same size and aligned, and where inside them the
 ## frame and the water's track fall (measured off the sheets' alpha). Drawn at a whole-number
 ## scale — it is pixel art, and a fractional scale smears it — picked so that the meter is
-## about twice its art on a 1080-line window: `METER_SCALE_PER` window lines per step.
+## three times its art on a 1080-line window: `METER_SCALE_PER` window lines per step.
 const METER_ART := "res://assets/ui/meter/"
 const METER_SHEET := Vector2(290.0, 94.0)
 const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
 const METER_TRACK := Rect2(91.0, 37.0, 170.0, 26.0)
-const METER_SCALE_PER := 540.0
+const METER_SCALE_PER := 360.0
 
 ## How wide the filth-to-clean blend is, as a fraction of the track. Narrowed near the ends
 ## (see `_show_meter`) so a nearly-clean lake keeps its last sliver of filth and a full one
