@@ -511,19 +511,9 @@ var _sparkle_at: float = 0.0
 @onready var _room: ShedRoom = %Room
 @onready var _open_shed: Button = %OpenShed
 @onready var _open_upgrades: UiButton = %OpenUpgrades
-@onready var _settings: PanelContainer = %Settings
+@onready var _settings: SettingsSkin = %Settings
 @onready var _open_settings: Button = %OpenSettings
-@onready var _fullscreen: CheckButton = %Fullscreen
 @onready var _music: AudioStreamPlayer = %Music
-@onready var _music_on: CheckButton = %MusicOn
-@onready var _music_level: HSlider = %MusicLevel
-@onready var _sfx_on: CheckButton = %SfxOn
-@onready var _sfx_level: HSlider = %SfxLevel
-@onready var _quit_game: Button = %QuitGame
-@onready var _save_now: Button = %SaveNow
-@onready var _load_now: Button = %LoadNow
-@onready var _wipe_save: Button = %WipeSave
-@onready var _swap_level: Button = %SwapLevel
 @onready var _send_now: Button = %SendNow
 @onready var _auto_ferry: CheckButton = %AutoFerry
 
@@ -851,29 +841,29 @@ func _ready() -> void:
 	# nobody can see or press.
 	_settings.get_parent().move_child(_settings, -1)
 	_settings.get_parent().move_child(_open_settings, -1)
-	_fullscreen.toggled.connect(_set_fullscreen)
-	_music_on.toggled.connect(_set_music)
-	_music_level.value_changed.connect(_set_music_level)
-	_sfx_on.toggled.connect(_set_sfx)
-	_sfx_level.value_changed.connect(_set_sfx_level)
+	_settings.fullscreen_toggled.connect(_set_fullscreen)
+	_settings.music_toggled.connect(_set_music)
+	_settings.music_level_changed.connect(_set_music_level)
+	_settings.sfx_toggled.connect(_set_sfx)
+	_settings.sfx_level_changed.connect(_set_sfx_level)
 	_push_sfx()
-	_quit_game.pressed.connect(_quit)
-	_save_now.pressed.connect(save_game)
-	_load_now.pressed.connect(load_game)
-	_wipe_save.pressed.connect(wipe_save)
-	_swap_level.text = _other_level_name()
-	_swap_level.pressed.connect(_swap_levels)
+	_settings.quit_pressed.connect(_quit)
+	_settings.save_pressed.connect(save_game)
+	_settings.load_pressed.connect(load_game)
+	_settings.wipe_pressed.connect(wipe_save)
+	_settings.swap_label = _other_level_name()
+	_settings.swap_pressed.connect(_swap_levels)
+	_settings.close_asked.connect(_set_settings.bind(false))
 	_send_now.pressed.connect(_send_ferry)
 	_auto_ferry.toggled.connect(_set_auto_ferry)
 	_close_menu.pressed.connect(_set_menu.bind(false))
 	_shop_skin.close_asked.connect(_set_menu.bind(false))
-	_pin_close(_settings, _set_settings.bind(false))
 	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
 	# the whole screen — so its own cross sits over the top of the inventory column, where
 	# the thing it closes actually is. See ShedRoom.
 	_polish_panel_controls()
 	_set_menu(false)
-	_fullscreen.button_pressed = _is_fullscreen()
+	_settings.fullscreen = _is_fullscreen()
 	_start_music()
 	_set_settings(false)
 	_set_shed(false)
@@ -1317,10 +1307,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					_set_settings(not _settings_open)
 				return
 			KEY_F11:
-				_fullscreen.button_pressed = not _is_fullscreen()
+				_settings.fullscreen = not _is_fullscreen()
+				_set_fullscreen(_settings.fullscreen)
 				return
 			KEY_M:
-				_music_on.button_pressed = not _music_on.button_pressed
+				_settings.music_on = not _settings.music_on
+				_push_music()
 				return
 			KEY_F5:
 				save_game()
@@ -1625,7 +1617,6 @@ const _PANEL_LABELS := [
 	"HUD/Shop/Pad/Scroll/Panel/NetHeading",
 	"HUD/Shop/Pad/Scroll/Panel/BoatHeading",
 	"HUD/Shop/Pad/Scroll/Panel/DecorHeading",
-	"HUD/Settings/Pad/Lines/Title",
 	"HUD/Shed/Pad/Lines/Title",
 	"HUD/Shed/Pad/Lines/Note",
 ]
@@ -1633,17 +1624,12 @@ const _PANEL_LABELS := [
 ## The two buttons that undo something. They used to be marked out three ways at once — a
 ## taller box, a bigger face, a colour of their own — which is two ways more than a warning
 ## needs. The colour is the one that stays.
-const _PANEL_WARNINGS := ["%WipeSave", "%QuitGame"]
+const _PANEL_WARNINGS: Array[String] = []
 
 
 func _polish_panel_controls() -> void:
 	var font := Style.font()
-	# Settings only. The shed has no panel behind it any more — it is the room, drawn edge
-	# to edge, and a plank frame round a room is a frame round a picture of planks.
-	_settings.add_theme_stylebox_override(
-		"panel", WoodUI.panel_style(6, WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 1)
-	)
-	_settings.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# Not the settings any more: it is a drawn board now (SettingsSkin), like the shop.
 	var normal := WoodUI.panel_style(4, WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 2)
 	var hover := WoodUI.panel_style(
 		4, WoodUI.PLANK_LIGHT, WoodUI.PLANK_LIGHT.lightened(0.2), WoodUI.PLANK, 2
@@ -1651,8 +1637,6 @@ func _polish_panel_controls() -> void:
 	var pressed := WoodUI.panel_style(4, WoodUI.PLANK_DARK, WoodUI.PLANK, WoodUI.SEAM, 2)
 	var nodes: Array[Control] = [_open_settings]
 	for path in [
-		"%MusicOn", "%SfxOn", "%Fullscreen", "%SaveNow", "%LoadNow", "%WipeSave",
-		"%SwapLevel", "%QuitGame",
 		"%BuyNetWidth", "%BuyNetStrength", "%BuyNetRange", "%BuyReel", "%BuyNetHold",
 		"%BuyBoatSpeed", "%BuyCargo", "%BuySkimmer", "%BuyFleet",
 		"%OpenShed", "%SendNow", "%AutoFerry", "%CloseMenu",
@@ -1693,20 +1677,6 @@ func _polish_panel_controls() -> void:
 		if node is CheckButton:
 			node.add_theme_icon_override("on", WoodUI.switch_icon(true))
 			node.add_theme_icon_override("off", WoodUI.switch_icon(false))
-	for path in ["%MusicLevel", "%SfxLevel"]:
-		var slider := get_node_or_null(path) as HSlider
-		if slider == null:
-			continue
-		slider.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		slider.add_theme_stylebox_override("slider", WoodUI.slider_groove())
-		slider.add_theme_stylebox_override("grabber_area", WoodUI.slider_fill())
-		slider.add_theme_stylebox_override("grabber_area_highlight", WoodUI.slider_fill())
-		var thumb := WoodUI.slider_thumb()
-		slider.add_theme_icon_override("grabber", thumb)
-		slider.add_theme_icon_override("grabber_highlight", thumb)
-		slider.add_theme_icon_override("grabber_disabled", thumb)
-
-
 ## When to start asking whether the lake is finished, as a fraction of the filth it was
 ## built with, and how often to ask once it is that close.
 ##
@@ -1896,8 +1866,8 @@ func _push_music() -> void:
 ## The level both players are working from: what the two controls in the settings say.
 func _music_db() -> float:
 	return (
-		lerpf(MUSIC_SILENT, MUSIC_LOUDEST, clampf(_music_level.value, 0.0, 1.0))
-		if _music_on.button_pressed else MUSIC_SILENT
+		lerpf(MUSIC_SILENT, MUSIC_LOUDEST, _settings.music_level)
+		if _settings.music_on else MUSIC_SILENT
 	)
 
 
@@ -1917,7 +1887,7 @@ func _fade_radio(delta: float) -> void:
 ## a player who wants the lake quiet and the radio on is not confused, they are working.
 func _push_sfx() -> void:
 	if _sfx != null:
-		_sfx.set_level(clampf(_sfx_level.value, 0.0, 1.0), _sfx_on.button_pressed)
+		_sfx.set_level(_settings.sfx_level, _settings.sfx_on)
 
 
 func _set_sfx(_on: bool) -> void:
@@ -1926,8 +1896,8 @@ func _set_sfx(_on: bool) -> void:
 
 func _set_sfx_level(_level: float) -> void:
 	# Dragging the slider up is a request to hear it, the same as the music's.
-	if not _sfx_on.button_pressed:
-		_sfx_on.button_pressed = true
+	if not _settings.sfx_on:
+		_settings.sfx_on = true
 	_push_sfx()
 
 
@@ -1936,8 +1906,8 @@ func _set_music(_on: bool) -> void:
 
 
 func _set_music_level(_level: float) -> void:
-	if not _music_on.button_pressed:
-		_music_on.button_pressed = true
+	if not _settings.music_on:
+		_settings.music_on = true
 	_push_music()
 
 
@@ -2778,7 +2748,7 @@ func _update_hud() -> void:
 	# player is inside.
 	_open_upgrades.note = "%d available" % affordable
 	_skin.hint = _last_pieces_line()
-	_load_now.disabled = not has_save()
+	_settings.can_load = has_save()
 
 	if not _menu_open:
 		return
@@ -2922,11 +2892,11 @@ func save_game() -> bool:
 		"runs_done": _runs_done(),
 		"auto_ferry": _auto_ferry.button_pressed,
 		"fullscreen": _is_fullscreen(),
-		"music": _music_on.button_pressed,
-		"music_level": _music_level.value,
+		"music": _settings.music_on,
+		"music_level": _settings.music_level,
 		"farewell": _farewell_shown,
-		"sfx": _sfx_on.button_pressed,
-		"sfx_level": _sfx_level.value,
+		"sfx": _settings.sfx_on,
+		"sfx_level": _settings.sfx_level,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -3027,9 +2997,10 @@ func load_game() -> bool:
 	for piece: int in PackedInt32Array(save.get("afloat", PackedInt32Array())):
 		_yard.put(piece)
 
-	_fullscreen.button_pressed = bool(save.get("fullscreen", _is_fullscreen()))
-	_music_level.value = clampf(float(save.get("music_level", _music_level.value)), 0.0, 1.0)
-	_music_on.button_pressed = bool(save.get("music", true))
+	_settings.fullscreen = bool(save.get("fullscreen", _is_fullscreen()))
+	_set_fullscreen(_settings.fullscreen)
+	_settings.music_level = clampf(float(save.get("music_level", _settings.music_level)), 0.0, 1.0)
+	_settings.music_on = bool(save.get("music", true))
 	_push_music()
 	# A lake that was finished before the game was closed is finished when it comes back,
 	# and lit that way from the first frame rather than brightening as if it had just
@@ -3049,8 +3020,8 @@ func load_game() -> bool:
 	# finished lake is worked out again from the field a frame later, and says so again.
 	_cleaned = false
 	_sparkle_at = 1.0 if empty else 0.0
-	_sfx_level.value = clampf(float(save.get("sfx_level", _sfx_level.value)), 0.0, 1.0)
-	_sfx_on.button_pressed = bool(save.get("sfx", true))
+	_settings.sfx_level = clampf(float(save.get("sfx_level", _settings.sfx_level)), 0.0, 1.0)
+	_settings.sfx_on = bool(save.get("sfx", true))
 	_push_sfx()
 	if _room != null:
 		_room.unlocked = unlocked

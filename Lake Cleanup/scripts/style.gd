@@ -75,6 +75,10 @@ const BOARD_ROW := Color(0.25, 0.41, 0.47)
 const BOARD_ROW_OFF := Color(0.22, 0.35, 0.25)
 const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
+## The clean end of the meter's water, for the one thing on a board that is "on": a
+## switch's track and the played part of a slider.
+const TAG_WATER := Color(0.31, 0.60, 0.75)
+
 ## The price on its tag is the money plate's own figure colour, so a cost and a purse read
 ## as the same substance.
 const PRICE_INK := Color(0.985, 0.87, 0.58)
@@ -502,4 +506,43 @@ static func chip(on: CanvasItem, box: Rect2) -> void:
 	on.draw_rect(box.grow(1.0), FRAME_DEEP, true)
 	on.draw_rect(box, FRAME_SHADOW, true)
 	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_GLOW, true)
+
+
+## One step cut off each corner of a plate: the pixel-art round corner.
+const CLIP := 3.0
+
+
+## A plate in a colour of its own, its corners clipped a step: a seam, the face, a lit edge
+## top and left, a shaded one bottom and right. `plaque` bevels in wood and stays square;
+## these are the boards' buttons and read better softened.
+static func plate(on: CanvasItem, box: Rect2, face: Color, c: float = CLIP) -> void:
+	var bevel := bevel_of(box)
+	on.draw_colored_polygon(clipped(box.grow(1.0), c), SEAM)
+	on.draw_colored_polygon(clipped(box, c), face)
+	var lit := face.lightened(0.22)
+	var deep := face.darkened(0.28)
+	on.draw_rect(Rect2(box.position + Vector2(c, 0.0), Vector2(box.size.x - c * 2.0, bevel)), lit, true)
+	on.draw_rect(Rect2(box.position + Vector2(0.0, c), Vector2(bevel, box.size.y - c * 2.0)), lit, true)
+	on.draw_rect(
+		Rect2(Vector2(box.position.x + c, box.end.y - bevel), Vector2(box.size.x - c * 2.0, bevel)),
+		deep, true
+	)
+	on.draw_rect(
+		Rect2(Vector2(box.end.x - bevel, box.position.y + c), Vector2(bevel, box.size.y - c * 2.0)),
+		deep, true
+	)
+
+
+## A rectangle with one step cut off each corner.
+static func clipped(box: Rect2, c: float) -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(box.position.x + c, box.position.y),
+		Vector2(box.end.x - c, box.position.y),
+		Vector2(box.end.x, box.position.y + c),
+		Vector2(box.end.x, box.end.y - c),
+		Vector2(box.end.x - c, box.end.y),
+		Vector2(box.position.x + c, box.end.y),
+		Vector2(box.position.x, box.end.y - c),
+		Vector2(box.position.x, box.position.y + c),
+	])
 

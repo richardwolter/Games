@@ -82,32 +82,34 @@ func _physics_process(_delta: float) -> void:
 		4:
 			_stage_yard_cap()
 		5:
-			_stage_draw_batch()
+			_stage_net_ring()
 		6:
-			_stage_dropoffs()
+			_stage_draw_batch()
 		7:
-			_stage_ferry()
+			_stage_dropoffs()
 		8:
-			_stage_skimmer()
+			_stage_ferry()
 		9:
-			_stage_fleet()
+			_stage_skimmer()
 		10:
-			_stage_one_gesture()
+			_stage_fleet()
 		11:
-			_stage_save()
+			_stage_one_gesture()
 		12:
-			_stage_settings()
+			_stage_save()
 		13:
-			_stage_ferry_art()
+			_stage_settings()
 		14:
-			_stage_art()
+			_stage_ferry_art()
 		15:
-			_stage_shed()
+			_stage_art()
 		16:
-			_stage_pigeons()
+			_stage_shed()
 		17:
-			_stage_ending()
+			_stage_pigeons()
 		18:
+			_stage_ending()
+		19:
 			_stage_ending_on_load()
 		_:
 			pass
@@ -439,6 +441,66 @@ func _stage_yard_cap() -> void:
 	_net.state = CastNet.State.IDLE
 	_net.catch.resize(0)
 	_yard.held.resize(piled)
+	_advance()
+
+
+## The ring tells the truth: a piece is caught when its drawing touches the mouth, wherever
+## its tile is, and not when it does not; the haul catches at the size the net is drawn; and
+## the catch starts the frame the net lands.
+func _stage_net_ring() -> void:
+	var was_radius := _net.radius
+	var was_power := _net.power
+	var was_hold := _net.hold
+	_net.state = CastNet.State.IDLE
+	_net.catch.resize(0)
+	_net.radius = 0.6
+	_net.power = 99
+	_net.hold = 99
+	var mouth := _net.open_extent()
+
+	# The widest top piece on the lake, so its drawing stands well off its own tile.
+	var index := -1
+	var widest := 0.0
+	for cell in _grid.tile_count():
+		if _grid.reachable_slot(cell, 1, 99) < 0:
+			continue
+		var wide := _grid.footprint(cell).x
+		if wide > widest:
+			widest = wide
+			index = cell
+	_check(index >= 0, "there is a piece to aim past", "")
+	if index >= 0:
+		var centre := _grid.surface_pos(index)
+		var half := _grid.footprint(index)
+		var grazing := centre + Vector2(mouth + half.x * 0.8, 0.0)
+		var reach: Array = _net.call(&"_reach", grazing, mouth, _net.power)
+		_check(reach.has(index) and centre.distance_to(grazing) > mouth,
+			"a ring grazing a piece's drawing catches it, middle outside the ring or not",
+			"mouth %.1f px, piece half %.1f px" % [mouth, half.x])
+		var clear := centre + Vector2(mouth + half.x * 1.3, 0.0)
+		reach = _net.call(&"_reach", clear, mouth, _net.power)
+		_check(not reach.has(index), "a ring short of the drawing does not", "")
+
+	# Brought home, the catch shrinks with the drawing.
+	_net.near = 1.0
+	_check(is_equal_approx(_net.mouth_extent() * 2.0, float(_net.call(&"_draw_span"))),
+		"the hauled net catches at the size it is drawn", "")
+	_net.near = 0.0
+
+	var where := _water_near_angler()
+	_check(_net.cast_to(where), "a cast at something liftable is thrown", "")
+	_net.tile_pos = _net.target
+	_net.call(&"_process", 0.0)
+	_check(_net.state == CastNet.State.REELING and not _net.catch.is_empty(),
+		"the net catches the moment it lands", "%d pieces" % _net.catch.size())
+
+	_net.state = CastNet.State.IDLE
+	_net.catch.resize(0)
+	_net.tile_pos = _angler.tile_pos
+	_angler.end_cast()
+	_net.radius = was_radius
+	_net.power = was_power
+	_net.hold = was_hold
 	_advance()
 
 
@@ -856,7 +918,9 @@ func _stage_settings() -> void:
 	var shop := _main.get_node(^"HUD/ShopSkin") as Control
 	_check(not settings.visible, "the settings panel starts closed", "")
 	var shop_panel := _main.get_node(^"HUD/Shop") as Control
-	_check(settings.find_child("SaveNow", true, false) != null
+	# The settings are a drawn board (SettingsSkin) now, not a panel of buttons: the save
+	# is a signal off it, and there is no SaveNow button anywhere in the shop.
+	_check(settings.has_signal(&"save_pressed")
 		and shop_panel.find_child("SaveNow", true, false) == null,
 		"the logbook is in the settings, not in the shed", "")
 
@@ -1354,7 +1418,7 @@ func _stage_pigeons() -> void:
 	var held := _yard.held.size()
 	var caught_before := int(_main.get(&"birds_caught"))
 	_net.flock = _flock
-	_net.tile_pos = Vector2(_grid.tile_of(perch))
+	_net.tile_pos = Iso.world_to_tile(_grid.surface_pos(perch))
 	_net.radius = 1
 	# No room for rubbish, so the bird is the only thing this sweep can lift: birds are taken
 	# before the hold is checked (see CastNet._sweep). With room, the junk the bird sits on

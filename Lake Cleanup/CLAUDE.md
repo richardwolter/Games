@@ -201,6 +201,14 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   painted `assets/shop.png` / `shop.json` / `tools/slice_shop.gd` are gone. Rows carry a
   `board` key from `Lake._shop_rows`; a track added to `TRACKS` needs one.
 
+- **The settings are a drawn board too** (`settings_skin.gd`, 2026-09-11): one board in the
+  shop's wood — plank title, three plank section headings (Sound, Screen, Save), switches and
+  sliders drawn on clipped plates, the quit alone at the bottom. It owns the state
+  (`music_on`, `music_level`, `sfx_on`, `sfx_level`, `fullscreen`, `can_load`) and emits
+  signals; the lake reads and sets those, save and load included. The stock Controls and
+  their WoodUI theming are gone from the settings; WoodUI still dresses the remaining scene
+  buttons. The shared plate/plank/grain/chip drawing lives in `style.gd`.
+
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
 psd-extract left in `art_source/character_extracted/` (source `Character_Sprite_Sheet.psd`).

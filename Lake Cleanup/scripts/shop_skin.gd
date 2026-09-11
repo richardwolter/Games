@@ -78,8 +78,7 @@ const CATCH_SCALE := 2.0
 ## plays that loop while it is up. Even odds.
 const DOG_SLEEP_ODDS := 0.5
 
-## One step cut off each corner of a row and a tag — the pixel-art round corner.
-const CLIP := 3.0
+const CLIP := Style.CLIP
 const SPRITE_TALL := 68.0
 const HEAD_GAP := 8.0
 
@@ -579,7 +578,7 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
 		)
 	var ink := Style.BOARD_INK if afford else Style.BOARD_INK_DIM
-	_plate(box, face)
+	Style.plate(self, box, face)
 
 	var tag_wide := box.size.x * TAG_SHARE
 	var text_at := box.position.x + 10.0
@@ -610,43 +609,6 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 	)
 
 
-## A plate in a colour of its own, its corners clipped a step: a seam, the face, a lit edge top
-## and left, a shaded one bottom and right. `Style.plaque` bevels in wood and stays square;
-## these are the shop's buttons and read better softened.
-func _plate(box: Rect2, face: Color) -> void:
-	var bevel := Style.bevel_of(box)
-	var c := CLIP
-	draw_colored_polygon(_clipped(box.grow(1.0), c), Style.SEAM)
-	draw_colored_polygon(_clipped(box, c), face)
-	var lit := face.lightened(0.22)
-	var deep := face.darkened(0.28)
-	# The bevel strips stop short of the clipped corners, so the corner stays one clean cut.
-	draw_rect(Rect2(box.position + Vector2(c, 0.0), Vector2(box.size.x - c * 2.0, bevel)), lit, true)
-	draw_rect(Rect2(box.position + Vector2(0.0, c), Vector2(bevel, box.size.y - c * 2.0)), lit, true)
-	draw_rect(
-		Rect2(Vector2(box.position.x + c, box.end.y - bevel), Vector2(box.size.x - c * 2.0, bevel)),
-		deep, true
-	)
-	draw_rect(
-		Rect2(Vector2(box.end.x - bevel, box.position.y + c), Vector2(bevel, box.size.y - c * 2.0)),
-		deep, true
-	)
-
-
-## A rectangle with one step cut off each corner: the pixel-art round corner.
-func _clipped(box: Rect2, c: float) -> PackedVector2Array:
-	return PackedVector2Array([
-		Vector2(box.position.x + c, box.position.y),
-		Vector2(box.end.x - c, box.position.y),
-		Vector2(box.end.x, box.position.y + c),
-		Vector2(box.end.x, box.end.y - c),
-		Vector2(box.end.x - c, box.end.y),
-		Vector2(box.position.x + c, box.end.y),
-		Vector2(box.position.x, box.end.y - c),
-		Vector2(box.position.x, box.position.y + c),
-	])
-
-
 ## The price, on an oak tag shrunk onto the number in the money plate's gold, so a cost
 ## and a purse read as one substance — and a five-figure price and a two-figure one both
 ## sit in the middle of their own tag rather than one rattling around a fixed box.
@@ -663,7 +625,7 @@ func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -
 		face = Color(
 			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
 		)
-	_plate(tag, face)
+	Style.plate(self, tag, face)
 	Style.highlight(
 		self, tag.position + Vector2(CLIP, 0.0), Vector2(tag.size.x - CLIP * 2.0, 0.0),
 		int(tag.position.x)

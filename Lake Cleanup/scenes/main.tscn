@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://cs7pifqxi5oo4" path="res://scripts/perf_hud.gd" id="9_perf"]
 [ext_resource type="Script" uid="uid://bcda8vbtl133t" path="res://scripts/hud_skin.gd" id="9_skin"]
 [ext_resource type="Script" uid="uid://dr22ekyjmso6u" path="res://scripts/shop_skin.gd" id="10_shop"]
+[ext_resource type="Script" path="res://scripts/settings_skin.gd" id="11_settings"]
 [ext_resource type="Script" uid="uid://bomnr6avmr21a" path="res://scripts/ui_button.gd" id="11_uibtn"]
 [ext_resource type="Script" uid="uid://bwjm1n8cd37pb" path="res://scripts/dog.gd" id="12_dog"]
 [ext_resource type="Script" path="res://scripts/day_cycle.gd" id="13_day"]
@@ -229,107 +230,16 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Back to the water  (E)"
 
-[node name="Settings" type="PanelContainer" parent="HUD" unique_id=603249598]
-unique_name_in_owner = true
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -270.0
-offset_top = -210.0
-offset_right = 270.0
-offset_bottom = 210.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_shop")
-
-[node name="Pad" type="MarginContainer" parent="HUD/Settings" unique_id=58232507]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 16
-
-[node name="Lines" type="VBoxContainer" parent="HUD/Settings/Pad" unique_id=414264453]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="Title" type="Label" parent="HUD/Settings/Pad/Lines" unique_id=98978410]
-layout_mode = 2
-text = "Settings"
-
-[node name="MusicOn" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=1566196849]
-unique_name_in_owner = true
-layout_mode = 2
-button_pressed = true
-text = "Music  (M)"
-
-[node name="MusicLevel" type="HSlider" parent="HUD/Settings/Pad/Lines" unique_id=872247912]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 24)
-layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 0.75
-
-[node name="SfxOn" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=1675231646]
-unique_name_in_owner = true
-layout_mode = 2
-button_pressed = true
-text = "Sound effects"
-
-[node name="SfxLevel" type="HSlider" parent="HUD/Settings/Pad/Lines" unique_id=1781900292]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 24)
-layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 0.8
-
-[node name="Fullscreen" type="CheckButton" parent="HUD/Settings/Pad/Lines" unique_id=29343585]
-unique_name_in_owner = true
-layout_mode = 2
-button_pressed = true
-text = "Fullscreen  (F11)"
-
-[node name="SaveNow" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=630510786]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Save the run  (F5)"
-
-[node name="LoadNow" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=7533017]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Load the last save  (F9)"
-
-[node name="WipeSave" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=1209604824]
+[node name="Settings" type="Control" parent="HUD"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Start the lake over  (F6)"
-
-[node name="SwapLevel" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=884213377]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Go to the siege"
-
-[node name="Spacer" type="Control" parent="HUD/Settings/Pad/Lines" unique_id=729344977]
-layout_mode = 2
-size_flags_vertical = 3
-mouse_filter = 2
-
-[node name="QuitGame" type="Button" parent="HUD/Settings/Pad/Lines" unique_id=1506550388]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Save and quit"
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("11_settings")
 
 [node name="Shed" type="PanelContainer" parent="HUD" unique_id=1665550222]
 unique_name_in_owner = true
