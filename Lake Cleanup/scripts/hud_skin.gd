@@ -40,14 +40,16 @@ const SHINE_SWELL := 0.1
 const SHINE_LIFT := 0.55
 
 ## The meter's art: the four sheets, all the same size and aligned, and where inside them the
-## frame and the water's track fall (measured off the sheets' alpha). Drawn at a whole-number
-## scale — it is pixel art, and a fractional scale smears it — picked so that the meter is
-## three times its art on a 1080-line window: `METER_SCALE_PER` window lines per step.
+## frame and the water's track fall (measured off the sheets' alpha). Drawn at a half-step
+## scale (1, 1.5, 2...) — it is pixel art, and whole steps would be cleaner, but 1x was too
+## small and 2x too big, so half steps it is, nearest-filtered — picked so that the meter is
+## one and a half times its art on a 1080-line window: `METER_SCALE_PER` window lines per
+## whole step.
 const METER_ART := "res://assets/ui/meter/"
 const METER_SHEET := Vector2(290.0, 94.0)
 const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
 const METER_TRACK := Rect2(91.0, 37.0, 170.0, 26.0)
-const METER_SCALE_PER := 360.0
+const METER_SCALE_PER := 720.0
 
 ## How wide the filth-to-clean blend is, as a fraction of the track. Narrowed near the ends
 ## (see `_show_meter`) so a nearly-clean lake keeps its last sliver of filth and a full one
@@ -231,7 +233,7 @@ func _read_book(path: String) -> void:
 ## where the eye already goes to ask how the run is doing.
 func _lay_out() -> void:
 	var wide := size.x
-	var scale := float(clampi(roundi(size.y / METER_SCALE_PER), 1, 4))
+	var scale := clampf(roundf(size.y / METER_SCALE_PER * 2.0) * 0.5, 1.0, 4.0)
 	var span := METER_SHEET * scale
 	# Centred on the frame, not on the sheet: the garbage circle hangs off the frame's left
 	# end and the sheet has room for it, so centring the sheet puts the frame right of middle.
