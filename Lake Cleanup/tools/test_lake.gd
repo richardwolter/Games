@@ -184,7 +184,7 @@ func _stage_build() -> void:
 	_flock.spawning = false
 	# So is the dog, for the same reason and then some: it takes rubbish out of the water and
 	# puts it in the yard on its own clock, which is exactly what half of these checks are
-	# counting. scripts/dog.gd has a watcher of its own — tools/dog_watch.gd.
+	# counting.
 	var dog := _main.get_node_or_null(^"Dog")
 	if dog != null:
 		dog.set_process(false)

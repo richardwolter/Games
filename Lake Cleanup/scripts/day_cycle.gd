@@ -51,13 +51,6 @@ func _process(delta: float) -> void:
 	_settle()
 
 
-## Put the day at a given point in its loop. For the screenshot harness, which wants four
-## named times of day rather than to sit and wait ten minutes for them.
-func set_phase(at: float) -> void:
-	phase = fposmod(at, 1.0)
-	_settle()
-
-
 ## How high the sun is, 0 at either end of the day and 1 at noon.
 ##
 ## Noon is not the middle of the loop: the trough is at the end, so the daylight half runs

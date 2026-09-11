@@ -10,9 +10,6 @@
 
 # Headless test output
 /tools/last_*.log
-/tools/shot.png
-/tools/shot_siege.png
-/tools/shot_water_*.png
 
 # Slicer check-my-work pictures. The catalogues they describe are committed; these are not.
 /assets/sliced_*.png
