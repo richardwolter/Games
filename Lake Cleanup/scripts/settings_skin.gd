@@ -347,8 +347,19 @@ func _draw_head(box: Rect2, label: String) -> void:
 	)
 
 
-func _row_face(hovered: bool, live: bool) -> Color:
-	var face := Style.BOARD_ROW if live else Style.BOARD_ROW_OFF
+## The plate a row sits on, by which section it is in. A row that cannot be used is drawn
+## back towards the board rather than in a colour of its own.
+func _row_face(key: StringName, hovered: bool, live: bool) -> Color:
+	var face := Style.ROW_SOUND
+	match key:
+		&"fullscreen":
+			face = Style.ROW_SCREEN
+		&"save", &"load", &"wipe", &"swap":
+			face = Style.ROW_SAVE
+		&"quit":
+			face = Style.ROW_QUIT
+	if not live:
+		face = face.lerp(Style.BOARD, 0.55)
 	if hovered and live:
 		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
 	return face
@@ -359,7 +370,7 @@ func _draw_switch(box: Rect2, line: Dictionary) -> void:
 	var key: StringName = line["key"]
 	var on := _state_of(key)
 	_lines.append({"kind": &"switch", "key": key, "box": box})
-	Style.plate(self, box, _row_face(_hovered == key, true))
+	Style.plate(self, box, _row_face(key, _hovered == key, true))
 	Style.write(
 		self, String(line["label"]), Style.TEXT_BODY,
 		Vector2(box.position.x + 10.0, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
@@ -370,7 +381,7 @@ func _draw_switch(box: Rect2, line: Dictionary) -> void:
 		Vector2(SWITCH_WIDE, SWITCH_TALL)
 	)
 	draw_rect(track.grow(1.0), Style.SEAM, true)
-	draw_rect(track, Style.TAG_WATER if on else Style.BOARD, true)
+	draw_rect(track, Style.ON_GOLD if on else Style.BOARD, true)
 	var thumb_wide := SWITCH_TALL - 2.0
 	var thumb := Rect2(
 		Vector2(track.end.x - thumb_wide - 1.0 if on else track.position.x + 1.0, track.position.y + 1.0),
@@ -402,7 +413,7 @@ func _draw_slider(box: Rect2, line: Dictionary) -> void:
 	_lines.append({"kind": &"slider", "key": key, "box": box, "groove": groove})
 	draw_rect(groove.grow(1.0), Style.SEAM, true)
 	draw_rect(groove, Style.FRAME_SHADOW, true)
-	var fill := Style.TAG_WATER if on else Style.BOARD_ROW_OFF
+	var fill := Style.ON_GOLD if on else Style.BOARD_ROW_OFF
 	draw_rect(Rect2(groove.position, Vector2(groove.size.x * level, groove.size.y)), fill, true)
 	var thumb := Rect2(
 		Vector2(groove.position.x + groove.size.x * level - THUMB_WIDE * 0.5, box.position.y + 2.0),
@@ -416,8 +427,11 @@ func _draw_button(box: Rect2, line: Dictionary) -> void:
 	var key: StringName = line["key"]
 	var live := can_load if key == &"load" else true
 	_lines.append({"kind": &"button", "key": key, "box": box})
-	Style.plate(self, box, _row_face(_hovered == key, live))
-	var ink := Style.BOARD_INK if live else Style.BOARD_INK_DIM
+	Style.plate(self, box, _row_face(key, _hovered == key, live))
+	# Oak rows take the frame's cream, the rest the board's pale ink.
+	var ink := Style.RIBBON_INK if key in [&"save", &"load", &"wipe", &"swap", &"quit"] else Style.BOARD_INK
+	if not live:
+		ink = Style.BOARD_INK_DIM
 	if bool(line.get("warn", false)):
 		ink = Style.DANGER.lerp(Style.INK, 0.35)
 	Style.write(
