@@ -177,7 +177,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   window, in proportion elsewhere. Settled by eye (3x, 1.5x, then 1.3x that), not snapped
   to a pixel step; nearest-filtered. The shader slides the filth-to-clean seam (feather
   `METER_FEATHER`, narrowed at the ends) and rocks both sheets a pixel or two
-  (sine, not scroll: the sheets are not tileable). Garbage circle static; `%` figure only,
+  (sine, not scroll: the sheets are not tileable). Both sheets have soft, part-transparent
+  ends, so every water sample is clamped to `METER_OPAQUE` (where both are fully opaque)
+  and the band is forced opaque; the band runs `leak` under the circle. Check gaps by
+  filming a whole drift cycle (~18 s) over magenta and scanning every frame — a short film
+  misses the bad phase. Garbage circle static; `%` figure only,
   right-aligned on the clean end; no `POLLUTION` label. `Style.meter_water`/`water` and
   the `METER_*` colours are gone.
 

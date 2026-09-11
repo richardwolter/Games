@@ -49,6 +49,10 @@ const METER_SHEET := Vector2(290.0, 94.0)
 const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
 const METER_TRACK := Rect2(91.0, 37.0, 170.0, 26.0)
 const METER_CIRCLE := Rect2(11.0, 1.0, 85.0, 87.0)
+## Where both water sheets are fully opaque, in art pixels. Their ends and edges are soft
+## and part-transparent; the shader never samples outside this, or the drift shows the
+## screen through the gap between the circle and the water.
+const METER_OPAQUE := Rect2(97.0, 40.0, 161.0, 19.0)
 const METER_SCALE := 1.95
 const METER_SCALE_LINES := 1080.0
 
@@ -477,6 +481,16 @@ func _build_meter() -> void:
 	_meter_shader.set_shader_parameter(&"clean_tex", clean)
 	_meter_shader.set_shader_parameter(&"track_from", METER_TRACK.position.x / METER_SHEET.x)
 	_meter_shader.set_shader_parameter(&"track_to", METER_TRACK.end.x / METER_SHEET.x)
+	_meter_shader.set_shader_parameter(&"track_top", METER_TRACK.position.y / METER_SHEET.y)
+	_meter_shader.set_shader_parameter(&"track_bottom", METER_TRACK.end.y / METER_SHEET.y)
+	# Texel centres of the opaque rectangle's first and last pixels, so a clamped sample
+	# never lands between an opaque pixel and a soft one.
+	_meter_shader.set_shader_parameter(&"opaque", Vector4(
+		(METER_OPAQUE.position.x + 0.5) / METER_SHEET.x,
+		(METER_OPAQUE.position.y + 0.5) / METER_SHEET.y,
+		(METER_OPAQUE.end.x - 0.5) / METER_SHEET.x,
+		(METER_OPAQUE.end.y - 0.5) / METER_SHEET.y
+	))
 	_meter_water = _sheet_node(murky)
 	_meter_water.material = _meter_shader
 	# The frame first and the circle over it: the circle caps the frame's end, and drawn
