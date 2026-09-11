@@ -166,6 +166,11 @@ const DOOR_ALONG := 0.5
 ## into the shed rather than a leaf standing shut in it.
 const DOOR_OPEN := Color(0.05, 0.04, 0.05)
 
+## How many source rows of the horizontal strip are the flat band along its top — the dark
+## line and the plain wood under it — before the moulding starts on row 4. That band is
+## what carries over the door as its lintel; the moulding below it stops at the jambs.
+const LINTEL_ROWS := 4
+
 ## The player, indoors: the cut sheet they are drawn from, how tall they draw in cells, how
 ## fast they walk across them, and the longest step one frame may take.
 ##
@@ -577,12 +582,12 @@ func _draw_you_hat(
 ## Where the door's own empty rect sits, in screen pixels: the dark opening only, not the
 ## jambs either side of it. `_door_span()` is worked back from the same width, so the
 ## player walks in through the opening and never through a jamb. Never taller than the
-## wall below its top run: the moulding goes over the door, not through it.
+## wall below the lintel band: the top of the run goes over the door, not through it.
 func _door_opening(wall: Rect2) -> Rect2:
 	var step := float(CELL * _zoom())
 	var span := _door_span()
 	var size := _door_size()
-	var lintel := wall.position.y + BORDER_HORIZONTAL.get_height() * _zoom()
+	var lintel := wall.position.y + float(LINTEL_ROWS) * _zoom()
 	var tall := minf(size.y, wall.end.y - lintel)
 	return Rect2(
 		Vector2(wall.position.x + span.x * step, wall.end.y - tall),
@@ -592,26 +597,46 @@ func _door_opening(wall: Rect2) -> Rect2:
 
 ## The way in, drawn into the back wall: an open vent with a jamb down each side, not a
 ## leaf standing shut in it. The jambs are the frame's own vertical strip, stood outside
-## the opening so they add to the door rather than narrow it. The wall's top run goes
-## straight over the door, and the jambs hang from it down to the wall's foot; under the
-## opening there is no moulding at all — floor_box's frame gaps its top run to the opening
-## (see _draw()), so the way in is not closed off by a sill.
+## the opening so they add to the door rather than narrow it, and they meet the wall's
+## top run the way the wall's own sides do — with a corner piece, turned about: the run
+## arrives at the left jamb from the left, which is the shape the top-right corner draws,
+## and leaves the right jamb to the right, which is the top-left one. The run's moulding
+## stops at those corners (`top_gap`); only its flat top band carries on between them,
+## over the opening, as the lintel. Under the opening there is no moulding at all —
+## floor_box's frame gaps its top run to it (see _draw()), so the way in is not closed
+## off by a sill.
 func _draw_door(wall: Rect2) -> void:
 	if wall.size.y <= 2.0:
 		return
 	var zoom := _zoom()
 	var opening := _door_opening(wall)
 	var jamb_wide := BORDER_VERTICAL.get_width() * zoom
-	var lintel := wall.position.y + BORDER_HORIZONTAL.get_height() * zoom
+	var corner := BORDER_TOP_LEFT.get_size() * zoom
+	var left := opening.position.x - jamb_wide
+	var right := opening.end.x
 	draw_rect(opening, DOOR_OPEN)
-	_draw_room_frame(wall, false)
+	_draw_room_frame(wall, false, Vector2(left, right + jamb_wide))
+	# The lintel: the run's top band only, between the two corners.
+	_tile_rect(
+		BORDER_HORIZONTAL,
+		Rect2(
+			Vector2(opening.position.x, wall.position.y),
+			Vector2(opening.size.x, float(LINTEL_ROWS) * zoom)
+		)
+	)
+	# Jambs, from under their corners down to the wall's foot.
+	_tile_run(
+		BORDER_VERTICAL, Vector2(left, wall.position.y + corner.y), wall.size.y - corner.y, false
+	)
 	_tile_run(
 		BORDER_VERTICAL,
-		Vector2(opening.position.x - jamb_wide, lintel),
-		wall.end.y - lintel,
-		false
+		Vector2(right, wall.position.y + corner.y),
+		wall.size.y - corner.y,
+		false,
+		true
 	)
-	_tile_run(BORDER_VERTICAL, Vector2(opening.end.x, lintel), wall.end.y - lintel, false, true)
+	draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, wall.position.y), corner), false)
+	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
 
 
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
@@ -1171,8 +1196,9 @@ func _tile_rect(tex: Texture2D, rect: Rect2) -> void:
 ## with `bottom` false, and once for floor_box with `bottom` true — the wall's own bottom
 ## edge would only sit on top of floor_box's top edge at the seam between them, so only one
 ## of the two draws it. `top_gap`, when its x is not negative, is a range in the same
-## screen-x the top run skips instead of tiling across — the door's opening, so the floor's
-## frame does not close the way in off with a run of moulding (see _draw_door).
+## screen-x the top run skips instead of tiling across — for the wall, the door with its
+## jambs, so the run stops at the door's corners; for the floor, the opening alone, so
+## the frame does not close the way in off with a run of moulding (see _draw_door).
 ##
 ## Corners first, then the runs between them, and every run is cut to its own length —
 ## the runs used to tile in whole strips and overshoot, and the top run and the sill both
