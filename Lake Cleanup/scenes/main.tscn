@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://dr22ekyjmso6u" path="res://scripts/shop_skin.gd" id="10_shop"]
 [ext_resource type="Script" uid="uid://bomnr6avmr21a" path="res://scripts/ui_button.gd" id="11_uibtn"]
 [ext_resource type="Script" uid="uid://bwjm1n8cd37pb" path="res://scripts/dog.gd" id="12_dog"]
+[ext_resource type="Script" path="res://scripts/day_cycle.gd" id="13_day"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shop"]
 bg_color = Color(0.03, 0.04, 0.05, 0.93)
@@ -33,6 +34,13 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.501961, 0.541176, 0.498039, 1)
+
+[node name="Day" type="Node" parent="." unique_id=1533730483]
+unique_name_in_owner = true
+script = ExtResource("13_day")
+
+[node name="Daylight" type="CanvasModulate" parent="." unique_id=1533730484]
+unique_name_in_owner = true
 
 [node name="Camera" type="Camera2D" parent="." unique_id=1548062958]
 

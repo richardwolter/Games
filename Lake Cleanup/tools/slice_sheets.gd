@@ -23,8 +23,10 @@
 ## fresh sheet with it; do not re-cut the ones already in the game.
 ##
 ## It also owns only its own half of the catalogue's contents and writes the whole file, so
-## a re-run drops the decoration pieces and the lake_objects sheet, neither of which is cut
-## here. Run tools/build_decor.py afterwards to put the decoration half back.
+## a re-run drops the decoration pieces and both lake_objects sheets, none of which is cut
+## here. Run tools/build_decor.py and tools/build_lake_objects_new.py afterwards to put the
+## decoration pieces and the second rubbish batch back. The first lake_objects sheet's
+## entries have no builder and are lost for good — restore them from git.
 ##
 ## Run it with:
 ##   godot --headless --path . --script res://tools/slice_sheets.gd

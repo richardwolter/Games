@@ -1322,7 +1322,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     73,
+     129,
      227,
      49,
      25
@@ -1334,7 +1334,7 @@
      55
     ],
     [
-     104,
+     154,
      160,
      49,
      31
@@ -1385,7 +1385,7 @@
      36
     ],
     [
-     98,
+     148,
      195,
      32,
      28
@@ -1424,25 +1424,25 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
+     58,
      227,
      16,
      27
     ],
     [
-     132,
+     182,
      195,
      15,
      28
     ],
     [
-     110,
-     256,
+     160,
+     257,
      16,
      21
     ],
     [
-     149,
+     199,
      195,
      15,
      28
@@ -1456,7 +1456,7 @@
    "fill": 0.681,
    "name": "decor_dining_chair",
    "region": [
-    29,
+    98,
     114,
     15,
     28
@@ -1475,25 +1475,25 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     20,
+     76,
      227,
      14,
      27
     ],
     [
-     166,
+     216,
      195,
      15,
      28
     ],
     [
-     128,
-     256,
+     178,
+     257,
      14,
      21
     ],
     [
-     183,
+     233,
      195,
      15,
      28
@@ -1507,7 +1507,7 @@
    "fill": 0.937,
    "name": "decor_kitchen_chair",
    "region": [
-    102,
+    171,
     114,
     14,
     27
@@ -1561,13 +1561,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     20,
-     256,
+     70,
+     257,
      20,
      23
     ],
     [
-     36,
+     92,
      227,
      15,
      27
@@ -1581,8 +1581,8 @@
    "fill": 0.952,
    "name": "decor_nightstand",
    "region": [
-    233,
-    114,
+    70,
+    146,
     20,
     23
    ],
@@ -1672,8 +1672,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     172,
-     160,
+     2,
+     195,
      48,
      30
     ],
@@ -1709,7 +1709,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
+     52,
      195,
      46,
      30
@@ -1729,8 +1729,8 @@
    "fill": 0.985,
    "name": "decor_old_table",
    "region": [
-    187,
-    67,
+    2,
+    114,
     46,
     30
    ],
@@ -1746,13 +1746,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     228,
-     227,
+     34,
+     257,
      16,
      24
     ],
     [
-     124,
+     180,
      227,
      16,
      25
@@ -1766,8 +1766,8 @@
    "fill": 0.961,
    "name": "decor_side_desk",
    "region": [
-    197,
-    114,
+    34,
+    146,
     16,
     24
    ],
@@ -1826,8 +1826,8 @@
      32
     ],
     [
-     200,
-     195,
+     2,
+     227,
      22,
      28
     ]
@@ -1840,7 +1840,7 @@
    "fill": 0.643,
    "name": "decor_toilet",
    "region": [
-    46,
+    115,
     114,
     22,
     28
@@ -1894,14 +1894,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     155,
+     205,
      160,
      15,
      31
     ],
     [
-     170,
-     256,
+     220,
+     257,
      31,
      15
     ]
@@ -1914,8 +1914,8 @@
    "fill": 0.948,
    "name": "decor_old_rug",
    "region": [
-    96,
-    145,
+    186,
+    146,
     31,
     15
    ],
@@ -1931,13 +1931,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     142,
+     198,
      227,
      24,
      25
     ],
     [
-     168,
+     224,
      227,
      26,
      25
@@ -1951,7 +1951,7 @@
    "fill": 0.911,
    "name": "decor_fireplace",
    "region": [
-    118,
+    187,
     114,
     25,
     26
@@ -2005,14 +2005,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     203,
-     256,
+     2,
+     284,
      27,
      13
     ],
     [
-     2,
-     282,
+     31,
+     284,
      27,
      13
     ]
@@ -2025,8 +2025,8 @@
    "fill": 0.943,
    "name": "decor_pet_bed",
    "region": [
-    129,
-    145,
+    219,
+    146,
     27,
     13
    ],
@@ -2036,12 +2036,49 @@
   },
   {
    "alt_roles": [
+    "green",
+    "blue"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     104,
+     160,
+     23,
+     32
+    ],
+    [
+     129,
+     160,
+     23,
+     32
+    ]
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.973,
+   "name": "decor_bed",
+   "region": [
+    187,
+    67,
+    23,
+    32
+   ],
+   "set": "VARIANT",
+   "sheet": "decor_dirty",
+   "title": "Bed"
+  },
+  {
+   "alt_roles": [
     "front"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     53,
+     109,
      227,
      18,
      26
@@ -2055,7 +2092,7 @@
    "fill": 0.793,
    "name": "decor_lamp",
    "region": [
-    145,
+    214,
     114,
     18,
     26
@@ -2221,8 +2258,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     196,
-     227,
+     2,
+     257,
      30,
      25
     ]
@@ -2235,8 +2272,8 @@
    "fill": 0.812,
    "name": "decor_vynil_player",
    "region": [
-    165,
-    114,
+    2,
+    146,
     30,
     25
    ],
@@ -2251,7 +2288,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     50,
+     100,
      195,
      19,
      29
@@ -2265,8 +2302,8 @@
    "fill": 0.539,
    "name": "decor_bath_sink",
    "region": [
-    235,
-    67,
+    50,
+    114,
     19,
     29
    ],
@@ -2281,8 +2318,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     42,
-     256,
+     92,
+     257,
      42,
      23
     ]
@@ -2295,8 +2332,8 @@
    "fill": 0.891,
    "name": "decor_bathtub",
    "region": [
-    2,
-    145,
+    92,
+    146,
     42,
     23
    ],
@@ -2311,7 +2348,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     71,
+     121,
      195,
      25,
      29
@@ -2325,7 +2362,7 @@
    "fill": 0.574,
    "name": "decor_iron_board",
    "region": [
-    2,
+    71,
     114,
     25,
     29
@@ -2341,8 +2378,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     144,
-     256,
+     194,
+     257,
      24,
      19
     ]
@@ -2355,8 +2392,8 @@
    "fill": 0.904,
    "name": "decor_center_table",
    "region": [
-    70,
-    145,
+    160,
+    146,
     24,
     19
    ],
@@ -2371,8 +2408,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
-     256,
+     52,
+     257,
      16,
      24
     ]
@@ -2385,8 +2422,8 @@
    "fill": 0.62,
    "name": "decor_game_table",
    "region": [
-    215,
-    114,
+    52,
+    146,
     16,
     24
    ],
@@ -2401,8 +2438,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     224,
-     195,
+     26,
+     227,
      30,
      28
     ]
@@ -2415,7 +2452,7 @@
    "fill": 0.993,
    "name": "decor_tiny_bookcase",
    "region": [
-    70,
+    139,
     114,
     30,
     28
@@ -2431,8 +2468,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     31,
-     282,
+     60,
+     284,
      22,
      12
     ]
@@ -2445,8 +2482,8 @@
    "fill": 0.826,
    "name": "decor_oval_rug",
    "region": [
-    158,
-    145,
+    2,
+    173,
     22,
     12
    ],
@@ -2461,8 +2498,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     86,
-     256,
+     136,
+     257,
      10,
      23
     ]
@@ -2475,8 +2512,8 @@
    "fill": 0.613,
    "name": "decor_flower_pot",
    "region": [
-    46,
-    145,
+    136,
+    146,
     10,
     23
    ],
@@ -2491,8 +2528,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     98,
-     256,
+     148,
+     257,
      10,
      23
     ]
@@ -2505,14 +2542,184 @@
    "fill": 0.657,
    "name": "decor_plant_pot",
    "region": [
-    58,
-    145,
+    148,
+    146,
     10,
     23
    ],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Potted plant"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Wood Painting3",
+   "fill": 1.0,
+   "name": "wood_painting3",
+   "region": [
+    89,
+    2,
+    13,
+    15
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Timber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Wood Painting4",
+   "fill": 1.0,
+   "name": "wood_painting4",
+   "region": [
+    104,
+    2,
+    13,
+    15
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Timber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Metal Lamp",
+   "fill": 0.74,
+   "name": "metal_lamp",
+   "region": [
+    50,
+    2,
+    12,
+    16
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Metal Mirror",
+   "fill": 0.778,
+   "name": "metal_mirror",
+   "region": [
+    64,
+    2,
+    9,
+    16
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Plastic Sign",
+   "fill": 1.0,
+   "name": "plastic_sign",
+   "region": [
+    131,
+    2,
+    12,
+    9
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Plastic Frame",
+   "fill": 1.0,
+   "name": "plastic_frame",
+   "region": [
+    75,
+    2,
+    12,
+    16
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Plastic Toy",
+   "fill": 1.0,
+   "name": "plastic_toy",
+   "region": [
+    2,
+    2,
+    31,
+    21
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Plastic Globe",
+   "fill": 0.696,
+   "name": "plastic_globe",
+   "region": [
+    35,
+    2,
+    13,
+    20
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Rubber Block",
+   "fill": 0.964,
+   "name": "rubber_block",
+   "region": [
+    145,
+    2,
+    8,
+    7
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Rubber Toy",
+   "fill": 0.582,
+   "name": "rubber_toy",
+   "region": [
+    119,
+    2,
+    10,
+    11
+   ],
+   "sheet": "lake_objects_new",
+   "yard": "Rubber"
   }
  ],
  "sheets": {
@@ -2520,18 +2727,25 @@
    "file": "res://assets/decor_clean.png",
    "size": [
     256,
-    297
+    299
    ]
   },
   "decor_dirty": {
    "file": "res://assets/decor_dirty.png",
    "size": [
     256,
-    170
+    187
    ]
   },
   "lake_objects": {
    "file": "res://assets/lake_objects.png"
+  },
+  "lake_objects_new": {
+   "file": "res://assets/lake_objects_new.png",
+   "size": [
+    256,
+    25
+   ]
   },
   "small": {
    "file": "res://assets/TopDownHouse_SmallItems.png",

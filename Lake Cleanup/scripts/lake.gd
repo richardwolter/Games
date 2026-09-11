@@ -9,11 +9,13 @@
 ## nothing can pop, jitter, explode, or fall through anything.
 ##
 ## The loop is two halves that need each other. The angler stands on the island and casts
-## a net at the water; what the net drags home goes into the yard, and that is where the
-## pollution meter drops, because that piece is out of the lake. The yard is a hard cap,
-## so the only way to keep fishing is the other half: the ferry loads the yard and does a
-## round of the four merchants on the bank, one per material, selling as it goes — and that
-## is where the money comes from. Cleaning and earning are two different actions on purpose.
+## a net at the water; the pollution meter drops the instant the mouth closes on a piece
+## (see _on_net_caught), not whenever the haul finishes crossing the lake — what the net
+## drags home goes into the yard instead, which is a hard cap on the catch rather than
+## the thing the meter watches. So the only way to keep fishing is the other half: the
+## ferry loads the yard and does a round of the four merchants on the bank, one per
+## material, selling as it goes — and that is where the money comes from. Cleaning and
+## earning are two different actions on purpose.
 ##
 ## This script owns none of that work. It builds the basin, wires the four things that do
 ## (angler, net, yard, ferry) to each other and to the grid, and is the one place the
@@ -30,6 +32,7 @@ const Style := preload("res://scripts/style.gd")
 
 ## Master palette colors. See scripts/palette.gd and resources/palette.tres.
 const Palette := preload("res://scripts/palette.gd")
+const DogArt := preload("res://scripts/dog_art.gd")
 
 
 ## The lake is laid out from this, once, at load. Same seed, same lake, every run — which
@@ -272,7 +275,9 @@ const CLOSE_INSET := 12.0
 ## save is written on its own timer rather than on every change: a purchase or a sale can
 ## happen several times a second, and the field is the biggest thing in the file.
 const SAVE_PATH := "user://lake_cleanup.save"
-const SAVE_VERSION := 5
+## 6: ten rubbish kinds appended to TRASH_ORDER. Saved stacks hold indices into the whole
+## def list and the finds follow the rubbish in it, so every find's index moved.
+const SAVE_VERSION := 6
 const AUTOSAVE_EVERY := 20.0
 
 
@@ -320,6 +325,12 @@ var skimmer_level: int = 0
 ## second ferry is the only upgrade that buys a whole extra round of the lake at once, so
 ## it is priced well above anything that only makes the first one better.
 var fleet_level: int = 0
+
+## The dog. Two tracks of training: how many pieces it brings back in one trip out, and how
+## much comes off the longest it will laze about between trips. Neither raises what it is
+## able to pick up — heavy and wide junk stays the net's and the skimmer's business.
+var dog_fetch_level: int = 0
+var dog_wait_level: int = 0
 
 ## Pieces landed on the island, ever, and pieces sold. Two numbers because they are two
 ## different achievements now.
@@ -406,6 +417,13 @@ var _yard: Yard
 
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
+
+## The daylight, and the two things it is painted with: one modulate over the whole world
+## canvas, and the fill behind it. The HUD, the shop board and the shed room are on canvas
+## layers of their own and are deliberately not touched by either — a menu that dims at dusk
+## is a menu that is harder to read at dusk, for nothing.
+var _day: DayCycle
+var _daylight: CanvasModulate
 var _water_material: ShaderMaterial
 
 ## The island's shed. A drawn node with nothing else to do.
@@ -428,6 +446,7 @@ var _shed_open: bool = false
 const UPGRADE_ORDER := [
 	"net_width", "net_strength", "net_range", "reel", "net_hold",
 	"boat_speed", "cargo", "fleet",
+	"dog_fetch", "dog_wait",
 ]
 var _upgrades: Dictionary = {}
 
@@ -589,6 +608,18 @@ func boat_cargo() -> int:
 	return int(_upgrades[&"cargo"].value(cargo_level))
 
 
+## How many pieces one trip out may bring back. resources/upgrades/dog_fetch.tres.
+func dog_fetch() -> int:
+	return int(_upgrades[&"dog_fetch"].value(dog_fetch_level))
+
+
+## Seconds off the top of the dog's wait between trips, so the longest it will laze about
+## comes down and the shortest does not. resources/upgrades/dog_wait.tres, and see
+## Dog.MOOD_MOST for what it is taken off.
+func dog_wait_cut() -> float:
+	return _upgrades[&"dog_wait"].value(dog_wait_level)
+
+
 ## How wide the skimmer bites as it sails, in tiles out from the hull. Below zero is no
 ## skimmer fitted, which is what every ferry starts as.
 func skim_radius() -> int:
@@ -634,6 +665,8 @@ func _skim_level() -> int:
 
 func _ready() -> void:
 	($Sky/Fill as ColorRect).color = BEYOND
+	_day = %Day as DayCycle
+	_daylight = %Daylight as CanvasModulate
 	_pop_rng.randomize()
 	_load_upgrades()
 	_grid = $Grid as LakeGrid
@@ -668,8 +701,10 @@ func _ready() -> void:
 
 	_splash = WaterSplash.new()
 	_splash.name = &"Splash"
-	# Above the floating rubbish: a splash is on top of the water by definition.
-	_splash.z_index = 7
+	# Just under the floating rubbish (z 5), every splash alike. Drawn over it, a catch's
+	# crown and specks covered the pieces around the net; the splash is the water moving,
+	# and anything floating in that water is in front of it.
+	_splash.z_index = 4
 	_splash.z_as_relative = false
 	add_child(_splash)
 
@@ -716,7 +751,10 @@ func _ready() -> void:
 	# dog's, so it hands the piece over and forgets about it.
 	_dog.grid = _grid
 	_dog.angler = _angler
+	_angler.day = _day
+	_dog.day = _day
 	_dog.fetched.connect(_dog_brought_back)
+	_push_dog_numbers()
 	_dog.petted.connect(func() -> void:
 		if _sfx != null:
 			_sfx.play_bought()
@@ -758,6 +796,7 @@ func _ready() -> void:
 	_net.angler = _angler
 	_net.flock = _flock
 	_net.landed.connect(_on_net_landed)
+	_net.caught.connect(_on_net_caught)
 	_net.caught_bird.connect(_on_bird_caught)
 
 	# The ferry lives on the island's south side and works its way round the bank from
@@ -794,6 +833,12 @@ func _ready() -> void:
 		_shop_skin.icons[&"boat_speed"] = _lent(ferry, &"arrow", 0.95)
 		_shop_skin.icons[&"cargo"] = _lent(ferry, &"plus", 0.95)
 		_shop_skin.icons[&"fleet"] = _lent(ferry, &"pair", 0.72)
+	# The dog itself on both of its rows, told apart the same way the ferry's three are: an
+	# arrow for a dog that goes out sooner, a plus for one that comes back with more.
+	var pup := DogArt.art_frame(&"idle", 0)
+	if not pup.is_empty():
+		_shop_skin.icons[&"dog_fetch"] = _lent(pup, &"plus", 0.9)
+		_shop_skin.icons[&"dog_wait"] = _lent(pup, &"arrow", 0.9)
 	if not mesh.is_empty() and _net.art_sheet() != null:
 		_shop_skin.icons[&"skimmer"] = _lent(
 			{"sheet": _net.art_sheet(), "region": mesh["region"]}, &"", 0.62
@@ -839,6 +884,7 @@ func _ready() -> void:
 	if autoload_save and not start_fresh:
 		load_game()
 	start_fresh = false
+	_seed_starter_bed()
 
 
 ## The bank: the land the lake sits in, drawn as the shore ring grown outward. Two flat
@@ -901,6 +947,7 @@ func _shape_bank() -> void:
 	var ground := Ground.new()
 	ground.name = &"Ground"
 	ground.layer = Ground.Layer.OUTSIDE
+	ground.day = _day
 	add_child(ground)
 
 	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
@@ -985,6 +1032,7 @@ func _shape_island() -> void:
 	var shallows := Ground.new()
 	shallows.name = &"IslandShallows"
 	shallows.layer = Ground.Layer.ISLAND_DEEP
+	shallows.day = _day
 	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
 		shallows.visible = false
 	add_child(shallows)
@@ -992,6 +1040,7 @@ func _shape_island() -> void:
 	var ground := Ground.new()
 	ground.name = &"IslandGround"
 	ground.layer = Ground.Layer.ISLAND
+	ground.day = _day
 	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
 		ground.visible = false
 	add_child(ground)
@@ -1072,6 +1121,10 @@ const TRASH_ORDER := [
 	"plastic_wrap", "rubber_ball", "rubber_bone", "rubber_disk",
 	"rubber_duck", "rubber_tire", "wood_box1", "wood_box2",
 	"wood_painting1", "wood_painting2", "wood_piece",
+	# Second batch, art_source/New_Objects_Lake -> assets/lake_objects_new.png.
+	"wood_painting3", "wood_painting4", "metal_lamp", "metal_mirror",
+	"plastic_sign", "plastic_frame", "plastic_toy", "plastic_globe",
+	"rubber_block", "rubber_toy",
 ]
 
 func _default_defs() -> Array[TrashDef]:
@@ -1828,11 +1881,19 @@ func _quit() -> void:
 	get_tree().quit()
 
 
-## A cast landing on the island. The meter moves here and nowhere else on this path: the
-## piece is out of the water the moment it reaches the yard.
-## The catch coming out of the net. The lake decides what happens to each piece here and
-## now — the water is cleaner the moment it is landed — but the pieces bound for the yard
-## are thrown there rather than teleported, and the pile only takes them when they land.
+## A piece lifted off the water, the moment the net's mouth closes on it. The meter moves
+## here and nowhere else: the water reads as cleaner the instant the piece is out of it,
+## not whenever the haul happens to finish crossing the lake to the angler.
+func _on_net_caught(def_index: int) -> void:
+	var def := _grid.defs[def_index]
+	_filth_left = maxf(_filth_left - def.pollution, 0.0)
+	_filth_stale = true
+	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
+
+
+## The catch coming out of the net, back at the angler. The pollution meter has already
+## moved (see _on_net_caught) — what is left to decide here is only where each piece goes:
+## a find onto the shelf in the shed, everything else thrown on to the yard.
 func _on_net_landed(cargo: PackedInt32Array) -> void:
 	var from := _angler.rod_tip()
 	var slot := 0
@@ -1842,18 +1903,13 @@ func _on_net_landed(cargo: PackedInt32Array) -> void:
 		# which is the only thing in this game that is kept rather than spent.
 		if def.keepsake:
 			_keep(def)
-			_filth_left = maxf(_filth_left - def.pollution, 0.0)
-			_filth_stale = true
 			caught += 1
 			continue
 		_haul.send(
 			cargo[i], from, _yard.drop_point(), slot, cargo.size(), null, null, _angler
 		)
 		slot += 1
-		_filth_left = maxf(_filth_left - def.pollution, 0.0)
-		_filth_stale = true
 		caught += 1
-	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 
 
 ## A thrown piece reaching wherever it was thrown. A boat tagged itself and takes it into
@@ -1915,6 +1971,19 @@ func _build_trophy() -> void:
 ## Put a find on the shed's shelf. Once each: the lake holds one of every piece, and a
 ## second copy of the same name would be a bug worth swallowing quietly rather than
 ## showing the player twice in their inventory.
+## The bed the shed starts with rather than one anybody has to fish out — the one piece of
+## furniture that was never dirty. Runs once per session after load_game(), whether a save
+## was read or not, so a fresh game gets it and a save from before it existed backfills it
+## the same way: only added when it is not already on the shelf.
+func _seed_starter_bed() -> void:
+	var piece := "decor_bed"
+	if unlocked.has(piece):
+		return
+	unlocked.append(piece)
+	if _room != null:
+		_room.place(StringName(piece), Vector2i(1, 1))
+
+
 func _keep(def: TrashDef) -> void:
 	var name := String(def.piece)
 	if name.is_empty():
@@ -1977,6 +2046,7 @@ const PRICES := {
 const TRACKS := [
 	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
 	&"boat_speed", &"cargo", &"skimmer", &"fleet",
+	&"dog_fetch", &"dog_wait",
 ]
 
 
@@ -2010,6 +2080,10 @@ func _shop_rows() -> Array:
 			else "%d items, %d%%" % [skim_hold(), roundi(skim_chance() * 100.0)]
 		)],
 		[&"fleet", -1, "Extra ferry", "%d in the water" % fleet_size()],
+		[&"dog_fetch", -1, "Dog fetching", "%d per trip" % dog_fetch()],
+		[&"dog_wait", -1, "Dog keenness", "waits %.0fs at most" % maxf(
+			Dog.MOOD_MOST - dog_wait_cut(), Dog.MOOD_LEAST
+		)],
 	]
 	for line: Array in listed:
 		var key: StringName = line[0]
@@ -2049,6 +2123,24 @@ func _push_net_numbers() -> void:
 	_net.range_tiles = net_range()
 	_net.reel_speed = reel_speed()
 	_net.hold = net_hold()
+
+
+## The day, onto the things that show it.
+##
+## The modulate does the world in one multiply, so nothing that draws has to know what time
+## it is. The fill behind the lake is a separate canvas and has to be tinted by hand, or the
+## woodland past the last of the trees stays at noon while the lake goes gold. The water
+## takes the sun itself rather than only its colour: its glints are the sun on the surface,
+## and a sun that has moved with a sheet of glints left where it was is worse than no cycle.
+func _push_daylight() -> void:
+	if _day == null:
+		return
+	if _daylight != null:
+		_daylight.color = _day.tint
+	($Sky/Fill as ColorRect).color = BEYOND * _day.tint
+	if _water_material != null:
+		_water_material.set_shader_parameter(&"sun_tint", _day.tint)
+		_water_material.set_shader_parameter(&"sun_lean", _day.lean)
 
 
 ## The other level, as a scene and as the words on the button that goes there. The lake is
@@ -2111,6 +2203,10 @@ func _level_of(what: StringName) -> int:
 			return skimmer_level
 		&"fleet":
 			return fleet_level
+		&"dog_fetch":
+			return dog_fetch_level
+		&"dog_wait":
+			return dog_wait_level
 		_:
 			return 0
 
@@ -2153,6 +2249,10 @@ func _buy(what: StringName) -> void:
 		&"fleet":
 			fleet_level += 1
 			_add_boat()
+		&"dog_fetch":
+			dog_fetch_level += 1
+		&"dog_wait":
+			dog_wait_level += 1
 	# After the level goes on, not before: the sound is the purchase landing, and a buy that
 	# fell through above has already returned without making one. The sparkle over the row's
 	# own icon is the same receipt for the eye.
@@ -2161,6 +2261,7 @@ func _buy(what: StringName) -> void:
 	_shop_skin.cheer(what)
 	_push_net_numbers()
 	_push_boat_numbers()
+	_push_dog_numbers()
 
 
 ## Everything a hull needs to work, and where it ties up.
@@ -2221,6 +2322,16 @@ func _reberth(boat: Boat, index: int) -> void:
 ## already under way keeps the numbers it set off with only for its current leg — speed is
 ## re-read each frame from the boat's own field, which is what an upgrade felt instantly
 ## should do.
+## What training has bought the dog. Pushed the same way and for the same reason as the
+## net's and the ferry's: a loaded save has to reach the animal before it next decides what
+## to do, or the first trip of the session is the trip an untrained dog would have made.
+func _push_dog_numbers() -> void:
+	if _dog == null:
+		return
+	_dog.fetch_most = dog_fetch()
+	_dog.wait_cut = dog_wait_cut()
+
+
 func _push_boat_numbers() -> void:
 	for boat in _boats:
 		boat.speed = boat_speed()
@@ -2277,6 +2388,7 @@ func _net_wash() -> float:
 
 
 func _process(delta: float) -> void:
+	_push_daylight()
 	_fade_radio(delta)
 	_remap_filth(delta)
 	# The camera follows the angler rather than being panned: the arrow keys are theirs
@@ -2746,6 +2858,7 @@ func save_game() -> bool:
 			"net_hold": net_hold_level,
 			"boat_speed": boat_speed_level, "cargo": cargo_level,
 			"skimmer": skimmer_level, "fleet": fleet_level,
+			"dog_fetch": dog_fetch_level, "dog_wait": dog_wait_level,
 		},
 		"caught": caught,
 		"sold_count": sold_count,
@@ -2808,6 +2921,8 @@ func load_game() -> bool:
 	boat_speed_level = _saved_level(levels, &"boat_speed")
 	cargo_level = _saved_level(levels, &"cargo")
 	skimmer_level = _saved_level(levels, &"skimmer")
+	dog_fetch_level = _saved_level(levels, &"dog_fetch")
+	dog_wait_level = _saved_level(levels, &"dog_wait")
 
 	sludge = float(save.get("sludge", 0.0))
 	caught = int(save.get("caught", 0))
@@ -2896,6 +3011,7 @@ func load_game() -> bool:
 	_push_net_numbers()
 	_net.tile_pos = _angler.tile_pos
 	_push_boat_numbers()
+	_push_dog_numbers()
 
 	# The meter is re-read from the field rather than stored: it is a fraction of a total
 	# that the build already worked out, and the field is the truth.
@@ -2970,13 +3086,12 @@ const SHED_SHADOW := 0.74
 func _draw_shed() -> void:
 	var at := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
 
-	# Footprint first, so the hut has something to stand on rather than floating. Drawn
-	# inside the ellipse the angler is kept out of rather than on it: the walking rule has to
-	# clear the eaves and the porch, and a shadow drawn out to that line was a dark pool
-	# reaching well past the walls. What is under the hut is what should be dark.
-	# Square, like the hut standing on it, and like the crate's. An ellipse was what the
-	# walking rule is — a hut is not round, and a round shadow under a square building reads
-	# as a puddle it happens to be parked in.
+	# Footprint first, so the hut has something to stand on rather than floating. This is
+	# the contact patch under the walls, not the shadow the sun throws — that is the hut's
+	# own outline, laid out below. Drawn inside the ellipse the angler is kept out of rather
+	# than on it: the walking rule has to clear the eaves and the porch, and a patch drawn
+	# out to that line was a dark pool reaching well past the walls. Square, like the hut
+	# standing on it, and like the crate's.
 	var half := Iso.SHED_FOOT * SHED_SHADOW
 	var ring := PackedVector2Array()
 	for corner: Vector2 in [
@@ -2991,6 +3106,18 @@ func _draw_shed() -> void:
 		# Standing on the footprint rather than centred on it: the hut's own base is the
 		# bottom of the picture, and the middle of it is halfway up a wall.
 		var size := _shed_art.get_size() * (Iso.SHED_TALL / _shed_art.get_size().y)
+		# The hut's shadow: its own picture again, laid across the grass away from the sun.
+		# A building is the biggest thing on the island and the one whose shadow says most
+		# about where the light is coming from, so it swings with the rest of the land.
+		if _day != null:
+			_island.draw_set_transform_matrix(
+				Shade.lying(at + Vector2(0.0, Iso.TILE_H * 0.35), _day.lean, _day.stretch)
+			)
+			_island.draw_texture_rect(
+				_shed_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false,
+				Shade.tint(_day.ink)
+			)
+			_island.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		_island.draw_texture_rect(
 			_shed_art,
 			Rect2(at - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.35), size),

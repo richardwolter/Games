@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="DayConfig" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/day_config.gd" id="1_day"]
+
+[sub_resource type="Gradient" id="Gradient_day"]
+offsets = PackedFloat32Array(0, 0.18, 0.5, 0.78, 0.9, 1)
+colors = PackedColorArray(0.72, 0.74, 0.86, 1, 0.94, 0.93, 0.92, 1, 1, 1, 1, 1, 1, 0.88, 0.72, 1, 0.86, 0.71, 0.63, 1, 0.72, 0.74, 0.86, 1)
+
+[resource]
+script = ExtResource("1_day")
+cycle_seconds = 600.0
+trough_at = 0.9
+trough_dip = 0.34
+tint = SubResource("Gradient_day")
+lean_dawn = 1.7
+lean_noon = 0.18
+lean_dusk = -1.7
+stretch_noon = 0.42
+stretch_ends = 1.35
+ink_noon = 0.34
+ink_ends = 0.16

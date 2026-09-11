@@ -177,6 +177,14 @@ const ISLAND_BERTH := 1.57
 const SKIM_STEP := 0.6
 
 ## Set from the lake's upgrade levels when a run starts. Speed is in tiles per second.
+## How far round the hull floating pieces are set bobbing as it passes, in tiles.
+const BUMP_REACH := 1.6
+
+## How far round the hull pieces are looked at for shoving aside, in tiles, and how much room
+## past the hull's side they are pushed out to, in pixels.
+const SHOVE_REACH := 2.6
+const SHOVE_CLEAR := 10.0
+
 var speed: float = 4.2
 var capacity: int = 6
 ## Tiles out from the hull the skimmer bites. Below zero is a boat with no skimmer fitted,
@@ -280,12 +288,20 @@ var _painted: int = 0
 var _skim_travel: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
+## The bow wave the hull leaves while under way. See HullFoam.
+var _foam: HullFoam
+
 
 func _ready() -> void:
 	# Seeded, like the lake itself: a run that can be replayed is a run that can be tuned.
 	_rng.seed = rng_seed
 	tile_pos = dock
 	_place()
+	_foam = HullFoam.new()
+	_foam.name = &"Foam"
+	_foam.half_length = HULL_LENGTH * 0.5
+	_foam.half_width = HULL_WIDTH * 0.5
+	add_child(_foam)
 
 
 func is_running() -> bool:
@@ -422,12 +438,52 @@ func _process(delta: float) -> void:
 
 	_place()
 	_throw_spray(delta)
+	if _foam != null:
+		_foam.lay(_screen_heading(), 1.0 if _under_way() else 0.0, delta)
+	# The water the hull pushes aside sets what is floating near it bobbing, the same bobble a
+	# piece settles with when it surfaces. See LakeGrid.bump.
+	if grid != null and _under_way():
+		var here := grid.tile_at(position)
+		if here >= 0:
+			for index in grid.tiles_within(here, BUMP_REACH):
+				grid.bump(index)
+			_shove_aside(here, delta)
 	# The wake drawn under the hull is the boat's own; this is what it leaves behind in the
 	# lake, on the same water everything else disturbs.
 	if splash != null and _under_way():
 		splash.wake(self, position + _screen_heading() * -HULL_LENGTH * 0.5,
 			HULL_WIDTH * 1.1, HULL_RIPPLE)
 	_repaint()
+
+
+## Push the floating pieces in the hull's way out to either side of it, the way a bow parts
+## what is floating in front of it. A piece is pushed out across the hull's line to just clear
+## its side, on whichever side it already was; one dead ahead goes to a side picked off its
+## tile, so a row of them parts both ways rather than all to one. Drawing only — see
+## LakeGrid.shove_to.
+func _shove_aside(here: int, delta: float) -> void:
+	var along := _screen_heading()
+	var across := Vector2(-along.y, along.x)
+	# The hull's footprint on the water, squashed across the way the plane is.
+	var flat := Vector2(across.x, across.y * HullFoam.SQUASH)
+	var half_l := HULL_LENGTH * 0.5
+	var clear := HULL_WIDTH * 0.5 * HullFoam.SQUASH + SHOVE_CLEAR
+	for index in grid.tiles_within(here, SHOVE_REACH):
+		var tile := grid.tile_of(index)
+		var rest := Iso.tile_to_world(float(tile.x) + 0.5, float(tile.y) + 0.5) + grid.nudge[index]
+		var rel := rest - position
+		var ahead := rel.dot(along)
+		# Only alongside the hull and a little ahead of the bow; behind the stern it is left
+		# to drift back.
+		if ahead < -half_l or ahead > half_l * 1.2:
+			continue
+		var side := rel.dot(across)
+		var gap := clear - absf(side)
+		if gap <= 0.0:
+			continue
+		# Out on the side it already sits, or a side picked off the tile if it is dead ahead.
+		var way := signf(side) if absf(side) > 0.5 else (1.0 if (tile.x + tile.y) % 2 == 0 else -1.0)
+		grid.shove_to(index, flat * way * gap, delta)
 
 
 ## Repaint while the hull is moving, and otherwise only when its picture would differ.

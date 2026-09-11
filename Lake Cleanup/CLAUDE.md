@@ -179,6 +179,45 @@ glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shimmers 
 through the muck, and glints fully with turning specks once uncovered. Drawn *above* the
 rubbish, because the point is to be visible while the find itself is not.
 
+### Strand Line (outer bank rubbish, fetched by the dog)
+The ordinary fill stops `LAKE_EDGE` short of the bank. The band inside that margin
+(`Iso.on_strand`) gets its own washed-up rubbish from `LakeGrid._strand`: `STRAND_CHANCE` of
+those tiles hold one piece, `STRAND_TWO` of them a second. **Only tier-0 pieces no wider than
+`STRAND_WIDE`** (the cans, cup, wrap, sheet) — because the **dog** is what collects them. The
+net reaches ~6 tiles from the island and the bank is ~26 away; patrolling boats stay inside
+85% of the radius. So the dog makes an occasional bank run (`Dog.STRAND_ODDS`, only when
+nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOST`).
+- Collectible and counted like any piece: the lake cannot finish until the dog has cleared
+  the strand. If a bank piece ever becomes unfetchable (bigger def, tier > 0), the lake
+  stalls — keep `STRAND_WIDE`/tier in step with `Dog.CARRY_WIDE`/`CARRY_TIER`.
+- Outer bank only, by decision: the island's beach stays tidy.
+- Seeded off the lake seed on its own generator, so the rest of the fill is unchanged.
+  Existing saves restore their stacks and have no strand pieces.
+- Grime: `water.gdshader` draws scum blotches in the bank's shallowest water, scaled by the
+  local filth, so they go as that stretch is fetched clean.
+- **Beach litter** (dry pieces): the same small set also lies up the outer bank's sand,
+  `Iso.BEACH_LITTER` tiles past the waterline, on `BEACH_CHANCE` of those tiles. They are real
+  stacks on land tiles, flagged by `LakeGrid.dry`: no bob/sway (packed with `DRY_ANCHOR`,
+  which rubbish.gdshader and shadow.gdshader read as "still"), no waterline cut, no foam, no
+  rise, no bump/shove. The dog may walk up the bank's beach to `Dog.BEACH_WALK` to fetch
+  them. Any new code that moves or cuts pieces must respect `dry`.
+
+### Rubbish Sheets
+The regular rubbish (not finds) is drawn from two sheets:
+- `assets/lake_objects.png` — the first 27 kinds, from `art_source/LakeObjects.psd`. Its
+  regions in `pieces.json` were cut once and corrected by hand; nothing regenerates them.
+- `assets/lake_objects_new.png` — the second batch of 10, built from
+  `art_source/New_Objects_Lake` by `tools/build_lake_objects_new.py` (psd-extract venv
+  python, project root). Despecks with `build_decor.py`'s rule, maps the two
+  `Wood Painting` layers to `wood_painting3`/`4` by left-to-right position, and replaces
+  only its own sheet's entries.
+
+**Adding kinds**: a `.tres` under `resources/trash/`, its slug appended to `TRASH_ORDER`
+(`lake.gd`), and a `SAVE_VERSION` bump. Saved stacks hold indices into the whole def list and
+the finds come after the rubbish in it, so appending rubbish moves every find's index.
+`size` in a `.tres` is only the no-art fallback: `Lake._dress` draws a piece at its pixel
+size × `SPRITE_SCALE` (1.5), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
+
 ### Retired
 `assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
 names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the

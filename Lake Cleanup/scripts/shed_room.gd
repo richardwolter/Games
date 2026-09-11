@@ -119,6 +119,35 @@ const STATE_ON := 1
 ## grid is half this and drawing a line every four screen pixels reads as corduroy.
 const BOARD := 16
 
+## The room's shell art: floor and wallpaper tiles, and the wooden frame round the door
+## opening. From art_source/Interior_Bed_and_Textures (psd-extract, "Shed Border" and
+## "Texture" groups) — see tools/decor_sets.json for the bed pulled from the same file.
+##
+## "Shed Border" reads as a picture-frame moulding once its pieces are laid out at the
+## relative positions the PSD's own "Shed Border Example" group draws them at (built once
+## as a throwaway composite to check this): small corners and a tiled strip across the top,
+## taller corners and a "down view" sill across the bottom, an open rectangle in the
+## middle. That middle is the door, not a picture — this used to be read as trim for the
+## floor's whole perimeter and drawn round floor_box, which was wrong; it frames the
+## doorway in the wall instead.
+const FLOOR_TILE := preload("res://assets/Shed_Floor_Tile.png")
+const WALLPAPER_TILE := preload("res://assets/Shed_Wallpaper_Tile.png")
+const BORDER_TOP_LEFT := preload("res://assets/Shed_Border_Top_Left.png")
+const BORDER_TOP_RIGHT := preload("res://assets/Shed_Border_Top_Right.png")
+const BORDER_BOTTOM_LEFT := preload("res://assets/Shed_Border_Bottom_Left.png")
+const BORDER_BOTTOM_RIGHT := preload("res://assets/Shed_Border_Bottom_Right.png")
+const BORDER_VERTICAL := preload("res://assets/Shed_Border_Vertical.png")
+const BORDER_HORIZONTAL := preload("res://assets/Shed_Border_Horizontal.png")
+const BORDER_SILL := preload("res://assets/Shed_Border_Baseboard.png")
+
+## How much taller the back wall stands than a plain board-multiple, and how the door
+## opening it frames is sized against it. Both grew together — a door framed in moulding
+## reads small against the wall it used to fit, so the wall grew to give it room.
+## `_room_rect()` reserves the same height at the top of the panel for it, so the floor
+## (and everything below it — the list, the close cross) sits that much further down the
+## screen than before. Tune by feel; these are first guesses.
+const WALL_GROW := 1.9
+
 ## The door in the back wall: how wide it is against its own height, how much of the wall it
 ## stands in, and where along the wall it sits.
 ##
@@ -129,14 +158,13 @@ const BOARD := 16
 ## The lake has the player walk up to a hut and press a key; inside, the same hut had no way
 ## in and no way out but a cross in the corner. The door is where they came in, and it is
 ## what the room is oriented around — the wall is the north side, so the door is in it.
-const DOOR_WIDE := 0.58
-const DOOR_TALL := 0.94
+const DOOR_WIDE := 0.7
+const DOOR_TALL := 1.0
 const DOOR_ALONG := 0.5
 
-## The door's colours: planks, its frame, and the dark of the gap under it.
-const DOOR_FACE := Color(0.42, 0.29, 0.19)
-const DOOR_LIT := Color(0.52, 0.37, 0.24)
-const DOOR_FRAME := Color(0.24, 0.17, 0.12)
+## The doorway itself, inside the frame the border moulding draws — an open, empty vent
+## into the shed rather than a leaf standing shut in it.
+const DOOR_OPEN := Color(0.05, 0.04, 0.05)
 
 ## The player, indoors: the cut sheet they are drawn from, how tall they draw in cells, how
 ## fast they walk across them, and the longest step one frame may take.
@@ -406,7 +434,7 @@ func _door_span() -> Vector2:
 ## How big the door is drawn, in pixels: as tall as the wall allows, and proportioned from
 ## that.
 func _door_size() -> Vector2:
-	var wall := float(BOARD * ZOOM)
+	var wall := float(BOARD * ZOOM) * WALL_GROW
 	var tall := wall * DOOR_TALL
 	return Vector2(tall * DOOR_WIDE, tall)
 
@@ -546,33 +574,35 @@ func _draw_you_hat(
 	)
 
 
-## The way in, drawn into the back wall: a frame, a door inside it, and a handle.
-func _draw_door(wall: Rect2, floor_box: Rect2, ink: Color) -> void:
-	if wall.size.y <= 2.0:
-		return
+## Where the door's own empty rect sits, in screen pixels — shared between _draw_door
+## (which fills it) and floor_box's own frame (which gaps its top run to it, so the opening
+## reads as one vent running from the wall down through the floor's edge rather than
+## stopping dead at the wall's bottom).
+func _door_opening(wall: Rect2, floor_box: Rect2) -> Rect2:
 	var step := float(CELL * _zoom())
 	var span := _door_span()
 	var size := _door_size()
-	var frame := Rect2(
+	return Rect2(
 		Vector2(
 			floor_box.position.x + span.x * step,
 			maxf(wall.end.y - size.y, wall.position.y)
 		),
 		Vector2(size.x, minf(size.y, wall.size.y))
 	)
-	draw_rect(frame, DOOR_FRAME)
-	var leaf := frame.grow(-maxf(2.0, frame.size.x * 0.06))
-	draw_rect(leaf, DOOR_FACE)
-	# Boards down the door, which is what tells it apart from a dark rectangle in a wall.
-	var boards := 4
-	for i in range(1, boards):
-		var x := leaf.position.x + leaf.size.x * float(i) / float(boards)
-		draw_line(Vector2(x, leaf.position.y), Vector2(x, leaf.end.y), DOOR_LIT, 1.0)
-	draw_rect(leaf, ink, false, 1.5)
-	draw_circle(
-		Vector2(leaf.end.x - leaf.size.x * 0.16, leaf.position.y + leaf.size.y * 0.55),
-		maxf(1.5, leaf.size.x * 0.05), Style.GOLD
-	)
+
+
+## The way in, drawn into the back wall: a moulded frame round an open vent, not a leaf
+## standing shut in it. The moulding frames the wall it stands in, corner to corner of the
+## whole strip — not a frame of its own tight round the opening — so the opening is just an
+## empty rect drawn inside that. No bottom edge of its own: the wall's frame stops at the
+## corners and the top run, and floor_box's frame (see _draw(), gapped to the same opening)
+## is what closes the room off underneath it.
+func _draw_door(wall: Rect2, floor_box: Rect2) -> void:
+	if wall.size.y <= 2.0:
+		return
+	var opening := _door_opening(wall, floor_box)
+	draw_rect(opening, DOOR_OPEN)
+	_draw_room_frame(wall, false)
 
 
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
@@ -1062,7 +1092,7 @@ func _zoom() -> float:
 ## covered the two labels above it in the panel. A Control that draws outside itself cannot
 ## be laid out beside anything, so the wall is given room here instead.
 func _room_rect() -> Rect2:
-	var wall := float(BOARD * ZOOM)
+	var wall := float(BOARD * ZOOM) * WALL_GROW
 	return Rect2(
 		Vector2(MARGIN, wall + MARGIN),
 		Vector2(
@@ -1098,6 +1128,111 @@ func _list_rect() -> Rect2:
 	)
 
 
+## Repeats `tex` across `rect`, native size times the room's own zoom, left to right and
+## top to bottom. The last tile in each row and column is clipped by `rect` itself rather
+## than measured for — draw_texture_rect_region happily draws past its own source into
+## the room, and Control clips its own _draw() at its bounds.
+func _tile_rect(tex: Texture2D, rect: Rect2) -> void:
+	var step := tex.get_size() * _zoom()
+	if step.x <= 0.0 or step.y <= 0.0:
+		return
+	var cols := int(ceil(rect.size.x / step.x))
+	var rows := int(ceil(rect.size.y / step.y))
+	for row in rows:
+		for col in cols:
+			draw_texture_rect(
+				tex,
+				Rect2(rect.position + Vector2(float(col), float(row)) * step, step),
+				false
+			)
+
+
+## The moulded frame round `frame`'s outer edge: four corners (top ones only when `bottom`
+## is false), the horizontal strip tiled across the top run between them, the sill (the
+## "down view" piece) across the bottom run (skipped when `bottom` is false), and the
+## vertical strip down each side — mirrored for the right, since the source only drew the
+## one side.
+##
+## Called twice with two different rects, back to back in _draw(): once for the back wall
+## with `bottom` false, and once for floor_box with `bottom` true — the wall's own bottom
+## edge would only sit on top of floor_box's top edge at the seam between them, so only one
+## of the two draws it. `top_gap`, when its x is not negative, is a range in the same
+## screen-x the top run skips instead of tiling across — the door's own width, so the
+## opening reads as one vent running from the wall down through the floor's edge rather
+## than the floor's edge closing it off flush.
+func _draw_room_frame(frame: Rect2, bottom: bool = true, top_gap: Vector2 = Vector2(-1.0, -1.0)) -> void:
+	var tl := BORDER_TOP_LEFT.get_size() * _zoom()
+	var tr := BORDER_TOP_RIGHT.get_size() * _zoom()
+	var bl := BORDER_BOTTOM_LEFT.get_size() * _zoom() if bottom else Vector2.ZERO
+	var br := BORDER_BOTTOM_RIGHT.get_size() * _zoom() if bottom else Vector2.ZERO
+
+	draw_texture_rect(BORDER_TOP_LEFT, Rect2(frame.position, tl), false)
+	draw_texture_rect(
+		BORDER_TOP_RIGHT, Rect2(Vector2(frame.end.x - tr.x, frame.position.y), tr), false
+	)
+	if bottom:
+		draw_texture_rect(
+			BORDER_BOTTOM_LEFT, Rect2(Vector2(frame.position.x, frame.end.y - bl.y), bl), false
+		)
+		draw_texture_rect(BORDER_BOTTOM_RIGHT, Rect2(frame.end - br, br), false)
+		# Bottom run: the sill, corner to corner.
+		_tile_run(
+			BORDER_SILL,
+			Vector2(frame.position.x + bl.x, frame.end.y - BORDER_SILL.get_height() * _zoom()),
+			frame.size.x - bl.x - br.x,
+			true
+		)
+
+	# Top run: horizontal strip, corner to corner — split round the door's gap when one
+	# is given, rather than tiled straight across it.
+	var top_from := frame.position.x + tl.x
+	var top_to := frame.end.x - tr.x
+	if top_gap.x >= 0.0:
+		_tile_run(BORDER_HORIZONTAL, Vector2(top_from, frame.position.y), top_gap.x - top_from, true)
+		_tile_run(BORDER_HORIZONTAL, Vector2(top_gap.y, frame.position.y), top_to - top_gap.y, true)
+	else:
+		_tile_run(BORDER_HORIZONTAL, Vector2(top_from, frame.position.y), top_to - top_from, true)
+
+	# Side runs: the one vertical strip, corner to corner down the left, and flipped for
+	# the right — the source only holds one side, mirrored the same way a find's art is.
+	_tile_run(
+		BORDER_VERTICAL,
+		Vector2(frame.position.x, frame.position.y + tl.y),
+		frame.size.y - tl.y - bl.y,
+		false
+	)
+	_tile_run(
+		BORDER_VERTICAL,
+		Vector2(frame.end.x - BORDER_VERTICAL.get_width() * _zoom(), frame.position.y + tr.y),
+		frame.size.y - tr.y - br.y,
+		false,
+		true
+	)
+
+
+## One run of a border strip between two corners, tiled along its length and clipped to it
+## — `along_x` picks whether the run travels horizontally or down the side, and `flip`
+## mirrors a vertical strip for the side the source art was not drawn for.
+func _tile_run(tex: Texture2D, at: Vector2, length: float, along_x: bool, flip: bool = false) -> void:
+	if length <= 0.0:
+		return
+	var size := tex.get_size() * _zoom()
+	var step := size.x if along_x else size.y
+	if step <= 0.0:
+		return
+	var count := int(ceil(length / step))
+	for i in count:
+		var offset := float(i) * step
+		var draw_size := Vector2(size.x, size.y)
+		var pos := at + (Vector2(offset, 0.0) if along_x else Vector2(0.0, offset))
+		var rect := Rect2(pos, draw_size)
+		if flip:
+			rect.position.x += draw_size.x
+			draw_size.x = -draw_size.x
+			rect = Rect2(rect.position, draw_size)
+		draw_texture_rect(tex, rect, false)
+
+
 func _draw() -> void:
 	if sheets == null:
 		return
@@ -1107,32 +1242,29 @@ func _draw() -> void:
 	var floor_box := _floor_rect()
 
 	# The room: a back wall standing above the floor, so the space has a direction and the
-	# furniture has something to be against.
-	var wall_tall := float(BOARD * ZOOM)
+	# furniture has something to be against. Wallpapered, not flat.
+	var wall_tall := float(BOARD * ZOOM) * WALL_GROW
 	var wall := Rect2(
 		Vector2(floor_box.position.x, maxf(floor_box.position.y - wall_tall, 0.0)),
 		Vector2(floor_box.size.x, minf(wall_tall, floor_box.position.y))
 	)
 	draw_rect(wall, Color(0.30, 0.26, 0.24))
-	_draw_door(wall, floor_box, ink)
-	draw_rect(wall, ink, false, 2.0)
+	_tile_rect(WALLPAPER_TILE, wall)
+	_draw_door(wall, floor_box)
 
-	# Floorboards, run the long way, with a seam every other cell. Drawn rather than
-	# authored, like everything else in this game.
+	# The floor: the new tile, laid both ways across the whole box. Backed by a flat fill
+	# first so a box whose size does not divide evenly never shows a gap at the far edge —
+	# the last row and column just draw partly off it.
 	draw_rect(floor_box, Color(0.47, 0.36, 0.26))
-	var board := BOARD * _zoom()
-	var boards := int(ceil(floor_box.size.y / board))
-	for row in boards:
-		var y := floor_box.position.y + float(row) * board
-		draw_rect(
-			Rect2(floor_box.position.x, y, floor_box.size.x, minf(board, floor_box.end.y - y)),
-			Color(0.50, 0.39, 0.28) if row % 2 == 0 else Color(0.44, 0.34, 0.25)
-		)
-		draw_line(
-			Vector2(floor_box.position.x, y), Vector2(floor_box.end.x, y),
-			Color(0.0, 0.0, 0.0, 0.14), 1.0
-		)
-	draw_rect(floor_box, ink, false, 2.0)
+	_tile_rect(FLOOR_TILE, floor_box)
+
+	# The room's walls carry on down the floor's own sides and along its front edge, the
+	# same moulding as the back wall's — a second frame, floor_box's own, meeting the first
+	# at the seam where wall ends and floor begins rather than replacing it. Gapped at the
+	# top to the same width as the door, so the opening carries on down through this edge
+	# instead of the floor's frame closing it off flush.
+	var opening := _door_opening(wall, floor_box)
+	_draw_room_frame(floor_box, true, Vector2(opening.position.x, opening.end.x))
 
 	# The cells, faintly, while something is being carried: the drop is snapped, and the
 	# player should be able to see what it is snapping to.

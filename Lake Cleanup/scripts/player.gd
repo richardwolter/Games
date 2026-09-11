@@ -28,16 +28,15 @@ const ACCEL := WALK_SPEED / ACCEL_TIME
 
 ## How far out the character may walk past the waterline, in world pixels.
 ##
-## Barely any: the last step off the beach wets the boots and no more. The water is drawn to
-## a line a little inside this one, so six pixels past the island's own outline puts the
-## angler at the water rather than in it.
+## A short wade: was six pixels, which only wet the boots; twenty more lets the angler step
+## properly into the shallows off the beach.
 ##
 ## Pixels, not a fraction of the island's radius as it used to be. A fraction is a different
 ## distance at every angle once the projection has stretched one diagonal against the other:
 ## at 1.06 the angler could paddle four tenths of a tile out on the eastern shore and barely
 ## a tenth on the northern one, and the bigger the island got the worse the gap. See
 ## `Iso.past_island`.
-const WALK_LIMIT := 6.0
+const WALK_LIMIT := 26.0
 
 ## How much of the figure the water swallows once it is past the waterline, in source pixels
 ## at the far end of that step out.
@@ -72,9 +71,16 @@ const PRINT_OFFSET := 3.0
 ## that uses it says so — the angler walks the same whether or not the water is drawn.
 var splash: WaterSplash
 
+## The daylight, handed over by the level. Null anywhere there is no lake — the shed screen,
+## a test — where the angler simply casts no shadow.
+var day: DayCycle
+
 ## The island's trail of footprints, handed over the same way. Null until then, and walking
 ## works the same either way — the marks are a nicety, not a thing the walk depends on.
 var prints: Footprints
+
+## The foam where the boots cut the surface while wading. See WaterlineFoam.
+var _foam: WaterlineFoam
 
 ## The rings of water round the ankles of somebody standing in the shallows: how many are
 ## in the air at once, how long each takes to spread and fade, how wide it gets, and how
@@ -142,8 +148,7 @@ const WALK_FRAME := 0.1
 
 ## Same idea for the second sheet's own cycles: a seventeen-frame run has more frames to get
 ## through than the six-frame stride above, so it is held for less each, and the sixteen-frame
-## cast is played once — see CAST_FRAME's own note — not looped, so its rate only has to look
-## right for one pass.
+## cast loops for as long as the net is out — see _cast_time.
 const RUN_FRAME_V2 := 0.05
 const CAST_FRAME_V2 := 0.04
 
@@ -255,9 +260,16 @@ var use_v2 := false
 var _toggle_was_down := false
 
 ## Seconds into the cast animation, or negative while none is playing. Only the second sheet
-## has one; see start_cast(). Counts up past the last frame rather than looping or resetting,
-## so "still in the last frame" is the same test as "still casting" — see _paint_key().
+## has one; see start_cast(). Counts up for the whole haul, and _pose_v2() wraps it, so the
+## throw repeats while the net is dragged home and only end_cast() drops it back to idle.
 var _cast_time := -1.0
+
+## How long a cast holds the angler still, in seconds — long enough to see the throw play
+## out before the boots are free again. Tune by feel; this is a first guess.
+const CAST_LOCK := 1.0
+
+## Seconds left of that lock, or 0 once it has run out and walking is free again.
+var _cast_lock := 0.0
 
 ## How tall the figure draws inside its cell and where its feet sit in it, taken once from
 ## one frame and used for every frame.
@@ -277,6 +289,9 @@ func _ready() -> void:
 	# set on the project: the piers are drawn at four tenths of their size and the hut at half
 	# of its, and nearest on a shrink with no mipmaps sets both of them crawling.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_foam = WaterlineFoam.new()
+	_foam.name = &"Foam"
+	add_child(_foam)
 	_wear_tone()
 	_load_art()
 	_load_art_v2()
@@ -309,7 +324,7 @@ func stand_at(tile: Vector2) -> void:
 ## walking out from the island's middle the way the asked-for spot already leans. Anywhere
 ## legal is returned untouched.
 func _nearest_standing(tile: Vector2) -> Vector2:
-	if Iso.past_island(tile) < WALK_LIMIT and not Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP):
+	if _wet_by(tile) < WALK_LIMIT and not Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP):
 		return tile
 	var away := tile - Iso.ISLAND_CENTRE
 	# Dead centre has no direction to lean; south-east is where the door faces.
@@ -318,9 +333,53 @@ func _nearest_standing(tile: Vector2) -> Vector2:
 	away = away.normalized()
 	for step in 60:
 		var out := Iso.ISLAND_CENTRE + away * (0.1 * float(step))
-		if Iso.past_island(out) < WALK_LIMIT and not Iso.in_shed(out.x, out.y, Iso.SHED_KEEP):
+		if _wet_by(out) < WALK_LIMIT and not Iso.in_shed(out.x, out.y, Iso.SHED_KEEP):
 			return out
 	return tile
+
+
+## How far into the water a spot is, in world pixels, or 0 on the island's drawn ground.
+##
+## The tile decides dry, not the curve: a corner of sand that sticks out past the outline is
+## still sand to stand on, and a notch of water between two diamonds is water even inside it.
+## Off the sand the curve still decides how deep, with a pixel's floor so a notch inside the
+## outline reads as wet rather than as dry ground nobody can see.
+func _wet_by(at: Vector2) -> float:
+	if Iso.on_island_sand(at):
+		return 0.0
+	return maxf(Iso.past_island(at), 1.0)
+
+
+## Where a blocked step goes instead: along the wall rather than into it.
+##
+## Walking into the edge of how far out the angler may wade used to try each tile axis alone,
+## and tile axes are diagonals on screen — against most of a curved shore neither of them is
+## along it, so both failed and the angler stuck fast. This takes the part of the step that
+## heads out of the island away and keeps the rest, which is the way along the shore at this
+## point. The curve bends away from a straight tangent, so the same slide nudged a little back
+## in is tried next; the axes stay as a last resort for the stepped sand corners, where the
+## wall is a tile edge rather than the curve. Anything the shed or the crate refuses is still
+## refused — every candidate goes through _can_stand.
+func _slide(move: Vector2) -> Vector2:
+	# Which way is out, in tile space, off the same distance the walking limit is measured in.
+	var e := 0.05
+	var out := Vector2(
+		Iso.past_island(tile_pos + Vector2(e, 0.0)) - Iso.past_island(tile_pos - Vector2(e, 0.0)),
+		Iso.past_island(tile_pos + Vector2(0.0, e)) - Iso.past_island(tile_pos - Vector2(0.0, e))
+	)
+	var candidates: Array[Vector2] = []
+	if out.length_squared() > 0.000001:
+		out = out.normalized()
+		var along := move - out * maxf(move.dot(out), 0.0)
+		if along.length_squared() > 0.0000001:
+			candidates.append(tile_pos + along)
+			candidates.append(tile_pos + along - out * along.length() * 0.3)
+	candidates.append(tile_pos + Vector2(move.x, 0.0))
+	candidates.append(tile_pos + Vector2(0.0, move.y))
+	for at in candidates:
+		if _can_stand(at):
+			return at
+	return tile_pos
 
 
 ## Read the cut sheets. False means no art and the placeholder stands in, the same bargain
@@ -411,13 +470,22 @@ func _view2() -> StringName:
 	return &"south" if on_screen.y > 0.0 else &"north"
 
 
-## Starts the cast animation on the second sheet, played once and then held — see _cast_time
+## Starts the cast animation on the second sheet, looped until the net is home — see _cast_time
 ## and _paint_key(). A no-op on the first sheet and while the second sheet's art is missing:
 ## the net still flies and comes home exactly as it always has either way (see net.gd), this
 ## only decides what the angler is shown holding while it does.
 func start_cast() -> void:
 	if use_v2 and not _poses2.is_empty():
 		_cast_time = 0.0
+		_cast_lock = CAST_LOCK
+
+
+## Drops the held cast pose back to idle. Called once the net is home, so a haul that ends
+## empty-handed lets go of the pose the same as one that comes back full — see net.gd's
+## _come_home().
+func end_cast() -> void:
+	_cast_time = -1.0
+	_cast_lock = 0.0
 
 
 ## TOGGLE_KEY, edge-detected. Only flips onto the second sheet if it actually loaded, so a
@@ -432,14 +500,29 @@ func _poll_toggle() -> void:
 	_toggle_was_down = down
 
 
-## Where the line is drawn from and where the net comes home to, in world space.
+## Where the hands are, against the point the figure stands on: how far out in front of the body
+## along the way it faces, in world pixels, and how high up it, as a fraction of HEIGHT.
+##
+## The rope leaves from here. It used to leave from sixteen pixels out at nearly shoulder
+## height, which was open air beside the figure — the rope started in nothing and the gap
+## between it and the angler read as a line nobody was holding. A few pixels out at the waist
+## is inside the silhouette from every side, so the rope always starts on the body.
+const HAND_REACH := 4.0
+const HAND_HEIGHT := 0.5
+
+
+## Where the rope is held and where the catch is thrown from, in world space.
 ##
 ## Still called the rod tip, and there is still no rod: the sprite holds nothing, and drawing
 ## one over it put a stick through the figure that read as part of the character being wrong.
-## The line has to leave from somewhere in front of them either way, and this is that point.
+## It is the hands now — see HAND_REACH.
 func rod_tip() -> Vector2:
-	return position + Vector2(facing.x - facing.y, (facing.x + facing.y) * 0.5).normalized() \
-		* 16.0 + Vector2(0.0, -HEIGHT * 0.72)
+	return position + _screen_facing() * HAND_REACH + Vector2(0.0, -HEIGHT * HAND_HEIGHT)
+
+
+## The way the figure faces, as a direction on the screen rather than on the tile plane.
+func _screen_facing() -> Vector2:
+	return Vector2(facing.x - facing.y, (facing.x + facing.y) * 0.5).normalized()
 
 
 func _place() -> void:
@@ -449,6 +532,18 @@ func _place() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_poll_toggle()
+
+	# The throw itself holds the boots still — a cast that let the player walk out from
+	# under it never finished playing. Input is read and thrown away rather than skipped,
+	# so a held direction takes hold the instant the lock lifts instead of waiting for a
+	# fresh key-down.
+	if _cast_lock > 0.0:
+		_cast_lock = maxf(_cast_lock - delta, 0.0)
+		_step = 0.0
+		_speed = move_toward(_speed, 0.0, ACCEL * delta)
+		_cast_time += delta
+		_repaint()
+		return
 
 	# The arrows and WASD both feed these, which is what the walk_* actions are for. See
 	# the [input] block in project.godot.
@@ -477,19 +572,12 @@ func _process(delta: float) -> void:
 	var step := Iso.world_to_tile(push.normalized() * Iso.TILE_W).normalized()
 	facing = step
 	_speed = move_toward(_speed, WALK_SPEED, ACCEL * delta)
-	var wanted := tile_pos + step * _speed * delta
+	var move := step * _speed * delta
+	var wanted := tile_pos + move
 	if _can_stand(wanted):
 		tile_pos = wanted
 	else:
-		# Blocked head-on. Try each axis alone, so walking into the shore slides along it
-		# instead of sticking — the island is a wobbly ellipse and a hard stop on it feels
-		# like a bug every time.
-		var slide_x := tile_pos + Vector2(step.x, 0.0) * _speed * delta
-		var slide_y := tile_pos + Vector2(0.0, step.y) * _speed * delta
-		if _can_stand(slide_x):
-			tile_pos = slide_x
-		elif _can_stand(slide_y):
-			tile_pos = slide_y
+		tile_pos = _slide(move)
 	_step += delta
 	_wake()
 	_place()
@@ -502,7 +590,7 @@ func _process(delta: float) -> void:
 ## Nothing until the waterline and the full depth at the end of the step past it, which is as
 ## far out as `WALK_LIMIT` lets anyone go.
 func _wading() -> float:
-	var out := Iso.past_island(tile_pos)
+	var out := _wet_by(tile_pos)
 	if out <= 0.0:
 		return 0.0
 	var into := clampf(out / maxf(WALK_LIMIT, 0.0001), 0.0, 1.0)
@@ -511,7 +599,7 @@ func _wading() -> float:
 
 ## A ring of disturbed water behind the boots, if they are in the water at all.
 func _wake() -> void:
-	if splash == null or Iso.past_island(tile_pos) <= 0.0:
+	if splash == null or _wet_by(tile_pos) <= 0.0:
 		return
 	splash.wake(self, Iso.tile_to_world(tile_pos.x, tile_pos.y), WAKE_SPAN, WAKE_EVERY)
 
@@ -524,7 +612,7 @@ func _wake() -> void:
 func _leave_print() -> void:
 	var moved := position.distance_to(_last_print_pos)
 	_last_print_pos = position
-	if prints == null or Iso.past_island(tile_pos) > 0.0:
+	if prints == null or _wet_by(tile_pos) > 0.0:
 		return
 	_dist_since_print += moved
 	if _dist_since_print < PRINT_SPACING:
@@ -545,7 +633,7 @@ func _leave_print() -> void:
 ## collision shape for the same reason the shore is — there is no physics in this game, and
 ## a question asked before each step cannot wedge the character inside anything.
 func _can_stand(at: Vector2) -> bool:
-	if Iso.past_island(at) >= WALK_LIMIT:
+	if _wet_by(at) >= WALK_LIMIT:
 		return false
 	# Not through the crate, and only just: a box a tile and a third across, with a keep-out
 	# barely wider than its own planks. Enforced the way the hut is — on somebody who is not
@@ -598,22 +686,28 @@ func _repaint() -> void:
 
 
 ## Which frame of which pose is currently showing, as one number.
+## The sun, coarsely, so a swinging shadow repaints the figure without repainting it every
+## frame. Mirrors Dog._sun_key.
+func _sun_key() -> int:
+	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
+
+
 func _paint_key() -> int:
 	var walking := _step > 0.0
 	# How deep the boots are is part of the picture too: stepping into the shallows changes
 	# what is drawn without changing which frame it is, and while they are in the water the
 	# rings round them move on their own clock.
 	var sunk := _wading()
-	var rings := int(_time / RIPPLE_STEP) if sunk > 0.0 else 0
+	var rings := int(_time / RIPPLE_STEP) if sunk > 0.0 and walking else 0
 	if use_v2:
 		var pose: Dictionary = _pose_v2(walking)
-		return hash([true, pose["pose"], pose["index"], sunk, rings])
+		return hash([true, pose["pose"], pose["index"], sunk, rings, _sun_key()])
 	var held := WALK_FRAME if walking else IDLE_FRAME
-	return hash([walking, _view()[0], int(_time / held), sunk, rings])
+	return hash([walking, _view()[0], int(_time / held), sunk, rings, _sun_key()])
 
 
 ## The pose and frame index the second sheet is showing right now: idle, run, or the cast
-## once through and held — see start_cast() and _cast_time. Shared between _paint_key() and
+## looping for as long as the net is out — see start_cast() and _cast_time. Shared between _paint_key() and
 ## _draw() so the two can never disagree about which frame that is.
 func _pose_v2(walking: bool) -> Dictionary:
 	var dir := _view2()
@@ -621,7 +715,7 @@ func _pose_v2(walking: bool) -> Dictionary:
 		var pose := StringName("cast_%s" % dir)
 		var frames: Array = _poses2.get(pose, [])
 		if not frames.is_empty():
-			return {"pose": pose, "index": mini(int(_cast_time / CAST_FRAME_V2), frames.size() - 1)}
+			return {"pose": pose, "index": posmod(int(_cast_time / CAST_FRAME_V2), frames.size())}
 	if walking:
 		var pose := StringName("run_%s" % dir)
 		var frames: Array = _poses2.get(pose, [])
@@ -639,8 +733,12 @@ func _pose_v2(walking: bool) -> Dictionary:
 ## circle on the water rather than as a hoop standing up out of it. They spread and fade with
 ## how deep the boots are: a toe in the shallows barely marks the water and a step further out
 ## is a bootful.
+##
+## Only while walking. Standing still in the shallows, the foam collar on the cut is enough to
+## say the boots are in the water; rings pulsing out forever round somebody who is not moving
+## read as the water fidgeting.
 func _draw_ripples(sunk: float) -> void:
-	if sunk <= 0.0:
+	if sunk <= 0.0 or _step <= 0.0:
 		return
 	var deep := clampf(sunk / WADE_SINK, 0.0, 1.0)
 	for i in RIPPLE_RINGS:
@@ -670,19 +768,20 @@ func _draw() -> void:
 	# picture down instead of moving it.
 	var land_shift := 0.0 if sunk > 0.0 else LAND_SINK
 
-	# The shadow, which is what puts them on the ground on a plane seen at an angle. Drawn
-	# whether or not the art loaded: it is the contact point, not the figure. Tightened in a
-	# little on the step, the same squash a boot planting down puts into a footprint — a shadow
-	# that never moves under a figure that is visibly walking is the tell that it is a painted
-	# disc rather than a shadow.
-	var squash := 1.0 - 0.1 * absf(sin(_step * 11.0)) if _step > 0.0 else 1.0
-	_blot(
-		Vector2(0.0, land_shift), Vector2(14.0, 7.0) * squash, Color(0.0, 0.0, 0.0, 0.32)
-	)
+	# The shadow, which is what puts them on the ground on a plane seen at an angle.
+	_draw_shadow(sunk, land_shift)
 
 	# And the water they have disturbed, over the shadow and under the figure — the rings are
 	# on the surface the boots are in, not on the boots.
 	_draw_ripples(sunk)
+
+	# The foam on the cut, behind the figure, while any of it is under.
+	if _foam != null:
+		var edge := _cut_edge(sunk, land_shift)
+		if edge.is_empty():
+			_foam.clear()
+		else:
+			_foam.lay(edge[0], edge[1])
 
 	if use_v2:
 		_draw_v2(sunk, land_shift)
@@ -690,12 +789,64 @@ func _draw() -> void:
 		_draw_v1(sunk, land_shift)
 
 
+## Where the wading cut ends the picture, as the two ends of that edge, or nothing on dry land.
+##
+## Across the body rather than the cell: the frame's ink box says how wide the figure actually
+## is, and a collar the width of the cell is foam sat on open water either side of the legs.
+## The height is the bottom of the box the cut frame is drawn into, which is the cut itself.
+func _cut_edge(sunk: float, land_shift: float) -> Array:
+	if sunk <= 0.0:
+		return []
+	var box: Rect2
+	var ink: Rect2
+	var scale: float
+	var mirrored := false
+	if use_v2:
+		var shown := _frame_v2(sunk, land_shift)
+		if shown.is_empty():
+			return []
+		box = shown["box"]
+		ink = shown["ink"]
+		scale = shown["scale"]
+	else:
+		var shown := _frame_v1(sunk, land_shift)
+		if shown.is_empty():
+			return []
+		box = shown["box"]
+		ink = (shown["frame"] as Dictionary)["ink"]
+		scale = shown["scale"]
+		# The side row turned over for the other direction: the ink is measured on the
+		# unturned frame, so it sits as far from the right edge as it was from the left.
+		mirrored = bool((shown["view"] as Array)[1])
+	var y := box.end.y
+	var left := box.position.x + ink.position.x * scale
+	if mirrored:
+		left = box.end.x - (ink.position.x + ink.size.x) * scale
+	return [Vector2(left, y), Vector2(left + ink.size.x * scale, y)]
+
+
 ## The first sheet: three drawn rows, one of them mirrored for the fourth direction, and a
 ## hat drawn on top. See the module doc on _sheet/_mirror and _draw_hat().
 func _draw_v1(sunk: float, land_shift: float) -> void:
-	if _poses.is_empty():
+	var shown := _frame_v1(sunk, land_shift)
+	if shown.is_empty():
 		_draw_blocked()
 		return
+	_stamp_v1(shown, Color.WHITE)
+	# Over the figure, and after it, because it is worn rather than drawn into the sheet.
+	_draw_hat(
+		shown["box"] as Rect2, (shown["frame"] as Dictionary)["ink"],
+		float((shown["frame"] as Dictionary)["head"]), float(shown["scale"]),
+		shown["view"] as Array
+	)
+
+
+## Which frame of the first sheet is showing, and the box it goes in. Pulled out of the draw
+## because the shadow wants exactly the same answer: a shadow picked from a different frame
+## than the figure is a shadow of somebody else.
+func _frame_v1(sunk: float, land_shift: float) -> Dictionary:
+	if _poses.is_empty():
+		return {}
 
 	var view := _view()
 	var walking := _step > 0.0
@@ -703,8 +854,7 @@ func _draw_v1(sunk: float, land_shift: float) -> void:
 		"%s_%s" % ["walk" if walking else "idle", view[0]]
 	)
 	if not _poses.has(pose):
-		_draw_blocked()
-		return
+		return {}
 	var frames: Array = _poses[pose]
 	var held := WALK_FRAME if walking else IDLE_FRAME
 	var frame: Dictionary = frames[posmod(int(_time / held), frames.size())]
@@ -731,37 +881,54 @@ func _draw_v1(sunk: float, land_shift: float) -> void:
 		Vector2(-size.x * 0.5, -_stand_foot * scale + land_shift), size
 	)
 
-	# One side row for two directions, so the other one comes off the turned-over sheet. The
-	# frame is at the mirrored place in it — as far from the right edge as it was from the
-	# left — and the box it goes in does not move, because it is centred on the angler.
-	if bool(view[1]):
+	return {
+		"region": region, "box": box, "scale": scale, "frame": frame, "view": view,
+	}
+
+
+## One stamp of the first sheet, in whatever colour is asked for: white for the figure, flat
+## ink for its shadow.
+##
+## One side row serves two directions, so the other one comes off the turned-over sheet. The
+## frame is at the mirrored place in it — as far from the right edge as it was from the left
+## — and the box it goes in does not move, because it is centred on the angler.
+func _stamp_v1(shown: Dictionary, tint: Color) -> void:
+	var region: Rect2 = shown["region"]
+	var box: Rect2 = shown["box"]
+	if bool((shown["view"] as Array)[1]):
 		draw_texture_rect_region(
 			_mirror, box,
 			Rect2(
 				Vector2(_sheet_wide - region.position.x - region.size.x, region.position.y),
 				region.size
-			)
+			),
+			tint
 		)
-	else:
-		draw_texture_rect_region(_sheet, box, region)
-
-	# Over the figure, and after it, because it is worn rather than drawn into the sheet.
-	_draw_hat(box, frame["ink"], float(frame["head"]), scale, view)
+		return
+	draw_texture_rect_region(_sheet, box, region, tint)
 
 
 ## The second sheet: four drawn directions, no mirroring, and no hat drawn here — this one
 ## paints its own, straight into the frame. See _load_art_v2() and _pose_v2().
 func _draw_v2(sunk: float, land_shift: float) -> void:
-	if _poses2.is_empty():
+	var shown := _frame_v2(sunk, land_shift)
+	if shown.is_empty():
 		_draw_blocked()
 		return
+	draw_texture_rect_region(_sheet2, shown["box"] as Rect2, shown["region"] as Rect2)
+
+
+## Which frame of the second sheet is showing, and the box it goes in. Same split, and the
+## same reason, as _frame_v1().
+func _frame_v2(sunk: float, land_shift: float) -> Dictionary:
+	if _poses2.is_empty():
+		return {}
 
 	var walking := _step > 0.0
 	var chosen: Dictionary = _pose_v2(walking)
 	var frames: Array = _poses2.get(chosen["pose"], [])
 	if frames.is_empty():
-		_draw_blocked()
-		return
+		return {}
 	var frame: Dictionary = frames[chosen["index"]]
 	var region: Rect2 = frame["region"]
 	var ink: Rect2 = frame["ink"]
@@ -787,7 +954,7 @@ func _draw_v2(sunk: float, land_shift: float) -> void:
 		Vector2(-(ink.position.x + ink.size.x * 0.5) * scale, -_stand_foot2 * scale + land_shift),
 		size
 	)
-	draw_texture_rect_region(_sheet2, box, region)
+	return {"region": region, "box": box, "scale": scale, "ink": ink}
 
 
 ## A length rounded onto the figure's own pixel grid.
@@ -879,6 +1046,39 @@ func _draw_blocked() -> void:
 		HAT_STRAW
 	)
 
+
+
+## The angler's shadow: the frame they are drawn on, laid out on the ground away from the
+## sun, in flat ink.
+##
+## It used to be an ellipse squashed a little on the step. That put a dark patch under a
+## walking figure and called it a shadow; this is the figure's own outline, so it swings a
+## rod when they swing a rod. Wading is deliberately included: the same cut that takes the
+## boots off the picture takes them off the shadow, so what is under the water does not cast
+## on top of it.
+##
+## No day, no shadow — see Dog._draw_shadow for why a guessed sun is worse than none.
+func _draw_shadow(sunk: float, land_shift: float) -> void:
+	if day == null:
+		return
+	var ink := Shade.tint(day.ink)
+	var down := Shade.lying(Vector2(0.0, land_shift), day.lean, day.stretch)
+	if use_v2:
+		var second := _frame_v2(sunk, land_shift)
+		if second.is_empty():
+			return
+		draw_set_transform_matrix(down)
+		draw_texture_rect_region(
+			_sheet2, second["box"] as Rect2, second["region"] as Rect2, ink
+		)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
+	var first := _frame_v1(sunk, land_shift)
+	if first.is_empty():
+		return
+	draw_set_transform_matrix(down)
+	_stamp_v1(first, ink)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The shadow under the figure: a flat ellipse lying on the plane.

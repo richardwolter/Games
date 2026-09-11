@@ -21,6 +21,11 @@ extends Node2D
 ## happens to it; the net does not know the yard exists.
 signal landed(cargo: PackedInt32Array)
 
+## A piece lifted off the tile field, the moment the mouth closes on it — not when it
+## reaches the angler. The water is cleaner the instant the piece is out of it, so the
+## lake reads its pollution off this rather than off the haul arriving home.
+signal caught(def_index: int)
+
 ## A pigeon the net closed on, in world coordinates. Paid for on the spot rather than
 ## carried home: a bird is not cargo, and it is certainly not going in the yard.
 signal caught_bird(at: Vector2)
@@ -202,10 +207,20 @@ const CATCH_PACKED := 0.62
 const RING_STEP := 0.2
 
 ## The aiming marker: what a throw at the pointer would look like before it is thrown.
-## Green-white where the throw would take, red where it would not — over the island, or out
-## past what the rod can reach.
-const AIM_OK := Color(0.86, 0.97, 0.88)
+##
+## Three readings, on two axes. Whether the throw is allowed at all is the line: solid for a
+## legal cast, dashed for one the rod refuses — too far, or over the island. Whether the
+## throw is worth making is the colour: green over water with something in it, red over water
+## with nothing the net could lift. A refused throw gets no colour, because a verdict on a
+## cast that cannot happen is noise.
+const AIM_OK := Color(0.35, 0.85, 0.45)
 const AIM_NO := Color(0.92, 0.25, 0.22)
+const AIM_FAR := Color(0.93, 0.94, 0.91)
+
+## How solid each of those reads. The verdict colours carry the whole point of the marker, so
+## they sit well above the pale ghost this used to be.
+const AIM_ALPHA := 0.8
+const AIM_FAR_ALPHA := 0.55
 
 ## Set from the lake's upgrade levels at cast time, so a cast runs on the numbers the
 ## player had when they paid for them.
@@ -289,10 +304,30 @@ var shut: float = 0.0
 var near: float = 0.0
 
 
+## The rope, on a layer of its own.
+##
+## Drawn by this node it was under the net sprite (which is drawn last, over the catch) and
+## under the angler (z 9 against this node's 8) — so it vanished into the bag. On its own child
+## it is always drawn after the net, and still under the figure, which hides where it starts.
+class RopeLayer extends Node2D:
+	var line := PackedVector2Array()
+
+	func _draw() -> void:
+		if line.size() >= 2:
+			CastNet._draw_rope(self, line)
+
+
+var _rope: RopeLayer
+
+
 func _ready() -> void:
 	position = Vector2.ZERO
 	if angler != null:
 		tile_pos = angler.tile_pos
+	_rope = RopeLayer.new()
+	_rope.name = &"Rope"
+	_rope.z_as_relative = false
+	add_child(_rope)
 	_load_art()
 
 
@@ -572,6 +607,9 @@ func _leave_it_there() -> void:
 	if sfx != null:
 		sfx.play_splash(0.45)
 	state = State.IDLE
+	# The net stays out there, but the angler is done with it — stop the looping throw.
+	if angler != null:
+		angler.end_cast()
 	_settled_age = 0.0
 	shut = 0.0
 	near = 0.0
@@ -680,7 +718,9 @@ func _take_from(reach: Array[int]) -> void:
 			continue
 		var at := grid.surface_pos(index)
 		var def := grid.def_at(index, k)
-		catch.append(grid.take(index, k))
+		var taken := grid.take(index, k)
+		catch.append(taken)
+		caught.emit(taken)
 		var weight := clampf(0.2 + def.size.x / 40.0, 0.0, 0.85)
 		if splash != null:
 			# Inside the mouth, always. A piece's drawn position carries the drift it was
@@ -695,6 +735,7 @@ func _take_from(reach: Array[int]) -> void:
 func _come_home() -> void:
 	state = State.IDLE
 	tile_pos = angler.tile_pos
+	angler.end_cast()
 	var lot := catch.duplicate()
 	catch.resize(0)
 	if not lot.is_empty():
@@ -959,17 +1000,59 @@ func _draw_aim() -> void:
 	if legal and enchanted():
 		_draw_lay_ghost(pointer)
 
-	# The mouth as it would land, or a red ring saying it would not land at all. One ring
-	# either way, at the pointer: an earlier version added a second one out where a refused
-	# throw would have stopped, and that pale mark drifting about over the island and over
-	# the angler was the white circle that had to go. The refusal itself is worth showing —
-	# a click that does nothing is worse than a click the game says no to.
-	var tint := AIM_OK if legal else AIM_NO
+	# The mouth as it would land. One ring either way, at the pointer: an earlier version
+	# added a second one out where a refused throw would have stopped, and that pale mark
+	# drifting about over the island and over the angler was the white circle that had to go.
+	# The refusal itself is worth showing — a click that does nothing is worse than a click
+	# the game says no to.
+	var tint := AIM_FAR
+	var alpha := AIM_FAR_ALPHA
+	if legal:
+		var takes := _would_catch(pointer)
+		tint = AIM_OK if takes else AIM_NO
+		alpha = AIM_ALPHA
+	# 48 points rather than 24: the dashes are drawn as every other segment of this same
+	# ring, and a coarse circle broken in half reads as a polygon rather than as a dashed
+	# line. The solid case is happy to be smoother too.
 	var ghost := PackedVector2Array()
-	for i in 25:
-		var angle := TAU * float(i) / 24.0
+	for i in 49:
+		var angle := TAU * float(i % 48) / 48.0
 		ghost.append(pointer + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
-	draw_polyline(ghost, Color(tint.r, tint.g, tint.b, 0.5 if legal else 0.8), 1.5)
+	var ink := Color(tint.r, tint.g, tint.b, alpha)
+	if legal:
+		draw_polyline(ghost, ink, 1.5)
+	else:
+		# Dashed, because a refused throw is a rule rather than a thing on the water — the
+		# same reason the laid-net ghost is dashed.
+		for i in 24:
+			draw_line(ghost[i * 2], ghost[i * 2 + 1], ink, 1.5)
+
+
+## Would a cast landing here bring anything home?
+##
+## Only what the mouth covers where it lands, not the corridor it sweeps on the way back: the
+## marker is answering the question the pointer is asking, which is about this spot. A cast
+## called dead can still scoop something up on the haul, and that is a gift rather than a
+## broken promise.
+##
+## Rubbish the net is strong enough to lift, and birds. Not charms — a charm has its own pull
+## on the eye and the marker turning green for one would be the game aiming for the player.
+## The hold has no say either: a net with no room left is a different problem, and a red ring
+## over a full patch would read as the patch being empty.
+func _would_catch(pointer: Vector2) -> bool:
+	if grid == null:
+		return false
+	var here := grid.tile_at(pointer)
+	if here < 0:
+		return false
+	# The full width, not `sweep_radius()`: the mouth lands open and only purses on the way
+	# home, so what the ring is drawn at is what would close over this spot.
+	if flock != null and not flock.perched_near(Iso.world_to_tile(pointer), radius).is_empty():
+		return true
+	for index in grid.tiles_within(here, radius):
+		if grid.reachable_slot(index, 1, power) >= 0:
+			return true
+	return false
 
 
 ## The edge of what the angler can reach, at `strength` of full visibility.
@@ -1010,6 +1093,64 @@ func _charm_tint() -> Color:
 
 
 
+## The rope from the rod to the net: how thick, its colours, and how far apart the twists of
+## its strands are.
+##
+## It was a pale 1.5 px line, which read as fishing wire — too thin to be what hauls a bag of
+## junk out of a lake, and near white against water that is itself pale. A hauling rope is
+## brown and has some body: a dark edge so it holds against the water and the sand, a lighter
+## core, and short slanted marks across it at a steady pitch, which is the lay of the strands
+## and the whole of what makes a thick line read as rope rather than as a brown wire.
+const ROPE_WIDE := 3.6
+const ROPE_EDGE := Color(0.24, 0.15, 0.08, 0.95)
+const ROPE_CORE := Color(0.55, 0.38, 0.21, 1.0)
+const ROPE_TWIST := Color(0.36, 0.23, 0.12, 1.0)
+const ROPE_PITCH := 4.0
+
+
+## Hand the rope layer this frame's rope. An empty line takes the rope away.
+func _lay_rope(line: PackedVector2Array) -> void:
+	if _rope == null:
+		return
+	# Level with this node, always: being its child still draws it after the net sprite, and
+	# the angler (z 9) is drawn over it whichever way they face. The rope starts inside the
+	# figure's outline, so the body hides its cut end and it reads as coming out of the hands.
+	# Drawn over the figure, that square end showed on the front of the body.
+	_rope.z_index = z_index
+	_rope.line = line
+	_rope.queue_redraw()
+
+
+## Draw the rope along `line` onto `on`: the edge, the core inside it, then a twist mark every
+## ROPE_PITCH pixels, slanted across the rope the same way all the way along.
+static func _draw_rope(on: CanvasItem, line: PackedVector2Array) -> void:
+	on.draw_polyline(line, ROPE_EDGE, ROPE_WIDE)
+	on.draw_polyline(line, ROPE_CORE, ROPE_WIDE - 1.6)
+	var half := (ROPE_WIDE - 1.6) * 0.5
+	# Walked by distance rather than by segment, so the twists stay evenly spaced where the
+	# sag bunches the points together and where it stretches them apart.
+	var carried := ROPE_PITCH * 0.5
+	var marks := PackedVector2Array()
+	for i in line.size() - 1:
+		var a := line[i]
+		var b := line[i + 1]
+		var length := a.distance_to(b)
+		if length < 0.001:
+			continue
+		var along := (b - a) / length
+		var across := Vector2(-along.y, along.x)
+		var s := carried
+		while s < length:
+			var at := a + along * s
+			# Slanted: the back end of the mark a little behind the front, on opposite sides.
+			marks.append(at - across * half - along * half * 0.8)
+			marks.append(at + across * half + along * half * 0.8)
+			s += ROPE_PITCH
+		carried = s - length
+	if not marks.is_empty():
+		on.draw_multiline(marks, ROPE_TWIST, 1.0)
+
+
 ## The range ring, the line, the net, and whatever is being dragged in it.
 func _draw() -> void:
 	if angler == null:
@@ -1022,6 +1163,7 @@ func _draw() -> void:
 	# reached is still shown, at the moment it is being asked: see `_draw_aim`, which marks
 	# the pointer and, when the pointer is out of range, the furthest point along the way.
 	if state == State.IDLE:
+		_lay_rope(PackedVector2Array())
 		_draw_aim()
 		return
 
@@ -1043,7 +1185,7 @@ func _draw() -> void:
 	for i in 13:
 		var t := float(i) / 12.0
 		line.append(tip.lerp(end, t) + Vector2(0.0, sin(t * PI) * sag))
-	draw_polyline(line, Color(0.90, 0.92, 0.88, 0.75), 1.5)
+	_lay_rope(line)
 
 	# The catch always goes under the net, open mouth or closed bag. The whole read of a
 	# netted load is that the junk is inside the mesh, and junk drawn over the mesh is junk

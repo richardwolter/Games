@@ -21,7 +21,13 @@ const ART := "res://assets/shop.json"
 ## board size that was a fraction of a window. Three multiplications between "how big is this
 ## writing" and any number anyone chose. Now the row is the unit: one row is as tall as it
 ## needs to be for its text and its icon, and the board is however tall its rows come to.
+## How tall a row is drawn, and how short it may be squeezed to before the board gives up
+## and drops one. The board grows a row at a time until it is as tall as the window allows,
+## and then the rows themselves have to give: a shop that quietly stops drawing its last two
+## upgrades — which is what a fixed row height did the day the dog got two of its own — is
+## worse than a shop drawn slightly tighter.
 const ROW_TALL := 56.0
+const ROW_LEAST := 40.0
 const ROW_GAP := 6.0
 const BOARD_WIDE := 720.0
 const BOARD_PAD := 22.0
@@ -88,6 +94,10 @@ var icons := {}
 var _sheet: Texture2D
 var _pieces := {}
 var _board := Rect2()
+
+## How tall a row is on the board as it stands, which is ROW_TALL until there are more rows
+## than the window has height for. Every measurement down a row is taken off this.
+var _row_tall: float = ROW_TALL
 var _board_rows: int = -1
 var _row_boxes: Array[Rect2] = []
 var _hovered: int = -1
@@ -151,7 +161,12 @@ func _load_art() -> bool:
 func _lay_out() -> void:
 	var count := maxi(rows.size(), 1)
 	var head := float(Style.TEXT_TITLE) + BOARD_PAD
-	var tall := head + float(count) * ROW_TALL + float(count - 1) * ROW_GAP + BOARD_PAD * 2.0
+	var spare := head + float(count - 1) * ROW_GAP + BOARD_PAD * 2.0
+	# What is left for the rows themselves once the heading and the padding have had theirs,
+	# shared out and held between the two heights a row may be drawn at.
+	var room := (size.y - 40.0 - spare) / float(count)
+	_row_tall = clampf(room, ROW_LEAST, ROW_TALL)
+	var tall := spare + float(count) * _row_tall
 	var wide := minf(BOARD_WIDE, size.x - 40.0)
 	tall = minf(tall, size.y - 40.0)
 	_board = Rect2(
@@ -251,7 +266,7 @@ func _draw_rows() -> void:
 
 	for i in rows.size():
 		var row: Dictionary = rows[i]
-		var box := Rect2(left, top + (ROW_TALL + ROW_GAP) * float(i), wide, ROW_TALL)
+		var box := Rect2(left, top + (_row_tall + ROW_GAP) * float(i), wide, _row_tall)
 		if box.end.y > _board.end.y - BOARD_PAD:
 			break
 		_row_boxes.append(box)
@@ -270,7 +285,9 @@ func _draw_rows() -> void:
 		Style.plaque(self, box, Style.WOOD_LIT if lit else Style.WOOD_DEEP)
 
 		# The icon, in a tile as tall as the row.
-		var slot := Rect2(box.position + Vector2(4.0, 4.0), Vector2(ROW_TALL - 8.0, ROW_TALL - 8.0))
+		var slot := Rect2(
+			box.position + Vector2(4.0, 4.0), Vector2(_row_tall - 8.0, _row_tall - 8.0)
+		)
 		var icon := int(row.get("icon", -1))
 		if icon >= 0 and _pieces.has(StringName("icon%d" % icon)):
 			_draw_tile(slot, tint)
@@ -285,11 +302,11 @@ func _draw_rows() -> void:
 			_draw_sparkle(slot)
 
 		# The three columns, each starting where it starts on every other row.
-		var rest := box.size.x - ROW_TALL - 8.0
-		var name_at := box.position.x + ROW_TALL + 4.0
+		var rest := box.size.x - _row_tall - 8.0
+		var name_at := box.position.x + _row_tall + 4.0
 		var value_at := name_at + rest * NAME_SHARE
 		var price_at := value_at + rest * VALUE_SHARE
-		var middle := box.position.y + (ROW_TALL + float(Style.TEXT_BODY) * 0.62) * 0.5
+		var middle := box.position.y + (_row_tall + float(Style.TEXT_BODY) * 0.62) * 0.5
 
 		Style.write(
 			self, String(row.get("name", "")), Style.TEXT_BODY, Vector2(name_at, middle), ink
@@ -302,19 +319,19 @@ func _draw_rows() -> void:
 			var span := Style.measure(value, Style.TEXT_SMALL)
 			var tablet := Rect2(
 				Vector2(value_at, box.position.y + 10.0),
-				Vector2(minf(span.x + 20.0, rest * VALUE_SHARE - 10.0), ROW_TALL - 20.0)
+				Vector2(minf(span.x + 20.0, rest * VALUE_SHARE - 10.0), _row_tall - 20.0)
 			)
 			draw_rect(tablet, Style.scrim(Style.SCRIM_LIGHT))
 			Style.write(
 				self, value, Style.TEXT_SMALL,
-				Vector2(0.0, box.position.y + (ROW_TALL + float(Style.TEXT_SMALL) * 0.62) * 0.5),
+				Vector2(0.0, box.position.y + (_row_tall + float(Style.TEXT_SMALL) * 0.62) * 0.5),
 				ink, HORIZONTAL_ALIGNMENT_CENTER, tablet
 			)
 
 		_draw_tag(
 			Rect2(
 				Vector2(price_at, box.position.y + 8.0),
-				Vector2(rest * PRICE_SHARE, ROW_TALL - 16.0)
+				Vector2(rest * PRICE_SHARE, _row_tall - 16.0)
 			),
 			String(row.get("cost", "")), Style.TEXT_BODY, afford, lit
 		)

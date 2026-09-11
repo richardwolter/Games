@@ -158,6 +158,28 @@ static func stamp(
 	on.draw_texture_rect_region(_mirror, Rect2(back, size), flipped, tint)
 
 
+## Where `stamp` cuts a frame, as the two ends of the cut edge: the bottom corners of the box
+## it draws the kept part of the frame into. Same arguments, same arithmetic — the foam collar
+## has to sit on the edge the picture actually ends at, not on a guess at the waterline.
+static func cut_edge(
+	name: StringName, frame: int, at: Vector2, height: float, facing_left: bool, sink: float
+) -> Array:
+	if not has(name):
+		return [at, at]
+	var list: Array = _frames[name]
+	var cell: Dictionary = list[posmod(frame, list.size())]
+	var region: Rect2 = cell["region"]
+	var foot: Vector2 = cell["foot"]
+	var scale := _scale_for(name, height)
+	var kept := clampf(1.0 - sink, 0.05, 1.0)
+	var size := Vector2(region.size.x, region.size.y * kept) * scale
+	var corner := at - foot * scale
+	if not facing_left:
+		corner = at - Vector2((region.size.x - foot.x) * scale, foot.y * scale)
+	var y := corner.y + size.y
+	return [Vector2(corner.x, y), Vector2(corner.x + size.x, y)]
+
+
 ## Where the dog's mouth is, as an offset from the point it stands on.
 ##
 ## Worked out from the frame rather than written down: the nose is the leading edge of the
@@ -186,3 +208,14 @@ static func span(name: StringName, height: float) -> Vector2:
 	var list: Array = _frames[name]
 	var region: Rect2 = (list[0] as Dictionary)["region"]
 	return region.size * _scale_for(name, height)
+
+
+## One frame of the dog as a picture something else can draw: the sheet and the rectangle on
+## it. For the upgrades board, whose own five icons are all net parts — a row about the dog
+## wants the dog on it rather than an empty square.
+static func art_frame(name: StringName, frame: int) -> Dictionary:
+	if not has(name):
+		return {}
+	var list: Array = _frames[name]
+	var cell: Dictionary = list[posmod(frame, list.size())]
+	return {"sheet": _sheet, "region": cell["region"]}

@@ -40,23 +40,26 @@ void vertex() {
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
 
-	float t = TIME * wave_speed;
-	VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
-	// The wander. Two slow waves at different rates, off the same anchor, so neighbouring
-	// pieces are never in step and nothing in the lake travels in a straight line.
-	VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
-	VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	// The top anchor value is reserved: a piece lying on the beach, which does not float and
+	// so does not move. See LakeGrid.DRY_ANCHOR.
+	if (high < 255.0 || low < 255.0) {
+		float t = TIME * wave_speed;
+		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
+		// The wander. Two slow waves at different rates, off the same anchor, so neighbouring
+		// pieces are never in step and nothing in the lake travels in a straight line.
+		VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
+		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	}
 
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.
 	COLOR = vec4(vec3(COLOR.b), COLOR.a);
 }
 
-void fragment() {
-	// The grime used to be painted on here, as a per-piece noise stain. The art carries
-	// its own grime now (see art_source/LakeObjects.psd), so this just samples the atlas —
-	// nothing left to do but keep the piece riding the bob from vertex().
-	COLOR = texture(TEXTURE, UV) * COLOR;
-}
+// No fragment(). The grime used to be painted on here, as a per-piece noise stain; the art
+// carries its own grime now (see art_source/LakeObjects.psd). Godot already hands the
+// fragment stage COLOR as the vertex colour times the texture, so sampling TEXTURE again
+// and multiplying squared the art: dark pieces went muddy and every soft-edged pixel went
+// half see-through, letting the green water show through the rubbish.
 
 

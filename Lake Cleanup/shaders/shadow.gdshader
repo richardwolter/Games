@@ -31,11 +31,18 @@ void vertex() {
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
 
-	float t = TIME * wave_speed;
-	VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
-	VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	// The top anchor value is reserved for a piece lying on the beach, whose shadow stays put
+	// like the piece does. See LakeGrid.DRY_ANCHOR.
+	if (high < 255.0 || low < 255.0) {
+		float t = TIME * wave_speed;
+		VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
+		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	}
 }
 
 void fragment() {
-	COLOR = shade;
+	// The piece's own art, kept only for its alpha: the shape is the sprite's, the colour is
+	// the uniform's. That is what makes a shadow the shape of the thing above it without a
+	// second copy of the art or an outline anybody had to draw.
+	COLOR = vec4(shade.rgb, shade.a * texture(TEXTURE, UV).a);
 }

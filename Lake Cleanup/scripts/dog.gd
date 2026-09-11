@@ -2,8 +2,9 @@
 ##
 ## It lives on the island with the angler and it has one job it gave itself: small rubbish
 ## floating near the shore is a stick, and a stick has to be brought back. So it swims out,
-## takes one piece, swims in and drops it in the yard crate — the same crate the net fills,
-## so a dog's afternoon is worth the same as a cast, in smaller change.
+## takes a piece — or several, once it has been trained to — swims in and drops the lot in
+## the yard crate, the same crate the net fills, so a dog's afternoon is worth the same as a
+## cast, in smaller change.
 ##
 ## The point of it is not the rubbish. The lake is a long quiet job and the dog is the thing
 ## in it that is pleased to see you: it dozes on the grass, it wanders the beach, it comes
@@ -56,6 +57,18 @@ const REACH := 15.0
 const CARRY_TIER := 0
 const CARRY_WIDE := 16.0
 
+## The bank run: how often a spell with nothing near to fetch is spent swimming off to the
+## outer bank for the rubbish washed up there, how far out along the basin's radius it looks,
+## and how long such a trip may run before it counts as stuck. Longer than an ordinary trip,
+## because the bank is most of the lake away. See LakeGrid.STRAND_CHANCE.
+const STRAND_ODDS := 0.35
+const STRAND_AT := Vector2(0.955, 1.06)
+
+## How far up the outer bank's beach the dog may go, in tiles past the waterline — a little
+## past the furthest washed-up rubbish, so it can stand over the last piece to pick it up.
+const BEACH_WALK := 3.0
+const STRAND_TRIP_MOST := 60.0
+
 ## How near the target counts as arrived, in tiles.
 const CLOSE := 0.35
 
@@ -65,6 +78,9 @@ const CLOSE := 0.35
 ## the next, which read as the animal being fired out of the water. Everything it does now
 ## eases into its pace, and the pace it eases towards is what the state asks for.
 const ACCEL := 7.0
+
+## The foam where the swimming dog cuts the surface. See WaterlineFoam.
+var _foam: WaterlineFoam
 
 ## The longest step allowed in one frame, in tiles.
 ##
@@ -96,8 +112,12 @@ const CRATE_SIDE := 1.35
 
 ## How long a spell of doing nothing in particular lasts, and the odds it is spent asleep
 ## rather than mooching about. A dog that never settles reads as a machine on a patrol route.
+##
+## The top of that window is what `wait_cut` comes off: an untrained dog takes its full ten
+## seconds between jobs, and every level of training brings the longest wait down without
+## touching the shortest. See `_settle`.
 const MOOD_LEAST := 3.0
-const MOOD_MOST := 9.0
+const MOOD_MOST := 10.0
 
 ## How long the dog stays pleased about being petted, and how far the angler can be for the
 ## button to reach it, in tiles.
@@ -127,7 +147,8 @@ const HEART_SIDE := 3.4
 
 enum State { IDLE, WANDER, NAP, LOUNGE, SWIM_OUT, CARRY_BACK, DROPPING, PETTED }
 
-## One piece of rubbish, on its way to the crate.
+## One piece of rubbish, on its way to the crate. Emitted once per piece: a dog that came
+## home with a mouthful fires this several times over one delivery.
 signal fetched(def_index: int)
 
 ## The dog got some attention. The lake makes the noise; this does not know what a speaker
@@ -139,9 +160,20 @@ signal petted
 var grid: LakeGrid
 var angler: Angler
 
+## What training has bought, set by lake.gd from the two `dog_*` upgrade tracks. How many
+## pieces one trip out may bring back, and how many seconds come off the top of the wait
+## between trips. The defaults are an untrained dog, so a Dog with no lake behind it — the
+## shed screen, a test — behaves exactly as it did before there were upgrades to buy.
+var fetch_most: int = 1
+var wait_cut: float = 0.0
+
 ## The lake's own splash system, handed over by the level, for the wake the dog leaves when
 ## it swims. Null until then, and the dog swims the same either way.
 var splash: WaterSplash
+
+## The daylight, handed over by the level. Null in the shed screen and in any test without a
+## lake, where the dog draws no shadow at all rather than guessing at one.
+var day: DayCycle
 
 ## The island's trail of footprints, handed over the same way. Null until then, and the dog
 ## walks the same either way.
@@ -164,7 +196,9 @@ var _state: int = State.IDLE
 var _age: float = 0.0
 var _mood_left: float = 0.0
 var _target := Vector2.ZERO
-var _carrying: int = -1
+## What it has in its mouth, oldest first, at most `fetch_most` of them. Only the last one
+## is drawn — see `_draw_stick`.
+var _carried := PackedInt32Array()
 var _rng := RandomNumberGenerator.new()
 var _painted: int = 0
 
@@ -194,8 +228,15 @@ var _no_gain: float = 0.0
 var _trip: float = 0.0
 var _detour := Vector2.INF
 
+## Whether the trip under way is a bank run, which picks its sticks off the strand line and
+## gets the longer time limit. See STRAND_ODDS.
+var _to_strand: bool = false
+
 
 func _ready() -> void:
+	_foam = WaterlineFoam.new()
+	_foam.name = &"Foam"
+	add_child(_foam)
 	_rng.randomize()
 	_place()
 	_last_print_pos = position
@@ -298,9 +339,13 @@ func _settle() -> void:
 	_trip = 0.0
 	_detour = Vector2.INF
 	_fresh_aim()
-	_mood_left = _rng.randf_range(MOOD_LEAST, MOOD_MOST)
+	_mood_left = _rng.randf_range(MOOD_LEAST, maxf(MOOD_MOST - wait_cut, MOOD_LEAST))
+	_to_strand = false
 	if _rng.randf() < 0.45:
 		var stick := _find_stick()
+		if stick < 0 and _rng.randf() < STRAND_ODDS:
+			stick = _find_strand()
+			_to_strand = stick >= 0
 		if stick >= 0:
 			_target = Vector2(grid.tile_of(stick)) + Vector2(0.5, 0.5)
 			_state = State.SWIM_OUT
@@ -333,7 +378,14 @@ func _settle() -> void:
 ## Nearest to the shed rather than nearest to the dog: the trip that matters is the one back
 ## with something in its mouth, and the shortest of those keeps the dog in the water the
 ## player is actually looking at instead of off at the far bank for a minute at a time.
-func _find_stick() -> int:
+##
+## `from_dog` flips that, and only the second and later picks of one trip use it. Measured
+## from the shed, the next piece of a mouthful is as likely to be on the far side of the
+## island as the near one — and the dog swims at it in a straight line, which walks it up
+## the beach, across the grass and into the corner of the shed, where it stood with three
+## bottles in its mouth until the trip timed out. Measured from the dog, the rest of the
+## trip is the patch of water it is already in.
+func _find_stick(from_dog: bool = false) -> int:
 	if grid == null or grid.stacks.is_empty():
 		return -1
 	var best := -1
@@ -353,7 +405,39 @@ func _find_stick() -> int:
 		var def := grid.defs[stack[stack.size() - 1]]
 		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
 			continue
-		var gap := tile.distance_squared_to(Iso.ISLAND_CENTRE)
+		var gap := tile.distance_squared_to(tile_pos if from_dog else Iso.ISLAND_CENTRE)
+		if gap < best_gap:
+			best_gap = gap
+			best = index
+	return best
+
+
+## Something washed up on the outer bank to fetch, or -1 if nothing turned up.
+##
+## Sampled round the bank the way `_find_stick` samples round the island. The first pick of a
+## run is the nearest to the island, so the swim out is as short as the bank allows; later
+## picks of one trip (`from_dog`) are the nearest to the dog, so a trained dog works along the
+## shore it has reached instead of crossing the lake again for each piece.
+func _find_strand(from_dog: bool = false) -> int:
+	if grid == null or grid.stacks.is_empty():
+		return -1
+	var best := -1
+	var best_gap := INF
+	for _try in 60:
+		var angle := _rng.randf_range(0.0, TAU)
+		if from_dog:
+			angle = Iso.basin_angle(tile_pos) + _rng.randf_range(-0.25, 0.25)
+		var tile := Iso.basin_point(angle, _rng.randf_range(STRAND_AT.x, STRAND_AT.y))
+		if not Iso.on_strand(int(tile.x), int(tile.y)) and not Iso.on_beach(int(tile.x), int(tile.y)):
+			continue
+		var index := grid.index_of(int(tile.x), int(tile.y))
+		var stack: PackedInt32Array = grid.stacks[index]
+		if stack.is_empty():
+			continue
+		var def := grid.defs[stack[stack.size() - 1]]
+		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
+			continue
+		var gap := tile.distance_squared_to(tile_pos if from_dog else Iso.ISLAND_CENTRE)
 		if gap < best_gap:
 			best_gap = gap
 			best = index
@@ -371,9 +455,8 @@ func _go_fetch(delta: float) -> void:
 		return
 	# A swim that has gone on this long is a swim towards something unreachable. Head home
 	# rather than paddle at it for the rest of the run.
-	if _trip > TRIP_MOST:
+	if _trip > (STRAND_TRIP_MOST if _to_strand else TRIP_MOST):
 		_state = State.CARRY_BACK
-		_carrying = -1
 		_trip = 0.0
 		return
 	var index := grid.index_of(int(_target.x), int(_target.y))
@@ -384,12 +467,11 @@ func _go_fetch(delta: float) -> void:
 		# Somebody else got there first — the net, or a ferry running its skimmer. A dog that
 		# swam out for a stick does not come back without one if there is another one
 		# floating, so it picks the next nearest and carries on.
-		var again := _find_stick()
+		var again := _find_strand(true) if _to_strand else _find_stick()
 		if again >= 0:
 			_target = Vector2(grid.tile_of(again)) + Vector2(0.5, 0.5)
 			return
 		_state = State.CARRY_BACK
-		_carrying = -1
 		return
 	if not _step_towards(_target, SWIM_SPEED, delta):
 		if _blocked():
@@ -397,12 +479,21 @@ func _go_fetch(delta: float) -> void:
 			_fresh_aim()
 			if _detour == Vector2.INF:
 				_state = State.CARRY_BACK
-				_carrying = -1
 		return
 	var stack: PackedInt32Array = grid.stacks[index]
-	_carrying = grid.take(index, stack.size() - 1)
-	_state = State.CARRY_BACK
+	_carried.append(grid.take(index, stack.size() - 1))
 	_trip = 0.0
+	# Room for another and another one floating: the dog stays out and works the water
+	# rather than rowing back for each piece. `_find_stick` is the same sampling that
+	# started the trip, so the next one is the nearest to the island of what it turns up —
+	# a trained dog does a short circuit of the near shore, not a tour of the far bank.
+	if _carried.size() < fetch_most:
+		var next := _find_strand(true) if _to_strand else _find_stick(true)
+		if next >= 0:
+			_target = Vector2(grid.tile_of(next)) + Vector2(0.5, 0.5)
+			_fresh_aim()
+			return
+	_state = State.CARRY_BACK
 
 
 ## Back to the crate, by way of the shore. Swims while it is over water and runs once it is
@@ -427,7 +518,7 @@ func _come_home(delta: float) -> void:
 		_state = State.DROPPING
 		_mood_left = DROP_WAIT
 		return
-	if not _blocked() and _trip <= TRIP_MOST:
+	if not _blocked() and _trip <= (STRAND_TRIP_MOST if _to_strand else TRIP_MOST):
 		return
 	# Something is between the dog and the crate. Try to walk round it; and if there is no
 	# way round at all, or the trip has run long enough that something is properly wrong,
@@ -436,7 +527,7 @@ func _come_home(delta: float) -> void:
 	# holding it forever is a bug.
 	_detour = _way_round(landing)
 	_fresh_aim()
-	if _detour == Vector2.INF or _trip > TRIP_MOST:
+	if _detour == Vector2.INF or _trip > (STRAND_TRIP_MOST if _to_strand else TRIP_MOST):
 		_detour = Vector2.INF
 		_state = State.DROPPING
 		_mood_left = DROP_WAIT
@@ -462,13 +553,18 @@ func _drop_spot() -> Vector2:
 	return crate_tile
 
 
-## The stick goes in the crate. An empty mouth still counts as a trip — the dog does not
+## The sticks go in the crate. An empty mouth still counts as a trip — the dog does not
 ## know the difference, and neither does the lake, which is handed nothing.
+##
+## A mouthful goes in as one delivery: every piece is emitted here, on the same frame, and
+## the dog leaves after the one DROP_WAIT it always waited. Emptying the mouth piece by
+## piece would make a trained dog stand at the box for longer the more it caught, which is
+## the wait the other track was bought to get rid of.
 func _hand_over() -> void:
 	_trip = 0.0
-	if _carrying >= 0:
-		fetched.emit(_carrying)
-		_carrying = -1
+	for i in _carried.size():
+		fetched.emit(_carried[i])
+	_carried.clear()
 	_settle()
 
 
@@ -580,11 +676,17 @@ func _may_stand(tile: Vector2) -> bool:
 		return false
 	if Iso.island_fraction(tile.x, tile.y) < 1.0:
 		return true
-	return Iso.shore_fraction(tile.x, tile.y) < 1.0
+	if Iso.shore_fraction(tile.x, tile.y) < 1.0:
+		return true
+	# Up the outer bank's beach, as far as the washed-up rubbish goes and a little past it.
+	return Iso.on_beach_at(tile, -1.0, BEACH_WALK)
 
 
 func _on_land() -> bool:
-	return Iso.island_fraction(tile_pos.x, tile_pos.y) < 1.0
+	if Iso.island_fraction(tile_pos.x, tile_pos.y) < 1.0:
+		return true
+	# On the outer bank's sand, once it is past where the water is drawn over it.
+	return Iso.on_beach_at(tile_pos, Iso.WATER_LAP_TILES, BEACH_WALK + 1.0)
 
 
 ## Somewhere on the grass to go and sniff.
@@ -648,12 +750,19 @@ func _showing() -> StringName:
 			return &"idle"
 
 
+## The sun, coarsely, for the paint keys. A shadow that swings has to repaint the dog as it
+## goes, and quantised because the sun moves a hair a frame and a key that tracked it exactly
+## would repaint every frame forever — which is the thing the keys exist to stop.
+func _sun_key() -> int:
+	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
+
+
 func _repaint() -> void:
 	var name := _showing()
 	var key := hash([
 		name, DogArt.frame_at(name, _age), facing_left,
-		(position * 2.0).round(), _carrying >= 0, _state,
-		roundi(_greet * 60.0)
+		(position * 2.0).round(), not _carried.is_empty(), _state,
+		roundi(_greet * 60.0), _sun_key()
 	])
 	if key != _painted:
 		queue_redraw()
@@ -663,10 +772,12 @@ func _draw() -> void:
 	var name := _showing()
 	var frame := DogArt.frame_at(name, _age)
 	_painted = hash([
-		name, frame, facing_left, (position * 2.0).round(), _carrying >= 0, _state,
-		roundi(_greet * 60.0)
+		name, frame, facing_left, (position * 2.0).round(), not _carried.is_empty(), _state,
+		roundi(_greet * 60.0), _sun_key()
 	])
 	if not DogArt.ready():
+		if _foam != null:
+			_foam.clear()
 		_draw_blocked()
 		return
 
@@ -682,12 +793,19 @@ func _draw() -> void:
 		at.y += sin(_age * BOB_RATE) * BOB + SINK * HEIGHT
 		sink = SINK
 		_draw_wake(Vector2(0.0, sin(_age * BOB_RATE) * BOB))
+		# And the foam on that cut, bobbing with it: the same edge stamp is about to end the
+		# picture at, so the collar can never sit beside the dog instead of round it.
+		if _foam != null:
+			var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink)
+			_foam.lay(edge[0], edge[1])
 	else:
+		if _foam != null:
+			_foam.clear()
 		at.y += LAND_SINK
-		_draw_shadow(Vector2(0.0, LAND_SINK))
+		_draw_shadow(name, frame, Vector2(0.0, LAND_SINK))
 
 	DogArt.stamp(self, name, frame, at, HEIGHT, facing_left, sink)
-	if _carrying >= 0 and grid != null:
+	if not _carried.is_empty() and grid != null:
 		_draw_stick(at)
 	if _state == State.PETTED:
 		_draw_hearts(1.0 - clampf(_mood_left / PET_TIME, 0.0, 1.0))
@@ -706,17 +824,22 @@ func _draw_wake(at: Vector2) -> void:
 	draw_polyline(ring, Color(0.86, 0.94, 0.96, 0.30), 1.3)
 
 
-## A tight, dark contact shadow under the dog on land, the same idea as the angler's own.
-## Squashed a little on the step, tied to how fast it is actually moving rather than to a walk
-## cycle it does not have.
-func _draw_shadow(at: Vector2) -> void:
-	var squash := 1.0 - 0.1 * absf(sin(_age * 9.0)) if _speed > 0.1 else 1.0
-	var ring := PackedVector2Array()
-	var wide := HEIGHT * 0.36 * squash
-	for i in 13:
-		var angle := TAU * float(i) / 12.0
-		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.5))
-	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.30))
+## The dog's shadow: its own frame, laid out on the grass away from the sun.
+##
+## The same `stamp` the animal itself is drawn with, so the shadow is the shape the dog is
+## actually making — ears, tail, a leg mid-stride — rather than the ellipse that used to sit
+## under it whatever it was doing.
+##
+## Without a day to ask, no shadow. A guessed sun is worse than none: it would disagree with
+## every other shadow in the scene the moment one of them knew better.
+func _draw_shadow(name: StringName, frame: int, at: Vector2) -> void:
+	if day == null:
+		return
+	draw_set_transform_matrix(Shade.lying(at, day.lean, day.stretch))
+	DogArt.stamp(
+		self, name, frame, Vector2.ZERO, HEIGHT, facing_left, 0.0, Shade.tint(day.ink)
+	)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## What it is bringing back, hanging from its mouth. Drawn from the piece's own def, so a dog
@@ -726,9 +849,13 @@ func _draw_shadow(at: Vector2) -> void:
 ## and hung *below* it: a dog with something in its mouth carries the weight under its jaw,
 ## and a piece centred on the face reads as a dog wearing a bottle.
 func _draw_stick(at: Vector2) -> void:
-	if _carrying < 0 or _carrying >= grid.defs.size():
+	# The last one picked up, whatever else is in there. A dog that swam out three times
+	# without coming in carries one visible stick and the rest on trust: five pieces of
+	# junk drawn round a twenty-two pixel head is a blob, not a mouthful.
+	var held := _carried[_carried.size() - 1] if not _carried.is_empty() else -1
+	if held < 0 or held >= grid.defs.size():
 		return
-	var def: TrashDef = grid.defs[_carrying]
+	var def: TrashDef = grid.defs[held]
 	var hold := at + DogArt.mouth(_showing(), HEIGHT, facing_left)
 	hold.y += def.size.y * CARRY_SCALE * 0.4
 	draw_set_transform(hold, 0.0, Vector2(CARRY_SCALE, CARRY_SCALE))

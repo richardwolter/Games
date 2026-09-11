@@ -1,0 +1,26 @@
+{
+  "source": "Lake Cleanup/art_source/Shed_Sprite",
+  "canvas": [
+    154,
+    144
+  ],
+  "layers": [
+    {
+      "name": "Background",
+      "slug": "background",
+      "group_path": [],
+      "bbox": [
+        8,
+        1,
+        138,
+        128
+      ],
+      "size": [
+        130,
+        127
+      ],
+      "file": "background.png"
+    }
+  ],
+  "skipped": []
+}

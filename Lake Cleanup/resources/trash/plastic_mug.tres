@@ -10,6 +10,6 @@ piece = &"plastic_mug"
 size = Vector2(16.0, 14.4)
 pollution = 3.5
 haul_cost = 1.22
-tier = 1
+tier = 3
 lightness = 2.3
 block_color = Color(0.85, 0.72, 0.25, 1)

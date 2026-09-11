@@ -15,6 +15,12 @@
 class_name Ground
 extends Node2D
 
+## The daylight, handed over by the level, and where the sun was when this was last baked.
+## Null anywhere there is no day — the ground then draws no shadows at all rather than
+## guessing at a sun the rest of the scene would disagree with.
+var day: DayCycle
+var _sun_baked: float = INF
+
 ## Where the pack's individual tiles live.
 const TILES := "res://assets/Forest Isometric Pack Free/Tileset/Slice %d.png"
 
@@ -572,6 +578,21 @@ func _wooded(tx: int, ty: int) -> bool:
 	return false
 
 
+## How far the sun has to move before the ground is worth baking again, in units of `lean`.
+## Small enough that a shadow never visibly jumps, large enough that a ten minute day is a
+## handful of rebuilds rather than a rebuild a frame.
+const SUN_STEP := 0.06
+
+
+func _process(_delta: float) -> void:
+	if day == null:
+		return
+	if absf(day.lean - _sun_baked) < SUN_STEP:
+		return
+	_sun_baked = day.lean
+	queue_redraw()
+
+
 func _draw() -> void:
 	if _dirty:
 		_rebuild()
@@ -849,11 +870,31 @@ func _plant(cell: Vector2i, mid: Vector2) -> void:
 		return
 	for art: Texture2D in _props[cell]:
 		var size := Vector2(art.get_width(), art.get_height()) * SCALE
-		draw_texture_rect(
-			art,
-			Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size),
-			false
-		)
+		var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+		_lay_shadow(art, size)
+		draw_texture_rect(art, box, false)
+
+
+## A tree's or a rock's shadow: the same picture again, laid out on the ground away from the
+## sun in flat ink. See Shade.
+##
+## The ground is baked rather than drawn per frame — a wood of several hundred trees is laid
+## out once and left alone — so these move in steps rather than continuously: `_process`
+## below asks for a fresh bake when the sun has moved enough to be worth one. Over a ten
+## minute day that is a handful of rebuilds, against sixty a second for a shadow nobody can
+## see moving anyway.
+func _lay_shadow(art: Texture2D, size: Vector2) -> void:
+	if day == null:
+		return
+	# The foot of the picture, which is where the shadow is hinged: the props are sat on the
+	# plane by their feet in `_plant`, and a shadow hinged anywhere else slides out from
+	# under its own tree.
+	var foot := Vector2(0.0, Iso.TILE_H * 0.5)
+	draw_set_transform_matrix(Shade.lying(foot, day.lean, day.stretch))
+	draw_texture_rect(
+		art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false, Shade.tint(day.ink)
+	)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The first row of a picture that has anything in it, in source pixels. The top face starts

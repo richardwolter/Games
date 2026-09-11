@@ -9,6 +9,12 @@
 ## Headless, because none of it is about the picture.
 ##
 ##   godot --headless --path . res://tools/dog_watch.tscn
+##
+## Training is off unless it is asked for, so the plain run above is an untrained dog. Pass
+## levels on the end to watch a trained one — the deliveries line is what the two tracks are
+## bought for, and comparing the two runs is the only honest way to see they do anything:
+##
+##   godot --headless --path . res://tools/dog_watch.tscn -- --fetch=4 --wait=3
 extends Node
 
 const RUN_SECONDS := 90.0
@@ -28,8 +34,13 @@ var _seen := {}
 func _ready() -> void:
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.set(&"autoload_save", false)
+	_main.set(&"dog_fetch_level", _arg("--fetch="))
+	_main.set(&"dog_wait_level", _arg("--wait="))
 	add_child(_main)
 	_dog = _main.get_node(^"Dog") as Node2D
+	print("dog: %d per trip, waits %.0fs at most" % [
+		_dog.get(&"fetch_most"), 10.0 - float(_dog.get(&"wait_cut"))
+	])
 	_dog.connect(&"fetched", func(_i: int) -> void: _drops += 1)
 	_was = _dog.tile_pos
 
@@ -69,3 +80,12 @@ func _process(delta: float) -> void:
 	for i in names.size():
 		print("  %-11s %5.1fs" % [names[i], float(_seen.get(i, 0.0))])
 	get_tree().quit()
+
+
+## One `--name=N` off the command line, or zero. The levels are set before the lake is added
+## to the tree, so its own `_ready` pushes them to the dog like any other loaded save would.
+func _arg(flag: String) -> int:
+	for word: String in OS.get_cmdline_user_args():
+		if word.begins_with(flag):
+			return int(word.substr(flag.length()))
+	return 0

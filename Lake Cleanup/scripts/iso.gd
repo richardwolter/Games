@@ -236,6 +236,48 @@ static func past_shelf(at: Vector2) -> float:
 	return (island_ring_fraction(at, WATER_LAP_TILES) - 1.0) * mean
 
 
+## Is this tile on the strand line: water, right against the outer bank, in the band
+## `floats_here` keeps the ordinary fill out of? This is where the small rubbish washes up —
+## see LakeGrid.STRAND_CHANCE. Outer bank only; the island's own beach is kept tidy.
+static func on_strand(tx: int, ty: int) -> bool:
+	if not in_lake(tx, ty):
+		return false
+	if island_fraction(tx, ty) < 2.0:
+		return false
+	return shore_fraction(tx, ty) >= 1.0 - LAKE_EDGE
+
+
+## The band of outer-bank beach rubbish lies on, in tiles past the waterline: from just clear
+## of where the water is drawn (`WATER_LAP_TILES` up the sand) to a couple of tiles up the
+## beach, well short of the grass. See LakeGrid.BEACH_CHANCE.
+const BEACH_LITTER := Vector2(0.9, 2.4)
+
+
+## Is this tile's middle on that band of the outer bank's beach? Dry sand, so a piece here
+## lies still: no bob, no waterline, no foam.
+static func on_beach(tx: int, ty: int) -> bool:
+	return on_beach_at(Vector2(float(tx) + 0.5, float(ty) + 0.5), BEACH_LITTER.x, BEACH_LITTER.y)
+
+
+## The same question of any spot, with the band's two edges given — the dog walks a little
+## further either side of it than rubbish is laid.
+static func on_beach_at(at: Vector2, from: float, to: float) -> bool:
+	if island_fraction(at.x, at.y) < 2.0:
+		return false
+	var out := Ground.out_of_water(at.x, at.y)
+	return out >= from and out <= to
+
+
+## Is this spot on a tile of the island's dry ground, as `Ground` draws it?
+##
+## The drawn beach is whole diamonds, laid wherever a tile's middle is on the dry side of
+## `past_shelf` — a staircase round a smooth curve. Asking the curve alone where the angler
+## stands put corners of drawn sand in the water and notches of drawn water on the beach.
+## This asks the same question of the same tile the ground asked, so the two cannot disagree.
+static func on_island_sand(at: Vector2) -> bool:
+	return past_shelf(Vector2(floorf(at.x) + 0.5, floorf(at.y) + 0.5)) <= 0.0
+
+
 ## Is this tile far enough from both shores to float something on?
 static func floats_here(tx: int, ty: int) -> bool:
 	if not in_lake(tx, ty):

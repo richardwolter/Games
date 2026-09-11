@@ -192,6 +192,16 @@
    ]
   },
 
+  {
+   "name": "decor_bed", "title": "Bed",
+   "dirty": "bed_green",
+   "kind": "VARIANT", "mirror": false,
+   "views": [
+    {"role": "green", "layer": "bed_green"},
+    {"role": "blue",  "layer": "bed_blue"}
+   ]
+  },
+
   {"name": "decor_lamp",          "title": "Table lamp",    "dirty": "lamp_2",          "kind": "SINGLE", "mirror": false, "views": [{"role": "front", "layer": "lamp"}]},
   {"name": "decor_standing_lamp", "title": "Floor lamp",    "dirty": "standing_lamp_2", "kind": "SINGLE", "mirror": false, "views": [{"role": "front", "layer": "standing_lamp"}]},
   {"name": "decor_old_clock",     "title": "Old clock",     "dirty": "old_clock_2",     "kind": "SINGLE", "mirror": false, "views": [{"role": "front", "layer": "old_clock"}]},

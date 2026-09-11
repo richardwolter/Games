@@ -76,6 +76,28 @@ const RIPPLE_ALPHA := 0.3
 ## Hard ceiling on live ripples, the same bargain the drops strike.
 const MAX_RIPPLES := 90
 
+## The surface-particle burst that rides along with every crown, from Water_Splash_Particles.png:
+## one strip, BURST_FRAMES square frames of BURST_FRAME_SIZE px, played once through at
+## BURST_FPS and then gone. Sized off the same span a crown is, not off a fixed pixel count, so
+## it stays in proportion whether a bottle or a pallet made it.
+const BURST_TEX := preload("res://assets/Water_Splash_Particles.png")
+const BURST_FRAMES := 32
+const BURST_FRAME_SIZE := 96.0
+const BURST_FPS := 26.0
+const BURST_SCALE := 1.1
+## Most opaque a burst frame ever draws at. Short of solid: the sheet's own frames already
+## carry bright spray, and full alpha on top of the hand-drawn crown reads as two splashes
+## fighting for the same pixel.
+const BURST_ALPHA := 0.6
+## Hard ceiling on live bursts. A burst is one draw call regardless of how showy the sheet
+## is, so this can stay generous without costing what MAX_DROPS costs.
+const MAX_BURSTS := 40
+
+## How far a speck sheet is flattened to lie on the water: the plane's own 2:1, the same squash
+## the ripple rings are drawn with. The sheets are drawn face-on, and a round spray standing up
+## off an isometric lake reads as a disc facing the camera. Shared with LakeGrid's gold sparkle.
+const SPECK_SQUASH := 0.5
+
 ## Live drops, as parallel arrays. Swap-removed on death, so the live range is
 ## always the front of each array and there are no holes to skip.
 var _drop_pos := PackedVector2Array()
@@ -97,14 +119,63 @@ var _ripple_at := PackedVector2Array()
 var _ripple_age := PackedFloat32Array()
 var _ripple_span := PackedFloat32Array()
 
+## Live surface-particle bursts: where, how far along, and how wide the sheet draws.
+var _burst_at := PackedVector2Array()
+var _burst_age := PackedFloat32Array()
+var _burst_span := PackedFloat32Array()
+
 var _last_splash: Dictionary[int, float] = {}
 ## When each body last shed a ripple, so a trail is spaced by time rather than by how often
 ## its owner remembers to ask.
 var _last_ripple: Dictionary[int, float] = {}
 
 
+## The two parts of a splash that carry their own shader, each on a child of its own: a
+## CanvasItem material applies to everything that node draws, so the white-ink specks and
+## the bubbling foam cannot share a node, and neither can share this one, whose ripples are
+## plain lines. Children draw after their parent, in the order added, which is exactly the
+## stack wanted: ripples, then specks, then the crown on top.
+class SplashPart extends Node2D:
+	var splash: WaterSplash
+	var draws: Callable
+
+	func _draw() -> void:
+		draws.call(self)
+
+
+var _specks: SplashPart
+var _crowns: SplashPart
+
+
 func _ready() -> void:
 	set_process(false)
+
+	_specks = SplashPart.new()
+	_specks.name = &"Specks"
+	_specks.draws = _draw_specks
+	var ink := ShaderMaterial.new()
+	ink.shader = load("res://shaders/splash_specks.gdshader")
+	ink.set_shader_parameter(&"ink", FOAM)
+	_specks.material = ink
+	add_child(_specks)
+
+	_crowns = SplashPart.new()
+	_crowns.name = &"Crowns"
+	_crowns.draws = _draw_crowns
+	var froth := ShaderMaterial.new()
+	froth.shader = load("res://shaders/splash_foam.gdshader")
+	froth.set_shader_parameter(&"peak_alpha", PEAK_ALPHA)
+	_crowns.material = froth
+	add_child(_crowns)
+
+
+## Every layer of the splash, redrawn together: they all read the same arrays.
+func _redraw() -> void:
+	queue_redraw()
+	if _specks != null:
+		_specks.queue_redraw()
+	if _crowns != null:
+		_crowns.queue_redraw()
 
 
 ## Throw up a splash. `strength` is 0..1 — a cup slipping in against a fridge
@@ -116,6 +187,11 @@ func splash(at: Vector2, strength: float) -> void:
 	_crown_at.append(at)
 	_crown_age.append(0.0)
 	_crown_span.append(span)
+
+	if _burst_age.size() < MAX_BURSTS:
+		_burst_at.append(at)
+		_burst_age.append(0.0)
+		_burst_span.append(span * BURST_SCALE)
 
 	var wanted := 4 + roundi(force * 13.0)
 	for i in wanted:
@@ -136,7 +212,7 @@ func splash(at: Vector2, strength: float) -> void:
 		_drop_size.append(span * randf_range(0.018, 0.05))
 
 	set_process(true)
-	queue_redraw()
+	_redraw()
 
 
 ## A single drop of water, thrown from wherever you say. For water running off something
@@ -150,7 +226,7 @@ func drip(at: Vector2, vel: Vector2, size: float, life: float) -> void:
 	_drop_life.append(life)
 	_drop_size.append(size)
 	set_process(true)
-	queue_redraw()
+	_redraw()
 
 
 ## One ring of disturbed water, spreading flat on the surface from `at`. `span` is how wide
@@ -166,7 +242,7 @@ func ripple(at: Vector2, span: float) -> void:
 	_ripple_age.append(0.0)
 	_ripple_span.append(maxf(span, 4.0))
 	set_process(true)
-	queue_redraw()
+	_redraw()
 
 
 ## A trail of them behind something moving: one ripple every `every` seconds, per body.
@@ -245,6 +321,22 @@ func _process(delta: float) -> void:
 		_crown_age[c] = age
 		c += 1
 
+	var b := 0
+	var burst_life := float(BURST_FRAMES) / BURST_FPS
+	while b < _burst_age.size():
+		var age := _burst_age[b] + delta
+		if age >= burst_life:
+			var last := _burst_age.size() - 1
+			_burst_at[b] = _burst_at[last]
+			_burst_age[b] = _burst_age[last]
+			_burst_span[b] = _burst_span[last]
+			_burst_at.resize(last)
+			_burst_age.resize(last)
+			_burst_span.resize(last)
+			continue
+		_burst_age[b] = age
+		b += 1
+
 	var r := 0
 	while r < _ripple_age.size():
 		var age := _ripple_age[r] + delta
@@ -260,8 +352,11 @@ func _process(delta: float) -> void:
 		_ripple_age[r] = age
 		r += 1
 
-	queue_redraw()
-	if _drop_life.is_empty() and _crown_age.is_empty() and _ripple_age.is_empty():
+	_redraw()
+	if (
+		_drop_life.is_empty() and _crown_age.is_empty()
+		and _ripple_age.is_empty() and _burst_age.is_empty()
+	):
 		set_process(false)
 		# The cooldown table is the one thing here that would otherwise grow for the
 		# life of the session, and with nothing splashing there is nothing whose
@@ -287,6 +382,27 @@ func _draw() -> void:
 		ring.append(ring[0])
 		draw_polyline(ring, Color(FOAM, alpha), 1.5)
 
+
+## The speck ring, on the Specks child: over the ripples, under the crowns. The burst is spray
+## lying on the surface, and the crown is thrown up out of that surface, so it stands in front.
+func _draw_specks(on: CanvasItem) -> void:
+	for b in _burst_age.size():
+		var t := _burst_age[b] / (float(BURST_FRAMES) / BURST_FPS)
+		var frame := mini(int(t * float(BURST_FRAMES)), BURST_FRAMES - 1)
+		var size := _burst_span[b]
+		var at := _burst_at[b]
+		on.draw_texture_rect_region(
+			BURST_TEX,
+			Rect2(
+				at - Vector2(size, size * SPECK_SQUASH) * 0.5, Vector2(size, size * SPECK_SQUASH)
+			),
+			Rect2(float(frame) * BURST_FRAME_SIZE, 0.0, BURST_FRAME_SIZE, BURST_FRAME_SIZE),
+			Color(1.0, 1.0, 1.0, BURST_ALPHA)
+		)
+
+
+## The crowns and the drops, on the Crowns child, which bubbles them like the foam collar.
+func _draw_crowns(on: CanvasItem) -> void:
 	for c in _crown_age.size():
 		var t := _crown_age[c] / CROWN_LIFE
 		var span := _crown_span[c]
@@ -307,7 +423,7 @@ func _draw() -> void:
 		# points are all the same point cannot be triangulated — the engine says so, once
 		# per splash, which on a lake this size is a lot of saying so.
 		if ring > 1.0:
-			draw_colored_polygon(
+			on.draw_colored_polygon(
 				_ellipse(at, Vector2(ring, ring * 0.5)), Color(FOAM, alpha * 0.20)
 			)
 		# Likewise at the other end: the crown has collapsed to nothing before it has
@@ -315,19 +431,19 @@ func _draw() -> void:
 		if height <= 0.5 or width <= 0.5:
 			continue
 		# The mound next, so the plumes stand in it rather than on top of it.
-		draw_colored_polygon(_mound(at, width, height * 0.3), Color(FOAM, alpha * 0.9))
+		on.draw_colored_polygon(_mound(at, width, height * 0.3), Color(FOAM, alpha * 0.9))
 		# Three plumes: one up the middle and one leaning out each way. Two alone
 		# read as a pair of antlers — there was nothing between them, so the eye
 		# joined the tips instead of the bases.
-		draw_colored_polygon(_plume(at, -1.0, width, height * 0.8), ink)
-		draw_colored_polygon(_plume(at, 1.0, width, height * 0.8), ink)
-		draw_colored_polygon(_plume(at, 0.0, width * 0.5, height), ink)
+		on.draw_colored_polygon(_plume(at, -1.0, width, height * 0.8), ink)
+		on.draw_colored_polygon(_plume(at, 1.0, width, height * 0.8), ink)
+		on.draw_colored_polygon(_plume(at, 0.0, width * 0.5, height), ink)
 
 	for i in _drop_life.size():
 		# Drops fade over their last quarter only. Fading from the moment they leave
 		# the water makes the whole scatter look like it is already dying.
 		var fade := clampf(_drop_life[i] * 4.0, 0.0, 1.0)
-		draw_circle(_drop_pos[i], _drop_size[i], Color(FOAM, fade * 0.95))
+		on.draw_circle(_drop_pos[i], _drop_size[i], Color(FOAM, fade * 0.95))
 
 
 ## One plume of a crown: a tapered sheet of water arcing up and outward, built as a

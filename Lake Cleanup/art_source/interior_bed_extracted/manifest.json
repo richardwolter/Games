@@ -1,0 +1,406 @@
+{
+  "source": "C:\\Users\\Administrador\\Documents\\Games\\Lake Cleanup\\art_source\\Interior_Bed_and_Textures",
+  "canvas": [
+    200,
+    200
+  ],
+  "layers": [
+    {
+      "name": "Bottom_Right_Corner",
+      "slug": "bottom_right_corner",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        171,
+        61,
+        183,
+        77
+      ],
+      "size": [
+        12,
+        16
+      ],
+      "file": "bottom_right_corner.png"
+    },
+    {
+      "name": "Bottom_Left_Corner",
+      "slug": "bottom_left_corner",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        134,
+        61,
+        145,
+        77
+      ],
+      "size": [
+        11,
+        16
+      ],
+      "file": "bottom_left_corner.png"
+    },
+    {
+      "name": "Vertical_Border",
+      "slug": "vertical_border",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        134,
+        38,
+        140,
+        61
+      ],
+      "size": [
+        6,
+        23
+      ],
+      "file": "vertical_border.png"
+    },
+    {
+      "name": "Vertical_Border copy",
+      "slug": "vertical_border_copy",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        177,
+        38,
+        183,
+        61
+      ],
+      "size": [
+        6,
+        23
+      ],
+      "file": "vertical_border_copy.png"
+    },
+    {
+      "name": "Top_Left_Corner",
+      "slug": "top_left_corner",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        134,
+        31,
+        140,
+        38
+      ],
+      "size": [
+        6,
+        7
+      ],
+      "file": "top_left_corner.png"
+    },
+    {
+      "name": "Top_Right_Corner",
+      "slug": "top_right_corner",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        177,
+        31,
+        183,
+        38
+      ],
+      "size": [
+        6,
+        7
+      ],
+      "file": "top_right_corner.png"
+    },
+    {
+      "name": "Horizontal_Border",
+      "slug": "horizontal_border",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        140,
+        31,
+        150,
+        41
+      ],
+      "size": [
+        10,
+        10
+      ],
+      "file": "horizontal_border.png"
+    },
+    {
+      "name": "Horizontal_Border copy",
+      "slug": "horizontal_border_copy",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        167,
+        31,
+        177,
+        41
+      ],
+      "size": [
+        10,
+        10
+      ],
+      "file": "horizontal_border_copy.png"
+    },
+    {
+      "name": "Horizontal_Border copy 2",
+      "slug": "horizontal_border_copy_2",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        157,
+        31,
+        167,
+        41
+      ],
+      "size": [
+        10,
+        10
+      ],
+      "file": "horizontal_border_copy_2.png"
+    },
+    {
+      "name": "Horizontal_Border copy 3",
+      "slug": "horizontal_border_copy_3",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        149,
+        31,
+        159,
+        41
+      ],
+      "size": [
+        10,
+        10
+      ],
+      "file": "horizontal_border_copy_3.png"
+    },
+    {
+      "name": "Horizontal_Down_View",
+      "slug": "horizontal_down_view",
+      "group_path": [
+        "Shed Border Example"
+      ],
+      "bbox": [
+        145,
+        67,
+        171,
+        77
+      ],
+      "size": [
+        26,
+        10
+      ],
+      "file": "horizontal_down_view.png"
+    },
+    {
+      "name": "Bottom_Right_Corner",
+      "slug": "bottom_right_corner_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        20,
+        15,
+        32,
+        31
+      ],
+      "size": [
+        12,
+        16
+      ],
+      "file": "bottom_right_corner_2.png"
+    },
+    {
+      "name": "Bottom_Left_Corner",
+      "slug": "bottom_left_corner_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        7,
+        41,
+        18,
+        57
+      ],
+      "size": [
+        11,
+        16
+      ],
+      "file": "bottom_left_corner_2.png"
+    },
+    {
+      "name": "Vertical_Border",
+      "slug": "vertical_border_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        85,
+        29,
+        91,
+        52
+      ],
+      "size": [
+        6,
+        23
+      ],
+      "file": "vertical_border_2.png"
+    },
+    {
+      "name": "Top_Left_Corner",
+      "slug": "top_left_corner_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        62,
+        37,
+        68,
+        44
+      ],
+      "size": [
+        6,
+        7
+      ],
+      "file": "top_left_corner_2.png"
+    },
+    {
+      "name": "Top_Right_Corner",
+      "slug": "top_right_corner_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        46,
+        37,
+        52,
+        44
+      ],
+      "size": [
+        6,
+        7
+      ],
+      "file": "top_right_corner_2.png"
+    },
+    {
+      "name": "Horizontal_Border",
+      "slug": "horizontal_border_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        74,
+        13,
+        84,
+        23
+      ],
+      "size": [
+        10,
+        10
+      ],
+      "file": "horizontal_border_2.png"
+    },
+    {
+      "name": "Horizontal_Down_View",
+      "slug": "horizontal_down_view_2",
+      "group_path": [
+        "Shed Border"
+      ],
+      "bbox": [
+        42,
+        63,
+        68,
+        73
+      ],
+      "size": [
+        26,
+        10
+      ],
+      "file": "horizontal_down_view_2.png"
+    },
+    {
+      "name": "Bed_Green",
+      "slug": "bed_green",
+      "group_path": [
+        "Bed"
+      ],
+      "bbox": [
+        16,
+        96,
+        39,
+        128
+      ],
+      "size": [
+        23,
+        32
+      ],
+      "file": "bed_green.png"
+    },
+    {
+      "name": "Bed_Blue",
+      "slug": "bed_blue",
+      "group_path": [
+        "Bed"
+      ],
+      "bbox": [
+        16,
+        130,
+        39,
+        162
+      ],
+      "size": [
+        23,
+        32
+      ],
+      "file": "bed_blue.png"
+    },
+    {
+      "name": "Floor",
+      "slug": "floor",
+      "group_path": [
+        "Texture"
+      ],
+      "bbox": [
+        110,
+        114,
+        126,
+        146
+      ],
+      "size": [
+        16,
+        32
+      ],
+      "file": "floor.png"
+    },
+    {
+      "name": "Wallpaper",
+      "slug": "wallpaper",
+      "group_path": [
+        "Texture"
+      ],
+      "bbox": [
+        83,
+        106,
+        100,
+        123
+      ],
+      "size": [
+        17,
+        17
+      ],
+      "file": "wallpaper.png"
+    }
+  ],
+  "skipped": []
+}

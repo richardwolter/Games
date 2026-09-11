@@ -13,7 +13,8 @@
 // Three effects, cheapest first:
 //   - a depth gradient from the shore function, so the shallows read as shallow
 //   - domain-warped bands, the moving surface texture
-//   - foam along the waterline, strongest where the water is thinnest
+//   - a foam line along both shores: a ragged lip on the sand, a wash that runs up and
+//     draws back, and loose bubbles between — see shore_foam()
 //
 // There is no vertex ripple. Seen from above, a displaced waterline would only move
 // the rim of the polygon, and the surface motion the eye actually wants is in the
@@ -69,8 +70,38 @@ uniform float wave_speed = 1.0;
 // reading as plain stripes.
 uniform float warp_strength = 26.0;
 uniform float band_strength = 0.075;
-// Width of the foam collar, as a fraction of the way in from the shore.
-uniform float foam_band = 0.026;
+// The foam line against the sand, all in tiles measured in from the edge the water is drawn
+// to. `foam_lip` is how deep the solid lip is on average, `foam_wash` how far past it the
+// wash line runs out at the bottom of its surge, and `foam_line` how thick that wash line
+// and each row of bubbles is. `foam_pixel` is the size of one foam pixel on screen — the
+// pack is drawn at two screen pixels a source pixel, and foam finer than that is a fizz
+// laid over pixel art rather than part of it.
+uniform float foam_lip = 0.28;
+uniform float foam_wash = 0.55;
+uniform float foam_line = 0.09;
+uniform float foam_pixel = 2.0;
+
+// The same foam, loose out on open water: short, thin, broken streaks scattered over the lake,
+// each one growing, holding and falling apart before turning up somewhere else. See open_foam().
+// `open_foam_chance` is the share of cells holding one at any moment, `open_foam_cell` how big a
+// cell is in world pixels (with the 2:1 squash taken out), `open_foam_thick` how thick a streak
+// is in those same units, and `open_foam_life` how long one lasts, in seconds.
+uniform float open_foam_chance = 5.00;
+uniform float open_foam_cell = 150.0;
+uniform float open_foam_thick = 3.3;
+uniform float open_foam_life = 8.0;
+uniform float open_foam_strength = 9.55;
+
+// The swell the floating rubbish rides, so loose foam rides it too. Mirrors
+// LakeGrid.WAVE_AMPLITUDE and LakeGrid.SWAY, like foam.gdshader and rubbish.gdshader.
+uniform float swell_amplitude = 5.0;
+uniform float swell_sway = 3.2;
+
+// The grime caught along the outer bank: what colour it is and how solid, and how far out from
+// the bank's edge it reaches at most, in tiles. Scaled by the water's filth, so it goes as
+// that stretch of shore is cleaned.
+uniform vec4 grime_color : source_color = vec4(0.27, 0.30, 0.17, 0.7);
+uniform float grime_reach = 1.1;
 
 // 0 clean, 1 filthy. Adds a flat scum tint on top of the depth gradient and kills the
 // band contrast, so a dirty lake looks opaque as well as green — murk is a loss of
@@ -99,6 +130,16 @@ uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 // finer pattern is switched on over them so the surface breaks into points of light
 // rather than simply glowing harder. It is the same water, catching the sun at last.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
+
+// The daylight, from DayCycle. `sun_tint` is the same colour the whole world is multiplied
+// by; it arrives here as well because the glints are added light and added light has to be
+// the colour of the light adding it — white crests on a lake at dusk read as snow.
+//
+// `sun_lean` is how far over the sun is, negative one side of noon and positive the other,
+// and it slides the glint band across the water so the shine is a strip lying where the sun
+// is rather than an even sheen over the whole basin.
+uniform vec4 sun_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float sun_lean = 0.0;
 
 varying vec2 world_pos;
 
@@ -137,6 +178,121 @@ float island_fraction(vec2 tile) {
 	float wobble = 1.0 + 0.07 * sin(angle * 3.0 + 0.7) + 0.035 * sin(angle * 5.0 - 0.4)
 		+ 0.02 * sin(angle * 7.0 + 2.1);
 	return r / wobble;
+}
+
+// One random number per cell, the same every time for the same cell.
+float foam_hash(vec2 cell) {
+	vec2 p = fract(cell * vec2(123.34, 345.45));
+	p += dot(p, p + 34.345);
+	return fract(p.x * p.y);
+}
+
+// How much foam is on the water at one spot near a shore, 0 to 1.
+//
+// `dist` is how far into the water the spot is, in tiles — negative is under the sand. `angle`
+// is where round the shore it is, and `mean` is that shore's mean radius in tiles, which sets
+// how many waves and cells fit round it: the same count round the island and round the bank
+// would be pixels on one and tiles on the other.
+//
+// Everything that varies round the shore does so in whole waves or whole cells per lap, so the
+// ring closes on itself with no seam where atan() wraps from pi to minus pi.
+//
+// Three parts, and hard steps rather than smooth ramps for all of them — this sits against
+// pixel-art sand, and a soft gradient there is what read as a flat, blurred separation:
+//   - the lip, solid on the sand side, ragged and breaking into bubbles on the water side
+//   - the wash, a thin broken line that surges out from the lip and runs back up to it
+//   - flecks left behind between the two, thinning out as they get further from the sand
+float shore_foam(float dist, float angle, float mean, float wide) {
+	float t = TIME * wave_speed;
+	float round_t = angle / TAU + 0.5;
+
+	// The tear along the lip: two waves beating so it never reads as a scallop border.
+	float tear = sin(angle * round(mean * 2.2) + t * 0.9) * 0.55
+		+ sin(angle * round(mean * 5.3) - t * 1.3) * 0.45;
+	float lip_w = foam_lip * wide * (0.8 + tear * 0.4);
+
+	// About two cells a tile round the shore for the wash's segments, twice that for bubbles.
+	float cells = max(round(mean * 12.0), 12.0);
+	float along = mod(floor(round_t * cells * 2.0), cells * 2.0);
+	float row = floor(dist / (foam_line * wide) - t * 0.5);
+	float grain = foam_hash(vec2(along, row));
+
+	// The lip. Its last third, on the water side, keeps only the bubbles that rolled high.
+	float lip = step(dist, lip_w);
+	lip *= mix(1.0, step(0.35, grain), step(lip_w * 0.66, dist));
+
+	// The wash: out at the bottom of the surge, back onto the lip at the top. Phase drifts
+	// round the shore so the whole bank is not breathing in time.
+	float surge = sin(t * 0.8 + sin(angle * round(mean * 0.19)) * 2.0 + angle * round(mean * 0.6))
+		* 0.5 + 0.5;
+	float wash_at = lip_w + foam_wash * wide * surge;
+	float wash = step(abs(dist - wash_at), foam_line * wide * 0.5);
+	// Broken into segments, and fainter the further out it has run.
+	float segment = foam_hash(vec2(mod(floor(round_t * cells), cells), 7.0));
+	wash *= step(0.3, segment) * mix(1.0, 0.45, surge);
+
+	// What the wash leaves behind as it draws back.
+	float between = step(lip_w, dist) * step(dist, wash_at);
+	float reach = clamp((dist - lip_w) / max(wash_at - lip_w, 0.001), 0.0, 1.0);
+	float fleck = between * step(0.84 + reach * 0.12, grain);
+
+	return max(lip, max(wash * 0.75, fleck * 0.6));
+}
+
+// A streak of foam out on open water, 0 to 1, at a spot already snapped to foam pixels.
+//
+// The lake is cut into cells, and a few of them hold one streak each, placed off the cell's
+// middle so the cells never show as a grid. Worked in a space with the isometric squash taken
+// out, so a streak lies flat on the water rather than standing up on the screen. Every life a
+// cell rolls again — whether it holds a streak, where, which way and how bent — so the foam
+// wanders about the lake rather than blinking on and off in the same places.
+//
+// Same language as the shore foam: hard edges, broken into segments, no gradients.
+float open_foam(vec2 at) {
+	vec2 plane = vec2(at.x, at.y * 2.0);
+	vec2 cell = floor(plane / open_foam_cell);
+	float first = foam_hash(cell + vec2(3.1, 9.7));
+
+	// Each cell on its own clock, so the whole lake does not bloom at once.
+	float clock = TIME / open_foam_life + first;
+	float life = fract(clock);
+	vec2 roll = cell + vec2(floor(clock) * 17.3, floor(clock) * 5.9);
+	if (foam_hash(roll) > open_foam_chance) {
+		return 0.0;
+	}
+	float h_x = foam_hash(roll + vec2(1.0, 0.0));
+	float h_y = foam_hash(roll + vec2(0.0, 1.0));
+	float h_turn = foam_hash(roll + vec2(2.0, 3.0));
+	float h_bend = foam_hash(roll + vec2(5.0, 1.0));
+	float h_len = foam_hash(roll + vec2(4.0, 7.0));
+
+	// Off the middle, but by less than a cell's half minus the longest streak, so none reaches
+	// across into a neighbour and gets cut off by the cell edge.
+	vec2 middle = (cell + 0.5 + (vec2(h_x, h_y) - 0.5) * 0.3) * open_foam_cell;
+	vec2 local = plane - middle;
+	// Mostly along the iso grain, turned a little either way, and drifting slowly as it lives.
+	float turn = (h_turn - 0.5) * 0.9;
+	local = mat2(vec2(cos(turn), -sin(turn)), vec2(sin(turn), cos(turn))) * local;
+	local.x -= life * 6.0;
+
+	float half_len = open_foam_cell * (0.12 + h_len * 0.13);
+	// Grows from the middle out, holds, then shortens away: a crest forming and breaking.
+	float grown = half_len * sin(life * PI);
+	float along = abs(local.x) / max(grown, 0.001);
+	if (along >= 1.0) {
+		return 0.0;
+	}
+
+	// A shallow arc, thickest in the middle and drawn to a point at the ends.
+	float bend = (h_bend - 0.5) * 0.02;
+	float off = local.y + local.x * local.x * bend;
+	float thick = open_foam_thick * sqrt(1.0 - along * along);
+	float line = step(abs(off), thick);
+
+	// Broken into segments a few foam pixels long, and thinned further as it falls apart.
+	float segment = foam_hash(roll + vec2(floor(local.x / (foam_pixel * 3.0)), 11.0));
+	line *= step(0.25 + max(life - 0.6, 0.0) * 1.2, segment);
+	return line;
 }
 
 void vertex() {
@@ -197,7 +353,14 @@ void fragment() {
 	// plane read as moving water rather than as painted floor. A cleaned lake takes them
 	// lower down the wave and harder, so more of the surface is a crest.
 	float glint = smoothstep(mix(0.86, 0.83, sparkle), 1.0, bands) * (1.0 - filth * 0.8);
-	col.rgb += glint * (0.22 + sparkle * 0.06);
+	// The sun's own strip. Where the light is coming from low and to one side, the shine on
+	// the water gathers into a band under it rather than spreading evenly: this weights the
+	// crests by how near they are to the line the sun is on, and flattens back to an even
+	// sheen as the sun climbs to noon and `sun_lean` goes to nothing.
+	float sun_line = (world_pos.x / (tile_w * 0.5)) * -sun_lean;
+	float toward = 1.0 - clamp(abs(world_pos.y / (tile_h * 0.5) - sun_line) * 0.02, 0.0, 1.0);
+	float gather = mix(1.0, 0.35 + toward * 1.25, clamp(abs(sun_lean), 0.0, 1.0));
+	col.rgb += glint * (0.22 + sparkle * 0.06) * gather * sun_tint.rgb;
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
 	// near their peaks, which is a scatter of moving points rather than a sheen. Costs
@@ -219,22 +382,65 @@ void fragment() {
 	col.rgb = mix(col.rgb, scum_color.rgb, scum * 0.75);
 	col.a = clamp(col.a + scum * 0.2, 0.0, 1.0);
 
-	// Foam collar against the bank, wobbling so the line is not a clean stencil edge.
-	float lap = 1.0 + 0.35 * sin(along * 0.02 + TIME * 1.4);
-	float foam = smoothstep(1.0 - foam_band * lap, 1.0, s) * (1.0 - filth * 0.6);
-	// And the same collar round the island, read from the other side: 1 on its beach, falling
-	// off outward. Half again as wide as the bank's rather than exactly it — the island's
-	// own wobble is smaller (it has to stay a coastline, not a star, at a shape this size),
-	// so a collar the same width as the bank's still read as a hard ring where the bank's
-	// did not. The extra width is what the shape can't carry on its own.
+	// The foam line along both shores. Worked out on a grid of foam_pixel squares rather than
+	// per fragment, so its edges land on the art's own pixel size.
+	vec2 foam_tile = world_to_tile(floor(world_pos / foam_pixel) * foam_pixel + foam_pixel * 0.5);
+
+	// The bank: distance in from the edge the water polygon is drawn to, in tiles. The shore's
+	// wobble is left out of the conversion — it bends the width by a few percent either way,
+	// which is exactly the unevenness a shoreline wants anyway.
+	vec2 bank_d = (foam_tile - basin_centre) / (basin_radius + vec2(shore_lap));
+	float bank_mean = (basin_radius.x + basin_radius.y) * 0.5 + shore_lap;
+	float bank_in = (1.0 - shore_fraction(foam_tile)) * bank_mean;
+	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0);
+
+	// Grime along the outer bank: blotches of scum caught in the shallowest water, under the
+	// foam. Driven by this water's own filth, so it goes as the washed-up rubbish is fetched
+	// away. Blotches rather than a band, in 4-pixel cells, so it reads as muck lying on the
+	// water rather than a darker stripe drawn along the shore.
+	vec2 grime_at = vec2(world_pos.x, world_pos.y * 2.0);
+	float grime_cell = foam_hash(floor(grime_at / 4.0));
+	float grime_patch = foam_hash(floor(grime_at / 22.0) + vec2(5.0, 3.0));
+	float grime_band = step(bank_in, grime_reach * (0.5 + grime_patch * 0.8));
+	float grime = grime_band * step(0.35, grime_cell) * step(0.3, grime_patch) * color_t;
+	col.rgb = mix(col.rgb, grime_color.rgb, grime * grime_color.a);
+
+	// The island, read from the other side: outward from its beach. Half again as wide as the
+	// bank's — its tiles are drawn over the water with a stepped edge, and a lip the bank's
+	// width disappears under their corners. What is under the tiles' own corners is foam too,
+	// so a gap between two diamonds shows white water rather than deep blue.
 	//
 	// Drawn here rather than over the tiles, so that the foam and the shoaling either side of
 	// it are the same ring. Drawn on the ground it was a second ring just inside this one,
 	// and two rings a few pixels apart read as a seam, not as a shore.
-	float isl_foam = (1.0 - smoothstep(1.0, 1.0 + foam_band * lap * 1.5, isl))
-		* (1.0 - filth * 0.6);
-	foam = max(foam, isl_foam);
-	col = mix(col, foam_color, clamp(foam, 0.0, 1.0) * foam_color.a);
+	vec2 isl_d = foam_tile - island_centre;
+	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
+	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
+	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5));
+
+	// And loose out on the open lake, kept a couple of tiles clear of both shores so it never
+	// tangles with the lip and the wash there.
+	float open_room = step(2.0, bank_in) * step(2.5, isl_out);
+	// Riding the swell: the same bob and wander rubbish.gdshader gives a floating piece, taken
+	// off the lookup so the streak is carried by it. Keyed to this spot's own x where a piece
+	// uses its anchor's, which is the same wave laid continuously under the whole lake.
+	float swell_t = TIME * wave_speed;
+	vec2 swell = vec2(
+		sin(swell_t * 0.53 + world_pos.x * 0.017) * swell_sway,
+		(sin(world_pos.x * 0.011 + swell_t) * 0.62 + sin(world_pos.x * 0.029 - swell_t * 1.7) * 0.38)
+			* swell_amplitude
+			+ cos(swell_t * 0.41 + world_pos.x * 0.023) * swell_sway * 0.5
+	);
+	vec2 riding = world_pos - swell;
+	vec2 foam_at = floor(riding / foam_pixel) * foam_pixel + foam_pixel * 0.5;
+	foam = max(foam, open_foam(foam_at) * open_foam_strength * open_room);
+
+	// Dirty water keeps its foam, it just goes the colour of what it is churning: foam that
+	// faded out with the filth left the filthy lake, the one the player starts on, with no
+	// shoreline at all.
+	vec3 foam_rgb = mix(foam_color.rgb, vec3(0.80, 0.82, 0.68), color_t * 0.55);
+	col.rgb = mix(col.rgb, foam_rgb, clamp(foam, 0.0, 1.0) * foam_color.a * (1.0 - filth * 0.25));
+	col.a = mix(col.a, 1.0, clamp(foam, 0.0, 1.0) * foam_color.a);
 
 	COLOR = col;
 }
