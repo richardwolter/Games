@@ -512,7 +512,7 @@ var _sparkle_at: float = 0.0
 @onready var _open_shed: Button = %OpenShed
 @onready var _open_upgrades: UiButton = %OpenUpgrades
 @onready var _settings: SettingsSkin = %Settings
-@onready var _open_settings: Button = %OpenSettings
+@onready var _open_settings: PlankButton = %OpenSettings
 @onready var _music: AudioStreamPlayer = %Music
 @onready var _send_now: Button = %SendNow
 @onready var _auto_ferry: CheckButton = %AutoFerry
@@ -1635,7 +1635,7 @@ func _polish_panel_controls() -> void:
 		4, WoodUI.PLANK_LIGHT, WoodUI.PLANK_LIGHT.lightened(0.2), WoodUI.PLANK, 2
 	)
 	var pressed := WoodUI.panel_style(4, WoodUI.PLANK_DARK, WoodUI.PLANK, WoodUI.SEAM, 2)
-	var nodes: Array[Control] = [_open_settings]
+	var nodes: Array[Control] = []
 	for path in [
 		"%BuyNetWidth", "%BuyNetStrength", "%BuyNetRange", "%BuyReel", "%BuyNetHold",
 		"%BuyBoatSpeed", "%BuyCargo", "%BuySkimmer", "%BuyFleet",

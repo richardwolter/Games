@@ -592,26 +592,16 @@ func _ease_shine() -> float:
 ## the same kind of thing — a number the player checks — and the sheet has one panel drawn on
 ## it. Copying that keeps the two readouts obviously a pair.
 func _draw_stock() -> void:
-	if not _pieces.has(&"money"):
-		return
-	var piece: Dictionary = _pieces[&"money"]
-	var art: Rect2 = piece["region"]
-	var plate := _plate_of(&"money")
-	# The clean left end of the plate, stretched: on the older art the rest of it has the
-	# artist's figures painted on it, the same trap the shop's rows fell into.
-	var slab := Rect2(
-		art.position + Vector2(plate.position.x, plate.position.y) * art.size,
-		Vector2(PLATE_CLEAR, plate.size.y) * art.size
-	)
-	draw_texture_rect_region(piece["sheet"], _stock_box, slab)
-
+	# A plank of the meter's wood, the same as the drawn boards' buttons, rather than a
+	# slab off the money plate's art: the readout sits over the meter and should be its wood.
+	Style.plank(self, _stock_box, 41, Style.FRAME, Style.CLIP)
 	var height := Style.step(_stock_box.size.y * STOCK_TEXT)
 	Style.write(
 		self,
 		"Items in stock  %d" % stock,
 		height,
 		Vector2(0.0, _stock_box.position.y + _stock_box.size.y * 0.5 + float(height) * 0.35),
-		Style.INK,
+		Style.RIBBON_INK,
 		HORIZONTAL_ALIGNMENT_CENTER,
 		_stock_box
 	)

@@ -12,6 +12,7 @@
 [ext_resource type="Script" uid="uid://bcda8vbtl133t" path="res://scripts/hud_skin.gd" id="9_skin"]
 [ext_resource type="Script" uid="uid://dr22ekyjmso6u" path="res://scripts/shop_skin.gd" id="10_shop"]
 [ext_resource type="Script" path="res://scripts/settings_skin.gd" id="11_settings"]
+[ext_resource type="Script" path="res://scripts/plank_button.gd" id="12_plank"]
 [ext_resource type="Script" uid="uid://bomnr6avmr21a" path="res://scripts/ui_button.gd" id="11_uibtn"]
 [ext_resource type="Script" uid="uid://bwjm1n8cd37pb" path="res://scripts/dog.gd" id="12_dog"]
 [ext_resource type="Script" path="res://scripts/day_cycle.gd" id="13_day"]
@@ -284,8 +285,9 @@ offset_bottom = 102.0
 grow_horizontal = 0
 script = ExtResource("11_uibtn")
 
-[node name="OpenSettings" type="Button" parent="HUD" unique_id=2029636317]
+[node name="OpenSettings" type="Control" parent="HUD" unique_id=2029636317]
 unique_name_in_owner = true
+layout_mode = 3
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
@@ -297,7 +299,8 @@ offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "Settings"
+script = ExtResource("12_plank")
+label = "Settings"
 
 [node name="PerfHud" type="Node2D" parent="." unique_id=-996839803]
 script = ExtResource("9_perf")
