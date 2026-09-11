@@ -183,18 +183,14 @@ const LINTEL_ROWS := 4
 ## by a third again: 3.4 is 4.4 over 1.3, and the rounding still lands it on a clean whole
 ## number of screen pixels per pixel of art.
 ##
-## The same sheet the lake draws them from — three views and a six-frame stride — read here
+## The same sheet the lake draws them from — four directions, idle and run — read here
 ## rather than borrowed off the Angler node, because that node walks an island: its rules are
-## a shoreline and a hut footprint, and none of that is in this room.
-const YOU_ART := "res://assets/character.json"
+## a shoreline and a hut footprint, and none of that is in this room. Frames are held for
+## Angler.IDLE_FRAME and Angler.RUN_FRAME, so the figure moves the same indoors as out.
+const YOU_ART := Angler.ART
 const YOU_TALL := 3.4
 const YOU_SPEED := 7.0
 const YOU_STEP_MOST := 0.7
-
-## Seconds a frame of the walk and the idle are held. The lake's own numbers, so the figure
-## moves the same indoors as out.
-const YOU_IDLE_FRAME := 0.24
-const YOU_WALK_FRAME := 0.1
 
 ## How far the player stands in front of the door when the room opens, in cells. Just onto
 ## the floor: they have come through it, not out of the wall.
@@ -252,26 +248,19 @@ var _dog_rng := RandomNumberGenerator.new()
 ## have been walking (nought when still), and how long the room has been open — which is
 ## what the idle cycle is counted off.
 var _you_at := Vector2.ZERO
-var _you_left: bool = false
 var _you_facing := Vector2(0.0, 1.0)
 var _you_step: float = 0.0
 var _you_age: float = 0.0
 
-## The sheet the player is drawn from, and the same sheet turned over for the walks that go
-## the other way. Loaded once, and null when the art is missing — in which case the room
-## draws no player rather than a box.
+## The sheet the player is drawn from. Loaded once, and null when the art is missing — in
+## which case the room draws no player rather than a box.
 var _you_sheet: Texture2D
-var _you_mirror: Texture2D
-var _you_sheet_wide: float = 0.0
 var _you_poses := {}
-
-## The hat, toned to match the sheet. See `_load_you`.
-var _you_hat: Texture2D
 
 ## How tall the figure draws inside its cell, and where its feet sit in that cell. See
 ## `_load_you`.
-var _you_ink_tall: float = 20.0
-var _you_ink_foot: float = 26.0
+var _you_ink_tall: float = 43.0
+var _you_ink_foot: float = 45.0
 
 ## Cells something is standing on, rebuilt when `decor` changes. Rugs are not in it: a dog
 ## may walk on a rug, and a room full of rugs it refuses to cross is a room it cannot leave.
@@ -374,16 +363,6 @@ func _load_you() -> void:
 	# with it. Same arithmetic, same numbers — see Style.figure_tone.
 	image = _toned(image)
 	_you_sheet = ImageTexture.create_from_image(image)
-	# The hat goes through the same tone as the figure under it, for the same reason.
-	var hat := Art.image(Angler.HAT_ART)
-	if hat != null:
-		_you_hat = ImageTexture.create_from_image(_toned(hat))
-	_you_sheet_wide = float(image.get_width())
-	var turned := Image.create_from_data(
-		image.get_width(), image.get_height(), false, image.get_format(), image.get_data()
-	)
-	turned.flip_x()
-	_you_mirror = ImageTexture.create_from_image(turned)
 	for name: String in book["poses"]:
 		var frames: Array = []
 		for cell: Dictionary in book["poses"][name]:
@@ -392,18 +371,16 @@ func _load_you() -> void:
 			frames.append({
 				"region": Rect2(region[0], region[1], region[2], region[3]),
 				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
-				"head": float(cell.get("head", 0.0)),
 			})
 		_you_poses[StringName(name)] = frames
 
 	# What the figure measures inside its cell, taken from one frame and used for every one
-	# of them. The cell is mostly air — twelve pixels of character in thirty-two — so scaling
-	# a frame to its cell drew the player at a third of the size they should be, which is how
-	# they ended up shorter than the dog. Taken once rather than per frame for the same
-	# reason player.gd does: the drawing breathes inside its cell, and measuring each frame
-	# makes the figure pulse.
-	if _you_poses.has(&"idle_front"):
-		var first: Dictionary = (_you_poses[&"idle_front"] as Array)[0]
+	# of them. Scaling a frame to its cell draws the player at the wrong size, since the cell
+	# is wider than the figure. Taken once rather than per frame for the same reason player.gd
+	# does: the drawing breathes inside its cell, and measuring each frame makes the figure
+	# pulse.
+	if _you_poses.has(&"idle_south"):
+		var first: Dictionary = (_you_poses[&"idle_south"] as Array)[0]
 		var ink: Rect2 = first["ink"]
 		_you_ink_tall = maxf(ink.size.y, 1.0)
 		_you_ink_foot = ink.position.y + ink.size.y
@@ -411,8 +388,8 @@ func _load_you() -> void:
 
 ## A copy of the sheet with the game's own light on it. See Style.figure_tone.
 ##
-## Once, at load: the sheet is 192 pixels square and this walks all of it, which is nothing
-## done once and would be silly done per frame.
+## Once, at load: this walks every pixel of the sheet, which is nothing done once and would
+## be silly done per frame.
 func _toned(art: Image) -> Image:
 	var out := Image.create(art.get_width(), art.get_height(), false, Image.FORMAT_RGBA8)
 	for y in art.get_height():
@@ -461,8 +438,6 @@ func _walk_you(delta: float) -> void:
 		return
 	_you_step += delta
 	_you_facing = push.normalized()
-	if absf(push.x) > 0.001:
-		_you_left = push.x < 0.0
 	var step := push.normalized() * minf(YOU_SPEED * delta, YOU_STEP_MOST)
 	var wanted := _you_at + step
 	if _you_may_stand(wanted):
@@ -481,14 +456,14 @@ func _you_may_stand(where: Vector2) -> bool:
 	return _clear_of(where, _you_at, _dog_at)
 
 
-## Which of the three drawn views the player is showing, and whether it wants mirroring.
+## Which compass direction the player is showing.
 ##
 ## Flat on rather than projected, so the rule is simply which way the push leaned: mostly
-## sideways is the side row, and the rest is the front or the back.
-func _you_view() -> Array:
+## sideways is east or west, and the rest is south or north.
+func _you_view() -> StringName:
 	if absf(_you_facing.x) >= absf(_you_facing.y):
-		return [&"side", _you_left]
-	return [&"front" if _you_facing.y > 0.0 else &"back", false]
+		return &"west" if _you_facing.x < 0.0 else &"east"
+	return &"south" if _you_facing.y > 0.0 else &"north"
 
 
 ## The player, standing on the floor of the room.
@@ -505,78 +480,26 @@ func _draw_you(floor_box: Rect2) -> void:
 		ring.append(at + Vector2(cos(angle) * tall * 0.26, sin(angle) * tall * 0.11))
 	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
 
-	var view := _you_view()
 	var walking := _you_step > 0.0
-	var pose := StringName("%s_%s" % ["walk" if walking else "idle", view[0]])
+	var pose := StringName("%s_%s" % ["run" if walking else "idle", _you_view()])
 	if not _you_poses.has(pose):
 		return
 	var frames: Array = _you_poses[pose]
-	var held := YOU_WALK_FRAME if walking else YOU_IDLE_FRAME
+	var held := Angler.RUN_FRAME if walking else Angler.IDLE_FRAME
 	var frame: Dictionary = frames[posmod(int(_you_age / held), frames.size())]
 	var region: Rect2 = frame["region"]
-	# Scaled by how tall the figure is inside its cell, not by the cell: the cell is mostly
-	# air. Placed by the cell all the same — its foot line on the spot the player stands —
-	# so every frame lands where the artist put it and the walk does not bob about.
-	#
-	# Whole source pixels, like the lake draws them: a fraction of a pixel is what made the
-	# angler look out of focus out there, and this room is nothing but blown-up pixel art.
+	var ink: Rect2 = frame["ink"]
+	# Scaled by how tall the figure is inside its cell, not by the cell. Whole source pixels,
+	# like the lake draws them: a fraction of a pixel makes pixel art look out of focus, and
+	# this room is nothing but blown-up pixel art.
 	var scale := maxf(1.0, roundf(tall / _you_ink_tall))
-	# What the figure actually comes out as, which is not what was asked for: the scale is
-	# snapped to whole pixels, so a request for 49.6 draws 40. Everything hung on the figure is
-	# measured against this and not against `tall` — the hat was sized against the request and
-	# came out a quarter too wide for the head it sits on, which is why the angler indoors and
-	# the angler outdoors were not wearing the same hat.
-	var drawn := _you_ink_tall * scale
+	# Centred on the figure's ink rather than the cell, for the reason Angler._frame gives:
+	# the cells are an even split of a hand-trimmed strip and do not centre the body.
 	var size := region.size * scale
 	var box := Rect2(
-		at - Vector2(size.x * 0.5, _you_ink_foot * scale), size
+		at - Vector2((ink.position.x + ink.size.x * 0.5) * scale, _you_ink_foot * scale), size
 	)
-	if bool(view[1]):
-		draw_texture_rect_region(
-			_you_mirror, box,
-			Rect2(
-				Vector2(_you_sheet_wide - region.position.x - region.size.x, region.position.y),
-				region.size
-			)
-		)
-	else:
-		draw_texture_rect_region(_you_sheet, box, region)
-	_draw_you_hat(box, frame["ink"], float(frame["head"]), scale, drawn, view)
-
-
-## A length rounded onto the figure's own pixel grid, the same as the lake does it: the hat
-## is drawn geometry sitting on blown-up pixel art, and smooth edges on it are what would
-## look wrong.
-func _on_grid(px: float, scale: float) -> float:
-	return roundf(px / scale) * scale
-
-
-## The straw hat, indoors.
-##
-## The same picture the lake hangs on the angler, off the same constants, so it is one hat the
-## character wears rather than two that have to be kept looking alike. Only the size it is
-## measured against changes: Angler.HEIGHT in world pixels out there, and how tall the figure
-## is drawn on this floor at this zoom in here.
-func _draw_you_hat(
-	box: Rect2, ink: Rect2, head_at: float, scale: float, drawn: float, view: Array
-) -> void:
-	if _you_hat == null:
-		return
-	var head := box.position.y + ink.position.y * scale
-	# Over the head the slicer measured, the same as the lake does it.
-	var middle := (
-		box.position.x
-		+ box.size.x * 0.5
-		+ head_at * scale * (-1.0 if bool(view[1]) else 1.0)
-	)
-	var art := _you_hat.get_size()
-	var wide := maxf(scale, _on_grid(drawn * Angler.HAT_WIDE, scale))
-	var span := Vector2(wide, _on_grid(wide * art.y / maxf(art.x, 1.0), scale))
-	# The same per-view lift the lake gives it, so it is one hat in both places.
-	var line := head + _on_grid(drawn * Angler.HAT_SIT, scale) + Angler.lift_of(view) * scale
-	draw_texture_rect(
-		_you_hat, Rect2(Vector2(middle - span.x * 0.5, line - span.y), span), false
-	)
+	draw_texture_rect_region(_you_sheet, box, region)
 
 
 ## Where the door's own empty rect sits, in screen pixels: the dark opening only, not the
