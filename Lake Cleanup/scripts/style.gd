@@ -71,26 +71,6 @@ const DANGER := Color(0.80, 0.24, 0.19)
 const SAFE := Color(0.44, 0.78, 0.42)
 const COOL := Color(0.36, 0.66, 0.74)
 
-## The pollution meter's two ends: the lake's own two states, not a pair of colours picked
-## to look like them.
-##
-## CLEAN is `shallow_color` straight out of shaders/water.gdshader. DIRTY is what that same
-## shader makes of fully filthy shallow water — `mix(shallow_color, scum_color, 0.75)`, the
-## scum blend at line 167. So the bar is a strip of the lake at each end, and a player
-## reading it is reading the water they are looking at.
-##
-## These mirror the shader. If its `shallow_color` or `scum_color` defaults change, these
-## change with them, or the meter stops being the lake and goes back to being a bar.
-const METER_CLEAN := Color(0.24, 0.55, 0.66)
-const METER_DIRTY := Color(0.25, 0.41, 0.28)
-
-## And the same two at depth: `deep_color`, and `deep_color` under the scum blend the shader
-## weakens with depth (`mix(1.0, 0.7, d)` at line 166). The meter shades between its shallow
-## tone and its deep one down its own height, which is the gradient the lake has across its
-## width — without it the bar is the lake's colour but not the lake's surface.
-const METER_CLEAN_DEEP := Color(0.05, 0.16, 0.28)
-const METER_DIRTY_DEEP := Color(0.16, 0.27, 0.21)
-
 ## How the angler is brought into the game's own light: how much saturation comes out, what
 ## colour the figure leans toward and how far, and how much of its brightness goes.
 ##
@@ -121,12 +101,6 @@ static func figure_tone(art: Color) -> Color:
 	)
 
 
-## How the water is shaded: how many rows the shallow-to-deep fade is drawn in, how wide the
-## filth-to-clean blend is as a fraction of the track, and how many slices that blend is cut
-## into. Six rows is what the meter has always used; the blend matches it.
-const WATER_BANDS := 6
-const FEATHER := 0.14
-const FADE_STEPS := 14
 
 # ---------------------------------------------------------------------------------------
 # Scrims
@@ -382,80 +356,9 @@ static func button(
 	return box
 
 
-## Water in a box: a shallow tone at the top shading to a deep one at the bottom, the way
-## the lake shades from its shore to its middle. Drawn as bands rather than a gradient
-## texture because everything else in this game draws its own light too.
-static func water(on: CanvasItem, box: Rect2, shallow: Color, deep: Color) -> void:
-	if box.size.x <= 0.0 or box.size.y <= 0.0:
-		return
-	var bands := WATER_BANDS
-	var tall := box.size.y / float(bands)
-	for i in bands:
-		var part := float(i) / float(bands - 1)
-		on.draw_rect(
-			Rect2(box.position.x, box.position.y + tall * float(i), box.size.x, tall + 1.0),
-			shallow.lerp(deep, smoothstep(0.0, 1.0, part)),
-			true
-		)
-
-
-## The pollution meter: the filth on the left, the clean water on the right, and no line
-## between them.
-##
-## Drawn as one object rather than as clean water with a dirty rectangle laid over the left
-## of it. That earlier pair met at a hard vertical edge, which read as two bars rather than
-## as one lake half cleared — the whole point of the meter is that the filth is *in* the
-## water, and water does not have an edge in it.
-##
-## Each row of the fade is drawn in three pieces: filth up to the near side of the blend,
-## clean water from the far side, and a run of slices across the middle stepping from one to
-## the other. `FEATHER` is how wide that middle is as a fraction of the track.
-static func meter_water(
-	on: CanvasItem,
-	box: Rect2,
-	run: float,
-	dirty: Color,
-	dirty_deep: Color,
-	clean: Color,
-	clean_deep: Color
-) -> void:
-	if box.size.x <= 0.0 or box.size.y <= 0.0:
-		return
-	var share := clampf(run, 0.0, 1.0)
-	var edge := box.position.x + box.size.x * share
-	# Narrowed near the ends, so a nearly-clean lake keeps its last sliver of filth and a
-	# full one does not fade off the left of its own track.
-	var feather := minf(
-		box.size.x * FEATHER,
-		maxf(minf(edge - box.position.x, box.end.x - edge) * 2.0, 1.0)
-	)
-	var from := edge - feather * 0.5
-	var to := edge + feather * 0.5
-	var tall := box.size.y / float(WATER_BANDS)
-	for i in WATER_BANDS:
-		var down := smoothstep(0.0, 1.0, float(i) / float(WATER_BANDS - 1))
-		var foul := dirty.lerp(dirty_deep, down)
-		var fresh := clean.lerp(clean_deep, down)
-		var y := box.position.y + tall * float(i)
-		var high := tall + 1.0
-		if from > box.position.x:
-			on.draw_rect(Rect2(box.position.x, y, from - box.position.x, high), foul, true)
-		if to < box.end.x:
-			on.draw_rect(Rect2(to, y, box.end.x - to, high), fresh, true)
-		var step_wide := (minf(to, box.end.x) - maxf(from, box.position.x)) / float(FADE_STEPS)
-		if step_wide <= 0.0:
-			continue
-		for k in FADE_STEPS:
-			var at := maxf(from, box.position.x) + step_wide * float(k)
-			var through := smoothstep(0.0, 1.0, (float(k) + 0.5) / float(FADE_STEPS))
-			on.draw_rect(
-				Rect2(at, y, step_wide + 1.0, high), foul.lerp(fresh, through), true
-			)
-
-
 ## A reading: a sunken trough, a fill across whatever fraction of it, a seam outline, and an
 ## optional label centred on the whole thing. The shed's health and the siege's shield are
-## the same object. The pollution meter is not — it is water, and draws itself.
+## the same object. The pollution meter is not — it is art, assembled in hud_skin.gd.
 static func bar(
 	on: CanvasItem,
 	box: Rect2,

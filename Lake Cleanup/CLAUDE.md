@@ -168,9 +168,16 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   wobble small; the map decides where the junk is, the noise only makes the edge breathe.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
-- Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the
-  pollution meter (`style.gd` `METER_*` still mirror the old smooth water; the UI is due
-  to be replaced).
+- Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`.
+- **The pollution meter is art, not the water shader** (`hud_skin.gd` `_build_meter`,
+  `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
+  `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
+  clean water, garbage circle, wooden frame — as child TextureRects at a whole-number scale
+  (`METER_SCALE_PER` window lines per step, 2x at 1080). The shader slides the filth-to-clean
+  seam (feather `METER_FEATHER`, narrowed at the ends) and rocks both sheets a pixel or two
+  (sine, not scroll: the sheets are not tileable). Garbage circle static; `%` figure only,
+  right-aligned on the clean end; no `POLLUTION` label. `Style.meter_water`/`water` and
+  the `METER_*` colours are gone.
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.

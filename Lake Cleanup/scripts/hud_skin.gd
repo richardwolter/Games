@@ -5,10 +5,12 @@
 ## of a sheet at runtime — the same bargain the net and the pigeons strike, so that the game
 ## runs with the art missing rather than failing to load.
 ##
-## The meter used to be the reason this was drawn rather than assembled — it had to read at
-## any pollution, and the art was one picture of it reading seventy-two per cent. It is wood
-## and flat colour now (WoodUI, `_draw_meter`), not a picture, so that reason is gone; kept as
-## a drawn node anyway, alongside the three buttons that are still cut from the sheet.
+## The meter is the one thing here that is assembled rather than drawn: four sheets of art
+## (`assets/ui/meter/`) stacked as child nodes, the water between them a shader that slides
+## the filth-to-clean seam and rocks both sheets so the water moves. It went that way
+## because the art is pixel art and wants a nearest filter of its own, and because the water
+## has to keep moving between readings — the rest of this node only repaints when a figure
+## changes. See `_build_meter`.
 class_name HudSkin
 extends Control
 
@@ -37,25 +39,26 @@ const SHINE_TIME := 0.55
 const SHINE_SWELL := 0.1
 const SHINE_LIFT := 0.55
 
-## How wide the meter is drawn, as a fraction of the window, and the widest it may get in
-## pixels. Its height is a fixed multiple of that width — it is a long thin sign and
-## stretching it to a height would squash it.
-const METER_SHARE := 0.52
-const METER_WIDEST := 900.0
-const METER_ASPECT := 0.11
+## The meter's art: the four sheets, all the same size and aligned, and where inside them the
+## frame and the water's track fall (measured off the sheets' alpha). Drawn at a whole-number
+## scale — it is pixel art, and a fractional scale smears it — picked so that the meter is
+## about twice its art on a 1080-line window: `METER_SCALE_PER` window lines per step.
+const METER_ART := "res://assets/ui/meter/"
+const METER_SHEET := Vector2(290.0, 94.0)
+const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
+const METER_TRACK := Rect2(91.0, 37.0, 170.0, 26.0)
+const METER_SCALE_PER := 540.0
+
+## How wide the filth-to-clean blend is, as a fraction of the track. Narrowed near the ends
+## (see `_show_meter`) so a nearly-clean lake keeps its last sliver of filth and a full one
+## does not fade off the left of its own track.
+const METER_FEATHER := 0.14
 
 ## The side of a button, in screen pixels, and how much bigger the money plate is than the
 ## two that are actually buttons. It is the number the player checks before every purchase
 ## and it carries a figure that has to be read, not just recognised.
 const BUTTON_SIDE := 84.0
 const MONEY_SIDE := 116.0
-
-## The meter's own colours and face: wood to match the buttons around it, and Bungee for its
-## lettering — the reading it replaced was baked into the art, in a different face entirely.
-## Flat colour rather than a picture now, so there is nothing in it that can warp as the
-## reading changes: dirty on the left, clean on the right, the boundary sliding between them.
-const METER_DIRTY := Style.METER_DIRTY
-const METER_CLEAN := Style.METER_CLEAN
 
 ## Gaps: around the whole thing, and between the buttons.
 const EDGE := Style.EDGE
@@ -141,14 +144,21 @@ var _pieces := {}
 
 var _shown: float = 1.0
 
-## The meter's own pieces, built once rather than in `_draw()`: WoodUI's textures are real
-## `Image`s regenerated pixel by pixel, and `_draw()` runs every frame — building them there
-## would mean redoing that work sixty times a second for a frame that never moves.
-var _meter_frame: StyleBoxTexture
+## The meter's nodes, built once in `_build_meter`: the water sheet with its shader, the
+## garbage circle and the frame over it, and the face that writes the figure over the lot.
+## Null when the art is missing, and then there is no meter — the lake keeps its plain label.
+var _meter_water: TextureRect
+var _meter_circle: TextureRect
+var _meter_frame: TextureRect
+var _meter_face: MeterFace
+var _meter_shader: ShaderMaterial
 
 ## Screen boxes worked out in `_notification` when the size changes, so a click and a
-## drawing cannot disagree about where a button is.
+## drawing cannot disagree about where a button is. `_meter_box` is the whole sheet on
+## screen; `_meter_frame_box` the wooden frame inside it, which is what a line under the
+## meter centres on.
 var _meter_box := Rect2()
+var _meter_frame_box := Rect2()
 var _shed_box := Rect2()
 var _upgrades_box := Rect2()
 var _money_box := Rect2()
@@ -163,7 +173,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_load_art()
+	_build_meter()
 	_shown = pollution
+	_show_meter()
 	_lay_out()
 	resized.connect(_lay_out)
 
@@ -199,8 +211,8 @@ func _read_book(path: String) -> void:
 		var piece: Dictionary = book["pieces"][name]
 		var box: Array = piece["region"]
 		# The meter piece's own "water"/"shown" fields (where its baked waterline used to
-		# fall) went with the baked meter art — nothing reads them any more now the meter is
-		# drawn in flat colour instead, so they are no longer kept.
+		# fall) went with the baked meter art — the meter has its own sheets now
+		# (`_build_meter`), so they are no longer kept.
 		var kept := {"region": Rect2(box[0], box[1], box[2], box[3]), "sheet": sheet}
 		# Where the blank panel a live figure is written on sits inside the plaque, as
 		# fractions of it. Measured by the slicer; a piece without one is old art with a
@@ -219,13 +231,24 @@ func _read_book(path: String) -> void:
 ## where the eye already goes to ask how the run is doing.
 func _lay_out() -> void:
 	var wide := size.x
-	var span := minf(minf(wide * METER_SHARE, METER_WIDEST), wide - EDGE * 2.0)
-	_meter_box = Rect2((wide - span) * 0.5, EDGE, span, span * METER_ASPECT)
-	# Rebuilt here rather than in `_draw()`: this only runs on a resize, so the frame's own
-	# margin can scale with the box without regenerating a texture every frame.
-	_meter_frame = WoodUI.panel_style(
-		maxi(4, int(_meter_box.size.y * 0.14)), WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 5
+	var scale := float(clampi(roundi(size.y / METER_SCALE_PER), 1, 4))
+	var span := METER_SHEET * scale
+	# Centred on the frame, not on the sheet: the garbage circle hangs off the frame's left
+	# end and the sheet has room for it, so centring the sheet puts the frame right of middle.
+	var frame_middle := (METER_FRAME.position.x + METER_FRAME.size.x * 0.5) * scale
+	_meter_box = Rect2(floorf(wide * 0.5 - frame_middle), EDGE, span.x, span.y)
+	_meter_frame_box = Rect2(
+		_meter_box.position + METER_FRAME.position * scale, METER_FRAME.size * scale
 	)
+	for sheet: TextureRect in [_meter_water, _meter_circle, _meter_frame]:
+		if sheet != null:
+			sheet.position = _meter_box.position
+			sheet.size = _meter_box.size
+	if _meter_face != null:
+		_meter_face.position = _meter_box.position
+		_meter_face.size = _meter_box.size
+		_meter_face.track = Rect2(METER_TRACK.position * scale, METER_TRACK.size * scale)
+		_meter_face.queue_redraw()
 	# Along the top edge, on the same line the stock plate starts on over on the left, rather
 	# than hung under the meter. The right-hand corner is theirs now that Settings has gone
 	# to the bottom of the screen, and a row that starts at the same height on both sides
@@ -253,6 +276,7 @@ func _process(delta: float) -> void:
 		_shown = lerpf(_shown, wanted, clampf(METER_EASE * delta, 0.0, 1.0))
 		if absf(_shown - wanted) < 0.0005:
 			_shown = wanted
+		_show_meter()
 
 	# The figure runs up to what has been earned rather than jumping to it, and being paid
 	# lights the plate for a moment. A sale is the one thing in this game that happens all at
@@ -325,7 +349,6 @@ func _draw() -> void:
 	_painted = _paint_key()
 	if _sheet == null:
 		return
-	_draw_meter()
 	# The money plate swells a little while it is lit, about its own middle so it grows into
 	# the space around it rather than sliding off its corner.
 	var swell := 1.0 + SHINE_SWELL * _ease_shine()
@@ -358,7 +381,7 @@ func _draw_hint() -> void:
 		Vector2(0.0, _meter_box.position.y + _meter_box.size.y + GAP + float(height)),
 		Style.GOLD.lerp(Style.INK, 0.5),
 		HORIZONTAL_ALIGNMENT_CENTER,
-		_meter_box
+		_meter_frame_box
 	)
 
 
@@ -427,58 +450,91 @@ func _bar(box: Rect2, fill: float, tint: Color, label: String) -> void:
 	Style.bar(self, box, fill, tint, label)
 
 
-## The meter, rebuilt at the reading it is showing.
+## The meter's nodes. Four sheets over one another: the murky water (with the shader that
+## blends the clean water into it), the garbage circle, the frame, and a face for the figure.
+## Children rather than `draw_texture_rect` calls because they need a nearest filter and the
+## rest of this node does not, and because the shader keeps the water moving on its own
+## between readings without this node repainting.
 ##
-## Wood frame, sunken track, flat colour — no picture in it anywhere, which is also why this
-## is simpler than the art version it replaces: that one had to crop rather than stretch its
-## dirty end so the baked-in debris wouldn't warp as the reading changed; a flat rect has
-## nothing in it that can warp, so the boundary just slides.
-func _draw_meter() -> void:
-	if _meter_frame == null:
+## Any sheet missing means no meter at all rather than a meter with a hole in it.
+func _build_meter() -> void:
+	var murky := Art.texture(METER_ART + "Murky_Water.png")
+	var clean := Art.texture(METER_ART + "Clean_Water.png")
+	var circle := Art.texture(METER_ART + "Garbage_Circle.png")
+	var frame := Art.texture(METER_ART + "Meter_Border.png")
+	var shader := load("res://shaders/meter_water.gdshader") as Shader
+	if murky == null or clean == null or circle == null or frame == null or shader == null:
 		return
-	draw_style_box(_meter_frame, _meter_box)
-	var pad := _meter_box.size.y * 0.22
-	var track := Rect2(
-		_meter_box.position + Vector2(pad, pad), _meter_box.size - Vector2(pad, pad) * 2.0
+	_meter_shader = ShaderMaterial.new()
+	_meter_shader.shader = shader
+	_meter_shader.set_shader_parameter(&"clean_tex", clean)
+	_meter_shader.set_shader_parameter(&"track_from", METER_TRACK.position.x / METER_SHEET.x)
+	_meter_shader.set_shader_parameter(&"track_to", METER_TRACK.end.x / METER_SHEET.x)
+	_meter_water = _sheet_node(murky)
+	_meter_water.material = _meter_shader
+	_meter_circle = _sheet_node(circle)
+	_meter_frame = _sheet_node(frame)
+	_meter_face = MeterFace.new()
+	_meter_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_meter_face)
+	_show_meter()
+
+
+func _sheet_node(art: Texture2D) -> TextureRect:
+	var node := TextureRect.new()
+	node.texture = art
+	node.stretch_mode = TextureRect.STRETCH_SCALE
+	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(node)
+	return node
+
+
+## Put the reading it is showing on the meter: the seam between filth and clean water, and
+## the figure. The seam is where `_shown` falls along the track; the feather either side of
+## it narrows near the ends, so a nearly-clean lake keeps its last sliver of filth and a full
+## one does not fade off the left of its own track.
+func _show_meter() -> void:
+	if _meter_shader == null:
+		return
+	var share := clampf(_shown, 0.0, 1.0)
+	var edge := METER_TRACK.position.x + METER_TRACK.size.x * share
+	var feather := minf(
+		METER_TRACK.size.x * METER_FEATHER,
+		maxf(minf(edge - METER_TRACK.position.x, METER_TRACK.end.x - edge) * 2.0, 1.0)
 	)
-	# The lake itself, in a box: the filth still in it filling from the left, clean water to
-	# the right of it, both shaded from their shallow tone down to their deep one exactly as
-	# the water shader shades the real lake, and the two washing into each other rather than
-	# meeting at a line. The boundary slides left as the lake is cleared.
-	Style.meter_water(
-		self,
-		track,
-		clampf(_shown, 0.0, 1.0),
-		METER_DIRTY,
-		Style.METER_DIRTY_DEEP,
-		METER_CLEAN,
-		Style.METER_CLEAN_DEEP
-	)
-	draw_rect(track, Style.SEAM, false, maxf(1.0, track.size.y * 0.06))
-	var height := Style.step(track.size.y * 0.52)
-	var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
-	Style.write(
-		self,
-		"POLLUTION",
-		height,
-		Vector2(track.position.x + track.size.x * 0.03, baseline)
-	)
-	# The reading in figures as well as in water. The bar says how the lake is doing at a
-	# glance and the number says whether the last hour of work moved it — a lake that is
-	# ninety-six per cent clean and a lake that is ninety-nine look the same on a bar this
-	# long. Right-aligned, over the clean end, so it sits on water rather than on filth.
-	Style.write(
-		self,
-		"%d%%" % roundi(clampf(_shown, 0.0, 1.0) * 100.0),
-		height,
-		Vector2(0.0, baseline),
-		Style.INK,
-		HORIZONTAL_ALIGNMENT_RIGHT,
-		Rect2(
-			track.position + Vector2(0.0, 0.0),
-			Vector2(track.size.x - track.size.x * 0.03, track.size.y)
+	_meter_shader.set_shader_parameter(&"seam", edge / METER_SHEET.x)
+	_meter_shader.set_shader_parameter(&"feather", feather / METER_SHEET.x)
+	if _meter_face.shown != share:
+		_meter_face.shown = share
+		_meter_face.queue_redraw()
+
+
+## The figure on the meter. The water says how the lake is doing at a glance and the number
+## says whether the last hour of work moved it — a lake that is ninety-six per cent clean and
+## a lake that is ninety-nine look the same on a track this long. Right-aligned, over the
+## clean end, so it sits on water rather than on filth. Its own node so that it draws over
+## the frame, which is a child drawn after this node's own `_draw`.
+class MeterFace extends Control:
+	var shown: float = 1.0
+	## The water's track, in this node's own pixels.
+	var track := Rect2()
+
+	func _draw() -> void:
+		if track.size.x <= 0.0:
+			return
+		var height := Style.step(track.size.y * 0.52)
+		var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
+		Style.write(
+			self,
+			"%d%%" % roundi(shown * 100.0),
+			height,
+			Vector2(0.0, baseline),
+			Style.INK,
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			Rect2(track.position, Vector2(track.size.x - track.size.x * 0.03, track.size.y))
 		)
-	)
 
 
 func _draw_button(name: StringName, box: Rect2, wash: Color = Color.WHITE) -> void:
