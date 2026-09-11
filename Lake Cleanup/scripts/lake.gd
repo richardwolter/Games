@@ -1457,6 +1457,17 @@ func _push_zoom() -> void:
 	_camera.zoom = Vector2(_view_zoom, _view_zoom)
 
 
+## How much of the way to close in one frame, for an ease that closes `rate` of the gap a
+## second.
+##
+## Exponential rather than `rate * delta`: the linear form takes a bigger bite out of a long
+## frame than the same time in short ones, so a view following at an uneven frame rate
+## lurched — every slow frame a jump, every fast one a crawl. This closes the same share of
+## the gap over the same time however it is cut up. At 60 fps the two differ by a hair.
+static func _ease(rate: float, delta: float) -> float:
+	return 1.0 - exp(-rate * delta)
+
+
 ## Snap where the camera is drawn to whole screen pixels, leaving where it is alone.
 ##
 ## The position stays smooth — following, dragging and the cast's slide all ease on it — and
@@ -2455,7 +2466,7 @@ func _process(delta: float) -> void:
 	_cast_look = lerpf(
 		_cast_look,
 		CAST_LOOK if _net.state != CastNet.State.IDLE else 0.0,
-		clampf(LOOK_SPEED * delta, 0.0, 1.0)
+		_ease(LOOK_SPEED, delta)
 	)
 	# Walking asks for the view back too. Panning is for looking at the lake, and the moment
 	# the player starts moving they have stopped looking and started going somewhere —
@@ -2469,7 +2480,7 @@ func _process(delta: float) -> void:
 	# has all of it. Not while they are still holding the button, though — a hand on the
 	# mouse outranks the net.
 	if _pan_yielded and not _panning and _pan != Vector2.ZERO:
-		_pan = _pan.lerp(Vector2.ZERO, clampf(PAN_RELEASE * delta, 0.0, 1.0))
+		_pan = _pan.lerp(Vector2.ZERO, _ease(PAN_RELEASE, delta))
 		if _pan.length() < 1.0:
 			_pan = Vector2.ZERO
 
@@ -2477,7 +2488,7 @@ func _process(delta: float) -> void:
 	# a view that lags a hand on the mouse feels like a view being argued with.
 	_camera.position = _clamped_view(
 		_watching() if _panning
-		else _camera.position.lerp(_watching(), clampf(FOLLOW_SPEED * delta, 0.0, 1.0))
+		else _camera.position.lerp(_watching(), _ease(FOLLOW_SPEED, delta))
 	)
 
 	_look_for_the_end(delta)

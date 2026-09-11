@@ -319,6 +319,37 @@ cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 
 ---
 
+## Performance
+
+**Bar** (settled 2026-09-11): mean frame under 8 ms and no frame over 16.7 ms, uncapped,
+fullscreen 1080p, full lake, standing and walking. The 8 ms is headroom standing in for weaker
+PCs — there is no weak-hardware test, by decision. No visible quality cuts to get there.
+
+**Measure, don't guess.** `tools/bench_frames.tscn` (real window, vsync off, 600 frames):
+`BENCH_WALK=1` walks the angler, `BENCH_OFF=water|ripple` removes suspects, result in
+`tools/last_bench.log` with rebuild causes and draw calls. `tools/census.tscn` attributes the
+frame's draw calls to each top-level branch (`tools/last_census.log`). In play, F3's perf
+overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild cause.
+
+**Rules the numbers came from:**
+- **Draw calls are the cost.** Each `draw_texture*` with a different texture (or a transform
+  change between them) is its own draw call. The forest was ~5,600 of them — 15 ms a frame —
+  until `Ground._pack_props` put every tree, rock and tuft into one atlas and `_lay_props` laid
+  them and their shadows out as one triangle array. Anything drawn in the hundreds goes in a
+  batch off an atlas, never a loop of `draw_texture_rect`.
+- **`LakeGrid._rebuild` costs ~25-30 ms** over the whole basin. It must never run while
+  walking, casting or hauling. The soup is laid out for the view plus `BUILT_MARGIN`; a take
+  patches its tile (`_restamp`); detail changes skip the rebuild when every def has art.
+  `test_lake` guards the counts.
+- **The shaders are not the cost**: `BENCH_OFF=water` measured no difference.
+- **Eases use `Lake._ease` (exponential)**, not `rate * delta`, so the camera does not lurch at
+  an uneven frame rate.
+
+Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame
+42 ms -> 3-4 ms.
+
+---
+
 ## Godot/Windows Gotchas
 
 ### Logging & Debugging
