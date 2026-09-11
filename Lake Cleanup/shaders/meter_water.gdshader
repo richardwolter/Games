@@ -5,9 +5,9 @@
 // and not as a fill bar painted blue.
 //
 // TEXTURE is the murky sheet (it is the TextureRect's texture); the clean sheet comes in as
-// a uniform. Every x here is a fraction of the sheet's width. The murky sheet reaches under
-// the garbage circle; the clean one stops at the track, so only the track drifts, and the
-// stretch under the circle is drawn as it was painted.
+// a uniform. Every x here is a fraction of the sheet's width. Left of the track, under the
+// garbage circle, the track's first column is stretched out (`leak`), so the water runs
+// in behind the circle and its edge never shows a gap.
 shader_type canvas_item;
 render_mode blend_mix;
 
@@ -20,6 +20,10 @@ uniform float seam = 0.5;
 uniform float feather = 0.08;
 uniform float track_from = 0.31;
 uniform float track_to = 0.9;
+// How far left of the track the water is stretched, as a fraction of the width: the
+// track's first column repeated under the garbage circle, so that however the sheets
+// drift there is water behind the circle's edge and never the screen.
+uniform float leak = 0.06;
 
 // How far each sheet wanders, in fractions of the width, and how fast. Small: the sheets
 // are not tileable, so they rock back and forth rather than scroll off one end.
@@ -31,7 +35,7 @@ uniform float clean_rate = 0.35;
 void fragment() {
 	vec2 texel = TEXTURE_PIXEL_SIZE;
 	float x = UV.x;
-	bool in_track = x >= track_from && x <= track_to;
+	bool in_track = x >= track_from - leak && x <= track_to;
 	float last = track_to - texel.x;
 
 	vec2 murky_at = UV;
