@@ -541,12 +541,17 @@ void fragment() {
 			+ cos(swell_t * 0.41 + px.x * 0.023) * swell_sway * 0.5
 	);
 	vec2 foam_at = px - floor(swell / foam_pixel + 0.5) * foam_pixel;
-	foam = max(foam, open_foam(foam_at, clock) * open_foam_strength * open_room);
+	// Thinned with the state of the water it lies on: a crest of white on open water is a
+	// clean-water thing, and murk breaks fewer of them. Fewer, not fainter — a faint streak
+	// is a smear, and the streaks are drawn either whole or not at all.
+	float open_keep = step(state * 0.35, foam_hash(floor(foam_at / open_foam_cell) + vec2(2.0, 8.0)));
+	foam = max(foam, open_foam(foam_at, clock) * open_foam_strength * open_room * open_keep);
 
 	// Dirty water keeps its foam, it just goes the colour of what it is churning: foam that
 	// faded out with the filth left the filthy lake, the one the player starts on, with no
-	// shoreline at all. Which of the two it is follows the water's state under it.
-	vec3 foam_rgb = mix(foam_color.rgb, foam_dirty.rgb, step(1.5, state));
+	// shoreline at all. The tint follows the state under it in three steps, so a streak
+	// crossing from clean into murk into filth changes colour where the water does.
+	vec3 foam_rgb = mix(foam_color.rgb, foam_dirty.rgb, state * 0.5);
 	col = mix(col, foam_rgb, clamp(foam, 0.0, 1.0) * foam_color.a * (1.0 - filth * 0.25));
 
 	COLOR = vec4(col, 1.0);
