@@ -639,26 +639,30 @@ func _draw_door(wall: Rect2) -> void:
 	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
 
 
-## Where the jambs come down onto the floor's frame. Its top run stops either side of the
-## door, and each end takes the same corner piece the jamb took at the top, turned the
-## same way about — the run arrives from the left and stops under the left jamb, which is
-## the top-right corner's shape, and starts again under the right jamb with the top-left
-## one. The corners are the jambs' own width and sit directly beneath them, so a jamb's
-## edge lines run on down through the corner into the run instead of stopping dead on a
-## cut end of moulding. The corner's strip-end rows point down into the floor, the same
-## as they do at the room's own two front corners.
+## Where the jambs come down onto the floor's frame: the top joint upside down. The
+## floor's top run stops either side of the door, and each end takes the same corner piece
+## the jamb took at the top, turned about the same way (top-right under the left jamb,
+## top-left under the right) and flipped upright, so the corner's strip-end rows point up
+## into the jamb and its band and dark line sit at the bottom, on the run's own bottom
+## line. The jambs carry on down into the run to meet them — a corner stood on the run's
+## top line, stub down, read as a piece of frame facing the wrong way with the jamb
+## stopping short above it.
 func _draw_threshold(opening: Rect2, floor_box: Rect2) -> void:
 	var zoom := _zoom()
 	var jamb_wide := BORDER_VERTICAL.get_width() * zoom
 	var corner := BORDER_TOP_LEFT.get_size() * zoom
-	draw_texture_rect(
-		BORDER_TOP_RIGHT,
-		Rect2(Vector2(opening.position.x - jamb_wide, floor_box.position.y), corner),
-		false
+	var run_tall := BORDER_HORIZONTAL.get_height() * zoom
+	var left := opening.position.x - jamb_wide
+	var right := opening.end.x
+	var top := floor_box.position.y + run_tall - corner.y
+	_tile_run(BORDER_VERTICAL, Vector2(left, floor_box.position.y), top - floor_box.position.y, false)
+	_tile_run(
+		BORDER_VERTICAL, Vector2(right, floor_box.position.y), top - floor_box.position.y, false, true
 	)
-	draw_texture_rect(
-		BORDER_TOP_LEFT, Rect2(Vector2(opening.end.x, floor_box.position.y), corner), false
-	)
+	# Negative height flips the piece in place, the same way a negative width mirrors one.
+	var upright := Vector2(corner.x, -corner.y)
+	draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, top), upright), false)
+	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, top), upright), false)
 
 
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
