@@ -649,35 +649,27 @@ func _draw_stock() -> void:
 
 
 ## The recycle mark off the box's front: three chevron arrows chasing round a triangle,
-## carved into the plank — a round recess first, then the mark cut into it: a dark edge
-## where the cut faces away from the light (up and left), a lit edge where it catches it
-## (down and right), and the blue in the groove between. Drawn rather than cut from the box
-## art, which is eleven pixels of it at an isometric slant.
+## stamped into the plank — a round recess with a bevelled rim, and the arrows pressed into
+## it with a dark line hugging their outline all the way round, the way a stamp's edge
+## sinks. Drawn rather than cut from the box art, which is eleven pixels of it at an
+## isometric slant.
 func _draw_recycle_mark(box: Rect2) -> void:
 	var middle := box.position + box.size * 0.5
 	var recess := box.size.x * 0.56
-	draw_circle(middle, recess + 1.0, Style.SEAM)
+	draw_circle(middle, recess + 1.5, Style.SEAM)
 	draw_circle(middle, recess, Style.BOX_DEEP)
-	# The recess's own lip: dark along its upper inside, lit along its lower.
-	draw_arc(middle, recess - 0.5, PI * 1.05, PI * 1.95, 12, Style.BOX_HOLLOW, 1.5)
-	draw_arc(middle, recess - 0.5, PI * 0.05, PI * 0.95, 12, Style.BOX_LIT, 1.0)
+	# The rim of the recess: dark where it faces away from the light, lit where it faces it.
+	draw_arc(middle, recess - 1.0, PI * 1.0, PI * 2.0, 16, Style.BOX_HOLLOW, 2.0)
+	draw_arc(middle, recess - 1.0, 0.0, PI, 16, Style.BOX_LIT, 1.0)
 	var shapes := _recycle_shapes(box)
+	# The dark line round each arrow first, as a closed stroke: half of it lies outside the
+	# fill drawn over it, and that half is the cut.
 	for shape: PackedVector2Array in shapes:
-		var lit := PackedVector2Array()
-		var dark := PackedVector2Array()
-		for at in shape:
-			lit.append(at + Vector2(1.0, 1.0))
-			dark.append(at - Vector2(1.0, 1.0))
-		draw_colored_polygon(lit, Style.BOX_LIT)
-		draw_colored_polygon(dark, Style.SEAM)
+		var ring := PackedVector2Array(shape)
+		ring.append(shape[0])
+		draw_polyline(ring, Style.SEAM, 3.0)
 	for shape: PackedVector2Array in shapes:
 		draw_colored_polygon(shape, Style.BOX_BLUE)
-	# A pale glint down the right side of each arm, where the groove's far wall is lit.
-	for shape: PackedVector2Array in shapes:
-		var inner := PackedVector2Array()
-		for at in shape:
-			inner.append(at + Vector2(0.5, 0.5))
-		draw_polyline(inner, Color(Style.BOX_BLUE_LIT.r, Style.BOX_BLUE_LIT.g, Style.BOX_BLUE_LIT.b, 0.6), 1.0)
 
 
 ## The mark's three arms and heads as polygons, in the box given.
