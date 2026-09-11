@@ -141,6 +141,19 @@ const RIPPLE_OUTER := 1.55
 const RIPPLE_OUTER_FADE := 0.55
 const RIPPLE_OUTER_LAG := PI * 0.6
 
+## What the rings do on murky and dirty water: the ink they go to, and how much of their
+## alpha is kept, by water state (see `water_state`). Same idea as the shader's foam — a
+## ring round a piece in scum is scum pushed aside, not a white crest.
+const RIPPLE_INK := Color(0.86, 0.94, 0.96)
+const RIPPLE_INK_DIRTY := Color(0.8, 0.82, 0.678)
+const RIPPLE_KEEP := [1.0, 0.7, 0.45]
+
+## Mirrors water.gdshader's `color_bite`, `murky_at` and `dirty_at`. If those move, these
+## move, or the rings change colour a tile away from where the water does.
+const FILTH_STATE_BITE := 1.4
+const FILTH_MURKY_AT := 0.3
+const FILTH_DIRTY_AT := 0.65
+
 ## The shadow under a floating piece: how wide against the piece, how dark, and how far
 ## down the plane it is pushed so it shows past the near edge of the art.
 ##
@@ -329,6 +342,19 @@ var _shoved := PackedInt32Array()
 ## 1 for a tile on the outer bank's beach, where rubbish lies on dry sand. Worked out once per
 ## build from `Iso.on_beach`. See BEACH_CHANCE.
 var dry := PackedByteArray()
+
+## The filth map, one byte per tile, as Lake._build_filth_map last wrote it for the water
+## shader. Empty until the first build. What the CPU-drawn rings read so they follow the
+## water's state the way the shader-drawn foam does.
+var filth := PackedByteArray()
+
+## The water's state under a tile, 0 clean, 1 murky, 2 dirty: the shader's two cutoffs on
+## the bent filth, without its blotch noise. Clean where there is no map yet.
+func water_state(index: int) -> int:
+	if index < 0 or index >= filth.size():
+		return 0
+	var t := pow(float(filth[index]) / 255.0, FILTH_STATE_BITE)
+	return int(t >= FILTH_MURKY_AT) + int(t >= FILTH_DIRTY_AT)
 
 ## Whether the piece `_stamp` is laying down right now lies on dry sand. Read by `_sprite` and
 ## `_quad`, which have no index of their own to look it up by.
@@ -660,6 +686,10 @@ class ShadowLayer extends Node2D:
 		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
 		skin.set_shader_parameter("shade", shade)
 		material = skin
+		# Linear, not the nearest the rest of the lake uses: the shadow is the art squashed
+		# to half its height, and nearest sampling of that is a staircase of two-pixel
+		# blocks. Softened further in the shader — see `soften` there.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
 	## One shadow, written in place. Called from the rebuild's own walk over the lake, so
 	## the pieces are visited once rather than once for the soup and again for this.
@@ -960,9 +990,15 @@ class RippleLayer extends Node2D:
 			var breath := 1.0 + sin(phase) * LakeGrid.RIPPLE_BREATH
 			var wide := def.size.x * grid.swing[index] * LakeGrid.RIPPLE_SPAN * breath
 
+			# Inked for the water it is on: white on clean water, going to scum and fainter
+			# through murky to dirty, in the same three steps the shader's foam takes.
+			var state := grid.water_state(index)
+			var ink := LakeGrid.RIPPLE_INK.lerp(LakeGrid.RIPPLE_INK_DIRTY, float(state) * 0.5)
+			var keep: float = LakeGrid.RIPPLE_KEEP[state]
+
 			# Faintest at the top of the breath: a ring spreading is a ring going.
-			var fade := LakeGrid.RIPPLE_ALPHA * (1.0 - sin(phase) * 0.35)
-			_lay(_inner, _inner_ink, laid, at, wide, Color(0.86, 0.94, 0.96, fade))
+			var fade := LakeGrid.RIPPLE_ALPHA * keep * (1.0 - sin(phase) * 0.35)
+			_lay(_inner, _inner_ink, laid, at, wide, Color(ink, fade))
 
 			# And the one behind it, pushed back along the drift so the pair reads as a
 			# wake rather than as a pair of circles round a target.
@@ -979,13 +1015,10 @@ class RippleLayer extends Node2D:
 				* (1.0 + sin(out_phase) * LakeGrid.RIPPLE_BREATH)
 			)
 			var out_fade := (
-				LakeGrid.RIPPLE_ALPHA * LakeGrid.RIPPLE_OUTER_FADE
+				LakeGrid.RIPPLE_ALPHA * LakeGrid.RIPPLE_OUTER_FADE * keep
 				* (1.0 - sin(out_phase) * 0.35)
 			)
-			_lay(
-				_outer, _outer_ink, laid, trail, out_wide,
-				Color(0.86, 0.94, 0.96, out_fade)
-			)
+			_lay(_outer, _outer_ink, laid, trail, out_wide, Color(ink, out_fade))
 			laid += RING_SEGMENTS * 2
 
 		if laid <= 0:

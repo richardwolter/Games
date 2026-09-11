@@ -2719,6 +2719,10 @@ func _build_filth_map() -> void:
 		var here := pow(clampf(blurred[i] / _filth_ref, 0.0, 1.0), FILTH_EDGE)
 		pixels[i] = int(round(here * 255.0))
 
+	# The grid keeps a copy for what it draws on the CPU — the ripple rings read the state
+	# of the water under their piece off it, the way the shader does off the texture.
+	_grid.filth = pixels
+
 	if _filth_map == null:
 		_filth_map = Image.create_from_data(cols, rows, false, Image.FORMAT_R8, pixels)
 		_filth_texture = ImageTexture.create_from_image(_filth_map)

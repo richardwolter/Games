@@ -23,6 +23,12 @@ uniform float anchor_span = 8192.0;
 // because those carry the anchor instead.
 uniform vec4 shade : source_color = vec4(0.03, 0.08, 0.11, 0.16);
 
+// How far the silhouette's edge is blurred, in source texels. The art is squashed to half
+// its height here and drawn at twice its size, and its hard pixel edge came out as a
+// staircase of blocks under every piece — a shadow on water is soft at the edge, since the
+// water under it is not flat. A cross of four taps either side of the centre.
+uniform float soften = 1.2;
+
 void vertex() {
 	// The piece's anchor x, packed into red and green as one sixteen-bit number by
 	// LakeGrid.pack_anchor. Per piece, not per vertex: every corner of one shadow reads the
@@ -45,5 +51,11 @@ void fragment() {
 	// The piece's own art, kept only for its alpha: the shape is the sprite's, the colour is
 	// the uniform's. That is what makes a shadow the shape of the thing above it without a
 	// second copy of the art or an outline anybody had to draw.
-	COLOR = vec4(shade.rgb, shade.a * texture(TEXTURE, UV).a);
+	vec2 d = TEXTURE_PIXEL_SIZE * soften;
+	float a = texture(TEXTURE, UV).a * 2.0
+		+ texture(TEXTURE, UV + vec2(d.x, 0.0)).a
+		+ texture(TEXTURE, UV - vec2(d.x, 0.0)).a
+		+ texture(TEXTURE, UV + vec2(0.0, d.y)).a
+		+ texture(TEXTURE, UV - vec2(0.0, d.y)).a;
+	COLOR = vec4(shade.rgb, shade.a * a / 6.0);
 }
