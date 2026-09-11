@@ -584,8 +584,15 @@ static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) ->
 ## The title plank a board wears over its top edge. A plank of the same oak as the frame,
 ## lit the same way, with chips out of its edges. Cloth was tried — a bowed three-tone band,
 ## then one with tails — and read as a sticker.
+## `within` is where the title is centred, for a ribbon with something else sitting on one
+## end of it. Left empty, it is the plank itself.
 static func board_ribbon(
-	on: CanvasItem, box: Rect2, title: String, chips: int, size_px: int = TEXT_HEAD
+	on: CanvasItem,
+	box: Rect2,
+	title: String,
+	chips: int,
+	size_px: int = TEXT_HEAD,
+	within: Rect2 = Rect2()
 ) -> void:
 	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
 	plank(on, box, seed)
@@ -601,10 +608,11 @@ static func board_ribbon(
 	chip(on, Rect2(box.position.x - 1.0, y, 4.0, 8.0))
 	chip(on, Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
 
+	var text_box := box if within.size.x <= 0.0 else within
 	write(
 		on, title, size_px,
 		Vector2(0.0, box.position.y + (box.size.y + float(size_px) * 0.62) * 0.5),
-		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, box
+		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, text_box
 	)
 
 

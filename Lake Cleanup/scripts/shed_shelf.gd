@@ -27,6 +27,9 @@ var board := Rect2()
 var ribbon := Rect2()
 var list := Rect2()
 var title := ""
+## Where the title is centred: the ribbon less whatever sits on it. The close cross is
+## nailed to the right end of the plank, and a title centred on the whole plank ran under it.
+var title_box := Rect2()
 
 var atlas: Texture2D
 ## One entry per find on the shelf: `region` on the atlas, `title` to write beside it.
@@ -65,7 +68,13 @@ func _draw() -> void:
 		_draw_rows()
 		_draw_bar()
 
-	Style.board_ribbon(self, ribbon, title, chips, Style.TEXT_BODY)
+	# Dropped a size rather than cut short: the count is the half that would be lost, and a
+	# shelf that will not say how full it is is worse than one that says it small.
+	var head := Style.TEXT_BODY
+	var room := title_box.size.x if title_box.size.x > 0.0 else ribbon.size.x
+	if Style.measure(title, head).x > room:
+		head = Style.TEXT_SMALL
+	Style.board_ribbon(self, ribbon, title, chips, head, title_box)
 
 
 ## The rows, whole ones only. A row that starts inside the face and ends outside it used to

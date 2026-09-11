@@ -339,6 +339,15 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   `_floor_rect` still size off `LIST_WIDTH` alone, so the wood costs the floor nothing.
   `_list_rect` (the rows) is derived *from* the board, so a clamp moves rows and hit-testing
   together.
+- **Top and bottom come off the shed, not the floor** (`_shed_rect`): the wall's top edge
+  down to the floor's front edge, the same two numbers `_draw` builds the wall from. A board
+  squared up with the floor alone started below the wallpaper and read as a panel bolted on.
+- **The close cross is nailed to the title plank's right end** (`_place_close`,
+  `_title_box`). It used to sit in the air above the column; once the plank took that edge
+  the cross covered the title. `Style.board_ribbon` takes a `within` box so the writing
+  centres on the wood the cross leaves free, mirrored at the left end so the title stays
+  centred on the board. The title drops to `TEXT_SMALL` rather than being cut when the count
+  will not fit.
 - **It is its own Control** only so `modulate.a` can fade the whole thing to `LIST_BUSY`
   while a piece is carried. Threading an alpha through `Style.plank`/`grain`/`highlight`/
   `chip` would put an extra argument on every shared drawing helper in the game. The shelf

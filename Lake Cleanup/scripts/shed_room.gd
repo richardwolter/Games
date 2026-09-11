@@ -50,7 +50,7 @@ const ROW_HEIGHT := 56
 ## costs the floor nothing. Its right edge is clamped to the panel in `_board_rect`.
 const SHELF_FRAME := 10.0
 const SHELF_CHIPS := 3
-const SHELF_RIBBON := 30.0
+const SHELF_RIBBON := 36.0
 const SHELF_OVERHANG := 8.0
 const SHELF_PAD := 8.0
 const SHELF_ROW_GAP := 4.0
@@ -769,17 +769,30 @@ func _draw_dog(floor_box: Rect2) -> void:
 	)
 
 
-## The cross, pinned to the top corner of the inventory column. Worked out from the same
-## rectangle the list is drawn in rather than anchored to the control, so the two move
-## together when the room is resized and the cross is never left out over the floor.
+## The cross, nailed to the right end of the shelf's title plank.
+##
+## It used to sit in the air above the inventory column. Once the board grew a title plank
+## along that edge there was nothing above it to sit in, and the cross covered the title —
+## so it sits *on* the plank now, and `_title_box` keeps the writing clear of it.
 func _place_close() -> void:
 	if _close == null:
 		return
-	var list := _list_rect()
+	var ribbon := _ribbon_rect()
 	_close.size = Vector2(CLOSE_SIDE, CLOSE_SIDE)
 	_close.position = Vector2(
-		list.end.x - CLOSE_SIDE,
-		maxf(list.position.y - CLOSE_SIDE - CLOSE_LIFT, 0.0)
+		ribbon.end.x - CLOSE_SIDE - CLOSE_LIFT * 0.5,
+		ribbon.position.y + (ribbon.size.y - CLOSE_SIDE) * 0.5
+	).floor()
+
+
+## The stretch of the title plank the cross leaves free. Mirrored at the left end, so the
+## title stays centred on the board rather than sliding off towards the far side.
+func _title_box() -> Rect2:
+	var ribbon := _ribbon_rect()
+	var taken := CLOSE_SIDE + CLOSE_LIFT
+	return Rect2(
+		Vector2(ribbon.position.x + taken, ribbon.position.y),
+		Vector2(maxf(ribbon.size.x - taken * 2.0, 1.0), ribbon.size.y)
 	)
 
 
@@ -1154,16 +1167,39 @@ func _list_rect() -> Rect2:
 ## side; the right is clamped to the panel in case the panel is only just wide enough, and
 ## the rows follow the clamp because `_list_rect` is derived from this.
 func _board_rect() -> Rect2:
+	var shed := _shed_rect()
 	var floor_box := _floor_rect()
-	var column := Rect2(
-		Vector2(floor_box.end.x + GUTTER, floor_box.position.y),
-		Vector2(float(LIST_WIDTH), floor_box.size.y)
+	# Top and bottom off the shed, not off the floor: the board and the room it stands
+	# beside are two pieces of furniture of the same height, and a board that started
+	# below the wallpaper read as a panel bolted on rather than as a thing in the room.
+	var left := floor_box.end.x + GUTTER - SHELF_FRAME
+	var board := Rect2(
+		Vector2(left, shed.position.y),
+		Vector2(float(LIST_WIDTH) + SHELF_FRAME * 2.0, shed.size.y)
 	)
-	var board := column.grow(SHELF_FRAME)
 	var over := board.end.x - (size.x - 2.0)
 	if over > 0.0:
 		board.size.x = maxf(board.size.x - over, SHELF_FRAME * 2.0 + 8.0)
+	# The title plank straddles the top edge, so the board cannot start hard against the
+	# panel or half the plank is cut off.
+	var lift := SHELF_RIBBON * 0.5 + 2.0
+	if board.position.y < lift:
+		board.size.y -= lift - board.position.y
+		board.position.y = lift
+	board.size.y = maxf(board.size.y, SHELF_FRAME * 2.0 + 8.0)
 	return board
+
+
+## The block the shed itself draws as: the back wall standing above the floor, down to the
+## floor's front edge. `_draw` builds the wall from these same two numbers.
+func _shed_rect() -> Rect2:
+	var floor_box := _floor_rect()
+	var wall_tall := float(BOARD * ZOOM) * WALL_GROW
+	var top := maxf(floor_box.position.y - wall_tall, 0.0)
+	return Rect2(
+		Vector2(floor_box.position.x, top),
+		Vector2(floor_box.size.x, floor_box.end.y - top)
+	)
 
 
 ## The title plank, straddling the top edge of the frame and hanging over each end.
@@ -1433,8 +1469,9 @@ func _dress_shelf() -> void:
 	_shelf.modulate.a = LIST_BUSY if not carrying.is_empty() else 1.0
 	_shelf.board = _board_rect()
 	_shelf.ribbon = _ribbon_rect()
+	_shelf.title_box = _title_box()
 	_shelf.list = _list_rect()
-	_shelf.title = "Shed Decoration" if store.is_empty() else "Shed Decoration  (%d)" % store.size()
+	_shelf.title = "Shed Decoration" if store.is_empty() else "Shed Decoration (%d)" % store.size()
 	_shelf.atlas = sheets.atlas
 	_shelf.scroll = _scroll
 	_shelf.hovered = -1 if not carrying.is_empty() else _hovered_row()
