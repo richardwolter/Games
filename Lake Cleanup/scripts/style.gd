@@ -82,8 +82,7 @@ const FRAME := Color(0.44, 0.28, 0.19)
 const FRAME_LIT := Color(0.53, 0.35, 0.25)
 const FRAME_DEEP := Color(0.25, 0.16, 0.09)
 const FRAME_GRAIN := Color(0.13, 0.08, 0.04)
-const RIBBON := Color(0.53, 0.35, 0.25)
-const RIBBON_LIT := Color(0.66, 0.45, 0.32)
+## The title plank over each board is the frame's own oak; only its ink is its own.
 const RIBBON_INK := Color(0.94, 0.85, 0.75)
 
 ## The three things the UI says with colour rather than words.

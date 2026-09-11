@@ -44,9 +44,6 @@ const GRAIN_LONG := 26.0
 const CHIPS := 3
 const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
-## How far the band bows up in the middle.
-const RIBBON_ARC := 4.0
-
 ## How much of its slot each board's sprite fills. The net is a wide flat thing and fills
 ## the slot at 0.7; the ferry is a small square frame with air round the hull and needs
 ## more than the slot to come out the size of the dog beside it.
@@ -450,7 +447,7 @@ func _draw_frame(box: Rect2) -> void:
 			_chip(Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
 
 
-func _grain(plank: Rect2, across: bool, seed: int) -> void:
+func _grain(plank: Rect2, across: bool, seed: int, deep: float = FRAME) -> void:
 	var length := plank.size.x if across else plank.size.y
 	var n := int(length / GRAIN_EVERY)
 	for i in n:
@@ -459,7 +456,7 @@ func _grain(plank: Rect2, across: bool, seed: int) -> void:
 			continue
 		var at := (float(i) + 0.15 + 0.7 * float(h % 7) / 7.0) * GRAIN_EVERY
 		var run := 6.0 + float(h % 100) / 100.0 * (GRAIN_LONG - 6.0)
-		var lane := 2.5 + float((h / 7) % int(FRAME - 5.0))
+		var lane := 2.5 + float((h / 7) % int(deep - 5.0))
 		var start: Vector2
 		var stop: Vector2
 		if across:
@@ -482,55 +479,40 @@ func _chip(box: Rect2) -> void:
 
 
 func _draw_ribbon(box: Rect2, title: String) -> void:
-	var face := Style.RIBBON
-	var lit := Style.RIBBON_LIT
-	var shade := Style.FRAME_DEEP
-	var deep := face.darkened(0.28)
+	# A plank of the same oak as the frame, over the top edge of it: seam, face, lit top
+	# and left, shaded bottom and right, grain along it, chips out of its edges. Cloth was
+	# tried — a bowed three-tone band, then one with tails — and read as a sticker.
+	draw_rect(box.grow(1.0), Style.SEAM, true)
+	draw_rect(box, Style.FRAME, true)
+	draw_rect(Rect2(box.position, Vector2(box.size.x, 2.0)), Style.FRAME_LIT, true)
+	draw_rect(Rect2(box.position, Vector2(2.0, box.size.y)), Style.FRAME_LIT, true)
+	draw_rect(
+		Rect2(Vector2(box.position.x, box.end.y - 2.0), Vector2(box.size.x, 2.0)),
+		Style.FRAME_DEEP, true
+	)
+	draw_rect(
+		Rect2(Vector2(box.end.x - 2.0, box.position.y), Vector2(2.0, box.size.y)),
+		Style.FRAME_DEEP, true
+	)
+	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
+	_grain(box, true, seed, box.size.y)
+	# Chips out of the top and bottom edges and one out of each end.
+	for i in CHIPS:
+		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(CHIPS)
+		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
+		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
+		var x := box.position.x + box.size.x * along
+		_chip(Rect2(x, box.position.y - 1.0, wide, deep))
+		_chip(Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+	var y := box.position.y + box.size.y * 0.4
+	_chip(Rect2(box.position.x - 1.0, y, 4.0, 8.0))
+	_chip(Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
 
-	# The band over the board, bowed up a little in the middle, in three tones: a lit top
-	# third, the cloth, a shaded bottom third — a rolled edge rather than a painted stripe.
-	# Just the front block: tails hanging behind the frame were tried and read as clutter.
-	var x0 := box.position.x
-	var x1 := box.end.x
-	var y0 := box.position.y
-	var y1 := box.end.y
-	var third := (y1 - y0) / 3.0
-	_bow(x0, x1, y0, y0 + third, lit)
-	_bow(x0, x1, y0 + third, y1 - third, face)
-	_bow(x0, x1, y1 - third, y1, deep)
-	# Stitching a pixel or two inside each edge.
-	var stitch := Color(shade.r, shade.g, shade.b, 0.45)
-	_bow_line(x0 + 4.0, x1 - 4.0, y0 + 3.0, stitch)
-	_bow_line(x0 + 4.0, x1 - 4.0, y1 - 3.0, stitch)
-	# The seam round the whole band.
-	var outline := PackedVector2Array([
-		Vector2(x0, y0), Vector2((x0 + x1) * 0.5, y0 - RIBBON_ARC), Vector2(x1, y0),
-		Vector2(x1, y1), Vector2((x0 + x1) * 0.5, y1 - RIBBON_ARC), Vector2(x0, y1),
-		Vector2(x0, y0),
-	])
-	draw_polyline(outline, Style.SEAM, 2.0)
-
-	# The title stays straight: the arc is a few pixels and text will not follow it.
 	Style.write(
 		self, title, Style.TEXT_HEAD,
-		Vector2(0.0, y0 + (box.size.y + float(Style.TEXT_HEAD) * 0.62) * 0.5 - RIBBON_ARC * 0.5),
+		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_HEAD) * 0.62) * 0.5),
 		Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, box
 	)
-
-
-## One strip of the bowed band, between two heights, lifted RIBBON_ARC in the middle.
-func _bow(x0: float, x1: float, ya: float, yb: float, tint: Color) -> void:
-	var mid := (x0 + x1) * 0.5
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(x0, ya), Vector2(mid, ya - RIBBON_ARC), Vector2(x1, ya),
-		Vector2(x1, yb), Vector2(mid, yb - RIBBON_ARC), Vector2(x0, yb),
-	]), tint)
-
-
-func _bow_line(x0: float, x1: float, y: float, tint: Color) -> void:
-	draw_polyline(PackedVector2Array([
-		Vector2(x0, y), Vector2((x0 + x1) * 0.5, y - RIBBON_ARC), Vector2(x1, y),
-	]), tint, 1.0)
 
 
 func _draw_sprite(board: StringName, slot: Rect2) -> void:
