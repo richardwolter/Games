@@ -53,12 +53,17 @@ const RIBBON_ARC := 4.0
 const SPRITE_FILL := {&"net": 0.7, &"boat": 1.35, &"dog": 1.0}
 
 ## The ferry on its board is under way: the bow wake it leaves in the lake runs beside it
-## and the hull bobs a couple of pixels on a slow swell. The wake is sized off the hull as
-## drawn, by the ratio the lake's boat uses.
+## and the hull bobs a couple of pixels on a slow swell. The wake is laid exactly as the
+## lake lays it — the lake lends the heading, lift and size with the frame, in the frame's
+## own pixels, and the board scales them with the picture.
 const BOB_PX := 2.0
 const BOB_HZ := 0.4
-const WAKE_LENGTH := 0.5
-const WAKE_WIDTH := 0.21
+
+## A faint white halo behind every head, so a black net and a dark hull read against a
+## dark board: stepped ellipses, outermost first, each `HALO_ALPHA` white, the outer one
+## the picture grown by `HALO_GROW`.
+const HALO_ALPHA := [0.04, 0.07, 0.10]
+const HALO_GROW := 0.34
 
 ## The net on its board is thrown over a catch: drawn black, so the rubbish the lake lends
 ## (`sprites[&"catch"]`, a list of `{sheet, region}`) shows through the mesh. Where each
@@ -127,6 +132,7 @@ var _hovered: int = -1
 ## would bury it; the shop puts it back in front.)
 var _wake: HullFoam
 var _hull: Sprite2D
+var _wake_heading := Vector2.RIGHT
 var _bob_age: float = 0.0
 var _bob_px: int = 0
 
@@ -254,7 +260,7 @@ func _process(delta: float) -> void:
 		if bob != _bob_px:
 			_bob_px = bob
 			queue_redraw()
-		_wake.lay(Vector2.RIGHT, 1.0, delta)
+		_wake.lay(_wake_heading, 1.0, delta)
 	_dog_age += delta
 	var frame := DogArt.frame_at(_dog_pose, _dog_age)
 	if frame != _dog_frame:
@@ -500,9 +506,9 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	if board == &"dog" and DogArt.has(_dog_pose):
 		# Standing height is the slot's; the sleeper keeps its own proportion to that.
 		var tall := slot.size.y * fill
-		var foot := Vector2(
-			middle.x, slot.end.y - (slot.size.y - DogArt.span(_dog_pose, tall).y) * 0.5
-		)
+		var span := DogArt.span(_dog_pose, tall)
+		var foot := Vector2(middle.x, slot.end.y - (slot.size.y - span.y) * 0.5)
+		_halo(Rect2(foot - Vector2(span.x * 0.5, span.y), span))
 		DogArt.stamp(self, _dog_pose, DogArt.frame_at(_dog_pose, _dog_age), foot, tall, true)
 		return
 	var lent: Dictionary = sprites.get(board, {})
@@ -520,14 +526,17 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	if drawn.x > slot.size.x:
 		drawn *= slot.size.x / drawn.x
 	var box := Rect2(middle - drawn * 0.5, drawn)
+	_halo(box)
 	match board:
 		&"boat":
 			box.position.y += float(_bob_px)
-			# The wake is a node of its own, behind this control's drawing; it is placed
-			# under the hull here, where the hull is known.
-			_wake.position = box.position + box.size * 0.5
-			_wake.half_length = drawn.x * WAKE_LENGTH
-			_wake.half_width = drawn.x * WAKE_WIDTH
+			# The wake is a node of its own; it is placed under the hull here, where the
+			# hull is known, at the lake's own geometry scaled to the drawn frame.
+			var to_drawn := drawn.y / maxf(float(lent.get("frame", region.size.y)), 1.0)
+			_wake.position = box.position + box.size * 0.5 + Vector2(0.0, float(lent.get("lift", 0.0)) * to_drawn)
+			_wake.half_length = float(lent.get("half_length", region.size.x * 0.5)) * to_drawn
+			_wake.half_width = float(lent.get("half_width", region.size.x * 0.2)) * to_drawn
+			_wake_heading = lent.get("heading", Vector2.RIGHT)
 			_wake.visible = visible
 			_hull.texture = sheet
 			_hull.region_rect = region
@@ -545,6 +554,20 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			draw_texture_rect_region(sheet, box, region, NET_INK)
 		_:
 			draw_texture_rect_region(sheet, box, region)
+
+
+## The halo behind a head: stepped ellipses of faint white, biggest and faintest first.
+func _halo(box: Rect2) -> void:
+	var middle := box.position + box.size * 0.5
+	var steps := HALO_ALPHA.size()
+	for i in steps:
+		var grow := 1.0 + HALO_GROW * (1.0 - float(i) / float(steps))
+		var radius := box.size * 0.5 * grow
+		var ring := PackedVector2Array()
+		for k in 24:
+			var a := TAU * float(k) / 24.0
+			ring.append(middle + Vector2(cos(a) * radius.x, sin(a) * radius.y))
+		draw_colored_polygon(ring, Color(1.0, 1.0, 1.0, float(HALO_ALPHA[i])))
 
 
 ## One row: a clean-water plate, the name over its value on the left, the price tag on the

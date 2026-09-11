@@ -815,8 +815,20 @@ func _ready() -> void:
 	_shop_skin.bought.connect(_buy)
 	# The picture at the head of the net and ferry boards: the ferry's own baked hull and
 	# the net laid out. The dog's board draws the dog itself.
-	var ferry := Boat.art_frame(0.62)
+	# The hull at a fixed turn of the circle, with what the board needs to lay the same wake
+	# under it that the lake does: the heading that frame faces, how much of the frame the
+	# hull spans, how far up the frame sits over the waterline, and the wake's own size —
+	# all in the frame's pixels, so the board scales them with the picture.
+	var turn := 0.62
+	var ferry := Boat.art_frame(turn)
 	if not ferry.is_empty():
+		var frame := (ferry["region"] as Rect2).size.y
+		var to_frame := Boat.HULL_IN_FRAME / Boat.HULL_LENGTH
+		ferry["heading"] = Vector2(-sin(turn * TAU), -cos(turn * TAU))
+		ferry["lift"] = Boat.HULL_HEIGHT * 0.5 * to_frame
+		ferry["half_length"] = Boat.HULL_LENGTH * 0.5 * to_frame
+		ferry["half_width"] = Boat.HULL_WIDTH * 0.5 * to_frame
+		ferry["frame"] = frame
 		_shop_skin.sprites[&"boat"] = ferry
 	var mesh: Dictionary = _net.art_frame(&"land", -1)
 	if not mesh.is_empty() and _net.art_sheet() != null:
