@@ -48,6 +48,7 @@ const METER_ART := "res://assets/ui/meter/"
 const METER_SHEET := Vector2(290.0, 94.0)
 const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
 const METER_TRACK := Rect2(91.0, 37.0, 170.0, 26.0)
+const METER_CIRCLE := Rect2(11.0, 1.0, 85.0, 87.0)
 const METER_SCALE := 1.95
 const METER_SCALE_LINES := 1080.0
 
@@ -157,7 +158,7 @@ var _meter_shader: ShaderMaterial
 
 ## Screen boxes worked out in `_notification` when the size changes, so a click and a
 ## drawing cannot disagree about where a button is. `_meter_box` is the whole sheet on
-## screen; `_meter_frame_box` the wooden frame inside it, which is what a line under the
+## screen; `_meter_frame_box` the wooden frame inside it, which is what a line over the
 ## meter centres on.
 var _meter_box := Rect2()
 var _meter_frame_box := Rect2()
@@ -225,8 +226,8 @@ func _read_book(path: String) -> void:
 		_pieces[StringName(name)] = kept
 
 
-## Where everything sits: the meter across the top, the two buttons under its right-hand
-## end, and the money over on the left under the yard's readout.
+## Where everything sits: the meter in the bottom left corner, the two buttons in the top
+## right, and the money over on the left under the yard's readout.
 ##
 ## The money is not a button and does not belong in a row of them. It is a readout, and the
 ## other readout on screen is the yard count in the top left — so it goes with that one,
@@ -235,14 +236,17 @@ func _lay_out() -> void:
 	var wide := size.x
 	var scale := maxf(size.y / METER_SCALE_LINES * METER_SCALE, 0.5)
 	var span := METER_SHEET * scale
-	# Centred on the frame, not on the sheet: the garbage circle hangs off the frame's left
-	# end and the sheet has room for it, so centring the sheet puts the frame right of middle.
-	var frame_middle := (METER_FRAME.position.x + METER_FRAME.size.x * 0.5) * scale
-	_meter_box = Rect2(floorf(wide * 0.5 - frame_middle), EDGE, span.x, span.y)
+	# Bottom left, with the garbage circle's own edge (not the sheet's) sitting EDGE in from
+	# the corner: the sheet has empty room round the art, and the room is not the meter.
+	var circle_left := METER_CIRCLE.position.x * scale
+	var circle_bottom := (METER_SHEET.y - METER_CIRCLE.end.y) * scale
+	_meter_box = Rect2(
+		floorf(EDGE - circle_left), floorf(size.y - EDGE - span.y + circle_bottom), span.x, span.y
+	)
 	_meter_frame_box = Rect2(
 		_meter_box.position + METER_FRAME.position * scale, METER_FRAME.size * scale
 	)
-	for sheet: TextureRect in [_meter_water, _meter_circle, _meter_frame]:
+	for sheet: TextureRect in [_meter_water, _meter_frame, _meter_circle]:
 		if sheet != null:
 			sheet.position = _meter_box.position
 			sheet.size = _meter_box.size
@@ -372,15 +376,16 @@ func _draw() -> void:
 		_draw_siege()
 
 
-## A line of plain text under the meter, centred on it. No plate behind it: it is a note
-## about the lake, and it belongs on the lake.
+## A line of plain text over the meter, centred on its frame. No plate behind it: it is a
+## note about the lake, and it belongs on the lake. Over rather than under because the meter
+## sits on the bottom edge of the screen.
 func _draw_hint() -> void:
 	var height := Style.TEXT_BODY
 	Style.write(
 		self,
 		hint,
 		height,
-		Vector2(0.0, _meter_box.position.y + _meter_box.size.y + GAP + float(height)),
+		Vector2(0.0, _meter_frame_box.position.y - GAP),
 		Style.GOLD.lerp(Style.INK, 0.5),
 		HORIZONTAL_ALIGNMENT_CENTER,
 		_meter_frame_box
@@ -453,7 +458,7 @@ func _bar(box: Rect2, fill: float, tint: Color, label: String) -> void:
 
 
 ## The meter's nodes. Four sheets over one another: the murky water (with the shader that
-## blends the clean water into it), the garbage circle, the frame, and a face for the figure.
+## blends the clean water into it), the frame, the garbage circle, and a face for the figure.
 ## Children rather than `draw_texture_rect` calls because they need a nearest filter and the
 ## rest of this node does not, and because the shader keeps the water moving on its own
 ## between readings without this node repainting.
@@ -474,8 +479,10 @@ func _build_meter() -> void:
 	_meter_shader.set_shader_parameter(&"track_to", METER_TRACK.end.x / METER_SHEET.x)
 	_meter_water = _sheet_node(murky)
 	_meter_water.material = _meter_shader
-	_meter_circle = _sheet_node(circle)
+	# The frame first and the circle over it: the circle caps the frame's end, and drawn
+	# under it the frame's corner showed through the bags as a splinter.
 	_meter_frame = _sheet_node(frame)
+	_meter_circle = _sheet_node(circle)
 	_meter_face = MeterFace.new()
 	_meter_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_meter_face)

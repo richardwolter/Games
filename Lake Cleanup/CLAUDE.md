@@ -172,10 +172,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **The pollution meter is art, not the water shader** (`hud_skin.gd` `_build_meter`,
   `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
   `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
-  clean water, garbage circle, wooden frame — as child TextureRects at `METER_SCALE`
-  (1.95) times the art on a 1080-line window, in proportion elsewhere. Settled by eye (3x,
-  1.5x, then 1.3x that), not snapped to a pixel step; nearest-filtered. The shader slides the filth-to-clean
-  seam (feather `METER_FEATHER`, narrowed at the ends) and rocks both sheets a pixel or two
+  clean water, wooden frame, garbage circle over it — as child TextureRects in the bottom
+  left corner (hint line above it), at `METER_SCALE` (1.95) times the art on a 1080-line
+  window, in proportion elsewhere. Settled by eye (3x, 1.5x, then 1.3x that), not snapped
+  to a pixel step; nearest-filtered. The shader slides the filth-to-clean seam (feather
+  `METER_FEATHER`, narrowed at the ends) and rocks both sheets a pixel or two
   (sine, not scroll: the sheets are not tileable). Garbage circle static; `%` figure only,
   right-aligned on the clean end; no `POLLUTION` label. `Style.meter_water`/`water` and
   the `METER_*` colours are gone.
