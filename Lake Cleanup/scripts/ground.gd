@@ -234,66 +234,22 @@ const OUTER_OUT := 42.1
 ## lawn is a kept yard, which has a decided edge rather than a wandering one.
 const EDGE_WANDER := 0.55
 
-## How far the island's sand carries on past the water's edge, in tiles, how far each of
-## those tiles is dropped down the screen, in pixels, and how much of the water's colour is
-## mixed into the last of them.
+## How far the island's sand carries on past the water's drawn edge, in tiles, under the
+## water.
 ##
-## Three tiles at the island, which is as much shelf as it can have: past that the rubbish
-## would be floating over sand it cannot be told apart from, and the first cast has to reach
-## the nearest piece from the beach. The island used to stop dead at the waterline, which
-## left it standing on the lake like a coin on a table. A shore does not stop, it goes under: the sand keeps going out, each row
-## a little lower and a little more the colour of the water than the one before, until it is
-## the water. The outer bank gets this for nothing — its sand runs on under the lake and the
-## water is drawn over it — and this is the island being given the same thing by hand.
-const SINK_REACH := Iso.SHELF_TILES
-
-## How far each drowned row is dropped, in screen pixels.
+## The island is drawn under the water now, the same as the ground outside, and the shader
+## cuts the water out inside the island's curve (`island_fraction` there, `Iso.past_shelf`
+## here — one function, two languages). So the island's coast is that curve, not the tiles'
+## staircase, and all the sand has to do is be there under every pixel of it. A diamond's
+## corner reaches seven tenths of a tile from its middle, so a tile whose middle is a whole
+## tile past the curve is entirely under opaque water and drawing it buys nothing.
 ##
-## Bounded by the height of a sand slab's own side — six pixels drawn — and that is a
-## ceiling, not a preference. A row dropped further than the tile in front of it is tall
-## opens a gap under it that the lake shows through, and a bed of sand with a seam under
-## every row is worse than a flat one. It was nine, and every one of those seams was visible.
-##
-## Well under that ceiling now. Two pixels a row is barely a slope at all, which is the point:
-## the water going darker is what says the bed is dropping away, and the geometry only has to
-## agree with it rather than announce it.
-const SINK_STEP := 2.0
-
-## How the drop is spread across the shelf, as the power the distance out is raised to.
-##
-## One is a ramp of even slope, which starts the bed falling away the moment it leaves the
-## beach: the first drowned row, the one right against the island and the one most looked at,
-## is already below the sand it continues. Above one the fall is slow at the top and steepens
-## outwards — the near rows sit up close to the beach's own level and carry the shore out flat
-## before it drops, which is what a shore does.
-##
-## Kept low enough that the outermost step stays under the six pixels of a sand slab's side.
-## At 2.2 tiles of shelf and two pixels a row, the last step at this power is about three.
-const SINK_EASE := 2.0
-
-## How much of the water's colour is mixed into the sand at the top of the shelf and at the
-## bottom of it, and the colour itself.
-##
-## The top is not zero: a piece of sand a hand's width under the surface is already seen
-## through water, and the point of the whole band is that the tiling stops being something
-## you can count. The bottom is one, and has to be: a shelf that stops at anything less ends
-## on a row of half-visible tiles, which is a row of tips along the deep edge.
-const SINK_TINT := Color(0.30, 0.50, 0.52)
-
-## How much a drowned tile's fade is nudged off the smooth curve above, by a stable per-tile
-## hash.
-##
-## The curve itself is smooth, but each tile is still its own flat-shaded quad, and a run of
-## quads at almost-equal fade, stepping down in an even row, reads as a staircase however
-## gently the colour moves between them. Jittered, it reads as noise instead of a countable
-## row.
-const DISSOLVE_JITTER := 0.10
-
-## How far into the fade the first drowned row already is.
-##
-## Not zero, or that row is full-strength sand with the tiles' own staircase along its edge —
-## a hard step exactly where the ground is meant to stop being a thing with an edge.
-const SINK_FADE_START := 0.4
+## This replaces the drowned shelf — rows of sand stepping down and fading into the water
+## (SINK_REACH, SINK_STEP, SINK_TINT and the rest). Those were the island's coast when the
+## island stood on top of the water and had to end somewhere; under it, the water's own
+## shoaling is the shallows and nothing else has to be drawn. `Iso.SHELF_TILES` outlives
+## them: it still holds the rubbish off the beach, because a first cast has to reach.
+const ISLAND_UNDER := 1.0
 
 ## The wood on the far bank: which pictures, how thickly they stand, and how they keep out
 ## of each other's way.
@@ -359,11 +315,12 @@ const SEED := 20260907
 
 ## Which part of the ground this node draws.
 ##
-## The ground outside is drawn below the water, which is what lets the lake's own curve be
-## its edge. The island is drawn above it, because it is a hole in that curve. And each of
-## them has a second pass over the top — the sand that carries on into the lake and drowns,
-## fading as it goes, so neither shore ends anywhere in particular.
-enum Layer { OUTSIDE, ISLAND, ISLAND_DEEP }
+## Both are drawn below the water. Where the tiles stop is a staircase whatever tiles are
+## picked; the water's edge is a curve, drawn by the shader, and laying that over the sand is
+## what gives either shore a coastline. Outside, the water polygon simply ends at the bank.
+## On the island, which the polygon spans, the shader discards its pixels inside the
+## island's curve instead — same edge, cut from the other side.
+enum Layer { OUTSIDE, ISLAND }
 
 ## What is on the ground at a tile. WATER is the shader's, and NONE is off the end of what
 ## this layer covers; both draw nothing, but they are not the same to a neighbour — sand
@@ -422,35 +379,23 @@ func _ready() -> void:
 	# Nearest, or the pack's pixels come out smeared. Set here rather than on the project so
 	# the rest of the art keeps the filtering it was drawn against.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# The island sits above the water; the ground outside sits under it.
+	# Both layers sit under the water. Tiles are diamonds, so a shore drawn by where the
+	# tiles stop is a staircase however carefully they are picked; the water's edge is a
+	# curve, and laying the water over the sand is what gives a shore a coastline. See
+	# `Layer`, and ISLAND_UNDER for what that asks of the island's sand.
 	#
-	# Which way round is what decides the shape of the coast. Tiles are diamonds, so a shore
-	# drawn by where the tiles stop is a staircase however carefully they are picked. The
-	# water's own polygon is a curve, and laying that over the sand is what makes the lake
-	# round. Outside it can: the water is a disc and the ground is around it. On the island
-	# it cannot — the island is a hole in that disc — so its coast is carried by the sand that
-	# walks out under the lake and drowns. See SINK_REACH.
-	# The island and its shallows both sit above the water; only the ground outside is under
-	# it. Under the water the shallows were hidden well enough to be honest and not enough to
-	# be any use: the island still ended on a hard ring, and the point of them is that it
-	# should not end anywhere in particular. Over the water they fade out instead.
-	# Under the water: the ground outside, and the shelf it sends down into the lake. Over it:
-	# the island and its own shelf, because the island is a hole in the water and nothing can
-	# be laid over it from below.
-	#
-	# Standing over the water is why the shelf may not be painted with water of its own. It
-	# was, for a while: a flat SINK_TINT diamond per tile, drawn last, thickening to full
-	# opacity at the deep end so the sand under it could not be counted. A fixed colour
-	# cannot be the water it is standing on. The shader below varies by depth, by the bands
-	# moving through it, by the foam, and now by the filth on that particular tile — the
-	# overlay followed none of it, so it read as a row of teal plates pasted on the lake,
-	# worst exactly where it was thickest, all the way round the island.
-	#
-	# The tiles' own fade is the whole of it now: they thin out into the real water rather
-	# than being covered by a picture of it. If the middle of the shelf reads as dry sand,
-	# SINK_FADE_START is the number to move. Do not bring back a plate.
-	#
-	z_index = 1 if layer == Layer.OUTSIDE else 3
+	# The island stood above the water for a long while, because the water polygon spans it
+	# and nothing drawn from below could show through. Its coast was then the tiles' own
+	# staircase, and three attempts were made to soften that from on top: a shelf of drowned
+	# sand rows stepping down and fading into the lake; the same shelf under a flat
+	# water-coloured plate (a fixed colour cannot be the water it stands on — the shader
+	# varies by depth, bands, foam and filth, and the plate followed none of it, so it read
+	# as teal plates pasted on the lake); and the shelf fading by itself, jittered so the
+	# rows could not be counted. Every one of them still ended on a stepped edge somewhere,
+	# because the edge was still made of tiles. The shader discarding its water inside the
+	# island's curve is what finally made the coast a curve, and it made the shelf pointless:
+	# the water is opaque, and its own shoaling is the shallows.
+	z_index = 1
 	z_as_relative = false
 	for slice: int in _every_slice():
 		var tex := load(TILES % slice) as Texture2D
@@ -543,6 +488,10 @@ func _sow_island() -> void:
 			if kind != Kind.GRASS and kind != Kind.SAND:
 				continue
 			if Iso.in_shed(at.x, at.y, Iso.SHED_KEEP):
+				continue
+			# Not on the sand that runs out under the water: a tuft half under the lake's edge
+			# is a tuft cut in half.
+			if Iso.past_shelf(at) > -0.6:
 				continue
 			if _hash(at.x * 9.1, at.y * 3.7) > ISLAND_LEAF_SHARE:
 				continue
@@ -696,26 +645,10 @@ func _rebuild() -> void:
 			if slice != SAND:
 				lift += GRASS_LIFT
 
-			var tint := Color.WHITE
-			if layer == Layer.ISLAND_DEEP:
-				var sunk := _sunk_by(Vector2(float(tx) + 0.5, float(ty) + 0.5))
-				var deep := clampf(sunk / SINK_REACH, 0.0, 1.0)
-				# Eased rather than straight, so the rows nearest the island keep the beach's
-				# height and the fall is spent further out. See SINK_EASE.
-				lift -= pow(deep, SINK_EASE) * SINK_REACH * SINK_STEP
-				# See DISSOLVE_JITTER. Offset from `_pick`'s and `_wander`'s own sampling
-				# points so it doesn't just retrace their pattern.
-				var jitter := (_hash(tx + 11.0, ty - 7.0) - 0.5) * 2.0 * DISSOLVE_JITTER
-				var fade := clampf(
-					SINK_FADE_START + (1.0 - SINK_FADE_START) * sqrt(deep) + jitter, 0.0, 1.0
-				)
-				tint = Color.WHITE.lerp(Color(SINK_TINT, 0.0), fade)
-
 			# The grass keeps only as much of its own side as the step it stands on. See
-			# `skirt`. The sand keeps all of its: a drowned row needs its side to close the
-			# gap to the row in front of it, and the outer ring's last row is a real edge.
+			# `skirt`. The sand keeps all of its: the outer ring's last row is a real edge.
 			var skirt := GRASS_LIFT if slice != SAND else INF
-			_add_tile_quad(slice, mid, lift, tint, skirt)
+			_add_tile_quad(slice, mid, lift, Color.WHITE, skirt)
 			if slice != SAND:
 				_add_fringe(tx, ty, mid)
 
@@ -912,8 +845,8 @@ func _top_of(tex: Texture2D) -> int:
 ## ground outside runs to the far edge of the ring, which is well past the tile field the
 ## rubbish uses.
 func _span() -> Rect2i:
-	if layer == Layer.ISLAND or layer == Layer.ISLAND_DEEP:
-		var r := Iso.ISLAND_RADIUS + Vector2.ONE * (SINK_REACH + 2.0)
+	if layer == Layer.ISLAND:
+		var r := Iso.ISLAND_RADIUS + Vector2.ONE * (ISLAND_UNDER + 2.0)
 		return Rect2i(
 			Vector2i(Iso.ISLAND_CENTRE - r), Vector2i(r * 2.0) + Vector2i.ONE
 		)
@@ -929,16 +862,10 @@ func _span() -> Rect2i:
 func _kind_at(tx: float, ty: float) -> Kind:
 	var at := Vector2(tx, ty)
 	var island := Iso.island_fraction(at.x, at.y)
-	if layer == Layer.ISLAND or layer == Layer.ISLAND_DEEP:
-		# Each of the two draws only its own half of the island: the part standing out of the
-		# lake, and the part walking down into it.
-		var sunk := _sunk_by(at)
-		if (sunk > 0.0) != (layer == Layer.ISLAND_DEEP):
-			return Kind.NONE
-		# Back from the shoreline by more than half a tile, so no tile's corner reaches past
-		# the ring drawn over it. A diamond is widest at its corners, and one whose middle is
-		# just inside the curve still pokes its points out through it.
-		if sunk > SINK_REACH:
+	if layer == Layer.ISLAND:
+		# Out to a whole tile past the water's drawn edge, so there is sand under every pixel
+		# the shader leaves open, and no further. See ISLAND_UNDER.
+		if Iso.past_shelf(at) > ISLAND_UNDER:
 			return Kind.NONE
 		# The beach is the outside of the island; the grass starts a little in from it.
 		#
@@ -976,15 +903,6 @@ func _boxed(at: Vector2) -> float:
 
 ## How far past the water's edge a spot is, in tiles: zero on dry ground, positive out in
 ## the lake, where the sand is drowning.
-##
-## The island's only. The bank had a shelf of its own for a while and it never sat right:
-## seen almost edge-on from where the camera is, a row of tiles stepping down into the water
-## reads as tiles, however faint they are drawn. The bank's sand simply runs under the lake
-## and the water's own curve is its edge.
-func _sunk_by(at: Vector2) -> float:
-	return maxf(Iso.past_shelf(at), 0.0)
-
-
 ## How far the beach reaches past its ellipse at this spot, in tiles. See EDGE_WANDER.
 ##
 ## Two waves of different lengths rather than one roll a tile: a roll a tile is a ragged

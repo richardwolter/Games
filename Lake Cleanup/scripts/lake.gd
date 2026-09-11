@@ -1031,17 +1031,10 @@ const IN_FRONT := 9
 ## shape nothing ever moves. The shader shoals the water up to the beach so the join does
 ## not read as a sticker on deep water.
 func _shape_island() -> void:
-	# The island's own ground, over the water, and the sand that walks out under the lake
-	# around it, below the water. Two nodes because which side of the water a thing is drawn
-	# on is the whole of what makes it look submerged.
-	var shallows := Ground.new()
-	shallows.name = &"IslandShallows"
-	shallows.layer = Ground.Layer.ISLAND_DEEP
-	shallows.day = _day
-	if OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("ground"):
-		shallows.visible = false
-	add_child(shallows)
-
+	# The island's ground, under the water like the bank's: the water shader cuts itself out
+	# inside the island's curve, and that curve is the coast. There used to be a second node
+	# here, the shelf of drowned sand the island sent out under the lake when it stood on top
+	# of the water — see Ground.ISLAND_UNDER for why it went.
 	var ground := Ground.new()
 	ground.name = &"IslandGround"
 	ground.layer = Ground.Layer.ISLAND

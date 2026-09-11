@@ -196,11 +196,12 @@ const LAKE_EDGE := 0.03
 
 ## How far clear of the island rubbish is laid, in world pixels past its waterline.
 ##
-## Bigger than the margin at the outer bank, and for a different reason. The island's sand
-## does not stop at the water — it carries on out and sinks, fading as it goes (see
-## `Ground.SINK_REACH`), and anything floating over that band reads as lying on a beach.
-## Worse, it reads as somewhere the player cannot cast, which is the sort of thing that gets
-## learned once and then avoided for the rest of a run.
+## Bigger than the margin at the outer bank, and for a different reason. The water shoals
+## up to the island (see water.gdshader), and a piece floating in the lightest of that
+## shallows, right against the beach, reads as lying on it. Worse, it reads as somewhere the
+## player cannot cast, which is the sort of thing that gets learned once and then avoided
+## for the rest of a run. (This band used to be a drawn shelf of drowned sand; the island is
+## under the water now and the shelf is gone, but the holdoff it set is still the right one.)
 ##
 ## How far the drawn water is carried past the island's waterline, in tiles, and how far the
 ## island's sand carries on under it before it is lost.
@@ -268,14 +269,31 @@ static func on_beach_at(at: Vector2, from: float, to: float) -> bool:
 	return out >= from and out <= to
 
 
-## Is this spot on a tile of the island's dry ground, as `Ground` draws it?
+## Is this spot on the island's dry ground, as it is seen?
 ##
-## The drawn beach is whole diamonds, laid wherever a tile's middle is on the dry side of
-## `past_shelf` — a staircase round a smooth curve. Asking the curve alone where the angler
-## stands put corners of drawn sand in the water and notches of drawn water on the beach.
-## This asks the same question of the same tile the ground asked, so the two cannot disagree.
-static func on_island_sand(at: Vector2) -> bool:
-	return past_shelf(Vector2(floorf(at.x) + 0.5, floorf(at.y) + 0.5)) <= 0.0
+## The curve, not the tile: the water shader discards itself inside this same ring, so what
+## is seen as beach is exactly what this says is beach. It used to ask the tile under the
+## spot instead, back when the island's diamonds were drawn over the water and their
+## staircase was the edge that showed.
+static func on_island_ground(at: Vector2) -> bool:
+	return past_shelf(at) <= 0.0
+
+
+## How far past the water's drawn edge a spot is, in world pixels: negative on the beach,
+## zero on the edge, positive out in the water. `past_island` measured from the waterline,
+## which is a little way out from where the water is actually drawn; anything that wants to
+## know what the eye sees — is the angler standing in the water, and how deep — asks this.
+##
+## The spot and the edge below it lie on one ray out of the island's middle, and the ring
+## fraction grows linearly along that ray (the wobble depends only on the angle, which the
+## ray holds fixed), so the edge is the spot pulled back by that fraction — no search.
+static func past_water(at: Vector2) -> float:
+	var middle := tile_to_world(ISLAND_CENTRE.x, ISLAND_CENTRE.y)
+	var here := tile_to_world(at.x, at.y) - middle
+	var f := island_ring_fraction(at, WATER_LAP_TILES)
+	if f < 0.0001:
+		return -here.length()
+	return here.length() * (1.0 - 1.0 / f)
 
 
 ## Is this tile far enough from both shores to float something on?

@@ -548,7 +548,7 @@ func _drop_spot() -> Vector2:
 	for spot: Vector2 in [
 		crate_tile + along, crate_tile - along, crate_tile - out * CRATE_SIDE
 	]:
-		if Iso.island_fraction(spot.x, spot.y) < 1.0 and not Iso.in_shed(spot.x, spot.y, Iso.SHED_KEEP):
+		if Iso.on_island_ground(spot) and not Iso.in_shed(spot.x, spot.y, Iso.SHED_KEEP):
 			return spot
 	return crate_tile
 
@@ -683,7 +683,9 @@ func _may_stand(tile: Vector2) -> bool:
 
 
 func _on_land() -> bool:
-	if Iso.island_fraction(tile_pos.x, tile_pos.y) < 1.0:
+	# The island's drawn edge, not its waterline: the water is seen to start where the shader
+	# stops discarding it, and the dog should be swimming exactly where it is seen in water.
+	if Iso.on_island_ground(tile_pos):
 		return true
 	# On the outer bank's sand, once it is past where the water is drawn over it.
 	return Iso.on_beach_at(tile_pos, Iso.WATER_LAP_TILES, BEACH_WALK + 1.0)

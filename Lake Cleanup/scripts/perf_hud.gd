@@ -58,7 +58,7 @@ func _process(_delta: float) -> void:
 		var roots := get_tree().root.get_children()
 		for root in roots:
 			for child in root.get_children():
-				if child.name.begins_with("Ground") or child.name.begins_with("IslandGround") or child.name.begins_with("IslandShallows"):
+				if child.name.begins_with("Ground") or child.name.begins_with("IslandGround"):
 					child.visible = not child.visible
 	_g_held = g_now
 

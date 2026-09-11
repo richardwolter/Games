@@ -26,10 +26,11 @@ const WALK_SPEED := 5.4
 const ACCEL_TIME := 0.12
 const ACCEL := WALK_SPEED / ACCEL_TIME
 
-## How far out the character may walk past the waterline, in world pixels.
+## How far out the character may walk past the water's drawn edge, in world pixels.
 ##
 ## A short wade: was six pixels, which only wet the boots; twenty more lets the angler step
-## properly into the shallows off the beach.
+## properly into the shallows off the beach. Measured from where the water is seen to start
+## (`Iso.past_water`), not from the waterline `Iso.past_island` holds a little way out.
 ##
 ## Pixels, not a fraction of the island's radius as it used to be. A fraction is a different
 ## distance at every angle once the projection has stretched one diagonal against the other:
@@ -340,14 +341,12 @@ func _nearest_standing(tile: Vector2) -> Vector2:
 
 ## How far into the water a spot is, in world pixels, or 0 on the island's drawn ground.
 ##
-## The tile decides dry, not the curve: a corner of sand that sticks out past the outline is
-## still sand to stand on, and a notch of water between two diamonds is water even inside it.
-## Off the sand the curve still decides how deep, with a pixel's floor so a notch inside the
-## outline reads as wet rather than as dry ground nobody can see.
+## The curve decides, because the curve is what is drawn: the water shader cuts itself out
+## inside the same ring, so the boots are wet exactly where the picture shows water. (The
+## tile used to decide, when the island's diamonds were drawn over the water and stuck
+## their corners out past the curve.)
 func _wet_by(at: Vector2) -> float:
-	if Iso.on_island_sand(at):
-		return 0.0
-	return maxf(Iso.past_island(at), 1.0)
+	return maxf(Iso.past_water(at), 0.0)
 
 
 ## Where a blocked step goes instead: along the wall rather than into it.
@@ -357,15 +356,14 @@ func _wet_by(at: Vector2) -> float:
 ## along it, so both failed and the angler stuck fast. This takes the part of the step that
 ## heads out of the island away and keeps the rest, which is the way along the shore at this
 ## point. The curve bends away from a straight tangent, so the same slide nudged a little back
-## in is tried next; the axes stay as a last resort for the stepped sand corners, where the
-## wall is a tile edge rather than the curve. Anything the shed or the crate refuses is still
-## refused — every candidate goes through _can_stand.
+## in is tried next; the axes stay as a last resort. Anything the shed or the crate refuses
+## is still refused — every candidate goes through _can_stand.
 func _slide(move: Vector2) -> Vector2:
 	# Which way is out, in tile space, off the same distance the walking limit is measured in.
 	var e := 0.05
 	var out := Vector2(
-		Iso.past_island(tile_pos + Vector2(e, 0.0)) - Iso.past_island(tile_pos - Vector2(e, 0.0)),
-		Iso.past_island(tile_pos + Vector2(0.0, e)) - Iso.past_island(tile_pos - Vector2(0.0, e))
+		Iso.past_water(tile_pos + Vector2(e, 0.0)) - Iso.past_water(tile_pos - Vector2(e, 0.0)),
+		Iso.past_water(tile_pos + Vector2(0.0, e)) - Iso.past_water(tile_pos - Vector2(0.0, e))
 	)
 	var candidates: Array[Vector2] = []
 	if out.length_squared() > 0.000001:

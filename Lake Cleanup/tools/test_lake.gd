@@ -321,12 +321,12 @@ func _stage_walk() -> void:
 	Input.action_release(&"walk_left")
 	_check(_angler.tile_pos.distance_to(_walk_from) > 0.5, "the keys walk the angler",
 		"%.2f tiles from %s" % [_angler.tile_pos.distance_to(_walk_from), str(_walk_from)])
-	# The waterline plus the one step past it the walking rule allows — the last step off the
-	# grass is into the shallows on purpose (Angler.WALK_LIMIT), and the drawing now sinks the
+	# The water's drawn edge plus the wade past it the walking rule allows — the last step off
+	# the beach is into the shallows on purpose (Angler.WALK_LIMIT), and the drawing sinks the
 	# boots into the water when it is taken. Anything beyond that is a swim.
-	_check(Iso.island_fraction(_angler.tile_pos.x, _angler.tile_pos.y) <= Angler.WALK_LIMIT,
+	_check(Iso.past_water(_angler.tile_pos) <= Angler.WALK_LIMIT,
 		"walking never leaves the island",
-		"%.3f of the way out" % Iso.island_fraction(_angler.tile_pos.x, _angler.tile_pos.y))
+		"%.1f px past the water's edge" % Iso.past_water(_angler.tile_pos))
 	_check(not bool(_main.call(&"_at_shed")), "walking off takes them away from the shed", "")
 	_advance()
 

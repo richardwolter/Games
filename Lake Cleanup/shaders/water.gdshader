@@ -44,9 +44,12 @@ uniform float tile_h = 32.0;
 uniform vec2 basin_centre = vec2(46.0, 46.0);
 uniform vec2 basin_radius = vec2(40.0, 34.0);
 
-// The island in the middle. The water polygon still spans it — the island's own shapes
-// are drawn on top — but the shading has to know it is there, or the deepest, darkest
-// water would show through around a beach that is supposed to be shallow.
+// The island in the middle. The water polygon spans it, and this shader discards its
+// pixels inside the island's curve (see fragment()), which is what makes that curve the
+// island's coast: the sand is drawn under the water, the same as the bank's, and the
+// water's edge is the edge that is seen rather than the tiles' own staircase. The shading
+// also has to know it is there, or the deepest, darkest water would show through around
+// a beach that is supposed to be shallow.
 uniform vec2 island_centre = vec2(46.0, 46.0);
 uniform vec2 island_radius = vec2(4.6, 3.9);
 
@@ -405,6 +408,12 @@ void fragment() {
 	float clock = stepped_time(TIME, pixel_fps);
 
 	vec2 tile = world_to_tile(px);
+	// The island: no water inside its curve. This is the coast — Iso.past_shelf is the same
+	// curve in GDScript, and the angler and the dog are dry exactly where this discards.
+	// Decided per foam_pixel cell like everything else here, so the edge is pixel art too.
+	if (island_fraction(tile) < 1.0) {
+		discard;
+	}
 	float s = clamp(shore_fraction(tile), 0.0, 1.0);
 	// Mirrors Iso.depth_at: 0 at the bank, 1 over the deepest water.
 	float d = sqrt(max(1.0 - s, 0.0));
@@ -514,18 +523,13 @@ void fragment() {
 	float grime = grime_band * step(0.35, grime_cell) * step(0.3, grime_patch) * step(1.5, state);
 	col = mix(col, grime_color.rgb, grime);
 
-	// The island, read from the other side: outward from its beach. Half again as wide as the
-	// bank's — its tiles are drawn over the water with a stepped edge, and a lip the bank's
-	// width disappears under their corners. What is under the tiles' own corners is foam too,
-	// so a gap between two diamonds shows white water rather than deep blue.
-	//
-	// Drawn here rather than over the tiles, so that the foam and the shoaling either side of
-	// it are the same ring. Drawn on the ground it was a second ring just inside this one,
-	// and two rings a few pixels apart read as a seam, not as a shore.
+	// The island, read from the other side: outward from its beach. The same width as the
+	// bank's now that the island's sand is under the water too — it was half again as wide
+	// while the tiles were drawn over the water with a stepped edge, to cover their corners.
 	vec2 isl_d = foam_tile - island_centre;
 	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
 	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
-	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5, clock, state));
+	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.0, clock, state));
 
 	// And loose out on the open lake, kept a couple of tiles clear of both shores so it never
 	// tangles with the lip and the wash there.

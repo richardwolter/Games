@@ -239,6 +239,24 @@ nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOS
   rise, no bump/shove. The dog may walk up the bank's beach to `Dog.BEACH_WALK` to fetch
   them. Any new code that moves or cuts pieces must respect `dry`.
 
+### Island Coast (under the water, cut by the shader)
+The island's ground (`Ground.Layer.ISLAND`) draws **under** the water at z 1, same as the
+bank, and `water.gdshader` **discards** its pixels where its `island_fraction` is under 1.
+That curve is the coast. The sand runs `Ground.ISLAND_UNDER` (one tile) past it so there is
+sand under every open pixel; beyond that it is under opaque water and not drawn.
+- **One edge, two languages**: the shader's `island_fraction` (radii shrunk by `shore_lap`)
+  equals `Iso.island_ring_fraction(at, WATER_LAP_TILES)`, so `Iso.past_shelf` (tiles) and
+  `Iso.past_water` (world px) are the drawn edge. `Iso.on_island_ground`, the angler's
+  `_wet_by`/`WALK_LIMIT`, and the dog's `_on_land` all ask those. Never ask the tile under a
+  walker, and never move one wobble term without the other.
+- **Retired, by decision**: the island standing above the water with a drowned-sand shelf
+  stepping down into the lake (`SINK_*`, `ISLAND_DEEP`, `IslandShallows`), and the flat
+  water-coloured plate over it before that. Both left a stepped edge; the discard is what
+  made the coast a curve. Do not bring the island back above the water.
+- `Iso.SHELF_TILES`/`SHELF_CLEAR` still hold the rubbish off the beach (the first cast has to
+  reach); they no longer describe anything drawn.
+- Island foam ring width in the shader is 1.0 like the bank's (was 1.5 to cover tile corners).
+
 ### Rubbish Sheets
 The regular rubbish (not finds) is drawn from two sheets:
 - `assets/lake_objects.png` — the first 27 kinds, from `art_source/LakeObjects.psd`. Its
