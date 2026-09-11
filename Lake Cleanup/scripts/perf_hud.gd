@@ -66,7 +66,15 @@ func _process(_delta: float) -> void:
 	if frame_ms > SPIKE_THRESHOLD and _log_file != null:
 		var grid_rebuilds: int = _grid.get("rebuilds") if _grid else 0
 		var drawn: int = _grid.get("drawn_pieces") if _grid else 0
-		var msg: String = "frame %.1f ms  rebuilds %d  pieces %d" % [frame_ms, grid_rebuilds, drawn]
+		var msg: String = "frame %.1f ms  rebuilds %d (view %d detail %d patch %d) last %.1f ms  pieces %d  draws %d" % [
+			frame_ms, grid_rebuilds,
+			_grid.get("from_view") if _grid else 0,
+			_grid.get("from_detail") if _grid else 0,
+			_grid.get("from_patch") if _grid else 0,
+			_grid.get("rebuild_ms") if _grid else 0.0,
+			drawn,
+			int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		]
 		_log_file.store_line(msg)
 		_log_file.flush()
 

@@ -406,6 +406,14 @@ var _mesh_colors := PackedColorArray()
 var _mesh_indices := PackedInt32Array()
 var _dirty: bool = true
 
+## What the soup was last laid out to cover, the view plus `BUILT_MARGIN`; the floating
+## pieces that rebuild found, and where each one sits; and whether every def has art, which
+## is what makes the detail level irrelevant to the geometry.
+var _built := Rect2()
+var _afloat := PackedInt32Array()
+var _afloat_at := PackedVector2Array()
+var _all_art: bool = false
+
 ## How far into the mesh arrays a rebuild has written: vertices, and indices. The arrays
 ## are sized to the worst case up front and written into by index, then cut back to what
 ## was used — the same trick the shadow layer already plays, and for the same reason.
@@ -1120,9 +1128,48 @@ func set_view(to: Rect2) -> void:
 	if coarse == view:
 		return
 	view = coarse
+	# Still inside what the soup was laid out for: nothing to rebuild, only the rings to hand
+	# round the pieces now in view. A rebuild already coming will do that itself.
+	if _built.encloses(coarse):
+		if not _dirty:
+			_ripples.set_pieces(_spread_over(_afloat_in(view), RIPPLE_MOST))
+		return
+	_built = coarse.grow_individual(
+		coarse.size.x * BUILT_MARGIN, coarse.size.y * BUILT_MARGIN,
+		coarse.size.x * BUILT_MARGIN, coarse.size.y * BUILT_MARGIN
+	)
 	_dirty = true
 	from_view += 1
 	queue_redraw()
+
+
+## How far past the view the soup is laid out, as a fraction of the view's own size on each
+## side.
+##
+## A rebuild walks every tile in what it covers and costs about 25 ms over the whole basin —
+## a missed frame and a half. Laid out for the view alone, the soup was rebuilt every time a
+## following camera crossed a `VIEW_SNAP` line, which while walking was every second or so,
+## each one a visible hitch. With half a screen of margin the camera has to travel half a
+## screen before the view leaves it, and at the zoom the game is played at the margin already
+## reaches past the whole basin, so walking never rebuilds at all. Off-screen pieces cost the
+## GPU next to nothing: the soup is one draw call however many it holds.
+const BUILT_MARGIN := 0.5
+
+
+## The floating pieces of the last rebuild that are inside `box` (plus the cull's pad), for
+## the ripple rings — which are a bounded sample and so have to be taken from what is on
+## screen, not from the margin, or zoomed in most of them would be out of sight.
+func _afloat_in(box: Rect2) -> PackedInt32Array:
+	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
+	var lo := box.position - pad
+	var hi := box.end + pad
+	var out := PackedInt32Array()
+	for i in _afloat.size():
+		var at := _afloat_at[i]
+		if at.x < lo.x or at.x > hi.x or at.y < lo.y or at.y > hi.y:
+			continue
+		out.append(_afloat[i])
+	return out
 
 
 ## Whether pieces are drawn with their footprint and outline. lake.gd sets this from the
@@ -1132,6 +1179,10 @@ func set_detailed(on: bool) -> void:
 	if on == _detailed:
 		return
 	_detailed = on
+	# Only the no-art placeholder has details to drop. A lake whose every piece has art lays
+	# down the same four corners either way, and a rebuild for it is a hitch for nothing.
+	if _all_art:
+		return
 	_dirty = true
 	from_detail += 1
 	queue_redraw()
@@ -1214,6 +1265,10 @@ func tile_at(where: Vector2) -> int:
 ## is invited to fish out of a fight.
 func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> void:
 	defs = from_defs
+	_all_art = true
+	for def in defs:
+		if def.atlas == null:
+			_all_art = false
 	if sheets != null:
 		_white_uv = sheets.uv_of(sheets.white)
 	_rng.seed = lake_seed
@@ -1603,10 +1658,10 @@ func _process(delta: float) -> void:
 ## The visible tiles, as a range of the tile field. The cull is arithmetic: the view
 ## rectangle's corners are projected back into tile space and the box around them is what
 ## gets walked, so an empty screen costs nothing to skip.
-func _visible_tile_box() -> Rect2i:
+func _visible_tile_box(cover: Rect2) -> Rect2i:
 	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
-	var lo := view.position - pad
-	var hi := view.position + view.size + pad
+	var lo := cover.position - pad
+	var hi := cover.position + cover.size + pad
 	# The four corners, because a screen-aligned rectangle is a diamond in tile space and
 	# its extremes are corners, not edges.
 	var corners := [
@@ -1677,15 +1732,18 @@ func _rebuild() -> void:
 	_shadow_at.fill(-1)
 	drawn_pieces = 0
 	var textured: Array[int] = []
-	var afloat := PackedInt32Array()
+	_afloat.resize(0)
+	_afloat_at.resize(0)
 	var glinting: Array[Vector2i] = []
 	_shadows.begin()
 	_foam.begin()
 
+	# The view and its margin, not the view alone. See `BUILT_MARGIN`.
+	var cover := _built if _built.encloses(view) else view
 	var pad := Vector2(Iso.TILE_W, Iso.TILE_H * 4.0)
-	var lo := view.position - pad
-	var hi := view.position + view.size + pad
-	var box := _visible_tile_box()
+	var lo := cover.position - pad
+	var hi := cover.position + cover.size + pad
+	var box := _visible_tile_box(cover)
 
 	# Room for the worst the walk below could ask for, taken in one go. The walk then
 	# writes by index and the arrays are cut back to what was actually used, so a rebuild
@@ -1703,7 +1761,8 @@ func _rebuild() -> void:
 			var at := surface_still(index)
 			if at.x < lo.x or at.x > hi.x or at.y < lo.y or at.y > hi.y:
 				continue
-			afloat.append(index)
+			_afloat.append(index)
+			_afloat_at.append(at)
 			var glint := _glint_at(stack)
 			if glint >= 0:
 				glinting.append(Vector2i(index, glint))
@@ -1739,7 +1798,7 @@ func _rebuild() -> void:
 	_glints.set_finds(glinting)
 	_shadows.finish()
 	_foam.finish()
-	_ripples.set_pieces(_spread_over(afloat, RIPPLE_MOST))
+	_ripples.set_pieces(_spread_over(_afloat_in(view), RIPPLE_MOST))
 	walked = box.size.x * box.size.y
 	rebuild_ms = float(Time.get_ticks_usec() - began) / 1000.0
 
