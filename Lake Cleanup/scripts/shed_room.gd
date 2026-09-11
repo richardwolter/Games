@@ -576,53 +576,42 @@ func _draw_you_hat(
 
 ## Where the door's own empty rect sits, in screen pixels: the dark opening only, not the
 ## jambs either side of it. `_door_span()` is worked back from the same width, so the
-## player walks in through the opening and never through a jamb.
+## player walks in through the opening and never through a jamb. Never taller than the
+## wall below its top run: the moulding goes over the door, not through it.
 func _door_opening(wall: Rect2) -> Rect2:
 	var step := float(CELL * _zoom())
 	var span := _door_span()
 	var size := _door_size()
+	var lintel := wall.position.y + BORDER_HORIZONTAL.get_height() * _zoom()
+	var tall := minf(size.y, wall.end.y - lintel)
 	return Rect2(
-		Vector2(
-			wall.position.x + span.x * step,
-			maxf(wall.end.y - size.y, wall.position.y)
-		),
-		Vector2(size.x, minf(size.y, wall.size.y))
+		Vector2(wall.position.x + span.x * step, wall.end.y - tall),
+		Vector2(size.x, tall)
 	)
 
 
 ## The way in, drawn into the back wall: an open vent with a jamb down each side, not a
 ## leaf standing shut in it. The jambs are the frame's own vertical strip, stood outside
-## the opening so they add to the door rather than narrow it, and they stop at the wall's
-## bottom edge — floor_box's frame runs its top moulding straight across underneath as
-## the threshold. Where each jamb meets the wall's top run it takes a corner piece, the
-## same way the wall's own sides do, but turned about: the top run arrives at the left
-## jamb from the left, which is the shape the top-right corner draws, and leaves the
-## right jamb to the right, which is the top-left one. The wall's top run is split at
-## the jambs' outer edges (see _draw_room_frame's `top_gap`).
+## the opening so they add to the door rather than narrow it. The wall's top run goes
+## straight over the door, and the jambs hang from it down to the wall's foot; under the
+## opening there is no moulding at all — floor_box's frame gaps its top run to the opening
+## (see _draw()), so the way in is not closed off by a sill.
 func _draw_door(wall: Rect2) -> void:
 	if wall.size.y <= 2.0:
 		return
 	var zoom := _zoom()
 	var opening := _door_opening(wall)
 	var jamb_wide := BORDER_VERTICAL.get_width() * zoom
-	var corner := BORDER_TOP_LEFT.get_size() * zoom
-	var left := opening.position.x - jamb_wide
-	var right := opening.end.x
+	var lintel := wall.position.y + BORDER_HORIZONTAL.get_height() * zoom
 	draw_rect(opening, DOOR_OPEN)
-	_draw_room_frame(wall, false, Vector2(left, right + jamb_wide))
-	# Jambs, from under their corners down to the wall's foot.
-	_tile_run(
-		BORDER_VERTICAL, Vector2(left, wall.position.y + corner.y), wall.size.y - corner.y, false
-	)
+	_draw_room_frame(wall, false)
 	_tile_run(
 		BORDER_VERTICAL,
-		Vector2(right, wall.position.y + corner.y),
-		wall.size.y - corner.y,
-		false,
-		true
+		Vector2(opening.position.x - jamb_wide, lintel),
+		wall.end.y - lintel,
+		false
 	)
-	draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, wall.position.y), corner), false)
-	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
+	_tile_run(BORDER_VERTICAL, Vector2(opening.end.x, lintel), wall.end.y - lintel, false, true)
 
 
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
@@ -1182,8 +1171,8 @@ func _tile_rect(tex: Texture2D, rect: Rect2) -> void:
 ## with `bottom` false, and once for floor_box with `bottom` true — the wall's own bottom
 ## edge would only sit on top of floor_box's top edge at the seam between them, so only one
 ## of the two draws it. `top_gap`, when its x is not negative, is a range in the same
-## screen-x the top run skips instead of tiling across — the door, jambs and all, so the
-## run stops at the door's corners instead of running on behind them (see _draw_door).
+## screen-x the top run skips instead of tiling across — the door's opening, so the floor's
+## frame does not close the way in off with a run of moulding (see _draw_door).
 ##
 ## Corners first, then the runs between them, and every run is cut to its own length —
 ## the runs used to tile in whole strips and overshoot, and the top run and the sill both
@@ -1296,10 +1285,10 @@ func _draw() -> void:
 
 	# The room's walls carry on down the floor's own sides and along its front edge, the
 	# same moulding as the back wall's — a second frame, floor_box's own, meeting the first
-	# at the seam where wall ends and floor begins rather than replacing it. Its top run
-	# goes straight across under the door: the jambs stop at the wall's foot and this is
-	# the threshold they stop on.
-	_draw_room_frame(floor_box)
+	# at the seam where wall ends and floor begins rather than replacing it. Its top run is
+	# gapped to the door's opening: nothing runs under the way in.
+	var opening := _door_opening(wall)
+	_draw_room_frame(floor_box, true, Vector2(opening.position.x, opening.end.x))
 
 	# The cells, faintly, while something is being carried: the drop is snapped, and the
 	# player should be able to see what it is snapping to.
