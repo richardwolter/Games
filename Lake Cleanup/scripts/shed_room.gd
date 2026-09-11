@@ -639,6 +639,28 @@ func _draw_door(wall: Rect2) -> void:
 	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
 
 
+## Where the jambs come down onto the floor's frame. Its top run stops either side of the
+## door, and each end takes the same corner piece the jamb took at the top, turned the
+## same way about — the run arrives from the left and stops under the left jamb, which is
+## the top-right corner's shape, and starts again under the right jamb with the top-left
+## one. The corners are the jambs' own width and sit directly beneath them, so a jamb's
+## edge lines run on down through the corner into the run instead of stopping dead on a
+## cut end of moulding. The corner's strip-end rows point down into the floor, the same
+## as they do at the room's own two front corners.
+func _draw_threshold(opening: Rect2, floor_box: Rect2) -> void:
+	var zoom := _zoom()
+	var jamb_wide := BORDER_VERTICAL.get_width() * zoom
+	var corner := BORDER_TOP_LEFT.get_size() * zoom
+	draw_texture_rect(
+		BORDER_TOP_RIGHT,
+		Rect2(Vector2(opening.position.x - jamb_wide, floor_box.position.y), corner),
+		false
+	)
+	draw_texture_rect(
+		BORDER_TOP_LEFT, Rect2(Vector2(opening.end.x, floor_box.position.y), corner), false
+	)
+
+
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
 ##
 ## The bed outranks everything else when there is one out and the dog is not already on it,
@@ -1312,9 +1334,14 @@ func _draw() -> void:
 	# The room's walls carry on down the floor's own sides and along its front edge, the
 	# same moulding as the back wall's — a second frame, floor_box's own, meeting the first
 	# at the seam where wall ends and floor begins rather than replacing it. Its top run is
-	# gapped to the door's opening: nothing runs under the way in.
+	# gapped to the door, jambs and all: nothing runs under the way in, and the run's two
+	# ends take corner pieces under the jambs (see _draw_threshold).
 	var opening := _door_opening(wall)
-	_draw_room_frame(floor_box, true, Vector2(opening.position.x, opening.end.x))
+	var jamb_wide := BORDER_VERTICAL.get_width() * _zoom()
+	_draw_room_frame(
+		floor_box, true, Vector2(opening.position.x - jamb_wide, opening.end.x + jamb_wide)
+	)
+	_draw_threshold(opening, floor_box)
 
 	# The cells, faintly, while something is being carried: the drop is snapped, and the
 	# player should be able to see what it is snapping to.
