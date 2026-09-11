@@ -123,4 +123,5 @@ static func _material() -> ShaderMaterial:
 	var lip := LakeGrid.FOAM_COLOUR
 	lip.a = 0.75
 	_skin.set_shader_parameter("foam", lip)
+	Palette.dress_foam(_skin, lip.a)
 	return _skin

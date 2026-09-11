@@ -808,6 +808,7 @@ class FoamLayer extends Node2D:
 		skin.set_shader_parameter("wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
 		skin.set_shader_parameter("foam", lip)
+		Palette.dress_foam(skin, LakeGrid.FOAM_ALPHA)
 		# Where the waterline lands in a collar quad, which the shader needs and which is
 		# only knowable from the two heights the quad is built with.
 		skin.set_shader_parameter(

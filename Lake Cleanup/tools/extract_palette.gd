@@ -38,6 +38,23 @@ const TRUNK_HUE_HI := 0.10
 # The one color not measured from the pack. See file header.
 const WATER_CLEAN := Color("#5a86ad")
 
+# The water's ramps and the foam, authored rather than measured: water.gdshader outputs only
+# these, dithering between neighbouring steps. The dirty ramp is authored round the measured
+# water_dirty, so it is not re-derived if the pack's darkest tone moves — retune by hand.
+const WATER_RAMPS := {
+	"water_clean_deep": Color(0.173, 0.302, 0.431),
+	"water_clean_mid": Color(0.255, 0.42, 0.573),
+	"water_clean_shallow": Color(0.498, 0.655, 0.776),
+	"water_clean_light": Color(0.769, 0.859, 0.91),
+	"water_dirty_deep": Color(0.071, 0.18, 0.055),
+	"water_dirty_mid": Color(0.094, 0.227, 0.067),
+	"water_dirty_shallow": Color(0.227, 0.353, 0.141),
+	"water_dirty_light": Color(0.369, 0.435, 0.227),
+	"foam": Color(0.933, 0.965, 0.984),
+	"foam_light": Color(1.0, 1.0, 1.0),
+	"foam_dirty": Color(0.8, 0.82, 0.678),
+}
+
 const OUTPUT_PATH := "res://resources/palette.tres"
 
 
@@ -64,7 +81,7 @@ func _init() -> void:
 	print("\nNot from pack (see file header):")
 	print("  water_clean: %s" % WATER_CLEAN.to_html(false))
 
-	_write_resource({
+	var colors := {
 		"grass_light": grass_light,
 		"grass_dark": grass_dark,
 		"sand": sand,
@@ -72,9 +89,11 @@ func _init() -> void:
 		"leaf": leaf,
 		"water_dirty": water_dirty,
 		"water_clean": WATER_CLEAN,
-		"ui_neutral": ui_neutral,
-		"ui_accent": ui_accent,
-	})
+	}
+	colors.merge(WATER_RAMPS)
+	colors["ui_neutral"] = ui_neutral
+	colors["ui_accent"] = ui_accent
+	_write_resource(colors)
 	quit()
 
 

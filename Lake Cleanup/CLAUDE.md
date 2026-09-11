@@ -110,7 +110,28 @@ Lake Cleanup's visual target is **cohesive pixel art isometric**, all assets fro
 ### Master Palette
 All visuals (ground, water, UI, furniture) derive from a **master palette extracted from Forest Isometric Pack** (see issue #3). This ensures consistency by construction, not by manual matching.
 
-**Palette lives in**: `resources/palette.gd` and `resources/palette.tres` (to be created per issue #3)
+**Palette lives in**: `scripts/palette.gd` and `resources/palette.tres`, written by
+`tools/extract_palette.gd` (measured colours from the pack, plus the authored `WATER_RAMPS`).
+
+### Pixel-Art Water
+`water.gdshader`, `foam.gdshader` and `hull_foam.gdshader` draw as pixel art, not as smooth
+effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
+- **Grid**: every effect is evaluated once per `foam_pixel` (2 world px) cell. Water uses the
+  world grid; the foam collars and bow waves snap in their own piece/boat frame, so the grid
+  travels with the smoothly moving sprite instead of crawling across it.
+- **Colours**: output is only palette swatches — two five-step water ramps
+  (`water_clean_*`, `water_dirty_*`), `foam`/`foam_light`/`foam_dirty`, and the grime.
+  Depth, bands, glints and sparkle sum to a ramp position; in-between values are dithered
+  with a fixed 4x4 Bayer pattern, never blended. Clean vs dirty ramp is dithered on local
+  filth the same way, so a bay clears as a thinning green pattern. The water is opaque.
+- **Motion**: pattern animation runs on `stepped_time(TIME, pixel_fps)` (default 8 fps). The
+  **swell** (what open foam and foam collars ride) keeps real `TIME` because the rubbish rides
+  it smoothly; open foam's swell offset is rounded to whole pixels instead.
+- Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
+  shaders — their defaults only mirror the palette.
+- Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the
+  pollution meter (`style.gd` `METER_*` still mirror the old smooth water; the UI is due
+  to be replaced).
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
@@ -251,7 +272,8 @@ cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 - `scripts/player.gd` — boat position, net control, haul feedback
 - `scripts/boat.gd` — net animation and interaction
 - `scripts/water_splash.gd` — ripple feedback on haul/placement
-- `shaders/water.gdshader` — surface deformation, `pollution`-driven clarity
+- `shaders/water.gdshader` — pixel-art lake surface: palette ramps, dithered filth/depth, shore and open foam
+- `shaders/pixel.gdshaderinc` — shared pixel grid, Bayer dither, stepped time
 - `scripts/sfx.gd` — audio for haul, settling, collection
 
 ---

@@ -16,8 +16,24 @@
 // belongs to rode up over it is a white ring the mug climbs out of on every wave.
 //
 // Every term mirrors rubbish.gdshader exactly. If one drifts, the foam swims off the cut.
+//
+// Pixel art (see pixel.gdshaderinc): the collar is worked out on a grid of `foam_pixel`
+// squares laid in the piece's own frame, so the grid rides the swell with the piece rather
+// than the foam's pixels crawling across it. Coverage is dithered, not faded, and the tearing
+// ticks at `pixel_fps`. The swell itself keeps real TIME — the piece moves smoothly, and a
+// collar stepping behind it would come off its cut.
 shader_type canvas_item;
 render_mode blend_mix;
+
+#include "res://shaders/pixel.gdshaderinc"
+
+uniform float foam_pixel = 2.0;
+uniform float pixel_fps = 8.0;
+// The bright bubble cores. Palette `foam_light`.
+uniform vec4 foam_core : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+
+// Where this fragment is in the piece's frame, before the swell moved it: world units.
+varying vec2 local;
 
 // Mirrors LakeGrid.SWAY, LakeGrid.WAVE_SPEED and LakeGrid.ANCHOR_SPAN, like every other
 // shader on the floating rubbish. If one drifts, the foam parts company with the piece.
@@ -61,6 +77,7 @@ void vertex() {
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
 	seed = x;
+	local = VERTEX;
 
 	float t = TIME * wave_speed;
 	// The swell, exactly as the piece rides it, so the collar sits on the cut at every point
@@ -71,11 +88,22 @@ void vertex() {
 }
 
 void fragment() {
+	// Snap to the pixel grid in the piece's frame, and carry UV to the middle of that cell. The
+	// quad is affine, so UV's change per world unit is one matrix, read off the derivatives.
+	vec2 cell = floor(local / foam_pixel);
+	vec2 centre = (cell + 0.5) * foam_pixel;
+	mat2 d_local = mat2(dFdx(local), dFdy(local));
+	vec2 uv = UV;
+	if (abs(determinant(d_local)) > 1e-8) {
+		uv += mat2(dFdx(UV), dFdy(UV)) * inverse(d_local) * (centre - local);
+	}
+	float threshold = bayer4(cell);
+
 	// Across the collar: two waves beating against each other, seeded off the piece's own
 	// anchor so no two pieces foam alike, and drifting so the lip is never the same shape
 	// twice. Beating rather than one wave because a single sine reads as a scallop border.
-	float t = TIME * 1.6;
-	float across = UV.x * 12.0 + seed * 0.05;
+	float t = stepped_time(TIME, pixel_fps) * 1.6;
+	float across = uv.x * 12.0 + seed * 0.05;
 	float tear = sin(across + t) * 0.5 + sin(across * 2.3 - t * 0.7) * 0.5;
 
 	// The collar curves round the ends rather than stopping at them: its reach is scaled by
@@ -83,7 +111,7 @@ void fragment() {
 	// draws up to nothing at either side. An alpha fade did this before and it read as a bar
 	// going transparent — the same length of foam, dimmer at the ends. Taking the reach away
 	// instead makes it a shorter lip, which is the shape of water round a thing in it.
-	float round_off = sqrt(max(1.0 - pow(UV.x * 2.0 - 1.0, 2.0), 0.0));
+	float round_off = sqrt(max(1.0 - pow(uv.x * 2.0 - 1.0, 2.0), 0.0));
 
 	// A second, faster tear for what goes up the side of the piece. Its own frequencies and
 	// its own drift, so the tongues above the line are not the mirror of the lip below it —
@@ -104,7 +132,7 @@ void fragment() {
 	// Distance from the waterline, in the quad's own units, and which way it lies. `cut_at`
 	// is where the line sits in the quad — the quad is built with room above the cut for the
 	// tongues, so it is not the middle.
-	float d = UV.y - cut_at;
+	float d = uv.y - cut_at;
 	float reach = d >= 0.0 ? down : up;
 	float lip = 1.0 - smoothstep(reach * 0.3, max(reach, 0.001), abs(d));
 
@@ -113,11 +141,11 @@ void fragment() {
 	// number each, drifting slowly and seeded off the piece so no two collars carry the same
 	// froth. Whole cells rather than a smooth noise, so the grain lands on something like the
 	// art's own pixel size instead of dithering under it.
-	vec2 cell = floor(
-		vec2(UV.x * bubble_across, UV.y * bubble_down)
+	vec2 bubble = floor(
+		vec2(uv.x * bubble_across, uv.y * bubble_down)
 		+ vec2(seed * 0.13 - t * 0.35, t * bubble_churn)
 	);
-	float grain = bubbles_at(cell);
+	float grain = bubbles_at(bubble);
 
 	// Dissolved by the lip rather than multiplied by it: where the foam is thick every cell
 	// survives and it reads as solid white water; out towards the edges only the cells that
@@ -127,8 +155,9 @@ void fragment() {
 	float kept = mix(0.28, 1.0, step(grain, lip * 1.25));
 
 	// And the bright cores: a bubble catching the light is whiter than the water round it,
-	// and the brightest are where the foam is thickest.
-	vec3 lit = mix(foam.rgb, vec3(1.0), grain * 0.4 * lip);
+	// and the brightest are where the foam is thickest. A swatch per pixel, not a blend.
+	vec3 lit = mix(foam.rgb, foam_core.rgb, step(bayer4_offset(cell), grain * 0.4 * lip));
 
-	COLOR = vec4(lit, foam.a * lip * kept);
+	// Coverage dithered: a pixel is foam or it is water, never a see-through white.
+	COLOR = vec4(lit, step(threshold, foam.a * lip * kept));
 }

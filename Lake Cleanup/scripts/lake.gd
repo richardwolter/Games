@@ -962,6 +962,13 @@ func _shape_bank() -> void:
 ## which has to agree or the paint and its polygon part company.
 const SHORE_LAP := 0.45
 
+## The palette swatches water.gdshader draws with, under the same names on both sides.
+const WATER_SWATCHES: Array[StringName] = [
+	&"water_clean_deep", &"water_clean_mid", &"water_clean", &"water_clean_shallow",
+	&"water_clean_light", &"water_dirty_deep", &"water_dirty_mid", &"water_dirty",
+	&"water_dirty_shallow", &"water_dirty_light",
+]
+
 
 func _shape_water(_shore: PackedVector2Array) -> void:
 	var visual := Polygon2D.new()
@@ -979,19 +986,16 @@ func _shape_water(_shore: PackedVector2Array) -> void:
 	_water_material.set_shader_parameter(&"island_radius", Iso.ISLAND_RADIUS)
 	_water_material.set_shader_parameter(&"shore_lap", SHORE_LAP)
 
-	# Load colors from master palette, with fallback defaults
-	var palette := load("res://resources/palette.tres") as Resource
+	# The water's ramps from the master palette. The shader's own defaults are the same values,
+	# so a missing palette file still draws the right water.
+	var palette := Palette.master()
 	if palette != null:
-		var water_clean = palette.get(&"water_clean")
-		var water_dirty = palette.get(&"water_dirty")
-		if water_clean != null:
-			_water_material.set_shader_parameter(&"water_clean", water_clean)
-		if water_dirty != null:
-			_water_material.set_shader_parameter(&"water_dirty", water_dirty)
-	else:
-		# Fallback: use default palette colors if file not found
-		_water_material.set_shader_parameter(&"water_clean", Color(0.39, 0.51, 0.63, 1.0))
-		_water_material.set_shader_parameter(&"water_dirty", Color(0.36, 0.46, 0.49, 1.0))
+		for swatch: StringName in WATER_SWATCHES:
+			_water_material.set_shader_parameter(swatch, palette.get(swatch))
+		var foam := palette.foam
+		foam.a = 0.75
+		_water_material.set_shader_parameter(&"foam_color", foam)
+		_water_material.set_shader_parameter(&"foam_dirty", palette.foam_dirty)
 
 	visual.material = _water_material
 	add_child(visual)
@@ -2139,7 +2143,6 @@ func _push_daylight() -> void:
 		_daylight.color = _day.tint
 	($Sky/Fill as ColorRect).color = BEYOND * _day.tint
 	if _water_material != null:
-		_water_material.set_shader_parameter(&"sun_tint", _day.tint)
 		_water_material.set_shader_parameter(&"sun_lean", _day.lean)
 
 

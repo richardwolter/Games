@@ -10,6 +10,18 @@
 // Everything is driven by WORLD position, not UV: the polygon's outline is generated
 // in code, so its UVs are not something to key an effect to.
 //
+// Pixel art (see pixel.gdshaderinc). The water is drawn, not rendered:
+//   - every effect is worked out once per `foam_pixel` cell of world space, the art's own
+//     pixel size, so nothing has an edge finer than the sprites beside it
+//   - the only colours out are the palette's two water ramps, the foam swatches and the
+//     grime. Depth, bands, glints and sparkle all add up to a position on a ramp; where that
+//     falls between two steps, a fixed Bayer pattern picks one per pixel. Clean against
+//     filthy is the same trick one level up: which ramp a pixel reads from is dithered on
+//     the local filth, so a bay being cleaned turns blue as a thinning pattern of green
+//   - pattern animation ticks at `pixel_fps`. The swell open foam rides keeps real TIME,
+//     because the rubbish riding the same swell moves smoothly — only it is rounded to whole
+//     pixels, so the foam stays on the grid as it is carried
+//
 // Three effects, cheapest first:
 //   - a depth gradient from the shore function, so the shallows read as shallow
 //   - domain-warped bands, the moving surface texture
@@ -21,6 +33,8 @@
 // bands and the glints — which cost nothing extra.
 shader_type canvas_item;
 render_mode blend_mix;
+
+#include "res://shaders/pixel.gdshaderinc"
 
 // Must match scripts/iso.gd. If these drift, the shaded shore and the drawn shore
 // separate visibly, which is a loud enough failure to catch.
@@ -44,20 +58,42 @@ uniform vec2 island_radius = vec2(4.6, 3.9);
 // little further up the beach. The polygon this shader runs on is grown to match.
 uniform float shore_lap = 0.45;
 
-// Water colors derived from master palette (scripts/palette.gd, resources/palette.tres).
-// Clean lake uses water_clean (#6482a0, RGB(100, 130, 160)).
-// Dirty lake blends toward water_dirty (#5c767d, RGB(92, 118, 125)).
+// The water's two ramps, deepest to lightest, from the master palette (scripts/palette.gd,
+// resources/palette.tres). The lake script sets every one of these from the palette at
+// runtime; the defaults here are the palette's values, so a material with none set still
+// draws the right water.
 //
-// Defaults provided here; at runtime these are set by the lake script from the palette.
-uniform vec4 water_clean : source_color = vec4(0.39, 0.51, 0.63, 1.0);  // #6482a0
-uniform vec4 water_dirty : source_color = vec4(0.36, 0.46, 0.49, 1.0);   // #5c767d
-uniform vec4 foam_color : source_color = vec4(0.96, 0.99, 1.0, 0.75);
+// Step 0 deep, 1 mid, 2 the palette's base colour, 3 shallow, 4 light (glints on clean water,
+// the scum's pale film on filthy water).
+uniform vec4 water_clean_deep : source_color = vec4(0.173, 0.302, 0.431, 1.0);
+uniform vec4 water_clean_mid : source_color = vec4(0.255, 0.42, 0.573, 1.0);
+uniform vec4 water_clean : source_color = vec4(0.353, 0.525, 0.678, 1.0);
+uniform vec4 water_clean_shallow : source_color = vec4(0.498, 0.655, 0.776, 1.0);
+uniform vec4 water_clean_light : source_color = vec4(0.769, 0.859, 0.91, 1.0);
+uniform vec4 water_dirty_deep : source_color = vec4(0.071, 0.18, 0.055, 1.0);
+uniform vec4 water_dirty_mid : source_color = vec4(0.094, 0.227, 0.067, 1.0);
+uniform vec4 water_dirty : source_color = vec4(0.118, 0.275, 0.082, 1.0);
+uniform vec4 water_dirty_shallow : source_color = vec4(0.227, 0.353, 0.141, 1.0);
+uniform vec4 water_dirty_light : source_color = vec4(0.369, 0.435, 0.227, 1.0);
 
-// How hard the base colour and the scum bend toward filthy, on top of whatever `filth`
-// already reads at this pixel (map-local where the map is live, `pollution` where it is
-// not — see `filth` below). 1.0 leaves that reading alone; the map's own FILTH_EDGE
-// already shapes it, so this is a second, optional twist on top rather than the primary
-// shaping. Higher pulls blue in faster once a tile is even a little clear.
+// Foam's body on clean water and what it goes to on filthy water, palette `foam` and
+// `foam_dirty`. The alpha here is not transparency — the water is opaque pixel art — but how
+// much of the foam's reach is dithered in as foam at all.
+uniform vec4 foam_color : source_color = vec4(0.933, 0.965, 0.984, 0.75);
+uniform vec4 foam_dirty : source_color = vec4(0.8, 0.82, 0.678, 1.0);
+
+// The size of one pixel of water on screen, in world units, and so the grid every effect here
+// is worked out on. The pack is drawn at two world pixels a source pixel, and anything finer
+// than that is a fizz laid over pixel art rather than part of it.
+uniform float foam_pixel = 2.0;
+// How many times a second the water's pattern moves on.
+uniform float pixel_fps = 8.0;
+
+// How hard the ramp choice bends toward filthy, on top of whatever `filth` already reads at
+// this pixel (map-local where the map is live, `pollution` where it is not — see `filth`
+// below). 1.0 leaves that reading alone; the map's own FILTH_EDGE already shapes it, so this
+// is a second, optional twist on top rather than the primary shaping. Higher pulls blue in
+// faster once a tile is even a little clear.
 //
 // Used to bend the un-mapped `pollution` value directly, which is why it used to sit at
 // 6.0 — high enough to fight FILTH_BITE's own bend (lake.gd) on top of it. That compounded
@@ -69,17 +105,20 @@ uniform float wave_speed = 1.0;
 // How far the band pattern is pushed around by the warp. This is what stops it
 // reading as plain stripes.
 uniform float warp_strength = 26.0;
-uniform float band_strength = 0.075;
+// How many ramp steps the bands move the water either way at their crest and trough. Under
+// one keeps them a dithered shimmer between neighbouring steps rather than stripes of a
+// different colour.
+uniform float band_steps = 0.7;
+// How many ramp steps a full glint lifts the water, toward the light step.
+uniform float glint_steps = 2.2;
+
 // The foam line against the sand, all in tiles measured in from the edge the water is drawn
 // to. `foam_lip` is how deep the solid lip is on average, `foam_wash` how far past it the
 // wash line runs out at the bottom of its surge, and `foam_line` how thick that wash line
-// and each row of bubbles is. `foam_pixel` is the size of one foam pixel on screen — the
-// pack is drawn at two screen pixels a source pixel, and foam finer than that is a fizz
-// laid over pixel art rather than part of it.
+// and each row of bubbles is.
 uniform float foam_lip = 0.28;
 uniform float foam_wash = 0.55;
 uniform float foam_line = 0.09;
-uniform float foam_pixel = 2.0;
 
 // The same foam, loose out on open water: short, thin, broken streaks scattered over the lake,
 // each one growing, holding and falling apart before turning up somewhere else. See open_foam().
@@ -99,26 +138,27 @@ uniform float swell_sway = 3.2;
 
 // The grime caught along the outer bank: what colour it is and how solid, and how far out from
 // the bank's edge it reaches at most, in tiles. Scaled by the water's filth, so it goes as
-// that stretch of shore is cleaned.
+// that stretch of shore is cleaned. Its alpha is the share of blotch pixels drawn at full
+// filth, dithered.
 uniform vec4 grime_color : source_color = vec4(0.27, 0.30, 0.17, 0.7);
 uniform float grime_reach = 1.1;
 
-// 0 clean, 1 filthy. Adds a flat scum tint on top of the depth gradient and kills the
-// band contrast, so a dirty lake looks opaque as well as green — murk is a loss of
-// clarity, not just a hue change.
+// 0 clean, 1 filthy. Moves the water onto the dirty ramp and kills the band contrast, so a
+// dirty lake looks opaque as well as green — murk is a loss of clarity, not just a hue change.
 //
 // The whole lake's figure, and the fallback: what the water does where there is no map.
 // Everything below reads `filth`, not this directly — see `filth` below.
 uniform float pollution = 1.0;
 
 // Filth per tile, one texel per tile of the basin, red channel only. This is what makes
-// cleaning a patch of lake visible AND what colours the water: the base colour, the scum
-// film and the band/glint/foam fade all read this, local, instead of the lake's whole-basin
-// average — a bay just cleared reads blue while the next one over is still soup, and a
-// tile never goes green just because the meter upstairs has not moved much yet.
+// cleaning a patch of lake visible AND what colours the water: the ramp choice, the band/
+// glint/foam fade all read this, local, instead of the lake's whole-basin average — a bay just
+// cleared reads blue while the next one over is still soup, and a tile never goes green just
+// because the meter upstairs has not moved much yet.
 //
 // Sampled linearly, so the map's tile grid does not show through as squares: what is wanted
 // is the boundary between clean and filthy water, soft, wherever the junk happens to stop.
+// Soft here means a dithered edge, since the value is only ever a threshold.
 uniform sampler2D filth_map : filter_linear, repeat_disable;
 uniform vec2 filth_tiles = vec2(92.0, 92.0);
 // 0 to ignore the map and shade off `pollution` alone, 1 to read it. The lake sets this
@@ -131,14 +171,13 @@ uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 // rather than simply glowing harder. It is the same water, catching the sun at last.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
 
-// The daylight, from DayCycle. `sun_tint` is the same colour the whole world is multiplied
-// by; it arrives here as well because the glints are added light and added light has to be
-// the colour of the light adding it — white crests on a lake at dusk read as snow.
-//
 // `sun_lean` is how far over the sun is, negative one side of noon and positive the other,
 // and it slides the glint band across the water so the shine is a strip lying where the sun
 // is rather than an even sheen over the whole basin.
-uniform vec4 sun_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+//
+// There is no sun tint here any more. Glints used to be added light, which had to be the
+// colour of the light adding it; they are a palette step now, and the world's daylight
+// multiply tints that step like every other pixel on screen.
 uniform float sun_lean = 0.0;
 
 varying vec2 world_pos;
@@ -187,12 +226,35 @@ float foam_hash(vec2 cell) {
 	return fract(p.x * p.y);
 }
 
+// One step of one ramp: `step` 0 (deep) to 4 (light), `dirty` 0 or 1.
+vec3 ramp(float step_at, float dirty) {
+	vec3 clean_c;
+	vec3 dirty_c;
+	if (step_at < 0.5) {
+		clean_c = water_clean_deep.rgb;
+		dirty_c = water_dirty_deep.rgb;
+	} else if (step_at < 1.5) {
+		clean_c = water_clean_mid.rgb;
+		dirty_c = water_dirty_mid.rgb;
+	} else if (step_at < 2.5) {
+		clean_c = water_clean.rgb;
+		dirty_c = water_dirty.rgb;
+	} else if (step_at < 3.5) {
+		clean_c = water_clean_shallow.rgb;
+		dirty_c = water_dirty_shallow.rgb;
+	} else {
+		clean_c = water_clean_light.rgb;
+		dirty_c = water_dirty_light.rgb;
+	}
+	return dirty > 0.5 ? dirty_c : clean_c;
+}
+
 // How much foam is on the water at one spot near a shore, 0 to 1.
 //
 // `dist` is how far into the water the spot is, in tiles — negative is under the sand. `angle`
 // is where round the shore it is, and `mean` is that shore's mean radius in tiles, which sets
 // how many waves and cells fit round it: the same count round the island and round the bank
-// would be pixels on one and tiles on the other.
+// would be pixels on one and tiles on the other. `clock` is the stepped time.
 //
 // Everything that varies round the shore does so in whole waves or whole cells per lap, so the
 // ring closes on itself with no seam where atan() wraps from pi to minus pi.
@@ -202,8 +264,8 @@ float foam_hash(vec2 cell) {
 //   - the lip, solid on the sand side, ragged and breaking into bubbles on the water side
 //   - the wash, a thin broken line that surges out from the lip and runs back up to it
 //   - flecks left behind between the two, thinning out as they get further from the sand
-float shore_foam(float dist, float angle, float mean, float wide) {
-	float t = TIME * wave_speed;
+float shore_foam(float dist, float angle, float mean, float wide, float clock) {
+	float t = clock * wave_speed;
 	float round_t = angle / TAU + 0.5;
 
 	// The tear along the lip: two waves beating so it never reads as a scallop border.
@@ -248,15 +310,15 @@ float shore_foam(float dist, float angle, float mean, float wide) {
 // wanders about the lake rather than blinking on and off in the same places.
 //
 // Same language as the shore foam: hard edges, broken into segments, no gradients.
-float open_foam(vec2 at) {
+float open_foam(vec2 at, float clock) {
 	vec2 plane = vec2(at.x, at.y * 2.0);
 	vec2 cell = floor(plane / open_foam_cell);
 	float first = foam_hash(cell + vec2(3.1, 9.7));
 
 	// Each cell on its own clock, so the whole lake does not bloom at once.
-	float clock = TIME / open_foam_life + first;
-	float life = fract(clock);
-	vec2 roll = cell + vec2(floor(clock) * 17.3, floor(clock) * 5.9);
+	float cell_clock = clock / open_foam_life + first;
+	float life = fract(cell_clock);
+	vec2 roll = cell + vec2(floor(cell_clock) * 17.3, floor(cell_clock) * 5.9);
 	if (foam_hash(roll) > open_foam_chance) {
 		return 0.0;
 	}
@@ -300,7 +362,13 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 tile = world_to_tile(world_pos);
+	// The pixel this fragment belongs to, and everything below is worked out at its middle.
+	vec2 cell = floor(world_pos / foam_pixel);
+	vec2 px = (cell + 0.5) * foam_pixel;
+	float threshold = bayer4(cell);
+	float clock = stepped_time(TIME, pixel_fps);
+
+	vec2 tile = world_to_tile(px);
 	float s = clamp(shore_fraction(tile), 0.0, 1.0);
 	// Mirrors Iso.depth_at: 0 at the bank, 1 over the deepest water.
 	float d = sqrt(max(1.0 - s, 0.0));
@@ -311,43 +379,36 @@ void fragment() {
 	float isl = island_fraction(tile);
 	d *= smoothstep(1.0, 2.6, isl);
 
-	// How filthy this water is, here. Read before the colour so the colour can be built
-	// from it: local where the map is live (a bay just cleared is blue while the next one
-	// over is still soup), `pollution` where it is not.
+	// How filthy this water is, here: local where the map is live (a bay just cleared is blue
+	// while the next one over is still soup), `pollution` where it is not.
 	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
 	float filth = mix(pollution, local, filth_mapped);
 
-	// Derive water colors from the filth here, not the lake's whole-basin average: a clean
-	// bay reads blue on the spot instead of waiting for the meter upstairs to catch up.
-	// Shallow water is lighter/brighter, deep water is darker.
+	// Which ramp this pixel reads from. On a share `color_t` of pixels, the dirty one — so a
+	// half-clean bay is an even pattern of both ramps, thinning as it clears.
 	//
-	// color_t is also what the scum below fades on: scum is a green muck film on top
-	// of this gradient, and if it kept fading on raw `filth` while the gradient underneath
-	// it fades on color_t, the muck would go on painting the water green for most of the
-	// range regardless of how blue the water under it had already become — the two have to
-	// agree on how early "clean" arrives.
+	// color_t is also what the grime and the dirty foam go on: if they kept going on raw
+	// `filth` while the ramp choice goes on color_t, the muck would go on painting the water
+	// green for most of the range regardless of how blue the water under it had become.
 	float color_t = pow(filth, color_bite);
-	vec4 base_color = mix(water_clean, water_dirty, color_t);
-	vec4 shallow_color = mix(base_color, vec4(1.0), 0.2);
-	shallow_color.a = 0.92;
-	vec4 deep_color = vec4(base_color.rgb * 0.6, 0.98);
-	vec4 scum_color = mix(water_dirty, vec4(0.25, 0.36, 0.15, 1.0), color_t);
+	float dirty = step(bayer4_offset(cell), color_t);
 
-	vec4 col = mix(shallow_color, deep_color, smoothstep(0.15, 0.85, d));
+	// Position on the ramp: the shallows up at step 3, the deep water down at step 0.
+	float shade = mix(3.0, 0.0, smoothstep(0.15, 0.85, d));
 
 	// Bands, warped in phase rather than in position — pushing the pattern around by a
 	// function of the other axis is exactly "bend these lines", and it costs one term.
 	// Run against the isometric grain rather than screen-horizontally, so the surface
 	// reads as lying down.
-	float along = world_pos.x * 0.5 + world_pos.y;
-	float across = world_pos.y * 2.0 - world_pos.x * 0.5;
-	float warp = sin(along * 0.006 - TIME * 0.35) * warp_strength;
-	float streak = sin((across + warp) * 0.02 + TIME * 0.5);
+	float along = px.x * 0.5 + px.y;
+	float across = px.y * 2.0 - px.x * 0.5;
+	float warp = sin(along * 0.006 - clock * 0.35) * warp_strength;
+	float streak = sin((across + warp) * 0.02 + clock * 0.5);
 	// Second layer, finer and drifting the other way, to break up the first.
-	float fine = sin((across - warp * 0.6) * 0.055 - TIME * 0.9);
+	float fine = sin((across - warp * 0.6) * 0.055 - clock * 0.9);
 	float bands = streak * 0.7 + fine * 0.3;
 	// Bands fade with filth: in a polluted lake, light does not get far at all.
-	col.rgb += bands * band_strength * (1.0 - filth * 0.75);
+	shade += bands * band_steps * (1.0 - filth * 0.75);
 
 	// Glints: the sharp crests of the same pattern, and the thing that makes a flat
 	// plane read as moving water rather than as painted floor. A cleaned lake takes them
@@ -357,34 +418,31 @@ void fragment() {
 	// the water gathers into a band under it rather than spreading evenly: this weights the
 	// crests by how near they are to the line the sun is on, and flattens back to an even
 	// sheen as the sun climbs to noon and `sun_lean` goes to nothing.
-	float sun_line = (world_pos.x / (tile_w * 0.5)) * -sun_lean;
-	float toward = 1.0 - clamp(abs(world_pos.y / (tile_h * 0.5) - sun_line) * 0.02, 0.0, 1.0);
+	float sun_line = (px.x / (tile_w * 0.5)) * -sun_lean;
+	float toward = 1.0 - clamp(abs(px.y / (tile_h * 0.5) - sun_line) * 0.02, 0.0, 1.0);
 	float gather = mix(1.0, 0.35 + toward * 1.25, clamp(abs(sun_lean), 0.0, 1.0));
-	col.rgb += glint * (0.22 + sparkle * 0.06) * gather * sun_tint.rgb;
+	shade += glint * glint_steps * (1.0 + sparkle * 0.3) * gather;
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
 	// near their peaks, which is a scatter of moving points rather than a sheen. Costs
 	// nothing while sparkle is zero — the term is multiplied out.
 	if (sparkle > 0.001) {
-		float spark = sin(along * 0.19 + TIME * 2.3) * sin(across * 0.23 - TIME * 1.7);
-		float grain = sin(along * 0.41 - TIME * 3.1) * sin(across * 0.37 + TIME * 2.6);
+		float spark = sin(along * 0.19 + clock * 2.3) * sin(across * 0.23 - clock * 1.7);
+		float grain = sin(along * 0.41 - clock * 3.1) * sin(across * 0.37 + clock * 2.6);
 		// Cut very near the peak, so what survives is a scatter of small points rather than
 		// a wash: this is light off wavelets, and wavelets are mostly not catching it.
 		float points = smoothstep(0.962, 0.998, spark * 0.6 + grain * 0.4);
 		// Thinned in the shallows: the shore is where the light is already brightest and
 		// the collar of foam is about to be drawn over it.
-		col.rgb += points * sparkle * 1.05 * mix(0.5, 1.0, d);
+		shade += points * sparkle * 4.0 * mix(0.5, 1.0, d);
 	}
 
-	// Scum. Strongest in the shallows where the muck collects, and it takes opacity
-	// with it.
-	float scum = color_t * mix(1.0, 0.7, d);
-	col.rgb = mix(col.rgb, scum_color.rgb, scum * 0.75);
-	col.a = clamp(col.a + scum * 0.2, 0.0, 1.0);
+	// Onto a step: the whole part, plus one on the share of pixels the fraction says.
+	float step_at = clamp(floor(shade) + step(threshold, fract(shade)), 0.0, 4.0);
+	vec3 col = ramp(step_at, dirty);
 
-	// The foam line along both shores. Worked out on a grid of foam_pixel squares rather than
-	// per fragment, so its edges land on the art's own pixel size.
-	vec2 foam_tile = world_to_tile(floor(world_pos / foam_pixel) * foam_pixel + foam_pixel * 0.5);
+	// The foam line along both shores.
+	vec2 foam_tile = tile;
 
 	// The bank: distance in from the edge the water polygon is drawn to, in tiles. The shore's
 	// wobble is left out of the conversion — it bends the width by a few percent either way,
@@ -392,18 +450,19 @@ void fragment() {
 	vec2 bank_d = (foam_tile - basin_centre) / (basin_radius + vec2(shore_lap));
 	float bank_mean = (basin_radius.x + basin_radius.y) * 0.5 + shore_lap;
 	float bank_in = (1.0 - shore_fraction(foam_tile)) * bank_mean;
-	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0);
+	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0, clock);
 
 	// Grime along the outer bank: blotches of scum caught in the shallowest water, under the
 	// foam. Driven by this water's own filth, so it goes as the washed-up rubbish is fetched
 	// away. Blotches rather than a band, in 4-pixel cells, so it reads as muck lying on the
 	// water rather than a darker stripe drawn along the shore.
-	vec2 grime_at = vec2(world_pos.x, world_pos.y * 2.0);
+	vec2 grime_at = vec2(px.x, px.y * 2.0);
 	float grime_cell = foam_hash(floor(grime_at / 4.0));
 	float grime_patch = foam_hash(floor(grime_at / 22.0) + vec2(5.0, 3.0));
 	float grime_band = step(bank_in, grime_reach * (0.5 + grime_patch * 0.8));
-	float grime = grime_band * step(0.35, grime_cell) * step(0.3, grime_patch) * color_t;
-	col.rgb = mix(col.rgb, grime_color.rgb, grime * grime_color.a);
+	float grime = grime_band * step(0.35, grime_cell) * step(0.3, grime_patch)
+		* step(threshold, color_t * grime_color.a);
+	col = mix(col, grime_color.rgb, grime);
 
 	// The island, read from the other side: outward from its beach. Half again as wide as the
 	// bank's — its tiles are drawn over the water with a stepped edge, and a lip the bank's
@@ -416,7 +475,7 @@ void fragment() {
 	vec2 isl_d = foam_tile - island_centre;
 	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
 	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
-	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5));
+	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.5, clock));
 
 	// And loose out on the open lake, kept a couple of tiles clear of both shores so it never
 	// tangles with the lip and the wash there.
@@ -424,23 +483,26 @@ void fragment() {
 	// Riding the swell: the same bob and wander rubbish.gdshader gives a floating piece, taken
 	// off the lookup so the streak is carried by it. Keyed to this spot's own x where a piece
 	// uses its anchor's, which is the same wave laid continuously under the whole lake.
+	//
+	// Real TIME, not the stepped clock: the rubbish rides this smoothly, and foam that ticked
+	// behind it would jitter against every piece it passes. Rounded to whole pixels instead, so
+	// the streak is carried a pixel at a time and never lands between two.
 	float swell_t = TIME * wave_speed;
 	vec2 swell = vec2(
-		sin(swell_t * 0.53 + world_pos.x * 0.017) * swell_sway,
-		(sin(world_pos.x * 0.011 + swell_t) * 0.62 + sin(world_pos.x * 0.029 - swell_t * 1.7) * 0.38)
+		sin(swell_t * 0.53 + px.x * 0.017) * swell_sway,
+		(sin(px.x * 0.011 + swell_t) * 0.62 + sin(px.x * 0.029 - swell_t * 1.7) * 0.38)
 			* swell_amplitude
-			+ cos(swell_t * 0.41 + world_pos.x * 0.023) * swell_sway * 0.5
+			+ cos(swell_t * 0.41 + px.x * 0.023) * swell_sway * 0.5
 	);
-	vec2 riding = world_pos - swell;
-	vec2 foam_at = floor(riding / foam_pixel) * foam_pixel + foam_pixel * 0.5;
-	foam = max(foam, open_foam(foam_at) * open_foam_strength * open_room);
+	vec2 foam_at = px - floor(swell / foam_pixel + 0.5) * foam_pixel;
+	foam = max(foam, open_foam(foam_at, clock) * open_foam_strength * open_room);
 
 	// Dirty water keeps its foam, it just goes the colour of what it is churning: foam that
 	// faded out with the filth left the filthy lake, the one the player starts on, with no
-	// shoreline at all.
-	vec3 foam_rgb = mix(foam_color.rgb, vec3(0.80, 0.82, 0.68), color_t * 0.55);
-	col.rgb = mix(col.rgb, foam_rgb, clamp(foam, 0.0, 1.0) * foam_color.a * (1.0 - filth * 0.25));
-	col.a = mix(col.a, 1.0, clamp(foam, 0.0, 1.0) * foam_color.a);
+	// shoreline at all. Which of the two it is, dithered on the filth like the water under it.
+	vec3 foam_rgb = mix(foam_color.rgb, foam_dirty.rgb, step(bayer4_offset(cell), color_t * 0.55));
+	float foam_on = step(threshold, clamp(foam, 0.0, 1.0) * foam_color.a * (1.0 - filth * 0.25));
+	col = mix(col, foam_rgb, foam_on);
 
-	COLOR = col;
+	COLOR = vec4(col, 1.0);
 }

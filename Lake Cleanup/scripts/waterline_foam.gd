@@ -74,6 +74,7 @@ static func _material() -> ShaderMaterial:
 	_skin.set_shader_parameter("wave_amplitude", 0.0)
 	_skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
 	_skin.set_shader_parameter("foam", lip)
+	Palette.dress_foam(_skin, LakeGrid.FOAM_ALPHA)
 	_skin.set_shader_parameter(
 		"cut_at", LakeGrid.FOAM_RISE / maxf(LakeGrid.FOAM_RISE + LakeGrid.FOAM_TALL, 0.001)
 	)
