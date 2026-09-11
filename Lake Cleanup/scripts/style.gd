@@ -87,6 +87,16 @@ const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
 const ON_WATER := Color(0.31, 0.60, 0.75)
 
+## The recycle box's own colours, read off `assets/Recycle_Box.png`: its planks, their lit
+## and shaded tones, the dark hollow inside it, and the blue of the recycle mark on its
+## front. The stock readout wears them, because it is the count of what is in that box.
+const BOX := Color(0.47, 0.35, 0.25)
+const BOX_LIT := Color(0.63, 0.44, 0.31)
+const BOX_DEEP := Color(0.35, 0.22, 0.16)
+const BOX_HOLLOW := Color(0.28, 0.09, 0.09)
+const BOX_BLUE := Color(0.30, 0.52, 0.65)
+const BOX_BLUE_LIT := Color(0.43, 0.66, 0.80)
+
 ## The price on its tag is the money plate's own figure colour, so a cost and a purse read
 ## as the same substance.
 const PRICE_INK := Color(0.985, 0.87, 0.58)

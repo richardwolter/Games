@@ -71,22 +71,28 @@ const MONEY_SIDE := 116.0
 const EDGE := Style.EDGE
 const GAP := Style.GAP
 
-## The stock readout: where it sits, how big it is, and how much of the money plate's own
-## dark panel is copied to make its background.
-##
-## Built out of the money plate's parts rather than given a plaque of its own, because it is
-## the same kind of thing — a number the player checks — and the sheet has one panel drawn on
-## it. Copying that keeps the two readouts obviously a pair.
-const STOCK_TALL := 30.0
+## The stock readout: where it sits and how big it is. A plank in the recycle box's own
+## brown, the box's blue recycle mark on the left, a small label, and the count on a sunken
+## panel the colour of the box's hollow — so the number reads as what is in that box.
+const STOCK_TALL := 34.0
 const STOCK_TEXT := 0.56
+const STOCK_MARK_PAD := 6.0
+const STOCK_LABEL := "In stock"
+
+## How the count runs toward the true one when it changes — as a fraction of the gap a
+## second, and the least it may move — and how long the glow behind it lasts after it lands.
+## Both directions: a sale ticks it down as a catch ticks it up.
+const STOCK_RUN := 5.0
+const STOCK_LEAST := 6.0
+const STOCK_GLOW := 0.5
 
 ## The label the plate is measured against, rather than the one it happens to be showing.
 ## Measured, because 168 fixed pixels was a guess against a font the HUD no longer uses and
 ## the reading ran off the end of its own plate; measured against a five-figure count rather
 ## than the live one, because a plate that changed width every time a piece was sold would
 ## be a plate that moved while being read.
-const STOCK_SAMPLE := "Items in stock  99999"
-const STOCK_PAD := 18.0
+const STOCK_SAMPLE := "99999"
+const STOCK_PAD := 12.0
 
 ## The count written across the foot of the upgrades plaque: where its panel sits inside the
 ## plaque as fractions of it, and how big the lettering is against that panel's height.
@@ -144,6 +150,10 @@ const SIEGE_PIP := 13.0
 
 ## The figure actually on the plate, and how brightly it is still lit from the last payment.
 var _shown_money: float = 0.0
+
+## The stock figure as drawn, running toward `stock`, and how much glow it has left.
+var _shown_stock: float = 0.0
+var _stock_glow: float = 0.0
 var _shine: float = 0.0
 
 var _sheet: Texture2D
@@ -266,9 +276,11 @@ func _lay_out() -> void:
 	var right := wide - EDGE - BUTTON_SIDE
 	_upgrades_box = Rect2(right, EDGE, BUTTON_SIDE, BUTTON_SIDE)
 	_shed_box = Rect2(right - BUTTON_SIDE - GAP, EDGE, BUTTON_SIDE, BUTTON_SIDE)
-	var stock_wide := Style.measure(
-		STOCK_SAMPLE, Style.step(STOCK_TALL * STOCK_TEXT)
-	).x + STOCK_PAD * 2.0
+	var stock_wide := (
+		STOCK_PAD * 2.0 + (STOCK_TALL - STOCK_MARK_PAD * 2.0) + STOCK_MARK_PAD
+		+ Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
+		+ Style.measure(STOCK_SAMPLE, Style.TEXT_HEAD).x + 16.0
+	)
 	_stock_box = Rect2(EDGE + 2.0, EDGE, stock_wide, STOCK_TALL)
 	# Centred under the stock plate rather than sharing its left edge: they are two different
 	# widths (a wide slab and a square plate), and a shared left edge left their right edges,
@@ -291,6 +303,14 @@ func _process(delta: float) -> void:
 	# The figure runs up to what has been earned rather than jumping to it, and being paid
 	# lights the plate for a moment. A sale is the one thing in this game that happens all at
 	# once and out of sight — the boat is somewhere else when it lands — so it wants saying.
+	# The stock count runs toward the true one, up or down, and glows while it is moving.
+	var goal := float(stock)
+	if not is_equal_approx(_shown_stock, goal):
+		var step := maxf(absf(goal - _shown_stock) * STOCK_RUN, STOCK_LEAST) * delta
+		_shown_stock = move_toward(_shown_stock, goal, step)
+		_stock_glow = 1.0
+	else:
+		_stock_glow = maxf(_stock_glow - delta / STOCK_GLOW, 0.0)
 	_shine = maxf(_shine - delta / SHINE_TIME, 0.0)
 	if money > _shown_money:
 		_shine = 1.0
@@ -351,6 +371,7 @@ func _repaint() -> void:
 func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0),
+		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0),
 		stock, available, hint, _hovered, siege.hash()
 	])
 
@@ -592,19 +613,77 @@ func _ease_shine() -> float:
 ## the same kind of thing — a number the player checks — and the sheet has one panel drawn on
 ## it. Copying that keeps the two readouts obviously a pair.
 func _draw_stock() -> void:
-	# A plank of the meter's wood, the same as the drawn boards' buttons, rather than a
-	# slab off the money plate's art: the readout sits over the meter and should be its wood.
-	Style.plank(self, _stock_box, 41, Style.FRAME, Style.CLIP)
-	var height := Style.step(_stock_box.size.y * STOCK_TEXT)
+	var box := _stock_box
+	Style.plank(self, box, 41, Style.BOX, Style.CLIP)
+	# The recycle mark, on the left.
+	var side := box.size.y - STOCK_MARK_PAD * 2.0
+	var mark := Rect2(box.position + Vector2(STOCK_PAD, STOCK_MARK_PAD), Vector2(side, side))
+	_draw_recycle_mark(mark)
+	# The label, small and cream, after it.
+	var x := mark.end.x + STOCK_MARK_PAD
+	var middle := box.position.y + box.size.y * 0.5
 	Style.write(
-		self,
-		"Items in stock  %d" % stock,
-		height,
-		Vector2(0.0, _stock_box.position.y + _stock_box.size.y * 0.5 + float(height) * 0.35),
-		Style.RIBBON_INK,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		_stock_box
+		self, STOCK_LABEL, Style.TEXT_SMALL,
+		Vector2(x, middle + float(Style.TEXT_SMALL) * 0.35), Style.RIBBON_INK
 	)
+	x += Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
+	# The count, on a sunken panel the colour of the box's hollow, in the mark's blue.
+	var panel := Rect2(Vector2(x, box.position.y + 5.0), Vector2(box.end.x - STOCK_PAD - x, box.size.y - 10.0))
+	draw_rect(panel.grow(1.0), Style.SEAM, true)
+	draw_rect(panel, Style.BOX_HOLLOW, true)
+	draw_rect(Rect2(panel.position, Vector2(panel.size.x, 1.0)), Style.SEAM, true)
+	var shown := "%d" % roundi(_shown_stock)
+	var glow := _stock_glow * _stock_glow
+	var baseline := middle + float(Style.TEXT_HEAD) * 0.35
+	if glow > 0.01:
+		Style.write(
+			self, shown, Style.TEXT_HEAD, Vector2(0.0, baseline - 1.0),
+			Color(Style.BOX_BLUE_LIT.r, Style.BOX_BLUE_LIT.g, Style.BOX_BLUE_LIT.b, 0.55 * glow),
+			HORIZONTAL_ALIGNMENT_CENTER, panel
+		)
+	Style.write(
+		self, shown, Style.TEXT_HEAD, Vector2(0.0, baseline),
+		Style.BOX_BLUE_LIT.lerp(Style.INK, glow * 0.5),
+		HORIZONTAL_ALIGNMENT_CENTER, panel
+	)
+
+
+## The recycle mark off the box's front: three chevron arrows chasing round a triangle, in
+## the box's blue with a lit edge. Drawn rather than cut from the box art, which is eleven
+## pixels of it at an isometric slant.
+func _draw_recycle_mark(box: Rect2) -> void:
+	var middle := box.position + box.size * 0.5
+	var reach := box.size.x * 0.46
+	var thick := maxf(box.size.x * 0.16, 2.0)
+	for i in 3:
+		var a := -PI * 0.5 + TAU * float(i) / 3.0
+		var b := a + TAU / 3.0 - 0.55
+		# The arm: a short arc from a to b, as a strip.
+		var strip := PackedVector2Array()
+		var steps := 6
+		for k in steps + 1:
+			var t := lerpf(a, b, float(k) / float(steps))
+			strip.append(middle + Vector2(cos(t), sin(t)) * (reach - thick * 0.5))
+		for k in steps + 1:
+			var t := lerpf(b, a, float(k) / float(steps))
+			strip.append(middle + Vector2(cos(t), sin(t)) * (reach + thick * 0.5))
+		draw_colored_polygon(strip, Style.BOX_BLUE)
+		# The lit outer edge of the arm.
+		var edge := PackedVector2Array()
+		for k in steps + 1:
+			var t := lerpf(a, b, float(k) / float(steps))
+			edge.append(middle + Vector2(cos(t), sin(t)) * (reach + thick * 0.5 - 0.5))
+		draw_polyline(edge, Style.BOX_BLUE_LIT, 1.0)
+		# The head: a triangle at the arm's end, pointing on round.
+		var tip := middle + Vector2(cos(b), sin(b)) * reach
+		var on := Vector2(-sin(b), cos(b))
+		var out := Vector2(cos(b), sin(b))
+		draw_colored_polygon(PackedVector2Array([
+			tip + on * thick * 1.3,
+			tip + out * thick * 1.1,
+			tip - out * thick * 1.1,
+		]), Style.BOX_BLUE_LIT)
+
 
 
 ## How many upgrades the player can afford, written across the foot of the upgrades plaque.
