@@ -77,13 +77,15 @@ const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
 ## The settings board's rows, one tone a section so the eye finds a section by colour:
 ## sound on the murky water, the screen on the meter's scum green, the saves on oak like a
-## price tag, and the quit on the redder low plank. A switch or slider that is "on" is lit
-## in the money's gold rather than the water's blue, which was too much blue on one board.
+## price tag, and the quit on the redder low plank. A switch that is "on" is lit in the
+## money's gold; a slider's played length is clean water — a volume is a level, and gold
+## read as a price.
 const ROW_SOUND := Color(0.25, 0.41, 0.47)
 const ROW_SCREEN := Color(0.27, 0.40, 0.29)
 const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ROW_QUIT := Color(0.50, 0.28, 0.22)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
+const ON_WATER := Color(0.31, 0.60, 0.75)
 
 ## The price on its tag is the money plate's own figure colour, so a cost and a purse read
 ## as the same substance.

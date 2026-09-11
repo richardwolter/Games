@@ -413,7 +413,7 @@ func _draw_slider(box: Rect2, line: Dictionary) -> void:
 	_lines.append({"kind": &"slider", "key": key, "box": box, "groove": groove})
 	draw_rect(groove.grow(1.0), Style.SEAM, true)
 	draw_rect(groove, Style.FRAME_SHADOW, true)
-	var fill := Style.ON_GOLD if on else Style.BOARD_ROW_OFF
+	var fill := Style.ON_WATER if on else Style.BOARD_ROW_OFF
 	draw_rect(Rect2(groove.position, Vector2(groove.size.x * level, groove.size.y)), fill, true)
 	var thumb := Rect2(
 		Vector2(groove.position.x + groove.size.x * level - THUMB_WIDE * 0.5, box.position.y + 2.0),
@@ -427,9 +427,20 @@ func _draw_button(box: Rect2, line: Dictionary) -> void:
 	var key: StringName = line["key"]
 	var live := can_load if key == &"load" else true
 	_lines.append({"kind": &"button", "key": key, "box": box})
-	Style.plate(self, box, _row_face(key, _hovered == key, live))
+	var face := _row_face(key, _hovered == key, live)
+	var oak := key in [&"save", &"load", &"wipe", &"swap", &"quit"]
+	if oak:
+		# The save and quit buttons are planks like the frame: grained, lit along the top,
+		# a chip or two out of the edge.
+		Style.plank(self, box, int(box.position.y) * 13 + key.hash() % 89, face)
+		var seed := int(box.position.y) + key.hash() % 31
+		var chip_wide := 5.0 + float(seed % 3)
+		Style.chip(self, Rect2(box.position.x + box.size.x * (0.2 + 0.5 * float(seed % 7) / 7.0), box.position.y - 1.0, chip_wide, 3.0))
+		Style.chip(self, Rect2(box.end.x - box.size.x * (0.15 + 0.4 * float(seed % 5) / 5.0), box.end.y - 2.0, chip_wide, 3.0))
+	else:
+		Style.plate(self, box, face)
 	# Oak rows take the frame's cream, the rest the board's pale ink.
-	var ink := Style.RIBBON_INK if key in [&"save", &"load", &"wipe", &"swap", &"quit"] else Style.BOARD_INK
+	var ink := Style.RIBBON_INK if oak else Style.BOARD_INK
 	if not live:
 		ink = Style.BOARD_INK_DIM
 	if bool(line.get("warn", false)):
