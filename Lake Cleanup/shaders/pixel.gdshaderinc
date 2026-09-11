@@ -14,6 +14,27 @@
 // is held to whole screen pixels per art pixel and the drawn camera position is snapped
 // (Lake._push_zoom, Lake._snap_camera).
 
+// One random number per cell, the same every time for the same cell.
+float cell_hash(vec2 cell) {
+	vec2 p = fract(cell * vec2(123.34, 345.45));
+	p += dot(p, p + 34.345);
+	return fract(p.x * p.y);
+}
+
+// Smooth value noise, 0 to 1, one blob about a unit wide. Blobs rather than grain: what is
+// wanted from it is patches several pixels across with soft shapes, and it is evaluated on
+// the pixel grid by the caller so its edges still land on art pixels.
+float blob_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = cell_hash(i);
+	float b = cell_hash(i + vec2(1.0, 0.0));
+	float c = cell_hash(i + vec2(0.0, 1.0));
+	float d = cell_hash(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 // Time moved on in whole frames.
 float stepped_time(float t, float fps) {
 	return floor(t * fps) / max(fps, 0.001);

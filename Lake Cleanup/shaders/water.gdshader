@@ -87,6 +87,16 @@ uniform vec4 water_murky_light : source_color = vec4(0.55, 0.66, 0.58, 1.0);
 uniform float murky_at : hint_range(0.0, 1.0) = 0.3;
 uniform float dirty_at : hint_range(0.0, 1.0) = 0.65;
 
+// What keeps those two cutoffs from drawing as rings. `murk_blotch` is how wide a patch of
+// murk is, in world pixels with the isometric squash taken out — half a tile to a tile.
+// `murk_wobble` is how far, in filth, a patch pushes the water either side of where the map
+// says it is: at the edges that is patches of the neighbouring state spilling across, and
+// inside the murky band it is patches of both blue and green, more green toward the dirty
+// side. Two noises rather than one — a slow broad one that bends the contour, a finer one
+// that breaks it — or the edge is wavy but still one line.
+uniform float murk_blotch = 48.0;
+uniform float murk_wobble : hint_range(0.0, 0.5) = 0.16;
+
 // Foam's body on clean water and what it goes to on filthy water, palette `foam` and
 // `foam_dirty`. The alpha is how solid the foam is laid over the water.
 uniform vec4 foam_color : source_color = vec4(0.933, 0.965, 0.984, 0.75);
@@ -231,9 +241,7 @@ float island_fraction(vec2 tile) {
 
 // One random number per cell, the same every time for the same cell.
 float foam_hash(vec2 cell) {
-	vec2 p = fract(cell * vec2(123.34, 345.45));
-	p += dot(p, p + 34.345);
-	return fract(p.x * p.y);
+	return cell_hash(cell);
 }
 
 // One step of one ramp: `step_at` 0 (deep) to 4 (light), `state` 0 clean, 1 murky, 2 dirty.
@@ -408,7 +416,18 @@ void fragment() {
 	// color_t is also what the grime and the dirty foam go on, so all three agree on where
 	// the water changes state.
 	float color_t = pow(filth, color_bite);
-	float state = step(murky_at, color_t) + step(dirty_at, color_t);
+
+	// The murk, drifting: patches that push this water up or down the filth before the
+	// cutoffs read it. Flat on the water (the 2:1 squash taken out), crawling along the iso
+	// grain on the stepped clock. Centred on zero, so where the map is well inside one state
+	// nothing changes and the blotching lives only along the edges and inside the murky band.
+	vec2 murk_at = vec2(px.x, px.y * 2.0) / max(murk_blotch, 1.0);
+	murk_at += vec2(clock * 0.05, clock * 0.025);
+	float broad = blob_noise(murk_at * 0.5 + vec2(7.3, 2.1)) - 0.5;
+	float narrow = blob_noise(murk_at * 1.7 - vec2(3.9, 5.4)) - 0.5;
+	float murk = (broad * 0.6 + narrow * 0.4) * 2.0 * murk_wobble;
+	float state_t = clamp(color_t + murk, 0.0, 1.0);
+	float state = step(murky_at, state_t) + step(dirty_at, state_t);
 
 	// Position on the ramp: the shallows up at step 3, the deep water down at step 0.
 	float shade = mix(3.0, 0.0, smoothstep(0.15, 0.85, d));

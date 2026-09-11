@@ -122,8 +122,10 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **Colours**: the water body outputs only palette swatches — three five-step ramps
   (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands, glints and
   sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
-  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth. The
-  water is opaque. Foam keeps its own shapes and soft alpha.
+  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, after
+  a drifting blob noise (`murk_blotch`, `murk_wobble`) pushes the filth up or down — so the
+  edges wander and patches of the neighbouring state spill across, instead of flat rings.
+  The water is opaque. Foam keeps its own shapes and soft alpha.
 - **No dither, by decision**: a per-pixel Bayer dither was tried and rejected — grainy open
   water, lone dirty pixels in cleaned bays, shimmer under camera motion.
 - **Zoom and camera**: zoom only lands on levels where one art pixel (`Lake.ART_PIXEL` = 2
