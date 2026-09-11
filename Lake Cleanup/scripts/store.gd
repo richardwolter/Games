@@ -21,9 +21,28 @@ const Style := preload("res://scripts/style.gd")
 ## either way, and the draw cost of a late-game store is not worth paying.
 const MAX_DRAWN := 24
 
-## How wide and deep the crate is on the plane, and how tall its walls stand.
-const CRATE := Vector2(84.0, 42.0)
-const CRATE_TALL := 26.0
+## The recycle box art. An isometric box 32 art pixels wide: its top face is a 32x16 diamond
+## centred on row 8, and it stands on a matching diamond centred on row 24, so the walls are
+## 16 art pixels tall and the bottom point is the last row.
+const ART := "res://assets/Recycle_Box.png"
+const ART_SCALE := 2.5
+const ART_TOP := 8.0
+const ART_GROUND := 24.0
+
+## How wide and deep the crate is on the plane, and how tall its walls stand. Read off the
+## art, so the layering in lake.gd and the drop point agree with the picture.
+const CRATE := Vector2(32.0, 16.0) * ART_SCALE
+const CRATE_TALL := (ART_GROUND - ART_TOP) * ART_SCALE
+
+## Half the crate's side in tiles. Its footprint is a square in tile space, which is exactly
+## the diamond it stands on on screen, so walkers are kept off the box and nothing more.
+const FOOT_HALF := CRATE.x / Iso.TILE_W * 0.5
+
+## Where the heap sits inside the art box, and how far it climbs, as fractions of the wall
+## height above the ground point. Starts sunk behind the near walls and ends a little proud
+## of the rim, so a full box reads as full at a glance.
+const HEAP_FLOOR := 0.55
+const HEAP_CLIMB := 0.7
 
 ## The crate's shadow: how much bigger than its footprint it is drawn, and how far down the
 ## screen it sits. Barely either — it is a box on the ground, and the shadow is the sliver of
@@ -52,11 +71,62 @@ var grid: LakeGrid
 
 var _rng := RandomNumberGenerator.new()
 
+## Set by lake.gd, for the shadow. Null means no shadow, the same as every other caster.
+var day: DayCycle
+
+var _art: Texture2D
+## The art's two near walls and front rim alone, drawn again over the heap so the catch is
+## inside the box rather than stuck on its face.
+var _front: Texture2D
+## The sun the shadow was last drawn for.
+var _sun := Vector3(INF, INF, INF)
+
 
 func _ready() -> void:
 	# Fixed seed: the pile's scatter should not reshuffle itself every time a piece is
 	# added or sold.
 	_rng.seed = 90210
+	_art = Art.texture(ART)
+	_front = _cut_front(Art.image(ART)) if _art != null else null
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+
+func _process(_delta: float) -> void:
+	if day == null or _art == null:
+		return
+	var sun := Vector3(day.lean, day.stretch, day.ink)
+	if sun.is_equal_approx(_sun):
+		return
+	_sun = sun
+	queue_redraw()
+
+
+## How far outside the footprint a walker's feet are kept, in tiles: a pair of boots is not
+## a point, and without it they stood on the bottom plank.
+const WALK_KEEP := 0.15
+
+
+## Whether a tile-space point is on the crate standing at `crate_tile`, grown by `grow`.
+static func covers(crate_tile: Vector2, at: Vector2, grow: float = 0.0) -> bool:
+	var off := at - crate_tile
+	return absf(off.x) < FOOT_HALF + grow and absf(off.y) < FOOT_HALF + grow
+
+
+## Keep only the pixels in front of the mouth: everything below the two lower edges of the
+## top diamond, with the rim line along those edges, which is what covers the heap.
+static func _cut_front(image: Image) -> Texture2D:
+	if image == null:
+		return null
+	var out := image.duplicate() as Image
+	out.convert(Image.FORMAT_RGBA8)
+	var mid := float(out.get_width()) * 0.5
+	var mouth_low := ART_TOP * 2.0
+	for y in out.get_height():
+		for x in out.get_width():
+			var edge := mouth_low - absf(float(x) + 0.5 - mid) * 0.5
+			if float(y) + 0.5 < edge - 1.0:
+				out.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
+	return ImageTexture.create_from_image(out)
 
 
 ## Take a piece. Never refuses — kept returning a bool so callers that want to know it
@@ -81,12 +151,18 @@ func take_lot(n: int) -> PackedInt32Array:
 ## Where a piece thrown at the yard should land: inside the crate rather than on the ground
 ## in front of it, and higher as the crate fills.
 func drop_point() -> Vector2:
-	return position + Vector2(0.0, -CRATE_TALL * 0.5 - _heap_rise())
+	return position + Vector2(0.0, _heap_floor() - _heap_rise())
+
+
+## Where the heap sits before it rises, above the ground point.
+func _heap_floor() -> float:
+	return -CRATE_TALL * (HEAP_FLOOR if _art != null else 0.25)
 
 
 ## How far the top of the heap has risen off the crate's floor.
 func _heap_rise() -> float:
-	return CRATE_TALL * 0.55 * clampf(float(held.size()) / float(CRATE_FULL), 0.0, 1.0)
+	var climb := HEAP_CLIMB if _art != null else 0.55
+	return CRATE_TALL * climb * clampf(float(held.size()) / float(CRATE_FULL), 0.0, 1.0)
 
 
 ## The crate, with the catch in it.
@@ -96,6 +172,9 @@ func _heap_rise() -> float:
 ## in front. The heap climbs as the yard fills, which makes the box a readout — a glance says
 ## whether the ferry is keeping up without reading a number.
 func _draw() -> void:
+	if _art != null:
+		_draw_art()
+		return
 	var half := CRATE * 0.5
 	var lift := Vector2(0.0, -CRATE_TALL)
 
@@ -134,6 +213,23 @@ func _draw() -> void:
 	)
 
 
+## The recycle box from its art, standing on the node's point with its ground diamond centred
+## there. The sun's shadow, then the whole box, then the heap, then the near walls cut from
+## the same picture over it, which is what puts the catch inside.
+func _draw_art() -> void:
+	var size := _art.get_size() * ART_SCALE
+	var box := Rect2(Vector2(-size.x * 0.5, -ART_GROUND * ART_SCALE), size)
+	if day != null:
+		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, day.lean, day.stretch))
+		draw_texture_rect(_art, box, false, Shade.tint(day.ink))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_texture_rect(_art, box, false)
+	if grid != null and not held.is_empty():
+		_draw_heap()
+		if _front != null:
+			draw_texture_rect(_front, box, false)
+
+
 ## One wall of the crate: the quad between an edge of the floor and the same edge lifted,
 ## with a couple of board lines across it.
 func _wall(from: Vector2, to: Vector2, lift: Vector2, tint: Color) -> void:
@@ -153,7 +249,7 @@ func _wall(from: Vector2, to: Vector2, lift: Vector2, tint: Color) -> void:
 func _draw_heap() -> void:
 	_rng.seed = 90210
 	var count := mini(held.size(), MAX_DRAWN)
-	var floor_at := -CRATE_TALL * 0.25
+	var floor_at := _heap_floor()
 	var spots: Array[Vector2] = []
 	for i in count:
 		var angle := _rng.randf_range(0.0, TAU)

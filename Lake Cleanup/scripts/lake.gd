@@ -752,6 +752,7 @@ func _ready() -> void:
 	# crate you have to walk out of before you can see it.
 	# One layer over the walker band that means "past the hut, short of the crate", so
 	# somebody standing north of the crate is drawn behind it. See `_sort_walkers`.
+	_yard.day = _day
 	_yard.z_index = CRATE_LAYER
 	_yard.position = Iso.tile_to_world(
 		Iso.ISLAND_CENTRE.x + 2.7, Iso.ISLAND_CENTRE.y + 2.7
@@ -2527,8 +2528,13 @@ func _walker_layer(at: Vector2) -> int:
 	var shed_wide := (Iso.SHED_FOOT.x + Iso.SHED_FOOT.y) * Iso.TILE_W * 0.5
 	if at.y < _shed_front() - SHED_BEHIND_SLACK and absf(at.x - shed.x) < shed_wide * 0.5:
 		return BEHIND_SHED
-	var crate_front := _yard.position.y + Yard.CRATE.y * 0.5
-	if at.y < crate_front and absf(at.x - _yard.position.x) < Yard.CRATE.x * 0.5:
+	# Behind the crate means north of both near faces, not north of its bottom point: those
+	# faces slope up from that point, and a flat line there put somebody standing just south
+	# of a face behind the planks. The footprint is square in tile space, so the faces are
+	# the two tile axes.
+	var off := Iso.world_to_tile(at - _yard.position)
+	if off.x < Yard.FOOT_HALF and off.y < Yard.FOOT_HALF \
+			and absf(at.x - _yard.position.x) < Yard.CRATE.x * 0.5:
 		return BEHIND_CRATE
 	return IN_FRONT
 

@@ -208,10 +208,6 @@ var can_walk: bool = true
 ## small. It can be walked through.
 var crate_tile := Vector2.INF
 
-## How near the middle of the crate a walker may get, in tiles. The box is about 1.3 tiles
-## across on the plane, so this is its own footprint and no more.
-const CRATE_KEEP := 0.7
-
 var _time: float = 0.0
 var _step: float = 0.0
 
@@ -359,6 +355,17 @@ func _wet_by(at: Vector2) -> float:
 ## in is tried next; the axes stay as a last resort. Anything the shed or the crate refuses
 ## is still refused — every candidate goes through _can_stand.
 func _slide(move: Vector2) -> Vector2:
+	# Against the crate, slide along the face that was hit. Its footprint is a square in tile
+	# space, so a face runs along one tile axis: the axis the angler is already outside of is
+	# the one being pushed into, and the other is the way along. The shore's slide below would
+	# walk them round the island's curve instead, which is what made the box feel round.
+	if crate_tile != Vector2.INF and Yard.covers(crate_tile, tile_pos + move, Yard.WALK_KEEP) \
+			and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
+		var off := tile_pos - crate_tile
+		var face := Yard.FOOT_HALF + Yard.WALK_KEEP
+		var along := Vector2(0.0, move.y) if absf(off.x) >= face else Vector2(move.x, 0.0)
+		if along.length_squared() > 0.0000001 and _can_stand(tile_pos + along):
+			return tile_pos + along
 	# Which way is out, in tile space, off the same distance the walking limit is measured in.
 	var e := 0.05
 	var out := Vector2(
@@ -633,11 +640,10 @@ func _leave_print() -> void:
 func _can_stand(at: Vector2) -> bool:
 	if _wet_by(at) >= WALK_LIMIT:
 		return false
-	# Not through the crate, and only just: a box a tile and a third across, with a keep-out
-	# barely wider than its own planks. Enforced the way the hut is — on somebody who is not
-	# standing in it already.
-	if crate_tile != Vector2.INF and tile_pos.distance_to(crate_tile) >= CRATE_KEEP:
-		if at.distance_to(crate_tile) < CRATE_KEEP:
+	# Not through the crate: its own square footprint, no wider. Enforced the way the hut is —
+	# on somebody who is not standing in it already.
+	if crate_tile != Vector2.INF and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
+		if Yard.covers(crate_tile, at, Yard.WALK_KEEP):
 			return false
 	# Standing inside it already — an old save, or the shed being moved under them — means
 	# every step out is also a step through, and refusing those leaves them walled in

@@ -674,6 +674,11 @@ func _way_round(towards: Vector2) -> Vector2:
 func _may_stand(tile: Vector2) -> bool:
 	if Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP):
 		return false
+	# Round the crate, not through it; and never refused to a dog already inside, which would
+	# wall it in.
+	if Yard.covers(crate_tile, tile, Yard.WALK_KEEP) \
+			and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
+		return false
 	if Iso.island_fraction(tile.x, tile.y) < 1.0:
 		return true
 	if Iso.shore_fraction(tile.x, tile.y) < 1.0:
