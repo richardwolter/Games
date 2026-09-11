@@ -354,10 +354,9 @@ func _row_face(key: StringName, hovered: bool, live: bool) -> Color:
 	match key:
 		&"fullscreen":
 			face = Style.ROW_SCREEN
-		&"save", &"load", &"wipe", &"swap":
+		&"save", &"load", &"wipe", &"swap", &"quit":
+			# The quit is the same oak as the saves; its warning is in the ink alone.
 			face = Style.ROW_SAVE
-		&"quit":
-			face = Style.ROW_QUIT
 	if not live:
 		face = face.lerp(Style.BOARD, 0.55)
 	if hovered and live:
