@@ -57,9 +57,9 @@ const DRAG_RIPPLE := 0.13
 ## How close to the rod counts as home, in tiles.
 const HOME_DISTANCE := 0.35
 
-## How far past the swept radius the drawn rim sits, in tiles. Small: the rim is the edge
-## of the mesh and the sweep is what the mesh encloses, so anything more than the thickness
-## of the twine is the net promising reach it does not have.
+## How far past the net's width the drawn rim sits, in tiles: the thickness of the twine.
+## The rim is what catches — a drawing touching it is in the net — so anything more than
+## this is the net reaching further than its upgrade says.
 const MOUTH_EDGE := 0.15
 
 ## How many layers deep a cast works. The net comes down from above: it closes on what is
@@ -107,9 +107,9 @@ const LOAD_LAG := 1.3
 ## eight feet across is a reasonable thing to be lying on the water out there and an absurd
 ## thing to be dangling off the end of a rod next to a person half its height.
 ##
-## It is only the drawing. The swept radius is not touched — and it does not need to be,
-## because by the time this bites the net is a bag hanging clear of the surface, and a rim
-## on the water is not a promise a net out of the water is making.
+## The sweep shrinks with it (see `mouth_extent`). It used not to, on the grounds that a bag
+## hanging clear of the surface makes no promise about the water — but the player reads the
+## net they can see, and a haul taking pieces well outside it read as the net lying.
 const HOME_SIZE := 0.42
 
 ## How much of a cast, as a fraction, is the throw rather than the haul. Only `cast_progress`
@@ -183,16 +183,24 @@ const CATCH_HIDDEN := 0.5
 ## pieces pinned round the rim.
 const CATCH_SPREAD := 0.62
 
-## How high the pile of catch may stand out of the mouth, as a fraction of the mouth's own
-## width, and how many pieces sit in one layer of it.
+## How many pieces sit in one layer of the pile. Only a scale now: the pile is packed into
+## the mouth rather than stacked out of it, and this is the load at which the pieces start
+## being drawn smaller to fit.
 ##
-## A cap rather than a step per piece. Stacking a fixed distance per row is fine for the
-## three pieces the starting net holds and turns a full late-game haul into a tower of junk
+## Nothing climbs out of the bag. Stacking a fixed distance per row is fine for the three
+## pieces the starting net holds and turns a full late-game haul into a tower of junk
 ## standing a net and a half above the water, which reads as a pile the net is under rather
-## than a load it is carrying. Capping the rise means a bigger haul packs tighter instead of
-## climbing, which is what a bag of rubbish actually does.
-const CATCH_RISE := 0.34
+## than a load it is carrying.
 const CATCH_LAYER := 3
+
+## How much of the mouth's area the pile may cover, counting overlap, and the share of the
+## mouth the biggest single piece may span.
+##
+## The first is what decides how many pieces are drawn: as many of the catch as fit at the
+## packed scale, so a wider net shows more and a hold of a hundred is a full bag rather than
+## a hundred stamps. The rest of the catch is in there, just behind the ones drawn.
+const CATCH_FILL := 1.7
+const CATCH_FIT := 0.9
 
 ## How big a piece in the mouth is drawn, and the least it shrinks to when the net is full.
 ##
@@ -205,6 +213,103 @@ const CATCH_PACKED := 0.62
 ## How far a throw steps while looking for the first place along it that a cast stops being
 ## legal, in tiles. `_reach_along` walks in these, and the aiming marker is what it feeds.
 const RING_STEP := 0.2
+
+## The hauled net is drawn as a bending sheet rather than a rigid picture: this is how many
+## quads across and down it is cut into.
+##
+## Six by four is enough to bend smoothly at the size a net is drawn on this lake and cheap
+## enough to lay out every frame — one triangle array, one draw call, like everything else
+## here that moves.
+const WARP_COLS := 6
+const WARP_ROWS := 4
+
+## How far the rim tips and how far the belly trails, as fractions of how tall the frame is
+## drawn, at full lean.
+##
+## Tip and trail together are the whole of "it is being dragged". The rim nearest the rod
+## lifts towards the rope while the loaded body lags behind it — a net pulled through water
+## leads with its near edge, and one that only shrank read as a picture being scaled.
+const LEAN_TIP := 0.22
+const LEAN_TRAIL := 0.18
+
+## How much lean an empty net has, against a full one, and how fast the lean follows the
+## pull. Eased rather than set, so a net that changes direction or speed bends into it
+## instead of snapping over.
+const LEAN_EMPTY := 0.45
+const LEAN_EASE := 7.0
+
+## How deep the loaded belly sags and how far it spreads, as fractions of the drawn frame.
+## Both run on how full the hold is: an empty net is taut, a full one hangs heavy.
+const BULGE_DEEP := 0.34
+const BULGE_WIDE := 0.14
+
+## How far past the rim a shoved piece is pushed, in world pixels. The same idea as a hull's
+## `SHOVE_CLEAR`: clear of the thing, not merely touching its edge.
+const SHOVE_CLEAR := 5.0
+
+## The rope, as a chain of points hung between the rod and the net.
+##
+## Drawn only. Nothing in the game reads where the rope is; it is a picture of a line that
+## happens to be worked out by letting a few points fall and pulling them back to length.
+## That is not the physics this project banned — no bodies, no collision, nothing gameplay
+## waits on — it is the cheapest way to draw string that swings, whips on the throw, and
+## comes taut when the net is pulled, instead of a sine arc that only ever flattened.
+##
+## `ROPE_POINTS` along it, stepped `ROPE_STEP` at a time however uneven the frames are, with
+## `ROPE_PASSES` of tightening per step. `ROPE_GRAVITY` is screen-down pixels per second
+## squared, small because the rope is mostly lying on water; `ROPE_DRAG` is how fast the
+## swing dies. A point never moves more than `ROPE_LEAP` in one step, and if either end has
+## jumped further than `ROPE_JUMP` since the last frame the whole chain is laid out afresh
+## along the straight line rather than allowed to catch up.
+const ROPE_POINTS := 11
+const ROPE_STEP := 1.0 / 120.0
+const ROPE_PASSES := 4
+const ROPE_GRAVITY := 220.0
+const ROPE_DRAG := 2.8
+const ROPE_LEAP := 30.0
+const ROPE_JUMP := 200.0
+
+## How long the rope is against the straight rod-to-net distance: a little over while the
+## net flies and sits, so it hangs, easing to a hair under once the haul is on, so it pulls
+## straight and the reel is seen taking line up. `ROPE_TAKE_UP` is how fast that happens.
+const ROPE_SLACK := 1.07
+const ROPE_TAUT := 0.995
+const ROPE_TAKE_UP := 3.0
+
+## The horn: where the hand line ends, above the net's crown, and the short bridle lines
+## that run from it down to the crown ring.
+##
+## A cast net is not hauled by its edge. The line goes to a swivel over the gathered apex
+## and a bridle fans from there onto the crown, and that is what makes the net purse when it
+## is pulled. Both numbers are fractions of the **crown's own width** (`tools/slice_net.gd`
+## measures it, see `_crown`), not of the frame: the crown is where the rope belongs and the
+## crown is what the rope should be scaled against, so a net drawn at any size gets a bridle
+## in proportion to the ring it is tied to.
+##
+## `BRIDLE_SQUASH` flattens the ring the bridles land on, because the crown is a circle seen
+## from above at the same angle as everything else here. Bridles to the far side of it draw
+## at `BRIDLE_FAR`, as if seen through the mesh.
+## `HORN_LIFT` is deliberately small. At a third of the crown's width the line met the net
+## well above the apex and the whole thing read as a net being winched up from overhead
+## rather than dragged across water — the horn has to sit just clear of the crown, close
+## enough that the bridle is a gather and not a suspension.
+const HORN_LIFT := 0.08
+const HORN_LEAN := 0.12
+## `BRIDLE_REACH` is how far out across the crown the little ropes land, as a share of its
+## measured half-width. Well under one, by decision: the bridle gathers the very middle of
+## the apex, and lines reaching the crown's own edge read as a second, smaller net drawn on
+## top of the first. They are thinner than the hand line for the same reason — a bridle is
+## cord where the haul line is rope.
+const BRIDLES := 6
+const BRIDLE_REACH := 0.42
+const BRIDLE_WIDE := 1.0
+const BRIDLE_FAR := 0.45
+const BRIDLE_SQUASH := 0.25
+
+## Where the crown sits and how wide it is when the art does not say — the middle of the
+## frame's top edge, and a little under half its width. Only reached with a `net_frames.json`
+## cut before crowns were measured; the game still runs, the rope still ties on.
+const CROWN_FALLBACK := Vector3(0.5, 0.06, 0.4)
 
 ## The aiming marker: what a throw at the pointer would look like before it is thrown.
 ##
@@ -303,6 +408,23 @@ var _lit_was := false
 var shut: float = 0.0
 var near: float = 0.0
 
+## How hard the net is leaning into the pull, 0 lying flat and 1 bent right over, and which
+## way the rope is pulling it in world coordinates. Both eased towards where they should be
+## rather than set, so the bend follows the haul instead of flicking about with it.
+var _lean: float = 0.0
+var _pull := Vector2.RIGHT
+
+## The triangles of the warped sheet, in the order its points are laid out. The points move
+## every frame; how they are joined up never does.
+var _warp_faces := PackedInt32Array()
+
+## The rope's points now and a step ago (that pair is the whole of its motion), the time
+## banked towards the next fixed step, and how far the haul has taken the slack up, 0 to 1.
+var _rope_now := PackedVector2Array()
+var _rope_was := PackedVector2Array()
+var _rope_bank: float = 0.0
+var _rope_taut: float = 0.0
+
 
 ## The rope, on a layer of its own.
 ##
@@ -311,10 +433,18 @@ var near: float = 0.0
 ## it is always drawn after the net, and still under the figure, which hides where it starts.
 class RopeLayer extends Node2D:
 	var line := PackedVector2Array()
+	var near := PackedVector2Array()
+	var far := PackedVector2Array()
 
 	func _draw() -> void:
-		if line.size() >= 2:
-			CastNet._draw_rope(self, line)
+		if line.size() < 2:
+			return
+		# Far bridles first and faint, then the near ones, then the line over the lot.
+		if far.size() >= 2:
+			CastNet._draw_bridle(self, far, BRIDLE_FAR)
+		if near.size() >= 2:
+			CastNet._draw_bridle(self, near, 1.0)
+		CastNet._draw_rope(self, line)
 
 
 var _rope: RopeLayer
@@ -354,8 +484,18 @@ func _load_art() -> bool:
 			var region := Rect2(
 				float(box[0]), float(box[1]), float(box[2]), float(box[3])
 			)
+			# Where the apex is in this frame and how wide it runs, as fractions of the
+			# frame's own box, so it survives the frame being drawn at any size.
+			var crown := CROWN_FALLBACK
+			if cell.has("crown_x"):
+				crown = Vector3(
+					(float(cell["crown_x"]) - region.position.x) / maxf(region.size.x, 1.0),
+					(float(cell["crown_y"]) - region.position.y) / maxf(region.size.y, 1.0),
+					float(cell["crown_w"]) / maxf(region.size.x, 1.0)
+				)
 			frames.append({
 				"region": region,
+				"crown": crown,
 				"rim": float(cell["rim_width"]),
 				# Where in its own box the rim sits, as a fraction of the height. The net
 				# hangs from this: on a bag pulled shut it is down at the knot, and on a
@@ -489,6 +629,9 @@ func cast_to(where: Vector2, laying: bool = false) -> bool:
 	near = 0.0
 	tile_pos = angler.tile_pos
 	catch.resize(0)
+	# A fresh throw is a fresh rope: laid straight from the hands to the net on the first
+	# frame rather than the last cast's chain being dragged across the lake to the new one.
+	_rope_now.resize(0)
 	# The angler's own throw — only ever a flourish: the net still flies on this same line at
 	# this same speed either way, see Angler.start_cast().
 	angler.start_cast()
@@ -520,6 +663,7 @@ func world_pos() -> Vector2:
 func _process(delta: float) -> void:
 	_time += delta
 	_burn_down(delta)
+	_lean_into_pull(delta)
 	if state == State.SETTLED or state == State.REELING:
 		_settled_age += delta
 	# Before the sweep, so what is caught this frame is caught by a net as shut as the one
@@ -550,9 +694,16 @@ func _process(delta: float) -> void:
 					splash.ripple(world_pos(), mouth_extent() * 1.2)
 				if sfx != null:
 					sfx.play_splash(0.45)
+				# What the ring came down on is caught as it lands, not a frame into the haul
+				# after the mouth has already slid off it.
+				_sweep()
 		State.REELING:
 			_advance_towards(angler.tile_pos, reel_speed, delta)
 			_sweep()
+			# Whatever the mouth cannot lift is pushed out of its way instead, the way a hull
+			# parts the rubbish it passes. Straight after the sweep, so a piece is only ever
+			# shoved once the net has established it is not taking it.
+			_shove_aside(delta)
 			# Dragged, not carried: the water it is pulled through keeps letting go of it.
 			if splash != null:
 				splash.wake(self, world_pos(), mouth_extent() * 0.85, DRAG_RIPPLE)
@@ -565,6 +716,9 @@ func _process(delta: float) -> void:
 			# always drawn where they are actually thrown from.
 			if angler != null:
 				tile_pos = angler.tile_pos
+	# After the net has moved and before anything is drawn, so the rope hangs off where the
+	# net is this frame rather than where it was.
+	_drive_rope(delta)
 	_repaint()
 
 
@@ -629,6 +783,62 @@ func _burn_down(delta: float) -> void:
 		queue_redraw()
 
 
+## The bend, eased towards where the haul says it should be.
+##
+## Two things are followed: which way the rope is pulling, and how hard the net is resisting
+## it. A full net bends further than an empty one, because what bends a net is what is in it.
+## Anything that is not a haul lets the bend fall back out, so a net let go of on the water
+## settles rather than staying bent around a pull nobody is making.
+func _lean_into_pull(delta: float) -> void:
+	var ease := 1.0 - exp(-LEAN_EASE * delta)
+	if state != State.REELING or angler == null:
+		_lean = lerpf(_lean, 0.0, ease)
+		return
+	var pull := Iso.tile_to_world(angler.tile_pos.x, angler.tile_pos.y) - world_pos()
+	if pull.length_squared() > 0.001:
+		_pull = _pull.lerp(pull.normalized(), ease).normalized()
+	var load := clampf(float(catch.size()) / maxf(float(hold), 1.0), 0.0, 1.0)
+	_lean = lerpf(_lean, lerpf(LEAN_EMPTY, 1.0, load), ease)
+
+
+## Push aside what the cast is not taking.
+##
+## Only the refusals: a piece too heavy for this net, or anything at all once the hold is
+## full. Whatever the mouth is about to catch is caught rather than shoved, so nothing is
+## ever seen being knocked out of the way and then picked up anyway.
+##
+## The push is outwards from the middle of the mouth rather than along the haul, because
+## that is the one direction that always clears it — a piece dead ahead is parted to a side
+## picked off its tile, the same trick the hulls use so a row of them does not all go one way.
+func _shove_aside(delta: float) -> void:
+	if grid == null:
+		return
+	var at := world_pos()
+	var mouth := mouth_extent()
+	var pushed := _reach(at, mouth, power, 0, true)
+	if room_left() <= 0:
+		# Nothing is being taken, so everything the mouth meets is in its way.
+		pushed.append_array(_reach(at, mouth, power))
+	var clear := 1.0 + SHOVE_CLEAR / maxf(mouth, 1.0)
+	for index in pushed:
+		var rel := grid.surface_pos(index) - at
+		# Measured where the mouth is a unit circle, so "out of the net" is one number.
+		var norm := Vector2(rel.x / maxf(mouth, 1.0), rel.y / maxf(mouth * 0.5, 1.0))
+		var out := norm.length()
+		if out >= clear:
+			continue
+		var way := norm / out if out > 0.05 else _side_of(index)
+		var want := Vector2(way.x * mouth, way.y * mouth * 0.5) * (clear - out)
+		grid.shove_to(index, want, delta)
+
+
+## Which way a piece sitting under the middle of the mouth is parted, from its own tile, so
+## the choice is the same every frame and neighbours do not all go the same way.
+func _side_of(index: int) -> Vector2:
+	var tile := grid.tile_of(index)
+	return Vector2(1.0, 0.0) if (tile.x + tile.y) % 2 == 0 else Vector2(-1.0, 0.0)
+
+
 func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
 	var gap := to - tile_pos
 	var step := speed * delta
@@ -651,16 +861,14 @@ func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
 func _sweep() -> void:
 	if grid == null:
 		return
-	var here := grid.tile_at(Iso.tile_to_world(tile_pos.x, tile_pos.y))
-	if here < 0:
-		return
-	var reach := _sorted_reach(here)
+	var at := world_pos()
+	var mouth := mouth_extent()
 
 	# Every bird sat inside the mouth, without exception: a perched pigeon is on top of
 	# everything, the hold has no say in it, and one left bobbing inside the ring the player
 	# just closed reads as the net passing through it.
 	if flock != null:
-		for perched in flock.perched_near(tile_pos, sweep_radius()):
+		for perched in _birds_touched(at, mouth):
 			caught_bird.emit(flock.take(perched))
 
 	# Charms, on the same terms as the birds: on top of everything, free to lift, and gone
@@ -668,15 +876,18 @@ func _sweep() -> void:
 	# second lake is worth casting into, so nothing about the net's strength or its hold
 	# gets a say in whether one is picked up.
 	if charms != null:
-		for index in reach:
-			var floating := charms.charm_on(index)
-			if floating >= 0:
-				var kind := charms.take(floating)
-				if splash != null:
-					splash.splash(_within_mouth(grid.surface_pos(index)), 0.4)
-				if sfx != null:
-					sfx.play_catch()
-				caught_charm.emit(kind)
+		for i in range(charms.charms.size() - 1, -1, -1):
+			if not charms.is_up(charms.charms[i]):
+				continue
+			var drawn := charms.footprint(i)
+			if not _touches(at, mouth, drawn[0], drawn[1]):
+				continue
+			var kind := charms.take(i)
+			if splash != null:
+				splash.splash(_within_mouth(drawn[0]), 0.4)
+			if sfx != null:
+				sfx.play_catch()
+			caught_charm.emit(kind)
 
 	# Only the rubbish is limited by what the net can hold. A bird and a charm are lifted
 	# off the surface by a net that is already full, which is why the hold is not checked
@@ -684,25 +895,100 @@ func _sweep() -> void:
 	# lumps of tar in it would read as the net being broken.
 	if room_left() <= 0:
 		return
+	# Asked again for each layer: what a take uncovers is a new piece at a new size and pose,
+	# and whether the mouth touches it is a new question.
 	for layer in SWEEP_LAYERS:
-		_take_from(reach)
+		_take_from(_reach(at, mouth, power))
 
 
-## The tiles the mouth covers, nearest to the net first. Sorted on tile-space distance from
-## where the net actually is rather than from the tile it is standing on, so the order does
-## not jump as the net crosses a tile edge.
-func _sorted_reach(here: int) -> Array[int]:
+## Does a drawing — an ellipse at `centre` with half-extents `half`, in world pixels — touch a
+## mouth `mouth` world pixels across its long half, lying at `at`?
+##
+## The whole of what "inside the ring" means, for the catch and for the aiming marker alike.
+## A piece is in the net when any of its drawing is, not when its tile is: the tile is a
+## cell the player never sees, and a sofa hanging half into the ring is a sofa in the ring.
+##
+## Worked with the plane's height doubled, where the mouth is a circle, so the question is
+## only how close the drawing's nearest point comes to the mouth's middle.
+static func _touches(at: Vector2, mouth: float, centre: Vector2, half: Vector2) -> bool:
+	var a := maxf(half.x, 0.001)
+	var b := maxf(half.y * 2.0, 0.001)
+	# The mouth's middle as seen from the drawing's, folded into one quarter of it.
+	var px := absf(at.x - centre.x)
+	var py := absf(at.y - centre.y) * 2.0
+	if (px * px) / (a * a) + (py * py) / (b * b) <= 1.0:
+		return true
+	# The nearest point on the drawing's rim, walked towards in a few fixed-point steps.
+	# Three is plenty at the sizes on this lake: the answer is a pixel test, not a proof.
+	var tx := 0.70710678
+	var ty := 0.70710678
+	for i in 3:
+		var ex := (a * a - b * b) * tx * tx * tx / a
+		var ey := (b * b - a * a) * ty * ty * ty / b
+		var rim := Vector2(a * tx - ex, b * ty - ey).length()
+		var qx := px - ex
+		var qy := py - ey
+		var q := maxf(Vector2(qx, qy).length(), 0.000001)
+		tx = clampf((qx * rim / q + ex) / a, 0.0, 1.0)
+		ty = clampf((qy * rim / q + ey) / b, 0.0, 1.0)
+		var t := maxf(Vector2(tx, ty).length(), 0.000001)
+		tx /= t
+		ty /= t
+	return Vector2(px - a * tx, py - b * ty).length() <= mouth
+
+
+## The tiles whose top piece a mouth at `at` touches and a net of `strength` can lift, nearest
+## drawing first. `most` stops looking once that many are found; 0 finds them all.
+##
+## Tiles only narrow the search. Everything within the mouth plus the furthest any drawing can
+## stand off its tile is a candidate, and each candidate is kept on its drawing alone.
+## `refused` turns it around: the tiles holding something this net will *not* take, which is
+## what the haul shoves aside.
+func _reach(
+	at: Vector2, mouth: float, strength: int, most: int = 0, refused: bool = false
+) -> Array[int]:
 	var out: Array[int] = []
-	for index in grid.tiles_within(here, sweep_radius()):
-		out.append(index)
-	var from := tile_pos
+	if grid == null:
+		return out
+	var centre := Iso.world_to_tile(at)
+	var bound := mouth / Iso.tile_circle_extent(1.0) + grid.footprint_reach()
+	var span := int(ceil(bound)) + 1
+	var cx := int(floor(centre.x))
+	var cy := int(floor(centre.y))
+	for ty in range(maxi(cy - span, 0), mini(cy + span + 1, Iso.ROWS)):
+		for tx in range(maxi(cx - span, 0), mini(cx + span + 1, Iso.COLS)):
+			if Vector2(float(tx) + 0.5, float(ty) + 0.5).distance_to(centre) > bound:
+				continue
+			var index := grid.index_of(tx, ty)
+			var liftable := grid.reachable_slot(index, 1, strength) >= 0
+			if refused:
+				if liftable or grid.top_slot(index) < 0:
+					continue
+			elif not liftable:
+				continue
+			if not _touches(at, mouth, grid.surface_pos(index), grid.footprint(index)):
+				continue
+			out.append(index)
+			if most > 0 and out.size() >= most:
+				return out
+	# Nearest first, measured to where each piece is drawn, so the mouth closes from the
+	# middle out and the order does not jump as the net crosses a tile edge.
 	out.sort_custom(
-		func(a: int, b: int) -> bool:
-			return (
-				Vector2(grid.tile_of(a)).distance_squared_to(from)
-				< Vector2(grid.tile_of(b)).distance_squared_to(from)
-			)
+		func(p: int, q: int) -> bool:
+			return grid.surface_pos(p).distance_squared_to(at) < grid.surface_pos(q).distance_squared_to(at)
 	)
+	return out
+
+
+## The perched birds a mouth at `at` touches, highest row first so they can be taken in turn.
+func _birds_touched(at: Vector2, mouth: float) -> Array[int]:
+	var out: Array[int] = []
+	for i in range(flock.birds.size() - 1, -1, -1):
+		if int((flock.birds[i] as Dictionary)["state"]) != Flock.State.PERCHED:
+			continue
+		var drawn := flock.footprint(i)
+		if _touches(at, mouth, drawn[0], drawn[1]):
+			out.append(i)
 	return out
 
 
@@ -769,17 +1055,6 @@ func _home() -> float:
 	var t := clampf((from - gap) / maxf(from - CLOSE_END, 0.001), 0.0, 1.0)
 	# Eased, so nothing starts happening on a corner.
 	return t * t * (3.0 - 2.0 * t)
-
-
-## The radius the sweep is actually run at, in tiles: the net's width, less however far it
-## has pursed shut.
-##
-## With the art loaded the shrink is read off the drawing rather than guessed. Each drag
-## frame's rim was measured against the open net's, so the water the net closes over closes
-## at exactly the rate the picture of it does — snapped to the frame on screen, not eased
-## past it, because the whole point is that the two are the same thing.
-func sweep_radius() -> float:
-	return radius * _purse_scale()
 
 
 ## How wide the net is against its open self, from how far it has pursed. The sweep and the
@@ -899,11 +1174,77 @@ func _squash(name: StringName, index: int) -> float:
 	return lerpf(float(flatten[0]), float(flatten[1]), sqrt(through))
 
 
-## Where the line from the rod meets the net: the top of the picture, which on a hauled net
-## is the top of the bag standing out of the water and on a landed one is the near edge of
-## a mouth lying flat in it.
+## Where the rope is tied to the net: the horn, hanging over the crown — the gathered apex
+## the drawing itself shows the net being hauled from.
+##
+## Four anchors have been tried and this is the one the picture asked for all along. It ended
+## at the top of the frame's box (a point in the air above a net lying flat); then at that
+## plus a guess at the lean (which came apart from the mesh the moment the net bent); then on
+## the rim at the edge facing the rod (on the net at last, but a line tied to one point of a
+## hoop); and now over the crown, with `_bridle_points` fanning onto the crown ring.
 func _line_end(at: Vector2) -> Vector2:
-	return at - Vector2(0.0, _frame_height() * _hang_of(_pose()))
+	var laid := _crown_frame()
+	if laid.is_empty():
+		return at
+	var size: Vector2 = laid[0]
+	var crown: Vector3 = laid[2]
+	var wide := crown.z * size.x
+	return (
+		_warp_point(at, size, float(laid[1]), crown.x, crown.y)
+		- Vector2(0.0, HORN_LIFT * wide)
+		+ _pull * HORN_LEAN * wide * _lean
+	)
+
+
+## The bridle: pairs of points, horn to crown ring, for `BRIDLES` lines spaced round it. The
+## near half in `near`, the far half in `far`, so the far ones can be drawn as if through the
+## mesh. Empty with no art.
+##
+## Onto the crown, never to the rim. A line from the apex to the edge of the net is a line
+## drawn straight across the mesh — the thing it is supposed to be gathering — and at any
+## size the net is drawn it crosses most of the picture. The real bridle is short, and lives
+## in the dense part of the weave.
+##
+## Every point goes through `_warp_point`, so the bridle bends with the net it is tied to.
+func _bridle_points(
+	at: Vector2, horn: Vector2, near: PackedVector2Array, far: PackedVector2Array
+) -> void:
+	var laid := _crown_frame()
+	if laid.is_empty():
+		return
+	var size: Vector2 = laid[0]
+	var hang := float(laid[1])
+	var crown: Vector3 = laid[2]
+	var half := crown.z * 0.5 * BRIDLE_REACH
+	# Flattened the way everything on this plane is, and converted into the frame's own
+	# coordinates: a fraction of the width across, of the height down.
+	var drop := half * BRIDLE_SQUASH * size.x / maxf(size.y, 1.0)
+	for i in BRIDLES:
+		# Offset by half a step, so no line sits exactly on the widest points of the ring,
+		# where it would lie along the drawn cord of the mesh itself.
+		var angle := TAU * (float(i) + 0.5) / float(BRIDLES)
+		var lean := sin(angle)
+		var on_ring := _warp_point(
+			at, size, hang, crown.x + cos(angle) * half, crown.y + lean * drop
+		)
+		if lean >= 0.0:
+			near.append(horn)
+			near.append(on_ring)
+		else:
+			far.append(horn)
+			far.append(on_ring)
+
+
+## The frame the rope is being tied to, as `[size, hang, crown]`, or empty with no art. Both
+## the horn and its bridle ask for this, and they have to be given the same answer.
+func _crown_frame() -> Array:
+	var pose := _pose()
+	if pose[0] == &"":
+		return []
+	var index := _frame_at(pose[0], pose[1])
+	var box := _frame_box(pose[0], index, _draw_span())
+	var frame: Dictionary = (_art[pose[0]] as Dictionary)["frames"][index]
+	return [box[0], float(box[1]), frame["crown"] as Vector3]
 
 
 ## How tall the frame showing right now is drawn, in world pixels, and how far down it the
@@ -922,10 +1263,12 @@ func _hang_of(pose: Array) -> float:
 	return float(_frame_box(pose[0], _frame_at(pose[0], pose[1]), _draw_span())[1])
 
 
-## How far the mouth reaches on screen, along its long axis. Derived from the radius the
-## sweep is actually run with, so the two cannot drift apart.
+## How far the mouth reaches on screen, along its long axis: the open net, pursed and brought
+## down towards the rod. The one number the drawing, the sweep and the aiming marker all use,
+## so what is drawn is what is caught at every frame of a cast — including the last stride,
+## where the net shrinks by `HOME_SIZE` and used to go on sweeping at its full width.
 func mouth_extent() -> float:
-	return Iso.tile_circle_extent(sweep_radius() + MOUTH_EDGE)
+	return open_extent() * _purse_scale() * lerpf(1.0, HOME_SIZE, near)
 
 
 ## The same, for a net that is wide open. What the drawing is scaled against.
@@ -943,7 +1286,7 @@ func open_extent() -> float:
 ## against the picture goes through this, so the net, the line's end and the catch inside it
 ## all shrink together instead of coming apart at the last stride.
 func _draw_span() -> float:
-	return open_extent() * 2.0 * _purse_scale() * lerpf(1.0, HOME_SIZE, near)
+	return mouth_extent() * 2.0
 
 
 ## A point pulled inside the net's mouth, along the line from the mouth's middle. Points
@@ -1041,17 +1384,12 @@ func _draw_aim() -> void:
 func _would_catch(pointer: Vector2) -> bool:
 	if grid == null:
 		return false
-	var here := grid.tile_at(pointer)
-	if here < 0:
-		return false
-	# The full width, not `sweep_radius()`: the mouth lands open and only purses on the way
-	# home, so what the ring is drawn at is what would close over this spot.
-	if flock != null and not flock.perched_near(Iso.world_to_tile(pointer), radius).is_empty():
+	# The open mouth: the net lands open and only purses on the way home, so what the ring is
+	# drawn at is what would close over this spot. Same test as the sweep, same drawings.
+	var mouth := open_extent()
+	if flock != null and not _birds_touched(pointer, mouth).is_empty():
 		return true
-	for index in grid.tiles_within(here, radius):
-		if grid.reachable_slot(index, 1, power) >= 0:
-			return true
-	return false
+	return not _reach(pointer, mouth, power, 1).is_empty()
 
 
 ## The edge of what the angler can reach, at `strength` of full visibility.
@@ -1107,10 +1445,16 @@ const ROPE_TWIST := Color(0.36, 0.23, 0.12, 1.0)
 const ROPE_PITCH := 4.0
 
 
-## Hand the rope layer this frame's rope. An empty line takes the rope away.
-func _lay_rope(line: PackedVector2Array) -> void:
+## Hand the rope layer this frame's rope and bridle. An empty line takes the lot away.
+func _lay_rope(
+	line: PackedVector2Array,
+	near: PackedVector2Array = PackedVector2Array(),
+	far: PackedVector2Array = PackedVector2Array()
+) -> void:
 	if _rope == null:
 		return
+	_rope.near = near
+	_rope.far = far
 	# Level with this node, always: being its child still draws it after the net sprite, and
 	# the angler (z 9) is drawn over it whichever way they face. The rope starts inside the
 	# figure's outline, so the body hides its cut end and it reads as coming out of the hands.
@@ -1118,6 +1462,94 @@ func _lay_rope(line: PackedVector2Array) -> void:
 	_rope.z_index = z_index
 	_rope.line = line
 	_rope.queue_redraw()
+
+
+## Move the rope on by one frame: pin its ends to the hands and the rim, let it fall and
+## swing in fixed steps, and pull it back to length.
+##
+## Its length is the one thing gameplay tells it. Out on the water the rope is a little
+## longer than the gap it spans and hangs; under the haul it is eased down to a hair under
+## the gap, so it straightens and the reel is seen taking line up — the slack going out is
+## the pull starting, which is what a line does.
+func _drive_rope(delta: float) -> void:
+	if state == State.IDLE or angler == null:
+		_rope_now.resize(0)
+		_rope_taut = 0.0
+		return
+	var head := angler.rod_tip()
+	var foot := _line_end(world_pos())
+	if (
+		_rope_now.size() != ROPE_POINTS
+		or _rope_now[0].distance_to(head) > ROPE_JUMP
+		or _rope_now[ROPE_POINTS - 1].distance_to(foot) > ROPE_JUMP
+	):
+		_seed_rope(head, foot)
+	var ease := 1.0 - exp(-ROPE_TAKE_UP * delta)
+	_rope_taut = lerpf(_rope_taut, 1.0 if state == State.REELING else 0.0, ease)
+	var rest := (
+		head.distance_to(foot) * lerpf(ROPE_SLACK, ROPE_TAUT, _rope_taut)
+		/ float(ROPE_POINTS - 1)
+	)
+	# Fixed steps, banked: a long frame runs several, a short one may run none, and the rope
+	# behaves the same either way. Capped so a stall does not spend the next frame catching up.
+	_rope_bank += minf(delta, 0.1)
+	while _rope_bank >= ROPE_STEP:
+		_rope_bank -= ROPE_STEP
+		_rope_tick(head, foot, rest)
+	# Pinned again after the steps, so the drawn ends are this frame's whatever the banking did.
+	_rope_now[0] = head
+	_rope_now[ROPE_POINTS - 1] = foot
+
+
+## Lay the rope out straight between its ends, still. What a new cast starts from.
+func _seed_rope(head: Vector2, foot: Vector2) -> void:
+	_rope_now.resize(ROPE_POINTS)
+	_rope_was.resize(ROPE_POINTS)
+	for i in ROPE_POINTS:
+		_rope_now[i] = head.lerp(foot, float(i) / float(ROPE_POINTS - 1))
+		_rope_was[i] = _rope_now[i]
+	_rope_bank = 0.0
+
+
+## One fixed step of the rope: each free point keeps most of last step's motion and falls a
+## little, then every link is pulled back towards `rest` a few times over, the pinned ends
+## taking none of the correction and their neighbours all of it.
+func _rope_tick(head: Vector2, foot: Vector2, rest: float) -> void:
+	var last := ROPE_POINTS - 1
+	var keep := exp(-ROPE_DRAG * ROPE_STEP)
+	var fall := Vector2(0.0, ROPE_GRAVITY * ROPE_STEP * ROPE_STEP)
+	for i in range(1, last):
+		var here := _rope_now[i]
+		var moved := ((here - _rope_was[i]) * keep).limit_length(ROPE_LEAP)
+		_rope_was[i] = here
+		_rope_now[i] = here + moved + fall
+	_rope_now[0] = head
+	_rope_now[last] = foot
+	for pass_ in ROPE_PASSES:
+		for i in last:
+			var a := _rope_now[i]
+			var b := _rope_now[i + 1]
+			var gap := b - a
+			var length := gap.length()
+			if length < 0.0001:
+				continue
+			var share := gap * ((length - rest) / length)
+			var wa := 0.0 if i == 0 else 1.0
+			var wb := 0.0 if i + 1 == last else 1.0
+			var total := wa + wb
+			if total <= 0.0:
+				continue
+			_rope_now[i] = a + share * (wa / total)
+			_rope_now[i + 1] = b - share * (wb / total)
+
+
+## Draw bridle lines — pairs of points — onto `on`: the rope's edge and core, thinner, no
+## twist, at `fade` of the rope's own solidity.
+static func _draw_bridle(on: CanvasItem, pairs: PackedVector2Array, fade: float) -> void:
+	var edge := Color(ROPE_EDGE.r, ROPE_EDGE.g, ROPE_EDGE.b, ROPE_EDGE.a * fade)
+	var core := Color(ROPE_CORE.r, ROPE_CORE.g, ROPE_CORE.b, ROPE_CORE.a * fade)
+	on.draw_multiline(pairs, edge, BRIDLE_WIDE)
+	on.draw_multiline(pairs, core, BRIDLE_WIDE * 0.5)
 
 
 ## Draw the rope along `line` onto `on`: the edge, the core inside it, then a twist mark every
@@ -1167,24 +1599,17 @@ func _draw() -> void:
 		return
 
 	var at := world_pos()
-	var tip := angler.rod_tip()
 	var mouth := mouth_extent()
 	var pose := _pose()
 	var drawn: StringName = pose[0]
 
-	# The line, sagging between the rod and the net. A straight segment reads as a wire;
-	# the sag is what makes it string. It ends at the top of the bag once there is one,
-	# because the art draws its own hanging line up there and meeting it is free.
-	var end := _line_end(at) if drawn != &"" else at
-	var line := PackedVector2Array()
-	# The sag is the slack line's, and a line under a haul has no slack in it: it comes taut
-	# and straight the moment the player starts pulling, which is also what stops it reading
-	# as a cable strung through the air over a net hanging off it.
-	var sag := minf(tip.distance_to(end) * 0.12, 26.0) * (1.0 - shut)
-	for i in 13:
-		var t := float(i) / 12.0
-		line.append(tip.lerp(end, t) + Vector2(0.0, sin(t * PI) * sag))
-	_lay_rope(line)
+	# The rope, as `_drive_rope` left it this frame: from the hands to the horn over the net,
+	# and the bridle from the horn down to the rim.
+	var near := PackedVector2Array()
+	var far := PackedVector2Array()
+	if _rope_now.size() >= 2:
+		_bridle_points(at, _rope_now[_rope_now.size() - 1], near, far)
+	_lay_rope(_rope_now, near, far)
 
 	# The catch always goes under the net, open mouth or closed bag. The whole read of a
 	# netted load is that the junk is inside the mesh, and junk drawn over the mesh is junk
@@ -1193,9 +1618,12 @@ func _draw() -> void:
 	#
 	# Up into the body of the bag rather than down past its weights: the junk is what the
 	# net is holding, so it belongs in the tube above the rim it hangs from.
+	# And it rides in the belly, which is not where it was drawn before: the bag now bends
+	# away from the pull and sags under what is in it, and a load left hanging in the middle
+	# of the frame would be a load hanging outside the net holding it.
 	_draw_catch(
-		at - Vector2(0.0, _frame_height() * CATCH_INSIDE * shut),
-		mouth * lerpf(1.0, HOME_SIZE, near)
+		at - Vector2(0.0, _frame_height() * CATCH_INSIDE * shut) + _belly(),
+		mouth
 	)
 	if drawn != &"":
 		_draw_net(drawn, pose[1], at, mouth, ink)
@@ -1203,11 +1631,112 @@ func _draw() -> void:
 		_draw_mesh(at, mouth, ink)
 
 
+## How full the cast is, 0 to 1. What the bulge, the lean and the purse all bend on.
+func _load() -> float:
+	return clampf(float(catch.size()) / maxf(float(hold), 1.0), 0.0, 1.0)
+
+
+## Where the inside of the bag has moved to: back against the pull, and down under the load.
+## The catch is placed against this rather than against the middle of the frame.
+func _belly() -> Vector2:
+	var tall := _frame_height()
+	return (
+		-_pull * LEAN_TRAIL * tall * _lean * 0.6
+		+ Vector2(0.0, BULGE_DEEP * tall * _load() * 0.45)
+	)
+
+
 ## The net itself. One frame of whichever sequence it is in, tinted to the lake's ink: the
 ## sheets are line drawings keyed to a mask, so the colour is the game's rather than the
 ## paper's.
 func _draw_net(name: StringName, through: float, at: Vector2, mouth: float, ink: Color) -> void:
-	_draw_frame(name, through, at, _draw_span(), Color(ink.r, ink.g, ink.b, 0.92))
+	var tint := Color(ink.r, ink.g, ink.b, 0.92)
+	# A net in the air is a picture; a net in the water is a thing being pulled. Only the
+	# second one bends, and only once there is something to bend it.
+	if state == State.FLYING or (_lean <= 0.001 and _load() <= 0.001):
+		_draw_frame(name, through, at, _draw_span(), tint)
+		return
+	_draw_warped(name, through, at, _draw_span(), tint)
+
+
+## The net as a bending sheet: the frame cut into quads whose corners are moved, laid out as
+## one triangle array.
+##
+## Three things move them, and each says something the flat picture could not. The rim tips
+## towards the rope, so the net leads with the edge being pulled. The body trails behind it,
+## because water does not let a loaded bag keep up with the line. And the belly sags and
+## spreads with the load, which is the only thing on screen that says a net is full before
+## its catch is looked at.
+##
+## The picture itself is untouched — this is the landed net, the one the cast has been
+## showing since the splash, not the drag sheet (see the note on that above).
+func _draw_warped(name: StringName, through: float, at: Vector2, span: float, tint: Color) -> void:
+	var index := _frame_at(name, through)
+	var box := _frame_box(name, index, span)
+	var size: Vector2 = box[0]
+	var hang := float(box[1])
+	var region: Rect2 = (_art[name] as Dictionary)["frames"][index]["region"]
+	var sheet := _sheet.get_size()
+
+	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colours := PackedColorArray()
+	for row in WARP_ROWS + 1:
+		var v := float(row) / float(WARP_ROWS)
+		for col in WARP_COLS + 1:
+			var u := float(col) / float(WARP_COLS)
+			points.append(_warp_point(at, size, hang, u, v))
+			uvs.append(
+				(region.position + Vector2(u * region.size.x, v * region.size.y)) / sheet
+			)
+			colours.append(tint)
+
+	RenderingServer.canvas_item_add_triangle_array(
+		get_canvas_item(), _warp_faces_of(), points, colours, uvs,
+		PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
+	)
+
+
+## One point of the bending sheet: where the frame's (`u` across, `v` down) lands once the
+## lean and the load have moved it, for a frame `size` big whose rim sits `hang` of the way
+## down it, centred on `at`.
+##
+## The mesh and the rope's anchor both come through here, and that is the whole reason it is
+## a function of its own: a rope tied to a rim worked out by any other maths comes untied the
+## moment the net bends.
+func _warp_point(at: Vector2, size: Vector2, hang: float, u: float, v: float) -> Vector2:
+	var load := _load()
+	var tip := LEAN_TIP * size.y * _lean
+	var trail := LEAN_TRAIL * size.y * _lean
+	var sag := BULGE_DEEP * size.y * load
+	var widen := BULGE_WIDE * size.x * load
+	# 0 at the rim, 1 at the bottom of the frame: how much of the bag's body this point is.
+	var deep := clampf((v - hang) / maxf(1.0 - hang, 0.001), 0.0, 1.0)
+	var across := (u - 0.5) * 2.0
+	var p := at + Vector2(across * size.x * 0.5, (v - hang) * size.y)
+	# The rim tips: the side the rope is on lifts, the far side settles into the water.
+	# Fading with depth, because it is the rim being lifted and not the whole bag.
+	p.y -= tip * across * signf(_pull.x) * (1.0 - deep * 0.65)
+	# The body lags behind the pull.
+	p += -_pull * trail * deep
+	# And hangs heavier and wider the fuller it is, deepest in the middle.
+	p.y += sag * deep * sin(PI * u)
+	p.x += widen * across * deep
+	return p
+
+
+## How the warped sheet's points are joined into triangles. Worked out once: the points move
+## every frame, the weave does not.
+func _warp_faces_of() -> PackedInt32Array:
+	if not _warp_faces.is_empty():
+		return _warp_faces
+	for row in WARP_ROWS:
+		for col in WARP_COLS:
+			var a := row * (WARP_COLS + 1) + col
+			var b := a + 1
+			var c := a + WARP_COLS + 1
+			_warp_faces.append_array(PackedInt32Array([a, c, b, b, c, c + 1]))
+	return _warp_faces
 
 
 ## The net as it was drawn before there were any pictures of one: an ellipse in the tiles'
@@ -1238,30 +1767,67 @@ func _draw_catch(at: Vector2, mouth: float) -> void:
 	if catch.is_empty() or grid == null:
 		return
 	_scatter.seed = 20707
-	# The pile is packed into the mouth rather than stacked out of it: however many pieces
-	# are aboard, they share the same cap of headroom and are drawn a little smaller as the
-	# load grows. A haul is a bulging net, not a column.
-	var layers := ceili(float(catch.size()) / float(CATCH_LAYER))
-	var step := mouth * CATCH_RISE / float(maxi(layers, 1))
+	# As many of the catch as the mouth has room for, drawn smaller as the load grows: a bag
+	# with forty things in it is a full bag, not forty stamps, and a wider net shows more of
+	# what it is carrying because there is more net to see it through.
+	var shown := _shown_count(mouth)
 	var packed := CATCH_SCALE * clampf(
-		sqrt(float(CATCH_LAYER * 2) / float(maxi(catch.size(), 1))), CATCH_PACKED, 1.0
+		sqrt(float(CATCH_LAYER * 2) / float(maxi(shown, 1))), CATCH_PACKED, 1.0
 	)
+	# The last ones in, so a cast that is still catching visibly gathers rather than freezing
+	# on whatever it happened to take first.
+	var first := catch.size() - shown
 	var spots: Array[Vector2] = []
-	for i in catch.size():
+	var sizes: Array[float] = []
+	for i in shown:
+		var half: Vector2 = grid.defs[catch[first + i]].size * packed * 0.5
+		# Nothing is drawn wider than the bag holding it. A sofa in a starting net is a sofa
+		# the net is visibly straining around, not a sofa with a net painted behind it.
+		var fit := minf(
+			1.0,
+			minf(
+				mouth * CATCH_FIT / maxf(half.x, 0.001),
+				mouth * 0.5 * CATCH_FIT / maxf(half.y, 0.001)
+			)
+		)
+		half *= fit
 		var angle := _scatter.randf_range(0.0, TAU)
 		# Square-rooted, so the scatter is even over the area rather than crowding the
 		# middle, and then pulled in: the mesh gathers what is in it.
 		var out := sqrt(_scatter.randf()) * CATCH_SPREAD * lerpf(1.0, CLOSE_BUNCH, shut)
-		spots.append(
-			at + Vector2(cos(angle) * mouth, sin(angle) * mouth * 0.5) * out
-			- Vector2(0.0, float(i / CATCH_LAYER) * step)
-		)
+		# Scattered over what is left of the mouth once this piece's own size is taken off it,
+		# so the whole drawing stays inside the rim however big the piece is. That is the
+		# difference between junk in a net and junk cutting through one.
+		spots.append(at + Vector2(
+			cos(angle) * maxf(mouth - half.x, 0.0),
+			sin(angle) * maxf(mouth * 0.5 - half.y, 0.0)
+		) * out)
+		sizes.append(packed * fit)
 	var order: Array[int] = []
-	for i in catch.size():
+	for i in shown:
 		order.append(i)
 	order.sort_custom(func(a: int, b: int) -> bool: return spots[a].y < spots[b].y)
 	var seen := lerpf(1.0, CATCH_HIDDEN, shut)
 	for i in order:
-		draw_set_transform(spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(packed, packed))
-		grid.defs[catch[i]].stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
+		draw_set_transform(
+			spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(sizes[i], sizes[i])
+		)
+		grid.defs[catch[first + i]].stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## How many of the catch are drawn: as many as cover `CATCH_FILL` of the mouth's area at the
+## packed scale, never more than are aboard and never fewer than one.
+##
+## Measured rather than fixed, because the two things it depends on both move: the mouth
+## grows with every width upgrade, and what is in it is a different size every cast.
+func _shown_count(mouth: float) -> int:
+	if catch.is_empty() or grid == null:
+		return 0
+	var room := PI * mouth * (mouth * 0.5) * CATCH_FILL
+	var each := 0.0
+	for i in catch.size():
+		var drawn: Vector2 = grid.defs[catch[i]].size * CATCH_SCALE * CATCH_PACKED
+		each += drawn.x * drawn.y
+	each = maxf(each / float(catch.size()), 1.0)
+	return clampi(int(room / each), 1, catch.size())

@@ -343,6 +343,10 @@ var _shoved := PackedInt32Array()
 ## build from `Iso.on_beach`. See BEACH_CHANCE.
 var dry := PackedByteArray()
 
+## The biggest drawn size among the defs, per axis. Worked out once per build, for
+## `footprint_reach`.
+var _widest := Vector2.ZERO
+
 ## The filth map, one byte per tile, as Lake._build_filth_map last wrote it for the water
 ## shader. Empty until the first build. What the CPU-drawn rings read so they follow the
 ## water's state the way the shader-drawn foam does.
@@ -1238,6 +1242,31 @@ func tiles_within(index: int, radius: float) -> PackedInt32Array:
 	return out
 
 
+## Half the drawn size of a tile's top piece, in world pixels, centred on `surface_pos` like
+## the sprite. What the net's mouth has to touch to take it: the drawing, not the tile.
+func footprint(index: int) -> Vector2:
+	var stack := stacks[index]
+	if stack.is_empty():
+		return Vector2.ZERO
+	return defs[stack[stack.size() - 1]].size * swing[index] * 0.5
+
+
+## How far, in tiles, a piece's drawing can stand off the middle of its own tile: the biggest
+## piece at its biggest swing, drifted, shoved, swaying and rising as far as each goes. Anything
+## looking for pieces a ring touches looks this much wider for candidates, then tests the
+## drawings.
+##
+## Doubled on the height, because the plane is: a pixel up the screen is twice the distance
+## across the lake that a pixel along it is.
+func footprint_reach() -> float:
+	var x := _widest.x * (1.0 + SIZE_SPREAD) * 0.5 + Iso.TILE_W * DRIFT + SHOVE_MOST + SWAY
+	var y := (
+		_widest.y * (1.0 + SIZE_SPREAD) * 0.5 + Iso.TILE_H * DRIFT + SHOVE_MOST
+		+ WAVE_AMPLITUDE + EMERGE_DROP
+	)
+	return Vector2(x, y * 2.0).length() / Iso.tile_circle_extent(1.0)
+
+
 ## The tile a world point falls on, or -1 if it is off the field.
 func tile_at(where: Vector2) -> int:
 	var tile := Iso.world_to_tile(where)
@@ -1266,9 +1295,11 @@ func tile_at(where: Vector2) -> int:
 func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> void:
 	defs = from_defs
 	_all_art = true
+	_widest = Vector2.ZERO
 	for def in defs:
 		if def.atlas == null:
 			_all_art = false
+		_widest = _widest.max(def.size)
 	if sheets != null:
 		_white_uv = sheets.uv_of(sheets.white)
 	_rng.seed = lake_seed

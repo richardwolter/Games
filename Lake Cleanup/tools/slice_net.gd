@@ -53,6 +53,16 @@ const DEBUG_PNG := "res://assets/sliced_net.png"
 ## Where the background starts and where the art is solid, as luminance. Anything lighter
 ## than `CLEAR_AT` is thrown away outright — that band is where the JPEG ringing lives —
 ## and anything darker than `SOLID_AT` is fully opaque. Between them it ramps.
+## How much of a frame's ink, from the top down, counts as its crown: the gathered apex a
+## cast net is hauled from, where the hand line's loop and the bridle meet the mesh.
+##
+## A share of the ink rather than a number of pixels, because these frames are drawn at
+## wildly different sizes — the landed net is 274 px across and the bundled throw is 115.
+## An eighth is enough to land on the apex ring of the landed frames without creeping down
+## the dome, and on a balled-up throw it simply takes the top of the bundle, which is where
+## the line is in those drawings too.
+const CROWN_BAND := 0.12
+
 const CLEAR_AT := 0.88
 const SOLID_AT := 0.42
 
@@ -130,12 +140,18 @@ func _init() -> void:
 			var frames: Array = []
 			for box: Rect2i in runs:
 				var rim := _rim(atlas, box)
+				var crown := _crown(atlas, box)
 				frames.append({
 					"region": [box.position.x, box.position.y, box.size.x, box.size.y],
 					# Where the drawing is at its widest, and how wide: the net's rim, and
 					# the anchor the game hangs the frame from.
 					"rim_width": rim.x,
 					"rim_y": rim.y,
+					# And the crown: the middle of the gathered apex, and how wide the ink
+					# is across it. The game ties the rope there — see CastNet._line_end.
+					"crown_x": crown.x,
+					"crown_y": crown.y,
+					"crown_w": crown.z,
 				})
 				counted += 1
 			sequences[names[row]] = frames
@@ -288,6 +304,54 @@ func _rim(atlas: Image, box: Rect2i) -> Vector2i:
 			widest = width
 			at = y
 	return Vector2i(widest, at)
+
+
+## The crown: the middle of the top `CROWN_BAND` of a frame's ink, and how wide the ink runs
+## across it. `Vector3i(x, y, width)`, in atlas pixels.
+##
+## This is where a cast net is actually hauled from. The hand line goes to a swivel at the
+## gathered apex and a bridle fans from there to the rim — so a rope drawn to anywhere else
+## is a rope tied to the wrong part of the net. Measured rather than authored because the
+## apex sits somewhere different in every frame: dead centre on the landed net, off to one
+## side on a throw still opening, inside the bundle on the first frame of a cast.
+##
+## The middle is the ink's own centre of mass across the band, not the middle of the box.
+## A drawing whose skirt hangs further one way than the other would otherwise pull the
+## crown off the apex it is supposed to name.
+func _crown(atlas: Image, box: Rect2i) -> Vector3i:
+	var top := -1
+	var bottom := -1
+	for y in range(box.position.y, box.position.y + box.size.y):
+		if not _inked_row(atlas, box, y):
+			continue
+		if top < 0:
+			top = y
+		bottom = y
+	if top < 0:
+		return Vector3i(box.position.x + box.size.x / 2, box.position.y, box.size.x)
+	var deep := maxi(int(round(float(bottom - top + 1) * CROWN_BAND)), 1)
+	var weight := 0
+	var sum_x := 0
+	var low := box.position.x + box.size.x
+	var high := box.position.x - 1
+	for y in range(top, mini(top + deep, box.position.y + box.size.y)):
+		for x in range(box.position.x, box.position.x + box.size.x):
+			if atlas.get_pixel(x, y).a < INK_ALPHA:
+				continue
+			weight += 1
+			sum_x += x
+			low = mini(low, x)
+			high = maxi(high, x)
+	if weight == 0:
+		return Vector3i(box.position.x + box.size.x / 2, top, box.size.x)
+	return Vector3i(sum_x / weight, top + deep / 2, high - low + 1)
+
+
+func _inked_row(atlas: Image, box: Rect2i, y: int) -> bool:
+	for x in range(box.position.x, box.position.x + box.size.x):
+		if atlas.get_pixel(x, y).a >= INK_ALPHA:
+			return true
+	return false
 
 
 ## Shrink a box onto its own ink, in both directions.

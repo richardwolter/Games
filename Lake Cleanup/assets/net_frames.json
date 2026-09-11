@@ -2,6 +2,9 @@
 	"sequences": {
 		"cast_far": [
 			{
+				"crown_w": 22,
+				"crown_x": 171,
+				"crown_y": 92,
 				"region": [
 					63,
 					85,
@@ -12,6 +15,9 @@
 				"rim_y": 137
 			},
 			{
+				"crown_w": 22,
+				"crown_x": 326,
+				"crown_y": 98,
 				"region": [
 					315,
 					91,
@@ -22,6 +28,9 @@
 				"rim_y": 141
 			},
 			{
+				"crown_w": 112,
+				"crown_x": 700,
+				"crown_y": 81,
 				"region": [
 					545,
 					71,
@@ -32,6 +41,9 @@
 				"rim_y": 132
 			},
 			{
+				"crown_w": 88,
+				"crown_x": 975,
+				"crown_y": 61,
 				"region": [
 					827,
 					49,
@@ -42,6 +54,9 @@
 				"rim_y": 151
 			},
 			{
+				"crown_w": 122,
+				"crown_x": 1298,
+				"crown_y": 56,
 				"region": [
 					1133,
 					45,
@@ -54,6 +69,9 @@
 		],
 		"cast_near": [
 			{
+				"crown_w": 21,
+				"crown_x": 79,
+				"crown_y": 346,
 				"region": [
 					60,
 					342,
@@ -64,6 +82,9 @@
 				"rim_y": 380
 			},
 			{
+				"crown_w": 39,
+				"crown_x": 399,
+				"crown_y": 348,
 				"region": [
 					295,
 					343,
@@ -74,6 +95,9 @@
 				"rim_y": 387
 			},
 			{
+				"crown_w": 127,
+				"crown_x": 660,
+				"crown_y": 329,
 				"region": [
 					527,
 					322,
@@ -84,6 +108,9 @@
 				"rim_y": 373
 			},
 			{
+				"crown_w": 88,
+				"crown_x": 973,
+				"crown_y": 377,
 				"region": [
 					873,
 					372,
@@ -94,6 +121,9 @@
 				"rim_y": 433
 			},
 			{
+				"crown_w": 68,
+				"crown_x": 1266,
+				"crown_y": 382,
 				"region": [
 					1134,
 					377,
@@ -106,6 +136,9 @@
 		],
 		"drag": [
 			{
+				"crown_w": 290,
+				"crown_x": 251,
+				"crown_y": 936,
 				"region": [
 					19,
 					911,
@@ -116,6 +149,9 @@
 				"rim_y": 1114
 			},
 			{
+				"crown_w": 24,
+				"crown_x": 669,
+				"crown_y": 922,
 				"region": [
 					500,
 					900,
@@ -126,6 +162,9 @@
 				"rim_y": 1201
 			},
 			{
+				"crown_w": 14,
+				"crown_x": 957,
+				"crown_y": 923,
 				"region": [
 					862,
 					899,
@@ -136,6 +175,9 @@
 				"rim_y": 1237
 			},
 			{
+				"crown_w": 17,
+				"crown_x": 1150,
+				"crown_y": 924,
 				"region": [
 					1086,
 					901,
@@ -146,6 +188,9 @@
 				"rim_y": 1248
 			},
 			{
+				"crown_w": 14,
+				"crown_x": 1312,
+				"crown_y": 926,
 				"region": [
 					1257,
 					901,
@@ -158,6 +203,9 @@
 		],
 		"land": [
 			{
+				"crown_w": 64,
+				"crown_x": 133,
+				"crown_y": 610,
 				"region": [
 					8,
 					606,
@@ -168,6 +216,9 @@
 				"rim_y": 654
 			},
 			{
+				"crown_w": 77,
+				"crown_x": 386,
+				"crown_y": 604,
 				"region": [
 					260,
 					599,
@@ -178,6 +229,9 @@
 				"rim_y": 646
 			},
 			{
+				"crown_w": 79,
+				"crown_x": 652,
+				"crown_y": 605,
 				"region": [
 					518,
 					600,
@@ -188,6 +242,9 @@
 				"rim_y": 647
 			},
 			{
+				"crown_w": 94,
+				"crown_x": 946,
+				"crown_y": 621,
 				"region": [
 					806,
 					616,
@@ -198,6 +255,9 @@
 				"rim_y": 659
 			},
 			{
+				"crown_w": 109,
+				"crown_x": 1260,
+				"crown_y": 637,
 				"region": [
 					1114,
 					632,

@@ -185,17 +185,17 @@ func bird_on(tile: int) -> int:
 ## that changes as it purses, and the ring of tiles it covers is that circle rounded to
 ## whole tiles. A bird on the tile the rounding dropped was a bird sitting visibly inside
 ## the net that the net went straight past.
-func perched_near(from: Vector2, radius: float) -> Array[int]:
-	var out: Array[int] = []
-	if grid == null:
-		return out
-	for i in range(birds.size() - 1, -1, -1):
-		var bird: Dictionary = birds[i]
-		if int(bird["state"]) != State.PERCHED:
-			continue
-		if Vector2(grid.tile_of(int(bird["tile"]))).distance_to(from) <= radius:
-			out.append(i)
-	return out
+func footprint(i: int) -> Array:
+	var bird: Dictionary = birds[i]
+	var at: Vector2 = bird["at"]
+	# No sheet: roughly a pigeon's size, so a net still catches birds with the art missing.
+	var span := Vector2(16.0, 16.0) * SCALE
+	if _sheet != null:
+		var frames: Array = _cycle_of(int(bird["row"]), int(bird["state"]))
+		if not frames.is_empty():
+			span = (frames[posmod(int(bird["phase"]), frames.size())] as Rect2).size * SCALE
+	# The sprite stands on `at`, so its middle is half its height above it.
+	return [at - Vector2(0.0, span.y * 0.5), span * 0.5]
 
 
 ## Take a bird out of the flock — the net has it. Returns where it was, for the splash.

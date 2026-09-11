@@ -184,6 +184,16 @@ func charm_on(tile: int) -> int:
 	return -1
 
 
+## A charm's drawing as the net sees it: its middle and the half-size of its flat disc, in
+## world pixels, from the same numbers `_draw` uses.
+func footprint(i: int) -> Array:
+	var charm: Dictionary = charms[i]
+	var at: Vector2 = charm["tile"]
+	var seat := Iso.tile_to_world(at.x, at.y) + Vector2(0.0, sin(float(charm["phase"])) * 2.0)
+	var body := BODY * (1.0 - float(charm["sink"]) * 0.5)
+	return [seat, Vector2(body.x * 0.5, body.y * 0.5 * 0.55)]
+
+
 ## The net has it. Returns which kind it was, and takes it off the water.
 func take(index: int) -> int:
 	if index < 0 or index >= charms.size():

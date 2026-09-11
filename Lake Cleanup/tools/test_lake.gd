@@ -494,6 +494,121 @@ func _stage_net_ring() -> void:
 	_check(_net.state == CastNet.State.REELING and not _net.catch.is_empty(),
 		"the net catches the moment it lands", "%d pieces" % _net.catch.size())
 
+	# The bag shows what it is carrying: more of it as the load grows, and never more pieces
+	# than are actually aboard.
+	var few: int = _net.call(&"_shown_count", mouth)
+	var many_catch := _net.catch.duplicate()
+	# Far more than any mouth has room for, so the cap is what is being measured rather than
+	# how much happened to be aboard.
+	for i in 400:
+		many_catch.append(_net.catch[0])
+	_net.catch = many_catch
+	var many: int = _net.call(&"_shown_count", mouth)
+	_check(many > few and many < _net.catch.size(),
+		"a fuller net shows more of its catch, and never more than it holds",
+		"%d of %d shown, was %d" % [many, _net.catch.size(), few])
+	# A wider mouth has room for more of it.
+	_check(int(_net.call(&"_shown_count", mouth * 2.0)) > many,
+		"and a wider net shows more still",
+		"%d at twice the width" % int(_net.call(&"_shown_count", mouth * 2.0)))
+	_net.catch.resize(0)
+
+	# What it cannot lift is pushed out of the way instead of passed through.
+	var heavy := -1
+	for cell in _grid.tile_count():
+		if _grid.top_slot(cell) >= 0 and _grid.reachable_slot(cell, 1, 0) < 0:
+			heavy = cell
+			break
+	_check(heavy >= 0, "there is a piece too heavy for a starting net", "")
+	if heavy >= 0:
+		_net.power = 0
+		_net.state = CastNet.State.REELING
+		_net.tile_pos = Iso.world_to_tile(_grid.surface_pos(heavy))
+		_grid.shove[heavy] = Vector2.ZERO
+		for i in 20:
+			_net.call(&"_shove_aside", 0.05)
+		_check(_grid.shove[heavy].length() > 0.5,
+			"a piece the net cannot lift is shoved aside",
+			"%.1f px" % _grid.shove[heavy].length())
+		_check(_grid.top_slot(heavy) >= 0, "and is still in the lake", "")
+		_grid.shove[heavy] = Vector2.ZERO
+
+	# The lean falls back out once nothing is pulling.
+	_net.state = CastNet.State.REELING
+	for i in 20:
+		_net.call(&"_lean_into_pull", 0.05)
+	var bent: float = _net.get(&"_lean")
+	_net.state = CastNet.State.IDLE
+	for i in 40:
+		_net.call(&"_lean_into_pull", 0.05)
+	_check(bent > 0.1 and float(_net.get(&"_lean")) < 0.02,
+		"the net leans into the haul and settles when it ends",
+		"%.2f while hauling, %.2f after" % [bent, float(_net.get(&"_lean"))])
+
+	# The rope is tied to the drawn rim: when the net bends, the knot moves with it.
+	_net.state = CastNet.State.REELING
+	_net.catch.append(0)
+	_net.tile_pos = _angler.tile_pos + Vector2(3.0, 3.0)
+	var at := _net.world_pos()
+	_net.set(&"_lean", 0.0)
+	var flat: Vector2 = _net.call(&"_line_end", at)
+	_net.set(&"_lean", 1.0)
+	var bent_end: Vector2 = _net.call(&"_line_end", at)
+	_net.set(&"_lean", 0.0)
+	var span := float(_net.call(&"_draw_span"))
+	_check(not flat.is_equal_approx(bent_end) and flat.distance_to(at) <= span,
+		"the rope ends at the horn over the crown as the warp draws it, and moves when the net bends",
+		"flat at %.1f px from the mouth, bent end moved %.1f px" % [
+			flat.distance_to(at), flat.distance_to(bent_end)])
+
+	# The bridle stays on the crown. Every little rope is short against the net it is tied to
+	# and lands nowhere near the rim — a line from the apex to the edge is a line drawn across
+	# the whole picture, which is what this is here to catch.
+	var near := PackedVector2Array()
+	var far := PackedVector2Array()
+	_net.call(&"_bridle_points", at, flat, near, far)
+	var ends := near + far
+	var longest := 0.0
+	var reach := 0.0
+	for i in range(0, ends.size(), 2):
+		longest = maxf(longest, ends[i].distance_to(ends[i + 1]))
+		reach = maxf(reach, at.distance_to(ends[i + 1]))
+	_check(ends.size() == CastNet.BRIDLES * 2 and far.size() > 0 and near.size() > 0,
+		"the bridle is drawn on both sides of the crown",
+		"%d near, %d far" % [near.size() / 2, far.size() / 2])
+	_check(longest > 0.5 and longest < span * 0.4 and reach < span * 0.5,
+		"and every little rope is short, staying on the crown rather than reaching the rim",
+		"longest %.1f px, furthest end %.1f px from the middle, net %.1f px across" % [
+			longest, reach, span])
+	_net.catch.resize(0)
+
+	# And the rope itself stays a rope for a whole cast: every point near the line between
+	# the hands and the net, none flung off.
+	_net.state = CastNet.State.IDLE
+	_net.tile_pos = _angler.tile_pos
+	# With no hold, so the cast catches nothing and leaves the yard as the later stages
+	# expect it: this is a check on the rope, not on the catch.
+	_net.hold = 0
+	var thrown := _net.cast_to(_water_near_angler())
+	var worst := 0.0
+	var frames := 0
+	while thrown and _net.state != CastNet.State.IDLE and frames < 600:
+		_net.call(&"_process", 1.0 / 60.0)
+		frames += 1
+		var rope: PackedVector2Array = _net.get(&"_rope_now")
+		if rope.size() < 2:
+			continue
+		var head := rope[0]
+		var foot := rope[rope.size() - 1]
+		var along := foot - head
+		for p in rope:
+			# Distance off the straight line between the ends.
+			var t := clampf((p - head).dot(along) / maxf(along.length_squared(), 0.001), 0.0, 1.0)
+			worst = maxf(worst, p.distance_to(head + along * t))
+	_check(thrown and _net.state == CastNet.State.IDLE and worst < 80.0,
+		"the rope hangs off the net for a whole cast without flying apart",
+		"%d frames, %.1f px off the line at worst" % [frames, worst])
+
 	_net.state = CastNet.State.IDLE
 	_net.catch.resize(0)
 	_net.tile_pos = _angler.tile_pos

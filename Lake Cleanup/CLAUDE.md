@@ -22,6 +22,57 @@ Your job is to build the game incrementally with clean architecture and testable
 - Hold-to-haul discrete `TrashObject`s using a boat and net
 - Progress ring shows haul rate = player strength ÷ `TrashDef.haul_cost`
 - Net bites a configurable depth from each water column it passes, gated by tier
+- **The ring is the catch, by decision** (2026-09-11, `net.gd` `_touches`/`_reach`): a piece,
+  bird or charm is caught when any of its *drawing* (an ellipse at its drawn position and
+  size) touches the mouth — not when its tile is inside a tile radius. The aiming marker's
+  green/red verdict uses the same test at the open mouth. `mouth_extent()` is the one number
+  for drawing, sweep and marker, including the `HOME_SIZE` shrink on the haul. The sweep also
+  runs on the landing frame. Tiles only narrow the search (`LakeGrid.footprint_reach`).
+  `net_width.tres` was left as it was, to be retuned after playtesting the honest ring.
+- **The hauled net bends, by decision** (2026-09-11, `net.gd` `_draw_warped`): the landed
+  frame is drawn as a `WARP_COLS` x `WARP_ROWS` sheet of quads laid out as one triangle
+  array, so the rim tips towards the rope (`LEAN_TIP`), the body trails behind the pull
+  (`LEAN_TRAIL`) and the belly sags and spreads with the load (`BULGE_DEEP`/`BULGE_WIDE`).
+  `_lean` and `_pull` are eased, and fall back out when the haul ends. **The `drag` sheet
+  stays retired** — this bends the net that landed, it does not replace it. A net in flight,
+  and an empty one lying still, are drawn flat as before.
+- **The catch fills the bag** (`_draw_catch`, `_shown_count`): the drawn count is as many of
+  `catch` as cover `CATCH_FILL` of the mouth's area at the packed scale — so a wider net and
+  a fuller hold both show more — capped at what is really aboard. No filler pieces: what is
+  drawn was caught. Every piece is scaled to `CATCH_FIT` of the mouth and scattered over the
+  mouth **less its own half-size**, so nothing cuts through the rim; the pile rides `_belly`,
+  back against the pull and down under the load. The old out-of-the-mouth stacking
+  (`CATCH_RISE`) is gone.
+- **The haul shoves what it will not take** (`_shove_aside`): pieces over the net's strength,
+  and everything once the hold is full, are pushed clear of the rim through
+  `LakeGrid.shove_to` — the hulls' own call — outwards from the middle of the mouth, with a
+  piece dead centre parted to a side picked off its tile. Nothing catchable is ever shoved.
+  Haul only: the throw flies over the water.
+- **The rope ties to the crown, not the rim** (`_line_end`, `_bridle_points`, `_crown_frame`,
+  2026-09-11): a cast net is hauled from its gathered apex through a bridle, so the hand line
+  ends at a horn over the crown (lifted `HORN_LIFT`, pulled `HORN_LEAN` towards the rod with
+  the lean) and `BRIDLES` short lines fan from it onto the crown ring, flattened by
+  `BRIDLE_SQUASH`. **Both numbers are fractions of the crown's own width**, not the frame's,
+  so the bridle stays in proportion to the ring it is tied to at any drawn size. Every point
+  goes through `_warp_point`, so horn and bridle bend with the mesh. Far-side bridles draw at
+  `BRIDLE_FAR`. `test_lake` guards that no little rope reaches the rim.
+- **The crown is measured, not authored** (`tools/slice_net.gd` `_crown`): the ink centroid
+  and width across the top `CROWN_BAND` of each frame, baked into `net_frames.json` as
+  `crown_x`/`crown_y`/`crown_w` and read back as fractions of the frame's box. It lands on the
+  apex dome of the landed net and on the top of the bundle in a throw. **Re-run the slicer if
+  the net sheets change**; `CROWN_FALLBACK` keeps an older cut running.
+- **Retired anchors, in order**: the rope ending at the top of the frame's box (a point in
+  the air above a net lying flat); that plus a guessed lean offset (came apart from the mesh
+  the moment the net bent); the rope tied to one point on the near rim (on the net, but read
+  as a line to a hoop); bridles fanning from the horn all the way to the rim (little ropes
+  drawn straight across the mesh they are supposed to be gathering).
+- **The rope is a verlet chain, drawn only** (`_drive_rope`, `_rope_tick`): `ROPE_POINTS`
+  pinned at `rod_tip()` and the rim anchor, fixed `ROPE_STEP`s banked across frames,
+  `ROPE_PASSES` of tightening, per-step `ROPE_LEAP` clamp, re-seeded straight on every
+  cast and on any `ROPE_JUMP`. Rest length runs `ROPE_SLACK` over the rod-to-net gap while
+  the net flies or sits and eases to `ROPE_TAUT` under the haul, so reeling visibly takes
+  line up. **This is not the physics the project banned**: no bodies, no collision, nothing
+  gameplay reads — it is how the string is drawn. The old sine arc and its `sag` are gone.
 
 **Idle (automatic)**:
 - Machines and drones drain continuous `pollution` float over time
