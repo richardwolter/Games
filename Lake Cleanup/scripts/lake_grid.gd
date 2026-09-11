@@ -605,11 +605,11 @@ class GlintSparkle extends Node2D:
 ## same view-culled list the soup uses — one triangle array, every piece on screen, not the
 ## hundred-odd the rings can afford.
 ##
-## What moves it is shaders/shadow.gdshader, which takes the wander and leaves the bob. A
-## shadow that rises and falls with the thing casting it is the exact tell that the thing is
-## a sticker rather than something floating; a shadow that sits still while its mug drifts
-## off it is the same tell from the other side. So the geometry stays static and the GPU
-## slides each shadow along its piece's own sway, off the anchor packed into its vertices.
+## What moves it is shaders/shadow.gdshader, which takes the wander and the bob both, so the
+## shadow is pinned to its piece the way the foam collar is. (It used to leave the bob out,
+## on the theory that a shadow rising with its piece reads as a sticker; on the pixel-art
+## water a piece heaving over a shadow that stayed put was the louder tell.) The geometry
+## stays static and the GPU moves each shadow off the anchor packed into its vertices.
 class ShadowLayer extends Node2D:
 	var grid: LakeGrid
 
@@ -656,6 +656,7 @@ class ShadowLayer extends Node2D:
 		skin.shader = load("res://shaders/shadow.gdshader") as Shader
 		skin.set_shader_parameter("sway", LakeGrid.SWAY)
 		skin.set_shader_parameter("wave_speed", LakeGrid.WAVE_SPEED)
+		skin.set_shader_parameter("wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
 		skin.set_shader_parameter("shade", shade)
 		material = skin
@@ -946,12 +947,12 @@ class RippleLayer extends Node2D:
 			var stack := grid.stacks[index]
 			if stack.is_empty():
 				continue
-			# Still water plus the drift, and deliberately *not* the bob. `surface_pos`
-			# includes the swell, so the ring used to heave up and down with the piece it
-			# was drawn around — a disturbance in the water that rises with the thing
-			# floating in it is the whole reason the lake read as stickers on glass.
+			# Where the piece actually is, bob included, so the ring stays round the thing it
+			# is drawn round. It used to take only the drift and leave the bob out; with the
+			# shadow and the foam collar both riding the swell now, a ring that stayed level
+			# while the piece rose out of it was the one thing left moving on its own.
 			var still := grid.surface_still(index)
-			var at := still + LakeGrid._sway(still.x, clock)
+			var at := grid.surface_pos(index)
 			var def := grid.defs[stack[stack.size() - 1]]
 			# Off the piece's own place on the water, so no two rings breathe together —
 			# in step, a field of them pulses like a warning light.
