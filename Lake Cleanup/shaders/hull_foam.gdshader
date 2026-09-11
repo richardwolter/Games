@@ -11,8 +11,7 @@
 // moves, which is what makes it read as foam being left behind rather than a line drawn on.
 //
 // Pixel art (see pixel.gdshaderinc): worked out on a grid of `foam_pixel` squares in the
-// boat's own frame, so the grid travels with the boat; coverage dithered rather than faded;
-// the pattern ticks at `pixel_fps`.
+// boat's own frame, so the grid travels with the boat, and the pattern ticks at `pixel_fps`.
 //
 // How hard the boat is pushing — 0 stopped, 1 under way — arrives in the vertex colour's
 // alpha, so every boat can share this one material and a stopping boat's wave dies away.
@@ -23,7 +22,6 @@ render_mode blend_mix;
 
 // What the foam is drawn in, alpha included. Matches LakeGrid.FOAM_COLOUR, and a little more
 // solid than its FOAM_ALPHA because a streak this thin at that alpha disappears into the water.
-// The alpha is the share of the streak's pixels drawn, dithered.
 uniform vec4 foam : source_color = vec4(0.93, 0.97, 1.0, 0.75);
 // The bright bubble cores. Palette `foam_light`.
 uniform vec4 foam_core : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -63,7 +61,6 @@ void fragment() {
 	if (abs(determinant(d_local)) > 1e-8) {
 		uv += mat2(dFdx(UV), dFdy(UV)) * inverse(d_local) * (centre - local);
 	}
-	float threshold = bayer4(cell);
 
 	float t = stepped_time(TIME, pixel_fps);
 	float u = uv.x;
@@ -86,6 +83,6 @@ void fragment() {
 	// In off the bow without a hard start, and out at the tail.
 	float fade = smoothstep(0.0, 0.05, u) * (1.0 - smoothstep(0.6, 1.0, u));
 
-	vec3 lit = mix(foam.rgb, foam_core.rgb, step(bayer4_offset(cell), grain * 0.3));
-	COLOR = vec4(lit, step(threshold, foam.a * line * kept * fade * push));
+	vec3 lit = mix(foam.rgb, foam_core.rgb, grain * 0.3);
+	COLOR = vec4(lit, foam.a * line * kept * fade * push);
 }

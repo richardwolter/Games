@@ -18,9 +18,9 @@ const USED := "res://assets/pigeons_used.json"
 const SHEET := "res://assets/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
 
 ## How big a bird is drawn, as a multiple of its own pixels. The art is eleven pixels
-## across and the lake's rubbish is drawn at about one and a half times its own size, so
-## this keeps a pigeon and a floating mug in proportion.
-const SCALE := 1.5
+## across and the lake's rubbish is drawn at twice its own size (`Lake.SPRITE_SCALE`), so
+## this keeps a pigeon and a floating mug in proportion — and whole, so it sits on the art grid.
+const SCALE := 2.0
 
 ## One bird per this many pieces of rubbish on screen, up to a cap. The flock is a reading
 ## of how dirty the water in front of the player is.

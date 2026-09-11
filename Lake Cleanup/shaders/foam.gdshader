@@ -19,8 +19,7 @@
 //
 // Pixel art (see pixel.gdshaderinc): the collar is worked out on a grid of `foam_pixel`
 // squares laid in the piece's own frame, so the grid rides the swell with the piece rather
-// than the foam's pixels crawling across it. Coverage is dithered, not faded, and the tearing
-// ticks at `pixel_fps`. The swell itself keeps real TIME — the piece moves smoothly, and a
+// than the foam's pixels crawling across it, and the tearing ticks at `pixel_fps`. The swell itself keeps real TIME — the piece moves smoothly, and a
 // collar stepping behind it would come off its cut.
 shader_type canvas_item;
 render_mode blend_mix;
@@ -97,7 +96,6 @@ void fragment() {
 	if (abs(determinant(d_local)) > 1e-8) {
 		uv += mat2(dFdx(UV), dFdy(UV)) * inverse(d_local) * (centre - local);
 	}
-	float threshold = bayer4(cell);
 
 	// Across the collar: two waves beating against each other, seeded off the piece's own
 	// anchor so no two pieces foam alike, and drifting so the lip is never the same shape
@@ -155,9 +153,8 @@ void fragment() {
 	float kept = mix(0.28, 1.0, step(grain, lip * 1.25));
 
 	// And the bright cores: a bubble catching the light is whiter than the water round it,
-	// and the brightest are where the foam is thickest. A swatch per pixel, not a blend.
-	vec3 lit = mix(foam.rgb, foam_core.rgb, step(bayer4_offset(cell), grain * 0.4 * lip));
+	// and the brightest are where the foam is thickest.
+	vec3 lit = mix(foam.rgb, foam_core.rgb, grain * 0.4 * lip);
 
-	// Coverage dithered: a pixel is foam or it is water, never a see-through white.
-	COLOR = vec4(lit, step(threshold, foam.a * lip * kept));
+	COLOR = vec4(lit, foam.a * lip * kept);
 }

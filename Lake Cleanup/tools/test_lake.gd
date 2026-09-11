@@ -212,8 +212,18 @@ func _stage_build() -> void:
 	# Zoom has two ends and stays between them, so the wheel can never lose the lake.
 	var cam := _main.get_node(^"Camera") as Camera2D
 	_main.call(&"_zoom_by", 1000.0)
-	_check(is_equal_approx(cam.zoom.x, 1.8), "zooming in stops at the near limit",
-		"%.3f" % cam.zoom.x)
+	var near: float = _main.call(&"_near_zoom")
+	_check(is_equal_approx(cam.zoom.x, near) and near <= Lake.MAX_ZOOM + 0.001,
+		"zooming in stops at the near limit", "%.3f, near %.3f" % [cam.zoom.x, near])
+	# Every zoom the wheel can land on is a whole number of screen pixels to a pixel of art,
+	# or the lake's pixels shimmer as the camera moves.
+	# Only where a whole level fits under the limit at all: a headless run's dummy display
+	# reports a stretch near nothing, and there the zoom is held at MAX_ZOOM instead.
+	var stretch: float = _main.call(&"_stretch")
+	var per_art := cam.zoom.x * Lake.ART_PIXEL * stretch
+	if Lake.MAX_ZOOM * Lake.ART_PIXEL * stretch >= 1.0:
+		_check(absf(per_art - roundf(per_art)) < 0.001, "the near zoom is a whole pixel level",
+			"%.3f screen px per art px" % per_art)
 	# The far end is worked out from the window rather than written down, so it is asked of
 	# the game and then checked against the basin, which is what the limit is really about.
 	#
@@ -223,15 +233,20 @@ func _stage_build() -> void:
 	# stops there — the wheel can neither lose the lake nor turn it into a map.
 	_main.call(&"_zoom_by", 0.0001)
 	var fit: float = _main.call(&"_fit_zoom")
-	_check(is_equal_approx(cam.zoom.x, fit), "zooming out stops at the far limit",
-		"%.3f, fit %.3f" % [cam.zoom.x, fit])
+	var far: float = _main.call(&"_far_zoom")
+	_check(is_equal_approx(cam.zoom.x, far), "zooming out stops at the far limit",
+		"%.3f, far %.3f (fit %.3f)" % [cam.zoom.x, far, fit])
+	# The far level is at or out past the fitted zoom, except on a window too small for any
+	# level to fit, where it is level one — so "most of the lake" is scaled by how far level
+	# one overshoots.
 	var span := Iso.basin_extent() * cam.zoom.x
 	var view := _main.get_viewport_rect().size
 	var shown := minf(view.x / span.x, view.y / span.y)
-	_check(shown >= 1.0 / Lake.ZOOM_OUT_PULL - 0.01,
+	var wanted := 1.0 / Lake.ZOOM_OUT_PULL * minf(1.0, fit / cam.zoom.x)
+	_check(shown >= wanted - 0.01,
 		"and most of the lake is on screen there",
 		"%.2f of it, wanted %.2f (lake %.0fx%.0f in %.0fx%.0f)" % [
-			shown, 1.0 / Lake.ZOOM_OUT_PULL, span.x, span.y, view.x, view.y
+			shown, wanted, span.x, span.y, view.x, view.y
 		])
 	cam.zoom = Vector2(0.62, 0.62)
 

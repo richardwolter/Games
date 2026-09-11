@@ -119,11 +119,25 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **Grid**: every effect is evaluated once per `foam_pixel` (2 world px) cell. Water uses the
   world grid; the foam collars and bow waves snap in their own piece/boat frame, so the grid
   travels with the smoothly moving sprite instead of crawling across it.
-- **Colours**: output is only palette swatches — two five-step water ramps
-  (`water_clean_*`, `water_dirty_*`), `foam`/`foam_light`/`foam_dirty`, and the grime.
-  Depth, bands, glints and sparkle sum to a ramp position; in-between values are dithered
-  with a fixed 4x4 Bayer pattern, never blended. Clean vs dirty ramp is dithered on local
-  filth the same way, so a bay clears as a thinning green pattern. The water is opaque.
+- **Colours**: the water body outputs only palette swatches — three five-step ramps
+  (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands, glints and
+  sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
+  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth. The
+  water is opaque. Foam keeps its own shapes and soft alpha.
+- **No dither, by decision**: a per-pixel Bayer dither was tried and rejected — grainy open
+  water, lone dirty pixels in cleaned bays, shimmer under camera motion.
+- **Zoom and camera**: zoom only lands on levels where one art pixel (`Lake.ART_PIXEL` = 2
+  world px) is a whole number of real screen pixels, through the window stretch
+  (`_zoom_level`, `_near_level`, `_far_level`). The drawn camera is snapped to whole screen
+  pixels via `Camera2D.offset` (`_snap_camera`); the logical position stays smooth. The cast
+  lean-in zoom (`CAST_PUSH`) was removed for this — no level is close enough.
+  Moving objects still glide between art pixels; a low-res SubViewport would fix that but
+  needs every UI CanvasLayer pulled out of `Main` — not done.
+- **Sprite scale**: rubbish, finds (`SPRITE_SCALE`) and pigeons (`Flock.SCALE`) draw at 2.0.
+  A piece under `SPRITE_SMALLEST` scales up by whole steps. The ~15 big finds over 34 px art
+  keep an exact fractional cap to `SPRITE_LARGEST` (68) — rounding their scales inverted the
+  size order (44 px mirror -> 88, 55 px sofa -> 55), which `test_lake` guards. Carried pieces
+  (dog/boat/net) stay fractional.
 - **Motion**: pattern animation runs on `stepped_time(TIME, pixel_fps)` (default 8 fps). The
   **swell** (what open foam and foam collars ride) keeps real `TIME` because the rubbish rides
   it smoothly; open foam's swell offset is rounded to whole pixels instead.

@@ -38,6 +38,12 @@ var histogram: Dictionary = {}
 @export var water_dirty_mid: Color = Color.WHITE
 @export var water_dirty_shallow: Color = Color.WHITE
 @export var water_dirty_light: Color = Color.WHITE
+## The murky state between them: a bay part-way cleaned.
+@export var water_murky_deep: Color = Color.WHITE
+@export var water_murky_mid: Color = Color.WHITE
+@export var water_murky: Color = Color.WHITE
+@export var water_murky_shallow: Color = Color.WHITE
+@export var water_murky_light: Color = Color.WHITE
 
 ## Foam: the body, its bright bubble cores, and what foam on filthy water goes to.
 @export var foam: Color = Color.WHITE

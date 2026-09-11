@@ -17,9 +17,9 @@ var _faces: Array[Angler] = []
 
 ## Set the view zoom the way the lake does.
 ##
-## Writing the camera directly stopped working the day the cast push went in: the lake
-## multiplies the player's zoom by whatever a cast is leaning on it and writes the result
-## every frame, so anything set on the camera from outside is gone by the next one.
+## Writing the camera directly does not stick: the lake puts `_view_zoom` on the nearest
+## whole-pixel zoom level and writes it every frame, so anything set on the camera from
+## outside is gone by the next one — and the zoom asked for here lands on a level near it.
 func _set_zoom(camera: Camera2D, zoom: float) -> void:
 	_main.set(&"_view_zoom", zoom)
 	camera.zoom = Vector2(zoom, zoom)

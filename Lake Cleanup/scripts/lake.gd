@@ -103,26 +103,23 @@ const DRAG_PULL := 1.5
 ## out as the trees ever reach — so the ring grows, and the props with it, and the edge is
 ## still one drag away.
 const BEYOND := Color(0.16, 0.22, 0.14)
-## Per wheel notch. Multiplicative, so a notch is the same felt step at either end.
+## Per wheel notch. The wheel moves one zoom level per notch whatever this is; it only says
+## which way (and `_zoom_by` lets a bigger factor jump further).
 const ZOOM_STEP := 1.12
 
-## How much closer the view gets over the course of a cast, and how quickly it eases to
-## and from that. A cast is the one thing in this game that happens at a moment rather than
-## over an afternoon, and leaning in for it is most of what makes it feel like one.
+## World pixels to one pixel of the art — the ground pack's `Ground.SCALE`, and what the
+## rubbish, finds and pigeons are drawn at.
 ##
-## Multiplied onto whatever the player has set with the wheel rather than replacing it, so
-## it reads as leaning in from where they were standing instead of the view being taken off
-## them and handed back.
-## Gentle on purpose. At forty per cent the view moved enough over a cast to be felt in the
-## stomach, and a camera that has to be endured is worse than one that does nothing.
-const CAST_PUSH := 1.13
-
-## Leaning in and letting go are not the same speed. Following a cast has to be quick or the
-## view arrives after the thing it was meant to be watching — the first version eased both
-## ways at one rate and hit its closest a second *after* the net was already home. Letting go
-## is slow on purpose: the cast is over, and there is nothing to keep up with.
-const PUSH_IN := 4.5
-const PUSH_OUT := 1.6
+## Zoom is held to levels where one of these covers a whole number of real screen pixels,
+## worked out through the window's stretch (see `_zoom_level`), and the drawn camera position
+## is snapped to whole screen pixels (`_snap_camera`). Between them the art and the water's
+## pixel grid land on the same screen pixels every frame, so panning and zooming do not make
+## them shimmer. Free zoom put a two-pixel cell at 2.8 screen pixels, drawn as two or three
+## depending on where the camera happened to be.
+##
+## It is why there is no lean-in on a cast any more: the gentlest step between levels is a
+## third, far past the thirteen per cent the cast used to push.
+const ART_PIXEL := 2.0
 
 ## How far the view slides off the angler and onto the net while a cast is out, and how
 ## quickly it takes up and gives back that slack.
@@ -210,7 +207,11 @@ const SHOP_RANGE := 3.2
 ## six times between the smallest crumb and the biggest bed instead of three. Sixty-eight is
 ## about a tile wide: the size of the ferry, well under the shed, which is as far as this
 ## should go before a wardrobe starts eating the tiles either side of it.
-const SPRITE_SCALE := 1.5
+##
+## Two, not one and a half: two is `ART_PIXEL`, one pixel of the art to one pixel of the ground
+## pack, so a piece lands on the same screen pixels as everything else at every zoom level.
+## At 1.5 each source pixel was three quarters of one, and thin details dropped out.
+const SPRITE_SCALE := 2.0
 const SPRITE_SMALLEST := 11.0
 const SPRITE_LARGEST := 68.0
 
@@ -370,7 +371,6 @@ var _grid: LakeGrid
 ## of it. The camera's own zoom is the two multiplied together and is written every frame,
 ## so neither can be read back as the authority for the other.
 var _view_zoom: float = VIEW_ZOOM
-var _cast_push: float = 1.0
 ## How far the view has slid from the angler towards the net, 0 to 1.
 var _cast_look: float = 0.0
 
@@ -966,7 +966,8 @@ const SHORE_LAP := 0.45
 const WATER_SWATCHES: Array[StringName] = [
 	&"water_clean_deep", &"water_clean_mid", &"water_clean", &"water_clean_shallow",
 	&"water_clean_light", &"water_dirty_deep", &"water_dirty_mid", &"water_dirty",
-	&"water_dirty_shallow", &"water_dirty_light",
+	&"water_dirty_shallow", &"water_dirty_light", &"water_murky_deep", &"water_murky_mid",
+	&"water_murky", &"water_murky_shallow", &"water_murky_light",
 ]
 
 
@@ -1259,11 +1260,18 @@ func _dress(defs: Array[TrashDef]) -> void:
 		def.region = _sheets.region_of(def.piece)
 		var art := def.region.size
 		var longest := maxf(art.x, art.y)
-		var scale := clampf(
-			SPRITE_SCALE,
-			SPRITE_SMALLEST / longest,
-			maxf(SPRITE_LARGEST / longest, SPRITE_SMALLEST / longest)
-		)
+		# Whole source pixels wherever the limits allow, like the angler, so a piece sits on the
+		# art grid. A crumb too small at SPRITE_SCALE is scaled up by whole steps.
+		#
+		# The cap is the exception, and stays exact rather than whole: only the big finds reach
+		# it, and rounding their scales inverted the proportion — a 44-pixel mirror rounded up
+		# to 88 while a 55-pixel sofa rounded down to 55. Those few draw at exactly
+		# SPRITE_LARGEST, slightly off the grid, and the biggest picture stays the biggest thing.
+		var scale := SPRITE_SCALE
+		if longest * scale < SPRITE_SMALLEST:
+			scale = ceilf(SPRITE_SMALLEST / longest)
+		elif longest * scale > SPRITE_LARGEST:
+			scale = maxf(SPRITE_LARGEST / longest, SPRITE_SMALLEST / longest)
 		def.size = art * scale
 
 
@@ -1431,8 +1439,17 @@ func _at_shed() -> bool:
 
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
+##
+## On levels: at least one level in the factor's direction, further if the factor asks for it,
+## and never past either end.
 func _zoom_by(factor: float) -> void:
-	var wanted := clampf(_view_zoom * factor, _fit_zoom(), MAX_ZOOM)
+	var level := _zoom_level_of(_view_zoom)
+	var target := _zoom_level_of(_view_zoom * factor)
+	if factor > 1.0:
+		target = maxi(target, level + 1)
+	elif factor < 1.0:
+		target = mini(target, level - 1)
+	var wanted := _zoom_level(clampi(target, _far_level(), _near_level()))
 	if is_equal_approx(wanted, _view_zoom):
 		return
 	# Worked out from the camera's own mapping rather than by reading the mouse again
@@ -1446,15 +1463,72 @@ func _zoom_by(factor: float) -> void:
 	_camera.position = _clamped_view(_camera.position + offset / was - offset / now)
 
 
-## Write the camera's zoom: what the player set, leaned on by whatever a cast in progress
-## is asking for, and kept inside the same limits the wheel obeys.
+## Write the camera's zoom: what the player set, put on the nearest level and kept inside the
+## same limits the wheel obeys.
 func _push_zoom() -> void:
-	# Clamped on the way out as well as when the wheel turns: the window can be resized under
-	# a view that was already as far out as it went, and the far end is a fact about the
-	# window.
-	_view_zoom = clampf(_view_zoom, _fit_zoom(), MAX_ZOOM)
-	var wanted := clampf(_view_zoom * _cast_push, _fit_zoom(), MAX_ZOOM)
-	_camera.zoom = Vector2(wanted, wanted)
+	# Levelled and clamped on the way out as well as when the wheel turns: the window can be
+	# resized (or go fullscreen, which changes the stretch and so every level) under a view
+	# that was already set, and anything outside can write `_view_zoom` directly.
+	var level := clampi(_zoom_level_of(_view_zoom), _far_level(), _near_level())
+	_view_zoom = _zoom_level(level)
+	_camera.zoom = Vector2(_view_zoom, _view_zoom)
+
+
+## Snap where the camera is drawn to whole screen pixels, leaving where it is alone.
+##
+## The position stays smooth — following, dragging and the cast's slide all ease on it — and
+## only the offset takes up the difference, so nothing that reads the camera's position is
+## handed a stair-stepped value to ease from.
+func _snap_camera() -> void:
+	var per := _camera.zoom.x * _stretch()
+	if per <= 0.0:
+		return
+	var drawn := (_camera.position * per).round() / per
+	_camera.offset = drawn - _camera.position
+
+
+## Real screen pixels to one canvas unit: the window's stretch, 1 at the base size.
+func _stretch() -> float:
+	var s := get_viewport().get_final_transform().get_scale().x
+	return s if s > 0.0 else 1.0
+
+
+## The zoom at a level: `level` screen pixels to every pixel of the art.
+##
+## Never past MAX_ZOOM, even at level one. A window stretched down below about a quarter of
+## its base size (or a headless run, whose dummy display reports a stretch near nothing) has
+## no whole level under the limit, and a view pushed ten times in is worse than one that is
+## slightly off the pixel grid.
+func _zoom_level(level: int) -> float:
+	return minf(float(level) / (ART_PIXEL * _stretch()), MAX_ZOOM)
+
+
+## The nearest level to a zoom.
+func _zoom_level_of(zoom: float) -> int:
+	return maxi(roundi(zoom * ART_PIXEL * _stretch()), 1)
+
+
+## The closest level in: the last one not past MAX_ZOOM.
+func _near_level() -> int:
+	return maxi(floori(MAX_ZOOM * ART_PIXEL * _stretch() + 0.0001), 1)
+
+
+## The furthest level out: the one nearest the fitted zoom.
+##
+## Nearest, not the first one out past it. On a stretched window the levels are a third or
+## a half apart, and rounding outward went all the way to a view of the whole basin — the
+## map `ZOOM_OUT_PULL` is there to stop.
+func _far_level() -> int:
+	return clampi(roundi(_fit_zoom() * ART_PIXEL * _stretch()), 1, _near_level())
+
+
+## The zooms at the two ends, for the tests.
+func _near_zoom() -> float:
+	return _zoom_level(_near_level())
+
+
+func _far_zoom() -> float:
+	return _zoom_level(_far_level())
 
 
 ## The furthest out the view may go: the zoom at which the whole waterline sits inside the
@@ -2432,14 +2506,8 @@ func _process(delta: float) -> void:
 	if _autosave_in <= 0.0:
 		save_game()
 
-	# Eased rather than set: the push follows the cast, and a camera that snapped to it
-	# would be a cut.
-	var wants := lerpf(1.0, CAST_PUSH, _net.cast_progress())
-	_cast_push = lerpf(
-		_cast_push, wants,
-		clampf((PUSH_IN if wants > _cast_push else PUSH_OUT) * delta, 0.0, 1.0)
-	)
 	_push_zoom()
+	_snap_camera()
 
 	_grid.set_view(_visible_world_rect())
 	_grid.set_detailed(_camera.zoom.x >= DETAIL_ZOOM)
