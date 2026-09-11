@@ -531,7 +531,7 @@ func _screen_facing() -> Vector2:
 
 
 func _place() -> void:
-	position = Iso.tile_to_world(tile_pos.x, tile_pos.y)
+	position = Iso.drawn(Iso.tile_to_world(tile_pos.x, tile_pos.y))
 
 
 func _process(delta: float) -> void:

@@ -27,6 +27,7 @@ render_mode blend_mix;
 #include "res://shaders/pixel.gdshaderinc"
 
 uniform float foam_pixel = 2.0;
+uniform float snap_px = 0.0;
 uniform float pixel_fps = 8.0;
 // The bright bubble cores. Palette `foam_light`.
 uniform vec4 foam_core : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -81,9 +82,15 @@ void vertex() {
 	float t = TIME * wave_speed;
 	// The swell, exactly as the piece rides it, so the collar sits on the cut at every point
 	// of every wave rather than only at the top of one.
-	VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
-	VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
-	VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	vec2 off = vec2(0.0);
+	off.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
+	off.x += sin(t * 0.53 + x * 0.017) * sway;
+	off.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+	// The art-pixel snap on the ride; mirrors rubbish.gdshader. Set by LakeGrid.set_art_snap.
+	if (snap_px > 0.0) {
+		off = floor(off / snap_px + 0.5) * snap_px;
+	}
+	VERTEX += off;
 }
 
 void fragment() {

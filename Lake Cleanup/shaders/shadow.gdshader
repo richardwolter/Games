@@ -18,6 +18,8 @@ uniform float sway = 3.2;
 uniform float wave_speed = 1.0;
 uniform float wave_amplitude = 5.0;
 uniform float anchor_span = 8192.0;
+// The art-pixel snap on the ride; mirrors rubbish.gdshader. Set by LakeGrid.set_art_snap.
+uniform float snap_px = 0.0;
 
 // What a shadow is drawn in, alpha included. Held here rather than in the vertex colours
 // because those carry the anchor instead.
@@ -52,9 +54,14 @@ void vertex() {
 	// like the piece does. See LakeGrid.DRY_ANCHOR.
 	if (high < 255.0 || low < 255.0) {
 		float t = TIME * wave_speed;
-		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
-		VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
-		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+		vec2 off = vec2(0.0);
+		off.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
+		off.x += sin(t * 0.53 + x * 0.017) * sway;
+		off.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+		if (snap_px > 0.0) {
+			off = floor(off / snap_px + 0.5) * snap_px;
+		}
+		VERTEX += off;
 	}
 }
 

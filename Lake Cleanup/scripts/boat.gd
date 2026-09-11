@@ -396,8 +396,9 @@ func _sweep_from(from: float, index: int) -> float:
 
 
 func _place() -> void:
-	position = Iso.tile_to_world(tile_pos.x, tile_pos.y)
-	position.y += -RIDE_HEIGHT + _swell(position.x, _time * WAVE_SPEED) * WAVE_AMPLITUDE
+	var at := Iso.tile_to_world(tile_pos.x, tile_pos.y)
+	at.y += -RIDE_HEIGHT + _swell(at.x, _time * WAVE_SPEED) * WAVE_AMPLITUDE
+	position = Iso.drawn(at)
 
 
 func _process(delta: float) -> void:

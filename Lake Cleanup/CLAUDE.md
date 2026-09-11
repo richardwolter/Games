@@ -134,7 +134,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   pixels via `Camera2D.offset` (`_snap_camera`); the logical position stays smooth. The cast
   lean-in zoom (`CAST_PUSH`) was removed for this — no level is close enough.
   Moving objects still glide between art pixels; a low-res SubViewport would fix that but
-  needs every UI CanvasLayer pulled out of `Main` — not done.
+  needs every UI CanvasLayer pulled out of `Main` — not done. **On trial (2026-09-11), F4**:
+  `Iso.art_snap` draws the angler, dog and boat (`Iso.drawn` in their `_place`) and the swell
+  the rubbish, its shadows and collars ride (`snap_px` in rubbish/shadow/foam shaders, via
+  `LakeGrid.set_art_snap`) on the art-pixel grid; logic positions and the camera stay smooth
+  (`_watching` reads `tile_pos`, not the node). Off by default until Richard judges it. Not
+  snapped: the net, leaning/rotated sprites' own texels, ripple rings, splashes. The full
+  SubViewport stays the fallback if this is not enough.
 - **Ground edge** (`ground.gd` `BLEND`): the mainland lawn meets the beach through a mixed
   band ~2 tiles either side of the line, each tile rolling by stable hash between rough
   grass, tufted mounds (`GRASS_BORDER`), sand-with-tufts cubes (`SAND_TUFTED`) and plain

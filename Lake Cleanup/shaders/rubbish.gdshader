@@ -27,6 +27,9 @@ uniform float sway = 3.2;
 // LakeGrid.ANCHOR_SPAN.
 uniform float anchor_span = 8192.0;
 
+// The art-pixel snap on the ride, in world pixels; 0 is off. Set by LakeGrid.set_art_snap.
+uniform float snap_px = 0.0;
+
 void vertex() {
 	// The piece's own anchor position is packed into the red and green channels as one
 	// sixteen-bit number, and the colour it should actually be drawn in is the grey level
@@ -44,11 +47,18 @@ void vertex() {
 	// so does not move. See LakeGrid.DRY_ANCHOR.
 	if (high < 255.0 || low < 255.0) {
 		float t = TIME * wave_speed;
-		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
+		vec2 off = vec2(0.0);
+		off.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
 		// The wander. Two slow waves at different rates, off the same anchor, so neighbouring
 		// pieces are never in step and nothing in the lake travels in a straight line.
-		VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
-		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+		off.x += sin(t * 0.53 + x * 0.017) * sway;
+		off.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
+		// On trial (F4, see Iso.art_snap): the ride in whole art pixels. Mirrored in
+		// shadow.gdshader and foam.gdshader, or they slide off the piece by a pixel.
+		if (snap_px > 0.0) {
+			off = floor(off / snap_px + 0.5) * snap_px;
+		}
+		VERTEX += off;
 	}
 
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
