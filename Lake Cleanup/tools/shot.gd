@@ -208,6 +208,14 @@ func _process(_delta: float) -> void:
 			angler.call(&"_place")
 		var camera5 := _main.get_node(^"Camera") as Camera2D
 		camera5.position = Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+	if OS.get_cmdline_user_args().has("clean") and _frames == 3:
+		# The lake with nothing left in it, so the clean water can be looked at on its own:
+		# every stack emptied, the filth map rebuilt off that, and the meter agreeing.
+		var grid_c := _main.get_node(^"Grid") as LakeGrid
+		for i in grid_c.stacks.size():
+			grid_c.stacks[i] = PackedInt32Array()
+		_main.call(&"_build_filth_map")
+		_main.set(&"pollution", 0.0)
 	if OS.get_cmdline_user_args().has("shop") and _frames == 3:
 		# The upgrades board, with enough money that some rows are affordable and some are
 		# not — the two states are drawn differently and both want looking at.

@@ -120,7 +120,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   world grid; the foam collars and bow waves snap in their own piece/boat frame, so the grid
   travels with the smoothly moving sprite instead of crawling across it.
 - **Colours**: the water body outputs only palette swatches — three five-step ramps
-  (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands, glints and
+  (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands and
   sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
   Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, after
   a drifting blob noise (`murk_blotch`, `murk_wobble`) pushes the filth up or down — so the
@@ -142,12 +142,10 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   (dog/boat/net) stay fractional.
 - **Motion**: pattern animation runs on `stepped_time(TIME, pixel_fps)` (default 8 fps). The
   **swell** the foam collars ride keeps real `TIME` because the rubbish rides it smoothly.
-- **No open-water foam, by decision**: the loose white streaks riding the swell over the open
-  lake were removed (Sep 2026) — they read as lines through clean water. Shore foam stays.
-- **Filth map holes**: `Lake._build_filth_map` blurs a weighted average — a tile that cannot
-  hold rubbish (the holdoff band round the island, the island itself) takes the mean of its
-  neighbours instead of counting as clean. Otherwise the island wears a ring of blue water on
-  opening day.
+- **No glints and no open-water foam, by decision** (Sep 2026): the glints (band crests lifted
+  to the light step, gathered under the sun by `sun_lean`) drew pale strips across clean
+  water, and the loose foam streaks riding the swell drew white ones. Both removed, uniforms
+  and all. Bands stay; shore foam stays; the finished-lake sparkle stays.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the

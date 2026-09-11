@@ -14,7 +14,7 @@
 //   - every effect is worked out once per `foam_pixel` cell of world space, the art's own
 //     pixel size, so nothing has an edge finer than the sprites beside it
 //   - the only colours out are the palette's three water ramps, the foam swatches and the
-//     grime. Depth, bands, glints and sparkle all add up to a position on a ramp, rounded to
+//     grime. Depth, bands and sparkle all add up to a position on a ramp, rounded to
 //     the nearest step: solid areas with hard edges, never a dither. Per-pixel dither read as
 //     grain on open water, left lone green pixels in cleaned bays, and shimmered under a
 //     moving camera. Clean, murky and dirty are the same idea one level up — two cutoffs on
@@ -29,7 +29,12 @@
 //
 // There is no vertex ripple. Seen from above, a displaced waterline would only move
 // the rim of the polygon, and the surface motion the eye actually wants is in the
-// bands and the glints — which cost nothing extra.
+// bands — which cost nothing extra.
+//
+// There are no glints either, by decision. The crests of the bands used to be lifted two
+// steps to the palette's light step, and on clean water that was a set of pale strips
+// running across the lake. Taken out; the light step is now the scum's film on filthy
+// water and the sparkle's points on a finished lake, nothing else.
 shader_type canvas_item;
 render_mode blend_mix;
 
@@ -65,8 +70,8 @@ uniform float shore_lap = 0.45;
 // runtime; the defaults here are the palette's values, so a material with none set still
 // draws the right water.
 //
-// Step 0 deep, 1 mid, 2 the palette's base colour, 3 shallow, 4 light (glints on clean water,
-// the scum's pale film on filthy water).
+// Step 0 deep, 1 mid, 2 the palette's base colour, 3 shallow, 4 light (the scum's pale film
+// on filthy water, the sparkle's points on a finished lake).
 uniform vec4 water_clean_deep : source_color = vec4(0.173, 0.302, 0.431, 1.0);
 uniform vec4 water_clean_mid : source_color = vec4(0.255, 0.42, 0.573, 1.0);
 uniform vec4 water_clean : source_color = vec4(0.353, 0.525, 0.678, 1.0);
@@ -136,8 +141,6 @@ uniform float warp_strength = 26.0;
 // one keeps them a dithered shimmer between neighbouring steps rather than stripes of a
 // different colour.
 uniform float band_steps = 0.7;
-// How many ramp steps a full glint lifts the water, toward the light step.
-uniform float glint_steps = 2.2;
 
 // The foam line against the sand, all in tiles measured in from the edge the water is drawn
 // to. `foam_lip` is how deep the solid lip is on average, `foam_wash` how far past it the
@@ -181,15 +184,6 @@ uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 // finer pattern is switched on over them so the surface breaks into points of light
 // rather than simply glowing harder. It is the same water, catching the sun at last.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
-
-// `sun_lean` is how far over the sun is, negative one side of noon and positive the other,
-// and it slides the glint band across the water so the shine is a strip lying where the sun
-// is rather than an even sheen over the whole basin.
-//
-// There is no sun tint here any more. Glints used to be added light, which had to be the
-// colour of the light adding it; they are a palette step now, and the world's daylight
-// multiply tints that step like every other pixel on screen.
-uniform float sun_lean = 0.0;
 
 varying vec2 world_pos;
 
@@ -389,19 +383,6 @@ void fragment() {
 	float bands = streak * 0.7 + fine * 0.3;
 	// Bands fade with filth: in a polluted lake, light does not get far at all.
 	shade += bands * band_steps * (1.0 - filth * 0.75);
-
-	// Glints: the sharp crests of the same pattern, and the thing that makes a flat
-	// plane read as moving water rather than as painted floor. A cleaned lake takes them
-	// lower down the wave and harder, so more of the surface is a crest.
-	float glint = smoothstep(mix(0.86, 0.83, sparkle), 1.0, bands) * (1.0 - filth * 0.8);
-	// The sun's own strip. Where the light is coming from low and to one side, the shine on
-	// the water gathers into a band under it rather than spreading evenly: this weights the
-	// crests by how near they are to the line the sun is on, and flattens back to an even
-	// sheen as the sun climbs to noon and `sun_lean` goes to nothing.
-	float sun_line = (px.x / (tile_w * 0.5)) * -sun_lean;
-	float toward = 1.0 - clamp(abs(px.y / (tile_h * 0.5) - sun_line) * 0.02, 0.0, 1.0);
-	float gather = mix(1.0, 0.35 + toward * 1.25, clamp(abs(sun_lean), 0.0, 1.0));
-	shade += glint * glint_steps * (1.0 + sparkle * 0.3) * gather;
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
 	// near their peaks, which is a scatter of moving points rather than a sheen. Costs
