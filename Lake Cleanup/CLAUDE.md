@@ -187,6 +187,15 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   right-aligned on the clean end; no `POLLUTION` label. `Style.meter_water`/`water` and
   the `METER_*` colours are gone.
 
+- **The upgrades shop is three drawn boards** (`shop_skin.gd`, 2026-09-11): net, ferry, dog
+  side by side, each an oak frame round a clean-water face with a notched sand ribbon, the
+  thing itself (net / hull / dog sprite, lent by the lake as `ShopSkin.sprites`) under the
+  ribbon, and two-line rows (name over value, sand price tag) below. Colours are the
+  meter's own, as `Style.BOARD*`, `FRAME*`, `RIBBON*` — picked from four palettes (oak,
+  clean water, murky-to-clean, sand-and-bag); clean water won. No row icons, by decision.
+  The painted `assets/shop.png` / `shop.json` / `tools/slice_shop.gd` are gone. Rows carry a
+  `board` key from `Lake._shop_rows`; a track added to `TRACKS` needs one.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

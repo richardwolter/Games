@@ -813,26 +813,17 @@ func _ready() -> void:
 		if def.keepsake and not def.display_name.is_empty():
 			_room.titles[String(def.piece)] = def.display_name
 	_shop_skin.bought.connect(_buy)
-	# Pictures for the rows the upgrades board was not drawn with: the ferry's own baked
-	# sprite for the boat tracks, and the net for the skimmer, which is a net.
+	# The picture at the head of each upgrades board: the ferry's own baked hull, the dog's
+	# idle frame, and the net laid out.
 	var ferry := Boat.art_frame(0.62)
-	var mesh: Dictionary = _net.art_frame(&"land", -1)
 	if not ferry.is_empty():
-		# The same hull three times, told apart by what is drawn beside it: an arrow up for
-		# going faster, a plus for carrying more, and a second hull for a second hull.
-		_shop_skin.icons[&"boat_speed"] = _lent(ferry, &"arrow", 0.95)
-		_shop_skin.icons[&"cargo"] = _lent(ferry, &"plus", 0.95)
-		_shop_skin.icons[&"fleet"] = _lent(ferry, &"pair", 0.72)
-	# The dog itself on both of its rows, told apart the same way the ferry's three are: an
-	# arrow for a dog that goes out sooner, a plus for one that comes back with more.
+		_shop_skin.sprites[&"boat"] = ferry
 	var pup := DogArt.art_frame(&"idle", 0)
 	if not pup.is_empty():
-		_shop_skin.icons[&"dog_fetch"] = _lent(pup, &"plus", 0.9)
-		_shop_skin.icons[&"dog_wait"] = _lent(pup, &"arrow", 0.9)
+		_shop_skin.sprites[&"dog"] = pup
+	var mesh: Dictionary = _net.art_frame(&"land", -1)
 	if not mesh.is_empty() and _net.art_sheet() != null:
-		_shop_skin.icons[&"skimmer"] = _lent(
-			{"sheet": _net.art_sheet(), "region": mesh["region"]}, &"", 0.62
-		)
+		_shop_skin.sprites[&"net"] = {"sheet": _net.art_sheet(), "region": mesh["region"]}
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
@@ -2132,28 +2123,25 @@ func _affordable() -> int:
 	return count
 
 
-## Every upgrade as one row of the drawn board: what it is, what it does now, what the next
-## level costs, and whether it can be paid for.
-##
-## The five icons on the sheet are the net's, in the order they are drawn on it. The ferry's
-## upgrades have no picture yet and say so with an index of -1 rather than borrowing one.
+## Every upgrade as one row of the drawn boards: which board it stands on, what it is,
+## what it does now, what the next level costs, and whether it can be paid for.
 func _shop_rows() -> Array:
 	var out: Array = []
 	var listed := [
-		[&"net_width", 0, "Width", "%d tiles" % _tiles_in_radius(net_radius())],
-		[&"net_strength", 1, "Strength", "lifts tier %d" % net_power()],
-		[&"net_range", 2, "Range", "%.1f tiles" % net_range()],
-		[&"reel", 3, "Speed", "%.1f tiles/s" % reel_speed()],
-		[&"net_hold", 4, "Haul", "%d per cast" % net_hold()],
-		[&"boat_speed", -1, "Ferry speed", "%.1f tiles/s" % boat_speed()],
-		[&"cargo", -1, "Ferry hold", "%d aboard" % boat_cargo()],
-		[&"skimmer", -1, "Skimmer", (
+		[&"net_width", &"net", "Width", "%d tiles" % _tiles_in_radius(net_radius())],
+		[&"net_strength", &"net", "Strength", "lifts tier %d" % net_power()],
+		[&"net_range", &"net", "Range", "%.1f tiles" % net_range()],
+		[&"reel", &"net", "Speed", "%.1f tiles/s" % reel_speed()],
+		[&"net_hold", &"net", "Haul", "%d per cast" % net_hold()],
+		[&"boat_speed", &"boat", "Speed", "%.1f tiles/s" % boat_speed()],
+		[&"cargo", &"boat", "Hold", "%d aboard" % boat_cargo()],
+		[&"skimmer", &"boat", "Skimmer", (
 			"off" if skimmer_level <= 0
 			else "%d items, %d%%" % [skim_hold(), roundi(skim_chance() * 100.0)]
 		)],
-		[&"fleet", -1, "Extra ferry", "%d in the water" % fleet_size()],
-		[&"dog_fetch", -1, "Dog fetching", "%d per trip" % dog_fetch()],
-		[&"dog_wait", -1, "Dog keenness", "waits %.0fs at most" % maxf(
+		[&"fleet", &"boat", "Extra ferry", "%d in the water" % fleet_size()],
+		[&"dog_fetch", &"dog", "Fetching", "%d per trip" % dog_fetch()],
+		[&"dog_wait", &"dog", "Keenness", "waits %.0fs at most" % maxf(
 			Dog.MOOD_MOST - dog_wait_cut(), Dog.MOOD_LEAST
 		)],
 	]
@@ -2163,24 +2151,15 @@ func _shop_rows() -> Array:
 		var price := cost_of(key)
 		out.append({
 			"key": key,
-			"icon": line[1],
+			"board": line[1],
 			"name": "%s (Lvl %d)" % [line[2], _level_of(key)],
 			"value": line[3],
-			# No brackets: the tag is painted with a pair of its own, and its end caps are
-			# what get drawn either side of this. A track with nothing left to sell says so
-			# in a word: a dash reads as a price that failed to print.
+			# A track with nothing left to sell says so in a word: a dash reads as a price
+			# that failed to print.
 			"cost": "Max" if full else "$%d" % roundi(price),
 			"afford": not full and sludge >= price,
 		})
 	return out
-
-
-## One lent picture for the upgrades board: what to draw, what mark goes with it, and how
-## much of its tile it fills.
-func _lent(art: Dictionary, glyph: StringName, fill: float) -> Dictionary:
-	return {
-		"sheet": art["sheet"], "region": art["region"], "glyph": glyph, "fill": fill
-	}
 
 
 ## The net's numbers, from the levels the player has now.
@@ -2323,8 +2302,8 @@ func _buy(what: StringName) -> void:
 		&"dog_wait":
 			dog_wait_level += 1
 	# After the level goes on, not before: the sound is the purchase landing, and a buy that
-	# fell through above has already returned without making one. The sparkle over the row's
-	# own icon is the same receipt for the eye.
+	# fell through above has already returned without making one. The sparkle over the
+	# board's sprite is the same receipt for the eye.
 	if _sfx != null:
 		_sfx.play_bought()
 	_shop_skin.cheer(what)

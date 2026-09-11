@@ -135,14 +135,12 @@ pose.
 ## 8. UI
 
 **Status: real art, one JPG sheet.** `assets/ui.json` holds 4 pieces: the pollution `meter`,
-the `money` plate, the `shed` button and the `upgrades` button. `assets/shop.json` holds the
-upgrades board: banner, board, panel, row and price-tag nine-slices, and **5 icons**.
+the `money` plate, the `shed` button and the `upgrades` button. The upgrades boards are
+drawn in code (`scripts/shop_skin.gd`) in the pollution meter's colours; the painted shop
+sheet and its five icons are retired.
 
 Gaps:
 
-- Only **5 upgrade icons exist** (the net's: width, strength, range, speed, haul). The other
-  **4 tracks have no icon at all** and draw blank: **ferry speed, ferry hold, skimmer, extra
-  ferry**.
 - The **settings panel, the save/load notices, and the farewell/ending screen** are unskinned.
 - The font is `RubbishFont2-Regular.ttf`; a matching pixel font would tie the UI together.
 
