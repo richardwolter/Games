@@ -135,14 +135,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   lean-in zoom (`CAST_PUSH`) was removed for this — no level is close enough.
   Moving objects still glide between art pixels; a low-res SubViewport would fix that but
   needs every UI CanvasLayer pulled out of `Main` — not done.
-- **Ground joins** (`ground.gd` `JOINS`): the mainland lawn meets the beach through the
-  pack's grass/sand join tiles, keyed by a 4-bit sand-side mask (NW 1, NE 2, SE 4, SW 8;
-  table in `tools/tile_edges.log`). The pack lacks the SE+SW corner and the
-  grass-only-NE three-side piece; `_pipeline/tools/generate_joins.py` composes both from
-  pack pixels into `assets/joins/` (run with the psd-extract venv python). Straights (one
-  sand side) take a two-side piece leaning toward the sand diagonal — spill accepted by
-  decision; the light join grass against the dark rough lawn is accepted as a verge. The
-  island keeps its plain yard edge and mound pool. Grass patch edges roll a hash between
+- **Ground edge** (`ground.gd` `BLEND`): the mainland lawn meets the beach through a mixed
+  band ~2 tiles either side of the line, each tile rolling by stable hash between rough
+  grass, tufted mounds (`GRASS_BORDER`), sand-with-tufts cubes (`SAND_TUFTED`) and plain
+  sand, weighted by distance across the line. **The pack's grass/sand join tiles are
+  rejected, by decision** (tried 2026-09-11, plus two generated corner pieces): their sand
+  stops on each tile's diagonal and a shore of them reads as a staircase of cuts. Don't
+  re-raise. The island keeps its plain yard edge. Grass patch edges roll a hash between
   the two adjoining patches so they are ragged (`_pick`).
 - **Sprite scale**: rubbish, finds (`SPRITE_SCALE`) and pigeons (`Flock.SCALE`) draw at 2.0.
   A piece under `SPRITE_SMALLEST` scales up by whole steps. The ~15 big finds over 34 px art

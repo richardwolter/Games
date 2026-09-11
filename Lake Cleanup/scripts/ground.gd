@@ -100,49 +100,36 @@ const GRASS_ROUGH := [18, 20, 21]
 ## apart with, shares this one.
 const GRASS_BORDER := [37, 38, 43, 45]
 
-## The joining pieces: a mainland grass tile with sand on any side takes the tile whose top
-## face is sand along those sides, keyed by a four-bit mask — NW 1, NE 2, SE 4, SW 8, the
-## same side order `tools/tile_edges.gd` reads and the same tile-step mapping.
+## Why the pack's joining pieces are not used.
 ##
-## The pack's set is a corner set: sand along two adjacent sides, or three. `tile_edges.log`
-## has the table. Two of its pieces are missing — the front corner (SE+SW) and the three-side
-## piece leaving grass on the NE only — and on a lake the lawn surrounds, the front corner is
-## the whole top stretch of shore. Those two are generated from the pack's own pixels by
-## `_pipeline/tools/generate_joins.py` (a face flipped or mirrored onto a plain cube) and live
-## in `assets/joins/`, numbered from JOIN_FIRST so they can sit in the same tables.
+## The pack has grass tops with sand worn through them, and they look like the answer to a
+## lawn meeting a beach. `tools/tile_edges.gd` reads the sand off each tile's four sides, and
+## the set is a corner set — sand along two adjacent sides or three, never one — so a straight
+## run of shore has no piece. Fitting them anyway (two-side pieces on the straights, and two
+## generated pieces for the corners the pack lacks) was tried and rejected: the sand on each
+## face stops on the tile's own diagonal, so a shore of them reads as a staircase of diagonal
+## cuts, worse than the plain edge it replaced.
 ##
-## There is no one-side piece, and most of a shoreline is one-side straights. By decision a
-## straight takes a two-side piece anyway — its second sand side is turned toward whichever
-## diagonal neighbour is sand, so the spill follows the curve of the beach rather than cutting
-## against it, and a back side where neither is. The joins are all the pack's lighter grass,
-## and against the mainland's darker lawn they read as a lighter verge, also by decision.
-## (Earlier the joins were left unused for both reasons and the straights took tufted mounds
-## and a hanging fringe instead; see git history for that version.)
-const JOIN_FIRST := 1001
-const JOIN_SESW := 1001
-const JOIN_NWSESW := 1002
-const JOIN_ART := {
-	JOIN_SESW: "res://assets/joins/join_sesw.png",
-	JOIN_NWSESW: "res://assets/joins/join_nwsesw.png",
-}
-const SIDE_NW := 1
-const SIDE_NE := 2
-const SIDE_SE := 4
-const SIDE_SW := 8
-## Mask to a pool of slices. Opposite pairs (NW+SE, NE+SW) do not occur on a curve of tiles
-## this wide, and take the nearest three-side piece if they ever do.
-const JOINS := {
-	SIDE_NW | SIDE_NE: [27],
-	SIDE_NE | SIDE_SE: [30],
-	SIDE_NW | SIDE_SW: [16, 26],
-	SIDE_SE | SIDE_SW: [JOIN_SESW],
-	SIDE_NW | SIDE_NE | SIDE_SW: [4],
-	SIDE_NE | SIDE_SE | SIDE_SW: [5],
-	SIDE_NW | SIDE_NE | SIDE_SE: [17],
-	SIDE_NW | SIDE_SE | SIDE_SW: [JOIN_NWSESW],
-	SIDE_NW | SIDE_SE: [17],
-	SIDE_NE | SIDE_SW: [4],
-}
+## What the shore is instead is a mixed band — see `BLEND` — made only of tiles the pack has
+## whole: rough grass, the low tufted mounds, sand with tufts on it, and plain sand.
+
+## Sand with grass growing through it: the pack's sand cubes with a tuft or two on top. Not
+## sand for the beach — a beach of them is a beach with a rash — but the middle of the mixed
+## band, where a tile is neither lawn nor beach yet.
+const SAND_TUFTED := [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+
+## How wide the mixed band between lawn and beach is, in tiles, either side of the line
+## `_kind_at` draws.
+##
+## Tiles are diamonds, and a line between two kinds of tile is a staircase whatever the
+## pieces are. What a real edge has is a width: grass thinning out, sand showing through,
+## then sand with the odd tuft left in it. So a tile within BLEND of the line does not take
+## its kind's picture outright; it rolls, by a stable hash, between the four pictures in
+## proportion to how far across the line it sits. On the grass side the roll runs rough grass
+## to tufted mound to tufted sand; on the sand side tufted sand to plain sand. `BLEND_TUFTS`
+## is how much of the band's sand side keeps tufts at the line itself.
+const BLEND := 2.2
+const BLEND_TUFTS := 0.8
 
 ## How wide a patch of one grass tile is, in tiles, and how far a patch's middle is allowed to
 ## wander off the lattice, as a fraction of that width.
@@ -429,7 +416,7 @@ func _ready() -> void:
 	z_index = 1
 	z_as_relative = false
 	for slice: int in _every_slice():
-		var tex := load(_slice_path(slice)) as Texture2D
+		var tex := load(TILES % slice) as Texture2D
 		_art[slice] = tex
 		_face_top[slice] = _top_of(tex)
 		_mesh_data[slice] = {
@@ -680,10 +667,10 @@ func _rebuild() -> void:
 			# `skirt`. The sand keeps all of its: the outer ring's last row is a real edge.
 			var skirt := GRASS_LIFT if slice != SAND else INF
 			_add_tile_quad(slice, mid, lift, Color.WHITE, skirt)
-			# The fringe hangs off a lawn's cut edge onto the sand in front. A join tile
-			# carries its own sand up to that edge, so blades over it would be blades growing
-			# out of the beach.
-			if slice != SAND and not _is_join(slice):
+			# The fringe hangs off a lawn's cut edge onto whatever is in front. Not off the
+			# tufted sand: that is beach with grass in it, and blades hanging off it would be
+			# a lawn's edge drawn on the beach.
+			if slice != SAND and not SAND_TUFTED.has(slice):
 				_add_fringe(tx, ty, mid)
 
 
@@ -950,76 +937,47 @@ func _wander(at: Vector2) -> float:
 
 ## Which tile a spot gets, or 0 for nothing drawn.
 ##
-## One picture for sand, a fitted join where the mainland's lawn meets it (see JOINS), and a
-## pool of pictures for the open grass. The island's yard keeps its plain edge and the tufted
-## mounds: its geometry is the reverse of the mainland's — sand outside the grass — and a kept
-## yard has a decided edge rather than a worn one.
+## One picture for sand, a pool of pictures for the open grass, and on the mainland a mixed
+## band between them (see BLEND). The island's yard keeps its plain edge and the tufted
+## mounds: a kept yard has a decided edge rather than a worn one.
 func _slice_at(tx: float, ty: float, rng: RandomNumberGenerator) -> int:
 	var kind := _kind_at(tx, ty)
 	if kind == Kind.NONE or kind == Kind.WATER:
 		return 0
 
+	if layer == Layer.OUTSIDE:
+		return _blend_at(tx, ty, kind, rng)
 	if kind == Kind.SAND:
 		return SAND
-	if layer == Layer.OUTSIDE:
-		var sides := _sand_sides(tx, ty)
-		if sides == SIDE_NW | SIDE_NE | SIDE_SE | SIDE_SW:
-			return SAND
-		if sides != 0:
-			return _pick(JOINS[_join_mask(sides, tx, ty)], tx, ty, rng)
-		return _pick(GRASS_ROUGH, tx, ty, rng)
 	if _borders_sand(tx, ty):
 		return _pick(GRASS_BORDER, tx, ty, rng)
 	return _pick(GRASS_YARD, tx, ty, rng)
 
 
-## Which of a grass tile's four sides face sand, as a mask of SIDE_* bits.
-func _sand_sides(tx: float, ty: float) -> int:
-	var sides := 0
-	if _kind_at(tx - 1.0, ty) == Kind.SAND:
-		sides |= SIDE_NW
-	if _kind_at(tx, ty - 1.0) == Kind.SAND:
-		sides |= SIDE_NE
-	if _kind_at(tx + 1.0, ty) == Kind.SAND:
-		sides |= SIDE_SE
-	if _kind_at(tx, ty + 1.0) == Kind.SAND:
-		sides |= SIDE_SW
-	return sides
-
-
-## The mask JOINS is asked for, given the sides that actually face sand.
+## The mainland's picture at a spot, mixed across the lawn's edge. See BLEND.
 ##
-## A single side has no piece of its own, so it borrows a neighbour side: the one toward the
-## diagonal neighbour that is sand, so the spill leans into the beach's own curve, and
-## failing that a back side (NW or NE), which the tile behind partly hides.
-func _join_mask(sides: int, tx: float, ty: float) -> int:
-	if JOINS.has(sides):
-		return sides
-	match sides:
-		SIDE_NW:
-			return SIDE_NW | (SIDE_SW if _kind_at(tx - 1.0, ty + 1.0) == Kind.SAND else SIDE_NE)
-		SIDE_NE:
-			return SIDE_NE | (SIDE_SE if _kind_at(tx + 1.0, ty - 1.0) == Kind.SAND else SIDE_NW)
-		SIDE_SE:
-			return SIDE_SE | (SIDE_SW if _kind_at(tx + 1.0, ty + 1.0) == Kind.SAND else SIDE_NE)
-		SIDE_SW:
-			return SIDE_SW | (SIDE_SE if _kind_at(tx + 1.0, ty + 1.0) == Kind.SAND else SIDE_NW)
-	return SIDE_NW | SIDE_NE
-
-
-func _is_join(slice: int) -> bool:
-	if slice >= JOIN_FIRST:
-		return true
-	for pool: Array in JOINS.values():
-		if pool.has(slice):
-			return true
-	return false
-
-
-## Where a slice's picture is: the pack for its own numbers, `assets/joins/` for the
-## generated ones.
-func _slice_path(slice: int) -> String:
-	return JOIN_ART[slice] if JOIN_ART.has(slice) else TILES % slice
+## `across` is how far past the grass/sand line the spot is, in tiles, grass side positive.
+## Each tile rolls once, by position, against thresholds that slide with `across`, so the
+## mix thins smoothly from one picture to the next and the same tile always rolls the same.
+func _blend_at(tx: float, ty: float, kind: Kind, rng: RandomNumberGenerator) -> int:
+	var at := Vector2(tx, ty)
+	var across := out_of_water(tx, ty) - (SAND_OUT + _wander(at))
+	var roll := _hash(tx * 3.7 + 19.0, ty * 6.3 + 5.0)
+	if kind == Kind.SAND:
+		# Sand side: tufts thinning out toward the water. A tile past the band's reach is
+		# beach outright, whatever it rolled.
+		var t := clampf(1.0 + across / BLEND, 0.0, 1.0)
+		if roll < t * BLEND_TUFTS:
+			return _pick(SAND_TUFTED, tx, ty, rng)
+		return SAND
+	# Grass side: rough lawn well in, then mounds, then tufted sand right at the line. Two
+	# thresholds sliding with `across`, one for each step down.
+	var t := clampf(1.0 - across / BLEND, 0.0, 1.0)
+	if roll < t * t * 0.45:
+		return _pick(SAND_TUFTED, tx, ty, rng)
+	if roll < t * 0.9:
+		return _pick(GRASS_BORDER, tx, ty, rng)
+	return _pick(GRASS_ROUGH, tx, ty, rng)
 
 
 ## Whether a grass tile has sand on any of the four sides it can be seen from. See
@@ -1038,10 +996,7 @@ func _every_slice() -> Array:
 	var out: Array = GRASS_YARD.duplicate()
 	out.append_array(GRASS_ROUGH)
 	out.append_array(GRASS_BORDER)
-	for pool: Array in JOINS.values():
-		for slice: int in pool:
-			if not out.has(slice):
-				out.append(slice)
+	out.append_array(SAND_TUFTED)
 	out.append(SAND)
 	return out
 
