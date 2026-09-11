@@ -146,6 +146,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   to the light step, gathered under the sun by `sun_lean`) drew pale strips across clean
   water, and the loose foam streaks riding the swell drew white ones. Both removed, uniforms
   and all. Bands stay; shore foam stays; the finished-lake sparkle stays.
+- **Filth round the island**: the holdoff band holds no rubbish, so the raw map is zero there
+  and the blur carried that clean outward — a ring of blue against a foul lake on day one.
+  `Lake._fill_filth` (`FILTH_FILL` rounds) copies the foulest speaking neighbour into every
+  silent tile before the blur. A weighted-average blur was tried first and rejected: it still
+  left the ring murky rather than as foul as the water beside it.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Out of scope, by decision: `splash_foam`, `splash_specks`, `glint.gdshader`, and the

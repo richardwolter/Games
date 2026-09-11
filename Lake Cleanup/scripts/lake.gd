@@ -158,6 +158,19 @@ const FILTH_BITE := 0.62
 ## you can see from the boat.
 const FILTH_BLUR := 3
 
+## How far the filth is carried into the water that holds no rubbish, in tiles, before the
+## spread above runs.
+##
+## The band round the island (`Iso.SHELF_TILES` + `SHELF_CLEAR`) never has a piece on it, and
+## neither does the island. Left at nothing, those tiles read as clean water, and the blur
+## carried that clean out past the band: the island sat in a ring of blue on opening day, on
+## a lake that was foul everywhere else. Each tile with nothing to say now takes the foulest
+## of its neighbours that have something to say, and again, this many times — far enough to
+## cross the band, the blur's own reach past it, and the texture's linear sample at the
+## island's edge. So the ring is as dirty as the water it touches, and comes clean when
+## that water does, not before.
+const FILTH_FILL := 6
+
 ## How much spread filth counts as water at its filthiest, as a fraction of the worst the
 ## lake has anywhere on the day it is built. Under one, so the dirty half of a fresh lake
 ## reads as uniformly foul rather than as a heat map of where the junk happens to be dense.
@@ -2697,6 +2710,8 @@ func _build_filth_map() -> void:
 		)
 		raw[index] = total / slots
 
+	_fill_filth(raw, cols, rows)
+
 	# Separable, so the spread costs two passes of a line rather than one of a disc. A box
 	# blur and not a gaussian: at this size the difference cannot be seen, and the sums are
 	# running ones, so how far it is spread costs nothing.
@@ -2732,6 +2747,42 @@ func _build_filth_map() -> void:
 		_water_material.set_shader_parameter(&"filth_map", _filth_texture)
 		_water_material.set_shader_parameter(&"filth_tiles", Vector2(cols, rows))
 		_water_material.set_shader_parameter(&"filth_mapped", 1.0)
+
+
+## Carries the filth into the tiles that hold no rubbish and never will — the island and the
+## band round it — from the tiles beside them that do. See FILTH_FILL. In place.
+##
+## A tile with a say is one that can float a piece (`Iso.floats_here`) or has one on it
+## anyway (the strand). Everything else starts silent and takes the foulest neighbour that
+## is speaking, then speaks itself on the next round.
+func _fill_filth(raw: PackedFloat32Array, cols: int, rows: int) -> void:
+	var says := PackedByteArray()
+	says.resize(cols * rows)
+	for index in raw.size():
+		var here := _grid.tile_of(index)
+		var stack := _grid.stacks[index] if index < _grid.stacks.size() else PackedInt32Array()
+		if not stack.is_empty() or Iso.floats_here(here.x, here.y):
+			says[index] = 1
+	for _round in FILTH_FILL:
+		var next_says := says.duplicate()
+		for ty in rows:
+			for tx in cols:
+				var index := ty * cols + tx
+				if says[index] == 1:
+					continue
+				var loudest := -1.0
+				for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var nx := tx + step.x
+					var ny := ty + step.y
+					if nx < 0 or ny < 0 or nx >= cols or ny >= rows:
+						continue
+					var near := ny * cols + nx
+					if says[near] == 1:
+						loudest = maxf(loudest, raw[near])
+				if loudest >= 0.0:
+					raw[index] = loudest
+					next_says[index] = 1
+		says = next_says
 
 
 ## One pass of the spread, along the rows or down the columns. A sliding window, so how far
