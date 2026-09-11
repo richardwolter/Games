@@ -813,17 +813,21 @@ func _ready() -> void:
 		if def.keepsake and not def.display_name.is_empty():
 			_room.titles[String(def.piece)] = def.display_name
 	_shop_skin.bought.connect(_buy)
-	# The picture at the head of each upgrades board: the ferry's own baked hull, the dog's
-	# idle frame, and the net laid out.
+	# The picture at the head of the net and ferry boards: the ferry's own baked hull and
+	# the net laid out. The dog's board draws the dog itself.
 	var ferry := Boat.art_frame(0.62)
 	if not ferry.is_empty():
 		_shop_skin.sprites[&"boat"] = ferry
-	var pup := DogArt.art_frame(&"idle", 0)
-	if not pup.is_empty():
-		_shop_skin.sprites[&"dog"] = pup
 	var mesh: Dictionary = _net.art_frame(&"land", -1)
 	if not mesh.is_empty() and _net.art_sheet() != null:
 		_shop_skin.sprites[&"net"] = {"sheet": _net.art_sheet(), "region": mesh["region"]}
+	# A few pieces of rubbish for the net to lie over, off the lake's own atlas.
+	if _sheets != null and _sheets.atlas != null:
+		var catch: Array = []
+		for slug in ["metal_can1", "plastic_cup1", "rubber_duck"]:
+			if _sheets.has(StringName(slug)):
+				catch.append({"sheet": _sheets.atlas, "region": _sheets.region_of(StringName(slug))})
+		_shop_skin.sprites[&"catch"] = catch
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))

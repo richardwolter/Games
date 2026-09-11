@@ -189,12 +189,16 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   the `METER_*` colours are gone.
 
 - **The upgrades shop is three drawn boards** (`shop_skin.gd`, 2026-09-11): net, ferry, dog
-  side by side, each an oak frame round a clean-water face with a notched sand ribbon, the
-  thing itself (net / hull / dog sprite, lent by the lake as `ShopSkin.sprites`) under the
-  ribbon, and two-line rows (name over value, sand price tag) below. Colours are the
-  meter's own, as `Style.BOARD*`, `FRAME*`, `RIBBON*` — picked from four palettes (oak,
-  clean water, murky-to-clean, sand-and-bag); clean water won. No row icons, by decision.
-  The painted `assets/shop.png` / `shop.json` / `tools/slice_shop.gd` are gone. Rows carry a
+  side by side, each a grained, chipped oak frame (drawn like the meter's) round a dark
+  face, a bowed three-tone oak ribbon over the top edge (front block only — hanging tails
+  were tried and rejected), the thing itself under the ribbon, and two-line rows (name over
+  value, clean-water price tag) with 3 px clipped corners. Colours are the meter's own, as
+  `Style.BOARD*`, `FRAME*`, `RIBBON*`, `TAG*`: the murky-to-clean palette, picked over
+  oak-only, clean-water (tried first, too bright) and sand-and-bag. No row icons, by decision.
+  The heads are alive: the ferry is a `Sprite2D` over a `HullFoam` wake, bobbing 2 px; the net
+  is drawn black over three fixed rubbish pieces the lake lends as `sprites[&"catch"]`; the
+  dog draws itself through `DogArt`, rolling idle or asleep each time the shop opens. The
+  painted `assets/shop.png` / `shop.json` / `tools/slice_shop.gd` are gone. Rows carry a
   `board` key from `Lake._shop_rows`; a track added to `TRACKS` needs one.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)

@@ -65,20 +65,26 @@ const GOLD_DEEP := Color(0.72, 0.52, 0.14)
 # ---------------------------------------------------------------------------------------
 
 ## The three boards are the pollution meter's own colours, read off its sheets: the board
-## and its rows are the clean end of the water, the frame round each is the meter's oak,
-## and the ribbon and price tags are the frame's pale sand highlight. Picked (2026-09-11)
-## over the meter's oak alone, its murky-to-clean shift, and its sand-and-bin-bag circle,
-## because a clean-water board is the reward the shop is selling.
-const BOARD := Color(0.18, 0.42, 0.56)
-const BOARD_ROW := Color(0.31, 0.60, 0.75)
-const BOARD_ROW_OFF := Color(0.24, 0.49, 0.66)
-const BOARD_INK := Color(0.05, 0.17, 0.27)
-const BOARD_INK_DIM := Color(0.11, 0.29, 0.41)
+## is the dark between the meter's sheets, the rows are its murky water, a row that cannot
+## be afforded sinks to the scummy green, the price tags are the clean end of the water,
+## and the frame round each is the meter's oak. Picked (2026-09-11) over the oak alone, a
+## clean-water board, and the sand-and-bin-bag circle: the clean-water board was tried
+## first and read too bright against the lake.
+const BOARD := Color(0.17, 0.24, 0.25)
+const BOARD_ROW := Color(0.25, 0.41, 0.47)
+const BOARD_ROW_OFF := Color(0.22, 0.35, 0.25)
+const BOARD_INK := Color(0.85, 0.91, 0.94)
+const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
+const TAG := Color(0.31, 0.60, 0.75)
+const TAG_LIT := Color(0.40, 0.68, 0.82)
+const TAG_INK := Color(0.05, 0.17, 0.27)
 const FRAME := Color(0.44, 0.28, 0.19)
 const FRAME_LIT := Color(0.53, 0.35, 0.25)
 const FRAME_DEEP := Color(0.25, 0.16, 0.09)
-const RIBBON := Color(0.85, 0.66, 0.56)
-const RIBBON_LIT := Color(0.94, 0.78, 0.70)
+const FRAME_GRAIN := Color(0.13, 0.08, 0.04)
+const RIBBON := Color(0.53, 0.35, 0.25)
+const RIBBON_LIT := Color(0.66, 0.45, 0.32)
+const RIBBON_INK := Color(0.94, 0.85, 0.75)
 
 ## The three things the UI says with colour rather than words.
 const DANGER := Color(0.80, 0.24, 0.19)
