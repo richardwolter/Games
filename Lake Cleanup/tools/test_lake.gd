@@ -1589,6 +1589,7 @@ func _find_greedy_controls(node: Node, into: Array[String]) -> void:
 	if control != null and control.mouse_filter == Control.MOUSE_FILTER_STOP \
 			and not control is BaseButton and not control is Range \
 			and not control is UiButton and not control is CloseButton \
+			and not control is PlankButton \
 			and not CLICK_EATERS.has(str(control.name)):
 		into.append(str(control.name))
 	for child in node.get_children():
