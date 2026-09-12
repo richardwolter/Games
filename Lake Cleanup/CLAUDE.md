@@ -311,6 +311,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   because the garbage circle sits over it. `hud_buttons.gd`'s `FRAME`/`CHIPS` drawn frame is
   the fallback when the sheet is missing or the box is under `BORDER_LEAST`; `face_of` is the
   one place the inset is decided. Re-measure every `BORDER_*` if the meter art is repainted.
+  **The stock readout and the settings button wear it too** (2026-09-12): the stock plate is
+  that border round the recycle box's own brown (`STOCK_TALL` 62, up from 34 — the wood alone
+  is 30, and its width is measured against the face and then grown by the walls), and
+  `PlankButton` is it round a `BOARD` face with the word set to the **face** rather than to
+  the whole button (`LABEL_SHARE`), so a button sized to its own word carries no empty wood.
+  The settings button went 176x38 to 152x56 on that.
   **Retired, by decision** (2026-09-12): dressing the buttons with a nine-patch of that art —
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.

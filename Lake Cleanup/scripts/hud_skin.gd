@@ -69,10 +69,12 @@ const MONEY_TALL := 64.0
 const EDGE := Style.EDGE
 const GAP := Style.GAP
 
-## The stock readout: where it sits and how big it is. A plank in the recycle box's own
-## brown, the box's blue recycle mark on the left, a small label, and the count on a sunken
-## panel the colour of the box's hollow — so the number reads as what is in that box.
-const STOCK_TALL := 34.0
+## The stock readout: where it sits and how big it is. The meter's border round the recycle
+## box's own brown, the box's blue recycle mark on the left, a small label, and the count on
+## a sunken panel the colour of the box's hollow — so the number reads as what is in that
+## box. Tall enough that the border's own planks leave a face worth reading (2026-09-12):
+## the plate was 34 and the wood alone is 30.
+const STOCK_TALL := 62.0
 const STOCK_TEXT := 0.56
 const STOCK_MARK_PAD := 6.0
 const STOCK_LABEL := "In stock"
@@ -224,9 +226,11 @@ func _lay_out() -> void:
 	var right := wide - EDGE - UPGRADES_SIZE.x
 	_upgrades_box = Rect2(Vector2(right, EDGE), UPGRADES_SIZE)
 	_shed_box = Rect2(Vector2(right - SHED_SIZE.x - GAP, EDGE), SHED_SIZE)
+	# Measured against the face the border leaves, then grown by the wood on both sides.
+	var stock_face := STOCK_TALL - float(Style.BORDER_TOP + Style.BORDER_FOOT)
 	var stock_wide := (
-		STOCK_PAD * 2.0 + (STOCK_TALL - STOCK_MARK_PAD * 2.0) + STOCK_MARK_PAD
-		+ Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
+		float(Style.BORDER_WALL * 2) + STOCK_PAD * 2.0 + (stock_face - STOCK_MARK_PAD * 2.0)
+		+ STOCK_MARK_PAD + Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
 		+ Style.measure(STOCK_SAMPLE, Style.TEXT_HEAD).x + 16.0
 	)
 	_stock_box = Rect2(EDGE + 2.0, EDGE, stock_wide, STOCK_TALL)
@@ -544,7 +548,14 @@ func _ease_shine() -> float:
 ## it. Copying that keeps the two readouts obviously a pair.
 func _draw_stock() -> void:
 	var box := _stock_box
-	Style.plank(self, box, 41, Style.BOX, Style.CLIP)
+	# The meter's border round the box's own brown, the same wood the three buttons wear.
+	if Style.border_fits(box):
+		var face := Style.border_inset(box)
+		draw_rect(face.grow(2.0), Style.BOX, true)
+		Style.meter_frame(self, box)
+		box = face
+	else:
+		Style.plank(self, box, 41, Style.BOX, Style.CLIP)
 	# The recycle mark, on the left.
 	var side := box.size.y - STOCK_MARK_PAD * 2.0
 	var mark := Rect2(box.position + Vector2(STOCK_PAD, STOCK_MARK_PAD), Vector2(side, side))

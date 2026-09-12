@@ -1,9 +1,12 @@
-## A button that is a plank of the meter's wood with a word on it.
+## A button that is the meter's wood with a word on it.
 ##
 ## For the buttons that live in the scene and are placed by anchors — the settings button in
-## the HUD's corner — so they are the same wood as the drawn boards rather than a stock
-## Button in a theme override. Drawn by `Style.plank`, like the boards' save buttons and the
-## corner cross, with the corners clipped a step.
+## the HUD's corner — so they are the same wood as the HUD's own, rather than a stock Button
+## in a theme override. It wears the meter's built border (`Style.meter_frame`) like the
+## three corner buttons, and falls back to a clipped plank where that will not fit.
+##
+## The word is set to the face the border leaves rather than to the whole button, so a button
+## sized to its own word has no empty wood around it.
 class_name PlankButton
 extends Control
 
@@ -13,6 +16,10 @@ const Style := preload("res://scripts/style.gd")
 	set(value):
 		label = value
 		queue_redraw()
+
+## How much of the face the word is set to, and how much room is left beside it.
+const LABEL_SHARE := 0.78
+const LABEL_PAD := 12.0
 
 signal pressed
 
@@ -59,12 +66,22 @@ func _draw() -> void:
 		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
 	elif _held:
 		face = face.darkened(0.15)
-	Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y) + 3, face, Style.CLIP)
+	var on := box
+	if Style.border_fits(box):
+		on = Style.border_inset(box)
+		draw_rect(on.grow(2.0), Style.BOARD, true)
+		Style.meter_frame(self, box, Style.HOVER_WASH if _hovered and not _held else Color.WHITE)
+	else:
+		Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y) + 3, face, Style.CLIP)
 	if label.is_empty():
 		return
-	var height := Style.step(size.y * 0.42)
+	# Set to the face, and shrunk if the word is longer than the wood leaves room for.
+	var height := Style.step(on.size.y * LABEL_SHARE)
+	var wide := Style.measure(label, height).x
+	if wide > on.size.x - LABEL_PAD:
+		height = Style.step(float(height) * (on.size.x - LABEL_PAD) / wide)
 	Style.write(
 		self, label, height,
-		Vector2(0.0, box.position.y + (box.size.y + float(height) * 0.62) * 0.5),
-		Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, box
+		Vector2(0.0, on.position.y + (on.size.y + float(height) * 0.62) * 0.5),
+		Style.RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, on
 	)
