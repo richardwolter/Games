@@ -1793,6 +1793,12 @@ func _stage_ending() -> void:
 ## a lake finished and reopened came back with the flag already set, the words still owed,
 ## and no way left to say them. A player who cleaned the whole basin and quit got nothing
 ## but a bright lake and silence.
+## How far off vertical a shadow may lie before it reads as detached from its caster rather
+## than cast by it. 60 degrees is a low sun with a long shadow; past that the shadow is
+## mostly beside the thing instead of under it.
+const SHADOW_FLATTEST := 60.0
+
+
 ## The sun: in the southeast all day, so every cast shadow falls to the left of its caster.
 ##
 ## The painted assets are lit from the right — the shed and the recycle box are measurably
@@ -1805,6 +1811,8 @@ func _stage_sun() -> void:
 	add_child(day)
 	var worst := -INF
 	var worst_at := 0.0
+	var flattest := 0.0
+	var flattest_at := 0.0
 	var lit := 0
 	for step in 200:
 		day.phase = float(step) / 200.0
@@ -1812,11 +1820,21 @@ func _stage_sun() -> void:
 		if day.lean > worst:
 			worst = day.lean
 			worst_at = day.phase
+		# How far off vertical the shadow lies. A shadow thrown much further sideways than
+		# it is long comes away from the thing casting it — the shed's did, at 78 degrees,
+		# when the lean and the stretch were set independently of each other.
+		var off := rad_to_deg(atan2(absf(day.lean), maxf(day.stretch, 0.001) * 0.5))
+		if off > flattest:
+			flattest = off
+			flattest_at = day.phase
 		if day.ink > 0.0:
 			lit += 1
 	_check(worst < 0.0,
 		"the sun stays in the southeast: every shadow leans left, all loop",
 		"worst lean %.3f at phase %.2f" % [worst, worst_at])
+	_check(flattest < SHADOW_FLATTEST,
+		"and never lies so flat it comes away from its caster",
+		"%.0f degrees off vertical at phase %.2f" % [flattest, flattest_at])
 	_check(lit > 0, "the day is lit at all", "%d of 200 samples" % lit)
 	day.queue_free()
 	_advance()

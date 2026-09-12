@@ -30,15 +30,23 @@ extends Resource
 ## first light, white at noon, amber in the evening, deep blue in the trough.
 @export var tint: Gradient
 
-## How far a shadow leans, as a multiple of its own height, at the two ends of the day and at
-## noon. Negative throws the shadow to the left of its caster, which is where a sun in the
-## southeast puts it; all three are negative, and must stay so. The sun drifts west through
-## the day, so the shadow is furthest left at dawn and least so at dusk. `test_lake` guards
-## the sign over the whole loop — a positive value here lights the world from the northwest
-## and every painted highlight in the game then falls on the shadowed side.
-@export var lean_dawn: float = -1.3
-@export var lean_noon: float = -1.0
-@export var lean_dusk: float = -0.75
+## Which way a shadow points, as how far it goes sideways for every unit it goes down the
+## screen. This is an angle, not a distance: how long the shadow is comes from `stretch`
+## below, and `DayCycle` multiplies the two together to get the lean it hands out.
+##
+## Slant rather than a raw lean, by decision. The two were set independently once, and
+## nothing kept them agreeing: a noon lean of 1.0 against a noon stretch of 0.42 threw the
+## shed's shadow 141 px sideways while it was only 30 px long — 78 degrees off vertical, a
+## flat streak lying beside a building it had come away from. Tied together, the shadow keeps
+## its bearing all day and only its length changes, which is what a sun that climbs and sets
+## in one quarter of the sky actually does.
+##
+## Always positive here; `DayCycle` applies the minus. The sun is in the southeast, so the
+## shadow falls to the *left* of its caster — the side every painted asset keeps its shade
+## on. Drifting down through the day is the sun moving west.
+@export var slant_dawn: float = 1.25
+@export var slant_noon: float = 0.95
+@export var slant_dusk: float = 0.7
 
 ## How long a shadow is against the object casting it, at noon and at the ends of the day. A
 ## low sun throws a long shadow; an overhead one throws almost none.

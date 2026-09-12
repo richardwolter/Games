@@ -88,10 +88,18 @@ func _settle() -> void:
 	var day := maxf(_config.trough_at, 0.01)
 	if phase < day:
 		side = clampf(phase / day, 0.0, 1.0) * 2.0 - 1.0
-	lean = lerpf(
-		_config.lean_noon,
-		_config.lean_dusk if side > 0.0 else _config.lean_dawn,
+	stretch = lerpf(_config.stretch_ends, _config.stretch_noon, high)
+	# The lean comes off the stretch rather than being set beside it. `slant` is the bearing
+	# — how far sideways per unit down the screen — and the shadow's own drawn length is
+	# `stretch * 0.5`, so the two multiplied are a shadow that keeps its direction all day
+	# and only changes length. Set independently they drifted apart, and a shadow thrown four
+	# times further sideways than it was long came away from the thing casting it.
+	#
+	# Negative: the sun is in the southeast, so the shadow falls to the left.
+	var slant := lerpf(
+		_config.slant_noon,
+		_config.slant_dusk if side > 0.0 else _config.slant_dawn,
 		absf(side)
 	)
-	stretch = lerpf(_config.stretch_ends, _config.stretch_noon, high)
+	lean = -absf(slant) * stretch * 0.5
 	ink = lerpf(_config.ink_ends, _config.ink_noon, high)

@@ -448,9 +448,22 @@ the whole job.
   itself has not moved (`SHED_STAND` 0.35 is unchanged) — only what hangs off it. **Re-measure
   `SHED_ART_GROUND` if the hut is re-cut** (`tools/slice_shed.gd`): it is the diamond's side
   corners, rows 93 and 103 of 127, as a fraction up from the bottom.
-- **The hut's walls are the box's wood** (`tools/recolor_shed.py`, 2026-09-12): the tan cut
-  `slice_shed.gd` makes is kept as `art_source/shed_tan.png`, and the script writes
-  `assets/shed.png` with every wall pixel **histogram-matched onto the recycle box's plank
+- **The hut is drawn coarser** (`tools/downres_shed.py`, 2026-09-12): the 130x127 cut
+  `slice_shed.gd` makes (kept as `art_source/shed_tan.png`) is resampled to **103x101** and
+  drawn at 1.4 world px per painted pixel (`Iso.SHED_TALL` 141.4), because at 1.1 beside the
+  box (2.5) it read as a higher-resolution picture pasted on. 1.4 by decision, over 2.0 (one
+  art pixel each, but seams and thatch went to mush) and 1.6, judged side by side; not an
+  art-pixel multiple, so it draws faintly uneven on the screen grid, as the original did.
+  Resampled **by class** (each target pixel takes the class covering most of it and that
+  class's mean colour), snapped to a few tones per class, seams re-inked, roof speckle
+  cleaned, window and handle redrawn by rule, fascia kept as a line. Writes
+  `art_source/shed_101.png`. **Richard polishes that file by hand** ("rules first, polish
+  after"); from then on it is the painted source and a re-cut means redoing the polish.
+  `SHED_ART_GROUND` re-measured at 0.233; the footprint measured 1.14 x 0.83 and stays.
+  Both scripts take `--tall N` / `--source` / `--out` for trying another grain without
+  touching the pipeline's files.
+- **The hut's walls are the box's wood** (`tools/recolor_shed.py`): reads `shed_101.png` and
+  writes `assets/shed.png` with every wall pixel **histogram-matched onto the recycle box's plank
   browns** read off `Recycle_Box.png` — the same brown the ferry's hull took, not
   `Style.CRATE`. A remap by brightness rank, not a tint: seams stay seams and the outline
   becomes the box's darkest brown (one wood, by decision). Untouched: the thatch, the wooden
@@ -458,7 +471,7 @@ the whole job.
   its column), the lit yellow window and the grey door hardware. **The walls also get the
   box's border**: every wall pixel on the picture's outer edge is painted in the box's own
   silhouette colour (read off the box, 48,37,33), the one-pixel dark line the box is drawn
-  with; the roof's edge is left as painted. Two pixels deep and solid (`BORDER_DEEP`), and
+  with; the roof's edge is left as painted. One painted pixel deep now (`BORDER_DEEP`), and
   the half-alpha shadow row the art had under the walls is stripped (`STRIP_SOFT`) — one
   soft pixel with a grey smear under it read thin and faded next to the box's edge. A hut
   on grass throws no baked shadow; the lake draws the sun's. **One pixel is then cleared off
@@ -482,10 +495,19 @@ the sky — `lean_dawn` +1.7 through `lean_noon` +0.18 to `lean_dusk` -1.7 — w
 cast shadows to the *right* of their casters for most of the loop, onto the same side as
 every baked highlight, and crossed zero at noon so the whole world's shadows flipped sides
 in front of the player.
-- **All three leans are negative now** (-1.3 dawn, -1.0 noon, -0.75 dusk): the shadow always
-  falls down and to the left, and the sun only drifts west through the day instead of
-  crossing. The numbers are by eye and free to be retuned; **the sign is not**, and
-  `test_lake`'s `_stage_sun` walks 200 phases and guards it.
+- **The shadow always falls down and to the left**, and the sun only drifts west through the
+  day instead of crossing. `test_lake`'s `_stage_sun` walks 200 phases and guards the side.
+- **The lean is derived from the stretch, not set beside it** (`DayConfig.slant_*`,
+  `DayCycle._settle`, 2026-09-12). The exports are a *bearing* now — how far the shadow goes
+  sideways per unit it goes down the screen — and the lean handed out is that times the
+  shadow's own drawn length. Set independently they drifted apart on the first pass: a noon
+  lean of 1.0 against a noon stretch of 0.42 threw the shed's shadow 141 px sideways while it
+  was only 30 px long, 78 degrees off vertical, a flat streak lying beside a building it had
+  come away from. Tied together the shadow keeps its bearing all day and only its length
+  changes, which is what a sun climbing and setting in one quarter of the sky does. Slants
+  are 1.25 dawn, 0.95 noon, 0.7 dusk, which puts the shed's shadow 51, 44 and 35 degrees off
+  vertical. **`test_lake` guards the angle** (`SHADOW_FLATTEST`, 60 degrees) as well as the
+  side: the numbers are by eye and free to be retuned, the two rules are not.
 - **A narrow arc, by decision** — not a pinned sun. Pinning would take the movement out of
   the light for no gain; a wide arc is what contradicted the paint. `stretch`, `ink` and the
   tint gradient are untouched: the sun's *height* through the day was never the problem.
