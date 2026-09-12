@@ -26,6 +26,10 @@ const PIER_FOOT := 1.0
 ## line however far out the berth happens to be on that side.
 const PIER_OUT := 1.6
 
+## How far up its own picture a yard takes delivery, as a fraction of the drawn height: the
+## deck the crates stand on, above the posts and below the sign.
+const DROP_UP := 0.34
+
 ## Which of TrashDef.Kind this one buys.
 var kind: int = TrashDef.Kind.PLASTIC
 
@@ -46,6 +50,21 @@ static var _read := false
 
 func kind_name() -> String:
 	return TrashDef.KIND_NAMES[kind]
+
+
+## Where a piece landed off a ferry should come down: on the yard's own deck, part way up
+## the painting rather than at its feet, which are the bottoms of the posts in the water.
+##
+## Measured off the picture rather than marked per yard: all four are the same painting with
+## different signwriting, so one fraction of the height serves them all, and a yard drawn
+## without art puts its crates at the same place by the same arithmetic.
+func drop_point() -> Vector2:
+	var foot := Iso.shore_point(Iso.basin_angle(berth), PIER_OUT)
+	if not _load_art() or not _pieces.has(StringName(kind_name().to_lower())):
+		return foot + Vector2(0.0, -DROP_UP * PIER_WIDE * 0.5)
+	var region: Rect2 = _pieces[StringName(kind_name().to_lower())]
+	var tall := region.size.y * (PIER_WIDE / region.size.x)
+	return foot + Vector2(0.0, -tall * DROP_UP)
 
 
 ## Read the cut sheet. False means no art, and every yard falls back to the drawn version.

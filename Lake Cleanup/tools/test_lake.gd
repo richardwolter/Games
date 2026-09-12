@@ -753,6 +753,16 @@ func _stage_ferry() -> void:
 		"%.1f -> %.1f sludge" % [_sludge_before, float(_main.get(&"sludge"))])
 	_check(int(_main.get(&"sold_count")) > 0, "the sale was counted",
 		"%d sold" % int(_main.get(&"sold_count")))
+	# Thrown ashore, not deducted: the yard's drop point is on its own deck, above the feet
+	# of the posts, so a piece coming down lands in the picture rather than under it.
+	var stops: Array = _main.get(&"_dropoffs")
+	var ashore := true
+	for stop: Dropoff in stops:
+		var foot := Iso.shore_point(Iso.basin_angle(stop.berth), Dropoff.PIER_OUT)
+		var drop := stop.drop_point()
+		if drop.y >= foot.y or absf(drop.x - foot.x) > 1.0:
+			ashore = false
+	_check(ashore, "every yard takes delivery on its own deck, not at its feet", "")
 	_advance()
 
 
@@ -986,6 +996,35 @@ func _stage_fleet() -> void:
 	_main.call(&"_buy", &"fleet")
 	_check(is_equal_approx(float(_main.get(&"sludge")), purse),
 		"a full fleet is not charged for another", "")
+
+	# Hulls do not sit inside each other. Two put on the same tile, and a second pair put
+	# exactly on top of each other — which has no direction to part along and is the case
+	# that would loop forever if the nudge were rolled instead of worked out.
+	var clear := float(_main.get(&"PART_CLEAR"))
+	var one := fleet[0] as Boat
+	var two := fleet[1] as Boat
+	one.tile_pos = Iso.CENTRE + Vector2(3.0, 0.0)
+	two.tile_pos = one.tile_pos + Vector2(0.2, 0.0)
+	for i in 60:
+		_main.call(&"_part_the_fleet", 1.0 / 60.0)
+	_check(one.tile_pos.distance_to(two.tile_pos) > clear * 0.9,
+		"two hulls in the same water push apart",
+		"%.2f tiles, clearance %.2f" % [one.tile_pos.distance_to(two.tile_pos), clear])
+	two.tile_pos = one.tile_pos
+	for i in 60:
+		_main.call(&"_part_the_fleet", 1.0 / 60.0)
+	_check(one.tile_pos.distance_to(two.tile_pos) > clear * 0.9,
+		"two hulls exactly on top of each other still part",
+		"%.2f tiles" % one.tile_pos.distance_to(two.tile_pos))
+
+	# And a fleet at rest stays in its row: the moorings are spread wider than the
+	# clearance, so nothing pushes a moored boat off its berth.
+	var berthed := true
+	for i in fleet.size():
+		for j in range(i + 1, fleet.size()):
+			if (fleet[i] as Boat).dock.distance_to((fleet[j] as Boat).dock) < clear:
+				berthed = false
+	_check(berthed, "the moorings are spread wider than the clearance", "")
 	_advance()
 
 
@@ -1236,6 +1275,70 @@ func _stage_art() -> void:
 				overlaps += 1
 	_check(overlaps == 0, "no two pieces were cut out of the same pixels",
 		"%d pairs overlap" % overlaps)
+
+	# The hut's collision is its drawing. Iso.SHED_FOOT and Iso.SHED_ART_GROUND are both
+	# measured off shed.png by hand, so nothing but this stops a re-cut of the hut leaving the
+	# walking rule on the old building: a walker stopped short of one wall and standing inside
+	# the opposite one. Measured here the same way they were: the walls' feet are a
+	# parallelogram, and its left and right corners are the lowest row of the outermost columns
+	# that reach the ground band (the eaves overhang far higher up and are not it).
+	var hut := Art.image("res://assets/shed.png")
+	if hut != null:
+		var rows := PackedInt32Array()
+		var deep := -1
+		for column in hut.get_width():
+			var low := -1
+			for row in range(hut.get_height() - 1, -1, -1):
+				if hut.get_pixel(column, row).a > 0.0:
+					low = row
+					break
+			rows.append(low)
+			deep = maxi(deep, low)
+		var band := deep - int(float(hut.get_height()) * 0.3)
+		var left := -1
+		var right := -1
+		for column in rows.size():
+			if rows[column] < band:
+				continue
+			if left < 0:
+				left = column
+			right = column
+		var scale := Iso.SHED_TALL / float(hut.get_height())
+		var mid := Vector2(
+			float(left + right) * 0.5, float(rows[left] + rows[right]) * 0.5
+		)
+		# The right corner off the middle, in tiles: a rectangle's corner is (+x, -y) there.
+		var corner := Iso.world_to_tile(
+			(Vector2(float(right), float(rows[right])) - mid) * scale
+		)
+		_check(
+			absf(corner.x - Iso.SHED_FOOT.x) < 0.1 and absf(-corner.y - Iso.SHED_FOOT.y) < 0.1,
+			"the hut's footprint is the size the hut is drawn",
+			"%.2f x %.2f tiles drawn against %s" % [corner.x, -corner.y, str(Iso.SHED_FOOT)]
+		)
+		# And it is in the same place: the near corner of those walls, straight off the
+		# picture, against the line the walking rule stops at.
+		var stands := Iso.shed_centre()
+		var drawn := Iso.tile_to_world(stands.x, stands.y).y 			+ (float(deep + 1) - float(hut.get_height()) * (1.0 - Iso.SHED_ART_GROUND)) * scale
+		var front: float = _main.call(&"_shed_front")
+		_check(absf(drawn - front) < 2.0,
+			"and its near wall is where the walking rule says it is",
+			"%.1f px drawn against %.1f px walked" % [drawn, front])
+
+		# Anything the picture covers and stands north of is drawn behind it. The sideways
+		# limit used to be the footprint's width rather than the roof's, so a walker out past
+		# the wall's corner but still under the eaves was drawn over the hut.
+		var wide: float = _main.call(&"_shed_drawn_wide")
+		var stood := Iso.tile_to_world(stands.x, stands.y)
+		var under := Vector2(stood.x + wide * 0.45, stood.y - Iso.SHED_TALL * 0.25)
+		_check(int(_main.call(&"_walker_layer", under)) == Lake.BEHIND_SHED,
+			"under the hut's eaves is behind the hut", str(under))
+		# And standing clear to the south of it is not. Asked as "not behind the hut" rather
+		# than "in front of everything": the crate is parked straight down the screen from
+		# the hut, so a point due south of one is at the other.
+		var out_front := Vector2(stood.x - wide * 0.3, front + Iso.TILE_H * 2.0)
+		_check(int(_main.call(&"_walker_layer", out_front)) != Lake.BEHIND_SHED,
+			"and standing in front of it is not behind it", str(out_front))
 
 	# Every visible piece is one quad and nothing else: the pale plate that used to be
 	# drawn under each one read as a grey square behind every object in the lake.

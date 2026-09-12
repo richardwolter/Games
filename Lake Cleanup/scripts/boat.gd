@@ -316,6 +316,10 @@ var _painted: int = 0
 var _skim_travel: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
+## Whether the load it just tipped ashore is still in the air. Both halves of unloading are
+## State.UNLOADING with a dwell running down, and this is what tells them apart.
+var _landing := false
+
 ## The hull's drawn shape and its place on the sheet, kept from the frame just drawn so the
 ## sail can be laid over the load with the same polygon rather than a second measurement.
 var _hull_mesh := PackedVector2Array()
@@ -477,9 +481,18 @@ func _process(delta: float) -> void:
 				state = State.UNLOADING
 				_dwell = DWELL
 		State.UNLOADING:
+			# Twice through: once to tip the load ashore, and again while it is in the air.
+			# `_landing` is what tells the two apart, since both are this state with a dwell
+			# running down.
 			_dwell -= delta
 			if _dwell <= 0.0:
-				_land_cargo()
+				if _landing:
+					_landing = false
+					_head_back()
+				else:
+					_land_cargo()
+					if not _landing:
+						_head_back()
 		State.RETURNING:
 			if _sail(delta):
 				state = State.DOCKED
@@ -636,7 +649,8 @@ func _head_home() -> void:
 
 ## Everything of this yard's material comes off; the rest stays aboard for the next stop.
 func _land_cargo() -> void:
-	var kind := dropoffs[target].kind
+	var yard_here := dropoffs[target]
+	var kind := yard_here.kind
 	var landed := PackedInt32Array()
 	var kept := PackedInt32Array()
 	for i in cargo.size():
@@ -645,9 +659,30 @@ func _land_cargo() -> void:
 		else:
 			kept.append(cargo[i])
 	cargo = kept
-	if not landed.is_empty():
+	if landed.is_empty():
+		return
+	if haul == null:
 		sold.emit(landed, kind)
+		return
+	# Thrown ashore rather than deducted, the same half second the yard already gets when it
+	# loads the boat — and counted as each one comes down, not when the last one leaves, so
+	# what is on screen and what the purse says are the same thing. See lake.gd's haul
+	# handler: a piece tagged with a yard is a piece sold at it.
+	#
+	# The berth is held until the volley is over, for the reason the loading one is: a hull
+	# that sails away from its own cargo in mid-air is worse than no animation.
+	for i in landed.size():
+		haul.send(
+			landed[i], position, yard_here.drop_point(),
+			i, landed.size(), null, yard_here, self
+		)
+	state = State.UNLOADING
+	_dwell = maxf(DWELL, Haul.volley_time(landed.size()) + 0.15)
+	_landing = true
 
+
+## On to the next yard on the run, or home if that was the last of them.
+func _head_back() -> void:
 	if _route.is_empty():
 		_head_home()
 	else:

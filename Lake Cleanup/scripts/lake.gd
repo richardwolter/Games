@@ -384,6 +384,10 @@ var _angler_was := Vector2.INF
 ## falls back to the blocked-in one it drew before.
 var _shed_art: Texture2D
 
+## The grass growing round the hut's walls, baked the first time it is drawn. Static, by
+## decision — no sway — so one bake lasts the run.
+var _shed_skirt: Skirt.Patch
+
 var _splash: WaterSplash
 var _prints: Footprints
 var _sfx: Sfx
@@ -663,7 +667,7 @@ func _ready() -> void:
 	_shape_dropoffs()
 	_tune_ground()
 
-	_shed_art = Art.texture("res://assets/shed.png")
+	_shed_art = Art.texture(SHED_ART)
 
 	_sfx = Sfx.new()
 	_sfx.name = &"Sfx"
@@ -1491,8 +1495,12 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 
 
 ## Is the angler standing at the shed?
+##
+## Measured to where the hut stands, not to the island's middle — those are two thirds of a
+## tile apart (`Iso.shed_centre`), which on a range of about three tiles is the difference
+## between the door opening on the near side and on the far one.
 func _at_shed() -> bool:
-	return _angler.tile_pos.distance_to(Iso.ISLAND_CENTRE) < SHOP_RANGE
+	return _angler.tile_pos.distance_to(Iso.shed_centre()) < SHOP_RANGE
 
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
@@ -2043,6 +2051,12 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 	if boat != null:
 		boat.stow(def_index)
 		return
+	# Tagged with a yard: a piece a ferry has just thrown ashore, paid for as it comes down
+	# rather than when the hull tipped it, so the purse and the picture agree.
+	var sale := tag as Dropoff
+	if sale != null:
+		_on_sold(PackedInt32Array([def_index]), sale.kind)
+		return
 	_yard.put(def_index)
 
 
@@ -2376,6 +2390,47 @@ func _buy(what: StringName) -> void:
 	_push_dog_numbers()
 
 
+## How close two hulls may come, in tiles, and how fast they ease apart when they are closer
+## than that. A beam and a bit: the hulls are long, but two boats a length apart nose to tail
+## are a queue at a yard and read fine, while two a beam apart abreast are one boat drawn
+## twice. Under the 2.4 tiles the moorings are spread by, or a fleet at rest would push
+## itself out of its own row.
+const PART_CLEAR := 1.7
+const PART_EASE := 2.6
+
+
+## Keep the hulls out of each other.
+##
+## Not physics, and not a rule the boats obey: each pair that has come too close is eased
+## apart by half the overlap each, after they have all moved, and the route they are on is
+## untouched — a nudged hull sails on from wherever it now is, because every leg is planned
+## from `tile_pos`. The same bargain `Boat._shove_aside` strikes with the floating rubbish,
+## for the same reason: one representation, no bodies, nothing to fall out of step with.
+##
+## Two boats exactly on top of each other have no direction to part along, so they take one
+## off their place in the fleet rather than a roll — a nudge nobody can see the reason for is
+## still better than two hulls that never separate, and a rolled one would jitter.
+func _part_the_fleet(delta: float) -> void:
+	if _boats.size() < 2:
+		return
+	var ease := _ease(PART_EASE, delta)
+	for i in _boats.size():
+		for j in range(i + 1, _boats.size()):
+			var one := _boats[i]
+			var two := _boats[j]
+			var gap := two.tile_pos - one.tile_pos
+			var apart := gap.length()
+			if apart >= PART_CLEAR:
+				continue
+			var way := (
+				gap / apart if apart > 0.001
+				else Vector2(cos(float(i) * 2.4), sin(float(i) * 2.4))
+			)
+			var push := way * (PART_CLEAR - apart) * 0.5 * ease
+			one.tile_pos -= push
+			two.tile_pos += push
+
+
 ## Everything a hull needs to work, and where it ties up.
 ##
 ## Berths are spread along the island's south shore so a fleet at rest is a row of moored
@@ -2502,6 +2557,7 @@ func _net_wash() -> float:
 
 func _process(delta: float) -> void:
 	_push_daylight()
+	_part_the_fleet(delta)
 	_fade_radio(delta)
 	_remap_filth(delta)
 	# The camera follows the angler rather than being panned: the arrow keys are theirs
@@ -2579,9 +2635,17 @@ func _sort_walkers() -> void:
 ## swims out into the top half of the lake, which is north of the hut and nowhere near it,
 ## and a rule that read depth on its own put the animal underneath the floating rubbish.
 func _walker_layer(at: Vector2) -> int:
-	var shed := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
-	var shed_wide := (Iso.SHED_FOOT.x + Iso.SHED_FOOT.y) * Iso.TILE_W * 0.5
-	if at.y < _shed_front() - SHED_BEHIND_SLACK and absf(at.x - shed.x) < shed_wide * 0.5:
+	var shed := Iso.tile_to_world(Iso.shed_centre().x, Iso.shed_centre().y)
+	# Behind the hut means north of **both** its near faces and inside the width of the
+	# picture — the crate's rule, for the same two reasons it has it.
+	#
+	# A flat line across the near corner put somebody standing beside the hut, level with its
+	# left corner, behind a wall that was nowhere near them. And the sideways limit has to be
+	# the drawing's width rather than the footprint's: the roof overhangs the walls it stands
+	# on, so a walker north of the hut and out past the footprint's corner was still covered
+	# by the picture and was being drawn over it — the angler clipping through the shed.
+	var shed_off := Iso.world_to_tile(at - shed)
+	if shed_off.x < Iso.SHED_FOOT.x and shed_off.y < Iso.SHED_FOOT.y 			and absf(at.x - shed.x) < _shed_drawn_wide() * 0.5 			and at.y < _shed_front() - SHED_BEHIND_SLACK:
 		return BEHIND_SHED
 	# Behind the crate means north of both near faces, not north of its bottom point: those
 	# faces slope up from that point, and a flat line there put somebody standing just south
@@ -2594,18 +2658,24 @@ func _walker_layer(at: Vector2) -> int:
 	return IN_FRONT
 
 
+## How wide the hut's picture is drawn, in world pixels — the roof, not the walls' feet.
+## Falls back to the footprint's own width on screen when there is no picture.
+func _shed_drawn_wide() -> float:
+	if _shed_art == null:
+		return (Iso.SHED_FOOT.x + Iso.SHED_FOOT.y) * Iso.TILE_W
+	return _shed_art.get_size().x * (Iso.SHED_TALL / _shed_art.get_size().y)
+
+
 ## The world y of the near edge of the shed's footprint.
 ##
-## The footprint is an ellipse in tile space and the screen runs down `x + y`, so its
-## nearest point is the one that makes that sum largest, which for radii a and b is
-## `sqrt(a² + b²)` past the middle. Worth the line: taking the ellipse's southern pole
-## instead puts the line a third of a tile short, and a third of a tile is the difference
-## between standing behind the hut and standing through it.
+## The footprint is a rectangle in tile space and the screen runs down `x + y`, so its nearest
+## point is its near corner: both half-extents past the middle. It was an ellipse, where the
+## answer was `sqrt(a² + b²)` instead — keep this in step with `Iso.in_shed`, because a third
+## of a tile here is the difference between standing behind the hut and standing through it.
 func _shed_front() -> float:
-	var reach := sqrt(
-		Iso.SHED_FOOT.x * Iso.SHED_FOOT.x + Iso.SHED_FOOT.y * Iso.SHED_FOOT.y
-	)
-	return (Iso.ISLAND_CENTRE.x + Iso.ISLAND_CENTRE.y + reach) * Iso.TILE_H * 0.5
+	var mid := Iso.shed_centre()
+	var reach := Iso.SHED_FOOT.x + Iso.SHED_FOOT.y
+	return (mid.x + mid.y + reach) * Iso.TILE_H * 0.5
 
 
 ## Where the view wants to be: the angler, drawn out towards the net while one is in the
@@ -3176,10 +3246,32 @@ func _tiles_in_radius(radius: float) -> int:
 	return count
 
 
-## How much of the shed's walking footprint its shadow covers. Well under one: the footprint
-## is sized to keep the angler clear of the whole hut, roof included, and the shadow wants to
-## be the ground under the walls.
-const SHED_SHADOW := 0.74
+## The hut's picture, and the roll its grass comes off. A fixed seed: the same hut grows the
+## same grass every time the game is opened.
+##
+## There used to be a soft black quad under the hut here as well — a contact patch, so the
+## hut had something to stand on. Gone, by decision (2026-09-12): the grass along the bottom
+## line is what says the hut meets the ground now, and a dark pool under a skirt of blades
+## read as two shadows.
+const SHED_ART := "res://assets/shed.png"
+const SHED_SEED := 4477
+
+## The doorway across the hut's picture, as fractions of its width, kept clear of grass.
+##
+## Measured off `assets/shed.png`: the door panel on the front-left wall runs columns 30 to
+## 47 of 130, and a blade of the hem's full height reaches its bottom board. A door with
+## grass growing across it is a door nobody has opened, and this is the one the player walks
+## through several times a run — so the threshold is trodden bare. Re-measure with the hut.
+const SHED_DOOR := Vector2(0.22, 0.37)
+
+## Where the hut's picture is laid and where the building stands inside it both live in `Iso`
+## now (`SHED_STAND`, `SHED_ART_GROUND`, `shed_centre`), because the walkers need them too:
+## the walls' feet are an isometric diamond and the art's last row is that diamond's **near
+## corner**, not its middle, so the building stands about two thirds of a tile north of where
+## the picture bottoms out. Drawing off one number and colliding off another is what put the
+## footprint off the hut. Re-measure `SHED_ART_GROUND` if the hut is re-cut
+## (`tools/slice_shed.gd`): it is the diamond's side corners, rows 93 and 103 of 127, as a
+## fraction of the picture's height up from the bottom.
 
 
 ## The shed, and the prompt over it when the angler is close enough to use it.
@@ -3189,48 +3281,71 @@ const SHED_SHADOW := 0.74
 ## means by having walked up to it.
 func _draw_shed() -> void:
 	var at := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
-
-	# Footprint first, so the hut has something to stand on rather than floating. This is
-	# the contact patch under the walls, not the shadow the sun throws — that is the hut's
-	# own outline, laid out below. Drawn inside the ellipse the angler is kept out of rather
-	# than on it: the walking rule has to clear the eaves and the porch, and a patch drawn
-	# out to that line was a dark pool reaching well past the walls. Square, like the hut
-	# standing on it, and like the crate's.
-	var half := Iso.SHED_FOOT * SHED_SHADOW
-	var ring := PackedVector2Array()
-	for corner: Vector2 in [
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y)
-	]:
-		var tile := Iso.ISLAND_CENTRE + corner
-		ring.append(Iso.tile_to_world(tile.x, tile.y))
-	_island.draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.11))
+	# Where the bottom row of the picture is laid, and where inside the picture the walls
+	# actually stand. Everything cast from the hut hangs off the second one.
+	var feet := _shed_feet()
+	var stand := feet + Vector2(0.0, Iso.SHED_TALL * Iso.SHED_ART_GROUND)
 
 	if _shed_art != null:
-		# Standing on the footprint rather than centred on it: the hut's own base is the
-		# bottom of the picture, and the middle of it is halfway up a wall.
+		# Standing on the footprint rather than centred on it: the middle of the picture is
+		# halfway up a wall.
 		var size := _shed_art.get_size() * (Iso.SHED_TALL / _shed_art.get_size().y)
 		# The hut's shadow: its own picture again, laid across the grass away from the sun.
 		# A building is the biggest thing on the island and the one whose shadow says most
 		# about where the light is coming from, so it swings with the rest of the land.
+		#
+		# Rooted where the building stands, not at the bottom of the picture — the art's last
+		# row is the near corner of the diamond its walls stand on, and a shadow pinned there
+		# began a good way down the grass in front of the building it belonged to.
 		if _day != null:
 			_island.draw_set_transform_matrix(
-				Shade.lying(at + Vector2(0.0, Iso.TILE_H * 0.35), _day.lean, _day.stretch)
+				Shade.lying(feet, _day.lean, _day.stretch)
 			)
+			# The picture, in the shadow's own space: as far above the root as the walls
+			# stand above their feet in the art.
 			_island.draw_texture_rect(
-				_shed_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false,
+				_shed_art,
+				Rect2(
+					Vector2(-size.x * 0.5, -size.y * (1.0 - Iso.SHED_ART_GROUND)), size
+				),
+				false,
 				Shade.tint(_day.ink)
 			)
 			_island.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		_island.draw_texture_rect(
-			_shed_art,
-			Rect2(at - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.35), size),
-			false
+			_shed_art, Rect2(stand - Vector2(size.x * 0.5, size.y), size), false
 		)
-		_draw_shed_lamp(at)
+		# And the grass over the bottom line, which is the whole point of it: the last row
+		# of the picture is a straight cut, and blades standing along it are what stop the
+		# hut reading as a sticker on the lawn.
+		_shed_grass(Rect2(stand - Vector2(size.x * 0.5, size.y), size)).over(_island)
+		# Over the hut, not over the tile: the two are not the same point.
+		_draw_shed_lamp(feet)
 		return
 
 	_draw_shed_blocked(at)
+
+
+## The hut's grass, baked once off the hut's own silhouette. The island redraws every frame,
+## so this cannot be a few hundred `draw_rect` calls — it is one triangle array and one draw
+## call, built the first time the hut is drawn and kept.
+func _shed_grass(box: Rect2) -> Skirt.Patch:
+	if _shed_skirt == null:
+		_shed_skirt = Skirt.hem(
+			Art.image(SHED_ART), box, SHED_SEED, PackedVector2Array([SHED_DOOR])
+		)
+	return _shed_skirt
+
+
+## Where the hut stands, in world pixels: the middle of the diamond its walls' feet make, and
+## the same point the walking rule keeps everyone out of (`Iso.shed_centre`). The shadow and
+## the grass hang off it. With no picture there is nothing standing, so the blocked-in hut
+## uses the tile it is drawn on.
+func _shed_feet() -> Vector2:
+	if _shed_art == null:
+		return Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
+	var mid := Iso.shed_centre()
+	return Iso.tile_to_world(mid.x, mid.y)
 
 
 ## The hut as it was blocked in before there was a picture of it. Kept for the same reason

@@ -538,6 +538,25 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   12; six read as a handful. Kept short of the bow: laid to the rail by the plane's
   projection it floated past the cut bow end on, because the frames draw that deck higher
   than the projection puts it.
+- **Hulls do not sit inside each other** (`Lake._part_the_fleet`, `PART_CLEAR` 1.7 tiles,
+  2026-09-12): after every boat has moved, each pair closer than the clearance is eased apart
+  by half the overlap each. **Not physics** — no bodies, nothing to fall out of step with —
+  and not a rule the boats obey: the route is untouched, and a nudged hull sails on from
+  wherever it now is, because every leg is planned from `tile_pos`. The same bargain
+  `Boat._shove_aside` strikes with the floating rubbish. Two hulls exactly on top of each
+  other part along a direction taken from their place in the fleet, not a roll, which would
+  jitter. **Keep `PART_CLEAR` under the 2.4 tiles `_reberth` spreads the moorings by**, or a
+  fleet at rest pushes itself out of its own row; `test_lake` guards both ends.
+- **A ferry throws its load ashore** (`Boat._land_cargo`, 2026-09-12): the pieces a yard buys
+  fly to it through the same `Haul` the yard already uses to load the boat — from the hull,
+  which they follow as it lies at the berth, to `Dropoff.drop_point()`, which is `DROP_UP`
+  (0.34) of the way up the yard's own painting, the deck its crates stand on rather than the
+  feet of its posts in the water. **Paid for as each one lands**, not when the hull tipped
+  them: a piece tagged with a `Dropoff` reaches `Lake._on_haul_arrived` as a sale, so the
+  purse and the picture say the same thing — the rule `Haul` was built on. The berth is held
+  until the volley is over (`_landing`, the second pass through `State.UNLOADING`), for the
+  reason the loading one is: a hull that sails out from under its own cargo in mid-air is
+  worse than no animation. With no `Haul` the sale still happens on the spot.
 - **No wake and no rings**, by decision (2026-09-12): the pale wedge of slabs behind the
   stern with arcs shedding down it (`_draw_wake`, `_wake_arc`, `_wake_noise`, every `WAKE_*`)
   and the ripple rings dropped into the splash layer every `HULL_RIPPLE` are both gone. What
