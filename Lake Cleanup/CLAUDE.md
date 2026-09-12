@@ -505,15 +505,19 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   bottom edges) and tested — distance to the ring, point-in-triangle for the heads — so in a
   quartering heading it leans and foreshortens with the sail, and an edge is a pixel on or
   off, not a blurred step. Then **clipped to the face's own white pixels**: nothing of it
-  lands on the shaded head strip, the billow or the sky. **No outline**, by decision. Frames
+  lands on the shaded head strip, the billow or the sky. **A one-pixel edge all round each
+  arrow** (`MARK_EDGE`, the sheet's dark wood `d`, not its outline ink): every white pixel
+  edge-on to a painted one, so the blue stands off the cloth (2026-09-12, after the plain
+  blue was judged too faint). Frames
   0-3 and their mirrors carry the face; the side view (4, 12) shows only the billow's lens a
   few pixels wide and gets the mark squeezed into that, so a hint of the blue shows at every
   heading the painted side faces. The stern quarters show the sail's back and stay plain, by
   decision. Tried and rejected on the way (all 2026-09-12): a 15 px hand bitmap in the middle
   of the sail (a small odd knot); three bent arrows round a triangle, drawn at zoom and boxed
   down to size (ragged, heads bled into blobs); a flat box per heading that ran past the face
-  (bled onto the cloth round it); a one-pixel slate outline round the outside (read as more
-  bleed). **The pennant is gone** with it — the flag in the yard's colour at the masthead,
+  (bled onto the cloth round it); a one-pixel slate outline round the outside only, left off
+  the hole and the gaps by a flood fill (read as more bleed, and came out sparse once the
+  arrows went round). **The pennant is gone** with it — the flag in the yard's colour at the masthead,
   `PENNANT_STAFF`, `masthead()`, and the json's `masthead` list — the yards' own tints tell
   the piers apart. **After re-running the builder, reimport** (`<exe> --path . --headless
   --import`): a `--path` run without the editor draws the stale `.godot/imported` texture.
