@@ -773,8 +773,7 @@ func kind_at(tx: float, ty: float) -> Kind:
 ## ellipse `SAND_OUT` tiles out of the water, pushed about by `wander_at`.
 func coverage_at(at: Vector2) -> float:
 	if layer == Layer.ISLAND:
-		var mean := (Iso.ISLAND_RADIUS.x + Iso.ISLAND_RADIUS.y) * 0.5
-		return (1.0 - Iso.island_fraction(at.x, at.y)) * mean - BEACH_IN
+		return Iso.lawn_depth(at)
 	var plain := out_of_water(at.x, at.y) - beach_width
 	# The wander can only move the line by its amplitude, so anything further from the
 	# ellipse than that is decided without rolling the noise. The props ask this for every

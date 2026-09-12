@@ -279,6 +279,20 @@ static func on_island_ground(at: Vector2) -> bool:
 	return past_shelf(at) <= 0.0
 
 
+## How far into the island's lawn a point is, in tiles; under 0 is beach (or water). The one
+## rule for where the lawn starts: Ground.coverage_at draws it, walkers bury their feet by it.
+## The island's lawn line has no wander, so this is exact.
+static func lawn_depth(at: Vector2) -> float:
+	var mean := (ISLAND_RADIUS.x + ISLAND_RADIUS.y) * 0.5
+	return (1.0 - island_fraction(at.x, at.y)) * mean - Ground.BEACH_IN
+
+
+## On the island's grass. The only lawn a walker reaches: the bank's beach is wider than
+## anyone is let up it.
+static func on_lawn(at: Vector2) -> bool:
+	return island_fraction(at.x, at.y) < 1.0 and lawn_depth(at) > 0.0
+
+
 ## How far past the water's drawn edge a spot is, in world pixels: negative on the beach,
 ## zero on the edge, positive out in the water. `past_island` measured from the waterline,
 ## which is a little way out from where the water is actually drawn; anything that wants to

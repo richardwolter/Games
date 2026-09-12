@@ -1322,6 +1322,83 @@ func _stage_ferry_art() -> void:
 
 ## The art: a catalogue that fits its sheets, an atlas built from it, every def pointed at
 ## a picture, and the anchor still surviving the trip through the vertex colour.
+## The run cycles hold no idle frame (every strip opened on one), and every pose is
+## registered so its lowest foot row lands on the ground line its shadow folds from.
+func _stage_angler_sheet() -> void:
+	var poses: Dictionary = _angler.get(&"_poses")
+	var sheet: Texture2D = _angler.get(&"_sheet")
+	if poses.is_empty() or sheet == null:
+		_check(false, "the angler's sheet loaded", "no poses")
+		return
+	var image := sheet.get_image()
+	var idle_like := 0
+	for dir in ["south", "north", "east", "west"]:
+		for run: Dictionary in poses.get(StringName("run_" + dir), []):
+			for idle: Dictionary in poses.get(StringName("idle_" + dir), []):
+				if _same_ink(image, run, idle):
+					idle_like += 1
+	_check(idle_like == 0, "no run frame is an idle frame", "%d are" % idle_like)
+	# Nor a legs-together one: the two south frames dropped after the copy differed from the
+	# nearest idle by 336 and 423 pixels, every kept one by 520 or more. Side views overlap
+	# their legs by nature and sit closer, so only south is held to it.
+	var nearest := INF
+	for run: Dictionary in poses.get(&"run_south", []):
+		for idle: Dictionary in poses.get(&"idle_south", []):
+			nearest = minf(nearest, float(_ink_distance(image, run, idle)))
+	_check(nearest > 470.0, "no south run frame stands like the idle",
+		"nearest differs by %d pixels" % int(nearest))
+	var foot_of: Dictionary = _angler.get(&"_foot_of")
+	var off := 0
+	for pose: StringName in poses:
+		var lowest := 0.0
+		for f: Dictionary in poses[pose]:
+			var ink: Rect2 = f["ink"]
+			lowest = maxf(lowest, ink.end.y)
+		if not is_equal_approx(lowest, float(foot_of.get(pose, -1.0))):
+			off += 1
+	_check(off == 0, "every pose stands on its own lowest foot row", "%d do not" % off)
+
+
+## Pixels that differ between two frames' ink, stood on the same feet and centred across.
+func _ink_distance(image: Image, a: Dictionary, b: Dictionary) -> int:
+	var ra: Rect2 = a["region"]
+	var rb: Rect2 = b["region"]
+	var ia: Rect2 = a["ink"]
+	var ib: Rect2 = b["ink"]
+	var w := int(maxf(ia.size.x, ib.size.x))
+	var h := int(maxf(ia.size.y, ib.size.y))
+	var count := 0
+	for y in h:
+		for x in w:
+			var ca := _ink_at(image, ra, ia, x - (w - int(ia.size.x)) / 2, y - (h - int(ia.size.y)))
+			var cb := _ink_at(image, rb, ib, x - (w - int(ib.size.x)) / 2, y - (h - int(ib.size.y)))
+			if maxf(maxf(absf(ca.r - cb.r), absf(ca.g - cb.g)), maxf(absf(ca.b - cb.b), absf(ca.a - cb.a))) > 40.0 / 255.0:
+				count += 1
+	return count
+
+
+func _ink_at(image: Image, region: Rect2, ink: Rect2, x: int, y: int) -> Color:
+	if x < 0 or y < 0 or x >= int(ink.size.x) or y >= int(ink.size.y):
+		return Color(0.0, 0.0, 0.0, 0.0)
+	return image.get_pixel(int(region.position.x + ink.position.x) + x, int(region.position.y + ink.position.y) + y)
+
+
+func _same_ink(image: Image, a: Dictionary, b: Dictionary) -> bool:
+	var ra: Rect2 = a["region"]
+	var rb: Rect2 = b["region"]
+	var ia: Rect2 = a["ink"]
+	var ib: Rect2 = b["ink"]
+	if ia.size != ib.size:
+		return false
+	for y in int(ia.size.y):
+		for x in int(ia.size.x):
+			var ca := image.get_pixel(int(ra.position.x + ia.position.x) + x, int(ra.position.y + ia.position.y) + y)
+			var cb := image.get_pixel(int(rb.position.x + ib.position.x) + x, int(rb.position.y + ib.position.y) + y)
+			if absf(ca.a - cb.a) > 0.15 or (ca.a > 0.5 and absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b) > 0.15):
+				return false
+	return true
+
+
 func _stage_art() -> void:
 	var sheets: Sheets = _main.get(&"_sheets")
 	_check(sheets != null and sheets.atlas != null, "the sheets were cut and welded",
@@ -1329,6 +1406,8 @@ func _stage_art() -> void:
 	if sheets == null:
 		_advance()
 		return
+
+	_stage_angler_sheet()
 
 	var atlas_size := sheets.atlas.get_size()
 	var outside := 0
@@ -1959,6 +2038,19 @@ func _stage_sun() -> void:
 		"and none of it spills out on the sunlit side",
 		"sweep ends at %.1f, picture at %.1f" % [reach.end.x, box.end.x])
 	day.queue_free()
+	# Walkers bury their feet by Iso.on_lawn; it must be the lawn Ground draws.
+	var island := Ground.new()
+	island.layer = Ground.Layer.ISLAND
+	var disagree := 0
+	for i in 64:
+		var along := Iso.ISLAND_CENTRE + Vector2(float(i) * 0.15, float(i) * 0.08)
+		if Iso.island_fraction(along.x, along.y) >= 1.0:
+			break
+		if Iso.on_lawn(along) != (island.kind_at(along.x, along.y) == Ground.Kind.GRASS):
+			disagree += 1
+	island.free()
+	_check(disagree == 0, "feet are buried exactly where the island draws grass",
+		"%d points disagree" % disagree)
 	_advance()
 
 

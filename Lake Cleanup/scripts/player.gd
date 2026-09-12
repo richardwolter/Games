@@ -54,7 +54,12 @@ const WADE_SINK := 9.0
 ## Pixels rather than source pixels off the sheet, unlike WADE_SINK — that one cuts the art
 ## itself so the waterline lands on a whole source pixel; this one only moves where the whole
 ## picture is drawn, so it costs nothing to keep it a fraction of a screen pixel.
-const LAND_SINK := 2.0
+const LAND_SINK := 4.0
+
+## Source pixels of boot hidden in the island's grass, like a shallow wade with no foam. The
+## picture moves down by the same, so the cut sits on the ground. Sand keeps the boots whole,
+## and so does the shadow.
+const GRASS_BURY := 2.0
 
 ## How many source pixels of the ground under a walking step the boots leave a print in, in
 ## world pixels, and how far to the side of the last one the next one lands.
@@ -205,6 +210,9 @@ var _cast_lock := 0.0
 var _stand_tall: float = 43.0
 var _stand_foot: float = 45.0
 
+## The lowest foot row of each pose, in sheet pixels. What _frame registers a pose against.
+var _foot_of: Dictionary = {}
+
 
 func _ready() -> void:
 	# Nearest, and only here. The figure is magnified — two screen pixels per pixel of art —
@@ -336,6 +344,13 @@ func _load_art() -> bool:
 				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
 			})
 		_poses[StringName(name)] = frames
+		# Each pose stands on its own lowest foot row: the north strips end two rows higher
+		# than the south ones, and one row for all left the north figure above its shadow.
+		var foot := 0.0
+		for f: Dictionary in frames:
+			var box: Rect2 = f["ink"]
+			foot = maxf(foot, box.position.y + box.size.y)
+		_foot_of[StringName(name)] = foot
 
 	# The one frame everything is registered against: the angler standing still, facing the
 	# camera. A named one is easier to go and look at than "the first one that happened to
@@ -477,7 +492,9 @@ func _wading() -> float:
 func _wake() -> void:
 	if splash == null or _wet_by(tile_pos) <= 0.0:
 		return
-	splash.wake(self, Iso.tile_to_world(tile_pos.x, tile_pos.y), WAKE_SPAN, WAKE_EVERY)
+	# From the foam on the cut, not from the boots under it: the wake is the water they part.
+	var from := Iso.tile_to_world(tile_pos.x, tile_pos.y) + Vector2(0.0, _cut_y(_wading(), 0.0))
+	splash.wake(self, from, WAKE_SPAN, WAKE_EVERY)
 
 
 ## A boot print in the sand or the grass, every PRINT_SPACING of ground actually covered.
@@ -600,7 +617,7 @@ func _draw_ripples(sunk: float) -> void:
 		var fade := (1.0 - out) * 0.5 * deep
 		if fade <= 0.01 or wide <= 1.0:
 			continue
-		_ring(Vector2.ZERO, Vector2(wide, wide * 0.5), Color(0.86, 0.94, 0.97, fade))
+		_ring(Vector2(0.0, _cut_y(sunk, 0.0)), Vector2(wide, wide * 0.5), Color(0.86, 0.94, 0.97, fade))
 
 
 ## One flat ellipse, drawn as an outline. Sixteen sides: on a ring thirty pixels across that
@@ -634,7 +651,7 @@ func _draw() -> void:
 		else:
 			_foam.lay(edge[0], edge[1])
 
-	var shown := _frame(sunk, land_shift)
+	var shown := _frame(sunk, land_shift, true)
 	if shown.is_empty():
 		_draw_blocked()
 		return
@@ -660,10 +677,21 @@ func _cut_edge(sunk: float, land_shift: float) -> Array:
 	return [Vector2(left, y), Vector2(left + ink.size.x * scale, y)]
 
 
+## How high the picture ends: the wading cut (where the foam lies) or, on dry land, the feet.
+## The ink is centred on the origin, so the middle of the foam is straight above it.
+func _cut_y(sunk: float, land_shift: float) -> float:
+	if sunk <= 0.0:
+		return land_shift
+	var shown := _frame(sunk, land_shift)
+	if shown.is_empty():
+		return land_shift
+	return (shown["box"] as Rect2).end.y
+
+
 ## Which frame is showing, and the box it goes in. Pulled out of the draw because the shadow
 ## and the wading foam want exactly the same answer: a shadow picked from a different frame
 ## than the figure is a shadow of somebody else.
-func _frame(sunk: float, land_shift: float) -> Dictionary:
+func _frame(sunk: float, land_shift: float, buried := false) -> Dictionary:
 	if _poses.is_empty():
 		return {}
 
@@ -686,6 +714,15 @@ func _frame(sunk: float, land_shift: float) -> Dictionary:
 	# the boot half a pixel at a time.
 	if sunk > 0.0:
 		region = Rect2(region.position, Vector2(region.size.x, maxf(region.size.y - sunk, 1.0)))
+	# On the lawn the boots go into the grass: the air under the feet and GRASS_BURY rows off
+	# the bottom, and the picture drawn that much lower so what is left still meets the ground.
+	var dropped := 0.0
+	if buried and sunk <= 0.0 and Iso.on_lawn(tile_pos):
+		var air := maxf(region.size.y - (ink.position.y + ink.size.y), 0.0)
+		region = Rect2(
+			region.position, Vector2(region.size.x, maxf(region.size.y - air - GRASS_BURY, 1.0))
+		)
+		dropped = GRASS_BURY
 
 	# Centred on the figure, not on the cell. The cells are not authored — tools/slice_character.gd
 	# only has one strip per direction to divide evenly by its frame count, and an even split
@@ -694,7 +731,10 @@ func _frame(sunk: float, land_shift: float) -> Dictionary:
 	# middle — under the origin no matter where the cell cut it.
 	var size := region.size * scale
 	var box := Rect2(
-		Vector2(-(ink.position.x + ink.size.x * 0.5) * scale, -_stand_foot * scale + land_shift),
+		Vector2(
+			-(ink.position.x + ink.size.x * 0.5) * scale,
+			(dropped - float(_foot_of.get(chosen["pose"], _stand_foot))) * scale + land_shift
+		),
 		size
 	)
 	return {"region": region, "box": box, "scale": scale, "ink": ink}
@@ -741,7 +781,14 @@ func _draw_shadow(sunk: float, land_shift: float) -> void:
 	if day == null:
 		return
 	var ink := Shade.tint(day.ink)
+	# Rooted where the picture ends: the cut line while wading, the feet on dry land. Rooted at
+	# the hidden feet, the shadow started below the foam and left a strip of water between.
 	var down := Shade.lying(Vector2(0.0, land_shift), day.lean, day.stretch)
+	if sunk > 0.0:
+		# lying() folds about local y 0; slide the picture so the cut sits on that fold and
+		# stays put, then back to where the cut is drawn.
+		var cut := _cut_y(sunk, land_shift)
+		down = Shade.lying(Vector2(0.0, cut), day.lean, day.stretch) 			* Transform2D(0.0, Vector2(0.0, -cut))
 	var shown := _frame(sunk, land_shift)
 	if shown.is_empty():
 		return

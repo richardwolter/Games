@@ -17,9 +17,12 @@ const SOURCE_DIR := "res://art_source/character_extracted/"
 
 ## Each animation: the pose-name prefix the game will ask for, the layer-name slug
 ## psd-extract wrote the strip under (they don't all match the prefix), and the frame count.
+## `skip` leading frames are cut on the grid and then dropped: every run strip opens on a
+## frame identical to an idle one and two legs-together frames after it, which played as a
+## stand at the top of each stride.
 const ANIMS := [
 	{"prefix": "idle", "slug": "idle", "frames": 9},
-	{"prefix": "run", "slug": "running", "frames": 17},
+	{"prefix": "run", "slug": "running", "frames": 17, "skip": 3},
 	{"prefix": "cast", "slug": "casting", "frames": 16},
 ]
 
@@ -58,6 +61,7 @@ func _init() -> void:
 				"pose": "%s_%s" % [anim["prefix"], dir],
 				"art": image,
 				"frames": frames,
+				"skip": int(anim.get("skip", 0)),
 				"cell_w": cell_w,
 				"cell_h": image.get_height(),
 			})
@@ -75,7 +79,7 @@ func _init() -> void:
 		var cell_w: float = strip["cell_w"]
 		var cell_h: int = strip["cell_h"]
 		var frames: Array = []
-		for column in int(strip["frames"]):
+		for column in range(int(strip["skip"]), int(strip["frames"])):
 			# Whole-pixel columns off a fractional cell width: rounded edges rather than a
 			# truncated width repeated, so the last frame is not left thinner than the rest
 			# by everyone else's rounding.

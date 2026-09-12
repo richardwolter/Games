@@ -44,7 +44,10 @@ const BOB_RATE := 3.4
 
 ## How far the dog's paws sink into dry ground, in screen pixels. See Angler.LAND_SINK — the
 ## same idea, scaled down for a much smaller animal.
-const LAND_SINK := 1.0
+const LAND_SINK := 2.0
+
+## Sheet pixels of paw hidden in the island's grass. Sand keeps the paws whole.
+const GRASS_BURY := 1.0
 
 ## How far apart the paw prints land while it is walking on dry ground, in world pixels, and
 ## how far to the side of the last one the next one sits. See Angler.PRINT_SPACING.
@@ -810,6 +813,12 @@ func _draw() -> void:
 			_foam.clear()
 		at.y += LAND_SINK
 		_draw_shadow(name, frame, Vector2(0.0, LAND_SINK))
+		# Paws in the grass: the bottom row goes, and the picture moves down by it so the
+		# cut sits on the ground line. The shadow above keeps whole paws.
+		if Iso.on_lawn(tile_pos):
+			var buried := DogArt.bury(name, frame, HEIGHT, GRASS_BURY)
+			sink = buried[0]
+			at.y += buried[1]
 
 	DogArt.stamp(self, name, frame, at, HEIGHT, facing_left, sink)
 	if not _carried.is_empty() and grid != null:

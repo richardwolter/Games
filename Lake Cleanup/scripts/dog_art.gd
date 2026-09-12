@@ -180,6 +180,20 @@ static func cut_edge(
 	return [Vector2(corner.x, y), Vector2(corner.x + size.x, y)]
 
 
+## What to hand `stamp` to bury the paws `rows` sheet pixels into grass: the sink fraction
+## (the air under the feet plus those rows) and how far down to draw, so the cut lands on the
+## ground line instead of lifting the dog.
+static func bury(name: StringName, frame: int, height: float, rows: float) -> Array:
+	if not has(name) or rows <= 0.0:
+		return [0.0, 0.0]
+	var list: Array = _frames[name]
+	var cell: Dictionary = list[posmod(frame, list.size())]
+	var region: Rect2 = cell["region"]
+	var foot: Vector2 = cell["foot"]
+	var cut := maxf(region.size.y - foot.y, 0.0) + rows
+	return [cut / maxf(region.size.y, 1.0), rows * _scale_for(name, height)]
+
+
 ## Where the dog's mouth is, as an offset from the point it stands on.
 ##
 ## Worked out from the frame rather than written down: the nose is the leading edge of the
