@@ -512,9 +512,11 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   fractions: ring radius, bar thickness, head width and length, sweep and start angle),
   **decided pixel by pixel**: each frame pixel's centre is mapped back through the heading's
   parallelogram (`MARK_QUAD`: top-left, top-right, bottom-left, measured off the lit face's
-  white rows, about seven tenths of the face wide, leaning a couple of rows rather than the
-  face's full slope: sheared to the cloth, the ring in the quartering headings tilted into a
-  flat ellipse, and the art's sail is hardly foreshortened there) and tested — distance to the ring, point-in-triangle for the heads — so in a
+  white rows, about seven tenths of the face wide, and **square, no lean**: sheared to the
+  cloth's slope the ring in the quartering headings tilted into a flat ellipse, at a couple
+  of rows' lean it still read squashed going south-west, and the art's sail is hardly
+  foreshortened there, so the canvas starts a row or two lower, where the sloping top edge
+  has left the whole width white, and sits level) and tested — distance to the ring, point-in-triangle for the heads — so in a
   quartering heading it leans and foreshortens with the sail, and an edge is a pixel on or
   off, not a blurred step. Then **clipped to the face's own white pixels**: nothing of it
   lands on the shaded head strip, the billow or the sky. **A one-pixel edge all round each
