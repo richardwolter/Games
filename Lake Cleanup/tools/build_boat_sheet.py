@@ -266,6 +266,12 @@ MARK_HEAD_W = 0.21
 MARK_HEAD_L = 0.24
 MARK_SWEEP = 2.0
 MARK_START = -0.35
+## A one-pixel edge round each arrow, on the face's white, in the sheet's dark wood rather
+## than its outline ink — a slight line, so the blue stands off the cloth without the mark
+## reading as inked on. All the way round each arrow, as the box's own arrows are lined:
+## every white pixel beside a painted one, edge-on (not diagonally), so the line stays one
+## pixel thin on the curves.
+MARK_EDGE = "d"
 ## The canvas the mark is painted on in each frame that carries it: a parallelogram on the
 ## sail's lit face — top-left, top-right and bottom-left corners in frame pixels, the fourth
 ## implied — measured off the face's white rows with a pixel or two of cloth kept round it.
@@ -363,13 +369,24 @@ def mark_bitmap(quad, mirror=False):
 
 
 def stamp_mark(frame, quad, mirror=False):
-    """Paint the mark onto the face's own white pixels, and nothing else."""
+    """Paint the mark onto the face's own white pixels, and nothing else, with its edge."""
     bits = mark_bitmap(quad, mirror)
     px = frame.load()
     lit = INK["W"]
     for y in range(FRAME):
         for x in range(FRAME):
-            if bits[y][x] and px[x, y] == lit:
+            if bits[y][x] and px[x, y] != lit:
+                bits[y][x] = False
+    for y in range(FRAME):
+        for x in range(FRAME):
+            if bits[y][x] or px[x, y] != lit:
+                continue
+            if any(0 <= x + dx < FRAME and 0 <= y + dy < FRAME and bits[y + dy][x + dx]
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                px[x, y] = INK[MARK_EDGE]
+    for y in range(FRAME):
+        for x in range(FRAME):
+            if bits[y][x]:
                 px[x, y] = INK["R"]
 
 
