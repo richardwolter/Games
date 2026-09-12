@@ -3307,12 +3307,20 @@ func _draw_shed() -> void:
 			)
 			# The picture, in the shadow's own space: as far above the root as the walls
 			# stand above their feet in the art.
-			_island.draw_texture_rect(
+			#
+			# Only the part of it above that root. `Shade.lying` reflects about the point it
+			# is given, which is right for a figure — there is nothing below its feet — and
+			# wrong for a front-on building, whose last thirty-odd rows are the near half of
+			# the diamond its walls stand on. Sheared with the rest, that wedge folded up and
+			# to the *right* while the shadow went left, and stuck out in front of the hut as
+			# a lump that read as the shadow being on the wrong object. It casts nothing
+			# anyway: it is flat on the grass, under the building.
+			var walls := roundf(_shed_art.get_size().y * (1.0 - Iso.SHED_ART_GROUND))
+			var lift := walls * (size.y / _shed_art.get_size().y)
+			_island.draw_texture_rect_region(
 				_shed_art,
-				Rect2(
-					Vector2(-size.x * 0.5, -size.y * (1.0 - Iso.SHED_ART_GROUND)), size
-				),
-				false,
+				Rect2(Vector2(-size.x * 0.5, -lift), Vector2(size.x, lift)),
+				Rect2(Vector2.ZERO, Vector2(_shed_art.get_size().x, walls)),
 				Shade.tint(_day.ink)
 			)
 			_island.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

@@ -50,6 +50,29 @@ const HEAP_CLIMB := 0.7
 const SHADOW_SPREAD := 1.0
 const SHADOW_DROP := 3.0
 
+## The grass along the box's bottom line and the sand spilling out from it. Small, by
+## decision — the box is 32 art pixels tall, and a tuft that would read on the shed is a
+## bush on this.
+##
+## The sand is a *spill*, not a patch: loose grains thinning outwards, as if the crate has
+## been dragged about. There is no sand under the box on the map — it stands on the island's
+## lawn — so this is the ground the box itself has worn, and nothing in `Ground` knows or
+## needs to know about it.
+##
+## The grass is measured off the crate's own picture rather than laid on a ring round it
+## (`Skirt.hem`), so it follows the V the art ends on and fills that line. Only the sand has
+## a reach: it is the one of the two that is not tied to the drawing.
+const SKIRT_SEED := 9051
+
+## How tall the crate's blades stand, in art pixels — shorter than the hem's own default.
+## The crate is drawn at 2.5, so one of its painted pixels is two and a half of the game's,
+## and a blade sized for the shed stands a third of the way up this picture. At the default
+## the tufts on the lower-left edge reached the recycle mark painted just above it.
+const SKIRT_BLADES := Vector2i(1, 2)
+const SPILL_REACH := Vector2(1.10, 1.10)
+const SPILL_GRAINS := 26
+const SPILL_SEED := 9052
+
 ## How many pieces fill it to the brim. Past this the heap simply stops rising — the crate is
 ## a picture of how the run is going, not a second cap on it.
 const CRATE_FULL := 40
@@ -73,6 +96,11 @@ var _rng := RandomNumberGenerator.new()
 
 ## Set by lake.gd, for the shadow. Null means no shadow, the same as every other caster.
 var day: DayCycle
+
+## The grass round the crate and the sand spilled out of it, baked the first time it draws.
+## Static, so one bake lasts the run.
+var _skirt: Skirt.Patch
+var _spill: Skirt.Patch
 
 var _art: Texture2D
 ## The art's two near walls and front rim alone, drawn again over the heap so the catch is
@@ -183,6 +211,7 @@ func _draw() -> void:
 	# rather than a soft pool bigger than the box: nothing else here casts one of those, and
 	# a crate is a box sitting flat on the sand.
 	_diamond(Vector2(0.0, SHADOW_DROP), CRATE * SHADOW_SPREAD, Color(0.0, 0.0, 0.0, 0.22))
+	_ground().over(self)
 	draw_colored_polygon(
 		PackedVector2Array([
 			Vector2(0.0, -half.y), Vector2(half.x, 0.0),
@@ -219,15 +248,48 @@ func _draw() -> void:
 func _draw_art() -> void:
 	var size := _art.get_size() * ART_SCALE
 	var box := Rect2(Vector2(-size.x * 0.5, -ART_GROUND * ART_SCALE), size)
+	# The ground the crate has worn goes under the picture: sand is flat, and the box is
+	# standing on it.
+	_ground().over(self)
 	if day != null:
 		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, day.lean, day.stretch))
-		draw_texture_rect(_art, box, false, Shade.tint(day.ink))
+		# The crate down to its ground line and no further. The rows under it are the near
+		# half of the diamond it stands on, and `Shade.lying` reflects about the point it is
+		# given — so sheared with the rest they folded up and to the *right* while the shadow
+		# went left, and the box wore a lump of shade in front of it. Flat ground under the
+		# crate casts nothing. Same cut the shed's shadow takes, for the same reason.
+		draw_texture_rect_region(
+			_art,
+			Rect2(box.position, Vector2(box.size.x, ART_GROUND * ART_SCALE)),
+			Rect2(Vector2.ZERO, Vector2(_art.get_size().x, ART_GROUND)),
+			Shade.tint(day.ink)
+		)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	draw_texture_rect(_art, box, false)
 	if grid != null and not held.is_empty():
 		_draw_heap()
 		if _front != null:
 			draw_texture_rect(_front, box, false)
+	# And the blades along the bottom line, hiding the V the crate's picture ends on.
+	_grass(box).over(self)
+
+
+## The crate's grass, baked once off the crate's own silhouette: one triangle array rather
+## than a few hundred rects.
+func _grass(box: Rect2) -> Skirt.Patch:
+	if _skirt == null:
+		_skirt = Skirt.hem(
+			Art.image(ART), box, SKIRT_SEED, PackedVector2Array(), SKIRT_BLADES
+		)
+	return _skirt
+
+
+## The sand it has spilled, baked the same way. All of it counts as "front" — it is flat on
+## the ground and nothing of it goes behind the box.
+func _ground() -> Skirt.Patch:
+	if _spill == null:
+		_spill = Skirt.spill(Vector2.ZERO, SPILL_REACH, SPILL_GRAINS, SPILL_SEED)
+	return _spill
 
 
 ## One wall of the crate: the quad between an edge of the floor and the same edge lifted,

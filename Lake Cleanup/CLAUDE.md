@@ -520,6 +520,16 @@ in front of the player.
   exists to avoid. A piece of rubbish has no height to lean anyway — the whole shadow slides.
 - Applied before the `DRY_ANCHOR` test, so a piece lying on the beach throws its shadow the
   same way as one afloat. The anchor decides whether a shadow *bobs*, not whether the sun is out.
+- **A front-on picture casts only the part of itself above its ground line** (`Lake._draw_shed`,
+  `Store._draw_art`, 2026-09-12). `Shade.lying` *reflects* about the point it is handed, which
+  is right for a figure — there is nothing below its feet — and wrong for the hut and the
+  recycle box, whose last rows (33 world px and 22) are the near half of the diamond they
+  stand on. Sheared with the rest, that wedge folded up and to the **right** while the shadow
+  went left, and stuck out in front as a lump that read as the shadow belonging to something
+  else. Both now draw their shadow with `draw_texture_rect_region` cut at `SHED_ART_GROUND` /
+  `ART_GROUND`. The wedge casts nothing anyway: it is flat on the ground, under the object.
+  **Any new front-on painting that gets a sun shadow needs the same cut** — the piers are the
+  obvious next ones, as they are for `Skirt`.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
