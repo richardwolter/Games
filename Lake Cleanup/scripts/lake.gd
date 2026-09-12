@@ -3302,25 +3302,26 @@ func _draw_shed() -> void:
 		# row is the near corner of the diamond its walls stand on, and a shadow pinned there
 		# began a good way down the grass in front of the building it belonged to.
 		if _day != null:
-			_island.draw_set_transform_matrix(
-				Shade.lying(feet, _day.lean, _day.stretch)
-			)
-			# The picture, in the shadow's own space: as far above the root as the walls
-			# stand above their feet in the art.
+			# Rooted at the picture's bottom row — the near corner of the diamond the walls
+			# stand on — and not at the middle of that diamond.
 			#
-			# Only the part of it above that root. `Shade.lying` reflects about the point it
-			# is given, which is right for a figure — there is nothing below its feet — and
-			# wrong for a front-on building, whose last thirty-odd rows are the near half of
-			# the diamond its walls stand on. Sheared with the rest, that wedge folded up and
-			# to the *right* while the shadow went left, and stuck out in front of the hut as
-			# a lump that read as the shadow being on the wrong object. It casts nothing
-			# anyway: it is flat on the grass, under the building.
-			var walls := roundf(_shed_art.get_size().y * (1.0 - Iso.SHED_ART_GROUND))
-			var lift := walls * (size.y / _shed_art.get_size().y)
-			_island.draw_texture_rect_region(
-				_shed_art,
-				Rect2(Vector2(-size.x * 0.5, -lift), Vector2(size.x, lift)),
-				Rect2(Vector2.ZERO, Vector2(_shed_art.get_size().x, walls)),
+			# The middle was tried and is wrong for a building. `Shade.lying` lays the
+			# silhouette out *from* the point it is given, and at this hour the hut's shadow
+			# is some thirty pixels long against a picture whose bottom row is thirty-three
+			# below that middle. So the whole shadow landed inside the hut's own outline and
+			# was drawn over: what showed was a wedge poking out of the left wall and nothing
+			# along the front, which read as a shadow belonging to something else. Rooted at
+			# the near corner it comes out under the whole base and away to the left, which
+			# is what a building standing in the sun looks like.
+			#
+			# Nothing of the picture is below this root, so there is no wedge to fold the
+			# wrong way and the whole picture casts — the ground-line cut this used to need
+			# is gone with the root that made it necessary.
+			_island.draw_set_transform_matrix(
+				Shade.lying(stand, _day.lean, _day.stretch)
+			)
+			_island.draw_texture_rect(
+				_shed_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false,
 				Shade.tint(_day.ink)
 			)
 			_island.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

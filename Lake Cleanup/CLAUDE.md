@@ -520,16 +520,26 @@ in front of the player.
   exists to avoid. A piece of rubbish has no height to lean anyway — the whole shadow slides.
 - Applied before the `DRY_ANCHOR` test, so a piece lying on the beach throws its shadow the
   same way as one afloat. The anchor decides whether a shadow *bobs*, not whether the sun is out.
-- **A front-on picture casts only the part of itself above its ground line** (`Lake._draw_shed`,
-  `Store._draw_art`, 2026-09-12). `Shade.lying` *reflects* about the point it is handed, which
-  is right for a figure — there is nothing below its feet — and wrong for the hut and the
-  recycle box, whose last rows (33 world px and 22) are the near half of the diamond they
-  stand on. Sheared with the rest, that wedge folded up and to the **right** while the shadow
-  went left, and stuck out in front as a lump that read as the shadow belonging to something
-  else. Both now draw their shadow with `draw_texture_rect_region` cut at `SHED_ART_GROUND` /
-  `ART_GROUND`. The wedge casts nothing anyway: it is flat on the ground, under the object.
-  **Any new front-on painting that gets a sun shadow needs the same cut** — the piers are the
-  obvious next ones, as they are for `Skirt`.
+- **A front-on picture roots its shadow at its bottom row, not at its ground line**
+  (`Lake._draw_shed`, `Store._draw_art`, 2026-09-12). `Shade.lying` lays the silhouette out
+  *from* the point it is handed, and the hut's shadow is about thirty pixels long at midday
+  against a picture whose bottom row is thirty-three below the middle of the diamond its walls
+  stand on. Rooted at that middle, the whole shadow landed inside the hut's own outline and
+  was drawn over: what showed was a wedge poking out of the left wall and nothing at all along
+  the front, which reads as a shadow belonging to some other object. The recycle box did the
+  same at its own scale. Rooted at the near corner the shadow comes out under the whole base
+  and away to the left. **Any new front-on painting that gets a sun shadow roots the same
+  way** — the piers are the obvious next ones, as they are for `Skirt`.
+- **And so the ground-line cut is gone with it**: nothing of the picture is below the new
+  root, so there is no wedge below the anchor to be reflected up and to the *right* by the
+  shear, which is what the cut existed to stop. One root, no special case. **Do not move the
+  root back up without putting the cut back.**
+- **The shadow falls toward the camera, and only its sideways half can match the art**:
+  `stretch` is always positive, so a cast shadow runs *down* the screen whatever the hour.
+  Screen-down is the near side, so the sun is on the far side of the lake and cannot be put in
+  the south without sending every shadow up the screen and behind the thing casting it, where
+  none of it would be seen. What the southeast pass actually bought is the left/right half:
+  shadows fall left, highlights are painted right. Don't try to finish the compass.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips

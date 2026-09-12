@@ -252,17 +252,18 @@ func _draw_art() -> void:
 	# standing on it.
 	_ground().over(self)
 	if day != null:
-		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, day.lean, day.stretch))
-		# The crate down to its ground line and no further. The rows under it are the near
-		# half of the diamond it stands on, and `Shade.lying` reflects about the point it is
-		# given — so sheared with the rest they folded up and to the *right* while the shadow
-		# went left, and the box wore a lump of shade in front of it. Flat ground under the
-		# crate casts nothing. Same cut the shed's shadow takes, for the same reason.
-		draw_texture_rect_region(
-			_art,
-			Rect2(box.position, Vector2(box.size.x, ART_GROUND * ART_SCALE)),
-			Rect2(Vector2.ZERO, Vector2(_art.get_size().x, ART_GROUND)),
-			Shade.tint(day.ink)
+		# Rooted at the picture's bottom row, the near corner of the diamond the crate stands
+		# on, rather than at the node's point in the middle of it. Same reason the hut's is:
+		# the shadow is shorter than the half-diamond, so rooted at the middle all of it lay
+		# inside the crate's own outline and only a wedge on the left ever showed. See
+		# Lake._draw_shed.
+		draw_set_transform_matrix(
+			Shade.lying(
+				Vector2(0.0, box.position.y + size.y), day.lean, day.stretch
+			)
+		)
+		draw_texture_rect(
+			_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false, Shade.tint(day.ink)
 		)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	draw_texture_rect(_art, box, false)
