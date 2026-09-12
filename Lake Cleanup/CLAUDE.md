@@ -782,10 +782,17 @@ by their place on the bank and the tint the ferry reads.
   four fifths of the island's crate (`Yard.ART_SCALE` 2.5). **A whole art pixel, by
   decision**: at one and a quarter the sheet would crawl on the grid.
 - **The json is the contract**: `anchor` (the drawn waterline point on the jetty's
-  centreline), `jetty` and `platform` (deck-top outlines, `deck_up` above the plane),
-  `posts_wet` / `posts_dry`, `landward`, `drop` (the box), `box`, `berth_end`. `Dropoff`
-  reads all of it and measures nothing off the picture. `Dropoff.JETTY_OUT` must equal the
-  builder's.
+  centreline), `region` (the deck top and what stands on it), `under` (posts and beams),
+  `shade_wet` / `shade_dry` (the deck top's silhouette over water / over sand, white),
+  `jetty` and `platform` (deck-top outlines, `deck_up` above the plane), `posts_wet` /
+  `posts_dry`, `landward`, `drop` (the box), `box`, `berth_end`. All four pictures are one
+  size on one anchor. `Dropoff` reads all of it and measures nothing off the picture.
+  `Dropoff.JETTY_OUT` must equal the builder's.
+- **Two layers, by decision** (Richard, second pass: "objects in front of the poles must
+  not clip through it"): `Dropoff.Under` draws the posts and beams at z 4, **below** the
+  floating rubbish (5); the yard itself draws the deck top and the box at z 6, above it. A
+  piece floating in front of a post is drawn over the post; a piece under the deck is still
+  hidden by it. The under layer is also where the shadow, the collars and the sand live.
 - **Mooring is one bearing** (`Dropoff.moor`): the foot is `Iso.basin_point(angle, 1)`
   plus `Lake.SHORE_LAP` outward (the drawn water's edge, not Iso's line); the axis is the
   tile axis nearest the way to the lake's middle (the four yards are cardinal); the berth
@@ -793,19 +800,24 @@ by their place on the bank and the tint the ferry reads.
   hull (z 12) drawn over the pier (z 6) is the hull in front of it. `Boat._plan_legs` lines
   up `APPROACH` (2.5) tiles out along the jetty before coming in and leaves the same way,
   as it does for the island's dock, so the ferry lies alongside rather than nosing in.
-- **The shadow is the footprint slid along the sun**: a flat slab's shadow is its own
-  footprint moved by (`lean` x height, `stretch` x 0.5 x height), so the two decks are
-  filled as polygons in the day's ink, the jetty's over water at the hull's gain
-  (`SHADE_GAIN` 3, capped `SHADE_MOST` 0.7) because the day's ink is set for sand. The box
-  is a billboard and is laid down by `Shade.lying` from its foot on the deck. If the hut's
-  swept shadow (`Shade.Cast`) proves better for a picture whose base is a diamond corner,
-  the box is the candidate to follow it.
+- **The shadow is the deck's own silhouette slid along the sun**: a flat slab's shadow is
+  its shape moved by (`lean` x height, `stretch` x 0.5 x height) from its footprint, so the
+  sheet's `shade_dry` and `shade_wet` are drawn in the day's ink under the posts, the wet
+  one at the hull's gain (`SHADE_GAIN` 3, capped `SHADE_MOST` 0.7) because the day's ink is
+  set for sand. **Polygons were the first pass and were rejected as blocky** â€” the
+  silhouette carries the posts and bollards. **The wet shadow rides the swell**: the water
+  is what it falls on, so it rises and falls by `LakeGrid._swell` at the jetty's x off the
+  grid's clock (`Dropoff.swell`), the same swell the rubbish beside it bobs on. The box is
+  swept by `Shade.Cast` from its base on the deck, like the island's crate.
 - **Foam and sand are decided against the lake, not read off the sheet**: at `_ready` every
-  post's foot is tested with `Iso.shore_fraction` against the foot's own edge; past it, a
-  `WaterlineFoam` collar (`POST_COLLAR` 5 px half-width); short of it, `Skirt.spill` grains
-  drawn under the deck. The coast curves and the jetty does not, so the pair at the water's
-  edge can fall either side depending on the bank; `test_lake` guards that at least the two
-  pairs out along the jetty froth.
+  post's foot is tested with `Iso.shore_fraction` against the foot's own edge. Past it, a
+  `WaterlineFoam` collar (`POST_COLLAR` 8 px half-width) **in front of the post** â€” behind
+  a six-pixel post nothing showed â€” riding the same swell. Short of it, `Skirt.mound`: sand
+  banked over the post's bottom rows, widest at the ground, plus spilt grains, drawn over
+  the wood so the row where post meets sand is covered (the hem's bargain, in sand). The
+  coast curves and the jetty does not, so the pair at the water's edge can fall either side
+  depending on the bank; `test_lake` guards that at least the two pairs out along the jetty
+  froth.
 - **Retired**: `assets/Piers_Asset_Sheet.jpg`, `pier_*.png`, `tools/slice_piers.gd`,
   `export_piers.gd`, `debug_pier_coords.gd`, `Dropoff.PIER_OUT` / `PIER_WIDE` / `PIER_FOOT`
   / `DROP_UP`. The strand rubbish still fills the tiles under a jetty and is hidden by it

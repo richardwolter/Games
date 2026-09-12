@@ -703,6 +703,10 @@ func _ready() -> void:
 
 	_grid.z_index = 5
 	_grid.z_as_relative = false
+	# The yards read the grid's clock, so the shadow a jetty throws on the water rises and
+	# falls with the swell the rubbish beside it rides.
+	for stop: Dropoff in _dropoffs:
+		stop.grid = _grid
 	# The rubbish bobs on the GPU. That is what lets its geometry be built once and left
 	# alone until the view moves or a piece is taken, instead of every frame.
 	var bob := ShaderMaterial.new()

@@ -24,6 +24,15 @@ one painted pixel to two world pixels (Lake.ART_PIXEL), so the deck is a 2:1 dia
 lies in the grid rather than a front-on picture standing on it. The four banks face four
 ways, so the four yards are four drawings, not one turned.
 
+Each yard is written as four pictures of one size sharing one anchor (2026-09-12, after
+the first pass in the lake): `region` is the deck top and everything standing on it, `under`
+is the posts and the edge beams below it, and `shade_wet` / `shade_dry` are the deck top's
+silhouette over the water and over the sand, in white, for the runtime to draw in the day's
+ink. The split lets the lake draw the posts *under* the floating rubbish (z 4) and the deck
+over it (z 6), so a piece floating in front of a post is drawn over the post rather than
+clipped by it, and the deck still hides what floats under it; and the silhouettes let the
+deck's shadow be the deck's own shape — posts, bollards and all — rather than a slab.
+
 Everything the runtime needs to stand a pier on the lake is written to the json beside the
 sheet: where the waterline point lands in the picture (the anchor), the footprint polygons
 of the two decks (for the sun's shadow: a flat slab's shadow is its footprint slid along
@@ -338,6 +347,11 @@ def build_yard(yard, wood, sprites):
         x, y = yard.at(s, t, up)
         return (x + ox, y + oy)
 
+    # Which layer each pixel belongs to (1 under: posts and beams; 2 over: the deck top and
+    # what stands on it) and which deck it is (1 jetty, 2 platform; 0 for neither).
+    layer = [[0] * H for _ in range(W)]
+    deck = [[0] * H for _ in range(W)]
+
     book = {
         "anchor": [ox, oy],
         "deck_up": DECK_UP,
@@ -380,6 +394,9 @@ def build_yard(yard, wood, sprites):
             elif x == gx - half + POST_WIDE - 1:
                 tone = wood.plank_shade[0]
             draw.line([(x, top), (x, gy)], fill=tone + (255,))
+            for y in range(top, gy + 1):
+                if 0 <= x < W and 0 <= y < H:
+                    layer[x][y] = 1
         (book["posts_wet"] if wet else book["posts_dry"]).append([gx, gy])
 
     # --- deck tops, per pixel ----------------------------------------------------------
@@ -408,6 +425,8 @@ def build_yard(yard, wood, sprites):
                 if abs(across - kn) < seam_along * 0.6:
                     tone = wood.plank_shade[1]
             px[x, y] = tone + (255,)
+            layer[x][y] = 2
+            deck[x][y] = 1 if on_jetty else 2
 
     # --- the edge beam, per pixel: the rows under the deck top's lower boundary --------
     # The camera-facing edges of a slab on the plane are exactly where the deck-top region
@@ -423,6 +442,7 @@ def build_yard(yard, wood, sprites):
                     if y + k < H and not is_top[x][y + k]:
                         tone = wood.plank_shade[4] if k == BEAM else wood.plank_shade[1]
                         px[x, y + k] = tone + (255,)
+                        layer[x][y + k] = 1
 
     # --- bollards at the jetty's end ---------------------------------------------------
     for t in (-JETTY_WIDE * 0.5 + 0.12, JETTY_WIDE * 0.5 - 0.12):
@@ -433,6 +453,11 @@ def build_yard(yard, wood, sprites):
             draw.line([(x, by - BOLLARD_UP), (x, by)], fill=tone + (255,))
         draw.line([(bx - 1, by - BOLLARD_UP - 1), (bx + 1, by - BOLLARD_UP - 1)],
                   fill=wood.pale + (255,))
+        for x in range(bx - 1, bx + 2):
+            for y in range(by - BOLLARD_UP - 1, by + 1):
+                if 0 <= x < W and 0 <= y < H:
+                    layer[x][y] = 2
+                    deck[x][y] = 1
 
     # --- the box -----------------------------------------------------------------------
     if BOX.exists():
@@ -443,6 +468,12 @@ def build_yard(yard, wood, sprites):
         y0 = int(round(fy - ink[3]))
         image.alpha_composite(crate, (x0, y0))
         book["box"] = [x0, y0, crate.width, crate.height]
+        cp = crate.load()
+        for cy in range(crate.height):
+            for cx in range(crate.width):
+                if cp[cx, cy][3] > 0 and 0 <= x0 + cx < W and 0 <= y0 + cy < H:
+                    layer[x0 + cx][y0 + cy] = 2
+                    deck[x0 + cx][y0 + cy] = 0
     hx, hy = P(*BOX_AT, up=DECK_UP)
     book["drop"] = [int(round(hx)), int(round(hy))]
 
@@ -515,7 +546,28 @@ def build_yard(yard, wood, sprites):
     book["landward"] = [list(P(0.0, -hw)), list(P(s0, -hw)), list(P(s0, hw)), list(P(0.0, hw))]
 
     outline(image, wood.edge)
-    return image, book
+    # Anything painted that no layer claimed (the sign, the heap, when they are on) is over.
+    src = image.load()
+    for y in range(H):
+        for x in range(W):
+            if src[x, y][3] and layer[x][y] == 0:
+                layer[x][y] = 2
+    over = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    under = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    wet = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    dry = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    po, pu, pw, pd = over.load(), under.load(), wet.load(), dry.load()
+    for y in range(H):
+        for x in range(W):
+            if not src[x, y][3]:
+                continue
+            (po if layer[x][y] == 2 else pu)[x, y] = src[x, y]
+            if deck[x][y] == 1:
+                pw[x, y] = (255, 255, 255, 255)
+            elif deck[x][y] == 2:
+                pd[x, y] = (255, 255, 255, 255)
+    book["layers"] = {"under": under, "shade_wet": wet, "shade_dry": dry}
+    return over, book
 
 
 def stand_in_shadow(yard, image, book, lean, stretch, ink):
@@ -641,6 +693,7 @@ def mockup(yards, wood, sprites, scale, out):
             boat_first = by - miny < place[1] + book["berth_end"][1]
             if boat_first:
                 panel.alpha_composite(boat, boat_at)
+        panel.alpha_composite(book["layers"]["under"], place)
         panel.alpha_composite(image, place)
         if boat is not None and not boat_first:
             panel.alpha_composite(boat, boat_at)
@@ -675,14 +728,19 @@ def main():
         yard = Yard(name, axis, tint)
         built.append((yard, build_yard(yard, wood, sprites)))
 
-    # Pack the four side by side.
+    mockup(built, wood, sprites, scale, ROOT / "tools" / "last_piers_mockup.png")
+
+    # Pack the four side by side, each yard's four pictures in a run.
     gap = 2
-    width = sum(img.width for _, (img, _) in built) + gap * (len(built) - 1)
+    width = sum(img.width * 4 for _, (img, _) in built) + gap * (len(built) * 4 - 1)
     height = max(img.height for _, (img, _) in built)
     sheet = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     book = {"sheet": "res://" + str(Path(out_base).with_suffix(".png").relative_to(ROOT)).replace("\\", "/"),
             "art_pixel": ART_PIXEL,
-            "note": "painted px; multiply by art_pixel for world px. anchor = the drawn waterline "
+            "note": "painted px; multiply by art_pixel for world px. region = the deck top and what "
+                    "stands on it; under = posts and beams (drawn below the floating rubbish); "
+                    "shade_wet/shade_dry = the deck top's silhouette over water / over sand, white. "
+                    "All four share the anchor. anchor = the drawn waterline "
                     "point on the jetty's centreline; jetty/platform = deck-top outlines at deck_up "
                     "above the plane; posts_wet = feet of posts standing in the water; landward = the "
                     "platform's three edges on the sand; drop = where a delivered piece lands; "
@@ -690,14 +748,19 @@ def main():
             "pieces": {}}
     x = 0
     for yard, (img, entry) in built:
+        layers = entry.pop("layers")
         sheet.alpha_composite(img, (x, 0))
         entry["region"] = [x, 0, img.width, img.height]
-        book["pieces"][yard.name] = entry
         x += img.width + gap
+        for key in ("under", "shade_wet", "shade_dry"):
+            sheet.alpha_composite(layers[key], (x, 0))
+            entry[key] = [x, 0, img.width, img.height]
+            x += img.width + gap
+        book["pieces"][yard.name] = entry
     Path(out_base).with_suffix(".png").parent.mkdir(parents=True, exist_ok=True)
     sheet.save(Path(out_base).with_suffix(".png"))
     Path(out_base).with_suffix(".json").write_text(json.dumps(book, indent="\t"), encoding="utf-8")
-    mockup(built, wood, sprites, scale, ROOT / "tools" / "last_piers_mockup.png")
+
     print("wrote", Path(out_base).with_suffix(".png"), sheet.size)
 
 

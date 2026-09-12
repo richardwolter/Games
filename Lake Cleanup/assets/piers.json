@@ -1,7 +1,7 @@
 {
 	"sheet": "res://assets/piers.png",
 	"art_pixel": 2.0,
-	"note": "painted px; multiply by art_pixel for world px. anchor = the drawn waterline point on the jetty's centreline; jetty/platform = deck-top outlines at deck_up above the plane; posts_wet = feet of posts standing in the water; landward = the platform's three edges on the sand; drop = where a delivered piece lands; berth_end = the middle of the jetty's end.",
+	"note": "painted px; multiply by art_pixel for world px. region = the deck top and what stands on it; under = posts and beams (drawn below the floating rubbish); shade_wet/shade_dry = the deck top's silhouette over water / over sand, white. All four share the anchor. anchor = the drawn waterline point on the jetty's centreline; jetty/platform = deck-top outlines at deck_up above the plane; posts_wet = feet of posts standing in the water; landward = the platform's three edges on the sand; drop = where a delivered piece lands; berth_end = the middle of the jetty's end.",
 	"pieces": {
 		"plastic": {
 			"anchor": [
@@ -146,6 +146,24 @@
 				0,
 				122,
 				69
+			],
+			"under": [
+				124,
+				0,
+				122,
+				69
+			],
+			"shade_wet": [
+				248,
+				0,
+				122,
+				69
+			],
+			"shade_dry": [
+				372,
+				0,
+				122,
+				69
 			]
 		},
 		"timber": {
@@ -287,7 +305,25 @@
 				33
 			],
 			"region": [
-				124,
+				496,
+				0,
+				111,
+				67
+			],
+			"under": [
+				609,
+				0,
+				111,
+				67
+			],
+			"shade_wet": [
+				722,
+				0,
+				111,
+				67
+			],
+			"shade_dry": [
+				835,
 				0,
 				111,
 				67
@@ -432,7 +468,25 @@
 				33
 			],
 			"region": [
-				237,
+				948,
+				0,
+				122,
+				92
+			],
+			"under": [
+				1072,
+				0,
+				122,
+				92
+			],
+			"shade_wet": [
+				1196,
+				0,
+				122,
+				92
+			],
+			"shade_dry": [
+				1320,
 				0,
 				122,
 				92
@@ -577,7 +631,25 @@
 				33
 			],
 			"region": [
-				361,
+				1444,
+				0,
+				111,
+				89
+			],
+			"under": [
+				1557,
+				0,
+				111,
+				89
+			],
+			"shade_wet": [
+				1670,
+				0,
+				111,
+				89
+			],
+			"shade_dry": [
+				1783,
 				0,
 				111,
 				89

@@ -16,14 +16,24 @@
 ## posts' feet, where a delivery lands — is read from the sheet's json, never measured off
 ## the picture at runtime.
 ##
+## Drawn in two layers, by decision (Richard, 2026-09-12, "objects in front of the poles
+## must not clip through it"): the posts and the edge beams under the deck are drawn by
+## `Under`, a child at z 4, **below** the floating rubbish (z 5), and the deck top with the
+## box on it by this node at z 6, above it. A piece floating in front of a post is therefore
+## drawn over the post, and a piece under the deck is still hidden by it.
+##
 ## What the lake adds round the picture, none of it baked into the sheet:
-##   * the sun's shadow: a flat slab's shadow is its own footprint slid along the day's lean
-##     by the deck's height, so the two decks are filled as polygons in the day's ink, the
-##     jetty's over water at the hull's gain (SHADE_GAIN, see Boat) because the day's ink is
-##     set for sand; the box on the platform is a billboard and is laid down by Shade.lying
-##     from its foot like the hut;
-##   * foam: a WaterlineFoam collar at the foot of every post that stands in the water;
-##   * sand: Skirt.spill grains at the foot of every post on the beach, drawn under the deck.
+##   * the sun's shadow: a flat slab's shadow is its own silhouette slid along the day's
+##     lean by the deck's height, so the deck top's silhouette (`shade_wet` over the water,
+##     `shade_dry` over the sand, from the sheet) is drawn in the day's ink under the posts,
+##     the wet half at the hull's gain (SHADE_GAIN) because the day's ink is set for sand,
+##     and **the wet half rides the swell**: the water is what the shadow falls on, so it
+##     rises and falls with it, at the same swell the rubbish beside it bobs on
+##     (LakeGrid._swell, off the grid's clock). The box on the platform is swept by
+##     `Shade.Cast` like the island's crate;
+##   * foam: a WaterlineFoam collar round the foot of every post that stands in the water,
+##     drawn **in front** of the post and riding the same swell;
+##   * sand: Skirt.mound banked over the foot of every post on the beach, drawn over it.
 ## Wet or dry is measured against the lake at runtime, because the coast curves and the
 ## jetty does not.
 ## The old front-on paintings (Piers_Asset_Sheet.jpg, tools/slice_piers.gd) are retired.
@@ -32,6 +42,9 @@ extends Node2D
 
 ## The sheet of the four yards and its book, both written by tools/build_piers.py.
 const ART := "res://assets/piers.json"
+
+## The box the platform carries, for its swept shadow. The same picture the sheet pasted.
+const BOX_ART := "res://assets/Recycle_Box.png"
 
 ## World px per painted px. The sheet is drawn at 2.0 like every sprite in the lake
 ## (Lake.ART_PIXEL); the json's numbers are painted px and are scaled by this on the way in.
@@ -57,13 +70,15 @@ const APPROACH := 2.5
 const SHADE_GAIN := 3.0
 const SHADE_MOST := 0.7
 
-## The foam collar at a post: half its width in world px. A little wider than the post
-## (6 px) so the froth shows past its sides.
-const POST_COLLAR := 5.0
+## Where the posts and beams draw: under the floating rubbish (5), over the water (2).
+const UNDER_LAYER := 4
 
-## The sand a post on the beach has worn: how far the grains spill, in tiles, and how many.
-const SPILL_REACH := Vector2(0.45, 0.4)
-const SPILL_GRAINS := 14
+## The foam collar at a post: half its width in world px. Wider than the post (6 px) so the
+## froth rings it rather than hiding behind it.
+const POST_COLLAR := 8.0
+
+## The post's width on screen, in world px, for the sand banked over its foot.
+const POST_WIDE := 6.0
 
 ## Which of TrashDef.Kind this one buys.
 var kind: int = TrashDef.Kind.PLASTIC
@@ -89,13 +104,21 @@ var tint := Color(0.7, 0.7, 0.7)
 ## The day, for the shadow. Set by the lake; no day, no shadow.
 var day: DayCycle
 
+## The lake's grid, for its clock: the swell the wet shadow and the collars ride. Set by the
+## lake; without it the water under the pier is flat.
+var grid: LakeGrid
+
 ## The sheet, read once for all four yards rather than once each.
 static var _sheet: Texture2D
 static var _pieces := {}
 static var _read := false
+static var _box_image: Image
 
+var _under: Under
+var _box_cast: Shade.Cast
 var _collars: Array[WaterlineFoam] = []
-var _spills: Array[Skirt.Patch] = []
+var _collar_feet := PackedVector2Array()
+var _mounds: Array[Skirt.Patch] = []
 var _dressed := false
 
 
@@ -139,11 +162,20 @@ func drop_point() -> Vector2:
 	return _world(book["drop"], book)
 
 
+## How far the water under the jetty is up or down right now, in world px: the same swell
+## the floating rubbish rides (rubbish.gdshader mirrors LakeGrid._swell), read at the
+## jetty's own x so it agrees with the pieces beside it.
+func swell() -> float:
+	if grid == null:
+		return 0.0
+	return LakeGrid._swell(place().x, grid.wave_time()) * LakeGrid.WAVE_AMPLITUDE
+
+
 func _ready() -> void:
 	_dress()
 
 
-## The collars and the spills, once: the posts do not move.
+## The under layer, the collars and the sand, once: the posts do not move.
 func _dress() -> void:
 	if _dressed:
 		return
@@ -151,6 +183,16 @@ func _dress() -> void:
 	var book := _book()
 	if book.is_empty():
 		return
+	_under = Under.new()
+	_under.name = &"Under"
+	_under.yard = self
+	_under.z_index = UNDER_LAYER
+	_under.z_as_relative = false
+	add_child(_under)
+	if book.has("box"):
+		_box_cast = Shade.Cast.new()
+		_box_cast.name = &"BoxShade"
+		add_child(_box_cast)
 	# Wet or dry is decided here against the lake, not read off the sheet: the builder
 	# marks the jetty's posts wet and the platform's dry, but the coast is a curve and the
 	# jetty is straight, so the pair at the water's edge can stand either side of it
@@ -164,11 +206,15 @@ func _dress() -> void:
 			if Iso.shore_fraction(tile.x, tile.y) < edge:
 				var collar := WaterlineFoam.new()
 				collar.position = at
-				add_child(collar)
+				# In front of the post, not behind it: a collar behind a six-pixel post is
+				# a collar nobody sees. Over the posts and under the rubbish, with its parent.
+				collar.z_index = 0
+				_under.add_child(collar)
 				collar.lay(Vector2(-POST_COLLAR, 0.0), Vector2(POST_COLLAR, 0.0))
 				_collars.append(collar)
+				_collar_feet.append(at)
 			else:
-				_spills.append(Skirt.spill(at, SPILL_REACH, SPILL_GRAINS, 9101 + kind * 131 + i))
+				_mounds.append(Skirt.mound(at, POST_WIDE, 9101 + kind * 131 + i))
 			i += 1
 
 
@@ -178,6 +224,21 @@ func _world(point: Variant, book: Dictionary) -> Vector2:
 	return place() + Vector2(
 		float(point[0]) - float(anchor[0]), float(point[1]) - float(anchor[1])
 	) * ART_SCALE
+
+
+## A json rectangle on the sheet as a Rect2.
+static func _rect(box: Variant) -> Rect2:
+	return Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3]))
+
+
+## Where a region of the yard's size lands in the world: every layer shares the anchor.
+func _frame(book: Dictionary) -> Rect2:
+	var region := _rect(book["region"])
+	var anchor: Array = book["anchor"]
+	return Rect2(
+		place() - Vector2(float(anchor[0]), float(anchor[1])) * ART_SCALE,
+		region.size * ART_SCALE
+	)
 
 
 ## This yard's entry in the sheet's book, or an empty dictionary when there is no art.
@@ -206,11 +267,18 @@ static func _load_art() -> bool:
 		var piece: Variant = (book as Dictionary)["pieces"][name]
 		if piece is Dictionary and (piece as Dictionary).has("region"):
 			_pieces[StringName(name)] = piece
+	_box_image = Art.image(BOX_ART)
 	return true
 
 
 func _process(_delta: float) -> void:
-	# The shadow moves with the sun.
+	if _under == null:
+		return
+	# The water moves under the jetty every frame: the wet shadow and the collars with it.
+	var rise := swell()
+	for i in _collars.size():
+		_collars[i].position = _collar_feet[i] + Vector2(0.0, rise)
+	_under.queue_redraw()
 	if day != null:
 		queue_redraw()
 
@@ -220,51 +288,20 @@ func _draw() -> void:
 	if book.is_empty():
 		_draw_blocked()
 		return
-	for spill in _spills:
-		spill.behind(self)
-	if day != null:
-		_draw_shadow(book)
-	var region: Array = book["region"]
-	var rect := Rect2(float(region[0]), float(region[1]), float(region[2]), float(region[3]))
-	var anchor: Array = book["anchor"]
-	var at := place() - Vector2(float(anchor[0]), float(anchor[1])) * ART_SCALE
-	draw_texture_rect_region(_sheet, Rect2(at, rect.size * ART_SCALE), rect)
-
-
-## The sun's shadow: each deck's footprint slid along the lean by its height, and the box
-## laid down from its foot.
-func _draw_shadow(book: Dictionary) -> void:
-	var up := float(book["deck_up"]) * ART_SCALE
-	# A point `up` above the ground lands this far from the ground point (Shade.lying's
-	# transform on a point at that height).
-	var slide := Vector2(day.lean * up, day.stretch * 0.5 * up)
-	var on_water := Shade.tint(minf(day.ink * SHADE_GAIN, SHADE_MOST))
-	var on_sand := Shade.tint(day.ink)
-	for key: StringName in [&"jetty", &"platform"]:
-		var outline := PackedVector2Array()
-		for point: Variant in book[key]:
-			# The json outline is the deck top, drawn `up` above the plane; its footprint is
-			# that much lower on screen.
-			outline.append(_world(point, book) + Vector2(0.0, up) + slide)
-		draw_colored_polygon(outline, on_water if key == &"jetty" else on_sand)
-	if not book.has("box"):
-		return
-	# The box stands on the platform's deck, so its shadow starts from its foot on that deck
-	# and carries the deck's own slide.
-	var box: Array = book["box"]
-	var region: Array = book["region"]
-	var drop: Array = book["drop"]
-	var root := _world(drop, book) + slide
-	var corner := Vector2(float(box[0]) - float(drop[0]), float(box[1]) - float(drop[1])) * ART_SCALE
-	var size := Vector2(float(box[2]), float(box[3])) * ART_SCALE
-	draw_set_transform_matrix(Shade.lying(root, day.lean, day.stretch))
-	draw_texture_rect_region(
-		_sheet, Rect2(corner, size),
-		Rect2(float(region[0]) + float(box[0]), float(region[1]) + float(box[1]),
-			float(box[2]), float(box[3])),
-		on_sand
-	)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if day != null and _box_cast != null and _box_image != null:
+		# The box stands on the deck: its shadow is swept from its base there, the way the
+		# island's crate is swept from its own (Yard._draw), so the two crates cast alike.
+		var box: Array = book["box"]
+		var frame := _frame(book)
+		var rect := Rect2(
+			frame.position + Vector2(float(box[0]), float(box[1])) * ART_SCALE,
+			Vector2(float(box[2]), float(box[3])) * ART_SCALE
+		)
+		_box_cast.lay(
+			_box_image, rect, day.lean, day.stretch,
+			1.0 - Yard.ART_GROUND / float(maxi(_box_image.get_height(), 1)), day.ink
+		)
+	draw_texture_rect_region(_sheet, _frame(book), _rect(book["region"]))
 
 
 ## The yard as it was drawn before there was art for it: planks out over the water, a crate
@@ -289,3 +326,40 @@ func _draw_blocked() -> void:
 	var spot := Iso.tile_to_world(landward.x, landward.y) + Vector2(-12.0, -16.0)
 	draw_rect(Rect2(spot, Vector2(24.0, 18.0)), tint)
 	draw_rect(Rect2(spot, Vector2(24.0, 18.0)), ink, false, 1.4)
+
+
+## The half of the pier that is under the deck — the shadow it throws, its posts and beams,
+## and the sand banked over the dry posts' feet — drawn below the floating rubbish so a
+## piece in front of a post is drawn over it. The collars are its children, in front of the
+## posts. Redrawn every frame by the yard, because the wet shadow rides the swell.
+class Under extends Node2D:
+	var yard: Dropoff
+
+	func _draw() -> void:
+		if yard == null:
+			return
+		var book := yard._book()
+		if book.is_empty():
+			return
+		var frame := yard._frame(book)
+		if yard.day != null:
+			var day := yard.day
+			var up := float(book["deck_up"]) * Dropoff.ART_SCALE
+			# A point `up` above the ground lands this far from the ground point
+			# (Shade.lying's transform on a point at that height); the deck top's silhouette
+			# is drawn `up` above its footprint, so the footprint is that much lower first.
+			var slide := Vector2(day.lean * up, day.stretch * 0.5 * up + up)
+			draw_texture_rect_region(
+				Dropoff._sheet, Rect2(frame.position + slide, frame.size),
+				Dropoff._rect(book["shade_dry"]), Shade.tint(day.ink)
+			)
+			# On the water, and moving with it.
+			draw_texture_rect_region(
+				Dropoff._sheet,
+				Rect2(frame.position + slide + Vector2(0.0, yard.swell()), frame.size),
+				Dropoff._rect(book["shade_wet"]),
+				Shade.tint(minf(day.ink * Dropoff.SHADE_GAIN, Dropoff.SHADE_MOST))
+			)
+		draw_texture_rect_region(Dropoff._sheet, frame, Dropoff._rect(book["under"]))
+		for mound in yard._mounds:
+			mound.over(self)

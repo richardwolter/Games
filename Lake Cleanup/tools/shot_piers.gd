@@ -59,9 +59,9 @@ func _write(stop: Dropoff) -> void:
 	var log := FileAccess.open(LOG, FileAccess.WRITE if _shot == 0 else FileAccess.READ_WRITE)
 	log.seek_end()
 	var day: DayCycle = stop.day
-	log.store_line("%s: foot %s berth %s collars %d spills %d day %s" % [
+	log.store_line("%s: foot %s berth %s collars %d mounds %d day %s" % [
 		stop.kind_name(), str(stop.foot), str(stop.berth),
-		(stop.get(&"_collars") as Array).size(), (stop.get(&"_spills") as Array).size(),
+		(stop.get(&"_collars") as Array).size(), (stop.get(&"_mounds") as Array).size(),
 		"none" if day == null else "lean %.2f stretch %.2f ink %.2f" % [
 			day.lean, day.stretch, day.ink],
 	])

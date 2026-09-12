@@ -836,6 +836,9 @@ func _stage_dropoffs() -> void:
 		if book.is_empty() or not book.has("posts_wet") or (book["posts_wet"] as Array).is_empty():
 			pictured = false
 			continue
+		for key: String in ["under", "shade_wet", "shade_dry"]:
+			if not book.has(key):
+				pictured = false
 		# Wet is decided against the lake by the yard itself: every collar it hung is past
 		# the drawn water's edge, and the jetty's own posts — at least the two pairs out
 		# along it — got one.
