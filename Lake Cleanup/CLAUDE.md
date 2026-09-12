@@ -652,8 +652,12 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   --import`): a `--path` run without the editor draws the stale `.godot/imported` texture.
 - `assets/Blue_Boat/PixZels_Model_BlueBoat.json` that came with the sheet is a *different*
   boat (a pirate ship with a skull sail) and was no use as a reference; the edit is 2D only.
-- **Not yet retired**: `tools/bake_boat.gd` and the Kenney sheet `assets/boat_frames.png`
-  it bakes, kept until the sail boat is judged in play. `tools/shot_boat.tscn` (desktop
+- **Retired, by decision** (2026-09-12): the Kenney watercraft pack and everything that
+  baked it — `assets/kenney_watercraft-pack/` (7 MB of models), the sheet
+  `assets/boat_frames.png` and its json, `tools/bake_boat.gd` and `tools/bake_boat.tscn`.
+  They were kept until the sail boat had been judged in play; it has been, and it is the
+  ferry. Gone from `docs/CREDITS.md` and from the art brief's licensing note with them.
+  `tools/shot_boat.tscn` (desktop
   build, not `--headless`) saves three close crops of the ferry under way,
   `tools/last_boat_N.png`, for checking that the anchor puts the hull on the water. It loads
   the boat to `HOLD_SHOWN` — a full hold is the case worth looking at, an empty one shows

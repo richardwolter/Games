@@ -60,12 +60,14 @@ wet in the water, and clean at x3 zoom in the shed — so **two states per piece
 
 ## 2. The ferry
 
-**Status: placeholder.** 16 headings baked from a Kenney 3D model (`ship-cargo-c.glb`) at
-45 degrees azimuth / 30 degrees elevation into `boat_frames.png`, 128 px frames.
+**Status: done.** The PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, credit
+@Pixel_Salvaje), 16 drawn headings in 128 px frames, edited for the lake by
+`tools/build_boat_sheet.py` — jib and forestay off, hull repainted in the recycle box's
+brown, the box's recycle mark on the square sail, cut along a per-frame waterline. See The
+Ferry in `CLAUDE.md`. The Kenney bake it replaced is gone from the repo.
 
-Wanted, hand-drawn:
+Still wanted, hand-drawn:
 
-- Hull, **16 headings**, 128 px frames, about 104 px of actual hull in each.
 - Upgrade tells, since the player buys these: a **skimmer net rig on the transom** (5 visible
   levels), a fuller/faster hull read for speed levels, and a deeper hold.
 - Up to **3 hulls in the water** at once — ideally visibly different boats, not palette swaps.
@@ -163,6 +165,6 @@ sparkle** would replace the weakest-looking drawing in the game.
 
 ## Licensing note
 
-`TopDownHouse_*`, `kenney_watercraft-pack` and the pigeon sheets are third-party. Anything
+`TopDownHouse_*`, the blue boat and the pigeon sheets are third-party. Anything
 shipped commercially should either honour their licences or be replaced — which is most of
 what this brief asks for anyway.

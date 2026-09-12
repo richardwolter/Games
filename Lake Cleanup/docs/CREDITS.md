@@ -15,10 +15,6 @@ or its licensing status changes — it should always reflect reality, not aspira
   This feeds ~111 placeholder sprites (ART_BRIEF.md) so it's cheaper to buy the pack than
   re-source everything. **Action: purchase before shipping.**
 
-- **kenney_watercraft-pack** (feeds `boat_frames.png`, baked from `ship-cargo-c.glb`) —
-  Kenney, confirmed source: https://kenney-assets.itch.io/watercraft-kit. ✅ **CC0 1.0
-  Universal** — commercial use allowed, no attribution required.
-
 - **Pigeon sprites** (`assets/Pigeons/`, `pigeon_contact.png`, `pigeons.json`) — "Pigeons 2D
   Pixel Asset Pack" by Pop Shop Packs (https://pop-shop-packs.itch.io/pigeons-2d-pixel-asset-pack).
   ✅ Commercial use explicitly allowed; credit appreciated, not required.
