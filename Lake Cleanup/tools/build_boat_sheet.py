@@ -248,16 +248,21 @@ OPS = {
 ## yard's far tip stands higher than the truck.
 MASTHEAD = [(64, 32), (66, 33), (67, 34), (67, 34), (63, 32), (68, 33), (66, 37), (64, 37), (63, 37)]
 
-## Where the water meets the hull under the mast, the point the frames turn about.
-ANCHOR = (64, 88)
+## Where the frames turn about: the mast's column, and the water at the axis's depth,
+## which is the side view's waterline (frame 4, whose whole near side is at that depth).
+ANCHOR_X = 64
+SIDE_FRAME = 4
 
-## The waterline of each frame is one level row: one below the lowest row of the hull's
-## blue stripe, the painted boot-top, at the near end. Level by decision (2026-09-11): a
+## The waterline of each frame is one level row, SINK_ROWS up from the bottom of the hull's
+## body at the near end — the hull sits in the water by just that much, the stem foot and
+## the rudder post under it. The body's bottom is the lowest row with HULL_WIDE opaque
+## pixels, which the post and the foot fall short of. Level by decision (2026-09-11): a
 ## line following the boot-top along the near side ran diagonally into the bow and the
-## transom in the quartering headings and made a V across the bow face end on. A level
-## line at the near end leaves the far end of a quartering hull showing a few rows below
-## its stripe, as if riding high, which was judged the lesser wrong. Derived from the
-## pixels; a frame that comes out wrong can be pinned here by hand.
+## transom in the quartering headings and made a V across the bow face end on; a level
+## line at the near end leaves the far end of a quartering hull riding a little high, the
+## lesser wrong. Derived from the pixels; a frame that comes out wrong can be pinned here.
+SINK_ROWS = 2
+HULL_WIDE = 8
 CUT_ROW = {}
 
 ## How many rows above the line the hull's width is read over, for the collar's ends. The
@@ -271,22 +276,31 @@ def mastheads():
             for n in range(FRAMES)]
 
 
+def cut_row(frame, n):
+    """The row a frame is cut at: everything from it down is under the water."""
+    if n in CUT_ROW:
+        return CUT_ROW[n]
+    px = frame.load()
+    body = [y for y in range(FRAME)
+            if sum(1 for x in range(FRAME) if px[x, y][3] == 255) >= HULL_WIDE]
+    return (max(body) + 1 - SINK_ROWS) if body else FRAME // 2
+
+
 def cut_of(frame, n):
     """The waterline across one edited frame: left end, right end, in frame pixels."""
-    px = frame.load()
-    stripe = {INK["b"], INK["B"]}
-    row = CUT_ROW.get(n)
-    if row is None:
-        rows = [y for y in range(FRAME) for x in range(FRAME) if px[x, y] in stripe]
-        row = (max(rows) + 1) if rows else ANCHOR[1]
+    row = cut_row(frame, n)
     band = frame.crop((0, max(row - CUT_BAND, 0), FRAME, row)).getbbox()
     if band is None:
-        return [(ANCHOR[0] - 23, row), (ANCHOR[0] + 23, row)]
+        return [(ANCHOR_X - 23, row), (ANCHOR_X + 23, row)]
     return [(band[0], row), (band[2], row)]
 
 
 def cuts(frames):
     return [cut_of(frames[n], n) for n in range(FRAMES)]
+
+
+def anchor(frames):
+    return (ANCHOR_X, cut_row(frames[SIDE_FRAME], SIDE_FRAME))
 
 
 def strip_shadow(frame):
@@ -362,7 +376,7 @@ def write(frames):
         "frames": FRAMES,
         "frame": FRAME,
         "frame_zero": "bow towards the camera; frames turn clockwise seen from above",
-        "anchor": list(ANCHOR),
+        "anchor": list(anchor(frames)),
         "masthead": [list(at) for at in mastheads()],
         "cut": [[list(at) for at in line] for line in cuts(frames)],
         "edits": "jib, forestay and floor shadow removed by tools/build_boat_sheet.py",

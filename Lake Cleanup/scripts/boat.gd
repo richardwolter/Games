@@ -116,7 +116,7 @@ const HULL_HEIGHT := 16.0
 const HOLD_FROM := 0.06
 const HOLD_TO := 0.24
 const HOLD_ACROSS := 0.30
-const HOLD_LIFT := 0.9
+const HOLD_LIFT := 1.4
 
 ## How many pieces are drawn in the hold, and how big. A hold packed with forty things is
 ## a smear; six is enough to read as laden.
@@ -138,9 +138,10 @@ const HULL_IN_FRAME := 46.0
 const FRAME_SIDE := 128
 
 ## Where in a frame the water meets the hull under the mast — the point the sheet turns
-## about — laid on the boat's position. In frame pixels. The masthead in each frame comes
-## with the sheet's json, for the pennant.
-const HULL_ANCHOR := Vector2(64.0, 88.0)
+## about — laid on the boat's position. In frame pixels. The sheet's json says where that
+## is (its side view's waterline); this is the guess used without it. The masthead in each
+## frame comes with the json too, for the pennant.
+const HULL_ANCHOR := Vector2(64.0, 92.0)
 
 ## Which way the sheet's first frame points, as an angle in tile space: bow towards the
 ## camera, which on the plane is down the tile diagonal (1, 1). The frames turn clockwise
@@ -168,6 +169,7 @@ const SHADE_DROP := 0.30
 
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
+static var _anchor := HULL_ANCHOR
 static var _mastheads := PackedVector2Array()
 static var _cuts: Array[PackedVector2Array] = []
 static var _boxes: Dictionary = {}
@@ -995,18 +997,18 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 		var points := PackedVector2Array()
 		var uvs := PackedVector2Array()
 		for at in hull_polygon(index):
-			points.append((at - HULL_ANCHOR) * scale)
+			points.append((at - _anchor) * scale)
 			uvs.append((corner + at) / sheet_size)
 		draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, sheet)
 		var box := _ink_box(sheet, index)
 		_shade.lay(
 			sheet,
-			Rect2((Vector2(box.position) - HULL_ANCHOR) * scale, Vector2(box.size) * scale),
+			Rect2((Vector2(box.position) - _anchor) * scale, Vector2(box.size) * scale),
 			Rect2((corner + Vector2(box.position)) / sheet_size, Vector2(box.size) / sheet_size)
 		)
 		var line := PackedVector2Array()
 		for at in cut_line(index):
-			line.append((at - HULL_ANCHOR) * scale)
+			line.append((at - _anchor) * scale)
 		_collar.lay(line)
 		return
 	_shade.visible = false
@@ -1202,10 +1204,10 @@ static func turn_heading(turn: float) -> Vector2:
 func masthead() -> Vector2:
 	var scale := HULL_LENGTH / HULL_IN_FRAME
 	var frame := heading_frame()
-	var at := HULL_ANCHOR + Vector2(0.0, -HULL_HEIGHT * 3.0)
+	var at := _anchor + Vector2(0.0, -HULL_HEIGHT * 3.0)
 	if frame < _mastheads.size():
 		at = _mastheads[frame]
-	return (at - HULL_ANCHOR) * scale
+	return (at - _anchor) * scale
 
 
 ## How many headings the sheet holds. Taken from the sheet itself rather than written down
@@ -1243,7 +1245,7 @@ static func art_frame(turn: float) -> Dictionary:
 	return {
 		"sheet": sheet,
 		"region": Rect2(Vector2(float(index) * side, 0.0) + Vector2(box.position), kept),
-		"anchor": HULL_ANCHOR - Vector2(box.position),
+		"anchor": _anchor - Vector2(box.position),
 		"cut": cut,
 	}
 
@@ -1254,7 +1256,7 @@ static func cut_line(index: int) -> PackedVector2Array:
 	if index < _cuts.size() and _cuts[index].size() >= 2:
 		return _cuts[index]
 	return PackedVector2Array([
-		HULL_ANCHOR + Vector2(-HULL_IN_FRAME * 0.5, 0.0), HULL_ANCHOR + Vector2(HULL_IN_FRAME * 0.5, 0.0)
+		_anchor + Vector2(-HULL_IN_FRAME * 0.5, 0.0), _anchor + Vector2(HULL_IN_FRAME * 0.5, 0.0)
 	])
 
 
@@ -1298,6 +1300,7 @@ static func _sheet() -> Texture2D:
 
 
 static func _read_meta() -> void:
+	_anchor = HULL_ANCHOR
 	_mastheads = PackedVector2Array()
 	_cuts = []
 	if not FileAccess.file_exists(FRAMES_META):
@@ -1305,6 +1308,8 @@ static func _read_meta() -> void:
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FRAMES_META))
 	if not parsed is Dictionary:
 		return
+	if parsed.has("anchor"):
+		_anchor = Vector2(float(parsed["anchor"][0]), float(parsed["anchor"][1]))
 	if parsed.has("masthead"):
 		for pair in parsed["masthead"]:
 			_mastheads.append(Vector2(float(pair[0]), float(pair[1])))

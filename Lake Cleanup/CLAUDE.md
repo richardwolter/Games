@@ -345,15 +345,19 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   frame) and `HULL_LENGTH` (92) set that; `HULL_WIDTH` 50 is the beam bow on, doubled.
   Foam, wake, stern ripple, shove clearance and the shop board's wake follow from those,
   untuned this pass. The old 138 px ferry was a third longer; judge the size in play.
-- **`HULL_ANCHOR`** (64, 88) is the frame point that lands on the boat's position: the water
+- **The anchor** (json `anchor`, the side view's waterline under the mast; `HULL_ANCHOR`
+  is only the fallback) is the frame point that lands on the boat's position: the water
   under the mast, the point the frames turn about. `heading_frame` counts frames clockwise
   from `FRAME_ZERO_TURN` (bow towards the camera = tile diagonal (1, 1)); `turn_heading`
   gives the shop board the heading its frame faces. The pennant flies from the masthead the
   json lists per frame (`MASTHEAD` in the script, mirrored).
-- **In the water, not on it** (2026-09-11). Each frame is cut along a level waterline the
-  json lists (`cut`: one row under the lowest pixel of the painted boot-top, derived by
-  the script, `CUT_ROW` to pin a frame by hand), and drawn as a polygon of what is above
-  it (`Boat.hull_polygon`). Level by decision: a line bent to follow the boot-top along the
+- **In the water, not on it, but only just** (2026-09-11). Each frame is cut along a level
+  waterline the json lists (`cut`: `SINK_ROWS` (2) up from the bottom of the hull's body,
+  the lowest row `HULL_WIDE` (8) pixels wide, so the stem foot and the rudder post go under
+  and a couple of rows of keel planking with them; derived by the script, `CUT_ROW` to pin
+  a frame by hand), and drawn as a polygon of what is above it (`Boat.hull_polygon`). It
+  was cut at the boot-top first — the whole underwater hull gone — and Richard wanted it
+  sitting higher. Level by decision: a line bent to follow the boot-top along the
   near side ran diagonally into the bow and the transom in the quartering headings and made
   a V across the bow face end on; one row at the anchor for every frame chopped the bow
   off end on (the frames are not one strict projection — the bow-on rail is six rows tall
