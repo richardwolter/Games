@@ -1899,14 +1899,25 @@ func _stage_sun() -> void:
 	var reach := Rect2(cast[0], Vector2.ZERO)
 	for point in cast:
 		reach = reach.expand(point)
-	# It holds the picture itself, so there is no gap between a caster and its shade...
-	_check(reach.encloses(box),
-		"the sweep holds the picture it is cast from, so no gap can open under it",
+	# It starts at the caster's own contact point, so there is no gap between a thing and its
+	# shade. This is the property a shear cannot have on a V and the whole reason for the
+	# sweep — guard it rather than the numbers, which are all free to be retuned.
+	_check(reach.has_point(Vector2(box.get_center().x, box.end.y - 0.5)),
+		"a swept shadow starts at the caster's own base, so no gap can open under it",
 		"sweep %s against picture %s" % [reach, box])
-	# ...and it reaches past it, or nothing would be seen of the shadow at all.
-	_check(reach.position.x < box.position.x and reach.end.y > box.end.y,
-		"and reaches past it, down and to the left",
-		"%s" % reach)
+	# It reaches past where it started, or nothing would be seen of the shadow at all. Past
+	# the *contact point*, not past the whole picture: this V only touches down at its tip,
+	# so its arms are overhangs and rightly cast nothing.
+	var touches := Vector2(box.get_center().x, box.end.y)
+	_check(reach.position.x < touches.x and reach.end.y > touches.y,
+		"and reaches past the caster, down and to the left",
+		"sweep %s from contact %s" % [reach, touches])
+	# And nothing of it stands to the right of the picture. The drag goes down and left, so
+	# anything on the right is an overhang casting onto ground a wall should have caught —
+	# the hut's eaves threw shade onto the lit side of the building that way.
+	_check(reach.end.x <= box.end.x + 0.5,
+		"and none of it spills out on the sunlit side",
+		"sweep ends at %.1f, picture at %.1f" % [reach.end.x, box.end.x])
 	day.queue_free()
 	_advance()
 

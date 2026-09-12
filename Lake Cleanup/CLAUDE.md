@@ -542,6 +542,15 @@ in front of the player.
   widest part and the ground round a hut is shaded by its roof. Per column and per opaque run
   within it, so a gap in the art is a gap in the shadow; each run's swept region is the convex
   hull of its four corners and the same four dragged, fanned into triangles.
+- **Only the columns that reach the ground cast** (2026-09-12). An overhang is up in the air
+  and the sweep has no idea there is a wall under it: dragged with the rest, the hut's
+  right-hand eaves threw shade straight down onto open grass beside the wall — out on the
+  *sunlit* side of the building, which is the one place a shadow cannot be. A column casts only
+  if its lowest opaque pixel is within `ground` of the picture's deepest row, **the same rule
+  `Skirt.hem` uses** to decide where a blade may stand, and there for the same reason. The
+  columns that do cast carry their whole height, roof included, so the shadow is still as tall
+  as the building and only as *wide* as what stands on the ground. `test_lake` guards that
+  nothing of a sweep lands on the sunlit side.
 - **Overlaps composite once, through a `CanvasGroup`** (`Shade.Cast`). Every column's smear
   overlaps its neighbours', and a few hundred translucent triangles laid over each other come
   out as a black core with a pale fringe. The group draws its children into a buffer and then
@@ -552,7 +561,7 @@ in front of the player.
 - **Rebuilt only when the sun steps** (`Shade.SWEEP_STEP`, 0.02), the bargain
   `Ground._sun_baked` already strikes: the geometry is laid out, not transformed, and the
   island redraws every frame. Measured on an RTX 5060 Ti, full lake: 2.33 ms mean standing and
-  2.54 ms walking, worst frame 3.92 ms, no frame over 16.7 — inside the 8 ms bar.
+  2.48 ms standing, worst frame 3.46 ms, no frame over 16.7 — inside the 8 ms bar.
 - **`Shade.lying` is untouched** and stays the shadow for the angler, the dog, the ferry, the
   trees and the props. A figure's feet are a flat edge; the shear is right for them.
 - **Any new front-on painting sweeps** — the four piers are the obvious next ones, as they are
@@ -804,15 +813,15 @@ by their place on the bank and the tint the ferry reads.
   its shape moved by (`lean` x height, `stretch` x 0.5 x height) from its footprint, so the
   sheet's `shade_dry` and `shade_wet` are drawn in the day's ink under the posts, the wet
   one at the hull's gain (`SHADE_GAIN` 3, capped `SHADE_MOST` 0.7) because the day's ink is
-  set for sand. **Polygons were the first pass and were rejected as blocky** â€” the
+  set for sand. **Polygons were the first pass and were rejected as blocky** — the
   silhouette carries the posts and bollards. **The wet shadow rides the swell**: the water
   is what it falls on, so it rises and falls by `LakeGrid._swell` at the jetty's x off the
   grid's clock (`Dropoff.swell`), the same swell the rubbish beside it bobs on. The box is
   swept by `Shade.Cast` from its base on the deck, like the island's crate.
 - **Foam and sand are decided against the lake, not read off the sheet**: at `_ready` every
   post's foot is tested with `Iso.shore_fraction` against the foot's own edge. Past it, a
-  `WaterlineFoam` collar (`POST_COLLAR` 8 px half-width) **in front of the post** â€” behind
-  a six-pixel post nothing showed â€” riding the same swell. Short of it, `Skirt.mound`: sand
+  `WaterlineFoam` collar (`POST_COLLAR` 8 px half-width) **in front of the post** — behind
+  a six-pixel post nothing showed — riding the same swell. Short of it, `Skirt.mound`: sand
   banked over the post's bottom rows, widest at the ground, plus spilt grains, drawn over
   the wood so the row where post meets sand is covered (the hem's bargain, in sand). The
   coast curves and the jetty does not, so the pair at the water's edge can fall either side

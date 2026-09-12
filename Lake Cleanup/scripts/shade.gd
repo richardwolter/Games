@@ -61,9 +61,19 @@ const SWEEP_STEP := 0.02
 ## the shape of the picture rather than of the floor plan. On a thatched hut that reads: the
 ## eaves are the widest part of it and the ground round a hut is shaded by its roof.
 ##
+## **Only the columns that reach the ground cast.** An overhang is up in the air, and this has
+## no idea there is a wall under it: dragged with the rest, the hut's right-hand eaves threw
+## shade straight down onto open grass beside the wall — on the lit side of the building,
+## where the sun is. A real eave shades the wall below it, not the ground out to the side. So a
+## column casts only if its lowest opaque pixel is within `ground` of the picture's deepest
+## row, which is the same rule `Skirt.hem` uses to decide where a blade of grass may stand and
+## is there for the same reason. The columns that do cast carry their whole height, roof
+## included, so the shadow is still as tall as the building — it is only as *wide* as what
+## stands on the ground.
+##
 ## `box` is where the picture is drawn, in the caster's own space. `ground` is how much of the
-## picture's height is below the walls' ground line, so the drag is measured off what actually
-## stands up rather than off the whole image.
+## picture's height is below the walls' ground line: it measures the drag off what actually
+## stands up, and doubles as the band above the deepest row that counts as touching down.
 ##
 ## Per column, and per opaque run within it, so a gap in the art is a gap in the shadow. The
 ## swept region of one run is the convex hull of its corners and those corners moved along the
@@ -86,7 +96,26 @@ static func sweep(
 	if drag.is_zero_approx():
 		return out
 
+	# Where each column ends, and the deepest of them: the row the picture stands on.
+	var foot := PackedInt32Array()
+	foot.resize(wide)
+	var deepest := -1
 	for col in wide:
+		foot[col] = -1
+		for row in range(tall - 1, -1, -1):
+			if art.get_pixel(col, row).a > 0.5:
+				foot[col] = row
+				deepest = maxi(deepest, row)
+				break
+	if deepest < 0:
+		return out
+	# How far above that a column may end and still be counted as standing on the ground.
+	# Anything ending higher is an overhang, and an overhang casts onto what is under it.
+	var band := maxf(float(tall) * clampf(ground, 0.0, 1.0), 1.0)
+
+	for col in wide:
+		if foot[col] < 0 or float(deepest - foot[col]) > band:
+			continue
 		var run := -1
 		for row in tall + 1:
 			var solid := row < tall and art.get_pixel(col, row).a > 0.5
