@@ -247,13 +247,31 @@ static func spill(at: Vector2, radius: Vector2, count: int, seed_at: int) -> Pat
 	return mesh
 
 
+## How far the grains at a post's foot spill, in tiles, and how many. Tightened from
+## (0.35, 0.3) x 10 (2026-09-12, Richard: "sand specks should be closer to bottom tip of the
+## poles") — at that reach the cloud was a patch of beach round the post rather than sand
+## piled against it.
+const MOUND_SPILL := Vector2(0.16, 0.13)
+const MOUND_GRAINS := 8
+
+
 ## Sand banked over the foot of a post standing on the beach: a low heap of art pixels
 ## across the post's bottom rows, widest at the ground and narrowing upwards, plus loose
 ## grains spilling out round it. Drawn **over** the post — covering the row where the wood
 ## meets the sand is the whole job, the same bargain `hem` strikes for the hut with grass.
 ## `at` is the post's foot in world px, `wide` the post's width on screen.
 static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
-	var mesh := spill(at, Vector2(0.35, 0.3), 10, seed_at)
+	# Tight, and dropped a pixel: `spill` scatters round the point it is given, so half of a
+	# wide cloud lands *above* the foot — up the screen, on the wood — and reads as sand
+	# stuck to the post rather than gathered at its tip. At MOUND_SPILL the grains stay
+	# within a pixel or two of the bottom of the pole, which is where sand a post has
+	# disturbed actually lies.
+	# Snapped down to the art grid, not rounded to it: `_pixel` rounds, and a foot landing a
+	# hair past a row's middle rounded the whole mound one pixel **below** the pole, leaving
+	# the dark tip it is there to cover showing above the sand. Floor puts the ground row on
+	# the pole's own last row every time.
+	var base := Vector2(at.x, floor(at.y / PX) * PX)
+	var mesh := spill(base + Vector2(0.0, PX), MOUND_SPILL, MOUND_GRAINS, seed_at)
 	var sand := SAND
 	var palette := Palette.master()
 	if palette != null:
@@ -269,11 +287,11 @@ static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
 		for i in count:
 			if row == 2 and rng.randf() < 0.45:
 				continue
-			var x := at.x - span * 0.5 + (float(i) + 0.5) * PX
+			var x := base.x - span * 0.5 + (float(i) + 0.5) * PX
 			var tone := sand.lightened(rng.randf_range(0.0, 0.14))
 			if row == 0:
 				tone = sand.darkened(rng.randf_range(0.0, 0.08))
-			_pixel(mesh, Vector2(x, at.y - float(row) * PX), tone, true)
+			_pixel(mesh, Vector2(x, base.y - float(row) * PX), tone, true)
 	return mesh
 
 

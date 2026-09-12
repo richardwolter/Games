@@ -566,6 +566,24 @@ def build_yard(yard, wood, sprites):
                 pw[x, y] = (255, 255, 255, 255)
             elif deck[x][y] == 2:
                 pd[x, y] = (255, 255, 255, 255)
+    # Each post's foot, re-measured off the built picture rather than trusted from where the
+    # line was drawn from. The outline pass rings the wood, and the ring runs a row past the
+    # bottom of the post — so sand banked on the drawn foot sat a couple of pixels up the
+    # pole with its dark tip showing below, and a foam collar had the same gap. The lowest
+    # opaque row of the post's own columns is where the pole actually ends.
+    for key in ("posts_wet", "posts_dry"):
+        for post in book[key]:
+            gx, gy = post
+            low = gy
+            for x in range(gx - POST_WIDE // 2, gx - POST_WIDE // 2 + POST_WIDE):
+                if not (0 <= x < W):
+                    continue
+                y = H - 1
+                while y > gy and pu[x, y][3] == 0:
+                    y -= 1
+                low = max(low, y)
+            post[1] = low
+
     book["layers"] = {"under": under, "shade_wet": wet, "shade_dry": dry}
     return over, book
 
