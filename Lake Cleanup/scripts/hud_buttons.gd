@@ -97,7 +97,19 @@ const COIN_GLINT := Color(1.0, 0.94, 0.72)
 ## another size puts everything in the same place.
 ##
 ## Bake by pasting what `ButtonTuner` writes to `user://button_tune.log` into `BAKED`.
-const BAKED := {}
+##
+## Laid out by hand on the canvas, 2026-09-12. The net rides high and a little left of the
+## middle, the ferry and the dog sit lower and further out than the rule put them, the arrow
+## is a touch below centre, and the hut fills the room's whole height. Anything not named
+## here is still the rule's — the heap of finds, every size but the hut's.
+const BAKED := {
+	&"net": Vector2(0.4981, 0.2095),
+	&"boat": Vector2(0.2059, 0.4395),
+	&"dog": Vector2(0.8106, 0.5265),
+	&"arrow": Vector2(0.5019, 0.5286),
+	&"hut": Vector2(0.4944, 0.5089),
+	&"hut_tall": 1.0000,
+}
 
 ## The tuner's live overrides. Empty in a real run, so the game draws what `BAKED` and the
 ## rules say and pays nothing for this.
