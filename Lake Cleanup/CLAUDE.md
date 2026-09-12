@@ -348,12 +348,15 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   from `FRAME_ZERO_TURN` (bow towards the camera = tile diagonal (1, 1)); `turn_heading`
   gives the shop board the heading its frame faces. The pennant flies from the masthead the
   json lists per frame (`MASTHEAD` in the script, mirrored).
-- **In the water, not on it** (2026-09-11). Each frame is cut along a waterline the json
-  lists (`CUT` in the script, mirrored: two or three points, the painted boot-top along the
-  near side and round the near end), and drawn as a polygon of what is above it
-  (`Boat.hull_polygon`). Authored per frame, not derived: the frames are not one strict
-  projection — the bow-on rail is six rows tall where thirty degrees would make it
-  eighteen — and a level cut at the anchor row chopped the bow off end on. Along the cut
+- **In the water, not on it** (2026-09-11). Each frame is cut along a level waterline the
+  json lists (`cut`: one row under the lowest pixel of the painted boot-top, derived by
+  the script, `CUT_ROW` to pin a frame by hand), and drawn as a polygon of what is above
+  it (`Boat.hull_polygon`). Level by decision: a line bent to follow the boot-top along the
+  near side ran diagonally into the bow and the transom in the quartering headings and made
+  a V across the bow face end on; one row at the anchor for every frame chopped the bow
+  off end on (the frames are not one strict projection — the bow-on rail is six rows tall
+  where thirty degrees would make it eighteen). The far end of a quartering hull shows a
+  few rows below its stripe, accepted as the lesser wrong. Along the cut
   lies the lake's own foam collar (`HullCollar`: foam.gdshader with its own material,
   `COLLAR_SCALE` 2.4 times the rubbish's rise and fall, one strip over the cut's segments,
   tear and bubbles scaled to the width through the shader's new `tear_across` uniform — not

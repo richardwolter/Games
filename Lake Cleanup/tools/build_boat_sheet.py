@@ -251,24 +251,19 @@ MASTHEAD = [(64, 32), (66, 33), (67, 34), (67, 34), (63, 32), (68, 33), (66, 37)
 ## Where the water meets the hull under the mast, the point the frames turn about.
 ANCHOR = (64, 88)
 
-## The waterline across each frame, 0 to 8, left to right in frame pixels: everything
-## below this line is under the water and is not drawn. Read off the hull's blue stripe,
-## which is the painted boot-top, at the near side and the near end; the frames are not a
-## strict projection of one hull (the bow-on hull's rail is six rows tall where thirty
-## degrees of elevation would make it eighteen), so the line is authored per frame rather
-## than derived. Two points where the near side is straight, three where the near end is
-## the middle (bow on, stern on) or the near side turns the corner onto the transom.
-CUT = [
-    [(52, 89), (64, 94), (76, 89)],
-    [(48, 88), (60, 92), (80, 82)],
-    [(40, 89), (72, 88), (86, 82)],
-    [(38, 86), (66, 88), (88, 79)],
-    [(43, 89), (91, 89)],
-    [(42, 78), (68, 90), (88, 86)],
-    [(45, 81), (64, 90), (86, 85)],
-    [(48, 84), (66, 91), (80, 87)],
-    [(51, 91), (63, 96), (75, 91)],
-]
+## The waterline of each frame is one level row: one below the lowest row of the hull's
+## blue stripe, the painted boot-top, at the near end. Level by decision (2026-09-11): a
+## line following the boot-top along the near side ran diagonally into the bow and the
+## transom in the quartering headings and made a V across the bow face end on. A level
+## line at the near end leaves the far end of a quartering hull showing a few rows below
+## its stripe, as if riding high, which was judged the lesser wrong. Derived from the
+## pixels; a frame that comes out wrong can be pinned here by hand.
+CUT_ROW = {}
+
+## How many rows above the line the hull's width is read over, for the collar's ends. The
+## far end of a quartering hull bottoms out above the line, and a collar read off the one
+## row under it stopped short of that end.
+CUT_BAND = 4
 
 
 def mastheads():
@@ -276,10 +271,22 @@ def mastheads():
             for n in range(FRAMES)]
 
 
-def cuts():
-    """The waterline of every frame, the mirrored ones read back right to left."""
-    return [CUT[n] if n <= 8 else [(FRAME - 1 - x, y) for x, y in reversed(CUT[16 - n])]
-            for n in range(FRAMES)]
+def cut_of(frame, n):
+    """The waterline across one edited frame: left end, right end, in frame pixels."""
+    px = frame.load()
+    stripe = {INK["b"], INK["B"]}
+    row = CUT_ROW.get(n)
+    if row is None:
+        rows = [y for y in range(FRAME) for x in range(FRAME) if px[x, y] in stripe]
+        row = (max(rows) + 1) if rows else ANCHOR[1]
+    band = frame.crop((0, max(row - CUT_BAND, 0), FRAME, row)).getbbox()
+    if band is None:
+        return [(ANCHOR[0] - 23, row), (ANCHOR[0] + 23, row)]
+    return [(band[0], row), (band[2], row)]
+
+
+def cuts(frames):
+    return [cut_of(frames[n], n) for n in range(FRAMES)]
 
 
 def strip_shadow(frame):
@@ -357,7 +364,7 @@ def write(frames):
         "frame_zero": "bow towards the camera; frames turn clockwise seen from above",
         "anchor": list(ANCHOR),
         "masthead": [list(at) for at in mastheads()],
-        "cut": [[list(at) for at in line] for line in cuts()],
+        "cut": [[list(at) for at in line] for line in cuts(frames)],
         "edits": "jib, forestay and floor shadow removed by tools/build_boat_sheet.py",
     }, indent="\t") + "\n")
 

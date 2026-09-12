@@ -151,11 +151,12 @@ const FRAME_ZERO_TURN := PI * 0.25
 const PENNANT_STAFF := 14.0
 
 ## The hull in the water rather than on it. Each frame is cut along the waterline its json
-## lists (`cut`, authored in tools/build_boat_sheet.py: the painted boot-top along the near
-## side and round the near end), so what is under the water is not drawn — the same cut
-## every floating piece gets (LakeGrid.WATERLINE), bent where the hull turns. The lake's
-## own foam collar (foam.gdshader) lies along that line, scaled up from the ten-pixel
-## rubbish to the hull and reaching COLLAR_REACH past its ends. Under it the boat's
+## lists (`cut`, from tools/build_boat_sheet.py: one level row, under the painted boot-top
+## at the near end), so what is under the water is not drawn — the same cut every floating
+## piece gets (LakeGrid.WATERLINE). Level by decision (2026-09-11): a line bent to follow
+## the near side ran into the bow and the transom. The lake's own foam collar
+## (foam.gdshader) lies along that line, scaled up from the ten-pixel rubbish to the hull
+## and reaching COLLAR_REACH past its ends. Under it the boat's
 ## silhouette is laid on the water through shadow.gdshader the way the rubbish throws its
 ## shadow: squashed by LakeGrid.SHADOW_SQUASH and pushed SHADE_DROP of its height down the
 ## plane, so a crescent shows past the hull's near side and the sails' shadow past its
@@ -1247,8 +1248,8 @@ static func art_frame(turn: float) -> Dictionary:
 	}
 
 
-## The waterline across a frame, left to right in frame pixels, off the sheet's json; a
-## level line the hull's length through the anchor when the json is missing.
+## The waterline across a frame, left end and right end in frame pixels, off the sheet's
+## json; a level line the hull's length through the anchor when the json is missing.
 static func cut_line(index: int) -> PackedVector2Array:
 	if index < _cuts.size() and _cuts[index].size() >= 2:
 		return _cuts[index]
@@ -1259,7 +1260,7 @@ static func cut_line(index: int) -> PackedVector2Array:
 
 ## The part of a frame that is above the water, as a polygon in frame pixels: the frame's
 ## top edge, then the waterline read back right to left with its ends carried out to the
-## frame's sides.
+## frame's sides. Takes a bent line too, should one ever come back.
 static func hull_polygon(index: int) -> PackedVector2Array:
 	var line := cut_line(index)
 	var side := float(FRAME_SIDE)
@@ -1420,9 +1421,9 @@ class HullCollar extends Node2D:
 		# The anchor only seeds the tear here, so each hull froths its own way.
 		_anchor = LakeGrid.pack_anchor(float(seed % 4096) - 2048.0, 0.0, 1.0)
 
-	## The cut, left to right, two or three points in the parent's space. One quad per
-	## segment, the strip's UV running 0 to 1 over the whole line so the shader's rounding
-	## off and its tear read it as one collar.
+	## The cut, left to right, in the parent's space. One quad per segment — one, the line
+	## being level — the strip's UV running 0 to 1 over the whole line so the shader's
+	## rounding off and its tear read it as one collar.
 	func lay(line: PackedVector2Array) -> void:
 		visible = true
 		var total := 0.0
