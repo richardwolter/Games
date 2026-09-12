@@ -355,6 +355,25 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.
 
+- **Where each picture on a button stands is tunable by hand** (`HudButtons.BAKED`/`tune`/
+  `_at`/`_scale`, `scripts/button_tuner.gd`, **F7** in a debug build, 2026-09-12): three
+  layers, first one wins — the tuner's live overrides, the `BAKED` dictionary of what was
+  picked and kept, and the rule the constants describe. Rules are the right way to start (they
+  hold at any button size) and the wrong way to finish: "a little further left" is not a number
+  anybody can write down. Positions are the drawn picture's **middle** as a fraction of the
+  face — of the room, for the shed's two — and sizes are fractions of its height, so a picked
+  place survives a resize.
+  The canvas draws both buttons at `ZOOM` **through `draw_upgrades`/`draw_shed` themselves**,
+  with the lake's own sprites, and they report where every picture landed through
+  `HudButtons.traced` (filled only while `tracing`). There is no second layout to drift from
+  the first — which is why this is a panel in the game rather than a web canvas with the sums
+  written out again. Drag to move, wheel to size (shift for the arrow's width), arrows to
+  nudge, alt-click for the picture underneath, R to put one back to its rule, S to write
+  `user://button_tune.log` — a `BAKED` literal to paste. Only what was actually moved is
+  written: baking the rule's own answer freezes a number nobody chose.
+  Probe: `tools/shot_buttons.tscn` (desktop build, not `--headless`) opens the canvas and
+  saves `tools/last_buttons.png`.
+
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
   2026-09-11): a face inside that border. The two picture buttons stand theirs on
   `Style.BUTTON_FACE` (2026-09-12) — the boards' own murky water, one step up the palette

@@ -82,6 +82,50 @@ const COIN_RING := 0.72
 const COIN_GLINT := Color(1.0, 0.94, 0.72)
 
 
+# ---------------------------------------------------------------------------------------
+# Where things stand
+# ---------------------------------------------------------------------------------------
+
+## Every picture on a button asks `_at` where its middle goes and `_scale` how big it is, and
+## gets **the rule's own answer** unless a number has been laid over it. Three layers, first
+## one wins: `tune`, which the tuner writes while it is open; `BAKED`, which is what was
+## picked and kept; and the rule the constants above describe.
+##
+## A position is the drawn picture's **middle**, as a fraction of the face (or of the room,
+## for the shed's); a scale is a fraction of the face's height, except the arrow's width and
+## the net's fill, which are of the width and of the fit. Fractions, so a button drawn at
+## another size puts everything in the same place.
+##
+## Bake by pasting what `ButtonTuner` writes to `user://button_tune.log` into `BAKED`.
+const BAKED := {}
+
+## The tuner's live overrides. Empty in a real run, so the game draws what `BAKED` and the
+## rules say and pays nothing for this.
+static var tune := {}
+
+## Where each picture landed, in the drawing item's own pixels, for the tuner to hit-test
+## against. Filled only while `tracing`.
+static var tracing := false
+static var traced := {}
+
+
+static func _at(key: StringName, rule: Vector2) -> Vector2:
+	if tune.has(key):
+		return tune[key]
+	return BAKED.get(key, rule)
+
+
+static func _scale(key: StringName, rule: float) -> float:
+	if tune.has(key):
+		return float(tune[key])
+	return float(BAKED.get(key, rule))
+
+
+static func _trace(key: StringName, box: Rect2) -> void:
+	if tracing:
+		traced[key] = box
+
+
 ## The face inside a button of this size: what `board` fills and hands back, for a caller
 ## that needs it without drawing the button again.
 static func face_of(box: Rect2) -> Rect2:
@@ -152,32 +196,48 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	# The net, behind, filling the face and dimmed into it. Clipped to the face by drawing
 	# it centred rather than stood, so an over-fill spills evenly rather than out of the top.
+	_trace(&"face_upgrades", face)
 	if sprites.has("net"):
 		# `Style.NET_INK`, the shop board's own black, so the net is one net wherever it is
 		# drawn as a picture of itself. It was a pale grey dim until 2026-09-12.
 		var ink := Style.NET_INK
-		fit(on, sprites["net"], face, NET_FILL, Color(ink.r * tint.r, ink.g * tint.g, ink.b * tint.b, ink.a), false)
+		var net_span := span_of(sprites["net"], face.size, _scale(&"net_fill", NET_FILL))
+		var net_at := _at(&"net", Vector2(0.5, 0.5))
+		var net_box := Rect2(face.position + net_at * face.size - net_span * 0.5, net_span)
+		fit(on, sprites["net"], net_box, 1.0, Color(ink.r * tint.r, ink.g * tint.g, ink.b * tint.b, ink.a), false)
+		_trace(&"net", net_box)
 	# The ferry in the left half, a little up off the foot; the dog in the right half. Both
 	# mirrored from how their sheets face, so they look outwards, and both drawn before the
 	# arrow, which stands over the middle of them.
 	var foot := face.end.y - face.size.y * 0.08
 	var half := face.size.x * SIDE_HALF
 	var mid := face.position.x + face.size.x * 0.5
-	var arrow_half := face.size.x * ARROW_WIDE * 0.5
+	var arrow_half := face.size.x * _scale(&"arrow_wide", ARROW_WIDE) * 0.5
+	var arrow_mid := face.position.x + face.size.x * _at(&"arrow", Vector2(0.5, 0.5)).x
 	# Sized to their share of the face, not to the lane beside the arrow: the lane decides
 	# where they stand, `SIDE_UNDER` decides how much of them the arrow takes, and neither
-	# decides how big they are.
+	# decides how big they are. Each rule works out a middle, which is then what a tuned
+	# position replaces — see `_at`.
 	if sprites.has("boat"):
-		var span := span_of(sprites["boat"], Vector2(half, face.size.y * BOAT_TALL), 1.0)
-		var right := mid - arrow_half + span.x * SIDE_UNDER
-		var slot := Rect2(Vector2(right - span.x, foot - face.size.y * BOAT_LIFT - span.y), span)
+		var span := span_of(sprites["boat"], Vector2(half, face.size.y * _scale(&"boat_tall", BOAT_TALL)), 1.0)
+		var rule := (Vector2(
+			arrow_mid - arrow_half + span.x * SIDE_UNDER - span.x * 0.5,
+			foot - face.size.y * BOAT_LIFT - span.y * 0.5
+		) - face.position) / face.size
+		var slot := Rect2(face.position + _at(&"boat", rule) * face.size - span * 0.5, span)
 		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
+		_trace(&"boat", slot)
 	if Dogs.has(&"idle"):
-		var dog_tall := face.size.y * SIDE_TALL * 0.9
+		var dog_tall := face.size.y * _scale(&"dog_tall", SIDE_TALL * 0.9)
 		var dog_span := Dogs.span(&"idle", dog_tall)
 		# The same rule mirrored: its left edge that far inside the arrow's right.
-		var left := mid + arrow_half - dog_span.x * SIDE_UNDER
-		Dogs.stamp(on, &"idle", 0, Vector2(left + dog_span.x * 0.5, foot), dog_tall, false, 0.0, tint)
+		var rule := (Vector2(
+			arrow_mid + arrow_half - dog_span.x * SIDE_UNDER + dog_span.x * 0.5,
+			foot - dog_span.y * 0.5
+		) - face.position) / face.size
+		var middle := face.position + _at(&"dog", rule) * face.size
+		Dogs.stamp(on, &"idle", 0, Vector2(middle.x, middle.y + dog_span.y * 0.5), dog_tall, false, 0.0, tint)
+		_trace(&"dog", Rect2(middle - dog_span * 0.5, dog_span))
 	arrow(on, face, tint)
 
 
@@ -185,12 +245,14 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 ## green, a lit edge along its left and a shaded one down its right so it stands off the
 ## face rather than lying flat on it.
 static func arrow(on: CanvasItem, face: Rect2, tint: Color) -> void:
-	var tall := floorf(face.size.y * ARROW_TALL)
-	var wide := floorf(face.size.x * ARROW_WIDE)
+	var tall := floorf(face.size.y * _scale(&"arrow_tall", ARROW_TALL))
+	var wide := floorf(face.size.x * _scale(&"arrow_wide", ARROW_WIDE))
 	var head := floorf(tall * ARROW_HEAD)
 	var shaft := floorf(wide * ARROW_SHAFT)
-	var mid := floorf(face.position.x + face.size.x * 0.5)
-	var top := floorf(face.position.y + (face.size.y - tall) * 0.5)
+	var where := _at(&"arrow", Vector2(0.5, 0.5))
+	var mid := floorf(face.position.x + face.size.x * where.x)
+	var top := floorf(face.position.y + face.size.y * where.y - tall * 0.5)
+	_trace(&"arrow", Rect2(mid - wide * 0.5, top, wide, tall))
 	var shape := PackedVector2Array([
 		Vector2(mid, top),
 		Vector2(mid + wide * 0.5, top + head),
@@ -225,6 +287,7 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	var label_tall := floorf(face.size.y * 0.2)
 	var room := Rect2(face.position, Vector2(face.size.x, face.size.y - label_tall))
+	_trace(&"face_shed", face)
 	var decor: Array = sprites.get("decor", [])
 	if not decor.is_empty():
 		var dim := Color(DECOR_DIM.r * tint.r, DECOR_DIM.g * tint.g, DECOR_DIM.b * tint.b)
@@ -232,15 +295,36 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 		# hut, drawn after the lot, stands in front of all of them.
 		var placed := _scatter(decor.size(), room)
 		placed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["box"].end.y < b["box"].end.y)
+		# The heap moves and grows as one. Sixteen handles would be sixteen ways to make it
+		# look sown rather than heaped; what is worth moving is where the heap sits.
+		var shift := _at(&"decor", Vector2.ZERO) * room.size
+		var grow := _scale(&"decor_scale", 1.0)
+		var whole := Rect2()
 		for spot: Dictionary in placed:
-			fit(on, decor[spot["at"]], spot["box"], 1.0, dim)
+			var stood: Rect2 = spot["box"]
+			# Grown about its own foot, so a bigger find still stands on the ground it did.
+			stood = Rect2(
+				Vector2(stood.position.x + stood.size.x * (1.0 - grow) * 0.5, stood.end.y - stood.size.y * grow),
+				stood.size * grow
+			)
+			stood.position += shift
+			fit(on, decor[spot["at"]], stood, 1.0, dim)
+			whole = stood if whole.size == Vector2.ZERO else whole.merge(stood)
+		_trace(&"decor", whole)
 	var hut: Texture2D = sprites.get("shed")
 	if hut != null:
-		var tall := room.size.y * SHED_TALL
-		var slot := Rect2(
-			Vector2(room.position.x, room.position.y + (room.size.y - tall) * 0.62), Vector2(room.size.x, tall)
-		)
-		fit(on, {"sheet": hut, "region": Rect2(Vector2.ZERO, hut.get_size())}, slot, 1.0, tint)
+		var art := {"sheet": hut, "region": Rect2(Vector2.ZERO, hut.get_size())}
+		var tall := room.size.y * _scale(&"hut_tall", SHED_TALL)
+		var span := span_of(art, Vector2(room.size.x, tall), 1.0)
+		# The rule stands it `0.62` of the spare height down the room; what that comes to is
+		# the middle a tuned position replaces.
+		var rule := (Vector2(
+			room.position.x + room.size.x * 0.5,
+			room.position.y + (room.size.y - tall) * 0.62 + tall - span.y * 0.5
+		) - room.position) / room.size
+		var slot := Rect2(room.position + _at(&"hut", rule) * room.size - span * 0.5, span)
+		fit(on, art, slot, 1.0, tint)
+		_trace(&"hut", slot)
 	label(on, Rect2(Vector2(face.position.x, face.end.y - label_tall), Vector2(face.size.x, label_tall)), SHED_LABEL)
 
 

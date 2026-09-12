@@ -987,6 +987,22 @@ func _shape_bank() -> void:
 var _grounds: Array[Ground] = []
 
 
+## The corner buttons' canvas, F7, debug builds only. See ButtonTuner. Built on the key
+## rather than at start-up: it is a panel over the whole screen, and one that is up whenever
+## the game is is a panel in the way.
+func _tune_buttons() -> void:
+	if not OS.is_debug_build():
+		return
+	var open := get_node_or_null(^"ButtonTuner")
+	if open != null:
+		open.queue_free()
+		return
+	var tuner := ButtonTuner.new()
+	tuner.name = &"ButtonTuner"
+	tuner.sprites = _skin.sprites
+	add_child(tuner)
+
+
 ## The ground's sliders, F4, debug builds only. See GroundTuner.
 func _tune_ground() -> void:
 	if not OS.is_debug_build():
@@ -1410,6 +1426,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			KEY_F6:
 				wipe_save()
+				return
+			KEY_F7:
+				_tune_buttons()
 				return
 
 	var drag := event as InputEventMouseMotion
