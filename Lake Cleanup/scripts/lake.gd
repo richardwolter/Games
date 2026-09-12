@@ -2267,6 +2267,10 @@ func _push_daylight() -> void:
 	if _daylight != null:
 		_daylight.color = _day.tint
 	($Sky/Fill as ColorRect).color = BEYOND * _day.tint
+	# The floating rubbish's shadows, which are shader-driven and so cannot be re-laid as the
+	# sun moves. One uniform, every frame; see LakeGrid.sun_lean.
+	if _grid != null:
+		_grid.sun_lean(_day.lean)
 
 
 ## The other level, as a scene and as the words on the button that goes there. The lake is

@@ -172,6 +172,12 @@ const SHADOW_ALPHA := 0.15
 const SHADOW_DROP := 0.22
 const SHADOW_COLOUR := Color(0.03, 0.08, 0.11, 1.0)
 
+## How far a shadow slides off its piece, in world pixels, per unit of DayCycle.lean. The sun
+## is in the southeast, so a negative lean carries every crescent to the left of the piece
+## throwing it, the same side the angler's and the ferry's shadows fall on. Flat rather than
+## scaled by the piece: see shaders/shadow.gdshader for why the quads cannot be re-laid.
+const SHADOW_SUN_REACH := 3.0
+
 ## How many shadows there is room for. Everything on screen gets one — unlike the rings,
 ## which are sampled — so this is the worst case the view cull can hand over rather than a
 ## budget. The geometry for it is taken once at startup and written over every rebuild.
@@ -697,6 +703,7 @@ class ShadowLayer extends Node2D:
 		skin.set_shader_parameter("wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
 		skin.set_shader_parameter("shade", shade)
+		skin.set_shader_parameter("sun_reach", LakeGrid.SHADOW_SUN_REACH)
 		material = skin
 		# Linear, not the nearest the rest of the lake uses: the shadow is the art squashed
 		# to half its height, and nearest sampling of that is a staircase of two-pixel
@@ -725,10 +732,12 @@ class ShadowLayer extends Node2D:
 	## The piece's own quad, flattened into the plane and pushed down it, in the piece's own
 	## UVs so the ink comes out the shape of the art.
 	##
-	## Deliberately not swung by the sun. The land shadows lean and stretch through the day;
-	## these do not, because a shadow on water is mostly the piece blocking the light under
-	## itself, and eighteen thousand of them re-laid every time the sun moved would be the
-	## rebuild this whole layer exists to avoid.
+	## Not swung by the sun here. The quads are square to the world and the sun's lean is
+	## applied in the vertex shader instead (`sun_lean` there), because eighteen thousand
+	## quads re-laid every time the sun moved would be the rebuild this whole layer exists
+	## to avoid. What the shader does is slide the whole shadow; it does not lean the
+	## silhouette over the way Shade.lying does on land, since a piece of floating rubbish
+	## has almost no height to lean.
 	## `still` is a piece lying on the beach: its shadow is packed with DRY_ANCHOR so the
 	## shader leaves it where it is, like the piece.
 	func write(
@@ -773,6 +782,13 @@ class ShadowLayer extends Node2D:
 			return
 		for i in CORNERS:
 			_points[base + i] = Vector2.ZERO
+
+	## Where the sun is, onto the shader. Called every frame from the lake's daylight push:
+	## it is one uniform on one material, not a rebuild, which is the whole reason the lean
+	## lives in the shader rather than in the quads.
+	func sun(lean: float) -> void:
+		if material != null:
+			(material as ShaderMaterial).set_shader_parameter("sun_lean", lean)
 
 	func begin() -> void:
 		_count = 0
@@ -1053,6 +1069,14 @@ class RippleLayer extends Node2D:
 		draw_multiline_colors(
 			_outer.slice(0, laid), _outer_ink.slice(0, laid / 2), OUTER_WIDE
 		)
+
+
+## Where the sun is, onto the floating shadows. The lake calls this with DayCycle.lean every
+## time it pushes the daylight; the land's casters take the same number through Shade.lying,
+## so the whole world agrees about which way the light is coming from.
+func sun_lean(lean: float) -> void:
+	if _shadows != null:
+		_shadows.sun(lean)
 
 
 func _ready() -> void:

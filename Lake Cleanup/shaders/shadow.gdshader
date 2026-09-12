@@ -19,6 +19,16 @@ uniform float wave_speed = 1.0;
 uniform float wave_amplitude = 5.0;
 uniform float anchor_span = 8192.0;
 
+// Where the sun is, as DayCycle.lean, and how far a shadow slides off its piece per unit of
+// that. The land shadows are laid out under Shade.lying, which leans them by the caster's
+// own height; these cannot be, because their quads are built once per rebuild and re-laying
+// eighteen thousand of them every time the sun moved is the rebuild this layer exists to
+// avoid. So the whole shadow is slid by a flat world distance instead: a piece of rubbish is
+// a hand's breadth of floating junk, not a building, and one distance for all of them reads
+// as the same sun without costing a rebuild. `sun_reach` is in world pixels per unit lean.
+uniform float sun_lean = -1.0;
+uniform float sun_reach = 3.0;
+
 // What a shadow is drawn in, alpha included. Held here rather than in the vertex colours
 // because those carry the anchor instead.
 uniform vec4 shade : source_color = vec4(0.03, 0.08, 0.11, 0.16);
@@ -47,6 +57,11 @@ void vertex() {
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
 	local = COLOR.ba;
+
+	// Off the piece, towards where a sun in the southeast puts it. Before the anchor test,
+	// so a piece lying dry on the beach still throws its shadow the same way as one afloat —
+	// what the anchor decides is whether the shadow bobs, not whether the sun is out.
+	VERTEX.x += sun_lean * sun_reach;
 
 	// The top anchor value is reserved for a piece lying on the beach, whose shadow stays put
 	// like the piece does. See LakeGrid.DRY_ANCHOR.

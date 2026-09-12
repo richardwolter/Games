@@ -3,9 +3,14 @@
 ##
 ## The cycle is a loop with no night in it: dawn, noon, evening, a short dim trough, dawn
 ## again. The trough is not night — it is the darkest point of the loop, and it exists so
-## the sun has somewhere to swing back from. Shadows run east at dusk and west at dawn, and
-## a shadow visibly rotating through the whole compass in front of the player reads as a
-## bug; the trough is dim enough and short enough that the reset inside it is not seen.
+## the sun has somewhere to swing back from.
+##
+## The sun sits in the southeast all day and only drifts. Every painted asset is lit from
+## there — the shed's and the recycle box's own pixels are measurably brighter down their
+## right-hand sides — so a cast shadow that swung from one side of a caster to the other
+## would contradict the art for half of every loop. It drifts instead: a narrow arc, always
+## throwing the shadow down and to the left, so the light moves without ever disagreeing
+## with the paint. The trough's reset is a small step rather than a flip.
 class_name DayConfig
 extends Resource
 
@@ -26,11 +31,14 @@ extends Resource
 @export var tint: Gradient
 
 ## How far a shadow leans, as a multiple of its own height, at the two ends of the day and at
-## noon. Positive leans one way and negative the other; the sign flip across noon is the sun
-## crossing the sky.
-@export var lean_dawn: float = 1.7
-@export var lean_noon: float = 0.18
-@export var lean_dusk: float = -1.7
+## noon. Negative throws the shadow to the left of its caster, which is where a sun in the
+## southeast puts it; all three are negative, and must stay so. The sun drifts west through
+## the day, so the shadow is furthest left at dawn and least so at dusk. `test_lake` guards
+## the sign over the whole loop — a positive value here lights the world from the northwest
+## and every painted highlight in the game then falls on the shadowed side.
+@export var lean_dawn: float = -1.3
+@export var lean_noon: float = -1.0
+@export var lean_dusk: float = -0.75
 
 ## How long a shadow is against the object casting it, at noon and at the ends of the day. A
 ## low sun throws a long shadow; an overhead one throws almost none.

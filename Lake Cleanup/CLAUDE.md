@@ -458,16 +458,46 @@ the whole job.
   its column), the lit yellow window and the grey door hardware. **The walls also get the
   box's border**: every wall pixel on the picture's outer edge is painted in the box's own
   silhouette colour (read off the box, 48,37,33), the one-pixel dark line the box is drawn
-  with; the roof's edge is left as painted. **Darker and flatter than a straight match**
-  (`RAMP_MIDDLE`/`RAMP_SPREAD`/`RAMP_CROP`/`RAMP_STEPS`): the walls' ranks are squeezed into
-  the lower-middle of the box's ramp, never reach its lit rim, and are stepped to about as
-  many tones as the box has — the light half squeezed hard, the dark half hardly at all, so
-  the seams survive. Run it with the psd-extract
+  with; the roof's edge is left as painted. Two pixels deep and solid (`BORDER_DEEP`), and
+  the half-alpha shadow row the art had under the walls is stripped (`STRIP_SOFT`) — one
+  soft pixel with a grey smear under it read thin and faded next to the box's edge. A hut
+  on grass throws no baked shadow; the lake draws the sun's. **One pixel is then cleared off
+  each vertical side** (`SIDE_TRIM`). The box has the same step (`tools/trim_box_sides.py`,
+  from `art_source/recycle_box_painted.png`) **at zero, by decision**: its side line is one
+  pixel, and taking it off left the box with no border. What that script does do is
+  **repaint the box's vertical sides in its upper rim's colour** (the red-brown 76,29,29,
+  read off the top edges) so the outline reads as one line; the lower edges keep theirs. `recolor_shed.py` reads the box's
+  wood and edge colour off the painted source, not the asset, for the same reason. Only
+  vertical runs of the silhouette are sides; the sloping edges keep their line. Run it with the psd-extract
   venv python from the project root; **re-run after any re-cut**, copying the fresh cut to
   `shed_tan.png` first. `--mask out.png` writes the classification for checking.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
+
+### The Sun Is in the Southeast (`day_config.gd`, `shadow.gdshader`, 2026-09-12)
+Every painted asset in the game is lit from the right: the shed's and the recycle box's own
+pixels are measurably brighter down that side. The day cycle used to swing the sun across
+the sky — `lean_dawn` +1.7 through `lean_noon` +0.18 to `lean_dusk` -1.7 — which threw the
+cast shadows to the *right* of their casters for most of the loop, onto the same side as
+every baked highlight, and crossed zero at noon so the whole world's shadows flipped sides
+in front of the player.
+- **All three leans are negative now** (-1.3 dawn, -1.0 noon, -0.75 dusk): the shadow always
+  falls down and to the left, and the sun only drifts west through the day instead of
+  crossing. The numbers are by eye and free to be retuned; **the sign is not**, and
+  `test_lake`'s `_stage_sun` walks 200 phases and guards it.
+- **A narrow arc, by decision** — not a pinned sun. Pinning would take the movement out of
+  the light for no gain; a wide arc is what contradicted the paint. `stretch`, `ink` and the
+  tint gradient are untouched: the sun's *height* through the day was never the problem.
+- **The floating rubbish's crescents lean too** (`shadow.gdshader` `sun_lean`/`sun_reach`,
+  `LakeGrid.sun_lean`, pushed every frame from `Lake._push_daylight`). They used to be
+  centred under their pieces with no sun in them at all, which read as the only thing on the
+  lake the light did not reach. The lean is applied **in the vertex shader**, as a flat world
+  distance rather than a per-piece height: the quads are built once per rebuild, and re-laying
+  eighteen thousand of them every time the sun moved is the ~25-30 ms rebuild that layer
+  exists to avoid. A piece of rubbish has no height to lean anyway — the whole shadow slides.
+- Applied before the `DRY_ANCHOR` test, so a piece lying on the beach throws its shadow the
+  same way as one afloat. The anchor decides whether a shadow *bobs*, not whether the sun is out.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips

@@ -110,6 +110,8 @@ func _physics_process(_delta: float) -> void:
 		18:
 			_stage_ending()
 		19:
+			_stage_sun()
+		20:
 			_stage_ending_on_load()
 		_:
 			pass
@@ -1791,6 +1793,35 @@ func _stage_ending() -> void:
 ## a lake finished and reopened came back with the flag already set, the words still owed,
 ## and no way left to say them. A player who cleaned the whole basin and quit got nothing
 ## but a bright lake and silence.
+## The sun: in the southeast all day, so every cast shadow falls to the left of its caster.
+##
+## The painted assets are lit from the right — the shed and the recycle box are measurably
+## brighter down that side — and a lean that crossed zero would light the world from the
+## northwest for half of every loop, putting every shadow on the same side as every
+## highlight. So the guard is the sign over the whole cycle, not any one number: the three
+## leans in day.tres are free to be retuned, and are not free to change side.
+func _stage_sun() -> void:
+	var day := DayCycle.new()
+	add_child(day)
+	var worst := -INF
+	var worst_at := 0.0
+	var lit := 0
+	for step in 200:
+		day.phase = float(step) / 200.0
+		day.call(&"_settle")
+		if day.lean > worst:
+			worst = day.lean
+			worst_at = day.phase
+		if day.ink > 0.0:
+			lit += 1
+	_check(worst < 0.0,
+		"the sun stays in the southeast: every shadow leans left, all loop",
+		"worst lean %.3f at phase %.2f" % [worst, worst_at])
+	_check(lit > 0, "the day is lit at all", "%d of 200 samples" % lit)
+	day.queue_free()
+	_advance()
+
+
 func _stage_ending_on_load() -> void:
 	if _in_stage == 1:
 		# Put the closing words away and forget they were ever shown: what is being tested
