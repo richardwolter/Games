@@ -248,21 +248,24 @@ OPS = {
 }
 
 
-## The recycle mark, as painted on the square sail's lit face: three bent arrows chasing
-## clockwise round a triangle, each a bar folded at one corner with a head at its end.
-## Drawn as geometry and rasterised to the box each heading has for it, so the mark fills
-## the sail's lit face (2026-09-12: a 15 px hand bitmap in the middle of the sail read as a
-## small odd knot; Richard wanted it bigger, centred and with proper arrows). Fractions are
-## of the triangle's side: the bar's thickness, the head's width and length, where along
-## the side into a corner an arrow's tail starts and where past it its head ends, so the
-## gap between one arrow's head and the next one's tail is TAIL - TIP - HEAD_L of a side.
-MARK_THICK = 0.125
-MARK_HEAD_W = 0.36
-MARK_HEAD_L = 0.20
-MARK_TAIL = 0.64
-MARK_TIP = 0.36
-MARK_ZOOM = 8
-MARK_INK_AT = 128
+## The recycle mark, as painted on the square sail's lit face: two curved arrows chasing
+## clockwise round one ring, one over the top and one under, each ending in a chevron head
+## with a gap before the next tail — the mark on the yard's recycle box (assets/
+## Recycle_Box.png), which the ferry serves. Drawn as geometry on a unit canvas and decided
+## pixel by pixel: each frame pixel's centre is mapped back onto the canvas and tested,
+## distance to the ring for the arcs and point-in-triangle for the heads, so an edge is a
+## pixel that is on or off rather than a blurred step (2026-09-12: the earlier three bent
+## arrows round a triangle, drawn at zoom and boxed down, came out ragged, and Richard
+## wanted them round like the box's). Fractions are of the canvas's width: the ring's
+## radius and the bar's thickness, the head's half-width across the ring and its length
+## along it, and the angles: each arc runs MARK_SWEEP from its tail with the head at its
+## end, so the gap between the head and the next tail is what is left of the half turn.
+MARK_RADIUS = 0.39
+MARK_THICK = 0.13
+MARK_HEAD_W = 0.21
+MARK_HEAD_L = 0.24
+MARK_SWEEP = 2.0
+MARK_START = -0.35
 ## The canvas the mark is painted on in each frame that carries it: a parallelogram on the
 ## sail's lit face — top-left, top-right and bottom-left corners in frame pixels, the fourth
 ## implied — measured off the face's white rows with a pixel or two of cloth kept round it.
@@ -283,9 +286,6 @@ MARK_QUAD = {
     3: ((53, 46), (64, 54), (53, 59)),
     4: ((56, 46), (61, 49), (56, 60)),
 }
-## The one-pixel edge round the outside of the mark, on the face's white, so it reads.
-MARK_EDGE = "D"
-
 ## Where the frames turn about: the mast's column, and the water at the axis's depth,
 ## which is the side view's waterline (frame 4, whose whole near side is at that depth).
 ANCHOR_X = 64
@@ -317,111 +317,59 @@ def repaint_hull(frame):
                 px[x, y] = INK["X"]
 
 
-def mark_image(size=256):
-    """The mark drawn square, `size` pixels across, white on black."""
+def mark_on(u, v):
+    """Whether the canvas point (u, v), in a unit square, is under the mark's paint."""
     import math
-    im = Image.new("L", (size, size), 0)
-    d = ImageDraw.Draw(im)
-    side = float(size)
-    t = MARK_THICK * side
-    high = side * math.sqrt(3) / 2
-    cx = size / 2
-    top = (size - high) / 2 + t * 0.5
-    bot = top + high - t * 0.9
-    side = (bot - top) / (math.sqrt(3) / 2)
-    V = [(cx, top), (cx + side / 2, bot), (cx - side / 2, bot)]
-    for k in range(3):
-        a, b, c = V[(k - 1) % 3], V[k], V[(k + 1) % 3]
-        start = (a[0] + (b[0] - a[0]) * MARK_TAIL, a[1] + (b[1] - a[1]) * MARK_TAIL)
-        end = (b[0] + (c[0] - b[0]) * MARK_TIP, b[1] + (c[1] - b[1]) * MARK_TIP)
-        d.line([start, b, end], fill=255, width=int(t), joint="curve")
-        dx, dy = c[0] - b[0], c[1] - b[1]
-        run = math.hypot(dx, dy)
-        ux, uy = dx / run, dy / run
-        nx, ny = -uy, ux
-        hw, hl = MARK_HEAD_W * side / 2, MARK_HEAD_L * side
-        base = (end[0] - ux * t * 0.3, end[1] - uy * t * 0.3)
-        d.polygon([(base[0] + nx * hw, base[1] + ny * hw),
-                   (base[0] - nx * hw, base[1] - ny * hw),
-                   (base[0] + ux * hl, base[1] + uy * hl)], fill=255)
-    return im
+    x, y = u - 0.5, v - 0.5
+    r = math.hypot(x, y)
+    ang = math.atan2(y, x)
+    for k in range(2):
+        tail = MARK_START + math.pi * k
+        along = (ang - tail) % (2 * math.pi)
+        if abs(r - MARK_RADIUS) <= MARK_THICK * 0.5 and along <= MARK_SWEEP:
+            return True
+        # The head: a triangle across the ring at the arc's end, pointing on round it.
+        tip = tail + MARK_SWEEP
+        cx, cy = math.cos(tip) * MARK_RADIUS, math.sin(tip) * MARK_RADIUS
+        fx, fy = -math.sin(tip), math.cos(tip)
+        px, py = x - cx, y - cy
+        f = px * fx + py * fy
+        n = px * math.cos(tip) + py * math.sin(tip)
+        if -MARK_THICK * 0.3 <= f <= MARK_HEAD_L                 and abs(n) <= MARK_HEAD_W * (1.0 - (f + MARK_THICK * 0.3) / (MARK_HEAD_L + MARK_THICK * 0.3)):
+            return True
+    return False
 
 
 def mark_bitmap(quad, mirror=False):
     """The mark laid on the parallelogram `quad` (top-left, top-right, bottom-left, in frame
-    pixels), as a FRAME x FRAME grid of booleans: drawn MARK_ZOOM times over, boxed down,
-    and cut at MARK_INK_AT."""
-    src = mark_image()
-    z = MARK_ZOOM
-    n = src.width
+    pixels), as a FRAME x FRAME grid of booleans: every frame pixel's centre mapped back to
+    the canvas and tested."""
     (tlx, tly), (trx, try_), (blx, bly) = quad
     if mirror:
         tlx, trx, blx = FRAME - 1 - tlx, FRAME - 1 - trx, FRAME - 1 - blx
     ax, ay = trx - tlx, try_ - tly
     bx, by = blx - tlx, bly - tly
     det = float(ax * by - ay * bx)
-    # A zoomed output pixel (x, y) is the frame point (x / z, y / z); its place on the
-    # canvas is (u, v) with point = TL + u * (TR - TL) + v * (BL - TL), and the source
-    # pixel is n * (u, v). AFFINE takes source = (a x + b y + c, d x + e y + f).
-    a = by / det / z * n
-    b = -bx / det / z * n
-    c = (-tlx * by + tly * bx) / det * n
-    d = -ay / det / z * n
-    e = ax / det / z * n
-    f = (tlx * ay - tly * ax) / det * n
-    big = src.transform((FRAME * z, FRAME * z), Image.AFFINE, (a, b, c, d, e, f),
-                        resample=Image.BILINEAR, fillcolor=0)
-    px = big.resize((FRAME, FRAME), Image.BOX).load()
-    return [[px[x, y] >= MARK_INK_AT for x in range(FRAME)] for y in range(FRAME)]
+    # Corners are pixel centres; the canvas runs half a pixel past them.
+    bits = [[False] * FRAME for _ in range(FRAME)]
+    for y in range(FRAME):
+        for x in range(FRAME):
+            dx, dy = x - tlx, y - tly
+            u = (dx * by - dy * bx) / det
+            v = (ax * dy - ay * dx) / det
+            if -0.02 <= u <= 1.02 and -0.02 <= v <= 1.02 and mark_on(u, v):
+                bits[y][x] = True
+    return bits
 
 
 def stamp_mark(frame, quad, mirror=False):
+    """Paint the mark onto the face's own white pixels, and nothing else."""
     bits = mark_bitmap(quad, mirror)
     px = frame.load()
     lit = INK["W"]
-    # Only the face's own white takes paint: the mark is clipped to it, and the edge is
-    # painted only on white beside a painted pixel.
     for y in range(FRAME):
         for x in range(FRAME):
-            if bits[y][x] and px[x, y] != lit:
-                bits[y][x] = False
-    # The edge runs round the outside of the mark only. The hole in the middle and the
-    # gaps between the arms stay cloth: edged as well, they closed up and the three arrows
-    # read as one blob. "Outside" is found on the mark grown by one pixel, which closes the
-    # gaps between the arms, so the flood from the border cannot leak in through them.
-    width = tall = FRAME
-
-    def grown(x, y):
-        return any(0 <= x + dx < width and 0 <= y + dy < tall and bits[y + dy][x + dx]
-                   for dx in (-1, 0, 1) for dy in (-1, 0, 1))
-
-    outside = set()
-    stack = [(x, y) for x in range(-2, width + 2) for y in (-2, tall + 1)]
-    stack += [(x, y) for y in range(-2, tall + 2) for x in (-2, width + 1)]
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in outside or x < -2 or x > width + 1 or y < -2 or y > tall + 1:
-            continue
-        if grown(x, y):
-            continue
-        outside.add((x, y))
-        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-    rim = {(x, y) for x in range(-1, width + 1) for y in range(-1, tall + 1)
-           if (x, y) not in outside and any((x + dx, y + dy) in outside
-                                            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
-    for y, row in enumerate(bits):
-        for x, on in enumerate(row):
-            if not on:
-                continue
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                if (x + dx, y + dy) not in rim:
-                    continue
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < FRAME and 0 <= ny < FRAME and px[nx, ny] == lit:
-                    px[nx, ny] = INK[MARK_EDGE]
-    for y, row in enumerate(bits):
-        for x, on in enumerate(row):
-            if on:
+            if bits[y][x] and px[x, y] == lit:
                 px[x, y] = INK["R"]
 
 

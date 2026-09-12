@@ -378,6 +378,41 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `ui.json` stay only because `tools/slice_shed.gd` cuts the hut off them; nothing draws
   from them at runtime. The shed icon does not track the collection, by decision.
 
+### The Shed and the Box Stand in Grass (`scripts/skirt.gd`, 2026-09-12)
+The hut on the island and the recycle box are front-on pictures set on a lawn, and the row
+of pixels where each ends was a straight cut. `Skirt` grows small painted tufts round both:
+blades drawn as columns of whole art pixels (2-4 tall, 2-4 to a tuft, palette greens), rolled
+off a fixed seed on an isometric ring round the base, split by which side of the base they
+land on — the far half drawn **under** the picture, the near half **over** its bottom edge.
+Hiding the hard edge is the point; a ring drawn only behind it does not do the job.
+- **Baked, one draw call a half** (`Skirt.Patch`, `RenderingServer.canvas_item_add_triangle_array`,
+  the same batching as `Ground._lay_props`). The island redraws every frame, so a few hundred
+  `draw_rect` calls is exactly the cost that put the forest at 15 ms. **Not `draw_polygon`**:
+  it triangulates the points as one outline, and loose pixel quads handed to it fail
+  triangulation and draw nothing.
+- **Static, by decision** — no sway. A batched mesh never has to be rebuilt, and swaying grass
+  at the shed on an island of still grass reads as the only wind in the world.
+- **Painted in code, not pack `Leaves`** — the tufts on the beach and the island are the pack's;
+  these are blades sized and leaned to a base.
+- **The box also spills sand** (`Skirt.spill`): loose single art pixels thinning outwards from
+  its foot, palette `sand`, fading with distance. A spill, not a patch, and nothing in `Ground`
+  knows about it — the box stands on the island's lawn, and this is ground the crate has worn.
+  Its grass ring is wider than `Yard.FOOT_HALF` on purpose: the crate's side corners are out at
+  a tile and a quarter, and a ring at the footprint hides behind the picture.
+- **The shed's contact patch is gone, by decision**: the soft black quad under the hut
+  (`SHED_SHADOW`, alpha 0.11). The grass is what says the hut meets the ground; the quad under
+  a skirt of blades read as a second shadow.
+- **The hut's shadow is rooted at the walls, not at the bottom of the picture**
+  (`Lake.SHED_ART_GROUND` 0.224, `_shed_feet`): `assets/shed.png` paints the isometric diamond
+  the hut stands on, so the art's last row is that diamond's *front point*, some 27 px down the
+  grass from the walls. A shadow pinned there read as belonging to something else. The picture
+  itself has not moved (`SHED_STAND` 0.35 is unchanged) — only what hangs off it. **Re-measure
+  `SHED_ART_GROUND` if the hut is re-cut** (`tools/slice_shed.gd`): it is the diamond's side
+  corners, rows 93 and 103 of 127, as a fraction up from the bottom.
+- **Shed and box only**, this pass. The four dropoff piers have the same hard bottom edge on the
+  bank and are the obvious next ones; trees and rocks are not — they are the pack's own art with
+  their own baked bases.
+
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
 psd-extract left in `art_source/character_extracted/` (source `Character_Sprite_Sheet.psd`).
@@ -762,6 +797,7 @@ room's own coordinates while the picture is the whole window.
 - `scripts/water_splash.gd` — ripple feedback on haul/placement
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
+- `scripts/skirt.gd` — baked painted grass tufts and sand spill round the shed and the box
 - `scripts/sfx.gd` — audio for haul, settling, collection
 
 ---
