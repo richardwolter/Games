@@ -169,5 +169,6 @@
 			]
 		]
 	],
-	"edits": "jib, forestay and floor shadow removed, hull repainted in the recycle box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py"
+	"edits": "jib, forestay and floor shadow removed, hull repainted in the recycle box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py",
+	"sail_over": "assets/boat_sail_over.png \u2014 the sail alone, frame for frame, drawn over the boat's load"
 }

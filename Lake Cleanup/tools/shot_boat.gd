@@ -52,8 +52,9 @@ func _physics_process(_delta: float) -> void:
 			_main.call(&"_set_menu", true)
 
 
-## Under way, pointed, and going nowhere: a boat with no speed keeps its heading and
-## still lays its bow wave and wake.
+## Under way, pointed, and going nowhere: a boat with no speed keeps its heading and still
+## lays its foam. Loaded to the brim, because a full hold is the case worth looking at — an
+## empty one shows nothing and a half one hides whether the heap clears the sail.
 func _point(which: int) -> void:
 	_boat.speed = 0.0
 	_boat.patrol = true
@@ -61,7 +62,10 @@ func _point(which: int) -> void:
 	_boat.heading = HEADINGS[which].normalized()
 	_boat.patrol_at = _boat.tile_pos + _boat.heading * 10.0
 	_boat.target = 0
-	_boat.cargo = PackedInt32Array([0, 1, 2, 3])
+	var load := PackedInt32Array()
+	for i in Boat.HOLD_SHOWN:
+		load.append(i % 6)
+	_boat.cargo = load
 
 
 ## The ferry's board in the shop, at window size: the hull should sit whole-pixelled over

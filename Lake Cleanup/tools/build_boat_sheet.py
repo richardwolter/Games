@@ -22,6 +22,7 @@ Input:
 
 Output:
   assets/boat_sail_frames.png                 the sheet the ferry draws from
+  assets/boat_sail_over.png                   the sail alone, drawn over the ferry's load
   assets/boat_sail_frames.json                what the sheet is and which way frame 0 faces
 
 Run from the project root:
@@ -37,6 +38,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "art_source" / "Blue_Boat" / "blue_boat_16dir.png"
 OUT_PNG = ROOT / "assets" / "boat_sail_frames.png"
 OUT_JSON = ROOT / "assets" / "boat_sail_frames.json"
+## The sail on its own, frame for frame, drawn over the boat's load so the load sits in the
+## hull rather than on top of the picture. Not a cut: it is a *copy* of the sail's pixels off
+## the finished frame, so the main sheet is untouched and nothing can come out with a hole in
+## it — the boat draws the hull, then the load, then this over both.
+OUT_SAIL_PNG = ROOT / "assets" / "boat_sail_over.png"
 
 FRAME = 128
 FRAMES = 16
@@ -490,11 +496,51 @@ def build():
     return frames
 
 
+## What counts as the sail in a finished frame: the cloth, the recycle mark and its edge, and
+## the spars and ropes that touch the cloth — the yard over its head, its foot spar, the
+## bolt rope down its edge — so a piece of rubbish cannot be drawn over the sail's own outline
+## and read as sitting in front of a line it is behind. The mast and the rails do not touch
+## the cloth and stay with the hull, which is right: a load on the foredeck is behind the sail
+## and in front of nothing.
+SAIL_CLOTH = ".WDR"
+SAIL_TOUCHING = "oK" + MARK_EDGE
+
+
+def sail_layer(frame):
+    """A copy of the frame holding its sail and nothing else, transparent elsewhere."""
+    px = frame.load()
+    cloth = {INK[c] for c in SAIL_CLOTH}
+    touching = {INK[c] for c in SAIL_TOUCHING}
+    is_cloth = [[px[x, y] in cloth for x in range(FRAME)] for y in range(FRAME)]
+    keep = [row[:] for row in is_cloth]
+    # One step out from the cloth, measured against the cloth itself and never against what
+    # this loop has already added: grown against the running answer, the step walks the boat's
+    # outline all the way down to the keel and the overlay comes out as the whole hull.
+    for y in range(FRAME):
+        for x in range(FRAME):
+            if keep[y][x] or px[x, y] not in touching:
+                continue
+            if any(0 <= x + dx < FRAME and 0 <= y + dy < FRAME and is_cloth[y + dy][x + dx]
+                   for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                keep[y][x] = True
+    out = Image.new("RGBA", (FRAME, FRAME), (0, 0, 0, 0))
+    over = out.load()
+    for y in range(FRAME):
+        for x in range(FRAME):
+            if keep[y][x]:
+                over[x, y] = px[x, y]
+    return out
+
+
 def write(frames):
     sheet = Image.new("RGBA", (FRAME * FRAMES, FRAME), (0, 0, 0, 0))
     for n, frame in enumerate(frames):
         sheet.paste(frame, (n * FRAME, 0))
     sheet.save(OUT_PNG)
+    over = Image.new("RGBA", (FRAME * FRAMES, FRAME), (0, 0, 0, 0))
+    for n, frame in enumerate(frames):
+        over.paste(sail_layer(frame), (n * FRAME, 0))
+    over.save(OUT_SAIL_PNG)
     OUT_JSON.write_text(json.dumps({
         "source": "art_source/Blue_Boat/blue_boat_16dir.png",
         "frames": FRAMES,
@@ -504,6 +550,8 @@ def write(frames):
         "cut": [[list(at) for at in line] for line in cuts(frames)],
         "edits": "jib, forestay and floor shadow removed, hull repainted in the recycle "
                  "box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py",
+        "sail_over": "assets/boat_sail_over.png — the sail alone, frame for frame, drawn "
+                     "over the boat's load",
     }, indent="\t") + "\n")
 
 
@@ -574,7 +622,8 @@ def main(argv):
     write(frames)
     if "--contact" in argv:
         contact(frames, argv[argv.index("--contact") + 1])
-    print("wrote %s (%d frames)" % (OUT_PNG.relative_to(ROOT), len(frames)))
+    print("wrote %s and %s (%d frames)"
+          % (OUT_PNG.relative_to(ROOT), OUT_SAIL_PNG.relative_to(ROOT), len(frames)))
 
 
 if __name__ == "__main__":

@@ -47,33 +47,6 @@ const WAVE_SPEED := 1.0
 ## How high the hull rides above the tile it is over.
 const RIDE_HEIGHT := 7.0
 
-## The wake, in stern-lengths and hull-widths: how far back it reaches, how wide it opens,
-## how many ripples are in it and how fast they shed backwards down it.
-const WAKE_LONG := 2.2
-const WAKE_WIDE := 0.68
-const WAKE_RIPPLES := 7
-const WAKE_SPEED_OFF := 0.55
-
-## How many slabs the disturbed water behind the hull is built from.
-##
-## One flat polygon was a cone: a hard-edged triangle of pale grey laid on the lake, with a
-## visible line down each side where it stopped being water. Stacking shorter, wider, fainter
-## slabs gives the same shape an edge that runs out instead of ending, which is what lets it
-## sit in the surface rather than on it.
-const WAKE_LAYERS := 4
-
-## How far a ripple's ends may wander from where an even, symmetrical one would put them, as
-## a fraction of its own width, and how much its width and its speed may vary from its
-## neighbours'. A wake is water falling off a hull, and water does not queue.
-const WAKE_WANDER := 0.34
-const WAKE_VARY := 0.3
-
-## How far each ripple bows back towards the stern across its own span, as a fraction of its
-## width. A wake ripple is an arc trailing from the hull, not a chevron: the straight-line
-## vee read as a machined part, and two of them one behind the other read as a chevron
-## pattern rather than as water.
-const WAKE_BOW := 0.42
-
 ## The skimmer's mouth, as a fraction of the hull's beam at radius zero and per level after
 ## it, and how far back off the hull it hangs. Small and tucked in: it is a net on a frame
 ## bolted to the transom, not a trawl.
@@ -88,10 +61,6 @@ const SKIM_TRAIL := HULL_LENGTH * 0.5 * SKIM_BEHIND / TILE_REACH
 
 ## How often a boat under way throws spray off its bow, in seconds, and how big. Small: it is
 ## a work boat at walking pace, not a speedboat.
-## Seconds between the rings a hull leaves in the water under way. Slower than the net's:
-## the boat is bigger, its rings are wider, and packed any tighter they merge into a band.
-const HULL_RIPPLE := 0.22
-
 const BOW_SPRAY := 0.34
 const BOW_SPRAY_SIZE := 0.22
 
@@ -106,22 +75,29 @@ const HULL_WIDTH := 50.0
 const HULL_HEIGHT := 16.0
 
 ## The open hold, as a fraction of the hull: where along it the cargo deck starts and ends,
-## how far across it reaches, and how high above the water it is, in HULL_HEIGHTs. Taken
-## off the drawing — the cabin sits over the stern and the mast is amidships, so the load
-## goes on the foredeck, just ahead of the mast. Kept short of the bow: the frames draw the
-## bow-on deck higher than the plane's projection puts it, and a load laid to the bow rail
-## by the projection floats past the cut bow. It is drawn over the picture, sails and all,
-## by decision (2026-09-11): cutting every heading into a hull layer and a sail layer would
-## have tripled the art.
-const HOLD_FROM := 0.06
-const HOLD_TO := 0.24
-const HOLD_ACROSS := 0.30
-const HOLD_LIFT := 1.4
+## how far across it reaches, and how high above the water it is, in HULL_HEIGHTs. Taken off
+## the drawing — the cabin sits over the stern and the mast is amidships, so the load goes in
+## the well round the mast, on the foredeck side of it. Kept short of the bow: the frames draw
+## the bow-on deck higher than the plane's projection puts it, and a load laid to the bow rail
+## by the projection floats past the cut bow.
+##
+## Down in the boat rather than on top of it (2026-09-12): the lift is what decides whether a
+## piece reads as stowed or as balanced on the deck, and the sail overlay is what lets the
+## load sit round the mast at all — before it, anything that high cut through the cloth.
+const HOLD_FROM := 0.02
+const HOLD_TO := 0.20
+const HOLD_ACROSS := 0.26
+const HOLD_LIFT := 0.55
 
-## How many pieces are drawn in the hold, and how big. A hold packed with forty things is
-## a smear; six is enough to read as laden.
-const HOLD_SHOWN := 6
-const HOLD_SCALE := 0.55
+## How the hold fills: how many pieces are drawn, how big, how many lie in one layer before
+## the next starts on top of them, and how far each layer rides above the one under it, in
+## HULL_HEIGHTs. It fills bottom up like the recycle box — a ferry with one piece aboard has
+## it lying on the boards, and a full one is heaped — rather than spreading flat, which reads
+## as a deck cargo lashed down. Twelve is what a heap needs; six read as a handful.
+const HOLD_SHOWN := 12
+const HOLD_SCALE := 0.5
+const HOLD_LAYER := 4
+const HOLD_STACK := 0.3
 
 ## How many screen pixels one tile of travel covers, for laying things out on the deck in
 ## tiles rather than in pixels.
@@ -130,9 +106,17 @@ const TILE_REACH := 35.777
 ## The sheet of headings: sixteen turns of the PixZels blue boat, one row of square frames,
 ## cut by tools/build_boat_sheet.py (jib, forestay and floor shadow removed). The hull's
 ## waterline length in a frame sets the scale — HULL_LENGTH over it is the two world pixels
-## per art pixel — and the load and the wake are placed against the hull rather than
+## per art pixel — and the load and the foam are placed against the hull rather than
 ## against the frame.
 const FRAMES_PATH := "res://assets/boat_sail_frames.png"
+
+## The sail on its own, frame for frame, from the same builder. Drawn over the load so the
+## load sits in the hull instead of on top of the picture (2026-09-12). It is a *copy* of the
+## sail's pixels rather than a cut, so the main sheet is whole and a missing overlay costs
+## nothing but the layering. This supersedes the 2026-09-11 call that the load draws over the
+## picture, sails and all: that weighed hand-cutting sixteen headings into two layers, and the
+## builder detects the cloth instead.
+const SAIL_OVER_PATH := "res://assets/boat_sail_over.png"
 const FRAMES_META := "res://assets/boat_sail_frames.json"
 const HULL_IN_FRAME := 46.0
 const FRAME_SIDE := 128
@@ -165,6 +149,8 @@ const COLLAR_REACH := 4.0
 const SHADE_GAIN := 3.0
 const SHADE_MOST := 0.7
 
+static var _over_cache: Texture2D
+static var _over_missing: bool = false
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
 static var _anchor := HULL_ANCHOR
@@ -286,7 +272,7 @@ var cargo := PackedInt32Array()
 var tile_pos := Vector2.ZERO
 var dock := Vector2(Iso.CENTRE.x, Iso.CENTRE.y)
 
-## Which way it is pointing on the plane, for the wake and the hull's lean.
+## Which way it is pointing on the plane, for the foam and the hull's lean.
 var heading := Vector2(1.0, 0.0)
 
 ## Wired up by lake.gd. The boat loads straight out of the yard and skims straight out of
@@ -329,6 +315,11 @@ var _dwell: float = 0.0
 var _painted: int = 0
 var _skim_travel: float = 0.0
 var _rng := RandomNumberGenerator.new()
+
+## The hull's drawn shape and its place on the sheet, kept from the frame just drawn so the
+## sail can be laid over the load with the same polygon rather than a second measurement.
+var _hull_mesh := PackedVector2Array()
+var _hull_uvs := PackedVector2Array()
 
 ## The bow wave the hull leaves while under way. See HullFoam.
 var _foam: HullFoam
@@ -507,11 +498,6 @@ func _process(delta: float) -> void:
 			for index in grid.tiles_within(here, BUMP_REACH):
 				grid.bump(index)
 			_shove_aside(here, delta)
-	# The wake drawn under the hull is the boat's own; this is what it leaves behind in the
-	# lake, on the same water everything else disturbs.
-	if splash != null and _under_way():
-		splash.wake(self, position + _screen_heading() * -HULL_LENGTH * 0.5,
-			HULL_WIDTH * 1.1, HULL_RIPPLE)
 	_repaint()
 
 
@@ -547,9 +533,9 @@ func _shove_aside(here: int, delta: float) -> void:
 
 ## Repaint while the hull is moving, and otherwise only when its picture would differ.
 ##
-## A hull under way has a wake that runs on the clock, so it earns its frame. A hull tied up
-## at a yard does not: it is a silhouette and a load, and both of those sit still. The bob
-## on the swell moves the node rather than the drawing, so it costs nothing to skip.
+## A hull under way is followed by foam that runs on the clock, so it earns its frame. A hull
+## tied up at a yard does not: it is a silhouette and a load, and both of those sit still. The
+## bob on the swell moves the node rather than the drawing, so it costs nothing to skip.
 func _repaint() -> void:
 	if _under_way():
 		queue_redraw()
@@ -934,7 +920,7 @@ static func _swell(x: float, t: float) -> float:
 
 
 ## The ferry, drawn from its sheet of headings, plus the parts that are not the boat: its
-## wake, its load and its skimmer.
+## foam, its load and its skimmer.
 ##
 ## The hull is a picture per heading rather than one picture turned. A boat is not a flat
 ## card: seen on an isometric plane, one pointing away from the camera shows its stern and
@@ -954,11 +940,9 @@ func _draw() -> void:
 	var along := _screen_heading()
 	var across := Vector2(-along.y, along.x)
 
-	# The wake, first, so the hull sits in it. Only while actually moving — a docked boat
-	# throwing a wake is the kind of detail that reads as broken.
-	if _under_way():
-		_draw_wake(half_l, half_w, along, across)
-
+	# No wake under the hull, by decision (2026-09-12): the pale wedge with arcs shedding
+	# down it, and the rings dropped behind the stern, are both gone. What a boat leaves is
+	# the foam it drags, and that is HullFoam's job.
 	# The skimmer, trailing off the stern. Drawn before the hull so it sits behind it, and
 	# only once one is fitted, because it is the visible difference a bought upgrade makes.
 	if skim_radius >= 0:
@@ -966,10 +950,11 @@ func _draw() -> void:
 
 	_draw_hull(half_l, half_w, ink)
 
-	# The load, sitting in the hold rather than on top of the boat. A laden ferry and an
-	# empty one have to be different silhouettes, or the run has nothing to show for
-	# itself — but it has to look stowed, so the rows are laid out along the hull between
-	# the cabin and the foredeck and are drawn back to front.
+	# The load, down in the hold round the mast. A laden ferry and an empty one have to be
+	# different silhouettes, or the run has nothing to show for itself. It fills from the
+	# bottom up like the recycle box it is feeding: the first pieces lie on the boards and
+	# later ones heap on top of them, each row drawn back to front. Then the sail goes over
+	# the lot, so nothing in the hold cuts through the cloth.
 	if grid != null:
 		var shown := mini(cargo.size(), HOLD_SHOWN)
 		for i in shown:
@@ -977,6 +962,7 @@ func _draw() -> void:
 			draw_set_transform(spot, 0.0, Vector2(HOLD_SCALE, HOLD_SCALE))
 			grid.defs[cargo[i]].stamp_iso(self)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_sail_over()
 
 	# No pennant, by decision (2026-09-12): the flag in the colour of the yard it was running
 	# to was a cue nobody needed, and the yards' own tints already tell the piers apart.
@@ -1004,7 +990,10 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 		for at in cut_line(index):
 			line.append((at - _anchor) * scale)
 		_collar.lay(line)
+		_hull_mesh = points
+		_hull_uvs = uvs
 		return
+	_hull_mesh = PackedVector2Array()
 	_shade.visible = false
 	_collar.visible = false
 
@@ -1021,97 +1010,21 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 	draw_polyline(closed, ink, 1.6)
 
 
+## The sail again, over whatever has been drawn since the hull — which is the load. The same
+## polygon and the same texture coordinates the hull was drawn with, so the two line up by
+## construction rather than by a second measurement that could drift.
+func _draw_sail_over() -> void:
+	var over := _sail_over()
+	if over == null or _hull_mesh.is_empty():
+		return
+	draw_polygon(_hull_mesh, PackedColorArray([Color.WHITE]), _hull_uvs, over)
+
+
 ## Under way, as opposed to sitting at a berth or a merchant with the engine idling.
 func _under_way() -> bool:
 	return (
 		state == State.SAILING or state == State.RETURNING or state == State.PATROL
 	)
-
-
-## The wake: disturbed water off the stern with arcs shedding backwards down it.
-##
-## The wedge alone was still: correct in shape and dead as a photograph, which under a moving
-## hull reads as a grey plate the boat is sitting on. What makes water look like water is
-## that it keeps arriving — so the arcs are spaced along the wedge and slid backwards with
-## time, each fading as it goes, and a new one appears at the stern as the last one dies.
-##
-## Everything that made the old one look machined is gone. One hard polygon has become a
-## stack of fainter ones, so the wake has no outline; the chevrons have become arcs that bow
-## back the way water peels off a hull; and every arc gets its own width, its own drift and
-## its own offset off the centreline, so no two are the same shape and the pattern never
-## repeats down the length of it. The jitter is hashed off the arc's own index rather than
-## drawn from `_rng`, because it has to be the same jitter every frame — rolled fresh, the
-## wake boils.
-func _draw_wake(half_l: float, half_w: float, along: Vector2, across: Vector2) -> void:
-	var stern := -along * half_l * 0.85
-	var length := half_l * WAKE_LONG
-
-	# The disturbed water, as overlapping slabs rather than one wedge: each shorter and
-	# wider and fainter than the last, so the sides fray out into the lake instead of
-	# ending on a line. Off-centre by a little, because a hull throws more water one side
-	# than the other and a perfectly balanced wake is the tell that this is geometry.
-	for layer in WAKE_LAYERS:
-		var t := float(layer) / float(WAKE_LAYERS - 1)
-		var reach := length * lerpf(1.0, 0.34, t)
-		var wide := half_w * WAKE_WIDE * lerpf(0.72, 1.35, t)
-		var skew := across * half_w * 0.16 * (_wake_noise(layer, 3.1) * 2.0 - 1.0)
-		var tail := stern - along * reach + skew
-		draw_colored_polygon(
-			PackedVector2Array([
-				stern + across * half_w * 0.2,
-				stern - across * half_w * 0.2,
-				tail - across * wide,
-				tail + across * wide,
-			]),
-			Color(1.0, 1.0, 1.0, 0.035)
-		)
-
-	for i in WAKE_RIPPLES:
-		# Each arc's own place along the wedge, sliding back and wrapping round, at its own
-		# pace so the spacing between them keeps changing.
-		var pace := lerpf(1.0 - WAKE_VARY, 1.0 + WAKE_VARY, _wake_noise(i, 7.7))
-		var speed := WAKE_SPEED_OFF * pace
-		var down := fposmod(float(i) / float(WAKE_RIPPLES) + _time * speed, 1.0)
-		var wide := half_w * lerpf(0.3, WAKE_WIDE, down)
-		wide *= lerpf(1.0 - WAKE_VARY, 1.0 + WAKE_VARY, _wake_noise(i, 1.3))
-		var at := stern - along * (length * down)
-		# Off the centreline, and by a different amount at each end: this is the one thing
-		# that stops a row of arcs reading as a stencil.
-		at += across * wide * WAKE_WANDER * (_wake_noise(i, 2.9) * 2.0 - 1.0)
-		var left := wide * lerpf(1.0 - WAKE_WANDER, 1.0 + WAKE_WANDER, _wake_noise(i, 5.2))
-		var right := wide * lerpf(1.0 - WAKE_WANDER, 1.0 + WAKE_WANDER, _wake_noise(i, 8.6))
-		# Fades in off the stern and out at the tail, so neither end pops.
-		var fade := sin(down * PI) * 0.2 * lerpf(0.7, 1.2, _wake_noise(i, 4.4))
-		draw_polyline(
-			_wake_arc(at, along, across, left, right), Color(1.0, 1.0, 1.0, fade), 1.5
-		)
-
-
-## One arc of the wake: a curve bowing back towards the stern, longer on one side than the
-## other. Built point by point rather than as a polyline through three corners, because the
-## corners were what read as a chevron.
-func _wake_arc(
-	at: Vector2, along: Vector2, across: Vector2, left: float, right: float
-) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	var steps := 8
-	for step in steps + 1:
-		# -1 at the left tip, 0 on the centreline, 1 at the right.
-		var u := lerpf(-1.0, 1.0, float(step) / float(steps))
-		var reach := left if u < 0.0 else right
-		# Squared, so the arc is flat through the middle and turns hard at the tips, which
-		# is the shape water peeling off a hull actually leaves.
-		out.append(
-			at + across * u * reach + along * (1.0 - u * u) * maxf(left, right) * WAKE_BOW
-		)
-	return out
-
-
-## Fixed noise for the wake, 0 to 1, from an arc's index and a salt. Hashed rather than
-## random: the same arc has to come out the same shape every frame it is drawn.
-func _wake_noise(i: int, salt: float) -> float:
-	var h := sin(float(i) * 12.9898 + salt * 78.233 + float(rng_seed) * 0.017) * 43758.5453
-	return fposmod(h, 1.0)
 
 
 ## The skimmer: the angler's own net, lying open on the water and trailing off the stern.
@@ -1159,16 +1072,26 @@ func _draw_skimmer(
 ## screen offsets floats half of it off the side of the hull.
 func hold_spot(i: int, shown: int) -> Vector2:
 	var beam := Vector2(-heading.y, heading.x).normalized()
-	var rows := maxf(float((shown - 1) / 2), 1.0)
-	var down_hold := float(i / 2) / rows
-	var across_hold := -1.0 if i % 2 == 0 else 1.0
+	# Which layer this piece is in and where it sits within it. A layer is HOLD_LAYER pieces
+	# laid out over the well; the next starts on top once it is full, so the heap grows
+	# upwards and the boat is visibly laden before it is visibly full.
+	var layer := i / HOLD_LAYER
+	var within := i % HOLD_LAYER
+	var rows := maxf(float((HOLD_LAYER - 1) / 2), 1.0)
+	var down_hold := float(within / 2) / rows
+	var across_hold := -1.0 if within % 2 == 0 else 1.0
 	if shown == 1:
 		across_hold = 0.0
+	# Each layer sits a little further aft and a little narrower than the one under it, so a
+	# heap comes to a point rather than standing as a column.
+	var taper := 1.0 - 0.18 * float(layer)
 	var in_tiles := (
-		heading.normalized() * lerpf(HOLD_FROM, HOLD_TO, down_hold) * (HULL_LENGTH / TILE_REACH)
-		+ beam * across_hold * (HULL_WIDTH / TILE_REACH) * HOLD_ACROSS * 0.5
+		heading.normalized() * lerpf(HOLD_FROM, HOLD_TO, down_hold) * taper
+		* (HULL_LENGTH / TILE_REACH)
+		+ beam * across_hold * (HULL_WIDTH / TILE_REACH) * HOLD_ACROSS * 0.5 * taper
 	)
-	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -HULL_HEIGHT * HOLD_LIFT)
+	var lift := HULL_HEIGHT * (HOLD_LIFT + HOLD_STACK * float(layer))
+	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -lift)
 
 
 ## Which frame shows the boat pointing the way it is pointing: how far round the compass
@@ -1273,6 +1196,15 @@ static func _ink_box(sheet: Texture2D, index: int) -> Rect2i:
 
 
 ## The sheet, loaded once and shared by every hull in the fleet, with its json.
+## The sail-only sheet, loaded once for every boat, or null when it has not been built.
+static func _sail_over() -> Texture2D:
+	if _over_cache == null and not _over_missing:
+		if ResourceLoader.exists(SAIL_OVER_PATH):
+			_over_cache = load(SAIL_OVER_PATH) as Texture2D
+		_over_missing = _over_cache == null
+	return _over_cache
+
+
 static func _sheet() -> Texture2D:
 	if _sheet_cache == null and not _sheet_missing:
 		if ResourceLoader.exists(FRAMES_PATH):

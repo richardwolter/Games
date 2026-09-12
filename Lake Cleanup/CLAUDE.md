@@ -420,6 +420,27 @@ the whole job.
 - **The shed's contact patch is gone, by decision**: the soft black quad under the hut
   (alpha 0.11). The grass is what says the hut meets the ground; the quad under a skirt of
   blades read as a second shadow.
+- **The hut is 1.2x bigger, and its footprint is measured off the art** (`Iso.SHED_TALL` 141.6,
+  `SHED_FOOT` 1.15 x 0.83, 2026-09-12). The footprint was an ellipse of 1.70 x 1.40 — sized to
+  hold a walker clear of the whole picture, eaves and all, which cost most of a tile of grass
+  on every side and made the hut feel round to walk round. It is now **a rectangle in tile
+  space, the diamond the walls stand on**, exactly as `Yard.covers` treats the crate, and the
+  angler slides along its faces (`Angler._slide`) instead of being handed to the shore's
+  curve. You may stand against the wall and under the eaves, as you may against the box.
+- **And the hut stands where it is drawn** (`Iso.shed_centre`, `SHED_STAND`, `SHED_ART_GROUND`):
+  the picture's bottom row is the near corner of the walls' base, so the building stands about
+  two thirds of a tile north of the island's middle — and the footprint, `_shed_front`, the
+  layer test, the door's range (`_at_shed`) and the lamp were all measured from the middle.
+  A walker was stopped short of the near wall and could stand inside the far one. The drawing
+  numbers live in `Iso` now, because the walkers need them too; drawing off one number and
+  colliding off another is how they drifted. `test_lake` guards both ends — the footprint
+  against the corners measured in the art, and `_shed_front` against the drawn near corner.
+- **A dog inside the footprint can walk out of it** (`Dog._may_stand`): the rule is only
+  enforced on an animal that is outside already, the way the crate's always was. It was not,
+  so a dog that started inside (an old save, or the hut growing under it) was walled in.
+- **The island's tufts keep clear of the picture, not of the footprint** (`Iso.SHED_COVER`):
+  they draw under the hut, so one inside it is wasted rather than wrong — but the walkers must
+  not inherit that clearance, which is what the old single number did.
 - **The hut's shadow is rooted where the building stands, not at the bottom of the picture**
   (`Lake.SHED_ART_GROUND` 0.224, `_shed_feet`): the walls' feet are an isometric diamond and the
   art's last row is that diamond's **near corner**, some 27 px down the grass from the middle of
@@ -495,12 +516,39 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   shadow. `tools/shot_boat.tscn` logs the sun and the shade node beside its pictures
   (`tools/last_boat.log`), since a missing shadow can be either. The shop board draws the same
   polygon (`Polygon2D`, `cut` from `art_frame`).
-- **Cargo draws over the picture**, sails and all, on the foredeck just ahead of the mast
-  (`HOLD_FROM` 0.06 to `HOLD_TO` 0.24, `HOLD_LIFT` 0.9 hull heights). Kept short of the
-  bow: laid to the rail by the plane's projection it floated past the cut bow end on,
-  because the frames draw that deck higher than the projection puts it. Cutting each
-  heading into hull and sail layers would have tripled the art; not drawing the load loses
-  the laden-ferry read. Richard's call.
+- **Cargo sits in the hull, behind the sail** (2026-09-12): `tools/build_boat_sheet.py`
+  writes a second sheet, `assets/boat_sail_over.png`, holding the sail alone frame for
+  frame, and `Boat` draws the hull, then the load, then that over both — same polygon, same
+  texture coordinates (`_hull_mesh`/`_hull_uvs`), so the two line up by construction. The
+  overlay is a **copy** of the sail's pixels, not a cut, so the main sheet is whole and a
+  missing overlay costs only the layering. What counts as sail is the cloth, the recycle
+  mark and its edge, plus the spars and ropes that **touch** the cloth (`SAIL_CLOTH`/
+  `SAIL_TOUCHING`) — the mast and the rails do not touch it and stay with the hull, which is
+  right: a load on the foredeck is behind the sail and in front of nothing. **Grow that one
+  step against the cloth, never against the running answer** — grown against itself it walks
+  the outline down to the keel and the overlay comes out as the whole boat.
+  This **supersedes the 2026-09-11 call** that the load draws over the picture, sails and
+  all: that weighed hand-cutting sixteen headings into two layers, and the builder detects
+  the cloth instead.
+- **The hold fills bottom up, like the box it feeds** (`hold_spot`, 2026-09-12): the load
+  lies in the well round the mast (`HOLD_FROM` 0.02 to `HOLD_TO` 0.20, `HOLD_LIFT` 0.55 hull
+  heights — down in the boat, which only the overlay makes possible), `HOLD_LAYER` (4) pieces
+  to a layer, each layer `HOLD_STACK` (0.3) hull heights above the last and tapered in, so a
+  ferry with one piece aboard has it on the boards and a full one is heaped. `HOLD_SHOWN` is
+  12; six read as a handful. Kept short of the bow: laid to the rail by the plane's
+  projection it floated past the cut bow end on, because the frames draw that deck higher
+  than the projection puts it.
+- **No wake and no rings**, by decision (2026-09-12): the pale wedge of slabs behind the
+  stern with arcs shedding down it (`_draw_wake`, `_wake_arc`, `_wake_noise`, every `WAKE_*`)
+  and the ripple rings dropped into the splash layer every `HULL_RIPPLE` are both gone. What
+  a boat leaves is foam it drags, not water it sits on — see `HullFoam` below. Nothing else
+  in the lake stopped making rings.
+- **The foam is four streaks, and the trail is two of them** (`hull_foam.gd`, 2026-09-12):
+  the pair that hug the hull are as they were; behind them a pair that start tucked further
+  in (`TRAIL_HUG`), leave the hull sooner (`TRAIL_HUG_UNTIL`), open much wider
+  (`TRAIL_SPREAD`), run `TRAIL_LONG` (2.5) half-lengths back and draw at `TRAIL_FADE`. The
+  trail drawn first, so the bow's own wave sits over it where they cross. One shader, four
+  strips, by decision: a separate stern system would be the wedge again under another name.
 - **The hull wears the yard box's brown, and the sail its mark** (2026-09-12,
   `repaint_hull`/`MARK`/`MARK_AT` in the builder): the sheet's one hull-plank colour
   (122,66,34) is repainted to `Style.BOX` (120,89,64) — hull planks only, by decision; deck
@@ -540,7 +588,9 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
 - **Not yet retired**: `tools/bake_boat.gd` and the Kenney sheet `assets/boat_frames.png`
   it bakes, kept until the sail boat is judged in play. `tools/shot_boat.tscn` (desktop
   build, not `--headless`) saves three close crops of the ferry under way,
-  `tools/last_boat_N.png`, for checking that the anchor puts the hull on the water.
+  `tools/last_boat_N.png`, for checking that the anchor puts the hull on the water. It loads
+  the boat to `HOLD_SHOWN` — a full hold is the case worth looking at, an empty one shows
+  nothing and a half one hides whether the heap clears the sail.
 - **Open**: the bow-foam streaks (`HullFoam`, `HUG` at a constant `SQUASH`) sit inside the
   hull's silhouette in the side and end-on views and only show where they spread past the
   stern — as they did under the old hull. A heading-aware across scale would fix it.
