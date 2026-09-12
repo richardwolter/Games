@@ -269,12 +269,47 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `board` key from `Lake._shop_rows`; a track added to `TRACKS` needs one.
 
 - **The settings are a drawn board too** (`settings_skin.gd`, 2026-09-11): one board in the
-  shop's wood — plank title, three plank section headings (Sound, Screen, Save), switches and
-  sliders drawn on clipped plates, the quit alone at the bottom. It owns the state
-  (`music_on`, `music_level`, `sfx_on`, `sfx_level`, `fullscreen`, `can_load`) and emits
-  signals; the lake reads and sets those, save and load included. The stock Controls and
-  their WoodUI theming are gone from the settings; WoodUI still dresses the remaining scene
-  buttons. The shared plate/plank/grain/chip drawing lives in `style.gd`.
+  shop's wood — plank title, then Music and Sound effects each as **one plate two lines
+  tall** (label and switch over a full-width volume groove), Fullscreen, the level swap, and
+  the quit alone at the bottom. It owns the state (`music_on`, `music_level`, `sfx_on`,
+  `sfx_level`, `fullscreen`) and emits signals; the lake reads and sets those. The stock
+  Controls and their WoodUI theming are gone from the settings; WoodUI still dresses the
+  remaining scene buttons. The frame and title plank are `Style.board_frame`/`board_ribbon`,
+  the same as the shop's.
+  **Retired, by decision** (2026-09-11): the plank section headings (Sound / Screen / Save)
+  and their seam lines; the separate slider plates; the *Save the run* and *Load the last
+  save* rows **and the F5/F9 keys with them**. Saving is automatic — `Lake.AUTOSAVE_EVERY`
+  (20 s), the window's close request, and *Save and quit* — and the game loads on start. A
+  crash costs at most the 20 s; that was weighed and kept. Don't put a save button back.
+
+- **The bites out of the wood are holes** (`Style.frame_bites`/`ribbon_bites`/`button_bites`,
+  `carved`, `fill_carved`, `line_carved`, `rims`, 2026-09-11): every plank and frame is
+  drawn as a polygon with its bites cut out (`Geometry2D.clip_polygons`), grain and highlight
+  runs skip the bites, and each hole is ringed in one pixel of pure black (`Style.HOLE_RIM`).
+  What is behind the wood shows through — the lake through an outer frame, the board face
+  through a title plank. `Style.chip` (a painted brown rim, darker hollow and lit lip) is
+  gone; anything that wants a bite passes `bites` to `plank`. **All drawn wood at once**, by
+  decision — it is one set of functions. The pollution meter is painted art and keeps its
+  painted crevices; repaint it if the mismatch ever reads.
+
+- **The upgrades rows say their level in blue** (`Style.LEVEL_INK`, 2026-09-11): `Lake._shop_rows`
+  hands `level` ("(Lvl n)") as its own field and `ShopSkin._draw_row` writes it after the
+  name in the clean water's blue, dimmed with the row when it cannot be bought. Not the gold:
+  gold on this board is a price.
+
+- **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
+  2026-09-11): the boards' oak frame (`FRAME` 7, one bite a side) round a dark `BOARD` face.
+  *Upgrades* (132x84): the landed net dimmed behind, the ferry in from the left, the dog
+  (`DogArt` idle, facing in) from the right, a black-ringed green (`SAFE`) block arrow large
+  in the middle, the "n available" panel across the foot. *Shed* (104x84): three fixed
+  finds (`Lake.BUTTON_DECOR`, clean views) along the back, the hut in front. *Money*: as wide
+  as the stock plate over it, a drawn gold coin on the left and the running figure on a
+  sunken panel to its right; the swell-and-shine on payment stays. Same places as before.
+  The lake lends the sprites once (`Lake._lend_button_art`) to `HudSkin.sprites` and the
+  static `UiButton.sprites`, so the shed's copy of the upgrades button is the same drawing.
+  **Retired**: `assets/buttons.png`/`.json` and `tools/slice_buttons.gd`. `assets/ui.png`/
+  `ui.json` stay only because `tools/slice_shed.gd` cuts the hut off them; nothing draws
+  from them at runtime. The shed icon does not track the collection, by decision.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
@@ -411,7 +446,7 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   will not fit.
 - **It is its own Control** only so `modulate.a` can fade the whole thing to `LIST_BUSY`
   while a piece is carried. Threading an alpha through `Style.plank`/`grain`/`highlight`/
-  `chip` would put an extra argument on every shared drawing helper in the game. The shelf
+  `rims` would put an extra argument on every shared drawing helper in the game. The shelf
   holds no state: `ShedRoom._dress_shelf` hands it rects and rows each draw, measured once
   and reused by `_listed_at`/`_hovered_row`, so drawn rows and clicked rows cannot drift.
   It ignores the mouse; the room still takes every click.

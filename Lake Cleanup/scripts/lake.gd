@@ -831,6 +831,7 @@ func _ready() -> void:
 			if _sheets.has(StringName(slug)):
 				catch.append({"sheet": _sheets.atlas, "region": _sheets.region_of(StringName(slug))})
 		_shop_skin.sprites[&"catch"] = catch
+	_lend_button_art(ferry, mesh)
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
@@ -849,8 +850,6 @@ func _ready() -> void:
 	_settings.sfx_level_changed.connect(_set_sfx_level)
 	_push_sfx()
 	_settings.quit_pressed.connect(_quit)
-	_settings.save_pressed.connect(save_game)
-	_settings.load_pressed.connect(load_game)
 	_settings.wipe_pressed.connect(wipe_save)
 	_settings.swap_label = _other_level_name()
 	_settings.swap_pressed.connect(_swap_levels)
@@ -873,6 +872,31 @@ func _ready() -> void:
 		load_game()
 	start_fresh = false
 	_seed_starter_bed()
+
+
+## What the corner buttons draw (`hud_buttons.gd`): the net and ferry the shop was lent,
+## the hut, and a fixed three finds off the clean sheet for the shed to stand in front of.
+## Handed to the HUD and to the shed's copy of the upgrades button alike, so they are one
+## button. Whatever is missing is left out, and the button draws without it.
+const BUTTON_DECOR := [&"decor_sofa", &"decor_standing_lamp", &"decor_mirror"]
+
+
+func _lend_button_art(ferry: Dictionary, mesh: Dictionary) -> void:
+	var lent := {}
+	if not ferry.is_empty():
+		lent["boat"] = ferry
+	if not mesh.is_empty() and _net.art_sheet() != null:
+		lent["net"] = {"sheet": _net.art_sheet(), "region": mesh["region"]}
+	if _shed_art != null:
+		lent["shed"] = _shed_art
+	if _sheets != null and _sheets.atlas != null:
+		var decor: Array = []
+		for slug: StringName in BUTTON_DECOR:
+			if _sheets.has(slug):
+				decor.append({"sheet": _sheets.atlas, "region": _sheets.view_region_of(slug, 0)})
+		lent["decor"] = decor
+	_skin.sprites = lent
+	UiButton.sprites = lent
 
 
 ## The bank: the land the lake sits in, drawn as the shore ring grown outward. Two flat
@@ -1330,12 +1354,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M:
 				_settings.music_on = not _settings.music_on
 				_push_music()
-				return
-			KEY_F5:
-				save_game()
-				return
-			KEY_F9:
-				_note_save("nothing to load" if not load_game() else "loaded")
 				return
 			KEY_F6:
 				wipe_save()
@@ -2155,7 +2173,10 @@ func _shop_rows() -> Array:
 		out.append({
 			"key": key,
 			"board": line[1],
-			"name": "%s (Lvl %d)" % [line[2], _level_of(key)],
+			"name": line[2],
+			# Its own field, not part of the name: the shop draws it in the clean water's blue
+			# so the level stands off the name (2026-09-11).
+			"level": "(Lvl %d)" % _level_of(key),
 			"value": line[3],
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
@@ -2765,7 +2786,6 @@ func _update_hud() -> void:
 	# player is inside.
 	_open_upgrades.note = "%d available" % affordable
 	_skin.hint = _last_pieces_line()
-	_settings.can_load = has_save()
 
 	if not _menu_open:
 		return

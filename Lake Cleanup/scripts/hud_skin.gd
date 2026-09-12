@@ -1,9 +1,8 @@
 ## The drawn HUD: the pollution meter and the three wooden buttons.
 ##
 ## One node draws the lot and takes the clicks for it, the way the flock and the splashes
-## do. The alternative was four scene nodes with four textures, and the textures are cut out
-## of a sheet at runtime — the same bargain the net and the pigeons strike, so that the game
-## runs with the art missing rather than failing to load.
+## do. The three buttons are drawn wood (`hud_buttons.gd`) carrying the game's own sprites,
+## lent by the lake into `sprites`; they were painted plaques off a sheet until 2026-09-11.
 ##
 ## The meter is the one thing here that is assembled rather than drawn: four sheets of art
 ## (`assets/ui/meter/`) stacked as child nodes, the water between them a shader that slides
@@ -15,11 +14,7 @@ class_name HudSkin
 extends Control
 
 const Style := preload("res://scripts/style.gd")
-
-## The books of cut pieces, in the order they are read. The first is the original sheet, the
-## second the repainted money and upgrades plaques; a piece named in a later book replaces
-## the one before it, so a repaint is a file added here rather than a sheet re-cut.
-const ART := ["res://assets/ui.json", "res://assets/buttons.json"]
+const HudButtons := preload("res://scripts/hud_buttons.gd")
 
 ## How fast the drawn waterline chases the real one, as a fraction of the gap a second. The
 ## lake cleans up a piece at a time and the meter would tick; sliding it is the whole reason
@@ -61,11 +56,14 @@ const METER_SCALE_LINES := 1080.0
 ## does not fade off the left of its own track.
 const METER_FEATHER := 0.14
 
-## The side of a button, in screen pixels, and how much bigger the money plate is than the
-## two that are actually buttons. It is the number the player checks before every purchase
-## and it carries a figure that has to be read, not just recognised.
-const BUTTON_SIDE := 84.0
-const MONEY_SIDE := 116.0
+## The buttons, in screen pixels. Not squares any more: the upgrades button is wide enough
+## for the ferry and the dog to flank its arrow, the shed's for the finds to stand behind
+## the hut, and the money plate is as wide as the stock plate over it and as tall as its
+## coin — two slabs of one width read as a pair, where a square under a slab read as
+## lopsided.
+const UPGRADES_SIZE := Vector2(132.0, 84.0)
+const SHED_SIZE := Vector2(104.0, 84.0)
+const MONEY_TALL := 52.0
 
 ## Gaps: around the whole thing, and between the buttons.
 const EDGE := Style.EDGE
@@ -94,13 +92,9 @@ const STOCK_GLOW := 0.5
 const STOCK_SAMPLE := "99999"
 const STOCK_PAD := 12.0
 
-## The count written across the foot of the upgrades plaque: where its panel sits inside the
-## plaque as fractions of it, and how big the lettering is against that panel's height.
-##
-## Placed to match the money plate rather than measured off the art, because matching it is
-## the point — the two plaques hang in the same band of the screen and a reading in a
-## different place on each would read as two unrelated things.
-const AVAILABLE_PLATE := Rect2(0.09, 0.715, 0.82, 0.16)
+## The count written across the foot of the upgrades button: how tall its panel is and how
+## big the lettering is against that height.
+const AVAILABLE_TALL := 14.0
 const AVAILABLE_TEXT := 0.8
 
 ## The smallest the count may be lettered at. The plaque is eighty-odd pixels on a side and
@@ -109,12 +103,11 @@ const AVAILABLE_TEXT := 0.8
 ## reading.
 const AVAILABLE_LEAST := 8
 
-## Where the money plate sits inside the money button, as fractions of it, and how far in
-## from its left edge is a good place to read its own colour from. Measured off the art —
-## the plate is a flat dark panel with the figures sitting on it, so a patch of it copied
-## over the baked-in number is an honest way to make room for a live one.
-const PLATE := Rect2(0.085, 0.775, 0.83, 0.165)
-const PLATE_CLEAR := 0.03
+## The sprites the buttons carry, lent by the lake — see `hud_buttons.gd` for the keys.
+var sprites := {}:
+	set(v):
+		sprites = v
+		queue_redraw()
 
 ## Emitted when the buttons are pressed. The lake decides what a shed is.
 signal shed_pressed
@@ -156,9 +149,6 @@ var _shown_stock: float = 0.0
 var _stock_glow: float = 0.0
 var _shine: float = 0.0
 
-var _sheet: Texture2D
-var _pieces := {}
-
 var _shown: float = 1.0
 
 ## The meter's nodes, built once in `_build_meter`: the water sheet with its shader, the
@@ -189,55 +179,11 @@ var _painted: int = 0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_load_art()
 	_build_meter()
 	_shown = pollution
 	_show_meter()
 	_lay_out()
 	resized.connect(_lay_out)
-
-
-## Read the cut sheets. False means no art at all, and the HUD draws nothing rather than
-## boxes — the lake keeps its plain labels either way.
-##
-## Each piece carries the texture it was cut from rather than every piece sharing one, so a
-## repainted plaque can arrive on a sheet of its own without the rest being redrawn to match.
-func _load_art() -> bool:
-	for path: String in ART:
-		_read_book(path)
-	return not _pieces.is_empty()
-
-
-## One book of pieces, added over whatever is already loaded. A missing or broken book is
-## simply skipped: the first one is the whole HUD and the second is two repainted plaques,
-## and either should be able to go missing without taking the other with it.
-func _read_book(path: String) -> void:
-	var text := FileAccess.get_file_as_string(path)
-	if text.is_empty():
-		return
-	var book: Dictionary = JSON.parse_string(text)
-	if book == null or not book.has("pieces"):
-		return
-	var sheet := Art.texture(book["sheet"])
-	if sheet == null:
-		return
-	if _sheet == null:
-		_sheet = sheet
-
-	for name: String in book["pieces"]:
-		var piece: Dictionary = book["pieces"][name]
-		var box: Array = piece["region"]
-		# The meter piece's own "water"/"shown" fields (where its baked waterline used to
-		# fall) went with the baked meter art — the meter has its own sheets now
-		# (`_build_meter`), so they are no longer kept.
-		var kept := {"region": Rect2(box[0], box[1], box[2], box[3]), "sheet": sheet}
-		# Where the blank panel a live figure is written on sits inside the plaque, as
-		# fractions of it. Measured by the slicer; a piece without one is old art with a
-		# number painted on it, and the plate is patched over instead. See `_plate_of`.
-		if piece.has("plate"):
-			var plate: Array = piece["plate"]
-			kept["plate"] = Rect2(plate[0], plate[1], plate[2], plate[3])
-		_pieces[StringName(name)] = kept
 
 
 ## Where everything sits: the meter in the bottom left corner, the two buttons in the top
@@ -273,21 +219,18 @@ func _lay_out() -> void:
 	# than hung under the meter. The right-hand corner is theirs now that Settings has gone
 	# to the bottom of the screen, and a row that starts at the same height on both sides
 	# reads as one band across the top instead of as three separate corners.
-	var right := wide - EDGE - BUTTON_SIDE
-	_upgrades_box = Rect2(right, EDGE, BUTTON_SIDE, BUTTON_SIDE)
-	_shed_box = Rect2(right - BUTTON_SIDE - GAP, EDGE, BUTTON_SIDE, BUTTON_SIDE)
+	var right := wide - EDGE - UPGRADES_SIZE.x
+	_upgrades_box = Rect2(Vector2(right, EDGE), UPGRADES_SIZE)
+	_shed_box = Rect2(Vector2(right - SHED_SIZE.x - GAP, EDGE), SHED_SIZE)
 	var stock_wide := (
 		STOCK_PAD * 2.0 + (STOCK_TALL - STOCK_MARK_PAD * 2.0) + STOCK_MARK_PAD
 		+ Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
 		+ Style.measure(STOCK_SAMPLE, Style.TEXT_HEAD).x + 16.0
 	)
 	_stock_box = Rect2(EDGE + 2.0, EDGE, stock_wide, STOCK_TALL)
-	# Centred under the stock plate rather than sharing its left edge: they are two different
-	# widths (a wide slab and a square plate), and a shared left edge left their right edges,
-	# and the whole pair, looking lopsided.
+	# The same width as the stock plate, under it: two slabs of one width.
 	_money_box = Rect2(
-		_stock_box.position.x + (stock_wide - MONEY_SIDE) * 0.5,
-		_stock_box.position.y + STOCK_TALL + GAP, MONEY_SIDE, MONEY_SIDE
+		_stock_box.position.x, _stock_box.position.y + STOCK_TALL + GAP, stock_wide, MONEY_TALL
 	)
 	queue_redraw()
 
@@ -378,8 +321,6 @@ func _paint_key() -> int:
 
 func _draw() -> void:
 	_painted = _paint_key()
-	if _sheet == null:
-		return
 	# The money plate swells a little while it is lit, about its own middle so it grows into
 	# the space around it rather than sliding off its corner.
 	var swell := 1.0 + SHINE_SWELL * _ease_shine()
@@ -389,10 +330,11 @@ func _draw() -> void:
 	)
 	# Warmed rather than blown out: the coin is already the brightest thing on the plate, and
 	# multiplying it half again pushes it past white and out the other side into green.
-	_draw_button(&"money", lit, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()))
-	_draw_button(&"shed", _shed_box)
-	_draw_button(&"upgrades", _upgrades_box)
-	_draw_money(lit)
+	_draw_money(lit, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()))
+	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
+	# is a wooden sign, not a web page.
+	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
+	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
 	_draw_stock()
 	_draw_available()
 	if not hint.is_empty():
@@ -581,24 +523,10 @@ class MeterFace extends Control:
 		)
 
 
-func _draw_button(name: StringName, box: Rect2, wash: Color = Color.WHITE) -> void:
-	if not _pieces.has(name):
-		return
-	var piece: Dictionary = _pieces[name]
-	var art: Rect2 = piece["region"]
-	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
-	# is a wooden sign, not a web page.
-	var lift := Vector2(0.0, -Style.HOVER_LIFT) if _hovered == name else Vector2.ZERO
-	var tint := Style.HOVER_WASH if _hovered == name else wash
-	draw_texture_rect_region(piece["sheet"], Rect2(box.position + lift, box.size), art, tint)
-
-
-## Where a plaque's writing panel is, as fractions of the plaque. The slicer measures it on
-## the sheets that have one; the older art is a painting with a number already on it, and
-## PLATE is where that painted number sits.
-func _plate_of(name: StringName) -> Rect2:
-	var piece: Dictionary = _pieces.get(name, {})
-	return piece.get("plate", PLATE)
+func _lifted(box: Rect2, name: StringName) -> Rect2:
+	if _hovered != name:
+		return box
+	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)
 
 
 ## The shine, eased. Squared off at the front so it lands hard and lets go softly, which is
@@ -703,29 +631,23 @@ func _recycle_shapes(box: Rect2) -> Array:
 
 
 
-## How many upgrades the player can afford, written across the foot of the upgrades plaque.
+## How many upgrades the player can afford, written across the foot of the upgrades button
+## on a sunken panel like the money's.
 ##
-## The same lettering, and the same place on the plaque, as the figure on the money plate:
-## they are a pair, and the money one is the number this one is measured against. White
-## rather than that one's gold — gold in this game is money, and this is a count of things,
-## not a sum. The plaque has no blank panel painted into it the way the money one does, so a
-## sunken panel in the game's own wood is drawn under the words to sit them on.
+## The same lettering as the figure on the money plate: they are a pair, and the money one
+## is the number this one is measured against. White rather than that one's gold — gold in
+## this game is money, and this is a count of things, not a sum.
 ##
 ## Always there, zero included: a panel that comes and goes is a thing the player has to
 ## notice the absence of, and "0 available" is the answer to the question they are asking
 ## when they look at it.
 func _draw_available() -> void:
-	if not _pieces.has(&"upgrades"):
-		return
+	var box := _lifted(_upgrades_box, &"upgrades").grow(-HudButtons.FRAME)
 	var plate := Rect2(
-		_upgrades_box.position + AVAILABLE_PLATE.position * _upgrades_box.size,
-		AVAILABLE_PLATE.size * _upgrades_box.size
+		Vector2(box.position.x + 4.0, box.end.y - AVAILABLE_TALL - 3.0),
+		Vector2(box.size.x - 8.0, AVAILABLE_TALL)
 	)
-	# The panel rides the button's own hover lift, or it would come unstuck from the sign it
-	# is painted on the moment the cursor crossed it.
-	if _hovered == &"upgrades":
-		plate.position.y -= Style.HOVER_LIFT
-	Style.plaque(self, plate, Style.WOOD_DEEP)
+	Style.plate(self, plate, Style.BOARD.darkened(0.35), 2.0)
 	# Set to the panel's height and then shrunk to its width if the words are too long for
 	# it — not stepped onto the game's ladder of text sizes, because every rung of that
 	# ladder is wider than this panel.
@@ -745,29 +667,9 @@ func _draw_available() -> void:
 	)
 
 
-## The live figure on the money plate.
-##
-## The art has a number painted on it, so a patch of the plate's own colour goes over that
-## first. Read out of the sheet rather than written down here: the plate is flat, and
-## sampling it means the number sits on the same brown whatever the art is repainted to.
-func _draw_money(box: Rect2) -> void:
-	if not _pieces.has(&"money"):
-		return
-	var piece: Dictionary = _pieces[&"money"]
-	var art: Rect2 = piece["region"]
-	var panel := _plate_of(&"money")
-	var plate := Rect2(
-		box.position + panel.position * box.size, panel.size * box.size
-	)
-	# Only where the art has a number painted on it. The repainted plaque leaves the panel
-	# blank for this, and patching a blank panel with a strip of itself only risks a seam.
-	if not piece.has("plate"):
-		var ink := Rect2(
-			art.position + panel.position * art.size,
-			Vector2(PLATE_CLEAR, panel.size.y) * art.size
-		)
-		draw_texture_rect_region(piece["sheet"], plate, ink)
-
+## The money plate: the coin, the sunken panel, and the live figure on it.
+func _draw_money(box: Rect2, wash: Color) -> void:
+	var plate := HudButtons.draw_money(self, box, wash)
 	var height := Style.step(plate.size.y * 0.72)
 	# The running figure, not the real one: the plate is meant to be watched climbing.
 	var shown := "%d" % roundi(_shown_money)

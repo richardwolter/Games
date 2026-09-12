@@ -86,6 +86,9 @@ const ROW_SCREEN := Color(0.27, 0.40, 0.29)
 const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
 const ON_WATER := Color(0.31, 0.60, 0.75)
+## The level on an upgrades row, after its name: the slider's clean-water blue, lifted a
+## step so it reads on the row's murky plate. A level is not a price, so not the gold.
+const LEVEL_INK := Color(0.47, 0.78, 0.92)
 
 ## The recycle box's own colours, read off `assets/Recycle_Box.png`: its planks, their lit
 ## and shaded tones, the dark hollow inside it, and the blue of the recycle mark on its
@@ -456,27 +459,166 @@ const GRAIN_LONG := 34.0
 const GLOW_LONG := 22.0
 const PLANK_DEEP := 12.0
 
+## The bites out of a plank's edge are holes, not paint (2026-09-11): the wood is drawn as
+## a polygon with the bites cut out of it, so whatever is behind the plank — the lake, the
+## board face under a title plank — shows through, and each hole is ringed in one pixel of
+## pure black. Before this a chip was a brown rim round a darker brown hollow with a lit
+## lip, painted over the finished plank, and read as a smudge rather than as broken wood.
+const HOLE_RIM := Color(0.0, 0.0, 0.0)
+
+
+## Where the bites out of a board frame's outer edge fall: `chips` per side, staggered by
+## the seed, sized 6-8 wide by 3-5 deep, starting a pixel outside the seam so the hole is
+## open to the outside. Whole pixels, so the polygon edges land on the pixel grid.
+static func frame_bites(box: Rect2, seed: int, chips: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for i in chips:
+		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
+		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
+		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
+		var y := floorf(box.position.y + box.size.y * along)
+		var x := floorf(box.position.x + box.size.x * (1.0 - along))
+		out.append(Rect2(box.position.x - 1.0, y, deep, wide))
+		out.append(Rect2(box.end.x + 1.0 - deep, y - floorf(wide * 0.4), deep, wide))
+		if i % 2 == 0:
+			out.append(Rect2(x, box.position.y - 1.0, wide, deep))
+			out.append(Rect2(x - floorf(wide * 0.6), box.end.y + 1.0 - deep, wide, deep))
+	return out
+
+
+## Where the bites out of a title plank fall: `chips` along the top and bottom edges and
+## one out of each end.
+static func ribbon_bites(box: Rect2, seed: int, chips: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for i in chips:
+		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
+		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
+		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
+		var x := floorf(box.position.x + box.size.x * along)
+		out.append(Rect2(x, box.position.y - 1.0, wide, deep))
+		out.append(Rect2(
+			floorf(box.end.x - box.size.x * along - wide * 0.6), box.end.y + 1.0 - deep, wide, deep
+		))
+	var y := floorf(box.position.y + box.size.y * 0.4)
+	out.append(Rect2(box.position.x - 1.0, y, 4.0, 8.0))
+	out.append(Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
+	return out
+
+
+## The bites a button plank takes: one out of the top edge, one out of the bottom.
+static func button_bites(box: Rect2, seed: int) -> Array[Rect2]:
+	var wide := 5.0 + float(seed % 3)
+	var out: Array[Rect2] = []
+	out.append(Rect2(floorf(box.position.x + box.size.x * (0.2 + 0.5 * float(seed % 7) / 7.0)), box.position.y - 1.0, wide, 3.0))
+	out.append(Rect2(floorf(box.end.x - box.size.x * (0.15 + 0.4 * float(seed % 5) / 5.0)), box.end.y - 2.0, wide, 3.0))
+	return out
+
+
+static func rect_poly(box: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([
+		box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)
+	])
+
+
+## A polygon with the bites cut out of it, each bite grown by `grow` first. What comes
+## back is the pieces left, minus any that are holes — bites sit on an edge, so there are
+## none, but a caller who hands a bite in the middle of a plank gets the plank and not a
+## polygon it cannot draw.
+static func carved(poly: PackedVector2Array, bites: Array[Rect2], grow: float = 0.0) -> Array[PackedVector2Array]:
+	var pieces: Array[PackedVector2Array] = [poly]
+	for bite in bites:
+		var cut := rect_poly(bite.grow(grow))
+		var next: Array[PackedVector2Array] = []
+		for piece in pieces:
+			for got in Geometry2D.clip_polygons(piece, cut):
+				if got.size() >= 3 and not Geometry2D.is_polygon_clockwise(got):
+					next.append(got)
+		pieces = next
+	return pieces
+
+
+static func fill_carved(on: CanvasItem, poly: PackedVector2Array, bites: Array[Rect2], colour: Color, grow: float = 0.0) -> void:
+	if bites.is_empty():
+		on.draw_colored_polygon(poly, colour)
+		return
+	for piece in carved(poly, bites, grow):
+		on.draw_colored_polygon(piece, colour)
+
+
+## A one-pixel line along an axis, with the stretches that cross a bite left out. Grain,
+## highlights and the shaded edges are all such lines; anything else through a hole would
+## be a line drawn across the air.
+static func line_carved(on: CanvasItem, from: Vector2, to: Vector2, colour: Color, bites: Array[Rect2]) -> void:
+	if bites.is_empty():
+		on.draw_line(from, to, colour, 1.0)
+		return
+	var across := is_equal_approx(from.y, to.y)
+	var lo := minf(from.x, to.x) if across else minf(from.y, to.y)
+	var hi := maxf(from.x, to.x) if across else maxf(from.y, to.y)
+	var at := from.y if across else from.x
+	var spans: Array[Vector2] = [Vector2(lo, hi)]
+	for bite in bites:
+		var hole := bite.grow(1.0)
+		var cut_lo := hole.position.x if across else hole.position.y
+		var cut_hi := hole.end.x if across else hole.end.y
+		var side_lo := hole.position.y if across else hole.position.x
+		var side_hi := hole.end.y if across else hole.end.x
+		if at < side_lo or at >= side_hi:
+			continue
+		var next: Array[Vector2] = []
+		for span in spans:
+			if span.y <= cut_lo or span.x >= cut_hi:
+				next.append(span)
+				continue
+			if span.x < cut_lo:
+				next.append(Vector2(span.x, cut_lo))
+			if span.y > cut_hi:
+				next.append(Vector2(cut_hi, span.y))
+		spans = next
+	for span in spans:
+		if span.y - span.x < 1.0:
+			continue
+		if across:
+			on.draw_line(Vector2(span.x, at), Vector2(span.y, at), colour, 1.0)
+		else:
+			on.draw_line(Vector2(at, span.x), Vector2(at, span.y), colour, 1.0)
+
+
+## The black pixel round each hole: a one-pixel ring outside the bite, kept inside the
+## plank's seam so the open side of the hole stays open.
+static func rims(on: CanvasItem, box: Rect2, bites: Array[Rect2]) -> void:
+	var keep := box.grow(1.0)
+	for bite in bites:
+		var ring := bite.grow(1.0)
+		for strip: Rect2 in [
+			Rect2(ring.position, Vector2(ring.size.x, 1.0)),
+			Rect2(Vector2(ring.position.x, ring.end.y - 1.0), Vector2(ring.size.x, 1.0)),
+			Rect2(ring.position, Vector2(1.0, ring.size.y)),
+			Rect2(Vector2(ring.end.x - 1.0, ring.position.y), Vector2(1.0, ring.size.y)),
+		]:
+			var shown := strip.intersection(keep)
+			if shown.size.x > 0.0 and shown.size.y > 0.0:
+				on.draw_rect(shown, HOLE_RIM, true)
+
 
 ## A plank: seam, face, the broken highlight along its top and left, a deep line under it
 ## and down its right, grain along it. `seed` picks the grain so two planks never match.
 ## `clip` cuts a step off each corner, for a plank that is a button rather than a frame.
-static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME, clip: float = 0.0) -> void:
-	if clip > 0.0:
-		on.draw_colored_polygon(clipped(box.grow(1.0), clip), SEAM)
-		on.draw_colored_polygon(clipped(box, clip), face)
-	else:
-		on.draw_rect(box.grow(1.0), SEAM, true)
-		on.draw_rect(box, face, true)
-	grain(on, box.grow(-clip * 0.5), true, seed, box.size.y - clip)
-	highlight(on, box.position + Vector2(clip, 0.0), Vector2(box.size.x - clip * 2.0, 0.0), seed + 4)
-	highlight(on, box.position + Vector2(0.0, clip), Vector2(0.0, box.size.y - clip * 2.0), seed + 5)
-	on.draw_rect(Rect2(Vector2(box.position.x + clip, box.end.y - 1.0), Vector2(box.size.x - clip * 2.0, 1.0)), FRAME_DEEP, true)
-	on.draw_rect(Rect2(Vector2(box.end.x - 1.0, box.position.y + clip), Vector2(1.0, box.size.y - clip * 2.0)), FRAME_DEEP, true)
+## `bites` are the holes out of its edges (see `frame_bites`, `ribbon_bites`, `button_bites`).
+static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME, clip: float = 0.0, bites: Array[Rect2] = []) -> void:
+	fill_carved(on, clipped(box.grow(1.0), clip), bites, SEAM)
+	fill_carved(on, clipped(box, clip), bites, face, 1.0)
+	grain(on, box.grow(-clip * 0.5), true, seed, box.size.y - clip, bites)
+	highlight(on, box.position + Vector2(clip, 0.0), Vector2(box.size.x - clip * 2.0, 0.0), seed + 4, bites)
+	highlight(on, box.position + Vector2(0.0, clip), Vector2(0.0, box.size.y - clip * 2.0), seed + 5, bites)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x + clip, box.end.y - 1.0), Vector2(box.size.x - clip * 2.0, 1.0))), bites, FRAME_DEEP, 1.0)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y + clip), Vector2(1.0, box.size.y - clip * 2.0))), bites, FRAME_DEEP, 1.0)
+	rims(on, box, bites)
 
 
 ## The broken highlight the light lays along a plank's lit edge: runs of pale peach a
 ## pixel in from the seam, gaps between, lengths off a hash so no two edges match.
-static func highlight(on: CanvasItem, from: Vector2, along: Vector2, seed: int) -> void:
+static func highlight(on: CanvasItem, from: Vector2, along: Vector2, seed: int, bites: Array[Rect2] = []) -> void:
 	var length := along.length()
 	if length <= 0.0:
 		return
@@ -490,14 +632,14 @@ static func highlight(on: CanvasItem, from: Vector2, along: Vector2, seed: int) 
 		var gap := 3.0 + float((h / 100) % 9)
 		var stop := minf(at + run, length - 3.0)
 		var lit := FRAME_GLOW if h % 5 != 0 else FRAME_LIT
-		on.draw_line(from + dir * at + inward, from + dir * stop + inward, lit, 1.0)
+		line_carved(on, from + dir * at + inward, from + dir * stop + inward, lit, bites)
 		at = stop + gap
 		i += 1
 
 
 ## Grain: streaks running the length of a plank, staggered by a hash so no two planks
 ## repeat. A dark fibre, and a light one beside it on about a third of them.
-static func grain(on: CanvasItem, plank_box: Rect2, across: bool, seed: int, deep: float = PLANK_DEEP) -> void:
+static func grain(on: CanvasItem, plank_box: Rect2, across: bool, seed: int, deep: float = PLANK_DEEP, bites: Array[Rect2] = []) -> void:
 	var length := plank_box.size.x if across else plank_box.size.y
 	var lanes := maxi(int(deep - 5.0), 1)
 	var n := int(length / GRAIN_EVERY)
@@ -516,50 +658,38 @@ static func grain(on: CanvasItem, plank_box: Rect2, across: bool, seed: int, dee
 		else:
 			start = plank_box.position + Vector2(lane, at)
 			stop = Vector2(start.x, minf(start.y + run, plank_box.end.y - 2.0))
-		on.draw_line(start, stop, FRAME_GRAIN, 1.0)
+		line_carved(on, start, stop, FRAME_GRAIN, bites)
 		if h % 3 == 1:
 			var step := Vector2(0.0, 1.0) if across else Vector2(1.0, 0.0)
-			on.draw_line(start + step, stop + step, FRAME_GRAIN_LIT, 1.0)
-
-
-## One bite out of a plank's edge: a dark rim round a hollow, and a lit lip along the
-## hollow's lower edge where the light catches the broken wood. The rim is what keeps it
-## from reading as a missing pixel.
-static func chip(on: CanvasItem, box: Rect2) -> void:
-	on.draw_rect(box.grow(1.0), FRAME_DEEP, true)
-	on.draw_rect(box, FRAME_SHADOW, true)
-	on.draw_rect(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_GLOW, true)
+			line_carved(on, start + step, stop + step, FRAME_GRAIN_LIT, bites)
 
 
 ## The oak frame round a drawn board, as the meter's is painted: a dark seam, the plank,
-## a lit top and left edge, a shaded bottom and right, grain along each side, and chips out
-## of the outer edge. `thick` is how wide the wood is; `chips` how many bites per edge.
+## a lit top and left edge, a shaded bottom and right, grain along each side, and bites
+## out of the outer edge. `thick` is how wide the wood is; `chips` how many bites per edge.
 ##
 ## Lives here rather than in the shop, because the shop's boards, the settings board and the
 ## shed's shelf are one piece of furniture drawn three times. Two copies would drift into
 ## two woods the first time either was retuned.
 static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) -> void:
-	on.draw_rect(box.grow(1.0), SEAM, true)
-	on.draw_rect(box, FRAME, true)
+	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
+	var bites := frame_bites(box, seed, chips)
+	fill_carved(on, rect_poly(box.grow(1.0)), bites, SEAM)
+	fill_carved(on, rect_poly(box), bites, FRAME, 1.0)
 	# Lit from the upper left, as the meter is: the bottom plank is the redder low tone,
 	# the top and left planks carry a broken highlight along their outer edge.
-	on.draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)),
-		FRAME_LOW, true
+	fill_carved(
+		on, rect_poly(Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick))),
+		bites, FRAME_LOW, 1.0
 	)
-	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
-	grain(on, Rect2(box.position, Vector2(box.size.x, thick)), true, seed)
-	grain(on, Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)), true, seed + 1)
-	grain(on, Rect2(box.position, Vector2(thick, box.size.y)), false, seed + 2)
-	grain(on, Rect2(Vector2(box.end.x - thick, box.position.y), Vector2(thick, box.size.y)), false, seed + 3)
-	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4)
-	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5)
-	on.draw_rect(
-		Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0)), FRAME_DEEP, true
-	)
-	on.draw_rect(
-		Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y)), FRAME_DEEP, true
-	)
+	grain(on, Rect2(box.position, Vector2(box.size.x, thick)), true, seed, PLANK_DEEP, bites)
+	grain(on, Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)), true, seed + 1, PLANK_DEEP, bites)
+	grain(on, Rect2(box.position, Vector2(thick, box.size.y)), false, seed + 2, PLANK_DEEP, bites)
+	grain(on, Rect2(Vector2(box.end.x - thick, box.position.y), Vector2(thick, box.size.y)), false, seed + 3, PLANK_DEEP, bites)
+	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4, bites)
+	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5, bites)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0))), bites, FRAME_DEEP, 1.0)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y))), bites, FRAME_DEEP, 1.0)
 	# The inset shadow where the wood meets the board face: two deep along the top and
 	# left, where the frame shades the face, one along the bottom and right.
 	var face := box.grow(-thick)
@@ -567,22 +697,11 @@ static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) ->
 	on.draw_rect(Rect2(face.position - Vector2(2.0, 2.0), Vector2(2.0, face.size.y + 4.0)), FRAME_SHADOW, true)
 	on.draw_rect(Rect2(Vector2(face.position.x - 2.0, face.end.y + 1.0), Vector2(face.size.x + 4.0, 1.0)), FRAME_SHADOW, true)
 	on.draw_rect(Rect2(Vector2(face.end.x + 1.0, face.position.y - 2.0), Vector2(1.0, face.size.y + 4.0)), FRAME_SHADOW, true)
-	# Chips: small bites out of the outer edge, dark where the wood is gone.
-	for i in chips:
-		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
-		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
-		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
-		var y := box.position.y + box.size.y * along
-		var x := box.position.x + box.size.x * (1.0 - along)
-		chip(on, Rect2(box.position.x - 1.0, y, deep, wide))
-		chip(on, Rect2(box.end.x + 1.0 - deep, y - wide * 0.4, deep, wide))
-		if i % 2 == 0:
-			chip(on, Rect2(x, box.position.y - 1.0, wide, deep))
-			chip(on, Rect2(x - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
+	rims(on, box, bites)
 
 
 ## The title plank a board wears over its top edge. A plank of the same oak as the frame,
-## lit the same way, with chips out of its edges. Cloth was tried — a bowed three-tone band,
+## lit the same way, with bites out of its edges. Cloth was tried — a bowed three-tone band,
 ## then one with tails — and read as a sticker.
 ## `within` is where the title is centred, for a ribbon with something else sitting on one
 ## end of it. Left empty, it is the plank itself.
@@ -595,19 +714,7 @@ static func board_ribbon(
 	within: Rect2 = Rect2()
 ) -> void:
 	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
-	plank(on, box, seed)
-	# Chips out of the top and bottom edges and one out of each end.
-	for i in chips:
-		var along := (float(i) + 0.5 + 0.3 * float(hash(seed + i) % 5) / 5.0) / float(chips)
-		var wide := 6.0 + 2.0 * float(hash(seed * 3 + i) % 3)
-		var deep := 3.0 + float(hash(seed * 5 + i) % 3)
-		var x := box.position.x + box.size.x * along
-		chip(on, Rect2(x, box.position.y - 1.0, wide, deep))
-		chip(on, Rect2(box.end.x - box.size.x * along - wide * 0.6, box.end.y + 1.0 - deep, wide, deep))
-	var y := box.position.y + box.size.y * 0.4
-	chip(on, Rect2(box.position.x - 1.0, y, 4.0, 8.0))
-	chip(on, Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
-
+	plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
 	var text_box := box if within.size.x <= 0.0 else within
 	write(
 		on, title, size_px,
