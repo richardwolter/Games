@@ -1173,19 +1173,18 @@ func _board_rect() -> Rect2:
 	# beside are two pieces of furniture of the same height, and a board that started
 	# below the wallpaper read as a panel bolted on rather than as a thing in the room.
 	var left := floor_box.end.x + GUTTER - SHELF_FRAME
+	# The title plank straddles the board's top edge and so hangs half its height above it.
+	# That half is part of the shelf's outline, so it is what has to land on the shed's top
+	# line — the frame starts below it. Squaring the *frame* with the shed instead left the
+	# plank sticking up over the room, which is what the misalignment was.
+	var top := shed.position.y + SHELF_RIBBON * 0.5
 	var board := Rect2(
-		Vector2(left, shed.position.y),
-		Vector2(float(LIST_WIDTH) + SHELF_FRAME * 2.0, shed.size.y)
+		Vector2(left, top),
+		Vector2(float(LIST_WIDTH) + SHELF_FRAME * 2.0, shed.end.y - top)
 	)
 	var over := board.end.x - (size.x - 2.0)
 	if over > 0.0:
 		board.size.x = maxf(board.size.x - over, SHELF_FRAME * 2.0 + 8.0)
-	# The title plank straddles the top edge, so the board cannot start hard against the
-	# panel or half the plank is cut off.
-	var lift := SHELF_RIBBON * 0.5 + 2.0
-	if board.position.y < lift:
-		board.size.y -= lift - board.position.y
-		board.position.y = lift
 	board.size.y = maxf(board.size.y, SHELF_FRAME * 2.0 + 8.0)
 	return board
 

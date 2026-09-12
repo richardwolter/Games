@@ -11,6 +11,10 @@
 # Headless test output
 /tools/last_*.log
 
+# Probe screenshots. The scene that takes them is committed; the pictures are not.
+/tools/last_*.png
+/tools/last_*.png.import
+
 # Slicer check-my-work pictures. The catalogues they describe are committed; these are not.
 /assets/sliced_*.png
 /assets/pigeon_contact.png

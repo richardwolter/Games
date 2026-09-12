@@ -342,6 +342,11 @@ old scrim rectangle and its 1.5 px ink outline are gone.
 - **Top and bottom come off the shed, not the floor** (`_shed_rect`): the wall's top edge
   down to the floor's front edge, the same two numbers `_draw` builds the wall from. A board
   squared up with the floor alone started below the wallpaper and read as a panel bolted on.
+  **The line to match is the title plank's, not the frame's**: the plank straddles the
+  board's top edge, so squaring the frame with the shed left half a plank sticking up over
+  the room. `_board_rect` starts `SHELF_RIBBON * 0.5` below the shed's top instead, and the
+  shelf's outline lands on the shed's at both ends. The border sheets carry no transparent
+  padding (measured), so rect edges and drawn edges are the same line.
 - **The close cross is nailed to the title plank's right end** (`_place_close`,
   `_title_box`). It used to sit in the air above the column; once the plank took that edge
   the cross covered the title. `Style.board_ribbon` takes a `within` box so the writing
@@ -485,6 +490,16 @@ Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking
 42 ms -> 3-4 ms.
 
 ---
+
+### Shed Screenshot Probe
+`tools/shot_shed.tscn` opens the lake, fills the shelf, opens the shed and saves
+`tools/last_shed.png` plus `tools/last_shed.log` (the room, shed, floor, board, ribbon and
+row rectangles, and the colour changes down a column of each). Run it with the **desktop
+build, not `--headless`** — nothing renders under the dummy driver. The pictures are
+git-ignored; the scene is not. Use it for questions about where an edge actually lands:
+eyeballing a screenshot to a pixel does not work, and the rect the log prints is in the
+room's own coordinates while the picture is the whole window.
+
 
 ## Godot/Windows Gotchas
 
