@@ -505,8 +505,10 @@ in front of the player.
   was only 30 px long, 78 degrees off vertical, a flat streak lying beside a building it had
   come away from. Tied together the shadow keeps its bearing all day and only its length
   changes, which is what a sun climbing and setting in one quarter of the sky does. Slants
-  are 1.25 dawn, 0.95 noon, 0.7 dusk, which puts the shed's shadow 51, 44 and 35 degrees off
-  vertical. **`test_lake` guards the angle** (`SHADOW_FLATTEST`, 60 degrees) as well as the
+  are 0.85 dawn, 0.62 noon, 0.45 dusk, which puts the shed's shadow 40, 32 and 24 degrees off
+  vertical. **Pulled in from 1.25 / 0.95 / 0.7** (51, 44, 35 degrees) once the sweep landed:
+  the swept shadow reaches much further to the side than the old sheared one did at the same
+  slant, and at the wider numbers it stood too far off the left wall to read as the hut's. **`test_lake` guards the angle** (`SHADOW_FLATTEST`, 60 degrees) as well as the
   side: the numbers are by eye and free to be retuned, the two rules are not.
 - **A narrow arc, by decision** — not a pinned sun. Pinning would take the movement out of
   the light for no gain; a wide arc is what contradicted the paint. `stretch`, `ink` and the
@@ -773,7 +775,7 @@ by their place on the bank and the tint the ferry reads.
 - **The wood is the box's**: plank pitch five painted px, the box's own rows 12-16 (a lit
   line, two of body, a lighter one, a seam), the deck in its lit face's tones and the beams
   and posts in its shaded face's, the silhouette ringed in its edge colour (48,37,33). The
-  box is `assets/Recycle_Box.png` pasted at one painted px to one, so it draws at 2.0 â€”
+  box is `assets/Recycle_Box.png` pasted at one painted px to one, so it draws at 2.0 —
   four fifths of the island's crate (`Yard.ART_SCALE` 2.5). **A whole art pixel, by
   decision**: at one and a quarter the sheet would crawl on the grid.
 - **The json is the contract**: `anchor` (the drawn waterline point on the jetty's
