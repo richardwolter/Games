@@ -319,9 +319,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   the whole button (`LABEL_SHARE`), so a button sized to its own word carries no empty wood.
   The settings button went 176x38 to 152x56 on that.
   **The built frame is bitten too** (`_border_bites`, 2026-09-12): one hole per `BITE_EVERY`
-  of each outer edge, pixels cleared and the wood round each ringed in `HOLE_RIM`, exactly
-  like the drawn boards' `frame_bites`. Punched into the image, so a hole is a real hole and
-  the lake shows through. Needed because the planks' *clean* runs are what the edges are
+  of each outer edge, pixels cleared and the wood round each ringed in `HOLE_RIM`, like the
+  drawn boards' `frame_bites`. Punched into the image, so a hole is a real hole and the lake
+  shows through. **Each is a V**, widest where it opens on the edge and narrowing to a blunt
+  point `BITE_TIP` wide — a square notch read as a slot someone cut, and what these are is a
+  splinter that came away. The rim goes on after the whole V is carved (a pixel on the slope
+  would otherwise be blacked and then cleared by the next step in) and covers the diagonal
+  shoulders too, or a corner touching the hole at a point draws as a loose pixel in the gap. Needed because the planks' *clean* runs are what the edges are
   cropped from — the art's own chips are in the stretches the crop avoids — so an unbitten
   built frame read as plastic beside the drawn boards. Bites stay `BITE_CLEAR` off the
   corners: the chamfer is already the corner's shape.

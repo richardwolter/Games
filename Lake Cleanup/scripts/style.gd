@@ -880,10 +880,16 @@ static func _build_border(want: Vector2i) -> ImageTexture:
 ## One bite per `BITE_EVERY` of each edge, staggered off the size so two buttons side by side
 ## are not bitten in the same places, and kept off the corners — the art's chamfer is already
 ## the corner's shape and a hole in it reads as damage rather than as wear.
+##
+## Each is a **V**, widest where it opens on the outer edge and narrowing to a point in the
+## wood, by decision (2026-09-12): a square notch reads as a slot someone cut, and what these
+## are is a splinter that came away. `BITE_TIP` is how much of the width is still there at
+## the deepest row, so the point is blunt rather than a single stray pixel.
 const BITE_EVERY := 46.0
-const BITE_WIDE := Vector2i(6, 8)
+const BITE_WIDE := Vector2i(7, 10)
 const BITE_DEEP := Vector2i(3, 5)
 const BITE_CLEAR := 5
+const BITE_TIP := 0.2
 
 
 static func _border_bites(out: Image, want: Vector2i) -> void:
@@ -900,35 +906,58 @@ static func _border_bites(out: Image, want: Vector2i) -> void:
 			var deep := BITE_DEEP.x + int((h / 11) % (BITE_DEEP.y - BITE_DEEP.x + 1))
 			var step := float(room) / float(count)
 			var at := BORDER_WALL + BITE_CLEAR + int(step * (float(i) + 0.15 + 0.7 * float((h / 131) % 100) / 100.0))
-			var bite: Rect2i
+			_bite_out(out, want, edge, at, wide, deep)
+
+
+## One V-shaped hole out of an edge: a run of pixels cleared at every depth, narrowing as it
+## goes in, and then every pixel of wood left touching the hole blacked.
+##
+## `edge` is which side it opens on (0 top, 1 bottom, 2 left, 3 right), `at` where along that
+## side it starts, `wide` how far it opens and `deep` how far in it reaches.
+static func _bite_out(out: Image, want: Vector2i, edge: int, at: int, wide: int, deep: int) -> void:
+	var down := edge == 0 or edge == 1
+	var middle := float(at) + float(wide) * 0.5
+	var gone: Array[Vector2i] = []
+	for step in deep:
+		# Full width at the mouth, down to `BITE_TIP` of it at the point.
+		var share := 1.0 - (1.0 - BITE_TIP) * float(step) / float(maxi(deep - 1, 1))
+		var span := maxi(int(round(float(wide) * share)), 1)
+		var from := int(round(middle - float(span) * 0.5))
+		for i in span:
+			var spot: Vector2i
 			match edge:
 				0:
-					bite = Rect2i(at, 0, wide, deep)
+					spot = Vector2i(from + i, step)
 				1:
-					bite = Rect2i(at, want.y - deep, wide, deep)
+					spot = Vector2i(from + i, want.y - 1 - step)
 				2:
-					bite = Rect2i(0, at, deep, wide)
+					spot = Vector2i(step, from + i)
 				_:
-					bite = Rect2i(want.x - deep, at, deep, wide)
-			_bite_out(out, bite)
-
-
-## One hole: the pixels inside it cleared, and every pixel of wood touching it blacked.
-static func _bite_out(out: Image, bite: Rect2i) -> void:
-	var box := Rect2i(Vector2i.ZERO, out.get_size())
-	var hole := bite.intersection(box)
-	if hole.size.x <= 0 or hole.size.y <= 0:
-		return
-	for y in range(hole.position.y, hole.end.y):
-		for x in range(hole.position.x, hole.end.x):
-			out.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
-	var ring := bite.grow(1).intersection(box)
-	for y in range(ring.position.y, ring.end.y):
-		for x in range(ring.position.x, ring.end.x):
-			if hole.has_point(Vector2i(x, y)):
+					spot = Vector2i(want.x - 1 - step, from + i)
+			if spot.x < 0 or spot.y < 0 or spot.x >= want.x or spot.y >= want.y:
 				continue
-			if out.get_pixel(x, y).a > 0.5:
-				out.set_pixel(x, y, HOLE_RIM)
+			out.set_pixel(spot.x, spot.y, Color(0.0, 0.0, 0.0, 0.0))
+			gone.append(spot)
+	# The rim, after the whole V is cut: a pixel on the slope would otherwise be blacked and
+	# then cleared by the next step in.
+	for spot: Vector2i in gone:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var near := spot + step
+			if near.x < 0 or near.y < 0 or near.x >= want.x or near.y >= want.y:
+				continue
+			if out.get_pixel(near.x, near.y).a > 0.5:
+				out.set_pixel(near.x, near.y, HOLE_RIM)
+	# The shoulders the slope leaves: without these a diagonal has a corner of wood touching
+	# the hole only at a point, which draws as a loose pixel hanging in the gap.
+	for spot: Vector2i in gone:
+		for step: Vector2i in [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+			var near := spot + step
+			if near.x < 0 or near.y < 0 or near.x >= want.x or near.y >= want.y:
+				continue
+			if (down and near.x == spot.x) or (not down and near.y == spot.y):
+				continue
+			if out.get_pixel(near.x, near.y).a > 0.5:
+				out.set_pixel(near.x, near.y, HOLE_RIM)
 
 
 ## The joints, painted in the wood's own outline: down each side of both corners, and across
