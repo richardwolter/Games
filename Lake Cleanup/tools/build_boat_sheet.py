@@ -284,12 +284,15 @@ MARK_EDGE = "d"
 ## the sail's back, the slate face, and are left plain, by decision.
 ## The canvas is a square on the cloth, foreshortened as the sail is: about seven tenths of
 ## the face's width bow on (a wider one crowded the reef points), the same share of each
-## narrower face, and the face's own slope for its top and bottom edges.
+## narrower face, and a shallower slope for its top and bottom edges than the face's own
+## (2026-09-12): sheared to the cloth's full slope, the ring in the quartering headings
+## tilted into a flat ellipse, and the pixel art's sail is hardly foreshortened there — its
+## face is 26 px wide against 34 bow on — so a lean of a couple of rows is all it can carry.
 MARK_QUAD = {
     0: ((52, 51), (75, 51), (52, 71)),
     1: ((51, 50), (74, 50), (51, 70)),
-    2: ((52, 48), (69, 53), (52, 64)),
-    3: ((53, 46), (64, 54), (53, 59)),
+    2: ((52, 48), (69, 50), (52, 65)),
+    3: ((53, 46), (64, 51), (53, 60)),
     4: ((56, 46), (61, 49), (56, 60)),
 }
 ## Where the frames turn about: the mast's column, and the water at the axis's depth,

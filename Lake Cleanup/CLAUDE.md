@@ -393,6 +393,17 @@ the whole job.
 - **Overhangs are not ground** (`HEM_BAND`): the shed's eaves end at row 52 of 127, seventy
   pixels up in the air, and grass planted on a column's lowest row alone grew out of the
   roof. Only columns within the band above the picture's deepest row are planted.
+- **The blades are cut down towards the far ends of the line** (`HEM_SHORTEST`, `HEM_TAPER`),
+  measured against the base's *own* rise — seven rows on the crate, thirty-three on the shed —
+  and cubed, so the cut bites only at the corners. A full-height tuft on the crate's lower-left
+  edge reached the recycle mark painted just above it. A flat taper measured against `HEM_BAND`
+  was tried first and left the shed's left wall bare.
+- **A caller can set its own blade height** (`Yard.SKIRT_BLADES` 1-2 against the hem's 2-4):
+  the crate is drawn at 2.5, so one of its painted pixels is two and a half of the game's and
+  a shed-sized blade stands a third of the way up it.
+- **The doorway is kept bare** (`Lake.SHED_DOOR`, columns 30-47 of 130 as fractions): a door
+  with grass across it is a door nobody opens, and this is the one the player walks through
+  several times a run. `hem` takes any number of such cleared spans.
 - **Baked, one draw call** (`Skirt.Patch`, `RenderingServer.canvas_item_add_triangle_array`,
   the same batching as `Ground._lay_props`). The island redraws every frame, so a few hundred
   `draw_rect` calls is exactly the cost that put the forest at 15 ms. **Not `draw_polygon`**:
@@ -409,10 +420,10 @@ the whole job.
 - **The shed's contact patch is gone, by decision**: the soft black quad under the hut
   (alpha 0.11). The grass is what says the hut meets the ground; the quad under a skirt of
   blades read as a second shadow.
-- **The hut's shadow is rooted at the walls, not at the bottom of the picture**
-  (`Lake.SHED_ART_GROUND` 0.224, `_shed_feet`): `assets/shed.png` paints the isometric diamond
-  the hut stands on, so the art's last row is that diamond's *front point*, some 27 px down the
-  grass from the walls. A shadow pinned there read as belonging to something else. The picture
+- **The hut's shadow is rooted where the building stands, not at the bottom of the picture**
+  (`Lake.SHED_ART_GROUND` 0.224, `_shed_feet`): the walls' feet are an isometric diamond and the
+  art's last row is that diamond's **near corner**, some 27 px down the grass from the middle of
+  it. A shadow pinned there read as belonging to something else. The picture
   itself has not moved (`SHED_STAND` 0.35 is unchanged) — only what hangs off it. **Re-measure
   `SHED_ART_GROUND` if the hut is re-cut** (`tools/slice_shed.gd`): it is the diamond's side
   corners, rows 93 and 103 of 127, as a fraction up from the bottom.
@@ -501,8 +512,9 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   fractions: ring radius, bar thickness, head width and length, sweep and start angle),
   **decided pixel by pixel**: each frame pixel's centre is mapped back through the heading's
   parallelogram (`MARK_QUAD`: top-left, top-right, bottom-left, measured off the lit face's
-  white rows, about seven tenths of the face wide, with the face's own slope for its top and
-  bottom edges) and tested — distance to the ring, point-in-triangle for the heads — so in a
+  white rows, about seven tenths of the face wide, leaning a couple of rows rather than the
+  face's full slope: sheared to the cloth, the ring in the quartering headings tilted into a
+  flat ellipse, and the art's sail is hardly foreshortened there) and tested — distance to the ring, point-in-triangle for the heads — so in a
   quartering heading it leans and foreshortens with the sail, and an edge is a pixel on or
   off, not a blurred step. Then **clipped to the face's own white pixels**: nothing of it
   lands on the shaded head strip, the billow or the sky. **A one-pixel edge all round each
