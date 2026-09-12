@@ -505,10 +505,13 @@ in front of the player.
   was only 30 px long, 78 degrees off vertical, a flat streak lying beside a building it had
   come away from. Tied together the shadow keeps its bearing all day and only its length
   changes, which is what a sun climbing and setting in one quarter of the sky does. Slants
-  are 0.85 dawn, 0.62 noon, 0.45 dusk, which puts the shed's shadow 40, 32 and 24 degrees off
-  vertical. **Pulled in from 1.25 / 0.95 / 0.7** (51, 44, 35 degrees) once the sweep landed:
-  the swept shadow reaches much further to the side than the old sheared one did at the same
-  slant, and at the wider numbers it stood too far off the left wall to read as the hut's. **`test_lake` guards the angle** (`SHADOW_FLATTEST`, 60 degrees) as well as the
+  are 0.5 dawn, 0.35 noon, 0.25 dusk, which puts the shed's shadow 27, 19 and 14 degrees off
+  vertical. **Pulled in twice from 1.25 / 0.95 / 0.7** (51, 44, 35 degrees), by eye, once the
+  sweep landed: a swept shadow reaches much further to the side than the old sheared one did
+  at the same slant, because the shear only ever showed the part that escaped past the sprite
+  while the sweep draws the whole occluded region. At the old numbers the shadow stood off the
+  left wall instead of belonging to it. It is meant to tuck under the roof's overhang. **The
+  two sets of numbers are not comparable** — don't read a slant from before the sweep. **`test_lake` guards the angle** (`SHADOW_FLATTEST`, 60 degrees) as well as the
   side: the numbers are by eye and free to be retuned, the two rules are not.
 - **A narrow arc, by decision** — not a pinned sun. Pinning would take the movement out of
   the light for no gain; a wide arc is what contradicted the paint. `stretch`, `ink` and the

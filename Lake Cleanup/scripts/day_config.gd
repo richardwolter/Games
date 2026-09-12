@@ -44,9 +44,9 @@ extends Resource
 ## Always positive here; `DayCycle` applies the minus. The sun is in the southeast, so the
 ## shadow falls to the *left* of its caster — the side every painted asset keeps its shade
 ## on. Drifting down through the day is the sun moving west.
-@export var slant_dawn: float = 0.85
-@export var slant_noon: float = 0.62
-@export var slant_dusk: float = 0.45
+@export var slant_dawn: float = 0.5
+@export var slant_noon: float = 0.35
+@export var slant_dusk: float = 0.25
 
 ## How long a shadow is against the object casting it, at noon and at the ends of the day. A
 ## low sun throws a long shadow; an overhead one throws almost none.
