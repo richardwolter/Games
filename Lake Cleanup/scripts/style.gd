@@ -865,7 +865,70 @@ static func _build_border(want: Vector2i) -> ImageTexture:
 	out.blit_rect(foot_left, foot_box, Vector2i(0, want.y - BORDER_FOOT))
 	out.blit_rect(foot_right, foot_box, Vector2i(want.x - BORDER_WALL, want.y - BORDER_FOOT))
 	_border_seams(out, want)
+	_border_bites(out, want)
 	return ImageTexture.create_from_image(out)
+
+
+## The bites out of the built frame's outer edge, the same holes the drawn wood takes
+## (`frame_bites`, `rims`): the pixels go, and what is left round each is ringed in black.
+##
+## Punched here rather than drawn over the button, because this is an image and a hole in it
+## is a real hole — the lake shows through. The meter's own art has chips in its bottom
+## plank, but the clean runs the edges are cropped from deliberately avoid them, so without
+## this a built frame comes out unbroken and reads as plastic beside the drawn boards.
+##
+## One bite per `BITE_EVERY` of each edge, staggered off the size so two buttons side by side
+## are not bitten in the same places, and kept off the corners — the art's chamfer is already
+## the corner's shape and a hole in it reads as damage rather than as wear.
+const BITE_EVERY := 46.0
+const BITE_WIDE := Vector2i(6, 8)
+const BITE_DEEP := Vector2i(3, 5)
+const BITE_CLEAR := 5
+
+
+static func _border_bites(out: Image, want: Vector2i) -> void:
+	var seed := want.x * 31 + want.y * 17
+	for edge in 4:
+		var along := want.x if edge < 2 else want.y
+		var room := along - (BORDER_WALL + BITE_CLEAR) * 2 - BITE_WIDE.y
+		if room <= 0:
+			continue
+		var count := maxi(int(float(along) / BITE_EVERY), 1)
+		for i in count:
+			var h := hash(seed * 97 + edge * 13 + i)
+			var wide := BITE_WIDE.x + int(h % (BITE_WIDE.y - BITE_WIDE.x + 1))
+			var deep := BITE_DEEP.x + int((h / 11) % (BITE_DEEP.y - BITE_DEEP.x + 1))
+			var step := float(room) / float(count)
+			var at := BORDER_WALL + BITE_CLEAR + int(step * (float(i) + 0.15 + 0.7 * float((h / 131) % 100) / 100.0))
+			var bite: Rect2i
+			match edge:
+				0:
+					bite = Rect2i(at, 0, wide, deep)
+				1:
+					bite = Rect2i(at, want.y - deep, wide, deep)
+				2:
+					bite = Rect2i(0, at, deep, wide)
+				_:
+					bite = Rect2i(want.x - deep, at, deep, wide)
+			_bite_out(out, bite)
+
+
+## One hole: the pixels inside it cleared, and every pixel of wood touching it blacked.
+static func _bite_out(out: Image, bite: Rect2i) -> void:
+	var box := Rect2i(Vector2i.ZERO, out.get_size())
+	var hole := bite.intersection(box)
+	if hole.size.x <= 0 or hole.size.y <= 0:
+		return
+	for y in range(hole.position.y, hole.end.y):
+		for x in range(hole.position.x, hole.end.x):
+			out.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
+	var ring := bite.grow(1).intersection(box)
+	for y in range(ring.position.y, ring.end.y):
+		for x in range(ring.position.x, ring.end.x):
+			if hole.has_point(Vector2i(x, y)):
+				continue
+			if out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, HOLE_RIM)
 
 
 ## The joints, painted in the wood's own outline: down each side of both corners, and across

@@ -318,6 +318,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `PlankButton` is it round a `BOARD` face with the word set to the **face** rather than to
   the whole button (`LABEL_SHARE`), so a button sized to its own word carries no empty wood.
   The settings button went 176x38 to 152x56 on that.
+  **The built frame is bitten too** (`_border_bites`, 2026-09-12): one hole per `BITE_EVERY`
+  of each outer edge, pixels cleared and the wood round each ringed in `HOLE_RIM`, exactly
+  like the drawn boards' `frame_bites`. Punched into the image, so a hole is a real hole and
+  the lake shows through. Needed because the planks' *clean* runs are what the edges are
+  cropped from — the art's own chips are in the stretches the crop avoids — so an unbitten
+  built frame read as plastic beside the drawn boards. Bites stay `BITE_CLEAR` off the
+  corners: the chamfer is already the corner's shape.
   **Retired, by decision** (2026-09-12): dressing the buttons with a nine-patch of that art —
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.
