@@ -326,6 +326,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   wrong for one of them. A ribbon is `_build_border` at exactly `PLANK_TALL` (30), where
   there are no middle rows to fill and it comes out a solid plank with rounded, bitten ends
   rather than a frame with a hole. `Style.board_frame`/`plank` stay as the fallback.
+  **The close crosses too** (`close_button.gd`, 2026-09-12): each is `meter_plank` with the
+  cross drawn over it, so a cross pinned to a title plank is part of that plank rather than a
+  lighter tile bolted on. They grew 34 to 44 (`CLOSE_SIZE`/`CLOSE_SIDE`) and
+  `_border_seams` skips the end joints when the run between the corners is under
+  `BORDER_JOINT` — on something that small the two corners nearly meet and a pair of joints a
+  few pixels apart reads as a crack down the middle.
   **The built frame is bitten too** (`_border_bites`, 2026-09-12): one hole per `BITE_EVERY`
   of each outer edge, pixels cleared and the wood round each ringed in `HOLE_RIM`, like the
   drawn boards' `frame_bites`. Punched into the image, so a hole is a real hole and the lake
@@ -343,7 +349,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
   2026-09-11): a dark `BOARD` face inside that border.
-  *Upgrades* (132x84): the landed net dimmed behind, the ferry in from the left, the dog
+  *Upgrades* (176x100): the landed net dimmed behind, the ferry to the left of the arrow, the dog
   (`DogArt` idle) in its right, both mirrored to face outwards and both at a size that can
   be made out, a black-ringed green (`SAFE`) block arrow large in the middle drawn last over
   them, the "n available" panel across the foot. *Shed* (104x84): sixteen fixed finds
@@ -351,6 +357,15 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   each shoved off an even spread by its own hash, drawn back to front — with the hut standing
   in the middle of them so they stick out on every side, and "Decorate" on a sunken panel
   across the foot.
+  The ferry and the dog are **sized to the clear lane beside the arrow** and placed by their
+  own drawn edges, so exactly `SIDE_UNDER` (0.13) of each goes behind it (2026-09-12). Fitting
+  them to a slot and then clamping them onto the face put the ferry half under the arrow,
+  which is where it started; the arrow narrowed to `ARROW_WIDE` 0.40 and the button widened to
+  176 to leave a lane worth standing in.
+  **`fit`'s mirror turns the canvas over** (`draw_set_transform`), because a `Rect2` of
+  negative width does **not** flip a `draw_texture_rect_region` — it degenerates, and the
+  ferry drew as a few scraps for a day before that was spotted. Don't "flip" with a negative
+  rect anywhere.
   **Retired, by decision** (2026-09-11): holding the ferry and the dog clear of the arrow's
   edges (the lane left was a couple of dozen pixels and shrank them to smudges — overlapping
   is what "behind" looks like), and standing the finds in two rows along the back (a band of

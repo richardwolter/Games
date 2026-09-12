@@ -85,7 +85,7 @@ const HEAD_GAP := 8.0
 ## How much of a row the price tag may take.
 const TAG_SHARE := 0.34
 
-const CLOSE_SIZE := 34.0
+const CLOSE_SIZE := 44.0
 
 ## How long the sparkle over a bought board's sprite lasts, how far it reaches, and how
 ## many points it is made of. Short and small on purpose: it is a receipt for a click the

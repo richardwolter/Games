@@ -1,9 +1,10 @@
 ## The cross in a panel's corner.
 ##
 ## Drawn rather than fetched off the UI sheet: the sheet has four pieces on it and none of
-## them is a cross, and a cross is two lines. Drawn on a plank of the meter's wood
-## (`Style.plank`), the same as the upgrades boards' frames, so it reads as one piece of
-## furniture wherever it is pinned — the shop, the shed's boards or the settings' plank.
+## them is a cross, and a cross is two lines. It sits on a plank of the meter's painted wood
+## (`Style.meter_plank`, 2026-09-12), the same wood and the same bitten ends as every board
+## and button in the game, so a cross pinned to a title plank is part of it rather than a
+## lighter tile bolted on. `Style.plank` is the fallback where the painted wood will not fit.
 class_name CloseButton
 extends Control
 
@@ -47,12 +48,14 @@ func _draw() -> void:
 	var middle := size * 0.5
 	var box := Rect2(middle - Vector2(side, side) * 0.5, Vector2(side, side))
 	var ink := tint * Style.HOVER_WASH if _hovered else tint
-	# A plank of the meter's wood under the cross, drawn by the same helper as the upgrades
-	# boards' frames, so the corner cross and the board it sits on cannot be two woods.
-	var face := Style.FRAME
-	if _hovered:
-		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
-	Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y), face, Style.CLIP)
+	# A plank of the meter's wood under the cross, so the corner cross and the board it sits
+	# on cannot be two woods.
+	var wash := Style.HOVER_WASH if _hovered else Color.WHITE
+	if not Style.meter_plank(self, box, wash):
+		var face := Style.FRAME
+		if _hovered:
+			face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
+		Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y), face, Style.CLIP)
 	var arm := side * ARM
 	var thick := maxf(side * STROKE, 2.0)
 	draw_line(middle - Vector2(arm, arm), middle + Vector2(arm, arm), ink, thick, true)

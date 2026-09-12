@@ -45,7 +45,7 @@ const GROOVE_LINE := 20.0
 const THUMB_WIDE := 12.0
 const ROW_INSET := 10.0
 
-const CLOSE_SIZE := 34.0
+const CLOSE_SIZE := 44.0
 
 ## What the player has set. Setters redraw, so a key press that flips one shows at once.
 var music_on: bool = true:

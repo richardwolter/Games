@@ -46,8 +46,13 @@ const SIDE_HALF := 0.46
 const BOAT_TALL := 0.64
 const BOAT_LIFT := 0.12
 const SIDE_IN := 0.04
+## How much of the ferry and the dog the arrow covers, as a fraction of their own width.
+## Placed by their **drawn** edges rather than by a slot, because a slot centres whatever it
+## is given and the ferry came out almost entirely behind the arrow (2026-09-12): a tenth or
+## so reads as standing behind it, half reads as hidden.
+const SIDE_UNDER := 0.13
 const ARROW_TALL := 0.78
-const ARROW_WIDE := 0.52
+const ARROW_WIDE := 0.40
 const ARROW_HEAD := 0.5
 const ARROW_SHAFT := 0.42
 
@@ -114,10 +119,28 @@ static func fit(on: CanvasItem, art: Dictionary, box: Rect2, fill: float, tint: 
 	var at := Vector2(box.position.x + (box.size.x - drawn.x) * 0.5, 0.0)
 	at.y = box.end.y - drawn.y if stand else box.position.y + (box.size.y - drawn.y) * 0.5
 	var rect := Rect2(at, drawn)
-	# A negative width is how a drawn rect mirrors its picture.
-	var shown := Rect2(at + Vector2(drawn.x, 0.0), Vector2(-drawn.x, drawn.y)) if flip else rect
-	on.draw_texture_rect_region(sheet, shown, region, tint)
+	if not flip:
+		on.draw_texture_rect_region(sheet, rect, region, tint)
+		return rect
+	# Mirrored about the rect's own middle. A Rect2 of negative width does **not** flip a
+	# `draw_texture_rect_region` — it degenerates, and the ferry drew as scraps for a day
+	# before that was spotted (2026-09-12). Turn the canvas over instead.
+	var middle := rect.position.x + drawn.x * 0.5
+	on.draw_set_transform(Vector2(middle, 0.0), 0.0, Vector2(-1.0, 1.0))
+	on.draw_texture_rect_region(
+		sheet, Rect2(Vector2(-drawn.x * 0.5, rect.position.y), drawn), region, tint
+	)
+	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	return rect
+
+
+## How big a sprite comes out when it is fitted into a box of this size — the same sums
+## `fit` does, without drawing, for a caller that has to place a sprite by its own edges.
+static func span_of(art: Dictionary, room: Vector2, fill: float) -> Vector2:
+	var region: Rect2 = art.get("region", Rect2())
+	if region.size.x <= 0.0 or region.size.y <= 0.0:
+		return Vector2.ZERO
+	return region.size * (minf(room.x / region.size.x, room.y / region.size.y) * fill)
 
 
 ## The upgrades button. `hovered` lifts and lights it; `wash` is the caller's own tint on
@@ -135,17 +158,29 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	# arrow, which stands over the middle of them.
 	var foot := face.end.y - face.size.y * 0.08
 	var half := face.size.x * SIDE_HALF
+	var mid := face.position.x + face.size.x * 0.5
+	var arrow_half := face.size.x * ARROW_WIDE * 0.5
+	# The clear lane beside the arrow, and the widest a thing standing in it may be drawn if
+	# only `SIDE_UNDER` of it is to go behind the arrow. Sizing them to the lane rather than
+	# clamping them into it is the whole fix (2026-09-12): a ferry fitted to half the face
+	# and then shoved back on screen ended up half under the arrow, which is where it was.
+	var clear := maxf(mid - arrow_half - face.position.x, 8.0)
+	var lane := minf(clear / (1.0 - SIDE_UNDER), half)
 	if sprites.has("boat"):
-		var boat_tall := face.size.y * BOAT_TALL
-		var slot := Rect2(
-			Vector2(face.position.x + face.size.x * SIDE_IN, foot - face.size.y * BOAT_LIFT - boat_tall),
-			Vector2(half, boat_tall)
-		)
+		var span := span_of(sprites["boat"], Vector2(lane, face.size.y * BOAT_TALL), 1.0)
+		var right := mid - arrow_half + span.x * SIDE_UNDER
+		var slot := Rect2(Vector2(right - span.x, foot - face.size.y * BOAT_LIFT - span.y), span)
 		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
 	if Dogs.has(&"idle"):
 		var dog_tall := face.size.y * SIDE_TALL * 0.9
-		var dog_foot := Vector2(face.end.x - face.size.x * SIDE_IN - half * 0.5, foot)
-		Dogs.stamp(on, &"idle", 0, dog_foot, dog_tall, false, 0.0, tint)
+		var dog_span := Dogs.span(&"idle", dog_tall)
+		# The dog is wider than it is tall, so the lane is what decides its height.
+		if dog_span.x > lane:
+			dog_tall *= lane / dog_span.x
+			dog_span = Dogs.span(&"idle", dog_tall)
+		# The same rule mirrored: its left edge that far inside the arrow's right.
+		var left := mid + arrow_half - dog_span.x * SIDE_UNDER
+		Dogs.stamp(on, &"idle", 0, Vector2(left + dog_span.x * 0.5, foot), dog_tall, false, 0.0, tint)
 	arrow(on, face, tint)
 
 

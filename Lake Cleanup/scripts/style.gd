@@ -944,6 +944,9 @@ const BITE_DEEP := Vector2i(3, 5)
 const BITE_CLEAR := 5
 const BITE_TIP := 0.2
 
+## The shortest run between two corners that is drawn with joints at its ends.
+const BORDER_JOINT := 10
+
 
 static func _border_bites(out: Image, want: Vector2i) -> void:
 	var seed := want.x * 31 + want.y * 17
@@ -1017,9 +1020,13 @@ static func _bite_out(out: Image, want: Vector2i, edge: int, at: int, wide: int,
 ## the top and bottom of each wall. A butt joint between two boards is a line; a cut with no
 ## line is where the eye finds the seam.
 static func _border_seams(out: Image, want: Vector2i) -> void:
-	for x: int in [BORDER_WALL - 1, want.x - BORDER_WALL]:
-		_border_line(out, Rect2i(x, 0, 1, BORDER_TOP))
-		_border_line(out, Rect2i(x, want.y - BORDER_FOOT, 1, BORDER_FOOT))
+	# Only where the run between the corners is a board in its own right. On something as
+	# small as a corner cross the two corners very nearly meet, and a pair of joints a few
+	# pixels apart reads as a crack down the middle rather than as joinery.
+	if want.x - BORDER_WALL * 2 >= BORDER_JOINT:
+		for x: int in [BORDER_WALL - 1, want.x - BORDER_WALL]:
+			_border_line(out, Rect2i(x, 0, 1, BORDER_TOP))
+			_border_line(out, Rect2i(x, want.y - BORDER_FOOT, 1, BORDER_FOOT))
 	for y: int in [BORDER_TOP, want.y - BORDER_FOOT - 1]:
 		_border_line(out, Rect2i(0, y, BORDER_WALL, 1))
 		_border_line(out, Rect2i(want.x - BORDER_WALL, y, BORDER_WALL, 1))

@@ -68,7 +68,7 @@ const LIST_BUSY := 0.25
 
 
 ## The close cross: how big it is drawn, and how far above the inventory column it sits.
-const CLOSE_SIDE := 34.0
+const CLOSE_SIDE := 44.0
 const CLOSE_LIFT := 10.0
 
 ## The dog, when it happens to be in.
