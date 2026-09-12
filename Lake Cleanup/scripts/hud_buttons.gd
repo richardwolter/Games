@@ -37,16 +37,19 @@ const CHIPS := 1
 const NET_FILL := 1.05
 const NET_DIM := Color(0.55, 0.62, 0.66)
 const SIDE_TALL := 0.52
+const BOAT_TALL := 0.64
+const BOAT_LIFT := 0.12
 const SIDE_IN := 0.06
-const ARROW_TALL := 0.62
-const ARROW_WIDE := 0.42
+const ARROW_TALL := 0.78
+const ARROW_WIDE := 0.52
 const ARROW_HEAD := 0.5
 const ARROW_SHAFT := 0.42
 
-## The shed button: three finds stand along the back of the face, the hut in front of them
-## on the right. Fixed, by decision (2026-09-11): a button that showed the player's own
+## The shed button: a row of finds stands along the back of the face, the hut centred in
+## front of them. Fixed, by decision (2026-09-11): a button that showed the player's own
 ## finds would be bare for the first hour, and it is the way in, not a shelf.
 const DECOR_TALL := 0.5
+const DECOR_DIM := Color(0.82, 0.86, 0.88)
 const SHED_TALL := 0.86
 
 ## The coin: a disc in the money's gold with a deeper rim, a paler crescent where the light
@@ -70,7 +73,7 @@ static func board(on: CanvasItem, box: Rect2, hovered: bool) -> Rect2:
 ## A sprite fitted into a box: scaled to fit the box's height (or width, if it is the
 ## tighter), and stood on the box's bottom edge centred on its middle. `fill` over one lets
 ## it run past the box; the caller is saying it does not mind.
-static func fit(on: CanvasItem, art: Dictionary, box: Rect2, fill: float, tint: Color, stand: bool = true) -> Rect2:
+static func fit(on: CanvasItem, art: Dictionary, box: Rect2, fill: float, tint: Color, stand: bool = true, flip: bool = false) -> Rect2:
 	var sheet: Texture2D = art.get("sheet")
 	if sheet == null:
 		return Rect2()
@@ -82,7 +85,9 @@ static func fit(on: CanvasItem, art: Dictionary, box: Rect2, fill: float, tint: 
 	var at := Vector2(box.position.x + (box.size.x - drawn.x) * 0.5, 0.0)
 	at.y = box.end.y - drawn.y if stand else box.position.y + (box.size.y - drawn.y) * 0.5
 	var rect := Rect2(at, drawn)
-	on.draw_texture_rect_region(sheet, rect, region, tint)
+	# A negative width is how a drawn rect mirrors its picture.
+	var shown := Rect2(at + Vector2(drawn.x, 0.0), Vector2(-drawn.x, drawn.y)) if flip else rect
+	on.draw_texture_rect_region(sheet, shown, region, tint)
 	return rect
 
 
@@ -96,20 +101,22 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	if sprites.has("net"):
 		var net_tint := Color(NET_DIM.r * tint.r, NET_DIM.g * tint.g, NET_DIM.b * tint.b)
 		fit(on, sprites["net"], face, NET_FILL, net_tint, false)
-	# The ferry, in from the left; the dog, in from the right, looking at the arrow.
+	# The ferry, in from the left and a little up off the foot; the dog, in from the right.
+	# Both mirrored from how their sheets face, so they look outwards past the arrow.
 	var side_tall := face.size.y * SIDE_TALL
 	var foot := face.end.y - face.size.y * 0.08
 	if sprites.has("boat"):
+		var boat_tall := face.size.y * BOAT_TALL
 		var slot := Rect2(
-			Vector2(face.position.x + face.size.x * SIDE_IN, foot - side_tall),
-			Vector2(face.size.x * 0.4, side_tall)
+			Vector2(face.position.x + face.size.x * SIDE_IN, foot - face.size.y * BOAT_LIFT - boat_tall),
+			Vector2(face.size.x * 0.46, boat_tall)
 		)
-		fit(on, sprites["boat"], slot, 1.0, tint)
+		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
 	if Dogs.has(&"idle"):
 		var dog_tall := side_tall * 0.9
 		var span := Dogs.span(&"idle", dog_tall)
 		var dog_foot := Vector2(face.end.x - face.size.x * SIDE_IN - span.x * 0.5, foot)
-		Dogs.stamp(on, &"idle", 0, dog_foot, dog_tall, true, 0.0, tint)
+		Dogs.stamp(on, &"idle", 0, dog_foot, dog_tall, false, 0.0, tint)
 	arrow(on, face, tint)
 
 
@@ -156,19 +163,21 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	var decor: Array = sprites.get("decor", [])
 	if not decor.is_empty():
-		# Spread across the face's upper half, each in its own slot, dimmed like the net.
+		# Spread across the face's upper half, each in its own slot, only a little dimmed:
+		# they are the collection, not a backdrop.
 		var slot_wide := face.size.x / float(decor.size())
 		var tall := face.size.y * DECOR_TALL
 		var foot := face.position.y + face.size.y * 0.62
-		var dim := Color(NET_DIM.r * tint.r, NET_DIM.g * tint.g, NET_DIM.b * tint.b)
+		var dim := Color(DECOR_DIM.r * tint.r, DECOR_DIM.g * tint.g, DECOR_DIM.b * tint.b)
 		for i in decor.size():
 			var slot := Rect2(Vector2(face.position.x + slot_wide * float(i), foot - tall), Vector2(slot_wide, tall))
 			fit(on, decor[i], slot.grow(-2.0), 1.0, dim)
 	var hut: Texture2D = sprites.get("shed")
 	if hut != null:
+		# Centred on the face, in front of the finds.
 		var slot := Rect2(
-			Vector2(face.position.x + face.size.x * 0.2, face.position.y + face.size.y * (1.0 - SHED_TALL)),
-			Vector2(face.size.x * 0.75, face.size.y * SHED_TALL)
+			Vector2(face.position.x, face.position.y + face.size.y * (1.0 - SHED_TALL)),
+			Vector2(face.size.x, face.size.y * SHED_TALL)
 		)
 		fit(on, {"sheet": hut, "region": Rect2(Vector2.ZERO, hut.get_size())}, slot, 1.0, tint)
 

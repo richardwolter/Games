@@ -875,10 +875,12 @@ func _ready() -> void:
 
 
 ## What the corner buttons draw (`hud_buttons.gd`): the net and ferry the shop was lent,
-## the hut, and a fixed three finds off the clean sheet for the shed to stand in front of.
+## the hut, and a fixed five finds off the clean sheet for the shed to stand in front of.
 ## Handed to the HUD and to the shed's copy of the upgrades button alike, so they are one
 ## button. Whatever is missing is left out, and the button draws without it.
-const BUTTON_DECOR := [&"decor_sofa", &"decor_standing_lamp", &"decor_mirror"]
+const BUTTON_DECOR := [
+	&"decor_standing_lamp", &"decor_sofa", &"decor_mirror", &"decor_fridge", &"decor_lamp"
+]
 
 
 func _lend_button_art(ferry: Dictionary, mesh: Dictionary) -> void:
