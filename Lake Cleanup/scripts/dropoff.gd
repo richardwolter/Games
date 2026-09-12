@@ -348,24 +348,31 @@ class Under extends Node2D:
 		if book.is_empty():
 			return
 		var frame := yard._frame(book)
-		if yard.day != null:
-			var day := yard.day
-			var up := float(book["deck_up"]) * Dropoff.ART_SCALE
-			# A point `up` above the ground lands this far from the ground point
-			# (Shade.lying's transform on a point at that height); the deck top's silhouette
-			# is drawn `up` above its footprint, so the footprint is that much lower first.
-			var slide := Vector2(day.lean * up, day.stretch * 0.5 * up + up)
-			draw_texture_rect_region(
-				Dropoff._sheet, Rect2(frame.position + slide, frame.size),
-				Dropoff._rect(book["shade_dry"]), Shade.tint(day.ink)
-			)
-			# On the water, and moving with it.
-			draw_texture_rect_region(
-				Dropoff._sheet,
-				Rect2(frame.position + slide + Vector2(0.0, yard.swell()), frame.size),
-				Dropoff._rect(book["shade_wet"]),
-				Shade.tint(minf(day.ink * Dropoff.SHADE_GAIN, Dropoff.SHADE_MOST))
-			)
 		draw_texture_rect_region(Dropoff._sheet, frame, Dropoff._rect(book["under"]))
+		# The sand before the shadow, the posts before the sand: the sand is heaped against
+		# a pole, so it covers the pole's own bottom row, and it is ground, so the pier's
+		# shadow falls on it. Drawn after the shadow it stood out in full daylight colour
+		# inside the shade the platform throws — a handful of bright grains on dark sand.
 		for mound in yard._mounds:
 			mound.over(self)
+		if yard.day == null:
+			return
+		var day := yard.day
+		var up := float(book["deck_up"]) * Dropoff.ART_SCALE
+		# A point `up` above the ground lands this far from the ground point (Shade.lying's
+		# transform on a point at that height); the deck top's silhouette is drawn `up`
+		# above its footprint, so the footprint is that much lower first.
+		var slide := Vector2(day.lean * up, day.stretch * 0.5 * up + up)
+		# Over the posts as well as the ground, and rightly: a post stands under the deck
+		# and is in the deck's own shade.
+		draw_texture_rect_region(
+			Dropoff._sheet, Rect2(frame.position + slide, frame.size),
+			Dropoff._rect(book["shade_dry"]), Shade.tint(day.ink)
+		)
+		# On the water, and moving with it.
+		draw_texture_rect_region(
+			Dropoff._sheet,
+			Rect2(frame.position + slide + Vector2(0.0, yard.swell()), frame.size),
+			Dropoff._rect(book["shade_wet"]),
+			Shade.tint(minf(day.ink * Dropoff.SHADE_GAIN, Dropoff.SHADE_MOST))
+		)
