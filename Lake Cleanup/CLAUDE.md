@@ -380,12 +380,20 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 
 ### The Shed and the Box Stand in Grass (`scripts/skirt.gd`, 2026-09-12)
 The hut on the island and the recycle box are front-on pictures set on a lawn, and the row
-of pixels where each ends was a straight cut. `Skirt` grows small painted tufts round both:
-blades drawn as columns of whole art pixels (2-4 tall, 2-4 to a tuft, palette greens), rolled
-off a fixed seed on an isometric ring round the base, split by which side of the base they
-land on — the far half drawn **under** the picture, the near half **over** its bottom edge.
-Hiding the hard edge is the point; a ring drawn only behind it does not do the job.
-- **Baked, one draw call a half** (`Skirt.Patch`, `RenderingServer.canvas_item_add_triangle_array`,
+of pixels where each ends was a straight cut. `Skirt.hem` grows small painted tufts along
+that line: blades drawn as columns of whole art pixels (2-4 tall, 2-4 to a tuft, palette
+greens), rolled off a fixed seed, **standing on the sprite's own silhouette** — for every
+art pixel across the picture, the lowest opaque row of that column is where a tuft stands.
+The grass therefore follows the shed's diamond and the crate's V exactly and fills the line
+rather than dotting it. Every blade is drawn **over** the picture: covering that last row is
+the whole job.
+- **Not a ring round the base, by decision**: an ellipse on the ground stood clear of a
+  front-on painting round its sides, leaving lawn between the blades and the picture and the
+  hard line still showing. The line to hug is the drawing's, not the footprint's.
+- **Overhangs are not ground** (`HEM_BAND`): the shed's eaves end at row 52 of 127, seventy
+  pixels up in the air, and grass planted on a column's lowest row alone grew out of the
+  roof. Only columns within the band above the picture's deepest row are planted.
+- **Baked, one draw call** (`Skirt.Patch`, `RenderingServer.canvas_item_add_triangle_array`,
   the same batching as `Ground._lay_props`). The island redraws every frame, so a few hundred
   `draw_rect` calls is exactly the cost that put the forest at 15 ms. **Not `draw_polygon`**:
   it triangulates the points as one outline, and loose pixel quads handed to it fail
@@ -395,13 +403,12 @@ Hiding the hard edge is the point; a ring drawn only behind it does not do the j
 - **Painted in code, not pack `Leaves`** — the tufts on the beach and the island are the pack's;
   these are blades sized and leaned to a base.
 - **The box also spills sand** (`Skirt.spill`): loose single art pixels thinning outwards from
-  its foot, palette `sand`, fading with distance. A spill, not a patch, and nothing in `Ground`
-  knows about it — the box stands on the island's lawn, and this is ground the crate has worn.
-  Its grass ring is wider than `Yard.FOOT_HALF` on purpose: the crate's side corners are out at
-  a tile and a quarter, and a ring at the footprint hides behind the picture.
+  its foot, palette `sand`, fading with distance, drawn under the picture. A spill, not a
+  patch, and nothing in `Ground` knows about it — the box stands on the island's lawn, and
+  this is ground the crate has worn.
 - **The shed's contact patch is gone, by decision**: the soft black quad under the hut
-  (`SHED_SHADOW`, alpha 0.11). The grass is what says the hut meets the ground; the quad under
-  a skirt of blades read as a second shadow.
+  (alpha 0.11). The grass is what says the hut meets the ground; the quad under a skirt of
+  blades read as a second shadow.
 - **The hut's shadow is rooted at the walls, not at the bottom of the picture**
   (`Lake.SHED_ART_GROUND` 0.224, `_shed_feet`): `assets/shed.png` paints the isometric diamond
   the hut stands on, so the art's last row is that diamond's *front point*, some 27 px down the
@@ -409,9 +416,9 @@ Hiding the hard edge is the point; a ring drawn only behind it does not do the j
   itself has not moved (`SHED_STAND` 0.35 is unchanged) — only what hangs off it. **Re-measure
   `SHED_ART_GROUND` if the hut is re-cut** (`tools/slice_shed.gd`): it is the diamond's side
   corners, rows 93 and 103 of 127, as a fraction up from the bottom.
-- **Shed and box only**, this pass. The four dropoff piers have the same hard bottom edge on the
-  bank and are the obvious next ones; trees and rocks are not — they are the pack's own art with
-  their own baked bases.
+- Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
+  grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
+  bottom edge on the bank and are the obvious next ones.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
@@ -488,20 +495,25 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   (122,66,34) is repainted to `Style.BOX` (120,89,64) — hull planks only, by decision; deck
   wood, spars, outline and the blue stripe stay as drawn — so the ferry and the recycle box
   it serves read as one wood. The square sail's lit face carries the box's recycle mark
-  in `Style.BOX_BLUE`: three bent arrows drawn as geometry (`MARK_*` fractions of the
-  triangle's side) and **mapped onto a parallelogram on the cloth** per heading
-  (`MARK_QUAD`: top-left, top-right, bottom-left, measured off the lit face's white rows,
-  about seven tenths of the face wide, with the face's own slope for its top and bottom
-  edges), so in a quartering heading it leans and foreshortens with the sail instead of
-  lying flat over it. Then **clipped to the face's own white pixels**: nothing of it lands
-  on the shaded head strip, the billow or the sky. Frames 0-3 and their mirrors carry the
-  face; the side view (4, 12) shows only the billow's lens a few pixels wide and gets the
-  mark squeezed into that, so a hint of the blue shows at every heading the painted side
-  faces. The stern quarters show the sail's back and stay plain, by decision. Tried and
-  rejected on the way: a 15 px hand bitmap in the middle of the sail (a small odd knot),
-  and a flat box per heading that ran past the face (bled onto the cloth round it). The
-  one-pixel slate edge runs round the **outside** only (edging the hole and the gaps too
-  closed them into a blob). **The pennant is gone** with it — the flag in the yard's colour at the masthead,
+  in `Style.BOX_BLUE`: **two curved arrows chasing round one ring**, one over the top and
+  one under, each ending in a chevron head — the box's own mark (`assets/Recycle_Box.png`),
+  round rather than the triangular one the HUD draws. Geometry on a unit canvas (`MARK_*`
+  fractions: ring radius, bar thickness, head width and length, sweep and start angle),
+  **decided pixel by pixel**: each frame pixel's centre is mapped back through the heading's
+  parallelogram (`MARK_QUAD`: top-left, top-right, bottom-left, measured off the lit face's
+  white rows, about seven tenths of the face wide, with the face's own slope for its top and
+  bottom edges) and tested — distance to the ring, point-in-triangle for the heads — so in a
+  quartering heading it leans and foreshortens with the sail, and an edge is a pixel on or
+  off, not a blurred step. Then **clipped to the face's own white pixels**: nothing of it
+  lands on the shaded head strip, the billow or the sky. **No outline**, by decision. Frames
+  0-3 and their mirrors carry the face; the side view (4, 12) shows only the billow's lens a
+  few pixels wide and gets the mark squeezed into that, so a hint of the blue shows at every
+  heading the painted side faces. The stern quarters show the sail's back and stay plain, by
+  decision. Tried and rejected on the way (all 2026-09-12): a 15 px hand bitmap in the middle
+  of the sail (a small odd knot); three bent arrows round a triangle, drawn at zoom and boxed
+  down to size (ragged, heads bled into blobs); a flat box per heading that ran past the face
+  (bled onto the cloth round it); a one-pixel slate outline round the outside (read as more
+  bleed). **The pennant is gone** with it — the flag in the yard's colour at the masthead,
   `PENNANT_STAFF`, `masthead()`, and the json's `masthead` list — the yards' own tints tell
   the piers apart. **After re-running the builder, reimport** (`<exe> --path . --headless
   --import`): a `--path` run without the editor draws the stale `.godot/imported` texture.
