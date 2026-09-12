@@ -95,17 +95,6 @@ const STOCK_GLOW := 0.5
 const STOCK_SAMPLE := "99999"
 const STOCK_PAD := 12.0
 
-## The count written across the foot of the upgrades button: how tall its panel is and how
-## big the lettering is against that height.
-const AVAILABLE_TALL := 14.0
-const AVAILABLE_TEXT := 0.8
-
-## The smallest the count may be lettered at. The plaque is eighty-odd pixels on a side and
-## "9 available" set to its panel's height would run off both ends of it, so the words are
-## shrunk to fit — but only so far, and under this they would be a smudge rather than a
-## reading.
-const AVAILABLE_LEAST := 8
-
 ## The sprites the buttons carry, lent by the lake — see `hud_buttons.gd` for the keys.
 var sprites := {}:
 	set(v):
@@ -654,28 +643,8 @@ func _recycle_shapes(box: Rect2) -> Array:
 ## notice the absence of, and "0 available" is the answer to the question they are asking
 ## when they look at it.
 func _draw_available() -> void:
-	var box := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
-	var plate := Rect2(
-		Vector2(box.position.x + 4.0, box.end.y - AVAILABLE_TALL - 3.0),
-		Vector2(box.size.x - 8.0, AVAILABLE_TALL)
-	)
-	Style.plate(self, plate, Style.BUTTON_SUNK, 2.0)
-	# Set to the panel's height and then shrunk to its width if the words are too long for
-	# it — not stepped onto the game's ladder of text sizes, because every rung of that
-	# ladder is wider than this panel.
-	var label := "%d available" % available
-	var height := maxi(AVAILABLE_LEAST, int(plate.size.y * AVAILABLE_TEXT))
-	var wide := Style.measure(label, height).x
-	if wide > plate.size.x:
-		height = maxi(AVAILABLE_LEAST, int(float(height) * plate.size.x / wide))
-	Style.write(
-		self,
-		label,
-		height,
-		Vector2(0.0, plate.position.y + plate.size.y * 0.5 + float(height) * 0.35),
-		Style.INK,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		plate
+	HudButtons.label(
+		self, HudButtons.face_of(_lifted(_upgrades_box, &"upgrades")), "%d available" % available
 	)
 
 

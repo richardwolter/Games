@@ -26,13 +26,6 @@ var note: String = "":
 		note = value
 		queue_redraw()
 
-## How tall the note's panel is and how big it is lettered against that. HudSkin's own
-## numbers — the two buttons are the same picture and the writing on them has to land in
-## the same place.
-const NOTE_TALL := 14.0
-const NOTE_TEXT := 0.8
-const NOTE_LEAST := 8
-
 ## How much it lifts under the cursor. The same feedback the HUD's buttons give, because
 ## they are the same buttons.
 const HOVER_LIFT := Style.HOVER_LIFT
@@ -96,21 +89,4 @@ func _draw() -> void:
 ## shrunk to its width — the button is small and the game's ladder of text sizes starts wider
 ## than this panel.
 func _draw_note(face: Rect2) -> void:
-	var plate := Rect2(
-		Vector2(face.position.x + 4.0, face.end.y - NOTE_TALL - 3.0),
-		Vector2(face.size.x - 8.0, NOTE_TALL)
-	)
-	Style.plate(self, plate, Style.BUTTON_SUNK, 2.0)
-	var height := maxi(NOTE_LEAST, int(plate.size.y * NOTE_TEXT))
-	var wide := Style.measure(note, height).x
-	if wide > plate.size.x:
-		height = maxi(NOTE_LEAST, int(float(height) * plate.size.x / wide))
-	Style.write(
-		self,
-		note,
-		height,
-		Vector2(0.0, plate.position.y + plate.size.y * 0.5 + float(height) * 0.35),
-		Style.INK,
-		HORIZONTAL_ALIGNMENT_CENTER,
-		plate
-	)
+	HudButtons.label(self, face, note)

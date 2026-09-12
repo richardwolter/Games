@@ -370,13 +370,12 @@ class Stage extends Control:
 		HudButtons.draw_upgrades(self, upgrades, false, tuner.sprites)
 		HudButtons.draw_shed(self, shed, false, tuner.sprites)
 		# The shed's room is the face less the band its word sits on — the two handles on that
-		# button are measured against it, so the tuner needs it traced like a face.
+		# button are measured against it, so the tuner needs it traced like a face. Asked for
+		# rather than worked out again, or the canvas and the button disagree about where a
+		# fraction of the room is.
 		var face: Rect2 = HudButtons.traced.get(&"face_shed", Rect2())
 		if face.size.x > 0.0:
-			var label_tall := floorf(face.size.y * 0.2)
-			HudButtons.traced[&"room_shed"] = Rect2(
-				face.position, Vector2(face.size.x, face.size.y - label_tall)
-			)
+			HudButtons.traced[&"room_shed"] = HudButtons.room_of(face)
 		HudButtons.tracing = false
 		var ring: Rect2 = HudButtons.traced.get(tuner._picked, Rect2())
 		if ring.size.x > 0.0:

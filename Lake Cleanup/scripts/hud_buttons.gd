@@ -301,8 +301,7 @@ static func arrow(on: CanvasItem, face: Rect2, tint: Color) -> void:
 static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictionary) -> void:
 	var face := board(on, box, hovered, Style.BUTTON_FACE)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
-	var label_tall := floorf(face.size.y * 0.2)
-	var room := Rect2(face.position, Vector2(face.size.x, face.size.y - label_tall))
+	var room := room_of(face)
 	_trace(&"face_shed", face)
 	var decor: Array = sprites.get("decor", [])
 	if not decor.is_empty():
@@ -341,7 +340,7 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 		var slot := Rect2(room.position + _at(&"hut", rule) * room.size - span * 0.5, span)
 		fit(on, art, slot, 1.0, tint)
 		_trace(&"hut", slot)
-	label(on, Rect2(Vector2(face.position.x, face.end.y - label_tall), Vector2(face.size.x, label_tall)), SHED_LABEL)
+	label(on, face, SHED_LABEL)
 
 
 ## Where each find stands: one slot per find, spread across the width in order so the heap
@@ -365,20 +364,43 @@ static func _scatter(count: int, room: Rect2) -> Array:
 	return out
 
 
-## The word across the foot of a button, on a sunken panel. The same panel the upgrades
-## button writes its count on, because they are a pair.
-static func label(on: CanvasItem, box: Rect2, text: String) -> void:
-	var plate := Rect2(box.position + Vector2(4.0, 1.0), box.size - Vector2(8.0, 4.0))
+## The word across the foot of a button, on a sunken panel — the decorate button's name, the
+## upgrades button's count, and the same again on the shed's copy of that button.
+##
+## **One panel, drawn once** (2026-09-12). It was written out three times, and the three
+## drifted: the decorate button's plate was measured off the band rather than the face and its
+## lettering went through `Style.step` onto the size ladder, so "Decorate" stood taller on a
+## deeper plate than "n available" did beside it. Given the **face**, not a band, because that
+## is what all three callers have.
+const LABEL_TALL := 14.0
+const LABEL_TEXT := 0.8
+const LABEL_LEAST := 8
+
+
+static func label(on: CanvasItem, face: Rect2, text: String) -> void:
+	var plate := Rect2(
+		Vector2(face.position.x + 4.0, face.end.y - LABEL_TALL - 3.0),
+		Vector2(face.size.x - 8.0, LABEL_TALL)
+	)
 	Style.plate(on, plate, Style.BUTTON_SUNK, 2.0)
-	var height := Style.step(plate.size.y * 0.8)
+	# Set to the plate's height and then shrunk to its width if the word is too long for it.
+	# Not stepped onto the game's ladder of text sizes: every rung of that ladder is taller
+	# than this plate.
+	var height := maxi(LABEL_LEAST, int(plate.size.y * LABEL_TEXT))
 	var wide := Style.measure(text, height).x
 	if wide > plate.size.x:
-		height = maxi(8, int(float(height) * plate.size.x / wide))
+		height = maxi(LABEL_LEAST, int(float(height) * plate.size.x / wide))
 	Style.write(
 		on, text, height,
 		Vector2(0.0, plate.position.y + plate.size.y * 0.5 + float(height) * 0.35),
 		Style.INK, HORIZONTAL_ALIGNMENT_CENTER, plate
 	)
+
+
+## What a button leaves for its pictures: the face less the band its word sits on. The one
+## place that sum is done — the shed's heap, its hut and the tuner all ask.
+static func room_of(face: Rect2) -> Rect2:
+	return Rect2(face.position, Vector2(face.size.x, face.size.y - LABEL_TALL - 4.0))
 
 
 ## A panel pressed **into** the wood: a seam all round, the dark face, and a second seam

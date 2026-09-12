@@ -391,6 +391,14 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   each shoved off an even spread by its own hash, drawn back to front — with the hut standing
   in the middle of them so they stick out on every side, and "Decorate" on a sunken panel
   across the foot.
+  **That panel is drawn once** (`HudButtons.label`, `LABEL_TALL`/`LABEL_TEXT`/`LABEL_LEAST`,
+  2026-09-12): the decorate button's name, the upgrades button's count and the shed's copy of
+  it all call the one function, which is given the **face** because that is what all three
+  callers have. Written out three times they drifted — the decorate plate was measured off its
+  own band rather than the face and its lettering went through `Style.step` onto the size
+  ladder, so "Decorate" stood taller on a deeper plate than "n available" beside it.
+  `room_of` is the matching sum for what the band leaves the pictures, asked for by the shed's
+  heap, its hut and the tuner alike.
   The ferry and the dog are **sized to their share of the face** and placed by their own drawn
   edges, so `SIDE_UNDER` (0.3) of each goes behind the arrow (2026-09-12). Sizing them to the
   lane beside the arrow was tried while the button was 176 wide and does not survive the
