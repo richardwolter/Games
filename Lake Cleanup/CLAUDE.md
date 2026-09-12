@@ -453,10 +453,13 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   (122,66,34) is repainted to `Style.BOX` (120,89,64) — hull planks only, by decision; deck
   wood, spars, outline and the blue stripe stay as drawn — so the ferry and the recycle box
   it serves read as one wood. The square sail's lit face carries the box's recycle mark
-  in `Style.BOX_BLUE`: a hand-authored 15 px bitmap of three chasing arrows, baked per
-  heading into frames 0-3 and their mirrors, squashed sideways to the face's width (columns
-  OR-merged, so no arm drops out), with a one-pixel slate edge round its **outside** only
-  (edging the hole and the gaps too closed them into a blob). The side view shows only the
+  in `Style.BOX_BLUE`: three bent arrows drawn as geometry (`MARK_*` fractions of the
+  triangle's side) and rasterised into the box each heading has for it (`MARK_AT`,
+  measured off the lit face's white rows), so it fills the face and turns with the sail —
+  26x21 bow on, down to 14x13 in the last quartering frame. Frames 0-3 and their mirrors.
+  A 15 px hand bitmap in the middle of the sail was tried first and read as a small odd
+  knot. One-pixel slate edge round the **outside** only (edging the hole and the gaps too
+  closed them into a blob). The side view shows only the
   sail's billow edge and the stern quarters its back, so those headings carry no mark, by
   decision. **The pennant is gone** with it — the flag in the yard's colour at the masthead,
   `PENNANT_STAFF`, `masthead()`, and the json's `masthead` list — the yards' own tints tell

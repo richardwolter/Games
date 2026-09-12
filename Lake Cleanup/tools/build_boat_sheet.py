@@ -248,34 +248,31 @@ OPS = {
 }
 
 
-## The recycle mark, as painted on the square sail's lit face: three arms chasing round a
-## triangle, with a blunt head on each. Fifteen pixels across; a face narrower than that
-## gets it squashed sideways (columns merged, so no arm drops out) to the width given.
-## Only the headings that show the sail's lit face carry it (frames 0-3 and their mirrors):
-## the side view shows just the sail's billow edge, and the stern quarters its back.
-## The stern quarters' sail back is the slate face and is left plain, by decision.
-MARK = [
-    ".......R.......",
-    "......RRR......",
-    ".....RR.RR.....",
-    "....RR...RR....",
-    "....R.....RRR..",
-    "..R.......RRRR.",
-    ".RRR.......RRR.",
-    "RRRRR.......R..",
-    ".RR............",
-    ".RR..........RR",
-    "..RR......RRRRR",
-    "...RRRR.RRRRRR.",
-    ".........RRR...",
-]
-MARK_WIDE = len(MARK[0])
-## Where the mark sits in each frame that carries it: left, top, width in frame pixels.
+## The recycle mark, as painted on the square sail's lit face: three bent arrows chasing
+## clockwise round a triangle, each a bar folded at one corner with a head at its end.
+## Drawn as geometry and rasterised to the box each heading has for it, so the mark fills
+## the sail's lit face (2026-09-12: a 15 px hand bitmap in the middle of the sail read as a
+## small odd knot; Richard wanted it bigger, centred and with proper arrows). Fractions are
+## of the triangle's side: the bar's thickness, the head's width and length, where along
+## the side into a corner an arrow's tail starts and where past it its head ends, so the
+## gap between one arrow's head and the next one's tail is TAIL - TIP - HEAD_L of a side.
+MARK_THICK = 0.125
+MARK_HEAD_W = 0.36
+MARK_HEAD_L = 0.20
+MARK_TAIL = 0.64
+MARK_TIP = 0.36
+MARK_ZOOM = 8
+MARK_INK_AT = 96
+## The box the mark fills in each frame that carries it: left, top, width, height in frame
+## pixels, measured off the lit face's white rows with a pixel or two of cloth kept round
+## it. Only the headings that show the sail's lit face carry it (frames 0-3 and their
+## mirrors): the side view shows just the sail's billow edge, and the stern quarters its
+## back, which is the slate face and is left plain, by decision.
 MARK_AT = {
-    0: (57, 51, 15),
-    1: (56, 51, 15),
-    2: (54, 51, 13),
-    3: (55, 51, 9),
+    0: (51, 51, 26, 21),
+    1: (49, 50, 26, 21),
+    2: (50, 51, 20, 17),
+    3: (51, 49, 14, 13),
 }
 ## The one-pixel edge round the outside of the mark where it lies on cloth, so it reads on
 ## white.
@@ -312,23 +309,42 @@ def repaint_hull(frame):
                 px[x, y] = INK["X"]
 
 
-def mark_bitmap(width):
-    """The mark squashed to `width` columns: each output column is the OR of the source
-    columns that fall into it, so a narrow face keeps every arm."""
-    rows = []
-    for line in MARK:
-        out = []
-        for i in range(width):
-            x0 = i * MARK_WIDE // width
-            x1 = max((i + 1) * MARK_WIDE // width, x0 + 1)
-            out.append(any(c == "R" for c in line[x0:x1]))
-        rows.append(out)
-    return rows
+def mark_bitmap(width, tall):
+    """The mark rasterised to `width` x `tall`: drawn MARK_ZOOM times over, boxed down, and
+    cut at MARK_INK_AT so a thin diagonal keeps its pixels."""
+    import math
+    W, H = width * MARK_ZOOM, tall * MARK_ZOOM
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    side = min(W, H / (math.sqrt(3) / 2))
+    t = MARK_THICK * side
+    high = side * math.sqrt(3) / 2
+    cx = W / 2
+    top = (H - high) / 2 + t * 0.5
+    bot = top + high - t * 0.9
+    side = (bot - top) / (math.sqrt(3) / 2)
+    V = [(cx, top), (cx + side / 2, bot), (cx - side / 2, bot)]
+    for k in range(3):
+        a, b, c = V[(k - 1) % 3], V[k], V[(k + 1) % 3]
+        start = (a[0] + (b[0] - a[0]) * MARK_TAIL, a[1] + (b[1] - a[1]) * MARK_TAIL)
+        end = (b[0] + (c[0] - b[0]) * MARK_TIP, b[1] + (c[1] - b[1]) * MARK_TIP)
+        d.line([start, b, end], fill=255, width=int(t), joint="curve")
+        dx, dy = c[0] - b[0], c[1] - b[1]
+        run = math.hypot(dx, dy)
+        ux, uy = dx / run, dy / run
+        nx, ny = -uy, ux
+        hw, hl = MARK_HEAD_W * side / 2, MARK_HEAD_L * side
+        base = (end[0] - ux * t * 0.3, end[1] - uy * t * 0.3)
+        d.polygon([(base[0] + nx * hw, base[1] + ny * hw),
+                   (base[0] - nx * hw, base[1] - ny * hw),
+                   (base[0] + ux * hl, base[1] + uy * hl)], fill=255)
+    px = im.resize((width, tall), Image.BOX).load()
+    return [[px[x, y] >= MARK_INK_AT for x in range(width)] for y in range(tall)]
 
 
 def stamp_mark(frame, at, mirror=False):
-    left, top, width = at
-    bits = mark_bitmap(width)
+    left, top, width, tall = at
+    bits = mark_bitmap(width, tall)
     px = frame.load()
 
     def mx(x):
@@ -339,7 +355,6 @@ def stamp_mark(frame, at, mirror=False):
     # read as one blob.
     # "Outside" is found on the mark grown by one pixel, which closes the gaps between the
     # arms, so the flood from the border cannot leak in through them.
-    tall = len(bits)
 
     def grown(x, y):
         return any(0 <= x + dx < width and 0 <= y + dy < tall and bits[y + dy][x + dx]
