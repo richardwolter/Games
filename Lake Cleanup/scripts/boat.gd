@@ -141,7 +141,7 @@ const FRAME_ZERO_TURN := PI * 0.25
 ## picture: see HullShade. Collar and shadow ride in this node's space, which already bobs
 ## (`_place`), so the collar's material carries no swell.
 const COLLAR_SCALE := 2.4
-const COLLAR_REACH := 4.0
+const COLLAR_REACH := 1.5
 
 ## How far the collar bows towards the camera at the near side, as a fraction of the hull's
 ## half beam on screen, and how many segments the curve is built from. Shallow: the point is
@@ -149,6 +149,13 @@ const COLLAR_REACH := 4.0
 ## boat is standing in rather than the line it floats on.
 const COLLAR_BOW := 0.34
 const COLLAR_STEPS := 8
+
+## How far the whole arc is lifted up into the hull, as a fraction of the foam's own reach
+## below the line. The cut is the bottom of the drawn hull, so a collar hung straight on it
+## puts its whole lower band outside the sprite and the boat wears a skirt. Lifted, the froth
+## sits in the hull's own bottom edge and only its tongues show past it, which is what a
+## waterline looks like.
+const COLLAR_LIFT := 0.8
 
 ## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
 ## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
@@ -1235,10 +1242,14 @@ static func waterline_arc(index: int, scale: float) -> PackedVector2Array:
 	if across.y < 0.0:
 		across = -across
 	var sag := across * span.length() * COLLAR_BOW
+	# Up into the hull, so the band sits in the sprite's own bottom edge rather than hanging
+	# under it. In the parent's space, where the scale is already applied, so it is measured
+	# in the same pixels the foam's own reach is.
+	var lift := Vector2(0.0, -LakeGrid.FOAM_TALL * COLLAR_SCALE * COLLAR_LIFT)
 	var out := PackedVector2Array()
 	for step in COLLAR_STEPS + 1:
 		var u := lerpf(-1.0, 1.0, float(step) / float(COLLAR_STEPS))
-		out.append(middle + span * u + sag * (1.0 - u * u))
+		out.append(middle + span * u + sag * (1.0 - u * u) + lift)
 	return out
 
 

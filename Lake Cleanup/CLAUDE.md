@@ -455,7 +455,10 @@ the whole job.
   `Style.CRATE`. A remap by brightness rank, not a tint: seams stay seams and the outline
   becomes the box's darkest brown (one wood, by decision). Untouched: the thatch, the wooden
   fascia along the roof's outer edges (told from the walls by having thatch *below* it in
-  its column), the lit yellow window and the grey door hardware. Run it with the psd-extract
+  its column), the lit yellow window and the grey door hardware. **The walls also get the
+  box's border**: every wall pixel on the picture's outer edge is painted in the box's own
+  silhouette colour (read off the box, 48,37,33), the one-pixel dark line the box is drawn
+  with; the roof's edge is left as painted. Run it with the psd-extract
   venv python from the project root; **re-run after any re-cut**, copying the fresh cut to
   `shed_tan.png` first. `--mask out.png` writes the classification for checking.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
@@ -557,7 +560,11 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   the cut bow once for trusting the plane's projection over the drawing, and white on open
   water would read worse than the bar did. The far half is not drawn: it would be above the
   cut, behind the hull drawn over it. Shallow by decision — a deeper curve reads as a puddle
-  the boat is standing in rather than the line it floats on. `HullCollar.lay` takes each
+  the boat is standing in rather than the line it floats on. The whole arc is then lifted
+  `COLLAR_LIFT` (0.8) of the foam's own reach **up into the hull**, and `COLLAR_REACH` past
+  the ends cut from 4 to 1.5: the cut is the bottom of the drawn hull, so a collar hung
+  straight on it puts its entire lower band outside the sprite and the boat wears a skirt.
+  Lifted, the froth sits in the hull's own bottom edge and only its tongues show past it. `HullCollar.lay` takes each
   point's normal from the run either side of it, not from one segment, or every bend leaves a
   notch outside and an overlap inside. `test_lake` guards the bow and the fit at all sixteen
   headings. **This is not the ring `HullFoam` rejected** — that was the moving bow wave,
