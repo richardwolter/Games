@@ -704,16 +704,25 @@ static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) ->
 # The meter's own border
 # ---------------------------------------------------------------------------------------
 
-## The pollution meter's painted frame, cut up into a patch a button of any size can wear.
+## The pollution meter's painted frame, cut up and built back into a frame of any size.
 ##
-## The corner buttons asked for the meter's border rather than the drawn one, and the meter's
-## art is a single painted frame at one size, so it is turned into a nine-patch here: the
-## corners kept whole, the edges tiled, the middle left open for the caller to fill.
+## The corner buttons asked for the meter's border rather than the drawn one, and that art is
+## one painting 188 pixels wide by 49 tall with its grain running the full length. **Nothing
+## here is ever stretched or squeezed**: a nine-patch was tried first (2026-09-11) and tiling
+## eight-pixel slices of that grain turned the oak into corduroy and flattened the chamfer off
+## its corners. Every piece below is cut at 1:1, cropped to length, or turned ninety degrees.
 ##
-## The left wall is the right wall mirrored, not the art's own. The meter's left side is
-## two pixels thin — the garbage circle sits over it, so it was never painted — and a button
-## with a hairline down one edge and fourteen pixels down the other reads as a mistake. The
-## rest is the sheet as painted, nicks and all.
+## The recipe, Richard's:
+## - the top and bottom edges are the art's own planks, **cropped** out of their long clean
+##   runs — a shorter edge is a shorter cut of the plank, never the same plank squashed;
+## - the side walls are a length cut out of that top plank and **turned on its side**, so the
+##   grain runs down the stile the way a real frame's sides do;
+## - the corners are the meter's own, stamped whole;
+## - the butt joints are painted over in the wood's own outline colour, so a join reads as two
+##   boards meeting rather than as a cut.
+##
+## The left half is the right half mirrored. The meter's left side was never painted — the
+## garbage circle sits over it, and all that is there is two pixels of edge.
 const METER_BORDER := "res://assets/ui/meter/Meter_Border.png"
 
 ## Preloaded rather than reached as the global `Art`: this file has no `class_name` and a
@@ -721,52 +730,39 @@ const METER_BORDER := "res://assets/ui/meter/Meter_Border.png"
 ## there is no cycle.
 const Pics := preload("res://scripts/art.gd")
 
-## Where the pieces are on that sheet, and so how thick each wall is. Measured off the
-## sheet's alpha, not authored — re-measure if the art is repainted.
-const BORDER_WALL := 14
+## The pieces on that sheet. Measured off the sheet's alpha — the planks' clean runs are the
+## stretches where every row of the plank is solid, so a crop never lands half on a chip.
+## Re-measure all of these if the meter art is repainted.
+const BORDER_WALL := 15
 const BORDER_TOP := 16
 const BORDER_FOOT := 14
-const BORDER_RUN := 8
-const BORDER_RIGHT := Vector2i(257, 24)
-const BORDER_MID_X := 180
-const BORDER_MID_Y := 46
+const BORDER_CORNER_TOP := Rect2i(256, 24, BORDER_WALL, BORDER_TOP)
+const BORDER_CORNER_FOOT := Rect2i(256, 59, BORDER_WALL, BORDER_FOOT)
+const BORDER_TOP_RUN := Rect2i(142, 24, 110, BORDER_TOP)
+const BORDER_FOOT_RUN := Rect2i(106, 59, 95, BORDER_FOOT)
+## The line painted over a butt joint, read off the art's own outer outline.
+const BORDER_SEAM := Color8(66, 43, 28)
 
-## The built patch, kept: it is a 36x38 image and every button in the game wears the same one.
-static var _patch: ImageTexture
+## The smallest box that can wear it: two corners across and the two planks down, with a
+## pixel of face left over.
+const BORDER_LEAST := Vector2i(BORDER_WALL * 2 + 2, BORDER_TOP + BORDER_FOOT + 2)
 
-
-## The patch, built on the first call. Null if the art is missing, and a caller falls back to
-## the drawn frame — the game runs with the art missing rather than failing to load.
-static func meter_patch() -> ImageTexture:
-	if _patch != null:
-		return _patch
-	var art := Pics.image(METER_BORDER)
-	if art == null:
-		return null
-	art.convert(Image.FORMAT_RGBA8)
-	var wide := BORDER_WALL * 2 + BORDER_RUN
-	var tall := BORDER_TOP + BORDER_RUN + BORDER_FOOT
-	var built := Image.create(wide, tall, false, Image.FORMAT_RGBA8)
-	# The right column: its two corners and a slice of wall between them, as painted.
-	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_RIGHT.y, BORDER_WALL, BORDER_TOP), Vector2i(BORDER_WALL + BORDER_RUN, 0))
-	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_MID_Y, BORDER_WALL, BORDER_RUN), Vector2i(BORDER_WALL + BORDER_RUN, BORDER_TOP))
-	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_RIGHT.y + BORDER_TOP + 19, BORDER_WALL, BORDER_FOOT), Vector2i(BORDER_WALL + BORDER_RUN, BORDER_TOP + BORDER_RUN))
-	# The top and bottom walls, from the middle of the sheet where the frame is unbroken.
-	_lay(built, art, Rect2i(BORDER_MID_X, BORDER_RIGHT.y, BORDER_RUN, BORDER_TOP), Vector2i(BORDER_WALL, 0))
-	_lay(built, art, Rect2i(BORDER_MID_X, BORDER_RIGHT.y + BORDER_TOP + 19, BORDER_RUN, BORDER_FOOT), Vector2i(BORDER_WALL, BORDER_TOP + BORDER_RUN))
-	# The left column: the right one, mirrored.
-	for y in tall:
-		for x in BORDER_WALL:
-			built.set_pixel(x, y, built.get_pixel(wide - 1 - x, y))
-	_patch = ImageTexture.create_from_image(built)
-	return _patch
+## One built frame per size, kept. There are three buttons and they change size only when the
+## window does, so this holds three or four images for the life of the run.
+static var _frames := {}
+static var _sheet: Image
+static var _looked: bool = false
 
 
-static func _lay(into: Image, from: Image, cut: Rect2i, at: Vector2i) -> void:
-	var kept := cut.intersection(Rect2i(Vector2i.ZERO, from.get_size()))
-	if kept.size.x <= 0 or kept.size.y <= 0:
-		return
-	into.blit_rect(from, kept, at)
+## The sheet, read once. Null if the art is missing, and every caller falls back to the drawn
+## frame — the game runs with the art missing rather than failing to load.
+static func border_sheet() -> Image:
+	if not _looked:
+		_looked = true
+		_sheet = Pics.image(METER_BORDER)
+		if _sheet != null:
+			_sheet.convert(Image.FORMAT_RGBA8)
+	return _sheet
 
 
 ## How far in from a button's edge its face starts, once it is wearing the meter's border.
@@ -777,19 +773,122 @@ static func border_inset(box: Rect2) -> Rect2:
 	)
 
 
-## The meter's border round a box, corners whole and edges tiled, nothing drawn in the
-## middle. False if there is no art, and the caller draws `board_frame` instead.
-static func meter_frame(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
-	var patch := meter_patch()
-	if patch == null:
-		return false
-	RenderingServer.canvas_item_add_nine_patch(
-		on.get_canvas_item(), box, Rect2(Vector2.ZERO, patch.get_size()), patch.get_rid(),
-		Vector2(float(BORDER_WALL), float(BORDER_TOP)),
-		Vector2(float(BORDER_WALL), float(BORDER_FOOT)),
-		RenderingServer.NINE_PATCH_TILE, RenderingServer.NINE_PATCH_TILE, false, tint
+## Whether a box of this size can wear the border at all.
+static func border_fits(box: Rect2) -> bool:
+	return (
+		border_sheet() != null
+		and int(box.size.x) >= BORDER_LEAST.x and int(box.size.y) >= BORDER_LEAST.y
 	)
+
+
+## The meter's border round a box. False if there is no art or the box is too small for it,
+## and the caller draws `board_frame` instead.
+static func meter_frame(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
+	if not border_fits(box):
+		return false
+	var want := Vector2i(int(box.size.x), int(box.size.y))
+	var built: ImageTexture = _frames.get(want)
+	if built == null:
+		built = _build_border(want)
+		if built == null:
+			return false
+		_frames[want] = built
+	on.draw_texture_rect(built, Rect2(box.position.floor(), Vector2(want)), false, tint)
 	return true
+
+
+## One piece of the sheet as an image of its own.
+static func _cut(from: Image, box: Rect2i) -> Image:
+	var out := Image.create(box.size.x, box.size.y, false, Image.FORMAT_RGBA8)
+	out.blit_rect(from, box, Vector2i.ZERO)
+	return out
+
+
+## A run of plank `length` long, laid out of `piece` end to end, every other length mirrored
+## so the grain turns back on itself instead of repeating. Only long edges need more than one
+## length: the clean runs are over ninety pixels and most buttons are shorter than that.
+static func _plank_run(piece: Image, length: int) -> Image:
+	var out := Image.create(maxi(length, 1), piece.get_height(), false, Image.FORMAT_RGBA8)
+	var back := piece.duplicate() as Image
+	back.flip_x()
+	var at := 0
+	var turn := false
+	while at < length:
+		var take := mini(piece.get_width(), length - at)
+		var from := back if turn else piece
+		# Cut from the far end of a mirrored length, so the two meet on the same grain.
+		var start := from.get_width() - take if turn else 0
+		out.blit_rect(from, Rect2i(start, 0, take, piece.get_height()), Vector2i(at, 0))
+		at += take
+		turn = not turn
+	return out
+
+
+## The frame for one size, built out of the sheet.
+static func _build_border(want: Vector2i) -> ImageTexture:
+	var art := border_sheet()
+	if art == null:
+		return null
+	var out := Image.create(want.x, want.y, false, Image.FORMAT_RGBA8)
+	var run := want.x - BORDER_WALL * 2
+	var down := want.y - BORDER_TOP - BORDER_FOOT
+
+	# The top and bottom edges: a cropped length of each plank between the two corners.
+	if run > 0:
+		out.blit_rect(_plank_run(_cut(art, BORDER_TOP_RUN), run), Rect2i(0, 0, run, BORDER_TOP), Vector2i(BORDER_WALL, 0))
+		out.blit_rect(
+			_plank_run(_cut(art, BORDER_FOOT_RUN), run), Rect2i(0, 0, run, BORDER_FOOT),
+			Vector2i(BORDER_WALL, want.y - BORDER_FOOT)
+		)
+	# The walls: a length of the top plank turned on its side, and mirrored for the far one.
+	if down > 0:
+		var stile := _plank_run(_cut(art, BORDER_TOP_RUN), down)
+		stile.rotate_90(CLOCKWISE)
+		# Rotating the plank puts its lit edge down the right-hand side, which is the near
+		# wall; the far one is that mirrored, so the light stays on the outside of both.
+		var right := _cut(stile, Rect2i(stile.get_width() - BORDER_WALL, 0, BORDER_WALL, down))
+		var left := right.duplicate() as Image
+		left.flip_x()
+		out.blit_rect(left, Rect2i(0, 0, BORDER_WALL, down), Vector2i(0, BORDER_TOP))
+		out.blit_rect(right, Rect2i(0, 0, BORDER_WALL, down), Vector2i(want.x - BORDER_WALL, BORDER_TOP))
+	# The corners, stamped whole over the ends of both.
+	var top_right := _cut(art, BORDER_CORNER_TOP)
+	var foot_right := _cut(art, BORDER_CORNER_FOOT)
+	var top_left := top_right.duplicate() as Image
+	top_left.flip_x()
+	var foot_left := foot_right.duplicate() as Image
+	foot_left.flip_x()
+	var corner := Rect2i(0, 0, BORDER_WALL, BORDER_TOP)
+	var foot_box := Rect2i(0, 0, BORDER_WALL, BORDER_FOOT)
+	out.blit_rect(top_left, corner, Vector2i.ZERO)
+	out.blit_rect(top_right, corner, Vector2i(want.x - BORDER_WALL, 0))
+	out.blit_rect(foot_left, foot_box, Vector2i(0, want.y - BORDER_FOOT))
+	out.blit_rect(foot_right, foot_box, Vector2i(want.x - BORDER_WALL, want.y - BORDER_FOOT))
+	_border_seams(out, want)
+	return ImageTexture.create_from_image(out)
+
+
+## The joints, painted in the wood's own outline: down each side of both corners, and across
+## the top and bottom of each wall. A butt joint between two boards is a line; a cut with no
+## line is where the eye finds the seam.
+static func _border_seams(out: Image, want: Vector2i) -> void:
+	for x: int in [BORDER_WALL - 1, want.x - BORDER_WALL]:
+		_border_line(out, Rect2i(x, 0, 1, BORDER_TOP))
+		_border_line(out, Rect2i(x, want.y - BORDER_FOOT, 1, BORDER_FOOT))
+	for y: int in [BORDER_TOP, want.y - BORDER_FOOT - 1]:
+		_border_line(out, Rect2i(0, y, BORDER_WALL, 1))
+		_border_line(out, Rect2i(want.x - BORDER_WALL, y, BORDER_WALL, 1))
+
+
+## A line, drawn only where there is wood: a joint painted across a corner's chamfer would
+## put pixels out in the air beside it.
+static func _border_line(out: Image, box: Rect2i) -> void:
+	for y in range(box.position.y, box.end.y):
+		for x in range(box.position.x, box.end.x):
+			if x < 0 or y < 0 or x >= out.get_width() or y >= out.get_height():
+				continue
+			if out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, BORDER_SEAM)
 
 
 ## The title plank a board wears over its top edge. A plank of the same oak as the frame,

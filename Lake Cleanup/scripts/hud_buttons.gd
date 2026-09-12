@@ -77,7 +77,7 @@ const COIN_GLINT := Color(1.0, 0.94, 0.72)
 ## The face inside a button of this size: what `board` fills and hands back, for a caller
 ## that needs it without drawing the button again.
 static func face_of(box: Rect2) -> Rect2:
-	return Style.border_inset(box) if Style.meter_patch() != null else box.grow(-FRAME)
+	return Style.border_inset(box) if Style.border_fits(box) else box.grow(-FRAME)
 
 
 ## The wood and the face. Returns the face, which is where the contents go.
@@ -89,7 +89,7 @@ static func board(on: CanvasItem, box: Rect2, hovered: bool) -> Rect2:
 	if hovered:
 		fill = Color(fill.r * Style.HOVER_WASH.r, fill.g * Style.HOVER_WASH.g, fill.b * Style.HOVER_WASH.b)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
-	if Style.meter_patch() != null:
+	if Style.border_fits(box):
 		var face := Style.border_inset(box)
 		on.draw_rect(face.grow(2.0), fill, true)
 		Style.meter_frame(on, box, tint)

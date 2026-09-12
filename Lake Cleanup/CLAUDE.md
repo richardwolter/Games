@@ -297,15 +297,23 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   name in the clean water's blue, dimmed with the row when it cannot be bought. Not the gold:
   gold on this board is a price.
 
-- **The corner buttons wear the meter's own border** (`Style.meter_patch`/`meter_frame`/
-  `border_inset`, 2026-09-11): `assets/ui/meter/Meter_Border.png` is cut once into a 36x38
-  nine-patch — corners whole, edges tiled, middle open — and the three buttons wear it round
-  a dark `BOARD` face. Walls are 14 px, 16 at the top, measured off the sheet's alpha; the
-  buttons grew to 148x100 / 120x100 to keep their faces. **The left wall is the right wall
-  mirrored**: the meter's own left side is two pixels thin, because the garbage circle sits
-  over it and it was never painted. `hud_buttons.gd`'s `FRAME`/`CHIPS` drawn frame is the
-  fallback for when the sheet is missing; `face_of` is the one place the inset is decided.
-  Re-measure `BORDER_*` if the meter art is repainted.
+- **The corner buttons wear the meter's own border** (`Style.meter_frame`/`_build_border`/
+  `border_inset`, 2026-09-12): `assets/ui/meter/Meter_Border.png` is one painting 188x49 with
+  its grain running the full length, so a frame of any size is **built** out of it, once per
+  size and kept. **Nothing is stretched**: the top and bottom edges are the art's own planks
+  cropped out of their long clean runs (`BORDER_TOP_RUN`/`BORDER_FOOT_RUN`, mirrored end to
+  end past their length so the grain turns back rather than repeating), the side walls are a
+  length of the top plank turned ninety degrees so the grain runs down the stile, the corners
+  are the meter's own stamped whole, and the butt joints are painted in the wood's outline
+  colour so a join reads as two boards meeting. Walls 15 px, 16 at the top, 14 at the foot,
+  measured off the sheet's alpha; the buttons grew to 148x100 / 120x100 to keep their faces.
+  **The left half is the right half mirrored**: the meter's own left side was never painted,
+  because the garbage circle sits over it. `hud_buttons.gd`'s `FRAME`/`CHIPS` drawn frame is
+  the fallback when the sheet is missing or the box is under `BORDER_LEAST`; `face_of` is the
+  one place the inset is decided. Re-measure every `BORDER_*` if the meter art is repainted.
+  **Retired, by decision** (2026-09-12): dressing the buttons with a nine-patch of that art —
+  tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
+  chamfer off its corners. Don't nine-patch painted wood.
 
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
   2026-09-11): a dark `BOARD` face inside that border.
