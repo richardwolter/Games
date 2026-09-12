@@ -818,12 +818,28 @@ by their place on the bank and the tint the ferry reads.
   is what it falls on, so it rises and falls by `LakeGrid._swell` at the jetty's x off the
   grid's clock (`Dropoff.swell`), the same swell the rubbish beside it bobs on. The box is
   swept by `Shade.Cast` from its base on the deck, like the island's crate.
+- **Only the posts the deck leaves showing are dressed** (2026-09-12): a deck one tile wide
+  carries a row of posts down each side and the far row is drawn under a deck that covers it
+  completely, so dressing every post the geometry placed hung sand and foam on open beach a
+  tile from any pole. The builder keeps a post only when its foot pixel survives into the
+  `under` layer, and records it as `[middle, bottom, width]` in painted px.
+- **The beam is keyed to the deck mask, not to pixel colour**: the post's body is painted in
+  the same tone as the edge beam, so a colour test called every post a deck top and hung two
+  more rows of "beam" under each one. Every pole was two rows longer than the foot the json
+  recorded â€” which is why sand banked on that foot sat in the middle of the pole with its
+  bottom showing below, and why walking down from a foot to find "the real bottom" walks
+  into the beam. `draw.line` includes its endpoint; the drawn row is the bottom.
+- **The sand is drawn on the sprite's grid, not the world's** (`Skirt._pixel`'s `snap`): the
+  pier stands at a fractional world position, so its pixels are not on the art lattice
+  everything else in `skirt.gd` snaps to, and sand snapped to the lattice landed up to a
+  pixel off the wood â€” a dark line of pole under the heap however the rows were counted.
 - **Foam and sand are decided against the lake, not read off the sheet**: at `_ready` every
   post's foot is tested with `Iso.shore_fraction` against the foot's own edge. Past it, a
   `WaterlineFoam` collar (`POST_COLLAR` 8 px half-width) **in front of the post** — behind
   a six-pixel post nothing showed — riding the same swell. Short of it, `Skirt.mound`: sand
-  banked over the post's bottom rows, widest at the ground, plus spilt grains, drawn over
-  the wood so the row where post meets sand is covered (the hem's bargain, in sand). The
+  banked over the post's bottom rows, widest at the ground, solid (a gap in the pile is the
+  dark pole showing through it), plus grains falling below it only â€” `spill` scatters a full
+  ellipse, so half of every cloud went up the screen onto the deck step. The
   coast curves and the jetty does not, so the pair at the water's edge can fall either side
   depending on the bank; `test_lake` guards that at least the two pairs out along the jetty
   froth.

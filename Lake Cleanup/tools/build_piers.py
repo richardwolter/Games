@@ -433,8 +433,12 @@ def build_yard(yard, wood, sprites):
     # ends going down the screen, so the beam is BEAM rows painted under each such pixel.
     # Painted this way rather than as polygons because an aliased polygon edge and the
     # per-pixel top left a one-pixel gap of daylight along every near edge.
-    is_top = [[px[x, y][3] != 0 and px[x, y][:3] in set(wood.plank_lit) | {wood.plank_shade[1]}
-               for y in range(H)] for x in range(W)]
+    # Keyed to the deck mask, **not to the pixel's colour** (2026-09-12): the post's body is
+    # painted in the same tone as the beam, so a colour test called every post a deck top and
+    # hung two more rows of "beam" under each one. Every pole was two rows longer than the
+    # foot the json recorded, and the sand banked on that foot sat in the middle of the pole
+    # with its bottom showing below.
+    is_top = [[deck[x][y] != 0 for y in range(H)] for x in range(W)]
     for x in range(W):
         for y in range(H - 1):
             if is_top[x][y] and not is_top[x][y + 1]:
@@ -566,23 +570,34 @@ def build_yard(yard, wood, sprites):
                 pw[x, y] = (255, 255, 255, 255)
             elif deck[x][y] == 2:
                 pd[x, y] = (255, 255, 255, 255)
-    # Each post's foot, re-measured off the built picture rather than trusted from where the
-    # line was drawn from. The outline pass rings the wood, and the ring runs a row past the
-    # bottom of the post — so sand banked on the drawn foot sat a couple of pixels up the
-    # pole with its dark tip showing below, and a foam collar had the same gap. The lowest
-    # opaque row of the post's own columns is where the pole actually ends.
+    # Each post as [middle column, bottom row, width], all in painted px.
+    #
+    # **Only the posts whose wood the deck leaves showing.** A deck one tile wide carries a
+    # row of posts down each side, and the far row is drawn under a deck that covers it
+    # completely — so dressing every post the geometry placed hung sand and foam on nothing,
+    # a tile up the beach from the pole they were supposed to belong to. That is the strays
+    # going up the bank. A post is kept when its foot pixel survives into the under layer.
+    #
+    # The bottom is the row the line was drawn to and is **not** re-measured: walking down
+    # from it to find "the real bottom" walks into the edge beam, which is painted under the
+    # deck in the same layer and reaches lower at the near edges. `draw.line` includes its
+    # endpoint, so the drawn row is the bottom.
     for key in ("posts_wet", "posts_dry"):
-        for post in book[key]:
-            gx, gy = post
-            low = gy
-            for x in range(gx - POST_WIDE // 2, gx - POST_WIDE // 2 + POST_WIDE):
-                if not (0 <= x < W):
-                    continue
-                y = H - 1
-                while y > gy and pu[x, y][3] == 0:
-                    y -= 1
-                low = max(low, y)
-            post[1] = low
+        kept = []
+        for gx, gy in book[key]:
+            if not (0 <= gx < W and 0 <= gy < H) or pu[gx, gy][3] == 0:
+                continue
+            left = right = gx
+            while left - 1 >= 0 and pu[left - 1, gy][3]:
+                left -= 1
+            while right + 1 < W and pu[right + 1, gy][3]:
+                right += 1
+            # Clamped to the post's own width: at a deck's corner the run along the bottom
+            # row runs into the neighbouring post's wood and into the beam's.
+            left = max(left, gx - POST_WIDE // 2)
+            right = min(right, gx - POST_WIDE // 2 + POST_WIDE - 1)
+            kept.append([(left + right) // 2, gy, right - left + 1])
+        book[key] = kept
 
     book["layers"] = {"under": under, "shade_wet": wet, "shade_dry": dry}
     return over, book
@@ -694,7 +709,7 @@ def mockup(yards, wood, sprites, scale, out):
         ink.putalpha(shade.point(lambda v: alpha if v else 0))
         panel.alpha_composite(ink, (place[0] - off[0], place[1] - off[1]))
         # Foam collars at the wet posts.
-        for gx, gy in book["posts_wet"]:
+        for gx, gy, _pw in book["posts_wet"]:
             cx, cy = gx + place[0], gy + place[1]
             for dx in range(-3, 4):
                 yy = cy + (1 if abs(dx) < 2 else 0)

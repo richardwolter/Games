@@ -77,7 +77,9 @@ const UNDER_LAYER := 4
 ## froth rings it rather than hiding behind it.
 const POST_COLLAR := 8.0
 
-## The post's width on screen, in world px, for the sand banked over its foot.
+## The post's width on screen, in world px, when the sheet does not say. The sheet records
+## each post as [middle column, bottom row, width] in painted px, and the width is what the
+## sand is sized to.
 const POST_WIDE := 6.0
 
 ## Which of TrashDef.Kind this one buys.
@@ -201,7 +203,11 @@ func _dress() -> void:
 	var i := 0
 	for list: StringName in [&"posts_wet", &"posts_dry"]:
 		for post: Variant in book[list]:
-			var at := _world(post, book)
+			# The middle of the post, not its left edge: `_world` gives the top-left corner
+			# of the foot pixel, and a mound centred there sits half an art pixel left of
+			# the pole and leaves a column of wood showing down its right side.
+			var wide := (float(post[2]) if (post as Array).size() > 2 else POST_WIDE / ART_SCALE) * ART_SCALE
+			var at := _world(post, book) + Vector2(ART_SCALE * 0.5, 0.0)
 			var tile := Iso.world_to_tile(at)
 			if Iso.shore_fraction(tile.x, tile.y) < edge:
 				var collar := WaterlineFoam.new()
@@ -214,7 +220,7 @@ func _dress() -> void:
 				_collars.append(collar)
 				_collar_feet.append(at)
 			else:
-				_mounds.append(Skirt.mound(at, POST_WIDE, 9101 + kind * 131 + i))
+				_mounds.append(Skirt.mound(at, wide, 9101 + kind * 131 + i))
 			i += 1
 
 

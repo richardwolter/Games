@@ -267,11 +267,13 @@ const MOUND_SIDE := 1.0
 ## wood meets the sand is the whole job, the same bargain `hem` strikes for the hut with
 ## grass. `at` is the post's foot in world px, `wide` the post's width on screen.
 static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
-	# Snapped down to the art grid, not rounded to it: `_pixel` rounds, and a foot landing a
-	# hair past a row's middle rounded the whole mound one pixel **below** the pole, leaving
-	# the dark tip it is there to cover showing above the sand. Floor puts the ground row on
-	# the pole's own last row every time.
-	var base := Vector2(at.x, floor(at.y / PX) * PX)
+	# **Not snapped to the world's art grid**, unlike every other thing this file draws. The
+	# pier is a sprite standing at a fractional world position, so its pixels are not on that
+	# lattice; sand snapped to the lattice landed up to a pixel off the wood, which showed as
+	# a dark line of pole under the heap however the rows were counted. `at` is already the
+	# top left of the pole's own bottom pixel, so it is used exactly and the sand lands on
+	# the same grid the picture is drawn on.
+	var base := at
 	var mesh := Patch.new()
 	var sand := SAND
 	var palette := Palette.master()
@@ -280,20 +282,21 @@ static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_at + 7
 
-	# The heap: three rows. The ground row reaches a pixel past the wood either side, the
-	# next covers the wood, the top is a few grains left standing on it.
-	var rows := [wide + 2.0 * PX, wide, wide - 2.0 * PX]
+	# The heap. The bottom row reaches a pixel past the wood either side; the row above is
+	# the wood's own width; the top is that less a pixel each side. Every row is solid —
+	# nothing is rolled away, because a gap in the pile is the dark pole showing through it,
+	# which is the one thing this exists to stop. The randomness is in the tone only.
+	var rows := [wide + 2.0 * PX, wide, maxf(wide - 2.0 * PX, PX)]
 	for row in rows.size():
 		var span: float = rows[row]
 		var count := maxi(int(round(span / PX)), 1)
+		var left := base.x - float(count) * PX * 0.5
 		for i in count:
-			if row == 2 and rng.randf() < 0.45:
-				continue
-			var x := base.x - span * 0.5 + (float(i) + 0.5) * PX
+			var x := left + (float(i) + 0.5) * PX
 			var tone := sand.lightened(rng.randf_range(0.0, 0.14))
 			if row == 0:
 				tone = sand.darkened(rng.randf_range(0.0, 0.08))
-			_pixel(mesh, Vector2(x, base.y - float(row) * PX), tone, true)
+			_pixel(mesh, Vector2(x, base.y - float(row) * PX), tone, true, false)
 
 	# And what has fallen off it: single grains below the heap only, thinning downwards,
 	# never wider than the heap's own ground row. Nothing above the foot and nothing out to
@@ -305,7 +308,7 @@ static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
 		var y := base.y + PX + down * MOUND_FALL * PX
 		var tone := sand.lightened(rng.randf_range(0.0, 0.12))
 		tone.a = 1.0 - down * 0.35
-		_pixel(mesh, Vector2(x, y), tone, true)
+		_pixel(mesh, Vector2(x, y), tone, true, false)
 	return mesh
 
 
@@ -338,8 +341,8 @@ static func _tuft(
 
 ## One art pixel, as the two triangles that fill it. Snapped to the art grid, so the blade
 ## sits on the same lattice as the ground under it.
-static func _pixel(mesh: Patch, at: Vector2, ink: Color, front: bool) -> void:
-	var top := Vector2(round(at.x / PX) * PX, round(at.y / PX) * PX)
+static func _pixel(mesh: Patch, at: Vector2, ink: Color, front: bool, snap := true) -> void:
+	var top := Vector2(round(at.x / PX) * PX, round(at.y / PX) * PX) if snap else at
 	var points := mesh.front if front else mesh.back
 	var inks := mesh.front_ink if front else mesh.back_ink
 	var corner := [

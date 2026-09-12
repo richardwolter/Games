@@ -830,6 +830,7 @@ func _stage_dropoffs() -> void:
 	# on the camera's side, and every post the json calls wet stands in the lake.
 	var pictured := true
 	var wet_posts := true
+	var wet_why := ""
 	var beside := true
 	for stop: Dropoff in stops:
 		var book: Dictionary = stop.call(&"_book")
@@ -839,17 +840,31 @@ func _stage_dropoffs() -> void:
 		for key: String in ["under", "shade_wet", "shade_dry"]:
 			if not book.has(key):
 				pictured = false
+		# Every post the sheet lists is one the deck leaves showing, recorded as
+		# [middle, bottom, width]: sand and foam hung on a post drawn under the deck land on
+		# open beach a tile from any pole.
+		for key: String in ["posts_wet", "posts_dry"]:
+			for post: Variant in book[key]:
+				if (post as Array).size() != 3 or int(post[2]) <= 0:
+					pictured = false
 		# Wet is decided against the lake by the yard itself: every collar it hung is past
-		# the drawn water's edge, and the jetty's own posts — at least the two pairs out
-		# along it — got one.
+		# the drawn water's edge, and the jetty has some. Two, not four: the sheet only
+		# carries the posts the deck leaves showing, and a jetty's far row is drawn under
+		# the deck that covers it.
 		var edge := Iso.shore_fraction(stop.foot.x, stop.foot.y)
 		var collars: Array = stop.get(&"_collars")
-		if collars.size() < 4:
+		if collars.size() < 2:
 			wet_posts = false
-		for collar: Node2D in collars:
-			var at: Vector2 = Iso.world_to_tile(collar.position)
-			if Iso.shore_fraction(at.x, at.y) >= edge:
+			wet_why += "%s only %d collars; " % [stop.kind_name(), collars.size()]
+		# The feet, not the collars themselves: a collar rides the swell, so its own position
+		# crosses the drawn waterline by a thousandth twice a second and the check would
+		# pass or fail on which frame it ran. The foot is where the post stands.
+		for at: Vector2 in (stop.get(&"_collar_feet") as PackedVector2Array):
+			var tile := Iso.world_to_tile(at)
+			if Iso.shore_fraction(tile.x, tile.y) >= edge:
 				wet_posts = false
+				wet_why += "%s collar at %.3f past %.3f; " % [
+					stop.kind_name(), Iso.shore_fraction(tile.x, tile.y), edge]
 		var end := stop.foot + stop.axis * Dropoff.JETTY_OUT
 		var off := stop.berth - end
 		if absf(off.dot(stop.axis)) > 0.01 or Iso.tile_to_world(off.x, off.y).y <= 0.0:
@@ -857,7 +872,7 @@ func _stage_dropoffs() -> void:
 		if absf(Iso.shore_fraction(stop.foot.x, stop.foot.y) - 1.0) > 0.05:
 			beside = false
 	_check(pictured, "every yard is drawn from the built sheet, posts and all", "")
-	_check(wet_posts, "the jetty's posts stand in the water and wear foam", "")
+	_check(wet_posts, "the jetty's posts stand in the water and wear foam", wet_why)
 	_check(beside, "the berth lies beside the jetty's end, on the camera's side", "")
 	_check(spread > Iso.RADIUS.x, "the merchants are spread round the lake",
 		"%.1f tiles apart at the widest" % spread)
