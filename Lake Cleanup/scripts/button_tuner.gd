@@ -321,9 +321,16 @@ func _show_numbers() -> void:
 	_readout.text = "\n".join(lines)
 
 
-## What was picked, as a dictionary to paste into `HudButtons.BAKED`. Only the handles that
-## were actually moved: a bake that writes down the rule's own answer freezes a number nobody
-## chose, and the rules are meant to keep working at another size.
+## What has been picked, as a whole dictionary to paste over `HudButtons.BAKED`.
+##
+## `BAKED` and this session's moves together, not the moves alone: the panel clears its
+## overrides when it closes, so a handle baked last time and left alone this time is not in
+## `tune` at all, and a log of `tune` alone quietly drops it (2026-09-12 — the first save
+## after a bake lost the net, the dog and the arrow).
+##
+## Still only what has been *moved*, though: a bake that wrote down the rule's own answer for
+## everything would freeze numbers nobody chose, and the rules are what keep working when a
+## button is resized.
 func _write_log() -> void:
 	var lines := PackedStringArray([
 		"# Paste into HudButtons.BAKED. Written %s." % Time.get_datetime_string_from_system(),
@@ -331,13 +338,13 @@ func _write_log() -> void:
 	])
 	for handle: Dictionary in HANDLES:
 		var key: StringName = handle["key"]
-		if HudButtons.tune.has(key):
-			var at: Vector2 = HudButtons.tune[key]
+		if HudButtons.tune.has(key) or HudButtons.BAKED.has(key):
+			var at := HudButtons._at(key, Vector2.ZERO)
 			lines.append("\t&\"%s\": Vector2(%.4f, %.4f)," % [key, at.x, at.y])
 		for field: StringName in [&"size", &"wide"]:
 			var name: StringName = handle.get(field, &"")
-			if name != &"" and HudButtons.tune.has(name):
-				lines.append("\t&\"%s\": %.4f," % [name, float(HudButtons.tune[name])])
+			if name != &"" and (HudButtons.tune.has(name) or HudButtons.BAKED.has(name)):
+				lines.append("\t&\"%s\": %.4f," % [name, _size_of(name)])
 	lines.append("}")
 	var text := "\n".join(lines) + "\n"
 	var file := FileAccess.open(LOG_PATH, FileAccess.WRITE)

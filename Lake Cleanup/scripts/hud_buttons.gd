@@ -99,15 +99,19 @@ const COIN_GLINT := Color(1.0, 0.94, 0.72)
 ## Bake by pasting what `ButtonTuner` writes to `user://button_tune.log` into `BAKED`.
 ##
 ## Laid out by hand on the canvas, 2026-09-12. The net rides high and a little left of the
-## middle, the ferry and the dog sit lower and further out than the rule put them, the arrow
-## is a touch below centre, and the hut fills the room's whole height. Anything not named
-## here is still the rule's — the heap of finds, every size but the hut's.
+## middle; the ferry is bigger and well out to the left, the dog lower and out to the right;
+## the arrow is a touch below centre; the heap of finds is shifted down and right and half
+## again as big, with the hut over it filling the room's whole height. Anything not named
+## here is still the rule's.
 const BAKED := {
 	&"net": Vector2(0.4981, 0.2095),
-	&"boat": Vector2(0.2059, 0.4395),
+	&"boat": Vector2(0.1503, 0.4133),
+	&"boat_tall": 0.7200,
 	&"dog": Vector2(0.8106, 0.5265),
 	&"arrow": Vector2(0.5019, 0.5286),
-	&"hut": Vector2(0.4944, 0.5089),
+	&"decor": Vector2(0.0333, 0.0714),
+	&"decor_scale": 1.6200,
+	&"hut": Vector2(0.4666, 0.5029),
 	&"hut_tall": 1.0000,
 }
 
