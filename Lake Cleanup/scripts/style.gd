@@ -781,6 +781,59 @@ static func border_fits(box: Rect2) -> bool:
 	)
 
 
+## How tall a plank of this wood is: the two painted planks, one over the other, with no
+## wall between them. A ribbon is built by `_build_border` at exactly this height, where
+## there are no middle rows to fill and it comes out solid — a board with rounded, bitten
+## ends rather than a frame with a hole in it.
+const PLANK_TALL := BORDER_TOP + BORDER_FOOT
+
+
+static func plank_fits(box: Rect2) -> bool:
+	return border_sheet() != null and int(box.size.x) >= BORDER_LEAST.x
+
+
+## The frame round a drawn board: the meter's built border where it fits, the drawn oak
+## where it does not. Returns the **face** — where the board's own contents go — because the
+## two woods are not the same thickness and a caller that works its own inset out will be
+## wrong for one of them.
+static func board_wood(on: CanvasItem, box: Rect2, thick: float, chips: int) -> Rect2:
+	if border_fits(box):
+		meter_frame(on, box)
+		return border_inset(box)
+	board_frame(on, box, thick, chips)
+	return box.grow(-thick)
+
+
+## The same inset, without drawing: for the layout pass, which has to know how much room the
+## wood will take before anything is painted.
+static func board_face(box: Rect2, thick: float) -> Rect2:
+	return border_inset(box) if border_fits(box) else box.grow(-thick)
+
+
+## How much wood a board of this width loses off its height, top and bottom together.
+static func board_wood_tall(wide: float, thick: float) -> float:
+	if border_sheet() != null and int(wide) >= BORDER_LEAST.x:
+		return float(BORDER_TOP + BORDER_FOOT)
+	return thick * 2.0
+
+
+## A plank of the painted wood, `PLANK_TALL` tall, centred in the box it is given. Used for
+## the title ribbon over a board, so the ribbon and the frame under it are one wood.
+static func meter_plank(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
+	if not plank_fits(box):
+		return false
+	var want := Vector2i(int(box.size.x), PLANK_TALL)
+	var built: ImageTexture = _frames.get(want)
+	if built == null:
+		built = _build_border(want)
+		if built == null:
+			return false
+		_frames[want] = built
+	var at := Vector2(box.position.x, box.position.y + (box.size.y - float(PLANK_TALL)) * 0.5)
+	on.draw_texture_rect(built, Rect2(at.floor(), Vector2(want)), false, tint)
+	return true
+
+
 ## The meter's border round a box. False if there is no art or the box is too small for it,
 ## and the caller draws `board_frame` instead.
 static func meter_frame(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
@@ -996,8 +1049,9 @@ static func board_ribbon(
 	size_px: int = TEXT_HEAD,
 	within: Rect2 = Rect2()
 ) -> void:
-	var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
-	plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
+	if not meter_plank(on, box):
+		var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
+		plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
 	var text_box := box if within.size.x <= 0.0 else within
 	write(
 		on, title, size_px,

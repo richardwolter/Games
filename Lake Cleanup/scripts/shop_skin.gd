@@ -231,7 +231,10 @@ func _count(board: StringName) -> int:
 
 ## The head of a board: frame, ribbon, sprite and their gaps, above the first row.
 func _head_tall() -> float:
-	return FRAME + RIBBON_TALL * 0.5 + BOARD_PAD + SPRITE_TALL + HEAD_GAP
+	# Half the wood, because only the top plank is above the head; a board is three of these
+	# side by side, so its own width is the whole width less the gaps, divided by three.
+	var one := (BOARDS_WIDE - BOARD_GAP * float(BOARDS.size() - 1)) / float(BOARDS.size())
+	return Style.board_wood_tall(one, FRAME) * 0.5 + RIBBON_TALL * 0.5 + BOARD_PAD + SPRITE_TALL + HEAD_GAP
 
 
 ## The three boards in a row, each as tall as its rows come to, tops aligned.
@@ -368,7 +371,7 @@ func _draw() -> void:
 ## One board: oak frame, clean-water face, ribbon over the top edge, the sprite, the rows.
 func _draw_board(board: StringName, box: Rect2) -> void:
 	_draw_frame(box)
-	var face := box.grow(-FRAME)
+	var face := Style.board_face(box, FRAME)
 	draw_rect(face.grow(1.0), Style.SEAM, true)
 	draw_rect(face, Style.BOARD, true)
 
@@ -410,7 +413,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 ## The board's oak frame and its title plank. Both are drawn by `Style`, so the shop's
 ## boards, the settings board and the shed's shelf cannot become three woods.
 func _draw_frame(box: Rect2) -> void:
-	Style.board_frame(self, box, FRAME, CHIPS)
+	Style.board_wood(self, box, FRAME, CHIPS)
 
 
 func _draw_ribbon(box: Rect2, title: String) -> void:

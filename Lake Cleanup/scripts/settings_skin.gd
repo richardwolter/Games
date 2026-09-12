@@ -135,10 +135,10 @@ func _tall_of(kind: StringName) -> float:
 
 
 func _lay_out() -> void:
-	var tall := FRAME + RIBBON_TALL * 0.5 + BOARD_PAD
+	var tall := Style.board_wood_tall(BOARD_WIDE, FRAME) + RIBBON_TALL * 0.5 + BOARD_PAD
 	for line: Dictionary in _plan():
 		tall += _tall_of(line["kind"]) + ROW_GAP
-	tall += BOARD_PAD + FRAME - ROW_GAP
+	tall += BOARD_PAD - ROW_GAP
 	var wide := minf(BOARD_WIDE, size.x - 40.0)
 	tall = minf(tall, size.y - 40.0)
 	_board = Rect2(floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall)
@@ -232,8 +232,7 @@ func _draw() -> void:
 	if _board.size.x <= 0.0:
 		return
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
-	Style.board_frame(self, _board, FRAME, CHIPS)
-	var face := _board.grow(-FRAME)
+	var face := Style.board_wood(self, _board, FRAME, CHIPS)
 	draw_rect(face, Style.BOARD, true)
 
 	var ribbon := Rect2(

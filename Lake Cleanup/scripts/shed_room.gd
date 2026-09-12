@@ -1150,7 +1150,7 @@ func _floor_rect() -> Rect2:
 ## and ends below it.
 func _list_rect() -> Rect2:
 	var board := _board_rect()
-	var face := board.grow(-SHELF_FRAME)
+	var face := Style.board_face(board, SHELF_FRAME)
 	var rows := Rect2(
 		face.position + Vector2(SHELF_PAD, SHELF_PAD),
 		face.size - Vector2(SHELF_PAD * 2.0 + SHELF_BAR + SHELF_BAR_GAP, SHELF_PAD * 2.0)

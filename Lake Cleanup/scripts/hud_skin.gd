@@ -27,9 +27,10 @@ const METER_EASE := 2.2
 const MONEY_RUN := 6.0
 const MONEY_LEAST := 12.0
 
-## How long a payment keeps the plate lit, in seconds, and how far the coin swells and the
-## figure brightens at the moment it lands. Small: this happens every time a boat unloads,
-## and a HUD that leaps about on every sale is one the player learns to stop looking at.
+## How long a payment keeps the plate lit, in seconds, and how far the **coin** swells and
+## the figure brightens at the moment it lands. Small: this happens every time a boat
+## unloads, and a HUD that leaps about on every sale is one the player learns to stop looking
+## at. The swell is the coin's alone; the plate and its border stand still.
 const SHINE_TIME := 0.55
 const SHINE_SWELL := 0.1
 const SHINE_LIFT := 0.55
@@ -327,16 +328,14 @@ func _paint_key() -> int:
 
 func _draw() -> void:
 	_painted = _paint_key()
-	# The money plate swells a little while it is lit, about its own middle so it grows into
-	# the space around it rather than sliding off its corner.
-	var swell := 1.0 + SHINE_SWELL * _ease_shine()
-	var lit := Rect2(
-		_money_box.position - _money_box.size * (swell - 1.0) * 0.5,
-		_money_box.size * swell
-	)
+	# The coin swells a little while the plate is lit, about its own middle and inside the
+	# wood — the plate itself does not move. See `HudButtons.draw_money`.
 	# Warmed rather than blown out: the coin is already the brightest thing on the plate, and
 	# multiplying it half again pushes it past white and out the other side into green.
-	_draw_money(lit, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()))
+	_draw_money(
+		_money_box, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()),
+		1.0 + SHINE_SWELL * _ease_shine()
+	)
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
 	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
@@ -681,8 +680,8 @@ func _draw_available() -> void:
 
 
 ## The money plate: the coin, the sunken panel, and the live figure on it.
-func _draw_money(box: Rect2, wash: Color) -> void:
-	var plate := HudButtons.draw_money(self, box, wash)
+func _draw_money(box: Rect2, wash: Color, swell: float) -> void:
+	var plate := HudButtons.draw_money(self, box, wash, swell)
 	var height := Style.step(plate.size.y * 0.72)
 	# The running figure, not the real one: the plate is meant to be watched climbing.
 	var shown := "%d" % roundi(_shown_money)

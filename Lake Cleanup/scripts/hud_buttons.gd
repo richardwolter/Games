@@ -250,12 +250,21 @@ static func label(on: CanvasItem, box: Rect2, text: String) -> void:
 
 
 ## The money plate: the coin on the left, and the sunken panel the figure is written on
-## filling the rest. Returns the panel. `wash` is the payment's shine on the coin.
-static func draw_money(on: CanvasItem, box: Rect2, wash: Color) -> Rect2:
+## filling the rest. Returns the panel. `wash` is the payment's shine on the coin, and
+## `swell` how much bigger it is drawn for the moment a payment lands.
+##
+## The swell is the **coin's**, not the plate's, by decision (2026-09-12): growing the whole
+## button moved its border, and a frame that breathes reads as the HUD coming loose rather
+## than as money arriving. The wood stands still and the coin in it jumps.
+static func draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float = 1.0) -> Rect2:
 	var face := board(on, box, false)
 	var side := face.size.y
-	var coin_box := Rect2(face.position, Vector2(side, side))
-	coin(on, coin_box.grow(-3.0), wash)
+	var coin_box := Rect2(face.position, Vector2(side, side)).grow(-3.0)
+	# About its own middle, and never past the face the wood leaves.
+	coin_box = Rect2(
+		coin_box.position - coin_box.size * (swell - 1.0) * 0.5, coin_box.size * swell
+	).intersection(face)
+	coin(on, coin_box, wash)
 	var panel := Rect2(
 		Vector2(coin_box.end.x + 2.0, face.position.y + 5.0),
 		Vector2(face.end.x - coin_box.end.x - 7.0, face.size.y - 10.0)

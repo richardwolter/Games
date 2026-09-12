@@ -53,8 +53,7 @@ func _ready() -> void:
 func _draw() -> void:
 	if board.size.x <= 0.0:
 		return
-	Style.board_frame(self, board, frame_thick, chips)
-	draw_rect(board.grow(-frame_thick), Style.BOARD, true)
+	draw_rect(Style.board_wood(self, board, frame_thick, chips), Style.BOARD, true)
 
 	if rows.is_empty():
 		Style.write(

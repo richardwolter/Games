@@ -318,6 +318,14 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `PlankButton` is it round a `BOARD` face with the word set to the **face** rather than to
   the whole button (`LABEL_SHARE`), so a button sized to its own word carries no empty wood.
   The settings button went 176x38 to 152x56 on that.
+  **And so do the three menus** (2026-09-12): the upgrades boards, the settings board and the
+  shed's shelf call `Style.board_wood` for their frames and `Style.board_ribbon` — which now
+  reaches for `meter_plank` first — for their title planks. `board_wood` **returns the face**
+  and `board_face`/`board_wood_tall` give the same numbers without drawing, because the two
+  woods are not the same thickness and every caller that worked its own inset out would be
+  wrong for one of them. A ribbon is `_build_border` at exactly `PLANK_TALL` (30), where
+  there are no middle rows to fill and it comes out a solid plank with rounded, bitten ends
+  rather than a frame with a hole. `Style.board_frame`/`plank` stay as the fallback.
   **The built frame is bitten too** (`_border_bites`, 2026-09-12): one hole per `BITE_EVERY`
   of each outer edge, pixels cleared and the wood round each ringed in `HOLE_RIM`, like the
   drawn boards' `frame_bites`. Punched into the image, so a hole is a real hole and the lake
