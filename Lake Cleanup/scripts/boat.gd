@@ -157,6 +157,21 @@ const COLLAR_STEPS := 8
 ## waterline looks like.
 const COLLAR_LIFT := 0.8
 
+## How far the froth carries out towards the ends of the collar: the exponent on the shader's
+## half-ellipse round-off, where 1 is the ellipse the rubbish uses. Lower spreads it, and how
+## many tongues the tear puts across the hull's width is raised with it, so what spreads is
+## foam rather than a stretched copy of the same shapes.
+const COLLAR_SIDES := 0.45
+const COLLAR_TEAR := 1.45
+
+## How far the drawn hull sits below where its anchor puts it, in world pixels: one art pixel
+## (Lake.ART_PIXEL), so the picture stays on its own grid — half of one would put a
+## nearest-filtered texture off its texels and make the planking crawl. The hull, its shadow,
+## the sail over it and the load in it all move together; the waterline collar does not, so
+## the froth rides that much higher up the sprite. That is the point of it (2026-09-12): the
+## boat sits down into its own foam rather than on top of it.
+const HULL_DROP := 2.0
+
 ## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
 ## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
 ## the same alpha at dawn is a shade of blue nobody can see.
@@ -1030,8 +1045,9 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 		var corner := Vector2(float(index) * frame, 0.0)
 		var points := PackedVector2Array()
 		var uvs := PackedVector2Array()
+		var drop := Vector2(0.0, HULL_DROP)
 		for at in hull_polygon(index):
-			points.append((at - _anchor) * scale)
+			points.append((at - _anchor) * scale + drop)
 			uvs.append((corner + at) / sheet_size)
 		draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, sheet)
 		_shade.lay(sheet, points, uvs, day)
@@ -1137,7 +1153,8 @@ func hold_spot(i: int, shown: int) -> Vector2:
 		+ beam * across_hold * (HULL_WIDTH / TILE_REACH) * HOLD_ACROSS * 0.5 * taper
 	)
 	var lift := HULL_HEIGHT * (HOLD_LIFT + HOLD_STACK * float(layer))
-	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -lift)
+	# Down with the hull it is stowed in, or the heap floats a pixel over its own deck.
+	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, HULL_DROP - lift)
 
 
 ## Which frame shows the boat pointing the way it is pointing: how far round the compass
@@ -1398,6 +1415,10 @@ class HullCollar extends Node2D:
 			"cut_at", LakeGrid.FOAM_RISE / maxf(LakeGrid.FOAM_RISE + LakeGrid.FOAM_TALL, 0.001)
 		)
 		_skin.set_shader_parameter("bubble_down", 7.0 * Boat.COLLAR_SCALE)
+		# The froth carries further out towards the ends than it does on a piece of rubbish:
+		# a ten-pixel collar is a lip that should draw up to nothing quickly, and a hull's
+		# length of waterline is in the water at its ends as much as its middle.
+		_skin.set_shader_parameter("round_bite", Boat.COLLAR_SIDES)
 		material = _skin
 		# The anchor only seeds the tear here, so each hull froths its own way.
 		_anchor = LakeGrid.pack_anchor(float(seed % 4096) - 2048.0, 0.0, 1.0)
@@ -1454,7 +1475,7 @@ class HullCollar extends Node2D:
 					base, base + 1, base + 3, base, base + 3, base + 2
 				]))
 		var wide := total / PIECE_WIDE
-		_skin.set_shader_parameter("tear_across", 12.0 * wide)
+		_skin.set_shader_parameter("tear_across", 12.0 * wide * Boat.COLLAR_TEAR)
 		_skin.set_shader_parameter("bubble_across", 20.0 * wide)
 		queue_redraw()
 

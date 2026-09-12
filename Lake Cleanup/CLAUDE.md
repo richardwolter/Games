@@ -458,7 +458,11 @@ the whole job.
   its column), the lit yellow window and the grey door hardware. **The walls also get the
   box's border**: every wall pixel on the picture's outer edge is painted in the box's own
   silhouette colour (read off the box, 48,37,33), the one-pixel dark line the box is drawn
-  with; the roof's edge is left as painted. Run it with the psd-extract
+  with; the roof's edge is left as painted. **Darker and flatter than a straight match**
+  (`RAMP_MIDDLE`/`RAMP_SPREAD`/`RAMP_CROP`/`RAMP_STEPS`): the walls' ranks are squeezed into
+  the lower-middle of the box's ramp, never reach its lit rim, and are stepped to about as
+  many tones as the box has — the light half squeezed hard, the dark half hardly at all, so
+  the seams survive. Run it with the psd-extract
   venv python from the project root; **re-run after any re-cut**, copying the fresh cut to
   `shed_tan.png` first. `--mask out.png` writes the classification for checking.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
@@ -564,7 +568,20 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   `COLLAR_LIFT` (0.8) of the foam's own reach **up into the hull**, and `COLLAR_REACH` past
   the ends cut from 4 to 1.5: the cut is the bottom of the drawn hull, so a collar hung
   straight on it puts its entire lower band outside the sprite and the boat wears a skirt.
-  Lifted, the froth sits in the hull's own bottom edge and only its tongues show past it. `HullCollar.lay` takes each
+  Lifted, the froth sits in the hull's own bottom edge and only its tongues show past it.
+  The froth also **carries further out to the ends** than a piece of rubbish's does
+  (`COLLAR_SIDES` 0.45 on the shader's new `round_bite`, `COLLAR_TEAR` 1.45 on its tongue
+  count): the half-ellipse that takes the reach away towards the ends is right for a
+  ten-pixel lip and wrong for a hull, which is in the water at its ends as much as its
+  middle. The tongue count rises with it, or what spreads is a stretched copy of the same
+  shapes rather than more foam. `round_bite` defaults to 1, so every other collar in the lake
+  is untouched.
+- **The hull is drawn one art pixel low** (`HULL_DROP`, 2026-09-12): the picture, its shadow,
+  the sail over it and the load in it all sit `Lake.ART_PIXEL` (2 world px) below where the
+  anchor puts them; the waterline collar does not move, so the froth rides that much higher
+  up the sprite and the boat sits down into its own foam rather than on top of it. **A whole
+  art pixel, not half of one** — the sheet is nearest-filtered, and half a pixel puts it off
+  its own texels and sets the planking crawling. `HullCollar.lay` takes each
   point's normal from the run either side of it, not from one segment, or every bend leaves a
   notch outside and an overlap inside. `test_lake` guards the bow and the fit at all sixteen
   headings. **This is not the ring `HullFoam` rejected** — that was the moving bow wave,

@@ -66,6 +66,13 @@ uniform float bubble_churn = 1.1;
 // stretched.
 uniform float tear_across = 12.0;
 
+// How hard the half-ellipse below takes the foam's reach away towards the ends of the quad.
+// 1 is the ellipse itself, which is right for a ten-pixel piece of rubbish — the collar is
+// a short lip and it should draw up to nothing quickly. Under 1 the falloff is gentler and
+// the froth carries further out to the sides before it goes, which is what a hull's length
+// of waterline wants: a boat is in the water at its ends as well as its middle.
+uniform float round_bite = 1.0;
+
 
 // One number per cell of the bubble field, the same every time for the same cell. A hash
 // rather than a texture: this is called once a fragment on a layer that can be eighteen
@@ -114,7 +121,7 @@ void fragment() {
 	// draws up to nothing at either side. An alpha fade did this before and it read as a bar
 	// going transparent — the same length of foam, dimmer at the ends. Taking the reach away
 	// instead makes it a shorter lip, which is the shape of water round a thing in it.
-	float round_off = sqrt(max(1.0 - pow(uv.x * 2.0 - 1.0, 2.0), 0.0));
+	float round_off = pow(sqrt(max(1.0 - pow(uv.x * 2.0 - 1.0, 2.0), 0.0)), round_bite);
 
 	// A second, faster tear for what goes up the side of the piece. Its own frequencies and
 	// its own drift, so the tongues above the line are not the mirror of the lip below it —
