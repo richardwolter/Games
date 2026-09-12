@@ -1033,11 +1033,13 @@ func _stage_settings() -> void:
 	var shop := _main.get_node(^"HUD/ShopSkin") as Control
 	_check(not settings.visible, "the settings panel starts closed", "")
 	var shop_panel := _main.get_node(^"HUD/Shop") as Control
-	# The settings are a drawn board (SettingsSkin) now, not a panel of buttons: the save
-	# is a signal off it, and there is no SaveNow button anywhere in the shop.
-	_check(settings.has_signal(&"save_pressed")
+	# The settings are a drawn board (SettingsSkin) now, not a panel of buttons, and saving
+	# is automatic: no save or load signal off it, and no SaveNow button anywhere in the
+	# shop. The quit is the one button that writes a save on purpose.
+	_check(not settings.has_signal(&"save_pressed") and not settings.has_signal(&"load_pressed")
+		and settings.has_signal(&"quit_pressed")
 		and shop_panel.find_child("SaveNow", true, false) == null,
-		"the logbook is in the settings, not in the shed", "")
+		"saving is automatic: no save or load button anywhere", "")
 
 	_press_escape()
 	_check(settings.visible, "escape opens the settings", "")
@@ -1126,7 +1128,7 @@ func _stage_ferry_art() -> void:
 		var across := Vector2(-along.y, along.x)
 		for slot in Boat.HOLD_SHOWN:
 			var spot: Vector2 = _boat.hold_spot(slot, Boat.HOLD_SHOWN)
-			spot.y += Boat.HULL_HEIGHT * 0.55
+			spot.y += Boat.HULL_HEIGHT * Boat.HOLD_LIFT
 			if absf(spot.dot(along)) > Boat.HULL_LENGTH * 0.5 					or absf(spot.dot(across)) > Boat.HULL_WIDTH * 0.5:
 				strays += 1
 				worst_heading = _boat.heading

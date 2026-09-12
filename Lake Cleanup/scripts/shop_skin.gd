@@ -104,7 +104,7 @@ signal bought(key: StringName)
 signal close_asked
 
 ## The rows to draw, newest set every frame by the lake. Each is
-## `{key, board, name, value, cost, afford}` — `board` is one of BOARDS.
+## `{key, board, name, level, value, cost, afford}` — `board` is one of BOARDS.
 var rows: Array = []
 
 ## The picture at the head of the net and ferry boards, by board name, each `{sheet,
@@ -132,7 +132,7 @@ var _hovered: int = -1
 ## (HullFoam sets itself behind its parent, which under a boat is right and under a board
 ## would bury it; the shop puts it back in front.)
 var _wake: HullFoam
-var _hull: Sprite2D
+var _hull: Polygon2D
 var _wake_heading := Vector2.RIGHT
 
 ## The net's foam collar, the net over it, and where the swell has them this frame. The
@@ -174,9 +174,9 @@ func _ready() -> void:
 	_wake.z_index = 0
 	_wake.visible = false
 	add_child(_wake)
-	_hull = Sprite2D.new()
-	_hull.region_enabled = true
-	_hull.centered = false
+	# A polygon rather than a sprite: the hull is cut along its waterline, which is not a
+	# rectangle's edge.
+	_hull = Polygon2D.new()
 	_hull.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_hull.visible = false
 	add_child(_hull)
@@ -463,7 +463,14 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_wake_heading = lent.get("heading", Vector2.RIGHT)
 			_wake.visible = visible
 			_hull.texture = sheet
-			_hull.region_rect = region
+			var cut: PackedVector2Array = lent.get("cut", PackedVector2Array([
+				Vector2.ZERO, Vector2(region.size.x, 0.0), region.size, Vector2(0.0, region.size.y)
+			]))
+			_hull.polygon = cut
+			var uv := PackedVector2Array()
+			for at in cut:
+				uv.append(region.position + at)
+			_hull.uv = uv
 			_hull.position = box.position
 			_hull.scale = box.size / region.size
 			_hull.visible = visible
@@ -536,7 +543,14 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 	else:
 		var stack := float(Style.TEXT_BODY) * 0.62 + float(Style.TEXT_SMALL) * 0.62 + 6.0
 		var first := box.position.y + (box.size.y - stack) * 0.5 + float(Style.TEXT_BODY) * 0.62
-		Style.write(self, name, Style.TEXT_BODY, Vector2(text_at, first), ink)
+		var took := Style.write(self, name, Style.TEXT_BODY, Vector2(text_at, first), ink)
+		# The level after the name, in the clean water's blue: `LEVEL_INK` rather than the
+		# money's gold, because gold on this board is a price. Dimmed with the rest of the
+		# row when it cannot be bought.
+		var level := String(row.get("level", ""))
+		if not level.is_empty():
+			var level_ink := Style.LEVEL_INK if afford else Style.LEVEL_INK.lerp(Style.BOARD_INK_DIM, 0.5)
+			Style.write(self, level, Style.TEXT_BODY, Vector2(text_at + took.x + 6.0, first), level_ink)
 		Style.write(
 			self, value, Style.TEXT_SMALL,
 			Vector2(text_at, first + 6.0 + float(Style.TEXT_SMALL) * 0.62),

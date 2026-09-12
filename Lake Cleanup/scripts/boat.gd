@@ -106,13 +106,17 @@ const HULL_WIDTH := 50.0
 const HULL_HEIGHT := 16.0
 
 ## The open hold, as a fraction of the hull: where along it the cargo deck starts and ends,
-## and how far across it reaches. Taken off the drawing — the cabin sits over the stern and
-## the mast is amidships, so the load goes on the foredeck, from just ahead of the mast to
-## the bow rail. It is drawn over the picture, sails and all, by decision (2026-09-11):
-## cutting every heading into a hull layer and a sail layer would have tripled the art.
-const HOLD_FROM := 0.08
-const HOLD_TO := 0.34
+## how far across it reaches, and how high above the water it is, in HULL_HEIGHTs. Taken
+## off the drawing — the cabin sits over the stern and the mast is amidships, so the load
+## goes on the foredeck, just ahead of the mast. Kept short of the bow: the frames draw the
+## bow-on deck higher than the plane's projection puts it, and a load laid to the bow rail
+## by the projection floats past the cut bow. It is drawn over the picture, sails and all,
+## by decision (2026-09-11): cutting every heading into a hull layer and a sail layer would
+## have tripled the art.
+const HOLD_FROM := 0.06
+const HOLD_TO := 0.24
 const HOLD_ACROSS := 0.30
+const HOLD_LIFT := 0.9
 
 ## How many pieces are drawn in the hold, and how big. A hold packed with forty things is
 ## a smear; six is enough to read as laden.
@@ -131,6 +135,7 @@ const TILE_REACH := 35.777
 const FRAMES_PATH := "res://assets/boat_sail_frames.png"
 const FRAMES_META := "res://assets/boat_sail_frames.json"
 const HULL_IN_FRAME := 46.0
+const FRAME_SIDE := 128
 
 ## Where in a frame the water meets the hull under the mast — the point the sheet turns
 ## about — laid on the boat's position. In frame pixels. The masthead in each frame comes
@@ -145,9 +150,25 @@ const FRAME_ZERO_TURN := PI * 0.25
 ## How far the pennant's staff stands above the truck, in world pixels.
 const PENNANT_STAFF := 14.0
 
+## The hull in the water rather than on it. Each frame is cut along the waterline its json
+## lists (`cut`, authored in tools/build_boat_sheet.py: the painted boot-top along the near
+## side and round the near end), so what is under the water is not drawn — the same cut
+## every floating piece gets (LakeGrid.WATERLINE), bent where the hull turns. The lake's
+## own foam collar (foam.gdshader) lies along that line, scaled up from the ten-pixel
+## rubbish to the hull and reaching COLLAR_REACH past its ends. Under it the boat's
+## silhouette is laid on the water through shadow.gdshader the way the rubbish throws its
+## shadow: squashed by LakeGrid.SHADOW_SQUASH and pushed SHADE_DROP of its height down the
+## plane, so a crescent shows past the hull's near side and the sails' shadow past its
+## ends. It is the frame's own alpha, so it turns with the boat. Collar and shadow ride in
+## this node's space, which already bobs (`_place`), so their materials carry no swell.
+const COLLAR_SCALE := 2.4
+const COLLAR_REACH := 4.0
+const SHADE_DROP := 0.30
+
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
 static var _mastheads := PackedVector2Array()
+static var _cuts: Array[PackedVector2Array] = []
 static var _boxes: Dictionary = {}
 
 ## How close to the end of a leg counts as arrived, in tiles.
@@ -312,6 +333,11 @@ var _rng := RandomNumberGenerator.new()
 ## The bow wave the hull leaves while under way. See HullFoam.
 var _foam: HullFoam
 
+## The shadow on the water and the foam along the waterline, both children so each can
+## wear its own shader.
+var _shade: HullShade
+var _collar: HullCollar
+
 
 func _ready() -> void:
 	# Pixel art at a whole number of world pixels per art pixel: filtered, its edges smear.
@@ -325,6 +351,12 @@ func _ready() -> void:
 	_foam.half_length = HULL_LENGTH * 0.5
 	_foam.half_width = HULL_WIDTH * 0.5
 	add_child(_foam)
+	_shade = HullShade.new()
+	_shade.name = &"Shade"
+	add_child(_shade)
+	_collar = HullCollar.new(rng_seed)
+	_collar.name = &"Collar"
+	add_child(_collar)
 
 
 func is_running() -> bool:
@@ -948,19 +980,36 @@ func _draw() -> void:
 		)
 
 
-## The hull itself: the frame for the way it is pointing, its anchor on this node's origin,
+## The hull itself: the frame for the way it is pointing, cut along its waterline, its
+## anchor on this node's origin — with its shadow and its collar laid for the same frame —
 ## or the blocked-in placeholder if the sheet is missing, so the game still runs without it.
 func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 	var sheet := _sheet()
 	if sheet != null:
 		var frame := float(sheet.get_height())
 		var scale := HULL_LENGTH / HULL_IN_FRAME
-		draw_texture_rect_region(
+		var index := heading_frame()
+		var sheet_size := Vector2(sheet.get_size())
+		var corner := Vector2(float(index) * frame, 0.0)
+		var points := PackedVector2Array()
+		var uvs := PackedVector2Array()
+		for at in hull_polygon(index):
+			points.append((at - HULL_ANCHOR) * scale)
+			uvs.append((corner + at) / sheet_size)
+		draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, sheet)
+		var box := _ink_box(sheet, index)
+		_shade.lay(
 			sheet,
-			Rect2(-HULL_ANCHOR * scale, Vector2(frame, frame) * scale),
-			Rect2(float(heading_frame()) * frame, 0.0, frame, frame)
+			Rect2((Vector2(box.position) - HULL_ANCHOR) * scale, Vector2(box.size) * scale),
+			Rect2((corner + Vector2(box.position)) / sheet_size, Vector2(box.size) / sheet_size)
 		)
+		var line := PackedVector2Array()
+		for at in cut_line(index):
+			line.append((at - HULL_ANCHOR) * scale)
+		_collar.lay(line)
 		return
+	_shade.visible = false
+	_collar.visible = false
 
 	var along := _screen_heading()
 	var across := Vector2(-along.y, along.x)
@@ -1122,7 +1171,7 @@ func hold_spot(i: int, shown: int) -> Vector2:
 		heading.normalized() * lerpf(HOLD_FROM, HOLD_TO, down_hold) * (HULL_LENGTH / TILE_REACH)
 		+ beam * across_hold * (HULL_WIDTH / TILE_REACH) * HOLD_ACROSS * 0.5
 	)
-	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -HULL_HEIGHT * 0.55)
+	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -HULL_HEIGHT * HOLD_LIFT)
 
 
 ## Which frame shows the boat pointing the way it is pointing: how far round the compass
@@ -1180,11 +1229,46 @@ static func art_frame(turn: float) -> Dictionary:
 	var count := int(round(float(sheet.get_width()) / side))
 	var index := clampi(int(turn * float(count)), 0, count - 1)
 	var box := _ink_box(sheet, index)
+	# Cut along the waterline like the lake draws it, so the board's hull sits in its wake:
+	# the region reaches down to the cut's deepest point, and `cut` is the polygon of what
+	# is above the water, in the region's own pixels.
+	var deepest := 0.0
+	for at in cut_line(index):
+		deepest = maxf(deepest, at.y)
+	var kept := Vector2(float(box.size.x), minf(float(box.end.y), deepest) - float(box.position.y))
+	var cut := PackedVector2Array()
+	for at in hull_polygon(index):
+		cut.append(at - Vector2(box.position))
 	return {
 		"sheet": sheet,
-		"region": Rect2(Vector2(float(index) * side, 0.0) + Vector2(box.position), Vector2(box.size)),
+		"region": Rect2(Vector2(float(index) * side, 0.0) + Vector2(box.position), kept),
 		"anchor": HULL_ANCHOR - Vector2(box.position),
+		"cut": cut,
 	}
+
+
+## The waterline across a frame, left to right in frame pixels, off the sheet's json; a
+## level line the hull's length through the anchor when the json is missing.
+static func cut_line(index: int) -> PackedVector2Array:
+	if index < _cuts.size() and _cuts[index].size() >= 2:
+		return _cuts[index]
+	return PackedVector2Array([
+		HULL_ANCHOR + Vector2(-HULL_IN_FRAME * 0.5, 0.0), HULL_ANCHOR + Vector2(HULL_IN_FRAME * 0.5, 0.0)
+	])
+
+
+## The part of a frame that is above the water, as a polygon in frame pixels: the frame's
+## top edge, then the waterline read back right to left with its ends carried out to the
+## frame's sides.
+static func hull_polygon(index: int) -> PackedVector2Array:
+	var line := cut_line(index)
+	var side := float(FRAME_SIDE)
+	var polygon := PackedVector2Array([Vector2(0.0, 0.0), Vector2(side, 0.0)])
+	polygon.append(Vector2(side, line[line.size() - 1].y))
+	for i in range(line.size() - 2, 0, -1):
+		polygon.append(line[i])
+	polygon.append(Vector2(0.0, line[0].y))
+	return polygon
 
 
 ## The box round the drawn boat in a frame, measured off the sheet once per frame.
@@ -1214,12 +1298,21 @@ static func _sheet() -> Texture2D:
 
 static func _read_meta() -> void:
 	_mastheads = PackedVector2Array()
+	_cuts = []
 	if not FileAccess.file_exists(FRAMES_META):
 		return
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FRAMES_META))
-	if parsed is Dictionary and parsed.has("masthead"):
+	if not parsed is Dictionary:
+		return
+	if parsed.has("masthead"):
 		for pair in parsed["masthead"]:
 			_mastheads.append(Vector2(float(pair[0]), float(pair[1])))
+	if parsed.has("cut"):
+		for line in parsed["cut"]:
+			var points := PackedVector2Array()
+			for pair in line:
+				points.append(Vector2(float(pair[0]), float(pair[1])))
+			_cuts.append(points)
 
 
 ## Which way the boat points on screen. The tile field is seen at an angle, so a heading of
@@ -1227,3 +1320,152 @@ static func _read_meta() -> void:
 func _screen_heading() -> Vector2:
 	var on_screen := Iso.tile_to_world(heading.x, heading.y)
 	return on_screen.normalized() if on_screen.length_squared() > 0.0001 else Vector2.RIGHT
+
+
+## The boat's shadow on the water: its own frame's alpha, flattened and pushed down the
+## plane through shadow.gdshader, exactly as LakeGrid.ShadowLayer lays the rubbish's. One
+## quad, rewritten whenever the hull is redrawn for a new heading. Packed with DRY_ANCHOR:
+## the parent already rides the swell, so the shader must not move it again.
+class HullShade extends Node2D:
+	static var INDICES := PackedInt32Array([0, 1, 2, 0, 2, 3])
+
+	var _sheet: Texture2D
+	var _points := PackedVector2Array()
+	var _uvs := PackedVector2Array()
+	var _colors := PackedColorArray()
+
+	func _init() -> void:
+		z_index = -2
+		# Linear, like the rubbish's shadows: the art squashed to half its height under
+		# nearest sampling is a staircase of blocks. The shader softens it further.
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var shade := LakeGrid.SHADOW_COLOUR
+		shade.a = LakeGrid.SHADOW_ALPHA
+		var skin := ShaderMaterial.new()
+		skin.shader = load("res://shaders/shadow.gdshader") as Shader
+		skin.set_shader_parameter("shade", shade)
+		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
+		material = skin
+
+	## `box` is the drawn boat in the parent's space, `uv` the same box on the sheet, 0 to 1.
+	func lay(sheet: Texture2D, box: Rect2, uv: Rect2) -> void:
+		_sheet = sheet
+		visible = true
+		var half := Vector2(box.size.x * 0.5, box.size.y * LakeGrid.SHADOW_SQUASH * 0.5)
+		var centre := box.get_center() + Vector2(0.0, box.size.y * Boat.SHADE_DROP)
+		_points = PackedVector2Array([
+			centre + Vector2(-half.x, -half.y), centre + Vector2(half.x, -half.y),
+			centre + Vector2(half.x, half.y), centre + Vector2(-half.x, half.y),
+		])
+		_uvs = PackedVector2Array([
+			uv.position, uv.position + Vector2(uv.size.x, 0.0), uv.end,
+			uv.position + Vector2(0.0, uv.size.y),
+		])
+		_colors = PackedColorArray()
+		for i in 4:
+			# Blue and alpha say which corner this is, for the shader's rounding off.
+			var c := LakeGrid.DRY_ANCHOR
+			c.b = 1.0 if i == 1 or i == 2 else 0.0
+			c.a = 1.0 if i >= 2 else 0.0
+			_colors.append(c)
+		queue_redraw()
+
+	func _draw() -> void:
+		if _sheet == null or _points.is_empty():
+			return
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), INDICES, _points, _colors, _uvs,
+			PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
+		)
+
+
+## The foam along the hull's waterline: the lake's collar (foam.gdshader, the rubbish's
+## FOAM_RISE over and FOAM_TALL under the line) grown COLLAR_SCALE times for a hull, laid
+## along the cut's one or two segments as one strip, its tear and its bubbles scaled with
+## the width so the froth is the same grain as on the rubbish beside it. Drawn behind the
+## hull, so its tongues show past the sides and its lip lies on the water. No swell in the
+## material: the parent bobs.
+##
+## Not a WaterlineFoam: that is one material shared by every figure, sized for a boot or a
+## dog, on one straight edge. A hull is four times as wide, bends round its near end, and
+## every heading is a different width, so this owns its material.
+class HullCollar extends Node2D:
+	## The rubbish collar's own width, which its tear and bubble counts were set for.
+	const PIECE_WIDE := 24.0
+
+	var _points := PackedVector2Array()
+	var _uvs := PackedVector2Array()
+	var _indices := PackedInt32Array()
+	var _colors := PackedColorArray()
+	var _anchor: Color
+	var _skin: ShaderMaterial
+
+	func _init(seed: int) -> void:
+		z_index = -1
+		var lip := LakeGrid.FOAM_COLOUR
+		lip.a = LakeGrid.FOAM_ALPHA
+		_skin = ShaderMaterial.new()
+		_skin.shader = load("res://shaders/foam.gdshader") as Shader
+		_skin.set_shader_parameter("sway", 0.0)
+		_skin.set_shader_parameter("wave_amplitude", 0.0)
+		_skin.set_shader_parameter("wave_speed", LakeGrid.WAVE_SPEED)
+		_skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
+		_skin.set_shader_parameter("foam", lip)
+		Palette.dress_foam(_skin, LakeGrid.FOAM_ALPHA)
+		_skin.set_shader_parameter(
+			"cut_at", LakeGrid.FOAM_RISE / maxf(LakeGrid.FOAM_RISE + LakeGrid.FOAM_TALL, 0.001)
+		)
+		_skin.set_shader_parameter("bubble_down", 7.0 * Boat.COLLAR_SCALE)
+		material = _skin
+		# The anchor only seeds the tear here, so each hull froths its own way.
+		_anchor = LakeGrid.pack_anchor(float(seed % 4096) - 2048.0, 0.0, 1.0)
+
+	## The cut, left to right, two or three points in the parent's space. One quad per
+	## segment, the strip's UV running 0 to 1 over the whole line so the shader's rounding
+	## off and its tear read it as one collar.
+	func lay(line: PackedVector2Array) -> void:
+		visible = true
+		var total := 0.0
+		for i in line.size() - 1:
+			total += line[i].distance_to(line[i + 1])
+		total = maxf(total, 1.0)
+		_points = PackedVector2Array()
+		_uvs = PackedVector2Array()
+		_indices = PackedInt32Array()
+		_colors = PackedColorArray()
+		var run := 0.0
+		for i in line.size() - 1:
+			var a := line[i]
+			var b := line[i + 1]
+			var out := (b - a).normalized() if b != a else Vector2.RIGHT
+			var side := Vector2(-out.y, out.x)
+			if i == 0:
+				a -= out * Boat.COLLAR_REACH
+			if i == line.size() - 2:
+				b += out * Boat.COLLAR_REACH
+			var top := -side * LakeGrid.FOAM_RISE * Boat.COLLAR_SCALE
+			var low := side * LakeGrid.FOAM_TALL * Boat.COLLAR_SCALE
+			var u0 := run / total
+			run += line[i].distance_to(line[i + 1])
+			var u1 := run / total
+			var base := _points.size()
+			_points.append_array(PackedVector2Array([a + top, b + top, b + low, a + low]))
+			_uvs.append_array(PackedVector2Array([
+				Vector2(u0, 0.0), Vector2(u1, 0.0), Vector2(u1, 1.0), Vector2(u0, 1.0)
+			]))
+			_indices.append_array(PackedInt32Array([
+				base, base + 1, base + 2, base, base + 2, base + 3
+			]))
+			for _corner in 4:
+				_colors.append(_anchor)
+		var wide := total / PIECE_WIDE
+		_skin.set_shader_parameter("tear_across", 12.0 * wide)
+		_skin.set_shader_parameter("bubble_across", 20.0 * wide)
+		queue_redraw()
+
+	func _draw() -> void:
+		if _points.is_empty():
+			return
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), _indices, _points, _colors, _uvs
+		)

@@ -312,9 +312,26 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   from `FRAME_ZERO_TURN` (bow towards the camera = tile diagonal (1, 1)); `turn_heading`
   gives the shop board the heading its frame faces. The pennant flies from the masthead the
   json lists per frame (`MASTHEAD` in the script, mirrored).
-- **Cargo draws over the picture**, sails and all, on the foredeck (`HOLD_FROM` 0.08 to
-  `HOLD_TO` 0.34). Cutting each heading into hull and sail layers would have tripled the
-  art; not drawing the load loses the laden-ferry read. Richard's call.
+- **In the water, not on it** (2026-09-11). Each frame is cut along a waterline the json
+  lists (`CUT` in the script, mirrored: two or three points, the painted boot-top along the
+  near side and round the near end), and drawn as a polygon of what is above it
+  (`Boat.hull_polygon`). Authored per frame, not derived: the frames are not one strict
+  projection — the bow-on rail is six rows tall where thirty degrees would make it
+  eighteen — and a level cut at the anchor row chopped the bow off end on. Along the cut
+  lies the lake's own foam collar (`HullCollar`: foam.gdshader with its own material,
+  `COLLAR_SCALE` 2.4 times the rubbish's rise and fall, one strip over the cut's segments,
+  tear and bubbles scaled to the width through the shader's new `tear_across` uniform — not
+  a `WaterlineFoam`, which is one shared material sized for a figure on a straight edge).
+  Under it the frame's own silhouette is the shadow (`HullShade`: shadow.gdshader,
+  LakeGrid's squash and colour, `SHADE_DROP` 0.30, packed `DRY_ANCHOR` since the node
+  already bobs). The shop board draws the same polygon (`Polygon2D`, `cut` from
+  `art_frame`).
+- **Cargo draws over the picture**, sails and all, on the foredeck just ahead of the mast
+  (`HOLD_FROM` 0.06 to `HOLD_TO` 0.24, `HOLD_LIFT` 0.9 hull heights). Kept short of the
+  bow: laid to the rail by the plane's projection it floated past the cut bow end on,
+  because the frames draw that deck higher than the projection puts it. Cutting each
+  heading into hull and sail layers would have tripled the art; not drawing the load loses
+  the laden-ferry read. Richard's call.
 - `assets/Blue_Boat/PixZels_Model_BlueBoat.json` that came with the sheet is a *different*
   boat (a pirate ship with a skull sail) and was no use as a reference; the edit is 2D only.
 - **Not yet retired**: `tools/bake_boat.gd` and the Kenney sheet `assets/boat_frames.png`

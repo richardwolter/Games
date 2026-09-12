@@ -251,9 +251,34 @@ MASTHEAD = [(64, 32), (66, 33), (67, 34), (67, 34), (63, 32), (68, 33), (66, 37)
 ## Where the water meets the hull under the mast, the point the frames turn about.
 ANCHOR = (64, 88)
 
+## The waterline across each frame, 0 to 8, left to right in frame pixels: everything
+## below this line is under the water and is not drawn. Read off the hull's blue stripe,
+## which is the painted boot-top, at the near side and the near end; the frames are not a
+## strict projection of one hull (the bow-on hull's rail is six rows tall where thirty
+## degrees of elevation would make it eighteen), so the line is authored per frame rather
+## than derived. Two points where the near side is straight, three where the near end is
+## the middle (bow on, stern on) or the near side turns the corner onto the transom.
+CUT = [
+    [(52, 89), (64, 94), (76, 89)],
+    [(48, 88), (60, 92), (80, 82)],
+    [(40, 89), (72, 88), (86, 82)],
+    [(38, 86), (66, 88), (88, 79)],
+    [(43, 89), (91, 89)],
+    [(42, 78), (68, 90), (88, 86)],
+    [(45, 81), (64, 90), (86, 85)],
+    [(48, 84), (66, 91), (80, 87)],
+    [(51, 91), (63, 96), (75, 91)],
+]
+
 
 def mastheads():
     return [MASTHEAD[n] if n <= 8 else (FRAME - 1 - MASTHEAD[16 - n][0], MASTHEAD[16 - n][1])
+            for n in range(FRAMES)]
+
+
+def cuts():
+    """The waterline of every frame, the mirrored ones read back right to left."""
+    return [CUT[n] if n <= 8 else [(FRAME - 1 - x, y) for x, y in reversed(CUT[16 - n])]
             for n in range(FRAMES)]
 
 
@@ -332,6 +357,7 @@ def write(frames):
         "frame_zero": "bow towards the camera; frames turn clockwise seen from above",
         "anchor": list(ANCHOR),
         "masthead": [list(at) for at in mastheads()],
+        "cut": [[list(at) for at in line] for line in cuts()],
         "edits": "jib, forestay and floor shadow removed by tools/build_boat_sheet.py",
     }, indent="\t") + "\n")
 

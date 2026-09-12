@@ -61,6 +61,11 @@ uniform float bubble_across = 20.0;
 uniform float bubble_down = 7.0;
 uniform float bubble_churn = 1.1;
 
+// How many tongues the tear puts across a collar. Set for the ten-pixel rubbish; a wider
+// collar — the ferry's hull — raises it in step with its width, or the foam comes out
+// stretched.
+uniform float tear_across = 12.0;
+
 
 // One number per cell of the bubble field, the same every time for the same cell. A hash
 // rather than a texture: this is called once a fragment on a layer that can be eighteen
@@ -101,7 +106,7 @@ void fragment() {
 	// anchor so no two pieces foam alike, and drifting so the lip is never the same shape
 	// twice. Beating rather than one wave because a single sine reads as a scallop border.
 	float t = stepped_time(TIME, pixel_fps) * 1.6;
-	float across = uv.x * 12.0 + seed * 0.05;
+	float across = uv.x * tear_across + seed * 0.05;
 	float tear = sin(across + t) * 0.5 + sin(across * 2.3 - t * 0.7) * 0.5;
 
 	// The collar curves round the ends rather than stopping at them: its reach is scaled by
