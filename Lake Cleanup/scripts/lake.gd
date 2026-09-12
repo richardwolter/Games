@@ -2349,6 +2349,7 @@ func _buy(what: StringName) -> void:
 ## what the route planner already assumes of the dock.
 func _fit_out(boat: Boat, index: int) -> void:
 	_reberth(boat, index)
+	boat.day = _day
 	boat.dropoffs = _dropoffs
 	boat.yard = _yard
 	boat.grid = _grid

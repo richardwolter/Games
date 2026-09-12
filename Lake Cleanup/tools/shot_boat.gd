@@ -7,8 +7,8 @@ extends Node
 ## Run it with the desktop build, not --headless: nothing renders under the dummy driver.
 
 const SHOT := "res://tools/last_boat_%d.png"
-const CROP := 200
-const ZOOM := 3
+const CROP := 340
+const ZOOM := 2
 
 ## Tile headings to shoot, each held still under way long enough for the bow wave to build.
 const HEADINGS: Array[Vector2] = [Vector2(-1.0, 1.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0)]
@@ -78,6 +78,18 @@ func _write_board() -> void:
 
 
 func _write(which: int) -> void:
+	# What the shadow is being cast by, beside the picture: a shadow that is not there is
+	# either a sun that is not or a node that is not, and the picture cannot say which.
+	var log := FileAccess.open("res://tools/last_boat.log", FileAccess.WRITE if which == 0 else FileAccess.READ_WRITE)
+	log.seek_end()
+	var shade: Node2D = _boat.get_node(^"Shade")
+	log.store_line("shot %d: heading %s frame %d day %s shade %s" % [
+		which, str(_boat.heading), _boat.heading_frame(),
+		"none" if _boat.day == null else "lean %.2f stretch %.2f ink %.2f" % [
+			_boat.day.lean, _boat.day.stretch, _boat.day.ink],
+		"visible" if shade.visible else "hidden",
+	])
+	log.close()
 	var shot := get_viewport().get_texture().get_image()
 	var at := _boat.get_global_transform_with_canvas().origin
 	var to_shot := float(shot.get_width()) / get_viewport().get_visible_rect().size.x

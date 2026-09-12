@@ -372,10 +372,17 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   `COLLAR_SCALE` 2.4 times the rubbish's rise and fall, one strip over the cut's segments,
   tear and bubbles scaled to the width through the shader's new `tear_across` uniform — not
   a `WaterlineFoam`, which is one shared material sized for a figure on a straight edge).
-  Under it the frame's own silhouette is the shadow (`HullShade`: shadow.gdshader,
-  LakeGrid's squash and colour, `SHADE_DROP` 0.30, packed `DRY_ANCHOR` since the node
-  already bobs). The shop board draws the same polygon (`Polygon2D`, `cut` from
-  `art_frame`).
+  The shadow is the sun's (`HullShade`): the same above-water polygon drawn again in the
+  day's ink under `Shade.lying`, like the angler, the dog and the trees, so it leans and
+  stretches with the day and is the shape of the boat on its heading, at `SHADE_GAIN` (3)
+  times the day's ink, capped at `SHADE_MOST` (0.7): the day's ink is set for sand and
+  grass, and on the lake — darker, and darkening away from the island the way the shadow
+  falls — the same alpha could not be seen (0.16 at dawn: nothing; 0.35: still nothing;
+  0.48: reads). The rubbish's squashed crescent (shadow.gdshader) was tried first and could
+  not be seen under a hull either. `Boat.day` is set in `Lake._fit_out`; no day, no
+  shadow. `tools/shot_boat.tscn` logs the sun and the shade node beside its pictures
+  (`tools/last_boat.log`), since a missing shadow can be either. The shop board draws the same
+  polygon (`Polygon2D`, `cut` from `art_frame`).
 - **Cargo draws over the picture**, sails and all, on the foredeck just ahead of the mast
   (`HOLD_FROM` 0.06 to `HOLD_TO` 0.24, `HOLD_LIFT` 0.9 hull heights). Kept short of the
   bow: laid to the rail by the plane's projection it floated past the cut bow end on,

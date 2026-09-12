@@ -157,15 +157,17 @@ const PENNANT_STAFF := 14.0
 ## piece gets (LakeGrid.WATERLINE). Level by decision (2026-09-11): a line bent to follow
 ## the near side ran into the bow and the transom. The lake's own foam collar
 ## (foam.gdshader) lies along that line, scaled up from the ten-pixel rubbish to the hull
-## and reaching COLLAR_REACH past its ends. Under it the boat's
-## silhouette is laid on the water through shadow.gdshader the way the rubbish throws its
-## shadow: squashed by LakeGrid.SHADOW_SQUASH and pushed SHADE_DROP of its height down the
-## plane, so a crescent shows past the hull's near side and the sails' shadow past its
-## ends. It is the frame's own alpha, so it turns with the boat. Collar and shadow ride in
-## this node's space, which already bobs (`_place`), so their materials carry no swell.
+## and reaching COLLAR_REACH past its ends. Its shadow is the sun's, cast from the same
+## picture: see HullShade. Collar and shadow ride in this node's space, which already bobs
+## (`_place`), so the collar's material carries no swell.
 const COLLAR_SCALE := 2.4
 const COLLAR_REACH := 4.0
-const SHADE_DROP := 0.30
+
+## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
+## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
+## the same alpha at dawn is a shade of blue nobody can see.
+const SHADE_GAIN := 3.0
+const SHADE_MOST := 0.7
 
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
@@ -336,8 +338,12 @@ var _rng := RandomNumberGenerator.new()
 ## The bow wave the hull leaves while under way. See HullFoam.
 var _foam: HullFoam
 
-## The shadow on the water and the foam along the waterline, both children so each can
-## wear its own shader.
+## The day, for the sun the shadow is cast by. Handed over by the lake; null in a scene
+## with no day, which draws no shadow.
+var day: DayCycle
+
+## The shadow on the water and the foam along the waterline, both children so they draw
+## under the hull, the collar wearing its own shader.
 var _shade: HullShade
 var _collar: HullCollar
 
@@ -554,11 +560,17 @@ func _repaint() -> void:
 		queue_redraw()
 		return
 	var key := hash([
-		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round()
+		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round(), _sun_key()
 	])
 	if key != _painted:
 		_painted = key
 		queue_redraw()
+
+
+## Where the sun is, coarsely, for the repaint key: a shadow that only moves when the boat
+## does is a shadow stuck to the morning. Mirrors Dog._sun_key.
+func _sun_key() -> int:
+	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
 
 
 ## Spray off the bow while under way. The same splash the net and the falling rubbish make,
@@ -936,7 +948,7 @@ static func _swell(x: float, t: float) -> float:
 ## the frame.
 func _draw() -> void:
 	_painted = hash([
-		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round()
+		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round(), _sun_key()
 	])
 	var ink := Color(0.11, 0.09, 0.1)
 	var half_l := HULL_LENGTH * 0.5
@@ -1000,12 +1012,7 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 			points.append((at - _anchor) * scale)
 			uvs.append((corner + at) / sheet_size)
 		draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, sheet)
-		var box := _ink_box(sheet, index)
-		_shade.lay(
-			sheet,
-			Rect2((Vector2(box.position) - _anchor) * scale, Vector2(box.size) * scale),
-			Rect2((corner + Vector2(box.position)) / sheet_size, Vector2(box.size) / sheet_size)
-		)
+		_shade.lay(sheet, points, uvs, day)
 		var line := PackedVector2Array()
 		for at in cut_line(index):
 			line.append((at - _anchor) * scale)
@@ -1328,61 +1335,39 @@ func _screen_heading() -> Vector2:
 	return on_screen.normalized() if on_screen.length_squared() > 0.0001 else Vector2.RIGHT
 
 
-## The boat's shadow on the water: its own frame's alpha, flattened and pushed down the
-## plane through shadow.gdshader, exactly as LakeGrid.ShadowLayer lays the rubbish's. One
-## quad, rewritten whenever the hull is redrawn for a new heading. Packed with DRY_ANCHOR:
-## the parent already rides the swell, so the shader must not move it again.
+## The boat's shadow: the sun's, like the angler's, the dog's and the trees' (see Shade).
+## The frame above the waterline is drawn a second time in the day's ink, laid out on the
+## water away from the sun about the hull's anchor, so it is the shape of the boat on this
+## heading — sails and all — and leans and stretches as the day goes. Not the rubbish's
+## squashed crescent (LakeGrid.ShadowLayer): that is eighteen thousand shadows that cannot
+## afford to follow the sun, and under a hull it was a sliver nobody could see. A child so
+## it sits under the collar and the bow wave as well as the hull. Without a day, no shadow.
 class HullShade extends Node2D:
-	static var INDICES := PackedInt32Array([0, 1, 2, 0, 2, 3])
-
 	var _sheet: Texture2D
 	var _points := PackedVector2Array()
 	var _uvs := PackedVector2Array()
-	var _colors := PackedColorArray()
+	var _day: DayCycle
 
 	func _init() -> void:
 		z_index = -2
-		# Linear, like the rubbish's shadows: the art squashed to half its height under
-		# nearest sampling is a staircase of blocks. The shader softens it further.
-		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var shade := LakeGrid.SHADOW_COLOUR
-		shade.a = LakeGrid.SHADOW_ALPHA
-		var skin := ShaderMaterial.new()
-		skin.shader = load("res://shaders/shadow.gdshader") as Shader
-		skin.set_shader_parameter("shade", shade)
-		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
-		material = skin
 
-	## `box` is the drawn boat in the parent's space, `uv` the same box on the sheet, 0 to 1.
-	func lay(sheet: Texture2D, box: Rect2, uv: Rect2) -> void:
+	## The boat above the water, in the parent's space, with its texture coordinates on the
+	## sheet, 0 to 1 — the same polygon the hull is drawn from.
+	func lay(sheet: Texture2D, points: PackedVector2Array, uvs: PackedVector2Array, day: DayCycle) -> void:
 		_sheet = sheet
+		_points = points
+		_uvs = uvs
+		_day = day
 		visible = true
-		var half := Vector2(box.size.x * 0.5, box.size.y * LakeGrid.SHADOW_SQUASH * 0.5)
-		var centre := box.get_center() + Vector2(0.0, box.size.y * Boat.SHADE_DROP)
-		_points = PackedVector2Array([
-			centre + Vector2(-half.x, -half.y), centre + Vector2(half.x, -half.y),
-			centre + Vector2(half.x, half.y), centre + Vector2(-half.x, half.y),
-		])
-		_uvs = PackedVector2Array([
-			uv.position, uv.position + Vector2(uv.size.x, 0.0), uv.end,
-			uv.position + Vector2(0.0, uv.size.y),
-		])
-		_colors = PackedColorArray()
-		for i in 4:
-			# Blue and alpha say which corner this is, for the shader's rounding off.
-			var c := LakeGrid.DRY_ANCHOR
-			c.b = 1.0 if i == 1 or i == 2 else 0.0
-			c.a = 1.0 if i >= 2 else 0.0
-			_colors.append(c)
 		queue_redraw()
 
 	func _draw() -> void:
-		if _sheet == null or _points.is_empty():
+		if _sheet == null or _points.is_empty() or _day == null:
 			return
-		RenderingServer.canvas_item_add_triangle_array(
-			get_canvas_item(), INDICES, _points, _colors, _uvs,
-			PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
-		)
+		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, _day.lean, _day.stretch))
+		var ink := minf(_day.ink * Boat.SHADE_GAIN, Boat.SHADE_MOST)
+		draw_polygon(_points, PackedColorArray([Shade.tint(ink)]), _uvs, _sheet)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The foam along the hull's waterline: the lake's collar (foam.gdshader, the rubbish's
