@@ -286,6 +286,45 @@ of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
   poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
   marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.
 
+### The Ferry (`scripts/boat.gd`, sheet: `assets/boat_sail_frames.png`)
+The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a 16-heading
+128 px sheet, credit @Pixel_Salvaje), cut for the lake by `tools/build_boat_sheet.py`
+(psd-extract venv python, project root), which writes the sheet and its json. Decided
+2026-09-11:
+- **The jib is gone, and the forestay with it.** Three sails were drawn — a jib on the
+  forestay, a square sail on the yard at the mast (its forward billow is the white-and-slate
+  lens in the side views), a gaff sail aft — and Richard wanted the front one off. The edit
+  is a per-frame table of ops in the script (`OPS`, frames 0-8, mirrored onto 9-15: the sheet
+  is mirror-symmetric to within a few pixels of the hull's blue stripe), not a hand-saved PNG,
+  so it can be re-run. What the jib hid is repainted from the frame's own colours: the bow
+  deck under its clew as a far rail stepping down to the stem cap with deck in shadow inside
+  it, the square sail's lit face where the jib's shaded half lay over it, the sail's foot
+  spar where its far end was. Bow on and stern on, the jib was edge-on behind its own stay,
+  so only the stay came out.
+- **The baked floor shadow is stripped** (every half-alpha pixel): a hull on water throws
+  none. No replacement shadow.
+- **Drawn at 2.0**, like every other sprite. `HULL_IN_FRAME` (46, the waterline length in a
+  frame) and `HULL_LENGTH` (92) set that; `HULL_WIDTH` 50 is the beam bow on, doubled.
+  Foam, wake, stern ripple, shove clearance and the shop board's wake follow from those,
+  untuned this pass. The old 138 px ferry was a third longer; judge the size in play.
+- **`HULL_ANCHOR`** (64, 88) is the frame point that lands on the boat's position: the water
+  under the mast, the point the frames turn about. `heading_frame` counts frames clockwise
+  from `FRAME_ZERO_TURN` (bow towards the camera = tile diagonal (1, 1)); `turn_heading`
+  gives the shop board the heading its frame faces. The pennant flies from the masthead the
+  json lists per frame (`MASTHEAD` in the script, mirrored).
+- **Cargo draws over the picture**, sails and all, on the foredeck (`HOLD_FROM` 0.08 to
+  `HOLD_TO` 0.34). Cutting each heading into hull and sail layers would have tripled the
+  art; not drawing the load loses the laden-ferry read. Richard's call.
+- `assets/Blue_Boat/PixZels_Model_BlueBoat.json` that came with the sheet is a *different*
+  boat (a pirate ship with a skull sail) and was no use as a reference; the edit is 2D only.
+- **Not yet retired**: `tools/bake_boat.gd` and the Kenney sheet `assets/boat_frames.png`
+  it bakes, kept until the sail boat is judged in play. `tools/shot_boat.tscn` (desktop
+  build, not `--headless`) saves three close crops of the ferry under way,
+  `tools/last_boat_N.png`, for checking that the anchor puts the hull on the water.
+- **Open**: the bow-foam streaks (`HullFoam`, `HUG` at a constant `SQUASH`) sit inside the
+  hull's silhouette in the side and end-on views and only show where they spread past the
+  stern — as they did under the old hull. A heading-aware across scale would fix it.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

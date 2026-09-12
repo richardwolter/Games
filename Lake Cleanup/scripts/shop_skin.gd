@@ -42,14 +42,14 @@ const CHIPS := 3
 const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
 ## How much of its slot each board's sprite fills. The net is a wide flat thing and fills
-## the slot at 0.7; the ferry is a small square frame with air round the hull and needs
-## more than the slot to come out the size of the dog beside it.
-const SPRITE_FILL := {&"net": 0.7, &"boat": 1.35, &"dog": 0.8}
+## the slot at 0.7; the ferry's region is the box round the drawn boat, and pixel art, so
+## it is drawn at a whole number of pixels per art pixel and fills what that comes to.
+const SPRITE_FILL := {&"net": 0.7, &"boat": 1.0, &"dog": 0.8}
 
 ## The ferry on its board is under way: the bow wake it leaves in the lake runs beside it
 ## and the hull bobs a couple of pixels on a slow swell. The wake is laid exactly as the
-## lake lays it — the lake lends the heading, lift and size with the frame, in the frame's
-## own pixels, and the board scales them with the picture.
+## lake lays it — the lake lends the heading, anchor and size with the picture, in the
+## picture's own pixels, and the board scales them with it.
 const BOB_PX := 2.0
 const BOB_HZ := 0.4
 
@@ -440,9 +440,12 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 		return
 	var region: Rect2 = lent["region"]
 	var scale := minf(slot.size.x / region.size.x, slot.size.y / region.size.y) * fill
+	# Pixel art at a fraction of a pixel per art pixel drops rows; the ferry keeps to whole
+	# steps.
+	if board == &"boat":
+		scale = maxf(floor(scale), 1.0)
 	var drawn := region.size * scale
-	# Never wider than the slot: the ferry's over-fill is for its baked-in margin, not for
-	# running into the frame.
+	# Never wider than the slot.
 	if drawn.x > slot.size.x:
 		drawn *= slot.size.x / drawn.x
 	var box := Rect2(middle - drawn * 0.5, drawn)
@@ -453,7 +456,8 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			# The wake is a node of its own; it is placed under the hull here, where the
 			# hull is known, at the lake's own geometry scaled to the drawn frame.
 			var to_drawn := drawn.y / maxf(float(lent.get("frame", region.size.y)), 1.0)
-			_wake.position = box.position + box.size * 0.5 + Vector2(0.0, float(lent.get("lift", 0.0)) * to_drawn)
+			var anchor: Vector2 = lent.get("anchor", region.size * 0.5)
+			_wake.position = box.position + anchor * to_drawn
 			_wake.half_length = float(lent.get("half_length", region.size.x * 0.5)) * to_drawn
 			_wake.half_width = float(lent.get("half_width", region.size.x * 0.2)) * to_drawn
 			_wake_heading = lent.get("heading", Vector2.RIGHT)

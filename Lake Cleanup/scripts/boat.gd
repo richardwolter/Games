@@ -95,20 +95,23 @@ const HULL_RIPPLE := 0.22
 const BOW_SPRAY := 0.34
 const BOW_SPRAY_SIZE := 0.22
 
-## Bigger than anything it collects, and no bigger. At a bit over two tiles long it reads
-## as the machine that eats the lake without the lake stopping being the thing on screen.
-const HULL_LENGTH := 138.0
-const HULL_WIDTH := 57.0
+## The hull at the waterline, in world pixels: the blue boat's forty-six by twenty-five art
+## pixels at two world pixels each, the scale every other sprite in the lake is drawn at.
+## Bigger than anything it collects, and no bigger.
+const HULL_LENGTH := 92.0
+const HULL_WIDTH := 50.0
 
 ## How tall the drawn hull stands above the water, for the things that sit on it: the load
 ## in the hold and the pennant above it.
 const HULL_HEIGHT := 16.0
 
 ## The open hold, as a fraction of the hull: where along it the cargo deck starts and ends,
-## and how far across it reaches. Taken off the model — the cabin sits over the stern and
-## the bow is decked in, so the load goes in the middle and slightly forward.
-const HOLD_FROM := 0.02
-const HOLD_TO := 0.33
+## and how far across it reaches. Taken off the drawing — the cabin sits over the stern and
+## the mast is amidships, so the load goes on the foredeck, from just ahead of the mast to
+## the bow rail. It is drawn over the picture, sails and all, by decision (2026-09-11):
+## cutting every heading into a hull layer and a sail layer would have tripled the art.
+const HOLD_FROM := 0.08
+const HOLD_TO := 0.34
 const HOLD_ACROSS := 0.30
 
 ## How many pieces are drawn in the hold, and how big. A hold packed with forty things is
@@ -120,14 +123,32 @@ const HOLD_SCALE := 0.55
 ## tiles rather than in pixels.
 const TILE_REACH := 35.777
 
-## The baked headings, and how much of one frame the hull actually covers — the bake leaves
-## room around it for the diagonals, and the load and the wake are placed against the hull
-## rather than against the frame.
-const FRAMES_PATH := "res://assets/boat_frames.png"
-const HULL_IN_FRAME := 104.0
+## The sheet of headings: sixteen turns of the PixZels blue boat, one row of square frames,
+## cut by tools/build_boat_sheet.py (jib, forestay and floor shadow removed). The hull's
+## waterline length in a frame sets the scale — HULL_LENGTH over it is the two world pixels
+## per art pixel — and the load and the wake are placed against the hull rather than
+## against the frame.
+const FRAMES_PATH := "res://assets/boat_sail_frames.png"
+const FRAMES_META := "res://assets/boat_sail_frames.json"
+const HULL_IN_FRAME := 46.0
+
+## Where in a frame the water meets the hull under the mast — the point the sheet turns
+## about — laid on the boat's position. In frame pixels. The masthead in each frame comes
+## with the sheet's json, for the pennant.
+const HULL_ANCHOR := Vector2(64.0, 88.0)
+
+## Which way the sheet's first frame points, as an angle in tile space: bow towards the
+## camera, which on the plane is down the tile diagonal (1, 1). The frames turn clockwise
+## seen from above, and the projection keeps that.
+const FRAME_ZERO_TURN := PI * 0.25
+
+## How far the pennant's staff stands above the truck, in world pixels.
+const PENNANT_STAFF := 14.0
 
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
+static var _mastheads := PackedVector2Array()
+static var _boxes: Dictionary = {}
 
 ## How close to the end of a leg counts as arrived, in tiles.
 const ARRIVE_DISTANCE := 0.25
@@ -293,6 +314,8 @@ var _foam: HullFoam
 
 
 func _ready() -> void:
+	# Pixel art at a whole number of world pixels per art pixel: filtered, its edges smear.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# Seeded, like the lake itself: a run that can be replayed is a run that can be tuned.
 	_rng.seed = rng_seed
 	tile_pos = dock
@@ -868,14 +891,14 @@ static func _swell(x: float, t: float) -> float:
 	return sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38
 
 
-## The ferry, drawn from the sheet of headings baked out of the 3D model, plus the parts
-## that are not the boat: its wake, its load, its pennant and its skimmer.
+## The ferry, drawn from its sheet of headings, plus the parts that are not the boat: its
+## wake, its load, its pennant and its skimmer.
 ##
 ## The hull is a picture per heading rather than one picture turned. A boat is not a flat
 ## card: seen on an isometric plane, one pointing away from the camera shows its stern and
 ## one coming towards it shows its bow, and no amount of rotating a single sprite produces
-## the second from the first. tools/bake_boat.gd renders the model once per heading through
-## the same camera the game's projection describes, and this picks the frame.
+## the second from the first. The sheet is sixteen turns of one drawn boat, and this picks
+## the frame.
 func _draw() -> void:
 	_painted = hash([
 		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round()
@@ -916,27 +939,25 @@ func _draw() -> void:
 	# A pennant in the colour of wherever it is going, so a glance at the boat says which
 	# yard it is running to.
 	if target >= 0 and target < dropoffs.size():
-		var mast := Vector2(0.0, -HULL_HEIGHT * 1.4)
-		draw_line(mast, mast + Vector2(0.0, -24.0), ink, 1.6)
+		var truck := masthead()
+		var top := truck + Vector2(0.0, -PENNANT_STAFF)
+		draw_line(truck, top, ink, 1.6)
 		draw_colored_polygon(
-			PackedVector2Array([
-				mast + Vector2(0.0, -24.0), mast + Vector2(16.0, -18.0),
-				mast + Vector2(0.0, -12.0)
-			]),
+			PackedVector2Array([top, top + Vector2(16.0, 6.0), top + Vector2(0.0, 12.0)]),
 			dropoffs[target].tint
 		)
 
 
-## The hull itself: the baked frame for the way it is pointing, or the blocked-in
-## placeholder if the sheet is missing, so the game still runs without the bake.
+## The hull itself: the frame for the way it is pointing, its anchor on this node's origin,
+## or the blocked-in placeholder if the sheet is missing, so the game still runs without it.
 func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 	var sheet := _sheet()
 	if sheet != null:
 		var frame := float(sheet.get_height())
-		var span := frame * (HULL_LENGTH / HULL_IN_FRAME)
+		var scale := HULL_LENGTH / HULL_IN_FRAME
 		draw_texture_rect_region(
 			sheet,
-			Rect2(Vector2(-span, -span) * 0.5 + Vector2(0.0, -HULL_HEIGHT * 0.5), Vector2(span, span)),
+			Rect2(-HULL_ANCHOR * scale, Vector2(frame, frame) * scale),
 			Rect2(float(heading_frame()) * frame, 0.0, frame, frame)
 		)
 		return
@@ -1104,18 +1125,37 @@ func hold_spot(i: int, shown: int) -> Vector2:
 	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, -HULL_HEIGHT * 0.55)
 
 
-## Which baked frame shows the boat pointing the way it is pointing.
-##
-## The bake turns the model about its up axis, and Godot's forward is -Z. The camera it was
-## baked through puts world +X along the tile field's +x and world +Z along its +y, so a
-## model turned by t is heading (-sin t, -cos t) in tiles — and the frame wanted for a
-## heading is that read backwards.
+## Which frame shows the boat pointing the way it is pointing: how far round the compass
+## the heading is from the first frame's, in frames.
 func heading_frame() -> int:
 	var frames := _frame_count()
 	if frames <= 0:
 		return 0
-	var turn := atan2(-heading.x, -heading.y)
+	var turn := atan2(heading.y, heading.x) - FRAME_ZERO_TURN
 	return posmod(int(round(turn / TAU * float(frames))), frames)
+
+
+## The heading, in tiles, of the frame `turn` picks (0 to 1 round the compass) — for laying
+## a wake under a frame drawn somewhere other than the lake.
+static func turn_heading(turn: float) -> Vector2:
+	var sheet := _sheet()
+	if sheet == null:
+		return Vector2.RIGHT
+	var count := int(round(float(sheet.get_width()) / float(sheet.get_height())))
+	var index := clampi(int(turn * float(count)), 0, count - 1)
+	var angle := FRAME_ZERO_TURN + TAU * float(index) / float(count)
+	return Vector2(cos(angle), sin(angle))
+
+
+## The top of the mast in this node's own space, off the sheet's json; a guess above the
+## anchor when the json is missing.
+func masthead() -> Vector2:
+	var scale := HULL_LENGTH / HULL_IN_FRAME
+	var frame := heading_frame()
+	var at := HULL_ANCHOR + Vector2(0.0, -HULL_HEIGHT * 3.0)
+	if frame < _mastheads.size():
+		at = _mastheads[frame]
+	return (at - HULL_ANCHOR) * scale
 
 
 ## How many headings the sheet holds. Taken from the sheet itself rather than written down
@@ -1127,8 +1167,11 @@ func _frame_count() -> int:
 	return int(round(float(sheet.get_width()) / float(sheet.get_height())))
 
 
-## One frame of the baked sheet, for anything that wants a picture of a ferry without being
-## one — the shop's rows, so far. `turn` runs 0 to 1 round the compass.
+## One frame of the sheet, for anything that wants a picture of a ferry without being one —
+## the shop's board, so far. `turn` runs 0 to 1 round the compass. The region is the box
+## round the drawn boat, not the whole frame, so a board fits the boat rather than the air
+## round it and can draw it at a whole number of pixels per art pixel; `anchor` is where
+## the water meets the hull, in the region's own pixels.
 static func art_frame(turn: float) -> Dictionary:
 	var sheet := _sheet()
 	if sheet == null:
@@ -1136,19 +1179,47 @@ static func art_frame(turn: float) -> Dictionary:
 	var side := float(sheet.get_height())
 	var count := int(round(float(sheet.get_width()) / side))
 	var index := clampi(int(turn * float(count)), 0, count - 1)
+	var box := _ink_box(sheet, index)
 	return {
 		"sheet": sheet,
-		"region": Rect2(float(index) * side, 0.0, side, side),
+		"region": Rect2(Vector2(float(index) * side, 0.0) + Vector2(box.position), Vector2(box.size)),
+		"anchor": HULL_ANCHOR - Vector2(box.position),
 	}
 
 
-## The baked sheet, loaded once and shared by every hull in the fleet.
+## The box round the drawn boat in a frame, measured off the sheet once per frame.
+static func _ink_box(sheet: Texture2D, index: int) -> Rect2i:
+	if _boxes.has(index):
+		return _boxes[index]
+	var side := sheet.get_height()
+	var box := Rect2i(0, 0, side, side)
+	var image := sheet.get_image()
+	if image != null:
+		var used := image.get_region(Rect2i(index * side, 0, side, side)).get_used_rect()
+		if used.size.x > 0 and used.size.y > 0:
+			box = used
+	_boxes[index] = box
+	return box
+
+
+## The sheet, loaded once and shared by every hull in the fleet, with its json.
 static func _sheet() -> Texture2D:
 	if _sheet_cache == null and not _sheet_missing:
 		if ResourceLoader.exists(FRAMES_PATH):
 			_sheet_cache = load(FRAMES_PATH) as Texture2D
 		_sheet_missing = _sheet_cache == null
+		_read_meta()
 	return _sheet_cache
+
+
+static func _read_meta() -> void:
+	_mastheads = PackedVector2Array()
+	if not FileAccess.file_exists(FRAMES_META):
+		return
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FRAMES_META))
+	if parsed is Dictionary and parsed.has("masthead"):
+		for pair in parsed["masthead"]:
+			_mastheads.append(Vector2(float(pair[0]), float(pair[1])))
 
 
 ## Which way the boat points on screen. The tile field is seen at an angle, so a heading of

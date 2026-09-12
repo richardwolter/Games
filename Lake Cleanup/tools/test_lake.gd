@@ -1064,7 +1064,7 @@ func _stage_settings() -> void:
 ## The ferry's art: one baked frame per heading, and the right one picked for each.
 func _stage_ferry_art() -> void:
 	var sheet: Texture2D = _boat.call(&"_sheet")
-	_check(sheet != null, "the ferry has a sheet of baked headings", "")
+	_check(sheet != null, "the ferry has a sheet of headings", "")
 	if sheet == null:
 		_advance()
 		return
@@ -1072,11 +1072,16 @@ func _stage_ferry_art() -> void:
 	_check(frames >= 8 and sheet.get_width() == sheet.get_height() * frames,
 		"it is one row of square frames", "%d frames of %d px" % [frames, sheet.get_height()])
 
-	# Heading zero of the bake is the model's own forward, which the camera puts along the
-	# tile field's -y — up and to the right on screen.
-	_boat.heading = Vector2(0.0, -1.0)
+	# The sheet's first frame is the boat coming at the camera: down the screen, which on
+	# the plane is the tile diagonal (1, 1).
+	_boat.heading = Vector2(1.0, 1.0)
 	_check(int(_boat.call(&"heading_frame")) == 0,
-		"the first frame is the heading the model was baked facing", "")
+		"the first frame is the boat coming towards the camera", "")
+	# A quarter turn on: the sheet's side view, pointing left across the screen.
+	_boat.heading = Vector2(-1.0, 1.0)
+	_check(int(_boat.call(&"heading_frame")) == frames / 4,
+		"and a quarter turn on it is drawn side on, pointing left",
+		"frame %d" % int(_boat.call(&"heading_frame")))
 
 	# Turning right round comes back to where it started, and opposite headings are
 	# opposite frames.
