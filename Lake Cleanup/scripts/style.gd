@@ -72,6 +72,15 @@ const GOLD_DEEP := Color(0.72, 0.52, 0.14)
 ## first and read too bright against the lake.
 const BOARD := Color(0.17, 0.24, 0.25)
 const BOARD_ROW := Color(0.25, 0.41, 0.47)
+## The face the two picture buttons stand their contents on: the boards' own murky water,
+## one step up the palette from `BOARD` (2026-09-12). A menu is a dark board because it is
+## mostly writing; these two are mostly pictures — a hut in grass, a green arrow, a black net
+## — and the darkest swatch in the set was a hole in the corner of the screen rather than a
+## sign on it. The money plate and the menus keep `BOARD`: their job is to be read.
+const BUTTON_FACE := BOARD_ROW
+## What a panel pressed into that face is: the same water taken well down, so it reads as a
+## recess in the button rather than as a second colour laid on it.
+const BUTTON_SUNK := Color(0.12, 0.20, 0.23)
 const BOARD_ROW_OFF := Color(0.22, 0.35, 0.25)
 const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)

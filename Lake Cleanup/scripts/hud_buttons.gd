@@ -92,8 +92,7 @@ static func face_of(box: Rect2) -> Rect2:
 ##
 ## The face is filled before the border goes on, so the border's own nicked outer edge is
 ## the button's silhouette and nothing shows through behind it.
-static func board(on: CanvasItem, box: Rect2, hovered: bool) -> Rect2:
-	var fill := Style.BOARD
+static func board(on: CanvasItem, box: Rect2, hovered: bool, fill := Style.BOARD) -> Rect2:
 	if hovered:
 		fill = Color(fill.r * Style.HOVER_WASH.r, fill.g * Style.HOVER_WASH.g, fill.b * Style.HOVER_WASH.b)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
@@ -149,7 +148,7 @@ static func span_of(art: Dictionary, room: Vector2, fill: float) -> Vector2:
 ## The upgrades button. `hovered` lifts and lights it; `wash` is the caller's own tint on
 ## top of that, white for none.
 static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictionary) -> void:
-	var face := board(on, box, hovered)
+	var face := board(on, box, hovered, Style.BUTTON_FACE)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	# The net, behind, filling the face and dimmed into it. Clipped to the face by drawing
 	# it centred rather than stood, so an over-fill spills evenly rather than out of the top.
@@ -222,7 +221,7 @@ static func arrow(on: CanvasItem, face: Rect2, tint: Color) -> void:
 ## The shed button: the finds scattered over the face, the hut in the middle of them, the
 ## word across the foot.
 static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictionary) -> void:
-	var face := board(on, box, hovered)
+	var face := board(on, box, hovered, Style.BUTTON_FACE)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	var label_tall := floorf(face.size.y * 0.2)
 	var room := Rect2(face.position, Vector2(face.size.x, face.size.y - label_tall))
@@ -270,7 +269,7 @@ static func _scatter(count: int, room: Rect2) -> Array:
 ## button writes its count on, because they are a pair.
 static func label(on: CanvasItem, box: Rect2, text: String) -> void:
 	var plate := Rect2(box.position + Vector2(4.0, 1.0), box.size - Vector2(8.0, 4.0))
-	Style.plate(on, plate, Style.BOARD.darkened(0.35), 2.0)
+	Style.plate(on, plate, Style.BUTTON_SUNK, 2.0)
 	var height := Style.step(plate.size.y * 0.8)
 	var wide := Style.measure(text, height).x
 	if wide > plate.size.x:

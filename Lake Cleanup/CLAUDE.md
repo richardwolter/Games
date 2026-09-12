@@ -356,7 +356,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   chamfer off its corners. Don't nine-patch painted wood.
 
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
-  2026-09-11): a dark `BOARD` face inside that border.
+  2026-09-11): a face inside that border. The two picture buttons stand theirs on
+  `Style.BUTTON_FACE` (2026-09-12) — the boards' own murky water, one step up the palette
+  from `BOARD` — because they are mostly pictures, and the darkest swatch in the set read as
+  a hole in the corner of the screen rather than a sign on it. Their sunken panels are
+  `Style.BUTTON_SUNK`, that water taken well down. The money plate and the menus keep
+  `BOARD`: their job is to be read.
   *Upgrades* (120x100, the decorate button's own size): the landed net behind in
   `Style.NET_INK` — the shop board's own black, one net wherever it is drawn as a picture of
   itself — the ferry to the left of the arrow, the dog

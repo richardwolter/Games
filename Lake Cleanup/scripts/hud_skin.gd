@@ -659,7 +659,7 @@ func _draw_available() -> void:
 		Vector2(box.position.x + 4.0, box.end.y - AVAILABLE_TALL - 3.0),
 		Vector2(box.size.x - 8.0, AVAILABLE_TALL)
 	)
-	Style.plate(self, plate, Style.BOARD.darkened(0.35), 2.0)
+	Style.plate(self, plate, Style.BUTTON_SUNK, 2.0)
 	# Set to the panel's height and then shrunk to its width if the words are too long for
 	# it — not stepped onto the game's ladder of text sizes, because every rung of that
 	# ladder is wider than this panel.

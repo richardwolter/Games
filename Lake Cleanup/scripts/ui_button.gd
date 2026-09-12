@@ -100,7 +100,7 @@ func _draw_note(face: Rect2) -> void:
 		Vector2(face.position.x + 4.0, face.end.y - NOTE_TALL - 3.0),
 		Vector2(face.size.x - 8.0, NOTE_TALL)
 	)
-	Style.plate(self, plate, Style.BOARD.darkened(0.35), 2.0)
+	Style.plate(self, plate, Style.BUTTON_SUNK, 2.0)
 	var height := maxi(NOTE_LEAST, int(plate.size.y * NOTE_TEXT))
 	var wide := Style.measure(note, height).x
 	if wide > plate.size.x:
