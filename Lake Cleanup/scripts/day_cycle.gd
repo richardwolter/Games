@@ -17,7 +17,16 @@ extends Node
 const CONFIG_PATH := "res://resources/day.tres"
 
 ## Where in the loop the day is, 0 at first light and 1 back at it.
-var phase: float = 0.0
+##
+## A run opens at 0.35 rather than at 0: phase 0 is first light, which is the dimmest the
+## day gets short of the trough, so the game used to open at dusk and spend its first four
+## minutes getting brighter. 0.35 is late morning — near full light, still climbing, so the
+## opening minutes warm rather than fade. Not noon (0.45) by decision: start at the peak and
+## the only direction the light can go is down.
+##
+## Nothing saves or restores this. Every run opens at the same hour, which is what makes it
+## a mood rather than a clock the player is being asked to track.
+var phase: float = 0.35
 
 ## The colour the world is multiplied by, sampled from the config's gradient.
 var tint := Color.WHITE
