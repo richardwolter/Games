@@ -209,8 +209,8 @@ var _stand_foot: float = 45.0
 func _ready() -> void:
 	# Nearest, and only here. The figure is magnified — two screen pixels per pixel of art —
 	# and a filter that blends between them throws away exactly what makes it pixel art. Not
-	# set on the project: the piers are drawn at four tenths of their size and the hut at half
-	# of its, and nearest on a shrink with no mipmaps sets both of them crawling.
+	# set on the project: the hut is drawn at 1.4 world px per painted one, and nearest on a
+	# fractional scale with no mipmaps sets it crawling.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_foam = WaterlineFoam.new()
 	_foam.name = &"Foam"

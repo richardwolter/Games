@@ -757,6 +757,60 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   hull's silhouette in the side and end-on views and only show where they spread past the
   stern — as they did under the old hull. A heading-aware across scale would fix it.
 
+### The Piers (`scripts/dropoff.gd`, `tools/build_piers.py`, sheet: `assets/piers.png`, 2026-09-12)
+The four merchant yards are isometric pixel art **built from rules, not painted** (issue #10;
+Richard: "rebuild in code, isometric", judged on a static mockup before anything in the
+lake changed). Each is a jetty of planks on posts running `JETTY_OUT` (3) tiles from the
+drawn waterline into the lake, one tile wide, bollards at the end, and a two-by-two tile
+platform on the sand behind it carrying the recycle box, empty. No sign and no heap of the
+material, by decision (both were drawn first and taken off: "just the pier and the empty
+box"; they stay behind `WITH_SIGN` / `WITH_HEAP` in the builder). The yards are told apart
+by their place on the bank and the tint the ferry reads.
+- **Laid into the plane, not stood on it**: the deck is a 2:1 diamond on the grid, projected
+  the way `Iso.tile_to_world` does at one painted px to two world px, so the four banks are
+  four different drawings and nothing is mirrored. The old front-on paintings were drawn at
+  four tenths of their size against a game where everything else is at 2.0 nearest.
+- **The wood is the box's**: plank pitch five painted px, the box's own rows 12-16 (a lit
+  line, two of body, a lighter one, a seam), the deck in its lit face's tones and the beams
+  and posts in its shaded face's, the silhouette ringed in its edge colour (48,37,33). The
+  box is `assets/Recycle_Box.png` pasted at one painted px to one, so it draws at 2.0 â€”
+  four fifths of the island's crate (`Yard.ART_SCALE` 2.5). **A whole art pixel, by
+  decision**: at one and a quarter the sheet would crawl on the grid.
+- **The json is the contract**: `anchor` (the drawn waterline point on the jetty's
+  centreline), `jetty` and `platform` (deck-top outlines, `deck_up` above the plane),
+  `posts_wet` / `posts_dry`, `landward`, `drop` (the box), `box`, `berth_end`. `Dropoff`
+  reads all of it and measures nothing off the picture. `Dropoff.JETTY_OUT` must equal the
+  builder's.
+- **Mooring is one bearing** (`Dropoff.moor`): the foot is `Iso.basin_point(angle, 1)`
+  plus `Lake.SHORE_LAP` outward (the drawn water's edge, not Iso's line); the axis is the
+  tile axis nearest the way to the lake's middle (the four yards are cardinal); the berth
+  lies `BERTH_ASIDE` (1.3) tiles beside the jetty's end **on the camera's side**, so the
+  hull (z 12) drawn over the pier (z 6) is the hull in front of it. `Boat._plan_legs` lines
+  up `APPROACH` (2.5) tiles out along the jetty before coming in and leaves the same way,
+  as it does for the island's dock, so the ferry lies alongside rather than nosing in.
+- **The shadow is the footprint slid along the sun**: a flat slab's shadow is its own
+  footprint moved by (`lean` x height, `stretch` x 0.5 x height), so the two decks are
+  filled as polygons in the day's ink, the jetty's over water at the hull's gain
+  (`SHADE_GAIN` 3, capped `SHADE_MOST` 0.7) because the day's ink is set for sand. The box
+  is a billboard and is laid down by `Shade.lying` from its foot on the deck. If the hut's
+  swept shadow (`Shade.Cast`) proves better for a picture whose base is a diamond corner,
+  the box is the candidate to follow it.
+- **Foam and sand are decided against the lake, not read off the sheet**: at `_ready` every
+  post's foot is tested with `Iso.shore_fraction` against the foot's own edge; past it, a
+  `WaterlineFoam` collar (`POST_COLLAR` 5 px half-width); short of it, `Skirt.spill` grains
+  drawn under the deck. The coast curves and the jetty does not, so the pair at the water's
+  edge can fall either side depending on the bank; `test_lake` guards that at least the two
+  pairs out along the jetty froth.
+- **Retired**: `assets/Piers_Asset_Sheet.jpg`, `pier_*.png`, `tools/slice_piers.gd`,
+  `export_piers.gd`, `debug_pier_coords.gd`, `Dropoff.PIER_OUT` / `PIER_WIDE` / `PIER_FOOT`
+  / `DROP_UP`. The strand rubbish still fills the tiles under a jetty and is hidden by it
+  (the dog fetches it from under the deck); clearing the jetty's footprint in `LakeGrid` is
+  open.
+- **Probe**: `tools/shot_piers.tscn` (desktop build) pans to each yard and saves
+  `tools/last_pier_<kind>.png` plus `last_piers.log` (foot, berth, collar and spill counts,
+  the sun). The mockup the design was judged on is `tools/last_piers_mockup.png`, rewritten
+  by every builder run. **Reimport after running the builder.**
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

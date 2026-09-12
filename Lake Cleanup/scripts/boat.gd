@@ -839,16 +839,30 @@ func _plan_legs(from: Vector2, to: Vector2) -> Array[Vector2]:
 	# straight out from the island, the way any boat comes at a jetty. Without this every
 	# path to it is a chord that clips the beach on one side and has to be bent again, and
 	# the bend has to be bent, and the ferry arrives home sideways after four corrections.
+	#
+	# A yard's berth is the same case (2026-09-12): it lies alongside the end of a jetty, so
+	# the ferry lines up out along the jetty and comes in parallel to it, and leaves the same
+	# way, rather than cutting across the planks from wherever it happens to be.
 	var points: Array[Vector2] = []
 	var start := from
 	if from.distance_to(dock) < ARRIVE_DISTANCE:
 		start = _dock_approach()
 		points.append(start)
+	else:
+		var leaving := _yard_at(from)
+		if leaving != null:
+			start = leaving.approach()
+			points.append(start)
 	var finish := to
 	var tail: Array[Vector2] = []
 	if to.distance_to(dock) < ARRIVE_DISTANCE:
 		finish = _dock_approach()
 		tail.append(to)
+	else:
+		var calling := _yard_at(to)
+		if calling != null:
+			finish = calling.approach()
+			tail.append(to)
 
 	points.append_array(_split_leg(start, finish))
 	points.append_array(tail)
@@ -884,6 +898,14 @@ func _smooth(from: Vector2, legs: Array[Vector2]) -> Array[Vector2]:
 					out[i] = moved
 					break
 	return out
+
+
+## The yard whose berth `at` is, if it is one.
+func _yard_at(at: Vector2) -> Dropoff:
+	for yard: Dropoff in dropoffs:
+		if at.distance_to(yard.berth) < ARRIVE_DISTANCE:
+			return yard
+	return null
 
 
 ## Where the ferry lines up before coming in to the dock: straight out from the island,
