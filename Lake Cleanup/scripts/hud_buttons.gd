@@ -24,9 +24,10 @@ const Style := preload("res://scripts/style.gd")
 ## no `class_name`, and from one the global class is not in scope on a headless tool run.
 const Dogs := preload("res://scripts/dog_art.gd")
 
-## The oak round a button and how many bites it takes per side. Thinner than a board's
-## frame: a button is a small thing, and twelve pixels of wood round a sixty-pixel face
-## would be a frame with a picture as an afterthought.
+## The fallback oak round a button and how many bites it takes per side, for when the
+## meter's painted border is missing. The border itself is `Style.meter_frame`, by decision
+## (2026-09-11): these three sit in the same corners of the screen as the pollution meter and
+## wearing its wood is what makes them read as the same object as it.
 const FRAME := 7.0
 const CHIPS := 1
 
@@ -73,15 +74,29 @@ const COIN_RING := 0.72
 const COIN_GLINT := Color(1.0, 0.94, 0.72)
 
 
+## The face inside a button of this size: what `board` fills and hands back, for a caller
+## that needs it without drawing the button again.
+static func face_of(box: Rect2) -> Rect2:
+	return Style.border_inset(box) if Style.meter_patch() != null else box.grow(-FRAME)
+
+
 ## The wood and the face. Returns the face, which is where the contents go.
+##
+## The face is filled before the border goes on, so the border's own nicked outer edge is
+## the button's silhouette and nothing shows through behind it.
 static func board(on: CanvasItem, box: Rect2, hovered: bool) -> Rect2:
-	Style.board_frame(on, box, FRAME, CHIPS)
-	var face := box.grow(-FRAME)
 	var fill := Style.BOARD
 	if hovered:
 		fill = Color(fill.r * Style.HOVER_WASH.r, fill.g * Style.HOVER_WASH.g, fill.b * Style.HOVER_WASH.b)
-	on.draw_rect(face, fill, true)
-	return face
+	var tint := Style.HOVER_WASH if hovered else Color.WHITE
+	if Style.meter_patch() != null:
+		var face := Style.border_inset(box)
+		on.draw_rect(face.grow(2.0), fill, true)
+		Style.meter_frame(on, box, tint)
+		return face
+	on.draw_rect(box.grow(-FRAME), fill, true)
+	Style.board_frame(on, box, FRAME, CHIPS)
+	return box.grow(-FRAME)
 
 
 ## A sprite fitted into a box: scaled to fit the box's height (or width, if it is the

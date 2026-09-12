@@ -61,9 +61,9 @@ const METER_FEATHER := 0.14
 ## the hut, and the money plate is as wide as the stock plate over it and as tall as its
 ## coin — two slabs of one width read as a pair, where a square under a slab read as
 ## lopsided.
-const UPGRADES_SIZE := Vector2(132.0, 84.0)
-const SHED_SIZE := Vector2(104.0, 84.0)
-const MONEY_TALL := 52.0
+const UPGRADES_SIZE := Vector2(148.0, 100.0)
+const SHED_SIZE := Vector2(120.0, 100.0)
+const MONEY_TALL := 64.0
 
 ## Gaps: around the whole thing, and between the buttons.
 const EDGE := Style.EDGE
@@ -179,6 +179,8 @@ var _painted: int = 0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# The buttons wear the meter's painted border, which is pixel art and wants its own filter.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_build_meter()
 	_shown = pollution
 	_show_meter()
@@ -642,7 +644,7 @@ func _recycle_shapes(box: Rect2) -> Array:
 ## notice the absence of, and "0 available" is the answer to the question they are asking
 ## when they look at it.
 func _draw_available() -> void:
-	var box := _lifted(_upgrades_box, &"upgrades").grow(-HudButtons.FRAME)
+	var box := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
 	var plate := Rect2(
 		Vector2(box.position.x + 4.0, box.end.y - AVAILABLE_TALL - 3.0),
 		Vector2(box.size.x - 8.0, AVAILABLE_TALL)

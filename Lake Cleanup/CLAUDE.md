@@ -297,8 +297,18 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   name in the clean water's blue, dimmed with the row when it cannot be bought. Not the gold:
   gold on this board is a price.
 
+- **The corner buttons wear the meter's own border** (`Style.meter_patch`/`meter_frame`/
+  `border_inset`, 2026-09-11): `assets/ui/meter/Meter_Border.png` is cut once into a 36x38
+  nine-patch — corners whole, edges tiled, middle open — and the three buttons wear it round
+  a dark `BOARD` face. Walls are 14 px, 16 at the top, measured off the sheet's alpha; the
+  buttons grew to 148x100 / 120x100 to keep their faces. **The left wall is the right wall
+  mirrored**: the meter's own left side is two pixels thin, because the garbage circle sits
+  over it and it was never painted. `hud_buttons.gd`'s `FRAME`/`CHIPS` drawn frame is the
+  fallback for when the sheet is missing; `face_of` is the one place the inset is decided.
+  Re-measure `BORDER_*` if the meter art is repainted.
+
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
-  2026-09-11): the boards' oak frame (`FRAME` 7, one bite a side) round a dark `BOARD` face.
+  2026-09-11): a dark `BOARD` face inside that border.
   *Upgrades* (132x84): the landed net dimmed behind, the ferry in from the left, the dog
   (`DogArt` idle) in its right, both mirrored to face outwards and both at a size that can
   be made out, a black-ringed green (`SAFE`) block arrow large in the middle drawn last over

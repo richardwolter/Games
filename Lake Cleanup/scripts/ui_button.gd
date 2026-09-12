@@ -38,7 +38,7 @@ const NOTE_LEAST := 8
 const HOVER_LIFT := Style.HOVER_LIFT
 
 ## The size the HUD draws this button at; the container's slot is centred on it.
-const SIZES := {&"upgrades": Vector2(132.0, 84.0), &"shed": Vector2(104.0, 84.0)}
+const SIZES := {&"upgrades": Vector2(148.0, 100.0), &"shed": Vector2(120.0, 100.0)}
 
 signal pressed
 
@@ -51,6 +51,8 @@ var _hovered: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# The button wears the meter's painted border, which is pixel art and wants its own filter.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	queue_redraw()
 
 
@@ -71,7 +73,7 @@ func _gui_input(event: InputEvent) -> void:
 func _draw() -> void:
 	# The HUD's own size, centred, shrunk only if the slot is smaller: a container that
 	# hands one a wide slot should not stretch it into a signboard.
-	var wanted: Vector2 = SIZES.get(piece, Vector2(84.0, 84.0))
+	var wanted: Vector2 = SIZES.get(piece, Vector2(100.0, 100.0))
 	var scale := minf(1.0, minf(size.x / wanted.x, size.y / wanted.y))
 	var side := (wanted * scale).floor()
 	var at := ((size - side) * 0.5).floor()
@@ -84,7 +86,7 @@ func _draw() -> void:
 		_:
 			HudButtons.draw_upgrades(self, box, _hovered, sprites)
 	if not note.is_empty():
-		_draw_note(box.grow(-HudButtons.FRAME))
+		_draw_note(HudButtons.face_of(box))
 
 
 ## The note, on a sunken panel across the foot of the button.

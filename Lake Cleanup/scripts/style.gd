@@ -700,6 +700,98 @@ static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) ->
 	rims(on, box, bites)
 
 
+# ---------------------------------------------------------------------------------------
+# The meter's own border
+# ---------------------------------------------------------------------------------------
+
+## The pollution meter's painted frame, cut up into a patch a button of any size can wear.
+##
+## The corner buttons asked for the meter's border rather than the drawn one, and the meter's
+## art is a single painted frame at one size, so it is turned into a nine-patch here: the
+## corners kept whole, the edges tiled, the middle left open for the caller to fill.
+##
+## The left wall is the right wall mirrored, not the art's own. The meter's left side is
+## two pixels thin — the garbage circle sits over it, so it was never painted — and a button
+## with a hairline down one edge and fourteen pixels down the other reads as a mistake. The
+## rest is the sheet as painted, nicks and all.
+const METER_BORDER := "res://assets/ui/meter/Meter_Border.png"
+
+## Preloaded rather than reached as the global `Art`: this file has no `class_name` and a
+## headless tool run cannot count on the global class cache. art.gd depends on nothing, so
+## there is no cycle.
+const Pics := preload("res://scripts/art.gd")
+
+## Where the pieces are on that sheet, and so how thick each wall is. Measured off the
+## sheet's alpha, not authored — re-measure if the art is repainted.
+const BORDER_WALL := 14
+const BORDER_TOP := 16
+const BORDER_FOOT := 14
+const BORDER_RUN := 8
+const BORDER_RIGHT := Vector2i(257, 24)
+const BORDER_MID_X := 180
+const BORDER_MID_Y := 46
+
+## The built patch, kept: it is a 36x38 image and every button in the game wears the same one.
+static var _patch: ImageTexture
+
+
+## The patch, built on the first call. Null if the art is missing, and a caller falls back to
+## the drawn frame — the game runs with the art missing rather than failing to load.
+static func meter_patch() -> ImageTexture:
+	if _patch != null:
+		return _patch
+	var art := Pics.image(METER_BORDER)
+	if art == null:
+		return null
+	art.convert(Image.FORMAT_RGBA8)
+	var wide := BORDER_WALL * 2 + BORDER_RUN
+	var tall := BORDER_TOP + BORDER_RUN + BORDER_FOOT
+	var built := Image.create(wide, tall, false, Image.FORMAT_RGBA8)
+	# The right column: its two corners and a slice of wall between them, as painted.
+	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_RIGHT.y, BORDER_WALL, BORDER_TOP), Vector2i(BORDER_WALL + BORDER_RUN, 0))
+	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_MID_Y, BORDER_WALL, BORDER_RUN), Vector2i(BORDER_WALL + BORDER_RUN, BORDER_TOP))
+	_lay(built, art, Rect2i(BORDER_RIGHT.x, BORDER_RIGHT.y + BORDER_TOP + 19, BORDER_WALL, BORDER_FOOT), Vector2i(BORDER_WALL + BORDER_RUN, BORDER_TOP + BORDER_RUN))
+	# The top and bottom walls, from the middle of the sheet where the frame is unbroken.
+	_lay(built, art, Rect2i(BORDER_MID_X, BORDER_RIGHT.y, BORDER_RUN, BORDER_TOP), Vector2i(BORDER_WALL, 0))
+	_lay(built, art, Rect2i(BORDER_MID_X, BORDER_RIGHT.y + BORDER_TOP + 19, BORDER_RUN, BORDER_FOOT), Vector2i(BORDER_WALL, BORDER_TOP + BORDER_RUN))
+	# The left column: the right one, mirrored.
+	for y in tall:
+		for x in BORDER_WALL:
+			built.set_pixel(x, y, built.get_pixel(wide - 1 - x, y))
+	_patch = ImageTexture.create_from_image(built)
+	return _patch
+
+
+static func _lay(into: Image, from: Image, cut: Rect2i, at: Vector2i) -> void:
+	var kept := cut.intersection(Rect2i(Vector2i.ZERO, from.get_size()))
+	if kept.size.x <= 0 or kept.size.y <= 0:
+		return
+	into.blit_rect(from, kept, at)
+
+
+## How far in from a button's edge its face starts, once it is wearing the meter's border.
+static func border_inset(box: Rect2) -> Rect2:
+	return Rect2(
+		box.position + Vector2(float(BORDER_WALL), float(BORDER_TOP)),
+		box.size - Vector2(float(BORDER_WALL * 2), float(BORDER_TOP + BORDER_FOOT))
+	)
+
+
+## The meter's border round a box, corners whole and edges tiled, nothing drawn in the
+## middle. False if there is no art, and the caller draws `board_frame` instead.
+static func meter_frame(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
+	var patch := meter_patch()
+	if patch == null:
+		return false
+	RenderingServer.canvas_item_add_nine_patch(
+		on.get_canvas_item(), box, Rect2(Vector2.ZERO, patch.get_size()), patch.get_rid(),
+		Vector2(float(BORDER_WALL), float(BORDER_TOP)),
+		Vector2(float(BORDER_WALL), float(BORDER_FOOT)),
+		RenderingServer.NINE_PATCH_TILE, RenderingServer.NINE_PATCH_TILE, false, tint
+	)
+	return true
+
+
 ## The title plank a board wears over its top edge. A plank of the same oak as the frame,
 ## lit the same way, with bites out of its edges. Cloth was tried — a bowed three-tone band,
 ## then one with tails — and read as a sticker.
