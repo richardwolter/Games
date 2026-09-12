@@ -67,9 +67,9 @@ const MARGIN := 8.0
 const LIST_BUSY := 0.25
 
 
-## The close cross: how big it is drawn, and how far above the inventory column it sits.
+## The close cross: how big it is drawn. Where it sits on the title plank is
+## `Style.close_on`, the same for every menu.
 const CLOSE_SIDE := 44.0
-const CLOSE_LIFT := 10.0
 
 ## The dog, when it happens to be in.
 ##
@@ -777,23 +777,15 @@ func _draw_dog(floor_box: Rect2) -> void:
 func _place_close() -> void:
 	if _close == null:
 		return
-	var ribbon := _ribbon_rect()
-	_close.size = Vector2(CLOSE_SIDE, CLOSE_SIDE)
-	_close.position = Vector2(
-		ribbon.end.x - CLOSE_SIDE - CLOSE_LIFT * 0.5,
-		ribbon.position.y + (ribbon.size.y - CLOSE_SIDE) * 0.5
-	).floor()
+	var at := Style.close_on(_ribbon_rect(), CLOSE_SIDE)
+	_close.size = at.size
+	_close.position = at.position
 
 
 ## The stretch of the title plank the cross leaves free. Mirrored at the left end, so the
 ## title stays centred on the board rather than sliding off towards the far side.
 func _title_box() -> Rect2:
-	var ribbon := _ribbon_rect()
-	var taken := CLOSE_SIDE + CLOSE_LIFT
-	return Rect2(
-		Vector2(ribbon.position.x + taken, ribbon.position.y),
-		Vector2(maxf(ribbon.size.x - taken * 2.0, 1.0), ribbon.size.y)
-	)
+	return Style.title_room(_ribbon_rect(), CLOSE_SIDE)
 
 
 ## Everything unlocked that is not already standing in the room.

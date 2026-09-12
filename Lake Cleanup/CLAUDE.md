@@ -345,6 +345,22 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   cropped from — the art's own chips are in the stretches the crop avoids — so an unbitten
   built frame read as plastic beside the drawn boards. Bites stay `BITE_CLEAR` off the
   corners: the chamfer is already the corner's shape.
+  **A ribbon's plank ends where its board's face begins** (`Style.ribbon_plank`, 2026-09-12):
+  every menu hangs its ribbon centred on the board's top edge, so the box's middle is that
+  edge and the face starts `BORDER_TOP` below it. Centred in its box instead, the plank
+  stopped a row short, and the frame's own top-plank outline showed in that row as a dark line
+  straight under every bite along the ribbon's foot — closing each notch off.
+  **The stiles have no see-through column** (`_fill_empty_columns`, 2026-09-12): the foot plank
+  is 14 rows and the wall 15 wide, so turning it on its side left an empty column down the
+  inside of both stiles — a hairline of the lake beside every menu's face, hidden on the
+  buttons only because they grow their fill. Filled from its neighbour in the frame itself;
+  `test_lake` guards the inner ring.
+  **Every menu nails its close cross to its title plank's right end** (`Style.close_on`,
+  `title_room`, `CLOSE_LIFT`, 2026-09-12), as the shed's shelf did first — the settings board
+  on its own ribbon, the upgrades shop on the last board's — with the title centred on what
+  the cross leaves, mirrored at the left end. The X itself came in (`CloseButton.ARM` 0.3 to
+  0.22, `STROKE` 0.1 to 0.085): at that size it ran off the plank and outweighed the title.
+  Probe: `tools/shot_menus.tscn` (desktop build) saves all three, `tools/last_menu_*.png`.
   **A plank's bottom bites are backed, not open** (`_backings`, `meter_plank`'s `under`,
   2026-09-12): a ribbon straddles its board's top edge, so a hole in its lower edge shows the
   frame plank it is lying on. `_border_bites` records what each bottom bite cleared into a

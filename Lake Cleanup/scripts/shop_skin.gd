@@ -267,11 +267,12 @@ func _lay_out() -> void:
 		_boards[BOARDS[i]] = Rect2(
 			floorf(left + (each + BOARD_GAP) * float(i)), top, floorf(each), tall
 		)
-	if _close != null:
-		# Just outside the top right corner of the last board, where a window's close is,
-		# clear of that board's ribbon.
-		_close.position = Vector2(_table.end.x - CLOSE_SIZE, _table.position.y - CLOSE_SIZE - 4.0)
-		_close.size = Vector2(CLOSE_SIZE, CLOSE_SIZE)
+	if _close != null and _boards.has(BOARDS[BOARDS.size() - 1]):
+		# Nailed to the right end of the last board's title plank, as the shed's shelf has it,
+		# rather than hung in the air past that board's corner.
+		var at := Style.close_on(_ribbon_of(_boards[BOARDS[BOARDS.size() - 1]]), CLOSE_SIZE)
+		_close.position = at.position
+		_close.size = at.size
 	queue_redraw()
 
 
@@ -377,11 +378,10 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 
 	# The ribbon, hung over the top of the frame and a little wider than the board, the
 	# way the old painted one was. Its ends are notched like the meter's frame.
-	var ribbon := Rect2(
-		Vector2(box.position.x - RIBBON_OVERHANG, box.position.y - RIBBON_TALL * 0.5),
-		Vector2(box.size.x + RIBBON_OVERHANG * 2.0, RIBBON_TALL)
-	)
-	_draw_ribbon(ribbon, String(TITLES.get(board, "")))
+	var ribbon := _ribbon_of(box)
+	# Only the last board carries the cross, so only its title makes room for one.
+	var room := Style.title_room(ribbon, CLOSE_SIZE) if board == BOARDS[BOARDS.size() - 1] else Rect2()
+	_draw_ribbon(ribbon, String(TITLES.get(board, "")), room)
 
 	# The sprite, fitted into its slot at its own proportions.
 	var slot := Rect2(
@@ -416,8 +416,16 @@ func _draw_frame(box: Rect2) -> void:
 	Style.board_wood(self, box, FRAME, CHIPS)
 
 
-func _draw_ribbon(box: Rect2, title: String) -> void:
-	Style.board_ribbon(self, box, title, CHIPS)
+func _draw_ribbon(box: Rect2, title: String, within: Rect2 = Rect2()) -> void:
+	Style.board_ribbon(self, box, title, CHIPS, Style.TEXT_HEAD, within)
+
+
+## A board's title plank, hung over its top edge and a little wider than the board.
+func _ribbon_of(box: Rect2) -> Rect2:
+	return Rect2(
+		Vector2(box.position.x - RIBBON_OVERHANG, box.position.y - RIBBON_TALL * 0.5),
+		Vector2(box.size.x + RIBBON_OVERHANG * 2.0, RIBBON_TALL)
+	)
 
 
 func _draw_sprite(board: StringName, slot: Rect2) -> void:

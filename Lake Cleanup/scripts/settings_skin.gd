@@ -143,9 +143,20 @@ func _lay_out() -> void:
 	tall = minf(tall, size.y - 40.0)
 	_board = Rect2(floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall)
 	if _close != null:
-		_close.position = Vector2(_board.end.x - CLOSE_SIZE, _board.position.y - CLOSE_SIZE - 4.0)
-		_close.size = Vector2(CLOSE_SIZE, CLOSE_SIZE)
+		# Nailed to the title plank's right end, as the shed's shelf has it, rather than hung
+		# in the air above the board's corner.
+		var at := Style.close_on(_ribbon(), CLOSE_SIZE)
+		_close.position = at.position
+		_close.size = at.size
 	queue_redraw()
+
+
+## The title plank hung across the board's top edge, a little wider than the board.
+func _ribbon() -> Rect2:
+	return Rect2(
+		Vector2(_board.position.x - RIBBON_OVERHANG, _board.position.y - RIBBON_TALL * 0.5),
+		Vector2(_board.size.x + RIBBON_OVERHANG * 2.0, RIBBON_TALL)
+	)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -235,11 +246,10 @@ func _draw() -> void:
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
 	draw_rect(face, Style.BOARD, true)
 
-	var ribbon := Rect2(
-		Vector2(_board.position.x - RIBBON_OVERHANG, _board.position.y - RIBBON_TALL * 0.5),
-		Vector2(_board.size.x + RIBBON_OVERHANG * 2.0, RIBBON_TALL)
+	var ribbon := _ribbon()
+	Style.board_ribbon(
+		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
 	)
-	Style.board_ribbon(self, ribbon, TITLE, CHIPS)
 
 	_lines.clear()
 	var left := face.position.x + BOARD_PAD

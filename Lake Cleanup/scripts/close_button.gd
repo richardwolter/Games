@@ -15,9 +15,11 @@ const Style := preload("res://scripts/style.gd")
 ## button.
 @export var tint: Color = Style.INK
 
-## The arms of the cross, as a fraction of the box.
-const ARM := 0.3
-const STROKE := 0.1
+## The arms of the cross, as a fraction of the box. Brought in (2026-09-12) from 0.3 and 0.1:
+## at that size the cross ran off the plank it is nailed to and read as bigger than the title
+## beside it.
+const ARM := 0.22
+const STROKE := 0.085
 
 signal pressed
 

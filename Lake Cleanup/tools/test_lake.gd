@@ -1218,6 +1218,31 @@ func _stage_settings() -> void:
 	var really_full := mode == DisplayServer.WINDOW_MODE_FULLSCREEN 		or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 	_check(bool(_main.call(&"_is_fullscreen")) == really_full,
 		"the fullscreen box reads the real window", "")
+
+	# The built border has no hole down the inside of its walls. The stiles are the foot plank
+	# turned on its side, a row narrower than the wall is wide, and the cut used to leave that
+	# row empty — a one-pixel line of the lake down both inner edges of every menu board.
+	var StyleScript := preload("res://scripts/style.gd")
+	var frame: ImageTexture = StyleScript._build_border(Vector2i(200, 160))
+	if frame != null:
+		var pic := frame.get_image()
+		var holes := 0
+		var inner := Rect2i(
+			StyleScript.BORDER_WALL - 1, StyleScript.BORDER_TOP,
+			200 - StyleScript.BORDER_WALL * 2 + 2, 160 - StyleScript.BORDER_TOP - StyleScript.BORDER_FOOT
+		)
+		for y in range(inner.position.y, inner.end.y):
+			for x: int in [inner.position.x, inner.end.x - 1]:
+				if pic.get_pixel(x, y).a < 0.5:
+					holes += 1
+		_check(holes == 0, "a built border's walls have no see-through column on the inside",
+			"%d holes" % holes)
+		# And a ribbon's plank ends where the board's face begins, so nothing of the frame is
+		# left showing under the bites along its foot.
+		var ribbon := Rect2(0.0, 100.0, 300.0, 36.0)
+		var wood: Rect2 = StyleScript.ribbon_plank(ribbon)
+		_check(is_equal_approx(wood.end.y, 118.0 + float(StyleScript.BORDER_TOP)),
+			"a ribbon's plank ends where the board's face begins", "ends at %.1f" % wood.end.y)
 	_advance()
 
 

@@ -877,6 +877,36 @@ static func meter_frame(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -
 	return true
 
 
+## Any fully transparent column of a strip, filled with a copy of the nearest column that has
+## something in it. For a strip cut wider than the thing it was cut from.
+static func _fill_empty_columns(strip: Image) -> void:
+	var wide := strip.get_width()
+	var tall := strip.get_height()
+	var solid: Array[bool] = []
+	for x in wide:
+		var any := false
+		for y in tall:
+			if strip.get_pixel(x, y).a > 0.0:
+				any = true
+				break
+		solid.append(any)
+	for x in wide:
+		if solid[x]:
+			continue
+		var from := -1
+		for reach in range(1, wide):
+			if x - reach >= 0 and solid[x - reach]:
+				from = x - reach
+				break
+			if x + reach < wide and solid[x + reach]:
+				from = x + reach
+				break
+		if from < 0:
+			return
+		for y in tall:
+			strip.set_pixel(x, y, strip.get_pixel(from, y))
+
+
 ## One piece of the sheet as an image of its own.
 static func _cut(from: Image, box: Rect2i) -> Image:
 	var out := Image.create(box.size.x, box.size.y, false, Image.FORMAT_RGBA8)
@@ -930,6 +960,12 @@ static func _build_border(want: Vector2i) -> ImageTexture:
 		# Rotating the plank puts its lit edge down the right-hand side, which is the near
 		# wall; the far one is that mirrored, so the light stays on the outside of both.
 		var right := _cut(stile, Rect2i(stile.get_width() - BORDER_WALL, 0, BORDER_WALL, down))
+		# The foot plank is `BORDER_FOOT` (14) rows and the wall is `BORDER_WALL` (15) wide, so
+		# the plank turned on its side comes up a column short, and the cut leaves that column
+		# empty down the **inside** of both stiles — a hairline of whatever is behind the panel,
+		# which a board's face fill, laid exactly to the inset, does not reach (2026-09-12).
+		# Filled from its neighbour rather than papered over by growing every caller's fill.
+		_fill_empty_columns(right)
 		var left := right.duplicate() as Image
 		left.flip_x()
 		out.blit_rect(left, Rect2i(0, 0, BORDER_WALL, down), Vector2i(0, BORDER_TOP))
@@ -1097,14 +1133,63 @@ static func board_ribbon(
 	size_px: int = TEXT_HEAD,
 	within: Rect2 = Rect2()
 ) -> void:
-	if not meter_plank(on, box, Color.WHITE, BOARD):
+	var wood := box
+	if plank_fits(box):
+		wood = ribbon_plank(box)
+		meter_plank(on, wood, Color.WHITE, BOARD)
+	else:
 		var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
 		plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
-	var text_box := box if within.size.x <= 0.0 else within
+	var text_box := wood if within.size.x <= 0.0 else Rect2(
+		Vector2(within.position.x, wood.position.y), Vector2(within.size.x, wood.size.y)
+	)
 	write(
 		on, title, size_px,
-		Vector2(0.0, box.position.y + (box.size.y + float(size_px) * 0.62) * 0.5),
+		Vector2(0.0, wood.position.y + (wood.size.y + float(size_px) * 0.62) * 0.5),
 		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, text_box
+	)
+
+
+## Where the painted plank of a title ribbon goes, given the ribbon's box.
+##
+## Every menu hangs its ribbon centred on its board's top edge, so the box's middle **is**
+## that edge, and the board's face begins `BORDER_TOP` below it. The plank's lower edge is put
+## exactly there (2026-09-12). Centred in the box instead, it stopped a row short, and the
+## frame's own top-plank outline showed in that row as a dark line straight under every bite
+## along the ribbon's foot — closing each notch off, so none of them read as a gap.
+static func ribbon_plank(box: Rect2) -> Rect2:
+	var bottom := floorf(box.position.y + box.size.y * 0.5) + float(BORDER_TOP)
+	return Rect2(Vector2(box.position.x, bottom - float(PLANK_TALL)), Vector2(box.size.x, float(PLANK_TALL)))
+
+
+## The height a thing pinned to a ribbon should be centred on: the painted plank's own middle
+## where it is used, the box's where it is not. The corner crosses ask, so a cross and the
+## plank it is nailed to line up.
+static func ribbon_middle(box: Rect2) -> float:
+	if plank_fits(box):
+		var wood := ribbon_plank(box)
+		return wood.position.y + wood.size.y * 0.5
+	return box.position.y + box.size.y * 0.5
+
+
+## Where a close cross goes on a ribbon's right end, and the stretch of the ribbon that is left
+## for the title — mirrored at the left end, so the title stays centred on the board rather
+## than sliding away from the cross. The shed's shelf did this first; every menu does it now.
+const CLOSE_LIFT := 10.0
+
+
+static func close_on(box: Rect2, side: float) -> Rect2:
+	return Rect2(
+		Vector2(box.end.x - side - CLOSE_LIFT * 0.5, ribbon_middle(box) - side * 0.5).floor(),
+		Vector2(side, side)
+	)
+
+
+static func title_room(box: Rect2, side: float) -> Rect2:
+	var taken := side + CLOSE_LIFT
+	return Rect2(
+		Vector2(box.position.x + taken, box.position.y),
+		Vector2(maxf(box.size.x - taken * 2.0, 1.0), box.size.y)
 	)
 
 
