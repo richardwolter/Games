@@ -31,26 +31,35 @@ const FRAME := 7.0
 const CHIPS := 1
 
 ## The upgrades button. The net fills the face behind everything, dimmed so it reads as a
-## backdrop; the ferry comes in from the left edge and the dog from the right, each about
-## half the face tall; the arrow stands in the middle over the lot, the biggest and the
-## brightest thing there. The dog is drawn by `DogArt` (`Dogs` here), facing the arrow.
+## backdrop; the ferry stands to the left of the arrow and the dog to the right, both inside
+## the arrow's own edges so neither crosses it; the arrow is drawn last and over the lot, the
+## biggest and brightest thing there. The dog is drawn by `DogArt` (`Dogs` here).
 const NET_FILL := 1.05
 const NET_DIM := Color(0.55, 0.62, 0.66)
 const SIDE_TALL := 0.52
 const BOAT_TALL := 0.64
 const BOAT_LIFT := 0.12
-const SIDE_IN := 0.06
+const SIDE_IN := 0.04
 const ARROW_TALL := 0.78
 const ARROW_WIDE := 0.52
 const ARROW_HEAD := 0.5
 const ARROW_SHAFT := 0.42
 
-## The shed button: a row of finds stands along the back of the face, the hut centred in
-## front of them. Fixed, by decision (2026-09-11): a button that showed the player's own
-## finds would be bare for the first hour, and it is the way in, not a shelf.
-const DECOR_TALL := 0.5
+## The shed button: the finds cover the face behind the hut, in two overlapping rows — the
+## tall pieces along the back, the low ones in front of them — and the hut stands centred
+## over the lot with the word across its foot. Fixed, by decision (2026-09-11): a button
+## that showed the player's own finds would be bare for the first hour, and it is the way
+## in, not a shelf.
+##
+## `DECOR_OVER` is how much of its neighbour each find laps, so the row closes up rather than
+## standing in spaced slots: a backdrop with gaps in it reads as a row of objects, and the
+## point of this one is to be a wall of furniture.
+const DECOR_BACK := 0.62
+const DECOR_FRONT := 0.44
+const DECOR_OVER := 0.3
 const DECOR_DIM := Color(0.82, 0.86, 0.88)
-const SHED_TALL := 0.86
+const SHED_TALL := 0.8
+const SHED_LABEL := "Decorate"
 
 ## The coin: a disc in the money's gold with a deeper rim, a paler crescent where the light
 ## catches it, and a ring struck into it a little in from the edge.
@@ -101,21 +110,29 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	if sprites.has("net"):
 		var net_tint := Color(NET_DIM.r * tint.r, NET_DIM.g * tint.g, NET_DIM.b * tint.b)
 		fit(on, sprites["net"], face, NET_FILL, net_tint, false)
-	# The ferry, in from the left and a little up off the foot; the dog, in from the right.
-	# Both mirrored from how their sheets face, so they look outwards past the arrow.
+	# The ferry to the left of the arrow, a little up off the foot; the dog to the right.
+	# Both mirrored from how their sheets face, so they look outwards. Each is kept inside
+	# the arrow's own edge, so the arrow stands clear of them rather than on top of them.
 	var side_tall := face.size.y * SIDE_TALL
 	var foot := face.end.y - face.size.y * 0.08
+	var arrow_half := face.size.x * ARROW_WIDE * 0.5
+	var mid := face.position.x + face.size.x * 0.5
+	var lane := maxf(mid - arrow_half - face.position.x - face.size.x * SIDE_IN, 1.0)
 	if sprites.has("boat"):
 		var boat_tall := face.size.y * BOAT_TALL
 		var slot := Rect2(
 			Vector2(face.position.x + face.size.x * SIDE_IN, foot - face.size.y * BOAT_LIFT - boat_tall),
-			Vector2(face.size.x * 0.46, boat_tall)
+			Vector2(lane, boat_tall)
 		)
 		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
 	if Dogs.has(&"idle"):
 		var dog_tall := side_tall * 0.9
+		# Shrunk if it would not fit its lane: the dog is wider than it is tall, and the lane
+		# beside the arrow is the narrow measurement.
 		var span := Dogs.span(&"idle", dog_tall)
-		var dog_foot := Vector2(face.end.x - face.size.x * SIDE_IN - span.x * 0.5, foot)
+		if span.x > lane:
+			dog_tall *= lane / span.x
+		var dog_foot := Vector2(mid + arrow_half + lane * 0.5, foot)
 		Dogs.stamp(on, &"idle", 0, dog_foot, dog_tall, false, 0.0, tint)
 	arrow(on, face, tint)
 
@@ -157,29 +174,57 @@ static func arrow(on: CanvasItem, face: Rect2, tint: Color) -> void:
 	on.draw_polyline(PackedVector2Array([shape[4] + Vector2(1.0, -1.0), shape[3] + Vector2(-1.0, -1.0)]), deep, 1.0)
 
 
-## The shed button: finds along the back, the hut in front.
+## The shed button: the finds behind, the hut centred in front, the word across the foot.
 static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictionary) -> void:
 	var face := board(on, box, hovered)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
+	var label_tall := floorf(face.size.y * 0.2)
+	var room := Rect2(face.position, Vector2(face.size.x, face.size.y - label_tall))
 	var decor: Array = sprites.get("decor", [])
 	if not decor.is_empty():
-		# Spread across the face's upper half, each in its own slot, only a little dimmed:
-		# they are the collection, not a backdrop.
-		var slot_wide := face.size.x / float(decor.size())
-		var tall := face.size.y * DECOR_TALL
-		var foot := face.position.y + face.size.y * 0.62
 		var dim := Color(DECOR_DIM.r * tint.r, DECOR_DIM.g * tint.g, DECOR_DIM.b * tint.b)
-		for i in decor.size():
-			var slot := Rect2(Vector2(face.position.x + slot_wide * float(i), foot - tall), Vector2(slot_wide, tall))
-			fit(on, decor[i], slot.grow(-2.0), 1.0, dim)
+		# The back row takes the first half of the list and stands on the room's middle; the
+		# front row takes the rest and stands on its foot, lapping over the row behind.
+		var split := int(ceil(float(decor.size()) * 0.5))
+		_decor_row(on, decor.slice(0, split), room, DECOR_BACK, room.position.y + room.size.y * 0.72, dim)
+		_decor_row(on, decor.slice(split), room, DECOR_FRONT, room.end.y, dim)
 	var hut: Texture2D = sprites.get("shed")
 	if hut != null:
-		# Centred on the face, in front of the finds.
-		var slot := Rect2(
-			Vector2(face.position.x, face.position.y + face.size.y * (1.0 - SHED_TALL)),
-			Vector2(face.size.x, face.size.y * SHED_TALL)
-		)
+		var tall := room.size.y * SHED_TALL
+		var slot := Rect2(Vector2(room.position.x, room.end.y - tall), Vector2(room.size.x, tall))
 		fit(on, {"sheet": hut, "region": Rect2(Vector2.ZERO, hut.get_size())}, slot, 1.0, tint)
+	label(on, Rect2(Vector2(face.position.x, face.end.y - label_tall), Vector2(face.size.x, label_tall)), SHED_LABEL)
+
+
+## One row of finds across a box, each as tall as `tall` of it, stood on `baseline`, spaced
+## so every one laps `DECOR_OVER` of its neighbour and the row leaves no gaps.
+static func _decor_row(on: CanvasItem, row: Array, box: Rect2, tall: float, baseline: float, dim: Color) -> void:
+	if row.is_empty():
+		return
+	var height := box.size.y * tall
+	var stride := box.size.x / float(row.size())
+	for i in row.size():
+		var slot := Rect2(
+			Vector2(box.position.x + stride * float(i) - stride * DECOR_OVER * 0.5, baseline - height),
+			Vector2(stride * (1.0 + DECOR_OVER), height)
+		)
+		fit(on, row[i], slot, 1.0, dim)
+
+
+## The word across the foot of a button, on a sunken panel. The same panel the upgrades
+## button writes its count on, because they are a pair.
+static func label(on: CanvasItem, box: Rect2, text: String) -> void:
+	var plate := Rect2(box.position + Vector2(4.0, 1.0), box.size - Vector2(8.0, 4.0))
+	Style.plate(on, plate, Style.BOARD.darkened(0.35), 2.0)
+	var height := Style.step(plate.size.y * 0.8)
+	var wide := Style.measure(text, height).x
+	if wide > plate.size.x:
+		height = maxi(8, int(float(height) * plate.size.x / wide))
+	Style.write(
+		on, text, height,
+		Vector2(0.0, plate.position.y + plate.size.y * 0.5 + float(height) * 0.35),
+		Style.INK, HORIZONTAL_ALIGNMENT_CENTER, plate
+	)
 
 
 ## The money plate: the coin on the left, and the sunken panel the figure is written on

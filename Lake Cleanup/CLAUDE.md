@@ -300,10 +300,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
   2026-09-11): the boards' oak frame (`FRAME` 7, one bite a side) round a dark `BOARD` face.
   *Upgrades* (132x84): the landed net dimmed behind, the ferry in from the left, the dog
-  (`DogArt` idle) from the right, both mirrored to face outwards, a black-ringed green
-  (`SAFE`) block arrow large in the middle, the "n available" panel across the foot. *Shed*
-  (104x84): five fixed finds (`Lake.BUTTON_DECOR`, clean views, barely dimmed) along the
-  back, the hut centred in front. *Money*: as wide
+  (`DogArt` idle) to its right, both mirrored to face outwards and both held inside the
+  arrow's own edges so it stands clear of them, a black-ringed green (`SAFE`) block arrow
+  large in the middle drawn last, the "n available" panel across the foot. *Shed* (104x84):
+  sixteen fixed finds (`Lake.BUTTON_DECOR`, clean views, barely dimmed) in two overlapping
+  rows covering the face — tall ones behind, low ones in front — the hut centred over them,
+  and "Decorate" on a sunken panel across the foot. *Money*: as wide
   as the stock plate over it, a drawn gold coin on the left and the running figure on a
   sunken panel to its right; the swell-and-shine on payment stays. Same places as before.
   The lake lends the sprites once (`Lake._lend_button_art`) to `HudSkin.sprites` and the
