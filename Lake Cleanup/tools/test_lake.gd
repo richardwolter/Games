@@ -755,16 +755,21 @@ func _stage_ferry() -> void:
 		"%.1f -> %.1f sludge" % [_sludge_before, float(_main.get(&"sludge"))])
 	_check(int(_main.get(&"sold_count")) > 0, "the sale was counted",
 		"%d sold" % int(_main.get(&"sold_count")))
-	# Thrown ashore, not deducted: the yard's drop point is on its own deck, above the feet
-	# of the posts, so a piece coming down lands in the picture rather than under it.
+	# Thrown ashore, not deducted: the yard's drop point is the box on its platform, up the
+	# bank from where the jetty meets the water, so a piece coming down lands in the picture
+	# rather than in the lake.
 	var stops: Array = _main.get(&"_dropoffs")
 	var ashore := true
 	for stop: Dropoff in stops:
-		var foot := Iso.shore_point(Iso.basin_angle(stop.berth), Dropoff.PIER_OUT)
+		# Not "above the foot on screen": on the south and west banks the platform is
+		# towards the camera, below the water's edge on screen. Above the ground the box
+		# stands on, and near it, is the test.
 		var drop := stop.drop_point()
-		if drop.y >= foot.y or absf(drop.x - foot.x) > 1.0:
+		var landward := stop.foot - stop.axis * 1.0
+		var back := Iso.tile_to_world(landward.x, landward.y)
+		if drop.y >= back.y or drop.distance_to(back) > Iso.TILE_W:
 			ashore = false
-	_check(ashore, "every yard takes delivery on its own deck, not at its feet", "")
+	_check(ashore, "every yard takes delivery in the box on its platform", "")
 
 	# The waterline foam wraps the hull rather than lying under it as a bar: the arc's ends
 	# are the frame's own cut, so it cannot leave the hull, and its middle bows towards the
@@ -805,16 +810,52 @@ func _stage_dropoffs() -> void:
 			in_order = false
 	_check(in_order, "the merchants are held in material order", "")
 
-	# Every berth is on open water, or the ferry would sail into the bank to reach it.
+	# Every berth is on open water, or the ferry would sail into the bank to reach it — and
+	# so is the point it lines up at, out along the jetty.
 	var all_afloat := true
 	var spread := 0.0
 	for i in stops.size():
-		var berth: Vector2 = (stops[i] as Dropoff).berth
+		var stop := stops[i] as Dropoff
+		var berth: Vector2 = stop.berth
 		if Iso.shore_fraction(berth.x, berth.y) >= 1.0:
+			all_afloat = false
+		if Iso.shore_fraction(stop.approach().x, stop.approach().y) >= 1.0:
 			all_afloat = false
 		for j in stops.size():
 			spread = maxf(spread, berth.distance_to((stops[j] as Dropoff).berth))
-	_check(all_afloat, "every berth is in the water", "")
+	_check(all_afloat, "every berth and its approach are in the water", "")
+
+	# The piers are drawn from the built sheet, laid into the plane: every yard has its
+	# picture, the jetty leaves the bank at the water, the berth lies beside the jetty's end
+	# on the camera's side, and every post the json calls wet stands in the lake.
+	var pictured := true
+	var wet_posts := true
+	var beside := true
+	for stop: Dropoff in stops:
+		var book: Dictionary = stop.call(&"_book")
+		if book.is_empty() or not book.has("posts_wet") or (book["posts_wet"] as Array).is_empty():
+			pictured = false
+			continue
+		# Wet is decided against the lake by the yard itself: every collar it hung is past
+		# the drawn water's edge, and the jetty's own posts — at least the two pairs out
+		# along it — got one.
+		var edge := Iso.shore_fraction(stop.foot.x, stop.foot.y)
+		var collars: Array = stop.get(&"_collars")
+		if collars.size() < 4:
+			wet_posts = false
+		for collar: Node2D in collars:
+			var at: Vector2 = Iso.world_to_tile(collar.position)
+			if Iso.shore_fraction(at.x, at.y) >= edge:
+				wet_posts = false
+		var end := stop.foot + stop.axis * Dropoff.JETTY_OUT
+		var off := stop.berth - end
+		if absf(off.dot(stop.axis)) > 0.01 or Iso.tile_to_world(off.x, off.y).y <= 0.0:
+			beside = false
+		if absf(Iso.shore_fraction(stop.foot.x, stop.foot.y) - 1.0) > 0.05:
+			beside = false
+	_check(pictured, "every yard is drawn from the built sheet, posts and all", "")
+	_check(wet_posts, "the jetty's posts stand in the water and wear foam", "")
+	_check(beside, "the berth lies beside the jetty's end, on the camera's side", "")
 	_check(spread > Iso.RADIUS.x, "the merchants are spread round the lake",
 		"%.1f tiles apart at the widest" % spread)
 
@@ -1836,6 +1877,33 @@ func _stage_sun() -> void:
 		"and never lies so flat it comes away from its caster",
 		"%.0f degrees off vertical at phase %.2f" % [flattest, flattest_at])
 	_check(lit > 0, "the day is lit at all", "%d of 200 samples" % lit)
+
+	# The swept shadow, on a picture shaped like the ones that broke the sheared one: a V,
+	# whose base is a single pixel at the bottom middle. A shear anchored anywhere leaves
+	# every other column's shadow starting below its own base, which is the gap this
+	# replaced. A sweep cannot: the drag starts at zero, so the silhouette is part of its own
+	# shadow and the two share a border by construction.
+	var vee := Image.create(9, 9, false, Image.FORMAT_RGBA8)
+	vee.fill(Color(0, 0, 0, 0))
+	for row in 9:
+		for col in 9:
+			if absf(float(col) - 4.0) <= float(8 - row) * 0.5:
+				vee.set_pixel(col, row, Color.WHITE)
+	var box := Rect2(Vector2(-18.0, -36.0), Vector2(36.0, 36.0))
+	var cast := Shade.sweep(vee, box, -0.25, 0.48, 0.2)
+	_check(cast.size() >= 3 and cast.size() % 3 == 0,
+		"a swept shadow comes out as whole triangles", "%d points" % cast.size())
+	var reach := Rect2(cast[0], Vector2.ZERO)
+	for point in cast:
+		reach = reach.expand(point)
+	# It holds the picture itself, so there is no gap between a caster and its shade...
+	_check(reach.encloses(box),
+		"the sweep holds the picture it is cast from, so no gap can open under it",
+		"sweep %s against picture %s" % [reach, box])
+	# ...and it reaches past it, or nothing would be seen of the shadow at all.
+	_check(reach.position.x < box.position.x and reach.end.y > box.end.y,
+		"and reaches past it, down and to the left",
+		"%s" % reach)
 	day.queue_free()
 	_advance()
 

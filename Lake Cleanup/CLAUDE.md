@@ -520,20 +520,39 @@ in front of the player.
   exists to avoid. A piece of rubbish has no height to lean anyway — the whole shadow slides.
 - Applied before the `DRY_ANCHOR` test, so a piece lying on the beach throws its shadow the
   same way as one afloat. The anchor decides whether a shadow *bobs*, not whether the sun is out.
-- **A front-on picture roots its shadow at its bottom row, not at its ground line**
-  (`Lake._draw_shed`, `Store._draw_art`, 2026-09-12). `Shade.lying` lays the silhouette out
-  *from* the point it is handed, and the hut's shadow is about thirty pixels long at midday
-  against a picture whose bottom row is thirty-three below the middle of the diamond its walls
-  stand on. Rooted at that middle, the whole shadow landed inside the hut's own outline and
-  was drawn over: what showed was a wedge poking out of the left wall and nothing at all along
-  the front, which reads as a shadow belonging to some other object. The recycle box did the
-  same at its own scale. Rooted at the near corner the shadow comes out under the whole base
-  and away to the left. **Any new front-on painting that gets a sun shadow roots the same
-  way** — the piers are the obvious next ones, as they are for `Skirt`.
-- **And so the ground-line cut is gone with it**: nothing of the picture is below the new
-  root, so there is no wedge below the anchor to be reflected up and to the *right* by the
-  shear, which is what the cut existed to stop. One root, no special case. **Do not move the
-  root back up without putting the cut back.**
+- **A front-on painting sweeps its shadow, it does not shear it** (`Shade.sweep`,
+  `Shade.Cast`, `Lake._shed_shade`, `Store._shade`, 2026-09-12). `Shade.lying` moves every
+  pixel sideways in proportion to its height. That is right for a billboard standing on a flat
+  edge — a figure, whose feet are a straight line — and it comes apart on the hut and the
+  recycle box, which end in the near corner of the diamond their walls stand on. Against a V,
+  exactly one pixel of the picture touches the anchor and every other column's shadow starts
+  below its own base, so what draws is a slab of shade lying on the grass a little way off the
+  building. **No anchor fixes this**: the ground line and the near corner were both tried and
+  both wrong, because no single horizontal line is the contact line of a V.
+- **What a solid casts is a sweep**: the ground it hides is its footprint smeared along the
+  light, and that region touches the caster's own base everywhere by construction — there is
+  nowhere for a gap to open. `Shade.sweep` uses the *silhouette* in place of the footprint,
+  since a front-on painting is all the depth there is, so the hut's shadow is the shape of the
+  picture rather than of the floor plan. On a thatched hut that reads: the eaves are its
+  widest part and the ground round a hut is shaded by its roof. Per column and per opaque run
+  within it, so a gap in the art is a gap in the shadow; each run's swept region is the convex
+  hull of its four corners and the same four dragged, fanned into triangles.
+- **Overlaps composite once, through a `CanvasGroup`** (`Shade.Cast`). Every column's smear
+  overlaps its neighbours', and a few hundred translucent triangles laid over each other come
+  out as a black core with a pale fringe. The group draws its children into a buffer and then
+  draws that buffer once under **`self_modulate`** — `modulate` would reach the child and put
+  the stacking back. The node sits behind its parent's own drawing (`show_behind_parent`) at
+  the parent's z, so the caster covers the half of the sweep beneath it and the shadow still
+  lies over the ground.
+- **Rebuilt only when the sun steps** (`Shade.SWEEP_STEP`, 0.02), the bargain
+  `Ground._sun_baked` already strikes: the geometry is laid out, not transformed, and the
+  island redraws every frame. Measured on an RTX 5060 Ti, full lake: 2.33 ms mean standing and
+  2.54 ms walking, worst frame 3.92 ms, no frame over 16.7 — inside the 8 ms bar.
+- **`Shade.lying` is untouched** and stays the shadow for the angler, the dog, the ferry, the
+  trees and the props. A figure's feet are a flat edge; the shear is right for them.
+- **Any new front-on painting sweeps** — the four piers are the obvious next ones, as they are
+  for `Skirt`. `test_lake` casts a V-shaped test picture and guards that the sweep encloses the
+  picture it came from, which is the property a shear cannot have.
 - **The shadow falls toward the camera, and only its sideways half can match the art**:
   `stretch` is always positive, so a cast shadow runs *down* the screen whatever the hour.
   Screen-down is the near side, so the sun is on the far side of the lake and cannot be put in

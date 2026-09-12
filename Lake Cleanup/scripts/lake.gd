@@ -64,9 +64,10 @@ const ZOOM_FIT_MARGIN := 0.04
 
 ## How much bank the far end of the zoom shows past the waterline, in tiles.
 ##
-## The lake and the four piers on it, and nothing else worth pulling back for. A pier stands
-## `Dropoff.PIER_OUT` past the waterline and is most of a hundred pixels wide from there, so
-## this is that plus enough air to keep it off the edge of the window.
+## The lake and the four piers on it, and nothing else worth pulling back for. A pier's
+## platform stands two tiles back from the waterline with the recycle box on it (see
+## tools/build_piers.py), so this is that plus enough air to keep it off the edge of the
+## window.
 ##
 ## It has been further out. Thirteen tiles showed the wood behind the bank, which sounded
 ## like more of the place and read as a lake going away from you — the boats got small, the
@@ -423,6 +424,7 @@ var _water_material: ShaderMaterial
 
 ## The island's shed. A drawn node with nothing else to do.
 var _island: Node2D
+var _shed_cast: Shade.Cast
 
 ## The four merchants on the bank, held in TrashDef.Kind order so a material index is a
 ## dropoff index everywhere.
@@ -1144,8 +1146,11 @@ func _shape_dropoffs() -> void:
 		var stop := Dropoff.new()
 		stop.kind = row[0] as int
 		stop.tint = row[2] as Color
-		# Just inside the waterline, so the hull has water under it when it arrives.
-		stop.berth = Iso.basin_point(row[1] as float, 0.92)
+		# The jetty leaves the bank at the drawn waterline — Iso's line plus the lap the
+		# water is painted past it — and the berth is alongside the jetty's end, worked out
+		# by the yard itself from that one bearing.
+		stop.moor(row[1] as float, SHORE_LAP)
+		stop.day = _day
 		stop.name = StringName("Dropoff" + stop.kind_name())
 		# Above the rubbish (5), not below it: a yard stands on the bank and the water in
 		# front of it is where the junk is. At 4 the piers were drawn under every bottle
@@ -3301,42 +3306,36 @@ func _draw_shed() -> void:
 		# Rooted where the building stands, not at the bottom of the picture — the art's last
 		# row is the near corner of the diamond its walls stand on, and a shadow pinned there
 		# began a good way down the grass in front of the building it belonged to.
+		var picture := Rect2(stand - Vector2(size.x * 0.5, size.y), size)
+		# The hut's shadow: its own silhouette dragged along the sun, on a node of its own
+		# behind this one. Not `Shade.lying` — a shear anchored on any one line comes away
+		# from a picture whose base is the near corner of a diamond. See Shade.sweep.
 		if _day != null:
-			# Rooted at the picture's bottom row — the near corner of the diamond the walls
-			# stand on — and not at the middle of that diamond.
-			#
-			# The middle was tried and is wrong for a building. `Shade.lying` lays the
-			# silhouette out *from* the point it is given, and at this hour the hut's shadow
-			# is some thirty pixels long against a picture whose bottom row is thirty-three
-			# below that middle. So the whole shadow landed inside the hut's own outline and
-			# was drawn over: what showed was a wedge poking out of the left wall and nothing
-			# along the front, which read as a shadow belonging to something else. Rooted at
-			# the near corner it comes out under the whole base and away to the left, which
-			# is what a building standing in the sun looks like.
-			#
-			# Nothing of the picture is below this root, so there is no wedge to fold the
-			# wrong way and the whole picture casts — the ground-line cut this used to need
-			# is gone with the root that made it necessary.
-			_island.draw_set_transform_matrix(
-				Shade.lying(stand, _day.lean, _day.stretch)
+			_shed_shade().lay(
+				Art.image(SHED_ART), picture, _day.lean, _day.stretch,
+				Iso.SHED_ART_GROUND, _day.ink
 			)
-			_island.draw_texture_rect(
-				_shed_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false,
-				Shade.tint(_day.ink)
-			)
-			_island.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		_island.draw_texture_rect(
-			_shed_art, Rect2(stand - Vector2(size.x * 0.5, size.y), size), false
-		)
+		_island.draw_texture_rect(_shed_art, picture, false)
 		# And the grass over the bottom line, which is the whole point of it: the last row
 		# of the picture is a straight cut, and blades standing along it are what stop the
 		# hut reading as a sticker on the lawn.
-		_shed_grass(Rect2(stand - Vector2(size.x * 0.5, size.y), size)).over(_island)
+		_shed_grass(picture).over(_island)
 		# Over the hut, not over the tile: the two are not the same point.
 		_draw_shed_lamp(feet)
 		return
 
 	_draw_shed_blocked(at)
+
+
+## The node the hut's swept shadow lives on: a child of the island's canvas, drawn behind the
+## island's own commands so the hut covers the half of the sweep that is under it. Made on
+## first use, because the picture has to be there before there is anything to cast.
+func _shed_shade() -> Shade.Cast:
+	if _shed_cast == null:
+		_shed_cast = Shade.Cast.new()
+		_shed_cast.name = &"ShedShade"
+		_island.add_child(_shed_cast)
+	return _shed_cast
 
 
 ## The hut's grass, baked once off the hut's own silhouette. The island redraws every frame,

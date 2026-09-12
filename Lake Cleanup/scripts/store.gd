@@ -103,6 +103,7 @@ var _skirt: Skirt.Patch
 var _spill: Skirt.Patch
 
 var _art: Texture2D
+var _cast: Shade.Cast
 ## The art's two near walls and front rim alone, drawn again over the heap so the catch is
 ## inside the box rather than stuck on its face.
 var _front: Texture2D
@@ -242,6 +243,16 @@ func _draw() -> void:
 	)
 
 
+## The node the crate's swept shadow lives on, behind this one's own drawing so the crate
+## covers the half of the sweep that is under it.
+func _shade() -> Shade.Cast:
+	if _cast == null:
+		_cast = Shade.Cast.new()
+		_cast.name = &"CrateShade"
+		add_child(_cast)
+	return _cast
+
+
 ## The recycle box from its art, standing on the node's point with its ground diamond centred
 ## there. The sun's shadow, then the whole box, then the heap, then the near walls cut from
 ## the same picture over it, which is what puts the catch inside.
@@ -251,21 +262,14 @@ func _draw_art() -> void:
 	# The ground the crate has worn goes under the picture: sand is flat, and the box is
 	# standing on it.
 	_ground().over(self)
+	# The crate's shadow: its silhouette dragged along the sun, on a node behind this one.
+	# Not `Shade.lying` — the crate's base is a V and a shear anchored on any one line comes
+	# away from it. Same as the hut; see Shade.sweep.
 	if day != null:
-		# Rooted at the picture's bottom row, the near corner of the diamond the crate stands
-		# on, rather than at the node's point in the middle of it. Same reason the hut's is:
-		# the shadow is shorter than the half-diamond, so rooted at the middle all of it lay
-		# inside the crate's own outline and only a wedge on the left ever showed. See
-		# Lake._draw_shed.
-		draw_set_transform_matrix(
-			Shade.lying(
-				Vector2(0.0, box.position.y + size.y), day.lean, day.stretch
-			)
+		_shade().lay(
+			_art.get_image(), box, day.lean, day.stretch,
+			1.0 - ART_GROUND / float(maxi(_art.get_height(), 1)), day.ink
 		)
-		draw_texture_rect(
-			_art, Rect2(Vector2(-size.x * 0.5, -size.y), size), false, Shade.tint(day.ink)
-		)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	draw_texture_rect(_art, box, false)
 	if grid != null and not held.is_empty():
 		_draw_heap()

@@ -35,3 +35,156 @@ static func lying(at: Vector2, lean: float, stretch: float) -> Transform2D:
 ## The ink a shadow is drawn in, at the strength the day says.
 static func tint(ink: float) -> Color:
 	return Color(INK.r, INK.g, INK.b, clampf(ink, 0.0, 1.0))
+
+
+## How far the sun has to move before a swept shadow is rebuilt. The sweep is geometry, not a
+## transform, so it costs something to lay out; this is the same bargain `Ground._sun_baked`
+## strikes with the props' shadows.
+const SWEEP_STEP := 0.02
+
+
+## The silhouette dragged along the sun, as triangles.
+##
+## Not a shear. `lying` maps every pixel sideways in proportion to its height, which is right
+## for a billboard standing on a flat edge — a figure, whose feet are a straight line — and
+## comes apart on a front-on painting of a solid. The hut and the recycle box end in the near
+## corner of the diamond their walls stand on, a V, so under a shear exactly one pixel of the
+## picture touches the anchor and every other column's shadow starts below its own base. What
+## that draws is a slab of shade lying on the grass a little way off the building, which is
+## the bug this replaces. Moving the anchor cannot fix it: no single horizontal line is the
+## contact line of a V.
+##
+## A sweep is what a solid actually casts. The ground a box hides from the sun is its
+## footprint smeared along the light, and that region touches the box's own base everywhere
+## by construction — there is nowhere for a gap to open. Here the *silhouette* stands in for
+## the footprint, since a front-on painting is all the depth there is, so the shadow comes out
+## the shape of the picture rather than of the floor plan. On a thatched hut that reads: the
+## eaves are the widest part of it and the ground round a hut is shaded by its roof.
+##
+## `box` is where the picture is drawn, in the caster's own space. `ground` is how much of the
+## picture's height is below the walls' ground line, so the drag is measured off what actually
+## stands up rather than off the whole image.
+##
+## Per column, and per opaque run within it, so a gap in the art is a gap in the shadow. The
+## swept region of one run is the convex hull of its corners and those corners moved along the
+## drag — six points, fanned into four triangles.
+static func sweep(
+	art: Image, box: Rect2, lean: float, stretch: float, ground: float
+) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if art == null or art.is_empty() or box.size.x <= 0.0 or box.size.y <= 0.0:
+		return out
+	var wide := art.get_width()
+	var tall := art.get_height()
+	if wide <= 0 or tall <= 0:
+		return out
+	var step := Vector2(box.size.x / float(wide), box.size.y / float(tall))
+	# What stands up, and so how far its shadow is dragged. The same two numbers `lying` uses,
+	# against the object's height instead of against each pixel's own.
+	var rise := box.size.y * clampf(1.0 - ground, 0.0, 1.0)
+	var drag := Vector2(lean, maxf(stretch, 0.02) * 0.5) * rise
+	if drag.is_zero_approx():
+		return out
+
+	for col in wide:
+		var run := -1
+		for row in tall + 1:
+			var solid := row < tall and art.get_pixel(col, row).a > 0.5
+			if solid and run < 0:
+				run = row
+			elif not solid and run >= 0:
+				_smear(
+					out,
+					Rect2(
+						box.position + Vector2(float(col) * step.x, float(run) * step.y),
+						Vector2(step.x, float(row - run) * step.y)
+					),
+					drag
+				)
+				run = -1
+	return out
+
+
+## One run of solid pixels, swept. The hull of the run's own corners and the same four moved
+## along the drag: a hexagon when the drag has both a sideways and a downward half, which it
+## always does. Fanned from its first point, which is sound because the hull is convex.
+static func _smear(into: PackedVector2Array, cell: Rect2, drag: Vector2) -> void:
+	var corners := PackedVector2Array([
+		cell.position,
+		cell.position + Vector2(cell.size.x, 0.0),
+		cell.position + cell.size,
+		cell.position + Vector2(0.0, cell.size.y),
+	])
+	var both := corners.duplicate()
+	for point in corners:
+		both.append(point + drag)
+	var hull := Geometry2D.convex_hull(both)
+	# `convex_hull` closes the ring by repeating the first point; the fan must not.
+	if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.remove_at(hull.size() - 1)
+	for i in range(1, hull.size() - 1):
+		into.append(hull[0])
+		into.append(hull[i])
+		into.append(hull[i + 1])
+
+
+## A swept shadow as a node, so the overlaps inside it are composited once instead of stacking.
+##
+## Every column's smear overlaps its neighbours' — they are parallel and a pixel apart — and a
+## few hundred translucent triangles laid over each other come out as a black core with a pale
+## fringe. A `CanvasGroup` draws its children into a buffer first and then draws that buffer
+## once under its own `self_modulate`, so the shadow is one flat ink whatever it overlaps.
+## `self_modulate` rather than `modulate`, which would reach the child and put the stacking
+## back.
+##
+## Behind its parent's own drawing, so the caster covers the half of the sweep that is under
+## it, and still at the parent's z, so it lies over the ground rather than under it.
+class Cast extends CanvasGroup:
+	var _face: Face
+	var _lean := INF
+	var _stretch := INF
+	var _key := ""
+
+	func _init() -> void:
+		show_behind_parent = true
+		_face = Face.new()
+		add_child(_face)
+
+	## The shadow for this picture at this hour. Cheap to call every frame: the geometry is
+	## only rebuilt when the sun has actually moved, or when the picture or its box changes.
+	func lay(
+		art: Image, box: Rect2, lean: float, stretch: float, ground: float, ink: float
+	) -> void:
+		self_modulate = Shade.tint(ink)
+		var key := "%s|%.2f" % [box, ground]
+		if key == _key 				and absf(lean - _lean) < Shade.SWEEP_STEP 				and absf(stretch - _stretch) < Shade.SWEEP_STEP:
+			return
+		_key = key
+		_lean = lean
+		_stretch = stretch
+		_face.points = Shade.sweep(art, box, lean, stretch, ground)
+		_face.queue_redraw()
+
+
+## The triangles themselves. One `canvas_item_add_triangle_array`, the same batching the
+## ground's props and the shed's grass use — a loop of `draw_colored_polygon` at this count is
+## the cost that put the forest at 15 ms.
+class Face extends Node2D:
+	var points := PackedVector2Array()
+
+	var _order := PackedInt32Array()
+	var _ink := PackedColorArray()
+
+	func _draw() -> void:
+		if points.is_empty():
+			return
+		# White, and flat: the colour is the group's, applied once over the whole buffer.
+		if _order.size() != points.size():
+			_order.resize(points.size())
+			_ink.resize(points.size())
+			for i in points.size():
+				_order[i] = i
+				_ink[i] = Color.WHITE
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), _order, points, _ink
+		)
