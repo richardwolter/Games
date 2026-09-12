@@ -763,6 +763,30 @@ func _stage_ferry() -> void:
 		if drop.y >= foot.y or absf(drop.x - foot.x) > 1.0:
 			ashore = false
 	_check(ashore, "every yard takes delivery on its own deck, not at its feet", "")
+
+	# The waterline foam wraps the hull rather than lying under it as a bar: the arc's ends
+	# are the frame's own cut, so it cannot leave the hull, and its middle bows towards the
+	# camera. Checked at every heading, because the cut's width is different in each.
+	var wraps := true
+	var fitted := true
+	for index in 16:
+		var arc := Boat.waterline_arc(index, 2.0)
+		var line := Boat.cut_line(index)
+		var ends := arc[0].distance_to(arc[arc.size() - 1])
+		var sag := 0.0
+		for at in arc:
+			sag = maxf(sag, at.y - arc[0].y)
+		if sag < ends * 0.08 or sag > ends * 0.30:
+			wraps = false
+		# Never wider than the cut it was fitted to.
+		var span := line[line.size() - 1].x - line[0].x
+		for at in arc:
+			if at.x < arc[0].x - 0.01 or at.x > arc[arc.size() - 1].x + 0.01:
+				fitted = false
+		if absf(ends - span * 2.0) > 0.01:
+			fitted = false
+	_check(wraps, "the waterline foam bows round the hull at every heading", "")
+	_check(fitted, "and never reaches past the frame's own cut", "")
 	_advance()
 
 

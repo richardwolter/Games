@@ -448,6 +448,16 @@ the whole job.
   itself has not moved (`SHED_STAND` 0.35 is unchanged) — only what hangs off it. **Re-measure
   `SHED_ART_GROUND` if the hut is re-cut** (`tools/slice_shed.gd`): it is the diamond's side
   corners, rows 93 and 103 of 127, as a fraction up from the bottom.
+- **The hut's walls are the box's wood** (`tools/recolor_shed.py`, 2026-09-12): the tan cut
+  `slice_shed.gd` makes is kept as `art_source/shed_tan.png`, and the script writes
+  `assets/shed.png` with every wall pixel **histogram-matched onto the recycle box's plank
+  browns** read off `Recycle_Box.png` — the same brown the ferry's hull took, not
+  `Style.CRATE`. A remap by brightness rank, not a tint: seams stay seams and the outline
+  becomes the box's darkest brown (one wood, by decision). Untouched: the thatch, the wooden
+  fascia along the roof's outer edges (told from the walls by having thatch *below* it in
+  its column), the lit yellow window and the grey door hardware. Run it with the psd-extract
+  venv python from the project root; **re-run after any re-cut**, copying the fresh cut to
+  `shed_tan.png` first. `--mask out.png` writes the classification for checking.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
@@ -502,7 +512,7 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   where thirty degrees would make it eighteen). The far end of a quartering hull shows a
   few rows below its stripe, accepted as the lesser wrong. Along the cut
   lies the lake's own foam collar (`HullCollar`: foam.gdshader with its own material,
-  `COLLAR_SCALE` 2.4 times the rubbish's rise and fall, one strip over the cut's segments,
+  `COLLAR_SCALE` 2.4 times the rubbish's rise and fall, one strip over the waterline arc,
   tear and bubbles scaled to the width through the shader's new `tear_across` uniform — not
   a `WaterlineFoam`, which is one shared material sized for a figure on a straight edge).
   The shadow is the sun's (`HullShade`): the same above-water polygon drawn again in the
@@ -538,6 +548,20 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   12; six read as a handful. Kept short of the bow: laid to the rail by the plane's
   projection it floated past the cut bow end on, because the frames draw that deck higher
   than the projection puts it.
+- **The waterline foam wraps the hull** (`Boat.waterline_arc`, `COLLAR_BOW` 0.34,
+  `COLLAR_STEPS` 8, 2026-09-12): the cut is one level line, so the collar laid straight along
+  it was a bar under the boat — a hull leaning on one strip of the lake rather than floating
+  in it. It is now a curve from one end of the cut, round the near side towards the camera,
+  to the other. **Its ends are the cut's own ends**, so the fit to the painted hull is exact
+  by construction and the foam cannot leave it at any heading — the load already floated past
+  the cut bow once for trusting the plane's projection over the drawing, and white on open
+  water would read worse than the bar did. The far half is not drawn: it would be above the
+  cut, behind the hull drawn over it. Shallow by decision — a deeper curve reads as a puddle
+  the boat is standing in rather than the line it floats on. `HullCollar.lay` takes each
+  point's normal from the run either side of it, not from one segment, or every bend leaves a
+  notch outside and an overlap inside. `test_lake` guards the bow and the fit at all sixteen
+  headings. **This is not the ring `HullFoam` rejected** — that was the moving bow wave,
+  where a ring read as a halo; this is the static line a floating hull sits on.
 - **Hulls do not sit inside each other** (`Lake._part_the_fleet`, `PART_CLEAR` 1.7 tiles,
   2026-09-12): after every boat has moved, each pair closer than the clearance is eased apart
   by half the overlap each. **Not physics** — no bodies, nothing to fall out of step with —

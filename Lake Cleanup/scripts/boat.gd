@@ -143,6 +143,13 @@ const FRAME_ZERO_TURN := PI * 0.25
 const COLLAR_SCALE := 2.4
 const COLLAR_REACH := 4.0
 
+## How far the collar bows towards the camera at the near side, as a fraction of the hull's
+## half beam on screen, and how many segments the curve is built from. Shallow: the point is
+## that the hull is in the water all the way round, and a deeper curve reads as a puddle the
+## boat is standing in rather than the line it floats on.
+const COLLAR_BOW := 0.34
+const COLLAR_STEPS := 8
+
 ## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
 ## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
 ## the same alpha at dawn is a shade of blue nobody can see.
@@ -1021,10 +1028,7 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 			uvs.append((corner + at) / sheet_size)
 		draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, sheet)
 		_shade.lay(sheet, points, uvs, day)
-		var line := PackedVector2Array()
-		for at in cut_line(index):
-			line.append((at - _anchor) * scale)
-		_collar.lay(line)
+		_collar.lay(waterline_arc(index, scale))
 		_hull_mesh = points
 		_hull_uvs = uvs
 		return
@@ -1201,6 +1205,43 @@ static func cut_line(index: int) -> PackedVector2Array:
 	])
 
 
+## Where the hull meets the water, as a curve in the parent's space: from one end of the
+## frame's waterline, round the near side, to the other.
+##
+## The cut is one level line, so the collar laid straight along it is a bar under the hull —
+## a boat leaning on one strip of the lake rather than floating in it (2026-09-12). A hull
+## afloat is in the water all the way round, and on this plane the near half of that is an
+## arc bowing towards the camera.
+##
+## The shape is the hull's footprint on the plane, turned with the heading and squashed by
+## it, but **scaled so its widest point lands on the frame's own cut** rather than where the
+## projection would put it: the frames are not one strict projection — the bow-on rail is six
+## rows tall where thirty degrees would make it eighteen — and the load already floated past
+## the cut bow once for trusting the projection over the drawing. Fitted, the foam cannot
+## leave the hull at any heading.
+##
+## The far half is not drawn. It would be above the cut on screen, behind the hull that is
+## drawn over it, so it is geometry nobody sees.
+static func waterline_arc(index: int, scale: float) -> PackedVector2Array:
+	var line := cut_line(index)
+	var left := (line[0] - _anchor) * scale
+	var right := (line[line.size() - 1] - _anchor) * scale
+	# The ends of the cut are the arc's ends, so the fit is exact by construction rather than
+	# by a ratio worked out from a length the drawing does not agree with.
+	var middle := (left + right) * 0.5
+	var span := (right - left) * 0.5
+	var across := Vector2(-span.y, span.x).normalized() if span.length_squared() > 0.0 		else Vector2.DOWN
+	# Towards the camera, which on this plane is down the screen.
+	if across.y < 0.0:
+		across = -across
+	var sag := across * span.length() * COLLAR_BOW
+	var out := PackedVector2Array()
+	for step in COLLAR_STEPS + 1:
+		var u := lerpf(-1.0, 1.0, float(step) / float(COLLAR_STEPS))
+		out.append(middle + span * u + sag * (1.0 - u * u))
+	return out
+
+
 ## The part of a frame that is above the water, as a polygon in frame pixels: the frame's
 ## top edge, then the waterline read back right to left with its ends carried out to the
 ## frame's sides. Takes a bent line too, should one ever come back.
@@ -1311,10 +1352,10 @@ class HullShade extends Node2D:
 
 ## The foam along the hull's waterline: the lake's collar (foam.gdshader, the rubbish's
 ## FOAM_RISE over and FOAM_TALL under the line) grown COLLAR_SCALE times for a hull, laid
-## along the cut's one or two segments as one strip, its tear and its bubbles scaled with
-## the width so the froth is the same grain as on the rubbish beside it. Drawn behind the
-## hull, so its tongues show past the sides and its lip lies on the water. No swell in the
-## material: the parent bobs.
+## along `Boat.waterline_arc` as one strip, its tear and its bubbles scaled with the width so
+## the froth is the same grain as on the rubbish beside it. Drawn behind the hull, so its
+## tongues show past the sides and its lip lies on the water. No swell in the material: the
+## parent bobs.
 ##
 ## Not a WaterlineFoam: that is one material shared by every figure, sized for a boot or a
 ## dog, on one straight edge. A hull is four times as wide, bends round its near end, and
@@ -1350,44 +1391,57 @@ class HullCollar extends Node2D:
 		# The anchor only seeds the tear here, so each hull froths its own way.
 		_anchor = LakeGrid.pack_anchor(float(seed % 4096) - 2048.0, 0.0, 1.0)
 
-	## The cut, left to right, in the parent's space. One quad per segment — one, the line
-	## being level — the strip's UV running 0 to 1 over the whole line so the shader's
-	## rounding off and its tear read it as one collar.
+	## The waterline, left to right, in the parent's space: the curve `Boat.waterline_arc`
+	## builds, bowing towards the camera round the hull's near side.
+	##
+	## Built from its points rather than from independent quads, with each point's normal
+	## taken from the run either side of it: quads squared up to their own segment leave a
+	## notch on the outside of every bend and overlap on the inside, which on a curve this
+	## shallow reads as a foam line someone has kinked. The strip's UV runs 0 to 1 over the
+	## whole curve, so the shader's rounding off and its tear read it as one collar however
+	## many segments it arrived in.
 	func lay(line: PackedVector2Array) -> void:
 		visible = true
+		if line.size() < 2:
+			_points = PackedVector2Array()
+			queue_redraw()
+			return
+		# The ends run COLLAR_REACH past the hull, along the curve's own direction there, so
+		# the froth spills off the bow and the transom rather than stopping square on them.
+		var run := PackedVector2Array(line)
+		var head := (run[1] - run[0]).normalized()
+		var tail := (run[run.size() - 1] - run[run.size() - 2]).normalized()
+		run[0] -= head * Boat.COLLAR_REACH
+		run[run.size() - 1] += tail * Boat.COLLAR_REACH
+
 		var total := 0.0
-		for i in line.size() - 1:
-			total += line[i].distance_to(line[i + 1])
+		var along := PackedFloat32Array([0.0])
+		for i in run.size() - 1:
+			total += run[i].distance_to(run[i + 1])
+			along.append(total)
 		total = maxf(total, 1.0)
+
 		_points = PackedVector2Array()
 		_uvs = PackedVector2Array()
 		_indices = PackedInt32Array()
 		_colors = PackedColorArray()
-		var run := 0.0
-		for i in line.size() - 1:
-			var a := line[i]
-			var b := line[i + 1]
-			var out := (b - a).normalized() if b != a else Vector2.RIGHT
+		var top := LakeGrid.FOAM_RISE * Boat.COLLAR_SCALE
+		var low := LakeGrid.FOAM_TALL * Boat.COLLAR_SCALE
+		for i in run.size():
+			var back := run[maxi(i - 1, 0)]
+			var next := run[mini(i + 1, run.size() - 1)]
+			var way := (next - back)
+			var out := way.normalized() if way.length_squared() > 0.0 else Vector2.RIGHT
 			var side := Vector2(-out.y, out.x)
-			if i == 0:
-				a -= out * Boat.COLLAR_REACH
-			if i == line.size() - 2:
-				b += out * Boat.COLLAR_REACH
-			var top := -side * LakeGrid.FOAM_RISE * Boat.COLLAR_SCALE
-			var low := side * LakeGrid.FOAM_TALL * Boat.COLLAR_SCALE
-			var u0 := run / total
-			run += line[i].distance_to(line[i + 1])
-			var u1 := run / total
-			var base := _points.size()
-			_points.append_array(PackedVector2Array([a + top, b + top, b + low, a + low]))
-			_uvs.append_array(PackedVector2Array([
-				Vector2(u0, 0.0), Vector2(u1, 0.0), Vector2(u1, 1.0), Vector2(u0, 1.0)
-			]))
-			_indices.append_array(PackedInt32Array([
-				base, base + 1, base + 2, base, base + 2, base + 3
-			]))
-			for _corner in 4:
-				_colors.append(_anchor)
+			var u := along[i] / total
+			_points.append_array(PackedVector2Array([run[i] - side * top, run[i] + side * low]))
+			_uvs.append_array(PackedVector2Array([Vector2(u, 0.0), Vector2(u, 1.0)]))
+			_colors.append_array(PackedColorArray([_anchor, _anchor]))
+			if i < run.size() - 1:
+				var base := i * 2
+				_indices.append_array(PackedInt32Array([
+					base, base + 1, base + 3, base, base + 3, base + 2
+				]))
 		var wide := total / PIECE_WIDE
 		_skin.set_shader_parameter("tear_across", 12.0 * wide)
 		_skin.set_shader_parameter("bubble_across", 20.0 * wide)
