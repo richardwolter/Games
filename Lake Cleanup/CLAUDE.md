@@ -355,6 +355,20 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   inside of both stiles — a hairline of the lake beside every menu's face, hidden on the
   buttons only because they grow their fill. Filled from its neighbour in the frame itself;
   `test_lake` guards the inner ring.
+  **A board's face is filled under its wood, not after it** (`board_wood`'s `fill`,
+  `FACE_UNDER`, 2026-09-12): filled exactly to the inset after the frame, a board on
+  fractional coordinates — the shed's shelf stands at y 99.8 — rounded the frame's texture one
+  way and the face's rectangle the other through the window stretch, and a one-pixel seam of
+  the lake opened down the inside of its right stile and along the top of its face, at every
+  window size tried. The fill now runs `FACE_UNDER` pixels in under the wood. Probe:
+  `tools/shot_holes.tscn` (desktop build; `HOLES_W`/`HOLES_H` for the window) draws the
+  settings board and the shelf over flat magenta with the world hidden, so any hole is magenta.
+  **The drawn wood's bites are V's too** (`Style.v_rows`, `v_all`, 2026-09-12): the fallback
+  planks — and the settings board's two button planks, which still use them — carved square
+  holes, and a three-pixel square read as a pixel gone missing. Each bite is a staircase of
+  one-pixel rows narrowing to `BITE_TIP`, so the rectangle carving and grain clipping cut a V
+  without new geometry; `rims` blacks every wood pixel touching it, edge-on or at a shoulder,
+  on whole pixels as `_bite_out` does for the painted wood.
   **Every menu nails its close cross to its title plank's right end** (`Style.close_on`,
   `title_room`, `CLOSE_LIFT`, 2026-09-12), as the shed's shelf did first — the settings board
   on its own ribbon, the upgrades shop on the last board's — with the title centred on what

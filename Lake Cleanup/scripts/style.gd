@@ -598,21 +598,68 @@ static func line_carved(on: CanvasItem, from: Vector2, to: Vector2, colour: Colo
 			on.draw_line(Vector2(at, span.x), Vector2(at, span.y), colour, 1.0)
 
 
-## The black pixel round each hole: a one-pixel ring outside the bite, kept inside the
-## plank's seam so the open side of the hole stays open.
+## A bite as the drawn wood carves it: a **V**, one row of whole pixels per step in from the
+## edge it opens on, full width at the mouth and `BITE_TIP` of it at the point — the same
+## shape `_bite_out` punches into the painted wood (2026-09-12). The drawn wood's bites were
+## plain rectangles, and on the settings board's two button planks a three-pixel square hole
+## read as a pixel gone missing rather than as a splinter out of the plank.
+##
+## Rows, not a triangle, so the carving (`carved`) and the grain clipping (`line_carved`) that
+## already work on rectangles cut a V without learning any geometry, and so its edge steps on
+## whole pixels like every other edge in the game.
+static func v_rows(bite: Rect2, box: Rect2) -> Array[Rect2]:
+	var rows: Array[Rect2] = []
+	var up := bite.position.y <= box.position.y + 0.5
+	var down := bite.end.y >= box.end.y - 0.5
+	var left := bite.position.x <= box.position.x + 0.5
+	var along_x := up or down or not (left or bite.end.x >= box.end.x - 0.5)
+	var wide := bite.size.x if along_x else bite.size.y
+	var deep := int(round(bite.size.y if along_x else bite.size.x))
+	var middle := (bite.position.x + bite.size.x * 0.5) if along_x else (bite.position.y + bite.size.y * 0.5)
+	for step in maxi(deep, 1):
+		var share := 1.0 - (1.0 - BITE_TIP) * float(step) / float(maxi(deep - 1, 1))
+		var span := maxf(roundf(wide * share), 1.0)
+		var from := roundf(middle - span * 0.5)
+		if along_x:
+			var y := bite.position.y + float(step) if not down else bite.end.y - 1.0 - float(step)
+			rows.append(Rect2(from, y, span, 1.0))
+		else:
+			var x := bite.position.x + float(step) if left else bite.end.x - 1.0 - float(step)
+			rows.append(Rect2(x, from, 1.0, span))
+	return rows
+
+
+## Every bite of a plank as its V's rows, for the carving and the grain.
+static func v_all(bites: Array[Rect2], box: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for bite in bites:
+		out.append_array(v_rows(bite, box))
+	return out
+
+
+## The black pixel round each hole: every pixel of wood touching the V, edge-on or at a
+## shoulder, kept inside the plank's seam so the open side of the hole stays open. Worked out
+## on whole pixels, the way `_bite_out` rims the painted wood, so the two woods' holes are
+## drawn alike.
 static func rims(on: CanvasItem, box: Rect2, bites: Array[Rect2]) -> void:
 	var keep := box.grow(1.0)
 	for bite in bites:
-		var ring := bite.grow(1.0)
-		for strip: Rect2 in [
-			Rect2(ring.position, Vector2(ring.size.x, 1.0)),
-			Rect2(Vector2(ring.position.x, ring.end.y - 1.0), Vector2(ring.size.x, 1.0)),
-			Rect2(ring.position, Vector2(1.0, ring.size.y)),
-			Rect2(Vector2(ring.end.x - 1.0, ring.position.y), Vector2(1.0, ring.size.y)),
-		]:
-			var shown := strip.intersection(keep)
-			if shown.size.x > 0.0 and shown.size.y > 0.0:
-				on.draw_rect(shown, HOLE_RIM, true)
+		var gone := {}
+		for row in v_rows(bite, box):
+			for y in range(int(row.position.y), int(row.end.y)):
+				for x in range(int(row.position.x), int(row.end.x)):
+					gone[Vector2i(x, y)] = true
+		var rim := {}
+		for cell: Vector2i in gone:
+			for dy in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					var near := cell + Vector2i(dx, dy)
+					if not gone.has(near):
+						rim[near] = true
+		for cell: Vector2i in rim:
+			var px := Rect2(Vector2(cell), Vector2.ONE)
+			if keep.encloses(px):
+				on.draw_rect(px, HOLE_RIM, true)
 
 
 ## A plank: seam, face, the broken highlight along its top and left, a deep line under it
@@ -620,13 +667,14 @@ static func rims(on: CanvasItem, box: Rect2, bites: Array[Rect2]) -> void:
 ## `clip` cuts a step off each corner, for a plank that is a button rather than a frame.
 ## `bites` are the holes out of its edges (see `frame_bites`, `ribbon_bites`, `button_bites`).
 static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME, clip: float = 0.0, bites: Array[Rect2] = []) -> void:
-	fill_carved(on, clipped(box.grow(1.0), clip), bites, SEAM)
-	fill_carved(on, clipped(box, clip), bites, face, 1.0)
-	grain(on, box.grow(-clip * 0.5), true, seed, box.size.y - clip, bites)
-	highlight(on, box.position + Vector2(clip, 0.0), Vector2(box.size.x - clip * 2.0, 0.0), seed + 4, bites)
-	highlight(on, box.position + Vector2(0.0, clip), Vector2(0.0, box.size.y - clip * 2.0), seed + 5, bites)
-	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x + clip, box.end.y - 1.0), Vector2(box.size.x - clip * 2.0, 1.0))), bites, FRAME_DEEP, 1.0)
-	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y + clip), Vector2(1.0, box.size.y - clip * 2.0))), bites, FRAME_DEEP, 1.0)
+	var cuts := v_all(bites, box)
+	fill_carved(on, clipped(box.grow(1.0), clip), cuts, SEAM)
+	fill_carved(on, clipped(box, clip), cuts, face)
+	grain(on, box.grow(-clip * 0.5), true, seed, box.size.y - clip, cuts)
+	highlight(on, box.position + Vector2(clip, 0.0), Vector2(box.size.x - clip * 2.0, 0.0), seed + 4, cuts)
+	highlight(on, box.position + Vector2(0.0, clip), Vector2(0.0, box.size.y - clip * 2.0), seed + 5, cuts)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x + clip, box.end.y - 1.0), Vector2(box.size.x - clip * 2.0, 1.0))), cuts, FRAME_DEEP)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y + clip), Vector2(1.0, box.size.y - clip * 2.0))), cuts, FRAME_DEEP)
 	rims(on, box, bites)
 
 
@@ -688,22 +736,23 @@ static func grain(on: CanvasItem, plank_box: Rect2, across: bool, seed: int, dee
 static func board_frame(on: CanvasItem, box: Rect2, thick: float, chips: int) -> void:
 	var seed := int(box.position.x) * 31 + int(box.position.y) * 17
 	var bites := frame_bites(box, seed, chips)
-	fill_carved(on, rect_poly(box.grow(1.0)), bites, SEAM)
-	fill_carved(on, rect_poly(box), bites, FRAME, 1.0)
+	var cuts := v_all(bites, box)
+	fill_carved(on, rect_poly(box.grow(1.0)), cuts, SEAM)
+	fill_carved(on, rect_poly(box), cuts, FRAME)
 	# Lit from the upper left, as the meter is: the bottom plank is the redder low tone,
 	# the top and left planks carry a broken highlight along their outer edge.
 	fill_carved(
 		on, rect_poly(Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick))),
-		bites, FRAME_LOW, 1.0
+		cuts, FRAME_LOW
 	)
-	grain(on, Rect2(box.position, Vector2(box.size.x, thick)), true, seed, PLANK_DEEP, bites)
-	grain(on, Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)), true, seed + 1, PLANK_DEEP, bites)
-	grain(on, Rect2(box.position, Vector2(thick, box.size.y)), false, seed + 2, PLANK_DEEP, bites)
-	grain(on, Rect2(Vector2(box.end.x - thick, box.position.y), Vector2(thick, box.size.y)), false, seed + 3, PLANK_DEEP, bites)
-	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4, bites)
-	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5, bites)
-	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0))), bites, FRAME_DEEP, 1.0)
-	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y))), bites, FRAME_DEEP, 1.0)
+	grain(on, Rect2(box.position, Vector2(box.size.x, thick)), true, seed, PLANK_DEEP, cuts)
+	grain(on, Rect2(Vector2(box.position.x, box.end.y - thick), Vector2(box.size.x, thick)), true, seed + 1, PLANK_DEEP, cuts)
+	grain(on, Rect2(box.position, Vector2(thick, box.size.y)), false, seed + 2, PLANK_DEEP, cuts)
+	grain(on, Rect2(Vector2(box.end.x - thick, box.position.y), Vector2(thick, box.size.y)), false, seed + 3, PLANK_DEEP, cuts)
+	highlight(on, box.position, Vector2(box.size.x, 0.0), seed + 4, cuts)
+	highlight(on, box.position, Vector2(0.0, box.size.y), seed + 5, cuts)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.position.x, box.end.y - 1.0), Vector2(box.size.x, 1.0))), cuts, FRAME_DEEP)
+	fill_carved(on, rect_poly(Rect2(Vector2(box.end.x - 1.0, box.position.y), Vector2(1.0, box.size.y))), cuts, FRAME_DEEP)
 	# The inset shadow where the wood meets the board face: two deep along the top and
 	# left, where the frame shades the face, one along the bottom and right.
 	var face := box.grow(-thick)
@@ -813,17 +862,33 @@ static func plank_fits(box: Rect2) -> bool:
 ## where it does not. Returns the **face** — where the board's own contents go — because the
 ## two woods are not the same thickness and a caller that works its own inset out will be
 ## wrong for one of them.
-static func board_wood(on: CanvasItem, box: Rect2, thick: float, chips: int) -> Rect2:
+##
+## The face is filled **under** the wood and a couple of pixels into it (2026-09-12). Filled
+## after the frame and exactly to the inset, a board on fractional coordinates — the shed's
+## shelf stands at y 99.8 — rounded the frame's texture one way and the face's rectangle the
+## other through the window stretch, and a one-pixel seam of the lake opened down the inside
+## of a stile and along the top of the face. Overlapped, there is nothing to round into.
+static func board_wood(on: CanvasItem, box: Rect2, thick: float, chips: int, fill := BOARD) -> Rect2:
+	box = Rect2(box.position.floor(), box.size.floor())
 	if border_fits(box):
+		var face := border_inset(box)
+		on.draw_rect(face.grow(FACE_UNDER), fill, true)
 		meter_frame(on, box)
-		return border_inset(box)
+		return face
+	on.draw_rect(box.grow(-thick).grow(FACE_UNDER), fill, true)
 	board_frame(on, box, thick, chips)
 	return box.grow(-thick)
+
+
+## How far a board's face fill runs in under its wood.
+const FACE_UNDER := 2.0
 
 
 ## The same inset, without drawing: for the layout pass, which has to know how much room the
 ## wood will take before anything is painted.
 static func board_face(box: Rect2, thick: float) -> Rect2:
+	# Floored as `board_wood` floors it, so the layout and the drawing agree to the pixel.
+	box = Rect2(box.position.floor(), box.size.floor())
 	return border_inset(box) if border_fits(box) else box.grow(-thick)
 
 
