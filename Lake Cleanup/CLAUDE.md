@@ -306,7 +306,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   end past their length so the grain turns back rather than repeating), the side walls are a
   length of the top plank turned ninety degrees so the grain runs down the stile, the corners
   are the meter's own stamped whole, and the butt joints are painted in the wood's outline
-  colour so a join reads as two boards meeting. Walls 15 px, 16 at the top, 14 at the foot,
+  colour so a join reads as two boards meeting. **The stiles come off the foot plank**
+  (2026-09-12), not the lit top one: a frame with the light tone down both sides and the dark
+  one along its bottom read as three woods. Light along the top, one shade everywhere else. Walls 15 px, 16 at the top, 14 at the foot,
   measured off the sheet's alpha; the buttons grew to 148x100 / 120x100 to keep their faces.
   **The left half is the right half mirrored**: the meter's own left side was never painted,
   because the garbage circle sits over it. `hud_buttons.gd`'s `FRAME`/`CHIPS` drawn frame is
@@ -343,13 +345,21 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   cropped from — the art's own chips are in the stretches the crop avoids — so an unbitten
   built frame read as plastic beside the drawn boards. Bites stay `BITE_CLEAR` off the
   corners: the chamfer is already the corner's shape.
+  **A plank's bottom bites are backed, not open** (`_backings`, `meter_plank`'s `under`,
+  2026-09-12): a ribbon straddles its board's top edge, so a hole in its lower edge shows the
+  frame plank it is lying on. `_border_bites` records what each bottom bite cleared into a
+  mask, and the plank draws that mask tinted `Style.BOARD` under itself — so the bite reads
+  through to the **board's face**, which is what is behind the panel. Top and end bites are
+  over the lake and stay open.
   **Retired, by decision** (2026-09-12): dressing the buttons with a nine-patch of that art —
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.
 
 - **The corner buttons are drawn wood carrying the game's sprites** (`hud_buttons.gd`,
   2026-09-11): a dark `BOARD` face inside that border.
-  *Upgrades* (176x100): the landed net dimmed behind, the ferry to the left of the arrow, the dog
+  *Upgrades* (120x100, the decorate button's own size): the landed net behind in
+  `Style.NET_INK` — the shop board's own black, one net wherever it is drawn as a picture of
+  itself — the ferry to the left of the arrow, the dog
   (`DogArt` idle) in its right, both mirrored to face outwards and both at a size that can
   be made out, a black-ringed green (`SAFE`) block arrow large in the middle drawn last over
   them, the "n available" panel across the foot. *Shed* (104x84): sixteen fixed finds
@@ -357,11 +367,13 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   each shoved off an even spread by its own hash, drawn back to front — with the hut standing
   in the middle of them so they stick out on every side, and "Decorate" on a sunken panel
   across the foot.
-  The ferry and the dog are **sized to the clear lane beside the arrow** and placed by their
-  own drawn edges, so exactly `SIDE_UNDER` (0.13) of each goes behind it (2026-09-12). Fitting
-  them to a slot and then clamping them onto the face put the ferry half under the arrow,
-  which is where it started; the arrow narrowed to `ARROW_WIDE` 0.40 and the button widened to
-  176 to leave a lane worth standing in.
+  The ferry and the dog are **sized to their share of the face** and placed by their own drawn
+  edges, so `SIDE_UNDER` (0.3) of each goes behind the arrow (2026-09-12). Sizing them to the
+  lane beside the arrow was tried while the button was 176 wide and does not survive the
+  narrower one — a couple of dozen pixels of lane shrinks both to smudges. The lane decides
+  where they stand, `SIDE_UNDER` how much the arrow takes, neither how big they are. Fitting
+  them to a slot and then clamping them onto the face is the older, worse way: it put the
+  ferry half under the arrow, which is where it started.
   **`fit`'s mirror turns the canvas over** (`draw_set_transform`), because a `Rect2` of
   negative width does **not** flip a `draw_texture_rect_region` — it degenerates, and the
   ferry drew as a few scraps for a day before that was spotted. Don't "flip" with a negative
@@ -371,7 +383,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   is what "behind" looks like), and standing the finds in two rows along the back (a band of
   furniture behind the hut, not a heap it sits in). *Money*: as wide
   as the stock plate over it, a drawn gold coin on the left and the running figure on a
-  sunken panel to its right; the swell-and-shine on payment stays. Same places as before.
+  panel **pressed into** the wood to its right (`HudButtons.sunk`, the stock readout's own
+  panel — a figure on a raised plate read as a tile stuck on the button while the one beside
+  it was cut into its board); the swell-and-shine on payment stays. Same places as before.
   The lake lends the sprites once (`Lake._lend_button_art`) to `HudSkin.sprites` and the
   static `UiButton.sprites`, so the shed's copy of the upgrades button is the same drawing.
   **Retired**: `assets/buttons.png`/`.json` and `tools/slice_buttons.gd`. `assets/ui.png`/
