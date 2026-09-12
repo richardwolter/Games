@@ -208,8 +208,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   batched mesh, and the pack's grass/sand join tiles (tried 2026-09-11, a corner set that
   reads as a staircase of cuts). A line drawn by choosing whole tiles is a staircase
   whatever the tiles; don't go back to tile picking for the edge.
-  **Tuning**: F4 in a debug build opens `GroundTuner` (sliders for every ground uniform,
-  values written to `user://ground_tune.log`); bake picks into `Ground`'s constants. The
+  **Tuning**: F4 in a debug build opens `GroundTuner` (sliders for every ground uniform, plus
+  the island's coast wave, values written to `user://ground_tune.log`); bake picks into
+  `Ground`'s constants, or `Lake`'s for the coast rows. The
   beach cannot go under `beach_width - wander_amp` = 3.5 tiles (`Dog.BEACH_WALK`,
   `Iso.BEACH_LITTER` count on sand there).
 - **Sprite scale**: rubbish, finds (`SPRITE_SCALE`) and pigeons (`Flock.SCALE`) draw at 2.0.
@@ -562,7 +563,48 @@ sand under every open pixel; beyond that it is under opaque water and not drawn.
   equals `Iso.island_ring_fraction(at, WATER_LAP_TILES)`, so `Iso.past_shelf` (tiles) and
   `Iso.past_water` (world px) are the drawn edge. `Iso.on_island_ground`, the angler's
   `_wet_by`/`WALK_LIMIT`, and the dog's `_on_land` all ask those. Never ask the tile under a
-  walker, and never move one wobble term without the other.
+  walker, and never move one wobble term without the other. **One term is exempt, by
+  decision — the coast wave below, and only because it runs one way.**
+- **The coast laps, and only outward** (`water.gdshader` `coast_lap`, `Lake.COAST_WAVE`/
+  `COAST_WAVES`/`COAST_WAVE_SPEED`, 2026-09-12): the island's drawn edge is carried up its
+  beach and back on a slow wave travelling round the shore, so the coastline breathes instead
+  of sitting on one curve. This is **the exception to one-edge-two-languages**, and it cannot
+  be anything else: `Iso` is static and has no time to carry, and mirroring a wave into it
+  would dry and wet the ground under a walker several times a second. What makes the
+  divergence safe is that `coast_lap` returns 0 to `COAST_WAVE` and is **never negative** —
+  the paint covers sand the code calls dry and never uncovers water the code calls wet, so the
+  angler and the dog stay dry-correct by a line that does not move. `test_lake` guards both
+  ends: not negative, and under `Ground.BEACH_IN` (2.6) so a crest never reaches the lawn.
+- **The foam stays on the static line, and that is the whole trick**: `shore_foam`'s
+  `lip = step(dist, lip_w)` has no lower bound, so the lip is already drawn under the sand.
+  Water running up the beach therefore **uncovers** foam instead of sliding out from under it
+  — the band reads wider at a crest and narrower in a trough, and the wave arrives in the
+  existing foam's own style for no extra work. `isl_out` is deliberately measured off the
+  unwarped fraction. **Don't feed the lapped edge into `shore_foam`** thinking it is the fix;
+  it is the thing that would break it.
+- Whole waves per lap (`round(coast_waves)`), or the ring seams where `atan()` wraps from pi
+  to minus pi — the same rule `shore_foam`'s cells and tears follow. Two terms beating, not
+  one: a single travelling sine reads as a scalloped border turning on the spot.
+- **The outer bank laps too** (2026-09-12, second pass): the bank used to have no discard at
+  all — the water simply ran out of polygon at `Iso.shore_outline(SHORE_LAP)`. Now the polygon
+  is drawn well past the waterline (`Lake.WATER_RIM`) and a second discard carves it back to
+  wherever the wave has run to, so the bank's edge is decided by the shader like the island's.
+  **Grow one without the other** and either the crest is clipped flat by the rim or the surplus
+  water is left standing on the sand. `WATER_RIM` is `SHORE_LAP + COAST_WAVE * 2` plus a tenth,
+  because `shore_outline` adds its grow to the *wobbled* radius while `shore_fraction` folds
+  the lap in *before* the wobble; `test_lake` walks 240 bearings and checks the rim clears the
+  crest rather than trusting that arithmetic.
+- **One wavelength, not one wave count** (`coast_lobes`): `COAST_WAVES` is the count round the
+  island, and any other shore gets whatever count holds the same wavelength — the bank's mean
+  is about five times the island's, so it gets about five times as many. The same count on both
+  makes a bank wave some eighty tiles long, which reads as the coast not moving at all. The
+  island is the shore the number was tuned on, so it is the one that holds it.
+- The bank's foam is measured off the static line as well, for the same reason as the island's,
+  and the bank's beach litter (`Iso.BEACH_LITTER`, 2.4 tiles up) can take a wash from a crest.
+  That is wanted — the pieces are `dry`-flagged and do not bob, so the water moving over them
+  is the only thing that says they are at the waterline.
+- Tuning: F4's `GroundTuner` carries the three coast sliders beside the ground's (they go to
+  the water material, not the `Ground` nodes); bake picks into `Lake`'s constants.
 - **Retired, by decision**: the island standing above the water with a drowned-sand shelf
   stepping down into the lake (`SINK_*`, `ISLAND_DEEP`, `IslandShallows`), and the flat
   water-coloured plate over it before that. Both left a stepped edge; the discard is what

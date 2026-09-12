@@ -68,7 +68,16 @@ Games/
 ### Version & Setup
 - **Engine**: Godot 4.7+ (latest stable at session start)
 - **Build System**: Desktop builds are GUI-based (no shell integration). Headless scripting use `--script` with `SceneTree` and `_physics_process`, not `await physics_frame` (stalls indefinitely on this setup).
-- **Executable Path**: The Desktop Godot in `C:\Program Files\` is the one that runs. `Documents/Godot/` is broken; don't use it.
+- **Executable Path**: `C:\Users\Administrador\Desktop\Godot_v4.7.1-stable_win64.exe` is the
+  one that runs. `Documents\Godot\Godot_v4.7.1-stable_win64.exe` is a *directory* holding only
+  the console wrapper and fails with "Main executable not found"; don't use it. There is no
+  Godot under `C:\Program Files\` — this line used to say there was.
+- **Seeing output**: `print`/`printerr` reach no shell, but `--log-file <path>` writes the
+  engine log (script parse errors, runtime errors, shader errors) either way. Use it on every
+  harness run.
+- **`--headless` has no renderer**, so shaders are never compiled under it and a broken one
+  passes silently. Verify shader edits with a windowed run (`<exe> --path . --quit-after 400
+  --log-file <path>`); harnesses that call `get_viewport().get_texture()` need a window too.
 
 ### Physics & Simulation Gotchas
 - **Lake Cleanup** abandoned physics (`RigidBody2D`, `Area2D` buoyancy, collision) after several failed designs. Now an isometric tile field where each tile holds a stack — no physics at all. Keep one representation always (layout OR simulation, not both).

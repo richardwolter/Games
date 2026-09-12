@@ -984,6 +984,7 @@ func _tune_ground() -> void:
 	var tuner := GroundTuner.new()
 	tuner.name = &"GroundTuner"
 	tuner.grounds = _grounds
+	tuner.water = _water_material
 	add_child(tuner)
 
 ## How far the drawn water is carried past the waterline, in tiles — about sixteen screen
@@ -994,6 +995,36 @@ func _tune_ground() -> void:
 ## instead of stopping on the tile edge under it. Mirrored by `shore_lap` in the shader,
 ## which has to agree or the paint and its polygon part company.
 const SHORE_LAP := 0.45
+
+## The island's coast laps: how far up its beach the drawn water runs at the crest of a wave,
+## in tiles, how many waves go round the island, and how fast they travel.
+##
+## Drawing only, like SHORE_LAP — but unlike SHORE_LAP this one is *not* mirrored into Iso, by
+## decision. It cannot be: Iso is static, and a wave in it would dry and wet the ground under a
+## walker several times a second. The wave only ever runs one way instead (see `coast_wave` in
+## water.gdshader), so the paint covers sand the code calls dry and never uncovers water the
+## code calls wet. The angler and the dog walk exactly where they always did.
+##
+## Held well under `Ground.BEACH_IN` (2.6), the island's beach: a lap that reaches the lawn is
+## a flood, not a wave. `test_lake` guards both ends.
+##
+## Found on the F4 sliders and baked 2026-09-12, up from a first guess of 0.18 / 3 / 0.35.
+const COAST_WAVE := 0.32
+const COAST_WAVES := 3.0
+const COAST_WAVE_SPEED := 0.75
+
+## How far past the waterline the water polygon is actually drawn, in tiles: the lap, the
+## wave's crest, and slack enough that the crest is never clipped by the rim.
+##
+## The bank's edge is carved by the shader's discard now, not by this rim, so the rim only has
+## to stay out of the way. The slack is not decoration: `Iso.shore_outline` adds its grow to the
+## wobbled radius in tiles, while the shader's `shore_fraction` folds `shore_lap` into the radius
+## *before* the wobble multiplies it, so at the basin's widest lobe the discard's crest reaches
+## about 1.25 times the wave plus a fifteenth of a tile further out than a plain
+## SHORE_LAP + COAST_WAVE ring does. Doubling the wave and adding a tenth clears that for any
+## COAST_WAVE, and the surplus is fragments that discard. `test_lake` walks the ring and checks
+## it, rather than trusting this arithmetic.
+const WATER_RIM := SHORE_LAP + COAST_WAVE * 2.0 + 0.1
 
 ## The palette swatches water.gdshader draws with, under the same names on both sides.
 const WATER_SWATCHES: Array[StringName] = [
@@ -1007,7 +1038,7 @@ const WATER_SWATCHES: Array[StringName] = [
 func _shape_water(_shore: PackedVector2Array) -> void:
 	var visual := Polygon2D.new()
 	visual.name = &"WaterVisual"
-	visual.polygon = Iso.shore_outline(SHORE_LAP)
+	visual.polygon = Iso.shore_outline(WATER_RIM)
 	visual.z_index = 2
 	visual.z_as_relative = false
 	_water_material = ShaderMaterial.new()
@@ -1019,6 +1050,9 @@ func _shape_water(_shore: PackedVector2Array) -> void:
 	_water_material.set_shader_parameter(&"island_centre", Iso.ISLAND_CENTRE)
 	_water_material.set_shader_parameter(&"island_radius", Iso.ISLAND_RADIUS)
 	_water_material.set_shader_parameter(&"shore_lap", SHORE_LAP)
+	_water_material.set_shader_parameter(&"coast_wave", COAST_WAVE)
+	_water_material.set_shader_parameter(&"coast_waves", COAST_WAVES)
+	_water_material.set_shader_parameter(&"coast_wave_speed", COAST_WAVE_SPEED)
 
 	# The water's ramps from the master palette. The shader's own defaults are the same values,
 	# so a missing palette file still draws the right water.

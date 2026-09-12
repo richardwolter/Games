@@ -155,6 +155,30 @@ uniform float foam_lip = 0.28;
 uniform float foam_wash = 0.55;
 uniform float foam_line = 0.09;
 
+// The island's coast laps. Its drawn edge is carried up the beach on a slow wave travelling
+// round the shore, so the coastline breathes instead of sitting still on one curve. `coast_wave`
+// is how far it runs at the crest, in tiles; `coast_waves` how many waves fit round the island;
+// `coast_wave_speed` how fast they travel, on top of `wave_speed`.
+//
+// Drawing only, and outward only. `coast_lap` returns 0 to `coast_wave` and is never negative,
+// so the drawn water only ever covers more of the island than the curve Iso holds, never less.
+//
+// This is the one place the shader's shore and Iso's deliberately part company, and the reason
+// is that they cannot agree: Iso is static and has no time to carry, and mirroring a wave into
+// it would make the ground under a walker's feet dry and wet again several times a second.
+// Outward-only is what makes the divergence safe — the paint covers sand the code calls dry,
+// and never exposes water the code calls wet, so the angler and the dog stay dry-correct by a
+// line that does not move. `shore_lap` above is still mirrored (Iso.WATER_LAP_TILES); this is
+// not, by decision.
+//
+// The foam is left on the static line — see shore_foam's caller. Its lip is `step(dist, lip_w)`
+// with no lower bound, so it is already being drawn under the sand: water running up the beach
+// uncovers lip rather than covering it, and the band simply reads wider at a crest and
+// narrower in a trough. That is the wave, in the foam's own style, for nothing.
+uniform float coast_wave = 0.18;
+uniform float coast_waves = 3.0;
+uniform float coast_wave_speed = 0.35;
+
 // The grime caught along the outer bank: what colour it is and how solid, and how far out from
 // the bank's edge it reaches at most, in tiles. Scaled by the water's filth, so it goes as
 // that stretch of shore is cleaned. Drawn only where the water is in its dirty state, as a
@@ -227,6 +251,33 @@ float island_fraction(vec2 tile) {
 	float wobble = 1.0 + 0.07 * sin(angle * 3.0 + 0.7) + 0.035 * sin(angle * 5.0 - 0.4)
 		+ 0.02 * sin(angle * 7.0 + 2.1);
 	return r / wobble;
+}
+
+// How far up the island's beach the water is reaching at this angle round it, in tiles: 0 at
+// the trough, `coast_wave` at the crest, never negative. See the uniforms for why it only
+// ever runs one way.
+//
+// Whole waves per lap, so the ring closes on itself where atan() wraps from pi to minus pi —
+// the same rule shore_foam's cells and tears follow, and the same reason. Two terms beating
+// against each other rather than one: a single travelling sine reads as a scalloped border
+// turning on the spot, which is a pattern, not water.
+float coast_lap(float angle, float clock, float lobes) {
+	float t = clock * wave_speed * coast_wave_speed;
+	float drift = max(round(lobes * 0.37), 1.0);
+	float s = sin(angle * lobes + t + sin(angle * drift - t * 0.31) * 1.6) * 0.5 + 0.5;
+	return max(coast_wave, 0.0) * s;
+}
+
+// How many waves fit round a shore of this mean radius, as a whole number.
+//
+// `coast_waves` is the count round the island, and every other shore gets the count that keeps
+// the same wavelength: the bank's mean is about five times the island's, so it gets about five
+// times as many. The same count round both instead would make one wave on the bank some eighty
+// tiles long, which reads as the coast not moving at all — the island is the shore the number
+// was tuned on, so it is the one that holds it.
+float coast_lobes(float mean) {
+	float isl = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
+	return max(round(coast_waves * mean / isl), 1.0);
 }
 
 // One random number per cell, the same every time for the same cell.
@@ -333,10 +384,31 @@ void fragment() {
 	float clock = stepped_time(TIME, pixel_fps);
 
 	vec2 tile = world_to_tile(px);
-	// The island: no water inside its curve. This is the coast — Iso.past_shelf is the same
-	// curve in GDScript, and the angler and the dog are dry exactly where this discards.
-	// Decided per foam_pixel cell like everything else here, so the edge is pixel art too.
-	if (island_fraction(tile) < 1.0) {
+	// The island: no water inside its curve. That curve is the coast — Iso.past_shelf is the
+	// same one in GDScript. Decided per foam_pixel cell like everything else here, so the edge
+	// is pixel art too.
+	//
+	// `coast_lap` then carries the drawn edge up the beach and back on a slow wave. Drawing
+	// only: the curve Iso holds has not moved, and the lap is never negative, so the angler and
+	// the dog are still dry everywhere this used to discard — the water just washes over them.
+	vec2 isl_d = tile - island_centre;
+	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
+	float lap = coast_lap(atan(isl_d.y, isl_d.x), clock, coast_lobes(isl_mean)) / isl_mean;
+	if (island_fraction(tile) < 1.0 - lap) {
+		discard;
+	}
+
+	// The outer bank, the same wave read from the other side. Outward is away from the middle
+	// here, so this threshold rises where the island's fell.
+	//
+	// The bank's edge is carved here rather than by the polygon's rim, which is the whole
+	// change: the water is drawn a good way past the waterline now (Lake.WATER_RIM) and this
+	// cuts it back to wherever the wave has run to. Grow one without the other and either the
+	// crest is clipped flat by the rim or the surplus is left standing on the sand.
+	vec2 bank_d = (tile - basin_centre) / (basin_radius + vec2(shore_lap));
+	float bank_mean = (basin_radius.x + basin_radius.y) * 0.5 + shore_lap;
+	float bank_lap = coast_lap(atan(bank_d.y, bank_d.x), clock, coast_lobes(bank_mean)) / bank_mean;
+	if (shore_fraction(tile) > 1.0 + bank_lap) {
 		discard;
 	}
 	float s = clamp(shore_fraction(tile), 0.0, 1.0);
@@ -420,8 +492,10 @@ void fragment() {
 	// The bank: distance in from the edge the water polygon is drawn to, in tiles. The shore's
 	// wobble is left out of the conversion — it bends the width by a few percent either way,
 	// which is exactly the unevenness a shoreline wants anyway.
-	vec2 bank_d = (foam_tile - basin_centre) / (basin_radius + vec2(shore_lap));
-	float bank_mean = (basin_radius.x + basin_radius.y) * 0.5 + shore_lap;
+	// Measured off the static line, not the lapped one, for the same reason the island's is:
+	// the lip is solid for every `dist` below `foam_lip`, negative included, so the wave running
+	// up the beach uncovers foam instead of sliding out from under it. `bank_d` and `bank_mean`
+	// are the ones the discard above already worked out.
 	float bank_in = (1.0 - shore_fraction(foam_tile)) * bank_mean;
 	float foam = shore_foam(bank_in, atan(bank_d.y, bank_d.x), bank_mean, 1.0, clock, state);
 
@@ -439,8 +513,12 @@ void fragment() {
 	// The island, read from the other side: outward from its beach. The same width as the
 	// bank's now that the island's sand is under the water too — it was half again as wide
 	// while the tiles were drawn over the water with a stepped edge, to cover their corners.
-	vec2 isl_d = foam_tile - island_centre;
-	float isl_mean = max((island_radius.x + island_radius.y) * 0.5 - shore_lap, 0.5);
+	//
+	// Measured off the static curve, not the lapped one, by decision: the lip is solid for
+	// every `dist` below `foam_lip`, negative included, so it is already drawn under the sand.
+	// A wave running up the beach therefore uncovers foam instead of sliding out from under it,
+	// and the band widens and narrows with the water at no cost. `isl_d` and `isl_mean` are the
+	// ones the discard above already worked out.
 	float isl_out = (island_fraction(foam_tile) - 1.0) * isl_mean;
 	foam = max(foam, shore_foam(isl_out, atan(isl_d.y, isl_d.x), isl_mean, 1.0, clock, state));
 

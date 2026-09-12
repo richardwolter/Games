@@ -1,10 +1,14 @@
-## The ground's sliders. F4 to show or hide; debug builds only.
+## The ground's and the coast's sliders. F4 to show or hide; debug builds only.
 ##
 ## The ground is built in code (`Lake._shape_bank`, `_shape_island`), so there is no
 ## inspector to tune it in. This is the inspector: one slider per number the ground shader
 ## takes, pushed to both layers as it moves, and every setting written to
 ## `user://ground_tune.log` so a picked value can be copied into `Ground`'s constants
 ## afterwards and the panel closed for good.
+##
+## The island's coast wave (`WATER_ROWS`) is tuned from the same panel because it is the same
+## question — where the line between sand and water lands, and how it moves. Those go to the
+## water material instead of the grounds, and bake into `Lake`'s constants.
 ##
 ## The beach cannot be tuned thinner than the dog walks: `Dog.BEACH_WALK` (3.0) and
 ## `Iso.BEACH_LITTER` (2.4) both count on sand out to about 3.5 tiles, so the wander's
@@ -32,11 +36,24 @@ const ROWS := [
 	["tuft_reach", 0.0, 3.0, 0.1, true],
 ]
 
+## The island's coast wave, straight onto the water material. Same columns as `ROWS`; nothing
+## here lays props out, so the last is always false.
+##
+## `coast_wave` stops short of `Ground.BEACH_IN` (2.6): past the beach the water is on the lawn,
+## which is a flood rather than a wave, and no slider should be able to ask for it.
+const WATER_ROWS := [
+	["coast_wave", 0.0, 2.0, 0.02, false],
+	["coast_waves", 1.0, 8.0, 1.0, false],
+	["coast_wave_speed", 0.0, 1.5, 0.05, false],
+]
+
 var grounds: Array[Ground] = []
+var water: ShaderMaterial
 
 var _panel: PanelContainer
 var _sliders: Dictionary = {}
 var _values: Dictionary = {}
+var _water_values: Dictionary = {}
 var _resow_pending: bool = false
 
 
@@ -51,34 +68,44 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	_panel.add_child(box)
 	var title := Label.new()
-	title.text = "Ground (F4)  —  values in user://ground_tune.log"
+	title.text = "Ground & coast (F4)  —  values in user://ground_tune.log"
 	box.add_child(title)
 	var first := grounds[0] if not grounds.is_empty() else null
 	for row: Array in ROWS:
 		var key: String = row[0]
-		var line := HBoxContainer.new()
-		var name := Label.new()
-		name.custom_minimum_size.x = 110
-		name.text = key
-		line.add_child(name)
-		var slider := HSlider.new()
-		slider.custom_minimum_size.x = 220
-		slider.min_value = row[1]
-		slider.max_value = row[2]
-		slider.step = row[3]
-		var start: float = _read(first, key) if first != null else row[1]
-		slider.value = start
-		_values[key] = start
-		line.add_child(slider)
-		var shown := Label.new()
-		shown.custom_minimum_size.x = 56
-		shown.text = _fmt(start)
-		line.add_child(shown)
-		box.add_child(line)
-		_sliders[key] = [slider, shown]
-		slider.value_changed.connect(_on_slid.bind(key, row[4]))
-		slider.drag_ended.connect(_on_dropped.bind(row[4]))
+		_add_row(box, row, _read(first, key) if first != null else float(row[1]), false)
+	for row: Array in WATER_ROWS:
+		var key: String = row[0]
+		_add_row(box, row, float(water.get_shader_parameter(key)), true)
 	add_child(_panel)
+
+
+func _add_row(box: VBoxContainer, row: Array, start: float, to_water: bool) -> void:
+	var key: String = row[0]
+	var line := HBoxContainer.new()
+	var name := Label.new()
+	name.custom_minimum_size.x = 130
+	name.text = key
+	line.add_child(name)
+	var slider := HSlider.new()
+	slider.custom_minimum_size.x = 220
+	slider.min_value = row[1]
+	slider.max_value = row[2]
+	slider.step = row[3]
+	slider.value = start
+	if to_water:
+		_water_values[key] = start
+	else:
+		_values[key] = start
+	line.add_child(slider)
+	var shown := Label.new()
+	shown.custom_minimum_size.x = 56
+	shown.text = _fmt(start)
+	line.add_child(shown)
+	box.add_child(line)
+	_sliders[key] = [slider, shown]
+	slider.value_changed.connect(_on_slid.bind(key, row[4]))
+	slider.drag_ended.connect(_on_dropped.bind(row[4]))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -103,6 +130,12 @@ func _fmt(v: float) -> String:
 ## A slider moved: keep the beach past the floor, push the numbers, and if the line moved,
 ## lay the props out again when the drag ends rather than on every tick of it.
 func _on_slid(value: float, key: String, resows: bool) -> void:
+	if _water_values.has(key):
+		_water_values[key] = value
+		(_sliders[key][1] as Label).text = _fmt(value)
+		water.set_shader_parameter(key, value)
+		_log()
+		return
 	_values[key] = value
 	if key == "beach_width" or key == "wander_amp":
 		var most := maxf(_values["beach_width"] - BEACH_FLOOR, 0.0)
@@ -141,4 +174,7 @@ func _log() -> void:
 	for row: Array in ROWS:
 		var key: String = row[0]
 		file.store_line("%s = %s" % [key, _fmt(_values[key])])
+	for row: Array in WATER_ROWS:
+		var key: String = row[0]
+		file.store_line("%s = %s" % [key, _fmt(_water_values[key])])
 	file.close()

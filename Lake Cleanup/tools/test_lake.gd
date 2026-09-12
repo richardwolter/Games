@@ -273,6 +273,40 @@ func _stage_build() -> void:
 	_check(_boat.skim_radius < 0, "it has no skimmer fitted",
 		"radius %d" % _boat.skim_radius)
 
+	# The island's coast wave. It is the one place the drawn shore and Iso's are allowed to
+	# disagree, and both bounds are what keep that safe:
+	#   - never negative, or the water would pull back off sand Iso calls wet and the angler
+	#     would be shown standing in the lake
+	#   - never past the island's beach, or a crest would run onto the lawn and the shed
+	_check(Lake.COAST_WAVE >= 0.0, "the coast wave only ever laps up the beach",
+		"%.2f tiles" % Lake.COAST_WAVE)
+	_check(Lake.COAST_WAVE < Ground.BEACH_IN, "and never reaches the lawn",
+		"%.2f tiles of a %.1f-tile beach" % [Lake.COAST_WAVE, Ground.BEACH_IN])
+	# Whole waves per lap, or the ring seams where atan() wraps from pi to minus pi.
+	_check(is_equal_approx(Lake.COAST_WAVES, roundf(Lake.COAST_WAVES)) and Lake.COAST_WAVES >= 1.0,
+		"and closes on itself round the island",
+		"%.1f waves a lap" % Lake.COAST_WAVES)
+
+	# The bank's edge is carved by the shader's discard, so the polygon has to reach past the
+	# wave's crest all the way round or the rim clips it flat. Walked rather than worked out:
+	# the rim adds its grow to the wobbled radius while the discard folds the lap in before the
+	# wobble, and the gap between those two conventions is exactly what this is guarding.
+	var bank_mean := (Iso.RADIUS.x + Iso.RADIUS.y) * 0.5 + Lake.SHORE_LAP
+	var crest := 1.0 + Lake.COAST_WAVE / bank_mean
+	var lapped := Iso.RADIUS + Vector2(Lake.SHORE_LAP, Lake.SHORE_LAP)
+	var rim := Iso.shore_outline(Lake.WATER_RIM)
+	var clipped := 0
+	for i in 240:
+		var angle := TAU * float(i) / 240.0
+		# The same wobble shore_fraction uses, and it has to stay the same.
+		var wobble := 1.0 + 0.09 * sin(angle * 3.0) + 0.05 * sin(angle * 5.0 + 1.3)
+		var reach := wobble * crest
+		var tile := Iso.CENTRE + Vector2(cos(angle) * lapped.x, sin(angle) * lapped.y) * reach
+		if not Geometry2D.is_point_in_polygon(Iso.tile_to_world(tile.x, tile.y), rim):
+			clipped += 1
+	_check(clipped == 0, "the water polygon reaches past the wave's crest all the way round",
+		"%d of 240 bearings fall outside the rim" % clipped)
+
 	# Held at the dock for the casting and yard-cap stages, which need the yard to stay
 	# where they put it. Switched back on in _stage_ferry, which is what tests the toggle.
 	_main.call(&"_set_auto_ferry", false)
