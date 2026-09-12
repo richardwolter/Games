@@ -102,7 +102,7 @@ const HULL_LENGTH := 92.0
 const HULL_WIDTH := 50.0
 
 ## How tall the drawn hull stands above the water, for the things that sit on it: the load
-## in the hold and the pennant above it.
+## in the hold.
 const HULL_HEIGHT := 16.0
 
 ## The open hold, as a fraction of the hull: where along it the cargo deck starts and ends,
@@ -139,17 +139,13 @@ const FRAME_SIDE := 128
 
 ## Where in a frame the water meets the hull under the mast — the point the sheet turns
 ## about — laid on the boat's position. In frame pixels. The sheet's json says where that
-## is (its side view's waterline); this is the guess used without it. The masthead in each
-## frame comes with the json too, for the pennant.
+## is (its side view's waterline); this is the guess used without it.
 const HULL_ANCHOR := Vector2(64.0, 92.0)
 
 ## Which way the sheet's first frame points, as an angle in tile space: bow towards the
 ## camera, which on the plane is down the tile diagonal (1, 1). The frames turn clockwise
 ## seen from above, and the projection keeps that.
 const FRAME_ZERO_TURN := PI * 0.25
-
-## How far the pennant's staff stands above the truck, in world pixels.
-const PENNANT_STAFF := 14.0
 
 ## The hull in the water rather than on it. Each frame is cut along the waterline its json
 ## lists (`cut`, from tools/build_boat_sheet.py: one level row, under the painted boot-top
@@ -172,7 +168,6 @@ const SHADE_MOST := 0.7
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
 static var _anchor := HULL_ANCHOR
-static var _mastheads := PackedVector2Array()
 static var _cuts: Array[PackedVector2Array] = []
 static var _boxes: Dictionary = {}
 
@@ -939,7 +934,7 @@ static func _swell(x: float, t: float) -> float:
 
 
 ## The ferry, drawn from its sheet of headings, plus the parts that are not the boat: its
-## wake, its load, its pennant and its skimmer.
+## wake, its load and its skimmer.
 ##
 ## The hull is a picture per heading rather than one picture turned. A boat is not a flat
 ## card: seen on an isometric plane, one pointing away from the camera shows its stern and
@@ -983,16 +978,8 @@ func _draw() -> void:
 			grid.defs[cargo[i]].stamp_iso(self)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
-	# A pennant in the colour of wherever it is going, so a glance at the boat says which
-	# yard it is running to.
-	if target >= 0 and target < dropoffs.size():
-		var truck := masthead()
-		var top := truck + Vector2(0.0, -PENNANT_STAFF)
-		draw_line(truck, top, ink, 1.6)
-		draw_colored_polygon(
-			PackedVector2Array([top, top + Vector2(16.0, 6.0), top + Vector2(0.0, 12.0)]),
-			dropoffs[target].tint
-		)
+	# No pennant, by decision (2026-09-12): the flag in the colour of the yard it was running
+	# to was a cue nobody needed, and the yards' own tints already tell the piers apart.
 
 
 ## The hull itself: the frame for the way it is pointing, cut along its waterline, its
@@ -1206,17 +1193,6 @@ static func turn_heading(turn: float) -> Vector2:
 	return Vector2(cos(angle), sin(angle))
 
 
-## The top of the mast in this node's own space, off the sheet's json; a guess above the
-## anchor when the json is missing.
-func masthead() -> Vector2:
-	var scale := HULL_LENGTH / HULL_IN_FRAME
-	var frame := heading_frame()
-	var at := _anchor + Vector2(0.0, -HULL_HEIGHT * 3.0)
-	if frame < _mastheads.size():
-		at = _mastheads[frame]
-	return (at - _anchor) * scale
-
-
 ## How many headings the sheet holds. Taken from the sheet itself rather than written down
 ## twice: it is one row of square frames.
 func _frame_count() -> int:
@@ -1308,7 +1284,6 @@ static func _sheet() -> Texture2D:
 
 static func _read_meta() -> void:
 	_anchor = HULL_ANCHOR
-	_mastheads = PackedVector2Array()
 	_cuts = []
 	if not FileAccess.file_exists(FRAMES_META):
 		return
@@ -1317,9 +1292,6 @@ static func _read_meta() -> void:
 		return
 	if parsed.has("anchor"):
 		_anchor = Vector2(float(parsed["anchor"][0]), float(parsed["anchor"][1]))
-	if parsed.has("masthead"):
-		for pair in parsed["masthead"]:
-			_mastheads.append(Vector2(float(pair[0]), float(pair[1])))
 	if parsed.has("cut"):
 		for line in parsed["cut"]:
 			var points := PackedVector2Array()

@@ -5,7 +5,10 @@ The source is a 16-direction pixel-art sail boat, one row of 128x128 frames, dra
 three sails: a jib forward of the mast on a forestay, a square sail on a yard at the mast
 (its forward billow is the white-and-slate lens in the side views), and a gaff sail aft.
 The ferry sails without the jib and without the forestay it hung on, and without the
-floor shadow the frames were rendered with, since a hull on water throws none.
+floor shadow the frames were rendered with, since a hull on water throws none. Its hull
+planks are repainted in the yard's recycle box's brown (Style.BOX), so the boat and the
+box it serves read as one wood, and the square sail's lit face carries the box's blue
+recycle mark (Style.BOX_BLUE), painted per heading so it turns with the sail.
 
 This is a hand edit written down, not a detector. Which light-blue pixels are the jib and
 which are the square sail's head strip, and what the bow deck looks like under the jib's
@@ -38,7 +41,7 @@ OUT_JSON = ROOT / "assets" / "boat_sail_frames.json"
 FRAME = 128
 FRAMES = 16
 
-## The sheet's thirteen colours, by the letter the ops and the ascii dump use. Space is
+## The sheet's fifteen colours, by the letter the ops and the ascii dump use. Space is
 ## transparent. The shadow (13,13,22 at half alpha) is stripped before any op runs.
 INK = {
     "o": (53, 31, 28, 255),  # outline brown: spars, rails, every edge
@@ -50,7 +53,9 @@ INK = {
     "l": (222, 181, 129, 255),  # wood, light
     "m": (203, 140, 85, 255),  # wood, warm
     "d": (113, 65, 59, 255),  # wood, dark (deck in shadow)
-    "x": (122, 66, 34, 255),  # hull planks
+    "x": (122, 66, 34, 255),  # hull planks, as shipped
+    "X": (120, 89, 64, 255),  # hull planks, the recycle box's brown (Style.BOX)
+    "R": (77, 133, 166, 255),  # the recycle mark, the box's blue (Style.BOX_BLUE)
     "b": (53, 151, 231, 255),  # blue stripe
     "B": (59, 86, 149, 255),  # blue stripe, dark
     " ": (0, 0, 0, 0),
@@ -243,10 +248,38 @@ OPS = {
 }
 
 
-## The top of the mast in each frame, 0 to 8, read off the truck's outline; mirrored for the
-## rest. The pennant flies from here. Not the topmost pixel: in the stern quarters the
-## yard's far tip stands higher than the truck.
-MASTHEAD = [(64, 32), (66, 33), (67, 34), (67, 34), (63, 32), (68, 33), (66, 37), (64, 37), (63, 37)]
+## The recycle mark, as painted on the square sail's lit face: three arms chasing round a
+## triangle, with a blunt head on each. Fifteen pixels across; a face narrower than that
+## gets it squashed sideways (columns merged, so no arm drops out) to the width given.
+## Only the headings that show the sail's lit face carry it (frames 0-3 and their mirrors):
+## the side view shows just the sail's billow edge, and the stern quarters its back.
+## The stern quarters' sail back is the slate face and is left plain, by decision.
+MARK = [
+    ".......R.......",
+    "......RRR......",
+    ".....RR.RR.....",
+    "....RR...RR....",
+    "....R.....RRR..",
+    "..R.......RRRR.",
+    ".RRR.......RRR.",
+    "RRRRR.......R..",
+    ".RR............",
+    ".RR..........RR",
+    "..RR......RRRRR",
+    "...RRRR.RRRRRR.",
+    ".........RRR...",
+]
+MARK_WIDE = len(MARK[0])
+## Where the mark sits in each frame that carries it: left, top, width in frame pixels.
+MARK_AT = {
+    0: (57, 51, 15),
+    1: (56, 51, 15),
+    2: (54, 51, 13),
+    3: (55, 51, 9),
+}
+## The one-pixel edge round the outside of the mark where it lies on cloth, so it reads on
+## white.
+MARK_EDGE = "D"
 
 ## Where the frames turn about: the mast's column, and the water at the axis's depth,
 ## which is the side view's waterline (frame 4, whose whole near side is at that depth).
@@ -271,9 +304,78 @@ CUT_ROW = {}
 CUT_BAND = 4
 
 
-def mastheads():
-    return [MASTHEAD[n] if n <= 8 else (FRAME - 1 - MASTHEAD[16 - n][0], MASTHEAD[16 - n][1])
-            for n in range(FRAMES)]
+def repaint_hull(frame):
+    px = frame.load()
+    for y in range(frame.height):
+        for x in range(frame.width):
+            if px[x, y] == INK["x"]:
+                px[x, y] = INK["X"]
+
+
+def mark_bitmap(width):
+    """The mark squashed to `width` columns: each output column is the OR of the source
+    columns that fall into it, so a narrow face keeps every arm."""
+    rows = []
+    for line in MARK:
+        out = []
+        for i in range(width):
+            x0 = i * MARK_WIDE // width
+            x1 = max((i + 1) * MARK_WIDE // width, x0 + 1)
+            out.append(any(c == "R" for c in line[x0:x1]))
+        rows.append(out)
+    return rows
+
+
+def stamp_mark(frame, at, mirror=False):
+    left, top, width = at
+    bits = mark_bitmap(width)
+    px = frame.load()
+
+    def mx(x):
+        return FRAME - 1 - x if mirror else x
+
+    # The edge runs round the outside of the mark only. The hole in the middle and the
+    # gaps between the arms stay cloth: edged as well, they closed up and the three arrows
+    # read as one blob.
+    # "Outside" is found on the mark grown by one pixel, which closes the gaps between the
+    # arms, so the flood from the border cannot leak in through them.
+    tall = len(bits)
+
+    def grown(x, y):
+        return any(0 <= x + dx < width and 0 <= y + dy < tall and bits[y + dy][x + dx]
+                   for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+
+    outside = set()
+    stack = [(x, y) for x in range(-2, width + 2) for y in (-2, tall + 1)]
+    stack += [(x, y) for y in range(-2, tall + 2) for x in (-2, width + 1)]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in outside or x < -2 or x > width + 1 or y < -2 or y > tall + 1:
+            continue
+        if grown(x, y):
+            continue
+        outside.add((x, y))
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    # The edge cells themselves are in the grown mark; a cloth cell is edged when it touches
+    # the outside.
+    rim = {(x, y) for x in range(-1, width + 1) for y in range(-1, tall + 1)
+           if (x, y) not in outside and any((x + dx, y + dy) in outside
+                                            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
+    cloth = {INK["."], INK["W"]}
+    for y, row in enumerate(bits):
+        for x, on in enumerate(row):
+            if not on:
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                if (x + dx, y + dy) not in rim:
+                    continue
+                nx, ny = mx(left + x + dx), top + y + dy
+                if px[nx, ny] in cloth:
+                    px[nx, ny] = INK[MARK_EDGE]
+    for y, row in enumerate(bits):
+        for x, on in enumerate(row):
+            if on:
+                px[mx(left + x), top + y] = INK["R"]
 
 
 def cut_row(frame, n):
@@ -362,6 +464,11 @@ def build():
             apply(frame, OPS[n])
         else:
             apply(frame, OPS[16 - n], mirror=True)
+        repaint_hull(frame)
+        if n in MARK_AT:
+            stamp_mark(frame, MARK_AT[n])
+        elif 16 - n in MARK_AT:
+            stamp_mark(frame, MARK_AT[16 - n], mirror=True)
         frames.append(frame)
     return frames
 
@@ -377,9 +484,9 @@ def write(frames):
         "frame": FRAME,
         "frame_zero": "bow towards the camera; frames turn clockwise seen from above",
         "anchor": list(anchor(frames)),
-        "masthead": [list(at) for at in mastheads()],
         "cut": [[list(at) for at in line] for line in cuts(frames)],
-        "edits": "jib, forestay and floor shadow removed by tools/build_boat_sheet.py",
+        "edits": "jib, forestay and floor shadow removed, hull repainted in the recycle "
+                 "box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py",
     }, indent="\t") + "\n")
 
 

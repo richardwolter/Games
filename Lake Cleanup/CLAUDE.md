@@ -448,6 +448,20 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   because the frames draw that deck higher than the projection puts it. Cutting each
   heading into hull and sail layers would have tripled the art; not drawing the load loses
   the laden-ferry read. Richard's call.
+- **The hull wears the yard box's brown, and the sail its mark** (2026-09-12,
+  `repaint_hull`/`MARK`/`MARK_AT` in the builder): the sheet's one hull-plank colour
+  (122,66,34) is repainted to `Style.BOX` (120,89,64) — hull planks only, by decision; deck
+  wood, spars, outline and the blue stripe stay as drawn — so the ferry and the recycle box
+  it serves read as one wood. The square sail's lit face carries the box's recycle mark
+  in `Style.BOX_BLUE`: a hand-authored 15 px bitmap of three chasing arrows, baked per
+  heading into frames 0-3 and their mirrors, squashed sideways to the face's width (columns
+  OR-merged, so no arm drops out), with a one-pixel slate edge round its **outside** only
+  (edging the hole and the gaps too closed them into a blob). The side view shows only the
+  sail's billow edge and the stern quarters its back, so those headings carry no mark, by
+  decision. **The pennant is gone** with it — the flag in the yard's colour at the masthead,
+  `PENNANT_STAFF`, `masthead()`, and the json's `masthead` list — the yards' own tints tell
+  the piers apart. **After re-running the builder, reimport** (`<exe> --path . --headless
+  --import`): a `--path` run without the editor draws the stale `.godot/imported` texture.
 - `assets/Blue_Boat/PixZels_Model_BlueBoat.json` that came with the sheet is a *different*
   boat (a pirate ship with a skull sail) and was no use as a reference; the edit is 2D only.
 - **Not yet retired**: `tools/bake_boat.gd` and the Kenney sheet `assets/boat_frames.png`

@@ -7,72 +7,6 @@
 		64,
 		92
 	],
-	"masthead": [
-		[
-			64,
-			32
-		],
-		[
-			66,
-			33
-		],
-		[
-			67,
-			34
-		],
-		[
-			67,
-			34
-		],
-		[
-			63,
-			32
-		],
-		[
-			68,
-			33
-		],
-		[
-			66,
-			37
-		],
-		[
-			64,
-			37
-		],
-		[
-			63,
-			37
-		],
-		[
-			63,
-			37
-		],
-		[
-			61,
-			37
-		],
-		[
-			59,
-			33
-		],
-		[
-			64,
-			32
-		],
-		[
-			60,
-			34
-		],
-		[
-			60,
-			34
-		],
-		[
-			61,
-			33
-		]
-	],
 	"cut": [
 		[
 			[
@@ -235,5 +169,5 @@
 			]
 		]
 	],
-	"edits": "jib, forestay and floor shadow removed by tools/build_boat_sheet.py"
+	"edits": "jib, forestay and floor shadow removed, hull repainted in the recycle box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py"
 }

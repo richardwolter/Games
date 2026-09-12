@@ -1,6 +1,6 @@
 extends Node
 ## Opens the lake on a real window, points the ferry three ways under way, and saves a close
-## crop of it each time: hull, bow foam, wake and pennant together, at three times size;
+## crop of it each time: hull, bow foam and wake together, at three times size;
 ## then opens the shop and saves its ferry board. A probe, not a test: whether the sheet's
 ## anchor puts the hull on the water and the foam on the hull is a thing to look at.
 ##
