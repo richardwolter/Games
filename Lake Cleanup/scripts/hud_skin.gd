@@ -62,7 +62,7 @@ const METER_FEATHER := 0.14
 ## the hut, and the money plate is as wide as the stock plate over it and as tall as its
 ## coin — two slabs of one width read as a pair, where a square under a slab read as
 ## lopsided.
-const UPGRADES_SIZE := Vector2(176.0, 100.0)
+const UPGRADES_SIZE := Vector2(120.0, 100.0)
 const SHED_SIZE := Vector2(120.0, 100.0)
 const MONEY_TALL := 64.0
 

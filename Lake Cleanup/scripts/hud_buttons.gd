@@ -40,7 +40,6 @@ const CHIPS := 1
 ## arrow's edge and the face's was a couple of dozen pixels, and a ferry shrunk into it was
 ## a smudge. Overlapping is what "behind" looks like.
 const NET_FILL := 1.05
-const NET_DIM := Color(0.55, 0.62, 0.66)
 const SIDE_TALL := 0.52
 const SIDE_HALF := 0.46
 const BOAT_TALL := 0.64
@@ -48,9 +47,13 @@ const BOAT_LIFT := 0.12
 const SIDE_IN := 0.04
 ## How much of the ferry and the dog the arrow covers, as a fraction of their own width.
 ## Placed by their **drawn** edges rather than by a slot, because a slot centres whatever it
-## is given and the ferry came out almost entirely behind the arrow (2026-09-12): a tenth or
-## so reads as standing behind it, half reads as hidden.
-const SIDE_UNDER := 0.13
+## is given and the ferry came out almost entirely behind the arrow.
+##
+## Raised from 0.13 when the button came down to the decorate one's width (2026-09-12): on a
+## narrow face the lane beside the arrow is a couple of dozen pixels, and sizing them to it
+## shrank both to smudges again. They keep their share of the face and lie further under the
+## arrow instead — which is what standing behind something looks like.
+const SIDE_UNDER := 0.3
 const ARROW_TALL := 0.78
 const ARROW_WIDE := 0.40
 const ARROW_HEAD := 0.5
@@ -151,8 +154,10 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	# The net, behind, filling the face and dimmed into it. Clipped to the face by drawing
 	# it centred rather than stood, so an over-fill spills evenly rather than out of the top.
 	if sprites.has("net"):
-		var net_tint := Color(NET_DIM.r * tint.r, NET_DIM.g * tint.g, NET_DIM.b * tint.b)
-		fit(on, sprites["net"], face, NET_FILL, net_tint, false)
+		# `Style.NET_INK`, the shop board's own black, so the net is one net wherever it is
+		# drawn as a picture of itself. It was a pale grey dim until 2026-09-12.
+		var ink := Style.NET_INK
+		fit(on, sprites["net"], face, NET_FILL, Color(ink.r * tint.r, ink.g * tint.g, ink.b * tint.b, ink.a), false)
 	# The ferry in the left half, a little up off the foot; the dog in the right half. Both
 	# mirrored from how their sheets face, so they look outwards, and both drawn before the
 	# arrow, which stands over the middle of them.
@@ -160,24 +165,17 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	var half := face.size.x * SIDE_HALF
 	var mid := face.position.x + face.size.x * 0.5
 	var arrow_half := face.size.x * ARROW_WIDE * 0.5
-	# The clear lane beside the arrow, and the widest a thing standing in it may be drawn if
-	# only `SIDE_UNDER` of it is to go behind the arrow. Sizing them to the lane rather than
-	# clamping them into it is the whole fix (2026-09-12): a ferry fitted to half the face
-	# and then shoved back on screen ended up half under the arrow, which is where it was.
-	var clear := maxf(mid - arrow_half - face.position.x, 8.0)
-	var lane := minf(clear / (1.0 - SIDE_UNDER), half)
+	# Sized to their share of the face, not to the lane beside the arrow: the lane decides
+	# where they stand, `SIDE_UNDER` decides how much of them the arrow takes, and neither
+	# decides how big they are.
 	if sprites.has("boat"):
-		var span := span_of(sprites["boat"], Vector2(lane, face.size.y * BOAT_TALL), 1.0)
+		var span := span_of(sprites["boat"], Vector2(half, face.size.y * BOAT_TALL), 1.0)
 		var right := mid - arrow_half + span.x * SIDE_UNDER
 		var slot := Rect2(Vector2(right - span.x, foot - face.size.y * BOAT_LIFT - span.y), span)
 		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
 	if Dogs.has(&"idle"):
 		var dog_tall := face.size.y * SIDE_TALL * 0.9
 		var dog_span := Dogs.span(&"idle", dog_tall)
-		# The dog is wider than it is tall, so the lane is what decides its height.
-		if dog_span.x > lane:
-			dog_tall *= lane / dog_span.x
-			dog_span = Dogs.span(&"idle", dog_tall)
 		# The same rule mirrored: its left edge that far inside the arrow's right.
 		var left := mid + arrow_half - dog_span.x * SIDE_UNDER
 		Dogs.stamp(on, &"idle", 0, Vector2(left + dog_span.x * 0.5, foot), dog_tall, false, 0.0, tint)
@@ -284,6 +282,16 @@ static func label(on: CanvasItem, box: Rect2, text: String) -> void:
 	)
 
 
+## A panel pressed **into** the wood: a seam all round, the dark face, and a second seam
+## along the top where the light cannot reach. The same panel the stock readout's count sits
+## on, by decision (2026-09-12) — a figure on a raised plate read as a tile stuck on the
+## button while the one beside it was cut into its board.
+static func sunk(on: CanvasItem, box: Rect2, face: Color) -> void:
+	on.draw_rect(box.grow(1.0), Style.SEAM, true)
+	on.draw_rect(box, face, true)
+	on.draw_rect(Rect2(box.position, Vector2(box.size.x, 1.0)), Style.SEAM, true)
+
+
 ## The money plate: the coin on the left, and the sunken panel the figure is written on
 ## filling the rest. Returns the panel. `wash` is the payment's shine on the coin, and
 ## `swell` how much bigger it is drawn for the moment a payment lands.
@@ -304,7 +312,7 @@ static func draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float = 1
 		Vector2(coin_box.end.x + 2.0, face.position.y + 5.0),
 		Vector2(face.end.x - coin_box.end.x - 7.0, face.size.y - 10.0)
 	)
-	Style.plate(on, panel, Style.BOARD.darkened(0.35), 2.0)
+	sunk(on, panel, Style.BOARD.darkened(0.35))
 	return panel
 
 

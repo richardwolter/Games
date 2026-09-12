@@ -38,7 +38,7 @@ const NOTE_LEAST := 8
 const HOVER_LIFT := Style.HOVER_LIFT
 
 ## The size the HUD draws this button at; the container's slot is centred on it.
-const SIZES := {&"upgrades": Vector2(176.0, 100.0), &"shed": Vector2(120.0, 100.0)}
+const SIZES := {&"upgrades": Vector2(120.0, 100.0), &"shed": Vector2(120.0, 100.0)}
 
 signal pressed
 

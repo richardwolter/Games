@@ -86,6 +86,11 @@ const ROW_SCREEN := Color(0.27, 0.40, 0.29)
 const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
 const ON_WATER := Color(0.31, 0.60, 0.75)
+## The net, wherever it is drawn as a picture of itself rather than as the thing in the lake:
+## on the shop's board and on the upgrades button. Near black, so the rubbish under it on the
+## board and the arrow beside it on the button both read against it.
+const NET_INK := Color(0.08, 0.07, 0.07, 0.92)
+
 ## The level on an upgrades row, after its name: the slider's clean-water blue, lifted a
 ## step so it reads on the row's murky plate. A level is not a price, so not the gold.
 const LEVEL_INK := Color(0.47, 0.78, 0.92)
@@ -748,8 +753,11 @@ const BORDER_SEAM := Color8(66, 43, 28)
 const BORDER_LEAST := Vector2i(BORDER_WALL * 2 + 2, BORDER_TOP + BORDER_FOOT + 2)
 
 ## One built frame per size, kept. There are three buttons and they change size only when the
-## window does, so this holds three or four images for the life of the run.
+## window does, so this holds three or four images for the life of the run. `_backings` holds
+## each one's bottom bites as a mask, for a plank that has a panel under it — see
+## `_border_bites`.
 static var _frames := {}
+static var _backings := {}
 static var _sheet: Image
 static var _looked: bool = false
 
@@ -819,7 +827,12 @@ static func board_wood_tall(wide: float, thick: float) -> float:
 
 ## A plank of the painted wood, `PLANK_TALL` tall, centred in the box it is given. Used for
 ## the title ribbon over a board, so the ribbon and the frame under it are one wood.
-static func meter_plank(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -> bool:
+## `under`, when it is not clear, is painted into the bites along the plank's bottom edge, so
+## a ribbon nailed across a board shows that board's face through them rather than the frame
+## plank it happens to be lying on.
+static func meter_plank(
+	on: CanvasItem, box: Rect2, tint: Color = Color.WHITE, under: Color = Color(0, 0, 0, 0)
+) -> bool:
 	if not plank_fits(box):
 		return false
 	var want := Vector2i(int(box.size.x), PLANK_TALL)
@@ -830,7 +843,12 @@ static func meter_plank(on: CanvasItem, box: Rect2, tint: Color = Color.WHITE) -
 			return false
 		_frames[want] = built
 	var at := Vector2(box.position.x, box.position.y + (box.size.y - float(PLANK_TALL)) * 0.5)
-	on.draw_texture_rect(built, Rect2(at.floor(), Vector2(want)), false, tint)
+	var where := Rect2(at.floor(), Vector2(want))
+	if under.a > 0.0:
+		var backing: ImageTexture = _backings.get(want)
+		if backing != null:
+			on.draw_texture_rect(backing, where, false, under)
+	on.draw_texture_rect(built, where, false, tint)
 	return true
 
 
@@ -893,9 +911,12 @@ static func _build_border(want: Vector2i) -> ImageTexture:
 			_plank_run(_cut(art, BORDER_FOOT_RUN), run), Rect2i(0, 0, run, BORDER_FOOT),
 			Vector2i(BORDER_WALL, want.y - BORDER_FOOT)
 		)
-	# The walls: a length of the top plank turned on its side, and mirrored for the far one.
+	# The walls: a length of the **foot** plank turned on its side, and mirrored for the far
+	# one. The foot plank, by decision (2026-09-12): the top one is the lit board and a frame
+	# with its light tone down both sides and its dark one along the bottom read as three
+	# different woods. Light along the top, the same shade down both stiles and the foot.
 	if down > 0:
-		var stile := _plank_run(_cut(art, BORDER_TOP_RUN), down)
+		var stile := _plank_run(_cut(art, BORDER_FOOT_RUN), down)
 		stile.rotate_90(CLOCKWISE)
 		# Rotating the plank puts its lit edge down the right-hand side, which is the near
 		# wall; the far one is that mirrored, so the light stays on the outside of both.
@@ -918,7 +939,9 @@ static func _build_border(want: Vector2i) -> ImageTexture:
 	out.blit_rect(foot_left, foot_box, Vector2i(0, want.y - BORDER_FOOT))
 	out.blit_rect(foot_right, foot_box, Vector2i(want.x - BORDER_WALL, want.y - BORDER_FOOT))
 	_border_seams(out, want)
-	_border_bites(out, want)
+	var under := Image.create(want.x, want.y, false, Image.FORMAT_RGBA8)
+	_border_bites(out, want, under)
+	_backings[want] = ImageTexture.create_from_image(under)
 	return ImageTexture.create_from_image(out)
 
 
@@ -948,7 +971,12 @@ const BITE_TIP := 0.2
 const BORDER_JOINT := 10
 
 
-static func _border_bites(out: Image, want: Vector2i) -> void:
+## `under`, when given, is filled white wherever a **bottom-edge** bite cleared a pixel. It
+## becomes the plank's backing: a ribbon straddles its board's top plank, so a hole in its
+## lower edge shows that plank's wood rather than anything behind the panel, and what should
+## show there is the board's own face. Top and end bites are left out — those are over the
+## lake and are meant to be seen through.
+static func _border_bites(out: Image, want: Vector2i, under: Image = null) -> void:
 	var seed := want.x * 31 + want.y * 17
 	for edge in 4:
 		var along := want.x if edge < 2 else want.y
@@ -962,7 +990,7 @@ static func _border_bites(out: Image, want: Vector2i) -> void:
 			var deep := BITE_DEEP.x + int((h / 11) % (BITE_DEEP.y - BITE_DEEP.x + 1))
 			var step := float(room) / float(count)
 			var at := BORDER_WALL + BITE_CLEAR + int(step * (float(i) + 0.15 + 0.7 * float((h / 131) % 100) / 100.0))
-			_bite_out(out, want, edge, at, wide, deep)
+			_bite_out(out, want, edge, at, wide, deep, under if edge == 1 else null)
 
 
 ## One V-shaped hole out of an edge: a run of pixels cleared at every depth, narrowing as it
@@ -970,7 +998,9 @@ static func _border_bites(out: Image, want: Vector2i) -> void:
 ##
 ## `edge` is which side it opens on (0 top, 1 bottom, 2 left, 3 right), `at` where along that
 ## side it starts, `wide` how far it opens and `deep` how far in it reaches.
-static func _bite_out(out: Image, want: Vector2i, edge: int, at: int, wide: int, deep: int) -> void:
+static func _bite_out(
+	out: Image, want: Vector2i, edge: int, at: int, wide: int, deep: int, under: Image = null
+) -> void:
 	var down := edge == 0 or edge == 1
 	var middle := float(at) + float(wide) * 0.5
 	var gone: Array[Vector2i] = []
@@ -993,6 +1023,8 @@ static func _bite_out(out: Image, want: Vector2i, edge: int, at: int, wide: int,
 			if spot.x < 0 or spot.y < 0 or spot.x >= want.x or spot.y >= want.y:
 				continue
 			out.set_pixel(spot.x, spot.y, Color(0.0, 0.0, 0.0, 0.0))
+			if under != null:
+				under.set_pixel(spot.x, spot.y, Color.WHITE)
 			gone.append(spot)
 	# The rim, after the whole V is cut: a pixel on the slope would otherwise be blacked and
 	# then cleared by the next step in.
@@ -1056,7 +1088,7 @@ static func board_ribbon(
 	size_px: int = TEXT_HEAD,
 	within: Rect2 = Rect2()
 ) -> void:
-	if not meter_plank(on, box):
+	if not meter_plank(on, box, Color.WHITE, BOARD):
 		var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
 		plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
 	var text_box := box if within.size.x <= 0.0 else within
