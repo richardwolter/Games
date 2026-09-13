@@ -216,6 +216,23 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   angler, dog, boat and the rubbish's swell on the art-pixel grid, and Richard judged the game
   much better with it off (commit `91cc581`, reverted). The low-res SubViewport would give the
   same stepped motion, so it is not pursued either. Don't re-raise.
+- **The view comes home no faster than `Lake.HOME_SPEED`** (issue #19, 2026-09-13): the
+  camera follows a point `CAST_LOOK` (0.45) of the way out to the net, so on the haul it
+  came home at 0.45 of the reel speed and a reel upgrade was a camera upgrade. Now its step
+  is capped at `HOME_SPEED` world px/s (260, about the pace it follows the angler walking)
+  from the first frame of the reel until it has settled back on the angler (`_homing`) — a
+  net that beats it home is waited for. **A ceiling, not the speed of the return**: under it
+  the view still follows the net at the net's own pace, so a slow reel keeps the view between
+  angler and net as before. Return only — the throw is not capped, by the issue's own rule.
+  The cost: a max-range haul at the top of the reel track is over in under a second and the
+  view then pans home for 3-5 s. `HOME_SPEED` is the one knob for that.
+  **Landing is framed, not centred** (`LAND_INSET` 0.25, `_framed_on`): the follow point is
+  pulled on towards the net, only as far as it needs to go, until the whole mouth is inside
+  the window's middle 75% — taken up over the first `FRAME_BY` (0.6) of the flight towards
+  where the net will land, and the flying net itself pushes the view the last of the way if
+  a short throw was over before the ease caught up. `tools/probe_camera.tscn` (headless,
+  `--fixed-fps 60`) measures all of it: peak camera speed by phase and the landing spot as a
+  fraction of the half-view at reel levels 0 and 20, short and long, across and down.
 - **The ground is drawn per pixel, not per tile** (`shaders/ground.gdshader`, issue #17,
   2026-09-11): each `Ground` layer is one `Polygon2D` with the shader on it; every pixel works
   out its tile, whether it is lawn or beach (`coverage` — `out_of_water` less `beach_width`

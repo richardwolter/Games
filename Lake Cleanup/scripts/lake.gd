@@ -129,9 +129,46 @@ const ART_PIXEL := 2.0
 ## screen; sitting between the two of them is what makes a long cast read as a throw across
 ## the water rather than as the lake sliding sideways. It needs no ending of its own —
 ## reeling brings the net home to the angler, so the two points converge and the view
-## arrives back where it started at the moment the haul finishes.
+## arrives back where it started as the haul finishes (or a little after it, on a haul
+## faster than `HOME_SPEED` lets the view travel).
 const CAST_LOOK := 0.45
 const LOOK_SPEED := 3.4
+
+## How far in from the window's edges the net has to be when it comes down on the water, as
+## a fraction of the view's half-width and half-height. `CAST_LOOK` puts the view most of
+## the way out to the net but not all of it, and on a long cast most of the way is not
+## far enough: the net lands on the edge of the window or past it. So the view is pulled the
+## rest of the way out — only as far as it needs to be, and only ever towards the net — until
+## the whole mouth sits inside this margin. Framed, not centred: the angler's share of the
+## screen is kept wherever there is room to keep it.
+##
+## Measured against where the net will land while it flies, so the view is on its way to
+## the landing from the throw rather than chasing the net there and arriving late — taken
+## up over the first `FRAME_BY` of the flight rather than all at once, or the view jumped
+## a hundred pixels on the frame of the click. The rest of the flight is for the follow
+## to close on it, and the flying net itself pushes the view the last of the way if it
+## has not (see `_process`): a short throw is over before the ease has done much.
+const LAND_INSET := 0.25
+const FRAME_BY := 0.6
+
+## The most the view may travel on the way home, in world pixels a second.
+##
+## The view follows a point that is `CAST_LOOK` of the way out to the net, and on the haul
+## that point comes home at `CAST_LOOK` of the reel speed — so a reel upgrade was a camera
+## upgrade, and at the top of the track the view whipped home at several screens a second.
+## What was bought was a faster net. Capped, the view pans home at a walking pace whatever
+## the net is doing, and a net that beats it home is waited for.
+##
+## The way home only. The throw is faster than any reel by design (`CastNet.CAST_SPEED`),
+## and a view that lagged the flying net would land it further off the middle of the
+## screen, which is the opposite of what `LAND_INSET` is for.
+##
+## A ceiling, not the speed of the return: under it the view still follows the net at the
+## net's own pace, so at a slow reel it stays between the angler and the net as it always
+## did rather than going home ahead of the net and leaving it to come in from the edge.
+## World pixels, so zooming out slows it on screen — the whole lake fits the window at the
+## far end of the wheel and there is nothing there to pan across.
+const HOME_SPEED := 260.0
 
 ## How far the middle button may move while held and still count as a tap rather than a
 ## drag, in screen pixels. A tap recentres the view on the angler.
@@ -391,6 +428,11 @@ var _grid: LakeGrid
 var _view_zoom: float = VIEW_ZOOM
 ## How far the view has slid from the angler towards the net, 0 to 1.
 var _cast_look: float = 0.0
+## Whether the view is on its way home from a haul, and so held under `HOME_SPEED`. Set on
+## the first frame of the reel and kept until the view has settled back on the angler:
+## the net beating the view home is the whole reason for the cap, so the cap cannot be
+## allowed to lift the moment the net arrives.
+var _homing: bool = false
 
 ## Where the player has dragged the view to with the middle button, as an offset in world
 ## units from wherever the camera would otherwise be. It stays where it is put: a view that
@@ -2780,7 +2822,9 @@ func _set_auto_ferry(on: bool) -> void:
 		boat.auto_ferry = on
 
 
-## How fast the view drifts to keep up with the angler.
+## How fast the view drifts to keep up with the angler: the share of the gap it closes a
+## second, see `_ease`. Its speed is its distance from what it is following, which is what
+## makes a fast net a fast camera — `HOME_SPEED` is the ceiling over it on the way home.
 const FOLLOW_SPEED := 6.0
 
 
@@ -2827,7 +2871,10 @@ func _process(delta: float) -> void:
 	# the player starts moving they have stopped looking and started going somewhere —
 	# which they want to be able to see. Noticed by watching the angler rather than by
 	# reading the keys, so it holds however they came to move.
-	if _angler_was.distance_to(_angler.tile_pos) > 0.001 and _angler_was != Vector2.INF:
+	var walking := (
+		_angler_was != Vector2.INF and _angler_was.distance_to(_angler.tile_pos) > 0.001
+	)
+	if walking:
 		_pan_yielded = true
 	_angler_was = _angler.tile_pos
 
@@ -2839,12 +2886,36 @@ func _process(delta: float) -> void:
 		if _pan.length() < 1.0:
 			_pan = Vector2.ZERO
 
+	# The way home is capped, see HOME_SPEED: from the first frame of the haul until the
+	# view is back on the angler. A throw lifts it — the throw is not capped — and so does
+	# the angler walking off once the net is in, since the view is then following them and
+	# not coming home from anything. A hand on the mouse snaps the view to wherever it
+	# wants to be, which ends the way home as surely as arriving does.
+	match _net.state:
+		CastNet.State.REELING:
+			_homing = true
+		CastNet.State.FLYING:
+			_homing = false
+		CastNet.State.IDLE:
+			if walking or _panning or (_watching() - _camera.position).length() < 1.0:
+				_homing = false
+
 	# Eased while it is following something, and snapped while the player is dragging it:
 	# a view that lags a hand on the mouse feels like a view being argued with.
-	_camera.position = _clamped_view(
-		_watching() if _panning
-		else _camera.position.lerp(_watching(), _ease(FOLLOW_SPEED, delta))
-	)
+	if _panning:
+		_camera.position = _clamped_view(_watching())
+	else:
+		var step := (_watching() - _camera.position) * _ease(FOLLOW_SPEED, delta)
+		if _homing:
+			step = step.limit_length(HOME_SPEED * delta)
+		var at := _camera.position + step
+		# The flying net pushes the view along if the ease has fallen behind it, so it
+		# comes down inside the margin however short the throw was. The throw only: on
+		# the haul the cap outranks the frame, and the net is coming towards the middle of
+		# the screen anyway.
+		if _net.state == CastNet.State.FLYING:
+			at = _framed_on(at, _net.tile_pos)
+		_camera.position = _clamped_view(at)
 
 	_look_for_the_end(delta)
 	if tree_mode:
@@ -2941,11 +3012,36 @@ func _shed_front() -> float:
 ## The net's tile position rather than its drawn one, which rides the swell — a camera that
 ## bobs with the water is a camera nobody asked for.
 func _watching() -> Vector2:
-	if _cast_look <= 0.001:
-		return _angler.position + _pan
-	return _angler.position.lerp(
-		Iso.tile_to_world(_net.tile_pos.x, _net.tile_pos.y), _cast_look
-	) + _pan
+	var at := _angler.position
+	if _cast_look > 0.001:
+		at = at.lerp(Iso.tile_to_world(_net.tile_pos.x, _net.tile_pos.y), _cast_look)
+	# And out past that as far as the landing needs, see LAND_INSET: towards where the net
+	# is going while it flies, taken up over the first FRAME_BY of the flight; and towards
+	# where it is once it is down, where the pull shrinks as the net comes in and hands the
+	# view back to CAST_LOOK's point on its own — no seam where it lets go.
+	match _net.state:
+		CastNet.State.FLYING:
+			var flown := _net.cast_progress() / CastNet.THROW_SHARE
+			at = at.lerp(_framed_on(at, _net.target), clampf(flown / FRAME_BY, 0.0, 1.0))
+		CastNet.State.SETTLED, CastNet.State.REELING:
+			at = _framed_on(at, _net.tile_pos)
+	return at + _pan
+
+
+## `at`, pulled towards the tile `spot` until a window centred on the result has the net's
+## whole mouth inside its middle, see LAND_INSET. Left alone when it already has, which is
+## every short cast. Only ever towards the net.
+func _framed_on(at: Vector2, spot: Vector2) -> Vector2:
+	var net := Iso.tile_to_world(spot.x, spot.y)
+	var half := get_viewport_rect().size / _camera.zoom * 0.5 * (1.0 - LAND_INSET)
+	# The mouth's full width both ways: the drawn net is wider than it is tall, but the
+	# crown and the bundle in a throw stand up off the water, and a margin that is a
+	# little generous down the screen costs nothing.
+	var room := (half - Vector2.ONE * _net.open_extent()).max(Vector2.ZERO)
+	return Vector2(
+		clampf(at.x, net.x - room.x, net.x + room.x),
+		clampf(at.y, net.y - room.y, net.y + room.y)
+	)
 
 
 ## Keep the camera over the ground.
