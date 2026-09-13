@@ -221,7 +221,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `_fit_zoom` — the whole lake and its piers on screen (level one on 1080p, the lake at
   about 61% of the width). `ZOOM_OUT_PULL` (1.68, "the whole-lake view is a map") is
   retired: on 1080p the levels are thirds, and it stopped the wheel a level short with the
-  lake wider than the window. `test_lake` checks both ends.
+  lake wider than the window. `test_lake` checks both ends. **The pan is clamped with the
+  view** (`_process`, same day): `_pan` used to wind up past the ground's edge out of sight,
+  so a drag back did nothing until it had unwound — at the far end, where the edge is a
+  hand's width away, the sides read as stuck. `test_lake` drives a drag past the edge and
+  a hundred pixels back.
 - **The view comes home no faster than `Lake.HOME_SPEED`** (issue #19, 2026-09-13): the
   camera follows a point `CAST_LOOK` (0.45) of the way out to the net, so on the haul it
   came home at 0.45 of the reel speed and a reel upgrade was a camera upgrade. Now its step

@@ -2888,6 +2888,16 @@ func _process(delta: float) -> void:
 		if _pan.length() < 1.0:
 			_pan = Vector2.ZERO
 
+	# The view is clamped to the ground, so the pan it is dragged by is clamped with it.
+	# Dragged past the edge, the surplus is dropped rather than wound up out of sight —
+	# wound up, dragging back did nothing until all of it had been unwound, which at the far
+	# end of the zoom, where the edge is a hand's width away, read as the sides sticking.
+	# Only a pan there is: a view the ground alone holds off the angler is not a pan, and
+	# writing the clamp back into an empty one would make it one.
+	if _pan != Vector2.ZERO:
+		var bare := _watching() - _pan
+		_pan = _clamped_view(bare + _pan) - bare
+
 	# The way home is capped, see HOME_SPEED: from the first frame of the haul until the
 	# view is back on the angler. A throw lifts it — the throw is not capped — and so does
 	# the angler walking off once the net is in, since the view is then following them and

@@ -251,6 +251,23 @@ func _stage_build() -> void:
 		"%.2f of it, wanted %.2f (lake %.0fx%.0f in %.0fx%.0f)" % [
 			shown, wanted, span.x, span.y, view.x, view.y
 		])
+	# A drag past the edge of the ground does not wind up. The view is clamped to the
+	# ground, and the pan it is dragged by has to be clamped with it, or dragging back does
+	# nothing until the invisible surplus has been unwound — which at the far end of the
+	# zoom, where the edge is a hand's width away, read as the sides sticking (2026-09-13).
+	# Driven by hand through _process: a drag far past the edge, then a hundred pixels back.
+	_main.set(&"_panning", true)
+	_main.set(&"_pan", Vector2(50000.0, 0.0))
+	_main._process(1.0 / 60.0)
+	var at_edge: float = cam.position.x
+	var pan: Vector2 = _main.get(&"_pan")
+	_main.set(&"_pan", pan - Vector2(100.0, 0.0))
+	_main._process(1.0 / 60.0)
+	_check(absf(cam.position.x - (at_edge - 100.0)) < 1.0,
+		"a drag back from past the edge moves the view at once",
+		"at the edge %.0f, after 100 px back %.0f" % [at_edge, cam.position.x])
+	_main.set(&"_panning", false)
+	_main.set(&"_pan", Vector2.ZERO)
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
