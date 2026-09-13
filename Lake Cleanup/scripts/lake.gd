@@ -22,8 +22,9 @@
 ## meter and the purse move.
 ##
 ## Named so the harness can read the numbers that decide how the view behaves —
-## `tools/test_lake.gd` checks the zoom against `ZOOM_OUT_PULL` — rather than keeping its
-## own copy of them, which is the sort of copy that goes stale without anything failing.
+## `tools/test_lake.gd` checks the two ends of the zoom against `MAX_ZOOM` and `_fit_zoom` —
+## rather than keeping its own copy of them, which is the sort of copy that goes stale
+## without anything failing.
 class_name Lake
 extends Node2D
 
@@ -55,8 +56,16 @@ const VIEW_ZOOM := 0.62
 ## to decide. The far end is now whatever zoom fits the waterline inside the window, worked
 ## out from the basin and the window rather than written down, so it frames the same lake on
 ## any screen. MIN_ZOOM stays as the floor under that, for a window too small to fit it.
+##
+## The near end came in from 1.8 (2026-09-13, Richard's call): on a 1080p window that is
+## four screen pixels to an art pixel rather than five. The far end is the whole lake
+## again, on the same call: it was held in past that by `ZOOM_OUT_PULL` (1.68, the
+## argument being that a view of the whole basin is a map, not a game), which on 1080p
+## stopped the wheel a level short with the lake wider than the window. The levels on a
+## 1080p window are thirds, so there was no "a little further" to give — the next level
+## out is the one that fits the lake.
 const MIN_ZOOM := 0.22
-const MAX_ZOOM := 1.8
+const MAX_ZOOM := 1.5
 
 ## How much room is left round the lake at that far end, as a fraction of the basin. A
 ## shoreline drawn hard against the edge of the window reads as cropped.
@@ -74,15 +83,6 @@ const ZOOM_FIT_MARGIN := 0.04
 ## piers got small, and the thing the player is actually doing sat in the middle of a lot of
 ## scenery.
 const ZOOM_OUT_TILES := 4.0
-
-## And then held in by this much again: the far end of the wheel is this multiple of the zoom
-## that would fit the lake and its piers exactly.
-##
-## Over one, so the view stops before the whole basin is on screen. The lake is bigger than a
-## window at any size worth reading it at, and a zoom that fits all of it is a zoom at which
-## a bottle is three pixels — the whole-lake view is a map, and this is a game about looking
-## at the water in front of you.
-const ZOOM_OUT_PULL := 1.68
 
 ## And the same for the drag: the view may be pushed this fraction of the way out to where
 ## the ground runs out, rather than all of it.
@@ -1718,13 +1718,15 @@ func _near_level() -> int:
 	return maxi(floori(MAX_ZOOM * ART_PIXEL * _stretch() + 0.0001), 1)
 
 
-## The furthest level out: the one nearest the fitted zoom.
+## The furthest level out: the first one at or out past the fitted zoom, so the whole lake
+## and its piers are on screen there.
 ##
-## Nearest, not the first one out past it. On a stretched window the levels are a third or
-## a half apart, and rounding outward went all the way to a view of the whole basin — the
-## map `ZOOM_OUT_PULL` is there to stop.
+## Out past it, not nearest. On a stretched window the levels are a third or a half apart,
+## and the nearest level to the fit is as likely to be in from it as out — a far end at
+## which the lake is wider than the window is the far end not doing its job. Level one on a
+## window too small for any level to fit, as before.
 func _far_level() -> int:
-	return clampi(roundi(_fit_zoom() * ART_PIXEL * _stretch()), 1, _near_level())
+	return clampi(floori(_fit_zoom() * ART_PIXEL * _stretch() + 0.0001), 1, _near_level())
 
 
 ## The zooms at the two ends, for the tests.
@@ -1748,7 +1750,7 @@ func _fit_zoom() -> float:
 	var view := get_viewport_rect().size
 	if span.x <= 0.0 or span.y <= 0.0:
 		return MIN_ZOOM
-	return maxf(minf(view.x / span.x, view.y / span.y) * ZOOM_OUT_PULL, MIN_ZOOM)
+	return maxf(minf(view.x / span.x, view.y / span.y), MIN_ZOOM)
 
 
 func _set_menu(open: bool) -> void:

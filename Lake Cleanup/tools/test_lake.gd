@@ -231,26 +231,23 @@ func _stage_build() -> void:
 		_check(absf(per_art - roundf(per_art)) < 0.001, "the near zoom is a whole pixel level",
 			"%.3f screen px per art px" % per_art)
 	# The far end is worked out from the window rather than written down, so it is asked of
-	# the game and then checked against the basin, which is what the limit is really about.
-	#
-	# Not "the whole lake fits" any more. The view is deliberately held in past that (see
-	# `Lake.ZOOM_OUT_PULL`): a zoom that fits the whole basin is a zoom at which a bottle is
-	# three pixels. What has to hold is that pulling back still shows most of the lake and
-	# stops there — the wheel can neither lose the lake nor turn it into a map.
+	# the game and then checked against the basin, which is what the limit is really about:
+	# the whole lake on screen (2026-09-13 — it was held in past that by `ZOOM_OUT_PULL`
+	# for a while, and Richard asked for the lake back), and the wheel stopping there.
 	_main.call(&"_zoom_by", 0.0001)
 	var fit: float = _main.call(&"_fit_zoom")
 	var far: float = _main.call(&"_far_zoom")
 	_check(is_equal_approx(cam.zoom.x, far), "zooming out stops at the far limit",
 		"%.3f, far %.3f (fit %.3f)" % [cam.zoom.x, far, fit])
 	# The far level is at or out past the fitted zoom, except on a window too small for any
-	# level to fit, where it is level one — so "most of the lake" is scaled by how far level
+	# level to fit, where it is level one — so "the whole lake" is scaled by how far level
 	# one overshoots.
 	var span := Iso.basin_extent() * cam.zoom.x
 	var view := _main.get_viewport_rect().size
 	var shown := minf(view.x / span.x, view.y / span.y)
-	var wanted := 1.0 / Lake.ZOOM_OUT_PULL * minf(1.0, fit / cam.zoom.x)
+	var wanted := minf(1.0, fit / cam.zoom.x)
 	_check(shown >= wanted - 0.01,
-		"and most of the lake is on screen there",
+		"and the whole lake is on screen there",
 		"%.2f of it, wanted %.2f (lake %.0fx%.0f in %.0fx%.0f)" % [
 			shown, wanted, span.x, span.y, view.x, view.y
 		])

@@ -216,6 +216,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   angler, dog, boat and the rubbish's swell on the art-pixel grid, and Richard judged the game
   much better with it off (commit `91cc581`, reverted). The low-res SubViewport would give the
   same stepped motion, so it is not pursued either. Don't re-raise.
+  **The two ends** (2026-09-13, Richard's call): `MAX_ZOOM` 1.5 (was 1.8), four screen px
+  to an art px on 1080p rather than five; the far end is the first level at or out past
+  `_fit_zoom` — the whole lake and its piers on screen (level one on 1080p, the lake at
+  about 61% of the width). `ZOOM_OUT_PULL` (1.68, "the whole-lake view is a map") is
+  retired: on 1080p the levels are thirds, and it stopped the wheel a level short with the
+  lake wider than the window. `test_lake` checks both ends.
 - **The view comes home no faster than `Lake.HOME_SPEED`** (issue #19, 2026-09-13): the
   camera follows a point `CAST_LOOK` (0.45) of the way out to the net, so on the haul it
   came home at 0.45 of the reel speed and a reel upgrade was a camera upgrade. Now its step
