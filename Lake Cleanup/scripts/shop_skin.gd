@@ -15,8 +15,13 @@ const Style := preload("res://scripts/style.gd")
 const DogArt := preload("res://scripts/dog_art.gd")
 
 ## The boards, in the order they stand, and what each is called.
-const BOARDS: Array[StringName] = [&"net", &"boat", &"dog"]
-const TITLES := {&"net": "The net", &"boat": "The ferry", &"dog": "The dog"}
+const BOARDS: Array[StringName] = [&"net", &"boat", &"dog", &"market"]
+const TITLES := {&"net": "The net", &"boat": "The ferry", &"dog": "The dog", &"market": "The market"}
+
+## The market board's head is the money plate's own coin (`HudButtons.coin`), drawn from
+## nothing like the plate's: the game has no picture of money, and the board sells what
+## things are worth rather than a thing.
+const HudButtons := preload("res://scripts/hud_buttons.gd")
 
 ## How tall a row is drawn, and how short it may be squeezed to before a board gives up
 ## and drops one. A board grows a row at a time until it is as tall as the window allows,
@@ -28,9 +33,10 @@ const ROW_TALL := 50.0
 const ROW_LEAST := 40.0
 const ROW_GAP := 6.0
 
-## The three boards together, and the gap between them. Sized in the 1280-wide design
-## frame; a narrower window shrinks all three alike.
-const BOARDS_WIDE := 900.0
+## The four boards together, and the gap between them. Sized in the 1280-wide design
+## frame; a narrower window shrinks all four alike. 900 held three; the market board
+## (2026-09-13) took it to 1180, or a row's name and its tag met in the middle.
+const BOARDS_WIDE := 1180.0
 const BOARD_GAP := 44.0
 const BOARD_PAD := 14.0
 
@@ -44,7 +50,7 @@ const RIBBON_OVERHANG := 10.0
 ## How much of its slot each board's sprite fills. The net is a wide flat thing and fills
 ## the slot at 0.7; the ferry's region is the box round the drawn boat, and pixel art, so
 ## it is drawn at a whole number of pixels per art pixel and fills what that comes to.
-const SPRITE_FILL := {&"net": 0.7, &"boat": 1.0, &"dog": 0.8}
+const SPRITE_FILL := {&"net": 0.7, &"boat": 1.0, &"dog": 0.8, &"market": 0.62}
 
 ## The ferry on its board is under way: the bow wake it leaves in the lake runs beside it
 ## and the hull bobs a couple of pixels on a slow swell. The wake is laid exactly as the
@@ -438,6 +444,12 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 		var foot := Vector2(middle.x, slot.end.y - (slot.size.y - span.y) * 0.5)
 		_halo(Rect2(foot - Vector2(span.x * 0.5, span.y), span))
 		DogArt.stamp(self, _dog_pose, DogArt.frame_at(_dog_pose, _dog_age), foot, tall, true)
+		return
+	if board == &"market":
+		var side := slot.size.y * fill
+		var coin := Rect2(middle - Vector2.ONE * side * 0.5, Vector2.ONE * side)
+		_halo(coin)
+		HudButtons.coin(self, coin, Color.WHITE)
 		return
 	var lent: Dictionary = sprites.get(board, {})
 	var sheet: Texture2D = lent.get("sheet")

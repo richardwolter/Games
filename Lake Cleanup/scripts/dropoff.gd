@@ -184,6 +184,21 @@ var _drain_clock := 0.0
 var _front: Texture2D
 var _heap_rng := RandomNumberGenerator.new()
 
+## The Recycle Bonus is here (Lake._move_bonus): the yard wears the finds' own shine — the
+## column of gold light standing up out of the box and the stars over its face — for as
+## long as it pays over the odds. No new art: the shine a find wears, on the box that pays.
+var boosted: bool = false:
+	set(v):
+		boosted = v
+		if _shine != null:
+			_shine.visible = v
+			_shine.set_process(v)
+var _shine: Shine
+
+## The shine's column: how many box heights tall, and how many stars a second.
+const SHINE_TALL := 2.2
+const SHINE_STARS := 3.0
+
 
 func kind_name() -> String:
 	return TrashDef.KIND_NAMES[kind]
@@ -268,6 +283,20 @@ func swell() -> float:
 
 func _ready() -> void:
 	_dress()
+	_shine = Shine.new()
+	_shine.name = &"Shine"
+	_shine.yard = self
+	_shine.visible = boosted
+	_shine.set_process(boosted)
+	add_child(_shine)
+
+
+## Where the box is drawn, in world px, for the shine; empty with no art.
+func box_world() -> Rect2:
+	var book := _book()
+	if book.is_empty() or not book.has("box"):
+		return Rect2()
+	return _box_rect(book)
 
 
 ## The under layer, the collars and the sand, once: the posts do not move.
@@ -542,6 +571,77 @@ func _draw_blocked() -> void:
 ## and the sand banked over the dry posts' feet — drawn below the floating rubbish so a
 ## piece in front of a post is drawn over it. The collars are its children, in front of the
 ## posts. Redrawn every frame by the yard, because the wet shadow rides the swell.
+## The bonus shine over a yard's box: the beam through the finds' shader on this node, the
+## stars on a child with no material — a CanvasItem material applies to everything the
+## node draws, the same split GlintLayer makes. The beam stands at the finds' own height
+## over everything on the lake; the stars just over the yard.
+class Shine extends Node2D:
+	var yard: Dropoff
+	var age := 0.0
+	var _stars: Stars
+
+	func _init() -> void:
+		var mat := ShaderMaterial.new()
+		mat.shader = LakeGrid.BEAM_SHADER
+		material = mat
+		z_as_relative = false
+		z_index = 20
+		_stars = Stars.new()
+		_stars.name = &"Stars"
+		_stars.z_as_relative = false
+		_stars.z_index = 7
+		add_child(_stars)
+
+	func _process(delta: float) -> void:
+		age += delta
+		_stars.tick(delta, age, yard.box_world())
+		queue_redraw()
+		_stars.queue_redraw()
+
+	func _draw() -> void:
+		var box := yard.box_world()
+		if box.size.x <= 0.0:
+			return
+		var wide := box.size.x * 0.7
+		var tall := box.size.y * Dropoff.SHINE_TALL
+		var foot := Vector2(box.get_center().x, box.end.y - box.size.y * 0.15)
+		var beat := 0.5 + 0.5 * sin(age * LakeGrid.GLINT_BREATH + float(yard.kind) * 1.3)
+		var glow := LakeGrid.GLINT_TINT
+		glow.a = LakeGrid.BEAM_BRIGHT * (0.7 + 0.3 * beat)
+		draw_rect(Rect2(foot - Vector2(wide * 0.5, tall), Vector2(wide, tall)), glow)
+
+
+## The stars over the boosted box: the finds' own (`GlintTwinkle.draw_star`), popping at
+## random over the box's face and fading.
+class Stars extends Node2D:
+	# [spot in world px, born, big]
+	var _live: Array = []
+	var _rng := RandomNumberGenerator.new()
+	var _due := 0.0
+	var _age := 0.0
+
+	func tick(delta: float, age: float, box: Rect2) -> void:
+		_age = age
+		if box.size.x <= 0.0:
+			return
+		_due += delta * Dropoff.SHINE_STARS
+		while _due >= 1.0:
+			_due -= 1.0
+			var spot := box.position + Vector2(_rng.randf(), _rng.randf()) * box.size
+			_live.append([spot, age, _rng.randf() < 0.6])
+		_live = _live.filter(func(s: Array) -> bool:
+			return age - float(s[1]) < (LakeGrid.STAR_LIFE if s[2] else LakeGrid.SPARK_LIFE))
+
+	func _draw() -> void:
+		for star: Array in _live:
+			var big: bool = star[2]
+			var span := LakeGrid.STAR_LIFE if big else LakeGrid.SPARK_LIFE
+			var life := clampf((_age - float(star[1])) / span, 0.0, 1.0)
+			draw_set_transform(star[0], 0.0, Vector2.ONE)
+			LakeGrid.GlintTwinkle.draw_star(self, big, sin(life * PI))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 class Under extends Node2D:
 	var yard: Dropoff
 

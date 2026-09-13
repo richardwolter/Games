@@ -340,6 +340,15 @@ var range_tiles: float = 6.0
 var reel_speed: float = 3.0
 var hold: int = 3
 
+## A lucky haul (Lake._roll_luck): one tier more of lift and a few more in the bag, this
+## cast only. Cleared when the net comes home. `strength()` and `room_left()` read them.
+var luck_power: int = 0
+var luck_hold: int = 0
+
+## A helper net — the double cast's second net. It never plays the angler's throw or ends
+## it: that gesture belongs to the first net, which is still out when this one lands.
+var helper: bool = false
+
 ## Wired up by lake.gd. The net reads the tile field directly rather than asking the lake
 ## to fetch for it — it is the thing doing the catching.
 var grid: LakeGrid
@@ -686,7 +695,17 @@ func _compose_drag() -> void:
 ## Space left in this cast. The lake also caps this against the yard, so a full yard stops
 ## the net catching rather than throwing the catch away.
 func room_left() -> int:
-	return maxi(hold - catch.size(), 0)
+	return maxi(hold + luck_hold - catch.size(), 0)
+
+
+## The heaviest tier this cast lifts: the net's own, and the lucky haul's tier on top.
+func strength() -> int:
+	return power + luck_power
+
+
+## Is this cast a lucky one?
+func lucky() -> bool:
+	return luck_power > 0 or luck_hold > 0
 
 
 ## Put fire or ice on the net for a while. Extends whichever clock it names and leaves the
@@ -778,7 +797,8 @@ func cast_to(where: Vector2, laying: bool = false) -> bool:
 	_rope_now.resize(0)
 	# The angler's own throw — only ever a flourish: the net still flies on this same line at
 	# this same speed either way, see Angler.start_cast().
-	angler.start_cast()
+	if not helper:
+		angler.start_cast()
 	# A cast is one gesture from the throw to the catch coming out of the water. Nothing
 	# has to be held down for the second half of it.
 	_pulling = true
@@ -959,10 +979,10 @@ func _shove_aside(delta: float) -> void:
 		return
 	var at := world_pos()
 	var mouth := mouth_extent()
-	var pushed := _reach(at, mouth, power, 0, true)
+	var pushed := _reach(at, mouth, strength(), 0, true)
 	if room_left() <= 0:
 		# Nothing is being taken, so everything the mouth meets is in its way.
-		pushed.append_array(_reach(at, mouth, power))
+		pushed.append_array(_reach(at, mouth, strength()))
 	var clear := 1.0 + SHOVE_CLEAR / maxf(mouth, 1.0)
 	for index in pushed:
 		var rel := grid.surface_pos(index) - at
@@ -1042,7 +1062,7 @@ func _sweep() -> void:
 	# Asked again for each layer: what a take uncovers is a new piece at a new size and pose,
 	# and whether the mouth touches it is a new question.
 	for layer in SWEEP_LAYERS:
-		_take_from(_reach(at, mouth, power))
+		_take_from(_reach(at, mouth, strength()))
 
 
 ## Does a drawing — an ellipse at `centre` with half-extents `half`, in world pixels — touch a
@@ -1142,7 +1162,7 @@ func _take_from(reach: Array[int]) -> void:
 	for index in reach:
 		if room_left() <= 0:
 			return
-		var k := grid.reachable_slot(index, 1, power)
+		var k := grid.reachable_slot(index, 1, strength())
 		if k < 0:
 			continue
 		var at := grid.surface_pos(index)
@@ -1164,7 +1184,10 @@ func _take_from(reach: Array[int]) -> void:
 func _come_home() -> void:
 	state = State.IDLE
 	tile_pos = angler.tile_pos
-	angler.end_cast()
+	luck_power = 0
+	luck_hold = 0
+	if not helper:
+		angler.end_cast()
 	var lot := catch.duplicate()
 	catch.resize(0)
 	if not lot.is_empty():
@@ -1796,6 +1819,9 @@ func _belly() -> Vector2:
 ## paper's.
 func _draw_net(name: StringName, through: float, at: Vector2, mouth: float, ink: Color) -> void:
 	var tint := Color(ink.r, ink.g, ink.b, 0.92)
+	# A lucky cast is drawn in the finds' gold, so the roll is seen on the net itself.
+	if lucky():
+		tint = LakeGrid.GLINT_TINT.lerp(tint, 0.35)
 	# A net in the air is a picture; a net in the water is a thing being pulled. Only the
 	# second one bends, and only once there is something to bend it.
 	if state == State.FLYING or (_lean <= 0.001 and _load() <= 0.001):

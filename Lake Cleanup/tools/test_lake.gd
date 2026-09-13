@@ -96,22 +96,24 @@ func _physics_process(_delta: float) -> void:
 		11:
 			_stage_one_gesture()
 		12:
-			_stage_save()
+			_stage_market()
 		13:
-			_stage_settings()
+			_stage_save()
 		14:
-			_stage_ferry_art()
+			_stage_settings()
 		15:
-			_stage_art()
+			_stage_ferry_art()
 		16:
-			_stage_shed()
+			_stage_art()
 		17:
-			_stage_pigeons()
+			_stage_shed()
 		18:
-			_stage_ending()
+			_stage_pigeons()
 		19:
-			_stage_sun()
+			_stage_ending()
 		20:
+			_stage_sun()
+		21:
 			_stage_ending_on_load()
 		_:
 			pass
@@ -1227,6 +1229,8 @@ func _stage_save() -> void:
 		_yard.put(_def_of(TrashDef.Kind.PLASTIC))
 	_main.set(&"sludge", 4321.0)
 	_main.call(&"_buy", &"net_width")
+	_main.call(&"_buy", &"sell_3")
+	var sell_was: int = (_main.get(&"sell_levels") as PackedInt32Array)[3]
 	var pieces := _grid.piece_count()
 	var sludge_was := float(_main.get(&"sludge"))
 	var width_was := int(_main.get(&"net_width_level"))
@@ -1239,6 +1243,7 @@ func _stage_save() -> void:
 	# Spend and catch after saving, so a load that did nothing would be caught.
 	_main.set(&"sludge", 0.0)
 	_main.set(&"net_width_level", 0)
+	_main.set(&"sell_levels", PackedInt32Array([0, 0, 0, 0, 0]))
 	_yard.held.resize(0)
 	_grid.take(_deep_tile(), 0)
 
@@ -1247,6 +1252,9 @@ func _stage_save() -> void:
 		"%.0f" % float(_main.get(&"sludge")))
 	_check(int(_main.get(&"net_width_level")) == width_was, "the upgrades came back",
 		"net width %d" % int(_main.get(&"net_width_level")))
+	_check((_main.get(&"sell_levels") as PackedInt32Array)[3] == sell_was and sell_was > 0,
+		"and the market's tracks with them",
+		"heavy pieces %d" % (_main.get(&"sell_levels") as PackedInt32Array)[3])
 	_check(_yard.held.size() == yard_was, "the yard came back",
 		"%d of %d pieces" % [_yard.held.size(), yard_was])
 	_check(_grid.piece_count() == pieces, "the lake came back as it was left",
@@ -1256,6 +1264,117 @@ func _stage_save() -> void:
 	_check(float(_main.get(&"pollution")) < 1.0 and float(_main.get(&"pollution")) > 0.0,
 		"the meter was re-read from the field",
 		"%.5f" % float(_main.get(&"pollution")))
+	_advance()
+
+
+## The market board and the net's two luck tracks (2026-09-13): every track loads; a tier's
+## sell track raises that tier's pay and no other; the Recycle Bonus lands on one yard,
+## shines there, pays there only and moves on when its window ends; a pigeon is worth its
+## track; a lucky haul lifts a tier more and takes more, this cast only; a double cast has a
+## second net, a helper, that finds a nearby spot with rubbish on it.
+func _stage_market() -> void:
+	var tracks: Dictionary = _main.get(&"_upgrades")
+	var missing := []
+	for key in ["sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
+			"recycle_bonus", "bird_worth", "lucky_haul", "double_cast"]:
+		if not tracks.has(StringName(key)):
+			missing.append(key)
+	_check(missing.is_empty(), "every market and luck track loads", ", ".join(missing))
+	var boards := {}
+	for row: Dictionary in _main.call(&"_shop_rows") as Array:
+		boards[row["board"]] = int(boards.get(row["board"], 0)) + 1
+	_check(int(boards.get(&"market", 0)) == 7, "the market board has seven rows",
+		"%d" % int(boards.get(&"market", 0)))
+	_check(int(boards.get(&"net", 0)) == 7, "and the net's board has seven",
+		"%d" % int(boards.get(&"net", 0)))
+
+	_main.set(&"sludge", 100000.0)
+	var plain_2 := float(_main.call(&"tier_pay", 2))
+	var plain_3 := float(_main.call(&"tier_pay", 3))
+	_check(is_equal_approx(plain_2, 1.0), "pieces sell at par to begin with", "%.2f" % plain_2)
+	_main.call(&"_buy", &"sell_2")
+	_check(float(_main.call(&"tier_pay", 2)) > plain_2, "a tier's track raises its pay",
+		"%.2f" % float(_main.call(&"tier_pay", 2)))
+	_check(is_equal_approx(float(_main.call(&"tier_pay", 3)), plain_3),
+		"and no other tier's", "%.2f" % float(_main.call(&"tier_pay", 3)))
+
+	_check(int(_main.call(&"bonus_kind")) < 0, "no yard is boosted before the bonus is bought", "")
+	_main.call(&"_buy", &"recycle_bonus")
+	var kind := int(_main.call(&"bonus_kind"))
+	_check(kind >= 0, "the first level puts the bonus on a yard", "%d" % kind)
+	var lit := 0
+	var lit_kind := -1
+	for stop: Dropoff in _main.get(&"_dropoffs") as Array:
+		if stop.boosted:
+			lit += 1
+			lit_kind = stop.kind
+	_check(lit == 1 and lit_kind == kind, "and that yard alone shines", "%d lit, kind %d" % [lit, lit_kind])
+	var piece := _def_of(kind)
+	var other := (kind + 1) % TrashDef.Kind.size()
+	_check(float(_main.call(&"piece_pay", piece, kind)) > float(_main.call(&"piece_pay", piece, other)),
+		"a piece sold at the boosted yard pays more than at another", "")
+	_main.set(&"_bonus_left", 0.01)
+	_main.call(&"_tick_bonus", 0.1)
+	_check(int(_main.call(&"bonus_kind")) != kind and int(_main.call(&"bonus_kind")) >= 0,
+		"when the window ends the bonus moves to another yard", "%d" % int(_main.call(&"bonus_kind")))
+	_check(absf(float(_main.get(&"_bonus_left")) - Lake.BONUS_EVERY) < 0.001,
+		"for a fresh window", "%.1f" % float(_main.get(&"_bonus_left")))
+
+	var bird_was := float(_main.call(&"bird_pay"))
+	_main.call(&"_buy", &"bird_worth")
+	_check(float(_main.call(&"bird_pay")) > bird_was, "a pigeon is worth its track",
+		"%.0f from %.0f" % [float(_main.call(&"bird_pay")), bird_was])
+
+	var strength_was := _net.strength()
+	var room_was := _net.room_left()
+	_net.luck_power = 1
+	_net.luck_hold = Lake.LUCKY_EXTRA
+	_check(_net.strength() == strength_was + 1 and _net.room_left() == room_was + Lake.LUCKY_EXTRA,
+		"a lucky haul lifts a tier more and takes more", "%d, %d" % [_net.strength(), _net.room_left()])
+	_net.call(&"_come_home")
+	_check(not _net.lucky() and _net.strength() == strength_was, "and is over when the net comes home", "")
+
+	var second: CastNet = _main.get(&"_net2")
+	_check(second != null and second.helper and second.state == CastNet.State.IDLE and not second.visible,
+		"the double cast's net is a stowed helper", "")
+	# With a longer rod than the starting one: at a 3.4-tile throw the neighbourhood of a
+	# cast at the edge of the ring is mostly out of range or on the bare shelf, and a double
+	# cast that finds nothing there throws nothing — by design, not a failure.
+	var range_was := int(_main.get(&"net_range_level"))
+	_main.set(&"net_range_level", 8)
+	_main.call(&"_push_net_numbers")
+	var where := _water_near_angler()
+	var spot: Vector2 = _main.call(&"_double_spot", Iso.world_to_tile(where))
+	if spot == Vector2.INF:
+		var t := Iso.world_to_tile(where)
+		var n_reach := 0
+		var n_cast := 0
+		var n_in := 0
+		for ty in range(int(t.y) - 4, int(t.y) + 5):
+			for tx in range(int(t.x) - 4, int(t.x) + 5):
+				var tile := Vector2(float(tx) + 0.5, float(ty) + 0.5)
+				var away := tile.distance_to(t)
+				if away > Lake.DOUBLE_NEAR or away < Lake.DOUBLE_APART:
+					continue
+				n_in += 1
+				if _grid.reachable_slot(_grid.index_of(tx, ty), 1, _net.power) >= 0:
+					n_reach += 1
+				if second.can_cast_to(Iso.tile_to_world(tile.x, tile.y)):
+					n_cast += 1
+		_log("  double_spot: in %d reach %d cast %d, power %d range %.1f angler %s target %s" % [
+			n_in, n_reach, n_cast, _net.power, second.range_tiles, second.angler != null, t])
+	_check(spot != Vector2.INF, "a second net finds a spot near the first", "")
+	if spot != Vector2.INF:
+		var away := spot.distance_to(Iso.world_to_tile(where))
+		_check(away <= Lake.DOUBLE_NEAR and away >= Lake.DOUBLE_APART,
+			"near it but not on it", "%.2f tiles" % away)
+		_check(second.cast_to(Iso.tile_to_world(spot.x, spot.y)) and second.state == CastNet.State.FLYING,
+			"and can be thrown there", "")
+		second.state = CastNet.State.IDLE
+		second.catch.resize(0)
+	_main.set(&"net_range_level", range_was)
+	_main.call(&"_push_net_numbers")
+	_main.set(&"sludge", 0.0)
 	_advance()
 
 

@@ -1063,6 +1063,51 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   one coin of the purchase sound, no more than one per `CHINK_GAP`). `test_lake` guards the
   aim, the sign, the heap and its drain, and the coins' cap and carry.
 
+### The Market Board and the Luck Tracks (2026-09-13, old shop only)
+Five upgrades built from what the game already had, no new art, decided with `/grill-me`
+(Richard: skimmer stays cut; helper, idle and tree-mode upgrades out of scope; **old shop
+only**, the tree run sells at par and rolls no luck). Nine tracks, all `UpgradeTrack`
+`.tres` under `resources/upgrades/`, in `UPGRADE_ORDER`/`TRACKS`, saved under `levels`
+like the rest (no `SAVE_VERSION` bump: a missing key reads as level 0).
+- **The market** is a fourth drawn board (`ShopSkin.BOARDS` `&"market"`, head the money
+  plate's own coin through `HudButtons.coin`; `BOARDS_WIDE` 900 to 1180 for it):
+  - **Sell by weight tier** — `sell_0`..`sell_4`, one per `TrashDef.tier`, named by
+    `Lake.TIER_NAMES` (Light/Small/Medium/Heavy/Bulky); each multiplies that tier's pay
+    and no other's (`tier_pay`). Heavier tiers cost more to start.
+  - **Recycle Bonus** — `recycle_bonus`. Once the first level is owned one yard is always
+    boosted, and every `BONUS_EVERY` (30 s, **fixed**: the upgrade raises the bonus, never
+    the time) it hops to a *different* yard (`_move_bonus`). **Counts at the sale**: a piece
+    landing at the boosted yard inside the window, whenever it was netted (Richard's call
+    over tagging at the catch). Shown in the world with **the finds' own shine on the box**
+    (`Dropoff.boosted`, `Dropoff.Shine`/`Stars`: the beam shader column and
+    `GlintTwinkle.draw_star`), no HUD timer; the shop row says which yard and how long.
+    Not saved — a load rolls a fresh yard.
+  - **Pigeons** — `bird_worth`, a multiplier on `EconomyConfig.bird_bonus` (`bird_pay`).
+    Bird count unchanged, by decision.
+- **On the net's board**:
+  - **Lucky haul** — `lucky_haul`, odds per cast. Rolled in `Lake._roll_luck` after the
+    throw; the net carries `luck_power` 1 and `luck_hold` `LUCKY_EXTRA` (4) **for that cast
+    only** (`CastNet.strength()`/`room_left()`, cleared in `_come_home`), and is drawn in
+    the finds' gold while it does. The aim marker reads the plain `power`.
+  - **Double cast** — `double_cast`, odds per cast. A second `CastNet` (`Lake._net2`,
+    `helper = true`: it never plays or ends the angler's throw, hidden while stowed so it
+    draws no second ring) is thrown the same moment at `_double_spot`: a tile within
+    `DOUBLE_NEAR` (4) of the first net's target, at least `DOUBLE_APART` (1.5) from it,
+    with a liftable piece on top, inside the angler's range. **Own hold** (Richard's call, so
+    it stays useful once every cast fills the bag). None found, no second net — luck on
+    bare water throws nothing, which at the starting 3.4-tile range is most of the time.
+    The camera frames the first net only.
+- Pay is one function now: `Lake.piece_pay(def, kind)` = flat + filth, times the tier's
+  track, times the bonus at that yard. Both sale paths (`_on_haul_arrived`, the ferry's
+  `sold`) go through `_on_sold` into it.
+- **Open**: numbers are first guesses, untuned in play; the `economy_config.gd` comment
+  claiming heavy pieces outearn light ones is still contradicted by the data (~13%) — the
+  per-tier tracks are the knob that can make it true. Row text is not clipped
+  (`ShopSkin._draw_row`): a long name still runs under its tag, as the dog's did before.
+- Tests: `test_lake`'s `_stage_market` (tracks load, seven rows a board, tier pay, bonus
+  placement/shine/pay/hop, bird pay, luck fields and their clearing, the helper net and its
+  spot); `_stage_save` round-trips a sell level.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

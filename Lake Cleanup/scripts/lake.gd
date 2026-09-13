@@ -401,6 +401,18 @@ var fleet_level: int = 0
 var dog_fetch_level: int = 0
 var dog_wait_level: int = 0
 
+## The market board (2026-09-13): what a piece of each weight tier sells for, one track per
+## tier (`sell_0`..`sell_4`, in TrashDef.tier order); the Recycle Bonus, one yard at a time
+## paying over the odds for `BONUS_EVERY` seconds before the bonus moves on; and what a
+## netted pigeon is worth. Plus two more on the net's board: the odds of a lucky haul (one
+## tier deeper and a few more in the bag, that cast only) and of a double cast (a second net
+## thrown alongside the first at a nearby spot with rubbish on it, its own hold).
+var sell_levels := PackedInt32Array([0, 0, 0, 0, 0])
+var recycle_bonus_level: int = 0
+var bird_worth_level: int = 0
+var lucky_haul_level: int = 0
+var double_cast_level: int = 0
+
 ## Pieces landed on the island, ever, and pieces sold. Two numbers because they are two
 ## different achievements now.
 var caught: int = 0
@@ -525,8 +537,34 @@ const UPGRADE_ORDER := [
 	"net_width", "net_strength", "net_range", "reel", "net_hold",
 	"boat_speed", "cargo", "fleet",
 	"dog_fetch", "dog_wait",
+	"sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
+	"recycle_bonus", "bird_worth", "lucky_haul", "double_cast",
 ]
 var _upgrades: Dictionary = {}
+
+## The Recycle Bonus: which material's yard is paying over the odds right now (-1 until the
+## first level is bought), and how long it has left before the bonus moves to another yard.
+## Only the sale counts — a piece landed at the boosted yard inside the window, whenever it
+## was netted — and the window is fixed: the upgrade raises the bonus, never the time.
+## Not saved: it is a clock, and a load starts it again.
+const BONUS_EVERY := 30.0
+var _bonus_kind: int = -1
+var _bonus_left: float = 0.0
+
+## The luck rolls — lucky haul and double cast — on their own generator, so they change
+## nothing about the pigeon's timing or the lake's fill.
+var _luck_rng := RandomNumberGenerator.new()
+## How many more pieces a lucky haul's bag takes, that cast only.
+const LUCKY_EXTRA := 4
+## How far from where the first net lands the second one may land, in tiles, and how close
+## to the first it may not: a second net on top of the first is one net drawn twice.
+const DOUBLE_NEAR := 4.0
+const DOUBLE_APART := 1.5
+
+## The second net: thrown by a double cast, reeled in like the first, landing its own catch
+## in the yard through the same signals. Made in `_ready`, hidden whenever it is stowed so
+## it does not draw a second range ring and marker under the angler's feet.
+var _net2: CastNet
 
 ## Seconds until the next autosave, and what the HUD says about the last one.
 var _autosave_in: float = AUTOSAVE_EVERY
@@ -737,6 +775,44 @@ func skim_hold() -> int:
 	return _skim_level()
 
 
+## What a piece of weight tier `tier` sells for, as a multiple of its plain pay.
+## resources/upgrades/sell_N.tres. Tree runs have no market board and sell at par.
+func tier_pay(tier: int) -> float:
+	if tree_mode:
+		return 1.0
+	var t := clampi(tier, 0, sell_levels.size() - 1)
+	return _upgrades[StringName("sell_%d" % t)].value(sell_levels[t])
+
+
+## How much over the odds the boosted yard pays, as a fraction (0.25 is +25%).
+## resources/upgrades/recycle_bonus.tres.
+func recycle_bonus() -> float:
+	if tree_mode:
+		return 0.0
+	return _upgrades[&"recycle_bonus"].value(recycle_bonus_level)
+
+
+## What a netted pigeon pays. resources/upgrades/bird_worth.tres times the economy's bonus.
+func bird_pay() -> float:
+	if tree_mode:
+		return _economy.bird_bonus
+	return _economy.bird_bonus * _upgrades[&"bird_worth"].value(bird_worth_level)
+
+
+## Odds that a cast is a lucky one. resources/upgrades/lucky_haul.tres.
+func lucky_chance() -> float:
+	if tree_mode:
+		return 0.0
+	return _upgrades[&"lucky_haul"].value(lucky_haul_level)
+
+
+## Odds that a cast throws a second net. resources/upgrades/double_cast.tres.
+func double_cast_chance() -> float:
+	if tree_mode:
+		return 0.0
+	return _upgrades[&"double_cast"].value(double_cast_level)
+
+
 ## How many slots down the skimmer digs for the material it is running out. More than one,
 ## always: it is looking for one material in particular, and on the way to the sawmill most
 ## of what is floating on top is not wood.
@@ -894,6 +970,24 @@ func _ready() -> void:
 	_net.landed.connect(_on_net_landed)
 	_net.caught.connect(_on_net_caught)
 	_net.caught_bird.connect(_on_bird_caught)
+
+	# The double cast's net: the first one over again, on the same signals, but a helper —
+	# it never plays the angler's throw or ends it, that is the first net's gesture.
+	_net2 = CastNet.new()
+	_net2.name = &"Net2"
+	_net2.helper = true
+	_net2.z_as_relative = false
+	_net2.z_index = _net.z_index
+	_net2.grid = _grid
+	_net2.splash = _splash
+	_net2.sfx = _sfx
+	_net2.angler = _angler
+	_net2.flock = _flock
+	_net2.visible = false
+	_net2.landed.connect(_on_net_landed)
+	_net2.caught.connect(_on_net_caught)
+	_net2.caught_bird.connect(_on_bird_caught)
+	add_child(_net2)
 
 	# The ferry lives on the island's south side and works its way round the bank from
 	# there, calling at whichever merchants its load is for.
@@ -1684,10 +1778,53 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 		# Watching the cast is worth more than whatever the player had panned over to look
 		# at, and they can always pan back.
 		_pan_yielded = true
+		if not laying:
+			_roll_luck(where)
 		if tree_mode:
 			var since := -1.0 if _tree_last_cast < 0.0 else snappedf(_tree_play - _tree_last_cast, 0.01)
 			TreeLog.write("cast", _tree_play, {"since_last": since})
 			_tree_last_cast = _tree_play
+
+
+## The two luck rolls on a cast just thrown. A lucky haul goes on the net itself, for this
+## cast only (`CastNet.luck_power`/`luck_hold`, cleared when it comes home). A double cast
+## throws the second net at a spot near the first with rubbish on it — none found, no
+## second net: luck that lands on bare water is a net thrown at nothing.
+func _roll_luck(where: Vector2) -> void:
+	if _luck_rng.randf() < lucky_chance():
+		_net.luck_power = 1
+		_net.luck_hold = LUCKY_EXTRA
+	if _net2 == null or _net2.state != CastNet.State.IDLE:
+		return
+	if _luck_rng.randf() >= double_cast_chance():
+		return
+	var spot := _double_spot(Iso.world_to_tile(where))
+	if spot != Vector2.INF:
+		_net2.cast_to(Iso.tile_to_world(spot.x, spot.y))
+
+
+## Somewhere for the second net to land: a tile within `DOUBLE_NEAR` of the first net's
+## target and at least `DOUBLE_APART` from it, with a piece on top the net can lift, that
+## the angler could have thrown at. One picked at random from all of them, or INF.
+func _double_spot(target: Vector2) -> Vector2:
+	var found: Array[Vector2] = []
+	var span := int(ceil(DOUBLE_NEAR))
+	var cx := int(floor(target.x))
+	var cy := int(floor(target.y))
+	for ty in range(maxi(cy - span, 0), mini(cy + span + 1, Iso.ROWS)):
+		for tx in range(maxi(cx - span, 0), mini(cx + span + 1, Iso.COLS)):
+			var tile := Vector2(float(tx) + 0.5, float(ty) + 0.5)
+			var away := tile.distance_to(target)
+			if away > DOUBLE_NEAR or away < DOUBLE_APART:
+				continue
+			if _grid.reachable_slot(_grid.index_of(tx, ty), 1, net_power()) < 0:
+				continue
+			if not _net2.can_cast_to(Iso.tile_to_world(tile.x, tile.y)):
+				continue
+			found.append(tile)
+	if found.is_empty():
+		return Vector2.INF
+	return found[_luck_rng.randi_range(0, found.size() - 1)]
 
 
 ## Is the angler standing at the shed?
@@ -2094,6 +2231,8 @@ func _hold_the_angler() -> void:
 	# itself in the moment the water is in front of the player again. Nothing is held down,
 	# so nothing is dropped by opening the shed mid-cast.
 	_net.set_pulling(not busy)
+	if _net2 != null:
+		_net2.set_pulling(not busy)
 
 
 ## The music: one long track, looped, started the moment the lake is, and started twice.
@@ -2278,7 +2417,7 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 ## any merchant buys, and it was never part of the lake's filth — so the meter does not
 ## move for it either.
 func _on_bird_caught(at: Vector2) -> void:
-	sludge += _economy.bird_bonus
+	sludge += bird_pay()
 	birds_caught += 1
 	if _splash != null:
 		_splash.splash(at, 0.55)
@@ -2289,7 +2428,7 @@ func _on_bird_caught(at: Vector2) -> void:
 	if _pop_rng.randf() >= POP_ODDS:
 		return
 	if _pigeon != null:
-		_pigeon.pop(roundi(_economy.bird_bonus))
+		_pigeon.pop(roundi(bird_pay()))
 	if _sfx != null:
 		_sfx.play_coo()
 
@@ -2389,9 +2528,50 @@ func _keep(def: TrashDef) -> void:
 ## second case is counted below, because it left the lake when the skimmer took it.
 func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 	for i in cargo.size():
-		sludge += _economy.piece_base_pay + _grid.defs[cargo[i]].pollution * _economy.piece_filth_pay
+		sludge += piece_pay(cargo[i], kind)
 		sold_count += 1
 	sold_by_kind[kind] += cargo.size()
+
+
+## What one piece pays landed at the `kind` yard right now: the flat fee and the filth cut
+## (`EconomyConfig`), times its weight tier's sell track, times the Recycle Bonus if that
+## yard is the boosted one this moment.
+func piece_pay(def_index: int, kind: int) -> float:
+	var def := _grid.defs[def_index]
+	var pay := _economy.piece_base_pay + def.pollution * _economy.piece_filth_pay
+	pay *= tier_pay(def.tier)
+	if kind == _bonus_kind:
+		pay *= 1.0 + recycle_bonus()
+	return pay
+
+
+## The Recycle Bonus moves on: another yard than the one it was at, for a fresh window.
+## Never the same yard twice running, so the bonus is seen to travel.
+func _move_bonus() -> void:
+	_bonus_left = BONUS_EVERY
+	if _dropoffs.is_empty():
+		_bonus_kind = -1
+		return
+	var others: Array[Dropoff] = _dropoffs.filter(func(d: Dropoff) -> bool: return d.kind != _bonus_kind)
+	if others.is_empty():
+		others = _dropoffs
+	_bonus_kind = others[_luck_rng.randi_range(0, others.size() - 1)].kind
+	for stop: Dropoff in _dropoffs:
+		stop.boosted = stop.kind == _bonus_kind
+
+
+## The bonus clock, ticked every frame once the first level is owned.
+func _tick_bonus(delta: float) -> void:
+	if _bonus_kind < 0:
+		return
+	_bonus_left -= delta
+	if _bonus_left <= 0.0:
+		_move_bonus()
+
+
+## Which material's yard the Recycle Bonus is at, or -1 for none.
+func bonus_kind() -> int:
+	return _bonus_kind
 
 
 ## A piece the ferry's skimmer took out of the water on its way past. It left the lake
@@ -2418,7 +2598,12 @@ const TRACKS := [
 	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
 	&"boat_speed", &"cargo", &"skimmer", &"fleet",
 	&"dog_fetch", &"dog_wait",
+	&"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4",
+	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
+
+## What the market board calls each weight tier's sell track.
+const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 
 
 ## How many upgrades could be bought right now. Drawn on the HUD's upgrades button, so that
@@ -2458,7 +2643,26 @@ func _shop_rows() -> Array:
 		[&"dog_wait", &"dog", "Keenness", "waits %.0fs at most" % maxf(
 			Dog.MOOD_MOST - dog_wait_cut(), Dog.MOOD_LEAST
 		)],
+		[&"lucky_haul", &"net", "Lucky haul", "%d%%: +1 tier, +%d held" % [
+			roundi(lucky_chance() * 100.0), LUCKY_EXTRA
+		]],
+		[&"double_cast", &"net", "Double cast", "%d%%: second net" % roundi(
+			double_cast_chance() * 100.0
+		)],
 	]
+	for tier in sell_levels.size():
+		listed.append([
+			StringName("sell_%d" % tier), &"market", TIER_NAMES[tier],
+			"sells x%.2f" % tier_pay(tier),
+		])
+	listed.append([&"recycle_bonus", &"market", "Recycle Bonus", (
+		"off" if recycle_bonus_level <= 0
+		else "+%d%% %s, %ds" % [
+			roundi(recycle_bonus() * 100.0), TrashDef.KIND_NAMES[_bonus_kind].to_lower(),
+			ceili(_bonus_left),
+		]
+	)])
+	listed.append([&"bird_worth", &"market", "Pigeons", "$%d a bird" % roundi(bird_pay())])
 	for line: Array in listed:
 		var key: StringName = line[0]
 		var full := is_maxed(key)
@@ -2486,11 +2690,14 @@ func _shop_rows() -> Array:
 ## draws the range it was built with — which on a loaded save is a ring for somebody else's
 ## rod. It is the first thing on screen and it was the one thing lying about the save.
 func _push_net_numbers() -> void:
-	_net.radius = net_radius()
-	_net.power = net_power()
-	_net.range_tiles = net_range()
-	_net.reel_speed = reel_speed()
-	_net.hold = net_hold()
+	for net: CastNet in [_net, _net2]:
+		if net == null:
+			continue
+		net.radius = net_radius()
+		net.power = net_power()
+		net.range_tiles = net_range()
+		net.reel_speed = reel_speed()
+		net.hold = net_hold()
 
 
 ## The day, onto the things that show it.
@@ -2576,8 +2783,26 @@ func _level_of(what: StringName) -> int:
 			return dog_fetch_level
 		&"dog_wait":
 			return dog_wait_level
+		&"recycle_bonus":
+			return recycle_bonus_level
+		&"bird_worth":
+			return bird_worth_level
+		&"lucky_haul":
+			return lucky_haul_level
+		&"double_cast":
+			return double_cast_level
 		_:
-			return 0
+			var tier := _sell_tier(what)
+			return sell_levels[tier] if tier >= 0 else 0
+
+
+## Which weight tier a `sell_N` track is for, or -1 for any other track.
+func _sell_tier(what: StringName) -> int:
+	var key := String(what)
+	if not key.begins_with("sell_"):
+		return -1
+	var tier := key.trim_prefix("sell_").to_int()
+	return tier if tier >= 0 and tier < sell_levels.size() else -1
 
 
 ## Whether a track has sold everything it has. The board, the old buttons and the buy
@@ -2622,6 +2847,21 @@ func _buy(what: StringName) -> void:
 			dog_fetch_level += 1
 		&"dog_wait":
 			dog_wait_level += 1
+		&"recycle_bonus":
+			recycle_bonus_level += 1
+			# The first level starts the clock: until then no yard is boosted.
+			if _bonus_kind < 0:
+				_move_bonus()
+		&"bird_worth":
+			bird_worth_level += 1
+		&"lucky_haul":
+			lucky_haul_level += 1
+		&"double_cast":
+			double_cast_level += 1
+		_:
+			var tier := _sell_tier(what)
+			if tier >= 0:
+				sell_levels[tier] += 1
 	# After the level goes on, not before: the sound is the purchase landing, and a buy that
 	# fell through above has already returned without making one. The sparkle over the
 	# board's sprite is the same receipt for the eye.
@@ -2951,6 +3191,9 @@ func _process(delta: float) -> void:
 	_part_the_fleet(delta)
 	_fade_radio(delta)
 	_remap_filth(delta)
+	_tick_bonus(delta)
+	if _net2 != null:
+		_net2.visible = _net2.state != CastNet.State.IDLE
 	# The camera follows the angler rather than being panned: the arrow keys are theirs
 	# now, and a view that has to be driven separately from the character is two jobs for
 	# one pair of hands. While a cast is out it drifts off them and onto the net.
@@ -3487,6 +3730,10 @@ func save_game() -> bool:
 			"boat_speed": boat_speed_level, "cargo": cargo_level,
 			"skimmer": skimmer_level, "fleet": fleet_level,
 			"dog_fetch": dog_fetch_level, "dog_wait": dog_wait_level,
+			"sell_0": sell_levels[0], "sell_1": sell_levels[1], "sell_2": sell_levels[2],
+			"sell_3": sell_levels[3], "sell_4": sell_levels[4],
+			"recycle_bonus": recycle_bonus_level, "bird_worth": bird_worth_level,
+			"lucky_haul": lucky_haul_level, "double_cast": double_cast_level,
 		},
 		"caught": caught,
 		"sold_count": sold_count,
@@ -3560,6 +3807,17 @@ func load_game() -> bool:
 	skimmer_level = _saved_level(levels, &"skimmer")
 	dog_fetch_level = _saved_level(levels, &"dog_fetch")
 	dog_wait_level = _saved_level(levels, &"dog_wait")
+	for tier in sell_levels.size():
+		sell_levels[tier] = _saved_level(levels, StringName("sell_%d" % tier))
+	recycle_bonus_level = _saved_level(levels, &"recycle_bonus")
+	bird_worth_level = _saved_level(levels, &"bird_worth")
+	lucky_haul_level = _saved_level(levels, &"lucky_haul")
+	double_cast_level = _saved_level(levels, &"double_cast")
+	# The bonus clock starts over on a load; which yard it lands on first is the roll's.
+	_bonus_kind = -1
+	_bonus_left = 0.0
+	if recycle_bonus_level > 0:
+		_move_bonus()
 
 	sludge = float(save.get("sludge", 0.0))
 	caught = int(save.get("caught", 0))
@@ -3648,11 +3906,16 @@ func load_game() -> bool:
 	_angler.stand_at(save.get("angler", _angler.tile_pos) as Vector2)
 	if _trophy != null:
 		_trophy.clear()
-	_net.set_pulling(false)
-	_net.state = CastNet.State.IDLE
-	_net.catch.resize(0)
+	for net: CastNet in [_net, _net2]:
+		if net == null:
+			continue
+		net.set_pulling(false)
+		net.state = CastNet.State.IDLE
+		net.catch.resize(0)
+		net.luck_power = 0
+		net.luck_hold = 0
+		net.tile_pos = _angler.tile_pos
 	_push_net_numbers()
-	_net.tile_pos = _angler.tile_pos
 	_push_boat_numbers()
 	_push_dog_numbers()
 
