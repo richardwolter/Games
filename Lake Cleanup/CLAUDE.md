@@ -1226,6 +1226,9 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   beam at the lake's beam z with its own breath clock, the stars over the mesh with no
   material. `GlintTwinkle.sample_spots`/`draw_star` are static so the two twinkle layers
   are one drawing. Cleared on idle. Not carried on to the hold or the dog.
+- **Third pass** (Richard: the beam sank into the water, above all when buried): a pale
+  core (`core_white`) up the middle of the column, firmer sides (`soft_side` 0.55),
+  `BEAM_BRIGHT` 0.85 / `BEAM_FAINT` 0.45 / `BEAM_SUNK_TALL` 0.6.
 - **Retired, by decision**: the radial glow disc (`glint.gdshader`, `GlintGlow`), the
   32-frame sparkle sheet laid flat round the piece (`GlintSparkle`,
   `Sparkle_Effect_Decorations_v2.png` — Richard: speckles, not sparkles) and the specular

@@ -91,9 +91,9 @@ const GLINT_BREATH := 2.3
 ## out once from the defs (`GlintBeam.width`), so a lamp and a sofa throw the same column.
 const BEAM_SHADER := preload("res://shaders/beam.gdshader")
 const BEAM_TALL := 2.5
-const BEAM_SUNK_TALL := 0.5
-const BEAM_BRIGHT := 0.55
-const BEAM_FAINT := 0.14
+const BEAM_SUNK_TALL := 0.6
+const BEAM_BRIGHT := 0.85
+const BEAM_FAINT := 0.45
 ## How far under the waterline the column's foot starts, so with the shader's soft foot it
 ## comes up out of the water rather than standing on a line cut across it.
 const BEAM_SINK := 8.0

@@ -16,7 +16,10 @@ render_mode blend_add;
 // How far in from each side the column is at full strength (0 = a hard-edged bar,
 // 1 = a soft spike). How steeply it fades toward the top. How strong the streaks are
 // against the body and how fast they climb.
-uniform float soft_side : hint_range(0.0, 1.0) = 0.75;
+uniform float soft_side : hint_range(0.0, 1.0) = 0.55;
+// How far the middle of the column goes towards white: a plain gold wash sinks into
+// green water, a pale core reads as light against it.
+uniform float core_white : hint_range(0.0, 1.0) = 0.6;
 uniform float fade_up : hint_range(0.5, 4.0) = 1.7;
 // How much of the height the foot fades in over, so the column comes up out of the water
 // rather than starting on a hard line at it.
@@ -41,5 +44,7 @@ void fragment() {
 	float thread = blob_noise(vec2(UV.x * 9.0 + phase, UV.y * 2.5 - TIME * climb));
 	float lines = smoothstep(0.55, 0.95, thread);
 	float body = (1.0 - streak) + streak * lines;
-	COLOR = vec4(COLOR.rgb, COLOR.a * side * tall * foot * body);
+	float core = 1.0 - smoothstep(0.0, 0.5, across);
+	vec3 tint = mix(COLOR.rgb, vec3(1.0), core * core_white * tall);
+	COLOR = vec4(tint, COLOR.a * side * tall * foot * body);
 }
