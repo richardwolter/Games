@@ -286,6 +286,36 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   clean**, and the rubbish-free band round the island is a plain clean ring. Rejected on the
   way here: a pollution-over-capacity box blur (lone pieces floated on blue, green spread
   over empty water), a weighted blur, and a fill that made the island's band foul.
+- **A catch opens a clean patch** (`Lake._on_net_swept`, `patch_radius`, `_push_patches`,
+  `water.gdshader` `patches[8]`/`patch_seeds`, 2026-09-13, Richard: "a glimpse of the cleaned
+  lake before the grime sets in again"). The map is presence-only, and most casts lift the top
+  piece off a stack with junk still under it, so most casts moved no water at all. Now every
+  sweep that takes something (`CastNet.swept`, one per sweep, after its `caught`s) opens a
+  patch of clean water at the mouth: the mouth's own extent plus `PATCH_REACH` (3) tiles in
+  proportion to how much of the hold it took, opening over `PATCH_IN` (0.8 s, the closing
+  run backwards), whole for `PATCH_HOLD` of `PATCH_LIFE` (5 s, up from 2: "more slowly")
+  and then closing, both ends eased. **Not a disc and not the net's ring**
+  (Richard, same day, twice: the first noise pass was "still too round" with grime spots
+  showing inside a fresh patch): the plane is **domain-warped** by a noise rolled per catch
+  (`patch_seeds`, `_patch_rng`, `patch_warp`) before the distance is measured, so the outline
+  is curved lobes and inlets; a fresh patch is clear right through (the threshold starts
+  under the field's floor); and as it closes the threshold climbs through a **ridged** noise
+  on the bent plane (`patch_top`), so the grime comes back as curved threads along the ridge
+  lines that thicken and run into each other, the last clean water being the ground between
+  them near the middle. The grime gathers; nothing shrinks as a ring. Knobs: `patch_blotch`
+  (cell size, world px), `patch_warp` (bend, fraction of radius), `patch_shape` (how deep the
+  threads cut), `patch_top`,
+  `patch_soft`. In the shader the patch takes `filth` to zero **before** the cutoffs, so
+  it inherits the stepped ramps, blotch wobble and stagger like any clean bay — no colour
+  laid over the water, no sparkle. **A transient lie, by decision**: the one exception to
+  "water touching objects looks grimy"; its end state is always the map's value, so an honest
+  clear is revealed under the shrinking patch, not replaced. Nets only (both nets). **Every
+  sweep is its own patch with its own roll** (Richard, same day): a reel that took on its
+  way home used to grow the one patch it had, repeating the same shape at every grab; now
+  each grab is a new pool, and the cap keeps a long drag from piling them up. Dog and ferry takes
+  leave the water alone. Not saved. Capped at `PATCHES` (8), oldest replaced. Numbers are a
+  first guess for Richard to retune by eye. `test_lake` guards the landing, the sizing, the
+  closing and the cap.
 - **Blotch noise and stagger, low** (`murk_wobble` 0.1, `state_spread` 0.1): removed once
   because at 0.28 the blobs read as water leaking from under the island, then put back at
   under half that (2026-09-11) because with the cutoffs read straight off the map the

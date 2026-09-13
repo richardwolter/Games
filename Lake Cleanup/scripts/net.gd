@@ -26,6 +26,12 @@ signal landed(cargo: PackedInt32Array)
 ## lake reads its pollution off this rather than off the haul arriving home.
 signal caught(def_index: int)
 
+## A sweep of the mouth that lifted rubbish: where the mouth was, in world coordinates,
+## how many pieces it took, and how far it reached. One per sweep, after every piece in
+## it has been `caught` — the lake opens its clean patch off this rather than off the
+## pieces one by one.
+signal swept(at: Vector2, taken: int, hold: int, mouth: float)
+
 ## A pigeon the net closed on, in world coordinates. Paid for on the spot rather than
 ## carried home: a bird is not cargo, and it is certainly not going in the yard.
 signal caught_bird(at: Vector2)
@@ -1061,8 +1067,11 @@ func _sweep() -> void:
 		return
 	# Asked again for each layer: what a take uncovers is a new piece at a new size and pose,
 	# and whether the mouth touches it is a new question.
+	var before := catch.size()
 	for layer in SWEEP_LAYERS:
 		_take_from(_reach(at, mouth, strength()))
+	if catch.size() > before:
+		swept.emit(at, catch.size() - before, hold + luck_hold, mouth)
 
 
 ## Does a drawing — an ellipse at `centre` with half-extents `half`, in world pixels — touch a

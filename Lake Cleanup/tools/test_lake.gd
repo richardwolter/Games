@@ -115,6 +115,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_sun()
 		21:
 			_stage_ending_on_load()
+		22:
+			_stage_patch()
 		_:
 			pass
 
@@ -440,6 +442,13 @@ func _stage_cast() -> void:
 	# way back with whatever it landed on.
 	_check(_net.state == CastNet.State.REELING, "the net reels itself in from where it lands",
 		"after %d frames" % _in_stage)
+	var patches: Array = _main.get(&"_patches")
+	_check(not patches.is_empty(), "the landing opened a clean patch at the mouth",
+		"%d patches" % patches.size())
+	if not patches.is_empty():
+		var patch: Dictionary = patches[0]
+		_check(patch["at"] is Vector2 and float(patch["radius"]) >= _net.mouth_extent(),
+			"at least the mouth wide", "%.1f against %.1f" % [float(patch["radius"]), _net.mouth_extent()])
 	_advance()
 
 
@@ -2339,6 +2348,63 @@ func _stage_ending_on_load() -> void:
 		"and it carries the door back to the menu", "")
 	_check(String(_main.call(&"_next_scene")) == "",
 		"and no door on to a siege", "%s" % _main.call(&"_next_scene"))
+	_advance()
+
+
+## The clean patch a catch opens: sized to the catch, closing over PATCH_LIFE, capped.
+func _stage_patch() -> void:
+	var mouth := 40.0
+	var reach := float(Iso.tile_circle_extent(float(_main.get(&"PATCH_REACH"))))
+	_check(is_equal_approx(float(_main.call(&"patch_radius", 0, 3, mouth)), mouth),
+		"a sweep that fills nothing of the hold clears just the mouth", "")
+	_check(is_equal_approx(float(_main.call(&"patch_radius", 3, 3, mouth)), mouth + reach),
+		"and a full hold clears the mouth plus the stain's reach", "")
+	_check(float(_main.call(&"patch_radius", 1, 3, mouth)) < mouth + reach,
+		"and one piece of three less than that", "")
+
+	var patches: Array = _main.get(&"_patches")
+	patches.clear()
+	var life := float(_main.get(&"PATCH_LIFE"))
+	var cap := int(_main.get(&"PATCHES"))
+	_main.call(&"_on_net_swept", Vector2(100, 100), 1, 3, mouth, _net)
+	_check(patches.size() == 1, "a sweep that took something opens a patch", "%d" % patches.size())
+	_main.call(&"_on_net_swept", Vector2(120, 100), 2, 3, mouth, _net)
+	_check(patches.size() == 2, "the same net sweeping on opens another",
+		"%d" % patches.size())
+	_check(float(patches[0]["seed"]) != float(patches[1]["seed"]),
+		"with its own roll", "")
+	patches.remove_at(1)
+	var born := float(patches[0]["born"])
+	var opening := float(_main.call(&"_patch_open", patches[0]))
+	_check(opening < 0.5, "a patch opens rather than snapping open", "%.2f" % opening)
+	patches[0]["born"] = born - float(_main.get(&"PATCH_IN"))
+	_check(is_equal_approx(float(_main.call(&"_patch_open", patches[0])), 1.0),
+		"and is fully open after PATCH_IN", "")
+	patches[0]["born"] = born
+	patches[0]["born"] = born - life * 0.5
+	var half := float(_main.call(&"_patch_open", patches[0]))
+	_check(half > 0.0 and half < 1.0, "half way through its life it is closing",
+		"%.2f" % half)
+	patches[0]["born"] = born - life * 1.01
+	_main.call(&"_push_patches", 0.0)
+	_check(patches.is_empty(), "and after PATCH_LIFE it is gone", "%d" % patches.size())
+
+	var spare: Array[CastNet] = []
+	for i in cap + 2:
+		var net := CastNet.new()
+		spare.append(net)
+		_main.call(&"_on_net_swept", Vector2(i * 10.0, 0.0), 1, 3, mouth, net)
+		_main.call(&"_push_patches", 0.001)
+	_check(patches.size() == cap, "the patches are capped", "%d of %d" % [patches.size(), cap])
+	var first_gone := true
+	for patch in patches:
+		if (patch["at"] as Vector2).x < 15.0:
+			first_gone = false
+	_check(first_gone, "and the oldest are the ones replaced", "")
+	patches.clear()
+	_main.call(&"_push_patches", 0.0)
+	for net in spare:
+		net.free()
 	_finish()
 
 

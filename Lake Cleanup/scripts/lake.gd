@@ -209,6 +209,33 @@ const FILTH_FALL := 0.6
 ## ten times.
 const FILTH_REMAP := 0.2
 
+## The clean patch a catch opens (2026-09-13, Richard: "a glimpse of the cleaned lake
+## before the grime sets in again"). The map only ever says where the junk is, and most
+## casts lift the top piece off a stack that still has junk under it, so most casts moved
+## no water at all — the catch had no answer in the lake. Now every sweep that takes
+## something opens a patch of clean water at the mouth that the grime closes back over.
+##
+## A transient lie, by decision — the one exception to "water touching objects looks
+## grimy". Its end state is always the map's own value, so an honest clear is revealed
+## under the shrinking patch rather than replaced by it. Nets only: the dog and the ferry
+## leave the water alone. Not saved.
+##
+## Sized to the catch: the mouth itself, plus PATCH_REACH tiles more for a full hold, in
+## proportion for less. Opens over PATCH_IN seconds (the grime drawing apart, the closing
+## run backwards), holds whole for PATCH_HOLD of PATCH_LIFE, then closes over the rest —
+## slowly, by Richard's call (2026-09-13: "appear and disappear more slowly"; the first
+## cut snapped open and was gone in 2 s). PATCHES is the shader's cap; past it the oldest
+## is replaced.
+const PATCHES := 14
+const PATCH_LIFE := 2.0
+const PATCH_IN := 0.2
+const PATCH_HOLD := 0.1
+const PATCH_REACH := 0.5
+## The patch's shape is a blob noise rolled per catch (`_patch_rng`): the rim wanders in and
+## out of the mouth's disc and the grime comes back as spots that grow and join, so no two
+## catches look alike and nothing reads as the net's ring stamped on the water. The
+## shape's knobs are the shader's (`patch_blotch`, `patch_shape`, `patch_top`, `patch_soft`).
+
 
 
 ## Below this zoom the rubbish drops its footprint and its outline. A piece is about
@@ -579,6 +606,11 @@ var _save_note_for: float = 0.0
 var _filth_map: Image
 var _filth_texture: ImageTexture
 var _filth_stale: bool = false
+## The open clean patches: `at` (world), `radius` (world px, long axis), `born` (on
+## `_patch_clock`), `seed` (the shape's roll).
+var _patches: Array[Dictionary] = []
+var _patch_clock: float = 0.0
+var _patch_rng := RandomNumberGenerator.new()
 var _filth_remap_in: float = 0.0
 
 var _filth_total: float = 1.0
@@ -969,6 +1001,7 @@ func _ready() -> void:
 	_net.flock = _flock
 	_net.landed.connect(_on_net_landed)
 	_net.caught.connect(_on_net_caught)
+	_net.swept.connect(_on_net_swept.bind(_net))
 	_net.caught_bird.connect(_on_bird_caught)
 
 	# The double cast's net: the first one over again, on the same signals, but a helper —
@@ -986,6 +1019,7 @@ func _ready() -> void:
 	_net2.visible = false
 	_net2.landed.connect(_on_net_landed)
 	_net2.caught.connect(_on_net_caught)
+	_net2.swept.connect(_on_net_swept.bind(_net2))
 	_net2.caught_bird.connect(_on_bird_caught)
 	add_child(_net2)
 
@@ -1276,6 +1310,7 @@ func _shape_water(_shore: PackedVector2Array) -> void:
 	_water_material = ShaderMaterial.new()
 	_water_material.shader = load("res://shaders/water.gdshader")
 	_water_material.set_shader_parameter(&"tile_w", Iso.TILE_W)
+	_patch_rng.randomize()
 	_water_material.set_shader_parameter(&"tile_h", Iso.TILE_H)
 	_water_material.set_shader_parameter(&"basin_centre", Iso.CENTRE)
 	_water_material.set_shader_parameter(&"basin_radius", Iso.RADIUS)
@@ -2372,6 +2407,64 @@ func _on_net_caught(def_index: int) -> void:
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 
 
+## A sweep of a mouth that took something: open a clean patch there. Every sweep its own
+## patch with its own roll (Richard, 2026-09-13): a reel that takes on its way home was
+## growing the one patch it had, which repeated the same shape at every grab; now each grab
+## is a new pool of clean water in a new shape, and the cap keeps a long drag from piling
+## them up.
+func _on_net_swept(at: Vector2, taken: int, hold: int, mouth: float, _net_from: CastNet) -> void:
+	var radius := patch_radius(taken, hold, mouth)
+	var fresh := {"at": at, "radius": radius, "born": _patch_clock, "seed": _patch_rng.randf()}
+	if _patches.size() < PATCHES:
+		_patches.append(fresh)
+		return
+	var oldest := 0
+	for i in _patches.size():
+		if float(_patches[i]["born"]) < float(_patches[oldest]["born"]):
+			oldest = i
+	_patches[oldest] = fresh
+
+
+## How far a catch's clean patch reaches, in world px along the long axis: the mouth that
+## made it, plus PATCH_REACH tiles more in proportion to how much of the hold it took.
+func patch_radius(taken: int, hold: int, mouth: float) -> float:
+	var share := clampf(float(taken) / float(maxi(hold, 1)), 0.0, 1.0)
+	return mouth + Iso.tile_circle_extent(PATCH_REACH) * share
+
+
+## How open a patch is, 0 at the catch, 1 whole, 0 gone: opening over PATCH_IN, whole
+## through PATCH_HOLD of its life, then closing over the rest, both ends eased so nothing
+## snaps.
+func _patch_open(patch: Dictionary) -> float:
+	var age := _patch_clock - float(patch["born"])
+	if age < PATCH_IN:
+		var u := clampf(age / PATCH_IN, 0.0, 1.0)
+		return u * u * (3.0 - 2.0 * u)
+	var t := clampf((age / PATCH_LIFE - PATCH_HOLD) / (1.0 - PATCH_HOLD), 0.0, 1.0)
+	return 1.0 - t * t * (3.0 - 2.0 * t)
+
+
+## Every frame: age the patches, drop the ones that have closed, hand the rest to the water.
+func _push_patches(delta: float) -> void:
+	_patch_clock += delta
+	for i in range(_patches.size() - 1, -1, -1):
+		if _patch_clock - float(_patches[i]["born"]) >= PATCH_LIFE:
+			_patches.remove_at(i)
+	if _water_material == null:
+		return
+	var packed := PackedVector4Array()
+	packed.resize(PATCHES)
+	var seeds := PackedFloat32Array()
+	seeds.resize(PATCHES)
+	for i in mini(_patches.size(), PATCHES):
+		var patch := _patches[i]
+		var at: Vector2 = patch["at"]
+		packed[i] = Vector4(at.x, at.y, float(patch["radius"]), _patch_open(patch))
+		seeds[i] = float(patch["seed"])
+	_water_material.set_shader_parameter(&"patches", packed)
+	_water_material.set_shader_parameter(&"patch_seeds", seeds)
+
+
 ## The catch coming out of the net, back at the angler. The pollution meter has already
 ## moved (see _on_net_caught) — what is left to decide here is only where each piece goes:
 ## a find onto the shelf in the shed, everything else thrown on to the yard.
@@ -3191,6 +3284,7 @@ func _process(delta: float) -> void:
 	_part_the_fleet(delta)
 	_fade_radio(delta)
 	_remap_filth(delta)
+	_push_patches(delta)
 	_tick_bonus(delta)
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE

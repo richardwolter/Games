@@ -208,6 +208,36 @@ uniform vec2 filth_tiles = vec2(92.0, 92.0);
 // once the map exists; without it a missing texture would read as a spotless lake.
 uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 
+// The clean patches: a glimpse of the cleaned lake where a net has just closed. Each is
+// (x, y) world centre, (z) radius in world px along the long axis, (w) how open it is,
+// 1 at the moment of the catch down to 0 gone (the lake eases that). `patch_seeds` is a
+// roll per patch, so two catches on the same spot are two shapes.
+//
+// Not a disc and not the net's ring. The plane is domain-warped by a noise rolled off the
+// seed before the distance is measured (`patch_warp`, a fraction of the radius), so the
+// outline is curved lobes and inlets rather than a circle — the trick that makes the
+// murk's own blotches read as water. A fresh patch is clear right through: the threshold
+// starts under the field's floor. As it closes the threshold climbs through a *ridged*
+// noise on the warped plane — the grime comes back first along the ridge lines, as curved
+// threads that thicken and run into each other, and the last clean water is the ground
+// between them near the middle. That is the grime gathering, not a ring shrinking.
+// Inside, the filth is taken to zero before the cutoffs read it, so the patch inherits the
+// stepped ramps, the blotch wobble and the shade stagger like any clean bay, rather than
+// being a colour laid over the water. A transient lie, by decision: the map says what is
+// still in the water, the patch says what has just left it.
+//
+// `patch_blotch` is the noise's cell size in world px on the plane; `patch_shape` is how
+// much the threads cut into the disc (0 a plain disc, 1 all lines); `patch_top` is where
+// the threshold ends up (over the field's highest value, or the middle never closes);
+// `patch_soft` the edge's softness in field units.
+uniform vec4 patches[8];
+uniform float patch_seeds[8];
+uniform float patch_blotch = 20.0;
+uniform float patch_warp : hint_range(0.0, 1.0) = 0.5;
+uniform float patch_shape : hint_range(0.0, 1.0) = 4;
+uniform float patch_top = 1.8;
+uniform float patch_soft = 0.42;
+
 // 0 for a lake with work left in it, 1 for one that has none. The reward for finishing:
 // the crests the water already has are let go wider and brighter, and a second, much
 // finer pattern is switched on over them so the surface breaks into points of light
@@ -425,6 +455,41 @@ void fragment() {
 	// while the next one over is still soup), `pollution` where it is not.
 	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
 	float filth = mix(pollution, local, filth_mapped);
+	// The clean patches, on the plane (the 2:1 squash taken out, where a mouth is a circle).
+	float patched = 0.0;
+	for (int i = 0; i < 8; i++) {
+		vec4 patch = patches[i];
+		if (patch.w <= 0.0) {
+			continue;
+		}
+		vec2 off = vec2(px.x - patch.x, (px.y - patch.y) * 2.0);
+		// Well outside the reach even after the warp has pulled it about: skip.
+		if (length(off) > patch.z * (1.0 + patch_warp)) {
+			continue;
+		}
+		vec2 seed = vec2(patch_seeds[i] * 37.1, patch_seeds[i] * 91.7);
+		vec2 at = off / max(patch_blotch, 1.0) + seed;
+		// Bend the plane, then measure: lobes and inlets, no circle.
+		vec2 warp = vec2(blob_noise(at * 0.55 + vec2(11.3, 5.9)),
+			blob_noise(at * 0.55 + vec2(23.7, 17.1))) - 0.5;
+		vec2 bent = off + warp * 2.0 * patch_warp * patch.z;
+		float d = length(bent) / max(patch.z, 1.0);
+		if (d >= 1.0) {
+			continue;
+		}
+		// Ridged noise on the bent plane: 1 along the ridge lines, 0 away from them.
+		vec2 line_at = bent / max(patch_blotch, 1.0) + seed;
+		float n = blob_noise(line_at) * 0.6 + blob_noise(line_at * 2.1 + vec2(4.7, 1.3)) * 0.4;
+		float lines = 1.0 - abs(n * 2.0 - 1.0);
+		// The field: the disc falling off to its rim, cut low along the lines, so the
+		// threshold reaches them first.
+		float field = (1.0 - d) * mix(1.0, 1.6 - lines * 1.4, patch_shape);
+		// The threshold climbs as the patch closes, from under the floor (a fresh patch is
+		// clear right through) to over the top.
+		float close = mix(-patch_soft, patch_top, 1.0 - patch.w);
+		patched = max(patched, smoothstep(close, close + patch_soft, field));
+	}
+	filth *= 1.0 - patched;
 
 	// Which ramp this pixel reads from: clean under `murky_at`, dirty from `dirty_at`, murky
 	// between. A bay being cleaned shrinks from green to a murky ring, then goes blue.
