@@ -861,9 +861,9 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   fleet at rest pushes itself out of its own row; `test_lake` guards both ends.
 - **A ferry throws its load ashore** (`Boat._land_cargo`, 2026-09-12): the pieces a yard buys
   fly to it through the same `Haul` the yard already uses to load the boat — from the hull,
-  which they follow as it lies at the berth, to `Dropoff.drop_point()`, which is `DROP_UP`
-  (0.34) of the way up the yard's own painting, the deck its crates stand on rather than the
-  feet of its posts in the water. **Paid for as each one lands**, not when the hull tipped
+  which they follow as it lies at the berth, to `Dropoff.drop_point()`, the middle of the
+  box's mouth lifted to the top of its heap (see The Piers; the old `DROP_UP` fraction of a
+  front-on painting is gone). **Paid for as each one lands**, not when the hull tipped
   them: a piece tagged with a `Dropoff` reaches `Lake._on_haul_arrived` as a sale, so the
   purse and the picture say the same thing — the rule `Haul` was built on. The berth is held
   until the volley is over (`_landing`, the second pass through `State.UNLOADING`), for the
@@ -935,10 +935,11 @@ The four merchant yards are isometric pixel art **built from rules, not painted*
 Richard: "rebuild in code, isometric", judged on a static mockup before anything in the
 lake changed). Each is a jetty of planks on posts running `JETTY_OUT` (3) tiles from the
 drawn waterline into the lake, one tile wide, bollards at the end, and a two-by-two tile
-platform on the sand behind it carrying the recycle box, empty. No sign and no heap of the
-material, by decision (both were drawn first and taken off: "just the pier and the empty
-box"; they stay behind `WITH_SIGN` / `WITH_HEAP` in the builder). The yards are told apart
-by their place on the bank and the tint the ferry reads.
+platform on the sand behind it carrying the recycle box. The first pass had no sign and no
+heap of the material, by decision ("just the pier and the empty box"); **superseded
+2026-09-13** — each yard now has a name sign, an emblem carved on its box, and a heap that
+comes and goes with each delivery, see the last three bullets. The old signboard and heap
+stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring only.
 - **Laid into the plane, not stood on it**: the deck is a 2:1 diamond on the grid, projected
   the way `Iso.tile_to_world` does at one painted px to two world px, so the four banks are
   four different drawings and nothing is mirrored. The old front-on paintings were drawn at
@@ -953,9 +954,11 @@ by their place on the bank and the tint the ferry reads.
   centreline), `region` (the deck top and what stands on it), `under` (posts and beams),
   `shade_wet` / `shade_dry` (the deck top's silhouette over water / over sand, white),
   `jetty` and `platform` (deck-top outlines, `deck_up` above the plane), `posts_wet` /
-  `posts_dry`, `landward`, `drop` (the box), `box`, `berth_end`. All four pictures are one
-  size on one anchor. `Dropoff` reads all of it and measures nothing off the picture.
-  `Dropoff.JETTY_OUT` must equal the builder's.
+  `posts_dry`, `landward`, `box`, `box_ground` (the middle of the diamond the box stands
+  on), `drop` (the middle of its mouth), `sign` (the bare plank), `sign_foot`, `sign_cut`
+  (the post and plank alone, a fifth picture, for the sign's shadow), `berth_end`. All five
+  pictures are one size on one anchor. `Dropoff` reads all of it and measures nothing off
+  the picture. `Dropoff.JETTY_OUT` must equal the builder's.
 - **Two layers, by decision** (Richard, second pass: "objects in front of the poles must
   not clip through it"): `Dropoff.Under` draws the posts and beams at z 4, **below** the
   floating rubbish (5); the yard itself draws the deck top and the box at z 6, above it. A
@@ -985,19 +988,19 @@ by their place on the bank and the tint the ferry reads.
 - **The beam is keyed to the deck mask, not to pixel colour**: the post's body is painted in
   the same tone as the edge beam, so a colour test called every post a deck top and hung two
   more rows of "beam" under each one. Every pole was two rows longer than the foot the json
-  recorded â€” which is why sand banked on that foot sat in the middle of the pole with its
+  recorded — which is why sand banked on that foot sat in the middle of the pole with its
   bottom showing below, and why walking down from a foot to find "the real bottom" walks
   into the beam. `draw.line` includes its endpoint; the drawn row is the bottom.
 - **The sand is drawn on the sprite's grid, not the world's** (`Skirt._pixel`'s `snap`): the
   pier stands at a fractional world position, so its pixels are not on the art lattice
   everything else in `skirt.gd` snaps to, and sand snapped to the lattice landed up to a
-  pixel off the wood â€” a dark line of pole under the heap however the rows were counted.
+  pixel off the wood — a dark line of pole under the heap however the rows were counted.
 - **Foam and sand are decided against the lake, not read off the sheet**: at `_ready` every
   post's foot is tested with `Iso.shore_fraction` against the foot's own edge. Past it, a
   `WaterlineFoam` collar (`POST_COLLAR` 8 px half-width) **in front of the post** — behind
   a six-pixel post nothing showed — riding the same swell. Short of it, `Skirt.mound`: sand
   banked over the post's bottom rows, widest at the ground, solid (a gap in the pile is the
-  dark pole showing through it), plus grains falling below it only â€” `spill` scatters a full
+  dark pole showing through it), plus grains falling below it only — `spill` scatters a full
   ellipse, so half of every cloud went up the screen onto the deck step. The
   coast curves and the jetty does not, so the pair at the water's edge can fall either side
   depending on the bank; `test_lake` guards that at least the two pairs out along the jetty
@@ -1007,10 +1010,58 @@ by their place on the bank and the tint the ferry reads.
   / `DROP_UP`. The strand rubbish still fills the tiles under a jetty and is hidden by it
   (the dog fetches it from under the deck); clearing the jetty's footprint in `LakeGrid` is
   open.
-- **Probe**: `tools/shot_piers.tscn` (desktop build) pans to each yard and saves
-  `tools/last_pier_<kind>.png` plus `last_piers.log` (foot, berth, collar and spill counts,
-  the sun). The mockup the design was judged on is `tools/last_piers_mockup.png`, rewritten
-  by every builder run. **Reimport after running the builder.**
+- **Probe**: `tools/shot_piers.tscn` (desktop build) pans to each yard, heaps `HEAPED`
+  pieces into its box and sends three coins, and saves `tools/last_pier_<kind>.png`, the
+  front cut it draws over the heap (`last_pier_front_<kind>.png`) and `last_piers.log`
+  (foot, berth, collar and spill counts, heap, sign text, the sun). The mockup the design
+  was judged on is `tools/last_piers_mockup.png`, rewritten by every builder run.
+  **Reimport after running the builder.**
+- **The yards are named and marked** (2026-09-13, Richard's call). A **sign**: a post and a
+  bare plank the builder paints, with the name written on it at runtime by
+  `Dropoff._draw_sign` through `tr()` — `sign_text()` is the one place — so a translation
+  changes the sign without a repaint; set at the zoom's own pixel size under a transform
+  that undoes the zoom, so the glyphs are the font's at that size and not a bigger drawing
+  shrunk. Where it stands is decided in the builder by what is behind the plank on the
+  screen: `SIGN_BACK` straight behind the box where that is sand (north and west banks,
+  whose platforms lie up the screen from the jetty), and at the platform's side corner,
+  `SIGN_POST` tall and hung `SIGN_HANG` px outward over the beach, where it would be water
+  (south and east banks — a plank across the waterline was the objection; the sign may
+  stand apart from the box as long as it stands on the pier). Its shadow is `Shade.lying`
+  from the post's foot, drawn by the yard over its own deck, since a billboard on a post is
+  the angler's case and not the box's. **The plank is the menus' carpentry** (Richard,
+  same day: "the crevices like the menus, so they don't look too flat"): V bites out of
+  its edges narrowing to `SIGN_BITE_TIP`, two a long edge and one an end, the corners
+  chamfered, grain dashes in the plank's own tones, all hashed off the yard's name so the
+  four are four planks; the pier's outline pass rings the holes. A foot-edge bite is
+  steered off the post's column. And an **emblem** carved into the box's lit face:
+  the actual sprite of one of the yard's pieces (`EMBLEM_PIECE`: globe, wood piece, hanger,
+  duck), laid on the face's own slope, colours sunk `EMBLEM_SOAK` into the plank, grooved in
+  the wood's dark and lit-edged left and below (`carve_emblem`). Decoration at 10-13 painted
+  px — the face is 16 — and the sign is what tells the yards apart. **Tried and rejected the
+  same day**: a stencil of the silhouette projected onto the jetty's planks (a one-tile deck
+  gives a mark twenty-odd screen pixels across, a smudge whatever is painted in it), the
+  emblem wrapped round the box's corner, and an unpainted relief. The pick was made on
+  `tools/last_sign_mockup.png`; `sign_mockup`'s `variants` shows the other rows again.
+- **The box fills and empties** (`Dropoff.put` / `_drain`, 2026-09-13): each piece the ferry
+  lands goes on a heap drawn inside the box the island crate's way (`_draw_heap`, then the
+  near walls cut off the sheet's own box — emblem and all — drawn over it), and the heap
+  sinks away `DRAIN_HOLD` after the last landing, one piece per `DRAIN_EVERY`: a readout of
+  the last delivery, not stock — nothing reads it, and it is not saved. Its floor is higher
+  than the island crate's (`HEAP_FLOOR` 0.72 against 0.55) and its scatter tighter, because a
+  delivery is a handful and at the crate's numbers a handful is entirely behind the near
+  wall (found on the probe). `drop_point()` is the mouth's middle lifted to the top of the
+  heap, so a volley aims into the hole; it used to be the box's bottom corner. **The stand
+  and the mouth are rows 24 and 8 of the box art, measured from its top** (`BOX_STAND`,
+  `BOX_TOP`): the first bake took the mouth as 16 rows above the bottom corner and aimed
+  every delivery 8 rows low.
+- **A sale pays in coins** (`scripts/coin_fly.gd`, 2026-09-13): every piece landing at a
+  yard sends a coin from the box to the money plate's own coin — in screen space on the
+  HUD's layer, `FLIGHT` 0.5 s, and past `MOST` (12) in the air a landing joins the last coin
+  sent rather than adding one, so a hundred-piece hold is not a fountain. The purse still
+  moves when the piece lands (the rule `Haul` was built on); the plate shines again when
+  the coin arrives (`HudSkin.shine`, aimed by `coin_centre`) with a chink (`Sfx.play_chink`,
+  one coin of the purchase sound, no more than one per `CHINK_GAP`). `test_lake` guards the
+  aim, the sign, the heap and its drain, and the coins' cap and carry.
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
@@ -1210,6 +1261,11 @@ The regular rubbish (not finds) is drawn from two sheets:
   python, project root). Despecks with `build_decor.py`'s rule, maps the two
   `Wood Painting` layers to `wood_painting3`/`4` by left-to-right position, and replaces
   only its own sheet's entries.
+
+**The material is Wood, not Timber** (Richard, 2026-09-13, "in all accounts"):
+`TrashDef.Kind.WOOD`, `KIND_NAMES` "Wood", the piers' sheet key `wood`, the sign reads
+WOOD, `pieces.json`'s `yard` field "Wood", the art brief likewise. Saves are untouched —
+kinds are stored by index and the order did not change.
 
 **Adding kinds**: a `.tres` under `resources/trash/`, its slug appended to `TRASH_ORDER`
 (`lake.gd`), and a `SAVE_VERSION` bump. Saved stacks hold indices into the whole def list and

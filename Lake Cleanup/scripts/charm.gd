@@ -1,6 +1,6 @@
 ## What the four yards on the bank make now that nobody is buying rubbish.
 ##
-## The same four spots that used to take plastic, timber, metal and rubber off the ferry
+## The same four spots that used to take plastic, wood, metal and rubber off the ferry
 ## have been turned round: each one fabricates one charm and pushes it out onto the water.
 ## Ammo, shield, fire and ice, one to a yard, always from the same yard — so the player
 ## learns the lake as four sources rather than as a scatter, and going for ice means going

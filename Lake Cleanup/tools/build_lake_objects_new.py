@@ -48,7 +48,7 @@ SLUGS = {
     "Rubber Block": ["rubber_block"],
     "Rubber Toy": ["rubber_toy"],
 }
-YARDS = {"wood": "Timber", "metal": "Metal", "plastic": "Plastic", "rubber": "Rubber"}
+YARDS = {"wood": "Wood", "metal": "Metal", "plastic": "Plastic", "rubber": "Rubber"}
 
 
 def main():

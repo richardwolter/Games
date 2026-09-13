@@ -266,7 +266,7 @@ func _all_defs() -> Array[TrashDef]:
 ## thing a returning player notices is that their old net bounces off the deep stuff.
 func _sludge_defs() -> Array[TrashDef]:
 	var p := TrashDef.Kind.PLASTIC
-	var w := TrashDef.Kind.TIMBER
+	var w := TrashDef.Kind.WOOD
 	var m := TrashDef.Kind.METAL
 	var r := TrashDef.Kind.RUBBER
 	return [

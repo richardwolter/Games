@@ -972,7 +972,7 @@
     16
    ],
    "sheet": "lake_objects",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "display_name": "Wood Painting1",
@@ -985,7 +985,7 @@
     14
    ],
    "sheet": "lake_objects",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "display_name": "Plastic Cup2",
@@ -1024,7 +1024,7 @@
     12
    ],
    "sheet": "lake_objects",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "display_name": "Wood Piece",
@@ -1037,7 +1037,7 @@
     12
    ],
    "sheet": "lake_objects",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "display_name": "Metal Phone",
@@ -1063,7 +1063,7 @@
     11
    ],
    "sheet": "lake_objects",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "display_name": "Metal Support",
@@ -2566,7 +2566,7 @@
     15
    ],
    "sheet": "lake_objects_new",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "cells": [
@@ -2583,7 +2583,7 @@
     15
    ],
    "sheet": "lake_objects_new",
-   "yard": "Timber"
+   "yard": "Wood"
   },
   {
    "cells": [

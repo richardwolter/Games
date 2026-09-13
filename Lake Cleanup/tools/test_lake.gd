@@ -950,7 +950,7 @@ func _stage_dropoffs() -> void:
 
 	# And the case the bending exists for: two yards on opposite banks, with the island in
 	# between.
-	var east: Vector2 = (stops[TrashDef.Kind.TIMBER] as Dropoff).berth
+	var east: Vector2 = (stops[TrashDef.Kind.WOOD] as Dropoff).berth
 	var west: Vector2 = (stops[TrashDef.Kind.RUBBER] as Dropoff).berth
 	var across: Array[Vector2] = _boat.call(&"_plan_legs", east, west)
 	_check(across.size() > 1, "a run across the lake bends round the island",
@@ -959,6 +959,69 @@ func _stage_dropoffs() -> void:
 		crossings += 1
 	_check(crossings == 0, "no planned path runs over the island",
 		"%d of them do" % crossings)
+
+	# The box on the pier (2026-09-13): a delivery is aimed into its mouth, heaps up inside
+	# it and sinks away again while the ferry is gone; the sign is on the sheet and the
+	# name is written on it at runtime.
+	var aimed := true
+	var signed := true
+	var heaped := true
+	var box_why := ""
+	for stop: Dropoff in stops:
+		var book: Dictionary = stop.call(&"_book")
+		if book.is_empty():
+			continue
+		var mouth: Vector2 = stop.call(&"_world", book["drop"], book)
+		var empty_at := stop.drop_point()
+		# Into the mouth: on its centreline, under its middle, above the box's floor.
+		if absf(empty_at.x - mouth.x) > 0.01 or empty_at.y < mouth.y \
+				or empty_at.y > mouth.y + Dropoff.BOX_TALL * 0.5:
+			aimed = false
+			box_why += "%s aims %s at mouth %s; " % [stop.kind_name(), str(empty_at), str(mouth)]
+		for key: String in ["sign", "sign_cut", "sign_foot"]:
+			if not book.has(key):
+				signed = false
+		if stop.sign_text().is_empty():
+			signed = false
+		for i in 5:
+			stop.put(_def_of(stop.kind))
+		var full_at := stop.drop_point()
+		if stop.held_count() != 5 or full_at.y >= empty_at.y:
+			heaped = false
+			box_why += "%s held %d, rose %.1f; " % [
+				stop.kind_name(), stop.held_count(), empty_at.y - full_at.y]
+		# The drain: nothing through the hold, then one every DRAIN_EVERY.
+		stop.call(&"_drain", Dropoff.DRAIN_HOLD - 0.1)
+		if stop.held_count() != 5:
+			heaped = false
+			box_why += "%s drained during the hold; " % stop.kind_name()
+		stop.call(&"_drain", 0.1 + Dropoff.DRAIN_EVERY * 5.0 + 0.01)
+		if stop.held_count() != 0:
+			heaped = false
+			box_why += "%s still holds %d after the drain; " % [stop.kind_name(), stop.held_count()]
+	_check(aimed, "a delivery is aimed into the box's mouth", box_why)
+	_check(signed, "every yard has a sign on the sheet and a name to write on it", "")
+	_check(heaped, "the pier's box heaps up as pieces land and drains while the ferry is away",
+		box_why)
+
+	# Coins: one per landing, to the plate, merged past the cap, landing with what they carry.
+	var coins: CoinFly = _main.get(&"_coins")
+	var coined := coins != null
+	if coined:
+		var tally := [0]
+		var on_land := func(carry: int) -> void: tally[0] += carry
+		coins.landed.connect(on_land)
+		var sent := CoinFly.MOST + 8
+		for i in sent:
+			coins.fly((stops[0] as Dropoff).drop_point())
+		if coins.flying() != CoinFly.MOST:
+			coined = false
+		coins.call(&"_process", CoinFly.FLIGHT + 0.01)
+		if coins.flying() != 0 or tally[0] != sent:
+			coined = false
+		coins.landed.disconnect(on_land)
+	_check(coined, "a sale's coins fly to the plate, merged past the cap, and land with what they carry",
+		"" if coins == null else "%d in the air" % coins.flying())
 	_advance()
 
 
@@ -1021,7 +1084,7 @@ func _stage_skimmer() -> void:
 
 		# One material only, so every single thing the skimmer brings up on this run has
 		# to be that material or the filter is broken.
-		_skim_kind = TrashDef.Kind.TIMBER
+		_skim_kind = TrashDef.Kind.WOOD
 		for i in 4:
 			_yard.put(_def_of(_skim_kind))
 		# Wound right up, so the run finishes inside the harness's frame budget and the

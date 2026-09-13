@@ -10,7 +10,7 @@
 ## The route is the interesting part. A hold of nothing but bottles is one stop and back;
 ## a hold with a bit of everything is a lap. And because each leg has a destination that
 ## wants one particular material, the skimmer knows what to look for on the way — it fishes
-## for timber while it is running timber to the sawmill, which is what makes a laden ferry
+## for wood while it is running wood to the sawmill, which is what makes a laden ferry
 ## worth watching rather than a delivery animation.
 ##
 ## Legs are planned around the island rather than straight through it: a chord from the
@@ -254,7 +254,7 @@ var skim_power: int = 0
 ##
 ## It has to be more than one. A skimmer looking only at the top of each stack is hunting
 ## for a particular material among whatever happens to be floating, and on a run to the
-## sawmill most of what is on top is not timber — a whole lap would bring up one plank.
+## sawmill most of what is on top is not wood — a whole lap would bring up one plank.
 ## Digging a little is what makes a filtered skimmer worth fitting at all.
 var skim_depth: int = 1
 ## Odds that any one piece the skimmer passes over actually comes up, 0 to 1. A net dragged

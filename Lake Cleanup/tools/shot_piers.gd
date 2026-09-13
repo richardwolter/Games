@@ -15,6 +15,10 @@ const CROP := Vector2i(520, 360)
 const ZOOM := 2
 ## Frames the view is given to settle on each yard before the picture is taken.
 const HOLD := 40
+## How many of its own material each box is given before its picture: a heap is the case
+## worth looking at, as the boat probe loads the hold (shot_boat.gd HOLD_SHOWN). Put in as
+## the view arrives, well inside the drain's hold.
+const HEAPED := 8
 
 var _main: Node
 var _frames := 0
@@ -53,19 +57,42 @@ func _look_at(stop: Dropoff) -> void:
 	var angler: Node2D = _main.get(&"_angler")
 	_main.set(&"_pan", stop.place() - angler.position)
 	_main.set(&"_panning", true)
+	var grid: LakeGrid = _main.get(&"_grid")
+	var put := 0
+	for i in grid.defs.size():
+		if put >= HEAPED:
+			break
+		if (grid.defs[i] as TrashDef).material == stop.kind and not (grid.defs[i] as TrashDef).keepsake:
+			stop.put(i)
+			put += 1
+	# And a few coins off the box for the plate, so the flight is drawn under a real
+	# renderer once per run: they have landed by the time the picture is taken, and what
+	# this buys is an error in their drawing reaching the engine log.
+	var coins: CoinFly = _main.get(&"_coins")
+	if coins != null:
+		for i in 3:
+			coins.fly(stop.drop_point())
 
 
 func _write(stop: Dropoff) -> void:
 	var log := FileAccess.open(LOG, FileAccess.WRITE if _shot == 0 else FileAccess.READ_WRITE)
 	log.seek_end()
 	var day: DayCycle = stop.day
-	log.store_line("%s: foot %s berth %s collars %d mounds %d day %s" % [
+	log.store_line("%s: foot %s berth %s collars %d mounds %d heap %d front %s sign '%s' day %s" % [
 		stop.kind_name(), str(stop.foot), str(stop.berth),
 		(stop.get(&"_collars") as Array).size(), (stop.get(&"_mounds") as Array).size(),
+		stop.held_count(), "cut" if stop.get(&"_front") != null else "none", stop.sign_text(),
 		"none" if day == null else "lean %.2f stretch %.2f ink %.2f" % [
 			day.lean, day.stretch, day.ink],
 	])
 	log.close()
+	# The near walls cut off the sheet for the heap, saved beside the pictures: if the box
+	# looks empty with a heap in it, this is the first thing to look at.
+	var front: Texture2D = stop.get(&"_front")
+	if front != null and front.get_image() != null:
+		front.get_image().save_png(
+			ProjectSettings.globalize_path("res://tools/last_pier_front_%s.png" % stop.kind_name().to_lower())
+		)
 	var shot := get_viewport().get_texture().get_image()
 	var at := stop.get_global_transform_with_canvas() * stop.place()
 	var to_shot := float(shot.get_width()) / get_viewport().get_visible_rect().size.x

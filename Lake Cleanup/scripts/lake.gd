@@ -562,6 +562,9 @@ var _pigeon: PigeonPop
 const POP_ODDS := 0.5
 var _pop_rng := RandomNumberGenerator.new()
 
+## Coins flying from a sale at a pier to the money plate, on the HUD's layer.
+var _coins: CoinFly
+
 var _farewell_shown: bool = false
 var _farewell: Farewell
 ## How far the sparkle has come up, 0 to 1. Eased rather than switched so the lake brightens
@@ -723,7 +726,7 @@ func skim_hold() -> int:
 
 ## How many slots down the skimmer digs for the material it is running out. More than one,
 ## always: it is looking for one material in particular, and on the way to the sawmill most
-## of what is floating on top is not timber.
+## of what is floating on top is not wood.
 func skim_depth() -> int:
 	return 1 + _skim_level()
 
@@ -815,6 +818,7 @@ func _ready() -> void:
 
 	_build_trophy()
 	_build_pigeon_pop()
+	_build_coins()
 
 	_bounds = _outline_bounds(shore)
 	_view_zoom = VIEW_ZOOM
@@ -1252,7 +1256,7 @@ func _shape_island() -> void:
 func _shape_dropoffs() -> void:
 	var order := [
 		[TrashDef.Kind.PLASTIC, PI * 0.5, Color(0.42, 0.66, 0.78)],
-		[TrashDef.Kind.TIMBER, 0.0, Color(0.66, 0.50, 0.28)],
+		[TrashDef.Kind.WOOD, 0.0, Color(0.66, 0.50, 0.28)],
 		[TrashDef.Kind.METAL, -PI * 0.5, Color(0.62, 0.64, 0.70)],
 		[TrashDef.Kind.RUBBER, PI, Color(0.32, 0.30, 0.34)],
 	]
@@ -1354,7 +1358,7 @@ func _all_defs() -> Array[TrashDef]:
 		var bulk := cells.x * cells.y
 		var find := _def(
 			_pretty(name),
-			TrashDef.Kind.TIMBER if bulk % 2 == 0 else TrashDef.Kind.METAL,
+			TrashDef.Kind.WOOD if bulk % 2 == 0 else TrashDef.Kind.METAL,
 			Vector2(26.0, 26.0),
 			# Heavy: a wardrobe belongs at the bottom of a stack, under the mugs.
 			0.22, 2.0 + 0.4 * float(bulk), 2.0 + 0.5 * float(bulk),
@@ -2195,9 +2199,13 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 		boat.stow(def_index)
 		return
 	# Tagged with a yard: a piece a ferry has just thrown ashore, paid for as it comes down
-	# rather than when the hull tipped it, so the purse and the picture agree.
+	# rather than when the hull tipped it, so the purse and the picture agree. It goes on
+	# the yard's heap, and a coin sets off from there for the plate (2026-09-13).
 	var sale := tag as Dropoff
 	if sale != null:
+		sale.put(def_index)
+		if _coins != null:
+			_coins.fly(sale.drop_point())
 		_on_sold(PackedInt32Array([def_index]), sale.kind)
 		return
 	_yard.put(def_index)
@@ -2233,6 +2241,25 @@ func _build_pigeon_pop() -> void:
 	over.layer = 18
 	over.add_child(_pigeon)
 	add_child(over)
+
+
+## Coins from a sale to the purse, on the HUD's own layer after the skin, so they fly over
+## the plate they land on. Under the pigeon and the finds card: a coin is a receipt, and
+## those two are events.
+func _build_coins() -> void:
+	_coins = CoinFly.new()
+	_coins.name = &"Coins"
+	_coins.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_coins.target = _skin.coin_centre
+	_coins.landed.connect(_on_coin_landed)
+	_skin.get_parent().add_child(_coins)
+
+
+## A coin reached the plate: the plate lights, and the coin says so.
+func _on_coin_landed(_carry: int) -> void:
+	_skin.shine()
+	if _sfx != null:
+		_sfx.play_chink()
 
 
 ## The card that holds a new find up, on its own layer just under the ending's. Above the

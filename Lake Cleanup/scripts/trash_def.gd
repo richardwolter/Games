@@ -11,10 +11,10 @@ extends Resource
 
 ## What this is made of, and therefore which yard on the shore buys it. Four of them, one
 ## per dropoff — the ferry's whole route is decided by which of these are in its hold.
-enum Kind { PLASTIC, TIMBER, METAL, RUBBER }
+enum Kind { PLASTIC, WOOD, METAL, RUBBER }
 
 ## The four, in enum order, for anything that needs to name one.
-const KIND_NAMES := ["Plastic", "Timber", "Metal", "Rubber"]
+const KIND_NAMES := ["Plastic", "Wood", "Metal", "Rubber"]
 
 @export var display_name: String = "Bottle"
 

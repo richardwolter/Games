@@ -286,7 +286,7 @@ const RIPPLE_MOST := 110
 ## What the basin's fill draws on for a slot, once depth has decided how many slots a tile
 ## gets. See `build`.
 ##
-## `MATERIAL_QUOTA` is not tuned by feel: it is `Plastic, Timber, Metal, Rubber`, measured
+## `MATERIAL_QUOTA` is not tuned by feel: it is `Plastic, Wood, Metal, Rubber`, measured
 ## off the lake this replaced (`tools/measure_fill.gd`, one run, logged) so the four yards
 ## keep the mix of work they had before this changed what fills a stack. Changing which
 ## piece lands where should not quietly change which yard gets the traffic.
@@ -1507,7 +1507,7 @@ func top_slot(index: int) -> int:
 ##
 ## `material` narrows it to one of TrashDef.Kind; -1 takes whatever is there. The ferry's
 ## skimmer is the only caller that narrows: it is sweeping for the cargo it is already
-## carrying to one particular yard, and hauling in a tyre on the way to the timber merchant
+## carrying to one particular yard, and hauling in a tyre on the way to the wood merchant
 ## would just ride around the lake unsold.
 func reachable_slot(
 	index: int, depth: int, max_tier: int, material: int = -1, keepsakes: bool = true

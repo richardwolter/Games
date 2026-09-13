@@ -40,7 +40,7 @@ at about 20 px.
 | Material | Pieces (tier) |
 | --- | --- |
 | Plastic | Mug (0), Jar (0), Bottle (0), Fish bowl (2) |
-| Timber | Shelf board (0), Book (1), Chopping board (2), Crate (3) |
+| Wood | Shelf board (0), Book (1), Chopping board (2), Crate (3) |
 | Metal | Tin plate (0), Cooking pot (2), Teapot (3), Wall clock (4) |
 | Rubber | Rubber duck (0), Chew toy (1), Ball (2), Urn (4) |
 
@@ -109,7 +109,7 @@ Wanted:
 - **Bank and beach** — drawn as polygons. Wants a **shoreline tile set**: sand, grass, the
   transition between them, and scatter (reeds, rocks, stumps).
 - **The island** — sand plus green blobs plus the shed. Wants a drawn island.
-- **The four merchant yards** (Plastic / Timber / Metal / Rubber) — currently a plank pier,
+- **The four merchant yards** (Plastic / Wood / Metal / Rubber) — currently a plank pier,
   crates and a coloured sign per yard, all polygons. Wants **4 distinct dockside buildings**
   with pier, sign and material-coloured stock. These are the landmarks the player navigates
   by.

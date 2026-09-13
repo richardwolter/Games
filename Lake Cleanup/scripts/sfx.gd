@@ -54,6 +54,12 @@ const BOUGHT_DB := -9.0
 ## A find held up. Softer than a purchase: it is a thing being shown to the player rather
 ## than a thing they did.
 const FOUND_DB := -10.0
+## A coin landing on the money plate. One per coin, up to a dozen in flight per sale, so it
+## sits under the pop: the pop is the piece coming down, this is the receipt.
+const CHINK_DB := -13.0
+## Shortest gap between two chinks, the haul's rule for its pops: coins landing on the same
+## frame are one sound.
+const CHINK_GAP := 0.06
 
 ## What the player's slider means, in decibels, from all the way down to all the way up.
 ## The top is above unity because the mix has to carry over the music, and every sound here
@@ -83,6 +89,10 @@ var _coo: AudioStreamWAV
 var _chime: AudioStreamWAV
 var _bought: AudioStreamWAV
 var _found: AudioStreamWAV
+var _chink: AudioStreamWAV
+## When the last coin was heard, on the engine's clock: a stamp, not a countdown, for the
+## reason Haul._pop_at is one.
+var _chink_at: float = -1000.0
 
 ## The bird's own player, kept out of the pool. See `_ready`.
 var _coo_player: AudioStreamPlayer
@@ -247,6 +257,16 @@ func play_bought() -> void:
 	_fire(_bought, BOUGHT_DB, _rng.randf_range(0.97, 1.04))
 
 
+## A coin reaching the plate. No more than one every CHINK_GAP, and each a little off the
+## last in pitch, so a run of them is a handful of coins and not one coin on repeat.
+func play_chink() -> void:
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if now - _chink_at < CHINK_GAP:
+		return
+	_chink_at = now
+	_fire(_chink, CHINK_DB, _rng.randf_range(0.92, 1.1))
+
+
 ## A pigeon going over: three or four wingbeats, close enough to hear the air in them.
 func play_wings() -> void:
 	_fire(_wings, WINGS_DB, _rng.randf_range(0.92, 1.1))
@@ -304,6 +324,7 @@ func _build() -> void:
 	_chime = _make_chime()
 	_bought = _make_bought()
 	_found = _make_found()
+	_chink = _make_chink()
 
 
 ## Water, as filtered noise: a bright spike of spray that dies almost at once over a low
@@ -727,9 +748,35 @@ func _make_bought() -> AudioStreamWAV:
 	return _to_wav(out, false)
 
 
+## One coin landing: the purchase sound's coin, alone and short — the ring of struck small
+## metal with the tick of an edge on the front, gone in a fifth of a second. No sparkle:
+## that is the purchase's flourish, and a receipt does not get one.
+func _make_chink() -> AudioStreamWAV:
+	var length := 0.2
+	var count := int(length * RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var rings := [[1.0, 1.0], [1.71, 0.6], [2.43, 0.34], [3.19, 0.16]]
+	var root := 1560.0
+	var peak := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var note := 0.0
+		for ring: Array in rings:
+			note += sin(TAU * root * float(ring[0]) * t) * float(ring[1])
+		var tick := _rng.randf_range(-1.0, 1.0) * exp(-t * 700.0) * 0.5
+		var swell := minf(t / 0.002, 1.0) * clampf((length - t) / 0.05, 0.0, 1.0)
+		out[i] = (note * 0.34 + tick) * exp(-t * 28.0) * swell
+		peak = maxf(peak, absf(out[i]))
+	if peak > 0.0001:
+		for i in count:
+			out[i] = out[i] / peak * 0.7
+	return _to_wav(out, false)
+
+
 ## A find: a wooden knock with a metal glow growing out of it.
 ##
-## The furniture in this lake is timber and metal, and both are in the sound. The wood is
+## The furniture in this lake is wood and metal, and both are in the sound. The wood is
 ## the front of it — a low box resonance with a knuckle of noise on the front, dead inside a
 ## third of a second, because wood does not ring. The metal is the opposite and is what the
 ## card is really doing: two close partials that swell in rather than being struck, beating

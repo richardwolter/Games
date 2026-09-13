@@ -529,6 +529,23 @@ func _ease_shine() -> float:
 	return _shine * _shine
 
 
+## Where the coin on the money plate is, in the HUD's own coordinates: what a coin flying
+## in from a sale (CoinFly) aims at. The same sum `HudButtons.draw_money` makes for the
+## coin's box, so the two cannot drift.
+func coin_centre() -> Vector2:
+	var face := HudButtons.face_of(_money_box)
+	var side := face.size.y
+	var coin_box := Rect2(face.position, Vector2(side, side)).grow(-3.0)
+	return coin_box.position + coin_box.size * 0.5
+
+
+## A coin arrived: light the plate again, for the arrival and not only for the sum, which
+## moved when the piece landed half a second earlier.
+func shine() -> void:
+	_shine = 1.0
+	_repaint()
+
+
 ## What is waiting in the yard, on a strip of the money plate's own panel.
 ##
 ## Built out of the money plate's parts rather than given a plaque of its own, because it is
