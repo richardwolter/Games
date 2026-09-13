@@ -27,6 +27,15 @@ uniform float sway = 3.2;
 // LakeGrid.ANCHOR_SPAN.
 uniform float anchor_span = 8192.0;
 
+// The gold an uncovered find's rim is drawn in. The rim is the find's own picture stamped
+// again round it, one art pixel out in each direction, and flagged in the vertex alpha
+// (LakeGrid.RIM_FLAG) rather than given a colour of its own: the packed vertex colour has
+// no room for one, and one flag is enough for one gold.
+uniform vec3 rim_gold : source_color = vec3(1.0, 0.84, 0.35);
+
+// Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
+varying flat float rim;
+
 void vertex() {
 	// The piece's own anchor position is packed into the red and green channels as one
 	// sixteen-bit number, and the colour it should actually be drawn in is the grey level
@@ -51,12 +60,24 @@ void vertex() {
 		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
 	}
 
+	// A rim copy: flagged by an alpha nothing else in the soup uses (LakeGrid.RIM_FLAG,
+	// 0.5 — the placeholder blocks draw at 0.14 and 1.0). Handed on white so the fragment
+	// stage gets the art's own alpha to cut the gold to.
+	rim = abs(COLOR.a - 0.5) < 0.02 ? 1.0 : 0.0;
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.
-	COLOR = vec4(vec3(COLOR.b), COLOR.a);
+	COLOR = rim > 0.5 ? vec4(1.0) : vec4(vec3(COLOR.b), COLOR.a);
 }
 
-// No fragment(). The grime used to be painted on here, as a per-piece noise stain; the art
+// COLOR arrives as the vertex colour times the texture (see the note below), so for a rim
+// copy that is the art's alpha under white: swap the colour for gold and keep the cut.
+void fragment() {
+	if (rim > 0.5) {
+		COLOR.rgb = rim_gold;
+	}
+}
+
+// The fragment stage does nothing else. The grime used to be painted on here, as a per-piece noise stain; the art
 // carries its own grime now (see art_source/LakeObjects.psd). Godot already hands the
 // fragment stage COLOR as the vertex colour times the texture, so sampling TEXTURE again
 // and multiplying squared the art: dark pieces went muddy and every soft-edged pixel went

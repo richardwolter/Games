@@ -294,7 +294,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Not yet converted to pixel art (pending, still live): `splash_foam`, `splash_specks`
-  (`water_splash.gd`), `glint.gdshader` (`LakeGrid.GlintLayer`).
+  (`water_splash.gd`), `beam.gdshader` (`LakeGrid.GlintBeam`).
 - **The pollution meter is art, not the water shader** (`hud_skin.gd` `_build_meter`,
   `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
   `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
@@ -1164,11 +1164,39 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   four the moment the first was stood down.
 - `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
 
-### Golden Glitter (`LakeGrid.GlintLayer`)
+### Golden Glitter (`LakeGrid.GlintLayer`, `shaders/beam.gdshader`, rim in `rubbish.gdshader`)
 Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down). The
-glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shimmers faintly
-through the muck, and glints fully with turning specks once uncovered. Drawn *above* the
-rubbish, because the point is to be visible while the find itself is not.
+glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shows through the
+muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's floor loot**
+(Richard's reference: the golden gun with its column of light, gold outline and glitter):
+- **Beam** (`GlintBeam`, buried or not): a see-through column of gold light standing
+  straight up the screen from the piece's waterline, `BEAM_TALL` (2.5) times the find's
+  larger drawn side, soft-sided, brightest at the foot and gone by the top, faint streaks
+  climbing inside it, breathing out of step per tile. **One width for every beam** — the
+  mean drawn width of the finds (`GlintBeam.width`) — by decision. Buried finds get a
+  dimmer, shorter one (`BEAM_FAINT`, `BEAM_SUNK_TALL` at the bottom of the reach). Drawn
+  **over everything on the lake** (absolute z 20: hulls, haul, walkers) by decision; it is
+  additive and see-through. Not yet on the art-pixel grid.
+- **Rim** (uncovered only): the find's own picture stamped again in gold one art pixel out
+  in each of eight directions, **in the rubbish soup** just before the piece, flagged to
+  `rubbish.gdshader` by `RIM_FLAG` (vertex alpha 0.5, an alpha nothing else in the soup
+  uses) and coloured by its `rim_gold`. In the soup by decision: rubbish nearer the camera
+  covers the rim as it covers the piece; a layer over the soup would draw gold across the
+  mug lying on the sofa. **Every tile with a find anywhere in its stack carries the rim's
+  room** (`_stamp_len` adds `RIM_VERTS`, blank quads while the find is down), so uncovering
+  and taking a find both patch in place (`_restamp` blanks what a smaller stamp leaves)
+  and never cost a 25 ms rebuild mid-haul. `test_lake` counts the soup against it.
+- **Twinkles** (`GlintTwinkle`, uncovered only): four-point stars, `STAR_LEAST`..`STAR_MOST`
+  px, gold going white, popping and fading over `STAR_LIFE` at spots sampled once per find
+  off the atlas image's own opaque pixels, laid out by the same cut and mirror `_sprite`
+  draws the piece with — so the piece itself glitters and nothing lands on the water beside
+  it. Just over the soup (the layer's own z, drawn after it), under the piers.
+- **Retired, by decision**: the radial glow disc (`glint.gdshader`, `GlintGlow`), the
+  32-frame sparkle sheet laid flat round the piece (`GlintSparkle`,
+  `Sparkle_Effect_Decorations_v2.png` — Richard: speckles, not sparkles) and the specular
+  sweep across the piece (proposed, rejected: "more like the object is glittering").
+  `assets/Sparkle_Effect_Decorations.png` (the v1 sheet) was already unused and is still
+  in the tree.
 
 ### Strand Line (outer bank rubbish, fetched by the dog)
 The ordinary fill stops `LAKE_EDGE` short of the bank. The band inside that margin

@@ -70,8 +70,7 @@ const BEACH_CHANCE := 0.35
 ## shadow.gdshader as "do not move". Only its red and green are used.
 const DRY_ANCHOR := Color(1.0, 1.0, 0.0, 0.0)
 
-## How many slots below the top of a stack a keepsake still shows through, and how bright
-## its glitter is at the top of a stack against the deepest slot that shows.
+## How many slots below the top of a stack a keepsake still shows through.
 ##
 ## The finds stay buried — see `_hide_treasures` in lake.gd, which plants them a couple of
 ## slots down on purpose — so the glitter is not a map of where they are. It is the last
@@ -80,27 +79,44 @@ const DRY_ANCHOR := Color(1.0, 1.0, 0.0, 0.0)
 ## reason rather than skimming at random, which is the difference between a lake and a
 ## progress bar.
 const GLINT_REACH := 3
-const GLINT_BRIGHT := 0.55
-const GLINT_FAINT := 0.10
 
-## The colour a find glitters, how far the glitter spreads past the piece, and how fast it
-## breathes.
+## The colour a find shines, and how the shine breathes.
 const GLINT_TINT := Color(1.0, 0.84, 0.35)
-const GLINT_SPAN := 1.45
 const GLINT_BREATH := 2.3
 
-## The sparkle sheet drawn over an uncovered find, in place of the old hand-drawn specks:
-## one strip, GLINT_FRAMES square frames of GLINT_FRAME_SIZE px each, played at
-## GLINT_FPS and looped. How large it draws relative to the glow span is GLINT_SPARKLE_SCALE.
-const GLINT_SPARKLE := preload("res://assets/Sparkle_Effect_Decorations_v2.png")
-const GLINT_FRAMES := 32
-const GLINT_FRAME_SIZE := 96.0
-const GLINT_FPS := 90.0
-const GLINT_SPARKLE_SCALE := 0.90
+## The beam standing over a find (shaders/beam.gdshader): how tall it is against the find's
+## larger drawn side, how much of that a find at the bottom of GLINT_REACH keeps, and its
+## body alpha at the foot for an uncovered find and for one at the bottom of the reach. One
+## width for every beam, by decision (2026-09-13): the mean drawn width of the finds, worked
+## out once from the defs (`GlintBeam.width`), so a lamp and a sofa throw the same column.
+const BEAM_SHADER := preload("res://shaders/beam.gdshader")
+const BEAM_TALL := 2.5
+const BEAM_SUNK_TALL := 0.5
+const BEAM_BRIGHT := 0.55
+const BEAM_FAINT := 0.14
 
-## The radial-falloff shader the glow itself draws with, so a find reads as a point of
-## light rather than a coin lying on the water. See shaders/glint.gdshader.
-const GLINT_GLOW_SHADER := preload("res://shaders/glint.gdshader")
+## The rim round an uncovered find: the find's own picture stamped again in gold, one art
+## pixel out in each of RIM_OFFSETS directions, in the soup just before the piece so the
+## rubbish nearer the camera covers it and the rubbish behind does not. Flagged to
+## rubbish.gdshader by RIM_FLAG in the vertex alpha — an alpha nothing else in the soup uses.
+const RIM_FLAG := 0.5
+const RIM_STEP := 2.0
+const RIM_OFFSETS: Array[Vector2] = [
+	Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
+	Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1),
+]
+const RIM_VERTS := 4 * 8
+
+## The twinkles on an uncovered find: four-point stars popping at spots sampled once per
+## find off its own opaque pixels (`GlintTwinkle`), so the piece itself glitters. How many
+## spots are kept per find, how many stars a find spawns a second, how long one lives, and
+## its reach from tip to tip in world pixels.
+const STAR_SPOTS := 48
+const STAR_RATE := 3.5
+const STAR_LIFE := 0.45
+const STAR_LEAST := 3.0
+const STAR_MOST := 7.0
+const STAR_WHITE := Color(1.0, 0.97, 0.85)
 
 ## How far a floating piece may be turned, in radians, how far it may drift off the middle
 ## of its own tile, as a fraction of a tile, and how much bigger or smaller than its drawn
@@ -445,6 +461,10 @@ const PIECE_VERTS := 16
 ## those re-stamped every visible piece in the lake, which is a few thousand of them for
 ## the sake of one.
 var _slot_base := PackedInt32Array()
+
+## How many of the defs are finds: the most tiles that can carry a rim's room, so the
+## rebuild's reservation has it.
+var _find_count := 0
 var _slot_len := PackedInt32Array()
 
 ## Which shadow in the shadow layer belongs to each tile, so a patch can move a piece's
@@ -524,116 +544,202 @@ class GlintLayer extends Node2D:
 	var grid: LakeGrid:
 		set(v):
 			grid = v
-			_glow.grid = v
-			_sparkle.grid = v
+			_beam.grid = v
+			_twinkle.grid = v
 	var finds: Array[Vector2i] = []
 	var age: float = 0.0
 
-	# Two children rather than one node drawing both: the glow is a shader quad (no
-	# texture, alpha only) and the sparkle is a texture strip, and a CanvasItem material
-	# applies to everything that node draws. Split, each keeps its own draw path; combined,
-	# the glow shader would swallow the sparkle's texture the moment it drew after it.
-	var _glow: GlintGlow
-	var _sparkle: GlintSparkle
+	# Two children rather than one node drawing both: the beam is a shader quad and the
+	# stars are plain polygons, and a CanvasItem material applies to everything that node
+	# draws. Split, each keeps its own draw path. They also stand at different heights: the
+	# beam over everything on the lake, the stars just over the rubbish.
+	var _beam: GlintBeam
+	var _twinkle: GlintTwinkle
 
 	func _init() -> void:
-		_glow = GlintGlow.new()
-		_glow.name = &"Glow"
-		add_child(_glow)
+		_twinkle = GlintTwinkle.new()
+		_twinkle.name = &"Twinkle"
+		add_child(_twinkle)
 
-		_sparkle = GlintSparkle.new()
-		_sparkle.name = &"Sparkle"
-		# Over its own glow by child order, not by z: a z of +1 here would lift it level with
-		# the rubbish and draw it over the pieces again.
-		add_child(_sparkle)
+		_beam = GlintBeam.new()
+		_beam.name = &"Beam"
+		# Over everything on the lake — hulls (12), the net's haul (8), the walkers — by
+		# decision: it is a column of light, and it is see-through.
+		_beam.z_as_relative = false
+		_beam.z_index = 20
+		add_child(_beam)
 
 	func set_finds(list: Array[Vector2i]) -> void:
 		finds = list
-		_glow.finds = list
-		_sparkle.finds = list.filter(func(f: Vector2i) -> bool: return f.y == 0)
+		_beam.finds = list
+		_twinkle.set_finds(list.filter(func(f: Vector2i) -> bool: return f.y == 0))
 		set_process(not finds.is_empty())
-		_glow.queue_redraw()
-		_sparkle.queue_redraw()
+		_beam.queue_redraw()
+		_twinkle.queue_redraw()
 
 	func _process(delta: float) -> void:
 		age += delta
-		_glow.age = age
-		_sparkle.age = age
-		_glow.queue_redraw()
-		_sparkle.queue_redraw()
+		_beam.age = age
+		_twinkle.tick(delta, age)
+		_beam.queue_redraw()
+		_twinkle.queue_redraw()
 
 
-## The glow itself: one shader-quad per find, buried or not, drawn as a point of light
-## rather than a flat disc. See shaders/glint.gdshader for the falloff.
-class GlintGlow extends Node2D:
+## The column of light over a find, buried or not: one shader quad per find, standing
+## straight up the screen from the piece's waterline. See shaders/beam.gdshader.
+class GlintBeam extends Node2D:
 	var grid: LakeGrid
 	var finds: Array[Vector2i] = []
 	var age: float = 0.0
+	var _width := 0.0
 
 	func _init() -> void:
 		var mat := ShaderMaterial.new()
-		mat.shader = GLINT_GLOW_SHADER
+		mat.shader = BEAM_SHADER
 		material = mat
 
+	## One width for every beam: the mean drawn width of the finds.
+	func width() -> float:
+		if _width > 0.0 or grid == null:
+			return _width
+		var total := 0.0
+		var count := 0
+		for def: TrashDef in grid.defs:
+			if def.keepsake:
+				total += def.size.x
+				count += 1
+		_width = total / float(count) if count > 0 else 32.0
+		return _width
+
 	func _draw() -> void:
+		var wide := width()
 		for find: Vector2i in finds:
 			var index := find.x
 			var sunk := find.y
 			var stack := grid.stacks[index]
-			if stack.is_empty():
+			if stack.size() <= sunk:
 				continue
-			var at := grid.surface_pos(index)
-			# The piece it belongs to when it is up, and whatever is covering it when it is
-			# not: either way the glow is sized off what is drawn on that tile, so it never
-			# spills across the neighbours.
-			var def := grid.defs[stack[stack.size() - 1]]
-			var span := maxf(def.size.x, def.size.y) * grid.swing[index] * GLINT_SPAN
-			# Buried finds still fade toward GLINT_FAINT — the point-light shader makes the
-			# shape honest, it does not make a three-slots-down find any less hidden.
-			var lit := lerpf(
-				GLINT_BRIGHT, GLINT_FAINT,
-				clampf(float(sunk) / float(GLINT_REACH), 0.0, 1.0)
+			# The beam stands on whatever is drawn on the tile — the find, or the rubbish
+			# covering it — and is sized off the find itself, so a buried sofa throws a
+			# sofa's column through the mugs on top of it.
+			var top := grid.defs[stack[stack.size() - 1]]
+			var own := grid.defs[stack[stack.size() - 1 - sunk]]
+			var edge := LakeGrid.waterline_of(
+				grid.surface_pos(index), top.size * grid.swing[index], grid.tilt[index]
 			)
+			var foot: Vector2 = (edge[0] + edge[1]) * 0.5
+			var deep := clampf(float(sunk) / float(GLINT_REACH), 0.0, 1.0)
+			var tall := maxf(own.size.x, own.size.y) * grid.swing[index] * BEAM_TALL
+			tall *= lerpf(1.0, BEAM_SUNK_TALL, deep)
+			var lit := lerpf(BEAM_BRIGHT, BEAM_FAINT, deep)
 			# Out of step tile by tile, so a basin with several finds in it does not pulse
 			# like a set of indicator lights.
 			var beat := 0.5 + 0.5 * sin(age * GLINT_BREATH + float(index) * 0.7)
 			var glow := GLINT_TINT
-			glow.a = lit * (0.55 + 0.45 * beat)
-			draw_rect(Rect2(at - Vector2.ONE * span * 0.5, Vector2.ONE * span), glow)
+			glow.a = lit * (0.7 + 0.3 * beat)
+			draw_rect(Rect2(foot - Vector2(wide * 0.5, tall), Vector2(wide, tall)), glow)
 
 
-## The sparkle sheet over an uncovered find only — the thing the net is for, not the shimmer
-## that says something is down there. Plays the strip on a loop, out of step per tile the
-## same way the glow's breath is, so several uncovered finds on screen do not twinkle in
-## lockstep.
-class GlintSparkle extends Node2D:
+## The stars on an uncovered find only — the thing the net is for, not the beam that says
+## something is down there. Spots are sampled once per find off the atlas's own opaque
+## pixels, so a star never lands on water beside the piece; each star pops in, holds and
+## fades, gold going white at its brightest.
+class GlintTwinkle extends Node2D:
 	var grid: LakeGrid
 	var finds: Array[Vector2i] = []
 	var age: float = 0.0
+	# Per def index: the spots a star may stand on, as fractions of the region's box.
+	var _spots := {}
+	var _image: Image
+	# Live stars: [tile index, spot, born].
+	var _stars: Array = []
+	var _rng := RandomNumberGenerator.new()
+
+	func set_finds(list: Array[Vector2i]) -> void:
+		finds = list
+		if finds.is_empty():
+			_stars.clear()
+
+	func tick(delta: float, now: float) -> void:
+		age = now
+		# The dead go first, so the array never grows past what a frame can show.
+		var kept: Array = []
+		for star: Array in _stars:
+			if now - float(star[2]) < STAR_LIFE:
+				kept.append(star)
+		_stars = kept
+		for find: Vector2i in finds:
+			if _rng.randf() < STAR_RATE * delta:
+				var spots := _spots_of(find.x)
+				if spots.is_empty():
+					continue
+				_stars.append([find.x, spots[_rng.randi() % spots.size()], now])
+
+	## The opaque pixels of a find's dirty picture, sampled once and kept.
+	func _spots_of(index: int) -> PackedVector2Array:
+		var stack := grid.stacks[index]
+		if stack.is_empty():
+			return PackedVector2Array()
+		var which := stack[stack.size() - 1]
+		if _spots.has(which):
+			return _spots[which]
+		var found := PackedVector2Array()
+		var def := grid.defs[which]
+		if def.atlas != null and grid.sheets != null and grid.sheets.atlas != null:
+			if _image == null:
+				_image = grid.sheets.atlas.get_image()
+			if _image != null:
+				var box := def.region
+				var roll := RandomNumberGenerator.new()
+				roll.seed = which * 7919 + 13
+				var tries := STAR_SPOTS * 6
+				while found.size() < STAR_SPOTS and tries > 0:
+					tries -= 1
+					var u := roll.randf()
+					var v := roll.randf()
+					var px := int(box.position.x + u * box.size.x)
+					var py := int(box.position.y + v * box.size.y)
+					if px < 0 or py < 0 or px >= _image.get_width() or py >= _image.get_height():
+						continue
+					if _image.get_pixel(px, py).a > 0.5:
+						found.append(Vector2(u, v))
+		_spots[which] = found
+		return found
 
 	func _draw() -> void:
-		for find: Vector2i in finds:
-			var index := find.x
+		for star: Array in _stars:
+			var index: int = star[0]
 			var stack := grid.stacks[index]
 			if stack.is_empty():
 				continue
 			var def := grid.defs[stack[stack.size() - 1]]
-			var span := maxf(def.size.x, def.size.y) * grid.swing[index] * GLINT_SPAN
-			var size := span * GLINT_SPARKLE_SCALE
-			var frame := int(age * GLINT_FPS + float(index) * 5.0) % GLINT_FRAMES
-			# Laid flat on the water round the piece: centred on its waterline, the line the
-			# foam collar sits on, and squashed to the plane's 2:1 like the splash specks. Level
-			# rather than leaned with the piece, because the surface it lies on is level.
-			var edge := LakeGrid.waterline_of(
-				grid.surface_pos(index), def.size * grid.swing[index], grid.tilt[index]
-			)
-			var at: Vector2 = (edge[0] + edge[1]) * 0.5
-			var flat := Vector2(size, size * WaterSplash.SPECK_SQUASH)
-			draw_texture_rect_region(
-				GLINT_SPARKLE,
-				Rect2(at - flat * 0.5, flat),
-				Rect2(float(frame) * GLINT_FRAME_SIZE, 0.0, GLINT_FRAME_SIZE, GLINT_FRAME_SIZE)
-			)
+			var spot: Vector2 = star[1]
+			var life := clampf((age - float(star[2])) / STAR_LIFE, 0.0, 1.0)
+			# The same layout `_sprite` draws the piece with: the top of the picture stays
+			# and the bottom is cut at the waterline, mirrored pieces read their spot from
+			# the other side. A spot below the cut is under water and not drawn.
+			var size := def.size * grid.swing[index]
+			var lean := grid.tilt[index]
+			var sink := 0.0 if grid.dry[index] == 1 else LakeGrid.sunk_by(size)
+			var kept := maxf(size.y - sink, 1.0)
+			var down := spot.y * size.y
+			if down > kept:
+				continue
+			var u := 1.0 - spot.x if grid.facing[index] == 1 else spot.x
+			var sat := grid.surface_pos(index) - Vector2(0.0, sink * 0.5).rotated(lean)
+			var at := sat + Vector2((u - 0.5) * size.x, down - kept * 0.5).rotated(lean)
+			# In, hold, out: bright quickly, gone slowly.
+			var bright := sin(life * PI)
+			var reach := lerpf(STAR_LEAST, STAR_MOST, bright) * 0.5
+			var ink := GLINT_TINT.lerp(STAR_WHITE, bright)
+			ink.a = clampf(bright * 1.4, 0.0, 1.0)
+			var waist := reach * 0.22
+			draw_colored_polygon(PackedVector2Array([
+				at + Vector2(0.0, -reach), at + Vector2(waist, -waist),
+				at + Vector2(reach, 0.0), at + Vector2(waist, waist),
+				at + Vector2(0.0, reach), at + Vector2(-waist, waist),
+				at + Vector2(-reach, 0.0), at + Vector2(-waist, -waist),
+			]), ink)
 
 
 ## The rings of disturbed water round the floating rubbish.
@@ -1126,12 +1232,10 @@ func _ready() -> void:
 	_glints = GlintLayer.new()
 	_glints.name = &"Glints"
 	_glints.grid = self
-	# Under the rubbish, over the foam. It was over the rubbish, and the gold then sat on top
-	# of the find and every piece around it, which reads as a sticker rather than as light
-	# coming up from behind. The glow reaches past the piece's edges, so a find under two mugs
-	# still catches the eye; what it gives up is showing over pieces that overlap it.
-	# Added after the foam at the same z, so child order puts it over the collars.
-	_glints.z_index = -1
+	# Over the rubbish: a child at the grid's own z draws after the soup, so the stars land
+	# on the find's picture; the beam sets its own absolute z over everything on the lake.
+	# The rim is not drawn here at all — it is in the soup, see `_stamp`.
+	_glints.z_index = 0
 	_glints.set_process(false)
 	add_child(_glints)
 
@@ -1320,10 +1424,13 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 	defs = from_defs
 	_all_art = true
 	_widest = Vector2.ZERO
+	_find_count = 0
 	for def in defs:
 		if def.atlas == null:
 			_all_art = false
 		_widest = _widest.max(def.size)
+		if def.keepsake:
+			_find_count += 1
 	if sheets != null:
 		_white_uv = sheets.uv_of(sheets.white)
 	_rng.seed = lake_seed
@@ -1803,7 +1910,7 @@ func _rebuild() -> void:
 	# Room for the worst the walk below could ask for, taken in one go. The walk then
 	# writes by index and the arrays are cut back to what was actually used, so a rebuild
 	# costs two resizes rather than one allocation per piece.
-	_reserve(box.size.x * box.size.y * PIECE_VERTS)
+	_reserve(box.size.x * box.size.y * PIECE_VERTS + _find_count * RIM_VERTS)
 
 	# Row by row, near-tile last: tile-confined pieces come out in painter's order, and a
 	# triangle array keeps the order it was given.
@@ -1931,7 +2038,8 @@ func _restamp(index: int) -> void:
 		return
 
 	var def := defs[stack[stack.size() - 1]]
-	if def.sprite != null or _stamp_len(def) != span:
+	var need := _stamp_len(def, index)
+	if def.sprite != null or need > span:
 		_dirty = true
 		from_patch += 1
 		return
@@ -1939,6 +2047,10 @@ func _restamp(index: int) -> void:
 	var at := surface_still(index)
 	_write_at = base
 	_stamp(def, at, index)
+	# What the new stamp did not need of the old slot — the rim's room once the find is
+	# taken — is collapsed rather than left drawing the old piece.
+	if need < span:
+		_blank_slot(base + need, span - need)
 	_write_at = -1
 
 	# The shadow moves with the piece. A rising piece whose shadow stayed put would look
@@ -1967,10 +2079,25 @@ func _uv_of(def: TrashDef) -> Rect2:
 	return _white_uv
 
 
-func _stamp_len(def: TrashDef) -> int:
-	if def.atlas != null:
-		return 4
-	return 16 if _detailed else 8
+func _stamp_len(def: TrashDef, index: int) -> int:
+	var own := 4 if def.atlas != null else (16 if _detailed else 8)
+	# A tile with a find anywhere in it carries the rim's room whether or not the find is
+	# up, so uncovering it — and taking it — patches the tile in place rather than laying
+	# the whole soup out again (`_restamp` blanks what a smaller stamp leaves).
+	return own + RIM_VERTS if _holds_find(index) else own
+
+
+## Whether any slot of a tile's stack is a find.
+func _holds_find(index: int) -> bool:
+	for k in stacks[index]:
+		if defs[k].keepsake:
+			return true
+	return false
+
+
+## A quad with no area, so a slot reserved for a rim that is not up draws nothing.
+func _blank_quad() -> void:
+	_quad(Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, 0.0, 0.0, Vector2.ZERO, _white_uv)
 
 
 ## Collapse a tile's vertices to a point, so its triangles have no area and nothing is
@@ -1986,6 +2113,17 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 	var lean := tilt[index]
 	_dry_now = dry[index] == 1
 	if def.atlas != null:
+		var held := _holds_find(index)
+		# An uncovered find wears its rim: its own picture again, in gold, one art pixel out
+		# each way, laid before the piece so the piece covers the middle and only the edge
+		# shows. In the soup rather than on a layer over it, by decision (2026-09-13): the
+		# rubbish nearer the camera covers the rim as it covers the piece.
+		if held and def.keepsake:
+			for step: Vector2 in RIM_OFFSETS:
+				_sprite(
+					at + step * RIM_STEP, def.size * swing[index], lean, sheets.uv_of(def.region),
+					facing[index] == 1, RIM_FLAG
+				)
 		# The art is the whole of the piece. There is no plate of pale water under it any
 		# more: at the size these are drawn it read as a grey square behind every single
 		# thing in the lake, which is worse than no ripple at all.
@@ -1993,6 +2131,10 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 			at, def.size * swing[index], lean, sheets.uv_of(def.region),
 			facing[index] == 1
 		)
+		# A find still buried keeps the rim's room, empty, so it can come up in place.
+		if held and not def.keepsake:
+			for i in RIM_OFFSETS.size():
+				_blank_quad()
 		return
 
 	# No art loaded. The old blocked-in placeholder, in grey: the vertex colour is carrying
@@ -2019,7 +2161,9 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 ## One piece of art, as a leaning quad with its atlas region mapped onto it. Mirrored by
 ## running the texture across it the other way, which costs nothing and doubles how many
 ## different things a field of the same picture looks like.
-func _sprite(at: Vector2, size: Vector2, lean: float, uv: Rect2, mirrored: bool) -> void:
+func _sprite(
+	at: Vector2, size: Vector2, lean: float, uv: Rect2, mirrored: bool, alpha: float = 1.0
+) -> void:
 	# The waterline. The bottom of the picture goes under the surface, so it comes off the
 	# art and off the box it is drawn in together — the same bargain DogArt.stamp makes for
 	# a swimming dog, and the reason the drawn waterline is the world's waterline rather
@@ -2049,7 +2193,7 @@ func _sprite(at: Vector2, size: Vector2, lean: float, uv: Rect2, mirrored: bool)
 		sat + Vector2(-half.x, -half.y).rotated(lean),
 		sat + Vector2(half.x, -half.y).rotated(lean),
 		edge[1], edge[0],
-		1.0, 1.0, at, box
+		1.0, alpha, at, box
 	)
 
 

@@ -1607,11 +1607,19 @@ func _stage_art() -> void:
 			"and standing in front of it is not behind it", str(out_front))
 
 	# Every visible piece is one quad and nothing else: the pale plate that used to be
-	# drawn under each one read as a grey square behind every object in the lake.
+	# drawn under each one read as a grey square behind every object in the lake. The one
+	# thing a tile carries besides is the rim's room, on the tiles with a find in them
+	# (LakeGrid.RIM_VERTS, 2026-09-13) — and only on those.
 	var verts: PackedVector2Array = _grid.get(&"_mesh_points")
-	_check(verts.size() == _grid.drawn_pieces * 4,
-		"a piece of rubbish is its picture and nothing else",
-		"%d corners for %d pieces" % [verts.size(), _grid.drawn_pieces])
+	var slot_base: PackedInt32Array = _grid.get(&"_slot_base")
+	var rimmed := 0
+	for i in slot_base.size():
+		if slot_base[i] >= 0 and bool(_grid.call(&"_holds_find", i)):
+			rimmed += 1
+	_check(rimmed > 0, "some drawn tiles hold a find", str(rimmed))
+	_check(verts.size() == _grid.drawn_pieces * 4 + rimmed * LakeGrid.RIM_VERTS,
+		"a piece of rubbish is its picture and nothing else, plus a rim's room over a find",
+		"%d corners for %d pieces, %d with a find" % [verts.size(), _grid.drawn_pieces, rimmed])
 
 	# And no two of them lie the same way.
 	var turns := {}
