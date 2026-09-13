@@ -585,6 +585,17 @@ class GlintLayer extends Node2D:
 		_beam.queue_redraw()
 		_twinkle.queue_redraw()
 
+	## One tile's entry brought up to date: `depth` is `_glint_at` for its stack now, -1
+	## for a tile with nothing to shine.
+	func refresh(index: int, depth: int) -> void:
+		var list: Array[Vector2i] = []
+		for find: Vector2i in finds:
+			if find.x != index:
+				list.append(find)
+		if depth >= 0:
+			list.append(Vector2i(index, depth))
+		set_finds(list)
+
 	func _process(delta: float) -> void:
 		age += delta
 		_beam.age = age
@@ -665,8 +676,16 @@ class GlintTwinkle extends Node2D:
 
 	func set_finds(list: Array[Vector2i]) -> void:
 		finds = list
-		if finds.is_empty():
-			_stars.clear()
+		# A star on a tile no longer uncovered dies with the change: left to live out its
+		# fraction of a second it would draw on whatever rubbish came up under the find.
+		var still := {}
+		for find: Vector2i in finds:
+			still[find.x] = true
+		var kept: Array = []
+		for star: Array in _stars:
+			if still.has(star[0]):
+				kept.append(star)
+		_stars = kept
 
 	func tick(delta: float, now: float) -> void:
 		age = now
@@ -2039,6 +2058,10 @@ func _restamp(index: int) -> void:
 	queue_redraw()
 
 	var stack: PackedInt32Array = stacks[index]
+	# The shine follows the patch. It used to be set only by the rebuild, so a find netted
+	# out of a tile left its beam and stars over whatever rubbish came up under it until the
+	# view next moved, and a find uncovered by the net did not shine until then either.
+	_glints.refresh(index, _glint_at(stack))
 	var base := _slot_base[index]
 	if base < 0:
 		# Not in the soup: culled, or drawn by the sprite layer. Nothing to patch, and if

@@ -1165,7 +1165,14 @@ old scrim rectangle and its 1.5 px ink outline are gone.
 - `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
 
 ### Golden Glitter (`LakeGrid.GlintLayer`, `shaders/beam.gdshader`, rim in `rubbish.gdshader`)
-Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down). The
+Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down, dealt
+**`FIND_APART` (7) tiles from each other** — 160 darts, the last 40 unspaced, then
+`_plant_anywhere`; Richard, 2026-09-13: they sat too close). **Two exceptions**, same day:
+the **pet bed** (`FIRST_FIND`) is planted first, afloat on top of a stack in the first
+`FIRST_FIND_OUT` (2.5) tiles of water past the island's shelf, so the first casts have a
+decoration to bring home; and the **house's bed** (`STARTER_BED`, `decor_bed`) is not a
+find at all — the shed starts with it (`_seed_starter_bed`), so `_all_defs` skips it.
+`SAVE_VERSION` went to 7 for the def list. `test_lake` guards all three. The
 glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shows through the
 muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's floor loot**
 (Richard's reference: the golden gun with its column of light, gold outline and glitter):
@@ -1206,6 +1213,11 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   a line cut across it; the stars are whole art pixels drawn in the piece's own frame
   (`STAR_PIXEL`, a plus with `STAR_ARM` arms), with single-pixel sparks between them
   (`SPARK_RATE`, `SPARK_LIFE`) — smooth polygons over the picture read as disconnected.
+- **The shine follows every patch** (`GlintLayer.refresh` from `_restamp`, 2026-09-13):
+  it used to be set only by the rebuild, so a find netted out left its beam and stars over
+  the rubbish that came up under it until the view moved — read as rubbish shining. Stars
+  on a tile no longer uncovered die with the change. **Beams over rubbish are otherwise
+  the buried finds under it**, by the first-pass decision.
 - **Retired, by decision**: the radial glow disc (`glint.gdshader`, `GlintGlow`), the
   32-frame sparkle sheet laid flat round the piece (`GlintSparkle`,
   `Sparkle_Effect_Decorations_v2.png` — Richard: speckles, not sparkles) and the specular
@@ -1319,7 +1331,7 @@ size × `SPRITE_SCALE` (2.0), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
 ### Retired
 `assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
 names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the
-rectangles now). `SAVE_VERSION` is 5 and older saves are refused rather than migrated;
+rectangles now). `SAVE_VERSION` is 7 and older saves are refused rather than migrated;
 `RECUT_RENAMES` and `tools/repair_save.gd` went with them. `tools/slice_sheets.gd` still
 cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 `tools/build_decor.py` after any re-slice** or the decor half is lost.

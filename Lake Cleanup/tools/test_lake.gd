@@ -1508,6 +1508,38 @@ func _stage_art() -> void:
 	_check(undressed == 0, "every def is pointed at a picture",
 		"%d are not" % undressed)
 	_check(keepsakes > 0, "there are finds to find", "%d of them" % keepsakes)
+	_check(not keepsake_names.has(Lake.STARTER_BED),
+		"the house's own bed is not in the lake", "")
+
+	# Where they lie: the pet bed afloat in the first band past the shelf, the rest spread
+	# FIND_APART from each other (the darts' fallback may put a late one closer).
+	var first_tile := -1
+	var lie: Array[Vector2] = []
+	for index in _grid.stacks.size():
+		var stack: PackedInt32Array = _grid.stacks[index]
+		for k in stack.size():
+			var def: TrashDef = _grid.defs[stack[k]]
+			if not def.keepsake:
+				continue
+			if def.piece == Lake.FIRST_FIND:
+				first_tile = index
+				_check(k == stack.size() - 1, "the pet bed is on top of its stack",
+					"slot %d of %d" % [k, stack.size()])
+			else:
+				lie.append(Vector2(_grid.tile_of(index)))
+	_check(first_tile >= 0, "the pet bed is in the lake", "")
+	if first_tile >= 0:
+		var out := Iso.past_shelf(Vector2(_grid.tile_of(first_tile)))
+		var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
+		_check(out >= near and out <= near + Lake.FIRST_FIND_OUT,
+			"the pet bed floats just past the island's shelf", "%.1f tiles out" % out)
+	var crowded := 0
+	for i in lie.size():
+		for j in range(i + 1, lie.size()):
+			if lie[i].distance_to(lie[j]) < Lake.FIND_APART:
+				crowded += 1
+	_check(crowded <= 2, "the finds are dealt apart from each other",
+		"%d pairs closer than %.0f tiles" % [crowded, Lake.FIND_APART])
 
 	# Proportion: a bed is bigger than a mug in the lake too, not normalised to it.
 	var smallest := 1e9

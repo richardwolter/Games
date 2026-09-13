@@ -309,7 +309,18 @@ const SAVE_PATH := "user://lake_cleanup.save"
 const MENU_SCENE := "res://scenes/menu.tscn"
 ## 6: ten rubbish kinds appended to TRASH_ORDER. Saved stacks hold indices into the whole
 ## def list and the finds follow the rubbish in it, so every find's index moved.
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
+
+## The piece of furniture the shed starts with, and so the one find not in the lake.
+const STARTER_BED := "decor_bed"
+
+## The one find that starts on the surface, by the island, so the first casts have a
+## decoration to bring home; and how far past the rubbish's inner edge it may lie.
+const FIRST_FIND := &"decor_pet_bed"
+const FIRST_FIND_OUT := 2.5
+
+## How far apart the hidden finds are dealt, in tiles: two a cast apart read as a hoard.
+const FIND_APART := 7.0
 const AUTOSAVE_EVERY := 20.0
 
 
@@ -1354,6 +1365,11 @@ func _all_defs() -> Array[TrashDef]:
 		# the player carried home and could not name. Kept as the gate that stops that.
 		if _pretty(name).is_empty():
 			continue
+		# The house's own bed is never in the water: the shed starts with it
+		# (`_seed_starter_bed`), so a second one to fish out was a find nobody needed.
+		# Richard, 2026-09-13. Leaves the pet bed, which is a find.
+		if name == STARTER_BED:
+			continue
 		var cells := _sheets.cells_of(name)
 		var bulk := cells.x * cells.y
 		var find := _def(
@@ -1383,22 +1399,64 @@ func _all_defs() -> Array[TrashDef]:
 func _hide_treasures() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _level_seed() ^ 0x5EED
+	var planted_at: Array[Vector2] = []
+	# The pet bed first, afloat by the island — the one find that is not a dig, so the net
+	# has something for the shed within its first few casts (Richard, 2026-09-13). Planted
+	# first so the rest keep their distance from it, not the other way round.
+	var first := _first_find_tile(rng)
 	for i in _grid.defs.size():
-		if not _grid.defs[i].keepsake:
+		var def := _grid.defs[i]
+		if not def.keepsake:
+			continue
+		if def.piece == FIRST_FIND and first >= 0:
+			_grid.insert(first, _grid.height_of(first), i)
+			planted_at.append(Vector2(_grid.tile_of(first)))
+			first = -1
 			continue
 		var planted := false
-		for attempt in 40:
+		# Spread out: a dart is refused inside FIND_APART of a find already down, until the
+		# darts run low and any deep tile will do. Forty darts found tiles; a hundred and
+		# twenty find spaced ones on a lake this size, and the fallback keeps the guarantee.
+		for attempt in 160:
 			var tx := rng.randi_range(2, Iso.COLS - 3)
 			var ty := rng.randi_range(2, Iso.ROWS - 3)
 			var index := _grid.index_of(tx, ty)
 			var height := _grid.height_of(index)
 			if height < 3:
 				continue
+			if attempt < 120 and _too_near(Vector2(tx, ty), planted_at):
+				continue
 			_grid.insert(index, maxi(height - 1 - rng.randi_range(0, 2), 0), i)
+			planted_at.append(Vector2(tx, ty))
 			planted = true
 			break
 		if not planted:
 			_plant_anywhere(i)
+
+
+func _too_near(at: Vector2, others: Array[Vector2]) -> bool:
+	for other: Vector2 in others:
+		if at.distance_to(other) < FIND_APART:
+			return true
+	return false
+
+
+## A tile for the first find: floating rubbish in the first band of water past the island's
+## shelf, picked off the seed. -1 if the lake has none there (a bare test lake).
+func _first_find_tile(rng: RandomNumberGenerator) -> int:
+	var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
+	var pool := PackedInt32Array()
+	for ty in Iso.ROWS:
+		for tx in Iso.COLS:
+			var out := Iso.past_shelf(Vector2(tx, ty))
+			if out < near or out > near + FIRST_FIND_OUT:
+				continue
+			var index := _grid.index_of(tx, ty)
+			if _grid.height_of(index) >= 1 and _grid.dry[index] == 0:
+				pool.append(index)
+	if pool.is_empty():
+		return -1
+	return pool[rng.randi() % pool.size()]
 
 
 ## Put a find somewhere — anywhere — after the random darts all missed.
@@ -2284,7 +2342,7 @@ func _build_trophy() -> void:
 ## was read or not, so a fresh game gets it and a save from before it existed backfills it
 ## the same way: only added when it is not already on the shelf.
 func _seed_starter_bed() -> void:
-	var piece := "decor_bed"
+	var piece := STARTER_BED
 	if unlocked.has(piece):
 		return
 	unlocked.append(piece)
