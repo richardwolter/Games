@@ -1218,6 +1218,14 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   the rubbish that came up under it until the view moved — read as rubbish shining. Stars
   on a tile no longer uncovered die with the change. **Beams over rubbish are otherwise
   the buried finds under it**, by the first-pass decision.
+- **A find keeps its shine in the net** (`CastNet.CatchRim`/`CatchBeam`/`CatchStars`,
+  `shaders/rim.gdshader`, 2026-09-13): `_draw_catch` hands every shown find's spot, turn
+  and scale to three children — the rim behind the net's own drawing
+  (`show_behind_parent`; the picture drawn again in a pure-green modulate that
+  `rim.gdshader` turns to flat gold, so the piece and the rest of the catch cover it), the
+  beam at the lake's beam z with its own breath clock, the stars over the mesh with no
+  material. `GlintTwinkle.sample_spots`/`draw_star` are static so the two twinkle layers
+  are one drawing. Cleared on idle. Not carried on to the hold or the dog.
 - **Retired, by decision**: the radial glow disc (`glint.gdshader`, `GlintGlow`), the
   32-frame sparkle sheet laid flat round the piece (`GlintSparkle`,
   `Sparkle_Effect_Decorations_v2.png` — Richard: speckles, not sparkles) and the specular

@@ -585,6 +585,9 @@ class GlintLayer extends Node2D:
 		_beam.queue_redraw()
 		_twinkle.queue_redraw()
 
+	func beam_width() -> float:
+		return _beam.width()
+
 	## One tile's entry brought up to date: `depth` is `_glint_at` for its stack now, -1
 	## for a tile with nothing to shine.
 	func refresh(index: int, depth: int) -> void:
@@ -712,28 +715,52 @@ class GlintTwinkle extends Node2D:
 		var which := stack[stack.size() - 1]
 		if _spots.has(which):
 			return _spots[which]
-		var found := PackedVector2Array()
-		var def := grid.defs[which]
-		if def.atlas != null and grid.sheets != null and grid.sheets.atlas != null:
-			if _image == null:
-				_image = grid.sheets.atlas.get_image()
-			if _image != null:
-				var box := def.region
-				var roll := RandomNumberGenerator.new()
-				roll.seed = which * 7919 + 13
-				var tries := STAR_SPOTS * 6
-				while found.size() < STAR_SPOTS and tries > 0:
-					tries -= 1
-					var u := roll.randf()
-					var v := roll.randf()
-					var px := int(box.position.x + u * box.size.x)
-					var py := int(box.position.y + v * box.size.y)
-					if px < 0 or py < 0 or px >= _image.get_width() or py >= _image.get_height():
-						continue
-					if _image.get_pixel(px, py).a > 0.5:
-						found.append(Vector2(u, v))
+		if _image == null and grid.sheets != null and grid.sheets.atlas != null:
+			_image = grid.sheets.atlas.get_image()
+		var found := sample_spots(_image, grid.defs[which], which)
 		_spots[which] = found
 		return found
+
+	## Up to STAR_SPOTS opaque pixels of a def's picture, as fractions of its region's box,
+	## rolled off `seed` so the same find gets the same spots wherever it is drawn.
+	static func sample_spots(image: Image, def: TrashDef, seed: int) -> PackedVector2Array:
+		var found := PackedVector2Array()
+		if image == null or def.atlas == null:
+			return found
+		var box := def.region
+		var roll := RandomNumberGenerator.new()
+		roll.seed = seed * 7919 + 13
+		var tries := STAR_SPOTS * 6
+		while found.size() < STAR_SPOTS and tries > 0:
+			tries -= 1
+			var u := roll.randf()
+			var v := roll.randf()
+			var px := int(box.position.x + u * box.size.x)
+			var py := int(box.position.y + v * box.size.y)
+			if px < 0 or py < 0 or px >= image.get_width() or py >= image.get_height():
+				continue
+			if image.get_pixel(px, py).a > 0.5:
+				found.append(Vector2(u, v))
+		return found
+
+	## One star or spark at the canvas's current transform's origin, `bright` 0 to 1 over
+	## its life: whole art pixels, a plus for a star whose arms grow and shrink with it.
+	static func draw_star(canvas: CanvasItem, big: bool, bright: float) -> void:
+		var ink := GLINT_TINT.lerp(STAR_WHITE, bright)
+		ink.a = clampf(bright * 1.4, 0.0, 1.0)
+		var px := STAR_PIXEL
+		var half := Vector2.ONE * px * 0.5
+		canvas.draw_rect(Rect2(-half, Vector2.ONE * px), ink)
+		if not big:
+			return
+		var arm := int(round(bright * float(STAR_ARM)))
+		for k in range(1, arm + 1):
+			var dim := ink
+			dim.a *= 1.0 - float(k - 1) / float(STAR_ARM + 1)
+			canvas.draw_rect(Rect2(Vector2(k * px, 0.0) - half, Vector2.ONE * px), dim)
+			canvas.draw_rect(Rect2(Vector2(-k * px, 0.0) - half, Vector2.ONE * px), dim)
+			canvas.draw_rect(Rect2(Vector2(0.0, k * px) - half, Vector2.ONE * px), dim)
+			canvas.draw_rect(Rect2(Vector2(0.0, -k * px) - half, Vector2.ONE * px), dim)
 
 	func _draw() -> void:
 		for star: Array in _stars:
@@ -759,26 +786,10 @@ class GlintTwinkle extends Node2D:
 			var u := 1.0 - spot.x if grid.facing[index] == 1 else spot.x
 			var sat := grid.surface_pos(index) - Vector2(0.0, sink * 0.5).rotated(lean)
 			var at := sat + Vector2((u - 0.5) * size.x, down - kept * 0.5).rotated(lean)
-			# In, hold, out: bright quickly, gone slowly.
-			var bright := sin(life * PI)
-			var ink := GLINT_TINT.lerp(STAR_WHITE, bright)
-			ink.a = clampf(bright * 1.4, 0.0, 1.0)
-			# Whole art pixels, in the piece's frame: a lit pixel on the picture, not a
-			# smooth shape floating over it.
+			# In, hold, out: bright quickly, gone slowly. Whole art pixels, in the piece's
+			# frame: a lit pixel on the picture, not a smooth shape floating over it.
 			draw_set_transform(at, lean, Vector2.ONE)
-			var px := STAR_PIXEL
-			var half := Vector2.ONE * px * 0.5
-			draw_rect(Rect2(-half, Vector2.ONE * px), ink)
-			if big:
-				# A plus, its arms growing and shrinking with the brightness.
-				var arm := int(round(bright * float(STAR_ARM)))
-				for k in range(1, arm + 1):
-					var dim := ink
-					dim.a *= 1.0 - float(k - 1) / float(STAR_ARM + 1)
-					draw_rect(Rect2(Vector2(k * px, 0.0) - half, Vector2.ONE * px), dim)
-					draw_rect(Rect2(Vector2(-k * px, 0.0) - half, Vector2.ONE * px), dim)
-					draw_rect(Rect2(Vector2(0.0, k * px) - half, Vector2.ONE * px), dim)
-					draw_rect(Rect2(Vector2(0.0, -k * px) - half, Vector2.ONE * px), dim)
+			GlintTwinkle.draw_star(self, big, sin(life * PI))
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -1910,6 +1921,11 @@ func _draw() -> void:
 		get_canvas_item(), _mesh_indices, _mesh_points, _mesh_colors, _mesh_uvs,
 		PackedInt32Array(), PackedFloat32Array(), atlas_rid()
 	)
+
+
+## The one beam width, for anything shining a find away from its tile (the net's catch).
+func beam_width() -> float:
+	return _glints.beam_width()
 
 
 func atlas_rid() -> RID:

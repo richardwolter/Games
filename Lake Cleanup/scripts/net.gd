@@ -449,6 +449,141 @@ class RopeLayer extends Node2D:
 
 var _rope: RopeLayer
 
+## The shine a find keeps while it is in the net (Richard, 2026-09-13): the same rim, beam
+## and stars it had on the water, on the piece where the catch draws it. Three children,
+## because three draw paths: the rim under everything this node draws (`show_behind_parent`,
+## so the piece and the rest of the catch cover it, with shaders/rim.gdshader turning a
+## green-modulated copy of the picture into gold), the beam over everything on the lake
+## (the lake's own beam shader and z), and the stars over the mesh with no material at all.
+## `_draw_catch` tells them where each shown find landed, every frame it draws.
+const RIM_SHADER := preload("res://shaders/rim.gdshader")
+
+class CatchShine extends Node2D:
+	var grid: LakeGrid
+	# What `_draw_catch` drew this frame: [def index, spot, angle, scale] per shown find.
+	var finds: Array = []
+	var age: float = 0.0
+
+
+class CatchRim extends CatchShine:
+	func _init() -> void:
+		var mat := ShaderMaterial.new()
+		mat.shader = RIM_SHADER
+		material = mat
+		show_behind_parent = true
+
+	func _draw() -> void:
+		for find: Array in finds:
+			var def: TrashDef = grid.defs[find[0]]
+			if def.atlas == null:
+				continue
+			var scale_by: float = find[3]
+			# The offsets are in the piece's own frame, so at a packed scale they shrink with
+			# it: a whole-lake rim on a half-size picture would be twice as thick.
+			draw_set_transform(find[1], find[2], Vector2(scale_by, scale_by))
+			for step: Vector2 in LakeGrid.RIM_OFFSETS:
+				draw_texture_rect_region(
+					def.atlas, Rect2(-def.size * 0.5 + step * LakeGrid.RIM_STEP, def.size),
+					def.region, Color(0.0, 1.0, 0.0, 1.0)
+				)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+class CatchBeam extends CatchShine:
+	func _init() -> void:
+		var mat := ShaderMaterial.new()
+		mat.shader = LakeGrid.BEAM_SHADER
+		material = mat
+		z_as_relative = false
+		z_index = 20
+
+	# Its own clock for the breath: the net only redraws when it moves, and a beam that
+	# breathed only while the bag swung would hold its breath on a landed net.
+	func _process(delta: float) -> void:
+		age += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		if grid == null:
+			return
+		var wide := grid.beam_width()
+		for find: Array in finds:
+			var def: TrashDef = grid.defs[find[0]]
+			var scale_by: float = find[3]
+			var at: Vector2 = find[1]
+			# From the bottom of the picture, straight up the screen whatever the piece's
+			# turn: the column is light, and it stands.
+			var foot := at + Vector2(0.0, def.size.y * scale_by * 0.5 + LakeGrid.BEAM_SINK * 0.5)
+			var tall := maxf(def.size.x, def.size.y) * scale_by * LakeGrid.BEAM_TALL
+			var beat := 0.5 + 0.5 * sin(age * LakeGrid.GLINT_BREATH + float(find[0]) * 0.7)
+			var glow := LakeGrid.GLINT_TINT
+			glow.a = LakeGrid.BEAM_BRIGHT * (0.7 + 0.3 * beat)
+			draw_rect(Rect2(foot - Vector2(wide * 0.5, tall), Vector2(wide, tall)), glow)
+
+
+class CatchStars extends CatchShine:
+	var _spots := {}
+	var _image: Image
+	# Live stars and sparks: [def index, spot, born, star (true) or spark (false)].
+	var _stars: Array = []
+	var _rng := RandomNumberGenerator.new()
+
+	func _process(delta: float) -> void:
+		age += delta
+		var kept: Array = []
+		var shown := {}
+		for find: Array in finds:
+			shown[find[0]] = find
+		for star: Array in _stars:
+			var span: float = LakeGrid.STAR_LIFE if star[3] else LakeGrid.SPARK_LIFE
+			if age - float(star[2]) < span and shown.has(star[0]):
+				kept.append(star)
+		_stars = kept
+		for find: Array in finds:
+			var spots := _spots_of(find[0])
+			if spots.is_empty():
+				continue
+			if _rng.randf() < LakeGrid.STAR_RATE * delta:
+				_stars.append([find[0], spots[_rng.randi() % spots.size()], age, true])
+			if _rng.randf() < LakeGrid.SPARK_RATE * delta:
+				_stars.append([find[0], spots[_rng.randi() % spots.size()], age, false])
+		queue_redraw()
+
+	func _spots_of(which: int) -> PackedVector2Array:
+		if _spots.has(which):
+			return _spots[which]
+		if _image == null and grid != null and grid.sheets != null and grid.sheets.atlas != null:
+			_image = grid.sheets.atlas.get_image()
+		var found := LakeGrid.GlintTwinkle.sample_spots(_image, grid.defs[which], which)
+		_spots[which] = found
+		return found
+
+	func _draw() -> void:
+		var shown := {}
+		for find: Array in finds:
+			shown[find[0]] = find
+		for star: Array in _stars:
+			if not shown.has(star[0]):
+				continue
+			var find: Array = shown[star[0]]
+			var def: TrashDef = grid.defs[find[0]]
+			var spot: Vector2 = star[1]
+			var big: bool = star[3]
+			var span: float = LakeGrid.STAR_LIFE if big else LakeGrid.SPARK_LIFE
+			var life := clampf((age - float(star[2])) / span, 0.0, 1.0)
+			var scale_by: float = find[3]
+			# The whole picture shows in the net — no waterline cut — so a spot is simply
+			# its fraction of the box, turned and scaled as the piece was drawn.
+			var local := (spot - Vector2(0.5, 0.5)) * def.size * scale_by
+			draw_set_transform(find[1] + local.rotated(find[2]), find[2], Vector2.ONE)
+			LakeGrid.GlintTwinkle.draw_star(self, big, sin(life * PI))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+var _rim: CatchRim
+var _beam: CatchBeam
+var _stars: CatchStars
+
 
 func _ready() -> void:
 	position = Vector2.ZERO
@@ -458,6 +593,15 @@ func _ready() -> void:
 	_rope.name = &"Rope"
 	_rope.z_as_relative = false
 	add_child(_rope)
+	_rim = CatchRim.new()
+	_rim.name = &"CatchRim"
+	add_child(_rim)
+	_stars = CatchStars.new()
+	_stars.name = &"CatchStars"
+	add_child(_stars)
+	_beam = CatchBeam.new()
+	_beam.name = &"CatchBeam"
+	add_child(_beam)
 	_load_art()
 
 
@@ -1595,6 +1739,7 @@ func _draw() -> void:
 	# the pointer and, when the pointer is out of range, the furthest point along the way.
 	if state == State.IDLE:
 		_lay_rope(PackedVector2Array())
+		_shine([])
 		_draw_aim()
 		return
 
@@ -1764,7 +1909,9 @@ func _draw_mesh(at: Vector2, mouth: float, ink: Color) -> void:
 ## it into the bag by then, and the mesh in front of it does the rest. Drawn back to front,
 ## so near pieces overlap far ones.
 func _draw_catch(at: Vector2, mouth: float) -> void:
+	var shining: Array = []
 	if catch.is_empty() or grid == null:
+		_shine(shining)
 		return
 	_scatter.seed = 20707
 	# As many of the catch as the mouth has room for, drawn smaller as the load grows: a bag
@@ -1809,11 +1956,30 @@ func _draw_catch(at: Vector2, mouth: float) -> void:
 	order.sort_custom(func(a: int, b: int) -> bool: return spots[a].y < spots[b].y)
 	var seen := lerpf(1.0, CATCH_HIDDEN, shut)
 	for i in order:
-		draw_set_transform(
-			spots[i], _scatter.randf_range(-0.22, 0.22), Vector2(sizes[i], sizes[i])
-		)
-		grid.defs[catch[first + i]].stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
+		var turn := _scatter.randf_range(-0.22, 0.22)
+		draw_set_transform(spots[i], turn, Vector2(sizes[i], sizes[i]))
+		var def := grid.defs[catch[first + i]]
+		def.stamp_iso(self, Color(1.0, 1.0, 1.0, seen))
+		if def.keepsake:
+			shining.append([catch[first + i], spots[i], turn, sizes[i]])
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_shine(shining)
+
+
+## Hand the shown finds to the shine layers. The rim and the beam redraw with this node;
+## the stars run their own clock and redraw themselves.
+func _shine(shining: Array) -> void:
+	if _rim == null:
+		return
+	for layer: CatchShine in [_rim, _beam, _stars]:
+		layer.grid = grid
+		layer.finds = shining
+	_rim.queue_redraw()
+	_beam.queue_redraw()
+	_beam.set_process(not shining.is_empty())
+	_stars.set_process(not shining.is_empty())
+	if shining.is_empty():
+		_stars.queue_redraw()
 
 
 ## How many of the catch are drawn: as many as cover `CATCH_FILL` of the mouth's area at the
