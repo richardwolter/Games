@@ -98,17 +98,18 @@ const BEAM_FAINT := 0.14
 ## comes up out of the water rather than standing on a line cut across it.
 const BEAM_SINK := 8.0
 
-## The rim round an uncovered find: the find's own picture stamped again in gold, one art
-## pixel out in each of RIM_OFFSETS directions, in the soup just before the piece so the
-## rubbish nearer the camera covers it and the rubbish behind does not. Flagged to
+## The rim round an uncovered find: the find's own picture stamped again in gold, RIM_STEP
+## world pixels out in each of RIM_OFFSETS directions, in the soup just before the piece so
+## the rubbish nearer the camera covers it and the rubbish behind does not. Flagged to
 ## rubbish.gdshader by RIM_FLAG in the vertex alpha — an alpha nothing else in the soup uses.
+## Thin, by decision (Richard, 2026-09-13): half an art pixel, the four sides only — a
+## whole art pixel all round with the corners filled read as a border, not a shine.
 const RIM_FLAG := 0.5
-const RIM_STEP := 2.0
+const RIM_STEP := 1.0
 const RIM_OFFSETS: Array[Vector2] = [
 	Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
-	Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1),
 ]
-const RIM_VERTS := 4 * 8
+const RIM_VERTS := 4 * 4
 
 ## The twinkles on an uncovered find: four-point stars popping at spots sampled once per
 ## find off its own opaque pixels (`GlintTwinkle`), so the piece itself glitters, with a

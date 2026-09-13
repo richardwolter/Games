@@ -1177,8 +1177,8 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   dimmer, shorter one (`BEAM_FAINT`, `BEAM_SUNK_TALL` at the bottom of the reach). Drawn
   **over everything on the lake** (absolute z 20: hulls, haul, walkers) by decision; it is
   additive and see-through. Not yet on the art-pixel grid.
-- **Rim** (uncovered only): the find's own picture stamped again in gold one art pixel out
-  in each of eight directions, **in the rubbish soup** just before the piece, flagged to
+- **Rim** (uncovered only): the find's own picture stamped again in gold half an art pixel
+  out on each of four sides, **in the rubbish soup** just before the piece, flagged to
   `rubbish.gdshader` by `RIM_FLAG` (vertex alpha 0.5, an alpha nothing else in the soup
   uses) and coloured by its `rim_gold`. In the soup by decision: rubbish nearer the camera
   covers the rim as it covers the piece; a layer over the soup would draw gold across the
@@ -1199,8 +1199,9 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   and the twinkles — bobbed seconds out of step with the piece it was on. Anything new that
   rocks on the swell in a shader reads `lake_clock`; anything on the CPU reads
   `wave_time()`. Declared in `project.godot` under `[shader_globals]`.
-- **Second pass, same day** (Richard's notes): rim toned down (`rim_gold` darker,
-  `rim_fade` 0.6); the beam's foot starts `BEAM_SINK` px under the waterline and fades in
+- **Second pass, same day** (Richard's notes): rim thinner — half an art pixel, four
+  sides, `RIM_STEP` 1.0 (the colour stays; darkening it was the wrong reading of "tone
+  down"); the beam's foot starts `BEAM_SINK` px under the waterline and fades in
   over `foot_soft` of its height, so it comes up out of the water rather than standing on
   a line cut across it; the stars are whole art pixels drawn in the piece's own frame
   (`STAR_PIXEL`, a plus with `STAR_ARM` arms), with single-pixel sparks between them

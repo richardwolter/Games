@@ -37,9 +37,9 @@ uniform float anchor_span = 8192.0;
 // again round it, one art pixel out in each direction, and flagged in the vertex alpha
 // (LakeGrid.RIM_FLAG) rather than given a colour of its own: the packed vertex colour has
 // no room for one, and one flag is enough for one gold.
-uniform vec3 rim_gold : source_color = vec3(0.86, 0.64, 0.22);
+uniform vec3 rim_gold : source_color = vec3(1.0, 0.84, 0.35);
 // How solid the rim is. The eight copies overlap along the edge, so this compounds there.
-uniform float rim_fade : hint_range(0.0, 1.0) = 0.6;
+uniform float rim_fade : hint_range(0.0, 1.0) = 1.0;
 
 // Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
 varying flat float rim;
