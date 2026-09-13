@@ -1169,8 +1169,8 @@ Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down
 **`FIND_APART` (7) tiles from each other** — 160 darts, the last 40 unspaced, then
 `_plant_anywhere`; Richard, 2026-09-13: they sat too close). **Two exceptions**, same day:
 the **pet bed** (`FIRST_FIND`) is planted first, afloat on top of a stack in the first
-`FIRST_FIND_OUT` (2.5) tiles of water past the island's shelf, so the first casts have a
-decoration to bring home; and the **house's bed** (`STARTER_BED`, `decor_bed`) is not a
+`FIRST_FIND_OUT` (0.8) tiles of water past the island's shelf and **at tier 0**, so a new
+game's net — power 0, a 3.4-tile throw — can bring it home on the first casts; and the **house's bed** (`STARTER_BED`, `decor_bed`) is not a
 find at all — the shed starts with it (`_seed_starter_bed`), so `_all_defs` skips it.
 `SAVE_VERSION` went to 7 for the def list. `test_lake` guards all three. The
 glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shows through the

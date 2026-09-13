@@ -1533,6 +1533,14 @@ func _stage_art() -> void:
 		var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
 		_check(out >= near and out <= near + Lake.FIRST_FIND_OUT,
 			"the pet bed floats just past the island's shelf", "%.1f tiles out" % out)
+		# A new game's net: power 0, throw at level 0. The bed has to be both.
+		var top_def: TrashDef = _grid.defs[_grid.stacks[first_tile][_grid.stacks[first_tile].size() - 1]]
+		_check(top_def.tier <= _main.net_power(),
+			"the pet bed is light enough for the first net",
+			"tier %d against power %d" % [top_def.tier, _main.net_power()])
+		_check(out <= _main.net_range(),
+			"the pet bed is inside the first net's throw",
+			"%.1f tiles out, %.1f tiles of throw" % [out, _main.net_range()])
 	var crowded := 0
 	for i in lie.size():
 		for j in range(i + 1, lie.size()):

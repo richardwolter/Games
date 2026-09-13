@@ -315,9 +315,11 @@ const SAVE_VERSION := 7
 const STARTER_BED := "decor_bed"
 
 ## The one find that starts on the surface, by the island, so the first casts have a
-## decoration to bring home; and how far past the rubbish's inner edge it may lie.
+## decoration to bring home; and how far past the rubbish's inner edge it may lie. Kept
+## inside a level-0 throw: the shelf is 2.3 tiles out and the rod starts at 3.4, so the
+## band is narrow, and the piece is tier 0 (see `_all_defs`).
 const FIRST_FIND := &"decor_pet_bed"
-const FIRST_FIND_OUT := 2.5
+const FIRST_FIND_OUT := 0.8
 
 ## How far apart the hidden finds are dealt, in tiles: two a cast apart read as a hoard.
 const FIND_APART := 7.0
@@ -1381,6 +1383,9 @@ func _all_defs() -> Array[TrashDef]:
 			clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
 		)
 		find.keepsake = true
+		# The first find is for the first net: tier 0, or a net at power 0 cannot lift it.
+		if StringName(name) == FIRST_FIND:
+			find.tier = 0
 		# One def per copy, not one def hidden several times: `_hide_treasures` plants one of
 		# each keepsake def, and every copy has to be its own object in the water with its own
 		# hiding place. Four chairs in one corner is a stack, not a set.
