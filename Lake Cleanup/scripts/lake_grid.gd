@@ -94,6 +94,9 @@ const BEAM_TALL := 2.5
 const BEAM_SUNK_TALL := 0.5
 const BEAM_BRIGHT := 0.55
 const BEAM_FAINT := 0.14
+## How far under the waterline the column's foot starts, so with the shader's soft foot it
+## comes up out of the water rather than standing on a line cut across it.
+const BEAM_SINK := 8.0
 
 ## The rim round an uncovered find: the find's own picture stamped again in gold, one art
 ## pixel out in each of RIM_OFFSETS directions, in the soup just before the piece so the
@@ -108,14 +111,18 @@ const RIM_OFFSETS: Array[Vector2] = [
 const RIM_VERTS := 4 * 8
 
 ## The twinkles on an uncovered find: four-point stars popping at spots sampled once per
-## find off its own opaque pixels (`GlintTwinkle`), so the piece itself glitters. How many
-## spots are kept per find, how many stars a find spawns a second, how long one lives, and
-## its reach from tip to tip in world pixels.
+## find off its own opaque pixels (`GlintTwinkle`), so the piece itself glitters, with a
+## scatter of single-pixel sparks between them. Drawn as whole art pixels (`STAR_PIXEL`),
+## in the piece's own frame, so they read as on the picture rather than over it. How many
+## spots are kept per find, how many stars and sparks a find spawns a second, how long each
+## lives, and a star's longest arm in art pixels.
 const STAR_SPOTS := 48
-const STAR_RATE := 3.5
-const STAR_LIFE := 0.45
-const STAR_LEAST := 3.0
-const STAR_MOST := 7.0
+const STAR_RATE := 2.5
+const STAR_LIFE := 0.5
+const STAR_ARM := 3
+const SPARK_RATE := 8.0
+const SPARK_LIFE := 0.22
+const STAR_PIXEL := 2.0
 const STAR_WHITE := Color(1.0, 0.97, 0.85)
 
 ## How far a floating piece may be turned, in radians, how far it may drift off the middle
@@ -627,7 +634,7 @@ class GlintBeam extends Node2D:
 			var edge := LakeGrid.waterline_of(
 				grid.surface_pos(index), top.size * grid.swing[index], grid.tilt[index]
 			)
-			var foot: Vector2 = (edge[0] + edge[1]) * 0.5
+			var foot: Vector2 = (edge[0] + edge[1]) * 0.5 + Vector2(0.0, BEAM_SINK)
 			var deep := clampf(float(sunk) / float(GLINT_REACH), 0.0, 1.0)
 			var tall := maxf(own.size.x, own.size.y) * grid.swing[index] * BEAM_TALL
 			tall *= lerpf(1.0, BEAM_SUNK_TALL, deep)
@@ -651,7 +658,7 @@ class GlintTwinkle extends Node2D:
 	# Per def index: the spots a star may stand on, as fractions of the region's box.
 	var _spots := {}
 	var _image: Image
-	# Live stars: [tile index, spot, born].
+	# Live stars and sparks: [tile index, spot, born, star (true) or spark (false)].
 	var _stars: Array = []
 	var _rng := RandomNumberGenerator.new()
 
@@ -665,15 +672,17 @@ class GlintTwinkle extends Node2D:
 		# The dead go first, so the array never grows past what a frame can show.
 		var kept: Array = []
 		for star: Array in _stars:
-			if now - float(star[2]) < STAR_LIFE:
+			if now - float(star[2]) < (STAR_LIFE if star[3] else SPARK_LIFE):
 				kept.append(star)
 		_stars = kept
 		for find: Vector2i in finds:
+			var spots := _spots_of(find.x)
+			if spots.is_empty():
+				continue
 			if _rng.randf() < STAR_RATE * delta:
-				var spots := _spots_of(find.x)
-				if spots.is_empty():
-					continue
-				_stars.append([find.x, spots[_rng.randi() % spots.size()], now])
+				_stars.append([find.x, spots[_rng.randi() % spots.size()], now, true])
+			if _rng.randf() < SPARK_RATE * delta:
+				_stars.append([find.x, spots[_rng.randi() % spots.size()], now, false])
 
 	## The opaque pixels of a find's dirty picture, sampled once and kept.
 	func _spots_of(index: int) -> PackedVector2Array:
@@ -714,7 +723,9 @@ class GlintTwinkle extends Node2D:
 				continue
 			var def := grid.defs[stack[stack.size() - 1]]
 			var spot: Vector2 = star[1]
-			var life := clampf((age - float(star[2])) / STAR_LIFE, 0.0, 1.0)
+			var big: bool = star[3]
+			var span := STAR_LIFE if big else SPARK_LIFE
+			var life := clampf((age - float(star[2])) / span, 0.0, 1.0)
 			# The same layout `_sprite` draws the piece with: the top of the picture stays
 			# and the bottom is cut at the waterline, mirrored pieces read their spot from
 			# the other side. A spot below the cut is under water and not drawn.
@@ -730,16 +741,25 @@ class GlintTwinkle extends Node2D:
 			var at := sat + Vector2((u - 0.5) * size.x, down - kept * 0.5).rotated(lean)
 			# In, hold, out: bright quickly, gone slowly.
 			var bright := sin(life * PI)
-			var reach := lerpf(STAR_LEAST, STAR_MOST, bright) * 0.5
 			var ink := GLINT_TINT.lerp(STAR_WHITE, bright)
 			ink.a = clampf(bright * 1.4, 0.0, 1.0)
-			var waist := reach * 0.22
-			draw_colored_polygon(PackedVector2Array([
-				at + Vector2(0.0, -reach), at + Vector2(waist, -waist),
-				at + Vector2(reach, 0.0), at + Vector2(waist, waist),
-				at + Vector2(0.0, reach), at + Vector2(-waist, waist),
-				at + Vector2(-reach, 0.0), at + Vector2(-waist, -waist),
-			]), ink)
+			# Whole art pixels, in the piece's frame: a lit pixel on the picture, not a
+			# smooth shape floating over it.
+			draw_set_transform(at, lean, Vector2.ONE)
+			var px := STAR_PIXEL
+			var half := Vector2.ONE * px * 0.5
+			draw_rect(Rect2(-half, Vector2.ONE * px), ink)
+			if big:
+				# A plus, its arms growing and shrinking with the brightness.
+				var arm := int(round(bright * float(STAR_ARM)))
+				for k in range(1, arm + 1):
+					var dim := ink
+					dim.a *= 1.0 - float(k - 1) / float(STAR_ARM + 1)
+					draw_rect(Rect2(Vector2(k * px, 0.0) - half, Vector2.ONE * px), dim)
+					draw_rect(Rect2(Vector2(-k * px, 0.0) - half, Vector2.ONE * px), dim)
+					draw_rect(Rect2(Vector2(0.0, k * px) - half, Vector2.ONE * px), dim)
+					draw_rect(Rect2(Vector2(0.0, -k * px) - half, Vector2.ONE * px), dim)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The rings of disturbed water round the floating rubbish.
@@ -1787,6 +1807,9 @@ static func _sway(x: float, t: float) -> Vector2:
 
 func _process(delta: float) -> void:
 	_time += delta
+	# The swell's clock, for every shader that rocks something on the water. Pushed rather
+	# than read off TIME so the CPU's `_swell`/`_sway` and the GPU's agree exactly.
+	RenderingServer.global_shader_parameter_set(&"lake_clock", _time)
 	_settle_shoves(delta)
 	if _emerging.is_empty():
 		# Nothing is moving that the GPU is not already moving on its own. This is the

@@ -17,6 +17,12 @@ render_mode blend_mix;
 uniform float wave_amplitude = 5.0;
 uniform float wave_speed = 1.0;
 
+// The lake's own clock (LakeGrid._time, pushed every frame as a global), not TIME: the
+// CPU works the same swell out for splashes, birds, beams and ripples off that clock, and
+// TIME runs from the engine's start while the lake's clock runs from the lake's, so the two
+// were seconds apart and everything placed on a piece bobbed out of step with it.
+global uniform float lake_clock;
+
 // How far a floating piece wanders off its anchor, in pixels. Rubbish on open water is not
 // pinned: it turns on the surface and slides about with it, and a lake where every piece
 // only ever moves straight up and down reads as a field of pegs. Mirrors LakeGrid._sway —
@@ -31,7 +37,9 @@ uniform float anchor_span = 8192.0;
 // again round it, one art pixel out in each direction, and flagged in the vertex alpha
 // (LakeGrid.RIM_FLAG) rather than given a colour of its own: the packed vertex colour has
 // no room for one, and one flag is enough for one gold.
-uniform vec3 rim_gold : source_color = vec3(1.0, 0.84, 0.35);
+uniform vec3 rim_gold : source_color = vec3(0.86, 0.64, 0.22);
+// How solid the rim is. The eight copies overlap along the edge, so this compounds there.
+uniform float rim_fade : hint_range(0.0, 1.0) = 0.6;
 
 // Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
 varying flat float rim;
@@ -52,7 +60,7 @@ void vertex() {
 	// The top anchor value is reserved: a piece lying on the beach, which does not float and
 	// so does not move. See LakeGrid.DRY_ANCHOR.
 	if (high < 255.0 || low < 255.0) {
-		float t = TIME * wave_speed;
+		float t = lake_clock * wave_speed;
 		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
 		// The wander. Two slow waves at different rates, off the same anchor, so neighbouring
 		// pieces are never in step and nothing in the lake travels in a straight line.
@@ -73,7 +81,7 @@ void vertex() {
 // copy that is the art's alpha under white: swap the colour for gold and keep the cut.
 void fragment() {
 	if (rim > 0.5) {
-		COLOR.rgb = rim_gold;
+		COLOR = vec4(rim_gold, COLOR.a * rim_fade);
 	}
 }
 

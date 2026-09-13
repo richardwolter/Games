@@ -1186,11 +1186,25 @@ muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's f
   room** (`_stamp_len` adds `RIM_VERTS`, blank quads while the find is down), so uncovering
   and taking a find both patch in place (`_restamp` blanks what a smaller stamp leaves)
   and never cost a 25 ms rebuild mid-haul. `test_lake` counts the soup against it.
-- **Twinkles** (`GlintTwinkle`, uncovered only): four-point stars, `STAR_LEAST`..`STAR_MOST`
-  px, gold going white, popping and fading over `STAR_LIFE` at spots sampled once per find
+- **Twinkles** (`GlintTwinkle`, uncovered only): four-point stars of whole art pixels,
+  gold going white, popping and fading over `STAR_LIFE` at spots sampled once per find
   off the atlas image's own opaque pixels, laid out by the same cut and mirror `_sprite`
   draws the piece with — so the piece itself glitters and nothing lands on the water beside
   it. Just over the soup (the layer's own z, drawn after it), under the piers.
+- **The swell has one clock** (`lake_clock`, a global shader uniform pushed from
+  `LakeGrid._process` every frame, 2026-09-13): `rubbish`, `shadow` and `foam.gdshader`
+  rock their vertices off it, not off `TIME`. Found through the beams: `LakeGrid._time`
+  runs from the lake's start and `TIME` from the engine's, so everything the CPU placed on a
+  piece through `surface_pos` — splashes, perching birds, the piers' wet shadows, the beam
+  and the twinkles — bobbed seconds out of step with the piece it was on. Anything new that
+  rocks on the swell in a shader reads `lake_clock`; anything on the CPU reads
+  `wave_time()`. Declared in `project.godot` under `[shader_globals]`.
+- **Second pass, same day** (Richard's notes): rim toned down (`rim_gold` darker,
+  `rim_fade` 0.6); the beam's foot starts `BEAM_SINK` px under the waterline and fades in
+  over `foot_soft` of its height, so it comes up out of the water rather than standing on
+  a line cut across it; the stars are whole art pixels drawn in the piece's own frame
+  (`STAR_PIXEL`, a plus with `STAR_ARM` arms), with single-pixel sparks between them
+  (`SPARK_RATE`, `SPARK_LIFE`) — smooth polygons over the picture read as disconnected.
 - **Retired, by decision**: the radial glow disc (`glint.gdshader`, `GlintGlow`), the
   32-frame sparkle sheet laid flat round the piece (`GlintSparkle`,
   `Sparkle_Effect_Decorations_v2.png` — Richard: speckles, not sparkles) and the specular

@@ -16,6 +16,12 @@ render_mode blend_mix;
 // travelling with the rubbish.
 uniform float sway = 3.2;
 uniform float wave_speed = 1.0;
+
+// The lake's own clock (LakeGrid._time, pushed every frame as a global), not TIME: the
+// CPU works the same swell out for splashes, birds, beams and ripples off that clock, and
+// TIME runs from the engine's start while the lake's clock runs from the lake's, so the two
+// were seconds apart and everything placed on a piece bobbed out of step with it.
+global uniform float lake_clock;
 uniform float wave_amplitude = 5.0;
 uniform float anchor_span = 8192.0;
 
@@ -66,7 +72,7 @@ void vertex() {
 	// The top anchor value is reserved for a piece lying on the beach, whose shadow stays put
 	// like the piece does. See LakeGrid.DRY_ANCHOR.
 	if (high < 255.0 || low < 255.0) {
-		float t = TIME * wave_speed;
+		float t = lake_clock * wave_speed;
 		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
 		VERTEX.x += sin(t * 0.53 + x * 0.017) * sway;
 		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;

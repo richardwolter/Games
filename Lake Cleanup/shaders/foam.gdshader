@@ -39,6 +39,12 @@ varying vec2 local;
 uniform float sway = 3.2;
 uniform float wave_speed = 1.0;
 
+// The lake's own clock (LakeGrid._time, pushed every frame as a global), not TIME: the
+// CPU works the same swell out for splashes, birds, beams and ripples off that clock, and
+// TIME runs from the engine's start while the lake's clock runs from the lake's, so the two
+// were seconds apart and everything placed on a piece bobbed out of step with it.
+global uniform float lake_clock;
+
 // Mirrors LakeGrid.WAVE_AMPLITUDE. The swell it drives is rubbish.gdshader's own.
 uniform float wave_amplitude = 5.0;
 uniform float anchor_span = 8192.0;
@@ -90,7 +96,7 @@ void vertex() {
 	seed = x;
 	local = VERTEX;
 
-	float t = TIME * wave_speed;
+	float t = lake_clock * wave_speed;
 	// The swell, exactly as the piece rides it, so the collar sits on the cut at every point
 	// of every wave rather than only at the top of one.
 	VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;

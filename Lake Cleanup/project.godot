@@ -59,6 +59,13 @@ walk_down={
 ]
 }
 
+[shader_globals]
+
+lake_clock={
+"type": "float",
+"value": 0.0
+}
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

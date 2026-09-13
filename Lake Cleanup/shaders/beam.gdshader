@@ -18,6 +18,9 @@ render_mode blend_add;
 // against the body and how fast they climb.
 uniform float soft_side : hint_range(0.0, 1.0) = 0.75;
 uniform float fade_up : hint_range(0.5, 4.0) = 1.7;
+// How much of the height the foot fades in over, so the column comes up out of the water
+// rather than starting on a hard line at it.
+uniform float foot_soft : hint_range(0.0, 0.5) = 0.18;
 uniform float streak : hint_range(0.0, 1.0) = 0.35;
 uniform float climb = 0.6;
 
@@ -32,10 +35,11 @@ void fragment() {
 	float across = abs(UV.x - 0.5) * 2.0;
 	float side = 1.0 - smoothstep(1.0 - soft_side, 1.0, across);
 	float tall = pow(clamp(UV.y, 0.0, 1.0), fade_up);
+	float foot = smoothstep(1.0, 1.0 - foot_soft, UV.y);
 	// Streaks: thin bright threads a fraction of the width apart, scrolling up. Value noise
 	// stretched tall so a thread is a line, not a blob.
 	float thread = blob_noise(vec2(UV.x * 9.0 + phase, UV.y * 2.5 - TIME * climb));
 	float lines = smoothstep(0.55, 0.95, thread);
 	float body = (1.0 - streak) + streak * lines;
-	COLOR = vec4(COLOR.rgb, COLOR.a * side * tall * body);
+	COLOR = vec4(COLOR.rgb, COLOR.a * side * tall * foot * body);
 }
