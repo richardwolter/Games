@@ -12,8 +12,12 @@ config_version=5
 
 config/name="Lake Cleanup"
 config/version="0.1.0"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+Prefs="*res://scripts/prefs.gd"
 
 [display]
 

@@ -310,6 +310,34 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   save* rows **and the F5/F9 keys with them**. Saving is automatic — `Lake.AUTOSAVE_EVERY`
   (20 s), the window's close request, and *Save and quit* — and the game loads on start. A
   crash costs at most the 20 s; that was weighed and kept. Don't put a save button back.
+  **The settings are `Prefs`' now** (`scripts/prefs.gd`, autoload, 2026-09-12): music,
+  sound effects and fullscreen live in the autoload and in `user://settings.cfg`, written on
+  every press (sliders on the release). The board reads them on its way in (`pull_prefs`)
+  and both the menu's board and the lake's are one set of settings. The board's bottom
+  button is **"Save and go to menu"** (`Lake._quit` saves and changes scene to the menu);
+  quitting the game is the menu's Quit or the window's cross. The level swap row is off
+  (`swap_shown`, default false): **the siege is set aside** — `Lake._next_scene` returns "",
+  the farewell offers no onward door, and nothing new should route to `siege.tscn`.
+
+- **The main menu** (`scenes/menu.tscn`, `scripts/menu.gd`, 2026-09-12, issue #12): the
+  game's `run/main_scene`. The menu art (`assets/MDLL_Menu_Background.jpg`, 1652x628, title
+  top-centre; it replaced the capsule art `menu_capsule.jpg`, which is retired) covers the
+  window, centred, cropped at the sides where it is wider than 16:9. **Never stretched or padded, by decision** (Richard,
+  2026-09-12): fitting it to the width with its edge rows smeared into the bands was
+  rejected as a distortion — don't distort an image without asking. Four `PlankButton`s
+  (232x56) stand bottom-left over the open water: Continue (only when `Lake.SAVE_PATH`
+  exists), New game (over a save, `MenuConfirm` asks "Start over?" first, then deletes the
+  file and opens the lake fresh), Settings (the lake's `SettingsSkin` in `menu_mode`: sound
+  and screen rows only) and Quit; Credits (`CreditsBoard`, placeholder lines in one
+  constant) stands alone in the bottom right corner.
+  Escape closes whichever board is up and does nothing on the bare menu. The menu plays the
+  lake's track with its own player at `Prefs`' level; it restarts when the lake starts —
+  the lake's two-player crossfade is built into its scene, and that was weighed and kept.
+  The lake comes back here from "Save and go to menu" and from the farewell's **"Back to
+  menu"** plaque (`Farewell.to_menu`, always drawn under the closing words; clicking
+  elsewhere still just dismisses). Probe: `tools/shot_menu.tscn` (desktop build) saves
+  `tools/last_menu_main.png`, `_main_settings`, `_credits`, `_confirm`. `test_lake` guards
+  the farewell's menu door and that no siege door is offered.
 
 - **The bites out of the wood are holes** (`Style.frame_bites`/`ribbon_bites`/`button_bites`,
   `carved`, `fill_carved`, `line_carved`, `rims`, 2026-09-11): every plank and frame is

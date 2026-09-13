@@ -7,10 +7,15 @@
 ## like, and what the player has set it to.
 ##
 ## No save or load buttons, by decision (2026-09-11): the lake autosaves every
-## `Lake.AUTOSAVE_EVERY` seconds, on the window's close request and on "Save and quit",
-## and loads on start. A save button on top of that was a promise the game was already
-## keeping. The section headings went at the same time: the board is short enough to read
-## without them, and the gap between sections says what the plank used to.
+## `Lake.AUTOSAVE_EVERY` seconds, on the window's close request and on "Save and go to
+## menu", and loads on start. A save button on top of that was a promise the game was
+## already keeping. The section headings went at the same time: the board is short enough
+## to read without them, and the gap between sections says what the plank used to.
+##
+## The values themselves are `Prefs`' (2026-09-12): the board reads them on its way in and
+## stores every press, so the menu's board and the lake's are one set of settings, kept
+## across scenes and sessions. In `menu_mode` the lake's own rows — the wipe, the level
+## swap, the way out — are left off: the menu is already outside the lake.
 class_name SettingsSkin
 extends Control
 
@@ -79,6 +84,18 @@ var swap_label: String = "Go to the siege":
 ## does it.
 var wipe_shown: bool = false
 
+## The level swap is not shown either (2026-09-12): the siege is set aside for now.
+var swap_shown: bool = false
+
+## The board as the main menu shows it: sound and screen only. No way out of a lake the
+## player is not in.
+var menu_mode: bool = false:
+	set(v):
+		menu_mode = v
+		_lay_out()
+
+const QUIT_LABEL := "Save and go to menu"
+
 signal music_toggled(on: bool)
 signal music_level_changed(level: float)
 signal sfx_toggled(on: bool)
@@ -100,11 +117,27 @@ var _close: CloseButton
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	pull_prefs()
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
 	resized.connect(_lay_out)
 	_lay_out()
+
+
+## Read what the player has set. The window's own mode is the truth for fullscreen — the
+## player may have pressed F11 — and is stored back, so the file agrees with the screen.
+func pull_prefs() -> void:
+	music_on = Prefs.music_on
+	music_level = Prefs.music_level
+	sfx_on = Prefs.sfx_on
+	sfx_level = Prefs.sfx_level
+	fullscreen = Prefs.is_fullscreen()
+
+
+## Every press goes to the file at once, so nothing is lost to a crash or a scene change.
+func _store(key: StringName, value: Variant) -> void:
+	Prefs.store(key, value)
 
 
 ## The lines, top to bottom, in sections.
@@ -116,11 +149,16 @@ func _plan() -> Array:
 		{"kind": &"switch", "key": &"fullscreen", "label": "Fullscreen  (F11)"},
 		{"kind": &"gap"},
 	]
+	if menu_mode:
+		plan.pop_back()
+		return plan
 	if wipe_shown:
 		plan.append({"kind": &"button", "key": &"wipe", "label": "Start the lake over  (F6)", "warn": true})
-	plan.append({"kind": &"button", "key": &"swap", "label": swap_label})
-	plan.append({"kind": &"gap"})
-	plan.append({"kind": &"button", "key": &"quit", "label": "Save and quit", "warn": true})
+	if swap_shown:
+		plan.append({"kind": &"button", "key": &"swap", "label": swap_label})
+	if wipe_shown or swap_shown:
+		plan.append({"kind": &"gap"})
+	plan.append({"kind": &"button", "key": &"quit", "label": QUIT_LABEL, "warn": true})
 	return plan
 
 
@@ -135,6 +173,8 @@ func _tall_of(kind: StringName) -> float:
 
 
 func _lay_out() -> void:
+	if not is_node_ready():
+		return
 	var tall := Style.board_wood_tall(BOARD_WIDE, FRAME) + RIBBON_TALL * 0.5 + BOARD_PAD
 	for line: Dictionary in _plan():
 		tall += _tall_of(line["kind"]) + ROW_GAP
@@ -176,6 +216,8 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if not click.pressed:
 		if _dragging != &"":
+			# Written once, on the release, rather than on every pixel of the drag.
+			_store(_dragging, music_level if _dragging == &"music_level" else sfx_level)
 			_dragging = &""
 			accept_event()
 		return
@@ -190,12 +232,15 @@ func _gui_input(event: InputEvent) -> void:
 	match key:
 		&"music":
 			music_on = not music_on
+			_store(&"music_on", music_on)
 			music_toggled.emit(music_on)
 		&"sfx":
 			sfx_on = not sfx_on
+			_store(&"sfx_on", sfx_on)
 			sfx_toggled.emit(sfx_on)
 		&"fullscreen":
 			fullscreen = not fullscreen
+			_store(&"fullscreen", fullscreen)
 			fullscreen_toggled.emit(fullscreen)
 		&"music_level", &"sfx_level":
 			_dragging = key
@@ -215,11 +260,18 @@ func _drag_to(at: Vector2) -> void:
 		var groove: Rect2 = line["groove"]
 		var level := clampf((at.x - groove.position.x) / groove.size.x, 0.0, 1.0)
 		level = roundf(level * 100.0) / 100.0
+		# Dragging the slider is a request to hear it: the switch comes on with it.
 		if _dragging == &"music_level":
+			if not music_on:
+				music_on = true
+				_store(&"music_on", true)
 			if not is_equal_approx(level, music_level):
 				music_level = level
 				music_level_changed.emit(level)
 		else:
+			if not sfx_on:
+				sfx_on = true
+				_store(&"sfx_on", true)
 			if not is_equal_approx(level, sfx_level):
 				sfx_level = level
 				sfx_level_changed.emit(level)

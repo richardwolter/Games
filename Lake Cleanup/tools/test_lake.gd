@@ -2083,14 +2083,18 @@ func _stage_ending_on_load() -> void:
 	_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
 	_check(_main.get_node_or_null(^"Farewell") != null,
 		"and the words the run was owed are on screen", "")
-	# Said once already, and said again: the way on to the second lake is a door on this
-	# screen, so a finished lake that showed its ending last week and refuses to show it
-	# again is a lake with nothing to do on it and no way off it.
+	# Said once already, and said again: the way off the lake is a door on this screen,
+	# so a finished lake that showed its ending last week and refuses to show it again is a
+	# lake with nothing to do on it and no way off it. The door is the menu's (2026-09-12);
+	# the siege is set aside and the onward door with it.
 	_check(bool(_main.get(&"_farewell_shown")),
 		"a lake that was already finished offers its ending again", "")
-	_check(String(_main.call(&"_next_scene")) != "",
-		"and it carries the door on to the next lake",
-		"%s" % _main.call(&"_next_scene"))
+	var farewell: Node = _main.get(&"_farewell")
+	_check(farewell != null and farewell.has_signal(&"to_menu")
+		and farewell.is_connected(&"to_menu", Callable(_main, &"_quit")),
+		"and it carries the door back to the menu", "")
+	_check(String(_main.call(&"_next_scene")) == "",
+		"and no door on to a siege", "%s" % _main.call(&"_next_scene"))
 	_finish()
 
 

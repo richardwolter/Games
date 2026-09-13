@@ -268,6 +268,8 @@ const CLOSE_INSET := 12.0
 ## save is written on its own timer rather than on every change: a purchase or a sale can
 ## happen several times a second, and the field is the biggest thing in the file.
 const SAVE_PATH := "user://lake_cleanup.save"
+## Where the lake goes when it is left: the main menu.
+const MENU_SCENE := "res://scenes/menu.tscn"
 ## 6: ten rubbish kinds appended to TRASH_ORDER. Saved stacks hold indices into the whole
 ## def list and the finds follow the rubbish in it, so every find's index moved.
 const SAVE_VERSION := 6
@@ -1469,10 +1471,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			KEY_F11:
 				_settings.fullscreen = not _is_fullscreen()
+				Prefs.store(&"fullscreen", _settings.fullscreen)
 				_set_fullscreen(_settings.fullscreen)
 				return
 			KEY_M:
 				_settings.music_on = not _settings.music_on
+				Prefs.store(&"music_on", _settings.music_on)
 				_push_music()
 				return
 			KEY_F6:
@@ -1907,6 +1911,7 @@ func _show_farewell() -> void:
 		return
 	_farewell = Farewell.new()
 	_farewell.dismissed.connect(_drop_farewell)
+	_farewell.to_menu.connect(_quit)
 	# A cleaned lake is not the end of the game any more, only the end of the quiet part.
 	var onward := _next_scene()
 	if onward != "":
@@ -1924,9 +1929,11 @@ func _show_farewell() -> void:
 
 ## The player has read it. Let go of it at once rather than when it finishes fading, so the
 ## angler gets their legs back on the click rather than half a second after it.
-## Where the ending leads, or an empty string for a level that is the last one.
+## Where the ending leads, or an empty string for a level that is the last one. The siege
+## is set aside (2026-09-12): the cleaned lake ends here, and the farewell's door is the
+## menu's.
 func _next_scene() -> String:
-	return "res://scenes/siege.tscn"
+	return ""
 
 
 ## Take the door. The run is written first: what carries into the next level is read back
@@ -2097,9 +2104,12 @@ func _set_fullscreen(on: bool) -> void:
 	)
 
 
+## The way out of the lake is the menu, not the desktop (2026-09-12): the run is written
+## first, and the menu's own Quit and the window's cross are what close the game.
 func _quit() -> void:
 	save_game()
-	get_tree().quit()
+	_farewell = null
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 
 ## A piece lifted off the water, the moment the net's mouth closes on it. The meter moves

@@ -56,6 +56,13 @@ signal dismissed
 ## does the scene change; this only says which of the two was clicked.
 signal onward
 
+## Emitted when the player takes the door back to the main menu (2026-09-12). Always
+## drawn: a finished lake has to lead somewhere, and clicking the words away to keep
+## fishing an empty lake is the other choice, not the only one.
+signal to_menu
+
+const MENU_LABEL := "Back to menu"
+
 ## The words actually shown. Defaults to LINES, and is set to something else by a level
 ## whose ending is not the cleaned lake.
 var lines: Array = LINES
@@ -70,10 +77,13 @@ var _age: float = 0.0
 var _has_onward: bool = false
 var _onward_rect := Rect2()
 var _onward_hot: bool = false
+var _menu_rect := Rect2()
+var _menu_hot: bool = false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	_font = Style.font()
 	# Sized by hand rather than by anchors: the parent is a CanvasLayer, and a Control whose
 	# parent is not a Control is not laid out by anyone. It has to keep up with the window
@@ -118,6 +128,14 @@ func take_onward() -> void:
 	onward.emit()
 
 
+## The player has taken the door home. Fades out like the others; the lake changes scene.
+func take_menu() -> void:
+	if _leaving or _age < SETTLE:
+		return
+	_leaving = true
+	to_menu.emit()
+
+
 ## The player has read it. Called by the click, and safe to call twice.
 func dismiss() -> void:
 	if _leaving or _age < SETTLE:
@@ -130,8 +148,10 @@ func _gui_input(event: InputEvent) -> void:
 	var moved := event as InputEventMouseMotion
 	if moved != null:
 		var over := _has_onward and _onward_rect.has_point(moved.position)
-		if over != _onward_hot:
+		var home := _menu_rect.has_point(moved.position)
+		if over != _onward_hot or home != _menu_hot:
 			_onward_hot = over
+			_menu_hot = home
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -142,6 +162,9 @@ func _gui_input(event: InputEvent) -> void:
 	# anywhere else on it. Testing the door first is what keeps the two apart.
 	if _has_onward and _onward_rect.has_point(click.position):
 		take_onward()
+		return
+	if _menu_rect.has_point(click.position):
+		take_menu()
 		return
 	dismiss()
 
@@ -171,8 +194,28 @@ func _draw() -> void:
 	_line(String(lines[0]), int(first), top + first, ink, shade)
 	var second_baseline := top + first + first * GAP
 	_line(String(lines[1]), int(second), second_baseline, ink, shade)
+	var under := second_baseline
 	if _has_onward:
-		_draw_onward(second_baseline, float(Style.TEXT_BODY), fade, shade)
+		_draw_onward(under, float(Style.TEXT_BODY), fade, shade)
+		under = _onward_rect.end.y
+	_draw_menu_door(under, float(Style.TEXT_BODY), fade, shade)
+
+
+## The way home: a box under the words, in the frame's deep brown rather than the danger's
+## red. Set the same way the onward door is, so the two are one kind of thing when both
+## show.
+func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> void:
+	var wide := Style.measure(MENU_LABEL, int(height)).x
+	var box := Vector2(wide, height) + ONWARD_PAD * 2.0
+	_menu_rect = Rect2(Vector2((size.x - box.x) * 0.5, under + height * ONWARD_DROP), box)
+	var lit := 0.22 if _menu_hot else 0.12
+	var face := Style.FRAME_DEEP
+	Style.plaque(self, _menu_rect, Color(face.r, face.g, face.b, minf(1.0, 0.55 + lit)), fade)
+	_line(
+		MENU_LABEL, int(height),
+		_menu_rect.position.y + ONWARD_PAD.y + height * 0.82,
+		Color(Style.INK.r, Style.INK.g, Style.INK.b, fade), shade
+	)
 
 
 ## The way on: a line of warning, and a box under it to click. Drawn rather than built from
