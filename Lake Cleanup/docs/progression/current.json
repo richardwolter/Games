@@ -1,0 +1,792 @@
+{
+ "game": "Lake Cleanup (current shop)",
+ "currency": "sludge",
+ "maxMinutes": 300,
+ "startMoney": 0,
+ "stats": {
+  "piece_base_pay": 2.5,
+  "piece_filth_pay": 6.0,
+  "net_radius": 0.6,
+  "net_power": 0,
+  "net_range": 3.4,
+  "reel": 2.4,
+  "net_hold": 3,
+  "boat_speed": 4.2,
+  "cargo": 6,
+  "skimmer": 0,
+  "boats": 1,
+  "dog_fetch": 1,
+  "dog_wait_cut": 0,
+  "k_lake_r": 36.88,
+  "k_island_r": 9.58,
+  "k_units_total": 16264,
+  "k_stack": 4.071,
+  "k_density": 1.2,
+  "k_reel_factor": 0.977,
+  "k_aim": 2.0,
+  "k_cast_share": 0.75,
+  "k_mouth_edge": 0.15,
+  "k_ferry_leg": 24.19,
+  "k_ferry_fixed": 6.33,
+  "k_material_share": 0.3,
+  "k_stack_slots": 4,
+  "k_skim_factor": 1.4,
+  "k_dog_trip": 8,
+  "k_dog_carry": 2.2,
+  "k_dog_reach": 6,
+  "k_dog_carry_share": 0.5,
+  "k_strand": 448,
+  "k_strand_band": 2.5,
+  "k_units_t0": 6337,
+  "k_units_t1": 3896,
+  "k_units_t2": 2769,
+  "k_units_t3": 1551,
+  "k_units_t4": 1711
+ },
+ "derived": [
+  [
+   "coverage",
+   "(min(k_lake_r, k_island_r + net_range) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2)"
+  ],
+  [
+   "dog_coverage",
+   "(min(k_lake_r, k_island_r + k_dog_reach) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2) * k_dog_carry_share"
+  ],
+  [
+   "strand_reach",
+   "clamp((k_island_r + net_range + net_radius - k_lake_r) / k_strand_band, 0, 1)"
+  ],
+  [
+   "access_now",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - coverage)) * (net_power >= 0) + max(0, pool_lake_t1 - k_units_t1 * (1 - coverage)) * (net_power >= 1) + max(0, pool_lake_t2 - k_units_t2 * (1 - coverage)) * (net_power >= 2) + max(0, pool_lake_t3 - k_units_t3 * (1 - coverage)) * (net_power >= 3) + max(0, pool_lake_t4 - k_units_t4 * (1 - coverage)) * (net_power >= 4) + max(0, pool_strand - k_strand * (1 - strand_reach))"
+  ],
+  [
+   "density",
+   "k_density * access_now / max(coverage * k_units_total + strand_reach * k_strand, 1)"
+  ],
+  [
+   "cast_dist",
+   "net_range * k_cast_share"
+  ],
+  [
+   "mouth",
+   "net_radius + k_mouth_edge"
+  ],
+  [
+   "swept",
+   "2 * mouth * cast_dist + PI * mouth ^ 2"
+  ],
+  [
+   "per_cast",
+   "min(net_hold, swept * density)"
+  ],
+  [
+   "cast_cycle",
+   "k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"
+  ],
+  [
+   "catch_rate",
+   "per_cast / cast_cycle"
+  ],
+  [
+   "ferry_trip",
+   "k_ferry_fixed + 2 * k_ferry_leg / boat_speed"
+  ],
+  [
+   "ferry_rate",
+   "boats * cargo / ferry_trip"
+  ],
+  [
+   "trips",
+   "min(boats / ferry_trip, rate_ferry)"
+  ],
+  [
+   "avg_lot",
+   "rate_ferry / max(trips, 0.000001)"
+  ],
+  [
+   "skim_room",
+   "skimmer + max(0, cargo - avg_lot)"
+  ],
+  [
+   "skim_chance",
+   "skimmer >= 1 ? lerp(0.3, 1, (skimmer - 1) / 9) : 0"
+  ],
+  [
+   "skim_power",
+   "floor(max(skimmer - 1, 0) / 2)"
+  ],
+  [
+   "skim_left",
+   "(pool_lake_t0 * (skim_power >= 0) + pool_lake_t1 * (skim_power >= 1) + pool_lake_t2 * (skim_power >= 2) + pool_lake_t3 * (skim_power >= 3) + pool_lake_t4 * (skim_power >= 4)) / k_units_total"
+  ],
+  [
+   "skim_found",
+   "k_skim_factor * k_ferry_leg * (2 * (skimmer - 1) + 1) * k_stack * min(1, (skimmer + 1) / k_stack_slots) * k_material_share * skim_left * skim_chance"
+  ],
+  [
+   "skim_rate",
+   "skimmer >= 1 ? trips * min(skim_room, skim_found) : 0"
+  ],
+  [
+   "dog_rate",
+   "min(dog_fetch, k_dog_carry) / (k_dog_trip + max(10 - dog_wait_cut, 3))"
+  ]
+ ],
+ "pools": {
+  "lake_t0": {
+   "units": "k_units_t0",
+   "value": "piece_base_pay + 3.01 * piece_filth_pay"
+  },
+  "lake_t1": {
+   "units": "k_units_t1",
+   "value": "piece_base_pay + 3.40 * piece_filth_pay"
+  },
+  "lake_t2": {
+   "units": "k_units_t2",
+   "value": "piece_base_pay + 3.07 * piece_filth_pay"
+  },
+  "lake_t3": {
+   "units": "k_units_t3",
+   "value": "piece_base_pay + 3.27 * piece_filth_pay"
+  },
+  "lake_t4": {
+   "units": "k_units_t4",
+   "value": "piece_base_pay + 3.50 * piece_filth_pay"
+  },
+  "strand": {
+   "units": 448,
+   "value": "piece_base_pay + 3.01 * piece_filth_pay"
+  },
+  "box": {
+   "units": 0
+  },
+  "pier": {
+   "units": 0,
+   "sell": true
+  }
+ },
+ "flows": [
+  {
+   "id": "catch",
+   "label": "net catch",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "gate": "net_power >= 0",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t1",
+     "gate": "net_power >= 1",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t2",
+     "gate": "net_power >= 2",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t3",
+     "gate": "net_power >= 3",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t4",
+     "gate": "net_power >= 4",
+     "share": "coverage"
+    },
+    {
+     "pool": "strand",
+     "share": "strand_reach"
+    }
+   ],
+   "to": "box",
+   "rate": "catch_rate",
+   "active": true
+  },
+  {
+   "id": "dog",
+   "label": "dog fetch",
+   "from": [
+    "strand",
+    {
+     "pool": "lake_t0",
+     "share": "dog_coverage"
+    }
+   ],
+   "to": "box",
+   "rate": "dog_rate"
+  },
+  {
+   "id": "ferry",
+   "label": "ferry haul",
+   "from": [
+    "box"
+   ],
+   "to": "pier",
+   "rate": "ferry_rate"
+  },
+  {
+   "id": "skim",
+   "label": "skimmer",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "gate": "skim_power >= 0"
+    },
+    {
+     "pool": "lake_t1",
+     "gate": "skim_power >= 1"
+    },
+    {
+     "pool": "lake_t2",
+     "gate": "skim_power >= 2"
+    },
+    {
+     "pool": "lake_t3",
+     "gate": "skim_power >= 3"
+    },
+    {
+     "pool": "lake_t4",
+     "gate": "skim_power >= 4"
+    }
+   ],
+   "to": "pier",
+   "rate": "skim_rate"
+  }
+ ],
+ "goal": {
+  "pools": [
+   "lake_t0",
+   "lake_t1",
+   "lake_t2",
+   "lake_t3",
+   "lake_t4",
+   "strand"
+  ],
+  "clearAt": 0.995
+ },
+ "links": [
+  {
+   "up": "catch",
+   "down": "ferry",
+   "band": [
+    0.8,
+    1.5
+   ],
+   "buffer": "box"
+  }
+ ],
+ "trees": [
+  "net",
+  "ferry",
+  "dog"
+ ],
+ "nodes": [
+  {
+   "id": "net_width",
+   "tree": "net",
+   "group": "net_width",
+   "name": "Width",
+   "ranks": 13,
+   "cost": [
+    22.0,
+    35.2,
+    56.3,
+    90.1,
+    144.2,
+    230.7,
+    369.1,
+    590.6,
+    944.9,
+    1511.8,
+    2418.9,
+    3870.3,
+    6192.4
+   ],
+   "effects": [
+    {
+     "stat": "net_radius",
+     "add": [
+      0.205,
+      0.295,
+      0.385,
+      0.475,
+      0.565,
+      0.655,
+      0.745,
+      0.835,
+      0.925,
+      1.015,
+      1.105,
+      1.195,
+      1.285
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "net_strength",
+   "tree": "net",
+   "group": "net_strength",
+   "name": "Strength",
+   "ranks": 4,
+   "cost": [
+    150.0,
+    900.0,
+    5400.0,
+    32400.0
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "net_range",
+   "tree": "net",
+   "group": "net_range",
+   "name": "Range",
+   "ranks": 16,
+   "cost": [
+    16.0,
+    21.4,
+    28.7,
+    38.5,
+    51.6,
+    69.1,
+    92.6,
+    124.1,
+    166.3,
+    222.9,
+    298.7,
+    400.2,
+    536.3,
+    718.6,
+    962.9,
+    1290.3
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": [
+      0.83,
+      1.09,
+      1.35,
+      1.61,
+      1.87,
+      2.13,
+      2.39,
+      2.65,
+      2.91,
+      3.17,
+      3.43,
+      3.69,
+      3.95,
+      4.21,
+      4.47,
+      4.73
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "reel",
+   "tree": "net",
+   "group": "reel",
+   "name": "Speed",
+   "ranks": 20,
+   "cost": [
+    22.0,
+    33.4,
+    50.8,
+    77.3,
+    117.4,
+    178.5,
+    271.3,
+    412.4,
+    626.9,
+    952.8,
+    1448.3,
+    2201.4,
+    3346.2,
+    5086.2,
+    7731.0,
+    11751.0,
+    17861.6,
+    27149.6,
+    41267.4,
+    62726.5
+   ],
+   "effects": [
+    {
+     "stat": "reel",
+     "add": [
+      0.575,
+      0.725,
+      0.875,
+      1.025,
+      1.175,
+      1.325,
+      1.475,
+      1.625,
+      1.775,
+      1.925,
+      2.075,
+      2.225,
+      2.375,
+      2.525,
+      2.675,
+      2.825,
+      2.975,
+      3.125,
+      3.275,
+      3.425
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "net_hold",
+   "tree": "net",
+   "group": "net_hold",
+   "name": "Haul",
+   "ranks": 22,
+   "cost": [
+    22.0,
+    34.1,
+    52.9,
+    81.9,
+    127.0,
+    196.8,
+    305.1,
+    472.9,
+    733.0,
+    1136.1,
+    1760.9,
+    2729.4,
+    4230.6,
+    6557.4,
+    10164.0,
+    15754.3,
+    24419.1,
+    37849.6,
+    58666.9,
+    90933.7,
+    140947.3,
+    218468.3
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": [
+      0,
+      1,
+      2,
+      2,
+      2,
+      3,
+      3,
+      3,
+      4,
+      5,
+      4,
+      5,
+      6,
+      6,
+      6,
+      7,
+      7,
+      7,
+      8,
+      9,
+      8,
+      9
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "boat_speed",
+   "tree": "ferry",
+   "group": "boat_speed",
+   "name": "Ferry speed",
+   "ranks": 18,
+   "cost": [
+    14.0,
+    18.9,
+    25.5,
+    34.4,
+    46.5,
+    62.8,
+    84.7,
+    114.4,
+    154.5,
+    208.5,
+    281.5,
+    380.0,
+    513.0,
+    692.6,
+    935.0,
+    1262.2,
+    1704.0,
+    2300.4
+   ],
+   "effects": [
+    {
+     "stat": "boat_speed",
+     "add": [
+      1.325,
+      1.375,
+      1.425,
+      1.475,
+      1.525,
+      1.575,
+      1.625,
+      1.675,
+      1.725,
+      1.775,
+      1.825,
+      1.875,
+      1.925,
+      1.975,
+      2.025,
+      2.075,
+      2.125,
+      2.175
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "cargo",
+   "tree": "ferry",
+   "group": "cargo",
+   "name": "Ferry hold",
+   "ranks": 28,
+   "cost": [
+    14.0,
+    18.2,
+    23.7,
+    30.8,
+    40.0,
+    52.0,
+    67.6,
+    87.8,
+    114.2,
+    148.5,
+    193.0,
+    250.9,
+    326.2,
+    424.0,
+    551.2,
+    716.6,
+    931.6,
+    1211.1,
+    1574.4,
+    2046.7,
+    2660.7,
+    3458.9,
+    4496.6,
+    5845.5,
+    7599.2,
+    9879.0,
+    12842.7,
+    16695.5
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": [
+      4,
+      4,
+      4,
+      4,
+      5,
+      4,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      6,
+      5,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      7,
+      6,
+      7,
+      7
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "fleet",
+   "tree": "ferry",
+   "group": "fleet",
+   "name": "Extra ferry",
+   "ranks": 4,
+   "cost": [
+    200.0,
+    400.0,
+    800.0,
+    1600.0
+   ],
+   "effects": [
+    {
+     "stat": "boats",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "dog_fetch",
+   "tree": "dog",
+   "group": "dog_fetch",
+   "name": "Fetching",
+   "ranks": 4,
+   "cost": [
+    18.0,
+    34.2,
+    65.0,
+    123.5
+   ],
+   "effects": [
+    {
+     "stat": "dog_fetch",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "dog_wait",
+   "tree": "dog",
+   "group": "dog_wait",
+   "name": "Keenness",
+   "ranks": 3,
+   "cost": [
+    16.0,
+    30.4,
+    57.8
+   ],
+   "effects": [
+    {
+     "stat": "dog_wait_cut",
+     "add": [
+      2,
+      2,
+      2
+     ]
+    }
+   ],
+   "tags": []
+  },
+  {
+   "id": "skimmer",
+   "tree": "ferry",
+   "group": "skimmer",
+   "name": "Skimmer",
+   "ranks": 10,
+   "cost": [
+    26.0,
+    38.5,
+    57.0,
+    84.3,
+    124.7,
+    184.6,
+    273.2,
+    404.4,
+    598.5,
+    885.8
+   ],
+   "effects": [
+    {
+     "stat": "skimmer",
+     "add": 1
+    }
+   ],
+   "tags": []
+  }
+ ],
+ "bots": [
+  {
+   "id": "focused",
+   "policy": "value",
+   "thinkEvery": 5
+  },
+  {
+   "id": "casual",
+   "policy": "mixed",
+   "noise": 0.3,
+   "attention": 0.9,
+   "offline": {
+    "every": 600,
+    "for": 270
+   },
+   "thinkEvery": 20,
+   "seeds": 3
+  },
+  {
+   "id": "cheapest",
+   "policy": "cheapest",
+   "thinkEvery": 5
+  },
+  {
+   "id": "no_skimmer",
+   "policy": "value",
+   "thinkEvery": 5,
+   "avoid": [
+    "skimmer"
+   ]
+  }
+ ],
+ "targets": {
+  "clearMinutes": {
+   "focused": [
+    50,
+    70
+   ],
+   "casual": [
+    100,
+    140
+   ]
+  }
+ }
+}

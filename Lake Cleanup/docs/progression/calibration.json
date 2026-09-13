@@ -1,0 +1,86 @@
+{
+ "source": "tools/last_probe.log",
+ "units_by_tier": {
+  "0": 6785,
+  "1": 3896,
+  "2": 2769,
+  "3": 1551,
+  "4": 1711
+ },
+ "strand": 448,
+ "k_stack": 4.071,
+ "deepest": 8,
+ "k_cast_fixed": -0.005,
+ "k_reel_factor": 0.977,
+ "k_shelf": 0.1,
+ "k_density": 1.2,
+ "k_ferry_leg": 24.19,
+ "k_ferry_fixed": 6.33,
+ "skim_runs": [
+  {
+   "level": 1,
+   "lot": 5,
+   "capacity": 157,
+   "skimmed": 1,
+   "seconds": 5.1
+  },
+  {
+   "level": 4,
+   "lot": 5,
+   "capacity": 157,
+   "skimmed": 98,
+   "seconds": 7.8
+  },
+  {
+   "level": 7,
+   "lot": 5,
+   "capacity": 157,
+   "skimmed": 159,
+   "seconds": 9.4
+  },
+  {
+   "level": 10,
+   "lot": 5,
+   "capacity": 157,
+   "skimmed": 162,
+   "seconds": 7.7
+  },
+  {
+   "level": 4,
+   "lot": 157,
+   "capacity": 157,
+   "skimmed": 4,
+   "seconds": 6.5
+  },
+  {
+   "level": 10,
+   "lot": 157,
+   "capacity": 157,
+   "skimmed": 10,
+   "seconds": 8.6
+  }
+ ],
+ "dog_runs": [
+  {
+   "levels": [
+    0,
+    0
+   ],
+   "per_minute": 3.33
+  },
+  {
+   "levels": [
+    4,
+    0
+   ],
+   "per_minute": 7.33
+  },
+  {
+   "levels": [
+    4,
+    3
+   ],
+   "per_minute": 11.33
+  }
+ ]
+}

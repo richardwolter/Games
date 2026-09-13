@@ -170,6 +170,15 @@ var angler: Angler
 var fetch_most: int = 1
 var wait_cut: float = 0.0
 
+## Tree test mode's dog training (see `Lake.tree_mode`). At these defaults the dog is exactly
+## the one the constants describe: `reach` is REACH, nothing sends it to the strand first, and
+## it swims at its own pace. A tree run sets them from its nodes (Long Leash, Beachcomber).
+var reach: float = REACH
+## Chance a trip goes to the strand before the near water is even looked at.
+var strand_first: float = 0.0
+## Pace on strand runs, as a multiple of the ordinary swim and run.
+var strand_speed: float = 1.0
+
 ## The lake's own splash system, handed over by the level, for the wake the dog leaves when
 ## it swims. Null until then, and the dog swims the same either way.
 var splash: WaterSplash
@@ -345,7 +354,12 @@ func _settle() -> void:
 	_mood_left = _rng.randf_range(MOOD_LEAST, maxf(MOOD_MOST - wait_cut, MOOD_LEAST))
 	_to_strand = false
 	if _rng.randf() < 0.45:
-		var stick := _find_stick()
+		var stick := -1
+		if strand_first > 0.0 and _rng.randf() < strand_first:
+			stick = _find_strand()
+			_to_strand = stick >= 0
+		if stick < 0:
+			stick = _find_stick()
 		if stick < 0 and _rng.randf() < STRAND_ODDS:
 			stick = _find_strand()
 			_to_strand = stick >= 0
@@ -395,7 +409,7 @@ func _find_stick(from_dog: bool = false) -> int:
 	var best_gap := INF
 	for _try in 40:
 		var angle := _rng.randf_range(0.0, TAU)
-		var out := Iso.ISLAND_RADIUS.x + _rng.randf_range(1.0, REACH)
+		var out := Iso.ISLAND_RADIUS.x + _rng.randf_range(1.0, maxf(reach, 1.0))
 		var tile := Iso.ISLAND_CENTRE + Vector2(cos(angle), sin(angle) * 0.85) * out
 		if not Iso.in_lake(int(tile.x), int(tile.y)):
 			continue
@@ -452,7 +466,7 @@ func _find_strand(from_dog: bool = false) -> int:
 func _go_fetch(delta: float) -> void:
 	# Getting round something first, if it is doing that.
 	if _detour != Vector2.INF:
-		if _step_towards(_detour, SWIM_SPEED, delta) or _blocked():
+		if _step_towards(_detour, _swim_pace(), delta) or _blocked():
 			_detour = Vector2.INF
 			_fresh_aim()
 		return
@@ -476,7 +490,7 @@ func _go_fetch(delta: float) -> void:
 			return
 		_state = State.CARRY_BACK
 		return
-	if not _step_towards(_target, SWIM_SPEED, delta):
+	if not _step_towards(_target, _swim_pace(), delta):
 		if _blocked():
 			_detour = _way_round(_target)
 			_fresh_aim()
@@ -499,6 +513,11 @@ func _go_fetch(delta: float) -> void:
 	_state = State.CARRY_BACK
 
 
+## The swim out, quicker on a strand run once Beachcomber is trained.
+func _swim_pace() -> float:
+	return SWIM_SPEED * (strand_speed if _to_strand else 1.0)
+
+
 ## Back to the crate, by way of the shore. Swims while it is over water and runs once it is
 ## on the grass, which is what the two animations are for.
 ##
@@ -507,7 +526,7 @@ func _go_fetch(delta: float) -> void:
 ## got in the way on the last stride, reads as the dog dropping the thing on the lawn.
 func _come_home(delta: float) -> void:
 	var landing := _drop_spot()
-	var pace := RUN_SPEED if _on_land() else SWIM_SPEED
+	var pace := (RUN_SPEED if _on_land() else SWIM_SPEED) * (strand_speed if _to_strand else 1.0)
 	if _detour != Vector2.INF:
 		if _step_towards(_detour, pace, delta) or _blocked():
 			_detour = Vector2.INF

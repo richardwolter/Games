@@ -1,0 +1,1600 @@
+<meta charset="utf-8">
+<title>Lake Cleanup Tuner</title>
+<meta name="description" content="Progression tuner: edit upgrade costs and effects, watch pacing checks update.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --ground: #edf1ef;
+  --surface: #f8faf9;
+  --sunk: #e2e9e6;
+  --ink: #14201d;
+  --muted: #5a6a66;
+  --rule: #cad4d1;
+  --accent: #0b6e69;
+  --accent-soft: #d2e7e4;
+  --oak: #8a5a1f;
+  --pass: #2c8a4b;
+  --warn: #a8701a;
+  --fail: #bf3b2c;
+  --pass-soft: #d9efe0;
+  --warn-soft: #f5e7cc;
+  --fail-soft: #f6dbd7;
+  --t0: #0b6e69; --t1: #8a5a1f; --t2: #5b4bb7; --t3: #b03a6f; --t4: #3f7d20; --t5: #1f5fa8;
+  --edited: #a8701a;
+  --shadow: 0 1px 0 rgba(20, 32, 29, 0.06), 0 8px 24px -16px rgba(20, 32, 29, 0.35);
+  --font-ui: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0d1413; --surface: #14201e; --sunk: #0f1918; --ink: #e2ebe8; --muted: #8c9e99;
+    --rule: #26383a; --accent: #52c2b8; --accent-soft: #173a37; --oak: #d19a58;
+    --pass: #5cc47c; --warn: #e0a84a; --fail: #ef6f61;
+    --pass-soft: #163324; --warn-soft: #3a2c12; --fail-soft: #3d1b17;
+    --t0: #52c2b8; --t1: #d19a58; --t2: #9d8ff0; --t3: #e57aa8; --t4: #86c75e; --t5: #6fa8ee;
+    --edited: #e0a84a;
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0d1413; --surface: #14201e; --sunk: #0f1918; --ink: #e2ebe8; --muted: #8c9e99;
+  --rule: #26383a; --accent: #52c2b8; --accent-soft: #173a37; --oak: #d19a58;
+  --pass: #5cc47c; --warn: #e0a84a; --fail: #ef6f61;
+  --pass-soft: #163324; --warn-soft: #3a2c12; --fail-soft: #3d1b17;
+  --t0: #52c2b8; --t1: #d19a58; --t2: #9d8ff0; --t3: #e57aa8; --t4: #86c75e; --t5: #6fa8ee;
+  --edited: #e0a84a;
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 400 14px/1.45 var(--font-ui); font-variation-settings: "wdth" 100;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* ---------- header ---------- */
+header.top {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 32px; align-items: flex-end;
+  padding: 22px 28px 18px; border-bottom: 1px solid var(--rule);
+}
+.title-block { flex: 1 1 380px; min-width: 0; }
+.status-row { flex: 0 1 auto; }
+.title-block h1 {
+  margin: 2px 0 0; font-size: 26px; line-height: 1.1; font-weight: 750;
+  font-variation-settings: "wdth" 118; letter-spacing: -0.01em; text-wrap: balance;
+}
+.title-block p { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+.status-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--sunk); color: var(--muted); white-space: nowrap;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.pass { background: var(--pass-soft); color: var(--pass); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.fail { background: var(--fail-soft); color: var(--fail); }
+.pill.quiet::before { display: none; }
+
+.clears { display: flex; gap: 10px; flex: 1 1 100%; flex-wrap: wrap; }
+.clear {
+  display: grid; gap: 2px; padding: 10px 14px 11px; min-width: 150px; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; position: relative;
+}
+.clear .v { font-family: var(--font-num); font-size: 22px; font-weight: 500; line-height: 1.1; }
+.clear .v small { font-size: 12px; color: var(--muted); margin-left: 3px; }
+.clear .tgt { font-size: 12px; color: var(--muted); }
+.clear[data-status]::after {
+  content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 2px 2px 0;
+}
+.clear[data-status="pass"]::after { background: var(--pass); }
+.clear[data-status="warn"]::after { background: var(--warn); }
+.clear[data-status="fail"]::after { background: var(--fail); }
+
+/* ---------- layout ---------- */
+main.work { display: grid; grid-template-columns: minmax(360px, 460px) minmax(0, 1fr); min-height: 70vh; }
+@media (max-width: 1040px) { main.work { grid-template-columns: 1fr; } }
+aside.editor { border-right: 1px solid var(--rule); background: var(--surface); display: flex; flex-direction: column; min-width: 0; }
+@media (max-width: 1040px) { aside.editor { border-right: 0; border-bottom: 1px solid var(--rule); } }
+section.results { padding: 20px 28px 40px; display: grid; gap: 22px; align-content: start; min-width: 0; }
+
+.tabs { display: flex; gap: 2px; padding: 12px 14px 0; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.tab {
+  border: 0; background: none; padding: 8px 12px 9px; cursor: pointer; color: var(--muted); font-weight: 600;
+  border-bottom: 2px solid transparent; white-space: nowrap; display: inline-flex; gap: 7px; align-items: center;
+}
+.tab .sw { width: 9px; height: 9px; border-radius: 2px; background: var(--c, var(--muted)); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--c, var(--accent)); }
+.tab .count { font-family: var(--font-num); font-size: 11px; color: var(--muted); font-weight: 400; }
+
+.editor-body { padding: 6px 0 24px; overflow-y: auto; max-height: calc(100vh - 40px); }
+.hint { margin: 10px 16px 4px; font-size: 12px; color: var(--muted); max-width: 60ch; }
+
+/* ---------- node rows ---------- */
+.node { padding: 10px 16px 11px calc(16px + var(--d, 0) * 18px); border-bottom: 1px solid var(--rule); position: relative; }
+.node::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: calc(8px + var(--d, 0) * 18px);
+  border-left: 1px dashed var(--rule);
+}
+.node.root::before { display: none; }
+.node-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.node-name { font-weight: 650; }
+.node-id { font-family: var(--font-num); font-size: 11px; color: var(--muted); }
+.tag { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; color: var(--c, var(--accent)); }
+.after { font-size: 11.5px; color: var(--muted); }
+.node-meta { margin-top: 3px; font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.node-meta .never { color: var(--fail); font-weight: 600; }
+.node-meta b { color: var(--ink); font-weight: 500; font-family: var(--font-num); }
+.node.edited .node-name::after { content: " \2022 edited"; color: var(--edited); font-size: 11px; font-weight: 600; }
+.reset {
+  margin-left: auto; border: 1px solid var(--rule); background: var(--surface); border-radius: 4px;
+  padding: 1px 8px; font-size: 11.5px; cursor: pointer; color: var(--muted);
+}
+.reset:hover { color: var(--ink); border-color: var(--muted); }
+.fields { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; }
+.field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.field .ranks { display: flex; gap: 3px; }
+input.n {
+  width: 72px; padding: 3px 6px; border: 1px solid var(--rule); border-radius: 4px; background: var(--ground);
+  font-family: var(--font-num); font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ink);
+}
+input.n.short { width: 56px; }
+input.n:hover { border-color: var(--muted); }
+input.n.changed { border-color: var(--edited); box-shadow: inset 0 -2px 0 var(--edited); }
+.expr { font-family: var(--font-num); font-size: 11.5px; color: var(--muted); }
+
+.globals h3 { margin: 16px 16px 6px; font-size: 13px; font-weight: 700; font-variation-settings: "wdth" 112; }
+.grow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 0 16px 6px; align-items: center; }
+.grow .k { font-family: var(--font-num); font-size: 12px; overflow-wrap: anywhere; }
+
+/* ---------- results ---------- */
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: var(--shadow); min-width: 0; }
+.panel-head { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px 0; flex-wrap: wrap; }
+.panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; font-variation-settings: "wdth" 112; }
+.panel-head .sub { color: var(--muted); font-size: 12px; }
+.legend { display: flex; gap: 12px; margin-left: auto; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; background: var(--c); display: inline-block; }
+.legend i.dash { background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px); }
+.chart { display: block; width: 100%; height: 220px; }
+.chart.short { height: 150px; }
+.charts-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; }
+
+.table-wrap { overflow-x: auto; padding: 6px 4px 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+td { padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; }
+td .pill { font-size: 11px; }
+.check-detail { color: var(--muted); max-width: 70ch; }
+.bot-tabs { display: flex; gap: 4px; margin-left: auto; }
+.bot-tabs button { border: 1px solid var(--rule); background: none; border-radius: 4px; padding: 2px 10px; font-size: 12px; cursor: pointer; color: var(--muted); }
+.bot-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
+.tree-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--c); margin-right: 6px; }
+
+.banner { margin: 0; padding: 10px 14px; border-radius: 6px; background: var(--fail-soft); color: var(--fail); font-weight: 600; }
+.banner[hidden] { display: none; }
+details.export { padding: 0 16px 14px; }
+details.export summary { cursor: pointer; padding: 12px 0 6px; font-weight: 600; }
+details.export textarea { width: 100%; height: 180px; font: 12px/1.4 var(--font-num); background: var(--ground); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 8px; }
+footer.note { padding: 0 28px 28px; color: var(--muted); font-size: 12px; max-width: 90ch; }
+@media (prefers-reduced-motion: no-preference) {
+  .running .clear .v, .running canvas { transition: opacity 0.2s; opacity: 0.55; }
+}
+</style>
+
+<header class="top">
+  <div class="title-block">
+    <div class="label">Progression tuner</div>
+    <h1 id="game-title">Lake Cleanup Tuner</h1>
+    <p>Change a cost or an effect and the simulated players replay the whole game. Your edits are saved for Claude to read back into the design.</p>
+  </div>
+  <div class="status-row">
+    <span class="pill quiet" id="save-state">Connecting…</span>
+    <span class="pill" id="sum-pass">– pass</span>
+    <span class="pill" id="sum-warn">– warn</span>
+    <span class="pill" id="sum-fail">– fail</span>
+  </div>
+  <div class="clears" id="clears"></div>
+</header>
+
+<main class="work">
+  <aside class="editor" aria-label="Tree editor">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="editor-body" id="editor"></div>
+  </aside>
+
+  <section class="results">
+    <p class="banner" id="error" hidden></p>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Lake cleared over time</h2><span class="sub">share of the finite resource gone, target windows shaded</span>
+        <div class="legend" id="legend-clear"></div>
+      </div>
+      <canvas class="chart" id="chart-clear"></canvas>
+    </div>
+
+    <div class="charts-2">
+      <div class="panel">
+        <div class="panel-head"><h2>Income</h2><span class="sub" id="currency-sub">per second</span><div class="legend" id="legend-income"></div></div>
+        <canvas class="chart short" id="chart-income"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Chain in step</h2><span class="sub" id="link-sub">carrier capacity ÷ supply</span><div class="legend" id="legend-link"></div></div>
+        <canvas class="chart short" id="chart-link"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Purchases</h2><span class="sub">focused player, one lane per tree; rings are unlocks</span></div>
+      <canvas class="chart short" id="chart-buys"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Checks</h2><span class="sub">pacing, power, dominance, bottlenecks</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody id="checks"></tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Purchase log</h2><div class="bot-tabs" id="bot-tabs"></div></div>
+      <div class="table-wrap"><table><thead><tr><th class="num">Min</th><th>Node</th><th class="num">Cost</th><th class="num">Income gain</th><th class="num">Payback</th></tr></thead><tbody id="log"></tbody></table></div>
+    </div>
+  </section>
+</main>
+<footer class="note">Bots are a sanity floor, not the player: they prove the numbers can't break pacing, never that the game feels good. Playtest decides feel.</footer>
+
+<script type="application/json" id="config">{"game":"Lake Cleanup","currency":"sludge","maxMinutes":300,"startMoney":50,"stats":{"piece_base_pay":2.5,"piece_filth_pay":6,"net_radius":0.6,"net_power":0,"net_range":3.4,"reel":2.4,"net_hold":3,"boat_speed":4.2,"cargo":18,"boats":0,"dog_fetch":1,"dog_wait_cut":0,"k_lake_r":36.88,"k_island_r":9.58,"k_units_total":16264,"k_stack":4.071,"k_density":1.2,"k_reel_factor":0.977,"k_aim":2,"k_cast_share":0.75,"k_mouth_edge":0.15,"k_ferry_leg":24.19,"k_ferry_fixed":6.33,"k_material_share":0.3,"k_stack_slots":4,"k_skim_factor":1.4,"k_dog_trip":8,"k_dog_carry":2.2,"k_dog_reach":6,"k_dog_carry_share":0.5,"k_strand":448,"k_strand_band":2.5,"k_units_t0":6337,"k_units_t1":3896,"k_units_t2":2769,"k_units_t3":1551,"k_units_t4":1711,"dog":0,"dog_beach":0.35,"dog_strand_speed":1,"dog_reach":6},"derived":[["coverage","(min(k_lake_r, k_island_r + net_range) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2)"],["dog_coverage","(min(k_lake_r, k_island_r + dog_reach) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2) * k_dog_carry_share"],["strand_reach","clamp((k_island_r + net_range + net_radius - k_lake_r) / k_strand_band, 0, 1)"],["access_now","max(0, pool_lake_t0 - k_units_t0 * (1 - coverage)) * (net_power >= 0) + max(0, pool_lake_t1 - k_units_t1 * (1 - coverage)) * (net_power >= 1) + max(0, pool_lake_t2 - k_units_t2 * (1 - coverage)) * (net_power >= 2) + max(0, pool_lake_t3 - k_units_t3 * (1 - coverage)) * (net_power >= 3) + max(0, pool_lake_t4 - k_units_t4 * (1 - coverage)) * (net_power >= 4) + max(0, pool_strand - k_strand * (1 - strand_reach))"],["density","k_density * access_now / max(coverage * k_units_total + strand_reach * k_strand, 1)"],["cast_dist","net_range * k_cast_share"],["mouth","net_radius + k_mouth_edge"],["swept","2 * mouth * cast_dist + PI * mouth ^ 2"],["per_cast","min(net_hold, swept * density)"],["cast_cycle","k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"],["catch_rate","per_cast / cast_cycle"],["ferry_trip","k_ferry_fixed + 2 * k_ferry_leg / boat_speed"],["ferry_rate","boats * cargo / ferry_trip"],["dog_near_left","max(0, pool_lake_t0 - k_units_t0 * (1 - dog_coverage))"],["dog_beach_share","dog_near_left > 5 ? dog_beach : 1"],["dog_rate","dog * min(dog_fetch, k_dog_carry) / (k_dog_trip + max(10 - dog_wait_cut, 3))"]],"pools":{"lake_t0":{"units":"k_units_t0","value":"piece_base_pay + 3.01 * piece_filth_pay"},"lake_t1":{"units":"k_units_t1","value":"piece_base_pay + 3.40 * piece_filth_pay"},"lake_t2":{"units":"k_units_t2","value":"piece_base_pay + 3.07 * piece_filth_pay"},"lake_t3":{"units":"k_units_t3","value":"piece_base_pay + 3.27 * piece_filth_pay"},"lake_t4":{"units":"k_units_t4","value":"piece_base_pay + 3.50 * piece_filth_pay"},"strand":{"units":448,"value":"piece_base_pay + 3.01 * piece_filth_pay"},"box":{"units":0},"pier":{"units":0,"sell":true}},"flows":[{"id":"catch","label":"net catch","from":[{"pool":"lake_t0","gate":"net_power >= 0","share":"coverage"},{"pool":"lake_t1","gate":"net_power >= 1","share":"coverage"},{"pool":"lake_t2","gate":"net_power >= 2","share":"coverage"},{"pool":"lake_t3","gate":"net_power >= 3","share":"coverage"},{"pool":"lake_t4","gate":"net_power >= 4","share":"coverage"},{"pool":"strand","share":"strand_reach"}],"to":"box","rate":"catch_rate","active":true},{"id":"dog","label":"dog fetch","from":[{"pool":"lake_t0","share":"dog_coverage"}],"to":"box","rate":"dog_rate * (1 - dog_beach_share)"},{"id":"dog_beach","label":"dog strand runs","from":["strand"],"to":"box","rate":"dog_rate * dog_beach_share * dog_strand_speed"},{"id":"ferry","label":"ferry haul","from":["box"],"to":"pier","rate":"ferry_rate"}],"goal":{"pools":["lake_t0","lake_t1","lake_t2","lake_t3","lake_t4","strand"],"clearAt":0.995},"links":[{"up":"catch","down":"ferry","band":[0.8,1.5],"buffer":"box"}],"trees":["net","ferry","dog"],"nodes":[{"id":"ferry_1","tree":"ferry","group":"fleet","name":"First Ferry","cost":50,"parents":[],"effects":[{"stat":"boats","set":1}],"tags":["unlock"],"desc":"The first purchase: a boat to carry the catch to the piers. Starting money covers it.","fixedCost":true},{"id":"hull_1","tree":"ferry","group":"hull","name":"Deeper Hull I","cost":300,"parents":["ferry_1"],"effects":[{"stat":"cargo","add":4}],"tags":[],"at":1.2},{"id":"sails_1","tree":"ferry","group":"sails","name":"Trim Sails I","cost":500,"parents":["ferry_1"],"effects":[{"stat":"boat_speed","add":2}],"tags":[],"at":2},{"id":"hull_2","tree":"ferry","group":"hull","name":"Deeper Hull II","cost":800,"parents":["hull_1"],"effects":[{"stat":"cargo","add":6}],"tags":[],"at":5.5},{"id":"ferry_2","tree":"ferry","group":"fleet","name":"Second Ferry","cost":2400,"parents":["hull_1"],"effects":[{"stat":"boats","add":1}],"tags":["unlock"],"at":9.5},{"id":"sails_2","tree":"ferry","group":"sails","name":"Trim Sails II","cost":2800,"parents":["sails_1"],"effects":[{"stat":"boat_speed","add":3}],"tags":[],"at":15},{"id":"hull_3","tree":"ferry","group":"hull","name":"Deeper Hull III","cost":4000,"parents":["hull_2"],"effects":[{"stat":"cargo","add":8}],"tags":[],"at":16.5},{"id":"ferry_3","tree":"ferry","group":"fleet","name":"Third Ferry","cost":11000,"parents":["ferry_2"],"effects":[{"stat":"boats","add":1}],"tags":["unlock"],"at":23.5},{"id":"line_1","tree":"net","group":"line","name":"Longer Line I","cost":150,"parents":["ferry_1"],"effects":[{"stat":"net_range","add":2.2},{"stat":"reel","add":1}],"tags":[],"desc":"Casts clear the rubbish-free shelf round the island and land in real water.","at":0.7},{"id":"bag_1","tree":"net","group":"bag","name":"Bigger Bag I","cost":600,"parents":["line_1"],"effects":[{"stat":"net_hold","add":3}],"tags":[],"at":6.5},{"id":"pull_1","tree":"net","group":"pull","name":"Stronger Pull","cost":1000,"parents":["line_1"],"effects":[{"stat":"net_power","set":1}],"tags":["unlock"],"desc":"Lifts tier 1: a quarter of the lake that was dead weight becomes catch.","at":4.5},{"id":"line_2","tree":"net","group":"line","name":"Longer Line II","cost":700,"parents":["line_1"],"effects":[{"stat":"net_range","add":4},{"stat":"reel","add":2}],"tags":[],"at":3.5},{"id":"bag_2","tree":"net","group":"bag","name":"Bigger Bag II","cost":1300,"parents":["bag_1"],"effects":[{"stat":"net_hold","add":3}],"tags":[],"at":8.5},{"id":"bag_3","tree":"net","group":"bag","name":"Bigger Bag III","cost":3000,"parents":["bag_2","ferry_2"],"effects":[{"stat":"net_hold","add":6}],"tags":[],"requireAll":true,"at":14},{"id":"pull_2","tree":"net","group":"pull","name":"Heavy Lift","cost":4500,"parents":["pull_1"],"effects":[{"stat":"net_power","set":2}],"tags":["unlock"],"at":11},{"id":"line_3","tree":"net","group":"line","name":"Longer Line III","cost":3000,"parents":["line_2"],"effects":[{"stat":"net_range","add":7},{"stat":"reel","add":3}],"tags":[],"at":13},{"id":"bag_4","tree":"net","group":"bag","name":"Bigger Bag IV","cost":6000,"parents":["bag_3"],"effects":[{"stat":"net_hold","add":10}],"tags":[],"at":19},{"id":"mouth_1","tree":"net","group":"mouth","name":"Wide Mouth I","cost":9000,"parents":["line_3"],"effects":[{"stat":"net_radius","add":0.4}],"tags":[],"at":20.5},{"id":"pull_3","tree":"net","group":"pull","name":"Iron Pull","cost":16000,"parents":["pull_2"],"effects":[{"stat":"net_power","set":3}],"tags":["unlock"],"at":22},{"id":"line_4","tree":"net","group":"line","name":"Longer Line IV","cost":14000,"parents":["line_3"],"effects":[{"stat":"net_range","add":10.7},{"stat":"reel","add":5}],"tags":[],"at":25},{"id":"bag_5","tree":"net","group":"bag","name":"Bigger Bag V","cost":17000,"parents":["bag_4"],"effects":[{"stat":"net_hold","add":14}],"tags":[],"at":28},{"id":"mouth_2","tree":"net","group":"mouth","name":"Wide Mouth II","cost":27000,"parents":["mouth_1"],"effects":[{"stat":"net_radius","add":0.6}],"tags":[],"at":34},{"id":"pull_4","tree":"net","group":"pull","name":"Titan Pull","cost":24000,"parents":["pull_3"],"effects":[{"stat":"net_power","set":4}],"tags":["unlock"],"at":32},{"id":"bank_reach","tree":"net","group":"line","name":"Bank Reach","cost":34000,"parents":["line_4"],"effects":[{"stat":"net_range","add":3},{"stat":"reel","add":8}],"tags":["keystone"],"desc":"Past the water's edge: the strand and beach litter come within a cast, and the reel flies. Line IV already reaches all the water, so nobody can be locked out by this price.","at":37},{"id":"trawl","tree":"net","group":"mouth","name":"Trawl Mouth","cost":40000,"parents":["mouth_2"],"effects":[{"stat":"net_radius","add":2}],"tags":["keystone"],"desc":"A mouth wide enough to sweep the last stragglers out of thin water.","at":41},{"id":"dog","tree":"dog","group":"dog","name":"Adopt the Dog","cost":700,"parents":["bag_2"],"effects":[{"stat":"dog","set":1}],"tags":["unlock","utility"],"at":7.5},{"id":"fetch_1","tree":"dog","group":"fetch","name":"Good Fetch I","cost":1000,"parents":["dog"],"effects":[{"stat":"dog_fetch","add":1}],"tags":["utility"],"at":12},{"id":"nose","tree":"dog","group":"nose","name":"Keen Nose","cost":2000,"parents":["dog"],"effects":[{"stat":"dog_wait_cut","add":3}],"tags":["utility"],"at":17.5},{"id":"fetch_2","tree":"dog","group":"fetch","name":"Good Fetch II","cost":6000,"parents":["fetch_1"],"effects":[{"stat":"dog_fetch","add":1}],"tags":["utility"],"at":26.5},{"id":"leash","tree":"dog","group":"leash","name":"Long Leash","cost":13000,"parents":["nose"],"effects":[{"stat":"dog_reach","add":6}],"tags":["utility"],"desc":"The dog ranges twice as far from the island for light pieces.","at":35.5},{"id":"beachcomber","tree":"dog","group":"beach","name":"Beachcomber","cost":9000,"parents":["fetch_2"],"effects":[{"stat":"dog_beach","set":0.85},{"stat":"dog_strand_speed","set":1.6}],"tags":["keystone","utility"],"desc":"The dog works the far bank on its own: strand runs first, and quicker.","at":39}],"bots":[{"id":"focused","policy":"value","thinkEvery":5},{"id":"casual","policy":"mixed","noise":0.15,"attention":0.9,"offline":{"every":600,"for":240},"thinkEvery":20,"seeds":3},{"id":"cheapest","policy":"cheapest","thinkEvery":5}],"targets":{"clearMinutes":{"focused":[50,70],"casual":[100,140]},"unlockGapMin":[2,15],"paybackCurve":[[0,30],[10,120],[30,360],[60,600]]}}</script>
+<script>// Progression simulator for incremental games with upgrade trees.
+//
+// One engine for both the command line (scripts/run_sim.js) and the tuner page
+// (assets/tuner.html inlines this file). Keep it dependency-free and free of eval:
+// artifact pages run under a CSP that may forbid `new Function`, so expressions go
+// through the small parser below.
+//
+// Model in one paragraph: a game is a set of STATS (base values plus the effects of owned
+// nodes, recomputed from scratch on every purchase so buy order never matters), DERIVED
+// values (expressions over stats and pools), POOLS of units that carry money value, and
+// FLOWS that move units between pools at a rate expression. Units reaching a `sell` pool
+// become money. NODES are the upgrade tree: reveal-on-buy by default. BOTS play the model
+// with different policies and the report measures pacing, bottlenecks and dominance.
+//
+// Config format: see references/config-schema.md.
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.ProgSim = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ------------------------------------------------------------------ expressions
+
+  const FNS = {
+    min: Math.min, max: Math.max, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+    sqrt: Math.sqrt, abs: Math.abs, log: Math.log, exp: Math.exp, pow: Math.pow,
+    clamp: (x, a, b) => Math.min(Math.max(x, a), b),
+    lerp: (a, b, t) => a + (b - a) * t,
+    step: (edge, x) => (x >= edge ? 1 : 0),
+  };
+  const CONSTS = { PI: Math.PI, E: Math.E, INF: Infinity };
+
+  function tokenize(src) {
+    const out = [];
+    let i = 0;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+      if ((c >= '0' && c <= '9') || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+        const m = /^(\d*\.?\d+|\d+\.)([eE][+-]?\d+)?/.exec(src.slice(i));
+        out.push({ t: 'num', v: parseFloat(m[0]) });
+        i += m[0].length;
+        continue;
+      }
+      if (/[A-Za-z_]/.test(c)) {
+        const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i));
+        out.push({ t: 'id', v: m[0] });
+        i += m[0].length;
+        continue;
+      }
+      const two = src.slice(i, i + 2);
+      if (['<=', '>=', '==', '!=', '&&', '||'].includes(two)) { out.push({ t: 'op', v: two }); i += 2; continue; }
+      if ('+-*/%^()<>!?:,'.includes(c)) { out.push({ t: 'op', v: c }); i++; continue; }
+      throw new Error(`unexpected "${c}" in expression "${src}"`);
+    }
+    return out;
+  }
+
+  // Compiles an expression to a function of a scope object. Booleans are 1/0.
+  function compile(src) {
+    if (typeof src === 'number') return () => src;
+    if (typeof src !== 'string') throw new Error(`expression must be a number or string, got ${JSON.stringify(src)}`);
+    const toks = tokenize(src);
+    let p = 0;
+    const peek = () => toks[p];
+    const isOp = (v) => toks[p] && toks[p].t === 'op' && toks[p].v === v;
+    const expect = (v) => { if (!isOp(v)) throw new Error(`expected "${v}" in "${src}"`); p++; };
+
+    function ternary() {
+      const c = orExpr();
+      if (isOp('?')) {
+        p++;
+        const a = ternary();
+        expect(':');
+        const b = ternary();
+        return (s) => (c(s) ? a(s) : b(s));
+      }
+      return c;
+    }
+    function binary(next, ops) {
+      return function () {
+        let left = next();
+        while (toks[p] && toks[p].t === 'op' && ops[toks[p].v]) {
+          const f = ops[toks[p].v];
+          p++;
+          const l = left, r = next();
+          left = (s) => f(l(s), r(s));
+        }
+        return left;
+      };
+    }
+    const mul = binary(unary, { '*': (a, b) => a * b, '/': (a, b) => a / b, '%': (a, b) => a % b });
+    const add = binary(mul, { '+': (a, b) => a + b, '-': (a, b) => a - b });
+    const cmp = binary(add, {
+      '<': (a, b) => +(a < b), '<=': (a, b) => +(a <= b), '>': (a, b) => +(a > b),
+      '>=': (a, b) => +(a >= b), '==': (a, b) => +(a === b), '!=': (a, b) => +(a !== b),
+    });
+    const andExpr = binary(cmp, { '&&': (a, b) => +(a && b) });
+    const orExpr = binary(andExpr, { '||': (a, b) => +(a || b) });
+
+    function unary() {
+      if (isOp('-')) { p++; const v = unary(); return (s) => -v(s); }
+      if (isOp('+')) { p++; return unary(); }
+      if (isOp('!')) { p++; const v = unary(); return (s) => +!v(s); }
+      return power();
+    }
+    function power() {
+      const base = primary();
+      if (isOp('^')) { p++; const e = unary(); return (s) => Math.pow(base(s), e(s)); }
+      return base;
+    }
+    function primary() {
+      const tk = peek();
+      if (!tk) throw new Error(`unexpected end of "${src}"`);
+      if (tk.t === 'num') { p++; const v = tk.v; return () => v; }
+      if (isOp('(')) { p++; const v = ternary(); expect(')'); return v; }
+      if (tk.t === 'id') {
+        p++;
+        const name = tk.v;
+        if (isOp('(')) {
+          p++;
+          const fn = FNS[name];
+          if (!fn) throw new Error(`unknown function "${name}" in "${src}"`);
+          const args = [];
+          if (!isOp(')')) {
+            args.push(ternary());
+            while (isOp(',')) { p++; args.push(ternary()); }
+          }
+          expect(')');
+          return (s) => fn(...args.map((a) => a(s)));
+        }
+        if (name in CONSTS) { const v = CONSTS[name]; return () => v; }
+        return (s) => {
+          const v = s[name];
+          if (v === undefined) throw new Error(`unknown name "${name}" in "${src}"`);
+          return v;
+        };
+      }
+      throw new Error(`unexpected "${tk.v}" in "${src}"`);
+    }
+
+    const fn = ternary();
+    if (p !== toks.length) throw new Error(`trailing "${toks[p].v}" in "${src}"`);
+    return fn;
+  }
+
+  // ------------------------------------------------------------------ model
+
+  const DEFAULT_TARGETS = {
+    earlyWindowMin: 10,
+    earlyGapSec: [10, 60],
+    maxGapSec: 300,
+    minJumpPct: 8,
+    dominanceRatio: 3,
+    dominanceShare: 0.5,
+    linkBandShare: 0.75,
+    paybackSpread: 4,
+    unlockGapMin: [2, 15],
+    lateContentShare: 0.85,
+    tailShare: [0.1, 0.25],
+  };
+
+  function prepare(config) {
+    const m = {
+      name: config.game || 'game',
+      currency: config.currency || 'money',
+      dt: config.tick || 1,
+      horizon: config.horizon || 90,
+      horizonDt: config.horizonTick || 3,
+      sampleEvery: config.sampleEvery || 30,
+      maxT: (config.maxMinutes || 240) * 60,
+      startMoney: config.startMoney || 0,
+      baseStats: Object.assign({}, config.stats || {}),
+      targets: Object.assign({}, DEFAULT_TARGETS, config.targets || {}),
+      trees: config.trees || [],
+      raw: config,
+    };
+
+    const derived = Array.isArray(config.derived) ? config.derived : Object.entries(config.derived || {});
+    m.derived = derived.map(([name, expr]) => ({ name, fn: compile(expr), src: expr }));
+
+    m.pools = Object.entries(config.pools || {}).map(([id, p]) => ({
+      id,
+      infinite: p.units === null || p.units === 'inf',
+      units: p.units === null || p.units === 'inf' ? Infinity : compile(p.units),
+      unitValue: compile(p.value === undefined ? 0 : p.value),
+      sell: !!p.sell,
+      payMult: p.payMult === undefined ? null : compile(p.payMult),
+      cap: p.cap === undefined ? null : compile(p.cap),
+    }));
+    m.poolById = Object.fromEntries(m.pools.map((p) => [p.id, p]));
+
+    m.flows = (config.flows || []).map((f) => {
+      const from = (Array.isArray(f.from) ? f.from : [f.from]).map((s) => {
+        const id = typeof s === 'string' ? s : s.pool;
+        if (!m.poolById[id]) throw new Error(`flow ${f.id}: unknown pool "${id}"`);
+        const gateSrc = typeof s === 'string' ? (f.gates && f.gates[id]) : s.gate;
+        const shareSrc = typeof s === 'string' ? undefined : s.share;
+        return { id, gate: gateSrc === undefined ? null : compile(gateSrc), share: shareSrc === undefined ? null : compile(shareSrc) };
+      });
+      if (!m.poolById[f.to]) throw new Error(`flow ${f.id}: unknown pool "${f.to}"`);
+      return { id: f.id, from, to: f.to, rate: compile(f.rate), active: !!f.active, label: f.label || f.id };
+    });
+
+    m.goal = config.goal || {};
+    m.goalPools = m.goal.pools || null; // default: every finite, unsold pool that starts non-empty
+    m.clearAt = m.goal.clearAt === undefined ? 0.995 : m.goal.clearAt;
+
+    m.links = config.links || [];
+
+    m.nodes = (config.nodes || []).map((n) => {
+      const node = Object.assign({ ranks: 1, parents: [], effects: [], tags: [], requireAll: false }, n);
+      node.gateFn = n.gate === undefined ? null : compile(n.gate);
+      node.group = n.group || n.tree || 'default';
+      return node;
+    });
+    m.byId = Object.fromEntries(m.nodes.map((n) => [n.id, n]));
+    m.children = Object.fromEntries(m.nodes.map((n) => [n.id, []]));
+    for (const n of m.nodes) {
+      for (const parent of n.parents) {
+        if (!m.byId[parent]) throw new Error(`node ${n.id}: unknown parent "${parent}"`);
+        m.children[parent].push(n.id);
+      }
+      for (const e of n.effects) {
+        if (!(e.stat in m.baseStats)) throw new Error(`node ${n.id}: effect on unknown stat "${e.stat}" (declare it in "stats")`);
+      }
+    }
+    m.startOwned = config.startOwned || {};
+    return m;
+  }
+
+  function nodeCost(node, rank) {
+    if (Array.isArray(node.cost)) return node.cost[Math.min(rank, node.cost.length - 1)];
+    return node.cost * Math.pow(node.costMult || 1, rank);
+  }
+
+  function effectSum(v, rank) {
+    if (Array.isArray(v)) { let s = 0; for (let i = 0; i < rank; i++) s += v[Math.min(i, v.length - 1)]; return s; }
+    return v * rank;
+  }
+  function effectProduct(v, rank) {
+    if (Array.isArray(v)) { let s = 1; for (let i = 0; i < rank; i++) s *= v[Math.min(i, v.length - 1)]; return s; }
+    return Math.pow(v, rank);
+  }
+
+  // Full recompute from base: set (largest wins), then add, then multiply.
+  function computeStats(m, owned) {
+    const sets = {}, adds = {}, muls = {};
+    for (const id in owned) {
+      const rank = owned[id];
+      if (!rank) continue;
+      for (const e of m.byId[id].effects) {
+        if (e.set !== undefined) sets[e.stat] = Math.max(sets[e.stat] === undefined ? -Infinity : sets[e.stat], e.set);
+        if (e.add !== undefined) adds[e.stat] = (adds[e.stat] || 0) + effectSum(e.add, rank);
+        if (e.mul !== undefined) muls[e.stat] = (muls[e.stat] === undefined ? 1 : muls[e.stat]) * effectProduct(e.mul, rank);
+      }
+    }
+    const s = {};
+    for (const k in m.baseStats) {
+      const base = k in sets ? sets[k] : m.baseStats[k];
+      s[k] = (base + (adds[k] || 0)) * (k in muls ? muls[k] : 1);
+    }
+    return s;
+  }
+
+  function initState(m) {
+    const owned = Object.assign({}, m.startOwned);
+    const stats = computeStats(m, owned);
+    const pools = {};
+    const scope0 = Object.assign({}, stats);
+    for (const p of m.pools) {
+      const units = p.infinite ? Infinity : p.units(scope0);
+      pools[p.id] = { units, init: units, value: p.infinite ? 0 : units * p.unitValue(scope0) };
+    }
+    const st = { t: 0, money: m.startMoney, earned: 0, owned, stats, pools, rates: {}, caps: {}, initialGoal: 0 };
+    if (!m.goalPools) m.goalPools = m.pools.filter((p) => !p.infinite && !p.sell && pools[p.id].units > 0).map((p) => p.id);
+    st.initialGoal = m.goalPools.reduce((a, id) => a + pools[id].units, 0);
+    return st;
+  }
+
+  function cloneState(st) {
+    const pools = {};
+    for (const id in st.pools) pools[id] = { units: st.pools[id].units, init: st.pools[id].init, value: st.pools[id].value };
+    return { t: st.t, money: st.money, earned: st.earned, owned: Object.assign({}, st.owned), stats: st.stats, pools, rates: {}, caps: {}, initialGoal: st.initialGoal };
+  }
+
+  function cleared(m, st) {
+    if (!st.initialGoal) return 1;
+    const left = m.goalPools.reduce((a, id) => a + st.pools[id].units, 0);
+    return 1 - left / st.initialGoal;
+  }
+
+  function buildScope(m, st) {
+    const s = Object.assign({}, st.stats);
+    for (const id in st.pools) s['pool_' + id] = st.pools[id].units;
+    s.time = st.t;
+    s.minutes = st.t / 60;
+    s.money = st.money;
+    s.cleared = cleared(m, st);
+    for (const id in st.owned) s['owned_' + id] = st.owned[id];
+    for (const f of m.flows) s['rate_' + f.id] = st.rates[f.id] || 0;
+    for (const d of m.derived) s[d.name] = d.fn(s);
+    return s;
+  }
+
+  // Advances the world by dt. `active` scales flows marked active (manual play).
+  function step(m, st, dt, active) {
+    const s = buildScope(m, st);
+    for (const f of m.flows) {
+      let rate = f.rate(s);
+      if (!(rate > 0) || !isFinite(rate)) { st.caps[f.id] = rate > 0 ? rate : 0; st.rates[f.id] = 0; s['rate_' + f.id] = 0; continue; }
+      st.caps[f.id] = rate;
+      if (f.active) rate *= active;
+      let want = rate * dt;
+      const dst = st.pools[f.to];
+      const dstDef = m.poolById[f.to];
+      if (dstDef.cap) want = Math.max(0, Math.min(want, dstDef.cap(s) - dst.units));
+      // A source with a `share` only offers the part of the pool in reach: what is left of it
+      // once the out-of-reach part of the starting units (assumed untouched) is set aside.
+      let avail = 0;
+      const srcs = [];
+      const reachable = {};
+      for (const src of f.from) {
+        if (src.gate && !src.gate(s)) continue;
+        const pool = st.pools[src.id];
+        let u = pool.units;
+        if (src.share && u !== Infinity) u = Math.max(0, u - pool.init * (1 - Math.min(1, Math.max(0, src.share(s)))));
+        if (u > 0) { srcs.push(src.id); reachable[src.id] = u; avail += u; }
+      }
+      const take = Math.min(want, avail);
+      if (!(take > 0)) { st.rates[f.id] = 0; s['rate_' + f.id] = 0; continue; }
+      let moved = 0;
+      const infinite = srcs.filter((id) => st.pools[id].units === Infinity);
+      for (const id of srcs) {
+        const pool = st.pools[id];
+        const def = m.poolById[id];
+        let amt;
+        if (avail === Infinity) amt = pool.units === Infinity ? take / infinite.length : 0;
+        else amt = take * (reachable[id] / avail);
+        if (!(amt > 0)) continue;
+        if (pool.units === Infinity) {
+          moved += amt * def.unitValue(s);
+        } else {
+          const vpu = pool.value / pool.units;
+          pool.units -= amt;
+          pool.value -= vpu * amt;
+          if (pool.units < 1e-9) { pool.units = 0; pool.value = 0; }
+          moved += vpu * amt;
+        }
+        s['pool_' + id] = pool.units;
+      }
+      if (dstDef.sell) {
+        const pay = moved * (dstDef.payMult ? dstDef.payMult(s) : 1);
+        st.money += pay;
+        st.earned += pay;
+        dst.units += take;
+      } else {
+        dst.units += take;
+        dst.value += moved;
+      }
+      s['pool_' + f.to] = dst.units;
+      st.rates[f.id] = take / dt;
+      s['rate_' + f.id] = take / dt;
+    }
+    st.t += dt;
+  }
+
+  function visible(m, owned, node) {
+    if (!node.parents.length) return true;
+    return node.requireAll ? node.parents.every((p) => owned[p] > 0) : node.parents.some((p) => owned[p] > 0);
+  }
+
+  function candidates(m, st, scope) {
+    const out = [];
+    for (const n of m.nodes) {
+      const rank = st.owned[n.id] || 0;
+      if (rank >= n.ranks) continue;
+      if (!visible(m, st.owned, n)) continue;
+      if (n.gateFn && !n.gateFn(scope)) continue;
+      out.push({ node: n, rank, cost: nodeCost(n, rank) });
+    }
+    return out;
+  }
+
+  // Money earned over the horizon if `owned` were the tree right now.
+  function horizonMoney(m, st, owned, active) {
+    const h = cloneState(st);
+    h.owned = owned;
+    h.stats = computeStats(m, owned);
+    const start = h.earned;
+    for (let t = 0; t < m.horizon; t += m.horizonDt) step(m, h, m.horizonDt, active);
+    return h.earned - start;
+  }
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ------------------------------------------------------------------ bots
+
+  function activeFactor(bot, t) {
+    let f = bot.attention === undefined ? 1 : bot.attention;
+    const off = bot.offline;
+    if (off && off.every > 0) {
+      const phase = t % off.every;
+      if (phase >= off.every - off.for) f = 0;
+    }
+    return f;
+  }
+
+  function runBot(m, bot, seed) {
+    const rng = mulberry32(seed || 1);
+    const st = initState(m);
+    const log = { bot: bot.id, seed: seed || 1, purchases: [], decisions: [], samples: [], revealedAt: {}, clearedAt: null };
+    const think = bot.thinkEvery || 5;
+    let nextThink = 0;
+    let nextSample = 0;
+    const recentEarn = [];
+
+    const markReveals = (scope) => {
+      for (const c of candidates(m, st, scope)) if (log.revealedAt[c.node.id] === undefined) log.revealedAt[c.node.id] = st.t;
+    };
+    markReveals(buildScope(m, st));
+
+    while (st.t < m.maxT) {
+      if (st.t >= nextThink) {
+        nextThink = st.t + think;
+        decide(m, bot, st, log, rng, recentEarn);
+        markReveals(buildScope(m, st));
+      }
+      const before = st.earned;
+      step(m, st, m.dt, activeFactor(bot, st.t));
+      recentEarn.push(st.earned - before);
+      if (recentEarn.length > 60 / m.dt) recentEarn.shift();
+      if (st.t >= nextSample) {
+        nextSample = st.t + m.sampleEvery;
+        log.samples.push({
+          t: st.t, money: st.money, earned: st.earned, cleared: cleared(m, st),
+          income: recentEarn.reduce((a, b) => a + b, 0) / (recentEarn.length * m.dt),
+          rates: Object.assign({}, st.rates), caps: Object.assign({}, st.caps),
+          pools: Object.fromEntries(Object.entries(st.pools).map(([k, v]) => [k, v.units])),
+        });
+      }
+      if (cleared(m, st) >= m.clearAt) { log.clearedAt = st.t; break; }
+    }
+    log.end = { t: st.t, owned: st.owned, money: st.money, earned: st.earned, cleared: cleared(m, st) };
+    return log;
+  }
+
+  function decide(m, bot, st, log, rng, recentEarn) {
+    const policy = bot.policy || 'value';
+    for (let guard = 0; guard < 20; guard++) {
+      const scope = buildScope(m, st);
+      const avoid = bot.avoid || [];
+      const cands = candidates(m, st, scope).filter((c) => !avoid.includes(c.node.id) && !avoid.includes(c.node.group));
+      if (!cands.length) return;
+      const affordable = cands.filter((c) => c.cost <= st.money);
+      if (!affordable.length) return;
+
+      if (policy === 'cheapest') {
+        affordable.sort((a, b) => a.cost - b.cost);
+        const pick = affordable[0];
+        const score = scoreOne(m, st, pick, activeFactor(bot, st.t));
+        buy(m, st, log, pick, score, 'cheapest');
+        continue;
+      }
+
+      // Helpers and conveniences (tag `utility`) aren't bought for income: a player picks one up once
+      // it costs less than `utilitySeconds` of what they are earning.
+      const income = recentEarn.length ? recentEarn.reduce((a, b) => a + b, 0) / (recentEarn.length * m.dt) : 0;
+      const utilityBudget = income * (bot.utilitySeconds === undefined ? 90 : bot.utilitySeconds);
+      const helper = affordable.filter((c) => (c.node.tags || []).includes('utility') && c.cost <= utilityBudget).sort((a, b) => a.cost - b.cost)[0];
+      if (helper && policy !== 'cheapest') {
+        buy(m, st, log, helper, { base: 0, gain: 0, gainRate: 0 }, 'utility');
+        continue;
+      }
+
+      const act = Math.max(activeFactor(bot, st.t), bot.attention === undefined ? 1 : bot.attention);
+      const base = horizonMoney(m, st, st.owned, act);
+      const scored = cands.map((c) => scoreCandidate(m, st, c, base, act));
+      scored.sort((a, b) => b.score - a.score);
+      const best = scored[0];
+      const second = scored[1];
+      const affordScored = scored.filter((c) => c.cost <= st.money);
+
+      if (policy === 'mixed' && rng() < (bot.noise || 0.3)) {
+        const pick = affordScored[Math.floor(rng() * affordScored.length)];
+        recordDecision(log, st, best, second, pick, true);
+        buy(m, st, log, pick, pick, 'random');
+        continue;
+      }
+
+      const maxPayback = bot.maxPayback === undefined ? 1200 : bot.maxPayback;
+      const worth = (c) => c.via || (c.gain > c.base * 0.001 && c.cost / Math.max(c.gainRate, 1e-9) <= maxPayback);
+      let pick = affordScored.find(worth);
+      if (!pick && !worth(best)) {
+        // Chain lock: every stage is at the same capacity, so no single upgrade earns alone.
+        // A player buys the pair; look for the best pair and buy its cheaper half.
+        const pair = bestPair(m, st, cands, base, act, maxPayback);
+        if (pair) {
+          const first = pair.a.cost <= pair.b.cost ? pair.a : pair.b;
+          const other = first === pair.a ? pair.b : pair.a;
+          if (first.cost <= st.money) {
+            recordDecision(log, st, best, second, first, false);
+            buy(m, st, log, first, Object.assign({}, first, { gain: pair.gain, gainRate: pair.gain / m.horizon, base, via: other.node.id }), 'pair');
+            continue;
+          }
+          return; // save up for it
+        }
+      }
+      if (!pick) {
+        // Nothing affordable earns anything. A real player still spends eventually: after a
+        // long stall, buy the cheapest node and mark it as filler.
+        const stall = st.t - (log.purchases.length ? log.purchases[log.purchases.length - 1].t : 0);
+        if (stall < (bot.fillerAfter === undefined ? 120 : bot.fillerAfter) || !best || worth(best)) return;
+        const cheapest = affordScored.slice().sort((a, b) => a.cost - b.cost)[0];
+        recordDecision(log, st, best, second, cheapest, false);
+        buy(m, st, log, cheapest, cheapest, 'filler');
+        continue;
+      }
+      if (pick !== best) {
+        const income = recentEarn.length ? recentEarn.reduce((a, b) => a + b, 0) / (recentEarn.length * m.dt) : base / m.horizon;
+        const wait = (best.cost - st.money) / Math.max(income, 1e-9);
+        const pickPayback = pick.gainRate > 0 ? pick.cost / pick.gainRate : Infinity;
+        const goodEnough = pick.score >= best.score * (bot.patience === undefined ? 0.6 : bot.patience);
+        if (!goodEnough && pickPayback > wait) { recordDecision(log, st, best, second, null, false); return; }
+      }
+      recordDecision(log, st, best, second, pick, false);
+      buy(m, st, log, pick, pick, 'value');
+    }
+  }
+
+  function scoreCandidate(m, st, c, base, act) {
+    const owned = Object.assign({}, st.owned);
+    owned[c.node.id] = c.rank + 1;
+    const gain = horizonMoney(m, st, owned, act) - base;
+    let score = gain / c.cost;
+    let via = null;
+    if (!(gain > base * 0.005) && c.rank === 0) {
+      for (const childId of m.children[c.node.id]) {
+        const child = m.byId[childId];
+        if (!visible(m, owned, child) || visible(m, st.owned, child)) continue;
+        const o2 = Object.assign({}, owned);
+        o2[childId] = 1;
+        const g2 = horizonMoney(m, st, o2, act) - base;
+        const s2 = (0.8 * g2) / (c.cost + nodeCost(child, 0));
+        if (s2 > score) { score = s2; via = childId; }
+      }
+    }
+    return Object.assign({}, c, { gain, gainRate: gain / m.horizon, base, score, via });
+  }
+
+  function bestPair(m, st, cands, base, act, maxPayback) {
+    const pool = cands.filter((c) => !(c.node.tags || []).includes('utility')).sort((a, b) => a.cost - b.cost).slice(0, 6);
+    let best = null;
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) {
+        const a = pool[i], b = pool[j];
+        if (a.node.group === b.node.group) continue;
+        const owned = Object.assign({}, st.owned);
+        owned[a.node.id] = a.rank + 1;
+        owned[b.node.id] = b.rank + 1;
+        const gain = horizonMoney(m, st, owned, act) - base;
+        const cost = a.cost + b.cost;
+        if (!(gain > base * 0.001) || cost / (gain / m.horizon) > maxPayback) continue;
+        const score = gain / cost;
+        if (!best || score > best.score) best = { a, b, gain, score };
+      }
+    }
+    return best;
+  }
+
+  function scoreOne(m, st, c, act) {
+    const base = horizonMoney(m, st, st.owned, act);
+    return scoreCandidate(m, st, c, base, act);
+  }
+
+  function recordDecision(log, st, best, second, pick, random) {
+    log.decisions.push({
+      t: st.t,
+      best: best.node.id,
+      bestGroup: best.node.group,
+      ratio: second && second.score > 0 ? best.score / second.score : null,
+      pick: pick ? pick.node.id : null,
+      random,
+    });
+  }
+
+  function buy(m, st, log, c, scored, why) {
+    st.money -= c.cost;
+    st.owned[c.node.id] = c.rank + 1;
+    st.stats = computeStats(m, st.owned);
+    log.purchases.push({
+      t: st.t, id: c.node.id, rank: c.rank + 1, tree: c.node.tree, group: c.node.group, cost: c.cost,
+      gainPct: scored.base > 0 ? Math.max(0, (100 * scored.gain) / scored.base) : null,
+      payback: scored.gainRate > 0 ? c.cost / scored.gainRate : null,
+      via: why === 'value' || why === 'pair' ? scored.via || null : null, tags: c.node.tags, why,
+    });
+  }
+
+  // ------------------------------------------------------------------ analysis
+
+  function median(xs) {
+    const a = xs.filter((x) => x !== null && isFinite(x)).sort((p, q) => p - q);
+    if (!a.length) return null;
+    const i = Math.floor(a.length / 2);
+    return a.length % 2 ? a[i] : (a[i - 1] + a[i]) / 2;
+  }
+
+  function analyze(m, log) {
+    const T = m.targets;
+    const P = log.purchases;
+    const endT = log.clearedAt === null ? log.end.t : log.clearedAt;
+    const out = { bot: log.bot, clearMinutes: log.clearedAt === null ? null : log.clearedAt / 60, endCleared: log.end.cleared };
+
+    const times = [0].concat(P.map((p) => p.t));
+    const gaps = [];
+    for (let i = 1; i < times.length; i++) gaps.push({ from: times[i - 1], to: times[i], sec: times[i] - times[i - 1] });
+    if (P.length) gaps.push({ from: P[P.length - 1].t, to: endT, sec: endT - P[P.length - 1].t, tail: true });
+    out.purchaseCount = P.length;
+    out.earlyMedianGap = median(gaps.filter((g) => g.to <= T.earlyWindowMin * 60 && !g.tail).map((g) => g.sec));
+    const nonTail = gaps.filter((g) => !g.tail);
+    out.longestGap = nonTail.reduce((a, g) => (g.sec > (a ? a.sec : -1) ? g : a), null);
+    out.tailGap = gaps.find((g) => g.tail) || null;
+
+    out.fillerBuys = P.filter((p) => p.why === 'filler').map((p) => ({ id: p.id, rank: p.rank, t: p.t }));
+    out.pairBuys = P.filter((p) => p.why === 'pair').map((p) => ({ id: p.id, with: p.via, t: p.t }));
+    out.weakJumps = P.filter((p) => p.why !== 'filler' && p.why !== 'pair' && p.gainPct !== null && p.gainPct < T.minJumpPct && !p.tags.includes('utility'))
+      .map((p) => ({ id: p.id, rank: p.rank, t: p.t, gainPct: p.gainPct }));
+
+    // Payback outliers against the median of their own 10-minute phase.
+    const phases = {};
+    for (const p of P) if (p.payback !== null && p.why !== 'filler' && p.why !== 'pair' && !p.tags.includes('utility')) (phases[Math.floor(p.t / 600)] = phases[Math.floor(p.t / 600)] || []).push(p);
+    out.paybackOutliers = [];
+    out.phasePayback = [];
+    for (const k of Object.keys(phases).sort((a, b) => a - b)) {
+      const med = median(phases[k].map((p) => p.payback));
+      out.phasePayback.push({ phaseMin: k * 10, medianPaybackSec: med, buys: phases[k].length });
+      for (const p of phases[k]) {
+        if (p.payback < med / T.paybackSpread) out.paybackOutliers.push({ id: p.id, rank: p.rank, payback: p.payback, median: med, kind: 'too strong for price' });
+        else if (p.payback > med * T.paybackSpread) out.paybackOutliers.push({ id: p.id, rank: p.rank, payback: p.payback, median: med, kind: 'too weak for price' });
+      }
+    }
+
+    // Dominance: how far ahead the top pick is, and which group keeps being the top pick.
+    const D = log.decisions.filter((d) => d.ratio !== null && !d.random);
+    out.dominance = {
+      medianRatio: median(D.map((d) => d.ratio)),
+      shareOverRatio: D.length ? D.filter((d) => d.ratio > T.dominanceRatio).length / D.length : 0,
+      topGroups: {},
+    };
+    for (const d of D) out.dominance.topGroups[d.bestGroup] = (out.dominance.topGroups[d.bestGroup] || 0) + 1;
+    const topEntries = Object.entries(out.dominance.topGroups).sort((a, b) => b[1] - a[1]);
+    out.dominance.leader = topEntries.length ? { group: topEntries[0][0], share: topEntries[0][1] / D.length } : null;
+
+    const reveal = {};
+    for (const p of P) if (p.rank === 1 && log.revealedAt[p.id] !== undefined) reveal[p.id] = p.t - log.revealedAt[p.id];
+    const byGroup = {};
+    for (const [id, sec] of Object.entries(reveal)) (byGroup[m.byId[id].group] = byGroup[m.byId[id].group] || []).push(sec);
+    out.revealToBuyByGroup = Object.fromEntries(Object.entries(byGroup).map(([g, xs]) => [g, median(xs)]));
+
+    out.deadGates = P.filter((p) => p.via && p.why === 'value' && !p.tags.includes('unlock')).map((p) => ({ id: p.id, via: p.via }));
+
+    out.links = m.links.map((L) => {
+      let inside = 0, n = 0, under = 0, over = 0;
+      let maxBuffer = 0;
+      for (const s of log.samples) {
+        const up = s.rates[L.up], down = s.caps[L.down];
+        if (L.buffer) maxBuffer = Math.max(maxBuffer, s.pools[L.buffer] || 0);
+        if (!(up > 0) || !(down > 0)) continue;
+        n++;
+        const r = down / up;
+        if (r < L.band[0]) under++;
+        else if (r > L.band[1]) over++;
+        else inside++;
+      }
+      return { up: L.up, down: L.down, band: L.band, samples: n, insideShare: n ? inside / n : null, underShare: n ? under / n : null, overShare: n ? over / n : null, maxBuffer, buffer: L.buffer || null };
+    });
+
+    out.unlocks = P.filter((p) => p.tags.includes('unlock') && p.rank === 1).map((p) => ({ id: p.id, t: p.t }));
+    const ug = [];
+    for (let i = 1; i < out.unlocks.length; i++) ug.push((out.unlocks[i].t - out.unlocks[i - 1].t) / 60);
+    out.unlockGapsMin = ug;
+
+    const owned = log.end.owned;
+    out.unbought = m.nodes.filter((n) => !(owned[n.id] > 0)).map((n) => n.id);
+    out.lateBuys = P.filter((p) => p.t > endT * T.lateContentShare && p.rank === 1).map((p) => p.id);
+    out.totalCost = P.reduce((a, p) => a + p.cost, 0);
+
+    const inc = (min) => {
+      const s = log.samples.find((x) => x.t >= min * 60);
+      return s ? s.income : null;
+    };
+    out.income = { at2: inc(2), at10: inc(10), at30: inc(30) };
+
+    // Soft-lock: never cleared, nothing left to earn, and what is left to buy costs more than the purse.
+    if (log.clearedAt === null) {
+      const tail = log.samples.slice(-10);
+      const earning = tail.length ? tail.reduce((a, x) => a + x.income, 0) / tail.length : 0;
+      const left = m.nodes.filter((n) => (owned[n.id] || 0) < n.ranks).map((n) => ({ id: n.id, cost: nodeCost(n, owned[n.id] || 0) }));
+      if (earning < 0.01 && left.every((x) => x.cost > log.end.money)) out.softLock = { cleared: log.end.cleared, money: log.end.money, left };
+    }
+    return out;
+  }
+
+  function checks(m, reports) {
+    const T = m.targets;
+    const out = [];
+    const add = (id, label, status, detail) => out.push({ id, label, status, detail });
+    const fmtMin = (x) => (x === null ? 'never' : `${x.toFixed(1)} min`);
+
+    for (const r of reports) {
+      const want = T.clearMinutes && T.clearMinutes[r.bot];
+      if (!want) continue;
+      const v = r.clearMinutes;
+      const status = v === null ? 'fail' : v >= want[0] && v <= want[1] ? 'pass' : Math.abs(v - (want[0] + want[1]) / 2) < (want[1] - want[0]) ? 'warn' : 'fail';
+      add(`clear_${r.bot}`, `${r.bot} clears in ${want[0]}-${want[1]} min`, status, `${fmtMin(v)} (cleared ${(100 * r.endCleared).toFixed(1)}%)`);
+    }
+
+    for (const r of reports) {
+      add(`softlock_${r.bot}`, `${r.bot} can always finish (no soft-lock)`,
+        r.softLock ? 'fail' : 'pass',
+        r.softLock ? `stuck at ${(100 * r.softLock.cleared).toFixed(1)}% cleared with ${Math.round(r.softLock.money)} and no income; needs ${r.softLock.left.map((x) => `${x.id} (${Math.round(x.cost)})`).join(', ')}` : 'finishes');
+    }
+
+    const main = reports.find((r) => r.bot === (T.mainBot || 'focused')) || reports[0];
+    if (!main) return out;
+
+    const eg = main.earlyMedianGap;
+    add('early_cadence', `early buys every ${T.earlyGapSec[0]}-${T.earlyGapSec[1]} s (first ${T.earlyWindowMin} min)`,
+      eg === null ? 'fail' : eg >= T.earlyGapSec[0] && eg <= T.earlyGapSec[1] ? 'pass' : 'warn',
+      eg === null ? 'no early purchases' : `median gap ${eg.toFixed(0)} s`);
+
+    const lg = main.longestGap;
+    add('dead_stretch', `no gap between buys over ${T.maxGapSec} s`,
+      !lg ? 'warn' : lg.sec <= T.maxGapSec ? 'pass' : lg.sec <= T.maxGapSec * 1.5 ? 'warn' : 'fail',
+      lg ? `longest ${lg.sec.toFixed(0)} s at ${(lg.from / 60).toFixed(1)}-${(lg.to / 60).toFixed(1)} min` : 'no purchases');
+
+    const tailShare = main.tailGap && main.clearMinutes ? main.tailGap.sec / (main.clearMinutes * 60) : null;
+    add('finale', `last purchase leaves ${Math.round(T.tailShare[0] * 100)}-${Math.round(T.tailShare[1] * 100)}% of the game to enjoy it`,
+      tailShare === null ? 'warn' : tailShare >= T.tailShare[0] && tailShare <= T.tailShare[1] ? 'pass' : 'warn',
+      tailShare === null ? 'not cleared' : `last buy at ${(main.tailGap.from / 60).toFixed(1)} min, ${(100 * tailShare).toFixed(0)}% of the game after it`);
+
+    add('power_jump', `every buy raises income at least ${T.minJumpPct}%`,
+      main.weakJumps.length === 0 ? 'pass' : main.weakJumps.length <= 2 ? 'warn' : 'fail',
+      main.weakJumps.length ? main.weakJumps.slice(0, 6).map((w) => `${w.id}${w.rank > 1 ? ' r' + w.rank : ''} +${w.gainPct.toFixed(1)}%`).join(', ') : 'all buys felt');
+
+    const dom = main.dominance;
+    add('dominance', `no single pick wins by ${T.dominanceRatio}x in over ${Math.round(T.dominanceShare * 100)}% of choices`,
+      dom.shareOverRatio <= T.dominanceShare ? (dom.leader && dom.leader.share > 0.6 ? 'warn' : 'pass') : 'fail',
+      `median best/second ${dom.medianRatio === null ? 'n/a' : dom.medianRatio.toFixed(2)}x; over ${T.dominanceRatio}x in ${(100 * dom.shareOverRatio).toFixed(0)}%` +
+        (dom.leader ? `; "${dom.leader.group}" top pick ${(100 * dom.leader.share).toFixed(0)}%` : ''));
+
+    add('payback', `payback within ${T.paybackSpread}x of its phase median`,
+      main.paybackOutliers.length === 0 ? 'pass' : main.paybackOutliers.length <= 3 ? 'warn' : 'fail',
+      main.paybackOutliers.length ? main.paybackOutliers.slice(0, 6).map((o) => `${o.id}${o.rank > 1 ? ' r' + o.rank : ''} ${o.kind} (${o.payback.toFixed(0)} s vs ${o.median.toFixed(0)} s)`).join('; ') : 'consistent');
+
+    for (const L of main.links) {
+      add(`link_${L.up}_${L.down}`, `${L.down} capacity within ${L.band[0]}-${L.band[1]}x of ${L.up} rate`,
+        L.insideShare === null ? 'warn' : L.insideShare >= T.linkBandShare ? 'pass' : L.insideShare >= T.linkBandShare * 0.6 ? 'warn' : 'fail',
+        L.insideShare === null ? 'never both running' :
+          `inside ${(100 * L.insideShare).toFixed(0)}%, lagging ${(100 * L.underShare).toFixed(0)}%, overrunning ${(100 * L.overShare).toFixed(0)}%` +
+          (L.buffer ? `; ${L.buffer} peaked at ${Math.round(L.maxBuffer)}` : ''));
+    }
+
+    add('chain_lock', 'single upgrades are felt (no stage locked against another)',
+      main.pairBuys.length === 0 ? 'pass' : main.pairBuys.length <= 2 ? 'warn' : 'fail',
+      main.pairBuys.length ? `${main.pairBuys.length} buys only paid off with another: ` + main.pairBuys.slice(0, 5).map((p) => `${p.id}+${p.with} @${(p.t / 60).toFixed(1)}`).join(', ') : 'none');
+
+    add('gatekeepers', 'no bought node whose only value is what it unlocks',
+      main.deadGates.length === 0 ? 'pass' : 'warn',
+      main.deadGates.length ? main.deadGates.map((g) => `${g.id} (bought for ${g.via})`).join(', ') : 'none');
+
+    if (main.unlocks.length) {
+      const bad = main.unlockGapsMin.filter((g) => g < T.unlockGapMin[0] || g > T.unlockGapMin[1]);
+      add('unlock_spacing', `new systems arrive ${T.unlockGapMin[0]}-${T.unlockGapMin[1]} min apart`,
+        bad.length === 0 ? 'pass' : 'warn',
+        main.unlocks.map((u) => `${u.id} @${(u.t / 60).toFixed(1)}`).join(', '));
+    }
+
+    add('content_used', `every node earns its purchase, none only in the last ${Math.round(100 * (1 - T.lateContentShare))}%`,
+      main.unbought.length === 0 && main.lateBuys.length === 0 && main.fillerBuys.length === 0 ? 'pass' : main.unbought.length + main.fillerBuys.length > 3 ? 'fail' : 'warn',
+      `${main.fillerBuys.length} bought only as filler (earned nothing); ${main.unbought.length} never bought${main.unbought.length ? ' (' + main.unbought.slice(0, 8).join(', ') + ')' : ''}; ${main.lateBuys.length} first bought late${main.lateBuys.length ? ' (' + main.lateBuys.slice(0, 6).join(', ') + ')' : ''}`);
+
+    return out;
+  }
+
+  function run(config, opts) {
+    opts = opts || {};
+    const m = prepare(config);
+    const bots = opts.bots || config.bots || [{ id: 'focused', policy: 'value' }];
+    const logs = [];
+    const reports = [];
+    for (const bot of bots) {
+      const seeds = bot.seeds || 1;
+      const runs = [];
+      for (let i = 0; i < seeds; i++) runs.push(runBot(m, bot, 1 + i * 7919));
+      // Report the median run by clear time (unfinished runs sort last).
+      runs.sort((a, b) => (a.clearedAt === null ? Infinity : a.clearedAt) - (b.clearedAt === null ? Infinity : b.clearedAt));
+      const chosen = runs[Math.floor((runs.length - 1) / 2)];
+      logs.push(chosen);
+      const rep = analyze(m, chosen);
+      rep.seedClearMinutes = runs.map((r) => (r.clearedAt === null ? null : r.clearedAt / 60));
+      reports.push(rep);
+    }
+    return { model: m, logs, reports, checks: checks(m, reports) };
+  }
+
+  // ------------------------------------------------------------------ text report
+
+  function markdown(result) {
+    const { model: m, logs, reports, checks: C } = result;
+    const L = [];
+    const mark = { pass: 'PASS', warn: 'WARN', fail: 'FAIL' };
+    const money = (x) => (x >= 1e6 ? (x / 1e6).toFixed(2) + 'M' : x >= 1e4 ? (x / 1e3).toFixed(1) + 'k' : x.toFixed(0));
+    L.push(`# Progression sim: ${m.name}`, '');
+    L.push('## Checks', '', '| | check | result |', '|---|---|---|');
+    for (const c of C) L.push(`| ${mark[c.status]} | ${c.label} | ${c.detail} |`);
+    L.push('');
+    for (let i = 0; i < reports.length; i++) {
+      const r = reports[i], log = logs[i];
+      L.push(`## Bot: ${r.bot}`, '');
+      L.push(`- Clear: ${r.clearMinutes === null ? 'not cleared' : r.clearMinutes.toFixed(1) + ' min'}` +
+        (r.seedClearMinutes.length > 1 ? ` (seeds: ${r.seedClearMinutes.map((x) => (x === null ? '-' : x.toFixed(0))).join(', ')})` : ''));
+      L.push(`- Purchases: ${r.purchaseCount}, spent ${money(r.totalCost)} ${m.currency}`);
+      L.push(`- Income/s at 2 / 10 / 30 min: ${[r.income.at2, r.income.at10, r.income.at30].map((x) => (x === null ? '-' : x.toFixed(1))).join(' / ')}`);
+      if (r.phasePayback.length) L.push(`- Median payback by phase: ${r.phasePayback.map((p) => `${p.phaseMin}m ${p.medianPaybackSec.toFixed(0)}s`).join(', ')}`);
+      if (Object.keys(r.revealToBuyByGroup).length)
+        L.push(`- Median seconds from reveal to buy, by group: ${Object.entries(r.revealToBuyByGroup).map(([g, s]) => `${g} ${s.toFixed(0)}`).join(', ')}`);
+      L.push('', '| min | buy | cost | income gain | payback | |', '|---|---|---|---|---|---|');
+      for (const p of log.purchases) {
+        L.push(`| ${(p.t / 60).toFixed(1)} | ${p.id}${p.rank > 1 ? ' r' + p.rank : ''}${p.via ? (p.why === 'pair' ? ' (with ' : ' (for ') + p.via + ')' : ''}${p.why === 'random' ? ' *' : ''} | ${money(p.cost)} | ${p.gainPct === null ? 'from zero' : '+' + p.gainPct.toFixed(0) + '%'} | ${p.payback === null || p.payback > 36000 ? 'never' : p.payback.toFixed(0) + ' s'} |${p.why === 'filler' ? ' filler' : ''}`);
+      }
+      L.push('');
+    }
+    return L.join('\n');
+  }
+
+  return { compile, prepare, computeStats, run, runBot, analyze, checks, markdown, nodeCost };
+});
+</script>
+<script>
+(function () {
+  "use strict";
+  const BASE = JSON.parse(document.getElementById("config").textContent);
+  const $ = (id) => document.getElementById(id);
+  const trees = BASE.trees && BASE.trees.length ? BASE.trees : [...new Set(BASE.nodes.map((n) => n.tree || "tree"))];
+  const treeColor = (t) => `var(--t${Math.max(0, trees.indexOf(t)) % 6})`;
+  const overrides = { nodes: {}, stats: {}, pools: {} };
+  const ui = { tab: trees[0], bot: null, result: null, db: null, runTimer: 0, saveTimers: {} };
+
+  // ------------------------------------------------------------ config with edits applied
+  function effective() {
+    const c = JSON.parse(JSON.stringify(BASE));
+    for (const k in overrides.stats) if (k in c.stats) c.stats[k] = overrides.stats[k];
+    for (const id in overrides.pools) if (c.pools[id]) Object.assign(c.pools[id], overrides.pools[id]);
+    for (const n of c.nodes) {
+      const o = overrides.nodes[n.id];
+      if (!o) continue;
+      if (o.cost !== undefined) n.cost = o.cost;
+      if (o.costMult !== undefined) n.costMult = o.costMult;
+      (o.effects || []).forEach((e, i) => { if (n.effects[i] && n.effects[i].stat === e.stat) n.effects[i][e.op] = e.value; });
+    }
+    return c;
+  }
+  const opOf = (e) => (e.add !== undefined ? "add" : e.mul !== undefined ? "mul" : "set");
+  const opSign = { add: "+", mul: "×", set: "=" };
+
+  // ------------------------------------------------------------ editor
+  function orderTree(tree) {
+    const nodes = BASE.nodes.filter((n) => (n.tree || "tree") === tree);
+    const ids = new Set(nodes.map((n) => n.id));
+    const kids = {};
+    const roots = [];
+    for (const n of nodes) {
+      const local = (n.parents || []).filter((p) => ids.has(p));
+      if (!local.length) roots.push(n);
+      else (kids[local[0]] = kids[local[0]] || []).push(n);
+    }
+    const out = [];
+    const walk = (n, d) => { out.push([n, d]); (kids[n.id] || []).forEach((k) => walk(k, d + 1)); };
+    roots.forEach((r) => walk(r, 0));
+    return out;
+  }
+
+  function renderTabs() {
+    const tabs = $("tabs");
+    tabs.textContent = "";
+    for (const t of trees.concat(["economy"])) {
+      const b = document.createElement("button");
+      b.className = "tab";
+      b.role = "tab";
+      b.setAttribute("aria-selected", String(ui.tab === t));
+      if (t !== "economy") b.style.setProperty("--c", treeColor(t));
+      const count = t === "economy" ? Object.keys(BASE.stats).length : BASE.nodes.filter((n) => (n.tree || "tree") === t).length;
+      b.innerHTML = `${t !== "economy" ? '<span class="sw"></span>' : ""}<span></span><span class="count">${count}</span>`;
+      b.children[t !== "economy" ? 1 : 0].textContent = t === "economy" ? "Economy & calibration" : t;
+      b.onclick = () => { ui.tab = t; renderTabs(); renderEditor(); };
+      tabs.appendChild(b);
+    }
+  }
+
+  const fmtVal = (v) => (Math.abs(v) >= 100 ? String(Math.round(v * 100) / 100) : String(Math.round(v * 10000) / 10000));
+
+  function numInput(value, attrs, short) {
+    const i = document.createElement("input");
+    i.type = "number"; i.step = "any"; i.className = "n" + (short ? " short" : "");
+    i.value = fmtVal(value);
+    for (const k in attrs) i.dataset[k] = attrs[k];
+    return i;
+  }
+
+  function renderEditor() {
+    const box = $("editor");
+    box.textContent = "";
+    if (ui.tab === "economy") return renderGlobals(box);
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Indented nodes appear when the node above them is bought. Values per rank where a node has several.";
+    box.appendChild(hint);
+    const eff = effective();
+    const effById = Object.fromEntries(eff.nodes.map((n) => [n.id, n]));
+    for (const [base, depth] of orderTree(ui.tab)) {
+      const n = effById[base.id];
+      const row = document.createElement("div");
+      row.className = "node" + (depth === 0 ? " root" : "") + (overrides.nodes[n.id] ? " edited" : "");
+      row.style.cssText = `--d:${depth}`;
+      row.dataset.id = n.id;
+      const head = document.createElement("div");
+      head.className = "node-head";
+      const name = document.createElement("span"); name.className = "node-name"; name.textContent = n.name || n.id; head.appendChild(name);
+      const idl = document.createElement("span"); idl.className = "node-id"; idl.textContent = n.id; head.appendChild(idl);
+      for (const tag of n.tags || []) { const t = document.createElement("span"); t.className = "tag"; t.style.setProperty("--c", treeColor(n.tree)); t.textContent = tag; head.appendChild(t); }
+      const cross = (n.parents || []).filter((p) => !BASE.nodes.find((x) => x.id === p && x.tree === n.tree));
+      if (cross.length) { const a = document.createElement("span"); a.className = "after"; a.textContent = (n.requireAll ? "needs all: " : "after ") + cross.join(", "); head.appendChild(a); }
+      if (overrides.nodes[n.id]) {
+        const r = document.createElement("button"); r.className = "reset"; r.textContent = "Reset";
+        r.onclick = () => { delete overrides.nodes[n.id]; saveNode(n.id); renderEditor(); scheduleRun(); };
+        head.appendChild(r);
+      }
+      row.appendChild(head);
+
+      const meta = document.createElement("div"); meta.className = "node-meta"; meta.dataset.meta = n.id; row.appendChild(meta);
+
+      const fields = document.createElement("div"); fields.className = "fields";
+      const ranks = n.ranks || 1;
+      const cf = document.createElement("label"); cf.className = "field";
+      cf.appendChild(Object.assign(document.createElement("span"), { textContent: "cost" }));
+      const cr = document.createElement("span"); cr.className = "ranks";
+      if (Array.isArray(n.cost)) n.cost.forEach((v, r) => cr.appendChild(numInput(v, { kind: "cost", rank: r }, ranks > 2)));
+      else {
+        cr.appendChild(numInput(n.cost, { kind: "cost" }));
+        if (ranks > 1) { cr.appendChild(Object.assign(document.createElement("span"), { textContent: "×", className: "expr" })); cr.appendChild(numInput(n.costMult || 1, { kind: "costMult" }, true)); }
+      }
+      cf.appendChild(cr); fields.appendChild(cf);
+      n.effects.forEach((e, i) => {
+        const op = opOf(e);
+        const f = document.createElement("label"); f.className = "field";
+        f.appendChild(Object.assign(document.createElement("span"), { textContent: `${e.stat} ${opSign[op]}` }));
+        const er = document.createElement("span"); er.className = "ranks";
+        if (Array.isArray(e[op])) e[op].forEach((v, r) => er.appendChild(numInput(v, { kind: "effect", i, rank: r }, true)));
+        else er.appendChild(numInput(e[op], { kind: "effect", i }, true));
+        if (ranks > 1 && !Array.isArray(e[op])) er.appendChild(Object.assign(document.createElement("span"), { textContent: "per rank", className: "expr" }));
+        f.appendChild(er); fields.appendChild(f);
+      });
+      row.appendChild(fields);
+      row.addEventListener("input", () => onNodeInput(row, base));
+      box.appendChild(row);
+    }
+    paintMeta();
+    const ex = document.createElement("details"); ex.className = "export";
+    ex.innerHTML = "<summary>Config with your edits (JSON)</summary>";
+    const ta = document.createElement("textarea"); ta.readOnly = true; ta.value = JSON.stringify(effective(), null, 1);
+    ex.appendChild(ta); box.appendChild(ex);
+  }
+
+  function readNum(input) { const v = parseFloat(input.value); return isFinite(v) ? v : null; }
+
+  function onNodeInput(row, base) {
+    const o = {};
+    const costInputs = row.querySelectorAll('input[data-kind="cost"]');
+    if (Array.isArray(base.cost)) o.cost = [...costInputs].map((i, r) => (readNum(i) ?? base.cost[r]));
+    else o.cost = readNum(costInputs[0]) ?? base.cost;
+    const cm = row.querySelector('input[data-kind="costMult"]');
+    if (cm) o.costMult = readNum(cm) ?? (base.costMult || 1);
+    o.effects = base.effects.map((e, i) => {
+      const op = opOf(e);
+      const ins = row.querySelectorAll(`input[data-kind="effect"][data-i="${i}"]`);
+      const value = Array.isArray(e[op]) ? [...ins].map((x, r) => (readNum(x) ?? e[op][r])) : (readNum(ins[0]) ?? e[op]);
+      return { stat: e.stat, op, value };
+    });
+    const same = JSON.stringify(o.cost) === JSON.stringify(base.cost) &&
+      (o.costMult === undefined || o.costMult === (base.costMult || 1)) &&
+      o.effects.every((e, i) => JSON.stringify(e.value) === JSON.stringify(base.effects[i][e.op]));
+    if (same) delete overrides.nodes[base.id]; else overrides.nodes[base.id] = o;
+    row.classList.toggle("edited", !same);
+    row.querySelectorAll("input.n").forEach((inp) => {
+      const k = inp.dataset.kind, r = inp.dataset.rank;
+      let orig;
+      if (k === "cost") orig = r === undefined ? base.cost : base.cost[r];
+      else if (k === "costMult") orig = base.costMult || 1;
+      else { const e = base.effects[inp.dataset.i]; const op = opOf(e); orig = r === undefined ? e[op] : e[op][r]; }
+      inp.classList.toggle("changed", readNum(inp) !== null && Math.abs(readNum(inp) - orig) > 1e-12);
+    });
+    saveNode(base.id);
+    scheduleRun();
+  }
+
+  function renderGlobals(box) {
+    const wrap = document.createElement("div"); wrap.className = "globals";
+    const h = document.createElement("h3"); h.textContent = "Base stats"; wrap.appendChild(h);
+    const p = document.createElement("p"); p.className = "hint"; p.textContent = "Starting values before any upgrade. k_ values are calibration constants measured or estimated from the game."; wrap.appendChild(p);
+    const g = document.createElement("div"); g.className = "grow";
+    for (const k of Object.keys(BASE.stats)) {
+      g.appendChild(Object.assign(document.createElement("span"), { className: "k", textContent: k }));
+      const i = numInput(k in overrides.stats ? overrides.stats[k] : BASE.stats[k], { stat: k });
+      i.classList.toggle("changed", k in overrides.stats);
+      i.addEventListener("input", () => {
+        const v = readNum(i);
+        if (v === null || v === BASE.stats[k]) delete overrides.stats[k]; else overrides.stats[k] = v;
+        i.classList.toggle("changed", k in overrides.stats);
+        saveGlobal("stats"); scheduleRun();
+      });
+      g.appendChild(i);
+    }
+    wrap.appendChild(g);
+    const h2 = document.createElement("h3"); h2.textContent = "Pools: units and value per unit"; wrap.appendChild(h2);
+    const g2 = document.createElement("div"); g2.className = "grow";
+    for (const [id, pool] of Object.entries(BASE.pools)) {
+      for (const key of ["units", "value"]) {
+        if (pool[key] === undefined || pool[key] === null) continue;
+        g2.appendChild(Object.assign(document.createElement("span"), { className: "k", textContent: `${id}.${key}` }));
+        const cur = overrides.pools[id] && overrides.pools[id][key] !== undefined ? overrides.pools[id][key] : pool[key];
+        if (typeof pool[key] !== "number") { g2.appendChild(Object.assign(document.createElement("span"), { className: "expr", textContent: String(cur) })); continue; }
+        const i = numInput(cur, {});
+        i.classList.toggle("changed", cur !== pool[key]);
+        i.addEventListener("input", () => {
+          const v = readNum(i);
+          overrides.pools[id] = overrides.pools[id] || {};
+          if (v === null || v === pool[key]) delete overrides.pools[id][key]; else overrides.pools[id][key] = v;
+          if (!Object.keys(overrides.pools[id]).length) delete overrides.pools[id];
+          i.classList.toggle("changed", v !== null && v !== pool[key]);
+          savePool(id); scheduleRun();
+        });
+        g2.appendChild(i);
+      }
+    }
+    wrap.appendChild(g2);
+    box.appendChild(wrap);
+  }
+
+  // ------------------------------------------------------------ saving
+  function setSave(text, cls) { const s = $("save-state"); s.textContent = text; s.className = "pill " + (cls || "quiet"); }
+  function debounceSave(key, fn) {
+    clearTimeout(ui.saveTimers[key]);
+    if (!ui.db) { setSave("Not saving here: open the published page to save", "warn"); return; }
+    setSave("Saving…");
+    ui.saveTimers[key] = setTimeout(() => fn().then(() => setSave("Saved", "pass")).catch((e) => setSave(saveError(e), "fail")), 500);
+  }
+  function saveError(e) {
+    const code = e && e.code;
+    if (code === "resource_exhausted") return "Saving too fast, will retry on next edit";
+    if (code === "revoked" || code === "not_granted") return "Saving is not available in this view";
+    return "Save failed: " + ((e && e.message) || "unknown error");
+  }
+  function saveNode(id) {
+    debounceSave("n:" + id, () => {
+      const ref = ui.db.doc("nodes/" + id);
+      return overrides.nodes[id] ? ref.set(Object.assign({}, overrides.nodes[id], { savedAt: new Date().toISOString() })) : ref.delete();
+    });
+  }
+  function saveGlobal() {
+    debounceSave("stats", () => {
+      const ref = ui.db.doc("globals/stats");
+      return Object.keys(overrides.stats).length ? ref.set(Object.assign({}, overrides.stats)) : ref.delete();
+    });
+  }
+  function savePool(id) {
+    debounceSave("p:" + id, () => {
+      const ref = ui.db.doc("pools/" + id);
+      return overrides.pools[id] ? ref.set(Object.assign({}, overrides.pools[id])) : ref.delete();
+    });
+  }
+
+  async function connect() {
+    let db = null;
+    try { db = window.claude && (await window.claude.use("db")); } catch (e) { db = null; }
+    if (!db) { setSave("Preview: edits not saved", "warn"); return; }
+    ui.db = db;
+    setSave("Loading saved edits…");
+    try {
+      const [nodes, stats, pools] = await Promise.all([db.collection("nodes").get(), db.doc("globals/stats").get(), db.collection("pools").get()]);
+      for (const d of nodes.docs) {
+        const body = d.data();
+        const base = BASE.nodes.find((n) => n.id === d.id);
+        if (!base || !body) continue;
+        overrides.nodes[d.id] = { cost: body.cost, costMult: body.costMult, effects: body.effects || [] };
+      }
+      if (stats.exists) for (const [k, v] of Object.entries(stats.data())) if (k in BASE.stats && typeof v === "number") overrides.stats[k] = v;
+      for (const d of pools.docs) if (BASE.pools[d.id]) overrides.pools[d.id] = Object.assign({}, d.data());
+      const n = Object.keys(overrides.nodes).length + Object.keys(overrides.stats).length + Object.keys(overrides.pools).length;
+      setSave(n ? `Saved edits loaded (${n})` : "Saved", "pass");
+      renderEditor();
+      runNow();
+    } catch (e) {
+      setSave(saveError(e), "fail");
+    }
+  }
+
+  // ------------------------------------------------------------ running
+  function scheduleRun() { clearTimeout(ui.runTimer); ui.runTimer = setTimeout(runNow, 300); }
+  function runNow() {
+    document.body.classList.add("running");
+    setTimeout(() => {
+      try {
+        ui.result = ProgSim.run(effective());
+        $("error").hidden = true;
+        if (!ui.bot || !ui.result.logs.find((l) => l.bot === ui.bot)) ui.bot = ui.result.logs[0].bot;
+        paintAll();
+      } catch (e) {
+        $("error").hidden = false;
+        $("error").textContent = "The model could not run: " + e.message;
+      }
+      document.body.classList.remove("running");
+    }, 20);
+  }
+
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const botColor = (i) => ["--accent", "--oak", "--muted", "--t2", "--t3"][i % 5];
+  const money = (x) => (x >= 1e6 ? (x / 1e6).toFixed(2) + "M" : x >= 1e4 ? (x / 1e3).toFixed(1) + "k" : Math.round(x).toString());
+
+  function paintAll() {
+    const R = ui.result;
+    const counts = { pass: 0, warn: 0, fail: 0 };
+    R.checks.forEach((c) => counts[c.status]++);
+    for (const k of ["pass", "warn", "fail"]) { const el = $("sum-" + k); el.textContent = `${counts[k]} ${k}`; el.className = "pill " + (counts[k] ? k : "quiet"); }
+
+    const clears = $("clears"); clears.textContent = "";
+    R.reports.forEach((r) => {
+      const t = BASE.targets && BASE.targets.clearMinutes && BASE.targets.clearMinutes[r.bot];
+      const chk = R.checks.find((c) => c.id === "clear_" + r.bot);
+      const d = document.createElement("div"); d.className = "clear";
+      if (chk) d.dataset.status = chk.status;
+      d.innerHTML = `<span class="label"></span><span class="v"></span><span class="tgt"></span>`;
+      d.children[0].textContent = r.bot + " clear";
+      d.children[1].innerHTML = r.clearMinutes === null ? "not cleared" : `${r.clearMinutes.toFixed(1)}<small>min</small>`;
+      d.children[2].textContent = t ? `target ${t[0]}–${t[1]} min · ${r.purchaseCount} buys` : `${r.purchaseCount} buys · no target`;
+      clears.appendChild(d);
+    });
+
+    const tb = $("checks"); tb.textContent = "";
+    for (const c of R.checks) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><span class="pill ${c.status}"></span></td><td></td><td class="check-detail"></td>`;
+      tr.children[0].firstChild.textContent = c.status;
+      tr.children[1].textContent = c.label;
+      tr.children[2].textContent = c.detail;
+      tb.appendChild(tr);
+    }
+
+    const bt = $("bot-tabs"); bt.textContent = "";
+    R.logs.forEach((l) => {
+      const b = document.createElement("button"); b.textContent = l.bot; b.setAttribute("aria-pressed", String(l.bot === ui.bot));
+      b.onclick = () => { ui.bot = l.bot; paintAll(); };
+      bt.appendChild(b);
+    });
+    const log = R.logs.find((l) => l.bot === ui.bot);
+    const lb = $("log"); lb.textContent = "";
+    const byId = Object.fromEntries(BASE.nodes.map((n) => [n.id, n]));
+    for (const p of log.purchases) {
+      const n = byId[p.id] || {};
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="num"></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td>`;
+      tr.children[0].textContent = (p.t / 60).toFixed(1);
+      tr.children[1].innerHTML = `<span class="tree-dot"></span>`;
+      tr.children[1].firstChild.style.setProperty("--c", treeColor(n.tree));
+      tr.children[1].append((n.name || p.id) + (p.rank > 1 ? ` (rank ${p.rank})` : "") + (p.via ? ` — for ${p.via}` : "") + (p.why === "random" ? " — random pick" : ""));
+      tr.children[2].textContent = money(p.cost);
+      tr.children[3].textContent = p.gainPct === null ? "from zero" : `+${p.gainPct.toFixed(0)}%`;
+      tr.children[4].textContent = p.payback === null ? "–" : `${Math.round(p.payback)} s`;
+      [0, 2, 3, 4].forEach((i) => tr.children[i].classList.add("num"));
+      lb.appendChild(tr);
+    }
+    $("currency-sub").textContent = `${R.model.currency} per second`;
+    paintMeta();
+    drawCharts();
+  }
+
+  function paintMeta() {
+    if (!ui.result) return;
+    const main = ui.result.logs[0];
+    const firsts = {};
+    const all = {};
+    for (const p of main.purchases) { (all[p.id] = all[p.id] || []).push(p); if (!firsts[p.id]) firsts[p.id] = p; }
+    document.querySelectorAll("[data-meta]").forEach((el) => {
+      const id = el.dataset.meta, p = firsts[id];
+      el.textContent = "";
+      if (!p) { el.innerHTML = `<span class="never">${main.bot}: never bought</span>`; return; }
+      const parts = [
+        [`${main.bot} buys at`, `${(p.t / 60).toFixed(1)} min`],
+        ["payback", p.payback === null ? "–" : `${Math.round(p.payback)} s`],
+        ["gain", p.gainPct === null ? "from zero" : `+${p.gainPct.toFixed(0)}%`],
+      ];
+      if (all[id].length > 1) parts.push(["ranks", `${all[id].length}`]);
+      for (const [k, v] of parts) { const s = document.createElement("span"); s.append(k + " "); const b = document.createElement("b"); b.textContent = v; s.appendChild(b); el.appendChild(s); }
+    });
+  }
+
+  // ------------------------------------------------------------ charts
+  function setupCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    return { g, w, h };
+  }
+  function niceMax(v) { if (!(v > 0)) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * e >= v) return m * e; return 10 * e; }
+
+  function frame(cv, xMax, yMax, yFmt, pad) {
+    const { g, w, h } = setupCanvas(cv);
+    const P = Object.assign({ l: 48, r: 16, t: 14, b: 26 }, pad || {});
+    const X = (x) => P.l + (x / xMax) * (w - P.l - P.r);
+    const Y = (y) => h - P.b - (y / yMax) * (h - P.t - P.b);
+    g.font = `11px ${css("--font-num")}`; g.fillStyle = css("--muted"); g.strokeStyle = css("--rule"); g.lineWidth = 1;
+    const yTicks = 4;
+    if (yFmt) for (let i = 0; i <= yTicks; i++) {
+      const v = (yMax / yTicks) * i, y = Math.round(Y(v)) + 0.5;
+      g.globalAlpha = i ? 0.6 : 1; g.beginPath(); g.moveTo(P.l, y); g.lineTo(w - P.r, y); g.stroke(); g.globalAlpha = 1;
+      g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(yFmt(v), P.l - 6, y);
+    }
+    const step = niceMax(xMax / 6);
+    g.textAlign = "center"; g.textBaseline = "top";
+    for (let x = 0; x <= xMax + 1e-9; x += step) g.fillText(`${Math.round(x)}${x === 0 ? " min" : ""}`, X(x), h - P.b + 7);
+    return { g, w, h, X, Y, P };
+  }
+  function line(g, pts, color, width, dash) {
+    if (!pts.length) return;
+    g.strokeStyle = color; g.lineWidth = width || 2; g.setLineDash(dash || []); g.lineJoin = "round";
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); g.setLineDash([]);
+  }
+
+  function drawCharts() {
+    const R = ui.result;
+    if (!R) return;
+    const logs = R.logs;
+    const end = (l) => (l.clearedAt !== null ? l.clearedAt : l.end.t) / 60;
+    const targets = (BASE.targets && BASE.targets.clearMinutes) || {};
+    let xMax = Math.max(...logs.map(end), ...Object.values(targets).map((t) => t[1])) * 1.05;
+    xMax = niceMax(xMax);
+
+    // cleared
+    const c1 = frame($("chart-clear"), xMax, 100, (v) => `${Math.round(v)}%`);
+    logs.forEach((l, i) => {
+      const t = targets[l.bot];
+      if (!t) return;
+      c1.g.fillStyle = css(botColor(i)); c1.g.globalAlpha = 0.1;
+      c1.g.fillRect(c1.X(t[0]), c1.P.t, c1.X(t[1]) - c1.X(t[0]), c1.h - c1.P.t - c1.P.b); c1.g.globalAlpha = 1;
+    });
+    logs.forEach((l, i) => {
+      const pts = [[c1.X(0), c1.Y(0)]].concat(l.samples.map((s) => [c1.X(s.t / 60), c1.Y(100 * s.cleared)]));
+      line(c1.g, pts, css(botColor(i)), i === 0 ? 2.5 : 2, i >= 2 ? [5, 4] : null);
+      const last = pts[pts.length - 1];
+      c1.g.fillStyle = css(botColor(i)); c1.g.beginPath(); c1.g.arc(last[0], last[1], 3.5, 0, Math.PI * 2); c1.g.fill();
+    });
+    legend("legend-clear", logs.map((l, i) => [l.bot, botColor(i), i >= 2]));
+
+    // income
+    const incMax = niceMax(Math.max(1, ...logs.flatMap((l) => l.samples.map((s) => s.income))));
+    const c2 = frame($("chart-income"), xMax, incMax, (v) => money(v));
+    logs.forEach((l, i) => line(c2.g, l.samples.map((s) => [c2.X(s.t / 60), c2.Y(s.income)]), css(botColor(i)), i === 0 ? 2 : 1.5, i >= 2 ? [5, 4] : null));
+    legend("legend-income", logs.map((l, i) => [l.bot, botColor(i), i >= 2]));
+
+    // link ratio (main bot)
+    const links = BASE.links || [];
+    const main = logs[0];
+    const ratioMax = 3;
+    const c3 = frame($("chart-link"), xMax, ratioMax, (v) => `${v.toFixed(v % 1 ? 1 : 0)}×`);
+    const lk = [];
+    links.forEach((L, i) => {
+      const col = css(`--t${(i + 2) % 6}`);
+      c3.g.fillStyle = col; c3.g.globalAlpha = 0.1;
+      c3.g.fillRect(c3.P.l, c3.Y(Math.min(L.band[1], ratioMax)), c3.w - c3.P.l - c3.P.r, c3.Y(L.band[0]) - c3.Y(Math.min(L.band[1], ratioMax)));
+      c3.g.globalAlpha = 1;
+      const pts = [];
+      for (const s of main.samples) {
+        const up = s.rates[L.up], down = s.caps[L.down];
+        if (up > 0 && down > 0) pts.push([c3.X(s.t / 60), c3.Y(Math.min(ratioMax, down / up))]);
+        else if (pts.length) { line(c3.g, pts.splice(0), col, 2); }
+      }
+      line(c3.g, pts, col, 2);
+      lk.push([`${L.down} ÷ ${L.up}`, `--t${(i + 2) % 6}`]);
+    });
+    $("link-sub").textContent = links.length ? `${main.bot}: capacity ÷ supply, band shaded` : "no links in this config";
+    legend("legend-link", lk);
+
+    // purchases lanes
+    const cv = $("chart-buys");
+    const laneH = Math.max(1, trees.length);
+    const c4 = frame(cv, xMax, laneH, null, { l: 90, b: 26 });
+    const byId = Object.fromEntries(BASE.nodes.map((n) => [n.id, n]));
+    trees.forEach((t, i) => {
+      const y = c4.Y(laneH - i - 0.5);
+      c4.g.strokeStyle = css("--rule"); c4.g.beginPath(); c4.g.moveTo(c4.P.l, Math.round(y) + 0.5); c4.g.lineTo(c4.w - c4.P.r, Math.round(y) + 0.5); c4.g.stroke();
+      c4.g.fillStyle = css("--muted"); c4.g.textAlign = "right"; c4.g.textBaseline = "middle"; c4.g.font = `12px ${css("--font-ui")}`;
+      c4.g.fillText(t, c4.P.l - 10, y);
+    });
+    for (const p of main.purchases) {
+      const n = byId[p.id]; if (!n) continue;
+      const i = Math.max(0, trees.indexOf(n.tree));
+      const x = c4.X(p.t / 60), y = c4.Y(laneH - i - 0.5);
+      const col = css(`--t${i % 6}`);
+      if ((n.tags || []).includes("unlock") && p.rank === 1) {
+        c4.g.strokeStyle = col; c4.g.lineWidth = 2; c4.g.beginPath(); c4.g.arc(x, y, 7, 0, Math.PI * 2); c4.g.stroke(); c4.g.lineWidth = 1;
+      }
+      c4.g.fillStyle = col; c4.g.beginPath(); c4.g.arc(x, y, 3.5, 0, Math.PI * 2); c4.g.fill();
+    }
+  }
+
+  function legend(id, items) {
+    const el = $(id); el.textContent = "";
+    for (const [name, color, dash] of items) {
+      const s = document.createElement("span");
+      const i = document.createElement("i"); i.style.setProperty("--c", `var(${color})`); if (dash) i.className = "dash";
+      s.appendChild(i); s.append(name); el.appendChild(s);
+    }
+  }
+
+  // ------------------------------------------------------------ boot
+  document.title = BASE.game ? `${BASE.game} Tuner` : document.title;
+  renderTabs();
+  renderEditor();
+  runNow();
+  connect();
+  let rz = 0;
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawCharts, 120); });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawCharts);
+  new MutationObserver(drawCharts).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

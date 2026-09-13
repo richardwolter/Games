@@ -96,6 +96,34 @@ Treat it as a deliverable, not polish: the clean state must **gain density** (pl
 
 This inverts the notes' advice but keeps fun physics-first.
 
+### Tree Test Mode (2026-09-12, `upgrade_tree.gd`, `tree_screen.gd`, `tree_log.gd`)
+The proposed upgrade tree (`docs/progression/lake-tree.md`, designed with the
+`incremental-progression` skill) is playable as **its own game mode** before it replaces the
+shop. Richard's call: build it beside the shop, test it, then decide.
+- **Menu**: "New game (tree)" / "Continue (tree)" set `Lake.start_tree` (read once, like
+  `start_fresh`). Shown in every build, by decision; clean it out before a release export.
+- **Separate save slot**: `Lake.TREE_SAVE_PATH` (`user://lake_cleanup_tree.save`). A save carries
+  `"tree"`, and a tree run and a shop run each refuse the other's file.
+- **Numbers come straight from `res://docs/progression/lake-tree.json`**, the simulator's own
+  config, so what is played is what was simulated. Don't copy them into `.tres`. The export's
+  `*.json` include filter ships the whole `docs/progression` folder; settle that at export.
+- **Stats are a full recompute** from base and owned nodes (largest set, then add, then multiply),
+  the simulator's rule. `Lake.net_radius()` and the other getters, plus `fleet_size()`, read
+  `_tree_stats` when `tree_mode`.
+- **Start state**: net only, the file's `startMoney` (50). The scene's ferry is hidden and stopped
+  until First Ferry; later hulls are built by `_sync_tree_world`. The dog is hidden, stopped and
+  can't be petted until Adopt the Dog. No skimmer. `Dog.reach` / `strand_first` /
+  `strand_speed` are the tree's dog knobs; at their defaults the dog is exactly today's.
+- **Screen**: the Upgrades button opens `TreeScreen` instead of the shop board. It's a plain node
+  graph like Master Healer Kale's (Richard: not the drawn boards). Auto-laid out radially from
+  the parents, so a tuning pass needs no positions. It never frames below `FRAME_LEAST` or the
+  names collide; drag to reach the rest.
+- **Playtest log**: `user://tree_playtest.log`, JSON lines (session, purchase, progress every
+  30 s, cast with seconds since the last, shed open/close), timed by the run's own play clock.
+  Read it to recalibrate the sim's `k_aim`, decorating share and real purchase schedule.
+- **Tests**: `tools/test_tree.tscn` (headless, 38 checks) and `tools/shot_tree.tscn` (desktop
+  build, `tools/last_tree.png`). `test_lake` still covers the shop run.
+
 ---
 
 ## Architecture: Physics-Free Grid Layout

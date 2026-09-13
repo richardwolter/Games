@@ -1,0 +1,926 @@
+{
+ "game": "Lake Cleanup",
+ "currency": "sludge",
+ "maxMinutes": 300,
+ "startMoney": 50,
+ "stats": {
+  "piece_base_pay": 2.5,
+  "piece_filth_pay": 6.0,
+  "net_radius": 0.6,
+  "net_power": 0,
+  "net_range": 3.4,
+  "reel": 2.4,
+  "net_hold": 3,
+  "boat_speed": 4.2,
+  "cargo": 18,
+  "boats": 0,
+  "dog_fetch": 1,
+  "dog_wait_cut": 0,
+  "k_lake_r": 36.88,
+  "k_island_r": 9.58,
+  "k_units_total": 16264,
+  "k_stack": 4.071,
+  "k_density": 1.2,
+  "k_reel_factor": 0.977,
+  "k_aim": 2.0,
+  "k_cast_share": 0.75,
+  "k_mouth_edge": 0.15,
+  "k_ferry_leg": 24.19,
+  "k_ferry_fixed": 6.33,
+  "k_material_share": 0.3,
+  "k_stack_slots": 4,
+  "k_skim_factor": 1.4,
+  "k_dog_trip": 8,
+  "k_dog_carry": 2.2,
+  "k_dog_reach": 6,
+  "k_dog_carry_share": 0.5,
+  "k_strand": 448,
+  "k_strand_band": 2.5,
+  "k_units_t0": 6337,
+  "k_units_t1": 3896,
+  "k_units_t2": 2769,
+  "k_units_t3": 1551,
+  "k_units_t4": 1711,
+  "dog": 0,
+  "dog_beach": 0.35,
+  "dog_strand_speed": 1.0,
+  "dog_reach": 6
+ },
+ "derived": [
+  [
+   "coverage",
+   "(min(k_lake_r, k_island_r + net_range) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2)"
+  ],
+  [
+   "dog_coverage",
+   "(min(k_lake_r, k_island_r + dog_reach) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2) * k_dog_carry_share"
+  ],
+  [
+   "strand_reach",
+   "clamp((k_island_r + net_range + net_radius - k_lake_r) / k_strand_band, 0, 1)"
+  ],
+  [
+   "access_now",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - coverage)) * (net_power >= 0) + max(0, pool_lake_t1 - k_units_t1 * (1 - coverage)) * (net_power >= 1) + max(0, pool_lake_t2 - k_units_t2 * (1 - coverage)) * (net_power >= 2) + max(0, pool_lake_t3 - k_units_t3 * (1 - coverage)) * (net_power >= 3) + max(0, pool_lake_t4 - k_units_t4 * (1 - coverage)) * (net_power >= 4) + max(0, pool_strand - k_strand * (1 - strand_reach))"
+  ],
+  [
+   "density",
+   "k_density * access_now / max(coverage * k_units_total + strand_reach * k_strand, 1)"
+  ],
+  [
+   "cast_dist",
+   "net_range * k_cast_share"
+  ],
+  [
+   "mouth",
+   "net_radius + k_mouth_edge"
+  ],
+  [
+   "swept",
+   "2 * mouth * cast_dist + PI * mouth ^ 2"
+  ],
+  [
+   "per_cast",
+   "min(net_hold, swept * density)"
+  ],
+  [
+   "cast_cycle",
+   "k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"
+  ],
+  [
+   "catch_rate",
+   "per_cast / cast_cycle"
+  ],
+  [
+   "ferry_trip",
+   "k_ferry_fixed + 2 * k_ferry_leg / boat_speed"
+  ],
+  [
+   "ferry_rate",
+   "boats * cargo / ferry_trip"
+  ],
+  [
+   "dog_near_left",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - dog_coverage))"
+  ],
+  [
+   "dog_beach_share",
+   "dog_near_left > 5 ? dog_beach : 1"
+  ],
+  [
+   "dog_rate",
+   "dog * min(dog_fetch, k_dog_carry) / (k_dog_trip + max(10 - dog_wait_cut, 3))"
+  ]
+ ],
+ "pools": {
+  "lake_t0": {
+   "units": "k_units_t0",
+   "value": "piece_base_pay + 3.01 * piece_filth_pay"
+  },
+  "lake_t1": {
+   "units": "k_units_t1",
+   "value": "piece_base_pay + 3.40 * piece_filth_pay"
+  },
+  "lake_t2": {
+   "units": "k_units_t2",
+   "value": "piece_base_pay + 3.07 * piece_filth_pay"
+  },
+  "lake_t3": {
+   "units": "k_units_t3",
+   "value": "piece_base_pay + 3.27 * piece_filth_pay"
+  },
+  "lake_t4": {
+   "units": "k_units_t4",
+   "value": "piece_base_pay + 3.50 * piece_filth_pay"
+  },
+  "strand": {
+   "units": 448,
+   "value": "piece_base_pay + 3.01 * piece_filth_pay"
+  },
+  "box": {
+   "units": 0
+  },
+  "pier": {
+   "units": 0,
+   "sell": true
+  }
+ },
+ "flows": [
+  {
+   "id": "catch",
+   "label": "net catch",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "gate": "net_power >= 0",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t1",
+     "gate": "net_power >= 1",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t2",
+     "gate": "net_power >= 2",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t3",
+     "gate": "net_power >= 3",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t4",
+     "gate": "net_power >= 4",
+     "share": "coverage"
+    },
+    {
+     "pool": "strand",
+     "share": "strand_reach"
+    }
+   ],
+   "to": "box",
+   "rate": "catch_rate",
+   "active": true
+  },
+  {
+   "id": "dog",
+   "label": "dog fetch",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "share": "dog_coverage"
+    }
+   ],
+   "to": "box",
+   "rate": "dog_rate * (1 - dog_beach_share)"
+  },
+  {
+   "id": "dog_beach",
+   "label": "dog strand runs",
+   "from": [
+    "strand"
+   ],
+   "to": "box",
+   "rate": "dog_rate * dog_beach_share * dog_strand_speed"
+  },
+  {
+   "id": "ferry",
+   "label": "ferry haul",
+   "from": [
+    "box"
+   ],
+   "to": "pier",
+   "rate": "ferry_rate"
+  }
+ ],
+ "goal": {
+  "pools": [
+   "lake_t0",
+   "lake_t1",
+   "lake_t2",
+   "lake_t3",
+   "lake_t4",
+   "strand"
+  ],
+  "clearAt": 0.995
+ },
+ "links": [
+  {
+   "up": "catch",
+   "down": "ferry",
+   "band": [
+    0.8,
+    1.5
+   ],
+   "buffer": "box"
+  }
+ ],
+ "trees": [
+  "net",
+  "ferry",
+  "dog"
+ ],
+ "nodes": [
+  {
+   "id": "ferry_1",
+   "tree": "ferry",
+   "group": "fleet",
+   "name": "First Ferry",
+   "cost": 50,
+   "parents": [],
+   "effects": [
+    {
+     "stat": "boats",
+     "set": 1
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "desc": "The first purchase: a boat to carry the catch to the piers. Starting money covers it.",
+   "fixedCost": true
+  },
+  {
+   "id": "hull_1",
+   "tree": "ferry",
+   "group": "hull",
+   "name": "Deeper Hull I",
+   "cost": 300,
+   "parents": [
+    "ferry_1"
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": 4
+    }
+   ],
+   "tags": [],
+   "at": 1.2
+  },
+  {
+   "id": "sails_1",
+   "tree": "ferry",
+   "group": "sails",
+   "name": "Trim Sails I",
+   "cost": 500,
+   "parents": [
+    "ferry_1"
+   ],
+   "effects": [
+    {
+     "stat": "boat_speed",
+     "add": 2.0
+    }
+   ],
+   "tags": [],
+   "at": 2
+  },
+  {
+   "id": "hull_2",
+   "tree": "ferry",
+   "group": "hull",
+   "name": "Deeper Hull II",
+   "cost": 800,
+   "parents": [
+    "hull_1"
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": 6
+    }
+   ],
+   "tags": [],
+   "at": 5.5
+  },
+  {
+   "id": "ferry_2",
+   "tree": "ferry",
+   "group": "fleet",
+   "name": "Second Ferry",
+   "cost": 2400,
+   "parents": [
+    "hull_1"
+   ],
+   "effects": [
+    {
+     "stat": "boats",
+     "add": 1
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "at": 9.5
+  },
+  {
+   "id": "sails_2",
+   "tree": "ferry",
+   "group": "sails",
+   "name": "Trim Sails II",
+   "cost": 2800,
+   "parents": [
+    "sails_1"
+   ],
+   "effects": [
+    {
+     "stat": "boat_speed",
+     "add": 3.0
+    }
+   ],
+   "tags": [],
+   "at": 15
+  },
+  {
+   "id": "hull_3",
+   "tree": "ferry",
+   "group": "hull",
+   "name": "Deeper Hull III",
+   "cost": 4000,
+   "parents": [
+    "hull_2"
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": 8
+    }
+   ],
+   "tags": [],
+   "at": 16.5
+  },
+  {
+   "id": "ferry_3",
+   "tree": "ferry",
+   "group": "fleet",
+   "name": "Third Ferry",
+   "cost": 11000,
+   "parents": [
+    "ferry_2"
+   ],
+   "effects": [
+    {
+     "stat": "boats",
+     "add": 1
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "at": 23.5
+  },
+  {
+   "id": "line_1",
+   "tree": "net",
+   "group": "line",
+   "name": "Longer Line I",
+   "cost": 150,
+   "parents": [
+    "ferry_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": 2.2
+    },
+    {
+     "stat": "reel",
+     "add": 1.0
+    }
+   ],
+   "tags": [],
+   "desc": "Casts clear the rubbish-free shelf round the island and land in real water.",
+   "at": 0.7
+  },
+  {
+   "id": "bag_1",
+   "tree": "net",
+   "group": "bag",
+   "name": "Bigger Bag I",
+   "cost": 600,
+   "parents": [
+    "line_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": 3
+    }
+   ],
+   "tags": [],
+   "at": 6.5
+  },
+  {
+   "id": "pull_1",
+   "tree": "net",
+   "group": "pull",
+   "name": "Stronger Pull",
+   "cost": 1000,
+   "parents": [
+    "line_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "set": 1
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "desc": "Lifts tier 1: a quarter of the lake that was dead weight becomes catch.",
+   "at": 4.5
+  },
+  {
+   "id": "line_2",
+   "tree": "net",
+   "group": "line",
+   "name": "Longer Line II",
+   "cost": 700,
+   "parents": [
+    "line_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": 4.0
+    },
+    {
+     "stat": "reel",
+     "add": 2.0
+    }
+   ],
+   "tags": [],
+   "at": 3.5
+  },
+  {
+   "id": "bag_2",
+   "tree": "net",
+   "group": "bag",
+   "name": "Bigger Bag II",
+   "cost": 1300,
+   "parents": [
+    "bag_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": 3
+    }
+   ],
+   "tags": [],
+   "at": 8.5
+  },
+  {
+   "id": "bag_3",
+   "tree": "net",
+   "group": "bag",
+   "name": "Bigger Bag III",
+   "cost": 3000,
+   "parents": [
+    "bag_2",
+    "ferry_2"
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": 6
+    }
+   ],
+   "tags": [],
+   "requireAll": true,
+   "at": 14
+  },
+  {
+   "id": "pull_2",
+   "tree": "net",
+   "group": "pull",
+   "name": "Heavy Lift",
+   "cost": 4500,
+   "parents": [
+    "pull_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "set": 2
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "at": 11
+  },
+  {
+   "id": "line_3",
+   "tree": "net",
+   "group": "line",
+   "name": "Longer Line III",
+   "cost": 3000,
+   "parents": [
+    "line_2"
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": 7.0
+    },
+    {
+     "stat": "reel",
+     "add": 3.0
+    }
+   ],
+   "tags": [],
+   "at": 13
+  },
+  {
+   "id": "bag_4",
+   "tree": "net",
+   "group": "bag",
+   "name": "Bigger Bag IV",
+   "cost": 6000,
+   "parents": [
+    "bag_3"
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": 10
+    }
+   ],
+   "tags": [],
+   "at": 19
+  },
+  {
+   "id": "mouth_1",
+   "tree": "net",
+   "group": "mouth",
+   "name": "Wide Mouth I",
+   "cost": 9000,
+   "parents": [
+    "line_3"
+   ],
+   "effects": [
+    {
+     "stat": "net_radius",
+     "add": 0.4
+    }
+   ],
+   "tags": [],
+   "at": 20.5
+  },
+  {
+   "id": "pull_3",
+   "tree": "net",
+   "group": "pull",
+   "name": "Iron Pull",
+   "cost": 16000,
+   "parents": [
+    "pull_2"
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "set": 3
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "at": 22
+  },
+  {
+   "id": "line_4",
+   "tree": "net",
+   "group": "line",
+   "name": "Longer Line IV",
+   "cost": 14000,
+   "parents": [
+    "line_3"
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": 10.7
+    },
+    {
+     "stat": "reel",
+     "add": 5.0
+    }
+   ],
+   "tags": [],
+   "at": 25
+  },
+  {
+   "id": "bag_5",
+   "tree": "net",
+   "group": "bag",
+   "name": "Bigger Bag V",
+   "cost": 17000,
+   "parents": [
+    "bag_4"
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": 14
+    }
+   ],
+   "tags": [],
+   "at": 28
+  },
+  {
+   "id": "mouth_2",
+   "tree": "net",
+   "group": "mouth",
+   "name": "Wide Mouth II",
+   "cost": 27000,
+   "parents": [
+    "mouth_1"
+   ],
+   "effects": [
+    {
+     "stat": "net_radius",
+     "add": 0.6
+    }
+   ],
+   "tags": [],
+   "at": 34
+  },
+  {
+   "id": "pull_4",
+   "tree": "net",
+   "group": "pull",
+   "name": "Titan Pull",
+   "cost": 24000,
+   "parents": [
+    "pull_3"
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "set": 4
+    }
+   ],
+   "tags": [
+    "unlock"
+   ],
+   "at": 32
+  },
+  {
+   "id": "bank_reach",
+   "tree": "net",
+   "group": "line",
+   "name": "Bank Reach",
+   "cost": 34000,
+   "parents": [
+    "line_4"
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": 3.0
+    },
+    {
+     "stat": "reel",
+     "add": 8.0
+    }
+   ],
+   "tags": [
+    "keystone"
+   ],
+   "desc": "Past the water's edge: the strand and beach litter come within a cast, and the reel flies. Line IV already reaches all the water, so nobody can be locked out by this price.",
+   "at": 37
+  },
+  {
+   "id": "trawl",
+   "tree": "net",
+   "group": "mouth",
+   "name": "Trawl Mouth",
+   "cost": 40000,
+   "parents": [
+    "mouth_2"
+   ],
+   "effects": [
+    {
+     "stat": "net_radius",
+     "add": 2.0
+    }
+   ],
+   "tags": [
+    "keystone"
+   ],
+   "desc": "A mouth wide enough to sweep the last stragglers out of thin water.",
+   "at": 41
+  },
+  {
+   "id": "dog",
+   "tree": "dog",
+   "group": "dog",
+   "name": "Adopt the Dog",
+   "cost": 700,
+   "parents": [
+    "bag_2"
+   ],
+   "effects": [
+    {
+     "stat": "dog",
+     "set": 1
+    }
+   ],
+   "tags": [
+    "unlock",
+    "utility"
+   ],
+   "at": 7.5
+  },
+  {
+   "id": "fetch_1",
+   "tree": "dog",
+   "group": "fetch",
+   "name": "Good Fetch I",
+   "cost": 1000,
+   "parents": [
+    "dog"
+   ],
+   "effects": [
+    {
+     "stat": "dog_fetch",
+     "add": 1
+    }
+   ],
+   "tags": [
+    "utility"
+   ],
+   "at": 12
+  },
+  {
+   "id": "nose",
+   "tree": "dog",
+   "group": "nose",
+   "name": "Keen Nose",
+   "cost": 2000,
+   "parents": [
+    "dog"
+   ],
+   "effects": [
+    {
+     "stat": "dog_wait_cut",
+     "add": 3
+    }
+   ],
+   "tags": [
+    "utility"
+   ],
+   "at": 17.5
+  },
+  {
+   "id": "fetch_2",
+   "tree": "dog",
+   "group": "fetch",
+   "name": "Good Fetch II",
+   "cost": 6000,
+   "parents": [
+    "fetch_1"
+   ],
+   "effects": [
+    {
+     "stat": "dog_fetch",
+     "add": 1
+    }
+   ],
+   "tags": [
+    "utility"
+   ],
+   "at": 26.5
+  },
+  {
+   "id": "leash",
+   "tree": "dog",
+   "group": "leash",
+   "name": "Long Leash",
+   "cost": 13000,
+   "parents": [
+    "nose"
+   ],
+   "effects": [
+    {
+     "stat": "dog_reach",
+     "add": 6
+    }
+   ],
+   "tags": [
+    "utility"
+   ],
+   "desc": "The dog ranges twice as far from the island for light pieces.",
+   "at": 35.5
+  },
+  {
+   "id": "beachcomber",
+   "tree": "dog",
+   "group": "beach",
+   "name": "Beachcomber",
+   "cost": 9000,
+   "parents": [
+    "fetch_2"
+   ],
+   "effects": [
+    {
+     "stat": "dog_beach",
+     "set": 0.85
+    },
+    {
+     "stat": "dog_strand_speed",
+     "set": 1.6
+    }
+   ],
+   "tags": [
+    "keystone",
+    "utility"
+   ],
+   "desc": "The dog works the far bank on its own: strand runs first, and quicker.",
+   "at": 39
+  }
+ ],
+ "bots": [
+  {
+   "id": "focused",
+   "policy": "value",
+   "thinkEvery": 5
+  },
+  {
+   "id": "casual",
+   "policy": "mixed",
+   "noise": 0.15,
+   "attention": 0.9,
+   "offline": {
+    "every": 600,
+    "for": 240
+   },
+   "thinkEvery": 20,
+   "seeds": 3
+  },
+  {
+   "id": "cheapest",
+   "policy": "cheapest",
+   "thinkEvery": 5
+  }
+ ],
+ "targets": {
+  "clearMinutes": {
+   "focused": [
+    50,
+    70
+   ],
+   "casual": [
+    100,
+    140
+   ]
+  },
+  "unlockGapMin": [
+   2,
+   15
+  ],
+  "paybackCurve": [
+   [
+    0,
+    30
+   ],
+   [
+    10,
+    120
+   ],
+   [
+    30,
+    360
+   ],
+   [
+    60,
+    600
+   ]
+  ]
+ }
+}
