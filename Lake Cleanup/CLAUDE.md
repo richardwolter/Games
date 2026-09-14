@@ -96,7 +96,56 @@ Treat it as a deliverable, not polish: the clean state must **gain density** (pl
 
 This inverts the notes' advice but keeps fun physics-first.
 
+### The Shop Balance Pass (2026-09-14, `/grill-me` with Richard; supersedes the tree)
+Richard's call: **the tree is set aside, the shop stays**, and the shop is rebalanced around
+these rules. Everything below the tree section about the tree still describes code that is in
+the repo; none of it is on the menu.
+- **Hidden, not deleted** (`Menu.TREE_DOORS` false, `Lake.SHELVED`): the tree's two menu
+  doors, the skimmer, and the market's five sell-by-tier tracks. Shelved tracks have no row,
+  are not counted by `_affordable`, `_buy` refuses them and `tier_pay` is 1; their levels
+  still save and load. Flip `TREE_DOORS` to play the tree again.
+- **Haul and Hold are one track twice** (`net_hold.tres` = `cargo.tres`, same value and same
+  price at every level, `test_lake` guards): one cast fills one ferry. 4 + 1 a level, 24 at
+  the top. Richard chose this over Hold = 2 x Haul after the pushback; **the sim says the
+  ferry is the ceiling** under it (see below).
+- **Caps**: the big tracks stop at 20 levels with round steps — Width 0.6 + 0.21 a level to
+  **4.8 tiles (+700%)**, wider stutters and looks bad (Richard); Range 4 + 1.6 to 36 (the
+  farthest shore is 35.6, `probe_reach`); Speed (reel) 3 + 1 to 23; Ferry speed 4 + 1.6 to
+  36; Haul/Hold as above. The simple ones are short: Strength 4, Extra ferry 3 (**4 ferries
+  at most**, `MAX_BOATS`), Pack 3 (**4 dogs at most**, `MAX_DOGS`), Fetching 4, Keenness 3,
+  Recycle Bonus 8, Pigeons 8, Lucky haul 10, Double cast 10.
+- **The pack** (`dog_count.tres`, "Pack" on the dog's board, `Lake._add_dog`/`_fit_dog`/
+  `_dogs`): three more dogs, the same sprite, wired like the first, sharing one Fetching and
+  Keenness level. **Claims** (`Dog.claims`, static, `_aim_at`/`_release`): a stick one dog is
+  swimming for is skipped by the others' sampling, cleared on the take, the give-up or the
+  settle. Not a lock — the net and the ferry still take what they like. Petting reaches the
+  nearest dog (`_dog_in_reach`). The tree run keeps one dog.
+- **Heavier tiers always pay more** (`EconomyConfig.tier_pay_step` 0.5, `piece_pay`): a piece
+  pays its flat-plus-filth times 1 + 0.5 x tier, and `test_lake` guards it piece by piece —
+  the cheapest of every tier over the dearest of the tier below. `rubber_disk` and
+  `rubber_ball` went to pollution 3.0 to sit inside their tiers' bands; a new kind's
+  pollution has to keep that order.
+- **`SAVE_VERSION` 9**, old saves refused (Richard starts fresh).
+- **Priced by the sim** (`docs/progression/build_shop.py` -> `shop.json`, `price_shop.py`,
+  `shop_loop.sh`, report in `shop-report/`): the tree's calibration (`k_catch_scale` 1.7 from
+  Richard's run) on the shop's tracks. `price_shop.py` gives every level a minute of the run
+  (a track's levels spread evenly to `LAST_BUY` 48) and steers it there pass by pass, fitting
+  each track back to `price_base x price_mult ^ level`; pricing at income x gap off the bot's
+  own purchases ran away (a cheap track got cheaper) and pinning to income at the scheduled
+  minute front-loaded everything by 18 min. Haul/Hold's multiplier was then set to 1.5 by
+  hand (the fit's 1.69 put 420k on each tail). Result: the focused bot clears in **69 min**,
+  brisk buys early (median 15 s), income climbs to about 280/s by 48 min.
+  **The ceiling is the ferry, by the arithmetic**: at equal Haul and Hold, four hulls carry
+  4H / (8.4 + 206/speed + 0.06H) a second against a net at about 0.4H (calibrated), so the
+  boats cannot keep up at any speed; the box peaks at about 400 in the sim and income is
+  flat from about 25 min. Hold = 2 x Haul (8 + 2 a level) balances at the top and was
+  simulated too (cleared faster, the strand stalled the bot). `cargo.tres`'s curve is the one
+  number to change if Richard revisits it; re-run `shop_loop.sh` after.
+- **Out of scope, by decision**: deleting the tree or skimmer code, new dog art, per-dog
+  rows, idle or helper upgrades, tree-mode balance.
+
 ### Tree Test Mode (2026-09-12, `upgrade_tree.gd`, `tree_screen.gd`, `tree_log.gd`)
+**Set aside 2026-09-14** (see The Shop Balance Pass): the doors are hidden, the code stays.
 The proposed upgrade tree (`docs/progression/lake-tree.md`, designed with the
 `incremental-progression` skill) is playable as **its own game mode** before it replaces the
 shop. Richard's call: build it beside the shop, test it, then decide.
@@ -115,14 +164,52 @@ shop. Richard's call: build it beside the shop, test it, then decide.
   can't be petted until Adopt the Dog. No skimmer. `Dog.reach` / `strand_first` /
   `strand_speed` are the tree's dog knobs; at their defaults the dog is exactly today's.
 - **Screen**: the Upgrades button opens `TreeScreen` instead of the shop board. It's a plain node
-  graph like Master Healer Kale's (Richard: not the drawn boards). Auto-laid out radially from
-  the parents, so a tuning pass needs no positions. It never frames below `FRAME_LEAST` or the
-  names collide; drag to reach the rest.
+  graph like Master Healer Kale's (Richard: not the drawn boards). Auto-laid out from the parents,
+  so a tuning pass needs no positions. It never frames below `FRAME_LEAST`; drag to reach the rest.
+  **Laid out in rings by depth, a wedge per category** (2026-09-14, Richard: too clustered, lines
+  crossing): a node's ring is its longest path from the root, each category's wedge is as wide as
+  its most crowded ring needs, wedges are ordered so linked categories sit side by side (the dog
+  between net and ferry), each ring is ordered by its parents' angles and spread over
+  `RING_SPREAD` of its wedge at least `NODE_GAP` apart. Edges sweep round the rings rather than
+  cutting chords; cross-category ones are dashed and run along the wedge border. Nodes and their
+  writing scale with the zoom down to `DRAW_LEAST`. `test_tree` guards the ring gap and that no
+  two edges within a category cross. `TREE_SHOT_ALL=1` on `tools/shot_tree.tscn` buys the whole
+  tree and frames all of it.
 - **Playtest log**: `user://tree_playtest.log`, JSON lines (session, purchase, progress every
   30 s, cast with seconds since the last, shed open/close), timed by the run's own play clock.
   Read it to recalibrate the sim's `k_aim`, decorating share and real purchase schedule.
-- **Tests**: `tools/test_tree.tscn` (headless, 38 checks) and `tools/shot_tree.tscn` (desktop
+- **Playtest log** also records `birds` (netted so far) in each progress line, for calibrating the
+  pigeons (2026-09-14).
+- **Tests**: `tools/test_tree.tscn` (headless, 53 checks) and `tools/shot_tree.tscn` (desktop
   build, `tools/last_tree.png`). `test_lake` still covers the shop run.
+- **Second pass** (2026-09-14, grilled with Richard; full design in `lake-tree.md`): focused clear
+  about 90 min, buys brisk at the start and slowing to the end, the boats nearly keep up with the
+  box, the dog mid-game (needs Iron Pull and Second Ferry), the net as **rings** of Line / Bag /
+  Mouth plus a luck slot, each joined by a strength node needing **any two** of its ring
+  (`requireCount` in the tree file, read by `UpgradeTree.is_visible` and by the skill's `sim.js`).
+  **Lucky Haul and Double Cast** are ring slots, **Recycle Bonus** is on the ferry, and the
+  **Pigeons** are a fourth tree, "bonus": the tree stats `lucky_odds`, `double_odds`,
+  `recycle_bonus` and `bird_worth` feed `lucky_chance`, `double_cast_chance`, `recycle_bonus` and
+  `bird_pay` in a tree run, and the bonus clock starts with the first node giving a bonus
+  (`_sync_tree_world`). Sell-by-tier stays out: a tree run still sells every tier at par.
+- **Range reaches every shore** (2026-09-14): `tools/probe_reach.gd` (headless `--script`) measures
+  the farthest shore from anywhere the angler can stand, 35.6 tiles; Longer Line IV reaches 35.9.
+  Re-run it if the island, the bank or `Angler.WALK_LIMIT` change.
+- **The ferry was mis-measured**: `tools/probe_rates` loaded one material a run, so every run was a
+  one-stop trip. It now loads mixed holds; a real run is 8.4 s + 206.6/speed + 0.059 s a piece,
+  about three times what the first tree was priced on — the box pile-up in the first playtest.
+- **Pricing**: `sh docs/progression/loop.sh` (build, `price_by_income.py`, sim, `check_tree.py`).
+  `price_to_schedule.js` oscillated on this tree and is not used.
+- **Third pass** (2026-09-14 afternoon, grilled after Richard's full run; see `lake-tree.md`): the sim is
+  **calibrated to his run** (`replay_playtest.py` and the skill's new `replay` bot policy: catch x1.7,
+  `k_catch_scale`), a real clear of about 70 min that **spends down** (his run ended on 16,426 unspent;
+  `price_by_income.py` puts the surplus on the late nodes, `check_tree.py` guards it within 5%). **The dog
+  is first**: 100 sludge after First Ferry, and the net's first ring needs it (supersedes "mid-game"); its
+  training and the pigeons (now from Heavy Lift) are gated by strength nodes. Deeper Hull IV-V and Trim
+  Sails IV added; **Fast Reel replaces Bank Reach**; **reel scattered** (same day: base 6, +1.5 to +3 on every strength node, +1 on every luck slot, on top of the Lines); reel and width a quarter stronger, the bag smaller
+  (+2 a node) because the calibrated model showed the bag sets the clear time. On the tree screen the
+  strength nodes draw at `POWER_SIZE` with a gold rim, and a strength node gating another category's node
+  is a gold badge on that node (`TreeScreen.is_badge`) rather than a dashed arc.
 
 ---
 
@@ -695,6 +782,11 @@ the sky — `lean_dawn` +1.7 through `lean_noon` +0.18 to `lean_dusk` -1.7 — w
 cast shadows to the *right* of their casters for most of the loop, onto the same side as
 every baked highlight, and crossed zero at noon so the whole world's shadows flipped sides
 in front of the player.
+- **No night** (2026-09-14, Richard: "night is too dark"): the loop runs the sun from `sun_from`
+  (0.15, mid morning) to `sun_to` (0.8, late afternoon) over `turn_at` (0.88) of it, and the light
+  then eases back to the morning's without passing noon (`DayCycle._sun_at`, `_light_at`). The dim
+  blue trough at dusk and `trough_at`/`trough_dip` are gone; late afternoon is the darkest the lake
+  gets, and `test_lake` guards that nothing in the loop is darker. Both the shop run and the tree run.
 - **The shadow always falls down and to the left**, and the sun only drifts west through the
   day instead of crossing. `test_lake`'s `_stage_sun` walks 200 phases and guards the side.
 - **The lean is derived from the stretch, not set beside it** (`DayConfig.slant_*`,
@@ -910,6 +1002,13 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   until the volley is over (`_landing`, the second pass through `State.UNLOADING`), for the
   reason the loading one is: a hull that sails out from under its own cargo in mid-air is
   worse than no animation. With no `Haul` the sale still happens on the spot.
+- **A ferry sails only with a full hold** (`Boat.ready_to_sail`, 2026-09-14, Richard: "too
+  many missed trips"): auto-dispatch waits until the yard holds `capacity` pieces for it, so
+  a hull no longer makes its long trip round the lake for two or three pieces. The one exception is
+  a lake with no rubbish left in the water (counted every `DRY_CHECK_EVERY` s), where what is
+  in the box is all there will be. The shop's hidden "send now" still sends a part load.
+  The tree's pricing sim was calibrated on play from before this change;
+  check the box pile-up and ferry income against the next playtest log.
 - **No wake and no rings**, by decision (2026-09-12): the pale wedge of slabs behind the
   stern with arcs shedding down it (`_draw_wake`, `_wake_arc`, `_wake_noise`, every `WAKE_*`)
   and the ripple rings dropped into the splash layer every `HULL_RIPPLE` are both gone. What
@@ -1105,9 +1204,13 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   aim, the sign, the heap and its drain, and the coins' cap and carry.
 
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
+**2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
+the market board carries Recycle Bonus and Pigeons only. See The Shop Balance Pass.
 Five upgrades built from what the game already had, no new art, decided with `/grill-me`
 (Richard: skimmer stays cut; helper, idle and tree-mode upgrades out of scope; **old shop
-only**, the tree run sells at par and rolls no luck). Nine tracks, all `UpgradeTrack`
+only**, the tree run sells at par and rolls no luck). **Superseded in part on 2026-09-14**:
+Lucky Haul, Double Cast, Recycle Bonus and Pigeons are tree nodes now (see Tree Test Mode); a tree
+run still sells every tier at par. Nine tracks, all `UpgradeTrack`
 `.tres` under `resources/upgrades/`, in `UPGRADE_ORDER`/`TRACKS`, saved under `levels`
 like the rest (no `SAVE_VERSION` bump: a missing key reads as level 0).
 - **The market** is a fourth drawn board (`ShopSkin.BOARDS` `&"market"`, head the money
@@ -1181,6 +1284,53 @@ only**, say what the next level buys, carry a "?" each, and the market is explai
 - **TreeScreen untouched**, by decision. Probe: `tools/shot_menus.tscn` now also saves
   `tools/last_menu_upgrades_help.png` with the first row's "?" hovered.
 
+### The Gamepad (issue #33, 2026-09-14, `/grill-me` with Richard)
+A trial of full controller support, to decide keep or drop after playtesting. Xbox names.
+- **The last device wins** (`scripts/pad.gd`, autoload `Pad`): a pad button, or a stick or
+  trigger past `WAKE_AXIS`, switches to pad mode; the mouse moved `MOUSE_WAKE` px or clicked
+  switches back. No setting. The mouse pointer is hidden in pad mode on the bare lake.
+- **Lake**: left stick walks (added to `walk_*`), right stick aims, RT casts, LT lays a lit
+  net, A interacts (the shed door, petting the dog), X opens the shed from anywhere (the
+  decorate button), Y opens the upgrades, Start opens the settings, LB/RB zoom out/in about
+  the reticle, R3 puts the reticle back on the angler. Read in `Lake._pad_buttons` with
+  `is_action_just_pressed`, because a trigger is an axis and a held axis sends many events.
+- **The reticle is free** (`scripts/pad_aim.gd`, `PadAim`): the stick sets its speed (view
+  heights a second, so the same on screen at every zoom). It stays on its spot in the world
+  when the stick is let go and when the angler walks. The view leans towards it
+  (`Lake._pad_framed`, which calls `_framed_on`), but keeps the angler inside
+  `PAD_ANGLER_INSET` first, so walking away pushes the reticle along by the window's edge
+  (`PadAim.hold_in`). `Lake.aim_point` / `CastNet.aim_point` are the one place that decides
+  what is being aimed at.
+- **The assist is subtle and only acts while the stick is pushed** (Richard: "just to help,
+  not to fully auto aim and lock on"): over a green spot the reticle slows to `FRICTION`;
+  short of one it drifts towards the nearest green spot within `REACH` mouth widths, at
+  `PULL` of the speed the stick asks for (`CastNet.nearest_catch`). A still stick means no
+  movement at all. Spots behind the push (cosine under `AHEAD`) are skipped, so the assist
+  can bend the aim but never hold it back. **Green means green on the marker**
+  (`would_catch`), picked over counting pieces or favouring finds. The numbers are first
+  guesses for Richard to retune.
+- **Menus use a virtual cursor, by decision**, not focus navigation: wherever the scene
+  wants a pointer (`pad_cursor_wanted`: on the lake, while a board or the farewell is up; a
+  scene without the method, such as the main menu, always wants one), the right stick moves
+  the real pointer (`warp_mouse`) and `Pad` turns buttons into real events tagged
+  `SYNTH_DEVICE`: A is the left button (hold to drag), B is Escape, LB/RB are the wheel. In
+  the shed, X turns the piece in hand and Y works a switch, and the shed's prompt and the
+  tree screen's help line show pad buttons in pad mode. **In the shed, A picks a piece up
+  and the next A puts it down** (`ShedRoom._gui_input` tells a pad click by its
+  `SYNTH_DEVICE` tag; the mouse still drags), and **while a piece is in hand the left stick
+  moves it** (`_carry_with_pad`), because the player stands still while carrying anyway.
+- **The aim ring stays up while a cast is out** (2026-09-14, both pad and mouse): drawn over
+  the net by `CastNet._draw` so the next throw can be lined up, with the same green/red
+  verdict (`in_reach` is `can_cast_to` without the idle check). Not on the double cast's
+  second net. The laid-net ghost is still idle only, and the assist works during a cast too.
+- **Out of scope for now**: focus navigation, button glyph art, rumble, a Steam Deck pass,
+  an aim-assist setting.
+- **Tests**: `test_lake`'s `_stage_pad` covers the input map, mode switching, the reticle,
+  the assist (still stick, bend, never backwards, friction) and the lean.
+  `tools/probe_pad_cursor.tscn` (desktop build, not `--headless`) checks that the pad's
+  click, wheel and Escape land where the pointer is in a stretched window
+  (`tools/last_pad_cursor.log`).
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.
@@ -1193,7 +1343,8 @@ sprite scale breaks the grid assumptions.
 The finds — the furniture the player nets and stands in the shed — come from
 `art_source/Decoration_Clean_Dirty` (a PSD, no extension). It holds two layer groups:
 `Decoration` (restored, as the shed shows it) and `Decoration Dirty` (grimy, as the lake
-shows it). 34 finds.
+shows it). 37 finds (2026-09-13: the kitchen chairs and the old table cut, four rubbish-born
+finds added — see The Shed Floor below).
 
 **Pipeline** (all offline, run from the project root):
 1. `psd-extract` skill → `art_source/decoration_extracted/` (one PNG per layer + manifest).
@@ -1274,13 +1425,72 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   the room is one `_draw` on a Control.
 - The view a piece stands in persists in the `decor` row as `"view"`.
 - **Copies**: a find can be hidden more than once — `copies` in `decor_sets.json`, baked
-  into `pieces.json`, read via `Sheets.copies_of`. Both chairs are **4** (a dining table
+  into `pieces.json`, read via `Sheets.copies_of`. The dining chairs are **4** (a dining table
   with one chair at it is not a room anybody lives in); everything else is 1. Each copy is
   its own def, its own hiding place in the lake, and its own row in `unlocked` — they share
   one dirty sprite and are netted and stood separately. `_keep` caps at `copies_of`, and
   `in_store()` **counts** rather than matching by name: matching emptied the shelf of all
   four the moment the first was stood down.
 - `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
+
+### The Shed Floor: Bases, the Wall, Small Pieces (2026-09-13, `/grill-me` with Richard)
+- **Cut**: `decor_kitchen_chair` (4) and `decor_old_table`. Dining table and dining chairs
+  stay. `SAVE_VERSION` 8.
+- **Four finds born from the rubbish**: `decor_painting_a` ("Painting", the lake's
+  `wood_painting3`), `decor_painting_b` ("Landscape", `wood_painting4`), `decor_chew_toy`
+  (the **rubber bone**, not `rubber_toy` — Richard, same day), `decor_globe`. Richard painted
+  both groups into the Decoration PSD, so they go through the ordinary pipeline: PSD layers
+  `wood_painting`/`wood_painting_2` (clean) and `_3`/`_4` (dirty; the psd-extract slugs are
+  by layer order, so re-check the pairing after any re-extract — the manifest bboxes at
+  x 157 and x 139 tell them apart), `rubber_bone_copy`/`rubber_bone`,
+  `plastic_globe`/`plastic_globe_2`. **The rubbish kinds stay in the fill as well** —
+  netting a plain one is rubbish, the find is one extra buried copy that shines. The
+  builder's `dirty_piece` (a lake sprite copied onto the dirty sheet, with the clean view
+  falling back to it) was the bridge before the paint existed; unused now, kept.
+- **Only a piece's base takes floor** (`base` per view in the catalogue, `Sheets.base_of`,
+  `ShedRoom.base_of`): the bottom N rows of cells; the rest of the picture is height and
+  **rises up the back wall** when the piece is pushed to it. Authored by eye off
+  `tools/last_decor_views.png` (the art is three-quarter view: a front-on sofa's base is
+  its seat depth, a side-on one's nearly the whole picture); rugs default to their whole
+  height, everything else to one row. Blocking, the drop clamp and the draw order all read
+  it. **Richard corrects the numbers by eye**; nothing else has to move.
+- **The wall is `WALL_ROWS` (4) cells**, not `BOARD * ZOOM * WALL_GROW` px: placement rows
+  must mean the same at every window size. `_zoom()` fits wall and floor together. A
+  bookcase (6 cells, base 1) stands one row off the wall, a fridge two. `_drop_cell` clamps
+  the row so a piece let go too high slides down until its base is on the boards rather
+  than going back on the shelf.
+- **`place`**: `floor` (default), `wall` (the paintings — hang on the wall strip only,
+  `can_place` wants the whole picture above row 0, no floor cell blocked, drawn first),
+  `small` (pots, table lamp, clock, chew toy, globe — may be set over a big piece).
+  **Free overlap kept, by Richard's call** over refusing shared base cells.
+- **One draw order** (`_order`, `_before`): wall, flats, then standing by foot row, **ties
+  by the order the pieces went down** (`sort_custom` is not stable — two pieces on one
+  row swapped frame to frame, the "chair through the desk"). A small piece keyed
+  `OVER_HOST` past its host, the standing piece whose picture holds the middle of its base
+  (`_host_of`), so a pot on a table draws right after the table however high up the
+  picture it sits. The dog and the player sort in by `_walker_key`: their feet, or
+  `OVER_PIECE` past any piece whose base band their feet are in — a dog on the bed is on
+  the bed wherever on it it lies (replaces the 1.2-cell `own_bed` rule). The piece in hand
+  is sorted in as a ghost (`_ghost`, alpha in the row) so what is seen is what lands; the
+  green/red rect goes on the boards under everything.
+- **Not done, by decision**: snap-to-surface stacking (a surface height per piece), base
+  collision, scaling the dog.
+- **The angler indoors is `YOU_TALL` 3.9**: 1.3x (4.4) was asked for and then read as too
+  big, so half way. At the room's usual zoom of 2 that is one and a half screen pixels to
+  an art pixel, so the figure's scale rounds to **half pixels** (`YOU_STEP`) — whole pixels
+  only ever gave 1 or 2, the two sizes already rejected. Dog unchanged.
+- **The bed draws 1.5x** (`scale` in the catalogue, `Sheets.scale_of`/`view_size_of`; the
+  footprint, stamp and ghost all go through `view_size_of`). 1.5, not "a bit" as 1.25,
+  because at zoom 2 it is three whole screen pixels to one painted. **The stove and the
+  kitchen counter draw 0.75x** (same day, "decrease size"). And **it has its name
+  on the shelf**: the starter bed is no def, so `Lake` hands its title over from the
+  catalogue by hand.
+- **Finds float 1.2x smaller** (`Lake.FIND_SHRINK`: `SPRITE_SCALE` 1.67 and the cap 57 for
+  keepsake defs; rubbish untouched). Not a whole art pixel — accepted, judge in play.
+- **Probe**: `tools/shot_shed.tscn` now furnishes the room (bookcase and fridge on the
+  wall, paintings, table with a pot, chair pair, sofa on rug). `test_lake` guards the wall
+  rows, the base-only block, the painting, the stable tie, the pot's host, the walker key
+  and the find scale.
 
 ### Golden Glitter (`LakeGrid.GlintLayer`, `shaders/beam.gdshader`, rim in `rubbish.gdshader`)
 Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down, dealt
@@ -1290,7 +1500,7 @@ the **pet bed** (`FIRST_FIND`) is planted first, afloat on top of a stack in the
 `FIRST_FIND_OUT` (0.8) tiles of water past the island's shelf and **at tier 0**, so a new
 game's net — power 0, a 3.4-tile throw — can bring it home on the first casts; and the **house's bed** (`STARTER_BED`, `decor_bed`) is not a
 find at all — the shed starts with it (`_seed_starter_bed`), so `_all_defs` skips it.
-`SAVE_VERSION` went to 7 for the def list. `test_lake` guards all three. The
+`SAVE_VERSION` went to 7 for the def list (8 on 2026-09-13, same reason). `test_lake` guards all three. The
 glitter is not a map: a find within `GLINT_REACH = 3` slots of the top shows through the
 muck, and shines fully once uncovered. **Rewritten 2026-09-13 after Fortnite's floor loot**
 (Richard's reference: the golden gun with its column of light, gold outline and glitter):
@@ -1460,7 +1670,7 @@ size × `SPRITE_SCALE` (2.0), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
 ### Retired
 `assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
 names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the
-rectangles now). `SAVE_VERSION` is 7 and older saves are refused rather than migrated;
+rectangles now). `SAVE_VERSION` is 8 and older saves are refused rather than migrated;
 `RECUT_RENAMES` and `tools/repair_save.gd` went with them. `tools/slice_sheets.gd` still
 cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 `tools/build_decor.py` after any re-slice** or the decor half is lost.

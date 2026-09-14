@@ -36,6 +36,9 @@ const DOORS := [
 	{"key": &"quit", "label": "Quit"},
 ]
 const CREDITS := {"key": &"credits", "label": "Credits"}
+## The tree doors are hidden (2026-09-14, Richard: the tree is set aside, the shop stays).
+## The code behind them is kept; flip this to play the tree again.
+const TREE_DOORS := false
 
 ## Where the stack stands, in the design frame: in from the left edge, up from the foot,
 ## over the open water on the left. The HUD's settings button's size, wider for the longest
@@ -125,7 +128,8 @@ func _lay_out() -> void:
 		var plank: PlankButton = _planks[key]
 		plank.visible = (
 			(key != &"continue" or has_save())
-			and (key != &"continue_tree" or has_tree_save())
+			and (key != &"continue_tree" or (TREE_DOORS and has_tree_save()))
+			and (key != &"new_tree" or TREE_DOORS)
 		)
 		if plank.visible:
 			shown.append(plank)
@@ -205,6 +209,12 @@ func _show_confirm(open: bool) -> void:
 ## Escape backs out of whichever board is up. On the bare menu it does nothing: the way out
 ## of the game is the Quit plank, and a key that quits by accident is not a shortcut.
 func _unhandled_input(event: InputEvent) -> void:
+	# Start is the pad's way to the settings, as on the lake. Everything else on the menu is
+	# the pad's pointer (scripts/pad.gd): A clicks a plank, B is Escape.
+	if event is InputEventJoypadButton and event.is_action_pressed(&"pad_settings"):
+		_show_settings(not _settings.visible)
+		get_viewport().set_input_as_handled()
+		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return

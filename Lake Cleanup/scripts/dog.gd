@@ -244,6 +244,15 @@ var _detour := Vector2.INF
 ## gets the longer time limit. See STRAND_ODDS.
 var _to_strand: bool = false
 
+## Which tile each dog in the pack is swimming for, tile index to dog, shared by every dog
+## (2026-09-14, the pack): a stick one dog has claimed is skipped by the others' sampling,
+## so four dogs do not all swim for the same can and three come home with nothing. Cleared
+## when the piece is taken, the trip given up, or the dog settles. Not a lock on the grid:
+## the net and the ferry still take what they like, and a dog whose stick went re-aims.
+static var claims: Dictionary = {}
+## The tile index this dog has claimed, or -1.
+var _claim: int = -1
+
 
 func _ready() -> void:
 	_foam = WaterlineFoam.new()
@@ -347,6 +356,7 @@ func _slow(delta: float) -> void:
 ## nothing small enough floating within reach the swim simply is not offered, and the roll
 ## falls through to the land moods.
 func _settle() -> void:
+	_release()
 	_age = 0.0
 	_trip = 0.0
 	_detour = Vector2.INF
@@ -364,7 +374,7 @@ func _settle() -> void:
 			stick = _find_strand()
 			_to_strand = stick >= 0
 		if stick >= 0:
-			_target = Vector2(grid.tile_of(stick)) + Vector2(0.5, 0.5)
+			_aim_at(stick)
 			_state = State.SWIM_OUT
 			return
 	# Afloat with nothing to fetch: swim in. Every mood below is a thing done on grass, and
@@ -422,6 +432,8 @@ func _find_stick(from_dog: bool = false) -> int:
 		var def := grid.defs[stack[stack.size() - 1]]
 		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
 			continue
+		if _claimed_by_other(index):
+			continue
 		var gap := tile.distance_squared_to(tile_pos if from_dog else Iso.ISLAND_CENTRE)
 		if gap < best_gap:
 			best_gap = gap
@@ -454,6 +466,8 @@ func _find_strand(from_dog: bool = false) -> int:
 		var def := grid.defs[stack[stack.size() - 1]]
 		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
 			continue
+		if _claimed_by_other(index):
+			continue
 		var gap := tile.distance_squared_to(tile_pos if from_dog else Iso.ISLAND_CENTRE)
 		if gap < best_gap:
 			best_gap = gap
@@ -473,6 +487,7 @@ func _go_fetch(delta: float) -> void:
 	# A swim that has gone on this long is a swim towards something unreachable. Head home
 	# rather than paddle at it for the rest of the run.
 	if _trip > (STRAND_TRIP_MOST if _to_strand else TRIP_MOST):
+		_release()
 		_state = State.CARRY_BACK
 		_trip = 0.0
 		return
@@ -486,8 +501,9 @@ func _go_fetch(delta: float) -> void:
 		# floating, so it picks the next nearest and carries on.
 		var again := _find_strand(true) if _to_strand else _find_stick()
 		if again >= 0:
-			_target = Vector2(grid.tile_of(again)) + Vector2(0.5, 0.5)
+			_aim_at(again)
 			return
+		_release()
 		_state = State.CARRY_BACK
 		return
 	if not _step_towards(_target, _swim_pace(), delta):
@@ -499,6 +515,7 @@ func _go_fetch(delta: float) -> void:
 		return
 	var stack: PackedInt32Array = grid.stacks[index]
 	_carried.append(grid.take(index, stack.size() - 1))
+	_release()
 	_trip = 0.0
 	# Room for another and another one floating: the dog stays out and works the water
 	# rather than rowing back for each piece. `_find_stick` is the same sampling that
@@ -507,7 +524,7 @@ func _go_fetch(delta: float) -> void:
 	if _carried.size() < fetch_most:
 		var next := _find_strand(true) if _to_strand else _find_stick(true)
 		if next >= 0:
-			_target = Vector2(grid.tile_of(next)) + Vector2(0.5, 0.5)
+			_aim_at(next)
 			_fresh_aim()
 			return
 	_state = State.CARRY_BACK
@@ -588,6 +605,27 @@ func _hand_over() -> void:
 		fetched.emit(_carried[i])
 	_carried.clear()
 	_settle()
+
+
+## Swim for this tile, and tell the rest of the pack so.
+func _aim_at(index: int) -> void:
+	_release()
+	_claim = index
+	claims[index] = self
+	_target = Vector2(grid.tile_of(index)) + Vector2(0.5, 0.5)
+
+
+## Give up the claim, if any.
+func _release() -> void:
+	if _claim >= 0 and claims.get(_claim) == self:
+		claims.erase(_claim)
+	_claim = -1
+
+
+## Is another dog already swimming for this tile?
+func _claimed_by_other(index: int) -> bool:
+	var who = claims.get(index)
+	return who != null and who != self and is_instance_valid(who)
 
 
 ## Walk or swim towards a tile. True the moment it is there.
@@ -694,7 +732,11 @@ func _way_round(towards: Vector2) -> Vector2:
 ## water and the whole tile under it was still island — the dog swam up to that ring and
 ## stopped dead, half a tile short of wherever it was going, for the rest of the run.
 func _may_stand(tile: Vector2) -> bool:
-	if Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP):
+	# Round the hut, not through it — and never refused to a dog already standing in it,
+	# which would wall the animal in for the rest of the run. The crate has always been
+	# handled this way; the shed was not, and a dog that started inside the footprint (an old
+	# save, or the hut growing under it) could never leave.
+	if Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP) 			and not Iso.in_shed(tile_pos.x, tile_pos.y, Iso.SHED_KEEP):
 		return false
 	# Round the crate, not through it; and never refused to a dog already inside, which would
 	# wall it in.

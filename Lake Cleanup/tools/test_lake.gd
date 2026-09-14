@@ -90,7 +90,7 @@ func _physics_process(_delta: float) -> void:
 		8:
 			_stage_ferry()
 		9:
-			_stage_skimmer()
+			_stage_pack()
 		10:
 			_stage_fleet()
 		11:
@@ -117,6 +117,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_ending_on_load()
 		22:
 			_stage_patch()
+		23:
+			_stage_pad()
 		_:
 			pass
 
@@ -782,15 +784,27 @@ func _stage_ferry() -> void:
 		_main.set(&"sludge", 1000.0)
 		_check(not _boat.is_running(),
 			"a ferry told to stay put has not moved all this time", "")
+		_check(_yard.held.size() > 0, "there is a load waiting", "%d pieces" % _yard.held.size())
+		# Short of a full hold, with the lake still full of rubbish: the ferry waits.
+		if _yard.held.size() >= _boat.capacity:
+			_yard.held.resize(_boat.capacity - 1)
 		_main.call(&"_set_auto_ferry", true)
 		_boat.speed = TEST_FERRY_SPEED
+		return
+	if _in_stage < 6:
+		return
+	if _in_stage == 6:
+		_check(not _boat.is_running(), "a part load waits in the yard for a full hold",
+			"%d of %d" % [_yard.held.size(), _boat.capacity])
+		var filler := _yard.held[0] if not _yard.held.is_empty() else 0
+		while _yard.held.size() < _boat.capacity:
+			_yard.held.append(filler)
 		_sludge_before = float(_main.get(&"sludge"))
 		_pieces_before = _yard.held.size()
-		_check(_pieces_before > 0, "there is a load waiting", "%d pieces" % _pieces_before)
 		return
-	if _in_stage < 4:
+	if _in_stage < 9:
 		return
-	if _in_stage == 4:
+	if _in_stage == 9:
 		_check(_boat.is_running(), "the ferry sets off on its own",
 			"it is %s" % _boat.status_line())
 		# Out of the yard, not yet aboard: the lot is thrown to the hold one piece at a time
@@ -1107,6 +1121,46 @@ func _path_misses_island(from: Vector2, legs: Array[Vector2]) -> bool:
 
 ## The skimmer: off until it is bought, then fishing on the way — for the material it is
 ## delivering, and only some of what it goes over.
+## The pack (2026-09-14): three more dogs may be adopted, wired like the first, sharing its
+## training, and no two of them swim for the same stick.
+func _stage_pack() -> void:
+	_main.set(&"sludge", 1000000.0)
+	var dogs: Array = _main.get(&"_dogs")
+	_check(dogs.size() == 1, "one dog to begin with", "%d" % dogs.size())
+	_main.call(&"_buy", &"dog_count")
+	dogs = _main.get(&"_dogs")
+	_check(dogs.size() == 2, "adopting puts a second dog on the island", "%d" % dogs.size())
+	var pup := dogs[1] as Dog
+	var first := dogs[0] as Dog
+	_check(pup.is_inside_tree() and pup.grid != null and pup.angler != null and pup.day != null,
+		"the new dog is wired like the first", "")
+	_main.call(&"_buy", &"dog_fetch")
+	_check(pup.fetch_most == first.fetch_most and pup.fetch_most == int(_main.call(&"dog_fetch")),
+		"the pack shares one training", "%d / %d" % [pup.fetch_most, first.fetch_most])
+	_check(not pup.tile_pos.is_equal_approx(first.tile_pos), "and stands apart", "")
+	var cap := int(_main.get(&"MAX_DOGS"))
+	for i in cap + 2:
+		_main.call(&"_buy", &"dog_count")
+	dogs = _main.get(&"_dogs")
+	_check(dogs.size() == cap and int(_main.call(&"dog_count")) == cap, "the pack stops at the limit",
+		"%d dogs, limit %d" % [dogs.size(), cap])
+	var purse := float(_main.get(&"sludge"))
+	_main.call(&"_buy", &"dog_count")
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "a full pack is not charged for another", "")
+	# Claims: what one dog is swimming for, the others do not pick.
+	pup.tile_pos = first.tile_pos
+	var stick := int(first.call(&"_find_stick"))
+	_check(stick >= 0, "there is a stick to fetch", "")
+	first.call(&"_aim_at", stick)
+	var others := []
+	for i in 20:
+		others.append(int(pup.call(&"_find_stick")))
+	_check(not stick in others, "a stick one dog has claimed is not picked by another", str(others))
+	first.call(&"_release")
+	_check((Dog.claims as Dictionary).is_empty(), "a released claim is gone", str(Dog.claims))
+	_advance()
+
+
 func _stage_skimmer() -> void:
 	if _in_stage == 1:
 		_main.set(&"sludge", 100000.0)
@@ -1125,7 +1179,7 @@ func _stage_skimmer() -> void:
 		# One material only, so every single thing the skimmer brings up on this run has
 		# to be that material or the filter is broken.
 		_skim_kind = TrashDef.Kind.WOOD
-		for i in 4:
+		for i in _boat.capacity:
 			_yard.put(_def_of(_skim_kind))
 		# Wound right up, so the run finishes inside the harness's frame budget and the
 		# sample of what it catches is big enough to mean something.
@@ -1183,7 +1237,7 @@ func _stage_fleet() -> void:
 		"%.1f tiles/s, carries %d" % [second.speed, second.capacity])
 	_check(not second.dock.is_equal_approx(_boat.dock), "the fleet moors in a row",
 		"%.1f apart" % second.dock.distance_to(_boat.dock))
-	_check(second.rng_seed != _boat.rng_seed, "each hull rolls its own skimmer",
+	_check(second.rng_seed != _boat.rng_seed, "each hull rolls its own dice",
 		"")
 
 	# The cap: buying past it takes no money and puts no hull in the water.
@@ -1267,8 +1321,10 @@ func _stage_save() -> void:
 		_yard.put(_def_of(TrashDef.Kind.PLASTIC))
 	_main.set(&"sludge", 4321.0)
 	_main.call(&"_buy", &"net_width")
-	_main.call(&"_buy", &"sell_3")
-	var sell_was: int = (_main.get(&"sell_levels") as PackedInt32Array)[3]
+	_main.call(&"_buy", &"bird_worth")
+	var birds_was := int(_main.get(&"bird_worth_level"))
+	_main.call(&"_buy", &"dog_count")
+	var dogs_was := (_main.get(&"_dogs") as Array).size()
 	var pieces := _grid.piece_count()
 	var sludge_was := float(_main.get(&"sludge"))
 	var width_was := int(_main.get(&"net_width_level"))
@@ -1281,7 +1337,7 @@ func _stage_save() -> void:
 	# Spend and catch after saving, so a load that did nothing would be caught.
 	_main.set(&"sludge", 0.0)
 	_main.set(&"net_width_level", 0)
-	_main.set(&"sell_levels", PackedInt32Array([0, 0, 0, 0, 0]))
+	_main.set(&"bird_worth_level", 0)
 	_yard.held.resize(0)
 	_grid.take(_deep_tile(), 0)
 
@@ -1290,9 +1346,11 @@ func _stage_save() -> void:
 		"%.0f" % float(_main.get(&"sludge")))
 	_check(int(_main.get(&"net_width_level")) == width_was, "the upgrades came back",
 		"net width %d" % int(_main.get(&"net_width_level")))
-	_check((_main.get(&"sell_levels") as PackedInt32Array)[3] == sell_was and sell_was > 0,
+	_check(int(_main.get(&"bird_worth_level")) == birds_was and birds_was > 0,
 		"and the market's tracks with them",
-		"heavy pieces %d" % (_main.get(&"sell_levels") as PackedInt32Array)[3])
+		"pigeons %d" % int(_main.get(&"bird_worth_level")))
+	_check((_main.get(&"_dogs") as Array).size() == dogs_was and dogs_was >= 2,
+		"and the pack", "%d dogs" % (_main.get(&"_dogs") as Array).size())
 	_check(_yard.held.size() == yard_was, "the yard came back",
 		"%d of %d pieces" % [_yard.held.size(), yard_was])
 	_check(_grid.piece_count() == pieces, "the lake came back as it was left",
@@ -1321,10 +1379,66 @@ func _stage_market() -> void:
 	var boards := {}
 	for row: Dictionary in _main.call(&"_shop_rows") as Array:
 		boards[row["board"]] = int(boards.get(row["board"], 0)) + 1
-	_check(int(boards.get(&"market", 0)) == 7, "the market board has seven rows",
+	_check(int(boards.get(&"market", 0)) == 2, "the market board has two rows",
 		"%d" % int(boards.get(&"market", 0)))
 	_check(int(boards.get(&"net", 0)) == 7, "and the net's board has seven",
 		"%d" % int(boards.get(&"net", 0)))
+	_check(int(boards.get(&"dog", 0)) == 3, "and the dog's board has three",
+		"%d" % int(boards.get(&"dog", 0)))
+	# The shelved tracks (2026-09-14): the skimmer and the sell-by-tier tracks are still in
+	# the code, but no row lists them, nothing counts them and nothing sells them.
+	var shelved_rows := []
+	for row: Dictionary in _main.call(&"_shop_rows") as Array:
+		if row["key"] in (_main.get(&"SHELVED") as Array):
+			shelved_rows.append(String(row["key"]))
+	_check(shelved_rows.is_empty(), "no shelved track has a row", ", ".join(shelved_rows))
+	_main.set(&"sludge", 100000.0)
+	var purse_before := float(_main.get(&"sludge"))
+	_main.call(&"_buy", &"sell_2")
+	_main.call(&"_buy", &"skimmer")
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse_before)
+		and int(_main.get(&"skimmer_level")) == 0,
+		"and buying one takes nothing", "%.0f" % float(_main.get(&"sludge")))
+	_main.set(&"sludge", float(_main.call(&"cost_of", &"skimmer")) + 1.0)
+	var counted := int(_main.call(&"_affordable"))
+	var cheapest := INF
+	for key: StringName in _main.get(&"TRACKS") as Array:
+		if not key in (_main.get(&"SHELVED") as Array):
+			cheapest = minf(cheapest, float(_main.call(&"cost_of", key)))
+	_check(counted == 0 or cheapest <= float(_main.get(&"sludge")),
+		"the affordable count ignores them", "%d counted" % counted)
+	# Haul and Hold are one track twice (2026-09-14): a cast fills a ferry.
+	var hold: UpgradeTrack = tracks[&"net_hold"]
+	var cargo: UpgradeTrack = tracks[&"cargo"]
+	var same := hold.level_cap == cargo.level_cap
+	for l in hold.level_cap + 1:
+		same = same and is_equal_approx(hold.value(l), cargo.value(l)) \
+			and is_equal_approx(hold.cost(l), cargo.cost(l))
+	_check(same, "Haul and Hold share value and price at every level", "")
+	var width: UpgradeTrack = tracks[&"net_width"]
+	_check(width.value(width.level_cap) <= 4.8 + 0.001 and width.value(0) >= 0.6 - 0.001,
+		"the net's width stops at 4.8 tiles (+700%)", "%.2f" % width.value(width.level_cap))
+	var caps := []
+	for key: StringName in tracks:
+		if (tracks[key] as UpgradeTrack).level_cap > 20:
+			caps.append(String(key))
+	_check(caps.is_empty(), "no track runs past 20 levels", ", ".join(caps))
+	# Heavier tiers always pay more (2026-09-14): the cheapest piece of every tier pays over
+	# the dearest of the tier below.
+	var top_pay := {}
+	var low_pay := {}
+	for i in _grid.defs.size():
+		var def: TrashDef = _grid.defs[i]
+		if def.keepsake:
+			continue
+		var pay := float(_main.call(&"piece_pay", i, -1))
+		top_pay[def.tier] = maxf(float(top_pay.get(def.tier, 0.0)), pay)
+		low_pay[def.tier] = minf(float(low_pay.get(def.tier, INF)), pay)
+	var ordered := true
+	for tier in range(1, 5):
+		ordered = ordered and float(low_pay.get(tier, INF)) > float(top_pay.get(tier - 1, 0.0))
+	_check(ordered, "every piece of a heavier tier pays more than any of the tier below",
+		"low %s top %s" % [low_pay, top_pay])
 
 	# The rows read in percents and whole numbers (2026-09-13): no tenths anywhere, the
 	# next level in brackets, a small level of its own, and a blurb for the "?".
@@ -1352,8 +1466,8 @@ func _stage_market() -> void:
 			width_row = String(row["value"])
 	_check(width_row.begins_with("+0%"), "a scaling track at level 0 reads as +0%", width_row)
 	var legend: Dictionary = _main.call(&"_shop_legend")
-	_check((legend.get("tiers", []) as Array).size() == 5 and (legend.get("yards", []) as Array).size() == 4,
-		"the legend lists five tiers and four yards", str(legend))
+	_check((legend.get("tiers", []) as Array).is_empty() and (legend.get("yards", []) as Array).size() == 4,
+		"the legend lists four yards and no tiers", str(legend))
 	var legend_decimals := "." in str(legend.get("tiers", []))
 	_check(not legend_decimals, "the legend's tier rates are percents", str(legend.get("tiers", [])))
 	# The shop skin: a "?" box in every row's corner, the legend under the ferry's and the
@@ -1389,14 +1503,8 @@ func _stage_market() -> void:
 	_check(folded.size() > 1, "a blurb wraps onto lines", str(folded))
 
 	_main.set(&"sludge", 100000.0)
-	var plain_2 := float(_main.call(&"tier_pay", 2))
-	var plain_3 := float(_main.call(&"tier_pay", 3))
-	_check(is_equal_approx(plain_2, 1.0), "pieces sell at par to begin with", "%.2f" % plain_2)
-	_main.call(&"_buy", &"sell_2")
-	_check(float(_main.call(&"tier_pay", 2)) > plain_2, "a tier's track raises its pay",
-		"%.2f" % float(_main.call(&"tier_pay", 2)))
-	_check(is_equal_approx(float(_main.call(&"tier_pay", 3)), plain_3),
-		"and no other tier's", "%.2f" % float(_main.call(&"tier_pay", 3)))
+	_check(is_equal_approx(float(_main.call(&"tier_pay", 2)), 1.0),
+		"the sell-by-tier tracks are shelved: every tier sells at par", "%.2f" % float(_main.call(&"tier_pay", 2)))
 
 	_check(int(_main.call(&"bonus_kind")) < 0, "no yard is boosted before the bonus is bought", "")
 	_main.call(&"_buy", &"recycle_bonus")
@@ -1768,23 +1876,29 @@ func _stage_art() -> void:
 	_check(crowded <= 2, "the finds are dealt apart from each other",
 		"%d pairs closer than %.0f tiles" % [crowded, Lake.FIND_APART])
 
-	# Proportion: a bed is bigger than a mug in the lake too, not normalised to it.
+	# Proportion: a bed is bigger than a mug in the lake too, not normalised to it. The
+	# finds and the rubbish are two scales now (Lake.FIND_SHRINK), so the size order is
+	# asked of each on its own.
 	var smallest := 1e9
 	var largest := 0.0
-	var biggest_art := 0.0
-	var biggest_drawn := 0.0
+	var biggest_art := {false: 0.0, true: 0.0}
+	var biggest_drawn := {false: 0.0, true: 0.0}
+	var largest_of := {false: 0.0, true: 0.0}
 	for def: TrashDef in _grid.defs:
 		var longest := maxf(def.size.x, def.size.y)
 		smallest = minf(smallest, longest)
 		largest = maxf(largest, longest)
+		largest_of[def.keepsake] = maxf(float(largest_of[def.keepsake]), longest)
 		var art := maxf(def.region.size.x, def.region.size.y)
-		if art > biggest_art:
-			biggest_art = art
-			biggest_drawn = longest
+		if art > float(biggest_art[def.keepsake]):
+			biggest_art[def.keepsake] = art
+			biggest_drawn[def.keepsake] = longest
 	_check(largest > smallest * 2.0, "the big things are drawn bigger than the small ones",
 		"%.0f px against %.0f px" % [largest, smallest])
-	_check(is_equal_approx(biggest_drawn, largest),
-		"and the biggest picture is the biggest thing on the water", "")
+	_check(is_equal_approx(float(biggest_drawn[false]), float(largest_of[false])),
+		"and the biggest rubbish picture is the biggest rubbish on the water", "")
+	_check(is_equal_approx(float(biggest_drawn[true]), float(largest_of[true])),
+		"and the biggest find picture is the biggest find on the water", "")
 
 	# The batch is still one call, and it is textured now.
 	_check(_grid.atlas_rid().is_valid(), "the lake surface draws from the atlas", "")
@@ -2040,6 +2154,102 @@ func _stage_shed() -> void:
 		"and something else may be stood on top of it — a chair belongs on a rug", "")
 	_check(not room.can_place(piece, Vector2i(ShedRoom.COLS - span.x + 1, 1)),
 		"and nothing can be stood off the edge of the floor", "")
+
+	# Against the wall (2026-09-13): only a piece's base takes floor, so a tall piece may
+	# rise up the back wall until its base is on the boards, and no further.
+	var tall := &"decor_bookcase_tall"
+	if sheets.has(tall):
+		var tall_span := room.span_of(tall)
+		var tall_base := room.base_of(tall)
+		# As far up the wall as the wall goes, or as far as keeps its base on the boards.
+		var top := maxi(tall_base - tall_span.y, -ShedRoom.WALL_ROWS)
+		_check(top < 0 and room.can_place(tall, Vector2i(1, top)),
+			"a bookcase may stand with its picture up the wall",
+			"span %s base %d top %d" % [tall_span, tall_base, top])
+		_check(not room.can_place(tall, Vector2i(1, top - 1)),
+			"but no higher than the wall, and never with its base off the floor", "")
+		_check(not room.can_place(tall, Vector2i(1, tall_base - tall_span.y - 1)),
+			"a base above the floor is refused whatever the wall", "")
+		room.place(tall, Vector2i(1, top))
+		var blocked: Dictionary = room.call(&"_taken")
+		var foot := top + tall_span.y - 1
+		_check(blocked.has(Vector2i(1, foot)) and not blocked.has(Vector2i(1, foot - tall_base)),
+			"and only its base blocks the walkers", "foot row %d" % foot)
+		decor.clear()
+	# A painting hangs on the wall and takes no floor.
+	var painting := &""
+	for name: String in sheets.names:
+		if sheets.on_wall(StringName(name)):
+			painting = StringName(name)
+			break
+	_check(not painting.is_empty(), "the catalogue has something that hangs on the wall", "")
+	if not painting.is_empty():
+		var hang := room.span_of(painting)
+		_check(room.can_place(painting, Vector2i(3, -hang.y)),
+			"a painting may hang on the wall", "")
+		_check(not room.can_place(painting, Vector2i(3, 0)),
+			"and not stand on the floor", "")
+		room.place(painting, Vector2i(3, -hang.y))
+		var blocked: Dictionary = room.call(&"_taken")
+		_check(blocked.is_empty(), "and it blocks nothing", "%d cells" % blocked.size())
+		var order: Array = room.call(&"_order")
+		_check(int((order[0] as Dictionary)["layer"]) == 0, "and is drawn first", "")
+		decor.clear()
+
+	# The drawing order (2026-09-13, after a chair drawn through a desk): two pieces on
+	# one row keep the order they went down in, later on top, every time it is asked.
+	var chair := StringName(find.piece)
+	room.place(chair, Vector2i(4, 4))
+	room.place(chair, Vector2i(5, 4))
+	var steady := true
+	for again in 6:
+		var order: Array = room.call(&"_stacking")
+		if order != [0, 1]:
+			steady = false
+	_check(steady, "two pieces on one row are drawn in the order they went down", "")
+	decor.clear()
+	# A small piece set over a big one is drawn right after it, however high up the
+	# picture it was put.
+	var table := &"decor_big_table"
+	var pot := &""
+	for name: String in sheets.names:
+		if sheets.is_small(StringName(name)):
+			pot = StringName(name)
+			break
+	_check(not pot.is_empty(), "the catalogue has something small enough to set on a table", "")
+	if not pot.is_empty() and sheets.has(table):
+		room.place(table, Vector2i(6, 6))
+		var table_foot := 6 + room.span_of(table).y
+		# On the table's top, so its own foot is rows above the table's.
+		room.place(pot, Vector2i(7, 6 + 1 - room.span_of(pot).y + room.base_of(pot)))
+		var order: Array = room.call(&"_stacking")
+		_check(order == [0, 1], "a pot set on a table is drawn after the table",
+			"order %s, table foot %d" % [order, table_foot])
+		# And a dog with its feet in the table's base is drawn over the table too.
+		var over: float = room.call(
+			&"_walker_key", Vector2(7.5, float(table_foot) - 0.5), decor
+		)
+		_check(over > float(table_foot), "a walker standing in a piece's base is drawn over it",
+			"key %.2f, foot %d" % [over, table_foot])
+		var behind: float = room.call(&"_walker_key", Vector2(7.5, 6.5), decor)
+		_check(behind < float(table_foot), "and one behind it is drawn behind it",
+			"key %.2f" % behind)
+		decor.clear()
+
+	# The finds float smaller than the rubbish: Lake.FIND_SHRINK off SPRITE_SCALE.
+	var shrunk := true
+	var shrunk_detail := ""
+	for def: TrashDef in _grid.defs:
+		if not def.keepsake or def.region.size == Vector2.ZERO:
+			continue
+		var longest := maxf(def.region.size.x, def.region.size.y)
+		var want := longest * Lake.SPRITE_SCALE / Lake.FIND_SHRINK
+		var got := maxf(def.size.x, def.size.y)
+		if got > want + 0.01 or got > Lake.SPRITE_LARGEST / Lake.FIND_SHRINK + 0.01:
+			shrunk = false
+			shrunk_detail = "%s draws %.1f, art %.0f" % [def.piece, got, longest]
+	_check(shrunk, "a find floats at SPRITE_SCALE over FIND_SHRINK, capped in proportion",
+		shrunk_detail)
 	# The footprint is the object, not the tile it fits in: rounded to nearest, so a piece
 	# 27 pixels across is three cells of eight and not four.
 	# Measured in pixels rather than as a fraction: the smallest pieces are a few pixels
@@ -2053,7 +2263,7 @@ func _stage_shed() -> void:
 	var worst_name := ""
 	for name: String in sheets.names:
 		for view in sheets.view_count(StringName(name)):
-			var art := sheets.view_region_of(StringName(name), view).size
+			var art := sheets.view_size_of(StringName(name), view)
 			var cells := room.span_of(StringName(name), view)
 			var off := maxf(
 				absf(float(cells.x * ShedRoom.CELL) - art.x),
@@ -2280,6 +2490,12 @@ func _stage_ending() -> void:
 	if _in_stage < 80:
 		return
 	_check(_grid.piece_count() == 0, "the lake is empty", "")
+	# Nothing left to fill a hold with, so a part load goes rather than waiting for good.
+	var held_was := _yard.held.duplicate()
+	_yard.held = PackedInt32Array([0])
+	_boat.set(&"_dry_check_in", 0.0)
+	_check(_boat.ready_to_sail(0.0), "an empty lake sends a ferry off with a part load", "")
+	_yard.held = held_was
 	_check(bool(_main.get(&"_cleaned")),
 		"an empty lake ends the run even with dust left on the meter", "")
 	_check(is_zero_approx(float(_main.get(&"pollution"))),
@@ -2321,9 +2537,14 @@ func _stage_sun() -> void:
 	var flattest := 0.0
 	var flattest_at := 0.0
 	var lit := 0
+	var dimmest := INF
+	var dimmest_at := 0.0
 	for step in 200:
 		day.phase = float(step) / 200.0
 		day.call(&"_settle")
+		if day.tint.get_luminance() < dimmest:
+			dimmest = day.tint.get_luminance()
+			dimmest_at = day.phase
 		if day.lean > worst:
 			worst = day.lean
 			worst_at = day.phase
@@ -2343,6 +2564,11 @@ func _stage_sun() -> void:
 		"and never lies so flat it comes away from its caster",
 		"%.0f degrees off vertical at phase %.2f" % [flattest, flattest_at])
 	_check(lit > 0, "the day is lit at all", "%d of 200 samples" % lit)
+	# No night (2026-09-14): the darkest the loop gets is its late afternoon.
+	var config: DayConfig = load(DayCycle.CONFIG_PATH)
+	var late := config.tint.sample(config.sun_to).get_luminance()
+	_check(dimmest >= late - 0.01, "there is no night: nothing in the loop is darker than late afternoon",
+		"dimmest %.2f at phase %.2f, late afternoon %.2f" % [dimmest, dimmest_at, late])
 
 	# The swept shadow, on a picture shaped like the ones that broke the sheared one: a V,
 	# whose base is a single pixel at the bottom middle. A shear anchored anywhere leaves
@@ -2496,6 +2722,140 @@ func _stage_patch() -> void:
 	_main.call(&"_push_patches", 0.0)
 	for net in spare:
 		net.free()
+	_advance()
+
+
+## The gamepad (issue #33): the input map, which hand is playing, the reticle and its assist,
+## the camera leaning out to it, and the pointer only wanted over a board.
+func _stage_pad() -> void:
+	if _net.state != CastNet.State.IDLE:
+		if _in_stage > 900:
+			_check(false, "the net is home for the pad checks", "state %d" % _net.state)
+			_finish()
+		return
+	var pad := get_node(^"/root/Pad")
+	# The run before this one ended the lake: the closing words are up and the water is empty.
+	var over := _main.get_node_or_null(^"Farewell")
+	if over != null:
+		_main.call(&"_drop_farewell")
+		over.free()
+	for pair: Array in [
+		[&"walk_left", 0], [&"walk_right", 0], [&"walk_up", 1], [&"walk_down", 1],
+		[&"aim_left", 2], [&"aim_right", 2], [&"aim_up", 3], [&"aim_down", 3],
+		[&"pad_cast", 5], [&"pad_lay", 4],
+	]:
+		var found := false
+		for event: InputEvent in InputMap.action_get_events(pair[0]):
+			if event is InputEventJoypadMotion and (event as InputEventJoypadMotion).axis == pair[1]:
+				found = true
+		_check(found, "%s answers to its stick" % pair[0], "")
+	for pair: Array in [
+		[&"pad_interact", JOY_BUTTON_A], [&"pad_back", JOY_BUTTON_B], [&"pad_rotate", JOY_BUTTON_X],
+		[&"pad_upgrades", JOY_BUTTON_Y], [&"pad_settings", JOY_BUTTON_START],
+		[&"pad_recentre", JOY_BUTTON_RIGHT_STICK], [&"pad_zoom_out", JOY_BUTTON_LEFT_SHOULDER],
+		[&"pad_zoom_in", JOY_BUTTON_RIGHT_SHOULDER],
+	]:
+		var found := false
+		for event: InputEvent in InputMap.action_get_events(pair[0]):
+			if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == pair[1]:
+				found = true
+		_check(found, "%s answers to its button" % pair[0], "")
+
+	# The last hand wins, and neither a resting stick nor a nudged mouse counts.
+	pad.call(&"set_mode", 0)
+	var drift := InputEventJoypadMotion.new()
+	drift.axis = JOY_AXIS_RIGHT_X
+	drift.axis_value = 0.2
+	pad.call(&"_input", drift)
+	_check(int(pad.get(&"mode")) == 0, "a stick at rest does not take the game off the mouse", "")
+	var shove := InputEventJoypadMotion.new()
+	shove.axis = JOY_AXIS_RIGHT_X
+	shove.axis_value = 0.9
+	pad.call(&"_input", shove)
+	_check(int(pad.get(&"mode")) == 1, "a stick pushed does", "")
+	var nudge := InputEventMouseMotion.new()
+	nudge.relative = Vector2(1, 0)
+	pad.call(&"_input", nudge)
+	_check(int(pad.get(&"mode")) == 1, "a mouse nudged a pixel does not take it back", "")
+
+	_check(not bool(_main.call(&"pad_cursor_wanted")), "no pointer wanted on the bare lake", "")
+	_main.call(&"_set_menu", true)
+	_check(bool(_main.call(&"pad_cursor_wanted")), "a pointer wanted over the upgrades", "")
+	_main.call(&"_set_menu", false)
+
+	var aim: PadAim = _main.get(&"_aim")
+	_main.call(&"_pad_tick", 0.016)
+	_check(aim.at != Vector2.INF, "pad mode puts a reticle on the lake", "")
+	_check(_net.aim_point() == aim.at and _main.call(&"aim_point") == aim.at,
+		"and the marker and the cast both aim at it", "")
+
+	# A spot short of green with green nearby, found by walking out from a liftable piece.
+	var cell := _grid.tile_at(_water_near_angler())
+	if cell >= 0 and _grid.reachable_slot(cell, 1, _net.power) < 0:
+		_grid.insert(cell, 0, 0)
+	var view := Rect2(_angler.position - Vector2(2000, 2000), Vector2(4000, 4000))
+	var reach := maxf(_net.open_extent() * PadAim.REACH, Iso.tile_circle_extent(PadAim.REACH_LEAST))
+	var start := Vector2.INF
+	var spot := Vector2.INF
+	if cell >= 0:
+		var piece := _grid.surface_pos(cell)
+		for ring in range(1, 12):
+			for step in 16:
+				var angle := TAU * float(step) / 16.0
+				var tried := piece + Vector2(cos(angle), sin(angle) * 0.5) * _net.open_extent() * (1.0 + ring * 0.15)
+				if _net.would_catch(tried) or not _net.can_cast_to(tried):
+					continue
+				var found := _net.nearest_catch(tried, reach)
+				if found != Vector2.INF:
+					start = tried
+					spot = found
+					break
+			if start != Vector2.INF:
+				break
+	_check(start != Vector2.INF, "a spot short of green with green in reach", "")
+	if start != Vector2.INF:
+		_check(_net.would_catch(spot), "the spot the assist finds is green by the marker's own test", "")
+		aim.at = start
+		aim.step(0.1, Vector2.ZERO, view, _net)
+		_check(aim.at == start, "a still stick leaves the reticle where it is, green nearby or not", "")
+		var toward := (spot - start).normalized()
+		var sideways := Vector2(-toward.y, toward.x)
+		aim.at = start
+		aim.step(0.02, sideways * 0.5, view, null)
+		var bare := aim.at
+		aim.at = start
+		aim.step(0.02, sideways * 0.5, view, _net)
+		_check(aim.pulled_to != Vector2.INF and aim.at.distance_to(spot) < bare.distance_to(spot),
+			"a stick pushed past green bends the aim towards it", "")
+		aim.at = start
+		aim.step(0.02, -toward, view, _net)
+		_check(aim.pulled_to == Vector2.INF, "but never back against the push", "")
+		aim.at = spot
+		aim.step(0.02, toward * 0.5, view, null)
+		var free := aim.at.distance_to(spot)
+		aim.at = spot
+		aim.step(0.02, toward * 0.5, view, _net)
+		_check(aim.over_green and aim.at.distance_to(spot) < free,
+			"and over green it slows", "%.2f of %.2f" % [aim.at.distance_to(spot), free])
+
+	# The edge pushes a reticle the view left behind, and the view never leaves the angler.
+	var shown: Rect2 = _main.call(&"_visible_world_rect")
+	aim.at = shown.end + Vector2(5000, 5000)
+	aim.hold_in(shown, 1.0)
+	_check(shown.has_point(aim.at), "the window's edge holds the reticle on screen", "")
+	aim.at = _angler.position + Vector2(100000, 0)
+	var framed: Vector2 = _main.call(&"_pad_framed", _angler.position)
+	var half := shown.size * 0.5
+	_check(absf(framed.x - _angler.position.x) <= half.x,
+		"leaning out to a far reticle keeps the angler on screen", "")
+	aim.at = _angler.position + Vector2(shown.size.x * 0.1, 0)
+	framed = _main.call(&"_pad_framed", _angler.position)
+	_check(framed.is_equal_approx(_angler.position), "and a reticle near the middle moves nothing", "")
+
+	pad.call(&"set_mode", 0)
+	_main.call(&"_pad_tick", 0.016)
+	_check(aim.at == Vector2.INF and _net.pad_aim == Vector2.INF,
+		"back on the mouse, the reticle is gone", "")
 	_finish()
 
 

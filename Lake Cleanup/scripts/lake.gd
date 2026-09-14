@@ -175,6 +175,12 @@ const FRAME_BY := 0.6
 ## far end of the wheel and there is nothing there to pan across.
 const HOME_SPEED := 260.0
 
+## With a pad aiming, how far in from the window's edges the angler is kept while the view
+## leans out towards the reticle, as a fraction of the half-view. The angler wins: past this
+## the view stops leaning and the reticle is pushed along by the window's edge instead
+## (`_pad_framed`, `PadAim.hold_in`).
+const PAD_ANGLER_INSET := 0.15
+
 ## How far the middle button may move while held and still count as a tap rather than a
 ## drag, in screen pixels. A tap recentres the view on the angler.
 const PAN_TAP := 4.0
@@ -276,11 +282,18 @@ const SPRITE_SCALE := 2.0
 const SPRITE_SMALLEST := 11.0
 const SPRITE_LARGEST := 68.0
 
+## The finds float smaller than the rubbish (Richard, 2026-09-13: "objects floating on
+## lake too big, scale down 1.2x" — the decorations only, not every piece of rubbish).
+## Divides SPRITE_SCALE and SPRITE_LARGEST for a keepsake def, so a find draws at 1.67
+## world px per art px and the big ones cap at 57. Not a whole art pixel, so a find bobbing
+## on the swell crawls a little on the grid; weighed and accepted, to be judged in play.
+const FIND_SHRINK := 1.2
+
 ## Hulls the lake will hold. Used to read 3, on the theory that three ferries working one
 ## yard was already more loading than the yard produces — 2026-09 playtest says otherwise
 ## (see docs/balance/2026-09-06.md): the yard sat thousands deep the whole run. Raised to 5;
 ## `fleet`'s own `.tres` gates how many of those are actually for sale.
-const MAX_BOATS := 5
+const MAX_BOATS := 4
 
 ## What the first skimmer fitted brings up. The track walks from here to a certainty at
 ## its last level.
@@ -292,6 +305,16 @@ const SKIM_FIRST_CHANCE := 0.30
 const MAX_LEVELS := {
 	&"skimmer": 10,
 }
+
+## Tracks the shop no longer sells but the code still carries (2026-09-14, Richard: keep the
+## code, hide the rows). The skimmer, and the market's five sell-by-tier tracks. Not listed,
+## not counted as affordable, and `_buy` refuses them; their levels still save and load so
+## a file written before they were shelved reads without complaint. `tier_pay` is 1 for all.
+const SHELVED := [&"skimmer", &"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4"]
+
+## Dogs in the pack at most: the one adopted plus what `dog_count` buys (2026-09-14). All of
+## them share one Fetching and Keenness level and one drawing.
+const MAX_DOGS := 4
 
 ## How loud the music is when it is turned right up, in decibels, and how far down "off"
 ## is. Silence is a volume rather than a stopped player: a track that keeps running while
@@ -341,7 +364,9 @@ const SAVE_PATH := "user://lake_cleanup.save"
 const MENU_SCENE := "res://scenes/menu.tscn"
 ## 6: ten rubbish kinds appended to TRASH_ORDER. Saved stacks hold indices into the whole
 ## def list and the finds follow the rubbish in it, so every find's index moved.
-const SAVE_VERSION := 7
+## 8: the kitchen chairs and the old table left the catalogue and four rubbish-born finds
+## (two paintings, the chew toy, the globe) joined it; the def list changed again.
+const SAVE_VERSION := 9
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -432,6 +457,8 @@ var fleet_level: int = 0
 ## able to pick up — heavy and wide junk stays the net's and the skimmer's business.
 var dog_fetch_level: int = 0
 var dog_wait_level: int = 0
+## Dogs adopted on top of the first, up to MAX_DOGS in the pack. resources/upgrades/dog_count.tres.
+var dog_count_level: int = 0
 
 ## The market board (2026-09-13): what a piece of each weight tier sells for, one track per
 ## tier (`sell_0`..`sell_4`, in TrashDef.tier order); the Recycle Bonus, one yard at a time
@@ -538,6 +565,9 @@ var _yard: Yard
 
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
+## The whole pack, `_dog` first. Every dog is wired like the first (`_fit_dog`) and shares
+## its numbers; they only differ in where they stand and what they have claimed.
+var _dogs: Array[Dog] = []
 
 ## The daylight, and the two things it is painted with: one modulate over the whole world
 ## canvas, and the fill behind it. The HUD, the shop board and the shed room are on canvas
@@ -571,6 +601,7 @@ const UPGRADE_ORDER := [
 	"dog_fetch", "dog_wait",
 	"sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
 	"recycle_bonus", "bird_worth", "lucky_haul", "double_cast",
+	"dog_count",
 ]
 var _upgrades: Dictionary = {}
 
@@ -655,6 +686,11 @@ var _coins: CoinFly
 
 var _farewell_shown: bool = false
 var _farewell: Farewell
+
+## The pad's reticle and its assist, see scripts/pad_aim.gd. `at` is INF while the mouse is
+## aiming; `_pad_was` notices the switch so the reticle starts where the pointer was.
+var _aim := PadAim.new()
+var _pad_was: bool = false
 ## How far the sparkle has come up, 0 to 1. Eased rather than switched so the lake brightens
 ## over a couple of seconds — the last piece is lifted and the water answers.
 var _sparkle_at: float = 0.0
@@ -818,35 +854,38 @@ func tier_pay(tier: int) -> float:
 	if tree_mode:
 		return 1.0
 	var t := clampi(tier, 0, sell_levels.size() - 1)
-	return _upgrades[StringName("sell_%d" % t)].value(sell_levels[t])
+	var key := StringName("sell_%d" % t)
+	if key in SHELVED:
+		return 1.0
+	return _upgrades[key].value(sell_levels[t])
 
 
 ## How much over the odds the boosted yard pays, as a fraction (0.25 is +25%).
 ## resources/upgrades/recycle_bonus.tres.
 func recycle_bonus() -> float:
 	if tree_mode:
-		return 0.0
+		return _tree_stat("recycle_bonus")
 	return _upgrades[&"recycle_bonus"].value(recycle_bonus_level)
 
 
 ## What a netted pigeon pays. resources/upgrades/bird_worth.tres times the economy's bonus.
 func bird_pay() -> float:
 	if tree_mode:
-		return _economy.bird_bonus
+		return _economy.bird_bonus * _tree_stat("bird_worth")
 	return _economy.bird_bonus * _upgrades[&"bird_worth"].value(bird_worth_level)
 
 
 ## Odds that a cast is a lucky one. resources/upgrades/lucky_haul.tres.
 func lucky_chance() -> float:
 	if tree_mode:
-		return 0.0
+		return _tree_stat("lucky_odds")
 	return _upgrades[&"lucky_haul"].value(lucky_haul_level)
 
 
 ## Odds that a cast throws a second net. resources/upgrades/double_cast.tres.
 func double_cast_chance() -> float:
 	if tree_mode:
-		return 0.0
+		return _tree_stat("double_odds")
 	return _upgrades[&"double_cast"].value(double_cast_level)
 
 
@@ -877,6 +916,7 @@ func _ready() -> void:
 	_net = $Net as CastNet
 	_yard = $Yard as Yard
 	_dog = $Dog as Dog
+	_dogs = [_dog]
 
 	var shore := Iso.shore_outline()
 	_shape_bank()
@@ -957,16 +997,8 @@ func _ready() -> void:
 	# The dog needs the water to fish out of, somebody to be pleased to see, and the crate
 	# to put things in. What happens to what it brings back is the lake's business, not the
 	# dog's, so it hands the piece over and forgets about it.
-	_dog.grid = _grid
-	_dog.angler = _angler
 	_angler.day = _day
-	_dog.day = _day
-	_dog.fetched.connect(_dog_brought_back)
-	_push_dog_numbers()
-	_dog.petted.connect(func() -> void:
-		if _sfx != null:
-			_sfx.play_bought()
-	)
+	_fit_dog(_dog)
 	# Clear of the shed and clear of where the angler stands: a crate you spawn inside is a
 	# crate you have to walk out of before you can see it.
 	# One layer over the walker band that means "past the hut, short of the crate", so
@@ -979,7 +1011,8 @@ func _ready() -> void:
 	# Told after the crate has been put somewhere, not before: the dog walks to this, and a
 	# crate whose position is still the origin sends it to the top left corner of the world
 	# to drop things in the water.
-	_dog.crate_tile = Vector2(Iso.ISLAND_CENTRE.x + 2.7, Iso.ISLAND_CENTRE.y + 2.7)
+	for dog in _dogs:
+		dog.crate_tile = Vector2(Iso.ISLAND_CENTRE.x + 2.7, Iso.ISLAND_CENTRE.y + 2.7)
 	# The angler is told as well, but for the opposite reason: the dog walks to the crate and
 	# the player walks round it.
 	_angler.crate_tile = _dog.crate_tile
@@ -998,9 +1031,10 @@ func _ready() -> void:
 	_net.grid = _grid
 	_net.splash = _splash
 	_angler.splash = _splash
-	_dog.splash = _splash
+	for dog in _dogs:
+		dog.splash = _splash
+		dog.prints = _prints
 	_angler.prints = _prints
-	_dog.prints = _prints
 	_net.sfx = _sfx
 	_net.angler = _angler
 	_net.flock = _flock
@@ -1053,6 +1087,10 @@ func _ready() -> void:
 	for def: TrashDef in _grid.defs:
 		if def.keepsake and not def.display_name.is_empty():
 			_room.titles[String(def.piece)] = def.display_name
+	# The house's own bed is never a def (`_all_defs` skips it), so its name comes off the
+	# catalogue, or the shelf shows a picture with no word under it (Richard, 2026-09-13).
+	if _sheets != null and not _pretty(STARTER_BED).is_empty():
+		_room.titles[STARTER_BED] = _pretty(STARTER_BED)
 	_shop_skin.bought.connect(_buy)
 	# The picture at the head of the net and ferry boards: the ferry's own baked hull and
 	# the net laid out. The dog's board draws the dog itself.
@@ -1653,11 +1691,12 @@ func _dress(defs: Array[TrashDef]) -> void:
 		# it, and rounding their scales inverted the proportion — a 44-pixel mirror rounded up
 		# to 88 while a 55-pixel sofa rounded down to 55. Those few draw at exactly
 		# SPRITE_LARGEST, slightly off the grid, and the biggest picture stays the biggest thing.
-		var scale := SPRITE_SCALE
+		var shrink := FIND_SHRINK if def.keepsake else 1.0
+		var scale := SPRITE_SCALE / shrink
 		if longest * scale < SPRITE_SMALLEST:
 			scale = ceilf(SPRITE_SMALLEST / longest)
-		elif longest * scale > SPRITE_LARGEST:
-			scale = maxf(SPRITE_LARGEST / longest, SPRITE_SMALLEST / longest)
+		elif longest * scale > SPRITE_LARGEST / shrink:
+			scale = maxf(SPRITE_LARGEST / shrink / longest, SPRITE_SMALLEST / longest)
 		def.size = art * scale
 
 
@@ -1697,10 +1736,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					_set_menu(false)
 				elif _at_shed():
 					_set_shed(true)
-				elif _dog != null and _dog.visible and _dog.within_reach(_angler.tile_pos):
-					# Standing next to the dog with nothing else under the key: the same
+				elif _dog_in_reach() != null:
+					# Standing next to a dog with nothing else under the key: the same
 					# button that opens the shed says hello.
-					_dog.pet()
+					_dog_in_reach().pet()
 				return
 			KEY_ESCAPE:
 				# One key backing out of whatever is open, innermost first: the shed, then
@@ -1808,6 +1847,86 @@ func _unhandled_input(event: InputEvent) -> void:
 	_net.set_pulling(true)
 
 
+## Whether the pad should drive a pointer (see scripts/pad.gd): only while something the
+## mouse is for is up. On the bare lake the right stick is the reticle's.
+func pad_cursor_wanted() -> bool:
+	return _menu_open or _settings_open or _shed_open or _farewell != null
+
+
+## Where a cast goes: the pad's reticle while there is one, else the mouse.
+func aim_point() -> Vector2:
+	return _aim.at if _aim.at != Vector2.INF else get_global_mouse_position()
+
+
+## The pad, once a frame: the reticle's life, its step and the assist, and the buttons.
+##
+## Buttons are read here with `is_action_just_pressed` rather than as events, because the
+## triggers are axes and an axis past its deadzone is a stream of events — read as events,
+## a trigger held down would throw again the moment the net was home. The buttons `Pad` turns
+## into the mouse while a board is up (A, B, the shoulders) are only acted on here when
+## nothing is, so the two never both answer one press.
+func _pad_tick(delta: float) -> void:
+	var pad := Pad.is_pad()
+	if pad and not _pad_was:
+		var pointer := get_global_mouse_position()
+		_aim.at = pointer if _visible_world_rect().has_point(pointer) else _angler.position
+	elif not pad:
+		_aim.at = Vector2.INF
+	_pad_was = pad
+	var busy := pad_cursor_wanted()
+	if pad:
+		if not busy:
+			var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")
+			_aim.step(delta, stick, _visible_world_rect(), _net)
+		_aim.hold_in(_visible_world_rect(), _camera.zoom.x)
+	_net.pad_aim = _aim.at
+	_pad_buttons(busy)
+
+
+func _pad_buttons(busy: bool) -> void:
+	if Input.is_action_just_pressed(&"pad_settings"):
+		_set_settings(not _settings_open)
+		return
+	if _settings_open or _farewell != null:
+		return
+	if _shed_open:
+		# The room's own verbs, the shed's R and E.
+		if Input.is_action_just_pressed(&"pad_rotate"):
+			_room.turn_carried()
+		if Input.is_action_just_pressed(&"pad_upgrades"):
+			_room.switch_near()
+		return
+	if Input.is_action_just_pressed(&"pad_upgrades"):
+		_set_menu(not _menu_open)
+		return
+	if busy:
+		return
+	if Input.is_action_just_pressed(&"pad_rotate"):
+		# X on the water is the corner's decorate button: the shed from anywhere.
+		_set_shed(true)
+		return
+	if Input.is_action_just_pressed(&"pad_interact"):
+		if _at_shed():
+			_set_shed(true)
+		elif _dog_in_reach() != null:
+			_dog_in_reach().pet()
+		return
+	if Input.is_action_just_pressed(&"pad_recentre"):
+		_aim.at = _angler.position
+	if Input.is_action_just_pressed(&"pad_zoom_in"):
+		_zoom_by(ZOOM_STEP, aim_point())
+	if Input.is_action_just_pressed(&"pad_zoom_out"):
+		_zoom_by(1.0 / ZOOM_STEP, aim_point())
+	if Input.is_action_just_pressed(&"pad_lay"):
+		if _net.state == CastNet.State.IDLE and _net.enchanted():
+			_cast_at(aim_point(), true)
+	if Input.is_action_just_pressed(&"pad_cast"):
+		# The click's own gesture: throw from idle, and a net sitting still is set pulling.
+		if _net.state == CastNet.State.IDLE:
+			_cast_at(aim_point())
+		_net.set_pulling(true)
+
+
 ## Throw the net, on the numbers the player has now. The only cap is the net's own hold —
 ## the yard takes whatever comes back, however much of it there is.
 func _cast_at(where: Vector2, laying: bool = false) -> void:
@@ -1885,7 +2004,7 @@ func _at_shed() -> bool:
 ## so the follow does not ease the view back onto the angler a moment later and undo the
 ## zoom. A wheel zoom is a pan like a middle-button drag, and is given back the same way —
 ## walking, a cast, or a tap of the middle button.
-func _zoom_by(factor: float) -> void:
+func _zoom_by(factor: float, about := Vector2.INF) -> void:
 	var stops := _zoom_stops()
 	var index := _nearest_stop(stops, _view_zoom)
 	var target := _nearest_stop(stops, _view_zoom * factor)
@@ -1900,6 +2019,9 @@ func _zoom_by(factor: float) -> void:
 	# after moving it: the canvas transform only catches up next frame, so asking twice
 	# would compare a fresh position against a stale one.
 	var offset := get_viewport().get_mouse_position() - get_viewport_rect().size * 0.5
+	# Or about the pad's reticle, which is the pad's pointer: `about` in world pixels.
+	if about != Vector2.INF:
+		offset = (about - _camera.position) * _camera.zoom
 	var was := _camera.zoom.x
 	_view_zoom = wanted
 	_push_zoom()
@@ -2686,6 +2808,10 @@ func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 func piece_pay(def_index: int, kind: int) -> float:
 	var def := _grid.defs[def_index]
 	var pay := _economy.piece_base_pay + def.pollution * _economy.piece_filth_pay
+	# Heavier tiers always pay more than the tiers before them (Richard, 2026-09-14): a
+	# step of the whole per tier, on top of the piece's own filth. `test_lake` guards the
+	# order piece by piece, so a kind's pollution has to stay inside its tier's band.
+	pay *= 1.0 + _economy.tier_pay_step * float(def.tier)
 	pay *= tier_pay(def.tier)
 	if kind == _bonus_kind:
 		pay *= 1.0 + recycle_bonus()
@@ -2744,7 +2870,7 @@ const PRICES := {
 const TRACKS := [
 	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
 	&"boat_speed", &"cargo", &"skimmer", &"fleet",
-	&"dog_fetch", &"dog_wait",
+	&"dog_fetch", &"dog_wait", &"dog_count",
 	&"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4",
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
@@ -2766,6 +2892,7 @@ const BLURBS := {
 	&"fleet": "Placeholder: another ferry in the water.",
 	&"dog_fetch": "Placeholder: how many pieces the dog brings back a trip.",
 	&"dog_wait": "Placeholder: how long the dog lazes about between trips, at most.",
+	&"dog_count": "Placeholder: another dog for the pack, trained like the first.",
 	&"lucky_haul": "Placeholder: odds that a cast lifts one tier heavier and holds more.",
 	&"double_cast": "Placeholder: odds that a cast throws a second net beside the first.",
 	&"sell_0": "Placeholder: what light pieces sell for at the yards.",
@@ -2789,6 +2916,8 @@ func _affordable() -> int:
 				count += 1
 		return count
 	for key: StringName in TRACKS:
+		if key in SHELVED:
+			continue
 		if not is_maxed(key) and sludge >= cost_of(key):
 			count += 1
 	return count
@@ -2815,10 +2944,6 @@ func _shop_rows() -> Array:
 		[&"boat_speed", &"boat", "Speed", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
 		[&"cargo", &"boat", "Hold", func(l: int) -> String:
 			return "%d aboard" % int(_track_value(&"cargo", l))],
-		[&"skimmer", &"boat", "Skimmer", func(l: int) -> String:
-			return "off" if l <= 0 else "%d items, %d%%" % [
-				mini(l, MAX_LEVELS[&"skimmer"]), roundi(_skim_chance_at(l) * 100.0)
-			]],
 		[&"fleet", &"boat", "Extra ferry", func(l: int) -> String: return "%d in the water" % (1 + l)],
 		[&"dog_fetch", &"dog", "Fetching", func(l: int) -> String:
 			return "%d per trip" % int(_track_value(&"dog_fetch", l))],
@@ -2826,6 +2951,8 @@ func _shop_rows() -> Array:
 			return "waits %ds at most" % roundi(maxf(
 				Dog.MOOD_MOST - _track_value(&"dog_wait", l), Dog.MOOD_LEAST
 			))],
+		[&"dog_count", &"dog", "Pack", func(l: int) -> String:
+			return "%d dog%s" % [1 + l, "" if l == 0 else "s"]],
 		[&"lucky_haul", &"net", "Lucky haul", func(l: int) -> String:
 			return "%d%%: +1 tier, +%d held" % [
 				roundi(_track_value(&"lucky_haul", l) * 100.0), LUCKY_EXTRA
@@ -2833,10 +2960,6 @@ func _shop_rows() -> Array:
 		[&"double_cast", &"net", "Double cast", func(l: int) -> String:
 			return "%d%%: second net" % roundi(_track_value(&"double_cast", l) * 100.0)],
 	]
-	for tier in sell_levels.size():
-		var key := StringName("sell_%d" % tier)
-		listed.append([key, &"market", TIER_NAMES[tier], func(l: int) -> String:
-			return _pct_at(key, l)])
 	listed.append([&"recycle_bonus", &"market", "Recycle Bonus", func(l: int) -> String:
 		if l <= 0:
 			return "off"
@@ -2903,16 +3026,15 @@ func _skim_chance_at(level: int) -> float:
 ## the four materials with what a piece of each pays on average, the tiers with their sell
 ## rates, and one line of explanation. Nothing else — the first pass said too much.
 func _shop_legend() -> Dictionary:
+	# The sell-by-tier rates used to stand here; the tracks are shelved (2026-09-14).
 	var tiers: Array = []
-	for tier in sell_levels.size():
-		tiers.append([TIER_NAMES[tier], _pct_at(StringName("sell_%d" % tier), sell_levels[tier])])
 	var yards: Array = []
 	for kind in TrashDef.KIND_NAMES.size():
 		yards.append([TrashDef.KIND_NAMES[kind], "$%d" % roundi(_mean_pay_of(kind))])
 	return {
 		"tiers": tiers,
 		"yards": yards,
-		"rule": "Collect objects of different materials and tiers, each pays a flat fee plus bonuses.",
+		"rule": "Each material sells at its own yard. Heavier pieces always pay more.",
 	}
 
 
@@ -3032,6 +3154,8 @@ func _level_of(what: StringName) -> int:
 			return dog_fetch_level
 		&"dog_wait":
 			return dog_wait_level
+		&"dog_count":
+			return dog_count_level
 		&"recycle_bonus":
 			return recycle_bonus_level
 		&"bird_worth":
@@ -3066,7 +3190,7 @@ func _saved_level(levels: Dictionary, what: StringName) -> int:
 
 
 func _buy(what: StringName) -> void:
-	if is_maxed(what):
+	if is_maxed(what) or what in SHELVED:
 		return
 	var price := cost_of(what)
 	if sludge < price:
@@ -3096,6 +3220,9 @@ func _buy(what: StringName) -> void:
 			dog_fetch_level += 1
 		&"dog_wait":
 			dog_wait_level += 1
+		&"dog_count":
+			dog_count_level += 1
+			_add_dog()
 		&"recycle_bonus":
 			recycle_bonus_level += 1
 			# The first level starts the clock: until then no yard is boosted.
@@ -3173,10 +3300,15 @@ func _sync_tree_world() -> void:
 		_boats[i].visible = on
 		_boats[i].set_process(on)
 		_reberth(_boats[i], i)
-	if _dog != null:
-		var adopted := _tree_stat("dog") >= 1.0
-		_dog.visible = adopted
-		_dog.set_process(adopted)
+	for i in _dogs.size():
+		# The tree adopts one dog; the pack is the shop's.
+		var adopted := _tree_stat("dog") >= 1.0 and i == 0
+		_dogs[i].visible = adopted
+		_dogs[i].set_process(adopted)
+	# The Recycle Bonus clock starts with the first node that gives a bonus, as the shop's first
+	# level does; until then no yard shines.
+	if _bonus_kind < 0 and recycle_bonus() > 0.0:
+		_move_bonus()
 
 
 func _build_tree_screen() -> void:
@@ -3250,6 +3382,7 @@ func _tick_tree_log(delta: float) -> void:
 		"cleared": snappedf(_cleared_share(), 0.0001),
 		"pieces_left": _grid.piece_count(),
 		"sludge": roundi(sludge),
+		"birds": birds_caught,
 		"box": _yard.held.size(),
 		"ferries": fleet_size(),
 		"owned": _tree_owned.size(),
@@ -3364,18 +3497,71 @@ func _reberth(boat: Boat, index: int) -> void:
 ## net's and the ferry's: a loaded save has to reach the animal before it next decides what
 ## to do, or the first trip of the session is the trip an untrained dog would have made.
 func _push_dog_numbers() -> void:
-	if _dog == null:
-		return
-	_dog.fetch_most = dog_fetch()
-	_dog.wait_cut = dog_wait_cut()
+	for dog in _dogs:
+		dog.fetch_most = dog_fetch()
+		dog.wait_cut = dog_wait_cut()
+		if tree_mode:
+			# The tree's dog numbers are relative to the file's base (6 tiles, 0.35 of trips,
+			# pace 1), so a base dog is exactly today's dog and the nodes scale it from there.
+			var base_reach := maxf(float(_tree.base_stats.get("dog_reach", 6.0)), 0.001)
+			dog.reach = Dog.REACH * _tree_stat("dog_reach") / base_reach
+			var beach := _tree_stat("dog_beach")
+			dog.strand_first = beach if beach > Dog.STRAND_ODDS else 0.0
+			dog.strand_speed = maxf(_tree_stat("dog_strand_speed"), 0.1)
+
+
+## How many dogs the pack has: the first plus what `dog_count` bought. The tree has one.
+func dog_count() -> int:
 	if tree_mode:
-		# The tree's dog numbers are relative to the file's base (6 tiles, 0.35 of trips, pace
-		# 1), so a base dog is exactly today's dog and the nodes scale it from there.
-		var base_reach := maxf(float(_tree.base_stats.get("dog_reach", 6.0)), 0.001)
-		_dog.reach = Dog.REACH * _tree_stat("dog_reach") / base_reach
-		var beach := _tree_stat("dog_beach")
-		_dog.strand_first = beach if beach > Dog.STRAND_ODDS else 0.0
-		_dog.strand_speed = maxf(_tree_stat("dog_strand_speed"), 0.1)
+		return 1
+	return 1 + dog_count_level
+
+
+## The nearest dog the angler could pet from where they stand, or null.
+func _dog_in_reach() -> Dog:
+	var best: Dog = null
+	var best_gap := INF
+	for dog in _dogs:
+		if dog == null or not dog.visible or not dog.within_reach(_angler.tile_pos):
+			continue
+		var gap := dog.tile_pos.distance_to(_angler.tile_pos)
+		if gap < best_gap:
+			best_gap = gap
+			best = dog
+	return best
+
+
+## Wire a dog the way the scene's first one is wired: the water to fish out of, somebody to
+## be pleased to see, the crate to put things in, the day for its shadow. One place, so a
+## dog bought later cannot be missing something the first one has.
+func _fit_dog(dog: Dog) -> void:
+	dog.grid = _grid
+	dog.angler = _angler
+	dog.day = _day
+	dog.fetched.connect(_dog_brought_back)
+	dog.petted.connect(func() -> void:
+		if _sfx != null:
+			_sfx.play_bought()
+	)
+	_push_dog_numbers()
+
+
+## A dog bought for the pack: the scene's dog again, standing a stride off from the others
+## so the new one is seen to arrive, drawn on the walkers' layer like the first.
+func _add_dog() -> void:
+	if _dogs.size() >= MAX_DOGS:
+		return
+	var dog := Dog.new()
+	dog.name = &"Dog%d" % _dogs.size()
+	dog.z_index = _dog.z_index
+	dog.z_as_relative = false
+	dog.tile_pos = _dog.tile_pos + Vector2(0.9, -0.6) * float(_dogs.size())
+	dog.crate_tile = _dog.crate_tile
+	dog.splash = _splash
+	dog.prints = _prints
+	_dogs.append(dog)
+	_fit_dog(dog)
+	add_child(dog)
 
 
 func _push_boat_numbers() -> void:
@@ -3436,6 +3622,7 @@ func _net_wash() -> float:
 
 
 func _process(delta: float) -> void:
+	_pad_tick(delta)
 	_push_daylight()
 	_part_the_fleet(delta)
 	_fade_radio(delta)
@@ -3548,8 +3735,8 @@ func _process(delta: float) -> void:
 func _sort_walkers() -> void:
 	if _angler != null:
 		_angler.z_index = _walker_layer(_angler.position)
-	if _dog != null:
-		_dog.z_index = _walker_layer(_dog.position)
+	for dog in _dogs:
+		dog.z_index = _walker_layer(dog.position)
 
 
 ## The layer for something standing here. See `_sort_walkers`.
@@ -3620,7 +3807,20 @@ func _watching() -> Vector2:
 			at = at.lerp(_framed_on(at, _net.target), clampf(flown / FRAME_BY, 0.0, 1.0))
 		CastNet.State.SETTLED, CastNet.State.REELING:
 			at = _framed_on(at, _net.tile_pos)
+		CastNet.State.IDLE:
+			if _aim.at != Vector2.INF:
+				at = _pad_framed(at)
 	return at + _pan
+
+
+## `at`, leaned out towards the pad's reticle until the ghost mouth under it is inside the
+## same margin a landing net is framed in (`_framed_on`), and then held back so the angler
+## stays inside `PAD_ANGLER_INSET` of the window. Only as far as it needs: a reticle already
+## well inside the view moves nothing.
+func _pad_framed(at: Vector2) -> Vector2:
+	var framed := _framed_on(at, Iso.world_to_tile(_aim.at))
+	var half := get_viewport_rect().size / _camera.zoom * 0.5 * (1.0 - PAD_ANGLER_INSET)
+	return framed.clamp(_angler.position - half, _angler.position + half)
 
 
 ## `at`, pulled towards the tile `spot` until a window centred on the result has the net's
@@ -3981,6 +4181,7 @@ func save_game() -> bool:
 			"boat_speed": boat_speed_level, "cargo": cargo_level,
 			"skimmer": skimmer_level, "fleet": fleet_level,
 			"dog_fetch": dog_fetch_level, "dog_wait": dog_wait_level,
+			"dog_count": dog_count_level,
 			"sell_0": sell_levels[0], "sell_1": sell_levels[1], "sell_2": sell_levels[2],
 			"sell_3": sell_levels[3], "sell_4": sell_levels[4],
 			"recycle_bonus": recycle_bonus_level, "bird_worth": bird_worth_level,
@@ -4113,6 +4314,10 @@ func load_game() -> bool:
 	while fleet_level < wanted:
 		fleet_level += 1
 		_add_boat()
+	var dogs_wanted := _saved_level(levels, &"dog_count")
+	while dog_count_level < dogs_wanted:
+		dog_count_level += 1
+		_add_dog()
 	for boat in _boats:
 		boat.cargo.resize(0)
 		boat.state = Boat.State.DOCKED

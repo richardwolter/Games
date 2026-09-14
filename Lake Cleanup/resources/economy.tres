@@ -7,3 +7,4 @@ script = ExtResource("1_economy")
 piece_base_pay = 2.5
 piece_filth_pay = 6.0
 bird_bonus = 26.0
+tier_pay_step = 0.5

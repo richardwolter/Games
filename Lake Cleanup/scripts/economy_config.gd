@@ -11,3 +11,7 @@ extends Resource
 @export var piece_base_pay: float = 4.0
 @export var piece_filth_pay: float = 9.0
 @export var bird_bonus: float = 26.0
+## How much more each weight tier pays than the one below, as a fraction of the whole: a
+## tier-4 piece pays 1 + 4 * step times what its filth alone would. Heavier tiers always pay
+## more than the tiers before them (2026-09-14), and test_lake guards that piece by piece.
+@export var tier_pay_step: float = 0.5
