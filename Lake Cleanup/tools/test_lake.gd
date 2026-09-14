@@ -1157,7 +1157,9 @@ func _stage_pack() -> void:
 		others.append(int(pup.call(&"_find_stick")))
 	_check(not stick in others, "a stick one dog has claimed is not picked by another", str(others))
 	first.call(&"_release")
-	_check((Dog.claims as Dictionary).is_empty(), "a released claim is gone", str(Dog.claims))
+	# The other dogs are still running and may be claiming sticks of their own; only this one's
+	# claim has to be gone.
+	_check(not first in (Dog.claims as Dictionary).values(), "a released claim is gone", str(Dog.claims))
 	_advance()
 
 

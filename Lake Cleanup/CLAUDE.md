@@ -134,7 +134,10 @@ the repo; none of it is on the menu.
   own purchases ran away (a cheap track got cheaper) and pinning to income at the scheduled
   minute front-loaded everything by 18 min. Haul/Hold's multiplier was then set to 1.5 by
   hand (the fit's 1.69 put 420k on each tail). Result: the focused bot clears in **69 min**,
-  brisk buys early (median 15 s), income climbs to about 280/s by 48 min.
+  brisk buys early (median 15 s), income climbs to about 280/s by 48 min. **The first extra
+  ferry costs 200** (Richard, same day: "200 at most"; `fleet.tres` 200 x 5, so 200 / 1000 /
+  5000, bought at about 2 / 6 / 10 min in the sim, clear 62 min) — set by hand, and
+  `shop_loop.sh` would move it back; re-pin it after any re-run.
   **The ceiling is the ferry, by the arithmetic**: at equal Haul and Hold, four hulls carry
   4H / (8.4 + 206/speed + 0.06H) a second against a net at about 0.4H (calibrated), so the
   boats cannot keep up at any speed; the box peaks at about 400 in the sim and income is
