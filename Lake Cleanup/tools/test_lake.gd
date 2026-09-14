@@ -255,6 +255,35 @@ func _stage_build() -> void:
 		"%.2f of it, wanted %.2f (lake %.0fx%.0f in %.0fx%.0f)" % [
 			shown, wanted, span.x, span.y, view.x, view.y
 		])
+	# The stops (2026-09-14): whole pixel levels, plus one half level just in from the far end
+	# where the levels are a third apart or more. Asked of the rule at a 1080p stretch (1.5)
+	# and a 1440p one (2.0), since a headless run's own stretch has a single stop.
+	var at_1080: Array[float] = _main.call(&"_zoom_stops", 1.5)
+	var halves := 0
+	for stop in at_1080:
+		var px := stop * Lake.ART_PIXEL * 1.5
+		if absf(px - roundf(px)) > 0.001:
+			halves += 1
+	_check(at_1080.size() == 5 and halves == 1 and absf(at_1080[1] - 0.5) < 0.001,
+		"1080p has five zoom stops, one of them the half level at 0.5",
+		", ".join(PackedStringArray(at_1080.map(func(z: float) -> String: return "%.3f" % z))))
+	var at_1440: Array[float] = _main.call(&"_zoom_stops", 2.0)
+	var whole_1440 := true
+	for stop in at_1440:
+		var px := stop * Lake.ART_PIXEL * 2.0
+		whole_1440 = whole_1440 and absf(px - roundf(px)) < 0.001
+	_check(whole_1440, "and 1440p, already quarters apart, gets no half level",
+		", ".join(PackedStringArray(at_1440.map(func(z: float) -> String: return "%.3f" % z))))
+	# A wheel zoom leaves the view on the spot it zoomed about, rather than the follow easing
+	# it back onto the angler (2026-09-14). Checked through the hold `_zoom_by` ends on.
+	var spot := _angler.position + Vector2(300.0, 150.0)
+	_main.call(&"_keep_view_at", spot)
+	for i in 180:
+		_main._process(1.0 / 60.0)
+	_check(cam.position.distance_to(spot) < 1.0,
+		"a wheel zoom keeps the view on the spot it zoomed about",
+		"%.0f px off after 3 s" % cam.position.distance_to(spot))
+	_main.set(&"_pan", Vector2.ZERO)
 	# A drag past the edge of the ground does not wind up. The view is clamped to the
 	# ground, and the pan it is dragged by has to be clamped with it, or dragging back does
 	# nothing until the invisible surplus has been unwound — which at the far end of the

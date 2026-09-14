@@ -226,6 +226,17 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   so a drag back did nothing until it had unwound — at the far end, where the edge is a
   hand's width away, the sides read as stuck. `test_lake` drives a drag past the edge and
   a hundred pixels back.
+  **The wheel zooms onto the spot and stays there** (2026-09-14, `/grill-me` with Richard):
+  `_zoom_by` zooms about the cursor and then writes the move into `_pan` (`_keep_view_at`),
+  so the follow no longer eases the view back onto the angler and undoes it. A wheel zoom
+  is a pan, given back as a drag is: walking, a cast, a middle-button tap.
+  **A fifth stop, the one exception to the pixel rule** (`_zoom_stops`, `HALF_STOP_GAP`,
+  same day): where the levels are a third or more apart (1080p and coarser) a half level
+  sits between the far end and the next one in — 0.33 / **0.5** / 0.67 / 1.0 / 1.33 on
+  1080p. At 1.5 screen px an art px it draws 1 and 2 px by turns and crawls in motion;
+  accepted by Richard, to be judged in play. 1440p and finer get no half level. No zoom
+  glide, by decision (offered, not taken). `test_lake` asks the rule at stretch 1.5 and 2.0
+  and holds a zoomed-to spot for three seconds.
 - **The view comes home no faster than `Lake.HOME_SPEED`** (issue #19, 2026-09-13): the
   camera follows a point `CAST_LOOK` (0.45) of the way out to the net, so on the haul it
   came home at 0.45 of the reel speed and a reel upgrade was a camera upgrade. Now its step

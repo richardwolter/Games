@@ -104,9 +104,14 @@ const DRAG_PULL := 1.5
 ## out as the trees ever reach — so the ring grows, and the props with it, and the edge is
 ## still one drag away.
 const BEYOND := Color(0.16, 0.22, 0.14)
-## Per wheel notch. The wheel moves one zoom level per notch whatever this is; it only says
+## Per wheel notch. The wheel moves one zoom stop per notch whatever this is; it only says
 ## which way (and `_zoom_by` lets a bigger factor jump further).
 const ZOOM_STEP := 1.12
+
+## Levels at least this far apart (in zoom) get a half level between the far end and the
+## next one in, see `_zoom_stops`. A third: the levels on a 1080p window, and on anything
+## coarser. At 1440p they are quarters and need no extra stop.
+const HALF_STOP_GAP := 1.0 / 3.0
 
 ## World pixels to one pixel of the art — the ground pack's `Ground.SCALE`, and what the
 ## rubbish, finds and pigeons are drawn at.
@@ -1873,16 +1878,22 @@ func _at_shed() -> bool:
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
 ##
-## On levels: at least one level in the factor's direction, further if the factor asks for it,
-## and never past either end.
+## On stops (`_zoom_stops`): at least one stop in the factor's direction, further if the
+## factor asks for it, and never past either end.
+##
+## The spot stays put afterwards too (2026-09-14, Richard): the move is written into `_pan`,
+## so the follow does not ease the view back onto the angler a moment later and undo the
+## zoom. A wheel zoom is a pan like a middle-button drag, and is given back the same way —
+## walking, a cast, or a tap of the middle button.
 func _zoom_by(factor: float) -> void:
-	var level := _zoom_level_of(_view_zoom)
-	var target := _zoom_level_of(_view_zoom * factor)
+	var stops := _zoom_stops()
+	var index := _nearest_stop(stops, _view_zoom)
+	var target := _nearest_stop(stops, _view_zoom * factor)
 	if factor > 1.0:
-		target = maxi(target, level + 1)
+		target = maxi(target, index + 1)
 	elif factor < 1.0:
-		target = mini(target, level - 1)
-	var wanted := _zoom_level(clampi(target, _far_level(), _near_level()))
+		target = mini(target, index - 1)
+	var wanted: float = stops[clampi(target, 0, stops.size() - 1)]
 	if is_equal_approx(wanted, _view_zoom):
 		return
 	# Worked out from the camera's own mapping rather than by reading the mouse again
@@ -1893,18 +1904,58 @@ func _zoom_by(factor: float) -> void:
 	_view_zoom = wanted
 	_push_zoom()
 	var now := _camera.zoom.x
-	_camera.position = _clamped_view(_camera.position + offset / was - offset / now)
+	_keep_view_at(_clamped_view(_camera.position + offset / was - offset / now))
 
 
-## Write the camera's zoom: what the player set, put on the nearest level and kept inside the
+## Put the view here and hold it here, as a pan. See `_zoom_by`.
+func _keep_view_at(to: Vector2) -> void:
+	_camera.position = to
+	if _angler == null:
+		return
+	# The pan that makes the view want to be exactly here, measured against where it wants to
+	# be without one — not added to the camera's move, or a view still easing after the
+	# angler would carry that lag into the pan and drift off the spot.
+	_pan = to - (_watching() - _pan)
+	_pan_yielded = false
+
+
+## Write the camera's zoom: what the player set, put on the nearest stop and kept inside the
 ## same limits the wheel obeys.
 func _push_zoom() -> void:
-	# Levelled and clamped on the way out as well as when the wheel turns: the window can be
+	# Stopped and clamped on the way out as well as when the wheel turns: the window can be
 	# resized (or go fullscreen, which changes the stretch and so every level) under a view
 	# that was already set, and anything outside can write `_view_zoom` directly.
-	var level := clampi(_zoom_level_of(_view_zoom), _far_level(), _near_level())
-	_view_zoom = _zoom_level(level)
+	var stops := _zoom_stops()
+	_view_zoom = stops[_nearest_stop(stops, _view_zoom)]
 	_camera.zoom = Vector2(_view_zoom, _view_zoom)
+
+
+## Every zoom the wheel may land on, far to near: the whole pixel levels between the two ends,
+## plus a half level just in from the far end where the levels are coarse (`HALF_STOP_GAP`).
+##
+## The half level is the one exception to the pixel rule (2026-09-14, Richard's call): on a
+## 1080p window the levels are thirds, and the jump from the whole lake at 0.33 to 0.67 read
+## as stuck. The stop at 0.5 is 1.5 screen pixels to an art pixel, so the art draws 1 and 2
+## pixels wide by turns and crawls a little while the view moves there. Accepted, to be
+## judged in play. Finer windows already have stops that close and get no half level.
+func _zoom_stops(stretch: float = -1.0) -> Array[float]:
+	var far := _far_level(stretch)
+	var near := _near_level(stretch)
+	var stops: Array[float] = []
+	for level in range(far, near + 1):
+		stops.append(_zoom_level(level, stretch))
+	if near > far and stops[1] - stops[0] >= HALF_STOP_GAP - 0.001:
+		stops.insert(1, (stops[0] + stops[1]) * 0.5)
+	return stops
+
+
+## The index of the stop nearest a zoom.
+static func _nearest_stop(stops: Array[float], zoom: float) -> int:
+	var best := 0
+	for i in stops.size():
+		if absf(stops[i] - zoom) < absf(stops[best] - zoom):
+			best = i
+	return best
 
 
 ## How much of the way to close in one frame, for an ease that closes `rate` of the gap a
@@ -1943,18 +1994,15 @@ func _stretch() -> float:
 ## its base size (or a headless run, whose dummy display reports a stretch near nothing) has
 ## no whole level under the limit, and a view pushed ten times in is worse than one that is
 ## slightly off the pixel grid.
-func _zoom_level(level: int) -> float:
-	return minf(float(level) / (ART_PIXEL * _stretch()), MAX_ZOOM)
-
-
-## The nearest level to a zoom.
-func _zoom_level_of(zoom: float) -> int:
-	return maxi(roundi(zoom * ART_PIXEL * _stretch()), 1)
+##
+## `stretch` defaults to the window's own; the tests pass one to ask about other screens.
+func _zoom_level(level: int, stretch: float = -1.0) -> float:
+	return minf(float(level) / (ART_PIXEL * _stretch_or(stretch)), MAX_ZOOM)
 
 
 ## The closest level in: the last one not past MAX_ZOOM.
-func _near_level() -> int:
-	return maxi(floori(MAX_ZOOM * ART_PIXEL * _stretch() + 0.0001), 1)
+func _near_level(stretch: float = -1.0) -> int:
+	return maxi(floori(MAX_ZOOM * ART_PIXEL * _stretch_or(stretch) + 0.0001), 1)
 
 
 ## The furthest level out: the first one at or out past the fitted zoom, so the whole lake
@@ -1964,8 +2012,14 @@ func _near_level() -> int:
 ## and the nearest level to the fit is as likely to be in from it as out — a far end at
 ## which the lake is wider than the window is the far end not doing its job. Level one on a
 ## window too small for any level to fit, as before.
-func _far_level() -> int:
-	return clampi(floori(_fit_zoom() * ART_PIXEL * _stretch() + 0.0001), 1, _near_level())
+func _far_level(stretch: float = -1.0) -> int:
+	var s := _stretch_or(stretch)
+	return clampi(floori(_fit_zoom() * ART_PIXEL * s + 0.0001), 1, _near_level(s))
+
+
+## The stretch given, or the window's own when none was.
+func _stretch_or(stretch: float) -> float:
+	return stretch if stretch > 0.0 else _stretch()
 
 
 ## The zooms at the two ends, for the tests.
