@@ -93,6 +93,25 @@ const TAG_SHARE := 0.34
 
 const CLOSE_SIZE := 44.0
 
+## The "?" in the top left corner of every row (2026-09-13): a small oak tag, like the
+## price's, with the mark on it. Hovering it opens the row's blurb on a plate beside it;
+## clicking it buys nothing. The row's writing starts past it.
+const HELP_SIZE := 15.0
+const HELP_INSET := 3.0
+const HELP_GAP := 5.0
+## The blurb's plate: how wide its writing may run, its padding, and the gap off the "?".
+const BLURB_WIDE := 250.0
+const BLURB_PAD := 12.0
+const BLURB_OFF := Vector2(10.0, 4.0)
+
+## The legend under the shortest boards (the ferry's and the dog's, which stand in the
+## middle): the weight tiers with their sell rates, the yards, the bonus and the pay rule.
+## Drawn only where the room under those two boards comes to at least `LEGEND_LEAST`.
+const LEGEND_GAP := 22.0
+const LEGEND_PAD := 12.0
+const LEGEND_LINE := 4.0
+const LEGEND_LEAST := 96.0
+
 ## How long the sparkle over a bought board's sprite lasts, how far it reaches, and how
 ## many points it is made of. Short and small on purpose: it is a receipt for a click the
 ## player already made, not an event.
@@ -113,6 +132,10 @@ signal close_asked
 ## `{key, board, name, level, value, cost, afford}` — `board` is one of BOARDS.
 var rows: Array = []
 
+## What the legend under the boards says, set by the lake beside `rows`:
+## `{tiers: [[name, pct]...], yards: [name...], bonus, rule, yard_rule}`.
+var legend: Dictionary = {}
+
 ## The picture at the head of the net and ferry boards, by board name, each `{sheet,
 ## region}`. Lent by the lake, which already has the ferry's baked hull and the net. The
 ## dog draws itself through DogArt.
@@ -131,6 +154,14 @@ var _laid_rows: int = -1
 var _row_boxes: Array[Rect2] = []
 var _row_index: Array[int] = []
 var _hovered: int = -1
+
+## Every drawn row's "?" box, parallel to `_row_boxes`, and which row's is under the
+## pointer, or -1.
+var _help_boxes: Array[Rect2] = []
+var _help_hovered: int = -1
+
+## Where the legend stands this frame; zero-sized when there is no room for it.
+var _legend_box := Rect2()
 
 ## The ferry's wake and the hull over it. Both are nodes rather than this control's own
 ## drawing: HullFoam is a Node2D with a shader, and a child of a Control draws after the
@@ -273,6 +304,17 @@ func _lay_out() -> void:
 		_boards[BOARDS[i]] = Rect2(
 			floorf(left + (each + BOARD_GAP) * float(i)), top, floorf(each), tall
 		)
+	_legend_box = Rect2()
+	if _boards.has(&"boat") and _boards.has(&"dog"):
+		var under: Rect2 = _boards[&"boat"]
+		var dog: Rect2 = _boards[&"dog"]
+		var top_y := maxf(under.end.y, dog.end.y) + LEGEND_GAP
+		var free := _table.end.y - top_y
+		if free >= LEGEND_LEAST:
+			_legend_box = Rect2(
+				Vector2(under.position.x, top_y),
+				Vector2(dog.end.x - under.position.x, minf(free, _legend_tall()))
+			)
 	if _close != null and _boards.has(BOARDS[BOARDS.size() - 1]):
 		# Nailed to the right end of the last board's title plank, as the shed's shelf has it,
 		# rather than hung in the air past that board's corner.
@@ -322,8 +364,11 @@ func _process(delta: float) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		var was := _hovered
-		_hovered = _row_under((event as InputEventMouseMotion).position)
-		if was != _hovered:
+		var was_help := _help_hovered
+		var at := (event as InputEventMouseMotion).position
+		_hovered = _row_under(at)
+		_help_hovered = _help_under(at)
+		if was != _hovered or was_help != _help_hovered:
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -338,6 +383,9 @@ func _gui_input(event: InputEvent) -> void:
 			close_asked.emit()
 		return
 	accept_event()
+	# The "?" is for reading, not buying: a click on it is eaten.
+	if _help_under(click.position) >= 0:
+		return
 	var row: Dictionary = rows[index]
 	if bool(row.get("afford", false)):
 		bought.emit(StringName(row["key"]))
@@ -358,8 +406,21 @@ func _row_under(at: Vector2) -> int:
 	return -1
 
 
+## Which row's "?" is under the pointer, or -1.
+func _help_under(at: Vector2) -> int:
+	for i in _help_boxes.size():
+		if _help_boxes[i].has_point(at):
+			return _row_index[i]
+	return -1
+
+
+## The "?" tag's box in the top left corner of a row's plate.
+static func help_box_of(row_box: Rect2) -> Rect2:
+	return Rect2(row_box.position + Vector2(HELP_INSET, HELP_INSET), Vector2(HELP_SIZE, HELP_SIZE))
+
+
 func _paint_key() -> int:
-	return hash([rows.hash(), _hovered, roundi(_sparkle * 120.0), _dog_frame])
+	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame])
 
 
 func _draw() -> void:
@@ -371,8 +432,13 @@ func _draw() -> void:
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	_row_boxes.clear()
 	_row_index.clear()
+	_help_boxes.clear()
 	for board in BOARDS:
 		_draw_board(board, _boards[board])
+	if _legend_box.size.y > 0.0:
+		_draw_legend(_legend_box)
+	if _help_hovered >= 0 and _help_hovered < rows.size():
+		_draw_blurb(rows[_help_hovered])
 
 
 ## One board: oak frame, clean-water face, ribbon over the top edge, the sprite, the rows.
@@ -413,7 +479,8 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 			break
 		_row_boxes.append(line)
 		_row_index.append(i)
-		_draw_row(row, line, _hovered == i)
+		_help_boxes.append(help_box_of(line))
+		_draw_row(row, line, _hovered == i, _help_hovered == i)
 
 
 ## The board's oak frame and its title plank. Both are drawn by `Style`, so the shop's
@@ -541,7 +608,7 @@ func _halo(box: Rect2) -> void:
 ## One row: a clean-water plate, the name over its value on the left, the price tag on the
 ## right. A row the player cannot afford is drawn back rather than hidden: the point of a
 ## shop is knowing what is coming.
-func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
+func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> void:
 	var afford := bool(row.get("afford", false))
 	var lit := hovered and afford
 	var face := Style.BOARD_ROW if afford else Style.BOARD_ROW_OFF
@@ -553,7 +620,9 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 	Style.plate(self, box, face)
 
 	var tag_wide := box.size.x * TAG_SHARE
-	var text_at := box.position.x + 10.0
+	# The "?" first, in the corner, and the writing starts past it.
+	_draw_help(help_box_of(box), afford, help_lit)
+	var text_at := box.position.x + HELP_INSET + HELP_SIZE + HELP_GAP
 	var name := String(row.get("name", ""))
 	var value := String(row.get("value", ""))
 	# Two lines, or one centred if there is no value to say.
@@ -566,16 +635,36 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 	else:
 		var stack := float(Style.TEXT_BODY) * 0.62 + float(Style.TEXT_SMALL) * 0.62 + 6.0
 		var first := box.position.y + (box.size.y - stack) * 0.5 + float(Style.TEXT_BODY) * 0.62
-		var took := Style.write(self, name, Style.TEXT_BODY, Vector2(text_at, first), ink)
+		# Both lines stop short of the tag (2026-09-13): with the next level on the value
+		# line it ran under the price, and a long name's level already did. The name drops a
+		# size before its level is given up, the value drops a size and is then cut with an
+		# ellipsis — a line under a tag reads as a bug, a short line as a short line.
+		var tag := _tag_of(box, tag_wide, String(row.get("cost", "")), Style.TEXT_BODY)
+		var room := (tag.position.x if tag.size.x > 0.0 else box.end.x) - 8.0 - text_at
 		# The level after the name, in the clean water's blue: `LEVEL_INK` rather than the
 		# money's gold, because gold on this board is a price. Dimmed with the rest of the
-		# row when it cannot be bought.
+		# row when it cannot be bought. Small (2026-09-13): the name is what the row is, the
+		# level is a footnote to it.
 		var level := String(row.get("level", ""))
+		var level_wide := 0.0 if level.is_empty() else Style.measure(level, Style.TEXT_TINY).x + 6.0
+		var name_size := Style.TEXT_BODY
+		if Style.measure(name, name_size).x + level_wide > room:
+			name_size = Style.TEXT_SMALL
+		if Style.measure(name, name_size).x + level_wide > room:
+			level = ""
+		var took := Style.write(self, _cut_to(name, name_size, room), name_size, Vector2(text_at, first), ink)
 		if not level.is_empty():
 			var level_ink := Style.LEVEL_INK if afford else Style.LEVEL_INK.lerp(Style.BOARD_INK_DIM, 0.5)
-			Style.write(self, level, Style.TEXT_BODY, Vector2(text_at + took.x + 6.0, first), level_ink)
+			Style.write(self, level, Style.TEXT_TINY, Vector2(text_at + took.x + 6.0, first), level_ink)
+		var value_size := Style.TEXT_SMALL
+		if Style.measure(value, value_size).x > room:
+			value_size = Style.TEXT_TINY
+		if Style.measure(value, value_size).x > room:
+			# The word "next" goes before any of the numbers do: "(+55%)" after the figure
+			# still reads as the step, "(+5…" does not.
+			value = value.replace(" next)", ")")
 		Style.write(
-			self, value, Style.TEXT_SMALL,
+			self, _cut_to(value, value_size, room), value_size,
 			Vector2(text_at, first + 6.0 + float(Style.TEXT_SMALL) * 0.62),
 			ink.lerp(face, 0.25)
 		)
@@ -586,6 +675,130 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool) -> void:
 		),
 		String(row.get("cost", "")), Style.TEXT_BODY, afford, lit
 	)
+
+
+## Where a row's price tag will stand, without drawing it: the same sum `_draw_tag` makes.
+func _tag_of(box: Rect2, tag_wide: float, cost: String, height: int) -> Rect2:
+	if cost.is_empty():
+		return Rect2()
+	var slot := Rect2(
+		Vector2(box.end.x - tag_wide - 6.0, box.position.y + 8.0),
+		Vector2(tag_wide, box.size.y - 16.0)
+	)
+	var wide := minf(Style.measure(cost, height).x + float(height) * 1.2, slot.size.x)
+	return Rect2(slot.position + Vector2(slot.size.x - wide, 0.0), Vector2(wide, slot.size.y))
+
+
+## A line cut to `wide` with an ellipsis, or whole if it fits.
+static func _cut_to(text: String, height: int, wide: float) -> String:
+	if Style.measure(text, height).x <= wide:
+		return text
+	var kept := text
+	while kept.length() > 1 and Style.measure(kept + "…", height).x > wide:
+		kept = kept.left(kept.length() - 1)
+	return kept.strip_edges() + "…"
+
+
+## The "?" tag: the price tag's oak, the mark in the price's ink, lit under the pointer.
+func _draw_help(box: Rect2, afford: bool, lit: bool) -> void:
+	var face := Style.FRAME if afford else Style.FRAME_LOW
+	if lit:
+		face = Color(
+			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
+		)
+	Style.plate(self, box, face, 2.0)
+	Style.write(
+		self, "?", Style.TEXT_SMALL,
+		Vector2(0.0, box.position.y + box.size.y * 0.5 + float(Style.TEXT_SMALL) * 0.36),
+		Style.PRICE_INK if afford else Style.PRICE_INK.lerp(Style.FRAME_LOW, 0.5),
+		HORIZONTAL_ALIGNMENT_CENTER, box
+	)
+
+
+## A row's blurb on a plate of the boards' own wood, hung off its "?" and kept inside the
+## window. Drawn last, over every board.
+func _draw_blurb(row: Dictionary) -> void:
+	var i := _row_index.find(_help_hovered)
+	if i < 0:
+		return
+	var anchor := _help_boxes[i]
+	var title := String(row.get("name", ""))
+	var lines := _wrap(String(row.get("blurb", "")), Style.TEXT_SMALL, BLURB_WIDE)
+	var wide := Style.measure(title, Style.TEXT_BODY).x
+	for line in lines:
+		wide = maxf(wide, Style.measure(line, Style.TEXT_SMALL).x)
+	var line_tall := float(Style.TEXT_SMALL) + LEGEND_LINE
+	var inner := Vector2(
+		wide + BLURB_PAD * 2.0,
+		BLURB_PAD * 2.0 + float(Style.TEXT_BODY) + 6.0 + line_tall * float(lines.size())
+	)
+	# Sized so the face holds the writing whichever wood the box gets: the painted border
+	# is thicker than the drawn frame, and `board_face` knows which it will be.
+	var box := Rect2(
+		Vector2(anchor.end.x, anchor.position.y) + BLURB_OFF, inner + Vector2(FRAME, FRAME) * 2.0
+	)
+	box.size += inner - Style.board_face(box, FRAME).size
+	box.position.x = clampf(box.position.x, 4.0, size.x - box.size.x - 4.0)
+	box.position.y = clampf(box.position.y, 4.0, size.y - box.size.y - 4.0)
+	var face := Style.board_wood(self, box, FRAME, CHIPS)
+	var at := face.position + Vector2(BLURB_PAD, BLURB_PAD + float(Style.TEXT_BODY) * 0.8)
+	Style.write(self, title, Style.TEXT_BODY, at, Style.BOARD_INK)
+	at.y += 6.0 + line_tall
+	for line in lines:
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
+		at.y += line_tall
+
+
+## How tall the legend wants to be: its four lines and their padding, in the board's wood.
+func _legend_tall() -> float:
+	var inner := LEGEND_PAD * 2.0 + (float(Style.TEXT_SMALL) + LEGEND_LINE) * 5.0 + 4.0
+	return inner + Style.board_wood_tall(BOARDS_WIDE * 0.5, FRAME)
+
+
+## The legend: one plate in the boards' wood under the ferry's and the dog's, four lines of
+## small writing — the tiers with their sell rates, the yards, the bonus, the pay rule.
+func _draw_legend(box: Rect2) -> void:
+	var face := Style.board_wood(self, box, FRAME, CHIPS)
+	var line_tall := float(Style.TEXT_SMALL) + LEGEND_LINE
+	var at := face.position + Vector2(LEGEND_PAD, LEGEND_PAD + float(Style.TEXT_SMALL) * 0.8)
+	var wide := face.size.x - LEGEND_PAD * 2.0
+	# Tiers: name in the ink, rate in the level's blue, spread across the line.
+	var tiers: Array = legend.get("tiers", [])
+	if not tiers.is_empty():
+		var step := wide / float(tiers.size())
+		for t in tiers.size():
+			var pair: Array = tiers[t]
+			var x := at.x + step * float(t)
+			var took := Style.write(self, String(pair[0]), Style.TEXT_SMALL, Vector2(x, at.y), Style.BOARD_INK)
+			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(x + took.x + 6.0, at.y), Style.LEVEL_INK)
+		at.y += line_tall
+	var yards: Array = legend.get("yards", [])
+	var yard_line := "Yards: %s.  %s" % [" · ".join(yards), String(legend.get("yard_rule", ""))]
+	for line in _wrap(yard_line, Style.TEXT_SMALL, wide):
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
+		at.y += line_tall
+	for line in _wrap(String(legend.get("bonus", "")), Style.TEXT_SMALL, wide):
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.LEVEL_INK)
+		at.y += line_tall
+	for line in _wrap(String(legend.get("rule", "")), Style.TEXT_SMALL, wide):
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
+		at.y += line_tall
+
+
+## Words folded onto lines no wider than `wide`. `Style.write` has no wrap of its own.
+static func _wrap(text: String, height: int, wide: float) -> Array[String]:
+	var out: Array[String] = []
+	var line := ""
+	for word in text.split(" ", false):
+		var trial := word if line.is_empty() else line + " " + word
+		if not line.is_empty() and Style.measure(trial, height).x > wide:
+			out.append(line)
+			line = word
+		else:
+			line = trial
+	if not line.is_empty():
+		out.append(line)
+	return out
 
 
 ## The price, on an oak tag shrunk onto the number in the money plate's gold, so a cost

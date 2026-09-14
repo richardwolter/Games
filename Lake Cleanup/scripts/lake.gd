@@ -2698,6 +2698,31 @@ const TRACKS := [
 ## What the market board calls each weight tier's sell track.
 const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 
+## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
+## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
+const BLURBS := {
+	&"net_width": "Placeholder: how wide the net's mouth opens, so one cast covers more water.",
+	&"net_strength": "Placeholder: the heaviest weight tier the net can lift.",
+	&"net_range": "Placeholder: how far from the shore the angler can throw.",
+	&"reel": "Placeholder: how fast the net is reeled back in.",
+	&"net_hold": "Placeholder: how many pieces one cast can carry home.",
+	&"boat_speed": "Placeholder: how fast the ferry sails between the island and the yards.",
+	&"cargo": "Placeholder: how many pieces the ferry carries a trip.",
+	&"skimmer": "Placeholder: a skimmer on the ferry picks up rubbish as it sails.",
+	&"fleet": "Placeholder: another ferry in the water.",
+	&"dog_fetch": "Placeholder: how many pieces the dog brings back a trip.",
+	&"dog_wait": "Placeholder: how long the dog lazes about between trips, at most.",
+	&"lucky_haul": "Placeholder: odds that a cast lifts one tier heavier and holds more.",
+	&"double_cast": "Placeholder: odds that a cast throws a second net beside the first.",
+	&"sell_0": "Placeholder: what light pieces sell for at the yards.",
+	&"sell_1": "Placeholder: what small pieces sell for at the yards.",
+	&"sell_2": "Placeholder: what medium pieces sell for at the yards.",
+	&"sell_3": "Placeholder: what heavy pieces sell for at the yards.",
+	&"sell_4": "Placeholder: what bulky pieces sell for at the yards.",
+	&"recycle_bonus": "Placeholder: one yard at a time pays over the odds, and it moves.",
+	&"bird_worth": "Placeholder: what a netted pigeon is worth.",
+}
+
 
 ## How many upgrades could be bought right now. Drawn on the HUD's upgrades button, so that
 ## money worth spending says so on the way in rather than only once the board is open.
@@ -2716,64 +2741,133 @@ func _affordable() -> int:
 
 
 ## Every upgrade as one row of the drawn boards: which board it stands on, what it is,
-## what it does now, what the next level costs, and whether it can be paid for.
+## what it does now and what the next level buys, what that costs, and whether it can be
+## paid for.
+##
+## Percentages and whole numbers only (Richard, 2026-09-13): a track that scales a rate
+## reads as a percent over its level 0 ("+40%"), a track that counts reads as the count
+## ("3 per cast"), and the next level's figure follows in brackets. No tenths anywhere.
 func _shop_rows() -> Array:
 	var out: Array = []
+	# Each line: key, board, name, and what the value reads at a given level.
 	var listed := [
-		[&"net_width", &"net", "Width", "%d tiles" % _tiles_in_radius(net_radius())],
-		[&"net_strength", &"net", "Strength", "lifts tier %d" % net_power()],
-		[&"net_range", &"net", "Range", "%.1f tiles" % net_range()],
-		[&"reel", &"net", "Speed", "%.1f tiles/s" % reel_speed()],
-		[&"net_hold", &"net", "Haul", "%d per cast" % net_hold()],
-		[&"boat_speed", &"boat", "Speed", "%.1f tiles/s" % boat_speed()],
-		[&"cargo", &"boat", "Hold", "%d aboard" % boat_cargo()],
-		[&"skimmer", &"boat", "Skimmer", (
-			"off" if skimmer_level <= 0
-			else "%d items, %d%%" % [skim_hold(), roundi(skim_chance() * 100.0)]
-		)],
-		[&"fleet", &"boat", "Extra ferry", "%d in the water" % fleet_size()],
-		[&"dog_fetch", &"dog", "Fetching", "%d per trip" % dog_fetch()],
-		[&"dog_wait", &"dog", "Keenness", "waits %.0fs at most" % maxf(
-			Dog.MOOD_MOST - dog_wait_cut(), Dog.MOOD_LEAST
-		)],
-		[&"lucky_haul", &"net", "Lucky haul", "%d%%: +1 tier, +%d held" % [
-			roundi(lucky_chance() * 100.0), LUCKY_EXTRA
-		]],
-		[&"double_cast", &"net", "Double cast", "%d%%: second net" % roundi(
-			double_cast_chance() * 100.0
-		)],
+		[&"net_width", &"net", "Width", func(l: int) -> String: return _pct_at(&"net_width", l)],
+		[&"net_strength", &"net", "Strength", func(l: int) -> String:
+			return "Tier %d" % int(_track_value(&"net_strength", l))],
+		[&"net_range", &"net", "Range", func(l: int) -> String: return _pct_at(&"net_range", l)],
+		[&"reel", &"net", "Speed", func(l: int) -> String: return _pct_at(&"reel", l)],
+		[&"net_hold", &"net", "Haul", func(l: int) -> String:
+			return "%d per cast" % int(_track_value(&"net_hold", l))],
+		[&"boat_speed", &"boat", "Speed", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
+		[&"cargo", &"boat", "Hold", func(l: int) -> String:
+			return "%d aboard" % int(_track_value(&"cargo", l))],
+		[&"skimmer", &"boat", "Skimmer", func(l: int) -> String:
+			return "off" if l <= 0 else "%d items, %d%%" % [
+				mini(l, MAX_LEVELS[&"skimmer"]), roundi(_skim_chance_at(l) * 100.0)
+			]],
+		[&"fleet", &"boat", "Extra ferry", func(l: int) -> String: return "%d in the water" % (1 + l)],
+		[&"dog_fetch", &"dog", "Fetching", func(l: int) -> String:
+			return "%d per trip" % int(_track_value(&"dog_fetch", l))],
+		[&"dog_wait", &"dog", "Keenness", func(l: int) -> String:
+			return "waits %ds at most" % roundi(maxf(
+				Dog.MOOD_MOST - _track_value(&"dog_wait", l), Dog.MOOD_LEAST
+			))],
+		[&"lucky_haul", &"net", "Lucky haul", func(l: int) -> String:
+			return "%d%%: +1 tier, +%d held" % [
+				roundi(_track_value(&"lucky_haul", l) * 100.0), LUCKY_EXTRA
+			]],
+		[&"double_cast", &"net", "Double cast", func(l: int) -> String:
+			return "%d%%: second net" % roundi(_track_value(&"double_cast", l) * 100.0)],
 	]
 	for tier in sell_levels.size():
-		listed.append([
-			StringName("sell_%d" % tier), &"market", TIER_NAMES[tier],
-			"sells x%.2f" % tier_pay(tier),
-		])
-	listed.append([&"recycle_bonus", &"market", "Recycle Bonus", (
-		"off" if recycle_bonus_level <= 0
-		else "+%d%% %s, %ds" % [
-			roundi(recycle_bonus() * 100.0), TrashDef.KIND_NAMES[_bonus_kind].to_lower(),
-			ceili(_bonus_left),
-		]
-	)])
-	listed.append([&"bird_worth", &"market", "Pigeons", "$%d a bird" % roundi(bird_pay())])
+		var key := StringName("sell_%d" % tier)
+		listed.append([key, &"market", TIER_NAMES[tier], func(l: int) -> String:
+			return _pct_at(key, l)])
+	listed.append([&"recycle_bonus", &"market", "Recycle Bonus", func(l: int) -> String:
+		if l <= 0:
+			return "off"
+		var bonus := "+%d%%" % roundi(_track_value(&"recycle_bonus", l) * 100.0)
+		if l != recycle_bonus_level or _bonus_kind < 0:
+			return bonus
+		return "%s %s, %ds" % [bonus, TrashDef.KIND_NAMES[_bonus_kind].to_lower(), ceili(_bonus_left)]
+	])
+	listed.append([&"bird_worth", &"market", "Pigeons", func(l: int) -> String:
+		return "$%d a bird" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l))])
 	for line: Array in listed:
 		var key: StringName = line[0]
 		var full := is_maxed(key)
 		var price := cost_of(key)
+		var level := _level_of(key)
+		var reads: Callable = line[3]
+		var now: String = reads.call(level)
 		out.append({
 			"key": key,
 			"board": line[1],
 			"name": line[2],
 			# Its own field, not part of the name: the shop draws it in the clean water's blue
-			# so the level stands off the name (2026-09-11).
-			"level": "(Lvl %d)" % _level_of(key),
-			"value": line[3],
+			# so the level stands off the name (2026-09-11), and small (2026-09-13).
+			"level": "Lvl %d" % level,
+			# What it does now, and what the next level buys after it, unless there is none.
+			"value": now if full else "%s  (%s next)" % [now, reads.call(level + 1)],
+			# What the upgrade is, for the row's "?" — placeholder wording for now.
+			"blurb": String(BLURBS.get(key, "")),
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
 			"cost": "Max" if full else "$%d" % roundi(price),
 			"afford": not full and sludge >= price,
 		})
 	return out
+
+
+## A track's value at a level, straight off the resource. The shop's rows ask for the
+## level after the one owned too, which no getter answers.
+func _track_value(key: StringName, level: int) -> float:
+	var track: UpgradeTrack = _upgrades.get(key)
+	if track == null:
+		return 0.0
+	return track.value(level)
+
+
+## A scaling track as a percent over its level 0: "+0%" to begin with, "+40%" later. A
+## track whose base is nothing has no percent to be over and reads as its plain number.
+func _pct_at(key: StringName, level: int) -> String:
+	var base := _track_value(key, 0)
+	if base <= 0.0:
+		return "%d" % roundi(_track_value(key, level))
+	return "+%d%%" % roundi((_track_value(key, level) / base - 1.0) * 100.0)
+
+
+## `skim_chance` at any level, not only the one owned.
+func _skim_chance_at(level: int) -> float:
+	if level < 1:
+		return 0.0
+	var top := float(MAX_LEVELS[&"skimmer"])
+	return clampf(lerpf(SKIM_FIRST_CHANCE, 1.0, float(level - 1) / (top - 1.0)), 0.0, 1.0)
+
+
+## What the market's legend under the boards says: each weight tier's sell rate, the
+## four yards and their material, the bonus, and the pay rule in a line. Percentages only.
+func _shop_legend() -> Dictionary:
+	var tiers: Array = []
+	for tier in sell_levels.size():
+		tiers.append([TIER_NAMES[tier], _pct_at(StringName("sell_%d" % tier), sell_levels[tier])])
+	var yards: Array = []
+	for kind in TrashDef.KIND_NAMES.size():
+		yards.append(TrashDef.KIND_NAMES[kind])
+	var bonus := "No bonus yard yet."
+	if recycle_bonus_level > 0 and _bonus_kind >= 0:
+		bonus = "The %s yard pays +%d%% for %ds more." % [
+			TrashDef.KIND_NAMES[_bonus_kind].to_lower(), roundi(recycle_bonus() * 100.0),
+			ceili(_bonus_left),
+		]
+	return {
+		"tiers": tiers,
+		"yards": yards,
+		"bonus": bonus,
+		"rule": "A piece pays a flat fee plus a cut for its filth, times its tier's sell rate, "
+			+ "times the bonus at the yard that takes it.",
+		"yard_rule": "Each material sells at its own yard. The bonus yard moves every %ds." % roundi(BONUS_EVERY),
+	}
 
 
 ## The net's numbers, from the levels the player has now.
@@ -3693,6 +3787,7 @@ func _update_hud() -> void:
 	if not _menu_open:
 		return
 	_shop_skin.rows = _shop_rows()
+	_shop_skin.legend = _shop_legend()
 
 	_buy_net_width.text = "Net width %d  —  %d tiles  (%d)" % [
 		net_width_level, _tiles_in_radius(net_radius()), roundi(cost_of(&"net_width"))

@@ -1138,6 +1138,33 @@ like the rest (no `SAVE_VERSION` bump: a missing key reads as level 0).
   placement/shine/pay/hop, bird pay, luck fields and their clearing, the helper net and its
   spot); `_stage_save` round-trips a sell level.
 
+### The Rows Read in Percents, and Explain Themselves (2026-09-13, old shop only)
+Decided with `/grill-me` (Richard): the upgrade rows use **percentages and whole numbers
+only**, say what the next level buys, carry a "?" each, and the market is explained once.
+- **Values** (`Lake._shop_rows`, `_pct_at`, `_track_value`): a track that scales a rate reads
+  as a percent over its level 0 ("+40%"; "+0%" to begin with), a track that counts reads as
+  the count ("3 per cast", "Tier 2", "waits 4s at most"), odds as percents; **no tenths
+  anywhere**. Each row's line is built by one closure over a level, so the next level's
+  figure follows in brackets, "(+55% next)", and a maxed row shows now alone. The tier rows
+  read "+0% (+15% next)" — the name is the tier. `test_lake` guards no "." in any value.
+- **The level is a footnote** (`Style.TEXT_TINY`, "Lvl n", still `LEVEL_INK` after the name).
+- **Both lines stop short of the tag** (`ShopSkin._tag_of`, `_cut_to`): the name drops to
+  `TEXT_SMALL` before its level is given up; the value drops to `TEXT_TINY`, then loses the
+  word "next", then is cut with an ellipsis. This supersedes "row text is not clipped" above.
+- **The "?"** (`HELP_SIZE`, `help_box_of`, `_draw_help`): an oak tag in each row's top-left
+  corner, the writing starts past it; hovering it draws the row's `blurb` on a plate in the
+  boards' wood beside it (`_draw_blurb`, `_wrap` — `Style.write` has no wrap), clicking it
+  buys nothing. **Blurbs are placeholders** (`Lake.BLURBS`, one line a track) for Richard to
+  rewrite; a track added to `TRACKS` needs one, `test_lake` checks.
+- **The legend** (`Lake._shop_legend`, `ShopSkin.legend`, `_draw_legend`): one plate in the
+  boards' wood centred under the ferry's and the dog's boards — the shortest, so the room
+  under them is the shop's free space — with the five tiers and their sell rates, the four
+  yards and "each material sells at its own yard, the bonus yard moves every 30 s", the bonus
+  as it stands, and the pay rule in a line. Drawn only when at least `LEGEND_LEAST` is free.
+  Percent only, real text (not placeholder).
+- **TreeScreen untouched**, by decision. Probe: `tools/shot_menus.tscn` now also saves
+  `tools/last_menu_upgrades_help.png` with the first row's "?" hovered.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

@@ -1297,6 +1297,64 @@ func _stage_market() -> void:
 	_check(int(boards.get(&"net", 0)) == 7, "and the net's board has seven",
 		"%d" % int(boards.get(&"net", 0)))
 
+	# The rows read in percents and whole numbers (2026-09-13): no tenths anywhere, the
+	# next level in brackets, a small level of its own, and a blurb for the "?".
+	var decimals := []
+	var no_next := []
+	var no_blurb := []
+	var no_level := []
+	for row: Dictionary in _main.call(&"_shop_rows") as Array:
+		var value := String(row["value"])
+		if "." in value:
+			decimals.append("%s: %s" % [row["key"], value])
+		if String(row.get("blurb", "")).is_empty():
+			no_blurb.append(String(row["key"]))
+		if not String(row.get("level", "")).begins_with("Lvl "):
+			no_level.append(String(row["key"]))
+		if String(row["cost"]) != "Max" and not value.ends_with(" next)"):
+			no_next.append("%s: %s" % [row["key"], value])
+	_check(decimals.is_empty(), "no row's value carries a decimal", ", ".join(decimals))
+	_check(no_next.is_empty(), "every unmaxed row says what the next level buys", ", ".join(no_next))
+	_check(no_blurb.is_empty(), "every row has a blurb for its ?", ", ".join(no_blurb))
+	_check(no_level.is_empty(), "every row has its level as its own field", ", ".join(no_level))
+	var width_row := ""
+	for row: Dictionary in _main.call(&"_shop_rows") as Array:
+		if row["key"] == &"net_width":
+			width_row = String(row["value"])
+	_check(width_row.begins_with("+0%"), "a scaling track at level 0 reads as +0%", width_row)
+	var legend: Dictionary = _main.call(&"_shop_legend")
+	_check((legend.get("tiers", []) as Array).size() == 5 and (legend.get("yards", []) as Array).size() == 4,
+		"the legend lists five tiers and four yards", str(legend))
+	var legend_decimals := "." in str(legend.get("tiers", []))
+	_check(not legend_decimals, "the legend's tier rates are percents", str(legend.get("tiers", [])))
+	# The shop skin: a "?" box in every row's corner, the legend under the ferry's and the
+	# dog's boards, inside the table, and the level written small.
+	var skin := _main.get_node(^"HUD/ShopSkin")
+	skin.set(&"rows", _main.call(&"_shop_rows"))
+	skin.set(&"legend", legend)
+	skin.call(&"_lay_out")
+	var skin_boards: Dictionary = skin.get(&"_boards")
+	var legend_box: Rect2 = skin.get(&"_legend_box")
+	var table: Rect2 = skin.get(&"_table")
+	_check(legend_box.size.y > 0.0, "the legend has room under the boards",
+		"table %s boat %s dog %s" % [table, skin_boards.get(&"boat"), skin_boards.get(&"dog")])
+	if legend_box.size.y > 0.0:
+		var boat_box: Rect2 = skin_boards[&"boat"]
+		var dog_box: Rect2 = skin_boards[&"dog"]
+		_check(legend_box.position.y >= maxf(boat_box.end.y, dog_box.end.y)
+			and legend_box.end.y <= table.end.y + 0.5
+			and is_equal_approx(legend_box.position.x, boat_box.position.x)
+			and is_equal_approx(legend_box.end.x, dog_box.end.x),
+			"and stands under the ferry's and the dog's boards, inside the table",
+			"legend %s boat %s dog %s table %s" % [legend_box, boat_box, dog_box, table])
+	var row_box := Rect2(100.0, 100.0, 300.0, 50.0)
+	var help: Rect2 = skin.call(&"help_box_of", row_box)
+	_check(row_box.has_point(help.position) and help.position.x < row_box.position.x + 8.0
+		and help.position.y < row_box.position.y + 8.0 and help.size.x <= 20.0,
+		"the ? sits in a row's top left corner", str(help))
+	var folded: Array = skin.call(&"_wrap", "one two three four five six seven eight nine ten", 13, 60.0)
+	_check(folded.size() > 1, "a blurb wraps onto lines", str(folded))
+
 	_main.set(&"sludge", 100000.0)
 	var plain_2 := float(_main.call(&"tier_pay", 2))
 	var plain_3 := float(_main.call(&"tier_pay", 3))

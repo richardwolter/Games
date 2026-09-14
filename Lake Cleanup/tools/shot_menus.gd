@@ -8,6 +8,7 @@ extends Node
 const SHOTS := {
 	&"settings": "res://tools/last_menu_settings.png",
 	&"upgrades": "res://tools/last_menu_upgrades.png",
+	&"upgrades_help": "res://tools/last_menu_upgrades_help.png",
 	&"shed": "res://tools/last_menu_shed.png",
 }
 
@@ -35,11 +36,18 @@ func _physics_process(_delta: float) -> void:
 			_main.call(&"_set_menu", true)
 		32:
 			_save(&"upgrades")
+			# The first row's "?" hovered, so its blurb is in the picture.
+			var skin := _main.get_node(^"HUD/ShopSkin")
+			skin.set(&"_help_hovered", 0)
+			skin.queue_redraw()
+		38:
+			_save(&"upgrades_help")
+			_main.get_node(^"HUD/ShopSkin").set(&"_help_hovered", -1)
 			_main.call(&"_set_menu", false)
 			_main.call(&"_set_shed", true)
-		44:
+		50:
 			_save(&"shed")
-		48:
+		54:
 			get_tree().quit()
 
 
