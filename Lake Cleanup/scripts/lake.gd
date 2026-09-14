@@ -2845,29 +2845,37 @@ func _skim_chance_at(level: int) -> float:
 	return clampf(lerpf(SKIM_FIRST_CHANCE, 1.0, float(level - 1) / (top - 1.0)), 0.0, 1.0)
 
 
-## What the market's legend under the boards says: each weight tier's sell rate, the
-## four yards and their material, the bonus, and the pay rule in a line. Percentages only.
+## What the market's legend under the boards says (2026-09-13, second pass, Richard):
+## the four materials with what a piece of each pays on average, the tiers with their sell
+## rates, and one line of explanation. Nothing else — the first pass said too much.
 func _shop_legend() -> Dictionary:
 	var tiers: Array = []
 	for tier in sell_levels.size():
 		tiers.append([TIER_NAMES[tier], _pct_at(StringName("sell_%d" % tier), sell_levels[tier])])
 	var yards: Array = []
 	for kind in TrashDef.KIND_NAMES.size():
-		yards.append(TrashDef.KIND_NAMES[kind])
-	var bonus := "No bonus yard yet."
-	if recycle_bonus_level > 0 and _bonus_kind >= 0:
-		bonus = "The %s yard pays +%d%% for %ds more." % [
-			TrashDef.KIND_NAMES[_bonus_kind].to_lower(), roundi(recycle_bonus() * 100.0),
-			ceili(_bonus_left),
-		]
+		yards.append([TrashDef.KIND_NAMES[kind], "$%d" % roundi(_mean_pay_of(kind))])
 	return {
 		"tiers": tiers,
 		"yards": yards,
-		"bonus": bonus,
-		"rule": "A piece pays a flat fee plus a cut for its filth, times its tier's sell rate, "
-			+ "times the bonus at the yard that takes it.",
-		"yard_rule": "Each material sells at its own yard. The bonus yard moves every %ds." % roundi(BONUS_EVERY),
+		"rule": "Collect objects of different materials and tiers, each pays a flat fee plus bonuses.",
 	}
+
+
+## What a piece of one material pays on average at its own yard, over the rubbish kinds of
+## that material (finds are not for sale), at today's tier rates and bonus.
+func _mean_pay_of(kind: int) -> float:
+	if _grid == null:
+		return 0.0
+	var total := 0.0
+	var count := 0
+	for i in _grid.defs.size():
+		var def: TrashDef = _grid.defs[i]
+		if def.keepsake or int(def.material) != kind:
+			continue
+		total += piece_pay(i, kind)
+		count += 1
+	return total / float(count) if count > 0 else 0.0
 
 
 ## The net's numbers, from the levels the player has now.

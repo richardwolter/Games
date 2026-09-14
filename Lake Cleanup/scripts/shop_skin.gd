@@ -97,8 +97,10 @@ const CLOSE_SIZE := 44.0
 ## price's, with the mark on it. Hovering it opens the row's blurb on a plate beside it;
 ## clicking it buys nothing. The row's writing starts past it.
 const HELP_SIZE := 15.0
-const HELP_INSET := 3.0
-const HELP_GAP := 5.0
+## Hung out over the plate's corner rather than set inside it (Richard, 2026-09-13): a tag
+## sat in the corner took a strip off every row. Negative, so most of it is on the board.
+const HELP_INSET := -6.0
+const HELP_GAP := 4.0
 ## The blurb's plate: how wide its writing may run, its padding, and the gap off the "?".
 const BLURB_WIDE := 250.0
 const BLURB_PAD := 12.0
@@ -133,7 +135,7 @@ signal close_asked
 var rows: Array = []
 
 ## What the legend under the boards says, set by the lake beside `rows`:
-## `{tiers: [[name, pct]...], yards: [name...], bonus, rule, yard_rule}`.
+## `{tiers: [[name, pct]...], yards: [[name, "$n"]...], rule}`.
 var legend: Dictionary = {}
 
 ## The picture at the head of the net and ferry boards, by board name, each `{sheet,
@@ -622,7 +624,7 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> vo
 	var tag_wide := box.size.x * TAG_SHARE
 	# The "?" first, in the corner, and the writing starts past it.
 	_draw_help(help_box_of(box), afford, help_lit)
-	var text_at := box.position.x + HELP_INSET + HELP_SIZE + HELP_GAP
+	var text_at := box.position.x + maxf(HELP_INSET + HELP_SIZE + HELP_GAP, 10.0)
 	var name := String(row.get("name", ""))
 	var value := String(row.get("value", ""))
 	# Two lines, or one centred if there is no value to say.
@@ -749,20 +751,38 @@ func _draw_blurb(row: Dictionary) -> void:
 		at.y += line_tall
 
 
-## How tall the legend wants to be: its four lines and their padding, in the board's wood.
+## How tall the legend wants to be: the materials over their prices, the tiers, the line,
+## and their padding, in the board's wood.
 func _legend_tall() -> float:
-	var inner := LEGEND_PAD * 2.0 + (float(Style.TEXT_SMALL) + LEGEND_LINE) * 5.0 + 4.0
+	var line := float(Style.TEXT_SMALL) + LEGEND_LINE
+	var inner := LEGEND_PAD * 2.0 + line * 4.0 + LEGEND_GAP_ROW * 2.0
 	return inner + Style.board_wood_tall(BOARDS_WIDE * 0.5, FRAME)
 
 
-## The legend: one plate in the boards' wood under the ferry's and the dog's, four lines of
-## small writing — the tiers with their sell rates, the yards, the bonus, the pay rule.
+## The gap between the legend's three parts.
+const LEGEND_GAP_ROW := 6.0
+
+
+## The legend: one plate in the boards' wood under the ferry's and the dog's. The four
+## materials spread across the top with what a piece of each pays on average under them
+## (in the price's gold, as a price), the tiers with their sell rates on one line below,
+## and one line of explanation under it all.
 func _draw_legend(box: Rect2) -> void:
 	var face := Style.board_wood(self, box, FRAME, CHIPS)
 	var line_tall := float(Style.TEXT_SMALL) + LEGEND_LINE
 	var at := face.position + Vector2(LEGEND_PAD, LEGEND_PAD + float(Style.TEXT_SMALL) * 0.8)
 	var wide := face.size.x - LEGEND_PAD * 2.0
-	# Tiers: name in the ink, rate in the level's blue, spread across the line.
+	var yards: Array = legend.get("yards", [])
+	if not yards.is_empty():
+		var step := wide / float(yards.size())
+		for y in yards.size():
+			var pair: Array = yards[y]
+			var slot := Rect2(Vector2(at.x + step * float(y), 0.0), Vector2(step, 0.0))
+			Style.write(self, String(pair[0]), Style.TEXT_SMALL, Vector2(0.0, at.y), Style.BOARD_INK,
+				HORIZONTAL_ALIGNMENT_CENTER, slot)
+			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(0.0, at.y + line_tall),
+				Style.PRICE_INK, HORIZONTAL_ALIGNMENT_CENTER, slot)
+		at.y += line_tall * 2.0 + LEGEND_GAP_ROW
 	var tiers: Array = legend.get("tiers", [])
 	if not tiers.is_empty():
 		var step := wide / float(tiers.size())
@@ -771,15 +791,7 @@ func _draw_legend(box: Rect2) -> void:
 			var x := at.x + step * float(t)
 			var took := Style.write(self, String(pair[0]), Style.TEXT_SMALL, Vector2(x, at.y), Style.BOARD_INK)
 			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(x + took.x + 6.0, at.y), Style.LEVEL_INK)
-		at.y += line_tall
-	var yards: Array = legend.get("yards", [])
-	var yard_line := "Yards: %s.  %s" % [" · ".join(yards), String(legend.get("yard_rule", ""))]
-	for line in _wrap(yard_line, Style.TEXT_SMALL, wide):
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
-		at.y += line_tall
-	for line in _wrap(String(legend.get("bonus", "")), Style.TEXT_SMALL, wide):
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.LEVEL_INK)
-		at.y += line_tall
+		at.y += line_tall + LEGEND_GAP_ROW
 	for line in _wrap(String(legend.get("rule", "")), Style.TEXT_SMALL, wide):
 		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
 		at.y += line_tall

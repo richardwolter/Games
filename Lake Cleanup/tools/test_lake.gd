@@ -1349,9 +1349,13 @@ func _stage_market() -> void:
 			"legend %s boat %s dog %s table %s" % [legend_box, boat_box, dog_box, table])
 	var row_box := Rect2(100.0, 100.0, 300.0, 50.0)
 	var help: Rect2 = skin.call(&"help_box_of", row_box)
-	_check(row_box.has_point(help.position) and help.position.x < row_box.position.x + 8.0
-		and help.position.y < row_box.position.y + 8.0 and help.size.x <= 20.0,
-		"the ? sits in a row's top left corner", str(help))
+	_check(help.position.x < row_box.position.x + 8.0 and help.position.y < row_box.position.y + 8.0
+		and help.end.x > row_box.position.x and help.end.y > row_box.position.y and help.size.x <= 20.0,
+		"the ? hangs over a row's top left corner", str(help))
+	var priced := true
+	for pair: Array in legend.get("yards", []):
+		priced = priced and String(pair[1]).begins_with("$") and not "." in String(pair[1])
+	_check(priced, "each material in the legend carries a whole-dollar average", str(legend.get("yards", [])))
 	var folded: Array = skin.call(&"_wrap", "one two three four five six seven eight nine ten", 13, 60.0)
 	_check(folded.size() > 1, "a blurb wraps onto lines", str(folded))
 

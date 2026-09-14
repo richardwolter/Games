@@ -1151,17 +1151,22 @@ only**, say what the next level buys, carry a "?" each, and the market is explai
 - **Both lines stop short of the tag** (`ShopSkin._tag_of`, `_cut_to`): the name drops to
   `TEXT_SMALL` before its level is given up; the value drops to `TEXT_TINY`, then loses the
   word "next", then is cut with an ellipsis. This supersedes "row text is not clipped" above.
-- **The "?"** (`HELP_SIZE`, `help_box_of`, `_draw_help`): an oak tag in each row's top-left
-  corner, the writing starts past it; hovering it draws the row's `blurb` on a plate in the
+- **The "?"** (`HELP_SIZE`, `help_box_of`, `_draw_help`): an oak tag hung out over each
+  row's top-left corner (`HELP_INSET` negative — set inside the plate it took a strip off
+  every row, Richard 2026-09-13), the writing starts past what is inside; hovering it draws the row's `blurb` on a plate in the
   boards' wood beside it (`_draw_blurb`, `_wrap` — `Style.write` has no wrap), clicking it
   buys nothing. **Blurbs are placeholders** (`Lake.BLURBS`, one line a track) for Richard to
   rewrite; a track added to `TRACKS` needs one, `test_lake` checks.
-- **The legend** (`Lake._shop_legend`, `ShopSkin.legend`, `_draw_legend`): one plate in the
-  boards' wood centred under the ferry's and the dog's boards — the shortest, so the room
-  under them is the shop's free space — with the five tiers and their sell rates, the four
-  yards and "each material sells at its own yard, the bonus yard moves every 30 s", the bonus
-  as it stands, and the pay rule in a line. Drawn only when at least `LEGEND_LEAST` is free.
-  Percent only, real text (not placeholder).
+- **The legend** (`Lake._shop_legend`, `_mean_pay_of`, `ShopSkin.legend`, `_draw_legend`):
+  one plate in the boards' wood centred under the ferry's and the dog's boards — the
+  shortest, so the room under them is the shop's free space. Three parts, by Richard's
+  second pass the same day ("more concise"): the four materials spread across the top with
+  what a rubbish piece of each pays on average today, in the price's gold, under each
+  (mean `piece_pay` over the non-keepsake defs of that material, at today's tier rates and
+  bonus); the five tiers with their sell rates on one line; and the one sentence "Collect
+  objects of different materials and tiers, each pays a flat fee plus bonuses." **Cut**: the
+  "Yards:" line, the yard rule, the bonus line and the pay-rule sentence. Drawn only when at
+  least `LEGEND_LEAST` is free. Percent and whole dollars only.
 - **TreeScreen untouched**, by decision. Probe: `tools/shot_menus.tscn` now also saves
   `tools/last_menu_upgrades_help.png` with the first row's "?" hovered.
 
