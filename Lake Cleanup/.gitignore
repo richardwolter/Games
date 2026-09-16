@@ -27,3 +27,29 @@ __pycache__/
 
 # Summer Engine local-only state (SummerGit, caches, locks)
 .summer/local/
+tools/film/*/
+tools/film/habibs.wav
+
+# The menu background is posed once and picked by hand; only the bake is committed.
+tools/menu_bg/
+tools/menu_bg_run.log
+tools/menu_import.log
+tools/menu_shot.log
+tools/test_run.log
+tools/cursor/
+
+# Source media: the deliveries the builders read, kept local (art_source/SFX alone is
+# 236 MB and holds a 133 MB wav, past what GitHub will take).
+art_source/SFX/
+art_source/Music/
+art_source/MDDL_Capsule_Art.jpg
+
+# Session scratch and a reference model that turned out to be a different boat.
+Claude outputs/
+assets/Blue_Boat/
+
+# Probe run logs
+tools/run.log
+tools/ending_run.log
+tools/film/last_film.log
+tools/film/*.import

@@ -1579,6 +1579,95 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   click, wheel and Escape land where the pointer is in a stretched window
   (`tools/last_pad_cursor.log`).
 
+### The Pointer and the Aim Ring (2026-09-16, `/grill-me` with Richard)
+The mouse pointer is a wooden arrow, and the net's aim marker is painted off the palette.
+Both were picked by Richard off one contact sheet, `tools/last_cursor_mockup.png`, written
+by `tools/build_cursor.py` (psd-extract venv python, from the project root; **reimport
+after a re-run**). The sheet still draws every option that was offered.
+
+- **One arrow, everywhere, set once at boot** (`Pad.CURSOR_ART`, `Pad.wear_wood` from
+  `_ready`): menu, lake, shed, every board. It lives in `Pad` because that is already the
+  one node that decides what the pointer *does* — whether it is shown at all, and where it
+  is while the pad drives it — so what it looks like belongs beside those.
+- **A quick water ripple answers the click** (`ClickRipple`, `scripts/click_ripple.gd`,
+  `Pad.ripples`/`ring_water`/`RIPPLE_LAYER` 40): two rings staggered `STAGGER` (0.07 s)
+  apart, opening `FROM` 3 to `TO` 22 screen pixels over `LIFE` (0.30 s), out fast and
+  slowing, fading the whole way, in the 2:1 of every ellipse in this game and in the
+  wading rings' own pale (`Angler.RIPPLE_*`). Over the menus and the boards as well as the
+  lake, because the cursor is one cursor everywhere.
+  - **Drawn on a layer of its own, not baked into the cursor picture**: a hardware cursor
+    can hold a pose but not an animation. **Retired, by decision** (Richard, same day): a
+    bead of lake water baked into a second picture and swapped in while the button was
+    down — first standing clear of the arrow, then tucked under its point with the wood
+    over it. Both read as decoration hanging off the pointer rather than as an answer to
+    the press. `assets/cursor_press.png` and the builder's drop are gone with it.
+  - **A zero-sized `Control` under a `CanvasLayer` is culled before it is drawn**, whatever
+    its `_draw` puts out — an opaque red rect from one does not reach the screen either.
+    Anchors will not size it, because it has no parent `Control` to anchor against, so
+    `_fit` sets it to the viewport and follows `size_changed`. `test_lake` guards the size
+    for that reason alone.
+  - **The canvas is 1280x720 and the window is not**: the pointer, the ripple and every
+    other drawn thing live in the stretched canvas, so `ring_water` takes the viewport's
+    mouse position and `tools/shot_ripple.gd` scales its crop. A point written in window
+    pixels is off the bottom of the canvas.
+  - **The ripple is rung before the synthetic events are dropped** in `Pad._input`, so the
+    pad's own A button rings the water exactly as a mouse click does. **Nothing rings where
+    there is no pointer** — pad mode on the bare lake hides the mouse — asked of `Pad`'s own
+    `_shown` rather than of `Input.mouse_mode`, which is a second answer that can differ
+    from the one this node gave.
+  - `MOST` (6) caps what can be ringing at once, and an empty list stops both the clock and
+    the redraws, so an idle menu costs nothing.
+  - Probe: `tools/shot_ripple.tscn` (desktop build, `--fixed-fps 60`) rings it over the menu
+    and saves `tools/last_ripple_{open,wide,going}.png`.
+- **No other shape, by decision**: the I-beam, the hand and the drag cursor Godot swaps in
+  for itself are left stock, and there is no hover picture. The game has one
+  clickable language and it is drawn boards; a second wooden shape would have nothing to
+  mean. The arrow is **always drawn on the lake** too, over the aim ring, by decision — it
+  is what says the mouse is being listened to when the ring is dashed or off water.
+- **Menu oak, bitten, at 2x** (`PICKED` in the builder): `Style.FRAME` body, `FRAME_LIT`
+  along the lit top-left edge, `FRAME_LOW` on the shaded one, `FRAME_GRAIN` dashes running
+  lengthwise, and two V bites out of the long diagonal edge — the menus' own carpentry.
+  Drawn at the 2 screen pixels an art pixel the rest of the game's art is drawn at
+  (26x42). The recycle box's plank brown was the other option on the sheet.
+- **The straight left edge and the tip are left whole, by decision**: the left edge is the
+  arrow's identity and the tip is the hotspot, so a notch in either reads as a broken
+  pointer rather than as chipped wood. Twelve pixels across is not room for more bites.
+- **`FRAME_DEEP` is not the shaded face**: at a pixel wide it is close enough to the black
+  outline that the two read as one fat rim. `FRAME_LOW` is what gives the wood form.
+- **The silhouette is a polygon, rasterised** (`ARROW`, `ART_TALL`, `RASTER`), not a table
+  of rows: one number resizes the whole arrow and the diagonals stay clean at any of them.
+  A hand-authored 10x16 row table was the first pass and had no room for grain or bites.
+- **The hotspot is the tip** (`Pad.CURSOR_TIP`, one art pixel in from each edge for the
+  outline, times the baked scale). The builder prints it; the two must agree or every click
+  lands off the point of the arrow. Missing art leaves the system pointer alone — a game
+  with no cursor at all is worse than one with the stock arrow.
+- **The ring's three readings are the palette's own** (`CastNet.AIM_OK`/`AIM_NO`/`AIM_FAR`):
+  the pack's measured `grass_light` and its `wood` red-brown, each **lifted by `AIM_LIFT`**
+  (1.52), and the lake's `foam` white — in place of the screen green and fire-engine red
+  they were. **The meanings do not move** — green is will-catch, red is nothing-to-lift,
+  pale is out-of-range — only the swatches, so nobody has to relearn the marker.
+  **The lift is what makes them carry over dirty water without being invented beside the
+  palette**: repaint the pack and the ring moves with it, which is what `test_lake` asks.
+  The sheet's row C is the pick; its pale was within four parts in 255 of `foam`, and at
+  `AIM_FAR_ALPHA` over water that is under a pixel step, so the palette's own swatch stands.
+- **Plus a dark backing line** (`AIM_BACK`, `AIM_BACK_SHARE` 0.55, `AIM_BACK_WIDE` 3.5):
+  the same ring drawn once underneath in `Style.HOLE_RIM`'s black, wider, carrying a share
+  of whatever the coloured line carries — so the dashed out-of-range ring is backed as
+  faintly as it is drawn. Palette swatches are duller than the ones they replaced and the
+  ring sits on water running from soup green to clean blue, so a toned green over dirty
+  water had nothing to stand on. **The one thing beyond the three swatches**, by Richard's
+  call; the 1.5 px line, the alphas, the dashes and the 48-point ellipse are untouched.
+- **Out of scope, by decision**: `_draw_lay_ghost` (the charm ring) keeps its warm/cold
+  tint — the siege is shelved and repainting a ring nobody sees has no judge. Hover, pressed
+  and drag cursor shapes. Pad mode's hidden pointer, which is unchanged.
+- `test_lake`'s `_stage_pointer` guards the picture, its outline, that the hotspot lands on
+  the arrow, that the retired second picture is gone rather than merely unused, the ripple's
+  layer, size, ignoring of the mouse, that a click rings it and the ring dies on its own and
+  stops the redraws, the cap, and that nothing rings with no pointer; and the aim ring's
+  colours **against `Palette`** rather than against numbers written down twice — repaint the
+  pack and it says so — plus that the three stay three and the backing is darker than all of
+  them.
+
 ### Sound (2026-09-15, `/grill-me` with Richard, `scripts/sfx.gd`, `tools/build_sfx.py`)
 The code-built placeholder sounds are replaced by Richard's recordings. **Supersedes the old
 `sfx.gd` header's "there are no sound files and there is not going to be a folder of them".**

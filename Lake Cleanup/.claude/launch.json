@@ -6,6 +6,12 @@
       "runtimeExecutable": "godot",
       "runtimeArgs": ["--path", ".", "-d"],
       "port": 6007
+    },
+    {
+      "name": "Lake Cleanup web build",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8060", "--directory", "build/web"],
+      "port": 8060
     }
   ]
 }
