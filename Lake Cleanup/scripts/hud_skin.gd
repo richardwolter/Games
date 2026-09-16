@@ -39,7 +39,8 @@ const SHINE_LIFT := 0.55
 ## frame and the water's track fall (measured off the sheets' alpha). Drawn at
 ## `METER_SCALE` times its art on a 1080-line window and in proportion on any other,
 ## nearest-filtered. Not snapped to a pixel step: the size was settled by eye (3x, 1.5x,
-## then a third up from that), and a snap would undo the settling.
+## then a third up from that, then cut back by an eighth on 2026-09-16 with the rest of the
+## HUD), and a snap would undo the settling.
 const METER_ART := "res://assets/ui/meter/"
 const METER_SHEET := Vector2(290.0, 94.0)
 const METER_FRAME := Rect2(83.0, 24.0, 188.0, 49.0)
@@ -49,7 +50,7 @@ const METER_CIRCLE := Rect2(11.0, 1.0, 85.0, 87.0)
 ## and part-transparent; the shader never samples outside this, or the drift shows the
 ## screen through the gap between the circle and the water.
 const METER_OPAQUE := Rect2(97.0, 40.0, 161.0, 19.0)
-const METER_SCALE := 1.95
+const METER_SCALE := 1.7
 const METER_SCALE_LINES := 1080.0
 
 ## How wide the filth-to-clean blend is, as a fraction of the track. Narrowed near the ends
@@ -64,7 +65,7 @@ const METER_FEATHER := 0.14
 ## lopsided.
 const UPGRADES_SIZE := Vector2(120.0, 100.0)
 const SHED_SIZE := Vector2(120.0, 100.0)
-const MONEY_TALL := 64.0
+const MONEY_TALL := 56.0
 
 ## Gaps: around the whole thing, and between the buttons.
 const EDGE := Style.EDGE
@@ -75,8 +76,14 @@ const GAP := Style.GAP
 ## a sunken panel the colour of the box's hollow — so the number reads as what is in that
 ## box. Tall enough that the border's own planks leave a face worth reading (2026-09-12):
 ## the plate was 34 and the wood alone is 30.
-const STOCK_TALL := 62.0
-const STOCK_TEXT := 0.56
+##
+## `STOCK_TEXT` is the count's height as a fraction of that face, and the label a rung under
+## it (`STOCK_LABEL_SHARE`) — the money plate's own rule, so the one number that shrinks the
+## plate shrinks its writing and its width with it. Written down, the two sizes stayed put
+## while the plate came in and the reading ran off its own panel.
+const STOCK_TALL := 54.0
+const STOCK_TEXT := 0.72
+const STOCK_LABEL_SHARE := 0.8
 const STOCK_MARK_PAD := 6.0
 const STOCK_LABEL := "In stock"
 
@@ -93,7 +100,7 @@ const STOCK_GLOW := 0.5
 ## than the live one, because a plate that changed width every time a piece was sold would
 ## be a plate that moved while being read.
 const STOCK_SAMPLE := "99999"
-const STOCK_PAD := 12.0
+const STOCK_PAD := 10.0
 
 ## The sprites the buttons carry, lent by the lake — see `hud_buttons.gd` for the keys.
 var sprites := {}:
@@ -217,11 +224,11 @@ func _lay_out() -> void:
 	_upgrades_box = Rect2(Vector2(right, EDGE), UPGRADES_SIZE)
 	_shed_box = Rect2(Vector2(right - SHED_SIZE.x - GAP, EDGE), SHED_SIZE)
 	# Measured against the face the border leaves, then grown by the wood on both sides.
-	var stock_face := STOCK_TALL - float(Style.BORDER_TOP + Style.BORDER_FOOT)
+	var stock_face := _stock_face_tall()
 	var stock_wide := (
 		float(Style.BORDER_WALL * 2) + STOCK_PAD * 2.0 + (stock_face - STOCK_MARK_PAD * 2.0)
-		+ STOCK_MARK_PAD + Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
-		+ Style.measure(STOCK_SAMPLE, Style.TEXT_HEAD).x + 16.0
+		+ STOCK_MARK_PAD + Style.measure(STOCK_LABEL, _stock_label_size()).x + STOCK_MARK_PAD
+		+ Style.measure(STOCK_SAMPLE, _stock_count_size()).x + 12.0
 	)
 	_stock_box = Rect2(EDGE + 2.0, EDGE, stock_wide, STOCK_TALL)
 	# The same width as the stock plate, under it: two slabs of one width.
@@ -269,6 +276,8 @@ func _gui_input(event: InputEvent) -> void:
 		var was := _hovered
 		_hovered = _under((event as InputEventMouseMotion).position)
 		if was != _hovered:
+			if _hovered != &"":
+				Sfx.ui(&"ui_hover")
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -279,6 +288,8 @@ func _gui_input(event: InputEvent) -> void:
 			shed_pressed.emit()
 			accept_event()
 		&"upgrades":
+			# The shed's door is its own sound (`Lake._set_shed`); the upgrades are a click.
+			Sfx.ui(&"ui_click")
 			upgrades_pressed.emit()
 			accept_event()
 
@@ -551,6 +562,21 @@ func shine() -> void:
 ## Built out of the money plate's parts rather than given a plaque of its own, because it is
 ## the same kind of thing — a number the player checks — and the sheet has one panel drawn on
 ## it. Copying that keeps the two readouts obviously a pair.
+## The face the border's planks leave inside the stock plate, and the two writing sizes that
+## come off it. One place, because `_lay_out` measures the plate's width against them and
+## `_draw_stock` writes with them: measured apart, the plate and its reading drift.
+func _stock_face_tall() -> float:
+	return STOCK_TALL - float(Style.BORDER_TOP + Style.BORDER_FOOT)
+
+
+func _stock_count_size() -> int:
+	return Style.step(_stock_face_tall() * STOCK_TEXT)
+
+
+func _stock_label_size() -> int:
+	return Style.step(_stock_face_tall() * STOCK_TEXT * STOCK_LABEL_SHARE)
+
+
 func _draw_stock() -> void:
 	var box := _stock_box
 	# The meter's border round the box's own brown, the same wood the three buttons wear.
@@ -568,27 +594,35 @@ func _draw_stock() -> void:
 	# The label, small and cream, after it.
 	var x := mark.end.x + STOCK_MARK_PAD
 	var middle := box.position.y + box.size.y * 0.5
+	var label_size := _stock_label_size()
+	var count_size := _stock_count_size()
 	Style.write(
-		self, STOCK_LABEL, Style.TEXT_SMALL,
-		Vector2(x, middle + float(Style.TEXT_SMALL) * 0.35), Style.RIBBON_INK
+		self, STOCK_LABEL, label_size,
+		Vector2(x, middle + float(label_size) * 0.35), Style.RIBBON_INK
 	)
-	x += Style.measure(STOCK_LABEL, Style.TEXT_SMALL).x + STOCK_MARK_PAD
-	# The count, on a sunken panel the colour of the box's hollow, in the mark's blue.
-	var panel := Rect2(Vector2(x, box.position.y + 5.0), Vector2(box.end.x - STOCK_PAD - x, box.size.y - 10.0))
+	x += Style.measure(STOCK_LABEL, label_size).x + STOCK_MARK_PAD
+	# The count, on a sunken panel the colour of the box's hollow, in the mark's blue. The
+	# panel is inset by `HudButtons.PANEL_INSET`, not five pixels: the wood takes thirty of the plate's
+	# height whatever its size, so on a plate this short a generous inset is what would push
+	# the reading off its own panel.
+	var panel := Rect2(
+		Vector2(x, box.position.y + HudButtons.PANEL_INSET),
+		Vector2(box.end.x - STOCK_PAD - x, box.size.y - HudButtons.PANEL_INSET * 2.0)
+	)
 	draw_rect(panel.grow(1.0), Style.SEAM, true)
 	draw_rect(panel, Style.BOX_HOLLOW, true)
 	draw_rect(Rect2(panel.position, Vector2(panel.size.x, 1.0)), Style.SEAM, true)
 	var shown := "%d" % roundi(_shown_stock)
 	var glow := _stock_glow * _stock_glow
-	var baseline := middle + float(Style.TEXT_HEAD) * 0.35
+	var baseline := middle + float(count_size) * 0.35
 	if glow > 0.01:
 		Style.write(
-			self, shown, Style.TEXT_HEAD, Vector2(0.0, baseline - 1.0),
+			self, shown, count_size, Vector2(0.0, baseline - 1.0),
 			Color(Style.BOX_BLUE_LIT.r, Style.BOX_BLUE_LIT.g, Style.BOX_BLUE_LIT.b, 0.55 * glow),
 			HORIZONTAL_ALIGNMENT_CENTER, panel
 		)
 	Style.write(
-		self, shown, Style.TEXT_HEAD, Vector2(0.0, baseline),
+		self, shown, count_size, Vector2(0.0, baseline),
 		Style.BOX_BLUE_LIT.lerp(Style.INK, glow * 0.5),
 		HORIZONTAL_ALIGNMENT_CENTER, panel
 	)

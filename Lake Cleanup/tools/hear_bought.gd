@@ -4,14 +4,15 @@
 ##   godot --headless --path . res://tools/hear_bought.tscn -- found
 ##
 ## The name after the dashes is the field on Sfx, without its underscore; the default is the
-## upgrade sound. The sounds themselves live in Sfx and are built there; this only asks for
+## crate's pop. Only the sounds still built in code are here — the rest are files in
+## assets/sfx. The sounds themselves live in Sfx and are built there; this only asks for
 ## one and puts the samples in a file with a header on the front.
 extends Node
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
-	var which := String(args[0]) if not args.is_empty() else "bought"
+	var which := String(args[0]) if not args.is_empty() else "catch"
 	var sfx := Sfx.new()
 	add_child(sfx)
 	var path := "user://%s.wav" % which

@@ -77,6 +77,12 @@ const SHED_LABEL := "Decorate"
 
 ## The coin: a disc in the money's gold with a deeper rim, a paler crescent where the light
 ## catches it, and a ring struck into it a little in from the edge.
+## How far the sunken reading panel is set in from the face the wood leaves, on the money
+## plate and on the stock plate that copies it. Two pixels, not five (2026-09-16): the
+## border's own planks take thirty of a plate's height whatever the plate's size, so on the
+## shorter plates a generous inset is what drops the figure a rung.
+const PANEL_INSET := 2.0
+
 const COIN_RIM := 2.0
 const COIN_RING := 0.72
 const COIN_GLINT := Color(1.0, 0.94, 0.72)
@@ -430,8 +436,8 @@ static func draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float = 1
 	).intersection(face)
 	coin(on, coin_box, wash)
 	var panel := Rect2(
-		Vector2(coin_box.end.x + 2.0, face.position.y + 5.0),
-		Vector2(face.end.x - coin_box.end.x - 7.0, face.size.y - 10.0)
+		Vector2(coin_box.end.x + 2.0, face.position.y + PANEL_INSET),
+		Vector2(face.end.x - coin_box.end.x - 2.0 - PANEL_INSET, face.size.y - PANEL_INSET * 2.0)
 	)
 	sunk(on, panel, Style.BOARD.darkened(0.35))
 	return panel

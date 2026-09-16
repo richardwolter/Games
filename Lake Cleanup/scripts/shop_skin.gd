@@ -371,6 +371,8 @@ func _gui_input(event: InputEvent) -> void:
 		_hovered = _row_under(at)
 		_help_hovered = _help_under(at)
 		if was != _hovered or was_help != _help_hovered:
+			if (_hovered >= 0 and _hovered != was) or (_help_hovered >= 0 and _help_hovered != was_help):
+				Sfx.ui(&"ui_hover")
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -385,8 +387,10 @@ func _gui_input(event: InputEvent) -> void:
 			close_asked.emit()
 		return
 	accept_event()
-	# The "?" is for reading, not buying: a click on it is eaten.
+	# The "?" is for reading, not buying: a click on it is eaten. A row itself makes no click:
+	# a purchase is heard as the purchase, and one that cannot be afforded is silent.
 	if _help_under(click.position) >= 0:
+		Sfx.ui(&"ui_click")
 		return
 	var row: Dictionary = rows[index]
 	if bool(row.get("afford", false)):

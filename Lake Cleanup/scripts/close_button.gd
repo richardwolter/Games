@@ -34,6 +34,8 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_MOUSE_ENTER or what == NOTIFICATION_MOUSE_EXIT:
 		_hovered = what == NOTIFICATION_MOUSE_ENTER
+		if _hovered:
+			Sfx.ui(&"ui_hover")
 		queue_redraw()
 
 

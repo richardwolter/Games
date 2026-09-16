@@ -52,6 +52,8 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_MOUSE_ENTER or what == NOTIFICATION_MOUSE_EXIT:
 		_hovered = what == NOTIFICATION_MOUSE_ENTER
+		if _hovered:
+			Sfx.ui(&"ui_hover")
 		queue_redraw()
 
 
@@ -60,6 +62,8 @@ func _gui_input(event: InputEvent) -> void:
 	if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
 		return
 	accept_event()
+	if piece != &"shed":
+		Sfx.ui(&"ui_click")
 	pressed.emit()
 
 
