@@ -64,11 +64,17 @@ func flying() -> int:
 ## it is turned into screen px here and now, so a camera that pans during the flight does
 ## not drag the coin's start about with it.
 func fly(from_world: Vector2) -> void:
+	fly_from(get_viewport().get_canvas_transform() * from_world)
+
+
+## The same, from a point already in screen pixels. Used by the pigeon that pops into the
+## side of the screen: it is drawn on a CanvasLayer and has no place on the lake at all, so
+## there is no world point to put through the transform.
+func fly_from(from: Vector2) -> void:
 	if _flying.size() >= MOST:
 		var last: Dictionary = _flying.back()
 		last["carry"] = int(last["carry"]) + 1
 		return
-	var from := get_viewport().get_canvas_transform() * from_world
 	_flying.append({
 		"from": from,
 		"to": _target(),
@@ -77,6 +83,14 @@ func fly(from_world: Vector2) -> void:
 		"spin": _rng.randf_range(0.6, 1.4),
 	})
 	set_process(true)
+	queue_redraw()
+
+
+## Drop whatever is in the air, unpaid-for on screen only: the purse was paid when each piece
+## landed. Used when the shed covers the lake — a coin arcing over the decoration room, towards
+## a plate that is not drawn, is a receipt for something the player cannot see.
+func clear() -> void:
+	_flying.clear()
 	queue_redraw()
 
 

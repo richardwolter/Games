@@ -11,10 +11,15 @@
 class_name Flock
 extends Node2D
 
-## Where the cut sheet and the choice of birds live. The rows in `USED` were picked off
-## tools/pigeon_contact.gd's picture; with the file missing, every row flies.
+## Where the cut sheet and the choice of birds live.
+##
+## `CATALOGUE` is the mechanical cut — every rectangle on the sheet, found by
+## tools/slice_pigeons.gd. `BIRDS` is the authored half: which of those rectangles are one
+## bird, and which birds fly on this lake. The two are separate for the reason
+## tools/decor_sets.json is separate from the decoration sheet — gap detection finds the
+## rectangles, only a person can say what they are. With `BIRDS` missing, every bird flies.
 const CATALOGUE := "res://assets/pigeons.json"
-const USED := "res://assets/pigeons_used.json"
+const BIRDS := "res://assets/pigeon_birds.json"
 const SHEET := "res://assets/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
 
 ## How big a bird is drawn, as a multiple of its own pixels. The art is eleven pixels
@@ -44,20 +49,76 @@ const ARC_HEIGHT := 34.0
 const PERCH_MIN := 6.0
 const PERCH_MAX := 20.0
 
-## Seconds a frame of the walk cycle is held, perched and in the air. A flying bird beats
-## its wings; a perched one shuffles.
-const PERCH_FRAME := 0.42
+## Seconds a frame of the flap is held. A flying bird beats its wings.
 const FLY_FRAME := 0.09
 
-## Droppings: how likely one is per second of flight, how long one lasts, and how big it
-## is drawn. Perched birds go too, at a lower rate — a bird sitting still all day is what
-## actually covers a lake in the stuff.
+## The two poses a perched bird has, and the shuffle between them.
+##
+## The sheet gives each bird exactly two standing pictures: up on its legs, and sat down
+## with them tucked away. That is not a cycle and it was never meant to be played as one —
+## it is a bird settling and shifting its weight. So a pose is held for a stretch and then
+## rolled again, mostly landing on standing. A bird lands standing, whatever it does next.
+##
+## Numbers by eye, to be retuned in play (2026-09-16).
+const POSE_STAND := 0
+const POSE_SIT := 1
+const POSE_MIN := 1.2
+const POSE_MAX := 3.5
+const SIT_ODDS := 0.3
+
+## Droppings: how likely one is per second of flight, and how long one lasts. Perched birds
+## go too, at a lower rate — a bird sitting still all day is what actually covers a lake in
+## the stuff.
 const POOP_CHANCE := 0.9
 const POOP_CHANCE_PERCHED := 0.35
-const POOP_LIFE := 55.0
+## Roughly halved, all three (2026-09-16, Richard: they can vanish a little quicker).
+const POOP_LIFE := 28.0
 ## On open water a splat is washed off in a few seconds rather than sitting on a wave.
-const POOP_LIFE_WATER := 6.0
-const POOP_SIZE := 3.4
+const POOP_LIFE_WATER := 3.5
+
+## A splat is a blob of whole art pixels grown off its own seed, not two circles.
+##
+## Every splat used to be the same pair of discs at the same offset, so a lake under a
+## flock was covered in one shape repeated — which reads as a decal, not as mess. These
+## are grown a cell at a time from the middle, each one different, on the art grid the
+## rest of the world is drawn on (`Skirt`'s blades are made the same way and for the same
+## reason). `POOP_CELLS` is the body, `POOP_SPECKS` the loose pixels flicked off it, and
+## `POOP_SPECK_OUT` how far out those may land, in cells.
+const POOP_PIXEL := 2.0
+const POOP_CELLS := 7
+const POOP_SPECKS := 3
+const POOP_SPECK_OUT := 3
+
+## The two tones a splat is drawn in: the body, and the drier cells round its edge.
+const POOP_INK := Color(0.94, 0.94, 0.90, 0.85)
+const POOP_INK_DRY := Color(0.86, 0.86, 0.80, 0.70)
+
+## A flying bird's shadow, as a multiple of the day's own ink and the most it may reach.
+##
+## The day's ink is set for sand and grass. On the lake — darker, and darker still away
+## from the island — it cannot be seen at all, which is the bargain `Boat.SHADE_GAIN`
+## already strikes for the hull. Lighter than the hull's, because a pigeon is not a boat.
+## By eye; retune freely.
+const SHADE_GAIN := 2.4
+const SHADE_MOST := 0.45
+
+## What height takes off a shadow: at the top of its arc a bird's shadow is this much
+## smaller and this much fainter than it is on the water.
+const SHADE_SHRINK := 0.3
+const SHADE_THIN := 0.45
+
+## The rim on a perched bird that the net could actually reach (2026-09-16, Richard: they
+## are hard to see against the lake).
+##
+## The find's own trick — the picture stamped again a little out on each of four sides, so
+## only its edge shows past the bird drawn over it — in a pale blue-white rather than the
+## finds' gold. Gold on this lake means treasure, and a pigeon is worth a handful of
+## sludge, not a keepsake.
+const RIM_STEP := 1.0
+const RIM_OFFSETS: Array[Vector2] = [
+	Vector2(-1.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, -1.0), Vector2(0.0, 1.0)
+]
+const RIM_TONE := Color(0.86, 0.94, 1.0)
 
 ## How close overhead, in tiles, a flying bird has to pass before the angler hears its
 ## wings, and the shortest gap between two of them being heard. A lake with a dozen birds
@@ -67,7 +128,7 @@ const WINGS_GAP := 1.6
 
 ## How long a splat rides the angler before it wears off. Landing one on the player is the
 ## joke; making them wear it for a minute is not.
-const POOP_ON_ANGLER := 6.0
+const POOP_ON_ANGLER := 3.0
 
 enum State { FLYING, PERCHED, LEAVING }
 
@@ -80,6 +141,12 @@ var grid: LakeGrid
 var angler: Angler
 ## The noises. Optional — a silent flock still flies.
 var sfx: Sfx
+## The daylight, for the flying birds' shadows. Without one, no shadow: a guessed sun is
+## worse than none, since it would disagree with every other shadow in the scene.
+var day: DayCycle
+## The player's net, asked whether a perched bird is inside reach and so worth rimming.
+## Optional — with no net, nothing is rimmed.
+var net: CastNet
 
 ## Every bird, as a row of the flock. Small enough to be an array of dictionaries and clear
 ## enough to be worth it.
@@ -92,16 +159,18 @@ var droppings: Array = []
 var spawning: bool = true
 
 var _sheet: Texture2D
-## Row index -> its three frames in the air, as atlas rectangles.
-var _frames := {}
 
-## Row index -> the same bird's standing frames. Empty for a row the sheet has none for,
-## which falls back to the flight cycle.
-var _still := {}
-var _rows: Array[int] = []
+## The birds in use, each `{bird, name, fly: Array[Rect2], stand: Rect2, sit: Rect2}`. A
+## bird is a bird here: its flap and its two poses are one row of this array, so nothing
+## downstream can pair a white dove's wings with a street pigeon's legs.
+var _kinds: Array[Dictionary] = []
 
 var _time: float = 0.0
 var _rethink: float = 0.0
+
+## The pale rim under the perched birds the net could reach. Its own child, behind this
+## node's drawing, because the rim is a shader trick and the birds themselves are not.
+var _rim: BirdRim
 
 ## Whether the flock that should already be here has been put here. See `settle`.
 var _settled: bool = false
@@ -114,10 +183,18 @@ var _wings_at: float = -1000.0
 func _ready() -> void:
 	_rng.seed = 4242
 	_load_art()
+	_rim = BirdRim.new()
+	_rim.name = &"BirdRim"
+	_rim.flock = self
+	add_child(_rim)
 
 
-## Read the cut sheet and the choice of rows. False means no art, and the flock stays
+## Read the cut sheet and the authored birds. False means no art, and the flock stays
 ## empty rather than drawing rectangles at the player.
+##
+## The sheet is laid out by action, not by bird: a row's first block is one bird's flap,
+## and its later blocks are three *other* birds standing and sitting. So the pairing cannot
+## be read off the cut — it comes from `BIRDS`, by name.
 func _load_art() -> bool:
 	var text := FileAccess.get_file_as_string(CATALOGUE)
 	if text.is_empty():
@@ -130,41 +207,50 @@ func _load_art() -> bool:
 	if _sheet == null:
 		return false
 
-	# The first block of each row is the three frames of a bird in the air, wings out. The
-	# second is the same bird standing: a perched pigeon shuffles, it does not hover in place
-	# over the mug it is sitting on, which is what drawing the flight cycle at a slower frame
-	# rate looked like. Later blocks are the same again at other canvas sizes and unused.
+	var boxes := {}
 	for cell: Dictionary in book["cells"]:
-		var block := int(cell["block"])
-		if int(cell["row"]) == 0 or block > 1:
-			continue
-		var row := int(cell["row"])
-		var into := _frames if block == 0 else _still
-		if not into.has(row):
-			into[row] = []
 		var box: Array = cell["region"]
-		(into[row] as Array).append(
-			Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3]))
+		boxes[String(cell["name"])] = Rect2(
+			float(box[0]), float(box[1]), float(box[2]), float(box[3])
 		)
 
-	# Read as whole numbers: JSON hands every number over as a float, and a float 7.0 is
-	# not the same key as the int 7 the frames are stored under.
-	var wanted: Array[int] = []
-	var choice: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(USED))
-	if choice != null and choice.has("rows"):
-		for row: float in choice["rows"] as Array:
-			wanted.append(int(row))
-	for row: int in _frames:
-		if wanted.is_empty() or wanted.has(row):
-			_rows.append(row)
-	_rows.sort()
-	return not _rows.is_empty()
+	var chosen: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(BIRDS))
+	if chosen == null or not chosen.has("birds"):
+		return false
+	for entry: Dictionary in chosen["birds"] as Array:
+		# `use` missing reads as in: a hand-written file that lists a bird at all means it.
+		if not bool(entry.get("use", true)):
+			continue
+		if not boxes.has(String(entry["stand"])):
+			continue
+		var fly: Array[Rect2] = []
+		for name: String in entry["fly"] as Array:
+			if boxes.has(name):
+				fly.append(boxes[name])
+		if fly.is_empty():
+			continue
+		# A bird with no sit picture sits the way it stands. Every bird on this sheet has
+		# one; a hand-written file need not.
+		var stand: Rect2 = boxes[String(entry["stand"])]
+		_kinds.append({
+			"bird": int(entry.get("bird", _kinds.size() + 1)),
+			"name": String(entry.get("name", "")),
+			"fly": fly,
+			"stand": stand,
+			"sit": boxes.get(String(entry.get("sit", "")), stand),
+		})
+	return not _kinds.is_empty()
+
+
+## The birds in use, for the harness and for anything that wants to know what is flying.
+func kinds() -> Array[Dictionary]:
+	return _kinds
 
 
 ## How many birds the lake in front of the player can support. Read off what the grid
 ## actually drew last rebuild, which is exactly "floating rubbish the player can see".
 func target_count() -> int:
-	if grid == null or _rows.is_empty() or not spawning:
+	if grid == null or _kinds.is_empty() or not spawning:
 		return 0
 	return mini(grid.drawn_pieces / PIECES_PER_BIRD, MOST_BIRDS)
 
@@ -191,9 +277,9 @@ func footprint(i: int) -> Array:
 	# No sheet: roughly a pigeon's size, so a net still catches birds with the art missing.
 	var span := Vector2(16.0, 16.0) * SCALE
 	if _sheet != null:
-		var frames: Array = _cycle_of(int(bird["row"]), int(bird["state"]))
-		if not frames.is_empty():
-			span = (frames[posmod(int(bird["phase"]), frames.size())] as Rect2).size * SCALE
+		var frame := frame_of(bird)
+		if frame.size.x > 0.0:
+			span = frame.size * SCALE
 	# The sprite stands on `at`, so its middle is half its height above it.
 	return [at - Vector2(0.0, span.y * 0.5), span * 0.5]
 
@@ -212,18 +298,19 @@ func take(index: int) -> Vector2:
 ## Put a bird on the water, flying in from off screen towards a perch. Used by the flock
 ## itself and by the harness, which does not wait around for one to wander in.
 func add_bird(perch: int = -1) -> bool:
-	if _rows.is_empty() or grid == null:
+	if _kinds.is_empty() or grid == null:
 		return false
 	var tile := perch if perch >= 0 else _free_perch()
 	if tile < 0:
 		return false
-	var landing := grid.surface_pos(tile)
+	var landing := grid.perch_point(tile)
 	# In from beyond the edge of the view, so birds arrive rather than appear.
 	var from := landing + Vector2(
 		_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)
 	).normalized() * 900.0
 	birds.append({
-		"row": _rows[_rng.randi_range(0, _rows.size() - 1)],
+		# Picked once and kept for life: a bird does not change species mid-flight.
+		"kind": _rng.randi_range(0, _kinds.size() - 1),
 		"state": State.FLYING,
 		"tile": tile,
 		"at": from,
@@ -233,6 +320,8 @@ func add_bird(perch: int = -1) -> bool:
 		"span": maxf(from.distance_to(landing), 1.0),
 		"facing": 1.0,
 		"phase": _rng.randf() * 3.0,
+		"pose": POSE_STAND,
+		"pose_for": _rng.randf_range(POSE_MIN, POSE_MAX),
 		"rest": _rng.randf_range(PERCH_MIN, PERCH_MAX),
 	})
 	queue_redraw()
@@ -251,7 +340,7 @@ func add_bird(perch: int = -1) -> bool:
 ## Runs once, on the first frame the grid is there to be asked. Nothing calls it twice: after
 ## that the flock keeps itself up in its own time.
 func settle() -> void:
-	if _settled or grid == null or _rows.is_empty():
+	if _settled or grid == null or _kinds.is_empty():
 		return
 	var want := target_count()
 	# Not yet: on the first frame the grid exists but has not been filled, so the lake it is
@@ -269,6 +358,10 @@ func settle() -> void:
 		bird["at"] = bird["to"]
 		bird["travel"] = 1.0
 		bird["rest"] = _rng.randf_range(0.0, PERCH_MAX)
+		# Part way through a pose as well, or a whole flock settles into the same one and
+		# shuffles in step, which is worse than not shuffling at all.
+		_roll_pose(bird)
+		bird["pose_for"] = _rng.randf_range(0.0, POSE_MAX)
 	queue_redraw()
 
 
@@ -290,6 +383,9 @@ func _process(delta: float) -> void:
 	# flock that has any is worth a frame; an empty sky over a clean lake is not.
 	if not birds.is_empty() or not droppings.is_empty():
 		queue_redraw()
+		# The rim is a child with its own drawing, and what it draws changes as the angler
+		# walks even when no bird has moved.
+		_rim.queue_redraw()
 
 
 ## Call birds in or send them away, so the flock matches the water it is over.
@@ -332,8 +428,10 @@ func _step(bird: Dictionary, delta: float) -> bool:
 				# Whatever it was standing on has been netted out from under it.
 				_hop(bird)
 				return true
-			bird["at"] = grid.surface_pos(tile) + Vector2(0.0, -_perch_height(tile))
-			bird["phase"] = float(bird["phase"]) + delta / PERCH_FRAME
+			bird["at"] = grid.perch_point(tile)
+			bird["pose_for"] = float(bird["pose_for"]) - delta
+			if float(bird["pose_for"]) <= 0.0:
+				_roll_pose(bird)
 			bird["rest"] = float(bird["rest"]) - delta
 			_maybe_poop(bird, delta, POOP_CHANCE_PERCHED)
 			if float(bird["rest"]) <= 0.0:
@@ -358,7 +456,18 @@ func _step(bird: Dictionary, delta: float) -> bool:
 					return false
 				bird["state"] = State.PERCHED
 				bird["rest"] = _rng.randf_range(PERCH_MIN, PERCH_MAX)
+				# On its legs, whatever it does next: a bird that lands already sat down
+				# has put its feet away in mid-air.
+				bird["pose"] = POSE_STAND
+				bird["pose_for"] = _rng.randf_range(POSE_MIN, POSE_MAX)
 	return true
+
+
+## Pick the pose a perched bird holds next, and for how long. Rolled rather than swapped,
+## so standing can follow standing and the shuffle has no beat to it.
+func _roll_pose(bird: Dictionary) -> void:
+	bird["pose"] = POSE_SIT if _rng.randf() < SIT_ODDS else POSE_STAND
+	bird["pose_for"] = _rng.randf_range(POSE_MIN, POSE_MAX)
 
 
 ## Off to another piece of rubbish, or away altogether when there is nothing left to sit
@@ -372,7 +481,7 @@ func _hop(bird: Dictionary) -> void:
 	bird["state"] = State.FLYING
 	bird["tile"] = tile
 	bird["from"] = bird["at"]
-	bird["to"] = grid.surface_pos(tile)
+	bird["to"] = grid.perch_point(tile)
 	bird["travel"] = 0.0
 	bird["span"] = maxf((bird["from"] as Vector2).distance_to(bird["to"]), 1.0)
 
@@ -409,15 +518,6 @@ func _claimed(tile: int) -> bool:
 	return false
 
 
-## How high above the water a bird standing on a stack sits: on top of what is floating
-## there rather than in it.
-func _perch_height(tile: int) -> float:
-	var stack := grid.stacks[tile]
-	if stack.is_empty():
-		return 0.0
-	return grid.defs[stack[stack.size() - 1]].size.y * 0.35
-
-
 ## A bird passing over the angler, heard rather than seen. Tied to how close it actually
 ## comes, so the sound is a bird going over rather than birdsong playing somewhere.
 func _maybe_wings(bird: Dictionary) -> void:
@@ -452,7 +552,37 @@ func _maybe_poop(bird: Dictionary, delta: float, chance: float = POOP_CHANCE) ->
 		"born": _time,
 		"on_angler": on_angler,
 		"on_land": on_land,
+		"cells": _smudge(),
 	})
+
+
+## One splat's shape: cells on the art grid, as offsets in whole art pixels, with the
+## number of body cells first and the loose specks after them so `_draw` can tell the two
+## tones apart without a second array.
+##
+## Grown rather than drawn: start on the middle cell, then take a cell already in the blob
+## and add one of its four neighbours, over and over. That makes a connected lump with a
+## ragged outline — a smudge — where a radius makes a disc, and no two rolls come out the
+## same. The specks are flicked out beyond it, which is what stops the whole thing reading
+## as one solid pebble.
+func _smudge() -> Array:
+	var body: Array[Vector2] = [Vector2.ZERO]
+	while body.size() < POOP_CELLS:
+		var from: Vector2 = body[_rng.randi_range(0, body.size() - 1)]
+		var step := [
+			Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, 1.0), Vector2(0.0, -1.0)
+		][_rng.randi_range(0, 3)] as Vector2
+		var cell := from + step
+		if not body.has(cell):
+			body.append(cell)
+	var out: Array = [body.size()]
+	out.append_array(body)
+	for _speck in POOP_SPECKS:
+		out.append(Vector2(
+			float(_rng.randi_range(-POOP_SPECK_OUT, POOP_SPECK_OUT)),
+			float(_rng.randi_range(-POOP_SPECK_OUT, POOP_SPECK_OUT))
+		))
+	return out
 
 
 ## How much of a bird is drawn at this spot on the plane: all of it over the lake, none of it
@@ -485,33 +615,92 @@ func _fade_droppings(_delta: float) -> void:
 			splat["at"] = angler.position - position + Vector2(0.0, -18.0)
 
 
-## The frames to draw a bird from: standing when it is sat on something, flying otherwise.
-func _cycle_of(row: int, state: int) -> Array:
-	if state == State.PERCHED and _still.has(row):
-		return _still[row]
-	return _frames[row]
+## One bird's picture: the frame drawn standing on `at`, facing whichever way, in `tint`.
+##
+## One place, because the bird, its shadow and its rim all have to land on the same pixels —
+## static and given the node to draw on, the way `DogArt.stamp` is, so the rim child draws
+## through it too. `base` is a transform to draw under (the shadow's `Shade.lying`) and
+## `step` an offset in the bird's own frame (the rim's).
+##
+## **The mirror turns the canvas over, it does not flip a rectangle.** A `Rect2` of negative
+## width degenerates in `draw_texture_rect_region` rather than drawing the picture the other
+## way round — the ferry lost most of its hull to exactly that for a day, see `HudButtons.fit`.
+## The flock mirrored with a negative rect from the day it was written, so a bird flying east
+## never turned round; a shadow and a rim built on the same rect would have gone the same way.
+static func stamp(
+	on: CanvasItem, sheet: Texture2D, frame: Rect2, at: Vector2, facing: float, tint: Color,
+	base: Transform2D = Transform2D.IDENTITY, step: Vector2 = Vector2.ZERO,
+	scale_by: float = 1.0
+) -> void:
+	if sheet == null:
+		return
+	var span := frame.size * SCALE * scale_by
+	var turn := Transform2D(
+		Vector2(-1.0 if facing < 0.0 else 1.0, 0.0), Vector2(0.0, 1.0), at
+	)
+	on.draw_set_transform_matrix(base * turn)
+	on.draw_texture_rect_region(
+		sheet, Rect2(step + Vector2(-span.x * 0.5, -span.y), span), frame, tint
+	)
+	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The frame a bird is showing this instant, or an empty rect with no sheet loaded.
+##
+## Every picture a bird can ever show comes out of its own `kind` — the flap when it is in
+## the air, one of its two poses when it is down. The bug this shape exists to make
+## impossible: the poses used to be read off the sheet row the flap came from, and that row
+## holds three *other* birds, so a perched pigeon changed colour every frame.
+func frame_of(bird: Dictionary) -> Rect2:
+	if _sheet == null or _kinds.is_empty():
+		return Rect2()
+	var kind: Dictionary = _kinds[posmod(int(bird.get("kind", 0)), _kinds.size())]
+	if int(bird["state"]) == State.PERCHED:
+		return kind["sit"] if int(bird.get("pose", POSE_STAND)) == POSE_SIT else kind["stand"]
+	var fly: Array = kind["fly"]
+	return fly[posmod(int(bird["phase"]), fly.size())]
+
+
+## Is this bird sitting still *and* inside what the net could reach? The rim's rule.
+##
+## `CastNet.in_reach` rather than `can_cast_to`: it answers while a cast is already out, so
+## the rim does not blink off for the second and a half the net is in the water.
+func catchable(bird: Dictionary) -> bool:
+	if net == null or int(bird["state"]) != State.PERCHED:
+		return false
+	return net.in_reach(bird["at"] + position)
+
+
+## The sheet, for the rim child, which draws the same frames this node does.
+func sheet() -> Texture2D:
+	return _sheet
 
 
 func _draw() -> void:
 	for splat: Dictionary in droppings:
 		var life := _splat_life(splat)
 		var left := clampf(1.0 - (_time - float(splat["born"])) / life, 0.0, 1.0)
-		var at: Vector2 = splat["at"]
-		# A splat lies on the ground, so it is drawn as a flat ellipse like everything else
-		# on this plane.
-		draw_circle(at, POOP_SIZE, Color(0.94, 0.94, 0.90, 0.85 * left))
-		draw_circle(
-			at + Vector2(POOP_SIZE * 0.6, POOP_SIZE * 0.25), POOP_SIZE * 0.55,
-			Color(0.88, 0.88, 0.83, 0.7 * left)
-		)
+		# A row put together by hand — the harness does — has no shape, and draws nothing
+		# rather than bringing the frame down.
+		var cells: Array = splat.get("cells", [])
+		if cells.is_empty():
+			continue
+		# On the art grid, so a splat is made of the same pixels the world is drawn in
+		# rather than lying across them at whatever fraction the bird happened to be at.
+		var foot := ((splat["at"] as Vector2) / POOP_PIXEL).round() * POOP_PIXEL
+		var body := int(cells[0])
+		for i in range(1, cells.size()):
+			var tone := POOP_INK if i <= body else POOP_INK_DRY
+			draw_rect(
+				Rect2(foot + (cells[i] as Vector2) * POOP_PIXEL, Vector2(POOP_PIXEL, POOP_PIXEL)),
+				Color(tone.r, tone.g, tone.b, tone.a * left)
+			)
 
 	if _sheet == null:
 		return
 	for bird: Dictionary in birds:
-		var frames: Array = _cycle_of(int(bird["row"]), int(bird["state"]))
-		var frame: Rect2 = frames[posmod(int(bird["phase"]), frames.size())]
+		var frame := frame_of(bird)
 		var at: Vector2 = bird["at"]
-		var span := frame.size * SCALE
 		var ground := Vector2(at.x, at.y + sin(float(bird["travel"]) * PI) * ARC_HEIGHT)
 
 		# Faded out at the bank. A bird arrives from nine hundred pixels beyond the shore and
@@ -524,12 +713,69 @@ func _draw() -> void:
 			continue
 
 		if int(bird["state"]) != State.PERCHED:
-			# A shadow on the water under a flying bird, which is what says it is above the
-			# lake rather than floating on it.
-			draw_circle(ground, span.x * 0.3, Color(0.0, 0.0, 0.0, 0.16 * fade))
+			_draw_shadow(bird, frame, ground, fade)
 
-		var facing := float(bird["facing"])
-		var box := Rect2(at - Vector2(span.x * 0.5, span.y), span)
-		if facing < 0.0:
-			box = Rect2(box.position + Vector2(span.x, 0.0), Vector2(-span.x, span.y))
-		draw_texture_rect_region(_sheet, box, frame, Color(1.0, 1.0, 1.0, fade))
+		stamp(self, _sheet, frame, at, float(bird["facing"]), Color(1.0, 1.0, 1.0, fade))
+
+
+## A flying bird's shadow on the water: its own frame again, laid out away from the sun by
+## `Shade.lying`, the way the angler, the dog, the trees and the hull all cast.
+##
+## It used to be a black disc under the bird — the one shadow left on the lake that was not
+## the shape of the thing making it, and the one that ignored the sun the rest of the world
+## leans away from.
+##
+## Drawn from the shadow's own anchor on the water rather than from the bird, and shrunk and
+## thinned by how high the arc has carried it: a shadow the same size whatever the height is
+## what makes a bird look like it is sliding along the surface.
+func _draw_shadow(bird: Dictionary, frame: Rect2, ground: Vector2, fade: float) -> void:
+	if day == null:
+		return
+	var up := sin(float(bird["travel"]) * PI)
+	var ink := minf(day.ink * SHADE_GAIN, SHADE_MOST) * fade * (1.0 - SHADE_THIN * up)
+	if ink <= 0.002:
+		return
+	# Standing on the origin of the shadow's own frame: `lying` has already put that origin
+	# where the bird's feet would be.
+	stamp(
+		self, _sheet, frame, Vector2.ZERO, float(bird["facing"]), Shade.tint(ink),
+		Shade.lying(ground, day.lean, day.stretch), Vector2.ZERO,
+		1.0 - SHADE_SHRINK * up
+	)
+
+
+## The pale rim round a perched bird the net could reach.
+##
+## The finds' own trick, in the finds' own shader with its gold turned down to a blue-white:
+## the bird's picture stamped again a pixel out on each of four sides, behind the flock's own
+## drawing, so the bird covers the middle and only the edge shows. `rim.gdshader` reads a
+## modulate of pure green as "make this a flat silhouette", so the four copies come out as
+## one outline rather than four tinted birds.
+class BirdRim extends Node2D:
+	var flock: Flock
+
+	func _init() -> void:
+		var mat := ShaderMaterial.new()
+		mat.shader = load("res://shaders/rim.gdshader")
+		mat.set_shader_parameter(
+			"rim_gold", Vector3(Flock.RIM_TONE.r, Flock.RIM_TONE.g, Flock.RIM_TONE.b)
+		)
+		material = mat
+		show_behind_parent = true
+
+	func _draw() -> void:
+		if flock == null or flock.sheet() == null:
+			return
+		for bird: Dictionary in flock.birds:
+			if not flock.catchable(bird):
+				continue
+			var frame := flock.frame_of(bird)
+			# Through the flock's own stamp, so the rim goes down with exactly the mirror
+			# and the size the bird does — on this node, so the green reaches this node's
+			# shader and not the birds themselves.
+			for step: Vector2 in Flock.RIM_OFFSETS:
+				Flock.stamp(
+					self, flock.sheet(), frame, bird["at"], float(bird["facing"]),
+					Color(0.0, 1.0, 0.0, 1.0), Transform2D.IDENTITY,
+					step * Flock.RIM_STEP
+				)

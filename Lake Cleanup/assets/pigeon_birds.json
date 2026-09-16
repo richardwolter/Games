@@ -1,0 +1,137 @@
+{
+	"comment": [
+		"Which pigeon is which, and which of them fly on this lake. Authored by hand, like",
+		"tools/decor_sets.json: assets/pigeons.json is the mechanical cut of the sheet and",
+		"nothing in those rectangles says which standing bird belongs to which flying one.",
+		"",
+		"The sheet is laid out by action, not by bird. A row's first block is one bird's",
+		"three-frame flap. Its second and third blocks are three DIFFERENT birds standing",
+		"and sitting -- birds 1-3 on row 1, 4-6 on row 2, 7-9 on row 3 (rows 4-6 repeat",
+		"them). So bird N's poses live on row (N-1)/3+1 at frame (N-1)%3, never on N's own",
+		"row. Reading the standing frames off the flying bird's row is what made a perched",
+		"pigeon change colour every 0.42 s, and is why this file exists.",
+		"",
+		"`use` is the pick: three birds, by decision (2026-09-16). Pick from",
+		"tools/pigeon_contact.gd's picture and flip the flags -- do not delete a bird."
+	],
+	"cells": "res://assets/pigeons.json",
+	"birds": [
+		{
+			"bird": 1,
+			"name": "slate_head",
+			"look": "cream, slate-blue head and neck, pink beak",
+			"use": true,
+			"fly": [
+				"pigeon_r01_b0_f0",
+				"pigeon_r01_b0_f1",
+				"pigeon_r01_b0_f2"
+			],
+			"stand": "pigeon_r01_b1_f0",
+			"sit": "pigeon_r01_b2_f0"
+		},
+		{
+			"bird": 2,
+			"name": "brown",
+			"look": "brown body, white cap, yellow eye",
+			"use": false,
+			"fly": [
+				"pigeon_r02_b0_f0",
+				"pigeon_r02_b0_f1",
+				"pigeon_r02_b0_f2"
+			],
+			"stand": "pigeon_r01_b1_f1",
+			"sit": "pigeon_r01_b2_f1"
+		},
+		{
+			"bird": 3,
+			"name": "white_dove",
+			"look": "white, red eye, pink legs",
+			"use": true,
+			"fly": [
+				"pigeon_r03_b0_f0",
+				"pigeon_r03_b0_f1",
+				"pigeon_r03_b0_f2"
+			],
+			"stand": "pigeon_r01_b1_f2",
+			"sit": "pigeon_r01_b2_f2"
+		},
+		{
+			"bird": 4,
+			"name": "cream",
+			"look": "plain pale cream, dark eye",
+			"use": false,
+			"fly": [
+				"pigeon_r04_b0_f0",
+				"pigeon_r04_b0_f1",
+				"pigeon_r04_b0_f2"
+			],
+			"stand": "pigeon_r02_b1_f0",
+			"sit": "pigeon_r02_b2_f0"
+		},
+		{
+			"bird": 5,
+			"name": "blue_bar",
+			"look": "grey-blue, green throat, yellow feet",
+			"use": false,
+			"fly": [
+				"pigeon_r05_b0_f0",
+				"pigeon_r05_b0_f1",
+				"pigeon_r05_b0_f2"
+			],
+			"stand": "pigeon_r02_b1_f1",
+			"sit": "pigeon_r02_b2_f1"
+		},
+		{
+			"bird": 6,
+			"name": "tan",
+			"look": "tan and orange, pink legs",
+			"use": false,
+			"fly": [
+				"pigeon_r06_b0_f0",
+				"pigeon_r06_b0_f1",
+				"pigeon_r06_b0_f2"
+			],
+			"stand": "pigeon_r02_b1_f2",
+			"sit": "pigeon_r02_b2_f2"
+		},
+		{
+			"bird": 7,
+			"name": "grey",
+			"look": "grey, black wing bar, orange feet",
+			"use": false,
+			"fly": [
+				"pigeon_r07_b0_f0",
+				"pigeon_r07_b0_f1",
+				"pigeon_r07_b0_f2"
+			],
+			"stand": "pigeon_r03_b1_f0",
+			"sit": "pigeon_r03_b2_f0"
+		},
+		{
+			"bird": 8,
+			"name": "grey_speck",
+			"look": "pale grey, purple neck, orange feet",
+			"use": false,
+			"fly": [
+				"pigeon_r08_b0_f0",
+				"pigeon_r08_b0_f1",
+				"pigeon_r08_b0_f2"
+			],
+			"stand": "pigeon_r03_b1_f1",
+			"sit": "pigeon_r03_b2_f1"
+		},
+		{
+			"bird": 9,
+			"name": "street",
+			"look": "dark speckled street pigeon, purple neck, orange feet",
+			"use": true,
+			"fly": [
+				"pigeon_r09_b0_f0",
+				"pigeon_r09_b0_f1",
+				"pigeon_r09_b0_f2"
+			],
+			"stand": "pigeon_r03_b1_f2",
+			"sit": "pigeon_r03_b2_f2"
+		}
+	]
+}

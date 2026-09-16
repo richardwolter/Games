@@ -21,6 +21,10 @@
 class_name LakeGrid
 extends Node2D
 
+## A find has come to the top of its stack: the piece over it was taken. Play-time only (a
+## patched tile, not a rebuild), so loading a lake does not ring every find already afloat.
+signal find_surfaced(index: int)
+
 ## How fast a newly exposed piece rises to the surface after the one above it is taken,
 ## in pixels per second. Fast enough to read as a consequence, slow enough to see.
 const EMERGE_SPEED := 90.0
@@ -587,6 +591,13 @@ class GlintLayer extends Node2D:
 
 	func beam_width() -> float:
 		return _beam.width()
+
+	## How far down the find on a tile is, as it was last set, or -1 for none shining.
+	func depth_of(index: int) -> int:
+		for find: Vector2i in finds:
+			if find.x == index:
+				return find.y
+		return -1
 
 	## One tile's entry brought up to date: `depth` is `_glint_at` for its stack now, -1
 	## for a tile with nothing to shine.
@@ -1694,6 +1705,12 @@ func surface_still(index: int) -> Vector2:
 	return at + shove[index]
 
 
+
+## Every find shining now, as (tile index, depth under the top): the ones the beams stand
+## over. Read by the net's aim marker for its chime.
+func shining_finds() -> Array[Vector2i]:
+	return _glints.finds
+
 ## Where a tile's floating piece actually is, bob included. What gameplay asks — where to
 ## put a splash, where the net found something — because the piece on screen is at the
 ## bobbing position even though the geometry submitted for it is not.
@@ -1703,6 +1720,31 @@ func surface_pos(index: int) -> Vector2:
 		return at
 	at.y += _swell(at.x, _time * WAVE_SPEED) * WAVE_AMPLITUDE
 	return at + _sway(at.x, _time * WAVE_SPEED)
+
+
+## The middle of the top edge of the piece a tile is actually *drawing* — where a bird
+## standing on that tile puts its feet.
+##
+## Not `surface_pos` plus a guess at the piece's height. Every floating piece is turned
+## (`tilt`), sized (`swing`) and cut off at its own waterline (`sunk_by`) before it is
+## drawn, and a perch worked out from the def's raw size ignored all three: the bird
+## floated a gap above a small piece and stood beside a leaning one. This repeats exactly
+## the arithmetic `_stamp`/`_sprite` lay the quad down with, so the two cannot drift.
+func perch_point(index: int) -> Vector2:
+	var at := surface_pos(index)
+	var stack := stacks[index]
+	if stack.is_empty():
+		return at
+	var def := defs[stack[stack.size() - 1]]
+	var lean := tilt[index]
+	var size := def.size * swing[index]
+	if def.atlas == null:
+		# The blocked-in fallback: no waterline cut, and a body 0.72 of the def's height.
+		return at + Vector2(0.0, -size.y * 0.72 * 0.5).rotated(lean)
+	var sink := 0.0 if dry[index] == 1 else sunk_by(size)
+	var kept := maxf(size.y - sink, 1.0)
+	var sat := at - Vector2(0.0, sink * 0.5).rotated(lean)
+	return sat + Vector2(0.0, -kept * 0.5).rotated(lean)
 
 
 ## Take a piece out. Whatever is under it becomes the tile's visible piece, and rises into
@@ -2077,7 +2119,10 @@ func _restamp(index: int) -> void:
 	# The shine follows the patch. It used to be set only by the rebuild, so a find netted
 	# out of a tile left its beam and stars over whatever rubbish came up under it until the
 	# view next moved, and a find uncovered by the net did not shine until then either.
-	_glints.refresh(index, _glint_at(stack))
+	var depth := _glint_at(stack)
+	if depth == 0 and _glints.depth_of(index) != 0:
+		find_surfaced.emit(index)
+	_glints.refresh(index, depth)
 	var base := _slot_base[index]
 	if base < 0:
 		# Not in the soup: culled, or drawn by the sprite layer. Nothing to patch, and if
