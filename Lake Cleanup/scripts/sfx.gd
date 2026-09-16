@@ -185,9 +185,9 @@ const HAUL_EVERY := 1.0
 const HAUL_FALLS := -4.0
 const HAUL_SPENT := -16.0
 
-## What the player's slider means, in decibels, from all the way down to all the way up.
-## The bottom is a floor rather than a murmur: turning the sound down should turn it off.
-const LOUDEST := 6.0
+## A bed at or under this is not playing at all: the floor the fades run down to. It is not
+## the player's slider any more (2026-09-16, issue #26) — the sliders are audio buses now
+## (`Prefs`), and what is written here is each sound's own balance against the others.
 const SILENT := -50.0
 
 ## How quickly a held bed fades in and out, in decibels a second.
@@ -238,12 +238,6 @@ var _wade_on: bool = false
 var _wading: Dictionary = {}
 var _wade_wait: float = 0.0
 
-## The player's settings. `level` 0 to 1.
-var level: float = 0.8
-var on: bool = true
-var ambience_level: float = 0.7
-var ambience_on: bool = true
-
 var _rng := RandomNumberGenerator.new()
 
 
@@ -270,32 +264,6 @@ var shopping: bool = false
 var indoors: bool = false
 
 
-## The player's setting as decibels to add to every sound. Off is off rather than faint, and
-## the travel between the two ends is `Prefs`' `volume_db`: the law every slider shares.
-func _trim() -> float:
-	return Prefs.volume_db(level, on, LOUDEST, SILENT)
-
-
-func _ambience_trim() -> float:
-	return Prefs.volume_db(ambience_level, ambience_on, LOUDEST, SILENT)
-
-
-## Set the level and whether the sound plays at all. The held sounds are already running
-## when this changes, so they are pushed at once.
-func set_level(new_level: float, new_on: bool) -> void:
-	level = new_level
-	on = new_on
-
-
-func _pull_prefs() -> void:
-	var prefs := get_node_or_null(^"/root/Prefs")
-	if prefs == null:
-		return
-	set_level(prefs.sfx_level, prefs.sfx_on)
-	ambience_level = prefs.ambience_level
-	ambience_on = prefs.ambience_on
-
-
 func _ready() -> void:
 	_rng.randomize()
 	_build()
@@ -312,17 +280,16 @@ func _ready() -> void:
 		_channel_next[name] = 0
 	_coo_player = _player()
 	_start_player = _player()
-	_ambience_player = _player(_first(&"lake_ambient"))
+	_ambience_player = _player(_first(&"lake_ambient"), Prefs.BUS_AMBIENCE)
 	_fire_player = _player(_first(&"fireplace"))
-	_pull_prefs()
-	var prefs := get_node_or_null(^"/root/Prefs")
-	if prefs != null:
-		prefs.changed.connect(_pull_prefs)
 
 
-func _player(stream: AudioStream = null) -> AudioStreamPlayer:
+## Every voice goes to the SFX bus, which is where the player's slider now is. The lake's
+## own bed is the exception: Ambience is its own slider, so it is its own bus.
+func _player(stream: AudioStream = null, bus: StringName = Prefs.BUS_SFX) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
 	player.stream = stream
+	player.bus = bus
 	add_child(player)
 	return player
 
@@ -381,8 +348,8 @@ func _process(delta: float) -> void:
 	var ambience_want := SILENT
 	if _ambience_on:
 		ambience_want = AMBIENCE_DB + (AMBIENCE_DUCK if _ambience_duck else 0.0)
-	_ambience_at = _bed(_ambience_player, _ambience_at, ambience_want, _ambience_trim(), delta)
-	_fire_at = _bed(_fire_player, _fire_at, FIRE_DB if _fire_on else SILENT, _trim(), delta)
+	_ambience_at = _bed(_ambience_player, _ambience_at, ambience_want, delta)
+	_fire_at = _bed(_fire_player, _fire_at, FIRE_DB if _fire_on else SILENT, delta)
 	# The held sounds go quiet with the rest of the lake while the board is up. The ambience
 	# above does not: it is the bed the lake plays under everything, board or no board.
 	# The wading wash: while the boots are moving water, play it, let it finish, wait
@@ -401,7 +368,7 @@ func _process(delta: float) -> void:
 
 ## One frame of a bed: ease its level towards where it is wanted, and stop it outright once it
 ## is inaudible so a quiet lake costs nothing. A stopped bed starts again from the top.
-func _bed(player: AudioStreamPlayer, at: float, want: float, trim: float, delta: float) -> float:
+func _bed(player: AudioStreamPlayer, at: float, want: float, delta: float) -> float:
 	if player == null or player.stream == null:
 		return at
 	var now := move_toward(at, want, BED_FADE * delta)
@@ -409,7 +376,7 @@ func _bed(player: AudioStreamPlayer, at: float, want: float, trim: float, delta:
 		if player.playing:
 			player.stop()
 		return now
-	player.volume_db = now + trim
+	player.volume_db = now
 	if not player.playing:
 		player.play()
 	return now
@@ -452,17 +419,17 @@ func play(name: StringName, db: float = 0.0, pitch: float = 1.0) -> void:
 	var tune: Array = SOUNDS.get(name, [0.0, 0.0])
 	var spread: float = tune[1]
 	voice.stream = list[_rng.randi() % list.size()]
-	voice.volume_db = float(tune[0]) + db + _trim()
+	voice.volume_db = float(tune[0]) + db
 	voice.pitch_scale = pitch * _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
 
 
-## Whether a sound of the lake's may be heard at all right now: the settings' switch, and
-## the upgrades board holding everything but the money.
+## Whether a sound of the lake's may be heard at all right now: where the player is, and the
+## upgrades board holding everything but the money. Not the volume — a slider at zero mutes
+## the bus (`Prefs`), and asking the setting here as well would be a second copy of it.
 func may_play(name: StringName) -> bool:
 	return (
-		on
-		and (not shopping or name in WHILE_SHOPPING)
+		(not shopping or name in WHILE_SHOPPING)
 		and (not indoors or name in WHILE_INDOORS)
 	)
 
@@ -488,14 +455,14 @@ func play_ui(name: StringName) -> void:
 	if name == &"ui_hover" and not _gap(name, HOVER_GAP):
 		return
 	var list: Array = _streams.get(name, [])
-	if list.is_empty() or _ui_voices.is_empty() or not on:
+	if list.is_empty() or _ui_voices.is_empty():
 		return
 	var voice := _ui_voices[_next_ui]
 	_next_ui = (_next_ui + 1) % _ui_voices.size()
 	var tune: Array = SOUNDS.get(name, [0.0, 0.0])
 	var spread: float = tune[1]
 	voice.stream = list[_rng.randi() % list.size()]
-	voice.volume_db = float(tune[0]) + _trim()
+	voice.volume_db = float(tune[0])
 	voice.pitch_scale = _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
 
@@ -630,7 +597,7 @@ func play_coo() -> void:
 		return
 	var tune: Array = SOUNDS[&"pigeon_coo"]
 	_coo_player.stream = list[0]
-	_coo_player.volume_db = float(tune[0]) + _trim()
+	_coo_player.volume_db = float(tune[0])
 	_coo_player.pitch_scale = _rng.randf_range(1.0 - tune[1], 1.0 + tune[1])
 	_coo_player.play()
 
@@ -693,10 +660,10 @@ func set_ambience(playing: bool, ducked: bool = false) -> void:
 ## into the lake after the menu is gone.
 func play_start() -> void:
 	var list: Array = _streams.get(&"game_start", [])
-	if _start_player == null or list.is_empty() or not on:
+	if _start_player == null or list.is_empty():
 		return
 	_start_player.stream = list[0]
-	_start_player.volume_db = float(SOUNDS[&"game_start"][0]) + _trim()
+	_start_player.volume_db = float(SOUNDS[&"game_start"][0])
 	_start_player.play()
 
 
@@ -704,14 +671,14 @@ func play_start() -> void:
 func _fire(stream: AudioStreamWAV, db: float, pitch: float) -> void:
 	# The built sounds are the siege's chime and the cleaned note; neither is money, so the
 	# board holds both.
-	if stream == null or _voices.is_empty() or not on or shopping:
+	if stream == null or _voices.is_empty() or shopping:
 		return
 	var voice := _idle(_voices)
 	if voice == null:
 		voice = _voices[_next_voice]
 		_next_voice = (_next_voice + 1) % _voices.size()
 	voice.stream = stream
-	voice.volume_db = db + _trim()
+	voice.volume_db = db
 	voice.pitch_scale = pitch
 	voice.play()
 

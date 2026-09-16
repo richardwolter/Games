@@ -121,6 +121,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_pad()
 		24:
 			_stage_music()
+		25:
+			_stage_pointer()
 		_:
 			pass
 
@@ -1530,10 +1532,18 @@ func _stage_save() -> void:
 	_check(is_equal_approx(settings.sfx_level, 0.42)
 		and is_equal_approx(settings.ambience_level, 0.17),
 		"the settings come from Prefs, whatever the file says", "")
-	var sound := Sfx.main()
-	if sound != null:
-		_check(is_equal_approx(sound.level, 0.42) and is_equal_approx(sound.ambience_level, 0.17),
-			"and the sound board is set to them", "%.2f / %.2f" % [sound.level, sound.ambience_level])
+	# The mix is the buses' now (2026-09-16): the setting is not copied into `Sfx` any more,
+	# it is the SFX and Ambience bus volumes, so that is what is asked.
+	_check(
+		is_equal_approx(
+			AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Prefs.BUS_SFX)),
+			Prefs.volume_db(0.42, true, float(Prefs.BUS_TOP[Prefs.BUS_SFX]), Prefs.BUS_SILENT)
+		)
+		and is_equal_approx(
+			AudioServer.get_bus_volume_db(AudioServer.get_bus_index(Prefs.BUS_AMBIENCE)),
+			Prefs.volume_db(0.17, true, float(Prefs.BUS_TOP[Prefs.BUS_AMBIENCE]), Prefs.BUS_SILENT)
+		),
+		"and the buses are set to them", "")
 	Prefs.store(&"sfx_level", sfx_was)
 	Prefs.store(&"ambience_level", ambience_was)
 	settings.pull_prefs()
@@ -1808,6 +1818,21 @@ func _stage_settings() -> void:
 	_check(not settings.visible, "escape closes it again", "")
 	_check(_angler.can_walk, "and the angler is free again", "")
 
+	# And the pad's own reading of the same press does not answer it a second time
+	# (2026-09-16). `open_settings` holds Escape as well as Start, and
+	# `Input.is_action_just_pressed` cannot tell which device pressed it — so the pad tick
+	# used to open the board that the keyboard had just opened, and shut it in the same
+	# frame. Escape looked dead. The tick is pad-mode only for that reason; here it is run
+	# by hand in mouse mode, which is when a keyboard press arrives.
+	var hand := get_node(^"/root/Pad")
+	hand.call(&"set_mode", 0)
+	_press_escape()
+	_main.call(&"_pad_tick", 0.016)
+	_check(settings.visible, "and the pad tick does not answer the same press", "")
+	_press_escape()
+	_main.call(&"_pad_tick", 0.016)
+	_check(not settings.visible, "nor the press that closes it", "")
+
 	# The shed and the settings are one screen or the other, never both.
 	_main.call(&"_set_settings", true)
 	_main.call(&"_set_menu", true)
@@ -1817,9 +1842,16 @@ func _stage_settings() -> void:
 	_check(not shop.visible and not settings.visible,
 		"escape backs out of the shed first", "")
 	var mode := DisplayServer.window_get_mode()
-	var really_full := mode == DisplayServer.WINDOW_MODE_FULLSCREEN 		or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
-	_check(bool(_main.call(&"_is_fullscreen")) == really_full,
-		"the fullscreen box reads the real window", "")
+	var really_full := mode == DisplayServer.WINDOW_MODE_FULLSCREEN \
+		or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+	_check(Prefs.is_fullscreen() == really_full,
+		"the window row reads the real window", "")
+	_check((Prefs.live_window_mode() == Prefs.WindowMode.WINDOWED) != really_full,
+		"and names it as one of the three modes", "")
+
+	_check_buses()
+	_check_display(settings)
+	_check_binds()
 
 	# The built border has no hole down the inside of its walls. The stiles are the foot plank
 	# turned on its side, a row narrower than the wall is wide, and the cut used to leave that
@@ -1879,6 +1911,160 @@ func _stage_settings() -> void:
 		_main.call(&"_set_shed", false)
 		_check(not sound._ambience_duck, "and comes back when it closes", "")
 	_advance()
+
+
+## The mix is four audio buses (2026-09-16, issue #26), and every voice is on one of them:
+## the sliders have one place to be, which is what a Master slider needed.
+func _check_buses() -> void:
+	var missing := PackedStringArray()
+	for bus: StringName in [Prefs.BUS_MASTER, Prefs.BUS_MUSIC, Prefs.BUS_SFX, Prefs.BUS_AMBIENCE]:
+		if AudioServer.get_bus_index(bus) == -1:
+			missing.append(String(bus))
+	_check(missing.is_empty(), "the four audio buses are there", ", ".join(missing))
+	if not missing.is_empty():
+		return
+	var sent := PackedStringArray()
+	for bus: StringName in [Prefs.BUS_MUSIC, Prefs.BUS_SFX, Prefs.BUS_AMBIENCE]:
+		if AudioServer.get_bus_send(AudioServer.get_bus_index(bus)) != Prefs.BUS_MASTER:
+			sent.append(String(bus))
+	_check(sent.is_empty(), "and the three go through Master", ", ".join(sent))
+
+	# Master at the top of its travel is 0 dB: a player who never touches it hears the mix
+	# exactly as it was tuned by ear before the buses existed.
+	_check(
+		is_equal_approx(
+			Prefs.volume_db(1.0, true, float(Prefs.BUS_TOP[Prefs.BUS_MASTER]), Prefs.BUS_SILENT),
+			0.0
+		),
+		"a full Master slider changes nothing", ""
+	)
+	# And a slider at its floor mutes rather than whispers.
+	var was_level := Prefs.master_level
+	Prefs.preview(&"master_level", 0.0)
+	_check(AudioServer.is_bus_mute(AudioServer.get_bus_index(Prefs.BUS_MASTER)),
+		"a slider at the floor mutes its bus", "")
+	Prefs.preview(&"master_level", was_level)
+	_check(not AudioServer.is_bus_mute(AudioServer.get_bus_index(Prefs.BUS_MASTER)),
+		"and comes back off the floor", "")
+
+	var sound := Sfx.main()
+	if sound != null:
+		var off := PackedStringArray()
+		for child in sound.get_children():
+			var voice := child as AudioStreamPlayer
+			if voice == null:
+				continue
+			if not (voice.bus in [Prefs.BUS_SFX, Prefs.BUS_AMBIENCE]):
+				off.append(voice.bus)
+		_check(off.is_empty(), "every lake voice is on the SFX or Ambience bus", ", ".join(off))
+	var music := MusicStation.main()
+	if music != null:
+		var stray := 0
+		for child in music.get_children():
+			var song := child as AudioStreamPlayer
+			if song != null and song.bus != Prefs.BUS_MUSIC:
+				stray += 1
+		_check(stray == 0, "and every song is on the Music bus", "%d elsewhere" % stray)
+
+
+## The display rows: what each is worth, and the two rules that keep them safe — the
+## resolution is windowed-only, and nothing offered is smaller than the boards need.
+func _check_display(settings: Node) -> void:
+	var caps: Array = settings.call(&"_choices_of", &"fps_cap")
+	_check(caps.size() >= 4 and int(caps[0]) == 0,
+		"the frame cap offers uncapped and a few steps", "%d steps" % caps.size())
+	_check(String(settings.call(&"_choice_text", &"fps_cap", 0)) == "Uncapped"
+		and String(settings.call(&"_choice_text", &"fps_cap", 60)) == "60",
+		"and reads in whole frames", "")
+	var modes: Array = settings.call(&"_choices_of", &"window_mode")
+	_check(modes.size() == 3, "the window row offers three modes", "%d" % modes.size())
+	var small := 0
+	for size: Vector2i in Prefs.window_sizes():
+		if size.x < Prefs.LEAST_WINDOW.x or size.y < Prefs.LEAST_WINDOW.y:
+			small += 1
+	_check(small == 0, "no window size is smaller than the boards need", "%d too small" % small)
+
+	# Windowed: the resolution row is live and reads what is stored. In either fullscreen it
+	# is dead and reads the monitor's own size, so picking one can never hand a screen a mode
+	# it will not show.
+	var live: bool = settings.call(&"_screen_row_live", &"window_size")
+	_check(live == (Prefs.live_window_mode() == Prefs.WindowMode.WINDOWED),
+		"the resolution row is live in a window and dead in fullscreen", "")
+	_check(bool(settings.call(&"_screen_row_live", &"window_mode")),
+		"the window row itself is always live", "")
+
+	# The safeguard: only exclusive asks, and nothing answering puts it back.
+	_check(settings.has_method(&"_try_window_mode") and SettingsSkin.REVERT_AFTER > 0.0,
+		"an exclusive fullscreen asks to be kept", "%.0f s" % SettingsSkin.REVERT_AFTER)
+
+
+## The bind table: the defaults are physical, a swap leaves nothing unbound, a context is
+## allowed to share a button, and what is written down comes back.
+func _check_binds() -> void:
+	var was_walk := Binds.bound(&"walk_up", "key")
+	var was_cast := Binds.bound(&"cast", "key")
+	_check(was_walk == "key:%d" % KEY_W,
+		"walking up is bound to the hole W sits in", was_walk)
+	_check(not Binds.label_of(was_walk).is_empty()
+		and Binds.label_of(was_walk) == Binds.key_name(KEY_W),
+		"and is named by what this keyboard prints on it", Binds.label_of(was_walk))
+
+	var found := false
+	for event: InputEvent in InputMap.action_get_events(&"walk_up"):
+		var key := event as InputEventKey
+		if key != null and key.physical_keycode == KEY_W and key.keycode == KEY_NONE:
+			found = true
+	_check(found, "the input map holds it as a physical key, not a letter", "")
+
+	# A swap: whatever held the key takes the one being given up, so nothing is left bare.
+	var swapped: StringName = Binds.bind(&"walk_up", "key", was_cast)
+	_check(swapped == &"cast", "binding a key another verb holds swaps the two", String(swapped))
+	_check(Binds.bound(&"cast", "key") == was_walk and Binds.bound(&"walk_up", "key") == was_cast,
+		"and the other verb keeps what this one had", "")
+	Binds.restore(&"walk_up", "key")
+	Binds.restore(&"cast", "key")
+	_check(Binds.bound(&"walk_up", "key") == was_walk and Binds.bound(&"cast", "key") == was_cast,
+		"a restored cell is the table's own binding again", "")
+
+	# Two contexts may share a button: X opens the shed out there and turns a piece in here.
+	_check(Binds.bound(&"open_shed", "pad") == Binds.bound(&"shed_rotate", "pad"),
+		"the lake and the shed share a pad button by design", "")
+	_check(Binds.holder_of(&"open_shed", "pad", Binds.bound(&"shed_rotate", "pad")) == &"",
+		"and that is not counted as a clash", "")
+	_check(
+		Binds.holder_of(&"open_shed", "pad", Binds.bound(&"open_upgrades", "pad"))
+			== &"open_upgrades",
+		"while two verbs of one context are", ""
+	)
+
+	# Escape is never captured: it is what cancels a capture.
+	var escape := InputEventKey.new()
+	escape.physical_keycode = KEY_ESCAPE
+	_check(not Binds.bindable(escape, "key"), "escape cannot be bound to anything", "")
+	var stick := InputEventJoypadMotion.new()
+	stick.axis = JOY_AXIS_LEFT_X
+	stick.axis_value = 1.0
+	_check(not Binds.bindable(stick, "pad"), "and a stick cannot be bound either", "")
+	var trigger := InputEventJoypadMotion.new()
+	trigger.axis = JOY_AXIS_TRIGGER_RIGHT
+	trigger.axis_value = 1.0
+	_check(Binds.bindable(trigger, "pad"), "a trigger can", "")
+
+	# Written down and read back: the overrides survive the file, and a row for an action that
+	# no longer exists is dropped rather than refusing the lot.
+	Binds.bind(&"open_shed", "key", "key:%d" % KEY_J)
+	var cfg := ConfigFile.new()
+	Binds.save_to(cfg)
+	cfg.set_value(Binds.SECTION, "a_verb_we_deleted.key", "key:70")
+	Binds.load_from(cfg)
+	_check(Binds.bound(&"open_shed", "key") == "key:%d" % KEY_J,
+		"a rebound key comes back out of the settings file", Binds.bound(&"open_shed", "key"))
+	Binds.reset()
+	_check(
+		not Binds.changed()
+			and Binds.bound(&"open_shed", "key") == String(Binds.row_of(&"open_shed")["key"]),
+		"and the reset puts every row back", ""
+	)
 
 
 ## The ferry's art: one baked frame per heading, and the right one picked for each.
@@ -2622,8 +2808,10 @@ func _stage_shed() -> void:
 		_main.call(&"_set_shed", true)
 		room.carrying = StringName(turner)
 		room.set(&"_carry_view", 0)
+		# Physical, because that is how the binds are written: the hole R sits in, not the
+		# letter, so the same press turns a piece on an AZERTY keyboard.
 		var press := InputEventKey.new()
-		press.keycode = KEY_R
+		press.physical_keycode = KEY_R
 		press.pressed = true
 		room.get_viewport().push_input(press)
 		_check(int(room.get(&"_carry_view")) == 1,
@@ -3405,7 +3593,7 @@ func _stage_pad() -> void:
 	for pair: Array in [
 		[&"walk_left", 0], [&"walk_right", 0], [&"walk_up", 1], [&"walk_down", 1],
 		[&"aim_left", 2], [&"aim_right", 2], [&"aim_up", 3], [&"aim_down", 3],
-		[&"pad_cast", 5], [&"pad_lay", 4],
+		[&"cast", 5], [&"lay_net", 4],
 	]:
 		var found := false
 		for event: InputEvent in InputMap.action_get_events(pair[0]):
@@ -3413,10 +3601,11 @@ func _stage_pad() -> void:
 				found = true
 		_check(found, "%s answers to its stick" % pair[0], "")
 	for pair: Array in [
-		[&"pad_interact", JOY_BUTTON_A], [&"pad_back", JOY_BUTTON_B], [&"pad_rotate", JOY_BUTTON_X],
-		[&"pad_upgrades", JOY_BUTTON_Y], [&"pad_settings", JOY_BUTTON_START],
-		[&"pad_recentre", JOY_BUTTON_RIGHT_STICK], [&"pad_zoom_out", JOY_BUTTON_LEFT_SHOULDER],
-		[&"pad_zoom_in", JOY_BUTTON_RIGHT_SHOULDER],
+		[&"interact", JOY_BUTTON_A], [&"pad_back", JOY_BUTTON_B], [&"open_shed", JOY_BUTTON_X],
+		[&"open_upgrades", JOY_BUTTON_Y], [&"open_settings", JOY_BUTTON_START],
+		[&"recentre", JOY_BUTTON_RIGHT_STICK], [&"zoom_out", JOY_BUTTON_LEFT_SHOULDER],
+		[&"zoom_in", JOY_BUTTON_RIGHT_SHOULDER],
+		[&"shed_rotate", JOY_BUTTON_X], [&"shed_switch", JOY_BUTTON_Y],
 	]:
 		var found := false
 		for event: InputEvent in InputMap.action_get_events(pair[0]):
@@ -3620,7 +3809,6 @@ func _stage_music() -> void:
 	# The board covers the lake, so the lake goes quiet behind it — all but the money.
 	var sound := Sfx.main()
 	if sound != null:
-		sound.on = true
 		_main.call(&"_set_menu", true)
 		_check(sound.shopping and not sound.may_play(&"bark")
 			and not sound.may_play(&"net_splash") and not sound.may_play(&"pigeon_fly"),
@@ -3631,7 +3819,7 @@ func _stage_music() -> void:
 		_check(not sound.shopping and sound.may_play(&"bark"),
 			"and closing the board gives the lake its noise back", "")
 		_check_audio_pass(sound)
-	_finish()
+	_advance()
 
 
 ## The 2026-09-16 audio pass (issue #1): the knock is cut, the wading loop is shared, and a
@@ -3767,3 +3955,131 @@ func _log(line: String) -> void:
 	f.store_line(line)
 	f.flush()
 	f.close()
+
+
+## The pointer and the aim ring (2026-09-16).
+##
+## The wooden arrow is one picture set once at boot, so what is guarded here is that the art
+## is there, that its outline and its tip are where `Pad.CURSOR_TIP` says, and that putting
+## it on does not throw. The ring's three colours are the palette's own, so they are guarded
+## against the palette rather than against three numbers written down twice: repaint the pack
+## and this says so.
+func _stage_pointer() -> void:
+	_check(ResourceLoader.exists(Pad.CURSOR_ART), "the wooden cursor's art is in the project",
+		Pad.CURSOR_ART)
+	var art := load(Pad.CURSOR_ART) as Texture2D
+	_check(art != null, "and it loads as a texture", "")
+	if art != null:
+		var pic := art.get_image()
+		var tip := Vector2i(Pad.CURSOR_TIP)
+		_check(tip.x < pic.get_width() and tip.y < pic.get_height(),
+			"the hotspot is inside the picture",
+			"tip %s in %dx%d" % [tip, pic.get_width(), pic.get_height()])
+		_check(pic.get_pixelv(tip).a > 0.5, "and it lands on the arrow, not beside it",
+			"alpha %.2f" % pic.get_pixelv(tip).a)
+		# The outline: the tip is one pixel in from each edge, so the corner it was inset
+		# from is the black rim, and the corner beyond the arrow's widest row is open air.
+		var rim := pic.get_pixelv(Vector2i.ZERO)
+		_check(rim.a > 0.5 and rim.r < 0.1 and rim.g < 0.1 and rim.b < 0.1,
+			"the arrow keeps a standard cursor's black outline", "%s" % rim)
+		var wood := 0
+		var black := 0
+		for y in pic.get_height():
+			for x in pic.get_width():
+				var at := pic.get_pixel(x, y)
+				if at.a < 0.5:
+					continue
+				if at.r < 0.1 and at.g < 0.1 and at.b < 0.1:
+					black += 1
+				elif at.r > at.b:
+					wood += 1
+		_check(wood > black and black > 0, "and it is wood inside that outline",
+			"%d wood, %d rim" % [wood, black])
+	# Putting it on must not throw, with or without art.
+	Pad.wear_wood()
+	_check(not FileAccess.file_exists("res://assets/cursor_press.png"),
+		"the beaded second picture is gone, not just unused", "")
+
+	# The click is answered by a ripple on its own layer, which is the thing a hardware
+	# cursor cannot be.
+	var ripples := Pad.ripples
+	_check(ripples != null and ripples.get_parent() is CanvasLayer,
+		"the click's ripple has a layer of its own", "")
+	if ripples != null:
+		_check((ripples.get_parent() as CanvasLayer).layer == Pad.RIPPLE_LAYER
+			and Pad.RIPPLE_LAYER > Lake.BIRD_LAYER,
+			"over everything the pointer can be over",
+			"layer %d against the pigeons' %d" % [Pad.RIPPLE_LAYER, Lake.BIRD_LAYER])
+		_check(ripples.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+			"and never in the way of what is under the pointer", "")
+		# A zero-sized CanvasItem is culled before it is drawn, whatever its _draw puts out.
+		_check(ripples.size.x > 0.0 and ripples.size.y > 0.0
+			and ripples.size.is_equal_approx(get_viewport().get_visible_rect().size),
+			"it is the size of the canvas, or nothing of it would be drawn",
+			"%s against %s" % [ripples.size, get_viewport().get_visible_rect().size])
+		var before: int = ripples.get(&"_splashes").size()
+		ripples.splash(Vector2(120.0, 80.0))
+		_check(ripples.get(&"_splashes").size() == before + 1 and ripples.is_processing(),
+			"a click rings the water", "")
+		# It is quick, by the ask: over well inside half a second, and gone from the list.
+		var over := ClickRipple.LIFE + ClickRipple.STAGGER * float(ClickRipple.RINGS - 1)
+		_check(over < 0.5, "and it is quick", "%.2f s" % over)
+		for i in 60:
+			ripples.call(&"_process", over / 30.0)
+		_check(ripples.get(&"_splashes").is_empty() and not ripples.is_processing(),
+			"the ring dies on its own and stops the redraws with it", "")
+		for i in ClickRipple.MOST + 4:
+			ripples.splash(Vector2(float(i), 0.0))
+		_check(ripples.get(&"_splashes").size() <= ClickRipple.MOST,
+			"a held button cannot grow the list without end",
+			"%d of %d" % [ripples.get(&"_splashes").size(), ClickRipple.MOST])
+		ripples.get(&"_splashes").clear()
+	# No pointer, no ripple: pad mode on the bare lake hides the mouse. Driven through Pad's
+	# own record of that, because the dummy display driver does not take a mouse mode.
+	var was: int = Pad.get(&"_shown")
+	Pad.set(&"_shown", Input.MOUSE_MODE_HIDDEN)
+	Pad.ring_water()
+	_check(ripples == null or ripples.get(&"_splashes").is_empty(),
+		"nothing rings where there is no pointer to ring under", "")
+	Pad.set(&"_shown", was)
+	Pad.ring_water()
+	_check(ripples == null or not ripples.get(&"_splashes").is_empty(),
+		"and it rings again once there is", "")
+	if ripples != null:
+		ripples.get(&"_splashes").clear()
+
+	var palette := Palette.master()
+	_check(palette != null, "the palette the ring is toned off loads", "")
+	if palette != null:
+		var green := palette.grass_light * CastNet.AIM_LIFT
+		var red := palette.wood * CastNet.AIM_LIFT
+		_check(absf(CastNet.AIM_OK.r - green.r) < 0.01
+			and absf(CastNet.AIM_OK.g - green.g) < 0.01
+			and absf(CastNet.AIM_OK.b - green.b) < 0.01,
+			"the ring's green is the pack's own grass, lifted", "%s" % CastNet.AIM_OK)
+		_check(absf(CastNet.AIM_NO.r - red.r) < 0.01
+			and absf(CastNet.AIM_NO.g - red.g) < 0.01
+			and absf(CastNet.AIM_NO.b - red.b) < 0.01,
+			"its red is the pack's own wood, lifted", "%s" % CastNet.AIM_NO)
+		_check(CastNet.AIM_LIFT > 1.0,
+			"and the lift lifts", "x%.2f" % CastNet.AIM_LIFT)
+		_check(CastNet.AIM_FAR.is_equal_approx(palette.foam),
+			"and its pale is the lake's own foam", "%s" % CastNet.AIM_FAR)
+	var inks := [CastNet.AIM_OK, CastNet.AIM_NO, CastNet.AIM_FAR]
+	var apart := true
+	for i in inks.size():
+		for j in range(i + 1, inks.size()):
+			if (inks[i] as Color).is_equal_approx(inks[j]):
+				apart = false
+	_check(apart, "the three readings stay three colours", "")
+	var darkest := 1.0
+	for ink: Color in inks:
+		darkest = minf(darkest, ink.get_luminance())
+	_check(CastNet.AIM_BACK.get_luminance() < darkest,
+		"the backing is darker than every colour it backs",
+		"%.3f under %.3f" % [CastNet.AIM_BACK.get_luminance(), darkest])
+	_check(CastNet.AIM_BACK_WIDE > 1.5 and CastNet.AIM_BACK_SHARE > 0.0
+		and CastNet.AIM_BACK_SHARE <= 1.0,
+		"and it is wider than the line and carries a share of it",
+		"%.1f px at %.2f" % [CastNet.AIM_BACK_WIDE, CastNet.AIM_BACK_SHARE])
+	_finish()

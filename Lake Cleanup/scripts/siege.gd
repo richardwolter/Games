@@ -466,7 +466,7 @@ func _start_wave() -> void:
 	_to_spawn = _wave_size()
 	_spawn_in = 0.0
 	if _sfx != null:
-		_sfx.play_horn()
+		_sfx.play_bell()
 
 
 func _end_wave() -> void:
@@ -781,16 +781,9 @@ func _carry_over() -> void:
 		fleet_level += 1
 		_add_boat()
 
-	# Through the settings board, like the lake's own load does: the stock sliders and check
-	# boxes these used to set are gone (see SettingsSkin).
-	_settings.music_level = clampf(
-		float(save.get("music_level", _settings.music_level)), 0.0, 1.0
-	)
-	_settings.music_on = bool(save.get("music", true))
-	_settings.sfx_level = clampf(float(save.get("sfx_level", _settings.sfx_level)), 0.0, 1.0)
-	_settings.sfx_on = bool(save.get("sfx", true))
-	_push_music()
-	_push_sfx()
+	# The volumes are not the save file's: they are `Prefs`', on the audio buses, and the
+	# board that sets them is the same one the menu and the lake show (2026-09-16). An old
+	# siege save's copy of them is ignored, as the lake's own load ignores its copy.
 
 	_push_net_numbers()
 	_push_boat_numbers()

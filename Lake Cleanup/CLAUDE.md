@@ -471,8 +471,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   (20 s), the window's close request, and *Save and quit* — and the game loads on start. A
   crash costs at most the 20 s; that was weighed and kept. Don't put a save button back.
   **The settings are `Prefs`' now** (`scripts/prefs.gd`, autoload, 2026-09-12): music,
-  sound effects and fullscreen live in the autoload and in `user://settings.cfg`, written on
-  every press (sliders on the release). The board reads them on its way in (`pull_prefs`)
+  sound effects and the window live in the autoload and in `user://settings.cfg`, written on
+  every press (sliders on the release). **Since 2026-09-16 the sliders are audio buses and
+  the Fullscreen switch is a three-way Window row** — see The Settings Menu. The board reads them on its way in (`pull_prefs`)
   and both the menu's board and the lake's are one set of settings. The board's bottom
   button is **"Save and go to menu"** (`Lake._quit` saves and changes scene to the menu);
   quitting the game is the menu's Quit or the window's cross. The level swap row is off
@@ -1531,6 +1532,106 @@ only**, say what the next level buys, carry a "?" each, and the market is explai
   least `LEGEND_LEAST` is free. Percent and whole dollars only.
 - **TreeScreen untouched**, by decision. Probe: `tools/shot_menus.tscn` now also saves
   `tools/last_menu_upgrades_help.png` with the first row's "?" hovered.
+
+### The Settings Menu (issue #26, 2026-09-16, `/grill-me` with Richard)
+The final settings menu: four audio buses with a master over them, four display rows, and
+every verb rebindable on both devices. **Two boards, by Richard's call** — the settings board
+keeps the sound and screen rows and its Controls row opens `ControlsSkin`, because a table of
+fifteen verbs on two devices does not belong under a volume slider.
+- **The mix is audio buses now** (`Prefs.BUS_*`, `_build_buses`, `apply_audio`): Master over
+  Music, SFX and Ambience, built in code at boot rather than in a bus layout resource (a
+  second file saying what four lines say). `Sfx` and `MusicStation` no longer hold a copy of
+  what the player set and no longer add it to every player — they set each sound's own
+  balance and their fades, and every voice names its bus. `Sfx._trim`, `Sfx.level`/`on`/
+  `ambience_level`/`ambience_on`, `MusicStation.set_level` and both `LOUDEST` constants are
+  gone, and the tops they carried are `BUS_TOP`. **Master's top is 0 dB and its default is
+  full**, so a player who never touches it hears the mix exactly as it was tuned by ear.
+  A slider at `SLIDER_FLOOR` mutes its bus rather than leaving it whispering.
+  **`Sfx.may_play` no longer asks the volume**: a muted bus is the mute, and asking the
+  setting as well would be a second copy of it.
+- **The lake and the menu push nothing** (`Lake._push_music`/`_push_sfx`/`_push_ambience`,
+  `MainMenu._push_music`/`_drag_music`, all gone): the board writes `Prefs`, `Prefs` sets the
+  buses. A drag is `Prefs.preview` (heard at once, not written) and the release is
+  `Prefs.store` (written), which is the rule the sliders already followed.
+- **Display rows**: Window (Windowed / Borderless / Exclusive, replacing the Fullscreen
+  switch — **F11 still flips windowed and borderless**, the two that cannot go wrong),
+  Resolution, VSync (Off / On / Adaptive) and Frame cap (uncapped, 30, 60, 120, 144).
+- **The resolution is a windowed-mode setting, by decision**: in either fullscreen the row is
+  dimmed and reads the monitor's own size, and picking one does nothing. So no display row
+  can hand a screen a mode it will not show except exclusive, which asks (below). The list is
+  **measured against the monitor**, floored at `Prefs.LEAST_WINDOW` (1280x720, under which
+  the drawn boards stop fitting).
+- **Exclusive fullscreen asks to be kept** (`SettingsSkin._try_window_mode`, `REVERT_AFTER`
+  10 s, Richard asked for the safeguard): the mode is taken, a `MenuConfirm` counts down, and
+  nothing answering puts the window back — a player looking at a black screen cannot click
+  "no". `MenuConfirm`'s words are the caller's now (`title`/`words`/`yes_label`/`no_label`,
+  the menu's "Start over?" as the defaults) rather than a second board beside it.
+- **A choice row is arrows, except the resolution** (Richard's call): `◂ Borderless ▸` reads
+  at a glance and costs no second layer, but a dozen window sizes behind a pair of arrows is
+  a lot of clicking, so that one value drops a short list over the board.
+- **Nothing in `settings.cfg` is ever refused** (`Prefs`' header): a save file from an older
+  build is thrown away rather than migrated, but a settings file is not a save file. A value
+  that makes no sense here — a resolution no monitor has, a bind for an action that no longer
+  exists, a window mode from a build that had four — falls back to its default and is written
+  back, and the worst a bad line costs is that one setting. An old file's `fullscreen` true
+  becomes **borderless**, which is what that switch did.
+
+### The Bind Board (`scripts/binds.gd`, `scripts/controls_skin.gd`, same pass)
+- **The InputMap is built from `Binds.ACTIONS`, not from `project.godot`**: the actions are
+  still listed there so the editor's inspector knows their names, but with **no events** —
+  `Binds.install()` erases and refills them at boot, from its own table and then the player's
+  overrides. A default in a serialised `Object(InputEventKey, ...)` string in an ini file is a
+  default nobody can read or change; here it is a line of GDScript.
+- **The keys were always physical and that was never the bug** — `physical_keycode` is a hole
+  in the keyboard, so the walk keys sit under the same fingers on AZERTY. What was wrong was
+  the **labels**: the game said "W/A/S/D", "E", "Y" in so many words. `Binds.label_of` /
+  `key_name` ask the OS what is printed on that hole
+  (`DisplayServer.keyboard_get_label_from_physical`), so a French player is told ZQSD and a
+  German one Y where we say Z. **No keyboard-layout row, by decision** (Richard, after the
+  physical binds were pointed out): there is nothing for the player to get wrong and it works
+  for every layout rather than the two we thought of. A real ZQSD keycode preset would move
+  the keys *away* from the fingers.
+- **Every verb is in the map now**: `cast`, `lay_net`, `interact`, `open_shed`,
+  `open_upgrades`, `open_settings`, `zoom_in`, `zoom_out`, `recentre`, `shed_rotate`,
+  `shed_switch` beside the four `walk_*`. The `KEY_E` / `KEY_R` checks and the raw wheel and
+  mouse-button reads in `Lake._unhandled_input` and `ShedRoom._unhandled_key_input` are gone.
+  The old `pad_*` actions are gone with them — one action holds both devices — bar `pad_back`
+  and the four `aim_*` sticks, which the player never rebinds (`Binds.FIXED`).
+- **Only the desk is read in `_unhandled_input`** (`Lake._desk_pressed`), and **the pad tick
+  runs only in pad mode** (`Lake._pad_tick`): the pad's buttons are still read once a frame in
+  `_pad_buttons`, because a trigger is an axis and a held axis is a stream of events — but
+  `Input.is_action_just_pressed` cannot tell which device pressed an action, and an action
+  holds both devices now. Read on every frame it answered the keyboard's Escape and the
+  mouse's click as well, and the desk answered them again: Escape opened the settings in the
+  tick and the desk shut them in the same frame, so **Escape looked dead** (found by Richard
+  the same day). Two answers to one press is no answer. `test_lake` presses Escape in mouse
+  mode and runs the tick by hand.
+- **Conflicts are checked inside a context, not across the table** (`CONTEXT_LAKE` /
+  `CONTEXT_SHED`): X opens the shed out there and turns the piece in your hands in here, E
+  works the thing in front of you and works a switch — one button, two places, which is the
+  design and not a mistake. Within a context a new binding **swaps** with whatever held it
+  (Richard's call over refusing it or allowing duplicates), so nothing is left unbound.
+- **Escape is never bound and never captured**: it is what cancels a capture. `open_settings`
+  is on Escape by default, so **right-click a cell** puts it back to the table's own — the
+  only way back to a binding the capture will not take. Sticks are not bindable either
+  (walking and aiming are what they are); triggers are.
+- **Not rebindable, by decision**: Escape as back, F11, M, and the debug keys F3/F4/F6/F7 —
+  a player who rebinds the way out of a board has no way out of the board, and the tuners are
+  not shipped features.
+- **The pan drag is the middle button, not a verb** (`Lake.PAN_BUTTON`): a drag is a gesture,
+  and `recentre` is the verb the board moves. A `recentre` bound to a mouse button is still
+  the tap-after-drag; any other binding acts on the press.
+- **The binds live in `settings.cfg`** under `[binds]`, one line a changed cell
+  (`walk_up.key = "key:87"`), and **only what differs from the table is kept**, so a default
+  retuned later reaches a player who never touched that row.
+- **Out of scope, by decision**: mute-when-unfocused, an aim-assist or sensitivity row
+  (issue #33 left those out), a reset-progress row in the settings (the menu's New game
+  confirm stays the only one), and the language row — **all of that is issue #28**.
+- `test_lake`'s `_check_buses` / `_check_display` / `_check_binds` guard the four buses and
+  what is on them, a full Master changing nothing, the floor muting, the display choices, the
+  resolution row being windowed-only, the physical defaults, the swap, the context sharing,
+  what cannot be captured, and the file round-trip. Probe: `tools/shot_menus.tscn` also saves
+  `last_menu_settings_list.png`, `last_menu_controls.png` and `last_menu_controls_capture.png`.
 
 ### The Gamepad (issue #33, 2026-09-14, `/grill-me` with Richard)
 A trial of full controller support, to decide keep or drop after playtesting. Xbox names.

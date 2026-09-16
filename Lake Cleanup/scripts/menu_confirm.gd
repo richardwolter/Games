@@ -1,11 +1,16 @@
-## "Start over?" — the one question the menu asks.
+## A question with two answers, on a small board.
 ##
-## New game over a saved lake throws the save away, and that is the only thing the menu can
-## do that cannot be undone, so it asks. A small board in the shop's wood: a title plank, a
-## line of what will happen, and two button planks drawn as the settings board draws its own
-## — the warning one in the danger ink, the safe one plain. Drawn, not a ConfirmationDialog:
-## a grey engine popup over the capsule art would be the one thing on the screen from a
-## different game.
+## "Start over?" is the one the menu asks: New game over a saved lake throws the save away,
+## and that is the only thing the menu can do that cannot be undone. A small board in the
+## shop's wood: a title plank, a line of what will happen, and two button planks drawn as the
+## settings board draws its own — the warning one in the danger ink, the safe one plain.
+## Drawn, not a ConfirmationDialog: a grey engine popup over the capsule art would be the one
+## thing on the screen from a different game.
+##
+## **The words are the caller's** (2026-09-16, issue #26), with the menu's own as the
+## defaults. The settings board asks the second question in the game — whether an exclusive
+## fullscreen mode is one the monitor can actually show — and a board that could only say
+## "Start over?" would have meant a second one of these beside it.
 class_name MenuConfirm
 extends Control
 
@@ -15,6 +20,23 @@ const TITLE := "Start over?"
 const WORDS := "The saved lake will be thrown away."
 const YES := "Start over"
 const NO := "Keep it"
+
+var title: String = TITLE:
+	set(v):
+		title = v
+		queue_redraw()
+var words: String = WORDS:
+	set(v):
+		words = v
+		queue_redraw()
+var yes_label: String = YES:
+	set(v):
+		yes_label = v
+		queue_redraw()
+var no_label: String = NO:
+	set(v):
+		no_label = v
+		queue_redraw()
 
 const BOARD_WIDE := 400.0
 const BOARD_PAD := 16.0
@@ -73,6 +95,8 @@ func _gui_input(event: InputEvent) -> void:
 		var was := _hovered
 		_hovered = _door_under((event as InputEventMouseMotion).position)
 		if was != _hovered:
+			if _hovered != &"":
+				Sfx.ui(&"ui_hover")
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -96,11 +120,11 @@ func _draw() -> void:
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
 	draw_rect(face, Style.BOARD, true)
-	Style.board_ribbon(self, _ribbon(), TITLE, CHIPS, Style.TEXT_HEAD)
+	Style.board_ribbon(self, _ribbon(), title, CHIPS, Style.TEXT_HEAD)
 
 	var y := face.position.y + BOARD_PAD
 	Style.write(
-		self, WORDS, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
+		self, words, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
 		Style.BOARD_INK, HORIZONTAL_ALIGNMENT_CENTER, face
 	)
 	y += WORDS_TALL + ROW_GAP
@@ -108,8 +132,8 @@ func _draw() -> void:
 	_doors.clear()
 	var left := face.position.x + BOARD_PAD
 	var wide := (face.size.x - BOARD_PAD * 2.0 - ROW_GAP) * 0.5
-	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", YES, true)
-	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", NO, false)
+	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", yes_label, true)
+	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", no_label, false)
 
 
 ## A button plank, as the settings board draws its rows.

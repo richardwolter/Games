@@ -36,7 +36,7 @@ func _physics_process(_delta: float) -> void:
 		20:
 			_save(&"settings")
 			# The resolution's dropped list, the one chooser that opens a second layer.
-			var board := _main.get_node(^"HUD/Settings")
+			var board: Control = _main.get_node(^"HUD/Settings")
 			board.set(&"_listing", &"window_size")
 			board.queue_redraw()
 		26:
@@ -46,7 +46,7 @@ func _physics_process(_delta: float) -> void:
 		34:
 			_save(&"controls")
 			# And a cell waiting to be pressed into, which is the board's other state.
-			var binds := _main.get(&"_controls")
+			var binds: Node = _main.get(&"_controls")
 			binds.call(&"_start_capture", &"open_shed", "pad")
 		40:
 			_save(&"controls_capture")

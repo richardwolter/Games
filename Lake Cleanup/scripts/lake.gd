@@ -185,6 +185,10 @@ const PAD_ANGLER_INSET := 0.15
 ## drag, in screen pixels. A tap recentres the view on the angler.
 const PAN_TAP := 4.0
 
+## The button the view is dragged with. Not a bound verb: a drag is a gesture, not something
+## the player asks for once, and `recentre` is the verb the bind board moves.
+const PAN_BUTTON := MOUSE_BUTTON_MIDDLE
+
 ## How quickly a cast takes the view back, as a fraction of the offset a second. Throwing
 ## the net is asking to watch it, so the pan is handed back and the cast's own follow takes
 ## over — out to the net, and home with it. Eased rather than dropped: a view that jumps the
@@ -562,6 +566,10 @@ var _bounds := Rect2()
 var _menu_open: bool = false
 var _settings_open: bool = false
 var _shed_open: bool = false
+## The bind board, opened from the settings board's Controls row. Made on demand rather than
+## put in the scene: it is a board a player opens once a run at most.
+var _controls_open: bool = false
+var _controls: ControlsSkin
 
 ## Every purchasable track but `skimmer`, loaded from resources/upgrades/*.tres. Keyed by
 ## the same StringName used throughout the shop (`&"net_width"`, `&"cargo"`, ...).
@@ -1116,14 +1124,9 @@ func _ready() -> void:
 	# nobody can see or press.
 	_settings.get_parent().move_child(_settings, -1)
 	_settings.get_parent().move_child(_open_settings, -1)
-	_settings.fullscreen_toggled.connect(_set_fullscreen)
-	_settings.music_toggled.connect(_set_music)
-	_settings.music_level_changed.connect(_set_music_level)
-	_settings.sfx_toggled.connect(_set_sfx)
-	_settings.sfx_level_changed.connect(_set_sfx_level)
-	_settings.ambience_toggled.connect(func(_on: bool) -> void: _push_ambience())
-	_settings.ambience_level_changed.connect(func(_level: float) -> void: _push_ambience())
-	_push_sfx()
+	# The volumes are audio buses now (2026-09-16, issue #26): the board sets them through
+	# `Prefs` and nothing has to be pushed from here. What is left is the doors it opens.
+	_settings.controls_asked.connect(_set_controls.bind(true))
 	_settings.quit_pressed.connect(_quit)
 	_settings.wipe_pressed.connect(wipe_save)
 	_settings.swap_label = _other_level_name()
@@ -1140,9 +1143,9 @@ func _ready() -> void:
 	# the thing it closes actually is. See ShedRoom.
 	_polish_panel_controls()
 	_set_menu(false)
-	_settings.fullscreen = _is_fullscreen()
 	_start_music()
 	_set_settings(false)
+	_set_controls(false)
 	_set_shed(false)
 	_push_water_colours()
 	var loaded := false
@@ -1714,34 +1717,30 @@ func _def(
 	return d
 
 
-## Casting, reeling, zooming, and the shed door. Four inputs, and no two of them mean the
-## same thing at the same time.
+## Casting, reeling, zooming, and the shed door — every one of them through the input map
+## (2026-09-16, issue #26), so the bind board can move any of them.
+##
+## **Only the keyboard and the mouse are read here.** The pad's own buttons are read once a
+## frame in `_pad_buttons`, because a trigger is an axis and a held axis is a stream of
+## events; an action holds both devices, so acting on a joypad event here as well would
+## answer every pad press twice.
+##
+## The keys that are not verbs stay hard-wired: Escape backs out of whatever is open, F11 is
+## the window, M mutes the music, and F6 and F7 are the debug doors. None of them are in the
+## bind table, by decision — Escape is what cancels a capture, and a player who rebinds the
+## way out of a board has no way out of the board.
 func _unhandled_input(event: InputEvent) -> void:
 	if _extra_input(event):
 		return
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
 		match key.keycode:
-			KEY_E:
-				# Walking up to the shed and pressing E opens the shed. The upgrades are a
-				# thing you go into the shed to do, not a thing the shed is.
-				if _settings_open:
-					return
-				if _shed_open:
-					_shut(_set_shed)
-				elif _menu_open:
-					_shut(_set_menu)
-				elif _at_shed():
-					_set_shed(true)
-				elif _dog_in_reach() != null:
-					# Standing next to a dog with nothing else under the key: the same
-					# button that opens the shed says hello.
-					_dog_in_reach().pet()
-				return
 			KEY_ESCAPE:
 				# One key backing out of whatever is open, innermost first: the shed, then
 				# the shop board, and only on open water does it mean the settings.
-				if _shed_open:
+				if _controls_open:
+					_shut(_set_controls)
+				elif _shed_open:
 					_shut(_set_shed)
 				elif _menu_open:
 					_shut(_set_menu)
@@ -1751,14 +1750,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					_set_settings(true)
 				return
 			KEY_F11:
-				_settings.fullscreen = not _is_fullscreen()
-				Prefs.store(&"fullscreen", _settings.fullscreen)
-				_set_fullscreen(_settings.fullscreen)
+				_flip_fullscreen()
 				return
 			KEY_M:
 				_settings.music_on = not _settings.music_on
 				Prefs.store(&"music_on", _settings.music_on)
-				_push_music()
 				return
 			KEY_F6:
 				wipe_save()
@@ -1775,81 +1771,130 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pan_moved += drag.relative.length()
 		return
 
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		return
+
+	# The shed door and saying hello to a dog.
+	if _desk_pressed(event, &"interact"):
+		if _settings_open or _controls_open:
+			return
+		if _shed_open:
+			_shut(_set_shed)
+		elif _menu_open:
+			_shut(_set_menu)
+		elif _at_shed():
+			_set_shed(true)
+		elif _dog_in_reach() != null:
+			# Standing next to a dog with nothing else under the key: the same button that
+			# opens the shed says hello.
+			_dog_in_reach().pet()
+		return
+	if _desk_pressed(event, &"open_shed") and not _panelled():
+		_set_shed(true)
+		return
+	if _desk_pressed(event, &"open_upgrades") and not _shed_open and not _settings_open 			and not _controls_open:
+		_set_menu(not _menu_open)
+		return
+	if _desk_pressed(event, &"open_settings") and not _panelled():
+		_set_settings(true)
+		return
+
 	var click := event as InputEventMouseButton
 	if click == null:
 		return
 
 	# The middle button drags the view off the angler. Tapping it without dragging puts the
 	# view back on them, which is the way out of having panned somewhere and lost yourself.
-	if click.button_index == MOUSE_BUTTON_MIDDLE:
+	# The drag is the button's, not a verb's: `recentre` is what the bind board moves, and a
+	# binding that is not a mouse button acts on the press instead of on a tap.
+	if click.button_index == PAN_BUTTON:
 		if click.pressed:
 			_panning = true
 			_pan_moved = 0.0
 			_pan_yielded = false
 		else:
 			_panning = false
-			if _pan_moved < PAN_TAP:
+			if _pan_moved < PAN_TAP and not _panelled():
 				_pan = Vector2.ZERO
 		return
 
-	# The wheel zooms about the cursor, so the thing the player is pointing at is the
-	# thing that stays put. Zooming about the screen's middle makes reaching a corner of
-	# the lake a game of chasing it back.
-	#
 	# Guarded against any panel being open: this is _unhandled_input, so a wheel event over a
 	# panel's own controls never reaches here — but the settings panel and the shop board
 	# don't cover the whole screen, so a wheel turned over the exposed lake behind either one
-	# used to zoom the lake out from under an open menu. The shed panel already covers nearly
-	# everything, so this was likely never reachable from there, but it costs nothing to guard
-	# uniformly rather than per-panel.
-	if _settings_open or _menu_open or _shed_open:
-		return
-	if click.pressed and click.button_index == MOUSE_BUTTON_WHEEL_UP:
-		_zoom_by(ZOOM_STEP)
-		return
-	if click.pressed and click.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		_zoom_by(1.0 / ZOOM_STEP)
-		return
-
-	# The right button lays a lit net: the cast goes out, stays where it lands, and burns
-	# or freezes there. It does nothing at all with an unlit net, which is why it is the
-	# second button — the first one is the game, and this is the thing the charms buy.
-	if click.button_index == MOUSE_BUTTON_RIGHT:
-		if click.pressed and _net.state == CastNet.State.IDLE and _net.enchanted():
-			_cast_at(get_global_mouse_position(), true)
-		return
-
-	if click.button_index != MOUSE_BUTTON_LEFT:
-		return
-
-	# A click that reaches this far is a click on the lake rather than on a panel — the
-	# panels eat their own. So it closes whatever is open, which is what the "back to the
-	# water" buttons were for and is a thing every player tries first anyway.
-	if _settings_open or _menu_open or _shed_open:
-		if click.pressed:
+	# used to zoom the lake out from under an open menu.
+	if _panelled():
+		# A click that reaches this far is a click on the lake rather than on a panel — the
+		# panels eat their own. So it closes whatever is open, which is what the "back to the
+		# water" buttons were for and is a thing every player tries first anyway.
+		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+			_set_controls(false)
 			_set_settings(false)
 			_set_menu(false)
 			_set_shed(false)
 		return
 
+	# The wheel zooms about the cursor, so the thing the player is pointing at is the thing
+	# that stays put. Zooming about the screen's middle makes reaching a corner of the lake a
+	# game of chasing it back.
+	if _desk_pressed(event, &"zoom_in"):
+		_zoom_by(ZOOM_STEP)
+		return
+	if _desk_pressed(event, &"zoom_out"):
+		_zoom_by(1.0 / ZOOM_STEP)
+		return
+	if _desk_pressed(event, &"recentre"):
+		_pan = Vector2.ZERO
+		return
+
+	# A lit net is laid: the cast goes out, stays where it lands, and burns or freezes there.
+	# It does nothing at all with an unlit net, which is why it is the second button — the
+	# first one is the game, and this is the thing the charms buy.
+	if _desk_pressed(event, &"lay_net"):
+		if _net.state == CastNet.State.IDLE and _net.enchanted():
+			_cast_at(get_global_mouse_position(), true)
+		return
+
 	# Letting go is not part of the gesture any more: the net reels itself in from wherever
 	# it lands, and a cast is one click rather than a click held down for the length of a
 	# drag across the basin.
-	if not click.pressed:
-		return
+	#
+	# Click to throw. A click on a net already down starts it moving again — the only way it
+	# can be sitting still is a panel that was opened over it — and a click on one that is
+	# already coming home is left alone.
+	if _desk_pressed(event, &"cast"):
+		if _net.state == CastNet.State.IDLE:
+			_cast_at(get_global_mouse_position())
+		_net.set_pulling(true)
 
-	# Click to throw. A click on a net already down starts it moving again — the only way
-	# it can be sitting still is a panel that was opened over it — and a click on one that
-	# is already coming home is left alone.
-	if _net.state == CastNet.State.IDLE:
-		_cast_at(get_global_mouse_position())
-	_net.set_pulling(true)
+
+## Whether a press of this action came from the desk — a key or a mouse button — rather than
+## from the pad, which `_pad_buttons` answers.
+func _desk_pressed(event: InputEvent, action: StringName) -> bool:
+	if not (event is InputEventKey or event is InputEventMouseButton):
+		return false
+	return event.is_action_pressed(action)
+
+
+## Whether any board is over the lake.
+func _panelled() -> bool:
+	return _settings_open or _menu_open or _shed_open or _controls_open
+
+
+## F11, and the window row's two ordinary modes. Borderless rather than exclusive: the lake
+## is a window to alt-tab out of, and exclusive is the one the settings board asks about.
+func _flip_fullscreen() -> void:
+	var to := (
+		Prefs.WindowMode.WINDOWED if Prefs.live_window_mode() != Prefs.WindowMode.WINDOWED
+		else Prefs.WindowMode.BORDERLESS
+	)
+	Prefs.store(&"window_mode", to)
+	Prefs.apply_window()
 
 
 ## Whether the pad should drive a pointer (see scripts/pad.gd): only while something the
 ## mouse is for is up. On the bare lake the right stick is the reticle's.
 func pad_cursor_wanted() -> bool:
-	return _menu_open or _settings_open or _shed_open or _farewell != null
+	return _menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
 
 
 ## Where a cast goes: the pad's reticle while there is one, else the mouse.
@@ -1879,47 +1924,55 @@ func _pad_tick(delta: float) -> void:
 			_aim.step(delta, stick, _visible_world_rect(), _net)
 		_aim.hold_in(_visible_world_rect(), _camera.zoom.x)
 	_net.pad_aim = _aim.at
-	_pad_buttons(busy)
+	# **Pad mode only** (2026-09-16): one action holds both devices now, and
+	# `is_action_just_pressed` does not care which one pressed it — so read on every frame
+	# this answered the keyboard's Escape and the mouse's click as well as the pad's, and the
+	# desk answered them again in `_unhandled_input`. Two answers to one press is no answer:
+	# Escape opened the settings here and closed them there, in the same frame.
+	if pad:
+		_pad_buttons(busy)
 
 
 func _pad_buttons(busy: bool) -> void:
-	if Input.is_action_just_pressed(&"pad_settings"):
+	if Input.is_action_just_pressed(&"open_settings"):
 		_set_settings(not _settings_open)
 		return
-	if _settings_open or _farewell != null:
+	if _settings_open or _controls_open or _farewell != null:
 		return
 	if _shed_open:
-		# The room's own verbs, the shed's R and E.
-		if Input.is_action_just_pressed(&"pad_rotate"):
+		# The room's own verbs, the shed's R and E. Their own actions, because the buttons
+		# that turn a piece and work a switch in here open the shed and the upgrades out
+		# there: one button, two places, and `Binds` checks a clash inside a context only.
+		if Input.is_action_just_pressed(&"shed_rotate"):
 			_room.turn_carried()
-		if Input.is_action_just_pressed(&"pad_upgrades"):
+		if Input.is_action_just_pressed(&"shed_switch"):
 			_room.switch_near()
 		return
-	if Input.is_action_just_pressed(&"pad_upgrades"):
+	if Input.is_action_just_pressed(&"open_upgrades"):
 		_set_menu(not _menu_open)
 		return
 	if busy:
 		return
-	if Input.is_action_just_pressed(&"pad_rotate"):
+	if Input.is_action_just_pressed(&"open_shed"):
 		# X on the water is the corner's decorate button: the shed from anywhere.
 		_set_shed(true)
 		return
-	if Input.is_action_just_pressed(&"pad_interact"):
+	if Input.is_action_just_pressed(&"interact"):
 		if _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
 			_dog_in_reach().pet()
 		return
-	if Input.is_action_just_pressed(&"pad_recentre"):
+	if Input.is_action_just_pressed(&"recentre"):
 		_aim.at = _angler.position
-	if Input.is_action_just_pressed(&"pad_zoom_in"):
+	if Input.is_action_just_pressed(&"zoom_in"):
 		_zoom_by(ZOOM_STEP, aim_point())
-	if Input.is_action_just_pressed(&"pad_zoom_out"):
+	if Input.is_action_just_pressed(&"zoom_out"):
 		_zoom_by(1.0 / ZOOM_STEP, aim_point())
-	if Input.is_action_just_pressed(&"pad_lay"):
+	if Input.is_action_just_pressed(&"lay_net"):
 		if _net.state == CastNet.State.IDLE and _net.enchanted():
 			_cast_at(aim_point(), true)
-	if Input.is_action_just_pressed(&"pad_cast"):
+	if Input.is_action_just_pressed(&"cast"):
 		# The click's own gesture: throw from idle, and a net sitting still is set pulling.
 		if _net.state == CastNet.State.IDLE:
 			_cast_at(aim_point())
@@ -2231,7 +2284,25 @@ func _shut(close: Callable) -> void:
 	close.call(false)
 
 
+## The bind board. It lies over the settings board that opened it, and closing it leaves
+## that one up: the player asked for the controls, not for the settings to go away.
+func _set_controls(open: bool) -> void:
+	if open and _controls == null:
+		_controls = ControlsSkin.new()
+		_controls.name = &"Controls"
+		_controls.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_controls.close_asked.connect(_shut.bind(_set_controls))
+		_settings.get_parent().add_child(_controls)
+	if _controls == null:
+		return
+	_controls_open = open
+	_controls.visible = open
+	_hold_the_angler()
+
+
 func _set_settings(open: bool) -> void:
+	if not open:
+		_set_controls(false)
 	if open:
 		# Read again on the way in: F11, the menu's board and this one are one set of values.
 		_settings.pull_prefs()
@@ -2510,7 +2581,7 @@ func _pin_close(panel: Control, closing: Callable) -> void:
 ## button does not walk them into the water behind the panel.
 func _hold_the_angler() -> void:
 	var busy := (
-		_menu_open or _settings_open or _shed_open
+		_menu_open or _settings_open or _shed_open or _controls_open
 		or _farewell != null
 	)
 	_angler.can_walk = not busy
@@ -2524,13 +2595,13 @@ func _hold_the_angler() -> void:
 
 ## The music is the `Music` station's (`scripts/music_station.gd`): an autoload, so the song
 ## that was playing on the menu carries on into the lake rather than starting over. The lake
-## only says where the player is and how loud it should be.
+## only says where the player is; how loud it is is the Music bus's, set by the settings
+## board through `Prefs`.
 func _start_music() -> void:
 	var music := MusicStation.main()
 	if music != null:
 		music.leave_rooms()
 	_push_rooms()
-	_push_music()
 
 
 ## Tell the station where the player is. The shed is Indie Boi through its wall; the upgrades
@@ -2548,62 +2619,6 @@ func _push_rooms() -> void:
 	music.indoors = _shed_open
 	music.muffled = _menu_open or _settings_open
 	music.set_ending(ending())
-
-
-## Volume, from the two controls that set it, pushed live while the slider is dragged.
-func _push_music() -> void:
-	var music := MusicStation.main()
-	if music != null:
-		music.set_level(_settings.music_level, _settings.music_on)
-
-
-## The sound effects' own level. Separate from the music because they are separate things:
-## a player who wants the lake quiet and the radio on is not confused, they are working.
-func _push_sfx() -> void:
-	if _sfx != null:
-		_sfx.set_level(_settings.sfx_level, _settings.sfx_on)
-
-
-func _set_sfx(_on: bool) -> void:
-	_push_sfx()
-
-
-## The ambience's slider, pushed as it is dragged; `Prefs` has it once it is let go.
-func _push_ambience() -> void:
-	if _sfx != null:
-		_sfx.ambience_level = _settings.ambience_level
-		_sfx.ambience_on = _settings.ambience_on
-
-
-func _set_sfx_level(_level: float) -> void:
-	# Dragging the slider up is a request to hear it, the same as the music's.
-	if not _settings.sfx_on:
-		_settings.sfx_on = true
-	_push_sfx()
-
-
-func _set_music(_on: bool) -> void:
-	_push_music()
-
-
-func _set_music_level(_level: float) -> void:
-	if not _settings.music_on:
-		_settings.music_on = true
-	_push_music()
-
-
-func _is_fullscreen() -> bool:
-	var mode := DisplayServer.window_get_mode()
-	return mode == DisplayServer.WINDOW_MODE_FULLSCREEN 		or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
-
-
-## Borderless fullscreen rather than exclusive: the lake is a window to alt-tab out of.
-func _set_fullscreen(on: bool) -> void:
-	if on == _is_fullscreen():
-		return
-	DisplayServer.window_set_mode(
-		DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED
-	)
 
 
 ## The way out of the lake is the menu, not the desktop (2026-09-12): the run is written
@@ -4418,8 +4433,6 @@ func load_game() -> bool:
 	# What the player has set comes from `Prefs`, not from the file: see save_game(). An old
 	# save's copy of them is ignored.
 	_settings.pull_prefs()
-	_set_fullscreen(_settings.fullscreen)
-	_push_music()
 	# A lake that was finished before the game was closed is finished when it comes back,
 	# and lit that way from the first frame rather than brightening as if it had just
 	# happened. The thanks are not repeated: they were earned once.
@@ -4438,8 +4451,6 @@ func load_game() -> bool:
 	# finished lake is worked out again from the field a frame later, and says so again.
 	_cleaned = false
 	_sparkle_at = 1.0 if empty else 0.0
-	_push_sfx()
-	_push_ambience()
 	if _room != null:
 		_room.unlocked = unlocked
 		_room.decor = decor
