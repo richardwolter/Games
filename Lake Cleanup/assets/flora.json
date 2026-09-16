@@ -1,0 +1,287 @@
+{
+ "flower_red": {
+  "full": [
+   1,
+   1,
+   7,
+   9
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "flower_yellow": {
+  "full": [
+   9,
+   1,
+   7,
+   8
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "flower_white": {
+  "full": [
+   17,
+   1,
+   7,
+   9
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "flower_blue": {
+  "full": [
+   25,
+   1,
+   9,
+   11
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "flower_pink": {
+  "full": [
+   35,
+   1,
+   9,
+   12
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "flower_violet": {
+  "full": [
+   45,
+   1,
+   5,
+   6
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "patch_red": {
+  "full": [
+   51,
+   1,
+   11,
+   8
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "patch_yellow": {
+  "full": [
+   63,
+   1,
+   11,
+   8
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "patch_white": {
+  "full": [
+   75,
+   1,
+   11,
+   8
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "patch_blue": {
+  "full": [
+   87,
+   1,
+   11,
+   8
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "shrub": {
+  "full": [
+   99,
+   1,
+   15,
+   12
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "shrub_berries": {
+  "full": [
+   115,
+   1,
+   15,
+   12
+  ],
+  "sprout": [
+   49,
+   19,
+   3,
+   4
+  ],
+  "kind": "lawn"
+ },
+ "reed": {
+  "full": [
+   131,
+   1,
+   7,
+   17
+  ],
+  "sprout": [
+   53,
+   19,
+   3,
+   4
+  ],
+  "kind": "beach"
+ },
+ "beach_grass": {
+  "full": [
+   139,
+   1,
+   9,
+   8
+  ],
+  "sprout": [
+   53,
+   19,
+   3,
+   4
+  ],
+  "kind": "beach"
+ },
+ "beach_flower": {
+  "full": [
+   149,
+   1,
+   7,
+   8
+  ],
+  "sprout": [
+   53,
+   19,
+   3,
+   4
+  ],
+  "kind": "beach"
+ },
+ "beach_flower_white": {
+  "full": [
+   1,
+   19,
+   5,
+   5
+  ],
+  "sprout": [
+   53,
+   19,
+   3,
+   4
+  ],
+  "kind": "beach"
+ },
+ "lily": {
+  "full": [
+   7,
+   19,
+   13,
+   8
+  ],
+  "sprout": [
+   57,
+   19,
+   5,
+   3
+  ],
+  "kind": "water"
+ },
+ "lily_pink": {
+  "full": [
+   21,
+   19,
+   13,
+   8
+  ],
+  "sprout": [
+   57,
+   19,
+   5,
+   3
+  ],
+  "kind": "water"
+ },
+ "lily_white": {
+  "full": [
+   35,
+   19,
+   13,
+   8
+  ],
+  "sprout": [
+   57,
+   19,
+   5,
+   3
+  ],
+  "kind": "water"
+ }
+}

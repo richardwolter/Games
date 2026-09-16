@@ -123,6 +123,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_music()
 		25:
 			_stage_pointer()
+		26:
+			_stage_nature()
 		_:
 			pass
 
@@ -4082,4 +4084,104 @@ func _stage_pointer() -> void:
 		and CastNet.AIM_BACK_SHARE <= 1.0,
 		"and it is wider than the line and carries a share of it",
 		"%.1f px at %.2f" % [CastNet.AIM_BACK_WIDE, CastNet.AIM_BACK_SHARE])
+	_advance()
+
+
+## Nature coming back (2026-09-16): the flora on the shores and the fish in the clean water
+## follow the filth map and the lake's clean share, and the glint uniform follows the share.
+func _stage_nature() -> void:
+	var flora: Flora = _main.get(&"_flora")
+	var fish: Fish = _main.get(&"_fish")
+	_check(flora != null and fish != null, "the lake grew its flora and fish nodes", "")
+	if flora == null or fish == null:
+		_finish()
+		return
+	_check(flora.ready_to_grow(), "the flora sheet and table loaded and sowed candidates",
+		"%d candidates" % flora.candidate_count())
+	# Where the candidates stand: on the ground they say, never in the hut or the crate.
+	var wrong_ground := 0
+	var in_hut := 0
+	var on_crate := 0
+	var kinds := {}
+	var crate: Vector2 = (_main.get(&"_dog") as Dog).crate_tile
+	for k in flora.candidate_count():
+		var c := flora.candidate(k)
+		var at: Vector2 = c["tile"]
+		kinds[c["kind"]] = int(kinds.get(c["kind"], 0)) + 1
+		if Iso.in_shed(at.x, at.y, Iso.SHED_COVER):
+			in_hut += 1
+		if Yard.covers(crate, at, 0.5):
+			on_crate += 1
+		var kind: String = c["kind"]
+		var lake_tile := Iso.in_lake(int(floor(at.x)), int(floor(at.y)))
+		if kind == "water" and not lake_tile:
+			wrong_ground += 1
+		if kind != "water" and Iso.on_island_ground(at) == false and Ground.out_of_water(at.x, at.y) < 0.0:
+			wrong_ground += 1
+	_check(in_hut == 0 and on_crate == 0, "no plant stands in the hut or on the crate",
+		"hut %d crate %d" % [in_hut, on_crate])
+	_check(wrong_ground == 0, "every plant stands on the ground its kind says", "%d off" % wrong_ground)
+	_check(kinds.has("lawn") and kinds.has("beach") and kinds.has("water"),
+		"lawn, beach and water candidates all exist", str(kinds))
+	# The stages before this one emptied the lake. Fill it again, as a new game does, and
+	# forget what grew: a fresh lake's share is the island's clean ring and little else.
+	_grid.build(_main._all_defs(), _main._level_seed(), true)
+	_main._build_filth_map()
+	flora.reset()
+	fish.refresh(_main.clean_share(), _main.get(&"_clean_tiles"))
+	fish.schools().clear()
+	var fresh: float = _main.clean_share()
+	_check(fresh < 0.25, "a fresh lake's clean share is small", "%.3f" % fresh)
+	_check(fish.school_count() == 0 or fresh >= Fish.TIERS[0]["at"],
+		"no fish before the first tier's share", "%d schools at %.3f" % [fish.school_count(), fresh])
+	# Empty the west half of the lake and rebuild the map: the share climbs, plants come
+	# due beside the cleared water only, the fish arrive and stay on clean tiles.
+	for index in _grid.stacks.size():
+		var tile := _grid.tile_of(index)
+		if tile.x < Iso.CENTRE.x and not _grid.stacks[index].is_empty():
+			_grid.stacks[index].resize(0)
+	_grid._rebuild()
+	_main._build_filth_map()
+	var half: float = _main.clean_share()
+	_check(half > fresh + 0.2, "clearing half the lake lifts the clean share", "%.3f -> %.3f" % [fresh, half])
+	var glint: float = _water_material().get_shader_parameter(&"glint")
+	_check(glint > 0.0 and glint < 1.0, "the water is told to glint, short of full", "%.3f" % glint)
+	_check(flora.alive_count() > 0, "plants came due beside the cleared water", "%d" % flora.alive_count())
+	var foul_plants := 0
+	for k in flora.candidate_count():
+		var c := flora.candidate(k)
+		if not bool(c["alive"]):
+			continue
+		var wi: int = flora._water_index[k]
+		if _grid.water_state(wi) != 0:
+			foul_plants += 1
+	_check(foul_plants == 0, "no plant grew beside foul water", "%d" % foul_plants)
+	# Let the fish reckon and swim a while.
+	for i in 240:
+		fish._process(1.0 / 60.0)
+	_check(fish.school_count() > 0, "fish schools arrived once the share allowed", "%d" % fish.school_count())
+	var foul_fish := 0
+	for s: Dictionary in fish.schools():
+		var at := Iso.world_to_tile(s["at"])
+		var t := Vector2i(int(floor(at.x)), int(floor(at.y)))
+		if not Iso.in_lake(t.x, t.y) or _grid.water_state(_grid.index_of(t.x, t.y)) != 0:
+			if float(s["fade"]) > 0.05:
+				foul_fish += 1
+	_check(foul_fish == 0, "no school is in foul water while shown", "%d" % foul_fish)
+	# A scare turns the schools and speeds them; nothing here can catch or pay.
+	var before: Array = []
+	for s: Dictionary in fish.schools():
+		before.append([s["at"], s["heading"]])
+	if not fish.schools().is_empty():
+		var first: Dictionary = fish.schools()[0]
+		var hit: Vector2 = (first["at"] as Vector2) + Vector2(20.0, 0.0)
+		fish.scare(hit)
+		_check(float(first["flee"]) > 0.0, "a landing beside a school sends it fleeing", "")
+		_check((first["heading"] as Vector2).x < 0.0, "and away from the landing", str(first["heading"]))
+	_check(not fish.has_method("catch") and not fish.has_method("pay"),
+		"fish have no catch and no pay", "")
 	_finish()
+
+
+func _water_material() -> ShaderMaterial:
+	return _main.get(&"_water_material")

@@ -1008,6 +1008,8 @@ func _ready() -> void:
 	# deck, hidden behind a moored hull and walked in front of by the angler. Above the net
 	# and the finds' beams too — "over everything" was the whole of the instruction, and a
 	# bird that vanishes behind the thing being cast at it is the bug, not the fix.
+	_grow_nature()
+
 	_flock = Flock.new()
 	_flock.name = &"Flock"
 	_flock.z_index = BIRD_LAYER
@@ -1261,6 +1263,22 @@ func _shape_bank() -> void:
 
 ## Both layers of ground, for the tuner.
 var _grounds: Array[Ground] = []
+
+## Nature coming back (2026-09-16): the plants on the shores and the fish in the clean
+## water, both read off the filth map and `_clean_share`. See flora.gd and fish.gd.
+var _flora: Flora
+var _fish: Fish
+## The share of the lake's water tiles the map calls clean, 0..1, set by each map build.
+var _clean_share: float = 0.0
+## Every water tile index the map calls clean, as of the last build.
+var _clean_tiles := PackedInt32Array()
+## How many water tiles there are to be clean, counted once.
+var _water_tiles: int = 0
+## The glints on clean water: the tease of the finished lake's sparkle. `glint` in the
+## water shader, driven off `_clean_share` bent by GLINT_BITE so the first clean bay pops a
+## little and the last stretch pops a lot.
+const GLINT_BITE := 1.4
+const GLINT_MOST := 0.7
 
 
 ## The corner buttons' canvas, F7, debug builds only. See ButtonTuner. Built on the key
@@ -2701,6 +2719,8 @@ func _push_patches(delta: float) -> void:
 ## moved (see _on_net_caught) — what is left to decide here is only where each piece goes:
 ## a find onto the shelf in the shed, everything else thrown on to the yard.
 func _on_net_landed(cargo: PackedInt32Array) -> void:
+	if _fish != null:
+		_fish.scare(_net.position)
 	var from := _angler.rod_tip()
 	var slot := 0
 	for i in cargo.size():
@@ -4064,6 +4084,7 @@ func _build_filth_map() -> void:
 	# The grid keeps a copy for what it draws on the CPU — the ripple rings read the state
 	# of the water under their piece off it, the way the shader does off the texture.
 	_grid.filth = pixels
+	_count_clean()
 
 	if _filth_map == null:
 		_filth_map = Image.create_from_data(cols, rows, false, Image.FORMAT_R8, pixels)
@@ -4076,6 +4097,59 @@ func _build_filth_map() -> void:
 		_water_material.set_shader_parameter(&"filth_map", _filth_texture)
 		_water_material.set_shader_parameter(&"filth_tiles", Vector2(cols, rows))
 		_water_material.set_shader_parameter(&"filth_mapped", 1.0)
+		_water_material.set_shader_parameter(&"glint", pow(_clean_share, GLINT_BITE) * GLINT_MOST)
+	if _flora != null:
+		_flora.refresh(_clean_share)
+	if _fish != null:
+		_fish.refresh(_clean_share, _clean_tiles)
+
+
+## How much of the water reads clean on the map, and which tiles: the stage nature is at.
+## Water tiles are the lake's wet ones off both shores; the island's clean ring counts, so
+## a fresh lake is not at zero — and it should not be, since that ring is clean.
+func _count_clean() -> void:
+	_clean_tiles.resize(0)
+	if _water_tiles == 0:
+		for index in _grid.stacks.size():
+			if _wet_tile(index):
+				_water_tiles += 1
+	for index in _grid.stacks.size():
+		if _wet_tile(index) and _grid.water_state(index) == 0:
+			_clean_tiles.append(index)
+	_clean_share = float(_clean_tiles.size()) / float(maxi(_water_tiles, 1))
+
+
+func _wet_tile(index: int) -> bool:
+	var tile := _grid.tile_of(index)
+	if not Iso.in_lake(tile.x, tile.y):
+		return false
+	if index < _grid.dry.size() and _grid.dry[index] == 1:
+		return false
+	return Iso.shore_fraction(float(tile.x) + 0.5, float(tile.y) + 0.5) < 1.0
+
+
+## The share of the lake's water that reads clean on the map, 0..1.
+func clean_share() -> float:
+	return _clean_share
+
+
+## The plants and the fish, wired once the grounds, the grid, the crate and the fleet are
+## there to read. Their first refresh is this call: the map was built before they were.
+func _grow_nature() -> void:
+	_flora = Flora.new()
+	_flora.name = &"Flora"
+	_flora.grid = _grid
+	_flora.grounds = _grounds
+	_flora.crate_tile = _dog.crate_tile
+	add_child(_flora)
+	_fish = Fish.new()
+	_fish.name = &"Fish"
+	_fish.grid = _grid
+	_fish.splash = _splash
+	_fish.boats = _boats
+	add_child(_fish)
+	_flora.refresh(_clean_share)
+	_fish.refresh(_clean_share, _clean_tiles)
 
 
 ## Distance from every tile to the nearest source, in tiles, in place: `dist` comes in as 0

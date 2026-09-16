@@ -244,6 +244,15 @@ uniform float patch_soft = 0.42;
 // rather than simply glowing harder. It is the same water, catching the sun at last.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
 
+// The tease of that sparkle on a lake with work left in it: rare single art-pixel pops of
+// the top step on clean water, more of them the cleaner the whole lake is. Nothing while
+// `glint` is zero. One pop per `glint_cell` art pixels square at most, `glint_rate` the
+// odds of a cell popping on a given tick, ticks at `glint_fps`.
+uniform float glint : hint_range(0.0, 1.0) = 0.0;
+uniform float glint_cell = 14.0;
+uniform float glint_rate = 0.09;
+uniform float glint_fps = 5.0;
+
 varying vec2 world_pos;
 
 // The inverse projection, mirroring Iso.world_to_tile.
@@ -530,6 +539,24 @@ void fragment() {
 		// Thinned in the shallows: the shore is where the light is already brightest and
 		// the collar of foam is about to be drawn over it.
 		shade += points * sparkle * 4.0 * mix(0.5, 1.0, d);
+	}
+
+	// The glints: a lake coming clean catches the light now and then, well before it is
+	// finished. Only on water the map calls clean, so a pop never lands in the soup.
+	if (glint > 0.001 && filth < murky_at) {
+		vec2 gcell = floor(cell / glint_cell);
+		float tick = floor(TIME * glint_fps);
+		float roll = cell_hash(gcell + vec2(tick * 17.3, tick * 5.9));
+		if (roll < glint * glint_rate) {
+			vec2 inner = cell - gcell * glint_cell;
+			vec2 spot = floor(vec2(
+				cell_hash(gcell * 1.7 + vec2(tick, 3.0)),
+				cell_hash(gcell * 2.3 - vec2(5.0, tick))
+			) * glint_cell);
+			if (inner.x == spot.x && inner.y == spot.y) {
+				shade += 4.0;
+			}
+		}
 	}
 
 	// Onto the nearest step: solid areas, hard edges.

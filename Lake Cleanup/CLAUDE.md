@@ -1452,6 +1452,59 @@ crop of the flock's eleven-pixel birds, cut by `tools/slice_pigeon_head.gd`.
   lying on its side, that the coin waits for the head and then leaves it (one a head), and
   that a catch with no head still pays off the water.
 
+### Nature Coming Back (2026-09-16, `/grill-me` with Richard; a spike, to judge in play)
+The clean state gains density as the lake is cleaned: fish in the clean water, flora on the
+shores, and a tease of the finished sparkle. Three nodes, nothing saved, everything derived
+from the filth map and `Lake._clean_share` (the share of wet lake tiles whose
+`LakeGrid.water_state` is 0, counted in `_count_clean` on every map build; the island's clean
+ring gives a fresh lake about 0.001).
+- **Driver = local clean + global stage**, by decision: a thing appears only where the honest
+  map says clean, and how much appears is the whole lake's share. **The transient catch
+  patches are never read** — a patch that closes never held a fish.
+- **Fish are purely ambient** (`scripts/fish.gd`, z 3, between the water and the splash
+  layer): no catch, no pay, no target, and `test_lake` guards there is no `catch`/`pay`.
+  Three tiers by share (`Fish.TIERS`, `at` 0.12 / 0.38 / 0.68: minnow schools, perch-size
+  schools, one or two carp; tiers accumulate), so many schools per clean tile (`per_tiles`,
+  capped `most`), reconciled every `RECKON_EVERY`. Seen only as a **shadow** (a fish-shaped
+  polygon on the plane, `_shadow`, not art-pixel snapped — open) and **rings** through
+  `WaterSplash.ripple` from a member every `ripple` s. They wander, look `LOOK_AHEAD` tiles
+  ahead and turn off foul water, fade out and are replaced if they end up in it, and **flee**
+  (`scare`) from a net landing (`Lake._on_net_landed`) and from every hull each frame.
+- **Flora is decoration only** (`scripts/flora.gd`, z 3): no collision, no footprint, kept
+  out of the hut (`Iso.in_shed` at `SHED_COVER`) and off the crate (`Yard.covers`). Every
+  candidate is rolled once at build (`_sow`: `LAWN_SPOTS` per lawn tile, one per beach tile
+  within `BANK_REACH` of the outer bank's water and on the island, one per water tile in the
+  `PAD_OUT` ring off each shore for lily pads), with a species by ground kind and a rank. A
+  candidate is due when the water beside it (`_water_beside`: itself, or the first lake
+  tile walking out from its shore) reads clean **and** its rank is under `stage * MOST`.
+  Once due it **grows in** over `GROW_TIME`, staggered by `GROW_STAGGER`: sprout frame until
+  `SPROUT_UNTIL`, then the full picture rising. Never regresses (the lake cannot get
+  dirtier); `reset()` exists for the harness only. One triangle array off `assets/flora.png`
+  — Ground's rule, anything in the hundreds is one batch.
+- **The sheet is built, not painted** (`tools/build_flora.py`, psd-extract venv python, from
+  the project root; **reimport after a re-run**): flowers, patches, shrubs (lawn), reeds,
+  pale grass, small flowers (beach), lily pads plain/pink/white (water), each with a sprout,
+  all off `palette.tres` swatches lifted or mixed, at one painted px drawn at 2. Rectangles
+  and kinds in `assets/flora.json`; contact sheet `tools/last_flora_sheet.png`. Richard may
+  hand-polish the PNG; the json holds while the rectangles do.
+- **The glimmer is rare glints, not per-tile sparkle** (`water.gdshader` `glint`,
+  `glint_cell`/`glint_rate`/`glint_fps`; pushed as `pow(share, GLINT_BITE) * GLINT_MOST` from
+  `_build_filth_map`): one art pixel of the top step popping per `glint_cell` square at most,
+  only where the map's filth is under `murky_at`, so nothing pops in the soup. The finished
+  lake's `sparkle` is untouched.
+- **Out of scope, by decision**: fish as catch or pay, fish sprites, blocking flora, flora on
+  the piers, birds/insects, sound, per-tile sparkle, reading the patches.
+- **Numbers are first guesses** — tiers, densities, `MOST`, `BANK_REACH`, the shadows' ink —
+  for Richard to retune in play. Bench on a fresh lake: 2.77 ms mean, worst 4.36, but a
+  fresh lake has no fish or flora yet; **re-bench on a half-clean save** before calling the
+  8 ms bar met.
+- `test_lake`'s `_stage_nature` refills the lake, checks the fresh share is small, empties the
+  west half, and guards: candidates on the right ground and off the hut and crate, plants
+  come due only beside clean water, fish arrive and are never shown in foul water, a scare
+  turns them away, the glint uniform is between 0 and 1. Probe: `tools/shot_nature.tscn`
+  (desktop build, `--fixed-fps 60`, own save) saves `tools/last_nature_{fresh,half,clean}.png`
+  and `last_nature.log`.
+
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
 the market board carries Recycle Bonus and Pigeons only. See The Shop Balance Pass.
@@ -2567,6 +2620,7 @@ room's own coordinates while the picture is the whole window.
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
 - `scripts/skirt.gd` — baked painted grass tufts and sand spill round the shed and the box
+- `scripts/flora.gd`, `scripts/fish.gd` — nature coming back as the lake cleans (see Nature Coming Back)
 - `scripts/sfx.gd` — the `Sound` autoload: recordings from `assets/sfx/` (see Sound), plus the few sounds still built in code
 
 ---
