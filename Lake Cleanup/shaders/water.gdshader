@@ -230,8 +230,15 @@ uniform float filth_mapped : hint_range(0.0, 1.0) = 0.0;
 // much the threads cut into the disc (0 a plain disc, 1 all lines); `patch_top` is where
 // the threshold ends up (over the field's highest value, or the middle never closes);
 // `patch_soft` the edge's softness in field units.
-uniform vec4 patches[8];
-uniform float patch_seeds[8];
+// Sizes mirror Lake.PATCHES and Lake.LANE_POINTS; the lake packs exactly that many.
+uniform vec4 patches[14];
+uniform float patch_seeds[14];
+// The lane a reel with a catch aboard parts through the grime: a chain of small patches
+// laid along the mouth's path, one roll per reel, closing the same way a patch does. Subtle
+// by decision (2026-09-16, Richard: "very subtle but noticeable") — narrower than the
+// mouth, and only ever a hint of blue in the wake.
+uniform vec4 lane[24];
+uniform float lane_seed = 0.5;
 uniform float patch_blotch = 20.0;
 uniform float patch_warp : hint_range(0.0, 1.0) = 0.5;
 uniform float patch_shape : hint_range(0.0, 1.0) = 4;
@@ -416,6 +423,41 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
+// How clear one patch leaves the water at `px`: 0 untouched, 1 clean. `patch` is (x, y)
+// world centre, (z) radius along the long axis, (w) how open; `seed` its roll. The 2:1
+// squash is taken out first, where a mouth is a circle. See `patches` above for the shape.
+float patch_clear(vec4 patch, float seed_roll, vec2 px) {
+	if (patch.w <= 0.0) {
+		return 0.0;
+	}
+	vec2 off = vec2(px.x - patch.x, (px.y - patch.y) * 2.0);
+	// Well outside the reach even after the warp has pulled it about: skip.
+	if (length(off) > patch.z * (1.0 + patch_warp)) {
+		return 0.0;
+	}
+	vec2 seed = vec2(seed_roll * 37.1, seed_roll * 91.7);
+	vec2 at = off / max(patch_blotch, 1.0) + seed;
+	// Bend the plane, then measure: lobes and inlets, no circle.
+	vec2 warp = vec2(blob_noise(at * 0.55 + vec2(11.3, 5.9)),
+		blob_noise(at * 0.55 + vec2(23.7, 17.1))) - 0.5;
+	vec2 bent = off + warp * 2.0 * patch_warp * patch.z;
+	float d = length(bent) / max(patch.z, 1.0);
+	if (d >= 1.0) {
+		return 0.0;
+	}
+	// Ridged noise on the bent plane: 1 along the ridge lines, 0 away from them.
+	vec2 line_at = bent / max(patch_blotch, 1.0) + seed;
+	float n = blob_noise(line_at) * 0.6 + blob_noise(line_at * 2.1 + vec2(4.7, 1.3)) * 0.4;
+	float lines = 1.0 - abs(n * 2.0 - 1.0);
+	// The field: the disc falling off to its rim, cut low along the lines, so the
+	// threshold reaches them first.
+	float field = (1.0 - d) * mix(1.0, 1.6 - lines * 1.4, patch_shape);
+	// The threshold climbs as the patch closes, from under the floor (a fresh patch is
+	// clear right through) to over the top.
+	float close = mix(-patch_soft, patch_top, 1.0 - patch.w);
+	return smoothstep(close, close + patch_soft, field);
+}
+
 void fragment() {
 	// The pixel this fragment belongs to, and everything below is worked out at its middle.
 	vec2 cell = floor(world_pos / foam_pixel);
@@ -464,39 +506,13 @@ void fragment() {
 	// while the next one over is still soup), `pollution` where it is not.
 	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
 	float filth = mix(pollution, local, filth_mapped);
-	// The clean patches, on the plane (the 2:1 squash taken out, where a mouth is a circle).
+	// The clean patches and the reel's lane, on the plane.
 	float patched = 0.0;
-	for (int i = 0; i < 8; i++) {
-		vec4 patch = patches[i];
-		if (patch.w <= 0.0) {
-			continue;
-		}
-		vec2 off = vec2(px.x - patch.x, (px.y - patch.y) * 2.0);
-		// Well outside the reach even after the warp has pulled it about: skip.
-		if (length(off) > patch.z * (1.0 + patch_warp)) {
-			continue;
-		}
-		vec2 seed = vec2(patch_seeds[i] * 37.1, patch_seeds[i] * 91.7);
-		vec2 at = off / max(patch_blotch, 1.0) + seed;
-		// Bend the plane, then measure: lobes and inlets, no circle.
-		vec2 warp = vec2(blob_noise(at * 0.55 + vec2(11.3, 5.9)),
-			blob_noise(at * 0.55 + vec2(23.7, 17.1))) - 0.5;
-		vec2 bent = off + warp * 2.0 * patch_warp * patch.z;
-		float d = length(bent) / max(patch.z, 1.0);
-		if (d >= 1.0) {
-			continue;
-		}
-		// Ridged noise on the bent plane: 1 along the ridge lines, 0 away from them.
-		vec2 line_at = bent / max(patch_blotch, 1.0) + seed;
-		float n = blob_noise(line_at) * 0.6 + blob_noise(line_at * 2.1 + vec2(4.7, 1.3)) * 0.4;
-		float lines = 1.0 - abs(n * 2.0 - 1.0);
-		// The field: the disc falling off to its rim, cut low along the lines, so the
-		// threshold reaches them first.
-		float field = (1.0 - d) * mix(1.0, 1.6 - lines * 1.4, patch_shape);
-		// The threshold climbs as the patch closes, from under the floor (a fresh patch is
-		// clear right through) to over the top.
-		float close = mix(-patch_soft, patch_top, 1.0 - patch.w);
-		patched = max(patched, smoothstep(close, close + patch_soft, field));
+	for (int i = 0; i < 14; i++) {
+		patched = max(patched, patch_clear(patches[i], patch_seeds[i], px));
+	}
+	for (int i = 0; i < 24; i++) {
+		patched = max(patched, patch_clear(lane[i], lane_seed, px));
 	}
 	filth *= 1.0 - patched;
 

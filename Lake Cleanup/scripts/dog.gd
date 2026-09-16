@@ -104,6 +104,12 @@ const ACCEL := 7.0
 
 ## The foam where the swimming dog cuts the surface. See WaterlineFoam.
 var _foam: WaterlineFoam
+## The foam it leaves behind while swimming. See STREAK_LONG.
+var _streak: HullFoam
+## Whether it was in the water last frame, so going in is one event.
+var _was_swimming := false
+## Where it was last frame, in world px, for the streak's heading.
+var _streak_from := Vector2.INF
 
 ## The longest step allowed in one frame, in tiles.
 ##
@@ -226,8 +232,13 @@ var prints: Footprints
 
 ## How wide a ring the dog pushes out, and how often one is shed while it is moving. Smaller
 ## and quicker than the angler's: less dog in the water, and more of it in a hurry.
-const WAKE_SPAN := 12.0
-const WAKE_EVERY := 0.12
+## The foam the swimming dog leaves (issue #31, 2026-09-16, Richard: "a foam streak behind
+## them, ripples only when they enter the water"): the ferry's own HullFoam, small, pointed
+## the way the dog is going. STREAK_LONG/WIDE are its half length and half width in world
+## px. ENTRY_SPAN is the one ring pushed out as the dog goes into the water, world px.
+const STREAK_LONG := 9.0
+const STREAK_WIDE := 5.0
+const ENTRY_SPAN := 24.0
 
 ## Where the crate stands, in tile coordinates. Set by lake.gd once the yard has been put
 ## down. The dog walks to the grass beside it and drops what it is carrying in.
@@ -305,6 +316,11 @@ func _ready() -> void:
 	_foam = WaterlineFoam.new()
 	_foam.name = &"Foam"
 	add_child(_foam)
+	_streak = HullFoam.new()
+	_streak.name = &"Streak"
+	_streak.half_length = STREAK_LONG
+	_streak.half_width = STREAK_WIDE
+	add_child(_streak)
 	_rng.randomize()
 	_place()
 	_last_print_pos = position
@@ -403,7 +419,7 @@ func _process(delta: float) -> void:
 			_slow(delta)
 			if _mood_left <= 0.0:
 				_settle()
-	_wake()
+	_wake(delta)
 	_place()
 	_leave_print()
 	_repaint()
@@ -1023,11 +1039,24 @@ func _somewhere_on_land() -> Vector2:
 	return best
 
 
-## A ring of disturbed water behind it, if it is off the island at all.
-func _wake() -> void:
-	if splash == null or _on_land():
+## The water it moves: one ring as it goes in, and the streak behind it while it swims.
+## Rings only on entry, by decision — a swimming dog leaves foam, not rings.
+func _wake(delta: float) -> void:
+	var swimming := not _on_land()
+	var at := Iso.tile_to_world(tile_pos.x, tile_pos.y)
+	if swimming and not _was_swimming and splash != null:
+		splash.ripple(at, ENTRY_SPAN)
+	_was_swimming = swimming
+	if _streak == null:
 		return
-	splash.wake(self, Iso.tile_to_world(tile_pos.x, tile_pos.y), WAKE_SPAN, WAKE_EVERY)
+	var heading := Vector2.RIGHT
+	if _streak_from != Vector2.INF and _streak_from.distance_squared_to(at) > 0.01:
+		heading = at - _streak_from
+	elif facing_left:
+		heading = Vector2.LEFT
+	_streak_from = at
+	var push := 1.0 if swimming and _speed > Angler.WADE_LEAST else 0.0
+	_streak.lay(heading, push, delta)
 
 
 ## A paw print in the sand or the grass, every PRINT_SPACING of ground actually covered. See
@@ -1113,7 +1142,6 @@ func _draw() -> void:
 		# pushes out can be drawn around the dog rather than under it.
 		at.y += sin(_age * BOB_RATE) * BOB + SINK * HEIGHT
 		sink = SINK
-		_draw_wake(Vector2(0.0, sin(_age * BOB_RATE) * BOB))
 		# And the foam on that cut, bobbing with it: the same edge stamp is about to end the
 		# picture at, so the collar can never sit beside the dog instead of round it.
 		if _foam != null:
@@ -1138,17 +1166,6 @@ func _draw() -> void:
 		_draw_hearts(1.0 - clampf(_mood_left / PET_TIME, 0.0, 1.0))
 	elif _greet > 0.0:
 		_draw_hearts(1.0 - clampf(_greet / GREET_TIME, 0.0, 1.0))
-
-
-## The ring the swimming dog pushes out. Drawn here rather than through WaterSplash because
-## it is a steady thing that follows the animal, not an event with a life of its own.
-func _draw_wake(at: Vector2) -> void:
-	var ring := PackedVector2Array()
-	var wide := HEIGHT * 0.5 + sin(_age * BOB_RATE) * 1.2
-	for i in 13:
-		var angle := TAU * float(i) / 12.0
-		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.42))
-	draw_polyline(ring, Color(0.86, 0.94, 0.96, 0.30), 1.3)
 
 
 ## The dog's shadow: its own frame, laid out on the grass away from the sun.

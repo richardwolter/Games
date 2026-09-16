@@ -241,11 +241,31 @@ const FILTH_REMAP := 0.2
 ## slowly, by Richard's call (2026-09-13: "appear and disappear more slowly"; the first
 ## cut snapped open and was gone in 2 s). PATCHES is the shader's cap; past it the oldest
 ## is replaced.
+## Slower and smoother again on 2026-09-16 (issue #31, Richard: the grime should get back
+## together "a little bit slower", and continuously — not in beats): life 2 to 4 s, the
+## opening 0.2 to 0.4 s, and PATCH_CLOSE_SOFT is the shader's `patch_soft`, raised so the
+## threads thicken as a gradient rather than arriving. Continuous by his call, over a
+## stepped or swell-timed close.
 const PATCHES := 14
-const PATCH_LIFE := 2.0
-const PATCH_IN := 0.2
+const PATCH_LIFE := 4.0
+const PATCH_IN := 0.4
 const PATCH_HOLD := 0.1
 const PATCH_REACH := 0.5
+const PATCH_CLOSE_SOFT := 0.6
+
+## The lane a reel parts through the grime (issue #31, 2026-09-16, Richard: "a small clear
+## way as it drags through grime before the grime gets back in again, very subtle but
+## noticeable"). Only a net with a catch aboard leaves one — his call over every reel — so
+## the lane is the catch being dragged home, not the net. A chain of small patches dropped
+## every LANE_SPACING world px of travel along the mouth's path, LANE_WIDE of the mouth
+## across, each closing over LANE_LIFE the way a patch does. One roll per reel
+## (`_lane_seed`), so the chain reads as one lane rather than a string of beads.
+## LANE_POINTS mirrors the shader's `lane[]`; past it the oldest point is reused, which is
+## the tail of the lane closing anyway.
+const LANE_POINTS := 24
+const LANE_SPACING := 14.0
+const LANE_WIDE := 0.55
+const LANE_LIFE := 3.2
 ## The patch's shape is a blob noise rolled per catch (`_patch_rng`): the rim wanders in and
 ## out of the mouth's disc and the grime comes back as spots that grow and join, so no two
 ## catches look alike and nothing reads as the net's ring stamped on the water. The
@@ -625,6 +645,11 @@ var _filth_stale: bool = false
 var _patches: Array[Dictionary] = []
 var _patch_clock: float = 0.0
 var _patch_rng := RandomNumberGenerator.new()
+## The lane's points, oldest first once full: `at`, `radius`, `born`. `_lane_last` is where
+## each net last dropped one, keyed by instance id, and `_lane_seed` the reel's roll.
+var _lane: Array[Dictionary] = []
+var _lane_last: Dictionary[int, Vector2] = {}
+var _lane_seed: float = 0.5
 var _filth_remap_in: float = 0.0
 
 var _filth_total: float = 1.0
@@ -1371,6 +1396,7 @@ func _shape_water(_shore: PackedVector2Array) -> void:
 	_water_material.set_shader_parameter(&"island_centre", Iso.ISLAND_CENTRE)
 	_water_material.set_shader_parameter(&"island_radius", Iso.ISLAND_RADIUS)
 	_water_material.set_shader_parameter(&"shore_lap", SHORE_LAP)
+	_water_material.set_shader_parameter(&"patch_soft", PATCH_CLOSE_SOFT)
 	_water_material.set_shader_parameter(&"coast_wave", COAST_WAVE)
 	_water_material.set_shader_parameter(&"coast_waves", COAST_WAVES)
 	_water_material.set_shader_parameter(&"coast_wave_speed", COAST_WAVE_SPEED)
@@ -2694,14 +2720,63 @@ func _patch_open(patch: Dictionary) -> float:
 	return 1.0 - t * t * (3.0 - 2.0 * t)
 
 
-## Every frame: age the patches, drop the ones that have closed, hand the rest to the water.
+## A net reeling with a catch aboard drops a lane point every LANE_SPACING of travel; a net
+## doing anything else forgets where it last dropped one, so the next reel starts a fresh
+## lane with a fresh roll.
+func _lay_lane(net: CastNet) -> void:
+	if net == null:
+		return
+	var id := net.get_instance_id()
+	if net.state != CastNet.State.REELING or net.catch.is_empty():
+		if _lane_last.erase(id) and _lane_last.is_empty():
+			_lane_seed = _patch_rng.randf()
+		return
+	var at := net.world_pos()
+	if _lane_last.has(id) and (_lane_last[id] as Vector2).distance_to(at) < LANE_SPACING:
+		return
+	_lane_last[id] = at
+	var point := {"at": at, "radius": net.mouth_extent() * LANE_WIDE, "born": _patch_clock}
+	if _lane.size() < LANE_POINTS:
+		_lane.append(point)
+		return
+	var oldest := 0
+	for i in _lane.size():
+		if float(_lane[i]["born"]) < float(_lane[oldest]["born"]):
+			oldest = i
+	_lane[oldest] = point
+
+
+## How open a lane point is: the patch's own curve, over the lane's shorter life.
+func _lane_open(point: Dictionary) -> float:
+	var age := _patch_clock - float(point["born"])
+	if age < PATCH_IN:
+		var u := clampf(age / PATCH_IN, 0.0, 1.0)
+		return u * u * (3.0 - 2.0 * u)
+	var t := clampf((age / LANE_LIFE - PATCH_HOLD) / (1.0 - PATCH_HOLD), 0.0, 1.0)
+	return 1.0 - t * t * (3.0 - 2.0 * t)
+
+
+## Every frame: age the patches and the lane, drop what has closed, hand the rest to the
+## water.
 func _push_patches(delta: float) -> void:
 	_patch_clock += delta
 	for i in range(_patches.size() - 1, -1, -1):
 		if _patch_clock - float(_patches[i]["born"]) >= PATCH_LIFE:
 			_patches.remove_at(i)
+	_lay_lane(_net)
+	_lay_lane(_net2)
+	for i in range(_lane.size() - 1, -1, -1):
+		if _patch_clock - float(_lane[i]["born"]) >= LANE_LIFE:
+			_lane.remove_at(i)
 	if _water_material == null:
 		return
+	var lane := PackedVector4Array()
+	lane.resize(LANE_POINTS)
+	for i in mini(_lane.size(), LANE_POINTS):
+		var at: Vector2 = _lane[i]["at"]
+		lane[i] = Vector4(at.x, at.y, float(_lane[i]["radius"]), _lane_open(_lane[i]))
+	_water_material.set_shader_parameter(&"lane", lane)
+	_water_material.set_shader_parameter(&"lane_seed", _lane_seed)
 	var packed := PackedVector4Array()
 	packed.resize(PATCHES)
 	var seeds := PackedFloat32Array()

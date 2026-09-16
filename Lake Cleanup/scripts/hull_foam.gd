@@ -15,6 +15,11 @@
 ## A child of the boat, drawn behind the hull, laid in the boat's own space. It follows the
 ## boat's heading, and how hard the boat is pushing is eased in and out, so the wave builds as
 ## it gets going and dies away once it stops rather than switching.
+##
+## Worn by more than the hull since issue #31 (2026-09-16): the reeling net's mouth wears a
+## short bow wave with no trail, and the swimming dog and the wading angler wear a small
+## one with its trail — the streaks each thing leaves are one foam, sized to the thing. The
+## lengths are per instance for that; the shape is the one shape.
 class_name HullFoam
 extends Node2D
 
@@ -62,6 +67,12 @@ const PUSH_EASE := 2.0
 var half_length := 69.0
 var half_width := 28.5
 
+## How long the hugging streak runs, as a multiple of the half length; STREAK_LONG for a
+## hull. The net's mouth wants a short one — foam at the mouth, not a wake behind it.
+var streak_long := STREAK_LONG
+## Whether the trailing pair is drawn at all. Off for the net, by decision.
+var with_trail := true
+
 var _heading := Vector2(1.0, 0.0)
 var _push := 0.0
 var _shown_push := -1.0
@@ -94,8 +105,9 @@ func _draw() -> void:
 	var across := Vector2(-along.y, along.x)
 	across = Vector2(across.x, across.y * SQUASH)
 	# The trail first, so the bow's own wave sits over it where the two cross.
-	for side: float in [-1.0, 1.0]:
-		_draw_streak(along, across * side, true)
+	if with_trail:
+		for side: float in [-1.0, 1.0]:
+			_draw_streak(along, across * side, true)
 	for side: float in [-1.0, 1.0]:
 		_draw_streak(along, across * side, false)
 
@@ -137,7 +149,7 @@ func _draw_streak(along: Vector2, out: Vector2, trail: bool) -> void:
 ## the hull's side quickly, then peeling steadily away behind it. The trailing pair run the
 ## same curve with its own numbers — further back, wider, and away from the hull sooner.
 func _centre(along: Vector2, out: Vector2, u: float, trail: bool) -> Vector2:
-	var long := TRAIL_LONG if trail else STREAK_LONG
+	var long := TRAIL_LONG if trail else streak_long
 	var reach := TRAIL_HUG if trail else HUG
 	var spread := TRAIL_SPREAD if trail else SPREAD
 	var until := TRAIL_HUG_UNTIL if trail else HUG_UNTIL

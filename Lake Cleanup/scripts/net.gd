@@ -58,7 +58,14 @@ const CAST_SPEED := 26.0
 ## Seconds between the rings a hauled net leaves behind it. Close enough that the trail
 ## reads as continuous disturbance and far enough apart that the rings can be told from one
 ## another as they spread.
-const DRAG_RIPPLE := 0.13
+## The foam the reel pushes at the mouth (issue #31, 2026-09-16, Richard: the drag's ripples
+## "replaced by a foam streak", and "foam at the mouth only" — a bow wave with a short
+## tail, no trail): the ferry's own HullFoam sized to the mouth. MOUTH_STREAK is how far
+## back it runs, as a multiple of the mouth's half width.
+const MOUTH_STREAK := 0.7
+## How far out from the mouth's middle the streaks run, as a multiple of the mouth's
+## extent: a little outside the rim, so the foam shows past the mesh rather than under it.
+const MOUTH_FLARE := 0.7
 
 ## How close to the rod counts as home, in tiles.
 const HOME_DISTANCE := 0.35
@@ -632,6 +639,8 @@ class CatchStars extends CatchShine:
 var _rim: CatchRim
 var _beam: CatchBeam
 var _stars: CatchStars
+## The foam at the mouth while reeling. See MOUTH_STREAK.
+var _bow: HullFoam
 
 
 func _ready() -> void:
@@ -651,6 +660,11 @@ func _ready() -> void:
 	_beam = CatchBeam.new()
 	_beam.name = &"CatchBeam"
 	add_child(_beam)
+	_bow = HullFoam.new()
+	_bow.name = &"Bow"
+	_bow.with_trail = false
+	_bow.streak_long = MOUTH_STREAK
+	add_child(_bow)
 	_load_art()
 
 
@@ -875,6 +889,7 @@ func world_pos() -> Vector2:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_push_bow(delta)
 	_burn_down(delta)
 	_lean_into_pull(delta)
 	if state == State.SETTLED or state == State.REELING:
@@ -917,9 +932,6 @@ func _process(delta: float) -> void:
 			# parts the rubbish it passes. Straight after the sweep, so a piece is only ever
 			# shoved once the net has established it is not taking it.
 			_shove_aside(delta)
-			# Dragged, not carried: the water it is pulled through keeps letting go of it.
-			if splash != null:
-				splash.wake(self, world_pos(), mouth_extent() * 0.85, DRAG_RIPPLE)
 			if tile_pos.distance_to(angler.tile_pos) < HOME_DISTANCE:
 				_come_home()
 		State.SETTLED:
@@ -940,6 +952,27 @@ func _process(delta: float) -> void:
 ## uncovered, and the last ring finishes after it leaves (2026-09-15, Richard; `Sfx.hover_find`).
 ## The marker is up while a cast is out too, so this is too; not on the double cast's second
 ## net, which draws no marker, and not while a board is over the water and the angler is held.
+## The mouth's foam: pushed while the net is reeling, dying away otherwise. Laid at the
+## mouth's own spot, pointed the way it is being pulled — towards the angler — and sized to
+## the mouth it is on, so a wider net pushes a wider wave.
+func _push_bow(delta: float) -> void:
+	if _bow == null:
+		return
+	var at := world_pos()
+	var extent := mouth_extent()
+	var reeling := state == State.REELING and angler != null
+	var heading := Vector2.RIGHT
+	if reeling and angler.position.distance_squared_to(at) > 0.01:
+		heading = (angler.position - at).normalized()
+	# The wave's bow sits on the mouth's leading rim, not its middle: the streaks run back
+	# from there along the rim's sides, drawn behind the net so what shows is the water
+	# parting round the front of it. Laid at the middle, the whole wave was under the mesh.
+	_bow.position = at + Vector2(heading.x, heading.y * 0.5) * extent * 0.5
+	_bow.half_length = extent * 0.5
+	_bow.half_width = extent * MOUTH_FLARE
+	_bow.lay(heading, 1.0 if reeling else 0.0, delta)
+
+
 func _chime_at_finds() -> void:
 	if helper or sfx == null or grid == null or angler == null or not angler.can_walk:
 		return

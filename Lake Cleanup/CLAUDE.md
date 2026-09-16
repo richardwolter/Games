@@ -394,9 +394,15 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   piece off a stack with junk still under it, so most casts moved no water at all. Now every
   sweep that takes something (`CastNet.swept`, one per sweep, after its `caught`s) opens a
   patch of clean water at the mouth: the mouth's own extent plus `PATCH_REACH` (3) tiles in
-  proportion to how much of the hold it took, opening over `PATCH_IN` (0.8 s, the closing
-  run backwards), whole for `PATCH_HOLD` of `PATCH_LIFE` (5 s, up from 2: "more slowly")
-  and then closing, both ends eased. **Not a disc and not the net's ring**
+  proportion to how much of the hold it took, opening over `PATCH_IN` (0.4 s, the closing
+  run backwards), whole for `PATCH_HOLD` of `PATCH_LIFE` (4 s) and then closing, both ends
+  eased. **The numbers here were wrong until 2026-09-16**: this note said 8 patches, 5 s
+  and 0.8 s while the code had shipped 14 / 2 s / 0.2 s from the first commit, and the
+  shader still held `patches[8]`, so six of the fourteen were dropped silently. Issue #31
+  (Richard: the grime should get back together "a little bit slower", and continuously,
+  not in beats) settled it at 14 / 4 s / 0.4 s with `patch_soft` raised to
+  `PATCH_CLOSE_SOFT` (0.6), the shader's arrays sized to `PATCHES`, and `test_lake` reading
+  the shader source for both sizes. **Not a disc and not the net's ring**
   (Richard, same day, twice: the first noise pass was "still too round" with grime spots
   showing inside a fresh patch): the plane is **domain-warped** by a noise rolled per catch
   (`patch_seeds`, `_patch_rng`, `patch_warp`) before the distance is measured, so the outline
@@ -415,9 +421,19 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   sweep is its own patch with its own roll** (Richard, same day): a reel that took on its
   way home used to grow the one patch it had, repeating the same shape at every grab; now
   each grab is a new pool, and the cap keeps a long drag from piling them up. Dog and ferry takes
-  leave the water alone. Not saved. Capped at `PATCHES` (8), oldest replaced. Numbers are a
+  leave the water alone. Not saved. Capped at `PATCHES` (14), oldest replaced. Numbers are a
   first guess for Richard to retune by eye. `test_lake` guards the landing, the sizing, the
   closing and the cap.
+- **A reel with a catch aboard parts a lane through the grime** (`Lake._lay_lane`,
+  `LANE_*`, `water.gdshader` `lane[24]`/`lane_seed`, issue #31, 2026-09-16, Richard: "a
+  small clear way as it drags through grime before the grime gets back in again, very
+  subtle but noticeable"). A chain of small patches dropped every `LANE_SPACING` (14) world
+  px along the mouth's path, `LANE_WIDE` (0.55) of the mouth across, each opening and
+  closing on the patch's own curve over `LANE_LIFE` (3.2 s), all on one roll per reel so the
+  chain reads as one lane. **Catch only, by Richard's call** over every reel: the lane is
+  the catch being dragged home. Both nets. The shader's patch arithmetic is one function,
+  `patch_clear`, that the patches and the lane both call. `test_lake` guards the trigger
+  (empty net, net in flight), the spacing, the width, the cap and the roll.
 - **Blotch noise and stagger, low** (`murk_wobble` 0.1, `state_spread` 0.1): removed once
   because at 0.28 the blobs read as water leaking from under the island, then put back at
   under half that (2026-09-11) because with the cutoffs read straight off the map the
@@ -425,8 +441,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   wobble small; the map decides where the junk is, the noise only makes the edge breathe.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
-- Not yet converted to pixel art (pending, still live): `splash_foam`, `splash_specks`
-  (`water_splash.gd`), `beam.gdshader` (`LakeGrid.GlintBeam`).
+- Not yet converted to pixel art (pending, still live): `beam.gdshader`
+  (`LakeGrid.GlintBeam`). The splash went over on 2026-09-16 — see Foam on the Water.
 - **The pollution meter is art, not the water shader** (`hud_skin.gd` `_build_meter`,
   `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
   `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
@@ -976,6 +992,60 @@ in front of the player.
   the south without sending every shadow up the screen and behind the thing casting it, where
   none of it would be seen. What the southeast pass actually bought is the left/right half:
   shadows fall left, highlights are painted right. Don't try to finish the compass.
+
+### Foam on the Water (issue #31, 2026-09-16, `/grill-me` with Richard)
+Every disturbance on the lake is drawn in the one foam language — the collar's rules from
+`foam.gdshader`: worked out per art pixel, hard edges, palette swatches, dissolving into
+whole bubbles rather than fading. Richard's brief: splashes "replaced by our foam look, but
+keep its sizes and splash movement"; the drag's ripples "replaced by a foam streak"; the
+dogs' ripples "replaced by a foam streak behind them, ripples only when they enter the
+water"; boat splashes likewise.
+- **The splash keeps all four parts and every number of motion** (`water_splash.gd`): the
+  crown (mound and three plumes), the drops, the 32-frame speck sheet and the flat ring.
+  Only the ink changed. `splash_foam.gdshader` now snaps its bubble field to the world's
+  art-pixel grid (`foam_pixel` = `Lake.ART_PIXEL`; a splash happens in one place, so the
+  world grid, not a moving frame), ticks at `pixel_fps`, outputs one of three alpha steps
+  (whole, `remnant`, nothing) and two palette swatches (`foam` / `foam_core` through
+  `Palette.dress_foam`) — no gradient anywhere. `splash_specks.gdshader` re-reads the sheet
+  once per art-pixel cell at the cell's middle and cuts it hard at `edge`, so the frames'
+  soft spray lands on whole pixels. Drops are whole art pixels square (`draw_rect`), never
+  circles, and still glide. Rings are **bands, not lines** (`_band`, a strip of twenty
+  quads) so the shader has an area to tear: a ripple is `RIPPLE_THICK` (1 art px) of foam,
+  which the bubble cells break into a dashed ring; the crown's ring `RING_THICK` of its span.
+  `RIPPLE_ALPHA` went 0.3 to 0.5 because a torn band loses most of itself. Three parts,
+  drawn in order: `Rings`, `Specks`, `Crowns`; rings and crowns share one material.
+- **`ripple()` is a foam ring for every caller, by decision**: the net's landing ring (kept,
+  mouth x1.2), the fish schools' rings and the shelved siege's. One primitive.
+- **The reel wears a bow wave at the mouth, no trail** (`CastNet._push_bow`, `_bow`,
+  `MOUTH_STREAK` 0.7, `MOUTH_FLARE` 0.7): the ferry's own `HullFoam`, sized to the mouth,
+  its bow laid on the mouth's **leading rim** (laid at the middle the whole wave was under
+  the mesh) and drawn behind the net, so what shows is the water parting round the front.
+  Richard picked "foam at the mouth only" over a hull-style pair and a single trailing
+  strip. The 0.13 s ripple trail (`DRAG_RIPPLE`, `WaterSplash.wake` from the net) is gone.
+- **`HullFoam` is per instance now** (`streak_long`, `with_trail`): the shape is the one
+  shape, the lengths belong to the thing wearing it.
+- **The dog and the angler leave a streak and push one ring going in** (`Dog._wake`,
+  `Angler._wake`, `STREAK_LONG`/`STREAK_WIDE`/`ENTRY_SPAN` on each): a small `HullFoam`
+  with its trail, pushed while moving in the water faster than `Angler.WADE_LEAST`, pointed
+  the way the walker is going; one `ripple()` of `ENTRY_SPAN` on the frame the walker goes
+  in (`_was_swimming` / `_was_wading`), none after. **Retired**: the dog's drawn ring
+  (`_draw_wake`), the angler's pulsing boot rings (`_draw_ripples`, every `RIPPLE_*`,
+  and the `rings` term in `_paint_key`) and both `WaterSplash.wake` trails. The angler's
+  is the dog's rule by Richard's call; "streak only, keep the boot rings" was offered.
+- **The boat's bow spray is the same splash** and changed with it; the hull's own four
+  streaks are untouched.
+- **Out of scope, by decision**: the click ripple (`ClickRipple`), the hull streaks, the
+  grime blotch wobble, dog footsteps, `beam.gdshader`.
+- **Cost** (`bench_frames`, RTX 5060 Ti, 1080p, full lake, uncapped): 2.92 ms mean standing,
+  3.46 ms walking, worst 5.55 ms, nothing over 16.7 — inside the bar. The lane adds a
+  24-point loop with an early distance skip to every water fragment.
+- **Probe**: `tools/shot_foam.tscn` (desktop build, `--fixed-fps 60`, its own save) casts at
+  the farthest spot the marker reads green, and saves `tools/last_foam_{land,crown,reel,
+  lane}.png` cropped on the net plus `last_foam.log` (bow push, lane and patch counts).
+  Headless compiles no shader, so this is what proves the three edited ones — read its
+  engine log. `test_lake`'s `_stage_foam` guards the parts and their shaders and swatches,
+  the source having no line or circle left, the bow (trail off, short, on the rim, sized,
+  pushed up on the reel and dying at home), and both walkers' entry ring firing once.
 
 ### The Angler (`scripts/player.gd`, shed: `shed_room.gd`)
 One sheet, `assets/character.json`/`.png`, cut by `tools/slice_character.gd` from the strips
@@ -2616,7 +2686,7 @@ room's own coordinates while the picture is the whole window.
 - `scripts/lake_grid.gd` — basin, column stacks, settling logic, net harvesting
 - `scripts/player.gd` — boat position, net control, haul feedback
 - `scripts/boat.gd` — net animation and interaction
-- `scripts/water_splash.gd` — ripple feedback on haul/placement
+- `scripts/water_splash.gd` — splashes, ripples and drops, drawn as pixel foam (see Foam on the Water)
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
 - `scripts/skirt.gd` — baked painted grass tufts and sand spill round the shed and the box

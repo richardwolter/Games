@@ -125,6 +125,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_pointer()
 		26:
 			_stage_nature()
+		27:
+			_stage_foam()
 		_:
 			pass
 
@@ -3575,6 +3577,60 @@ func _stage_patch() -> void:
 	_main.call(&"_push_patches", 0.0)
 	for net in spare:
 		net.free()
+
+	# The shader's arrays are literal sizes; the lake packs exactly PATCHES and LANE_POINTS,
+	# and a mismatch drops the surplus silently (it did: 14 packed into patches[8]).
+	var source: String = (load("res://shaders/water.gdshader") as Shader).code
+	_check(source.contains("uniform vec4 patches[%d];" % cap),
+		"the water shader holds PATCHES patches", "%d" % cap)
+	var lane_cap := int(_main.get(&"LANE_POINTS"))
+	_check(source.contains("uniform vec4 lane[%d];" % lane_cap),
+		"and LANE_POINTS lane points", "%d" % lane_cap)
+	_check(float(_main.get(&"PATCH_LIFE")) >= 4.0 and float(_main.get(&"PATCH_IN")) >= 0.4,
+		"the grime gathers back slowly", "%.1f s, in over %.1f s"
+		% [float(_main.get(&"PATCH_LIFE")), float(_main.get(&"PATCH_IN"))])
+
+	# The lane: a reel with a catch aboard parts the grime along its path; an empty net,
+	# or one not reeling, leaves none.
+	var lane: Array = _main.get(&"_lane")
+	lane.clear()
+	var lane_net := CastNet.new()
+	lane_net.grid = _grid
+	lane_net.angler = _angler
+	lane_net.state = CastNet.State.REELING
+	lane_net.tile_pos = Vector2(46.0, 46.0)
+	_main.call(&"_lay_lane", lane_net)
+	_check(lane.is_empty(), "an empty net reeling parts no lane", "%d" % lane.size())
+	lane_net.catch.append(0)
+	lane_net.state = CastNet.State.FLYING
+	_main.call(&"_lay_lane", lane_net)
+	_check(lane.is_empty(), "nor a loaded one in flight", "%d" % lane.size())
+	lane_net.state = CastNet.State.REELING
+	_main.call(&"_lay_lane", lane_net)
+	_check(lane.size() == 1, "a reel with a catch aboard starts a lane", "%d" % lane.size())
+	_check(float(lane[0]["radius"]) < lane_net.mouth_extent(),
+		"narrower than the mouth", "%.1f of %.1f" % [float(lane[0]["radius"]), lane_net.mouth_extent()])
+	_main.call(&"_lay_lane", lane_net)
+	_check(lane.size() == 1, "and drops nothing until it has moved", "%d" % lane.size())
+	var spacing := float(_main.get(&"LANE_SPACING"))
+	lane_net.tile_pos += Vector2(spacing * 1.1 / Iso.TILE_W, 0.0) * 2.0
+	_main.call(&"_lay_lane", lane_net)
+	_check(lane.size() == 2, "then another after LANE_SPACING", "%d" % lane.size())
+	for i in lane_cap + 3:
+		lane_net.tile_pos += Vector2(spacing * 1.1 / Iso.TILE_W, 0.0) * 2.0
+		_main.call(&"_lay_lane", lane_net)
+	_check(lane.size() == lane_cap, "capped at LANE_POINTS", "%d" % lane.size())
+	lane[0]["born"] = float(lane[0]["born"]) - float(_main.get(&"LANE_LIFE")) * 1.01
+	var seed_was := float(_main.get(&"_lane_seed"))
+	lane_net.state = CastNet.State.IDLE
+	_main.call(&"_lay_lane", lane_net)
+	_main.call(&"_push_patches", 0.0)
+	_check(lane.size() == lane_cap - 1, "a point past LANE_LIFE is gone", "%d" % lane.size())
+	_check(float(_main.get(&"_lane_seed")) != seed_was,
+		"and a reel ending rolls the next lane's shape", "")
+	lane.clear()
+	_main.call(&"_push_patches", 0.0)
+	lane_net.free()
 	_advance()
 
 
@@ -4094,7 +4150,7 @@ func _stage_nature() -> void:
 	var fish: Fish = _main.get(&"_fish")
 	_check(flora != null and fish != null, "the lake grew its flora and fish nodes", "")
 	if flora == null or fish == null:
-		_finish()
+		_advance()
 		return
 	_check(flora.ready_to_grow(), "the flora sheet and table loaded and sowed candidates",
 		"%d candidates" % flora.candidate_count())
@@ -4180,8 +4236,145 @@ func _stage_nature() -> void:
 		_check((first["heading"] as Vector2).x < 0.0, "and away from the landing", str(first["heading"]))
 	_check(not fish.has_method("catch") and not fish.has_method("pay"),
 		"fish have no catch and no pay", "")
-	_finish()
+	_advance()
 
 
 func _water_material() -> ShaderMaterial:
 	return _main.get(&"_water_material")
+
+
+## Issue #31: every disturbance on the water is foam. The splash is drawn through the foam
+## shaders, a ripple is a torn band rather than a line, the reel wears a bow wave at the
+## mouth in place of its ripple trail, and the dog and the angler leave a streak while
+## moving in the water and push one ring only on the way in.
+func _stage_foam() -> void:
+	var splash := _main.get(&"_splash") as WaterSplash
+	_check(splash != null, "the lake has its splash", "")
+	if splash == null:
+		_finish()
+		return
+	var rings := splash.get_node_or_null(^"Rings") as Node2D
+	var specks := splash.get_node_or_null(^"Specks") as Node2D
+	var crowns := splash.get_node_or_null(^"Crowns") as Node2D
+	_check(rings != null and specks != null and crowns != null,
+		"the splash draws rings, specks and crowns on their own parts", "")
+	if rings != null and crowns != null and specks != null:
+		var froth := crowns.material as ShaderMaterial
+		_check(froth != null and froth.shader != null
+			and froth.shader.resource_path.ends_with("splash_foam.gdshader"),
+			"the crowns are drawn in the splash foam shader", "")
+		_check(rings.material == crowns.material, "and the rings in the same material", "")
+		var ink := specks.material as ShaderMaterial
+		_check(ink != null and ink.shader != null
+			and ink.shader.resource_path.ends_with("splash_specks.gdshader"),
+			"the specks through their own", "")
+		var palette := Palette.master()
+		if palette != null and froth != null and ink != null:
+			_check(froth.get_shader_parameter(&"foam") == palette.foam
+				and froth.get_shader_parameter(&"foam_core") == palette.foam_light
+				and ink.get_shader_parameter(&"foam") == palette.foam,
+				"both wear the palette's foam swatches", "")
+		_check(float(froth.get_shader_parameter(&"foam_pixel")) == Lake.ART_PIXEL,
+			"on the art-pixel grid", "%s" % froth.get_shader_parameter(&"foam_pixel"))
+		_check(int(rings.get_index()) < int(specks.get_index())
+			and int(specks.get_index()) < int(crowns.get_index()),
+			"rings under specks under crowns", "")
+	var ripples: PackedFloat32Array = splash.get(&"_ripple_age")
+	var ripples_was := ripples.size()
+	splash.ripple(Vector2(100.0, 100.0), 20.0)
+	ripples = splash.get(&"_ripple_age")
+	_check(ripples.size() == ripples_was + 1 and splash.is_processing(),
+		"a ripple is still one ring the water works out", "")
+	var splash_source: String = (load("res://scripts/water_splash.gd") as Script).source_code
+	_check(not splash_source.contains("draw_polyline") and not splash_source.contains("draw_circle"),
+		"nothing in the splash is a line or a circle any more", "")
+
+	# The reel's bow wave.
+	var bow := _net.get(&"_bow") as HullFoam
+	_check(bow != null and not bow.with_trail and bow.streak_long < 1.0,
+		"the net wears a short bow wave with no trail", "")
+	var net_source: String = (load("res://scripts/net.gd") as Script).source_code
+	_check(not net_source.contains("splash.wake("), "and sheds no ripple trail", "")
+	if bow != null:
+		var state_was := _net.state
+		var at_was := _net.tile_pos
+		_net.state = CastNet.State.REELING
+		_net.tile_pos = _angler.tile_pos + Vector2(2.0, 2.0)
+		for i in 30:
+			_net.call(&"_push_bow", 0.05)
+		_check(float(bow.get(&"_push")) > 0.9, "reeling pushes the wave up", "%.2f" % float(bow.get(&"_push")))
+		_check(bow.position.distance_to(_net.world_pos()) <= _net.mouth_extent() * 0.5 + 0.01
+			and bow.position.distance_to(_net.world_pos()) > 1.0, "on the mouth's leading rim", "")
+		_check(is_equal_approx(bow.half_width, _net.mouth_extent() * CastNet.MOUTH_FLARE),
+			"sized to the mouth", "%.1f" % bow.half_width)
+		_net.state = CastNet.State.IDLE
+		for i in 60:
+			_net.call(&"_push_bow", 0.05)
+		_check(float(bow.get(&"_push")) <= 0.0, "and it dies away at home", "%.2f" % float(bow.get(&"_push")))
+		_net.state = state_was
+		_net.tile_pos = at_was
+
+	# The dog: one ring going in, a streak while swimming, no ring lines drawn.
+	var dogs: Array = _main.get(&"_dogs")
+	var dog_source: String = (load("res://scripts/dog.gd") as Script).source_code
+	_check(not dog_source.contains("_draw_wake") and not dog_source.contains("splash.wake("),
+		"the dog draws no ring while swimming", "")
+	if not dogs.is_empty():
+		var dog := dogs[0] as Dog
+		var streak := dog.get(&"_streak") as HullFoam
+		_check(streak != null and streak.with_trail, "the dog wears a streak with its trail", "")
+		var dog_was := dog.tile_pos
+		var land := Iso.ISLAND_CENTRE
+		var water := land
+		for i in 60:
+			water += Vector2(0.25, 0.25)
+			dog.tile_pos = water
+			if not bool(dog.call(&"_on_land")):
+				break
+		dog.tile_pos = land
+		dog.set(&"_was_swimming", false)
+		ripples_was = (splash.get(&"_ripple_age") as PackedFloat32Array).size()
+		dog.call(&"_wake", 0.016)
+		_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was,
+			"a dog on land pushes no ring", "")
+		dog.tile_pos = water
+		dog.call(&"_wake", 0.016)
+		_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was + 1,
+			"going into the water pushes one", "")
+		dog.tile_pos = water + Vector2(0.1, 0.1)
+		dog.call(&"_wake", 0.016)
+		_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was + 1,
+			"and swimming on pushes no more", "")
+		dog.tile_pos = dog_was
+		dog.set(&"_was_swimming", not bool(dog.call(&"_on_land")))
+
+	# The angler: the same rule.
+	var angler_source: String = (load("res://scripts/player.gd") as Script).source_code
+	_check(not angler_source.contains("_draw_ripples") and not angler_source.contains("splash.wake("),
+		"the angler draws no rings round the boots", "")
+	var boots := _angler.get(&"_streak") as HullFoam
+	_check(boots != null and boots.with_trail, "and wears a streak with its trail", "")
+	var angler_was := _angler.tile_pos
+	var dry := Iso.ISLAND_CENTRE
+	var wet := dry
+	for i in 80:
+		wet += Vector2(0.2, 0.2)
+		if float(_angler.call(&"_wet_by", wet)) > 0.0:
+			break
+	_angler.tile_pos = dry
+	_angler.set(&"_was_wading", false)
+	ripples_was = (splash.get(&"_ripple_age") as PackedFloat32Array).size()
+	_angler.call(&"_wake", 0.016)
+	_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was,
+		"dry boots push no ring", "")
+	_angler.tile_pos = wet
+	_angler.call(&"_wake", 0.016)
+	_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was + 1,
+		"stepping in pushes one", "")
+	_angler.call(&"_wake", 0.016)
+	_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was + 1,
+		"and wading on pushes no more", "")
+	_angler.tile_pos = angler_was
+	_angler.set(&"_was_wading", float(_angler.call(&"_wet_by", angler_was)) > 0.0)
+	(splash.get(&"_ripple_age") as PackedFloat32Array).clear()
+	_finish()

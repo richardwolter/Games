@@ -85,28 +85,15 @@ var prints: Footprints
 
 ## The foam where the boots cut the surface while wading. See WaterlineFoam.
 var _foam: WaterlineFoam
+## The foam the boots leave while wading. See STREAK_LONG.
+var _streak: HullFoam
+var _was_wading := false
 
-## The rings of water round the ankles of somebody standing in the shallows: how many are
-## in the air at once, how long each takes to spread and fade, how wide it gets, and how
-## often the drawing is asked to move them on.
-##
-## Drawn rather than thrown at the splash system, which is for the net: a splash is an event
-## and this is a state — the water is disturbed for as long as the boots are in it, and that
-## is a ring or two spreading and going again, forever, for nothing.
-const RIPPLE_RINGS := 2
-const RIPPLE_PERIOD := 1.7
-const RIPPLE_FROM := 7.0
-const RIPPLE_TO := 30.0
-const RIPPLE_STEP := 0.05
-
-## The wake left by wading: how wide a ring, and how often one is shed while moving.
-##
-## The rings above are what standing in water looks like; this is what moving through it
-## looks like, and it is the same trail the net leaves when it is dragged home — see
-## `WaterSplash.wake`. Shed by time rather than by distance, which is the water's own rule
-## and not this file's business.
-const WAKE_SPAN := 16.0
-const WAKE_EVERY := 0.15
+## The foam the wading angler leaves (issue #31, 2026-09-16, the dog's rule: a streak
+## behind while moving in the water, one ring on the way in). See Dog.STREAK_LONG.
+const STREAK_LONG := 11.0
+const STREAK_WIDE := 6.0
+const ENTRY_SPAN := 30.0
 
 ## How tall the figure draws, in pixels — asked for rather than promised. The drawing is
 ## scaled by whole source pixels (see `_frame`), so what comes out is the nearest whole
@@ -246,6 +233,11 @@ func _ready() -> void:
 	_foam = WaterlineFoam.new()
 	_foam.name = &"Foam"
 	add_child(_foam)
+	_streak = HullFoam.new()
+	_streak.name = &"Streak"
+	_streak.half_length = STREAK_LONG
+	_streak.half_width = STREAK_WIDE
+	add_child(_streak)
 	_wear_tone()
 	_load_art()
 	stand_at(tile_pos)
@@ -459,6 +451,7 @@ func _place() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_push_wade()
+	_wake(delta)
 
 	# The throw itself holds the boots still — a cast that let the player walk out from
 	# under it never finished playing. Input is read and thrown away rather than skipped,
@@ -506,7 +499,6 @@ func _process(delta: float) -> void:
 	else:
 		tile_pos = _slide(move)
 	_step += delta
-	_wake()
 	_place()
 	_leave_print()
 	_footfall()
@@ -566,13 +558,20 @@ func _wading() -> float:
 	return roundf(into * WADE_SINK)
 
 
-## A ring of disturbed water behind the boots, if they are in the water at all.
-func _wake() -> void:
-	if splash == null or _wet_by(tile_pos) <= 0.0:
+## The water the boots move: one ring as they go in, and the streak behind them while they
+## are moving in it. From the foam on the cut, not from the boots under it: the wake is the
+## water they part.
+func _wake(delta: float) -> void:
+	var wading := _wet_by(tile_pos) > 0.0
+	var cut := Vector2(0.0, _cut_y(_wading(), 0.0))
+	if wading and not _was_wading and splash != null:
+		splash.ripple(Iso.tile_to_world(tile_pos.x, tile_pos.y) + cut, ENTRY_SPAN)
+	_was_wading = wading
+	if _streak == null:
 		return
-	# From the foam on the cut, not from the boots under it: the wake is the water they part.
-	var from := Iso.tile_to_world(tile_pos.x, tile_pos.y) + Vector2(0.0, _cut_y(_wading(), 0.0))
-	splash.wake(self, from, WAKE_SPAN, WAKE_EVERY)
+	_streak.position = cut
+	var moving := wading and _step > 0.0 and _speed > WADE_LEAST
+	_streak.lay(_screen_facing(), 1.0 if moving else 0.0, delta)
 
 
 ## A boot print in the sand or the grass, every PRINT_SPACING of ground actually covered.
@@ -644,12 +643,10 @@ func _sun_key() -> int:
 func _paint_key() -> int:
 	var walking := _step > 0.0
 	# How deep the boots are is part of the picture too: stepping into the shallows changes
-	# what is drawn without changing which frame it is, and while they are in the water the
-	# rings round them move on their own clock.
+	# what is drawn without changing which frame it is.
 	var sunk := _wading()
-	var rings := int(_time / RIPPLE_STEP) if sunk > 0.0 and walking else 0
 	var pose: Dictionary = _pose(walking)
-	return hash([pose["pose"], pose["index"], sunk, rings, _sun_key()])
+	return hash([pose["pose"], pose["index"], sunk, _sun_key()])
 
 
 ## The pose and frame index showing right now: idle, run, or the cast looping for as long as
@@ -673,31 +670,6 @@ func _pose(walking: bool) -> Dictionary:
 	return {"pose": pose, "index": index}
 
 
-## Rings of disturbed water round the feet, while any of the figure is under the surface.
-##
-## Flattened the same two to one as everything else lying on this plane, so a ring reads as a
-## circle on the water rather than as a hoop standing up out of it. They spread and fade with
-## how deep the boots are: a toe in the shallows barely marks the water and a step further out
-## is a bootful.
-##
-## Only while walking. Standing still in the shallows, the foam collar on the cut is enough to
-## say the boots are in the water; rings pulsing out forever round somebody who is not moving
-## read as the water fidgeting.
-func _draw_ripples(sunk: float) -> void:
-	if sunk <= 0.0 or _step <= 0.0:
-		return
-	var deep := clampf(sunk / WADE_SINK, 0.0, 1.0)
-	for i in RIPPLE_RINGS:
-		var out := fposmod(
-			_time / RIPPLE_PERIOD + float(i) / float(RIPPLE_RINGS), 1.0
-		)
-		var wide := lerpf(RIPPLE_FROM, RIPPLE_TO, out) * deep
-		var fade := (1.0 - out) * 0.5 * deep
-		if fade <= 0.01 or wide <= 1.0:
-			continue
-		_ring(Vector2(0.0, _cut_y(sunk, 0.0)), Vector2(wide, wide * 0.5), Color(0.86, 0.94, 0.97, fade))
-
-
 ## One flat ellipse, drawn as an outline. Sixteen sides: on a ring thirty pixels across that
 ## is a step of about six pixels, which is under the size the water itself is drawn at.
 func _ring(at: Vector2, extent: Vector2, colour: Color) -> void:
@@ -716,10 +688,6 @@ func _draw() -> void:
 
 	# The shadow, which is what puts them on the ground on a plane seen at an angle.
 	_draw_shadow(sunk, land_shift)
-
-	# And the water they have disturbed, over the shadow and under the figure — the rings are
-	# on the surface the boots are in, not on the boots.
-	_draw_ripples(sunk)
 
 	# The foam on the cut, behind the figure, while any of it is under.
 	if _foam != null:

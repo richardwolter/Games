@@ -17,9 +17,19 @@
 ## rubbish is the common case and it must cost nothing.
 ##
 ## Isometric, so a splash is three things at once: a ring spreading flat across the
-## surface, a crown thrown up off it, and a scatter of drops falling back in. The
-## ring is what places the splash on the plane — without it, a crown drawn at a
-## point could be anywhere along that line of sight.
+## surface, a crown thrown up off it, and a scatter of drops falling back in. The ring is
+## what places the splash on the plane — without it, a crown drawn at a point could be
+## anywhere along that line of sight.
+##
+## Drawn as foam (issue #31, 2026-09-16, Richard: "replaced by our foam look, but keep its
+## sizes and splash movement"): every shape and every number of motion below is as it was,
+## and what changed is the ink. The crown, its ring, the drops and the ripples go through
+## shaders/splash_foam.gdshader — the collar's own rules: worked out per art pixel on the
+## world grid, hard edges, palette swatches, dissolving into whole bubbles rather than
+## fading — and the speck sheet through splash_specks.gdshader, which re-cuts its frames on
+## the same grid. Rings are drawn as bands rather than lines so the foam has something to
+## tear; drops are whole art pixels rather than circles. Colours come from the palette
+## through Palette.dress_foam, so a repainted pack repaints the splashes.
 class_name WaterSplash
 extends Node2D
 
@@ -68,10 +78,20 @@ const RIPPLE_LIFE := 1.15
 ## it travels further and lives longer than that one.
 const RIPPLE_GROWTH := 2.6
 
-## Most opaque a ripple line ever is. Faint on purpose — a lake with hard white rings on it
+## Most opaque a ripple ring ever is. Faint on purpose — a lake with hard white rings on it
 ## looks like a puddle in the rain, and what is wanted is the surface being disturbed enough
-## to stop reading as a painted floor.
-const RIPPLE_ALPHA := 0.3
+## to stop reading as a painted floor. Higher than the 0.3 the line was drawn at: the band
+## is torn into bubbles by the shader, so at the old figure most of it dissolved away.
+const RIPPLE_ALPHA := 0.5
+
+## How thick a ripple's band is, and the crown's own ring, in art pixels. A ripple is one
+## pixel of foam: at that width the bubble cells tear it into a dashed ring, which is what a
+## ring of foam on pixel-art water is. The crown's ring is the splash spreading and is
+## thicker, in proportion to its span, with this as its least.
+const RIPPLE_THICK := 1.0
+const RING_THICK := 0.06
+## What the crown's flat ring is drawn at, as a share of the crown's own alpha.
+const RING_ALPHA := 0.6
 
 ## Hard ceiling on live ripples, the same bargain the drops strike.
 const MAX_RIPPLES := 90
@@ -143,6 +163,7 @@ class SplashPart extends Node2D:
 		draws.call(self)
 
 
+var _rings: SplashPart
 var _specks: SplashPart
 var _crowns: SplashPart
 
@@ -150,28 +171,43 @@ var _crowns: SplashPart
 func _ready() -> void:
 	set_process(false)
 
+	# The foam ink, one material shared by the rings and the crowns: the rings and the crowns
+	# are the same substance, and two materials would be two places to tune it.
+	var froth := ShaderMaterial.new()
+	froth.shader = load("res://shaders/splash_foam.gdshader")
+	froth.set_shader_parameter(&"peak_alpha", PEAK_ALPHA)
+	froth.set_shader_parameter(&"foam", FOAM)
+	froth.set_shader_parameter(&"foam_pixel", Lake.ART_PIXEL)
+	Palette.dress_foam(froth, 1.0)
+
+	_rings = SplashPart.new()
+	_rings.name = &"Rings"
+	_rings.draws = _draw_rings
+	_rings.material = froth
+	add_child(_rings)
+
 	_specks = SplashPart.new()
 	_specks.name = &"Specks"
 	_specks.draws = _draw_specks
 	var ink := ShaderMaterial.new()
 	ink.shader = load("res://shaders/splash_specks.gdshader")
-	ink.set_shader_parameter(&"ink", FOAM)
+	ink.set_shader_parameter(&"foam", FOAM)
+	ink.set_shader_parameter(&"foam_pixel", Lake.ART_PIXEL)
+	Palette.dress_foam(ink, 1.0)
 	_specks.material = ink
 	add_child(_specks)
 
 	_crowns = SplashPart.new()
 	_crowns.name = &"Crowns"
 	_crowns.draws = _draw_crowns
-	var froth := ShaderMaterial.new()
-	froth.shader = load("res://shaders/splash_foam.gdshader")
-	froth.set_shader_parameter(&"peak_alpha", PEAK_ALPHA)
 	_crowns.material = froth
 	add_child(_crowns)
 
 
 ## Every layer of the splash, redrawn together: they all read the same arrays.
 func _redraw() -> void:
-	queue_redraw()
+	if _rings != null:
+		_rings.queue_redraw()
 	if _specks != null:
 		_specks.queue_redraw()
 	if _crowns != null:
@@ -365,9 +401,9 @@ func _process(delta: float) -> void:
 		_last_ripple.clear()
 
 
-func _draw() -> void:
-	# Under the crowns and the drops: a ripple is the surface itself, and the splash is
-	# something happening on top of it.
+## The ripples, on the Rings child, under everything: a ripple is the surface itself, and
+## the splash is something happening on top of it.
+func _draw_rings(on: CanvasItem) -> void:
 	for r in _ripple_age.size():
 		var t := _ripple_age[r] / RIPPLE_LIFE
 		# Out fast and then coasting, the way a ring of water actually leaves what made it.
@@ -378,9 +414,8 @@ func _draw() -> void:
 		# In over the first fifth so a ring does not appear at full strength on top of the
 		# thing that made it, then away for the rest of its life.
 		var alpha := minf(t * 5.0, 1.0) * (1.0 - t) * (1.0 - t) * RIPPLE_ALPHA
-		var ring := _ellipse(_ripple_at[r], Vector2(wide, wide * 0.5))
-		ring.append(ring[0])
-		draw_polyline(ring, Color(FOAM, alpha), 1.5)
+		_band(on, _ripple_at[r], Vector2(wide, wide * 0.5), RIPPLE_THICK * Lake.ART_PIXEL,
+			Color(FOAM, alpha * PEAK_ALPHA))
 
 
 ## The speck ring, on the Specks child: over the ripples, under the crowns. The burst is spray
@@ -419,12 +454,12 @@ func _draw_crowns(on: CanvasItem) -> void:
 		# The ring: flat on the water, spreading and thinning. Only an isometric view can
 		# show this, and it is what tells the eye where on the plane the splash happened.
 		var ring := span * RING_SPREAD * t
-		# On the frame a splash is born the ring has no radius at all, and a polygon whose
-		# points are all the same point cannot be triangulated — the engine says so, once
-		# per splash, which on a lake this size is a lot of saying so.
+		# On the frame a splash is born the ring has no radius at all, and a band with no
+		# radius is nothing; the old filled disc could not be triangulated there either.
 		if ring > 1.0:
-			on.draw_colored_polygon(
-				_ellipse(at, Vector2(ring, ring * 0.5)), Color(FOAM, alpha * 0.20)
+			_band(
+				on, at, Vector2(ring, ring * 0.5),
+				maxf(span * RING_THICK, Lake.ART_PIXEL), Color(FOAM, alpha * RING_ALPHA)
 			)
 		# Likewise at the other end: the crown has collapsed to nothing before it has
 		# finished fading.
@@ -443,7 +478,13 @@ func _draw_crowns(on: CanvasItem) -> void:
 		# Drops fade over their last quarter only. Fading from the moment they leave
 		# the water makes the whole scatter look like it is already dying.
 		var fade := clampf(_drop_life[i] * 4.0, 0.0, 1.0)
-		on.draw_circle(_drop_pos[i], _drop_size[i], Color(FOAM, fade * 0.95))
+		# A drop is a whole number of art pixels square, never a circle: the smallest are
+		# one pixel of foam. It glides between pixels as everything moving on the lake does.
+		var side := maxf(roundf(_drop_size[i] * 2.0 / Lake.ART_PIXEL), 1.0) * Lake.ART_PIXEL
+		on.draw_rect(
+			Rect2(_drop_pos[i] - Vector2(side, side) * 0.5, Vector2(side, side)),
+			Color(FOAM, fade * PEAK_ALPHA)
+		)
 
 
 ## One plume of a crown: a tapered sheet of water arcing up and outward, built as a
@@ -507,10 +548,34 @@ func _mound(origin: Vector2, width: float, height: float) -> PackedVector2Array:
 	return out
 
 
-## A flat ellipse on the plane, for the spreading ring.
-func _ellipse(at: Vector2, extent: Vector2, steps: int = 20) -> PackedVector2Array:
-	var out := PackedVector2Array()
+## A flat ring on the plane with a width to it: the ellipse at `extent` as the band's
+## middle, `thick` world px across, drawn as one strip of triangles so the shader has an
+## area to tear into bubbles. A polyline had no area, and a line the foam cannot break up
+## is a line, not foam.
+func _band(on: CanvasItem, at: Vector2, extent: Vector2, thick: float, colour: Color) -> void:
+	var steps := 20
+	var points := PackedVector2Array()
+	var colours := PackedColorArray()
+	var indices := PackedInt32Array()
+	var half := thick * 0.5
 	for i in steps:
 		var angle := TAU * float(i) / float(steps)
-		out.append(at + Vector2(cos(angle) * extent.x * 0.5, sin(angle) * extent.y * 0.5))
-	return out
+		var dir := Vector2(cos(angle), sin(angle))
+		# The band's inner and outer edges, the width measured on the plane's own squash so
+		# the ring is as thick at its ends as at its front.
+		var outer := at + Vector2(
+			dir.x * (extent.x * 0.5 + half), dir.y * (extent.y * 0.5 + half * 0.5)
+		)
+		var inner := at + Vector2(
+			dir.x * maxf(extent.x * 0.5 - half, 0.0), dir.y * maxf(extent.y * 0.5 - half * 0.5, 0.0)
+		)
+		points.append(outer)
+		points.append(inner)
+		colours.append(colour)
+		colours.append(colour)
+		var base := i * 2
+		var next := ((i + 1) % steps) * 2
+		indices.append_array([base, base + 1, next + 1, base, next + 1, next])
+	RenderingServer.canvas_item_add_triangle_array(
+		on.get_canvas_item(), indices, points, colours
+	)
