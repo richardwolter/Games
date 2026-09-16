@@ -1302,8 +1302,12 @@ var _water_tiles: int = 0
 ## The glints on clean water: the tease of the finished lake's sparkle. `glint` in the
 ## water shader, driven off `_clean_share` bent by GLINT_BITE so the first clean bay pops a
 ## little and the last stretch pops a lot.
+## Sparser on 2026-09-16 (Richard: "decrease the amount of sparkle on clean water during
+## gameplay, it should be more sparse"): GLINT_MOST 0.7 to 0.4 and the shader's cell
+## 14 to 20 art px (GLINT_CELL), about a third of the pops there were.
 const GLINT_BITE := 1.4
-const GLINT_MOST := 0.7
+const GLINT_MOST := 0.4
+const GLINT_CELL := 20.0
 
 
 ## The corner buttons' canvas, F7, debug builds only. See ButtonTuner. Built on the key
@@ -1397,6 +1401,7 @@ func _shape_water(_shore: PackedVector2Array) -> void:
 	_water_material.set_shader_parameter(&"island_radius", Iso.ISLAND_RADIUS)
 	_water_material.set_shader_parameter(&"shore_lap", SHORE_LAP)
 	_water_material.set_shader_parameter(&"patch_soft", PATCH_CLOSE_SOFT)
+	_water_material.set_shader_parameter(&"glint_cell", GLINT_CELL)
 	_water_material.set_shader_parameter(&"coast_wave", COAST_WAVE)
 	_water_material.set_shader_parameter(&"coast_waves", COAST_WAVES)
 	_water_material.set_shader_parameter(&"coast_wave_speed", COAST_WAVE_SPEED)

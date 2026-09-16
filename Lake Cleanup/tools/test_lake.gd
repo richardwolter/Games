@@ -4202,6 +4202,10 @@ func _stage_nature() -> void:
 	_check(half > fresh + 0.2, "clearing half the lake lifts the clean share", "%.3f -> %.3f" % [fresh, half])
 	var glint: float = _water_material().get_shader_parameter(&"glint")
 	_check(glint > 0.0 and glint < 1.0, "the water is told to glint, short of full", "%.3f" % glint)
+	_check(float(_water_material().get_shader_parameter(&"glint_cell")) >= 20.0
+		and float(_main.get(&"GLINT_MOST")) <= 0.4,
+		"and sparsely", "cell %.0f, most %.2f" % [
+			float(_water_material().get_shader_parameter(&"glint_cell")), float(_main.get(&"GLINT_MOST"))])
 	_check(flora.alive_count() > 0, "plants came due beside the cleared water", "%d" % flora.alive_count())
 	var foul_plants := 0
 	for k in flora.candidate_count():
@@ -4288,6 +4292,19 @@ func _stage_foam() -> void:
 	var splash_source: String = (load("res://scripts/water_splash.gd") as Script).source_code
 	_check(not splash_source.contains("draw_polyline") and not splash_source.contains("draw_circle"),
 		"nothing in the splash is a line or a circle any more", "")
+	# No two crowns alike: each carries a roll, and the roll moves the shape.
+	var rolls_was := (splash.get(&"_crown_roll") as PackedFloat32Array).size()
+	splash.splash(Vector2(100.0, 100.0), 0.5)
+	splash.splash(Vector2(100.0, 100.0), 0.5)
+	var rolls: PackedFloat32Array = splash.get(&"_crown_roll")
+	_check(rolls.size() == rolls_was + 2 and rolls[rolls.size() - 1] != rolls[rolls.size() - 2],
+		"every crown rolls its own shape", "")
+	var straight: PackedVector2Array = splash.call(&"_plume", Vector2.ZERO, 1.0, 40.0, 20.0, 1.0)
+	var leant: PackedVector2Array = splash.call(&"_plume", Vector2.ZERO, 1.0, 40.0, 20.0, 1.3)
+	_check(straight.size() == leant.size() and straight != leant, "and the roll moves the plume", "")
+	_check(WaterSplash.CROWN_VARY > 0.0 and WaterSplash.CROWN_VARY <= 0.5,
+		"within a bit, not a different crown", "%.2f" % WaterSplash.CROWN_VARY)
+	(splash.get(&"_crown_age") as PackedFloat32Array).clear()
 
 	# The reel's bow wave.
 	var bow := _net.get(&"_bow") as HullFoam

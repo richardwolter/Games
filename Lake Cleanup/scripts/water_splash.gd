@@ -133,6 +133,15 @@ var _drop_floor := PackedFloat32Array()
 var _crown_at := PackedVector2Array()
 var _crown_age := PackedFloat32Array()
 var _crown_span := PackedFloat32Array()
+## One roll per crown (Richard, 2026-09-16: "randomize a bit of the crown format, so it is
+## not repetitive"): the plumes' lean, their heights against each other and the middle
+## one's width are read off it, within CROWN_VARY of the drawn shape. The span — the size —
+## is untouched: the roll is the shape, not the scale.
+var _crown_roll := PackedFloat32Array()
+
+## How far a crown's shape may wander from the drawn one, as a fraction: the side plumes'
+## lean and heights and the middle plume's width each move by up to this much.
+const CROWN_VARY := 0.3
 
 ## Live ripples: where on the plane, how far along, and how wide at birth.
 var _ripple_at := PackedVector2Array()
@@ -223,6 +232,7 @@ func splash(at: Vector2, strength: float) -> void:
 	_crown_at.append(at)
 	_crown_age.append(0.0)
 	_crown_span.append(span)
+	_crown_roll.append(randf())
 
 	if _burst_age.size() < MAX_BURSTS:
 		_burst_at.append(at)
@@ -350,9 +360,11 @@ func _process(delta: float) -> void:
 			_crown_at[c] = _crown_at[last]
 			_crown_age[c] = _crown_age[last]
 			_crown_span[c] = _crown_span[last]
+			_crown_roll[c] = _crown_roll[last]
 			_crown_at.resize(last)
 			_crown_age.resize(last)
 			_crown_span.resize(last)
+			_crown_roll.resize(last)
 			continue
 		_crown_age[c] = age
 		c += 1
@@ -469,10 +481,19 @@ func _draw_crowns(on: CanvasItem) -> void:
 		on.draw_colored_polygon(_mound(at, width, height * 0.3), Color(FOAM, alpha * 0.9))
 		# Three plumes: one up the middle and one leaning out each way. Two alone
 		# read as a pair of antlers — there was nothing between them, so the eye
-		# joined the tips instead of the bases.
-		on.draw_colored_polygon(_plume(at, -1.0, width, height * 0.8), ink)
-		on.draw_colored_polygon(_plume(at, 1.0, width, height * 0.8), ink)
-		on.draw_colored_polygon(_plume(at, 0.0, width * 0.5, height), ink)
+		# joined the tips instead of the bases. Each crown's roll sets how far the sides
+		# lean, which side stands taller, and how broad the middle is, so no two are alike.
+		var roll := _crown_roll[c]
+		var lean := 1.0 + (_unroll(roll, 1.0) * 2.0 - 1.0) * CROWN_VARY
+		var tilt := (_unroll(roll, 2.0) * 2.0 - 1.0) * CROWN_VARY
+		var broad := 1.0 + (_unroll(roll, 3.0) * 2.0 - 1.0) * CROWN_VARY
+		on.draw_colored_polygon(
+			_plume(at, -1.0, width, height * 0.8 * (1.0 + tilt), lean), ink
+		)
+		on.draw_colored_polygon(
+			_plume(at, 1.0, width, height * 0.8 * (1.0 - tilt), lean), ink
+		)
+		on.draw_colored_polygon(_plume(at, 0.0, width * 0.5 * broad, height), ink)
 
 	for i in _drop_life.size():
 		# Drops fade over their last quarter only. Fading from the moment they leave
@@ -493,10 +514,14 @@ func _draw_crowns(on: CanvasItem) -> void:
 ## The spine is a quadratic curve whose control point sits high and *inboard* of
 ## the tip, which is what makes the plume lean over at the top the way thrown water
 ## does. Control point outboard gives a pair of inward-hooking antlers instead.
-func _plume(origin: Vector2, dir: float, width: float, height: float) -> PackedVector2Array:
+##
+## `lean` scales how far out the tip and the control point sit, 1 for the drawn shape.
+func _plume(
+	origin: Vector2, dir: float, width: float, height: float, lean: float = 1.0
+) -> PackedVector2Array:
 	var base := origin + Vector2(dir * width * 0.12, 0.0)
-	var control := origin + Vector2(dir * width * 0.22, -height * 1.05)
-	var tip := origin + Vector2(dir * width * 0.5, -height * 0.62)
+	var control := origin + Vector2(dir * width * 0.22 * lean, -height * 1.05)
+	var tip := origin + Vector2(dir * width * 0.5 * lean, -height * 0.62)
 	var thickness := maxf(width * 0.16, 3.0)
 
 	var steps := 7
@@ -513,6 +538,12 @@ func _plume(origin: Vector2, dir: float, width: float, height: float) -> PackedV
 	for i in range(spine.size() - 1, -1, -1):
 		out.append(spine[i] - _across(spine, i) * thickness * _taper(i, spine.size()))
 	return out
+
+
+## A second, third... number off one roll, 0 to 1, so a crown carries one float and reads
+## several independent-enough shapes off it.
+func _unroll(roll: float, salt: float) -> float:
+	return fposmod(roll * (17.0 + salt * 11.0) + salt * 0.37, 1.0)
 
 
 ## How wide the plume is at a point along its spine: full at the waterline, nothing

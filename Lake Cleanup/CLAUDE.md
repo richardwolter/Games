@@ -1014,6 +1014,10 @@ water"; boat splashes likewise.
   which the bubble cells break into a dashed ring; the crown's ring `RING_THICK` of its span.
   `RIPPLE_ALPHA` went 0.3 to 0.5 because a torn band loses most of itself. Three parts,
   drawn in order: `Rings`, `Specks`, `Crowns`; rings and crowns share one material.
+  **Every crown rolls its own shape** (`_crown_roll`, `CROWN_VARY` 0.3, `_unroll`, same
+  day, Richard: "not repetitive"): the side plumes' lean, which side stands taller and the
+  middle plume's breadth each wander up to 30% off the drawn shape. The span is untouched —
+  the roll is the shape, not the size.
 - **`ripple()` is a foam ring for every caller, by decision**: the net's landing ring (kept,
   mouth x1.2), the fish schools' rings and the shelved siege's. One primitive.
 - **The reel wears a bow wave at the mouth, no trail** (`CastNet._push_bow`, `_bow`,
@@ -1036,6 +1040,9 @@ water"; boat splashes likewise.
   streaks are untouched.
 - **Out of scope, by decision**: the click ripple (`ClickRipple`), the hull streaks, the
   grime blotch wobble, dog footsteps, `beam.gdshader`.
+- **The clean-water glints are sparser** (`Lake.GLINT_MOST` 0.7 to 0.4, `GLINT_CELL` 20
+  art px pushed to the shader's `glint_cell`, was 14; same day, Richard: "more sparse"):
+  about a third of the pops. The finished lake's `sparkle` is untouched.
 - **Cost** (`bench_frames`, RTX 5060 Ti, 1080p, full lake, uncapped): 2.92 ms mean standing,
   3.46 ms walking, worst 5.55 ms, nothing over 16.7 — inside the bar. The lane adds a
   24-point loop with an early distance skip to every water fragment.
