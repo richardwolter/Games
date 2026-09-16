@@ -1,6 +1,7 @@
 ## Headless checks for tree test mode (`Lake.tree_mode`): the tree file loads, a tree run
 ## starts net-only with the file's money, nodes are bought by the tree's rules, the ferries and
-## the dog appear when they are bought, the tree screen lays the whole tree out, and the tree
+## the dog appear when they are bought, the strength nodes open on any two of their ring, luck and
+## the bonus and the pigeons read the tree, the tree screen lays the whole tree out, and the tree
 ## slot saves and loads — and is refused by an ordinary run.
 ##
 ## Run: <godot> --headless --path . res://tools/test_tree.tscn --log-file tools/last_tree_engine.log
@@ -101,26 +102,54 @@ func _stage_fresh_run() -> void:
 	_check(not owned.has("line_1"), "a node that cannot be paid for is not bought", "")
 
 	_main.set(&"sludge", 1000000.0)
+	# The dog comes first: the net's first ring hangs off it (third pass, 2026-09-14).
+	_main.call(&"buy_node", "line_1")
+	_check(not owned.has("line_1"), "the net's first upgrades wait for the dog", "")
+	_check(float(tree.cost(owned, "dog")) <= 500.0, "and the dog is cheap", "%.0f" % float(tree.cost(owned, "dog")))
+	_main.call(&"buy_node", "dog")
+	_check(owned.has("dog") and dog.visible and dog.is_processing(), "the dog appears once adopted", "")
+	_check(is_equal_approx(dog.reach, Dog.REACH) and is_zero_approx(dog.strand_first), "an untrained dog is today's dog", "")
 	var range_was := float(_main.call(&"net_range"))
 	var reel_was := float(_main.call(&"reel_speed"))
+	var line_range := _effect(tree, "line_1", "net_range")
+	var line_reel := _effect(tree, "line_1", "reel")
 	_main.call(&"buy_node", "line_1")
 	var net: CastNet = _main.get(&"_net")
-	_check(is_equal_approx(float(_main.call(&"net_range")), range_was + 2.2) and is_equal_approx(net.range_tiles, range_was + 2.2),
+	_check(line_range > 0.0 and is_equal_approx(float(_main.call(&"net_range")), range_was + line_range) and is_equal_approx(net.range_tiles, range_was + line_range),
 		"Longer Line I reaches the net", "range %.2f -> %.2f, net %.2f" % [range_was, float(_main.call(&"net_range")), net.range_tiles])
-	_check(is_equal_approx(float(_main.call(&"reel_speed")), reel_was + 1.0), "and speeds the reel", "")
+	_check(is_equal_approx(float(_main.call(&"reel_speed")), reel_was + line_reel), "and speeds the reel", "")
 
-	_main.call(&"buy_node", "bag_3")
-	_check(not owned.has("bag_3"), "Bigger Bag III waits for Bigger Bag II and the Second Ferry", "")
-	for id in ["bag_1", "bag_2", "dog"]:
+	# The strength nodes join their ring: any two of it.
+	_check(int(tree.by_id["pull_1"]["requireCount"]) == 2, "Stronger Pull needs a count of its ring", "")
+	_main.call(&"buy_node", "pull_1")
+	_check(not owned.has("pull_1"), "one node of the ring does not open Stronger Pull", "")
+	_main.call(&"buy_node", "mouth_1")
+	_check(tree.is_visible(owned, "pull_1"), "two of the ring do", "")
+	_main.call(&"buy_node", "pull_1")
+	_check(owned.has("pull_1") and int(_main.call(&"net_power")) == 1, "and Stronger Pull lifts tier 1", "")
+	_main.call(&"buy_node", "bag_1")
+	_check(owned.has("bag_1"), "the ring's third node can still be bought after it", "")
+
+	# Luck, the bonus and the pigeons read the tree in a tree run.
+	_check(is_zero_approx(float(_main.call(&"lucky_chance"))) and is_zero_approx(float(_main.call(&"double_cast_chance"))),
+		"no luck before it is bought", "")
+	_check(int(_main.call(&"bonus_kind")) < 0 and is_zero_approx(float(_main.call(&"recycle_bonus"))), "and no yard is boosted", "")
+	var bird_was := float(_main.call(&"bird_pay"))
+	for id in ["line_2", "lucky_1", "pull_2", "double_1", "sails_1", "recycle_1", "pigeons_1"]:
 		_main.call(&"buy_node", id)
-	_check(dog.visible and dog.is_processing(), "the dog appears once adopted", "")
-	_check(is_equal_approx(dog.reach, Dog.REACH) and is_zero_approx(dog.strand_first), "an untrained dog is today's dog", "")
-	for id in ["hull_1", "ferry_2"]:
+	_check(is_equal_approx(float(_main.call(&"lucky_chance")), _effect(tree, "lucky_1", "lucky_odds")), "Lucky Haul I sets the odds of a lucky cast",
+		"%.2f" % float(_main.call(&"lucky_chance")))
+	_check(is_equal_approx(float(_main.call(&"double_cast_chance")), _effect(tree, "double_1", "double_odds")), "Double Cast I sets the odds of a second net",
+		"%.2f" % float(_main.call(&"double_cast_chance")))
+	_check(int(_main.call(&"bonus_kind")) >= 0 and float(_main.call(&"recycle_bonus")) > 0.0, "Recycle Bonus I boosts a yard", "")
+	_check(float(_main.call(&"bird_pay")) > bird_was, "Pigeon Bounty I raises what a bird pays", "%.1f -> %.1f" % [bird_was, float(_main.call(&"bird_pay"))])
+
+	_main.call(&"buy_node", "leash")
+	_check(not owned.has("leash"), "the dog's later training waits for its strength node", "")
+	for id in ["line_3", "bag_3", "pull_3", "hull_1", "ferry_2"]:
 		_main.call(&"buy_node", id)
 	boats = _main.get(&"_boats")
 	_check(boats.size() == 2 and (boats[1] as Boat).visible, "the Second Ferry is a second hull in the water", "%d hulls" % boats.size())
-	_main.call(&"buy_node", "bag_3")
-	_check(owned.has("bag_3"), "and with both owned, Bigger Bag III can be bought", "")
 	for id in ["fetch_1", "fetch_2", "beachcomber", "nose", "leash"]:
 		_main.call(&"buy_node", id)
 	_check(dog.strand_first > 0.5 and is_equal_approx(dog.strand_speed, 1.6), "Beachcomber sends the dog to the strand, quicker",
@@ -140,6 +169,17 @@ func _stage_fresh_run() -> void:
 			if a < b and (at[a] as Vector2).distance_to(at[b]) < 40.0:
 				spread = false
 	_check(spread, "no two nodes sit on top of each other", "")
+	# Spread for reading (2026-09-14): nodes on one ring keep their gap, and edges do not cross.
+	var tight := 0
+	for a: String in at:
+		for b: String in at:
+			if a < b and absf((at[a] as Vector2).length() - (at[b] as Vector2).length()) < 1.0 \
+					and (at[a] as Vector2).distance_to(at[b]) < TreeScreen.NODE_GAP * 0.9:
+				tight += 1
+	_check(tight == 0, "nodes on one ring stay NODE_GAP apart", "%d pairs too close" % tight)
+	var crossings := _crossings(tree, screen)
+	_check(crossings[0] == 0, "no two edges within a category cross", "%d crossings" % crossings[0])
+	_check(crossings[1] <= 2, "and hardly any across categories", "%d crossings" % crossings[1])
 	_main.call(&"_set_menu", false)
 	_check(not screen.visible, "and closes", "")
 
@@ -179,6 +219,48 @@ func _stage_other_mode() -> void:
 	_main.queue_free()
 	_main = null
 	_finish()
+
+
+## Edge crossings on the tree screen, as [within a category, involving a cross-category edge].
+## Edges that share a node are allowed to meet there.
+func _crossings(tree: UpgradeTree, screen: TreeScreen) -> Array:
+	var edges: Array = []
+	for n: Dictionary in tree.nodes:
+		for p: String in n["parents"]:
+			if screen.is_badge(p, n["id"]):
+				continue
+			var same: bool = tree.by_id[p]["tree"] == n["tree"] or (tree.by_id[p]["parents"] as Array).is_empty()
+			edges.append([p, n["id"], screen.call(&"_edge_path", p, n["id"]), same])
+	var within := 0
+	var across := 0
+	for i in edges.size():
+		for j in range(i + 1, edges.size()):
+			var e: Array = edges[i]
+			var f: Array = edges[j]
+			if e[0] == f[0] or e[0] == f[1] or e[1] == f[0] or e[1] == f[1]:
+				continue
+			if _paths_cross(e[2], f[2]):
+				if e[3] and f[3]:
+					within += 1
+				else:
+					across += 1
+	return [within, across]
+
+
+func _paths_cross(a: PackedVector2Array, b: PackedVector2Array) -> bool:
+	for i in range(1, a.size()):
+		for j in range(1, b.size()):
+			if Geometry2D.segment_intersects_segment(a[i - 1], a[i], b[j - 1], b[j]) != null:
+				return true
+	return false
+
+
+## The first `add` a node's effects make to `stat`.
+func _effect(tree: UpgradeTree, id: String, stat: String) -> float:
+	for e: Dictionary in tree.by_id[id].get("effects", []) as Array:
+		if String(e["stat"]) == stat and e.has("add"):
+			return float(e["add"])
+	return 0.0
 
 
 func _finish() -> void:

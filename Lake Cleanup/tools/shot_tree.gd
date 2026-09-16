@@ -7,7 +7,7 @@ extends Node
 
 const SAVE_PATH := "user://shot_tree.save"
 const OUT := "res://tools/last_tree.png"
-const BUY := ["ferry_1", "line_1", "hull_1", "bag_1", "line_2", "pull_1", "bag_2", "dog", "sails_1", "hull_2"]
+const BUY := ["ferry_1", "dog", "line_1", "hull_1", "bag_1", "line_2", "pull_1", "bag_2", "sails_1", "hull_2"]
 
 var _main: Node
 var _frames: int = 0
@@ -35,6 +35,20 @@ func _process(_delta: float) -> void:
 	if _frames == 8:
 		var screen: TreeScreen = _main.get(&"_tree_screen")
 		screen.set(&"_hover", "ferry_2")
+		if OS.get_environment("TREE_SHOT_ALL") != "":
+			# The whole tree bought and framed, to judge its shape.
+			var tree: UpgradeTree = _main.get(&"_tree")
+			var owned: Dictionary = _main.get(&"_tree_owned")
+			for n: Dictionary in tree.nodes:
+				owned[n["id"]] = 1
+			var box := Rect2()
+			for id: String in screen.positions():
+				box = box.expand(screen.positions()[id])
+			var room := Vector2(screen.size.x, screen.size.y - TreeScreen.HEADER)
+			var zoom := minf(room.x / (box.size.x + 200.0), room.y / (box.size.y + 200.0))
+			screen.set(&"_zoom", zoom)
+			screen.set(&"_offset", Vector2(screen.size.x * 0.5, TreeScreen.HEADER + room.y * 0.5) - box.get_center() * zoom)
+			screen.set(&"_hover", "")
 	if _frames == 40:
 		var image := get_viewport().get_texture().get_image()
 		image.save_png(ProjectSettings.globalize_path(OUT))

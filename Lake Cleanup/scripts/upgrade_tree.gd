@@ -6,7 +6,9 @@
 ## simulator and the tuner page use, so what is played is exactly what was simulated. See
 ## `docs/progression/lake-tree.md` for the design and why each node exists.
 ##
-## A node is visible once any parent is owned (all of them, for `requireAll`), and roots are
+## A node is visible once any parent is owned (all of them, for `requireAll`; at least
+## `requireCount` of them, when that is set — the net's strength nodes need any two of their
+## ring), and roots are
 ## visible from the start. Stats are recomputed from the base values every time, never applied
 ## a purchase at a time: the largest `set` replaces the base, then every `add` is summed, then
 ## every `mul` multiplies. That is the simulator's rule, and it makes buy order irrelevant.
@@ -24,6 +26,7 @@ const GAME_STATS := [
 	"net_radius", "net_power", "net_range", "reel", "net_hold",
 	"boat_speed", "cargo", "boats",
 	"dog", "dog_fetch", "dog_wait_cut", "dog_reach", "dog_beach", "dog_strand_speed",
+	"lucky_odds", "double_odds", "recycle_bonus", "bird_worth",
 ]
 
 var nodes: Array = []
@@ -69,6 +72,7 @@ func _read(data: Dictionary) -> void:
 		n["parents"] = (n.get("parents", []) as Array).map(func(p: Variant) -> String: return String(p))
 		n["tags"] = (n.get("tags", []) as Array).map(func(p: Variant) -> String: return String(p))
 		n["requireAll"] = bool(n.get("requireAll", false))
+		n["requireCount"] = int(n.get("requireCount", 0))
 		if String(n["id"]).is_empty() or by_id.has(n["id"]):
 			error = "a node has no id, or two share one (%s)" % n["id"]
 			return
@@ -114,6 +118,13 @@ func is_visible(owned: Dictionary, id: String) -> bool:
 	var parents: Array = by_id[id]["parents"]
 	if parents.is_empty():
 		return true
+	var need := int(by_id[id]["requireCount"])
+	if need > 0:
+		var have := 0
+		for p: String in parents:
+			if is_owned(owned, p):
+				have += 1
+		return have >= need
 	if by_id[id]["requireAll"]:
 		for p: String in parents:
 			if not is_owned(owned, p):

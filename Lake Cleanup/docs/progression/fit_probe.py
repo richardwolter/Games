@@ -77,13 +77,54 @@ if casts:
     for cfg, cs in by_cfg.items():
         print(f"  levels {list(cfg)}: {sum(x['pieces'] for x in cs) / len(cs):5.1f} pieces, {sum(x['seconds'] for x in cs) / len(cs):4.1f} s per cast, hold {cs[0]['hold']}")
 
-# ---- ferry run: seconds = a + b / speed  (b = two legs)
+# ---- ferry run: seconds = a + b / speed + c * lot  (b = the lap's sailing, c = the volleys)
+# Loads are mixed since 2026-09-14, so a run is a lap of every yard it needs; the one-material
+# runs measured before that were one-stop trips and came out about three times too fast.
 if ferries:
-    a, b = least_squares([1.0 / f["speed"] for f in ferries], [f["seconds"] for f in ferries])
-    err = math.sqrt(sum((a + b / f["speed"] - f["seconds"]) ** 2 for f in ferries) / len(ferries))
-    cal["k_ferry_leg"] = round(b / 2.0, 2)
-    cal["k_ferry_fixed"] = round(a, 2)
-    print(f"ferry run: seconds = {a:.1f} + {b:.1f} / speed  -> leg {b / 2:.1f} tiles   (rms {err:.1f} s over {len(ferries)} runs)")
+    def solve3(rows3):
+        # normal equations for y = a + b*x1 + c*x2
+        import itertools
+        n = len(rows3)
+        S = [[0.0] * 3 for _ in range(3)]
+        T = [0.0] * 3
+        for x1, x2, y in rows3:
+            v = [1.0, x1, x2]
+            for i in range(3):
+                T[i] += v[i] * y
+                for j in range(3):
+                    S[i][j] += v[i] * v[j]
+        # Gauss
+        M = [S[i] + [T[i]] for i in range(3)]
+        for i in range(3):
+            piv = max(range(i, 3), key=lambda r: abs(M[r][i]))
+            M[i], M[piv] = M[piv], M[i]
+            for r in range(3):
+                if r != i and M[i][i]:
+                    f = M[r][i] / M[i][i]
+                    M[r] = [M[r][k] - f * M[i][k] for k in range(4)]
+        return [M[i][3] / M[i][i] for i in range(3)]
+    fa, fb, fc = solve3([(1.0 / f["speed"], f["lot"], f["seconds"]) for f in ferries])
+    err = math.sqrt(sum((fa + fb / f["speed"] + fc * f["lot"] - f["seconds"]) ** 2 for f in ferries) / len(ferries))
+    cal["k_ferry_leg"] = round(fb / 2.0, 2)
+    cal["k_ferry_fixed"] = round(fa, 2)
+    cal["k_ferry_per_piece"] = round(fc, 3)
+    print(f"ferry run (mixed loads): seconds = {fa:.1f} + {fb:.1f} / speed + {fc:.3f} * lot  (rms {err:.1f} s over {len(ferries)} runs)")
+    for f in ferries[::2]:
+        print(f"  speed {f['speed']:5.1f}, lot {f['lot']:3d}: {f['seconds']:.1f} s")
+
+# ---- double cast and birds, off the same casts
+if casts:
+    found = [c for c in casts if "double_found" in c]
+    if found:
+        cal["k_double_found"] = round(sum(1 for c in found if c["double_found"]) / len(found), 3)
+        print(f"double cast: a spot for the second net found on {cal['k_double_found'] * 100:.0f}% of casts (fresh lake)")
+    with_birds = [c for c in casts if "birds" in c]
+    if with_birds:
+        first = [c for c in with_birds if c["hold"] <= 6]
+        cal["k_bird_per_cast"] = round(sum(c["birds"] for c in with_birds) / len(with_birds), 3)
+        cal["k_bird_per_cast_small"] = round(sum(c["birds"] for c in first) / max(len(first), 1), 3)
+        cal["k_birds_on_lake"] = round(sum(c["birds_on_lake"] for c in with_birds) / len(with_birds), 1)
+        print(f"birds: {cal['k_bird_per_cast']:.2f} a cast over all casts, {cal['k_bird_per_cast_small']:.2f} with a small net, not aimed at; {cal['k_birds_on_lake']} on the lake")
 
 # ---- skimmer: pieces per run against the model's shape, as one correction factor
 if skims:

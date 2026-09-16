@@ -14,73 +14,34 @@
  "k_reel_factor": 0.977,
  "k_shelf": 0.1,
  "k_density": 1.2,
- "k_ferry_leg": 24.19,
- "k_ferry_fixed": 6.33,
- "skim_runs": [
-  {
-   "level": 1,
-   "lot": 5,
-   "capacity": 157,
-   "skimmed": 1,
-   "seconds": 5.1
-  },
-  {
-   "level": 4,
-   "lot": 5,
-   "capacity": 157,
-   "skimmed": 98,
-   "seconds": 7.8
-  },
-  {
-   "level": 7,
-   "lot": 5,
-   "capacity": 157,
-   "skimmed": 159,
-   "seconds": 9.4
-  },
-  {
-   "level": 10,
-   "lot": 5,
-   "capacity": 157,
-   "skimmed": 162,
-   "seconds": 7.7
-  },
-  {
-   "level": 4,
-   "lot": 157,
-   "capacity": 157,
-   "skimmed": 4,
-   "seconds": 6.5
-  },
-  {
-   "level": 10,
-   "lot": 157,
-   "capacity": 157,
-   "skimmed": 10,
-   "seconds": 8.6
-  }
- ],
+ "k_ferry_leg": 103.29,
+ "k_ferry_fixed": 8.4,
+ "k_ferry_per_piece": 0.059,
+ "k_double_found": 1.0,
+ "k_bird_per_cast": 0.295,
+ "k_bird_per_cast_small": 0.083,
+ "k_birds_on_lake": 11.2,
  "dog_runs": [
   {
    "levels": [
     0,
     0
    ],
-   "per_minute": 3.33
+   "per_minute": 2.67
   },
   {
    "levels": [
     4,
     0
    ],
-   "per_minute": 7.33
+   "per_minute": 9.33
   },
   {
    "levels": [
     4,
     3
    ],
-   "per_minute": 11.33
+   "per_minute": 4.0
   }
  ]
 }

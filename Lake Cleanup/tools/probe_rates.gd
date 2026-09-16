@@ -32,12 +32,16 @@ const CASTS := 8
 ## Where along the range each cast lands, in turn.
 const CAST_REACH := [0.55, 0.8, 0.95, 0.7]
 
-## Ferry levels: boat_speed, cargo.
-const FERRY_CONFIGS := [[0, 0], [6, 10], [12, 20], [18, 28]]
+## Ferry levels: boat_speed, cargo. Loaded mixed, in the lake's own material shares
+## (`_material_share`, off the census), because a real hold is mixed and a run visits every
+## yard its load needs — a one-material load is a one-stop run, and measuring only those put
+## the sim's ferries 2.5 times faster than play (2026-09-14).
+const FERRY_CONFIGS := [[0, 3], [3, 3], [0, 6], [3, 6], [6, 6], [3, 12], [8, 12]]
 const FERRY_RUNS := 2
 
 ## Skimmer level, and the load the ferry leaves with (a big number means a full hold).
-const SKIM_CONFIGS := [[1, 5], [4, 5], [7, 5], [10, 5], [4, 999], [10, 999]]
+## The skimmer is cut from the tree design; left empty so the phase passes straight through.
+const SKIM_CONFIGS := []
 const SKIM_CARGO_LEVEL := 28
 const SKIM_SPEED_LEVEL := 10
 
@@ -66,6 +70,10 @@ var _count0: int = 0
 var _runs0: int = 0
 var _skimmed: int = 0
 var _lot: int = 0
+var _material_share: Array = [0.25, 0.25, 0.25, 0.25]
+var _birds: int = 0
+var _birds0: int = 0
+var _double_found: bool = false
 
 
 func _ready() -> void:
@@ -108,9 +116,8 @@ func _boot() -> void:
 	_yard = _main.get_node(^"Yard")
 	_boat = _main.get_node(^"Boat") as Boat
 	_dog = _main.get_node_or_null(^"Dog")
-	var flock := _main.get_node_or_null(^"Flock")
-	if flock != null:
-		flock.set(&"spawning", false)
+	# The flock stays on: the net phase counts the birds a cast takes without aiming at them.
+	_net.caught_bird.connect(func(_at: Vector2) -> void: _birds += 1)
 	if _dog != null:
 		_dog.set_process(false)
 	_main.call(&"_set_auto_ferry", false)
@@ -128,6 +135,7 @@ func _census() -> void:
 	var depth_sum := 0
 	var deepest := 0
 	var by_ring := {}
+	var by_material := {}
 	for index in _grid.stacks.size():
 		var stack: PackedInt32Array = _grid.stacks[index]
 		var here := 0
@@ -149,13 +157,19 @@ func _census() -> void:
 			if is_dry:
 				dry += 1
 			by_tier[def.tier] = int(by_tier.get(def.tier, 0)) + 1
+			by_material[def.material] = int(by_material.get(def.material, 0)) + 1
 			by_ring[ring] = int(by_ring.get(ring, 0)) + 1
 		if here > 0:
 			tiles_used += 1
 			depth_sum += here
 			deepest = maxi(deepest, here)
+	var counted := 0
+	for m: int in by_material:
+		counted += int(by_material[m])
+	for m in 4:
+		_material_share[m] = float(by_material.get(m, 0)) / maxf(float(counted), 1.0)
 	_emit({
-		"probe": "census", "pieces": _grid.piece_count(), "by_tier": by_tier, "keepsakes": keepsakes,
+		"probe": "census", "pieces": _grid.piece_count(), "by_tier": by_tier, "by_material": by_material, "keepsakes": keepsakes,
 		"strand": strand, "dry": dry, "tiles_with_pieces": tiles_used,
 		"mean_stack": float(depth_sum) / maxf(float(tiles_used), 1.0), "deepest": deepest,
 		"by_distance_from_island_centre": by_ring,
@@ -200,7 +214,12 @@ func _net_step() -> void:
 			reach *= 0.9
 			target = _angler.tile_pos + dir * reach
 			tries += 1
+		# Would a double cast have found somewhere to throw the second net? Asked before the
+		# throw, as `_roll_luck` asks it, and the second net is never actually thrown.
+		var second: Vector2 = _main.call(&"_double_spot", target)
+		_double_found = second != Vector2.INF
 		_count0 = _grid.piece_count()
+		_birds0 = _birds
 		_t0 = _clock
 		_main.call(&"_cast_at", Iso.tile_to_world(target.x, target.y))
 		if _net.state != CastNet.State.FLYING:
@@ -219,6 +238,8 @@ func _net_step() -> void:
 			"reel": _net.reel_speed, "hold": _net.hold,
 			"distance": float(_lot) / 100.0, "pieces": _count0 - _grid.piece_count(),
 			"seconds": _clock - _t0, "timed_out": _net.state != CastNet.State.IDLE,
+			"birds": _birds - _birds0, "double_found": _double_found,
+			"birds_on_lake": ((_main.get(&"_flock") as Node).get(&"birds") as Array).size(),
 		})
 		_net.set_pulling(false)
 		_round += 1
@@ -255,6 +276,19 @@ func _load_yard(count: int, kind: int) -> void:
 		_yard.call(&"put", _def_of(kind))
 
 
+## `count` pieces in the lake's material shares, dealt round so the hold is mixed through.
+func _load_mixed(count: int) -> void:
+	var owed := [0.0, 0.0, 0.0, 0.0]
+	for i in count:
+		var pick := 0
+		for m in 4:
+			owed[m] += float(_material_share[m])
+			if owed[m] > owed[pick]:
+				pick = m
+		owed[pick] -= 1.0
+		_yard.call(&"put", _def_of(pick))
+
+
 func _ferry_step() -> void:
 	if _config >= FERRY_CONFIGS.size():
 		_phase = "skim"
@@ -279,7 +313,7 @@ func _ferry_step() -> void:
 				return
 			_empty_yard()
 			_lot = _boat.capacity
-			_load_yard(_lot, (_config + _round) % 4)
+			_load_mixed(_lot)
 			_runs0 = _boat.runs_done
 			_t0 = _clock
 			_boat.auto_ferry = true
@@ -290,7 +324,7 @@ func _ferry_step() -> void:
 			_boat.auto_ferry = false
 			_emit({
 				"probe": "ferry_run", "levels": FERRY_CONFIGS[_config], "speed": _boat.speed,
-				"capacity": _boat.capacity, "lot": _lot, "kind": (_config + _round) % 4,
+				"capacity": _boat.capacity, "lot": _lot, "mixed": true,
 				"seconds": _clock - _t0, "timed_out": _boat.runs_done == _runs0,
 			})
 			_round += 1

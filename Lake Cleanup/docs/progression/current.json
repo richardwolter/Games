@@ -26,8 +26,9 @@
   "k_aim": 2.0,
   "k_cast_share": 0.75,
   "k_mouth_edge": 0.15,
-  "k_ferry_leg": 24.19,
-  "k_ferry_fixed": 6.33,
+  "k_ferry_leg": 103.29,
+  "k_ferry_fixed": 8.4,
+  "k_ferry_per_piece": 0.059,
   "k_material_share": 0.3,
   "k_stack_slots": 4,
   "k_skim_factor": 1.4,
@@ -90,7 +91,7 @@
   ],
   [
    "ferry_trip",
-   "k_ferry_fixed + 2 * k_ferry_leg / boat_speed"
+   "k_ferry_fixed + 2 * k_ferry_leg / boat_speed + k_ferry_per_piece * cargo"
   ],
   [
    "ferry_rate",

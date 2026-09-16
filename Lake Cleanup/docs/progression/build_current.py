@@ -66,6 +66,7 @@ stats = {
     # ferry
     "k_ferry_leg": cal["k_ferry_leg"],      # measured: tiles each way, dock to pier
     "k_ferry_fixed": cal["k_ferry_fixed"],  # measured: seconds per run not spent sailing
+    "k_ferry_per_piece": cal.get("k_ferry_per_piece", 0.0),  # measured: the volleys, per piece aboard
     # skimmer
     "k_material_share": 0.3,  # sum of MATERIAL_QUOTA squared: chance a piece is the pier's material
     "k_stack_slots": 4,       # measured mean stack 4.07
@@ -106,7 +107,7 @@ derived = [
     ["per_cast", "min(net_hold, swept * density)"],
     ["cast_cycle", "k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"],
     ["catch_rate", "per_cast / cast_cycle"],
-    ["ferry_trip", "k_ferry_fixed + 2 * k_ferry_leg / boat_speed"],
+    ["ferry_trip", "k_ferry_fixed + 2 * k_ferry_leg / boat_speed + k_ferry_per_piece * cargo"],
     ["ferry_rate", "boats * cargo / ferry_trip"],
     # The skimmer only fishes on a loaded run to a pier, only for that pier's material.
     ["trips", "min(boats / ferry_trip, rate_ferry)"],
