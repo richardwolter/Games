@@ -229,11 +229,16 @@ func _roll(delta: float) -> void:
 ## Spotify's mark on the row it belongs to, moved here in the frame rather than in `_draw`.
 ##
 ## Placed from the draw it jittered as it climbed (2026-09-16, Richard): a child node's
-## position set while its parent is filling its own draw list lands a frame late and not
-## always the same frame late, so the mark shivered against the name beside it. It is also
-## **not snapped to whole pixels** — it is a smooth vector at a linear filter, and rounding a
-## thing that moves 1.3 px a frame to the nearest pixel is exactly what stepping looks like.
-## The pixel-art rule is for pixel art.
+## position set while its parent is filling its own draw list lands a frame late, and not
+## always the same frame late, so the mark shivered against the name beside it.
+##
+## That was not the whole of it. The font is imported with `subpixel_positioning`, so a
+## glyph lands on a **fraction-of-a-pixel grid** while a node's position is continuous: the
+## name stepped, the mark slid, and the gap between them opened and closed every few frames.
+## Leaving the mark unsnapped made that worse rather than better. **Both are put on the
+## row's own whole pixel** now (`_roll_row_y`) — the text's baseline and the mark's box off
+## the same rounded number — so whatever the rasteriser does with the glyphs, the two move
+## as one thing. A roll that steps in whole pixels is right for this game anyway.
 func _place_icon() -> void:
 	if _icon == null:
 		return
@@ -241,19 +246,20 @@ func _place_icon() -> void:
 		_icon.visible = false
 		return
 	var fade := 1.0 - pow(1.0 - _shown, 3.0)
-	var y := size.y * (1.0 + ROLL_BELOW) - _roll_at
+	var y := _roll_top()
 	for row in _roll_rows:
 		var step := float(row["step"])
 		var px := int(row["px"])
 		if px > 0 and float(row["icon"]) > 0.0:
-			var mark := _icon_size(px)
-			if y > -step and y < size.y + step:
+			var mark := roundf(_icon_size(px))
+			var top := _roll_row_y(y)
+			if top > -step and top < size.y + step:
 				_icon.position = Vector2(
-					_roll_start(row, String(row["text"]), px) - _icon_room(px),
-					y + (float(px) - mark) * 0.5
+					roundf(_roll_start(row, String(row["text"]), px) - _icon_room(px)),
+					top + roundf((float(px) - mark) * 0.5)
 				)
 				_icon.size = Vector2(mark, mark)
-				_icon.modulate.a = fade * _roll_clear(y, float(px))
+				_icon.modulate.a = fade * _roll_clear(top, float(px))
 				_icon.visible = true
 			else:
 				_icon.visible = false
@@ -343,21 +349,23 @@ func _make_icon() -> void:
 func _draw_roll(fade: float) -> void:
 	if not _rolling or _roll_rows.is_empty():
 		return
-	var y := size.y * (1.0 + ROLL_BELOW) - _roll_at
+	var y := _roll_top()
 	for row in _roll_rows:
 		var step := float(row["step"])
 		var px := int(row["px"])
-		if px > 0 and y > -step and y < size.y + step:
+		var top := _roll_row_y(y)
+		if px > 0 and top > -step and top < size.y + step:
 			var head: bool = bool(row["head"])
 			var tone := Style.RIBBON_INK if head else Style.INK
 			var ink := Color(tone.r, tone.g, tone.b, fade)
 			var text := String(row["text"])
-			var start := _roll_start(row, text, px)
-			var clear := _roll_clear(y, float(px))
+			var start := roundf(_roll_start(row, text, px))
+			var clear := _roll_clear(top, float(px))
+			var base := top + float(px)
 			Style.write(
-				self, text, px, Vector2(start, y + float(px)),
+				self, text, px, Vector2(start, base),
 				Color(ink.r, ink.g, ink.b, 1.0), HORIZONTAL_ALIGNMENT_LEFT,
-				Rect2(start, y + float(px), size.x, 1.0), fade * clear
+				Rect2(start, base, size.x, 1.0), fade * clear
 			)
 		y += step
 
@@ -382,6 +390,17 @@ func _roll_clear(top: float, tall: float) -> float:
 	if gap <= 0.0:
 		return ROLL_BEHIND
 	return lerpf(ROLL_BEHIND, 1.0, gap / ROLL_BEHIND_SOFT)
+
+
+## Where the roll's first row stands this frame, before any row's own rounding.
+func _roll_top() -> float:
+	return size.y * (1.0 + ROLL_BELOW) - _roll_at
+
+
+## A row's top on a whole pixel. The one place the roll's height is quantised, asked by the
+## writing and by Spotify's mark alike — see `_place_icon` for why they have to agree.
+func _roll_row_y(y: float) -> float:
+	return roundf(y)
 
 
 ## Where a row starts, so that the mark, its gap and the writing are centred on the window

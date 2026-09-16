@@ -59,6 +59,14 @@ func _physics_process(_delta: float) -> void:
 		# dims under the words.
 		760:
 			_save(&"behind")
+		# Spotify's mark and the name beside it, frame by frame: if the two move by the same
+		# whole pixel every frame they are locked, and if they do not the mark jitters
+		# against the word. Eyeballing a still cannot tell the difference (2026-09-16).
+		#
+		# Measured well clear of the message, where the roll is at full strength: inside the
+		# band it dims to ROLL_BEHIND and neither the green nor the cream is itself any more.
+		700, 701, 702, 703, 704, 705:
+			_save_frame()
 		# Well up the screen, with the whole roll in the picture.
 		900:
 			_note("rolling: %s" % str(_ending() != null and _ending().rolling()))
@@ -104,6 +112,18 @@ func _empty_the_lake() -> void:
 func _note(line: String) -> void:
 	_log += line + "\n"
 	print(line)
+
+
+## Six frames in a row, well clear of the message, for `tools/check_mark_jitter.py` to
+## measure Spotify's mark against the name beside it.
+##
+## The pictures are what is measured, not the scene: reading the viewport's texture inside
+## `_physics_process` hands back a stale capture, which said the mark was in open water and
+## never moved. `_save` writes a real frame, so the check is made off the files.
+func _save_frame() -> void:
+	get_viewport().get_texture().get_image().save_png(
+		ProjectSettings.globalize_path("res://tools/last_ending_jitter_%d.png" % _frames)
+	)
 
 
 func _save(which: StringName) -> void:
