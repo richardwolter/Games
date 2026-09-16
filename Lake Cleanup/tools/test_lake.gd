@@ -3661,6 +3661,23 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(dog != null and dog.has_method(&"carrying"),
 		"a dog says what is in its mouth, so the ending can wait for it", "")
 
+	# A ferry landing its hold at a pier is silent: that volley is a whole hold going into a
+	# box across the lake, several times a minute, and the coins are what say it landed. The
+	# angler's own throws into the island crate keep the thud.
+	var haul: Haul = _main.get(&"_haul")
+	var yard_here: Dropoff = (_main.get(&"_dropoffs") as Array)[0]
+	# `play_pop` steps the crate thud's pitch every time it fires, so the step table is what
+	# says whether it sounded at all.
+	sound.set(&"_pitch_step", {})
+	haul.set(&"_pop_at", -1000.0)
+	haul.call(&"_pop", yard_here)
+	_check(not bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
+		"a ferry landing at a pier knocks no box", "")
+	haul.set(&"_pop_at", -1000.0)
+	haul.call(&"_pop", null)
+	_check(bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
+		"but the angler's own throw into the crate still does", "")
+
 	# Every recording is levelled by the builder now, so what SOUNDS holds is the mix. A
 	# figure far outside the band is a take that was never rebuilt.
 	var loudest := -100.0

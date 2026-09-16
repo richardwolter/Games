@@ -170,7 +170,7 @@ func _process(delta: float) -> void:
 			continue
 		piece["age"] = float(piece["age"]) + delta
 		if float(piece["age"]) >= FLIGHT:
-			_pop()
+			_pop(piece["tag"])
 			arrived.emit(int(piece["def"]), piece["tag"])
 			_flying.remove_at(i)
 	if _flying.is_empty():
@@ -184,8 +184,14 @@ func _process(delta: float) -> void:
 ## half-second of nothing, and then the real run of them — the gap being the flight, which
 ## is silent by definition. One pop per piece, at the moment it lands, is a stream that
 ## matches what is on screen.
-func _pop() -> void:
-	if sfx == null:
+##
+## **A ferry landing its hold at a pier is silent** (2026-09-16, Richard: too repetitive).
+## That volley is a whole hold going into a box across the lake, several times a minute, and
+## it already has a sound of its own — the run of coins to the plate, which is what the
+## delivery is actually about. The angler's own throws into the crate keep the thud: that is
+## the player's hand, in front of them, one cast at a time.
+func _pop(tag: Variant = null) -> void:
+	if sfx == null or tag is Dropoff:
 		return
 	var now := float(Time.get_ticks_msec()) / 1000.0
 	if now - _pop_at < POP_GAP:

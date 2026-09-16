@@ -1699,7 +1699,14 @@ purpose. What the audit settled, against the shipped design:
   - Hauling: `Haul_Sound` replaces the drag loop. It plays when the reel starts and again every
     `HAUL_EVERY` (1 s) while reeling, pitch and level off the net's effort (`set_drag`).
   - Each piece lifted: `Object_Splash`, pitched lower and louder by weight, at most one every
-    `SPLASH_GAP` (0.08 s), the built knock under it.
+    `SPLASH_GAP` (0.08 s). The built knock that used to go under it is cut (see above).
+  - A piece landing in a box: the shed's wooden thud (`play_pop`), **except when a ferry is
+    landing its hold at a pier** (`Haul._pop` skips a `Dropoff` tag, 2026-09-16, Richard: too
+    repetitive). That volley is a whole hold going into a box across the lake, several times
+    a minute, and it already has a sound of its own — the run of coins to the plate, which is
+    what the delivery is about. The angler's own throws into the island crate keep the thud:
+    that is the player's hand, in front of them, one cast at a time. `test_lake` guards both
+    halves.
   - A find caught: `Decoration_Caught_Net` (replaces the struck note). `Decoration_Chime` (its
     first 1.5 s, faded over 0.9 s, quiet) rings while the aim marker is over a shining find,
     buried or uncovered, **no more than once in `CHIME_GAP` (6 s)**; after the marker leaves,
