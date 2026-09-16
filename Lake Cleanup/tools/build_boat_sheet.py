@@ -296,12 +296,20 @@ MARK_EDGE = "d"
 ## face is 26 px wide against 34 bow on — so a level ring sits on it as it does bow on. The
 ## canvas starts a row or two lower in those frames, where the sloping top edge has left
 ## the whole width white.
+## Square in every frame that carries it (2026-09-12), and as large as the white face will
+## take: a ring drawn into a canvas taller than it is wide comes out an ellipse, and a ring
+## drawn into a small one comes out an angular blob. Frame 3's was 11 x 11 — the arcs
+## quantised into a squashed lump — and its face takes 14. Frame 4's was 5 wide by 14 tall,
+## which is the flattest of the lot; the billow lens it is painted on is about seven pixels
+## across at the widest, so the canvas is seven square and the mark is a small round one
+## rather than a tall thin one. Their mirrors (13 and 12) are the east headings and come off
+## the same numbers.
 MARK_QUAD = {
     0: ((52, 51), (75, 51), (52, 71)),
     1: ((51, 50), (74, 50), (51, 70)),
     2: ((52, 50), (69, 50), (52, 67)),
-    3: ((53, 52), (64, 52), (53, 63)),
-    4: ((56, 46), (61, 49), (56, 60)),
+    3: ((52, 50), (65, 50), (52, 63)),
+    4: ((56, 51), (62, 51), (56, 57)),
 }
 ## Where the frames turn about: the mast's column, and the water at the axis's depth,
 ## which is the side view's waterline (frame 4, whose whole near side is at that depth).
