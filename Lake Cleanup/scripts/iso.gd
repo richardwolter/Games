@@ -88,8 +88,8 @@ static func shore_fraction(tx: float, ty: float) -> float:
 	return r / wobble
 
 
-## The shed's footprint on the plane, as tile radii out from the island's middle, and how
-## tall it is drawn in world pixels.
+## The shed's footprint on the plane, as tile half-extents out from the island's middle, and
+## how tall it is drawn in world pixels.
 ##
 ## Kept here rather than in whichever script draws it, because two things need it and they
 ## must not disagree: the lake draws the hut, and the angler walks round it. A building you
@@ -97,36 +97,81 @@ static func shore_fraction(tx: float, ty: float) -> float:
 ##
 ## Grown from 1.15x0.95 / 74px once the rubbish stopped all drawing at one size: at 74 the
 ## hut was a tenth taller than the biggest thing floating past it, which read as a shed the
-## size of a wardrobe. At 118 it is about three quarters again as tall as the largest find
-## and takes a third of its island, leaving beach on every side.
-const SHED_FOOT := Vector2(1.70, 1.40)
-const SHED_TALL := 118.0
-
-
-## Is this tile inside the shed? An ellipse in tile space, which is the same shape on screen
-## as everything else that lies on the plane.
+## size of a wardrobe. Then 118, and now 1.2 times that again, Richard's call.
 ##
-## `grow` widens it, and is what anything that walks passes in. The hut is drawn as a picture
-## a great deal taller and a little wider than the ground it stands on, so a walker allowed
-## right up to the footprint ends up with the wall drawn across its middle — standing in the
-## shed as far as the eye is concerned. Kept out of a slightly bigger ellipse, it either
-## walks past the hut or goes behind it, and never through it.
+## **The footprint is measured off the art, not chosen** (2026-09-12): the walls' feet are a
+## diamond on screen whose left and right corners are rows 93 and 103 of `shed.png` and whose
+## near corner is (73.5, 126) about a middle at (64.5, 98) — which comes back as half-extents
+## of 0.96 by 0.69 tiles at 118 tall, and so 1.15 by 0.83 at this size. It used to be
+## 1.70 x 1.40: an ellipse sized to hold a walker clear of the whole picture, eaves and all,
+## which is most of a tile of grass the player could see and not use on every side. The hut
+## is now treated the way the crate is — you may stand right against the wall, and the roof
+## over your head is the roof over your head. Re-measure both numbers if the hut is re-cut.
+## 141.4 (2026-09-12): the hut is 101 painted pixels tall now (tools/downres_shed.py) and
+## drawn at 1.4 world px per painted pixel — the grain Richard picked over 2.0 and 1.6. Not
+## an art-pixel multiple, so it draws faintly uneven on the screen grid, as the 1.1 original
+## did. The footprint re-measured at the new size is within a few hundredths of the values
+## below and they are left.
+const SHED_FOOT := Vector2(1.15, 0.83)
+const SHED_TALL := 141.4
+
+## Where the hut's picture is laid, and where inside that picture the walls stand: the bottom
+## row of `shed.png` goes this far below the island's middle in tile heights, and the walls'
+## feet are this fraction of the picture's height up from that row.
+##
+## Both are drawing numbers and both live here, because `shed_centre` below is what turns
+## them into the place the hut *is* — and the lake that draws it and the walkers that are
+## kept out of it must agree on that or the building is in two places. They were in `lake.gd`
+## and only the drawing used them, which is exactly how the two drifted apart.
+const SHED_STAND := 0.35
+const SHED_ART_GROUND := 0.233
+
+
+## Where the hut stands, in tile coordinates: the middle of the diamond its walls' feet make.
+##
+## **Not the island's middle.** The picture's bottom row is laid `SHED_STAND` below that, and
+## the walls stand `SHED_ART_GROUND` of the picture's height above its bottom row, which on a
+## hut this tall leaves the building about two thirds of a tile north of the point everything
+## used to assume it was on. The footprint was centred on the island's middle and the picture
+## was not, so a walker was stopped well short of the wall on the near side and could stand
+## inside it on the far side. Only the old footprint being half again too big hid it.
+static func shed_centre() -> Vector2:
+	var down := (TILE_H * SHED_STAND - SHED_TALL * SHED_ART_GROUND) / TILE_H
+	return ISLAND_CENTRE + Vector2(down, down)
+
+
+## Is this tile inside the shed? A **rectangle in tile space** — the diamond the walls stand
+## on, on screen — exactly as `Yard.covers` treats the crate.
+##
+## It was an ellipse, and an ellipse is the one shape here that is not the shape of anything
+## drawn: it rounded off the corners the walls actually have and bulged past the faces
+## between them, so the hut felt round to walk round. Its faces are tile axes now, which is
+## what lets a walker slide along one instead of sticking to it.
+##
+## `grow` widens it, and is what anything that walks passes in.
 static func in_shed(tx: float, ty: float, grow: float = 0.0) -> bool:
-	var foot := SHED_FOOT + Vector2(grow, grow)
-	return Vector2(
-		(tx - ISLAND_CENTRE.x) / foot.x, (ty - ISLAND_CENTRE.y) / foot.y
-	).length_squared() < 1.0
+	var mid := shed_centre()
+	return absf(tx - mid.x) < SHED_FOOT.x + grow and absf(ty - mid.y) < SHED_FOOT.y + grow
 
 
 ## How much wider than its footprint the hut is kept clear of, in tiles, for anything that
-## walks. See `in_shed`.
+## walks. See `in_shed`. The crate's `Yard.WALK_KEEP` is the same idea and about the same
+## size: a pair of boots is not a point, and without it a walker stands on the bottom plank.
 ##
 ## Barely anything now. It was half a tile, which on an island nine tiles across is a wall
 ## standing well clear of the hut it belongs to: walking round the shed meant being shoved
 ## out onto the sand, and the grass between the two was land the player could see and not
-## use. The picture is taller than its footprint, not much wider, so this only has to keep a
-## walker off the wall itself.
+## use. This only has to keep a walker off the wall itself.
 const SHED_KEEP := 0.12
+
+
+## How far past the footprint the hut's *picture* spreads, in tiles: the eaves and the roof.
+##
+## Nothing walking uses this — a walker may stand under the eaves, the way it may stand
+## against the crate. It is for things that are **planted** and would then be drawn growing
+## out of the building: the island's tufts. They draw under the hut, so one inside this is
+## not visible so much as wasted, and one just clear of it is a plant beside a shed.
+const SHED_COVER := 0.9
 
 
 ## How far a tile is from the island's middle, as a fraction of the island's edge in that
