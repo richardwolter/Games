@@ -32,6 +32,27 @@ func _physics_process(_delta: float) -> void:
 		for i in mini(names.size(), 24):
 			unlocked.append(String(names[i]))
 		room.unlocked = unlocked
+		# A room in use, for the placement rules to be looked at (2026-09-13): the tall
+		# bookcase and the fridge against the wall, a painting hung over them, the table
+		# with a pot set on it, two chairs on one row, and the bed. Every name that the
+		# catalogue does not know is skipped, so a re-cut costs the probe nothing.
+		var decor: Array = _main.get(&"decor")
+		decor.clear()
+		room.decor = decor
+		for want: Array in [
+			[&"decor_bookcase_tall", 1, -4], [&"decor_fridge", 9, -4],
+			[&"decor_painting_a", 14, -3], [&"decor_painting_b", 18, -4],
+			[&"decor_kitchen_counter", 22, -2], [&"decor_stove", 32, -3],
+			[&"decor_big_table", 4, 8], [&"decor_flower_pot", 6, 6], [&"decor_globe", 9, 5],
+			[&"decor_dining_chair", 12, 10], [&"decor_dining_chair", 14, 10],
+			[&"decor_pet_bed", 24, 14], [&"decor_big_rug", 20, 6], [&"decor_sofa", 22, 8],
+		]:
+			if room.sheets.has(want[0]):
+				# Written in cells, which is what the eye lays a room out in; the room places
+				# in source pixels now (2026-09-16, ShedRoom.CELL), so they are scaled here.
+				var at := Vector2i(int(want[1]), int(want[2])) * ShedRoom.CELL
+				if not room.place(want[0], at):
+					push_warning("shot_shed: %s refused at %s,%s" % want)
 		_main.call(&"_set_shed", true)
 	if _frames == 20:
 		_write()

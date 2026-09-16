@@ -122,13 +122,36 @@ def despeck(im):
     return im.crop((x0, y0, x1, y1))
 
 
-def load_layer(slug, cache):
+def load_layer(slug, cache, missing_ok=False):
     if slug not in cache:
         path = LAYERS / (slug + ".png")
         if not path.exists():
+            if missing_ok:
+                return None
             sys.exit("missing layer PNG: %s" % path)
         cache[slug] = Image.open(path).convert("RGBA")
     return cache[slug]
+
+
+def rubbish_sprite(book, slug, cache):
+    """One rubbish kind's own picture, cut off the lake sheet it lives on.
+
+    A find born from the rubbish (the paintings, the chew toy, the globe — Richard,
+    2026-09-13) has no dirty layer in the decoration PSD: what the lake shows is the
+    rubbish kind itself, and the kind stays in the fill as well. So its grimy sprite is a
+    copy of that region, packed onto the dirty sheet like any other find's, which keeps
+    `Sheets.by_sheet["decor_dirty"]` the one list of finds.
+    """
+    for piece in book["pieces"]:
+        if piece["name"] == slug:
+            sheet = book["sheets"][piece["sheet"]]
+            key = "sheet:" + piece["sheet"]
+            if key not in cache:
+                path = ROOT / sheet["file"].replace("res://", "")
+                cache[key] = Image.open(path).convert("RGBA")
+            x, y, w, h = piece["region"]
+            return cache[key].crop((x, y, x + w, y + h))
+    sys.exit("no rubbish kind called %s in the catalogue" % slug)
 
 
 def fill_of(im):
@@ -167,9 +190,14 @@ def pack(sprites):
     return sheet, spots
 
 
+## Where a find may go. See tools/decor_sets.json.
+PLACES = ("floor", "wall", "small")
+
+
 def main():
     table = json.loads(TABLE.read_text(encoding="utf-8"))
     entries = table["entries"]
+    book = json.loads(CATALOGUE.read_text(encoding="utf-8"))
 
     cache = {}
     clean_sprites = {}
@@ -190,10 +218,28 @@ def main():
             sys.exit("%s asks for a mirror but is not a three-view set" % name)
         if int(e.get("copies", 1)) < 1:
             sys.exit("%s asks for %s copies" % (name, e.get("copies")))
+        if e.get("place", "floor") not in PLACES:
+            sys.exit("%s is placed '%s'; one of %s" % (name, e.get("place"), PLACES))
+        faces = len(views) + (1 if e["mirror"] else 0)
+        bases = e.get("base")
+        if bases is not None and len(bases) != faces:
+            sys.exit("%s has %d views and %d bases" % (name, faces, len(bases)))
+
+        # The grimy sprite first: a rubbish-born find's clean views fall back to it.
+        if e.get("dirty_piece"):
+            grimy = rubbish_sprite(book, e["dirty_piece"], cache)
+        else:
+            grimy = despeck(load_layer(e["dirty"], cache))
+        if grimy is None:
+            sys.exit("%s has no dirty art (layer %s is empty)" % (name, e.get("dirty")))
 
         keys = []
         for v in views:
-            layer = load_layer(v["layer"], cache)
+            layer = load_layer(v["layer"], cache, missing_ok=bool(e.get("dirty_piece")))
+            if layer is None:
+                print("  %s/%s: no clean layer yet, using the rubbish sprite" % (
+                    name, v["role"]))
+                layer = grimy
             cut = layer.crop(tuple(
                 [v["rect"][0], v["rect"][1],
                  v["rect"][0] + v["rect"][2], v["rect"][1] + v["rect"][3]]
@@ -217,10 +263,6 @@ def main():
             keys.append(key)
 
         view_keys[name] = keys
-
-        grimy = despeck(load_layer(e["dirty"], cache))
-        if grimy is None:
-            sys.exit("%s has no dirty art (layer %s is empty)" % (name, e["dirty"]))
         dirty_sprites[name] = grimy
         fills[name] = fill_of(grimy)
 
@@ -230,7 +272,6 @@ def main():
     clean_sheet.save(CLEAN_PNG)
     dirty_sheet.save(DIRTY_PNG)
 
-    book = json.loads(CATALOGUE.read_text(encoding="utf-8"))
     kept = [p for p in book["pieces"]
             if p["sheet"] not in RETIRED_SHEETS and not p["name"].startswith("decor_")]
 
@@ -252,6 +293,10 @@ def main():
             "copies": int(e.get("copies", 1)),
             "cells": [max(1, -(-box[2] // CELL)), max(1, -(-box[3] // CELL))],
             "fill": fills[name],
+            "place": e.get("place", "floor"),
+            "scale": float(e.get("scale", 1.0)),
+            # Per view, in view order; the shed reads a missing list as its own default.
+            "base": [int(b) for b in e["base"]] if e.get("base") else [],
         })
 
     book["pieces"] = kept + pieces

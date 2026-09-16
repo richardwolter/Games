@@ -1313,1245 +1313,6 @@
    "yard": "Rubber"
   },
   {
-   "alt_roles": [
-    "front",
-    "side",
-    "back",
-    "side_r"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     129,
-     227,
-     49,
-     25
-    ],
-    [
-     65,
-     2,
-     22,
-     55
-    ],
-    [
-     154,
-     160,
-     49,
-     31
-    ],
-    [
-     89,
-     2,
-     22,
-     55
-    ]
-   ],
-   "cells": [
-    2,
-    4
-   ],
-   "copies": 1,
-   "fill": 0.881,
-   "name": "decor_sofa",
-   "region": [
-    37,
-    2,
-    22,
-    55
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Sofa"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side",
-    "back",
-    "side_r"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     52,
-     160,
-     32,
-     32
-    ],
-    [
-     134,
-     115,
-     23,
-     36
-    ],
-    [
-     148,
-     195,
-     32,
-     28
-    ],
-    [
-     159,
-     115,
-     23,
-     36
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.836,
-   "name": "decor_loveseat",
-   "region": [
-    153,
-    67,
-    32,
-    32
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Armchair"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side",
-    "back",
-    "side_r"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     58,
-     227,
-     16,
-     27
-    ],
-    [
-     182,
-     195,
-     15,
-     28
-    ],
-    [
-     160,
-     257,
-     16,
-     21
-    ],
-    [
-     199,
-     195,
-     15,
-     28
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 4,
-   "fill": 0.681,
-   "name": "decor_dining_chair",
-   "region": [
-    98,
-    114,
-    15,
-    28
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Dining chair"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side",
-    "back",
-    "side_r"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     76,
-     227,
-     14,
-     27
-    ],
-    [
-     216,
-     195,
-     15,
-     28
-    ],
-    [
-     178,
-     257,
-     14,
-     21
-    ],
-    [
-     233,
-     195,
-     15,
-     28
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 4,
-   "fill": 0.937,
-   "name": "decor_kitchen_chair",
-   "region": [
-    171,
-    114,
-    14,
-    27
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Kitchen chair"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     184,
-     115,
-     25,
-     35
-    ],
-    [
-     116,
-     115,
-     16,
-     41
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.946,
-   "name": "decor_dresser",
-   "region": [
-    126,
-    67,
-    25,
-    35
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Dresser"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     70,
-     257,
-     20,
-     23
-    ],
-    [
-     92,
-     227,
-     15,
-     27
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.952,
-   "name": "decor_nightstand",
-   "region": [
-    70,
-    146,
-    20,
-    23
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Nightstand"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     110,
-     67,
-     46,
-     45
-    ],
-    [
-     141,
-     2,
-     16,
-     48
-    ]
-   ],
-   "cells": [
-    3,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.945,
-   "name": "decor_bookcase_drawers",
-   "region": [
-    2,
-    67,
-    46,
-    45
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Bookcase"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     207,
-     2,
-     46,
-     47
-    ],
-    [
-     159,
-     2,
-     12,
-     48
-    ]
-   ],
-   "cells": [
-    3,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.997,
-   "name": "decor_bookcase_tall",
-   "region": [
-    123,
-    2,
-    46,
-    47
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Tall bookcase"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     2,
-     195,
-     48,
-     30
-    ],
-    [
-     2,
-     67,
-     30,
-     46
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.986,
-   "name": "decor_big_table",
-   "region": [
-    171,
-    2,
-    30,
-    46
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Dining table"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     52,
-     195,
-     46,
-     30
-    ],
-    [
-     34,
-     67,
-     30,
-     46
-    ]
-   ],
-   "cells": [
-    3,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.985,
-   "name": "decor_old_table",
-   "region": [
-    2,
-    114,
-    46,
-    30
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Old table"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     34,
-     257,
-     16,
-     24
-    ],
-    [
-     180,
-     227,
-     16,
-     25
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.961,
-   "name": "decor_side_desk",
-   "region": [
-    34,
-    146,
-    16,
-    24
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Side desk"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     2,
-     115,
-     80,
-     43
-    ],
-    [
-     2,
-     2,
-     32,
-     63
-    ]
-   ],
-   "cells": [
-    3,
-    4
-   ],
-   "copies": 1,
-   "fill": 0.858,
-   "name": "decor_kitchen_counter",
-   "region": [
-    2,
-    2,
-    33,
-    63
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Kitchen counter"
-  },
-  {
-   "alt_roles": [
-    "front",
-    "side"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     86,
-     160,
-     16,
-     32
-    ],
-    [
-     2,
-     227,
-     22,
-     28
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.643,
-   "name": "decor_toilet",
-   "region": [
-    115,
-    114,
-    22,
-    28
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Toilet"
-  },
-  {
-   "alt_roles": [
-    "wide",
-    "long"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     2,
-     160,
-     48,
-     33
-    ],
-    [
-     173,
-     2,
-     32,
-     48
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.975,
-   "name": "decor_big_rug",
-   "region": [
-    89,
-    2,
-    32,
-    48
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Big rug"
-  },
-  {
-   "alt_roles": [
-    "long",
-    "wide"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     205,
-     160,
-     15,
-     31
-    ],
-    [
-     220,
-     257,
-     31,
-     15
-    ]
-   ],
-   "cells": [
-    2,
-    1
-   ],
-   "copies": 1,
-   "fill": 0.948,
-   "name": "decor_old_rug",
-   "region": [
-    186,
-    146,
-    31,
-    15
-   ],
-   "set": "ROTATE",
-   "sheet": "decor_dirty",
-   "title": "Runner rug"
-  },
-  {
-   "alt_roles": [
-    "off",
-    "on"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     198,
-     227,
-     24,
-     25
-    ],
-    [
-     224,
-     227,
-     26,
-     25
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.911,
-   "name": "decor_fireplace",
-   "region": [
-    187,
-    114,
-    25,
-    26
-   ],
-   "set": "STATE",
-   "sheet": "decor_dirty",
-   "title": "Fireplace"
-  },
-  {
-   "alt_roles": [
-    "shut",
-    "open"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     113,
-     2,
-     26,
-     55
-    ],
-    [
-     36,
-     2,
-     27,
-     60
-    ]
-   ],
-   "cells": [
-    2,
-    4
-   ],
-   "copies": 1,
-   "fill": 0.952,
-   "name": "decor_fridge",
-   "region": [
-    61,
-    2,
-    26,
-    55
-   ],
-   "set": "STATE",
-   "sheet": "decor_dirty",
-   "title": "Fridge"
-  },
-  {
-   "alt_roles": [
-    "round",
-    "oval"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     2,
-     284,
-     27,
-     13
-    ],
-    [
-     31,
-     284,
-     27,
-     13
-    ]
-   ],
-   "cells": [
-    2,
-    1
-   ],
-   "copies": 1,
-   "fill": 0.943,
-   "name": "decor_pet_bed",
-   "region": [
-    219,
-    146,
-    27,
-    13
-   ],
-   "set": "VARIANT",
-   "sheet": "decor_dirty",
-   "title": "Pet bed"
-  },
-  {
-   "alt_roles": [
-    "green",
-    "blue"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     104,
-     160,
-     23,
-     32
-    ],
-    [
-     129,
-     160,
-     23,
-     32
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.973,
-   "name": "decor_bed",
-   "region": [
-    187,
-    67,
-    23,
-    32
-   ],
-   "set": "VARIANT",
-   "sheet": "decor_dirty",
-   "title": "Bed"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     109,
-     227,
-     18,
-     26
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.793,
-   "name": "decor_lamp",
-   "region": [
-    214,
-    114,
-    18,
-    26
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Table lamp"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     66,
-     67,
-     19,
-     46
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.507,
-   "name": "decor_standing_lamp",
-   "region": [
-    203,
-    2,
-    19,
-    46
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Floor lamp"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     87,
-     67,
-     21,
-     46
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.811,
-   "name": "decor_old_clock",
-   "region": [
-    224,
-    2,
-    21,
-    46
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Old clock"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     158,
-     67,
-     16,
-     44
-    ]
-   ],
-   "cells": [
-    1,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.51,
-   "name": "decor_coat_hanger",
-   "region": [
-    50,
-    67,
-    16,
-    44
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Coat hanger"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     176,
-     67,
-     24,
-     44
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.994,
-   "name": "decor_mirror",
-   "region": [
-    68,
-    67,
-    24,
-    44
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Standing mirror"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     84,
-     115,
-     30,
-     43
-    ]
-   ],
-   "cells": [
-    2,
-    3
-   ],
-   "copies": 1,
-   "fill": 0.982,
-   "name": "decor_stove",
-   "region": [
-    94,
-    67,
-    30,
-    43
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Stove"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     2,
-     257,
-     30,
-     25
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.812,
-   "name": "decor_vynil_player",
-   "region": [
-    2,
-    146,
-    30,
-    25
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Record player"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     100,
-     195,
-     19,
-     29
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.539,
-   "name": "decor_bath_sink",
-   "region": [
-    50,
-    114,
-    19,
-    29
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Bathroom sink"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     92,
-     257,
-     42,
-     23
-    ]
-   ],
-   "cells": [
-    3,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.891,
-   "name": "decor_bathtub",
-   "region": [
-    92,
-    146,
-    42,
-    23
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Bathtub"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     121,
-     195,
-     25,
-     29
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.574,
-   "name": "decor_iron_board",
-   "region": [
-    71,
-    114,
-    25,
-    29
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Ironing board"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     194,
-     257,
-     24,
-     19
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.904,
-   "name": "decor_center_table",
-   "region": [
-    160,
-    146,
-    24,
-    19
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Coffee table"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     52,
-     257,
-     16,
-     24
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.62,
-   "name": "decor_game_table",
-   "region": [
-    52,
-    146,
-    16,
-    24
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Card table"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     26,
-     227,
-     30,
-     28
-    ]
-   ],
-   "cells": [
-    2,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.993,
-   "name": "decor_tiny_bookcase",
-   "region": [
-    139,
-    114,
-    30,
-    28
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Small bookcase"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     60,
-     284,
-     22,
-     12
-    ]
-   ],
-   "cells": [
-    2,
-    1
-   ],
-   "copies": 1,
-   "fill": 0.826,
-   "name": "decor_oval_rug",
-   "region": [
-    2,
-    173,
-    22,
-    12
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Oval rug"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     136,
-     257,
-     10,
-     23
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.613,
-   "name": "decor_flower_pot",
-   "region": [
-    136,
-    146,
-    10,
-    23
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Flower pot"
-  },
-  {
-   "alt_roles": [
-    "front"
-   ],
-   "alt_sheet": "decor_clean",
-   "alt_views": [
-    [
-     148,
-     257,
-     10,
-     23
-    ]
-   ],
-   "cells": [
-    1,
-    2
-   ],
-   "copies": 1,
-   "fill": 0.657,
-   "name": "decor_plant_pot",
-   "region": [
-    148,
-    146,
-    10,
-    23
-   ],
-   "set": "SINGLE",
-   "sheet": "decor_dirty",
-   "title": "Potted plant"
-  },
-  {
    "cells": [
     1,
     1
@@ -2720,6 +1481,1473 @@
    ],
    "sheet": "lake_objects_new",
    "yard": "Rubber"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     130,
+     194,
+     49,
+     25
+    ],
+    [
+     65,
+     2,
+     22,
+     55
+    ],
+    [
+     27,
+     160,
+     49,
+     31
+    ],
+    [
+     89,
+     2,
+     22,
+     55
+    ]
+   ],
+   "base": [
+    2,
+    6,
+    2,
+    6
+   ],
+   "cells": [
+    2,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.881,
+   "name": "decor_sofa",
+   "place": "floor",
+   "region": [
+    37,
+    2,
+    22,
+    55
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Sofa"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     179,
+     115,
+     32,
+     32
+    ],
+    [
+     52,
+     115,
+     23,
+     36
+    ],
+    [
+     193,
+     160,
+     32,
+     28
+    ],
+    [
+     77,
+     115,
+     23,
+     36
+    ]
+   ],
+   "base": [
+    2,
+    4,
+    2,
+    4
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.836,
+   "name": "decor_loveseat",
+   "place": "floor",
+   "region": [
+    153,
+    67,
+    32,
+    32
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Armchair"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "back",
+    "side_r"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     75,
+     194,
+     16,
+     27
+    ],
+    [
+     227,
+     160,
+     15,
+     28
+    ],
+    [
+     160,
+     224,
+     16,
+     21
+    ],
+    [
+     2,
+     194,
+     15,
+     28
+    ]
+   ],
+   "base": [
+    1,
+    2,
+    1,
+    2
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 4,
+   "fill": 0.681,
+   "name": "decor_dining_chair",
+   "place": "floor",
+   "region": [
+    29,
+    114,
+    15,
+    28
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dining chair"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     102,
+     115,
+     25,
+     35
+    ],
+    [
+     34,
+     115,
+     16,
+     41
+    ]
+   ],
+   "base": [
+    1,
+    4
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.946,
+   "name": "decor_dresser",
+   "place": "floor",
+   "region": [
+    126,
+    67,
+    25,
+    35
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dresser"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     70,
+     224,
+     20,
+     23
+    ],
+    [
+     93,
+     194,
+     15,
+     27
+    ]
+   ],
+   "base": [
+    1,
+    2
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.952,
+   "name": "decor_nightstand",
+   "place": "floor",
+   "region": [
+    217,
+    114,
+    20,
+    23
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Nightstand"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     78,
+     67,
+     46,
+     45
+    ],
+    [
+     141,
+     2,
+     16,
+     48
+    ]
+   ],
+   "base": [
+    1,
+    5
+   ],
+   "cells": [
+    3,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.945,
+   "name": "decor_bookcase_drawers",
+   "place": "floor",
+   "region": [
+    2,
+    67,
+    46,
+    45
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Bookcase"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     207,
+     2,
+     46,
+     47
+    ],
+    [
+     159,
+     2,
+     12,
+     48
+    ]
+   ],
+   "base": [
+    1,
+    5
+   ],
+   "cells": [
+    3,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.997,
+   "name": "decor_bookcase_tall",
+   "place": "floor",
+   "region": [
+    123,
+    2,
+    46,
+    47
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Tall bookcase"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     95,
+     160,
+     48,
+     30
+    ],
+    [
+     2,
+     67,
+     30,
+     46
+    ]
+   ],
+   "base": [
+    2,
+    5
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.986,
+   "name": "decor_big_table",
+   "place": "floor",
+   "region": [
+    171,
+    2,
+    30,
+    46
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Dining table"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     34,
+     224,
+     16,
+     24
+    ],
+    [
+     181,
+     194,
+     16,
+     25
+    ]
+   ],
+   "base": [
+    1,
+    2
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.961,
+   "name": "decor_side_desk",
+   "place": "floor",
+   "region": [
+    181,
+    114,
+    16,
+    24
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Side desk"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     170,
+     67,
+     80,
+     43
+    ],
+    [
+     2,
+     2,
+     32,
+     63
+    ]
+   ],
+   "base": [
+    2,
+    6
+   ],
+   "cells": [
+    3,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.858,
+   "name": "decor_kitchen_counter",
+   "place": "floor",
+   "region": [
+    2,
+    2,
+    33,
+    63
+   ],
+   "scale": 0.75,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Kitchen counter"
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     213,
+     115,
+     16,
+     32
+    ],
+    [
+     19,
+     194,
+     22,
+     28
+    ]
+   ],
+   "base": [
+    2,
+    3
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.643,
+   "name": "decor_toilet",
+   "place": "floor",
+   "region": [
+    46,
+    114,
+    22,
+    28
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Toilet"
+  },
+  {
+   "alt_roles": [
+    "wide",
+    "long"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     129,
+     115,
+     48,
+     33
+    ],
+    [
+     173,
+     2,
+     32,
+     48
+    ]
+   ],
+   "base": [],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.975,
+   "name": "decor_big_rug",
+   "place": "floor",
+   "region": [
+    89,
+    2,
+    32,
+    48
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Big rug"
+  },
+  {
+   "alt_roles": [
+    "long",
+    "wide"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     78,
+     160,
+     15,
+     31
+    ],
+    [
+     219,
+     224,
+     31,
+     15
+    ]
+   ],
+   "base": [],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.948,
+   "name": "decor_old_rug",
+   "place": "floor",
+   "region": [
+    111,
+    145,
+    31,
+    15
+   ],
+   "scale": 1.0,
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "title": "Runner rug"
+  },
+  {
+   "alt_roles": [
+    "off",
+    "on"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     199,
+     194,
+     24,
+     25
+    ],
+    [
+     225,
+     194,
+     26,
+     25
+    ]
+   ],
+   "base": [
+    1,
+    1
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.911,
+   "name": "decor_fireplace",
+   "place": "floor",
+   "region": [
+    102,
+    114,
+    25,
+    26
+   ],
+   "scale": 1.0,
+   "set": "STATE",
+   "sheet": "decor_dirty",
+   "title": "Fireplace"
+  },
+  {
+   "alt_roles": [
+    "shut",
+    "open"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     113,
+     2,
+     26,
+     55
+    ],
+    [
+     36,
+     2,
+     27,
+     60
+    ]
+   ],
+   "base": [
+    1,
+    1
+   ],
+   "cells": [
+    2,
+    4
+   ],
+   "copies": 1,
+   "fill": 0.952,
+   "name": "decor_fridge",
+   "place": "floor",
+   "region": [
+    61,
+    2,
+    26,
+    55
+   ],
+   "scale": 1.0,
+   "set": "STATE",
+   "sheet": "decor_dirty",
+   "title": "Fridge"
+  },
+  {
+   "alt_roles": [
+    "round",
+    "oval"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     32,
+     251,
+     27,
+     13
+    ],
+    [
+     61,
+     251,
+     27,
+     13
+    ]
+   ],
+   "base": [
+    2,
+    2
+   ],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.943,
+   "name": "decor_pet_bed",
+   "place": "floor",
+   "region": [
+    174,
+    145,
+    27,
+    13
+   ],
+   "scale": 1.0,
+   "set": "VARIANT",
+   "sheet": "decor_dirty",
+   "title": "Pet bed"
+  },
+  {
+   "alt_roles": [
+    "green",
+    "blue"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     231,
+     115,
+     23,
+     32
+    ],
+    [
+     2,
+     160,
+     23,
+     32
+    ]
+   ],
+   "base": [
+    4,
+    4
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.973,
+   "name": "decor_bed",
+   "place": "floor",
+   "region": [
+    187,
+    67,
+    23,
+    32
+   ],
+   "scale": 1.5,
+   "set": "VARIANT",
+   "sheet": "decor_dirty",
+   "title": "Bed"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     110,
+     194,
+     18,
+     26
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.793,
+   "name": "decor_lamp",
+   "place": "small",
+   "region": [
+    129,
+    114,
+    18,
+    26
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Table lamp"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     34,
+     67,
+     19,
+     46
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.507,
+   "name": "decor_standing_lamp",
+   "place": "floor",
+   "region": [
+    203,
+    2,
+    19,
+    46
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Floor lamp"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     55,
+     67,
+     21,
+     46
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.811,
+   "name": "decor_old_clock",
+   "place": "small",
+   "region": [
+    224,
+    2,
+    21,
+    46
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Old clock"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     126,
+     67,
+     16,
+     44
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    1,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.51,
+   "name": "decor_coat_hanger",
+   "place": "floor",
+   "region": [
+    50,
+    67,
+    16,
+    44
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Coat hanger"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     144,
+     67,
+     24,
+     44
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.994,
+   "name": "decor_mirror",
+   "place": "floor",
+   "region": [
+    68,
+    67,
+    24,
+    44
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Standing mirror"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     115,
+     30,
+     43
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "fill": 0.982,
+   "name": "decor_stove",
+   "place": "floor",
+   "region": [
+    94,
+    67,
+    30,
+    43
+   ],
+   "scale": 0.75,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Stove"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     224,
+     30,
+     25
+    ]
+   ],
+   "base": [
+    2
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.812,
+   "name": "decor_vynil_player",
+   "place": "floor",
+   "region": [
+    149,
+    114,
+    30,
+    25
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Record player"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     145,
+     160,
+     19,
+     29
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.539,
+   "name": "decor_bath_sink",
+   "place": "floor",
+   "region": [
+    212,
+    67,
+    19,
+    29
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Bathroom sink"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     92,
+     224,
+     42,
+     23
+    ]
+   ],
+   "base": [
+    3
+   ],
+   "cells": [
+    3,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.891,
+   "name": "decor_bathtub",
+   "place": "floor",
+   "region": [
+    2,
+    145,
+    42,
+    23
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Bathtub"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     166,
+     160,
+     25,
+     29
+    ]
+   ],
+   "base": [
+    2
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.574,
+   "name": "decor_iron_board",
+   "place": "floor",
+   "region": [
+    2,
+    114,
+    25,
+    29
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Ironing board"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     193,
+     224,
+     24,
+     19
+    ]
+   ],
+   "base": [
+    2
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.904,
+   "name": "decor_center_table",
+   "place": "floor",
+   "region": [
+    85,
+    145,
+    24,
+    19
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Coffee table"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     52,
+     224,
+     16,
+     24
+    ]
+   ],
+   "base": [
+    2
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.62,
+   "name": "decor_game_table",
+   "place": "floor",
+   "region": [
+    199,
+    114,
+    16,
+    24
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Card table"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     43,
+     194,
+     30,
+     28
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.993,
+   "name": "decor_tiny_bookcase",
+   "place": "floor",
+   "region": [
+    70,
+    114,
+    30,
+    28
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Small bookcase"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     90,
+     251,
+     22,
+     12
+    ]
+   ],
+   "base": [],
+   "cells": [
+    2,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.826,
+   "name": "decor_oval_rug",
+   "place": "floor",
+   "region": [
+    203,
+    145,
+    22,
+    12
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Oval rug"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     136,
+     224,
+     10,
+     23
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.613,
+   "name": "decor_flower_pot",
+   "place": "small",
+   "region": [
+    46,
+    145,
+    10,
+    23
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Flower pot"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     148,
+     224,
+     10,
+     23
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.657,
+   "name": "decor_plant_pot",
+   "place": "small",
+   "region": [
+    58,
+    145,
+    10,
+    23
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Potted plant"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     251,
+     13,
+     15
+    ]
+   ],
+   "base": [],
+   "cells": [
+    1,
+    1
+   ],
+   "copies": 1,
+   "fill": 1.0,
+   "name": "decor_painting_a",
+   "place": "wall",
+   "region": [
+    144,
+    145,
+    13,
+    15
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Painting"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     17,
+     251,
+     13,
+     15
+    ]
+   ],
+   "base": [],
+   "cells": [
+    1,
+    1
+   ],
+   "copies": 1,
+   "fill": 1.0,
+   "name": "decor_painting_b",
+   "place": "wall",
+   "region": [
+    159,
+    145,
+    13,
+    15
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Landscape"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     114,
+     251,
+     11,
+     6
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    1,
+    1
+   ],
+   "copies": 1,
+   "fill": 0.758,
+   "name": "decor_chew_toy",
+   "place": "small",
+   "region": [
+    227,
+    145,
+    11,
+    6
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Chew toy"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     178,
+     224,
+     13,
+     20
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "fill": 0.696,
+   "name": "decor_globe",
+   "place": "small",
+   "region": [
+    70,
+    145,
+    13,
+    20
+   ],
+   "scale": 1.0,
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "title": "Globe"
   }
  ],
  "sheets": {
@@ -2727,14 +2955,14 @@
    "file": "res://assets/decor_clean.png",
    "size": [
     256,
-    299
+    268
    ]
   },
   "decor_dirty": {
    "file": "res://assets/decor_dirty.png",
    "size": [
     256,
-    187
+    170
    ]
   },
   "lake_objects": {

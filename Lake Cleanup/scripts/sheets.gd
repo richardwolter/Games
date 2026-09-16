@@ -36,6 +36,18 @@ const FLAT_WORDS := ["rug", "mat"]
 ## Several sprites under one name are three different mechanics wearing the same shape, and
 ## nothing in the pixels tells them apart — see tools/decor_sets.json, where a person says
 ## which is which.
+## Where a find may go in the shed. Authored per piece (Richard, 2026-09-13).
+enum Place {
+	## Stands on the boards. Nothing else stands where its base is, as far as the walkers
+	## are concerned.
+	FLOOR,
+	## Hangs on the back wall and takes no floor at all: the paintings.
+	WALL,
+	## Stands on the floor, but may be set over a big piece and is drawn just after
+	## whatever it sits on: pots, the table lamp, the clock, the chew toy, the globe.
+	SMALL,
+}
+
 enum Set {
 	## One view. Nothing to cycle.
 	SINGLE,
@@ -77,6 +89,18 @@ var kinds := {}
 ## Piece name -> how many of it are hidden in the lake, and so how many the shed may hold.
 ## One for everything but the chairs. See tools/decor_sets.json.
 var copies := {}
+
+## Where a piece goes, and so what the shed lets it do. See tools/decor_sets.json and
+## `Place`.
+var places := {}
+
+## Piece name -> how many of each view's bottom rows of cells stand on the floor, in view
+## order. Empty for a piece the catalogue says nothing about; see `base_of` for the default.
+var bases := {}
+
+## Piece name -> how many times bigger than painted the shed draws it. One for nearly
+## everything; the bed is 1.5. The lake never reads it.
+var scales := {}
 
 ## Piece name -> what to call it on screen.
 ##
@@ -184,6 +208,12 @@ func load_all() -> bool:
 		kinds[name] = _set_of(String(entry.get("set", "SINGLE")))
 		copies[name] = maxi(int(entry.get("copies", 1)), 1)
 		titles[name] = String(entry.get("title", ""))
+		places[name] = _place_of(String(entry.get("place", "floor")))
+		scales[name] = maxf(float(entry.get("scale", 1.0)), 0.1)
+		var depths := PackedInt32Array()
+		for depth in entry.get("base", []) as Array:
+			depths.append(maxi(int(depth), 1))
+		bases[name] = depths
 
 		cells[name] = Vector2i(
 			maxi(int(ceil(float(box[2]) / cell)), 1), maxi(int(ceil(float(box[3]) / cell)), 1)
@@ -224,6 +254,56 @@ func _set_of(word: String) -> Set:
 			return Set.STATE
 		_:
 			return Set.SINGLE
+
+
+func _place_of(word: String) -> Place:
+	match word:
+		"wall":
+			return Place.WALL
+		"small":
+			return Place.SMALL
+		_:
+			return Place.FLOOR
+
+
+## How many times bigger than painted the shed draws a piece.
+func scale_of(name: StringName) -> float:
+	return float(scales.get(String(name), 1.0))
+
+
+## How big one restored view is drawn in the shed, in source pixels: the art times the
+## piece's scale. Every shed measurement — footprint, stamp, ghost — goes through this.
+func view_size_of(name: StringName, view: int) -> Vector2:
+	return view_region_of(name, view).size * scale_of(name)
+
+
+func place_of(name: StringName) -> Place:
+	return places.get(String(name), Place.FLOOR) as Place
+
+
+## Does this piece hang on the back wall rather than stand on the floor?
+func on_wall(name: StringName) -> bool:
+	return place_of(name) == Place.WALL
+
+
+## May this piece be set over a bigger one?
+func is_small(name: StringName) -> bool:
+	return place_of(name) == Place.SMALL
+
+
+## How many of a view's bottom rows of cells stand on the floor; the rest of the picture
+## is the piece's height, and may rise up the back wall.
+##
+## The catalogue's number where it gives one. Otherwise the whole picture for anything
+## lying flat — a rug is all floor — and one row for everything else, which is what the
+## shed assumed for every piece before the bases were authored. Never more than the view
+## is tall.
+func base_of(name: StringName, view: int, cell: int) -> int:
+	var tall := _cells_across(view_size_of(name, view), cell).y
+	var depths: PackedInt32Array = bases.get(String(name), PackedInt32Array())
+	if depths.is_empty():
+		return tall if lies_flat(name) else mini(1, tall)
+	return mini(depths[posmod(view, depths.size())], tall)
 
 
 ## How many restored faces a piece has. One means there is nothing for R or E to do.
@@ -300,7 +380,7 @@ func footprint(name: StringName, cell: int) -> Vector2i:
 ## of the width it is head-on. Measuring the floor it takes up off the lake's sprite left a
 ## chair standing in a footprint drawn for a sofa.
 func footprint_view(name: StringName, view: int, cell: int) -> Vector2i:
-	return _cells_across(view_region_of(name, view).size, cell)
+	return _cells_across(view_size_of(name, view), cell)
 
 
 func _cells_across(box: Vector2, cell: int) -> Vector2i:

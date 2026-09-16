@@ -1,5 +1,5 @@
 {
-  "source": "Lake Cleanup/art_source/Decoration_Clean_Dirty",
+  "source": "art_source/Decoration_Clean_Dirty.psd",
   "canvas": [
     208,
     288
@@ -636,112 +636,76 @@
       "file": "old_table.png"
     },
     {
-      "name": "Kitchen counter",
-      "slug": "kitchen_counter_2",
+      "name": "Wood Painting",
+      "slug": "wood_painting",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        171,
-        193,
-        204,
-        256
+        157,
+        9,
+        170,
+        24
       ],
       "size": [
-        33,
-        63
+        13,
+        15
       ],
-      "file": "kitchen_counter_2.png"
+      "file": "wood_painting.png"
     },
     {
-      "name": "Lamp",
-      "slug": "lamp_2",
+      "name": "Wood Painting",
+      "slug": "wood_painting_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        185,
-        194,
-        203,
-        220
+        139,
+        9,
+        160,
+        24
       ],
       "size": [
-        18,
+        21,
+        15
+      ],
+      "file": "wood_painting_2.png"
+    },
+    {
+      "name": "Plastic Globe",
+      "slug": "plastic_globe",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        68,
+        6,
+        81,
         26
       ],
-      "file": "lamp_2.png"
+      "size": [
+        13,
+        20
+      ],
+      "file": "plastic_globe.png"
     },
     {
-      "name": "Bath Sink",
-      "slug": "bath_sink_2",
+      "name": "Rubber Bone copy",
+      "slug": "rubber_bone_copy",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        23,
-        201,
-        195,
-        287
+        462,
+        285,
+        473,
+        291
       ],
       "size": [
-        172,
-        86
+        11,
+        6
       ],
-      "file": "bath_sink_2.png"
-    },
-    {
-      "name": "Iron Board",
-      "slug": "iron_board_2",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "bbox": [
-        93,
-        256,
-        118,
-        285
-      ],
-      "size": [
-        25,
-        29
-      ],
-      "file": "iron_board_2.png"
-    },
-    {
-      "name": "Bathtub",
-      "slug": "bathtub_2",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "bbox": [
-        82,
-        264,
-        124,
-        287
-      ],
-      "size": [
-        42,
-        23
-      ],
-      "file": "bathtub_2.png"
-    },
-    {
-      "name": "Pet Bed 2",
-      "slug": "pet_bed_2_2",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "bbox": [
-        98,
-        173,
-        125,
-        186
-      ],
-      "size": [
-        27,
-        13
-      ],
-      "file": "pet_bed_2_2.png"
+      "file": "rubber_bone_copy.png"
     },
     {
       "name": "Toilet",
@@ -1246,7 +1210,122 @@
         30
       ],
       "file": "old_table_2.png"
+    },
+    {
+      "name": "Rubber Bone",
+      "slug": "rubber_bone",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        462,
+        425,
+        473,
+        431
+      ],
+      "size": [
+        11,
+        6
+      ],
+      "file": "rubber_bone.png"
+    },
+    {
+      "name": "Wood Painting",
+      "slug": "wood_painting_3",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        157,
+        9,
+        170,
+        24
+      ],
+      "size": [
+        13,
+        15
+      ],
+      "file": "wood_painting_3.png"
+    },
+    {
+      "name": "Wood Painting",
+      "slug": "wood_painting_4",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        139,
+        9,
+        152,
+        24
+      ],
+      "size": [
+        13,
+        15
+      ],
+      "file": "wood_painting_4.png"
+    },
+    {
+      "name": "Plastic Globe",
+      "slug": "plastic_globe_2",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        68,
+        6,
+        81,
+        26
+      ],
+      "size": [
+        13,
+        20
+      ],
+      "file": "plastic_globe_2.png"
     }
   ],
-  "skipped": []
+  "skipped": [
+    {
+      "name": "Kitchen counter",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    },
+    {
+      "name": "Lamp",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    },
+    {
+      "name": "Bath Sink",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    },
+    {
+      "name": "Iron Board",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    },
+    {
+      "name": "Bathtub",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    },
+    {
+      "name": "Pet Bed 2",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "reason": "hidden"
+    }
+  ]
 }
