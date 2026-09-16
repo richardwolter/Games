@@ -324,14 +324,39 @@ const CROWN_FALLBACK := Vector3(0.5, 0.06, 0.4)
 ## throw is worth making is the colour: green over water with something in it, red over water
 ## with nothing the net could lift. A refused throw gets no colour, because a verdict on a
 ## cast that cannot happen is noise.
-const AIM_OK := Color(0.35, 0.85, 0.45)
-const AIM_NO := Color(0.92, 0.25, 0.22)
-const AIM_FAR := Color(0.93, 0.94, 0.91)
+##
+## **The three are the palette's own** (2026-09-16, `/grill-me` with Richard, picked off
+## `tools/last_cursor_mockup.png`): the pack's measured `grass_light` and its `wood`
+## red-brown, each **lifted by `AIM_LIFT`**, and the lake's `foam` white — in place of the
+## screen green and fire-engine red they were. The meanings do not move — green is still
+## will-catch, red still nothing-to-lift, pale still out-of-range — only the swatches, so
+## nobody has to relearn the marker.
+##
+## The lift is what makes them carry over dirty water without being invented beside the
+## palette: repaint the pack and these move with it. The pale is `foam` at every strength,
+## because the picked row's was within four parts in 255 of it and at `AIM_FAR_ALPHA` over
+## water that is under a pixel step.
+const AIM_LIFT := 1.52
+const AIM_OK := Color(0.649, 0.804, 0.382)
+const AIM_NO := Color(0.822, 0.357, 0.214)
+const AIM_FAR := Color(0.933, 0.965, 0.984)
 
 ## How solid each of those reads. The verdict colours carry the whole point of the marker, so
 ## they sit well above the pale ghost this used to be.
 const AIM_ALPHA := 0.8
 const AIM_FAR_ALPHA := 0.55
+
+## The backing: the same ring drawn once underneath in black, wider, at a share of whatever
+## the coloured line is carrying. Palette swatches are duller than the ones they replaced and
+## the ring sits on water running from soup green to clean blue, so a toned green over dirty
+## water had nothing to stand on. This is the black every hole in the menus' wood is rimmed
+## with (`Style.HOLE_RIM`), doing the same job: telling the drawing from what is behind it.
+##
+## **The one thing beyond the three swatches**, by Richard's call. Everything else about the
+## marker is untouched — the 1.5 px line, the alphas, the dashes, the 48-point ellipse.
+const AIM_BACK := Color(0.0, 0.0, 0.0)
+const AIM_BACK_SHARE := 0.55
+const AIM_BACK_WIDE := 3.5
 
 ## How far into the mouth a piece's middle is put when the pad's assist looks for a green
 ## spot beside it (`nearest_catch`): inside the rim, so the spot is green by a margin rather
@@ -1576,11 +1601,18 @@ func _draw_aim() -> void:
 		var angle := TAU * float(i % 48) / 48.0
 		ghost.append(pointer + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
 	var ink := Color(tint.r, tint.g, tint.b, alpha)
+	# The backing goes down first, carrying its share of whatever the coloured line carries,
+	# so the dashed out-of-range ring is backed as faintly as it is drawn.
+	var back := Color(AIM_BACK.r, AIM_BACK.g, AIM_BACK.b,
+		AIM_BACK_SHARE * alpha / AIM_ALPHA)
 	if legal:
+		draw_polyline(ghost, back, AIM_BACK_WIDE)
 		draw_polyline(ghost, ink, 1.5)
 	else:
 		# Dashed, because a refused throw is a rule rather than a thing on the water — the
 		# same reason the laid-net ghost is dashed.
+		for i in 24:
+			draw_line(ghost[i * 2], ghost[i * 2 + 1], back, AIM_BACK_WIDE)
 		for i in 24:
 			draw_line(ghost[i * 2], ghost[i * 2 + 1], ink, 1.5)
 
