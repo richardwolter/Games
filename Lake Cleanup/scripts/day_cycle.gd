@@ -16,13 +16,12 @@ extends Node
 
 const CONFIG_PATH := "res://resources/day.tres"
 
-## Where in the loop the day is, 0 at first light and 1 back at it.
+## Where in the loop the day is, 0 at mid morning and 1 back at it.
 ##
-## A run opens at 0.35 rather than at 0: phase 0 is first light, which is the dimmest the
-## day gets short of the trough, so the game used to open at dusk and spend its first four
-## minutes getting brighter. 0.35 is late morning — near full light, still climbing, so the
-## opening minutes warm rather than fade. Not noon (0.45) by decision: start at the peak and
-## the only direction the light can go is down.
+## Phase 0 is the loop's mid morning, not first light (see `_sun_at`: there is no night). A run
+## opens at 0.35, late morning — near full light, still climbing, so the opening minutes warm
+## rather than fade. Not noon by decision: start at the peak and the only direction the light
+## can go is down.
 ##
 ## Nothing saves or restores this. Every run opens at the same hour, which is what makes it
 ## a mood rather than a clock the player is being asked to track.
@@ -33,7 +32,7 @@ var tint := Color.WHITE
 
 ## How far a shadow leans off its caster, as a multiple of the caster's own height, and how
 ## long it is drawn against that height. Both come off the sun's height in the sky, which is
-## what `_height` works out from the phase.
+## where `_sun_at` puts the sun for the phase.
 var lean: float = 0.0
 var stretch: float = 1.0
 
@@ -60,34 +59,45 @@ func _process(delta: float) -> void:
 	_settle()
 
 
-## How high the sun is, 0 at either end of the day and 1 at noon.
+## Where the sun is along its day, 0 at first light and 1 at dusk, for this phase.
 ##
-## Noon is not the middle of the loop: the trough is at the end, so the daylight half runs
-## from 0 to `trough_at` and the sun is highest halfway through that.
-func _height() -> float:
-	var day := maxf(_config.trough_at, 0.01)
-	if phase >= day:
-		return 0.0
-	# A sine rather than a triangle, so the sun slows at the top of its arc the way it does
-	# in the sky, and the shadows spend longer being short than being any one length.
-	return sin(phase / day * PI)
+## No night (2026-09-14, Richard: "night is too dark"): the loop runs the sun from `sun_from`
+## (mid morning) to `sun_to` (late afternoon) over the first `turn_at` of it, and then the light
+## eases back to the morning's over the rest, without passing noon on the way. The darkest the
+## lake gets is late afternoon. Returns -1 while easing back; `_settle` handles that stretch.
+func _sun_at() -> float:
+	var turn := clampf(_config.turn_at, 0.01, 1.0)
+	if phase >= turn:
+		return -1.0
+	return lerpf(_config.sun_from, _config.sun_to, phase / turn)
 
 
 func _settle() -> void:
-	var high := _height()
-	tint = _tint_ramp.sample(phase)
-	if phase >= _config.trough_at:
-		# The trough. Dimmed on top of whatever the gradient says, and dimmed on a curve
-		# that comes down and back up rather than in a step, so the bottom of the loop is a
-		# slow blink and not a light switch.
-		var through := (phase - _config.trough_at) / maxf(1.0 - _config.trough_at, 0.001)
-		var dip := sin(through * PI) * _config.trough_dip
-		tint = tint.darkened(dip)
-	# Which side of noon the sun is on, -1 to 1 across the daylight half.
-	var side := 0.0
-	var day := maxf(_config.trough_at, 0.01)
-	if phase < day:
-		side = clampf(phase / day, 0.0, 1.0) * 2.0 - 1.0
+	var at := _sun_at()
+	if at >= 0.0:
+		_light_at(at)
+		return
+	# Easing back: late afternoon's light and shadows turn into the morning's, smoothly, the
+	# shadow shortening and swinging its bearing rather than the sun running back over noon.
+	var turn := clampf(_config.turn_at, 0.01, 1.0)
+	var back := smoothstep(0.0, 1.0, (phase - turn) / maxf(1.0 - turn, 0.001))
+	_light_at(_config.sun_to)
+	var late := [tint, lean, stretch, ink]
+	_light_at(_config.sun_from)
+	tint = (late[0] as Color).lerp(tint, back)
+	lean = lerpf(late[1], lean, back)
+	stretch = lerpf(late[2], stretch, back)
+	ink = lerpf(late[3], ink, back)
+
+
+## The light with the sun `at` along its day (0 first light, 0.5 noon, 1 dusk).
+func _light_at(at: float) -> void:
+	# A sine rather than a triangle, so the sun slows at the top of its arc the way it does
+	# in the sky, and the shadows spend longer being short than being any one length.
+	var high := sin(clampf(at, 0.0, 1.0) * PI)
+	tint = _tint_ramp.sample(at)
+	# Which side of noon the sun is on, -1 to 1.
+	var side := clampf(at, 0.0, 1.0) * 2.0 - 1.0
 	stretch = lerpf(_config.stretch_ends, _config.stretch_noon, high)
 	# The lean comes off the stretch rather than being set beside it. `slant` is the bearing
 	# — how far sideways per unit down the screen — and the shadow's own drawn length is

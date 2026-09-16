@@ -520,7 +520,9 @@ func _sow_island() -> void:
 			var kind := kind_at(at.x, at.y)
 			if kind != Kind.GRASS and kind != Kind.SAND:
 				continue
-			if Iso.in_shed(at.x, at.y, Iso.SHED_KEEP):
+			# Clear of the picture, not just of the walls' feet: a walker may stand under the
+			# eaves, but a tuft planted there is drawn under the hut and wasted.
+			if Iso.in_shed(at.x, at.y, Iso.SHED_COVER):
 				continue
 			# Not on the sand that runs out under the water: a tuft half under the lake's edge
 			# is a tuft cut in half.

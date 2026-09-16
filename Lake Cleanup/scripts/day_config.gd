@@ -1,16 +1,16 @@
 ## The daylight cycle's tunable numbers, in a Resource so a pass over the look of the lake
 ## means turning dials in the Inspector rather than editing a script.
 ##
-## The cycle is a loop with no night in it: dawn, noon, evening, a short dim trough, dawn
-## again. The trough is not night — it is the darkest point of the loop, and it exists so
-## the sun has somewhere to swing back from.
+## The cycle is a loop with no night in it: mid morning, noon, late afternoon, and the light
+## easing back to the morning's. The dim blue trough at dusk that used to close the loop is gone
+## (2026-09-14, Richard: too dark); late afternoon is now the darkest the lake gets.
 ##
 ## The sun sits in the southeast all day and only drifts. Every painted asset is lit from
 ## there — the shed's and the recycle box's own pixels are measurably brighter down their
 ## right-hand sides — so a cast shadow that swung from one side of a caster to the other
 ## would contradict the art for half of every loop. It drifts instead: a narrow arc, always
 ## throwing the shadow down and to the left, so the light moves without ever disagreeing
-## with the paint. The trough's reset is a small step rather than a flip.
+## with the paint. The easing back to morning swings the bearing gently rather than flipping it.
 class_name DayConfig
 extends Resource
 
@@ -19,15 +19,20 @@ extends Resource
 ## while nothing else is being asked of the player.
 @export var cycle_seconds: float = 600.0
 
-## Where the trough starts, as a fraction of the loop, and how far the light comes down at
-## the bottom of it. The remaining fraction is the trough itself, so 0.9 is a minute of dusk
-## in a ten-minute day.
-@export_range(0.5, 0.99) var trough_at: float = 0.9
-@export_range(0.0, 1.0) var trough_dip: float = 0.34
+## How much of the loop the sun spends going from `sun_from` to `sun_to`; the rest is the light
+## easing back from late afternoon to morning. 0.88 is about a minute of easing in a ten-minute
+## loop.
+@export_range(0.5, 0.99) var turn_at: float = 0.88
 
-## The colour of the light through the loop, sampled at the phase the cycle is at. Multiplied
-## over the world, so a value under white darkens and a tinted one colours: pale blue at
-## first light, white at noon, amber in the evening, deep blue in the trough.
+## Where the sun starts and ends its day, as a fraction of first light (0) to dusk (1), noon at
+## 0.5. The tint, the shadows' length and their bearing are all read at that point, so these
+## two are the whole of "morning to late afternoon".
+@export_range(0.0, 0.5) var sun_from: float = 0.15
+@export_range(0.5, 1.0) var sun_to: float = 0.8
+
+## The colour of the light across the sun's day, 0 first light to 1 dusk, sampled where the sun
+## is. Multiplied over the world, so a value under white darkens and a tinted one colours: pale
+## at morning, white at noon, amber in the late afternoon.
 @export var tint: Gradient
 
 ## Which way a shadow points, as how far it goes sideways for every unit it goes down the
@@ -63,13 +68,12 @@ extends Resource
 ## half-filled .tres is a plain day rather than a black screen.
 static func default_tint() -> Gradient:
 	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.18, 0.5, 0.78, 0.9, 1.0])
+	g.offsets = PackedFloat32Array([0.0, 0.18, 0.5, 0.78, 1.0])
 	g.colors = PackedColorArray([
-		Color(0.72, 0.74, 0.86, 1.0),
+		Color(0.86, 0.87, 0.9, 1.0),
 		Color(0.94, 0.93, 0.92, 1.0),
 		Color(1.0, 1.0, 1.0, 1.0),
 		Color(1.0, 0.88, 0.72, 1.0),
-		Color(0.86, 0.71, 0.63, 1.0),
-		Color(0.72, 0.74, 0.86, 1.0),
+		Color(0.96, 0.82, 0.68, 1.0),
 	])
 	return g
