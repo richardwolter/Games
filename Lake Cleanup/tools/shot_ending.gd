@@ -52,25 +52,25 @@ func _physics_process(_delta: float) -> void:
 			_save(&"beat")
 		# The words have arrived and the roll is starting from under the glass. The beat is
 		# two seconds, so this is well past the frame the lake was emptied on.
-		170:
+		330:
 			_note("words up: %s" % str(_main.get_node_or_null(^"Farewell") != null))
 			_save(&"words")
 		# The first credits reaching the message's band, where the two cross and the roll
 		# dims under the words.
-		540:
+		760:
 			_save(&"behind")
 		# Well up the screen, with the whole roll in the picture.
-		640:
+		900:
 			_note("rolling: %s" % str(_ending() != null and _ending().rolling()))
 			_save(&"roll")
 			if _ending() != null:
 				_ending().skip_roll()
 		# The skip runs at ROLL_SKIP times the pace, so three seconds is plenty of room for
 		# what is left of a twenty-six second roll.
-		820:
+		1080:
 			_note("after the skip, rolling: %s" % str(_ending() != null and _ending().rolling()))
 			_save(&"skipped")
-		828:
+		1088:
 			FileAccess.open("res://tools/last_ending.log", FileAccess.WRITE).store_string(_log)
 			if FileAccess.file_exists(SAVE_PATH):
 				DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
@@ -90,8 +90,14 @@ func _empty_the_lake() -> void:
 		if not stack.is_empty():
 			stack.resize(0)
 			grid.stacks[i] = stack
+	# The soup is one triangle array, laid out when something is taken. Emptying the stacks
+	# by hand takes nothing, so the mesh has to be told or the probe photographs a clean
+	# lake with the old rubbish still drawn over it.
+	grid.set(&"_dirty", true)
+	grid.queue_redraw()
 	_main.set(&"pollution", 0.0)
 	_main.set(&"_filth_left", 0.0)
+	_main.set(&"_filth_stale", true)
 	_main.set(&"_clean_check_in", 0.0)
 
 

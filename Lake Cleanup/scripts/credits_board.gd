@@ -1,30 +1,61 @@
 ## The credits: one board in the shop's wood, a title plank, and the names.
 ##
 ## Drawn from `Style` like the settings board, so it is the same board with different words
-## on it. The words are placeholder lines (2026-09-12) in one constant: the maker, and the
-## asset packs already cleared in `docs/CREDITS.md`. Rewrite `LINES` when the list is final;
-## nothing else here knows what they say. An empty string is a gap.
+## on it. `LINES` is the whole of what it says; nothing else here knows. An empty string is
+## a gap.
+##
+## Each art line is that pack's **own required credit wording** (2026-09-16, Richard's call),
+## not a handle — Zato's licence names the exact string, Penzilla's licence names theirs. The
+## in-game board never says what an asset is; `docs/CREDITS.md` keeps that mapping, and the
+## licence status with it. AI-generated art is not credited, by decision.
+##
+## A line wider than the face **wraps** rather than being cut or shrunk: the required strings
+## are long and none of them may be shortened. `Style.write` has no wrap, so `_wrap` does it
+## here, greedily on spaces, and the rows of one line are set `WRAP_GAP` apart so a wrapped
+## credit still reads as one entry.
 class_name CreditsBoard
 extends Control
+
+## Retired, by decision (2026-09-16, Richard): the closing "Thanks for playing." line. The
+## farewell's own second line says it, and on the board there is nobody to thank for having
+## opened a list of credits. These are the credits and nothing else.
 
 const Style := preload("res://scripts/style.gd")
 
 const TITLE := "Credits"
 
 const LINES := [
-	"My Dirty Little Lake",
-	"",
 	"Design and programming",
-	"Richard Wolter",
+	"Modern Daedalus Studio",
 	"",
-	"Pigeons — Pop Shop Packs",
-	"Boat — @Pixel_Salvaje",
+	"Music and sound",
+	"Nuven",
 	"",
-	"Thanks for playing.",
+	"Art and Assets",
+	"Benvictus",
+	"xStrax",
+	"Graphics created by Penzilla Design",
+	"Modern Interiors by LimeZu",
+	"Kipperfalcon",
+	"Asset by Zato - https://zatoart.itch.io/",
+	"Pop Shop Packs",
+	"@Pixel_Salvaje",
 ]
 
 ## Which lines are headings: set a size up, in the ribbon's ink.
-const HEADS := ["My Dirty Little Lake", "Design and programming"]
+const HEADS := ["Design and programming", "Music and sound", "Art and Assets"]
+
+## The line the Spotify mark stands beside, and the mark itself.
+##
+## Spotify's brand guidelines forbid redrawing, recolouring or distorting the logo, so this is
+## their own file, trimmed and resampled by `tools/build_spotify_icon.py` and nothing else. It
+## is a smooth vector mark rather than pixel art, so it is drawn by a child `TextureRect` of
+## its own at a **linear** filter — the board's wood keeps whatever filter it draws at.
+## Decoration only, by decision (2026-09-16): no click, no hover.
+const ICON_LINE := "Nuven"
+const ICON_PATH := "res://assets/ui/spotify_icon.png"
+const ICON_SIZE := 22.0
+const ICON_GAP := 7.0
 
 ## The board, in the 1280-wide design frame. The settings board's numbers.
 const BOARD_WIDE := 460.0
@@ -35,12 +66,15 @@ const RIBBON_OVERHANG := 10.0
 const CHIPS := 3
 const CLOSE_SIZE := 44.0
 const LINE_GAP := 8.0
+const WRAP_GAP := 2.0
 const BLANK := 12.0
 
 signal close_asked
 
 var _board := Rect2()
+var _rows: Array[Dictionary] = []
 var _close: CloseButton
+var _icon: TextureRect
 
 
 func _ready() -> void:
@@ -48,32 +82,115 @@ func _ready() -> void:
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
+	var art := load(ICON_PATH) as Texture2D
+	if art != null:
+		_icon = TextureRect.new()
+		_icon.texture = art
+		_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_icon.stretch_mode = TextureRect.STRETCH_SCALE
+		_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_icon)
 	resized.connect(_lay_out)
 	_lay_out()
 
 
-func _line_tall(text: String) -> float:
-	if text.is_empty():
-		return BLANK
-	return float(Style.TEXT_HEAD if text in HEADS else Style.TEXT_BODY) + LINE_GAP
+## How wide the mark and its gap are on the line they stand beside — nothing, with no art.
+func _icon_room() -> float:
+	return 0.0 if _icon == null else ICON_SIZE + ICON_GAP
+
+
+## One line of `LINES` broken into the rows it is drawn as. Greedy on spaces; a single word
+## too wide for the face is left long rather than cut, since none of these strings may be
+## shortened.
+func _wrap(text: String, px: int, wide: float) -> PackedStringArray:
+	var rows := PackedStringArray()
+	var row := ""
+	for word in text.split(" ", false):
+		var tried := word if row.is_empty() else row + " " + word
+		if not row.is_empty() and Style.measure(tried, px).x > wide:
+			rows.append(row)
+			row = word
+		else:
+			row = tried
+	rows.append(row)
+	return rows
+
+
+## The rows the board draws, measured against a face of this width: the text, its size, its
+## ink, how much room the mark wants on it, and how far down to step after it.
+func _laid_out(face_wide: float) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for text: String in LINES:
+		if text.is_empty():
+			rows.append({"text": "", "px": 0, "head": false, "icon": 0.0, "step": BLANK})
+			continue
+		var head: bool = text in HEADS
+		var px := Style.TEXT_HEAD if head else Style.TEXT_BODY
+		var room := _icon_room() if text == ICON_LINE else 0.0
+		var wrapped := _wrap(text, px, face_wide - room)
+		for i in wrapped.size():
+			var last := i == wrapped.size() - 1
+			rows.append({
+				"text": wrapped[i],
+				"px": px,
+				"head": head,
+				"icon": room if i == 0 else 0.0,
+				"step": float(px) + (LINE_GAP if last else WRAP_GAP),
+			})
+	return rows
 
 
 func _lay_out() -> void:
 	if not is_node_ready():
 		return
+	var wide := minf(BOARD_WIDE, size.x - 40.0)
+	# The face's width does not depend on the board's height, so the rows can be wrapped
+	# before the height they add up to is known.
+	var face_wide := Style.board_face(Rect2(Vector2.ZERO, Vector2(wide, 1000.0)), FRAME).size.x
+	_rows = _laid_out(face_wide)
 	# The rows start at the face's top, under the frame's wood, so the words sit centred
 	# in the board rather than crowding its title.
-	var tall := Style.board_wood_tall(BOARD_WIDE, FRAME) + BOARD_PAD
-	for text: String in LINES:
-		tall += _line_tall(text)
-	tall += BOARD_PAD
-	var wide := minf(BOARD_WIDE, size.x - 40.0)
+	var tall := Style.board_wood_tall(wide, FRAME) + BOARD_PAD * 2.0
+	for row in _rows:
+		tall += float(row["step"])
 	tall = minf(tall, size.y - 40.0)
 	_board = Rect2(floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall)
 	var at := Style.close_on(_ribbon(), CLOSE_SIZE)
 	_close.position = at.position
 	_close.size = at.size
+	_place_icon()
 	queue_redraw()
+
+
+## Where a row's text starts: the mark, its gap and the writing are centred on the face as
+## one, so a line with the mark on it is not pushed off centre by it.
+func _row_start(row: Dictionary, face: Rect2) -> float:
+	var span := Style.measure(String(row["text"]), int(row["px"])).x
+	return face.position.x + (face.size.x - span - float(row["icon"])) * 0.5 + float(row["icon"])
+
+
+func _place_icon() -> void:
+	if _icon == null:
+		return
+	_icon.visible = false
+	if _board.size.x <= 0.0:
+		return
+	var face := Style.board_face(_board, FRAME)
+	var y := face.position.y + BOARD_PAD
+	for row in _rows:
+		var step := float(row["step"])
+		if float(row["icon"]) > 0.0:
+			# Centred on the writing's own middle, so the mark sits with the name rather
+			# than on its baseline.
+			_icon.position = Vector2(
+				_row_start(row, face) - _icon_room(),
+				y + (float(row["px"]) - ICON_SIZE) * 0.5
+			).floor()
+			_icon.size = Vector2(ICON_SIZE, ICON_SIZE)
+			_icon.visible = y + step <= face.end.y - BOARD_PAD
+			return
+		y += step
 
 
 func _ribbon() -> Rect2:
@@ -104,15 +221,15 @@ func _draw() -> void:
 		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
 	)
 	var y := face.position.y + BOARD_PAD
-	for text: String in LINES:
-		var tall := _line_tall(text)
+	for row in _rows:
+		var text := String(row["text"])
 		if not text.is_empty():
-			var head := text in HEADS
-			var px := Style.TEXT_HEAD if head else Style.TEXT_BODY
+			var px := int(row["px"])
 			Style.write(
-				self, text, px, Vector2(0.0, y + float(px) * 0.82),
-				Style.RIBBON_INK if head else Style.BOARD_INK, HORIZONTAL_ALIGNMENT_CENTER, face
+				self, text, px,
+				Vector2(_row_start(row, face), y + float(px) * 0.82),
+				Style.RIBBON_INK if bool(row["head"]) else Style.BOARD_INK
 			)
-		y += tall
+		y += float(row["step"])
 		if y > face.end.y - BOARD_PAD:
 			break

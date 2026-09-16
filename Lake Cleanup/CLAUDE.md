@@ -545,6 +545,17 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   rising, the note ringing, and **the end song coming in with the beat, not with the text**
   (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their
   legs during it; the hold comes with the words.
+- **The message stands in the middle of the window** (`Farewell.BLOCK_AT` 0.5, 2026-09-16):
+  it used to sit at 0.60, a little low, because the middle is where the island is. With the
+  credits climbing under it the low block left the roll a short screen to cross and a long
+  one to wait in. One number, read by the words and by the band the roll dims in.
+- **The words take `FADE_IN` 3.6 s to arrive**, two seconds longer than they did (Richard:
+  the shimmer can last two seconds longer as the message fades in). The lake is live and
+  lighting up the whole time and the wash eases in with the words, so a slower fade *is*
+  more clean water before the ending is written over it. `Lake.ENDING_BEAT` is untouched —
+  that one is silence before anything at all — and **the roll waits for the words**
+  (`_shown >= 1.0`): a credit arriving while the message is a third of the way in reads as
+  the roll having started without it.
 - **The credits roll up and off** (`Farewell.roll_credits`, `_draw_roll`): `CreditsBoard`'s
   own strings and headings, wrapped to `ROLL_WIDE` of the window and climbing over `ROLL_TIME`
   (26 s) from `ROLL_BELOW` under the glass to `ROLL_ABOVE` over it. Drawn **under** the
