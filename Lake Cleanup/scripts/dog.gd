@@ -34,6 +34,26 @@ const RUN_SPEED := 6.2
 ## the shed it will settle. Under the angler's own limit, so it stays visibly on the grass.
 const LAND_LIMIT := 0.84
 
+## How much room a dog wants around a spot it is going to stand about in, in tiles: clear of
+## the crate, clear of the hut, and clear of the rest of the pack (2026-09-16, Richard: the
+## dogs cluster around the box).
+##
+## **Preferences, not walls.** `_may_stand` is what decides where a dog may be, and it has to
+## keep letting one walk up to the crate — the delivery spot is `CRATE_SIDE`, a tile and a
+## third, from the middle of the box. These only steer where it chooses to go and loaf.
+##
+## The hut wants more than the crate because it is the bigger building and it sits in the
+## middle of the island, where a dog standing against it is in the way of everything.
+const IDLE_CLEAR := 3.2
+const SHED_CLEAR := 4.0
+const PACK_APART := 3.6
+
+## How many spots are tried before the best of them is taken. Darts, like everything else
+## here that picks a place: the island is a few hundred tiles and a dog wants one of them.
+## A dart that satisfies all three wants is taken on the spot, so this is only the budget
+## for a crowded island.
+const IDLE_DARTS := 24
+
 ## How much of the picture goes under the water while it swims, as a fraction of the frame.
 ## Enough that the legs and most of the chest are gone and the head and shoulders are not.
 const SINK := 0.42
@@ -144,6 +164,19 @@ const DROP_WAIT := 0.8
 const GREET_TIME := 1.3
 const GREET_AGAIN := 7.0
 
+## The dog's noises (2026-09-15, Richard): a bark when it passes the angler or sits about
+## near them, a sniff when it wanders round them or they walk up. Sparse by rule, because
+## there can be four of it: one gap shared by the whole pack (`_voice_next`), a roll every
+## `VOICE_ROLL` seconds at `VOICE_ODDS`, and only within `HEAR` tiles of the angler. Numbers
+## are first guesses, to be tuned by ear.
+const HEAR := 3.5
+const VOICE_GAP_LEAST := 8.0
+const VOICE_GAP_MOST := 18.0
+const VOICE_ROLL := 1.5
+const VOICE_ODDS := 0.35
+## A walk up to the dog is likelier to be answered than a dog merely being nearby.
+const GREET_VOICE_ODDS := 0.6
+
 ## Where the hearts go and how big they draw when the dog is petted.
 const HEART_RISE := 18.0
 const HEART_SIDE := 3.4
@@ -238,6 +271,11 @@ var _aiming := Vector2.INF
 var _closest: float = INF
 var _no_gain: float = 0.0
 var _trip: float = 0.0
+## Which face of the hut or the crate the dog is currently walking along, and which way
+## along it. See `_hug`. ZERO means it is not up against either of them.
+var _hug_along := Vector2.ZERO
+var _hug_way: float = 1.0
+
 var _detour := Vector2.INF
 
 ## Whether the trip under way is a bank run, which picks its sticks off the strand line and
@@ -250,6 +288,15 @@ var _to_strand: bool = false
 ## when the piece is taken, the trip given up, or the dog settles. Not a lock on the grid:
 ## the net and the ferry still take what they like, and a dog whose stick went re-aims.
 static var claims: Dictionary = {}
+
+## Every dog in the pack, so one can keep its distance from the others when it picks
+## somewhere to loaf (`_elbow_room`). Kept the way `claims` is — static, because the pack is
+## a fact about the lake rather than about any one animal — and emptied of a dog as it
+## leaves the tree, with `is_instance_valid` on every read for the frame a scene is swapped.
+static var pack: Array = []
+## The earliest time, in engine seconds, any dog in the pack may make a noise again.
+static var _voice_next: float = 0.0
+var _voice_roll: float = 0.0
 ## The tile index this dog has claimed, or -1.
 var _claim: int = -1
 
@@ -261,7 +308,19 @@ func _ready() -> void:
 	_rng.randomize()
 	_place()
 	_last_print_pos = position
+	# In the pack before it settles: the first thing `_settle` does is pick somewhere to go,
+	# and a dog that is not in the pack yet is one the others will not keep clear of.
+	if not pack.has(self):
+		pack.append(self)
 	_settle()
+
+
+func _exit_tree() -> void:
+	_release()
+	pack.erase(self)
+	var sound := Sfx.main()
+	if sound != null:
+		sound.set_wading(false, self)
 
 
 ## Turn to face along a step, or towards a thing, given in tiles.
@@ -293,6 +352,7 @@ func pet() -> void:
 	_mood_left = PET_TIME
 	if angler != null:
 		_look_along(angler.tile_pos - tile_pos)
+	_voice_next = _now() + _rng.randf_range(VOICE_GAP_LEAST, VOICE_GAP_MOST)
 	petted.emit()
 	queue_redraw()
 
@@ -311,7 +371,14 @@ func _process(delta: float) -> void:
 	if near and not _was_near and _greet_wait <= 0.0 and _state != State.PETTED:
 		_greet = GREET_TIME
 		_greet_wait = GREET_AGAIN
+		if _rng.randf() < GREET_VOICE_ODDS:
+			_speak(&"sniff" if _rng.randf() < 0.4 else &"bark")
 	_was_near = near
+	_voice_roll -= delta
+	if _voice_roll <= 0.0:
+		_voice_roll = VOICE_ROLL
+		_maybe_speak()
+	_push_wade()
 	match _state:
 		State.SWIM_OUT:
 			_go_fetch(delta)
@@ -342,6 +409,56 @@ func _process(delta: float) -> void:
 	_repaint()
 
 
+## Now and then, near the angler: a sniff or a bark wandering past them, a bark sitting about.
+func _maybe_speak() -> void:
+	if angler == null or tile_pos.distance_to(angler.tile_pos) > HEAR:
+		return
+	if _rng.randf() >= VOICE_ODDS:
+		return
+	match _state:
+		State.WANDER:
+			_speak(&"sniff" if _rng.randf() < 0.35 else &"bark")
+		State.IDLE, State.LOUNGE:
+			_speak(&"bark")
+
+
+## One noise, if the pack has been quiet long enough.
+func _speak(what: StringName) -> void:
+	var sound := Sfx.main()
+	if sound == null or _now() < _voice_next:
+		return
+	_voice_next = _now() + _rng.randf_range(VOICE_GAP_LEAST, VOICE_GAP_MOST)
+	if what == &"sniff":
+		sound.play_sniff()
+	else:
+		sound.play_bark()
+
+
+## How many pieces are in this dog's mouth. Asked by the lake, which cannot call the run
+## finished while a dog is still walking one to the crate.
+func carrying() -> int:
+	return _carried.size()
+
+
+## The water the dog moves, on the angler's own rule (2026-09-16, Richard: entering and
+## leaving the water uses the same as the character). Past the drawn edge by `Angler.WADE_IN`
+## and going at more than `Angler.WADE_LEAST`, so wading in, swimming out and coming back up
+## the beach all push the same wash, and a dog standing in the shallows pushes none.
+##
+## Every frame, including the frames that return early: a dog holding still moves no water.
+## Footsteps on land stay out, by the Sound pass's own decision.
+func _push_wade() -> void:
+	var sound := Sfx.main()
+	if sound == null:
+		return
+	var wet := Iso.past_water(tile_pos) > Angler.WADE_IN
+	sound.set_wading(wet and _speed > Angler.WADE_LEAST, self)
+
+
+static func _now() -> float:
+	return float(Time.get_ticks_msec()) / 1000.0
+
+
 ## Come to a stop rather than stopping. Standing still is a speed like any other, and a dog
 ## that reaches a full halt on the frame its mood changes reads as a sprite being switched
 ## rather than an animal arriving.
@@ -355,7 +472,11 @@ func _slow(delta: float) -> void:
 ## and going for a swim is the occasional event that makes the player look up. If there is
 ## nothing small enough floating within reach the swim simply is not offered, and the roll
 ## falls through to the land moods.
-func _settle() -> void:
+## `move_off` is set by a dog that has just emptied its mouth into the crate: whatever else
+## it does next, it does not do it standing at the box. Without it the roll settles two thirds
+## of the pack into a still mood on the spot they delivered on, and four dogs coming home one
+## after another pile up around the crate — which is what the clustering was.
+func _settle(move_off: bool = false) -> void:
 	_release()
 	_age = 0.0
 	_trip = 0.0
@@ -380,6 +501,11 @@ func _settle() -> void:
 	# Afloat with nothing to fetch: swim in. Every mood below is a thing done on grass, and
 	# a dog dozing in open water is the kind of picture that gets screenshotted.
 	if not _on_land():
+		_state = State.WANDER
+		_target = _somewhere_on_land()
+		return
+	# Just delivered: walk away from the box first, and pick the mood when it gets there.
+	if move_off:
 		_state = State.WANDER
 		_target = _somewhere_on_land()
 		return
@@ -572,24 +698,35 @@ func _come_home(delta: float) -> void:
 		_mood_left = DROP_WAIT
 
 
-## Where the dog stands to drop something in: on the grass beside the crate.
+## Where the dog stands to drop something in: on the grass at whichever side of the crate it
+## is already nearest (2026-09-16, Richard's call).
 ##
-## Alongside rather than in front. Straight out from the middle of the island puts the dog in
-## the water, which is where it just came from and not where a delivery happens; straight in
-## puts it behind the box, where it is drawn over the top of it. Either side is grass, level
-## with the crate, and clear of it.
+## All four sides, the far one included. It used to be one side, picked off the crate's
+## bearing from the middle of the island and the same whatever direction the animal came
+## from — so a dog arriving from the east walked the whole way round the box to deliver from
+## the west, which is most of what "running against the box" was. The far side puts the crate
+## in front of the dog and hides some of it; that is accepted, and the walkers sort into their
+## layer by position so it is drawn correctly.
+##
+## Water and the hut are still refused: `Iso.on_island_ground` is the drawn edge, not the
+## waterline, so a spot the sea has run up to is not offered. With all four refused — which
+## would mean an island that had moved out from under the crate — the crate's own tile is the
+## answer, as it always was.
 func _drop_spot() -> Vector2:
-	var out := crate_tile - Iso.ISLAND_CENTRE
-	if out.length_squared() < 0.0001:
-		out = Vector2(1.0, 1.0)
-	out = out.normalized()
-	var along := Vector2(-out.y, out.x) * CRATE_SIDE
-	for spot: Vector2 in [
-		crate_tile + along, crate_tile - along, crate_tile - out * CRATE_SIDE
-	]:
-		if Iso.on_island_ground(spot) and not Iso.in_shed(spot.x, spot.y, Iso.SHED_KEEP):
-			return spot
-	return crate_tile
+	var sides: Array[Vector2] = [
+		crate_tile + Vector2(CRATE_SIDE, 0.0), crate_tile - Vector2(CRATE_SIDE, 0.0),
+		crate_tile + Vector2(0.0, CRATE_SIDE), crate_tile - Vector2(0.0, CRATE_SIDE),
+	]
+	var best := Vector2.INF
+	var closest := INF
+	for spot: Vector2 in sides:
+		if not Iso.on_island_ground(spot) or Iso.in_shed(spot.x, spot.y, Iso.SHED_KEEP):
+			continue
+		var gap := spot.distance_squared_to(tile_pos)
+		if gap < closest:
+			closest = gap
+			best = spot
+	return crate_tile if best == Vector2.INF else best
 
 
 ## The sticks go in the crate. An empty mouth still counts as a trip — the dog does not
@@ -604,7 +741,7 @@ func _hand_over() -> void:
 	for i in _carried.size():
 		fetched.emit(_carried[i])
 	_carried.clear()
-	_settle()
+	_settle(true)
 
 
 ## Swim for this tile, and tell the rest of the pack so.
@@ -669,11 +806,22 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 	if _may_stand(wanted):
 		tile_pos = wanted
 		_stuck = 0.0
+		# Clear of it: the next thing walked into is decided fresh.
+		_hug_along = Vector2.ZERO
 		return tile_pos.distance_to(tile) <= CLOSE
 	# Each axis on its own — but only an axis the dog is actually moving along. A step
 	# straight down the screen has no sideways part, and "slide sideways by nothing" is a
 	# legal move to nowhere: it succeeds every frame, clears the stuck timer, and leaves the
 	# animal treading water for ever while believing it is walking.
+	# Round the thing it walked into, first. A face of the hut or the crate is a straight
+	# line in tile space, so "along the face" is a whole step at walking pace in one
+	# direction — not the fraction of a step an axis slide leaves when the dog is coming in
+	# at an angle, which is what made it scrape along a wall at a crawl.
+	var hugged := _hug(step, tile)
+	if hugged != Vector2.ZERO and _may_stand(tile_pos + hugged):
+		tile_pos += hugged
+		_stuck = 0.0
+		return tile_pos.distance_to(tile) <= CLOSE
 	var slide_x := tile_pos + Vector2(step.x, 0.0)
 	var slide_y := tile_pos + Vector2(0.0, step.y)
 	if absf(step.x) > 0.0005 and _may_stand(slide_x):
@@ -691,6 +839,62 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 	return tile_pos.distance_to(tile) <= CLOSE
 
 
+## The thing on the island the dog has just walked into, as `[middle, half-extent]` in tile
+## space, or empty for anything else (the island's own edge, the beach, open water).
+##
+## Both of them are rectangles — `Iso.in_shed` is the diamond the hut's walls stand on and
+## `Yard.covers` is the crate's — which is the whole reason a tangent can be worked out here
+## without a shape library. Read exactly as `_may_stand` reads them, exemption and all, or
+## the dog could be told to hug something it is standing inside.
+func _bumped(where: Vector2) -> Array:
+	if Iso.in_shed(where.x, where.y, Iso.SHED_KEEP) \
+			and not Iso.in_shed(tile_pos.x, tile_pos.y, Iso.SHED_KEEP):
+		return [
+			Iso.shed_centre(),
+			Iso.SHED_FOOT + Vector2(Iso.SHED_KEEP, Iso.SHED_KEEP)
+		]
+	if Yard.covers(crate_tile, where, Yard.WALK_KEEP) \
+			and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
+		var half := Yard.FOOT_HALF + Yard.WALK_KEEP
+		return [crate_tile, Vector2(half, half)]
+	return []
+
+
+## A step along the face of whatever the dog just walked into, or ZERO when it did not walk
+## into one of the two boxes.
+##
+## The face is the axis the dog has least room inside: against the hut's left wall it is
+## barely inside the wall's own x span and well inside its y span, so the wall is the x face
+## and the way round it is along y. Which way along it is the way the dog was already leaning;
+## heading dead-on at a face there is no lean to read, so it takes the end of the face nearer
+## to where it is going.
+##
+## Held to one side once picked (`_hug_along`, `_hug_way`) until a clear step is taken. A
+## corner is where the two faces swap over, and a dog that re-decides every frame at a corner
+## picks one face, rounds it, is blocked by the other, picks back, and rocks there — which is
+## the stall `_no_gain` was put in to catch rather than to cause.
+func _hug(step: Vector2, towards: Vector2) -> Vector2:
+	var box := _bumped(tile_pos + step)
+	if box.is_empty():
+		_hug_along = Vector2.ZERO
+		return Vector2.ZERO
+	var mid: Vector2 = box[0]
+	var half: Vector2 = box[1]
+	var off := tile_pos - mid
+	var along := _hug_along
+	if along == Vector2.ZERO:
+		# Room left inside each face. The smaller one is the face it is up against.
+		var room_x := half.x - absf(off.x)
+		var room_y := half.y - absf(off.y)
+		along = Vector2(0.0, 1.0) if room_x < room_y else Vector2(1.0, 0.0)
+		var lean := step.dot(along)
+		if absf(lean) < 0.0001:
+			lean = (towards - tile_pos).dot(along)
+		_hug_along = along
+		_hug_way = 1.0 if lean >= 0.0 else -1.0
+	return along * _hug_way * step.length()
+
+
 ## Is the dog getting nowhere — either shoving at something solid, or rocking on the spot
 ## without closing on what it is heading for?
 func _blocked() -> bool:
@@ -703,6 +907,7 @@ func _fresh_aim() -> void:
 	_no_gain = 0.0
 	_closest = INF
 	_aiming = Vector2.INF
+	_hug_along = Vector2.ZERO
 
 
 ## Somewhere off to one side to make for while whatever is in the way is got round.
@@ -760,17 +965,62 @@ func _on_land() -> bool:
 	return Iso.on_beach_at(tile_pos, Iso.WATER_LAP_TILES, BEACH_WALK + 1.0)
 
 
-## Somewhere on the grass to go and sniff.
+## How much elbow room a spot has, as the worst of what it wants: 1.0 is clear of the crate,
+## the hut and every other dog by as much as this one would like, and less is as close as the
+## nearest of them leaves it.
+##
+## The worst rather than the sum, because a spot wedged against the box is a bad spot however
+## far it is from the hut. Capped at 1.0 per term, so once a want is met, going further does
+## not make one dart beat another — which is what keeps the pack spread over the whole island
+## rather than all filing off to the one corner furthest from everything.
+func _elbow_room(tile: Vector2) -> float:
+	var room := minf(
+		tile.distance_to(crate_tile) / IDLE_CLEAR,
+		tile.distance_to(Iso.shed_centre()) / SHED_CLEAR
+	)
+	for other in pack:
+		var dog: Dog = other as Dog
+		if dog == self or not is_instance_valid(dog):
+			continue
+		# Where it is going, not where it is: two dogs walking to spots a stride apart end
+		# up standing together, however far apart they were when they chose.
+		var theirs: Vector2 = dog.aiming_for()
+		room = minf(room, tile.distance_to(theirs) / PACK_APART)
+		if room <= 0.0:
+			return 0.0
+	return minf(room, 1.0)
+
+
+## Where this dog is headed, for another dog working out where not to go. Its own place when
+## it is not going anywhere.
+func aiming_for() -> Vector2:
+	return _target if _state == State.WANDER else tile_pos
+
+
+## Somewhere on the grass to go and sniff: clear of the crate, the hut and the rest of the
+## pack (2026-09-16), rather than anywhere at all on the island.
+##
+## The first dart that satisfies all three wants is taken, so the spot is still a random one
+## and the dog does not walk the same beat every time. Only when the island is crowded does
+## it fall back to the roomiest of what it tried.
 func _somewhere_on_land() -> Vector2:
-	for _try in 20:
+	var best := tile_pos
+	var most := -1.0
+	for _try in IDLE_DARTS:
 		var angle := _rng.randf_range(0.0, TAU)
 		var out := sqrt(_rng.randf()) * LAND_LIMIT
 		var tile := Iso.ISLAND_CENTRE + Vector2(
 			cos(angle) * Iso.ISLAND_RADIUS.x * out, sin(angle) * Iso.ISLAND_RADIUS.y * out
 		)
-		if _may_stand(tile):
+		if not _may_stand(tile):
+			continue
+		var room := _elbow_room(tile)
+		if room >= 1.0:
 			return tile
-	return tile_pos
+		if room > most:
+			most = room
+			best = tile
+	return best
 
 
 ## A ring of disturbed water behind it, if it is off the island at all.

@@ -141,6 +141,27 @@ const IDLE_FRAME := 0.24
 const RUN_FRAME := 0.05
 const CAST_FRAME := 0.04
 
+## Where in the run cycle a foot comes down, as fractions of it: frames 3 and 10 of the
+## fourteen, where the figure's head is lowest. A footstep sound fires on each (2026-09-15).
+const FOOTFALLS := [0.21, 0.71]
+
+## How far past the water's drawn edge the boots have to be before they count as in it, in
+## world pixels (`step_surface`). Measured out from the edge rather than back up the beach
+## (2026-09-15, Richard: "only when the player really enters water, not on foam"): the wet sand
+## and the foam the coast wave runs over it are the beach, and the wade itself is only
+## `WALK_LIMIT` (26 px) deep, so this leaves most of it.
+
+## How far past the water's drawn edge the boots must be before they count as in it, in world
+## pixels (`step_surface`). Measured out from the edge rather than back up the beach
+## (2026-09-15, Richard: "only when the player really enters water, not on foam"): the wet sand,
+## and the foam the coast wave runs over it, are the beach. The wade is `WALK_LIMIT` (26 px)
+## deep, so this still leaves most of it.
+const WADE_IN := 8.0
+
+## Tiles a second under which the wading wash is not played: standing in the shallows moves no
+## water, and the collar of foam round the boots already says they are in it.
+const WADE_LEAST := 0.3
+
 ## Straw, for the blocked-in figure only: with no art at all the hat has to be drawn, and a
 ## hat is the one thing that separates the placeholder from a post.
 const HAT_STRAW := Color(0.87, 0.71, 0.38)
@@ -167,6 +188,8 @@ var crate_tile := Vector2.INF
 
 var _time: float = 0.0
 var _step: float = 0.0
+## The run frame the last footfall check saw, so a frame held for several draws steps once.
+var _run_frame: int = -1
 
 ## Tiles a second, eased towards WALK_SPEED (or zero) rather than snapped to it. See
 ## ACCEL_TIME.
@@ -299,6 +322,18 @@ func _slide(move: Vector2) -> Vector2:
 		var along := Vector2(0.0, move.y) if absf(off.x) >= face else Vector2(move.x, 0.0)
 		if along.length_squared() > 0.0000001 and _can_stand(tile_pos + along):
 			return tile_pos + along
+	# And against the hut, the same way: its footprint is a rectangle in tile space now, so
+	# its walls are tile axes too. Without this the shore's slide below took over and walked
+	# the angler round the island's curve instead of along the wall — which is exactly what
+	# made the hut feel round to walk round.
+	var step := tile_pos + move
+	if Iso.in_shed(step.x, step.y, Iso.SHED_KEEP) \
+			and not Iso.in_shed(tile_pos.x, tile_pos.y, Iso.SHED_KEEP):
+		var out_of := tile_pos - Iso.ISLAND_CENTRE
+		var wall := Iso.SHED_FOOT + Vector2(Iso.SHED_KEEP, Iso.SHED_KEEP)
+		var slip := Vector2(0.0, move.y) if absf(out_of.x) >= wall.x else Vector2(move.x, 0.0)
+		if slip.length_squared() > 0.0000001 and _can_stand(tile_pos + slip):
+			return tile_pos + slip
 	# Which way is out, in tile space, off the same distance the walking limit is measured in.
 	var e := 0.05
 	var out := Vector2(
@@ -423,6 +458,7 @@ func _place() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_push_wade()
 
 	# The throw itself holds the boots still — a cast that let the player walk out from
 	# under it never finished playing. Input is read and thrown away rather than skipped,
@@ -473,7 +509,49 @@ func _process(delta: float) -> void:
 	_wake()
 	_place()
 	_leave_print()
+	_footfall()
 	_repaint()
+
+
+## A footstep, on the run frames a foot comes down on, off what is under the boots: the
+## shallows, the lawn, or the beach.
+func _footfall() -> void:
+	var frames: Array = _poses.get(StringName("run_%s" % _view()), [])
+	if frames.is_empty():
+		return
+	var at := posmod(int(_time / RUN_FRAME), frames.size())
+	if at == _run_frame:
+		return
+	_run_frame = at
+	var down := false
+	for fall: float in FOOTFALLS:
+		down = down or at == int(fall * float(frames.size()))
+	var sound := Sfx.main()
+	if not down or sound == null:
+		return
+	var on := step_surface()
+	# The shallows are the wading loop, not a footfall: see `_push_wade`.
+	if on != &"water":
+		sound.play_step(on)
+
+
+## The water the boots move, held while they are moving it. Pushed every frame, including the
+## frames that return early — a cast holds the feet still, and still feet move no water.
+func _push_wade() -> void:
+	var sound := Sfx.main()
+	if sound != null:
+		sound.set_wading(_speed > WADE_LEAST and step_surface() == &"water", self)
+
+
+## What is under the boots, as the footstep sounds name it: the shallows, the lawn, or the
+## beach. Public, so the test can ask it without walking the figure about.
+##
+## Wet means past the water's own edge by `WADE_IN`, not merely near it: foam running up the
+## sand is still sand.
+func step_surface() -> StringName:
+	if Iso.past_water(tile_pos) > WADE_IN:
+		return &"water"
+	return &"grass" if Iso.on_lawn(tile_pos) else &"sand"
 
 
 ## How many source pixels of the figure are under water where it is standing, whole pixels.

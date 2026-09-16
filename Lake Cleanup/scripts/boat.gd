@@ -270,8 +270,12 @@ var skim_chance: float = 0.0
 ## it crosses.
 var skim_hold: int = 0
 
-## Whether it sets off on its own as soon as there is something to carry.
+## Whether it sets off on its own once there is a full hold to carry (`ready_to_sail`).
 var auto_ferry: bool = true
+
+## How often a docked hull looks to see whether the lake has anything left in it, in seconds.
+## Counting the lake walks every tile, which is not a thing to do sixty times a second a hull.
+const DRY_CHECK_EVERY := 1.0
 
 ## Set while the boat has nothing to ferry and should be out on the water anyway.
 ##
@@ -294,6 +298,12 @@ var patrol_at := Vector2.INF
 var _patrol_aim := Vector2.INF
 
 var state: int = State.DOCKED
+
+## Whether the lake had any rubbish left the last time a docked hull counted, and when it
+## counts again. See `ready_to_sail`.
+var _lake_dry: bool = false
+var _dry_check_in: float = 0.0
+
 ## What is aboard, as def indices.
 var cargo := PackedInt32Array()
 
@@ -437,6 +447,29 @@ func dispatch() -> bool:
 	return true
 
 
+## Whether the yard has a full hold waiting for this hull, or the lake has nothing left that
+## could ever fill one.
+##
+## Full holds only, by decision (Richard, 2026-09-14: "too many missed trips"): a ferry that
+## sailed the moment anything was in the box made its long lap for two or three pieces, and
+## was out on the water when the real load came in. The one exception is the end of the lake:
+## once every piece is out of the water, what is in the box is all there will ever be, and a
+## hull waiting for more would leave it unsold for good. The shop's "send now" still sends
+## whatever there is (`dispatch` alone).
+func ready_to_sail(delta: float) -> bool:
+	if yard == null or yard.held.is_empty():
+		return false
+	if yard.held.size() >= maxi(capacity, 1):
+		return true
+	if grid == null:
+		return true
+	_dry_check_in -= delta
+	if _dry_check_in <= 0.0:
+		_dry_check_in = DRY_CHECK_EVERY
+		_lake_dry = grid.piece_count() == 0
+	return _lake_dry
+
+
 ## A piece landing in the hold. The haul calls this when it arrives, which is the only way
 ## anything gets aboard while there is a haul to throw it.
 func stow(def_index: int) -> void:
@@ -488,9 +521,9 @@ func _process(delta: float) -> void:
 
 	match state:
 		State.DOCKED:
-			# Ferrying first: a hull with something to carry carries it, and only a hull
+			# Ferrying first: a hull with a full hold to carry carries it, and only a hull
 			# with nothing to do goes wandering.
-			if auto_ferry and dispatch():
+			if auto_ferry and ready_to_sail(delta) and dispatch():
 				pass
 			elif patrol:
 				_next_patrol()
@@ -527,6 +560,10 @@ func _process(delta: float) -> void:
 				state = State.DOCKED
 				target = -1
 				runs_done += 1
+				# Coming alongside is heard, the way setting off is — the water first, the
+				# bell now and then. The berth is on the island the player stands on.
+				if sfx != null:
+					sfx.play_berth()
 
 	_place()
 	_throw_spray(delta)
@@ -622,7 +659,7 @@ func _throw_spray(delta: float) -> void:
 ## straight home.
 func _begin_route() -> void:
 	if sfx != null:
-		sfx.play_horn()
+		sfx.play_bell()
 	_route = plan_route()
 	if _route.is_empty():
 		_head_home()

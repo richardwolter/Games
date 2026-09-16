@@ -316,36 +316,6 @@ const SHELVED := [&"skimmer", &"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell
 ## them share one Fetching and Keenness level and one drawing.
 const MAX_DOGS := 4
 
-## How loud the music is when it is turned right up, in decibels, and how far down "off"
-## is. Silence is a volume rather than a stopped player: a track that keeps running while
-## muted comes back where it would have been rather than restarting mid-session.
-## The top of the music slider, in decibels. Above unity: the track was mixed quietly and
-## the old ceiling of minus six left it under the water at every setting.
-const MUSIC_LOUDEST := 4.0
-
-## The song as heard from indoors: the same recording, squeezed into a 190 Hz to 7.2 kHz
-## band with a little drive and a slap of room, baked into a second file.
-##
-## It was a bus with four effects on it, which is the obvious way to do this and works
-## everywhere except where the game actually ships: the web export runs the mix but not the
-## bus effects, so on itch the shed sounded exactly like the lake. A second track is dumber
-## and it is the same in every build.
-##
-## The band is wide, and deliberately so. The first pass took it down to a
-## five-hundred-to-three-thousand band with real overdrive on top, which is what a bad radio
-## measures like and not what one should sound like in a game: it swallowed the song. This
-## only thins it — the bass goes and the very top goes, and everything that carries the tune
-## stays.
-const RADIO_TRACK := preload("res://assets/music_goin_radio.mp3")
-
-## How fast the song moves between outdoors and indoors, as a fraction of the way there a
-## second: a quarter of a second door. The two recordings run side by side and one is faded
-## up as the other goes down, because swapping the stream under a single player and seeking
-## to where the other one had reached is a cut, however small the gap, and a cut in the
-## middle of a bar is heard as a fault.
-const RADIO_FADE := 4.0
-const MUSIC_SILENT := -60.0
-
 ## How fast the finished lake lights up, as a fraction of the way there a second.
 const SPARKLE_RISE := 0.5
 
@@ -366,7 +336,17 @@ const MENU_SCENE := "res://scenes/menu.tscn"
 ## def list and the finds follow the rubbish in it, so every find's index moved.
 ## 8: the kitchen chairs and the old table left the catalogue and four rubbish-born finds
 ## (two paintings, the chew toy, the globe) joined it; the def list changed again.
-const SAVE_VERSION := 9
+## 10: the shed places furniture on whole source pixels rather than on eight-pixel cells
+## (2026-09-16), so a `decor` row's numbers mean something eight times smaller.
+const SAVE_VERSION := 10
+
+## The one older save this build still reads, and it is read rather than refused because the
+## only thing that changed in it is the unit the shed's furniture is placed in: a version 9
+## file is exact in cells, so its rows are scaled by `ShedRoom.CELL` and every piece lands
+## back where it stood. Everything else in the file is identical, which is what makes the one
+## exception to "older saves are refused rather than migrated" safe. Don't grow this into a
+## migration chain: the next change to the def list refuses it again.
+const SAVE_SHED_CELLS := 9
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -544,16 +524,6 @@ var _shed_skirt: Skirt.Patch
 var _splash: WaterSplash
 var _prints: Footprints
 var _sfx: Sfx
-
-## The indoors half of the music: the same song through a wall, on its own player. Both
-## players run from the same moment for the whole session, so what the crossfade moves
-## between is two copies of the same bar rather than two positions in a song.
-var _radio: AudioStreamPlayer
-
-## Whether the song should be the indoors one, and how far it has got there: 0 is the lake,
-## 1 is the hut.
-var _radio_on: bool = false
-var _radio_at: float = 0.0
 var _haul: Haul
 var _camera: Camera2D
 ## The fleet, in the order it was bought. The first is the ferry in the scene; the rest
@@ -685,6 +655,9 @@ var _pop_rng := RandomNumberGenerator.new()
 var _coins: CoinFly
 
 var _farewell_shown: bool = false
+## Seconds left of the shimmer the ending opens on, counting down to the words. Above zero
+## only during the beat; the farewell itself is what says the ending is up afterwards.
+var _ending_in: float = 0.0
 var _farewell: Farewell
 
 ## The pad's reticle and its assist, see scripts/pad_aim.gd. `at` is INF while the mouse is
@@ -714,7 +687,6 @@ var _sparkle_at: float = 0.0
 @onready var _open_upgrades: UiButton = %OpenUpgrades
 @onready var _settings: SettingsSkin = %Settings
 @onready var _open_settings: PlankButton = %OpenSettings
-@onready var _music: AudioStreamPlayer = %Music
 @onready var _send_now: Button = %SendNow
 @onready var _auto_ferry: CheckButton = %AutoFerry
 
@@ -927,9 +899,15 @@ func _ready() -> void:
 
 	_shed_art = Art.texture(SHED_ART)
 
-	_sfx = Sfx.new()
-	_sfx.name = &"Sfx"
-	add_child(_sfx)
+	# The autoload, so the start sound pressed on the menu is still playing as the lake comes
+	# up. A run without it — a tool scene — gets its own board.
+	_sfx = Sfx.main()
+	if _sfx == null:
+		_sfx = Sfx.new()
+		_sfx.name = &"Sfx"
+		add_child(_sfx)
+	_sfx.set_ambience(true)
+	_grid.find_surfaced.connect(func(_index: int) -> void: _sfx.play_find_chime())
 
 	# Over the island and the shed: the catch is thrown across them, not through them.
 	_haul = Haul.new()
@@ -1017,15 +995,19 @@ func _ready() -> void:
 	# the player walks round it.
 	_angler.crate_tile = _dog.crate_tile
 
-	# The flock sits between the floating rubbish and the splashes: birds are on the water,
-	# and a splash is on top of everything.
+	# The flock is drawn over the whole lake (2026-09-16, Richard's call): birds are the one
+	# thing here that is genuinely in the air, and at z 6 they were cut in half by a pier
+	# deck, hidden behind a moored hull and walked in front of by the angler. Above the net
+	# and the finds' beams too — "over everything" was the whole of the instruction, and a
+	# bird that vanishes behind the thing being cast at it is the bug, not the fix.
 	_flock = Flock.new()
 	_flock.name = &"Flock"
-	_flock.z_index = 6
+	_flock.z_index = BIRD_LAYER
 	_flock.z_as_relative = false
 	_flock.grid = _grid
 	_flock.angler = _angler
 	_flock.sfx = _sfx
+	_flock.day = _day
 	add_child(_flock)
 
 	_net.grid = _grid
@@ -1038,6 +1020,9 @@ func _ready() -> void:
 	_net.sfx = _sfx
 	_net.angler = _angler
 	_net.flock = _flock
+	# And back the other way: the flock asks the net whether a perched bird is inside reach,
+	# which is what decides the rim. The player's own net, not the double cast's helper.
+	_flock.net = _net
 	_net.landed.connect(_on_net_landed)
 	_net.caught.connect(_on_net_caught)
 	_net.swept.connect(_on_net_swept.bind(_net))
@@ -1124,7 +1109,7 @@ func _ready() -> void:
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
 	_open_shed.pressed.connect(_set_shed.bind(true))
-	_room.close_asked.connect(_set_shed.bind(false))
+	_room.close_asked.connect(_shut.bind(_set_shed))
 	_open_settings.pressed.connect(_set_settings.bind(true))
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
 	# fills the screen now, and a settings panel drawn beneath that is a settings panel
@@ -1136,16 +1121,18 @@ func _ready() -> void:
 	_settings.music_level_changed.connect(_set_music_level)
 	_settings.sfx_toggled.connect(_set_sfx)
 	_settings.sfx_level_changed.connect(_set_sfx_level)
+	_settings.ambience_toggled.connect(func(_on: bool) -> void: _push_ambience())
+	_settings.ambience_level_changed.connect(func(_level: float) -> void: _push_ambience())
 	_push_sfx()
 	_settings.quit_pressed.connect(_quit)
 	_settings.wipe_pressed.connect(wipe_save)
 	_settings.swap_label = _other_level_name()
 	_settings.swap_pressed.connect(_swap_levels)
-	_settings.close_asked.connect(_set_settings.bind(false))
+	_settings.close_asked.connect(_shut.bind(_set_settings))
 	_send_now.pressed.connect(_send_ferry)
 	_auto_ferry.toggled.connect(_set_auto_ferry)
 	_close_menu.pressed.connect(_set_menu.bind(false))
-	_shop_skin.close_asked.connect(_set_menu.bind(false))
+	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
 	if tree_mode:
 		_build_tree_screen()
 	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
@@ -1229,7 +1216,10 @@ func level_name() -> String:
 ## The last piece has come out of the water. Level one calls that an ending.
 func _on_lake_cleaned() -> void:
 	_farewell_shown = true
-	_show_farewell()
+	# The lake gets the first two seconds to itself: the sparkle rising, the note ringing and
+	# the end song coming in. The words follow. See ENDING_BEAT.
+	_ending_in = ENDING_BEAT
+	_push_rooms()
 
 
 ## Anything the level wants kept, added to the dictionary on its way to disk.
@@ -1399,6 +1389,11 @@ const BEHIND_CRATE := 7
 const CRATE_LAYER := 8
 const IN_FRONT := 9
 
+## The flock, above the lot of it — hulls (12), the haul (8), the piers, the walkers, and
+## the net and the finds' beams at 20. A pigeon is the only thing on this lake that is
+## actually in the air, and nothing here is ever in front of one.
+const BIRD_LAYER := 21
+
 
 ## The island: its beach and grass, tiled the same way the bank is, and the shed the
 ## upgrades are bought in.
@@ -1483,7 +1478,9 @@ func _dog_brought_back(def_index: int) -> void:
 	_yard.put(def_index)
 	_filth_stale = true
 	if _sfx != null:
-		_sfx.play_catch()
+		# The crate's own thud, the same one a piece landing in it plays from anywhere else.
+		# It used to be the knock, which was the water it came out of and not the box.
+		_sfx.play_pop()
 
 
 ## The starting junk set, one `.tres` per kind under `resources/trash/`. The numbers live
@@ -1731,9 +1728,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _settings_open:
 					return
 				if _shed_open:
-					_set_shed(false)
+					_shut(_set_shed)
 				elif _menu_open:
-					_set_menu(false)
+					_shut(_set_menu)
 				elif _at_shed():
 					_set_shed(true)
 				elif _dog_in_reach() != null:
@@ -1745,11 +1742,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				# One key backing out of whatever is open, innermost first: the shed, then
 				# the shop board, and only on open water does it mean the settings.
 				if _shed_open:
-					_set_shed(false)
+					_shut(_set_shed)
 				elif _menu_open:
-					_set_menu(false)
+					_shut(_set_menu)
+				elif _settings_open:
+					_shut(_set_settings)
 				else:
-					_set_settings(not _settings_open)
+					_set_settings(true)
 				return
 			KEY_F11:
 				_settings.fullscreen = not _is_fullscreen()
@@ -2179,7 +2178,7 @@ func _set_menu(open: bool) -> void:
 		_tree_screen.visible = open
 		if open:
 			_tree_screen.open()
-	_push_radio()
+	_push_rooms()
 	if open:
 		_set_settings(false)
 		_set_shed(false)
@@ -2190,6 +2189,8 @@ func _set_menu(open: bool) -> void:
 ## already is when they open it, and closed by the cross in its corner or by a click on the
 ## water around it.
 func _set_shed(open: bool) -> void:
+	if open and not _shed_open and _sfx != null:
+		_sfx.play(&"shed_open")
 	if tree_mode and open != _shed_open and _tree != null:
 		TreeLog.write("shed_open" if open else "shed_close", _tree_play)
 	_shed_open = open
@@ -2207,15 +2208,33 @@ func _set_shed(open: bool) -> void:
 		_room.decor = decor
 		_room.carrying = &""
 		_room.queue_redraw()
-	# The lake's own readouts are not readable through a room and are not about it.
+	# The lake's own readouts are not readable through a room and are not about it. The coins
+	# go with them: they are drawn over everything, and they are a receipt for the plate.
 	_skin.visible = not open
-	_push_radio()
+	if _coins != null:
+		_coins.visible = not open
+		if open:
+			_coins.clear()
+	_push_rooms()
+	if _sfx != null:
+		# The lake heard through the hut's wall.
+		_sfx.set_ambience(true, open)
 	_hold_the_angler()
 
 
 ## The settings panel: the logbook and the window, which are about the session rather than
 ## about the lake and so are not in the shed with the upgrades.
+## A board closed by the player — its cross, a click off it, Escape — rather than put away
+## by another board opening over it, which is the only case that makes the closing sound.
+func _shut(close: Callable) -> void:
+	Sfx.ui(&"ui_close")
+	close.call(false)
+
+
 func _set_settings(open: bool) -> void:
+	if open:
+		# Read again on the way in: F11, the menu's board and this one are one set of values.
+		_settings.pull_prefs()
 	_settings_open = open
 	_settings.visible = open
 	# Available on every screen except itself now, not just when the shed happens to be
@@ -2228,6 +2247,7 @@ func _set_settings(open: bool) -> void:
 	# shut the shed on the way in, which left the room gone, the lake's own readouts still
 	# hidden behind it, and nothing to press: opening settings from the decoration screen
 	# emptied the screen. What is underneath is none of this panel's business.
+	_push_rooms()
 	_hold_the_angler()
 
 
@@ -2322,6 +2342,13 @@ func _polish_panel_controls() -> void:
 const CLEAN_ENOUGH := 0.001
 const CLEAN_CHECK_EVERY := 0.5
 
+## How long the lake has to itself before a word is written over it (2026-09-16, Richard:
+## a little bit of the lake shimmer and sound before the message and the credits).
+##
+## The water is lighting up, the note is ringing and the end song is already coming in
+## under all of it. Two seconds, by decision: a breath, not a held shot.
+const ENDING_BEAT := 2.0
+
 
 ## Is it over yet?
 ##
@@ -2352,6 +2379,13 @@ func _look_for_the_end(delta: float) -> void:
 func _check_cleaned() -> void:
 	if _cleaned or _grid == null or _grid.piece_count() > 0:
 		return
+	# And nothing is still on its way to the crate (2026-09-16, Richard: the run ends when
+	# the last item has been put into the box). A piece leaves the water in a net's hold or
+	# a dog's mouth, and the ending used to fire the instant it left rather than the instant
+	# it landed — the player watched the words arrive with the last piece still in hand. The
+	# ferries may go on running underneath; what they carry is already in the box.
+	if not _all_landed():
+		return
 	_cleaned = true
 	# The remainder is float dust from thousands of subtractions, and the lake is empty:
 	# the meter is allowed to say so now that the field has been asked.
@@ -2362,6 +2396,42 @@ func _check_cleaned() -> void:
 	_on_lake_cleaned()
 	# The moment is worth keeping without waiting for the autosave to come round.
 	save_game()
+
+
+## Is every piece that has left the water in the crate?
+##
+## The nets' holds and the dogs' mouths, and the pieces in the air between either of them
+## and the box. Everything past that point — a ferry's hold, a yard's heap — is stock, and
+## stock is not the lake.
+func _all_landed() -> bool:
+	for net: CastNet in [_net, _net2]:
+		if net != null and not net.catch.is_empty():
+			return false
+	for dog in _dogs:
+		if dog != null and dog.carrying() > 0:
+			return false
+	# Only the flights bound for the crate, which are the ones the net throws and the ones
+	# alone that carry no tag (`_on_haul_arrived`): cargo crossing to a hull and cargo a
+	# ferry is landing at a pier are both tagged, and both are stock already.
+	return _haul == null or _haul.flying_to(null) == 0
+
+
+## The shimmer before the words. Run down every frame once the lake is finished; the words
+## are raised on the frame it reaches zero, and never again (the farewell itself is the
+## guard after that).
+func _count_the_beat(delta: float) -> void:
+	if _ending_in <= 0.0:
+		return
+	_ending_in -= delta
+	if _ending_in <= 0.0:
+		_ending_in = 0.0
+		_show_farewell()
+
+
+## Whether the ending is up: the shimmer it opens on, or the words themselves. What the
+## music station is told, so the end song comes in with the beat rather than with the text.
+func ending() -> bool:
+	return _ending_in > 0.0 or _farewell != null
 
 
 ## Lay the closing words over the lake.
@@ -2376,6 +2446,10 @@ func _show_farewell() -> void:
 	if onward != "":
 		_farewell.offer_onward()
 		_farewell.onward.connect(_go_onward.bind(onward))
+	else:
+		# A lake with nowhere to go on to is the end of the game, so the credits roll under
+		# the words (2026-09-16). A level that leads somewhere does not end anything.
+		_farewell.roll_credits()
 	# Its own layer, above the HUD rather than beside it: the closing words are the one thing
 	# in the game that everything else — the island, the meter, the money — goes behind.
 	var over := CanvasLayer.new()
@@ -2383,6 +2457,7 @@ func _show_farewell() -> void:
 	over.layer = 20
 	over.add_child(_farewell)
 	add_child(over)
+	_push_rooms()
 	_hold_the_angler()
 
 
@@ -2405,6 +2480,7 @@ func _go_onward(scene: String) -> void:
 
 func _drop_farewell() -> void:
 	_farewell = null
+	_push_rooms()
 	_hold_the_angler()
 
 
@@ -2446,81 +2522,39 @@ func _hold_the_angler() -> void:
 		_net2.set_pulling(not busy)
 
 
-## The music: one long track, looped, started the moment the lake is, and started twice.
-##
-## Looping is set here as well as on the imported files so a re-import cannot quietly end
-## the song four minutes in, and the indoors copy is started in the same breath as the
-## outdoors one: two players from the same instant stay in step for as long as they both
-## run, which is what lets the shed door be a fade rather than a seek.
+## The music is the `Music` station's (`scripts/music_station.gd`): an autoload, so the song
+## that was playing on the menu carries on into the lake rather than starting over. The lake
+## only says where the player is and how loud it should be.
 func _start_music() -> void:
-	if _radio == null:
-		_radio = AudioStreamPlayer.new()
-		_radio.name = &"MusicRadio"
-		_radio.stream = RADIO_TRACK
-		_radio.volume_db = MUSIC_SILENT
-		add_child(_radio)
-	for player in [_music, _radio]:
-		var track := player.stream as AudioStreamMP3
-		if track != null:
-			track.loop = true
-		# A stream that runs out anyway — a browser that decoded it short, an import that
-		# came back without the loop — is put back to the top rather than left silent.
-		if not player.finished.is_connected(_restart_music):
-			player.finished.connect(_restart_music.bind(player))
-	_push_music()
-	if not _music.playing:
-		_music.play()
-	if not _radio.playing:
-		_radio.play()
-
-
-## Both copies back to the top together, so they are still the same bar when they get there.
-func _restart_music(_who: AudioStreamPlayer) -> void:
-	_music.play()
-	if _radio != null:
-		_radio.play()
+	var music := MusicStation.main()
+	if music != null:
+		music.leave_rooms()
+	_push_rooms()
 	_push_music()
 
 
-## Aim the song at the room or at the lake. Called whenever a panel opens: the shed and the
-## upgrades board are both inside the hut, and a song heard from inside a hut is a song heard
-## through a wall. The move itself is made a frame at a time in `_fade_radio`.
-func _push_radio() -> void:
-	_radio_on = _menu_open or _shed_open
+## Tell the station where the player is. The shed is Indie Boi through its wall; the upgrades
+## board and the settings are the lake's own song through the radio; the closing words are
+## Habibs. Called whenever one of those opens or closes.
+func _push_rooms() -> void:
+	# The upgrades board covers the lake, so the lake goes quiet behind it: the song through
+	# the radio, the ambience, and the money. See `Sfx.WHILE_SHOPPING`.
+	if _sfx != null:
+		_sfx.shopping = _menu_open
+		_sfx.indoors = _shed_open
+	var music := MusicStation.main()
+	if music == null:
+		return
+	music.indoors = _shed_open
+	music.muffled = _menu_open or _settings_open
+	music.set_ending(ending())
 
 
-## Volume, from the two controls that set it. Muting leaves the track running quietly
-## rather than stopping it, so turning it back on does not start the song again.
+## Volume, from the two controls that set it, pushed live while the slider is dragged.
 func _push_music() -> void:
-	if _radio == null:
-		_music.volume_db = _music_db()
-		return
-	# Equal-power would be the textbook curve, but these are the same recording a filter
-	# apart: they sum rather than fight, and a straight level crossfade keeps the song at one
-	# loudness through the door.
-	var db := _music_db()
-	_music.volume_db = db + linear_to_db(maxf(1.0 - _radio_at, 0.0001))
-	_radio.volume_db = db + linear_to_db(maxf(_radio_at, 0.0001))
-
-
-## The level both players are working from: what the two controls in the settings say.
-func _music_db() -> float:
-	return (
-		lerpf(MUSIC_SILENT, MUSIC_LOUDEST, _settings.music_level)
-		if _settings.music_on else MUSIC_SILENT
-	)
-
-
-## One frame of the walk between the lake and the hut.
-func _fade_radio(delta: float) -> void:
-	if _radio == null:
-		return
-	var want := 1.0 if _radio_on else 0.0
-	if is_equal_approx(_radio_at, want):
-		return
-	_radio_at = move_toward(_radio_at, want, RADIO_FADE * delta)
-	_push_music()
-
+	var music := MusicStation.main()
+	if music != null:
+		music.set_level(_settings.music_level, _settings.music_on)
 
 
 ## The sound effects' own level. Separate from the music because they are separate things:
@@ -2532,6 +2566,13 @@ func _push_sfx() -> void:
 
 func _set_sfx(_on: bool) -> void:
 	_push_sfx()
+
+
+## The ambience's slider, pushed as it is dragged; `Prefs` has it once it is let go.
+func _push_ambience() -> void:
+	if _sfx != null:
+		_sfx.ambience_level = _settings.ambience_level
+		_sfx.ambience_on = _settings.ambience_on
 
 
 func _set_sfx_level(_level: float) -> void:
@@ -2675,7 +2716,8 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 	var sale := tag as Dropoff
 	if sale != null:
 		sale.put(def_index)
-		if _coins != null:
+		# Not while the shed is up: its room covers the lake and the money plate with it.
+		if _coins != null and not _shed_open:
 			_coins.fly(sale.drop_point())
 		_on_sold(PackedInt32Array([def_index]), sale.kind)
 		return
@@ -2690,16 +2732,41 @@ func _on_bird_caught(at: Vector2) -> void:
 	birds_caught += 1
 	if _splash != null:
 		_splash.splash(at, 0.55)
-	# And, on some catches, the bird itself: the head in the corner and the coo that goes with
-	# it, both off the one roll. They are halves of the same joke — a coo with no bird is a
-	# noise from nowhere, and a bird with no coo is a picture — so either both happen or
-	# neither does. The money is not part of the bargain and arrives every time.
-	if _pop_rng.randf() >= POP_ODDS:
-		return
-	if _pigeon != null:
-		_pigeon.pop(roundi(bird_pay()))
-	if _sfx != null:
-		_sfx.play_coo()
+	# And, on some catches, the bird itself: the head at the side of the screen and the coo
+	# that goes with it, both off the one roll. They are halves of the same joke — a coo with
+	# no bird is a noise from nowhere, and a bird with no coo is a picture — so either both
+	# happen or neither does. The money is not part of the bargain and arrives every time.
+	var showing := _pop_rng.randf() < POP_ODDS
+	if showing:
+		showing = _pigeon != null and _pigeon.pop(roundi(bird_pay()))
+		if _sfx != null:
+			_sfx.play_coo()
+	# And a coin to the purse, the way a sale at a yard sends one (2026-09-16). A pigeon is
+	# the only thing in the game that pays on the spot, and it was the only money in the game
+	# that arrived with nothing crossing the screen.
+	#
+	# **It leaves the bird.** With the head coming in, that is the head, and the coin waits
+	# for it (`_on_pigeon_arrived`) — a coin setting off from an empty edge of the screen a
+	# tenth of a second before the pigeon got there is money from nowhere. With no head this
+	# catch, it leaves the bird's own splash out on the water instead. Either way, one catch
+	# is one coin.
+	if not showing:
+		_send_bird_coin(at)
+
+
+## The head has finished coming in: the catch's coin sets off from it, in screen pixels,
+## since the pop is drawn on its own CanvasLayer and is nowhere on the lake.
+func _on_pigeon_arrived(at: Vector2) -> void:
+	if _coins != null and not _shed_open:
+		_coins.fly_from(at)
+
+
+## The coin for a catch that gets no head, from the bird's own place on the water.
+##
+## Not while the shed is up, either way — its room covers the plate the coin is aimed at.
+func _send_bird_coin(at: Vector2) -> void:
+	if _coins != null and not _shed_open:
+		_coins.fly(at)
 
 
 ## The pigeon in the corner, on its own layer just under the finds card: a bird is worth a
@@ -2707,6 +2774,7 @@ func _on_bird_caught(at: Vector2) -> void:
 func _build_pigeon_pop() -> void:
 	_pigeon = PigeonPop.new()
 	_pigeon.name = &"PigeonPop"
+	_pigeon.arrived.connect(_on_pigeon_arrived)
 	var over := CanvasLayer.new()
 	over.name = &"Pigeon"
 	over.layer = 18
@@ -2760,7 +2828,8 @@ func _seed_starter_bed() -> void:
 		return
 	unlocked.append(piece)
 	if _room != null:
-		_room.place(StringName(piece), Vector2i(1, 1))
+		# One cell in from the corner, as it always stood — in pixels now.
+		_room.place(StringName(piece), Vector2i(ShedRoom.CELL, ShedRoom.CELL))
 
 
 func _keep(def: TrashDef) -> void:
@@ -2786,7 +2855,7 @@ func _keep(def: TrashDef) -> void:
 	if _trophy != null:
 		_trophy.show_find(def.piece, def.display_name)
 	if _sfx != null:
-		_sfx.play_chime()
+		_sfx.play_find_caught()
 
 
 ## The ferry landing a load at one of the four merchants. The purse moves here and nowhere
@@ -3321,7 +3390,7 @@ func _build_tree_screen() -> void:
 	_shop_skin.get_parent().add_child(_tree_screen)
 	_tree_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_tree_screen.buy_asked.connect(buy_node)
-	_tree_screen.close_asked.connect(_set_menu.bind(false))
+	_tree_screen.close_asked.connect(_shut.bind(_set_menu))
 
 
 ## A tree run has begun: fresh (the file's starting money, nothing owned) or from its save.
@@ -3541,7 +3610,7 @@ func _fit_dog(dog: Dog) -> void:
 	dog.fetched.connect(_dog_brought_back)
 	dog.petted.connect(func() -> void:
 		if _sfx != null:
-			_sfx.play_bought()
+			_sfx.play_sniff()
 	)
 	_push_dog_numbers()
 
@@ -3595,19 +3664,14 @@ func _set_auto_ferry(on: bool) -> void:
 const FOLLOW_SPEED := 6.0
 
 
-## One engine for the whole fleet, driven by the busiest hull. Two boats loading at once
-## are not twice as loud — they are one dock making a noise, and mixing a second copy of
-## the same loop against itself would only phase.
+## The net's wash, pushed every frame.
+##
+## The fleet's own engine loop went with the diesel it was built from (2026-09-15): the ferry
+## is a sail boat, the water it pushes and its bell say it is leaving, and a loop under the
+## whole game was heard as a wind and a tick.
 func _push_engine() -> void:
 	if _sfx == null:
 		return
-	var effort := 0.0
-	var moving := false
-	for boat in _boats:
-		effort = maxf(effort, boat.engine_effort())
-		if boat.is_running():
-			moving = true
-	_sfx.set_engine(effort, moving)
 	_sfx.set_drag(_net_wash())
 
 
@@ -3625,7 +3689,6 @@ func _process(delta: float) -> void:
 	_pad_tick(delta)
 	_push_daylight()
 	_part_the_fleet(delta)
-	_fade_radio(delta)
 	_remap_filth(delta)
 	_push_patches(delta)
 	_tick_bonus(delta)
@@ -3700,6 +3763,7 @@ func _process(delta: float) -> void:
 		_camera.position = _clamped_view(at)
 
 	_look_for_the_end(delta)
+	_count_the_beat(delta)
 	if tree_mode:
 		_tick_tree_log(delta)
 
@@ -3734,7 +3798,25 @@ func _process(delta: float) -> void:
 ## the crate were spread apart to leave room for the middle one.
 func _sort_walkers() -> void:
 	if _angler != null:
-		_angler.z_index = _walker_layer(_angler.position)
+		var stood := _walker_layer(_angler.position)
+		_angler.z_index = stood
+		# The net and its rope go with the angler, one layer under (2026-09-16, Richard:
+		# casting north off solid ground, the end of the rope showed against the player).
+		#
+		# The net's job here is to be *behind* the figure — the rope starts inside the
+		# outline and the body is what hides its cut end, see `CastNet._lay_rope`. That was
+		# written against a fixed z 8 and an angler on 9, and it quietly stopped being true
+		# wherever the angler drops a band: behind the hut they are on 5 and behind the
+		# crate on 7, so the net and the whole rope with it were drawn over the player.
+		# Following the walker rule is what makes "behind the angler" mean it everywhere.
+		#
+		# The cost, behind the hut only: the net goes to 4, under the floating rubbish at 5,
+		# so the rope passes behind junk on its way out. The angler is already tied with the
+		# soup on that band; a two-pixel line going under a bottle is the lesser wrong.
+		if _net != null:
+			_net.z_index = stood - 1
+		if _net2 != null:
+			_net2.z_index = stood - 1
 	for dog in _dogs:
 		dog.z_index = _walker_layer(dog.position)
 
@@ -4193,12 +4275,11 @@ func save_game() -> bool:
 		"sold_by_kind": sold_by_kind,
 		"runs_done": _runs_done(),
 		"auto_ferry": _auto_ferry.button_pressed,
-		"fullscreen": _is_fullscreen(),
-		"music": _settings.music_on,
-		"music_level": _settings.music_level,
+		# The settings are not in here, by decision (2026-09-15): they are `Prefs`', written
+		# to user://settings.cfg on every press, and one set of them across the menu and the
+		# lake. A save that carried its own copy handed it back on load and undid whatever the
+		# player had set on the menu.
 		"farewell": _farewell_shown,
-		"sfx": _settings.sfx_on,
-		"sfx_level": _settings.sfx_level,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -4233,7 +4314,8 @@ func load_game() -> bool:
 	file.close()
 	var save := raw as Dictionary
 	var written := 0 if save == null else int(save.get("version", 0))
-	if save == null or written != SAVE_VERSION 			or int(save.get("seed", 0)) != _level_seed():
+	var readable := written == SAVE_VERSION or written == SAVE_SHED_CELLS
+	if save == null or not readable 			or int(save.get("seed", 0)) != _level_seed():
 		_note_save("the save is from another build — ignored")
 		return false
 	# A tree run and a shop run never read each other's file: their upgrades are not the same
@@ -4294,13 +4376,18 @@ func load_game() -> bool:
 		if _sheets == null or _sheets.has(StringName(name)):
 			unlocked.append(name)
 	decor.clear()
+	# A version 9 file holds cells; this build places in pixels. See SAVE_SHED_CELLS.
+	var decor_scale := ShedRoom.CELL if written == SAVE_SHED_CELLS else 1
 	for row: Dictionary in save.get("decor", []) as Array:
 		var name := String(row.get("piece", ""))
 		if not unlocked.has(name):
 			continue
 		decor.append({
 			"piece": name,
-			"cell": [int((row["cell"] as Array)[0]), int((row["cell"] as Array)[1])],
+			"cell": [
+				int((row["cell"] as Array)[0]) * decor_scale,
+				int((row["cell"] as Array)[1]) * decor_scale,
+			],
 			# Which way round it was left standing, and whether its fire was lit. A piece
 			# with one face reads as 0 whatever is in the file. See ShedRoom._row_view.
 			"view": int(row.get("view", 0)),
@@ -4328,10 +4415,10 @@ func load_game() -> bool:
 	for piece: int in PackedInt32Array(save.get("afloat", PackedInt32Array())):
 		_yard.put(piece)
 
-	_settings.fullscreen = bool(save.get("fullscreen", _is_fullscreen()))
+	# What the player has set comes from `Prefs`, not from the file: see save_game(). An old
+	# save's copy of them is ignored.
+	_settings.pull_prefs()
 	_set_fullscreen(_settings.fullscreen)
-	_settings.music_level = clampf(float(save.get("music_level", _settings.music_level)), 0.0, 1.0)
-	_settings.music_on = bool(save.get("music", true))
 	_push_music()
 	# A lake that was finished before the game was closed is finished when it comes back,
 	# and lit that way from the first frame rather than brightening as if it had just
@@ -4351,9 +4438,8 @@ func load_game() -> bool:
 	# finished lake is worked out again from the field a frame later, and says so again.
 	_cleaned = false
 	_sparkle_at = 1.0 if empty else 0.0
-	_settings.sfx_level = clampf(float(save.get("sfx_level", _settings.sfx_level)), 0.0, 1.0)
-	_settings.sfx_on = bool(save.get("sfx", true))
 	_push_sfx()
+	_push_ambience()
 	if _room != null:
 		_room.unlocked = unlocked
 		_room.decor = decor
@@ -4401,6 +4487,17 @@ func wipe_save() -> void:
 func _note_save(what: String) -> void:
 	_save_note = what
 	_save_note_for = 2.5
+
+
+func _exit_tree() -> void:
+	# The station is an autoload too, and the rooms it was told about were this scene's.
+	var music := MusicStation.main()
+	if music != null:
+		music.leave_rooms()
+	# The sound board is an autoload and outlives the lake: its engine, haul, fire and
+	# ambience are the lake's and go with it.
+	if _sfx != null:
+		_sfx.hush()
 
 
 func _notification(what: int) -> void:

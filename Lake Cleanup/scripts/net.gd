@@ -333,6 +333,11 @@ const AIM_FAR := Color(0.93, 0.94, 0.91)
 const AIM_ALPHA := 0.8
 const AIM_FAR_ALPHA := 0.55
 
+## How far into the mouth a piece's middle is put when the pad's assist looks for a green
+## spot beside it (`nearest_catch`): inside the rim, so the spot is green by a margin rather
+## than on the knife edge where the next frame's swell calls it red.
+const CATCH_INNER := 0.8
+
 ## Set from the lake's upgrade levels at cast time, so a cast runs on the numbers the
 ## player had when they paid for them.
 ##
@@ -409,6 +414,10 @@ var _settled_age: float = 0.0
 ## Where the pointer, the angler and the charm were when the idle picture was last painted.
 ## See `_repaint`.
 var _aim_was := Vector2.INF
+
+## Where the pad's reticle stands, in world pixels, or INF when the mouse is aiming. Set by
+## the lake every frame (`Lake._pad_tick`); `aim_point` is the one place the net asks.
+var pad_aim := Vector2.INF
 var _idle_was := Vector2.INF
 var _lit_was := false
 
@@ -758,7 +767,14 @@ func enchanted() -> bool:
 ## Is this world point a legal cast? Inside the range ring, and on the lake rather than on
 ## the island or the bank — a net thrown onto dry land is not a mistake worth simulating.
 func can_cast_to(where: Vector2) -> bool:
-	if state != State.IDLE or angler == null:
+	return state == State.IDLE and in_reach(where)
+
+
+## Whether a throw could land here, whatever the net is doing now: in range of the angler, on
+## open water. `can_cast_to` is this and an idle net; the aiming marker and the pad's assist
+## ask this one, so they keep answering while a cast is out.
+func in_reach(where: Vector2) -> bool:
+	if angler == null:
 		return false
 	var tile := Iso.world_to_tile(where)
 	if tile.distance_to(angler.tile_pos) > range_tiles:
@@ -805,6 +821,8 @@ func cast_to(where: Vector2, laying: bool = false) -> bool:
 	# this same speed either way, see Angler.start_cast().
 	if not helper:
 		angler.start_cast()
+		if sfx != null:
+			sfx.play_throw()
 	# A cast is one gesture from the throw to the catch coming out of the water. Nothing
 	# has to be held down for the second half of it.
 	_pulling = true
@@ -863,7 +881,7 @@ func _process(delta: float) -> void:
 					# the one that is still spreading a second later.
 					splash.ripple(world_pos(), mouth_extent() * 1.2)
 				if sfx != null:
-					sfx.play_splash(0.45)
+					sfx.play_net_splash()
 				# What the ring came down on is caught as it lands, not a frame into the haul
 				# after the mouth has already slid off it.
 				_sweep()
@@ -889,7 +907,25 @@ func _process(delta: float) -> void:
 	# After the net has moved and before anything is drawn, so the rope hangs off where the
 	# net is this frame rather than where it was.
 	_drive_rope(delta)
+	_chime_at_finds()
 	_repaint()
+
+
+## The chime rings on for as long as the aim marker is over a shining find, buried or
+## uncovered, and the last ring finishes after it leaves (2026-09-15, Richard; `Sfx.hover_find`).
+## The marker is up while a cast is out too, so this is too; not on the double cast's second
+## net, which draws no marker, and not while a board is over the water and the angler is held.
+func _chime_at_finds() -> void:
+	if helper or sfx == null or grid == null or angler == null or not angler.can_walk:
+		return
+	var pointer := aim_point()
+	var mouth := open_extent()
+	var over := -1
+	for find: Vector2i in grid.shining_finds():
+		if _touches(pointer, mouth, grid.surface_pos(find.x), grid.footprint(find.x)):
+			over = find.x
+			break
+	sfx.hover_find(over >= 0)
 
 
 ## Ask for a repaint, but not while the idle picture is standing still.
@@ -901,7 +937,7 @@ func _process(delta: float) -> void:
 ## and it used to repaint the ring sixty times a second.
 func _repaint() -> void:
 	if state == State.IDLE:
-		var aim := get_global_mouse_position()
+		var aim := aim_point()
 		var lit := enchanted()
 		if (
 			aim.is_equal_approx(_aim_was)
@@ -928,7 +964,7 @@ func _leave_it_there() -> void:
 		splash.splash(world_pos(), 0.45)
 		splash.ripple(world_pos(), Iso.tile_circle_extent(field_radius()))
 	if sfx != null:
-		sfx.play_splash(0.45)
+		sfx.play_net_splash()
 	state = State.IDLE
 	# The net stays out there, but the angler is done with it — stop the looping throw.
 	if angler != null:
@@ -1056,7 +1092,9 @@ func _sweep() -> void:
 			if splash != null:
 				splash.splash(_within_mouth(drawn[0]), 0.4)
 			if sfx != null:
-				sfx.play_catch()
+				# The same weight the drawn splash is given: a charm comes out of the water
+				# like anything else, and the knock that used to stand in for it is cut.
+				sfx.play_splash(0.4)
 			caught_charm.emit(kind)
 
 	# Only the rubbish is limited by what the net can hold. A bird and a charm are lifted
@@ -1187,7 +1225,6 @@ func _take_from(reach: Array[int]) -> void:
 			splash.splash(_within_mouth(at), weight)
 		if sfx != null:
 			sfx.play_splash(weight)
-			sfx.play_catch()
 
 
 func _come_home() -> void:
@@ -1508,14 +1545,16 @@ func _reach_along(towards: Vector2) -> Vector2:
 ##
 ## The whole point of it is that the range stops being something you learn by throwing.
 func _draw_aim() -> void:
-	var pointer := get_global_mouse_position()
-	var legal := can_cast_to(pointer)
-	var span := mouth_extent()
+	var pointer := aim_point()
+	var legal := in_reach(pointer)
+	# The open mouth, not the one being pursed: the ring is the next throw, which lands wide
+	# open, so it must not shrink with the net coming home.
+	var span := open_extent()
 
 	# A lit net has two casts in it, so the preview shows both: the mouth this click would
 	# scoop with, and inside it the patch the other button would leave burning. Neither
 	# replaces the other, because neither action replaces the other.
-	if legal and enchanted():
+	if legal and enchanted() and state == State.IDLE:
 		_draw_lay_ghost(pointer)
 
 	# The mouth as it would land. One ring either way, at the pointer: an earlier version
@@ -1544,6 +1583,72 @@ func _draw_aim() -> void:
 		# same reason the laid-net ghost is dashed.
 		for i in 24:
 			draw_line(ghost[i * 2], ghost[i * 2 + 1], ink, 1.5)
+
+
+## What the player is aiming at: the pad's reticle while there is one, else the mouse.
+func aim_point() -> Vector2:
+	return pad_aim if pad_aim != Vector2.INF else get_global_mouse_position()
+
+
+## The marker's verdict, for the pad's assist (`PadAim`), which must call green exactly what
+## the marker does.
+func would_catch(at: Vector2) -> bool:
+	return _would_catch(at)
+
+
+## The nearest spot to `at` where the marker would be green, no further than `reach` world
+## pixels past where it is now, or INF. For the pad's assist (`PadAim`).
+##
+## Not a search over spots: over pieces. Each piece the net could lift (and each perched
+## bird) has a nearest point from which the mouth covers its middle, which is on the line
+## from the piece to `at`, `CATCH_INNER` of the mouth out from it — measured, like `_touches`,
+## on the plane with its height doubled, where the mouth is a circle. The candidate found is
+## checked with the marker's own test before it is handed back, so the pull never leads onto
+## a spot the marker would call red.
+##
+## `heading` is where the reticle is being pushed: a spot behind it (under `ahead` of cosine)
+## is passed over, so the assist can bend the aim towards something but never hold it back
+## from where the player is steering. ZERO takes every direction.
+func nearest_catch(at: Vector2, reach: float, heading: Vector2 = Vector2.ZERO, ahead: float = -1.0) -> Vector2:
+	if grid == null or angler == null:
+		return Vector2.INF
+	var mouth := open_extent()
+	var inner := mouth * CATCH_INNER
+	var spots: Array[Vector2] = []
+	var centre := Iso.world_to_tile(at)
+	var bound := (reach + mouth) / Iso.tile_circle_extent(1.0) + grid.footprint_reach()
+	var span := int(ceil(bound)) + 1
+	var cx := int(floor(centre.x))
+	var cy := int(floor(centre.y))
+	for ty in range(maxi(cy - span, 0), mini(cy + span + 1, Iso.ROWS)):
+		for tx in range(maxi(cx - span, 0), mini(cx + span + 1, Iso.COLS)):
+			if Vector2(float(tx) + 0.5, float(ty) + 0.5).distance_to(centre) > bound:
+				continue
+			var index := grid.index_of(tx, ty)
+			if grid.reachable_slot(index, 1, power) >= 0:
+				spots.append(grid.surface_pos(index))
+	if flock != null:
+		for i in flock.birds.size():
+			if int((flock.birds[i] as Dictionary)["state"]) == Flock.State.PERCHED:
+				spots.append(flock.footprint(i)[0])
+
+	var best := Vector2.INF
+	var best_gap := INF
+	for piece in spots:
+		var off := at - piece
+		var flat := Vector2(off.x, off.y * 2.0)
+		var gap := flat.length() - inner
+		if gap <= 0.0 or gap > reach or gap >= best_gap:
+			continue
+		var rim := flat.normalized() * inner
+		var spot := piece + Vector2(rim.x, rim.y * 0.5)
+		if heading != Vector2.ZERO and (spot - at).normalized().dot(heading) < ahead:
+			continue
+		if not in_reach(spot) or not _would_catch(spot):
+			continue
+		best = spot
+		best_gap = gap
+	return best
 
 
 ## Would a cast landing here bring anything home?
@@ -1806,6 +1911,13 @@ func _draw() -> void:
 		_draw_net(drawn, pose[1], at, mouth, ink)
 	else:
 		_draw_mesh(at, mouth, ink)
+
+	# The aim stays up while the cast is out (Richard, 2026-09-14): the next throw is being
+	# lined up while this one comes home, and with a pad the ring is the only pointer there
+	# is. Over the net, so the net cannot hide it. Not on the double cast's second net, which
+	# would draw the same ring twice.
+	if not helper:
+		_draw_aim()
 
 
 ## How full the cast is, 0 to 1. What the bulge, the lean and the purse all bend on.

@@ -125,7 +125,8 @@ the repo; none of it is on the menu.
   the cheapest of every tier over the dearest of the tier below. `rubber_disk` and
   `rubber_ball` went to pollution 3.0 to sit inside their tiers' bands; a new kind's
   pollution has to keep that order.
-- **`SAVE_VERSION` 9**, old saves refused (Richard starts fresh).
+- **`SAVE_VERSION` 9**, old saves refused (Richard starts fresh). **10 since 2026-09-16**,
+  with version 9 read rather than refused — see Free Placement below.
 - **Priced by the sim** (`docs/progression/build_shop.py` -> `shop.json`, `price_shop.py`,
   `shop_loop.sh`, report in `shop-report/`): the tree's calibration (`k_catch_scale` 1.7 from
   Richard's run) on the shop's tracks. `price_shop.py` gives every level a minute of the run
@@ -430,8 +431,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `shaders/meter_water.gdshader`, sheets in `assets/ui/meter/` from
   `art_source/UI/Lake meter/Lake_Meter` PSD): four aligned 290x94 sheets — murky water,
   clean water, wooden frame, garbage circle over it — as child TextureRects in the bottom
-  left corner (hint line above it), at `METER_SCALE` (1.95) times the art on a 1080-line
-  window, in proportion elsewhere. Settled by eye (3x, 1.5x, then 1.3x that), not snapped
+  left corner (hint line above it), at `METER_SCALE` (**1.7**, was 1.95) times the art on a
+  1080-line window, in proportion elsewhere. Settled by eye (3x, 1.5x, then 1.3x that, then
+  cut back an eighth with the rest of the HUD, 2026-09-16), not snapped
   to a pixel step; nearest-filtered. The shader slides the filth-to-clean seam (feather
   `METER_FEATHER`, narrowed at the ends) and rocks both sheets a pixel or two
   (sine, not scroll: the sheets are not tileable). Both sheets have soft, part-transparent
@@ -478,19 +480,101 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   the farewell offers no onward door, and nothing new should route to `siege.tscn`.
 
 - **The main menu** (`scenes/menu.tscn`, `scripts/menu.gd`, 2026-09-12, issue #12): the
-  game's `run/main_scene`. The menu art (`assets/MDLL_Menu_Background.jpg`, 1652x628, title
-  top-centre; it replaced the capsule art `menu_capsule.jpg`, which is retired) covers the
-  window, centred, cropped at the sides where it is wider than 16:9. **Never stretched or padded, by decision** (Richard,
-  2026-09-12): fitting it to the width with its edge rows smeared into the bands was
-  rejected as a distortion — don't distort an image without asking. Four `PlankButton`s
-  (232x56) stand bottom-left over the open water: Continue (only when `Lake.SAVE_PATH`
+  game's `run/main_scene`. **The art is the lake itself** (2026-09-16, `/grill-me` with
+  Richard, "based on the work in the trailer"): `assets/menu_lake.png`, 1920x1080, the
+  trailer's own last page — the lake still filthy with a few clear pools, the angler on the
+  island's south-east beach with a net out in the soup, the pack on the sand, the ferry at
+  the island and a pier bottom-left — filmed by `tools/shot_menu_bg.tscn` and darkened by
+  `tools/bake_menu_bg.py`. It covers the window, centred, cropped where the window is not
+  16:9; on 1080p it draws one screen pixel to one. **Never stretched or padded, by
+  decision** (Richard, 2026-09-12): fitting it to the width with its edge rows smeared into
+  the bands was rejected as a distortion — don't distort an image without asking.
+  - **The picture has no title in it, so the logo is its own node**: `%Logo`,
+    `assets/mdll_logo_stacked.png` (the v1 stacked lockup the trailer and the capsules use,
+    3.09:1), `LOGO_WIDE` (0.50 of the window) at `LOGO_AT` in the design frame — **anchored
+    to the top-left corner, not to the plank stack**, which grows and shrinks with Continue;
+    a title that moved when a save appeared would read as a bug. Both numbers are by eye on
+    `tools/last_menu_main.png`.
+  - **The darkening is baked into the PNG, by decision** (Richard, over a `ColorRect` drawn
+    in Godot): one file, nothing at runtime. The capsules' own recipe — a flat `DARKEN`, a
+    smoothstepped left band under the logo and the planks (`LEFT_KEEP`, `LEFT_TO`), a mild
+    vignette and a cool `TINT` so the shadowed soup goes green rather than grey. The lake as
+    the game draws it is busy edge to edge, and cream lettering and oak planks need
+    somewhere to stand.
+  - **A one-off, not a pipeline, by decision**: the frame was posed once and picked by hand.
+    `tools/shot_menu_bg.tscn` (desktop build, not `--headless`, `--fixed-fps 60`;
+    `MENU_SHIFT` re-frames, `MENU_SHOTS` keeps several frames apart) and
+    `tools/bake_menu_bg.py` are kept as the record of what the numbers were, not as
+    something anything reads. The angler stands at `STAND` — at the trailer's own (2, 2) the
+    figure is **behind the recycle box** and not in the picture at all. Retired:
+    `assets/MDLL_Menu_Background.jpg` (1652x628, painted, title top-centre), and the capsule
+    art `menu_capsule.jpg` before it.
+
+  Four `PlankButton`s (232x56) stand bottom-left over the darkened soup: Continue (only when `Lake.SAVE_PATH`
   exists), New game (over a save, `MenuConfirm` asks "Start over?" first, then deletes the
   file and opens the lake fresh), Settings (the lake's `SettingsSkin` in `menu_mode`: sound
-  and screen rows only) and Quit; Credits (`CreditsBoard`, placeholder lines in one
-  constant) stands alone in the bottom right corner.
-  Escape closes whichever board is up and does nothing on the bare menu. The menu plays the
-  lake's track with its own player at `Prefs`' level; it restarts when the lake starts —
-  the lake's two-player crossfade is built into its scene, and that was weighed and kept.
+  and screen rows only) and Quit; Credits (`CreditsBoard`, all its words in one constant)
+  stands alone in the bottom right corner. **The credits are real now** (2026-09-16,
+  `/grill-me` with Richard): one "Art and Assets" heading over every third-party art pack,
+  each in that pack's **own required credit wording** (`Graphics created by Penzilla Design`,
+  `Asset by Zato - https://zatoart.itch.io/`, …) and **never saying what the asset is** —
+  `docs/CREDITS.md` is the only place the asset → pack mapping and the licence status live.
+  AI-generated art is credited nowhere, by decision, and the Steam page and the trailer carry
+  no credits. A line too wide for the face **wraps** on spaces rather than being cut or
+  shrunk, since none of the required strings may be shortened (`_wrap`, rows of one line set
+  `WRAP_GAP` apart); at the board's 460 the longest is 370 of 430, so the wrap is insurance.
+  **Spotify's mark stands beside Nuven** (`assets/ui/spotify_icon.png`, baked from their own
+  download by `tools/build_spotify_icon.py`): their guidelines forbid redrawing, recolouring
+  or distorting it, so it is never built in code and never tinted, and it is drawn by a child
+  `TextureRect` at a **linear** filter because it is a vector mark, not pixel art.
+  **Decoration only**, by decision — no click, no hover. Probe: `tools/probe_credits_wrap.gd`
+  (headless `--script`) prints the rows at three face widths.
+  Escape closes whichever board is up and does nothing on the bare menu. The music is the
+  `Music` station's, not the menu's (see The Music below): nothing restarts on the way into
+  the lake.
+### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
+A cleaned lake ends on a beat of clean water, then the words, then the credits.
+- **The run ends when the last piece is put in the crate** (`Lake._all_landed`), not when the
+  water empties. `_check_cleaned` still asks the field — the meter is float dust and cannot
+  be the trigger — and now also asks that no net holds a catch, no dog has anything in its
+  mouth (`Dog.carrying`) and nothing the net threw is still in the air. **Only the untagged
+  flights count** (`Haul.flying_to(null)`): cargo crossing to a hull and cargo a ferry is
+  landing at a pier are tagged, and both are stock already. The ferries may go on running
+  under the ending; what they carry is in the box.
+- **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
+  rising, the note ringing, and **the end song coming in with the beat, not with the text**
+  (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their
+  legs during it; the hold comes with the words.
+- **The credits roll up and off** (`Farewell.roll_credits`, `_draw_roll`): `CreditsBoard`'s
+  own strings and headings, wrapped to `ROLL_WIDE` of the window and climbing over `ROLL_TIME`
+  (26 s) from `ROLL_BELOW` under the glass to `ROLL_ABOVE` over it. Drawn **under** the
+  message, which does not move: the two lines are what the ending says, and a line that
+  scrolls away is a line somebody missed. Spotify's mark rides its row as its own
+  `TextureRect` at a linear filter, on the board's own terms.
+  **The rows are laid out here, not borrowed**: the board is a plate of wood with a face to
+  wrap against and this is open water with the whole window. The words are read from
+  `CreditsBoard`, so a credit added there is added here.
+- **A click skips the roll** (`skip_roll`, `ROLL_SKIP`): it runs off at nine times the pace
+  and leaves the words and the plaque. A second click dismisses as before. **The doors are
+  not drawn while the roll is running** — the credits pass over exactly the band they stand
+  in, and a plaque under a moving credit is one nobody can aim at.
+- **Only an ending that ends the game rolls them**: `_show_farewell` calls `roll_credits`
+  when `_next_scene()` is empty. A level that leads somewhere does not end anything.
+- **The roll dims where the words are** (`_message_band`, `_roll_clear`, `ROLL_BEHIND`): the
+  message does not move and the credits go under it, so the two cross. At full strength the
+  crossing is two lines of lettering in one place and neither reads; blinked out it is a
+  credit missing. It fades to `ROLL_BEHIND` over `ROLL_BEHIND_SOFT`, the way anything passing
+  behind something else does. One band, asked by both, so the dimming cannot drift from the
+  words.
+- `test_lake` guards the beat (its length, that nothing is written during it, that the song
+  is told), the crate rule (a piece in the net keeps the run going), the roll and the words.
+  **Headless has no renderer**, so `tools/shot_ending.tscn` (desktop build, `--fixed-fps 60`)
+  is what exercises the drawing: the beat, the words arriving, the first credits crossing the
+  message, the roll well up, and what is left after a skip —
+  `tools/last_ending_{beat,words,behind,roll,skipped}.png` and `last_ending.log`. It runs on
+  **a save of its own**, because finishing a lake saves it on the spot and a probe may not
+  hand the player back an emptied run.
+
   The lake comes back here from "Save and go to menu" and from the farewell's **"Back to
   menu"** plaque (`Farewell.to_menu`, always drawn under the closing words; clicking
   elsewhere still just dismisses). Probe: `tools/shot_menu.tscn` (desktop build) saves
@@ -529,11 +613,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   the fallback when the sheet is missing or the box is under `BORDER_LEAST`; `face_of` is the
   one place the inset is decided. Re-measure every `BORDER_*` if the meter art is repainted.
   **The stock readout and the settings button wear it too** (2026-09-12): the stock plate is
-  that border round the recycle box's own brown (`STOCK_TALL` 62, up from 34 — the wood alone
-  is 30, and its width is measured against the face and then grown by the walls), and
+  that border round the recycle box's own brown (`STOCK_TALL` **54**, up from 34 and then down
+  from 62 — the wood alone is 30, and its width is measured against the face and then grown by
+  the walls), and
   `PlankButton` is it round a `BOARD` face with the word set to the **face** rather than to
   the whole button (`LABEL_SHARE`), so a button sized to its own word carries no empty wood.
-  The settings button went 176x38 to 152x56 on that.
+  The settings button went 176x38 to 152x56 on that, and to **134x48** in the HUD cut below.
   **And so do the three menus** (2026-09-12): the upgrades boards, the settings board and the
   shed's shelf call `Style.board_wood` for their frames and `Style.board_ribbon` — which now
   reaches for `meter_plank` first — for their title planks. `board_wood` **returns the face**
@@ -595,6 +680,17 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   mask, and the plank draws that mask tinted `Style.BOARD` under itself — so the bite reads
   through to the **board's face**, which is what is behind the panel. Top and end bites are
   over the lake and stay open.
+  **The corner HUD came in an eighth** (2026-09-16, Richard: reduce the meter, the coin, the
+  stock plate and the settings button): `METER_SCALE` 1.95 to 1.7, `STOCK_TALL` 62 to 54,
+  `MONEY_TALL` 64 to 56, the settings plank 152x56 to 134x48. **The border's planks take a
+  fixed 30 px of any plate's height**, so a shorter plate is all face lost and the writing is
+  what runs out of room first: the stock plate's two sizes are **derived off that face** now
+  (`STOCK_TEXT`, `STOCK_LABEL_SHARE`, `_stock_count_size`/`_stock_label_size`), the way the
+  money plate's already was, and `_lay_out` measures the plate's width against the same
+  numbers — written down, the plate came in while its reading stayed put and ran off its own
+  panel. The sunken reading panel's inset went 5 px to `HudButtons.PANEL_INSET` (2) for the
+  same reason, which is what keeps both figures on their old rung (16). One knob each; retune
+  by eye.
   **Retired, by decision** (2026-09-12): dressing the buttons with a nine-patch of that art —
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.
@@ -1073,6 +1169,21 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   hull's silhouette in the side and end-on views and only show where they spread past the
   stern — as they did under the old hull. A heading-aware across scale would fix it.
 
+### The Net Sorts With The Angler (2026-09-16)
+The net node and its rope take **the angler's own walker layer, minus one** (`Lake._sort_walkers`),
+rather than a fixed z 8.
+- **Why**: the rope starts inside the figure's outline and the body is what hides its cut
+  end (`CastNet._lay_rope`), which was written against an angler on `IN_FRONT` (9). The
+  angler drops a band behind the crate (7) and two behind the hut (5), and on both of those
+  the net and the whole rope were drawn **over** the player — casting up the screen off solid
+  ground, the end of the rope showed against the figure (Richard). Following the walker rule
+  is what makes "behind the angler" mean it wherever they stand.
+- **The cost, behind the hut only**: the net lands on 4, under the floating rubbish at 5, so
+  the rope passes behind junk on its way out. The angler is already tied with the soup on
+  that band, and a two-pixel line going under a bottle is the lesser wrong.
+- Both nets, so the double cast's helper does not sort on its own. `test_lake` walks the
+  angler through all three bands and guards it.
+
 ### The Piers (`scripts/dropoff.gd`, `tools/build_piers.py`, sheet: `assets/piers.png`, 2026-09-12)
 The four merchant yards are isometric pixel art **built from rules, not painted** (issue #10;
 Richard: "rebuild in code, isometric", judged on a static mockup before anything in the
@@ -1206,6 +1317,129 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   one coin of the purchase sound, no more than one per `CHINK_GAP`). `test_lake` guards the
   aim, the sign, the heap and its drain, and the coins' cap and carry.
 
+### The Pigeons (`scripts/flock.gd`, 2026-09-16, `/grill-me` with Richard)
+The flock is drawn and placed properly, and a sitting bird is worth spotting.
+- **They are drawn over everything** (`Lake.BIRD_LAYER` 21): hulls (12), the haul (8), the
+  piers, the walkers, and the net and the finds' beams at 20. At z 6 a bird was cut in half
+  by a pier deck, hidden behind a moored hull and walked in front of by the angler. **The
+  net too, by decision** — "over everything" was the whole of the instruction, and a bird
+  disappearing behind the thing being cast at it is the bug, not the fix. The cost: a bird
+  perched behind a pier draws on top of the deck; accepted.
+- **A perch is the drawn top of the drawn piece** (`LakeGrid.perch_point`): the same
+  arithmetic `_stamp`/`_sprite` lay the quad down with — `tilt`, `swing`, the waterline
+  `sunk_by` cut, `nudge`, `shove` and the bob. The old perch was `surface_pos` plus the
+  def's raw `size.y * 0.35`, which ignored all four: a bird floated a gap above a small
+  piece and stood beside a leaning one. `_perch_height` is gone. **The two must move
+  together** — a change to how a piece is cut or turned is a change to where a bird stands.
+- **A splat is a blob of whole art pixels, rolled per splat** (`_smudge`, `POOP_CELLS`,
+  `POOP_SPECKS`): grown a cell at a time out from the middle, with loose specks flicked
+  beyond it, snapped to the art grid. Two tones, body and edge. It was the same pair of
+  circles at the same offset every time, which reads as a decal rather than mess. Lives
+  roughly halved: island 28 s, open water 3.5 s, on the angler 3 s.
+- **A flying bird's shadow is its own silhouette** (`_draw_shadow`, `Shade.lying`), like the
+  angler, the dog, the trees and the hull — leaning and stretching with the day. It was a
+  black disc: the last shadow on the lake that was not the shape of the thing making it and
+  the only one that ignored the sun. At the day's own ink it cannot be seen on water, so it
+  takes the hull's bargain (`SHADE_GAIN` 2.4, `SHADE_MOST` 0.45, lighter than the boat's),
+  and it shrinks and thins with the height the arc has carried the bird to (`SHADE_SHRINK`,
+  `SHADE_THIN`) — a shadow the same size at every height reads as a bird sliding along the
+  surface. No day, no shadow. Perched birds cast none; they are standing on their perch.
+- **A perched bird inside the net's reach wears a pale rim** (`BirdRim`, `RIM_TONE`,
+  `Flock.catchable`): the finds' own trick and the finds' own `rim.gdshader`, with its
+  `rim_gold` uniform turned down to a blue-white — **not gold**, which on this lake means
+  treasure, and a pigeon is worth a handful of sludge. `CastNet.in_reach` rather than
+  `can_cast_to`, so the rim does not blink off while a cast is out. Out of range, or in the
+  air, no rim: it is a promise the next cast can keep, not decoration.
+- **Out of scope, by decision**: perched-bird shadows, painted splat art, and any change to
+  the flock's size, perch timing or what a bird pays.
+- `test_lake`'s `_stage_pigeon_look` guards the layer, the perch against the drawn picture
+  and its lean, the smudge (all cells different, all touching, no two splats alike), the
+  shortened lives, the shader, and the rim's three conditions.
+
+**A bird is a bird** (2026-09-16, second `/grill-me` with Richard; supersedes the
+"row"-keyed flock above):
+- **The sheet is laid out by action, not by bird**, and that is the whole trap. A row's
+  first block is one bird's three-frame flap; its second and third blocks are three
+  *different* birds standing and sitting — birds 1-3 on row 1, 4-6 on row 2, 7-9 on row 3,
+  with rows 4-6 repeating them. So **bird N's poses live on row (N-1)/3+1 at frame
+  (N-1)%3**, never on N's own row. `flock.gd` read the standing frames off the flying
+  bird's own row and played them as a cycle, so a perched pigeon changed species every
+  0.42 s — the bug Richard reported.
+- **The pairing is authored, in `assets/pigeon_birds.json`**: all nine birds, each with its
+  three fly cells, its stand cell, its sit cell, a name and a `use` flag. Separate from
+  `assets/pigeons.json` for the reason `tools/decor_sets.json` is separate from the
+  decoration sheet — the slicer finds the rectangles, only a person can say what they are.
+  **In `assets/`, not `tools/`**: the export excludes `tools/*`. `pigeons_used.json` (a
+  list of sheet rows) is retired with the idea it encoded.
+- **Three birds, by decision**: 1 `slate_head`, 3 `white_dove`, 9 `street`, equal thirds,
+  picked once at spawn and kept for life. Change the pick by flipping `use`; **do not
+  delete a bird** — the other six stay listed and off.
+- **The idle is a stand/sit shuffle, not a cycle**: a bird has exactly two ground pictures,
+  so a pose is held `POSE_MIN`..`POSE_MAX` and then **rolled again** (`SIT_ODDS` 0.3, so
+  standing can follow standing and the shuffle has no beat). It lands standing — a bird
+  that touches down already sat has put its feet away in mid-air. `PERCH_FRAME` is gone.
+  Numbers by eye, to be retuned in play.
+- **The flap is unchanged**: block 0, `FLY_FRAME` 0.09. Those three frames were always the
+  right ones.
+- **`tools/pigeon_contact.gd` draws birds now**, one row each — flap, then stand and sit,
+  unused ones dimmed. Laid out the sheet's way it is the picture the wrong pairing was
+  picked off. Re-run it (needs a window) before the next pick.
+- **`test_lake` asks the pixels, not the file**: a bird's poses share all their colours
+  with its own flap and at most a third with any other bird's, so a mis-authored
+  `pigeon_birds.json` fails rather than agreeing with itself. It also guards the three
+  chosen birds, that a perched bird only ever shows its own two poses, and that it lands
+  standing.
+
+**The head that pops in** (`scripts/pigeon_pop.gd`, `Lake.POP_ODDS` 0.5): netting a bird
+pays on the spot, and the only sign of it was a splash out where the player was not
+looking. So on half the catches the bird's head slides in from the side of the screen, coos
+(`Sfx.play_coo`) and says what it paid. Mortal Kombat II's Toasty, and deliberately not
+solemn — a gag that fires every time is a notification. Its own `CanvasLayer` at 18, under
+the finds card. The portrait is `assets/pigeon_head.png`, its own drawing rather than a
+crop of the flock's eleven-pixel birds, cut by `tools/slice_pigeon_head.gd`.
+- **It comes in halfway down the left edge, leaning** (2026-09-16, Richard). The painting
+  is a head cut off at the neck and **the cut is its bottom edge**, so whichever screen edge
+  that cut is laid against is the edge that does the hiding. Mirrored (`_turned`, baked) it
+  faces right; leant `HEAD_LEAN` (**54 degrees**, picked off the mockup after 65 read as too
+  square) clockwise the beak swings **down** and the cut comes round to the **left**, where
+  the screen's own side cuts it. `HEAD_DOWN` 0.5.
+- **The lean is drawn, not baked, and only the head turns**: there is no turning a picture a
+  fraction of a quarter without resampling it, and this is pixel art — so `_draw` sets the
+  canvas transform for the one `draw_texture_rect` and puts it straight again, or the price
+  tag leans over with the bird.
+- **How far past the edge it stands is measured off the painting** (`_measure_cut`,
+  `cut_reach()`, `CUT_BAND`): the far end of the cut is put `HEAD_TUCK` (0.04 of the head's
+  height) past the edge, and where that end lands depends on the lean — so the number is
+  read off the art the way `Skirt.hem` reads a silhouette, not written down. Nudge
+  `HEAD_LEAN` and the placement follows. **The reach starts at minus infinity, not zero**:
+  leant this far the whole cut sits left of the head's middle, and a floor of zero threw
+  that away and shoved the bird half off the screen.
+- **Retired, in order**: standing upright and mirrored in the **bottom left corner** with
+  its neck on the bottom edge (that corner is the pollution meter's, and the two sat on top
+  of each other; `HEAD_SINK` went with it), then a flat **quarter turn** with the beak up —
+  a head at ninety degrees has fallen over, and it was looking away out of the screen.
+- **Where it is drawn is `head_centre()` and `head_box()`**, asked by the harness too, so
+  the check that keeps the bird off the meter cannot measure a second layout and drift from
+  the first.
+- **Every catch sends a coin** to the money plate, the way a sale at a yard does
+  (2026-09-16). A pigeon was the only money in the game that arrived with nothing crossing
+  the screen. **Every catch, not just the ones that get the head** — the coin is the receipt
+  for the money and the money is not part of the joke — and not while the shed is up, whose
+  room covers the plate it is aimed at.
+- **The coin leaves the bird, so with a head it leaves the head** (`PigeonPop.arrived`,
+  `coin_from`, `CoinFly.fly_from`, `Lake._on_pigeon_arrived`): the pop emits once it has
+  finished sliding in, and the coin sets off from the middle of what the head covers. It has
+  to **wait for the head** — fired at the catch it left an empty edge of the screen a tenth
+  of a second before the pigeon got there, which is money from nowhere. `pop()` returns
+  false when there is no art, so the lake knows no head is coming and falls back to the
+  bird's own splash on the water (`_send_bird_coin`). `fly_from` is `fly` without the canvas
+  transform: the pop is on a `CanvasLayer` and has no place on the lake at all. One head is
+  one coin, however long it is held.
+- `test_lake` guards the head against the meter's own box, its place down the screen, that
+  the side cuts it and that the whole of the cut is past the edge, that it leans rather than
+  lying on its side, that the coin waits for the head and then leaves it (one a head), and
+  that a catch with no head still pays off the water.
+
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
 the market board carries Recycle Bonus and Pigeons only. See The Shop Balance Pass.
@@ -1334,6 +1568,247 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   click, wheel and Escape land where the pointer is in a stretched window
   (`tools/last_pad_cursor.log`).
 
+### Sound (2026-09-15, `/grill-me` with Richard, `scripts/sfx.gd`, `tools/build_sfx.py`)
+The code-built placeholder sounds are replaced by Richard's recordings. **Supersedes the old
+`sfx.gd` header's "there are no sound files and there is not going to be a folder of them".**
+- **Pipeline**: the recordings stay in `art_source/SFX` (24-bit, 96 kHz, silence either side,
+  230 MB). `python tools/build_sfx.py` (ffmpeg on PATH) writes `assets/sfx/`: 16-bit 44.1 kHz
+  WAV with the silence cut and the tail faded, footsteps cut into single steps
+  (`step_grass_N`, `step_sand_N`), the sniff into three (`sniff_N`), the barks as `bark_N`, the
+  find chime cut to its first 1.5 s, and the beds as seamless loops — the lake and the fireplace
+  as OGG, the wading cut as WAV (`LOOP_WAV`: as an .ogg it would not open in the editor's
+  inspector however often it was reimported, renamed or had its UID rebuilt, while every other
+  .ogg in the project did; `Sfx.BEDS` sets the loop point on the way in; lake
+  236 s, fire 30 s, wading 2.2 s, equal-power crossfade). Every cut is a number in its `PLAN`. **Reimport
+  after a re-run.** 11 MB in all.
+- **A harness that borrows a setting puts it back** (2026-09-16): `Prefs.store` writes
+  `user://settings.cfg` there and then, and `test_lake`'s save stage set a sound and an ambience
+  level to check that a load reads them from `Prefs` — so every headless run left the player's own
+  sliders on the test's numbers, and the next launch loaded those. It now records both levels
+  first and stores them back, and checks it did. **Nothing in `tools/` may leave `Prefs`, the
+  save file or `user://` changed**; the probes that write one copy it first (`film_trailer`'s
+  `_load_shed_save`).
+- **The settings are `Prefs`' alone** (2026-09-15): the save file used to carry its own copy of
+  music, sound, ambience and fullscreen and hand it back on load, which threw away whatever had
+  been set on the main menu. `save_game` writes none of them, `load_game` calls
+  `SettingsSkin.pull_prefs`, and opening the board reads them again. `test_lake` guards both.
+- **`Sfx` is an autoload, `Sound`** (`Sfx.main()`, `Sfx.ui(name)`), so the menu has its clicks
+  and the start sound carries into the lake. It reads `Prefs` itself. The lake calls `hush()`
+  on `_exit_tree`: the engine, haul, fire and ambience are the lake's and must not follow it to
+  the menu. `SOUNDS` is every recording's balance in dB and pitch roll — **first guesses, to be
+  tuned by ear**.
+- **Nothing important is stolen** (first playtest, same day): through one round-robin pool, a
+  sweep's knocks (one per piece) took every voice in a frame and cut the net's splash, the haul,
+  the bell and the chime short. `CHANNELS` gives those (and the throw, the find, the barks and
+  sniffs) players of their own; `NEVER_CUT` (haul, chime, bell) skips a new play rather than stop
+  one sounding, so a haul always finishes; the shared pool takes a free player before stealing;
+  the knock is held to `CATCH_GAP`. `ui_click`, `ui_close` and the two decoration drops are cut
+  from their own transient (`("peak", ...)`) — each take leads with a softer tick or a rise,
+  which was heard as a late press. **Nothing else is late** (measured 2026-09-16): the files
+  have no lead-in, `play()` to audible is under a millisecond, and the WASAPI driver's floor is
+  10 ms whatever `audio/driver/output_latency` says (4 and 2 both report 10).
+  The `ui_*` imports are uncompressed, and `audio/driver/output_latency` is 8 ms rather than the
+  15 ms default — both takes start loud in their first millisecond, so what was left of "the
+  click is late" was the engine's own buffer. Raise it again if a weaker machine crackles.
+- **Second pass by ear** (same day): net splash quieter, and dropped onto one of
+  `NET_SPLASH_PITCHES` (four steps, never the last one played, with a small roll on top) rather
+  than rolled about one pitch — one take lands every cast; pigeon wings quieter; `AMBIENCE_DB` -10 (was +2); piece splash louder. **A piece landing
+  in a box is the shed's own wooden thud** (`drop_big` at `POP_PITCH` 0.85) — the built pop is
+  gone, and dropped in pitch it read as a shot heard from a long way off (Richard: "wood on
+  wood, bold").
+- **Still built in code** (no recording): the lake-cleaned note (`play_found`) and the
+  siege's chime. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
+  that played it already drew a splash, dropped a piece in the crate or knocked the box, so
+  the knock under those was one event sounded twice. A charm lifted out of the water plays
+  the piece splash instead and a dog delivering to the crate plays the crate's own thud
+  (`play_pop`), which is what it should always have been. Don't put it back.
+
+### The Audio Audit (2026-09-16, issue #1, `/grill-me` with Richard)
+Issue #1's taxonomy was written before the recordings existed and the game moved past it on
+purpose. What the audit settled, against the shipped design:
+- **Delivered**: `wings`→`pigeon_fly`, `coo`→`pigeon_coo`, `ui_click`, `ui_hover`, `upgrade`,
+  `find`→`find_caught`, `decoration_apply`→`drop_small`/`drop_big`, `ambient_layer`→
+  `lake_ambient`, `decoration_menu`→`indie_boi_radio`, `main_loop`/`menu_theme`→the Nuven
+  playlist, `victory_stinger`→Habibs, plus everything the spec never listed (the ferry, the
+  net, the steps, the wading, the coins, the dogs, the shed).
+- **Superseded** by decisions above: `horn`→`ferry_bell`, `engine_loop` retired, `drag_loop`→
+  `haul`, `pop`→`drop_big` at `POP_PITCH`.
+- **Struck off, by decision**: the four splash tiers (`splash_small`/`medium`/`large`/`heavy`)
+  stay **one recording pitched by weight** — `Object_Splash` through `play_splash`, which is
+  what is in play and what works; `catch.wav` (the knock, cut); and `warning.wav`, which has
+  no caller, no substitute and none wanted.
+- **Open**: `chime.wav`, the lake coming clean, is the one sound still owed a recording.
+  `_make_found` stays until the take is in `art_source/SFX`.
+- **The delivery format lines are struck too**: the spec's 24-bit 48 kHz PCM in
+  `assets/audio/` describes a hand-off, and the hand-off is `art_source/SFX` at 24-bit
+  96 kHz, which exceeds it. What the game imports is 16-bit 44.1 kHz in `assets/sfx/` and
+  `assets/music/`, by design.
+
+- **Every cut is levelled, and `SOUNDS` is the mix** (2026-09-16, `tools/build_sfx.py`
+  `loudness`/`level`, report in `tools/last_sfx.log`): the takes were delivered up to twenty
+  decibels apart, so a number in `SOUNDS` was doing two jobs — rescuing a quiet recording and
+  mixing the game — and there was no telling which was which. Every file is now measured
+  K-weighted (ITU-R BS.1770, **ungated, over the whole cut**: the gate's 400 ms blocks are
+  built for programme material and most of this is a tenth of a second long) and gained to
+  `TARGET_LUFS` (-22, the middle of issue #1's band; -20 for the beds), held under
+  `PEAK_CEIL` (-3 dBFS). `LOUDEN`, `STEP_PEAK` and `peak_gain` are gone with it.
+  **Every `SOUNDS` figure was shifted by its own file's gain on the changeover**, so what is
+  written there is the balance Richard had tuned by ear, said over a level floor — nothing
+  in play changed on the day. The report's last column is that shift, per name: read it after
+  a re-record and move the entry by hand. A cut whose peak stops it reaching the target lands
+  short and says so in the report (the wading bed, the lake's ambience, the piece splash).
+- **The box thud came up** (same day, Richard: still a bit muffled): `POP_DB` -16 to **-9**
+  and `POP_PITCH` 0.85 to **0.90**. Dropping the pitch is what makes it bold and also what
+  makes it dull, so the pitch went half the way back and the level took the rest. Both are
+  by-ear knobs.
+- **A ferry is heard coming home** (same day, Richard: sparsely): `Sfx.play_berth` from
+  `Boat`'s RETURNING→DOCKED — the water it pushes on the fleet's own `BOAT_MOVE_GAP`, the
+  bell on `BERTH_BELL_GAP` (70 s), much longer than the 25 s it leaves on. **The island end
+  only, by decision**: the pier end is across the lake from where the player stands, and the
+  coins are what say a delivery landed.
+- **The dogs wade on the angler's own rule** (same day, `Dog._push_wade`): past the drawn
+  water's edge by `Angler.WADE_IN` and moving faster than `Angler.WADE_LEAST` pushes the same
+  wash the angler's boots do, so entering, swimming and coming back up the beach all sound
+  the same for both. **Dog footsteps on land stay out**, as before. `Sfx.set_wading` is
+  **keyed by walker** now (`_wading`, a set): there is one wading loop and up to four dogs,
+  and a boolean set by whoever pushed last was turned off by a dog on the lawn while the
+  angler stood in the water. A key is dropped when its walker leaves the tree.
+- **The fleet's engine loop is retired, by decision** (2026-09-15): the ferry is a sail boat, the
+  water it pushes and its bell say it is leaving, and the built diesel — a hiss with a pulse in
+  it — was heard as a wind and a tick under the whole game. `set_engine`, `_make_engine` and the
+  engine player are gone; `Lake._push_engine` only pushes the net's wash now.
+- **Where each goes**:
+  - Ferry leaving the island: the water the hull pushes (`boat_move`, the body of
+    `Boatmove_water_steps`), with `Boat_Bell` over it at most once in `BELL_GAP` (25 s) for the
+    whole fleet (`play_bell`, replacing the horn). **One hull at a time**: it has a single
+    player, is never cut and is held to `BOAT_MOVE_GAP` (2.5 s) — two ferries setting off
+    together played the take over itself, which is what read as a weird space sound.
+  - Throw: `Throwing_Net`, once (the double cast's second net is silent). Landing, and a lit
+    net laid: `Net_Splash`.
+  - Hauling: `Haul_Sound` replaces the drag loop. It plays when the reel starts and again every
+    `HAUL_EVERY` (1 s) while reeling, pitch and level off the net's effort (`set_drag`).
+  - Each piece lifted: `Object_Splash`, pitched lower and louder by weight, at most one every
+    `SPLASH_GAP` (0.08 s), the built knock under it.
+  - A find caught: `Decoration_Caught_Net` (replaces the struck note). `Decoration_Chime` (its
+    first 1.5 s, faded over 0.9 s, quiet) rings while the aim marker is over a shining find,
+    buried or uncovered, **no more than once in `CHIME_GAP` (6 s)**; after the marker leaves,
+    the one playing finishes; never restarted while still sounding (`Sfx.hover_find`, `CastNet._chime_at_finds`,
+    `LakeGrid.shining_finds`). Also when a find surfaces (`LakeGrid.find_surfaced`, emitted
+    from `_restamp`, so a rebuild or a load rings nothing).
+  - Coins: `Coin_Sound_2` (`CHINK_GAP`). Purchases: `Upgrade_Purchase`. **The coin and the
+    box's thud are pitched in steps** (`COIN_PITCHES`, `POP_PITCHES`, through `_next_pitch`,
+    which the net's splash shares, 2026-09-16): both fire dozens of times a minute on a long
+    haul, and one take at one pitch reads as a metronome. Never the step used last, with
+    `SOUNDS`' own roll on top.
+  - Pigeons: `Pigeon_Fly` passing over, `Pigeon_Noise` lifted from the lake (own player).
+  - Dogs (`Dog._maybe_speak`/`_speak`): a bark (1 or 2 at random) passing the angler or sitting
+    idle within `HEAR`; a sniff wandering near them or when they walk up. **Sparse by rule**:
+    one gap shared by the pack (`_voice_next`, 8-18 s), a roll every `VOICE_ROLL` at
+    `VOICE_ODDS`, barks favoured over sniffs. Petting plays a sniff (it used to play the
+    purchase sound).
+  - Angler steps (`Angler._footfall`): one step on each foot-down frame of the run cycle
+    (`FOOTFALLS`, frames 3 and 10 of 14): grass on the lawn, sand otherwise, and
+    **wet only past the water's drawn edge by `Angler.WADE_IN` (8 px)** — the wet sand and the
+    foam the coast wave runs up it are the beach, not the water (Richard, 2026-09-15). **The shallows are a wash with a gap in it, not
+    footsteps** (Richard, same day): `WaterSteps3` is water being moved rather than a drip or a
+    splash, so while the boots are moving in it (`Sfx.set_wading`, `Angler._push_wade`, over
+    `Angler.WADE_LEAST`) the cut plays, finishes, waits `WADE_EVERY` (1 s) and plays again. Held
+    as one loop it was water running without a break. Its own player, never cut. No step sound fires on water. Retired as
+    the wet step, in order: `Water_Steps.wav`, `Boatmove_water_steps`' tail, `WaterSteps2`'s
+    drip. `Angler.step_surface` is the one
+    place that decides, and `test_lake` asks it. The grass and sand takes were recorded some
+    20 dB under the rest: the builder drops the faint onsets (`STEP_LEAST`) and brings every step
+    up to `STEP_PEAK`, the sniffs and the boat's water likewise (`LOUDEN`). Not the dogs, not the
+    shed.
+  - Interface: hover on everything clickable (`HOVER_GAP`), a click on **press** (a
+    `PlankButton` used to click on release, heard late), **no click on a
+    shop row** (the purchase sound is the answer; an unaffordable row is silent). `Close_Tab`
+    when the player closes a board — cross, click off it, Escape, E out of the shed
+    (`Lake._shut`, `MainMenu._shut`) — never when another board opening puts it away.
+    The menu's Quit closes rather than clicks.
+    `NewGame_Continue_Sound` on New game / Continue (and "Start over" confirmed) on the
+    autoload's own player; the menu's planks set `PlankButton.clicks` false.
+  - **The lake is not heard from inside the shed** (2026-09-15): `Sfx.indoors`, pushed by
+    `Lake._push_rooms`, silences everything but `WHILE_INDOORS` — the door, the pieces put down,
+    the fire and the interface — so no ferry sets off and no water moves while the player is
+    decorating. `play_pop` checks the flag itself, since a piece landing in a box plays the
+    shed's own thud. The coins go with them (`CoinFly.clear`, no new flights while the shed is
+    up): they are drawn over everything, and they are a receipt for a plate the room covers.
+  - Shed: `Decoration_Menu_Open` when it opens. Put down, a `small` or `wall` piece taps
+    (`Drop_Small`), a floor piece thuds (`Drop_Big`). `Fireplace_On` loops while a fire is lit
+    in the room and the shed is open (`ShedRoom._fire_lit`), easing in and out.
+  - `Lake_Ambient` loops whenever the lake is up, **ducked `AMBIENCE_DUCK` while the shed is
+    open**, on its own **Ambience** row on the settings board (`Prefs.ambience_on`/
+    `ambience_level`, `settings.cfg`).
+- **Out of scope, by decision**: dog footsteps, footsteps in the shed, the tree screen's nodes
+  (set aside). `test_lake` guards the autoload, that every name in `SOUNDS` loaded, the variants,
+  the looping beds and the duck.
+- **The lake goes quiet behind the upgrades board** (`Sfx.shopping`, `WHILE_SHOPPING`,
+  `may_play`, pushed from `Lake._push_rooms`, 2026-09-15, Richard: "keep only music, ambient
+  and money from lake sounds"). While that board is up the lake's own sounds are held —
+  barks, splashes, the ferry, the pigeons, the steps, the haul and the wade bed, and the
+  three built sounds through `_fire`. What is left: the song through the radio, the ambience
+  bed (it is the lake being there, not an event) and the **money**, `coin` and `upgrade`,
+  because a sale landing while the shop is open is the plate's number moving. Interface
+  sounds come through `play_ui` and are not the lake's, so they are untouched. The shed and
+  the settings board are unchanged. `test_lake` guards what is held and what is not.
+- **Every slider obeys one law** (`Prefs.volume_db`, `SLIDER_LAW` 33.2 dB a tenfold,
+  `SLIDER_FLOOR`, 2026-09-15, Richard: "they feel like they are only working at half of it,
+  the other half is just mute"). The three sliders ran straight from their floor to their
+  ceiling in decibels — sixty of them for the music — so half way along was 28 dB down, a
+  sixteenth of the loudness, and everything audible was crowded into the top third of the
+  groove. A decibel is a ratio and the ear hears ratios, so the travel is a power law
+  instead: half the slider is about half the loudness, and the drawn fill is honest about
+  what is being used. `loudest` stays each sound's own (+4 music, +6 effects and ambience);
+  the law is what the travel between the ends is worth. Music, effects and ambience all go
+  through it.
+
+### The Music (2026-09-15, `/grill-me` with Richard, `scripts/music_station.gd`, `tools/build_music.py`)
+One station for the whole session. **Supersedes** the lake's two-player Goin crossfade and the
+menu's own player (both gone, with `%Music` in both scenes and `assets/music_goin*.mp3`).
+- **An autoload, `Music`** (`MusicStation.main()`), started as the engine loads — the splash is
+  still up, the earliest Godot allows. Menu and lake hear one stream; going to the menu and back
+  restarts nothing. Scenes only say where the player is (`indoors`, `muffled`, `set_ending`,
+  `leave_rooms` on a scene's way in and out) and push the volume (`set_level`, live off the
+  slider). **Desktop only, by decision**: the web build's loading screen and autoplay block
+  were not designed around.
+- **Playlist**: beatgucci -> Save ME -> Goin -> beatgucci, forever. The next song eases up
+  underneath over `FADE` (4 s, squared, so it is still quiet while the other is whole) and
+  the song playing holds its level until its own last `FADE_OUT` (1.5 s). **Not an
+  equal-power crossfade** (2026-09-15, Richard: "getting cut too quickly on fade out"): Save
+  ME plays at full level to its final sample — it has no outro — so a four-second symmetric
+  fade threw four seconds of the song away. The two together peak about a decibel over one
+  song, which `test_lake` guards. **beatgucci stops
+  at 2:12**, cut in the file by the builder; every song's trailing silence is cut too, so a
+  file's length is where it ends and the station fades them all the same way.
+- **Muffled** (the upgrades board or the settings open on the lake): the playing song
+  crossfades to its `_radio` copy in `DOOR_FADE` (a quarter second). Each pair is started on
+  the same instant so the door is a fade, not a seek. **The settings board is new here**;
+  it used to be the shop and the shed only.
+- **Indoors** (the shed): Indie Boi through the radio. It has played since boot and loops, so
+  walking in lands wherever it has reached; the playlist runs on muted underneath.
+- **The ending**: Habibs fades in over everything from its start, over `FADE`, when the
+  farewell appears on a cleaned lake and when Credits opens on the menu; it fades back to the
+  playlist, which kept running, when either closes. Not on a finished lake after the farewell.
+- **Silence is a volume**, never a stopped player (below `OFF_DB`).
+- **The song's clock is its player's playback position** when it has one, so a long scene
+  load cannot run a file out before its fade; `follow_players` off drives it by hand.
+- **Levels**: `GAIN_DB` levels each song to Goin's -11.1 LUFS (the deliveries were up to five
+  dB apart, which a crossfade turns into a jump). Zero everywhere is as delivered. The
+  slider's top, `LOUDEST`, is **0 dB, down from +4** (2026-09-15, Richard: "decrease volume of
+  songs a bit overall").
+- **Radio recipe** (`RADIO` in the builder): mono, 190 Hz and 7.2 kHz two-stage filters, a
+  little tanh drive, a 35 ms slap, 64 kbps. The first bake's recipe was lost; this one was
+  matched to `music_goin_radio.mp3` by spectrum and loudness (-20.9 against -20.7 LUFS). A
+  baked file, not a bus, because the web export runs no bus effects.
+- **Pipeline**: songs stay in `art_source/Music`; `python tools/build_music.py` writes
+  `assets/music/` (35 MB). **Reimport after a re-run.**
+- **Tests**: `test_lake`'s `_stage_music` drives its own station by hand: the order, the 2:12
+  cut, the equal-power handover, shed and radio over a running playlist, the end song in and
+  out, and the lake telling the autoload.
+- **Credits**: every song and recorded sound is by Nuven (Richard, 2026-09-15), in
+  `docs/CREDITS.md` and on the credits board.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.
@@ -1436,6 +1911,66 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   four the moment the first was stood down.
 - `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
 
+### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
+Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,
+"the snap is too tight to adjust exactly where I want the decoration". At ZOOM 3 the step
+went from 24 screen pixels to 3.
+- **Whole art pixels, never finer**, by decision: the room is pixel art, and a piece at half
+  a pixel blurs or crawls on the screen grid.
+- **No coarse snap anywhere**, by decision: no Shift modifier, no magnet to a neighbour's
+  edge. One gesture, one thing. Lining four chairs up at a table is done by eye.
+- **`ShedRoom.CELL` (8) stays the walkers' grid.** The player and the dog still move in
+  cells, `REACH` and the glow radii are cells, and `_taken` still blocks whole cells:
+  per-pixel walker collision is sixty-four times the entries for a difference nobody can
+  feel. So there are two units in one file, and every place they meet divides by `CELL` —
+  `_foot_of` and `_walker_key` (**sort keys are in cells**, because the walkers' keys are
+  sorted against the furniture's), `_taken`, `_bed_cell`, `_switch_near`. A new caller that
+  mixes them is out by eight.
+- **`PLACE_COLS`/`PLACE_ROWS`/`PLACE_WALL`** are the floor and the wall in placement pixels.
+  `cell_at` is renamed **`spot_at`** — it does not return a cell any more, and the name was
+  the only thing that would have said so.
+- **A footprint is now the drawing itself** (`span_of` = `footprint_view(..., 1)`), not the
+  nearest whole cells to it — the rounding `Sheets._cells_across` does was the dead floor
+  around everything.
+- **A base is still authored in cells** and multiplied back up (`base_of`). `Sheets.base_of`
+  reads `bases`, which the catalogue authors by eye off `tools/last_decor_views.png`; asked
+  at a granularity of one it would hand those cell counts back as pixels and every piece
+  would stand on a one-pixel foot. **Don't ask `Sheets` for a base at 1.**
+- **A cell is blocked when its middle is inside a base** (`_taken`), with a fallback to the
+  cell the base's own middle is in. Marking every cell a base *touches* would round the
+  blocked floor up on all four sides, which is the dead floor coming back in the one place
+  it would still be felt.
+- **The drag is held inside the floor, not refused at it** (2026-09-16, Richard: "fix the
+  limits you can put heavy objects, they should not go with base over wall or border").
+  `_drop_cell` clamps **both** axes now (`_held`): a wide piece dragged up against a side
+  wall used to be let go past the floor's edge, fail `can_place` and go back to the shelf.
+  It slides along the wall instead, the way one let go too high already slid down. `_held`
+  exists because `clampi` with a low over its high keeps the **low** — for a piece too big
+  for the room that is the far wall, and the hand is aiming at the near one.
+- **The bound is the floor's own rectangle: a piece's whole base on the boards, its picture
+  free to rise up the wall.** Tried and **reverted the same day**: holding a base clear of
+  the room's drawn moulding as well. It parked a *small* piece a run's width down the floor
+  while a tall one still looked flush against the wall (Richard: "I can't push them close to
+  the top wall") — a pot's base is most of its picture and a wardrobe's is a strip along the
+  bottom of one, so the same inset costs them completely different amounts of wall. And it
+  was wrong anyway: those runs are the room's skirting, and furniture standing against a
+  wall covers the skirting. `_trim` stays, as the **walkers'** bound alone (`_feet_keep`),
+  which is what it always was.
+- **The faint cell grid under a carried piece is gone**: it was drawn to show what the drop
+  snapped to, and what it snaps to now is the floorboards.
+- **`SAVE_VERSION` 10, and version 9 is read rather than refused** (`Lake.SAVE_SHED_CELLS`):
+  a v9 file is exact in cells, so its `decor` rows are scaled by `CELL` on the way in and
+  every piece lands back where it stood — Richard's furnished save, which the trailer's shed
+  shot loads, survives. **The one exception to "older saves are refused rather than
+  migrated"**, and not a migration chain: the next change to the def list refuses v9 again.
+- **Out of scope, by decision**: free movement or finer collision for the walkers,
+  snap-to-surface stacking, base collision, refusing overlaps.
+- `test_lake` guards the pixel placement and that a row is kept to the pixel, the footprint
+  against the art, the base-only blocking in cells, the wall, a small piece reaching the
+  back wall and no further, the stable tie, the pot's host, the walker key, and the v9
+  migration. `tools/shot_shed.gd` writes its layout in cells and
+  scales it, since a room is laid out by eye in cells.
+
 ### The Shed Floor: Bases, the Wall, Small Pieces (2026-09-13, `/grill-me` with Richard)
 - **Cut**: `decor_kitchen_chair` (4) and `decor_old_table`. Dining table and dining chairs
   stay. `SAVE_VERSION` 8.
@@ -1458,7 +1993,8 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   height, everything else to one row. Blocking, the drop clamp and the draw order all read
   it. **Richard corrects the numbers by eye**; nothing else has to move.
 - **The wall is `WALL_ROWS` (4) cells**, not `BOARD * ZOOM * WALL_GROW` px: placement rows
-  must mean the same at every window size. `_zoom()` fits wall and floor together. A
+  must mean the same at every window size. (In pixels since 2026-09-16, `PLACE_WALL` = 32;
+  the rule is unchanged.) `_zoom()` fits wall and floor together. A
   bookcase (6 cells, base 1) stands one row off the wall, a fridge two. `_drop_cell` clamps
   the row so a piece let go too high slides down until its base is on the boards rather
   than going back on the shelf.
@@ -1490,6 +2026,18 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   catalogue by hand.
 - **Finds float 1.2x smaller** (`Lake.FIND_SHRINK`: `SPRITE_SCALE` 1.67 and the cap 57 for
   keepsake defs; rubbish untouched). Not a whole art pixel — accepted, judge in play.
+- **The walkers stay on the boards** (`ShedRoom._feet_keep`, `FEET_CLEAR`, 2026-09-16): the
+  moulded frame is drawn *inside* `_floor_rect` along its outer edge, and the bound was half
+  a cell on all four sides — narrower than the moulding is on three of them, so both the
+  player and the dog stood on the skirting and on the wall's bottom edge. The inset is
+  **measured off the art**, not written down (the vertical strip's width down the sides, the
+  horizontal run's height along the top, the sill's along the bottom, plus `FEET_CLEAR`), so
+  a repainted border moves the walls with it. The corner pieces are deeper than the runs and
+  are not counted: nobody walks into a corner on purpose.
+- **Feet only, by decision**: the drawing may still rise over the wall, the way a bookcase's
+  does. A room where the whole figure had to fit would lose four rows of floor at the top.
+  Placement is untouched — `can_place` has its own bounds and furniture may still stand on
+  the moulding.
 - **Probe**: `tools/shot_shed.tscn` now furnishes the room (bookcase and fridge on the
   wall, paintings, table with a pot, chair pair, sofa on rug). `test_lake` guards the wall
   rows, the base-only block, the painting, the stable tie, the pot's host, the walker key
@@ -1575,6 +2123,48 @@ those tiles hold one piece, `STRAND_TWO` of them a second. **Only tier-0 pieces 
 net reaches ~6 tiles from the island and the bank is ~26 away; patrolling boats stay inside
 85% of the radius. So the dog makes an occasional bank run (`Dog.STRAND_ODDS`, only when
 nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOST`).
+- **The dog delivers from whichever side of the crate it is already at** (`Dog._drop_spot`,
+  2026-09-16): all four, the far side included — the crate stands in front of the animal
+  there and hides some of it, accepted, and the walkers sort into their layer by position so
+  it is drawn correctly. It used to be one side, picked off the crate's bearing from the
+  middle of the island and the same whatever direction the dog came from, so a dog arriving
+  from the east walked the whole way round the box to deliver from the west. Water and the
+  hut are still refused (`Iso.on_island_ground`, the drawn edge, not the waterline).
+- **A blocked step slides along the face, not along an axis** (`Dog._hug`, `_bumped`,
+  2026-09-16): the two things on the island a walker can bump into are rectangles in tile
+  space — `Iso.in_shed` is the diamond the hut's walls stand on, `Yard.covers` the crate —
+  so the tangent is one axis and a step along it is a **whole step at walking pace**, not
+  the fraction an axis slide leaves when the dog is coming in at an angle. The face is the
+  axis the dog has least room inside; the way along it is the way it was already leaning, or
+  towards where it is going when it is heading dead-on. **The side is held** (`_hug_along`,
+  `_hug_way`) until a clear step is taken: a corner is where the two faces swap over, and a
+  dog re-deciding every frame there rocks on the spot — the stall `_no_gain` was put in to
+  catch, not to cause. The axis slides stay underneath it for the island's own curved edge,
+  and `_way_round` and the stuck timers are still the last resort.
+- **No path planning, by decision** (Richard, over corner waypoints and over A*): the dog
+  still discovers a wall by touching it. Two convex boxes a tile and a third apart do not
+  need a search.
+- **The pack loafs away from the box and the hut, and away from each other**
+  (`Dog._elbow_room`, `_somewhere_on_land`, `IDLE_CLEAR` 3.2 / `SHED_CLEAR` 4.0 /
+  `PACK_APART` 3.6 tiles, 2026-09-16, Richard: they cluster around the box). A spot is
+  scored by **the worst** of its three wants, each capped at met — a spot wedged against the
+  crate is a bad spot however far it is from the hut, and once a want is met, going further
+  does not make one dart beat another, which is what keeps the pack spread over the whole
+  island instead of all filing off to the one corner furthest from everything.
+  `_somewhere_on_land` takes the first of `IDLE_DARTS` that satisfies all three, so the spot
+  is still a random one; only a crowded island falls back to the roomiest it tried.
+- **Preferences, not walls, by decision**: `_may_stand` is untouched and still lets a dog
+  walk right up to the crate — the delivery spot is `CRATE_SIDE` (1.35 tiles) from the
+  middle of the box, and a hard clearance would make delivering impossible.
+- **The pack is a static registry** (`Dog.pack`, joined in `_ready`, left in `_exit_tree`,
+  `is_instance_valid` on every read), the way `Dog.claims` is: which dogs there are is a
+  fact about the lake, not about any one animal. A dog keeps clear of where another is
+  **going** (`aiming_for`), not only where it is — two dogs choosing spots a stride apart
+  arrive together however far apart they were when they chose.
+- **A dog that has just delivered always walks off** (`_settle(true)` from `_hand_over`):
+  the mood roll used to settle two thirds of them into a still mood on the spot, so four
+  dogs coming home one after another piled up at the crate. The swim roll is untouched —
+  going straight back out to fetch is still the commonest thing it does.
 - Collectible and counted like any piece: the lake cannot finish until the dog has cleared
   the strand. If a bank piece ever becomes unfetchable (bigger def, tier > 0), the lake
   stalls — keep `STRAND_WIDE`/tier in step with `Dog.CARRY_WIDE`/`CARRY_TIER`.
@@ -1673,7 +2263,8 @@ size × `SPRITE_SCALE` (2.0), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
 ### Retired
 `assets/TopDownHouse_FurnitureState1/2.png` no longer feed the catalogue and `furniture_NN`
 names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the
-rectangles now). `SAVE_VERSION` is 8 and older saves are refused rather than migrated;
+rectangles now). `SAVE_VERSION` is 10 (8 when this was written) and older saves are refused
+rather than migrated, bar the one v9 shed-unit scale above;
 `RECUT_RENAMES` and `tools/repair_save.gd` went with them. `tools/slice_sheets.gd` still
 cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
 `tools/build_decor.py` after any re-slice** or the decor half is lost.
@@ -1710,6 +2301,26 @@ Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking
 42 ms -> 3-4 ms.
 
 ---
+
+### The Trailer (2026-09-16, `tools/film_trailer.tscn`, `marketing/My Dirty Little Lake/trailer/`)
+A 30 s Steam trailer cut to Habibs 2#1, built by a re-runnable pipeline (Richard's call:
+scripted capture, no OBS). **Film**: `godot --path . --fixed-fps 60 res://tools/film_trailer.tscn`
+(desktop build) poses each shot — five casts from five banks, each further and wider, the last
+gold with its double, over a lake thinned in noise pools (`_thin`, grime spots left, the next
+landing and the dogs' sticks kept foul by `KEEP_NEAR`); the fleet followed hull to pier and
+the logo's hold **filmed first, on the dirty lake** (Richard: a much dirtier lake at the end,
+a few clear pools; thinning only cleans, so the order is the state); the pack on the east beach (one asleep, three sent swimming out, `_send_dogs`); the furnished shed
+from Richard's own save (`_load_shed_save` copies `user://lake_cleanup.save` and never writes
+it; the farewell a finished lake raises is dropped every frame; the room's box is logged for
+the cut's `crop`); the near-clean hold — and dumps 60 fps JPEGs to `tools/film/<shot>/` (git-ignored, ~2.7 GB).
+No HUD; the aim ring is pointed off the lake; the camera is the game's own for casts and held by
+hand elsewhere; zoom is set straight on the camera (levels 5-6, past `MAX_ZOOM`, whole pixels).
+`FILM_ONLY=a,b` re-shoots by name; `last_film.log` gives each cast's landing frame. **Cut**:
+`build_trailer.py` reads `shots.json` (everything in beats: 143.55 BPM, beat 0 on frame one,
+the song started on the grid at 4.273 s) — per-cut drift, `crop` for the shed room, flashes as a white overlay (never
+`fade c=white`, which paints all frames before it), Bungee captions with the logo's sticker rim,
+the stacked v1 logo, "Wishlist now" — and writes `trailer.mp4`, 1080p60 H.264. Re-run the probe
+then the script; retune by editing `shots.json`.
 
 ### Shed Screenshot Probe
 `tools/shot_shed.tscn` opens the lake, fills the shelf, opens the shed and saves
@@ -1748,7 +2359,7 @@ room's own coordinates while the picture is the whole window.
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
 - `scripts/skirt.gd` — baked painted grass tufts and sand spill round the shed and the box
-- `scripts/sfx.gd` — audio for haul, settling, collection
+- `scripts/sfx.gd` — the `Sound` autoload: recordings from `assets/sfx/` (see Sound), plus the few sounds still built in code
 
 ---
 

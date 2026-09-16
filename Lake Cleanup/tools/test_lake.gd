@@ -119,6 +119,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_patch()
 		23:
 			_stage_pad()
+		24:
+			_stage_music()
 		_:
 			pass
 
@@ -416,6 +418,20 @@ func _stage_walk() -> void:
 	_check(Iso.past_water(_angler.tile_pos) <= Angler.WALK_LIMIT,
 		"walking never leaves the island",
 		"%.1f px past the water's edge" % Iso.past_water(_angler.tile_pos))
+
+	# What a footstep sounds like is decided by where the boots are (2026-09-15). Asked of the
+	# angler rather than heard: a step in the shallows is the wading sound, one on the lawn is
+	# grass, and the beach between them is sand.
+	var stood := _angler.tile_pos
+	var surfaces := {}
+	for out: float in [-1.5, 1.3, 3.4]:
+		# Straight out from the island's middle, so the three spots are lawn, beach and water.
+		var towards := (stood - Iso.ISLAND_CENTRE).normalized()
+		_angler.tile_pos = stood + towards * out
+		surfaces[_angler.call(&"step_surface")] = true
+	_angler.tile_pos = stood
+	_check(surfaces.has(&"grass") and surfaces.has(&"water"),
+		"a footstep knows lawn from shallows", ", ".join(PackedStringArray(surfaces.keys())))
 	_check(not bool(_main.call(&"_at_shed")), "walking off takes them away from the shed", "")
 	_advance()
 
@@ -1160,7 +1176,155 @@ func _stage_pack() -> void:
 	# The other dogs are still running and may be claiming sticks of their own; only this one's
 	# claim has to be gone.
 	_check(not first in (Dog.claims as Dictionary).values(), "a released claim is gone", str(Dog.claims))
+	_stage_dog_delivery(first)
+	_stage_dog_idle(dogs)
 	_advance()
+
+
+## Where the pack loafs (2026-09-16, Richard: they cluster around the box).
+##
+## The rule is a preference, not a wall, so this asks the rule rather than watching the
+## animals: `_elbow_room` scores a spot by the worst of what it wants — clear of the crate,
+## the hut and the rest of the pack — and `_somewhere_on_land` takes the first dart that
+## satisfies all three.
+func _stage_dog_idle(dogs: Array) -> void:
+	var dog := dogs[0] as Dog
+	var crate := dog.crate_tile
+	var hut := Iso.shed_centre()
+	# Everyone out of the way, so the two buildings are the only thing the score can see.
+	# Stood still as well as moved: a dog left walking somewhere reports the spot it is
+	# walking to, and the stage before this one leaves them wherever the sim got to.
+	for other: Variant in dogs:
+		var away := other as Dog
+		away.set(&"_state", Dog.State.IDLE)
+		away.tile_pos = Iso.ISLAND_CENTRE + Vector2(0.0, -20.0)
+	_check(float(dog.call(&"_elbow_room", crate)) < 0.5
+		and float(dog.call(&"_elbow_room", hut)) < 0.5,
+		"a spot against the box or the hut scores badly",
+		"crate %.2f, hut %.2f" % [
+			float(dog.call(&"_elbow_room", crate)), float(dog.call(&"_elbow_room", hut))
+		])
+	# Somewhere on the far side of the island from both.
+	var open := Iso.ISLAND_CENTRE + Vector2(-Dog.SHED_CLEAR - 1.0, -Dog.IDLE_CLEAR - 1.0)
+	_check(is_equal_approx(float(dog.call(&"_elbow_room", open)), 1.0),
+		"and open grass scores full marks",
+		"%.2f" % float(dog.call(&"_elbow_room", open)))
+	# Another dog standing on that spot spoils it.
+	var pup := dogs[1] as Dog
+	# Standing on it, not walking to it: `aiming_for` hands back the target of a dog that is
+	# on its way somewhere, so a stale one would answer this question instead of the spot.
+	pup.set(&"_state", Dog.State.IDLE)
+	pup.tile_pos = open
+	_check(float(dog.call(&"_elbow_room", open)) < 0.2,
+		"a spot another dog is already on scores badly too",
+		"%.2f" % float(dog.call(&"_elbow_room", open)))
+	# And so does one another dog is walking to, which is the case that actually piles them
+	# up: two dogs choosing a stride apart arrive together however far apart they chose.
+	pup.tile_pos = Iso.ISLAND_CENTRE + Vector2(0.0, -20.0)
+	pup.set(&"_state", Dog.State.WANDER)
+	pup.set(&"_target", open)
+	_check(float(dog.call(&"_elbow_room", open)) < 0.2,
+		"and so does one another dog is on its way to",
+		"%.2f" % float(dog.call(&"_elbow_room", open)))
+	pup.set(&"_state", Dog.State.IDLE)
+
+	# The whole pack, put on the box and asked where it would rather be. Every dog picks
+	# somewhere with more room than it is standing in, and none of them picks the box.
+	for other: Variant in dogs:
+		var animal := other as Dog
+		animal.tile_pos = crate
+		animal.set(&"_state", Dog.State.IDLE)
+	var tight := 0
+	var near_crate := 0
+	for other: Variant in dogs:
+		var animal := other as Dog
+		var spot: Vector2 = animal.call(&"_somewhere_on_land")
+		if float(animal.call(&"_elbow_room", spot)) <= float(animal.call(&"_elbow_room", crate)):
+			tight += 1
+		if spot.distance_to(crate) < Dog.IDLE_CLEAR * 0.5:
+			near_crate += 1
+		# Taken, so the next dog has to keep clear of it.
+		animal.set(&"_state", Dog.State.WANDER)
+		animal.set(&"_target", spot)
+	_check(tight == 0 and near_crate == 0,
+		"the pack picks roomier spots than the box it delivered to",
+		"%d no better, %d still at the box" % [tight, near_crate])
+
+	# A delivery never ends with the dog standing at the crate.
+	var one := dogs[0] as Dog
+	one.tile_pos = crate
+	one.set(&"_state", Dog.State.DROPPING)
+	one.call(&"_hand_over")
+	_check(int(one.get(&"_state")) != Dog.State.IDLE
+		and int(one.get(&"_state")) != Dog.State.NAP
+		and int(one.get(&"_state")) != Dog.State.LOUNGE,
+		"and a dog that has just delivered walks off rather than settling on the box",
+		"state %d" % int(one.get(&"_state")))
+
+
+## The delivery (2026-09-16): whichever side of the crate the dog is already at, and round
+## the box rather than into it.
+func _stage_dog_delivery(dog: Dog) -> void:
+	var crate := dog.crate_tile
+	# Each of the four sides, asked for from just outside it. The one nearest is the one it
+	# gets — the old rule handed back the same side whatever direction the dog came from.
+	var sides := {
+		"east": Vector2(1.0, 0.0), "west": Vector2(-1.0, 0.0),
+		"south": Vector2(0.0, 1.0), "north": Vector2(0.0, -1.0),
+	}
+	var wrong := []
+	for name: String in sides:
+		var way: Vector2 = sides[name]
+		dog.tile_pos = crate + way * 3.0
+		var spot: Vector2 = dog.call(&"_drop_spot")
+		if (spot - crate).normalized().dot(way) < 0.9:
+			wrong.append(name)
+		if not Iso.on_island_ground(spot) or Iso.in_shed(spot.x, spot.y, Iso.SHED_KEEP):
+			wrong.append(name + " (off the grass)")
+	_check(wrong.is_empty(), "the dog delivers from whichever side of the crate it is at",
+		"wrong: %s" % str(wrong))
+	# The far side counts as a side. It is the one towards the middle of the island, which
+	# the old rule only ever offered as a last resort.
+	var inward := (Iso.ISLAND_CENTRE - crate).normalized()
+	dog.tile_pos = crate + inward * 3.0
+	var far: Vector2 = dog.call(&"_drop_spot")
+	_check((far - crate).normalized().dot(inward) > 0.6,
+		"including the far side, where the box stands in front of it",
+		"%.2f" % (far - crate).normalized().dot(inward))
+
+	# Round the crate, not through it. Straight across the box, which is the trip that used
+	# to leave the animal shoving at a plank.
+	dog.tile_pos = crate - Vector2(2.2, 0.0)
+	dog.call(&"_fresh_aim")
+	var goal := crate + Vector2(2.2, 0.0)
+	var inside := 0
+	var got := false
+	for step in 400:
+		if bool(dog.call(&"_step_towards", goal, Dog.RUN_SPEED, 0.016)):
+			got = true
+			break
+		if Yard.covers(crate, dog.tile_pos, 0.0):
+			inside += 1
+	_check(got and inside == 0, "it walks round the crate rather than into it",
+		"arrived %s, %d frames inside the box" % [str(got), inside])
+	_check(not bool(dog.call(&"_blocked")),
+		"and is never reported stuck doing it", "")
+
+	# The same, past the hut: its footprint is the other rectangle on the island.
+	var hut := Iso.shed_centre()
+	dog.tile_pos = hut - Vector2(2.6, 0.0)
+	dog.call(&"_fresh_aim")
+	var over := hut + Vector2(2.6, 0.0)
+	var through := 0
+	got = false
+	for step in 400:
+		if bool(dog.call(&"_step_towards", over, Dog.RUN_SPEED, 0.016)):
+			got = true
+			break
+		if Iso.in_shed(dog.tile_pos.x, dog.tile_pos.y, 0.0):
+			through += 1
+	_check(got and through == 0, "and round the hut the same way",
+		"arrived %s, %d frames in the walls" % [str(got), through])
 
 
 func _stage_skimmer() -> void:
@@ -1336,6 +1500,16 @@ func _stage_save() -> void:
 	_check(bool(_main.call(&"save_game")), "the run writes itself out", "")
 	_check(bool(_main.call(&"has_save")), "there is a save on disk", "")
 
+	# The settings are `Prefs`' alone (2026-09-15): a save that carried its own copy handed it
+	# back on load and undid whatever had been set on the menu.
+	var file := FileAccess.open(_main.get(&"save_path") as String, FileAccess.READ)
+	var written: Dictionary = (file.get_var(true) as Dictionary) if file != null else {}
+	var settings_in_save := PackedStringArray()
+	for key: String in ["music", "music_level", "sfx", "sfx_level", "fullscreen"]:
+		if written.has(key):
+			settings_in_save.append(key)
+	_check(settings_in_save.is_empty(), "the save carries no sound or screen settings",
+		", ".join(settings_in_save))
 	# Spend and catch after saving, so a load that did nothing would be caught.
 	_main.set(&"sludge", 0.0)
 	_main.set(&"net_width_level", 0)
@@ -1343,7 +1517,29 @@ func _stage_save() -> void:
 	_yard.held.resize(0)
 	_grid.take(_deep_tile(), 0)
 
+	# `Prefs.store` writes user://settings.cfg there and then, so a harness that sets a level
+	# and walks away has changed the player's own sliders — which is exactly what "my ambience
+	# was lost on restart" turned out to be (2026-09-16). What it borrows, it puts back.
+	var settings := _main.get_node(^"HUD/Settings")
+	var sfx_was := Prefs.sfx_level
+	var ambience_was := Prefs.ambience_level
+	Prefs.store(&"sfx_level", 0.42)
+	Prefs.store(&"ambience_level", 0.17)
+
 	_check(bool(_main.call(&"load_game")), "and reads itself back", "")
+	_check(is_equal_approx(settings.sfx_level, 0.42)
+		and is_equal_approx(settings.ambience_level, 0.17),
+		"the settings come from Prefs, whatever the file says", "")
+	var sound := Sfx.main()
+	if sound != null:
+		_check(is_equal_approx(sound.level, 0.42) and is_equal_approx(sound.ambience_level, 0.17),
+			"and the sound board is set to them", "%.2f / %.2f" % [sound.level, sound.ambience_level])
+	Prefs.store(&"sfx_level", sfx_was)
+	Prefs.store(&"ambience_level", ambience_was)
+	settings.pull_prefs()
+	_check(is_equal_approx(Prefs.sfx_level, sfx_was)
+		and is_equal_approx(Prefs.ambience_level, ambience_was),
+		"and the harness gives the player's own levels back", "")
 	_check(is_equal_approx(float(_main.get(&"sludge")), sludge_was), "the purse came back",
 		"%.0f" % float(_main.get(&"sludge")))
 	_check(int(_main.get(&"net_width_level")) == width_was, "the upgrades came back",
@@ -1649,6 +1845,39 @@ func _stage_settings() -> void:
 		var wood: Rect2 = StyleScript.ribbon_plank(ribbon)
 		_check(is_equal_approx(wood.end.y, 118.0 + float(StyleScript.BORDER_TOP)),
 			"a ribbon's plank ends where the board's face begins", "ends at %.1f" % wood.end.y)
+
+	# The sounds (2026-09-15): the board is the autoload, every recording it names has a file
+	# behind it, the beds loop, and the lake's ambience is wanted and goes under in the shed.
+	var sound := Sfx.main()
+	_check(sound != null, "the sound board is the Sound autoload", "")
+	if sound != null:
+		var missing := PackedStringArray()
+		for name: StringName in Sfx.SOUNDS:
+			if (sound._streams.get(name, []) as Array).is_empty():
+				missing.append(String(name))
+		_check(missing.is_empty(), "every recording the sound board names is loaded",
+			", ".join(missing))
+		_check((sound._streams[&"step_sand"] as Array).size() > 3
+			and (sound._streams[&"bark"] as Array).size() == 2
+			and (sound._streams[&"sniff"] as Array).size() == 3,
+			"steps, barks and sniffs come in their numbered variants", "")
+		var unlooped := PackedStringArray()
+		for name: StringName in Sfx.BEDS:
+			var ogg := sound._first(name) as AudioStreamOggVorbis
+			var wav := sound._first(name) as AudioStreamWAV
+			var loops := (
+				(ogg != null and ogg.loop)
+				or (wav != null and wav.loop_mode == AudioStreamWAV.LOOP_FORWARD and wav.loop_end > 0)
+			)
+			if not loops:
+				unlooped.append(String(name))
+		_check(unlooped.is_empty(), "every bed is set to loop, wave file or ogg",
+			", ".join(unlooped))
+		_check(sound._ambience_on and not sound._ambience_duck, "the lake's ambience is wanted", "")
+		_main.call(&"_set_shed", true)
+		_check(sound._ambience_duck, "and goes under while the shed is open", "")
+		_main.call(&"_set_shed", false)
+		_check(not sound._ambience_duck, "and comes back when it closes", "")
 	_advance()
 
 
@@ -2134,7 +2363,7 @@ func _stage_shed() -> void:
 		room.unlocked = unlocked as Array[String]
 		room.decor = many_decor
 		var before := room.in_store().size()
-		room.place(StringName(many), Vector2i(1, 1))
+		room.place(StringName(many), Vector2i(2, 2))
 		_check(room.in_store().size() == before - 1,
 			"and standing one of them down leaves the rest on the shelf",
 			"%d listed, %d after one was placed" % [before, room.in_store().size()])
@@ -2143,6 +2372,7 @@ func _stage_shed() -> void:
 		_main.call(&"_on_net_landed", PackedInt32Array([find_index]))
 
 	# The room.
+	var inside := Vector2i(2, 2)
 	var decor: Array = _main.get(&"decor")
 	decor.clear()
 	room.unlocked = unlocked as Array[String]
@@ -2150,12 +2380,47 @@ func _stage_shed() -> void:
 	var piece := StringName(find.piece)
 	var span := room.span_of(piece)
 	_check(room.in_store().size() == 1, "the find shows up in the inventory", "")
-	_check(room.place(piece, Vector2i(1, 1)), "it can be put down on the floor", "")
+	_check(room.place(piece, inside), "it can be put down on the floor", "")
 	_check(room.in_store().is_empty(), "and leaves the inventory once it is out", "")
-	_check(room.can_place(piece, Vector2i(1, 1)),
+	_check(room.can_place(piece, inside),
 		"and something else may be stood on top of it — a chair belongs on a rug", "")
-	_check(not room.can_place(piece, Vector2i(ShedRoom.COLS - span.x + 1, 1)),
+	_check(not room.can_place(piece, Vector2i(ShedRoom.PLACE_COLS - span.x + 1, inside.y)),
 		"and nothing can be stood off the edge of the floor", "")
+	# A short piece reaches the back wall (2026-09-16, Richard: small pieces could not be
+	# pushed up to it). Its base is most of its picture, so a bound that held the base clear
+	# of the room's skirting parked it a run's width down the floor while a tall piece, whose
+	# base is a strip, still looked flush. The rule is the floor itself: base on the boards.
+	var small := &""
+	for name: String in sheets.names:
+		if sheets.is_small(StringName(name)):
+			small = StringName(name)
+			break
+	if not small.is_empty():
+		var small_span := room.span_of(small)
+		var against := small_span.y - room.base_of(small)
+		_check(room.can_place(small, Vector2i(inside.x, -against)),
+			"a small piece may stand with its base against the back wall",
+			"span %s base %d" % [str(small_span), room.base_of(small)])
+		_check(not room.can_place(small, Vector2i(inside.x, -against - 1)),
+			"and no further: its base may not go up the wall", "")
+	# Free placement (2026-09-16): the unit is one source pixel, so a piece may be nudged by
+	# one — the whole point of the change. Placed at a pixel that is not a cell boundary and
+	# read back unrounded.
+	decor.clear()
+	var nudged := Vector2i(ShedRoom.CELL + 3, ShedRoom.CELL + 5)
+	_check(room.place(piece, nudged), "a piece may stand off the old eight-pixel grid", "")
+	var put: Array = (decor[0] as Dictionary)["cell"]
+	_check(int(put[0]) == nudged.x and int(put[1]) == nudged.y,
+		"and it is kept where it was put, to the pixel", "%s" % str(put))
+	var art_span := room.sheets.view_size_of(piece, 0)
+	var px_span := room.span_of(piece)
+	_check(
+		absf(float(px_span.x) - art_span.x) <= 0.5 and absf(float(px_span.y) - art_span.y) <= 0.5,
+		"and a footprint is the drawing itself, not the cells nearest to it",
+		"%s against %s" % [str(px_span), str(art_span)]
+	)
+	decor.clear()
+	room.place(piece, inside)
 
 	# Against the wall (2026-09-13): only a piece's base takes floor, so a tall piece may
 	# rise up the back wall until its base is on the boards, and no further.
@@ -2164,20 +2429,57 @@ func _stage_shed() -> void:
 		var tall_span := room.span_of(tall)
 		var tall_base := room.base_of(tall)
 		# As far up the wall as the wall goes, or as far as keeps its base on the boards.
-		var top := maxi(tall_base - tall_span.y, -ShedRoom.WALL_ROWS)
-		_check(top < 0 and room.can_place(tall, Vector2i(1, top)),
+		var top := maxi(tall_base - tall_span.y, -ShedRoom.PLACE_WALL)
+		_check(top < 0 and room.can_place(tall, Vector2i(inside.x, top)),
 			"a bookcase may stand with its picture up the wall",
 			"span %s base %d top %d" % [tall_span, tall_base, top])
-		_check(not room.can_place(tall, Vector2i(1, top - 1)),
+		_check(not room.can_place(tall, Vector2i(inside.x, top - 1)),
 			"but no higher than the wall, and never with its base off the floor", "")
-		_check(not room.can_place(tall, Vector2i(1, tall_base - tall_span.y - 1)),
-			"a base above the floor is refused whatever the wall", "")
-		room.place(tall, Vector2i(1, top))
+		_check(not room.can_place(tall, Vector2i(inside.x, tall_base - tall_span.y - 1)),
+			"a base off the floor is refused whatever the wall", "")
+		room.place(tall, Vector2i(inside.x, top))
 		var blocked: Dictionary = room.call(&"_taken")
-		var foot := top + tall_span.y - 1
-		_check(blocked.has(Vector2i(1, foot)) and not blocked.has(Vector2i(1, foot - tall_base)),
-			"and only its base blocks the walkers", "foot row %d" % foot)
+		# The blocked map is in walker cells, the piece in pixels: the cell the foot stands
+		# in is blocked, and the one a base-and-a-half above it is not.
+		var foot_cell := (top + tall_span.y - 1) / ShedRoom.CELL
+		var air_cell := (top + tall_span.y - 1 - tall_base - ShedRoom.CELL) / ShedRoom.CELL
+		var post := inside.x / ShedRoom.CELL
+		_check(
+			blocked.has(Vector2i(post, foot_cell))
+			and not blocked.has(Vector2i(post, air_cell)),
+			"and only its base blocks the walkers",
+			"foot cell %d, air cell %d, %d blocked" % [foot_cell, air_cell, blocked.size()])
 		decor.clear()
+	# The walkers stay on the boards (2026-09-16): the moulded frame is drawn inside the
+	# floor's own rectangle and both of them used to stand on it.
+	decor.clear()
+	var keep: Vector4 = room.call(&"_feet_keep")
+	var side := float(ShedRoom.BORDER_VERTICAL.get_width()) / float(ShedRoom.CELL)
+	var head := float(ShedRoom.BORDER_HORIZONTAL.get_height()) / float(ShedRoom.CELL)
+	var sill := float(ShedRoom.BORDER_SILL.get_height()) / float(ShedRoom.CELL)
+	_check(keep.x >= side and keep.z >= side and keep.y >= head and keep.w >= sill,
+		"the walkable floor is inset by the moulding it is drawn inside",
+		"keep %s against %.2f / %.2f / %.2f" % [str(keep), side, head, sill])
+	var skirting := [
+		Vector2(keep.x - 0.2, 5.0), Vector2(float(ShedRoom.COLS) - keep.z + 0.2, 5.0),
+		Vector2(5.0, keep.y - 0.2), Vector2(5.0, float(ShedRoom.ROWS) - keep.w + 0.2),
+	]
+	var stood := 0
+	for where: Vector2 in skirting:
+		if bool(room.call(&"_dog_may_stand", where)):
+			stood += 1
+	_check(stood == 0, "and a walker is refused the skirting on all four sides",
+		"%d of 4 allowed" % stood)
+	_check(bool(room.call(&"_dog_may_stand", Vector2(keep.x + 0.1, keep.y + 0.1)))
+		and bool(room.call(&"_dog_may_stand", Vector2(
+			float(ShedRoom.COLS) - keep.z - 0.1, float(ShedRoom.ROWS) - keep.w - 0.1
+		))),
+		"but the boards just inside it are walkable", "")
+	# Feet only, by decision: the drawing still rises over the wall the way furniture does.
+	_check(float(ShedRoom.ROWS) - keep.w - keep.y > ShedRoom.YOU_TALL,
+		"and the room is still deeper than the figure is tall",
+		"%.1f rows against %.1f" % [float(ShedRoom.ROWS) - keep.w - keep.y, ShedRoom.YOU_TALL])
+
 	# A painting hangs on the wall and takes no floor.
 	var painting := &""
 	for name: String in sheets.names:
@@ -2187,11 +2489,13 @@ func _stage_shed() -> void:
 	_check(not painting.is_empty(), "the catalogue has something that hangs on the wall", "")
 	if not painting.is_empty():
 		var hang := room.span_of(painting)
-		_check(room.can_place(painting, Vector2i(3, -hang.y)),
+		_check(room.can_place(painting, Vector2i(inside.x, -hang.y)),
 			"a painting may hang on the wall", "")
-		_check(not room.can_place(painting, Vector2i(3, 0)),
+		_check(not room.can_place(painting, Vector2i(inside.x, 0)),
 			"and not stand on the floor", "")
-		room.place(painting, Vector2i(3, -hang.y))
+		_check(not room.can_place(painting, Vector2i(inside.x, -ShedRoom.PLACE_WALL - 1)),
+			"and not over the top of the wall", "")
+		room.place(painting, Vector2i(inside.x, -hang.y))
 		var blocked: Dictionary = room.call(&"_taken")
 		_check(blocked.is_empty(), "and it blocks nothing", "%d cells" % blocked.size())
 		var order: Array = room.call(&"_order")
@@ -2201,8 +2505,8 @@ func _stage_shed() -> void:
 	# The drawing order (2026-09-13, after a chair drawn through a desk): two pieces on
 	# one row keep the order they went down in, later on top, every time it is asked.
 	var chair := StringName(find.piece)
-	room.place(chair, Vector2i(4, 4))
-	room.place(chair, Vector2i(5, 4))
+	room.place(chair, Vector2i(4 * ShedRoom.CELL, 4 * ShedRoom.CELL))
+	room.place(chair, Vector2i(5 * ShedRoom.CELL + 3, 4 * ShedRoom.CELL))
 	var steady := true
 	for again in 6:
 		var order: Array = room.call(&"_stacking")
@@ -2220,21 +2524,28 @@ func _stage_shed() -> void:
 			break
 	_check(not pot.is_empty(), "the catalogue has something small enough to set on a table", "")
 	if not pot.is_empty() and sheets.has(table):
-		room.place(table, Vector2i(6, 6))
-		var table_foot := 6 + room.span_of(table).y
-		# On the table's top, so its own foot is rows above the table's.
-		room.place(pot, Vector2i(7, 6 + 1 - room.span_of(pot).y + room.base_of(pot)))
+		var corner := 6 * ShedRoom.CELL
+		room.place(table, Vector2i(corner, corner))
+		var table_span := room.span_of(table)
+		# The walkers' keys are in cells, the placement in pixels (see ShedRoom.CELL).
+		var table_foot := float(corner + table_span.y) / float(ShedRoom.CELL)
+		# Set on the table's top, so the pot's own foot is well above the table's.
+		room.place(pot, Vector2i(
+			corner + 8, corner + 1 - room.span_of(pot).y + room.base_of(pot)
+		))
 		var order: Array = room.call(&"_stacking")
 		_check(order == [0, 1], "a pot set on a table is drawn after the table",
-			"order %s, table foot %d" % [order, table_foot])
+			"order %s, table foot %.2f" % [order, table_foot])
 		# And a dog with its feet in the table's base is drawn over the table too.
-		var over: float = room.call(
-			&"_walker_key", Vector2(7.5, float(table_foot) - 0.5), decor
+		var in_base := table_foot - 0.5 * float(room.base_of(table)) / float(ShedRoom.CELL)
+		var across := float(corner + table_span.x / 2) / float(ShedRoom.CELL)
+		var over: float = room.call(&"_walker_key", Vector2(across, in_base), decor)
+		_check(over > table_foot, "a walker standing in a piece's base is drawn over it",
+			"key %.2f, foot %.2f" % [over, table_foot])
+		var behind: float = room.call(
+			&"_walker_key", Vector2(across, float(corner) / float(ShedRoom.CELL) + 0.5), decor
 		)
-		_check(over > float(table_foot), "a walker standing in a piece's base is drawn over it",
-			"key %.2f, foot %d" % [over, table_foot])
-		var behind: float = room.call(&"_walker_key", Vector2(7.5, 6.5), decor)
-		_check(behind < float(table_foot), "and one behind it is drawn behind it",
+		_check(behind < table_foot, "and one behind it is drawn behind it",
 			"key %.2f" % behind)
 		decor.clear()
 
@@ -2266,16 +2577,15 @@ func _stage_shed() -> void:
 	for name: String in sheets.names:
 		for view in sheets.view_count(StringName(name)):
 			var art := sheets.view_size_of(StringName(name), view)
-			var cells := room.span_of(StringName(name), view)
+			var box := room.span_of(StringName(name), view)
 			var off := maxf(
-				absf(float(cells.x * ShedRoom.CELL) - art.x),
-				absf(float(cells.y * ShedRoom.CELL) - art.y)
+				absf(float(box.x) - art.x), absf(float(box.y) - art.y)
 			)
 			if off > worst:
 				worst = off
 				worst_name = "%s/%s" % [name, sheets.role_of(StringName(name), view)]
-	_check(worst <= float(ShedRoom.CELL), "a footprint fits the thing standing in it",
-		"%s is %.0f px out of %d" % [worst_name, worst, ShedRoom.CELL])
+	_check(worst <= 0.5, "a footprint is the thing standing in it, to the pixel",
+		"%s is %.1f px out" % [worst_name, worst])
 
 	# Every set is a set of something: a piece with more than one face has to say which
 	# verb turns it, or the shed has art it cannot show. The authored table in
@@ -2331,7 +2641,7 @@ func _stage_shed() -> void:
 	_check(not rug.is_empty(), "the art knows which of it lies flat", "")
 	if not rug.is_empty():
 		unlocked.append(rug)
-		room.place(StringName(rug), Vector2i(1, 1))
+		room.place(StringName(rug), Vector2i(2, 2))
 		var stacking: Array = room.call(&"_stacking")
 		var first: Dictionary = decor[stacking[0]]
 		_check(String(first["piece"]) == rug, "and lays it under everything else", "")
@@ -2353,13 +2663,40 @@ func _stage_shed() -> void:
 	_check(unlocked.size() == 1 and decor.size() == 1,
 		"the room came back as it was left",
 		"%d found, %d placed" % [unlocked.size(), decor.size()])
+	var kept := Vector2i(2, 3)
 	_check(
-		int((decor[0] as Dictionary)["cell"][0]) == 2
-		and int((decor[0] as Dictionary)["cell"][1]) == 3,
+		int((decor[0] as Dictionary)["cell"][0]) == kept.x
+		and int((decor[0] as Dictionary)["cell"][1]) == kept.y,
 		"and everything is where it was put", str((decor[0] as Dictionary)["cell"])
 	)
 	_check(not unlocked.has("no_such_piece"),
 		"a find the catalogue no longer knows is dropped rather than kept", "")
+
+	# The one migration (2026-09-16, Lake.SAVE_SHED_CELLS): a version 9 file placed the shed's
+	# furniture in eight-pixel cells, so its rows are read back multiplied and every piece
+	# lands exactly where it stood. Written by hand here rather than kept as a fixture: the
+	# file is one dictionary and the only field that moved is `decor`.
+	var path: String = _main.get(&"save_path")
+	var reading := FileAccess.open(path, FileAccess.READ)
+	var raw: Dictionary = (reading.get_var(true) as Dictionary) if reading != null else {}
+	if reading != null:
+		reading.close()
+	_check(not raw.is_empty(), "the save file reads back as a dictionary", "")
+	if not raw.is_empty():
+		raw["version"] = Lake.SAVE_SHED_CELLS
+		raw["decor"] = [{"piece": String(piece), "cell": [2, 3], "view": 0}]
+		var writing := FileAccess.open(path, FileAccess.WRITE)
+		if writing != null:
+			writing.store_var(raw, true)
+			writing.close()
+		_check(bool(_main.call(&"load_game")), "a version 9 save is read rather than refused", "")
+		decor = _main.get(&"decor")
+		var back: Array = ((decor[0] as Dictionary)["cell"] as Array) if decor.size() > 0 else []
+		_check(
+			back.size() == 2 and int(back[0]) == 2 * ShedRoom.CELL
+			and int(back[1]) == 3 * ShedRoom.CELL,
+			"and its cells come back as pixels, so nothing in the room moves", str(back)
+		)
 	_advance()
 
 
@@ -2392,8 +2729,8 @@ func _stage_pigeons() -> void:
 		"every bird is cut from its own pixels, inside the sheet",
 		"%d outside, %d overlapping" % [outside, overlaps])
 
-	var rows: Array = _flock.get(&"_rows")
-	_check(rows.size() > 0, "the chosen birds loaded", "%s" % str(rows))
+	var kinds: Array[Dictionary] = _flock.kinds()
+	_check(kinds.size() > 0, "the chosen birds loaded", "%d" % kinds.size())
 
 	# The flock is a reading of the rubbish in view, and a cleared lake keeps none of it.
 	_flock.spawning = true
@@ -2451,8 +2788,301 @@ func _stage_pigeons() -> void:
 	_check(_flock.droppings.size() == 1, "old droppings fade away and fresh ones stay",
 		"%d left" % _flock.droppings.size())
 
+	_stage_pigeon_look()
+	_stage_net_behind()
+
 	_flock.spawning = false
 	_advance()
+
+
+## The net is behind the angler wherever the angler is standing (2026-09-16).
+##
+## It used to be a fixed z 8 against an angler on 9, which is only true out in the open: the
+## walker drops to `BEHIND_CRATE` beside the crate and `BEHIND_SHED` behind the hut, and on
+## both of those the net and the whole rope were drawn over the player — the end of the rope
+## showing against the figure on a cast aimed up the screen.
+func _stage_net_behind() -> void:
+	var stood := _angler.position
+	var shed := Iso.tile_to_world(Iso.shed_centre().x, Iso.shed_centre().y)
+	var where := {
+		# South-east of the crate as well as of the hut: at +3 the angler is still inside
+		# the crate's own footprint test and lands on the middle band.
+		"in the open": Iso.tile_to_world(
+			Iso.ISLAND_CENTRE.x + 4.5, Iso.ISLAND_CENTRE.y + 4.5
+		),
+		"behind the hut": shed - Vector2(0.0, 90.0),
+		"beside the crate": _yard.position - Vector2(0.0, 40.0),
+	}
+	var helper := _main.get(&"_net2") as CastNet
+	var over := []
+	var bands := {}
+	for name: String in where:
+		_angler.position = where[name]
+		_main.call(&"_sort_walkers")
+		bands[name] = _angler.z_index
+		if _net.z_index >= _angler.z_index:
+			over.append("%s (net %d, angler %d)" % [name, _net.z_index, _angler.z_index])
+		if helper != null and helper.z_index != _net.z_index:
+			over.append("%s (the double cast's net is on its own layer)" % name)
+	_check(over.is_empty(), "the net stays behind the angler wherever they stand",
+		"over: %s" % str(over))
+	# The three bands really are three, or the check above proves nothing.
+	_check(int(bands["in the open"]) > int(bands["beside the crate"])
+		and int(bands["beside the crate"]) > int(bands["behind the hut"]),
+		"and the angler was actually tested on all three bands", "%s" % str(bands))
+	_angler.position = stood
+	_main.call(&"_sort_walkers")
+
+
+## How the flock is drawn (2026-09-16): over the whole lake, standing on the piece it is
+## actually sitting on, with a smudge for a splat and its own silhouette for a shadow.
+func _stage_pigeon_look() -> void:
+	_check(_flock.z_index > 12 and _flock.z_index > 20 and not _flock.z_as_relative,
+		"the flock is drawn over the hulls, the piers and the net",
+		"z %d" % _flock.z_index)
+	# The rim is a shader trick and a missing shader is a silent nothing, not an error.
+	var rim := _flock.get_node_or_null(^"BirdRim")
+	var mat := (rim.material as ShaderMaterial) if rim != null else null
+	_check(rim != null and mat != null and mat.shader != null and rim.show_behind_parent,
+		"the rim's shader loaded, behind the birds it outlines", "")
+	var tone = mat.get_shader_parameter("rim_gold") if mat != null else null
+	_check(tone != null and Vector3(tone).z > Vector3(tone).x,
+		"and it is not the finds' gold", "%s" % str(tone))
+
+	# The perch is the drawn top of the drawn piece, not the tile's own surface point plus a
+	# guess at the def's height. Asked of a leaning, resized piece, which is what every piece
+	# on this lake is.
+	var perch := _deep_tile()
+	var def: TrashDef = _grid.defs[_grid.stacks[perch][_grid.stacks[perch].size() - 1]]
+	var top := _grid.perch_point(perch)
+	var water := _grid.surface_pos(perch)
+	_check(top.y < water.y, "a bird's perch is above the water it floats on",
+		"%.1f over %.1f" % [top.y, water.y])
+	var drawn := def.size.y * _grid.swing[perch]
+	var lift := water.y - top.y
+	_check(lift <= drawn * 0.5 + 0.01 and lift > 0.0,
+		"and no higher than the top of the picture",
+		"%.1f up, picture %.1f tall" % [lift, drawn])
+	# The lean is in it: a piece turned on the water carries its top sideways, and a perch
+	# that ignored that is the bird standing beside the thing rather than on it.
+	var was := _grid.tilt[perch]
+	_grid.tilt[perch] = 0.0
+	var straight := _grid.perch_point(perch)
+	_grid.tilt[perch] = 0.8
+	var leaned := _grid.perch_point(perch)
+	_grid.tilt[perch] = was
+	_check(absf(leaned.x - straight.x) > 0.5,
+		"a leaning piece carries its perch over with it",
+		"%.1f aside" % (leaned.x - straight.x))
+
+	# A splat is a blob of art pixels, rolled fresh each time.
+	var one: Array = _flock.call(&"_smudge")
+	var two: Array = _flock.call(&"_smudge")
+	_check(one.size() == Flock.POOP_CELLS + Flock.POOP_SPECKS + 1,
+		"a splat is a body of cells with specks off it", "%d parts" % one.size())
+	var body: Array[Vector2] = []
+	for i in range(1, int(one[0]) + 1):
+		body.append(one[i])
+	var doubled := 0
+	var joined := 0
+	for i in body.size():
+		for j in range(i + 1, body.size()):
+			if body[i] == body[j]:
+				doubled += 1
+	for cell: Vector2 in body:
+		if cell == Vector2.ZERO:
+			joined += 1
+			continue
+		for step: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+			if body.has(cell + step):
+				joined += 1
+				break
+	_check(doubled == 0 and joined == body.size(),
+		"its cells are all different and all touching", "%d doubled" % doubled)
+	_check(str(one) != str(two), "and no two splats are the same shape", "")
+
+	# The splat lives were roughly halved.
+	_check(Flock.POOP_LIFE < 30.0 and Flock.POOP_LIFE_WATER < 4.0
+		and Flock.POOP_ON_ANGLER < 4.0,
+		"splats go away quicker than they did",
+		"%.0f / %.1f / %.1f s" % [
+			Flock.POOP_LIFE, Flock.POOP_LIFE_WATER, Flock.POOP_ON_ANGLER
+		])
+
+	# Three birds, by decision (2026-09-16), and the ones Richard picked.
+	var kinds: Array[Dictionary] = _flock.kinds()
+	var picked := []
+	for kind: Dictionary in kinds:
+		picked.append(int(kind["bird"]))
+	picked.sort()
+	_check(picked == [1, 3, 9], "three birds fly, and they are the three picked",
+		"%s" % str(picked))
+
+	# A bird is a bird: every picture it can show is painted in its own colours.
+	#
+	# This is the stage's reason to exist. The sheet is laid out by action, not by bird —
+	# a row's first block is one bird's flap and its later blocks are three *other* birds
+	# standing and sitting. The poses used to be read off the flying bird's own row, so a
+	# perched pigeon changed species every 0.42 s. Asked of the pixels rather than of the
+	# names in assets/pigeon_birds.json, or the test only proves the file agrees with
+	# itself: a bird's own poses share all their colours with its flap, and the other
+	# birds' share a third of them at most.
+	var shot := _flock.sheet().get_image()
+	# A compressed import hands back a format `get_pixel` cannot read.
+	if shot.is_compressed():
+		shot.decompress()
+	var strays := []
+	for kind: Dictionary in kinds:
+		var wings := {}
+		for frame: Rect2 in kind["fly"] as Array:
+			for shade in _bird_tones(shot, frame):
+				wings[shade] = true
+		for other: Dictionary in kinds:
+			for pose: String in ["stand", "sit"]:
+				var share := _tone_share(_bird_tones(shot, other[pose]), wings)
+				var same: bool = int(other["bird"]) == int(kind["bird"])
+				if same != (share > 0.95):
+					strays.append("bird %d's flap vs bird %d's %s: %.2f"
+						% [int(kind["bird"]), int(other["bird"]), pose, share])
+	_check(strays.is_empty(),
+		"a bird's poses are its own colours, and no other bird's",
+		"; ".join(strays))
+
+	# The rim: perched and in the net's reach, and nothing else. The angler and the net are
+	# put back afterwards — the stages that follow read both.
+	_flock.birds.clear()
+	_flock.net = _net
+	_check(_flock.add_bird(perch), "a bird to rim", "")
+	var bird: Dictionary = _flock.birds[0]
+	bird["travel"] = 1.0
+	_flock.call(&"_step", bird, 0.016)
+
+	# A perched bird shuffles between its two poses and shows nothing else. It has two
+	# pictures, not a cycle: played as one they were three different pigeons in a row.
+	var own: Dictionary = kinds[posmod(int(bird["kind"]), kinds.size())]
+	var standing := 0
+	var sat := 0
+	var wrong := 0
+	for i in 4000:
+		# Topped up every step: the point here is the poses, and a bird whose rest ran out
+		# hops off and starts flapping, which counts as neither.
+		bird["rest"] = Flock.PERCH_MAX
+		_flock.call(&"_step", bird, 0.05)
+		var frame := _flock.frame_of(bird)
+		if frame == own["stand"]:
+			standing += 1
+		elif frame == own["sit"]:
+			sat += 1
+		else:
+			wrong += 1
+	_check(wrong == 0 and standing > 0 and sat > 0 and standing > sat,
+		"a perched bird shuffles between its own two poses, mostly standing",
+		"%d standing, %d sitting, %d neither" % [standing, sat, wrong])
+	_flock.droppings.clear()
+	# And it lands on its legs rather than in mid-air with its feet put away.
+	bird["state"] = Flock.State.FLYING
+	bird["travel"] = 1.0
+	_flock.call(&"_step", bird, 0.05)
+	_check(int(bird["state"]) == Flock.State.PERCHED
+		and int(bird["pose"]) == Flock.POSE_STAND,
+		"and it lands standing", "pose %d" % int(bird["pose"]))
+	bird["rest"] = Flock.PERCH_MAX
+	var stood := _angler.tile_pos
+	var reach := _net.range_tiles
+	_angler.tile_pos = Iso.world_to_tile(_grid.surface_pos(perch))
+	_net.range_tiles = 40.0
+	_check(_flock.catchable(bird), "a perched bird the net can reach is rimmed", "")
+	_net.range_tiles = 0.2
+	_check(not _flock.catchable(bird), "one out of range is not", "")
+	_net.range_tiles = 40.0
+	bird["state"] = Flock.State.FLYING
+	_check(not _flock.catchable(bird), "and neither is one in the air", "")
+	_flock.birds.clear()
+	_angler.tile_pos = stood
+	_net.range_tiles = reach
+
+	# The head in the corner (2026-09-16): out of the meter's way, and cut by the screen's
+	# own side rather than standing clear of it.
+	var pop := _main.get(&"_pigeon") as PigeonPop
+	var head := pop.head_box() if pop != null else Rect2()
+	var skin := _main.get(&"_skin") as HudSkin
+	var meter: Rect2 = skin.get(&"_meter_box") if skin != null else Rect2()
+	var view := pop.get_viewport_rect().size if pop != null else Vector2.ZERO
+	_check(pop != null and head.size.x > 0.0, "the pigeon head loaded", "")
+	_check(not head.intersects(meter),
+		"the head in the corner keeps off the pollution meter",
+		"head %s, meter %s" % [str(head), str(meter)])
+	_check(absf(head.get_center().y - view.y * 0.5) <= 1.0,
+		"it comes in halfway down the screen",
+		"%.0f of %.0f" % [head.get_center().y, view.y])
+	_check(head.position.x < 0.0 and head.end.x > 0.0,
+		"with its neck cut off by the side of the screen",
+		"from %.0f to %.0f" % [head.position.x, head.end.x])
+	# And cut right through: the far end of the neck's cut is off the edge as well, or the
+	# flat of it shows on screen and the head reads as a sticker rather than as a bird
+	# leaning in. Measured off the painting by the pop itself.
+	var cut_at := pop.head_centre().x + pop.cut_reach() * PigeonPop.HEAD_TALL
+	_check(cut_at < 0.0, "with the whole of the cut past it",
+		"the cut reaches %.1f" % cut_at)
+	# Leaning, not square on: at ninety degrees the head lies flat on its side.
+	_check(PigeonPop.HEAD_LEAN > 0.0 and PigeonPop.HEAD_LEAN < 90.0,
+		"and it leans rather than lying on its side",
+		"%.0f degrees" % PigeonPop.HEAD_LEAN)
+
+	# Every catch sends a coin, whether or not the head comes with it — and when it does, the
+	# coin leaves the head rather than the water, once the head is actually there.
+	var coins: CoinFly = _main.get(&"_coins")
+	coins.clear()
+	_check(pop.pop(7), "the head pops", "")
+	_check(coins.flying() == 0, "and sends nothing while it is still off the edge",
+		"%d in the air" % coins.flying())
+	for i in 12:
+		pop.call(&"_process", PigeonPop.RISE * 0.25)
+	_check(coins.flying() == 1, "then one coin as it arrives",
+		"%d in the air" % coins.flying())
+	var in_air: Array = coins.get(&"_flying")
+	var leaves: Vector2 = (in_air[0] as Dictionary)["from"]
+	_check(pop.head_box().has_point(leaves), "and it leaves the head, not the lake",
+		"%s off %s" % [str(leaves), str(pop.head_box())])
+	# One head is one coin, however long it is held.
+	for i in 40:
+		pop.call(&"_process", PigeonPop.RISE * 0.25)
+	_check(coins.flying() == 1, "one head is one coin", "%d in the air" % coins.flying())
+	coins.clear()
+
+	# And a catch that gets no head still pays, with the coin off the water. The pop is put
+	# out of reach for the one call rather than rolling until the odds fall the right way.
+	var kept: PigeonPop = _main.get(&"_pigeon")
+	_main.set(&"_pigeon", null)
+	var purse := float(_main.get(&"sludge"))
+	_main.call(&"_on_bird_caught", _grid.surface_pos(perch))
+	_main.set(&"_pigeon", kept)
+	_check(coins.flying() == 1, "a catch with no head sends its coin off the water",
+		"%d in the air" % coins.flying())
+	_check(float(_main.get(&"sludge")) > purse, "and the purse is paid for it", "")
+	coins.clear()
+
+
+## Every opaque colour in one cut of the pigeon sheet, as a set. A bird's palette.
+func _bird_tones(shot: Image, box: Rect2) -> Dictionary:
+	var tones := {}
+	for y in int(box.size.y):
+		for x in int(box.size.x):
+			var tone := shot.get_pixel(int(box.position.x) + x, int(box.position.y) + y)
+			if tone.a > 0.0:
+				tones[tone.to_rgba32()] = true
+	return tones
+
+
+## How much of one palette the other holds, 0 to 1.
+func _tone_share(tones: Dictionary, within: Dictionary) -> float:
+	if tones.is_empty():
+		return 0.0
+	var shared := 0
+	for tone in tones:
+		if within.has(tone):
+			shared += 1
+	return float(shared) / float(tones.size())
 
 
 ## The end of the run.
@@ -2487,6 +3117,19 @@ func _stage_ending() -> void:
 		var stack := _grid.stacks[_deep_tile()]
 		stack.resize(0)
 		_grid.stacks[_deep_tile()] = stack
+		# The water is empty and the last piece is still in the net's hold: the run ends
+		# when the piece is put in the crate, not when it leaves the lake (2026-09-16).
+		_net.catch = PackedInt32Array([0])
+		_check(not bool(_main.call(&"_all_landed")),
+			"a piece still in the net keeps the run going", "")
+		_main.set(&"_clean_check_in", 0.0)
+		return
+	if _in_stage == 41:
+		_check(not bool(_main.get(&"_cleaned")),
+			"so an empty lake with a full net is not finished yet", "")
+		_net.catch = PackedInt32Array()
+		_check(bool(_main.call(&"_all_landed")),
+			"and it is the moment the hold is empty that ends it", "")
 		_main.set(&"_clean_check_in", 0.0)
 		return
 	if _in_stage < 80:
@@ -2503,9 +3146,26 @@ func _stage_ending() -> void:
 	_check(is_zero_approx(float(_main.get(&"pollution"))),
 		"and the meter is put to zero rather than left near it",
 		"%.6f" % float(_main.get(&"pollution")))
+	# The lake gets the first two seconds to itself before a word is written over it
+	# (2026-09-16): the sparkle rising, the note, the end song coming in.
+	_check(float(_main.get(&"_ending_in")) > 0.0,
+		"the ending opens on a beat of clean water",
+		"%.2f s" % float(_main.get(&"_ending_in")))
+	_check(_main.get_node_or_null(^"Farewell") == null,
+		"and nothing is written over the lake during it", "")
+	_check(bool(_main.call(&"ending")),
+		"but the end song is told to come in with the beat", "")
+	_check(_angler.can_walk, "and the angler still has their legs", "")
+	_main.call(&"_count_the_beat", Lake.ENDING_BEAT + 0.1)
 	_check(_main.get_node_or_null(^"Farewell") != null,
 		"the closing words are on screen", "")
 	_check(not _angler.can_walk, "which holds the angler where they stand", "")
+	var ending: Farewell = _main.get(&"_farewell")
+	_check(ending != null and ending.rolling(),
+		"and the credits are climbing under them", "")
+	_check(ending != null and ending.get_child_count() >= 0
+		and not CreditsBoard.LINES.is_empty(),
+		"off the credits board's own words", "%d" % CreditsBoard.LINES.size())
 	_check(_main.call(&"_last_pieces_line") == "",
 		"and the note about leftovers is gone", "")
 	_advance()
@@ -2653,6 +3313,7 @@ func _stage_ending_on_load() -> void:
 	if _in_stage < 40:
 		return
 	_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
+	_main.call(&"_count_the_beat", Lake.ENDING_BEAT + 0.1)
 	_check(_main.get_node_or_null(^"Farewell") != null,
 		"and the words the run was owed are on screen", "")
 	# Said once already, and said again: the way off the lake is a door on this screen,
@@ -2858,7 +3519,168 @@ func _stage_pad() -> void:
 	_main.call(&"_pad_tick", 0.016)
 	_check(aim.at == Vector2.INF and _net.pad_aim == Vector2.INF,
 		"back on the mouse, the reticle is gone", "")
+	_advance()
+
+
+## The music station (2026-09-15): the playlist's order and its cut, the handover, the shed
+## and the radio as fades over a playlist that keeps running, the end song coming and going,
+## and the lake telling the autoload where the player is. Its own station, driven by hand:
+## the dummy audio driver gives the players no clock.
+func _stage_music() -> void:
+	var music := MusicStation.new()
+	music.follow_players = false
+	add_child(music)
+	var fade := MusicStation.FADE
+	_check(music.now_playing() == &"beatgucci", "the station opens on beatgucci",
+		"%s" % music.now_playing())
+	var cut := float(music.call(&"_length", 0))
+	_check(absf(cut - 132.0) < 0.2, "beatgucci stops at 2:12", "%.2f s" % cut)
+	_run_music(music, cut - fade - 1.0)
+	var g := music.gains()
+	_check(is_equal_approx(float(g["beatgucci"]), 1.0) and is_zero_approx(float(g["save_me"]))
+		and not music.is_playing(&"save_me"),
+		"a second before the handover, only beatgucci is heard", "%s" % g)
+	_run_music(music, 1.0 + fade * 0.5)
+	g = music.gains()
+	var out := float(g["beatgucci"])
+	var into := float(g["save_me"])
+	_check(is_equal_approx(out, 1.0) and into > 0.1 and into < 0.9
+		and music.is_playing(&"beatgucci") and music.is_playing(&"save_me"),
+		"the next song comes up under one that is still playing whole",
+		"out %.2f in %.2f" % [out, into])
+	_check(out * out + into * into < 1.6,
+		"and the two together are no louder than about a decibel over one song",
+		"%.2f" % (out * out + into * into))
+	_run_music(music, fade * 0.5 - MusicStation.FADE_OUT - 0.2)
+	_check(float(music.gains()["beatgucci"]) > 0.95,
+		"the song on its way out is whole until its own last seconds",
+		"%.3f" % float(music.gains()["beatgucci"]))
+	_run_music(music, MusicStation.FADE_OUT + 0.7)
+	g = music.gains()
+	_check(music.now_playing() == &"save_me" and not music.is_playing(&"beatgucci")
+		and is_equal_approx(float(g["save_me"]), 1.0),
+		"then Save ME leads and beatgucci has stopped", "%s" % music.now_playing())
+	var round_trip := float(music.call(&"_length", 1)) + float(music.call(&"_length", 2))
+	_run_music(music, float(music.call(&"_length", 1)))
+	_check(music.now_playing() == &"goin", "Goin comes third", "%s" % music.now_playing())
+	_run_music(music, round_trip - float(music.call(&"_length", 1)))
+	_check(music.now_playing() == &"beatgucci", "and the playlist goes round to beatgucci",
+		"%s" % music.now_playing())
+
+	music.indoors = true
+	_run_music(music, 0.4)
+	g = music.gains()
+	_check(is_equal_approx(float(g["indie_boi_radio"]), 1.0)
+		and is_zero_approx(float(g["beatgucci"])) and music.is_playing(&"beatgucci")
+		and music.is_playing(&"indie_boi"),
+		"indoors, Indie Boi through the wall, the playlist running muted under it", "%s" % g)
+	music.indoors = false
+	music.muffled = true
+	_run_music(music, 0.4)
+	g = music.gains()
+	_check(is_equal_approx(float(g["beatgucci_radio"]), 1.0)
+		and is_zero_approx(float(g["beatgucci"])) and is_zero_approx(float(g["indie_boi_radio"])),
+		"a board open: the lake's own song through the radio", "%s" % g)
+	music.muffled = false
+	_run_music(music, 0.4)
+
+	music.set_ending(true)
+	_run_music(music, fade * 0.5)
+	g = music.gains()
+	_check(float(g["habibs"]) > 0.2 and float(g["habibs"]) < 0.9 and music.is_playing(&"habibs"),
+		"the end song fades in over the playlist", "%s" % g)
+	_run_music(music, fade * 0.5 + 0.2)
+	var at := music.song_time()
+	g = music.gains()
+	_check(is_equal_approx(float(g["habibs"]), 1.0) and is_zero_approx(float(g["beatgucci"]))
+		and music.is_playing(&"beatgucci"),
+		"and has the whole of it, the playlist still running under", "%s" % g)
+	music.set_ending(false)
+	_run_music(music, fade + 0.2)
+	g = music.gains()
+	_check(is_zero_approx(float(g["habibs"])) and not music.is_playing(&"habibs")
+		and is_equal_approx(float(g["beatgucci"]), 1.0) and music.song_time() > at,
+		"closing it fades back to the playlist where it has got to", "%s" % g)
+	music.queue_free()
+
+	var station := MusicStation.main()
+	_check(station != null, "the station is an autoload", "")
+	if station != null:
+		_main.call(&"_set_shed", true)
+		_check(station.indoors and not station.muffled, "the shed tells the station", "")
+		_main.call(&"_set_shed", false)
+		_main.call(&"_set_settings", true)
+		_check(station.muffled and not station.indoors, "so does the settings board", "")
+		_main.call(&"_set_settings", false)
+		_main.call(&"_set_menu", true)
+		_check(station.muffled, "and the upgrades board", "")
+		_main.call(&"_set_menu", false)
+		_check(not station.muffled and not station.indoors, "and closing them lets go", "")
+
+	# The board covers the lake, so the lake goes quiet behind it — all but the money.
+	var sound := Sfx.main()
+	if sound != null:
+		sound.on = true
+		_main.call(&"_set_menu", true)
+		_check(sound.shopping and not sound.may_play(&"bark")
+			and not sound.may_play(&"net_splash") and not sound.may_play(&"pigeon_fly"),
+			"the upgrades board holds the lake's own sounds", "")
+		_check(sound.may_play(&"coin") and sound.may_play(&"upgrade"),
+			"the money is still heard through it", "")
+		_main.call(&"_set_menu", false)
+		_check(not sound.shopping and sound.may_play(&"bark"),
+			"and closing the board gives the lake its noise back", "")
+		_check_audio_pass(sound)
 	_finish()
+
+
+## The 2026-09-16 audio pass (issue #1): the knock is cut, the wading loop is shared, and a
+## ferry is heard coming home as well as leaving.
+func _check_audio_pass(sound: Sfx) -> void:
+	_check(not sound.has_method(&"play_catch"),
+		"the catch knock is gone, not quietened", "")
+	_check(sound.has_method(&"play_berth"),
+		"a ferry coming alongside the island has a sound of its own", "")
+	_check(Sfx.BERTH_BELL_GAP > Sfx.BELL_GAP,
+		"and its bell is sparser than the one it leaves on",
+		"%.0f s against %.0f" % [Sfx.BERTH_BELL_GAP, Sfx.BELL_GAP])
+
+	# One wading loop, four dogs and an angler: a boolean set by whoever pushed last would
+	# be turned off by a dog on the lawn while the angler stood in the water.
+	var dogs: Array = _main.get(&"_dogs")
+	var dog: Dog = dogs[0] as Dog if not dogs.is_empty() else null
+	sound.set_wading(false, _angler)
+	sound.set_wading(true, _angler)
+	sound.set_wading(true, dog)
+	sound.set_wading(false, dog)
+	_check(bool(sound.get(&"_wade_on")),
+		"a dog leaving the water does not take the angler's wading with it", "")
+	sound.set_wading(false, _angler)
+	_check(not bool(sound.get(&"_wade_on")),
+		"and the wash stops when the last of them is out of it", "")
+	_check(dog != null and dog.has_method(&"carrying"),
+		"a dog says what is in its mouth, so the ending can wait for it", "")
+
+	# Every recording is levelled by the builder now, so what SOUNDS holds is the mix. A
+	# figure far outside the band is a take that was never rebuilt.
+	var loudest := -100.0
+	var quietest := 100.0
+	for name: StringName in Sfx.SOUNDS:
+		var db := float(Sfx.SOUNDS[name][0])
+		loudest = maxf(loudest, db)
+		quietest = minf(quietest, db)
+	_check(loudest <= 0.0, "no sound in the mix is asked for above nought",
+		"%.1f dB" % loudest)
+	_check(quietest > -60.0, "and none is written down as silence", "%.1f dB" % quietest)
+
+
+## Drive a hand-held station on by `seconds`, a frame at a time.
+func _run_music(music: MusicStation, seconds: float) -> void:
+	var left := seconds
+	while left > 0.0:
+		var dt := minf(0.05, left)
+		music.step(dt)
+		left -= dt
 
 
 func _finish() -> void:
