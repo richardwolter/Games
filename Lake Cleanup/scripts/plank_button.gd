@@ -23,6 +23,10 @@ const LABEL_PAD := 12.0
 
 signal pressed
 
+## Whether a press clicks. The menu's own planks turn it off and choose their sound there: New
+## game and Continue play the start sound instead.
+var clicks: bool = true
+
 var _hovered: bool = false
 var _held: bool = false
 
@@ -35,6 +39,8 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_MOUSE_ENTER or what == NOTIFICATION_MOUSE_EXIT:
 		_hovered = what == NOTIFICATION_MOUSE_ENTER
+		if _hovered:
+			Sfx.ui(&"ui_hover")
 		if not _hovered:
 			_held = false
 		queue_redraw()
@@ -47,6 +53,8 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 	if click.pressed:
 		_held = true
+		if clicks:
+			Sfx.ui(&"ui_click")
 		queue_redraw()
 		return
 	if _held:

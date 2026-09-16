@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
-[ext_resource type="Texture2D" path="res://assets/MDLL_Menu_Background.jpg" id="2_art"]
-[ext_resource type="AudioStream" path="res://assets/music_goin.mp3" id="3_music"]
+[ext_resource type="Texture2D" path="res://assets/menu_lake.png" id="2_art"]
+[ext_resource type="Texture2D" path="res://assets/mdll_logo_stacked.png" id="3_logo"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -26,6 +26,10 @@ texture = ExtResource("2_art")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="Music" type="AudioStreamPlayer" parent="."]
+[node name="Logo" type="TextureRect" parent="."]
 unique_name_in_owner = true
-stream = ExtResource("3_music")
+layout_mode = 1
+mouse_filter = 2
+texture = ExtResource("3_logo")
+expand_mode = 1
+stretch_mode = 5
