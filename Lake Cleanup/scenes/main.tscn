@@ -7,7 +7,6 @@
 [ext_resource type="Script" uid="uid://bcgg76ymsrjxn" path="res://scripts/net.gd" id="5_net"]
 [ext_resource type="Script" uid="uid://3ru7hm5tyfr7" path="res://scripts/store.gd" id="6_yard"]
 [ext_resource type="Script" uid="uid://0dfb4r7tnuco" path="res://scripts/shed_room.gd" id="7_shed"]
-[ext_resource type="AudioStream" uid="uid://cu7ddrxgbwk0u" path="res://assets/music_goin.mp3" id="8_music"]
 [ext_resource type="Script" uid="uid://cs7pifqxi5oo4" path="res://scripts/perf_hud.gd" id="9_perf"]
 [ext_resource type="Script" uid="uid://bcda8vbtl133t" path="res://scripts/hud_skin.gd" id="9_skin"]
 [ext_resource type="Script" uid="uid://dr22ekyjmso6u" path="res://scripts/shop_skin.gd" id="10_shop"]
@@ -74,10 +73,6 @@ script = ExtResource("4_player")
 z_index = 12
 z_as_relative = false
 script = ExtResource("3_boat")
-
-[node name="Music" type="AudioStreamPlayer" parent="." unique_id=1071933407]
-unique_name_in_owner = true
-stream = ExtResource("8_music")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1179505305]
 
@@ -293,8 +288,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -172.0
-offset_top = -76.0
+offset_left = -154.0
+offset_top = -68.0
 offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 0
