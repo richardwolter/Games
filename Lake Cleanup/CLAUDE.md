@@ -428,8 +428,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `LANE_*`, `water.gdshader` `lane[24]`/`lane_seed`, issue #31, 2026-09-16, Richard: "a
   small clear way as it drags through grime before the grime gets back in again, very
   subtle but noticeable"). A chain of small patches dropped every `LANE_SPACING` (14) world
-  px along the mouth's path, `LANE_WIDE` (0.55) of the mouth across, each opening and
-  closing on the patch's own curve over `LANE_LIFE` (3.2 s), all on one roll per reel so the
+  px along the mouth's path, `LANE_WIDE` (0.35, narrowed from 0.55 on 2026-09-17) of the mouth across, each opening and
+  closing on the patch's own curve over `LANE_LIFE` (2 s, down from 3.2, same day), all on one roll per reel so the
   chain reads as one lane. **Catch only, by Richard's call** over every reel: the lane is
   the catch being dragged home. Both nets. The shader's patch arithmetic is one function,
   `patch_clear`, that the patches and the lane both call. `test_lake` guards the trigger

@@ -264,8 +264,8 @@ const PATCH_CLOSE_SOFT := 0.6
 ## the tail of the lane closing anyway.
 const LANE_POINTS := 24
 const LANE_SPACING := 14.0
-const LANE_WIDE := 0.55
-const LANE_LIFE := 3.2
+const LANE_WIDE := 0.35
+const LANE_LIFE := 2.0
 ## The patch's shape is a blob noise rolled per catch (`_patch_rng`): the rim wanders in and
 ## out of the mouth's disc and the grime comes back as spots that grow and join, so no two
 ## catches look alike and nothing reads as the net's ring stamped on the water. The
@@ -1528,7 +1528,12 @@ func _outline_bounds(outline: PackedVector2Array) -> Rect2:
 ## is a slow trickle of work done rather than a second income.
 func _dog_brought_back(def_index: int) -> void:
 	_yard.put(def_index)
+	# The meter moves for the dog's pieces too. It did not, so a lake the pack helped clear
+	# never read empty — and the ending, which waited on the meter, never came.
+	_filth_left = maxf(_filth_left - _grid.defs[def_index].pollution, 0.0)
+	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 	_filth_stale = true
+	_ask_the_end()
 	if _sfx != null:
 		# The crate's own thud, the same one a piece landing in it plays from anywhere else.
 		# It used to be the knock, which was the water it came out of and not the box.
@@ -2452,14 +2457,13 @@ func _polish_panel_controls() -> void:
 		if node is CheckButton:
 			node.add_theme_icon_override("on", WoodUI.switch_icon(true))
 			node.add_theme_icon_override("off", WoodUI.switch_icon(false))
-## When to start asking whether the lake is finished, as a fraction of the filth it was
-## built with, and how often to ask once it is that close.
+## How often to ask whether the lake is finished.
 ##
-## The meter cannot be the trigger on its own. It is a float that has had eighteen thousand
-## subtractions done to it, and eighteen thousand subtractions do not land on zero — they
-## land a millionth above it, which is a bar that reads empty and a game that never ends.
-## So the meter reading nothing is the cue to ask the field, and the field is what answers.
-const CLEAN_ENOUGH := 0.001
+## The meter is not the trigger and, since 2026-09-17, not the cue to ask either. It is a
+## float that has had eighteen thousand subtractions done to it, and it only moves for the
+## paths that remember to move it: `CLEAN_ENOUGH`, the fraction under which the field used
+## to be asked, was never reached on a lake the dogs helped clear. The field is what
+## answers, and it is asked on this clock and whenever a piece lands in the crate.
 const CLEAN_CHECK_EVERY := 0.5
 
 ## How long the lake has to itself before a word is written over it (2026-09-16, Richard:
@@ -2480,14 +2484,24 @@ const ENDING_BEAT := 2.0
 func _look_for_the_end(delta: float) -> void:
 	if _cleaned:
 		return
-	if _filth_left > _filth_total * CLEAN_ENOUGH:
-		return
+	# No meter gate any more (2026-09-17). The float was the cue to ask the field, and any
+	# path that took a piece without moving the float — the dogs' deliveries did not — left
+	# it above the old threshold for good, so the field was never asked and the run never ended.
+	# The walk is 8464 `size()` calls twice a second, which is nothing; the truth is cheap
+	# enough to ask outright. A piece landing in the crate asks at once, see `_ask_the_end`.
 	_clean_check_in -= delta
 	if _clean_check_in > 0.0:
 		return
 	_clean_check_in = CLEAN_CHECK_EVERY
 	_left_over = _grid.piece_count() if _grid != null else 0
 	_check_cleaned()
+
+
+## A piece has just gone into the island's crate: ask on the next frame rather than at the
+## next half second, so the ending starts as the last one lands. Next frame, not now — the
+## haul and the dog are both still mid-handover when they call, and would answer "not yet".
+func _ask_the_end() -> void:
+	_clean_check_in = 0.0
 
 
 ## Has the last piece come out of the water?
@@ -2837,6 +2851,7 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 		_on_sold(PackedInt32Array([def_index]), sale.kind)
 		return
 	_yard.put(def_index)
+	_ask_the_end()
 
 
 ## A pigeon in the net. Paid on the spot: it never reaches the yard, it is not a material
