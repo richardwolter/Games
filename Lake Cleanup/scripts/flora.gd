@@ -41,7 +41,8 @@ const SPROUT_UNTIL := 0.4
 ## How far the filth map is followed to find "the water beside this spot", in tiles.
 const WATER_LOOK := 9
 ## The map's byte under which water is clean enough for something to grow beside it. The
-## shader's murky cutoff is on the bent value (LakeGrid.water_state); this asks the same.
+## shader's first cutoff, clean to hazy, is on the bent value (LakeGrid.water_state); this
+## asks the same.
 const SEED := 20260916
 
 var grid: LakeGrid

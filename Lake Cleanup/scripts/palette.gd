@@ -44,6 +44,18 @@ var histogram: Dictionary = {}
 @export var water_murky: Color = Color.WHITE
 @export var water_murky_shallow: Color = Color.WHITE
 @export var water_murky_light: Color = Color.WHITE
+## The two states between those three: hazy (clean to murky) and foul (murky to dirty), so a
+## bay lightens a shade at a time as its stacks come up rather than in two jumps.
+@export var water_hazy_deep: Color = Color.WHITE
+@export var water_hazy_mid: Color = Color.WHITE
+@export var water_hazy: Color = Color.WHITE
+@export var water_hazy_shallow: Color = Color.WHITE
+@export var water_hazy_light: Color = Color.WHITE
+@export var water_foul_deep: Color = Color.WHITE
+@export var water_foul_mid: Color = Color.WHITE
+@export var water_foul: Color = Color.WHITE
+@export var water_foul_shallow: Color = Color.WHITE
+@export var water_foul_light: Color = Color.WHITE
 
 ## Foam: the body, its bright bubble cores, and what foam on filthy water goes to.
 @export var foam: Color = Color.WHITE

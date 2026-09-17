@@ -169,18 +169,19 @@ const RIPPLE_OUTER := 1.55
 const RIPPLE_OUTER_FADE := 0.55
 const RIPPLE_OUTER_LAG := PI * 0.6
 
-## What the rings do on murky and dirty water: the ink they go to, and how much of their
-## alpha is kept, by water state (see `water_state`). Same idea as the shader's foam — a
-## ring round a piece in scum is scum pushed aside, not a white crest.
+## What the rings do on water that is not clean: the ink they go to, and how much of their
+## alpha is kept, by water state (see `water_state`), clean to dirty. Same idea as the
+## shader's foam — a ring round a piece in scum is scum pushed aside, not a white crest.
 const RIPPLE_INK := Color(0.86, 0.94, 0.96)
 const RIPPLE_INK_DIRTY := Color(0.8, 0.82, 0.678)
-const RIPPLE_KEEP := [1.0, 0.7, 0.45]
+const RIPPLE_KEEP := [1.0, 0.85, 0.7, 0.57, 0.45]
 
-## Mirrors water.gdshader's `color_bite`, `murky_at` and `dirty_at`. If those move, these
-## move, or the rings change colour a tile away from where the water does.
+## Mirrors water.gdshader's `color_bite` and `state_at`. If those move, these move, or the
+## rings change colour a tile away from where the water does.
 const FILTH_STATE_BITE := 1.4
-const FILTH_MURKY_AT := 0.3
-const FILTH_DIRTY_AT := 0.65
+const FILTH_STATE_AT := [0.15, 0.35, 0.55, 0.75]
+## The dirtiest state there is: 0 clean, 1 hazy, 2 murky, 3 foul, 4 dirty.
+const FILTH_STATES := 4
 
 ## The shadow under a floating piece: how wide against the piece, how dark, and how far
 ## down the plane it is pushed so it shows past the near edge of the art.
@@ -462,13 +463,20 @@ var _widest := Vector2.ZERO
 ## water's state the way the shader-drawn foam does.
 var filth := PackedByteArray()
 
-## The water's state under a tile, 0 clean, 1 murky, 2 dirty: the shader's two cutoffs on
-## the bent filth, without its blotch noise. Clean where there is no map yet.
+## The water's state under a tile, 0 clean, 1 hazy, 2 murky, 3 foul, 4 dirty: the shader's
+## four cutoffs on the bent filth, without its blotch noise. Clean where there is no map yet.
+##
+## Nature (fish, flora, the clean share) asks for 0 and nothing else, and 0 still means what
+## it always did — no rubbish within the stain's reach — because the map holds any water
+## touching a piece at hazy or worse (Lake.FILTH_FLOOR).
 func water_state(index: int) -> int:
 	if index < 0 or index >= filth.size():
 		return 0
 	var t := pow(float(filth[index]) / 255.0, FILTH_STATE_BITE)
-	return int(t >= FILTH_MURKY_AT) + int(t >= FILTH_DIRTY_AT)
+	var state := 0
+	for at: float in FILTH_STATE_AT:
+		state += int(t >= at)
+	return state
 
 ## Whether the piece `_stamp` is laying down right now lies on dry sand. Read by `_sprite` and
 ## `_quad`, which have no index of their own to look it up by.
@@ -1284,9 +1292,11 @@ class RippleLayer extends Node2D:
 			var wide := def.size.x * grid.swing[index] * LakeGrid.RIPPLE_SPAN * breath
 
 			# Inked for the water it is on: white on clean water, going to scum and fainter
-			# through murky to dirty, in the same three steps the shader's foam takes.
+			# through murky to dirty, in the same five steps the shader's foam takes.
 			var state := grid.water_state(index)
-			var ink := LakeGrid.RIPPLE_INK.lerp(LakeGrid.RIPPLE_INK_DIRTY, float(state) * 0.5)
+			var ink := LakeGrid.RIPPLE_INK.lerp(
+				LakeGrid.RIPPLE_INK_DIRTY, float(state) / float(LakeGrid.FILTH_STATES)
+			)
 			var keep: float = LakeGrid.RIPPLE_KEEP[state]
 
 			# Faintest at the top of the breath: a ring spreading is a ring going.

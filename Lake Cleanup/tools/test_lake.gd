@@ -4572,6 +4572,7 @@ func _stage_nature() -> void:
 	_check(fresh < 0.25, "a fresh lake's clean share is small", "%.3f" % fresh)
 	_check(fish.school_count() == 0 or fresh >= Fish.TIERS[0]["at"],
 		"no fish before the first tier's share", "%d schools at %.3f" % [fish.school_count(), fresh])
+	_check_grime()
 	# Empty the west half of the lake and rebuild the map: the share climbs, plants come
 	# due beside the cleared water only, the fish arrive and stay on clean tiles.
 	for index in _grid.stacks.size():
@@ -4580,6 +4581,14 @@ func _stage_nature() -> void:
 			_grid.stacks[index].resize(0)
 	_grid._rebuild()
 	_main._build_filth_map()
+	# Water past the stain's reach of any piece is clean, whatever the pooled share says.
+	var green_over_empty := 0
+	for index in _grid.stacks.size():
+		var tile := _grid.tile_of(index)
+		if tile.x < Iso.CENTRE.x - float(_main.get(&"FILTH_BLUR")) - 2.0 and _grid.water_state(index) != 0:
+			green_over_empty += 1
+	_check(green_over_empty == 0, "no grime is drawn over water with nothing near it",
+		"%d tiles" % green_over_empty)
 	var half: float = _main.clean_share()
 	_check(half > fresh + 0.2, "clearing half the lake lifts the clean share", "%.3f -> %.3f" % [fresh, half])
 	var glint: float = _water_material().get_shader_parameter(&"glint")
@@ -4623,6 +4632,67 @@ func _stage_nature() -> void:
 	_check(not fish.has_method("catch") and not fish.has_method("pay"),
 		"fish have no catch and no pay", "")
 	_advance()
+
+
+## The graded grime (2026-09-17): the water's shade follows how much rubbish an area still
+## holds, in five states, so it lightens as stacks come up rather than when they are gone.
+## Asked of a fresh, full lake; `_stage_nature` empties the west half straight after.
+func _check_grime() -> void:
+	var seen := {}
+	var blue_under_junk := 0
+	for index in _grid.stacks.size():
+		if _grid.stacks[index].is_empty():
+			continue
+		if index < _grid.dry.size() and _grid.dry[index] == 1:
+			continue
+		var state := _grid.water_state(index)
+		seen[state] = int(seen.get(state, 0)) + 1
+		if state == 0:
+			blue_under_junk += 1
+	_check(blue_under_junk == 0, "water touching a piece never reads clean", "%d tiles" % blue_under_junk)
+	_check(seen.size() >= 3 and seen.has(LakeGrid.FILTH_STATES),
+		"a fresh lake is several shades, the dirtiest among them", str(seen))
+	# Deep water by the island is fouler than the shallows by the bank.
+	var deep := _grid.index_of(int(Iso.CENTRE.x) - 10, int(Iso.CENTRE.y))
+	var shallow := _grid.index_of(int(Iso.CENTRE.x - Iso.RADIUS.x * 0.8), int(Iso.CENTRE.y))
+	_check(_grid.filth[deep] > _grid.filth[shallow], "deep stacks read fouler than shallow ones",
+		"%d against %d" % [_grid.filth[deep], _grid.filth[shallow]])
+	# Lift half of every stack round the deep tile: its water comes up a shade or more, is
+	# still not clean, and nothing anywhere got dirtier for it.
+	var before := _grid.filth.duplicate()
+	var state_before := _grid.water_state(deep)
+	var around := _grid.tile_of(deep)
+	for index in _grid.stacks.size():
+		var tile := _grid.tile_of(index)
+		if absi(tile.x - around.x) <= 4 and absi(tile.y - around.y) <= 4:
+			var stack := _grid.stacks[index]
+			if stack.size() > 1:
+				stack.resize(maxi(stack.size() / 2, 1))
+	_main._build_filth_map()
+	var state_after := _grid.water_state(deep)
+	_check(state_after < state_before and state_after >= 1,
+		"lifting half an area's rubbish lightens its water, short of clean",
+		"state %d -> %d" % [state_before, state_after])
+	var rose := 0
+	for i in before.size():
+		if _grid.filth[i] > before[i]:
+			rose += 1
+	_check(rose == 0, "and no water got dirtier for it", "%d tiles" % rose)
+	# The floor lands a lone piece's own tile inside the first state past clean.
+	var floor_t := pow(float(_main.get(&"FILTH_FLOOR")), LakeGrid.FILTH_STATE_BITE)
+	_check(floor_t >= LakeGrid.FILTH_STATE_AT[0] and floor_t < LakeGrid.FILTH_STATE_AT[1],
+		"the floor under a lone piece is the lightest grime", "%.3f" % floor_t)
+	# The shader draws what the grid reports: both new ramps, and the same four cutoffs.
+	var source: String = (_water_material().shader as Shader).code
+	var cuts := "vec4(%s, %s, %s, %s)" % [
+		LakeGrid.FILTH_STATE_AT[0], LakeGrid.FILTH_STATE_AT[1],
+		LakeGrid.FILTH_STATE_AT[2], LakeGrid.FILTH_STATE_AT[3]]
+	_check(source.contains("water_hazy_deep") and source.contains("water_foul_deep"),
+		"the water shader has the hazy and the foul ramps", "")
+	_check(source.contains("state_at = " + cuts), "and the grid's cutoffs are the shader's", cuts)
+	var palette := Palette.master()
+	_check(palette != null and palette.water_hazy != Color.WHITE and palette.water_foul != Color.WHITE,
+		"the palette carries both ramps", "")
 
 
 func _water_material() -> ShaderMaterial:

@@ -85,7 +85,7 @@ Why two layers? You cannot idle-drain individual objects without it feeling arbi
 
 **Idle layer**: Continuous `pollution` float is what machines reduce passively.
 
-**Visual link**: the lake clearing up **IS** the progress bar — not a separate number. As of the per-tile filth map (`Lake._build_filth_map`), the water shader's colour reads that map, not `pollution` directly: a bay just cleared reads blue on the spot while the next one over is still soup. `pollution` is the map's fallback (read only where `filth_mapped` is 0, i.e. before the first map build) and still drives `sparkle` at the finished state.
+**Visual link**: the lake clearing up **IS** the progress bar — not a separate number. As of the per-tile filth map (`Lake._build_filth_map`), the water shader's colour reads that map, not `pollution` directly: a bay just cleared reads blue on the spot while the next one over is still soup. Since 2026-09-17 the map is graded by how much rubbish an area still holds, in five shades, so a bay lightens as it is worked rather than when it is empty (see Pixel-Art Water). `pollution` is the map's fallback (read only where `filth_mapped` is 0, i.e. before the first map build) and still drives `sparkle` at the finished state.
 
 ### Progression
 Treat it as a deliverable, not polish: the clean state must **gain density** (plants, surfacing fish, birds, clarity) — Richard flagged this as the weakest part of the loop.
@@ -512,10 +512,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **Grid**: every effect is evaluated once per `foam_pixel` (2 world px) cell. Water uses the
   world grid; the foam collars and bow waves snap in their own piece/boat frame, so the grid
   travels with the smoothly moving sprite instead of crawling across it.
-- **Colours**: the water body outputs only palette swatches — three five-step ramps
-  (`water_clean_*`, `water_murky_*`, `water_dirty_*`) and the grime. Depth, bands and
+- **Colours**: the water body outputs only palette swatches — five five-step ramps
+  (`water_clean_*`, `water_hazy_*`, `water_murky_*`, `water_foul_*`, `water_dirty_*`; three
+  until 2026-09-17, see the filth map below) and the grime. Depth, bands and
   sparkle sum to a ramp position rounded to the nearest step: solid areas, hard edges.
-  Clean/murky/dirty is picked by two cutoffs (`murky_at`, `dirty_at`) on local filth, after
+  The state is picked by four cutoffs (`state_at`) on local filth, after
   a small drifting blob noise (`murk_blotch`, `murk_wobble` 0.1) and a shade stagger
   (`state_spread` 0.1) so the contours breathe instead of sitting still.
   The water is opaque. Foam keeps its own shapes and soft alpha.
@@ -605,13 +606,61 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   to the light step, gathered under the sun by `sun_lean`) drew pale strips across clean
   water, and the loose foam streaks riding the swell drew white ones. Both removed, uniforms
   and all. Bands stay; shore foam stays; the finished-lake sparkle stays.
-- **The filth map is a distance from the rubbish** (`Lake._build_filth_map`, `_chamfer`):
-  a tile with a piece on it is foul, the stain falls off to clean at `FILTH_BLUR` (3) tiles,
-  bent by `FILTH_FALL`. Presence only — no pollution values, no capacity, no averaging. The
-  rule, by decision: **water touching objects looks grimy, water with no objects looks
-  clean**, and the rubbish-free band round the island is a plain clean ring. Rejected on the
-  way here: a pollution-over-capacity box blur (lone pieces floated on blue, green spread
-  over empty water), a weighted blur, and a fill that made the island's band foul.
+- **The filth map is a distance from the rubbish, times how much rubbish is there**
+  (`Lake._build_filth_map`, `_chamfer`, `_pooled_share`; 2026-09-17, `/grill-me` with
+  Richard: "I see the same green shade, until I remove all the objects, then it turns clear
+  on that spot"). **Supersedes "presence only"**: every wet tile holds a stack, so under
+  presence alone lifting the top of one moved no water, and the lake was one green until a
+  tile was empty.
+  - **The outline is still the distance map**: the stain falls off to clean at `FILTH_BLUR`
+    (3) tiles from the nearest piece, bent by `FILTH_FALL`. **The strength is the pooled
+    share**: the pieces in every stack within `FILTH_POOL` (3) tiles over what those tiles
+    could hold at `Iso.MAX_SLOTS` each (only tiles the fill or the strand can use, so the
+    island's bare shelf does not dilute it), bent by `FILTH_SHARE_BITE` (0.5) and floored at
+    `FILTH_FLOOR` (0.34). The two are **multiplied**, which keeps both halves of the old
+    rule and both of its rejections: water past the stain's reach is clean whatever the
+    average says (no green over empty water), and water touching a piece is never clean (no
+    lone piece on blue — the floor lands inside the first state past clean).
+  - **Over the deepest a stack goes, not over what each tile started with, by decision**:
+    depth is already smooth across the basin (`Iso.depth_at`), so a fresh lake is darkest
+    round the island and lightens to the bank, and **nothing is saved** — the map is still
+    derived from the stacks alone. "Uniform soup, then lighten" was offered (start depth per
+    tile, a `SAVE_VERSION` bump) and turned down.
+  - **Broad, by decision** (over a 1-tile blur and over two scales mixed): one early cast
+    moves nothing by itself, a handful in one bay moves it a shade. The catch patch stays
+    the per-cast feedback. If it reads dead in play, two scales is the fallback.
+  - **Five states, two new ramps**: clean / **hazy** / murky / **foul** / dirty
+    (`water_hazy_*`, `water_foul_*` in `extract_palette.gd` and `palette.tres`, first
+    guesses at the midpoints of their neighbours — retune by eye). Four cutoffs, the
+    shader's `state_at` mirrored by `LakeGrid.FILTH_STATE_AT`; `test_lake` reads the shader
+    source for them. Still hard steps, no dither, no blend; `murk_wobble` and
+    `state_spread` untouched.
+  - **A scum film on the two dirtiest states** (`water.gdshader` `scum_*`): clumps off a
+    blob noise broken into whole art pixels, in the bank's own `grime_color`, carried along
+    in art-pixel steps so the cells never slide under the grid. Denser on dirty than on
+    foul, gone by murky — so the scum is the first thing lifting pieces removes, then the
+    colour. The shore foam and its tint take `state * 0.5`, so they read 0-2 as before; the
+    bank's grime still wants murky or worse.
+  - **Nature is unchanged**: fish, flora, glints and `_clean_share` ask for state 0, and
+    because of the floor, 0 still means "no rubbish within reach". The in-between shades
+    earn nothing, by decision. Patches and the lane untouched: they close back onto
+    whatever shade the map now says.
+  - **`_count_clean` asks which tiles are water once** (`_wet_mask`): it was walking
+    `Iso.shore_fraction` for all 8464 tiles on every remap, 12.7 ms of a 20 ms map build —
+    mid-haul. The build is 8.5 ms now, graded share (2.7 ms) included.
+  - **Probe**: `tools/shot_grime.tscn` (desktop build, own save) lifts a quarter, a half
+    and three quarters of the rubbish in uneven pools and saves
+    `tools/last_grime_<stage>_{far,near}.png` plus `last_grime.log` — the share of water in
+    each state per stage and the map's build time. It is also what proves the shader
+    compiles. At these numbers: fresh 40% dirty / 45% foul / 15% murky; half lifted 1 / 48 /
+    43 / 7% hazy. **Retune `FILTH_SHARE_BITE` against that log**, not by feel.
+  - `test_lake`'s `_check_grime`: no piece on clean water, a fresh lake is several shades
+    with the dirtiest among them, deep reads fouler than shallow, lifting half an area
+    lightens it short of clean and dirties nothing, no grime past the stain's reach, the
+    floor is the lightest grime, the shader and the palette carry both ramps.
+  - **Out of scope, by decision**: stronger contour noise (the island-leak risk), pollution
+    values or density as the driver, the meter's art and the `Style` colours picked off the
+    old ramps, the siege's flat map, a patch that lifts only a few shades.
 - **A catch opens a clean patch** (`Lake._on_net_swept`, `patch_radius`, `_push_patches`,
   `water.gdshader` `patches[8]`/`patch_seeds`, 2026-09-13, Richard: "a glimpse of the cleaned
   lake before the grime sets in again"). The map is presence-only, and most casts lift the top

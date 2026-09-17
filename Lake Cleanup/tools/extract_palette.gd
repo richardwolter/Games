@@ -55,6 +55,18 @@ const WATER_RAMPS := {
 	"water_murky": Color(0.22, 0.4, 0.38),
 	"water_murky_shallow": Color(0.34, 0.5, 0.45),
 	"water_murky_light": Color(0.55, 0.66, 0.58),
+	# The two in-between states (2026-09-17): hazy between clean and murky, foul between
+	# murky and dirty. First guesses at the midpoints of their neighbours — retune by eye.
+	"water_hazy_deep": Color(0.142, 0.271, 0.336),
+	"water_hazy_mid": Color(0.208, 0.37, 0.442),
+	"water_hazy": Color(0.287, 0.463, 0.529),
+	"water_hazy_shallow": Color(0.419, 0.578, 0.613),
+	"water_hazy_light": Color(0.66, 0.76, 0.745),
+	"water_foul_deep": Color(0.091, 0.21, 0.148),
+	"water_foul_mid": Color(0.127, 0.274, 0.189),
+	"water_foul": Color(0.169, 0.338, 0.231),
+	"water_foul_shallow": Color(0.284, 0.427, 0.296),
+	"water_foul_light": Color(0.46, 0.548, 0.404),
 	"foam": Color(0.933, 0.965, 0.984),
 	"foam_light": Color(1.0, 1.0, 1.0),
 	"foam_dirty": Color(0.8, 0.82, 0.678),

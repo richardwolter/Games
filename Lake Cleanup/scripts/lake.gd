@@ -216,8 +216,35 @@ const FILTH_BITE := 0.62
 ##
 ## FILTH_FALL bends the falloff. Under one holds the stain up near the piece and drops it
 ## late: at 0.6 the tile next to a piece still reads foul, two out reads murky, three clean.
+##
+## **That distance map is the stain's outline now, not its strength** (2026-09-17, Richard:
+## "I see the same green shade, until I remove all the objects, then it turns clear on that
+## spot"). Presence alone could not say anything until a tile was empty: every wet tile
+## holds a stack, so lifting the top of one moved no water. The strength is how much
+## rubbish the water round a tile still holds — see FILTH_POOL — and the two are
+## multiplied, which keeps both halves of the old rule: water past the stain's reach is
+## clean whatever the average says (no green over empty water), and water touching a piece
+## is never clean (FILTH_FLOOR — no lone piece floating on blue).
 const FILTH_BLUR := 3
 const FILTH_FALL := 0.6
+
+## How much rubbish an area holds: the pieces in every stack within FILTH_POOL tiles, over
+## what those tiles could hold at Iso.MAX_SLOTS each — only the tiles the fill or the strand
+## can put anything on, so the island's bare shelf does not water the figure down.
+##
+## Over the deepest a stack goes, not over what each tile started with, by decision: depth
+## is already smooth across the basin (Iso.depth_at), so a fresh lake is darkest round the
+## island and lightens to the bank, and nothing has to be saved — the map is still worked
+## out from the stacks alone. Broad by decision too: one early cast moves nothing by
+## itself, a handful in one bay moves it a shade.
+##
+## FILTH_SHARE_BITE bends the share before it is used: under one holds the water dark for
+## longer, over one lightens it early. FILTH_FLOOR is what the strength bottoms out at
+## where there is any rubbish at all, picked to land inside the first state past clean
+## (LakeGrid.FILTH_STATE_AT) on a tile with a piece on it. `test_lake` guards that.
+const FILTH_POOL := 3
+const FILTH_SHARE_BITE := 0.5
+const FILTH_FLOOR := 0.34
 
 ## Seconds between rebuilds of the map, at most. It is a moment of work on a grid this size
 ## and none of it has to be frame-exact, but a cast landing ten pieces should not pay for it
@@ -684,6 +711,10 @@ var _save_note_for: float = 0.0
 var _filth_map: Image
 var _filth_texture: ImageTexture
 var _filth_stale: bool = false
+## What each tile could hold, summed — see `_pooled_share`. Built once; the basin does not move.
+var _filth_room := PackedInt32Array()
+## Which tiles are the lake's water, 1 or 0 — see `_count_clean`. Asked once, with `_water_tiles`.
+var _wet_mask := PackedByteArray()
 ## The open clean patches: `at` (world), `radius` (world px, long axis), `born` (on
 ## `_patch_clock`), `seed` (the shape's roll).
 var _patches: Array[Dictionary] = []
@@ -1474,6 +1505,9 @@ const WATER_SWATCHES: Array[StringName] = [
 	&"water_clean_light", &"water_dirty_deep", &"water_dirty_mid", &"water_dirty",
 	&"water_dirty_shallow", &"water_dirty_light", &"water_murky_deep", &"water_murky_mid",
 	&"water_murky", &"water_murky_shallow", &"water_murky_light",
+	&"water_hazy_deep", &"water_hazy_mid", &"water_hazy", &"water_hazy_shallow",
+	&"water_hazy_light", &"water_foul_deep", &"water_foul_mid", &"water_foul",
+	&"water_foul_shallow", &"water_foul_light",
 ]
 
 
@@ -4638,12 +4672,16 @@ func _build_filth_map() -> void:
 			continue
 		dist[index] = 0.0
 	_chamfer(dist, cols, rows)
+	var share := _pooled_share(cols, rows)
 
 	var pixels := PackedByteArray()
 	pixels.resize(cols * rows)
 	for i in dist.size():
 		var near := clampf(1.0 - dist[i] / float(FILTH_BLUR), 0.0, 1.0)
-		pixels[i] = int(round(pow(near, FILTH_FALL) * 255.0))
+		if near <= 0.0:
+			continue
+		var strength := lerpf(FILTH_FLOOR, 1.0, pow(share[i], FILTH_SHARE_BITE))
+		pixels[i] = int(round(pow(near, FILTH_FALL) * strength * 255.0))
 
 	# The grid keeps a copy for what it draws on the CPU — the ripple rings read the state
 	# of the water under their piece off it, the way the shader does off the texture.
@@ -4668,17 +4706,68 @@ func _build_filth_map() -> void:
 		_fish.refresh(_clean_share, _clean_tiles)
 
 
+## How full of rubbish the water round each tile is, 0 to 1: the pieces afloat within
+## FILTH_POOL tiles over what those tiles could hold. See FILTH_POOL.
+##
+## Two summed-area tables, so the cost is a pass over the grid whatever the pool's width —
+## this runs on every remap, in the middle of a haul. Whole numbers, so there is no drift
+## in the sums. The table of what the tiles could hold never changes and is built once.
+func _pooled_share(cols: int, rows: int) -> PackedFloat32Array:
+	var wide := cols + 1
+	if _filth_room.is_empty():
+		_filth_room.resize(wide * (rows + 1))
+		for ty in rows:
+			var run := 0
+			for tx in cols:
+				if Iso.floats_here(tx, ty) or Iso.on_strand(tx, ty):
+					run += Iso.MAX_SLOTS
+				_filth_room[(ty + 1) * wide + tx + 1] = _filth_room[ty * wide + tx + 1] + run
+	var held := PackedInt32Array()
+	held.resize(wide * (rows + 1))
+	for ty in rows:
+		var run := 0
+		var row := ty * cols
+		for tx in cols:
+			var index := row + tx
+			if not (index < _grid.dry.size() and _grid.dry[index] == 1):
+				run += _grid.stacks[index].size()
+			held[(ty + 1) * wide + tx + 1] = held[ty * wide + tx + 1] + run
+
+	var share := PackedFloat32Array()
+	share.resize(cols * rows)
+	for ty in rows:
+		var top := maxi(ty - FILTH_POOL, 0) * wide
+		var foot := mini(ty + FILTH_POOL + 1, rows) * wide
+		for tx in cols:
+			var left := maxi(tx - FILTH_POOL, 0)
+			var right := mini(tx + FILTH_POOL + 1, cols)
+			var room := (
+				_filth_room[foot + right] - _filth_room[top + right]
+				- _filth_room[foot + left] + _filth_room[top + left]
+			)
+			if room <= 0:
+				continue
+			var pieces := held[foot + right] - held[top + right] - held[foot + left] + held[top + left]
+			share[ty * cols + tx] = clampf(float(pieces) / float(room), 0.0, 1.0)
+	return share
+
+
 ## How much of the water reads clean on the map, and which tiles: the stage nature is at.
 ## Water tiles are the lake's wet ones off both shores; the island's clean ring counts, so
 ## a fresh lake is not at zero — and it should not be, since that ring is clean.
 func _count_clean() -> void:
 	_clean_tiles.resize(0)
+	# Which tiles are water is asked once: it is a walk of the shore function per tile, and
+	# at every remap it was most of what the map cost (12.7 ms of 20, tools/shot_grime).
 	if _water_tiles == 0:
+		_wet_mask.resize(_grid.stacks.size())
+		_wet_mask.fill(0)
 		for index in _grid.stacks.size():
 			if _wet_tile(index):
+				_wet_mask[index] = 1
 				_water_tiles += 1
-	for index in _grid.stacks.size():
-		if _wet_tile(index) and _grid.water_state(index) == 0:
+	for index in _wet_mask.size():
+		if _wet_mask[index] == 1 and _grid.water_state(index) == 0:
 			_clean_tiles.append(index)
 	_clean_share = float(_clean_tiles.size()) / float(maxi(_water_tiles, 1))
 
