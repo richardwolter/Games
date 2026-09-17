@@ -4379,12 +4379,19 @@ func _update_hud() -> void:
 ## bar, and a player looking at an empty bar and no ending has been told the lake is clean
 ## by the only thing in the game that tells them anything. This is what says otherwise —
 ## and it only appears once the bar is on the floor, so it is never noise.
+##
+## Only from LAST_PIECES_FROM down (2026-09-17, Richard): "n pieces left" and nothing more,
+## on the hint line over the pollution meter. `_left_over` is counted every
+## CLEAN_CHECK_EVERY now that the end check has no meter gate, so the figure is live.
+const LAST_PIECES_FROM := 50
+
+
 func _last_pieces_line() -> String:
-	if _cleaned or _left_over <= 0:
+	if _cleaned or _left_over <= 0 or _left_over > LAST_PIECES_FROM:
 		return ""
 	if _left_over == 1:
-		return "One last piece is still out there"
-	return "%d pieces still out there" % _left_over
+		return "1 piece left"
+	return "%d pieces left" % _left_over
 
 
 ## The fleet in one line: the lone ferry reads as it always did, and a fleet reads as a

@@ -3305,6 +3305,17 @@ func _stage_ending() -> void:
 		_check(_main.call(&"_last_pieces_line") != "",
 			"and the player is told how much is still out there",
 			"%s" % _main.call(&"_last_pieces_line"))
+		_check(_main.call(&"_last_pieces_line") == "2 pieces left",
+			"in so many words: the count and \"pieces left\"", "%s" % _main.call(&"_last_pieces_line"))
+		# Only from fifty down (2026-09-17): at fifty it shows, at fifty-one it does not.
+		var was: int = _main.get(&"_left_over")
+		_main.set(&"_left_over", 50)
+		_check(_main.call(&"_last_pieces_line") == "50 pieces left", "it shows at fifty", "")
+		_main.set(&"_left_over", 51)
+		_check(_main.call(&"_last_pieces_line") == "", "and not at fifty-one", "")
+		_main.set(&"_left_over", 1)
+		_check(_main.call(&"_last_pieces_line") == "1 piece left", "one piece is singular", "")
+		_main.set(&"_left_over", was)
 		# And now it really is empty, with the same float dust on the meter.
 		var stack := _grid.stacks[_deep_tile()]
 		stack.resize(0)

@@ -569,6 +569,12 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   call, where the haul and the dog are mid-handover and would answer "not yet". **Any new
   way a piece leaves the water needs no wiring for the ending**, only for the meter.
   `test_lake` ends an empty lake with the meter at half.
+- **"n pieces left" over the meter, from fifty down** (`Lake._last_pieces_line`,
+  `LAST_PIECES_FROM` 50, 2026-09-17, Richard): the hint line `HudSkin._draw_hint` writes
+  over the pollution meter says the count and nothing else, and says nothing above fifty.
+  It used to read "n pieces still out there" and only once the meter was on the floor —
+  which, with the gate above, was never on a lake the dogs worked. The count is live every
+  `CLEAN_CHECK_EVERY`. `test_lake` guards the words, fifty, fifty-one and the singular.
 - **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
   rising, the note ringing, and **the end song coming in with the beat, not with the text**
   (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their
