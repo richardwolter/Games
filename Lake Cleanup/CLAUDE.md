@@ -577,6 +577,19 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   right-aligned on the clean end; no `POLLUTION` label. `Style.meter_water`/`water` and
   the `METER_*` colours are gone.
 
+- **The meter's water is the lake's water** (2026-09-17, `/grill-me` with Richard,
+  `tools/recolor_meter.py`): the two painted strips read as off-palette (a teal gradient, a
+  bright caustic blue), so each is remapped by brightness rank onto a ramp read from
+  `palette.tres` — murky sheet onto `water_dirty_*`, clean onto `water_clean_*`, spanning
+  `SPAN` of the ramp. **Interpolated between the steps, not snapped, by decision**: the
+  painted gradients and caustics stay. Alpha, frame, garbage circle and the shader untouched.
+  The painted originals are `art_source/meter/`; psd-extract venv python, project root,
+  **reimport after**. Contact sheet `tools/last_meter_recolor.png`. The `Style` colours once
+  picked off the old paint followed: `BOARD` (murky deep, taken down), `BOARD_ROW`/
+  `ROW_SOUND` (`water_murky`), `BUTTON_SUNK` (murky deep), `BOARD_ROW_OFF`/`ROW_SCREEN`
+  (`water_dirty_shallow`), `ON_WATER` (`water_clean`), `LEVEL_INK` (clean shallow, lifted).
+  Written as numbers, not read from `Palette` — a palette retune means re-picking them.
+
 - **The upgrades shop is three drawn boards** (`shop_skin.gd`, 2026-09-11): net, ferry, dog
   side by side, each a grained, chipped oak frame (drawn like the meter's) round a dark
   face, a bowed three-tone oak ribbon over the top edge (front block only — hanging tails

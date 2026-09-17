@@ -70,8 +70,11 @@ const GOLD_DEEP := Color(0.72, 0.52, 0.14)
 ## and the frame round each is the meter's oak. Picked (2026-09-11) over the oak alone, a
 ## clean-water board, and the sand-and-bin-bag circle: the clean-water board was tried
 ## first and read too bright against the lake.
-const BOARD := Color(0.17, 0.24, 0.25)
-const BOARD_ROW := Color(0.25, 0.41, 0.47)
+## Re-picked 2026-09-17 off `palette.tres` with the meter's strips (`tools/recolor_meter.py`):
+## the board is `water_murky_deep` taken down, the rows `water_murky`, the unaffordable row
+## `water_dirty_shallow`, the slider and the level the clean ramp.
+const BOARD := Color(0.10, 0.20, 0.20)
+const BOARD_ROW := Color(0.22, 0.40, 0.38)
 ## The face the two picture buttons stand their contents on: the boards' own murky water,
 ## one step up the palette from `BOARD` (2026-09-12). A menu is a dark board because it is
 ## mostly writing; these two are mostly pictures — a hut in grass, a green arrow, a black net
@@ -80,8 +83,8 @@ const BOARD_ROW := Color(0.25, 0.41, 0.47)
 const BUTTON_FACE := BOARD_ROW
 ## What a panel pressed into that face is: the same water taken well down, so it reads as a
 ## recess in the button rather than as a second colour laid on it.
-const BUTTON_SUNK := Color(0.12, 0.20, 0.23)
-const BOARD_ROW_OFF := Color(0.22, 0.35, 0.25)
+const BUTTON_SUNK := Color(0.11, 0.24, 0.24)
+const BOARD_ROW_OFF := Color(0.227, 0.353, 0.141)
 const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
 ## The settings board's rows, one tone a section so the eye finds a section by colour:
@@ -90,11 +93,11 @@ const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
 ## was tried and did not work). A switch that is "on" is lit in the
 ## money's gold; a slider's played length is clean water — a volume is a level, and gold
 ## read as a price.
-const ROW_SOUND := Color(0.25, 0.41, 0.47)
-const ROW_SCREEN := Color(0.27, 0.40, 0.29)
+const ROW_SOUND := Color(0.22, 0.40, 0.38)
+const ROW_SCREEN := Color(0.227, 0.353, 0.141)
 const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
-const ON_WATER := Color(0.31, 0.60, 0.75)
+const ON_WATER := Color(0.353, 0.525, 0.678)
 ## The net, wherever it is drawn as a picture of itself rather than as the thing in the lake:
 ## on the shop's board and on the upgrades button. Near black, so the rubbish under it on the
 ## board and the arrow beside it on the button both read against it.
@@ -102,7 +105,7 @@ const NET_INK := Color(0.08, 0.07, 0.07, 0.92)
 
 ## The level on an upgrades row, after its name: the slider's clean-water blue, lifted a
 ## step so it reads on the row's murky plate. A level is not a price, so not the gold.
-const LEVEL_INK := Color(0.47, 0.78, 0.92)
+const LEVEL_INK := Color(0.60, 0.76, 0.86)
 
 ## The recycle box's own colours, read off `assets/Recycle_Box.png`: its planks, their lit
 ## and shaded tones, the dark hollow inside it, and the blue of the recycle mark on its
