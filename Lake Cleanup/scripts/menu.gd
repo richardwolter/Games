@@ -1,76 +1,94 @@
-## The main menu: a picture of the lake itself, the logo standing on it, and a stack of the
-## game's own planks under that.
+## The main menu: the logo and a stack of the game's own planks, standing over the lake itself.
 ##
-## The first thing the game shows (2026-09-12, issue #12). The art fills the window — cropped
-## to cover rather than letterboxed — and five `PlankButton`s stand on it: Continue, New game,
-## Settings, Credits, Quit. Nothing here is a stock Button in a theme: the planks are the
-## HUD's own wood, the boards the shop's, so the menu and the lake are one game.
+## **The menu has no picture of its own** (2026-09-17, `/grill-me` with Richard). It is an
+## overlay on the running lake — `Lake` builds it on a layer of its own and holds the world
+## in a pose behind it (dogs asleep, hulls moored, the angler idle, the view pulled back to
+## the whole lake) — so what is behind the doors is the player's own lake as they left it:
+## their clean bays, their fleet, their pack, their flora. The lake clearing up is the
+## progress bar, and it is the menu's too; nothing here says a figure.
 ##
-## The art is `assets/menu_lake.png` (2026-09-16, replacing the painted
-## `MDLL_Menu_Background.jpg`): the trailer's own last page — the lake still filthy, a few
-## clear pools, the angler with a net out and the pack on the island — filmed by
-## `tools/shot_menu_bg.tscn` and darkened by `tools/bake_menu_bg.py`. The picture has no
-## title painted into it, so the logo is its own node: `mdll_logo_stacked.png`, the v1
-## lockup the trailer and the capsules use, standing in the top-left corner over the
-## darkened soup with the plank stack below it.
+## Nothing here changes scene. Continue, or New game where there is no run to lose, is
+## `play_asked`: the lake takes the menu off and glides the view down to the angler. A run
+## thrown away, or the tree's own save, is `reload_asked`: the lake reloads itself and comes
+## up playing. Supersedes the baked `assets/menu_lake.png` (2026-09-16), `scenes/menu.tscn`
+## and the scene change into `main.tscn`.
 ##
-## Continue is only there when there is a lake to go back to. New game over a saved lake
-## asks first (`MenuConfirm`) — the save is the one thing the menu can destroy. Settings is
-## the lake's own board in `menu_mode` (sound and screen, none of the lake's rows), reading
-## and writing `Prefs`, so what is set here is what the lake finds. The lake comes back here
-## from its own settings board and from the farewell.
+## Five `PlankButton`s: Continue (only when the lake behind loaded a run), New game (over a
+## run, `MenuConfirm` asks first — the save is the one thing the menu can destroy),
+## Settings (the lake's own board in `menu_mode`: sound and screen, none of the lake's
+## rows), Credits and Quit. Nothing here is a stock Button in a theme: the planks are the
+## HUD's own wood, the boards the shop's.
 class_name MainMenu
 extends Control
 
 const Style := preload("res://scripts/style.gd")
+const LOGO := preload("res://assets/mdll_logo_stacked.png")
 
-const LAKE_SCENE := "res://scenes/main.tscn"
+## Into the lake that is already there.
+signal play_asked
+## This lake is thrown away for another: a fresh run (`fresh`), or the tree's (`tree`).
+signal reload_asked(fresh: bool, tree: bool)
 
-## The stack: one plank per door, in this order. Credits stands alone in the bottom right
-## corner, where a credits button lives, and leaves the stack a plank shorter.
+## The stack: one plank per door, in this order. **Credits is in the stack, above Quit**
+## (2026-09-17, Richard); it used to stand alone in the bottom-right corner, which was where
+## a credits button lived when the doors were in the opposite corner and the two had the
+## screen between them.
+##
+## **The accented door is the one into the lake** (`PlankButton.accent`): Continue when
+## there is a run to go back to, New game when there is not. The same wood, a lighter face
+## and the lit edge the shop's affordable rows carry. Only ever one of them, or the accent
+## says nothing.
 ##
 ## The two tree doors start and resume tree test mode (`Lake.tree_mode`, 2026-09-12): the
-## proposed upgrade tree played as its own run on its own save, so it can be tried before it
-## replaces the shop. Shown in every build, by decision; cleared out before a release export.
+## proposed upgrade tree played as its own run on its own save.
 const DOORS := [
 	{"key": &"continue", "label": "Continue"},
 	{"key": &"new", "label": "New game"},
 	{"key": &"continue_tree", "label": "Continue (tree)"},
 	{"key": &"new_tree", "label": "New game (tree)"},
 	{"key": &"settings", "label": "Settings"},
+	{"key": &"credits", "label": "Credits"},
 	{"key": &"quit", "label": "Quit"},
 ]
-const CREDITS := {"key": &"credits", "label": "Credits"}
 ## The tree doors are hidden (2026-09-14, Richard: the tree is set aside, the shop stays).
 ## The code behind them is kept; flip this to play the tree again.
 const TREE_DOORS := false
 
-## Where the stack stands, in the design frame: in from the left edge, up from the foot,
-## over the darkened soup on the left. The HUD's settings button's size, wider for the
-## longest word.
+## Where the stack stands: **centred on the logo's own axis, directly under it**
+## (2026-09-17), so the title and the doors read as one block. `DROP` is the gap between the
+## logo's foot and the first plank, in the design frame.
 const PLANK := Vector2(232.0, 56.0)
 const GAP := 12.0
-const LEFT := 64.0
-const FOOT := 44.0
-## The credits plank's corner: in from the right edge and up from the foot.
-const CORNER := Vector2(28.0, 28.0)
-
+const DROP := 24.0
 ## The logo, in the design frame: its width as a share of the window, and its top-left
 ## corner. Anchored to the corner rather than to the stack, which grows and shrinks with
-## Continue — a title that moved when a save appeared would read as a bug. Both by eye on
-## `tools/last_menu_main.png`; retune them there.
-const LOGO_WIDE := 0.50
-const LOGO_AT := Vector2(64.0, 48.0)
+## Continue — a title that moved when a save appeared would read as a bug. Smaller than it
+## stood on the baked picture (0.50): that picture was there to carry a title, and the lake
+## behind this one is the thing to be looked at. By eye on `tools/last_menu_main.png`.
+const LOGO_WIDE := 0.40
+const LOGO_AT := Vector2(56.0, 40.0)
 
-## The art covers the window, centred, cropped where it is wider than the window. **Never
-## stretched or padded** (Richard, 2026-09-12): a fit-to-width with the edge rows smeared
-## into the bands was tried and rejected as a distortion. It is filmed at 16:9, so at 16:9
-## nothing is lost and it is drawn one screen pixel to one on 1080p; a taller or wider
-## window crops the sides or the sky.
+## The dark the logo and the planks stand on: a band down the left of the window, full at
+## the edge and gone by `SCRIM_TO` of the width. **Drawn, not baked**: the old menu's
+## darkening was baked into its picture by decision, and there is no picture any more. The
+## left band only — no flat darkening and no vignette, which the baked recipe had — because
+## the lake is the message and dimming it dims what the menu is there to show.
+const SCRIM := Color(0.02, 0.07, 0.06, 0.78)
+const SCRIM_TO := 0.58
 
-@onready var _art: TextureRect = %Art
-@onready var _logo: TextureRect = %Logo
+## How long the menu takes to come and go. Going is the first stretch of the lake's glide.
+const FADE := 0.45
 
+## Whether the lake behind holds a run that was loaded. Decides Continue, the accent, and
+## whether New game has anything to ask about. Set by the lake before the menu is shown.
+var has_run: bool = false:
+	set(on):
+		has_run = on
+		if is_node_ready():
+			_lay_out()
+
+var _scrim: TextureRect
+var _logo: TextureRect
 var _planks: Dictionary = {}
 var _settings: SettingsSkin
 var _controls: ControlsSkin
@@ -78,18 +96,37 @@ var _credits: CreditsBoard
 var _confirm: MenuConfirm
 ## Which save "Start over?" is about: the ordinary one, or the tree run's.
 var _confirm_tree: bool = false
+## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
+## way out is a second answer to a question already answered.
+var _live: bool = false
+var _fade: Tween
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
-	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	# Sized by hand rather than by anchors: the parent is a CanvasLayer, and a Control whose
+	# parent is not a Control is laid out by nobody. See `Farewell._fill`.
+	get_viewport().size_changed.connect(_fill)
+
+	_scrim = TextureRect.new()
+	_scrim.name = &"Scrim"
+	_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scrim.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_scrim.stretch_mode = TextureRect.STRETCH_SCALE
+	_scrim.texture = _band()
+	add_child(_scrim)
+
+	_logo = TextureRect.new()
+	_logo.name = &"Logo"
+	_logo.texture = LOGO
 	_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-	for door: Dictionary in DOORS + [CREDITS]:
+	# The lockup is a sticker with a soft rim, not pixel art.
+	_logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	add_child(_logo)
+
+	for door: Dictionary in DOORS:
 		var plank := PlankButton.new()
 		plank.name = StringName("Door_" + String(door["key"]))
 		plank.label = String(door["label"])
@@ -128,21 +165,44 @@ func _ready() -> void:
 	_confirm.cancelled.connect(_shut.bind(_show_confirm))
 	add_child(_confirm)
 
-	for over: Control in [_settings, _controls, _credits, _confirm]:
-		over.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_fill()
 
-	resized.connect(_lay_out)
+
+## The left band, as a texture: `SCRIM` at the edge, nothing by `SCRIM_TO`. A gradient rather
+## than a shader, so there is nothing to compile and a headless run lays it out the same.
+func _band() -> GradientTexture2D:
+	var ramp := Gradient.new()
+	var clear := SCRIM
+	clear.a = 0.0
+	ramp.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CUBIC
+	ramp.offsets = PackedFloat32Array([0.0, 1.0])
+	ramp.colors = PackedColorArray([SCRIM, clear])
+	var band := GradientTexture2D.new()
+	band.gradient = ramp
+	band.width = 256
+	band.height = 4
+	band.fill_from = Vector2.ZERO
+	band.fill_to = Vector2(SCRIM_TO, 0.0)
+	return band
+
+
+## Cover the window, whatever shape it currently is.
+func _fill() -> void:
+	position = Vector2.ZERO
+	size = get_viewport().get_visible_rect().size
+	for over: Control in [_scrim, _settings, _controls, _credits, _confirm]:
+		over.position = Vector2.ZERO
+		over.size = size
 	_lay_out()
-	_start_music()
 
 
-## Which doors are open, and where they stand. Continue comes and goes with the save, and
+## Which doors are open, and where they stand. Continue comes and goes with the run, and
 ## the rest close up under it rather than leaving its gap.
 func _lay_out() -> void:
 	# The logo first: its own corner, in proportion to the window, whatever the stack does.
 	var frame := size.x / 1280.0
 	var wide := size.x * LOGO_WIDE
-	var tall := wide * float(_logo.texture.get_height()) / float(_logo.texture.get_width())
+	var tall := wide * float(LOGO.get_height()) / float(LOGO.get_width())
 	_logo.position = (LOGO_AT * frame).floor()
 	_logo.size = Vector2(wide, tall).floor()
 	var shown: Array = []
@@ -150,25 +210,63 @@ func _lay_out() -> void:
 		var key: StringName = door["key"]
 		var plank: PlankButton = _planks[key]
 		plank.visible = (
-			(key != &"continue" or has_save())
+			(key != &"continue" or has_run)
 			and (key != &"continue_tree" or (TREE_DOORS and has_tree_save()))
 			and (key != &"new_tree" or TREE_DOORS)
 		)
+		plank.accent = key == (&"continue" if has_run else &"new")
+		plank.queue_redraw()
 		if plank.visible:
 			shown.append(plank)
-	var stack := float(shown.size()) * PLANK.y + float(maxi(shown.size() - 1, 0)) * GAP
-	var y := size.y - FOOT - stack
+	# Under the logo, on its axis. Both come off `_logo`'s own drawn box rather than off
+	# `LOGO_AT` and `LOGO_WIDE` again, so the stack cannot drift from the picture it hangs
+	# under when either is retuned.
+	var middle := _logo.position.x + _logo.size.x * 0.5
+	var y := _logo.position.y + _logo.size.y + DROP * frame
 	for plank: PlankButton in shown:
-		plank.position = Vector2(LEFT, y).floor()
 		plank.size = PLANK
+		plank.position = Vector2(middle - PLANK.x * 0.5, y).floor()
 		y += PLANK.y + GAP
-	var credits: PlankButton = _planks[CREDITS["key"]]
-	credits.size = PLANK
-	credits.position = (size - PLANK - CORNER).floor()
 
 
-func has_save() -> bool:
-	return FileAccess.file_exists(Lake.SAVE_PATH)
+## Bring the menu up over the lake: at once (the boot, which comes up under the splash's own
+## cover) or faded in (the way back from the game, out of the dark the pose was struck in).
+func show_up(at_once: bool = false) -> void:
+	_kill_fade()
+	for over: Control in [_settings, _controls, _credits, _confirm]:
+		over.visible = false
+	visible = true
+	_live = true
+	_lay_out()
+	if at_once:
+		modulate.a = 1.0
+		return
+	modulate.a = 0.0
+	_fade = create_tween()
+	_fade.tween_property(self, ^"modulate:a", 1.0, FADE)
+
+
+## Take it off again. The doors stop answering on the instant; the picture takes `FADE`.
+func put_away(at_once: bool = false) -> void:
+	_kill_fade()
+	_live = false
+	if at_once:
+		visible = false
+		return
+	_fade = create_tween()
+	_fade.tween_property(self, ^"modulate:a", 0.0, FADE)
+	_fade.tween_callback(func() -> void: visible = false)
+
+
+## Whether the menu is up and answering.
+func live() -> bool:
+	return visible and _live
+
+
+func _kill_fade() -> void:
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	_fade = null
 
 
 func has_tree_save() -> bool:
@@ -176,30 +274,31 @@ func has_tree_save() -> bool:
 
 
 func _take(key: StringName) -> void:
+	if not _live:
+		return
+	var asks := (key == &"new" and has_run) or (key == &"new_tree" and has_tree_save())
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
-	elif key in [&"settings", &"credits"]:
-		Sfx.ui(&"ui_click")
-	elif (key == &"new" and has_save()) or (key == &"new_tree" and has_tree_save()):
-		# Only asks; the start sound waits for the answer.
+	elif key in [&"settings", &"credits"] or asks:
+		# A question only; the start sound waits for the answer.
 		Sfx.ui(&"ui_click")
 	match key:
 		&"continue":
-			_open_lake()
+			_play()
 		&"new":
 			_confirm_tree = false
-			if has_save():
+			if has_run:
 				_show_confirm(true)
 			else:
-				_open_lake()
+				_play()
 		&"continue_tree":
-			_open_lake(true)
+			_reload(false, true)
 		&"new_tree":
 			_confirm_tree = true
 			if has_tree_save():
 				_show_confirm(true)
 			else:
-				_open_lake(true)
+				_reload(true, true)
 		&"settings":
 			_show_settings(true)
 		&"credits":
@@ -208,23 +307,28 @@ func _take(key: StringName) -> void:
 			get_tree().quit()
 
 
-## The saved lake is thrown away and a fresh one opened. The lake finds no file and starts
-## clean; nothing has to be told.
+## "Start over?", answered yes. The lake deletes the file: it knows which one is its own.
 func _start_over() -> void:
-	var path := Lake.TREE_SAVE_PATH if _confirm_tree else Lake.SAVE_PATH
-	if FileAccess.file_exists(path):
-		DirAccess.remove_absolute(path)
-	_open_lake(_confirm_tree)
+	_show_confirm(false)
+	_reload(true, _confirm_tree)
 
 
-func _open_lake(tree: bool = false) -> void:
-	# Played on the autoload, which outlives this scene: it is still ringing as the lake
-	# comes up.
+func _play() -> void:
+	_start_sound()
+	play_asked.emit()
+
+
+func _reload(fresh: bool, tree: bool) -> void:
+	_live = false
+	_start_sound()
+	reload_asked.emit(fresh, tree)
+
+
+## Played on the autoload, which outlives a reload: it is still ringing as the lake comes up.
+func _start_sound() -> void:
 	var sound := Sfx.main()
 	if sound != null:
 		sound.play_start()
-	Lake.start_tree = tree
-	get_tree().change_scene_to_file(LAKE_SCENE)
 
 
 ## A board closed by the player: the cross, a click off it, Escape, "keep it".
@@ -261,7 +365,12 @@ func _show_confirm(open: bool) -> void:
 
 ## Escape backs out of whichever board is up. On the bare menu it does nothing: the way out
 ## of the game is the Quit plank, and a key that quits by accident is not a shortcut.
+##
+## The lake under the menu reads no input at all while it is up (`Lake._in_menu`), so
+## whatever is left unhandled here is nobody's.
 func _unhandled_input(event: InputEvent) -> void:
+	if not live():
+		return
 	# Start is the pad's way to the settings, as on the lake. Everything else on the menu is
 	# the pad's pointer (scripts/pad.gd): A clicks a plank, B is Escape.
 	if event is InputEventJoypadButton and event.is_action_pressed(&"open_settings"):
@@ -293,13 +402,3 @@ func _unhandled_input(event: InputEvent) -> void:
 			))
 			Prefs.apply_window()
 			get_viewport().set_input_as_handled()
-
-
-## The music is the `Music` station's (`scripts/music_station.gd`), an autoload that has been
-## playing since the engine started: the menu only clears any room the lake left open.
-## Nothing starts or restarts here, so going into the lake is not a cut, and how loud it is
-## is the Music bus's (`Prefs`), not this scene's.
-func _start_music() -> void:
-	var music := MusicStation.main()
-	if music != null:
-		music.leave_rooms()

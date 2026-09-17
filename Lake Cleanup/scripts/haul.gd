@@ -71,6 +71,19 @@ func flying() -> int:
 	return _flying.size()
 
 
+## Everything in the air lands now, in the order it was thrown and without the knock: the
+## lake going to its menu pose under a fade (2026-09-17). Each piece still arrives through
+## `arrived`, so cargo bound for a hull is stowed, a sale is a sale and the crate gets the
+## rest — nothing thrown is lost to the cut.
+func land_all() -> void:
+	var lot := _flying.duplicate()
+	_flying.clear()
+	for piece: Dictionary in lot:
+		arrived.emit(int(piece["def"]), piece["tag"])
+	set_process(false)
+	queue_redraw()
+
+
 ## How many are on their way to one place. Cargo crossing to a hull is not about to land in
 ## the yard, and counting it against the yard would stop the player casting every time a
 ## boat loaded.

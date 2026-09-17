@@ -1298,6 +1298,16 @@ func _come_home() -> void:
 		landed.emit(lot)
 
 
+## Home this instant, catch and all, from wherever the cast had got to: the lake going to
+## its menu pose under a fade. The catch is landed the ordinary way, through `landed`.
+func stow() -> void:
+	if state == State.IDLE:
+		return
+	set_pulling(false)
+	_come_home()
+	queue_redraw()
+
+
 ## How shut the net is, 0 wide open and 1 drawn in.
 func closed() -> float:
 	return shut

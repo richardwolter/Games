@@ -204,7 +204,7 @@ func _ready() -> void:
 ## where the eye already goes to ask how the run is doing.
 func _lay_out() -> void:
 	var wide := size.x
-	var scale := maxf(size.y / METER_SCALE_LINES * METER_SCALE, 0.5)
+	var scale := meter_scale(size.y)
 	var span := METER_SHEET * scale
 	# Bottom left, with the garbage circle's own edge (not the sheet's) sitting EDGE in from
 	# the corner: the sheet has empty room round the art, and the room is not the meter.
@@ -530,21 +530,7 @@ func _build_meter() -> void:
 	var shader := load("res://shaders/meter_water.gdshader") as Shader
 	if murky == null or clean == null or circle == null or frame == null or shader == null:
 		return
-	_meter_shader = ShaderMaterial.new()
-	_meter_shader.shader = shader
-	_meter_shader.set_shader_parameter(&"clean_tex", clean)
-	_meter_shader.set_shader_parameter(&"track_from", METER_TRACK.position.x / METER_SHEET.x)
-	_meter_shader.set_shader_parameter(&"track_to", METER_TRACK.end.x / METER_SHEET.x)
-	_meter_shader.set_shader_parameter(&"track_top", METER_TRACK.position.y / METER_SHEET.y)
-	_meter_shader.set_shader_parameter(&"track_bottom", METER_TRACK.end.y / METER_SHEET.y)
-	# Texel centres of the opaque rectangle's first and last pixels, so a clamped sample
-	# never lands between an opaque pixel and a soft one.
-	_meter_shader.set_shader_parameter(&"opaque", Vector4(
-		(METER_OPAQUE.position.x + 0.5) / METER_SHEET.x,
-		(METER_OPAQUE.position.y + 0.5) / METER_SHEET.y,
-		(METER_OPAQUE.end.x - 0.5) / METER_SHEET.x,
-		(METER_OPAQUE.end.y - 0.5) / METER_SHEET.y
-	))
+	_meter_shader = meter_material(shader, clean)
 	_meter_water = _sheet_node(murky)
 	_meter_water.material = _meter_shader
 	# The frame first and the circle over it: the circle caps the frame's end, and drawn
@@ -568,6 +554,49 @@ func _build_meter() -> void:
 	_show_meter()
 
 
+## How big the meter's art is drawn on a window this tall: `METER_SCALE` on a 1080-line
+## window and in proportion on any other. Static for the loading screen's bar, which is the
+## HUD's meter at the HUD's size and not a bigger drawing of it.
+static func meter_scale(view_tall: float) -> float:
+	return maxf(view_tall / METER_SCALE_LINES * METER_SCALE, 0.5)
+
+
+## The meter's water, as a material: the clean sheet and where the track and the opaque
+## water are on the sheet. Static, because the loading screen's bar is this same water in
+## this same frame with no circle on its end (`MeterBar`), and two copies of these numbers
+## are two meters the first time the art is re-cut.
+static func meter_material(shader: Shader, clean: Texture2D) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter(&"clean_tex", clean)
+	material.set_shader_parameter(&"track_from", METER_TRACK.position.x / METER_SHEET.x)
+	material.set_shader_parameter(&"track_to", METER_TRACK.end.x / METER_SHEET.x)
+	material.set_shader_parameter(&"track_top", METER_TRACK.position.y / METER_SHEET.y)
+	material.set_shader_parameter(&"track_bottom", METER_TRACK.end.y / METER_SHEET.y)
+	# Texel centres of the opaque rectangle's first and last pixels, so a clamped sample
+	# never lands between an opaque pixel and a soft one.
+	material.set_shader_parameter(&"opaque", Vector4(
+		(METER_OPAQUE.position.x + 0.5) / METER_SHEET.x,
+		(METER_OPAQUE.position.y + 0.5) / METER_SHEET.y,
+		(METER_OPAQUE.end.x - 0.5) / METER_SHEET.x,
+		(METER_OPAQUE.end.y - 0.5) / METER_SHEET.y
+	))
+	return material
+
+
+## Put the seam where `share` of the track is clean. The feather either side of it narrows
+## near the ends, so a nearly-clean lake keeps its last sliver of filth and a full one does
+## not fade off the left of its own track.
+static func meter_seam(material: ShaderMaterial, share: float) -> void:
+	var edge := METER_TRACK.position.x + METER_TRACK.size.x * clampf(share, 0.0, 1.0)
+	var feather := minf(
+		METER_TRACK.size.x * METER_FEATHER,
+		maxf(minf(edge - METER_TRACK.position.x, METER_TRACK.end.x - edge) * 2.0, 1.0)
+	)
+	material.set_shader_parameter(&"seam", edge / METER_SHEET.x)
+	material.set_shader_parameter(&"feather", feather / METER_SHEET.x)
+
+
 func _sheet_node(art: Texture2D) -> TextureRect:
 	var node := TextureRect.new()
 	node.texture = art
@@ -587,13 +616,7 @@ func _show_meter() -> void:
 	if _meter_shader == null:
 		return
 	var share := clampf(_shown, 0.0, 1.0)
-	var edge := METER_TRACK.position.x + METER_TRACK.size.x * share
-	var feather := minf(
-		METER_TRACK.size.x * METER_FEATHER,
-		maxf(minf(edge - METER_TRACK.position.x, METER_TRACK.end.x - edge) * 2.0, 1.0)
-	)
-	_meter_shader.set_shader_parameter(&"seam", edge / METER_SHEET.x)
-	_meter_shader.set_shader_parameter(&"feather", feather / METER_SHEET.x)
+	meter_seam(_meter_shader, share)
 	if _meter_face.shown != share:
 		_meter_face.shown = share
 		_meter_face.queue_redraw()
@@ -604,29 +627,6 @@ func _show_meter() -> void:
 ## a lake that is ninety-nine look the same on a track this long. Right-aligned, over the
 ## clean end, so it sits on water rather than on filth. Its own node so that it draws over
 ## the frame, which is a child drawn after this node's own `_draw`.
-class MeterFace extends Control:
-	var shown: float = 1.0
-	## The water's track, in this node's own pixels.
-	var track := Rect2()
-
-	func _draw() -> void:
-		if track.size.x <= 0.0:
-			return
-		var height := Style.step(track.size.y * 0.52)
-		var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
-		Style.write(
-			self,
-			"%d%%" % roundi(shown * 100.0),
-			height,
-			Vector2(0.0, baseline),
-			Style.INK,
-			HORIZONTAL_ALIGNMENT_RIGHT,
-			Rect2(track.position, Vector2(track.size.x - track.size.x * 0.03, track.size.y))
-		)
-
-
-func _lifted(box: Rect2, name: StringName) -> Rect2:
-	if _hovered != name:
 ## The meter's wooden frame, built to its own drawn size rather than stamped from the sheet
 ## at `METER_SCALE`.
 ##
@@ -652,6 +652,29 @@ class MeterFrame extends Control:
 			draw_texture_rect(sheet, Rect2(sheet_box.position - position, sheet_box.size), false)
 
 
+class MeterFace extends Control:
+	var shown: float = 1.0
+	## The water's track, in this node's own pixels.
+	var track := Rect2()
+
+	func _draw() -> void:
+		if track.size.x <= 0.0:
+			return
+		var height := Style.step(track.size.y * 0.52)
+		var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
+		Style.write(
+			self,
+			"%d%%" % roundi(shown * 100.0),
+			height,
+			Vector2(0.0, baseline),
+			Style.INK,
+			HORIZONTAL_ALIGNMENT_RIGHT,
+			Rect2(track.position, Vector2(track.size.x - track.size.x * 0.03, track.size.y))
+		)
+
+
+func _lifted(box: Rect2, name: StringName) -> Rect2:
+	if _hovered != name:
 		return box
 	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cxh3gre5lmlbm"
-path="res://.godot/imported/menu_lake.png-bf50f578c91a74ce321076f30b9af51c.ctex"
+uid="uid://b68tibbbgi5fh"
+path="res://.godot/imported/boot_splash.png-58752582489c18025e901e53092cacd4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/menu_lake.png"
-dest_files=["res://.godot/imported/menu_lake.png-bf50f578c91a74ce321076f30b9af51c.ctex"]
+source_file="res://assets/boot_splash.png"
+dest_files=["res://.godot/imported/boot_splash.png-58752582489c18025e901e53092cacd4.ctex"]
 
 [params]
 

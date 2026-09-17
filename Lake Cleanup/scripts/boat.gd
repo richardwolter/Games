@@ -278,6 +278,12 @@ var skim_hold: int = 0
 ## Whether it sets off on its own once there is a full hold to carry (`ready_to_sail`).
 var auto_ferry: bool = true
 
+## Held at its berth: the main menu's pose (2026-09-17, Richard: "boats are stationary at
+## island"). The lake runs live behind the menu, and a fleet ferrying and selling there would
+## be the game playing itself. A moored hull never sets off, whatever the yard holds;
+## `dispatch` itself is left alone, so nothing else has to know.
+var moored: bool = false
+
 ## How often a docked hull looks to see whether the lake has anything left in it, in seconds.
 ## Counting the lake walks every tile, which is not a thing to do sixty times a second a hull.
 const DRY_CHECK_EVERY := 1.0
@@ -406,6 +412,25 @@ func is_running() -> bool:
 	return state != State.DOCKED
 
 
+## Back at the berth this instant, wherever on its run it was, and what was aboard handed
+## back. The lake puts that in the crate — the rule a save already keeps for a hold afloat
+## (`Lake.load_game` and `afloat`) — so going to the menu mid-run loses nothing and sells
+## nothing. Done under the menu's fade, never in sight.
+func moor_now() -> PackedInt32Array:
+	var aboard := cargo
+	cargo = PackedInt32Array()
+	_route.clear()
+	_legs.clear()
+	_landing = false
+	_dwell = 0.0
+	target = -1
+	state = State.DOCKED
+	tile_pos = dock
+	_place()
+	queue_redraw()
+	return aboard
+
+
 ## Where it is on its run, for the HUD. One line rather than five branches at the call site.
 func status_line() -> String:
 	match state:
@@ -528,7 +553,9 @@ func _process(delta: float) -> void:
 		State.DOCKED:
 			# Ferrying first: a hull with a full hold to carry carries it, and only a hull
 			# with nothing to do goes wandering.
-			if auto_ferry and ready_to_sail(delta) and dispatch():
+			if moored:
+				pass
+			elif auto_ferry and ready_to_sail(delta) and dispatch():
 				pass
 			elif patrol:
 				_next_patrol()

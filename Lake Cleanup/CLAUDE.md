@@ -302,7 +302,8 @@ Two more shop tracks, one on each of the ferry's and the dog's boards.
 The proposed upgrade tree (`docs/progression/lake-tree.md`, designed with the
 `incremental-progression` skill) is playable as **its own game mode** before it replaces the
 shop. Richard's call: build it beside the shop, test it, then decide.
-- **Menu**: "New game (tree)" / "Continue (tree)" set `Lake.start_tree` (read once, like
+- **Menu**: "New game (tree)" / "Continue (tree)" go through `MainMenu.reload_asked` and
+  `Lake._reload_as`, which sets `Lake.start_tree` (read once, like
   `start_fresh`). Shown in every build, by decision; clean it out before a release export.
 - **Separate save slot**: `Lake.TREE_SAVE_PATH` (`user://lake_cleanup_tree.save`). A save carries
   `"tree"`, and a tree run and a shop run each refuse the other's file.
@@ -548,7 +549,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   sits between the far end and the next one in — 0.33 / **0.5** / 0.67 / 1.0 / 1.33 on
   1080p. At 1.5 screen px an art px it draws 1 and 2 px by turns and crawls in motion;
   accepted by Richard, to be judged in play. 1440p and finer get no half level. No zoom
-  glide, by decision (offered, not taken). `test_lake` asks the rule at stretch 1.5 and 2.0
+  glide, by decision (offered, not taken) — **for the wheel**. The one glide in the game is
+  the menu's Continue (2026-09-17, The Front): the rule is about where the view rests. `test_lake` asks the rule at stretch 1.5 and 2.0
   and holds a zoomed-to spot for three seconds.
 - **The view comes home no faster than `Lake.HOME_SPEED`** (issue #19, 2026-09-13): the
   camera follows a point `CAST_LOOK` (0.45) of the way out to the net, so on the haul it
@@ -727,14 +729,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   every press (sliders on the release). **Since 2026-09-16 the sliders are audio buses and
   the Fullscreen switch is a three-way Window row** — see The Settings Menu. The board reads them on its way in (`pull_prefs`)
   and both the menu's board and the lake's are one set of settings. The board's bottom
-  button is **"Save and go to menu"** (`Lake._quit` saves and changes scene to the menu);
+  button is **"Save and go to menu"** (`Lake._quit`: a dip to dark, the menu's pose struck
+  behind it, the run written, the menu up — no scene change since 2026-09-17, see The Front);
   quitting the game is the menu's Quit or the window's cross. The level swap row is off
   (`swap_shown`, default false): **the siege is set aside** — `Lake._next_scene` returns "",
   the farewell offers no onward door, and nothing new should route to `siege.tscn`.
 
-- **The main menu** (`scenes/menu.tscn`, `scripts/menu.gd`, 2026-09-12, issue #12): the
-  game's `run/main_scene`. **The art is the lake itself** (2026-09-16, `/grill-me` with
-  Richard, "based on the work in the trailer"): `assets/menu_lake.png`, 1920x1080, the
 
   **And the settings board reads in the shop's language** (2026-09-17, `/grill-me` with
   Richard, `_stage_settings_shape`): the same pass the upgrades shop had, over the one board
@@ -792,39 +792,46 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     `tools/last_menu_settings.png` and retune. The probe puts the window into windowed for the
     resolution list's picture, through `DisplayServer` rather than `Prefs`, so nothing in
     `user://` is touched.
-  trailer's own last page — the lake still filthy with a few clear pools, the angler on the
-  island's south-east beach with a net out in the soup, the pack on the sand, the ferry at
-  the island and a pier bottom-left — filmed by `tools/shot_menu_bg.tscn` and darkened by
-  `tools/bake_menu_bg.py`. It covers the window, centred, cropped where the window is not
-  16:9; on 1080p it draws one screen pixel to one. **Never stretched or padded, by
-  decision** (Richard, 2026-09-12): fitting it to the width with its edge rows smeared into
-  the bands was rejected as a distortion — don't distort an image without asking.
-  - **The picture has no title in it, so the logo is its own node**: `%Logo`,
-    `assets/mdll_logo_stacked.png` (the v1 stacked lockup the trailer and the capsules use,
-    3.09:1), `LOGO_WIDE` (0.50 of the window) at `LOGO_AT` in the design frame — **anchored
-    to the top-left corner, not to the plank stack**, which grows and shrinks with Continue;
-    a title that moved when a save appeared would read as a bug. Both numbers are by eye on
-    `tools/last_menu_main.png`.
-  - **The darkening is baked into the PNG, by decision** (Richard, over a `ColorRect` drawn
-    in Godot): one file, nothing at runtime. The capsules' own recipe — a flat `DARKEN`, a
-    smoothstepped left band under the logo and the planks (`LEFT_KEEP`, `LEFT_TO`), a mild
-    vignette and a cool `TINT` so the shadowed soup goes green rather than grey. The lake as
-    the game draws it is busy edge to edge, and cream lettering and oak planks need
-    somewhere to stand.
-  - **A one-off, not a pipeline, by decision**: the frame was posed once and picked by hand.
-    `tools/shot_menu_bg.tscn` (desktop build, not `--headless`, `--fixed-fps 60`;
-    `MENU_SHIFT` re-frames, `MENU_SHOTS` keeps several frames apart) and
-    `tools/bake_menu_bg.py` are kept as the record of what the numbers were, not as
-    something anything reads. The angler stands at `STAND` — at the trailer's own (2, 2) the
-    figure is **behind the recycle box** and not in the picture at all. Retired:
-    `assets/MDLL_Menu_Background.jpg` (1652x628, painted, title top-centre), and the capsule
-    art `menu_capsule.jpg` before it.
+- **The main menu** (`scripts/menu.gd`, 2026-09-12, issue #12): **an overlay on the live
+  lake since 2026-09-17** — see The Front below, which supersedes the menu's scene, its
+  picture and the scene change. What is left here is the doors.
+  - **Retired, in order**: the capsule art `menu_capsule.jpg`; the painted
+    `assets/MDLL_Menu_Background.jpg` (1652x628, title top-centre); and `assets/menu_lake.png`
+    (2026-09-16, the trailer's last page filmed by `tools/shot_menu_bg.tscn` and darkened by
+    `tools/bake_menu_bg.py`, "a one-off, not a pipeline", its darkening "baked into the PNG,
+    by decision") with `scenes/menu.tscn`. A picture of a lake that is not the player's, then
+    a cut to one that is, was the thing the live menu exists to end.
+  - **The logo is its own node**: `assets/mdll_logo_stacked.png` (the v1 stacked lockup the
+    trailer and the capsules use, 3.09:1), `LOGO_WIDE` (**0.40** of the window, down from
+    0.50: that picture was there to carry a title, this lake is the thing to look at) at
+    `LOGO_AT` in the design frame — **anchored to the top-left corner, not to the plank
+    stack**, which grows and shrinks with Continue; a title that moved when a save appeared
+    would read as a bug. Both numbers are by eye on `tools/last_menu_main.png`.
 
-  Four `PlankButton`s (232x56) stand bottom-left over the darkened soup: Continue (only when `Lake.SAVE_PATH`
-  exists), New game (over a save, `MenuConfirm` asks "Start over?" first, then deletes the
-  file and opens the lake fresh), Settings (the lake's `SettingsSkin` in `menu_mode`: sound
-  and screen rows only) and Quit; Credits (`CreditsBoard`, all its words in one constant)
-  stands alone in the bottom right corner. **The credits are real now** (2026-09-16,
+  **The four doors stand centred under the logo** (2026-09-17, Richard), not in the bottom-left
+  corner: `menu.gd`'s `DROP` is the gap under the logo's foot and the stack takes the logo's
+  own drawn box for both its axis and its top, so it cannot drift from the picture it hangs
+  under when `LOGO_AT` or `LOGO_WIDE` is retuned. `LEFT` and `FOOT` are gone.
+  **Centred on the logo, not on the window, by decision**: the darkening is a **left band**
+  (`MainMenu.SCRIM`, full at the edge, gone by `SCRIM_TO` 0.58 of the width; drawn since
+  2026-09-17, a `GradientTexture2D` rather than a shader) and the logo's axis is at about
+  0.25. A stack centred on the window would stand half out of the band.
+  **Credits is in the stack, above Quit** (2026-09-17, Richard), and `CORNER` is gone with the
+  corner it named: a lone plank in the bottom right was where a credits button lived while the
+  doors were in the opposite corner and the two had the screen between them. With the stack
+  centred under the logo it was the only thing left in the old arrangement.
+  **The accented door is the one into the lake** (`PlankButton.accent`) — Continue when the
+  lake behind loaded a run, **New game when it did not** (2026-09-17): the same wood, the lighter
+  `BOARD_ROW` face an affordable shop row wears in place of the boards' dark `BOARD`, **and
+  the lit edge along its top** — two channels, because the two faces are close in luminance
+  and told apart by hue alone they are one face to a red-green colourblind player. Only ever
+  one door is accented, or the accent says nothing.
+  Five `PlankButton`s (232x56): Continue (only when the lake behind **loaded** a run —
+  `MainMenu.has_run`, set from `load_game`'s own answer; it used to ask whether the file
+  existed, and offered to continue a save the lake had just refused), New game (over a run,
+  `MenuConfirm` asks "Start over?" first, then `reload_asked` and the lake deletes its own
+  file and reloads), Settings (the lake's `SettingsSkin` in `menu_mode`: sound
+  and screen rows only), Credits (`CreditsBoard`, all its words in one constant) and Quit. **The credits are real now** (2026-09-16,
   `/grill-me` with Richard): one "Art and Assets" heading over every third-party art pack,
   each in that pack's **own required credit wording** (`Graphics created by Penzilla Design`,
   `Asset by Zato - https://zatoart.itch.io/`, …) and **never saying what the asset is** —
@@ -842,6 +849,127 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   Escape closes whichever board is up and does nothing on the bare menu. The music is the
   `Music` station's, not the menu's (see The Music below): nothing restarts on the way into
   the lake.
+### The Front: Splash, Curtain, and the Menu over the Lake (2026-09-17, `/grill-me` with Richard)
+The game boots through a loading screen into the lake itself. `run/main_scene` is
+`scenes/boot.tscn`, which puts `scenes/main.tscn` in; the player's own run loads behind the
+doors and `MainMenu` is an overlay on it (`Lake`'s "The menu over the lake" section,
+`MENU_LAYER` 30). Continue hides a menu and nothing else.
+- **One loading screen, drawn in three places** (`scripts/loading_screen.gd`, second pass the
+  same day, Richard: "lets use a flat image of a dirty lake, and bring the loading meter
+  anyways (without the garbage and circle, just the bar). It doesn matter if it loads too
+  quickly"): the filthy lake darkened (`DARKEN`), the stacked logo above the island and the
+  bar below it. (1) **The engine's splash is a photograph of that control with its bar
+  filthy** (`assets/boot_splash.png`, stretch mode Cover to match the control's fit — 4.7
+  has `stretch_mode`, not `fullsize`; `bg_color` is `water_dirty_deep` and is what
+  `Curtain.water()` reads). (2) The boot scene (`scripts/boot.gd`) sweeps the bar. (3) The
+  lake's curtain holds it, bar clean, and dissolves it onto the menu. Same picture each
+  time, so no hand-over is a cut. Retired: the logo on flat green and
+  `tools/build_boot_splash.py`.
+- **The picture is the fresh lake at the menu's own view** (`assets/loading_lake.png`),
+  filmed through `Lake._enter_menu` so it cannot drift from the framing it dissolves into:
+  near seamless on a new game, a before-and-after on a run in progress. The flock is hidden
+  in it (a bird frozen in mid-air hangs there as a ghost while the picture goes).
+  **`tools/shot_loading.tscn`, two runs with a reimport between** — the lake, then
+  `SHOT_SPLASH=1` for the splash and `tools/last_loading.png`. **Re-run both if the menu's
+  view, the island, the fill or the screen's layout change.**
+- **The bar is the HUD's meter with nothing on its end** (`scripts/meter_bar.gd`): the same
+  sheets, shader (`HudSkin.meter_material`/`meter_seam`, static now, used by both) and built
+  frame, the node being the frame's own box with `clip_contents` and the sheet hung behind.
+  **At the HUD's own size** (`HudSkin.meter_scale`; Richard on the first look, when it was a
+  third of the window wide: "too big and stretched, we dont need it to be bigger than how it
+  is in the game"). **It fills right to left, like the game's meter** (Richard: "start green
+  and fill to blue, but from right to left, just like in the game"): a mirrored bar filling
+  left to right like a stock loading bar was built and turned down. The shader's seam is
+  where the *filth* ends, so it is handed `1 - share` — handed the clean share straight, the
+  very first cut swept clean to filthy and the splash showed a clean bar. `test_lake` asks
+  the seam at both ends and that the water is not flipped.
+- **A timed sweep, not a reading, by decision**: `Boot.SWEEP` 0.9 s, eased, then the lake is
+  put in with the bar already full, so the half second the screen stands still reads as a
+  beat. Costs every boot its length; weighed and taken. **Why it cannot be honest**:
+  `tools/probe_boot.tscn` (desktop build; `tools/last_boot.log`; `Lake.boot_marks` / `_mark`
+  time `_ready` stretch by stretch) found the threaded load of `main.tscn` is **20 ms** and
+  everything else is main thread, where nothing on screen can move; and that **2.17 s of
+  the lake's 2.6 s build was one line**: `Ground._boxed` called `Iso.basin_extent()` — which
+  walks the whole shore outline — for every lawn tile of the ring. Cached (`_basin_half`),
+  the sow is 131 ms and the build 0.56 s. **Re-run the probe before believing a load is
+  slow**; every harness and probe got the 2 s back too. (The first pass that day shipped no
+  bar at all on these numbers; Richard wanted the bar anyway.)
+- **The curtain** (`scripts/curtain.gd`, layer 90) is the one thing over everything.
+  `open_on`: the loading screen whole over a lake that has just come up, held `HOLD_FRAMES`
+  while its first frames compile and upload, then dissolved (`LIFT`) — **the logo and the
+  bar taken off in one frame first, and the lake alone dissolved** (`LoadingScreen.dress`,
+  Richard: "should remove logo and bar right away, not in pieces"). The screen is several
+  pictures lying on each other, and under one alpha each fades against what is under it, so
+  the overlaps went slower than the rest: the lockup and the bar hung on after the lake had
+  half gone, and the bar's water showed through its own wood. `to_loading` is the same the
+  other way — the lake comes in, then the logo and bar go on at once. The flat fill under
+  the picture is a fallback only and hidden when the picture is there, for the same reason. **`dissolve`, the way
+  back to the menu**: the live view dims to `DIM` over `DIM_TIME`, *that dimmed frame is
+  grabbed and frozen over the screen*, the pose is struck behind it, and the frozen frame
+  dissolves onto the menu (`DISSOLVE`) — a crossfade, the snap never seen, no flat colour
+  ever on screen. The frame is grabbed on `RenderingServer.frame_post_draw` by a one-shot
+  connection, **not awaited**, and what follows is deferred out of the renderer's signal.
+  `to_loading` is the reload: the view dims and the loading screen, bar filthy, comes in
+  over it. **Retired** (Richard, first look: "a little stiff... not put a total green screen
+  right away"): `dip` and `close`, down to the splash's solid green and back.
+- **Alive but posed** (Richard: "fully live but dogs just sleeping until game starts, and
+  boats are stationary at island. Player is idle."): water, birds, fish, flora, day and
+  ambience run. `Dog.doze` (NAP that never runs out, no greeting, no voice, no petting;
+  scattered over the island at the boot, lying down where it stands on the way back; wakes
+  `WAKE_LEAST`..`WAKE_MOST` after), `Boat.moored` (a docked hull never dispatches), the
+  angler held, `_in_menu` gating the lake's input, the pad's reticle and verbs, the autosave,
+  the bonus clock and the search for the ending. The HUD layer is hidden.
+- **Nothing is lost to the pose and nothing is sold by it** (`_pose_world`): `CastNet.stow`
+  lands the catch the ordinary way, `Haul.land_all` brings down everything in the air
+  through `arrived` (so a sale in flight is still a sale), `Boat.moor_now` hands its hold
+  back and `Dog.doze` its mouthful, all into the crate — the rule a save already kept for
+  `afloat`. **`_quit` saves after the pose, not before**: written first, as it used to be, a
+  net's catch was in neither the water nor the file.
+- **The lake is the message**: no figures on the menu. The view is the far stop with the
+  lake's middle `MENU_LAKE_AT` (0.62) across — as far as `_clamped_view` allows, 0.59 on
+  1080p, where the lake is most of the window and the doors stand over its left end.
+- **Continue is a glide** (`_begin_glide`, `_glide_step`, `GLIDE_TIME` 1.6 s): the zoom
+  eased in its logarithm, and what is interpolated is **where the angler stands on the
+  screen**, not the camera's place in the world, so they drift to the middle instead of
+  swinging in. The one exception to "no zoom glide" (Richard, over stepping stop by stop);
+  it lands on the stop nearest `VIEW_ZOOM`. The world is let go at once; the HUD comes in
+  over the last `1 - GLIDE_HUD_FROM`; the player's hands come back when it lands.
+  `_drive_view` is the old camera block of `_process`, moved whole.
+- **New game over a run reloads through the boot scene** (`_reload_as`, `Lake.skip_menu`,
+  read once): `Curtain.to_loading`, file deleted *by the lake*, `change_scene_to_file` to
+  `BOOT_SCENE` — whose first frame is what the curtain is already showing — the sweep, and
+  the new lake strikes the same pose with no doors on it and sets off on the glide by itself
+  (`SKIP_GLIDE_AFTER`). One loading screen in the game. F6 keeps its direct reload.
+  No save at all: the fresh lake is already behind the menu and New game is just the glide.
+- **Only a lake run as the game wears the front** (`get_parent() == root`): every harness
+  and probe instantiates `main.tscn` under its own node and gets the lake it always did.
+  `Lake.force_front` is for the probes that photograph the menu.
+- **Out of scope, by decision**: figures or HUD on the menu, a live wind-down (boats
+  finishing trips, dogs walking home) instead of the snap, auto-starting on first launch,
+  a drifting camera, threading the lake's build for an honest meter, the web build.
+- **First guesses for Richard's eye**: `SCRIM`, `SCRIM_TO`, `LOGO_WIDE`, `MENU_LAKE_AT`,
+  `GLIDE_TIME`, `Curtain.LIFT`/`DIM`/`DIM_TIME`/`DISSOLVE`, `LoadingScreen.DARKEN`/`LOGO_AT`/
+  `BAR_AT`, `Boot.SWEEP`, the ambience playing under the menu.
+- **Probe**: `tools/shot_menu.tscn` (desktop build, `--fixed-fps 60`, **on a copy of the
+  save**) saves `tools/last_menu_{curtain,main,main_settings,credits,confirm,glide,landed,
+  dim,dissolve,back}.png` and `last_menu.log` (zoom, where the lake's middle stands, dogs
+  asleep, hulls moored, per shot). **`tools/shot_reload.tscn`** walks New game over a run
+  (lake, loading screen, boot scene, fresh lake, glide): that road ends in a scene change
+  only the game's own lake takes, so the probe makes its lake the tree's current scene.
+  **`Lake.session_save_path`** exists for it: a static that pins every lake of the session
+  to the probe's file, because the lake that comes up after the reload is built by the boot
+  scene and no tool can hand it a `save_path`. The probe's first cut relied on quitting
+  before the autosave, then stopped stepping at the scene change (**a freed node compares
+  equal to null**, and its guard was `_lake == null`), never quit, and the game ran on over
+  the player's real save until the autosave wrote it. **A probe's safety may not depend on
+  the probe working**: pin the path, and quit on a wall clock as well. `test_lake`'s
+  `_check_loading` guards the boot scene being first, the bar having no circle, its size
+  being the HUD meter's, the sweep, and the seam at both ends; `_stage_front` guards the pose (with a hold at sea,
+  a stick in a mouth and a catch in the net: all in the crate, nothing sold), the holds (a
+  full crate sends no ferry, the autosave writes nothing, Escape opens nothing), the doors'
+  accent, the release, the glide landing on the play stop, and the way back writing the run
+  on the same lake.
+
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
 - **The run ends when the last piece is put in the crate** (`Lake._all_landed`), not when the
@@ -927,10 +1055,10 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   **a save of its own**, because finishing a lake saves it on the spot and a probe may not
   hand the player back an emptied run.
 
-  The lake comes back here from "Save and go to menu" and from the farewell's **"Back to
+  The menu comes back from "Save and go to menu" and from the farewell's **"Back to
   menu"** plaque (`Farewell.to_menu`, always drawn under the closing words; clicking
-  elsewhere still just dismisses). Probe: `tools/shot_menu.tscn` (desktop build) saves
-  `tools/last_menu_main.png`, `_main_settings`, `_credits`, `_confirm`. `test_lake` guards
+  elsewhere still just dismisses), both through `Lake._quit` — see The Front. Probe:
+  `tools/shot_menu.tscn`. `test_lake` guards
   the farewell's menu door and that no siege door is offered.
 
 - **The bites out of the wood are holes** (`Style.frame_bites`/`ribbon_bites`/`button_bites`,
@@ -1032,6 +1160,65 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   mask, and the plank draws that mask tinted `Style.BOARD` under itself — so the bite reads
   through to the **board's face**, which is what is behind the panel. Top and end bites are
   over the lake and stay open.
+  **The HUD speaks one language** (2026-09-17, `/grill-me` with Richard, cohesion pass):
+  - **The meter's frame is built, not stamped** (`HudSkin.MeterFrame`, `Style.meter_frame`).
+    The sheet's own frame was drawn pre-scaled at `METER_SCALE`, so its planks landed at 27
+    and 24 px while every other plate in the HUD landed at 16 and 14 — **and they are the
+    same wood**, because `Style._build_border` crops its frames out of `Meter_Border.png`,
+    which *is* the meter's frame. One board at two thicknesses, side by side in one corner.
+    Built to the wooden box's own drawn size instead, the planks match everywhere and the
+    meter gains the V bites every other frame has. The painted water sheets, the shader and
+    the garbage circle are untouched; `MeterFrame` falls back to stamping the sheet where
+    `Style.border_fits` says no, because a frame at the wrong thickness beats none.
+    **Not a repaint, by decision** — the wood was never wrong, only its scale.
+  - **The lake's settings button is a gear and carries no word** (`PlankButton.mark`,
+    `_draw_mark`/`_cog`, 56x56): Richard's call, "it's the industry standard". Drawn in code
+    like the close cross and the coin — `assets/ui.png` has four pieces on it and none is a
+    gear — with square shoulders rather than a scalloped rim, because this game's wood is all
+    straight cuts, and **its hub is a hole** — filled in the button's own face colour
+    (Richard, 2026-09-17), because filled with the oak it read as a disc of wood lying on the
+    panel, which is the opposite of what a gear's middle is.
+    **The main menu keeps the word "Settings"**, having the room and no
+    convention to lean on. One button class still: `mark` is an option on `PlankButton`, so
+    the border, the hover, the press and the sound have one path.
+  - **The decorate button's finds are a fan, not a band** (`HudButtons._scatter`, every
+    `FAN_*`): a sweep from low on one side, up over the roof, down to low on the other, on
+    `FAN_RANKS` rings, each find drawn smaller and washed further towards the face the
+    further back it sits (`FAN_FADE`) — a peacock's tail behind the shed, Richard's phrase.
+    Held inside `room_of` by each find's own half-size, so nothing is clipped by the frame;
+    several were. `fit` stands a find on the **bottom** of the box it is given, so the point
+    on the sweep is its foot — centred, every find sat half its own height low.
+    **All the numbers are first guesses**: judge on `tools/shot_buttons.tscn` and retune
+    there, or with the F7 tuner, whose `decor`/`decor_scale` handles still move and scale the
+    whole tail as one.
+  - **Already true, and worth writing down**: `UPGRADES_SIZE` and `SHED_SIZE` are both
+    120x100 and have been since the border pass.
+  - **Out of scope, deliberately**: nothing moved corner to corner. Grouping money with the
+    shop, giving the fleet and the pack a readout, and whether the stock plate earns its place
+    are a second pass, to be grilled off the new screenshot.
+  - `test_lake` guards the meter's frame being a node built to the wood's box, the two picture
+    buttons being one size, the gear being square and wordless, and the fan keeping every find
+    inside the button and reaching above the old band's ceiling.
+
+  **And says two things straighter** (2026-09-17, second pass, `/grill-me` with Richard):
+  - **"Waiting", not "In stock"** (`HudSkin.STOCK_LABEL`). The crate has **no cap** —
+    `Store.held` is an unbounded list and `CRATE_FULL` only decides how high the heap draws —
+    so the plate holds a **backlog**, pieces waiting for a ferry, not a balance. Sat on the
+    same plate as the money and labelled "In stock", it read as a second purse. The word is
+    the whole fix, by decision: the number rising is the clearest sign the fleet cannot keep
+    up (CLAUDE.md's own pricing note has the box peaking near 400 in the sim), but saying so
+    with a trend mark is a fleet readout, and Richard left fleet and pack readouts out.
+  - **The upgrades button says "Upgrades" and wears the count on a badge**
+    (`HudButtons.badge`, `HudSkin.UPGRADES_LABEL`). It read "n available" across the foot: a
+    count with no noun — available what? — and the only thing in the HUD whose width moved
+    with its own number, so the panel breathed as the purse filled. The badge is sized to
+    `BADGE_SAMPLE` ("99"), never to the count in hand. **Still always there, zero included**,
+    which was the old panel's rule and a good one — at zero it is drawn back, not hidden.
+  - **Out of scope, by Richard's call**: moving money beside the shop, and any readout for the
+    fleet or the pack. The diagonal between the purse and the button it feeds stands.
+  - `test_lake` guards the label having changed, the foot being a name rather than a count,
+    and the badge coming out one width at 1 and at 99.
+
   **The corner HUD came in an eighth** (2026-09-16, Richard: reduce the meter, the coin, the
   stock plate and the settings button): `METER_SCALE` 1.95 to 1.7, `STOCK_TALL` 62 to 54,
   `MONEY_TALL` 64 to 56, the settings plank 152x56 to 134x48. **The border's planks take a
@@ -1165,65 +1352,6 @@ the whole job.
   blades read as a second shadow.
 - **The hut is 1.2x bigger, and its footprint is measured off the art** (`Iso.SHED_TALL` 141.6,
   `SHED_FOOT` 1.15 x 0.83, 2026-09-12). The footprint was an ellipse of 1.70 x 1.40 — sized to
-  **The HUD speaks one language** (2026-09-17, `/grill-me` with Richard, cohesion pass):
-  - **The meter's frame is built, not stamped** (`HudSkin.MeterFrame`, `Style.meter_frame`).
-    The sheet's own frame was drawn pre-scaled at `METER_SCALE`, so its planks landed at 27
-    and 24 px while every other plate in the HUD landed at 16 and 14 — **and they are the
-    same wood**, because `Style._build_border` crops its frames out of `Meter_Border.png`,
-    which *is* the meter's frame. One board at two thicknesses, side by side in one corner.
-    Built to the wooden box's own drawn size instead, the planks match everywhere and the
-    meter gains the V bites every other frame has. The painted water sheets, the shader and
-    the garbage circle are untouched; `MeterFrame` falls back to stamping the sheet where
-    `Style.border_fits` says no, because a frame at the wrong thickness beats none.
-    **Not a repaint, by decision** — the wood was never wrong, only its scale.
-  - **The lake's settings button is a gear and carries no word** (`PlankButton.mark`,
-    `_draw_mark`/`_cog`, 56x56): Richard's call, "it's the industry standard". Drawn in code
-    like the close cross and the coin — `assets/ui.png` has four pieces on it and none is a
-    gear — with square shoulders rather than a scalloped rim, because this game's wood is all
-    straight cuts, and **its hub is a hole** — filled in the button's own face colour
-    (Richard, 2026-09-17), because filled with the oak it read as a disc of wood lying on the
-    panel, which is the opposite of what a gear's middle is.
-    **The main menu keeps the word "Settings"**, having the room and no
-    convention to lean on. One button class still: `mark` is an option on `PlankButton`, so
-    the border, the hover, the press and the sound have one path.
-  - **The decorate button's finds are a fan, not a band** (`HudButtons._scatter`, every
-    `FAN_*`): a sweep from low on one side, up over the roof, down to low on the other, on
-    `FAN_RANKS` rings, each find drawn smaller and washed further towards the face the
-    further back it sits (`FAN_FADE`) — a peacock's tail behind the shed, Richard's phrase.
-    Held inside `room_of` by each find's own half-size, so nothing is clipped by the frame;
-    several were. `fit` stands a find on the **bottom** of the box it is given, so the point
-    on the sweep is its foot — centred, every find sat half its own height low.
-    **All the numbers are first guesses**: judge on `tools/shot_buttons.tscn` and retune
-    there, or with the F7 tuner, whose `decor`/`decor_scale` handles still move and scale the
-    whole tail as one.
-  - **Already true, and worth writing down**: `UPGRADES_SIZE` and `SHED_SIZE` are both
-    120x100 and have been since the border pass.
-  - **Out of scope, deliberately**: nothing moved corner to corner. Grouping money with the
-    shop, giving the fleet and the pack a readout, and whether the stock plate earns its place
-    are a second pass, to be grilled off the new screenshot.
-  - `test_lake` guards the meter's frame being a node built to the wood's box, the two picture
-    buttons being one size, the gear being square and wordless, and the fan keeping every find
-    inside the button and reaching above the old band's ceiling.
-
-  **And says two things straighter** (2026-09-17, second pass, `/grill-me` with Richard):
-  - **"Waiting", not "In stock"** (`HudSkin.STOCK_LABEL`). The crate has **no cap** —
-    `Store.held` is an unbounded list and `CRATE_FULL` only decides how high the heap draws —
-    so the plate holds a **backlog**, pieces waiting for a ferry, not a balance. Sat on the
-    same plate as the money and labelled "In stock", it read as a second purse. The word is
-    the whole fix, by decision: the number rising is the clearest sign the fleet cannot keep
-    up (CLAUDE.md's own pricing note has the box peaking near 400 in the sim), but saying so
-    with a trend mark is a fleet readout, and Richard left fleet and pack readouts out.
-  - **The upgrades button says "Upgrades" and wears the count on a badge**
-    (`HudButtons.badge`, `HudSkin.UPGRADES_LABEL`). It read "n available" across the foot: a
-    count with no noun — available what? — and the only thing in the HUD whose width moved
-    with its own number, so the panel breathed as the purse filled. The badge is sized to
-    `BADGE_SAMPLE` ("99"), never to the count in hand. **Still always there, zero included**,
-    which was the old panel's rule and a good one — at zero it is drawn back, not hidden.
-  - **Out of scope, by Richard's call**: moving money beside the shop, and any readout for the
-    fleet or the pack. The diagonal between the purse and the button it feeds stands.
-  - `test_lake` guards the label having changed, the foot being a name rather than a count,
-    and the badge coming out one width at 1 and at 99.
-
   hold a walker clear of the whole picture, eaves and all, which cost most of a tile of grass
   on every side and made the hut feel round to walk round. It is now **a rectangle in tile
   space, the diamond the walls stand on**, exactly as `Yard.covers` treats the crate, and the
@@ -2020,6 +2148,10 @@ like the rest (no `SAVE_VERSION` bump: a missing key reads as level 0).
   spot); `_stage_save` round-trips a sell level.
 
 ### The Rows Read in Percents, and Explain Themselves (2026-09-13, old shop only)
+**Largely superseded 2026-09-17 by The Shop Reads below**: the "(… next)" bracket, the seven
+value grammars, the "Lvl n" footnote on the name line and the "?" hung on a row's corner are
+all gone. What still holds: percents and whole numbers, no tenths, a blurb per track, and
+the two lines stopping short of the price tag.
 Decided with `/grill-me` (Richard): the upgrade rows use **percentages and whole numbers
 only**, say what the next level buys, carry a "?" each, and the market is explained once.
 - **Values** (`Lake._shop_rows`, `_pct_at`, `_track_value`): a track that scales a rate reads
@@ -2146,13 +2278,64 @@ fifteen verbs on two devices does not belong under a volume slider.
 - **Out of scope, by decision**: mute-when-unfocused, an aim-assist or sensitivity row
   (issue #33 left those out), a reset-progress row in the settings (the menu's New game
   confirm stays the only one), and the language row — **all of that is issue #28**.
+- **The bind board reads with the rest** (2026-09-17, `/grill-me` with Richard,
+  `_stage_binds_shape`): the same pass the shop and the settings board had.
+  - **The two columns are named** — `Keyboard` and `Gamepad`, in a band of their own above the
+    first group. It was a table of thirty cells with nothing saying which half was which.
+  - **The gesture that is the only way out is said, once there is something to go back from**
+    (`ControlsSkin.HINT`, drawn only while `Binds.changed()`, its room reserved either way so
+    the board does not jump the first time somebody rebinds). Right-click restores one cell,
+    and that is not a convenience: `open_settings` is on Escape, Escape is what cancels a
+    capture, so right-click is the **only** route back to that binding short of throwing all
+    fifteen away. **The board went 560 to 640 wide to pay for it** — it is short of room down
+    the screen (666 of the 680 the smallest frame leaves) and has plenty across, and the hint
+    stands in the empty left half of a band that had to exist anyway. At 560 that half was
+    234 px and nothing saying the whole gesture fitted; at 640 it is 314 against 296.
+    The middle dot is Bungee's (`tools/probe_hint.gd`, which also measures the candidates).
+  - **"Set to default", and it asks first** (Richard: the rename, and the confirm). Fifteen
+    rows of somebody's own arrangement is not nothing, so the plank opens `MenuConfirm` with
+    this board's words rather than wiping on the click: **"Are you sure?" / "Set to default" /
+    "Keep current"**, with **no line under the title** (Richard's wording, 2026-09-17): the two
+    doors each say what they do, and a sentence saying it a third time is one nobody reads.
+    `MenuConfirm` takes an empty `words` now and **stands shorter for it** rather than leaving
+    the band empty — a gap where a sentence used to be reads as a sentence that failed to draw.
+  - **The words fit the one board rather than the board stretching for them.** A door is 174
+    and the line 358; "Keep current buttons" measured 209 and was cut to "Keep current" (126).
+    A `board_wide` per caller was built first and
+    thrown away — one width the words must clear is a rule, a width per caller is a place for
+    them to drift. Found on the way: **the menu's own line had been overrunning its board by
+    ten pixels** — "The saved lake will be thrown away." is 348 against the 338 a 400-wide
+    board leaves, and `Style.write` neither wraps nor clips — so `BOARD_WIDE` went 400 to
+    **420**. `tools/probe_confirm.gd` measures the lines and the doors; `test_lake` guards
+    every caller's words and both its labels against the room they actually get.
+  - **Open, and known**: `MenuConfirm`'s own doors are still the frame's pale oak, so its
+    warning label reads **1.37:1** and its plain one **2.97:1** — the exact defect the
+    settings board's and this board's foot buttons were just taken off that face to fix. It
+    was out of scope for this pass by decision and is owed the same one-line change.
+  - **The plank is the settings board's dark plate.** On the frame's oak its word read
+    **2.97:1** and nothing pale clears 4.5:1 on that face. With nothing to undo it draws **no
+    lit edge** — the face cannot be dimmed to say so, being the board's own colour, and a lit
+    edge is what says a button can be pressed.
+  - **A walking row's pad cell reads `Left stick`**, not `—`. The stick moves the angler
+    through the row's `extra` list and is `FIXED`, so a dash was telling the player the verb
+    had no gamepad control at all. `Binds.standing_label` reads it off the table's own
+    `extra`, so a verb given a stick later says so with nothing here edited. **The keyboard
+    column is untouched, by decision** — the arrow keys stay unmentioned.
+  - **One row face**, and a row that has just taken a moved binding is marked the shop's way:
+    `Style.BOARD_ROW_LIT` with `Style.lit_edge` over it. That swatch is **as far as a lift can
+    go** — at 1.17x the row's luminance the writing still clears 4.5:1 (4.62) and a lift big
+    enough to carry the moment alone would not, so the lit edge carries it.
+  - **The capture cell keeps its gold and takes dark ink**: cream on `ON_GOLD` was **2.40:1**,
+    the least legible thing on the board at the one moment the player is staring at it.
+  - **Every word clears 4.5:1**, worst 4.62. Overflow is counted (`dropped_lines`) and
+    `test_lake` lays the board out at 1280x720 and asks for zero, the settings board's rule.
+  - **A test that rebinds puts the player's keys back**: `Binds.overrides` /
+    `take_overrides` exist for that and nothing in the game calls them. `shot_menus` borrows
+    the board the same way — the captured picture needs a touched board, since the hint and
+    the swap flash only exist in that state.
 - `test_lake`'s `_check_buses` / `_check_display` / `_check_binds` guard the four buses and
   what is on them, a full Master changing nothing, the floor muting, the display choices, the
   resolution row being windowed-only, the physical defaults, the swap, the context sharing,
-**Largely superseded 2026-09-17 by The Shop Reads below**: the "(… next)" bracket, the seven
-value grammars, the "Lvl n" footnote on the name line and the "?" hung on a row's corner are
-all gone. What still holds: percents and whole numbers, no tenths, a blurb per track, and
-the two lines stopping short of the price tag.
   what cannot be captured, and the file round-trip. Probe: `tools/shot_menus.tscn` also saves
   `last_menu_settings_list.png`, `last_menu_controls.png` and `last_menu_controls_capture.png`.
 
@@ -2182,8 +2365,8 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   (`would_catch`), picked over counting pieces or favouring finds. The numbers are first
   guesses for Richard to retune.
 - **Menus use a virtual cursor, by decision**, not focus navigation: wherever the scene
-  wants a pointer (`pad_cursor_wanted`: on the lake, while a board or the farewell is up; a
-  scene without the method, such as the main menu, always wants one), the right stick moves
+  wants a pointer (`pad_cursor_wanted`: on the lake, while a board, the farewell or the main
+  menu is up; a scene without the method always wants one), the right stick moves
   the real pointer (`warp_mouse`) and `Pad` turns buttons into real events tagged
   `SYNTH_DEVICE`: A is the left button (hold to drag), B is Escape, LB/RB are the wheel. In
   the shed, X turns the piece in hand and Y works a switch, and the shed's prompt and the
@@ -2278,61 +2461,6 @@ after a re-run**). The sheet still draws every option that was offered.
   the same ring drawn once underneath in `Style.HOLE_RIM`'s black, wider, carrying a share
   of whatever the coloured line carries — so the dashed out-of-range ring is backed as
   faintly as it is drawn. Palette swatches are duller than the ones they replaced and the
-- **The bind board reads with the rest** (2026-09-17, `/grill-me` with Richard,
-  `_stage_binds_shape`): the same pass the shop and the settings board had.
-  - **The two columns are named** — `Keyboard` and `Gamepad`, in a band of their own above the
-    first group. It was a table of thirty cells with nothing saying which half was which.
-  - **The gesture that is the only way out is said, once there is something to go back from**
-    (`ControlsSkin.HINT`, drawn only while `Binds.changed()`, its room reserved either way so
-    the board does not jump the first time somebody rebinds). Right-click restores one cell,
-    and that is not a convenience: `open_settings` is on Escape, Escape is what cancels a
-    capture, so right-click is the **only** route back to that binding short of throwing all
-    fifteen away. **The board went 560 to 640 wide to pay for it** — it is short of room down
-    the screen (666 of the 680 the smallest frame leaves) and has plenty across, and the hint
-    stands in the empty left half of a band that had to exist anyway. At 560 that half was
-    234 px and nothing saying the whole gesture fitted; at 640 it is 314 against 296.
-    The middle dot is Bungee's (`tools/probe_hint.gd`, which also measures the candidates).
-  - **"Set to default", and it asks first** (Richard: the rename, and the confirm). Fifteen
-    rows of somebody's own arrangement is not nothing, so the plank opens `MenuConfirm` with
-    this board's words rather than wiping on the click: **"Are you sure?" / "Set to default" /
-    "Keep current"**, with **no line under the title** (Richard's wording, 2026-09-17): the two
-    doors each say what they do, and a sentence saying it a third time is one nobody reads.
-    `MenuConfirm` takes an empty `words` now and **stands shorter for it** rather than leaving
-    the band empty — a gap where a sentence used to be reads as a sentence that failed to draw.
-  - **The words fit the one board rather than the board stretching for them.** A door is 174
-    and the line 358; "Keep current buttons" measured 209 and was cut to "Keep current" (126).
-    A `board_wide` per caller was built first and
-    thrown away — one width the words must clear is a rule, a width per caller is a place for
-    them to drift. Found on the way: **the menu's own line had been overrunning its board by
-    ten pixels** — "The saved lake will be thrown away." is 348 against the 338 a 400-wide
-    board leaves, and `Style.write` neither wraps nor clips — so `BOARD_WIDE` went 400 to
-    **420**. `tools/probe_confirm.gd` measures the lines and the doors; `test_lake` guards
-    every caller's words and both its labels against the room they actually get.
-  - **Open, and known**: `MenuConfirm`'s own doors are still the frame's pale oak, so its
-    warning label reads **1.37:1** and its plain one **2.97:1** — the exact defect the
-    settings board's and this board's foot buttons were just taken off that face to fix. It
-    was out of scope for this pass by decision and is owed the same one-line change.
-  - **The plank is the settings board's dark plate.** On the frame's oak its word read
-    **2.97:1** and nothing pale clears 4.5:1 on that face. With nothing to undo it draws **no
-    lit edge** — the face cannot be dimmed to say so, being the board's own colour, and a lit
-    edge is what says a button can be pressed.
-  - **A walking row's pad cell reads `Left stick`**, not `—`. The stick moves the angler
-    through the row's `extra` list and is `FIXED`, so a dash was telling the player the verb
-    had no gamepad control at all. `Binds.standing_label` reads it off the table's own
-    `extra`, so a verb given a stick later says so with nothing here edited. **The keyboard
-    column is untouched, by decision** — the arrow keys stay unmentioned.
-  - **One row face**, and a row that has just taken a moved binding is marked the shop's way:
-    `Style.BOARD_ROW_LIT` with `Style.lit_edge` over it. That swatch is **as far as a lift can
-    go** — at 1.17x the row's luminance the writing still clears 4.5:1 (4.62) and a lift big
-    enough to carry the moment alone would not, so the lit edge carries it.
-  - **The capture cell keeps its gold and takes dark ink**: cream on `ON_GOLD` was **2.40:1**,
-    the least legible thing on the board at the one moment the player is staring at it.
-  - **Every word clears 4.5:1**, worst 4.62. Overflow is counted (`dropped_lines`) and
-    `test_lake` lays the board out at 1280x720 and asks for zero, the settings board's rule.
-  - **A test that rebinds puts the player's keys back**: `Binds.overrides` /
-    `take_overrides` exist for that and nothing in the game calls them. `shot_menus` borrows
-    the board the same way — the captured picture needs a touched board, since the hint and
-    the swap flash only exist in that state.
   ring sits on water running from soup green to clean blue, so a toned green over dirty
   water had nothing to stand on. **The one thing beyond the three swatches**, by Richard's
   call; the 1.5 px line, the alphas, the dashes and the 48-point ellipse are untouched.
@@ -2457,6 +2585,10 @@ purpose. What the audit settled, against the shipped design:
   **keyed by walker** now (`_wading`, a set): there is one wading loop and up to four dogs,
   and a boolean set by whoever pushed last was turned off by a dog on the lawn while the
   angler stood in the water. A key is dropped when its walker leaves the tree.
+  **Only within `Dog.HEAR` of the angler** (2026-09-17, the barks' own rule): the wash is one
+  player at one level, so a dog on a bank run across the lake played it under a player
+  standing still, which read as the angler's own wading firing for no reason. `test_lake`
+  guards both sides of the radius.
 - **The fleet's engine loop is retired, by decision** (2026-09-15): the ferry is a sail boat, the
   water it pushes and its bell say it is leaving, and the built diesel — a hiss with a pulse in
   it — was heard as a wind and a tick under the whole game. `set_engine`, `_make_engine` and the
@@ -2519,6 +2651,27 @@ purpose. What the audit settled, against the shipped design:
     The menu's Quit closes rather than clicks.
     `NewGame_Continue_Sound` on New game / Continue (and "Start over" confirmed) on the
     autoload's own player; the menu's planks set `PlankButton.clicks` false.
+  - **The hover and the click takes are inverted** (2026-09-17, Richard: a click should be the
+    bolder of the two, and `Mouse_Over_Sound` is the bolder recording). So `ui_click` is built
+    from `Mouse_Over_Sound.wav` and `ui_hover` from `Click_Sound.wav`, swapped in
+    `build_sfx.py`'s `PLAN` rather than at the 26 `Sfx.ui()` call sites: **a key means the verb,
+    not the file**, and the cut recipe travels with the recording. **The click keeps the take
+    whole** (`("trim", 0.2)`, the very cut that shipped as the hover): it is two knocks, the
+    second at 62% of the first 60 ms later, and the pair reads as a droplet, which Richard
+    wanted kept. The first knock alone was tried first and dropped for it. The hover keeps the
+    cut that shipped as the click — the loud tick 145 ms in, its soft
+    lead tick still discarded. **The click's cut takes a fade-in of its own**
+    (`trimmed`'s third argument, 0.5 ms against `FADE_IN`'s 4): its attack is in the take's
+    very first samples — 40% of peak half a millisecond in — so the standard ramp lay over
+    the knock and turned it into a 5 ms rise, which Richard heard as a late click. It now
+    reads 39% in its first millisecond where it read 5%. What is left is the take's own rise
+    to a peak at 5.4 ms, the second knock at 60 ms, and the engine's 10 ms output floor. Every cut is levelled to `TARGET_LUFS`, so what `SOUNDS` holds
+    is the mix and the gap between click and hover is the whole prominence — the hover's cut is
+    peak-limited and lands 3.3 dB short of the target (`tools/last_sfx.log`) on top of it, the
+    click's reaches it at a peak of -8.1 dBFS. **Then 3 dB each way by ear** (Richard, same day):
+    click -3.0 to **-6.0** and `Close_Tab` -12.4 to **-15.4**, hover -18.6 to **-15.6** —
+    which is what the hover's own peak limiting had taken off it, and still leaves about
+    13 dB between click and hover.
   - **The lake is not heard from inside the shed** (2026-09-15): `Sfx.indoors`, pushed by
     `Lake._push_rooms`, silences everything but `WHILE_INDOORS` — the door, the pieces put down,
     the fire and the interface — so no ferry sets off and no water moves while the player is
@@ -2585,10 +2738,6 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
 - **The song's clock is its player's playback position** when it has one, so a long scene
   load cannot run a file out before its fade; `follow_players` off drives it by hand.
 - **Levels**: `GAIN_DB` levels each song to Goin's -11.1 LUFS (the deliveries were up to five
-  **Only within `Dog.HEAR` of the angler** (2026-09-17, the barks' own rule): the wash is one
-  player at one level, so a dog on a bank run across the lake played it under a player
-  standing still, which read as the angler's own wading firing for no reason. `test_lake`
-  guards both sides of the radius.
   dB apart, which a crossfade turns into a jump). Zero everywhere is as delivered. The
   slider's top, `LOUDEST`, is **0 dB, down from +4** (2026-09-15, Richard: "decrease volume of
   songs a bit overall").
@@ -2651,27 +2800,6 @@ the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 The inventory column down the right of the shed is a drawn oak board, the same furniture as
 the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over
 the top edge reading "Shed Decoration" with the count, and one clipped `Style.plate` per
-  - **The hover and the click takes are inverted** (2026-09-17, Richard: a click should be the
-    bolder of the two, and `Mouse_Over_Sound` is the bolder recording). So `ui_click` is built
-    from `Mouse_Over_Sound.wav` and `ui_hover` from `Click_Sound.wav`, swapped in
-    `build_sfx.py`'s `PLAN` rather than at the 26 `Sfx.ui()` call sites: **a key means the verb,
-    not the file**, and the cut recipe travels with the recording. **The click keeps the take
-    whole** (`("trim", 0.2)`, the very cut that shipped as the hover): it is two knocks, the
-    second at 62% of the first 60 ms later, and the pair reads as a droplet, which Richard
-    wanted kept. The first knock alone was tried first and dropped for it. The hover keeps the
-    cut that shipped as the click — the loud tick 145 ms in, its soft
-    lead tick still discarded. **The click's cut takes a fade-in of its own**
-    (`trimmed`'s third argument, 0.5 ms against `FADE_IN`'s 4): its attack is in the take's
-    very first samples — 40% of peak half a millisecond in — so the standard ramp lay over
-    the knock and turned it into a 5 ms rise, which Richard heard as a late click. It now
-    reads 39% in its first millisecond where it read 5%. What is left is the take's own rise
-    to a peak at 5.4 ms, the second knock at 60 ms, and the engine's 10 ms output floor. Every cut is levelled to `TARGET_LUFS`, so what `SOUNDS` holds
-    is the mix and the gap between click and hover is the whole prominence — the hover's cut is
-    peak-limited and lands 3.3 dB short of the target (`tools/last_sfx.log`) on top of it, the
-    click's reaches it at a peak of -8.1 dBFS. **Then 3 dB each way by ear** (Richard, same day):
-    click -3.0 to **-6.0** and `Close_Tab` -12.4 to **-15.4**, hover -18.6 to **-15.6** —
-    which is what the hover's own peak limiting had taken off it, and still leaves about
-    13 dB between click and hover.
 find (clean sprite fitted left, name in `BOARD_INK`, `HOVER_WASH` under the pointer). The
 old scrim rectangle and its 1.5 px ink outline are gone.
 - **The board grows outwards**: `_board_rect` is the column `LIST_WIDTH`/`GUTTER` already
@@ -3136,6 +3264,12 @@ overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild
 - **The shaders are not the cost**: `BENCH_OFF=water` measured no difference.
 - **Eases use `Lake._ease` (exponential)**, not `rate * delta`, so the camera does not lurch at
   an uneven frame rate.
+- **The load is measured the same way** (`tools/probe_boot.tscn`, 2026-09-17): the lake's
+  build is 0.56 s, the boot about 2 s. It was 2.6 s and 5 s until one call was cached —
+  `Ground._boxed` asking `Iso.basin_extent()` (a walk round the whole shore outline) once a
+  lawn tile. `Lake._mark` stamps `_ready` stretch by stretch into `Lake.boot_marks`; a
+  stretch that grows shows up by name. **`main.tscn` itself loads in 20 ms**: everything
+  heavy is built in `_ready`, on the main thread, which is why there is no loading bar.
 
 Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame
 42 ms -> 3-4 ms.

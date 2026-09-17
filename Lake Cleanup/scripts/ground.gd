@@ -292,6 +292,9 @@ var _prop_uvs := PackedVector2Array()
 var _prop_colors := PackedColorArray()
 var _prop_indices := PackedInt32Array()
 
+## Half the basin's box on the screen's axes, measured once. See `_boxed`.
+var _basin_half := Vector2.ZERO
+
 ## How far out of the water a tile is, in tiles. `shore_fraction` is a fraction of the
 ## radius in that tile's own direction, so it is scaled back up by the radius it came from
 ## rather than by an average of the two. Mirrored in the shader.
@@ -821,8 +824,15 @@ static func _fract(x: float) -> float:
 
 ## How far out of the basin's own box a spot is, on the screen's axes rather than the lake's:
 ## 1 on the box, more outside it. See WOOD_CORNER_FROM.
+##
+## The basin's box is asked for once and kept. `Iso.basin_extent` walks the whole shore
+## outline to answer, and this is called for every lawn tile of the ring: asked afresh each
+## time it was 2.2 s of the lake's 2.6 s load (`tools/probe_boot.gd`, 2026-09-17), all of it
+## re-measuring a lake that does not change shape.
 func _boxed(at: Vector2) -> float:
-	var half := Iso.basin_extent() * 0.5
+	if _basin_half == Vector2.ZERO:
+		_basin_half = Iso.basin_extent() * 0.5
+	var half := _basin_half
 	var here := Iso.tile_to_world(at.x, at.y) - Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
 	if half.x <= 0.0 or half.y <= 0.0:
 		return 0.0

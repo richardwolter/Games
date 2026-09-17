@@ -24,7 +24,7 @@ const SHOTS := {
 const AT := Vector2(200.0, 520.0)
 
 ## How long the menu is given to lay itself out before anything is drawn over it.
-const SETTLE := 0.6
+const SETTLE := 2.4
 
 var _menu: Node
 var _age := -SETTLE
@@ -34,8 +34,13 @@ var _taken: Array[StringName] = []
 
 func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	_menu = load("res://scenes/menu.tscn").instantiate()
-	get_tree().root.add_child.call_deferred(_menu)
+	# The menu is the lake wearing its front now (2026-09-17). Borrowed, so told to wear it,
+	# and on a save of its own that is never the player's.
+	_menu = load("res://scenes/main.tscn").instantiate()
+	_menu.set(&"save_path", "user://probe_ripple.save")
+	_menu.set(&"autoload_save", false)
+	_menu.set(&"force_front", true)
+	add_child(_menu)
 	set_physics_process(true)
 
 

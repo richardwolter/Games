@@ -361,8 +361,6 @@ const CLOSE_INSET := 12.0
 ## save is written on its own timer rather than on every change: a purchase or a sale can
 ## happen several times a second, and the field is the biggest thing in the file.
 const SAVE_PATH := "user://lake_cleanup.save"
-## Where the lake goes when it is left: the main menu.
-const MENU_SCENE := "res://scenes/menu.tscn"
 ## 6: ten rubbish kinds appended to TRASH_ORDER. Saved stacks hold indices into the whole
 ## def list and the finds follow the rubbish in it, so every find's index moved.
 ## 8: the kitchen chairs and the old table left the catalogue and four rubbish-born finds
@@ -419,6 +417,14 @@ const AUTOSAVE_EVERY := 20.0
 var save_path: String = SAVE_PATH
 var autoload_save: bool = true
 
+## For a probe that follows the lake across a scene change (`tools/shot_reload.gd`): the path
+## **every** lake brought up in this session saves to, whatever else it was told. Static,
+## because the lake that comes up after a reload is built by the boot scene, and no tool can
+## hand that one a `save_path` — so without this it is the player's own run, loaded, played
+## and autosaved by a probe. That happened (2026-09-17): a probe's bug left the game running
+## on the real save and it was written. Empty in the game, and nothing in the game sets it.
+static var session_save_path: String = ""
+
 ## Set by the settings door, and true for exactly one scene load: the level being walked
 ## into starts from nothing rather than from its own save.
 ##
@@ -426,6 +432,16 @@ var autoload_save: bool = true
 ## it is gone by the time the node that reads it is built. Cleared as soon as it is read,
 ## so a level loaded any other way is the saved one again.
 static var start_fresh: bool = false
+
+## Where the load goes, for `tools/probe_boot.gd`: `_ready` appends [label, usec] here while
+## this is an Array. Null in play, so a mark costs one comparison.
+static var boot_marks: Variant = null
+
+
+static func _mark(label: String) -> void:
+	if boot_marks != null:
+		(boot_marks as Array).append([label, Time.get_ticks_usec()])
+
 
 ## Tree test mode (2026-09-12): the proposed upgrade tree played as its own game, started from
 ## the main menu's "New game (tree)" so it can be tried before it replaces the shop. A tree run
@@ -731,6 +747,7 @@ var _sparkle_at: float = 0.0
 
 @onready var _shop: PanelContainer = %Shop
 @onready var _close_menu: Button = %CloseMenu
+@onready var _hud_layer: CanvasLayer = $HUD
 @onready var _skin: HudSkin = %Skin
 @onready var _shop_skin: ShopSkin = %ShopSkin
 @onready var _buy_net_width: Button = %BuyNetWidth
@@ -965,11 +982,16 @@ func _skim_level() -> int:
 
 func _ready() -> void:
 	($Sky/Fill as ColorRect).color = BEYOND
+	_mark("children ready")
 	_day = %Day as DayCycle
 	_daylight = %Daylight as CanvasModulate
 	_pop_rng.randomize()
 	_load_upgrades()
 	_setup_tree()
+	# After the tree has had its say: a probe's path outranks both slots.
+	if not session_save_path.is_empty():
+		save_path = session_save_path
+	_mark("upgrades")
 	_grid = $Grid as LakeGrid
 	_camera = $Camera as Camera2D
 	_boats = [$Boat as Boat]
@@ -985,6 +1007,7 @@ func _ready() -> void:
 	_shape_island()
 	_shape_dropoffs()
 	_tune_ground()
+	_mark("shapes and ground")
 
 	_shed_art = Art.texture(SHED_ART)
 
@@ -997,6 +1020,7 @@ func _ready() -> void:
 		add_child(_sfx)
 	_sfx.set_ambience(true)
 	_grid.find_surfaced.connect(func(_index: int) -> void: _sfx.play_find_chime())
+	_mark("sfx")
 
 	# Over the island and the shed: the catch is thrown across them, not through them.
 	_haul = Haul.new()
@@ -1041,17 +1065,22 @@ func _ready() -> void:
 	if not _sheets.load_all():
 		_sheets = null
 	_grid.sheets = _sheets
+	_mark("sheets")
 	_grid.build(_all_defs(), _level_seed(), _fills_the_lake())
+	_mark("grid build")
 	_hide_treasures()
+	_mark("hide treasures")
 	_pieces_full = _grid.piece_count()
 	_filth_total = maxf(_grid.filth_left(), 0.001)
 	_filth_left = _filth_total
 	pollution = 1.0
 	_build_filth_map()
+	_mark("filth map")
 
 	_build_trophy()
 	_build_pigeon_pop()
 	_build_coins()
+	_mark("trophy pop coins")
 
 	_bounds = _outline_bounds(shore)
 	_view_zoom = VIEW_ZOOM
@@ -1090,6 +1119,7 @@ func _ready() -> void:
 	# and the finds' beams too — "over everything" was the whole of the instruction, and a
 	# bird that vanishes behind the thing being cast at it is the bug, not the fix.
 	_grow_nature()
+	_mark("nature")
 
 	_flock = Flock.new()
 	_flock.name = &"Flock"
@@ -1137,6 +1167,7 @@ func _ready() -> void:
 	_net2.swept.connect(_on_net_swept.bind(_net2))
 	_net2.caught_bird.connect(_on_bird_caught)
 	add_child(_net2)
+	_mark("flock and nets")
 
 	# The ferry lives on the island's south side and works its way round the bank from
 	# there, calling at whichever merchants its load is for.
@@ -1145,6 +1176,7 @@ func _ready() -> void:
 	_push_boat_numbers()
 	if tree_mode:
 		_sync_tree_world()
+	_mark("fit out boat")
 
 	_buy_net_width.pressed.connect(_buy.bind(&"net_width"))
 	_buy_net_strength.pressed.connect(_buy.bind(&"net_strength"))
@@ -1196,6 +1228,7 @@ func _ready() -> void:
 				catch.append({"sheet": _sheets.atlas, "region": _sheets.region_of(StringName(slug))})
 		_shop_skin.sprites[&"catch"] = catch
 	_lend_button_art(ferry, mesh)
+	_mark("shop art")
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
@@ -1231,13 +1264,17 @@ func _ready() -> void:
 	_set_controls(false)
 	_set_shed(false)
 	_push_water_colours()
+	_mark("panels and music")
 	var loaded := false
 	if autoload_save and not start_fresh:
 		loaded = load_game()
 	start_fresh = false
+	_mark("load game")
 	if tree_mode:
 		_begin_tree_session(loaded)
 	_seed_starter_bed()
+	_mark("end")
+	_raise_front(loaded)
 
 
 ## What the corner buttons draw (`hud_buttons.gd`): the net and ferry the shop was lent,
@@ -1862,6 +1899,10 @@ func _def(
 ## bind table, by decision — Escape is what cancels a capture, and a player who rebinds the
 ## way out of a board has no way out of the board.
 func _unhandled_input(event: InputEvent) -> void:
+	# Behind the menu, and on the way down out of it, the lake reads nothing: the menu's own
+	# boards answer Escape and F11, and a click meant for a plank must not also be a cast.
+	if _fronted():
+		return
 	if _extra_input(event):
 		return
 	var key := event as InputEventKey
@@ -2026,7 +2067,10 @@ func _flip_fullscreen() -> void:
 ## Whether the pad should drive a pointer (see scripts/pad.gd): only while something the
 ## mouse is for is up. On the bare lake the right stick is the reticle's.
 func pad_cursor_wanted() -> bool:
-	return _menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
+	return (
+		_menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
+		or _in_menu
+	)
 
 
 ## Where a cast goes: the pad's reticle while there is one, else the mouse.
@@ -2042,6 +2086,12 @@ func aim_point() -> Vector2:
 ## into the mouse while a board is up (A, B, the shoulders) are only acted on here when
 ## nothing is, so the two never both answer one press.
 func _pad_tick(delta: float) -> void:
+	# No reticle and no verbs behind the menu: the pad there is the menu's pointer.
+	if _fronted():
+		_aim.at = Vector2.INF
+		_net.pad_aim = Vector2.INF
+		_pad_was = false
+		return
 	var pad := Pad.is_pad()
 	if pad and not _pad_was:
 		var pointer := get_global_mouse_position()
@@ -2723,7 +2773,7 @@ func _pin_close(panel: Control, closing: Callable) -> void:
 func _hold_the_angler() -> void:
 	var busy := (
 		_menu_open or _settings_open or _shed_open or _controls_open
-		or _farewell != null
+		or _farewell != null or _fronted()
 	)
 	_angler.can_walk = not busy
 	# The net is held where it is for as long as the panel is up, and goes back to reeling
@@ -2764,10 +2814,270 @@ func _push_rooms() -> void:
 
 ## The way out of the lake is the menu, not the desktop (2026-09-12): the run is written
 ## first, and the menu's own Quit and the window's cross are what close the game.
+##
+## **No scene change** (2026-09-17): the menu is an overlay on this lake, so going to it is
+## the view dimming, that dimmed frame frozen over the screen, the world snapped into the
+## menu's pose behind it, and the frozen frame dissolving onto the menu (`Curtain.dissolve`).
+## A lake borrowed by a tool has no curtain, and does it at once.
 func _quit() -> void:
+	if _fronted():
+		return
+	if _curtain == null:
+		_go_to_menu()
+		return
+	# The lake stops answering now, not when the view has dimmed.
+	_leaving = true
+	_hold_the_angler()
+	_curtain.dissolve(_go_to_menu)
+
+
+func _go_to_menu() -> void:
+	_leaving = false
+	if _farewell != null:
+		_farewell.get_parent().queue_free()
+		_farewell = null
+	_enter_menu(false)
+	# Written once the pose is struck, not before it: the catch in the net, the sticks in
+	# the dogs' mouths and the holds afloat are all in the crate by now, so the file holds
+	# every piece. Written first, as it used to be, a net's catch was in neither.
 	save_game()
-	_farewell = null
-	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+# ---- The menu over the lake -------------------------------------------------------------
+#
+# The main menu is this scene (2026-09-17, `/grill-me` with Richard): the lake is the
+# game's main scene, the player's own run loads behind the doors, and `MainMenu` is an
+# overlay on a layer of its own. Behind it the world is alive but **posed** — water, birds,
+# fish, flora and the day all run; the dogs are asleep, the hulls are moored, the angler
+# stands idle, nothing sells, nothing is saved and no input reaches the lake. The view is
+# pulled back to the whole lake, because the lake clearing up is the progress bar and the
+# menu says nothing else about the run. Continue takes the menu off and glides the view down
+# to the angler; there is no scene change to wait for. Supersedes `scenes/menu.tscn`, the
+# baked `menu_lake.png` and `change_scene_to_file` in both directions.
+#
+# **Only a lake run as the game wears it.** A tool or a harness instantiates `main.tscn`
+# under a node of its own, and gets the lake it always did: no menu, no curtain, playing
+# from the first frame. `test_lake` raises the menu by hand (`_enter_menu`).
+
+## Set before a reload to come up playing rather than in the menu: New game over a run, the
+## tree's doors, F6. Read once, the way `start_fresh` is.
+static var skip_menu: bool = false
+## The game's first scene, which a reload goes back through: one loading screen in the game.
+const BOOT_SCENE := "res://scenes/boot.tscn"
+
+const MENU_LAYER := 30
+## Where across the window the lake's middle stands behind the menu: right of centre, so the
+## logo and the planks have the left bank to stand over. As far as the ground allows — the
+## view is still clamped to it, and on a wide window that may be less than this asks.
+const MENU_LAKE_AT := 0.62
+## The glide down to the angler, in seconds, and the share of it after which the HUD starts
+## to come in. **The one zoom glide in the game, by decision** (Richard, over stepping stop
+## by stop): the pixel rule is about where the view *rests*, and this passes through the
+## fractional levels in a second and a half and lands on a stop. The art crawls while it
+## moves; accepted, for this move only. The wheel still steps.
+const GLIDE_TIME := 1.6
+const GLIDE_HUD_FROM := 0.6
+## A lake that comes up playing (`skip_menu`) sets off on its glide this long after it goes
+## in: the curtain's held frames and the better part of its dissolve.
+const SKIP_GLIDE_AFTER := 0.7
+
+## For the probes that photograph the menu: wear the front although borrowed. Set before the
+## scene enters the tree, like `save_path`.
+var force_front: bool = false
+
+var _in_menu: bool = false
+## On the way to the menu: the view is dimming and the lake has stopped answering.
+var _leaving: bool = false
+## Seconds into the glide, or under zero when there is none.
+var _glide: float = -1.0
+var _glide_zoom_from: float = 1.0
+var _glide_zoom_to: float = 1.0
+## Where the angler stood on the screen when the glide began, off the middle, in pixels.
+var _glide_offset := Vector2.ZERO
+var _menu: MainMenu
+var _curtain: Curtain
+
+
+## Whether the menu has the lake: up, on its way up, or on its way off.
+func _fronted() -> bool:
+	return _in_menu or _leaving or _glide >= 0.0
+
+
+## The end of `_ready`: the curtain and, unless told otherwise, the menu.
+func _raise_front(loaded: bool) -> void:
+	var playing := skip_menu
+	skip_menu = false
+	# Borrowed by a tool: see the header.
+	if get_parent() != get_tree().root and not force_front:
+		return
+	# Under the loading screen's own picture, which the boot scene has just been showing.
+	_curtain = Curtain.new()
+	add_child(_curtain)
+	_curtain.open_on()
+	_build_menu()
+	_menu.has_run = loaded
+	_enter_menu(true)
+	if not playing:
+		return
+	# Straight into the game: the same pose and the same view, with no doors on it, and the
+	# glide setting off by itself as the loading picture goes. One way down into the lake.
+	_menu.put_away(true)
+	get_tree().create_timer(SKIP_GLIDE_AFTER).timeout.connect(_begin_glide)
+
+
+func _build_menu() -> void:
+	if _menu != null:
+		return
+	var over := CanvasLayer.new()
+	over.name = &"MenuLayer"
+	over.layer = MENU_LAYER
+	add_child(over)
+	_menu = MainMenu.new()
+	_menu.name = &"Menu"
+	_menu.visible = false
+	_menu.play_asked.connect(_begin_glide)
+	_menu.reload_asked.connect(_reload_as)
+	over.add_child(_menu)
+
+
+## Raise the menu and strike the pose behind it. `at_once` is the boot, which comes up under
+## the curtain with the pack scattered over the island; otherwise it is the way back from
+## the game, struck behind the curtain's frozen frame, where each dog lies down where it
+## stands.
+func _enter_menu(at_once: bool) -> void:
+	_build_menu()
+	_in_menu = true
+	_glide = -1.0
+	_set_controls(false)
+	_set_settings(false)
+	_set_menu(false)
+	_set_shed(false)
+	_pose_world(at_once)
+	_hud_layer.visible = false
+	if _coins != null:
+		_coins.clear()
+	_pan = Vector2.ZERO
+	_panning = false
+	_pan_yielded = false
+	_cast_look = 0.0
+	_homing = false
+	_hold_the_angler()
+	_hold_menu_view()
+	_snap_camera()
+	# Back from the game there is a run behind the menu whether or not one was loaded: it
+	# has just been played, and New game would throw it away.
+	_menu.has_run = _menu.has_run or not at_once
+	_menu.show_up(at_once)
+
+
+## The pose: everything in flight brought home, the fleet moored, the pack asleep. Nothing
+## is lost to it — a catch, a hold and a mouthful all end up in the crate, which is the
+## rule a save already keeps for a hold afloat — and nothing is sold by it.
+func _pose_world(scatter: bool) -> void:
+	for net: CastNet in [_net, _net2]:
+		if net != null:
+			net.stow()
+	if _haul != null:
+		_haul.land_all()
+	for boat in _boats:
+		boat.moored = true
+		for piece in boat.moor_now():
+			_yard.put(piece)
+	for dog in _dogs:
+		for piece in dog.doze(true, scatter):
+			_dog_brought_back(piece)
+	_sort_walkers()
+
+
+## Let the pose go: the fleet may sail and the pack wakes, each dog in its own time.
+func _release_world() -> void:
+	for boat in _boats:
+		boat.moored = false
+	for dog in _dogs:
+		dog.doze(false)
+
+
+## The view behind the menu: the far stop, the whole lake, its middle `MENU_LAKE_AT` across.
+func _hold_menu_view() -> void:
+	_view_zoom = _zoom_stops()[0]
+	_push_zoom()
+	_camera.position = _menu_view()
+
+
+func _menu_view() -> Vector2:
+	var middle := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+	var wide := get_viewport_rect().size.x / _camera.zoom.x
+	return _clamped_view(middle - Vector2((MENU_LAKE_AT - 0.5) * wide, 0.0))
+
+
+## Continue, or New game where there was nothing to lose: the menu goes and the view comes
+## down. The world is let go at once — a ferry setting off as the view arrives is the game
+## starting — but the player's hands come back only when the view has landed.
+func _begin_glide() -> void:
+	if not _in_menu:
+		return
+	_in_menu = false
+	_menu.put_away()
+	_release_world()
+	var stops := _zoom_stops()
+	_glide = 0.0
+	_glide_zoom_from = _camera.zoom.x
+	_glide_zoom_to = stops[_nearest_stop(stops, VIEW_ZOOM)]
+	_glide_offset = (_watching() - _camera.position) * _glide_zoom_from
+	_autosave_in = AUTOSAVE_EVERY
+	_skin.modulate.a = 0.0
+	_open_settings.modulate.a = 0.0
+	_hud_layer.visible = true
+
+
+## One frame of the glide. The zoom runs in its logarithm, so the push reads as one even
+## move rather than fast then slow; and what is interpolated is **where the angler stands on
+## the screen**, not the camera's place in the world, so they drift steadily to the middle
+## instead of swinging in on the curve a lerped position makes under a moving zoom.
+func _glide_step(delta: float) -> void:
+	_glide += delta
+	var t := clampf(_glide / GLIDE_TIME, 0.0, 1.0)
+	var eased := t * t * (3.0 - 2.0 * t)
+	var zoom := exp(lerpf(log(_glide_zoom_from), log(_glide_zoom_to), eased))
+	_camera.zoom = Vector2(zoom, zoom)
+	_camera.position = _clamped_view(_watching() - _glide_offset * (1.0 - eased) / zoom)
+	var hud := clampf((t - GLIDE_HUD_FROM) / (1.0 - GLIDE_HUD_FROM), 0.0, 1.0)
+	_skin.modulate.a = hud
+	_open_settings.modulate.a = hud
+	if t < 1.0:
+		return
+	_glide = -1.0
+	_view_zoom = _glide_zoom_to
+	_push_zoom()
+	_hold_the_angler()
+
+
+## This lake is thrown away for another, behind the loading screen: a fresh run over this
+## one, or the tree's. The file is deleted here, where it is known which file is this run's.
+## The game's own lake goes back through the boot scene, off a curtain already showing that
+## scene's first frame; a borrowed one reloads whatever borrowed it.
+func _reload_as(fresh: bool, tree: bool) -> void:
+	_leaving = true
+	var go := func() -> void:
+		_wiping = true
+		if fresh:
+			# This run's own file when it is this kind of run being thrown away — a harness
+			# plays on a path of its own — and the other kind's by its name.
+			var path := save_path
+			if tree != tree_mode:
+				path = TREE_SAVE_PATH if tree else SAVE_PATH
+			if FileAccess.file_exists(path):
+				DirAccess.remove_absolute(path)
+		start_tree = tree
+		skip_menu = true
+		if get_parent() == get_tree().root:
+			get_tree().change_scene_to_file(BOOT_SCENE)
+		else:
+			get_tree().reload_current_scene()
+	if _curtain == null:
+		go.call()
+	else:
+		_curtain.to_loading(go)
 
 
 ## A piece lifted off the water, the moment the net's mouth closes on it. The meter moves
@@ -3157,6 +3467,11 @@ const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
 ## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
+## What stands between a row's figure now and its figure one level on. A mark rather than
+## the words "(… next)": it is half the width, it is the same in every language, and Bungee
+## has it (checked in `tools/probe_shop_glyphs.gd`).
+const ARROW := "→"
+
 const BLURBS := {
 	&"net_width": "How wide the net's mouth opens, so one cast covers more water.",
 	&"net_strength": "The heaviest weight tier the net can lift.",
@@ -3275,6 +3590,8 @@ func _shop_rows() -> Array:
 		var reads: Callable = line[4]
 		var prefix: String = String(line[5]) if line.size() > 5 else ""
 		var now: String = reads.call(level)
+		var said := now if full else "%s %s %s" % [now, ARROW, reads.call(level + 1)]
+		said = prefix + said + suffix
 		out.append({
 			"key": key,
 			"board": line[1],
@@ -3335,9 +3652,25 @@ func _shop_legend() -> Dictionary:
 	var yards: Array = []
 	for kind in TrashDef.KIND_NAMES.size():
 		yards.append([TrashDef.KIND_NAMES[kind], "$%d" % roundi(_mean_pay_of(kind))])
+	# The recycle bonus lives here rather than in its row: it is a change to what one
+	# material pays, and this is the one place that says what materials pay.
+	#
+	# It carries no figure of its own, because `_mean_pay_of` goes through `piece_pay`,
+	# which already multiplies the boosted kind — so the boosted material's price in `yards`
+	# above *is* the boosted price, and always has been. The plate has been printing it for
+	# as long as the bonus has existed, with nothing on it saying why the number moved. All
+	# this adds is the saying. Empty when no bonus is running.
+	var bonus := {}
+	if _bonus_kind >= 0 and recycle_bonus_level > 0:
+		bonus = {
+			"kind": _bonus_kind,
+			"pct": "+%d%%" % roundi(_track_value(&"recycle_bonus", recycle_bonus_level) * 100.0),
+			"seconds": ceili(_bonus_left),
+		}
 	return {
 		"tiers": tiers,
 		"yards": yards,
+		"bonus": bonus,
 		"rule": "Each material sells at its own yard. Heavier pieces always pay more.",
 	}
 
@@ -3483,11 +3816,6 @@ func _sell_tier(what: StringName) -> int:
 	if not key.begins_with("sell_"):
 		return -1
 	var tier := key.trim_prefix("sell_").to_int()
-## What stands between a row's figure now and its figure one level on. A mark rather than
-## the words "(… next)": it is half the width, it is the same in every language, and Bungee
-## has it (checked in `tools/probe_shop_glyphs.gd`).
-const ARROW := "→"
-
 	return tier if tier >= 0 and tier < sell_levels.size() else -1
 
 
@@ -3596,8 +3924,6 @@ func _tree_stat(stat: String) -> float:
 
 
 ## Stats recomputed from what is owned, and the world brought in line with them.
-		var said := now if full else "%s %s %s" % [now, ARROW, reads.call(level + 1)]
-		said = prefix + said + suffix
 func _apply_tree(push: bool = true) -> void:
 	_tree_stats = _tree.stats(_tree_owned)
 	_sync_tree_world()
@@ -3652,25 +3978,9 @@ func _begin_tree_session(loaded: bool) -> void:
 		_apply_tree()
 	_tree_progress_in = 0.0
 	TreeLog.write("session", _tree_play, {
-	# The recycle bonus lives here rather than in its row: it is a change to what one
-	# material pays, and this is the one place that says what materials pay.
-	#
-	# It carries no figure of its own, because `_mean_pay_of` goes through `piece_pay`,
-	# which already multiplies the boosted kind — so the boosted material's price in `yards`
-	# above *is* the boosted price, and always has been. The plate has been printing it for
-	# as long as the bonus has existed, with nothing on it saying why the number moved. All
-	# this adds is the saying. Empty when no bonus is running.
-	var bonus := {}
-	if _bonus_kind >= 0 and recycle_bonus_level > 0:
-		bonus = {
-			"kind": _bonus_kind,
-			"pct": "+%d%%" % roundi(_track_value(&"recycle_bonus", recycle_bonus_level) * 100.0),
-			"seconds": ceili(_bonus_left),
-		}
 		"started": "continue" if loaded else "new",
 		"tree_file": UpgradeTree.PATH,
 		"nodes": _tree.nodes.size(),
-		"bonus": bonus,
 		"owned": _tree_owned.keys(),
 		"sludge": roundi(sludge),
 		"cleared": snappedf(_cleared_share(), 0.0001),
@@ -3954,15 +4264,10 @@ func _net_wash() -> float:
 	return clampf(0.36 + 0.64 * load, 0.0, 1.0) * lerpf(1.0, 0.45, _net.closed())
 
 
-func _process(delta: float) -> void:
-	_pad_tick(delta)
-	_push_daylight()
-	_part_the_fleet(delta)
-	_remap_filth(delta)
-	_push_patches(delta)
-	_tick_bonus(delta)
-	if _net2 != null:
-		_net2.visible = _net2.state != CastNet.State.IDLE
+## The player's view, once a frame: following the angler, leaning out to a cast, dragged by
+## the mouse. Everything `_process` does about the camera while the game is being played —
+## the menu's hold and the glide down out of it are the two times it is not.
+func _drive_view(delta: float) -> void:
 	# The camera follows the angler rather than being panned: the arrow keys are theirs
 	# now, and a view that has to be driven separately from the character is two jobs for
 	# one pair of hands. While a cast is out it drifts off them and onto the net.
@@ -4031,17 +4336,42 @@ func _process(delta: float) -> void:
 			at = _framed_on(at, _net.tile_pos)
 		_camera.position = _clamped_view(at)
 
-	_look_for_the_end(delta)
-	_count_the_beat(delta)
-	if tree_mode:
-		_tick_tree_log(delta)
 
-	_save_note_for = maxf(_save_note_for - delta, 0.0)
-	_autosave_in -= delta
-	if _autosave_in <= 0.0:
-		save_game()
+func _process(delta: float) -> void:
+	_pad_tick(delta)
+	_push_daylight()
+	_part_the_fleet(delta)
+	_remap_filth(delta)
+	_push_patches(delta)
+	if not _in_menu:
+		_tick_bonus(delta)
+	if _net2 != null:
+		_net2.visible = _net2.state != CastNet.State.IDLE
+	# The view: held on the whole lake behind the menu, flown down to the angler when the
+	# menu lets go, and the player's own the rest of the time.
+	if _in_menu:
+		_hold_menu_view()
+	elif _glide >= 0.0:
+		_glide_step(delta)
+	else:
+		_drive_view(delta)
 
-	_push_zoom()
+	# Nothing is decided behind the menu: no ending found, no run clocked, nothing written.
+	# The world there is a pose, and a pose has nothing to save that was not saved going in.
+	if not _in_menu:
+		_look_for_the_end(delta)
+		_count_the_beat(delta)
+		if tree_mode:
+			_tick_tree_log(delta)
+
+		_save_note_for = maxf(_save_note_for - delta, 0.0)
+		_autosave_in -= delta
+		if _autosave_in <= 0.0:
+			save_game()
+
+	# Not during the glide, which writes the zoom itself: this puts it on a stop.
+	if _glide < 0.0:
+		_push_zoom()
 	_snap_camera()
 
 	_grid.set_view(_visible_world_rect())
@@ -4804,6 +5134,8 @@ func load_game() -> bool:
 func wipe_save() -> void:
 	_wiping = true
 	start_tree = tree_mode
+	# Straight back into the lake: this is a key pressed in play, not a trip to the menu.
+	skip_menu = true
 	if has_save():
 		# The engine's own path, not a globalized one: on the web there is no such thing as
 		# an absolute path to a save, and user:// is understood everywhere.

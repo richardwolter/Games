@@ -370,7 +370,7 @@ func within_reach(of: Vector2) -> bool:
 ## Somebody said hello. Ignored while the dog is out in the water with a job on — it is a
 ## dog, not a butler, and it finishes the stick first.
 func pet() -> void:
-	if _state == State.SWIM_OUT or _state == State.CARRY_BACK:
+	if dozing or _state == State.SWIM_OUT or _state == State.CARRY_BACK:
 		return
 	_state = State.PETTED
 	_age = 0.0
@@ -380,6 +380,45 @@ func pet() -> void:
 	_voice_next = _now() + _rng.randf_range(VOICE_GAP_LEAST, VOICE_GAP_MOST)
 	petted.emit()
 	queue_redraw()
+
+
+## Asleep until told otherwise: the main menu's pose (2026-09-17, Richard: "dogs just
+## sleeping until game starts"). The lake runs live behind the menu, and a pack fetching and
+## delivering there would be a game playing itself with nobody at it.
+##
+## Turned on, the dog lies down where it is — or on a roomy spot of grass when `scatter` is
+## set or it is out in the water — and its nap never runs out; what it had in its mouth is
+## handed back for the lake to put in the crate, since a piece must not be lost to a pose.
+## Turned off, it wakes after a moment of its own, so a pack of four does not get up as one.
+var dozing: bool = false
+
+
+func doze(on: bool, scatter: bool = false) -> PackedInt32Array:
+	var dropped := _carried.duplicate()
+	dozing = on
+	if not on:
+		_mood_left = _rng.randf_range(WAKE_LEAST, WAKE_MOST)
+		return PackedInt32Array()
+	_carried.clear()
+	_release()
+	_detour = Vector2.INF
+	_to_strand = false
+	_speed = 0.0
+	_greet = 0.0
+	if scatter or not _on_land():
+		tile_pos = _somewhere_on_land()
+	_state = State.NAP
+	# Not all on the same breath.
+	_age = _rng.randf_range(0.0, 4.0)
+	_mood_left = INF
+	_place()
+	queue_redraw()
+	return dropped
+
+
+## How long after the menu lets go a dozing dog gets up, in seconds.
+const WAKE_LEAST := 0.6
+const WAKE_MOST := 3.0
 
 
 func _process(delta: float) -> void:
@@ -392,7 +431,7 @@ func _process(delta: float) -> void:
 	_greet_wait = maxf(_greet_wait - delta, 0.0)
 	# Somebody came over. Noticed on the step into reach rather than while they are in it,
 	# so it is a hello and not a hum.
-	var near := angler != null and within_reach(angler.tile_pos)
+	var near := angler != null and within_reach(angler.tile_pos) and not dozing
 	if near and not _was_near and _greet_wait <= 0.0 and _state != State.PETTED:
 		_greet = GREET_TIME
 		_greet_wait = GREET_AGAIN
@@ -436,7 +475,7 @@ func _process(delta: float) -> void:
 
 ## Now and then, near the angler: a sniff or a bark wandering past them, a bark sitting about.
 func _maybe_speak() -> void:
-	if angler == null or tile_pos.distance_to(angler.tile_pos) > HEAR:
+	if dozing or angler == null or tile_pos.distance_to(angler.tile_pos) > HEAR:
 		return
 	if _rng.randf() >= VOICE_ODDS:
 		return

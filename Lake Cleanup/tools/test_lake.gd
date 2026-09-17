@@ -172,6 +172,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_settings_shape()
 		31:
 			_stage_binds_shape()
+		32:
+			_stage_front()
 		_:
 			pass
 
@@ -5174,7 +5176,7 @@ func _stage_binds_shape() -> void:
 			"and the player's own keys are put back", str(Binds.overrides().size()))
 	board.visible = false
 	_main.call(&"_set_controls", false)
-	_finish()
+	_advance()
 
 
 ## How wide the upgrades count's badge comes out for a given count. The badge draws itself,
@@ -5200,6 +5202,266 @@ func _luminance(c: Color) -> float:
 	for v: float in parts:
 		lit.append(v / 12.92 if v <= 0.04045 else pow((v + 0.055) / 1.055, 2.4))
 	return 0.2126 * float(lit[0]) + 0.7152 * float(lit[1]) + 0.0722 * float(lit[2])
+
+
+## The menu over the lake (2026-09-17). The harness's lake is borrowed, so it wears no front
+## of its own; the menu is raised by hand and the rules are asked of it.
+##
+## Waits on drawn frames and on the glide itself, never on harness frames — this node steps
+## in `_physics_process` and the lake's `_process` is an idle callback, see `_ferry_step`.
+var _front_step: int = 0
+var _front_mark: int = 0
+var _front_held: int = 0
+var _front_sludge: float = 0.0
+
+
+## Every piece that is out of the water and not yet sold: in the crate, in a hold, in a
+## mouth, in a net, or in the air on its way to one of those. Cargo already thrown at a
+## yard's box is as good as sold and is not counted.
+func _pieces_in_hand() -> int:
+	var total := _yard.held.size()
+	for boat: Boat in _main.get(&"_boats") as Array:
+		total += boat.cargo.size()
+	for dog: Dog in _main.get(&"_dogs") as Array:
+		total += dog.carrying()
+	for net in [_net, _main.get(&"_net2")]:
+		if net != null:
+			total += (net as CastNet).catch.size()
+	var haul := _main.get(&"_haul") as Haul
+	for piece: Dictionary in haul.get(&"_flying") as Array:
+		if not (piece["tag"] is Dropoff):
+			total += 1
+	return total
+
+
+## The loading screen (2026-09-17): the game opens on the boot scene, and its bar is the
+## HUD's meter with nothing on its end, at the HUD's size, swept filthy to clean.
+func _check_loading() -> void:
+	var first := String(ProjectSettings.get_setting("application/run/main_scene"))
+	_check(first == "res://scenes/boot.tscn", "the game opens on the boot scene", first)
+	var screen := LoadingScreen.new()
+	add_child(screen)
+	var bar := screen.bar()
+	var circles := 0
+	var waters := 0
+	for node in bar.get_children():
+		var sheet := node as TextureRect
+		if sheet == null or sheet.texture == null:
+			continue
+		if sheet.texture.resource_path.contains("Garbage_Circle"):
+			circles += 1
+		if sheet.texture.resource_path.contains("Murky_Water"):
+			waters += 1
+	_check(circles == 0 and waters == 1 and bar.get_child_count() == 2,
+		"the loading bar is the meter's water in its frame, and no garbage circle",
+		"%d children, %d circles" % [bar.get_child_count(), circles])
+	var skin := _main.get(&"_skin") as Control
+	var hud_frame: Rect2 = skin.get(&"_meter_frame_box")
+	_check(absf(bar.size.x - hud_frame.size.x) <= 1.0 and absf(bar.size.y - hud_frame.size.y) <= 1.0,
+		"drawn at the HUD meter's own size, not a bigger one",
+		"bar %s, hud %s" % [str(bar.size), str(hud_frame.size)])
+	var rising := true
+	var last := -1.0
+	for i in 21:
+		var at := Boot.sweep_at(Boot.SWEEP * float(i) / 20.0)
+		if at < last:
+			rising = false
+		last = at
+	_check(rising and is_zero_approx(Boot.sweep_at(0.0))
+		and is_equal_approx(Boot.sweep_at(Boot.SWEEP), 1.0),
+		"the sweep runs from filthy to clean and never back", "")
+	# The shader's seam is where the *filth* ends, so an untouched bar has it at the far end of
+	# the track and a finished one at the near end: green first, the clean water coming in
+	# from the right, as on the HUD. Handed the clean share straight, the first cut swept from
+	# clean to filthy; mirrored to fill left to right, the second was not the game's meter.
+	var water := bar.get_node_or_null(^"Water") as TextureRect
+	_check(water != null and not water.flip_h,
+		"the bar's water is the HUD's way round, not mirrored", "")
+	var track: Rect2 = HudSkin.METER_TRACK
+	var sheet_wide: float = HudSkin.METER_SHEET.x
+	screen.progress = 0.0
+	_check(is_equal_approx(bar.seam(), track.end.x / sheet_wide),
+		"a bar that has not started is filth from end to end", "%.3f" % bar.seam())
+	screen.progress = 1.0
+	_check(is_equal_approx(bar.share, 1.0) and is_equal_approx(bar.seam(), track.position.x / sheet_wide),
+		"and a finished one is clean from end to end", "%.3f" % bar.seam())
+	# The way out: the logo and the bar go at once and the lake alone dissolves. Faded with
+	# it they went in pieces, each layer against what was under it.
+	screen.dress(false)
+	var picture := screen.get_node_or_null(^"Picture") as CanvasItem
+	_check(not screen.dressed() and not bar.visible and picture != null and picture.visible,
+		"undressed, the loading screen is the lake alone", "")
+	var fill := screen.get_node_or_null(^"Fill") as CanvasItem
+	_check(fill != null and not fill.visible,
+		"and no flat colour lies under the picture to wash through it", "")
+	screen.queue_free()
+	var curtain := Curtain.new()
+	add_child(curtain)
+	curtain.open_on()
+	var loading := curtain.get_node(^"Loading") as LoadingScreen
+	var whole := loading.dressed() and loading.visible
+	for i in Curtain.HOLD_FRAMES + 1:
+		curtain.call(&"_process", 0.016)
+	_check(whole and not loading.dressed() and loading.visible,
+		"the curtain holds the screen whole, then takes the logo and the bar off in one frame", "")
+	curtain.queue_free()
+
+
+func _stage_front() -> void:
+	var dogs: Array = _main.get(&"_dogs")
+	var boats: Array = _main.get(&"_boats")
+	var camera := _main.get(&"_camera") as Camera2D
+	match _front_step:
+		0:
+			_check_loading()
+			# Something of every kind in flight: a hold at sea, a stick in a mouth, a catch
+			# in the net. The pose may lose none of it and may sell none of it.
+			for panel in [&"_set_controls", &"_set_settings", &"_set_menu", &"_set_shed"]:
+				_main.call(panel, false)
+			var def := 0
+			var hull := boats[0] as Boat
+			hull.cargo = PackedInt32Array([def, def])
+			hull.state = Boat.State.SAILING
+			hull.tile_pos = hull.dock + Vector2(6.0, 6.0)
+			(dogs[0] as Dog).set(&"_carried", PackedInt32Array([def]))
+			_net.catch.append(def)
+			_net.state = CastNet.State.REELING
+			# Everything the lake has out of the water and not yet sold, wherever it is: the
+			# stages before this one leave holds and mouths as they found them.
+			_front_held = _pieces_in_hand()
+			_front_sludge = float(_main.get(&"sludge"))
+			_main.call(&"_enter_menu", false)
+			_check(bool(_main.get(&"_in_menu")), "the menu goes up over the lake", "")
+			var menu := _main.get(&"_menu") as MainMenu
+			_check(menu != null and menu.live(), "and its doors answer", "")
+			var asleep := 0
+			var ashore := 0
+			for dog: Dog in dogs:
+				if dog.dozing and int(dog.get(&"_state")) == Dog.State.NAP:
+					asleep += 1
+				if bool(dog.call(&"_on_land")):
+					ashore += 1
+			_check(asleep == dogs.size() and ashore == dogs.size(),
+				"every dog is asleep on the grass behind it",
+				"%d asleep, %d ashore of %d" % [asleep, ashore, dogs.size()])
+			var home := 0
+			for boat: Boat in boats:
+				if boat.moored and not boat.is_running() and boat.cargo.is_empty() \
+						and boat.tile_pos.is_equal_approx(boat.dock):
+					home += 1
+			_check(home == boats.size(), "every hull is moored at its berth, hold empty",
+				"%d of %d" % [home, boats.size()])
+			_check(_net.state == CastNet.State.IDLE and _net.catch.is_empty(),
+				"the net is home", "")
+			_check(_yard.held.size() == _front_held and _front_held >= 4,
+				"and the hold, the stick and the catch are all in the crate",
+				"%d in hand -> %d in the crate" % [_front_held, _yard.held.size()])
+			_check(is_equal_approx(float(_main.get(&"sludge")), _front_sludge),
+				"nothing was sold by the pose", "")
+			_check(not (_main.get(&"_hud_layer") as CanvasLayer).visible,
+				"the HUD is off", "")
+			_check(not _angler.can_walk, "the angler stands idle", "")
+			_check(bool(_main.call(&"pad_cursor_wanted")), "the pad drives a pointer", "")
+			var stops: Array = _main.call(&"_zoom_stops")
+			_check(is_equal_approx(camera.zoom.x, float(stops[0])),
+				"the view is the whole lake, on the far stop", "%.3f" % camera.zoom.x)
+			# Continue is the run's door, and the accent is on whichever door goes in.
+			var planks: Dictionary = menu.get(&"_planks")
+			menu.has_run = false
+			_check(not (planks[&"continue"] as Control).visible
+				and (planks[&"new"] as PlankButton).accent,
+				"with no run there is no Continue, and New game is the lit door", "")
+			menu.has_run = true
+			_check((planks[&"continue"] as Control).visible
+				and (planks[&"continue"] as PlankButton).accent
+				and not (planks[&"new"] as PlankButton).accent,
+				"with a run Continue is there and is the lit one", "")
+			# The lake reads nothing: Escape here used to mean the settings.
+			var escape := InputEventKey.new()
+			escape.keycode = KEY_ESCAPE
+			escape.pressed = true
+			_main.call(&"_unhandled_input", escape)
+			_check(not bool(_main.get(&"_settings_open")),
+				"Escape behind the menu does not open the lake's settings", "")
+			# A full crate and a clock run out: neither may move anything behind the menu.
+			for i in (boats[0] as Boat).capacity:
+				_yard.put(def)
+			if FileAccess.file_exists(SAVE_PATH):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+			_main.set(&"_autosave_in", 0.0)
+			_front_mark = Engine.get_process_frames()
+			_front_step = 1
+		1:
+			if Engine.get_process_frames() - _front_mark < 8:
+				return
+			var sailing := 0
+			for boat: Boat in boats:
+				if boat.is_running():
+					sailing += 1
+			_check(sailing == 0, "a full crate sends no ferry out from behind the menu",
+				"%d sailing" % sailing)
+			_check(not FileAccess.file_exists(SAVE_PATH),
+				"and the autosave does not write a pose", "")
+			var menu := _main.get(&"_menu") as MainMenu
+			menu.call(&"_take", &"continue")
+			_check(not bool(_main.get(&"_in_menu")) and float(_main.get(&"_glide")) >= 0.0,
+				"Continue takes the menu off and starts the glide", "")
+			var awake := 0
+			for dog: Dog in dogs:
+				if not dog.dozing:
+					awake += 1
+			var free := 0
+			for boat: Boat in boats:
+				if not boat.moored:
+					free += 1
+			_check(awake == dogs.size() and free == boats.size(),
+				"the pack and the fleet are let go at once", "")
+			_check(not _angler.can_walk, "but the angler's legs wait for the view to land", "")
+			_front_mark = Engine.get_process_frames()
+			_front_step = 2
+		2:
+			if float(_main.get(&"_glide")) >= 0.0:
+				if Engine.get_process_frames() - _front_mark > 2400:
+					_check(false, "the glide ends", "still gliding")
+					_finish()
+				return
+			var stops: Array = _main.call(&"_zoom_stops")
+			var on_stop := false
+			for stop: float in stops:
+				if is_equal_approx(camera.zoom.x, stop):
+					on_stop = true
+			# The stop nearest the play zoom. Headless has one stop (a dummy display's stretch
+			# is near nothing, so every level is MAX_ZOOM), so "in from the far end" cannot be
+			# asked here; that it is a stop, and the play one, can.
+			var typed: Array[float] = []
+			typed.assign(stops)
+			var play: float = typed[Lake._nearest_stop(typed, Lake.VIEW_ZOOM)]
+			_check(on_stop and is_equal_approx(camera.zoom.x, play),
+				"the glide lands on a whole stop, the play one", "%.3f" % camera.zoom.x)
+			_check(_angler.can_walk, "and the angler has their legs back", "")
+			var skin := _main.get(&"_skin") as Control
+			_check((_main.get(&"_hud_layer") as CanvasLayer).visible
+				and is_equal_approx(skin.modulate.a, 1.0), "the HUD is back, whole", "")
+			# And out again: no scene change, the run written once the pose is struck.
+			if FileAccess.file_exists(SAVE_PATH):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+			_net.catch.append(0)
+			_net.state = CastNet.State.REELING
+			var held := _pieces_in_hand()
+			_main.call(&"_quit")
+			_check(bool(_main.get(&"_in_menu")) and _main.is_inside_tree()
+				and get_tree().current_scene != null,
+				"Save and go to menu raises the menu on this same lake", "")
+			_check(FileAccess.file_exists(SAVE_PATH), "and writes the run", "")
+			_check(_yard.held.size() == held,
+				"with the net's catch in the crate, not lost to the save",
+				"%d in hand -> %d in the crate" % [held, _yard.held.size()])
+			_main.call(&"_begin_glide")
+			_front_step = 3
+		3:
+			if float(_main.get(&"_glide")) >= 0.0:
+				return
+			_finish()
 
 
 func _stage_new_tracks() -> void:
