@@ -119,6 +119,12 @@ const WHILE_INDOORS := [
 ## and SOUNDS' own small roll on top, so two casts at the same step are still not identical.
 const NET_SPLASH_PITCHES: Array[float] = [0.72, 0.85, 0.98, 1.1]
 
+## And the throw with it (2026-09-17, Richard): the cast is two takes in a row, so pitching
+## the splash alone left the whoosh in front of it identical every time. A narrower spread
+## than the splash's — the throw is the rope leaving the hand, and a wide swing on it reads
+## as a different net rather than the same one thrown again.
+const NET_THROW_PITCHES: Array[float] = [0.9, 0.97, 1.04, 1.12]
+
 ## The same for the two sounds a long haul fires most often (2026-09-16, Richard: "not too
 ## repetitive and tiring"). The coin lands once a piece sold and the thud once a piece boxed,
 ## so both are heard dozens of times a minute; one take at one pitch turns into a metronome.
@@ -503,7 +509,7 @@ func _next_pitch(name: StringName, steps: Array[float]) -> float:
 
 ## The net leaving the angler's hands.
 func play_throw() -> void:
-	play(&"net_throw")
+	play(&"net_throw", 0.0, _next_pitch(&"net_throw", NET_THROW_PITCHES))
 
 
 ## A piece of rubbish leaving a hand or landing on a pile. One note, played straight: this
