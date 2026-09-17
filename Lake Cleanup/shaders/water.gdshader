@@ -692,10 +692,19 @@ void fragment() {
 	// foam. Driven by this water's own filth, so it goes as the washed-up rubbish is fetched
 	// away. Blotches rather than a band, in 4-pixel cells, so it reads as muck lying on the
 	// water rather than a darker stripe drawn along the shore.
-	vec2 grime_at = vec2(px.x, px.y * 2.0);
+	//
+	// It sways with the water it lies on (2026-09-17, Richard: "shore scum is not swaying"):
+	// the blotches' plane is pushed along the bands' axis by the bands' own `warp`, as the
+	// open-water film's is, and the whole band rides the coast wave — carried up the beach
+	// at a crest and drawn back out in a trough, by the same `bank_lap` that moves the
+	// water's edge. Both in whole art pixels. It used to sit on the static line while the
+	// water's edge ran in and out under it.
+	float grime_push = floor(warp / foam_pixel + 0.5) * foam_pixel;
+	vec2 grime_at = vec2(px.x, px.y * 2.0) + vec2(-0.4472, 0.8944) * grime_push;
 	float grime_cell = foam_hash(floor(grime_at / 4.0));
 	float grime_patch = foam_hash(floor(grime_at / 22.0) + vec2(5.0, 3.0));
-	float grime_band = step(bank_in, grime_reach * (0.5 + grime_patch * 0.8));
+	float grime_in = bank_in + bank_lap * bank_mean;
+	float grime_band = step(grime_in, grime_reach * (0.5 + grime_patch * 0.8));
 	float grime = grime_band * step(0.35, grime_cell) * step(0.3, grime_patch) * step(1.5, state);
 	col = mix(col, grime_color.rgb, grime);
 

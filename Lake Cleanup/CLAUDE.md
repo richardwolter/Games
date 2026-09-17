@@ -3231,6 +3231,10 @@ nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOS
   Existing saves restore their stacks and have no strand pieces.
 - Grime: `water.gdshader` draws scum blotches in the bank's shallowest water, scaled by the
   local filth, so they go as that stretch is fetched clean.
+  **They sway with the water** (2026-09-17, Richard: "shore scum is not swaying"): the
+  blotches' plane is pushed by the bands' own `warp`, like the open-water film, and the band
+  rides the coast wave (`bank_lap`) up the beach and back. They sat on the static line
+  while the water's edge moved under them.
 - **Beach litter** (dry pieces): the same small set also lies up the outer bank's sand,
   `Iso.BEACH_LITTER` tiles past the waterline, on `BEACH_CHANCE` of those tiles. They are real
   stacks on land tiles, flagged by `LakeGrid.dry`: no bob/sway (packed with `DRY_ANCHOR`,
