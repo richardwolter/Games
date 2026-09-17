@@ -1,6 +1,14 @@
 """Build the game's sound files from the recordings in art_source/SFX.
 
     python tools/build_sfx.py          (from the project root; needs ffmpeg on PATH)
+    python tools/build_sfx.py --split Object_in_box.wav
+
+The second is the auditioning pass, for a recording that holds several takes one after
+another: every onset is written whole to `art_source/SFX/_takes/<name>/take_NN.wav` with
+its timestamp, for Richard to listen to in Explorer and name the ones worth keeping. Those
+timestamps are then pinned in `PLAN` by hand as ordinary `span` cuts. The scratch folder is
+not shipped and nothing in the build reads it: a pick a person made is data this table
+holds, not something the onset finder gets to decide again on the next run.
 
 The recordings are kept as they were saved: 24-bit, 96 kHz, seconds of silence either
 side. The game gets `assets/sfx/`: short sounds as 16-bit 44.1 kHz WAV with the silence cut
@@ -39,6 +47,9 @@ RATE = 44100
 #   ("span", start_s, end_s[, fade_s])  exactly that stretch, short fade in, FADE_OUT (or
 #                              fade_s) out
 #   ("peak", end_s)            from just before the loudest transient, faded by end_s
+#   ("takes", [(start_s, end_s), ...])  one file per stretch, `name_1`, `name_2`...: the
+#                              takes a person picked out of a recording that holds many,
+#                              each trimmed to where its own ring dies away
 #   ("steps", gap_rel, most_s) one file per onset, `name_1`, `name_2`...; onsets under
 #                              STEP_LEAST of the loudest are dropped as room, not steps
 #   ("loop", start_s, len_s[, cross_s])  a seamless loop of len_s, its end crossfaded into its
@@ -74,6 +85,12 @@ PLAN = {
     # drop landing a moment after the piece does (Richard, 2026-09-16).
     "drop_big": ("Drop_Big_Decoration.wav", ("peak", 0.5)),
     "drop_small": ("Drop_Small_Decoration.wav", ("peak", 0.4)),
+    # A piece landing in the island crate: Richard's own recording of an object dropped into
+    # a box, which holds 28 takes one after another (2026-09-17). Three of them, picked by ear
+    # off `--split`'s scratch cuts: takes 5, 18 and 24. The game plays one of the three at
+    # random, never the one it played last, so the variety is three real drops rather than one
+    # take pitched about — which is why `POP_PITCH` and `POP_PITCHES` went with this change.
+    "pop": ("Object_in_box.wav", ("takes", [(3.040, 3.620), (14.160, 15.140), (20.390, 22.410)])),
     "fireplace": ("Fireplace_On.wav", ("loop", 10.0, 30.0)),
     "step_grass": ("Grass_Steps.wav", ("steps", 0.25, 0.34)),
     "step_sand": ("Sand_Steps.wav", ("steps", 0.3, 0.34)),
@@ -312,6 +329,24 @@ def from_peak(samples, end_s):
     return fade(cut(samples, start, start + end_s), 0.001, FADE_OUT)
 
 
+def takes(samples, spans):
+    """One cut per picked stretch, each let go where its own ring dies away.
+
+    The spans come from `--split`'s log, so they run to the next onset and carry however much
+    room happened to follow. Trimming each to its own tail is what keeps three takes of one
+    thing the same length as each other rather than as long as the gaps in the recording."""
+    out = []
+    for start_s, end_s in spans:
+        clip = cut(samples, start_s, end_s)
+        env = envelope(clip, 0.005)
+        peak = max(env) if env else 0.0
+        if peak > 0.0:
+            last = max(i for i, e in enumerate(env) if e > peak * 0.01) * 0.005 + 0.02
+            clip = cut(clip, 0.0, min(end_s - start_s, last + FADE_OUT))
+        out.append(fade(clip, 0.0005, FADE_OUT))
+    return out
+
+
 def steps(samples, rel, most_s):
     env = envelope(samples, 0.01)
     peak = max(env)
@@ -379,7 +414,55 @@ def write_ogg(name, samples):
     return path
 
 
+TAKES = os.path.join(SRC, "_takes")
+## An onset in an audition take, against the loudest in the recording. Lower than
+## STEP_LEAST's footsteps: a softer drop is still a drop worth hearing.
+TAKE_LEAST = 0.12
+
+
+def split(source):
+    """Write every onset of `source` to its own scratch WAV, for listening to.
+
+    Untouched but for the cut: no level pass, no fade in. What is being judged is the
+    recording, and a candidate that has been mixed is not the thing that will be shipped."""
+    samples = decode(os.path.join(SRC, source))
+    env = envelope(samples, 0.01)
+    peak = max(env)
+    onsets = []
+    low = True
+    for i, e in enumerate(env):
+        if low and e > peak * TAKE_LEAST:
+            onsets.append(i * 0.01)
+            low = False
+        elif e < peak * TAKE_LEAST * 0.35:
+            low = True
+    folder = os.path.join(TAKES, os.path.splitext(source)[0])
+    os.makedirs(folder, exist_ok=True)
+    lines = ["%-10s %8s %8s %8s" % ("take", "at", "secs", "peak")]
+    for k, at in enumerate(onsets):
+        end = onsets[k + 1] - 0.02 if k + 1 < len(onsets) else len(samples) / 2.0 / RATE
+        start = max(0.0, at - 0.02)
+        clip = fade(cut(samples, start, end), 0.0005, FADE_OUT)
+        name = "take_%02d" % (k + 1)
+        path = os.path.join(folder, name + ".wav")
+        with wave.open(path, "wb") as w:
+            w.setnchannels(2)
+            w.setsampwidth(2)
+            w.setframerate(RATE)
+            w.writeframes(clip.tobytes())
+        lines.append("%-10s %8.3f %8.2f %8.1f"
+                     % (name, start, (end - start), peak_db(clip)))
+    text = chr(10).join(lines) + chr(10)
+    with open(os.path.join(folder, "takes.log"), "w", encoding="utf-8") as log:
+        log.write(text)
+    print(text)
+    print("%d takes in %s" % (len(onsets), folder))
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--split":
+        split(sys.argv[2])
+        return
     os.makedirs(OUT, exist_ok=True)
     cache = {}
     report = []
@@ -399,6 +482,9 @@ def main():
             cuts = [(name, fade(clip, SMOOTH_IN if name in SMOOTH else FADE_IN, out_s), "wav")]
         elif kind == "peak":
             cuts = [(name, from_peak(samples, how[1]), "wav")]
+        elif kind == "takes":
+            cuts = [("%s_%d" % (name, i + 1), s, "wav")
+                    for i, s in enumerate(takes(samples, how[1]))]
         elif kind == "steps":
             cuts = [("%s_%d" % (name, i + 1), s, "wav")
                     for i, s in enumerate(steps(samples, how[1], how[2]))]

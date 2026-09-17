@@ -4284,6 +4284,28 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
 		"but the angler's own throw into the crate still does", "")
 
+	# The crate's thud is its own recording, in three takes, one of which is played per drop
+	# and never the one played last (2026-09-17). The shed's furniture thud is untouched and
+	# is still its own file.
+	_check(sound.call(&"_count", &"pop") == 3,
+		"the crate's thud loaded its three takes", "%d" % sound.call(&"_count", &"pop"))
+	_check(sound._first(&"pop") != sound._first(&"drop_big"),
+		"and the shed's furniture thud is still a recording of its own", "")
+	var repeated := false
+	var picked := -1
+	for i in 40:
+		var step := int(sound.call(&"next_step", &"pop", 3))
+		if step == picked:
+			repeated = true
+		picked = step
+	_check(not repeated, "no take follows itself", "")
+	# Its own name, so the room's allow-list refuses it with the rest of the lake while the
+	# shed is open, and lets the furniture's own thud through.
+	sound.indoors = true
+	_check(not sound.may_play(&"pop"), "the crate is not heard from inside the shed", "")
+	_check(sound.may_play(&"drop_big"), "but a piece set down in the room is", "")
+	sound.indoors = false
+
 	# Every recording is levelled by the builder now, so what SOUNDS holds is the mix. A
 	# figure far outside the band is a take that was never rebuilt.
 	var loudest := -100.0

@@ -2526,7 +2526,8 @@ The code-built placeholder sounds are replaced by Richard's recordings. **Supers
   than rolled about one pitch — one take lands every cast; pigeon wings quieter; `AMBIENCE_DB` -10 (was +2); piece splash louder. **A piece landing
   in a box is the shed's own wooden thud** (`drop_big` at `POP_PITCH` 0.85) — the built pop is
   gone, and dropped in pitch it read as a shot heard from a long way off (Richard: "wood on
-  wood, bold").
+  wood, bold"). **Superseded 2026-09-17**: the crate has a recording of its own, see The
+  crate's thud below.
 - **The throw is stepped too** (2026-09-17, Richard: not too repetitive), `NET_THROW_PITCHES`
   through the same `_next_pitch`. A cast is two takes one after the other, so pitching the
   splash alone left the whoosh in front of it identical every time. **Narrower than the
@@ -2548,7 +2549,8 @@ purpose. What the audit settled, against the shipped design:
   playlist, `victory_stinger`→Habibs, plus everything the spec never listed (the ferry, the
   net, the steps, the wading, the coins, the dogs, the shed).
 - **Superseded** by decisions above: `horn`→`ferry_bell`, `engine_loop` retired, `drag_loop`→
-  `haul`, `pop`→`drop_big` at `POP_PITCH`.
+  `haul`, `pop`→`drop_big` at `POP_PITCH`, and since 2026-09-17 `pop`→`Object_in_box`, its own
+  recording in three takes.
 - **Struck off, by decision**: the four splash tiers (`splash_small`/`medium`/`large`/`heavy`)
   stay **one recording pitched by weight** — `Object_Splash` through `play_splash`, which is
   what is in play and what works; `catch.wav` (the knock, cut); and `warning.wav`, which has
@@ -2576,7 +2578,35 @@ purpose. What the audit settled, against the shipped design:
 - **The box thud came up** (same day, Richard: still a bit muffled): `POP_DB` -16 to **-9**
   and `POP_PITCH` 0.85 to **0.90**. Dropping the pitch is what makes it bold and also what
   makes it dull, so the pitch went half the way back and the level took the rest. Both are
-  by-ear knobs.
+  by-ear knobs. **Both constants are gone since 2026-09-17**, with the single take they were
+  rescuing; the level they settled on is carried into `SOUNDS[&"pop"]`.
+- **The crate's thud is its own recording, in three takes** (2026-09-17, `/grill-me` with
+  Richard, `art_source/SFX/Object_in_box.wav`). It was the shed's furniture thud, `drop_big`,
+  pitched down to 0.90 and stepped across four pitches — both of which existed only to
+  disguise one take being heard a thousand times a run. **So both are retired**: `POP_PITCH`
+  and `POP_PITCHES` are gone, and `POP_DB` with them (the balance is `SOUNDS[&"pop"]` now,
+  where every other recording's is).
+  - **The recording holds 28 takes one after another**, so the builder grew an auditioning
+    pass: `python tools/build_sfx.py --split Object_in_box.wav` writes every onset whole to
+    `art_source/SFX/_takes/<name>/take_NN.wav` with a log of timestamps, for listening to in
+    Explorer. Scratch, git-ignored, and **nothing in the build reads it**: the pick a person
+    made is data `PLAN` holds, not something the onset finder gets to decide again next run.
+  - **Richard picked 5, 18 and 24**, pinned as a `("takes", [(start, end), ...])` cut. Each
+    span runs to the next onset, so each is trimmed to where its own ring dies away — three
+    takes of one thing should be the same length as each other, not as long as the gaps that
+    happened to follow them in the room.
+  - **One of the three per drop, never the one played last** (`Sfx.next_step`, the rule
+    `_next_pitch` was already following — what is being avoided is the repeat, not the pitch;
+    `play` takes a `take` index for it). `SOUNDS`' own small roll goes on top.
+  - **Its own name is what keeps it out of the shed**: borrowing `drop_big` put it on the
+    room's allow-list, so `play_pop` had to say `if indoors: return` for itself. As `pop` the
+    allow-list refuses it with the rest of the lake and the furniture's thud still comes
+    through. The ferry-at-a-pier silence is untouched.
+  - **`drop_big` is untouched** and is still the shed's own recording, by decision — one
+    wooden-thud take everywhere was offered and turned down.
+  - **-9 dB is carried over from `POP_DB`** as the first guess; a by-ear knob, in `SOUNDS`.
+  - `test_lake` guards the three takes loading, the two thuds being different recordings, no
+    take following itself, and the shed hearing the furniture but not the crate.
 - **A ferry is heard coming home** (same day, Richard: sparsely): `Sfx.play_berth` from
   `Boat`'s RETURNING→DOCKED — the water it pushes on the fleet's own `BOAT_MOVE_GAP`, the
   bell on `BERTH_BELL_GAP` (70 s), much longer than the 25 s it leaves on. **The island end
@@ -2609,7 +2639,7 @@ purpose. What the audit settled, against the shipped design:
     `HAUL_EVERY` (1 s) while reeling, pitch and level off the net's effort (`set_drag`).
   - Each piece lifted: `Object_Splash`, pitched lower and louder by weight, at most one every
     `SPLASH_GAP` (0.08 s). The built knock that used to go under it is cut (see above).
-  - A piece landing in a box: the shed's wooden thud (`play_pop`), **except when a ferry is
+  - A piece landing in a box: `Object_in_box`, three takes (`play_pop`), **except when a ferry is
     landing its hold at a pier** (`Haul._pop` skips a `Dropoff` tag, 2026-09-16, Richard: too
     repetitive). That volley is a whole hold going into a box across the lake, several times
     a minute, and it already has a sound of its own — the run of coins to the plate, which is
@@ -2622,11 +2652,11 @@ purpose. What the audit settled, against the shipped design:
     the one playing finishes; never restarted while still sounding (`Sfx.hover_find`, `CastNet._chime_at_finds`,
     `LakeGrid.shining_finds`). Also when a find surfaces (`LakeGrid.find_surfaced`, emitted
     from `_restamp`, so a rebuild or a load rings nothing).
-  - Coins: `Coin_Sound_2` (`CHINK_GAP`). Purchases: `Upgrade_Purchase`. **The coin and the
-    box's thud are pitched in steps** (`COIN_PITCHES`, `POP_PITCHES`, through `_next_pitch`,
-    which the net's splash shares, 2026-09-16): both fire dozens of times a minute on a long
-    haul, and one take at one pitch reads as a metronome. Never the step used last, with
-    `SOUNDS`' own roll on top.
+  - Coins: `Coin_Sound_2` (`CHINK_GAP`). Purchases: `Upgrade_Purchase`. **The coin is pitched
+    in steps** (`COIN_PITCHES`, through `_next_pitch`, which the net's splash and throw share,
+    2026-09-16): it fires dozens of times a minute on a long haul, and one take at one pitch
+    reads as a metronome. Never the step used last, with `SOUNDS`' own roll on top. **The box's
+    thud had the same ladder and no longer needs one** — see The Crate's Thud below.
   - Pigeons: `Pigeon_Fly` passing over, `Pigeon_Noise` lifted from the lake (own player).
   - Dogs (`Dog._maybe_speak`/`_speak`): a bark (1 or 2 at random) passing the angler or sitting
     idle within `HEAR`; a sniff wandering near them or when they walk up. **Sparse by rule**:

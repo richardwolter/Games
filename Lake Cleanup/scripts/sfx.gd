@@ -74,6 +74,10 @@ const SOUNDS := {
 	&"shed_open": [-10.5, 0.0],
 	&"game_start": [-9.1, 0.0],
 	&"drop_big": [-5.1, 0.05],
+	## A piece landing in the island crate: three takes of Richard's own recording, one of
+	## which is played per drop. A small roll on top of three real drops, where one take
+	## pitched about needed a whole ladder of steps to stop being a metronome.
+	&"pop": [-9.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
 }
 
@@ -128,28 +132,16 @@ const NET_THROW_PITCHES: Array[float] = [0.9, 0.97, 1.04, 1.12]
 ## The same for the two sounds a long haul fires most often (2026-09-16, Richard: "not too
 ## repetitive and tiring"). The coin lands once a piece sold and the thud once a piece boxed,
 ## so both are heard dozens of times a minute; one take at one pitch turns into a metronome.
-## The pop's steps multiply `POP_PITCH`, the coin's stand on their own.
+## The coin's stand on their own. The thud has no ladder: it has three recordings of its own
+## (2026-09-17), and `POP_PITCH`/`POP_PITCHES` went with the single take they were disguising.
 const COIN_PITCHES: Array[float] = [0.88, 0.96, 1.04, 1.14]
-const POP_PITCHES: Array[float] = [0.88, 0.96, 1.05, 1.14]
-
-## A piece landing in a box: the shed's own wooden thud, a little under the pitch it was
-## recorded at (2026-09-15, Richard: "wood on wood, bold"). The built pop it replaces was a
-## filtered knock, and dropped in pitch it read as a shot heard from a long way off.
-##
-## Up from 0.85 (2026-09-16, Richard: still a bit muffled). Dropping the pitch is what makes
-## it bold and also what makes it dull, so this went only half the way back and POP_DB took
-## the rest of the answer.
-const POP_PITCH := 0.90
 
 ## The find chime rings no more than once in this many seconds, from its start: the marker
 ## held over a find hears a ring now and then, not a peal.
 const CHIME_GAP := 6.0
 
-## The built sounds' balance, as before the recordings came.
-## A piece landing in the crate: the moment work turns into stock. Up 4 dB over the level
-## floor (2026-09-16, Richard: it is still a bit muffled) — this and POP_PITCH are the two
-## knobs for it, and both want a pass by ear.
-const POP_DB := -9.0
+## The built sounds' balance, as before the recordings came. The crate's thud is a recording
+## now and its balance is in SOUNDS with the rest of the mix.
 const CHIME_DB := -10.0
 ## The lake come clean.
 const FOUND_DB := -10.0
@@ -331,6 +323,11 @@ func _load_recordings() -> void:
 		_streams[name] = found
 
 
+## How many recordings a name loaded, so a caller picking one by hand does not have to know.
+func _count(name: StringName) -> int:
+	return int((_streams.get(name, []) as Array).size())
+
+
 func _first(name: StringName) -> AudioStream:
 	var list: Array = _streams.get(name, [])
 	return list[0] if not list.is_empty() else null
@@ -404,7 +401,9 @@ func hush() -> void:
 
 ## A recording by name, through the pool. `db` is added to its balance and `pitch` multiplies
 ## its roll. Any variant, picked at random.
-func play(name: StringName, db: float = 0.0, pitch: float = 1.0) -> void:
+## `take` picks one of a name's numbered recordings by hand, for a sound whose variants are
+## what stand in for a pitch ladder; -1 leaves the roll to chance, as every other name does.
+func play(name: StringName, db: float = 0.0, pitch: float = 1.0, take: int = -1) -> void:
 	var list: Array = _streams.get(name, [])
 	if list.is_empty() or not may_play(name):
 		return
@@ -424,7 +423,7 @@ func play(name: StringName, db: float = 0.0, pitch: float = 1.0) -> void:
 			_next_voice = (_next_voice + 1) % _voices.size()
 	var tune: Array = SOUNDS.get(name, [0.0, 0.0])
 	var spread: float = tune[1]
-	voice.stream = list[_rng.randi() % list.size()]
+	voice.stream = list[take % list.size()] if take >= 0 else list[_rng.randi() % list.size()]
 	voice.volume_db = float(tune[0]) + db
 	voice.pitch_scale = pitch * _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
@@ -499,12 +498,21 @@ func play_net_splash() -> void:
 ## One of `steps`, never the one this name used last, so two plays in a row are always a
 ## different pitch. SOUNDS' own small roll goes on top of it in `play`.
 func _next_pitch(name: StringName, steps: Array[float]) -> float:
+	return steps[next_step(name, steps.size())]
+
+
+## An index under `count`, never the one this name was last given. The pitch ladders and the
+## thud's three takes are the same rule — what is being avoided is the repeat, not the pitch.
+func next_step(name: StringName, count: int) -> int:
+	# A name whose files are missing asks for a step of nothing; `play` will drop it anyway.
+	if count <= 1:
+		return 0
 	var was := int(_pitch_step.get(name, -1))
-	var step := _rng.randi() % steps.size()
-	if step == was and steps.size() > 1:
-		step = (step + 1 + _rng.randi() % (steps.size() - 1)) % steps.size()
+	var step := _rng.randi() % count
+	if step == was:
+		step = (step + 1 + _rng.randi() % (count - 1)) % count
 	_pitch_step[name] = step
-	return steps[step]
+	return step
 
 
 ## The net leaving the angler's hands.
@@ -512,18 +520,15 @@ func play_throw() -> void:
 	play(&"net_throw", 0.0, _next_pitch(&"net_throw", NET_THROW_PITCHES))
 
 
-## A piece of rubbish leaving a hand or landing on a pile. One note, played straight: this
-## is a sound the player hears a thousand times.
+## A piece of rubbish landing in a box. One of three takes of the same drop, never the one
+## played last: this is a sound the player hears a thousand times, and it has its own
+## recording rather than the shed's furniture thud pitched down (2026-09-17).
+##
+## Its own name, so the shed's allow-list refuses it without being asked to: a yard filling
+## while the player decorates is out of earshot like the rest of the lake, which `play_pop`
+## used to have to say for itself while it borrowed `drop_big`.
 func play_pop() -> void:
-	# The shed's own thud is what a piece landing in a box plays, so the room's allow-list
-	# cannot tell the two apart: a yard filling while the player decorates is stopped here.
-	if indoors:
-		return
-	play(
-		&"drop_big",
-		POP_DB - float(SOUNDS[&"drop_big"][0]),
-		POP_PITCH * _next_pitch(&"pop", POP_PITCHES)
-	)
+	play(&"pop", 0.0, 1.0, next_step(&"pop", _count(&"pop")))
 
 
 ## A ferry setting off from the island's dock.
