@@ -74,8 +74,9 @@ const GRASS_BURY := 1.0
 const PRINT_SPACING := 10.0
 const PRINT_OFFSET := 1.6
 
-## How far out from the island the dog will go looking, in tiles, and how heavy a piece it
-## will bring back. A dog fetches sticks: tier zero, and small enough to get its mouth round.
+## How far out from the island the dog will go looking, in tiles, and how heavy a piece an
+## untrained one will bring back. A dog fetches sticks: tier zero, and small enough to get
+## its mouth round. Strong Dogs raises both ends from here — see `carry_tier`/`carry_wide`.
 const REACH := 15.0
 const CARRY_TIER := 0
 const CARRY_WIDE := 16.0
@@ -208,6 +209,14 @@ var angler: Angler
 ## shed screen, a test — behaves exactly as it did before there were upgrades to buy.
 var fetch_most: int = 1
 var wait_cut: float = 0.0
+
+## What Strong Dogs has bought: the heaviest weight tier the pack will pick up, and the
+## widest piece it can get its mouth round, in world pixels. Tier alone would buy almost
+## nothing — width is the gate that actually binds, since `def.size.x` is the art's own
+## width at SPRITE_SCALE — so one track raises the two in step. The defaults are the
+## constants, so a Dog with no lake behind it fetches exactly what it always did.
+var carry_tier: int = CARRY_TIER
+var carry_wide: float = CARRY_WIDE
 
 ## Tree test mode's dog training (see `Lake.tree_mode`). At these defaults the dog is exactly
 ## the one the constants describe: `reach` is REACH, nothing sends it to the strand first, and
@@ -572,7 +581,7 @@ func _find_stick(from_dog: bool = false) -> int:
 		if stack.is_empty():
 			continue
 		var def := grid.defs[stack[stack.size() - 1]]
-		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
+		if def.tier > carry_tier or def.size.x > carry_wide or def.keepsake:
 			continue
 		if _claimed_by_other(index):
 			continue
@@ -606,7 +615,7 @@ func _find_strand(from_dog: bool = false) -> int:
 		if stack.is_empty():
 			continue
 		var def := grid.defs[stack[stack.size() - 1]]
-		if def.tier > CARRY_TIER or def.size.x > CARRY_WIDE or def.keepsake:
+		if def.tier > carry_tier or def.size.x > carry_wide or def.keepsake:
 			continue
 		if _claimed_by_other(index):
 			continue

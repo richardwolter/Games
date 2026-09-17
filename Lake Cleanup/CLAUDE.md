@@ -113,7 +113,51 @@ the repo; none of it is on the menu.
   farthest shore is 35.6, `probe_reach`); Speed (reel) 3 + 1 to 23; Ferry speed 4 + 1.6 to
   36; Haul/Hold as above. The simple ones are short: Strength 4, Extra ferry 3 (**4 ferries
   at most**, `MAX_BOATS`), Pack 3 (**4 dogs at most**, `MAX_DOGS`), Fetching 4, Keenness 3,
-  Recycle Bonus 8, Pigeons 8, Lucky haul 10, Double cast 10.
+  Recycle Bonus 8, Pigeons 8, Lucky haul 10, Double cast 10, Fast Sell 4, Strong Dogs 4.
+
+### Fast Sell and Strong Dogs (2026-09-17, `/grill-me` with Richard)
+Two more shop tracks, one on each of the ferry's and the dog's boards.
+- **Fast Sell** (`boat_volley.tres`, `Lake.boat_volley_gap`, `Boat.volley_gap`) is the
+  **`Haul` volley at both ends of a ferry's run** — loading out of the island crate and
+  landing the hold in a yard's box. It is not the sail speed: `boat_speed` ("Speed" on the
+  same board) stays exactly as it was. Richard asked for "the speed objects move from boat
+  to pier boxes", and the loading volley came with it because they are the two waits a hull
+  has and they read as one thing.
+- **It tightens the stagger only**, by decision: every piece keeps its own `FLIGHT` (0.62 s)
+  arc and they merely leave closer together, so a fast ferry pours its hold instead of
+  trickling it and nothing is ever drawn whizzing. `Haul._gap` and `volley_time` take a
+  `gap_scale`; the net's throw into the island crate passes none and is untouched. **The
+  floor is `FLIGHT`** — the whole load in the air at once, which is the clump the `STAGGER`
+  constant exists to prevent — so the track stops at ×0.4 rather than at nothing. 4 levels,
+  ×1.0 to ×0.4: at a 24 hold a volley goes 1.72 s to 1.06 s an end, about 1.3 s off a ~14 s
+  trip. The row reads as "%d%% faster" (0 / 18 / 43 / 82 / 150), because a row saying the
+  gap is 40% of what it was is a row about the code. Stored as a **cut** in the `.tres`
+  (0 → 0.6) the way `dog_wait` is, so the curve counts up like every other track.
+- **Strong Dogs** (`dog_strength.tres`, `Lake.dog_carry_tier`/`dog_carry_wide`,
+  `Dog.carry_tier`/`carry_wide`) raises the pack's weight tier **and its mouth's width
+  together**, by decision. Tier alone buys almost nothing: `def.size.x` is the art's own
+  width at `SPRITE_SCALE`, so `CARRY_WIDE` 16 means an 8-pixel drawing, and lifting
+  `CARRY_TIER` 0 → 4 on its own opens exactly three kinds (`plastic_cup2`, `rubber_disk`,
+  `rubber_ball`). 4 levels, matching the net's Strength: tier 0 → 4, width 16 → 32
+  (`Lake.DOG_WIDE_STEP`), which is **everything in the catalogue but `plastic_toy`** — at
+  31 art px it would still hang half a dog's length out of its mouth at `CARRY_SCALE`.
+  `Dog.CARRY_TIER`/`CARRY_WIDE` are the level-0 defaults now; the values are pushed by
+  `_push_dog_numbers`, so a `Dog` with no lake behind it fetches what it always did.
+- **No `SAVE_VERSION` bump**: both live in the save's `levels` dictionary and a missing key
+  reads as level 0. **Tree runs get neither** — `boat_volley_gap` returns 1.0 and the dog's
+  two getters return the constants.
+- **Priced by hand** (Fast Sell 300 × 2.2, Strong Dogs 120 × 2.6), by Richard's call: "hand
+  price, we'll balance later". Every existing price is untouched and the 69-minute clear is
+  now an estimate. **Neither track is in `docs/progression/build_shop.py`'s `SPEC`**, so a
+  re-run of `shop_loop.sh` would drop them — add them to the model and to `ferry_trip`'s
+  `k_ferry_per_piece` (Fast Sell) and the dog's mean pay (Strong Dogs) before re-running.
+- **Out of scope, by decision**: re-running the pricing loop, `DWELL`, the approach legs,
+  `SPREAD`, `boat_speed`'s curve, tree nodes for either, and `plastic_toy` in a dog's mouth.
+- `test_lake`'s `_stage_new_tracks` guards both tracks loading, a blurb on every track, the
+  gap sliding to 0.4 and never under `FLIGHT`, an unscaled volley being untouched, every
+  hull and every dog being told, the top level opening the whole catalogue bar
+  `plastic_toy`, and both levels surviving a save.
+
 - **The pack** (`dog_count.tres`, "Pack" on the dog's board, `Lake._add_dog`/`_fit_dog`/
   `_dogs`): three more dogs, the same sprite, wired like the first, sharing one Fetching and
   Keenness level. **Claims** (`Dog.claims`, static, `_aim_at`/`_release`): a stick one dog is
@@ -2630,7 +2674,10 @@ nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOS
   going straight back out to fetch is still the commonest thing it does.
 - Collectible and counted like any piece: the lake cannot finish until the dog has cleared
   the strand. If a bank piece ever becomes unfetchable (bigger def, tier > 0), the lake
-  stalls — keep `STRAND_WIDE`/tier in step with `Dog.CARRY_WIDE`/`CARRY_TIER`.
+  stalls — keep `STRAND_WIDE`/tier in step with `Dog.CARRY_WIDE`/`CARRY_TIER`. Strong Dogs
+  (2026-09-17) only ever **raises** `Dog.carry_tier`/`carry_wide` off those constants, so it
+  widens what is fetchable and cannot strand anything; the constants are still the floor the
+  strand's fill must sit inside.
 - Outer bank only, by decision: the island's beach stays tidy.
 - Seeded off the lake seed on its own generator, so the rest of the fill is unchanged.
   Existing saves restore their stacks and have no strand pieces.

@@ -244,6 +244,11 @@ const SHOVE_CLEAR := 10.0
 
 var speed: float = 4.2
 var capacity: int = 6
+## What Fast Sell has bought: the multiple on the gap between two pieces of this hull's
+## volleys, at both ends of the run — loading out of the island crate and landing the hold in
+## a yard's box. 1.0 is an untrained ferry, so a Boat with no lake behind it throws exactly
+## as it did before there was a track to buy. See Haul._gap.
+var volley_gap: float = 1.0
 ## Tiles out from the hull the skimmer bites. Below zero is a boat with no skimmer fitted,
 ## which is what every ferry starts as.
 var skim_radius: int = -1
@@ -441,9 +446,9 @@ func dispatch() -> bool:
 	for i in lot.size():
 		haul.send(
 			lot[i], yard.drop_point(), hold_spot(mini(i, shown - 1), shown),
-			i, lot.size(), self, self
+			i, lot.size(), self, self, null, volley_gap
 		)
-	_dwell = maxf(DWELL, Haul.volley_time(lot.size()) + 0.15)
+	_dwell = maxf(DWELL, Haul.volley_time(lot.size(), volley_gap) + 0.15)
 	return true
 
 
@@ -740,10 +745,10 @@ func _land_cargo() -> void:
 	for i in landed.size():
 		haul.send(
 			landed[i], position, yard_here.drop_point(),
-			i, landed.size(), null, yard_here, self
+			i, landed.size(), null, yard_here, self, volley_gap
 		)
 	state = State.UNLOADING
-	_dwell = maxf(DWELL, Haul.volley_time(landed.size()) + 0.15)
+	_dwell = maxf(DWELL, Haul.volley_time(landed.size(), volley_gap) + 0.15)
 	_landing = true
 
 

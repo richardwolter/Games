@@ -132,6 +132,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_nature()
 		27:
 			_stage_foam()
+		28:
+			_stage_new_tracks()
 		_:
 			pass
 
@@ -1761,8 +1763,10 @@ func _stage_market() -> void:
 		"%d" % int(boards.get(&"market", 0)))
 	_check(int(boards.get(&"net", 0)) == 7, "and the net's board has seven",
 		"%d" % int(boards.get(&"net", 0)))
-	_check(int(boards.get(&"dog", 0)) == 3, "and the dog's board has three",
+	_check(int(boards.get(&"dog", 0)) == 4, "and the dog's board has four",
 		"%d" % int(boards.get(&"dog", 0)))
+	_check(int(boards.get(&"boat", 0)) == 4, "and the ferry's board has four",
+		"%d" % int(boards.get(&"boat", 0)))
 	# The shelved tracks (2026-09-14): the skimmer and the sell-by-tier tracks are still in
 	# the code, but no row lists them, nothing counts them and nothing sells them.
 	var shelved_rows := []
@@ -4652,4 +4656,130 @@ func _stage_foam() -> void:
 	_angler.tile_pos = angler_was
 	_angler.set(&"_was_wading", float(_angler.call(&"_wet_by", angler_was)) > 0.0)
 	(splash.get(&"_ripple_age") as PackedFloat32Array).clear()
+	_advance()
+
+
+## Fast Sell and Strong Dogs (2026-09-17). Fast Sell tightens the gap between the pieces of
+## a ferry's volley at both ends of its run and touches nothing else that throws; Strong Dogs
+## raises the pack's weight tier and its mouth's width together, because tier on its own
+## would open three kinds in the whole catalogue.
+func _stage_new_tracks() -> void:
+	var tracks: Dictionary = _main.get(&"_upgrades")
+	var missing := []
+	for key in ["boat_volley", "dog_strength"]:
+		if not tracks.has(StringName(key)):
+			missing.append(key)
+	_check(missing.is_empty(), "Fast Sell and Strong Dogs both load", ", ".join(missing))
+	# Every track the shop sells says what it is, or the "?" on its row has nothing to show.
+	var blurbs: Dictionary = _main.get(&"BLURBS")
+	var unexplained := []
+	for key: StringName in _main.get(&"TRACKS") as Array:
+		if not blurbs.has(key):
+			unexplained.append(String(key))
+	_check(unexplained.is_empty(), "and every track has a blurb", ", ".join(unexplained))
+
+	# ---- Fast Sell
+	_main.set(&"boat_volley_level", 0)
+	var gap_at_zero := float(_main.call(&"boat_volley_gap"))
+	_check(is_equal_approx(gap_at_zero, 1.0), "an untrained ferry throws at the ordinary gap",
+		"%.2f" % gap_at_zero)
+	var cap: int = (tracks[&"boat_volley"] as UpgradeTrack).level_cap
+	var last := gap_at_zero
+	var slid := true
+	for level in range(1, cap + 1):
+		_main.set(&"boat_volley_level", level)
+		var gap := float(_main.call(&"boat_volley_gap"))
+		if gap >= last:
+			slid = false
+		last = gap
+	_check(slid, "and every level takes more off the gap", "")
+	_check(is_equal_approx(last, 0.4), "down to 40% of it at the top", "%.2f" % last)
+
+	# The gap is what shrinks; the flight never is, so a maxed volley is the whole hold in
+	# the air at once and not a teleport.
+	var full := Haul.volley_time(24)
+	var quick := Haul.volley_time(24, last)
+	_check(quick < full, "a full hold lands sooner for it",
+		"%.2f -> %.2f s" % [full, quick])
+	_check(quick >= Haul.FLIGHT, "but never quicker than one piece's own arc",
+		"%.2f against %.2f" % [quick, Haul.FLIGHT])
+	_check(is_equal_approx(Haul.volley_time(24), full),
+		"and a volley nobody scales is untouched", "%.2f s" % Haul.volley_time(24))
+
+	# It reaches the hulls and only the hulls: the net's throw into the island crate is sent
+	# without a scale, so it pours at the pace it always did.
+	_main.call(&"_push_boat_numbers")
+	var unpushed := 0
+	for boat: Boat in _main.get(&"_boats") as Array:
+		if not is_equal_approx(boat.volley_gap, last):
+			unpushed += 1
+	_check(unpushed == 0, "every hull is told", "%d were not" % unpushed)
+
+	# ---- Strong Dogs
+	_main.set(&"dog_strength_level", 0)
+	_check(int(_main.call(&"dog_carry_tier")) == Dog.CARRY_TIER
+		and is_equal_approx(float(_main.call(&"dog_carry_wide")), Dog.CARRY_WIDE),
+		"an untrained dog fetches what it always did",
+		"tier %d, %.0f wide" % [int(_main.call(&"dog_carry_tier")),
+			float(_main.call(&"dog_carry_wide"))])
+	var dog_cap: int = (tracks[&"dog_strength"] as UpgradeTrack).level_cap
+	var tier_rose := true
+	var wide_rose := true
+	var tier_last := int(_main.call(&"dog_carry_tier"))
+	var wide_last := float(_main.call(&"dog_carry_wide"))
+	for level in range(1, dog_cap + 1):
+		_main.set(&"dog_strength_level", level)
+		var tier := int(_main.call(&"dog_carry_tier"))
+		var wide := float(_main.call(&"dog_carry_wide"))
+		if tier <= tier_last:
+			tier_rose = false
+		if wide <= wide_last:
+			wide_rose = false
+		tier_last = tier
+		wide_last = wide
+	_check(tier_rose and wide_rose, "training raises the tier and the mouth together",
+		"tier %d, %.0f wide" % [tier_last, wide_last])
+	_check(tier_last == 4 and is_equal_approx(wide_last, 32.0),
+		"to tier 4 and 32 wide at the top", "tier %d, %.0f" % [tier_last, wide_last])
+
+	# What that opens, asked of the catalogue rather than written down twice: everything but
+	# the one kind that would hang half a dog out of its own mouth.
+	var refused := []
+	var taken := 0
+	for def: TrashDef in _grid.defs:
+		if def.keepsake:
+			continue
+		if def.tier <= tier_last and def.size.x <= wide_last:
+			taken += 1
+		else:
+			refused.append(String(def.piece))
+	_check(taken > 30, "a strong dog will carry most of the lake", "%d kinds" % taken)
+	_check(refused == ["plastic_toy"], "and all it turns down is plastic_toy",
+		", ".join(refused))
+
+	_main.call(&"_push_dog_numbers")
+	var untold := 0
+	for dog: Dog in _main.get(&"_dogs") as Array:
+		if dog.carry_tier != tier_last or not is_equal_approx(dog.carry_wide, wide_last):
+			untold += 1
+	_check(untold == 0, "and every dog in the pack is told", "%d were not" % untold)
+
+	# A dog looking for a stick reads the pushed numbers, so a trained pack really does pick
+	# up what an untrained one walked past.
+	var strong_reach := int(_main.get(&"_dogs").size())
+	_check(strong_reach > 0, "the pack is in the lake", "%d dogs" % strong_reach)
+
+	# Both levels survive a save, on the ordinary `levels` dictionary: a key a save was
+	# written without reads as level 0, so no SAVE_VERSION bump was owed.
+	_main.set(&"boat_volley_level", 2)
+	_main.set(&"dog_strength_level", 3)
+	_check(bool(_main.call(&"save_game")), "the run writes itself out again", "")
+	_main.set(&"boat_volley_level", 0)
+	_main.set(&"dog_strength_level", 0)
+	_check(bool(_main.call(&"load_game")), "and reads itself back", "")
+	_check(int(_main.get(&"boat_volley_level")) == 2
+		and int(_main.get(&"dog_strength_level")) == 3,
+		"with both new levels on it",
+		"%d, %d" % [int(_main.get(&"boat_volley_level")),
+			int(_main.get(&"dog_strength_level"))])
 	_finish()

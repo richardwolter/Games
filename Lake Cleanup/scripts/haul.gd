@@ -99,7 +99,8 @@ func send(
 	of: int = 1,
 	follow: Node2D = null,
 	tag: Variant = null,
-	lead: Node2D = null
+	lead: Node2D = null,
+	gap_scale: float = 1.0
 ) -> void:
 	var def := grid.defs[def_index] if grid != null else null
 	# Heavier things are thrown flatter. Size stands in for weight: this game has no mass.
@@ -119,7 +120,7 @@ func send(
 		"follow": follow,
 		"tag": tag,
 		"age": 0.0,
-		"wait": float(slot) * _gap(of),
+		"wait": float(slot) * _gap(of, gap_scale),
 		"spin": _rng.randf_range(-SPIN, SPIN),
 		"lift": ARC * lerpf(1.0, ARC_HEAVY, heft) * _rng.randf_range(0.85, 1.15),
 	})
@@ -130,16 +131,23 @@ func send(
 ## How long apart the pieces of a volley of `count` set off. A tenth of a second each until
 ## that would take too long, and then however little it takes to get them all away inside
 ## `SPREAD`.
-static func _gap(count: int) -> float:
+##
+## `gap_scale` is the Fast Sell upgrade, and it is the gap it scales, never `FLIGHT`: every
+## piece keeps its own arc and they only leave closer together, so a fast ferry pours its
+## hold instead of trickling it and no piece is ever drawn whizzing. The floor a maxed track
+## can reach is therefore `FLIGHT` — the whole load in the air at once — which is why the
+## track stops well short of zero. Only the two ferry volleys pass one; the net's throw to
+## the island crate keeps the gap it always had.
+static func _gap(count: int, gap_scale: float = 1.0) -> float:
 	var others := maxf(float(count - 1), 1.0)
-	return minf(STAGGER, SPREAD / others)
+	return minf(STAGGER, SPREAD / others) * maxf(gap_scale, 0.0)
 
 
 ## How long a volley of `count` pieces takes to land, start to finish. Callers that have to
 ## wait for their load — the boat holds at the berth until it has one — ask rather than
 ## guess, so the wait cannot drift out of step with the flight.
-static func volley_time(count: int) -> float:
-	return FLIGHT + _gap(count) * maxf(float(count - 1), 0.0)
+static func volley_time(count: int, gap_scale: float = 1.0) -> float:
+	return FLIGHT + _gap(count, gap_scale) * maxf(float(count - 1), 0.0)
 
 
 ## Where a piece is heading right now, in world space.

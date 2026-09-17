@@ -337,8 +337,15 @@ const MAX_LEVELS := {
 const SHELVED := [&"skimmer", &"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4"]
 
 ## Dogs in the pack at most: the one adopted plus what `dog_count` buys (2026-09-14). All of
-## them share one Fetching and Keenness level and one drawing.
+## them share one Fetching, Keenness and Strong Dogs level and one drawing.
 const MAX_DOGS := 4
+
+## World pixels a level of Strong Dogs adds to how wide a piece the pack can carry. Four
+## levels takes `Dog.CARRY_WIDE` from 16 to 32 — the art's own width times SPRITE_SCALE, so
+## from an 8-pixel drawing to a 16-pixel one, which is every kind in the lake bar
+## `plastic_toy` at 31. That one is left out on purpose: at CARRY_SCALE it would still hang
+## half the dog's length out of its mouth.
+const DOG_WIDE_STEP := 4.0
 
 ## How fast the finished lake lights up, as a fraction of the way there a second.
 const SPARKLE_RISE := 0.5
@@ -466,6 +473,9 @@ var net_hold_level: int = 0
 ## the skimmer, which is off until it is bought.
 var boat_speed_level: int = 0
 var cargo_level: int = 0
+## Fast Sell: how much comes off the gap between two pieces of a hull's volley, at both
+## ends of its run. resources/upgrades/boat_volley.tres.
+var boat_volley_level: int = 0
 var skimmer_level: int = 0
 
 ## Hulls bought on top of the one the player starts with, up to MAX_BOATS in the water. A
@@ -473,11 +483,12 @@ var skimmer_level: int = 0
 ## it is priced well above anything that only makes the first one better.
 var fleet_level: int = 0
 
-## The dog. Two tracks of training: how many pieces it brings back in one trip out, and how
-## much comes off the longest it will laze about between trips. Neither raises what it is
-## able to pick up — heavy and wide junk stays the net's and the skimmer's business.
+## The dog. Three tracks of training: how many pieces it brings back in one trip out, how
+## much comes off the longest it will laze about between trips, and how heavy and how big a
+## piece it can get its mouth round at all (Strong Dogs, 2026-09-17).
 var dog_fetch_level: int = 0
 var dog_wait_level: int = 0
+var dog_strength_level: int = 0
 ## Dogs adopted on top of the first, up to MAX_DOGS in the pack. resources/upgrades/dog_count.tres.
 var dog_count_level: int = 0
 
@@ -612,8 +623,8 @@ var _controls: ControlsSkin
 ## the same StringName used throughout the shop (`&"net_width"`, `&"cargo"`, ...).
 const UPGRADE_ORDER := [
 	"net_width", "net_strength", "net_range", "reel", "net_hold",
-	"boat_speed", "cargo", "fleet",
-	"dog_fetch", "dog_wait",
+	"boat_speed", "cargo", "boat_volley", "fleet",
+	"dog_fetch", "dog_wait", "dog_strength",
 	"sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
 	"recycle_bonus", "bird_worth", "lucky_haul", "double_cast",
 	"dog_count",
@@ -817,6 +828,17 @@ func boat_speed() -> float:
 	return _upgrades[&"boat_speed"].value(boat_speed_level)
 
 
+## The multiple on the gap between two pieces of a ferry's volley, at both ends of its run:
+## 1.0 untrained, down to 0.4 at the top of Fast Sell. A cut rather than a scale in the
+## `.tres`, the way `dog_wait` is, so the curve counts up from nothing like every other
+## track. resources/upgrades/boat_volley.tres, and see Haul._gap for what it does and does
+## not touch. Tree runs have no Fast Sell and throw at the ordinary pace.
+func boat_volley_gap() -> float:
+	if tree_mode:
+		return 1.0
+	return 1.0 - _upgrades[&"boat_volley"].value(boat_volley_level)
+
+
 ## resources/upgrades/cargo.tres.
 func boat_cargo() -> int:
 	if tree_mode:
@@ -838,6 +860,23 @@ func dog_wait_cut() -> float:
 	if tree_mode:
 		return _tree_stat("dog_wait_cut")
 	return _upgrades[&"dog_wait"].value(dog_wait_level)
+
+
+## The heaviest weight tier the pack will pick up, and the widest piece it can get its mouth
+## round, in world pixels. One track raises both: tier on its own would open three kinds in
+## the whole catalogue, because `def.size.x` is the art's own width at SPRITE_SCALE and that
+## is the gate that actually binds. The top of the track is everything but `plastic_toy`.
+## resources/upgrades/dog_strength.tres. Tree runs keep the untrained dog.
+func dog_carry_tier() -> int:
+	if tree_mode:
+		return Dog.CARRY_TIER
+	return Dog.CARRY_TIER + int(_upgrades[&"dog_strength"].value(dog_strength_level))
+
+
+func dog_carry_wide() -> float:
+	if tree_mode:
+		return Dog.CARRY_WIDE
+	return Dog.CARRY_WIDE + DOG_WIDE_STEP * _upgrades[&"dog_strength"].value(dog_strength_level)
 
 
 ## How wide the skimmer bites as it sails, in tiles out from the hull. Below zero is no
@@ -3107,8 +3146,8 @@ const PRICES := {
 ## should not mean formatting nine lines of text every frame.
 const TRACKS := [
 	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
-	&"boat_speed", &"cargo", &"skimmer", &"fleet",
-	&"dog_fetch", &"dog_wait", &"dog_count",
+	&"boat_speed", &"cargo", &"boat_volley", &"skimmer", &"fleet",
+	&"dog_fetch", &"dog_wait", &"dog_strength", &"dog_count",
 	&"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4",
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
@@ -3126,11 +3165,13 @@ const BLURBS := {
 	&"net_hold": "Placeholder: how many pieces one cast can carry home.",
 	&"boat_speed": "Placeholder: how fast the ferry sails between the island and the yards.",
 	&"cargo": "Placeholder: how many pieces the ferry carries a trip.",
+	&"boat_volley": "Placeholder: how quickly a ferry throws its load aboard and into the yard's box.",
 	&"skimmer": "Placeholder: a skimmer on the ferry picks up rubbish as it sails.",
 	&"fleet": "Placeholder: another ferry in the water.",
 	&"dog_fetch": "Placeholder: how many pieces the dog brings back a trip.",
 	&"dog_wait": "Placeholder: how long the dog lazes about between trips, at most.",
 	&"dog_count": "Placeholder: another dog for the pack, trained like the first.",
+	&"dog_strength": "Placeholder: the heaviest and biggest pieces the dogs can carry back.",
 	&"lucky_haul": "Placeholder: odds that a cast lifts one tier heavier and holds more.",
 	&"double_cast": "Placeholder: odds that a cast throws a second net beside the first.",
 	&"sell_0": "Placeholder: what light pieces sell for at the yards.",
@@ -3182,6 +3223,13 @@ func _shop_rows() -> Array:
 		[&"boat_speed", &"boat", "Speed", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
 		[&"cargo", &"boat", "Hold", func(l: int) -> String:
 			return "%d aboard" % int(_track_value(&"cargo", l))],
+		[&"boat_volley", &"boat", "Fast Sell", func(l: int) -> String:
+			# Read as how much faster the load moves, not as the cut itself: a row that says
+			# the gap is 40% of what it was is a row about the code. The gap is what shrinks
+			# and the flight never does, so this tops out at +150% and not at the moon.
+			return "%d%% faster" % roundi(
+				(1.0 / maxf(1.0 - _track_value(&"boat_volley", l), 0.01) - 1.0) * 100.0
+			)],
 		[&"fleet", &"boat", "Extra ferry", func(l: int) -> String: return "%d in the water" % (1 + l)],
 		[&"dog_fetch", &"dog", "Fetching", func(l: int) -> String:
 			return "%d per trip" % int(_track_value(&"dog_fetch", l))],
@@ -3189,6 +3237,8 @@ func _shop_rows() -> Array:
 			return "waits %ds at most" % roundi(maxf(
 				Dog.MOOD_MOST - _track_value(&"dog_wait", l), Dog.MOOD_LEAST
 			))],
+		[&"dog_strength", &"dog", "Strong Dogs", func(l: int) -> String:
+			return "Tier %d" % (Dog.CARRY_TIER + int(_track_value(&"dog_strength", l)))],
 		[&"dog_count", &"dog", "Pack", func(l: int) -> String:
 			return "%d dog%s" % [1 + l, "" if l == 0 else "s"]],
 		[&"lucky_haul", &"net", "Lucky haul", func(l: int) -> String:
@@ -3384,6 +3434,8 @@ func _level_of(what: StringName) -> int:
 			return boat_speed_level
 		&"cargo":
 			return cargo_level
+		&"boat_volley":
+			return boat_volley_level
 		&"skimmer":
 			return skimmer_level
 		&"fleet":
@@ -3392,6 +3444,8 @@ func _level_of(what: StringName) -> int:
 			return dog_fetch_level
 		&"dog_wait":
 			return dog_wait_level
+		&"dog_strength":
+			return dog_strength_level
 		&"dog_count":
 			return dog_count_level
 		&"recycle_bonus":
@@ -3449,6 +3503,8 @@ func _buy(what: StringName) -> void:
 			boat_speed_level += 1
 		&"cargo":
 			cargo_level += 1
+		&"boat_volley":
+			boat_volley_level += 1
 		&"skimmer":
 			skimmer_level += 1
 		&"fleet":
@@ -3458,6 +3514,8 @@ func _buy(what: StringName) -> void:
 			dog_fetch_level += 1
 		&"dog_wait":
 			dog_wait_level += 1
+		&"dog_strength":
+			dog_strength_level += 1
 		&"dog_count":
 			dog_count_level += 1
 			_add_dog()
@@ -3738,6 +3796,8 @@ func _push_dog_numbers() -> void:
 	for dog in _dogs:
 		dog.fetch_most = dog_fetch()
 		dog.wait_cut = dog_wait_cut()
+		dog.carry_tier = dog_carry_tier()
+		dog.carry_wide = dog_carry_wide()
 		if tree_mode:
 			# The tree's dog numbers are relative to the file's base (6 tiles, 0.35 of trips,
 			# pace 1), so a base dog is exactly today's dog and the nodes scale it from there.
@@ -3806,6 +3866,7 @@ func _push_boat_numbers() -> void:
 	for boat in _boats:
 		boat.speed = boat_speed()
 		boat.capacity = boat_cargo()
+		boat.volley_gap = boat_volley_gap()
 		boat.skim_radius = skim_radius()
 		boat.skim_power = skim_power()
 		boat.skim_chance = skim_chance()
@@ -4491,9 +4552,10 @@ func save_game() -> bool:
 			"net_range": net_range_level, "reel": reel_level,
 			"net_hold": net_hold_level,
 			"boat_speed": boat_speed_level, "cargo": cargo_level,
+			"boat_volley": boat_volley_level,
 			"skimmer": skimmer_level, "fleet": fleet_level,
 			"dog_fetch": dog_fetch_level, "dog_wait": dog_wait_level,
-			"dog_count": dog_count_level,
+			"dog_strength": dog_strength_level, "dog_count": dog_count_level,
 			"sell_0": sell_levels[0], "sell_1": sell_levels[1], "sell_2": sell_levels[2],
 			"sell_3": sell_levels[3], "sell_4": sell_levels[4],
 			"recycle_bonus": recycle_bonus_level, "bird_worth": bird_worth_level,
@@ -4568,9 +4630,11 @@ func load_game() -> bool:
 	net_hold_level = _saved_level(levels, &"net_hold")
 	boat_speed_level = _saved_level(levels, &"boat_speed")
 	cargo_level = _saved_level(levels, &"cargo")
+	boat_volley_level = _saved_level(levels, &"boat_volley")
 	skimmer_level = _saved_level(levels, &"skimmer")
 	dog_fetch_level = _saved_level(levels, &"dog_fetch")
 	dog_wait_level = _saved_level(levels, &"dog_wait")
+	dog_strength_level = _saved_level(levels, &"dog_strength")
 	for tier in sell_levels.size():
 		sell_levels[tier] = _saved_level(levels, StringName("sell_%d" % tier))
 	recycle_bonus_level = _saved_level(levels, &"recycle_bonus")
