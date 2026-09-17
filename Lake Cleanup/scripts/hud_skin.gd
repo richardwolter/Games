@@ -342,26 +342,80 @@ func _draw() -> void:
 	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
 	_draw_stock()
 	_draw_available()
-	if not hint.is_empty():
-		_draw_hint()
+	# The hint is its own node over the meter's sheets. See `HintLine`.
+	_place_hint()
 	if not siege.is_empty():
 		_draw_siege()
 
 
-## A line of plain text over the meter, centred on its frame. No plate behind it: it is a
-## note about the lake, and it belongs on the lake. Over rather than under because the meter
-## sits on the bottom edge of the screen.
-func _draw_hint() -> void:
-	var height := Style.TEXT_BODY
-	Style.write(
-		self,
-		hint,
-		height,
-		Vector2(0.0, _meter_frame_box.position.y - GAP),
-		Style.GOLD.lerp(Style.INK, 0.5),
-		HORIZONTAL_ALIGNMENT_CENTER,
-		_meter_frame_box
-	)
+## A line of plain text over the meter. No plate behind it: it is a note about the lake, and
+## it belongs on the lake. Over rather than under because the meter sits on the bottom edge
+## of the screen.
+##
+## **A node of its own, added after the meter's sheets** (2026-09-17, Richard: the line was
+## showing behind the meter). It was written in this Control's own `_draw`, and the meter is
+## four child TextureRects — children draw over their parent, so wherever the two met the
+## wood won. And they met: the line was hung off the *frame's* top, while the garbage
+## circle beside the frame stands a good way higher. So two things, either of which would
+## have done: the line is drawn last, over every sheet, and it stands clear of the whole
+## meter's ink — the higher of the circle and the frame — by `GAP` plus the descenders.
+class HintLine extends Control:
+	var text := ""
+	## Where the glyphs' baseline goes, and the box the line is centred on.
+	var baseline := 0.0
+	var across := Rect2()
+
+	func _draw() -> void:
+		if text.is_empty():
+			return
+		Style.write(
+			self, text, Style.TEXT_BODY, Vector2(0.0, baseline),
+			Style.GOLD.lerp(Style.INK, 0.5), HORIZONTAL_ALIGNMENT_CENTER, across
+		)
+
+
+var _hint_line: HintLine
+
+
+## The top of everything the meter draws, on screen: the garbage circle's or the frame's,
+## whichever is higher.
+func meter_top() -> float:
+	var scale := _meter_box.size.y / METER_SHEET.y
+	return minf(_meter_frame_box.position.y, _meter_box.position.y + METER_CIRCLE.position.y * scale)
+
+
+## The box the hint's glyphs take, on screen, or an empty one when nothing is said. Asked by
+## the harness, so the check that keeps the line off the meter measures this layout.
+func hint_box() -> Rect2:
+	if hint.is_empty():
+		return Rect2()
+	var face := Style.font()
+	var span := face.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1.0, Style.TEXT_BODY)
+	var base := _hint_baseline()
+	var left := _meter_box.position.x + (_meter_box.size.x - span.x) * 0.5
+	return Rect2(left, base - face.get_ascent(Style.TEXT_BODY), span.x,
+		face.get_ascent(Style.TEXT_BODY) + face.get_descent(Style.TEXT_BODY))
+
+
+func _hint_baseline() -> float:
+	return floorf(meter_top() - GAP - Style.font().get_descent(Style.TEXT_BODY))
+
+
+func _place_hint() -> void:
+	if _hint_line == null:
+		_hint_line = HintLine.new()
+		_hint_line.name = &"HintLine"
+		_hint_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_hint_line.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(_hint_line)
+	# Last among the children, whatever was added since: over every sheet of the meter.
+	move_child(_hint_line, get_child_count() - 1)
+	_hint_line.size = size
+	_hint_line.text = hint
+	_hint_line.baseline = _hint_baseline()
+	# Centred on the whole meter, circle and all, now that it stands over the whole of it.
+	_hint_line.across = _meter_box
+	_hint_line.queue_redraw()
 
 
 ## What is happening to the shed, and what the player is holding.

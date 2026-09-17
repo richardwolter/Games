@@ -3315,6 +3315,22 @@ func _stage_ending() -> void:
 		_check(_main.call(&"_last_pieces_line") == "", "and not at fifty-one", "")
 		_main.set(&"_left_over", 1)
 		_check(_main.call(&"_last_pieces_line") == "1 piece left", "one piece is singular", "")
+		# Over the meter, not behind it (2026-09-17): the line is a node drawn after every
+		# sheet of the meter, and its glyphs end above the top of the meter's ink.
+		var skin: HudSkin = _main.get(&"_skin")
+		skin.hint = "50 pieces left"
+		skin.call(&"_place_hint")
+		var line: Control = skin.get_node_or_null(^"HintLine")
+		_check(line != null and line.get_index() == skin.get_child_count() - 1,
+			"the pieces line is its own node, drawn after every sheet of the meter", "")
+		var box: Rect2 = skin.hint_box()
+		_check(box.size.x > 0.0 and box.end.y <= skin.meter_top(),
+			"and its glyphs end above the meter's highest ink, the circle's included",
+			"line ends %.1f, meter starts %.1f" % [box.end.y, skin.meter_top()])
+		var circle_top: float = (skin.get(&"_meter_box") as Rect2).position.y
+		_check(skin.meter_top() <= (skin.get(&"_meter_frame_box") as Rect2).position.y
+			and skin.meter_top() >= circle_top,
+			"the meter's top is the circle's, not just the frame's", "")
 		_main.set(&"_left_over", was)
 		# And now it really is empty, with the same float dust on the meter.
 		var stack := _grid.stacks[_deep_tile()]

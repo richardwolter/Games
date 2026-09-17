@@ -575,6 +575,15 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   It used to read "n pieces still out there" and only once the meter was on the floor —
   which, with the gate above, was never on a lake the dogs worked. The count is live every
   `CLEAN_CHECK_EVERY`. `test_lake` guards the words, fifty, fifty-one and the singular.
+  **The line is its own node over the meter's sheets** (`HudSkin.HintLine`, `_place_hint`,
+  `meter_top`, `hint_box`, same day, Richard: it was showing behind the meter). It was
+  written in `HudSkin._draw`, and the meter is child TextureRects — **children draw over
+  their parent** — and it hung off the *frame's* top while the garbage circle stands
+  higher, so the two met and the wood won. Now it is the last child, centred on the whole
+  meter, its baseline `GAP` plus the descenders above the higher of the circle and the
+  frame. Anything new written over the meter goes through it, not through `_draw`.
+  `test_lake` guards the child order and that the glyphs end above `meter_top()`; probe
+  `tools/shot_pieces_left.tscn` (desktop build) saves `tools/last_pieces_left.png`.
 - **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
   rising, the note ringing, and **the end song coming in with the beat, not with the text**
   (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their
