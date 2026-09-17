@@ -51,6 +51,11 @@ var _flock: Flock
 var _rebuilds_before: int = 0
 var _skim_kind: int = 0
 var _skimmed_kinds: Array[int] = []
+## The frame `_stage_ending` settled on, so the rest of that stage can be timed from it
+## rather than from a frame number that a dog's delivery can push out of reach. -1 until.
+var _ending_at: int = -1
+## Whether that stage has seen the run end, so the wait for it happens once.
+var _ending_done: bool = false
 
 
 func _ready() -> void:
@@ -366,11 +371,167 @@ func _stage_build() -> void:
 	_check(clipped == 0, "the water polygon reaches past the wave's crest all the way round",
 		"%d of 240 bearings fall outside the rim" % clipped)
 
+	_check_surface()
+
 	# Held at the dock for the casting and yard-cap stages, which need the yard to stay
 	# where they put it. Switched back on in _stage_ferry, which is what tests the toggle.
 	_main.call(&"_set_auto_ferry", false)
 	_check(not _boat.auto_ferry, "the ferry can be told to stay put", "")
 	_advance()
+
+
+## What the fresh lake is showing, which is the first thing anybody sees of the game.
+##
+## The rules, not the numbers: `LakeGrid.SURFACE_QUOTA`, `SURFACE_APART`, `SURFACE_BAIT` and
+## the two repeat weights are all by-eye knobs and are meant to move. What must hold however
+## they are set is that light things float, that nothing near the island is unliftable, that
+## no one kind covers the water, and that leaning the surface towards the colourful materials
+## has not quietly moved what the yards are paid for.
+func _check_surface() -> void:
+	var span: Vector2 = _grid.get(&"_lightness_span")
+	_check(span.x < span.y,
+		"the depth band runs heavy at the floor and light at the surface",
+		"floor end %.1f, surface end %.1f" % [span.x, span.y])
+
+	var shown := {}
+	var top_kind := [0, 0, 0, 0]
+	var all_kind := [0, 0, 0, 0]
+	var tiles := 0
+	var pieces := 0
+	var top_light := 0.0
+	var floor_light := 0.0
+	var deep := 0
+	var ring_walls := 0
+	var landmarks := 0
+	var at: Array[Vector2i] = []
+	var tops := PackedInt32Array()
+	for index in _grid.stacks.size():
+		var stack := _grid.stacks[index]
+		for piece in stack:
+			all_kind[_grid.defs[piece].material] += 1
+			pieces += 1
+		if stack.is_empty():
+			continue
+		var def := _grid.defs[stack[stack.size() - 1]]
+		# The one-off finds are planted on top of a tile after the fill and are not part of
+		# it: one pet bed afloat by the island is the design, not a repeat.
+		if def.keepsake:
+			continue
+		tiles += 1
+		shown[stack[stack.size() - 1]] = int(shown.get(stack[stack.size() - 1], 0)) + 1
+		top_kind[def.material] += 1
+		at.append(Vector2i(_grid.tile_of(index)))
+		tops.append(stack[stack.size() - 1])
+		if stack.size() >= 4:
+			deep += 1
+			top_light += def.lightness
+			floor_light += _grid.defs[stack[0]].lightness
+		var out := Iso.past_shelf(Vector2(_grid.tile_of(index)))
+		if out < LakeGrid.OPEN_RING:
+			if def.tier > 0:
+				ring_walls += 1
+		elif def.tier > 0 and def.lightness < 1.7:
+			landmarks += 1
+
+	# The band, as it actually comes out rather than as the span says it should: over the
+	# deep stacks, what floats is lighter than what is lying on the floor under it.
+	#
+	# A trend, and a slight one — about 0.16 of lightness between the two ends. The span is
+	# stretched to 0.6 by one def (`wood_box2`) and the next heaviest thing in the lake is at
+	# 1.4, so the band around the floor's target lands where almost nothing lives and most
+	# floor slots fall through to a uniform roll over their material. The surface end is
+	# crowded and works; the floor end barely bites. That was as true before the band was put
+	# the right way up, and it is the fill's business rather than the surface's, so the bar
+	# here is the direction and not a size.
+	_check(deep > 100 and top_light / float(deep) > floor_light / float(deep) + 0.1,
+		"and the lake bears that out: what floats is lighter than what is under it",
+		"top %.2f, floor %.2f over %d deep stacks"
+		% [top_light / maxf(float(deep), 1.0), floor_light / maxf(float(deep), 1.0), deep])
+
+	# The opening ring: the first casts of a new game can lift everything they can see.
+	_check(ring_walls == 0, "nothing in the opening ring is too heavy for a level-0 net",
+		"%d tiles show one" % ring_walls)
+	# And past it, the bait still puts the occasional heavy thing where it can be seen.
+	_check(landmarks > 20, "past the ring, heavy pieces still break the surface as landmarks",
+		"%d of them" % landmarks)
+
+	# No kind covers the lake. Before the band was put the right way up, one tier-4 crate was
+	# the top of every deep stack and 21% of everything shown.
+	var most := 0
+	var commonest := &""
+	for kind: int in shown:
+		if int(shown[kind]) > most:
+			most = int(shown[kind])
+			commonest = _grid.defs[kind].piece
+	var share := float(most) / maxf(float(tiles), 1.0)
+	_check(shown.size() >= 30, "most of the catalogue is showing somewhere on the surface",
+		"%d kinds of %d" % [shown.size(), _grid.defs.size()])
+	_check(share < 0.08, "and no one kind is more than a fourteenth of it",
+		"%s on %.1f%%" % [commonest, 100.0 * share])
+
+	# The bargain with the yards: what is *seen* leans towards the colourful materials, what
+	# is *in the water* — and so what each yard is paid over a run — is where the quota put
+	# it. The lean is checked as a direction only; how far it gets is a knob, and it is
+	# capped by how often a material is in a stack at all (see `_surface_material`).
+	for m in 4:
+		var stocked := float(all_kind[m]) / maxf(float(pieces), 1.0)
+		_check(absf(stocked - float(LakeGrid.MATERIAL_QUOTA[m])) < 0.02,
+			"the water still holds the %s the yards were priced on"
+			% TrashDef.KIND_NAMES[m].to_lower(),
+			"%.1f%% against the quota's %.0f%%"
+			% [100.0 * stocked, 100.0 * float(LakeGrid.MATERIAL_QUOTA[m])])
+	var seen_metal := float(top_kind[TrashDef.Kind.METAL]) / maxf(float(tiles), 1.0)
+	var seen_rubber := float(top_kind[TrashDef.Kind.RUBBER]) / maxf(float(tiles), 1.0)
+	_check(seen_metal < float(all_kind[TrashDef.Kind.METAL]) / float(pieces)
+		and seen_rubber > float(all_kind[TrashDef.Kind.RUBBER]) / float(pieces),
+		"but the surface leans off the greys towards the colour",
+		"metal %.1f%% of the surface against %.1f%% of the water, rubber %.1f%% against %.1f%%"
+		% [100.0 * seen_metal, 100.0 * float(all_kind[TrashDef.Kind.METAL]) / float(pieces),
+		100.0 * seen_rubber, 100.0 * float(all_kind[TrashDef.Kind.RUBBER]) / float(pieces)])
+
+	# The anti-repeat, measured as the rule really is: by family of look-alikes rather than by
+	# kind (four cans are one can), and against each kind's own room, which is wider for a big
+	# piece. It is a preference and cannot be a law — the pick comes out of the stack the tile
+	# already holds, and a stack with nothing else to offer repeats. It is also asking for
+	# something arithmetically impossible in places: the can family is on an eighth of the
+	# surface and wants three tiles of room, which caps it nearer a fourteenth. So what is
+	# guarded is what the eye would actually catch — no family covering the lake, and two of
+	# a kind rarely side by side — and not a share that the rule was never going to reach.
+	var where := {}
+	for i in at.size():
+		where[at[i]] = _grid.family_of(tops[i])
+	var clan := {}
+	for i in at.size():
+		var head := _grid.family_of(tops[i])
+		clan[head] = int(clan.get(head, 0)) + 1
+	var widest := 0
+	var widest_name := &""
+	for head: int in clan:
+		if int(clan[head]) > widest:
+			widest = int(clan[head])
+			widest_name = _grid.defs[head].piece
+	_check(float(widest) / maxf(float(tiles), 1.0) < 0.18,
+		"no family of look-alikes covers the surface",
+		"%s and its like on %.1f%% of it"
+		% [widest_name, 100.0 * float(widest) / maxf(float(tiles), 1.0)])
+
+	var touching := 0
+	for i in at.size():
+		var head := _grid.family_of(tops[i])
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0:
+					continue
+				var other: Vector2i = at[i] + Vector2i(dx, dy)
+				if where.has(other) and int(where[other]) == head:
+					touching += 1
+					dx = 2
+					dy = 2
+					break
+	_check(float(touching) / maxf(float(tiles), 1.0) < 0.15,
+		"and two of a kind are rarely side by side",
+		"%.1f%% of tiles have one next door"
+		% [100.0 * float(touching) / maxf(float(tiles), 1.0)])
 
 
 ## How far the angler has to have walked before the walking checks are made, in tiles. Past
@@ -836,9 +997,14 @@ func _stage_ferry() -> void:
 			"loading took the catch out of the yard",
 			"%d aboard, %d left in the yard" % [_boat.cargo.size(), _yard.held.size()])
 		return
-	if _boat.runs_done < 1 and _in_stage < 500:
+	# A budget, not a deadline: how long a run takes is how far the yard is that the hold
+	# happens to be bound for, and that changes with what the harness managed to haul. At
+	# 500 this sat 17% off a run that really finished (414 frames), and a fill change that
+	# put a different material in the yard tipped it over. This is here to stop a hang.
+	if _boat.runs_done < 1 and _in_stage < 1200:
 		return
-	_check(_boat.runs_done == 1, "the ferry completed a run", "after %d frames" % _in_stage)
+	_check(_boat.runs_done == 1, "the ferry completed a run",
+		"after %d frames, %s" % [_in_stage, _boat.status_line()])
 	_check(not _boat.is_running() and _boat.cargo.is_empty(),
 		"it is back at the dock and empty", "")
 	_check(float(_main.get(&"sludge")) > _sludge_before, "selling paid out",
@@ -3356,7 +3522,30 @@ func _stage_ending() -> void:
 			"a piece still in the net keeps the run going", "")
 		_main.set(&"_clean_check_in", 0.0)
 		return
-	if _in_stage == 41:
+	if _in_stage >= 41 and _ending_at < 0:
+		# The dogs have been fetching all through the harness, and a dog carries a piece to
+		# the crate and then leaves it in the air for `Haul.FLIGHT`. Either is a piece not
+		# landed — which is the rule this stage is about, not a failure of it — so the pack
+		# is let finish what it is holding and the sky is let clear before the net's hold is
+		# emptied. The field is already empty, so nothing new can be picked up.
+		#
+		# Stopping the dogs first is what this did at its first try, and a dog stopped with
+		# a piece in its mouth holds it for ever: `_all_landed` never comes true and the run
+		# never ends. Stop them after, when their mouths are empty.
+		var flying: Haul = _main.get(&"_haul")
+		if flying != null and flying.flying_to(null) > 0:
+			return
+		var busy := false
+		for dog in _main.get(&"_dogs"):
+			if dog != null and dog.carrying() > 0:
+				busy = true
+		if busy:
+			return
+		for dog in _main.get(&"_dogs"):
+			if dog != null:
+				dog.set_process(false)
+		# Everything after this is timed off `_ending_at` rather than off a fixed frame.
+		_ending_at = _in_stage
 		_check(not bool(_main.get(&"_cleaned")),
 			"so an empty lake with a full net is not finished yet", "")
 		_net.catch = PackedInt32Array()
@@ -3374,11 +3563,26 @@ func _stage_ending() -> void:
 		_check(float(_main.get(&"_clean_check_in")) <= 0.0,
 			"and a piece landing in the crate asks for the ending at once", "")
 		return
-	if _in_stage == 44:
+	if _ending_at >= 0 and not _ending_done:
+		# Waited for rather than counted to. `_check_cleaned` runs in `_process` and this
+		# harness counts `_physics_process`, and headless catches physics up at its own rate
+		# — three physics ticks can go by with no `_process` between them, which is why a
+		# check written as "three frames later" failed about four runs in five. What is
+		# under test is whether an empty lake ends at all, not how many frames it takes.
+		if not bool(_main.get(&"_cleaned")) and _in_stage < _ending_at + 120:
+			return
+		_ending_done = true
 		_check(bool(_main.get(&"_cleaned")),
-			"an empty lake ends with the meter still high: the field answers, not the float", "")
+			"an empty lake ends with the meter still high: the field answers, not the float",
+			"pieces %d, landed %s, check in %.3f"
+			% [_grid.piece_count(), str(_main.call(&"_all_landed")),
+			float(_main.get(&"_clean_check_in"))])
+		# The rest of the stage is timed from the moment it really ended.
+		_ending_at = _in_stage
 		return
-	if _in_stage < 80:
+	# Also what holds the frames between the setup and the settle: `_ending_at` is -1 until
+	# the sky is clear, and every check below is timed from it.
+	if _ending_at < 0 or _in_stage < _ending_at + 36:
 		return
 	_check(_grid.piece_count() == 0, "the lake is empty", "")
 	# Nothing left to fill a hold with, so a part load goes rather than waiting for good.

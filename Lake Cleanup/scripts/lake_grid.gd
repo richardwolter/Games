@@ -341,6 +341,82 @@ const FILL_BAND := 0.55
 ## rare enough that it reads as a find and not as the new normal.
 const FILL_BAIT_CHANCE := 0.06
 
+## What the *top* of a stack draws on, once the slots under it have been rolled by
+## `MATERIAL_QUOTA` and the band. Plastic, Wood, Metal, Rubber, like the quota.
+##
+## The surface is the first thing anybody sees and it was 42% metal — greys — because that
+## is what the yards' traffic wants over a whole run. This leans what shows towards the
+## colourful materials **without moving that traffic**: the wanted material is fetched from
+## somewhere lower in the same stack and swapped up, so a tile holds exactly the pieces the
+## quota rolled for it, in a different order. Only a stack that holds none of the wanted
+## material keeps the top it rolled. See `_dress_surface`.
+const SURFACE_QUOTA := [0.32, 0.16, 0.22, 0.30]
+
+## How near, in tiles, a piece of the same kind may show on the surface. The top of each
+## stack is chosen against what its already-decided neighbours are showing, so no one kind
+## clumps — `metal_can1` and `plastic_cup1` used to land beside themselves all over the lake.
+##
+## It knows nothing about what a piece looks like: four cans are four kinds, and two
+## different cans may still sit side by side. A `look` field on TrashDef would fix that and
+## is deliberately not here — a new kind would silently repeat until somebody set it.
+const SURFACE_APART := 3.0
+
+## What a repeat costs the piece that would make one, against `MATERIAL_PULL` for a piece
+## of the material the surface asked for. Both sit over a tiebreak of the piece's own
+## lightness, which runs about 0.6 to 2.7, so the three are three bands rather than one sum.
+##
+## `REPEAT_ANY` is charged for a repeat at any distance at all and `REPEAT_COST` on top of
+## it, falling off to nothing at `SURFACE_APART`. Two terms because the two jobs are
+## different: the floor is what keeps any repeat worse than missing the material, and the
+## slope is what makes a repeat on the next tile worse than one three tiles off.
+##
+## Measured on a fresh lake (`tools/shot_surface.tscn`, and these are the numbers to
+## re-measure against if any of this is retuned):
+##
+##   flat veto, no slope     17% of tiles repeat   metal 39%  rubber 16%
+##   slope alone, no floor   38%                   metal 33%  rubber 20%
+##   floor and slope         17%                   metal 36%  rubber 18%
+##
+## The slope on its own trades away far repeats for material and more than doubles the
+## repeats to buy three points of metal, which is a bad price; with the floor under it the
+## repeats go back to the veto's and most of the material is kept.
+## How much more room the biggest piece in the lake needs before it may show again, as a
+## multiple of `SURFACE_APART`. The smallest needs `SURFACE_APART` itself and everything in
+## between is spread across the two by how much water it covers.
+##
+## A tile showing a 10 px can and a tile showing a 62 px toy are one tile each, and the toy
+## is thirty times as much lake. Counted by tiles the surface was already well spread — no
+## kind over 4.6% — while by *drawn area* `plastic_toy` alone covered 12.3% of the water and
+## `wood_box2` 9.1%, which is what "it still looks like the same few things" actually was.
+## What the eye counts is area, so that is what the spacing is measured in.
+const BIG_ROOM := 2.2
+
+const REPEAT_COST := 60.0
+const REPEAT_ANY := 20.0
+const MATERIAL_PULL := 10.0
+
+## How much of a roll a landmark's pick is worth. Under `REPEAT_ANY`, so a landmark still
+## keeps its distance from its own kind; over nothing else, since the weight tiebreak is
+## not used on a baited tile at all.
+const BAIT_SPREAD := 3.0
+
+## How often the top of a stack takes the *heaviest* thing the tile holds instead of the
+## lightest that suits. `FILL_BAIT_CHANCE` does this for any slot; this is the surface's
+## own rate, higher, because with the band the right way up everything afloat is small and
+## the big silhouettes — a tyre, a pot, a crate — would never be seen at all.
+const SURFACE_BAIT := 0.13
+
+## How far past the water's drawn edge the opening ring reaches, in tiles. Inside it the
+## top of every stack is tier 0, landmark or not, so the first casts of a new game always
+## meet something a level-0 net can lift.
+##
+## Base `net_range` is 4.0 tiles from the angler and the angler may wade `Angler.WALK_LIMIT`
+## (26 px, about half a tile) out from the shore, so 4.6 covers everything the opening net
+## can reach from anywhere on the island. The ordinary fill starts at 2.3 tiles out
+## (`Iso.SHELF_TILES` + `SHELF_CLEAR`), so the ring is a band about two tiles wide.
+## Re-measure if either number moves.
+const OPEN_RING := 4.6
+
 ## Def index per slot, bottom-first. One entry per tile, indexed ty * Iso.COLS + tx; dry
 ## land is an empty stack.
 var stacks: Array[PackedInt32Array] = []
@@ -406,9 +482,25 @@ var defs: Array[TrashDef] = []
 ## the whole list every slot.
 var _by_material: Array = [[], [], [], []]
 
-## The lightest and heaviest a slot can ask for, across every material together, so a
-## depth's band means the same weight class whichever material the quota happens to draw.
+## The two ends of the lightness range, across every material together, so a depth's band
+## means the same weight class whichever material the quota happens to draw. `x` is the
+## floor end (the lowest lightness: the heaviest thing in the lake), `y` the surface end
+## (the highest: the most buoyant). Not "lightest and heaviest" — see `build`.
 var _lightness_span := Vector2(0.0, 1.0)
+
+## The smallest and largest drawn area a piece of rubbish covers, in square world pixels.
+## What `_apart_of` spreads `SURFACE_APART` across. Measured off `defs`, which `Lake._dress`
+## has already sized from the art by the time `build` is called.
+var _area_span := Vector2(1.0, 2.0)
+
+## What each tile ended up showing, while `build` is running: scratch for the anti-repeat
+## in `_dress_surface`, which asks what its already-decided neighbours took. Emptied when
+## the fill is done — it is not the truth about the lake, `stacks` is, and a take changes
+## the top without telling anybody.
+var _surface_shown := PackedInt32Array()
+
+## Which family of look-alikes each def belongs to, one entry per def. See `family_of`.
+var _family := PackedInt32Array()
 
 ## The art. With no atlas every piece falls back to the blocked-in quad it used to be, so
 ## the lake still runs with assets/ missing.
@@ -1514,21 +1606,38 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 			dry[index_of(tx, ty)] = 1 if Iso.on_beach(tx, ty) else 0
 	_shove_at.resize(count)
 	_shoved.resize(0)
+	_surface_shown.resize(count)
+	_surface_shown.fill(-1)
 
 	# The one-off finds are not part of the fill. They are planted afterwards, one of each,
 	# and a fill that dealt them out would put a wardrobe on every third tile.
 	_by_material = [[], [], [], []]
-	var lightest := INF
-	var heaviest := -INF
+	# `lightness` is buoyancy, not weight: higher floats nearer the surface (see TrashDef).
+	# So the floor end of the span is the *lowest* lightness there is and the surface end is
+	# the highest. These two were named `lightest`/`heaviest` and handed over the other way
+	# round, which put the one def at the bottom of the range — `wood_box2`, a tier-4 crate —
+	# on top of every deep stack, and left every other material's surface band empty and
+	# falling back to a uniform roll. A fifth of the visible lake was one crate. Named for
+	# which end of the water they are rather than for how heavy they are, so it cannot
+	# silently invert again.
+	var floor_end := INF
+	var surface_end := -INF
+	var smallest := INF
+	var biggest := -INF
 	for i in defs.size():
 		if defs[i].keepsake:
 			continue
 		_by_material[defs[i].material].append(i)
-		lightest = minf(lightest, defs[i].lightness)
-		heaviest = maxf(heaviest, defs[i].lightness)
+		floor_end = minf(floor_end, defs[i].lightness)
+		surface_end = maxf(surface_end, defs[i].lightness)
+		var area := defs[i].size.x * defs[i].size.y
+		smallest = minf(smallest, area)
+		biggest = maxf(biggest, area)
+	_area_span = Vector2(smallest, maxf(biggest, smallest + 1.0))
+	_name_families()
 	for pool: Array in _by_material:
 		pool.sort_custom(func(a: int, b: int) -> bool: return defs[a].lightness < defs[b].lightness)
-	_lightness_span = Vector2(heaviest, lightest)  # x: floor end, y: surface end
+	_lightness_span = Vector2(floor_end, surface_end)
 
 	for ty in Iso.ROWS:
 		for tx in Iso.COLS:
@@ -1544,11 +1653,12 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 				# 0 at the floor, 1 at the surface.
 				var up := float(k) / maxf(float(slots - 1), 1.0)
 				stack.append(_roll_piece(up))
-			stacks[index] = stack
+			stacks[index] = _dress_surface(index, stack, Vector2(tx, ty))
 
 	if fill:
 		_strand(lake_seed)
 
+	_surface_shown.resize(0)
 	_emerging.resize(0)
 	_dirty = true
 	queue_redraw()
@@ -1582,6 +1692,240 @@ func _strand(lake_seed: int) -> void:
 			if rng.randf() < STRAND_TWO:
 				stack.append(small[rng.randi_range(0, small.size() - 1)])
 			stacks[index_of(tx, ty)] = stack
+
+
+## Choose what the top of a stack shows, out of the pieces that stack already holds.
+##
+## The slots under it have been rolled already and are not touched: this only decides which
+## of them is on top, by swapping the pick with whatever the roll left there. So a tile ends
+## up holding exactly the pieces `MATERIAL_QUOTA` and the band gave it, in a different
+## order, and the traffic each yard sees over a run is the same as it was. The one exception
+## is the opening ring, where a stack that holds nothing liftable has its top substituted —
+## see `OPEN_RING`.
+##
+## Three wants, in that order of priority:
+##
+## 1. Inside `OPEN_RING`, tier 0. Hard — the only one of the three that refuses a piece
+##    outright: the first casts of a new game must be able to lift what they can see.
+## 2. Not a family of look-alikes already showing within this piece's own room
+##    (`family_of`, `_apart_of`), so nothing clumps and a big piece clumps least.
+## 3. The material `SURFACE_QUOTA` asked for, and then the lightest thing that suits — or,
+##    `SURFACE_BAIT` of the time, no material in particular and any of the *heavier half*
+##    of what the tile holds, which is what puts an occasional tyre or crate up where it
+##    can be seen.
+##
+## 2 and 3 are weights, not rules (`REPEAT_ANY`, `REPEAT_COST`, `MATERIAL_PULL`), because
+## the pick has to come out of the pieces the tile already holds and a stack cannot always
+## offer one that suits.
+##
+## Only the field as it is built. A take shows whatever was under the piece, which is
+## heavier by the band and chosen by nothing here; that is the stack being a stack.
+func _dress_surface(index: int, stack: PackedInt32Array, tile: Vector2) -> PackedInt32Array:
+	if stack.is_empty():
+		return stack
+	var top := stack.size() - 1
+	var near_shore := Iso.past_shelf(tile) < OPEN_RING
+	var landmark := _rng.randf() < SURFACE_BAIT
+	var want := _surface_material(stack)
+	# Only as far as this tile's own pieces could ask for. Asked at the widest any piece in
+	# the lake might want, the window is 15 x 8 tiles round every one of eight thousand, and
+	# the fill went from 64 ms to 188; most stacks hold nothing big and want a third of that.
+	var room := 0.0
+	for k in stack.size():
+		if near_shore and defs[stack[k]].tier > 0:
+			continue
+		room = maxf(room, _apart_of(defs[stack[k]]))
+	var seen := _shown_near(tile, room)
+
+	# A landmark is any of the heavier half of what the tile holds, not the one heaviest
+	# thing in it. Taking the heaviest, every baited tile in the lake reached for one of the
+	# same half-dozen kinds — and they are the big ones, so they covered the water.
+	var heavy_from := _heavier_half(stack, near_shore)
+
+	var best := -1
+	var best_score := -INF
+	for k in stack.size():
+		var def := defs[stack[k]]
+		if near_shore and def.tier > 0:
+			continue
+		var score := 0.0
+		if seen.has(family_of(stack[k])):
+			var apart := _apart_of(def)
+			var away := minf(float(seen[family_of(stack[k])]), apart)
+			score -= REPEAT_ANY + REPEAT_COST * (1.0 - away / apart)
+		if landmark:
+			# Any of the heavy half will do, so which one is a roll rather than an order.
+			score += _rng.randf() * BAIT_SPREAD if def.lightness <= heavy_from else 0.0
+		else:
+			if def.material == want:
+				score += MATERIAL_PULL
+			score += def.lightness
+		if score > best_score:
+			best_score = score
+			best = k
+
+	if best < 0:
+		# Nothing in this stack is liftable and it is in the opening ring. Substitute, so
+		# the ring holds no wall; the material is kept, so the tile still pays the yard the
+		# quota sent it to.
+		var swap_in := _tier_zero_of(defs[stack[top]].material)
+		if swap_in >= 0:
+			stack[top] = swap_in
+	elif best != top:
+		var was := stack[best]
+		stack[best] = stack[top]
+		stack[top] = was
+	_surface_shown[index] = family_of(stack[top])
+	return stack
+
+
+## How near a kind may show to itself, in tiles, for a piece this big: `SURFACE_APART` for
+## the smallest thing in the lake, `SURFACE_APART * BIG_ROOM` for the largest, and spread
+## across by area rather than by width — a piece twice as wide is four times the water.
+func _apart_of(def: TrashDef) -> float:
+	var area := def.size.x * def.size.y
+	var across := (area - _area_span.x) / (_area_span.y - _area_span.x)
+	return SURFACE_APART * lerpf(1.0, BIG_ROOM, clampf(across, 0.0, 1.0))
+
+
+## The lightness at or under which a piece counts as one of the heavier half of this stack.
+## `near_shore` drops the pieces the opening ring will not have anyway, so the half is the
+## half of what can really be picked rather than of what happens to be lying there.
+func _heavier_half(stack: PackedInt32Array, near_shore: bool) -> float:
+	var weights: Array[float] = []
+	for piece in stack:
+		if near_shore and defs[piece].tier > 0:
+			continue
+		weights.append(defs[piece].lightness)
+	if weights.is_empty():
+		return INF
+	weights.sort()
+	return weights[(weights.size() - 1) / 2]
+
+
+## Which material the surface wants here: the materials this stack actually holds, weighted
+## by how far `SURFACE_QUOTA` leans on each against what `MATERIAL_QUOTA` put in the water.
+##
+## Asked as a flat `SURFACE_QUOTA` over all four, most of the ask goes to a tile that cannot
+## grant it. Stacks run about four pieces deep and rubber is 13% of the water, so **rubber is
+## in a stack at all only about 43% of the time** — and an ask that cannot be met falls
+## through to the weight tiebreak, which takes the lightest thing there is, and that is a can
+## or a cup. Every share the colourful materials could not spend was handed back to metal.
+##
+## The ratio is what corrects for that: rubber is asked for 0.30/0.13 = 2.3 times as eagerly
+## as it is stocked and metal 0.22/0.42 = 0.5, so where a stack holds both, rubber usually
+## wins. What it cannot do is beat the presence ceiling: a material that is not in the stack
+## cannot be swapped up, and nothing here will substitute one in — that is the whole bargain
+## with the yards. **`SURFACE_QUOTA` is an aim, not a promise**; what it actually lands on is
+## in `tools/last_surface.log`, which prints the two side by side.
+func _surface_material(stack: PackedInt32Array) -> int:
+	var weight := [0.0, 0.0, 0.0, 0.0]
+	var total := 0.0
+	for piece in stack:
+		var m: int = defs[piece].material
+		if weight[m] == 0.0:
+			weight[m] = SURFACE_QUOTA[m] / MATERIAL_QUOTA[m]
+			total += weight[m]
+	if total <= 0.0:
+		return defs[stack[stack.size() - 1]].material
+	var roll := _rng.randf() * total
+	var at := 0.0
+	for m in weight.size():
+		at += weight[m]
+		if roll < at:
+			return m
+	return weight.size() - 1
+
+
+## The families already showing within `room` tiles of this one, each against how near the
+## nearest tile showing it is.
+##
+## Only tiles `build` has already decided — the rows above, and this row to the left. The
+## field is walked in one order, so half a window is the whole of what there is to ask, and
+## asking it this way is what keeps the fill reproducible from the seed.
+##
+## Distance is measured in tiles, not on screen. A tile step across and a tile step down are
+## different distances once the projection has had them, and evening that out would make the
+## rule narrower up the screen than across it for no reason anybody could see.
+func _shown_near(tile: Vector2, room: float) -> Dictionary:
+	var out := {}
+	if room <= 0.0:
+		return out
+	var tx := int(tile.x)
+	var ty := int(tile.y)
+	# As far as the roomiest piece on *this* tile could ask for, since each candidate is
+	# measured against its own `_apart_of` rather than against one distance.
+	var reach := int(ceil(room))
+	for dy in range(-reach, 1):
+		for dx in range(-reach, reach + 1):
+			if dy == 0 and dx >= 0:
+				continue
+			if Vector2(float(dx), float(dy)).length() > room:
+				continue
+			var nx := tx + dx
+			var ny := ty + dy
+			if nx < 0 or ny < 0 or nx >= Iso.COLS or ny >= Iso.ROWS:
+				continue
+			var shown := _surface_shown[index_of(nx, ny)]
+			if shown < 0:
+				continue
+			var away := Vector2(float(dx), float(dy)).length()
+			if not out.has(shown) or away < float(out[shown]):
+				out[shown] = away
+	return out
+
+
+## Which family of look-alikes a kind belongs to: its own index, unless its name is one of a
+## numbered set, in which case the whole set shares the first one's.
+##
+## `metal_can1` to `metal_can4` are four kinds and one object. The anti-repeat could not see
+## that — it kept each can three tiles from itself while letting the four sit in a heap — and
+## a can was on 18% of the surface between them, which is the most repeated thing in the
+## lake by a distance. `wood_painting1` to `4` and `plastic_cup1` to `2` are the same story.
+##
+## Read off the name rather than authored, because the name already says it: a trailing
+## number in this catalogue means "another one of these". That is a convention and not a
+## fact, so it fails safe — a kind that does not follow it is simply its own family, and
+## nothing breaks if one slips through ungrouped.
+func family_of(def_index: int) -> int:
+	if def_index < 0 or def_index >= _family.size():
+		return def_index
+	return _family[def_index]
+
+
+## Work the families out once per build, off the def names.
+func _name_families() -> void:
+	_family.resize(defs.size())
+	var first := {}
+	for i in defs.size():
+		var name := String(defs[i].piece)
+		while not name.is_empty() and name[name.length() - 1] >= "0" 				and name[name.length() - 1] <= "9":
+			name = name.substr(0, name.length() - 1)
+		# A name that is nothing but digits, or an unnamed def, is its own family.
+		if name.is_empty():
+			_family[i] = i
+			continue
+		if not first.has(name):
+			first[name] = i
+		_family[i] = int(first[name])
+
+
+## Any tier-0 kind of this material, for the opening ring's substitution. Every material has
+## some; the walk over all four is there so adding a material without one cannot crash the
+## fill, and -1 says there is nothing to put in, which leaves the roll alone.
+func _tier_zero_of(material: int) -> int:
+	var picks: Array[int] = []
+	for idx: int in _by_material[material]:
+		if defs[idx].tier == 0:
+			picks.append(idx)
+	if picks.is_empty():
+		for pool: Array in _by_material:
+			for idx: int in pool:
+				if defs[idx].tier == 0:
+					picks.append(idx)
+	if picks.is_empty():
+		return -1
+	return picks[_rng.randi_range(0, picks.size() - 1)]
 
 
 ## One slot's piece: a material by `MATERIAL_QUOTA`, then a weight within it by `up` and

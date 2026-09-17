@@ -364,7 +364,12 @@ const MENU_SCENE := "res://scenes/menu.tscn"
 ## (2026-09-16), so a `decor` row's numbers mean something eight times smaller.
 ## 11: a second pet bed and a second chew toy joined the finds (2026-09-17); the def list
 ## changed, and the version 9 shed-unit read went with it, as its own note said it would.
-const SAVE_VERSION := 11
+## 12: the fill's depth band was inverted and is fixed, and the top of every stack is now
+## chosen for variety (2026-09-17). The def list is untouched, so a version 11 file would
+## load and run — and keep its old surface for ever, since a save stores its stacks rather
+## than its seed. Refused instead: the point of the change is what a lake looks like, and a
+## save that quietly opted out of it is a save nobody can judge it by.
+const SAVE_VERSION := 12
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"

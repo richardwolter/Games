@@ -249,6 +249,79 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   depth (`FILL_BAND`), with `FILL_BAIT_CHANCE` of slots ignoring the band so a rare heavy
   piece can float near the surface as a landmark rather than a hazard. Material quota is
   measured off the old fill, not guessed, so the four yards keep the traffic they had.
+- **That band did nothing at all until 2026-09-17.** `_lightness_span` was handed
+  `Vector2(max_lightness, min_lightness)` under the names `heaviest`/`lightest`, so `span`
+  came out negative and `half` with it — every slot's `lo` was above its `hi`, the filter
+  matched nothing, and **every slot in the lake fell through to a uniform roll over its
+  material**. Depth pointed at nothing, in either direction, anywhere. `lightness` is
+  buoyancy (higher floats), the two ends are named `floor_end`/`surface_end` now for which
+  end of the water they are rather than for how heavy they are, and `test_lake` asks the
+  lake itself — over the deep stacks, what floats is lighter than what is under it.
+  **The floor end still barely bites**: one def (`wood_box2`, 0.6) stretches the span and the
+  next heaviest thing is at 1.4, so the band around the floor's target lands where almost
+  nothing lives. The surface end is crowded and works. Percentile ends would fix the other
+  one; not done.
+
+### What the Surface Shows (2026-09-17, `/grill-me` with Richard, `LakeGrid._dress_surface`)
+The top of a stack is the whole first impression of the game, so it is chosen rather than
+left to the roll. **Out of the pieces that stack already holds**: the slots under it are
+rolled as before and the pick is swapped with whatever the roll left on top, so a tile ends
+up holding exactly the pieces `MATERIAL_QUOTA` and the band gave it, in a different order.
+- **Yard traffic is the thing that must not move, by decision** (Richard, over flattening
+  the real quota and re-pricing): what is *seen* leans towards the colourful materials, what
+  is *in the water* — and so what each yard is paid over a run, which `shop.json` was priced
+  on — is untouched. `test_lake` guards all four materials against the quota within 2%.
+- **`SURFACE_QUOTA` is an aim, not a promise.** A material that is not in a stack cannot be
+  swapped up and nothing substitutes one in, so the ask is capped by how often a material is
+  in a stack at all: stacks run about four deep and rubber is 13% of the water, so rubber is
+  there to be picked only about 43% of the time. Asked as a flat quota it landed nowhere —
+  every share the colourful materials could not spend fell through to the weight tiebreak,
+  which takes the lightest thing there is, and that is a can. The ask is weighted
+  `SURFACE_QUOTA / MATERIAL_QUOTA` over the materials the stack holds instead. Asked 32/16/
+  22/30, it lands about **30/13/38/19** against a water of 24/20/42/13. The remaining gap is
+  the presence ceiling; closing it means substitution or moving the real quota, and both were
+  ruled out.
+- **The anti-repeat is by family of look-alikes, read off the names** (`family_of`): a
+  trailing number in this catalogue means "another one of these", so `metal_can1` to `4` are
+  one can, `wood_painting1` to `4` one painting. By kind it kept each can three tiles from
+  itself and let the four sit in a heap, and a can was on 18% of the surface between them.
+  Derived, not authored — Richard chose "spatial anti-repeat, no new data" over a `look`
+  field, and a name is data that is already there. It fails safe: a kind that does not follow
+  the convention is simply its own family.
+- **A big piece needs more room** (`_apart_of`, `BIG_ROOM`): spacing runs from
+  `SURFACE_APART` for the smallest thing in the lake to `SURFACE_APART * BIG_ROOM` for the
+  largest, spread by *drawn area*. Counted by tiles the surface was already well spread — no
+  kind over 4.6% — while by area `plastic_toy` alone covered 12.3% of the water. What the eye
+  counts is area, and that is what "it still looks like the same few things" actually was.
+- **A repeat is graded with a floor under it** (`REPEAT_ANY` + `REPEAT_COST`), not a veto.
+  Flat, a repeat outranked everything and quietly squeezed out the materials with the fewest
+  kinds to their name — rubber has 7 against metal's 12, so "anything not showing nearby"
+  meant "metal" over and over. Measured: flat 17% of tiles repeat / metal 39%; slope alone
+  38% / 33%; **floor and slope 17% / 36%**. The slope alone doubles the repeats to buy three
+  points of metal, which is a bad price.
+- **The opening ring is tier 0** (`OPEN_RING`, 4.6 tiles past the drawn water edge — base
+  `net_range` 4.0 plus the wade): inside it the top of every stack is liftable by a level-0
+  net, landmark or not, so the first casts of a new game never meet a wall. A stack holding
+  nothing liftable has its top substituted, keeping its material — the one place anything is
+  substituted at all.
+- **A landmark is any of the heavier half of what the tile holds, not the heaviest**
+  (`SURFACE_BAIT`, `BAIT_SPREAD`). Taking the heaviest, every baited tile reached for one of
+  the same half-dozen kinds, and they are the big ones, so they covered the water.
+- **`SAVE_VERSION` 12**, version 11 refused: a save stores its stacks rather than its seed, so
+  a v11 file would load and keep its old surface for ever, and a save that quietly opted out
+  of the change is one nobody can judge it by.
+- **Cost: the fill goes 64 ms to 143 ms.** A window is walked round every tile, and the window
+  is only as wide as that tile's own pieces ask for (at the widest any piece might want it was
+  188 ms). Load only — `build` does not run in play, and no frame is touched. Reusing one
+  scratch dictionary instead of one per tile was tried and measured no gain, so it is not there.
+- **Out of scope, by decision**: new or repainted art; the water, grime and filth-map shaders;
+  fill density (every wet tile keeps its stack, so the lake is still junk edge to edge);
+  `TURN`/`DRIFT`/`SIZE_SPREAD`/`facing`; and the strand line (`_strand` overwrites the bank's
+  tiles after the fill and is the dog's band, not the first impression).
+- **Numbers are first guesses.** `tools/shot_surface.tscn` (desktop build) saves the opening
+  view and a near one plus `tools/last_surface.log` — shares by tile, by family, by how much
+  water each kind covers, the material bargain, the ring and the repeats. Retune against it.
+  `test_lake`'s `_check_surface` guards the rules, not the numbers.
 
 ### Why Layout is Better Than Physics
 1. One source of truth (layout) prevents overlap bugs
