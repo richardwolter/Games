@@ -558,6 +558,17 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   flights count** (`Haul.flying_to(null)`): cargo crossing to a hull and cargo a ferry is
   landing at a pier are tagged, and both are stock already. The ferries may go on running
   under the ending; what they carry is in the box.
+- **The field is asked outright, and at once when a piece lands** (2026-09-17, Richard: the
+  ending was not triggering reliably). `_look_for_the_end` used to walk the field only once
+  `_filth_left` was under `CLEAN_ENOUGH` of the total, and **a dog's delivery never moved
+  that float** — so on any lake the pack helped clear the meter never bottomed out, the
+  field was never asked and the run never ended. The gate and the constant are gone (the
+  walk is 8464 `size()` calls every `CLEAN_CHECK_EVERY`), `_dog_brought_back` moves the
+  meter, and both crate landings (`_on_haul_arrived` untagged, the dog's) call
+  `_ask_the_end`, which zeroes the clock so the check runs **next frame** — not in the
+  call, where the haul and the dog are mid-handover and would answer "not yet". **Any new
+  way a piece leaves the water needs no wiring for the ending**, only for the meter.
+  `test_lake` ends an empty lake with the meter at half.
 - **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
   rising, the note ringing, and **the end song coming in with the beat, not with the text**
   (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their

@@ -3322,7 +3322,21 @@ func _stage_ending() -> void:
 		_net.catch = PackedInt32Array()
 		_check(bool(_main.call(&"_all_landed")),
 			"and it is the moment the hold is empty that ends it", "")
-		_main.set(&"_clean_check_in", 0.0)
+		# The meter left high, as it was on any lake the dogs helped clear (2026-09-17):
+		# the field is what answers, and a meter that never bottomed out must not hold the
+		# ending back. And a dog's delivery moves the meter and asks at once.
+		var total: float = _main.get(&"_filth_total")
+		_main.set(&"_filth_left", 0.5 * total)
+		_main.set(&"_clean_check_in", 99.0)
+		_main.call(&"_dog_brought_back", 0)
+		_check(float(_main.get(&"_filth_left")) < 0.5 * total,
+			"a dog's delivery moves the meter", "%.2f of %.2f" % [_main.get(&"_filth_left"), total])
+		_check(float(_main.get(&"_clean_check_in")) <= 0.0,
+			"and a piece landing in the crate asks for the ending at once", "")
+		return
+	if _in_stage == 44:
+		_check(bool(_main.get(&"_cleaned")),
+			"an empty lake ends with the meter still high: the field answers, not the float", "")
 		return
 	if _in_stage < 80:
 		return
