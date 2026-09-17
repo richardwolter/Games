@@ -2412,6 +2412,27 @@ went from 24 screen pixels to 3.
   rows, the base-only block, the painting, the stable tie, the pot's host, the walker key
   and the find scale.
 
+### Where the Finds Lie (2026-09-17, `/grill-me` with Richard, `Lake._hide_treasures`)
+Finds are hidden by distance from the island, measured as `Iso.past_shelf` tiles. **Supersedes
+the basin-wide darts described under Golden Glitter below**; `FIND_APART` and the floating
+first pet bed are unchanged.
+- **Early** (`Lake.EARLY_FINDS`, piece -> forced tier): pet bed x2, chew toy x2, table lamp at
+  tier 0; record player, armchair (`decor_loveseat`), coffee table at tier 1 (first Strength
+  buy). Within `EARLY_OUT` (15) tiles, **exactly one slot down, on a tile whose top piece is
+  no heavier than the find** — early means never waiting on Strength.
+- **The second pet bed and second chew toy are `copies: 2`** in `decor_sets.json`; the bed is
+  a `VARIANT`, so R changes either copy's colour. One bed floats, the other is an early dig.
+- **The rest by rule, not authored**: tier 1-2 between `EARLY_OUT` and `MID_OUT` (25), tier
+  `LATE_TIER` (3) and up beyond, buried 1-3 down as before. A new find needs no placement data.
+- **800 darts** (banded for 760, spaced for 700): they are thrown over the whole square and
+  most miss a band; at 160 eight pairs landed inside `FIND_APART`. `_plant_anywhere` is still
+  the last resort. Bands are first guesses (7 / 20 / 13 finds) to judge in play.
+- **`SAVE_VERSION` 11**, everything older refused; the version 9 shed-unit read
+  (`SAVE_SHED_CELLS`) is gone, as its own note promised. The v10 save is kept at
+  `_builds/lake_cleanup_v10_20260917.save`; **the trailer's shed shot needs a refurnished
+  save before a re-shoot**.
+- Out of scope, by decision: an authored stage field, floor lamp early, save migration.
+
 ### Golden Glitter (`LakeGrid.GlintLayer`, `shaders/beam.gdshader`, rim in `rubbish.gdshader`)
 Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down, dealt
 **`FIND_APART` (7) tiles from each other** — 160 darts, the last 40 unspaced, then

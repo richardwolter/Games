@@ -587,6 +587,7 @@
   },
   {
    "name": "decor_pet_bed",
+   "copies": 2,
    "title": "Pet bed",
    "dirty": "pet_bed_2_2",
    "kind": "VARIANT",
@@ -916,6 +917,7 @@
   },
   {
    "name": "decor_chew_toy",
+   "copies": 2,
    "title": "Chew toy",
    "kind": "SINGLE",
    "mirror": false,

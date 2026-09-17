@@ -2197,7 +2197,7 @@
     2,
     1
    ],
-   "copies": 1,
+   "copies": 2,
    "fill": 0.943,
    "name": "decor_pet_bed",
    "place": "floor",
@@ -2899,7 +2899,7 @@
     1,
     1
    ],
-   "copies": 1,
+   "copies": 2,
    "fill": 0.758,
    "name": "decor_chew_toy",
    "place": "small",

@@ -2259,26 +2259,48 @@ func _stage_art() -> void:
 	_check(not keepsake_names.has(Lake.STARTER_BED),
 		"the house's own bed is not in the lake", "")
 
-	# Where they lie: the pet bed afloat in the first band past the shelf, the rest spread
-	# FIND_APART from each other (the darts' fallback may put a late one closer).
+	# Where they lie: one pet bed afloat in the first band past the shelf, the early finds
+	# within EARLY_OUT under nothing heavier than themselves, the rest banded by tier.
 	var first_tile := -1
 	var lie: Array[Vector2] = []
+	var laid := {}
+	var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
+	var misplaced := 0
+	var blocked := 0
+	var banded := [0, 0, 0]
 	for index in _grid.stacks.size():
 		var stack: PackedInt32Array = _grid.stacks[index]
 		for k in stack.size():
 			var def: TrashDef = _grid.defs[stack[k]]
 			if not def.keepsake:
 				continue
-			if def.piece == Lake.FIRST_FIND:
+			laid[def.piece] = int(laid.get(def.piece, 0)) + 1
+			var away := Iso.past_shelf(Vector2(_grid.tile_of(index)))
+			if def.piece == Lake.FIRST_FIND and k == stack.size() - 1 					and away <= near + Lake.FIRST_FIND_OUT:
 				first_tile = index
-				_check(k == stack.size() - 1, "the pet bed is on top of its stack",
-					"slot %d of %d" % [k, stack.size()])
-			else:
-				lie.append(Vector2(_grid.tile_of(index)))
-	_check(first_tile >= 0, "the pet bed is in the lake", "")
+				continue
+			lie.append(Vector2(_grid.tile_of(index)))
+			banded[0 if Lake.EARLY_FINDS.has(def.piece) else (2 if def.tier >= Lake.LATE_TIER else 1)] += 1
+			if Lake.EARLY_FINDS.has(def.piece):
+				if away > Lake.EARLY_OUT or def.tier > 1:
+					misplaced += 1
+				for above in range(k + 1, stack.size()):
+					if (_grid.defs[stack[above]] as TrashDef).tier > def.tier:
+						blocked += 1
+			elif def.tier >= Lake.LATE_TIER:
+				if away < Lake.MID_OUT:
+					misplaced += 1
+			elif away < Lake.EARLY_OUT or away > Lake.MID_OUT:
+				misplaced += 1
+	_check(misplaced <= 2, "every find lies in its band (the darts' fallback aside)",
+		"%d outside; early/mid/late %s" % [misplaced, str(banded)])
+	_check(blocked == 0, "no early find lies under something heavier than itself",
+		"%d do" % blocked)
+	_check(int(laid.get(&"decor_pet_bed", 0)) == 2 and int(laid.get(&"decor_chew_toy", 0)) == 2,
+		"two pet beds and two chew toys are in the lake", str(laid.get(&"decor_pet_bed", 0)))
+	_check(first_tile >= 0, "a pet bed floats on top by the island", "")
 	if first_tile >= 0:
 		var out := Iso.past_shelf(Vector2(_grid.tile_of(first_tile)))
-		var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
 		_check(out >= near and out <= near + Lake.FIRST_FIND_OUT,
 			"the pet bed floats just past the island's shelf", "%.1f tiles out" % out)
 		# A new game's net: power 0, throw at level 0. The bed has to be both.
@@ -2864,10 +2886,7 @@ func _stage_shed() -> void:
 	_check(not unlocked.has("no_such_piece"),
 		"a find the catalogue no longer knows is dropped rather than kept", "")
 
-	# The one migration (2026-09-16, Lake.SAVE_SHED_CELLS): a version 9 file placed the shed's
-	# furniture in eight-pixel cells, so its rows are read back multiplied and every piece
-	# lands exactly where it stood. Written by hand here rather than kept as a fixture: the
-	# file is one dictionary and the only field that moved is `decor`.
+	# An older file is refused, not migrated (the version 9 shed-unit read went with 11).
 	var path: String = _main.get(&"save_path")
 	var reading := FileAccess.open(path, FileAccess.READ)
 	var raw: Dictionary = (reading.get_var(true) as Dictionary) if reading != null else {}
@@ -2875,20 +2894,12 @@ func _stage_shed() -> void:
 		reading.close()
 	_check(not raw.is_empty(), "the save file reads back as a dictionary", "")
 	if not raw.is_empty():
-		raw["version"] = Lake.SAVE_SHED_CELLS
-		raw["decor"] = [{"piece": String(piece), "cell": [2, 3], "view": 0}]
+		raw["version"] = Lake.SAVE_VERSION - 1
 		var writing := FileAccess.open(path, FileAccess.WRITE)
 		if writing != null:
 			writing.store_var(raw, true)
 			writing.close()
-		_check(bool(_main.call(&"load_game")), "a version 9 save is read rather than refused", "")
-		decor = _main.get(&"decor")
-		var back: Array = ((decor[0] as Dictionary)["cell"] as Array) if decor.size() > 0 else []
-		_check(
-			back.size() == 2 and int(back[0]) == 2 * ShedRoom.CELL
-			and int(back[1]) == 3 * ShedRoom.CELL,
-			"and its cells come back as pixels, so nothing in the room moves", str(back)
-		)
+		_check(not bool(_main.call(&"load_game")), "an older save is refused", "")
 	_advance()
 
 

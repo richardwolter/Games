@@ -362,15 +362,9 @@ const MENU_SCENE := "res://scenes/menu.tscn"
 ## (two paintings, the chew toy, the globe) joined it; the def list changed again.
 ## 10: the shed places furniture on whole source pixels rather than on eight-pixel cells
 ## (2026-09-16), so a `decor` row's numbers mean something eight times smaller.
-const SAVE_VERSION := 10
-
-## The one older save this build still reads, and it is read rather than refused because the
-## only thing that changed in it is the unit the shed's furniture is placed in: a version 9
-## file is exact in cells, so its rows are scaled by `ShedRoom.CELL` and every piece lands
-## back where it stood. Everything else in the file is identical, which is what makes the one
-## exception to "older saves are refused rather than migrated" safe. Don't grow this into a
-## migration chain: the next change to the def list refuses it again.
-const SAVE_SHED_CELLS := 9
+## 11: a second pet bed and a second chew toy joined the finds (2026-09-17); the def list
+## changed, and the version 9 shed-unit read went with it, as its own note said it would.
+const SAVE_VERSION := 11
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -384,6 +378,24 @@ const FIRST_FIND_OUT := 0.8
 
 ## How far apart the hidden finds are dealt, in tiles: two a cast apart read as a hoard.
 const FIND_APART := 7.0
+
+## The finds a new shed wants first, and the net tier each is lifted at whatever its bulk
+## says (Richard, 2026-09-17): the small ones by the first net, the furniture after the
+## first Strength buy. They are hidden within `EARLY_OUT` tiles of the island's shelf, one
+## slot down, under nothing heavier than themselves — early means never waiting on Strength.
+const EARLY_FINDS := {
+	&"decor_pet_bed": 0,
+	&"decor_chew_toy": 0,
+	&"decor_lamp": 0,
+	&"decor_vynil_player": 1,
+	&"decor_loveseat": 1,
+	&"decor_center_table": 1,
+}
+## The bands the rest are dealt into by tier, in tiles past the shelf: tiers 1-2 between
+## `EARLY_OUT` and `MID_OUT`, tiers 3-4 beyond. By rule, so a new find needs no authoring.
+const EARLY_OUT := 15.0
+const MID_OUT := 25.0
+const LATE_TIER := 3
 const AUTOSAVE_EVERY := 20.0
 
 
@@ -1610,8 +1622,8 @@ func _all_defs() -> Array[TrashDef]:
 		)
 		find.keepsake = true
 		# The first find is for the first net: tier 0, or a net at power 0 cannot lift it.
-		if StringName(name) == FIRST_FIND:
-			find.tier = 0
+		if EARLY_FINDS.has(StringName(name)):
+			find.tier = int(EARLY_FINDS[StringName(name)])
 		# One def per copy, not one def hidden several times: `_hide_treasures` plants one of
 		# each keepsake def, and every copy has to be its own object in the water with its own
 		# hiding place. Four chairs in one corner is a stack, not a set.
@@ -1648,21 +1660,43 @@ func _hide_treasures() -> void:
 		# Spread out: a dart is refused inside FIND_APART of a find already down, until the
 		# darts run low and any deep tile will do. Forty darts found tiles; a hundred and
 		# twenty find spaced ones on a lake this size, and the fallback keeps the guarantee.
-		for attempt in 160:
+		for attempt in 800:
 			var tx := rng.randi_range(2, Iso.COLS - 3)
 			var ty := rng.randi_range(2, Iso.ROWS - 3)
 			var index := _grid.index_of(tx, ty)
 			var height := _grid.height_of(index)
 			if height < 3:
 				continue
-			if attempt < 120 and _too_near(Vector2(tx, ty), planted_at):
+			# Its own band for the first 760 darts, spaced for the first 700 (the darts are
+			# thrown over the whole square, so most miss the band); after that any
+			# deep tile, because a collection that cannot be completed is the worse failure.
+			var early := EARLY_FINDS.has(def.piece)
+			if attempt < 760:
+				var band := _find_band(def)
+				var out := Iso.past_shelf(Vector2(tx, ty))
+				if out < band.x or out > band.y or _grid.dry[index] != 0:
+					continue
+				if early and _grid.def_at(index, height - 1).tier > def.tier:
+					continue
+			if attempt < 700 and _too_near(Vector2(tx, ty), planted_at):
 				continue
-			_grid.insert(index, maxi(height - 1 - rng.randi_range(0, 2), 0), i)
+			var down := 0 if early else rng.randi_range(0, 2)
+			_grid.insert(index, maxi(height - 1 - down, 0), i)
 			planted_at.append(Vector2(tx, ty))
 			planted = true
 			break
 		if not planted:
 			_plant_anywhere(i)
+
+
+## The band a find is hidden in, as tiles past the island's shelf (from, to).
+func _find_band(def: TrashDef) -> Vector2:
+	var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
+	if EARLY_FINDS.has(def.piece):
+		return Vector2(near, EARLY_OUT)
+	if def.tier < LATE_TIER:
+		return Vector2(EARLY_OUT, MID_OUT)
+	return Vector2(MID_OUT, INF)
 
 
 func _too_near(at: Vector2, others: Array[Vector2]) -> bool:
@@ -4505,7 +4539,7 @@ func load_game() -> bool:
 	file.close()
 	var save := raw as Dictionary
 	var written := 0 if save == null else int(save.get("version", 0))
-	var readable := written == SAVE_VERSION or written == SAVE_SHED_CELLS
+	var readable := written == SAVE_VERSION
 	if save == null or not readable 			or int(save.get("seed", 0)) != _level_seed():
 		_note_save("the save is from another build — ignored")
 		return false
@@ -4567,8 +4601,6 @@ func load_game() -> bool:
 		if _sheets == null or _sheets.has(StringName(name)):
 			unlocked.append(name)
 	decor.clear()
-	# A version 9 file holds cells; this build places in pixels. See SAVE_SHED_CELLS.
-	var decor_scale := ShedRoom.CELL if written == SAVE_SHED_CELLS else 1
 	for row: Dictionary in save.get("decor", []) as Array:
 		var name := String(row.get("piece", ""))
 		if not unlocked.has(name):
@@ -4576,8 +4608,8 @@ func load_game() -> bool:
 		decor.append({
 			"piece": name,
 			"cell": [
-				int((row["cell"] as Array)[0]) * decor_scale,
-				int((row["cell"] as Array)[1]) * decor_scale,
+				int((row["cell"] as Array)[0]),
+				int((row["cell"] as Array)[1]),
 			],
 			# Which way round it was left standing, and whether its fire was lit. A piece
 			# with one face reads as 0 whatever is in the file. See ShedRoom._row_view.
