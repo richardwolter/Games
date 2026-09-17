@@ -77,7 +77,7 @@ const SOUNDS := {
 	## A piece landing in the island crate: three takes of Richard's own recording, one of
 	## which is played per drop. A small roll on top of three real drops, where one take
 	## pitched about needed a whole ladder of steps to stop being a metronome.
-	&"pop": [-9.0, 0.03],
+	&"pop": [-12.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
 }
 
@@ -121,7 +121,9 @@ const WHILE_INDOORS := [
 ## One take lands every cast, so it is dropped onto one of a few pitches rather than rolled
 ## about one (2026-09-15, Richard: "not too repetitive"). Never the pitch it landed on last,
 ## and SOUNDS' own small roll on top, so two casts at the same step are still not identical.
-const NET_SPLASH_PITCHES: Array[float] = [0.72, 0.85, 0.98, 1.1]
+## Six steps over a wider spread since 2026-09-17 (Richard: more varied): four steps a tenth
+## apart still read as the same splash four ways on a long session of casting.
+const NET_SPLASH_PITCHES: Array[float] = [0.66, 0.78, 0.9, 1.02, 1.14, 1.26]
 
 ## And the throw with it (2026-09-17, Richard): the cast is two takes in a row, so pitching
 ## the splash alone left the whoosh in front of it identical every time. A narrower spread

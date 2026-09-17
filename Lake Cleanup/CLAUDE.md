@@ -2522,7 +2522,8 @@ The code-built placeholder sounds are replaced by Richard's recordings. **Supers
   15 ms default — both takes start loud in their first millisecond, so what was left of "the
   click is late" was the engine's own buffer. Raise it again if a weaker machine crackles.
 - **Second pass by ear** (same day): net splash quieter, and dropped onto one of
-  `NET_SPLASH_PITCHES` (four steps, never the last one played, with a small roll on top) rather
+  `NET_SPLASH_PITCHES` (six steps since 2026-09-17, never the last one played, with a small
+  roll on top) rather
   than rolled about one pitch — one take lands every cast; pigeon wings quieter; `AMBIENCE_DB` -10 (was +2); piece splash louder. **A piece landing
   in a box is the shed's own wooden thud** (`drop_big` at `POP_PITCH` 0.85) — the built pop is
   gone, and dropped in pitch it read as a shot heard from a long way off (Richard: "wood on
@@ -2531,7 +2532,8 @@ The code-built placeholder sounds are replaced by Richard's recordings. **Supers
 - **The throw is stepped too** (2026-09-17, Richard: not too repetitive), `NET_THROW_PITCHES`
   through the same `_next_pitch`. A cast is two takes one after the other, so pitching the
   splash alone left the whoosh in front of it identical every time. **Narrower than the
-  splash's spread** (0.9-1.12 against 0.72-1.1): the throw is the rope leaving the hand, and
+  splash's spread** (0.9-1.12 against the splash's 0.66-1.26, which was 0.72-1.1 until
+  Richard asked for more variety on 2026-09-17): the throw is the rope leaving the hand, and
   a wide swing on it reads as a different net rather than the same one thrown again.
 - **Still built in code** (no recording): the lake-cleaned note (`play_found`) and the
   siege's chime. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
@@ -2604,7 +2606,8 @@ purpose. What the audit settled, against the shipped design:
     through. The ferry-at-a-pier silence is untouched.
   - **`drop_big` is untouched** and is still the shed's own recording, by decision — one
     wooden-thud take everywhere was offered and turned down.
-  - **-9 dB is carried over from `POP_DB`** as the first guess; a by-ear knob, in `SOUNDS`.
+  - **-12 dB**, in `SOUNDS`: `POP_DB`'s own -9 carried over, then 3 dB off by ear once the
+    takes were heard in play (Richard, same day). A by-ear knob.
   - `test_lake` guards the three takes loading, the two thuds being different recordings, no
     take following itself, and the shed hearing the furniture but not the crate.
 - **A ferry is heard coming home** (same day, Richard: sparsely): `Sfx.play_berth` from
