@@ -28,6 +28,14 @@ const SAVE_PATH := "user://test_lake.save"
 
 ## The ferry is wound up for the tests. Its real speed is a few tiles a second, and a
 ## round trip at that rate is most of the frame budget this harness has.
+## Idle frames the ferry stage gives the hull: enough to have set off with a part load if it
+## were going to, and enough to set off with a full one. A budget, not a deadline.
+##
+## Idle, not drawn: `--headless` draws nothing at all, so `Engine.get_frames_drawn()` sits at
+## zero for the whole run and a wait on it never ends. `_process` still runs.
+const FERRY_LOOKS := 4
+const FERRY_WAIT := 240
+
 const TEST_FERRY_SPEED := 60.0
 
 var _main: Node2D
@@ -47,6 +55,15 @@ var _pieces_before: int = 0
 var _filth_before: float = 1.0
 var _sludge_before: float = 0.0
 var _gesture_checked: bool = false
+## The ferry stage's own little state machine. It cannot count harness frames: this node
+## steps in `_physics_process` while `Boat._process` is an idle callback, and several physics
+## ticks fall inside one idle frame — so a check pinned to a frame number can run before the
+## hull has been asked to do anything at all, which is what "the ferry sets off on its own"
+## failing on a boat that then sailed perfectly well turned out to be (2026-09-17). It waits
+## on drawn frames and on the boat instead. `_ferry_step` is how far through the stage it is,
+## `_ferry_mark` the drawn frame it last waited from.
+var _ferry_step: int = 0
+var _ferry_mark: int = 0
 var _flock: Flock
 var _rebuilds_before: int = 0
 var _skim_kind: int = 0
@@ -965,7 +982,7 @@ func _stage_draw_batch() -> void:
 
 ## The ferry: loads the yard, sails out, sells, and comes back.
 func _stage_ferry() -> void:
-	if _in_stage == 1:
+	if _ferry_step == 0:
 		_main.set(&"sludge", 1000.0)
 		_check(not _boat.is_running(),
 			"a ferry told to stay put has not moved all this time", "")
@@ -975,10 +992,14 @@ func _stage_ferry() -> void:
 			_yard.held.resize(_boat.capacity - 1)
 		_main.call(&"_set_auto_ferry", true)
 		_boat.speed = TEST_FERRY_SPEED
+		_ferry_step = 1
+		_ferry_mark = Engine.get_process_frames()
 		return
-	if _in_stage < 6:
-		return
-	if _in_stage == 6:
+	if _ferry_step == 1:
+		# Idle frames, because those are the ones the hull is given to think in. Enough of
+		# them that a boat which was going to set off with a part load would have done it.
+		if Engine.get_process_frames() - _ferry_mark < FERRY_LOOKS:
+			return
 		_check(not _boat.is_running(), "a part load waits in the yard for a full hold",
 			"%d of %d" % [_yard.held.size(), _boat.capacity])
 		var filler := _yard.held[0] if not _yard.held.is_empty() else 0
@@ -986,11 +1007,15 @@ func _stage_ferry() -> void:
 			_yard.held.append(filler)
 		_sludge_before = float(_main.get(&"sludge"))
 		_pieces_before = _yard.held.size()
+		_ferry_step = 2
+		_ferry_mark = Engine.get_process_frames()
 		return
-	if _in_stage < 9:
-		return
-	if _in_stage == 9:
-		_check(_boat.is_running(), "the ferry sets off on its own",
+	if _ferry_step == 2:
+		# A budget, not a deadline: it sets off on the first idle frame after the hold comes
+		# up full, and how many physics ticks that is, is the machine's business.
+		if not _boat.is_running() and Engine.get_process_frames() - _ferry_mark < FERRY_WAIT:
+			return
+		_check(_boat.is_running(), "the ferry sets off on its own once the hold is full",
 			"it is %s" % _boat.status_line())
 		# Out of the yard, not yet aboard: the lot is thrown to the hold one piece at a time
 		# (`Boat.stow`), so `cargo` fills over the next frames. The sale below is what proves
@@ -998,6 +1023,7 @@ func _stage_ferry() -> void:
 		_check(_yard.held.size() < _pieces_before,
 			"loading took the catch out of the yard",
 			"%d aboard, %d left in the yard" % [_boat.cargo.size(), _yard.held.size()])
+		_ferry_step = 3
 		return
 	# A budget, not a deadline: how long a run takes is how far the yard is that the hold
 	# happens to be bound for, and that changes with what the harness managed to haul. At
