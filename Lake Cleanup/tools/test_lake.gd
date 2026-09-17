@@ -15,6 +15,12 @@
 ## silently — so a run that dies leaves the log as the only record of how far it got.
 extends Node
 
+## The drawn wood's colours, for the contrast checks in `_stage_shop_shape`. `Style` has no
+## `class_name`, so it is preloaded here as every drawing script preloads it.
+const Style := preload("res://scripts/style.gd")
+const HudSkin := preload("res://scripts/hud_skin.gd")
+const HudButtons := preload("res://scripts/hud_buttons.gd")
+
 const LOG_PATH := "res://tools/last_test.log"
 
 ## Panels that are meant to swallow a click: they are what is on screen when the lake is
@@ -47,6 +53,15 @@ var _yard: Yard
 
 var _stage: int = 0
 var _in_stage: int = 0
+## Whether the settings board was up before `_stage_settings_shape` put it up to measure it.
+var _was_settings_shown: bool = false
+## Whether `_stage_binds_shape` rebound something to test the hint, so it can put it back.
+## Nothing in `tools/` may leave the player's own `settings.cfg` changed.
+var _binds_touched: bool = false
+## The player's own overrides while the stage is borrowing the board, and what the board drew
+## before anything was rebound.
+var _binds_before: Dictionary = {}
+var _hint_on_clean: bool = false
 var _ran: int = 0
 var _failed: int = 0
 
@@ -151,6 +166,12 @@ func _physics_process(_delta: float) -> void:
 			_stage_foam()
 		28:
 			_stage_new_tracks()
+		29:
+			_stage_shop_shape()
+		30:
+			_stage_settings_shape()
+		31:
+			_stage_binds_shape()
 		_:
 			pass
 
@@ -1785,14 +1806,17 @@ func _stage_market() -> void:
 	var boards := {}
 	for row: Dictionary in _main.call(&"_shop_rows") as Array:
 		boards[row["board"]] = int(boards.get(row["board"], 0)) + 1
-	_check(int(boards.get(&"market", 0)) == 2, "the market board has two rows",
-		"%d" % int(boards.get(&"market", 0)))
-	_check(int(boards.get(&"net", 0)) == 7, "and the net's board has seven",
+	# The luck board (2026-09-17): the two per-cast rolls moved off the net's board to stand
+	# with the two yard bonuses, so the four boards are 5/4/4/4 instead of 7/4/4/2.
+	_check(int(boards.get(&"luck", 0)) == 4, "the luck board has four rows",
+		"%d" % int(boards.get(&"luck", 0)))
+	_check(int(boards.get(&"net", 0)) == 5, "and the net's board has five",
 		"%d" % int(boards.get(&"net", 0)))
 	_check(int(boards.get(&"dog", 0)) == 4, "and the dog's board has four",
 		"%d" % int(boards.get(&"dog", 0)))
-	_check(int(boards.get(&"boat", 0)) == 4, "and the ferry's board has four",
+	_check(int(boards.get(&"boat", 0)) == 4, "and the boats' board has four",
 		"%d" % int(boards.get(&"boat", 0)))
+	_check(not boards.has(&"market"), "and nothing is left on a market board", str(boards.keys()))
 	# The shelved tracks (2026-09-14): the skimmer and the sell-by-tier tracks are still in
 	# the code, but no row lists them, nothing counts them and nothing sells them.
 	var shelved_rows := []
@@ -1860,19 +1884,26 @@ func _stage_market() -> void:
 			decimals.append("%s: %s" % [row["key"], value])
 		if String(row.get("blurb", "")).is_empty():
 			no_blurb.append(String(row["key"]))
-		if not String(row.get("level", "")).begins_with("Lvl "):
+		# The level is the bare figure now: it stands in the row's rail, and "Lvl" is a word
+		# the row does not need and a translation would have to carry.
+		if not String(row.get("level", "")).is_valid_int():
 			no_level.append(String(row["key"]))
-		if String(row["cost"]) != "Max" and not value.ends_with(" next)"):
+		if String(row["cost"]) != "Max" and not (" %s " % _main.get(&"ARROW")) in value:
 			no_next.append("%s: %s" % [row["key"], value])
 	_check(decimals.is_empty(), "no row's value carries a decimal", ", ".join(decimals))
-	_check(no_next.is_empty(), "every unmaxed row says what the next level buys", ", ".join(no_next))
+	_check(no_next.is_empty(), "every unmaxed row reads now-arrow-next", ", ".join(no_next))
 	_check(no_blurb.is_empty(), "every row has a blurb for its ?", ", ".join(no_blurb))
-	_check(no_level.is_empty(), "every row has its level as its own field", ", ".join(no_level))
+	_check(no_level.is_empty(), "every row's level is a bare figure", ", ".join(no_level))
+	# A scaling track reads as a share of its level 0 (2026-09-17), not as the rise over it:
+	# `100 -> 135%`, not `+0% -> +35%`. Without the sign the old basis would have claimed
+	# 3.85x where the stat is 4.85x, so the basis and the missing `+` go together.
 	var width_row := ""
 	for row: Dictionary in _main.call(&"_shop_rows") as Array:
 		if row["key"] == &"net_width":
 			width_row = String(row["value"])
-	_check(width_row.begins_with("+0%"), "a scaling track at level 0 reads as +0%", width_row)
+	_check(width_row.begins_with("100 "), "a scaling track at level 0 reads as 100", width_row)
+	_check(width_row.ends_with("%") and not "+" in width_row,
+		"and carries one % at the end and no sign", width_row)
 	var legend: Dictionary = _main.call(&"_shop_legend")
 	_check((legend.get("tiers", []) as Array).is_empty() and (legend.get("yards", []) as Array).size() == 4,
 		"the legend lists four yards and no tiers", str(legend))
@@ -1898,11 +1929,22 @@ func _stage_market() -> void:
 			and is_equal_approx(legend_box.end.x, dog_box.end.x),
 			"and stands under the ferry's and the dog's boards, inside the table",
 			"legend %s boat %s dog %s table %s" % [legend_box, boat_box, dog_box, table])
+	# The rail (2026-09-17): a column down the left of a row, the "?" answering in its top
+	# half and the level's figure standing in its bottom. Both inside the plate, where the
+	# old corner tag hung outside it.
 	var row_box := Rect2(100.0, 100.0, 300.0, 50.0)
+	var rail: Rect2 = skin.call(&"rail_of", row_box)
+	_check(is_equal_approx(rail.position.x, row_box.position.x)
+		and is_equal_approx(rail.position.y, row_box.position.y)
+		and is_equal_approx(rail.size.y, row_box.size.y) and rail.size.x < row_box.size.x * 0.2,
+		"the rail runs down the left of a row, inside it", str(rail))
 	var help: Rect2 = skin.call(&"help_box_of", row_box)
-	_check(help.position.x < row_box.position.x + 8.0 and help.position.y < row_box.position.y + 8.0
-		and help.end.x > row_box.position.x and help.end.y > row_box.position.y and help.size.x <= 20.0,
-		"the ? hangs over a row's top left corner", str(help))
+	_check(is_equal_approx(help.size.x, rail.size.x)
+		and is_equal_approx(help.size.y, rail.size.y * 0.5)
+		and is_equal_approx(help.position.y, rail.position.y),
+		"and the ? answers for its top half only", str(help))
+	_check(help.size.x * help.size.y > 15.0 * 15.0,
+		"which is a bigger target than the corner tag was", "%.0f px" % (help.size.x * help.size.y))
 	var priced := true
 	for pair: Array in legend.get("yards", []):
 		priced = priced and String(pair[1]).begins_with("$") and not "." in String(pair[1])
@@ -4192,6 +4234,34 @@ func _check_audio_pass(sound: Sfx) -> void:
 	sound.set_wading(false, _angler)
 	_check(not bool(sound.get(&"_wade_on")),
 		"and the wash stops when the last of them is out of it", "")
+	# A dog swimming out of earshot pushes no wash: there is one wading loop at one level,
+	# and a bank run across the lake played it under an angler standing still.
+	if dog != null and dog.angler != null:
+		var dog_was := dog.tile_pos
+		var speed_was: float = dog.get(&"_speed")
+		var out := dog.angler.tile_pos
+		var way := (Vector2(Iso.COLS, Iso.ROWS) * 0.5 - out).normalized()
+		if way == Vector2.ZERO:
+			way = Vector2(1.0, 0.0)
+		way = -way
+		var near_wet := out
+		for i in 200:
+			near_wet += way * 0.1
+			if Iso.past_water(near_wet) > Angler.WADE_IN:
+				break
+		dog.set(&"_speed", 5.0)
+		dog.tile_pos = near_wet
+		var in_earshot := near_wet.distance_to(out) <= Dog.HEAR
+		dog.call(&"_push_wade")
+		_check(not in_earshot or bool(sound.get(&"_wade_on")),
+			"a dog swimming beside the angler pushes the wash", "")
+		dog.tile_pos = out + way * (Dog.HEAR + 8.0)
+		dog.call(&"_push_wade")
+		_check(Iso.past_water(dog.tile_pos) > Angler.WADE_IN and not bool(sound.get(&"_wade_on")),
+			"and one swimming out of earshot pushes none", "")
+		dog.tile_pos = dog_was
+		dog.set(&"_speed", speed_was)
+		sound.set_wading(false, dog)
 	_check(dog != null and dog.has_method(&"carrying"),
 		"a dog says what is in its mouth, so the ending can wait for it", "")
 
@@ -4689,6 +4759,449 @@ func _stage_foam() -> void:
 ## a ferry's volley at both ends of its run and touches nothing else that throws; Strong Dogs
 ## raises the pack's weight tier and its mouth's width together, because tier on its own
 ## would open three kinds in the whole catalogue.
+## The shop's shape (2026-09-17): four boards named without an article, every row's name
+## unique across all of them, every row claimed by exactly one group, one value grammar, and
+## the pricing plate standing under the middle two even though the boards are now level.
+func _stage_shop_shape() -> void:
+	var skin := _main.get_node(^"HUD/ShopSkin")
+	var titles: Dictionary = skin.get(&"TITLES")
+	var articled := []
+	for board in titles:
+		if String(titles[board]).begins_with("The "):
+			articled.append(String(titles[board]))
+	_check(articled.is_empty(), "no board's title carries an article", ", ".join(articled))
+
+	var shop_rows: Array = _main.call(&"_shop_rows")
+	# Two rows called "Speed" on two boards was the thing this pass set out to kill, so the
+	# guard is uniqueness across the whole shop, not within a board.
+	var seen := {}
+	var clashes := []
+	for row: Dictionary in shop_rows:
+		var name := String(row["name"])
+		if seen.has(name):
+			clashes.append("%s: %s and %s" % [name, seen[name], row["key"]])
+		seen[name] = String(row["key"])
+	_check(clashes.is_empty(), "every row's name is unique across the four boards", ", ".join(clashes))
+
+	var groups: Dictionary = skin.get(&"GROUPS")
+	var claimed := {}
+	var twice := []
+	for board in groups:
+		for group: Array in groups[board]:
+			for key in group[1]:
+				if claimed.has(key):
+					twice.append(String(key))
+				claimed[key] = board
+	_check(twice.is_empty(), "no row is claimed by two groups", ", ".join(twice))
+	var orphans := []
+	for row: Dictionary in shop_rows:
+		if not claimed.has(row["key"]) or claimed[row["key"]] != row["board"]:
+			orphans.append(String(row["key"]))
+	_check(orphans.is_empty(), "and every row is claimed by its own board's groups", ", ".join(orphans))
+	_check(int(skin.call(&"_headings_of", &"net")) == 0,
+		"a board with one group draws no heading", "%d" % int(skin.call(&"_headings_of", &"net")))
+	for board in [&"boat", &"dog", &"luck"]:
+		_check(int(skin.call(&"_headings_of", board)) == 2,
+			"and the %s board draws two" % board, "%d" % int(skin.call(&"_headings_of", board)))
+
+	var wordy := []
+	for row: Dictionary in shop_rows:
+		var value := String(row["value"])
+		if "Lvl" in value or "next)" in value:
+			wordy.append("%s: %s" % [row["key"], value])
+	_check(wordy.is_empty(), "no row's value says Lvl or next", ", ".join(wordy))
+
+	# The plate used to live in the height difference between the net board and the middle
+	# two. The grouping levels them, so this is the check that it no longer depends on that.
+	skin.set(&"rows", shop_rows)
+	skin.set(&"legend", _main.call(&"_shop_legend"))
+	skin.call(&"_lay_out")
+	var skin_boards: Dictionary = skin.get(&"_boards")
+	var plate: Rect2 = skin.get(&"_legend_box")
+	var boat_box: Rect2 = skin_boards[&"boat"]
+	var net_box: Rect2 = skin_boards[&"net"]
+	_check(absf(net_box.size.y - boat_box.size.y) < 40.0,
+		"the boards stand within a row of each other",
+		"net %.0f boat %.0f" % [net_box.size.y, boat_box.size.y])
+	_check(plate.size.y > 0.0, "and the pricing plate still has its room",
+		"plate %s" % plate)
+	_check(plate.position.y >= boat_box.end.y, "under the middle boards' feet", str(plate))
+
+	# The recycle bonus, on the plate rather than in its row. It carries no price of its own:
+	# `_mean_pay_of` already multiplies the boosted kind, so the yards list is the boosted
+	# list, and a second figure here would be the same number written twice.
+	_main.set(&"recycle_bonus_level", 1)
+	_main.call(&"_move_bonus")
+	var legend: Dictionary = _main.call(&"_shop_legend")
+	var bonus: Dictionary = legend.get("bonus", {})
+	_check(not bonus.is_empty() and int(bonus.get("kind", -1)) >= 0,
+		"a live bonus reaches the pricing plate", str(bonus))
+	_check(not bonus.has("pay"), "and carries no price of its own", str(bonus))
+	var bonus_row := ""
+	for row: Dictionary in _main.call(&"_shop_rows"):
+		if row["key"] == &"recycle_bonus":
+			bonus_row = String(row["value"])
+	var kinds: Array = TrashDef.KIND_NAMES
+	var named := false
+	for kind in kinds:
+		named = named or String(kind).to_lower() in bonus_row.to_lower()
+	_check(not named, "and the row does not name a yard as well", bonus_row)
+	_main.set(&"recycle_bonus_level", 0)
+
+	# One shape for every value line (2026-09-17): two bare figures either side of the arrow,
+	# a prefix on the first and a suffix on the last, each said once, and no nouns at all.
+	var nouns := []
+	var doubled := []
+	var shaped := []
+	for row: Dictionary in _main.call(&"_shop_rows"):
+		var value := String(row["value"])
+		for word in ["a cast", "aboard", "a trip", "dogs", "boats", "dog", "boat", "per", "faster"]:
+			if word in value.to_lower():
+				nouns.append("%s: %s" % [row["key"], value])
+				break
+		# Said once: a mark or a word may appear on one end of the line, never on both.
+		for mark in ["%", "$", "Tier"]:
+			if value.count(mark) > 1:
+				doubled.append("%s: %s" % [row["key"], value])
+		# Between the prefix and the suffix there is nothing but two figures and the arrow.
+		var arrow := String(_main.get(&"ARROW"))
+		if arrow in value:
+			var bare := value.replace("Tier ", "").replace("$", "").replace("%", "").replace("s", "")
+			var ends: PackedStringArray = bare.split(" %s " % arrow)
+			if ends.size() != 2 or not ends[0].is_valid_int() or not ends[1].is_valid_int():
+				shaped.append("%s: %s" % [row["key"], value])
+	_check(nouns.is_empty(), "no value line carries a noun", ", ".join(nouns))
+	_check(doubled.is_empty(), "and says its mark once, not on both ends", ", ".join(doubled))
+	_check(shaped.is_empty(), "and is two bare figures either side of the arrow", ", ".join(shaped))
+	var strength := ""
+	var pigeons := ""
+	for row: Dictionary in _main.call(&"_shop_rows"):
+		if row["key"] == &"net_strength":
+			strength = String(row["value"])
+		if row["key"] == &"bird_worth":
+			pigeons = String(row["value"])
+	_check(strength.begins_with("Tier ") and strength.count("Tier") == 1,
+		"a prefix binds to the first figure alone", strength)
+	_check(pigeons.begins_with("$") and pigeons.count("$") == 1,
+		"and so does the money mark", pigeons)
+
+	# The HUD's cohesion pass (2026-09-17). The meter's frame is built to the wood's own box
+	# rather than stamped from the sheet at `METER_SCALE`, so its planks are the 16 and 14 of
+	# every other plate instead of 27 and 24.
+	var hud := _main.get_node(^"HUD/Skin")
+	var meter_frame: Control = hud.get(&"_meter_frame")
+	var frame_box: Rect2 = hud.get(&"_meter_frame_box")
+	var sheet_box: Rect2 = hud.get(&"_meter_box")
+	_check(meter_frame != null and meter_frame.get_script() != null,
+		"the meter's frame is a node that builds itself", str(meter_frame))
+	if meter_frame != null:
+		_check(absf(meter_frame.size.x - floorf(frame_box.size.x)) < 1.5
+			and absf(meter_frame.size.y - floorf(frame_box.size.y)) < 1.5,
+			"built to the wood's box, not the whole sheet",
+			"node %s wood %s sheet %s" % [meter_frame.size, frame_box.size, sheet_box.size])
+		_check(Style.border_fits(Rect2(Vector2.ZERO, meter_frame.size)),
+			"and big enough for the border to be built at all", str(meter_frame.size))
+	# Both picture buttons are one size, and the settings button is a gear with no word.
+	_check(HudSkin.UPGRADES_SIZE == HudSkin.SHED_SIZE,
+		"the two picture buttons are one size",
+		"%s %s" % [HudSkin.UPGRADES_SIZE, HudSkin.SHED_SIZE])
+	var gear: PlankButton = _main.get(&"_open_settings")
+	_check(gear != null and gear.mark == &"gear" and gear.label.is_empty(),
+		"the lake's settings button is a gear and carries no word",
+		"mark %s label %s" % [gear.mark if gear != null else &"", gear.label if gear != null else ""])
+	_check(gear != null and absf(gear.size.x - gear.size.y) < 1.5,
+		"and is square", str(gear.size if gear != null else Vector2.ZERO))
+	# The decorate button's fan: every find inside the room, and the tail wrapping the hut
+	# rather than sitting in a band under it.
+	var room := HudButtons.room_of(Rect2(0.0, 0.0, 120.0, 100.0))
+	var fan: Array = HudButtons._scatter(16, room)
+	var outside := 0
+	var above := 0
+	for spot: Dictionary in fan:
+		var box: Rect2 = spot["box"]
+		if not room.grow(0.5).encloses(box):
+			outside += 1
+		if box.position.y < room.position.y + room.size.y * 0.42:
+			above += 1
+	_check(outside == 0, "no find in the fan is clipped by the button's frame", "%d outside" % outside)
+	_check(above >= 4, "and the tail reaches above the old band's ceiling", "%d of 16" % above)
+
+	# The information pass (2026-09-17): the crate's plate says what it holds is waiting, and
+	# the upgrades button's foot says what the button is with the count on a badge whose width
+	# does not move with it.
+	_check(HudSkin.STOCK_LABEL != "In stock",
+		"the crate's plate no longer reads as a second purse", HudSkin.STOCK_LABEL)
+	_check(not "available" in HudSkin.UPGRADES_LABEL.to_lower()
+		and not "%d" in HudSkin.UPGRADES_LABEL,
+		"the upgrades button's foot is a name, not a count", HudSkin.UPGRADES_LABEL)
+	# Sized to the widest count it can ever hold, so one affordable upgrade and ninety-nine
+	# draw the same plate.
+	var narrow := _badge_width("1")
+	var broad := _badge_width("99")
+	_check(is_equal_approx(narrow, broad),
+		"and the count's badge is one width at every count",
+		"1 -> %.0f, 99 -> %.0f" % [narrow, broad])
+
+	# The unaffordable row's ink. `Style.BOARD_INK_DIM` on the off face reads 2.19:1, which
+	# is why the shop has its own.
+	var ink: Color = skin.get(&"INK_DIM")
+	_check(_contrast(ink, Style.BOARD_ROW_OFF) >= 4.5,
+		"an unaffordable row's ink clears 4.5:1",
+		"%.2f:1" % _contrast(ink, Style.BOARD_ROW_OFF))
+	_check(_contrast(Style.BOARD_INK, Style.BOARD_ROW) >= 4.5,
+		"and an affordable row's does too",
+		"%.2f:1" % _contrast(Style.BOARD_INK, Style.BOARD_ROW))
+	_advance()
+
+
+## The settings board's shape (2026-09-17): one plate face under carved headings, every word
+## on it clearing 4.5:1, a dead chooser drawing nothing pressable, and the whole board fitting
+## in the smallest frame the game can be given.
+func _stage_settings_shape() -> void:
+	var board: SettingsSkin = _main.get(&"_settings")
+	if _in_stage == 1:
+		# Shown at the smallest frame the game can be given — height never goes under 720 —
+		# and left to draw itself once, so the next tick reads the real hit boxes.
+		_was_settings_shown = board.visible
+		board.size = Vector2(1280.0, 720.0)
+		board.visible = true
+		board.queue_redraw()
+		return
+	var plan: Array = board.call(&"_plan")
+
+	# One face for every row: the three section colours are not what says where a section
+	# ends any more, so nothing on the board may reach for them.
+	var source := FileAccess.get_file_as_string("res://scripts/settings_skin.gd")
+	var reached := []
+	for name in ["ROW_SOUND", "ROW_SCREEN", "ROW_SAVE", "ON_GOLD"]:
+		if source.contains("Style." + name):
+			reached.append(name)
+	_check(reached.is_empty(),
+		"the board reaches for no section colour", ", ".join(reached))
+
+	# Headings, and Master standing above the first of them.
+	var heads := []
+	var before_head := ""
+	for line: Dictionary in plan:
+		if line["kind"] == &"head":
+			if heads.is_empty():
+				before_head = String(before_head)
+			heads.append(String(line["label"]))
+		elif heads.is_empty() and line.has("label"):
+			before_head = String(line["label"])
+	_check(heads.size() >= 2, "the rows are grouped under headings", ", ".join(heads))
+	_check(before_head == "Master",
+		"and Master leads, above the first rule", before_head)
+
+	# No key name written into a name. The two that had one are not rebindable, so the
+	# Controls board will never say them either — but a label is a name, not a sentence.
+	var carrying := []
+	for line: Dictionary in plan:
+		if line.has("label") and String(line["label"]).contains("("):
+			carrying.append(String(line["label"]))
+	_check(carrying.is_empty(), "no label carries a key name", ", ".join(carrying))
+
+	# Every ink on the board, against the face it is actually drawn on.
+	var row := Style.BOARD_ROW
+	var dead := row.lerp(Style.BOARD, 0.55)
+	var inks := {
+		"a row's label": [Style.BOARD_INK, row],
+		"a chooser's value": [SettingsSkin.VALUE_INK, row],
+		"a dead row's reading": [SettingsSkin.INK_SOFT, dead],
+		"a heading": [Style.LEVEL_INK, Style.BOARD],
+		"a button's word": [Style.INK, SettingsSkin.BUTTON_FACE],
+		"a warning's word": [SettingsSkin.WARN_INK, SettingsSkin.BUTTON_FACE],
+		"a list entry": [Style.BOARD_INK, Style.BOARD],
+		"the entry it is on": [Style.INK_DARK, SettingsSkin.PICKED_FACE],
+	}
+	var faint := []
+	var worst := 99.0
+	for what: String in inks:
+		var pair: Array = inks[what]
+		var ratio := _contrast(pair[0], pair[1])
+		worst = minf(worst, ratio)
+		if ratio < 4.5:
+			faint.append("%s %.2f:1" % [what, ratio])
+	_check(faint.is_empty(),
+		"every word on the board clears 4.5:1", "worst %.2f:1  %s" % [worst, ", ".join(faint)])
+
+	# The warning is still red: told from the plain word by hue, not only by being an ink.
+	_check(SettingsSkin.WARN_INK.r - SettingsSkin.WARN_INK.b >= 0.25,
+		"and the warning is still plainly red",
+		"r-b %.2f" % (SettingsSkin.WARN_INK.r - SettingsSkin.WARN_INK.b))
+
+	# A dead chooser draws nothing that can be pressed. `_lines` is what the board hit-tests
+	# against, so asking it is asking the real thing — which means letting the board draw
+	# itself for a frame rather than calling `_draw` by hand, which is not allowed outside a
+	# draw pass.
+	var live_rows := []
+	for line: Dictionary in board.get(&"_lines"):
+		if String(line["key"]).begins_with("window_size"):
+			live_rows.append(String(line["key"]))
+	var windowed: bool = Prefs.live_window_mode() == Prefs.WindowMode.WINDOWED
+	if windowed:
+		_check(live_rows.size() == 3,
+			"a live Resolution row keeps its two arrows and its value",
+			", ".join(live_rows))
+	else:
+		_check(live_rows.is_empty(),
+			"a dead Resolution row offers nothing to press", ", ".join(live_rows))
+
+	# And the board fits the smallest frame the game can hand it: 1280x720 is the floor, and
+	# a line that does not fit is dropped. `dropped_lines` exists so that is a failure here
+	# rather than "Save and go to menu" quietly missing on somebody's monitor.
+	_check(int(board.get(&"dropped_lines")) == 0,
+		"no line is dropped at 1280x720",
+		"%d dropped, wants %.0f of %.0f"
+			% [int(board.get(&"dropped_lines")), board.call(&"wanted_tall"), 720.0 - 40.0])
+	_check(board.call(&"wanted_tall") <= 680.0,
+		"and the board asks for no more room than it has",
+		"%.0f of 680" % board.call(&"wanted_tall"))
+	board.visible = _was_settings_shown
+	_advance()
+
+
+## The bind board's shape (2026-09-17): its two columns named, the gesture that is the only
+## way back said once there is something to go back from, every word clearing 4.5:1, and the
+## whole table fitting the smallest frame.
+func _stage_binds_shape() -> void:
+	var board: ControlsSkin = _main.get(&"_controls")
+	if board == null:
+		_main.call(&"_set_controls", true)
+		board = _main.get(&"_controls")
+	# Shown at the smallest frame the game can be given, with no override on it, and left to
+	# draw itself — then again with one, so what is asked about the hint is what was drawn.
+	# The player's own keys are taken down first and put back at the end.
+	if _in_stage == 1:
+		_binds_before = Binds.overrides()
+		_binds_touched = true
+		Binds.take_overrides({})
+		board.size = Vector2(1280.0, 720.0)
+		board.visible = true
+		board.queue_redraw()
+		return
+	if _in_stage == 2:
+		_hint_on_clean = board.hint_shown
+		Binds.bind(&"interact", "key", "key:70")
+		board.queue_redraw()
+		return
+
+	_check(ControlsSkin.RESET_LABEL == "Set to default",
+		"the way back is called what it does", ControlsSkin.RESET_LABEL)
+
+	# The two columns are named, and the gesture is said — but only when there is something
+	# to go back from.
+	var kinds := []
+	for line: Dictionary in board.call(&"_plan"):
+		kinds.append(String(line["kind"]))
+	_check(kinds.front() == "columns",
+		"the columns are named above the first group", ", ".join(kinds.slice(0, 3)))
+
+	# The board's own drawing is what is asked, not a second layout worked out here.
+	_check(not _hint_on_clean,
+		"an untouched board explains no gesture nobody needs yet", str(_hint_on_clean))
+	_check(board.hint_shown,
+		"and says it once there is something to go back from", str(board.hint_shown))
+
+	# The stick stands behind the walking rows, so their pad cell is not a bare dash.
+	_check(Binds.standing_label(&"walk_up", "pad") == Binds.STICK_NAME,
+		"a walking row's pad cell names the stick",
+		Binds.standing_label(&"walk_up", "pad"))
+	_check(Binds.standing_label(&"cast", "pad").is_empty(),
+		"and a row with no stick behind it does not", Binds.standing_label(&"cast", "pad"))
+	_check(Binds.standing_label(&"walk_up", "key").is_empty(),
+		"nor does the keyboard column", Binds.standing_label(&"walk_up", "key"))
+
+	# Every ink, against the face it is drawn on.
+	var inks := {
+		"a verb's name": [Style.BOARD_INK, Style.BOARD_ROW],
+		"a name on a swapped row": [Style.BOARD_INK, ControlsSkin.SWAP_FACE],
+		"a binding": [Style.BOARD_INK, Style.FRAME_SHADOW],
+		"a cell waiting to be pressed": [Style.INK_DARK, Style.ON_GOLD],
+		"a standing binding": [Style.BOARD_INK_SOFT, Style.FRAME_SHADOW],
+		"the way back": [Style.INK, ControlsSkin.BUTTON_FACE],
+		"the way back, with nothing to undo": [Style.BOARD_INK_SOFT, ControlsSkin.BUTTON_FACE],
+		"a column's name": [Style.LEVEL_INK, Style.BOARD],
+		"the hint": [Style.BOARD_INK_SOFT, Style.BOARD],
+	}
+	var faint := []
+	var worst := 99.0
+	for what: String in inks:
+		var pair: Array = inks[what]
+		var ratio := _contrast(pair[0], pair[1])
+		worst = minf(worst, ratio)
+		if ratio < 4.5:
+			faint.append("%s %.2f:1" % [what, ratio])
+	_check(faint.is_empty(),
+		"every word on the bind board clears 4.5:1",
+		"worst %.2f:1  %s" % [worst, ", ".join(faint)])
+
+	# The swapped row is lifted off the plain one, or the lit edge is marking nothing.
+	_check(_luminance(ControlsSkin.SWAP_FACE) > _luminance(Style.BOARD_ROW),
+		"and a swapped row stands off a plain one",
+		"%.4f against %.4f" % [_luminance(ControlsSkin.SWAP_FACE), _luminance(Style.BOARD_ROW)])
+
+	_check(int(board.get(&"dropped_lines")) == 0,
+		"no line is dropped at 1280x720",
+		"%d dropped, wants %.0f of %.0f"
+			% [int(board.get(&"dropped_lines")), board.call(&"wanted_tall"), 680.0])
+	_check(board.call(&"wanted_tall") <= 680.0,
+		"and the board asks for no more room than it has",
+		"%.0f of 680" % board.call(&"wanted_tall"))
+
+	# The question the foot plank asks. `Style.write` neither wraps nor clips, so a line or a
+	# door label wider than the board it is on simply runs off the wood — which is how the
+	# menu's own "The saved lake will be thrown away." had been overrunning by ten pixels.
+	for asked: Array in [
+		[MenuConfirm.BOARD_WIDE, ControlsSkin.CONFIRM_WORDS,
+			ControlsSkin.CONFIRM_YES, ControlsSkin.CONFIRM_NO, "the bind board's question"],
+		[MenuConfirm.BOARD_WIDE, MenuConfirm.WORDS,
+			MenuConfirm.YES, MenuConfirm.NO, "the menu's own"],
+	]:
+		var line := float(asked[0]) - float(Style.BORDER_WALL) * 2.0 - MenuConfirm.BOARD_PAD * 2.0
+		var door := (line - MenuConfirm.ROW_GAP) * 0.5
+		var over := []
+		if Style.measure(String(asked[1]), Style.TEXT_BODY).x > line:
+			over.append("words %.0f of %.0f" % [Style.measure(String(asked[1]), Style.TEXT_BODY).x, line])
+		for label: String in [String(asked[2]), String(asked[3])]:
+			if Style.measure(label, Style.TEXT_BODY).x > door:
+				over.append("%s %.0f of %.0f" % [label, Style.measure(label, Style.TEXT_BODY).x, door])
+		_check(over.is_empty(), "%s fits its own board" % asked[4], ", ".join(over))
+
+	if _binds_touched:
+		Binds.take_overrides(_binds_before)
+		_check(Binds.overrides() == _binds_before,
+			"and the player's own keys are put back", str(Binds.overrides().size()))
+	board.visible = false
+	_main.call(&"_set_controls", false)
+	_finish()
+
+
+## How wide the upgrades count's badge comes out for a given count. The badge draws itself,
+## so this repeats its sum rather than reading it back — the check is that the sum ignores
+## the text it is given, which a drawn plate cannot be asked.
+func _badge_width(text: String) -> float:
+	var height := maxi(HudButtons.LABEL_LEAST, int(HudButtons.BADGE_TALL * HudButtons.BADGE_TEXT))
+	return maxf(
+		Style.measure(HudButtons.BADGE_SAMPLE, height).x, Style.measure(text, height).x
+	) + HudButtons.BADGE_PAD * 2.0
+
+
+## WCAG 2.1 relative-luminance contrast between two opaque colours.
+func _contrast(a: Color, b: Color) -> float:
+	var one := _luminance(a)
+	var two := _luminance(b)
+	return (maxf(one, two) + 0.05) / (minf(one, two) + 0.05)
+
+
+func _luminance(c: Color) -> float:
+	var parts := [c.r, c.g, c.b]
+	var lit := []
+	for v: float in parts:
+		lit.append(v / 12.92 if v <= 0.04045 else pow((v + 0.055) / 1.055, 2.4))
+	return 0.2126 * float(lit[0]) + 0.7152 * float(lit[1]) + 0.0722 * float(lit[2])
+
+
 func _stage_new_tracks() -> void:
 	var tracks: Dictionary = _main.get(&"_upgrades")
 	var missing := []
@@ -4808,4 +5321,4 @@ func _stage_new_tracks() -> void:
 		"with both new levels on it",
 		"%d, %d" % [int(_main.get(&"boat_volley_level")),
 			int(_main.get(&"dog_strength_level"))])
-	_finish()
+	_advance()

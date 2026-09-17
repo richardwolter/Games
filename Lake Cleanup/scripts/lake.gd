@@ -3158,29 +3158,29 @@ const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
 ## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
 const BLURBS := {
-	&"net_width": "Placeholder: how wide the net's mouth opens, so one cast covers more water.",
-	&"net_strength": "Placeholder: the heaviest weight tier the net can lift.",
-	&"net_range": "Placeholder: how far from the shore the angler can throw.",
-	&"reel": "Placeholder: how fast the net is reeled back in.",
-	&"net_hold": "Placeholder: how many pieces one cast can carry home.",
-	&"boat_speed": "Placeholder: how fast the ferry sails between the island and the yards.",
-	&"cargo": "Placeholder: how many pieces the ferry carries a trip.",
-	&"boat_volley": "Placeholder: how quickly a ferry throws its load aboard and into the yard's box.",
-	&"skimmer": "Placeholder: a skimmer on the ferry picks up rubbish as it sails.",
-	&"fleet": "Placeholder: another ferry in the water.",
-	&"dog_fetch": "Placeholder: how many pieces the dog brings back a trip.",
-	&"dog_wait": "Placeholder: how long the dog lazes about between trips, at most.",
-	&"dog_count": "Placeholder: another dog for the pack, trained like the first.",
-	&"dog_strength": "Placeholder: the heaviest and biggest pieces the dogs can carry back.",
-	&"lucky_haul": "Placeholder: odds that a cast lifts one tier heavier and holds more.",
-	&"double_cast": "Placeholder: odds that a cast throws a second net beside the first.",
-	&"sell_0": "Placeholder: what light pieces sell for at the yards.",
-	&"sell_1": "Placeholder: what small pieces sell for at the yards.",
-	&"sell_2": "Placeholder: what medium pieces sell for at the yards.",
-	&"sell_3": "Placeholder: what heavy pieces sell for at the yards.",
-	&"sell_4": "Placeholder: what bulky pieces sell for at the yards.",
-	&"recycle_bonus": "Placeholder: one yard at a time pays over the odds, and it moves.",
-	&"bird_worth": "Placeholder: what a netted pigeon is worth.",
+	&"net_width": "How wide the net's mouth opens, so one cast covers more water.",
+	&"net_strength": "The heaviest weight tier the net can lift.",
+	&"net_range": "How far from the shore the angler can throw.",
+	&"reel": "How fast the net is reeled back in.",
+	&"net_hold": "How many pieces one cast can carry home.",
+	&"boat_speed": "How fast the ferry sails between the island and the yards.",
+	&"cargo": "How many pieces the ferry carries a trip.",
+	&"boat_volley": "How quickly a ferry throws its load aboard and into the yard's box.",
+	&"skimmer": "A skimmer on the ferry picks up rubbish as it sails.",
+	&"fleet": "Another ferry in the water.",
+	&"dog_fetch": "How many pieces the dog brings back a trip.",
+	&"dog_wait": "How long the dog lazes about between trips, at most.",
+	&"dog_count": "Another dog for the pack, trained like the first.",
+	&"dog_strength": "The heaviest and biggest pieces the dogs can carry back.",
+	&"lucky_haul": "Odds that a cast lifts one tier heavier and holds more.",
+	&"double_cast": "Odds that a cast throws a second net beside the first.",
+	&"sell_0": "What light pieces sell for at the yards.",
+	&"sell_1": "What small pieces sell for at the yards.",
+	&"sell_2": "What medium pieces sell for at the yards.",
+	&"sell_3": "What heavy pieces sell for at the yards.",
+	&"sell_4": "What bulky pieces sell for at the yards.",
+	&"recycle_bonus": "One yard at a time pays over the odds, and it moves.",
+	&"bird_worth": "What a netted pigeon is worth.",
 }
 
 
@@ -3211,70 +3211,79 @@ func _affordable() -> int:
 ## ("3 per cast"), and the next level's figure follows in brackets. No tenths anywhere.
 func _shop_rows() -> Array:
 	var out: Array = []
-	# Each line: key, board, name, and what the value reads at a given level.
+	# Each line: key, board, name, the suffix that closes the figure, what the figure reads
+	# at a given level, and — where a word goes in front instead — the prefix.
+	#
+	# The value is the figure now, `ARROW`, and the figure one level on, with **the prefix on
+	# the first and the suffix on the last**, so a word or mark is said exactly once and the
+	# two numbers stand bare between them: `100 → 135%`, `Tier 2 → 3`, `$26 → 30`, `12 → 9s`.
+	# A maxed track shows one figure wearing both.
+	#
+	# **No nouns** (Richard, 2026-09-17): "a cast", "aboard", "a trip", "dogs" and "boats" are
+	# gone — the row's name and its "?" already say what is being counted, and the widest
+	# line in the shop was the thing deciding how small every row had to be drawn. `%`, `$`
+	# and `s` stay, being marks rather than words, and "Tier" stays, being a concept of the
+	# game with its own names rather than a unit of the row.
 	var listed := [
-		[&"net_width", &"net", "Width", func(l: int) -> String: return _pct_at(&"net_width", l)],
-		[&"net_strength", &"net", "Strength", func(l: int) -> String:
-			return "Tier %d" % int(_track_value(&"net_strength", l))],
-		[&"net_range", &"net", "Range", func(l: int) -> String: return _pct_at(&"net_range", l)],
-		[&"reel", &"net", "Speed", func(l: int) -> String: return _pct_at(&"reel", l)],
-		[&"net_hold", &"net", "Haul", func(l: int) -> String:
-			return "%d per cast" % int(_track_value(&"net_hold", l))],
-		[&"boat_speed", &"boat", "Speed", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
-		[&"cargo", &"boat", "Hold", func(l: int) -> String:
-			return "%d aboard" % int(_track_value(&"cargo", l))],
-		[&"boat_volley", &"boat", "Fast Sell", func(l: int) -> String:
-			# Read as how much faster the load moves, not as the cut itself: a row that says
-			# the gap is 40% of what it was is a row about the code. The gap is what shrinks
-			# and the flight never does, so this tops out at +150% and not at the moon.
-			return "%d%% faster" % roundi(
-				(1.0 / maxf(1.0 - _track_value(&"boat_volley", l), 0.01) - 1.0) * 100.0
-			)],
-		[&"fleet", &"boat", "Extra ferry", func(l: int) -> String: return "%d in the water" % (1 + l)],
-		[&"dog_fetch", &"dog", "Fetching", func(l: int) -> String:
-			return "%d per trip" % int(_track_value(&"dog_fetch", l))],
-		[&"dog_wait", &"dog", "Keenness", func(l: int) -> String:
-			return "waits %ds at most" % roundi(maxf(
+		[&"net_width", &"net", "Width", "%", func(l: int) -> String: return _pct_at(&"net_width", l)],
+		[&"net_strength", &"net", "Strength", "", func(l: int) -> String:
+			return "%d" % int(_track_value(&"net_strength", l)), "Tier "],
+		[&"net_range", &"net", "Range", "%", func(l: int) -> String: return _pct_at(&"net_range", l)],
+		[&"reel", &"net", "Reel", "%", func(l: int) -> String: return _pct_at(&"reel", l)],
+		[&"net_hold", &"net", "Catch", "", func(l: int) -> String:
+			return "%d" % int(_track_value(&"net_hold", l))],
+		[&"boat_speed", &"boat", "Sailing", "%", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
+		[&"cargo", &"boat", "Hold", "", func(l: int) -> String:
+			return "%d" % int(_track_value(&"cargo", l))],
+		[&"boat_volley", &"boat", "Loading", "%", func(l: int) -> String:
+			# How fast the load moves as a share of how fast it moved at level 0, not the cut
+			# itself: a row that says the gap is 40% of what it was is a row about the code.
+			# The gap is what shrinks and the flight never does, so this tops out near 250%.
+			return "%d" % roundi(100.0 / maxf(1.0 - _track_value(&"boat_volley", l), 0.01))],
+		[&"fleet", &"boat", "Fleet", "", func(l: int) -> String: return "%d" % (1 + l)],
+		[&"dog_count", &"dog", "Pack", "", func(l: int) -> String: return "%d" % (1 + l)],
+		[&"dog_strength", &"dog", "Carry", "", func(l: int) -> String:
+			return "%d" % (Dog.CARRY_TIER + int(_track_value(&"dog_strength", l))), "Tier "],
+		[&"dog_fetch", &"dog", "Fetch", "", func(l: int) -> String:
+			return "%d" % int(_track_value(&"dog_fetch", l))],
+		[&"dog_wait", &"dog", "Keenness", "s", func(l: int) -> String:
+			return "%d" % roundi(maxf(
 				Dog.MOOD_MOST - _track_value(&"dog_wait", l), Dog.MOOD_LEAST
 			))],
-		[&"dog_strength", &"dog", "Strong Dogs", func(l: int) -> String:
-			return "Tier %d" % (Dog.CARRY_TIER + int(_track_value(&"dog_strength", l)))],
-		[&"dog_count", &"dog", "Pack", func(l: int) -> String:
-			return "%d dog%s" % [1 + l, "" if l == 0 else "s"]],
-		[&"lucky_haul", &"net", "Lucky haul", func(l: int) -> String:
-			return "%d%%: +1 tier, +%d held" % [
-				roundi(_track_value(&"lucky_haul", l) * 100.0), LUCKY_EXTRA
-			]],
-		[&"double_cast", &"net", "Double cast", func(l: int) -> String:
-			return "%d%%: second net" % roundi(_track_value(&"double_cast", l) * 100.0)],
+		# The odds and the bonus are bare percents, not shares of a base: there is no base to
+		# be a share of, and they start at 0 where a scaling track starts at 100, which is
+		# what tells the two kinds of percent on this board apart.
+		[&"lucky_haul", &"luck", "Lucky cast", "%", func(l: int) -> String:
+			return "%d" % roundi(_track_value(&"lucky_haul", l) * 100.0)],
+		[&"double_cast", &"luck", "Double cast", "%", func(l: int) -> String:
+			return "%d" % roundi(_track_value(&"double_cast", l) * 100.0)],
+		# Which yard has the bonus, and how long it has left, is on the pricing plate
+		# (`_shop_legend`): the bonus is a change to what one material pays, and the plate is
+		# the one place that says what materials pay. The row sells a multiplier, so the row
+		# says the multiplier.
+		[&"recycle_bonus", &"luck", "Bonus yard", "%", func(l: int) -> String:
+			return "%d" % roundi(_track_value(&"recycle_bonus", l) * 100.0)],
+		[&"bird_worth", &"luck", "Pigeons", "", func(l: int) -> String:
+			return "%d" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l)), "$"],
 	]
-	listed.append([&"recycle_bonus", &"market", "Recycle Bonus", func(l: int) -> String:
-		if l <= 0:
-			return "off"
-		var bonus := "+%d%%" % roundi(_track_value(&"recycle_bonus", l) * 100.0)
-		if l != recycle_bonus_level or _bonus_kind < 0:
-			return bonus
-		return "%s %s, %ds" % [bonus, TrashDef.KIND_NAMES[_bonus_kind].to_lower(), ceili(_bonus_left)]
-	])
-	listed.append([&"bird_worth", &"market", "Pigeons", func(l: int) -> String:
-		return "$%d a bird" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l))])
 	for line: Array in listed:
 		var key: StringName = line[0]
 		var full := is_maxed(key)
 		var price := cost_of(key)
 		var level := _level_of(key)
-		var reads: Callable = line[3]
+		var suffix: String = line[3]
+		var reads: Callable = line[4]
+		var prefix: String = String(line[5]) if line.size() > 5 else ""
 		var now: String = reads.call(level)
 		out.append({
 			"key": key,
 			"board": line[1],
 			"name": line[2],
-			# Its own field, not part of the name: the shop draws it in the clean water's blue
-			# so the level stands off the name (2026-09-11), and small (2026-09-13).
-			"level": "Lvl %d" % level,
-			# What it does now, and what the next level buys after it, unless there is none.
-			"value": now if full else "%s  (%s next)" % [now, reads.call(level + 1)],
-			# What the upgrade is, for the row's "?" — placeholder wording for now.
+			# The figure alone. "Lvl" is a word the row does not need and a translation would
+			# have to carry, and the rail it stands in is what says the figure is a level.
+			"level": str(level),
+			"value": said,
+			# What the upgrade is, for the row's "?".
 			"blurb": String(BLURBS.get(key, "")),
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
@@ -3293,13 +3302,20 @@ func _track_value(key: StringName, level: int) -> float:
 	return track.value(level)
 
 
-## A scaling track as a percent over its level 0: "+0%" to begin with, "+40%" later. A
-## track whose base is nothing has no percent to be over and reads as its plain number.
+## What a scaling track is worth at a level, as a **share of what it was worth at level 0**:
+## `100` at the start, `900` at the top of the longest track. The figure the row prints, bare
+## — the `%` is put on by `_shop_rows` as the line's suffix.
+##
+## It used to read the rise instead — `(value / base - 1) x 100`, printed as `+385%`. Two
+## three-digit figures either side of the arrow came to 118px against a row's 87 and cut, and
+## dropping the `+` to save the width would have been a lie: `385%` claims 3.85x where the
+## stat is 4.85x. Measuring from the base instead needs no sign and is the same width.
+## A track whose base is nothing has no share to be of, and reads as its plain number.
 func _pct_at(key: StringName, level: int) -> String:
 	var base := _track_value(key, 0)
 	if base <= 0.0:
 		return "%d" % roundi(_track_value(key, level))
-	return "+%d%%" % roundi((_track_value(key, level) / base - 1.0) * 100.0)
+	return "%d" % roundi(_track_value(key, level) / base * 100.0)
 
 
 ## `skim_chance` at any level, not only the one owned.
@@ -3467,6 +3483,11 @@ func _sell_tier(what: StringName) -> int:
 	if not key.begins_with("sell_"):
 		return -1
 	var tier := key.trim_prefix("sell_").to_int()
+## What stands between a row's figure now and its figure one level on. A mark rather than
+## the words "(… next)": it is half the width, it is the same in every language, and Bungee
+## has it (checked in `tools/probe_shop_glyphs.gd`).
+const ARROW := "→"
+
 	return tier if tier >= 0 and tier < sell_levels.size() else -1
 
 
@@ -3575,6 +3596,8 @@ func _tree_stat(stat: String) -> float:
 
 
 ## Stats recomputed from what is owned, and the world brought in line with them.
+		var said := now if full else "%s %s %s" % [now, ARROW, reads.call(level + 1)]
+		said = prefix + said + suffix
 func _apply_tree(push: bool = true) -> void:
 	_tree_stats = _tree.stats(_tree_owned)
 	_sync_tree_world()
@@ -3629,9 +3652,25 @@ func _begin_tree_session(loaded: bool) -> void:
 		_apply_tree()
 	_tree_progress_in = 0.0
 	TreeLog.write("session", _tree_play, {
+	# The recycle bonus lives here rather than in its row: it is a change to what one
+	# material pays, and this is the one place that says what materials pay.
+	#
+	# It carries no figure of its own, because `_mean_pay_of` goes through `piece_pay`,
+	# which already multiplies the boosted kind — so the boosted material's price in `yards`
+	# above *is* the boosted price, and always has been. The plate has been printing it for
+	# as long as the bonus has existed, with nothing on it saying why the number moved. All
+	# this adds is the saying. Empty when no bonus is running.
+	var bonus := {}
+	if _bonus_kind >= 0 and recycle_bonus_level > 0:
+		bonus = {
+			"kind": _bonus_kind,
+			"pct": "+%d%%" % roundi(_track_value(&"recycle_bonus", recycle_bonus_level) * 100.0),
+			"seconds": ceili(_bonus_left),
+		}
 		"started": "continue" if loaded else "new",
 		"tree_file": UpgradeTree.PATH,
 		"nodes": _tree.nodes.size(),
+		"bonus": bonus,
 		"owned": _tree_owned.keys(),
 		"sludge": roundi(sludge),
 		"cleared": snappedf(_cleared_share(), 0.0001),

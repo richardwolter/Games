@@ -34,7 +34,8 @@ OUT = "assets/sfx"
 RATE = 44100
 
 # name in the game: (source file, how to cut it)
-#   ("trim", end_s)            silence cut from the front, faded out by end_s at the latest
+#   ("trim", end_s[, in_s])    silence cut from the front, faded out by end_s at the latest;
+#                              in_s overrides FADE_IN for a take that starts on its attack
 #   ("span", start_s, end_s[, fade_s])  exactly that stretch, short fade in, FADE_OUT (or
 #                              fade_s) out
 #   ("peak", end_s)            from just before the loudest transient, faded by end_s
@@ -47,11 +48,18 @@ RATE = 44100
 # something this table has to know about.
 PLAN = {
     "ferry_bell": ("Boat_Bell.wav", ("trim", 3.2)),
-    # Two ticks, the loud one 145 ms after a soft one: heard as a late click. The loud one only.
-    "ui_click": ("Click_Sound.wav", ("peak", 0.16)),
+    # The two takes are inverted, by decision (Richard, 2026-09-17): the mouse-over recording
+    # is the bolder sound and a click should be the bolder of the two, so it is the click now
+    # and the click recording is the hover. The keys mean the verb, not the file.
+    # Mouse_Over_Sound is two knocks, the second at 62% of the first 60 ms later, and the pair
+    # reads as a droplet: kept whole, exactly the cut that shipped as the hover (Richard,
+    # 2026-09-17). The first knock alone was tried and dropped for it. Its attack is in the
+    # take's first samples, so FADE_IN ramps over the knock and the click reads as late.
+    "ui_click": ("Mouse_Over_Sound.wav", ("trim", 0.2, 0.0005)),
     # Its own tick is 125 ms into the take, which was heard as a late close.
     "ui_close": ("Close_Tab.wav", ("peak", 0.5)),
-    "ui_hover": ("Mouse_Over_Sound.wav", ("trim", 0.2)),
+    # Two ticks, the loud one 145 ms after a soft one: heard as a late hover. The loud one only.
+    "ui_hover": ("Click_Sound.wav", ("peak", 0.16)),
     "coin": ("Coin_Sound_2.wav", ("trim", 0.4)),
     "find_caught": ("Decoration_Caught_Net.wav", ("trim", 1.0)),
     # The first hit and its ring, let go gently: at 5 s with a short fade it was heard as cut.
@@ -167,15 +175,20 @@ def fade(samples, fade_in, fade_out):
     return samples
 
 
-def trimmed(samples, end_s):
-    """Cut the silence before the sound and anything past end_s after its start."""
+def trimmed(samples, end_s, fade_in=None):
+    """Cut the silence before the sound and anything past end_s after its start.
+
+    `fade_in` overrides FADE_IN for a take whose attack is in its very first samples: four
+    milliseconds of ramp over a knock that peaks at five is what makes a click read as late.
+    """
     env = envelope(samples, 0.005)
     peak = max(env)
     start = next(i for i, e in enumerate(env) if e > peak * 0.03) * 0.005
     start = max(0.0, start - 0.005)
     last = max(i for i, e in enumerate(env) if e > peak * 0.01) * 0.005 + 0.02
     end = min(start + end_s, last + FADE_OUT)
-    return fade(cut(samples, start, end), FADE_IN, FADE_OUT)
+    in_s = FADE_IN if fade_in is None else fade_in
+    return fade(cut(samples, start, end), in_s, FADE_OUT)
 
 
 def high_pass(samples, hz):
@@ -377,7 +390,7 @@ def main():
         kind = how[0]
         cuts = []
         if kind == "trim":
-            cuts = [(name, trimmed(samples, how[1]), "wav")]
+            cuts = [(name, trimmed(samples, *how[1:]), "wav")]
         elif kind == "span":
             out_s = how[3] if len(how) > 3 else FADE_OUT
             clip = cut(samples, how[1], how[2])

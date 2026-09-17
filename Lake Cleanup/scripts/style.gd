@@ -84,9 +84,23 @@ const BUTTON_FACE := BOARD_ROW
 ## What a panel pressed into that face is: the same water taken well down, so it reads as a
 ## recess in the button rather than as a second colour laid on it.
 const BUTTON_SUNK := Color(0.11, 0.24, 0.24)
+## A row lifted a step off `BOARD_ROW`, for the moment something has just happened to it —
+## the bind board's swapped row. **As far as it can go and no further**: at 1.17x the row's
+## own luminance the writing on it still clears 4.5:1 (4.62), and a lift big enough to carry
+## the moment on its own would not. What carries it is the lit edge over the top, which is
+## the shop's own bargain for the same reason.
+const BOARD_ROW_LIT := Color(0.245, 0.43, 0.41)
 const BOARD_ROW_OFF := Color(0.227, 0.353, 0.141)
 const BOARD_INK := Color(0.85, 0.91, 0.94)
 const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
+## What writing that is drawn *back* is inked in, in place of `BOARD_INK_DIM`. That one
+## reads 2.19:1 on a dimmed plate; this reads over 5:1 on every face it is used on. Drawn
+## back rather than hidden: a row that cannot be used is still a row the player is owed the
+## reading of.
+##
+## The shop picked it first (2026-09-17) and the settings board took it the same day. The
+## shed's shelf still inks in `BOARD_INK_DIM` and is owed the same pass.
+const BOARD_INK_SOFT := Color(0.76, 0.83, 0.75)
 ## The settings board's rows, one tone a section so the eye finds a section by colour:
 ## sound on the murky water, the screen on the meter's scum green, the saves on oak like a
 ## price tag, and the quit on that same oak with its warning in the ink alone (a red plank
@@ -683,6 +697,27 @@ static func plank(on: CanvasItem, box: Rect2, seed: int, face: Color = FRAME, cl
 
 ## The broken highlight the light lays along a plank's lit edge: runs of pale peach a
 ## pixel in from the seam, gaps between, lengths off a hash so no two edges match.
+## A lit edge along the top of a painted face, in that face's own tone.
+##
+## **Not `highlight`** (2026-09-17): that one is the *wood's* lit edge and draws in
+## `FRAME_GLOW`/`FRAME_LIT`, a warm oak tone, in dashed runs like grain. Laid over a painted
+## face — the menu's accented Continue, the shop's affordable rows — it reads as pink strips
+## across a blue plate, because it is a highlight for a material the plate is not made of.
+##
+## One clean line rather than dashes: grain is a thing wood has and paint does not.
+const LIT_EDGE_LIFT := 0.22
+
+
+static func lit_edge(on: CanvasItem, box: Rect2, face: Color) -> void:
+	if box.size.x <= CLIP * 2.0:
+		return
+	var y := box.position.y + 0.5
+	on.draw_line(
+		Vector2(box.position.x + CLIP, y), Vector2(box.end.x - CLIP, y),
+		face.lightened(LIT_EDGE_LIFT), 1.0
+	)
+
+
 static func highlight(on: CanvasItem, from: Vector2, along: Vector2, seed: int, bites: Array[Rect2] = []) -> void:
 	var length := along.length()
 	if length <= 0.0:

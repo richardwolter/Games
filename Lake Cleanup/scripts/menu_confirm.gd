@@ -25,10 +25,12 @@ var title: String = TITLE:
 	set(v):
 		title = v
 		queue_redraw()
+## The line under the title, or "" for a board that needs none — a question whose two doors
+## already say what each of them does.
 var words: String = WORDS:
 	set(v):
 		words = v
-		queue_redraw()
+		_lay_out()
 var yes_label: String = YES:
 	set(v):
 		yes_label = v
@@ -38,7 +40,15 @@ var no_label: String = NO:
 		no_label = v
 		queue_redraw()
 
-const BOARD_WIDE := 400.0
+## The board's own width, and what a caller may ask for instead. **420, up from 400**
+## (2026-09-17): the menu's own line, "The saved lake will be thrown away.", measures 348
+## against the 338 a 400-wide board leaves it, and `Style.write` neither wraps nor clips — so
+## it had been running ten pixels off its own face. Measured by `tools/probe_confirm.gd`.
+##
+## One width for every caller, and the caller's words are what have to fit it: a door is 174
+## and the line 358. `test_lake` measures both for each caller, because `Style.write` will
+## draw a word straight off the wood rather than wrap or cut it.
+const BOARD_WIDE := 420.0
 const BOARD_PAD := 16.0
 const FRAME := 12.0
 const RIBBON_TALL := 36.0
@@ -47,6 +57,10 @@ const CHIPS := 3
 const ROW_TALL := 40.0
 const ROW_GAP := 10.0
 const WORDS_TALL := 30.0
+## What a board with no line puts above its doors instead. Not nothing: the title plank
+## straddles the board's top edge and hangs into the face, so doors set straight against
+## `BOARD_PAD` come up under the plank's bitten foot.
+const WORDLESS_AIR := 10.0
 
 signal confirmed
 signal cancelled
@@ -67,10 +81,10 @@ func _lay_out() -> void:
 	if not is_node_ready():
 		return
 	# From the face's top, under the frame's wood, so the words and the doors sit centred.
-	var tall := (
-		Style.board_wood_tall(BOARD_WIDE, FRAME) + BOARD_PAD
-		+ WORDS_TALL + ROW_GAP + ROW_TALL + BOARD_PAD
-	)
+	# A board given no line to say is a title and two doors. The band is not left standing
+	# empty: a gap where a sentence used to be reads as a sentence that failed to draw.
+	var tall := Style.board_wood_tall(BOARD_WIDE, FRAME) + BOARD_PAD + ROW_TALL + BOARD_PAD
+	tall += WORDS_TALL + ROW_GAP if not words.is_empty() else WORDLESS_AIR
 	var wide := minf(BOARD_WIDE, size.x - 40.0)
 	_board = Rect2(floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall)
 	queue_redraw()
@@ -122,12 +136,13 @@ func _draw() -> void:
 	draw_rect(face, Style.BOARD, true)
 	Style.board_ribbon(self, _ribbon(), title, CHIPS, Style.TEXT_HEAD)
 
-	var y := face.position.y + BOARD_PAD
-	Style.write(
-		self, words, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
-		Style.BOARD_INK, HORIZONTAL_ALIGNMENT_CENTER, face
-	)
-	y += WORDS_TALL + ROW_GAP
+	var y := face.position.y + BOARD_PAD + (0.0 if not words.is_empty() else WORDLESS_AIR)
+	if not words.is_empty():
+		Style.write(
+			self, words, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
+			Style.BOARD_INK, HORIZONTAL_ALIGNMENT_CENTER, face
+		)
+		y += WORDS_TALL + ROW_GAP
 
 	_doors.clear()
 	var left := face.position.x + BOARD_PAD

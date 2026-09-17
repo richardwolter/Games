@@ -30,6 +30,11 @@
 ## **The resolution is a windowed-mode setting**: in either fullscreen the row is dimmed and
 ## reads the monitor's own size. Nothing about picking a size can therefore leave a player
 ## staring at a screen that cannot display what the game asked for.
+##
+## **The board reads in the shop's language** (2026-09-17, `/grill-me` with Richard): one
+## plate face for every row and a carved heading over each group, in place of the three
+## section colours that had been doing that job alone since the headings were cut. Layout,
+## wording and ink only — no row was added or removed and nothing any row does moved.
 class_name SettingsSkin
 extends Control
 
@@ -48,9 +53,38 @@ const CHIPS := 3
 ## How tall each kind of line is, and the gaps between lines and between sections. A sound
 ## row is two lines on one plate: the label and its switch, and the volume groove under.
 const ROW_TALL := 40.0
-const SOUND_TALL := 58.0
+## A sound row came in 4 px (2026-09-17) to pay for the headings. With them at 58 the board
+## wanted 678 of the 680 the smallest frame leaves, which is not a margin — one longer label
+## or one more group and a row drops off the foot. The 4 come off the label line, not off the
+## groove: the groove is a target.
+const SOUND_TALL := 54.0
 const ROW_GAP := 6.0
 const SECTION_GAP := 12.0
+
+## A group's heading, the shop's own (`ShopSkin.GROUP_TALL`): the words in the clean water's
+## blue with a carved rule running from them to the board's far edge.
+##
+## **It stands in the section gap rather than over it.** The board is 638 design pixels tall
+## and the smallest frame — height never goes under 720 — leaves it 680, so headings drawn
+## above the gaps they separate (24 px each) would not fit and `_draw` would quietly drop the
+## bottom of the board. Standing in the gap each costs 14 px net and the board lands at 666.
+const GROUP_TALL := 20.0
+
+## What a row that cannot be used reads in. `Style.BOARD_INK_DIM` on a dimmed plate is
+## 2.19:1; this is 6.22:1, and the dimmed plate is what says the row is dead.
+const INK_SOFT := Style.BOARD_INK_SOFT
+
+## A chooser's value. `Style.LEVEL_INK` is 3.42:1 on the rows' one face — it was picked to
+## sit on the shop's plate, which is a different plate — so the settings board lifts it to
+## 4.76:1 here rather than moving a swatch the shop is using.
+const VALUE_INK := Color(0.78, 0.88, 0.95)
+
+## A button's plate and the two inks it carries. **A dark face, by decision** (2026-09-17):
+## on the frame's oak these two words read 2.97:1 and 1.37:1, and no ink clears 4.5:1 on that
+## face at all — white itself reaches 4.06:1. On this one the word is 11.8:1 and the warning
+## 5.30:1, and the warning is still plainly red.
+const BUTTON_FACE := Style.BOARD
+const WARN_INK := Color(0.877, 0.555, 0.492)
 
 ## The switch: a sunken track with a plank thumb pushed to one side.
 const SWITCH_WIDE := 44.0
@@ -70,9 +104,17 @@ const ARROW_WIDE := 22.0
 const VALUE_WIDE := 150.0
 const ARROW_GAP := 4.0
 
-## The dropped list the resolution opens: a row each, over the board.
+## What a dead Resolution row says instead of its arrows, and the gap between it and the
+## figure it explains.
+const DEAD_SIZE_NOTE := "set by Window"
+const NOTE_GAP := 8.0
+
+## The dropped list the resolution opens: a row each, over the board. The one it is standing
+## on is a pale plate written in dark, not cream on the clean water — that read 2.82:1, the
+## last word on the board that did not clear the bar.
 const LIST_ROW := 28.0
 const LIST_PAD := 6.0
+const PICKED_FACE := Style.LEVEL_INK
 
 const CLOSE_SIZE := 44.0
 
@@ -156,6 +198,12 @@ var _close: CloseButton
 var _listing: StringName = &""
 var _list_boxes: Array = []
 
+## Set by `_draw` when a line did not fit in the board and was not drawn. A board too tall
+## for its window used to drop its bottom rows in silence — at the smallest frame that is
+## "Save and go to menu" gone — so the fact is recorded and `test_lake` asks for it. Nothing
+## in the game reads it: it is there to be a failure rather than a surprise.
+var dropped_lines: int = 0
+
 ## The window mode the player was on before the one being tried, while the safeguard's
 ## question is up. -1 when nothing is being tried.
 var _trying_from: int = -1
@@ -194,15 +242,25 @@ func _store(key: StringName, value: Variant) -> void:
 	Prefs.store(key, value)
 
 
-## The lines, top to bottom, in sections.
+## The lines, top to bottom, in groups.
+##
+## **Master leads and carries no heading.** It is the bus the three under it feed, so what
+## says it governs them is the rule the "Mix" heading draws over those three — a lid on what
+## is under it, which is the shop's own reading of a heading. An indent, or dimming the three
+## while Master is off, were the other two ways and were not taken.
+##
+## **No key name is written into a label.** "Music  (M)" and "Window  (F11)" put a key a
+## translation has to carry into the middle of a name, on the only two rows that had one, for
+## two keys the Controls board will never list because neither is rebindable.
 func _plan() -> Array:
 	var plan := [
 		{"kind": &"sound", "key": &"master", "level": &"master_level", "label": "Master"},
-		{"kind": &"sound", "key": &"music", "level": &"music_level", "label": "Music  (M)"},
+		{"kind": &"head", "label": "Mix"},
+		{"kind": &"sound", "key": &"music", "level": &"music_level", "label": "Music"},
 		{"kind": &"sound", "key": &"sfx", "level": &"sfx_level", "label": "Sound effects"},
 		{"kind": &"sound", "key": &"ambience", "level": &"ambience_level", "label": "Ambience"},
-		{"kind": &"gap"},
-		{"kind": &"choice", "key": &"window_mode", "label": "Window  (F11)"},
+		{"kind": &"head", "label": "Screen"},
+		{"kind": &"choice", "key": &"window_mode", "label": "Window"},
 		{"kind": &"choice", "key": &"window_size", "label": "Resolution", "list": true},
 		{"kind": &"choice", "key": &"vsync", "label": "VSync"},
 		{"kind": &"choice", "key": &"fps_cap", "label": "Frame cap"},
@@ -213,7 +271,7 @@ func _plan() -> Array:
 		return plan
 	plan.append({"kind": &"gap"})
 	if wipe_shown:
-		plan.append({"kind": &"button", "key": &"wipe", "label": "Start the lake over  (F6)", "warn": true})
+		plan.append({"kind": &"button", "key": &"wipe", "label": "Start the lake over", "warn": true})
 	if swap_shown:
 		plan.append({"kind": &"button", "key": &"swap", "label": swap_label})
 	plan.append({"kind": &"button", "key": &"quit", "label": QUIT_LABEL, "warn": true})
@@ -224,19 +282,27 @@ func _tall_of(kind: StringName) -> float:
 	match kind:
 		&"sound":
 			return SOUND_TALL
+		&"head":
+			return GROUP_TALL
 		&"gap":
 			return SECTION_GAP - ROW_GAP
 		_:
 			return ROW_TALL
 
 
-func _lay_out() -> void:
-	if not is_node_ready():
-		return
+## How tall the board wants to be with the plan it has. Asked by `_lay_out` and by the
+## harness, which checks it against the room the smallest frame leaves.
+func wanted_tall() -> float:
 	var tall := Style.board_wood_tall(BOARD_WIDE, FRAME) + RIBBON_TALL * 0.5 + BOARD_PAD
 	for line: Dictionary in _plan():
 		tall += _tall_of(line["kind"]) + ROW_GAP
-	tall += BOARD_PAD - ROW_GAP
+	return tall + BOARD_PAD - ROW_GAP
+
+
+func _lay_out() -> void:
+	if not is_node_ready():
+		return
+	var tall := wanted_tall()
 	var wide := minf(BOARD_WIDE, size.x - 40.0)
 	tall = minf(tall, size.y - 40.0)
 	_board = Rect2(floorf((size.x - wide) * 0.5), floorf((size.y - tall) * 0.5), wide, tall)
@@ -570,6 +636,7 @@ func _draw() -> void:
 	)
 
 	_lines.clear()
+	dropped_lines = 0
 	var left := face.position.x + BOARD_PAD
 	var wide := face.size.x - BOARD_PAD * 2.0
 	var y := _board.position.y + RIBBON_TALL * 0.5 + BOARD_PAD
@@ -580,8 +647,12 @@ func _draw() -> void:
 		var box := Rect2(left, y, wide, tall)
 		y += tall + ROW_GAP
 		if box.end.y > face.end.y - BOARD_PAD + 1.0:
-			break
+			if kind != &"gap":
+				dropped_lines += 1
+			continue
 		match kind:
+			&"head":
+				_draw_group(String(line["label"]), box)
 			&"sound":
 				_draw_sound(box, line)
 			&"choice":
@@ -591,25 +662,41 @@ func _draw() -> void:
 			&"button":
 				_draw_button(box, line)
 	_list_boxes.clear()
-	if _listing != &"" and listed.size.x > 0.0:
+	if _listing != &"" and listed.size.x > 0.0 and _screen_row_live(_listing):
 		_draw_list(listed, _listing)
 
 
-## The plate a row sits on, by which section it is in. A row that cannot be used is drawn
-## back towards the board rather than in a colour of its own.
-func _row_face(key: StringName, hovered: bool, live: bool) -> Color:
-	var face := Style.ROW_SOUND
-	match key:
-		&"window_mode", &"window_size", &"vsync", &"fps_cap":
-			face = Style.ROW_SCREEN
-		&"controls", &"wipe", &"swap", &"quit":
-			# The quit is the same oak as the swap; its warning is in the ink alone.
-			face = Style.ROW_SAVE
+## The plate a row sits on. **One face for every row** (2026-09-17): the board used to carry
+## three — the murky water for sound, the scum green for the screen, the frame's oak for the
+## buttons — and with the section headings cut in September those colours were the only thing
+## saying where one section ended. Headings say it now, the way the shop's do, and a colour
+## on this board is free to mean something again.
+##
+## A row that cannot be used is drawn back towards the board, which is the one thing a face
+## still says.
+func _row_face(hovered: bool, live: bool) -> Color:
+	var face := Style.BOARD_ROW
 	if not live:
-		face = face.lerp(Style.BOARD, 0.55)
-	if hovered and live:
+		return face.lerp(Style.BOARD, 0.55)
+	if hovered:
 		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
 	return face
+
+
+## A group's heading: the words in the clean water's blue and a carved rule running from them
+## to the board's far edge. `ShopSkin._draw_group`'s own drawing, so the two boards cannot
+## end up with two kinds of heading.
+func _draw_group(heading: String, box: Rect2) -> void:
+	var base := box.position.y + box.size.y * 0.5 + float(Style.TEXT_SMALL) * 0.36
+	var took := Style.write(
+		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.LEVEL_INK
+	)
+	var from := box.position.x + took.x + 8.0
+	if from >= box.end.x - 4.0:
+		return
+	var mid := box.position.y + box.size.y * 0.5
+	draw_line(Vector2(from, mid), Vector2(box.end.x, mid), Style.SEAM, 2.0)
+	draw_line(Vector2(from, mid + 1.0), Vector2(box.end.x, mid + 1.0), Style.BOARD_ROW, 1.0)
 
 
 ## A label on the left of a line and a switch on its right.
@@ -625,7 +712,10 @@ func _draw_label_and_switch(line_box: Rect2, key: StringName, label: String) -> 
 		Vector2(SWITCH_WIDE, SWITCH_TALL)
 	)
 	draw_rect(track.grow(1.0), Style.SEAM, true)
-	draw_rect(track, Style.ON_GOLD if on else Style.BOARD, true)
+	# The clean water, not the money's gold: the groove under this switch already fills in
+	# `ON_WATER` when the row is on, so one row said "on" in two colours — and gold on the
+	# shop's board is a price.
+	draw_rect(track, Style.ON_WATER if on else Style.BOARD, true)
 	var thumb_wide := SWITCH_TALL - 2.0
 	var thumb := Rect2(
 		Vector2(track.end.x - thumb_wide - 1.0 if on else track.position.x + 1.0, track.position.y + 1.0),
@@ -645,14 +735,20 @@ func _draw_choice(box: Rect2, line: Dictionary) -> void:
 		or _hovered == StringName(String(row) + "_more")
 		or _hovered == row
 	)
-	Style.plate(self, box, _row_face(row, hovered, live))
+	Style.plate(self, box, _row_face(hovered, live))
 	Style.write(
 		self, String(line["label"]), Style.TEXT_BODY,
 		Vector2(box.position.x + ROW_INSET, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
-		Style.BOARD_INK if live else Style.BOARD_INK.lerp(Style.BOARD, 0.5)
+		Style.BOARD_INK if live else INK_SOFT
 	)
 	var right := box.end.x - ROW_INSET
 	var mid := box.position.y + (box.size.y - SWITCH_TALL) * 0.5
+	if not live:
+		_draw_dead_choice(row, Rect2(
+			Vector2(right - VALUE_WIDE - (ARROW_WIDE + ARROW_GAP) * 2.0, mid),
+			Vector2(VALUE_WIDE + (ARROW_WIDE + ARROW_GAP) * 2.0, SWITCH_TALL)
+		))
+		return
 	var more := Rect2(Vector2(right - ARROW_WIDE, mid), Vector2(ARROW_WIDE, SWITCH_TALL))
 	var value := Rect2(
 		Vector2(more.position.x - ARROW_GAP - VALUE_WIDE, mid), Vector2(VALUE_WIDE, SWITCH_TALL)
@@ -660,29 +756,54 @@ func _draw_choice(box: Rect2, line: Dictionary) -> void:
 	var less := Rect2(
 		Vector2(value.position.x - ARROW_GAP - ARROW_WIDE, mid), Vector2(ARROW_WIDE, SWITCH_TALL)
 	)
-	if live:
-		_lines.append({
-			"kind": &"arrow", "key": StringName(String(row) + "_less"), "row": row,
-			"step": -1, "box": less,
-		})
-		_lines.append({
-			"kind": &"arrow", "key": StringName(String(row) + "_more"), "row": row,
-			"step": 1, "box": more,
-		})
-		_lines.append({"kind": &"value", "key": row, "row": row, "box": value})
-	_draw_arrow(less, -1, live)
-	_draw_arrow(more, 1, live)
+	_lines.append({
+		"kind": &"arrow", "key": StringName(String(row) + "_less"), "row": row,
+		"step": -1, "box": less,
+	})
+	_lines.append({
+		"kind": &"arrow", "key": StringName(String(row) + "_more"), "row": row,
+		"step": 1, "box": more,
+	})
+	_lines.append({"kind": &"value", "key": row, "row": row, "box": value})
+	_draw_arrow(less, -1)
+	_draw_arrow(more, 1)
 	Style.write(
 		self, _shown_choice(row), Style.TEXT_SMALL,
 		Vector2(0.0, value.position.y + (value.size.y + float(Style.TEXT_SMALL) * 0.62) * 0.5),
-		Style.LEVEL_INK if live else Style.BOARD_INK.lerp(Style.BOARD, 0.5),
-		HORIZONTAL_ALIGNMENT_CENTER, value
+		VALUE_INK, HORIZONTAL_ALIGNMENT_CENTER, value
 	)
 
 
-func _draw_arrow(box: Rect2, step: int, live: bool) -> void:
-	Style.plank(self, box, int(box.position.y) * 7 + step, Style.FRAME if live else Style.FRAME.lerp(Style.BOARD, 0.5), 2.0)
-	var ink := Style.RIBBON_INK if live else Style.RIBBON_INK.lerp(Style.BOARD, 0.5)
+## A chooser that cannot be used **draws no arrows at all** (2026-09-17). Dimmed, they were a
+## pair of controls that would not answer, on the row most players meet first — an old
+## `fullscreen: true` migrates to borderless, and Resolution is dead in either fullscreen. So
+## what is left is a reading of the screen the window is filling, with the row that decides
+## it named, right-aligned where the chooser stood.
+func _draw_dead_choice(row: StringName, box: Rect2) -> void:
+	var text := _shown_choice(row)
+	var took := Style.measure(text, Style.TEXT_SMALL)
+	var base := box.position.y + (box.size.y + float(Style.TEXT_SMALL) * 0.62) * 0.5
+	Style.write(
+		self, text, Style.TEXT_SMALL, Vector2(box.end.x - took.x, base), INK_SOFT
+	)
+	if row != &"window_size":
+		return
+	var why := DEAD_SIZE_NOTE
+	var wants := Style.measure(why, Style.TEXT_TINY)
+	var at := box.end.x - took.x - NOTE_GAP - wants.x
+	# Said only where it fits whole: a reason cut in half is worse than no reason.
+	if at < box.position.x:
+		return
+	Style.write(
+		self, why, Style.TEXT_TINY,
+		Vector2(at, box.position.y + (box.size.y + float(Style.TEXT_TINY) * 0.62) * 0.5),
+		INK_SOFT
+	)
+
+
+func _draw_arrow(box: Rect2, step: int) -> void:
+	Style.plank(self, box, int(box.position.y) * 7 + step, Style.FRAME, 2.0)
+	var ink := Style.RIBBON_INK
 	# The point goes the way the arrow steps: the left one points left.
 	var mid := box.get_center()
 	var reach := Vector2(4.0, 6.0)
@@ -714,11 +835,11 @@ func _draw_list(row_box: Rect2, row: StringName) -> void:
 		_list_boxes.append({"box": entry, "value": value})
 		var picked: bool = _choice_text(row, value) == _choice_text(row, _choice_of(row))
 		if picked:
-			draw_rect(entry, Style.ON_WATER, true)
+			draw_rect(entry, PICKED_FACE, true)
 		Style.write(
 			self, _choice_text(row, value), Style.TEXT_SMALL,
 			Vector2(0.0, y + (LIST_ROW + float(Style.TEXT_SMALL) * 0.62) * 0.5),
-			Style.RIBBON_INK if picked else Style.BOARD_INK,
+			Style.INK_DARK if picked else Style.BOARD_INK,
 			HORIZONTAL_ALIGNMENT_CENTER, entry
 		)
 		y += LIST_ROW
@@ -739,7 +860,7 @@ func _draw_sound(box: Rect2, line: Dictionary) -> void:
 	)
 	_lines.append({"kind": &"switch", "key": key, "box": top})
 	_lines.append({"kind": &"slider", "key": level_key, "box": under, "groove": groove})
-	Style.plate(self, box, _row_face(key, _row_hovered(line), true))
+	Style.plate(self, box, _row_face(_row_hovered(line), true))
 	_draw_label_and_switch(top, key, String(line["label"]))
 	draw_rect(groove.grow(1.0), Style.SEAM, true)
 	draw_rect(groove, Style.FRAME_SHADOW, true)
@@ -778,17 +899,27 @@ func _set_state(key: StringName, on: bool) -> void:
 			ambience_on = on
 
 
-## A button row: a plank like the frame, grained, lit along the top, a bite or two out of
-## its edge.
+## A button row: a dark plate, ringed in the seam and lit along its top edge — the two marks
+## a `PlankButton` on the main menu wears, which is what tells it from the board it stands on
+## when the two are one colour.
+##
+## **It used to be a plank of the frame's oak** and could not be read: measured on that face,
+## "Controls" was 2.97:1 and "Save and go to menu" 1.37:1, and nothing could have fixed
+## either, because white itself only reaches 4.06:1 on it. A warning wants a dark face to be
+## red against.
+##
+## **Not `Style.highlight` for the lit edge**: that is the wood's, in a warm oak tone, and
+## this face is paint.
 func _draw_button(box: Rect2, line: Dictionary) -> void:
 	var key: StringName = line["key"]
 	_lines.append({"kind": &"button", "key": key, "box": box})
-	var face := _row_face(key, _hovered == key, true)
-	var seed := int(box.position.y) + key.hash() % 31
-	Style.plank(self, box, int(box.position.y) * 13 + key.hash() % 89, face, Style.CLIP, Style.button_bites(box, seed))
-	var ink := Style.RIBBON_INK
-	if bool(line.get("warn", false)):
-		ink = Style.DANGER.lerp(Style.INK, 0.35)
+	var face := BUTTON_FACE
+	if _hovered == key:
+		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
+	draw_rect(box.grow(1.0), Style.SEAM, true)
+	Style.plate(self, box, face)
+	Style.lit_edge(self, box, face)
+	var ink := WARN_INK if bool(line.get("warn", false)) else Style.INK
 	Style.write(
 		self, String(line["label"]), Style.TEXT_BODY,
 		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),

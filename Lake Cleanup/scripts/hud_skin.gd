@@ -85,7 +85,13 @@ const STOCK_TALL := 54.0
 const STOCK_TEXT := 0.72
 const STOCK_LABEL_SHARE := 0.8
 const STOCK_MARK_PAD := 6.0
-const STOCK_LABEL := "In stock"
+## "Waiting", not "In stock" (2026-09-17): the crate has no cap — `Store.held` is an
+## unbounded list and `CRATE_FULL` only decides how high the heap draws — so this is a
+## **backlog**, pieces waiting for a ferry, not a balance. Drawn on the same plate as the
+## money and labelled "In stock" it read as a second purse. The word is the whole fix, by
+## decision: the number rising is the clearest sign the fleet cannot keep up, but saying so
+## with a trend mark is a fleet readout, and that was left out of this pass.
+const STOCK_LABEL := "Waiting"
 
 ## How the count runs toward the true one when it changes — as a fraction of the gap a
 ## second, and the least it may move — and how long the glow behind it lasts after it lands.
@@ -100,6 +106,9 @@ const STOCK_GLOW := 0.5
 ## than the live one, because a plate that changed width every time a piece was sold would
 ## be a plate that moved while being read.
 const STOCK_SAMPLE := "99999"
+
+## What the upgrades button calls itself, under the count's badge.
+const UPGRADES_LABEL := "Upgrades"
 const STOCK_PAD := 10.0
 
 ## The sprites the buttons carry, lent by the lake — see `hud_buttons.gd` for the keys.
@@ -155,7 +164,7 @@ var _shown: float = 1.0
 ## Null when the art is missing, and then there is no meter — the lake keeps its plain label.
 var _meter_water: TextureRect
 var _meter_circle: TextureRect
-var _meter_frame: TextureRect
+var _meter_frame: MeterFrame
 var _meter_face: MeterFace
 var _meter_shader: ShaderMaterial
 
@@ -207,7 +216,14 @@ func _lay_out() -> void:
 	_meter_frame_box = Rect2(
 		_meter_box.position + METER_FRAME.position * scale, METER_FRAME.size * scale
 	)
-	for sheet: TextureRect in [_meter_water, _meter_frame, _meter_circle]:
+	if _meter_frame != null:
+		# The built frame is the wooden box alone, not the whole sheet: it is drawn at the
+		# size the wood occupies, and `_build_border` fills the rest.
+		_meter_frame.position = _meter_frame_box.position.floor()
+		_meter_frame.size = _meter_frame_box.size.floor()
+		_meter_frame.sheet_box = _meter_box
+		_meter_frame.queue_redraw()
+	for sheet: TextureRect in [_meter_water, _meter_circle]:
 		if sheet != null:
 			sheet.position = _meter_box.position
 			sheet.size = _meter_box.size
@@ -533,7 +549,18 @@ func _build_meter() -> void:
 	_meter_water.material = _meter_shader
 	# The frame first and the circle over it: the circle caps the frame's end, and drawn
 	# under it the frame's corner showed through the bags as a splinter.
-	_meter_frame = _sheet_node(frame)
+	#
+	# **Built, not stamped** (2026-09-17): the sheet's own frame is drawn pre-scaled at
+	# `METER_SCALE`, so its planks landed at 27 and 24 px while every other plate in the HUD
+	# — whose frames `Style._build_border` crops out of *this same sheet* — landed at 16 and
+	# 14. One wood at two thicknesses, side by side in the same corner. Built to the frame's
+	# drawn box instead, the planks are the HUD's everywhere and the meter gains the V bites
+	# every other frame has. `MeterFrame` falls back to stamping the sheet where the border
+	# will not fit, so a small window keeps a frame rather than losing one.
+	_meter_frame = MeterFrame.new()
+	_meter_frame.sheet = frame
+	_meter_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_meter_frame)
 	_meter_circle = _sheet_node(circle)
 	_meter_face = MeterFace.new()
 	_meter_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -600,6 +627,31 @@ class MeterFace extends Control:
 
 func _lifted(box: Rect2, name: StringName) -> Rect2:
 	if _hovered != name:
+## The meter's wooden frame, built to its own drawn size rather than stamped from the sheet
+## at `METER_SCALE`.
+##
+## `Style._build_border` makes a frame of any size out of the meter's own painted border,
+## with its planks at a fixed 16 and 14 px — which is what every other plate in the HUD
+## wears. Stamping the sheet scaled the planks with everything else and put 27 px of wood
+## round the meter beside 16 px of the same wood round the stock plate.
+##
+## Where the border will not fit — a window small enough that `Style.border_fits` says no —
+## it falls back to the painted sheet, drawn over the whole meter box as it always was. A
+## frame at the wrong thickness beats no frame at all.
+class MeterFrame extends Control:
+	## The painted sheet, for the fallback only.
+	var sheet: Texture2D = null
+	## The whole meter's box on screen, in the parent's pixels: what the fallback stamps the
+	## sheet over. The node's own rectangle is the wooden frame alone.
+	var sheet_box := Rect2()
+
+	func _draw() -> void:
+		if Style.meter_frame(self, Rect2(Vector2.ZERO, size)):
+			return
+		if sheet != null:
+			draw_texture_rect(sheet, Rect2(sheet_box.position - position, sheet_box.size), false)
+
+
 		return box
 	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)
 
@@ -753,20 +805,21 @@ func _recycle_shapes(box: Rect2) -> Array:
 
 
 
-## How many upgrades the player can afford, written across the foot of the upgrades button
-## on a sunken panel like the money's.
+## The upgrades button's foot says **what the button is**, and the count rides a badge in its
+## corner (2026-09-17).
 ##
-## The same lettering as the figure on the money plate: they are a pair, and the money one
-## is the number this one is measured against. White rather than that one's gold — gold in
-## this game is money, and this is a count of things, not a sum.
+## It used to read "n available" across the foot: a count with no noun — available what? —
+## and the only thing in the HUD whose width moved with its own number, so the panel breathed
+## in and out as the purse filled. The word is fixed now and the number has its own small
+## plate, which is the convention every game uses for a count of things waiting.
 ##
-## Always there, zero included: a panel that comes and goes is a thing the player has to
-## notice the absence of, and "0 available" is the answer to the question they are asking
-## when they look at it.
+## Still always there, zero included, which was the old rule and a good one: a badge that
+## comes and goes is a thing the player has to notice the absence of. At zero it is drawn
+## back rather than hidden.
 func _draw_available() -> void:
-	HudButtons.label(
-		self, HudButtons.face_of(_lifted(_upgrades_box, &"upgrades")), "%d available" % available
-	)
+	var face := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
+	HudButtons.label(self, face, UPGRADES_LABEL)
+	HudButtons.badge(self, face, str(available), available > 0)
 
 
 ## The money plate: the coin, the sunken panel, and the live figure on it.

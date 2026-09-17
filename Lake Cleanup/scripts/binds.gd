@@ -128,6 +128,10 @@ const FIXED := {
 ## touched that row.
 static var _set: Dictionary = {}
 
+## What the walking stick is called on the board. The sticks are `FIXED` and have no row, so
+## this is the only place the player is told one exists.
+const STICK_NAME := "Left stick"
+
 ## Xbox names, because that is the pad the game was built against and the one the prompts
 ## already say. Index is `JoyButton`.
 const PAD_NAMES := {
@@ -223,6 +227,18 @@ static func _write(action: StringName, column: String, event: String) -> void:
 ## Put every row back to the table's own binding.
 static func reset() -> void:
 	_set.clear()
+	install()
+
+
+## The player's overrides, and putting a whole set back. **The harness's, so that a test that
+## rebinds something can leave the player's own keys exactly as it found them** — the same
+## rule the sound levels follow. Nothing in the game calls these.
+static func overrides() -> Dictionary:
+	return _set.duplicate(true)
+
+
+static func take_overrides(set: Dictionary) -> void:
+	_set = set.duplicate(true)
 	install()
 
 
@@ -356,6 +372,22 @@ static func label_of(written: String) -> String:
 			var pair := "%s:%s" % [parts[1], parts[2]] if parts.size() > 2 else ""
 			return String(AXIS_NAMES.get(pair, "Axis %s" % parts[1]))
 	return "—"
+
+
+## What is *always* on this action's column besides the one binding the board can edit, or
+## "" where there is nothing. The walking rows are the case: the left stick moves the angler
+## through their `extra` list and is not rebindable, so a pad cell reading "—" was telling the
+## player the verb had no gamepad control at all.
+##
+## Read off the table's own `extra` rather than off a list of action names, so a verb that is
+## given a stick later says so without anything here being edited.
+static func standing_label(action: StringName, column: String) -> String:
+	if column != "pad":
+		return ""
+	for event: String in row_of(action).get("extra", []):
+		if event.begins_with("axis:"):
+			return STICK_NAME
+	return ""
 
 
 ## The word printed on that hole in the keyboard, through the OS's layout.

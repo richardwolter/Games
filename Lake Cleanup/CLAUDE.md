@@ -96,6 +96,111 @@ Treat it as a deliverable, not polish: the clean state must **gain density** (pl
 
 This inverts the notes' advice but keeps fun physics-first.
 
+### The Shop Reads (2026-09-17, `/grill-me` with Richard, `ui-ux-pro-max` review)
+A UI/UX pass over the upgrades shop. Full review, measurements and the mockups it was picked
+off: `docs/ui/shop-review.md`. **Layout and wording only — no price, curve or mechanic moved.**
+
+**What was wrong, measured** (`tools/probe_shop_text.gd`, headless, Bungee at the real sizes):
+a row's writing gets **108 px**, the same on every monitor (`BOARDS_WIDE` caps at 1180, so a
+21:9 screen bought the shop nothing but more empty table). **47 of those went on "Lvl 20"**.
+At a fresh save **12 of 17 value lines were cut with an ellipsis at 11 px**, 9 of 17 names
+dropped their level at the top of their track, and "Recycle Bonus" was cut inside its own
+name at every level. An unaffordable row's value line read **1.82:1** contrast at 11 px
+(`BOARD_INK_DIM` lerped a quarter into the face), against the intent stated in its own
+comment — "drawn back rather than hidden: the point of a shop is knowing what is coming".
+- **Four boards, renamed, no article**: `NET` / `BOATS` / `DOGS` / `LUCK`. The market board is
+  gone; **Lucky cast and Double cast moved off the net's board** to stand with Bonus yard and
+  Pigeons, so the boards are **5/4/4/4** instead of 7/4/4/2. The luck board keeps the coin as
+  its head.
+- **Rows are grouped by what they change** (`ShopSkin.GROUPS`, a carved rule and a small
+  heading): boats *The run* / *The fleet*, dogs *The pack* / *The trip*, luck *On a cast* /
+  *At the yards*. **A board with one group draws no heading** — one heading over everything
+  says nothing — so the net's five rows run on. `UPGRADE_ORDER` is the order tracks *load*
+  in and was never a reading order; `GROUPS` is. A row no group claims is drawn after them
+  rather than dropped, so a new track appears before anyone remembers to list it.
+- **Every name is unique across all four boards.** Two rows called "Speed" meant the reel and
+  the sail; "Haul" / "Hold" / "Fast Sell" were three near-synonyms for three unrelated
+  mechanics. Now: net Speed → **Reel**, net Haul → **Catch**, ferry Speed → **Sailing**,
+  Fast Sell → **Loading**, Extra ferry → **Fleet**, Fetching → **Fetch**, Strong Dogs →
+  **Carry**, Recycle Bonus → **Bonus yard**. `test_lake` guards uniqueness across the shop,
+  not within a board, because across is where the collisions were.
+- **One value grammar**: two bare figures either side of `Lake.ARROW` (U+2192, which Bungee
+  has — `tools/probe_shop_glyphs.gd`), a **prefix** on the first and a **suffix** on the last,
+  each said exactly once: `100 → 135%`, `Tier 2 → 3`, `$26 → 30`, `12 → 9s`. A maxed track
+  shows one figure wearing both. The bracket the value used to carry — "(+55% next)" — is
+  gone, and so is the word "next" with it.
+- **No nouns in a value** (2026-09-17, second pass with Richard): "a cast", "aboard", "a
+  trip", "dogs" and "boats" are all gone — the row's name and its "?" say what is being
+  counted. `%`, `$` and `s` stay, being marks rather than words; **"Tier" stays**, being a
+  concept of the game with its own names (Light / Small / Medium / Heavy / Bulky) rather than
+  a unit of the row.
+- **A scaling track reads as a share of its own level 0, not as the rise over it**
+  (`_pct_at`): `100 → 135%` at the start, `900%` at the top, where it read `+0% → +35%` and
+  `+700%`. **The basis and the missing sign go together.** Two three-digit figures either
+  side of the arrow came to 118 px against a row's 87 and cut; dropping the `+` to save that
+  width would have been a lie, because `385%` claims 3.85x where the stat is 4.85x. Measured
+  from the base it needs no sign, is the same width, and is true.
+  **The odds and the bonus are not shares of a base** and stay bare percents — `0 → 6%` for
+  Lucky cast and Double cast. Two kinds of percent on one board, told apart by one starting
+  at 100 and the other at 0.
+  **Dropping the nouns fixed almost nothing on its own** and it is worth knowing why: `17 →
+  18 a cast` went 102 px to 52, but that row was never the one deciding how small the shop
+  had to be drawn. The widest line was a rate track with no noun in it at all. The nouns went
+  because they were noise; the basis changed because it was the width.
+  **Widest value line: 118 px before, 87 after**, against the 87 a row leaves.
+- **The level moved into a rail** (`ShopSkin.RAIL_WIDE`, `rail_of`, `help_box_of`): one sunk
+  column down the left of every row, the "?" answering for its top half and the level's
+  **bare figure** standing in its bottom. "Lvl" is a word the row does not need and a
+  translation would have to carry, and the rail is what says the figure is a level. It also
+  turns the 15 px corner tag — the smallest target on the board — into a full-height one.
+- **The writing is readable in both states.** The value's quarter-lerp towards the face is
+  gone (the size ladder already says which line is the heading), and an unaffordable row inks
+  in `ShopSkin.INK_DIM` (**5.01:1**, against `BOARD_INK_DIM`'s 2.19:1). **Shop-local on
+  purpose**: `BOARD_INK_DIM` also inks the shed's shelf and the settings board and the same
+  fix is owed there, as its own pass. State is carried by the price tag and by **the lit edge,
+  which only an affordable row draws** — the two faces are 1.30:1 apart in luminance, so told
+  apart by hue alone they are one face to a red-green colourblind player.
+- **The pricing plate is no longer capped by the tallest board.** It used to fit only while
+  the net board stood three rows taller than the middle two; grouping levels them (the gap
+  goes 146 px to 10). It hangs below that line now and the block — boards and plate together —
+  is what gets centred. It stands under whichever two boards are in the middle of `BOARDS`.
+- **The recycle bonus is on the plate, not in its row** (Richard, same day): the boosted
+  material's column is lit and wears the **same four-point gold stars `Dropoff.Shine` puts on
+  the boosted box out at the pier**, so the shop and the lake say it with one mark. The row
+  sells a multiplier, so the row says the multiplier. **The bonus carries no figure of its
+  own**: `_mean_pay_of` goes through `piece_pay`, which already multiplies the boosted kind —
+  so the plate has been printing the boosted price for as long as the bonus has existed, with
+  nothing on it saying why the number moved. All this adds is the saying. **The bonus's line
+  is reserved whether or not one is running**, or the plate grows a line every thirty seconds
+  and re-centres the whole shop with it. Stars sit at fixed spots off one seed: a plate that
+  twinkles is a plate that redraws every frame.
+- **Some rows still cut, by decision** (Richard: "we'll have to accept some text cutting at
+  late game"). Measured honestly, it is **8 rows mid-run**, not 2: two names — Double cast
+  (115 px against a row's 87) and Bonus yard (108) — and **six rate tracks whose middle is
+  longer than either of its ends**. `+0% → +35%` fits and `+700%` fits, but `+385% → +420%`
+  wants 118. Down from 21 before the pass, and every one of them now falls back to `TEXT_TINY`
+  with two readable figures rather than to a sentence with its tail missing.
+  **`tools/probe_shop_text.gd` measures level 0, mid-run and maxed** for exactly this reason:
+  measuring only the two ends said two rows cut and was wrong. The levers, none taken:
+  `RAIL_WIDE` 26 (worth ~6 px), `TAG_SHARE` 0.34 (a four-figure price needs ~55 of its 69),
+  and the names.
+- **Out of scope, by decision**: tabbed and two-up layouts (mocked, rejected — two-up was the
+  only one that survived the endgame and was not picked); hold-to-buy (one click, one level
+  stays); rewriting the 23 blurb sentences; a font with Cyrillic or CJK; the shelved tracks;
+  and moving the rows to Control nodes — **the shop stays hand-drawn `_draw()`**, which is
+  what makes the cut-to-fit machinery worth having.
+- **Localization**: nothing here is `tr()`-wrapped yet — the game has one `tr()` call in it
+  (`dropoff.gd:210`) and no `locale/`. What this pass buys is **room and shape**: the arrow is
+  not a word, the unit is said once, the level carries no label, and no row spends 43% of its
+  width on a footnote.
+- **Probes**: `tools/probe_shop_text.gd` (headless, what cuts and where),
+  `tools/probe_shop_glyphs.gd` (Bungee's separator glyphs), `tools/shop_mock.gd` +
+  `tools/shot_shop_mock.tscn` (desktop build — the three layouts and the three ways of showing
+  the bonus, kept as the record of what was judged). `test_lake`'s `_stage_shop_shape` guards
+  the titles, the unique names, every row being claimed by exactly one group, the heading
+  rule, the grammar, the plate's room now the boards are level, the bonus reaching the plate
+  without a figure of its own, and both inks clearing 4.5:1.
+
 ### The Shop Balance Pass (2026-09-14, `/grill-me` with Richard; supersedes the tree)
 Richard's call: **the tree is set aside, the shop stays**, and the shop is rebalanced around
 these rules. Everything below the tree section about the tree still describes code that is in
@@ -590,7 +695,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   (`water_dirty_shallow`), `ON_WATER` (`water_clean`), `LEVEL_INK` (clean shallow, lifted).
   Written as numbers, not read from `Palette` — a palette retune means re-picking them.
 
-- **The upgrades shop is three drawn boards** (`shop_skin.gd`, 2026-09-11): net, ferry, dog
+- **The upgrades shop is four drawn boards** (`shop_skin.gd`, 2026-09-11; three until the
+  market board, four and renamed since The Shop Reads below): net, ferry, dog
   side by side, each a grained, chipped oak frame (drawn like the meter's) round a dark
   face, a bowed three-tone oak ribbon over the top edge (front block only — hanging tails
   were tried and rejected), the thing itself under the ribbon, and two-line rows (name over
@@ -629,6 +735,63 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **The main menu** (`scenes/menu.tscn`, `scripts/menu.gd`, 2026-09-12, issue #12): the
   game's `run/main_scene`. **The art is the lake itself** (2026-09-16, `/grill-me` with
   Richard, "based on the work in the trailer"): `assets/menu_lake.png`, 1920x1080, the
+
+  **And the settings board reads in the shop's language** (2026-09-17, `/grill-me` with
+  Richard, `_stage_settings_shape`): the same pass the upgrades shop had, over the one board
+  that had drifted furthest from it. **Layout, wording and ink only** — no row was added or
+  removed and nothing any row does moved.
+  - **One plate face for every row, under carved headings.** The board carried three faces —
+    `ROW_SOUND` for the sound rows, `ROW_SCREEN` for the screen rows, `ROW_SAVE` for the
+    buttons — and since the section headings were cut on 2026-09-11 those colours were the
+    only thing saying where a section ended. The shop had just gone the other way, so the
+    headings are back as `ShopSkin._draw_group`'s own drawing (the words in the clean water's
+    blue, a carved rule running to the far edge) and the rows are all `Style.BOARD_ROW`. A
+    colour on this board is free to mean something again. `ROW_SOUND`/`ROW_SCREEN`/`ROW_SAVE`
+    stay in `Style` for `controls_skin.gd` and `menu_confirm.gd`, which are their own pass.
+  - **A heading stands in the section gap, not over it** (`GROUP_TALL`, `wanted_tall`). The
+    board wants 662 design pixels and the smallest frame leaves it **680** — height never goes
+    under 720 — so headings drawn above the gaps they separate (24 px each) would not have
+    fitted, and `_draw` handled that by quietly dropping the bottom of the board, which at
+    that size is *Save and go to menu*. Standing in the gap costs 14 px each; `SOUND_TALL`
+    came 58 to **54** to pay for them and leave a real margin rather than two pixels.
+    **The drop is no longer silent**: `dropped_lines` counts what did not fit and `test_lake`
+    lays the board out at 1280x720 and asks for zero.
+  - **Master leads and carries no heading.** It is the bus the other three feed, and what says
+    so is the rule the "Mix" heading draws over those three — a lid on what is under it.
+    Indenting the three, and dimming them while Master is off, were the other two ways.
+  - **A switch that is on is the clean water, not the money's gold** (`Style.ON_WATER`). The
+    groove directly under it already filled in that blue, so one row said "on" in two
+    colours, and gold on the shop's board is a price. `ON_GOLD` is the bind board's now.
+  - **A dead chooser draws no arrows at all.** Dimmed, they were a pair of controls that would
+    not answer, on the row most players meet first: Resolution is a windowed-mode setting by
+    decision and an old `fullscreen: true` migrates to borderless. What is left is the screen
+    the window is filling, right-aligned where the chooser stood, with `DEAD_SIZE_NOTE` naming
+    the row that decides it — **said only where it fits whole**, since a reason cut in half is
+    worse than no reason. A dead row draws no dropped list either.
+  - **The two foot buttons are a dark plate**, ringed in the seam and lit along the top with
+    `Style.lit_edge` — a `PlankButton`'s own two marks, which is what tells one from the board
+    when both are the same colour. They were a plank of the frame's oak and **could not be
+    read**: "Controls" measured 2.97:1 and "Save and go to menu" **1.37:1**, and no ink could
+    have fixed either, because **white itself only reaches 4.06:1 on that face**. A warning
+    wants a dark face to be red against. It keeps its mark (Richard: it leaves the lake), in
+    `WARN_INK` at 5.30:1.
+  - **Every word on the board clears 4.5:1**, worst 4.76. `Style.LEVEL_INK` is 3.42:1 on the
+    rows' one face — it was picked to sit on the shop's plate, which is a different plate — so
+    the board lifts it to its own `VALUE_INK` rather than moving a swatch the shop is using.
+    A dead row inks in `Style.BOARD_INK_SOFT`, the swatch the shop picked the same day
+    (`ShopSkin.INK_DIM` points at it now; **the shed's shelf still inks in `BOARD_INK_DIM` at
+    2.19:1 and is owed the same pass**). The dropped list's picked entry was cream on
+    `ON_WATER` at 2.82:1 and is dark ink on a pale plate at 9.05:1.
+  - **No label carries a key name**: "Music  (M)" and "Window  (F11)" are now "Music" and
+    "Window". Neither key is rebindable, so the Controls board will never list them either —
+    but a label is a name, not a sentence, and a translation had to carry the brackets through.
+  - **Out of scope, by decision**: any row added or removed (the switch and the slider both
+    stay, so a sound row keeps its two mutes); what any setting does; the Language row (issue
+    #28); `ControlsSkin`, `MenuConfirm`, `Prefs`, the buses and the binds; a two-column board.
+  - **The heading words are a first guess.** Judge "Mix" and "Screen" on
+    `tools/last_menu_settings.png` and retune. The probe puts the window into windowed for the
+    resolution list's picture, through `DisplayServer` rather than `Prefs`, so nothing in
+    `user://` is touched.
   trailer's own last page — the lake still filthy with a few clear pools, the angler on the
   island's south-east beach with a net out in the soup, the pack on the sand, the ferry at
   the island and a pier bottom-left — filmed by `tools/shot_menu_bg.tscn` and darkened by
@@ -915,7 +1078,9 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   itself — the ferry to the left of the arrow, the dog
   (`DogArt` idle) in its right, both mirrored to face outwards and both at a size that can
   be made out, a black-ringed green (`SAFE`) block arrow large in the middle drawn last over
-  them, the "n available" panel across the foot. *Shed* (104x84): sixteen fixed finds
+  them, the "n available" panel across the foot. *Shed* (**120x100, the same box as the
+  upgrades button** — this said 104x84 until 2026-09-17 and the two have been one size since
+  the border pass): sixteen fixed finds
   (`Lake.BUTTON_DECOR`, clean views, barely dimmed) scattered over the face by `_scatter` —
   each shoved off an even spread by its own hash, drawn back to front — with the hut standing
   in the middle of them so they stick out on every side, and "Decorate" on a sunken panel
@@ -941,7 +1106,10 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   rect anywhere.
   **Retired, by decision** (2026-09-11): holding the ferry and the dog clear of the arrow's
   edges (the lane left was a couple of dozen pixels and shrank them to smudges — overlapping
-  is what "behind" looks like), and standing the finds in two rows along the back (a band of
+  is what "behind" looks like), **the band** (2026-09-17: `DECOR_BAND` put every find between
+  0.42 and 0.98 down the face, so the top was bare by rule and what showed was two clumps on
+  one baseline either side of the hut — a row of furniture standing in a line), and standing
+  the finds in two rows along the back (a band of
   furniture behind the hut, not a heap it sits in). *Money*: as wide
   as the stock plate over it, a drawn gold coin on the left and the running figure on a
   panel **pressed into** the wood to its right (`HudButtons.sunk`, the stock readout's own
@@ -997,6 +1165,65 @@ the whole job.
   blades read as a second shadow.
 - **The hut is 1.2x bigger, and its footprint is measured off the art** (`Iso.SHED_TALL` 141.6,
   `SHED_FOOT` 1.15 x 0.83, 2026-09-12). The footprint was an ellipse of 1.70 x 1.40 — sized to
+  **The HUD speaks one language** (2026-09-17, `/grill-me` with Richard, cohesion pass):
+  - **The meter's frame is built, not stamped** (`HudSkin.MeterFrame`, `Style.meter_frame`).
+    The sheet's own frame was drawn pre-scaled at `METER_SCALE`, so its planks landed at 27
+    and 24 px while every other plate in the HUD landed at 16 and 14 — **and they are the
+    same wood**, because `Style._build_border` crops its frames out of `Meter_Border.png`,
+    which *is* the meter's frame. One board at two thicknesses, side by side in one corner.
+    Built to the wooden box's own drawn size instead, the planks match everywhere and the
+    meter gains the V bites every other frame has. The painted water sheets, the shader and
+    the garbage circle are untouched; `MeterFrame` falls back to stamping the sheet where
+    `Style.border_fits` says no, because a frame at the wrong thickness beats none.
+    **Not a repaint, by decision** — the wood was never wrong, only its scale.
+  - **The lake's settings button is a gear and carries no word** (`PlankButton.mark`,
+    `_draw_mark`/`_cog`, 56x56): Richard's call, "it's the industry standard". Drawn in code
+    like the close cross and the coin — `assets/ui.png` has four pieces on it and none is a
+    gear — with square shoulders rather than a scalloped rim, because this game's wood is all
+    straight cuts, and **its hub is a hole** — filled in the button's own face colour
+    (Richard, 2026-09-17), because filled with the oak it read as a disc of wood lying on the
+    panel, which is the opposite of what a gear's middle is.
+    **The main menu keeps the word "Settings"**, having the room and no
+    convention to lean on. One button class still: `mark` is an option on `PlankButton`, so
+    the border, the hover, the press and the sound have one path.
+  - **The decorate button's finds are a fan, not a band** (`HudButtons._scatter`, every
+    `FAN_*`): a sweep from low on one side, up over the roof, down to low on the other, on
+    `FAN_RANKS` rings, each find drawn smaller and washed further towards the face the
+    further back it sits (`FAN_FADE`) — a peacock's tail behind the shed, Richard's phrase.
+    Held inside `room_of` by each find's own half-size, so nothing is clipped by the frame;
+    several were. `fit` stands a find on the **bottom** of the box it is given, so the point
+    on the sweep is its foot — centred, every find sat half its own height low.
+    **All the numbers are first guesses**: judge on `tools/shot_buttons.tscn` and retune
+    there, or with the F7 tuner, whose `decor`/`decor_scale` handles still move and scale the
+    whole tail as one.
+  - **Already true, and worth writing down**: `UPGRADES_SIZE` and `SHED_SIZE` are both
+    120x100 and have been since the border pass.
+  - **Out of scope, deliberately**: nothing moved corner to corner. Grouping money with the
+    shop, giving the fleet and the pack a readout, and whether the stock plate earns its place
+    are a second pass, to be grilled off the new screenshot.
+  - `test_lake` guards the meter's frame being a node built to the wood's box, the two picture
+    buttons being one size, the gear being square and wordless, and the fan keeping every find
+    inside the button and reaching above the old band's ceiling.
+
+  **And says two things straighter** (2026-09-17, second pass, `/grill-me` with Richard):
+  - **"Waiting", not "In stock"** (`HudSkin.STOCK_LABEL`). The crate has **no cap** —
+    `Store.held` is an unbounded list and `CRATE_FULL` only decides how high the heap draws —
+    so the plate holds a **backlog**, pieces waiting for a ferry, not a balance. Sat on the
+    same plate as the money and labelled "In stock", it read as a second purse. The word is
+    the whole fix, by decision: the number rising is the clearest sign the fleet cannot keep
+    up (CLAUDE.md's own pricing note has the box peaking near 400 in the sim), but saying so
+    with a trend mark is a fleet readout, and Richard left fleet and pack readouts out.
+  - **The upgrades button says "Upgrades" and wears the count on a badge**
+    (`HudButtons.badge`, `HudSkin.UPGRADES_LABEL`). It read "n available" across the foot: a
+    count with no noun — available what? — and the only thing in the HUD whose width moved
+    with its own number, so the panel breathed as the purse filled. The badge is sized to
+    `BADGE_SAMPLE` ("99"), never to the count in hand. **Still always there, zero included**,
+    which was the old panel's rule and a good one — at zero it is drawn back, not hidden.
+  - **Out of scope, by Richard's call**: moving money beside the shop, and any readout for the
+    fleet or the pack. The diagonal between the purse and the button it feeds stands.
+  - `test_lake` guards the label having changed, the foot being a name rather than a count,
+    and the badge coming out one width at 1 and at 99.
+
   hold a walker clear of the whole picture, eaves and all, which cost most of a tile of grass
   on every side and made the hut feel round to walk round. It is now **a rectangle in tile
   space, the diamond the walls stand on**, exactly as `Yard.covers` treats the crate, and the
@@ -1817,7 +2044,8 @@ only**, say what the next level buys, carry a "?" each, and the market is explai
   second pass the same day ("more concise"): the four materials spread across the top with
   what a rubbish piece of each pays on average today, in the price's gold, under each
   (mean `piece_pay` over the non-keepsake defs of that material, at today's tier rates and
-  bonus); the five tiers with their sell rates on one line; and the one sentence "Collect
+  bonus); **no tier line** — `_shop_legend` has returned `tiers` empty since the sell tracks
+  were shelved, and this said otherwise until 2026-09-17; and the one sentence "Collect
   objects of different materials and tiers, each pays a flat fee plus bonuses." **Cut**: the
   "Yards:" line, the yard rule, the bonus line and the pay-rule sentence. Drawn only when at
   least `LEGEND_LEAST` is free. Percent and whole dollars only.
@@ -1921,6 +2149,10 @@ fifteen verbs on two devices does not belong under a volume slider.
 - `test_lake`'s `_check_buses` / `_check_display` / `_check_binds` guard the four buses and
   what is on them, a full Master changing nothing, the floor muting, the display choices, the
   resolution row being windowed-only, the physical defaults, the swap, the context sharing,
+**Largely superseded 2026-09-17 by The Shop Reads below**: the "(… next)" bracket, the seven
+value grammars, the "Lvl n" footnote on the name line and the "?" hung on a row's corner are
+all gone. What still holds: percents and whole numbers, no tenths, a blurb per track, and
+the two lines stopping short of the price tag.
   what cannot be captured, and the file round-trip. Probe: `tools/shot_menus.tscn` also saves
   `last_menu_settings_list.png`, `last_menu_controls.png` and `last_menu_controls_capture.png`.
 
@@ -2046,6 +2278,61 @@ after a re-run**). The sheet still draws every option that was offered.
   the same ring drawn once underneath in `Style.HOLE_RIM`'s black, wider, carrying a share
   of whatever the coloured line carries — so the dashed out-of-range ring is backed as
   faintly as it is drawn. Palette swatches are duller than the ones they replaced and the
+- **The bind board reads with the rest** (2026-09-17, `/grill-me` with Richard,
+  `_stage_binds_shape`): the same pass the shop and the settings board had.
+  - **The two columns are named** — `Keyboard` and `Gamepad`, in a band of their own above the
+    first group. It was a table of thirty cells with nothing saying which half was which.
+  - **The gesture that is the only way out is said, once there is something to go back from**
+    (`ControlsSkin.HINT`, drawn only while `Binds.changed()`, its room reserved either way so
+    the board does not jump the first time somebody rebinds). Right-click restores one cell,
+    and that is not a convenience: `open_settings` is on Escape, Escape is what cancels a
+    capture, so right-click is the **only** route back to that binding short of throwing all
+    fifteen away. **The board went 560 to 640 wide to pay for it** — it is short of room down
+    the screen (666 of the 680 the smallest frame leaves) and has plenty across, and the hint
+    stands in the empty left half of a band that had to exist anyway. At 560 that half was
+    234 px and nothing saying the whole gesture fitted; at 640 it is 314 against 296.
+    The middle dot is Bungee's (`tools/probe_hint.gd`, which also measures the candidates).
+  - **"Set to default", and it asks first** (Richard: the rename, and the confirm). Fifteen
+    rows of somebody's own arrangement is not nothing, so the plank opens `MenuConfirm` with
+    this board's words rather than wiping on the click: **"Are you sure?" / "Set to default" /
+    "Keep current"**, with **no line under the title** (Richard's wording, 2026-09-17): the two
+    doors each say what they do, and a sentence saying it a third time is one nobody reads.
+    `MenuConfirm` takes an empty `words` now and **stands shorter for it** rather than leaving
+    the band empty — a gap where a sentence used to be reads as a sentence that failed to draw.
+  - **The words fit the one board rather than the board stretching for them.** A door is 174
+    and the line 358; "Keep current buttons" measured 209 and was cut to "Keep current" (126).
+    A `board_wide` per caller was built first and
+    thrown away — one width the words must clear is a rule, a width per caller is a place for
+    them to drift. Found on the way: **the menu's own line had been overrunning its board by
+    ten pixels** — "The saved lake will be thrown away." is 348 against the 338 a 400-wide
+    board leaves, and `Style.write` neither wraps nor clips — so `BOARD_WIDE` went 400 to
+    **420**. `tools/probe_confirm.gd` measures the lines and the doors; `test_lake` guards
+    every caller's words and both its labels against the room they actually get.
+  - **Open, and known**: `MenuConfirm`'s own doors are still the frame's pale oak, so its
+    warning label reads **1.37:1** and its plain one **2.97:1** — the exact defect the
+    settings board's and this board's foot buttons were just taken off that face to fix. It
+    was out of scope for this pass by decision and is owed the same one-line change.
+  - **The plank is the settings board's dark plate.** On the frame's oak its word read
+    **2.97:1** and nothing pale clears 4.5:1 on that face. With nothing to undo it draws **no
+    lit edge** — the face cannot be dimmed to say so, being the board's own colour, and a lit
+    edge is what says a button can be pressed.
+  - **A walking row's pad cell reads `Left stick`**, not `—`. The stick moves the angler
+    through the row's `extra` list and is `FIXED`, so a dash was telling the player the verb
+    had no gamepad control at all. `Binds.standing_label` reads it off the table's own
+    `extra`, so a verb given a stick later says so with nothing here edited. **The keyboard
+    column is untouched, by decision** — the arrow keys stay unmentioned.
+  - **One row face**, and a row that has just taken a moved binding is marked the shop's way:
+    `Style.BOARD_ROW_LIT` with `Style.lit_edge` over it. That swatch is **as far as a lift can
+    go** — at 1.17x the row's luminance the writing still clears 4.5:1 (4.62) and a lift big
+    enough to carry the moment alone would not, so the lit edge carries it.
+  - **The capture cell keeps its gold and takes dark ink**: cream on `ON_GOLD` was **2.40:1**,
+    the least legible thing on the board at the one moment the player is staring at it.
+  - **Every word clears 4.5:1**, worst 4.62. Overflow is counted (`dropped_lines`) and
+    `test_lake` lays the board out at 1280x720 and asks for zero, the settings board's rule.
+  - **A test that rebinds puts the player's keys back**: `Binds.overrides` /
+    `take_overrides` exist for that and nothing in the game calls them. `shot_menus` borrows
+    the board the same way — the captured picture needs a touched board, since the hint and
+    the swap flash only exist in that state.
   ring sits on water running from soup green to clean blue, so a toned green over dirty
   water had nothing to stand on. **The one thing beyond the three swatches**, by Richard's
   call; the 1.5 px line, the alphas, the dashes and the 48-point ellipse are untouched.
@@ -2298,6 +2585,10 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
 - **The song's clock is its player's playback position** when it has one, so a long scene
   load cannot run a file out before its fade; `follow_players` off drives it by hand.
 - **Levels**: `GAIN_DB` levels each song to Goin's -11.1 LUFS (the deliveries were up to five
+  **Only within `Dog.HEAR` of the angler** (2026-09-17, the barks' own rule): the wash is one
+  player at one level, so a dog on a bank run across the lake played it under a player
+  standing still, which read as the angler's own wading firing for no reason. `test_lake`
+  guards both sides of the radius.
   dB apart, which a crossfade turns into a jump). Zero everywhere is as delivered. The
   slider's top, `LOUDEST`, is **0 dB, down from +4** (2026-09-15, Richard: "decrease volume of
   songs a bit overall").
@@ -2360,6 +2651,27 @@ the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 The inventory column down the right of the shed is a drawn oak board, the same furniture as
 the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over
 the top edge reading "Shed Decoration" with the count, and one clipped `Style.plate` per
+  - **The hover and the click takes are inverted** (2026-09-17, Richard: a click should be the
+    bolder of the two, and `Mouse_Over_Sound` is the bolder recording). So `ui_click` is built
+    from `Mouse_Over_Sound.wav` and `ui_hover` from `Click_Sound.wav`, swapped in
+    `build_sfx.py`'s `PLAN` rather than at the 26 `Sfx.ui()` call sites: **a key means the verb,
+    not the file**, and the cut recipe travels with the recording. **The click keeps the take
+    whole** (`("trim", 0.2)`, the very cut that shipped as the hover): it is two knocks, the
+    second at 62% of the first 60 ms later, and the pair reads as a droplet, which Richard
+    wanted kept. The first knock alone was tried first and dropped for it. The hover keeps the
+    cut that shipped as the click — the loud tick 145 ms in, its soft
+    lead tick still discarded. **The click's cut takes a fade-in of its own**
+    (`trimmed`'s third argument, 0.5 ms against `FADE_IN`'s 4): its attack is in the take's
+    very first samples — 40% of peak half a millisecond in — so the standard ramp lay over
+    the knock and turned it into a 5 ms rise, which Richard heard as a late click. It now
+    reads 39% in its first millisecond where it read 5%. What is left is the take's own rise
+    to a peak at 5.4 ms, the second knock at 60 ms, and the engine's 10 ms output floor. Every cut is levelled to `TARGET_LUFS`, so what `SOUNDS` holds
+    is the mix and the gap between click and hover is the whole prominence — the hover's cut is
+    peak-limited and lands 3.3 dB short of the target (`tools/last_sfx.log`) on top of it, the
+    click's reaches it at a peak of -8.1 dBFS. **Then 3 dB each way by ear** (Richard, same day):
+    click -3.0 to **-6.0** and `Close_Tab` -12.4 to **-15.4**, hover -18.6 to **-15.6** —
+    which is what the hover's own peak limiting had taken off it, and still leaves about
+    13 dB between click and hover.
 find (clean sprite fitted left, name in `BOARD_INK`, `HOVER_WASH` under the pointer). The
 old scrim rectangle and its 1.5 px ink outline are gone.
 - **The board grows outwards**: `_board_rect` is the column `LIST_WIDTH`/`GUTTER` already

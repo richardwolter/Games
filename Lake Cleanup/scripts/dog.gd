@@ -477,7 +477,10 @@ func _push_wade() -> void:
 	if sound == null:
 		return
 	var wet := Iso.past_water(tile_pos) > Angler.WADE_IN
-	sound.set_wading(wet and _speed > Angler.WADE_LEAST, self)
+	# Only within earshot, the barks' own rule (2026-09-17): there is one wash at one level,
+	# and a dog on a bank run across the lake played it under a player standing still.
+	var near := angler != null and tile_pos.distance_to(angler.tile_pos) <= HEAR
+	sound.set_wading(wet and near and _speed > Angler.WADE_LEAST, self)
 
 
 static func _now() -> float:

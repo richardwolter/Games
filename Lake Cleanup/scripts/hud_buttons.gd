@@ -67,9 +67,38 @@ const ARROW_SHAFT := 0.42
 ## Each find's place is jittered off its own index — across the width, up and down within
 ## `DECOR_BAND`, and in size between `DECOR_LEAST` and `DECOR_MOST` — so the heap is uneven
 ## the way a heap is, and is the same heap every time the button is drawn.
+## The fan the finds stand in round the hut (2026-09-17). `FAN_FROM`/`FAN_TO` are the ends
+## of the sweep in radians, measured anticlockwise from due right with the screen's y flipped
+## — so a little under the horizon on the right, up over the roof, and a little under it on
+## the left. `FAN_MIDDLE` is how far down the room the fan turns about; `FAN_RADIUS` how much
+## of the room's half-size it reaches at rank 0; `FAN_NEAR`/`FAN_FAR` the innermost and
+## outermost rings; `FAN_WOBBLE` how far off its ring a find may sit; `FAN_STAGGER` how far
+## along the sweep it may slide; `FAN_HIGH` how much of the size falloff height alone buys.
+##
+## First guesses, all of them: judge on `tools/shot_buttons.tscn` and retune there.
+const FAN_FROM := -0.42
+const FAN_TO := PI + 0.42
+const FAN_MIDDLE := 0.74
+const FAN_RADIUS := 1.02
+const FAN_RANKS := 3
+const FAN_NEAR := 0.70
+const FAN_FAR := 1.0
+const FAN_WOBBLE := 0.12
+const FAN_STAGGER := 0.7
+const FAN_HIGH := 0.8
+## How wide a find's box is against its height. `fit` keeps the art's own proportions inside
+## it, so this only decides how much sideways room a wide find (a sofa) gets before its width
+## is what limits it.
+const FAN_ASPECT := 1.4
+## How much further back the far ranks are washed out than the near ones, on top of
+## `DECOR_DIM`. Depth the eye reads without having to measure sizes.
+const FAN_FADE := 0.4
+
+## Retired with the band (2026-09-17): every find sat between these two fractions down the
+## face, which put the whole heap in the lower 58% of it.
 const DECOR_BAND := Vector2(0.42, 0.98)
-const DECOR_LEAST := 0.3
-const DECOR_MOST := 0.56
+const DECOR_LEAST := 0.18
+const DECOR_MOST := 0.42
 const DECOR_SPREAD := 0.55
 const DECOR_DIM := Color(0.82, 0.86, 0.88)
 const SHED_TALL := 0.78
@@ -104,21 +133,23 @@ const COIN_GLINT := Color(1.0, 0.94, 0.72)
 ##
 ## Bake by pasting what `ButtonTuner` writes to `user://button_tune.log` into `BAKED`.
 ##
-## Laid out by hand on the canvas, 2026-09-12. The net rides high and a little left of the
-## middle; the ferry is bigger and well out to the left, the dog lower and out to the right;
-## the arrow is a touch below centre; the heap of finds is shifted down and right and half
-## again as big, with the hut over it filling the room's whole height. Anything not named
-## here is still the rule's.
+## Laid out by hand on the canvas, 2026-09-12, and re-tuned over the new fan on 2026-09-17.
+## The net rides high and a little left of the middle and is drawn a fifth over its fit; the
+## ferry is bigger and well out to the left, the dog lower and out to the right; the arrow is
+## a touch below centre; the tail of finds is shifted down and a little left and three
+## quarters again as big, with the hut over it a shade past the room's whole height. Anything
+## not named here is still the rule's.
 const BAKED := {
-	&"net": Vector2(0.4981, 0.2095),
+	&"net": Vector2(0.4777, 0.2452),
+	&"net_fill": 1.2000,
 	&"boat": Vector2(0.1503, 0.4133),
 	&"boat_tall": 0.7200,
 	&"dog": Vector2(0.8106, 0.5265),
 	&"arrow": Vector2(0.5019, 0.5286),
-	&"decor": Vector2(0.0333, 0.0714),
-	&"decor_scale": 1.6200,
+	&"decor": Vector2(0.0148, 0.1099),
+	&"decor_scale": 1.7400,
 	&"hut": Vector2(0.4666, 0.5029),
-	&"hut_tall": 1.0000,
+	&"hut_tall": 1.0200,
 }
 
 ## The tuner's live overrides. Empty in a real run, so the game draws what `BAKED` and the
@@ -329,7 +360,10 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 				stood.size * grow
 			)
 			stood.position += shift
-			fit(on, decor[spot["at"]], stood, 1.0, dim)
+			# Further back, further washed out: the tail's depth is read off tone as much as
+			# off size, and sixteen finds at one tone is the wall this replaced.
+			var back := float(spot.get("back", 0.0))
+			fit(on, decor[spot["at"]], stood, 1.0, dim.lerp(Style.BUTTON_FACE, back * FAN_FADE))
 			whole = stood if whole.size == Vector2.ZERO else whole.merge(stood)
 		_trace(&"decor", whole)
 	var hut: Texture2D = sprites.get("shed")
@@ -349,24 +383,51 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 	label(on, face, SHED_LABEL)
 
 
-## Where each find stands: one slot per find, spread across the width in order so the heap
-## has no bald patch, then shoved off that place by its own hash — sideways by `DECOR_SPREAD`
-## of a stride, down the face inside `DECOR_BAND`, and in size between `DECOR_LEAST` and
-## `DECOR_MOST` of the room. Deterministic: the same heap is drawn every frame.
+## Where each find stands: a fan around the hut, not a row beside it.
+##
+## Each find takes its place along a sweep from low on one side, up over the roof, and down
+## to low on the other — a peacock's tail behind the shed (Richard, 2026-09-17). Its radius
+## comes off one of `FAN_RANKS` rings so the tail has depth rather than reading as a hoop,
+## its own hash shoves it off that place along the arc and across the rings, and it is drawn
+## smaller the further up the sweep it sits, so the ones over the roof read as standing
+## behind it. `draw_shed` sorts them by baseline, which then puts those behind the hut for
+## free.
+##
+## **It used to be a band**: every find placed between `DECOR_BAND` 0.42 and 0.98 down the
+## face, which is the lower 58% by construction — so the top of the button was bare by rule,
+## the hut covered the middle, and what showed was two clumps on one baseline that read as a
+## row of furniture standing in a line.
+##
+## Deterministic: the same tail every frame. Fitted inside the room less each find's own
+## half-size, so nothing is clipped by the frame — several were.
 static func _scatter(count: int, room: Rect2) -> Array:
 	var out: Array = []
-	var stride := room.size.x / float(count)
+	var middle := room.position + room.size * Vector2(0.5, FAN_MIDDLE)
 	for i in count:
 		var h := hash(i * 7919 + 13)
-		var wobble := (float(h % 200) / 100.0 - 1.0) * DECOR_SPREAD
-		var down := float((h / 200) % 100) / 100.0
-		var tall := room.size.y * lerpf(DECOR_LEAST, DECOR_MOST, float((h / 20000) % 100) / 100.0)
-		var baseline := room.position.y + room.size.y * lerpf(DECOR_BAND.x, DECOR_BAND.y, down)
-		var middle := room.position.x + stride * (float(i) + 0.5 + wobble)
-		out.append({
-			"at": i,
-			"box": Rect2(Vector2(middle - stride, baseline - tall), Vector2(stride * 2.0, tall)),
-		})
+		var t := (float(i) + 0.5) / float(count)
+		# Along the sweep, shoved off its place by up to half a step so the ranks do not comb.
+		var step := 1.0 / float(count)
+		var along := t + (float(h % 200) / 100.0 - 1.0) * step * FAN_STAGGER
+		var angle := lerpf(FAN_FROM, FAN_TO, clampf(along, 0.0, 1.0))
+		# Which ring, and how far off it. Rank 0 is the near one, the last is the far one.
+		var rank := float((h / 200) % FAN_RANKS) / maxf(float(FAN_RANKS - 1), 1.0)
+		var reach := lerpf(FAN_NEAR, FAN_FAR, rank) + (float((h / 20000) % 100) / 100.0 - 0.5) * FAN_WOBBLE
+		var spread := room.size * 0.5 * FAN_RADIUS * reach
+		var at := middle + Vector2(cos(angle) * spread.x, -sin(angle) * spread.y)
+		# The far ranks draw smaller, and so does anything high up the sweep: both are depth.
+		var up := clampf((middle.y - at.y) / maxf(room.size.y * 0.5, 1.0), 0.0, 1.0)
+		var back := maxf(rank, up * FAN_HIGH)
+		var tall := room.size.y * lerpf(DECOR_MOST, DECOR_LEAST, back)
+		var wide := tall * FAN_ASPECT
+		# `fit` stands a find on the bottom of the box it is given, so the point on the sweep
+		# is its **foot**, not its middle. Centred, every find sat half its own height low.
+		var box := Rect2(Vector2(at.x - wide * 0.5, at.y - tall), Vector2(wide, tall))
+		# Held inside the room by its own half-size, so a wide find at the end of the sweep
+		# is moved rather than cut.
+		box.position.x = clampf(box.position.x, room.position.x, room.end.x - box.size.x)
+		box.position.y = clampf(box.position.y, room.position.y, room.end.y - box.size.y)
+		out.append({"at": i, "box": box, "back": back})
 	return out
 
 
@@ -381,6 +442,40 @@ static func _scatter(count: int, room: Rect2) -> Array:
 const LABEL_TALL := 14.0
 const LABEL_TEXT := 0.8
 const LABEL_LEAST := 8
+
+
+## A count on a small plate in a button's top-right corner: how many upgrades are affordable.
+##
+## Its own plate rather than a word across the foot, so the caption underneath can say what
+## the button *is* and stop moving. Sized to the widest count the game can ever show
+## (`BADGE_SAMPLE`) rather than to the count in hand — a badge that breathes as the purse
+## fills is the thing this replaced.
+##
+## `lit` false draws it back rather than hiding it: a badge that comes and goes is a thing
+## the player has to notice the absence of, which was the old panel's rule and a good one.
+const BADGE_TALL := 15.0
+const BADGE_PAD := 5.0
+const BADGE_INSET := 3.0
+const BADGE_TEXT := 0.82
+const BADGE_SAMPLE := "99"
+
+
+static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool) -> void:
+	var height := maxi(LABEL_LEAST, int(BADGE_TALL * BADGE_TEXT))
+	var wide := maxf(
+		Style.measure(BADGE_SAMPLE, height).x, Style.measure(text, height).x
+	) + BADGE_PAD * 2.0
+	var plate := Rect2(
+		Vector2(face.end.x - BADGE_INSET - wide, face.position.y + BADGE_INSET),
+		Vector2(wide, BADGE_TALL)
+	)
+	Style.plate(on, plate, Style.BUTTON_SUNK if lit else Style.BUTTON_SUNK.darkened(0.25), 2.0)
+	Style.write(
+		on, text, height,
+		Vector2(0.0, plate.position.y + (plate.size.y + float(height) * 0.62) * 0.5),
+		Style.BOARD_INK if lit else Style.BOARD_INK_DIM,
+		HORIZONTAL_ALIGNMENT_CENTER, plate
+	)
 
 
 static func label(on: CanvasItem, face: Rect2, text: String) -> void:
