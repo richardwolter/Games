@@ -636,11 +636,15 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     source for them. Still hard steps, no dither, no blend; `murk_wobble` and
     `state_spread` untouched.
   - **A scum film on the two dirtiest states** (`water.gdshader` `scum_*`): clumps off a
-    blob noise broken into whole art pixels, in the bank's own `grime_color`, carried along
-    in art-pixel steps so the cells never slide under the grid. Denser on dirty than on
-    foul, gone by murky — so the scum is the first thing lifting pieces removes, then the
-    colour. The shore foam and its tint take `state * 0.5`, so they read 0-2 as before; the
-    bank's grime still wants murky or worse.
+    blob noise broken into whole art pixels. Denser on dirty than on foul, gone by murky —
+    so the scum is the first thing lifting pieces removes, then the colour. **It rides the
+    lake and is one step up the water's own ramp** (second pass the same day, Richard:
+    "much less prominent, and sway with the lake (it looks separate)"): the plane it is
+    sampled on is pushed along the bands' axis by the bands' own `warp`, in art-pixel
+    steps, and a band passing under a clump swells its edge (`scum_sway`). **Retired**: the
+    bank's `grime_color` over 42% / 30% of the plane on a straight constant drift, which
+    read as a layer sliding over the water. The shore foam and its tint take
+    `state * 0.5`, so they read 0-2 as before; the bank's grime still wants murky or worse.
   - **Nature is unchanged**: fish, flora, glints and `_clean_share` ask for state 0, and
     because of the floor, 0 still means "no rubbish within reach". The in-between shades
     earn nothing, by decision. Patches and the lane untouched: they close back onto

@@ -113,12 +113,18 @@ uniform vec4 state_at = vec4(0.15, 0.35, 0.55, 0.75);
 // `scum_clump` is how wide a clump is in world px on the flattened plane, `scum_dirty` and
 // `scum_foul` how much of the plane the clumps cover on each state (0 none, 1 all of it),
 // `scum_fill` how much of a clump is film rather than water showing through, `scum_drift`
-// how fast it travels, in art pixels a second. Drawn in `grime_color`, the bank's own scum.
+// how fast it creeps along the bands' axis, in art pixels a second, and `scum_sway` how far
+// a band passing under a clump swells its edge. Drawn one step up the water's own ramp.
+//
+// Turned well down on 2026-09-17 (Richard: "much less prominent, and sway with the lake (it
+// looks separate)"): it was the bank's `grime_color` over 42% / 30% of the plane on a
+// straight drift, which read as a layer sliding over the water.
 uniform float scum_clump = 90.0;
-uniform float scum_dirty : hint_range(0.0, 1.0) = 0.42;
-uniform float scum_foul : hint_range(0.0, 1.0) = 0.3;
-uniform float scum_fill : hint_range(0.0, 1.0) = 0.55;
-uniform float scum_drift = 1.5;
+uniform float scum_dirty : hint_range(0.0, 1.0) = 0.34;
+uniform float scum_foul : hint_range(0.0, 1.0) = 0.24;
+uniform float scum_fill : hint_range(0.0, 1.0) = 0.35;
+uniform float scum_drift = 0.5;
+uniform float scum_sway : hint_range(0.0, 0.3) = 0.06;
 
 // What keeps those cutoffs from drawing as rings. `murk_blotch` is how wide a patch of
 // murk is, in world pixels with the isometric squash taken out. `murk_wobble` is how far, in
@@ -645,17 +651,28 @@ void fragment() {
 	float murk_state = state * 0.5;
 
 	// The scum film, on foul and dirty water only. Clumps from a blob noise, broken into
-	// whole art pixels by a cell hash, the whole plane carried along in art-pixel steps so
-	// the film travels without its cells sliding under the grid.
+	// whole art pixels by a cell hash.
+	//
+	// It rides the lake rather than sliding over it: the plane it is sampled on is pushed
+	// along the bands' own axis by the bands' own `warp`, in art-pixel steps, so a clump
+	// bends where the streaks bend, and the clumps' edges swell and draw back with the band
+	// passing under them (`scum_sway`). A straight constant drift was the first pass and
+	// read as a layer laid over the water. And it is one step up the water's own ramp, not
+	// a colour of its own — the ramp's light end is what the film is, see the ramps above.
 	float scum_cover = state > 3.5 ? scum_dirty : (state > 2.5 ? scum_foul : 0.0);
 	if (scum_cover > 0.0) {
+		vec2 flat_px = vec2(px.x, px.y * 2.0);
+		// `across` on the flattened plane is y - x / 2; this is the unit vector along it.
+		vec2 band_axis = vec2(-0.4472, 0.8944);
 		float carried = floor(clock * scum_drift) * foam_pixel;
-		vec2 scum_px = vec2(px.x + carried, px.y * 2.0 + carried);
+		float pushed = floor(warp / foam_pixel + 0.5) * foam_pixel;
+		vec2 scum_px = flat_px + band_axis * (pushed + carried);
 		float clump = blob_noise(scum_px / max(scum_clump, 1.0) + vec2(13.7, 4.2)) * 0.65
 			+ blob_noise(scum_px / max(scum_clump * 0.37, 1.0) - vec2(2.9, 8.8)) * 0.35;
+		clump += bands * scum_sway;
 		float speck = foam_hash(floor(scum_px / (foam_pixel * 2.0)));
 		float scum = step(1.0 - scum_cover, clump) * step(1.0 - scum_fill, speck);
-		col = mix(col, grime_color.rgb, scum);
+		col = mix(col, ramp(min(step_at + 1.0, 4.0), state), scum);
 	}
 
 	// The foam line along both shores.
