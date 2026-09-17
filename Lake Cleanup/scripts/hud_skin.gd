@@ -357,8 +357,8 @@ func _draw() -> void:
 ## four child TextureRects — children draw over their parent, so wherever the two met the
 ## wood won. And they met: the line was hung off the *frame's* top, while the garbage
 ## circle beside the frame stands a good way higher. So two things, either of which would
-## have done: the line is drawn last, over every sheet, and it stands clear of the whole
-## meter's ink — the higher of the circle and the frame — by `GAP` plus the descenders.
+## have done: the line is drawn last, over every sheet, and it sits on the bar's top plank
+## beside the circle (`hint_span`, `HINT_LIFT`) rather than over it.
 class HintLine extends Control:
 	var text := ""
 	## Where the glyphs' baseline goes, and the box the line is centred on.
@@ -377,11 +377,24 @@ class HintLine extends Control:
 var _hint_line: HintLine
 
 
-## The top of everything the meter draws, on screen: the garbage circle's or the frame's,
-## whichever is higher.
-func meter_top() -> float:
+## How far over the frame's top plank the line's baseline sits, in screen px. Tight, so
+## the line reads as the meter's own caption rather than as a note floating over the lake.
+##
+## Zero, measured on `tools/last_pieces_left.png`: the face's capitals stop a few pixels
+## short of their own baseline, and that is all the air the line wants. At 4 the ink stood
+## ten screen pixels off the wood on 1080p and read as floating.
+const HINT_LIFT := 0.0
+
+
+## The stretch of the meter the line is centred on: the wooden bar clear of the garbage
+## circle, from the circle's right edge to the frame's. **Not the whole meter and not the
+## circle's top** (2026-09-17, Richard, second pass: hung over the circle it stood a long way
+## above the bar and off to the left of it, dislocated from the thing it is about). The
+## circle stands higher than the bar, so the line goes beside it, not over it.
+func hint_span() -> Rect2:
 	var scale := _meter_box.size.y / METER_SHEET.y
-	return minf(_meter_frame_box.position.y, _meter_box.position.y + METER_CIRCLE.position.y * scale)
+	var left := _meter_box.position.x + METER_CIRCLE.end.x * scale
+	return Rect2(left, _meter_frame_box.position.y, _meter_frame_box.end.x - left, _meter_frame_box.size.y)
 
 
 ## The box the hint's glyphs take, on screen, or an empty one when nothing is said. Asked by
@@ -392,13 +405,17 @@ func hint_box() -> Rect2:
 	var face := Style.font()
 	var span := face.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1.0, Style.TEXT_BODY)
 	var base := _hint_baseline()
-	var left := _meter_box.position.x + (_meter_box.size.x - span.x) * 0.5
+	var across := hint_span()
+	var left := across.position.x + (across.size.x - span.x) * 0.5
 	return Rect2(left, base - face.get_ascent(Style.TEXT_BODY), span.x,
-		face.get_ascent(Style.TEXT_BODY) + face.get_descent(Style.TEXT_BODY))
+		face.get_ascent(Style.TEXT_BODY))
 
 
+## The baseline, not the descender line, is what sits HINT_LIFT over the plank: the game's
+## face sets everything in capitals, so the room a descender would want is empty, and
+## leaving it lifted the line a dozen pixels clear of the wood it is supposed to sit on.
 func _hint_baseline() -> float:
-	return floorf(meter_top() - GAP - Style.font().get_descent(Style.TEXT_BODY))
+	return floorf(_meter_frame_box.position.y - HINT_LIFT)
 
 
 func _place_hint() -> void:
@@ -413,8 +430,7 @@ func _place_hint() -> void:
 	_hint_line.size = size
 	_hint_line.text = hint
 	_hint_line.baseline = _hint_baseline()
-	# Centred on the whole meter, circle and all, now that it stands over the whole of it.
-	_hint_line.across = _meter_box
+	_hint_line.across = hint_span()
 	_hint_line.queue_redraw()
 
 

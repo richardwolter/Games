@@ -3324,13 +3324,15 @@ func _stage_ending() -> void:
 		_check(line != null and line.get_index() == skin.get_child_count() - 1,
 			"the pieces line is its own node, drawn after every sheet of the meter", "")
 		var box: Rect2 = skin.hint_box()
-		_check(box.size.x > 0.0 and box.end.y <= skin.meter_top(),
-			"and its glyphs end above the meter's highest ink, the circle's included",
-			"line ends %.1f, meter starts %.1f" % [box.end.y, skin.meter_top()])
-		var circle_top: float = (skin.get(&"_meter_box") as Rect2).position.y
-		_check(skin.meter_top() <= (skin.get(&"_meter_frame_box") as Rect2).position.y
-			and skin.meter_top() >= circle_top,
-			"the meter's top is the circle's, not just the frame's", "")
+		var frame: Rect2 = skin.get(&"_meter_frame_box")
+		var span: Rect2 = skin.hint_span()
+		_check(box.size.x > 0.0 and box.end.y <= frame.position.y
+			and frame.position.y - box.end.y <= 6.0,
+			"its glyphs end just over the bar's top plank: on the meter, not floating off it",
+			"line ends %.1f, bar starts %.1f" % [box.end.y, frame.position.y])
+		_check(box.position.x >= span.position.x and box.end.x <= span.end.x,
+			"and it stands beside the garbage circle, over the bar, not over the circle",
+			"line %.0f-%.0f in %.0f-%.0f" % [box.position.x, box.end.x, span.position.x, span.end.x])
 		_main.set(&"_left_over", was)
 		# And now it really is empty, with the same float dust on the meter.
 		var stack := _grid.stacks[_deep_tile()]

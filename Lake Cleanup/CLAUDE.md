@@ -579,10 +579,15 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   `meter_top`, `hint_box`, same day, Richard: it was showing behind the meter). It was
   written in `HudSkin._draw`, and the meter is child TextureRects — **children draw over
   their parent** — and it hung off the *frame's* top while the garbage circle stands
-  higher, so the two met and the wood won. Now it is the last child, centred on the whole
-  meter, its baseline `GAP` plus the descenders above the higher of the circle and the
-  frame. Anything new written over the meter goes through it, not through `_draw`.
-  `test_lake` guards the child order and that the glyphs end above `meter_top()`; probe
+  higher, so the two met and the wood won. Now it is the last child. **It sits on the bar,
+  beside the circle, not over it** (`hint_span`, `HINT_LIFT` 0, second pass the same day,
+  Richard: hung clear of the circle's top it stood far above the bar and off to its left,
+  "dislocated from the UI meter"): centred on the stretch of the frame from the circle's
+  right edge to the frame's, its **baseline** on the frame's top — the face is all capitals,
+  so descender room is empty air, and the ink's own few pixels short of the baseline are
+  the whole gap. Anything new written over the meter goes through it, not through `_draw`.
+  `test_lake` guards the child order, that the glyphs end on the bar's top and no more than
+  6 px off it, and that they stay inside the span beside the circle; probe
   `tools/shot_pieces_left.tscn` (desktop build) saves `tools/last_pieces_left.png`.
 - **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
   rising, the note ringing, and **the end song coming in with the beat, not with the text**
