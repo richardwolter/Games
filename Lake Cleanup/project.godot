@@ -44,11 +44,6 @@ project/assembly_name="Lake Cleanup"
 
 [input]
 
-; The bindable verbs are built by `scripts/binds.gd` at boot, from its own table and the
-; player's overrides in user://settings.cfg — see `Binds.install`. They are listed here with
-; no events so the editor's inspector knows their names; whatever is written here is erased
-; and refilled the moment the game runs.
-
 walk_left={
 "deadzone": 0.2,
 "events": []

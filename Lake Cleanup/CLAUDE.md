@@ -2233,6 +2233,10 @@ fifteen verbs on two devices does not belong under a volume slider.
   `Binds.install()` erases and refills them at boot, from its own table and then the player's
   overrides. A default in a serialised `Object(InputEventKey, ...)` string in an ini file is a
   default nobody can read or change; here it is a line of GDScript.
+  **Don't explain that in `project.godot` itself** (2026-09-17): a comment saying so stood
+  over `[input]` and the editor deleted it the first time it re-saved the file — Godot writes
+  that file out of its own memory and keeps no comments. The `binds.gd` header and this
+  section are where it is written down, and they are the only two places that survive.
 - **The keys were always physical and that was never the bug** — `physical_keycode` is a hole
   in the keyboard, so the walk keys sit under the same fingers on AZERTY. What was wrong was
   the **labels**: the game said "W/A/S/D", "E", "Y" in so many words. `Binds.label_of` /
