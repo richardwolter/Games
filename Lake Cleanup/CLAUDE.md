@@ -616,7 +616,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     (3) tiles from the nearest piece, bent by `FILTH_FALL`. **The strength is the pooled
     share**: the pieces in every stack within `FILTH_POOL` (3) tiles over what those tiles
     could hold at `Iso.MAX_SLOTS` each (only tiles the fill or the strand can use, so the
-    island's bare shelf does not dilute it), bent by `FILTH_SHARE_BITE` (0.5) and floored at
+    island's bare shelf does not dilute it), bent by `FILTH_SHARE_BITE` (0.7) and floored at
     `FILTH_FLOOR` (0.34). The two are **multiplied**, which keeps both halves of the old
     rule and both of its rejections: water past the stain's reach is clean whatever the
     average says (no green over empty water), and water touching a piece is never clean (no
@@ -626,6 +626,21 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     round the island and lightens to the bank, and **nothing is saved** — the map is still
     derived from the stacks alone. "Uniform soup, then lighten" was offered (start depth per
     tile, a `SAVE_VERSION` bump) and turned down.
+  - **Towards the outer bank a tile's room is its own fill, not nine** (`Lake._room_at`,
+    `FILTH_BANK_FROM` 0.5, `FILTH_STRAND_ROOM` 2; second `/grill-me` the same day, Richard:
+    "the beach shores are too clear... more grimy even with less objects"). Against nine
+    slots a full two-deep shallow was a quarter full and read murky going hazy from frame
+    one. The room eases from `MAX_SLOTS` to what the fill put there over the outer half of
+    the lake, so **a fresh bank reads dirty, the same as the middle** (Richard's pick over
+    foul) and still lightens a piece at a time. **This takes back most of "varied from
+    start"**: a fresh lake is 71% dirty / 28% foul, and the shades come from working it.
+    **A flat lift near the bank was asked for first and turned down on the pushback**: it
+    holds until the last piece leaves and then jumps to clean, the complaint the grading
+    was built to end, at the bank where the dogs work a piece at a time. Outer bank only;
+    by the island the weight is nought. `FILTH_SHARE_BITE` went 0.5 to **0.7** with it
+    (at 0.5 half the lake sat on foul from a quarter lifted to three quarters). Probe at
+    these numbers: quarter lifted 15 / 79 / 5 (dirty / foul / murky); half 0 / 41 / 55 / 4
+    hazy; three quarters 1 foul / 61 murky / 20 hazy / 18 clean.
   - **Broad, by decision** (over a 1-tile blur and over two scales mixed): one early cast
     moves nothing by itself, a handful in one bay moves it a shade. The catch patch stays
     the per-cast feedback. If it reads dead in play, two scales is the fallback.
@@ -656,10 +671,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     and three quarters of the rubbish in uneven pools and saves
     `tools/last_grime_<stage>_{far,near}.png` plus `last_grime.log` — the share of water in
     each state per stage and the map's build time. It is also what proves the shader
-    compiles. At these numbers: fresh 40% dirty / 45% foul / 15% murky; half lifted 1 / 48 /
-    43 / 7% hazy. **Retune `FILTH_SHARE_BITE` against that log**, not by feel.
+    compiles. **Retune `FILTH_SHARE_BITE` against that log**, not by feel.
   - `test_lake`'s `_check_grime`: no piece on clean water, a fresh lake is several shades
-    with the dirtiest among them, deep reads fouler than shallow, lifting half an area
+    mostly the dirtiest, a full shallow by the bank as dirty as a full deep bay and lighter half fetched, lifting half an area
     lightens it short of clean and dirties nothing, no grime past the stain's reach, the
     floor is the lightest grime, the shader and the palette carry both ramps.
   - **Out of scope, by decision**: stronger contour noise (the island-leak risk), pollution
@@ -705,7 +719,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `LANE_*`, `water.gdshader` `lane[24]`/`lane_seed`, issue #31, 2026-09-16, Richard: "a
   small clear way as it drags through grime before the grime gets back in again, very
   subtle but noticeable"). A chain of small patches dropped every `LANE_SPACING` (14) world
-  px along the mouth's path, `LANE_WIDE` (0.35, narrowed from 0.55 on 2026-09-17) of the mouth across, each opening and
+  px along the mouth's path, `LANE_WIDE` (**0.5**; 0.55, then 0.35, then Richard: "a bit wider", all 2026-09-17) of the mouth across, each opening and
   closing on the patch's own curve over `LANE_LIFE` (2 s, down from 3.2, same day), all on one roll per reel so the
   chain reads as one lane. **Catch only, by Richard's call** over every reel: the lane is
   the catch being dragged home. Both nets. The shader's patch arithmetic is one function,
@@ -1595,6 +1609,13 @@ water"; boat splashes likewise.
   the mesh) and drawn behind the net, so what shows is the water parting round the front.
   Richard picked "foam at the mouth only" over a hull-style pair and a single trailing
   strip. The 0.13 s ripple trail (`DRAG_RIPPLE`, `WaterSplash.wake` from the net) is gone.
+- **The bow wave is dropped the moment the reel ends** (`HullFoam.drop`, `_push_bow`,
+  2026-09-17, Richard: a streak of the drag firing beside the player after the haul). Off
+  the reel `_push_bow` fell back to a heading of `Vector2.RIGHT` at the net's home — the
+  angler — and eased the push out from there: foam pointing east at the player's feet
+  after every haul. Only a reel aims the wave now, and home is the angler's hand, where
+  there is nothing left to part. `test_lake` guards that it is gone at once and never
+  moved or turned on its way out.
 - **`HullFoam` is per instance now** (`streak_long`, `with_trail`): the shape is the one
   shape, the lengths belong to the thing wearing it.
 - **The dog and the angler leave a streak and push one ring going in** (`Dog._wake`,

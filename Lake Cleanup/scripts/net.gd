@@ -952,25 +952,34 @@ func _process(delta: float) -> void:
 ## uncovered, and the last ring finishes after it leaves (2026-09-15, Richard; `Sfx.hover_find`).
 ## The marker is up while a cast is out too, so this is too; not on the double cast's second
 ## net, which draws no marker, and not while a board is over the water and the angler is held.
-## The mouth's foam: pushed while the net is reeling, dying away otherwise. Laid at the
+## The mouth's foam: pushed while the net is reeling, gone the moment it is not. Laid at the
 ## mouth's own spot, pointed the way it is being pulled — towards the angler — and sized to
 ## the mouth it is on, so a wider net pushes a wider wave.
 func _push_bow(delta: float) -> void:
 	if _bow == null:
 		return
+	# Only a reel pushes a wave, and only a reel aims one. The moment it ends the net is in
+	# the angler's hand and the wave is dropped where it was — it used to fall back to a
+	# heading of dead right at the net's home, which is the angler, and ease out from
+	# there: a streak of foam pointing east beside the player after every haul (Richard,
+	# 2026-09-17).
+	if state != State.REELING or angler == null:
+		_bow.drop()
+		return
 	var at := world_pos()
 	var extent := mouth_extent()
-	var reeling := state == State.REELING and angler != null
-	var heading := Vector2.RIGHT
-	if reeling and angler.position.distance_squared_to(at) > 0.01:
+	var heading := Vector2.ZERO
+	if angler.position.distance_squared_to(at) > 0.01:
 		heading = (angler.position - at).normalized()
 	# The wave's bow sits on the mouth's leading rim, not its middle: the streaks run back
 	# from there along the rim's sides, drawn behind the net so what shows is the water
 	# parting round the front of it. Laid at the middle, the whole wave was under the mesh.
-	_bow.position = at + Vector2(heading.x, heading.y * 0.5) * extent * 0.5
+	# With no heading to speak of (the mouth is on the angler) the wave stays where it was.
+	if heading != Vector2.ZERO:
+		_bow.position = at + Vector2(heading.x, heading.y * 0.5) * extent * 0.5
 	_bow.half_length = extent * 0.5
 	_bow.half_width = extent * MOUTH_FLARE
-	_bow.lay(heading, 1.0 if reeling else 0.0, delta)
+	_bow.lay(heading, 1.0, delta)
 
 
 func _chime_at_finds() -> void:

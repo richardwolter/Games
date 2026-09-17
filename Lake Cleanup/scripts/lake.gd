@@ -242,8 +242,20 @@ const FILTH_FALL := 0.6
 ## longer, over one lightens it early. FILTH_FLOOR is what the strength bottoms out at
 ## where there is any rubbish at all, picked to land inside the first state past clean
 ## (LakeGrid.FILTH_STATE_AT) on a tile with a piece on it. `test_lake` guards that.
+##
+## **Towards the outer bank a tile's room is its own, not the deepest's** (FILTH_BANK_FROM,
+## second pass the same day, Richard: "the beach shores are too clear... more grimy even
+## with less objects"). Against nine slots a full two-deep shallow is a quarter full and
+## read murky going hazy from the first frame. From FILTH_BANK_FROM of the way out to the
+## bank the room eases from MAX_SLOTS to what the fill actually put there (the strand's
+## tiles count FILTH_STRAND_ROOM), so a full shallow reads as dirty as a full deep bay —
+## and still lightens a piece at a time, which a flat lift near the bank (asked for first,
+## turned down on the pushback) would not: it holds until the last piece and then jumps.
+## Outer bank only: by the island the weight is nought and nothing there moved.
 const FILTH_POOL := 3
-const FILTH_SHARE_BITE := 0.5
+const FILTH_BANK_FROM := 0.5
+const FILTH_STRAND_ROOM := 2
+const FILTH_SHARE_BITE := 0.7
 const FILTH_FLOOR := 0.34
 
 ## Seconds between rebuilds of the map, at most. It is a moment of work on a grid this size
@@ -291,7 +303,7 @@ const PATCH_CLOSE_SOFT := 0.6
 ## the tail of the lane closing anyway.
 const LANE_POINTS := 24
 const LANE_SPACING := 14.0
-const LANE_WIDE := 0.35
+const LANE_WIDE := 0.5
 const LANE_LIFE := 2.0
 ## The patch's shape is a blob noise rolled per catch (`_patch_rng`): the rim wanders in and
 ## out of the mouth's disc and the grime comes back as spots that grow and join, so no two
@@ -4719,8 +4731,7 @@ func _pooled_share(cols: int, rows: int) -> PackedFloat32Array:
 		for ty in rows:
 			var run := 0
 			for tx in cols:
-				if Iso.floats_here(tx, ty) or Iso.on_strand(tx, ty):
-					run += Iso.MAX_SLOTS
+				run += _room_at(tx, ty)
 				_filth_room[(ty + 1) * wide + tx + 1] = _filth_room[ty * wide + tx + 1] + run
 	var held := PackedInt32Array()
 	held.resize(wide * (rows + 1))
@@ -4750,6 +4761,22 @@ func _pooled_share(cols: int, rows: int) -> PackedFloat32Array:
 			var pieces := held[foot + right] - held[top + right] - held[foot + left] + held[top + left]
 			share[ty * cols + tx] = clampf(float(pieces) / float(room), 0.0, 1.0)
 	return share
+
+
+## What one tile could hold, for the pooled share: MAX_SLOTS over most of the lake, easing
+## to the tile's own fill towards the outer bank. Nought where nothing is ever put. In
+## whole slots, so the summed tables stay whole numbers. See FILTH_BANK_FROM.
+func _room_at(tx: int, ty: int) -> int:
+	var own := 0
+	if Iso.floats_here(tx, ty):
+		own = maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+	elif Iso.on_strand(tx, ty):
+		own = FILTH_STRAND_ROOM
+	else:
+		return 0
+	var out := Iso.shore_fraction(float(tx) + 0.5, float(ty) + 0.5)
+	var bank := smoothstep(FILTH_BANK_FROM, 1.0, out)
+	return maxi(int(round(lerpf(float(Iso.MAX_SLOTS), float(own), bank))), 1)
 
 
 ## How much of the water reads clean on the map, and which tiles: the stage nature is at.

@@ -4650,13 +4650,37 @@ func _check_grime() -> void:
 		if state == 0:
 			blue_under_junk += 1
 	_check(blue_under_junk == 0, "water touching a piece never reads clean", "%d tiles" % blue_under_junk)
-	_check(seen.size() >= 3 and seen.has(LakeGrid.FILTH_STATES),
-		"a fresh lake is several shades, the dirtiest among them", str(seen))
-	# Deep water by the island is fouler than the shallows by the bank.
+	# A fresh lake is filthy edge to edge since the bank's shallows are measured against
+	# their own fill: the shades come from working it, not from how deep it is.
+	var total_seen := 0
+	for state: int in seen:
+		total_seen += int(seen[state])
+	_check(int(seen.get(LakeGrid.FILTH_STATES, 0)) * 2 > total_seen,
+		"most of a fresh lake's rubbish lies in the dirtiest water", str(seen))
+	# The bank's shallows are measured against their own fill, so full ones read as foul as a
+	# full deep bay — and half fetched, lighter, rather than holding until the last piece.
 	var deep := _grid.index_of(int(Iso.CENTRE.x) - 10, int(Iso.CENTRE.y))
 	var shallow := _grid.index_of(int(Iso.CENTRE.x - Iso.RADIUS.x * 0.8), int(Iso.CENTRE.y))
-	_check(_grid.filth[deep] > _grid.filth[shallow], "deep stacks read fouler than shallow ones",
-		"%d against %d" % [_grid.filth[deep], _grid.filth[shallow]])
+	_check(_grid.water_state(shallow) == LakeGrid.FILTH_STATES
+		and _grid.water_state(deep) == LakeGrid.FILTH_STATES,
+		"a full shallow by the bank reads as dirty as a full deep bay",
+		"states %d and %d" % [_grid.water_state(shallow), _grid.water_state(deep)])
+	var bank_before := _grid.water_state(shallow)
+	var bank_at := _grid.tile_of(shallow)
+	var bank_kept := {}
+	for index in _grid.stacks.size():
+		var tile := _grid.tile_of(index)
+		if absi(tile.x - bank_at.x) <= 4 and absi(tile.y - bank_at.y) <= 4:
+			bank_kept[index] = _grid.stacks[index].duplicate()
+			if tile.x % 2 == 0:
+				_grid.stacks[index].resize(0)
+	_main._build_filth_map()
+	var bank_after := _grid.water_state(shallow)
+	_check(bank_after < bank_before and bank_after >= 1,
+		"a half-fetched bank is lighter, and not yet clean", "state %d -> %d" % [bank_before, bank_after])
+	for index: int in bank_kept:
+		_grid.stacks[index] = bank_kept[index]
+	_main._build_filth_map()
 	# Lift half of every stack round the deep tile: its water comes up a shade or more, is
 	# still not clean, and nothing anywhere got dirtier for it.
 	var before := _grid.filth.duplicate()
@@ -4776,10 +4800,17 @@ func _stage_foam() -> void:
 			and bow.position.distance_to(_net.world_pos()) > 1.0, "on the mouth's leading rim", "")
 		_check(is_equal_approx(bow.half_width, _net.mouth_extent() * CastNet.MOUTH_FLARE),
 			"sized to the mouth", "%.1f" % bow.half_width)
+		# Home is the angler's hand: the wave is gone on the spot, not eased out beside the
+		# player, and nothing re-aims it on the way.
+		var bow_at := bow.position
+		var bow_heading: Vector2 = bow.get(&"_heading")
 		_net.state = CastNet.State.IDLE
-		for i in 60:
-			_net.call(&"_push_bow", 0.05)
-		_check(float(bow.get(&"_push")) <= 0.0, "and it dies away at home", "%.2f" % float(bow.get(&"_push")))
+		_net.tile_pos = _angler.tile_pos
+		_net.call(&"_push_bow", 0.05)
+		_check(float(bow.get(&"_push")) <= 0.0, "and it is gone the moment the net is home",
+			"%.2f" % float(bow.get(&"_push")))
+		_check(bow.position.is_equal_approx(bow_at) and (bow.get(&"_heading") as Vector2).is_equal_approx(bow_heading),
+			"never moved to the angler or turned on its way out", "")
 		_net.state = state_was
 		_net.tile_pos = at_was
 

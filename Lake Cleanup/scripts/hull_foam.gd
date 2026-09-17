@@ -98,6 +98,17 @@ func lay(heading: Vector2, push: float, delta: float) -> void:
 	queue_redraw()
 
 
+## Gone now, no easing out. For a wave whose maker has stopped being in the water at all: a
+## net that has come home to the angler's hand has nothing left to part, and a wave dying
+## away over a couple of frames there is foam at the player's feet on dry land.
+func drop() -> void:
+	if _push <= 0.0 and _shown_push <= 0.0:
+		return
+	_push = 0.0
+	_shown_push = 0.0
+	queue_redraw()
+
+
 func _draw() -> void:
 	if _push <= 0.0:
 		return
