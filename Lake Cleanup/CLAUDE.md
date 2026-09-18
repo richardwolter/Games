@@ -75,15 +75,19 @@ Your job is to build the game incrementally with clean architecture and testable
   gameplay reads — it is how the string is drawn. The old sine arc and its `sag` are gone.
 
 **Idle (automatic)**:
-- Machines and drones drain continuous `pollution` float over time
-- They work while idle, accumulating per-room upgrade levels
+- The ferries carry what waits in the crate to the yards and sell it; the dogs fetch small
+  pieces near the island and off the bank. Both are upgraded in the shop.
+- **No machines, no drones, no continuous drain** (Richard, 2026-09-18): this section used to
+  say machines and drones drained a `pollution` float over time. That was never built and
+  never the design. `pollution` moves only when a piece leaves the water — by the net or by
+  a dog (`Lake._on_net_caught` and `_dog_brought_back`).
 
 ### Economy (Two-Layer)
-Why two layers? You cannot idle-drain individual objects without it feeling arbitrary, and a bare meter is just a progress bar with a button.
+Why two layers? The player's hands are what clear the lake; the helpers are what turn the catch into money while the hands are busy. A meter that drains by itself is a progress bar with a button.
 
 **Manual layer**: Hold-to-haul collects `TrashObject`s, knocking chunks off `pollution` (resolved per-object).
 
-**Idle layer**: Continuous `pollution` float is what machines reduce passively.
+**Idle layer**: ferries selling the crate's backlog and dogs fetching on their own. Nothing reduces `pollution` passively.
 
 **Visual link**: the lake clearing up **IS** the progress bar — not a separate number. As of the per-tile filth map (`Lake._build_filth_map`), the water shader's colour reads that map, not `pollution` directly: a bay just cleared reads blue on the spot while the next one over is still soup. Since 2026-09-17 the map is graded by how much rubbish an area still holds, in five shades, so a bay lightens as it is worked rather than when it is empty (see Pixel-Art Water). `pollution` is the map's fallback (read only where `filth_mapped` is 0, i.e. before the first map build) and still drives `sparkle` at the finished state.
 
