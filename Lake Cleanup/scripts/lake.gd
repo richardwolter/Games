@@ -358,22 +358,8 @@ const FIND_SHRINK := 1.2
 ## `fleet`'s own `.tres` gates how many of those are actually for sale.
 const MAX_BOATS := 4
 
-## What the first skimmer fitted brings up. The track walks from here to a certainty at
-## its last level.
-const SKIM_FIRST_CHANCE := 0.30
-
 ## Per-track price curve, value curve, and level cap now live in `resources/upgrades/*.tres`
-## (see `UpgradeTrack`) for every track except `skimmer`, whose payoff is a chance curve
-## rather than this price-and-value shape — it keeps its own entry here.
-const MAX_LEVELS := {
-	&"skimmer": 10,
-}
-
-## Tracks the shop no longer sells but the code still carries (2026-09-14, Richard: keep the
-## code, hide the rows). The skimmer, and the market's five sell-by-tier tracks. Not listed,
-## not counted as affordable, and `_buy` refuses them; their levels still save and load so
-## a file written before they were shelved reads without complaint. `tier_pay` is 1 for all.
-const SHELVED := [&"skimmer", &"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4"]
+## (see `UpgradeTrack`) for every track.
 
 ## Dogs in the pack at most: the one adopted plus what `dog_count` buys (2026-09-14). All of
 ## them share one Fetching, Keenness and Strong Dogs level and one drawing.
@@ -482,32 +468,11 @@ static func _mark(label: String) -> void:
 		(boot_marks as Array).append([label, Time.get_ticks_usec()])
 
 
-## Tree test mode (2026-09-12): the proposed upgrade tree played as its own game, started from
-## the main menu's "New game (tree)" so it can be tried before it replaces the shop. A tree run
-## starts with the net only and the tree file's starting money; the first ferry and the dog are
-## bought. It saves to its own slot and writes a playtest log (`TreeLog`). The shop, its
-## tracks and every normal run are untouched. See `UpgradeTree` and docs/progression/lake-tree.md.
-##
-## `start_tree` is set by the menu and read once, the way `start_fresh` is; `tree_mode` can
-## also be set before the scene enters the tree, which is how tools/test_tree.tscn runs it.
-const TREE_SAVE_PATH := "user://lake_cleanup_tree.save"
-static var start_tree: bool = false
-var tree_mode: bool = false
 ## Seconds of play in this shop run, saved with it, and the playtest log's clocks (`PlayLog`).
 var _play: float = 0.0
 var _play_progress_in: float = 0.0
 var _play_last_cast: float = -1.0
 const PLAY_PROGRESS_EVERY := 30.0
-var _tree: UpgradeTree
-## Node id -> rank owned. Shared with the tree screen, so it is edited in place, never replaced.
-var _tree_owned: Dictionary = {}
-var _tree_stats: Dictionary = {}
-var _tree_screen: TreeScreen
-## Seconds of play in this tree run, saved with it, and the playtest log's clocks.
-var _tree_play: float = 0.0
-var _tree_progress_in: float = 0.0
-var _tree_last_cast: float = -1.0
-const TREE_PROGRESS_EVERY := 30.0
 ## Pieces in the lake when it was built, for the log's cleared share.
 var _pieces_full: int = 0
 
@@ -529,14 +494,12 @@ var net_hold_level: int = 0
 
 ## The ferry. There from the first minute: catching does not pay, only selling does, so a
 ## player without a boat has no way to earn the upgrades that would buy one. It starts
-## slow and small instead, and is upgraded along the three axes a run has — and a fourth,
-## the skimmer, which is off until it is bought.
+## slow and small instead, and is upgraded along the axes a run has.
 var boat_speed_level: int = 0
 var cargo_level: int = 0
 ## Fast Sell: how much comes off the gap between two pieces of a hull's volley, at both
 ## ends of its run. resources/upgrades/boat_volley.tres.
 var boat_volley_level: int = 0
-var skimmer_level: int = 0
 
 ## Hulls bought on top of the one the player starts with, up to MAX_BOATS in the water. A
 ## second ferry is the only upgrade that buys a whole extra round of the lake at once, so
@@ -552,13 +515,11 @@ var dog_strength_level: int = 0
 ## Dogs adopted on top of the first, up to MAX_DOGS in the pack. resources/upgrades/dog_count.tres.
 var dog_count_level: int = 0
 
-## The market board (2026-09-13): what a piece of each weight tier sells for, one track per
-## tier (`sell_0`..`sell_4`, in TrashDef.tier order); the Recycle Bonus, one yard at a time
-## paying over the odds for `BONUS_EVERY` seconds before the bonus moves on; and what a
-## netted pigeon is worth. Plus two more on the net's board: the odds of a lucky haul (one
-## tier deeper and a few more in the bag, that cast only) and of a double cast (a second net
-## thrown alongside the first at a nearby spot with rubbish on it, its own hold).
-var sell_levels := PackedInt32Array([0, 0, 0, 0, 0])
+## The luck board: the Recycle Bonus, one yard at a time paying over the odds for
+## `BONUS_EVERY` seconds before the bonus moves on; what a netted pigeon is worth; the odds of
+## a lucky haul (one tier deeper and a few more in the bag, that cast only) and of a double
+## cast (a second net thrown alongside the first at a nearby spot with rubbish on it, its own
+## hold). The five sell-by-tier tracks that stood beside them were cut on 2026-09-18.
 var recycle_bonus_level: int = 0
 var bird_worth_level: int = 0
 var lucky_haul_level: int = 0
@@ -679,13 +640,12 @@ var _shed_open: bool = false
 var _controls_open: bool = false
 var _controls: ControlsSkin
 
-## Every purchasable track but `skimmer`, loaded from resources/upgrades/*.tres. Keyed by
+## Every purchasable track, loaded from resources/upgrades/*.tres. Keyed by
 ## the same StringName used throughout the shop (`&"net_width"`, `&"cargo"`, ...).
 const UPGRADE_ORDER := [
 	"net_width", "net_strength", "net_range", "reel", "net_hold",
 	"boat_speed", "cargo", "boat_volley", "fleet",
 	"dog_fetch", "dog_wait", "dog_strength",
-	"sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
 	"recycle_bonus", "bird_worth", "lucky_haul", "double_cast",
 	"dog_count",
 ]
@@ -805,7 +765,6 @@ var _sparkle_at: float = 0.0
 @onready var _buy_net_hold: Button = %BuyNetHold
 @onready var _buy_boat_speed: Button = %BuyBoatSpeed
 @onready var _buy_cargo: Button = %BuyCargo
-@onready var _buy_skimmer: Button = %BuySkimmer
 @onready var _buy_fleet: Button = %BuyFleet
 @onready var _shed: PanelContainer = %Shed
 @onready var _room: ShedRoom = %Room
@@ -847,15 +806,11 @@ func _load_upgrades() -> void:
 ## late are the ones that feel like money well spent. Numbers live in
 ## resources/upgrades/net_width.tres.
 func net_radius() -> float:
-	if tree_mode:
-		return _tree_stat("net_radius")
 	return _upgrades[&"net_width"].value(net_width_level)
 
 
 ## The heaviest TrashDef.tier the net can lift. resources/upgrades/net_strength.tres.
 func net_power() -> int:
-	if tree_mode:
-		return int(_tree_stat("net_power"))
 	return int(_upgrades[&"net_strength"].value(net_strength_level))
 
 
@@ -867,29 +822,21 @@ func net_power() -> int:
 ## less every time you buy it. The squared term is what keeps the late levels worth the
 ## money. Numbers live in resources/upgrades/net_range.tres.
 func net_range() -> float:
-	if tree_mode:
-		return _tree_stat("net_range")
 	return _upgrades[&"net_range"].value(net_range_level)
 
 
 ## How fast the net comes home, in tiles per second. resources/upgrades/reel.tres.
 func reel_speed() -> float:
-	if tree_mode:
-		return _tree_stat("reel")
 	return _upgrades[&"reel"].value(reel_level)
 
 
 ## How many pieces one cast can bring in. resources/upgrades/net_hold.tres.
 func net_hold() -> int:
-	if tree_mode:
-		return int(_tree_stat("net_hold"))
 	return int(_upgrades[&"net_hold"].value(net_hold_level))
 
 
 ## Ferry speed, in tiles per second. resources/upgrades/boat_speed.tres.
 func boat_speed() -> float:
-	if tree_mode:
-		return _tree_stat("boat_speed")
 	return _upgrades[&"boat_speed"].value(boat_speed_level)
 
 
@@ -897,24 +844,18 @@ func boat_speed() -> float:
 ## 1.0 untrained, down to 0.4 at the top of Fast Sell. A cut rather than a scale in the
 ## `.tres`, the way `dog_wait` is, so the curve counts up from nothing like every other
 ## track. resources/upgrades/boat_volley.tres, and see Haul._gap for what it does and does
-## not touch. Tree runs have no Fast Sell and throw at the ordinary pace.
+## not touch.
 func boat_volley_gap() -> float:
-	if tree_mode:
-		return 1.0
 	return 1.0 - _upgrades[&"boat_volley"].value(boat_volley_level)
 
 
 ## resources/upgrades/cargo.tres.
 func boat_cargo() -> int:
-	if tree_mode:
-		return int(_tree_stat("cargo"))
 	return int(_upgrades[&"cargo"].value(cargo_level))
 
 
 ## How many pieces one trip out may bring back. resources/upgrades/dog_fetch.tres.
 func dog_fetch() -> int:
-	if tree_mode:
-		return int(_tree_stat("dog_fetch"))
 	return int(_upgrades[&"dog_fetch"].value(dog_fetch_level))
 
 
@@ -922,8 +863,6 @@ func dog_fetch() -> int:
 ## comes down and the shortest does not. resources/upgrades/dog_wait.tres, and see
 ## Dog.MOOD_MOST for what it is taken off.
 func dog_wait_cut() -> float:
-	if tree_mode:
-		return _tree_stat("dog_wait_cut")
 	return _upgrades[&"dog_wait"].value(dog_wait_level)
 
 
@@ -931,101 +870,34 @@ func dog_wait_cut() -> float:
 ## round, in world pixels. One track raises both: tier on its own would open three kinds in
 ## the whole catalogue, because `def.size.x` is the art's own width at SPRITE_SCALE and that
 ## is the gate that actually binds. The top of the track is everything but `plastic_toy`.
-## resources/upgrades/dog_strength.tres. Tree runs keep the untrained dog.
+## resources/upgrades/dog_strength.tres.
 func dog_carry_tier() -> int:
-	if tree_mode:
-		return Dog.CARRY_TIER
 	return Dog.CARRY_TIER + int(_upgrades[&"dog_strength"].value(dog_strength_level))
 
 
 func dog_carry_wide() -> float:
-	if tree_mode:
-		return Dog.CARRY_WIDE
 	return Dog.CARRY_WIDE + DOG_WIDE_STEP * _upgrades[&"dog_strength"].value(dog_strength_level)
-
-
-## How wide the skimmer bites as it sails, in tiles out from the hull. Below zero is no
-## skimmer fitted, which is what every ferry starts as.
-func skim_radius() -> int:
-	return _skim_level() - 1
-
-
-## The heaviest tier the skimmer can lift. Deliberately behind the net: the boat catching
-## what the player cannot yet catch by hand would read as the game playing itself.
-func skim_power() -> int:
-	return maxi(_skim_level() - 1, 0) / 2
-
-
-## Odds that a piece the skimmer passes over actually comes up. A net dragged behind a
-## moving hull is a chance at a piece rather than a certainty, and most of what the
-## skimmer upgrade buys is that chance going up — the first one fitted still misses most of
-## what it passes, and even a maxed one lets some slip underneath.
-func skim_chance() -> float:
-	var level := _skim_level()
-	if level < 1:
-		return 0.0
-	var top := float(MAX_LEVELS[&"skimmer"])
-	return clampf(lerpf(SKIM_FIRST_CHANCE, 1.0, float(level - 1) / (top - 1.0)), 0.0, 1.0)
-
-
-## Deck space the skimmer gets on top of the hold, so a ferry loaded to the brim out of
-## the yard can still fish on the way.
-func skim_hold() -> int:
-	return _skim_level()
-
-
-## What a piece of weight tier `tier` sells for, as a multiple of its plain pay.
-## resources/upgrades/sell_N.tres. Tree runs have no market board and sell at par.
-func tier_pay(tier: int) -> float:
-	if tree_mode:
-		return 1.0
-	var t := clampi(tier, 0, sell_levels.size() - 1)
-	var key := StringName("sell_%d" % t)
-	if key in SHELVED:
-		return 1.0
-	return _upgrades[key].value(sell_levels[t])
 
 
 ## How much over the odds the boosted yard pays, as a fraction (0.25 is +25%).
 ## resources/upgrades/recycle_bonus.tres.
 func recycle_bonus() -> float:
-	if tree_mode:
-		return _tree_stat("recycle_bonus")
 	return _upgrades[&"recycle_bonus"].value(recycle_bonus_level)
 
 
 ## What a netted pigeon pays. resources/upgrades/bird_worth.tres times the economy's bonus.
 func bird_pay() -> float:
-	if tree_mode:
-		return _economy.bird_bonus * _tree_stat("bird_worth")
 	return _economy.bird_bonus * _upgrades[&"bird_worth"].value(bird_worth_level)
 
 
 ## Odds that a cast is a lucky one. resources/upgrades/lucky_haul.tres.
 func lucky_chance() -> float:
-	if tree_mode:
-		return _tree_stat("lucky_odds")
 	return _upgrades[&"lucky_haul"].value(lucky_haul_level)
 
 
 ## Odds that a cast throws a second net. resources/upgrades/double_cast.tres.
 func double_cast_chance() -> float:
-	if tree_mode:
-		return _tree_stat("double_odds")
 	return _upgrades[&"double_cast"].value(double_cast_level)
-
-
-## How many slots down the skimmer digs for the material it is running out. More than one,
-## always: it is looking for one material in particular, and on the way to the sawmill most
-## of what is floating on top is not wood.
-func skim_depth() -> int:
-	return 1 + _skim_level()
-
-
-## The level the skimmer numbers are read at: what was bought, held to the top of the
-## track, so a save written before the cap cannot run a skimmer past the end of it.
-func _skim_level() -> int:
-	return mini(skimmer_level, MAX_LEVELS[&"skimmer"])
 
 
 func _ready() -> void:
@@ -1035,8 +907,7 @@ func _ready() -> void:
 	_daylight = %Daylight as CanvasModulate
 	_pop_rng.randomize()
 	_load_upgrades()
-	_setup_tree()
-	# After the tree has had its say: a probe's path outranks both slots.
+	# A probe's path outranks the player's slot.
 	if not session_save_path.is_empty():
 		save_path = session_save_path
 	_mark("upgrades")
@@ -1222,8 +1093,6 @@ func _ready() -> void:
 	_fit_out(_boats[0], 0)
 	_push_net_numbers()
 	_push_boat_numbers()
-	if tree_mode:
-		_sync_tree_world()
 	_mark("fit out boat")
 
 	_buy_net_width.pressed.connect(_buy.bind(&"net_width"))
@@ -1233,7 +1102,6 @@ func _ready() -> void:
 	_buy_net_hold.pressed.connect(_buy.bind(&"net_hold"))
 	_buy_boat_speed.pressed.connect(_buy.bind(&"boat_speed"))
 	_buy_cargo.pressed.connect(_buy.bind(&"cargo"))
-	_buy_skimmer.pressed.connect(_buy.bind(&"skimmer"))
 	_buy_fleet.pressed.connect(_buy.bind(&"fleet"))
 	_room.sheets = _sheets
 	_room.unlocked = unlocked
@@ -1300,8 +1168,6 @@ func _ready() -> void:
 	_auto_ferry.toggled.connect(_set_auto_ferry)
 	_close_menu.pressed.connect(_set_menu.bind(false))
 	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
-	if tree_mode:
-		_build_tree_screen()
 	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
 	# the whole screen — so its own cross sits over the top of the inventory column, where
 	# the thing it closes actually is. See ShedRoom.
@@ -1318,9 +1184,7 @@ func _ready() -> void:
 		loaded = load_game()
 	start_fresh = false
 	_mark("load game")
-	if tree_mode:
-		_begin_tree_session(loaded)
-	elif _logs_play():
+	if _logs_play():
 		_begin_play_session(loaded)
 	_seed_starter_bed()
 	_mark("end")
@@ -2226,11 +2090,7 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 		_pan_yielded = true
 		if not laying:
 			_roll_luck(where)
-		if tree_mode:
-			var since := -1.0 if _tree_last_cast < 0.0 else snappedf(_tree_play - _tree_last_cast, 0.01)
-			TreeLog.write("cast", _tree_play, {"since_last": since})
-			_tree_last_cast = _tree_play
-		elif _logs_play():
+		if _logs_play():
 			var gap := -1.0 if _play_last_cast < 0.0 else snappedf(_play - _play_last_cast, 0.01)
 			PlayLog.write("cast", _play, {"since_last": gap})
 			_play_last_cast = _play
@@ -2464,12 +2324,8 @@ func _set_menu(open: bool) -> void:
 	# The drawn board replaces the panel of buttons rather than sitting behind it. The panel
 	# is kept in the tree — its buttons are still where the shop's numbers are written, and
 	# the shed's own controls live on it — but it is never shown.
-	_shop_skin.visible = open and not tree_mode
+	_shop_skin.visible = open
 	_shop.visible = false
-	if _tree_screen != null:
-		_tree_screen.visible = open
-		if open:
-			_tree_screen.open()
 	_push_rooms()
 	if open:
 		_set_settings(false)
@@ -2483,9 +2339,7 @@ func _set_menu(open: bool) -> void:
 func _set_shed(open: bool) -> void:
 	if open and not _shed_open and _sfx != null:
 		_sfx.play(&"shed_open")
-	if tree_mode and open != _shed_open and _tree != null:
-		TreeLog.write("shed_open" if open else "shed_close", _tree_play)
-	elif open != _shed_open and _logs_play():
+	if open != _shed_open and _logs_play():
 		PlayLog.write("shed_open" if open else "shed_close", _play)
 	_shed_open = open
 	_shed.visible = open
@@ -2605,7 +2459,7 @@ func _polish_panel_controls() -> void:
 	var nodes: Array[Control] = []
 	for path in [
 		"%BuyNetWidth", "%BuyNetStrength", "%BuyNetRange", "%BuyReel", "%BuyNetHold",
-		"%BuyBoatSpeed", "%BuyCargo", "%BuySkimmer", "%BuyFleet",
+		"%BuyBoatSpeed", "%BuyCargo", "%BuyFleet",
 		"%OpenShed", "%SendNow", "%AutoFerry", "%CloseMenu",
 	]:
 		var node := get_node_or_null(path) as Control
@@ -2666,7 +2520,7 @@ const ENDING_BEAT := 2.0
 ## Only asked while the meter is on the floor, and only twice a second even then, because
 ## the answer means walking every stack in the basin. Both of those are why the question is
 ## cheap enough to keep asking rather than being wired to the last piece landing — a piece
-## can leave the lake by the net, by the skimmer, or by burning, and an ending that has to
+## can leave the lake by the net, by a dog, or by burning, and an ending that has to
 ## be remembered by every one of those is an ending that will be forgotten by the next one.
 func _look_for_the_end(delta: float) -> void:
 	if _cleaned:
@@ -3115,19 +2969,14 @@ func _glide_step(delta: float) -> void:
 ## one, or the tree's. The file is deleted here, where it is known which file is this run's.
 ## The game's own lake goes back through the boot scene, off a curtain already showing that
 ## scene's first frame; a borrowed one reloads whatever borrowed it.
-func _reload_as(fresh: bool, tree: bool) -> void:
+func _reload_as(fresh: bool) -> void:
 	_leaving = true
 	var go := func() -> void:
 		_wiping = true
 		if fresh:
-			# This run's own file when it is this kind of run being thrown away — a harness
-			# plays on a path of its own — and the other kind's by its name.
-			var path := save_path
-			if tree != tree_mode:
-				path = TREE_SAVE_PATH if tree else SAVE_PATH
-			if FileAccess.file_exists(path):
-				DirAccess.remove_absolute(path)
-		start_tree = tree
+			# This run's own file: a harness plays on a path of its own.
+			if FileAccess.file_exists(save_path):
+				DirAccess.remove_absolute(save_path)
 		skip_menu = true
 		if get_parent() == get_tree().root:
 			get_tree().change_scene_to_file(BOOT_SCENE)
@@ -3438,9 +3287,8 @@ func _keep(def: TrashDef) -> void:
 ## The ferry landing a load at one of the four merchants. The purse moves here and nowhere
 ## else.
 ##
-## The meter is not touched: anything the boat is carrying either came out of the yard,
-## where it was already counted, or was skimmed out of the water on the way — and that
-## second case is counted below, because it left the lake when the skimmer took it.
+## The meter is not touched: everything the boat is carrying came out of the yard, where it
+## was already counted.
 func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 	for i in cargo.size():
 		sludge += piece_pay(cargo[i], kind)
@@ -3458,7 +3306,6 @@ func piece_pay(def_index: int, kind: int) -> float:
 	# step of the whole per tier, on top of the piece's own filth. `test_lake` guards the
 	# order piece by piece, so a kind's pollution has to stay inside its tier's band.
 	pay *= 1.0 + _economy.tier_pay_step * float(def.tier)
-	pay *= tier_pay(def.tier)
 	if kind == _bonus_kind:
 		pay *= 1.0 + recycle_bonus()
 	return pay
@@ -3493,35 +3340,17 @@ func bonus_kind() -> int:
 	return _bonus_kind
 
 
-## A piece the ferry's skimmer took out of the water on its way past. It left the lake
-## when the skimmer closed on it, so the meter moves now rather than when it is sold —
-## the same rule the net follows, and the reason both report through here.
-func _on_skimmed(def_index: int) -> void:
-	_filth_left = maxf(_filth_left - _grid.defs[def_index].pollution, 0.0)
-	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
-	_filth_stale = true
-	caught += 1
-
-
-## What `skimmer` costs: the price of its first level, and what each level multiplies the
-## next one by. Every other track's price lives in its own resources/upgrades/*.tres now.
-const PRICES := {
-	&"skimmer": [26.0, 1.48],
-}
-
-
 ## Every track the shop sells, in the order the board lists them. The rows themselves carry
 ## a name and a picture as well, but the HUD only wants to count them, and counting them
 ## should not mean formatting nine lines of text every frame.
 const TRACKS := [
 	&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold",
-	&"boat_speed", &"cargo", &"boat_volley", &"skimmer", &"fleet",
+	&"boat_speed", &"cargo", &"boat_volley", &"fleet",
 	&"dog_fetch", &"dog_wait", &"dog_strength", &"dog_count",
-	&"sell_0", &"sell_1", &"sell_2", &"sell_3", &"sell_4",
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
 
-## What the market board calls each weight tier's sell track.
+## What each weight tier is called.
 const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
@@ -3540,7 +3369,6 @@ const BLURBS := {
 	&"boat_speed": "How fast the ferry sails between the island and the yards.",
 	&"cargo": "How many pieces the ferry carries a trip.",
 	&"boat_volley": "How quickly a ferry throws its load aboard and into the yard's box.",
-	&"skimmer": "A skimmer on the ferry picks up rubbish as it sails.",
 	&"fleet": "Another ferry in the water.",
 	&"dog_fetch": "How many pieces the dog brings back a trip.",
 	&"dog_wait": "How long the dog lazes about between trips, at most.",
@@ -3548,11 +3376,6 @@ const BLURBS := {
 	&"dog_strength": "The heaviest and biggest pieces the dogs can carry back.",
 	&"lucky_haul": "Odds that a cast lifts one tier heavier and holds more.",
 	&"double_cast": "Odds that a cast throws a second net beside the first.",
-	&"sell_0": "What light pieces sell for at the yards.",
-	&"sell_1": "What small pieces sell for at the yards.",
-	&"sell_2": "What medium pieces sell for at the yards.",
-	&"sell_3": "What heavy pieces sell for at the yards.",
-	&"sell_4": "What bulky pieces sell for at the yards.",
 	&"recycle_bonus": "One yard at a time pays over the odds, and it moves.",
 	&"bird_worth": "What a netted pigeon is worth.",
 }
@@ -3562,15 +3385,7 @@ const BLURBS := {
 ## money worth spending says so on the way in rather than only once the board is open.
 func _affordable() -> int:
 	var count := 0
-	if tree_mode:
-		for n: Dictionary in _tree.nodes:
-			var id: String = n["id"]
-			if _tree.is_buyable(_tree_owned, id) and sludge >= _tree.cost(_tree_owned, id):
-				count += 1
-		return count
 	for key: StringName in TRACKS:
-		if key in SHELVED:
-			continue
 		if not is_maxed(key) and sludge >= cost_of(key):
 			count += 1
 	return count
@@ -3694,19 +3509,11 @@ func _pct_at(key: StringName, level: int) -> String:
 	return "%d" % roundi(_track_value(key, level) / base * 100.0)
 
 
-## `skim_chance` at any level, not only the one owned.
-func _skim_chance_at(level: int) -> float:
-	if level < 1:
-		return 0.0
-	var top := float(MAX_LEVELS[&"skimmer"])
-	return clampf(lerpf(SKIM_FIRST_CHANCE, 1.0, float(level - 1) / (top - 1.0)), 0.0, 1.0)
-
-
 ## What the market's legend under the boards says (2026-09-13, second pass, Richard):
 ## the four materials with what a piece of each pays on average, the tiers with their sell
 ## rates, and one line of explanation. Nothing else — the first pass said too much.
 func _shop_legend() -> Dictionary:
-	# The sell-by-tier rates used to stand here; the tracks are shelved (2026-09-14).
+	# The sell-by-tier rates used to stand here; the tracks were cut (2026-09-18).
 	var tiers: Array = []
 	var yards: Array = []
 	for kind in TrashDef.KIND_NAMES.size():
@@ -3812,18 +3619,13 @@ func _swap_levels() -> void:
 ## Cost of the next level on a track.
 func cost_of(what: StringName) -> float:
 	var track: UpgradeTrack = _upgrades.get(what)
-	if track != null:
-		return track.cost(_level_of(what))
-	var price: Array = PRICES[what]
-	return float(price[0]) * pow(float(price[1]), float(_level_of(what)))
+	return track.cost(_level_of(what)) if track != null else INF
 
 
-## Where a track stops. resources/upgrades/*.tres for everything but `skimmer`.
+## Where a track stops. resources/upgrades/*.tres.
 func _level_cap(what: StringName) -> int:
 	var track: UpgradeTrack = _upgrades.get(what)
-	if track != null:
-		return track.level_cap
-	return int(MAX_LEVELS.get(what, 0))
+	return track.level_cap if track != null else 0
 
 
 func _level_of(what: StringName) -> int:
@@ -3844,8 +3646,6 @@ func _level_of(what: StringName) -> int:
 			return cargo_level
 		&"boat_volley":
 			return boat_volley_level
-		&"skimmer":
-			return skimmer_level
 		&"fleet":
 			return fleet_level
 		&"dog_fetch":
@@ -3865,17 +3665,7 @@ func _level_of(what: StringName) -> int:
 		&"double_cast":
 			return double_cast_level
 		_:
-			var tier := _sell_tier(what)
-			return sell_levels[tier] if tier >= 0 else 0
-
-
-## Which weight tier a `sell_N` track is for, or -1 for any other track.
-func _sell_tier(what: StringName) -> int:
-	var key := String(what)
-	if not key.begins_with("sell_"):
-		return -1
-	var tier := key.trim_prefix("sell_").to_int()
-	return tier if tier >= 0 and tier < sell_levels.size() else -1
+			return 0
 
 
 ## Whether a track has sold everything it has. The board, the old buttons and the buy
@@ -3890,7 +3680,7 @@ func _saved_level(levels: Dictionary, what: StringName) -> int:
 
 
 func _buy(what: StringName) -> void:
-	if is_maxed(what) or what in SHELVED:
+	if is_maxed(what):
 		return
 	var price := cost_of(what)
 	if sludge < price:
@@ -3913,8 +3703,6 @@ func _buy(what: StringName) -> void:
 			cargo_level += 1
 		&"boat_volley":
 			boat_volley_level += 1
-		&"skimmer":
-			skimmer_level += 1
 		&"fleet":
 			fleet_level += 1
 			_add_boat()
@@ -3938,10 +3726,6 @@ func _buy(what: StringName) -> void:
 			lucky_haul_level += 1
 		&"double_cast":
 			double_cast_level += 1
-		_:
-			var tier := _sell_tier(what)
-			if tier >= 0:
-				sell_levels[tier] += 1
 	# After the level goes on, not before: the sound is the purchase landing, and a buy that
 	# fell through above has already returned without making one. The sparkle over the
 	# board's sprite is the same receipt for the eye.
@@ -3962,128 +3746,14 @@ func _buy(what: StringName) -> void:
 	_push_dog_numbers()
 
 
-# ------------------------------------------------------------------ tree test mode
-# See `tree_mode`. Everything below runs only in a tree run.
+# ------------------------------------------------------------------ playtest log
 
-## Reads the tree file when this is a tree run. A file that does not load leaves the run as an
-## ordinary one, on the ordinary save, rather than half a tree, and says why.
-func _setup_tree() -> void:
-	if start_tree:
-		tree_mode = true
-		save_path = TREE_SAVE_PATH
-		start_tree = false
-	if not tree_mode:
-		return
-	_tree = UpgradeTree.load_file()
-	if not _tree.error.is_empty():
-		push_error("Lake: tree mode is off, %s" % _tree.error)
-		tree_mode = false
-		_tree = null
-		if save_path == TREE_SAVE_PATH:
-			save_path = SAVE_PATH
-		return
-	if not _tree.unused_stats.is_empty():
-		push_warning("Lake: the tree changes stats the game does not read: %s" % ", ".join(_tree.unused_stats))
-	_tree_stats = _tree.stats(_tree_owned)
-
-
-func _tree_stat(stat: String) -> float:
-	return float(_tree_stats.get(stat, 0.0))
-
-
-## Stats recomputed from what is owned, and the world brought in line with them.
-func _apply_tree(push: bool = true) -> void:
-	_tree_stats = _tree.stats(_tree_owned)
-	_sync_tree_world()
-	if push:
-		_push_net_numbers()
-		_push_boat_numbers()
-		_push_dog_numbers()
-
-
-## In a tree run the ferries and the dog exist only once they are bought. The first ferry is
-## the scene's own hull, kept hidden and still until then; the rest are built as they are paid
-## for, exactly as the shop's Extra ferry builds them.
-func _sync_tree_world() -> void:
-	var want := fleet_size()
-	while _boats.size() < want:
-		_add_boat()
-	for i in _boats.size():
-		var on := i < want
-		_boats[i].visible = on
-		_boats[i].set_process(on)
-		_reberth(_boats[i], i)
-	for i in _dogs.size():
-		# The tree adopts one dog; the pack is the shop's.
-		var adopted := _tree_stat("dog") >= 1.0 and i == 0
-		_dogs[i].visible = adopted
-		_dogs[i].set_process(adopted)
-	# The Recycle Bonus clock starts with the first node that gives a bonus, as the shop's first
-	# level does; until then no yard shines.
-	if _bonus_kind < 0 and recycle_bonus() > 0.0:
-		_move_bonus()
-
-
-func _build_tree_screen() -> void:
-	_tree_screen = TreeScreen.new()
-	_tree_screen.name = &"TreeScreen"
-	_tree_screen.tree = _tree
-	_tree_screen.owned = _tree_owned
-	_tree_screen.money_of = func() -> float: return sludge
-	_tree_screen.visible = false
-	_shop_skin.get_parent().add_child(_tree_screen)
-	_tree_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_tree_screen.buy_asked.connect(buy_node)
-	_tree_screen.close_asked.connect(_shut.bind(_set_menu))
-
-
-## A tree run has begun: fresh (the file's starting money, nothing owned) or from its save.
-func _begin_tree_session(loaded: bool) -> void:
-	if not loaded:
-		_tree_owned.clear()
-		_tree_play = 0.0
-		sludge = _tree.start_money
-		_apply_tree()
-	_tree_progress_in = 0.0
-	TreeLog.write("session", _tree_play, {
-		"started": "continue" if loaded else "new",
-		"tree_file": UpgradeTree.PATH,
-		"nodes": _tree.nodes.size(),
-		"owned": _tree_owned.keys(),
-		"sludge": roundi(sludge),
-		"cleared": snappedf(_cleared_share(), 0.0001),
-	})
-
-
-## Buying a node off the tree screen. The same rules the screen draws by: visible, not already
-## owned to its last rank, and paid for.
-func buy_node(id: String) -> void:
-	if not tree_mode or not _tree.is_buyable(_tree_owned, id):
-		return
-	var price := _tree.cost(_tree_owned, id)
-	if sludge < price:
-		return
-	sludge -= price
-	_tree_owned[id] = _tree.rank_of(_tree_owned, id) + 1
-	_apply_tree()
-	if _sfx != null:
-		_sfx.play_bought()
-	if _tree_screen != null:
-		_tree_screen.bought()
-	TreeLog.write("purchase", _tree_play, {
-		"id": id,
-		"rank": _tree_owned[id],
-		"cost": roundi(price),
-		"sludge_after": roundi(sludge),
-		"cleared": snappedf(_cleared_share(), 0.0001),
-		"box": _yard.held.size(),
-	})
-
-
-## Whether this lake writes the playtest log: the player's own shop run and nothing else. Every
-## harness and probe runs on a save of its own, so none of them reaches the player's log.
+## Whether this lake writes the playtest log: the player's own run and nothing else — the lake
+## run as the game (the root's own child) on the player's own save path. A harness hangs its
+## lake under a node of its own and a probe plays on a save of its own, and either is enough
+## to keep it out: `tools/shot_menus` did neither once and wrote two lines into the real log.
 func _logs_play() -> bool:
-	return not tree_mode and save_path == SAVE_PATH
+	return save_path == SAVE_PATH and is_inside_tree() and get_parent() == get_tree().root
 
 
 ## A sitting of the shop run has begun, fresh or from its save.
@@ -4094,8 +3764,7 @@ func _begin_play_session(loaded: bool) -> void:
 	_play_last_cast = -1.0
 	var levels := {}
 	for key: StringName in TRACKS:
-		if not key in SHELVED:
-			levels[String(key)] = _level_of(key)
+		levels[String(key)] = _level_of(key)
 	PlayLog.write("session", _play, {
 		"started": "continue" if loaded else "new",
 		"levels": levels,
@@ -4130,25 +3799,6 @@ func _tick_play_log(delta: float) -> void:
 ## Share of the lake's pieces gone since it was built, for the playtest log.
 func _cleared_share() -> float:
 	return 1.0 - float(_grid.piece_count()) / float(maxi(_pieces_full, 1))
-
-
-func _tick_tree_log(delta: float) -> void:
-	_tree_play += delta
-	_tree_progress_in -= delta
-	if _tree_progress_in > 0.0:
-		return
-	_tree_progress_in = TREE_PROGRESS_EVERY
-	TreeLog.write("progress", _tree_play, {
-		"cleared": snappedf(_cleared_share(), 0.0001),
-		"pieces_left": _grid.piece_count(),
-		"sludge": roundi(sludge),
-		"birds": birds_caught,
-		"box": _yard.held.size(),
-		"ferries": fleet_size(),
-		"owned": _tree_owned.size(),
-		"in_shed": _shed_open,
-		"tree_open": _menu_open,
-	})
 
 
 ## How close two hulls may come, in tiles, and how fast they ease apart when they are closer
@@ -4206,17 +3856,11 @@ func _fit_out(boat: Boat, index: int) -> void:
 	boat.splash = _splash
 	boat.sfx = _sfx
 	boat.haul = _haul
-	# The skimmer drags the angler's net, so it is handed the angler's picture of one.
-	boat.skim_sheet = _net.art_sheet()
-	boat.skim_frame = _net.art_frame(&"land", -1)
 	boat.sold.connect(_on_sold)
-	boat.skimmed.connect(_on_skimmed)
 
 
 ## How many hulls the player owns.
 func fleet_size() -> int:
-	if tree_mode:
-		return maxi(int(_tree_stat("boats")), 0)
 	return 1 + fleet_level
 
 
@@ -4262,20 +3906,10 @@ func _push_dog_numbers() -> void:
 		dog.wait_cut = dog_wait_cut()
 		dog.carry_tier = dog_carry_tier()
 		dog.carry_wide = dog_carry_wide()
-		if tree_mode:
-			# The tree's dog numbers are relative to the file's base (6 tiles, 0.35 of trips,
-			# pace 1), so a base dog is exactly today's dog and the nodes scale it from there.
-			var base_reach := maxf(float(_tree.base_stats.get("dog_reach", 6.0)), 0.001)
-			dog.reach = Dog.REACH * _tree_stat("dog_reach") / base_reach
-			var beach := _tree_stat("dog_beach")
-			dog.strand_first = beach if beach > Dog.STRAND_ODDS else 0.0
-			dog.strand_speed = maxf(_tree_stat("dog_strand_speed"), 0.1)
 
 
 ## How many dogs the pack has: the first plus what `dog_count` bought. The tree has one.
 func dog_count() -> int:
-	if tree_mode:
-		return 1
 	return 1 + dog_count_level
 
 
@@ -4331,11 +3965,6 @@ func _push_boat_numbers() -> void:
 		boat.speed = boat_speed()
 		boat.capacity = boat_cargo()
 		boat.volley_gap = boat_volley_gap()
-		boat.skim_radius = skim_radius()
-		boat.skim_power = skim_power()
-		boat.skim_chance = skim_chance()
-		boat.skim_hold = skim_hold()
-		boat.skim_depth = skim_depth()
 
 
 ## Send one hull out: the first one sitting at its berth. The button is a nudge for a
@@ -4476,8 +4105,7 @@ func _process(delta: float) -> void:
 	if not _in_menu:
 		_look_for_the_end(delta)
 		_count_the_beat(delta)
-		if tree_mode:
-			_tick_tree_log(delta)
+		_tick_play_log(delta)
 
 		_save_note_for = maxf(_save_note_for - delta, 0.0)
 		_autosave_in -= delta
@@ -4485,8 +4113,6 @@ func _process(delta: float) -> void:
 			save_game()
 
 	# Not during the glide, which writes the zoom itself: this puts it on a stop.
-		else:
-			_tick_play_log(delta)
 	if _glide < 0.0:
 		_push_zoom()
 	_snap_camera()
@@ -4993,7 +4619,7 @@ func _update_hud() -> void:
 		[_buy_net_range, &"net_range"], [_buy_reel, &"reel"],
 		[_buy_net_hold, &"net_hold"],
 		[_buy_boat_speed, &"boat_speed"], [_buy_cargo, &"cargo"],
-		[_buy_skimmer, &"skimmer"], [_buy_fleet, &"fleet"]
+		[_buy_fleet, &"fleet"]
 	]:
 		var key: StringName = pair[1]
 		(pair[0] as Button).disabled = is_maxed(key) or sludge < cost_of(key)
@@ -5003,15 +4629,6 @@ func _update_hud() -> void:
 	]
 	_buy_cargo.text = "Ferry hold %d  —  carries %d  (%d)" % [
 		cargo_level, boat_cargo(), roundi(cost_of(&"cargo"))
-	]
-	_buy_skimmer.text = "Skimmer %d  —  %s  (%d)" % [
-		skimmer_level,
-		"not fitted" if skim_radius() < 0
-			else "%d tiles, %d deep, tier %d, %d%% of what it passes, %d items" % [
-				_tiles_in_radius(skim_radius()), skim_depth(), skim_power(),
-				roundi(skim_chance() * 100.0), skim_hold()
-			],
-		roundi(cost_of(&"skimmer"))
 	]
 	if fleet_size() < MAX_BOATS:
 		_buy_fleet.text = "Extra ferry %d  —  %d in the water  (%d)" % [
@@ -5109,11 +4726,9 @@ func save_game() -> bool:
 			"net_hold": net_hold_level,
 			"boat_speed": boat_speed_level, "cargo": cargo_level,
 			"boat_volley": boat_volley_level,
-			"skimmer": skimmer_level, "fleet": fleet_level,
+			"fleet": fleet_level,
 			"dog_fetch": dog_fetch_level, "dog_wait": dog_wait_level,
 			"dog_strength": dog_strength_level, "dog_count": dog_count_level,
-			"sell_0": sell_levels[0], "sell_1": sell_levels[1], "sell_2": sell_levels[2],
-			"sell_3": sell_levels[3], "sell_4": sell_levels[4],
 			"recycle_bonus": recycle_bonus_level, "bird_worth": bird_worth_level,
 			"lucky_haul": lucky_haul_level, "double_cast": double_cast_level,
 		},
@@ -5135,14 +4750,10 @@ func save_game() -> bool:
 		"afloat": afloat,
 		"stacks": _grid.stacks,
 	}
-	if tree_mode:
-		save["tree"] = true
-		save["tree_owned"] = _tree_owned
-		save["tree_play"] = _tree_play
+	save["play"] = _play
 	_save_extra(save)
 	file.store_var(save, true)
 	file.close()
-	save["play"] = _play
 	_note_save("saved")
 	return true
 
@@ -5167,11 +4778,6 @@ func load_game() -> bool:
 	if save == null or not readable 			or int(save.get("seed", 0)) != _level_seed():
 		_note_save("the save is from another build — ignored")
 		return false
-	# A tree run and a shop run never read each other's file: their upgrades are not the same
-	# thing, and a ferry bought one way would be a ferry nobody paid for the other.
-	if bool(save.get("tree", false)) != tree_mode:
-		_note_save("the save is from the other mode — ignored")
-		return false
 	if not _grid.restore(save.get("stacks", []) as Array):
 		_note_save("the save does not fit this lake — ignored")
 		return false
@@ -5188,12 +4794,9 @@ func load_game() -> bool:
 	boat_speed_level = _saved_level(levels, &"boat_speed")
 	cargo_level = _saved_level(levels, &"cargo")
 	boat_volley_level = _saved_level(levels, &"boat_volley")
-	skimmer_level = _saved_level(levels, &"skimmer")
 	dog_fetch_level = _saved_level(levels, &"dog_fetch")
 	dog_wait_level = _saved_level(levels, &"dog_wait")
 	dog_strength_level = _saved_level(levels, &"dog_strength")
-	for tier in sell_levels.size():
-		sell_levels[tier] = _saved_level(levels, StringName("sell_%d" % tier))
 	recycle_bonus_level = _saved_level(levels, &"recycle_bonus")
 	bird_worth_level = _saved_level(levels, &"bird_worth")
 	lucky_haul_level = _saved_level(levels, &"lucky_haul")
@@ -5209,14 +4812,9 @@ func load_game() -> bool:
 	sold_count = int(save.get("sold_count", 0))
 	birds_caught = int(save.get("birds_caught", 0))
 	sold_by_kind = PackedInt32Array(save.get("sold_by_kind", PackedInt32Array([0, 0, 0, 0])))
-	if tree_mode:
-		_tree_owned.clear()
-		_tree_owned.merge(_tree.sanitize(save.get("tree_owned", {}) as Dictionary))
-		_tree_play = float(save.get("tree_play", 0.0))
-		_apply_tree(false)
+	_play = float(save.get("play", 0.0))
 
 	# Finds and where they were put. Anything the catalogue no longer knows is dropped:
-	_play = float(save.get("play", 0.0))
 	# re-cutting the sheets renames pieces, and that must not take a save down with it.
 	unlocked.clear()
 	for name: String in save.get("unlocked", []) as Array:
@@ -5322,7 +4920,6 @@ func load_game() -> bool:
 ## in place: a fresh run is exactly what the first frame of the game already builds.
 func wipe_save() -> void:
 	_wiping = true
-	start_tree = tree_mode
 	# Straight back into the lake: this is a key pressed in play, not a trip to the menu.
 	skip_menu = true
 	if has_save():

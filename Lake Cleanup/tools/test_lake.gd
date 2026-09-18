@@ -81,8 +81,6 @@ var _ferry_step: int = 0
 var _ferry_mark: int = 0
 var _flock: Flock
 var _rebuilds_before: int = 0
-var _skim_kind: int = 0
-var _skimmed_kinds: Array[int] = []
 ## The frame `_stage_ending` settled on, so the rest of that stage can be timed from it
 ## rather than from a frame number that a dog's delivery can push out of reach. -1 until.
 var _ending_at: int = -1
@@ -376,8 +374,6 @@ func _stage_build() -> void:
 			and _boat.capacity == int(_main.call(&"boat_cargo")),
 		"the starting ferry is the unupgraded one",
 		"%.1f tiles/s, carries %d" % [_boat.speed, _boat.capacity])
-	_check(_boat.skim_radius < 0, "it has no skimmer fitted",
-		"radius %d" % _boat.skim_radius)
 
 	# The island's coast wave. It is the one place the drawn shore and Iso's are allowed to
 	# disagree, and both bounds are what keep that safe:
@@ -1358,8 +1354,6 @@ func _path_misses_island(from: Vector2, legs: Array[Vector2]) -> bool:
 	return true
 
 
-## The skimmer: off until it is bought, then fishing on the way — for the material it is
-## delivering, and only some of what it goes over.
 ## The pack (2026-09-14): three more dogs may be adopted, wired like the first, sharing its
 ## training, and no two of them swim for the same stick.
 func _stage_pack() -> void:
@@ -1548,60 +1542,6 @@ func _stage_dog_delivery(dog: Dog) -> void:
 			through += 1
 	_check(got and through == 0, "and round the hut the same way",
 		"arrived %s, %d frames in the walls" % [str(got), through])
-
-
-func _stage_skimmer() -> void:
-	if _in_stage == 1:
-		_main.set(&"sludge", 100000.0)
-		for i in 3:
-			_main.call(&"_buy", &"skimmer")
-		_check(_boat.skim_radius == 2, "buying the skimmer widens it",
-			"radius %d" % _boat.skim_radius)
-		_check(_boat.skim_chance > 0.0 and _boat.skim_chance < 1.0,
-			"the skimmer is a chance, not a certainty",
-			"%.0f%%" % (_boat.skim_chance * 100.0))
-		_check(_boat.skim_hold > 0, "the skimmer has deck space of its own",
-			"+%d" % _boat.skim_hold)
-		_check(_boat.skim_depth > 1, "it digs past the top of a stack for its material",
-			"%d slots" % _boat.skim_depth)
-
-		# One material only, so every single thing the skimmer brings up on this run has
-		# to be that material or the filter is broken.
-		_skim_kind = TrashDef.Kind.WOOD
-		for i in _boat.capacity:
-			_yard.put(_def_of(_skim_kind))
-		# Wound right up, so the run finishes inside the harness's frame budget and the
-		# sample of what it catches is big enough to mean something.
-		_boat.skim_chance = 1.0
-		_boat.skim_power = 4
-		_boat.speed = TEST_FERRY_SPEED * 0.3
-		_boat.skimmed.connect(_note_skimmed)
-		_skimmed_kinds.clear()
-		_pieces_before = _grid.piece_count()
-		_filth_before = float(_main.get(&"pollution"))
-		return
-	if _boat.runs_done < 2 and _in_stage < 900:
-		return
-	_boat.skimmed.disconnect(_note_skimmed)
-	_check(_boat.runs_done == 2, "the ferry ran again", "after %d frames" % _in_stage)
-	_check(_grid.piece_count() < _pieces_before,
-		"the skimmer cleared water on the way past",
-		"%d -> %d pieces" % [_pieces_before, _grid.piece_count()])
-	_check(not _skimmed_kinds.is_empty(), "it brought something up",
-		"%d pieces" % _skimmed_kinds.size())
-
-	var wrong := 0
-	for kind: int in _skimmed_kinds:
-		if kind != _skim_kind:
-			wrong += 1
-	_check(wrong == 0, "it only fished for what it was delivering",
-		"%d of %d were not %s" % [
-			wrong, _skimmed_kinds.size(), TrashDef.KIND_NAMES[_skim_kind]
-		])
-	_check(float(_main.get(&"pollution")) < _filth_before,
-		"skimmed rubbish counts as out of the lake",
-		"%.5f -> %.5f" % [_filth_before, float(_main.get(&"pollution"))])
-	_advance()
 
 
 ## The fleet: a second hull is a second boat in the water, wired up the same as the first
@@ -1800,11 +1740,10 @@ func _stage_save() -> void:
 func _stage_market() -> void:
 	var tracks: Dictionary = _main.get(&"_upgrades")
 	var missing := []
-	for key in ["sell_0", "sell_1", "sell_2", "sell_3", "sell_4",
-			"recycle_bonus", "bird_worth", "lucky_haul", "double_cast"]:
+	for key in ["recycle_bonus", "bird_worth", "lucky_haul", "double_cast"]:
 		if not tracks.has(StringName(key)):
 			missing.append(key)
-	_check(missing.is_empty(), "every market and luck track loads", ", ".join(missing))
+	_check(missing.is_empty(), "every luck track loads", ", ".join(missing))
 	var boards := {}
 	for row: Dictionary in _main.call(&"_shop_rows") as Array:
 		boards[row["board"]] = int(boards.get(row["board"], 0)) + 1
@@ -1819,28 +1758,20 @@ func _stage_market() -> void:
 	_check(int(boards.get(&"boat", 0)) == 4, "and the boats' board has four",
 		"%d" % int(boards.get(&"boat", 0)))
 	_check(not boards.has(&"market"), "and nothing is left on a market board", str(boards.keys()))
-	# The shelved tracks (2026-09-14): the skimmer and the sell-by-tier tracks are still in
-	# the code, but no row lists them, nothing counts them and nothing sells them.
-	var shelved_rows := []
-	for row: Dictionary in _main.call(&"_shop_rows") as Array:
-		if row["key"] in (_main.get(&"SHELVED") as Array):
-			shelved_rows.append(String(row["key"]))
-	_check(shelved_rows.is_empty(), "no shelved track has a row", ", ".join(shelved_rows))
+	# The cut tracks (2026-09-18, issue #23's scope lock): the skimmer and the five sell-by-tier
+	# tracks are out of the game, not hidden in it. Nothing loads them, nothing lists them, and
+	# asking to buy one takes nothing.
+	var lingering := []
+	for key in ["skimmer", "sell_0", "sell_1", "sell_2", "sell_3", "sell_4"]:
+		if tracks.has(StringName(key)) or StringName(key) in (_main.get(&"TRACKS") as Array):
+			lingering.append(key)
+	_check(lingering.is_empty(), "the cut tracks are gone", ", ".join(lingering))
 	_main.set(&"sludge", 100000.0)
 	var purse_before := float(_main.get(&"sludge"))
 	_main.call(&"_buy", &"sell_2")
 	_main.call(&"_buy", &"skimmer")
-	_check(is_equal_approx(float(_main.get(&"sludge")), purse_before)
-		and int(_main.get(&"skimmer_level")) == 0,
-		"and buying one takes nothing", "%.0f" % float(_main.get(&"sludge")))
-	_main.set(&"sludge", float(_main.call(&"cost_of", &"skimmer")) + 1.0)
-	var counted := int(_main.call(&"_affordable"))
-	var cheapest := INF
-	for key: StringName in _main.get(&"TRACKS") as Array:
-		if not key in (_main.get(&"SHELVED") as Array):
-			cheapest = minf(cheapest, float(_main.call(&"cost_of", key)))
-	_check(counted == 0 or cheapest <= float(_main.get(&"sludge")),
-		"the affordable count ignores them", "%d counted" % counted)
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse_before),
+		"and asking for one takes nothing", "%.0f" % float(_main.get(&"sludge")))
 	# The boats run ahead of the net (2026-09-18, issue #23; supersedes "one track twice"): a
 	# ferry holds two casts at every level, and its Hold is the cheaper of the two to buy.
 	var hold: UpgradeTrack = tracks[&"net_hold"]
@@ -1960,9 +1891,6 @@ func _stage_market() -> void:
 	_check(folded.size() > 1, "a blurb wraps onto lines", str(folded))
 
 	_main.set(&"sludge", 100000.0)
-	_check(is_equal_approx(float(_main.call(&"tier_pay", 2)), 1.0),
-		"the sell-by-tier tracks are shelved: every tier sells at par", "%.2f" % float(_main.call(&"tier_pay", 2)))
-
 	_check(int(_main.call(&"bonus_kind")) < 0, "no yard is boosted before the bonus is bought", "")
 	_main.call(&"_buy", &"recycle_bonus")
 	var kind := int(_main.call(&"bonus_kind"))
@@ -2710,7 +2638,7 @@ func _stage_art() -> void:
 		"%.3f px at worst" % worst)
 
 	# Every find planted in the water as many times as the catalogue asks for, and none of
-	# them on offer to the skimmer.
+	# them on offer to a sweep that is told to leave finds alone.
 	#
 	# It used to be one of each, flat. The chairs come four to a set now — a dining table
 	# with one chair at it is not a room anybody lives in — so the number to expect is the
@@ -2743,8 +2671,8 @@ func _stage_art() -> void:
 		])
 
 	if keepsake_tile >= 0:
-		# Dig straight to it with a net strong enough for anything, then ask again as the
-		# boat does. The boat must come away with nothing.
+		# Dig straight to it with a net strong enough for anything, then ask again with the
+		# finds ruled out. That sweep must come away with nothing.
 		var depth := _grid.stacks[keepsake_tile].size()
 		_check(_grid.reachable_slot(keepsake_tile, depth, 9) >= 0,
 			"the net can reach a find", "")
@@ -2752,7 +2680,7 @@ func _stage_art() -> void:
 		var boat_got_one := false
 		if to_boat >= 0:
 			boat_got_one = _grid.defs[_grid.stacks[keepsake_tile][to_boat]].keepsake
-		_check(not boat_got_one, "the skimmer leaves the finds alone", "")
+		_check(not boat_got_one, "a sweep with the finds ruled out leaves them alone", "")
 	_advance()
 
 
@@ -4354,10 +4282,6 @@ func _def_of(kind: int) -> int:
 		if _grid.defs[i].material == kind:
 			return i
 	return 0
-
-
-func _note_skimmed(def_index: int) -> void:
-	_skimmed_kinds.append(_grid.defs[def_index].material)
 
 
 func _collect_bodies(node: Node, into: Array[String]) -> void:

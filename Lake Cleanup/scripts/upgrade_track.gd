@@ -1,7 +1,6 @@
 ## One upgrade track's tunable numbers: what the next level costs, and what it buys.
 ##
-## Generalizes every purchasable track except `skimmer` (whose payoff is a chance curve,
-## not this price-and-value shape) into one editable Resource, so a balance pass means
+## Generalizes every purchasable track into one editable Resource, so a balance pass means
 ## tweaking a `.tres` in the Inspector rather than editing lake.gd.
 ##
 ## Level L's value is `curve_a + curve_b*L + curve_c*L*L`, clamped to `value_cap`, and

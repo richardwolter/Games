@@ -77,7 +77,7 @@ func _process(delta: float) -> void:
 		_asked = true
 		_age = 0.0
 		_say("start over asked; the copy exists: %s" % str(FileAccess.file_exists(SAVE_COPY)))
-		_lake.call(&"_reload_as", true, false)
+		_lake.call(&"_reload_as", true)
 		return
 	if _next < SHOTS.size() and _age >= float(SHOTS[_next][0]):
 		var shot: StringName = SHOTS[_next][1]

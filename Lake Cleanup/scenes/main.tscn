@@ -186,12 +186,6 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Ferry hold"
 
-[node name="BuySkimmer" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1845377555]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "Skimmer"
-
 [node name="BuyFleet" type="Button" parent="HUD/Shop/Pad/Scroll/Panel" unique_id=1164979095]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)

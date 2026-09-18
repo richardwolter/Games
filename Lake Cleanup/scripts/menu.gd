@@ -9,7 +9,7 @@
 ##
 ## Nothing here changes scene. Continue, or New game where there is no run to lose, is
 ## `play_asked`: the lake takes the menu off and glides the view down to the angler. A run
-## thrown away, or the tree's own save, is `reload_asked`: the lake reloads itself and comes
+## thrown away is `reload_asked`: the lake reloads itself and comes
 ## up playing. Supersedes the baked `assets/menu_lake.png` (2026-09-16), `scenes/menu.tscn`
 ## and the scene change into `main.tscn`.
 ##
@@ -26,8 +26,8 @@ const LOGO := preload("res://assets/mdll_logo_stacked.png")
 
 ## Into the lake that is already there.
 signal play_asked
-## This lake is thrown away for another: a fresh run (`fresh`), or the tree's (`tree`).
-signal reload_asked(fresh: bool, tree: bool)
+## This lake is thrown away for another: a fresh run (`fresh`).
+signal reload_asked(fresh: bool)
 
 ## The stack: one plank per door, in this order. **Credits is in the stack, above Quit**
 ## (2026-09-17, Richard); it used to stand alone in the bottom-right corner, which was where
@@ -38,22 +38,13 @@ signal reload_asked(fresh: bool, tree: bool)
 ## there is a run to go back to, New game when there is not. The same wood, a lighter face
 ## and the lit edge the shop's affordable rows carry. Only ever one of them, or the accent
 ## says nothing.
-##
-## The two tree doors start and resume tree test mode (`Lake.tree_mode`, 2026-09-12): the
-## proposed upgrade tree played as its own run on its own save.
 const DOORS := [
 	{"key": &"continue", "label": "Continue"},
 	{"key": &"new", "label": "New game"},
-	{"key": &"continue_tree", "label": "Continue (tree)"},
-	{"key": &"new_tree", "label": "New game (tree)"},
 	{"key": &"settings", "label": "Settings"},
 	{"key": &"credits", "label": "Credits"},
 	{"key": &"quit", "label": "Quit"},
 ]
-## The tree doors are hidden (2026-09-14, Richard: the tree is set aside, the shop stays).
-## The code behind them is kept; flip this to play the tree again.
-const TREE_DOORS := false
-
 ## Where the stack stands: **centred on the logo's own axis, directly under it**
 ## (2026-09-17), so the title and the doors read as one block. `DROP` is the gap between the
 ## logo's foot and the first plank, in the design frame.
@@ -94,8 +85,6 @@ var _settings: SettingsSkin
 var _controls: ControlsSkin
 var _credits: CreditsBoard
 var _confirm: MenuConfirm
-## Which save "Start over?" is about: the ordinary one, or the tree run's.
-var _confirm_tree: bool = false
 ## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
 ## way out is a second answer to a question already answered.
 var _live: bool = false
@@ -209,11 +198,7 @@ func _lay_out() -> void:
 	for door: Dictionary in DOORS:
 		var key: StringName = door["key"]
 		var plank: PlankButton = _planks[key]
-		plank.visible = (
-			(key != &"continue" or has_run)
-			and (key != &"continue_tree" or (TREE_DOORS and has_tree_save()))
-			and (key != &"new_tree" or TREE_DOORS)
-		)
+		plank.visible = key != &"continue" or has_run
 		plank.accent = key == (&"continue" if has_run else &"new")
 		plank.queue_redraw()
 		if plank.visible:
@@ -269,14 +254,10 @@ func _kill_fade() -> void:
 	_fade = null
 
 
-func has_tree_save() -> bool:
-	return FileAccess.file_exists(Lake.TREE_SAVE_PATH)
-
-
 func _take(key: StringName) -> void:
 	if not _live:
 		return
-	var asks := (key == &"new" and has_run) or (key == &"new_tree" and has_tree_save())
+	var asks := key == &"new" and has_run
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
 	elif key in [&"settings", &"credits"] or asks:
@@ -286,19 +267,10 @@ func _take(key: StringName) -> void:
 		&"continue":
 			_play()
 		&"new":
-			_confirm_tree = false
 			if has_run:
 				_show_confirm(true)
 			else:
 				_play()
-		&"continue_tree":
-			_reload(false, true)
-		&"new_tree":
-			_confirm_tree = true
-			if has_tree_save():
-				_show_confirm(true)
-			else:
-				_reload(true, true)
 		&"settings":
 			_show_settings(true)
 		&"credits":
@@ -310,7 +282,7 @@ func _take(key: StringName) -> void:
 ## "Start over?", answered yes. The lake deletes the file: it knows which one is its own.
 func _start_over() -> void:
 	_show_confirm(false)
-	_reload(true, _confirm_tree)
+	_reload(true)
 
 
 func _play() -> void:
@@ -318,10 +290,10 @@ func _play() -> void:
 	play_asked.emit()
 
 
-func _reload(fresh: bool, tree: bool) -> void:
+func _reload(fresh: bool) -> void:
 	_live = false
 	_start_sound()
-	reload_asked.emit(fresh, tree)
+	reload_asked.emit(fresh)
 
 
 ## Played on the autoload, which outlives a reload: it is still ringing as the lake comes up.

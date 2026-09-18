@@ -8,10 +8,7 @@
 ## home for the next load.
 ##
 ## The route is the interesting part. A hold of nothing but bottles is one stop and back;
-## a hold with a bit of everything is a lap. And because each leg has a destination that
-## wants one particular material, the skimmer knows what to look for on the way — it fishes
-## for wood while it is running wood to the sawmill, which is what makes a laden ferry
-## worth watching rather than a delivery animation.
+## a hold with a bit of everything is a lap.
 ##
 ## Legs are planned around the island rather than straight through it: a chord from the
 ## east yard to the west one would drive the hull over the shed.
@@ -21,10 +18,6 @@ extends Node2D
 ## Emitted at a yard with everything that was landed there. The lake pays for it; the boat
 ## does not know what a sludge is.
 signal sold(cargo: PackedInt32Array, kind: int)
-
-## One piece the skimmer took out of the water on the way past. Reported as it happens,
-## because that is the moment it left the lake — selling it later is a separate event.
-signal skimmed(def_index: int)
 
 enum State { DOCKED, LOADING, SAILING, UNLOADING, RETURNING, PATROL }
 
@@ -46,18 +39,6 @@ const WAVE_SPEED := 1.0
 
 ## How high the hull rides above the tile it is over.
 const RIDE_HEIGHT := 7.0
-
-## The skimmer's mouth, as a fraction of the hull's beam at radius zero and per level after
-## it, and how far back off the hull it hangs. Small and tucked in: it is a net on a frame
-## bolted to the transom, not a trawl.
-const SKIM_MOUTH := 0.42
-const SKIM_MOUTH_STEP := 0.11
-const SKIM_BEHIND := 0.62
-
-## How far behind the boat the skimmer's mouth sits, in tiles. The same offset the net is
-## drawn at, converted out of hull lengths — the sweep has to happen where the net is, not
-## where the wheelhouse is.
-const SKIM_TRAIL := HULL_LENGTH * 0.5 * SKIM_BEHIND / TILE_REACH
 
 ## How often a boat under way throws spray off its bow, in seconds, and how big. Small: it is
 ## a work boat at walking pace, not a speedboat.
@@ -210,9 +191,8 @@ const RING := 0.84
 ## which is the sand plus a lane of open water wide enough to read as one.
 ##
 ## Deliberately inside where the rubbish starts (`Iso.SHELF_CLEAR`, 2.3 tiles out): the lane
-## the ferry keeps is over the near edge of the rubbish ring, and a skimmer fitted to it
-## fishes that edge on the way past. Clearance here is about the picture — a boat crossing a
-## beach — not about the water being empty.
+## the ferry keeps is over the near edge of the rubbish ring. Clearance here is about the
+## picture — a boat crossing a beach — not about the water being empty.
 const ISLAND_CLEAR := 1.43
 
 ## How far out a bend round the island swings, and how far out the dock is approached from,
@@ -227,11 +207,6 @@ const ISLAND_CLEAR := 1.43
 ## four.
 const ISLAND_BEND := 1.72
 const ISLAND_BERTH := 1.57
-
-## How often a moving skimmer gets a go at the water, in tiles travelled. Rolling once per
-## frame would make the catch rate depend on the frame rate, which is the kind of bug that
-## only shows up on someone else's machine.
-const SKIM_STEP := 0.6
 
 ## Set from the lake's upgrade levels when a run starts. Speed is in tiles per second.
 ## How far round the hull floating pieces are set bobbing as it passes, in tiles.
@@ -249,32 +224,6 @@ var capacity: int = 6
 ## a yard's box. 1.0 is an untrained ferry, so a Boat with no lake behind it throws exactly
 ## as it did before there was a track to buy. See Haul._gap.
 var volley_gap: float = 1.0
-## Tiles out from the hull the skimmer bites. Below zero is a boat with no skimmer fitted,
-## which is what every ferry starts as.
-var skim_radius: int = -1
-## The heaviest tier the skimmer can lift.
-var skim_power: int = 0
-
-## How many slots down the skimmer will dig for the material it is after.
-##
-## It has to be more than one. A skimmer looking only at the top of each stack is hunting
-## for a particular material among whatever happens to be floating, and on a run to the
-## sawmill most of what is on top is not wood — a whole lap would bring up one plank.
-## Digging a little is what makes a filtered skimmer worth fitting at all.
-var skim_depth: int = 1
-## Odds that any one piece the skimmer passes over actually comes up, 0 to 1. A net dragged
-## behind a moving hull is a chance at a piece, not a guarantee — and turning that chance
-## up is what the skimmer upgrade mostly buys.
-var skim_chance: float = 0.0
-
-## Room the skimmer gets over and above the hold, in pieces.
-##
-## Without this the skimmer would be dead weight exactly when the player was doing well:
-## the ferry loads the hold full from the yard, and a full hold has nowhere to put anything
-## it fishes up. The deck space is the skimmer's own, so a laden ferry still works the water
-## it crosses.
-var skim_hold: int = 0
-
 ## Whether it sets off on its own once there is a full hold to carry (`ready_to_sail`).
 var auto_ferry: bool = true
 
@@ -325,8 +274,8 @@ var dock := Vector2(Iso.CENTRE.x, Iso.CENTRE.y)
 ## Which way it is pointing on the plane, for the foam and the hull's lean.
 var heading := Vector2(1.0, 0.0)
 
-## Wired up by lake.gd. The boat loads straight out of the yard and skims straight out of
-## the grid, for the same reason the net does: it is the thing doing the work.
+## Wired up by lake.gd. The boat loads straight out of the yard, for the same reason the net
+## takes straight out of the grid: it is the thing doing the work.
 var yard: Yard
 var grid: LakeGrid
 var splash: WaterSplash
@@ -336,17 +285,13 @@ var sfx: Sfx
 ## aboard the way it used to.
 var haul: Haul
 
-## The net the skimmer drags, borrowed off the angler's own sheet. Empty means no art, and
-## the skimmer falls back to the shape it was blocked in as.
-var skim_sheet: Texture2D
-var skim_frame := {}
 ## The four merchants, in TrashDef.Kind order.
 var dropoffs: Array[Dropoff] = []
 
 var runs_done: int = 0
 
-## Which seed this hull's skimmer rolls from. Every ferry in the fleet has to roll its own
-## dice, or two boats on the same leg bring up the same pieces in the same order.
+## Which seed this hull rolls from. Every ferry in the fleet has to roll its own dice, or two
+## boats throw the same spray and patrol the same line.
 var rng_seed: int = 771144
 
 ## Which dropoff it is sailing to, as an index into `dropoffs`; -1 when heading home.
@@ -363,7 +308,6 @@ var _dwell: float = 0.0
 
 ## What the last painted hull was made of, while it is sitting still. See `_repaint`.
 var _painted: int = 0
-var _skim_travel: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
 ## Whether the load it just tipped ashore is still in the air. Both halves of unloading are
@@ -512,11 +456,6 @@ func room_left() -> int:
 	return maxi(capacity - cargo.size(), 0)
 
 
-## Space the skimmer may fill: the hold plus its own deck space.
-func skim_room() -> int:
-	return maxi(capacity + skim_hold - cargo.size(), 0)
-
-
 ## Which materials are aboard, as dropoff indices, in the order they will be visited:
 ## round the lake one way from where the boat is now, so a run is a lap rather than a
 ## series of dashes back and forth across the middle.
@@ -652,7 +591,7 @@ func _repaint() -> void:
 		queue_redraw()
 		return
 	var key := hash([
-		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round(), _sun_key()
+		state, cargo.size(), (_screen_heading() * 64.0).round(), _sun_key()
 	])
 	if key != _painted:
 		_painted = key
@@ -799,99 +738,25 @@ func engine_effort() -> float:
 	return 0.0
 
 
-## One frame of travel along the current leg list, plus a bite of the water on the way.
+## One frame of travel along the current leg list.
 ## Returns true once the last waypoint is reached.
 func _sail(delta: float) -> bool:
 	if _legs.is_empty():
 		return true
 	var step := speed * delta
-	var moved := 0.0
 	while step > 0.0 and not _legs.is_empty():
 		var to: Vector2 = _legs[0]
 		var gap := to - tile_pos
 		if gap.length() <= maxf(step, ARRIVE_DISTANCE):
-			moved += gap.length()
 			tile_pos = to
 			_legs.pop_front()
 			step -= gap.length()
 			continue
 		heading = gap.normalized()
 		tile_pos += heading * step
-		moved += step
 		step = 0.0
 
-	# Only a boat with somewhere to be fishes. On the way home it is empty and pointed at
-	# the dock, and there is no material it would be looking for.
-	if target >= 0:
-		_skim_along(moved)
 	return _legs.is_empty()
-
-
-## The skimmer, worked in fixed steps of travel rather than per frame.
-##
-## Every piece it passes over is a roll of the dice, not a certainty: the boat is dragging
-## a net behind a moving hull, and most of what it goes over slips underneath. Turning that
-## chance up is most of what the skimmer upgrade buys.
-func _skim_along(distance: float) -> void:
-	if skim_radius < 0 or grid == null or target < 0:
-		return
-	_skim_travel += distance
-	while _skim_travel >= SKIM_STEP:
-		_skim_travel -= SKIM_STEP
-		_skim_once()
-
-
-## Where the skimmer's mouth is, in tile coordinates: off the stern rather than under the
-## hull.
-##
-## It used to sweep from the boat's own tile, which meant the ferry ate the water it was
-## about to sail over and left the water it had just dragged a net through untouched. The
-## rubbish went in the hold either way, but it went in from the wrong place.
-func _skim_centre() -> Vector2:
-	return tile_pos - heading.normalized() * SKIM_TRAIL
-
-
-func _skim_once() -> void:
-	if skim_room() <= 0:
-		return
-	var kind := dropoffs[target].kind
-	var mouth := _skim_centre()
-	var here := grid.tile_at(Iso.tile_to_world(mouth.x, mouth.y))
-	if here < 0:
-		return
-	for index in grid.tiles_around(here, skim_radius):
-		if skim_room() <= 0:
-			return
-		var k := grid.reachable_slot(index, skim_depth, skim_power, kind, false)
-		if k < 0:
-			continue
-		if _rng.randf() >= skim_chance:
-			continue
-		var at := grid.surface_pos(index)
-		var def := grid.def_at(index, k)
-		var taken := grid.take(index, k)
-		cargo.append(taken)
-		skimmed.emit(taken)
-		if splash != null:
-			# At the net, not at the tile the piece came off. The sweep reaches further than
-			# the net is drawn, so a crown of water blooming a couple of tiles out to one
-			# side reads as the lake spitting rather than as the boat catching something.
-			splash.splash(
-				_at_the_net(at), clampf(0.2 + def.size.x / 40.0, 0.0, 0.85)
-			)
-
-
-## A point pulled onto the skimmer's mouth, along the line from the middle of it. Measured in
-## a space where the mouth is a unit circle, the same way the cast net does it.
-func _at_the_net(at: Vector2) -> Vector2:
-	var centre := _skim_centre()
-	var middle := Iso.tile_to_world(centre.x, centre.y) + Vector2(0.0, -RIDE_HEIGHT)
-	var span := HULL_WIDTH * 0.5 * (SKIM_MOUTH + SKIM_MOUTH_STEP * float(skim_radius))
-	var gap := at - middle
-	var out := Vector2(gap.x / span, gap.y / (span * 0.5)).length()
-	if out <= 1.0:
-		return at
-	return middle + gap / out
 
 
 ## The waypoints from one point to another, bent around the island and then straightened
@@ -1075,7 +940,7 @@ static func _swell(x: float, t: float) -> float:
 
 
 ## The ferry, drawn from its sheet of headings, plus the parts that are not the boat: its
-## foam, its load and its skimmer.
+## foam and its load.
 ##
 ## The hull is a picture per heading rather than one picture turned. A boat is not a flat
 ## card: seen on an isometric plane, one pointing away from the camera shows its stern and
@@ -1084,25 +949,14 @@ static func _swell(x: float, t: float) -> float:
 ## the frame.
 func _draw() -> void:
 	_painted = hash([
-		state, cargo.size(), skim_radius, (_screen_heading() * 64.0).round(), _sun_key()
+		state, cargo.size(), (_screen_heading() * 64.0).round(), _sun_key()
 	])
 	var ink := Color(0.11, 0.09, 0.1)
 	var half_l := HULL_LENGTH * 0.5
 	var half_w := HULL_WIDTH * 0.5
-	# Where the boat is pointing on screen, which is not where it is pointing on the tile
-	# field: everything drawn alongside the hull has to lie along the same line the hull
-	# does.
-	var along := _screen_heading()
-	var across := Vector2(-along.y, along.x)
-
 	# No wake under the hull, by decision (2026-09-12): the pale wedge with arcs shedding
 	# down it, and the rings dropped behind the stern, are both gone. What a boat leaves is
 	# the foam it drags, and that is HullFoam's job.
-	# The skimmer, trailing off the stern. Drawn before the hull so it sits behind it, and
-	# only once one is fitted, because it is the visible difference a bought upgrade makes.
-	if skim_radius >= 0:
-		_draw_skimmer(half_l, half_w, along, across, ink)
-
 	_draw_hull(half_l, half_w, ink)
 
 	# The load, down in the hold round the mast. A laden ferry and an empty one have to be
@@ -1178,43 +1032,6 @@ func _under_way() -> bool:
 	return (
 		state == State.SAILING or state == State.RETURNING or state == State.PATROL
 	)
-
-
-## The skimmer: the angler's own net, lying open on the water and trailing off the stern.
-##
-## The same drawing the player casts, at the width the upgrade actually sweeps. It used to be
-## a green quadrilateral, which said "there is a thing here" and nothing else — and a skimmer
-## is a net, so it may as well be the one the game already has a picture of.
-func _draw_skimmer(
-	half_l: float, half_w: float, along: Vector2, across: Vector2, ink: Color
-) -> void:
-	var mouth := half_w * (SKIM_MOUTH + SKIM_MOUTH_STEP * float(skim_radius))
-	# Right off the transom rather than towed behind on a warp: it is a net slung off the
-	# back of a working boat, and a gap between the two reads as a net somebody dropped.
-	var back := -along * half_l * SKIM_BEHIND
-
-	if skim_sheet != null and not skim_frame.is_empty():
-		var region: Rect2 = skim_frame["region"]
-		# Scaled by the frame's own rim, the same way the angler's net is, so the drawn
-		# mouth is the width the skimmer sweeps rather than whatever the picture happens
-		# to be.
-		var scale := mouth * 2.0 / maxf(float(skim_frame["rim"]), 1.0)
-		var size := region.size * scale
-		var hang := Vector2(size.x * 0.5, size.y * float(skim_frame["hang"]))
-		draw_texture_rect_region(
-			skim_sheet, Rect2(back - hang, size), region, Color(ink.r, ink.g, ink.b, 0.85)
-		)
-		return
-
-	var net := PackedVector2Array([
-		back + across * mouth * 0.4, back - across * mouth * 0.4,
-		back - along * mouth - across * mouth * 0.22,
-		back - along * mouth + across * mouth * 0.22
-	])
-	draw_colored_polygon(net, Color(0.30, 0.36, 0.30, 0.75))
-	var closed := net.duplicate()
-	closed.append(net[0])
-	draw_polyline(closed, ink, 1.4)
 
 
 ## Where the i-th piece of a load of `shown` sits, in this node's own space.

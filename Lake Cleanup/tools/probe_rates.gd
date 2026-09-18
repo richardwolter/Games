@@ -1,9 +1,9 @@
 ## Measures the rates the progression sim is built on, off the real lake: what the basin holds
 ## and where, what a cast catches and how long it takes at given upgrade levels, how long a
-## ferry run takes, what the skimmer brings up on one, and how fast the dog fetches.
+## ferry run takes, and how fast the dog fetches.
 ##
 ## Probe only: it sets upgrade levels directly and reads the answers, it changes nothing in
-## the game. The numbers feed the k_* constants in docs/progression/build_current.py.
+## the game. The numbers feed the k_* constants in docs/progression/build_shop.py (through calibration.json).
 ##
 ## Run (desktop build, headless is fine, fixed fps so game time runs faster than real time):
 ##   <godot> --headless --path . res://tools/probe_rates.tscn --fixed-fps 60 --log-file tools/last_probe_engine.log
@@ -36,14 +36,8 @@ const CAST_REACH := [0.55, 0.8, 0.95, 0.7]
 ## (`_material_share`, off the census), because a real hold is mixed and a run visits every
 ## yard its load needs — a one-material load is a one-stop run, and measuring only those put
 ## the sim's ferries 2.5 times faster than play (2026-09-14).
-const FERRY_CONFIGS := [[0, 3], [3, 3], [0, 6], [3, 6], [6, 6], [3, 12], [8, 12]]
+const FERRY_CONFIGS := [[0, 3], [3, 3], [0, 6], [3, 6], [6, 6], [3, 8], [8, 8]]
 const FERRY_RUNS := 2
-
-## Skimmer level, and the load the ferry leaves with (a big number means a full hold).
-## The skimmer is cut from the tree design; left empty so the phase passes straight through.
-const SKIM_CONFIGS := []
-const SKIM_CARGO_LEVEL := 28
-const SKIM_SPEED_LEVEL := 10
 
 ## Dog levels: fetching, keenness. Each watched for DOG_SECONDS of game time.
 const DOG_CONFIGS := [[0, 0], [4, 0], [4, 3]]
@@ -68,7 +62,6 @@ var _round: int = 0
 var _t0: float = 0.0
 var _count0: int = 0
 var _runs0: int = 0
-var _skimmed: int = 0
 var _lot: int = 0
 var _material_share: Array = [0.25, 0.25, 0.25, 0.25]
 var _birds: int = 0
@@ -99,8 +92,6 @@ func _physics_process(delta: float) -> void:
 			_net_step()
 		"ferry":
 			_ferry_step()
-		"skim":
-			_skim_step()
 		"dog":
 			_dog_step()
 		"done":
@@ -291,7 +282,7 @@ func _load_mixed(count: int) -> void:
 
 func _ferry_step() -> void:
 	if _config >= FERRY_CONFIGS.size():
-		_phase = "skim"
+		_phase = "dog"
 		_config = 0
 		_round = 0
 		_step = "setup"
@@ -300,7 +291,6 @@ func _ferry_step() -> void:
 		"setup":
 			_main.set(&"boat_speed_level", FERRY_CONFIGS[_config][0])
 			_main.set(&"cargo_level", FERRY_CONFIGS[_config][1])
-			_main.set(&"skimmer_level", 0)
 			_main.call(&"_push_boat_numbers")
 			_step = "load"
 		"load":
@@ -329,54 +319,6 @@ func _ferry_step() -> void:
 			})
 			_round += 1
 			_step = "load"
-
-
-# ------------------------------------------------------------------ skimmer
-
-func _note_skim(_def_index: int) -> void:
-	_skimmed += 1
-
-
-func _skim_step() -> void:
-	if _config >= SKIM_CONFIGS.size():
-		if _boat.skimmed.is_connected(_note_skim):
-			_boat.skimmed.disconnect(_note_skim)
-		_main.set(&"skimmer_level", 0)
-		_main.call(&"_push_boat_numbers")
-		_phase = "dog"
-		_config = 0
-		_step = "setup"
-		return
-	match _step:
-		"setup":
-			if _boat.is_running():
-				return
-			if not _boat.skimmed.is_connected(_note_skim):
-				_boat.skimmed.connect(_note_skim)
-			_main.set(&"skimmer_level", SKIM_CONFIGS[_config][0])
-			_main.set(&"cargo_level", SKIM_CARGO_LEVEL)
-			_main.set(&"boat_speed_level", SKIM_SPEED_LEVEL)
-			_main.call(&"_push_boat_numbers")
-			_empty_yard()
-			_lot = mini(int(SKIM_CONFIGS[_config][1]), _boat.capacity)
-			_load_yard(_lot, _config % 4)
-			_skimmed = 0
-			_runs0 = _boat.runs_done
-			_t0 = _clock
-			_boat.auto_ferry = true
-			_step = "run"
-		"run":
-			if _boat.runs_done == _runs0 and _clock - _t0 < WAIT_MOST:
-				return
-			_boat.auto_ferry = false
-			_emit({
-				"probe": "skim_run", "level": SKIM_CONFIGS[_config][0], "lot": _lot,
-				"capacity": _boat.capacity, "skim_hold": _boat.skim_hold, "skim_radius": _boat.skim_radius,
-				"chance": _boat.skim_chance, "skimmed": _skimmed, "seconds": _clock - _t0,
-				"timed_out": _boat.runs_done == _runs0,
-			})
-			_config += 1
-			_step = "setup"
 
 
 # ------------------------------------------------------------------ dog

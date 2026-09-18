@@ -1356,9 +1356,8 @@ func _purse_scale() -> float:
 
 ## The cut sheet, and one frame off it, for anything else that wants to draw a net.
 ##
-## The ferry's skimmer is a net too, and it was a green quadrilateral. Lending it these
-## rather than giving it a loader of its own keeps one catalogue and one texture: there is
-## no second net in this game, only a second thing dragging one.
+## Lending these rather than giving a borrower a loader of its own keeps one catalogue and one
+## texture: the shop board's head and the HUD's button draw the net the player casts.
 func art_sheet() -> Texture2D:
 	return _sheet
 

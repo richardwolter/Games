@@ -27,7 +27,10 @@ var _was_binds: Dictionary = {}
 func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = load("res://scenes/main.tscn").instantiate()
-	get_tree().root.add_child.call_deferred(_main)
+	# Under this node and on a save of its own: hung off the root it was the game's own lake,
+	# wearing the front over every board it was sent to photograph, on the player's own save.
+	_main.set(&"save_path", "user://probe_menus.save")
+	add_child.call_deferred(_main)
 	set_physics_process(true)
 
 

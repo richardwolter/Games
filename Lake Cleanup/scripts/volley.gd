@@ -7,7 +7,7 @@
 ## to be micromanaged.
 ##
 ## Shots are stepped along their flight at a fixed distance per step and tested at each
-## step, the way the skimmer walks its route in boat.gd, so a fast shot on a slow frame
+## step, so a fast shot on a slow frame
 ## cannot step over the thing it should have hit.
 class_name Volley
 extends Node2D

@@ -761,7 +761,6 @@ func _carry_over() -> void:
 	net_hold_level = _saved_level(levels, &"net_hold")
 	boat_speed_level = _saved_level(levels, &"boat_speed")
 	cargo_level = _saved_level(levels, &"cargo")
-	skimmer_level = _saved_level(levels, &"skimmer")
 
 	unlocked.clear()
 	for name: String in save.get("unlocked", []) as Array:
