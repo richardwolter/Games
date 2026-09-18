@@ -201,7 +201,76 @@ comment — "drawn back rather than hidden: the point of a shop is knowing what 
   rule, the grammar, the plate's room now the boards are level, the bonus reaching the plate
   without a figure of its own, and both inks clearing 4.5:1.
 
+### The Boats Run Ahead (2026-09-18, `/grill-me` with Richard, issue #23; scope locked)
+Richard's playthrough: the boats were too slow and too dear to keep up with the net and the
+dogs, the net's prices jumped from cheap to dear, Catch (Haul) and Strength came too easily
+for what they do, and Strength is the game changer that belongs in the middle of a run.
+`docs/scope-lock.md` is the in/out list this pass closes on. **Nothing new after it.**
+- **A focused clear is 70 to 80 minutes.** Issue #23's "2-3 hours" is superseded.
+- **Supersedes, in The Shop Balance Pass below**: "Haul and Hold are one track twice", the
+  20-level Haul/Hold, Ferry speed 4 to 36, every price, the 69-minute clear, and "hidden,
+  not deleted" — the shelved code is deleted (see the end of this section).
+- **The boats stay slightly ahead of the net and the dogs, all run.** The HUD's *Waiting*
+  figure under about two ferry loads, a spike draining within a minute. In the sim: the
+  fleet's capacity 1 to 2.5 times what the net lands (`links` band in `build_shop.py`);
+  82% of the run inside it, the box peaking at 24, where the old pass had it at 400-2000.
+- **Hold is two casts at every level**: Hold 8 + 2 a level, Catch 4 + 1, **eight levels
+  each** (24 and 12 at the top), and Hold is the cheaper of the two at every level.
+  `test_lake` guards both. The level-0 hull sails at 8 (was 4), to 40.
+- **Catch is eight dear levels because it is what paces the run.** With the boats ahead,
+  nothing but the net's own levels decides how fast the lake clears, and a cast brings home
+  `min(Catch, swept x density)` — Catch binds from about minute five on. At 20 levels to 24
+  no price could hold the clear over 50 minutes; at 12 to 16 it was 56; at 8 to 12 it is 64.
+  **The levers not pulled** (Richard: Reel, Range and Width are fine): their caps, the luck
+  odds, `k_aim`.
+- **Every price is fitted to a schedule** (`build_shop.py` `SCHEDULE`, carried in `shop.json`
+  as each node's `schedule`; `price_shop.py` steers each level to its minute and keeps each
+  track geometric): **Strength at about 10 / 20 / 30 / 40 minutes** (sim: 12.8 / 18.0 /
+  31.9 / 40.3); the luck tracks from minute 3 to 5 and steadily through the climb, as
+  Strength's teaser; Hold and Sailing ahead of Catch all the way; Range finished by about
+  40. **Range runs ahead of the clearing on purpose**: scheduled to 48, its top levels
+  priced past what the run could earn, the water in reach emptied, income stopped and the
+  sim soft-locked at 82% cleared.
+- **The ladders are flatter and start higher** (Width 450 x 1.21, Reel 450 x 1.18, Range
+  400 x 1.11), which is the fix for "cheap, then suddenly dear"; Catch is 1000 x 1.82 and
+  Strength 5000 x 2.43. **Pinned by hand** (`price_shop.py` `BASE_MOST`): the first extra
+  hull 200 (Richard, 2026-09-14), Hold from 40, Sailing from 60 — the boats are forgiving
+  early. `test_lake` guards the 200.
+- **Three things the pricer had to learn** (all in `price_shop.py`, with the why): a level is
+  priced off the **running peak** of income, not the sample — income falls away as the lake
+  empties and late levels came out cheap and were bought early; a level is **capped at
+  `MOST_GAPS` gaps of income** at its own minute, or it runs away; a level never bought
+  because the run ended first is **not cheapened** — cheapened, the tops of the long tracks
+  dragged their whole ladders flat.
+- **Loading and Carry are in the sim** (`SPEC`, `boat_volley_cut` on the per-piece term of
+  `ferry_trip`, `dog_tier` gating the dog's pools), so a re-run no longer drops them.
+- **Sim**: focused 64 min, casual 110 min (the band asks 68-82: a WARN, left for the logged
+  run to settle, because the bot never stops casting and the calibration is from a tree
+  run). `python docs/progression/shop_schedule.py` prints bought-against-wanted per track.
+- **The player's own run writes a playtest log** (`scripts/play_log.gd`, `PlayLog`,
+  `user://shop_playtest.log`, JSON lines: session with every level, purchase with cost and
+  Waiting, progress every 30 s, cast, shed open/close; `Lake._play` is the run's clock,
+  saved as `play`). **Only the game's own lake on the player's own save path writes it**
+  (`Lake._logs_play`): `tools/shot_menus` hung its lake off the root with no save path of
+  its own, wore the front over every board it photographed and wrote two lines into the
+  real log before it was fixed. **Turn the log off before a release export.**
+- **Owed to close #23**: Richard plays one fresh logged run; the log is replayed into the
+  sim's calibration (`k_catch_scale`, `k_aim`, the dogs), one more `shop_loop.sh`, times
+  recorded on the issue and in `docs/scope-lock.md`.
+- **No `SAVE_VERSION` bump**: a saved level over a track's new cap is clamped on the way in
+  (`_saved_level`), and a stale `sell_N` or `skimmer` key is simply not read.
+- **Deleted, not shelved** (same day, Richard: "delete everything shelved"): tree mode
+  (`upgrade_tree.gd`, `tree_screen.gd`, `tree_log.gd`, the menu's two doors, the tree save
+  slot, `Dog.reach`/`strand_first`/`strand_speed`, `test_tree`, `shot_tree`,
+  `lake-tree.json`/`.md` and the tree's pricing scripts), the skimmer (`Boat`'s skim fields,
+  sweep and drawing, `Lake.skim_*`, `BuySkimmer` in `main.tscn`, the probe's skim phase) and
+  the five sell-by-tier tracks (`sell_N.tres`, `tier_pay`, `SHELVED`, `MAX_LEVELS`,
+  `PRICES`). `calibration.json` stays: the shop's model reads it. **The siege is not
+  deleted** — it is a whole level (`siege.gd`, charms, wards, laid nets) and its cleanup is
+  its own job; nothing routes to it.
+
 ### The Shop Balance Pass (2026-09-14, `/grill-me` with Richard; supersedes the tree)
+**Superseded in part 2026-09-18 — see The Boats Run Ahead above.**
 Richard's call: **the tree is set aside, the shop stays**, and the shop is rebalanced around
 these rules. Everything below the tree section about the tree still describes code that is in
 the repo; none of it is on the menu.
@@ -253,7 +322,7 @@ Two more shop tracks, one on each of the ferry's and the dog's boards.
   two getters return the constants.
 - **Priced by hand** (Fast Sell 300 × 2.2, Strong Dogs 120 × 2.6), by Richard's call: "hand
   price, we'll balance later". Every existing price is untouched and the 69-minute clear is
-  now an estimate. **Neither track is in `docs/progression/build_shop.py`'s `SPEC`**, so a
+  now an estimate. **Both tracks are in `build_shop.py`'s `SPEC` since 2026-09-18 and priced by the loop.** Before that: **neither track was in `docs/progression/build_shop.py`'s `SPEC`**, so a
   re-run of `shop_loop.sh` would drop them — add them to the model and to `ferry_trip`'s
   `k_ferry_per_piece` (Fast Sell) and the dog's mean pay (Strong Dogs) before re-running.
 - **Out of scope, by decision**: re-running the pricing loop, `DWELL`, the approach legs,
@@ -298,6 +367,8 @@ Two more shop tracks, one on each of the ferry's and the dog's boards.
   rows, idle or helper upgrades, tree-mode balance.
 
 ### Tree Test Mode (2026-09-12, `upgrade_tree.gd`, `tree_screen.gd`, `tree_log.gd`)
+**Deleted 2026-09-18** (The Boats Run Ahead): none of the code this section describes is in
+the repo. Kept as the record of what was tried and what the tree taught the shop's pricing.
 **Set aside 2026-09-14** (see The Shop Balance Pass): the doors are hidden, the code stays.
 The proposed upgrade tree (`docs/progression/lake-tree.md`, designed with the
 `incremental-progression` skill) is playable as **its own game mode** before it replaces the
@@ -2173,6 +2244,7 @@ ring gives a fresh lake about 0.001).
   and `last_nature.log`.
 
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
+**2026-09-18**: the five sell-by-tier tracks and `tier_pay` are deleted, not shelved.
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
 the market board carries Recycle Bonus and Pigeons only. See The Shop Balance Pass.
 Five upgrades built from what the game already had, no new art, decided with `/grill-me`
