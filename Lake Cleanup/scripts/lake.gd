@@ -493,6 +493,11 @@ static func _mark(label: String) -> void:
 const TREE_SAVE_PATH := "user://lake_cleanup_tree.save"
 static var start_tree: bool = false
 var tree_mode: bool = false
+## Seconds of play in this shop run, saved with it, and the playtest log's clocks (`PlayLog`).
+var _play: float = 0.0
+var _play_progress_in: float = 0.0
+var _play_last_cast: float = -1.0
+const PLAY_PROGRESS_EVERY := 30.0
 var _tree: UpgradeTree
 ## Node id -> rank owned. Shared with the tree screen, so it is edited in place, never replaced.
 var _tree_owned: Dictionary = {}
@@ -1315,6 +1320,8 @@ func _ready() -> void:
 	_mark("load game")
 	if tree_mode:
 		_begin_tree_session(loaded)
+	elif _logs_play():
+		_begin_play_session(loaded)
 	_seed_starter_bed()
 	_mark("end")
 	_raise_front(loaded)
@@ -2223,6 +2230,10 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 			var since := -1.0 if _tree_last_cast < 0.0 else snappedf(_tree_play - _tree_last_cast, 0.01)
 			TreeLog.write("cast", _tree_play, {"since_last": since})
 			_tree_last_cast = _tree_play
+		elif _logs_play():
+			var gap := -1.0 if _play_last_cast < 0.0 else snappedf(_play - _play_last_cast, 0.01)
+			PlayLog.write("cast", _play, {"since_last": gap})
+			_play_last_cast = _play
 
 
 ## The two luck rolls on a cast just thrown. A lucky haul goes on the net itself, for this
@@ -2474,6 +2485,8 @@ func _set_shed(open: bool) -> void:
 		_sfx.play(&"shed_open")
 	if tree_mode and open != _shed_open and _tree != null:
 		TreeLog.write("shed_open" if open else "shed_close", _tree_play)
+	elif open != _shed_open and _logs_play():
+		PlayLog.write("shed_open" if open else "shed_close", _play)
 	_shed_open = open
 	_shed.visible = open
 	# The way to the shop sits in the corner beside Settings rather than on the shed's own
@@ -3935,6 +3948,15 @@ func _buy(what: StringName) -> void:
 	if _sfx != null:
 		_sfx.play_bought()
 	_shop_skin.cheer(what)
+	if _logs_play():
+		PlayLog.write("purchase", _play, {
+			"id": String(what),
+			"rank": _level_of(what),
+			"cost": roundi(price),
+			"sludge_after": roundi(sludge),
+			"cleared": snappedf(_cleared_share(), 0.0001),
+			"box": _yard.held.size(),
+		})
 	_push_net_numbers()
 	_push_boat_numbers()
 	_push_dog_numbers()
@@ -4055,6 +4077,53 @@ func buy_node(id: String) -> void:
 		"sludge_after": roundi(sludge),
 		"cleared": snappedf(_cleared_share(), 0.0001),
 		"box": _yard.held.size(),
+	})
+
+
+## Whether this lake writes the playtest log: the player's own shop run and nothing else. Every
+## harness and probe runs on a save of its own, so none of them reaches the player's log.
+func _logs_play() -> bool:
+	return not tree_mode and save_path == SAVE_PATH
+
+
+## A sitting of the shop run has begun, fresh or from its save.
+func _begin_play_session(loaded: bool) -> void:
+	if not loaded:
+		_play = 0.0
+	_play_progress_in = 0.0
+	_play_last_cast = -1.0
+	var levels := {}
+	for key: StringName in TRACKS:
+		if not key in SHELVED:
+			levels[String(key)] = _level_of(key)
+	PlayLog.write("session", _play, {
+		"started": "continue" if loaded else "new",
+		"levels": levels,
+		"sludge": roundi(sludge),
+		"cleared": snappedf(_cleared_share(), 0.0001),
+	})
+
+
+## The shop run's clock, and a line of where the run stands every `PLAY_PROGRESS_EVERY`. `box`
+## is the HUD's Waiting figure: the boats are meant to stay ahead of it (issue #23).
+func _tick_play_log(delta: float) -> void:
+	_play += delta
+	if not _logs_play():
+		return
+	_play_progress_in -= delta
+	if _play_progress_in > 0.0:
+		return
+	_play_progress_in = PLAY_PROGRESS_EVERY
+	PlayLog.write("progress", _play, {
+		"cleared": snappedf(_cleared_share(), 0.0001),
+		"pieces_left": _grid.piece_count(),
+		"sludge": roundi(sludge),
+		"birds": birds_caught,
+		"box": _yard.held.size(),
+		"ferries": fleet_size(),
+		"dogs": dog_count(),
+		"in_shed": _shed_open,
+		"shop_open": _menu_open,
 	})
 
 
@@ -4416,6 +4485,8 @@ func _process(delta: float) -> void:
 			save_game()
 
 	# Not during the glide, which writes the zoom itself: this puts it on a stop.
+		else:
+			_tick_play_log(delta)
 	if _glide < 0.0:
 		_push_zoom()
 	_snap_camera()
@@ -5071,6 +5142,7 @@ func save_game() -> bool:
 	_save_extra(save)
 	file.store_var(save, true)
 	file.close()
+	save["play"] = _play
 	_note_save("saved")
 	return true
 
@@ -5144,6 +5216,7 @@ func load_game() -> bool:
 		_apply_tree(false)
 
 	# Finds and where they were put. Anything the catalogue no longer knows is dropped:
+	_play = float(save.get("play", 0.0))
 	# re-cutting the sheets renames pieces, and that must not take a save down with it.
 	unlocked.clear()
 	for name: String in save.get("unlocked", []) as Array:

@@ -8,7 +8,7 @@ i=0
 while [ $i -lt $PASSES ]; do
   python docs/progression/build_shop.py > /dev/null
   node $S/run_sim.js docs/progression/shop.json --bot focused --out docs/progression/shop-report --quiet > /dev/null 2>&1 || true
-  python docs/progression/price_shop.py ${BLEND:-0.6} > /dev/null
+  python docs/progression/price_shop.py ${BLEND:-0.6} | head -1
   i=$((i + 1))
 done
 python docs/progression/build_shop.py > /dev/null

@@ -1,6 +1,6 @@
 """Prices the shop's tracks to a schedule: every level of every track is given a minute of the run
-it should be bought at (a track's levels spread evenly over the run up to LAST_BUY, first level
-early, last level late), and at that minute it wants to cost income(t) x gap(t), the gap curve
+it should be bought at (build_shop.py's SCHEDULE, carried in shop.json as each node's
+"schedule"), and at that minute it wants to cost income(t) x gap(t), the gap curve
 in shop.json (brisk at the start, slower to the end), the income read off the focused bot's own
 run. A track's prices are geometric (price_base x price_mult ^ level, see UpgradeTrack), so the
 wanted costs are fitted to that shape by least squares in the log, blended towards from the
@@ -13,7 +13,8 @@ and a cheap one earlier still. The schedule anchors every level to a minute the 
 Run from the project root, after run_sim.js --bot focused --out docs/progression/shop-report:
     python docs/progression/price_shop.py [blend]
 
-Haul (net_hold) and Hold (cargo) are one track twice (Richard, 2026-09-14) and are written the same.
+Haul (net_hold) and Hold (cargo) are two tracks again (Richard, 2026-09-18): Hold runs ahead and
+cheap, Haul trails it. BASE_MOST holds the prices Richard set by hand.
 """
 import json
 import math
@@ -28,9 +29,16 @@ log = next(l for l in report["logs"] if l["bot"] == "focused")
 # clear would be priced for nothing, bought earlier, and clear the lake earlier still.
 END = (log["clearedAt"] / 60.0) if log.get("clearedAt") else 1e9
 samples = [(s["t"] / 60.0, s["income"]) for s in log["samples"] if s["t"] / 60.0 <= END]
+peaks, top = [], 0.0
+for t, inc in samples:
+    top = max(top, inc)
+    peaks.append((t, top))
 curve = config["gapCurve"]
 blend = float(sys.argv[1]) if len(sys.argv) > 1 else 0.6
-PAIRED = {"net_hold": "hold", "cargo": "hold"}
+PAIRED = {}
+# Richard, 2026-09-14: the first extra ferry costs 200 at most. 2026-09-18: the boats are
+# forgiving early, so Hold and Sailing start cheap and their ladders take up the difference.
+BASE_MOST = {"fleet": 200.0, "cargo": 40.0, "boat_speed": 60.0}
 
 
 def gap_at(minute):
@@ -43,10 +51,13 @@ def gap_at(minute):
 def income_at(minute):
     # Past the clear, the income the run ended on: a level scheduled after the lake was cleared
     # is priced as if the run had gone on at that pace.
+    # Read off the running peak, not the sample: income falls away over the last stretch as the
+    # lake empties, and a late level priced off that tail came out cheap, was bought early, and
+    # cleared the lake earlier still (the clear sat at 50 minutes whatever the schedule said).
     if minute > END - 1.0:
         minute = END - 1.0
-    near = [inc for t, inc in samples if abs(t - minute) <= 1.0]
-    return sum(near) / len(near) if near else samples[-1][1]
+    near = [inc for t, inc in peaks if abs(t - minute) <= 1.0]
+    return sum(near) / len(near) if near else peaks[-1][1]
 
 
 def nice(x):
@@ -62,8 +73,8 @@ def nice(x):
 # rather than pricing it at income x gap outright: the value bot front-loads whatever is cheap
 # for what it gives, so income x gap pricing off its own run had it max the big tracks by
 # 18 minutes and sit on a plateau for the rest.
-LAST_BUY = 48.0
-PULL = 0.7      # how hard a level is pushed towards its minute each pass
+PULL = 0.7
+MOST_GAPS = 6.0      # how hard a level is pushed towards its minute each pass
 bought = {}
 for p in log["purchases"]:
     bought[(PAIRED.get(p["id"], p["id"]), p["rank"] - 1)] = (p["t"] / 60.0, p["cost"])
@@ -75,14 +86,23 @@ for n in config["nodes"]:
     ranks = n["ranks"]
     costs = n["cost"]
     for level in range(ranks):
-        minute = LAST_BUY * (level + 0.5) / ranks
+        minute = n["schedule"][level]
         if (key, level) in bought:
             at, paid = bought[(key, level)]
             factor = min(max((minute / max(at, 0.25)) ** PULL, 0.5), 2.0)
             want = paid * factor
-        else:
+        elif minute < END - 8.0:
             want = costs[level] * 0.85
-        want = max(want, income_at(minute) * gap_at(minute) * 0.25, 5.0)
+        else:
+            # Never bought, but scheduled for the last stretch: the run ended first, which is
+            # not the price's fault. Cheapened with the rest, the tops of the long tracks
+            # dragged their whole ladders flat (Reel sat at x1.17) and were bought early.
+            want = costs[level]
+        # Held between a quarter of a gap's income and MOST_GAPS of them at its own minute. The
+        # ceiling is what stops a late level running away: priced past what the run can earn it
+        # is never bought, the water in reach empties, and the next pass prices off a dead run.
+        pace = income_at(minute) * gap_at(minute)
+        want = min(max(want, pace * 0.25, 5.0), max(pace * MOST_GAPS, 5.0))
         wants.setdefault(key, []).append((level, want))
 
 
@@ -120,6 +140,7 @@ def write_price(key, base, mult):
     open(tres_path(key), "w", encoding="utf8").write(s)
 
 
+print(f"clear {END:.1f} min" if END < 1e8 else "clear never")
 changed = []
 for key in sorted({PAIRED.get(n["id"], n["id"]) for n in config["nodes"]}):
     points = wants.get(key, [])
@@ -140,6 +161,13 @@ for key in sorted({PAIRED.get(n["id"], n["id"]) for n in config["nodes"]}):
         base = base * (1 - blend) + fb * blend
         mult = mult * (1 - blend) + fm * blend
         # The schedule's own steer comes through the wants; a low blend only slows it.
+    if key in BASE_MOST and base > BASE_MOST[key]:
+        # The base is held and the ladder takes up the difference, so the last level still
+        # lands where the fit put it.
+        if fitted is not None and len(points) > 1:
+            top = base * mult ** (len(points) - 1)
+            mult = min((top / BASE_MOST[key]) ** (1.0 / (len(points) - 1)), 2.5)
+        base = BASE_MOST[key]
     base = nice(base)
     mult = round(mult, 2)
     for t in targets:

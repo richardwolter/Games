@@ -1607,12 +1607,12 @@ func _stage_skimmer() -> void:
 ## The fleet: a second hull is a second boat in the water, wired up the same as the first
 ## and moored somewhere else.
 func _stage_fleet() -> void:
-	var net_price := float(_main.call(&"cost_of", &"net_width"))
 	_main.set(&"sludge", 100000.0)
 	var before := _main.get(&"_boats").size() as int
 	var price := float(_main.call(&"cost_of", &"fleet"))
-	_check(price > net_price * 4.0, "an extra hull is the expensive one",
-		"%.0f" % price)
+	# It used to be "the expensive one", over four times a net level. The boats are forgiving
+	# now (2026-09-18, issue #23): the first extra hull is 200 at most (Richard, 2026-09-14).
+	_check(price <= 200.0, "the first extra hull costs 200 at most", "%.0f" % price)
 	_main.call(&"_buy", &"fleet")
 	var boats: Array = _main.get(&"_boats")
 	_check(boats.size() == before + 1, "buying a ferry puts one in the water",
@@ -1841,14 +1841,19 @@ func _stage_market() -> void:
 			cheapest = minf(cheapest, float(_main.call(&"cost_of", key)))
 	_check(counted == 0 or cheapest <= float(_main.get(&"sludge")),
 		"the affordable count ignores them", "%d counted" % counted)
-	# Haul and Hold are one track twice (2026-09-14): a cast fills a ferry.
+	# The boats run ahead of the net (2026-09-18, issue #23; supersedes "one track twice"): a
+	# ferry holds two casts at every level, and its Hold is the cheaper of the two to buy.
 	var hold: UpgradeTrack = tracks[&"net_hold"]
 	var cargo: UpgradeTrack = tracks[&"cargo"]
-	var same := hold.level_cap == cargo.level_cap
+	var ahead := hold.level_cap == cargo.level_cap
+	var dearer := ""
 	for l in hold.level_cap + 1:
-		same = same and is_equal_approx(hold.value(l), cargo.value(l)) \
-			and is_equal_approx(hold.cost(l), cargo.cost(l))
-	_check(same, "Haul and Hold share value and price at every level", "")
+		ahead = ahead and int(cargo.value(l)) >= 2 * int(hold.value(l))
+		if l < hold.level_cap and cargo.cost(l) >= hold.cost(l):
+			dearer += " %d" % l
+	_check(ahead, "a ferry holds two casts at every level of Hold and Catch",
+		"%d against %d at the top" % [int(cargo.value(cargo.level_cap)), int(hold.value(hold.level_cap))])
+	_check(dearer.is_empty(), "Hold is cheaper than Catch at every level", "dearer at" + dearer)
 	var width: UpgradeTrack = tracks[&"net_width"]
 	_check(width.value(width.level_cap) <= 4.8 + 0.001 and width.value(0) >= 0.6 - 0.001,
 		"the net's width stops at 4.8 tiles (+700%)", "%.2f" % width.value(width.level_cap))

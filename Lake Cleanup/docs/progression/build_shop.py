@@ -1,6 +1,9 @@
 """Builds docs/progression/shop.json: the progression sim model of Lake Cleanup's shop after the
-2026-09-14 balance pass (the tree set aside, the skimmer and the sell-by-tier tracks shelved,
-Haul and Hold one track twice, four ferries and four dogs at most).
+2026-09-18 balance pass (issue #23): the boats slightly ahead of the net and the dogs all run
+(Hold 8 + 2 a level against Haul's 4 + 1, a faster level-0 hull), Strength bought at about
+10 / 20 / 30 / 40 minutes, Haul trailing Hold, the luck tracks early and steady, a focused
+clear of 70 to 80 minutes. SCHEDULE below is the minute each level is meant to be bought at;
+price_shop.py steers the prices to it.
 
 Run from the project root:  python docs/progression/build_shop.py
 Then:                        node ~/.claude/skills/incremental-progression/scripts/run_sim.js docs/progression/shop.json --out docs/progression/shop-report
@@ -51,8 +54,8 @@ stats = {
     "piece_base_pay": economy.get("piece_base_pay", 2.5),
     "piece_filth_pay": economy.get("piece_filth_pay", 6.0),
     "net_radius": 0, "net_power": 0, "net_range": 0, "reel": 0, "net_hold": 0,
-    "boat_speed": 0, "cargo": 0, "boats": 1,
-    "dog_fetch": 0, "dog_wait_cut": 0, "dog": 1,
+    "boat_speed": 0, "cargo": 0, "boats": 1, "boat_volley_cut": 0,
+    "dog_fetch": 0, "dog_wait_cut": 0, "dog": 1, "dog_tier": 0,
     "dog_beach": 0.35, "dog_strand_speed": 1.0, "dog_reach": 6,
     "lucky_odds": 0.0, "double_odds": 0.0, "recycle_bonus": 0.0, "bird_worth": 1.0,
     "bird_bonus": economy.get("bird_bonus", 26.0),
@@ -102,7 +105,9 @@ derived = [
     ["swept", "2 * mouth * max(0, cast_dist - k_shelf) + (cast_dist > k_shelf ? PI * mouth ^ 2 : 0)"],
     ["per_cast", "min(net_hold, swept * density)"],
     ["cast_cycle", "k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"],
-    ["ferry_trip", "k_ferry_fixed + 2 * k_ferry_leg / boat_speed + k_ferry_per_piece * cargo"],
+    # Loading (boat_volley) tightens the stagger of the volley at both ends of a run, which is
+    # what the per-piece term measures.
+    ["ferry_trip", "k_ferry_fixed + 2 * k_ferry_leg / boat_speed + k_ferry_per_piece * cargo * (1 - boat_volley_cut)"],
     ["ferry_rate", "k_ferry_scale * (boats * cargo / ferry_trip)"],
     ["access_lucky", access_now.replace("(net_power >= ", "(net_power + 1 >= ")],
     ["density_lucky", "k_density * access_lucky / max(coverage * k_units_total + strand_reach * k_strand, 1)"],
@@ -117,7 +122,9 @@ derived = [
 ]
 flows = [
     {"id": "catch", "label": "net catch", "from": catch_from, "to": "box", "rate": "catch_rate", "active": True},
-    {"id": "dog", "label": "dog fetch", "from": [{"pool": "lake_t0", "share": "dog_coverage"}], "to": "box",
+    # Carry (dog_strength) opens the heavier tiers to the pack, a tier a level.
+    {"id": "dog", "label": "dog fetch", "from": [{"pool": f"lake_t{t}", "gate": f"dog_tier >= {t}", "share": "dog_coverage"}
+                                                  for t in sorted(tiers)], "to": "box",
      "rate": "dog_rate * (1 - dog_beach_share)"},
     {"id": "dog_beach", "label": "dog strand runs", "from": ["strand"], "to": "box",
      "rate": "dog_rate * dog_beach_share * dog_strand_speed"},
@@ -137,19 +144,57 @@ SPEC = [
     ("net_width", "net", "Width", "net_radius", []),
     ("net_strength", "net", "Strength", "net_power", []),
     ("net_range", "net", "Range", "net_range", []),
-    ("reel", "net", "Speed", "reel", []),
-    ("net_hold", "net", "Haul", "net_hold", []),
-    ("lucky_haul", "net", "Lucky haul", "lucky_odds", []),
-    ("double_cast", "net", "Double cast", "double_odds", []),
-    ("boat_speed", "ferry", "Ferry speed", "boat_speed", []),
+    ("reel", "net", "Reel", "reel", []),
+    ("net_hold", "net", "Catch", "net_hold", []),
+    ("lucky_haul", "luck", "Lucky cast", "lucky_odds", []),
+    ("double_cast", "luck", "Double cast", "double_odds", []),
+    ("boat_speed", "ferry", "Sailing", "boat_speed", []),
     ("cargo", "ferry", "Hold", "cargo", []),
-    ("fleet", "ferry", "Extra ferry", "boats", []),
-    ("dog_fetch", "dog", "Fetching", "dog_fetch", []),
+    ("fleet", "ferry", "Fleet", "boats", []),
+    ("boat_volley", "ferry", "Loading", "boat_volley_cut", []),
+    ("dog_fetch", "dog", "Fetch", "dog_fetch", []),
     ("dog_wait", "dog", "Keenness", "dog_wait_cut", []),
     ("dog_count", "dog", "Pack", "dog", []),
-    ("recycle_bonus", "market", "Recycle Bonus", "recycle_bonus", []),
-    ("bird_worth", "market", "Pigeons", "bird_worth", ["utility"]),
+    ("dog_strength", "dog", "Carry", "dog_tier", []),
+    ("recycle_bonus", "luck", "Bonus yard", "recycle_bonus", []),
+    ("bird_worth", "luck", "Pigeons", "bird_worth", ["utility"]),
 ]
+
+
+def spread(first, last, ranks):
+    if ranks == 1:
+        return [first]
+    return [round(first + (last - first) * i / (ranks - 1), 1) for i in range(ranks)]
+
+
+# The minute of a focused run each level is meant to be bought at (Richard, 2026-09-18).
+# Strength is the game changer and is held to the middle of the run, a tier every ten minutes.
+# Hold and Sailing run ahead of Haul all the way, so the boats stay in front of the net. The
+# luck tracks start early and keep coming through the climb to Strength, as its teaser.
+# Range finishes early on purpose: the reach has to run ahead of the clearing, or the water in
+# reach empties, income stops and the last Range levels can never be paid for (the sim
+# soft-locked at 82% cleared with Range scheduled to minute 48). The net's own tracks run to
+# about an hour: bought by minute 46 they cleared the lake in 46, because with the boats ahead
+# nothing but the net's levels paces the run.
+SCHEDULE = {
+    "net_strength": [10, 20, 30, 40],
+    "net_hold": spread(8, 66, 8),
+    "net_width": spread(1.5, 58, 20),
+    "net_range": spread(1, 42, 20),
+    "reel": spread(2, 58, 20),
+    "lucky_haul": spread(3, 39, 10),
+    "double_cast": spread(5, 52, 10),
+    "cargo": spread(0.5, 48, 8),
+    "boat_speed": spread(1, 54, 20),
+    "fleet": [2, 9, 20],
+    "boat_volley": [6, 16, 28, 42],
+    "dog_fetch": [3, 9, 17, 27],
+    "dog_wait": [7, 15, 25],
+    "dog_count": [5, 12, 22],
+    "dog_strength": [12, 22, 32, 42],
+    "recycle_bonus": spread(6, 54, 8),
+    "bird_worth": spread(8, 58, 8),
+}
 nodes = []
 for key, tree, name, stat, tags in SPEC:
     d = tres(f"{ROOT}/resources/upgrades/{key}.tres")
@@ -161,25 +206,30 @@ for key, tree, name, stat, tags in SPEC:
         "cost": [round(d["price_base"] * d["price_mult"] ** level, 1) for level in range(cap)],
         "effects": [{"stat": stat, "add": [round(curve(d, level + 1) - curve(d, level), 5) for level in range(cap)]}],
         "tags": tags,
+        "schedule": SCHEDULE[key],
     })
+    assert len(SCHEDULE[key]) == cap, key
 
 config = {
-    "game": "Lake Cleanup (shop, 2026-09-14 pass)", "currency": "sludge", "maxMinutes": 300, "startMoney": 0,
+    "game": "Lake Cleanup (shop, 2026-09-18 pass)", "currency": "sludge", "maxMinutes": 300, "startMoney": 0,
     "stats": stats, "derived": derived, "pools": pools, "flows": flows,
     "goal": {"pools": ["lake_t0", "lake_t1", "lake_t2", "lake_t3", "lake_t4", "strand"], "clearAt": 0.995},
-    "links": [{"up": "catch", "down": "ferry", "band": [0.8, 1.5], "buffer": "box"}],
-    "trees": ["net", "ferry", "dog", "market"], "nodes": nodes,
+    # The boats slightly ahead (Richard, 2026-09-18): the fleet's capacity at or over what the net
+    # lands, never under it. The dogs feed the box too, which is why the band starts at par.
+    "links": [{"up": "catch", "down": "ferry", "band": [1.0, 2.5], "buffer": "box"}],
+    "trees": ["net", "ferry", "dog", "luck"], "nodes": nodes,
     "bots": [
         {"id": "focused", "policy": "value", "thinkEvery": 5},
         {"id": "casual", "policy": "mixed", "noise": 0.15, "attention": 0.9,
          "offline": {"every": 600, "for": 240}, "thinkEvery": 20, "seeds": 3},
         {"id": "cheapest", "policy": "cheapest", "thinkEvery": 5},
     ],
-    # A focused clear of about 70 minutes (Richard, 2026-09-14), the sim calibrated to his run.
-    "targets": {"clearMinutes": {"focused": [62, 78], "casual": [110, 160]},
+    # A focused clear of 70 to 80 minutes (Richard, 2026-09-18; issue #23's 2-3 hours is
+    # superseded). The casual bot stays for the soft-lock check and carries no time target.
+    "targets": {"clearMinutes": {"focused": [68, 82]},
                 "paybackCurve": [[0, 30], [10, 90], [30, 240], [60, 480], [90, 720]]},
     # Seconds between buys the pricing aims for: brisk at the start, slowing to the end. Its
-    # average over the run has to match the 173 levels spread to price_shop.py's LAST_BUY.
+    # average over the run has to match the 181 levels of SCHEDULE.
     "gapCurve": [[0, 7], [10, 14], [30, 26], [60, 42], [90, 60]],
 }
 
