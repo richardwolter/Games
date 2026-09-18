@@ -56,7 +56,7 @@ and the recorded sound.
 | The skimmer | **deleted** 2026-09-18 |
 | Sell-by-tier tracks (`sell_0`..`sell_4`) and the market board | **deleted** 2026-09-18 |
 | The siege (level 2: charms, wards, sludge, laid nets, `siege.tscn`) | set aside, **still in the repo** — nothing routes to it. Its own cleanup before release |
-| Idle machines and drones draining `pollution` | never built; the ferries and the dogs are the idle layer |
+| Idle machines and drones draining `pollution` | never part of the game (a stale line in CLAUDE.md, struck 2026-09-18); the ferries and the dogs are the idle layer |
 | A second lake, prestige, offline earnings | not in this game |
 | Hold-to-buy, tabbed or two-up shop layouts | decided against (The Shop Reads) |
 | Web build | desktop only |
