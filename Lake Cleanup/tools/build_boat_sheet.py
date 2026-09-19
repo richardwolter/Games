@@ -304,17 +304,25 @@ MARK_EDGE = "d"
 ## across at the widest, so the canvas is seven square and the mark is a small round one
 ## rather than a tall thin one. Their mirrors (13 and 12) are the east headings and come off
 ## the same numbers.
+## The side view is the one exception to square (2026-09-19, Richard, picked off
+## --mark-mockup): the small round ring up the lens read as a second, tiny mark. It is the
+## mark seen edge-on now — the same 14 rows as frame 3's, squeezed to the lens's seven white
+## pixels — a tall thin ring nobody can read by itself, which makes sense the moment the hull
+## turns a heading. Seven is all the white there is, and the least that works: at 5 and 6
+## the ring's bar maps to under a pixel, its sides drop out and two blobs are left.
 MARK_QUAD = {
     0: ((52, 51), (75, 51), (52, 71)),
     1: ((51, 50), (74, 50), (51, 70)),
     2: ((52, 50), (69, 50), (52, 67)),
     3: ((52, 50), (65, 50), (52, 63)),
-    4: ((56, 51), (62, 51), (56, 57)),
+    4: ((57, 48), (63, 48), (57, 61)),
 }
 ## Where the frames turn about: the mast's column, and the water at the axis's depth,
 ## which is the side view's waterline (frame 4, whose whole near side is at that depth).
 ANCHOR_X = 64
 SIDE_FRAME = 4
+## Whether the side view's squeezed mark keeps its dark edge. Kept: bare was the other row.
+MARK_SIDE_EDGE = True
 
 ## The waterline of each frame is one level row, SINK_ROWS up from the bottom of the hull's
 ## body at the near end — the hull sits in the water by just that much, the stem foot and
@@ -387,7 +395,7 @@ def mark_bitmap(quad, mirror=False):
     return bits
 
 
-def stamp_mark(frame, quad, mirror=False):
+def stamp_mark(frame, quad, mirror=False, edge=True):
     """Paint the mark onto the face's own white pixels, and nothing else, with its edge."""
     bits = mark_bitmap(quad, mirror)
     px = frame.load()
@@ -398,7 +406,7 @@ def stamp_mark(frame, quad, mirror=False):
                 bits[y][x] = False
     for y in range(FRAME):
         for x in range(FRAME):
-            if bits[y][x] or px[x, y] != lit:
+            if not edge or bits[y][x] or px[x, y] != lit:
                 continue
             if any(0 <= x + dx < FRAME and 0 <= y + dy < FRAME and bits[y + dy][x + dx]
                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
@@ -485,7 +493,11 @@ def apply(frame, ops, mirror=False):
             raise ValueError(op)
 
 
-def build():
+def build(side_quad=None, side_edge=None):
+    """`side_quad` / `side_edge` stand in for the side view's canvas and edge, for the mockup."""
+    quads = dict(MARK_QUAD)
+    if side_quad is not None:
+        quads[SIDE_FRAME] = side_quad
     source = Image.open(SOURCE).convert("RGBA")
     frames = []
     for n in range(FRAMES):
@@ -496,10 +508,10 @@ def build():
         else:
             apply(frame, OPS[16 - n], mirror=True)
         repaint_hull(frame)
-        if n in MARK_QUAD:
-            stamp_mark(frame, MARK_QUAD[n])
-        elif 16 - n in MARK_QUAD:
-            stamp_mark(frame, MARK_QUAD[16 - n], mirror=True)
+        of = n if n in quads else 16 - n
+        if of in quads:
+            edge = MARK_SIDE_EDGE if side_edge is None else side_edge
+            stamp_mark(frame, quads[of], mirror=of != n, edge=edge if of == SIDE_FRAME else True)
         frames.append(frame)
     return frames
 
@@ -611,7 +623,28 @@ def contact(frames, path, zoom=4):
     out.save(path)
 
 
+def mark_mockup(path, zoom=8):
+    """The side view's mark, every candidate: a row each, frames 3, 4, 5 and 12 side by side
+    so the squeeze can be judged against the quartering frame it turns into. No asset written."""
+    rows = [("w%d %s" % (x1 - x0 + 1, "edge" if edge else "bare"), ((x0, 48), (x1, 48), (x0, 61)), edge)
+            for x0, x1 in ((58, 62), (57, 62), (57, 63)) for edge in (True, False)]
+    shown, box = (3, 4, 5, 12), (40, 36, 88, 84)
+    w, h = (box[2] - box[0]) * zoom, (box[3] - box[1]) * zoom
+    out = Image.new("RGBA", (w * len(shown) + 90, h * len(rows)), (84, 118, 134, 255))
+    draw = ImageDraw.Draw(out)
+    for r, (name, quad, edge) in enumerate(rows):
+        frames = build(quad, edge)
+        draw.text((6, r * h + 6), name, fill=(255, 255, 255, 255))
+        for c, n in enumerate(shown):
+            big = frames[n].crop(box).resize((w, h), Image.NEAREST)
+            out.paste(big, (90 + c * w, r * h), big)
+    out.save(path)
+
+
 def main(argv):
+    if "--mark-mockup" in argv:
+        mark_mockup(argv[argv.index("--mark-mockup") + 1])
+        return
     frames = build()
     if "--zoom" in argv:
         where = Path(argv[argv.index("--zoom") + 1])
