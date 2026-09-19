@@ -39,6 +39,13 @@ PAIRED = {}
 # Richard, 2026-09-14: the first extra ferry costs 200 at most. 2026-09-18: the boats are
 # forgiving early, so Hold and Sailing start cheap and their ladders take up the difference.
 BASE_MOST = {"fleet": 200.0, "cargo": 40.0, "boat_speed": 60.0}
+# Priced by Richard off his logged run of 2026-09-18 (docs/progression/playtests/), not by
+# the fit, and left alone by this script: Strength from 3500 with its top kept where he maxed
+# it at 40 minutes; Range cheap to start and dear to finish (the tier-0 water in reach ran dry
+# at minutes 5 to 15 on Range 2 to 5); Pigeons cheap and early (he netted 196 birds and did
+# not buy a level until minute 50); the Pack cheap and the rest of the dogs dearer (he bought
+# eleven dog levels in one visit at minute 21).
+HAND = {"net_strength", "net_range", "bird_worth", "dog_count", "dog_fetch", "dog_wait", "dog_strength"}
 
 
 def gap_at(minute):
@@ -143,6 +150,8 @@ def write_price(key, base, mult):
 print(f"clear {END:.1f} min" if END < 1e8 else "clear never")
 changed = []
 for key in sorted({PAIRED.get(n["id"], n["id"]) for n in config["nodes"]}):
+    if key in HAND:
+        continue
     points = wants.get(key, [])
     fitted = fit(points)
     targets = ["net_hold", "cargo"] if key == "hold" else [key]

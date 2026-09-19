@@ -188,12 +188,12 @@ SCHEDULE = {
     "boat_speed": spread(1, 54, 20),
     "fleet": [2, 9, 20],
     "boat_volley": [6, 16, 28, 42],
-    "dog_fetch": [3, 9, 17, 27],
-    "dog_wait": [7, 15, 25],
-    "dog_count": [5, 12, 22],
+    "dog_fetch": [8, 16, 24, 32],
+    "dog_wait": [12, 22, 32],
+    "dog_count": [4, 9, 15],
     "dog_strength": [12, 22, 32, 42],
     "recycle_bonus": spread(6, 54, 8),
-    "bird_worth": spread(8, 58, 8),
+    "bird_worth": spread(2, 30, 8),
 }
 nodes = []
 for key, tree, name, stat, tags in SPEC:

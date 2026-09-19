@@ -26,7 +26,7 @@ five shades as the rubbish goes, nature comes back where it is clean.
 | Net | Reel | 20 | 3 to 23 tiles/s |
 | Net | Catch | 8 | 4 to 12 a cast. Few, dear levels: it is what paces the run |
 | Boats | Sailing | 20 | 8 to 40 tiles/s |
-| Boats | Hold | 8 | 8 to 24: **two casts at every level**, and cheaper than Catch |
+| Boats | Hold | 8 | 8 to 32: **at least two casts at every level**, and cheaper than Catch |
 | Boats | Fleet | 3 | 4 hulls at most, the first extra one 200 |
 | Boats | Loading | 4 | volley gap x1.0 to x0.4 |
 | Dogs | Pack | 3 | 4 dogs at most |
@@ -76,4 +76,5 @@ and the recorded sound.
 | | Sim (focused bot) | Sim (casual bot) | Real |
 |---|---|---|---|
 | 2026-09-14 pass | 69 min | — | about 70 min (tree run) |
-| 2026-09-18 pass | 64 min | 110 min | *to be recorded from the logged run* |
+| 2026-09-18 pass | 64 min | 110 min | **64.5 min** (logged run 1, `docs/progression/playtests/`) |
+| 2026-09-18 tweaks (Strength 3500, Hold to 32, Range, Pigeons, dogs) | 60 min | — | *next logged run* |

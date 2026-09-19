@@ -4,491 +4,499 @@
 
 | | check | result |
 |---|---|---|
-| WARN | focused clears in 68-82 min | 64.2 min (cleared 99.5%) |
+| FAIL | focused clears in 68-82 min | 59.7 min (cleared 99.5%) |
 | PASS | focused can always finish (no soft-lock) | finishes |
 | PASS | casual can always finish (no soft-lock) | finishes |
 | PASS | cheapest can always finish (no soft-lock) | finishes |
-| PASS | early buys every 10-60 s (first 10 min) | median gap 15 s |
-| PASS | no gap between buys over 300 s | longest 135 s at 37.3-39.5 min |
-| WARN | last purchase leaves 10-25% of the game to enjoy it | last buy at 63.2 min, 2% of the game after it |
-| FAIL | every buy raises income at least 8% | cargo r2 +5.3%, boat_speed r4 +1.5%, dog_fetch +5.7%, net_width +7.5%, boat_speed r5 +6.4%, boat_speed r6 +5.5% |
-| WARN | no single pick wins by 3x in over 50% of choices | median best/second 1.76x; over 3x in 2%; "net_strength" top pick 67% |
-| FAIL | payback within 4x of its phase median | cargo too strong for price (34 s vs 277 s); fleet too strong for price (34 s vs 277 s); boat_speed too strong for price (36 s vs 277 s); boat_speed r2 too strong for price (56 s vs 277 s); net_range r16 too strong for price (163 s vs 995 s) |
-| PASS | ferry capacity within 1-2.5x of catch rate | inside 82%, lagging 15%, overrunning 3%; box peaked at 24 |
-| WARN | single upgrades are felt (no stage locked against another) | 1 buys only paid off with another: lucky_haul+boat_volley @19.1 |
+| PASS | early buys every 10-60 s (first 10 min) | median gap 10 s |
+| PASS | no gap between buys over 300 s | longest 120 s at 30.3-32.3 min |
+| WARN | last purchase leaves 10-25% of the game to enjoy it | last buy at 59.0 min, 1% of the game after it |
+| FAIL | every buy raises income at least 8% | net_range r2 +3.0%, net_range r3 +5.5%, boat_speed r4 +7.5%, boat_volley +0.6%, dog_count +2.2%, net_range r4 +3.5% |
+| WARN | no single pick wins by 3x in over 50% of choices | median best/second 1.73x; over 3x in 3%; "net_strength" top pick 62% |
+| FAIL | payback within 4x of its phase median | cargo too strong for price (23 s vs 224 s); fleet too strong for price (31 s vs 224 s); boat_speed too strong for price (33 s vs 224 s); cargo r2 too strong for price (35 s vs 224 s); boat_speed r2 too strong for price (40 s vs 224 s); cargo r4 too strong for price (44 s vs 402 s) |
+| PASS | ferry capacity within 1-2.5x of catch rate | inside 88%, lagging 8%, overrunning 3%; box peaked at 31 |
+| WARN | single upgrades are felt (no stage locked against another) | 1 buys only paid off with another: net_range+boat_speed @37.3 |
 | PASS | no bought node whose only value is what it unlocks | none |
-| FAIL | every node earns its purchase, none only in the last 15% | 7 bought only as filler (earned nothing); 0 never bought; 0 first bought late |
+| FAIL | every node earns its purchase, none only in the last 15% | 8 bought only as filler (earned nothing); 0 never bought; 0 first bought late |
 
 ## Bot: focused
 
-- Clear: 64.2 min
-- Purchases: 137, spent 528.4k sludge
-- Income/s at 2 / 10 / 30 min: 19.1 / 61.5 / 215.5
-- Median payback by phase: 0m 277s, 10m 399s, 20m 661s, 30m 734s, 40m 995s, 50m 1012s
-- Median seconds from reveal to buy, by group: cargo 10, fleet 45, boat_speed 50, net_range 85, dog_fetch 115, net_width 170, reel 220, lucky_haul 235, double_cast 245, dog_count 355, dog_wait 390, boat_volley 440, recycle_bonus 490, net_hold 565, bird_worth 680, net_strength 765, dog_strength 2625
+- Clear: 59.7 min
+- Purchases: 137, spent 478.8k sludge
+- Income/s at 2 / 10 / 30 min: 12.0 / 59.1 / 299.2
+- Median payback by phase: 0m 224s, 10m 402s, 20m 631s, 30m 990s, 40m 770s, 50m 949s
+- Median seconds from reveal to buy, by group: cargo 10, bird_worth 30, fleet 90, boat_speed 95, net_range 110, boat_volley 160, dog_count 170, lucky_haul 260, net_width 280, reel 310, dog_fetch 360, net_strength 580, double_cast 590, recycle_bonus 620, net_hold 800, dog_wait 860, dog_strength 2470
 
 | min | buy | cost | income gain | payback | |
 |---|---|---|---|---|---|
-| 0.2 | cargo | 40 | +24% | 34 s |
-| 0.8 | fleet | 200 | +98% | 34 s |
-| 0.8 | boat_speed | 60 | +14% | 36 s |
-| 0.9 | boat_speed r2 | 84 | +11% | 56 s |
-| 1.1 | cargo r2 | 100 | +5% | 126 s |
-| 1.4 | net_range | 400 | +26% | 106 s |
-| 1.6 | boat_speed r3 | 118 | +9% | 72 s |
-| 1.7 | boat_speed r4 | 165 | +2% | 553 s |
-| 1.9 | dog_fetch | 300 | +6% | 277 s |
-| 2.3 | net_range r2 | 444 | +12% | 198 s |
-| 2.5 | cargo r3 | 250 | +13% | 89 s |
-| 2.8 | net_width | 450 | +7% | 262 s |
-| 2.9 | boat_speed r5 | 231 | +6% | 146 s |
-| 3.2 | boat_speed r6 | 323 | +6% | 222 s |
-| 3.4 | boat_speed r7 | 452 | +2% | 918 s |
-| 3.7 | reel | 450 | +7% | 222 s |
-| 3.9 | lucky_haul | 350 | +2% | 607 s |
-| 4.1 | double_cast | 400 | +2% | 931 s |
-| 4.4 | net_range r3 | 493 | +6% | 288 s |
-| 4.7 | fleet r2 | 500 | +19% | 88 s |
-| 4.9 | net_width r2 | 545 | +21% | 79 s |
-| 5.1 | reel r2 | 531 | +7% | 203 s |
-| 5.3 | net_range r4 | 547 | +12% | 115 s |
-| 5.5 | lucky_haul r2 | 476 | +2% | 454 s |
-| 5.9 | dog_count | 550 | +2% | 517 s |
-| 5.9 | cargo r4 | 625 | +3% | 512 s |
-| 6.2 | reel r3 | 627 | +6% | 259 s |
-| 6.4 | net_width r3 | 659 | +8% | 195 s |
-| 6.5 | dog_wait | 300 | +1% | 525 s |
-| 6.8 | dog_count r2 | 847 | +5% | 330 s |
-| 7.1 | reel r4 | 739 | +4% | 408 s |
-| 7.3 | net_range r5 | 607 | +3% | 419 s |
-| 7.3 | boat_volley | 160 | +1% | 459 s |
-| 7.5 | boat_speed r8 | 633 | +3% | 501 s |
-| 7.8 | lucky_haul r3 | 647 | +3% | 503 s |
-| 8.2 | recycle_bonus | 1500 | +6% | 471 s |
-| 8.5 | net_width r4 | 797 | +4% | 382 s |
-| 9.4 | net_range r6 | 674 | +4% | 313 s |
-| 9.4 | net_hold | 1000 | +5% | 344 s |
-| 9.4 | fleet r3 | 1250 | +12% | 192 s |
-| 9.5 | reel r5 | 872 | +4% | 365 s |
-| 10.1 | net_width r5 | 965 | +5% | 290 s |
-| 10.6 | net_range r7 | 748 | +5% | 230 s |
-| 10.6 | net_hold r2 | 1820 | +15% | 195 s |
-| 11.3 | bird_worth | 4000 | from zero | never |
-| 11.6 | net_range r8 | 831 | +9% | 141 s |
-| 12.8 | net_strength | 5000 | +48% | 160 s |
-| 12.8 | double_cast r2 | 616 | +2% | 308 s |
-| 13.0 | reel r6 | 1030 | +4% | 256 s |
-| 13.4 | recycle_bonus r2 | 2415 | +6% | 406 s |
-| 13.5 | dog_fetch r2 | 444 | +0% | 917 s |
-| 13.6 | boat_volley r2 | 398 | +0% | 985 s |
-| 14.2 | recycle_bonus r3 | 3888 | +5% | 649 s |
-| 15.0 | bird_worth r2 | 5920 | from zero | never |
-| 16.3 | bird_worth r3 | 8762 | from zero | never |
-| 18.0 | net_strength r2 | 12.2k | +21% | 489 s |
-| 18.8 | recycle_bonus r4 | 6260 | +5% | 858 s |
-| 18.8 | double_cast r3 | 949 | +1% | 1159 s |
-| 18.9 | boat_speed r9 | 886 | +2% | 322 s |
-| 19.0 | dog_wait r2 | 636 | +1% | 420 s |
-| 19.1 | lucky_haul r4 (with boat_volley) | 880 | +1% | 468 s |
-| 19.3 | boat_speed r10 | 1240 | +2% | 484 s |
-| 19.3 | lucky_haul r5 | 1197 | +2% | 391 s |
-| 20.8 | bird_worth r4 | 13.0k | from zero | never |
-| 22.3 | reel r7 | 1215 | +1% | 1111 s |
-| 22.3 | cargo r5 | 1563 | +3% | 358 s |
-| 22.3 | net_hold r3 | 3312 | +9% | 212 s |
-| 22.3 | boat_speed r11 | 1736 | +3% | 306 s |
-| 22.3 | boat_volley r3 | 992 | +1% | 788 s |
-| 22.4 | reel r8 | 1434 | +1% | 782 s |
-| 22.4 | boat_speed r12 | 2430 | +2% | 667 s |
-| 22.4 | double_cast r4 | 1461 | +1% | 727 s |
-| 22.8 | lucky_haul r6 | 1628 | +1% | 622 s |
-| 22.9 | net_width r6 | 1167 | +1% | 985 s |
-| 23.2 | reel r9 | 1692 | +1% | 738 s |
-| 23.4 | net_width r7 | 1412 | +2% | 471 s |
-| 23.6 | net_width r8 | 1709 | +1% | 656 s |
-| 23.8 | net_width r9 | 2068 | +1% | 764 s |
-| 23.9 | reel r10 | 1996 | +2% | 581 s |
-| 24.1 | double_cast r5 | 2250 | +2% | 569 s |
-| 24.2 | net_width r10 | 2502 | +1% | 869 s |
-| 24.3 | lucky_haul r7 | 2215 | +2% | 612 s |
-| 24.4 | net_width r11 | 3027 | +2% | 774 s |
-| 24.5 | reel r11 | 2355 | +1% | 872 s |
-| 24.7 | lucky_haul r8 | 3012 | +2% | 717 s |
-| 25.1 | net_range r9 | 922 | +2% | 225 s |
-| 25.1 | cargo r6 | 3906 | +9% | 237 s |
-| 25.2 | reel r12 | 2779 | +2% | 840 s |
-| 25.8 | double_cast r6 | 3465 | +2% | 742 s |
-| 26.4 | net_hold r4 | 6029 | +6% | 562 s |
-| 26.7 | net_range r10 | 1023 | +2% | 228 s |
-| 26.7 | boat_speed r13 | 3402 | +2% | 700 s |
-| 27.0 | cargo r7 | 9766 | +7% | 722 s |
-| 28.2 | net_range r11 | 1136 | +1% | 519 s |
-| 28.2 | net_hold r5 | 11.0k | +10% | 576 s |
-| 29.4 | bird_worth r5 | 19.2k | from zero | never |
-| 29.8 | net_range r12 | 1261 | +2% | 394 s |
-| 31.9 | net_strength r3 | 29.5k | +50% | 297 s |
-| 32.1 | reel r13 | 3279 | +2% | 579 s |
-| 32.7 | recycle_bonus r5 | 10.1k | +5% | 687 s |
-| 33.5 | recycle_bonus r6 | 16.2k | +5% | 1107 s |
-| 33.9 | reel r14 | 3870 | +1% | 1115 s |
-| 34.2 | net_width r12 | 3663 | +1% | 791 s |
-| 34.3 | net_width r13 | 4432 | +1% | 1093 s |
-| 34.4 | lucky_haul r9 | 4096 | +1% | 834 s |
-| 34.6 | double_cast r7 | 5336 | +2% | 718 s |
-| 34.8 | net_width r14 | 5363 | +2% | 865 s |
-| 35.3 | net_range r13 | 1399 | +2% | 313 s |
-| 35.3 | boat_speed r14 | 4762 | +2% | 734 s |
-| 35.3 | boat_volley r4 | 2470 | +1% | 712 s |
-| 37.3 | net_range r14 | 1553 | +3% | 217 s |
-| 37.3 | reel r15 | 4566 | +2% | 1026 s |
-| 39.5 | net_range r15 | 1724 | +1% | 549 s |
-| 39.5 | double_cast r8 | 8217 | +3% | 1014 s |
-| 40.3 | net_strength r4 | 71.7k | +50% | 540 s |
-| 40.6 | reel r16 | 5388 | +2% | 875 s |
-| 41.8 | bird_worth r6 | 28.4k | from zero | never |
-| 43.8 | dog_strength | 500 | +0% | never | filler
-| 44.6 | lucky_haul r10 | 5571 | +1% | 1054 s |
-| 45.0 | net_width r15 | 6489 | +1% | 1145 s |
-| 45.1 | double_cast r9 | 12.7k | +3% | 1160 s |
-| 45.2 | net_width r16 | 7852 | +2% | 1191 s |
-| 45.5 | net_width r17 | 9501 | +2% | 1193 s |
-| 46.0 | net_range r16 | 1914 | +4% | 163 s |
-| 46.0 | boat_speed r15 | 6667 | +2% | 935 s |
-| 48.0 | dog_fetch r3 | 657 | +0% | never | filler
-| 48.5 | net_range r17 | 2124 | +3% | 277 s |
-| 50.5 | dog_fetch r4 | 973 | +0% | never | filler
-| 51.0 | net_hold r6 | 20.0k | +6% | 1189 s |
-| 51.3 | net_range r18 | 2358 | +2% | 413 s |
-| 52.6 | cargo r8 | 24.4k | +7% | 1190 s |
-| 54.0 | net_range r19 | 2617 | +1% | 1012 s |
-| 56.0 | dog_strength r2 | 1015 | +0% | never | filler
-| 57.2 | net_range r20 | 2905 | +1% | 786 s |
-| 59.2 | dog_count r3 | 1304 | +0% | never | filler
-| 61.2 | dog_wait r3 | 1348 | +0% | never | filler
-| 63.2 | dog_strength r3 | 2060 | +0% | never | filler
+| 0.2 | cargo | 40 | +36% | 23 s |
+| 0.5 | bird_worth | 120 | from zero | never |
+| 1.0 | bird_worth r2 | 216 | from zero | never |
+| 1.5 | fleet | 200 | +98% | 31 s |
+| 1.6 | boat_speed | 60 | +14% | 33 s |
+| 1.8 | cargo r2 | 100 | +19% | 35 s |
+| 1.8 | net_range | 150 | +9% | 94 s |
+| 1.9 | boat_speed r2 | 84 | +11% | 40 s |
+| 2.1 | boat_speed r3 | 118 | +8% | 69 s |
+| 2.2 | net_range r2 | 191 | +3% | 281 s |
+| 2.3 | cargo r3 | 250 | +18% | 60 s |
+| 2.5 | net_range r3 | 242 | +6% | 167 s |
+| 2.6 | boat_speed r4 | 165 | +7% | 80 s |
+| 2.7 | boat_volley | 160 | +1% | 853 s |
+| 2.8 | dog_count | 200 | +2% | 316 s |
+| 3.0 | bird_worth r3 | 389 | from zero | never |
+| 3.2 | net_range r4 | 307 | +3% | 306 s |
+| 3.3 | boat_speed r5 | 231 | +6% | 120 s |
+| 3.7 | bird_worth r4 | 700 | from zero | never |
+| 3.9 | net_range r5 | 390 | +6% | 228 s |
+| 4.3 | lucky_haul | 350 | +2% | 656 s |
+| 4.7 | net_width | 450 | +3% | 541 s |
+| 5.0 | bird_worth r5 | 1260 | from zero | never |
+| 5.2 | reel | 450 | +2% | 579 s |
+| 5.3 | boat_speed r6 | 323 | +5% | 183 s |
+| 5.6 | fleet r2 | 500 | +7% | 209 s |
+| 5.8 | reel r2 | 531 | +10% | 152 s |
+| 6.0 | dog_fetch | 500 | +6% | 219 s |
+| 6.2 | dog_count r2 | 400 | +6% | 175 s |
+| 6.4 | reel r3 | 627 | +6% | 233 s |
+| 6.6 | lucky_haul r2 | 476 | +3% | 411 s |
+| 6.8 | reel r4 | 739 | +5% | 351 s |
+| 7.0 | net_width r2 | 545 | +4% | 260 s |
+| 7.7 | dog_count r3 | 800 | +4% | 380 s |
+| 8.1 | bird_worth r6 | 2268 | from zero | never |
+| 8.3 | net_width r3 | 659 | +4% | 303 s |
+| 9.3 | net_width r4 | 797 | +5% | 299 s |
+| 9.7 | net_strength | 3500 | +36% | 190 s |
+| 9.8 | boat_speed r7 | 452 | +2% | 294 s |
+| 9.8 | double_cast | 400 | +2% | 322 s |
+| 10.0 | double_cast r2 | 616 | +1% | 570 s |
+| 10.3 | recycle_bonus | 1500 | +6% | 339 s |
+| 10.8 | recycle_bonus r2 | 2415 | +6% | 546 s |
+| 11.7 | bird_worth r7 | 4082 | from zero | never |
+| 12.5 | recycle_bonus r3 | 3888 | +5% | 881 s |
+| 13.3 | net_hold | 1000 | +1% | 1012 s |
+| 13.3 | cargo r4 | 625 | +16% | 44 s |
+| 13.3 | boat_speed r8 | 633 | +2% | 322 s |
+| 13.3 | lucky_haul r3 | 647 | +2% | 282 s |
+| 14.3 | bird_worth r8 | 7347 | from zero | never |
+| 14.3 | dog_wait | 600 | +1% | 479 s |
+| 14.5 | net_width r5 | 965 | +2% | 546 s |
+| 14.6 | boat_volley r2 | 398 | +1% | 421 s |
+| 14.8 | reel r5 | 872 | +1% | 598 s |
+| 14.8 | boat_speed r9 | 886 | +2% | 392 s |
+| 15.0 | net_width r6 | 1167 | +4% | 287 s |
+| 15.2 | lucky_haul r4 | 880 | +2% | 432 s |
+| 15.3 | double_cast r3 | 949 | +2% | 508 s |
+| 15.5 | reel r6 | 1030 | +2% | 383 s |
+| 15.7 | net_width r7 | 1412 | +3% | 391 s |
+| 15.9 | net_width r8 | 1709 | +4% | 434 s |
+| 16.1 | lucky_haul r5 | 1197 | +2% | 455 s |
+| 16.3 | net_range r6 | 496 | +1% | 344 s |
+| 16.3 | fleet r3 | 1250 | +12% | 98 s |
+| 16.5 | net_hold r2 | 1820 | +14% | 107 s |
+| 16.7 | reel r7 | 1215 | +3% | 338 s |
+| 17.3 | net_range r7 | 629 | +2% | 263 s |
+| 17.3 | net_hold r3 | 3312 | +10% | 248 s |
+| 17.3 | boat_speed r10 | 1240 | +2% | 402 s |
+| 18.4 | net_strength r2 | 9590 | +38% | 181 s |
+| 18.5 | reel r8 | 1434 | +1% | 527 s |
+| 18.6 | boat_volley r3 | 992 | +1% | 533 s |
+| 19.2 | recycle_bonus r4 | 6260 | +5% | 635 s |
+| 19.7 | cargo r5 | 1563 | +1% | 1183 s |
+| 19.7 | double_cast r4 | 1461 | +2% | 291 s |
+| 19.7 | reel r9 | 1692 | +2% | 341 s |
+| 19.7 | lucky_haul r6 | 1628 | +2% | 430 s |
+| 19.8 | double_cast r5 | 2250 | +3% | 397 s |
+| 19.9 | dog_fetch r2 | 900 | +1% | 700 s |
+| 20.1 | reel r10 | 1996 | +2% | 434 s |
+| 20.3 | lucky_haul r7 | 2215 | +2% | 546 s |
+| 20.4 | reel r11 | 2355 | +2% | 670 s |
+| 20.7 | reel r12 | 2779 | +1% | 928 s |
+| 20.8 | net_width r9 | 2068 | +1% | 802 s |
+| 21.0 | double_cast r6 | 3465 | +2% | 631 s |
+| 21.2 | net_width r10 | 2502 | +2% | 589 s |
+| 21.3 | net_width r11 | 3027 | +2% | 711 s |
+| 21.8 | net_range r8 | 799 | +1% | 309 s |
+| 21.8 | net_hold r4 | 6029 | +5% | 594 s |
+| 22.0 | boat_speed r11 | 1736 | +3% | 260 s |
+| 22.2 | boat_speed r12 | 2430 | +3% | 388 s |
+| 23.2 | net_range r9 | 1015 | +2% | 241 s |
+| 23.2 | double_cast r7 | 5336 | +3% | 807 s |
+| 24.5 | net_strength r3 | 26.3k | +35% | 344 s |
+| 24.7 | lucky_haul r8 | 3012 | +2% | 638 s |
+| 24.8 | reel r13 | 3279 | +1% | 729 s |
+| 25.4 | recycle_bonus r5 | 10.1k | +5% | 693 s |
+| 26.2 | net_width r12 | 3663 | +1% | 996 s |
+| 26.3 | reel r14 | 3870 | +1% | 1121 s |
+| 26.4 | lucky_haul r9 | 4096 | +2% | 837 s |
+| 26.5 | net_width r13 | 4432 | +2% | 880 s |
+| 26.6 | lucky_haul r10 | 5571 | +2% | 1060 s |
+| 27.2 | net_range r10 | 1289 | +1% | 381 s |
+| 27.2 | cargo r6 | 3906 | +4% | 330 s |
+| 27.3 | net_hold r5 | 11.0k | +8% | 458 s |
+| 27.5 | boat_volley r4 | 2470 | +1% | 602 s |
+| 28.5 | net_range r11 | 1637 | +2% | 264 s |
+| 28.5 | double_cast r8 | 8217 | +3% | 920 s |
+| 30.3 | net_range r12 | 2079 | +2% | 457 s |
+| 30.3 | reel r15 | 4566 | +2% | 1050 s |
+| 32.3 | net_range r13 | 2641 | +2% | 456 s |
+| 32.6 | net_strength r4 | 72.0k | +43% | 610 s |
+| 32.8 | reel r16 | 5388 | +1% | 944 s |
+| 33.3 | double_cast r9 | 12.7k | +3% | 990 s |
+| 33.6 | reel r17 | 6358 | +1% | 1167 s |
+| 34.3 | recycle_bonus r6 | 16.2k | +5% | 859 s |
+| 36.3 | net_width r14 | 5363 | +1% | 1192 s |
+| 36.6 | net_width r15 | 6489 | +2% | 1012 s |
+| 36.7 | net_hold r6 | 20.0k | +4% | 1097 s |
+| 36.8 | net_width r16 | 7852 | +2% | 1141 s |
+| 36.9 | net_width r17 | 9501 | +2% | 1053 s |
+| 37.3 | net_range r14 (with boat_speed) | 3354 | +1% | 589 s |
+| 37.3 | cargo r7 | 9766 | +9% | 271 s |
+| 39.2 | net_range r15 | 4259 | +2% | 559 s |
+| 41.2 | dog_strength | 1200 | +0% | never | filler
+| 41.5 | net_range r16 | 5409 | +2% | 720 s |
+| 43.5 | dog_wait r2 | 1320 | +0% | never | filler
+| 44.1 | net_range r17 | 6870 | +3% | 717 s |
+| 46.1 | dog_fetch r3 | 1620 | +0% | never | filler
+| 46.8 | net_range r18 | 8725 | +3% | 890 s |
+| 48.8 | dog_strength r2 | 2640 | +0% | never | filler
+| 49.8 | net_range r19 | 11.1k | +5% | 820 s |
+| 51.8 | dog_wait r3 | 2904 | +0% | never | filler
+| 53.0 | net_range r20 | 14.1k | +5% | 949 s |
+| 55.0 | dog_fetch r4 | 2916 | +0% | never | filler
+| 57.0 | boat_speed r13 | 3402 | +0% | never | filler
+| 59.0 | boat_speed r14 | 4762 | +0% | never | filler
 
 ## Bot: casual
 
-- Clear: 110.2 min (seeds: 105, 110, 112)
-- Purchases: 151, spent 828.8k sludge
-- Income/s at 2 / 10 / 30 min: 17.7 / 6.3 / 2.2
-- Median payback by phase: 0m 211s, 10m 312s, 20m 380s, 30m 490s, 40m 861s, 50m 635s, 60m 894s, 70m 1064s, 80m 7953s, 90m 1297s, 100m 2789s
-- Median seconds from reveal to buy, by group: cargo 20, fleet 60, boat_speed 60, net_range 120, net_width 180, reel 200, dog_fetch 220, dog_wait 240, boat_volley 280, dog_count 340, lucky_haul 360, double_cast 500, dog_strength 720, net_hold 800, bird_worth 940, net_strength 1300, recycle_bonus 1320
+- Clear: 102.1 min (seeds: 101, 102, 102)
+- Purchases: 156, spent 854.0k sludge
+- Income/s at 2 / 10 / 30 min: 10.2 / 4.4 / 2.3
+- Median payback by phase: 0m 168s, 10m 332s, 20m 511s, 30m 572s, 40m 883s, 50m 1392s, 60m 1954s, 70m 1078s, 80m 951s, 90m 36410s
+- Median seconds from reveal to buy, by group: cargo 20, bird_worth 40, boat_speed 40, fleet 100, net_range 120, boat_volley 180, dog_count 200, net_width 280, dog_wait 300, reel 320, lucky_haul 400, double_cast 520, dog_fetch 740, net_strength 920, net_hold 940, recycle_bonus 1220, dog_strength 2820
 
 | min | buy | cost | income gain | payback | |
 |---|---|---|---|---|---|
-| 0.3 | cargo | 40 | +24% | 34 s |
-| 1.0 | fleet | 200 | +99% | 34 s |
-| 1.0 | boat_speed | 60 | +14% | 36 s |
-| 1.3 | boat_speed r2 | 84 | +11% | 57 s |
-| 1.3 | cargo r2 (with dog_fetch) | 100 | +7% | 92 s |
-| 1.3 | boat_speed r3 * | 118 | +0% | never |
-| 2.0 | net_range | 400 | +53% | 72 s |
-| 2.3 | net_range r2 | 444 | +30% | 98 s |
-| 3.0 | cargo r3 * | 250 | +0% | never |
-| 3.0 | net_width | 450 | +21% | 115 s |
-| 3.0 | boat_speed r4 | 165 | +8% | 95 s |
-| 3.0 | boat_speed r5 | 231 | +2% | 507 s |
-| 3.3 | reel | 450 | +9% | 211 s |
-| 3.7 | dog_fetch | 300 | +2% | 744 s |
-| 4.0 | dog_wait * | 300 | +1% | 2121 s |
-| 4.0 | net_range r3 * | 493 | +0% | 12144 s |
-| 4.3 | fleet r2 | 500 | +26% | 75 s |
-| 4.7 | net_width r2 | 545 | +19% | 95 s |
-| 4.7 | boat_volley * | 160 | +0% | never |
-| 5.0 | reel r2 | 531 | +7% | 216 s |
-| 5.0 | boat_volley r2 * | 398 | +0% | never |
-| 5.3 | net_width r3 | 659 | +12% | 165 s |
-| 5.7 | dog_count * | 550 | +7% | 215 s |
-| 6.0 | lucky_haul | 350 | +3% | 339 s |
-| 6.3 | lucky_haul r2 | 476 | +2% | 503 s |
-| 6.7 | dog_fetch r2 * | 444 | +0% | never |
-| 7.3 | boat_speed r6 | 323 | +2% | 476 s |
-| 8.3 | double_cast * | 400 | +1% | 673 s |
-| 10.0 | net_range r4 | 547 | +2% | 765 s |
-| 10.3 | lucky_haul r3 * | 647 | +1% | 2065 s |
-| 10.7 | boat_speed r7 | 452 | +2% | 441 s |
-| 11.0 | fleet r3 * | 1250 | +0% | never |
-| 11.3 | reel r3 | 627 | +6% | 270 s |
-| 11.7 | dog_count r2 | 847 | +7% | 300 s |
-| 12.0 | net_width r4 | 797 | +8% | 240 s |
-| 12.0 | dog_strength * | 500 | +0% | never |
-| 12.3 | net_width r5 | 965 | +5% | 403 s |
-| 12.7 | cargo r4 * | 625 | +0% | never |
-| 13.0 | net_range r5 | 607 | +7% | 207 s |
-| 13.3 | net_hold | 1000 | +15% | 142 s |
-| 13.3 | reel r4 | 739 | +4% | 324 s |
-| 14.0 | net_range r6 | 674 | +9% | 153 s |
-| 14.0 | reel r5 | 872 | +4% | 384 s |
-| 14.3 | cargo r5 * | 1563 | +0% | never |
-| 15.7 | bird_worth | 4000 | from zero | never |
-| 15.7 | net_range r7 | 748 | +10% | 143 s |
-| 17.0 | net_width r6 * | 1167 | +0% | 5115 s |
-| 17.3 | net_range r8 * | 831 | +0% | never |
-| 20.0 | dog_wait r2 * | 636 | +2% | 525 s |
-| 20.3 | net_hold r2 | 1820 | +15% | 228 s |
-| 21.7 | net_strength | 5000 | +36% | 222 s |
-| 22.0 | recycle_bonus | 1500 | +6% | 289 s |
-| 22.3 | reel r6 | 1030 | +4% | 291 s |
-| 22.3 | double_cast r2 | 616 | +2% | 328 s |
-| 22.7 | dog_count r3 | 1304 | +4% | 380 s |
-| 22.7 | double_cast r3 | 949 | +2% | 450 s |
-| 23.0 | reel r7 | 1215 | +3% | 378 s |
-| 23.0 | lucky_haul r4 | 880 | +2% | 460 s |
-| 23.7 | net_hold r3 | 3312 | +14% | 239 s |
-| 24.0 | recycle_bonus r2 | 2415 | +6% | 378 s |
-| 24.3 | reel r8 | 1434 | +3% | 411 s |
-| 24.3 | double_cast r4 | 1461 | +2% | 518 s |
-| 25.0 | recycle_bonus r3 * | 3888 | +5% | 589 s |
-| 25.3 | lucky_haul r5 | 1197 | +2% | 544 s |
-| 26.0 | bird_worth r2 | 5920 | from zero | never |
-| 27.0 | reel r9 | 1692 | +1% | 1163 s |
-| 30.3 | dog_fetch r3 * | 657 | +0% | never |
-| 30.3 | lucky_haul r6 * | 1628 | +0% | never |
-| 30.7 | dog_wait r3 * | 1348 | +0% | never |
-| 30.7 | boat_speed r8 | 633 | +4% | 115 s |
-| 30.7 | boat_volley r3 * | 992 | +0% | 2616 s |
-| 31.7 | net_width r7 | 1412 | +3% | 393 s |
-| 31.7 | net_width r8 * | 1709 | +1% | 942 s |
-| 32.3 | bird_worth r3 | 8762 | from zero | never |
-| 32.7 | net_range r9 | 922 | +4% | 213 s |
-| 34.0 | net_strength r2 | 12.2k | +36% | 275 s |
-| 34.3 | double_cast r5 | 2250 | +3% | 496 s |
-| 34.3 | reel r10 | 1996 | +2% | 484 s |
-| 35.0 | recycle_bonus r4 | 6260 | +5% | 701 s |
-| 36.0 | recycle_bonus r5 | 10.1k | +5% | 1129 s |
-| 37.7 | dog_strength r2 * | 1015 | +0% | never |
-| 41.3 | bird_worth r4 | 13.0k | from zero | never |
-| 42.3 | lucky_haul r7 | 2215 | +1% | 921 s |
-| 42.3 | net_width r9 * | 2068 | +0% | 3460 s |
-| 42.3 | boat_speed r9 | 886 | +1% | 356 s |
-| 42.3 | net_hold r4 * | 6029 | +2% | 1242 s |
-| 42.3 | boat_volley r4 * | 2470 | +1% | 1429 s |
-| 42.3 | boat_speed r10 | 1240 | +3% | 178 s |
-| 42.7 | net_width r10 | 2502 | +1% | 865 s |
-| 42.7 | boat_speed r11 | 1736 | +1% | 654 s |
-| 43.0 | net_width r11 * | 3027 | +3% | 533 s |
-| 43.0 | net_range r10 * | 1023 | +0% | never |
-| 43.3 | dog_strength r3 * | 2060 | +0% | never |
-| 44.0 | reel r11 | 2355 | +1% | 857 s |
-| 45.7 | reel r12 * | 2779 | +1% | 1132 s |
-| 45.7 | net_range r11 | 1136 | +7% | 90 s |
-| 48.3 | net_hold r5 * | 11.0k | +1% | 5813 s |
-| 48.3 | cargo r6 | 3906 | +10% | 221 s |
-| 49.3 | dog_fetch r4 * | 973 | +0% | never |
-| 50.7 | boat_speed r12 * | 2430 | +0% | never |
-| 50.7 | double_cast r6 | 3465 | +3% | 618 s |
-| 51.3 | net_range r12 | 1261 | +3% | 243 s |
-| 52.3 | net_strength r3 | 29.5k | +35% | 431 s |
-| 52.7 | reel r13 | 3279 | +2% | 652 s |
-| 52.7 | lucky_haul r8 | 3012 | +2% | 743 s |
-| 53.0 | net_range r13 * | 1399 | +0% | never |
-| 53.0 | double_cast r7 | 5336 | +3% | 709 s |
-| 54.3 | bird_worth r5 | 19.2k | from zero | never |
-| 57.3 | double_cast r8 * | 8217 | +1% | 3696 s |
-| 57.3 | boat_speed r13 | 3402 | +2% | 575 s |
-| 61.7 | cargo r7 * | 9766 | +0% | never |
-| 61.7 | net_hold r6 | 20.0k | +10% | 790 s |
-| 62.3 | net_width r12 | 3663 | +2% | 716 s |
-| 62.3 | reel r14 | 3870 | +2% | 894 s |
-| 62.7 | net_width r13 | 4432 | +2% | 743 s |
-| 63.0 | net_range r14 | 1553 | +2% | 391 s |
-| 64.3 | recycle_bonus r6 * | 16.2k | +5% | 1352 s |
-| 64.7 | recycle_bonus r7 * | 26.1k | +4% | 2185 s |
-| 64.7 | lucky_haul r9 * | 4096 | +1% | 1149 s |
-| 65.3 | net_range r15 | 1724 | +2% | 342 s |
-| 65.3 | reel r15 | 4566 | +2% | 986 s |
-| 67.3 | reel r16 * | 5388 | +1% | 1831 s |
-| 69.0 | net_range r16 * | 1914 | +0% | never |
-| 70.0 | boat_speed r14 * | 4762 | +0% | never |
-| 72.7 | net_range r17 * | 2124 | +0% | never |
-| 74.3 | boat_speed r15 * | 6667 | +0% | never |
-| 74.7 | net_strength r4 | 71.7k | +48% | 575 s |
-| 75.0 | lucky_haul r10 | 5571 | +1% | 1064 s |
-| 75.3 | reel r17 | 6358 | +1% | 1100 s |
-| 75.7 | double_cast r9 | 12.7k | +3% | 996 s |
-| 76.7 | reel r18 * | 7503 | +1% | 1352 s |
-| 80.3 | net_width r14 * | 5363 | +0% | 6996 s |
-| 81.3 | bird_worth r6 | 28.4k | from zero | never |
-| 83.3 | net_range r18 | 2358 | +0% | never | filler
-| 83.7 | double_cast r10 * | 19.5k | +3% | 1629 s |
-| 84.7 | net_range r19 * | 2617 | +0% | never |
-| 85.0 | bird_worth r7 * | 42.0k | +0% | never |
-| 85.0 | net_width r15 * | 6489 | +0% | 8910 s |
-| 86.7 | net_width r16 * | 7852 | +0% | 11589 s |
-| 87.3 | cargo r8 * | 24.4k | +0% | never |
-| 90.3 | net_range r20 | 2905 | +0% | never | filler
-| 92.3 | dog_strength r4 | 4183 | +0% | never | filler
-| 93.0 | net_hold r7 * | 36.3k | +9% | 1297 s |
-| 95.0 | reel r19 | 8853 | +1% | 1893 s | filler
-| 97.0 | boat_speed r16 | 9334 | +0% | never | filler
-| 99.0 | net_width r17 | 9501 | +0% | 32798 s | filler
-| 101.0 | recycle_bonus r8 * | 42.1k | +4% | 2789 s |
-| 101.7 | net_width r18 * | 11.5k | +1% | 4847 s |
-| 102.3 | net_width r19 * | 13.9k | +2% | 2207 s |
-| 104.3 | reel r20 | 10.4k | +1% | 12352 s | filler
-| 105.0 | bird_worth r8 * | 62.2k | +0% | never |
+| 0.3 | cargo | 40 | +36% | 23 s |
+| 0.7 | bird_worth | 120 | from zero | never |
+| 0.7 | boat_speed * | 60 | +14% | 66 s |
+| 1.3 | bird_worth r2 | 216 | from zero | never |
+| 1.7 | fleet | 200 | +98% | 27 s |
+| 2.0 | boat_speed r2 | 84 | +3% | 222 s |
+| 2.0 | net_range | 150 | +9% | 112 s |
+| 2.0 | cargo r2 | 100 | +26% | 23 s |
+| 2.3 | bird_worth r3 | 389 | from zero | never |
+| 2.7 | net_range r2 | 191 | +18% | 59 s |
+| 2.7 | boat_speed r3 | 118 | +7% | 78 s |
+| 3.0 | net_range r3 | 242 | +7% | 153 s |
+| 3.0 | boat_volley * | 160 | +0% | 1436 s |
+| 3.0 | boat_speed r4 | 165 | +8% | 94 s |
+| 3.3 | dog_count | 200 | +1% | 862 s |
+| 3.3 | boat_speed r5 | 231 | +3% | 267 s |
+| 3.7 | dog_count r2 * | 400 | +4% | 365 s |
+| 4.0 | bird_worth r4 | 700 | from zero | never |
+| 4.3 | net_range r4 | 307 | +12% | 107 s |
+| 4.3 | cargo r3 | 250 | +3% | 317 s |
+| 4.7 | net_width | 450 | +17% | 102 s |
+| 5.0 | dog_wait * | 600 | +1% | 1407 s |
+| 5.3 | reel | 450 | +6% | 229 s |
+| 5.3 | boat_speed r6 | 323 | +5% | 183 s |
+| 6.0 | bird_worth r5 | 1260 | from zero | never |
+| 6.7 | lucky_haul | 350 | +2% | 437 s |
+| 8.7 | double_cast | 400 | +2% | 721 s |
+| 10.3 | net_range r5 | 390 | +5% | 243 s |
+| 11.3 | bird_worth r6 | 2268 | from zero | never |
+| 12.0 | reel r2 | 531 | +5% | 332 s |
+| 12.0 | boat_speed r7 | 452 | +4% | 357 s |
+| 12.3 | net_width r2 | 545 | +4% | 376 s |
+| 12.3 | fleet r2 | 500 | +4% | 345 s |
+| 12.3 | dog_fetch | 500 | +10% | 130 s |
+| 12.7 | reel r3 | 627 | +6% | 249 s |
+| 13.0 | dog_count r3 | 800 | +6% | 311 s |
+| 13.3 | net_width r3 | 659 | +4% | 355 s |
+| 13.3 | lucky_haul r2 * | 476 | +2% | 437 s |
+| 13.7 | boat_speed r8 * | 633 | +0% | never |
+| 14.0 | reel r4 | 739 | +4% | 378 s |
+| 14.3 | net_width r4 | 797 | +5% | 323 s |
+| 15.3 | net_strength | 3500 | +47% | 163 s |
+| 15.7 | net_hold | 1000 | +14% | 105 s |
+| 15.7 | cargo r4 | 625 | +4% | 186 s |
+| 16.0 | reel r5 | 872 | +4% | 274 s |
+| 16.0 | lucky_haul r3 | 647 | +2% | 351 s |
+| 16.3 | boat_volley r2 * | 398 | +0% | never |
+| 17.3 | double_cast r2 | 616 | +2% | 368 s |
+| 19.0 | reel r6 | 1030 | +3% | 365 s |
+| 20.3 | recycle_bonus | 1500 | +6% | 275 s |
+| 20.3 | lucky_haul r4 | 880 | +1% | 651 s |
+| 21.0 | recycle_bonus r2 | 2415 | +6% | 437 s |
+| 21.0 | net_range r6 * | 496 | +0% | never |
+| 21.0 | double_cast r3 | 949 | +2% | 472 s |
+| 21.3 | reel r7 | 1215 | +2% | 743 s |
+| 21.3 | net_range r7 * | 629 | +0% | never |
+| 21.7 | lucky_haul r5 | 1197 | +2% | 567 s |
+| 22.3 | bird_worth r7 | 4082 | from zero | never |
+| 23.0 | boat_volley r3 * | 992 | +0% | never |
+| 23.0 | dog_fetch r2 | 900 | +1% | 827 s |
+| 23.3 | recycle_bonus r3 | 3888 | +5% | 739 s |
+| 24.0 | net_hold r2 | 1820 | +5% | 395 s |
+| 24.0 | fleet r3 | 1250 | +10% | 117 s |
+| 24.0 | dog_fetch r3 * | 1620 | +0% | never |
+| 24.7 | net_hold r3 | 3312 | +14% | 216 s |
+| 24.7 | double_cast r4 * | 1461 | +3% | 464 s |
+| 25.0 | net_width r5 * | 965 | +0% | 1591 s |
+| 25.0 | reel r8 | 1434 | +3% | 392 s |
+| 25.7 | cargo r5 * | 1563 | +0% | never |
+| 27.0 | net_width r6 | 1167 | +2% | 490 s |
+| 27.0 | reel r9 | 1692 | +2% | 531 s |
+| 27.0 | double_cast r5 | 2250 | +3% | 627 s |
+| 27.0 | net_width r7 * | 1412 | +1% | 1600 s |
+| 30.3 | net_range r8 * | 799 | +0% | never |
+| 31.0 | net_hold r4 | 6029 | +12% | 377 s |
+| 31.0 | boat_speed r9 * | 886 | +0% | never |
+| 32.0 | bird_worth r8 | 7347 | from zero | never |
+| 32.7 | net_width r8 * | 1709 | +5% | 262 s |
+| 32.7 | net_range r9 | 1015 | +5% | 148 s |
+| 33.3 | net_strength r2 | 9590 | +33% | 210 s |
+| 33.7 | reel r10 | 1996 | +2% | 449 s |
+| 33.7 | lucky_haul r6 | 1628 | +2% | 542 s |
+| 34.0 | reel r11 | 2355 | +2% | 582 s |
+| 34.0 | lucky_haul r7 | 2215 | +2% | 688 s |
+| 34.3 | double_cast r6 | 3465 | +3% | 604 s |
+| 34.7 | reel r12 | 2779 | +2% | 728 s |
+| 35.0 | double_cast r7 | 5336 | +3% | 844 s |
+| 35.3 | lucky_haul r8 | 3012 | +2% | 878 s |
+| 35.7 | reel r13 | 3279 | +2% | 906 s |
+| 36.0 | recycle_bonus r4 | 6260 | +5% | 562 s |
+| 40.7 | recycle_bonus r5 * | 10.1k | +5% | 905 s |
+| 41.3 | net_width r9 | 2068 | +2% | 454 s |
+| 41.7 | dog_wait r2 * | 1320 | +0% | never |
+| 41.7 | net_width r10 | 2502 | +2% | 474 s |
+| 42.3 | net_range r10 | 1289 | +5% | 118 s |
+| 43.0 | net_strength r3 | 26.3k | +28% | 430 s |
+| 43.3 | reel r14 | 3870 | +2% | 887 s |
+| 43.7 | lucky_haul r9 | 4096 | +2% | 879 s |
+| 43.7 | boat_speed r10 * | 1240 | +0% | never |
+| 44.0 | reel r15 | 4566 | +1% | 1124 s |
+| 44.0 | boat_volley r4 * | 2470 | +0% | never |
+| 44.3 | lucky_haul r10 | 5571 | +2% | 1131 s |
+| 45.0 | double_cast r8 | 8217 | +3% | 997 s |
+| 45.7 | net_width r11 | 3027 | +1% | 728 s |
+| 45.7 | net_range r11 * | 1637 | +0% | never |
+| 46.7 | recycle_bonus r6 * | 16.2k | +5% | 1348 s |
+| 47.0 | dog_strength * | 1200 | +0% | never |
+| 52.0 | net_width r12 * | 3663 | +1% | 1230 s |
+| 52.3 | net_hold r5 | 11.0k | +6% | 684 s |
+| 52.3 | cargo r6 * | 3906 | +0% | never |
+| 52.7 | net_range r12 | 2079 | +5% | 162 s |
+| 52.7 | net_hold r6 | 20.0k | +8% | 947 s |
+| 52.7 | net_range r13 * | 2641 | +0% | never |
+| 53.0 | net_range r14 * | 3354 | +0% | never |
+| 53.0 | dog_fetch r4 * | 2916 | +0% | never |
+| 54.3 | net_width r13 * | 4432 | +0% | 3227 s |
+| 55.3 | double_cast r9 * | 12.7k | +3% | 1392 s |
+| 57.0 | reel r16 * | 5388 | +1% | 1464 s |
+| 57.0 | cargo r7 * | 9766 | +0% | 14948 s |
+| 59.0 | net_range r15 * | 4259 | +0% | never |
+| 59.3 | dog_strength r2 * | 2640 | +0% | never |
+| 60.3 | reel r17 * | 6358 | +1% | 1589 s |
+| 61.0 | boat_speed r11 * | 1736 | +0% | never |
+| 62.7 | recycle_bonus r7 * | 26.1k | +4% | 2146 s |
+| 64.0 | reel r18 * | 7503 | +1% | 1954 s |
+| 64.3 | dog_strength r3 * | 5808 | +0% | never |
+| 65.3 | net_range r16 | 5409 | +4% | 525 s |
+| 67.0 | net_range r17 * | 6870 | +0% | never |
+| 67.3 | boat_speed r12 * | 2430 | +0% | never |
+| 69.0 | net_width r14 * | 5363 | +0% | 4196 s |
+| 70.3 | cargo r8 * | 24.4k | +0% | never |
+| 70.3 | dog_strength r4 * | 12.8k | +0% | never |
+| 73.7 | net_strength r4 | 72.0k | +59% | 436 s |
+| 75.0 | net_hold r7 | 36.3k | +9% | 950 s |
+| 77.0 | dog_wait r3 * | 2904 | +0% | never |
+| 77.7 | double_cast r10 * | 19.5k | +3% | 1206 s |
+| 79.3 | reel r19 * | 8853 | +1% | 1419 s |
+| 80.3 | net_width r15 * | 6489 | +0% | 7129 s |
+| 81.7 | boat_speed r13 * | 3402 | +0% | never |
+| 82.0 | net_width r16 | 7852 | +2% | 873 s |
+| 82.3 | reel r20 * | 10.4k | +1% | 3009 s |
+| 82.3 | net_width r17 | 9501 | +2% | 934 s |
+| 82.7 | net_range r18 | 8725 | +2% | 951 s |
+| 84.7 | boat_speed r14 | 4762 | +0% | never | filler
+| 85.3 | recycle_bonus r8 * | 42.1k | +4% | 3005 s |
+| 85.3 | net_range r19 | 11.1k | +8% | 393 s |
+| 85.3 | boat_speed r15 * | 6667 | +0% | never |
+| 87.3 | boat_speed r16 | 9334 | +0% | never | filler
+| 89.3 | net_width r18 | 11.5k | +0% | 22644 s | filler
+| 89.3 | boat_speed r17 * | 13.1k | +0% | never |
+| 90.0 | net_range r20 * | 14.1k | +0% | never |
+| 91.7 | net_width r19 * | 13.9k | +0% | never |
+| 93.0 | net_width r20 * | 16.8k | +0% | never |
+| 94.7 | net_hold r8 * | 66.1k | +3% | 7638 s |
+| 96.7 | boat_speed r18 | 18.3k | +0% | never | filler
+| 101.3 | boat_speed r19 | 25.6k | +0% | never | filler
 
 ## Bot: cheapest
 
 - Clear: not cleared
-- Purchases: 153, spent 762.4k sludge
-- Income/s at 2 / 10 / 30 min: 12.2 / 44.1 / 67.5
-- Median payback by phase: 0m 210s, 10m 650s, 20m 1209s, 30m 1973s, 40m 2159s, 60m 1814s, 70m 3088s, 80m 1159s, 90m 13572s, 250m 59s, 260m 2182s
-- Median seconds from reveal to buy, by group: cargo 10, boat_speed 20, boat_volley 75, fleet 110, dog_fetch 145, dog_wait 160, lucky_haul 220, net_range 290, double_cast 315, net_width 390, reel 405, dog_strength 490, dog_count 550, net_hold 940, recycle_bonus 1285, bird_worth 2535, net_strength 3850
+- Purchases: 156, spent 817.8k sludge
+- Income/s at 2 / 10 / 30 min: 11.7 / 49.7 / 10.6
+- Median payback by phase: 0m 482s, 10m 875s, 20m 1228s, 30m 1431s, 40m 8365s, 50m 1236s, 60m 1880s, 70m 2140s, 80m 3623s, 160m 52s, 170m 4047s
+- Median seconds from reveal to buy, by group: cargo 10, boat_speed 20, bird_worth 65, net_range 80, boat_volley 95, fleet 140, dog_count 150, lucky_haul 215, double_cast 265, net_width 290, reel 300, dog_fetch 365, dog_wait 400, net_hold 715, dog_strength 800, recycle_bonus 990, net_strength 3410
 
 | min | buy | cost | income gain | payback | |
 |---|---|---|---|---|---|
-| 0.2 | cargo | 40 | +24% | 34 s |
-| 0.3 | boat_speed | 60 | +14% | 72 s |
-| 0.6 | boat_speed r2 | 84 | +11% | 111 s |
-| 0.8 | cargo r2 | 100 | +19% | 68 s |
-| 1.0 | boat_speed r3 | 118 | +9% | 144 s |
-| 1.3 | boat_volley | 160 | +0% | 3876 s |
-| 1.6 | boat_speed r4 | 165 | +8% | 218 s |
-| 1.8 | fleet | 200 | +57% | 33 s |
-| 2.1 | boat_speed r5 | 231 | +0% | never |
-| 2.3 | cargo r3 | 250 | +0% | never |
-| 2.4 | dog_fetch | 300 | +9% | 277 s |
-| 2.7 | dog_wait | 300 | +2% | 1107 s |
-| 3.1 | boat_speed r6 | 323 | +0% | never |
-| 3.7 | lucky_haul | 350 | +2% | 1498 s |
-| 4.3 | boat_volley r2 | 398 | +0% | never |
-| 4.8 | net_range | 400 | +67% | 64 s |
-| 5.3 | double_cast | 400 | +2% | 1707 s |
-| 5.8 | net_range r2 | 444 | +40% | 79 s |
-| 6.1 | dog_fetch r2 | 444 | +1% | 1817 s |
-| 6.5 | net_width | 450 | +29% | 83 s |
-| 6.8 | reel | 450 | +10% | 201 s |
-| 7.1 | boat_speed r7 | 452 | +0% | never |
-| 7.3 | lucky_haul r2 | 476 | +3% | 672 s |
-| 7.7 | net_range r3 | 493 | +30% | 72 s |
-| 7.9 | fleet r2 | 500 | +2% | 733 s |
-| 8.2 | dog_strength | 500 | +0% | never |
-| 8.4 | reel r2 | 531 | +7% | 267 s |
-| 8.8 | net_width r2 | 545 | +22% | 87 s |
-| 9.0 | net_range r4 | 547 | +27% | 62 s |
-| 9.2 | dog_count | 550 | +7% | 195 s |
-| 9.4 | net_range r5 | 607 | +2% | 876 s |
-| 9.7 | double_cast r2 | 616 | +2% | 726 s |
-| 9.9 | cargo r4 | 625 | +0% | never |
-| 10.2 | reel r3 | 627 | +7% | 217 s |
-| 10.3 | boat_speed r8 | 633 | +0% | never |
-| 10.6 | dog_wait r2 | 636 | +2% | 787 s |
-| 10.8 | lucky_haul r3 | 647 | +3% | 533 s |
-| 11.0 | dog_fetch r3 | 657 | +0% | never |
-| 11.3 | net_width r3 | 659 | +8% | 191 s |
-| 11.5 | net_range r6 | 674 | +0% | never |
-| 11.8 | reel r4 | 739 | +5% | 295 s |
-| 12.0 | net_range r7 | 748 | +0% | never |
-| 12.3 | net_width r4 | 797 | +0% | 4607 s |
-| 12.6 | net_range r8 | 831 | +0% | never |
-| 12.9 | dog_count r2 | 847 | +7% | 262 s |
-| 13.2 | reel r5 | 872 | +4% | 411 s |
-| 13.5 | lucky_haul r4 | 880 | +3% | 685 s |
-| 13.8 | boat_speed r9 | 886 | +0% | never |
-| 14.1 | net_range r9 | 922 | +0% | never |
-| 14.4 | double_cast r3 | 949 | +2% | 1003 s |
-| 14.7 | net_width r5 | 965 | +0% | 4637 s |
-| 15.0 | dog_fetch r4 | 973 | +0% | never |
-| 15.3 | boat_volley r3 | 992 | +0% | never |
-| 15.7 | net_hold | 1000 | +9% | 217 s |
-| 16.0 | dog_strength r2 | 1015 | +0% | never |
-| 16.3 | net_range r10 | 1023 | +0% | 17999 s |
-| 16.6 | reel r6 | 1030 | +0% | 13531 s |
-| 16.9 | net_range r11 | 1136 | +0% | 19761 s |
-| 17.3 | net_width r6 | 1167 | +0% | 4925 s |
-| 17.6 | lucky_haul r5 | 1197 | +0% | never |
-| 18.0 | reel r7 | 1215 | +0% | 14956 s |
-| 18.3 | boat_speed r10 | 1240 | +3% | 650 s |
-| 18.7 | fleet r3 | 1250 | +19% | 112 s |
-| 19.0 | net_range r12 | 1261 | +0% | never |
-| 19.3 | dog_count r3 | 1304 | +5% | 404 s |
-| 19.6 | dog_wait r3 | 1348 | +3% | 626 s |
-| 19.9 | net_range r13 | 1399 | +0% | never |
-| 20.3 | net_width r7 | 1412 | +0% | 5335 s |
-| 20.7 | reel r8 | 1434 | +3% | 770 s |
-| 21.0 | double_cast r4 | 1461 | +2% | 1131 s |
-| 21.4 | recycle_bonus | 1500 | +6% | 370 s |
-| 21.8 | net_range r14 | 1553 | +0% | never |
-| 22.2 | cargo r5 | 1563 | +0% | never |
-| 22.5 | lucky_haul r6 | 1628 | +2% | 1209 s |
-| 22.9 | reel r9 | 1692 | +3% | 916 s |
-| 23.3 | net_width r8 | 1709 | +1% | 5599 s |
-| 23.8 | net_range r15 | 1724 | +0% | never |
-| 24.3 | boat_speed r11 | 1736 | +0% | never |
-| 24.9 | net_hold r2 | 1820 | +16% | 201 s |
-| 25.4 | net_range r16 | 1914 | +0% | never |
-| 25.9 | reel r10 | 1996 | +3% | 1033 s |
-| 26.4 | dog_strength r3 | 2060 | +0% | never |
-| 27.0 | net_width r9 | 2068 | +1% | 6231 s |
-| 27.5 | net_range r17 | 2124 | +0% | never |
-| 28.1 | lucky_haul r7 | 2215 | +2% | 1615 s |
-| 28.7 | double_cast r5 | 2250 | +3% | 1313 s |
-| 29.3 | reel r11 | 2355 | +3% | 1279 s |
-| 29.8 | net_range r18 | 2358 | +0% | never |
-| 30.5 | recycle_bonus r2 | 2415 | +6% | 656 s |
-| 31.1 | boat_speed r12 | 2430 | +0% | never |
-| 31.7 | boat_volley r4 | 2470 | +0% | never |
-| 32.3 | net_width r10 | 2502 | +1% | 6793 s |
-| 32.8 | net_range r19 | 2617 | +0% | never |
-| 33.5 | reel r12 | 2779 | +3% | 1571 s |
-| 34.2 | net_range r20 | 2905 | +0% | never |
-| 34.9 | lucky_haul r8 | 3012 | +2% | 2041 s |
-| 35.7 | net_width r11 | 3027 | +1% | 7691 s |
-| 36.4 | reel r13 | 3279 | +2% | 1973 s |
-| 37.2 | net_hold r3 | 3312 | +13% | 347 s |
-| 37.8 | boat_speed r13 | 3402 | +0% | never |
-| 38.6 | double_cast r6 | 3465 | +3% | 1502 s |
-| 39.3 | net_width r12 | 3663 | +1% | 8641 s |
-| 40.1 | reel r14 | 3870 | +2% | 2159 s |
-| 40.8 | recycle_bonus r3 | 3888 | +5% | 866 s |
-| 41.5 | cargo r6 | 3906 | +0% | never |
-| 42.3 | bird_worth | 4000 | +2% | 2299 s |
-| 43.0 | lucky_haul r9 | 4096 | +3% | 1928 s |
-| 43.8 | dog_strength r4 | 4183 | +0% | never |
-| 44.8 | net_width r13 | 4432 | +2% | 3680 s |
-| 46.3 | reel r15 | 4566 | +1% | 29404 s |
-| 54.1 | boat_speed r14 | 4762 | +0% | never |
-| 64.2 | net_strength | 5000 | +1792% | 34 s |
-| 64.8 | double_cast r7 | 5336 | +3% | 1176 s |
-| 65.3 | net_width r14 | 5363 | +0% | 8713 s |
-| 65.9 | reel r16 | 5388 | +2% | 1914 s |
-| 66.4 | lucky_haul r10 | 5571 | +2% | 1814 s |
-| 67.1 | bird_worth r2 | 5920 | +1% | 2752 s |
-| 67.7 | net_hold r4 | 6029 | +11% | 317 s |
-| 68.2 | recycle_bonus r4 | 6260 | +5% | 671 s |
-| 68.8 | reel r17 | 6358 | +2% | 2016 s |
-| 69.3 | net_width r15 | 6489 | +0% | 8137 s |
-| 69.8 | boat_speed r15 | 6667 | +0% | never |
-| 70.4 | reel r18 | 7503 | +1% | 2543 s |
-| 71.1 | net_width r16 | 7852 | +0% | 9661 s |
-| 71.8 | double_cast r8 | 8217 | +3% | 1320 s |
-| 72.4 | bird_worth r3 | 8762 | +1% | 3558 s |
-| 73.2 | reel r19 | 8853 | +1% | 3088 s |
-| 73.8 | boat_speed r16 | 9334 | +0% | never |
-| 74.6 | net_width r17 | 9501 | +0% | 10479 s |
-| 75.3 | cargo r7 | 9766 | +0% | never |
-| 76.1 | recycle_bonus r5 | 10.1k | +5% | 1005 s |
-| 76.9 | reel r20 | 10.4k | +1% | 5206 s |
-| 77.7 | net_hold r5 | 11.0k | +3% | 1989 s |
-| 78.8 | net_width r18 | 11.5k | +1% | 14343 s |
-| 85.9 | net_strength r2 | 12.2k | +2161% | 40 s |
-| 86.6 | double_cast r9 | 12.7k | +3% | 1241 s |
-| 87.3 | bird_worth r4 | 13.0k | +1% | 6281 s |
-| 87.9 | boat_speed r17 | 13.1k | +0% | never |
-| 88.6 | net_width r19 | 13.9k | +0% | 17448 s |
-| 89.4 | recycle_bonus r6 | 16.2k | +5% | 1076 s |
-| 90.3 | net_width r20 | 16.8k | +0% | 23315 s |
-| 91.2 | boat_speed r18 | 18.3k | +0% | never |
-| 92.1 | bird_worth r5 | 19.2k | +0% | 11770 s |
-| 93.0 | double_cast r10 | 19.5k | +2% | 3828 s |
-| 94.1 | net_hold r6 | 20.0k | +0% | never |
-| 112.5 | cargo r8 | 24.4k | +0% | never |
-| 147.8 | boat_speed r19 | 25.6k | +0% | never |
-| 183.8 | recycle_bonus r7 | 26.1k | +0% | never |
-| 223.0 | bird_worth r6 | 28.4k | +12% | 19573 s |
-| 259.3 | net_strength r3 | 29.5k | +3699% | 59 s |
-| 260.5 | boat_speed r20 | 35.9k | +0% | never |
-| 261.8 | net_hold r7 | 36.3k | +4% | 2182 s |
-| 263.2 | bird_worth r7 | 42.0k | +0% | never |
+| 0.2 | cargo | 40 | +36% | 23 s |
+| 0.3 | boat_speed | 60 | +14% | 66 s |
+| 0.5 | boat_speed r2 | 84 | +11% | 102 s |
+| 0.8 | cargo r2 | 100 | +26% | 46 s |
+| 0.9 | boat_speed r3 | 118 | +9% | 124 s |
+| 1.1 | bird_worth | 120 | +0% | 4200 s |
+| 1.3 | net_range | 150 | +1% | 2410 s |
+| 1.6 | boat_volley | 160 | +0% | 2872 s |
+| 1.8 | boat_speed r4 | 165 | +8% | 189 s |
+| 2.1 | net_range r2 | 191 | +0% | 3925 s |
+| 2.3 | fleet | 200 | +98% | 16 s |
+| 2.5 | dog_count | 200 | +0% | never |
+| 2.7 | bird_worth r2 | 216 | +0% | 3990 s |
+| 2.8 | boat_speed r5 | 231 | +6% | 144 s |
+| 2.9 | net_range r3 | 242 | +0% | 5053 s |
+| 3.1 | cargo r3 | 250 | +20% | 46 s |
+| 3.3 | net_range r4 | 307 | +0% | 7833 s |
+| 3.4 | boat_speed r6 | 323 | +6% | 183 s |
+| 3.6 | lucky_haul | 350 | +0% | never |
+| 3.8 | bird_worth r3 | 389 | +0% | 5518 s |
+| 4.0 | net_range r5 | 390 | +1% | 1191 s |
+| 4.2 | boat_volley r2 | 398 | +1% | 1657 s |
+| 4.4 | double_cast | 400 | +0% | never |
+| 4.6 | dog_count r2 | 400 | +0% | never |
+| 4.8 | net_width | 450 | +0% | 2711 s |
+| 5.0 | reel | 450 | +0% | 4218 s |
+| 5.3 | boat_speed r7 | 452 | +5% | 273 s |
+| 5.5 | lucky_haul r2 | 476 | +0% | never |
+| 5.7 | net_range r6 | 496 | +0% | 9219 s |
+| 5.9 | fleet r2 | 500 | +10% | 133 s |
+| 6.1 | dog_fetch | 500 | +9% | 146 s |
+| 6.3 | reel r2 | 531 | +9% | 147 s |
+| 6.4 | net_width r2 | 545 | +1% | 2267 s |
+| 6.7 | dog_wait | 600 | +2% | 700 s |
+| 6.9 | double_cast r2 | 616 | +2% | 762 s |
+| 7.2 | cargo r4 | 625 | +0% | never |
+| 7.3 | reel r3 | 627 | +7% | 209 s |
+| 7.6 | net_range r7 | 629 | +0% | never |
+| 7.8 | boat_speed r8 | 633 | +0% | never |
+| 8.1 | lucky_haul r3 | 647 | +3% | 568 s |
+| 8.3 | net_width r3 | 659 | +1% | 2245 s |
+| 8.6 | bird_worth r4 | 700 | +1% | 2680 s |
+| 8.8 | reel r4 | 739 | +5% | 287 s |
+| 9.1 | net_width r4 | 797 | +1% | 2094 s |
+| 9.3 | net_range r8 | 799 | +0% | never |
+| 9.7 | dog_count r3 | 800 | +5% | 311 s |
+| 9.9 | reel r5 | 872 | +4% | 397 s |
+| 10.2 | lucky_haul r4 | 880 | +2% | 685 s |
+| 10.5 | boat_speed r9 | 886 | +0% | never |
+| 10.8 | dog_fetch r2 | 900 | +2% | 875 s |
+| 11.1 | double_cast r3 | 949 | +2% | 924 s |
+| 11.3 | net_width r5 | 965 | +1% | 2168 s |
+| 11.6 | boat_volley r3 | 992 | +0% | never |
+| 11.9 | net_hold | 1000 | +16% | 107 s |
+| 12.2 | net_range r9 | 1015 | +0% | never |
+| 12.4 | reel r6 | 1030 | +4% | 423 s |
+| 12.8 | net_width r6 | 1167 | +1% | 2344 s |
+| 13.1 | lucky_haul r5 | 1197 | +2% | 885 s |
+| 13.3 | dog_strength | 1200 | +0% | never |
+| 13.7 | reel r7 | 1215 | +3% | 556 s |
+| 13.9 | boat_speed r10 | 1240 | +0% | never |
+| 14.3 | fleet r3 | 1250 | +0% | never |
+| 14.5 | bird_worth r5 | 1260 | +1% | 2231 s |
+| 14.8 | net_range r10 | 1289 | +0% | never |
+| 15.2 | dog_wait r2 | 1320 | +2% | 817 s |
+| 15.5 | net_width r7 | 1412 | +1% | 2261 s |
+| 15.8 | reel r8 | 1434 | +3% | 726 s |
+| 16.2 | double_cast r4 | 1461 | +2% | 958 s |
+| 16.5 | recycle_bonus | 1500 | +6% | 350 s |
+| 16.8 | cargo r5 | 1563 | +0% | never |
+| 17.2 | dog_fetch r3 | 1620 | +0% | never |
+| 17.5 | lucky_haul r6 | 1628 | +2% | 1045 s |
+| 17.8 | net_range r11 | 1637 | +0% | never |
+| 18.3 | reel r9 | 1692 | +3% | 863 s |
+| 18.6 | net_width r8 | 1709 | +1% | 2365 s |
+| 18.9 | boat_speed r11 | 1736 | +0% | never |
+| 19.3 | net_hold r2 | 1820 | +14% | 176 s |
+| 19.7 | reel r10 | 1996 | +2% | 1106 s |
+| 20.1 | net_width r9 | 2068 | +4% | 757 s |
+| 20.5 | net_range r12 | 2079 | +9% | 316 s |
+| 21.0 | lucky_haul r7 | 2215 | +2% | 1379 s |
+| 21.5 | double_cast r5 | 2250 | +2% | 1228 s |
+| 21.9 | bird_worth r6 | 2268 | +1% | 2246 s |
+| 22.4 | reel r11 | 2355 | +2% | 1755 s |
+| 22.9 | recycle_bonus r2 | 2415 | +5% | 798 s |
+| 23.4 | boat_speed r12 | 2430 | +0% | never |
+| 24.1 | boat_volley r4 | 2470 | +0% | never |
+| 24.9 | net_width r10 | 2502 | +3% | 2639 s |
+| 26.4 | dog_strength r2 | 2640 | +0% | never |
+| 30.6 | net_range r13 | 2641 | +525% | 48 s |
+| 31.3 | reel r12 | 2779 | +2% | 2814 s |
+| 32.0 | dog_wait r3 | 2904 | +0% | never |
+| 33.0 | dog_fetch r4 | 2916 | +0% | never |
+| 36.1 | lucky_haul r8 | 3012 | +0% | never |
+| 40.7 | net_width r11 | 3027 | +9% | 2992 s |
+| 45.2 | reel r13 | 3279 | +2% | 13737 s |
+| 49.6 | net_hold r3 | 3312 | +0% | never |
+| 54.1 | net_range r14 | 3354 | +512% | 53 s |
+| 54.8 | boat_speed r13 | 3402 | +0% | never |
+| 55.7 | double_cast r6 | 3465 | +1% | 8504 s |
+| 56.8 | net_strength | 3500 | +1191% | 22 s |
+| 57.3 | net_width r12 | 3663 | +1% | 3305 s |
+| 57.6 | reel r14 | 3870 | +2% | 1246 s |
+| 58.0 | recycle_bonus r3 | 3888 | +5% | 440 s |
+| 58.3 | cargo r6 | 3906 | +0% | never |
+| 58.8 | bird_worth r7 | 4082 | +1% | 2632 s |
+| 59.1 | lucky_haul r9 | 4096 | +2% | 1225 s |
+| 59.5 | net_range r15 | 4259 | +0% | never |
+| 59.9 | net_width r13 | 4432 | +1% | 3419 s |
+| 60.3 | reel r15 | 4566 | +2% | 1549 s |
+| 60.8 | boat_speed r14 | 4762 | +0% | never |
+| 61.3 | double_cast r7 | 5336 | +3% | 1034 s |
+| 61.8 | net_width r14 | 5363 | +1% | 3848 s |
+| 62.3 | reel r16 | 5388 | +2% | 1908 s |
+| 62.8 | net_range r16 | 5409 | +0% | never |
+| 63.3 | lucky_haul r10 | 5571 | +2% | 1851 s |
+| 63.8 | dog_strength r3 | 5808 | +0% | never |
+| 64.4 | net_hold r4 | 6029 | +11% | 324 s |
+| 64.9 | recycle_bonus r4 | 6260 | +5% | 685 s |
+| 65.5 | reel r17 | 6358 | +1% | 2156 s |
+| 66.0 | net_width r15 | 6489 | +1% | 4372 s |
+| 66.5 | boat_speed r15 | 6667 | +0% | never |
+| 67.1 | net_range r17 | 6870 | +0% | never |
+| 67.8 | bird_worth r8 | 7347 | +1% | 3308 s |
+| 68.3 | reel r18 | 7503 | +1% | 2818 s |
+| 69.0 | net_width r16 | 7852 | +1% | 4614 s |
+| 69.7 | double_cast r8 | 8217 | +3% | 1340 s |
+| 70.4 | net_range r18 | 8725 | +0% | never |
+| 71.2 | reel r19 | 8853 | +1% | 3565 s |
+| 72.0 | boat_speed r16 | 9334 | +0% | never |
+| 72.8 | net_width r17 | 9501 | +2% | 2938 s |
+| 73.6 | net_strength r2 | 9590 | +80% | 76 s |
+| 74.2 | cargo r7 | 9766 | +0% | never |
+| 74.8 | recycle_bonus r5 | 10.1k | +5% | 784 s |
+| 75.3 | reel r20 | 10.4k | +1% | 2968 s |
+| 75.9 | net_hold r5 | 11.0k | +10% | 374 s |
+| 76.5 | net_range r19 | 11.1k | +0% | never |
+| 77.2 | net_width r18 | 11.5k | +1% | 7677 s |
+| 77.9 | double_cast r9 | 12.7k | +3% | 1342 s |
+| 78.6 | dog_strength r4 | 12.8k | +0% | never |
+| 79.3 | boat_speed r17 | 13.1k | +0% | never |
+| 80.1 | net_width r19 | 13.9k | +0% | 10385 s |
+| 80.8 | net_range r20 | 14.1k | +0% | never |
+| 81.8 | recycle_bonus r6 | 16.2k | +4% | 1352 s |
+| 82.8 | net_width r20 | 16.8k | +0% | 14685 s |
+| 83.8 | boat_speed r18 | 18.3k | +0% | never |
+| 85.0 | double_cast r10 | 19.5k | +3% | 2412 s |
+| 86.2 | net_hold r6 | 20.0k | +3% | 3623 s |
+| 90.0 | cargo r8 | 24.4k | +0% | never |
+| 116.0 | boat_speed r19 | 25.6k | +0% | never |
+| 142.5 | recycle_bonus r7 | 26.1k | +0% | never |
+| 169.1 | net_strength r3 | 26.3k | +3045% | 52 s |
+| 170.3 | boat_speed r20 | 35.9k | +0% | never |
+| 171.4 | net_hold r7 | 36.3k | +4% | 2008 s |
+| 172.9 | recycle_bonus r8 | 42.1k | +4% | 6085 s |
+| 269.2 | net_hold r8 | 66.1k | +0% | never |

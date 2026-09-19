@@ -258,6 +258,24 @@ for what they do, and Strength is the game changer that belongs in the middle of
   (`Lake._logs_play`): `tools/shot_menus` hung its lake off the root with no save path of
   its own, wore the front over every board it photographed and wrote two lines into the
   real log before it was fixed. **Turn the log off before a release export.**
+- **The first logged run** (2026-09-18 evening, `docs/progression/playtests/
+  2026-09-18_shop_run1.log`): **64.5 min** against the sim's 64.2, Strength at 15.4 / 24.6 /
+  32.7 / 39.9, the first 20 minutes' Waiting at 31 or under. What it showed the sim had wrong:
+  **minutes 5 to 15 stalled** (0.6 pieces a second, income flat at about 20/s — the sim has
+  three times that; the tier-0 water in reach ran dry on Range 2 to 5 while 5000 was being
+  saved for Strength), and **Waiting ran 195 to 814 from minute 22 to 48** because the fleet
+  tops out at about 6.7 pieces a second and the net lands 7 (Richard: the pile-up is fine, it
+  drains at the end). 43.5k unspent at the end; Pigeons untouched until minute 50 with 196
+  birds netted; eleven dog levels bought in one visit at minute 21.
+- **Richard's tweaks off that run, priced by hand and pinned** (`price_shop.py` `HAND`, the
+  loop leaves them alone): Strength **3500 x 2.74** (the first tier was too dear; the top
+  stays at about 72k, where he maxed it at 40 min); **Hold 8 + 3 a level, 32 at the top**
+  (the boats carry more a trip; fleet capacity about 8.9 a second); Range **150 x 1.27**
+  (cheap to start, dear to finish — it crosses the old ladder at level 8); Pigeons **120 x
+  1.8**, "really early game"; the Pack **200 x 2** and the rest of the dogs dearer (Fetch
+  500 x 1.8, Keenness 600 x 2.2, Carry 1200 x 2.2). Sim with them: 59.7 min, Strength 9.7 /
+  18.4 / 24.5 / 32.6 — read those against the sim's early game being too rich. **The late
+  surplus and the run's length are left for the next session**, by Richard's call.
 - **Owed to close #23**: Richard plays one fresh logged run; the log is replayed into the
   sim's calibration (`k_catch_scale`, `k_aim`, the dogs), one more `shop_loop.sh`, times
   recorded on the issue and in `docs/scope-lock.md`.
