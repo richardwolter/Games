@@ -324,6 +324,13 @@ var _economy: EconomyConfig
 
 ## How close to the shed the angler has to stand to open it, in tiles.
 const SHOP_RANGE := 3.2
+## Where the pump stands, in tiles off the middle of the hut's walls: out past the near
+## right wall, clear of the roof's overhang, on the side the door is not. And how close the
+## angler has to be to work it — well inside `SHOP_RANGE`, which the pump stands within, so
+## beside the pump the key is the pump's and everywhere else round the hut it is the door's.
+## By eye on `tools/shot_pump.tscn`.
+const PUMP_AT := Vector2(2.1, -0.5)
+const PUMP_RANGE := 1.5
 
 ## How art is sized when it is floating in the lake.
 ##
@@ -553,6 +560,11 @@ var _sheets: Sheets
 ## edits alongside it, and a packed array would hand it a copy that stops agreeing with
 ## this one the moment either side changes.
 var unlocked: Array[String] = []
+## Finds that have been netted and not yet washed, oldest first (issue #37). **Must wash to
+## place**: a find waits here, at the pump, and only moves to `unlocked` — the shed's shelf —
+## once it has come clean on the wash stand. Saved as names; an older save has no such key
+## and everything it holds in `unlocked` is simply washed already.
+var unwashed: Array[String] = []
 
 ## What the player has put where, as `{piece, cell}` rows. Owned here rather than by the
 ## room so it saves with everything else.
@@ -605,6 +617,11 @@ var _boats: Array[Boat] = []
 var _angler: Angler
 var _net: CastNet
 var _yard: Yard
+## The water pump beside the hut, where a find is washed before the shed will take it
+## (issue #37). See `Pump`.
+var _pump: Pump
+var _wash: WashRoom
+var _wash_open := false
 
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
@@ -1028,6 +1045,16 @@ func _ready() -> void:
 	# The angler is told as well, but for the opposite reason: the dog walks to the crate and
 	# the player walks round it.
 	_angler.crate_tile = _dog.crate_tile
+
+	# The pump, on the crate's own layer: a walker north of it is put a band under, see
+	# `_walker_layer`. Nobody is told where it is — `Pump.tile` is a static the walkers ask.
+	_pump = Pump.new()
+	_pump.name = &"Pump"
+	_pump.day = _day
+	_pump.z_index = CRATE_LAYER
+	Pump.tile = Iso.shed_centre() + PUMP_AT
+	_pump.position = Iso.tile_to_world(Pump.tile.x, Pump.tile.y)
+	add_child(_pump)
 
 	# The flock is drawn over the whole lake (2026-09-16, Richard's call): birds are the one
 	# thing here that is genuinely in the air, and at z 6 they were cut in half by a pier
@@ -1848,6 +1875,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				# the shop board, and only on open water does it mean the settings.
 				if _controls_open:
 					_shut(_set_controls)
+				elif _wash_open:
+					_shut(_set_wash)
 				elif _shed_open:
 					_shut(_set_shed)
 				elif _menu_open:
@@ -1886,10 +1915,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _desk_pressed(event, &"interact"):
 		if _settings_open or _controls_open:
 			return
-		if _shed_open:
+		if _wash_open:
+			_shut(_set_wash)
+		elif _shed_open:
 			_shut(_set_shed)
 		elif _menu_open:
 			_shut(_set_menu)
+		elif _at_pump():
+			_open_wash()
 		elif _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
@@ -1985,7 +2018,7 @@ func _desk_pressed(event: InputEvent, action: StringName) -> bool:
 
 ## Whether any board is over the lake.
 func _panelled() -> bool:
-	return _settings_open or _menu_open or _shed_open or _controls_open
+	return _settings_open or _menu_open or _shed_open or _controls_open or _wash_open
 
 
 ## F11, and the window row's two ordinary modes. Borderless rather than exclusive: the lake
@@ -2004,7 +2037,7 @@ func _flip_fullscreen() -> void:
 func pad_cursor_wanted() -> bool:
 	return (
 		_menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
-		or _in_menu
+		or _in_menu or _wash_open
 	)
 
 
@@ -2075,7 +2108,9 @@ func _pad_buttons(busy: bool) -> void:
 		_set_shed(true)
 		return
 	if Input.is_action_just_pressed(&"interact"):
-		if _at_shed():
+		if _at_pump():
+			_open_wash()
+		elif _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
 			_dog_in_reach().pet()
@@ -2162,6 +2197,58 @@ func _double_spot(target: Vector2) -> Vector2:
 ## between the door opening on the near side and on the far one.
 func _at_shed() -> bool:
 	return _angler.tile_pos.distance_to(Iso.shed_centre()) < SHOP_RANGE
+
+
+## The wash room, up or down. Built the first time it is asked for, on the HUD's layer over
+## the skin, the way the shed's room lies over it. Going down takes whatever was on the
+## stand off it unwashed and unpaid for — the room's own rule.
+func _set_wash(open: bool) -> void:
+	if open and _wash == null:
+		_wash = WashRoom.new()
+		_wash.name = &"WashRoom"
+		_wash.sheets = _sheets
+		_wash.purse = func() -> float: return sludge
+		_wash.washed.connect(_on_find_washed)
+		_wash.close_asked.connect(_shut.bind(_set_wash))
+		_skin.get_parent().add_child(_wash)
+	if _wash == null:
+		return
+	if open and not _wash_open and _sfx != null:
+		_sfx.play(&"shed_open")
+	_wash_open = open
+	_wash.waiting = unwashed
+	_wash.open(open)
+	_skin.visible = not open
+	if _coins != null:
+		_coins.visible = not open
+		if open:
+			_coins.clear()
+	_push_rooms()
+
+
+func _open_wash() -> void:
+	if _panelled():
+		return
+	_set_wash(true)
+
+
+## A find has come clean on the stand: the soap is paid for now, not when it was picked, and
+## the find goes on the shed's shelf. Saved on the spot, like everything else kept.
+func _on_find_washed(piece: StringName, soap: int) -> void:
+	var name := String(piece)
+	if not unwashed.has(name):
+		return
+	unwashed.erase(name)
+	unlocked.append(name)
+	sludge = maxf(sludge - float(soap), 0.0)
+	if _room != null:
+		_room.unlocked = unlocked
+	_note_save("%s — clean, and in the shed" % _pretty(name))
+
+
+## Close enough to the pump to work it. Asked before `_at_shed`, which it stands inside.
+func _at_pump() -> bool:
+	return Pump.tile != Vector2.INF and _angler.tile_pos.distance_to(Pump.tile) < PUMP_RANGE
 
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
@@ -2712,7 +2799,8 @@ func _push_rooms() -> void:
 	# the radio, the ambience, and the money. See `Sfx.WHILE_SHOPPING`.
 	if _sfx != null:
 		_sfx.shopping = _menu_open
-		_sfx.indoors = _shed_open
+		# The wash room covers the lake as the shed's does, and is as deaf to it.
+		_sfx.indoors = _shed_open or _wash_open
 	var music := MusicStation.main()
 	if music == null:
 		return
@@ -2861,6 +2949,7 @@ func _enter_menu(at_once: bool) -> void:
 	_set_settings(false)
 	_set_menu(false)
 	_set_shed(false)
+	_set_wash(false)
 	_pose_world(at_once)
 	_hud_layer.visible = false
 	if _coins != null:
@@ -3261,16 +3350,18 @@ func _keep(def: TrashDef) -> void:
 	# Kept up to the number that were hidden. It used to be one of anything, which was the
 	# same rule as "one of each was planted"; now the chairs come four to a set, and the
 	# shelf has to hold four of them without holding a fifth that was never in the water.
+	# Washed or waiting, a copy is a copy: counted over both lists.
 	var held := 0
-	for kept: String in unlocked:
+	for kept: String in unlocked + unwashed:
 		if kept == name:
 			held += 1
 	if _sheets != null and held >= _sheets.copies_of(StringName(name)):
 		return
-	unlocked.append(name)
+	# To the pump, not to the shelf (issue #37): it is washed before the shed will have it.
+	unwashed.append(name)
 	_note_save(
-		"Something for the shed" if def.display_name.is_empty()
-		else "%s — it can go in the shed" % def.display_name
+		"Something for the shed — wash it at the pump" if def.display_name.is_empty()
+		else "%s — wash it at the pump" % def.display_name
 	)
 	# Held up in the middle of the screen as well as written in the corner. The shed is two
 	# clicks away, so without this the player never sees what they found.
@@ -4191,6 +4282,14 @@ func _walker_layer(at: Vector2) -> int:
 	if off.x < Yard.FOOT_HALF and off.y < Yard.FOOT_HALF \
 			and absf(at.x - _yard.position.x) < Yard.CRATE.x * 0.5:
 		return BEHIND_CRATE
+	# And behind the pump, the crate's rule over again: it stands on the crate's layer, the
+	# two are nowhere near each other, and the band under that layer is over the hut — which
+	# is right, because the pump stands in front of the hut's wall.
+	if _pump != null:
+		var from := Iso.world_to_tile(at - _pump.position)
+		if from.x < Pump.FOOT_HALF and from.y < Pump.FOOT_HALF \
+				and absf(at.x - _pump.position.x) < _pump.drawn_wide() * 0.5:
+			return BEHIND_CRATE
 	return IN_FRONT
 
 
@@ -4748,6 +4847,7 @@ func save_game() -> bool:
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
+		"unwashed": unwashed,
 		"decor": decor,
 		"afloat": afloat,
 		"stacks": _grid.stacks,
@@ -4827,6 +4927,13 @@ func load_game() -> bool:
 			continue
 		if _sheets == null or _sheets.has(StringName(name)):
 			unlocked.append(name)
+	# What was waiting at the pump. No such key in an older save, and nothing waiting.
+	unwashed.clear()
+	for name: String in save.get("unwashed", []) as Array:
+		if _pretty(name).is_empty():
+			continue
+		if _sheets == null or _sheets.has(StringName(name)):
+			unwashed.append(name)
 	decor.clear()
 	for row: Dictionary in save.get("decor", []) as Array:
 		var name := String(row.get("piece", ""))
@@ -5119,7 +5226,10 @@ func _draw_shed_blocked(at: Vector2) -> void:
 ## A lamp over the door when the shed can be used. Cheaper to read than a floating label,
 ## and it does not need a font at four different zoom levels.
 func _draw_shed_lamp(at: Vector2) -> void:
-	if not _at_shed() or _menu_open:
+	# Beside the pump the key is the pump's, and the lamp is over that instead.
+	if _pump != null:
+		_pump.lit = _at_pump() and not _menu_open
+	if not _at_shed() or _at_pump() or _menu_open:
 		return
 	var over := at + Vector2(0.0, -Iso.SHED_TALL - 10.0)
 	_island.draw_circle(over, 7.0, Color(1.0, 0.92, 0.62, 0.9))

@@ -176,6 +176,8 @@ func _sow() -> void:
 						continue
 					if Iso.in_shed(at.x, at.y, Iso.SHED_COVER):
 						continue
+					if Pump.covers(at, 0.5):
+						continue
 					if crate_tile != Vector2.INF and Yard.covers(crate_tile, at, 0.6):
 						continue
 					var water := _water_beside(at, kind)

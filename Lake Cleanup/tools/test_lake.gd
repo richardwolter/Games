@@ -171,6 +171,8 @@ func _physics_process(_delta: float) -> void:
 		31:
 			_stage_binds_shape()
 		32:
+			_stage_wash()
+		33:
 			_stage_front()
 		_:
 			pass
@@ -2701,13 +2703,33 @@ func _stage_shed() -> void:
 		return
 
 	# Landing one is what keeps it, and it must not reach the pile or a merchant.
+	#
+	# Kept at the pump, not on the shelf (issue #37): a find is washed before the shed will
+	# have it, and the soap is paid for when it comes clean.
 	var unlocked: Array = _main.get(&"unlocked")
+	var unwashed: Array = _main.get(&"unwashed")
 	unlocked.clear()
+	unwashed.clear()
 	_yard.held.resize(0)
 	_main.call(&"_on_net_landed", PackedInt32Array([find_index, find_index]))
-	_check(unlocked.size() == 1 and String(unlocked[0]) == String(find.piece),
+	_check(unwashed.size() == 1 and String(unwashed[0]) == String(find.piece),
 		"a find is kept, once, however many turn up",
-		"%d kept" % unlocked.size())
+		"%d kept" % unwashed.size())
+	_check(unlocked.is_empty(), "and it waits at the pump, not on the shed's shelf",
+		"%d on the shelf" % unlocked.size())
+	var purse_was: float = _main.get(&"sludge")
+	_main.set(&"sludge", 40.0)
+	_main.call(&"_on_find_washed", StringName(find.piece), 15)
+	_check(unwashed.is_empty() and unlocked.size() == 1
+		and String(unlocked[0]) == String(find.piece),
+		"washed, it goes on the shelf and leaves the pump",
+		"%d waiting, %d on the shelf" % [unwashed.size(), unlocked.size()])
+	_check(is_equal_approx(float(_main.get(&"sludge")), 25.0),
+		"and the soap is paid for when it comes clean", "%.0f left of 40" % float(_main.get(&"sludge")))
+	_main.call(&"_on_find_washed", StringName(find.piece), 15)
+	_check(unlocked.size() == 1 and is_equal_approx(float(_main.get(&"sludge")), 25.0),
+		"a find that is not waiting cannot be washed twice", "")
+	_main.set(&"sludge", purse_was)
 	_check(_yard.held.is_empty(), "a find never joins the pile to be sold",
 		"%d in the yard" % _yard.held.size())
 
@@ -2732,12 +2754,19 @@ func _stage_shed() -> void:
 				many_index = i
 				break
 		unlocked.clear()
+		unwashed.clear()
 		for attempt in wanted + 1:
 			_main.call(&"_on_net_landed", PackedInt32Array([many_index]))
+		# Two of them washed and two still waiting: a copy is a copy on either list.
+		for wash in 2:
+			_main.call(&"_on_find_washed", StringName(many), 0)
+		_main.call(&"_on_net_landed", PackedInt32Array([many_index]))
 		var held := 0
-		for kept: String in unlocked:
+		for kept: String in unlocked + unwashed:
 			if kept == many:
 				held += 1
+		while unwashed.has(many):
+			_main.call(&"_on_find_washed", StringName(many), 0)
 		_check(held == wanted, "a find that comes in fours is kept four times and no more",
 			"%s: %d kept of %d" % [many, held, wanted])
 
@@ -2754,7 +2783,9 @@ func _stage_shed() -> void:
 			"%d listed, %d after one was placed" % [before, room.in_store().size()])
 		many_decor.clear()
 		unlocked.clear()
+		unwashed.clear()
 		_main.call(&"_on_net_landed", PackedInt32Array([find_index]))
+		_main.call(&"_on_find_washed", StringName(find.piece), 0)
 
 	# The room.
 	var inside := Vector2i(2, 2)
@@ -5505,6 +5536,124 @@ func _check_loading() -> void:
 	_check(whole and not loading.dressed() and loading.visible,
 		"the curtain holds the screen whole, then takes the logo and the bar off in one frame", "")
 	curtain.queue_free()
+
+
+## The pump beside the hut and the wash room it opens (issue #37): a find waits at the pump,
+## is picked off a tray if the purse covers its soap, is washed on the stand, and only then
+## reaches the shed — paid for when it comes clean, and not at all if the player walks away.
+func _stage_wash() -> void:
+	var sheets: Sheets = _main.get(&"_sheets")
+	_check(Pump.tile != Vector2.INF, "the pump stands somewhere", str(Pump.tile))
+	_check(Iso.on_island_ground(Pump.tile) and not Iso.in_shed(Pump.tile.x, Pump.tile.y, 0.3),
+		"on the island's ground, clear of the hut's walls", str(Pump.tile))
+	_check(not Yard.covers(_angler.crate_tile, Pump.tile, 1.0), "and clear of the crate", "")
+	_check(Pump.covers(Pump.tile) and not Pump.covers(Pump.tile + Vector2(1.0, 0.0)),
+		"it covers its own square and no more", "")
+
+	# Walked round, not through, and sorted behind when north of it.
+	var stood := _angler.tile_pos
+	_angler.tile_pos = Pump.tile + Vector2(1.0, 1.0)
+	_check(not bool(_angler.call(&"_can_stand", Pump.tile)), "the angler cannot stand in it", "")
+	_check(bool(_main.call(&"_at_pump")), "but beside it is close enough to work it", "")
+	var pump: Node2D = _main.get(&"_pump")
+	var north := Iso.tile_to_world(Pump.tile.x - 0.5, Pump.tile.y - 0.5)
+	var south := Iso.tile_to_world(Pump.tile.x + 0.6, Pump.tile.y + 0.6)
+	_check(int(_main.call(&"_walker_layer", north)) < pump.z_index,
+		"somebody north of the pump is drawn behind it",
+		"%d under %d" % [int(_main.call(&"_walker_layer", north)), pump.z_index])
+	_check(int(_main.call(&"_walker_layer", south)) > pump.z_index,
+		"and somebody south of it in front", "")
+	_angler.tile_pos = Pump.tile + Vector2(6.0, 6.0)
+	_check(not bool(_main.call(&"_at_pump")), "away from it the key is not the pump's", "")
+	_angler.tile_pos = stood
+
+	# The room.
+	var find := ""
+	for name: String in sheets.names:
+		if WashRoom.is_find(sheets, name) and name != "decor_bed":
+			find = name
+			break
+	var unlocked: Array = _main.get(&"unlocked")
+	var unwashed: Array = _main.get(&"unwashed")
+	var shelf_was := unlocked.duplicate()
+	var purse_was: float = _main.get(&"sludge")
+	# An empty shelf for this: the stages before it leave their own finds on it, this one's
+	# among them, and "not on the shelf yet" has to mean something.
+	unlocked.clear()
+	unwashed.clear()
+	unwashed.append(find)
+	_main.set(&"sludge", 0.0)
+	_main.call(&"_set_wash", true)
+	var room: WashRoom = _main.get(&"_wash")
+	_check(room != null and room.visible and bool(_main.call(&"_panelled")),
+		"working the pump opens the wash room, and it holds the lake's hands", "")
+	var soap := room.soap_of(StringName(find))
+	var prices := {}
+	for name: String in sheets.names:
+		if WashRoom.is_find(sheets, name):
+			prices[room.soap_of(StringName(name))] = true
+	_check(prices.size() == 3 and prices.has(5) and prices.has(10) and prices.has(15),
+		"soap is 5, 10 or 15, and the catalogue has finds at all three", str(prices.keys()))
+	_check(not room.pick(StringName(find)) and room.on_stand() == &"",
+		"a purse that cannot cover the soap leaves the find on the tray", "")
+	_main.set(&"sludge", 100.0)
+	_check(room.pick(StringName(find)) and room.on_stand() == StringName(find),
+		"one that can puts it on the stand", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), 100.0), "and nothing is charged for picking", "")
+
+	# Walked away from half washed: back on the tray, unpaid for.
+	var stand := room.stand()
+	var box := stand.piece_box()
+	for k in 40:
+		stand.spray(box.position + box.size * Vector2(0.5, float(k) / 40.0), true)
+		stand.call(&"_process", 0.05)
+	var part := stand.share_clean()
+	_check(part > 0.02 and part < 0.99, "spraying it wears the coat away", "%.2f clean" % part)
+	_main.call(&"_set_wash", false)
+	_check(unwashed.has(find) and not unlocked.has(find)
+		and is_equal_approx(float(_main.get(&"sludge")), 100.0),
+		"walking away leaves it unwashed and unpaid for", "")
+	_main.call(&"_set_wash", true)
+	_check(room.on_stand() == &"" and stand.state == WashStand.State.EMPTY,
+		"and the stand is bare when the room comes back", "")
+
+	# Washed right through.
+	room.pick(StringName(find))
+	_check(is_zero_approx(stand.share_clean()), "picked again it wears its whole coat again",
+		"%.2f clean" % stand.share_clean())
+	var passes := 0
+	while stand.state == WashStand.State.WASHING and passes < 4000:
+		var along := float(passes % 60) / 60.0
+		var down := float((passes / 60) % 12) / 12.0 + 0.04
+		stand.spray(box.position + box.size * Vector2(along, down), true)
+		stand.call(&"_process", 0.05)
+		passes += 1
+	_check(stand.state != WashStand.State.WASHING, "sprayed all over, it finishes by itself",
+		"%d passes, %.3f clean" % [passes, stand.share_clean()])
+	for k in 60:
+		stand.call(&"_process", 0.05)
+	_check(unlocked.has(find) and not unwashed.has(find),
+		"clean, it is on the shed's shelf and off the tray", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), 100.0 - float(soap)),
+		"and the soap was charged then, once", "%.0f left, soap %d" % [float(_main.get(&"sludge")), soap])
+
+	# Saved as a name, read back as one.
+	unwashed.append(find)
+	_check(bool(_main.call(&"save_game")), "a find waiting at the pump is written out", "")
+	unwashed.clear()
+	_check(bool(_main.call(&"load_game")), "and read back", "")
+	unwashed = _main.get(&"unwashed")
+	_check(unwashed.size() == 1 and String(unwashed[0]) == find, "still waiting",
+		str(unwashed))
+
+	_main.call(&"_set_wash", false)
+	unwashed.clear()
+	unlocked = _main.get(&"unlocked")
+	unlocked.clear()
+	unlocked.append_array(shelf_was)
+	_main.set(&"sludge", purse_was)
+	_main.call(&"save_game")
+	_advance()
 
 
 func _stage_front() -> void:

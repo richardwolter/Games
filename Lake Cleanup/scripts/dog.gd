@@ -910,6 +910,9 @@ func _bumped(where: Vector2) -> Array:
 			and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
 		var half := Yard.FOOT_HALF + Yard.WALK_KEEP
 		return [crate_tile, Vector2(half, half)]
+	if Pump.covers(where, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
+		var side := Pump.FOOT_HALF + Pump.WALK_KEEP
+		return [Pump.tile, Vector2(side, side)]
 	return []
 
 
@@ -995,6 +998,9 @@ func _may_stand(tile: Vector2) -> bool:
 	# handled this way; the shed was not, and a dog that started inside the footprint (an old
 	# save, or the hut growing under it) could never leave.
 	if Iso.in_shed(tile.x, tile.y, Iso.SHED_KEEP) 			and not Iso.in_shed(tile_pos.x, tile_pos.y, Iso.SHED_KEEP):
+		return false
+	# Round the pump, on the same terms.
+	if Pump.covers(tile, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
 		return false
 	# Round the crate, not through it; and never refused to a dog already inside, which would
 	# wall it in.

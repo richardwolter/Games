@@ -296,8 +296,9 @@ for what they do, and Strength is the game changer that belongs in the middle of
   thin part of the game (few green spots), so it is kept short on purpose.
 - **The lake's money is finite**: about 870k in it and 812k of upgrades, so prices cannot all
   rise, and a longer run does not earn more. **The 43-56k left at the end is not a balance
-  problem and is left alone**; Richard's use for it is a one-time machine that cleans a find
-  before it goes in the shed — its own issue, the one named exception to the scope lock.
+  problem and is left alone**. The find-cleaning machine first named as its use (issue #37)
+  was built as the pump and the wash room, and **is not a sink**: soap is about 400 a run,
+  by Richard's call. See The Pump and the Wash Room.
 - **The sim is calibrated to both runs** (`docs/progression/replay_shop.py`: his purchases
   replayed at the second he made them; `read_playtest.py` reads a log on its own). The net's
   four constants went to `k_density` 0.7, `k_aim` 0.8, `k_cast_share` 0.65, `k_catch_scale`
@@ -2585,6 +2586,86 @@ fifteen verbs on two devices does not belong under a volume slider.
   resolution row being windowed-only, the physical defaults, the swap, the context sharing,
   what cannot be captured, and the file round-trip. Probe: `tools/shot_menus.tscn` also saves
   `last_menu_settings_list.png`, `last_menu_controls.png` and `last_menu_controls_capture.png`.
+
+### The Pump and the Wash Room (issue #37, 2026-09-18/19, `/grill-me` with Richard)
+A find is washed before the shed will have it. The one named exception to the scope lock.
+- **Must wash to place.** `Lake._keep` puts a netted find in `unwashed` (at the pump), not
+  `unlocked` (the shed's shelf); `_on_find_washed` moves it across. A copy is a copy on
+  either list. **Saved as names under `unwashed`; no `SAVE_VERSION` bump** — an older save
+  has no such key and everything in its `unlocked` is simply washed already, so Richard's
+  furnished save and the trailer's shed shot are untouched. The ending does not wait on
+  washing: a run still ends when the last piece is in the crate.
+- **The pump is free and there from a new game. Soap is flavour, not a sink**: 5 / 10 / 15
+  by the restored picture's area, in thirds of the catalogue (`WashRoom.soap_of`), about
+  400 over a run against the 870k the lake holds. **This supersedes issue #37's and the
+  scope lock's "paid for out of the 43-56k a run ends with"**: the surplus stays unspent,
+  by Richard's call. **Checked when a find is picked, charged when it comes clean**; a
+  purse that cannot cover it leaves the row drawn back and deaf. Walking away from a
+  half-washed find costs nothing and puts the whole coat back — the same coat, rolled off
+  the find's name — and nothing of a wash is ever saved.
+- **The pump** (`scripts/pump.gd`, `tools/build_pump.py`, `assets/pump.png`/`.json`): an
+  iron hand pump on a plank of the box's wood, a bucket under its spout, the nozzle's canvas
+  hose coiled at its side. Authored as rows of letters and inked by the builder, "rules
+  first, polish after". It stands `Lake.PUMP_AT` off the hut's walls, out past the near
+  right wall on the side the door is not, on the crate's layer; a walker north of it is put
+  on `BEHIND_CRATE`. Hemmed and swept like the hut and the crate. **`Pump.tile` is a
+  static the walkers ask** (the `Dog.pack` pattern): the angler's `_can_stand`/`_slide`,
+  the dog's `_may_stand`/`_bumped` and the flora's sow all go through `Pump.covers`, the
+  crate's own square-in-tile-space rule. E (or A) within `PUMP_RANGE` opens the room; the
+  pump stands inside `SHOP_RANGE`, so `_at_pump` is asked before `_at_shed` and the lamp
+  moves over the pump.
+- **The room** (`scripts/wash_room.gd`): the stand over the whole window and a tray of what
+  waits down the left in the shelf's wood — the find as the lake showed it, its name, its
+  soap. Click one and it goes on the stand. `_wash_open` is in `_panelled`,
+  `pad_cursor_wanted` and `Sfx.indoors`; Escape and E close it; the menu's pose closes it.
+  `find_caught` was added to `Sfx.WHILE_INDOORS` for the finish.
+- **The stand** (`scripts/wash_stand.gd`) knows nothing of money, the queue or the save.
+  **The grime is made, not painted**: a noise off the find's name over the restored view 0,
+  heavier low down and on the silhouette's edges, in the water's own filthy swatches, four
+  hard steps (scum / film / stain / clean). The lake's dirty sprite is not used — it is a
+  different drawing at a different size. `FINE` 2: grime cells are half a painted pixel,
+  which mixes two pixel sizes on one picture; 1 is the purist's knob.
+- **Drawn only, the rope's bargain**: the stream's dashes, the spray, the trickles and the
+  hose are lists of cells stepped by hand; nothing reads them back but how much grime is
+  left. The spray comes off **dirty while there is grime under the jet and white once there
+  is not**, which is the honest answer to "is this bit done". Trickles run down the
+  silhouette wearing a little away (the clean streaks), drop off edges, land again on what
+  is under them.
+- **Nothing rests on the stand** (Richard: the puddle looked bad): a drop that lands slides
+  to the nearer end or turns over the front edge, creeps down the plank's face, falls, splats
+  on the floor and is gone. `_pool` is retired.
+- **It finishes itself at `DONE_AT` 0.99** (0.93, then 0.97, by Richard's eye), and **a
+  cell that looks clean is clean** (`_wear` snaps anything under `THIN_AT` to nothing) — or
+  at 99% the player is sent to spray grime nobody can see. Then a rinse line, the finds'
+  gold stars, `find_caught`.
+- **The nozzle is one drawing, turned** (`tools/build_nozzle.py`, `assets/nozzle.png`): a
+  brass fireman's nozzle on an oak grip. **Retired, in order**: a `draw_line` turned at
+  runtime ("ugly and blocky, not pixel art"); eleven headings each drawn afresh (each lit
+  and cut anew read as a different nozzle every move); the straight one alone, never
+  turning ("lost the curving"). What stands: the straight frame drawn once by rule and
+  **that same picture turned** onto the art grid every 4 degrees to +-48 (`turned`: a
+  majority vote per pixel, the one-pixel shine and the bore kept, the outline re-inked
+  after). It glides between art pixels, eased toward the pointer and toward its heading —
+  the lake's own rule that stepping a moving thing on the grid is what reads as stiff —
+  kicks back while it sprays, breathes at rest, hangs a bead or two on its lip when let go,
+  and runs a glint down the brass on the press and on the finish.
+- **The hose is laid out every frame** (`_draw_hose`), not baked: a curve from the grip's
+  foot, leaving along the nozzle's own axis, to an anchor low and to one side
+  (`HOSE_SIDE`), its belly trailing a nozzle that moves. The builder's canvas tones and
+  edge colour come through `nozzle.json`, on the nozzle picture's own pixel grid.
+- **Placeholders, owed**: the hiss is a noise loop built in code (no recording of a jet —
+  Nuven); the stand's table and the room's wall are flat drawing.
+- **Out of scope, by decision**: pump upgrades, a timer or a score, nozzle types, stubborn
+  spots, saved masks, washing rubbish, washing a view other than the first, painted grime,
+  cellular water, any price or track change.
+- **Probes**: `tools/wash_spike.tscn` (the stand on its own, every find a key away;
+  `WASH_AUTO=1` washes one by raster and quits — what proves it runs end to end),
+  `tools/shot_pump.tscn` (desktop build, own save, under its own node:
+  `tools/last_pump.png`, `last_wash_room.png`, `last_pump.log`). `test_lake`'s
+  `_stage_wash` guards the pump's place, footprint and sorting, the three soap prices, the
+  broke refusal, no charge for picking or walking away, the bare stand on the way back, a
+  wash right through charging once and landing on the shelf, and the save; `_stage_shed`
+  guards that a netted find waits at the pump.
 
 ### The Gamepad (issue #33, 2026-09-14, `/grill-me` with Richard)
 A trial of full controller support, to decide keep or drop after playtesting. Xbox names.

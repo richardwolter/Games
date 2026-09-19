@@ -314,6 +314,13 @@ func _slide(move: Vector2) -> Vector2:
 		var along := Vector2(0.0, move.y) if absf(off.x) >= face else Vector2(move.x, 0.0)
 		if along.length_squared() > 0.0000001 and _can_stand(tile_pos + along):
 			return tile_pos + along
+	# The pump, the crate's way: a square in tile space, slid along the face that was hit.
+	if Pump.covers(tile_pos + move, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
+		var from := tile_pos - Pump.tile
+		var edge := Pump.FOOT_HALF + Pump.WALK_KEEP
+		var by := Vector2(0.0, move.y) if absf(from.x) >= edge else Vector2(move.x, 0.0)
+		if by.length_squared() > 0.0000001 and _can_stand(tile_pos + by):
+			return tile_pos + by
 	# And against the hut, the same way: its footprint is a rectangle in tile space now, so
 	# its walls are tile axes too. Without this the shore's slide below took over and walked
 	# the angler round the island's curve instead of along the wall — which is exactly what
@@ -610,6 +617,9 @@ func _can_stand(at: Vector2) -> bool:
 	if crate_tile != Vector2.INF and not Yard.covers(crate_tile, tile_pos, Yard.WALK_KEEP):
 		if Yard.covers(crate_tile, at, Yard.WALK_KEEP):
 			return false
+	# Nor through the pump, on the same terms: somebody standing in it may always leave.
+	if Pump.covers(at, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
+		return false
 	# Standing inside it already — an old save, or the shed being moved under them — means
 	# every step out is also a step through, and refusing those leaves them walled in
 	# forever. So the rule is only enforced on someone who is outside it.

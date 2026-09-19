@@ -65,10 +65,12 @@ and the recorded sound.
 
 ## The one exception to the lock
 
-- **A find-cleaning machine**: a one-time machine that cleans a find before it goes in the
-  shed, paid for out of the 43-56k a run ends with. Not an upgrade and not part of the
-  balance (Richard, 2026-09-18). Its own issue. To settle there: whether it can be used
-  mid-run, where it would compete with the upgrades for money.
+- **The pump and the wash room** (issue #37, built 2026-09-19): a netted find waits at a
+  water pump beside the hut and is washed on a stand — a jet, a coat of grime, dirty water
+  running off — before the shed will have it. **Not the money sink it was first written
+  down as**: the pump is free, soap is 5 / 10 / 15 a find (about 400 a run), and the 43-56k
+  a run ends with stays unspent, by Richard's call. Not an upgrade and not part of the
+  balance; it adds time spent playing. See CLAUDE.md, The Pump and the Wash Room.
 
 ## Still owed (not new scope)
 
@@ -77,6 +79,7 @@ and the recorded sound.
 - `BOARD_INK_DIM` on the shed's shelf and `MenuConfirm`'s pale doors (contrast).
 - Localization (issue #28).
 - Deleting the siege.
+- A recording of the wash jet (the hiss is built in code), and the wash room's table and wall.
 
 ## Times
 
