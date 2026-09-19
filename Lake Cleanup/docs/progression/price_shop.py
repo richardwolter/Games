@@ -44,8 +44,11 @@ BASE_MOST = {"fleet": 200.0, "cargo": 40.0, "boat_speed": 60.0}
 # it at 40 minutes; Range cheap to start and dear to finish (the tier-0 water in reach ran dry
 # at minutes 5 to 15 on Range 2 to 5); Pigeons cheap and early (he netted 196 birds and did
 # not buy a level until minute 50); the Pack cheap and the rest of the dogs dearer (he bought
-# eleven dog levels in one visit at minute 21).
-HAND = {"net_strength", "net_range", "bird_worth", "dog_count", "dog_fetch", "dog_wait", "dog_strength"}
+# eleven dog levels in one visit at minute 21). Catch's ladder was eased by hand on
+# 2026-09-19 (1.82 to 1.80, top level 66k to 61k) and is pinned here so a re-run cannot
+# put it back.
+HAND = {"net_strength", "net_range", "bird_worth", "dog_count", "dog_fetch", "dog_wait",
+        "dog_strength", "net_hold"}
 
 
 def gap_at(minute):

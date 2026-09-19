@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_track")
 price_base = 1000.0
-price_mult = 1.82
+price_mult = 1.80
 level_cap = 8
 curve_a = 4.0
 curve_b = 1.0
