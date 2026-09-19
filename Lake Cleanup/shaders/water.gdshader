@@ -639,11 +639,21 @@ void fragment() {
 	murk_at += vec2(clock * 0.05, clock * 0.025);
 	float broad = blob_noise(murk_at * 0.5 + vec2(7.3, 2.1)) - 0.5;
 	float narrow = blob_noise(murk_at * 1.7 - vec2(3.9, 5.4)) - 0.5;
-	float murk = (broad * 0.6 + narrow * 0.4) * 2.0 * murk_wobble;
+	// Clean means clean (2026-09-18, Richard: "at end game, there are still some grime
+	// smudges, it should be completely clean"). Both the wobble and the stagger are there to
+	// make an edge breathe, and water with no filth in it has no edge. Unfaded, they drew
+	// hazy water with nothing to draw it from: the stagger alone takes the first cutoff under
+	// zero in the darkest band troughs (shade under -1 gives a lean past -0.15), where
+	// `step()` passes a filth of exactly nothing, and the wobble's +0.1 cleared what was left
+	// of the cutoff over any deep water. So both fade out as the filth goes to zero, over the
+	// clean state's own width — which also makes the shader agree with
+	// `LakeGrid.water_state`, which never had either term.
+	float edge_live = smoothstep(0.0, state_at.x, color_t);
+	float murk = (broad * 0.6 + narrow * 0.4) * 2.0 * murk_wobble * edge_live;
 	float state_t = clamp(color_t + murk, 0.0, 1.0);
 	// Which ramp, staggered by the shade: deep water (0) flips earliest, light (4) latest, on
 	// the shade before it is rounded so the mix runs finer than the steps do.
-	float lean = (shade - 2.0) * 0.5 * state_spread;
+	float lean = (shade - 2.0) * 0.5 * state_spread * edge_live;
 	float state = step(state_at.x + lean, state_t) + step(state_at.y + lean, state_t)
 		+ step(state_at.z + lean, state_t) + step(state_at.w + lean, state_t);
 	vec3 col = ramp(step_at, state);

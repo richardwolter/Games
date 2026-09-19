@@ -1312,8 +1312,12 @@ var _water_tiles: int = 0
 ## Sparser on 2026-09-16 (Richard: "decrease the amount of sparkle on clean water during
 ## gameplay, it should be more sparse"): GLINT_MOST 0.7 to 0.4 and the shader's cell
 ## 14 to 20 art px (GLINT_CELL), about a third of the pops there were.
-const GLINT_BITE := 1.4
-const GLINT_MOST := 0.4
+## And again on 2026-09-18 (Richard: "decrease the clean lake sparkle while lake is still
+## grimy"), both knobs: fewer at the finish (GLINT_MOST 0.4 to 0.25) and far fewer early
+## (GLINT_BITE 1.4 to 2.5) — at half clean 0.044 where it was 0.15. The light belongs to the
+## last stretch; a lake that is mostly soup has not earned it yet.
+const GLINT_BITE := 2.5
+const GLINT_MOST := 0.25
 const GLINT_CELL := 20.0
 
 

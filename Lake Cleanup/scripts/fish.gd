@@ -10,13 +10,17 @@ extends Node2D
 ## draws lie over the shadow, as a ring on the surface lies over a fish under it.
 
 ## Clean share at which each tier appears, and what a school of it is.
+##
+## About a third more schools in every tier since 2026-09-18 (Richard: "increase fish
+## population by a little"): `most` 14/7/2 to 18/9/3 and `per_tiles` 70/160/700 to
+## 55/125/550. When each tier arrives, and what a school is, are as they were.
 const TIERS := [
 	{"at": 0.12, "size": Vector2(7.0, 3.0), "members": Vector2i(3, 6), "speed": 26.0,
-		"per_tiles": 70.0, "most": 14, "ripple": 2.6, "span": 6.0, "ink": 0.22},
+		"per_tiles": 55.0, "most": 18, "ripple": 2.6, "span": 6.0, "ink": 0.22},
 	{"at": 0.38, "size": Vector2(15.0, 6.0), "members": Vector2i(3, 5), "speed": 34.0,
-		"per_tiles": 160.0, "most": 7, "ripple": 1.8, "span": 12.0, "ink": 0.28},
+		"per_tiles": 125.0, "most": 9, "ripple": 1.8, "span": 12.0, "ink": 0.28},
 	{"at": 0.68, "size": Vector2(34.0, 13.0), "members": Vector2i(1, 1), "speed": 22.0,
-		"per_tiles": 700.0, "most": 2, "ripple": 1.2, "span": 26.0, "ink": 0.34},
+		"per_tiles": 550.0, "most": 3, "ripple": 1.2, "span": 26.0, "ink": 0.34},
 ]
 ## Seconds between reconciling what should be swimming with what is.
 const RECKON_EVERY := 2.0

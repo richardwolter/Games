@@ -805,6 +805,15 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   under half that (2026-09-11) because with the cutoffs read straight off the map the
   contours round the island sat dead still while the bands rippled across them. Keep the
   wobble small; the map decides where the junk is, the noise only makes the edge breathe.
+- **Clean means clean** (2026-09-18, Richard: "at end game, there are still some grime
+  smudges, it should be completely clean"): both terms are multiplied by `edge_live` =
+  `smoothstep(0, state_at.x, color_t)`, so they fade out as the filth goes to nothing.
+  Unfaded they drew hazy water over a filth of exactly zero: the stagger alone takes the
+  first cutoff **under zero** in the darkest band troughs (shade under -1, lean past -0.15),
+  where `step()` passes nothing at all, and the wobble's +0.1 cleared the 0.05 left of the
+  cutoff over any deep water. It was in every cleaned bay all run; the finished lake is
+  where there was nothing else to look at. The shader now agrees with
+  `LakeGrid.water_state`, which never had either term. `test_lake` reads the source for it.
 - Retune colours in `extract_palette.gd`'s `WATER_RAMPS` (and `palette.tres`), not in the
   shaders — their defaults only mirror the palette.
 - Not yet converted to pixel art (pending, still live): `beam.gdshader`
@@ -2232,8 +2241,16 @@ ring gives a fresh lake about 0.001).
 - **The glimmer is rare glints, not per-tile sparkle** (`water.gdshader` `glint`,
   `glint_cell`/`glint_rate`/`glint_fps`; pushed as `pow(share, GLINT_BITE) * GLINT_MOST` from
   `_build_filth_map`): one art pixel of the top step popping per `glint_cell` square at most,
-  only where the map's filth is under `murky_at`, so nothing pops in the soup. The finished
-  lake's `sparkle` is untouched.
+  only where the map's filth is under the clean cutoff (`state_at.x`; this said `murky_at`,
+  which the shader does not have), so nothing pops in the soup. The finished lake's
+  `sparkle` is untouched. **Cut twice**: 2026-09-16 (`GLINT_MOST` 0.7 to 0.4, cell 14 to
+  20), and 2026-09-18 on both knobs (Richard: "decrease the clean lake sparkle while lake is
+  still grimy") — `GLINT_MOST` **0.25** and `GLINT_BITE` 1.4 to **2.5**, so at half clean
+  the glint is 0.044 where it was 0.15. The light belongs to the last stretch.
+- **A third more fish** (2026-09-18, Richard: "increase fish population by a little"):
+  `most` 14/7/2 to **18/9/3**, `per_tiles` 70/160/700 to **55/125/550**. Arrival shares,
+  school sizes and ink untouched. `shot_nature` at these numbers: 27 schools at 46% clean,
+  30 at 84%.
 - **Out of scope, by decision**: fish as catch or pay, fish sprites, blocking flora, flora on
   the piers, birds/insects, sound, per-tile sparkle, reading the patches.
 - **Numbers are first guesses** — tiers, densities, `MOST`, `BANK_REACH`, the shadows' ink —
@@ -2983,6 +3000,12 @@ an invisible wall in the water — it covers what is behind it and eats clicks. 
 object, anything within `GLUE = 4` px joins it, the rest is a stray. A size threshold is
 the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 
+- **The Music switch covers the ending, by decision** (2026-09-18): Habibs is on the Music
+  bus like every song, so a player who has music off gets a silent ending. Found when
+  Richard reported the credits song not triggering: the ending had fired (the save's
+  `farewell` was true) and `settings.cfg` had `music_on=false`, written two minutes before
+  the last piece. Overriding the mute was offered and not taken. **Before calling the end
+  song broken, read `settings.cfg`.**
 ### The Shed's Shelf (`scripts/shed_shelf.gd`, 2026-09-11)
 The inventory column down the right of the shed is a drawn oak board, the same furniture as
 the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over

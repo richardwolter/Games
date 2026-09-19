@@ -4523,8 +4523,9 @@ func _stage_nature() -> void:
 	var glint: float = _water_material().get_shader_parameter(&"glint")
 	_check(glint > 0.0 and glint < 1.0, "the water is told to glint, short of full", "%.3f" % glint)
 	_check(float(_water_material().get_shader_parameter(&"glint_cell")) >= 20.0
-		and float(_main.get(&"GLINT_MOST")) <= 0.4,
-		"and sparsely", "cell %.0f, most %.2f" % [
+		and float(_main.get(&"GLINT_MOST")) <= 0.25
+		and float(_main.get(&"GLINT_BITE")) >= 2.5,
+		"and sparsely, late", "cell %.0f, most %.2f" % [
 			float(_water_material().get_shader_parameter(&"glint_cell")), float(_main.get(&"GLINT_MOST"))])
 	_check(flora.alive_count() > 0, "plants came due beside the cleared water", "%d" % flora.alive_count())
 	var foul_plants := 0
@@ -4762,6 +4763,12 @@ func _stage_foam() -> void:
 				break
 		dog.tile_pos = land
 		dog.set(&"_was_swimming", false)
+	# Clean means clean: the wobble and the stagger both fade out with the filth, or the
+	# darkest band troughs of a finished lake draw hazy smudges with nothing under them.
+	_check(source.contains("edge_live = smoothstep(0.0, state_at.x, color_t)")
+		and source.contains("murk_wobble * edge_live")
+		and source.contains("state_spread * edge_live"),
+		"water with no filth in it has no edge to wobble or stagger", "")
 		ripples_was = (splash.get(&"_ripple_age") as PackedFloat32Array).size()
 		dog.call(&"_wake", 0.016)
 		_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was,
