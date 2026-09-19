@@ -2304,6 +2304,16 @@ ring gives a fresh lake about 0.001).
   20), and 2026-09-18 on both knobs (Richard: "decrease the clean lake sparkle while lake is
   still grimy") — `GLINT_MOST` **0.25** and `GLINT_BITE` 1.4 to **2.5**, so at half clean
   the glint is 0.044 where it was 0.15. The light belongs to the last stretch.
+  **And a third time, 2026-09-19** (Richard: "still too much sparkle on clean water at early
+  game, it should be really sparse and rare"): `GLINT_BITE` 2.5 to **5**. **Count it, don't
+  feel it**: a screen of clean water at zoom 1 is 576 glint cells rolled five times a
+  second, so it shows `259 x glint` pops a second, and four times that at the 0.5 zoom
+  stop. At 2.5 that was 1.2 a second with a fifth of the lake clean and 3.2 at three
+  tenths, which is a steady twinkle. At 5: one in fifty seconds, one in six seconds, 2 a
+  second at half clean, 15 at eight tenths. `_clean_share` lags the meter (a tile is clean
+  only with nothing within `FILTH_BLUR` of it), so "early game" is a share under about 0.3.
+  `test_lake` holds the early rate (under one pop in four seconds at 30% clean), not the
+  constants.
 - **A third more fish** (2026-09-18, Richard: "increase fish population by a little"):
   `most` 14/7/2 to **18/9/3**, `per_tiles` 70/160/700 to **55/125/550**. Arrival shares,
   school sizes and ink untouched. `shot_nature` at these numbers: 27 schools at 46% clean,

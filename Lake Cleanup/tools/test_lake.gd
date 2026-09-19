@@ -4520,10 +4520,22 @@ func _stage_nature() -> void:
 	var glint: float = _water_material().get_shader_parameter(&"glint")
 	_check(glint > 0.0 and glint < 1.0, "the water is told to glint, short of full", "%.3f" % glint)
 	_check(float(_water_material().get_shader_parameter(&"glint_cell")) >= 20.0
-		and float(_main.get(&"GLINT_MOST")) <= 0.25
-		and float(_main.get(&"GLINT_BITE")) >= 2.5,
-		"and sparsely, late", "cell %.0f, most %.2f" % [
+		and float(_main.get(&"GLINT_MOST")) <= 0.25,
+		"and sparsely", "cell %.0f, most %.2f" % [
 			float(_water_material().get_shader_parameter(&"glint_cell")), float(_main.get(&"GLINT_MOST"))])
+	# Early in a run a glint is rare: with three tenths of the water clean, a screen of
+	# nothing but clean water (576 cells at zoom 1, five ticks a second, `glint_rate` a roll)
+	# pops less than once in four seconds. The rule, whatever the two constants become.
+	var early := pow(0.3, float(_main.get(&"GLINT_BITE"))) * float(_main.get(&"GLINT_MOST"))
+	# The roll and the tick are the shader's own defaults, which nothing pushes: a material
+	# hands back null for a parameter it was never given, so they are read off the source.
+	var water_code: String = (_water_material().shader as Shader).code
+	var roll := _shader_default(water_code, "glint_rate")
+	var ticks := _shader_default(water_code, "glint_fps")
+	_check(roll > 0.0 and ticks > 0.0, "the glint's roll and tick are in the shader", "%.3f, %.1f" % [roll, ticks])
+	var early_rate := 576.0 * ticks * early * roll
+	_check(early_rate < 0.25, "and rarely while most of the lake is still soup",
+		"%.3f pops a second on a clean screen at 30%% clean" % early_rate)
 	_check(flora.alive_count() > 0, "plants came due beside the cleared water", "%d" % flora.alive_count())
 	var foul_plants := 0
 	for k in flora.candidate_count():
@@ -4654,6 +4666,13 @@ func _check_grime() -> void:
 
 func _water_material() -> ShaderMaterial:
 	return _main.get(&"_water_material")
+
+
+## A float uniform's default, read off the shader's source. -1 when it is not there.
+func _shader_default(code: String, uniform_name: String) -> float:
+	var found := RegEx.create_from_string(
+		"uniform\\s+float\\s+%s\\b[^=;]*=\\s*([0-9.]+)" % uniform_name).search(code)
+	return float(found.get_string(1)) if found != null else -1.0
 
 
 ## Issue #31: every disturbance on the water is foam. The splash is drawn through the foam

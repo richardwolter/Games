@@ -1315,7 +1315,15 @@ var _water_tiles: int = 0
 ## grimy"), both knobs: fewer at the finish (GLINT_MOST 0.4 to 0.25) and far fewer early
 ## (GLINT_BITE 1.4 to 2.5) — at half clean 0.044 where it was 0.15. The light belongs to the
 ## last stretch; a lake that is mostly soup has not earned it yet.
-const GLINT_BITE := 2.5
+## And a third time the day after (Richard: "still too much sparkle on clean water at early
+## game, it should be really sparse and rare"): GLINT_BITE 2.5 to 5. Counted rather than
+## guessed this time. A pop is one cell's roll, five ticks a second, so a screen of nothing
+## but clean water at zoom 1 (576 cells) shows 259 x glint pops a second, and four times
+## that at the 0.5 stop. At 2.5 that was 1.2 a second at a fifth of the lake clean and 3.2 at
+## three tenths — a steady twinkle, not a rare one. At 5 it is one in fifty seconds and one
+## in six, 2 a second at half clean, and the old rate again only from about nine tenths.
+## `test_lake` holds the early rate, not the constant.
+const GLINT_BITE := 5.0
 const GLINT_MOST := 0.25
 const GLINT_CELL := 20.0
 
