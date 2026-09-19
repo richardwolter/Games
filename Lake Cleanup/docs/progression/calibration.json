@@ -13,7 +13,7 @@
  "k_cast_fixed": -0.005,
  "k_reel_factor": 0.977,
  "k_shelf": 0.1,
- "k_density": 1.2,
+ "k_density": 0.7,
  "k_ferry_leg": 103.29,
  "k_ferry_fixed": 8.4,
  "k_ferry_per_piece": 0.059,
@@ -43,5 +43,9 @@
    ],
    "per_minute": 4.0
   }
- ]
+ ],
+ "k_aim": 0.8,
+ "k_cast_share": 0.65,
+ "k_catch_scale": 1.3,
+ "fitted": "k_density, k_aim, k_cast_share and k_catch_scale: replay_shop.py against Richard's two logged shop runs of 2026-09-18 (docs/progression/playtests/), rms gap in the share cleared 0.022 (was 0.054 at 1.2 / 2.0 / 0.75 / 1.7, the tree run's fit). The rest: tools/last_probe.log."
 }

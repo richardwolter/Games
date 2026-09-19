@@ -19,8 +19,10 @@ Your job is to build the game incrementally with clean architecture and testable
 
 ### Verbs
 **Manual (active)**:
-- Hold-to-haul discrete `TrashObject`s using a boat and net
-- Progress ring shows haul rate = player strength ÷ `TrashDef.haul_cost`
+- The angler walks the island and **casts a net** at the water, then reels it home; what the
+  mouth touches and Strength can lift comes back, up to Catch. **There is no hold-to-haul
+  and no progress ring** — these two lines said so until 2026-09-18, off a design from
+  before the net. `TrashDef.haul_cost` is still in the data and nothing reads it.
 - Net bites a configurable depth from each water column it passes, gated by tier
 - **The ring is the catch, by decision** (2026-09-11, `net.gd` `_touches`/`_reach`): a piece,
   bird or charm is caught when any of its *drawing* (an ellipse at its drawn position and
@@ -85,7 +87,7 @@ Your job is to build the game incrementally with clean architecture and testable
 ### Economy (Two-Layer)
 Why two layers? The player's hands are what clear the lake; the helpers are what turn the catch into money while the hands are busy. A meter that drains by itself is a progress bar with a button.
 
-**Manual layer**: Hold-to-haul collects `TrashObject`s, knocking chunks off `pollution` (resolved per-object).
+**Manual layer**: every piece the net brings home knocks its own `pollution` off the lake's (resolved per piece).
 
 **Idle layer**: ferries selling the crate's backlog and dogs fetching on their own. Nothing reduces `pollution` passively.
 
@@ -210,7 +212,11 @@ Richard's playthrough: the boats were too slow and too dear to keep up with the 
 dogs, the net's prices jumped from cheap to dear, Catch (Haul) and Strength came too easily
 for what they do, and Strength is the game changer that belongs in the middle of a run.
 `docs/scope-lock.md` is the in/out list this pass closes on. **Nothing new after it.**
-- **A focused clear is 70 to 80 minutes.** Issue #23's "2-3 hours" is superseded.
+- **A run that only cleans is about 50 minutes; a first run about 65** (Richard's two logged
+  runs: 50.5 and 64.5). Decorating, petting and looking round are what take a run past that,
+  and none of it is counted. **Supersedes "70 to 80 focused"**, which this line said until
+  the second run (Richard: "the pacing was good... let's keep it this way"), and issue #23's
+  "2-3 hours".
 - **Supersedes, in The Shop Balance Pass below**: "Haul and Hold are one track twice", the
   20-level Haul/Hold, Ferry speed 4 to 36, every price, the 69-minute clear, and "hidden,
   not deleted" — the shelved code is deleted (see the end of this section).
@@ -248,7 +254,7 @@ for what they do, and Strength is the game changer that belongs in the middle of
   dragged their whole ladders flat.
 - **Loading and Carry are in the sim** (`SPEC`, `boat_volley_cut` on the per-piece term of
   `ferry_trip`, `dog_tier` gating the dog's pools), so a re-run no longer drops them.
-- **Sim**: focused 64 min, casual 110 min (the band asks 68-82: a WARN, left for the logged
+- **Sim, before the logged runs** (after them: focused 54 min, band 48-68): focused 64 min, casual 110 min (the band asked 68-82: a WARN, left for the logged
   run to settle, because the bot never stops casting and the calibration is from a tree
   run). `python docs/progression/shop_schedule.py` prints bought-against-wanted per track.
 - **The player's own run writes a playtest log** (`scripts/play_log.gd`, `PlayLog`,
@@ -276,9 +282,33 @@ for what they do, and Strength is the game changer that belongs in the middle of
   500 x 1.8, Keenness 600 x 2.2, Carry 1200 x 2.2). Sim with them: 59.7 min, Strength 9.7 /
   18.4 / 24.5 / 32.6 — read those against the sim's early game being too rich. **The late
   surplus and the run's length are left for the next session**, by Richard's call.
-- **Owed to close #23**: Richard plays one fresh logged run; the log is replayed into the
-  sim's calibration (`k_catch_scale`, `k_aim`, the dogs), one more `shop_loop.sh`, times
-  recorded on the issue and in `docs/scope-lock.md`.
+- **The second logged run, and the prices are frozen on it** (`playtests/
+  2026-09-18_shop_run2.log`): **50.5 min**, Strength at 5.8 / 15.5 / 20.1 / 28.4, Waiting's
+  median 33 with one spike to 762 when Strength 4 landed (the net at 9.3 a second against the
+  fleet's 7.8, drained in five minutes), the stall at minutes 5 to 15 gone (2.2 pieces a
+  second at minute 10 against 0.6), Pigeons from minute 6, the Pack whole at minute 7, 56k
+  unspent. He went straight for Strength and spent 0.7 min in the shed. **Richard judged the
+  pacing good and nothing moves**: raising Strength 2-4 and Catch to put the max back at 40
+  was offered and turned down. `shop_loop.sh` is not to be re-run without his say — it would
+  move the ten tracks `HAND` does not pin.
+- **A player who knows the game buys Strength first, and price cannot stop that**: a tier
+  roughly triples income, and 8k is earned by minute 6. The water before Strength 1 is the
+  thin part of the game (few green spots), so it is kept short on purpose.
+- **The lake's money is finite**: about 870k in it and 812k of upgrades, so prices cannot all
+  rise, and a longer run does not earn more. **The 43-56k left at the end is not a balance
+  problem and is left alone**; Richard's use for it is a one-time machine that cleans a find
+  before it goes in the shed — its own issue, the one named exception to the scope lock.
+- **The sim is calibrated to both runs** (`docs/progression/replay_shop.py`: his purchases
+  replayed at the second he made them; `read_playtest.py` reads a log on its own). The net's
+  four constants went to `k_density` 0.7, `k_aim` 0.8, `k_cast_share` 0.65, `k_catch_scale`
+  1.3 (the tree run's fit was 1.2 / 2.0 / 0.75 / 1.7): he casts every 1.8 to 2.2 s, closer in
+  and faster than the model had him. It now replays run 1 at 65.5 min (real 64.0) and run 2 at
+  52.9 (50.5), the share cleared never more than 0.043 out. **What it still gets wrong**: it
+  earns about 7% less than he did, and its box does not follow the real Waiting minute by
+  minute (it piles up early where his did not, and misses his spike at 30). Trust it for the
+  clear curve and for when a track gets bought, not for the box.
+- **#23 closed on that** (2026-09-18): two logged runs, the sim recalibrated and not
+  re-priced, the times on the issue and in `docs/scope-lock.md`.
 - **No `SAVE_VERSION` bump**: a saved level over a track's new cap is clamped on the way in
   (`_saved_level`), and a stale `sell_N` or `skimmer` key is simply not read.
 - **Deleted, not shelved** (same day, Richard: "delete everything shelved"): tree mode

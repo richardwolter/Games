@@ -10,9 +10,14 @@ Then:                        node ~/.claude/skills/incremental-progression/scrip
 Or the whole pricing loop:   sh docs/progression/shop_loop.sh
 
 Prices and effect curves are read from resources/upgrades/*.tres, pay from resources/economy.tres,
-tiers and pollution from resources/trash/*.tres. Everything named k_* is a calibration constant,
-inherited from build_tree.py (fitted to Richard's 2026-09-14 12:36 playtest by replay_playtest.py)
-and from tools/probe_rates via calibration.json.
+tiers and pollution from resources/trash/*.tres. Everything named k_* is a calibration constant:
+the net's four (k_density, k_aim, k_cast_share, k_catch_scale) are fitted by replay_shop.py to
+Richard's two logged shop runs of 2026-09-18, the rest measured by tools/probe_rates, all through
+calibration.json.
+
+**The prices are frozen as played in the second logged run** (Richard, 2026-09-18: "the pacing
+was good"). This model is for judging a future tweak before it is played; shop_loop.sh would
+move the ten tracks price_shop.py's HAND does not pin, and is not to be re-run without his say.
 """
 import glob
 import json
@@ -66,9 +71,9 @@ stats = {
     "k_lake_r": round(LAKE_R, 2), "k_island_r": round(ISLAND_R, 2),
     "k_units_total": LAKE, "k_stack": cal["k_stack"],
     "k_density": cal["k_density"], "k_reel_factor": cal["k_reel_factor"],
-    "k_aim": 2.0, "k_cast_share": 0.75, "k_mouth_edge": 0.15,
+    "k_aim": cal.get("k_aim", 2.0), "k_cast_share": cal.get("k_cast_share", 0.75), "k_mouth_edge": 0.15,
     "k_shelf": 2.5, "k_reach_far": 35.6,
-    "k_catch_scale": 1.7, "k_ferry_scale": 1.0,
+    "k_catch_scale": cal.get("k_catch_scale", 1.7), "k_ferry_scale": 1.0,
     "k_ferry_leg": cal["k_ferry_leg"], "k_ferry_fixed": cal["k_ferry_fixed"],
     "k_ferry_per_piece": cal.get("k_ferry_per_piece", 0.0),
     "k_dog_trip": 8, "k_dog_carry": 2.2, "k_dog_carry_share": 0.5,
@@ -224,9 +229,11 @@ config = {
          "offline": {"every": 600, "for": 240}, "thinkEvery": 20, "seeds": 3},
         {"id": "cheapest", "policy": "cheapest", "thinkEvery": 5},
     ],
-    # A focused clear of 70 to 80 minutes (Richard, 2026-09-18; issue #23's 2-3 hours is
-    # superseded). The casual bot stays for the soft-lock check and carries no time target.
-    "targets": {"clearMinutes": {"focused": [68, 82]},
+    # A run that only cleans is about 50 minutes and a first run about 65 (Richard's two logged
+    # runs, 2026-09-18: 50.5 and 64.5); decorating and the rest are what take a run past that.
+    # Supersedes "70 to 80 focused" and issue #23's 2-3 hours. The casual bot stays for the
+    # soft-lock check and carries no time target.
+    "targets": {"clearMinutes": {"focused": [48, 68]},
                 "paybackCurve": [[0, 30], [10, 90], [30, 240], [60, 480], [90, 720]]},
     # Seconds between buys the pricing aims for: brisk at the start, slowing to the end. Its
     # average over the run has to match the 181 levels of SCHEDULE.

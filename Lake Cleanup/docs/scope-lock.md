@@ -6,9 +6,11 @@ the next game, not in this one.
 
 ## The game
 
-One lake, cleaned once. A focused run is **70 to 80 minutes** (issue #23 first said 2-3 hours;
-superseded). Cleaning the lake triggers the ending and the credits; free play and decorating
-the shed carry on after it.
+One lake, cleaned once. **A run that only cleans is about 50 minutes and a first run about
+65**; decorating, petting and looking round take a normal run past that (issue #23 first said
+2-3 hours, then 70-80 focused; both superseded by the two logged runs). Cleaning the lake
+triggers the ending and the credits; free play and decorating the shed carry on after it.
+**The prices are frozen as played in the second logged run.**
 
 ## In
 
@@ -61,11 +63,16 @@ and the recorded sound.
 | Hold-to-buy, tabbed or two-up shop layouts | decided against (The Shop Reads) |
 | Web build | desktop only |
 
+## The one exception to the lock
+
+- **A find-cleaning machine**: a one-time machine that cleans a find before it goes in the
+  shed, paid for out of the 43-56k a run ends with. Not an upgrade and not part of the
+  balance (Richard, 2026-09-18). Its own issue. To settle there: whether it can be used
+  mid-run, where it would compete with the upgrades for money.
+
 ## Still owed (not new scope)
 
-- The logged playtest that closes #23: one fresh run, `user://shop_playtest.log`, replayed
-  into `docs/progression/build_shop.py`'s calibration, one more pricing pass, times recorded
-  on the issue.
+- Turn the playtest log off before a release export (`Lake._logs_play`).
 - `chime.wav`, the lake-cleaned note (the one sound still built in code).
 - `BOARD_INK_DIM` on the shed's shelf and `MenuConfirm`'s pale doors (contrast).
 - Localization (issue #28).
@@ -77,4 +84,5 @@ and the recorded sound.
 |---|---|---|---|
 | 2026-09-14 pass | 69 min | — | about 70 min (tree run) |
 | 2026-09-18 pass | 64 min | 110 min | **64.5 min** (logged run 1, `docs/progression/playtests/`) |
-| 2026-09-18 tweaks (Strength 3500, Hold to 32, Range, Pigeons, dogs) | 60 min | — | *next logged run* |
+| 2026-09-18 tweaks (Strength 3500, Hold to 32, Range, Pigeons, dogs) | 60 min | — | **50.5 min** (logged run 2, cleaning only) |
+| Recalibrated to both runs, prices frozen | 54 min | 95 min | replays: 65.5 for run 1, 52.9 for run 2 |

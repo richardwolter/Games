@@ -121,7 +121,7 @@ recolor). See `Lake Cleanup/CLAUDE.md` for the full pipeline.
 - **Validation**: Run `tools/test_pipeline.gd` (headless) after any pipeline change. Treat it as the regression gate.
 
 ### Two-Layer Economy (Lake Cleanup)
-- **Manual verb**: Hold-to-haul discrete `TrashObject`s (progress ring, rate = strength ÷ haul_cost).
+- **Manual verb**: cast the net from the island and reel it home; what its mouth touches and its Strength can lift comes back, up to Catch. (This line said "hold-to-haul" with a progress ring over `haul_cost` until 2026-09-18; nothing in the code reads `haul_cost`.)
 - **Idle layer**: the ferries and the dogs. Ferries sell what waits in the crate, dogs fetch pieces on their own. **There are no machines or drones and nothing drains `pollution` over time** (Richard, 2026-09-18: that line was never the game) — `pollution` only moves when a piece leaves the water.
 - **Why**: the player's hands clear the lake and the helpers keep the chain moving; a bare meter that drains by itself is a progress bar with a button.
 - **Visual Link**: lake clearing up IS the progress bar. Since the per-tile filth map, the shader's colour reads that map, local to each tile, not `pollution` directly — see `Lake Cleanup/CLAUDE.md` for the current split.
