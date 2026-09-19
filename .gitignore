@@ -11,3 +11,10 @@ _builds/
 # Editor / OS noise
 .DS_Store
 Thumbs.db
+
+# Marketing source and Steam store templates: PSDs, capsule art, logos and the
+# trailer render, ~176 MB and none of it read by any game. Local only, by decision
+# (Richard, 2026-09-19) -- including the trailer and capsule build scripts that live
+# among them. Lake Cleanup's CLAUDE.md documents that pipeline; it is not versioned.
+Marketing/
+Steam Game Templates/
