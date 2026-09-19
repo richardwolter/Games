@@ -1068,11 +1068,33 @@ func hold_spot(i: int, shown: int) -> Vector2:
 ## Which frame shows the boat pointing the way it is pointing: how far round the compass
 ## the heading is from the first frame's, in frames.
 func heading_frame() -> int:
-	var frames := _frame_count()
+	return frame_heading(heading, _frame_count())
+
+
+## The frame for a heading in tiles, out of `frames`. Static so something that draws a ferry
+## without being one picks its frame by the boat's own rule and never by a number somebody
+## read off the sheet.
+static func frame_heading(towards: Vector2, frames: int) -> int:
 	if frames <= 0:
 		return 0
-	var turn := atan2(heading.y, heading.x) - FRAME_ZERO_TURN
+	var turn := atan2(towards.y, towards.x) - FRAME_ZERO_TURN
 	return posmod(int(round(turn / TAU * float(frames))), frames)
+
+
+## The `art_frame` turn (0 to 1) of a ferry sailing `across` **the screen** — the wash
+## room's backdrop, whose boats go left and right and have no tiles under them. The screen
+## direction is taken back to tiles the way `Iso` lays them out, and then it is
+## `frame_heading`'s answer.
+static func turn_sailing(across: Vector2) -> float:
+	var sheet := _sheet()
+	if sheet == null:
+		return 0.0
+	var count := int(round(float(sheet.get_width()) / float(sheet.get_height())))
+	var tiles := Vector2(
+		across.x / (Iso.TILE_W * 0.5) + across.y / (Iso.TILE_H * 0.5),
+		across.y / (Iso.TILE_H * 0.5) - across.x / (Iso.TILE_W * 0.5)
+	)
+	return (float(frame_heading(tiles, count)) + 0.5) / float(count)
 
 
 ## The heading, in tiles, of the frame `turn` picks (0 to 1 round the compass) — for laying

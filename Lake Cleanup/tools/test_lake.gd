@@ -5638,6 +5638,31 @@ func _stage_wash() -> void:
 			back.step(0.1)
 		_check(bird.startled and back.bird_at(bird).y < height - 30.0,
 			"the jet on it sends it up and away", "%.0f to %.0f" % [height, back.bird_at(bird).y])
+	# Which way things face is their owner's answer, never this file's guess.
+	if bird != null:
+		_check(back.bird_facing(bird) == Flock.facing_of(Vector2.ZERO, Vector2(1.0, 0.0))
+			and Flock.facing_of(Vector2.ZERO, Vector2(1.0, 0.0)) < 0.0,
+			"a pigeon heading right is handed the flock's own facing: the flipped sheet", "")
+	var east: Dictionary = back.hull_art(1.0)
+	var west: Dictionary = back.hull_art(-1.0)
+	_check(not east.is_empty() and east["region"] != west["region"],
+		"a ferry sailing right and one sailing left are different frames", "")
+	var frames := 16
+	_check(is_equal_approx(Boat.turn_sailing(Vector2.RIGHT),
+			(float(Boat.frame_heading(Vector2(1.0, -1.0), frames)) + 0.5) / float(frames)),
+		"picked by the boat's own heading rule: screen-right is tile (1, -1)", "")
+	_check(back.hulls().size() == int(_main.call(&"fleet_size")),
+		"as many ferries cross as the fleet holds", str(back.hulls().size()))
+	back.filth = 1.0
+	var full := back.flotsam_shown()
+	back.filth = 0.5
+	var half := back.flotsam_shown()
+	back.filth = 0.0
+	_check(full == WashBackdrop.RUBBISH_MOST and half < full and half > 0
+		and back.flotsam_shown() == 0,
+		"rubbish floats on it by the meter: a full lake's worth, thinning to none",
+		"%d / %d / %d" % [full, half, back.flotsam_shown()])
+	back.filth = float(_main.get(&"pollution"))
 	var pup := back.dogs()[0]
 	var sat := pup.at
 	back.sprayed_at(sat - Vector2(0.0, 10.0))

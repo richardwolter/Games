@@ -104,12 +104,25 @@ func _physics_process(delta: float) -> void:
 			_say("art %s, solid %d of %d, region %s" % [
 				art != null, solid.count(1), solid.size(), room.stand().get(&"_region")
 			])
+			# Two hulls whatever the fleet, one on each lane, one each way: which way a
+			# bow points is a thing to look at.
+			room.backdrop().fleet = 2
+			room.backdrop().reset()
+			var lanes := 0
+			for hull in room.backdrop().hulls():
+				hull.wait = 0.0
+				hull.way = 1.0 if lanes == 0 else -1.0
+				hull.x = room.size.x * (0.62 + 0.2 * lanes)
+				lanes += 1
 			# Something of everything in the picture: a pair of pigeons well across, and the
 			# pack wherever it has got to.
 			for k in 2:
 				var bird := room.backdrop().send_bird(true, 0.25 + 0.12 * k)
 				if bird != null:
-					bird.along = 900.0 + 420.0 * k
+					bird.along = room.size.x * (0.5 + 0.2 * k)
+			_say("hulls %d, flotsam %d" % [
+				room.backdrop().hulls().size(), room.backdrop().flotsam_shown()
+			])
 			_say("dogs %d, birds %d" % [room.backdrop().dogs().size(), room.backdrop().birds().size()])
 			# And again over a lake that has come clean, late in the day.
 			room.day = null

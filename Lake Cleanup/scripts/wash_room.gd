@@ -54,6 +54,10 @@ var filth_left := Callable()
 ## for its sheet and its birds: the backdrop's own dogs and pigeons. Optional too.
 var pack_size := Callable()
 var flock: Flock
+## How many ferries the fleet holds, and the lake's rubbish as `{sheet, region}` rows: what
+## is on the backdrop's water.
+var fleet_size := Callable()
+var rubbish: Array = []
 
 var _backdrop: WashBackdrop
 var _stand: WashStand
@@ -99,6 +103,10 @@ func open(up: bool) -> void:
 			_backdrop.filth = float(filth_left.call())
 		if up and pack_size.is_valid():
 			_backdrop.pack = int(pack_size.call())
+		if up and fleet_size.is_valid():
+			_backdrop.fleet = int(fleet_size.call())
+		if up:
+			_backdrop.rubbish = rubbish
 		if up and flock != null:
 			_backdrop.bird_sheet = flock.sheet()
 			_backdrop.bird_kinds = flock.kinds()

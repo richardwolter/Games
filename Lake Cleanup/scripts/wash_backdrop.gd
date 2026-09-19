@@ -28,6 +28,17 @@
 ## - **Both answer the jet** (`sprayed_at`): a bird veers up and away with a puff and a coo,
 ##   a dog bolts from it with a bark. No pay, no count — a gag. Only while the jet is off
 ##   the find: a bird passing behind the piece is not what is being washed.
+## - **The lake is the player's lake in what is on it too** (third pass, Richard: "we should
+##   see objects on the lake so it does not break immersion. And boats also crossing...
+##   depending on how many boats you have"): the lake's own rubbish afloat, `RUBBISH_MOST`
+##   pieces on a full lake and none on a clean one — the same pieces off one seed, so they
+##   thin out as the meter falls rather than reshuffling — and as many ferries as the fleet
+##   holds crossing shore to shore on two lanes. **The jet does nothing to either, by
+##   decision**: birds and dogs are the gag, the lake is the view.
+## - **Which way a thing faces is asked of the thing's owner, never written here**:
+##   `Flock.facing_of` for a bird, `Boat.turn_sailing` for a hull, `DogArt.stamp`'s own
+##   `facing_left`. The first pigeons here flew tail first, because `Flock.stamp`'s sign is
+##   the sheet's (drawn facing left), not the direction of travel, and this file guessed.
 ## Decoration, the fish's own rule: nothing reads any of it back and nothing is saved. They
 ## are not the lake's real dogs and birds, which carry on behind the room.
 ##
@@ -86,7 +97,8 @@ const PUFF_LIFE := 0.45
 ## keep to as shares of the window's height below the near waterline, their trot, how long
 ## they stop, and the jet's reach. A bolt is `DOG_BOLT` times the trot and at least
 ## `BOLT_LEAST` long.
-const DOG_TALL := Vector2(26.0, 54.0)
+## (26 to 54 until Richard's first look: "too small in comparison".)
+const DOG_TALL := Vector2(36.0, 72.0)
 const DOG_BAND := Vector2(0.07, 0.3)
 const DOG_PACE := 95.0
 const DOG_REST := Vector2(1.5, 6.0)
@@ -95,6 +107,21 @@ const DOG_BOLT := 2.3
 const BOLT_LEAST := 320.0
 const BARK_GAP := 2.0
 const REST_POSES: Array[StringName] = [&"idle", &"idle", &"laid", &"sleep"]
+
+## Rubbish afloat: how many on a full lake, how far down the lake (as shares of it) they
+## lie, how much of each is under water, and the depth past which a piece draws at the full
+## `PIXEL` rather than half of it — what is far is small.
+const RUBBISH_MOST := 40
+const RUBBISH_SEED := 2909
+const RUBBISH_BAND := Vector2(0.12, 0.94)
+const RUBBISH_SUNK := 0.3
+const RUBBISH_NEAR_FROM := 0.55
+const BOB_PACE := 0.35
+## Ferries: each lane's waterline down the lake, its canvas pixels to a painted one, and its
+## pace. A hull crosses, waits out of sight `BOAT_WAIT`, and comes back the other way.
+const BOAT_LANES := [[0.2, 1.0, 20.0], [0.72, 2.0, 38.0]]
+const BOAT_WAIT := Vector2(6.0, 20.0)
+const BOAT_MARGIN := 140.0
 
 const PIXEL := 2.0
 ## Where the near waterline stands down the window, and how tall the lake is drawn, in
@@ -141,6 +168,9 @@ var tint := Color.WHITE:
 var pack := 1
 var bird_sheet: Texture2D
 var bird_kinds: Array[Dictionary] = []
+## How many ferries the fleet holds, and the lake's rubbish as `{sheet, region}` rows.
+var fleet := 1
+var rubbish: Array = []
 
 var _bank: Texture2D
 var _lawn: Texture2D
@@ -156,6 +186,16 @@ var _puffs: Array = []
 var _next_bird := 4.0
 var _bark_in := 0.0
 var _roll := RandomNumberGenerator.new()
+var _hulls: Array[Hull] = []
+var _flotsam: Array = []
+var _boat_art := {}
+
+
+class Hull:
+	var lane := 0
+	var x := 0.0
+	var way := 1.0
+	var wait := 0.0
 
 
 class Bird:
@@ -230,6 +270,15 @@ func reset() -> void:
 	_puffs.clear()
 	_dogs.clear()
 	_next_bird = _roll.randf_range(2.0, BIRD_EVERY.x)
+	_hulls.clear()
+	for k in clampi(fleet, 0, 4):
+		var hull := Hull.new()
+		hull.lane = k % BOAT_LANES.size()
+		hull.way = 1.0 if _roll.randf() < 0.5 else -1.0
+		# Already out on the water when the room comes up, not all queueing at one edge.
+		hull.x = _roll.randf_range(0.1, 0.9) * size.x
+		_hulls.append(hull)
+	_lay_flotsam()
 	if not DogArt.has(&"run"):
 		return
 	for k in clampi(pack, 0, 4):
@@ -238,6 +287,43 @@ func reset() -> void:
 		dog.at = Vector2(_roll.randf_range(0.1, 0.9) * size.x, 0.0)
 		_send(dog)
 		_dogs.append(dog)
+
+
+## The rubbish's places, rolled off one seed whatever the lake holds, so a cleaner lake
+## shows the first so-many of the same pieces.
+func _lay_flotsam() -> void:
+	_flotsam.clear()
+	if rubbish.is_empty():
+		return
+	var roll := RandomNumberGenerator.new()
+	roll.seed = RUBBISH_SEED
+	for k in RUBBISH_MOST:
+		_flotsam.append({
+			"across": roll.randf(), "deep": roll.randf(), "kind": roll.randi() % rubbish.size(),
+			"flip": roll.randf() < 0.5, "beat": roll.randf(),
+		})
+
+
+## How many pieces are afloat for the filth that is left.
+func flotsam_shown() -> int:
+	return mini(int(round(float(RUBBISH_MOST) * filth)), _flotsam.size())
+
+
+func hulls() -> Array[Hull]:
+	return _hulls
+
+
+## The picture of a ferry sailing `way` across the screen: the boat's own frame for it.
+func hull_art(way: float) -> Dictionary:
+	var key := int(signf(way))
+	if not _boat_art.has(key):
+		_boat_art[key] = Boat.art_frame(Boat.turn_sailing(Vector2(way, 0.0)))
+	return _boat_art[key]
+
+
+## What `Flock.stamp` is handed for a bird: the flock's own answer.
+func bird_facing(bird: Bird) -> float:
+	return Flock.facing_of(Vector2.ZERO, Vector2(bird.way, 0.0))
 
 
 func birds() -> Array[Bird]:
@@ -264,6 +350,7 @@ func step(delta: float) -> void:
 	_bark_in = maxf(_bark_in - delta, 0.0)
 	_drive_birds(delta)
 	_drive_dogs(delta)
+	_drive_hulls(delta)
 	for puff: Array in _puffs:
 		puff[1] = float(puff[1]) + delta
 	_puffs = _puffs.filter(func(puff: Array) -> bool: return float(puff[1]) < PUFF_LIFE)
@@ -298,6 +385,20 @@ func sprayed_at(point: Vector2) -> void:
 			var sound := Sfx.main()
 			if sound != null:
 				sound.room_bark()
+
+
+# --- Ferries -----------------------------------------------------------------------------
+
+func _drive_hulls(delta: float) -> void:
+	for hull in _hulls:
+		if hull.wait > 0.0:
+			hull.wait -= delta
+			continue
+		hull.x += hull.way * float(BOAT_LANES[hull.lane][2]) * delta
+		if hull.x < -BOAT_MARGIN or hull.x > size.x + BOAT_MARGIN:
+			hull.x = clampf(hull.x, -BOAT_MARGIN, size.x + BOAT_MARGIN)
+			hull.way = -hull.way
+			hull.wait = _roll.randf_range(BOAT_WAIT.x, BOAT_WAIT.y)
 
 
 # --- Pigeons -----------------------------------------------------------------------------
@@ -463,6 +564,9 @@ func _draw() -> void:
 	_draw_clouds(open)
 	_draw_water(lake)
 	_tile(_bank, bank_top)
+	# Over the far bank, not under it: a mast on the far lane stands up in front of the
+	# trees, and drawn under the strip the hull sailed with its sail behind the sand.
+	_draw_afloat(lake)
 	_tile(_lawn, lake.end.y)
 	_draw_dogs()
 	_draw_birds()
@@ -544,6 +648,50 @@ func _draw_clouds(sky_tall: float) -> void:
 		)
 
 
+## What is on the water, far to near: the rubbish and the hulls sorted together by their
+## waterlines.
+func _draw_afloat(lake: Rect2) -> void:
+	var now := stepped()
+	var rows: Array = []
+	for k in flotsam_shown():
+		var piece: Dictionary = _flotsam[k]
+		var deep := lerpf(RUBBISH_BAND.x, RUBBISH_BAND.y, float(piece["deep"]))
+		rows.append([lake.position.y + lake.size.y * deep, piece, deep])
+	for hull in _hulls:
+		if hull.wait <= 0.0:
+			rows.append([lake.position.y + lake.size.y * float(BOAT_LANES[hull.lane][0]), hull, 0.0])
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	for row: Array in rows:
+		var line := snappedf(float(row[0]), PIXEL)
+		if row[1] is Hull:
+			_draw_hull(row[1] as Hull, line)
+			continue
+		var piece: Dictionary = row[1]
+		var art: Dictionary = rubbish[int(piece["kind"])]
+		var region: Rect2 = art["region"]
+		var grain := PIXEL if float(row[2]) >= RUBBISH_NEAR_FROM else PIXEL * 0.5
+		# The bottom of the picture is under the water: not drawn, the dog's own way.
+		var kept := Rect2(region.position, Vector2(region.size.x, ceilf(region.size.y * (1.0 - RUBBISH_SUNK))))
+		var bob := grain if sin((now * BOB_PACE + float(piece["beat"])) * TAU) > 0.0 else 0.0
+		var span := kept.size * grain
+		var at := Vector2(snappedf(float(piece["across"]) * size.x, PIXEL), line - span.y + bob)
+		if bool(piece["flip"]):
+			draw_set_transform(Vector2(at.x * 2.0 + span.x, 0.0), 0.0, Vector2(-1.0, 1.0))
+		draw_texture_rect_region(art["sheet"], Rect2(at, span), kept)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_hull(hull: Hull, line: float) -> void:
+	var art := hull_art(hull.way)
+	if art.is_empty():
+		return
+	var grain := float(BOAT_LANES[hull.lane][1])
+	var region: Rect2 = art["region"]
+	var anchor: Vector2 = art["anchor"]
+	var corner := Vector2(snappedf(hull.x, PIXEL), line) - Vector2(anchor.x, region.size.y) * grain
+	draw_texture_rect_region(art["sheet"], Rect2(corner, region.size * grain), region)
+
+
 func _draw_dogs() -> void:
 	var order := _dogs.duplicate()
 	order.sort_custom(func(a: Hound, b: Hound) -> bool: return a.at.y < b.at.y)
@@ -559,8 +707,8 @@ func _draw_birds() -> void:
 		var fly: Array = bird.kind["fly"]
 		var frame: Rect2 = fly[int(bird.age / FLAP) % fly.size()]
 		Flock.stamp(
-			self, bird_sheet, frame, _bird_at(bird).snapped(Vector2.ONE * PIXEL), bird.way,
-			Color.WHITE
+			self, bird_sheet, frame, _bird_at(bird).snapped(Vector2.ONE * PIXEL),
+			bird_facing(bird), Color.WHITE
 		)
 	for puff: Array in _puffs:
 		var gone := float(puff[1]) / PUFF_LIFE

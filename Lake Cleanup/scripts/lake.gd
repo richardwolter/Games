@@ -2211,6 +2211,11 @@ func _set_wash(open: bool) -> void:
 		_wash.day = _day
 		_wash.filth_left = func() -> float: return pollution
 		_wash.pack_size = func() -> int: return _dogs.size()
+		_wash.fleet_size = func() -> int: return fleet_size()
+		# The lake's own rubbish for the water behind the stand: the lighter tiers, no finds.
+		for def: TrashDef in _grid.defs:
+			if not def.keepsake and def.tier <= 2 and def.atlas != null:
+				_wash.rubbish.append({"sheet": def.atlas, "region": def.region})
 		_wash.flock = _flock
 		_wash.washed.connect(_on_find_washed)
 		_wash.close_asked.connect(_shut.bind(_set_wash))

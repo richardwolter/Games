@@ -242,6 +242,16 @@ func _load_art() -> bool:
 	return not _kinds.is_empty()
 
 
+## What `stamp` wants as `facing` for a bird going from `from` to `to`. **The sheet's birds
+## are drawn facing left**, so +1 is a bird heading left and the one heading right is the
+## flipped one: the sign is the sheet's, not the direction of travel. One place, because the
+## wash room's backdrop wrote its own and sent its pigeons across tail first (2026-09-19,
+## Richard: "I don't want to see this mistake again"). **Anything that draws a bird asks
+## this; nothing writes the sign for itself.**
+static func facing_of(from: Vector2, to: Vector2) -> float:
+	return 1.0 if to.x < from.x else -1.0
+
+
 ## The birds in use, for the harness and for anything that wants to know what is flying.
 func kinds() -> Array[Dictionary]:
 	return _kinds
@@ -446,9 +456,7 @@ func _step(bird: Dictionary, delta: float) -> bool:
 			var flat := from.lerp(to, travel)
 			# Up and down again: a bird crossing a lake is not a ruler.
 			bird["at"] = flat - Vector2(0.0, sin(travel * PI) * ARC_HEIGHT)
-			# The sheet's birds are drawn walking left, so a bird heading right is the
-			# flipped one.
-			bird["facing"] = 1.0 if to.x < from.x else -1.0
+			bird["facing"] = facing_of(from, to)
 			_maybe_wings(bird)
 			_maybe_poop(bird, delta)
 			if travel >= 1.0:

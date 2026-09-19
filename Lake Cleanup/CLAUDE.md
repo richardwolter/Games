@@ -2724,7 +2724,35 @@ A find is washed before the shed will have it. The one named exception to the sc
   - **The song goes through the radio** behind the wash room as behind the shop
     (`music.muffled` in `_push_rooms`).
   - **Out of scope, by decision**: pigeons perching, pay or score for hits, dogs in front of
-    the stand, shadows for the actors, mirroring the real pack or flock, boats crossing.
+    the stand, shadows for the actors, mirroring the real pack or flock.
+- **Which way a sprite faces is asked of its owner, never written by the caller** (third
+  pass the same day, Richard: "pigeons are flying backwards... I don't want to see this
+  mistake again"). The backdrop's first pigeons crossed tail first: `Flock.stamp`'s
+  `facing` is **the sheet's sign** — the birds are drawn facing left, so +1 is a bird
+  heading *left* — and the backdrop passed the direction of travel. Now
+  `Flock.facing_of(from, to)` is the one place (the flock's own flight calls it too),
+  `Boat.frame_heading` / `Boat.turn_sailing(screen_direction)` pick a hull's frame by the
+  boat's own heading rule (screen-right is tile (1, -1)), and `DogArt.stamp` already took
+  `facing_left`. **Any new mover routes through these and is checked on a zoomed crop of a
+  probe shot before it is called done**; `test_lake` guards that the backdrop hands a
+  rightward bird the flock's own answer and that left and right hulls are different frames.
+- **The backdrop's lake carries what the player's does** (same pass: "we should see objects
+  on the lake so it does not break immersion. And boats also crossing"):
+  - **Rubbish**: the lake's own sprites (tiers 0-2, no finds, lent by `Lake` as
+    `{sheet, region}` rows), `RUBBISH_MOST` (40) on a full lake down to none on a clean one.
+    **One seed whatever the meter says**, so a cleaner lake shows the first so-many of the
+    same pieces — they thin out, they do not reshuffle. Bottom `RUBBISH_SUNK` under water
+    (not drawn), bobbing a pixel on the stepped clock, half grain past `RUBBISH_NEAR_FROM`.
+  - **Ferries**: `fleet_size()` hulls on two lanes (`BOAT_LANES`: far at 1 canvas px a
+    painted one, near at 2), `Boat.art_frame`'s waterline-cut picture, shore to shore, a
+    wait out of sight (`BOAT_WAIT`), back the other way. No cargo, no foam, no bell.
+    **Drawn over the far bank's strip**: under it, the far hull sailed with its sail behind
+    the sand.
+  - **The jet does nothing to the lake, the boats or the rubbish, by decision** (a foam
+    splash, pushed rubbish and a rung bell were offered).
+  - Dogs drew 26-54 px tall and read "too small in comparison": `DOG_TALL` 36-72.
+  - `shot_pump` forces two hulls, one each way on each lane, because which way a bow points
+    is a thing to look at.
   - All paces, counts and sizes are first guesses. `shot_pump` puts a pair of pigeons and
     the pack in its clean-lake shot; `_stage_wash` guards the muffle, the pack's count and
     band, the stepped clock, the bird's veer, the dog's bolt, a wide jet troubling nothing,
