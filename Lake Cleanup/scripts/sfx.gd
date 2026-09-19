@@ -144,9 +144,10 @@ const CHIME_GAP := 6.0
 
 ## The built sounds' balance, as before the recordings came. The crate's thud is a recording
 ## now and its balance is in SOUNDS with the rest of the mix.
+##
+## The lake-cleaned note (`play_found`, `_make_found`) is gone (2026-09-18, Richard: "no need
+## for the end game bell"): the end song is what the ending sounds like.
 const CHIME_DB := -10.0
-## The lake come clean.
-const FOUND_DB := -10.0
 
 ## The two long beds. The lake's recording is quiet (it peaks at a fifth of full scale), so it
 ## sits up where the short sounds sit down.
@@ -198,7 +199,6 @@ const BED_FADE := 18.0
 var _streams := {}
 
 var _chime: AudioStreamWAV
-var _found: AudioStreamWAV
 
 ## When each gap-limited sound last played, in seconds.
 var _last := {}
@@ -559,11 +559,6 @@ func play_chime() -> void:
 	_fire(_chime, CHIME_DB, 1.0)
 
 
-## The lake coming up clean.
-func play_found() -> void:
-	_fire(_found, FOUND_DB, _rng.randf_range(0.98, 1.03))
-
-
 ## A find brought up in the net.
 func play_find_caught() -> void:
 	play(&"find_caught")
@@ -698,7 +693,6 @@ func _fire(stream: AudioStreamWAV, db: float, pitch: float) -> void:
 
 func _build() -> void:
 	_chime = _make_chime()
-	_found = _make_found()
 
 
 ## A two-pole resonator, as its coefficients and its two remembered samples. Wide bandwidth
@@ -754,58 +748,6 @@ func _make_chime() -> AudioStreamWAV:
 		# as hit rather than switched on.
 		var strike := _rng.randf_range(-1.0, 1.0) * exp(-t * 220.0) * 0.16
 		out[i] = (note * 0.5 + strike) * swell
-		peak = maxf(peak, absf(out[i]))
-	if peak > 0.0001:
-		for i in count:
-			out[i] = out[i] / peak * 0.8
-	return _to_wav(out, false)
-
-
-## A find: a wooden knock with a metal glow growing out of it.
-##
-## The furniture in this lake is wood and metal, and both are in the sound. The wood is
-## the front of it — a low box resonance with a knuckle of noise on the front, dead inside a
-## third of a second, because wood does not ring. The metal is the opposite and is what the
-## card is really doing: two close partials that swell in rather than being struck, beating
-## slowly against each other, and still there a second later.
-##
-## The swell is the whole reason this is not the purchase sound. Money lands; a thing coming
-## up out of a lake and catching the light does not land, it arrives.
-func _make_found() -> AudioStreamWAV:
-	var length := 1.5
-	var count := int(length * RATE)
-	var out := PackedFloat32Array()
-	out.resize(count)
-
-	# The box: a low fundamental with the two partials a struck plank actually has, none of
-	# them ringing for long.
-	var wood := [[196.0, 1.0, 13.0], [301.0, 0.5, 17.0], [452.0, 0.22, 24.0]]
-	# The metal: a fifth apart, each detuned from its neighbour by a couple of hertz so the
-	# pair drifts in and out of each other instead of sitting still.
-	var metal := [[784.0, 0.55], [787.0, 0.42], [1176.0, 0.3], [1181.5, 0.22]]
-	var peak := 0.0
-	for i in count:
-		var t := float(i) / RATE
-		var sample := 0.0
-
-		for part: Array in wood:
-			sample += (
-				sin(TAU * float(part[0]) * t) * float(part[1]) * exp(-t * float(part[2]))
-			) * 0.5
-		# The knuckle on the front of the knock. Gone in three milliseconds, and what makes
-		# it wood being hit rather than a low note being played.
-		sample += _rng.randf_range(-1.0, 1.0) * exp(-t * 320.0) * 0.35
-
-		# Grows over a fifth of a second and then lets go slowly, so the metal is a light
-		# coming up rather than a second thing being struck.
-		var bloom := clampf(t / 0.2, 0.0, 1.0) * exp(-maxf(t - 0.2, 0.0) * 2.4)
-		var ring := 0.0
-		for part: Array in metal:
-			ring += sin(TAU * float(part[0]) * t) * float(part[1])
-		sample += ring * bloom * 0.3
-
-		var swell := minf(t / 0.002, 1.0) * clampf((length - t) / 0.3, 0.0, 1.0)
-		out[i] = sample * swell * 0.5
 		peak = maxf(peak, absf(out[i]))
 	if peak > 0.0001:
 		for i in count:

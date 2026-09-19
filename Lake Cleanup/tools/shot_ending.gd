@@ -1,6 +1,6 @@
 extends Node
-## The ending, photographed: the beat of clean water, the words arriving over it, the credits
-## partway up, and what is left once the roll has been skipped.
+## The ending, photographed: the words starting to arrive over the clean water, the words up,
+## the credits partway up, and what is left once the roll has been skipped.
 ##
 ## A probe, not a test — the harness runs headless and headless has no renderer, so nothing
 ## in `Farewell._draw` is exercised by it. Run this one with the desktop build.
@@ -35,7 +35,10 @@ func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.set(&"save_path", SAVE_PATH)
-	get_tree().root.add_child.call_deferred(_main)
+	# Under this node, not under the root: a lake hung off the root is the game's own and
+	# wears the front (2026-09-17), and nothing behind the menu looks for the ending. This
+	# probe did exactly that for a day and photographed a menu five times.
+	add_child.call_deferred(_main)
 	set_physics_process(true)
 
 
@@ -46,12 +49,13 @@ func _physics_process(_delta: float) -> void:
 	match _frames:
 		20:
 			_empty_the_lake()
-		# Mid-beat: the water is lighting up and not a word has been written.
+		# A third of a second in: the water is lighting up and the words have barely begun to
+		# arrive. There is no beat in front of them any more (2026-09-18); the shot keeps its
+		# name so the pictures line up with the older ones.
 		40:
-			_note("beat left %.2f s" % float(_main.get(&"_ending_in")))
+			_note("words begun: %s" % str(_main.get_node_or_null(^"Farewell") != null))
 			_save(&"beat")
-		# The words have arrived and the roll is starting from under the glass. The beat is
-		# two seconds, so this is well past the frame the lake was emptied on.
+		# The words have arrived and the roll is starting from under the glass.
 		330:
 			_note("words up: %s" % str(_main.get_node_or_null(^"Farewell") != null))
 			_save(&"words")

@@ -3603,19 +3603,17 @@ func _stage_ending() -> void:
 	_check(is_zero_approx(float(_main.get(&"pollution"))),
 		"and the meter is put to zero rather than left near it",
 		"%.6f" % float(_main.get(&"pollution")))
-	# The lake gets the first two seconds to itself before a word is written over it
-	# (2026-09-16): the sparkle rising, the note, the end song coming in.
-	_check(float(_main.get(&"_ending_in")) > 0.0,
-		"the ending opens on a beat of clean water",
-		"%.2f s" % float(_main.get(&"_ending_in")))
-	_check(_main.get_node_or_null(^"Farewell") == null,
-		"and nothing is written over the lake during it", "")
-	_check(bool(_main.call(&"ending")),
-		"but the end song is told to come in with the beat", "")
-	_check(_angler.can_walk, "and the angler still has their legs", "")
-	_main.call(&"_count_the_beat", Lake.ENDING_BEAT + 0.1)
+	# Straight to the words and the end song (2026-09-18, Richard): no beat of clean water
+	# in front of them and no struck note. The words' own slow fade is the breath.
 	_check(_main.get_node_or_null(^"Farewell") != null,
-		"the closing words are on screen", "")
+		"the closing words are on screen the moment the run ends", "")
+	_check(bool(_main.call(&"ending")),
+		"and the end song is told to come in with them", "")
+	_check(not _main.has_method(&"_count_the_beat") and _main.get(&"_ending_in") == null,
+		"with no beat held in front of them", "")
+	var sound_now := Sfx.main()
+	_check(sound_now == null or not sound_now.has_method(&"play_found"),
+		"and no bell rung over them", "")
 	_check(not _angler.can_walk, "which holds the angler where they stand", "")
 	var ending: Farewell = _main.get(&"_farewell")
 	_check(ending != null and ending.rolling(),
@@ -3770,7 +3768,6 @@ func _stage_ending_on_load() -> void:
 	if _in_stage < 40:
 		return
 	_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
-	_main.call(&"_count_the_beat", Lake.ENDING_BEAT + 0.1)
 	_check(_main.get_node_or_null(^"Farewell") != null,
 		"and the words the run was owed are on screen", "")
 	# Said once already, and said again: the way off the lake is a door on this screen,
@@ -4644,6 +4641,12 @@ func _check_grime() -> void:
 	_check(source.contains("water_hazy_deep") and source.contains("water_foul_deep"),
 		"the water shader has the hazy and the foul ramps", "")
 	_check(source.contains("state_at = " + cuts), "and the grid's cutoffs are the shader's", cuts)
+	# Clean means clean: the wobble and the stagger both fade out with the filth, or the
+	# darkest band troughs of a finished lake draw hazy smudges with nothing under them.
+	_check(source.contains("edge_live = smoothstep(0.0, state_at.x, color_t)")
+		and source.contains("murk_wobble * edge_live")
+		and source.contains("state_spread * edge_live"),
+		"water with no filth in it has no edge to wobble or stagger", "")
 	var palette := Palette.master()
 	_check(palette != null and palette.water_hazy != Color.WHITE and palette.water_foul != Color.WHITE,
 		"the palette carries both ramps", "")
@@ -4763,12 +4766,6 @@ func _stage_foam() -> void:
 				break
 		dog.tile_pos = land
 		dog.set(&"_was_swimming", false)
-	# Clean means clean: the wobble and the stagger both fade out with the filth, or the
-	# darkest band troughs of a finished lake draw hazy smudges with nothing under them.
-	_check(source.contains("edge_live = smoothstep(0.0, state_at.x, color_t)")
-		and source.contains("murk_wobble * edge_live")
-		and source.contains("state_spread * edge_live"),
-		"water with no filth in it has no edge to wobble or stagger", "")
 		ripples_was = (splash.get(&"_ripple_age") as PackedFloat32Array).size()
 		dog.call(&"_wake", 0.016)
 		_check((splash.get(&"_ripple_age") as PackedFloat32Array).size() == ripples_was,

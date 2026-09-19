@@ -1179,10 +1179,14 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   `test_lake` guards the child order, that the glyphs end on the bar's top and no more than
   6 px off it, and that they stay inside the span beside the circle; probe
   `tools/shot_pieces_left.tscn` (desktop build) saves `tools/last_pieces_left.png`.
-- **Two seconds of shimmer first** (`Lake.ENDING_BEAT`, `_count_the_beat`): the sparkle
-  rising, the note ringing, and **the end song coming in with the beat, not with the text**
-  (`Lake.ending()`, which is what `MusicStation.set_ending` is told). The angler keeps their
-  legs during it; the hold comes with the words.
+- **Straight to the words and the end song** (2026-09-18, Richard: "no need for the end game
+  bell, lets run straight to the message and credit song"). `_on_lake_cleaned` raises the
+  farewell on the spot, and `Lake.ending()` is simply "the words are up", which is what
+  `MusicStation.set_ending` is told. **Retired**: the two seconds of shimmer in front of the
+  words (`Lake.ENDING_BEAT`, `_ending_in`, `_count_the_beat`, 2026-09-16) and the struck
+  note that opened them (`Sfx.play_found`, `_make_found`, `FOUND_DB`). The breath is the
+  words' own `FADE_IN`, with the lake lighting up under it. The angler is held from the
+  same frame.
 - **The message stands in the middle of the window** (`Farewell.BLOCK_AT` 0.5, 2026-09-16):
   it used to sit at 0.60, a little low, because the middle is where the island is. With the
   credits climbing under it the low block left the roll a short screen to cross and a long
@@ -1190,8 +1194,8 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
 - **The words take `FADE_IN` 3.6 s to arrive**, two seconds longer than they did (Richard:
   the shimmer can last two seconds longer as the message fades in). The lake is live and
   lighting up the whole time and the wash eases in with the words, so a slower fade *is*
-  more clean water before the ending is written over it. `Lake.ENDING_BEAT` is untouched —
-  that one is silence before anything at all — and **the roll waits for the words**
+  more clean water before the ending is written over it — and since the beat in front was
+  cut it is the only such stretch there is. **The roll waits for the words**
   (`_shown >= 1.0`): a credit arriving while the message is a third of the way in reads as
   the roll having started without it.
 - **The credits roll up and off** (`Farewell.roll_credits`, `_draw_roll`): `CreditsBoard`'s
@@ -1215,14 +1219,19 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   credit missing. It fades to `ROLL_BEHIND` over `ROLL_BEHIND_SOFT`, the way anything passing
   behind something else does. One band, asked by both, so the dimming cannot drift from the
   words.
-- `test_lake` guards the beat (its length, that nothing is written during it, that the song
-  is told), the crate rule (a piece in the net keeps the run going), the roll and the words.
+- `test_lake` guards that the words are up the moment the run ends, that the song is told,
+  that no beat and no bell are left, the crate rule (a piece in the net keeps the run
+  going), the roll and the words.
   **Headless has no renderer**, so `tools/shot_ending.tscn` (desktop build, `--fixed-fps 60`)
-  is what exercises the drawing: the beat, the words arriving, the first credits crossing the
+  is what exercises the drawing: the words beginning (the shot still called `beat`), the
+  words arrived, the first credits crossing the
   message, the roll well up, and what is left after a skip —
   `tools/last_ending_{beat,words,behind,roll,skipped}.png` and `last_ending.log`. It runs on
   **a save of its own**, because finishing a lake saves it on the spot and a probe may not
-  hand the player back an emptied run.
+  hand the player back an emptied run. **And under its own node, not the root**
+  (2026-09-18): hung off the root it was the game's own lake, wore the front, and from
+  2026-09-17 photographed the menu five times with no ending behind it. Its log said
+  `words up: false` and nobody read it. **Read a probe's log, not only its exit code.**
 
   The menu comes back from "Save and go to menu" and from the farewell's **"Back to
   menu"** plaque (`Farewell.to_menu`, always drawn under the closing words; clicking
@@ -2720,8 +2729,8 @@ The code-built placeholder sounds are replaced by Richard's recordings. **Supers
   splash's spread** (0.9-1.12 against the splash's 0.66-1.26, which was 0.72-1.1 until
   Richard asked for more variety on 2026-09-17): the throw is the rope leaving the hand, and
   a wide swing on it reads as a different net rather than the same one thrown again.
-- **Still built in code** (no recording): the lake-cleaned note (`play_found`) and the
-  siege's chime. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
+- **Still built in code** (no recording): the siege's chime, and nothing else — the
+  lake-cleaned note (`play_found`) was cut on 2026-09-18, see The Ending. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
   that played it already drew a splash, dropped a piece in the crate or knocked the box, so
   the knock under those was one event sounded twice. A charm lifted out of the water plays
   the piece splash instead and a dog delivering to the crate plays the crate's own thud
@@ -2742,8 +2751,9 @@ purpose. What the audit settled, against the shipped design:
   stay **one recording pitched by weight** — `Object_Splash` through `play_splash`, which is
   what is in play and what works; `catch.wav` (the knock, cut); and `warning.wav`, which has
   no caller, no substitute and none wanted.
-- **Open**: `chime.wav`, the lake coming clean, is the one sound still owed a recording.
-  `_make_found` stays until the take is in `art_source/SFX`.
+- **Closed, by decision** (2026-09-18): `chime.wav`, the lake coming clean, was the one
+  sound still owed a recording. Richard cut the bell instead — the end song is the ending's
+  sound — so `_make_found` is deleted and no take is owed.
 - **The delivery format lines are struck too**: the spec's 24-bit 48 kHz PCM in
   `assets/audio/` describes a hand-off, and the hand-off is `art_source/SFX` at 24-bit
   96 kHz, which exceeds it. What the game imports is 16-bit 44.1 kHz in `assets/sfx/` and
@@ -2956,6 +2966,12 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
 - **The ending**: Habibs fades in over everything from its start, over `FADE`, when the
   farewell appears on a cleaned lake and when Credits opens on the menu; it fades back to the
   playlist, which kept running, when either closes. Not on a finished lake after the farewell.
+- **The Music switch covers the ending, by decision** (2026-09-18): Habibs is on the Music
+  bus like every song, so a player who has music off gets a silent ending. Found when
+  Richard reported the credits song not triggering: the ending had fired (the save's
+  `farewell` was true) and `settings.cfg` had `music_on=false`, written two minutes before
+  the last piece. Overriding the mute was offered and not taken. **Before calling the end
+  song broken, read `settings.cfg`.**
 - **Silence is a volume**, never a stopped player (below `OFF_DB`).
 - **The song's clock is its player's playback position** when it has one, so a long scene
   load cannot run a file out before its fade; `follow_players` off drives it by hand.
@@ -3018,12 +3034,6 @@ an invisible wall in the water — it covers what is behind it and eats clicks. 
 object, anything within `GLUE = 4` px joins it, the rest is a stray. A size threshold is
 the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 
-- **The Music switch covers the ending, by decision** (2026-09-18): Habibs is on the Music
-  bus like every song, so a player who has music off gets a silent ending. Found when
-  Richard reported the credits song not triggering: the ending had fired (the save's
-  `farewell` was true) and `settings.cfg` had `music_on=false`, written two minutes before
-  the last piece. Overriding the mute was offered and not taken. **Before calling the end
-  song broken, read `settings.cfg`.**
 ### The Shed's Shelf (`scripts/shed_shelf.gd`, 2026-09-11)
 The inventory column down the right of the shed is a drawn oak board, the same furniture as
 the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over

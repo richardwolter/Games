@@ -77,8 +77,9 @@ const ROLL_BLANK := 12.0
 ## Two seconds longer than it was (2026-09-16, Richard: the shimmer can last two seconds
 ## longer as the message fades in). The lake underneath is live and lighting up the whole
 ## time, and the wash over it eases in with the words — so a slower fade is more clean water
-## before the ending is written over it, which is what was asked for. The beat in front
-## (`Lake.ENDING_BEAT`) is untouched: that one is silence before anything at all.
+## before the ending is written over it, which is what was asked for. Since 2026-09-18 this
+## fade is the only breath there is: the two-second beat in front of it (`Lake.ENDING_BEAT`)
+## and its struck note are gone, and the words start arriving as the last piece lands.
 const FADE_IN := 3.6
 const FADE_OUT := 0.5
 

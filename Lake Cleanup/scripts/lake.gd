@@ -740,9 +740,6 @@ var _pop_rng := RandomNumberGenerator.new()
 var _coins: CoinFly
 
 var _farewell_shown: bool = false
-## Seconds left of the shimmer the ending opens on, counting down to the words. Above zero
-## only during the beat; the farewell itself is what says the ending is up afterwards.
-var _ending_in: float = 0.0
 var _farewell: Farewell
 
 ## The pad's reticle and its assist, see scripts/pad_aim.gd. `at` is INF while the mouse is
@@ -1253,10 +1250,12 @@ func level_name() -> String:
 ## The last piece has come out of the water. Level one calls that an ending.
 func _on_lake_cleaned() -> void:
 	_farewell_shown = true
-	# The lake gets the first two seconds to itself: the sparkle rising, the note ringing and
-	# the end song coming in. The words follow. See ENDING_BEAT.
-	_ending_in = ENDING_BEAT
-	_push_rooms()
+	# Straight to the words and the end song (2026-09-18, Richard: "no need for the end game
+	# bell, lets run straight to the message and credit song"). The two-second beat of
+	# clean water and the struck note that opened it are gone: the words take `Farewell.FADE_IN`
+	# to arrive, the lake is lighting up under them the whole time, and that is the breath.
+	# `_show_farewell` pushes the rooms, which is what tells the station.
+	_show_farewell()
 
 
 ## Anything the level wants kept, added to the dictionary on its way to disk.
@@ -2511,14 +2510,6 @@ func _polish_panel_controls() -> void:
 ## answers, and it is asked on this clock and whenever a piece lands in the crate.
 const CLEAN_CHECK_EVERY := 0.5
 
-## How long the lake has to itself before a word is written over it (2026-09-16, Richard:
-## a little bit of the lake shimmer and sound before the message and the credits).
-##
-## The water is lighting up, the note is ringing and the end song is already coming in
-## under all of it. Two seconds, by decision: a breath, not a held shot.
-const ENDING_BEAT := 2.0
-
-
 ## Is it over yet?
 ##
 ## Only asked while the meter is on the floor, and only twice a second even then, because
@@ -2570,8 +2561,6 @@ func _check_cleaned() -> void:
 	# the meter is allowed to say so now that the field has been asked.
 	_filth_left = 0.0
 	pollution = 0.0
-	if _sfx != null:
-		_sfx.play_found()
 	_on_lake_cleaned()
 	# The moment is worth keeping without waiting for the autosave to come round.
 	save_game()
@@ -2595,22 +2584,10 @@ func _all_landed() -> bool:
 	return _haul == null or _haul.flying_to(null) == 0
 
 
-## The shimmer before the words. Run down every frame once the lake is finished; the words
-## are raised on the frame it reaches zero, and never again (the farewell itself is the
-## guard after that).
-func _count_the_beat(delta: float) -> void:
-	if _ending_in <= 0.0:
-		return
-	_ending_in -= delta
-	if _ending_in <= 0.0:
-		_ending_in = 0.0
-		_show_farewell()
-
-
-## Whether the ending is up: the shimmer it opens on, or the words themselves. What the
-## music station is told, so the end song comes in with the beat rather than with the text.
+## Whether the ending is up, which is the closing words being on screen. What the music
+## station is told, so the end song comes in with them.
 func ending() -> bool:
-	return _ending_in > 0.0 or _farewell != null
+	return _farewell != null
 
 
 ## Lay the closing words over the lake.
@@ -4108,7 +4085,6 @@ func _process(delta: float) -> void:
 	# The world there is a pose, and a pose has nothing to save that was not saved going in.
 	if not _in_menu:
 		_look_for_the_end(delta)
-		_count_the_beat(delta)
 		_tick_play_log(delta)
 
 		_save_note_for = maxf(_save_note_for - delta, 0.0)
