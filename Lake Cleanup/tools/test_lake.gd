@@ -5587,6 +5587,30 @@ func _stage_wash() -> void:
 	var room: WashRoom = _main.get(&"_wash")
 	_check(room != null and room.visible and bool(_main.call(&"_panelled")),
 		"working the pump opens the wash room, and it holds the lake's hands", "")
+	# What is behind the stand: the view from the pump, its water the lake's own.
+	var back := room.backdrop()
+	_check(back != null and back.is_painted() and back.get_index() < room.stand().get_index()
+		and not room.stand().bare_room,
+		"the room has a painted backdrop under the stand, and the stand draws no wall", "")
+	_check(WashBackdrop.state_of(1.0) == LakeGrid.FILTH_STATES and WashBackdrop.state_of(0.0) == 0,
+		"its water is the dirtiest state on a full lake and clean on an empty one", "")
+	var pal := Palette.master()
+	_check(back.ramp_of(0)[2] == pal.water_clean and back.ramp_of(4)[2] == pal.water_dirty
+		and back.ramp_of(2)[0] == pal.water_murky_deep,
+		"in the palette's own ramps", "")
+	_check(is_equal_approx(back.filth, float(_main.get(&"pollution"))),
+		"and it was handed the lake's meter when the room came up",
+		"%.2f against %.2f" % [back.filth, float(_main.get(&"pollution"))])
+	_check(back.sky_at(0.0)[0] == pal.sky_morning_high and back.sky_at(0.5)[1] == pal.sky_noon_low
+		and back.sky_at(1.0)[0] == pal.sky_afternoon_high
+		and pal.sky_noon_high != Color.WHITE,
+		"the sky is the palette's, by the day's hour", "")
+	_check(back.modulate.v < 0.95 and back.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the whole of it is darkened behind the find, and takes no clicks", "%.2f" % back.modulate.v)
+	_check(room.stand().hiss_is_recorded(), "the jet is the recording, not the built noise", "")
+	_check(WashStand.HISS_OFF_PIECE - WashStand.HISS_ON_PIECE < 0.15
+		and WashStand.HISS_ON_PIECE < 1.0 and WashStand.HISS_OFF_PIECE > 1.0,
+		"duller on the piece and brighter off it, narrowly", "")
 	var soap := room.soap_of(StringName(find))
 	var prices := {}
 	for name: String in sheets.names:

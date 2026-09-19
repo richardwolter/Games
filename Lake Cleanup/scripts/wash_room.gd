@@ -1,6 +1,7 @@
 ## The wash room: what opens when the angler works the pump (issue #37).
 ##
-## The `WashStand` over the whole window, and a tray of what is waiting to be washed down its
+## A `WashBackdrop` — the view from the pump — with the `WashStand` over the whole window on
+## top of it, and a tray of what is waiting to be washed down its
 ## left side, in the shed shelf's own wood. Click a find on the tray and it goes on the stand;
 ## wash it and it goes to the shed. **Must wash to place**: a netted find waits here, not on
 ## the shed's shelf, until it has been through this room.
@@ -44,6 +45,13 @@ var waiting: Array[String] = []
 ## How much is in the purse right now.
 var purse := Callable()
 
+## The lake's day, for the backdrop's sky and tint, and how much of the lake's filth is
+## left, asked once each time the room comes up. Both optional: without them it is a late
+## morning over a filthy lake.
+var day: DayCycle
+var filth_left := Callable()
+
+var _backdrop: WashBackdrop
 var _stand: WashStand
 var _tray: Tray
 var _close: CloseButton
@@ -55,8 +63,13 @@ var _thirds := Vector2.ZERO
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_backdrop = WashBackdrop.new()
+	_backdrop.name = &"Backdrop"
+	add_child(_backdrop)
+	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_stand = WashStand.new()
 	_stand.name = &"Stand"
+	_stand.bare_room = not _backdrop.is_painted()
 	_stand.sheets = sheets
 	_stand.washed.connect(_on_washed)
 	add_child(_stand)
@@ -77,6 +90,8 @@ func _ready() -> void:
 ## unwashed and unpaid for.
 func open(up: bool) -> void:
 	visible = up
+	if up and _backdrop != null and filth_left.is_valid():
+		_backdrop.filth = float(filth_left.call())
 	_on_stand = &""
 	_scroll = 0
 	if _stand != null:
@@ -87,6 +102,10 @@ func open(up: bool) -> void:
 ## What is on the stand, or empty.
 func on_stand() -> StringName:
 	return _on_stand
+
+
+func backdrop() -> WashBackdrop:
+	return _backdrop
 
 
 ## The stand itself, for a harness to spray with.
@@ -145,6 +164,11 @@ func _on_washed(piece: StringName) -> void:
 func _process(_delta: float) -> void:
 	if not visible:
 		return
+	if day != null:
+		if absf(_backdrop.sun - day.sun) > 0.002:
+			_backdrop.sun = day.sun
+		if not _backdrop.tint.is_equal_approx(day.tint):
+			_backdrop.tint = day.tint
 	# The shine has run: the stand is cleared for the next one.
 	if _on_stand != &"" and _stand.state == WashStand.State.CLEAN:
 		_on_stand = &""

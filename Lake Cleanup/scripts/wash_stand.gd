@@ -184,18 +184,24 @@ const PLAIN_UNDER := 34.0
 const PLAIN_METAL := Color(0.26, 0.29, 0.31)
 const PLAIN_BRASS := Color(0.78, 0.60, 0.26)
 
-## The room behind. Placeholder too.
+## The room behind, **when nothing else is**: `WashRoom` lays a `WashBackdrop` under the
+## stand and turns `bare_room` off; the stand on its own (`tools/wash_spike`) keeps the flat
+## wall so it is never drawn over nothing.
 const WALL := Color(0.07, 0.13, 0.14)
 const FLOOR := Color(0.05, 0.09, 0.10)
 const MUD := Color(0.24, 0.19, 0.12)
 
-## The hiss. **A placeholder built in code** — there is no recording of a jet yet, and one is
-## owed (Nuven). Duller and lower on the piece, brighter off it.
-const HISS_DB := -17.0
+## The jet: Nuven's recording of a hose (2026-09-19), cut to a seamless loop and levelled by
+## `tools/build_sfx.py` (`hose_spray`). Duller on the piece, brighter off it — the ear's
+## version of "am I hitting it" — **but narrowly**: the code-built noise it replaces swung
+## 0.92 to 1.22, and a real recording pitched that far is a different hose. By-ear knobs.
+## The noise is still built when the file is missing, so the jet is never silent.
+const HISS_TAKE := "res://assets/sfx/hose_spray.ogg"
+const HISS_DB := -13.0
 const HISS_RATE := 22050
 const HISS_LENGTH := 1.2
-const HISS_ON_PIECE := 0.92
-const HISS_OFF_PIECE := 1.22
+const HISS_ON_PIECE := 0.96
+const HISS_OFF_PIECE := 1.06
 
 enum State { EMPTY, WASHING, RINSING, SHINING, CLEAN }
 
@@ -252,6 +258,9 @@ var _under := 0.0
 var _loosened := 0.0
 var _clear_bank := 0.0
 var _spray_bank := 0.0
+
+## Whether the stand draws its own flat wall and floor. See `WALL`.
+var bare_room := true
 
 var _runs: Array[Run] = []
 var _flecks: Array[Fleck] = []
@@ -822,9 +831,10 @@ func _drive_finish(delta: float) -> void:
 # --- Drawing -----------------------------------------------------------------------------
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), WALL)
 	var floor_y := size.y * FLOOR_AT
-	draw_rect(Rect2(0.0, floor_y, size.x, size.y - floor_y), FLOOR)
+	if bare_room:
+		draw_rect(Rect2(Vector2.ZERO, size), WALL)
+		draw_rect(Rect2(0.0, floor_y, size.x, size.y - floor_y), FLOOR)
 	_draw_stand(floor_y)
 	if state != State.EMPTY:
 		draw_texture_rect_region(
@@ -1177,8 +1187,30 @@ func _draw_stars() -> void:
 
 # --- Sound -------------------------------------------------------------------------------
 
-## A second of shaped noise on a loop, its ends crossed over so the seam is not a tick.
 func _build_hiss() -> void:
+	var stream: AudioStream = null
+	if ResourceLoader.exists(HISS_TAKE):
+		var take := load(HISS_TAKE) as AudioStreamOggVorbis
+		if take != null:
+			take.loop = true
+			stream = take
+	if stream == null:
+		stream = _noise_hiss()
+	_hiss = AudioStreamPlayer.new()
+	_hiss.stream = stream
+	_hiss.bus = Prefs.BUS_SFX
+	_hiss.volume_db = Prefs.BUS_SILENT
+	add_child(_hiss)
+
+
+## Whether the jet is the recording rather than the fallback, for the harness.
+func hiss_is_recorded() -> bool:
+	return _hiss != null and _hiss.stream is AudioStreamOggVorbis
+
+
+## The fallback: a second of shaped noise on a loop, its ends crossed over so the seam is
+## not a tick.
+func _noise_hiss() -> AudioStream:
 	var count := int(HISS_LENGTH * HISS_RATE)
 	var cross := int(0.12 * HISS_RATE)
 	var raw := PackedFloat32Array()
@@ -1207,11 +1239,7 @@ func _build_hiss() -> void:
 	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	stream.loop_end = count
 	stream.data = data
-	_hiss = AudioStreamPlayer.new()
-	_hiss.stream = stream
-	_hiss.bus = Prefs.BUS_SFX
-	_hiss.volume_db = Prefs.BUS_SILENT
-	add_child(_hiss)
+	return stream
 
 
 func _drive_hiss(delta: float) -> void:

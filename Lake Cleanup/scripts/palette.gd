@@ -62,6 +62,16 @@ var histogram: Dictionary = {}
 @export var foam_light: Color = Color.WHITE
 @export var foam_dirty: Color = Color.WHITE
 
+## The sky, which only the wash room's backdrop draws (2026-09-19): two flat steps, the high
+## one over the low, at mid morning, noon and late afternoon — the day has no night. Authored,
+## not measured: the pack has no sky in it.
+@export var sky_morning_high: Color = Color.WHITE
+@export var sky_morning_low: Color = Color.WHITE
+@export var sky_noon_high: Color = Color.WHITE
+@export var sky_noon_low: Color = Color.WHITE
+@export var sky_afternoon_high: Color = Color.WHITE
+@export var sky_afternoon_low: Color = Color.WHITE
+
 ## Wood/tree colors.
 @export var wood: Color = Color.WHITE
 

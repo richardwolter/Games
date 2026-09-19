@@ -70,6 +70,14 @@ const WATER_RAMPS := {
 	"foam": Color(0.933, 0.965, 0.984),
 	"foam_light": Color(1.0, 1.0, 1.0),
 	"foam_dirty": Color(0.8, 0.82, 0.678),
+	# The wash room's sky (2026-09-19): high step over low, at the day's three hours. First
+	# guesses — retune by eye on tools/last_wash_room.png.
+	"sky_morning_high": Color(0.62, 0.78, 0.88),
+	"sky_morning_low": Color(0.86, 0.88, 0.8),
+	"sky_noon_high": Color(0.49, 0.72, 0.9),
+	"sky_noon_low": Color(0.72, 0.86, 0.94),
+	"sky_afternoon_high": Color(0.58, 0.66, 0.8),
+	"sky_afternoon_low": Color(0.93, 0.8, 0.62),
 }
 
 const OUTPUT_PATH := "res://resources/palette.tres"

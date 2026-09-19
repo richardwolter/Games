@@ -2653,8 +2653,46 @@ A find is washed before the shed will have it. The one named exception to the sc
   foot, leaving along the nozzle's own axis, to an anchor low and to one side
   (`HOSE_SIDE`), its belly trailing a nozzle that moves. The builder's canvas tones and
   edge colour come through `nozzle.json`, on the nozzle picture's own pixel grid.
-- **Placeholders, owed**: the hiss is a noise loop built in code (no recording of a jet —
-  Nuven); the stand's table and the room's wall are flat drawing.
+- **The jet is Nuven's recording** (2026-09-19, `/grill-me` with Richard):
+  `art_source/SFX/Water_Hose_Spray.wav`, a steady spray with no tap-on or shut-off in it,
+  cut to a 9 s seamless loop and levelled by `build_sfx.py` as `hose_spray` (`--only a,b`
+  builds named cuts alone, so a new take does not re-encode the rest). `WashStand` loads it
+  for itself — it is not one of `Sfx`'s names — and eases it in and out on the button as
+  before. **Duller on the piece, brighter off it, narrowly**: `HISS_ON_PIECE` 0.96 /
+  `HISS_OFF_PIECE` 1.06, where the code-built noise swung 0.92 to 1.22 — a real recording
+  pitched that far is a different hose. `HISS_DB` -13. All by-ear knobs. The noise loop is
+  still built when the file is missing.
+- **Behind the stand is the view from the pump** (`scripts/wash_backdrop.gd`,
+  `tools/build_wash_backdrop.py`, same day; supersedes the two grey rects): sky, the far
+  bank's trees and sand, the lake, the island's sand, and its lawn under the stand to the
+  bottom of the window, the near waterline at `HORIZON` 0.52.
+  - **Two baked strips, two things drawn in code.** `assets/wash_bank.png` and
+    `wash_lawn.png` are all pack art (psd-extract venv python, project root, **reimport
+    after**; contact sheet `tools/last_wash_backdrop.png`): `Tree_1-3` in three ranks, the
+    back ones multiplied down, and ground as a patchwork of the rectangle inscribed in each
+    tile's top diamond. **The diamonds themselves are not used, by decision**: a first-person
+    floor is a plane running away and a 2:1 diamond under a front-on stand is two
+    perspectives in one picture. The patchwork's blocks get shorter and narrower towards the
+    horizon instead — stepped, nearest, whole painted pixels. Both strips wrap.
+  - **The water is the player's own lake**: the palette's five ramps, the state picked from
+    `pollution` through `LakeGrid.FILTH_STATE_AT`, flat bands (shallow at both shores, deep
+    between, far bands thinner), seeded streaks one step up the ramp, a foam line at each
+    shore. **Still, by decision** (over animated bands, glints and passing pigeons: a second
+    water renderer in a new projection). Set when the room opens, left alone while it is up.
+  - **The sky follows the day** (`DayCycle.sun`, new: the hour, eased back with the rest of
+    the light): two flat steps lerped between `sky_morning/noon/afternoon_high/low`,
+    authored in `extract_palette.gd` and `palette.tres`. **The only sky in the game.**
+  - **All of it under `DARKEN` (0.66) times the day's tint**: the grime and the dirty spray
+    are the water's filthy greens and lose to a full-strength lawn. One knob.
+  - At `PIXEL` 2, finer than the stand's and the nozzle's grain, on purpose: far is fine.
+  - The stand keeps its flat wall when it has no room round it (`WashStand.bare_room`,
+    `tools/wash_spike`). The backdrop holds nothing of the lake's: the room hands it
+    `filth`, `sun`, `tint`.
+  - **First guesses**: `HORIZON`, `LAKE_TALL`, `DARKEN`, the sky swatches, `RANKS`,
+    `DEAD_ODDS`. Judge on `tools/last_wash_room.png` / `last_wash_room_clean.png`
+    (`shot_pump`).
+  - **Out of scope, by decision**: the stand's table (still drawn planks), animated water,
+    anything crossing the view, parallax with the nozzle, tap-on and shut-off sounds.
 - **Out of scope, by decision**: pump upgrades, a timer or a score, nozzle types, stubborn
   spots, saved masks, washing rubbish, washing a view other than the first, painted grime,
   cellular water, any price or track change.

@@ -121,6 +121,10 @@ PLAN = {
     "pigeon_coo": ("Pigeon_Noise.wav", ("trim", 2.0)),
     "net_throw": ("Throwing_Net.wav", ("trim", 0.45)),
     "upgrade": ("Upgrade_Purchase.wav", ("trim", 1.2)),
+    # The wash room's jet (2026-09-19): a steady spray from 0.5 s to 11.5 s with no tap in it
+    # and no shut-off, so it is a held loop and the stand eases it in and out on the button.
+    # `WashStand` loads it for itself; it is not one of `Sfx`'s names.
+    "hose_spray": ("Water_Hose_Spray.wav", ("loop", 1.0, 9.0, 1.0)),
 }
 
 ## Names whose low end is rolled off and whose start is eased in: brought up to level, the
@@ -472,10 +476,14 @@ def main():
     if len(sys.argv) > 2 and sys.argv[1] == "--split":
         split(sys.argv[2])
         return
+    # `--only a,b` builds those names alone: a new take does not have to re-encode the rest.
+    only = set(sys.argv[2].split(",")) if len(sys.argv) > 2 and sys.argv[1] == "--only" else None
     os.makedirs(OUT, exist_ok=True)
     cache = {}
     report = []
     for name, (source, how) in PLAN.items():
+        if only is not None and name not in only:
+            continue
         if source not in cache:
             cache[source] = decode(os.path.join(SRC, source))
         samples = cache[source]
@@ -521,8 +529,10 @@ def main():
     for out_name, _path, _secs, _was, _now, _peak, gain in report:
         lines.append("  %-16s %+6.1f" % (out_name, -gain))
     text = chr(10).join(lines) + chr(10)
-    with open("tools/last_sfx.log", "w", encoding="utf-8") as log:
-        log.write(text)
+    # A part build keeps the whole build's report.
+    if only is None:
+        with open("tools/last_sfx.log", "w", encoding="utf-8") as log:
+            log.write(text)
     print(text)
     print("%d files, %.1f KB" % (
         len(report), sum(os.path.getsize(p) for _n, p, *_r in report) / 1024))

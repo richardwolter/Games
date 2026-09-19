@@ -2208,6 +2208,8 @@ func _set_wash(open: bool) -> void:
 		_wash.name = &"WashRoom"
 		_wash.sheets = _sheets
 		_wash.purse = func() -> float: return sludge
+		_wash.day = _day
+		_wash.filth_left = func() -> float: return pollution
 		_wash.washed.connect(_on_find_washed)
 		_wash.close_asked.connect(_shut.bind(_set_wash))
 		_skin.get_parent().add_child(_wash)

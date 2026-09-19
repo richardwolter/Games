@@ -36,6 +36,11 @@ var tint := Color.WHITE
 var lean: float = 0.0
 var stretch: float = 1.0
 
+## Where the sun is along its day, 0 first light, 0.5 noon, 1 dusk — eased back to the
+## morning's with the rest of the light. For what wants the hour rather than the tint: the
+## wash room's sky.
+var sun: float = 0.3
+
 ## How dark a shadow is drawn, as an alpha.
 var ink: float = 0.3
 
@@ -75,6 +80,7 @@ func _sun_at() -> float:
 func _settle() -> void:
 	var at := _sun_at()
 	if at >= 0.0:
+		sun = at
 		_light_at(at)
 		return
 	# Easing back: late afternoon's light and shadows turn into the morning's, smoothly, the
@@ -88,6 +94,7 @@ func _settle() -> void:
 	lean = lerpf(late[1], lean, back)
 	stretch = lerpf(late[2], stretch, back)
 	ink = lerpf(late[3], ink, back)
+	sun = lerpf(_config.sun_to, _config.sun_from, back)
 
 
 ## The light with the sun `at` along its day (0 first light, 0.5 noon, 1 dusk).

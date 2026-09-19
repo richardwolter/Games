@@ -8,7 +8,8 @@ extends Node
 ##   <godot> --path . --fixed-fps 60 res://tools/shot_pump.tscn
 ##
 ## Saves `tools/last_pump.png` (cropped on the pump, the angler beside it so the lamp is lit),
-## `tools/last_wash_room.png` (the room with three finds waiting, one on the stand) and
+## `tools/last_wash_room.png` (the room with three finds waiting, one on the stand),
+## `tools/last_wash_room_clean.png` (the same over a cleaned lake, late in the day) and
 ## `tools/last_pump.log`.
 ##
 ## **On a save of its own, under its own node**: a lake hung off the root is the game's own
@@ -93,10 +94,24 @@ func _physics_process(delta: float) -> void:
 			if _age < 1.2:
 				return
 			get_viewport().get_texture().get_image().save_png("res://tools/last_wash_room.png")
+			_say("backdrop painted %s, filth %.2f, state %d, sun %.2f" % [
+				room.backdrop().is_painted(), room.backdrop().filth,
+				WashBackdrop.state_of(room.backdrop().filth), room.backdrop().sun
+			])
 			_say("clean %.2f" % room.stand().share_clean())
 			var art: Image = room.stand().get(&"_art")
 			var solid: PackedByteArray = room.stand().get(&"_solid")
 			_say("art %s, solid %d of %d, region %s" % [
 				art != null, solid.count(1), solid.size(), room.stand().get(&"_region")
 			])
+			# And again over a lake that has come clean, late in the day.
+			room.day = null
+			room.backdrop().filth = 0.0
+			room.backdrop().sun = 0.8
+			_step = 3
+			_age = 0.0
+		3:
+			if _age < 0.3:
+				return
+			get_viewport().get_texture().get_image().save_png("res://tools/last_wash_room_clean.png")
 			get_tree().quit()
