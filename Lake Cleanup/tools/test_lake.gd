@@ -5663,6 +5663,14 @@ func _stage_wash() -> void:
 		"rubbish floats on it by the meter: a full lake's worth, thinning to none",
 		"%d / %d / %d" % [full, half, back.flotsam_shown()])
 	back.filth = float(_main.get(&"pollution"))
+	room.call(&"_process", 0.016)
+	_check(back.shade.z > 0.0 and back.shade == room.stand().shade,
+		"the dogs are lent the day's shadow, the same one the stand throws", str(back.shade))
+	var lanes_quick := true
+	for lane: Array in WashBackdrop.BOAT_LANES:
+		lanes_quick = lanes_quick and float(lane[2]) >= 30.0
+	_check(lanes_quick and WashBackdrop.FOAM_ROWS.size() >= 1,
+		"the ferries cross at a pace, and what floats wears a foam collar", "")
 	var pup := back.dogs()[0]
 	var sat := pup.at
 	back.sprayed_at(sat - Vector2(0.0, 10.0))

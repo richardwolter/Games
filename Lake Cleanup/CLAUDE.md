@@ -2753,6 +2753,16 @@ A find is washed before the shed will have it. The one named exception to the sc
   - Dogs drew 26-54 px tall and read "too small in comparison": `DOG_TALL` 36-72.
   - `shot_pump` forces two hulls, one each way on each lane, because which way a bow points
     is a thing to look at.
+  - **What floats wears a foam collar, and the dogs throw the sun's shadow** (fourth look,
+    Richard: "it lacks the objects foams, the dogs shadows and the boats can seem a little
+    bit quicker"). `_draw_collar`: a torn row of whole foam pixels on the waterline and a
+    thinner one under it, re-torn `FOAM_BEATS` (2) times a second, `foam_dirty` on foul or
+    dirty water — round every piece and along each hull's own waterline
+    (`Boat.art_frame`'s new `waterline` ends, not the picture's box). Dog shadows are
+    `Shade.lying` on `WashBackdrop.shade`, the same (lean, stretch, ink) the room hands the
+    stand, at `DOG_SHADE_GAIN`. **This supersedes "shadows for the actors" being out of
+    scope** for the dogs; birds and boats still throw none. Ferries went 20/38 to **32/60**
+    canvas px a second.
   - All paces, counts and sizes are first guesses. `shot_pump` puts a pair of pigeons and
     the pack in its clean-lake shot; `_stage_wash` guards the muffle, the pack's count and
     band, the stepped clock, the bird's veer, the dog's bolt, a wide jet troubling nothing,

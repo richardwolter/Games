@@ -1145,6 +1145,12 @@ static func art_frame(turn: float) -> Dictionary:
 		"sheet": sheet,
 		"region": Rect2(Vector2(float(index) * side, 0.0) + Vector2(box.position), kept),
 		"anchor": _anchor - Vector2(box.position),
+		# Where the hull meets the water, left end and right, in the region's own pixels:
+		# for a collar laid by something that is not a `HullCollar`.
+		"waterline": Vector2(
+			cut_line(index)[0].x - float(box.position.x),
+			cut_line(index)[cut_line(index).size() - 1].x - float(box.position.x)
+		),
 		"cut": cut,
 	}
 

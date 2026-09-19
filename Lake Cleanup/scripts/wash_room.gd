@@ -189,6 +189,7 @@ func _process(_delta: float) -> void:
 		if not _backdrop.tint.is_equal_approx(day.tint):
 			_backdrop.tint = day.tint
 		_stand.shade = Vector3(day.lean, day.stretch, day.ink)
+		_backdrop.shade = _stand.shade
 	_stand.ground_tone = _backdrop.modulate
 	# The jet off the find is the backdrop's to answer: its birds and dogs take fright.
 	var wet := _stand.jet_past_piece()

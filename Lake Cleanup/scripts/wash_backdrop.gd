@@ -119,7 +119,19 @@ const RUBBISH_NEAR_FROM := 0.55
 const BOB_PACE := 0.35
 ## Ferries: each lane's waterline down the lake, its canvas pixels to a painted one, and its
 ## pace. A hull crosses, waits out of sight `BOAT_WAIT`, and comes back the other way.
-const BOAT_LANES := [[0.2, 1.0, 20.0], [0.72, 2.0, 38.0]]
+## (20 and 38 until Richard's look: "can seem a little bit quicker".)
+const BOAT_LANES := [[0.2, 1.0, 32.0], [0.72, 2.0, 60.0]]
+## The foam collar where a piece or a hull meets the water (Richard, same look: "it lacks
+## the objects' foams"): the lake's own collar said in this grain — a torn row of whole foam
+## pixels along the waterline and a thinner one under it, re-torn `FOAM_BEATS` times a
+## second, the filthy foam on filthy water. How much of each row is there, and how far past
+## the picture's ends it runs, in its own pixels.
+const FOAM_BEATS := 2.0
+const FOAM_ROWS := [0.75, 0.35]
+const FOAM_PAST := 1
+## The dogs throw the sun's shadow (`Shade.lying`, the day's lean, stretch and ink lent by
+## the room as `shade`), at `DOG_SHADE_GAIN` of the ink: the lawn is already darkened.
+const DOG_SHADE_GAIN := 1.5
 const BOAT_WAIT := Vector2(6.0, 20.0)
 const BOAT_MARGIN := 140.0
 
@@ -168,6 +180,8 @@ var tint := Color.WHITE:
 var pack := 1
 var bird_sheet: Texture2D
 var bird_kinds: Array[Dictionary] = []
+## The day's shadow as (lean, stretch, ink); nought draws none.
+var shade := Vector3.ZERO
 ## How many ferries the fleet holds, and the lake's rubbish as `{sheet, region}` rows.
 var fleet := 1
 var rubbish: Array = []
@@ -679,6 +693,7 @@ func _draw_afloat(lake: Rect2) -> void:
 			draw_set_transform(Vector2(at.x * 2.0 + span.x, 0.0), 0.0, Vector2(-1.0, 1.0))
 		draw_texture_rect_region(art["sheet"], Rect2(at, span), kept)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		_draw_collar(at.x, at.x + span.x, at.y + span.y, grain, int(piece["kind"]) + int(at.x))
 
 
 func _draw_hull(hull: Hull, line: float) -> void:
@@ -690,11 +705,51 @@ func _draw_hull(hull: Hull, line: float) -> void:
 	var anchor: Vector2 = art["anchor"]
 	var corner := Vector2(snappedf(hull.x, PIXEL), line) - Vector2(anchor.x, region.size.y) * grain
 	draw_texture_rect_region(art["sheet"], Rect2(corner, region.size * grain), region)
+	# Along the hull, not the whole picture: the cut's own ends where the json has them.
+	var from := corner.x
+	var to := corner.x + region.size.x * grain
+	if art.has("waterline"):
+		var ends: Vector2 = art["waterline"]
+		from = corner.x + ends.x * grain
+		to = corner.x + ends.y * grain
+	_draw_collar(from, to, line, grain, 977 + hull.lane)
+
+
+## A foam collar from `from` to `to` along the waterline at `line`, in pixels of `grain`.
+func _draw_collar(from: float, to: float, line: float, grain: float, seed_at: int) -> void:
+	var foam := _palette.foam_dirty if state_of(filth) >= FOAM_DIRTY_FROM else _palette.foam
+	var beat := int(stepped() * FOAM_BEATS)
+	var cells := int((to - from) / grain) + FOAM_PAST * 2
+	for row in FOAM_ROWS.size():
+		for k in cells:
+			# The second row is pulled in from the ends: a collar, not a bar.
+			if row > 0 and (k < 2 or k >= cells - 2):
+				continue
+			if _hash(seed_at * 31 + k, beat + row * 7) > float(FOAM_ROWS[row]):
+				continue
+			draw_rect(
+				Rect2(
+					snappedf(from, grain) + float(k - FOAM_PAST) * grain,
+					line - grain + float(row) * grain, grain, grain
+				),
+				foam
+			)
 
 
 func _draw_dogs() -> void:
 	var order := _dogs.duplicate()
 	order.sort_custom(func(a: Hound, b: Hound) -> bool: return a.at.y < b.at.y)
+	if shade.z > 0.0:
+		var ink := Shade.tint(minf(shade.z * DOG_SHADE_GAIN, 0.6))
+		for dog: Hound in order:
+			draw_set_transform_matrix(
+				Shade.lying(dog.at.snapped(Vector2.ONE * PIXEL), shade.x, shade.y)
+			)
+			DogArt.stamp(
+				self, dog.pose, DogArt.frame_at(dog.pose, dog.age), Vector2.ZERO,
+				_dog_tall(dog), dog.left, 0.0, ink
+			)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for dog: Hound in order:
 		DogArt.stamp(
 			self, dog.pose, DogArt.frame_at(dog.pose, dog.age),
