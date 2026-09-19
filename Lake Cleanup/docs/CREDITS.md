@@ -8,11 +8,15 @@ or its licensing status changes — it should always reflect reality, not aspira
 
 ## Art
 
-The in-game credits board (`scripts/credits_board.gd`) lists every pack below under one
+The in-game credits board (`scripts/credits_board.gd`) lists every pack below under a single
 "Art and Assets" heading, in each pack's **own required credit wording** and with no mention
 of what the asset is (Richard, 2026-09-16). This file is the only place the asset → pack
 mapping and the licence status live, so keep it current when either changes. AI-generated
 art is credited nowhere, by decision.
+
+The board carries three other headings — "Design and programming", "Music and sound" and,
+since 2026-09-19, "Tools" (see below). "Art and Assets" is still the one heading every art
+pack stands under; nothing about an art pack goes anywhere else on that board.
 
 - **Decoration and small objects** (`art_source/Decoration_Clean_Dirty.psd` →
   `assets/decor_clean.png` / `decor_dirty.png`, and the earlier
@@ -115,6 +119,21 @@ license/agreement in place with the artist (confirmed 2026-09-06).
   resampled by `tools/build_spotify_icon.py`. ✅ Their guidelines allow the mark to point at
   Spotify content; they forbid redrawing, recolouring or distorting it, so it is never
   rebuilt in code and never tinted. Decoration only — it is not a link (2026-09-16).
+
+## Tools
+
+- **Godot Engine** (https://godotengine.org) — the engine the game is built and exported
+  with. ✅ **MIT licence**, which asks only that the licence text travel with copies of the
+  *engine's own source*; a game made with it owes no attribution at all. Credited anyway on
+  the board as "Made with Godot Engine" under a **Tools** heading (Richard, 2026-09-19),
+  because a player has nowhere else to look it up. **This is the only entry in this file
+  that is not a licence obligation.**
+
+- **Not credited, deliberately**: Bungee (SIL OFL 1.1 asks for no attribution — see **Font**
+  above), PixelLab (the AI tool behind the angler sheet, covered by the AI-art decision
+  under **Art**), ffmpeg and the psd-extract pipeline (build-time only, nothing of theirs
+  ships). A list of everything that asks for nothing has no end; the board carries the
+  required credits and one courtesy.
 
 ## Not yet reviewed
 

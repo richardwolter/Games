@@ -35,7 +35,7 @@
   "copies: how many of this find are hidden in the lake, and so how many the shed can hold",
   "at once. One unless said otherwise. The chairs are four each: a dining table with a",
   "single chair at it is not a room anybody lives in, and four of them turned four ways is",
-  "what the rotation is for. Every copy is the same find with the same one dirty sprite \u2014",
+  "what the rotation is for. Every copy is the same find with the same one dirty sprite —",
   "they are netted separately and stood separately, not one object that multiplies.",
   "",
   "place: where the piece goes. 'floor' (default) stands on the boards; 'wall' hangs on the",
@@ -46,11 +46,30 @@
   "base: how many of the picture's bottom rows of cells stand on the floor, per view, in the",
   "views' own order. The rest of the picture rises up the back wall when the piece is pushed",
   "against it. The art is a three-quarter view, so a front-on sofa's base is its seat depth",
-  "and a side-on one's is nearly the whole picture. Authored by eye off",
-  "tools/last_decor_views.png; one number applies to every view. Rugs and anything lying",
-  "flat default to their whole height, everything else to one cell.",
+  "and a side-on one's is nearly the whole picture. One number per face, and a mirrored set",
+  "counts as four. Rugs and anything lying flat default to their whole height, everything",
+  "else to one cell.",
   "",
-  "dirty_piece: for a find born from the rubbish \u2014 its lake sprite is that rubbish kind's",
+  "base_px: the same thing in the drawing's own PIXELS, for a piece a whole cell is too",
+  "coarse for. A cell is eight pixels, so the least a base can say in cells is eight, and on",
+  "a 23-pixel pot that is a third of the picture held off the back wall with nothing drawn in",
+  "the gap (Richard, 2026-09-19, issue #30). Never authored alongside base - the builder",
+  "refuses both. Only the two pots have one; a base is also the walker block, the host probe",
+  "and the band a walker sorts over, so two pixels is right for a pot standing on its foot",
+  "ring and would be wrong for a sofa.",
+  "",
+  "seat: where a dog's feet go on this view, in drawn pixels up from the picture's bottom",
+  "edge; 0 on a view nothing may lie on (2026-09-19, issue #30). Authoring one is the whole",
+  "rule - there is no test of a view's role, because decor_bed's views are colours and",
+  "decor_pet_bed's are shapes, and a gate on the name 'front' would give both beds no seat",
+  "at all. The sofa and the loveseat get one on their front face only: seen from the side or",
+  "the back, a dog laid on the cushion is cropped by the backrest.",
+  "",
+  "Both are measured against the DRAWN picture, so they already carry scale (the bed is 1.5).",
+  "Measured off assets/decor_clean.png, not off tools/last_decor_views.png, which is",
+  "git-ignored and which nothing in the repo writes.",
+  "",
+  "dirty_piece: for a find born from the rubbish — its lake sprite is that rubbish kind's",
   "own picture, cut off the lake sheet, and the rubbish kind stays in the fill as well. A",
   "clean view whose layer PNG is missing falls back to that same picture until it is painted.",
   "",
@@ -103,6 +122,12 @@
     6,
     2,
     6
+   ],
+   "seat": [
+    10,
+    0,
+    0,
+    0
    ]
   },
   {
@@ -148,6 +173,12 @@
     4,
     2,
     4
+   ],
+   "seat": [
+    12,
+    0,
+    0,
+    0
    ]
   },
   {
@@ -605,6 +636,10 @@
    "base": [
     2,
     2
+   ],
+   "seat": [
+    6,
+    6
    ]
   },
   {
@@ -627,7 +662,11 @@
     4,
     4
    ],
-   "scale": 1.5
+   "scale": 1.5,
+   "seat": [
+    21,
+    21
+   ]
   },
   {
    "name": "decor_lamp",
@@ -865,10 +904,10 @@
      "layer": "flower_pot"
     }
    ],
-   "base": [
-    1
-   ],
-   "place": "small"
+   "place": "small",
+   "base_px": [
+    2
+   ]
   },
   {
    "name": "decor_plant_pot",
@@ -882,10 +921,10 @@
      "layer": "plant_pot"
     }
    ],
-   "base": [
-    1
-   ],
-   "place": "small"
+   "place": "small",
+   "base_px": [
+    2
+   ]
   },
   {
    "name": "decor_painting_a",

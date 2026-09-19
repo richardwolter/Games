@@ -1522,6 +1522,7 @@
     2,
     6
    ],
+   "base_px": [],
    "cells": [
     2,
     4
@@ -1537,6 +1538,12 @@
     55
    ],
    "scale": 1.0,
+   "seat": [
+    10,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Sofa"
@@ -1581,6 +1588,7 @@
     2,
     4
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -1596,6 +1604,12 @@
     32
    ],
    "scale": 1.0,
+   "seat": [
+    12,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Armchair"
@@ -1640,6 +1654,7 @@
     1,
     2
    ],
+   "base_px": [],
    "cells": [
     1,
     2
@@ -1655,6 +1670,7 @@
     28
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Dining chair"
@@ -1683,6 +1699,7 @@
     1,
     4
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -1698,6 +1715,7 @@
     35
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Dresser"
@@ -1726,6 +1744,7 @@
     1,
     2
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -1741,6 +1760,7 @@
     23
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Nightstand"
@@ -1769,6 +1789,7 @@
     1,
     5
    ],
+   "base_px": [],
    "cells": [
     3,
     3
@@ -1784,6 +1805,7 @@
     45
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Bookcase"
@@ -1812,6 +1834,7 @@
     1,
     5
    ],
+   "base_px": [],
    "cells": [
     3,
     3
@@ -1827,6 +1850,7 @@
     47
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Tall bookcase"
@@ -1855,6 +1879,7 @@
     2,
     5
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -1870,6 +1895,7 @@
     46
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Dining table"
@@ -1898,6 +1924,7 @@
     1,
     2
    ],
+   "base_px": [],
    "cells": [
     1,
     2
@@ -1913,6 +1940,7 @@
     24
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Side desk"
@@ -1941,6 +1969,7 @@
     2,
     6
    ],
+   "base_px": [],
    "cells": [
     3,
     4
@@ -1956,6 +1985,7 @@
     63
    ],
    "scale": 0.75,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Kitchen counter"
@@ -1984,6 +2014,7 @@
     2,
     3
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -1999,6 +2030,7 @@
     28
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Toilet"
@@ -2024,6 +2056,7 @@
     ]
    ],
    "base": [],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -2039,6 +2072,7 @@
     48
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Big rug"
@@ -2064,6 +2098,7 @@
     ]
    ],
    "base": [],
+   "base_px": [],
    "cells": [
     2,
     1
@@ -2079,6 +2114,7 @@
     15
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
    "title": "Runner rug"
@@ -2107,6 +2143,7 @@
     1,
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2122,6 +2159,7 @@
     26
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "STATE",
    "sheet": "decor_dirty",
    "title": "Fireplace"
@@ -2150,6 +2188,7 @@
     1,
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     4
@@ -2165,6 +2204,7 @@
     55
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "STATE",
    "sheet": "decor_dirty",
    "title": "Fridge"
@@ -2193,6 +2233,7 @@
     2,
     2
    ],
+   "base_px": [],
    "cells": [
     2,
     1
@@ -2208,6 +2249,10 @@
     13
    ],
    "scale": 1.0,
+   "seat": [
+    6,
+    6
+   ],
    "set": "VARIANT",
    "sheet": "decor_dirty",
    "title": "Pet bed"
@@ -2236,6 +2281,7 @@
     4,
     4
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2251,6 +2297,10 @@
     32
    ],
    "scale": 1.5,
+   "seat": [
+    21,
+    21
+   ],
    "set": "VARIANT",
    "sheet": "decor_dirty",
    "title": "Bed"
@@ -2271,6 +2321,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2286,6 +2337,7 @@
     26
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Table lamp"
@@ -2306,6 +2358,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -2321,6 +2374,7 @@
     46
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Floor lamp"
@@ -2341,6 +2395,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -2356,6 +2411,7 @@
     46
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Old clock"
@@ -2376,6 +2432,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     1,
     3
@@ -2391,6 +2448,7 @@
     44
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Coat hanger"
@@ -2411,6 +2469,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -2426,6 +2485,7 @@
     44
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Standing mirror"
@@ -2446,6 +2506,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     3
@@ -2461,6 +2522,7 @@
     43
    ],
    "scale": 0.75,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Stove"
@@ -2481,6 +2543,7 @@
    "base": [
     2
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2496,6 +2559,7 @@
     25
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Record player"
@@ -2516,6 +2580,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2531,6 +2596,7 @@
     29
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Bathroom sink"
@@ -2551,6 +2617,7 @@
    "base": [
     3
    ],
+   "base_px": [],
    "cells": [
     3,
     2
@@ -2566,6 +2633,7 @@
     23
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Bathtub"
@@ -2586,6 +2654,7 @@
    "base": [
     2
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2601,6 +2670,7 @@
     29
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Ironing board"
@@ -2621,6 +2691,7 @@
    "base": [
     2
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2636,6 +2707,7 @@
     19
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Coffee table"
@@ -2656,6 +2728,7 @@
    "base": [
     2
    ],
+   "base_px": [],
    "cells": [
     1,
     2
@@ -2671,6 +2744,7 @@
     24
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Card table"
@@ -2691,6 +2765,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     2,
     2
@@ -2706,6 +2781,7 @@
     28
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Small bookcase"
@@ -2724,6 +2800,7 @@
     ]
    ],
    "base": [],
+   "base_px": [],
    "cells": [
     2,
     1
@@ -2739,6 +2816,7 @@
     12
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Oval rug"
@@ -2756,8 +2834,9 @@
      23
     ]
    ],
-   "base": [
-    1
+   "base": [],
+   "base_px": [
+    2
    ],
    "cells": [
     1,
@@ -2774,6 +2853,7 @@
     23
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Flower pot"
@@ -2791,8 +2871,9 @@
      23
     ]
    ],
-   "base": [
-    1
+   "base": [],
+   "base_px": [
+    2
    ],
    "cells": [
     1,
@@ -2809,6 +2890,7 @@
     23
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Potted plant"
@@ -2827,6 +2909,7 @@
     ]
    ],
    "base": [],
+   "base_px": [],
    "cells": [
     1,
     1
@@ -2842,6 +2925,7 @@
     15
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Painting"
@@ -2860,6 +2944,7 @@
     ]
    ],
    "base": [],
+   "base_px": [],
    "cells": [
     1,
     1
@@ -2875,6 +2960,7 @@
     15
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Landscape"
@@ -2895,6 +2981,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     1,
     1
@@ -2910,6 +2997,7 @@
     6
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Chew toy"
@@ -2930,6 +3018,7 @@
    "base": [
     1
    ],
+   "base_px": [],
    "cells": [
     1,
     2
@@ -2945,6 +3034,7 @@
     20
    ],
    "scale": 1.0,
+   "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
    "title": "Globe"

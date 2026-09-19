@@ -1058,7 +1058,14 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   `Asset by Zato - https://zatoart.itch.io/`, …) and **never saying what the asset is** —
   `docs/CREDITS.md` is the only place the asset → pack mapping and the licence status live.
   AI-generated art is credited nowhere, by decision, and the Steam page and the trailer carry
-  no credits. A line too wide for the face **wraps** on spaces rather than being cut or
+  no credits.
+  **And one heading that owes nothing: `Tools`, "Made with Godot Engine"** (2026-09-19,
+  issue #27). Godot is MIT and a game made with it owes no attribution; it is on the board
+  because a player has nowhere else to look, and it is the only line there that is not a
+  licence obligation. **The font is not listed** — Bungee's OFL asks for nothing either, and
+  a list of everything that asks for nothing has no end. Neither is PixelLab, which would
+  reverse the AI-art call. The board is 478 design px of the 680 the smallest window leaves.
+  A line too wide for the face **wraps** on spaces rather than being cut or
   shrunk, since none of the required strings may be shortened (`_wrap`, rows of one line set
   `WRAP_GAP` apart); at the board's 460 the longest is 370 of 430, so the wrap is insurance.
   **Spotify's mark stands beside Nuven** (`assets/ui/spotify_icon.png`, baked from their own
@@ -3441,6 +3448,54 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   `in_store()` **counts** rather than matching by name: matching emptied the shelf of all
   four the moment the first was stood down.
 - `ShedRoom.DOG_BED` is `decor_pet_bed` — one find, two styles, so either bed is the dog's.
+  Since 2026-09-19 that constant only says which piece a dog may **walk over** (`_taken`
+  leaves it out of the blocked floor). What a dog may **lie on** is the seat below.
+
+### The Pack in the Shed (2026-09-19, `/grill-me` with Richard, issue #30)
+One dog could be in the shed; up to the whole pack can be now, and they lie on the
+furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
+- **As many as the player owns, each rolling `DOG_ODDS` on its own** (Richard's call over a
+  count rolled once). `Lake` hands the room a `pack_size` **Callable**, the wash room's own
+  pattern — the pack grows mid-run and a number pushed at `_ready` would hold the shed at
+  one dog for the session. Unset, it reads as one dog, which is what every harness gets.
+  **The price, accepted**: at four dogs the room is empty 4% of the time rather than 45%,
+  so walking in and finding a dog asleep stops being a find. `DOG_ODDS` is the one knob.
+- **A seat is authored, per view, in `tools/decor_sets.json`** (`seat`, drawn pixels up from
+  the picture's bottom edge; `Sheets.seat_of`/`has_seat`): the two pet beds, the bed, and
+  the sofa and the armchair **seen from the front only** — from the side or the back a dog
+  laid on the cushion is cut in half by the backrest.
+  **Nothing tests a view's *name*.** `decor_bed`'s views are colours (green/blue) and
+  `decor_pet_bed`'s are shapes (round/oval), so a gate on the role `front` would have given
+  both beds no seat at all and **deleted the one seat that already worked**. Authored or
+  not is the whole rule.
+- **The starter bed is a seat too** (Richard, asked and answered): `Lake.STARTER_BED` is
+  `decor_bed` and every save has one from a new game, so a dog nearly always has somewhere
+  to lie and the walk/idle/laid/sleep mood roll is what a dog with no *free* seat gets.
+- **One dog to a seat**, claimed the way a stick in the lake is (`Dog.claims`): not a lock —
+  the player may pick the sofa up from under a sleeping dog, and the claim is dropped on
+  the spot when they do — but two dogs are never sent to one cushion. The key is the piece
+  and the spot it stands on, never its index in `decor`, which shifts as furniture moves.
+- **A dog lying on a piece is exempt from that piece's own block** (`ShedDog.over`). The
+  sofa, the bed and the armchair all block floor in `_taken`, so without this a dog sent to
+  a cushion fails `_dog_may_stand` and the unstick in `_drive_dog` shoves it off **every
+  frame**. The player gets no such exemption. The pet bed needed none of it — it is left
+  out of `_taken` altogether, which is why it was the only seat that ever worked.
+- **Seats are measured off `assets/decor_clean.png`**, by eye, like the bases; the numbers
+  are first guesses (pet bed 6, bed 21, sofa 10, armchair 12) to retune on the probe.
+- Dogs keep `ROOM_PERSONAL` from each other as well as from the player, and the escape
+  hatch in `_clear_of_all` is applied **per other** — applied once for the whole list, a dog
+  already overlapping one of the pack walks through all of them and through the player.
+  `IDLE_DARTS` went 24 to 32: four dogs and a player each wanting their own patch is a lot
+  more to miss than one dog was.
+- Nothing here is saved: which dogs are in is rolled each time the door opens.
+- `test_lake`'s `_check_shed_dogs` guards the count, the seat table, a sofa turned side on
+  offering none, one dog a seat, the rest on the floor, the exemption, the player being
+  refused the cushion, and the dog sorting over the piece it lies on. `tools/shot_shed.gd`
+  forces the whole pack in rather than leaving the picture to the roll.
+  **And it hangs its lake off its own node now**: parented to the tree root it was the game,
+  which since The Front means the menu is up and the HUD is hidden, so the probe had been
+  photographing a shed that was never laid out (`room size (0.0, 200.0)` in its own log,
+  which nobody read). The ending probe learned this in 2026-09-18; read a probe's log.
 
 ### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
 Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,
@@ -3464,9 +3519,21 @@ went from 24 screen pixels to 3.
   nearest whole cells to it — the rounding `Sheets._cells_across` does was the dead floor
   around everything.
 - **A base is still authored in cells** and multiplied back up (`base_of`). `Sheets.base_of`
-  reads `bases`, which the catalogue authors by eye off `tools/last_decor_views.png`; asked
+  reads `bases`, which the catalogue authors by eye; asked
   at a granularity of one it would hand those cell counts back as pixels and every piece
   would stand on a one-pixel foot. **Don't ask `Sheets` for a base at 1.**
+  **Except for the two pots, which author theirs in pixels** (2026-09-19, issue #30,
+  `base_px` in `tools/decor_sets.json`, `Sheets.has_base_px`/`base_px_of`, the one branch in
+  `ShedRoom.base_of`). A floor piece's base is exactly how far its picture may *not* go up
+  the back wall, and the least a cell can say is 8 px — a third of a 23 px pot, which stood
+  it that far down the floor with nothing drawn in the gap (Richard: "invisible pixels
+  behind it"). At 2 px it stands against the wall. **Not a free unit swap**: the same number
+  is the walker block, the host probe and the band a walker sorts over, so a pixel base is
+  right for a pot standing on its foot ring and wrong for a sofa. The builder refuses an
+  entry that authors both. No `SAVE_VERSION` bump — a `decor` row holds piece, cell and
+  view, and no base was ever saved.
+  **`tools/last_decor_views.png` is not the reference any more**: it is git-ignored and
+  nothing in the repo writes it. Measure off `assets/decor_clean.png`.
 - **A cell is blocked when its middle is inside a base** (`_taken`), with a fallback to the
   cell the base's own middle is in. Marking every cell a base *touches* would round the
   blocked floor up on all four sides, which is the dead floor coming back in the one place
@@ -3594,6 +3661,49 @@ first pet bed are unchanged.
   `_builds/lake_cleanup_v10_20260917.save`; **the trailer's shed shot needs a refurnished
   save before a re-shoot**.
 - Out of scope, by decision: an authored stage field, floor lamp early, save migration.
+
+### The Find-Caught Card (`scripts/trophy.gd`, 2026-09-19, `/grill-me` with Richard, issue #30)
+A find netted out is held up in the middle of the screen for 2.8 s, because the shed is two
+clicks away and the only other sign was a line of small text in the corner. The card itself
+is older than this note; what the note records is the pass that made it the game's own.
+- **It holds up the grimy sprite** (`Sheets.region_of`), not the restored one. It showed the
+  restored one on the reasoning that the card should say what the find will become — and the
+  pump made that false: a netted find goes to `unwashed`, and the shed will not have it until
+  it has been washed. So the card was showing the end of an errand nobody had run.
+- **It reads "New decoration available to wash"** (Richard's wording), which says where the
+  find went rather than what it is.
+- **The light round it is the finds' own** (Richard: the card "feels generic", the disc was
+  "blocky and doesn't blend in well with the style"): the gold column, the four-point
+  art-pixel stars and the gold rim the lake and the net already put on a find.
+  **Retired**: the wheel of ten spinning rays, the fourteen drifting motes, and the five
+  stacked dark discs the piece stood in.
+- **The rim is what lets the grimy picture be held up at all.** The disc's own comment said a
+  chair drawn straight onto the lake is a chair lost in a field of bottles, and it was right
+  about the problem; a gold outline separates the piece from the water without laying a
+  circle over the game. It **fades faster than the picture** (`RIM_FADE` 3): the rim is four
+  whole copies of the sprite and only their edges are meant to show, which stops being true
+  the moment the picture in front of them goes see-through — a find on its way out went
+  entirely gold.
+- **Copied from `CastNet`'s `CatchRim`/`CatchBeam`/`CatchStars`, not from `LakeGrid`'s own
+  `GlintBeam`/`GlintTwinkle`**: those are tile-bound (every line indexes `grid.stacks[i]`,
+  `grid.swing[i]`, `grid.surface_pos(i)`) and a card has no tile. Only the two statics and
+  the two shaders travel. `GlintTwinkle.sample_box` is new — `sample_spots` wants a
+  `TrashDef` and the card has a piece name and a `Sheets`.
+  **`show_behind_parent` does not travel**: on the net it means behind the catch, because
+  the net draws the catch itself; here the picture is a child, so child order is what puts
+  the rim behind it and the flag would sink the gold under the words as well.
+- **Sizes are the card's own, not the lake's**: the beam is sized to the picture rather than
+  to `beam_width` (one find on screen, nothing to be out of step with), the rim's step is in
+  screen pixels rather than scaled with a picture blown up to `PIECE_ZOOM`, and a star is
+  `STAR_BIG` times its lake size. All by eye.
+- **Probe: `tools/shot_trophy.tscn`** (desktop build, `--fixed-fps 60`, under its own node)
+  — three finds of three shapes at the pop, the hold and the way out, plus
+  `tools/last_trophy.log`. **Headless compiles no shader, so this is what proves the two
+  compile.** Driving `Trophy._process` by hand to jump to a moment was tried and does not
+  work: the node's own `_process` is running too and the two ages add.
+- `test_lake`'s `_check_trophy` guards the wording, the retired drawing being gone rather
+  than unused, the four layers in the one order they can be drawn in, their materials, the
+  rim not wearing the net's flag, and the glitter having spots on the grimy picture.
 
 ### Golden Glitter (`LakeGrid.GlintLayer`, `shaders/beam.gdshader`, rim in `rubbish.gdshader`)
 Finds stay **buried** (`Lake._hide_treasures` plants them a couple of slots down, dealt

@@ -98,6 +98,22 @@ var places := {}
 ## order. Empty for a piece the catalogue says nothing about; see `base_of` for the default.
 var bases := {}
 
+## Piece name -> the same thing measured in the drawing's own **pixels**, for the few pieces
+## a whole cell is too coarse for (2026-09-19, issue #30). A cell is eight of these, so the
+## smallest base a cell can say is a third of a pot's height, which held the pot eight
+## pixels off the back wall with nothing drawn in the gap.
+##
+## Only where the catalogue authors one; `base_of` is still the cells for everything else,
+## and the two are never both authored for one piece. Empty is "says nothing", which is why
+## the accessor is a has/get pair rather than a number with a sentinel.
+var bases_px := {}
+
+## Piece name -> where a dog's feet go on each view, in the drawing's own pixels, measured
+## up from the picture's bottom edge (2026-09-19, issue #30). Authored only on the views a
+## dog can be drawn lying on without being cropped — a sofa seen from its back has none —
+## and a piece with no seat at all is simply not a thing to lie on. See `ShedRoom`.
+var seats := {}
+
 ## Piece name -> how many times bigger than painted the shed draws it. One for nearly
 ## everything; the bed is 1.5. The lake never reads it.
 var scales := {}
@@ -214,6 +230,16 @@ func load_all() -> bool:
 		for depth in entry.get("base", []) as Array:
 			depths.append(maxi(int(depth), 1))
 		bases[name] = depths
+		var pixels := PackedInt32Array()
+		for depth in entry.get("base_px", []) as Array:
+			pixels.append(maxi(int(depth), 1))
+		bases_px[name] = pixels
+		var rests := PackedInt32Array()
+		# A seat of 0 means "no seat on this view", which is how a sofa's side and back
+		# faces opt out while its front opts in. So this one is floored at 0, not at 1.
+		for lift in entry.get("seat", []) as Array:
+			rests.append(maxi(int(lift), 0))
+		seats[name] = rests
 
 		cells[name] = Vector2i(
 			maxi(int(ceil(float(box[2]) / cell)), 1), maxi(int(ceil(float(box[3]) / cell)), 1)
@@ -298,12 +324,56 @@ func is_small(name: StringName) -> bool:
 ## lying flat — a rug is all floor — and one row for everything else, which is what the
 ## shed assumed for every piece before the bases were authored. Never more than the view
 ## is tall.
+##
+## A handful of pieces author their base in pixels instead — see `base_px_of`. This
+## function knows nothing about them: the caller asks `has_base_px` first, because `cell`
+## here is a clamp granularity and not a unit, and asking this at a granularity of one
+## would hand every cell-authored base back as pixels.
 func base_of(name: StringName, view: int, cell: int) -> int:
 	var tall := _cells_across(view_size_of(name, view), cell).y
 	var depths: PackedInt32Array = bases.get(String(name), PackedInt32Array())
 	if depths.is_empty():
 		return tall if lies_flat(name) else mini(1, tall)
 	return mini(depths[posmod(view, depths.size())], tall)
+
+
+## Whether this view's base is authored in pixels rather than in cells.
+func has_base_px(name: StringName, view: int) -> bool:
+	var pixels: PackedInt32Array = bases_px.get(String(name), PackedInt32Array())
+	return not pixels.is_empty() and pixels[posmod(view, pixels.size())] > 0
+
+
+## That base, in the drawing's own pixels. Ask `has_base_px` first: an unauthored piece
+## answers 0 here, and 0 is not a base.
+##
+## Clamped to the drawn height the way `base_of` is, and for the same reason: the number is
+## authored by eye against the art, and the art can be re-cut under it.
+func base_px_of(name: StringName, view: int) -> int:
+	var pixels: PackedInt32Array = bases_px.get(String(name), PackedInt32Array())
+	if pixels.is_empty():
+		return 0
+	return mini(pixels[posmod(view, pixels.size())], int(view_size_of(name, view).y))
+
+
+## How far up this view's picture a dog's feet go, in the drawing's own pixels from its
+## bottom edge, or 0 for a view nothing may lie on.
+##
+## Measured against the **drawn** size, so it already carries `scale_of` — the bed is drawn
+## at 1.5 and a seat read as raw art pixels would be half again too low on it.
+func seat_of(name: StringName, view: int) -> int:
+	var rests: PackedInt32Array = seats.get(String(name), PackedInt32Array())
+	if rests.is_empty():
+		return 0
+	return mini(rests[posmod(view, rests.size())], int(view_size_of(name, view).y))
+
+
+## Is there any view of this piece a dog may lie on? Asked when the shed builds its seat
+## table, so a piece nobody authored a seat for is never walked to.
+func has_seat(name: StringName) -> bool:
+	for lift in seats.get(String(name), PackedInt32Array()) as PackedInt32Array:
+		if lift > 0:
+			return true
+	return false
 
 
 ## How many restored faces a piece has. One means there is nothing for R or E to do.

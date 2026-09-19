@@ -9,6 +9,13 @@
 ## in-game board never says what an asset is; `docs/CREDITS.md` keeps that mapping, and the
 ## licence status with it. AI-generated art is not credited, by decision.
 ##
+## The **Tools** heading carries one line the licences do not ask for: Godot is MIT and needs
+## no attribution (2026-09-19, Richard). It is here because a player who wants to know what
+## the game is made with has nowhere else to look, and because a second heading costs the
+## board 64 px of the 266 it has spare. The font is not listed for the same reason the AI art
+## is not: Bungee's OFL asks for nothing, and a list of everything that asks for nothing has
+## no end. Required credits are what the art heading is for.
+##
 ## A line wider than the face **wraps** rather than being cut or shrunk: the required strings
 ## are long and none of them may be shortened. `Style.write` has no wrap, so `_wrap` does it
 ## here, greedily on spaces, and the rows of one line are set `WRAP_GAP` apart so a wrapped
@@ -40,10 +47,13 @@ const LINES := [
 	"Asset by Zato - https://zatoart.itch.io/",
 	"Pop Shop Packs",
 	"@Pixel_Salvaje",
+	"",
+	"Tools",
+	"Made with Godot Engine",
 ]
 
 ## Which lines are headings: set a size up, in the ribbon's ink.
-const HEADS := ["Design and programming", "Music and sound", "Art and Assets"]
+const HEADS := ["Design and programming", "Music and sound", "Art and Assets", "Tools"]
 
 ## The line the Spotify mark stands beside, and the mark itself.
 ##
@@ -71,6 +81,12 @@ const BLANK := 12.0
 
 signal close_asked
 
+## Set by `_draw` when a row did not fit in the board and was not drawn — the settings and
+## bind boards' own counter, brought here because this board drops its bottom rows in
+## silence too, and the bottom of this board is somebody's required credit. Nothing in the
+## game reads it: it is there so a credit going missing is a failure rather than a surprise.
+var dropped_lines: int = 0
+
 var _board := Rect2()
 var _rows: Array[Dictionary] = []
 var _close: CloseButton
@@ -96,8 +112,16 @@ func _ready() -> void:
 
 
 ## How wide the mark and its gap are on the line they stand beside — nothing, with no art.
+##
+## Asked of the **art**, not of the node: `_icon` is built in `_ready`, and a board measured
+## before that (the probe, which lays rows out without waiting a frame) would reserve nothing
+## for a mark the drawn board does reserve for. Static for the same reason.
+static func icon_room() -> float:
+	return 0.0 if load(ICON_PATH) == null else ICON_SIZE + ICON_GAP
+
+
 func _icon_room() -> float:
-	return 0.0 if _icon == null else ICON_SIZE + ICON_GAP
+	return icon_room()
 
 
 ## One line of `LINES` broken into the rows it is drawn as. Greedy on spaces; a single word
@@ -139,6 +163,18 @@ func _laid_out(face_wide: float) -> Array[Dictionary]:
 				"step": float(px) + (LINE_GAP if last else WRAP_GAP),
 			})
 	return rows
+
+
+## How tall the board would like to be, in design pixels, for the window it has been given.
+## The settings and bind boards' own accessor: `test_lake` asks it at 1280x720, where the
+## room is 680, because a board that wants more than that drops its bottom rows — and the
+## bottom of this board is somebody's required credit.
+func wanted_tall() -> float:
+	var wide := minf(BOARD_WIDE, size.x - 40.0)
+	var tall := Style.board_wood_tall(wide, FRAME) + BOARD_PAD * 2.0
+	for row in _laid_out(Style.board_face(Rect2(Vector2.ZERO, Vector2(wide, 1000.0)), FRAME).size.x):
+		tall += float(row["step"])
+	return tall
 
 
 func _lay_out() -> void:
@@ -221,8 +257,14 @@ func _draw() -> void:
 		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
 	)
 	var y := face.position.y + BOARD_PAD
+	dropped_lines = 0
+	var room := true
 	for row in _rows:
 		var text := String(row["text"])
+		if not room:
+			if not text.is_empty():
+				dropped_lines += 1
+			continue
 		if not text.is_empty():
 			var px := int(row["px"])
 			Style.write(
@@ -232,4 +274,6 @@ func _draw() -> void:
 			)
 		y += float(row["step"])
 		if y > face.end.y - BOARD_PAD:
-			break
+			# Out of face. The rest are counted rather than drawn, so the loss is a number
+			# somebody can ask for instead of a credit nobody notices is gone.
+			room = false

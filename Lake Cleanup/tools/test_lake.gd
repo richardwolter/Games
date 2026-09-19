@@ -2819,6 +2819,25 @@ func _stage_shed() -> void:
 			"span %s base %d" % [str(small_span), room.base_of(small)])
 		_check(not room.can_place(small, Vector2i(inside.x, -against - 1)),
 			"and no further: its base may not go up the wall", "")
+	# The pot, by name (2026-09-19, issue #30). The two checks above derive everything from
+	# `base_of` and so pass whether a pixel base works or is silently dropped; this one asks
+	# for the number the catalogue authored. It also asks that a cell-authored piece is
+	# still a whole multiple of CELL, so the fallback cannot rot unnoticed.
+	var the_pot := &"decor_plant_pot"
+	if sheets.has(the_pot):
+		_check(sheets.has_base_px(the_pot, 0) and room.base_of(the_pot) == 2,
+			"the pot's base is the two pixels it stands on, not a whole cell",
+			"%d px" % room.base_of(the_pot))
+		var the_pot_span := room.span_of(the_pot)
+		_check(room.can_place(the_pot, Vector2i(inside.x, -(the_pot_span.y - 2)))
+			and not room.can_place(the_pot, Vector2i(inside.x, -(the_pot_span.y - 1))),
+			"so it stands six pixels nearer the back wall than a cell would let it",
+			"span %s" % str(the_pot_span))
+	var sofa := &"decor_sofa"
+	if sheets.has(sofa):
+		_check(not sheets.has_base_px(sofa, 0) and room.base_of(sofa) % ShedRoom.CELL == 0,
+			"and a piece with no pixel base still measures in whole cells",
+			"%d px" % room.base_of(sofa))
 	# Free placement (2026-09-16): the unit is one source pixel, so a piece may be nudged by
 	# one — the whole point of the change. Placed at a pixel that is not a cell boundary and
 	# read back unrounded.
@@ -3104,7 +3123,154 @@ func _stage_shed() -> void:
 			writing.store_var(raw, true)
 			writing.close()
 		_check(not bool(_main.call(&"load_game")), "an older save is refused", "")
+	_check_shed_dogs(room)
+	_check_trophy()
 	_advance()
+
+
+## The find-caught card (2026-09-19, issue #30). It had no checks of any kind before this.
+##
+## What can be asked headless is the shape of it: the wording, that the retired drawing is
+## gone rather than merely unused, that the four shine layers are there in the order they
+## have to be drawn in and wearing the right materials, and that the glitter has somewhere
+## to land. What cannot be asked here is whether any of it draws — `--headless` compiles no
+## shader — and that is what `tools/shot_trophy.tscn` is for.
+func _check_trophy() -> void:
+	var card: Trophy = _main.get(&"_trophy")
+	if card == null:
+		_check(false, "the find card was built", "")
+		return
+	_check(Trophy.TITLE == "New decoration available to wash",
+		"the card says the find is waiting to be washed", Trophy.TITLE)
+
+	# The retired drawing, gone rather than left unused: the disc, the wheel of rays and the
+	# motes, and the restored sprite it used to hold up.
+	var source := FileAccess.get_file_as_string("res://scripts/trophy.gd")
+	var left := []
+	for name in ["DISC", "RAYS", "MOTES", "_draw_shine", "_draw_motes", "alt_region_of"]:
+		if source.contains(name):
+			left.append(name)
+	_check(left.is_empty(),
+		"and the disc, the rays and the motes are gone with the restored picture",
+		", ".join(left))
+
+	# Four layers, in the one order they can be drawn in: the light, the gold outline, the
+	# picture over both, the glitter over that.
+	var layers: Array[String] = []
+	for child in card.get_children():
+		layers.append(String(child.name))
+	_check(layers == ["Beam", "Rim", "Piece", "Glitter"],
+		"the card draws light, rim, picture, glitter, in that order", ", ".join(layers))
+	var beam := card.get_node_or_null(^"Beam")
+	var rim := card.get_node_or_null(^"Rim")
+	var art := card.get_node_or_null(^"Piece")
+	_check(beam != null and beam.material is ShaderMaterial
+		and (beam.material as ShaderMaterial).shader == LakeGrid.BEAM_SHADER,
+		"the light is the lake's own beam shader", "")
+	_check(rim != null and rim.material is ShaderMaterial
+		and (rim.material as ShaderMaterial).shader == Trophy.RIM_SHADER,
+		"and the outline is the finds' own rim shader", "")
+	# The net sets `show_behind_parent` on its rim because the net draws the catch itself.
+	# Here the picture is a child, so what puts the rim behind it is child order; copying
+	# the flag would sink the gold under the words as well.
+	_check(rim != null and not rim.show_behind_parent and art != null and art.material == null,
+		"the rim is behind the picture by child order, not by a flag", "")
+
+	# Somewhere for the glitter to land: the spots come off the grimy picture's own opaque
+	# pixels, which is the sprite the card now holds up.
+	var sheets: Sheets = card.sheets
+	if sheets != null and sheets.atlas != null and sheets.has(&"decor_plant_pot"):
+		var spots := LakeGrid.GlintTwinkle.sample_box(
+			sheets.atlas.get_image(), sheets.region_of(&"decor_plant_pot"), 11
+		)
+		_check(spots.size() > 0,
+			"and the glitter has spots to land on, off the grimy picture",
+			"%d spots" % spots.size())
+
+
+## The pack in the shed (2026-09-19, issue #30): up to as many dogs as the player owns, each
+## lying on a seat the catalogue authored, one dog to a seat.
+##
+## The roll is per dog and random, so the room is opened over and over off a fixed seed
+## until a full house turns up rather than being forced some other way: what is being
+## guarded is the real path, `_room_shown`.
+func _check_shed_dogs(room: ShedRoom) -> void:
+	var sheets: Sheets = room.sheets
+	if sheets == null or not sheets.has(&"decor_sofa") or not sheets.has(&"decor_pet_bed"):
+		return
+	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
+	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
+	# the lake's own array, so the furniture goes down after the door is open, not before.
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	# A sofa facing front (a seat) and a pet bed (a seat).
+	decor.clear()
+	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 0)
+	room.place(&"decor_pet_bed", Vector2i(ShedRoom.CELL * 22, ShedRoom.CELL * 16), 0)
+	var seats: Array = room.call(&"_seats")
+	_check(seats.size() == 2,
+		"a sofa facing front and a pet bed are two seats", "%d" % seats.size())
+
+	# The sofa turned side on is nobody's seat: a dog laid on that cushion is cut in half by
+	# the backrest, which is why the seat is authored per view rather than per piece.
+	decor.clear()
+	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 1)
+	_check((room.call(&"_seats") as Array).is_empty(),
+		"and a sofa turned side on is no seat at all", "")
+
+	decor.clear()
+	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 0)
+	room.place(&"decor_pet_bed", Vector2i(ShedRoom.CELL * 22, ShedRoom.CELL * 16), 0)
+	var was_pack: Callable = room.pack_size
+	room.pack_size = func() -> int: return 4
+	var rng: RandomNumberGenerator = room.get(&"_dog_rng")
+	rng.seed = 20260919
+	var dogs: Array = []
+	for _try in 400:
+		room.call(&"_room_shown")
+		dogs = room.dogs()
+		if dogs.size() == ShedRoom.DOGS_MOST:
+			break
+	_check(dogs.size() == ShedRoom.DOGS_MOST,
+		"four dogs owned puts up to four in the room", "%d" % dogs.size())
+	_check(dogs.size() <= ShedRoom.DOGS_MOST, "and never more", "%d" % dogs.size())
+
+	# One dog to a seat, and everybody else on the floor.
+	var held := {}
+	var seated := 0
+	var twice := false
+	for dog in dogs:
+		if dog.seat.is_empty():
+			continue
+		seated += 1
+		if held.has(dog.seat):
+			twice = true
+		held[dog.seat] = true
+	_check(not twice and seated == 2,
+		"the two seats take one dog each", "%d seated of %d" % [seated, dogs.size()])
+	_check(dogs.size() - seated == 2,
+		"and the rest lie on the floor", "%d on the floor" % (dogs.size() - seated))
+
+	# A dog on the sofa may stand on the sofa. Its own base blocks that cell for everybody
+	# else, including the player, and without the exemption the unstick in `_drive_dog`
+	# would shove the animal off the cushion every frame.
+	for dog in dogs:
+		if dog.seat.is_empty() or not dog.seat.begins_with("decor_sofa"):
+			continue
+		var on := Vector2i(int(dog.at.x), int(dog.at.y))
+		_check(bool(room.call(&"_dog_may_stand", dog.at, dog.over)),
+			"a dog lying on the sofa may stand where it is lying", str(on))
+		_check(not bool(room.call(&"_you_may_stand", dog.at)),
+			"and the player may not walk onto it", str(on))
+		# On it, not behind it: the walker sorts past the piece it is standing in.
+		_check(float(room.call(&"_walker_key", dog.at, decor)) > dog.at.y,
+			"and is drawn on the sofa rather than behind it", "")
+		break
+	room.pack_size = was_pack
+	decor.clear()
+	if not was_open:
+		_main.call(&"_set_shed", false)
 
 
 ## The pigeons: art that fits its sheet, a flock sized by the rubbish it can stand on, a
@@ -3652,9 +3818,48 @@ func _stage_ending() -> void:
 	_check(ending != null and ending.get_child_count() >= 0
 		and not CreditsBoard.LINES.is_empty(),
 		"off the credits board's own words", "%d" % CreditsBoard.LINES.size())
+	_check_credits()
 	_check(_main.call(&"_last_pieces_line") == "",
 		"and the note about leftovers is gone", "")
 	_advance()
+
+
+## The credits board's own words: every heading is a line, every line fits, and nothing is
+## dropped at the smallest window the game supports.
+##
+## The board had no guard at all until 2026-09-19 (issue #27, the Godot line). The two
+## things worth holding are not the wording — that is Richard's and the licences' — but the
+## structure: a heading only means something if `HEADS` and `LINES` agree, and a credit only
+## counts if it is drawn. `dropped_lines` is what says the second one.
+func _check_credits() -> void:
+	# Never added to the tree: nothing asked of it here needs `_ready`, and the mark's
+	# reserved room is `CreditsBoard.icon_room`, which is static for exactly that reason.
+	var board := CreditsBoard.new()
+	board.size = Vector2(Prefs.LEAST_WINDOW)
+	for head: String in CreditsBoard.HEADS:
+		_check(CreditsBoard.LINES.has(head),
+			"the credits heading \"%s\" is a line of the board" % head, "")
+	_check(CreditsBoard.LINES.has("Made with Godot Engine")
+		and CreditsBoard.HEADS.has("Tools"),
+		"the engine is credited under a Tools heading", "")
+	# Every name unique, so a pack cannot be thanked twice under two headings.
+	var seen: Dictionary = {}
+	var twice := ""
+	for text: String in CreditsBoard.LINES:
+		if text.is_empty():
+			continue
+		if seen.has(text):
+			twice = text
+		seen[text] = true
+	_check(twice.is_empty(), "and no credit is said twice", twice)
+	# The smallest window the game allows. Asked arithmetically rather than off a draw: the
+	# settings board's `wanted_tall`, against the 680 a 720-high window leaves. `_draw`'s
+	# own `dropped_lines` is the same fact at run time; this is the one the harness can ask
+	# without waiting a frame in the middle of a stage.
+	var wants: float = board.call(&"wanted_tall")
+	_check(wants <= 680.0,
+		"and every one of them fits the board at 1280x720", "%.0f of 680" % wants)
+	board.queue_free()
 
 
 ## The ending of a run that was saved on its last catch and opened again.

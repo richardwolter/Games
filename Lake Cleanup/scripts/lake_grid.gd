@@ -835,10 +835,18 @@ class GlintTwinkle extends Node2D:
 	## Up to STAR_SPOTS opaque pixels of a def's picture, as fractions of its region's box,
 	## rolled off `seed` so the same find gets the same spots wherever it is drawn.
 	static func sample_spots(image: Image, def: TrashDef, seed: int) -> PackedVector2Array:
+		if def.atlas == null:
+			return PackedVector2Array()
+		return sample_box(image, def.region, seed)
+
+
+	## The same, given the rectangle outright. For anything that has a picture but no def to
+	## hang it on — the find-caught card, which is handed a piece's name and gets its region
+	## from `Sheets`.
+	static func sample_box(image: Image, box: Rect2, seed: int) -> PackedVector2Array:
 		var found := PackedVector2Array()
-		if image == null or def.atlas == null:
+		if image == null or box.size.x <= 0.0 or box.size.y <= 0.0:
 			return found
-		var box := def.region
 		var roll := RandomNumberGenerator.new()
 		roll.seed = seed * 7919 + 13
 		var tries := STAR_SPOTS * 6

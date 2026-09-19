@@ -224,6 +224,20 @@ def main():
         bases = e.get("base")
         if bases is not None and len(bases) != faces:
             sys.exit("%s has %d views and %d bases" % (name, faces, len(bases)))
+        # base_px says the same thing in the drawing's own pixels, for a piece whose
+        # contact with the floor is finer than a cell. The same length rule, because
+        # Sheets wraps a short list with posmod and a mirrored view would get the wrong
+        # number in silence. Never both: two numbers for one fact is one too many.
+        bases_px = e.get("base_px")
+        if bases_px is not None and len(bases_px) != faces:
+            sys.exit("%s has %d views and %d pixel bases" % (name, faces, len(bases_px)))
+        if bases is not None and bases_px is not None:
+            sys.exit("%s authors both base and base_px; pick one" % name)
+        # seat: where a dog's feet go on a view, in drawn pixels up from the picture's
+        # bottom. 0 on a view nothing may lie on, so the list is as long as the others.
+        seats = e.get("seat")
+        if seats is not None and len(seats) != faces:
+            sys.exit("%s has %d views and %d seats" % (name, faces, len(seats)))
 
         # The grimy sprite first: a rubbish-born find's clean views fall back to it.
         if e.get("dirty_piece"):
@@ -297,6 +311,8 @@ def main():
             "scale": float(e.get("scale", 1.0)),
             # Per view, in view order; the shed reads a missing list as its own default.
             "base": [int(b) for b in e["base"]] if e.get("base") else [],
+            "base_px": [int(b) for b in e["base_px"]] if e.get("base_px") else [],
+            "seat": [int(b) for b in e["seat"]] if e.get("seat") else [],
         })
 
     book["pieces"] = kept + pieces

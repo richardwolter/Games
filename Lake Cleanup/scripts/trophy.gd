@@ -4,8 +4,35 @@
 ## The shed is the only place a find is ever seen properly, and the shed is behind two
 ## clicks — so a player pulling a wardrobe out of a lake got a line of small text in the
 ## corner and nothing else. This is the moment that was missing: the thing itself, big, in
-## the middle of the screen, in the cleaned-up palette it will wear on the shelf rather
-## than the grimy one it came up in.
+## the middle of the screen.
+##
+## **As it came up, grimy, and wearing the lake's own shine** (2026-09-19, issue #30,
+## Richard: the card "feels generic" and the disc behind it was "blocky and doesn't blend in
+## well with the style"). Two changes that go together:
+##
+## - The picture is the **dirty** sprite (`Sheets.region_of`), not the restored one. It used
+##   to be the restored one, on the reasoning that the card should show what the find will
+##   become. The pump changed what is true: a netted find goes to `unwashed` and the shed
+##   will not have it until it is washed, so a card showing the clean picture was showing
+##   the end of an errand the player has not run yet.
+## - The light round it is the **finds' own** — the gold column, the four-point stars and
+##   the gold rim that the lake and the net already put on a find (`LakeGrid.GlintBeam`,
+##   `GlintTwinkle`, `shaders/rim.gdshader`). It used to be a wheel of rays, a dust of motes
+##   and five stacked dark discs, which is a shape nothing else in this game draws.
+##
+## The rim is what makes the first change survive the second. A grimy picture drawn on a
+## grimy lake is a picture lost in a field of bottles, which is exactly what the dark pool
+## was there to prevent; a gold outline separates the piece from the water without laying a
+## circle over the game. The retired disc's comment said so, and it was right about the
+## problem and wrong about the answer.
+##
+## The three shine layers are copied from `CastNet`'s `CatchRim`/`CatchBeam`/`CatchStars`
+## rather than reusing `LakeGrid`'s own `GlintBeam`/`GlintTwinkle`: those are tile-bound —
+## every line of them indexes `grid.stacks[i]`, `grid.swing[i]`, `grid.surface_pos(i)` — and
+## a card has no tile. Only the two static helpers and the two shaders travel. The net's
+## `show_behind_parent` does **not** travel with them: there the net draws the catch itself,
+## so behind the parent is behind the piece, while here the piece is a child, and the rim
+## simply goes in before it.
 ##
 ## Drawn rather than built from nodes, like the farewell screen and the shop board. It
 ## never blocks the lake: the mouse goes straight through it, the angler keeps their legs,
@@ -17,8 +44,16 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
+## The find's own gold, turned on by drawing in pure green. `CastNet.RIM_SHADER` is the same
+## file; both are copies of the one rule, not two rules.
+const RIM_SHADER := preload("res://shaders/rim.gdshader")
+
 ## What is always said. The name of the piece goes underneath it.
-const TITLE := "You got a new decoration"
+##
+## It says where the find went, not what it is (2026-09-19, Richard): since the pump, a
+## netted find waits at the pump and the shed will not take it until it has been washed.
+## "You got a new decoration" was true and led nowhere.
+const TITLE := "New decoration available to wash"
 
 ## The three parts of one showing, in seconds: the pop in, how long it is held, and the
 ## fade out. Short — this happens mid-cast, and a player who is fishing should not be made
@@ -37,23 +72,29 @@ const MIDDLE := 0.79
 const PIECE_HEIGHT := 0.13
 const PIECE_ZOOM := 4.5
 
-## The shine behind it: how many rays, how far they reach past the piece, and how fast the
-## wheel turns in turns a second. Slow — this is a glow, not a siren.
-const RAYS := 10
-const RAY_REACH := 1.9
-const RAY_SPIN := 0.05
+## The beam behind the piece: how wide the column is as a share of the drawn picture's
+## larger side, and how far under its foot the column starts.
+##
+## The lake gives every find the same width, so a lamp and a sofa throw the same column
+## (`LakeGrid.beam_width`). The card has no lake to ask and one piece on screen at a time,
+## so it is sized to the picture instead — there is nothing beside it to be out of step
+## with, and a fixed width would be a thumb's breadth behind a wardrobe.
+const BEAM_WIDE := 0.55
+const BEAM_SINK := 0.06
 
-## The dark disc the piece stands in, as a multiple of its own half-size, and how solid
-## that pool is. The lake is a busy picture, and a chair drawn straight onto it is a chair
-## lost in a field of bottles; this gives the find something to be seen against without
-## covering the game up.
-const DISC := 2.6
-const DISC_DARK := 0.72
+## How thick the gold rim is drawn, in screen pixels. The lake's `RIM_STEP` is one world
+## pixel against sprites drawn at 2, so it is half an art pixel there; the card blows the
+## picture up to `PIECE_ZOOM`, and a rim scaled with it would be a gold band. Held at a
+## couple of screen pixels instead: it is an outline, not a frame.
+const RIM_STEP := 2.0
 
-## The motes drifting off it, how far out they start, and how long each one lives as a
-## fraction of the showing.
-const MOTES := 14
-const MOTE_SPREAD := 0.85
+## How much faster the rim fades than the picture in front of it. See `_draw_rim`.
+const RIM_FADE := 3.0
+
+## How big a star is drawn here, as a multiple of `LakeGrid.STAR_PIXEL`. The lake's stars
+## are one art pixel against a piece drawn at 2; the card's piece is four or five times
+## that, so a star left at its lake size is a speck on it.
+const STAR_BIG := 2.5
 
 ## Emitted when the last queued find has left the screen, so the lake can hush whatever it
 ## turned on for it.
@@ -69,20 +110,40 @@ var _queue: Array = []
 var _age: float = 0.0
 var _font: Font
 
-## Fixed seed: the motes scatter the same way every frame of one showing, and are re-dealt
-## for the next.
+## Rolls the stars. Seeded per showing, so one find twinkles the same way every time it is
+## held up and two finds in a row do not twinkle alike.
 var _rng := RandomNumberGenerator.new()
 
-## The card is three layers, and they have to be drawn in this order: the dimmed lake and
-## the words, then the light, then the piece itself. So the middle two are children — a
-## child draws after its parent, and two children draw in the order they were added.
+## The find's own glitter: where a star may land (fractions of the picture's box, off the
+## atlas's opaque pixels, the lake's own `sample_box`), the atlas read back as an `Image`
+## to ask it, and what is alight now — each `[spot, born, star (true) or spark (false)]`.
 ##
-## The light is a child for a second reason as well: it is added to what is behind it
-## rather than painted over it. Shine mixed the ordinary way is a pale wedge sitting on the
-## lake; shine that is added is light. The words must not be treated that way, which is why
-## the material is on the child and not on this node.
-var _glow: Node2D
+## The image is read once and kept: a full-atlas readback per card, on a run that lands
+## finds several at a time, is not a thing to do in `_draw`.
+var _spots := PackedVector2Array()
+var _image: Image
+var _stars_lit: Array = []
+
+## How big the picture is drawn and what rectangle of the atlas it is, worked out once a
+## frame by `_draw` and read by the four shine layers. Every child stands at the picture's
+## own middle, so all of them draw around their own origin.
+var _box := Vector2.ZERO
+var _region := Rect2()
+var _solid: float = 0.0
+
+## The card is five layers and they have to be drawn in this order: the words, the column
+## of light, the gold rim, the piece, the glitter over it. So the four after the words are
+## children — a child draws after its parent, and children draw in the order they were
+## added.
+##
+## They are children for a second reason as well: each wants its own material. The beam is
+## added to what is behind it rather than painted over it (light, not a pale wedge on the
+## lake), the rim runs a shader that turns pure green to gold, and the words and the stars
+## want neither. A material set here would reach all five.
+var _beam: Node2D
+var _rim: Node2D
 var _art: Node2D
+var _glitter: Node2D
 
 
 func _ready() -> void:
@@ -93,18 +154,33 @@ func _ready() -> void:
 	# window itself the way the ending screen does.
 	_fill()
 	get_viewport().size_changed.connect(_fill)
-	_glow = Node2D.new()
-	_glow.name = &"Glow"
-	var lit := CanvasItemMaterial.new()
-	lit.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	_glow.material = lit
-	_glow.draw.connect(_draw_glow)
-	add_child(_glow)
-	# After the light, so the piece is lit from behind rather than through.
+	# The column of light. `beam.gdshader` declares `blend_add` itself, so there is no
+	# CanvasItemMaterial on top of it — two additive passes on one node is twice the light.
+	_beam = Node2D.new()
+	_beam.name = &"Beam"
+	var lit := ShaderMaterial.new()
+	lit.shader = LakeGrid.BEAM_SHADER
+	_beam.material = lit
+	_beam.draw.connect(_draw_beam)
+	add_child(_beam)
+	# The gold outline, under the piece so the piece covers all but its edge.
+	_rim = Node2D.new()
+	_rim.name = &"Rim"
+	var gold := ShaderMaterial.new()
+	gold.shader = RIM_SHADER
+	_rim.material = gold
+	_rim.draw.connect(_draw_rim)
+	add_child(_rim)
+	# After the light and the rim, so the piece is lit from behind rather than through.
 	_art = Node2D.new()
 	_art.name = &"Piece"
 	_art.draw.connect(_draw_piece)
 	add_child(_art)
+	# Over the picture: the glitter is on the find, not behind it.
+	_glitter = Node2D.new()
+	_glitter.name = &"Glitter"
+	_glitter.draw.connect(_draw_stars)
+	add_child(_glitter)
 	set_process(false)
 	visible = false
 
@@ -129,20 +205,35 @@ func clear() -> void:
 	_queue.clear()
 	set_process(false)
 	visible = false
-	if _glow != null:
-		_glow.queue_redraw()
-	if _art != null:
-		_art.queue_redraw()
+	_stars_lit.clear()
+	_redraw_all()
 
 
 func _begin() -> void:
 	_age = 0.0
 	_rng.seed = hash(String(_queue[0]["piece"]))
+	_stars_lit.clear()
+	_take_spots()
 	visible = true
 	set_process(true)
-	queue_redraw()
-	_glow.queue_redraw()
-	_art.queue_redraw()
+	_redraw_all()
+
+
+## Where this find's glitter may land, off the atlas's own opaque pixels. Rolled per find,
+## so the same piece twinkles the same way every time it is held up; the atlas is read back
+## once for the life of the card and kept.
+func _take_spots() -> void:
+	_spots = PackedVector2Array()
+	if sheets == null or sheets.atlas == null:
+		return
+	var piece: StringName = _queue[0]["piece"]
+	if not sheets.has(piece):
+		return
+	if _image == null:
+		_image = sheets.atlas.get_image()
+	_spots = LakeGrid.GlintTwinkle.sample_box(
+		_image, sheets.region_of(piece), int(hash(String(piece)) & 0xFFFF)
+	)
 
 
 func _process(delta: float) -> void:
@@ -155,9 +246,17 @@ func _process(delta: float) -> void:
 			return
 		_begin()
 		return
+	_tick_stars(delta)
+	_redraw_all()
+
+
+## The card and its four shine layers. None of them redraws itself — the card decides when
+## anything on it has moved.
+func _redraw_all() -> void:
 	queue_redraw()
-	_glow.queue_redraw()
-	_art.queue_redraw()
+	for child in [_beam, _rim, _art, _glitter]:
+		if child != null:
+			child.queue_redraw()
 
 
 ## How solid the card is, 0 to 1: eased in, held, and cut away again.
@@ -194,9 +293,10 @@ func _draw() -> void:
 	var swell := _swell()
 	var centre := Vector2(size.x * 0.5, size.y * MIDDLE)
 
+	# The grimy picture, as it came out of the water — see the note at the top of the file.
 	var region := Rect2()
 	if sheets != null and sheets.has(piece):
-		region = sheets.alt_region_of(piece)
+		region = sheets.region_of(piece)
 	var tall := size.y * PIECE_HEIGHT * swell
 	var wide := tall
 	if region.size.y > 0.0:
@@ -207,25 +307,14 @@ func _draw() -> void:
 			wide *= most / tall
 			tall = most
 
-	# The pool of dark the find stands in: a few discs inside each other rather than one, so
-	# it falls off towards its edge instead of ending in a circle drawn on the lake.
-	var pool := maxf(wide, tall) * 0.5 * DISC
-	for step in 5:
-		var part := float(step) / 4.0
-		draw_circle(
-			centre, pool * lerpf(1.0, 0.35, part),
-			Style.scrim(DISC_DARK * 0.3 * fade)
-		)
-
-	# Where the light and the piece go, worked out here once and handed to the two children
-	# that draw them.
-	_glow.position = centre
-	_glow.set_meta(&"radius", maxf(wide, tall) * 0.5)
-	_glow.set_meta(&"fade", fade)
-	_art.position = centre
-	_art.set_meta(&"box", Vector2(wide, tall))
-	_art.set_meta(&"region", region)
-	_art.set_meta(&"fade", fade)
+	# Where the piece goes, worked out here once and read by all four children. They all
+	# stand at the same point, so the beam's foot, the rim's offsets and the stars' spots
+	# are in one frame and cannot drift from the picture.
+	_box = Vector2(wide, tall)
+	_region = region
+	_solid = fade
+	for child in [_beam, _rim, _art, _glitter]:
+		child.position = centre
 
 	var title := float(Style.TEXT_HEAD)
 	var named := float(Style.TEXT_BODY)
@@ -247,13 +336,11 @@ func _draw() -> void:
 ## The piece itself, over the light: its shadow first, so it sits on the shine rather than
 ## inside it. Drawn around the origin, because the node is moved to the middle of the card.
 func _draw_piece() -> void:
-	if _queue.is_empty():
+	if not _showing():
 		return
-	var region: Rect2 = _art.get_meta(&"region", Rect2())
-	var span: Vector2 = _art.get_meta(&"box", Vector2.ZERO)
-	var fade := float(_art.get_meta(&"fade", 0.0))
-	if region.size.x <= 0.0 or fade <= 0.0 or sheets == null:
-		return
+	var region := _region
+	var span := _box
+	var fade := _solid
 	var box := Rect2(-span * 0.5, span)
 	_art.draw_texture_rect_region(
 		sheets.atlas, Rect2(box.position + Vector2(0.0, span.y * 0.04), box.size),
@@ -262,72 +349,90 @@ func _draw_piece() -> void:
 	_art.draw_texture_rect_region(sheets.atlas, box, region, Color(1.0, 1.0, 1.0, fade))
 
 
-## Everything that is light rather than picture, drawn into the added-on child: the wheel
-## of rays and the dust coming off them. Both are drawn around the origin, because the
-## child is moved to the middle of the card rather than drawing there.
-func _draw_glow() -> void:
-	if _queue.is_empty():
-		return
-	var radius := float(_glow.get_meta(&"radius", 0.0))
-	var fade := float(_glow.get_meta(&"fade", 0.0))
-	if radius <= 0.0 or fade <= 0.0:
-		return
-	_draw_shine(Vector2.ZERO, radius, fade)
-	_draw_motes(Vector2.ZERO, radius, fade)
+## Is there a picture to draw right now? Asked by every shine layer, so none of them has to
+## repeat the four conditions that make a card real.
+func _showing() -> bool:
+	return (
+		not _queue.is_empty() and sheets != null and sheets.atlas != null
+		and _region.size.x > 0.0 and _solid > 0.0
+	)
 
 
-## The shine: a wheel of tapering rays turning behind the piece, brightest at the moment it
-## lands. Triangles rather than a texture — the whole game draws its own light — and an odd
-## number of long ones among the short so the wheel does not read as a cog.
-func _draw_shine(centre: Vector2, radius: float, fade: float) -> void:
-	# The core: light gathered on the piece itself, brightest at the middle and gone by the
-	# edge of the pool. Drawn before the rays, so they come out of it.
-	for step in 6:
-		var part := float(step) / 5.0
-		_glow.draw_circle(
-			centre, radius * lerpf(0.5, 2.0, part),
-			Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, 0.05 * fade * (1.0 - part * 0.7))
+## The column of gold light the find stands in, the lake's own (`shaders/beam.gdshader`):
+## one rectangle, the shader doing the rest, its colour and brightness carried in the
+## modulate. Straight up the screen from just under the picture's foot, so the piece looks
+## like it is standing in the light rather than in front of it.
+##
+## Its own breath comes off `_age`, which the card already runs — no second clock, unlike
+## the net's, which needs one because a landed net stops redrawing.
+func _draw_beam() -> void:
+	if not _showing():
+		return
+	var wide := maxf(_box.x, _box.y) * BEAM_WIDE
+	var tall := maxf(_box.x, _box.y) * LakeGrid.BEAM_TALL
+	var foot := _box.y * 0.5 + maxf(_box.x, _box.y) * BEAM_SINK
+	var beat := 0.5 + 0.5 * sin(_age * LakeGrid.GLINT_BREATH)
+	var glow := LakeGrid.GLINT_TINT
+	glow.a = LakeGrid.BEAM_BRIGHT * (0.7 + 0.3 * beat) * _solid
+	_beam.draw_rect(Rect2(Vector2(-wide * 0.5, foot - tall), Vector2(wide, tall)), glow)
+
+
+## The gold outline: the picture stamped again a step out on each of four sides, in pure
+## green, which `rim.gdshader` turns to gold. The net's own trick, and the reason the grimy
+## sprite can be held up over a grimy lake at all.
+##
+## The step is in screen pixels rather than scaled with the picture — see `RIM_STEP`.
+##
+## Its own alpha is `RIM_FADE`'d: the rim is four whole copies of the picture and only their
+## edges are meant to show, which holds while the piece over them is opaque and stops
+## holding the moment the card starts fading. At the same alpha as the piece, a find on its
+## way out went gold — the picture let the copies behind it through and what was left was a
+## silhouette. Cubed, the gold is all but gone by the time the picture is see-through, and
+## at full card it is still 0.8 of the way there.
+func _draw_rim() -> void:
+	if not _showing():
+		return
+	var box := Rect2(-_box * 0.5, _box)
+	var gold := pow(_solid, RIM_FADE)
+	for step: Vector2 in LakeGrid.RIM_OFFSETS:
+		_rim.draw_texture_rect_region(
+			sheets.atlas, Rect2(box.position + step * RIM_STEP, box.size), _region,
+			Color(0.0, 1.0, 0.0, gold)
 		)
 
-	var spin := _age * TAU * RAY_SPIN
-	# Brightest during the pop, then settling to a steady glow behind the piece.
-	var flare := 1.0 + (1.0 - clampf(_age / RISE, 0.0, 1.0)) * 2.2
-	# Warm and thin. Rays this size drawn any brighter stop being light coming off a thing
-	# and become a pinwheel drawn on the lake.
-	var glow := Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, 0.085 * fade * flare)
-	for i in RAYS:
-		var angle := spin + TAU * float(i) / float(RAYS)
-		var reach := radius * (RAY_REACH if i % 3 == 0 else RAY_REACH * 0.66)
-		var wide := TAU / float(RAYS) * 0.16
-		_glow.draw_colored_polygon(
-			PackedVector2Array([
-				centre,
-				centre + Vector2(cos(angle - wide), sin(angle - wide)) * reach,
-				centre + Vector2(cos(angle + wide), sin(angle + wide)) * reach,
-			]),
-			glow
-		)
+
+## The glitter on the find: four-point stars and single sparks of whole art pixels, at
+## spots taken off the picture's own opaque pixels so nothing lands on the water beside it.
+## `LakeGrid.GlintTwinkle.draw_star` draws them, the same call the lake and the net make.
+func _draw_stars() -> void:
+	if not _showing():
+		return
+	for star: Array in _stars_lit:
+		var spot: Vector2 = star[0]
+		var big: bool = star[2]
+		var span: float = LakeGrid.STAR_LIFE if big else LakeGrid.SPARK_LIFE
+		var life := clampf((_age - float(star[1])) / span, 0.0, 1.0)
+		var local := (spot - Vector2(0.5, 0.5)) * _box
+		_glitter.draw_set_transform(local, 0.0, Vector2.ONE * STAR_BIG)
+		LakeGrid.GlintTwinkle.draw_star(_glitter, big, sin(life * PI) * _solid)
+	_glitter.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The dust coming off it: a handful of points drifting outward and upward, each on its own
-## clock, so the piece looks like it is giving something off rather than being lit.
-func _draw_motes(centre: Vector2, radius: float, fade: float) -> void:
-	_rng.seed = hash(String(_queue[0]["piece"])) ^ 0x51A2
-	var span := RISE + HOLD + LEAVE
-	for i in MOTES:
-		var born := _rng.randf() * span * 0.7
-		var life := span * 0.45
-		var step := (_age - born) / life
-		if step < 0.0 or step > 1.0:
-			continue
-		var angle := _rng.randf() * TAU
-		var out := radius * lerpf(0.25, MOTE_SPREAD + 0.5, step)
-		var at := centre + Vector2(cos(angle), sin(angle) * 0.8) * out
-		at.y -= step * radius * 0.35
-		# Bright at birth, gone by the end of its own life rather than the card's.
-		var lit := (1.0 - step) * fade * 0.85
-		_glow.draw_circle(at, maxf(radius * 0.045 * (1.0 - step * 0.5), 1.5),
-			Color(1.0, 0.97, 0.80, lit))
+## Light and put out the stars. Driven from `_process` rather than from `_draw`, because
+## which stars are alight is state and a draw call must not make any.
+func _tick_stars(delta: float) -> void:
+	var kept: Array = []
+	for star: Array in _stars_lit:
+		var span: float = LakeGrid.STAR_LIFE if star[2] else LakeGrid.SPARK_LIFE
+		if _age - float(star[1]) < span:
+			kept.append(star)
+	_stars_lit = kept
+	if _spots.is_empty():
+		return
+	if _rng.randf() < LakeGrid.STAR_RATE * delta:
+		_stars_lit.append([_spots[_rng.randi() % _spots.size()], _age, true])
+	if _rng.randf() < LakeGrid.SPARK_RATE * delta:
+		_stars_lit.append([_spots[_rng.randi() % _spots.size()], _age, false])
 
 
 ## One line, centred, with a shadow under it — the same treatment the ending gives its

@@ -89,13 +89,23 @@ const LIST_BUSY := 0.25
 ## `Style.close_on`, the same for every menu.
 const CLOSE_SIDE := 44.0
 
-## The dog, when it happens to be in.
+## The dogs, when they happen to be in.
 ##
-## It is in the shed about half the time the player walks in, because a dog that is always
-## exactly where you left it is furniture. When it is in, it mooches from one clear patch of
-## floor to another — unless there is a pet bed out, in which case it goes straight to the
-## bed and stays there.
+## Each of the pack rolls this on its own, because a dog that is always exactly where you
+## left it is furniture. When one is in, it mooches from one clear patch of floor to another
+## — unless there is something out with a seat authored on it, in which case it goes and
+## lies on that.
+##
+## **Rolled per dog** (2026-09-19, issue #30, Richard's call over a count rolled once): at
+## the full pack of four that leaves the room empty 4% of the time rather than 45%, so
+## walking in and finding a dog stops being a find. Accepted — the player bought four dogs
+## and should see them. The comment about "finding it" is the price.
 const DOG_ODDS := 0.55
+
+## The most that can be in the room at once, whatever the pack holds. `Lake.MAX_DOGS` by
+## construction; written here rather than reached for because `ShedRoom` is a view of two
+## arrays and knows nothing else about the lake.
+const DOGS_MOST := 4
 
 ## How tall the dog draws, in floor cells, and how fast it walks across them.
 ##
@@ -120,6 +130,13 @@ const DOG_BED_SLEEP := 22.0
 ## One name covers both beds: the art draws two styles and the player picks which one it
 ## stands as with R, so they are one find with two faces rather than two finds. See
 ## Sheets.Set.VARIANT.
+##
+## Since 2026-09-19 this is only the piece the dogs may *walk over* — `_taken` leaves it out
+## of the blocked floor. **Which pieces they lie on is `Sheets.seat_of`**, authored per view
+## in tools/decor_sets.json, and the pet bed is one of four. Nothing here tests a view's
+## role: the bed's views are colours and the pet bed's are shapes, so a gate on the name
+## "front" would have given both beds no seat at all and taken away the one seat that
+## already worked.
 const DOG_BED := &"decor_pet_bed"
 
 ## How far past its host a piece set over another draws, and a walker standing in a
@@ -258,6 +275,11 @@ const YOU_ENTRY := 2.0
 ## you shove through the wardrobe is worse than one you have to step round.
 const ROOM_PERSONAL := 1.6
 
+## How many spots a dog looks at before settling for where it already is. Four of them and
+## a player in one room, each wanting `ROOM_PERSONAL` of floor, is a lot more to miss than
+## one dog was, and a dart that fails leaves the animal standing still.
+const IDLE_DARTS := 32
+
 signal changed
 
 ## The cross in the corner. The room is the whole screen now, so the way out is a button on
@@ -288,16 +310,53 @@ var _scroll: float = 0.0
 var _close: CloseButton
 var _shelf: ShedShelf
 
-## The dog: whether it is in at all, where it is standing in cells, and what it is up to.
-## See `_dog_think`.
-var _dog_here: bool = false
-var _dog_at := Vector2.ZERO
-var _dog_target := Vector2.ZERO
-var _dog_state: StringName = &"idle"
-var _dog_age: float = 0.0
-var _dog_mood: float = 0.0
-var _dog_left: bool = false
+## One dog in the room: where it stands in cells, what it is up to, and which seat it has
+## claimed. See `_dog_think`.
+##
+## A class rather than a Dictionary because every field is read in `_process` and drawn in
+## `_draw_dog`, and a typo in a string key would be a dog that quietly stops thinking.
+class ShedDog extends RefCounted:
+	var at := Vector2.ZERO
+	var target := Vector2.ZERO
+	var state: StringName = &"idle"
+	var age: float = 0.0
+	var mood: float = 0.0
+	var left: bool = false
+
+	## The seat this dog holds, as its key in `_seats()`, or "" for a dog on the floor.
+	## Held rather than looked up each frame: a seat is claimed, and a claim is a fact about
+	## the dog, not about the furniture.
+	var seat: String = ""
+
+	## The cells this dog is allowed to stand on although something is standing there — the
+	## foot of the piece whose seat it holds. Without it the sofa's own base refuses the dog
+	## the cushion and `_process`'s unstick shoves it off again every frame.
+	var over: Dictionary = {}
+
+
+## The dogs that are in, none to `DOGS_MOST`. Empty is a room with nobody in it.
+var _dogs: Array[ShedDog] = []
+
+## The dogs in the room, for the harness and the probe. Not for the game: nothing outside
+## this file drives them.
+func dogs() -> Array[ShedDog]:
+	return _dogs
+
+
+## How many dogs the player owns, asked of the lake each time the room opens rather than
+## pushed once: the pack grows mid-run (`Lake._add_dog`), and a number read at `_ready`
+## would hold the room at one dog for the whole session. The wash room's own pattern.
+##
+## Unset — a room with no lake behind it, which is every harness and `tools/wash_spike` —
+## reads as one dog, which is what this room has always had.
+var pack_size := Callable()
+
 var _dog_rng := RandomNumberGenerator.new()
+
+## The seat table, and the `decor.hash()` it was built for. Memoised like `_taken`, and for
+## the same reason: `decor` is the lake's own array, edited in place while the room is open.
+var _seat_table: Array = []
+var _seat_table_for: int = -1
 
 ## The player in the room: where they stand in cells, which way they face, how long they
 ## have been walking (nought when still), and how long the room has been open — which is
@@ -360,9 +419,14 @@ func _ready() -> void:
 
 ## The room came on screen, or went off it.
 ##
-## Whether the dog is in is rolled here rather than kept: it is decided each time the player
-## opens the shed, which is what makes walking in and finding it asleep on the bed feel like
-## finding it rather than like checking on it.
+## Which dogs are in is rolled here rather than kept: it is decided each time the player
+## opens the shed, so what is on the floor is a room walked into rather than a room left
+## running. Each of the pack rolls `DOG_ODDS` on its own; see the note there about what that
+## does to the odds of an empty room.
+##
+## Every dog that is in claims a free seat on the way, so a room with a sofa and a pet bed
+## out has two dogs already lying down when the door opens rather than two dogs setting off
+## towards the furniture.
 func _room_shown() -> void:
 	var showing := is_visible_in_tree()
 	set_process(showing)
@@ -378,17 +442,29 @@ func _room_shown() -> void:
 	_you_step = 0.0
 	_you_age = 0.0
 
-	_dog_here = DogArt.ready() and _dog_rng.randf() < DOG_ODDS
-	if not _dog_here:
+	_dogs.clear()
+	if not DogArt.ready():
 		return
-	# On the bed already when there is one, rather than walking over to it while the player
-	# watches: the door opening is not an event the dog got up for.
-	var bed := _bed_cell()
-	_dog_at = bed if bed != Vector2.INF else _dog_somewhere()
-	_dog_target = _dog_at
-	_dog_age = 0.0
-	_dog_mood = 0.0
-	_dog_think()
+	for _which in _pack_wanted():
+		if _dog_rng.randf() >= DOG_ODDS:
+			continue
+		var dog := ShedDog.new()
+		# Appended before it is placed, so the one after it keeps clear of where it stands
+		# and does not take the seat it has just claimed.
+		_dogs.append(dog)
+		# On a seat already when one is free, rather than walking over to it while the
+		# player watches: the door opening is not an event the dog got up for.
+		_claim_seat(dog)
+		dog.at = _seat_point(dog.seat) if not dog.seat.is_empty() else _dog_somewhere(dog)
+		dog.target = dog.at
+		_dog_think(dog)
+
+
+## How many of the pack to roll for. One when nothing has told the room otherwise.
+func _pack_wanted() -> int:
+	if not pack_size.is_valid():
+		return 1
+	return clampi(int(pack_size.call()), 1, DOGS_MOST)
 
 
 func _process(delta: float) -> void:
@@ -401,24 +477,35 @@ func _process(delta: float) -> void:
 	var sound := Sfx.main()
 	if sound != null:
 		sound.set_fireplace(_fire_lit())
-	if not _dog_here:
-		queue_redraw()
-		return
-	_dog_age += delta
-	_dog_mood -= delta
-	# Furniture can be put down on top of the dog, which leaves it standing inside a
-	# wardrobe with every step out of it refused. Nobody sees it move — the piece is over it
-	# — and a dog wedged in a cupboard for the rest of the session is worse than one that
-	# turns up a foot to the left.
-	if not _dog_may_stand(_dog_at):
-		_dog_at = _dog_somewhere()
-		_dog_target = _dog_at
-	if _dog_state == &"walk":
-		if _dog_walk(delta) or _dog_mood <= 0.0:
-			_dog_think()
-	elif _dog_mood <= 0.0:
-		_dog_think()
+	for dog in _dogs:
+		_drive_dog(dog, delta)
 	queue_redraw()
+
+
+## One dog's frame.
+func _drive_dog(dog: ShedDog, delta: float) -> void:
+	dog.age += delta
+	dog.mood -= delta
+	# The sofa a dog is asleep on can be picked up while it sleeps, or turned to a face that
+	# is nobody's seat. Give the claim up on the spot rather than leaving it holding a key
+	# to furniture that is no longer there.
+	if not _seat_still_there(dog):
+		_drop_seat(dog)
+		dog.mood = 0.0
+	# Furniture can be put down on top of a dog, which leaves it standing inside a wardrobe
+	# with every step out of it refused. Nobody sees it move — the piece is over it — and a
+	# dog wedged in a cupboard for the rest of the session is worse than one that turns up a
+	# foot to the left. A dog shoved off its seat gives the seat up with it, or it holds a
+	# claim on furniture it is no longer anywhere near.
+	if not _dog_may_stand(dog.at, dog.over):
+		_drop_seat(dog)
+		dog.at = _dog_somewhere(dog)
+		dog.target = dog.at
+	if dog.state == &"walk":
+		if _dog_walk(dog, delta) or dog.mood <= 0.0:
+			_dog_think(dog)
+	elif dog.mood <= 0.0:
+		_dog_think(dog)
 
 
 ## Read the player's cut sheet. Nothing drawn if it is missing, which is the same bargain
@@ -534,11 +621,17 @@ func _carry_with_pad(delta: float) -> void:
 	Pad.move_cursor(Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down"), delta)
 
 
-## May the player stand here? The floor, the furniture, and the dog.
+## May the player stand here? The floor, the furniture, and every dog in the room.
+##
+## The player is never let onto a seat's own cells: a dog is allowed to stand on the sofa
+## it is lying on, and the person is not.
 func _you_may_stand(where: Vector2) -> bool:
-	if not _dog_here:
+	if _dogs.is_empty():
 		return _dog_may_stand(where)
-	return _clear_of(where, _you_at, _dog_at)
+	var pack: Array[Vector2] = []
+	for dog in _dogs:
+		pack.append(dog.at)
+	return _clear_of_all(where, _you_at, pack)
 
 
 ## Which compass direction the player is showing.
@@ -678,33 +771,35 @@ func _draw_threshold(opening: Rect2, floor_box: Rect2) -> void:
 ## The bed outranks everything else when there is one out and the dog is not already on it,
 ## because a pet bed the dog ignores is a joke at the player's expense — they went and found
 ## it in the lake.
-func _dog_think() -> void:
-	_dog_age = 0.0
-	var bed := _bed_cell()
-	if bed != Vector2.INF:
-		# A bed in the room settles it. It used to be a coin flip each time the dog thought,
-		# so a player who had gone and found the bed in the lake and put it out watched the
-		# animal mooch about beside it half the afternoon. If there is a bed, the dog is on
-		# the bed; the mooching is what a room without one gets.
-		if _dog_at.distance_to(bed) <= 0.6:
-			_dog_state = &"sleep"
-			_dog_mood = DOG_BED_SLEEP
+func _dog_think(dog: ShedDog) -> void:
+	dog.age = 0.0
+	if dog.seat.is_empty():
+		_claim_seat(dog)
+	if not dog.seat.is_empty():
+		# A seat in the room settles it. The bed used to be a coin flip each time the dog
+		# thought, so a player who had gone and found it in the lake and put it out watched
+		# the animal mooch about beside it half the afternoon. If there is somewhere to lie,
+		# the dog lies on it; the mooching is what a dog with no seat left gets.
+		var seat := _seat_point(dog.seat)
+		if dog.at.distance_to(seat) <= 0.6:
+			dog.state = &"sleep"
+			dog.mood = DOG_BED_SLEEP
 		else:
-			_dog_state = &"walk"
-			_dog_target = bed
-			_dog_mood = DOG_MOOD_MOST
+			dog.state = &"walk"
+			dog.target = seat
+			dog.mood = DOG_MOOD_MOST
 		return
 	var roll := _dog_rng.randf()
-	_dog_mood = _dog_rng.randf_range(DOG_MOOD_LEAST, DOG_MOOD_MOST)
+	dog.mood = _dog_rng.randf_range(DOG_MOOD_LEAST, DOG_MOOD_MOST)
 	if roll < 0.45:
-		_dog_state = &"walk"
-		_dog_target = _dog_somewhere()
+		dog.state = &"walk"
+		dog.target = _dog_somewhere(dog)
 	elif roll < 0.65:
-		_dog_state = &"idle"
+		dog.state = &"idle"
 	elif roll < 0.85:
-		_dog_state = &"laid"
+		dog.state = &"laid"
 	else:
-		_dog_state = &"sleep"
+		dog.state = &"sleep"
 
 
 ## One step towards the target. True once it is there, or once it is stuck.
@@ -713,40 +808,75 @@ func _dog_think() -> void:
 ## outright rather than slid along, and then a new target is picked: a dog nosing along the
 ## side of a wardrobe looking for a way round reads as a bug, where a dog changing its mind
 ## reads as a dog.
-func _dog_walk(delta: float) -> bool:
-	var gap := _dog_target - _dog_at
+func _dog_walk(dog: ShedDog, delta: float) -> bool:
+	var gap := dog.target - dog.at
 	if gap.length() <= 0.25:
 		return true
 	var step := gap.normalized() * minf(DOG_SPEED * delta, DOG_STEP_MOST)
 	if absf(step.x) > 0.0001:
-		_dog_left = step.x < 0.0
-	var wanted := _dog_at + step
-	if _clear_of(wanted, _dog_at, _you_at):
-		_dog_at = wanted
-		return _dog_at.distance_to(_dog_target) <= 0.25
+		dog.left = step.x < 0.0
+	var wanted := dog.at + step
+	var others := _others_than(dog)
+	others.append(_you_at)
+	if _clear_of_all(wanted, dog.at, others, dog.over):
+		dog.at = wanted
+		return dog.at.distance_to(dog.target) <= 0.25
 	return true
 
 
-## Somewhere on the floor with nothing on it.
-func _dog_somewhere() -> Vector2:
-	for _try in 24:
+## Somewhere on the floor with nothing on it, and not on top of anybody else.
+##
+## The spacing is what four dogs in one room needed: the pairwise rule in `_clear_of` stops
+## a dog walking *through* another, and this stops one choosing a spot a stride from where
+## another is standing in the first place. Darts rather than a search, the way the island's
+## own loafing spots are picked, and a crowded room falls back to where the dog already is.
+func _dog_somewhere(dog: ShedDog) -> Vector2:
+	var others := _others_than(dog)
+	others.append(_you_at)
+	for _try in IDLE_DARTS:
 		var where := Vector2(
 			_dog_rng.randf_range(1.0, float(COLS) - 1.0),
 			_dog_rng.randf_range(1.0, float(ROWS) - 1.0)
 		)
-		if _dog_may_stand(where):
+		if not _dog_may_stand(where, dog.over):
+			continue
+		var room := true
+		for other: Vector2 in others:
+			if where.distance_to(other) < ROOM_PERSONAL:
+				room = false
+				break
+		if room:
 			return where
-	return _dog_at
+	return dog.at
 
 
-## May the dog stand with its feet on this cell? Inside the floor, and not on furniture.
-func _dog_may_stand(where: Vector2) -> bool:
+## Where every dog but this one is standing.
+func _others_than(dog: ShedDog) -> Array[Vector2]:
+	var others: Array[Vector2] = []
+	for other in _dogs:
+		if other != dog:
+			others.append(other.at)
+	return others
+
+
+## May a dog stand with its feet on this cell? Inside the floor, and not on furniture.
+##
+## `over` is the cells a particular dog is allowed to stand on although furniture is
+## standing there — the foot of the piece whose seat it holds. Without it a dog sent to a
+## sofa would be refused the cushion by the sofa's own base and shoved off by the unstick in
+## `_drive_dog` every frame. The pet bed needs none of this: it is left out of `_taken`
+## altogether, which is why it was the only seat that ever worked.
+##
+## Kept named for the dog, and kept to one argument's worth of default, because the player
+## reaches it through `_you_may_stand` and `test_lake` calls it by that name.
+func _dog_may_stand(where: Vector2, over: Dictionary = {}) -> bool:
 	var keep := _feet_keep()
 	if where.x < keep.x or where.y < keep.y:
 		return false
 	if where.x > float(COLS) - keep.z or where.y > float(ROWS) - keep.w:
 		return false
-	return not _taken().has(Vector2i(int(where.x), int(where.y)))
+	var cell := Vector2i(int(where.x), int(where.y))
+	return over.has(cell) or not _taken().has(cell)
 
 
 ## How far inside the floor's own rectangle a walker's feet have to stay, in cells, as
@@ -796,26 +926,143 @@ func _trim() -> Vector4:
 ## and only walking through you is refused. Enforced only on somebody not already inside the
 ## other — a chair put down on the pair of them, or a dog that padded up while the room was
 ## being rearranged, must not leave either of them pinned.
-func _clear_of(where: Vector2, from: Vector2, other: Vector2) -> bool:
-	if not _dog_may_stand(where):
+func _clear_of(where: Vector2, from: Vector2, other: Vector2, over: Dictionary = {}) -> bool:
+	if not _dog_may_stand(where, over):
 		return false
 	if from.distance_to(other) < ROOM_PERSONAL:
 		return true
 	return where.distance_to(other) >= ROOM_PERSONAL
 
 
-## Where the pet bed is standing, in cells, or INF for a room without one.
-func _bed_cell() -> Vector2:
-	for row: Dictionary in decor:
-		if StringName(row["piece"]) != DOG_BED:
+## The same, against several others at once — the pack, or the pack and the player.
+##
+## The escape hatch is applied **per other**, not once for the whole list: a dog already
+## overlapping one of the pack must not thereby be let through all of them and through the
+## player as well.
+func _clear_of_all(
+	where: Vector2, from: Vector2, others: Array[Vector2], over: Dictionary = {}
+) -> bool:
+	if not _dog_may_stand(where, over):
+		return false
+	for other: Vector2 in others:
+		if from.distance_to(other) < ROOM_PERSONAL:
 			continue
-		var span := span_of(DOG_BED, _row_view(row))
-		# In cells: the dog walks on those, and the bed is measured in pixels.
-		return Vector2(
-			float(int(row["cell"][0])) + float(span.x) * 0.5,
-			float(int(row["cell"][1])) + float(span.y) * 0.5
+		if where.distance_to(other) < ROOM_PERSONAL:
+			return false
+	return true
+
+
+## Everywhere in the room a dog may lie down, one entry a piece.
+##
+## A piece offers a seat when the catalogue authors one for the face it is standing in
+## (`Sheets.seat_of`) — the pet beds, the bed, and the sofa and armchair seen from the
+## front. Nothing here tests the *name* of a view: the bed's faces are colours and the pet
+## bed's are shapes, so "front" would have meant "neither bed".
+##
+## Each entry carries where the feet go (in cells), the cells the piece's own foot blocks
+## (so the dog sitting there can stand on them), and a key that survives the player moving
+## the furniture about — the piece and the spot it stands on, not its index in `decor`,
+## which shifts the moment anything is picked up.
+##
+## Memoised on `decor.hash()`, like `_taken`: `decor` is the lake's array and is edited in
+## place while the room is open.
+func _seats() -> Array:
+	var key := decor.hash()
+	if key == _seat_table_for:
+		return _seat_table
+	_seat_table_for = key
+	_seat_table = []
+	if sheets == null:
+		return _seat_table
+	for row: Dictionary in decor:
+		var piece := StringName(row["piece"])
+		var view := _row_view(row)
+		var lift := sheets.seat_of(piece, view)
+		if lift <= 0:
+			continue
+		var span := span_of(piece, view)
+		var cell := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
+		# The seat is measured up from the picture's bottom edge; the feet stand on it.
+		# In cells, because that is what walks.
+		var feet := Vector2(
+			float(cell.x) + float(span.x) * 0.5, float(cell.y + span.y - lift)
 		) / float(CELL)
-	return Vector2.INF
+		_seat_table.append({
+			"key": "%s@%d,%d" % [piece, cell.x, cell.y],
+			"feet": feet,
+			"over": _foot_cells(piece, view, cell),
+		})
+	return _seat_table
+
+
+## The cells a piece's own foot stands on, as a set — what a dog lying on it is allowed to
+## stand on although `_taken` says something is there. The same walk `_taken` does, kept
+## apart from it because this is one piece and that is the whole room.
+func _foot_cells(piece: StringName, view: int, cell: Vector2i) -> Dictionary:
+	var cells := {}
+	var span := span_of(piece, view)
+	var base := base_of(piece, view)
+	var foot := Rect2(
+		Vector2(float(cell.x), float(cell.y + span.y - base)),
+		Vector2(float(span.x), float(base))
+	)
+	var from := Vector2i(
+		int(floor(foot.position.x / float(CELL))), int(floor(foot.position.y / float(CELL)))
+	)
+	var to := Vector2i(
+		int(floor((foot.end.x - 1.0) / float(CELL))),
+		int(floor((foot.end.y - 1.0) / float(CELL)))
+	)
+	for cy in range(from.y, to.y + 1):
+		for cx in range(from.x, to.x + 1):
+			if cy >= 0:
+				cells[Vector2i(cx, cy)] = true
+	return cells
+
+
+## Where the feet of a dog holding this seat go, in cells. The middle of the room for a seat
+## that has gone — the piece was picked up while the dog was walking to it — which the next
+## `_dog_think` sorts out, because the claim goes with it.
+func _seat_point(key: String) -> Vector2:
+	for seat: Dictionary in _seats():
+		if String(seat["key"]) == key:
+			return seat["feet"]
+	return Vector2(float(COLS) * 0.5, float(ROWS) * 0.5)
+
+
+## Take a free seat, if there is one. One dog to a seat, the way a stick in the lake is
+## claimed (`Dog.claims`): not a lock on the furniture — the player may pick the sofa up
+## from under a sleeping dog — but two dogs are never sent to the same cushion.
+func _claim_seat(dog: ShedDog) -> void:
+	var held := {}
+	for other in _dogs:
+		if other != dog and not other.seat.is_empty():
+			held[other.seat] = true
+	for seat: Dictionary in _seats():
+		var key := String(seat["key"])
+		if held.has(key):
+			continue
+		dog.seat = key
+		dog.over = seat["over"]
+		return
+
+
+## Give a seat up: the piece has gone, or the dog has been shoved off it.
+func _drop_seat(dog: ShedDog) -> void:
+	dog.seat = ""
+	dog.over = {}
+
+
+## Has the seat this dog holds gone away — the piece picked up, or turned to a face with no
+## seat on it? Asked every frame a dog is asleep on one, because the player can do that
+## while it is lying there.
+func _seat_still_there(dog: ShedDog) -> bool:
+	if dog.seat.is_empty():
+		return true
+	for seat: Dictionary in _seats():
+		if String(seat["key"]) == dog.seat:
+			return true
+	return false
 
 
 ## Every cell something is standing on, rebuilt only when the room's contents change.
@@ -876,21 +1123,29 @@ func _taken() -> Dictionary:
 ##
 ## On its own shadow, the way everything else in this game that stands on a surface is: the
 ## room is drawn flat and a dog with nothing under it hovers over the boards.
-func _draw_dog(floor_box: Rect2) -> void:
-	if not _dog_here:
-		return
+func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 	var step := CELL * _zoom()
-	var at := floor_box.position + _dog_at * float(step)
+	var at := floor_box.position + dog.at * float(step)
 	var tall := DOG_TALL * float(step)
 	var ring := PackedVector2Array()
-	var wide := tall * (0.34 if _dog_state == &"sleep" or _dog_state == &"laid" else 0.44)
+	var wide := tall * (0.34 if dog.state == &"sleep" or dog.state == &"laid" else 0.44)
 	for i in 13:
 		var angle := TAU * float(i) / 12.0
 		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.42))
 	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
 	DogArt.stamp(
-		self, _dog_state, DogArt.frame_at(_dog_state, _dog_age), at, tall, _dog_left
+		self, dog.state, DogArt.frame_at(dog.state, dog.age), at, tall, dog.left
 	)
+
+
+## One of the things that walk about in here, drawn where the sort put it: a dog, or the
+## player, whose entry carries no dog.
+func _draw_walker(floor_box: Rect2, walker: Dictionary) -> void:
+	var dog: ShedDog = walker["dog"]
+	if dog == null:
+		_draw_you(floor_box)
+	else:
+		_draw_dog(floor_box, dog)
 
 
 ## The cross, nailed to the right end of the shelf's title plank.
@@ -955,15 +1210,31 @@ func span_of(piece: StringName, view: int = 0) -> Vector2i:
 ## How many of a piece's bottom rows of pixels stand on the floor, in this face. The rest
 ## of the picture is height, and rises up the back wall when the piece is pushed to it.
 ##
-## The catalogue authors a base in **cells** (`Sheets.base_of`), by eye off
-## `tools/last_decor_views.png`, and it stays authored that way — a base is a rough depth,
-## not something anybody measures to the pixel. So the answer is read at `CELL` and then
-## multiplied back up, never asked for at a granularity of one: `bases` holds cells, and
-## `Sheets.base_of` would hand those straight back as pixels.
+## The catalogue authors a base in **cells** (`Sheets.base_of`), and for nearly everything
+## it stays authored that way — a base is a rough depth, not something anybody measures to
+## the pixel. So the answer is read at `CELL` and then multiplied back up, never asked for
+## at a granularity of one: `bases` holds cells, and `Sheets.base_of` would hand those
+## straight back as pixels.
+##
+## **Except where a cell is too coarse to say the thing** (2026-09-19, issue #30, Richard:
+## the potted plant "has invisible pixels behind it"). A piece's whole base must stay on the
+## boards (`can_place`), so the base is exactly how far the picture may *not* go up the back
+## wall — and the smallest a cell can say is 8 px, which on a 23 px pot is a third of it.
+## The pot stood 8 px down the floor with nothing drawn in the gap. A `base_px` says the
+## same thing in the drawing's own pixels; the two are never both authored for one piece.
+##
+## What this is **not** is a free unit swap. The number read here is also the walker block
+## (`_taken`), the small piece's host probe (`_host_of`) and the band a walker sorts over
+## (`_walker_key`), so a piece given a one- or two-pixel base blocks a single cell, finds
+## its host from just above its own foot, and is never stood on. That is right for a pot
+## and would be wrong for a sofa. Author a `base_px` only where the picture's contact with
+## the floor really is a couple of pixels deep.
 func base_of(piece: StringName, view: int = 0) -> int:
 	if sheets == null:
 		return CELL
 	var tall := span_of(piece, view).y
+	if sheets.has_base_px(piece, view):
+		return clampi(sheets.base_px_of(piece, view), 1, tall)
 	return clampi(sheets.base_of(piece, view, CELL) * CELL, 1, tall)
 
 
@@ -1717,18 +1988,23 @@ func _draw() -> void:
 	var rows: Array = decor.duplicate()
 	if not ghost.is_empty():
 		rows.append(ghost)
-	var dog_drawn := not _dog_here
-	var dog_key := _walker_key(_dog_at, rows) if _dog_here else 0.0
-	var you_drawn := _you_sheet == null
-	var you_key := _walker_key(_you_at, rows) if not you_drawn else 0.0
+	# The walkers, in the order they sort among the furniture: every dog, then the player at
+	# the same key, which keeps the person in front of an animal standing level with them.
+	var walkers: Array = []
+	for dog in _dogs:
+		walkers.append({"key": _walker_key(dog.at, rows), "dog": dog})
+	if _you_sheet != null:
+		walkers.append({"key": _walker_key(_you_at, rows), "dog": null})
+	walkers.sort_custom(func(a, b): return float(a["key"]) < float(b["key"]))
+	var next_walker := 0
 	for entry: Dictionary in _order(ghost):
 		if int(entry["layer"]) == 2:
-			if not dog_drawn and float(entry["key"]) > dog_key:
-				_draw_dog(floor_box)
-				dog_drawn = true
-			if not you_drawn and float(entry["key"]) > you_key:
-				_draw_you(floor_box)
-				you_drawn = true
+			while (
+				next_walker < walkers.size()
+				and float(entry["key"]) > float(walkers[next_walker]["key"])
+			):
+				_draw_walker(floor_box, walkers[next_walker])
+				next_walker += 1
 		var row: Dictionary = entry["row"]
 		_stamp_piece(
 			StringName(row["piece"]),
@@ -1739,10 +2015,9 @@ func _draw() -> void:
 			_row_view(row),
 			Color(1.0, 1.0, 1.0, float(row.get("ghost", 1.0)))
 		)
-	if not dog_drawn:
-		_draw_dog(floor_box)
-	if not you_drawn:
-		_draw_you(floor_box)
+	while next_walker < walkers.size():
+		_draw_walker(floor_box, walkers[next_walker])
+		next_walker += 1
 
 	_draw_prompt(floor_box)
 	_dress_shelf()
