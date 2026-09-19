@@ -1963,8 +1963,13 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   edge-on to a painted one, so the blue stands off the cloth (2026-09-12, after the plain
   blue was judged too faint). Frames
   0-3 and their mirrors carry the face; the side view (4, 12) shows only the billow's lens a
-  few pixels wide and gets the mark squeezed into that, so a hint of the blue shows at every
-  heading the painted side faces. The stern quarters show the sail's back and stay plain, by
+  few pixels wide and carries **the mark seen edge-on** (2026-09-19, `/grill-me` with
+  Richard, picked off `--mark-mockup`): frame 3's own 14 rows squeezed to the lens's seven
+  white pixels, a tall thin ring that cannot be read by itself and makes sense the moment the
+  hull turns a heading. **The one exception to "square in every frame"**, and it supersedes
+  the small 7x7 round ring up the lens, which read as a second, tiny mark. Seven wide is all
+  the white there is and the least that works: at 5 and 6 the bar maps to under a pixel, the
+  sides drop out and two blobs are left. Edge kept (`MARK_SIDE_EDGE`; bare was the other row). The stern quarters show the sail's back and stay plain, by
   decision. Tried and rejected on the way (all 2026-09-12): a 15 px hand bitmap in the middle
   of the sail (a small odd knot); three bent arrows round a triangle, drawn at zoom and boxed
   down to size (ragged, heads bled into blobs); a flat box per heading that ran past the face
@@ -2631,6 +2636,11 @@ A find is washed before the shed will have it. The one named exception to the sc
   is not**, which is the honest answer to "is this bit done". Trickles run down the
   silhouette wearing a little away (the clean streaks), drop off edges, land again on what
   is under them.
+- **The table is one size whatever is on it** (Richard, 2026-09-19): it was the piece's
+  width plus `STAND_PAD` cells a side and changed size with every find. Now
+  `WashStand.STAND_WIDE` (0.54) of the window, just over the `ROOM_WIDE` the widest find is
+  fitted to; drops slide to its real ends through `_stand_pad` (cells, per piece).
+  `test_lake` puts a sofa, a lamp and nothing on it and asks for the same top.
 - **Nothing rests on the stand** (Richard: the puddle looked bad): a drop that lands slides
   to the nearer end or turns over the front edge, creeps down the plank's face, falls, splats
   on the floor and is gone. `_pool` is retired.

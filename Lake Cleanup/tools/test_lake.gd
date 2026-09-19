@@ -5719,6 +5719,17 @@ func _stage_wash() -> void:
 	_check(room.on_stand() == &"" and stand.state == WashStand.State.EMPTY,
 		"and the stand is bare when the room comes back", "")
 
+	# The table is furniture: one size, whatever stands on it.
+	var bare_top: Rect2 = stand.call(&"_stand_top")
+	var tops_same := true
+	for name: String in ["decor_sofa", "decor_table_lamp", find]:
+		if WashRoom.is_find(sheets, name):
+			stand.put(StringName(name))
+			tops_same = tops_same and (stand.call(&"_stand_top") as Rect2).is_equal_approx(bare_top)
+			tops_same = tops_same and float(stand.call(&"_stand_pad")) >= 1.0
+	stand.clear()
+	_check(tops_same, "the table is the same size under a sofa, a lamp and nothing", str(bare_top))
+
 	# Washed right through.
 	room.pick(StringName(find))
 	_check(is_zero_approx(stand.share_clean()), "picked again it wears its whole coat again",

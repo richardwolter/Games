@@ -107,7 +107,14 @@ const BUBBLE_MOST := 220
 ## drop slides along the wood than it ran down the piece. **Nothing rests on the stand**
 ## (Richard, 2026-09-19: the puddle under the piece looked bad): a drop that lands runs to
 ## the nearer end, falls off it and is gone on the floor.
-const STAND_PAD := 14
+##
+## **The table is one size whatever is on it** (Richard, 2026-09-19: "the table should be
+## always the same size, not switch between different objects"). It was the piece's own
+## width plus `STAND_PAD` cells each side, so it grew and shrank with every find put on it —
+## furniture changing size between objects. Now `STAND_WIDE` of the window, a little over
+## the `ROOM_WIDE` the widest find is fitted to, and the drops slide to *its* ends
+## (`_stand_pad`), which is how far past the piece the wood runs for this piece, in cells.
+const STAND_WIDE := 0.54
 const SLIDE_PACE := 1.5
 ## And over the front of it (Richard, same day): some of what lands goes straight over the
 ## near edge, and a drop sliding along may turn over it at any cell. It creeps down the
@@ -766,7 +773,8 @@ func _slide(run: Run) -> bool:
 	if run.trail.size() > RUN_TRAIL:
 		run.trail.pop_back()
 	run.at.x += run.sliding
-	var past_end := run.at.x < -STAND_PAD or run.at.x >= _cols + STAND_PAD
+	var pad := _stand_pad()
+	var past_end := run.at.x < -pad or run.at.x >= _cols + pad
 	if past_end or _roll.randf() < FRONT_A_CELL:
 		_go_over(run)
 	return true
@@ -886,10 +894,7 @@ func _cell_box(cx: float, cy: float, cells: float = 1.0) -> Rect2:
 
 
 func _draw_stand(floor_y: float) -> void:
-	var pad := float(STAND_PAD) * _cell
-	var top := Rect2(
-		_origin.x - pad, _origin.y + _rows * _cell, _cols * _cell + pad * 2.0, STAND_TALL
-	)
+	var top := _stand_top()
 	var leg_tall := floor_y - top.end.y + 6.0
 	for side in 2:
 		var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
@@ -903,10 +908,15 @@ func _draw_stand(floor_y: float) -> void:
 
 ## Where the stand's top is, the one sum `_draw_stand` and `_draw_shade` share.
 func _stand_top() -> Rect2:
-	var pad := float(STAND_PAD) * _cell
+	var wide := snappedf(size.x * STAND_WIDE, 2.0)
 	return Rect2(
-		_origin.x - pad, _origin.y + _rows * _cell, _cols * _cell + pad * 2.0, STAND_TALL
+		round(size.x * 0.5 - wide * 0.5), _origin.y + _rows * _cell, wide, STAND_TALL
 	)
+
+
+## How far the top runs past the piece each side, in this piece's cells.
+func _stand_pad() -> float:
+	return maxf((size.x * STAND_WIDE - _cols * _cell) * 0.5 / maxf(_cell, 0.001), 1.0)
 
 
 ## Blades over a leg's foot: columns of whole painted pixels, tallest at the leg and cut
