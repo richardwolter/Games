@@ -724,18 +724,25 @@ var _filth_remap_in: float = 0.0
 var _filth_total: float = 1.0
 var _filth_left: float = 1.0
 
-## Whether the player has ever been thanked for this lake. Kept for the record and for old
-## saves; it does not gate the closing screen any more.
+## Whether the player has been thanked for this lake, and the gate on the closing screen:
+## the words and the credit roll happen **once per save** (2026-09-19, Richard: "after player
+## has already ended the game, a continue should not trigger the end credits or message
+## again"). Continue into a finished lake and what comes up is the lit clean water and the
+## HUD — the shed, the pump, the decorating — with nothing written over it.
 ##
-## It used to. Showing the words once ever sounds like good manners and was a trap: the way
-## on to the second lake is a door on that screen, so a player who cleaned the basin, read
-## the words, and came back later found a finished lake with nothing to do on it and no way
-## off it. A finished lake now offers its ending whenever it is opened — once per sitting,
-## because the run is only finished once — and the door is therefore always there.
+## It gated nothing between 2026-09-12 and then, and that is worth knowing why: the way on
+## to the second lake was a door on that screen, so a lake that showed its ending last week
+## and refused to show it again was a lake with nothing to do on it and no way off it. The
+## siege is set aside and `_next_scene()` has returned "" ever since, so the farewell's only
+## door is the menu's — which the settings board offers on any run. The reason died with the
+## onward door; the gate is back.
 ##
-## The end of the run. `_cleaned` is the lake having nothing left in it, which is what the
-## water is lit by; `_farewell_shown` is whether the player has been thanked, which happens
-## once per save rather than once per session.
+## Still keyed on the flag rather than on the field, so an ending that was **owed** is paid:
+## a lake saved with its last piece still in a net's hold, or lost to a crash before the
+## words arrived, has an empty field and a false flag, and gets its ending on the way back in.
+##
+## `_cleaned` is the lake having nothing left in it, which is what the water is lit by and
+## which is worked out again every sitting; this is whether the player has been thanked.
 var _cleaned: bool = false
 ## Seconds until the next "is the lake empty" walk. See _look_for_the_end.
 var _clean_check_in: float = 0.0
@@ -1275,8 +1282,15 @@ func level_name() -> String:
 
 
 ## The last piece has come out of the water. Level one calls that an ending.
+##
+## The words are owed only once per save (2026-09-19). Everything else here happens every
+## time a finished lake is worked out — the lit water, the meter on the floor, the write —
+## because those are facts about the field, not about the player having been thanked.
 func _on_lake_cleaned() -> void:
+	var owed := not _farewell_shown
 	_farewell_shown = true
+	if not owed:
+		return
 	# Straight to the words and the end song (2026-09-18, Richard: "no need for the end game
 	# bell, lets run straight to the message and credit song"). The two-second beat of
 	# clean water and the struck note that opened it are gone: the words take `Farewell.FADE_IN`

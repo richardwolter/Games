@@ -3779,11 +3779,11 @@ func _stage_ending_on_load() -> void:
 		# Dismissed through the game's own door rather than by reaching in and nulling the
 		# reference: the lake forgets the screen in _drop_farewell, and a test that forgets
 		# it some other way is testing its own bookkeeping.
-		var over := _main.get_node_or_null(^"Farewell")
-		if over != null:
-			_main.call(&"_drop_farewell")
-			over.free()
-		_main.set(&"_farewell_shown", true)
+		_clear_farewell()
+		# The ending this save is owed: an empty field and a flag that says nobody has been
+		# thanked, which is a run saved on its last catch or lost to a crash before the
+		# words arrived.
+		_main.set(&"_farewell_shown", false)
 		_main.set(&"_cleaned", false)
 		_check(bool(_main.call(&"save_game")), "a finished lake can be saved", "")
 		# And now something else entirely is in memory, so the load has work to do.
@@ -3796,24 +3796,49 @@ func _stage_ending_on_load() -> void:
 			"a loaded lake has not dealt with its ending yet, finished or not", "")
 		_main.set(&"_clean_check_in", 0.0)
 		return
-	if _in_stage < 40:
+	if _in_stage == 40:
+		_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
+		_check(_main.get_node_or_null(^"Farewell") != null,
+			"and the words the run was owed are on screen", "")
+		_check(bool(_main.get(&"_farewell_shown")),
+			"and the save is marked as having been thanked", "")
+		var farewell: Node = _main.get(&"_farewell")
+		_check(farewell != null and farewell.has_signal(&"to_menu")
+			and farewell.is_connected(&"to_menu", Callable(_main, &"_quit")),
+			"and it carries the door back to the menu", "")
+		_check(String(_main.call(&"_next_scene")) == "",
+			"and no door on to a siege", "%s" % _main.call(&"_next_scene"))
+		# Now the same lake a second time, with the thanks already paid (2026-09-19). The
+		# words and the roll are once per save: a continue into a finished lake is the lit
+		# clean water and nothing written over it. The reason they used to come back every
+		# sitting was the onward door to the siege living on that screen, and `_next_scene`
+		# has returned "" since 2026-09-12.
+		_clear_farewell()
+		_main.set(&"_cleaned", false)
+		_check(bool(_main.call(&"save_game")), "a thanked lake can be saved", "")
+		_main.set(&"_cleaned", true)
+		_grid.insert(_deep_tile(), 0, 0)
+		_check(bool(_main.call(&"load_game")), "and read back", "")
+		_main.set(&"_clean_check_in", 0.0)
 		return
-	_check(bool(_main.get(&"_cleaned")), "the ending catches up a frame later", "")
-	_check(_main.get_node_or_null(^"Farewell") != null,
-		"and the words the run was owed are on screen", "")
-	# Said once already, and said again: the way off the lake is a door on this screen,
-	# so a finished lake that showed its ending last week and refuses to show it again is a
-	# lake with nothing to do on it and no way off it. The door is the menu's (2026-09-12);
-	# the siege is set aside and the onward door with it.
-	_check(bool(_main.get(&"_farewell_shown")),
-		"a lake that was already finished offers its ending again", "")
-	var farewell: Node = _main.get(&"_farewell")
-	_check(farewell != null and farewell.has_signal(&"to_menu")
-		and farewell.is_connected(&"to_menu", Callable(_main, &"_quit")),
-		"and it carries the door back to the menu", "")
-	_check(String(_main.call(&"_next_scene")) == "",
-		"and no door on to a siege", "%s" % _main.call(&"_next_scene"))
+	if _in_stage < 80:
+		return
+	_check(bool(_main.get(&"_cleaned")),
+		"a finished lake works its ending out again on the way back in", "")
+	_check(float(_main.get(&"pollution")) == 0.0, "the meter is on the floor",
+		"%f" % _main.get(&"pollution"))
+	_check(_main.get_node_or_null(^"Farewell") == null
+		and _main.get(&"_farewell") == null,
+		"but the words and the credits are not shown a second time", "")
 	_advance()
+
+
+## Dismiss the closing words through the lake's own door and take the layer with them.
+func _clear_farewell() -> void:
+	var over := _main.get_node_or_null(^"Farewell")
+	if over != null:
+		_main.call(&"_drop_farewell")
+		over.free()
 
 
 ## The clean patch a catch opens: sized to the catch, closing over PATCH_LIFE, capped.

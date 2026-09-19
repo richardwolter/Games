@@ -291,6 +291,27 @@ for what they do, and Strength is the game changer that belongs in the middle of
   pacing good and nothing moves**: raising Strength 2-4 and Catch to put the max back at 40
   was offered and turned down. `shop_loop.sh` is not to be re-run without his say — it would
   move the ten tracks `HAND` does not pin.
+- **The Reel is quicker and Catch's tail is cheaper** (2026-09-19, Richard: "a little bit
+  cheaper at the last level... increase the reel speed overall, it should be a bit quicker
+  all game"). **The two named exceptions to the freeze above**, and both are pinned rather
+  than re-fitted: `net_hold` is in `price_shop.py`'s `HAND` now, and `build_shop.py` reads
+  the `.tres` files, so `shop.json` was rebuilt from them without the pricing loop running.
+  - **Reel** (`reel.tres`) goes **5 + 1.2 a level to 28**, from 3 + 1 to 23: every level is
+    quicker, the level-0 net most of all (+67%). **Base and step both, by decision**, over
+    scaling the whole curve evenly — the early reel is where the dead time is. The cap binds
+    one level early (level 19 is 27.8), so the last level buys 0.2 rather than 1.2.
+  - **Catch** (`net_hold.tres`) goes **1000 x 1.80**, from x 1.82: the top level 66k to 61k
+    and the whole track 145k to 137k. **The multiplier, not a pin on the last level alone** —
+    `UpgradeTrack` costs are `base x mult ^ level` and nothing else, and a per-level override
+    field on every track in the game is not worth one number. So the back half of the ladder
+    eases with the tail.
+  - **`HOME_SPEED` stays 260, by decision** (Richard: judge it in play). At 5 tiles a second
+    the level-0 net already beats the camera home, so the view trails on every haul rather
+    than only the late ones. It is the one knob if that reads badly.
+  - **The run gets shorter and that is accepted** (Richard: "accept, feel wins"): the sim
+    goes **54.2 to 51.9 min** focused, still inside the 48-68 band, and no other price moved
+    to offset it. The three failing checks in `shop-report` fail identically before and
+    after. No `SAVE_VERSION` bump — both tracks keep their level caps.
 - **A player who knows the game buys Strength first, and price cannot stop that**: a tier
   roughly triples income, and 8k is earned by minute 6. The water before Strength 1 is the
   thin part of the game (few green spots), so it is kept short on purpose.
@@ -1210,6 +1231,20 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   `test_lake` guards the child order, that the glyphs end on the bar's top and no more than
   6 px off it, and that they stay inside the span beside the circle; probe
   `tools/shot_pieces_left.tscn` (desktop build) saves `tools/last_pieces_left.png`.
+- **The words and the roll are once per save** (2026-09-19, Richard: "after player has
+  already ended the game, a continue should not trigger the end credits or message again").
+  `_on_lake_cleaned` gates `_show_farewell` on the saved `farewell` flag; everything else it
+  does — the lit water, the meter on the floor, the write — happens every time a finished
+  lake is worked out, because those are facts about the field. A continue into a finished
+  lake is the clean water and the HUD, nothing written over it, playlist not Habibs (which
+  is still on the menu's Credits board). **Supersedes "a finished lake offers its ending
+  whenever it is opened — once per sitting"** (2026-09-12): that existed because the door on
+  to the siege lived on that screen, and `_next_scene()` has returned "" since the same day,
+  so the farewell's only door is the menu's — which the settings board offers on any run.
+  **An ending that was owed is still paid**: a save with an empty field and a false flag (the
+  last piece in a net's hold at the write, or a crash before the words) gets its ending on
+  the way back in. No `SAVE_VERSION` bump — the `farewell` key already means this.
+  `test_lake`'s `_stage_ending_on_load` walks both: owed, then thanked.
 - **Straight to the words and the end song** (2026-09-18, Richard: "no need for the end game
   bell, lets run straight to the message and credit song"). `_on_lake_cleaned` raises the
   farewell on the spot, and `Lake.ending()` is simply "the words are up", which is what
