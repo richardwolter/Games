@@ -1323,8 +1323,15 @@ var _water_tiles: int = 0
 ## three tenths — a steady twinkle, not a rare one. At 5 it is one in fifty seconds and one
 ## in six, 2 a second at half clean, and the old rate again only from about nine tenths.
 ## `test_lake` holds the early rate, not the constant.
-const GLINT_BITE := 5.0
-const GLINT_MOST := 0.25
+## And a fourth, an hour later, from 92% cleared (Richard: "still too much shine overall,
+## tone down a lot"): the bite had fixed the early game and left the ceiling where it was,
+## so nine tenths clean was still 38 pops a second on a clean screen and 150 at the 0.5
+## stop. GLINT_MOST 0.25 to 0.03, an eighth, and the bite back to 3.5 so what is left is
+## spread over the run instead of all arriving at the end: 0.1 a second at three tenths
+## clean, 0.7 at half, 3.6 at eight tenths, 5.4 at nine — lower than it was at every share.
+## `test_lake` holds both ends now.
+const GLINT_BITE := 3.5
+const GLINT_MOST := 0.03
 const GLINT_CELL := 20.0
 
 

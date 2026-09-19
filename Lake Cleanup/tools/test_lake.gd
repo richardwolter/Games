@@ -4520,7 +4520,7 @@ func _stage_nature() -> void:
 	var glint: float = _water_material().get_shader_parameter(&"glint")
 	_check(glint > 0.0 and glint < 1.0, "the water is told to glint, short of full", "%.3f" % glint)
 	_check(float(_water_material().get_shader_parameter(&"glint_cell")) >= 20.0
-		and float(_main.get(&"GLINT_MOST")) <= 0.25,
+		and float(_main.get(&"GLINT_MOST")) <= 0.03,
 		"and sparsely", "cell %.0f, most %.2f" % [
 			float(_water_material().get_shader_parameter(&"glint_cell")), float(_main.get(&"GLINT_MOST"))])
 	# Early in a run a glint is rare: with three tenths of the water clean, a screen of
@@ -4536,6 +4536,12 @@ func _stage_nature() -> void:
 	var early_rate := 576.0 * ticks * early * roll
 	_check(early_rate < 0.25, "and rarely while most of the lake is still soup",
 		"%.3f pops a second on a clean screen at 30%% clean" % early_rate)
+	# And it stays a glint at the far end of the run: nine tenths clean is a handful of pops
+	# a second on that screen, not a shimmer. The finished lake's sparkle is what shimmers.
+	var late := pow(0.9, float(_main.get(&"GLINT_BITE"))) * float(_main.get(&"GLINT_MOST"))
+	var late_rate := 576.0 * ticks * late * roll
+	_check(late_rate < 8.0, "and only a handful a second when the lake is nearly clean",
+		"%.1f pops a second on a clean screen at 90%% clean" % late_rate)
 	_check(flora.alive_count() > 0, "plants came due beside the cleared water", "%d" % flora.alive_count())
 	var foul_plants := 0
 	for k in flora.candidate_count():

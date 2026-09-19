@@ -2314,6 +2314,15 @@ ring gives a fresh lake about 0.001).
   only with nothing within `FILTH_BLUR` of it), so "early game" is a share under about 0.3.
   `test_lake` holds the early rate (under one pop in four seconds at 30% clean), not the
   constants.
+  **And a fourth, the same night, from 92% cleared** (Richard: "still too much shine
+  overall, tone down a lot"): the bite fixed the early game and left the ceiling alone, so
+  nine tenths clean was still 38 pops a second on that screen and 150 at the 0.5 stop.
+  `GLINT_MOST` 0.25 to **0.03** and `GLINT_BITE` back to **3.5**, so what is left is spread
+  over the run: 0.1 a second at 30% clean, 0.7 at half, 3.6 at 80%, 5.4 at 90%, 7.8 at the
+  very end — lower than before at every share. **Both knobs have to be read together**: the
+  bite moves *when*, the ceiling moves *how much*, and twice a complaint about one was
+  answered with the other. `test_lake` holds both ends (under 0.25 a second at 30%, under
+  8 at 90%). The finished lake's `sparkle` is still untouched.
 - **A third more fish** (2026-09-18, Richard: "increase fish population by a little"):
   `most` 14/7/2 to **18/9/3**, `per_tiles` 70/160/700 to **55/125/550**. Arrival shares,
   school sizes and ink untouched. `shot_nature` at these numbers: 27 schools at 46% clean,
