@@ -26,11 +26,20 @@ const ARC_HEAVY := 0.55
 const STAGGER := 0.09
 const SPREAD := 1.1
 
-## Shortest gap between two pops. Only enough to collapse pieces landing on the same frame
-## into one sound: past that, a piece landing is a pop, and a load coming down is a run of
-## them. Wider than the stagger and the run turns into an uneven half of itself, which is
-## worse than either a stream or a single knock.
-const POP_GAP := 0.07
+## Shortest gap between two pops: a ceiling of about six and a half thuds a second
+## (2026-09-18, Richard: less frequent, gentler on the ear). It was 0.07, under the gap
+## pieces land at, so every piece thudded and a full hold was two dozen of them in two
+## seconds. Now a short volley, landing `STAGGER` (0.09 s) apart, sounds every second
+## piece; a long one, whose gap `_gap` squeezes under that, is held to the same pace. The
+## picture still lands every piece; the sound says a load is coming down.
+##
+## 0.22, every third piece, was the first pick the same day and was a little too sparse.
+## **The choice is in steps, not a dial**: on a short volley any gap between one and two
+## staggers is every second piece and any between two and three is every third.
+##
+## **Keep it clear of a whole multiple of `STAGGER`**: sitting on one, frame jitter decides
+## which side each landing falls and the run comes out uneven. 0.15 is between 0.09 and 0.18.
+const POP_GAP := 0.15
 
 ## Turns a piece makes on the way over, and how big it is drawn at each end of the flight.
 ## It grows towards the camera at the top of the arc and settles back down.

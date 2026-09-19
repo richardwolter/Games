@@ -3994,6 +3994,13 @@ func _push_engine() -> void:
 	_sfx.set_drag(_net_wash())
 
 
+## What an empty net pushes on its way home, of the 0 to 1 the haul's sound is driven by.
+## 0.36 until 2026-09-18 (Richard: a cast that caught nothing sounded much like one that
+## did): an empty reel was already a third of a full one. Near silent now, and anything
+## grabbed on the way home brings it up through `load` as before.
+const EMPTY_WASH := 0.12
+
+
 ## How much water the net is pushing, 0 to 1. Nothing unless it is being hauled: a net
 ## sitting on the water is not making a sound. A wide mouth full of junk moves more water
 ## than an empty one, and the mouth pursing shut on the way in quiets it as it comes.
@@ -4001,7 +4008,7 @@ func _net_wash() -> float:
 	if _net == null or _net.state != CastNet.State.REELING:
 		return 0.0
 	var load := float(_net.catch.size()) / maxf(float(_net.hold), 1.0)
-	return clampf(0.36 + 0.64 * load, 0.0, 1.0) * lerpf(1.0, 0.45, _net.closed())
+	return clampf(EMPTY_WASH + (1.0 - EMPTY_WASH) * load, 0.0, 1.0) * lerpf(1.0, 0.45, _net.closed())
 
 
 ## The player's view, once a frame: following the angler, leaning out to a cast, dragged by

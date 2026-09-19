@@ -108,6 +108,15 @@ PLAN = {
     "net_splash": ("Net_Splash.wav", ("trim", 1.3)),
     "game_start": ("NewGame_Continue_Sound.wav", ("trim", 2.8)),
     "piece_splash": ("Object_Splash.wav", ("trim", 1.1)),
+    # Water draining off the mesh after a catch, and the plip of a grab on the way home
+    # (2026-09-18). Both recordings were retired as the angler's wet step for sounding like
+    # drips rather than like wading, which is exactly what is wanted of them here. The spans
+    # are `--split`'s own onsets: WaterSteps2's two drips (its 2 s dribble tail is left out),
+    # and Water_Steps' two small splashes.
+    "drip_1": ("WaterSteps2.wav", ("span", 0.110, 0.420)),
+    "drip_2": ("WaterSteps2.wav", ("span", 0.420, 0.760)),
+    "drip_3": ("Water_Steps.wav", ("span", 0.010, 0.190)),
+    "drip_4": ("Water_Steps.wav", ("span", 0.190, 0.790)),
     "pigeon_fly": ("Pigeon_Fly.wav", ("trim", 1.3)),
     "pigeon_coo": ("Pigeon_Noise.wav", ("trim", 2.0)),
     "net_throw": ("Throwing_Net.wav", ("trim", 0.45)),

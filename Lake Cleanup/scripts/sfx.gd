@@ -54,8 +54,9 @@ const SOUNDS := {
 	&"ferry_bell": [-17.9, 0.02],
 	&"boat_move": [-12.3, 0.05],
 	&"net_throw": [-6.8, 0.06],
-	&"net_splash": [-12.8, 0.04],
+	&"net_splash": [-14.8, 0.04],
 	&"piece_splash": [-13.9, 0.0],
+	&"drip": [-14.0, 0.05],
 	&"haul": [-13.0, 0.0],
 	&"find_caught": [-2.5, 0.0],
 	&"find_chime": [-19.7, 0.03],
@@ -64,10 +65,10 @@ const SOUNDS := {
 	&"pigeon_fly": [-15.4, 0.08],
 	&"pigeon_coo": [-3.0, 0.06],
 	&"bark": [-5.3, 0.06],
-	&"sniff": [-6.8, 0.05],
+	&"sniff": [-9.8, 0.05],
 	&"step_grass": [-14.9, 0.08],
 	&"step_sand": [-15.9, 0.08],
-	&"wading": [-10.9, 0.04],
+	&"wading": [-13.9, 0.04],
 	&"ui_hover": [-15.6, 0.03],
 	&"ui_click": [-6.0, 0.02],
 	&"ui_close": [-15.4, 0.0],
@@ -77,7 +78,7 @@ const SOUNDS := {
 	## A piece landing in the island crate: three takes of Richard's own recording, one of
 	## which is played per drop. A small roll on top of three real drops, where one take
 	## pitched about needed a whole ladder of steps to stop being a metronome.
-	&"pop": [-12.0, 0.03],
+	&"pop": [-15.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
 }
 
@@ -115,7 +116,10 @@ const WHILE_SHOPPING := [&"coin", &"upgrade"]
 ## no ferry setting off, no water, no dog (2026-09-15, Richard). What the room itself makes goes
 ## on: its door, the pieces put down, the fire, and the interface.
 const WHILE_INDOORS := [
-	&"ui_hover", &"ui_click", &"ui_close", &"shed_open", &"drop_big", &"drop_small", &"upgrade"
+	&"ui_hover", &"ui_click", &"ui_close", &"shed_open", &"drop_big", &"drop_small", &"upgrade",
+	# The wash room is indoors too, and a find coming clean on its stand rings the find's own
+	# sound (issue #37). Nothing in the shed plays it, so the shed is no louder for this.
+	&"find_caught",
 ]
 
 ## One take lands every cast, so it is dropped onto one of a few pitches rather than rolled
@@ -124,6 +128,69 @@ const WHILE_INDOORS := [
 ## Six steps over a wider spread since 2026-09-17 (Richard: more varied): four steps a tenth
 ## apart still read as the same splash four ways on a long session of casting.
 const NET_SPLASH_PITCHES: Array[float] = [0.66, 0.78, 0.9, 1.02, 1.14, 1.26]
+
+## **A landing says whether it caught** (2026-09-18, `/grill-me` with Richard: "there isn't
+## much of a difference when I cast a net and it catches nothing"). The ladder is split, and
+## the split is what the extra pitches were spent on: a landing that took something draws
+## from the low, heavy half and an empty one from the high, light half, `EMPTY_SPLASH_DB`
+## quieter. Random across the whole range, pitch could not also mean anything. Six steps a
+## half, so either kind of cast has as many to fall on as every cast had before. Each half
+## keeps its own "never the last one" memory. The whole ladder above is still what a laid
+## net lands on: nothing is caught by laying one, so there is nothing for it to say.
+const NET_SPLASH_CAUGHT: Array[float] = [0.62, 0.68, 0.74, 0.81, 0.88, 0.95]
+const NET_SPLASH_EMPTY: Array[float] = [1.0, 1.06, 1.12, 1.18, 1.24, 1.3]
+const EMPTY_SPLASH_DB := -5.0
+
+## What a catch is answered with: **one swell, then water draining off the mesh**
+## (2026-09-18, second `/grill-me` the same day, Richard: "too scripted, it feels the same
+## every catch... less of a series of pops"). The first pass that morning was a run of one to
+## five piece splashes 0.09 s apart, counted off a ladder of piece counts — and there is one
+## piece-splash recording, so it was the same take retriggered on a fixed beat with a count
+## anybody could learn. **Retired**: `CATCH_RUN_AT`, `CATCH_RUN_GAP`, `CATCH_RUN_MOST` and the
+## queue of weights.
+##
+## The swell is that one recording played **once** a landing, `SWELL_AFTER` behind the net's
+## own splash (rolled, so the two are never the same distance apart), louder and lower the
+## fuller the net came down, with a pitch and a level roll on top. `SWELL_SOFT_ODDS` of them
+## start a little way into the take, eased in, so the attack is sometimes a slap and
+## sometimes a round push of water. A second net landing with it (the double cast) joins the
+## first's swell rather than doubling it (`SWELL_GAP`).
+const SWELL_AFTER := Vector2(0.08, 0.2)
+const SWELL_DB := Vector2(-5.0, 2.0)
+const SWELL_PITCH := Vector2(1.12, 0.84)
+const SWELL_PITCH_ROLL := 0.1
+const SWELL_DB_ROLL := 1.5
+const SWELL_SOFT_ODDS := 0.35
+const SWELL_SOFT_FROM := Vector2(0.03, 0.09)
+const SWELL_SOFT_IN := 0.05
+const SWELL_GAP := 0.3
+## How many pieces a swell at full size is, and how much of the size is the count against
+## the mean weight of what came up: a bag of cans is not a sofa.
+const SWELL_FULL := 12.0
+const SWELL_BY_COUNT := 0.6
+
+## The drips after it: none to `DRIPS_MOST`, **rolled** — the fuller the net the more it
+## leans to the top, but one bottle can drip twice and a full bag once. Each lands at a time
+## of its own anywhere between `DRIP_FROM` and `DRIP_TO` after the swell, so there is no beat
+## to learn; each is a take and a pitch of its own, and each is quieter than the one before.
+## Cut from the two recordings retired as the angler's wet step for sounding like drips.
+const DRIPS_MOST := 4
+const DRIPS_WAITING_MOST := 6
+const DRIPS_LEAN := Vector2(0.2, 3.8)
+const DRIPS_ROLL := 1.2
+const DRIP_FROM := 0.2
+const DRIP_TO := 1.3
+const DRIP_DB := -4.0
+const DRIP_FALLS := -2.5
+const DRIP_PITCH := Vector2(0.82, 1.3)
+
+## A grab on the way home is a plip: one drip take, pitched by what was grabbed, no more
+## than one every `GRAB_GAP`. The swell is the landing's alone — a reel through a thick bay
+## grabs several times a second, and a swell each would be the series of pops again. The
+## haul rising with the load is what says the net is getting heavier.
+const GRAB_GAP := 0.32
+const GRAB_DB := -2.0
+const GRAB_PITCH := Vector2(1.25, 0.85)
 
 ## And the throw with it (2026-09-17, Richard): the cast is two takes in a row, so pitching
 ## the splash alone left the whoosh in front of it identical every time. A narrower spread
@@ -224,6 +291,12 @@ var _haul_effort: float = 0.0
 var _haul_wait: float = 0.0
 ## How many times the wash has been played since this haul started.
 var _haul_plays: int = 0
+## The swell a landing is owed: how long until it sounds (under zero, none), and how big.
+var _swell_wait: float = -1.0
+var _swell_size: float = 0.0
+## The drips still to come: `{"wait", "db", "pitch"}` each, every one on its own clock.
+var _drips: Array[Dictionary] = []
+
 
 ## The beds: whether each is wanted, and the level each has eased to (before the trim).
 var _ambience_player: AudioStreamPlayer
@@ -350,6 +423,7 @@ func _process(delta: float) -> void:
 	else:
 		_haul_wait = 0.0
 		_haul_plays = 0
+	_tick_catch(delta)
 	var ambience_want := SILENT
 	if _ambience_on:
 		ambience_want = AMBIENCE_DB + (AMBIENCE_DUCK if _ambience_duck else 0.0)
@@ -394,6 +468,8 @@ func hush() -> void:
 	indoors = false
 	_haul_effort = 0.0
 	_haul_plays = 0
+	_swell_wait = -1.0
+	_drips.clear()
 	_ambience_on = false
 	_ambience_duck = false
 	_fire_on = false
@@ -405,17 +481,19 @@ func hush() -> void:
 ## its roll. Any variant, picked at random.
 ## `take` picks one of a name's numbered recordings by hand, for a sound whose variants are
 ## what stand in for a pitch ladder; -1 leaves the roll to chance, as every other name does.
-func play(name: StringName, db: float = 0.0, pitch: float = 1.0, take: int = -1) -> void:
+func play(
+	name: StringName, db: float = 0.0, pitch: float = 1.0, take: int = -1
+) -> AudioStreamPlayer:
 	var list: Array = _streams.get(name, [])
 	if list.is_empty() or not may_play(name):
-		return
+		return null
 	var voice: AudioStreamPlayer
 	if _channels.has(name):
 		var own: Array[AudioStreamPlayer] = _channels[name]
 		voice = _idle(own)
 		if voice == null:
 			if name in NEVER_CUT:
-				return
+				return null
 			voice = own[_channel_next[name]]
 			_channel_next[name] = (int(_channel_next[name]) + 1) % own.size()
 	else:
@@ -429,6 +507,7 @@ func play(name: StringName, db: float = 0.0, pitch: float = 1.0, take: int = -1)
 	voice.volume_db = float(tune[0]) + db
 	voice.pitch_scale = pitch * _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
+	return voice
 
 
 ## Whether a sound of the lake's may be heard at all right now: where the player is, and the
@@ -492,9 +571,113 @@ func play_splash(strength: float) -> void:
 	play(&"piece_splash", lerpf(-4.0, 2.0, weight), lerpf(1.15, 0.85, weight))
 
 
-## The net coming down on the water, thrown or laid.
+## The net coming down on the water with nothing to say about a catch: a lit net laid.
 func play_net_splash() -> void:
 	play(&"net_splash", 0.0, _next_pitch(&"net_splash", NET_SPLASH_PITCHES))
+
+
+## A thrown net landing. `caught` is whether the landing's own sweep took anything, so the
+## sweep has to have run first. See NET_SPLASH_CAUGHT.
+func play_landing(caught: bool) -> void:
+	if caught:
+		play(&"net_splash", 0.0, _next_pitch(&"net_splash_caught", NET_SPLASH_CAUGHT))
+	else:
+		play(
+			&"net_splash",
+			EMPTY_SPLASH_DB,
+			_next_pitch(&"net_splash_empty", NET_SPLASH_EMPTY)
+		)
+
+
+## How big a swell `weights` is worth, 0 to 1: how many came up against SWELL_FULL, and how
+## heavy they were. The root of the count, because the first few pieces are most of the
+## difference between a catch and none.
+static func swell_size(weights: Array[float]) -> float:
+	if weights.is_empty():
+		return 0.0
+	var sum := 0.0
+	for weight in weights:
+		sum += weight
+	var by_count := sqrt(minf(float(weights.size()) / SWELL_FULL, 1.0))
+	var by_weight := clampf(sum / float(weights.size()) / 0.85, 0.0, 1.0)
+	return lerpf(by_weight, by_count, SWELL_BY_COUNT)
+
+
+## What a landing's sweep lifted, as the weights its drawn splashes were given: one swell
+## behind the net's own splash, then the drips. See SWELL_AFTER and DRIPS_MOST.
+func play_lifted(weights: Array[float]) -> void:
+	if weights.is_empty() or not may_play(&"piece_splash"):
+		return
+	var size := swell_size(weights)
+	if _gap(&"swell", SWELL_GAP):
+		_swell_wait = _rng.randf_range(SWELL_AFTER.x, SWELL_AFTER.y)
+		_swell_size = size
+	else:
+		# A second net down with the first: one body of water, as big as the bigger.
+		_swell_size = maxf(_swell_size, size)
+	var lean := lerpf(DRIPS_LEAN.x, DRIPS_LEAN.y, size)
+	var count := clampi(roundi(lean + _rng.randf_range(-DRIPS_ROLL, DRIPS_ROLL)), 0, DRIPS_MOST)
+	var times: Array[float] = []
+	for i in count:
+		times.append(_rng.randf_range(DRIP_FROM, DRIP_TO))
+	times.sort()
+	var after := maxf(_swell_wait, 0.0)
+	for i in count:
+		if _drips.size() >= DRIPS_WAITING_MOST:
+			return
+		_drips.append({
+			"wait": after + times[i],
+			"db": DRIP_DB + DRIP_FALLS * float(i) + _rng.randf_range(-1.5, 1.5),
+			"pitch": _rng.randf_range(DRIP_PITCH.x, DRIP_PITCH.y),
+		})
+
+
+## A grab on the way home. See GRAB_GAP.
+func play_grab(weights: Array[float]) -> void:
+	if weights.is_empty() or not _gap(&"grab", GRAB_GAP):
+		return
+	var size := swell_size(weights)
+	_drip(GRAB_DB + _rng.randf_range(-2.0, 1.0), lerpf(GRAB_PITCH.x, GRAB_PITCH.y, size))
+
+
+func _drip(db: float, pitch: float) -> void:
+	play(&"drip", db, pitch, next_step(&"drip", _count(&"drip")))
+
+
+## The swell and the drips, each on its own clock. Dropped whole the moment the lake may not
+## be heard: a board opening over a catch is not owed the rest of it when it shuts.
+func _tick_catch(delta: float) -> void:
+	if _swell_wait < 0.0 and _drips.is_empty():
+		return
+	if not may_play(&"piece_splash"):
+		_swell_wait = -1.0
+		_drips.clear()
+		return
+	if _swell_wait >= 0.0:
+		_swell_wait -= delta
+		if _swell_wait < 0.0:
+			_sound_swell(_swell_size)
+	for i in range(_drips.size() - 1, -1, -1):
+		var drip: Dictionary = _drips[i]
+		drip["wait"] = float(drip["wait"]) - delta
+		if float(drip["wait"]) <= 0.0:
+			_drips.remove_at(i)
+			_drip(float(drip["db"]), float(drip["pitch"]))
+
+
+func _sound_swell(size: float) -> void:
+	var db := lerpf(SWELL_DB.x, SWELL_DB.y, size) + _rng.randf_range(-SWELL_DB_ROLL, SWELL_DB_ROLL)
+	var pitch := lerpf(SWELL_PITCH.x, SWELL_PITCH.y, size)
+	pitch *= _rng.randf_range(1.0 - SWELL_PITCH_ROLL, 1.0 + SWELL_PITCH_ROLL)
+	var voice := play(&"piece_splash", db, pitch)
+	if voice == null or _rng.randf() >= SWELL_SOFT_ODDS:
+		return
+	# Past its own attack, and eased in over a few mix buffers: started cold in the middle
+	# of a waveform a take clicks.
+	var full := voice.volume_db
+	voice.play(_rng.randf_range(SWELL_SOFT_FROM.x, SWELL_SOFT_FROM.y))
+	voice.volume_db = full - 30.0
+	create_tween().tween_property(voice, "volume_db", full, SWELL_SOFT_IN)
 
 
 ## One of `steps`, never the one this name used last, so two plays in a row are always a

@@ -4236,6 +4236,125 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(sound.may_play(&"drop_big"), "but a piece set down in the room is", "")
 	sound.indoors = false
 
+	# A landing says whether it caught (2026-09-18): the net splash's ladder is split, the
+	# low half for a landing that took something and the high half, quieter, for bare water.
+	var lowest_empty := 100.0
+	for step in Sfx.NET_SPLASH_EMPTY:
+		lowest_empty = minf(lowest_empty, step)
+	var highest_caught := 0.0
+	for step in Sfx.NET_SPLASH_CAUGHT:
+		highest_caught = maxf(highest_caught, step)
+	_check(highest_caught < lowest_empty,
+		"every catching landing is pitched under every empty one",
+		"%.2f under %.2f" % [highest_caught, lowest_empty])
+	_check(Sfx.NET_SPLASH_CAUGHT.size() >= 6 and Sfx.NET_SPLASH_EMPTY.size() >= 6,
+		"and either kind has as many steps as every cast had before", "")
+	_check(Sfx.EMPTY_SPLASH_DB < 0.0, "an empty landing is the quieter one", "")
+	sound.set(&"_pitch_step", {})
+	sound.play_landing(false)
+	var steps: Dictionary = sound.get(&"_pitch_step")
+	_check(steps.has(&"net_splash_empty") and not steps.has(&"net_splash_caught"),
+		"a landing on bare water steps the empty ladder alone", "")
+	sound.play_landing(true)
+	_check(steps.has(&"net_splash_caught"), "and one that caught steps the other", "")
+	var net_source := FileAccess.get_file_as_string("res://scripts/net.gd")
+	var sweep_at := net_source.find("_sweep(true)")
+	var landing_at := net_source.find("sfx.play_landing(")
+	_check(sweep_at >= 0 and landing_at > sweep_at,
+		"the landing sweeps before it sounds, so the sound knows what was caught", "")
+
+	# The catch is answered with one swell and then water draining off the mesh: drips at
+	# times of their own, rolled, so no two catches are the same and none is a row of pops
+	# (2026-09-18, the second pass; the first was a counted run on a fixed beat).
+	_check(not sound.has_method(&"run_length") and sound.get(&"_run") == null,
+		"the counted run of splashes is gone, not loosened", "")
+	_check(sound.call(&"_count", &"drip") == 4,
+		"the drips loaded their four takes", "%d" % sound.call(&"_count", &"drip"))
+	var one: Array[float] = [0.3]
+	var bag: Array[float] = []
+	for i in 24:
+		bag.append(0.2 + 0.02 * float(i))
+	_check(Sfx.swell_size(bag) > Sfx.swell_size(one) + 0.3 and Sfx.swell_size(bag) <= 1.0,
+		"a full bag is a much bigger swell than one bottle",
+		"%.2f against %.2f" % [Sfx.swell_size(bag), Sfx.swell_size(one)])
+	var most := 0
+	var fewest := 100
+	var uneven := false
+	var layouts := {}
+	for cast in 30:
+		_forget_catch(sound)
+		sound.play_lifted(bag)
+		var owed: Array = sound.get(&"_drips")
+		most = maxi(most, owed.size())
+		fewest = mini(fewest, owed.size())
+		var waits: Array[float] = []
+		for drip: Dictionary in owed:
+			waits.append(float(drip["wait"]))
+		waits.sort()
+		layouts[str(waits)] = true
+		if waits.size() >= 3 and not is_equal_approx(waits[1] - waits[0], waits[2] - waits[1]):
+			uneven = true
+		if cast == 0:
+			_check(float(sound.get(&"_swell_wait")) >= Sfx.SWELL_AFTER.x,
+				"a landing is owed one swell, behind the net's own splash", "")
+	_check(most <= Sfx.DRIPS_MOST and most > fewest,
+		"the drips are rolled, never more than the cap and not the same count every cast",
+		"%d to %d over thirty casts" % [fewest, most])
+	_check(uneven, "and they land on no beat", "")
+	_check(layouts.size() > 20, "no two catches drain alike",
+		"%d layouts in thirty casts" % layouts.size())
+	# Two nets down together are one body of water.
+	_forget_catch(sound)
+	sound.play_lifted(one)
+	var first_wait := float(sound.get(&"_swell_wait"))
+	sound.play_lifted(bag)
+	_check(is_equal_approx(float(sound.get(&"_swell_wait")), first_wait)
+		and is_equal_approx(float(sound.get(&"_swell_size")), Sfx.swell_size(bag)),
+		"a second net landing with the first joins its swell, as big as the bigger", "")
+	for i in 10:
+		sound.play_lifted(bag)
+	_check((sound.get(&"_drips") as Array).size() <= Sfx.DRIPS_WAITING_MOST,
+		"and the drips waiting are capped", "")
+	sound.call(&"_tick_catch", Sfx.SWELL_AFTER.y + 0.01)
+	_check(float(sound.get(&"_swell_wait")) < 0.0, "the swell sounds once and is spent", "")
+	# A grab on the way home is a plip, never a swell, and no more than one in GRAB_GAP.
+	_forget_catch(sound)
+	sound.set(&"_pitch_step", {})
+	sound.play_grab(bag)
+	_check(float(sound.get(&"_swell_wait")) < 0.0 and (sound.get(&"_drips") as Array).is_empty(),
+		"a grab on the reel owes no swell and no drips", "")
+	_check((sound.get(&"_pitch_step") as Dictionary).has(&"drip"), "it plips", "")
+	sound.set(&"_pitch_step", {})
+	sound.play_grab(bag)
+	_check(not (sound.get(&"_pitch_step") as Dictionary).has(&"drip"),
+		"and a second grab inside the gap is not another", "")
+	# The shop over the lake drops what was owed and queues nothing.
+	_forget_catch(sound)
+	sound.play_lifted(bag)
+	sound.shopping = true
+	sound.call(&"_tick_catch", 0.016)
+	_check(float(sound.get(&"_swell_wait")) < 0.0 and (sound.get(&"_drips") as Array).is_empty(),
+		"a board opening over the lake drops what was left of a catch", "")
+	sound.play_lifted(bag)
+	_check(float(sound.get(&"_swell_wait")) < 0.0 and (sound.get(&"_drips") as Array).is_empty(),
+		"and nothing is queued behind one", "")
+	sound.shopping = false
+	_forget_catch(sound)
+
+	# An empty net coming home is near silent; the load is what brings the haul up.
+	var state_was: int = _net.state
+	var catch_was := _net.catch.duplicate()
+	_net.state = CastNet.State.REELING
+	_net.catch.resize(0)
+	var bare := float(_main.call(&"_net_wash"))
+	_net.catch.resize(maxi(_net.hold, 1))
+	var full := float(_main.call(&"_net_wash"))
+	_net.catch = catch_was
+	_net.state = state_was
+	_check(bare > 0.0 and bare <= Lake.EMPTY_WASH and Lake.EMPTY_WASH < 0.2,
+		"an empty reel is a whisper", "%.2f" % bare)
+	_check(full > bare * 4.0, "and a full one is several times it", "%.2f against %.2f" % [full, bare])
+
 	# Every recording is levelled by the builder now, so what SOUNDS holds is the mix. A
 	# figure far outside the band is a take that was never rebuilt.
 	var loudest := -100.0
@@ -5665,3 +5784,12 @@ func _stage_new_tracks() -> void:
 		"%d, %d" % [int(_main.get(&"boat_volley_level")),
 			int(_main.get(&"dog_strength_level"))])
 	_advance()
+
+
+## Clears what the sound owes a catch and the gaps that pace it, and nothing else of the
+## autoload's: the lake behind the harness is still using the rest.
+func _forget_catch(sound: Sfx) -> void:
+	sound.set(&"_swell_wait", -1.0)
+	(sound.get(&"_drips") as Array).clear()
+	(sound.get(&"_last") as Dictionary).erase(&"swell")
+	(sound.get(&"_last") as Dictionary).erase(&"grab")

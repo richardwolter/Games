@@ -51,6 +51,7 @@ assets/Blue_Boat/
 # Probe run logs
 tools/run.log
 tools/ending_run.log
+tools/pop_run.log
 tools/film/last_film.log
 tools/film/*.import
 docs/progression/replay-report/

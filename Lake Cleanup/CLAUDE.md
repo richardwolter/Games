@@ -2854,6 +2854,68 @@ purpose. What the audit settled, against the shipped design:
     takes were heard in play (Richard, same day). A by-ear knob.
   - `test_lake` guards the three takes loading, the two thuds being different recordings, no
     take following itself, and the shed hearing the furniture but not the crate.
+- **Four sounds came down, and the crate thuds less often** (2026-09-18, Richard: "a bit more
+  gentle on the ear"). In `SOUNDS`: `pop` -12 to **-15**, `net_splash` -12.8 to **-14.8**,
+  `sniff` -6.8 to **-9.8**, and `wading` -10.9 to **-13.9** — read as "the entering water
+  splash", since the wash is the only sound a walker going into the water makes; the entry
+  ring is silent and `piece_splash` is a piece coming *out*. `Haul.POP_GAP` 0.07 to 0.22 and
+  then, the same day, back to **0.15** (Richard: "can increase a little bit"): it was under
+  the gap pieces land at, so every piece thudded; now a short volley thuds every second
+  piece and a long one is capped at about six and a half a second. **The choice is in steps,
+  not a dial** — between one and two staggers is every second piece, between two and three
+  every third. **This supersedes "one pop per piece"** in `Haul._pop`'s older note. Keep the
+  gap off a whole multiple of `Haul.STAGGER` (0.09), or frame jitter makes the run uneven.
+  All by-ear knobs.
+- **A landing says whether it caught** (2026-09-18, `/grill-me` with Richard: "there isn't
+  much of a difference when I cast a net and it catches nothing"). An empty cast and a
+  catching one played the same net splash at the same level; the catch added one piece
+  splash on the same frame, masked, and a haul already a third as loud when empty.
+  - **The net splash's ladder is split by catch** (`Sfx.NET_SPLASH_CAUGHT` 0.62-0.95,
+    `NET_SPLASH_EMPTY` 1.0-1.3, `EMPTY_SPLASH_DB` -5, `play_landing`): six steps a half,
+    each with its own never-the-last memory. Richard asked for more pitches in the same
+    breath, and **random across the whole range a pitch cannot also mean anything** — so the
+    extra steps were spent on the split. Low comes to mean "got something". Picked over
+    random-with-level-only and over pitch following catch size. A laid lit net keeps the
+    whole ladder (`play_net_splash`): nothing is caught by laying one.
+  - **Caught means the landing's own sweep took anything** — rubbish, a find, a bird, a
+    charm. `CastNet._sweep` returns it, and **the landing sweeps before it sounds**; it used
+    to sound first. `test_lake` reads the source for that order.
+  - **A catch is one swell, then water draining off the mesh** (second `/grill-me` the same
+    day, Richard: "too scripted, it feels the same every catch... less of a series of pops").
+    `Sfx.play_lifted`, `_tick_catch`, `_sound_swell`. The piece splash plays **once** a
+    landing, `SWELL_AFTER` (0.08-0.2 s, rolled) behind the net's own, louder and lower with
+    `swell_size` — the root of the piece count against `SWELL_FULL` (12), mixed with the mean
+    weight — and a pitch and level roll on top. `SWELL_SOFT_ODDS` of them start a few
+    hundredths into the take, eased in over `SWELL_SOFT_IN`, so the attack is sometimes a
+    slap and sometimes a round push; **eased, because a take started cold in mid-waveform
+    clicks**. Then 0 to `DRIPS_MOST` (4) drips, the count **rolled** and only leaning with the
+    size, each at a time of its own between `DRIP_FROM` and `DRIP_TO`, its own take and
+    pitch, each quieter than the last. The double cast's second net joins the first's swell
+    (`SWELL_GAP`) rather than doubling it. Dropped whole when the shop or the shed comes up.
+  - **The drips are `drip_1`..`4`**, cut by `build_sfx.py` from `WaterSteps2.wav` and
+    `Water_Steps.wav` — the two recordings retired as the angler's wet step for sounding like
+    drips, which is what is wanted here. `WaterSteps2`'s 2 s dribble tail is not used; it is
+    the obvious bed under a very full net if the drips read thin. `drip_4` is peak-limited
+    and lands about 9 dB under the others: a drip that is sometimes barely there, accepted.
+  - **A grab on the way home is a plip** (`Sfx.play_grab`, `GRAB_GAP` 0.32 s): one drip take
+    pitched by what was grabbed. **The swell is the landing's alone** — a reel through a
+    thick bay grabs several times a second and a swell each is the row of pops again. The
+    haul rising with the load is what says the net is getting heavier. `CastNet._sweep`
+    takes `landing` and hands `_lifted` to one or the other; `_take_from` no longer calls
+    `play_splash` a piece.
+  - **Retired the same day it was built**: a run of one to five piece splashes 0.09 s apart,
+    counted off a ladder of piece counts (`CATCH_RUN_*`, `run_length`). There is one
+    piece-splash recording, so it was the same take on a fixed beat with a count anybody
+    could learn. **Don't vary one take by retriggering it**; vary it by what is rolled on it
+    and by what follows it. Staggering the crowns to match was offered and turned down: the
+    net's feel is locked, so this is **sound only**. **Not `play_catch`**: that was the
+    retired knock's name and `test_lake` guards it staying gone.
+  - **An empty reel is a whisper** (`Lake.EMPTY_WASH` 0.12, was 0.36 inline in `_net_wash`);
+    the load brings the haul up as before, so a piece grabbed on the way home is heard.
+  - **Out of scope, by decision**: any visual change, a new recording or built catch sound,
+    the throw, the find's and the bird's own sounds.
+  - All first guesses for Richard's ear. If empty casts read samey, the fix is more steps in
+    the high half.
 - **A ferry is heard coming home** (same day, Richard: sparsely): `Sfx.play_berth` from
   `Boat`'s RETURNING→DOCKED — the water it pushes on the fleet's own `BOAT_MOVE_GAP`, the
   bell on `BERTH_BELL_GAP` (70 s), much longer than the 25 s it leaves on. **The island end

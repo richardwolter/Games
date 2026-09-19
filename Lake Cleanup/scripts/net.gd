@@ -417,6 +417,9 @@ var tile_pos := Vector2.ZERO
 var target := Vector2.ZERO
 ## Def indices caught this cast, dragged in behind the net.
 var catch := PackedInt32Array()
+## What the sweep in hand has lifted out of the water so far, as the weights its drawn
+## splashes were given. Handed to the sound as one run when the sweep is over.
+var _lifted: Array[float] = []
 
 ## Whether the net is allowed to reel. A thrown net pulls itself in, so this is true for
 ## the whole of an ordinary cast — what turns it off is the game being paused over the
@@ -920,11 +923,13 @@ func _process(delta: float) -> void:
 					# The ring the landing pushes out, on top of the crown's own: this is
 					# the one that is still spreading a second later.
 					splash.ripple(world_pos(), mouth_extent() * 1.2)
-				if sfx != null:
-					sfx.play_net_splash()
 				# What the ring came down on is caught as it lands, not a frame into the haul
-				# after the mouth has already slid off it.
-				_sweep()
+				# after the mouth has already slid off it. Before the sound, because the
+				# sound says whether it caught: low and whole with something in the mesh,
+				# high and quieter on bare water (`Sfx.play_landing`).
+				var caught := _sweep(true)
+				if sfx != null:
+					sfx.play_landing(caught)
 		State.REELING:
 			_advance_towards(angler.tile_pos, reel_speed, delta)
 			_sweep()
@@ -1131,17 +1136,25 @@ func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
 ## each tile it crosses and leaving the patch looking untouched.
 ##
 ## Nearest first within each pass, so the mouth closes from the middle out.
-func _sweep() -> void:
+##
+## Returns whether it took anything at all, a bird and a charm included. What it lifted out
+## of the water is heard once for the whole sweep, not piece by piece: a `landing` is a
+## swell and the water draining after it (`Sfx.play_lifted`), a grab on the way home is a
+## plip (`Sfx.play_grab`).
+func _sweep(landing: bool = false) -> bool:
 	if grid == null:
-		return
+		return false
 	var at := world_pos()
 	var mouth := mouth_extent()
+	var took := false
+	_lifted.clear()
 
 	# Every bird sat inside the mouth, without exception: a perched pigeon is on top of
 	# everything, the hold has no say in it, and one left bobbing inside the ring the player
 	# just closed reads as the net passing through it.
 	if flock != null:
 		for perched in _birds_touched(at, mouth):
+			took = true
 			caught_bird.emit(flock.take(perched))
 
 	# Charms, on the same terms as the birds: on top of everything, free to lift, and gone
@@ -1158,25 +1171,31 @@ func _sweep() -> void:
 			var kind := charms.take(i)
 			if splash != null:
 				splash.splash(_within_mouth(drawn[0]), 0.4)
-			if sfx != null:
-				# The same weight the drawn splash is given: a charm comes out of the water
-				# like anything else, and the knock that used to stand in for it is cut.
-				sfx.play_splash(0.4)
+			# The same weight the drawn splash is given: a charm comes out of the water
+			# like anything else, and the knock that used to stand in for it is cut.
+			_lifted.append(0.4)
+			took = true
 			caught_charm.emit(kind)
 
 	# Only the rubbish is limited by what the net can hold. A bird and a charm are lifted
 	# off the surface by a net that is already full, which is why the hold is not checked
 	# until here: a cast that swept over a charm and left it floating because it had three
 	# lumps of tar in it would read as the net being broken.
-	if room_left() <= 0:
-		return
-	# Asked again for each layer: what a take uncovers is a new piece at a new size and pose,
-	# and whether the mouth touches it is a new question.
 	var before := catch.size()
-	for layer in SWEEP_LAYERS:
-		_take_from(_reach(at, mouth, strength()))
+	if room_left() > 0:
+		# Asked again for each layer: what a take uncovers is a new piece at a new size and
+		# pose, and whether the mouth touches it is a new question.
+		for layer in SWEEP_LAYERS:
+			_take_from(_reach(at, mouth, strength()))
+	if sfx != null and not _lifted.is_empty():
+		if landing:
+			sfx.play_lifted(_lifted)
+		else:
+			sfx.play_grab(_lifted)
 	if catch.size() > before:
+		took = true
 		swept.emit(at, catch.size() - before, hold + luck_hold, mouth)
+	return took
 
 
 ## Does a drawing — an ellipse at `centre` with half-extents `half`, in world pixels — touch a
@@ -1290,8 +1309,8 @@ func _take_from(reach: Array[int]) -> void:
 			# scattered with, and a crown of water blooming outside the ring the player is
 			# holding reads as the net catching things it visibly did not touch.
 			splash.splash(_within_mouth(at), weight)
-		if sfx != null:
-			sfx.play_splash(weight)
+		# Heard once for the whole sweep, not piece by piece: see `_sweep`.
+		_lifted.append(weight)
 
 
 func _come_home() -> void:
