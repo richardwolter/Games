@@ -15,7 +15,8 @@ day — both are drawn in code off `palette.tres`:
                          Its bottom row is the far waterline. Transparent where sky shows.
   assets/wash_lawn.png   the near bank: the island's sand, then its lawn, running to the
                          bottom of the window. Its top row is the near waterline.
-  assets/wash_backdrop.json   the sizes, and the rows the code needs.
+  assets/wash_clouds.png the clouds, side by side: the code drifts them across the sky.
+  assets/wash_backdrop.json   the sizes, the rows the code needs, the clouds' rectangles.
 
 Both wrap left to right, so a wide window tiles them.
 
@@ -66,6 +67,54 @@ GRASS_ROWS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8]
 BLOCK = (16, 8)
 EDGE_WANDER = 2
 BLADE_ODDS = 0.22
+
+
+# The clouds: (wide, tall) each, in painted pixels. Built by rule — puffs standing on one
+# flat base, whole pixels, two tones: the body, and a shaded foot `CLOUD_FOOT` rows deep
+# that follows the base's own outline. The colours are the palette's foam and a step under
+# it; the day's tint and the backdrop's darkening do the rest at runtime.
+CLOUDS = [(46, 12), (70, 17), (104, 22), (58, 13), (88, 19), (34, 9)]
+CLOUD_BODY = (238, 246, 251, 255)
+CLOUD_SHADE = (196, 213, 228, 255)
+CLOUD_FOOT = 0.3
+
+
+def cloud(roll, wide, tall):
+    im = Image.new("RGBA", (wide, tall))
+    puffs = []
+    x = 0.0
+    while x < wide:
+        # Tallest in the middle third, so it is a heap and not a hedge.
+        mid = 1.0 - abs((x / wide) * 2.0 - 1.0)
+        r = max(3.0, tall * (0.35 + 0.65 * mid) * roll.uniform(0.7, 1.0))
+        puffs.append((x + r * 0.5, r))
+        x += r * roll.uniform(0.7, 1.2)
+    for px in range(wide):
+        for py in range(tall):
+            for cx, r in puffs:
+                # A puff is the top half of an ellipse twice as wide as tall, on the base.
+                dx = (px + 0.5 - cx) / (r * 1.1)
+                dy = (tall - py - 0.5) / r
+                if 0 <= cx - r * 1.1 and cx + r * 1.1 <= wide and dx * dx + dy * dy <= 1.0:
+                    foot = tall - py <= max(2, int(tall * CLOUD_FOOT))
+                    im.putpixel((px, py), CLOUD_SHADE if foot else CLOUD_BODY)
+                    break
+    return im
+
+
+def build_clouds(roll):
+    pad = 2
+    sheet = Image.new("RGBA", (sum(w + pad for w, _ in CLOUDS), max(t for _, t in CLOUDS)))
+    boxes = []
+    x = 0
+    for wide, tall in CLOUDS:
+        art = cloud(roll, wide, tall)
+        box = art.getbbox() or (0, 0, wide, tall)
+        art = art.crop(box)
+        sheet.alpha_composite(art, (x, 0))
+        boxes.append([x, 0, art.width, art.height])
+        x += wide + pad
+    return sheet, boxes
 
 
 def face(tile, face_row):
@@ -171,6 +220,8 @@ def main():
     roll = random.Random(SEED)
     bank = build_bank(roll)
     lawn, sand_tall = build_lawn(roll)
+    clouds, cloud_boxes = build_clouds(roll)
+    clouds.save("assets/wash_clouds.png")
     bank.save("assets/wash_bank.png")
     lawn.save("assets/wash_lawn.png")
     with open("assets/wash_backdrop.json", "w", encoding="utf-8") as out:
@@ -180,10 +231,12 @@ def main():
             "bank_sand": BANK_SAND,
             "lawn_tall": LAWN_TALL,
             "lawn_sand": sand_tall,
+            "clouds": cloud_boxes,
         }, out, indent=1)
     sheet = Image.new("RGBA", (WIDE, BANK_TALL + 60 + LAWN_TALL), (60, 110, 150, 255))
     sheet.alpha_composite(bank, (0, 0))
     sheet.alpha_composite(lawn, (0, BANK_TALL + 60))
+    sheet.alpha_composite(clouds, (8, BANK_TALL + 8))
     sheet.save("tools/last_wash_backdrop.png")
     print("bank %dx%d, lawn %dx%d (sand %d)" % (*bank.size, *lawn.size, sand_tall))
 

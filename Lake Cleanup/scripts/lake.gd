@@ -2210,6 +2210,8 @@ func _set_wash(open: bool) -> void:
 		_wash.purse = func() -> float: return sludge
 		_wash.day = _day
 		_wash.filth_left = func() -> float: return pollution
+		_wash.pack_size = func() -> int: return _dogs.size()
+		_wash.flock = _flock
 		_wash.washed.connect(_on_find_washed)
 		_wash.close_asked.connect(_shut.bind(_set_wash))
 		_skin.get_parent().add_child(_wash)
@@ -2807,7 +2809,8 @@ func _push_rooms() -> void:
 	if music == null:
 		return
 	music.indoors = _shed_open
-	music.muffled = _menu_open or _settings_open
+	# The wash room too (Richard, 2026-09-19): the song through the radio, as behind the shop.
+	music.muffled = _menu_open or _settings_open or _wash_open
 	music.set_ending(ending())
 
 

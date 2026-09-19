@@ -5608,6 +5608,51 @@ func _stage_wash() -> void:
 	_check(back.modulate.v < 0.95 and back.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"the whole of it is darkened behind the find, and takes no clicks", "%.2f" % back.modulate.v)
 	_check(room.stand().hiss_is_recorded(), "the jet is the recording, not the built noise", "")
+	# The view is alive, and answers the jet.
+	var station := MusicStation.main()
+	_check(station == null or station.muffled,
+		"the song goes through the radio behind the wash room, as behind the shop", "")
+	_check(back.dogs().size() == (_main.get(&"_dogs") as Array).size() and back.dogs().size() >= 1,
+		"the pack is out on the lawn behind the stand, dog for dog", str(back.dogs().size()))
+	var lawn_top := back.lake_box().end.y
+	var all_on_lawn := true
+	for hound in back.dogs():
+		all_on_lawn = all_on_lawn and hound.at.y > lawn_top and hound.at.y < room.size.y * 0.9
+	_check(all_on_lawn, "between the beach and the stand's feet", "")
+	var was_clock := back.stepped()
+	back.step(0.05)
+	_check(is_equal_approx(back.stepped(), was_clock) or back.stepped() - was_clock >= 1.0 / WashBackdrop.PIXEL_FPS - 0.001,
+		"what moves moves on a stepped clock", "")
+	var bird := back.send_bird(true, 0.3)
+	_check(bird != null, "a pigeon can be sent across, off the flock's own sheet", "")
+	if bird != null:
+		for k in 20:
+			back.step(0.1)
+		var flew := back.bird_at(bird)
+		_check(flew.x > 100.0 and not bird.startled, "it flies across untroubled", str(flew))
+		back.sprayed_at(flew + Vector2(200.0, 0.0))
+		_check(not bird.startled, "a jet well wide of it troubles nothing", "")
+		back.sprayed_at(flew)
+		var height := flew.y
+		for k in 5:
+			back.step(0.1)
+		_check(bird.startled and back.bird_at(bird).y < height - 30.0,
+			"the jet on it sends it up and away", "%.0f to %.0f" % [height, back.bird_at(bird).y])
+	var pup := back.dogs()[0]
+	var sat := pup.at
+	back.sprayed_at(sat - Vector2(0.0, 10.0))
+	for k in 5:
+		back.step(0.1)
+	_check(pup.bolting and pup.pose == &"run" and absf(pup.at.x - sat.x) > 40.0,
+		"and a dog under the jet bolts", "%.0f px" % absf(pup.at.x - sat.x))
+	_check(room.stand().jet_past_piece() == Vector2.INF,
+		"a jet that is off tells the backdrop nothing", "")
+	var sound := Sfx.main()
+	if sound != null:
+		_check(not sound.may_play(&"bark") and not sound.may_play(&"pigeon_coo"),
+			"the lake's own barks and coos are still shut out of the room", "")
+	_check(not room.stand().bare_room and room.stand().ground_tone.v <= 1.0,
+		"the stand is lent the lawn's tone for the grass at its feet", "")
 	_check(WashStand.HISS_OFF_PIECE - WashStand.HISS_ON_PIECE < 0.15
 		and WashStand.HISS_ON_PIECE < 1.0 and WashStand.HISS_OFF_PIECE > 1.0,
 		"duller on the piece and brighter off it, narrowly", "")

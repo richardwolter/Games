@@ -261,6 +261,22 @@ var _spray_bank := 0.0
 
 ## Whether the stand draws its own flat wall and floor. See `WALL`.
 var bare_room := true
+## **The stand belongs to the lawn it is on** (2026-09-19, Richard: "better integrate the
+## stand to that point of view"; grounding it was picked over redrawing it as a table seen
+## from above, which would have meant re-fitting every drip). Two things, both the hut's
+## own: blades of grass grown over each leg's foot (`Skirt`'s idea, drawn here because a
+## hem is measured off an image and the stand is drawn planks), and the sun's shadow of the
+## stand and the find lying down the lawn (`Shade.lying`, leaning and stretching with the
+## day). The room lends the lawn's tone — the backdrop is darkened and day-tinted and the
+## stand is not, so blades in the palette's own greens would glow — and the day's shadow as
+## (lean, stretch, ink). With neither, neither is drawn.
+var ground_tone := Color.WHITE
+var shade := Vector3.ZERO
+const TUFT_PIXEL := 2.0
+const TUFT_REACH := 9.0
+const TUFT_BLADES := 9
+const TUFT_TALL := Vector2i(2, 6)
+const SHADE_GAIN := 1.6
 
 var _runs: Array[Run] = []
 var _flecks: Array[Fleck] = []
@@ -504,6 +520,15 @@ func _fit() -> void:
 		round(size.x * 0.5 - wide * zoom * 0.5),
 		round(size.y * STAND_AT - tall * zoom)
 	)
+
+
+## Where the jet is landing when it is landing **off the find**, or `Vector2.INF`: what the
+## room asks so the backdrop's birds and dogs can answer the water. On the find the jet is
+## washing, and what is behind the piece is not being sprayed.
+func jet_past_piece() -> Vector2:
+	if not _firing or _hitting or _reach < 1.0:
+		return Vector2.INF
+	return _aim
 
 
 ## Where the piece stands, in this control's own coordinates.
@@ -835,6 +860,8 @@ func _draw() -> void:
 	if bare_room:
 		draw_rect(Rect2(Vector2.ZERO, size), WALL)
 		draw_rect(Rect2(0.0, floor_y, size.x, size.y - floor_y), FLOOR)
+	else:
+		_draw_shade(floor_y)
 	_draw_stand(floor_y)
 	if state != State.EMPTY:
 		draw_texture_rect_region(
@@ -868,6 +895,57 @@ func _draw_stand(floor_y: float) -> void:
 		var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
 		Style.plank(self, Rect2(x, top.end.y - 2.0, 16.0, leg_tall), 11 + side)
 	Style.plank(self, top, 5)
+	if not bare_room:
+		for side in 2:
+			var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
+			_draw_tuft(Vector2(x + 8.0, top.end.y - 2.0 + leg_tall), 31 + side)
+
+
+## Where the stand's top is, the one sum `_draw_stand` and `_draw_shade` share.
+func _stand_top() -> Rect2:
+	var pad := float(STAND_PAD) * _cell
+	return Rect2(
+		_origin.x - pad, _origin.y + _rows * _cell, _cols * _cell + pad * 2.0, STAND_TALL
+	)
+
+
+## Blades over a leg's foot: columns of whole painted pixels, tallest at the leg and cut
+## down to either side, rolled off a fixed seed so they never move.
+func _draw_tuft(foot: Vector2, seed_at: int) -> void:
+	var palette := Palette.master()
+	if palette == null:
+		return
+	var greens := [palette.grass_light, palette.leaf, palette.grass_dark]
+	for k in TUFT_BLADES:
+		var across := (_hash(seed_at, k) * 2.0 - 1.0) * TUFT_REACH
+		var near := 1.0 - absf(across) / TUFT_REACH
+		var tall := int(lerpf(TUFT_TALL.x, TUFT_TALL.y, near * _hash(seed_at, k, 3))) + 1
+		var ink: Color = greens[int(_hash(seed_at, k, 5) * 2.99)] * ground_tone
+		ink.a = 1.0
+		var x := snappedf(foot.x + across * TUFT_PIXEL, TUFT_PIXEL)
+		var down := snappedf(foot.y + TUFT_PIXEL * 2.0 * _hash(seed_at, k, 9), TUFT_PIXEL)
+		draw_rect(Rect2(x, down - tall * TUFT_PIXEL, TUFT_PIXEL, tall * TUFT_PIXEL), ink)
+
+
+## The sun's shadow of the stand and what is on it, lying down the lawn from the feet.
+func _draw_shade(floor_y: float) -> void:
+	if shade.z <= 0.0:
+		return
+	var top := _stand_top()
+	var feet := Vector2(top.get_center().x, floor_y + 4.0)
+	var ink := Shade.tint(minf(shade.z * SHADE_GAIN, 0.6))
+	draw_set_transform_matrix(Shade.lying(feet, shade.x, shade.y))
+	# In the shadow's own space the feet are the origin and up is up.
+	var lift := Vector2(-feet.x, -feet.y)
+	for side in 2:
+		var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
+		draw_rect(Rect2(Vector2(x, top.end.y) + lift, Vector2(16.0, feet.y - top.end.y)), ink)
+	draw_rect(Rect2(top.position + lift, top.size), ink)
+	if state != State.EMPTY:
+		draw_texture_rect_region(
+			sheets.atlas, Rect2(_origin + lift, _region.size * float(_zoom)), _region, ink
+		)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_rinse_line() -> void:

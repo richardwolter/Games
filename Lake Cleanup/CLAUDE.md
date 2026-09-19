@@ -2677,10 +2677,11 @@ A find is washed before the shed will have it. The one named exception to the sc
   - **The water is the player's own lake**: the palette's five ramps, the state picked from
     `pollution` through `LakeGrid.FILTH_STATE_AT`, flat bands (shallow at both shores, deep
     between, far bands thinner), seeded streaks one step up the ramp, a foam line at each
-    shore. **Still, by decision** (over animated bands, glints and passing pigeons: a second
-    water renderer in a new projection). Set when the room opens, left alone while it is up.
+    shore. The state is set when the room opens and left alone while it is up. **"Still, by
+    decision" lasted an afternoon** — see the second pass below.
   - **The sky follows the day** (`DayCycle.sun`, new: the hour, eased back with the rest of
-    the light): two flat steps lerped between `sky_morning/noon/afternoon_high/low`,
+    the light): `SKY_STEPS` (5; two read as "2 blue blocks") flat steps from the high swatch
+    to the low, lerped between `sky_morning/noon/afternoon_high/low`,
     authored in `extract_palette.gd` and `palette.tres`. **The only sky in the game.**
   - **All of it under `DARKEN` (0.66) times the day's tint**: the grime and the dirty spray
     are the water's filthy greens and lose to a full-strength lawn. One knob.
@@ -2691,8 +2692,43 @@ A find is washed before the shed will have it. The one named exception to the sc
   - **First guesses**: `HORIZON`, `LAKE_TALL`, `DARKEN`, the sky swatches, `RANKS`,
     `DEAD_ODDS`. Judge on `tools/last_wash_room.png` / `last_wash_room_clean.png`
     (`shot_pump`).
-  - **Out of scope, by decision**: the stand's table (still drawn planks), animated water,
-    anything crossing the view, parallax with the nozzle, tap-on and shut-off sounds.
+  - **Out of scope, by decision**: parallax with the nozzle, tap-on and shut-off sounds.
+- **The view is alive, and answers the jet** (second `/grill-me` the same day, Richard:
+  "water movement and pigeons flying... pixelated clouds... the dogs running around").
+  Everything on one stepped clock (`WashBackdrop.PIXEL_FPS` 8, the lake's `pixel_fps`).
+  - **Water**: streaks drift along the shore, faster nearer, and blink in and out whole
+    (`STREAK_*`); the near foam line laps a painted pixel in stretches (`LAP_*`).
+  - **Clouds**: rule-built puffs on a flat base, two tones, baked by the same builder into
+    `assets/wash_clouds.png` (rectangles in `wash_backdrop.json`); two layers at two paces
+    and sizes (`CLOUD_LAYERS`), wrapping.
+  - **Pigeons**: the flock's own sheet and birds (lent through `WashRoom.flock`), one or a
+    pair every `BIRD_EVERY` (8-20 s) on a shallow arc. **Dogs**: as many as the pack holds
+    (`pack_size`), `DogArt`'s run and rest poses, on the lawn between beach and the stand's
+    feet (`DOG_BAND`), smaller further back, **behind the stand only** — in front, a dog
+    walks over the grime being read.
+  - **Both answer the jet** (`sprayed_at`, fed by `WashStand.jet_past_piece`): a bird veers
+    up and away with a foam puff and a coo, a dog bolts with a bark (`BARK_GAP`). **Only
+    while the jet is off the find.** No pay, no count, existing frames only. The stand still
+    knows nothing of any of it: the room reads the jet and tells the backdrop.
+  - **The bark and coo come through `Sfx.room_bark`/`room_coo`, not `WHILE_INDOORS`**: on
+    the allow-list, the lake's real pack — which goes on barking behind the room — would be
+    let in with them. The room's own call is what is let through, not the name.
+  - **They are not the lake's real dogs and birds**, which carry on behind the room.
+    Nothing saved, dropped and re-rolled each time the room opens (`reset`).
+  - **The stand is grounded, not redrawn** (picked over a perspective table, which would
+    re-fit every drip): blades over each leg's foot in the palette's greens times the
+    lawn's tone (`ground_tone` — the backdrop is darkened and the stand is not, so plain
+    greens would glow), and the sun's shadow of stand and find down the lawn
+    (`Shade.lying`, `shade` = the day's lean, stretch, ink; `SHADE_GAIN`). Neither is drawn
+    with `bare_room`.
+  - **The song goes through the radio** behind the wash room as behind the shop
+    (`music.muffled` in `_push_rooms`).
+  - **Out of scope, by decision**: pigeons perching, pay or score for hits, dogs in front of
+    the stand, shadows for the actors, mirroring the real pack or flock, boats crossing.
+  - All paces, counts and sizes are first guesses. `shot_pump` puts a pair of pigeons and
+    the pack in its clean-lake shot; `_stage_wash` guards the muffle, the pack's count and
+    band, the stepped clock, the bird's veer, the dog's bolt, a wide jet troubling nothing,
+    and the real barks staying shut out.
 - **Out of scope, by decision**: pump upgrades, a timer or a score, nozzle types, stubborn
   spots, saved masks, washing rubbish, washing a view other than the first, painted grime,
   cellular water, any price or track change.

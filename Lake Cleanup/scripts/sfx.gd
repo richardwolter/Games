@@ -335,6 +335,7 @@ var shopping: bool = false
 
 ## Whether the player is in the shed, where the lake is out of earshot (`WHILE_INDOORS`).
 var indoors: bool = false
+var _from_room := false
 
 
 func _ready() -> void:
@@ -514,10 +515,28 @@ func play(
 ## upgrades board holding everything but the money. Not the volume — a slider at zero mutes
 ## the bus (`Prefs`), and asking the setting here as well would be a second copy of it.
 func may_play(name: StringName) -> bool:
+	if _from_room:
+		return true
 	return (
 		(not shopping or name in WHILE_SHOPPING)
 		and (not indoors or name in WHILE_INDOORS)
 	)
+
+
+## A bark or a coo **out of the wash room's own view** (2026-09-19): the dogs and pigeons in
+## its backdrop answer the jet. Not on `WHILE_INDOORS` — put there, the lake's real pack,
+## which goes on barking behind the room, would be let through with them. The room's own
+## call is what is let through, not the name.
+func room_bark() -> void:
+	_from_room = true
+	play_bark()
+	_from_room = false
+
+
+func room_coo() -> void:
+	_from_room = true
+	play_coo()
+	_from_room = false
 
 
 ## The first player in a pool with nothing playing, or null.

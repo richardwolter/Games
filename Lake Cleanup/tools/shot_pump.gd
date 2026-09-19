@@ -104,6 +104,13 @@ func _physics_process(delta: float) -> void:
 			_say("art %s, solid %d of %d, region %s" % [
 				art != null, solid.count(1), solid.size(), room.stand().get(&"_region")
 			])
+			# Something of everything in the picture: a pair of pigeons well across, and the
+			# pack wherever it has got to.
+			for k in 2:
+				var bird := room.backdrop().send_bird(true, 0.25 + 0.12 * k)
+				if bird != null:
+					bird.along = 900.0 + 420.0 * k
+			_say("dogs %d, birds %d" % [room.backdrop().dogs().size(), room.backdrop().birds().size()])
 			# And again over a lake that has come clean, late in the day.
 			room.day = null
 			room.backdrop().filth = 0.0

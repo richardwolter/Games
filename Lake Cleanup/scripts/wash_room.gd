@@ -50,6 +50,10 @@ var purse := Callable()
 ## morning over a filthy lake.
 var day: DayCycle
 var filth_left := Callable()
+## How many dogs the pack holds, asked each time the room comes up, and the lake's flock,
+## for its sheet and its birds: the backdrop's own dogs and pigeons. Optional too.
+var pack_size := Callable()
+var flock: Flock
 
 var _backdrop: WashBackdrop
 var _stand: WashStand
@@ -90,8 +94,15 @@ func _ready() -> void:
 ## unwashed and unpaid for.
 func open(up: bool) -> void:
 	visible = up
-	if up and _backdrop != null and filth_left.is_valid():
-		_backdrop.filth = float(filth_left.call())
+	if _backdrop != null:
+		if up and filth_left.is_valid():
+			_backdrop.filth = float(filth_left.call())
+		if up and pack_size.is_valid():
+			_backdrop.pack = int(pack_size.call())
+		if up and flock != null:
+			_backdrop.bird_sheet = flock.sheet()
+			_backdrop.bird_kinds = flock.kinds()
+		_backdrop.reset()
 	_on_stand = &""
 	_scroll = 0
 	if _stand != null:
@@ -169,6 +180,12 @@ func _process(_delta: float) -> void:
 			_backdrop.sun = day.sun
 		if not _backdrop.tint.is_equal_approx(day.tint):
 			_backdrop.tint = day.tint
+		_stand.shade = Vector3(day.lean, day.stretch, day.ink)
+	_stand.ground_tone = _backdrop.modulate
+	# The jet off the find is the backdrop's to answer: its birds and dogs take fright.
+	var wet := _stand.jet_past_piece()
+	if wet != Vector2.INF:
+		_backdrop.sprayed_at(wet)
 	# The shine has run: the stand is cleared for the next one.
 	if _on_stand != &"" and _stand.state == WashStand.State.CLEAN:
 		_on_stand = &""
