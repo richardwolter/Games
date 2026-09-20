@@ -1,0 +1,332 @@
+{
+ "sheets": {
+  "consoles": {
+   "file": "res://assets/consoles.png"
+  },
+  "consoles_dirty": {
+   "file": "res://assets/consoles_dirty.png"
+  }
+ },
+ "consoles": [
+  {
+   "name": "console_01",
+   "title": "Console 01",
+   "region": [
+    2,
+    1177,
+    192,
+    153
+   ],
+   "dirty_region": [
+    2,
+    1177,
+    192,
+    153
+   ]
+  },
+  {
+   "name": "console_02",
+   "title": "Console 02",
+   "region": [
+    2,
+    2365,
+    162,
+    111
+   ],
+   "dirty_region": [
+    2,
+    2365,
+    162,
+    111
+   ]
+  },
+  {
+   "name": "console_03",
+   "title": "Console 03",
+   "region": [
+    2,
+    2079,
+    184,
+    144
+   ],
+   "dirty_region": [
+    2,
+    2079,
+    184,
+    144
+   ]
+  },
+  {
+   "name": "console_04",
+   "title": "Console 04",
+   "region": [
+    2,
+    1332,
+    168,
+    150
+   ],
+   "dirty_region": [
+    2,
+    1332,
+    168,
+    150
+   ]
+  },
+  {
+   "name": "console_05",
+   "title": "Console 05",
+   "region": [
+    2,
+    1484,
+    172,
+    148
+   ],
+   "dirty_region": [
+    2,
+    1484,
+    172,
+    148
+   ]
+  },
+  {
+   "name": "console_06",
+   "title": "Console 06",
+   "region": [
+    2,
+    2225,
+    156,
+    138
+   ],
+   "dirty_region": [
+    2,
+    2225,
+    156,
+    138
+   ]
+  },
+  {
+   "name": "console_07",
+   "title": "Console 07",
+   "region": [
+    2,
+    1932,
+    178,
+    145
+   ],
+   "dirty_region": [
+    2,
+    1932,
+    178,
+    145
+   ]
+  },
+  {
+   "name": "console_08",
+   "title": "Console 08",
+   "region": [
+    2,
+    1634,
+    169,
+    147
+   ],
+   "dirty_region": [
+    2,
+    1634,
+    169,
+    147
+   ]
+  },
+  {
+   "name": "console_09",
+   "title": "Console 09",
+   "region": [
+    2,
+    527,
+    165,
+    165
+   ],
+   "dirty_region": [
+    2,
+    527,
+    165,
+    165
+   ]
+  },
+  {
+   "name": "console_10",
+   "title": "Console 10",
+   "region": [
+    2,
+    861,
+    162,
+    156
+   ],
+   "dirty_region": [
+    2,
+    861,
+    162,
+    156
+   ]
+  },
+  {
+   "name": "console_11",
+   "title": "Console 11",
+   "region": [
+    2,
+    694,
+    153,
+    165
+   ],
+   "dirty_region": [
+    2,
+    694,
+    153,
+    165
+   ]
+  },
+  {
+   "name": "console_12",
+   "title": "Console 12",
+   "region": [
+    2,
+    1783,
+    150,
+    147
+   ],
+   "dirty_region": [
+    2,
+    1783,
+    150,
+    147
+   ]
+  },
+  {
+   "name": "console_13",
+   "title": "Console 13",
+   "region": [
+    2,
+    181,
+    144,
+    171
+   ],
+   "dirty_region": [
+    2,
+    181,
+    144,
+    171
+   ]
+  },
+  {
+   "name": "console_14",
+   "title": "Console 14",
+   "region": [
+    2,
+    2,
+    174,
+    177
+   ],
+   "dirty_region": [
+    2,
+    2,
+    174,
+    177
+   ]
+  },
+  {
+   "name": "console_15",
+   "title": "Console 15",
+   "region": [
+    2,
+    354,
+    150,
+    171
+   ],
+   "dirty_region": [
+    2,
+    354,
+    150,
+    171
+   ]
+  },
+  {
+   "name": "console_16",
+   "title": "Console 16",
+   "region": [
+    2,
+    1019,
+    150,
+    156
+   ],
+   "dirty_region": [
+    2,
+    1019,
+    150,
+    156
+   ]
+  },
+  {
+   "name": "console_17",
+   "title": "Console 17",
+   "region": [
+    79,
+    2564,
+    94,
+    64
+   ],
+   "dirty_region": [
+    79,
+    2564,
+    94,
+    64
+   ]
+  },
+  {
+   "name": "console_18",
+   "title": "Console 18",
+   "region": [
+    99,
+    2478,
+    106,
+    75
+   ],
+   "dirty_region": [
+    99,
+    2478,
+    106,
+    75
+   ]
+  },
+  {
+   "name": "console_19",
+   "title": "Console 19",
+   "region": [
+    2,
+    2564,
+    75,
+    75
+   ],
+   "dirty_region": [
+    2,
+    2564,
+    75,
+    75
+   ]
+  },
+  {
+   "name": "console_20",
+   "title": "Console 20",
+   "region": [
+    2,
+    2478,
+    95,
+    84
+   ],
+   "dirty_region": [
+    2,
+    2478,
+    95,
+    84
+   ]
+  }
+ ]
+}
