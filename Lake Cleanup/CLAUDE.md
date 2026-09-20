@@ -1290,6 +1290,89 @@ open** for those.
   imported, the greeting's room going to the pictures, the absent-key rule, the close ending
   the arrival, and the menu's plank standing above Credits.
 
+### The Boards Are Paper (2026-09-20, `/grill-me` with Richard, issue #7)
+The last UI pass, and what closes #7: every board that opens shares one face. Richard's four
+asks — more of the letter's cream, the decorate menu aligned and cosier, Strength set apart
+and moved to the top of its board, and the luck coin animated.
+- **Cream is the face, and only the face** (`Style.PAPER`/`PAPER_EDGE`/`PAPER_RULE`/
+  `PAPER_INK`/`PAPER_HEAD`/`PAPER_SOFT`, moved out of `letter.gd`, which now reads them):
+  `board_wood`'s fill defaults to the paper, so the shop's four boards, the pricing plate,
+  the blurb plate, the settings board, the bind board, `MenuConfirm`, the credits, the shed's
+  shelf and the wash room's tray all took it at once. **The row plates stay the murky water**
+  — every ink on them was measured against that face over three passes, and moving the plates
+  would have thrown all of it away. The letter keeps its dark board under its paper sheet, or
+  the sheet would vanish into the board.
+- **The HUD, the menu's doors and the gear keep their dark faces, by decision**: they stand
+  over open water, which is what `Style.BUTTON_FACE` was picked against, and a pale plate on
+  a cleaned lake at the end of a run would wash out.
+- **`Style.write` drops its shadow for dark ink** (`SHADE_UNDER`): the shade is for a pale
+  label on wood or water, and under dark ink on a pale sheet it is a smudge — `Letter._ink`
+  found that first and worked around it by not calling `write` at all. One rule now, in the
+  one place, so nothing written on paper has to remember.
+- **What is written straight on the paper takes the paper's inks**: group headings and their
+  rules (shop and settings, one drawing), the bind board's column names and hint, the
+  legend's sentence, the credits, the confirm's line, the shelf's "Nothing kept yet". Worst
+  measured 5.89:1. `test_lake` asks all three inks against the paper.
+- **A head stands in a window of the old dark water** (`ShopSkin._draw_board`): the ferry's
+  foam, the net drawn in black and the coin were all picked against `Style.BOARD`, and white
+  foam on cream is nothing. The legend's figures likewise — the price's gold is 1.6:1 on
+  paper — so the materials and their prices keep a dark plate and the sentence under it does
+  not. **The plate's foot is measured off `at.y`'s own walk**, not guessed: guessed, it ran
+  under the sentence and cut it in half.
+- **`MenuConfirm`'s doors are the settings board's dark plate**, ringed and lit-edged. This
+  is the 1.37:1 warning and 2.97:1 plain label that the settings pass named and left; white
+  reaches only 4.06:1 on that oak, so no ink could have fixed it. `Style.WARN_INK` is
+  `Style`'s now, not the settings board's.
+- **The shelf and the shed are one row** (`ShedRoom.GUTTER` 14 to 22, `shelf_lift`): the
+  shelf's title plank was overhanging the room — the gutter was narrower than
+  `SHELF_OVERHANG` — and its drawn top sat 4 px under the shed's, because the board was
+  squared with **half the ribbon's box** while the painted plank stands `PLANK_TALL` with its
+  foot on the face. `shelf_lift` asks `Style` where the wood really is. The title is
+  **"Decorate"** with a bare count, the word the HUD button already uses.
+- **The room is lit through the window** (`shaders/shed_light.gdshader`, `ShedRoom._dress_light`,
+  Richard: "sunlight coming through the left side, as if sun was hitting the side wall of the
+  shed with the round window... no circled rings like current fireplace, it looks blocky and
+  ugly"). One additive quad over the shed, under the shelf and the cross: a shaft from the
+  left wall opening across the floor, and a soft pool for every lit piece. **Smooth, but
+  worked out once per art pixel of the room** — a gradient per screen pixel is an HD effect
+  laid over pixel art, and hard steps are what the rings were. **Retired**: `GLOW_RINGS`, the
+  three stacked `draw_circle`s.
+  - **The light follows the day** (`DayCycle.sun` through `sun_share`): pale, short and steep
+    in the morning, long, low and orange late. `Lake` hands the room its `_day`; a room with
+    none sits at `SUN_NO_DAY`.
+  - **The room is dimmed for it** (`ROOM_DIM`, over the floor and the furniture, under the
+    quad): the light is additive and can only brighten, so with nothing to lift it out of the
+    shaft read as a pale wash rather than as sun. The lake behind is dimmed too
+    (`ROOM_SCRIM`), so the room is the lit thing on the screen.
+  - **`shot_shed` lights a fire and opens the fridge**: a probe that never lights one cannot
+    show the pools the rings were replaced by.
+  - Every number — `WINDOW_DOWN`, `SHAFT_*`, `SUN_POWER`, `SUN_SLOPE`, the two tones,
+    `ROOM_DIM`, `ROOM_SCRIM`, `FIRE_POWER` — is a first guess for Richard's eye.
+- **Strength leads the net's board and wears a gold rim** (`ShopSkin.GROUPS`, `FEATURED`,
+  `_draw_featured`): a tier roughly triples income and opens rubbish nothing else can lift,
+  and it read as one row in five. Two pixels of `Style.GOLD` round the plate, drawn back when
+  it cannot be bought. **Gold on this board is a price**, which was weighed: the rim is a line
+  round the plate rather than writing on it, and the tag still says the price.
+  **Retired, by decision**: a four-point gold star on the plate's corner — the top right is
+  the tag's, which reaches within a few pixels of the plate, and the top left is the rail's,
+  where it sat on the "?". And `Style.PRICE_INK` for the rim: the tag's pale gold on the
+  cream face read as a cream line.
+- **The luck coin is tossed** (`ShopSkin.toss_pose`, `HudButtons.coin_turned`): it rests face
+  on, and every 3-5 s (rolled, so it has no beat) and on any purchase from its own board it
+  hops and turns twice, landing on the face it left. **Tossed, not spinning**: the ferry bobs
+  and the dog breathes beside it, and a coin turning for ever is the busiest thing in the
+  shop. Drawn by squashing the disc to a **whole** number of pixels across with the coin's
+  thickness showing behind it, and the struck ring with no glint on its back. The board
+  redraws only while it is in the air.
+- **Out of scope, by decision**: cream row plates, the HUD's and the menu's faces, new
+  painted art, a painted window in the room's own art, and any price or mechanic.
+- `test_lake`'s `_stage_paper` guards the three paper inks, the shade rule, the letter
+  reading `Style`'s swatches, the confirm's doors being off the oak, the shelf standing clear
+  of the room and level with it at both ends, the ringed glow being gone rather than unused,
+  the room's light node and its day, Strength leading and being the one rimmed row, and the
+  coin's rest, hop, back and landing. Probes: `tools/shot_shed.tscn`,
+  `tools/shot_menus.tscn`, `tools/shot_menu.tscn`, `tools/shot_pump.tscn`.
+
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
 - **The run ends when the last piece is put in the crate** (`Lake._all_landed`), not when the

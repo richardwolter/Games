@@ -251,7 +251,7 @@ func _draw() -> void:
 		return
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
-	draw_rect(face, Style.BOARD, true)
+	draw_rect(face, Style.PAPER, true)
 	var ribbon := _ribbon()
 	Style.board_ribbon(
 		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
@@ -270,7 +270,7 @@ func _draw() -> void:
 			Style.write(
 				self, text, px,
 				Vector2(_row_start(row, face), y + float(px) * 0.82),
-				Style.RIBBON_INK if bool(row["head"]) else Style.BOARD_INK
+				Style.PAPER_HEAD if bool(row["head"]) else Style.PAPER_INK
 			)
 		y += float(row["step"])
 		if y > face.end.y - BOARD_PAD:

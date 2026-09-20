@@ -314,7 +314,7 @@ class Tray:
 				Style.write(
 					self, EMPTY_LINES[k], Style.TEXT_SMALL,
 					Vector2(0.0, face.position.y + TRAY_RIBBON * 0.5 + 30.0 + k * 20.0),
-					Style.BOARD_INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, face
+					Style.PAPER_SOFT, HORIZONTAL_ALIGNMENT_CENTER, face
 				)
 			return
 		var boxes := room.row_boxes()

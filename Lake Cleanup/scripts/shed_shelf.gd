@@ -53,7 +53,7 @@ func _ready() -> void:
 func _draw() -> void:
 	if board.size.x <= 0.0:
 		return
-	draw_rect(Style.board_wood(self, board, frame_thick, chips), Style.BOARD, true)
+	draw_rect(Style.board_wood(self, board, frame_thick, chips), Style.PAPER, true)
 
 	if rows.is_empty():
 		Style.write(
@@ -61,7 +61,7 @@ func _draw() -> void:
 			"Nothing kept yet.",
 			Style.TEXT_SMALL,
 			list.position + Vector2(2.0, float(Style.TEXT_SMALL) + 8.0),
-			Style.BOARD_INK_DIM
+			Style.PAPER_SOFT
 		)
 	else:
 		_draw_rows()

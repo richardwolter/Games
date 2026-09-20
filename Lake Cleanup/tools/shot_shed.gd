@@ -50,6 +50,10 @@ func _physics_process(_delta: float) -> void:
 			# (2026-09-19, issue #30): what its pixel base bought is a thing to look at,
 			# and neither pot in the list above was standing against the wall.
 			[&"decor_loveseat", 34, 8],
+			# Lit, for the light the room throws (2026-09-20): the pools are what the three
+			# ringed circles were replaced by, and a probe that never lights a fire is a
+			# probe that cannot show them.
+			[&"decor_fireplace", 30, 2],
 		]:
 			if room.sheets.has(want[0]):
 				# Written in cells, which is what the eye lays a room out in; the room places
@@ -70,6 +74,11 @@ func _physics_process(_delta: float) -> void:
 		# The whole pack, rather than whatever DOG_ODDS rolls: which dogs are in is random
 		# in play and a picture that changes run to run says nothing. The seats in the list
 		# above are the pet bed, the sofa and the armchair.
+		# Both switchable pieces on, for the light they throw.
+		for k in room.decor.size():
+			var row: Dictionary = room.decor[k]
+			if room.sheets.switchable(StringName(row["piece"])):
+				row["view"] = ShedRoom.STATE_ON
 		room.pack_size = func() -> int: return ShedRoom.DOGS_MOST
 		_main.call(&"_set_shed", true)
 		# Enough finds to fill the shelf past its bottom edge, so the scrollbar is in shot.

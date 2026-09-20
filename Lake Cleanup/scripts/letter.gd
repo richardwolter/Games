@@ -97,12 +97,12 @@ const CLOSE_SIZE := 44.0
 const SHEET_INSET := 8.0
 const SHEET_PAD := 18.0
 const SHEET_BITES := 4
-const PAPER := Color(0.918, 0.859, 0.722)
-const PAPER_EDGE := Color(0.780, 0.702, 0.541)
-const PAPER_RULE := Color(0.698, 0.612, 0.451)
-const INK := Color(0.196, 0.141, 0.110)
-const HEAD_INK := Color(0.451, 0.157, 0.102)
-const SOFT_INK := Color(0.369, 0.302, 0.235)
+const PAPER := Style.PAPER
+const PAPER_EDGE := Style.PAPER_EDGE
+const PAPER_RULE := Style.PAPER_RULE
+const INK := Style.PAPER_INK
+const HEAD_INK := Style.PAPER_HEAD
+const SOFT_INK := Style.PAPER_SOFT
 
 ## The blocks, bottom up, and the gaps between them.
 const PAGER_TALL := 48.0
@@ -495,7 +495,8 @@ func _draw() -> void:
 	draw_rect(face, Style.BOARD, true)
 	var ribbon := _ribbon()
 	Style.board_ribbon(
-		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
+		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE),
+		Style.BOARD
 	)
 	_draw_sheet()
 	var inside := _sheet.grow(-SHEET_PAD)

@@ -538,6 +538,35 @@ static func draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float = 1
 	return panel
 
 
+## The coin part-way through a flip: `turn` is the cosine of how far round it is, 1 face on,
+## 0 edge on, under 0 its back. Squashed across through the canvas transform, to a **whole
+## number of pixels** wide so the rim does not shimmer, with the coin's own thickness showing
+## as a second disc behind the face on the side turning away. The back carries the struck
+## ring and no glint: the light is on the side that faces it.
+static func coin_turned(on: CanvasItem, box: Rect2, wash: Color, turn: float, edge := 2.0) -> void:
+	if turn >= 0.999:
+		coin(on, box, wash)
+		return
+	var centre := (box.position + box.size * 0.5).floor()
+	var r := minf(box.size.x, box.size.y) * 0.5
+	var across := maxf(roundf(r * absf(turn)), 1.0) / r
+	var gold := Color(Style.GOLD.r * wash.r, Style.GOLD.g * wash.g, Style.GOLD.b * wash.b)
+	var deep := Color(Style.GOLD_DEEP.r * wash.r, Style.GOLD_DEEP.g * wash.g, Style.GOLD_DEEP.b * wash.b)
+	var thick := edge * (1.0 - absf(turn))
+	var lean := -thick if turn >= 0.0 else thick
+	on.draw_set_transform(centre + Vector2(lean, 0.0), 0.0, Vector2(across, 1.0))
+	on.draw_circle(Vector2.ZERO, r + 1.0, Style.HOLE_RIM)
+	on.draw_circle(Vector2.ZERO, r, deep)
+	on.draw_set_transform(centre, 0.0, Vector2(across, 1.0))
+	on.draw_circle(Vector2.ZERO, r + 1.0, Style.HOLE_RIM)
+	on.draw_circle(Vector2.ZERO, r, deep)
+	on.draw_circle(Vector2.ZERO, r - COIN_RIM, gold if turn >= 0.0 else gold.darkened(0.12))
+	on.draw_arc(Vector2.ZERO, r * COIN_RING, 0.0, TAU, 24, deep, 1.0)
+	if turn >= 0.0:
+		on.draw_arc(Vector2.ZERO, r - COIN_RIM - 1.0, PI * 1.05, PI * 1.55, 12, COIN_GLINT, 2.0)
+	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 static func coin(on: CanvasItem, box: Rect2, wash: Color) -> void:
 	var centre := box.position + box.size * 0.5
 	var r := minf(box.size.x, box.size.y) * 0.5

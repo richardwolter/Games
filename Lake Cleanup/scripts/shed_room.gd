@@ -76,7 +76,7 @@ const SHELF_BAR := 8.0
 const SHELF_BAR_GAP := 4.0
 
 ## Gap between the room and the list, and the margin around the lot inside the panel.
-const GUTTER := 14
+const GUTTER := 22
 const MARGIN := 8.0
 
 ## How far the inventory column fades back while a find is being carried. The list sits over
@@ -154,17 +154,44 @@ const OVER_PIECE := 0.02
 const REACH := 3.2
 const PROMPT_LIFT := 8.0
 
-## The glow a lit piece throws on the room, as a radius in cells and a colour.
+## The light in the room (2026-09-20, Richard: "sunlight coming through the left side... no
+## circled rings like current fireplace, it looks blocky and ugly"). One additive quad over
+## the shed, `shaders/shed_light.gdshader`: the sun's shaft from the round window in the left
+## wall, and a soft pool for every lit piece. Smooth, but worked out per art pixel of the
+## room. **Retired**: three stacked `draw_circle` rings (`GLOW_RINGS`), which read as rings.
 ##
-## Drawn rather than lit: the room is one `_draw` on a Control and has no light nodes to
-## hang a Light2D off. Three rings of a soft additive colour read as a glow at this scale
-## and cost three `draw_circle` calls.
-const GLOW_RINGS := 3
-const FIRE_GLOW := Color(1.0, 0.55, 0.18, 0.13)
-const FIRE_REACH := 7.0
-## Weaker and much whiter: an open fridge is a bulb in a box, not a hearth.
-const FRIDGE_GLOW := Color(0.86, 0.93, 1.0, 0.06)
-const FRIDGE_REACH := 3.6
+## A pool is a reach in cells, a power and a tone. The fridge is weaker and much whiter: an
+## open fridge is a bulb in a box, not a hearth.
+const LIGHT_SHADER := preload("res://shaders/shed_light.gdshader")
+const LAMPS_MOST := 8
+const FIRE_REACH := 9.0
+const FIRE_POWER := 0.34
+const FIRE_TONE := Color(1.0, 0.55, 0.2)
+const FRIDGE_REACH := 4.5
+const FRIDGE_POWER := 0.14
+const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
+## The window: how far down the back wall's height it sits on the left wall, and the shaft
+## it lets in — half-width and reach in cells. The sun's power, its slope (how steeply the
+## light falls across the room) and its tone all run morning to late afternoon on
+## `DayCycle.sun`: a pale, short, steep shaft early, a long low orange one late. With no day
+## handed over the room sits at `SUN_NO_DAY`. All by eye.
+const WINDOW_DOWN := 0.55
+const SHAFT_WIDE := 1.6
+const SHAFT_LONG := 30.0
+const SUN_POWER := Vector2(0.30, 0.62)
+const SUN_SLOPE := Vector2(0.95, 0.38)
+const SUN_EARLY := Color(1.0, 0.93, 0.74)
+const SUN_LATE := Color(1.0, 0.66, 0.34)
+const SUN_HOURS := Vector2(0.15, 0.8)
+const SUN_NO_DAY := 0.6
+## What is laid over the lake behind the room, so the room is the lit thing on the screen:
+## a warm dark rather than the boards' cold scrim.
+const ROOM_SCRIM := Color(0.09, 0.055, 0.03, 0.66)
+## The room's own shade, laid over the floor and the furniture under the light quad. The
+## light is additive and can only brighten, so without something to lift it out of, the
+## shaft reads as a pale wash rather than as sun: the room is dimmed a little and the window
+## gives it back where the light falls.
+const ROOM_DIM := Color(0.05, 0.03, 0.02, 0.26)
 
 ## Which view a STATE piece is switched on in. Both state sets are authored off-then-on.
 const STATE_OFF := 0
@@ -350,6 +377,9 @@ func dogs() -> Array[ShedDog]:
 ## Unset — a room with no lake behind it, which is every harness and `tools/wash_spike` —
 ## reads as one dog, which is what this room has always had.
 var pack_size := Callable()
+## The lake's day, for the sun through the window. None (every harness) is a fixed afternoon.
+var day: DayCycle
+var _light: ColorRect
 
 var _dog_rng := RandomNumberGenerator.new()
 
@@ -398,6 +428,13 @@ func _ready() -> void:
 	# Under the close cross but over the room, and blind to the mouse: the shelf is drawn
 	# by a node of its own only so it can be faded as one, and every click on it is still
 	# picked up by the room, against the same rects the shelf was handed.
+	_light = ColorRect.new()
+	_light.name = &"Light"
+	_light.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var lit := ShaderMaterial.new()
+	lit.shader = LIGHT_SHADER
+	_light.material = lit
+	add_child(_light)
 	_shelf = ShedShelf.new()
 	_shelf.name = &"Shelf"
 	_shelf.frame_thick = SHELF_FRAME
@@ -408,7 +445,10 @@ func _ready() -> void:
 	_shelf.row_height = float(ROW_HEIGHT)
 	_shelf.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_shelf)
+	# Under the shelf and the cross, over the room's own `_draw`: light falls on the floor
+	# and the furniture, not on the board standing beside them.
 	move_child(_shelf, 0)
+	move_child(_light, 1)
 	_dog_rng.randomize()
 	_load_you()
 	# The dog only runs while the room is on screen: it is a picture of a room, and nothing
@@ -1764,7 +1804,12 @@ func _board_rect() -> Rect2:
 	# That half is part of the shelf's outline, so it is what has to land on the shed's top
 	# line — the frame starts below it. Squaring the *frame* with the shed instead left the
 	# plank sticking up over the room, which is what the misalignment was.
-	var top := shed.position.y + SHELF_RIBBON * 0.5
+	#
+	# **The line to match is the plank's drawn wood, not the ribbon's box** (2026-09-20): the
+	# painted plank is `PLANK_TALL` with its foot on the face, so it stands 14 px over the
+	# board's top edge where half the box is 18, and the shelf's top sat 4 px under the
+	# shed's. `shelf_lift` asks `Style` where the wood really is.
+	var top := shed.position.y + shelf_lift()
 	var board := Rect2(
 		Vector2(left, top),
 		Vector2(float(LIST_WIDTH) + SHELF_FRAME * 2.0, shed.end.y - top)
@@ -1774,6 +1819,15 @@ func _board_rect() -> Rect2:
 		board.size.x = maxf(board.size.x - over, SHELF_FRAME * 2.0 + 8.0)
 	board.size.y = maxf(board.size.y, SHELF_FRAME * 2.0 + 8.0)
 	return board
+
+
+## How far the shelf's drawn top stands over its board's top edge: the painted plank's own
+## reach where it is used, half the ribbon's box where it is not.
+func shelf_lift() -> float:
+	var probe := Rect2(Vector2.ZERO, Vector2(float(LIST_WIDTH), SHELF_RIBBON))
+	if not Style.plank_fits(probe):
+		return SHELF_RIBBON * 0.5
+	return SHELF_RIBBON * 0.5 - Style.ribbon_plank(probe).position.y
 
 
 ## The block the shed itself draws as: the back wall standing above the floor, down to the
@@ -1923,6 +1977,7 @@ func _draw() -> void:
 	if sheets == null:
 		return
 	_place_close()
+	draw_rect(Rect2(-global_position, get_viewport_rect().size), ROOM_SCRIM)
 
 	var floor_box := _floor_rect()
 
@@ -1960,9 +2015,7 @@ func _draw() -> void:
 	# those is the floorboards themselves. Drawing the old eight-pixel lines would say the
 	# piece lands somewhere it does not.
 
-	# What the lit pieces throw on the boards. Under the furniture, so a fire washes the
-	# floor in front of the hearth rather than painting over the hearth itself.
-	_draw_glows(floor_box)
+	_dress_light(floor_box)
 
 	# Where the piece in hand would land, tinted by whether it may. On the boards under the
 	# furniture; the piece itself is drawn in its place among them below.
@@ -2019,6 +2072,9 @@ func _draw() -> void:
 		_draw_walker(floor_box, walkers[next_walker])
 		next_walker += 1
 
+	# The shade the window's light is lifted out of. Over the room and everything standing
+	# in it, under the light quad, which is a child and so drawn after all of this.
+	draw_rect(_shed_rect(), ROOM_DIM)
 	_draw_prompt(floor_box)
 	_dress_shelf()
 
@@ -2063,7 +2119,7 @@ func _dress_shelf() -> void:
 	_shelf.ribbon = _ribbon_rect()
 	_shelf.title_box = _title_box()
 	_shelf.list = _list_rect()
-	_shelf.title = "Shed Decoration" if store.is_empty() else "Shed Decoration (%d)" % store.size()
+	_shelf.title = "Decorate" if store.is_empty() else "Decorate  %d" % store.size()
 	_shelf.atlas = sheets.atlas
 	_shelf.scroll = _scroll
 	_shelf.hovered = -1 if not carrying.is_empty() else _hovered_row()
@@ -2087,31 +2143,75 @@ func _hovered_row() -> int:
 	return index if index >= 0 and index < in_store().size() else -1
 
 
-## The light a switched-on piece spills onto the room.
-##
-## Three flat circles of a low-alpha colour, largest first. A real falloff wants a gradient
-## texture or a shader and this is a lamp in a shed: the rings land close enough that the
-## eye reads warmth coming off the hearth, which is the whole job.
-func _draw_glows(floor_box: Rect2) -> void:
+## How far through the lit day the sun is, 0 early to 1 late.
+func sun_share() -> float:
+	var hour := day.sun if day != null else SUN_NO_DAY
+	return clampf((hour - SUN_HOURS.x) / (SUN_HOURS.y - SUN_HOURS.x), 0.0, 1.0)
+
+
+## The lit pieces as rows of {at, reach, power, tone}, `at` on the floor in canvas pixels.
+## The harness asks this too, so what is checked is what is lit.
+func lamps(floor_box: Rect2) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	if sheets == null:
-		return
+		return out
 	for row: Dictionary in decor:
 		var piece := StringName(row["piece"])
 		if not sheets.switchable(piece) or _row_view(row) != STATE_ON:
 			continue
-		var tint := FIRE_GLOW
-		var reach := FIRE_REACH
-		if sheets.role_of(piece, _row_view(row)) == &"open":
-			tint = FRIDGE_GLOW
-			reach = FRIDGE_REACH
+		var fridge := sheets.role_of(piece, _row_view(row)) == &"open"
 		var span := span_of(piece, _row_view(row))
-		var middle := floor_box.position + Vector2(
-			(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
-			(float(int(row["cell"][1])) + float(span.y)) * _zoom()
-		)
-		for ring in GLOW_RINGS:
-			var out := reach * CELL * _zoom() * (1.0 - float(ring) / float(GLOW_RINGS + 1))
-			draw_circle(middle, out, tint)
+		out.append({
+			"at": floor_box.position + Vector2(
+				(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
+				(float(int(row["cell"][1])) + float(span.y)) * _zoom()
+			),
+			"reach": (FRIDGE_REACH if fridge else FIRE_REACH) * CELL * _zoom(),
+			"power": FRIDGE_POWER if fridge else FIRE_POWER,
+			"tone": FRIDGE_TONE if fridge else FIRE_TONE,
+		})
+		if out.size() >= LAMPS_MOST:
+			break
+	return out
+
+
+## Lays the light quad over the shed and tells it where the window and the lit pieces are.
+## Over the furniture and the walkers: light falls on a sofa as it does on the boards.
+func _dress_light(floor_box: Rect2) -> void:
+	if _light == null:
+		return
+	var shed := _shed_rect()
+	_light.position = shed.position
+	_light.size = shed.size
+	var lit := _light.material as ShaderMaterial
+	var cell := CELL * _zoom()
+	var share := sun_share()
+	var tone := SUN_EARLY.lerp(SUN_LATE, share)
+	if day != null:
+		tone = tone * day.tint
+	lit.set_shader_parameter(&"box_px", shed.size)
+	lit.set_shader_parameter(&"art_px", _zoom())
+	lit.set_shader_parameter(&"window_at", Vector2(0.0, _wall_tall() * WINDOW_DOWN))
+	lit.set_shader_parameter(&"sun_dir", Vector2(1.0, lerpf(SUN_SLOPE.x, SUN_SLOPE.y, share)))
+	lit.set_shader_parameter(&"sun_power", lerpf(SUN_POWER.x, SUN_POWER.y, share))
+	lit.set_shader_parameter(&"sun_tone", Vector3(tone.r, tone.g, tone.b))
+	lit.set_shader_parameter(&"shaft_wide", SHAFT_WIDE * cell)
+	lit.set_shader_parameter(&"shaft_long", SHAFT_LONG * cell)
+	var rows := lamps(floor_box)
+	var spots := PackedVector4Array()
+	var tones := PackedVector3Array()
+	for k in LAMPS_MOST:
+		if k < rows.size():
+			var at: Vector2 = rows[k]["at"] - shed.position
+			var glow: Color = rows[k]["tone"]
+			spots.append(Vector4(at.x, at.y, float(rows[k]["reach"]), float(rows[k]["power"])))
+			tones.append(Vector3(glow.r, glow.g, glow.b))
+		else:
+			spots.append(Vector4.ZERO)
+			tones.append(Vector3.ZERO)
+	lit.set_shader_parameter(&"lamp_count", rows.size())
+	lit.set_shader_parameter(&"lamps", spots)
+	lit.set_shader_parameter(&"lamp_tones", tones)
 
 
 ## The nudge over a switch the player is standing at. Nothing at all when they are not.

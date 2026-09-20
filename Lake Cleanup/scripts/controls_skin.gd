@@ -318,7 +318,7 @@ func _draw() -> void:
 		return
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
-	draw_rect(face, Style.BOARD, true)
+	draw_rect(face, Style.PAPER, true)
 	var ribbon := _ribbon()
 	Style.board_ribbon(
 		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE)
@@ -361,7 +361,7 @@ func _draw_columns(box: Rect2) -> void:
 	)
 	for pair: Array in [[key_box, KEY_HEAD], [pad_box, PAD_HEAD]]:
 		Style.write(
-			self, String(pair[1]), Style.TEXT_SMALL, Vector2(0.0, base), Style.LEVEL_INK,
+			self, String(pair[1]), Style.TEXT_SMALL, Vector2(0.0, base), Style.PAPER_HEAD,
 			HORIZONTAL_ALIGNMENT_CENTER, pair[0]
 		)
 	if not Binds.changed():
@@ -371,7 +371,7 @@ func _draw_columns(box: Rect2) -> void:
 	if Style.measure(HINT, Style.TEXT_TINY).x > room:
 		return
 	Style.write(
-		self, HINT, Style.TEXT_TINY, Vector2(box.position.x, base), Style.BOARD_INK_SOFT
+		self, HINT, Style.TEXT_TINY, Vector2(box.position.x, base), Style.PAPER_SOFT
 	)
 	hint_shown = true
 
@@ -379,11 +379,11 @@ func _draw_columns(box: Rect2) -> void:
 func _draw_head(box: Rect2, label: String) -> void:
 	Style.write(
 		self, label, Style.TEXT_SMALL,
-		Vector2(box.position.x, box.end.y - 4.0), Style.LEVEL_INK
+		Vector2(box.position.x, box.end.y - 4.0), Style.PAPER_HEAD
 	)
 	draw_rect(
 		Rect2(Vector2(box.position.x, box.end.y - 2.0), Vector2(box.size.x, 1.0)),
-		Style.SEAM, true
+		Style.PAPER_RULE, true
 	)
 
 

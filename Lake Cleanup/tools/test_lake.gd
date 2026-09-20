@@ -166,6 +166,7 @@ func _physics_process(_delta: float) -> void:
 			_stage_new_tracks()
 		29:
 			_stage_shop_shape()
+			_stage_paper()
 		30:
 			_stage_settings_shape()
 		31:
@@ -5419,6 +5420,73 @@ func _stage_shop_shape() -> void:
 	_advance()
 
 
+## The final UI pass (issue #7, 2026-09-20): cream faces under dark plates, the shed's shelf
+## clear of the room and level with it, the room's light, Strength leading its board, and the
+## luck board's coin.
+func _stage_paper() -> void:
+	# What is written straight on the paper has to read on it; the plates keep their inks.
+	var worst := 99.0
+	for ink: Color in [Style.PAPER_INK, Style.PAPER_HEAD, Style.PAPER_SOFT]:
+		worst = minf(worst, _contrast(ink, Style.PAPER))
+	_check(worst >= 4.5, "every paper ink clears 4.5:1 on the paper", "%.2f" % worst)
+	_check(
+		Style.PAPER_INK.get_luminance() < Style.SHADE_UNDER
+		and Style.BOARD_INK.get_luminance() > Style.SHADE_UNDER,
+		"dark ink draws no shade and a plate's pale ink keeps it", ""
+	)
+	var letter := load("res://scripts/letter.gd")
+	_check(letter.PAPER == Style.PAPER, "the letter's paper is the boards' paper", "")
+	var confirm_src := FileAccess.get_file_as_string("res://scripts/menu_confirm.gd")
+	_check(not confirm_src.contains("ROW_SAVE"), "the confirm's doors are off the pale oak", "")
+	_check(_contrast(Style.WARN_INK, Style.BOARD) >= 4.5, "a warning reads on a dark door",
+		"%.2f" % _contrast(Style.WARN_INK, Style.BOARD))
+
+	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	room.size = Vector2(1264.0, 704.0)
+	var shed: Rect2 = room.call(&"_shed_rect")
+	var ribbon: Rect2 = room.call(&"_ribbon_rect")
+	_check(ribbon.position.x >= shed.end.x, "the shelf's plank stands clear of the room",
+		"%.0f against %.0f" % [ribbon.position.x, shed.end.x])
+	if Style.plank_fits(ribbon):
+		var wood := Style.ribbon_plank(ribbon)
+		_check(absf(wood.position.y - shed.position.y) < 0.6,
+			"the shelf's drawn top is the shed's top", "%.1f against %.1f" % [wood.position.y, shed.position.y])
+	var board: Rect2 = room.call(&"_board_rect")
+	_check(absf(board.end.y - shed.end.y) < 0.6, "and its foot is the shed's foot",
+		"%.1f against %.1f" % [board.end.y, shed.end.y])
+	var room_src := FileAccess.get_file_as_string("res://scripts/shed_room.gd")
+	_check(not room_src.contains("GLOW_RINGS =") and not room_src.contains("draw_circle(middle"),
+		"the ringed glow is gone rather than unused", "")
+	_check(room.get_node_or_null(^"Light") != null, "the room has its light", "")
+	var early := DayCycle.new()
+	early.sun = 0.15
+	room.day = early
+	var morning := room.sun_share()
+	early.sun = 0.8
+	var evening := room.sun_share()
+	_check(morning < 0.01 and evening > 0.99, "the window's sun follows the day",
+		"%.2f then %.2f" % [morning, evening])
+	room.day = _main.get(&"_day")
+	early.free()
+
+	var skin := _main.get_node(^"HUD/ShopSkin")
+	var groups: Dictionary = skin.get(&"GROUPS")
+	var first: StringName = (((groups[&"net"] as Array)[0] as Array)[1] as Array)[0]
+	_check(first == &"net_strength", "Strength leads the net's board", String(first))
+	_check((skin.get(&"FEATURED") as Array) == [&"net_strength"], "and is the one rimmed row", "")
+	var rest := ShopSkin.toss_pose(-1.0)
+	var top := ShopSkin.toss_pose(0.5)
+	var down := ShopSkin.toss_pose(1.0)
+	_check(is_equal_approx(rest.x, 1.0) and rest.y == 0.0, "the coin rests face on", "")
+	_check(top.y > 8.0, "it hops when tossed", "%.1f" % top.y)
+	_check(is_equal_approx(down.x, 1.0) and absf(down.y) < 0.01, "and lands on the face it left", "")
+	var seen_back := false
+	for k in 20:
+		if ShopSkin.toss_pose(float(k) / 20.0).x < -0.5:
+			seen_back = true
+	_check(seen_back, "showing its back on the way", "")
+
+
 ## The settings board's shape (2026-09-17): one plate face under carved headings, every word
 ## on it clearing 4.5:1, a dead chooser drawing nothing pressable, and the whole board fitting
 ## in the smallest frame the game can be given.
@@ -5473,7 +5541,7 @@ func _stage_settings_shape() -> void:
 		"a row's label": [Style.BOARD_INK, row],
 		"a chooser's value": [SettingsSkin.VALUE_INK, row],
 		"a dead row's reading": [SettingsSkin.INK_SOFT, dead],
-		"a heading": [Style.LEVEL_INK, Style.BOARD],
+		"a heading": [Style.PAPER_HEAD, Style.PAPER],
 		"a button's word": [Style.INK, SettingsSkin.BUTTON_FACE],
 		"a warning's word": [SettingsSkin.WARN_INK, SettingsSkin.BUTTON_FACE],
 		"a list entry": [Style.BOARD_INK, Style.BOARD],
@@ -5586,8 +5654,8 @@ func _stage_binds_shape() -> void:
 		"a standing binding": [Style.BOARD_INK_SOFT, Style.FRAME_SHADOW],
 		"the way back": [Style.INK, ControlsSkin.BUTTON_FACE],
 		"the way back, with nothing to undo": [Style.BOARD_INK_SOFT, ControlsSkin.BUTTON_FACE],
-		"a column's name": [Style.LEVEL_INK, Style.BOARD],
-		"the hint": [Style.BOARD_INK_SOFT, Style.BOARD],
+		"a column's name": [Style.PAPER_HEAD, Style.PAPER],
+		"the hint": [Style.PAPER_SOFT, Style.PAPER],
 	}
 	var faint := []
 	var worst := 99.0

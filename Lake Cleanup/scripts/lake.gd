@@ -1158,6 +1158,7 @@ func _ready() -> void:
 	# pack grows mid-run (`_add_dog`) and a count pushed here would hold the room at one dog
 	# for the whole session. The wash room's own pattern.
 	_room.pack_size = func() -> int: return _dogs.size()
+	_room.day = _day
 	# The room shows the finds by the names the defs give them rather than by their
 	# catalogue keys: "furniture_07" is not something anybody pulled out of a lake.
 	for def: TrashDef in _grid.defs:

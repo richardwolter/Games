@@ -133,14 +133,14 @@ func _draw() -> void:
 		return
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
-	draw_rect(face, Style.BOARD, true)
+	draw_rect(face, Style.PAPER, true)
 	Style.board_ribbon(self, _ribbon(), title, CHIPS, Style.TEXT_HEAD)
 
 	var y := face.position.y + BOARD_PAD + (0.0 if not words.is_empty() else WORDLESS_AIR)
 	if not words.is_empty():
 		Style.write(
 			self, words, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
-			Style.BOARD_INK, HORIZONTAL_ALIGNMENT_CENTER, face
+			Style.PAPER_INK, HORIZONTAL_ALIGNMENT_CENTER, face
 		)
 		y += WORDS_TALL + ROW_GAP
 
@@ -151,15 +151,18 @@ func _draw() -> void:
 	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", no_label, false)
 
 
-## A button plank, as the settings board draws its rows.
+## A door: the settings board's dark foot plate, ringed in the seam and lit along the top.
+## It was a plank of the frame's oak, where the warning read 1.37:1 and the plain word 2.97:1
+## and no pale ink could have fixed either (white itself reaches 4.06:1 on that face).
 func _draw_door(box: Rect2, key: StringName, label: String, warn: bool) -> void:
 	_doors.append({"key": key, "box": box})
-	var face := Style.ROW_SAVE
+	var face := Style.BOARD
 	if _hovered == key:
 		face = Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b)
-	var seed := int(box.position.y) + key.hash() % 31
-	Style.plank(self, box, int(box.position.y) * 13 + key.hash() % 89, face, Style.CLIP, Style.button_bites(box, seed))
-	var ink := Style.DANGER.lerp(Style.INK, 0.35) if warn else Style.RIBBON_INK
+	draw_rect(box.grow(1.0), Style.SEAM, true)
+	Style.plate(self, box, face)
+	Style.lit_edge(self, box, face)
+	var ink := Style.WARN_INK if warn else Style.INK
 	Style.write(
 		self, label, Style.TEXT_BODY,
 		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),

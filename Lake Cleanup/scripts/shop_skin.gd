@@ -34,7 +34,7 @@ const TITLES := {&"net": "Net", &"boat": "Boats", &"dog": "Dogs", &"luck": "Luck
 ## row whose key is missing here is drawn after the groups rather than dropped.
 const GROUPS := {
 	&"net": [
-		["", [&"net_width", &"net_strength", &"net_range", &"reel", &"net_hold"]],
+		["", [&"net_strength", &"net_width", &"net_range", &"reel", &"net_hold"]],
 	],
 	&"boat": [
 		["The run", [&"boat_speed", &"cargo", &"boat_volley"]],
@@ -293,11 +293,59 @@ func _on_shown() -> void:
 	set_process(true)
 
 
+## The luck board's coin is tossed (2026-09-20, Richard: "the coin should be animated, maybe
+## a flip"). It rests face on, and every `TOSS_EVERY` seconds (rolled, so it has no beat), and
+## whenever a row on its board is bought, it hops `TOSS_HOP` and turns `TOSS_TURNS` whole
+## times on the way, landing on the face it left. **Tossed, not spinning**: the ferry bobs
+## and the dog breathes beside it, and a coin turning for ever is the busiest thing on the
+## shop. The board redraws only while the coin is in the air.
+const TOSS_EVERY := Vector2(3.0, 5.0)
+const TOSS_TIME := 0.85
+const TOSS_TURNS := 2.0
+const TOSS_HOP := 12.0
+
+var _toss_age := -1.0
+var _toss_in := 2.0
+var _toss_rng := RandomNumberGenerator.new()
+
+
+func toss_coin() -> void:
+	if _toss_age < 0.0:
+		_toss_age = 0.0
+
+
+## How far through a toss the coin is, 0 to 1, or -1 at rest.
+func toss_share() -> float:
+	return -1.0 if _toss_age < 0.0 else clampf(_toss_age / TOSS_TIME, 0.0, 1.0)
+
+
+## The cosine of the coin's turn and how far it has hopped, at a share of the toss.
+static func toss_pose(share: float) -> Vector2:
+	if share < 0.0:
+		return Vector2(1.0, 0.0)
+	return Vector2(cos(TAU * TOSS_TURNS * share), 4.0 * share * (1.0 - share) * TOSS_HOP)
+
+
+func _drive_toss(delta: float) -> void:
+	if _toss_age >= 0.0:
+		_toss_age += delta
+		if _toss_age >= TOSS_TIME:
+			_toss_age = -1.0
+			_toss_in = _toss_rng.randf_range(TOSS_EVERY.x, TOSS_EVERY.y)
+		queue_redraw()
+		return
+	_toss_in -= delta
+	if _toss_in <= 0.0:
+		toss_coin()
+
+
 ## Light up the sprite of the board whose upgrade has just been bought. Called by the lake
 ## when a purchase actually lands, so a click that could not be afforded sparkles at nobody.
 func cheer(key: StringName) -> void:
 	_sparkling = _board_of(key)
 	_sparkle = SPARKLE_TIME
+	if _sparkling == &"luck":
+		toss_coin()
 	set_process(true)
 	queue_redraw()
 
@@ -430,6 +478,7 @@ func _process(delta: float) -> void:
 			_sway_px = sway
 			queue_redraw()
 		_wake.lay(_wake_heading, 1.0, delta)
+		_drive_toss(delta)
 	_dog_age += delta
 	var frame := DogArt.frame_at(_dog_pose, _dog_age)
 	if frame != _dog_frame:
@@ -548,7 +597,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 	_draw_frame(box)
 	var face := Style.board_face(box, FRAME)
 	draw_rect(face.grow(1.0), Style.SEAM, true)
-	draw_rect(face, Style.BOARD, true)
+	draw_rect(face, Style.PAPER, true)
 
 	# The ribbon, hung over the top of the frame and a little wider than the board, the
 	# way the old painted one was. Its ends are notched like the meter's frame.
@@ -562,6 +611,9 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		Vector2(face.position.x, box.position.y + RIBBON_TALL * 0.5 + BOARD_PAD),
 		Vector2(face.size.x, SPRITE_TALL)
 	)
+	# The head stands in a window of the boards' old dark water: the ferry's foam, the net's
+	# black and the coin were all picked against it, and white foam on cream is nothing.
+	Style.plate(self, slot.grow_individual(-BOARD_PAD, 0.0, -BOARD_PAD, 0.0), Style.BOARD, 3.0)
 	_draw_sprite(board, slot)
 	if _sparkle > 0.0 and board == _sparkling:
 		_draw_sparkle(slot)
@@ -620,14 +672,14 @@ func _ordered(board: StringName) -> Array[int]:
 func _draw_group(heading: String, box: Rect2) -> void:
 	var base := box.position.y + box.size.y * 0.5 + float(Style.TEXT_SMALL) * 0.36
 	var took := Style.write(
-		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.LEVEL_INK
+		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.PAPER_HEAD
 	)
 	var from := box.position.x + took.x + 8.0
 	if from >= box.end.x - 4.0:
 		return
 	var mid := box.position.y + box.size.y * 0.5
-	draw_line(Vector2(from, mid), Vector2(box.end.x, mid), Style.SEAM, 2.0)
-	draw_line(Vector2(from, mid + 1.0), Vector2(box.end.x, mid + 1.0), Style.BOARD_ROW, 1.0)
+	draw_line(Vector2(from, mid), Vector2(box.end.x, mid), Style.PAPER_RULE, 2.0)
+	draw_line(Vector2(from, mid + 1.0), Vector2(box.end.x, mid + 1.0), Style.PAPER_EDGE, 1.0)
 
 
 ## The board's oak frame and its title plank. Both are drawn by `Style`, so the shop's
@@ -663,7 +715,9 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 		var side := slot.size.y * fill
 		var coin := Rect2(middle - Vector2.ONE * side * 0.5, Vector2.ONE * side)
 		_halo(coin)
-		HudButtons.coin(self, coin, Color.WHITE)
+		var pose := toss_pose(toss_share())
+		coin.position.y -= roundf(pose.y)
+		HudButtons.coin_turned(self, coin, Color.WHITE, pose.x)
 		return
 	var lent: Dictionary = sprites.get(board, {})
 	var sheet: Texture2D = lent.get("sheet")
@@ -755,6 +809,30 @@ func _halo(box: Rect2) -> void:
 ## One row: a clean-water plate, the name over its value on the left, the price tag on the
 ## right. A row the player cannot afford is drawn back rather than hidden: the point of a
 ## shop is knowing what is coming.
+## The rows that change what the game is rather than how fast it goes, and so lead their
+## board and wear a gold rim with a star on its corner (2026-09-20, Richard: Strength
+## "visually differentiated, and come to the top of net upgrades"). A tier of Strength roughly
+## triples income and opens rubbish nothing else can lift; it read as one row in five.
+##
+## **Gold on this board is a price**, and that was weighed: the rim is a line round the plate
+## and not writing on it, the price keeps its tag, and a row that cannot be bought wears the
+## rim drawn back the way its "?" is. One row only, or the rim says nothing.
+##
+## **Retired, by decision**: a four-point gold star on the plate's corner. The top right
+## corner is the price tag's, which reaches within a few pixels of the plate, and the top
+## left is the rail's, where it sat on the "?". The rim in `Style.GOLD` reads on its own;
+## in `PRICE_INK`, the tag's pale gold, it read as a cream line on the cream face.
+const FEATURED: Array[StringName] = [&"net_strength"]
+
+
+func _draw_featured(box: Rect2, afford: bool) -> void:
+	var gold := Style.GOLD if afford else Style.GOLD.lerp(Style.FRAME_LOW, 0.45)
+	for inset: float in [1.0, 2.0]:
+		var ring := Style.clipped(box.grow(-inset), Style.CLIP)
+		ring.append(ring[0])
+		draw_polyline(ring, gold, 1.0)
+
+
 func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> void:
 	var afford := bool(row.get("afford", false))
 	var lit := hovered and afford
@@ -770,8 +848,11 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> vo
 	# red-green colourblind player. This is the second channel.
 	if afford:
 		Style.lit_edge(self, box, face)
-
 	_draw_rail(rail_of(box), row, afford, help_lit)
+	# After the rail: the star stands on the rail's own dark corner, and the rail's plate
+	# would draw over it the other way round.
+	if FEATURED.has(StringName(row.get("key", ""))):
+		_draw_featured(box, afford)
 	var text_at := box.position.x + RAIL_WIDE + RAIL_GAP
 
 	var tag_wide := box.size.x * TAG_SHARE
@@ -897,10 +978,10 @@ func _draw_blurb(row: Dictionary) -> void:
 	box.position.y = clampf(box.position.y, 4.0, size.y - box.size.y - 4.0)
 	var face := Style.board_wood(self, box, FRAME, CHIPS)
 	var at := face.position + Vector2(BLURB_PAD, BLURB_PAD + float(Style.TEXT_BODY) * 0.8)
-	Style.write(self, title, Style.TEXT_BODY, at, Style.BOARD_INK)
+	Style.write(self, title, Style.TEXT_BODY, at, Style.PAPER_HEAD)
 	at.y += 6.0 + line_tall
 	for line in lines:
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.PAPER_INK)
 		at.y += line_tall
 
 
@@ -929,6 +1010,17 @@ func _draw_legend(box: Rect2) -> void:
 	var yards: Array = legend.get("yards", [])
 	var bonus: Dictionary = legend.get("bonus", {})
 	var boosted := int(bonus.get("kind", -1))
+	# Figures stand on a plate, words on the paper: the price's gold and the lit yard were
+	# picked against the dark face and gold on cream is 1.6:1.
+	# Its foot is the line the rule's own first line stands on, less that line's own reach
+	# above its baseline: measured off `at.y`'s walk rather than guessed, or the plate runs
+	# under the sentence and cuts it in half.
+	var plate_top := face.position.y + LEGEND_PAD * 0.5
+	var plate_foot := at.y + line_tall * 3.0 + LEGEND_GAP_ROW - float(Style.TEXT_SMALL) - 4.0
+	Style.plate(self, Rect2(
+		Vector2(face.position.x + LEGEND_PAD * 0.5, plate_top),
+		Vector2(face.size.x - LEGEND_PAD, plate_foot - plate_top)
+	), Style.BOARD, 3.0)
 	if not yards.is_empty():
 		var step := wide / float(yards.size())
 		for y in yards.size():
@@ -972,7 +1064,7 @@ func _draw_legend(box: Rect2) -> void:
 			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(x + took.x + 6.0, at.y), Style.LEVEL_INK)
 		at.y += line_tall + LEGEND_GAP_ROW
 	for line in _wrap(String(legend.get("rule", "")), Style.TEXT_SMALL, wide):
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.BOARD_INK.lerp(Style.BOARD, 0.15))
+		Style.write(self, line, Style.TEXT_SMALL, at, Style.PAPER_INK)
 		at.y += line_tall
 
 

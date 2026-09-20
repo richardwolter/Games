@@ -84,7 +84,7 @@ const VALUE_INK := Color(0.78, 0.88, 0.95)
 ## face at all — white itself reaches 4.06:1. On this one the word is 11.8:1 and the warning
 ## 5.30:1, and the warning is still plainly red.
 const BUTTON_FACE := Style.BOARD
-const WARN_INK := Color(0.877, 0.555, 0.492)
+const WARN_INK := Style.WARN_INK
 
 ## The switch: a sunken track with a plank thumb pushed to one side.
 const SWITCH_WIDE := 44.0
@@ -628,7 +628,7 @@ func _draw() -> void:
 		return
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
-	draw_rect(face, Style.BOARD, true)
+	draw_rect(face, Style.PAPER, true)
 
 	var ribbon := _ribbon()
 	Style.board_ribbon(
@@ -689,14 +689,14 @@ func _row_face(hovered: bool, live: bool) -> Color:
 func _draw_group(heading: String, box: Rect2) -> void:
 	var base := box.position.y + box.size.y * 0.5 + float(Style.TEXT_SMALL) * 0.36
 	var took := Style.write(
-		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.LEVEL_INK
+		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.PAPER_HEAD
 	)
 	var from := box.position.x + took.x + 8.0
 	if from >= box.end.x - 4.0:
 		return
 	var mid := box.position.y + box.size.y * 0.5
-	draw_line(Vector2(from, mid), Vector2(box.end.x, mid), Style.SEAM, 2.0)
-	draw_line(Vector2(from, mid + 1.0), Vector2(box.end.x, mid + 1.0), Style.BOARD_ROW, 1.0)
+	draw_line(Vector2(from, mid), Vector2(box.end.x, mid), Style.PAPER_RULE, 2.0)
+	draw_line(Vector2(from, mid + 1.0), Vector2(box.end.x, mid + 1.0), Style.PAPER_EDGE, 1.0)
 
 
 ## A label on the left of a line and a switch on its right.

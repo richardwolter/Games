@@ -101,6 +101,21 @@ const BOARD_INK_DIM := Color(0.48, 0.55, 0.47)
 ## The shop picked it first (2026-09-17) and the settings board took it the same day. The
 ## shed's shelf still inks in `BOARD_INK_DIM` and is owed the same pass.
 const BOARD_INK_SOFT := Color(0.76, 0.83, 0.75)
+## The face of every board that opens (2026-09-20, issue #7): the letter's cream paper, the
+## sand lifted. **The face only** — the row plates on it stay the murky water, so every ink
+## measured against a plate still stands. What is written straight on the face (a group's
+## heading, the legend's sentence, a hint) takes `PAPER_INK`, or `PAPER_HEAD` for a heading,
+## and **no drop shadow**: `write`'s shade under dark ink on a pale sheet is a smudge, so
+## those lines go through `write_on_paper`. The HUD's plates and the menu's doors stand over
+## open water and keep their dark faces, by decision.
+## A warning's word on a dark plate: 5.30:1 on `BOARD`. The settings board's first.
+const WARN_INK := Color(0.877, 0.555, 0.492)
+const PAPER := Color(0.918, 0.859, 0.722)
+const PAPER_EDGE := Color(0.780, 0.702, 0.541)
+const PAPER_RULE := Color(0.698, 0.612, 0.451)
+const PAPER_INK := Color(0.196, 0.141, 0.110)
+const PAPER_HEAD := Color(0.451, 0.157, 0.102)
+const PAPER_SOFT := Color(0.369, 0.302, 0.235)
 ## The settings board's rows, one tone a section so the eye finds a section by colour:
 ## sound on the murky water, the screen on the meter's scum green, the saves on oak like a
 ## price tag, and the quit on that same oak with its warning in the ink alone (a red plank
@@ -338,6 +353,10 @@ static func plaque(on: CanvasItem, box: Rect2, face: Color, alpha: float = 1.0) 
 	)
 
 
+## Ink darker than this is writing on paper and draws no shade under it.
+const SHADE_UNDER := 0.3
+
+
 ## One line of text with the shadow every drawn label in the game wears. Returns the size it
 ## took, so a caller stacking lines does not have to measure twice.
 ##
@@ -364,15 +383,18 @@ static func write(
 			start.x = within.position.x + (within.size.x - span.x) * 0.5
 		elif align == HORIZONTAL_ALIGNMENT_RIGHT:
 			start.x = within.end.x - span.x
-	on.draw_string(
-		face,
-		start + Vector2(1.0, 1.0),
-		text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1.0,
-		size_px,
-		Color(SHADE.r, SHADE.g, SHADE.b, SHADE.a * alpha)
-	)
+	# Dark ink is ink on paper, and the shade under it is a smudge (the letter's `_ink` found
+	# this first). Pale ink is a label on wood or water and keeps it.
+	if ink.get_luminance() > SHADE_UNDER:
+		on.draw_string(
+			face,
+			start + Vector2(1.0, 1.0),
+			text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0,
+			size_px,
+			Color(SHADE.r, SHADE.g, SHADE.b, SHADE.a * alpha)
+		)
 	on.draw_string(
 		face,
 		start,
@@ -906,7 +928,7 @@ static func plank_fits(box: Rect2) -> bool:
 ## shelf stands at y 99.8 — rounded the frame's texture one way and the face's rectangle the
 ## other through the window stretch, and a one-pixel seam of the lake opened down the inside
 ## of a stile and along the top of the face. Overlapped, there is nothing to round into.
-static func board_wood(on: CanvasItem, box: Rect2, thick: float, chips: int, fill := BOARD) -> Rect2:
+static func board_wood(on: CanvasItem, box: Rect2, thick: float, chips: int, fill := PAPER) -> Rect2:
 	box = Rect2(box.position.floor(), box.size.floor())
 	if border_fits(box):
 		var face := border_inset(box)
@@ -1234,12 +1256,16 @@ static func board_ribbon(
 	title: String,
 	chips: int,
 	size_px: int = TEXT_HEAD,
-	within: Rect2 = Rect2()
+	within: Rect2 = Rect2(),
+	under: Color = PAPER
 ) -> void:
 	var wood := box
 	if plank_fits(box):
 		wood = ribbon_plank(box)
-		meter_plank(on, wood, Color.WHITE, BOARD)
+		# `under` is what a bite in the plank's lower edge reads through to, which is the
+		# board's own face — cream on every board that opens, and the letter's dark oak
+		# under its paper sheet.
+		meter_plank(on, wood, Color.WHITE, under)
 	else:
 		var seed := int(box.position.x) * 53 + int(box.position.y) * 29 + 7
 		plank(on, box, seed, FRAME, 0.0, ribbon_bites(box, seed, chips))
