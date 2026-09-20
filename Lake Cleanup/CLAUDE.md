@@ -937,8 +937,12 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   tall** (label and switch over a full-width volume groove), Fullscreen, the level swap, and
   the quit alone at the bottom. It owns the state (`music_on`, `music_level`, `sfx_on`,
   `sfx_level`, `fullscreen`) and emits signals; the lake reads and sets those. The stock
-  Controls and their WoodUI theming are gone from the settings; WoodUI still dresses the
-  remaining scene buttons. The frame and title plank are `Style.board_frame`/`board_ribbon`,
+  Controls and their WoodUI theming are gone from the settings. **Nothing is themed by
+  `WoodUI` any more** (2026-09-20): `Lake._polish_panel_controls` was its only caller, and
+  the deletion of the stock shop panel left it pointing at two nodes
+  (`HUD/Shed/Pad/Lines/Title`/`Note`) that had not been in the scene for some time — so it
+  had already been styling nothing. `scripts/wood_ui.gd` is now unreferenced. The frame and
+  title plank are `Style.board_frame`/`board_ribbon`,
   the same as the shop's.
   **Retired, by decision** (2026-09-11): the plank section headings (Sound / Screen / Save)
   and their seam lines; the separate slider plates; the *Save the run* and *Load the last
@@ -1387,6 +1391,65 @@ and moved to the top of its board, and the luck coin animated.
   the room's light node and its day, Strength leading and being the one rimmed row, and the
   coin's rest, hop, back and landing. Probes: `tools/shot_shed.tscn`,
   `tools/shot_menus.tscn`, `tools/shot_menu.tscn`, `tools/shot_pump.tscn`.
+
+### Every Word Is a Key (issue #28, 2026-09-20, `/grill-me` with Richard)
+The localization pass. **Scope this pass: the pipeline and English only** — extraction, one
+table, the CSV, a pseudo-locale and a Language row. The eight real languages, the CJK font
+and the letter's re-shot stills are later passes.
+- **`translations.csv` in the repo is the source of truth.** Committed, one row a key, one
+  column a locale. The artifact page is a viewer and editor over it with **no server state**:
+  a reviewer's in-progress edits survive a refresh in their own browser and **Export** hands
+  them a CSV to send back. Nothing the page holds is authoritative.
+- **Call sites read `Text.KEY`**, one generated table, rather than `tr()` scattered over
+  thirty scripts — the codebase's "one place decides" habit, and what makes the width probe
+  possible at all. The backing store is still Godot's `TranslationServer`, so locale
+  fallback and the `.translation` import stay the engine's job. `dropoff.gd:210`'s `tr()`,
+  the game's one existing call, folds into it.
+- **Every key carries a max-width budget**, measured in Bungee at its real drawn size.
+  Over budget is a flag on the page, and **where no sane translation fits, the board may be
+  widened** — layouts settled over three UI passes are open to re-tuning for this.
+- **Back-translation is the offensive-language guard**, by decision: every non-EN cell
+  carries a machine back-translation to EN beside it and drift is flagged for a human. No
+  blocklist. Nothing is judged by a machine alone.
+- **The pseudo-locale is the success test**: a generated `qps` that wraps every string and
+  runs ~40% longer, reachable from the Language row, so a missed literal and an overflow
+  both show themselves in play before a real translation exists.
+- **Out, by decision**: the credits' pack-attribution strings (verbatim by licence — the
+  headings over them are keyed), the nine letter stills, the Steam page, every tuner and
+  probe, and the siege (`siege.gd`, `defeat.gd`, `charm.gd`, `hud_skin.gd`'s wave block —
+  about 20 strings, its own pass if it is ever revived).
+- **Not a string, by decision**: `ARROW`, and figures wearing marks (`%d%%`, `$%d`, `%ds`).
+  `%`, `$` and `s` are marks rather than words, which is the shop's own settled rule. And
+  **the gamepad button names** (`A`, `LB`, `D-Pad Up`, `Left click`): Xbox's own printed
+  legends, not translated on the hardware either. Keyboard keys already come from
+  `DisplayServer.keyboard_get_label_from_physical` and involve no string at all.
+- **The 17 shop blurbs are translated as they stand**, placeholders and all (Richard,
+  2026-09-20: he rewrites them in the artifact). Their EN is known to be provisional.
+- **The inventory is `docs/ui/strings.md`**: 203 keys, each with its file, its box in design
+  pixels and its format placeholders. Read it before adding a key.
+
+**Deleted on the sweep, same day** (Richard: "delete dead strings"). Four surfaces wrote
+text no player could reach — **34 strings that would otherwise have been translated eight
+times and reviewed by native speakers**:
+- **The stock shop panel**: the whole `HUD/Shop` subtree of `scenes/main.tscn` (16 labels and
+  buttons) and the block of `Lake._update_hud` that formatted 10 more into it **every frame
+  the board was open**. `lake.gd` said so itself — "which no player sees (the drawn board
+  replaces it)". `ShopSkin` is the shop and now the only one.
+  - **`auto_ferry` was real state on a dead control**: a `CheckButton` nobody could see,
+    saved and loaded. It is `Lake._auto_ferry_on`, a plain bool, under the same save key —
+    **no `SAVE_VERSION` bump**. `_set_auto_ferry` stays; `test_lake` and `probe_rates` call it.
+  - **`_send_ferry` and `_any_boat_docked` went with it** — see the ferry's full-hold rule.
+- **`Lake._fleet_line`** — no caller at all. `Boat.status_line`, its only other reader, stays
+  as a **test diagnostic** and is marked as such in its own docstring: English, not a key.
+- **`Lake._note_save`** — six strings written to `_save_note`, its timer ticked every frame,
+  the string never drawn.
+- **`Lake._polish_panel_controls`**, found by the cut: with the shop panel gone it pointed
+  only at `HUD/Shed/Pad/Lines/Title`/`Note`, **which are not in the scene** — so it had
+  already been styling nothing. `scripts/wood_ui.gd` is unreferenced now; the file is left on
+  disk pending Richard's call.
+
+`test_lake` asks that `HUD/Shop` is **gone rather than hidden**, which is the check a
+deleted-because-invisible node needs.
 
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
@@ -2158,7 +2221,9 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   many missed trips"): auto-dispatch waits until the yard holds `capacity` pieces for it, so
   a hull no longer makes its long trip round the lake for two or three pieces. The one exception is
   a lake with no rubbish left in the water (counted every `DRY_CHECK_EVERY` s), where what is
-  in the box is all there will be. The shop's hidden "send now" still sends a part load.
+  in the box is all there will be.**The hidden "send now" is gone** (2026-09-20, with the stock
+  shop panel): it was a `Button` on a panel that was never shown, so nothing in the game
+  dispatches a part load any more. `Boat.dispatch()` stays, for the automatic run.
   The tree's pricing sim was calibrated on play from before this change;
   check the box pile-up and ferry income against the next playtest log.
 - **No wake and no rings**, by decision (2026-09-12): the pale wedge of slabs behind the

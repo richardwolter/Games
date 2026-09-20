@@ -1982,17 +1982,17 @@ func _stage_market() -> void:
 ## the shed. The logbook lives in it rather than in the shop.
 func _stage_settings() -> void:
 	var settings := _main.get_node(^"HUD/Settings") as Control
-	# The shop the player sees is the drawn board, not the panel of buttons behind it: the
-	# panel is kept in the tree for its numbers and is deliberately never shown.
+	# The shop is the drawn board and nothing else. The panel of buttons that used to stand
+	# behind it — never shown, still formatted every frame — was deleted on 2026-09-20.
 	var shop := _main.get_node(^"HUD/ShopSkin") as Control
 	_check(not settings.visible, "the settings panel starts closed", "")
-	var shop_panel := _main.get_node(^"HUD/Shop") as Control
+	_check(_main.get_node_or_null(^"HUD/Shop") == null,
+		"the stock shop panel is gone, not merely hidden", "")
 	# The settings are a drawn board (SettingsSkin) now, not a panel of buttons, and saving
-	# is automatic: no save or load signal off it, and no SaveNow button anywhere in the
-	# shop. The quit is the one button that writes a save on purpose.
+	# is automatic: no save or load signal off it. The quit is the one button that writes a
+	# save on purpose.
 	_check(not settings.has_signal(&"save_pressed") and not settings.has_signal(&"load_pressed")
-		and settings.has_signal(&"quit_pressed")
-		and shop_panel.find_child("SaveNow", true, false) == null,
+		and settings.has_signal(&"quit_pressed"),
 		"saving is automatic: no save or load button anywhere", "")
 
 	_press_escape()

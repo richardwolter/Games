@@ -718,8 +718,6 @@ var _autosave_in: float = AUTOSAVE_EVERY
 ## True once the save has been thrown away, so the reload on the way out does not put it
 ## straight back.
 var _wiping: bool = false
-var _save_note: String = ""
-var _save_note_for: float = 0.0
 
 ## The per-tile filth map handed to the water shader, and its texture. Rebuilt on a timer
 ## whenever something has come out of the water.
@@ -812,28 +810,20 @@ var _pad_was: bool = false
 ## over a couple of seconds — the last piece is lifted and the water answers.
 var _sparkle_at: float = 0.0
 
-@onready var _shop: PanelContainer = %Shop
-@onready var _close_menu: Button = %CloseMenu
 @onready var _hud_layer: CanvasLayer = $HUD
 @onready var _skin: HudSkin = %Skin
 @onready var _shop_skin: ShopSkin = %ShopSkin
-@onready var _buy_net_width: Button = %BuyNetWidth
-@onready var _buy_net_strength: Button = %BuyNetStrength
-@onready var _buy_net_range: Button = %BuyNetRange
-@onready var _buy_reel: Button = %BuyReel
-@onready var _buy_net_hold: Button = %BuyNetHold
-@onready var _buy_boat_speed: Button = %BuyBoatSpeed
-@onready var _buy_cargo: Button = %BuyCargo
-@onready var _buy_fleet: Button = %BuyFleet
 @onready var _shed: PanelContainer = %Shed
 @onready var _room: ShedRoom = %Room
-@onready var _open_shed: Button = %OpenShed
 @onready var _open_upgrades: UiButton = %OpenUpgrades
 @onready var _settings: SettingsSkin = %Settings
 @onready var _open_settings: PlankButton = %OpenSettings
 @onready var _free_camera: PlankButton = %FreeCamera
-@onready var _send_now: Button = %SendNow
-@onready var _auto_ferry: CheckButton = %AutoFerry
+
+## Whether a docked hull sets off on its own. A plain bool since the stock shop panel went
+## (2026-09-20): it used to live in a `CheckButton` nobody could see or press, on a panel the
+## drawn board replaced. Saved under `auto_ferry`, as it always was.
+var _auto_ferry_on: bool = true
 
 
 ## Loads every track's price and value curve from resources/upgrades/*.tres, and what
@@ -1165,14 +1155,6 @@ func _ready() -> void:
 	_push_boat_numbers()
 	_mark("fit out boat")
 
-	_buy_net_width.pressed.connect(_buy.bind(&"net_width"))
-	_buy_net_strength.pressed.connect(_buy.bind(&"net_strength"))
-	_buy_net_range.pressed.connect(_buy.bind(&"net_range"))
-	_buy_reel.pressed.connect(_buy.bind(&"reel"))
-	_buy_net_hold.pressed.connect(_buy.bind(&"net_hold"))
-	_buy_boat_speed.pressed.connect(_buy.bind(&"boat_speed"))
-	_buy_cargo.pressed.connect(_buy.bind(&"cargo"))
-	_buy_fleet.pressed.connect(_buy.bind(&"fleet"))
 	_room.sheets = _sheets
 	_room.unlocked = unlocked
 	_room.decor = decor
@@ -1223,7 +1205,6 @@ func _ready() -> void:
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
-	_open_shed.pressed.connect(_set_shed.bind(true))
 	_room.close_asked.connect(_shut.bind(_set_shed))
 	_open_settings.pressed.connect(_set_settings.bind(true))
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
@@ -1240,14 +1221,10 @@ func _ready() -> void:
 	_settings.swap_label = _other_level_name()
 	_settings.swap_pressed.connect(_swap_levels)
 	_settings.close_asked.connect(_shut.bind(_set_settings))
-	_send_now.pressed.connect(_send_ferry)
-	_auto_ferry.toggled.connect(_set_auto_ferry)
-	_close_menu.pressed.connect(_set_menu.bind(false))
 	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
 	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
 	# the whole screen — so its own cross sits over the top of the inventory column, where
 	# the thing it closes actually is. See ShedRoom.
-	_polish_panel_controls()
 	_set_menu(false)
 	_start_music()
 	_set_settings(false)
@@ -2319,7 +2296,6 @@ func _on_find_washed(piece: StringName, soap: int) -> void:
 	sludge = maxf(sludge - float(soap), 0.0)
 	if _room != null:
 		_room.unlocked = unlocked
-	_note_save("%s — clean, and in the shed" % _pretty(name))
 
 
 ## Close enough to the pump to work it. Asked before `_at_shed`, which it stands inside.
@@ -2503,11 +2479,7 @@ func _fit_zoom() -> float:
 
 func _set_menu(open: bool) -> void:
 	_menu_open = open
-	# The drawn board replaces the panel of buttons rather than sitting behind it. The panel
-	# is kept in the tree — its buttons are still where the shop's numbers are written, and
-	# the shed's own controls live on it — but it is never shown.
 	_shop_skin.visible = open
-	_shop.visible = false
 	_push_rooms()
 	if open:
 		_set_settings(false)
@@ -2530,7 +2502,6 @@ func _set_shed(open: bool) -> void:
 	# child of the panel any more, so its own visibility has to be said here.
 	_open_upgrades.visible = open
 	if open:
-		_shop.visible = false
 		_menu_open = false
 		_settings.visible = false
 		_settings_open = false
@@ -2599,87 +2570,6 @@ func _set_settings(open: bool) -> void:
 	_hold_the_angler()
 
 
-## The settings and shed panels are stock Godot controls (Button, CheckButton, HSlider) in
-## the engine's default theme. Styled here with WoodUI's pieces — the wood-plank kit Richard
-## gave as a style reference for this pass — so a settings checkbox reads as part of the same
-## plank panel as its background rather than a grey engine default glued on. Bungee replaces
-## RubbishFont2 here too, per the font swap asked for in the same message as the reference.
-##
-## Written once, at startup, over a fixed list of nodes, rather than as a Theme resource:
-## a Theme's own file format is easy to get subtly wrong unseen, where this fails loudly
-## per-control if a name is off instead of silently across the whole scene.
-##
-## Every scene Control in the game now, not just settings — including the shop panel's own
-## buttons, which no player sees (the drawn board replaces it) but which would otherwise be
-## the one corner of the scene still in the engine default. The drawn surfaces do not pass
-## through here at all; they read the same constants directly out of style.gd.
-## The labels the sweep reaches as well as the buttons. By full path, not by `%Title`: three
-## panels each have a node called Title and a unique name can only point at one of them.
-const _PANEL_LABELS := [
-	"HUD/Shop/Pad/Scroll/Panel/Title",
-	"HUD/Shop/Pad/Scroll/Panel/NetHeading",
-	"HUD/Shop/Pad/Scroll/Panel/BoatHeading",
-	"HUD/Shop/Pad/Scroll/Panel/DecorHeading",
-	"HUD/Shed/Pad/Lines/Title",
-	"HUD/Shed/Pad/Lines/Note",
-]
-
-## The two buttons that undo something. They used to be marked out three ways at once — a
-## taller box, a bigger face, a colour of their own — which is two ways more than a warning
-## needs. The colour is the one that stays.
-const _PANEL_WARNINGS: Array[String] = []
-
-
-func _polish_panel_controls() -> void:
-	var font := Style.font()
-	# Not the settings any more: it is a drawn board now (SettingsSkin), like the shop.
-	var normal := WoodUI.panel_style(4, WoodUI.PLANK, WoodUI.PLANK_LIGHT, WoodUI.PLANK_DARK, 2)
-	var hover := WoodUI.panel_style(
-		4, WoodUI.PLANK_LIGHT, WoodUI.PLANK_LIGHT.lightened(0.2), WoodUI.PLANK, 2
-	)
-	var pressed := WoodUI.panel_style(4, WoodUI.PLANK_DARK, WoodUI.PLANK, WoodUI.SEAM, 2)
-	var nodes: Array[Control] = []
-	for path in [
-		"%BuyNetWidth", "%BuyNetStrength", "%BuyNetRange", "%BuyReel", "%BuyNetHold",
-		"%BuyBoatSpeed", "%BuyCargo", "%BuyFleet",
-		"%OpenShed", "%SendNow", "%AutoFerry", "%CloseMenu",
-	]:
-		var node := get_node_or_null(path) as Control
-		if node != null:
-			nodes.append(node)
-	for path in _PANEL_LABELS:
-		var label := get_node_or_null(path) as Control
-		if label != null:
-			nodes.append(label)
-	var warnings: Array[Control] = []
-	for path in _PANEL_WARNINGS:
-		var node := get_node_or_null(path) as Control
-		if node != null:
-			warnings.append(node)
-	for node in nodes:
-		if font != null:
-			node.add_theme_font_override("font", font)
-		var ink := Style.DANGER.lerp(Style.INK, 0.35) if node in warnings else Style.INK
-		node.add_theme_color_override("font_color", ink)
-		# The sweep owns the size as well as the colour, so the scene no longer carries
-		# sixty per-node overrides that nothing keeps in step with each other.
-		var size_px := Style.TEXT_BODY
-		if node.name == &"Title":
-			size_px = Style.TEXT_TITLE
-		elif String(node.name).ends_with("Heading"):
-			size_px = Style.TEXT_HEAD
-		elif node.name == &"Note":
-			size_px = Style.TEXT_SMALL
-		node.add_theme_font_size_override("font_size", size_px)
-		node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		if node is BaseButton:
-			node.add_theme_stylebox_override("normal", normal)
-			node.add_theme_stylebox_override("hover", hover)
-			node.add_theme_stylebox_override("pressed", pressed)
-			node.add_theme_stylebox_override("focus", hover)
-		if node is CheckButton:
-			node.add_theme_icon_override("on", WoodUI.switch_icon(true))
-			node.add_theme_icon_override("off", WoodUI.switch_icon(false))
 ## How often to ask whether the lake is finished.
 ##
 ## The meter is not the trigger and, since 2026-09-17, not the cue to ask either. It is a
@@ -3590,10 +3480,6 @@ func _keep(def: TrashDef) -> void:
 		return
 	# To the pump, not to the shelf (issue #37): it is washed before the shed will have it.
 	unwashed.append(name)
-	_note_save(
-		"Something for the shed — wash it at the pump" if def.display_name.is_empty()
-		else "%s — wash it at the pump" % def.display_name
-	)
 	# Held up in the middle of the screen as well as written in the corner. The shed is two
 	# clicks away, so without this the player never sees what they found.
 	if _trophy != null:
@@ -4192,7 +4078,7 @@ func _add_boat() -> void:
 	# A hull of its own, so two ferries on the same leg do not fish up the same pieces in
 	# the same order.
 	boat.rng_seed = 771144 + 4013 * _boats.size()
-	boat.auto_ferry = _auto_ferry.button_pressed
+	boat.auto_ferry = _auto_ferry_on
 	_boats.append(boat)
 	_fit_out(boat, _boats.size() - 1)
 	add_child(boat)
@@ -4285,16 +4171,10 @@ func _push_boat_numbers() -> void:
 		boat.volley_gap = boat_volley_gap()
 
 
-## Send one hull out: the first one sitting at its berth. The button is a nudge for a
-## player who has turned the automatic runs off, not a way to dispatch the whole fleet
-## into a yard that only has one load in it.
-func _send_ferry() -> void:
-	for boat in _boats:
-		if boat.visible and boat.dispatch():
-			return
-
-
+## Whether a docked hull sets off on its own, for the whole fleet. Called by the harness and
+## by `probe_rates`; nothing in the game turns it off since the stock panel's checkbox went.
 func _set_auto_ferry(on: bool) -> void:
+	_auto_ferry_on = on
 	for boat in _boats:
 		boat.auto_ferry = on
 
@@ -4515,7 +4395,6 @@ func _process(delta: float) -> void:
 		_look_for_the_end(delta)
 		_tick_play_log(delta)
 
-		_save_note_for = maxf(_save_note_for - delta, 0.0)
 		_autosave_in -= delta
 		if _autosave_in <= 0.0:
 			save_game()
@@ -5015,51 +4894,6 @@ func _update_hud() -> void:
 	_shop_skin.rows = _shop_rows()
 	_shop_skin.legend = _shop_legend()
 
-	_buy_net_width.text = "Net width %d  —  %d tiles  (%d)" % [
-		net_width_level, _tiles_in_radius(net_radius()), roundi(cost_of(&"net_width"))
-	]
-	_buy_net_strength.text = "Net strength %d  —  lifts tier %d  (%d)" % [
-		net_strength_level, net_power(), roundi(cost_of(&"net_strength"))
-	]
-	_buy_net_range.text = "Cast range %d  —  %.1f tiles  (%d)" % [
-		net_range_level, net_range(), roundi(cost_of(&"net_range"))
-	]
-	_buy_reel.text = "Line speed %d  —  %.1f tiles/s  (%d)" % [
-		reel_level, reel_speed(), roundi(cost_of(&"reel"))
-	]
-	_buy_net_hold.text = "Net haul %d  —  %d per cast  (%d)" % [
-		net_hold_level, net_hold(), roundi(cost_of(&"net_hold"))
-	]
-	for pair: Array in [
-		[_buy_net_width, &"net_width"], [_buy_net_strength, &"net_strength"],
-		[_buy_net_range, &"net_range"], [_buy_reel, &"reel"],
-		[_buy_net_hold, &"net_hold"],
-		[_buy_boat_speed, &"boat_speed"], [_buy_cargo, &"cargo"],
-		[_buy_fleet, &"fleet"]
-	]:
-		var key: StringName = pair[1]
-		(pair[0] as Button).disabled = is_maxed(key) or sludge < cost_of(key)
-
-	_buy_boat_speed.text = "Ferry speed %d  —  %.1f tiles/s  (%d)" % [
-		boat_speed_level, boat_speed(), roundi(cost_of(&"boat_speed"))
-	]
-	_buy_cargo.text = "Ferry hold %d  —  carries %d  (%d)" % [
-		cargo_level, boat_cargo(), roundi(cost_of(&"cargo"))
-	]
-	if fleet_size() < MAX_BOATS:
-		_buy_fleet.text = "Extra ferry %d  —  %d in the water  (%d)" % [
-			fleet_level, fleet_size(), roundi(cost_of(&"fleet"))
-		]
-	else:
-		_buy_fleet.text = "Extra ferry %d  —  %d ferries is the whole fleet" % [
-			fleet_level, fleet_size()
-		]
-	_open_shed.text = "Decorate the shed  —  %d found, %d out" % [
-		unlocked.size(), decor.size()
-	]
-	_send_now.disabled = not _any_boat_docked() or _yard.held.is_empty()
-
-
 
 ## The one thing a filth meter cannot say: how much is left when the answer is "nearly
 ## nothing".
@@ -5083,35 +4917,11 @@ func _last_pieces_line() -> String:
 	return "%d pieces left" % _left_over
 
 
-## The fleet in one line: the lone ferry reads as it always did, and a fleet reads as a
-## count of what is out rather than a wall of per-boat status.
-func _fleet_line() -> String:
-	if _boats.size() == 1:
-		var only := _boats[0]
-		return "Ferry: %s    %d / %d aboard" % [
-			only.status_line(), only.cargo.size(), only.capacity
-		]
-	var out := 0
-	var aboard := 0
-	for boat in _boats:
-		if boat.is_running():
-			out += 1
-		aboard += boat.cargo.size()
-	return "Ferries: %d of %d out    %d aboard" % [out, _boats.size(), aboard]
-
-
 func _runs_done() -> int:
 	var total := 0
 	for boat in _boats:
 		total += boat.runs_done
 	return total
-
-
-func _any_boat_docked() -> bool:
-	for boat in _boats:
-		if not boat.is_running():
-			return true
-	return false
 
 
 ## Everything a run is, written to one file.
@@ -5124,8 +4934,7 @@ func save_game() -> bool:
 	_autosave_in = AUTOSAVE_EVERY
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
-		_note_save("could not write the save")
-		return false
+			return false
 
 	var afloat := PackedInt32Array()
 	for boat in _boats:
@@ -5153,7 +4962,7 @@ func save_game() -> bool:
 		"birds_caught": birds_caught,
 		"sold_by_kind": sold_by_kind,
 		"runs_done": _runs_done(),
-		"auto_ferry": _auto_ferry.button_pressed,
+		"auto_ferry": _auto_ferry_on,
 		# The settings are not in here, by decision (2026-09-15): they are `Prefs`', written
 		# to user://settings.cfg on every press, and one set of them across the menu and the
 		# lake. A save that carried its own copy handed it back on load and undid whatever the
@@ -5172,7 +4981,6 @@ func save_game() -> bool:
 	_save_extra(save)
 	file.store_var(save, true)
 	file.close()
-	_note_save("saved")
 	return true
 
 
@@ -5194,10 +5002,8 @@ func load_game() -> bool:
 	var written := 0 if save == null else int(save.get("version", 0))
 	var readable := written == SAVE_VERSION
 	if save == null or not readable 			or int(save.get("seed", 0)) != _level_seed():
-		_note_save("the save is from another build — ignored")
 		return false
 	if not _grid.restore(save.get("stacks", []) as Array):
-		_note_save("the save does not fit this lake — ignored")
 		return false
 
 	# Held to the caps on the way in. A save written before a track had a top level can
@@ -5314,8 +5120,7 @@ func load_game() -> bool:
 	if _room != null:
 		_room.unlocked = unlocked
 		_room.decor = decor
-	_auto_ferry.button_pressed = bool(save.get("auto_ferry", true))
-	_set_auto_ferry(_auto_ferry.button_pressed)
+	_set_auto_ferry(bool(save.get("auto_ferry", true)))
 	_angler.stand_at(save.get("angler", _angler.tile_pos) as Vector2)
 	if _trophy != null:
 		_trophy.clear()
@@ -5339,7 +5144,6 @@ func load_game() -> bool:
 	_filth_stale = true
 	_camera.position = Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_load_extra(save)
-	_note_save("loaded")
 	return true
 
 
@@ -5354,11 +5158,6 @@ func wipe_save() -> void:
 		# an absolute path to a save, and user:// is understood everywhere.
 		DirAccess.remove_absolute(save_path)
 	get_tree().reload_current_scene()
-
-
-func _note_save(what: String) -> void:
-	_save_note = what
-	_save_note_for = 2.5
 
 
 func _exit_tree() -> void:

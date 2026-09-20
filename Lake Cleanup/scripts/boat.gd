@@ -395,7 +395,10 @@ func arrive_from(at: Vector2) -> void:
 	queue_redraw()
 
 
-## Where it is on its run, for the HUD. One line rather than five branches at the call site.
+## Where it is on its run, in words, for a test's failure message. **Not player text**: the
+## HUD it was written for was the stock shop panel, deleted on 2026-09-20 along with
+## `Lake._fleet_line`, its only caller in the game. `tools/test_lake.gd` is what reads it
+## now, so it stays English and out of `translations.csv` like any developer message.
 func status_line() -> String:
 	match state:
 		State.LOADING:
