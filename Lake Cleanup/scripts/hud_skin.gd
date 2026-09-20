@@ -287,6 +287,12 @@ func _process(delta: float) -> void:
 	_repaint()
 
 
+## Whether the pointer is on one of the two picture buttons: the lake's edge scroll asks, so a
+## hand going for a corner button does not slide the view out from under itself.
+func over_button() -> bool:
+	return _under(get_local_mouse_position()) != &""
+
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		var was := _hovered

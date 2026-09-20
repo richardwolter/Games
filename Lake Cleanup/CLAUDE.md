@@ -3068,6 +3068,42 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   click, wheel and Escape land where the pointer is in a stretched window
   (`tools/last_pad_cursor.log`).
 
+### The Free Camera (2026-09-20, `/grill-me` with Richard; a trial, to judge in play)
+A toggle beside the gear pins the view to a spot in the world, so the player aims and casts by
+the cursor and nothing takes the view back.
+- **Pinned means pinned** (`Lake._free_view`, `_free_at`, `_drive_free_view`): no follow, no
+  `CAST_LOOK` lean, no landing framing, no `HOME_SPEED` way home, and the cast's and the
+  step's `_pan_yielded` give-back is skipped. **The angler may walk off the screen, by
+  decision** (offered and turned down: following the walk, and pulling the view just enough
+  to keep them in the window). Cast rules are untouched: range is from the angler.
+- **Moved by the middle drag, the wheel and the window's edges.** The drag and
+  `_keep_view_at` write `_free_at` instead of `_pan`; `_pan` is zeroed on the toggle, so
+  switching off is the ordinary follow easing home with nothing to unwind.
+- **Edge scroll is free mode's alone** (`_edge_scroll`, `_edge_push`, `EDGE_MARGIN` 24 canvas
+  px, `EDGE_SPEED` 0.9 view heights a second — `PadAim`'s rule, the same on screen at every
+  zoom). Held off while the pointer is out of the window (`_mouse_inside`, off
+  `NOTIFICATION_WM_MOUSE_EXIT`: **a pointer that leaves stays at its last spot, which on an
+  edge is a view scrolling for ever**), the window is unfocused, a board is up, the middle
+  button has the view, or the pointer is on a HUD button (`_over_hud`,
+  `HudSkin.over_button` — the corner buttons are inside the margin). **Known cost, accepted**:
+  aiming at water near the window's edge slides the view.
+- **Recentre stays free** (`_recentre`, the middle tap and the verb): the view jumps to the
+  angler and the mode does not change.
+- **Session only, mouse only, no key, by decision**: not in `Prefs`, not in the save, every
+  launch and every trip to the menu starts following (`_enter_menu` switches it off — the
+  glide down onto the angler is a thing a pinned view cannot do). In pad mode `_free_now()`
+  is false and the view follows as ever, because the reticle's lean and `hold_in` need it;
+  free mode resumes when the mouse is picked up. No bind: the Controls board is 666 of 680.
+- **The button** is a `PlankButton` at the gear's size to its left (`%FreeCamera`,
+  `mark = &"camera"`, `_draw_camera`): a boxy camera on whole pixels, its lens a hole like the
+  gear's hub. **On is two channels** (`PlankButton.lit`): the mark in `Style.ON_WATER`, the
+  settings board's switch colour, and the lit edge. Hidden while any board is up.
+- **Out of scope, by decision**: left-drag or WASD panning, a pad free camera, a settings
+  row, persistence, an off-screen-angler marker.
+- `test_lake`'s `_check_free_view` guards the button, the unlit start, the view holding
+  through a step and a cast, the wheel's hold, the edge push and its out-of-window gate, the
+  clamp, recentre staying free, and the way home when switched off.
+
 ### The Pointer and the Aim Ring (2026-09-16, `/grill-me` with Richard)
 The mouse pointer is a wooden arrow, and the net's aim marker is painted off the palette.
 Both were picked by Richard off one contact sheet, `tools/last_cursor_mockup.png`, written

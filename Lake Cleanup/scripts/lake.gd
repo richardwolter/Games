@@ -595,6 +595,27 @@ var _pan_moved: float = 0.0
 ## Without it the giving-back stops the moment the net lands, which on a short cast leaves
 ## the view sitting a little off the angler forever.
 var _pan_yielded: bool = false
+
+## The free camera (2026-09-20, `/grill-me` with Richard): the toggle beside the gear pins the
+## view to a spot in the world, `_free_at`, and nothing takes it back — not a cast, not a
+## step, not the landing's framing, not the way home. The player aims by the cursor and the
+## view is theirs: the middle drag and the wheel as ever, plus the window's edges
+## (`_edge_scroll`). The angler may walk off the screen, by decision.
+##
+## **Session only, mouse only, no key**: not in `Prefs`, not in the save, every launch starts
+## following; in pad mode the view follows as it always did (the reticle's lean and
+## `hold_in` need it to), and free mode resumes when the mouse is picked up again.
+var _free_view: bool = false
+var _free_at := Vector2.ZERO
+## Whether the pointer is inside the window. It stays at its last spot when it leaves, which
+## on an edge is a view scrolling on for ever with nobody's hand on it.
+var _mouse_inside: bool = true
+## The edge scroll: how close to the window's edge the pointer has to be, in canvas pixels,
+## and how fast the view goes at the very edge, in view heights a second so it is the same
+## on the screen at every zoom — `PadAim`'s rule. First guesses.
+const EDGE_MARGIN := 24.0
+const EDGE_SPEED := 0.9
+
 ## Where the angler was last frame, for noticing that they have started walking.
 var _angler_was := Vector2.INF
 
@@ -810,6 +831,7 @@ var _sparkle_at: float = 0.0
 @onready var _open_upgrades: UiButton = %OpenUpgrades
 @onready var _settings: SettingsSkin = %Settings
 @onready var _open_settings: PlankButton = %OpenSettings
+@onready var _free_camera: PlankButton = %FreeCamera
 @onready var _send_now: Button = %SendNow
 @onready var _auto_ferry: CheckButton = %AutoFerry
 
@@ -1209,6 +1231,7 @@ func _ready() -> void:
 	# nobody can see or press.
 	_settings.get_parent().move_child(_settings, -1)
 	_settings.get_parent().move_child(_open_settings, -1)
+	_free_camera.pressed.connect(_toggle_free_view)
 	# The volumes are audio buses now (2026-09-16, issue #26): the board sets them through
 	# `Prefs` and nothing has to be pushed from here. What is left is the doors it opens.
 	_settings.controls_asked.connect(_set_controls.bind(true))
@@ -1942,7 +1965,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if drag != null and _panning:
 		# Divided by the zoom, so a drag moves the world under the cursor by the distance
 		# the cursor moved however far in or out the view is.
-		_pan -= drag.relative / _camera.zoom
+		if _free_now():
+			_free_at = _clamped_view(_free_at - drag.relative / _camera.zoom)
+		else:
+			_pan -= drag.relative / _camera.zoom
 		_pan_moved += drag.relative.length()
 		return
 
@@ -1994,7 +2020,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_panning = false
 			if _pan_moved < PAN_TAP and not _panelled():
-				_pan = Vector2.ZERO
+				_recentre()
 		return
 
 	# Guarded against any panel being open: this is _unhandled_input, so a wheel event over a
@@ -2022,7 +2048,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_zoom_by(1.0 / ZOOM_STEP)
 		return
 	if _desk_pressed(event, &"recentre"):
-		_pan = Vector2.ZERO
+		_recentre()
 		return
 
 	# A lit net is laid: the cast goes out, stays where it lands, and burns or freezes there.
@@ -2338,6 +2364,7 @@ func _zoom_by(factor: float, about := Vector2.INF) -> void:
 ## Put the view here and hold it here, as a pan. See `_zoom_by`.
 func _keep_view_at(to: Vector2) -> void:
 	_camera.position = to
+	_free_at = to
 	if _angler == null:
 		return
 	# The pan that makes the view want to be exactly here, measured against where it wants to
@@ -3155,6 +3182,9 @@ func _enter_menu(at_once: bool) -> void:
 	_pan = Vector2.ZERO
 	_panning = false
 	_pan_yielded = false
+	# Back from the menu the view glides down onto the angler, which a pinned view cannot.
+	_free_view = false
+	_free_camera.lit = false
 	_cast_look = 0.0
 	_homing = false
 	_hold_the_angler()
@@ -3223,6 +3253,7 @@ func _begin_glide() -> void:
 	_autosave_in = AUTOSAVE_EVERY
 	_skin.modulate.a = 0.0
 	_open_settings.modulate.a = 0.0
+	_free_camera.modulate.a = 0.0
 	_hud_layer.visible = true
 	_start_arrival()
 
@@ -3241,6 +3272,7 @@ func _glide_step(delta: float) -> void:
 	var hud := clampf((t - GLIDE_HUD_FROM) / (1.0 - GLIDE_HUD_FROM), 0.0, 1.0)
 	_skin.modulate.a = hud
 	_open_settings.modulate.a = hud
+	_free_camera.modulate.a = hud
 	if t < 1.0:
 		return
 	_glide = -1.0
@@ -4324,6 +4356,11 @@ func _drive_view(delta: float) -> void:
 		_pan_yielded = true
 	_angler_was = _angler.tile_pos
 
+	_free_camera.visible = not _panelled()
+	if _free_now():
+		_drive_free_view(delta)
+		return
+
 	# A cast takes the view back off whoever panned it away, and goes on taking it until it
 	# has all of it. Not while they are still holding the button, though — a hand on the
 	# mouse outranks the net.
@@ -4372,6 +4409,84 @@ func _drive_view(delta: float) -> void:
 		if _net.state == CastNet.State.FLYING:
 			at = _framed_on(at, _net.tile_pos)
 		_camera.position = _clamped_view(at)
+
+
+## Whether the view is the player's own this frame: the toggle is on and the mouse is the
+## device. The pad's reticle leans the view and is held inside the window by it, so in pad
+## mode the view follows as ever and free mode waits for the mouse to come back.
+func _free_now() -> bool:
+	return _free_view and not Pad.is_pad()
+
+
+## The toggle beside the gear. On, the view is pinned where it stands; off, the follow eases
+## it home from wherever it was left, with no pan to unwind.
+func _toggle_free_view() -> void:
+	_free_view = not _free_view
+	_free_camera.lit = _free_view
+	_free_at = _camera.position
+	_pan = Vector2.ZERO
+	_pan_yielded = false
+	_homing = false
+
+
+## Look at the angler again: the middle button's tap and the `recentre` verb. In free mode
+## the view jumps to them and stays free — it is the way out of having lost yourself, not
+## the way out of the mode.
+func _recentre() -> void:
+	_pan = Vector2.ZERO
+	if _angler != null:
+		_free_at = _clamped_view(_angler.position)
+
+
+## The free camera's frame: pinned to `_free_at`, moved by the drag, the wheel and the edges.
+## Eased, so coming back from pad mode is a move and not a cut; snapped under a drag, as the
+## follow is.
+func _drive_free_view(delta: float) -> void:
+	_homing = false
+	_free_at = _clamped_view(_free_at + _edge_scroll() * delta)
+	if _panning:
+		_camera.position = _free_at
+	else:
+		_camera.position = _camera.position.lerp(_free_at, _ease(FOLLOW_SPEED, delta))
+
+
+## How fast the window's edges are pushing the view, in world px a second. Nothing while the
+## pointer is out of the window or the window out of focus, while a board is up, while the
+## middle button has the view, or while the pointer is on a HUD button — the corner buttons
+## are inside the margin, and a hand going for one would slide the lake out from under it.
+func _edge_scroll() -> Vector2:
+	if not _mouse_inside or not get_window().has_focus() or _panelled() or _panning:
+		return Vector2.ZERO
+	var at := get_viewport().get_mouse_position()
+	if _over_hud(at):
+		return Vector2.ZERO
+	return _edge_push(at, get_viewport_rect().size) * (
+		EDGE_SPEED * get_viewport_rect().size.y / _camera.zoom.y
+	)
+
+
+## The push at a pointer `at` in a window `size`: nought inside the margin's inner line,
+## rising to one at the very edge, on each axis by itself.
+static func _edge_push(at: Vector2, size: Vector2) -> Vector2:
+	var push := Vector2.ZERO
+	push.x = _edge_axis(at.x, size.x)
+	push.y = _edge_axis(at.y, size.y)
+	return push
+
+
+static func _edge_axis(at: float, size: float) -> float:
+	if at < EDGE_MARGIN:
+		return -clampf(1.0 - at / EDGE_MARGIN, 0.0, 1.0)
+	if at > size - EDGE_MARGIN:
+		return clampf(1.0 - (size - at) / EDGE_MARGIN, 0.0, 1.0)
+	return 0.0
+
+
+func _over_hud(at: Vector2) -> bool:
+	for button: Control in [_open_settings, _free_camera]:
+		if button.visible and button.get_global_rect().has_point(at):
+			return true
+	return _skin.over_button()
 
 
 func _process(delta: float) -> void:
@@ -5263,6 +5378,11 @@ func _notification(what: int) -> void:
 	# untrustworthy. A wipe is the one exit that must not write anything back.
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and not _wiping and _grid != null:
 		save_game()
+	# For the free camera's edge scroll, see `_mouse_inside`.
+	if what == NOTIFICATION_WM_MOUSE_EXIT:
+		_mouse_inside = false
+	elif what == NOTIFICATION_WM_MOUSE_ENTER:
+		_mouse_inside = true
 
 
 ## What each of the four merchants has taken, as one line. The four yards only read as

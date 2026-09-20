@@ -40,6 +40,14 @@ const Style := preload("res://scripts/style.gd")
 		mark = value
 		queue_redraw()
 
+## A mark that is switched on: the lake's free-camera toggle. Said the settings board's way —
+## the clean water's blue in place of the oak, plus the lit edge, because a colour alone is
+## one channel.
+var lit: bool = false:
+	set(value):
+		lit = value
+		queue_redraw()
+
 ## How much of the face the word is set to, and how much room is left beside it.
 const LABEL_SHARE := 0.78
 const LABEL_PAD := 12.0
@@ -52,6 +60,14 @@ const GEAR_TEETH := 8
 const GEAR_TOOTH := 0.26
 const GEAR_WIDTH := 0.46
 const GEAR_HUB := 0.34
+
+## The camera: the body's width and height as shares of the face, the viewfinder block on its
+## top-left shoulder, and the lens's radius as a share of the body's height. Square cuts, like
+## the gear. First guesses.
+const CAMERA_WIDE := 0.74
+const CAMERA_TALL := 0.46
+const CAMERA_FINDER := Vector2(0.3, 0.2)
+const CAMERA_LENS := 0.36
 
 signal pressed
 
@@ -112,7 +128,7 @@ func _draw() -> void:
 		on = Style.border_inset(box)
 		draw_rect(on.grow(2.0), behind, true)
 		Style.meter_frame(self, box, Style.HOVER_WASH if _hovered and not _held else Color.WHITE)
-		if accent and not _held:
+		if (accent or lit) and not _held:
 			Style.lit_edge(self, on.grow(2.0), behind)
 	else:
 		Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y) + 3, face, Style.CLIP)
@@ -137,6 +153,9 @@ func _draw() -> void:
 ## because the gear's hub is a **hole**: filled with the oak it read as a disc of wood lying
 ## on the panel, which is the opposite of what a gear's middle is.
 func _draw_mark(face: Rect2, behind: Color) -> void:
+	if mark == &"camera":
+		_draw_camera(face, behind)
+		return
 	if mark != &"gear":
 		return
 	var middle := face.position + face.size * 0.5
@@ -150,7 +169,33 @@ func _draw_mark(face: Rect2, behind: Color) -> void:
 	draw_circle(middle, radius * GEAR_HUB, behind)
 
 
-## A cog's outline: `GEAR_TEETH` teeth standing off a rim, each `GEAR_WIDTH` of its pitch
+## A boxy camera: a body, a viewfinder block on its shoulder, and a lens that is a hole like
+## the gear's hub. On whole pixels, so the black rim is one pixel all round.
+func _draw_camera(face: Rect2, behind: Color) -> void:
+	var ink := Style.ON_WATER if lit else Style.RIBBON_INK
+	var side := minf(face.size.x, face.size.y)
+	var middle := (face.position + face.size * 0.5).round()
+	var body := Rect2(
+		middle - Vector2(side * CAMERA_WIDE, side * CAMERA_TALL) * 0.5
+			+ Vector2(0.0, side * CAMERA_FINDER.y * 0.5),
+		Vector2(side * CAMERA_WIDE, side * CAMERA_TALL)
+	)
+	body = Rect2(body.position.round(), body.size.round())
+	var finder := Rect2(
+		body.position + Vector2(side * 0.08, -side * CAMERA_FINDER.y).round(),
+		(side * CAMERA_FINDER).round() + Vector2(0.0, 1.0)
+	)
+	draw_rect(body.grow(1.0), Style.HOLE_RIM, true)
+	draw_rect(finder.grow(1.0), Style.HOLE_RIM, true)
+	draw_rect(body, ink, true)
+	draw_rect(finder, ink, true)
+	var lens := body.position + body.size * 0.5
+	var radius := body.size.y * CAMERA_LENS
+	draw_circle(lens, radius + 1.0, Style.HOLE_RIM)
+	draw_circle(lens, radius, behind)
+
+
+## A cog's outline:`GEAR_TEETH` teeth standing off a rim, each `GEAR_WIDTH` of its pitch
 ## wide, with square shoulders rather than a scalloped edge — the game's wood is all straight
 ## cuts and chamfers, and a soft gear beside it would read as borrowed from another game.
 func _cog(middle: Vector2, radius: float) -> PackedVector2Array:

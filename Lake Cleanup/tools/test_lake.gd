@@ -362,6 +362,7 @@ func _stage_build() -> void:
 		"at the edge %.0f, after 100 px back %.0f" % [at_edge, cam.position.x])
 	_main.set(&"_panning", false)
 	_main.set(&"_pan", Vector2.ZERO)
+	_check_free_view(cam)
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -4703,6 +4704,87 @@ func _find_greedy_controls(node: Node, into: Array[String]) -> void:
 		into.append(str(control.name))
 	for child in node.get_children():
 		_find_greedy_controls(child, into)
+
+
+## The free camera (2026-09-20): the toggle beside the gear pins the view, and neither a cast
+## nor a step takes it back. The pointer is declared out of the window for the pinning checks
+## — a headless pointer sits at the origin, which is an edge.
+func _check_free_view(cam: Camera2D) -> void:
+	var button: PlankButton = _main.get(&"_free_camera")
+	var gear: PlankButton = _main.get(&"_open_settings")
+	_check(button != null and button.mark == &"camera" and button.label.is_empty(),
+		"the free camera toggle is a camera and carries no word",
+		str(button.mark if button != null else &""))
+	if button == null:
+		return
+	_check(button.size == gear.size and absf(button.position.y - gear.position.y) < 0.5
+		and button.position.x + button.size.x <= gear.position.x,
+		"and stands beside the gear, to its left, at the gear's size",
+		"%s at %s, gear %s at %s" % [button.size, button.position, gear.size, gear.position])
+	_check(not _main.get(&"_free_view") and not button.lit,
+		"a session starts following, the toggle unlit", "")
+	_main.set(&"_mouse_inside", false)
+	var stood: Vector2 = _angler.tile_pos
+	for i in 120:
+		_main._process(1.0 / 60.0)
+	_main.call(&"_toggle_free_view")
+	_check(_main.get(&"_free_view") and button.lit, "a press turns it on and lights it", "")
+	# A step and a cast both ask for the view back; neither gets it.
+	var pinned := cam.position
+	_angler.tile_pos = stood + Vector2(1.5, 0.0)
+	_main.set(&"_pan_yielded", true)
+	_main.set(&"_cast_look", Lake.CAST_LOOK)
+	for i in 180:
+		_main._process(1.0 / 60.0)
+	_check(cam.position.distance_to(pinned) < 1.0,
+		"free, the view stays put through a step and a cast",
+		"%.1f px off after 3 s" % cam.position.distance_to(pinned))
+	# The drag and the wheel's hold both move the pinned spot.
+	var spot := pinned + Vector2(200.0, 80.0)
+	_main.call(&"_keep_view_at", spot)
+	for i in 60:
+		_main._process(1.0 / 60.0)
+	_check(cam.position.distance_to(spot) < 1.0, "a wheel zoom's hold moves the pinned spot",
+		"%.1f px off" % cam.position.distance_to(spot))
+	# The edges: nothing in the middle, a whole push at the very edge, each axis alone.
+	var window := Vector2(1280.0, 720.0)
+	var middle: Vector2 = Lake._edge_push(window * 0.5, window)
+	var left: Vector2 = Lake._edge_push(Vector2(0.0, 360.0), window)
+	var corner: Vector2 = Lake._edge_push(window, window)
+	var inside: Vector2 = Lake._edge_push(Vector2(Lake.EDGE_MARGIN + 1.0, 360.0), window)
+	_check(middle == Vector2.ZERO and inside == Vector2.ZERO
+		and left.is_equal_approx(Vector2(-1.0, 0.0)) and corner.is_equal_approx(Vector2.ONE),
+		"the window's edges push the view and its middle does not",
+		"middle %s inside %s left %s corner %s" % [middle, inside, left, corner])
+	_check((_main.call(&"_edge_scroll") as Vector2) == Vector2.ZERO,
+		"and a pointer out of the window pushes nothing", "")
+	# Pushed far past the ground, the pinned spot is clamped with the view.
+	_main.set(&"_free_at", Vector2(90000.0, 0.0))
+	for i in 5:
+		_main._process(1.0 / 60.0)
+	var held: Vector2 = _main.get(&"_free_at")
+	_check(held.is_equal_approx(_main.call(&"_clamped_view", held)) and held.x < 90000.0,
+		"the pinned spot is clamped to the ground", str(held))
+	# Recentre looks at the angler and stays free.
+	_main.call(&"_recentre")
+	for i in 180:
+		_main._process(1.0 / 60.0)
+	var home: Vector2 = _main.call(&"_clamped_view", _angler.position)
+	_check(_main.get(&"_free_view") and cam.position.distance_to(home) < 2.0,
+		"recentre puts a free view on the angler and leaves it free",
+		"%.1f px off" % cam.position.distance_to(home))
+	# Off again, the follow brings the view home from wherever it was left.
+	_main.call(&"_keep_view_at", home + Vector2(250.0, 0.0))
+	_main.call(&"_toggle_free_view")
+	_main.set(&"_cast_look", 0.0)
+	for i in 240:
+		_main._process(1.0 / 60.0)
+	_check(not button.lit and cam.position.distance_to(home) < 2.0,
+		"switched off, the view comes home to the angler",
+		"%.1f px off" % cam.position.distance_to(home))
+	_angler.tile_pos = stood
+	_main.set(&"_pan", Vector2.ZERO)
+	_main.set(&"_mouse_inside", true)
 
 
 func _check(ok: bool, what: String, detail: String) -> void:
