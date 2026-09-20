@@ -1337,6 +1337,11 @@ and moved to the top of its board, and the luck coin animated.
   worked out once per art pixel of the room** — a gradient per screen pixel is an HD effect
   laid over pixel art, and hard steps are what the rings were. **Retired**: `GLOW_RINGS`, the
   three stacked `draw_circle`s.
+  - **The window is half way down the shed, not up in the wall** (`WINDOW_DOWN` 0.48 of the
+    shed's own height; Richard, 2026-09-20: "a little bit more from the middle/down of the
+    shed, not on top"). It was a share of `_wall_tall()`, which is four cells — 35 px down a
+    512 px room — so the shaft entered at the ceiling and the light read as coming through
+    the roof.
   - **The light follows the day** (`DayCycle.sun` through `sun_share`): pale, short and steep
     in the morning, long, low and orange late. `Lake` hands the room its `_day`; a room with
     none sits at `SUN_NO_DAY`.

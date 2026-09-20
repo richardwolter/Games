@@ -170,12 +170,12 @@ const FIRE_TONE := Color(1.0, 0.55, 0.2)
 const FRIDGE_REACH := 4.5
 const FRIDGE_POWER := 0.14
 const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
-## The window: how far down the back wall's height it sits on the left wall, and the shaft
+## The window: how far down **the shed's own height** it sits on the left wall, and the shaft
 ## it lets in — half-width and reach in cells. The sun's power, its slope (how steeply the
 ## light falls across the room) and its tone all run morning to late afternoon on
 ## `DayCycle.sun`: a pale, short, steep shaft early, a long low orange one late. With no day
 ## handed over the room sits at `SUN_NO_DAY`. All by eye.
-const WINDOW_DOWN := 0.55
+const WINDOW_DOWN := 0.48
 const SHAFT_WIDE := 1.6
 const SHAFT_LONG := 30.0
 const SUN_POWER := Vector2(0.30, 0.62)
@@ -2191,7 +2191,7 @@ func _dress_light(floor_box: Rect2) -> void:
 		tone = tone * day.tint
 	lit.set_shader_parameter(&"box_px", shed.size)
 	lit.set_shader_parameter(&"art_px", _zoom())
-	lit.set_shader_parameter(&"window_at", Vector2(0.0, _wall_tall() * WINDOW_DOWN))
+	lit.set_shader_parameter(&"window_at", Vector2(0.0, shed.size.y * WINDOW_DOWN))
 	lit.set_shader_parameter(&"sun_dir", Vector2(1.0, lerpf(SUN_SLOPE.x, SUN_SLOPE.y, share)))
 	lit.set_shader_parameter(&"sun_power", lerpf(SUN_POWER.x, SUN_POWER.y, share))
 	lit.set_shader_parameter(&"sun_tone", Vector3(tone.r, tone.g, tone.b))
