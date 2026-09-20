@@ -22,19 +22,21 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   `assets/decor_clean.png` / `decor_dirty.png`, and the earlier
   `TopDownHouse_SmallItems.png`, `TopDownHouse_FurnitureState1.png`,
   `TopDownHouse_FurnitureState2.png`) — "Top-Down Retro Interior" by Penzilla
-  (https://penzilla.itch.io/top-down-retro-interior). ⚠️ **Not cleared.** Commercial use
-  requires purchasing the pack (suggested $8 minimum) plus the credit "Graphics created by
-  Penzilla Design." Credited on the board as of 2026-09-16; still unpurchased.
-  **Action: purchase before shipping.**
+  (https://penzilla.itch.io/top-down-retro-interior). ✅ Cleared (purchased 2026-09-20).
+  Name-your-own-price; commercial use requires paying the suggested price, and the licence
+  (`PenzillaDesign_StandardLicense.pdf`, in the zip) names the credit wording. The board
+  carries that string verbatim: `Graphics created by Penzilla Design`. The bought zip is
+  `art_source/Top-Down_Retro_Interior.zip`.
 
 - **Decoration and small objects** (same art) — "Modern Interiors" by LimeZu
   (https://limezu.itch.io/moderninteriors, free-version overview:
   https://limezu.itch.io/moderninteriors/devlog/244045/free-version-overview-18042021-update).
-  ⚠️ **Not cleared.** The free version's licence is **non-commercial only** ("You CAN use the
-  asset for non commercial purposes"); the paid version is what covers shipping. Credited on
-  the board as of 2026-09-16 as "Modern Interiors by LimeZu" — the pack's `LICENSE.txt` may
-  name an exact string, which has not been read. **Action: purchase the commercial version
-  before shipping, and check the required wording against `LICENSE.txt`.**
+  ✅ Cleared (complete version purchased 2026-09-20). The **free** version is
+  non-commercial only; the complete version (paying at least $1.50) allows commercial use
+  and editing, forbids reselling or redistributing the assets, and **requires a credit with
+  the pack's link** — so the board's line is the link itself, `limezu.itch.io`, not
+  "Modern Interiors by LimeZu" as it read until this purchase. The bought zip is
+  `art_source/moderninteriors-win.zip`.
 
 - **Dogs** (`assets/dog*`, `scripts/dog.gd`'s art) — "Pixel Dogs" by Benvictus
   (https://benvictus.itch.io/pixel-dogs). ✅ Cleared (purchased/licensed by Richard,
@@ -59,8 +61,12 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   and AI training are prohibited; redistribution of the assets is too.
 
 - **Ferry hull** (`art_source/Blue_Boat/blue_boat_16dir.png` → `assets/boat_sail_frames.png`)
-  — PixZels, credited @Pixel_Salvaje. ❓ Licence terms and purchase status not recorded here;
-  the credit is on the board. **Action: confirm and write the terms down.**
+  — "Free Pixelart Boats (16 directions)" by @pixel_Salvaje
+  (https://pixel-salvaje.itch.io/free-boat-16-directions). ✅ Cleared (2026-09-20,
+  Richard: downloaded free from itch). Name-your-own-price, billed as "Free to use boats",
+  no further terms stated. Nothing is owed; the credit `@Pixel_Salvaje` is on the board as a
+  courtesy. (`PixZels` is the author's pixel-art *program*, not the pack — this file used to
+  name it as the source.)
 
 - **Pigeon sprites** (`assets/Pigeons/`, `pigeon_contact.png`, `pigeons.json`) — "Pigeons 2D
   Pixel Asset Pack" by Pop Shop Packs (https://pop-shop-packs.itch.io/pigeons-2d-pixel-asset-pack).

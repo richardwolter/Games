@@ -343,7 +343,7 @@ Headings — **translated**:
 | `CREDITS_HEAD_TOOLS` | Tools |
 
 Everything under them — **verbatim English, no key**: `Modern Daedalus Studio`, `Nuven`,
-`Benvictus`, `xStrax`, `Graphics created by Penzilla Design`, `Modern Interiors by LimeZu`,
+`Benvictus`, `xStrax`, `Graphics created by Penzilla Design`, `limezu.itch.io`,
 `Kipperfalcon`, `Asset by Zato - https://zatoart.itch.io/`, `Pop Shop Packs`,
 `@Pixel_Salvaje`, `Made with Godot Engine`. Names, and licence obligations that may not be
 reworded — CLAUDE.md already forbids shortening them.

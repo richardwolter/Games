@@ -42,7 +42,7 @@ const LINES := [
 	"Benvictus",
 	"xStrax",
 	"Graphics created by Penzilla Design",
-	"Modern Interiors by LimeZu",
+	"limezu.itch.io",
 	"Kipperfalcon",
 	"Asset by Zato - https://zatoart.itch.io/",
 	"Pop Shop Packs",
