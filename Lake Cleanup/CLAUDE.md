@@ -1337,6 +1337,16 @@ and moved to the top of its board, and the luck coin animated.
   worked out once per art pixel of the room** — a gradient per screen pixel is an HD effect
   laid over pixel art, and hard steps are what the rings were. **Retired**: `GLOW_RINGS`, the
   three stacked `draw_circle`s.
+  - **The shaft is a cone and the pools face front** (Richard, 2026-09-20): the shaft opens
+    as it crosses the room (`SHAFT_SPREAD` 0.78, `SHAFT_WIDE` 2.4 cells) so it lands on the
+    floor instead of running along the back wall, and dims with the distance it has come
+    (`SHAFT_LONG`). `shaft_spread` was a uniform the room never pushed, so the shader's own
+    0.22 was what shipped. A lit piece's pool reaches `pool_ahead` times as far down the
+    screen as across and falls off `pool_back` times as fast behind the piece: a hearth's
+    fire is on its front face and lights the boards before it, not the wall behind it.
+    **Its middle stays on the piece's own foot** — pushed forward instead (tried the same
+    day), the brightest patch came away from the hearth and left a dark gap between the fire
+    and its own light.
   - **The window is half way down the shed, not up in the wall** (`WINDOW_DOWN` 0.48 of the
     shed's own height; Richard, 2026-09-20: "a little bit more from the middle/down of the
     shed, not on top"). It was a share of `_wall_tall()`, which is four cells — 35 px down a

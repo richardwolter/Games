@@ -171,13 +171,17 @@ const FRIDGE_REACH := 4.5
 const FRIDGE_POWER := 0.14
 const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
 ## The window: how far down **the shed's own height** it sits on the left wall, and the shaft
-## it lets in — half-width and reach in cells. The sun's power, its slope (how steeply the
+## it lets in — half-width where it leaves the window, how fast it opens, and how far it
+## carries, in cells. **A cone, not a band** (Richard, 2026-09-20): it opens as it crosses the
+## room so it lands on the floor rather than running along the back wall, and dims with the
+## distance it has come. The sun's power, its slope (how steeply the
 ## light falls across the room) and its tone all run morning to late afternoon on
 ## `DayCycle.sun`: a pale, short, steep shaft early, a long low orange one late. With no day
 ## handed over the room sits at `SUN_NO_DAY`. All by eye.
 const WINDOW_DOWN := 0.48
-const SHAFT_WIDE := 1.6
-const SHAFT_LONG := 30.0
+const SHAFT_WIDE := 2.4
+const SHAFT_SPREAD := 0.78
+const SHAFT_LONG := 34.0
 const SUN_POWER := Vector2(0.30, 0.62)
 const SUN_SLOPE := Vector2(0.95, 0.38)
 const SUN_EARLY := Color(1.0, 0.93, 0.74)
@@ -2196,6 +2200,7 @@ func _dress_light(floor_box: Rect2) -> void:
 	lit.set_shader_parameter(&"sun_power", lerpf(SUN_POWER.x, SUN_POWER.y, share))
 	lit.set_shader_parameter(&"sun_tone", Vector3(tone.r, tone.g, tone.b))
 	lit.set_shader_parameter(&"shaft_wide", SHAFT_WIDE * cell)
+	lit.set_shader_parameter(&"shaft_spread", SHAFT_SPREAD)
 	lit.set_shader_parameter(&"shaft_long", SHAFT_LONG * cell)
 	var rows := lamps(floor_box)
 	var spots := PackedVector4Array()

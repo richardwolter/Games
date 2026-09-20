@@ -27,11 +27,19 @@ uniform float shaft_long = 420.0;
 uniform float bounce = 0.18;
 
 // The lit pieces: xy on the quad, z reach, w power. Pools lie on the floor, so they are
-// measured squashed (`pool_squash`), wider than they are deep.
+// measured squashed (`pool_squash`), wider than they are deep — and they are **in front of
+// the piece, not around it** (Richard, 2026-09-20): a hearth's fire is on its front face and
+// lights the boards before it, so the pool reaches `pool_ahead` times as far down the screen
+// as across and falls off `pool_back` times as fast behind the piece.
+//
+// **The middle stays on the piece's own foot**: pushed forward instead, the brightest patch
+// came away from the hearth and left a dark gap between the fire and its own light.
 uniform int lamp_count = 0;
 uniform vec4 lamps[8];
 uniform vec3 lamp_tones[8];
 uniform float pool_squash = 0.62;
+uniform float pool_ahead = 1.45;
+uniform float pool_back = 2.4;
 uniform float pixel_fps = 8.0;
 
 
@@ -62,6 +70,7 @@ void fragment() {
 
 	for (int i = 0; i < lamp_count; i++) {
 		vec2 off = at - lamps[i].xy;
+		off.y = off.y < 0.0 ? off.y * pool_back : off.y / pool_ahead;
 		off.y /= pool_squash;
 		float d = length(off) / max(lamps[i].z, 1.0);
 		float pool = exp(-d * d * 3.2);
