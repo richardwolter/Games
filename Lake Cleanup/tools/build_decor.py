@@ -9,7 +9,48 @@ TopDownHouse pair worked.
 
 Input:
   art_source/decoration_extracted/   one PNG per PSD layer, from the psd-extract skill
-  tools/decor_sets.json              the authored catalogue: roles, kinds, slice rects
+  art_source/decoration_extracted/manifest.json   the PSD's own layer tree
+  tools/decor_sets.json              tuning numbers, and the older hand-authored entries
+
+Two ways a find gets in, and a find uses exactly one of them:
+
+  The convention (2026-09-20, Richard's call). The PSD says what a piece is and what its
+  views are; tools/decor_sets.json says nothing but the numbers. A piece is a GROUP under
+  'Decoration' holding ONE LAYER PER VIEW, and one layer of the same name under
+  'Decoration Dirty':
+
+      Decoration
+        Sofa (rotate)        <- group name is the title; the suffix is the mechanic
+          front              <- layer name is the role, one view per layer
+          side
+          back
+        Fridge (state)
+          shut
+          open
+        Pet Bed (variant)
+          round
+          oval
+        Mirror (single)      <- a group still, holding its one layer
+      Decoration Dirty
+        Sofa                 <- one layer per piece, the title without its suffix
+        Fridge
+        Pet Bed
+        Mirror
+
+  The suffix is rotate / variant / state, and it is what decides the mechanic, because the
+  role words cannot: the rugs turn between 'wide' and 'long', which no vocabulary of
+  faces would have guessed, and 'round'/'oval' is a restyle while 'shut'/'open' is a
+  switch. A piece with one view needs no suffix and its role is 'front' whatever the
+  layer is called. Views come out in the PSD's own layer order, so the order R cycles
+  them in is the order they are stacked in.
+
+  A piece is always a group, never a bare layer: the flat layers under 'Decoration' are
+  the authored finds, and reading those as pieces too would claim all 37 twice.
+
+  The authored entries, in tools/decor_sets.json's 'entries'. Several views packed into
+  one layer, split by rectangles read off the pixels by hand. This is how all 37 finds
+  were built before the convention and none of them has to move; a piece may not be in
+  both places.
 
 Output:
   assets/decor_clean.png             every clean view, packed
@@ -28,6 +69,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 LAYERS = ROOT / "art_source" / "decoration_extracted"
 TABLE = ROOT / "tools" / "decor_sets.json"
+MANIFEST = LAYERS / "manifest.json"
 CATALOGUE = ROOT / "assets" / "pieces.json"
 CLEAN_PNG = ROOT / "assets" / "decor_clean.png"
 DIRTY_PNG = ROOT / "assets" / "decor_dirty.png"
@@ -194,9 +236,106 @@ def pack(sprites):
 PLACES = ("floor", "wall", "small")
 
 
+## The two top groups of the PSD: the restored piece, and the piece as the lake shows it.
+CLEAN_GROUP = "Decoration"
+DIRTY_GROUP = "Decoration Dirty"
+
+## The word a piece's group name ends in, and the mechanic it buys. A piece with one view
+## says nothing and is SINGLE.
+KINDS = {"rotate": "ROTATE", "variant": "VARIANT", "state": "STATE"}
+
+## The three faces that earn a mirrored fourth: facing you, turned, facing away — so the
+## turn back is the same side flipped, and R goes all the way round. Any other three views
+## are three drawings and the builder invents nothing.
+MIRRORED = ("front", "side", "back")
+
+
+def slug_of(title):
+    """The piece name a title makes: 'Pet Bed' -> 'decor_pet_bed'."""
+    keep = [c.lower() if c.isalnum() else "_" for c in title]
+    out = "".join(keep)
+    while "__" in out:
+        out = out.replace("__", "_")
+    return "decor_" + out.strip("_")
+
+
+def split_kind(group_name):
+    """A piece group's title and mechanic: 'Sofa (rotate)' -> ('Sofa', 'ROTATE')."""
+    name = group_name.strip()
+    if name.endswith(")") and "(" in name:
+        head, word = name[:-1].rsplit("(", 1)
+        word = word.strip().lower()
+        if word in KINDS:
+            return head.strip(), KINDS[word]
+        sys.exit("%s: '%s' is not one of %s" % (group_name, word, tuple(KINDS)))
+    return name, None
+
+
+def from_manifest(named):
+    """Read the PSD's own layer tree as catalogue entries.
+
+    `named` is the piece names the authored entries already claim; a piece in both places
+    is a piece with two answers, so it stops the build rather than picking one.
+    """
+    if not MANIFEST.exists():
+        return []
+    tree = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    groups = {}
+    dirty = {}
+    for layer in tree["layers"]:
+        path = layer.get("group_path") or []
+        if len(path) == 2 and path[0] == CLEAN_GROUP:
+            groups.setdefault(path[1], []).append(layer)
+        elif len(path) == 1 and path[0] == DIRTY_GROUP:
+            dirty[layer["name"].strip()] = layer["slug"]
+
+    entries = []
+    for group_name, layers in groups.items():
+        title, kind = split_kind(group_name)
+        name = slug_of(title)
+        if name in named:
+            sys.exit("%s is both a PSD group and an authored entry; pick one" % title)
+        if kind is None:
+            if len(layers) != 1:
+                sys.exit("%s has %d views and no (rotate|variant|state) in its name"
+                         % (title, len(layers)))
+            kind = "SINGLE"
+        elif len(layers) < 2:
+            sys.exit("%s is %s but holds one layer" % (title, kind))
+        if title not in dirty:
+            sys.exit("%s has no layer called '%s' under '%s'"
+                     % (title, title, DIRTY_GROUP))
+        roles = [layer["name"].strip().lower().replace(" ", "_") for layer in layers]
+        if kind == "SINGLE":
+            # Nothing cycles it, so the layer may be called anything; the catalogue's
+            # word for the one face every other piece has is 'front'.
+            roles = ["front"]
+        if len(set(roles)) != len(roles):
+            sys.exit("%s has two views with the same name" % title)
+        entries.append({
+            "name": name,
+            "title": title,
+            "dirty": dirty[title],
+            "kind": kind,
+            # A three-face set turns all the way round; everything else is what is drawn.
+            "mirror": kind == "ROTATE" and tuple(roles) == MIRRORED,
+            # One view per layer: the layer's own crop is the view, so no rect is authored.
+            "views": [{"role": r, "layer": layer["slug"]}
+                      for r, layer in zip(roles, layers)],
+        })
+    return entries
+
+
 def main():
     table = json.loads(TABLE.read_text(encoding="utf-8"))
-    entries = table["entries"]
+    entries = list(table["entries"])
+    grown = from_manifest({e["name"] for e in entries})
+    # The numbers live here whatever the art came in as: place, base, seat, scale, copies,
+    # and a mirror said out loud. Richard retunes them by eye and never in the PSD.
+    tuning = table.get("tuning", {})
+    for e in grown:
+        e.update(tuning.get(e["name"], {}))
+    entries += grown
     book = json.loads(CATALOGUE.read_text(encoding="utf-8"))
 
     cache = {}

@@ -3699,24 +3699,42 @@ sprite scale breaks the grid assumptions.
 
 ### The Decoration Catalogue (the collection)
 The finds — the furniture the player nets and stands in the shed — come from
-`art_source/Decoration_Clean_Dirty` (a PSD, no extension). It holds two layer groups:
-`Decoration` (restored, as the shed shows it) and `Decoration Dirty` (grimy, as the lake
-shows it). 37 finds (2026-09-13: the kitchen chairs and the old table cut, four rubbish-born
-finds added — see The Shed Floor below).
+**`art_source/Decoration_Clean_Dirty.psd`, the one file** (2026-09-20, `/grill-me` with
+Richard): Richard edits it, the build pulls from it, and the stale extensionless twin of it
+is deleted. It holds two layer groups: `Decoration` (restored, as the shed shows it) and
+`Decoration Dirty` (grimy, as the lake shows it). 37 finds (2026-09-13: the kitchen chairs
+and the old table cut, four rubbish-born finds added — see The Shed Floor below).
 
 **Pipeline** (all offline, run from the project root):
 1. `psd-extract` skill → `art_source/decoration_extracted/` (one PNG per layer + manifest).
    `art_source/.gdignore` keeps these out of the Godot project.
-2. `tools/decor_sets.json` — the **authored** catalogue: titles, dirty↔clean pairing, set
-   kind, and slice rects.
+2. `tools/decor_sets.json` — the numbers, and the older authored entries.
 3. `tools/build_decor.py` → `assets/decor_clean.png`, `assets/decor_dirty.png`, and the
    decor half of `assets/pieces.json`.
 
-**Why the table is authored, not detected**: a set is several sprites packed into *one*
-layer. Nothing in the pixels says whether the second sprite is the same chair turned
-sideways (`ROTATE`), a second style of the same thing (`VARIANT`), or the same fridge with
-its door open (`STATE`) — and those are three different mechanics. Gap detection finds the
-rectangles; only a person can say what they are.
+**A new find is drawn, not written down** (2026-09-20). A piece is a **group** under
+`Decoration` holding **one layer per view**, plus one layer of the same name under
+`Decoration Dirty`; the group's name is the title and its `(rotate)` / `(variant)` /
+`(state)` suffix is the mechanic. Roles are the layer names, in the PSD's own stacking
+order, and a one-view piece needs no suffix and is `SINGLE`. Nothing about such a piece is
+authored in `decor_sets.json`, and a piece may not be in both places.
+- **The suffix exists because the role words cannot carry the mechanic.** The rugs turn
+  between `wide` and `long`, which no vocabulary of faces would have guessed; `round`/`oval`
+  is a restyle and `shut`/`open` is a switch, and by their names alone they are the same
+  shape of thing. Gap detection finds rectangles; only a person can say what they are —
+  the PSD is now where that person says it.
+- **Tuning numbers never come from the PSD**, by decision: `place`, `base`, `base_px`,
+  `seat`, `scale`, `copies`, `mirror` live under `tuning` in `decor_sets.json`, keyed by
+  piece name, because they are set by eye against the shed and retuned without reopening
+  the art.
+- **A piece is always a group, never a bare layer**: the flat layers under `Decoration` are
+  the 37 authored finds, and reading those as pieces too would claim every one of them
+  twice.
+- **Mirror is derived, not asked for**: a `ROTATE` piece whose three roles are exactly
+  `front`, `side`, `back` gets the fourth face flipped, as the sofa always did. Anything
+  else is what is drawn.
+- **The 37 authored entries do not move.** They keep their several-views-to-a-layer
+  rectangles; the builder reads both and the sheets came out byte-identical when it landed.
 
 **Clean and dirty are no longer the same picture twice.** The retired TopDownHouse pair was
 one layout in two palettes, so `sheets.gd` read one rectangle against a parallel sheet. The
@@ -4283,9 +4301,23 @@ size × `SPRITE_SCALE` (2.0), clamped to `SPRITE_SMALLEST`..`SPRITE_LARGEST`.
 names are gone (so is `scripts/find_names.gd` — titles live in `pieces.json` beside the
 rectangles now). `SAVE_VERSION` is 10 (8 when this was written) and older saves are refused
 rather than migrated, bar the one v9 shed-unit scale above;
-`RECUT_RENAMES` and `tools/repair_save.gd` went with them. `tools/slice_sheets.gd` still
-cuts the rubbish sheet, and still writes the whole `pieces.json` — **run
-`tools/build_decor.py` after any re-slice** or the decor half is lost.
+`RECUT_RENAMES` and `tools/repair_save.gd` went with them.
+
+**`tools/slice_sheets.gd` is deleted** (2026-09-20) and so are the 64 `small_*` pieces it
+cut. Its last sheet was `TopDownHouse_SmallItems.png`, which only the retired
+`resources/trash/_old/*.tres` ever named — and it wrote the *whole* `pieces.json`, so with
+nothing left to cut a run would have emptied the catalogue. The first rubbish sheet's
+regions were cut by it once and corrected by hand since: they live in `pieces.json` and in
+git, and **nothing recomputes them**.
+
+**Pack art does not live in `assets/`** (2026-09-20): Penzilla's and LimeZu's own sheets
+were sitting there and therefore shipping in the export, which both licences forbid. They
+are in `art_source/retired_assets/` now, with the Forest pack's `Aseprite_files/` and
+`Atlas_files/`, the Pigeons `.mdp` sources, `Bungee.zip`, `Buttons_Fixed.png`,
+`lake_reference.png` and the slicer's two debug pictures. **Moved, not deleted** — they are
+what a future selection is mined from — and `art_source/.gdignore` is what stops them
+shipping, which also means **no Godot tool can load them**; a builder off them is Python,
+like `build_decor.py`.
 
 ---
 

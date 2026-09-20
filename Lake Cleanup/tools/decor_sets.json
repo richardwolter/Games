@@ -76,8 +76,21 @@
   "scale: how many times bigger than painted the shed draws a piece (default 1). The bed is",
   "1.5 (Richard, 2026-09-13: 'a bit bigger') - a whole screen pixel per painted one at the",
   "room's usual zoom of 2, where 1.25 would be two and a half. The lake never sees it.",
-  "The stove and the kitchen counter are 0.75 (Richard, same day: 'decrease size')."
+  "The stove and the kitchen counter are 0.75 (Richard, same day: 'decrease size').",
+  "",
+  "Two ways in, since 2026-09-20. A piece drawn as a GROUP under 'Decoration' in the PSD,",
+  "one layer per view, with a matching layer under 'Decoration Dirty', needs no entry here",
+  "at all: tools/build_decor.py reads it off the PSD's own layer tree, and the group name's",
+  "(rotate|variant|state) suffix is what says the mechanic. The 'entries' below are the 37",
+  "finds authored before that, several views to a layer and split by hand-read rectangles.",
+  "A piece may be in one place or the other, never both.",
+  "",
+  "'tuning' is where the numbers live for a piece that came in off the PSD, keyed by its",
+  "name (decor_<title>): place, base, base_px, seat, scale, copies, mirror, dirty_piece.",
+  "The numbers never go in the PSD - they are set by eye against the shed and retuned",
+  "without reopening the art."
  ],
+ "tuning": {},
  "entries": [
   {
    "name": "decor_sofa",
