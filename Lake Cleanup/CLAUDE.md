@@ -1428,6 +1428,57 @@ and the letter's re-shot stills are later passes.
 - **The inventory is `docs/ui/strings.md`**: 203 keys, each with its file, its box in design
   pixels and its format placeholders. Read it before adding a key.
 
+**The faces** (Richard, 2026-09-20; `Style.FALLBACK_*`, `tools/shot_fonts.gd`):
+- **Bungee draws every Latin language and nothing else.** 1082 codepoints, measured off its
+  own cmap: all of EN, PT-BR, ES, DE and FR including every accent, the arrow and the
+  middot — and **no kana, no Han, no Hangul, no Cyrillic at all**.
+- **Three stand-ins, picked per locale, not per glyph** (`Style.FALLBACKS`): M PLUS Rounded
+  1c for `ja`, Noto Sans SC for `zh`, Noto Sans KR for `ko`, all OFL, in `assets/fonts/`.
+  M PLUS Rounded 1c was Richard's pick and covers Japanese and Latin, but **not Chinese or
+  Korean** — its Google Fonts subsets are `cyrillic, greek, hebrew, japanese, latin,
+  vietnamese`, and measured it misses a third of a simplified-Chinese sample and every
+  Hangul. Per locale rather than one chain **because the first face holding a Han character
+  would answer for all three CJK languages**, and Chinese drawn in a Japanese font is the
+  wrong shapes rather than missing ones — which is worse, because nothing looks broken.
+- **Latin keeps Bungee, and the mixed look is accepted** (Richard, over one face for all
+  eight): the boards were laid out against Bungee over three UI passes, and a Japanese
+  player seeing a rounded gothic is what localized games do.
+- **The game ships its own glyphs or it shows none** (`Style._no_system`).
+  `FontFile.allow_system_fallback` is **on by default**, so a missing glyph is quietly drawn
+  out of whatever the machine has installed — on this Windows box Japanese, Chinese and
+  Korean all rendered correctly **out of Bungee alone, with no chain wired up**, and would
+  have shipped as tofu to anyone without a CJK system face. It is off now, so a glyph the
+  game does not carry draws as .notdef, which a probe can see. **Turning it off is what made
+  the font work testable at all**; don't turn it back on to make a screenshot look right.
+- **The weight is a synthetic embolden, not the `wght` axis** (`FALLBACK_EMBOLDEN`). Both
+  Noto files carry the axis — `{2003265652: (100, 900, 100)}` — and **open at Thin**, but a
+  `FontVariation` with `variation_opentype` set draws identically at 100 and at 900 whether
+  the key is a String, a StringName or the integer tag: four identical hairline rungs on the
+  ladder page, checked by **counting ink in the saved picture**, not by eye — an advance
+  width cannot show it, because an ideograph is the same width at every weight. Google Fonts
+  ships no static Noto SC/KR instance to use instead (404). So the axis is set anyway in
+  case a later Godot honours it, and `variation_embolden` is what actually lands.
+  **Per face, because they do not start in the same place**: 0.22 for M PLUS (a static
+  Regular), 0.55 for the two Notos (Thin). One number made Japanese heavy while Chinese was
+  still a hairline.
+- **`ShopSkin.titles` and `ShopSkin.headings` are the lake's to set** now, beside `rows`.
+  `TITLES` and the headings inside `GROUPS` are the English defaults and the layout's
+  reading order, not the strings a player sees.
+- **Probe**: `tools/shot_fonts.tscn` (desktop build, `--fixed-fps 60`, own save, under its
+  own node) saves `tools/last_font_<locale>.png` — the **real** net board with that locale's
+  words in it — plus `last_fonts_type_a/b.png` (all eight as type at the real ladder sizes)
+  and `last_fonts_weights.png` (the embolden ladder), and `last_fonts.log`. Words come from
+  `tools/font_samples.gd` and are **samples, not the translation**.
+  - **The board is shown by hand, not through `_set_menu`**: with the menu open the lake
+    writes `_shop_skin.rows = _shop_rows()` every frame and overwrote the sample words
+    between pushing them and photographing them.
+  - **A `draw_string` does not rasterise inside `_draw`.** Dropping the font cache at the end
+    of `_draw` freed the chains before the frame was drawn and the whole page came out as
+    tofu — twice — which looks exactly like the fallback not being wired up. The probe holds
+    every face it drew with until the page has been photographed.
+  - German is the Latin worst case and is in the pictures for it: *Reichweite* is 109 px
+    against a row's 87 and falls to `TEXT_SMALL` rather than cutting.
+
 **Deleted on the sweep, same day** (Richard: "delete dead strings"). Four surfaces wrote
 text no player could reach — **34 strings that would otherwise have been translated eight
 times and reviewed by native speakers**:

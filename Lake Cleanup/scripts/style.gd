@@ -244,7 +244,63 @@ const CRATE_IN := Color(0.18, 0.14, 0.10)
 # Type
 # ---------------------------------------------------------------------------------------
 
+## The game's own face, and the faces that stand in where it has no glyphs (issue #28,
+## 2026-09-20). Bungee is 1082 codepoints — every Latin language the game ships in, the
+## arrow, the middot — and **no kana, no Han, no Hangul, no Cyrillic at all**, measured off
+## its own cmap rather than assumed.
+##
+## So a language Bungee cannot draw is drawn by a fallback, and **which fallback is decided
+## per locale, not per glyph**: `FALLBACKS`. Left to one chain, the first face holding a Han
+## character would answer for all three CJK languages, and Chinese drawn in a Japanese font
+## is the wrong shapes rather than missing ones — which is worse, because nothing looks
+## broken. M PLUS Rounded 1c is 8201 codepoints and misses a third of a sample of simplified
+## Chinese and every Hangul; Noto Sans SC and KR each miss the other's script.
+##
+## **Latin keeps Bungee** (Richard, 2026-09-20): the boards were laid out against it over
+## three UI passes, and a Japanese player seeing a rounded gothic is what localized games
+## do. The mixed look is accepted, not overlooked.
 const FONT_PATH := "res://assets/Bungee-Regular.ttf"
+
+## Locale (the part before any underscore) -> the face that draws it when Bungee cannot.
+## A locale not listed here gets Bungee alone, which is right for every Latin language.
+const FALLBACKS := {
+	&"ja": "res://assets/fonts/MPLUSRounded1c-Regular.ttf",
+	&"zh": "res://assets/fonts/NotoSansSC-Variable.ttf",
+	&"ko": "res://assets/fonts/NotoSansKR-Variable.ttf",
+}
+
+## How heavy a fallback is set, on the `wght` axis.
+##
+## **A variable font opens at its lightest named instance, not at its regular**: the two Noto
+## files are one axis from 100 to 900 and both reported themselves as *Thin* on the first
+## run — hairlines standing beside Bungee, which is a heavy display face. The axis has to be
+## said out loud. M PLUS Rounded 1c is a static Regular and ignores this.
+##
+## A by-eye number: judge it on `tools/last_font_<locale>.png` and retune here.
+const FALLBACK_WEIGHT := 700.0
+
+## How much the stand-in faces are thickened.
+##
+## **The `wght` axis does not reach them.** Both Noto files carry it — `{2003265652: (100,
+## 900, 100)}`, measured — and their default instance is *Thin*, but a `FontVariation` with
+## `variation_opentype` set draws exactly the same at 100 and at 900 whether the key is a
+## String, a StringName or the integer tag: four identical hairline rungs on the ladder
+## page, checked by counting ink in the picture rather than by eye. So the axis is set
+## anyway, in case a later Godot honours it, and the weight that actually lands is this —
+## a synthetic embolden, which is coarser than a real Bold cut and is the trade being made.
+## Google Fonts ships no static Noto SC/KR instance to use instead (checked: 404).
+##
+## **Per face, because they do not start in the same place**: M PLUS Rounded 1c is a static
+## Regular and needs a nudge; the two Notos open at Thin and need most of the way. One
+## number for all three made Japanese heavy while Chinese was still a hairline.
+##
+## By-eye numbers: judge them on `tools/last_fonts_weights.png` and retune here.
+const FALLBACK_EMBOLDEN := {&"ja": 0.22, &"zh": 0.55, &"ko": 0.55}
+
+## An embolden for `tools/shot_fonts.gd`'s ladder to try instead, so the number above can be
+## picked off a picture rather than guessed. Negative means the constant. Nothing in the
+## game sets it.
+static var FALLBACK_EMBOLDEN_OVERRIDE := -1.0
 
 ## The size ladder, in pixels.
 ##
@@ -283,18 +339,65 @@ const BEVEL_MOST := 3.0
 ## How much room a label is given around itself inside a button it is measured for.
 const LABEL_PAD := Vector2(18.0, 10.0)
 
-## Loaded once and kept. A font is a resource load per call otherwise, and these are called
-## from `_draw`.
-static var _font: Font = null
+## Loaded once and kept, per locale. A font is a resource load per call otherwise, and these
+## are called from `_draw`. Keyed by the locale whose chain it is, so switching language and
+## switching back does not rebuild either.
+static var _fonts: Dictionary = {}
+## Which locale `font()` answers for. Set by `set_locale`; the probes set it by hand.
+static var _locale: StringName = &"en"
 
 
-## The one face the UI is set in. Falls back to the engine default rather than failing, so
+## The face the UI is set in, for the locale in hand: Bungee, with that locale's fallback
+## behind it where one is listed. Falls back to the engine default rather than failing, so
 ## the game still runs with the font missing — the same bargain the sheets strike.
 static func font() -> Font:
-	if _font == null:
-		var loaded := load(FONT_PATH)
-		_font = loaded as Font if loaded != null else ThemeDB.fallback_font
-	return _font
+	if _fonts.has(_locale):
+		return _fonts[_locale]
+	var loaded := load(FONT_PATH) as Font
+	if loaded == null:
+		_fonts[_locale] = ThemeDB.fallback_font
+		return _fonts[_locale]
+	# **The game ships its own glyphs or it shows none.** `FontFile.allow_system_fallback`
+	# is on by default, so a missing glyph is quietly drawn out of whatever the machine
+	# happens to have installed — which on this Windows box made Japanese, Chinese and
+	# Korean all render correctly out of Bungee alone, with no chain wired up at all, and
+	# would have shipped as tofu to anyone whose system has no CJK face. Off, a glyph we do
+	# not carry draws as .notdef, which is a thing a probe can see and a test can fail on.
+	_no_system(loaded)
+	var stand_in: String = FALLBACKS.get(_locale, "")
+	if not stand_in.is_empty():
+		var face := load(stand_in) as Font
+		if face != null:
+			_no_system(face)
+			var behind := FontVariation.new()
+			behind.base_font = face
+			behind.variation_opentype = {"wght": FALLBACK_WEIGHT}
+			behind.variation_embolden = (
+				FALLBACK_EMBOLDEN_OVERRIDE if FALLBACK_EMBOLDEN_OVERRIDE >= 0.0
+				else float(FALLBACK_EMBOLDEN.get(_locale, 0.0))
+			)
+			# A `FontVariation` over the real face, so the fallback is a property of the font
+			# the callers already hold rather than something every `draw_string` has to pass.
+			# Set on a copy: `base_font.fallbacks` would put Japanese behind English too.
+			var chained := FontVariation.new()
+			chained.base_font = loaded
+			chained.fallbacks = [behind]
+			loaded = chained
+	_fonts[_locale] = loaded
+	return loaded
+
+
+## Godot draws a missing glyph out of an OS font unless this is said. See `font()`.
+static func _no_system(face: Font) -> void:
+	if face is FontFile:
+		(face as FontFile).allow_system_fallback = false
+
+
+## Which locale the face is picked for. `"pt_BR"` and `"pt"` are one chain: the part before
+## the underscore is what decides a script.
+static func set_locale(locale: String) -> void:
+	var cut := locale.find("_")
+	_locale = StringName(locale.substr(0, cut) if cut > 0 else locale)
 
 
 ## The near-black at a given weight. Callers pass one of the three SCRIM constants rather

@@ -187,6 +187,15 @@ var rows: Array = []
 ## `{tiers: [[name, pct]...], yards: [[name, "$n"]...], rule}`.
 var legend: Dictionary = {}
 
+## What each board is called, and what each group heading reads, set by the lake beside
+## `rows`. **Both are words**, so both are the lake's to hand over once there is more than
+## one language (issue #28) — `TITLES` and the headings in `GROUPS` are the English defaults
+## and where the layout's own reading order lives, not the strings a player sees.
+## `headings` maps a heading as `GROUPS` spells it to what to draw; a heading it does not
+## hold draws as written.
+var titles: Dictionary = TITLES
+var headings: Dictionary = {}
+
 ## The picture at the head of the net and ferry boards, by board name, each `{sheet,
 ## region}`. Lent by the lake, which already has the ferry's baked hull and the net. The
 ## dog draws itself through DogArt.
@@ -604,7 +613,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 	var ribbon := _ribbon_of(box)
 	# Only the last board carries the cross, so only its title makes room for one.
 	var room := Style.title_room(ribbon, CLOSE_SIZE) if board == BOARDS[BOARDS.size() - 1] else Rect2()
-	_draw_ribbon(ribbon, String(TITLES.get(board, "")), room)
+	_draw_ribbon(ribbon, String(titles.get(board, TITLES.get(board, ""))), room)
 
 	# The sprite, fitted into its slot at its own proportions.
 	var slot := Rect2(
@@ -672,7 +681,8 @@ func _ordered(board: StringName) -> Array[int]:
 func _draw_group(heading: String, box: Rect2) -> void:
 	var base := box.position.y + box.size.y * 0.5 + float(Style.TEXT_SMALL) * 0.36
 	var took := Style.write(
-		self, heading, Style.TEXT_SMALL, Vector2(box.position.x, base), Style.PAPER_HEAD
+		self, String(headings.get(heading, heading)), Style.TEXT_SMALL,
+		Vector2(box.position.x, base), Style.PAPER_HEAD
 	)
 	var from := box.position.x + took.x + 8.0
 	if from >= box.end.x - 4.0:
