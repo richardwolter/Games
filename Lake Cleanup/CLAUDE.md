@@ -3654,6 +3654,13 @@ furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
   the picture's bottom edge; `Sheets.seat_of`/`has_seat`): the two pet beds, the bed, and
   the sofa and the armchair **seen from the front only** — from the side or the back a dog
   laid on the cushion is cut in half by the backrest.
+  **A seat is where the dog's feet go and the drawing rises from there**, so a lift picked
+  for where a dog would *stand* puts its body on the backrest (Richard, 2026-09-20: a dog
+  "sleeping over the backside of the sofa... only front/seating side"). The sofa went 10 px
+  to **6** and the armchair 12 to **7**, which is the front edge of the cushion rather than
+  its back. `test_lake` guards the rule for any seat on a piece a whole cell taller than the
+  dog — what has a back to lie over; a pet bed is two cells to the dog's one and a half and a
+  dog on one sticks out by design.
   **Nothing tests a view's *name*.** `decor_bed`'s views are colours (green/blue) and
   `decor_pet_bed`'s are shapes (round/oval), so a gate on the role `front` would have given
   both beds no seat at all and **deleted the one seat that already worked**. Authored or

@@ -20,6 +20,7 @@ extends Node
 const Style := preload("res://scripts/style.gd")
 const HudSkin := preload("res://scripts/hud_skin.gd")
 const HudButtons := preload("res://scripts/hud_buttons.gd")
+const DogArt := preload("res://scripts/dog_art.gd")
 
 const LOG_PATH := "res://tools/last_test.log"
 
@@ -3214,6 +3215,25 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 	var seats: Array = room.call(&"_seats")
 	_check(seats.size() == 2,
 		"a sofa facing front and a pet bed are two seats", "%d" % seats.size())
+
+	# A seated dog lies on the cushion, not over the backrest (Richard, 2026-09-20). A seat
+	# is where the dog's feet go and the drawing rises from there, so a lift picked for where
+	# a dog would *stand* puts its body on the back of the sofa. Asked of the seats a dog sits
+	# **in** — a piece a whole cell taller than the dog, which is what has a back to lie over.
+	# A pet bed is two cells to the dog's one and a half and a dog on one sticks out by
+	# design; there is nothing there for it to be on top of.
+	var dog_tall: float = DogArt.span(&"sleep", ShedRoom.DOG_TALL).y
+	for seat: Dictionary in seats:
+		var key := String(seat["key"])
+		var piece := StringName(key.split("@")[0])
+		var tall := float(room.span_of(piece, 0).y) / float(ShedRoom.CELL)
+		if tall - dog_tall < 1.0:
+			continue
+		var feet: Vector2 = seat["feet"]
+		var top := float(int(String(key.split("@")[1]).split(",")[1])) / float(ShedRoom.CELL)
+		_check(feet.y - dog_tall >= top - 0.01,
+			"a dog on the %s lies on its cushion, not over its back" % piece,
+			"dog top %.2f, piece top %.2f" % [feet.y - dog_tall, top])
 
 	# The sofa turned side on is nobody's seat: a dog laid on that cushion is cut in half by
 	# the backrest, which is why the seat is authored per view rather than per piece.
