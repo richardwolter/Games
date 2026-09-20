@@ -173,6 +173,8 @@ func _physics_process(_delta: float) -> void:
 		32:
 			_stage_wash()
 		33:
+			_stage_letter()
+		34:
 			_stage_front()
 		_:
 			pass
@@ -6275,6 +6277,148 @@ func _stage_new_tracks() -> void:
 		"with both new levels on it",
 		"%d, %d" % [int(_main.get(&"boat_volley_level")),
 			int(_main.get(&"dog_strength_level"))])
+	_advance()
+
+
+## The letter: the four onboarding cards, the pager, the room they need, and the save flag
+## that decides whether a new game plays the arrival at all (2026-09-19, issue #24).
+##
+## The board is laid out at **1280x720**, the smallest window the game allows, because that
+## is the one where a board runs out of room — the settings, bind and credits boards are
+## asked the same question and for the same reason.
+func _stage_letter() -> void:
+	var letter := Letter.new()
+	letter.size = Vector2(1280.0, 720.0)
+	add_child(letter)
+	letter.open()
+
+	_check(Letter.CARDS.size() == 4, "the letter is four cards",
+		"%d" % Letter.CARDS.size())
+	var heads: Array = []
+	var long_cards: Array = []
+	for card: Dictionary in Letter.CARDS:
+		heads.append(String(card["head"]))
+		if (card["lines"] as Array).size() > Letter.SENTENCE_ROWS:
+			long_cards.append(String(card["head"]))
+	_check(heads == ["Net", "Upgrades", "Weight", "Decoration"],
+		"named for what each one teaches", ", ".join(heads))
+	_check(long_cards.is_empty(),
+		"and none says more than the rows the board reserves", ", ".join(long_cards))
+	_check(Letter.GREETING.contains("new owner"),
+		"the greeting stands over every card", Letter.GREETING)
+
+	# The pager: a dot a card, clamped at both ends rather than wrapping round.
+	_check((letter.get(&"_dots") as Array).size() == Letter.CARDS.size(),
+		"one dot a card", "")
+	letter.turn(-1)
+	_check(letter.page == 0, "the first card cannot be paged back off", "%d" % letter.page)
+	_check(not (letter.get(&"_door") as Control).visible,
+		"and carries no door: there is still something to read", "")
+	for _i in Letter.CARDS.size() + 3:
+		letter.turn(1)
+	_check(letter.page == Letter.CARDS.size() - 1,
+		"the last card is the last one", "%d" % letter.page)
+	var door := letter.get(&"_door") as PlankButton
+	_check(door.visible and door.label == "Start cleaning",
+		"which is where the way out is, and says what it does", door.label)
+	_check((letter.get(&"_close") as Control).visible,
+		"the cross is there from the first card, so nobody is trapped", "")
+
+	# Room, at the smallest window the game will draw. The credits board's own question.
+	_check(letter.wanted_tall() <= 680.0, "the board fits the smallest window",
+		"%.0f of 680" % letter.wanted_tall())
+	# The first cut's net card ran its second line clean over both stiles: `Style.write`
+	# neither wraps nor clips. Every line and caption is measured against the paper now.
+	var over := letter.overruns()
+	_check(over.is_empty(), "and every line and caption fits the paper", ", ".join(over))
+	# Measured rather than drawn: headless has no renderer, so `_draw` — and the
+	# `dropped_lines` it sets — never runs. `tools/shot_letter.tscn` is what reads that.
+	var sheet := letter.get(&"_sheet") as Rect2
+	var way_out := letter.get(&"_door") as Control
+	var forward := letter.get(&"_on") as Rect2
+	_check(sheet.encloses(Rect2(way_out.position, way_out.size)),
+		"with its door on the paper", "")
+	_check(is_equal_approx(way_out.position.x + way_out.size.x, forward.end.x),
+		"standing where the forward arrow stood, so no card reserves a row for it", "")
+
+	# The pictures are the game's own photographs. A still that is not there is a probe
+	# nobody re-ran, and the card would show a blank print.
+	var blank := letter.missing_stills()
+	_check(blank.is_empty(), "every card's snapshots have been shot and imported",
+		", ".join(blank))
+	var crowded := []
+	for card: Dictionary in Letter.CARDS:
+		var pinned: Array = card["snaps"]
+		if pinned.is_empty() or pinned.size() > Letter.SNAPS_MOST:
+			crowded.append(String(card["head"]))
+	_check(crowded.is_empty(), "one to three to a card", ", ".join(crowded))
+	# The greeting is the first card's, and the others give its room to their pictures.
+	var inside := sheet.grow(-Letter.SHEET_PAD)
+	letter.page = 0
+	var first := (letter.call(&"_art_box", inside) as Rect2).size.y
+	letter.page = 1
+	var second := (letter.call(&"_art_box", inside) as Rect2).size.y
+	_check(first >= Letter.ART_LEAST - 1.0 and second > first + 20.0,
+		"the greeting's room goes to the pictures after the first card",
+		"%.0f then %.0f" % [first, second])
+	letter.queue_free()
+
+	# The save flag. A file written before this existed has no such key, and **absent means
+	# seen**: the arrival is for a new game, never for somebody's run in progress.
+	_main.set(&"_intro_done", false)
+	_check(bool(_main.call(&"save_game")), "the run writes itself out", "")
+	var path := String(_main.get(&"save_path"))
+	var file := FileAccess.open(path, FileAccess.READ)
+	var save: Dictionary = file.get_var(true)
+	file.close()
+	_check(save.has("intro_done") and not bool(save["intro_done"]),
+		"carrying the flag it was written with", "")
+	save.erase("intro_done")
+	file = FileAccess.open(path, FileAccess.WRITE)
+	file.store_var(save, true)
+	file.close()
+	_check(bool(_main.call(&"load_game")), "an older save reads back", "")
+	_check(bool(_main.get(&"_intro_done")),
+		"and a save with no such key has already seen it", "")
+
+	# Closing the cards is what ends the arrival: the flag is written, the hull may sail and
+	# the player has their legs back.
+	_main.set(&"_intro_done", false)
+	(_main.get(&"_boats") as Array)[0].moored = true
+	# The last beat of the walk, driven the way `_process` drives it: the step raises the
+	# letter itself and then has somewhere to stand.
+	_main.set(&"_arrive", Lake.Arrive.WALKING)
+	_main.set(&"_arrive_wait", 0.0)
+	_angler.walk_to = Vector2.INF
+	_main.call(&"_arrival_step")
+	_check(bool(_main.get(&"_letter_open")) and not _angler.can_walk,
+		"the walk ends by raising the letter, and it holds the angler", "")
+	# And the step is asked again every frame the cards are up. It used to answer by
+	# reopening them, which put the reader back on the first card — so the cards could not
+	# be paged at all. The state it moves to is what stops that.
+	var board := _main.get(&"_letter") as Letter
+	board.page = 2
+	_main.call(&"_arrival_step")
+	_main.call(&"_arrival_step")
+	_check(board.page == 2, "and does not turn the page back under the reader",
+		"page %d" % board.page)
+	_main.call(&"_set_letter", false)
+	_check(int(_main.get(&"_arrive")) == 0 and bool(_main.get(&"_intro_done")),
+		"closing them ends the arrival and writes the flag", "")
+	_check(not ((_main.get(&"_boats") as Array)[0] as Boat).moored,
+		"and lets the ferry go to work", "")
+	_check(_angler.can_walk, "the player has their hands back", "")
+
+	# The only way back to the cards once the intro is over.
+	# The harness's lake is borrowed, so it has never raised the front and has no menu yet.
+	_main.call(&"_build_menu")
+	var menu := _main.get(&"_menu") as MainMenu
+	var keys: Array = []
+	for door_row: Dictionary in MainMenu.DOORS:
+		keys.append(String(door_row["key"]))
+	_check(keys.find("how") == keys.find("credits") - 1,
+		"the menu's How to play plank stands above Credits", ", ".join(keys))
+	_check(menu != null and menu.letter() != null, "and opens the same board", "")
 	_advance()
 
 

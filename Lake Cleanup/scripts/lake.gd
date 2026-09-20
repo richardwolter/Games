@@ -766,6 +766,23 @@ var _coins: CoinFly
 var _farewell_shown: bool = false
 var _farewell: Farewell
 
+# The arrival and the letter (2026-09-19, `/grill-me` with Richard, issue #24).
+#
+# A new game lands the angler and his dog by boat, walks him up to the shed and opens the
+# letter on its door (`scripts/letter.gd`). **Unskippable and therefore short**, by
+# decision: about twelve seconds from the glide landing to the cards being up, with no key
+# that cuts it — a skip is an admission that the thing is too long.
+#
+# `_intro_done` is the save's own flag, and **a save with no such key reads as done**: every
+# file written before this existed belongs to somebody who has already played, and giving
+# them the arrival on Continue would be a bug wearing a tutorial's clothes. Nothing else in
+# the save moved, so there is no `SAVE_VERSION` bump.
+enum Arrive { OFF, SAILING, WALKING, READING }
+var _intro_done: bool = false
+var _arrive: int = Arrive.OFF
+var _letter: Letter
+var _letter_open: bool = false
+
 ## The pad's reticle and its assist, see scripts/pad_aim.gd. `at` is INF while the mouse is
 ## aiming; `_pad_was` notices the switch so the reticle starts where the pointer was.
 var _aim := PadAim.new()
@@ -1881,7 +1898,7 @@ func _def(
 func _unhandled_input(event: InputEvent) -> void:
 	# Behind the menu, and on the way down out of it, the lake reads nothing: the menu's own
 	# boards answer Escape and F11, and a click meant for a plank must not also be a cast.
-	if _fronted():
+	if _fronted() or _arrive != Arrive.OFF:
 		return
 	if _extra_input(event):
 		return
@@ -1891,7 +1908,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				# One key backing out of whatever is open, innermost first: the shed, then
 				# the shop board, and only on open water does it mean the settings.
-				if _controls_open:
+				if _letter_open:
+					_shut(_set_letter)
+				elif _controls_open:
 					_shut(_set_controls)
 				elif _wash_open:
 					_shut(_set_wash)
@@ -2036,7 +2055,10 @@ func _desk_pressed(event: InputEvent, action: StringName) -> bool:
 
 ## Whether any board is over the lake.
 func _panelled() -> bool:
-	return _settings_open or _menu_open or _shed_open or _controls_open or _wash_open
+	return (
+		_settings_open or _menu_open or _shed_open or _controls_open or _wash_open
+		or _letter_open
+	)
 
 
 ## F11, and the window row's two ordinary modes. Borderless rather than exclusive: the lake
@@ -2055,7 +2077,7 @@ func _flip_fullscreen() -> void:
 func pad_cursor_wanted() -> bool:
 	return (
 		_menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
-		or _in_menu or _wash_open
+		or _in_menu or _wash_open or _letter_open
 	)
 
 
@@ -2769,6 +2791,143 @@ func _drop_farewell() -> void:
 	_hold_the_angler()
 
 
+# The arrival, and the letter (issue #24)
+# =======================================
+#
+# What a new game opens with, in order: the glide down out of the menu, a ferry sailing in
+# off the lake, the angler and his dog stepping off at the dock, a walk up to the shed, and
+# the letter pinned to its door opening itself. The player's hands are held throughout and
+# come back when the cards are closed.
+#
+# **The boat is the fleet's own first hull**, by decision, not a visitor built for the
+# occasion: it berths and is the ferry from then on, which is both one less thing to build
+# and an answer to where the ferry came from. It is `moored` while the letter is up so it
+# does not set off on a run behind the cards.
+#
+# **The note on the door is the intro's alone.** It opens itself, and it is gone afterwards;
+# the cards are read again from the main menu's "How to play" plank. The cost, accepted: a
+# player ten minutes in has to go through the menu to re-read them.
+
+## Where the pair step off, as a share of the way from the island's middle out to the berth:
+## its own beach, on the side the hull came alongside.
+const ARRIVE_ASHORE := 0.82
+## How far out the hull starts, as a share of the basin's radius — off the drawn lake, so it
+## comes in over the water rather than fading up on it.
+const ARRIVE_OUT := 1.3
+## Where the angler is led, as a share of `SHOP_RANGE` south of the hut: inside the door's
+## reach, on the side the dock is.
+const ARRIVE_AT_SHED := 0.7
+## How long the pair stand on the boards before setting off, and how long the note is looked
+## at before it opens. Two small beats, so neither reads as a snap.
+const ARRIVE_STEP_OFF := 0.6
+const ARRIVE_READ := 0.8
+
+var _arrive_wait: float = 0.0
+
+
+## Arm the arrival, at the moment the glide sets off: the hull goes out onto the lake, and
+## the pair go with it. Called from `_begin_glide`, after `_release_world` — which unmoors
+## every hull, and this one is to stay put once it lands.
+func _start_arrival() -> void:
+	if _intro_done or _boats.is_empty():
+		return
+	_arrive = Arrive.SAILING
+	_arrive_wait = ARRIVE_STEP_OFF
+	var hull := _boats[0]
+	hull.moored = true
+	hull.arrive_from(Iso.basin_point(Iso.basin_angle(hull.dock), ARRIVE_OUT))
+	# Standing where the boat comes alongside, out of sight until they step off it. The
+	# berth itself is water, and `stand_at` would walk them off it to the nearest dry tile
+	# — which is inland, so the pair appeared halfway up the island instead of on its beach.
+	_angler.stand_at(_ashore_of(hull.dock))
+	_angler.visible = false
+	for dog in _dogs:
+		dog.visible = false
+		dog.doze(true, false)
+	_hold_the_angler()
+
+
+## The beach on the side a berth is: the island's own ring, taken in a little. Measured off
+## `Iso.ISLAND_RADIUS` rather than as a share of the way out to the berth — the berth lies
+## a couple of tiles beyond the ring, so a share of it is still water however small it looks.
+func _ashore_of(berth: Vector2) -> Vector2:
+	var way := (berth - Iso.ISLAND_CENTRE).normalized()
+	return Iso.ISLAND_CENTRE + Vector2(
+		way.x * Iso.ISLAND_RADIUS.x, way.y * Iso.ISLAND_RADIUS.y
+	) * ARRIVE_ASHORE
+
+
+## One frame of it. Three beats and no timeline: the hull's own state machine says when it
+## has berthed, and the angler's own walk says when he has arrived.
+func _arrival_step() -> void:
+	match _arrive:
+		Arrive.SAILING:
+			if _boats.is_empty() or _boats[0].state != Boat.State.DOCKED:
+				return
+			_arrive_wait -= get_process_delta_time()
+			if _arrive_wait > 0.0:
+				return
+			_angler.visible = true
+			for dog in _dogs:
+				dog.tile_pos = _ashore_of(_boats[0].dock)
+				dog.visible = true
+				dog.doze(false)
+			var mid := Iso.shed_centre()
+			_angler.walk_to = Vector2(
+				mid.x + SHOP_RANGE * ARRIVE_AT_SHED * 0.7,
+				mid.y + SHOP_RANGE * ARRIVE_AT_SHED * 0.7
+			)
+			_arrive = Arrive.WALKING
+			_arrive_wait = ARRIVE_READ
+		Arrive.WALKING:
+			if _angler.walk_to != Vector2.INF:
+				return
+			_arrive_wait -= get_process_delta_time()
+			if _arrive_wait > 0.0:
+				return
+			# A state of its own, and not for tidiness: `WALKING` is tested every frame, and
+			# without somewhere to go the step raised the letter again on each one — which
+			# calls `Letter.open`, which puts the reader back on the first card. The cards
+			# could not be paged at all until this was here.
+			_arrive = Arrive.READING
+			_set_letter(true)
+
+
+## The letter is down: the intro is over, the flag is written, and the hull may sail.
+func _finish_intro() -> void:
+	if _arrive == Arrive.OFF:
+		return
+	_arrive = Arrive.OFF
+	_angler.walk_to = Vector2.INF
+	for boat in _boats:
+		boat.moored = false
+	_intro_done = true
+	save_game()
+
+
+## The cards, on the HUD's layer over everything the lake draws. Built the first time they
+## are asked for, the way the wash room and the bind board are.
+func _set_letter(open: bool) -> void:
+	if open and _letter == null:
+		_letter = Letter.new()
+		_letter.name = &"Letter"
+		_letter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_letter.close_asked.connect(_shut.bind(_set_letter))
+		_settings.get_parent().add_child(_letter)
+	if _letter == null:
+		return
+	if open and not _letter_open and _sfx != null:
+		_sfx.play(&"shed_open")
+	_letter_open = open
+	if open:
+		_letter.open()
+	else:
+		_letter.visible = false
+		_finish_intro()
+	_push_rooms()
+	_hold_the_angler()
+
+
 ## Hang a cross in a panel's top right corner.
 ##
 ## The cross is a child of the HUD rather than of the panel: a PanelContainer stretches what
@@ -2796,7 +2955,7 @@ func _pin_close(panel: Control, closing: Callable) -> void:
 func _hold_the_angler() -> void:
 	var busy := (
 		_menu_open or _settings_open or _shed_open or _controls_open
-		or _farewell != null or _fronted()
+		or _farewell != null or _fronted() or _letter_open or _arrive != Arrive.OFF
 	)
 	_angler.can_walk = not busy
 	# The net is held where it is for as long as the panel is up, and goes back to reeling
@@ -2909,6 +3068,9 @@ const SKIP_GLIDE_AFTER := 0.7
 ## For the probes that photograph the menu: wear the front although borrowed. Set before the
 ## scene enters the tree, like `save_path`.
 var force_front: bool = false
+## For the one probe that photographs the arrival: play it although the lake is borrowed.
+## Read once, the way `skip_menu` is, so it cannot leak into the next lake of the session.
+static var force_intro: bool = false
 
 var _in_menu: bool = false
 ## On the way to the menu: the view is dimming and the lake has stopped answering.
@@ -2932,9 +3094,16 @@ func _fronted() -> bool:
 func _raise_front(loaded: bool) -> void:
 	var playing := skip_menu
 	skip_menu = false
-	# Borrowed by a tool: see the header.
-	if get_parent() != get_tree().root and not force_front:
-		return
+	# Borrowed by a tool: see the header. A borrowed lake also never plays the arrival —
+	# a harness that raises the menu by hand and glides down out of it is not a new game,
+	# and a probe photographing the front is not one either — unless it says so, which is
+	# what `tools/shot_letter.tscn` is for.
+	if get_parent() != get_tree().root:
+		if not force_intro:
+			_intro_done = true
+		force_intro = false
+		if not force_front:
+			return
 	# Under the loading screen's own picture, which the boot scene has just been showing.
 	_curtain = Curtain.new()
 	add_child(_curtain)
@@ -3054,6 +3223,7 @@ func _begin_glide() -> void:
 	_skin.modulate.a = 0.0
 	_open_settings.modulate.a = 0.0
 	_hud_layer.visible = true
+	_start_arrival()
 
 
 ## One frame of the glide. The zoom runs in its logarithm, so the push reads as one even
@@ -4211,6 +4381,7 @@ func _process(delta: float) -> void:
 	_push_patches(delta)
 	if not _in_menu:
 		_tick_bonus(delta)
+		_arrival_step()
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	# The view: held on the whole lake behind the menu, flown down to the angler when the
@@ -4872,6 +5043,7 @@ func save_game() -> bool:
 		# lake. A save that carried its own copy handed it back on load and undid whatever the
 		# player had set on the menu.
 		"farewell": _farewell_shown,
+		"intro_done": _intro_done,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -5007,6 +5179,8 @@ func load_game() -> bool:
 	# and lit that way from the first frame rather than brightening as if it had just
 	# happened. The thanks are not repeated: they were earned once.
 	_farewell_shown = bool(save.get("farewell", false))
+	# Absent means seen: see the arrival section. A run in progress never plays the intro.
+	_intro_done = bool(save.get("intro_done", true))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

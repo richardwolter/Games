@@ -13,10 +13,10 @@
 ## up playing. Supersedes the baked `assets/menu_lake.png` (2026-09-16), `scenes/menu.tscn`
 ## and the scene change into `main.tscn`.
 ##
-## Five `PlankButton`s: Continue (only when the lake behind loaded a run), New game (over a
+## Six `PlankButton`s: Continue (only when the lake behind loaded a run), New game (over a
 ## run, `MenuConfirm` asks first — the save is the one thing the menu can destroy),
 ## Settings (the lake's own board in `menu_mode`: sound and screen, none of the lake's
-## rows), Credits and Quit. Nothing here is a stock Button in a theme: the planks are the
+## rows), How to play (the onboarding cards again — see `letter.gd`), Credits and Quit. Nothing here is a stock Button in a theme: the planks are the
 ## HUD's own wood, the boards the shop's.
 class_name MainMenu
 extends Control
@@ -42,6 +42,7 @@ const DOORS := [
 	{"key": &"continue", "label": "Continue"},
 	{"key": &"new", "label": "New game"},
 	{"key": &"settings", "label": "Settings"},
+	{"key": &"how", "label": "How to play"},
 	{"key": &"credits", "label": "Credits"},
 	{"key": &"quit", "label": "Quit"},
 ]
@@ -84,6 +85,10 @@ var _planks: Dictionary = {}
 var _settings: SettingsSkin
 var _controls: ControlsSkin
 var _credits: CreditsBoard
+## The onboarding cards, read again (2026-09-19, issue #24). The same board the letter on
+## the shed door opens on a new game; the plank stands above Credits because this is the
+## only way back to it once the intro is over.
+var _letter: Letter
 var _confirm: MenuConfirm
 ## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
 ## way out is a second answer to a question already answered.
@@ -147,6 +152,12 @@ func _ready() -> void:
 	_credits.close_asked.connect(_shut.bind(_show_credits))
 	add_child(_credits)
 
+	_letter = Letter.new()
+	_letter.name = &"Letter"
+	_letter.visible = false
+	_letter.close_asked.connect(_shut.bind(_show_letter))
+	add_child(_letter)
+
 	_confirm = MenuConfirm.new()
 	_confirm.name = &"Confirm"
 	_confirm.visible = false
@@ -179,7 +190,7 @@ func _band() -> GradientTexture2D:
 func _fill() -> void:
 	position = Vector2.ZERO
 	size = get_viewport().get_visible_rect().size
-	for over: Control in [_scrim, _settings, _controls, _credits, _confirm]:
+	for over: Control in [_scrim, _settings, _controls, _credits, _letter, _confirm]:
 		over.position = Vector2.ZERO
 		over.size = size
 	_lay_out()
@@ -218,7 +229,7 @@ func _lay_out() -> void:
 ## cover) or faded in (the way back from the game, out of the dark the pose was struck in).
 func show_up(at_once: bool = false) -> void:
 	_kill_fade()
-	for over: Control in [_settings, _controls, _credits, _confirm]:
+	for over: Control in [_settings, _controls, _credits, _letter, _confirm]:
 		over.visible = false
 	visible = true
 	_live = true
@@ -260,7 +271,7 @@ func _take(key: StringName) -> void:
 	var asks := key == &"new" and has_run
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
-	elif key in [&"settings", &"credits"] or asks:
+	elif key in [&"settings", &"credits", &"how"] or asks:
 		# A question only; the start sound waits for the answer.
 		Sfx.ui(&"ui_click")
 	match key:
@@ -273,6 +284,8 @@ func _take(key: StringName) -> void:
 				_play()
 		&"settings":
 			_show_settings(true)
+		&"how":
+			_show_letter(true)
 		&"credits":
 			_show_credits(true)
 		&"quit":
@@ -323,6 +336,17 @@ func _show_controls(open: bool) -> void:
 	_controls.visible = open
 
 
+## The same board the letter on the shed door opens, for the harness to ask.
+func letter() -> Letter:
+	return _letter
+
+
+func _show_letter(open: bool) -> void:
+	_letter.visible = open
+	if open:
+		_letter.open()
+
+
 func _show_credits(open: bool) -> void:
 	_credits.visible = open
 	# The credits roll to the end song, and the playlist comes back under it on the way out.
@@ -358,6 +382,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_shut(_show_confirm)
 			elif _controls.visible:
 				_shut(_show_controls)
+			elif _letter.visible:
+				_shut(_show_letter)
 			elif _credits.visible:
 				_shut(_show_credits)
 			elif _settings.visible:

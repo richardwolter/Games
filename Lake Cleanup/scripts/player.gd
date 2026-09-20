@@ -165,6 +165,16 @@ var facing := Vector2(0.0, 1.0)
 ## Set false while the shop is open, so walking does not happen behind the panel.
 var can_walk: bool = true
 
+## A tile the angler walks to by himself, or `Vector2.INF` for nobody leading him. Set by
+## the new game's arrival (`Lake`'s arrival section, 2026-09-19, issue #24): the figure
+## walks up the beach to the shed while the player's hands are held, which is exactly the
+## case `can_walk` refuses — so this is read **instead of** the input, not through it.
+## Cleared by the walk itself on arrival, so a caller can watch it for the end.
+var walk_to := Vector2.INF
+## How near counts as arrived, in tiles. A stride is about a tenth of a tile a frame, so
+## anything under that would be walked past and back.
+const LED_CLOSE := 0.35
+
 ## Where the yard crate stands, in tiles, or INF for a scene with no crate in it. Set by the
 ## lake once the yard has been put down.
 ##
@@ -475,7 +485,17 @@ func _process(delta: float) -> void:
 	# The arrows and WASD both feed these, which is what the walk_* actions are for. See
 	# the [input] block in project.godot.
 	var push := Vector2.ZERO
-	if can_walk:
+	if walk_to != Vector2.INF:
+		# Led, not driven: the push is worked out in screen space, which is what the input
+		# gives and what the step below expects to be handed.
+		if tile_pos.distance_to(walk_to) <= LED_CLOSE:
+			walk_to = Vector2.INF
+		else:
+			push = (
+				Iso.tile_to_world(walk_to.x, walk_to.y)
+				- Iso.tile_to_world(tile_pos.x, tile_pos.y)
+			).normalized()
+	elif can_walk:
 		push = Vector2(
 			Input.get_axis(&"walk_left", &"walk_right"),
 			Input.get_axis(&"walk_up", &"walk_down")

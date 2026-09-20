@@ -375,6 +375,26 @@ func moor_now() -> PackedInt32Array:
 	return aboard
 
 
+## Sail in from off the lake and berth, as if coming home from a run (2026-09-19, issue
+## #24). The new game's arrival: this hull carries the angler and his dog in and is the
+## fleet's first ferry from then on, rather than a visitor that has to be built and sailed
+## away again. `RETURNING` rather than a state of its own — the course home, the bell at the
+## berth and the docking are all exactly what this is, and a hull with `moored` set will
+## simply sit there once it lands.
+func arrive_from(at: Vector2) -> void:
+	cargo = PackedInt32Array()
+	_route.clear()
+	_landing = false
+	_dwell = 0.0
+	target = -1
+	tile_pos = at
+	heading = (dock - at).normalized()
+	_legs = _plan_legs(at, dock)
+	state = State.RETURNING
+	_place()
+	queue_redraw()
+
+
 ## Where it is on its run, for the HUD. One line rather than five branches at the call site.
 func status_line() -> String:
 	match state:

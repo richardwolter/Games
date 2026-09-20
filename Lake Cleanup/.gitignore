@@ -55,3 +55,4 @@ tools/pop_run.log
 tools/film/last_film.log
 tools/film/*.import
 docs/progression/replay-report/
+tools/letter_run.log

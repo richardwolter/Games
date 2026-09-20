@@ -1047,7 +1047,11 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   the lit edge along its top** — two channels, because the two faces are close in luminance
   and told apart by hue alone they are one face to a red-green colourblind player. Only ever
   one door is accented, or the accent says nothing.
-  Five `PlankButton`s (232x56): Continue (only when the lake behind **loaded** a run —
+  **How to play stands above Credits** (2026-09-19, issue #24): the onboarding cards again,
+  and **the only way back to them** once the intro is over — the note on the shed door is
+  gone by then. Accepted cost: a player ten minutes in has to go to the menu to re-read
+  them, which the settings board's *Save and go to menu* makes one click.
+  Six `PlankButton`s (232x56): Continue (only when the lake behind **loaded** a run —
   `MainMenu.has_run`, set from `load_game`'s own answer; it used to ask whether the file
   existed, and offered to continue a save the lake had just refused), New game (over a run,
   `MenuConfirm` asks "Start over?" first, then `reload_asked` and the lake deletes its own
@@ -1197,6 +1201,94 @@ doors and `MainMenu` is an overlay on it (`Lake`'s "The menu over the lake" sect
   full crate sends no ferry, the autosave writes nothing, Escape opens nothing), the doors'
   accent, the release, the glide landing on the play stop, and the way back writing the run
   on the same lake.
+
+### The Arrival and the Letter (2026-09-19, `/grill-me` with Richard, issue #24)
+A new game opens with the angler and his dog landing by boat and reading a letter on the
+shed door. Four cards, and **that is the whole of the tutorial**, by decision: no contextual
+prompts, no unlock pacing that teaches one system at a time, no goal readout. **#24 stays
+open** for those.
+- **Unskippable, and therefore short** (Richard's call over a skip key): about twelve
+  seconds from the glide landing to the cards being up. A skip is an admission that the
+  thing is too long.
+- **The boat is the fleet's own first hull**, not a visitor built for the occasion:
+  `Boat.arrive_from` puts it off the lake and sails it home as `RETURNING`, so the course,
+  the bell and the berthing are the ones it already had, and it is the ferry from then on.
+  It is `moored` until the cards are closed, so it does not set off on a run behind them.
+- **The pair step off onto the beach, not onto the berth** (`Lake._ashore_of`): a berth is
+  water and `Angler.stand_at` walks a figure off water to the nearest dry tile, which is
+  inland — so the two appeared halfway up the island. The spot is measured off
+  `Iso.ISLAND_RADIUS`, not as a share of the way out to the berth, which is still water
+  however small the share looks.
+- **The angler is led, not driven** (`Angler.walk_to`): read **instead of** the input rather
+  than through it, because the player's hands are held for the whole arrival and that is
+  exactly what `can_walk` refuses. The walk clears it on arrival, so the lake watches it for
+  the end of the beat.
+- **`Arrive.READING` is a state and not tidiness**: `WALKING` is tested every frame, and
+  with nowhere to go the step raised the letter again on each one — which calls
+  `Letter.open`, which puts the reader back on the first card. The cards could not be paged
+  at all until it was there. `test_lake` drives the step twice with a card turned.
+- **The note on the door is the intro's alone.** It opens itself and is gone; the cards are
+  read again from the main menu's **How to play** plank (see The Front above).
+- **`intro_done` in the save, and a missing key reads as *done***: every file written before
+  this existed belongs to somebody who has already played, and giving them the arrival on
+  Continue would be a bug wearing a tutorial's clothes. Nothing else in the save moved, so
+  **no `SAVE_VERSION` bump** — the furnished save and the trailer's shed shot are untouched.
+  A borrowed lake (every harness and probe) is marked done as well, unless it asks with
+  `Lake.force_intro`.
+- **A paper letter on the wood, not a fourth settings board** (`scripts/letter.gd`; second
+  `/grill-me` the same day, a UI pass over the first cut). The oak frame, the title plank and
+  the close cross are the carpentry every board wears; the face is **a sheet in the sand's
+  tones** (`PAPER`, `INK`, `HEAD_INK`) with the planks' V bites torn out of its edges — **no
+  black rim round them**, which is what a hole in wood wears — and dark ink with **no drop
+  shadow** (`_ink`, not `Style.write`: that shade is for labels on dark wood or open water
+  and under dark ink on a pale sheet it is a smudge). The first cut was the shop's dark face
+  with three ellipses on it and read as a menu with nothing to set.
+- **The pictures are the game photographing itself** (`tools/shot_letter_art.tscn` ->
+  `assets/letter/*.png`, nine stills), **pinned like photographs**: a white border, a pin, a
+  shadow down and to the left, each hung up to `SNAP_TILT` (1.6 degrees) off level by a hash
+  of its name, as child `Snap` nodes at a **linear** filter so the board's pixel wood does
+  not go soft with them. **This supersedes the first cut's "every picture is drawn in code,
+  so nothing can drift"**: a ring on a flat face explained nothing, because what a ring
+  means is what is under it. **The cost, taken knowingly** (Richard): a repainted ring,
+  lake, shop or HUD means re-running the probe and reimporting, and **the stills carry the
+  game's English UI as it stands** — a language pass (#28) re-shoots them.
+- **A pose is found, not written down**: the probe asks the net where the ring reads green
+  (the busiest such water in reach, a tie going further out — by the island the fill is
+  thin), where it reads red over open water, where a piece too heavy for the net floats, and
+  the grid where the new game's find lies; the wash shot is sprayed **until the stand says
+  half clean** (`WASH_UNTIL`), not for a number of seconds. What it cannot find it says in
+  `tools/last_letter_art.log` and leaves the old still alone. Contact sheet:
+  `tools/last_letter_art.png`. The Strength row is cropped **with the rows either side of
+  it** (`ROW_CONTEXT`): alone it is a strip 3.5 times as wide as tall, and pinned beside a
+  photograph it took the whole card.
+- **The cards**: *Net* — three stills captioned Green / Red / White, one sentence; *Upgrades*
+  — the HUD button and the open shop; *Weight* — a red ring on a heavy piece, the Strength
+  row; *Decoration* — Catch it / Wash it / Place it. One to three stills a card, one height
+  for a row, each as wide as its own shape, the row scaled down together if too wide.
+- **The greeting is the first card's alone** (Richard, over a letterhead on every card and
+  over a fifth opening page), wrapped **evenly** (`_wrap_even`) so it does not leave two
+  words alone on its last line; the other three cards give its room to their pictures.
+- **One height whatever card is up** (428 design px of the 680 a 720 window leaves): laid
+  out **from the bottom** — pager, sentence, heading — and the pictures take what is left.
+  **"Start cleaning" stands at the pager's right end in place of the forward arrow**, so no
+  card reserves a row for a door it does not have; hung under the pager, the first cut left
+  a hundred pixels bare on three cards. The dots stay centred on the last card too.
+- **Every line is measured against the paper** (`_fitted`, `overruns`, `dropped_lines`):
+  `Style.write` neither wraps nor clips, and the first cut's net card ran its second line
+  clean over both stiles of the frame. A line too wide drops a size; one still too wide is
+  counted, and `test_lake` asks for none, captions included.
+- **Out of scope, by decision**: contextual hints, unlock pacing, a goal readout, a skip
+  key, new painted art, loops or animation on the cards, a live viewport onto the lake,
+  per-language stills, and any tutorial quest or checklist.
+- **Probes**: `tools/shot_letter.tscn` (desktop build, `--fixed-fps 60`, its own save path
+  and no file at it, `Lake.force_front` + `Lake.force_intro`) saves
+  `tools/last_letter_{sailing,walking,card_*}.png` and `last_letter.log`. **A page turned is
+  not the frame the capture lands on** — taken on the turn, all four pictures came out as
+  card one — so it waits `TURN_SETTLE` frames. `test_lake`'s `_stage_letter` guards the four
+  cards, the pager's clamping, the door on the paper where the forward arrow stood, the
+  cross, the room at 1280x720, every line and caption fitting, every still being shot and
+  imported, the greeting's room going to the pictures, the absent-key rule, the close ending
+  the arrival, and the menu's plank standing above Credits.
 
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.

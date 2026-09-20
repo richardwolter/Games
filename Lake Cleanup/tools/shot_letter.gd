@@ -104,7 +104,7 @@ func _physics_process(_delta: float) -> void:
 	if _wait > 0:
 		return
 	var card: Dictionary = Letter.CARDS[_card]
-	_shoot("card_%s" % String(card["art"]), "%-12s page %d  dropped %d  door %s" % [
+	_shoot("card_%s" % String(card["head"]).to_lower(), "%-12s page %d  dropped %d  door %s" % [
 		String(card["head"]), _letter.page, _letter.dropped_lines,
 		str((_letter.get(&"_door") as Control).visible)
 	])
