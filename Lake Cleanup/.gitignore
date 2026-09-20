@@ -56,3 +56,6 @@ tools/film/last_film.log
 tools/film/*.import
 docs/progression/replay-report/
 tools/letter_run.log
+
+# Probe scratch: import logs and check-my-work pictures from another session.
+tools/_logs/
