@@ -116,6 +116,16 @@ var bases_px := {}
 ## and a piece with no seat at all is simply not a thing to lie on. See `ShedRoom`.
 var seats := {}
 
+## Piece name -> which way each view faces, and whether each is switched on (0 or 1). What
+## R and E move along: R to the next face, E to the other state. A piece that does both —
+## the toilet turns and fills — carries both; a plain rotation counts faces and a plain
+## switch counts states.
+var facings := {}
+var states := {}
+
+## Piece name -> what it gives off while switched on: &"fire", &"warm", &"cold" or &"".
+var lights := {}
+
 ## Piece name -> how many times bigger than painted the shed draws it. One for nearly
 ## everything; the bed is 1.5. The lake never reads it.
 var scales := {}
@@ -242,6 +252,18 @@ func load_all() -> bool:
 		for lift in entry.get("seat", []) as Array:
 			rests.append(maxi(int(lift), 0))
 		seats[name] = rests
+		# A catalogue built before faces and states existed lists neither: every view is
+		# then its own face, switched off, which is what a plain rotation always was.
+		var said_faces: Array = entry.get("faces", []) as Array
+		var said_states: Array = entry.get("states", []) as Array
+		var turns := PackedInt32Array()
+		var lit := PackedInt32Array()
+		for i in faces_count(entry):
+			turns.append(int(said_faces[i]) if i < said_faces.size() else i)
+			lit.append(int(said_states[i]) if i < said_states.size() else 0)
+		facings[name] = turns
+		states[name] = lit
+		lights[name] = StringName(String(entry.get("light", "")))
 
 		cells[name] = Vector2i(
 			maxi(int(ceil(float(box[2]) / cell)), 1), maxi(int(ceil(float(box[3]) / cell)), 1)
@@ -257,6 +279,11 @@ func load_all() -> bool:
 	atlas = ImageTexture.create_from_image(sheet_image)
 	_size = Vector2(sheet_image.get_width(), sheet_image.get_height())
 	return not regions.is_empty()
+
+
+## How many views an entry lists, before the views are read into rects.
+static func faces_count(entry: Dictionary) -> int:
+	return maxi((entry.get("alt_views", []) as Array).size(), 1)
 
 
 func has(name: StringName) -> bool:
@@ -413,13 +440,75 @@ func copies_of(name: StringName) -> int:
 ## Can the player turn this piece while carrying it? Both R verbs, since picking a style and
 ## turning a chair are the same gesture from the player's side.
 func turnable(name: StringName) -> bool:
-	var kind := kind_of(name)
-	return (kind == Set.ROTATE or kind == Set.VARIANT) and view_count(name) > 1
+	for view in view_count(name):
+		if turned(name, view) != view:
+			return true
+	return false
 
 
-## Can the player switch this piece on where it stands? The fireplace and the fridge.
+## Can the player switch this piece where it stands, in any of its faces? The fireplace,
+## the fridge, the lamps, the water in the bathroom.
 func switchable(name: StringName) -> bool:
-	return kind_of(name) == Set.STATE and view_count(name) > 1
+	for view in view_count(name):
+		if switched(name, view) >= 0:
+			return true
+	return false
+
+
+func face_of(name: StringName, view: int) -> int:
+	var list: PackedInt32Array = facings.get(String(name), PackedInt32Array())
+	return list[posmod(view, list.size())] if not list.is_empty() else 0
+
+
+## Switched on: the fire lit, the fridge open, the bath full.
+func is_on(name: StringName, view: int) -> bool:
+	var list: PackedInt32Array = states.get(String(name), PackedInt32Array())
+	return not list.is_empty() and list[posmod(view, list.size())] == 1
+
+
+func light_of(name: StringName) -> StringName:
+	return lights.get(String(name), &"") as StringName
+
+
+## The view R goes to from this one: the next face round, in the same state where that face
+## was drawn in it, in whatever state it was drawn in where it was not — so an empty
+## counter still turns to its only side, which is full. Itself when there is nothing to
+## turn to.
+func turned(name: StringName, view: int) -> int:
+	var count := view_count(name)
+	if count < 2:
+		return view
+	view = posmod(view, count)
+	var here := face_of(name, view)
+	var on := is_on(name, view)
+	var ways := {}
+	for other in count:
+		ways[face_of(name, other)] = true
+	var order := ways.keys()
+	order.sort()
+	if order.size() < 2:
+		return view
+	var next: int = order[(order.find(here) + 1) % order.size()]
+	var fallback := -1
+	for other in count:
+		if face_of(name, other) != next:
+			continue
+		if is_on(name, other) == on:
+			return other
+		if fallback < 0:
+			fallback = other
+	return fallback if fallback >= 0 else view
+
+
+## The view E goes to from this one: the same face in the other state, or -1 where that
+## drawing was never made (the kitchen counter seen from the side has no empty sink).
+func switched(name: StringName, view: int) -> int:
+	var count := view_count(name)
+	view = posmod(view, maxi(count, 1))
+	for other in count:
+		if other != view and face_of(name, other) == face_of(name, view) 				and is_on(name, other) != is_on(name, view):
+			return other
+	return -1
 
 
 ## What to call this piece on screen. Empty for anything with no name — the rubbish, which

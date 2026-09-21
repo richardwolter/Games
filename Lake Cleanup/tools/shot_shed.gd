@@ -74,11 +74,13 @@ func _physics_process(_delta: float) -> void:
 		# The whole pack, rather than whatever DOG_ODDS rolls: which dogs are in is random
 		# in play and a picture that changes run to run says nothing. The seats in the list
 		# above are the pet bed, the sofa and the armchair.
-		# Both switchable pieces on, for the light they throw.
+		# Every switchable piece on, for the light it throws.
 		for k in room.decor.size():
 			var row: Dictionary = room.decor[k]
-			if room.sheets.switchable(StringName(row["piece"])):
-				row["view"] = ShedRoom.STATE_ON
+			var piece := StringName(row["piece"])
+			var on := room.sheets.switched(piece, int(row.get("view", 0)))
+			if on >= 0 and not room.sheets.is_on(piece, int(row.get("view", 0))):
+				row["view"] = on
 		room.pack_size = func() -> int: return ShedRoom.DOGS_MOST
 		_main.call(&"_set_shed", true)
 		# Enough finds to fill the shelf past its bottom edge, so the scrollbar is in shot.

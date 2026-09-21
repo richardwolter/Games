@@ -532,8 +532,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     130,
-     194,
+     205,
+     234,
      49,
      25
     ],
@@ -544,8 +544,8 @@
      55
     ],
     [
-     27,
-     160,
+     52,
+     200,
      49,
      31
     ],
@@ -568,11 +568,18 @@
     4
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1,
+    2,
+    3
+   ],
    "fill": 0.881,
+   "light": "",
    "name": "decor_sofa",
    "place": "floor",
    "region": [
-    37,
+    2,
     2,
     22,
     55
@@ -586,6 +593,12 @@
    ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0,
+    0,
+    0
+   ],
    "title": "Sofa"
   },
   {
@@ -598,26 +611,26 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     179,
-     115,
+     104,
+     162,
      32,
      32
     ],
     [
-     52,
-     115,
+     216,
+     117,
      23,
      36
     ],
     [
-     193,
-     160,
+     2,
+     234,
      32,
      28
     ],
     [
-     77,
-     115,
+     2,
+     162,
      23,
      36
     ]
@@ -634,12 +647,19 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1,
+    2,
+    3
+   ],
    "fill": 0.836,
+   "light": "",
    "name": "decor_loveseat",
    "place": "floor",
    "region": [
-    153,
-    67,
+    2,
+    106,
     32,
     32
    ],
@@ -652,6 +672,12 @@
    ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0,
+    0,
+    0
+   ],
    "title": "Armchair"
   },
   {
@@ -664,26 +690,26 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     75,
-     194,
+     150,
+     234,
      16,
      27
     ],
     [
-     227,
-     160,
+     36,
+     234,
      15,
      28
     ],
     [
-     160,
-     224,
+     70,
+     291,
      16,
      21
     ],
     [
-     2,
-     194,
+     53,
+     234,
      15,
      28
     ]
@@ -700,12 +726,19 @@
     2
    ],
    "copies": 4,
+   "faces": [
+    0,
+    1,
+    2,
+    3
+   ],
    "fill": 0.681,
+   "light": "",
    "name": "decor_dining_chair",
    "place": "floor",
    "region": [
-    29,
-    114,
+    159,
+    106,
     15,
     28
    ],
@@ -713,6 +746,12 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0,
+    0,
+    0
+   ],
    "title": "Dining chair"
   },
   {
@@ -723,14 +762,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     102,
-     115,
+     27,
+     162,
      25,
      35
     ],
     [
-     34,
-     115,
+     198,
+     117,
      16,
      41
     ]
@@ -745,12 +784,17 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.946,
+   "light": "",
    "name": "decor_dresser",
    "place": "floor",
    "region": [
-    126,
-    67,
+    209,
+    59,
     25,
     35
    ],
@@ -758,6 +802,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Dresser"
   },
   {
@@ -768,14 +816,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     70,
-     224,
+     174,
+     264,
      20,
      23
     ],
     [
-     93,
-     194,
+     168,
+     234,
      15,
      27
     ]
@@ -790,12 +838,17 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.952,
+   "light": "",
    "name": "decor_nightstand",
    "place": "floor",
    "region": [
-    217,
-    114,
+    117,
+    140,
     20,
     23
    ],
@@ -803,6 +856,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Nightstand"
   },
   {
@@ -813,7 +870,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     78,
+     160,
      67,
      46,
      45
@@ -835,12 +892,17 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.945,
+   "light": "",
    "name": "decor_bookcase_drawers",
    "place": "floor",
    "region": [
     2,
-    67,
+    59,
     46,
     45
    ],
@@ -848,6 +910,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Bookcase"
   },
   {
@@ -858,8 +924,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     207,
-     2,
+     36,
+     67,
      46,
      47
     ],
@@ -880,11 +946,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.997,
+   "light": "",
    "name": "decor_bookcase_tall",
    "place": "floor",
    "region": [
-    123,
+    88,
     2,
     46,
     47
@@ -893,6 +964,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Tall bookcase"
   },
   {
@@ -903,13 +978,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     95,
-     160,
+     120,
+     200,
      48,
      30
     ],
     [
-     2,
+     84,
      67,
      30,
      46
@@ -925,11 +1000,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.986,
+   "light": "",
    "name": "decor_big_table",
    "place": "floor",
    "region": [
-    171,
+    136,
     2,
     30,
     46
@@ -938,6 +1018,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Dining table"
   },
   {
@@ -948,14 +1032,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     34,
-     224,
+     138,
+     264,
      16,
      24
     ],
     [
-     181,
-     194,
+     2,
+     264,
      16,
      25
     ]
@@ -970,12 +1054,17 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.961,
+   "light": "",
    "name": "decor_side_desk",
    "place": "floor",
    "region": [
-    181,
-    114,
+    81,
+    140,
     16,
     24
    ],
@@ -983,18 +1072,29 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Side desk"
   },
   {
    "alt_roles": [
+    "front_empty",
     "front",
     "side"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     170,
-     67,
+     2,
+     117,
+     80,
+     43
+    ],
+    [
+     84,
+     117,
      80,
      43
     ],
@@ -1007,50 +1107,78 @@
    ],
    "base": [
     2,
+    2,
     6
    ],
    "base_px": [],
    "cells": [
-    3,
-    4
+    6,
+    3
    ],
    "copies": 1,
-   "fill": 0.858,
+   "faces": [
+    0,
+    0,
+    1
+   ],
+   "fill": 0.957,
+   "light": "",
    "name": "decor_kitchen_counter",
    "place": "floor",
    "region": [
-    2,
-    2,
-    33,
-    63
+    94,
+    59,
+    81,
+    43
    ],
    "scale": 0.75,
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1,
+    1
+   ],
    "title": "Kitchen counter"
   },
   {
    "alt_roles": [
+    "front_empty",
+    "side_empty",
     "front",
     "side"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     213,
-     115,
+     138,
+     162,
      16,
      32
     ],
     [
-     19,
-     194,
+     70,
+     234,
+     22,
+     28
+    ],
+    [
+     156,
+     162,
+     16,
+     32
+    ],
+    [
+     94,
+     234,
      22,
      28
     ]
    ],
    "base": [
+    2,
+    3,
     2,
     3
    ],
@@ -1060,12 +1188,19 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1,
+    0,
+    1
+   ],
    "fill": 0.643,
+   "light": "",
    "name": "decor_toilet",
    "place": "floor",
    "region": [
-    46,
-    114,
+    176,
+    106,
     22,
     28
    ],
@@ -1073,6 +1208,12 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0,
+    1,
+    1
+   ],
    "title": "Toilet"
   },
   {
@@ -1083,8 +1224,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     129,
-     115,
+     54,
+     162,
      48,
      33
     ],
@@ -1102,11 +1243,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.975,
+   "light": "",
    "name": "decor_big_rug",
    "place": "floor",
    "region": [
-    89,
+    54,
     2,
     32,
     48
@@ -1115,6 +1261,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Big rug"
   },
   {
@@ -1125,14 +1275,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     78,
-     160,
+     103,
+     200,
      15,
      31
     ],
     [
-     219,
-     224,
+     129,
+     291,
      31,
      15
     ]
@@ -1144,12 +1294,17 @@
     1
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.948,
+   "light": "",
    "name": "decor_old_rug",
    "place": "floor",
    "region": [
-    111,
-    145,
+    2,
+    168,
     31,
     15
    ],
@@ -1157,6 +1312,10 @@
    "seat": [],
    "set": "ROTATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Runner rug"
   },
   {
@@ -1167,14 +1326,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     199,
-     194,
+     20,
+     264,
      24,
      25
     ],
     [
-     225,
-     194,
+     46,
+     264,
      26,
      25
     ]
@@ -1189,12 +1348,17 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.911,
+   "light": "fire",
    "name": "decor_fireplace",
    "place": "floor",
    "region": [
-    102,
-    114,
+    2,
+    140,
     25,
     26
    ],
@@ -1202,6 +1366,10 @@
    "seat": [],
    "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Fireplace"
   },
   {
@@ -1234,11 +1402,16 @@
     4
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.952,
+   "light": "cold",
    "name": "decor_fridge",
    "place": "floor",
    "region": [
-    61,
+    26,
     2,
     26,
     55
@@ -1247,6 +1420,10 @@
    "seat": [],
    "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Fridge"
   },
   {
@@ -1257,14 +1434,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     32,
-     251,
+     192,
+     291,
      27,
      13
     ],
     [
-     61,
-     251,
+     221,
+     291,
      27,
      13
     ]
@@ -1279,12 +1456,17 @@
     1
    ],
    "copies": 2,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.943,
+   "light": "",
    "name": "decor_pet_bed",
    "place": "floor",
    "region": [
-    174,
-    145,
+    65,
+    168,
     27,
     13
    ],
@@ -1295,6 +1477,10 @@
    ],
    "set": "VARIANT",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Pet bed"
   },
   {
@@ -1305,14 +1491,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     231,
-     115,
+     174,
+     162,
      23,
      32
     ],
     [
-     2,
-     160,
+     199,
+     162,
      23,
      32
     ]
@@ -1327,12 +1513,17 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.973,
+   "light": "",
    "name": "decor_bed",
    "place": "floor",
    "region": [
-    187,
-    67,
+    36,
+    106,
     23,
     32
    ],
@@ -1343,22 +1534,34 @@
    ],
    "set": "VARIANT",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Bed"
   },
   {
    "alt_roles": [
-    "front"
+    "off",
+    "on"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     110,
-     194,
+     196,
+     264,
+     13,
+     23
+    ],
+    [
+     185,
+     234,
      18,
      26
     ]
    ],
    "base": [
+    1,
     1
    ],
    "base_px": [],
@@ -1367,35 +1570,52 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.793,
+   "light": "warm",
    "name": "decor_lamp",
    "place": "small",
    "region": [
-    129,
-    114,
+    29,
+    140,
     18,
     26
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Table lamp"
   },
   {
    "alt_roles": [
-    "front"
+    "off",
+    "on"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     34,
+     207,
+     2,
+     16,
+     48
+    ],
+    [
+     116,
      67,
      19,
      46
     ]
    ],
    "base": [
+    1,
     1
    ],
    "base_px": [],
@@ -1404,19 +1624,28 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.507,
+   "light": "warm",
    "name": "decor_standing_lamp",
    "place": "floor",
    "region": [
-    203,
+    168,
     2,
     19,
     46
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Floor lamp"
   },
   {
@@ -1426,7 +1655,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     55,
+     137,
      67,
      21,
      46
@@ -1441,11 +1670,15 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.811,
+   "light": "",
    "name": "decor_old_clock",
    "place": "small",
    "region": [
-    224,
+    189,
     2,
     21,
     46
@@ -1454,6 +1687,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Old clock"
   },
   {
@@ -1463,7 +1699,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     126,
+     208,
      67,
      16,
      44
@@ -1478,12 +1714,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.51,
+   "light": "",
    "name": "decor_coat_hanger",
    "place": "floor",
    "region": [
     50,
-    67,
+    59,
     16,
     44
    ],
@@ -1491,6 +1731,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Coat hanger"
   },
   {
@@ -1500,7 +1743,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     144,
+     226,
      67,
      24,
      44
@@ -1515,12 +1758,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.994,
+   "light": "",
    "name": "decor_mirror",
    "place": "floor",
    "region": [
     68,
-    67,
+    59,
     24,
     44
    ],
@@ -1528,6 +1775,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Standing mirror"
   },
   {
@@ -1537,8 +1787,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
-     115,
+     166,
+     117,
      30,
      43
     ]
@@ -1552,12 +1802,16 @@
     3
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.982,
+   "light": "",
    "name": "decor_stove",
    "place": "floor",
    "region": [
-    94,
-    67,
+    177,
+    59,
     30,
     43
    ],
@@ -1565,22 +1819,33 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Stove"
   },
   {
    "alt_roles": [
-    "front"
+    "closed",
+    "open"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
-     224,
+     74,
+     264,
+     30,
+     25
+    ],
+    [
+     106,
+     264,
      30,
      25
     ]
    ],
    "base": [
+    2,
     2
    ],
    "base_px": [],
@@ -1589,35 +1854,52 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.812,
+   "light": "",
    "name": "decor_vynil_player",
    "place": "floor",
    "region": [
-    149,
-    114,
+    49,
+    140,
     30,
     25
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Record player"
   },
   {
    "alt_roles": [
-    "front"
+    "empty",
+    "full"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     145,
-     160,
+     170,
+     200,
+     19,
+     29
+    ],
+    [
+     191,
+     200,
      19,
      29
     ]
    ],
    "base": [
+    1,
     1
    ],
    "base_px": [],
@@ -1626,35 +1908,52 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.539,
+   "light": "",
    "name": "decor_bath_sink",
    "place": "floor",
    "region": [
-    212,
-    67,
+    111,
+    106,
     19,
     29
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Bathroom sink"
   },
   {
    "alt_roles": [
-    "front"
+    "empty",
+    "full"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     92,
-     224,
+     211,
+     264,
+     42,
+     23
+    ],
+    [
+     2,
+     291,
      42,
      23
     ]
    ],
    "base": [
+    3,
     3
    ],
    "base_px": [],
@@ -1663,19 +1962,28 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
    "fill": 0.891,
+   "light": "",
    "name": "decor_bathtub",
    "place": "floor",
    "region": [
-    2,
-    145,
+    139,
+    140,
     42,
     23
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    1
+   ],
    "title": "Bathtub"
   },
   {
@@ -1685,8 +1993,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     166,
-     160,
+     212,
+     200,
      25,
      29
     ]
@@ -1700,12 +2008,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.574,
+   "light": "",
    "name": "decor_iron_board",
    "place": "floor",
    "region": [
-    2,
-    114,
+    132,
+    106,
     25,
     29
    ],
@@ -1713,6 +2025,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Ironing board"
   },
   {
@@ -1722,8 +2037,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     193,
-     224,
+     103,
+     291,
      24,
      19
     ]
@@ -1737,12 +2052,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.904,
+   "light": "",
    "name": "decor_center_table",
    "place": "floor",
    "region": [
-    85,
-    145,
+    222,
+    140,
     24,
     19
    ],
@@ -1750,6 +2069,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Coffee table"
   },
   {
@@ -1759,8 +2081,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     52,
-     224,
+     156,
+     264,
      16,
      24
     ]
@@ -1774,12 +2096,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.62,
+   "light": "",
    "name": "decor_game_table",
    "place": "floor",
    "region": [
-    199,
-    114,
+    99,
+    140,
     16,
     24
    ],
@@ -1787,6 +2113,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Card table"
   },
   {
@@ -1796,8 +2125,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     43,
-     194,
+     118,
+     234,
      30,
      28
     ]
@@ -1811,12 +2140,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.993,
+   "light": "",
    "name": "decor_tiny_bookcase",
    "place": "floor",
    "region": [
-    70,
-    114,
+    200,
+    106,
     30,
     28
    ],
@@ -1824,17 +2157,27 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Small bookcase"
   },
   {
    "alt_roles": [
-    "front"
+    "plain",
+    "red"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     90,
-     251,
+     2,
+     316,
+     22,
+     12
+    ],
+    [
+     26,
+     316,
      22,
      12
     ]
@@ -1846,19 +2189,28 @@
     1
    ],
    "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
    "fill": 0.826,
+   "light": "",
    "name": "decor_oval_rug",
    "place": "floor",
    "region": [
-    203,
-    145,
+    94,
+    168,
     22,
     12
    ],
    "scale": 1.0,
    "seat": [],
-   "set": "SINGLE",
+   "set": "VARIANT",
    "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
    "title": "Oval rug"
   },
   {
@@ -1868,8 +2220,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     136,
-     224,
+     46,
+     291,
      10,
      23
     ]
@@ -1883,12 +2235,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.613,
+   "light": "",
    "name": "decor_flower_pot",
    "place": "small",
    "region": [
-    46,
-    145,
+    183,
+    140,
     10,
     23
    ],
@@ -1896,6 +2252,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Flower pot"
   },
   {
@@ -1905,8 +2264,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     148,
-     224,
+     58,
+     291,
      10,
      23
     ]
@@ -1920,12 +2279,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.657,
+   "light": "",
    "name": "decor_plant_pot",
    "place": "small",
    "region": [
-    58,
-    145,
+    195,
+    140,
     10,
     23
    ],
@@ -1933,6 +2296,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Potted plant"
   },
   {
@@ -1942,8 +2308,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     2,
-     251,
+     162,
+     291,
      13,
      15
     ]
@@ -1955,12 +2321,16 @@
     1
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 1.0,
+   "light": "",
    "name": "decor_painting_a",
    "place": "wall",
    "region": [
-    144,
-    145,
+    35,
+    168,
     13,
     15
    ],
@@ -1968,6 +2338,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Painting"
   },
   {
@@ -1977,8 +2350,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     17,
-     251,
+     177,
+     291,
      13,
      15
     ]
@@ -1990,12 +2363,16 @@
     1
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 1.0,
+   "light": "",
    "name": "decor_painting_b",
    "place": "wall",
    "region": [
-    159,
-    145,
+    50,
+    168,
     13,
     15
    ],
@@ -2003,6 +2380,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Landscape"
   },
   {
@@ -2012,8 +2392,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     114,
-     251,
+     66,
+     316,
      11,
      6
     ]
@@ -2027,12 +2407,16 @@
     1
    ],
    "copies": 2,
+   "faces": [
+    0
+   ],
    "fill": 0.758,
+   "light": "",
    "name": "decor_chew_toy",
    "place": "small",
    "region": [
-    227,
-    145,
+    134,
+    168,
     11,
     6
    ],
@@ -2040,6 +2424,9 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Chew toy"
   },
   {
@@ -2049,8 +2436,8 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     178,
-     224,
+     88,
+     291,
      13,
      20
     ]
@@ -2064,12 +2451,16 @@
     2
    ],
    "copies": 1,
+   "faces": [
+    0
+   ],
    "fill": 0.696,
+   "light": "",
    "name": "decor_globe",
    "place": "small",
    "region": [
-    70,
-    145,
+    207,
+    140,
     13,
     20
    ],
@@ -2077,7 +2468,105 @@
    "seat": [],
    "set": "SINGLE",
    "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
    "title": "Globe"
+  },
+  {
+   "alt_roles": [
+    "wide",
+    "long"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     2,
+     200,
+     48,
+     32
+    ],
+    [
+     2,
+     67,
+     32,
+     48
+    ]
+   ],
+   "base": [],
+   "base_px": [],
+   "cells": [
+    3,
+    2
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
+   "fill": 0.975,
+   "light": "",
+   "name": "decor_rug",
+   "place": "floor",
+   "region": [
+    61,
+    106,
+    48,
+    32
+   ],
+   "scale": 1.0,
+   "seat": [],
+   "set": "ROTATE",
+   "sheet": "decor_dirty",
+   "states": [
+    0,
+    0
+   ],
+   "title": "Rug"
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_clean",
+   "alt_views": [
+    [
+     50,
+     316,
+     14,
+     12
+    ]
+   ],
+   "base": [
+    1
+   ],
+   "base_px": [],
+   "cells": [
+    1,
+    1
+   ],
+   "copies": 1,
+   "faces": [
+    0
+   ],
+   "fill": 0.81,
+   "light": "",
+   "name": "decor_aquarium",
+   "place": "small",
+   "region": [
+    118,
+    168,
+    14,
+    12
+   ],
+   "scale": 1.0,
+   "seat": [],
+   "set": "SINGLE",
+   "sheet": "decor_dirty",
+   "states": [
+    0
+   ],
+   "title": "Aquarium"
   }
  ],
  "sheets": {
@@ -2085,14 +2574,14 @@
    "file": "res://assets/decor_clean.png",
    "size": [
     256,
-    268
+    330
    ]
   },
   "decor_dirty": {
    "file": "res://assets/decor_dirty.png",
    "size": [
     256,
-    170
+    185
    ]
   },
   "lake_objects": {

@@ -170,6 +170,11 @@ const FIRE_TONE := Color(1.0, 0.55, 0.2)
 const FRIDGE_REACH := 4.5
 const FRIDGE_POWER := 0.14
 const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
+## A lamp: the hearth's warmth, a smaller pool and a softer one. A bulb under a shade lights
+## the boards round it, not the room (2026-09-20, first guess).
+const LAMP_REACH := 5.5
+const LAMP_POWER := 0.22
+const LAMP_TONE := Color(1.0, 0.78, 0.46)
 ## The window: how far down **the shed's own height** it sits on the left wall, and the shaft
 ## it lets in — half-width where it leaves the window, how fast it opens, and how far it
 ## carries, in cells. **A cone, not a band** (Richard, 2026-09-20): it opens as it crosses the
@@ -197,9 +202,10 @@ const ROOM_SCRIM := Color(0.09, 0.055, 0.03, 0.66)
 ## gives it back where the light falls.
 const ROOM_DIM := Color(0.05, 0.03, 0.02, 0.26)
 
-## Which view a STATE piece is switched on in. Both state sets are authored off-then-on.
+## What a piece leaves the store as: view 0, which the catalogue guarantees faces front and
+## is switched off. Which view is "on" is the catalogue's to say (`Sheets.is_on`), not a
+## fixed index: the toilet has two faces in each state.
 const STATE_OFF := 0
-const STATE_ON := 1
 
 ## How wide a floorboard is, in source pixels. The boards are the room, not the grid: the
 ## grid is half this and drawing a line every four screen pixels reads as corduroy.
@@ -1332,7 +1338,7 @@ func place(piece: StringName, cell: Vector2i, view: int = 0) -> bool:
 func turn_carried() -> void:
 	if carrying.is_empty() or sheets == null or not sheets.turnable(carrying):
 		return
-	_carry_view = posmod(_carry_view + 1, sheets.view_count(carrying))
+	_carry_view = sheets.turned(carrying, _carry_view)
 	queue_redraw()
 
 
@@ -1346,7 +1352,9 @@ func _switch_near() -> int:
 	for i in decor.size():
 		var row: Dictionary = decor[i]
 		var piece := StringName(row["piece"])
-		if not sheets.switchable(piece):
+		# Asked of the view it stands in, not of the piece: the counter switches facing
+		# front and does nothing turned side on, where no empty sink was drawn.
+		if sheets.switched(piece, _row_view(row)) < 0:
 			continue
 		var span := span_of(piece, _row_view(row))
 		# In cells: REACH is a walker's distance and the player stands in cells.
@@ -1371,23 +1379,24 @@ func switch_near() -> bool:
 	if at < 0:
 		return false
 	var row: Dictionary = decor[at]
-	row["view"] = STATE_ON if _row_view(row) == STATE_OFF else STATE_OFF
+	row["view"] = sheets.switched(StringName(row["piece"]), _row_view(row))
 	changed.emit()
 	queue_redraw()
 	return true
 
 
-## Whether any fire in the room is burning: a switched-on piece that is not a fridge standing
-## open. What the fireplace's crackle is held on.
+## Whether any fire in the room is burning. What the fireplace's crackle is held on.
+##
+## Asked of the piece's light, not of "switched on": until 2026-09-20 every switched-on piece
+## that was not an open fridge counted as a fire, which was true while the fireplace and the
+## fridge were the only two switches. A lamp, a full bath or a record player playing does
+## not crackle.
 func _fire_lit() -> bool:
 	if sheets == null:
 		return false
 	for row: Dictionary in decor:
 		var piece := StringName(row["piece"])
-		if (
-			sheets.switchable(piece) and _row_view(row) == STATE_ON
-			and sheets.role_of(piece, STATE_ON) != &"open"
-		):
+		if sheets.light_of(piece) == &"fire" and sheets.is_on(piece, _row_view(row)):
 			return true
 	return false
 
@@ -2161,18 +2170,18 @@ func lamps(floor_box: Rect2) -> Array[Dictionary]:
 		return out
 	for row: Dictionary in decor:
 		var piece := StringName(row["piece"])
-		if not sheets.switchable(piece) or _row_view(row) != STATE_ON:
+		var light := sheets.light_of(piece)
+		if light == &"" or not sheets.is_on(piece, _row_view(row)):
 			continue
-		var fridge := sheets.role_of(piece, _row_view(row)) == &"open"
 		var span := span_of(piece, _row_view(row))
 		out.append({
 			"at": floor_box.position + Vector2(
 				(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
 				(float(int(row["cell"][1])) + float(span.y)) * _zoom()
 			),
-			"reach": (FRIDGE_REACH if fridge else FIRE_REACH) * CELL * _zoom(),
-			"power": FRIDGE_POWER if fridge else FIRE_POWER,
-			"tone": FRIDGE_TONE if fridge else FIRE_TONE,
+			"reach": _pool(light).x * CELL * _zoom(),
+			"power": _pool(light).y,
+			"tone": _pool_tone(light),
 		})
 		if out.size() >= LAMPS_MOST:
 			break
@@ -2217,6 +2226,25 @@ func _dress_light(floor_box: Rect2) -> void:
 	lit.set_shader_parameter(&"lamp_count", rows.size())
 	lit.set_shader_parameter(&"lamps", spots)
 	lit.set_shader_parameter(&"lamp_tones", tones)
+
+
+## A light's pool as (reach in cells, power).
+func _pool(light: StringName) -> Vector2:
+	match light:
+		&"cold":
+			return Vector2(FRIDGE_REACH, FRIDGE_POWER)
+		&"warm":
+			return Vector2(LAMP_REACH, LAMP_POWER)
+	return Vector2(FIRE_REACH, FIRE_POWER)
+
+
+func _pool_tone(light: StringName) -> Color:
+	match light:
+		&"cold":
+			return FRIDGE_TONE
+		&"warm":
+			return LAMP_TONE
+	return FIRE_TONE
 
 
 ## The nudge over a switch the player is standing at. Nothing at all when they are not.

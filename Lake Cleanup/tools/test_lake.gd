@@ -3037,14 +3037,65 @@ func _stage_shed() -> void:
 			break
 	_check(mute.is_empty(), "every piece with more than one face says what turns it", mute)
 
-	# And the two verbs are exclusive: R turns a chair and E works a switch, and a piece
-	# that answered both would answer whichever was asked first.
-	var both := ""
+	# R and E are two axes, not two kinds (2026-09-20): the toilet turns and fills. So the
+	# rule is that each verb moves along its own axis only — R never empties a bath and E
+	# never turns a toilet — and that what leaves the store faces front, switched off.
+	var crossed := ""
+	var store_off := ""
 	for name: String in sheets.names:
-		if sheets.turnable(StringName(name)) and sheets.switchable(StringName(name)):
-			both = name
-			break
-	_check(both.is_empty(), "and nothing is both turned and switched", both)
+		var each := StringName(name)
+		if sheets.face_of(each, 0) != 0 or sheets.is_on(each, 0):
+			store_off = name
+		for view in sheets.view_count(each):
+			var e_to := sheets.switched(each, view)
+			if e_to >= 0 and sheets.face_of(each, e_to) != sheets.face_of(each, view):
+				crossed = "%s: E turned it" % name
+			var r_to := sheets.turned(each, view)
+			if r_to != view and sheets.face_of(each, r_to) == sheets.face_of(each, view):
+				crossed = "%s: R did not turn it" % name
+	_check(crossed.is_empty(), "R moves the face and E the state, never the other", crossed)
+	_check(store_off.is_empty(), "every piece leaves the store facing front, switched off",
+		store_off)
+
+	var toilet := &"decor_toilet"
+	_check(sheets.turnable(toilet) and sheets.switchable(toilet),
+		"the toilet both turns and fills", "")
+	var full_side := sheets.turned(toilet, sheets.switched(toilet, 0))
+	_check(sheets.is_on(toilet, full_side) and sheets.face_of(toilet, full_side) == 1,
+		"a full toilet turned stays full", "view %d" % full_side)
+	var counter := &"decor_kitchen_counter"
+	var counter_side := sheets.turned(counter, 0)
+	_check(sheets.face_of(counter, counter_side) == 1,
+		"an empty counter still turns to its only side view", "view %d" % counter_side)
+	_check(sheets.switched(counter, counter_side) < 0,
+		"and E does nothing to it side on, where no empty sink was drawn", "")
+	for pair: Array in [[&"decor_fireplace", &"fire"], [&"decor_fridge", &"cold"],
+			[&"decor_lamp", &"warm"], [&"decor_standing_lamp", &"warm"],
+			[&"decor_bathtub", &""], [&"decor_vynil_player", &""]]:
+		_check(sheets.light_of(pair[0]) == pair[1], "%s gives off '%s'" % pair,
+			String(sheets.light_of(pair[0])))
+	for switch: StringName in [&"decor_vynil_player", &"decor_lamp", &"decor_standing_lamp",
+			&"decor_bathtub", &"decor_bath_sink"]:
+		_check(sheets.switchable(switch) and not sheets.turnable(switch),
+			"%s switches with E" % switch, "")
+	_check(sheets.turnable(&"decor_oval_rug") and not sheets.switchable(&"decor_oval_rug"),
+		"the oval rug restyles with R", "")
+	_check(sheets.has(&"decor_rug") and sheets.has(&"decor_aquarium"),
+		"the rug and the aquarium are finds", "")
+
+	# A lamp lit is a pool of light and no crackle; only the hearth crackles.
+	var kept_decor := room.decor.duplicate()
+	room.decor.clear()
+	room.decor.append({"piece": "decor_lamp", "cell": [16, 40],
+		"view": sheets.switched(&"decor_lamp", 0)})
+	_check(not bool(room.call(&"_fire_lit")), "a lit lamp does not crackle", "")
+	_check((room.call(&"lamps", Rect2(0, 0, 400, 300)) as Array).size() == 1,
+		"but it throws a pool", "")
+	room.decor.append({"piece": "decor_fireplace", "cell": [80, 40],
+		"view": sheets.switched(&"decor_fireplace", 0)})
+	_check(bool(room.call(&"_fire_lit")), "the hearth does", "")
+	room.decor.clear()
+	room.decor.append_array(kept_decor)
 
 	# R has to arrive as a key, not as a method call. The room reads keys in
 	# `_unhandled_key_input` because `_gui_input` only ever sees them on the Control that

@@ -2,20 +2,20 @@
   "source": "art_source/Decoration_Clean_Dirty.psd",
   "canvas": [
     208,
-    288
+    600
   ],
   "layers": [
     {
       "name": "Lamp",
       "slug": "lamp",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         185,
-        194,
+        340,
         203,
-        220
+        366
       ],
       "size": [
         18,
@@ -24,38 +24,20 @@
       "file": "lamp.png"
     },
     {
-      "name": "Fireplace copy",
-      "slug": "fireplace_copy",
-      "group_path": [
-        "Decoration"
-      ],
-      "bbox": [
-        80,
-        128,
-        135,
-        153
-      ],
-      "size": [
-        55,
-        25
-      ],
-      "file": "fireplace_copy.png"
-    },
-    {
       "name": "Bath Sink",
       "slug": "bath_sink",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        170,
-        258,
-        189,
-        287
+        23,
+        347,
+        195,
+        433
       ],
       "size": [
-        19,
-        29
+        172,
+        86
       ],
       "file": "bath_sink.png"
     },
@@ -63,13 +45,13 @@
       "name": "Iron Board",
       "slug": "iron_board",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         93,
-        256,
+        402,
         118,
-        285
+        431
       ],
       "size": [
         25,
@@ -81,13 +63,13 @@
       "name": "Bathtub",
       "slug": "bathtub",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        92,
-        229,
-        134,
-        252
+        82,
+        410,
+        124,
+        433
       ],
       "size": [
         42,
@@ -99,13 +81,13 @@
       "name": "Pet Bed 2",
       "slug": "pet_bed_2",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         98,
-        173,
+        319,
         125,
-        186
+        332
       ],
       "size": [
         27,
@@ -114,38 +96,20 @@
       "file": "pet_bed_2.png"
     },
     {
-      "name": "Pet Bed 1",
-      "slug": "pet_bed_1",
-      "group_path": [
-        "Decoration"
-      ],
-      "bbox": [
-        98,
-        156,
-        125,
-        169
-      ],
-      "size": [
-        27,
-        13
-      ],
-      "file": "pet_bed_1.png"
-    },
-    {
       "name": "Toilet",
       "slug": "toilet",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        126,
-        255,
+        144,
+        406,
         166,
-        287
+        434
       ],
       "size": [
-        40,
-        32
+        22,
+        28
       ],
       "file": "toilet.png"
     },
@@ -153,13 +117,13 @@
       "name": "Vynil Player",
       "slug": "vynil_player",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         44,
-        168,
+        314,
         74,
-        193
+        339
       ],
       "size": [
         30,
@@ -171,13 +135,13 @@
       "name": "Stove",
       "slug": "stove",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         149,
-        208,
+        354,
         179,
-        251
+        397
       ],
       "size": [
         30,
@@ -189,17 +153,17 @@
       "name": "Fridge",
       "slug": "fridge",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        28,
-        227,
+        59,
+        373,
         85,
-        288
+        428
       ],
       "size": [
-        57,
-        61
+        26,
+        55
       ],
       "file": "fridge.png"
     },
@@ -207,13 +171,13 @@
       "name": "Flower Pot",
       "slug": "flower_pot",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         81,
-        168,
+        314,
         91,
-        191
+        337
       ],
       "size": [
         10,
@@ -225,17 +189,17 @@
       "name": "Sofa",
       "slug": "sofa",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         3,
-        195,
-        139,
-        286
+        377,
+        25,
+        432
       ],
       "size": [
-        136,
-        91
+        22,
+        55
       ],
       "file": "sofa.png"
     },
@@ -243,49 +207,49 @@
       "name": "Loveseat",
       "slug": "loveseat",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         127,
-        123,
-        194,
-        190
+        304,
+        159,
+        336
       ],
       "size": [
-        67,
-        67
+        32,
+        32
       ],
       "file": "loveseat.png"
     },
     {
-      "name": "Mirror",
-      "slug": "mirror",
+      "name": "Fireplace",
+      "slug": "fireplace",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        5,
-        157,
-        29,
-        201
+        79,
+        273,
+        104,
+        299
       ],
       "size": [
-        24,
-        44
+        25,
+        26
       ],
-      "file": "mirror.png"
+      "file": "fireplace.png"
     },
     {
       "name": "Standing Lamp",
       "slug": "standing_lamp",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         186,
-        117,
+        263,
         205,
-        163
+        309
       ],
       "size": [
         19,
@@ -297,13 +261,13 @@
       "name": "Old Clock",
       "slug": "old_clock",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         70,
-        113,
+        259,
         91,
-        159
+        305
       ],
       "size": [
         21,
@@ -315,13 +279,13 @@
       "name": "Coat Hanger",
       "slug": "coat_hanger",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         50,
-        116,
+        262,
         66,
-        160
+        306
       ],
       "size": [
         16,
@@ -333,17 +297,17 @@
       "name": "Drawer",
       "slug": "drawer",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         4,
-        114,
-        48,
-        155
+        263,
+        29,
+        298
       ],
       "size": [
-        44,
-        41
+        25,
+        35
       ],
       "file": "drawer.png"
     },
@@ -351,17 +315,17 @@
       "name": "Bookcase",
       "slug": "bookcase",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         97,
-        78,
-        160,
-        126
+        226,
+        143,
+        271
       ],
       "size": [
-        63,
-        48
+        46,
+        45
       ],
       "file": "bookcase.png"
     },
@@ -369,17 +333,17 @@
       "name": "Bookcase",
       "slug": "bookcase_2",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         33,
-        64,
-        92,
-        112
+        210,
+        79,
+        257
       ],
       "size": [
-        59,
-        48
+        46,
+        47
       ],
       "file": "bookcase_2.png"
     },
@@ -387,17 +351,17 @@
       "name": "Big Rug",
       "slug": "big_rug",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        160,
-        31,
-        208,
-        113
+        168,
+        211,
+        200,
+        259
       ],
       "size": [
-        48,
-        82
+        32,
+        48
       ],
       "file": "big_rug.png"
     },
@@ -405,13 +369,13 @@
       "name": "Oval Rug",
       "slug": "oval_rug",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         133,
-        63,
+        209,
         155,
-        75
+        221
       ],
       "size": [
         22,
@@ -423,17 +387,17 @@
       "name": "Old Rug",
       "slug": "old_rug",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        113,
-        33,
-        161,
-        64
+        128,
+        188,
+        159,
+        203
       ],
       "size": [
-        48,
-        31
+        31,
+        15
       ],
       "file": "old_rug.png"
     },
@@ -441,13 +405,13 @@
       "name": "Center Table",
       "slug": "center_table",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         84,
-        44,
+        190,
         108,
-        63
+        209
       ],
       "size": [
         24,
@@ -459,13 +423,13 @@
       "name": "Tiny Bookcase",
       "slug": "tiny_bookcase",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         51,
-        35,
+        181,
         81,
-        63
+        209
       ],
       "size": [
         30,
@@ -477,17 +441,17 @@
       "name": "Big Table",
       "slug": "big_table",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         1,
-        32,
-        49,
-        110
+        210,
+        31,
+        256
       ],
       "size": [
-        48,
-        78
+        30,
+        46
       ],
       "file": "big_table.png"
     },
@@ -495,13 +459,13 @@
       "name": "Game Table",
       "slug": "game_table",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         188,
-        3,
+        149,
         204,
-        27
+        173
       ],
       "size": [
         16,
@@ -513,16 +477,16 @@
       "name": "Dining Chair",
       "slug": "dining_chair",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        134,
-        4,
-        184,
-        32
+        152,
+        150,
+        167,
+        178
       ],
       "size": [
-        50,
+        15,
         28
       ],
       "file": "dining_chair.png"
@@ -531,17 +495,17 @@
       "name": "Kitchen Chair",
       "slug": "kitchen_chair",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         84,
-        3,
-        130,
-        31
+        149,
+        98,
+        176
       ],
       "size": [
-        46,
-        28
+        14,
+        27
       ],
       "file": "kitchen_chair.png"
     },
@@ -549,17 +513,17 @@
       "name": "Side Desk",
       "slug": "side_desk",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         46,
-        4,
-        82,
-        29
+        151,
+        62,
+        175
       ],
       "size": [
-        36,
-        25
+        16,
+        24
       ],
       "file": "side_desk.png"
     },
@@ -567,31 +531,49 @@
       "name": "Drawer",
       "slug": "drawer_2",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         2,
-        3,
-        43,
-        30
+        151,
+        22,
+        174
       ],
       "size": [
-        41,
-        27
+        20,
+        23
       ],
       "file": "drawer_2.png"
+    },
+    {
+      "name": "Mirror",
+      "slug": "mirror",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        5,
+        303,
+        29,
+        347
+      ],
+      "size": [
+        24,
+        44
+      ],
+      "file": "mirror.png"
     },
     {
       "name": "Plant Pot",
       "slug": "plant_pot",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        3,
-        168,
-        13,
-        191
+        41,
+        314,
+        51,
+        337
       ],
       "size": [
         10,
@@ -600,52 +582,52 @@
       "file": "plant_pot.png"
     },
     {
-      "name": "Kitchen counter",
-      "slug": "kitchen_counter",
-      "group_path": [
-        "Decoration"
-      ],
-      "bbox": [
-        90,
-        193,
-        204,
-        256
-      ],
-      "size": [
-        114,
-        63
-      ],
-      "file": "kitchen_counter.png"
-    },
-    {
       "name": "Old Table",
       "slug": "old_table",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         1,
-        32,
+        178,
         47,
-        110
+        208
       ],
       "size": [
         46,
-        78
+        30
       ],
       "file": "old_table.png"
+    },
+    {
+      "name": "Rubber Bone",
+      "slug": "rubber_bone",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        462,
+        571,
+        473,
+        577
+      ],
+      "size": [
+        11,
+        6
+      ],
+      "file": "rubber_bone.png"
     },
     {
       "name": "Wood Painting",
       "slug": "wood_painting",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        157,
-        9,
-        170,
-        24
+        177,
+        121,
+        190,
+        136
       ],
       "size": [
         13,
@@ -657,16 +639,16 @@
       "name": "Wood Painting",
       "slug": "wood_painting_2",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
-        139,
-        9,
         160,
-        24
+        121,
+        173,
+        136
       ],
       "size": [
-        21,
+        13,
         15
       ],
       "file": "wood_painting_2.png"
@@ -675,13 +657,13 @@
       "name": "Plastic Globe",
       "slug": "plastic_globe",
       "group_path": [
-        "Decoration"
+        "Decoration Dirty"
       ],
       "bbox": [
         68,
-        6,
+        152,
         81,
-        26
+        172
       ],
       "size": [
         13,
@@ -690,38 +672,218 @@
       "file": "plastic_globe.png"
     },
     {
-      "name": "Rubber Bone copy",
-      "slug": "rubber_bone_copy",
+      "name": "Aquarium Dirty",
+      "slug": "aquarium_dirty",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        99,
+        212,
+        113,
+        224
+      ],
+      "size": [
+        14,
+        12
+      ],
+      "file": "aquarium_dirty.png"
+    },
+    {
+      "name": "Rug Horizontal Dirty",
+      "slug": "rug_horizontal_dirty",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        93,
+        82,
+        141,
+        114
+      ],
+      "size": [
+        48,
+        32
+      ],
+      "file": "rug_horizontal_dirty.png"
+    },
+    {
+      "name": "Kitchen Counter Empty Dirty",
+      "slug": "kitchen_counter_empty_dirty",
+      "group_path": [
+        "Decoration Dirty"
+      ],
+      "bbox": [
+        65,
+        342,
+        146,
+        385
+      ],
+      "size": [
+        81,
+        43
+      ],
+      "file": "kitchen_counter_empty_dirty.png"
+    },
+    {
+      "name": "Aquarium",
+      "slug": "aquarium",
       "group_path": [
         "Decoration"
       ],
       "bbox": [
-        462,
-        285,
-        473,
-        291
+        99,
+        212,
+        113,
+        224
       ],
       "size": [
-        11,
-        6
+        14,
+        12
       ],
-      "file": "rubber_bone_copy.png"
+      "file": "aquarium.png"
+    },
+    {
+      "name": "Lamp",
+      "slug": "lamp_2",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        185,
+        340,
+        203,
+        366
+      ],
+      "size": [
+        18,
+        26
+      ],
+      "file": "lamp_2.png"
+    },
+    {
+      "name": "Fireplace copy",
+      "slug": "fireplace_copy",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        80,
+        274,
+        135,
+        299
+      ],
+      "size": [
+        55,
+        25
+      ],
+      "file": "fireplace_copy.png"
+    },
+    {
+      "name": "Bath Sink",
+      "slug": "bath_sink_2",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        170,
+        404,
+        189,
+        433
+      ],
+      "size": [
+        19,
+        29
+      ],
+      "file": "bath_sink_2.png"
+    },
+    {
+      "name": "Iron Board",
+      "slug": "iron_board_2",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        93,
+        402,
+        118,
+        431
+      ],
+      "size": [
+        25,
+        29
+      ],
+      "file": "iron_board_2.png"
+    },
+    {
+      "name": "Bathtub",
+      "slug": "bathtub_2",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        92,
+        375,
+        134,
+        398
+      ],
+      "size": [
+        42,
+        23
+      ],
+      "file": "bathtub_2.png"
+    },
+    {
+      "name": "Pet Bed 2",
+      "slug": "pet_bed_2_2",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        98,
+        319,
+        125,
+        332
+      ],
+      "size": [
+        27,
+        13
+      ],
+      "file": "pet_bed_2_2.png"
+    },
+    {
+      "name": "Pet Bed 1",
+      "slug": "pet_bed_1",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        98,
+        302,
+        125,
+        315
+      ],
+      "size": [
+        27,
+        13
+      ],
+      "file": "pet_bed_1.png"
     },
     {
       "name": "Toilet",
       "slug": "toilet_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        144,
-        260,
+        126,
+        401,
         166,
-        288
+        433
       ],
       "size": [
-        22,
-        28
+        40,
+        32
       ],
       "file": "toilet_2.png"
     },
@@ -729,13 +891,13 @@
       "name": "Vynil Player",
       "slug": "vynil_player_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         44,
-        168,
+        314,
         74,
-        193
+        339
       ],
       "size": [
         30,
@@ -747,13 +909,13 @@
       "name": "Stove",
       "slug": "stove_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         149,
-        208,
+        354,
         179,
-        251
+        397
       ],
       "size": [
         30,
@@ -765,17 +927,17 @@
       "name": "Fridge",
       "slug": "fridge_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        59,
-        227,
+        28,
+        373,
         85,
-        282
+        434
       ],
       "size": [
-        26,
-        55
+        57,
+        61
       ],
       "file": "fridge_2.png"
     },
@@ -783,13 +945,13 @@
       "name": "Flower Pot",
       "slug": "flower_pot_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         81,
-        168,
+        314,
         91,
-        191
+        337
       ],
       "size": [
         10,
@@ -798,70 +960,70 @@
       "file": "flower_pot_2.png"
     },
     {
-      "name": "Sofa",
-      "slug": "sofa_2",
+      "name": "Sofa Front Back Side",
+      "slug": "sofa_front_back_side",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         3,
-        231,
-        25,
-        286
+        341,
+        139,
+        432
       ],
       "size": [
-        22,
-        55
+        136,
+        91
       ],
-      "file": "sofa_2.png"
+      "file": "sofa_front_back_side.png"
     },
     {
-      "name": "Loveseat",
-      "slug": "loveseat_2",
+      "name": "Loveseat Front Back",
+      "slug": "loveseat_front_back",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         127,
-        158,
-        159,
-        190
+        269,
+        194,
+        336
       ],
       "size": [
-        32,
-        32
+        67,
+        67
       ],
-      "file": "loveseat_2.png"
+      "file": "loveseat_front_back.png"
     },
     {
-      "name": "Fireplace",
-      "slug": "fireplace",
+      "name": "Mirror",
+      "slug": "mirror_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        79,
-        127,
-        104,
-        153
+        5,
+        303,
+        29,
+        347
       ],
       "size": [
-        25,
-        26
+        24,
+        44
       ],
-      "file": "fireplace.png"
+      "file": "mirror_2.png"
     },
     {
       "name": "Standing Lamp",
       "slug": "standing_lamp_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         186,
-        117,
+        263,
         205,
-        163
+        309
       ],
       "size": [
         19,
@@ -873,13 +1035,13 @@
       "name": "Old Clock",
       "slug": "old_clock_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         70,
-        113,
+        259,
         91,
-        159
+        305
       ],
       "size": [
         21,
@@ -891,13 +1053,13 @@
       "name": "Coat Hanger",
       "slug": "coat_hanger_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         50,
-        116,
+        262,
         66,
-        160
+        306
       ],
       "size": [
         16,
@@ -909,17 +1071,17 @@
       "name": "Drawer",
       "slug": "drawer_3",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         4,
-        117,
-        29,
-        152
+        260,
+        48,
+        301
       ],
       "size": [
-        25,
-        35
+        44,
+        41
       ],
       "file": "drawer_3.png"
     },
@@ -927,17 +1089,17 @@
       "name": "Bookcase",
       "slug": "bookcase_3",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         97,
-        80,
-        143,
-        125
+        224,
+        160,
+        272
       ],
       "size": [
-        46,
-        45
+        63,
+        48
       ],
       "file": "bookcase_3.png"
     },
@@ -945,17 +1107,17 @@
       "name": "Bookcase",
       "slug": "bookcase_4",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         33,
-        64,
-        79,
-        111
+        210,
+        92,
+        258
       ],
       "size": [
-        46,
-        47
+        59,
+        48
       ],
       "file": "bookcase_4.png"
     },
@@ -963,17 +1125,17 @@
       "name": "Big Rug",
       "slug": "big_rug_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        168,
-        65,
-        200,
-        113
+        160,
+        177,
+        208,
+        259
       ],
       "size": [
-        32,
-        48
+        48,
+        82
       ],
       "file": "big_rug_2.png"
     },
@@ -981,13 +1143,13 @@
       "name": "Oval Rug",
       "slug": "oval_rug_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         133,
-        63,
+        209,
         155,
-        75
+        221
       ],
       "size": [
         22,
@@ -999,17 +1161,17 @@
       "name": "Old Rug",
       "slug": "old_rug_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        128,
-        42,
-        159,
-        57
+        113,
+        179,
+        161,
+        210
       ],
       "size": [
-        31,
-        15
+        48,
+        31
       ],
       "file": "old_rug_2.png"
     },
@@ -1017,13 +1179,13 @@
       "name": "Center Table",
       "slug": "center_table_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         84,
-        44,
+        190,
         108,
-        63
+        209
       ],
       "size": [
         24,
@@ -1035,13 +1197,13 @@
       "name": "Tiny Bookcase",
       "slug": "tiny_bookcase_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         51,
-        35,
+        181,
         81,
-        63
+        209
       ],
       "size": [
         30,
@@ -1053,17 +1215,17 @@
       "name": "Big Table",
       "slug": "big_table_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         1,
-        64,
-        31,
-        110
+        178,
+        49,
+        256
       ],
       "size": [
-        30,
-        46
+        48,
+        78
       ],
       "file": "big_table_2.png"
     },
@@ -1071,13 +1233,13 @@
       "name": "Game Table",
       "slug": "game_table_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         188,
-        3,
+        149,
         204,
-        27
+        173
       ],
       "size": [
         16,
@@ -1089,16 +1251,16 @@
       "name": "Dining Chair",
       "slug": "dining_chair_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        152,
-        4,
-        167,
-        32
+        134,
+        150,
+        184,
+        178
       ],
       "size": [
-        15,
+        50,
         28
       ],
       "file": "dining_chair_2.png"
@@ -1107,17 +1269,17 @@
       "name": "Kitchen Chair",
       "slug": "kitchen_chair_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         84,
-        3,
-        98,
-        30
+        149,
+        130,
+        177
       ],
       "size": [
-        14,
-        27
+        46,
+        28
       ],
       "file": "kitchen_chair_2.png"
     },
@@ -1125,17 +1287,17 @@
       "name": "Side Desk",
       "slug": "side_desk_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         46,
-        5,
-        62,
-        29
+        150,
+        82,
+        175
       ],
       "size": [
-        16,
-        24
+        36,
+        25
       ],
       "file": "side_desk_2.png"
     },
@@ -1143,49 +1305,31 @@
       "name": "Drawer",
       "slug": "drawer_4",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         2,
-        5,
-        22,
-        28
+        149,
+        43,
+        176
       ],
       "size": [
-        20,
-        23
+        41,
+        27
       ],
       "file": "drawer_4.png"
-    },
-    {
-      "name": "Mirror",
-      "slug": "mirror_2",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "bbox": [
-        5,
-        157,
-        29,
-        201
-      ],
-      "size": [
-        24,
-        44
-      ],
-      "file": "mirror_2.png"
     },
     {
       "name": "Plant Pot",
       "slug": "plant_pot_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        41,
-        168,
-        51,
-        191
+        3,
+        314,
+        13,
+        337
       ],
       "size": [
         10,
@@ -1194,52 +1338,52 @@
       "file": "plant_pot_2.png"
     },
     {
+      "name": "Kitchen counter",
+      "slug": "kitchen_counter",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        86,
+        453,
+        200,
+        516
+      ],
+      "size": [
+        114,
+        63
+      ],
+      "file": "kitchen_counter.png"
+    },
+    {
       "name": "Old Table",
       "slug": "old_table_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         1,
-        32,
+        178,
         47,
-        62
+        256
       ],
       "size": [
         46,
-        30
+        78
       ],
       "file": "old_table_2.png"
-    },
-    {
-      "name": "Rubber Bone",
-      "slug": "rubber_bone",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "bbox": [
-        462,
-        425,
-        473,
-        431
-      ],
-      "size": [
-        11,
-        6
-      ],
-      "file": "rubber_bone.png"
     },
     {
       "name": "Wood Painting",
       "slug": "wood_painting_3",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        157,
-        9,
-        170,
-        24
+        177,
+        121,
+        190,
+        136
       ],
       "size": [
         13,
@@ -1251,13 +1395,13 @@
       "name": "Wood Painting",
       "slug": "wood_painting_4",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
-        139,
-        9,
-        152,
-        24
+        160,
+        121,
+        173,
+        136
       ],
       "size": [
         13,
@@ -1269,63 +1413,236 @@
       "name": "Plastic Globe",
       "slug": "plastic_globe_2",
       "group_path": [
-        "Decoration Dirty"
+        "Decoration"
       ],
       "bbox": [
         68,
-        6,
+        112,
         81,
-        26
+        132
       ],
       "size": [
         13,
         20
       ],
       "file": "plastic_globe_2.png"
+    },
+    {
+      "name": "Rubber Bone copy",
+      "slug": "rubber_bone_copy",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        462,
+        404,
+        473,
+        410
+      ],
+      "size": [
+        11,
+        6
+      ],
+      "file": "rubber_bone_copy.png"
+    },
+    {
+      "name": "Floor Lamp Off",
+      "slug": "floor_lamp_off",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        112,
+        263,
+        128,
+        311
+      ],
+      "size": [
+        16,
+        48
+      ],
+      "file": "floor_lamp_off.png"
+    },
+    {
+      "name": "Lamp off",
+      "slug": "lamp_off",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        97,
+        288,
+        110,
+        311
+      ],
+      "size": [
+        13,
+        23
+      ],
+      "file": "lamp_off.png"
+    },
+    {
+      "name": "Bathtub empty",
+      "slug": "bathtub_empty",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        39,
+        288,
+        81,
+        311
+      ],
+      "size": [
+        42,
+        23
+      ],
+      "file": "bathtub_empty.png"
+    },
+    {
+      "name": "Sink Empty",
+      "slug": "sink_empty",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        53,
+        249,
+        72,
+        278
+      ],
+      "size": [
+        19,
+        29
+      ],
+      "file": "sink_empty.png"
+    },
+    {
+      "name": "Vynil Player Closed",
+      "slug": "vynil_player_closed",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        129,
+        287,
+        159,
+        312
+      ],
+      "size": [
+        30,
+        25
+      ],
+      "file": "vynil_player_closed.png"
+    },
+    {
+      "name": "Toilet Empty Front",
+      "slug": "toilet_empty_front",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        46,
+        317,
+        62,
+        349
+      ],
+      "size": [
+        16,
+        32
+      ],
+      "file": "toilet_empty_front.png"
+    },
+    {
+      "name": "Toilet Empty Side",
+      "slug": "toilet_empty_side",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        67,
+        320,
+        89,
+        348
+      ],
+      "size": [
+        22,
+        28
+      ],
+      "file": "toilet_empty_side.png"
+    },
+    {
+      "name": "Kitchen Counter Empty",
+      "slug": "kitchen_counter_empty",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        109,
+        336,
+        189,
+        379
+      ],
+      "size": [
+        80,
+        43
+      ],
+      "file": "kitchen_counter_empty.png"
+    },
+    {
+      "name": "Oval Rug Red",
+      "slug": "oval_rug_red",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        82,
+        269,
+        104,
+        281
+      ],
+      "size": [
+        22,
+        12
+      ],
+      "file": "oval_rug_red.png"
+    },
+    {
+      "name": "Rug Horizontal",
+      "slug": "rug_horizontal",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        92,
+        40,
+        140,
+        72
+      ],
+      "size": [
+        48,
+        32
+      ],
+      "file": "rug_horizontal.png"
+    },
+    {
+      "name": "Rug Vertical",
+      "slug": "rug_vertical",
+      "group_path": [
+        "Decoration"
+      ],
+      "bbox": [
+        98,
+        81,
+        130,
+        129
+      ],
+      "size": [
+        32,
+        48
+      ],
+      "file": "rug_vertical.png"
     }
   ],
-  "skipped": [
-    {
-      "name": "Kitchen counter",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    },
-    {
-      "name": "Lamp",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    },
-    {
-      "name": "Bath Sink",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    },
-    {
-      "name": "Iron Board",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    },
-    {
-      "name": "Bathtub",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    },
-    {
-      "name": "Pet Bed 2",
-      "group_path": [
-        "Decoration Dirty"
-      ],
-      "reason": "hidden"
-    }
-  ]
+  "skipped": []
 }

@@ -88,20 +88,29 @@
   "'tuning' is where the numbers live for a piece that came in off the PSD, keyed by its",
   "name (decor_<title>): place, base, base_px, seat, scale, copies, mirror, dirty_piece.",
   "The numbers never go in the PSD - they are set by eye against the shed and retuned",
-  "without reopening the art."
+  "without reopening the art.",
+  "",
+  "face / state (2026-09-20): a view may say which way it faces and whether it is switched on.",
+  "R moves to the next face (keeping the state when that drawing exists), E flips the state",
+  "keeping the face, and does nothing where the other drawing was never made - the kitchen",
+  "counter's side. Left out, they follow the kind: ROTATE/VARIANT count faces, STATE counts",
+  "states. View 0 is what a piece comes out of the store as, so it is face 0, switched off.",
+  "",
+  "light: what a piece gives off while switched on - fire (warm pool and the crackle), warm",
+  "(warm pool, silent: the lamps), cold (the open fridge). Anything else switches in silence."
  ],
  "tuning": {},
  "entries": [
   {
    "name": "decor_sofa",
    "title": "Sofa",
-   "dirty": "sofa_2",
+   "dirty": "Decoration Dirty/Sofa",
    "kind": "ROTATE",
    "mirror": true,
    "views": [
     {
      "role": "front",
-     "layer": "sofa",
+     "layer": "Decoration/Sofa Front Back Side",
      "rect": [
       23,
       6,
@@ -111,7 +120,7 @@
     },
     {
      "role": "side",
-     "layer": "sofa",
+     "layer": "Decoration/Sofa Front Back Side",
      "rect": [
       0,
       36,
@@ -121,7 +130,7 @@
     },
     {
      "role": "back",
-     "layer": "sofa",
+     "layer": "Decoration/Sofa Front Back Side",
      "rect": [
       87,
       0,
@@ -146,13 +155,13 @@
   {
    "name": "decor_loveseat",
    "title": "Armchair",
-   "dirty": "loveseat_2",
+   "dirty": "Decoration Dirty/Loveseat",
    "kind": "ROTATE",
    "mirror": true,
    "views": [
     {
      "role": "front",
-     "layer": "loveseat",
+     "layer": "Decoration/Loveseat Front Back",
      "rect": [
       0,
       35,
@@ -162,7 +171,7 @@
     },
     {
      "role": "side",
-     "layer": "loveseat",
+     "layer": "Decoration/Loveseat Front Back",
      "rect": [
       31,
       0,
@@ -172,7 +181,7 @@
     },
     {
      "role": "back",
-     "layer": "loveseat",
+     "layer": "Decoration/Loveseat Front Back",
      "rect": [
       35,
       39,
@@ -197,14 +206,14 @@
   {
    "name": "decor_dining_chair",
    "title": "Dining chair",
-   "dirty": "dining_chair_2",
+   "dirty": "Decoration Dirty/Dining Chair",
    "kind": "ROTATE",
    "mirror": true,
    "copies": 4,
    "views": [
     {
      "role": "front",
-     "layer": "dining_chair",
+     "layer": "Decoration/Dining Chair",
      "rect": [
       0,
       1,
@@ -214,7 +223,7 @@
     },
     {
      "role": "side",
-     "layer": "dining_chair",
+     "layer": "Decoration/Dining Chair",
      "rect": [
       18,
       0,
@@ -224,7 +233,7 @@
     },
     {
      "role": "back",
-     "layer": "dining_chair",
+     "layer": "Decoration/Dining Chair",
      "rect": [
       34,
       6,
@@ -243,13 +252,13 @@
   {
    "name": "decor_dresser",
    "title": "Dresser",
-   "dirty": "drawer_3",
+   "dirty": "Decoration Dirty/Drawer",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "drawer",
+     "layer": "Decoration/Drawer",
      "rect": [
       0,
       3,
@@ -259,7 +268,7 @@
     },
     {
      "role": "side",
-     "layer": "drawer",
+     "layer": "Decoration/Drawer",
      "rect": [
       28,
       0,
@@ -276,13 +285,13 @@
   {
    "name": "decor_nightstand",
    "title": "Nightstand",
-   "dirty": "drawer_4",
+   "dirty": "Decoration Dirty/Drawer#2",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "drawer_2",
+     "layer": "Decoration/Drawer#2",
      "rect": [
       0,
       2,
@@ -292,7 +301,7 @@
     },
     {
      "role": "side",
-     "layer": "drawer_2",
+     "layer": "Decoration/Drawer#2",
      "rect": [
       26,
       0,
@@ -309,13 +318,13 @@
   {
    "name": "decor_bookcase_drawers",
    "title": "Bookcase",
-   "dirty": "bookcase_3",
+   "dirty": "Decoration Dirty/Bookcase",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "bookcase",
+     "layer": "Decoration/Bookcase",
      "rect": [
       0,
       2,
@@ -325,7 +334,7 @@
     },
     {
      "role": "side",
-     "layer": "bookcase",
+     "layer": "Decoration/Bookcase",
      "rect": [
       47,
       0,
@@ -342,13 +351,13 @@
   {
    "name": "decor_bookcase_tall",
    "title": "Tall bookcase",
-   "dirty": "bookcase_4",
+   "dirty": "Decoration Dirty/Bookcase#2",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "bookcase_2",
+     "layer": "Decoration/Bookcase#2",
      "rect": [
       0,
       0,
@@ -358,7 +367,7 @@
     },
     {
      "role": "side",
-     "layer": "bookcase_2",
+     "layer": "Decoration/Bookcase#2",
      "rect": [
       47,
       0,
@@ -375,13 +384,13 @@
   {
    "name": "decor_big_table",
    "title": "Dining table",
-   "dirty": "big_table_2",
+   "dirty": "Decoration Dirty/Big Table",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "big_table",
+     "layer": "Decoration/Big Table",
      "rect": [
       0,
       0,
@@ -391,7 +400,7 @@
     },
     {
      "role": "side",
-     "layer": "big_table",
+     "layer": "Decoration/Big Table",
      "rect": [
       0,
       32,
@@ -408,13 +417,13 @@
   {
    "name": "decor_side_desk",
    "title": "Side desk",
-   "dirty": "side_desk_2",
+   "dirty": "Decoration Dirty/Side Desk",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "side_desk",
+     "layer": "Decoration/Side Desk",
      "rect": [
       0,
       1,
@@ -424,7 +433,7 @@
     },
     {
      "role": "side",
-     "layer": "side_desk",
+     "layer": "Decoration/Side Desk",
      "rect": [
       20,
       0,
@@ -441,13 +450,21 @@
   {
    "name": "decor_kitchen_counter",
    "title": "Kitchen counter",
-   "dirty": "kitchen_counter_2",
+   "dirty": "Decoration Dirty/Kitchen Counter Empty Dirty",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
+     "role": "front_empty",
+     "layer": "Decoration/Kitchen Counter Empty",
+     "face": 0,
+     "state": 0
+    },
+    {
      "role": "front",
-     "layer": "kitchen_counter",
+     "layer": "Decoration/Kitchen counter",
+     "face": 0,
+     "state": 1,
      "rect": [
       0,
       0,
@@ -457,7 +474,9 @@
     },
     {
      "role": "side",
-     "layer": "kitchen_counter",
+     "layer": "Decoration/Kitchen counter",
+     "face": 1,
+     "state": 1,
      "rect": [
       82,
       0,
@@ -468,6 +487,7 @@
    ],
    "base": [
     2,
+    2,
     6
    ],
    "scale": 0.75
@@ -475,13 +495,27 @@
   {
    "name": "decor_toilet",
    "title": "Toilet",
-   "dirty": "toilet_2",
+   "dirty": "Decoration Dirty/Toilet",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
+     "role": "front_empty",
+     "layer": "Decoration/Toilet Empty Front",
+     "face": 0,
+     "state": 0
+    },
+    {
+     "role": "side_empty",
+     "layer": "Decoration/Toilet Empty Side",
+     "face": 1,
+     "state": 0
+    },
+    {
      "role": "front",
-     "layer": "toilet",
+     "layer": "Decoration/Toilet",
+     "face": 0,
+     "state": 1,
      "rect": [
       0,
       0,
@@ -491,7 +525,9 @@
     },
     {
      "role": "side",
-     "layer": "toilet",
+     "layer": "Decoration/Toilet",
+     "face": 1,
+     "state": 1,
      "rect": [
       18,
       4,
@@ -502,19 +538,21 @@
    ],
    "base": [
     2,
+    3,
+    2,
     3
    ]
   },
   {
    "name": "decor_big_rug",
    "title": "Big rug",
-   "dirty": "big_rug_2",
+   "dirty": "Decoration Dirty/Big Rug",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "wide",
-     "layer": "big_rug",
+     "layer": "Decoration/Big Rug",
      "rect": [
       0,
       0,
@@ -524,7 +562,7 @@
     },
     {
      "role": "long",
-     "layer": "big_rug",
+     "layer": "Decoration/Big Rug",
      "rect": [
       8,
       34,
@@ -537,13 +575,13 @@
   {
    "name": "decor_old_rug",
    "title": "Runner rug",
-   "dirty": "old_rug_2",
+   "dirty": "Decoration Dirty/Old Rug",
    "kind": "ROTATE",
    "mirror": false,
    "views": [
     {
      "role": "long",
-     "layer": "old_rug",
+     "layer": "Decoration/Old Rug",
      "rect": [
       0,
       0,
@@ -553,7 +591,7 @@
     },
     {
      "role": "wide",
-     "layer": "old_rug",
+     "layer": "Decoration/Old Rug",
      "rect": [
       17,
       9,
@@ -566,13 +604,13 @@
   {
    "name": "decor_fireplace",
    "title": "Fireplace",
-   "dirty": "fireplace",
+   "dirty": "Decoration Dirty/Fireplace",
    "kind": "STATE",
    "mirror": false,
    "views": [
     {
      "role": "off",
-     "layer": "fireplace_copy",
+     "layer": "Decoration/Fireplace copy",
      "rect": [
       0,
       0,
@@ -582,7 +620,7 @@
     },
     {
      "role": "on",
-     "layer": "fireplace_copy",
+     "layer": "Decoration/Fireplace copy",
      "rect": [
       29,
       0,
@@ -594,18 +632,19 @@
    "base": [
     1,
     1
-   ]
+   ],
+   "light": "fire"
   },
   {
    "name": "decor_fridge",
    "title": "Fridge",
-   "dirty": "fridge_2",
+   "dirty": "Decoration Dirty/Fridge",
    "kind": "STATE",
    "mirror": false,
    "views": [
     {
      "role": "shut",
-     "layer": "fridge",
+     "layer": "Decoration/Fridge",
      "rect": [
       31,
       0,
@@ -615,7 +654,7 @@
     },
     {
      "role": "open",
-     "layer": "fridge",
+     "layer": "Decoration/Fridge",
      "rect": [
       0,
       1,
@@ -627,23 +666,24 @@
    "base": [
     1,
     1
-   ]
+   ],
+   "light": "cold"
   },
   {
    "name": "decor_pet_bed",
    "copies": 2,
    "title": "Pet bed",
-   "dirty": "pet_bed_2_2",
+   "dirty": "Decoration Dirty/Pet Bed 2",
    "kind": "VARIANT",
    "mirror": false,
    "views": [
     {
      "role": "round",
-     "layer": "pet_bed_1"
+     "layer": "Decoration/Pet Bed 1"
     },
     {
      "role": "oval",
-     "layer": "pet_bed_2"
+     "layer": "Decoration/Pet Bed 2"
     }
    ],
    "base": [
@@ -684,46 +724,58 @@
   {
    "name": "decor_lamp",
    "title": "Table lamp",
-   "dirty": "lamp_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Lamp",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "lamp"
+     "role": "off",
+     "layer": "Decoration/Lamp off"
+    },
+    {
+     "role": "on",
+     "layer": "Decoration/Lamp"
     }
    ],
    "base": [
+    1,
     1
    ],
-   "place": "small"
+   "place": "small",
+   "light": "warm"
   },
   {
    "name": "decor_standing_lamp",
    "title": "Floor lamp",
-   "dirty": "standing_lamp_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Standing Lamp",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "standing_lamp"
+     "role": "off",
+     "layer": "Decoration/Floor Lamp Off"
+    },
+    {
+     "role": "on",
+     "layer": "Decoration/Standing Lamp"
     }
    ],
    "base": [
+    1,
     1
-   ]
+   ],
+   "light": "warm"
   },
   {
    "name": "decor_old_clock",
    "title": "Old clock",
-   "dirty": "old_clock_2",
+   "dirty": "Decoration Dirty/Old Clock",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "old_clock"
+     "layer": "Decoration/Old Clock"
     }
    ],
    "base": [
@@ -734,13 +786,13 @@
   {
    "name": "decor_coat_hanger",
    "title": "Coat hanger",
-   "dirty": "coat_hanger_2",
+   "dirty": "Decoration Dirty/Coat Hanger",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "coat_hanger"
+     "layer": "Decoration/Coat Hanger"
     }
    ],
    "base": [
@@ -750,13 +802,13 @@
   {
    "name": "decor_mirror",
    "title": "Standing mirror",
-   "dirty": "mirror_2",
+   "dirty": "Decoration Dirty/Mirror",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "mirror"
+     "layer": "Decoration/Mirror"
     }
    ],
    "base": [
@@ -766,13 +818,13 @@
   {
    "name": "decor_stove",
    "title": "Stove",
-   "dirty": "stove_2",
+   "dirty": "Decoration Dirty/Stove",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "stove"
+     "layer": "Decoration/Stove"
     }
    ],
    "base": [
@@ -783,61 +835,76 @@
   {
    "name": "decor_vynil_player",
    "title": "Record player",
-   "dirty": "vynil_player_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Vynil Player",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "vynil_player"
+     "role": "closed",
+     "layer": "Decoration/Vynil Player Closed"
+    },
+    {
+     "role": "open",
+     "layer": "Decoration/Vynil Player"
     }
    ],
    "base": [
+    2,
     2
    ]
   },
   {
    "name": "decor_bath_sink",
    "title": "Bathroom sink",
-   "dirty": "bath_sink_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Bath Sink",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "bath_sink"
+     "role": "empty",
+     "layer": "Decoration/Sink Empty"
+    },
+    {
+     "role": "full",
+     "layer": "Decoration/Bath Sink"
     }
    ],
    "base": [
+    1,
     1
    ]
   },
   {
    "name": "decor_bathtub",
    "title": "Bathtub",
-   "dirty": "bathtub_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Bathtub",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "bathtub"
+     "role": "empty",
+     "layer": "Decoration/Bathtub empty"
+    },
+    {
+     "role": "full",
+     "layer": "Decoration/Bathtub"
     }
    ],
    "base": [
+    3,
     3
    ]
   },
   {
    "name": "decor_iron_board",
    "title": "Ironing board",
-   "dirty": "iron_board_2",
+   "dirty": "Decoration Dirty/Iron Board",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "iron_board"
+     "layer": "Decoration/Iron Board"
     }
    ],
    "base": [
@@ -847,13 +914,13 @@
   {
    "name": "decor_center_table",
    "title": "Coffee table",
-   "dirty": "center_table_2",
+   "dirty": "Decoration Dirty/Center Table",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "center_table"
+     "layer": "Decoration/Center Table"
     }
    ],
    "base": [
@@ -863,13 +930,13 @@
   {
    "name": "decor_game_table",
    "title": "Card table",
-   "dirty": "game_table_2",
+   "dirty": "Decoration Dirty/Game Table",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "game_table"
+     "layer": "Decoration/Game Table"
     }
    ],
    "base": [
@@ -879,13 +946,13 @@
   {
    "name": "decor_tiny_bookcase",
    "title": "Small bookcase",
-   "dirty": "tiny_bookcase_2",
+   "dirty": "Decoration Dirty/Tiny Bookcase",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "tiny_bookcase"
+     "layer": "Decoration/Tiny Bookcase"
     }
    ],
    "base": [
@@ -895,26 +962,30 @@
   {
    "name": "decor_oval_rug",
    "title": "Oval rug",
-   "dirty": "oval_rug_2",
-   "kind": "SINGLE",
+   "dirty": "Decoration Dirty/Oval Rug",
+   "kind": "VARIANT",
    "mirror": false,
    "views": [
     {
-     "role": "front",
-     "layer": "oval_rug"
+     "role": "plain",
+     "layer": "Decoration/Oval Rug"
+    },
+    {
+     "role": "red",
+     "layer": "Decoration/Oval Rug Red"
     }
    ]
   },
   {
    "name": "decor_flower_pot",
    "title": "Flower pot",
-   "dirty": "flower_pot_2",
+   "dirty": "Decoration Dirty/Flower Pot",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "flower_pot"
+     "layer": "Decoration/Flower Pot"
     }
    ],
    "place": "small",
@@ -925,13 +996,13 @@
   {
    "name": "decor_plant_pot",
    "title": "Potted plant",
-   "dirty": "plant_pot_2",
+   "dirty": "Decoration Dirty/Plant Pot",
    "kind": "SINGLE",
    "mirror": false,
    "views": [
     {
      "role": "front",
-     "layer": "plant_pot"
+     "layer": "Decoration/Plant Pot"
     }
    ],
    "place": "small",
@@ -948,10 +1019,10 @@
    "views": [
     {
      "role": "front",
-     "layer": "wood_painting_2"
+     "layer": "Decoration/Wood Painting#2"
     }
    ],
-   "dirty": "wood_painting_4"
+   "dirty": "Decoration Dirty/Wood Painting#2"
   },
   {
    "name": "decor_painting_b",
@@ -962,10 +1033,10 @@
    "views": [
     {
      "role": "front",
-     "layer": "wood_painting"
+     "layer": "Decoration/Wood Painting"
     }
    ],
-   "dirty": "wood_painting_3"
+   "dirty": "Decoration Dirty/Wood Painting"
   },
   {
    "name": "decor_chew_toy",
@@ -980,10 +1051,10 @@
    "views": [
     {
      "role": "front",
-     "layer": "rubber_bone_copy"
+     "layer": "Decoration/Rubber Bone copy"
     }
    ],
-   "dirty": "rubber_bone"
+   "dirty": "Decoration Dirty/Rubber Bone"
   },
   {
    "name": "decor_globe",
@@ -997,10 +1068,44 @@
    "views": [
     {
      "role": "front",
-     "layer": "plastic_globe"
+     "layer": "Decoration/Plastic Globe"
     }
    ],
-   "dirty": "plastic_globe_2"
+   "dirty": "Decoration Dirty/Plastic Globe"
+  },
+  {
+   "name": "decor_rug",
+   "title": "Rug",
+   "dirty": "Decoration Dirty/Rug Horizontal Dirty",
+   "kind": "ROTATE",
+   "mirror": false,
+   "views": [
+    {
+     "role": "wide",
+     "layer": "Decoration/Rug Horizontal"
+    },
+    {
+     "role": "long",
+     "layer": "Decoration/Rug Vertical"
+    }
+   ]
+  },
+  {
+   "name": "decor_aquarium",
+   "title": "Aquarium",
+   "dirty": "Decoration Dirty/Aquarium Dirty",
+   "kind": "SINGLE",
+   "mirror": false,
+   "views": [
+    {
+     "role": "front",
+     "layer": "Decoration/Aquarium"
+    }
+   ],
+   "base": [
+    1
+   ],
+   "place": "small"
   }
  ]
 }

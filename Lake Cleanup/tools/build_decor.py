@@ -164,15 +164,46 @@ def despeck(im):
     return im.crop((x0, y0, x1, y1))
 
 
-def load_layer(slug, cache, missing_ok=False):
-    if slug not in cache:
-        path = LAYERS / (slug + ".png")
+_BY_NAME = None
+
+
+def layer_file(ref):
+    """The PNG a layer reference names.
+
+    A reference is 'Group/Layer name' (every group on the way down, so a piece group
+    reads 'Decoration/Sofa (rotate)/front'), with '#n' for the nth layer of that name in that
+    group ('Decoration/Drawer#2'), read through the manifest psd-extract writes. Never by
+    slug: slugs are handed out in file order and de-duplicated across the WHOLE file, so
+    the day the 'Decoration Dirty' group was moved above 'Decoration' (2026-09-20) every
+    clean sprite took the name its dirty twin had had. A reference with no '/' is a plain
+    file in the folder — the bed's two views, which come from another PSD and are kept.
+    """
+    global _BY_NAME
+    if "/" not in ref:
+        return LAYERS / (ref + ".png")
+    if _BY_NAME is None:
+        _BY_NAME = {}
+        seen = {}
+        tree = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        for layer in tree["layers"]:
+            key = ("/".join(layer["group_path"]), layer["name"].strip())
+            seen[key] = seen.get(key, 0) + 1
+            _BY_NAME["%s/%s#%d" % (key[0], key[1], seen[key])] = LAYERS / layer["file"]
+    full = ref if "#" in ref else ref + "#1"
+    if full not in _BY_NAME:
+        sys.exit("no layer '%s' in %s" % (ref, MANIFEST))
+    return _BY_NAME[full]
+
+
+def load_layer(ref, cache, missing_ok=False):
+    if ref not in cache:
+        path = layer_file(ref)
         if not path.exists():
             if missing_ok:
                 return None
             sys.exit("missing layer PNG: %s" % path)
-        cache[slug] = Image.open(path).convert("RGBA")
-    return cache[slug]
+        cache[ref] = Image.open(path).convert("RGBA")
+    return cache[ref]
 
 
 def rubbish_sprite(book, slug, cache):
@@ -235,6 +266,10 @@ def pack(sprites):
 ## Where a find may go. See tools/decor_sets.json.
 PLACES = ("floor", "wall", "small")
 
+## What a piece gives off while switched on: nothing, the hearth (a warm pool and the
+## crackle), a lamp (a warm pool, silent), the open fridge (a cold white pool).
+LIGHTS = ("", "fire", "warm", "cold")
+
 
 ## The two top groups of the PSD: the restored piece, and the piece as the lake shows it.
 CLEAN_GROUP = "Decoration"
@@ -287,7 +322,7 @@ def from_manifest(named):
         if len(path) == 2 and path[0] == CLEAN_GROUP:
             groups.setdefault(path[1], []).append(layer)
         elif len(path) == 1 and path[0] == DIRTY_GROUP:
-            dirty[layer["name"].strip()] = layer["slug"]
+            dirty[layer["name"].strip()] = "%s/%s" % (DIRTY_GROUP, layer["name"].strip())
 
     entries = []
     for group_name, layers in groups.items():
@@ -320,7 +355,8 @@ def from_manifest(named):
             # A three-face set turns all the way round; everything else is what is drawn.
             "mirror": kind == "ROTATE" and tuple(roles) == MIRRORED,
             # One view per layer: the layer's own crop is the view, so no rect is authored.
-            "views": [{"role": r, "layer": layer["slug"]}
+            "views": [{"role": r, "layer": "%s/%s/%s" % (CLEAN_GROUP, group_name,
+                                                         layer["name"].strip())}
                       for r, layer in zip(roles, layers)],
         })
     return entries
@@ -342,6 +378,7 @@ def main():
     clean_sprites = {}
     dirty_sprites = {}
     view_keys = {}
+    axes = {}
     fills = {}
 
     for e in entries:
@@ -415,6 +452,25 @@ def main():
             # front, side, back, side flipped: facing you, turned, facing away, turned back.
             keys.append(key)
 
+        # Which way each view faces and whether it is switched on — what R and E move
+        # along. Authored per view for a piece that does both (the toilet); otherwise the
+        # kind says which of the two the views count.
+        faces, states = [], []
+        for i, v in enumerate(views):
+            faces.append(int(v.get("face", 0 if e["kind"] == "STATE" else i)))
+            states.append(int(v.get("state", i if e["kind"] == "STATE" else 0)))
+        if e["mirror"]:
+            faces.append(max(faces) + 1)
+            states.append(0)
+        pairs = list(zip(faces, states))
+        if len(set(pairs)) != len(pairs):
+            sys.exit("%s has two views facing the same way in the same state" % name)
+        if pairs[0] != (0, 0):
+            sys.exit("%s: view 0 is what leaves the store, so it must face 0, switched off"
+                     % name)
+        if e.get("light", "") not in LIGHTS:
+            sys.exit("%s gives off '%s'; one of %s" % (name, e.get("light"), LIGHTS))
+        axes[name] = (faces, states)
         view_keys[name] = keys
         dirty_sprites[name] = grimy
         fills[name] = fill_of(grimy)
@@ -443,6 +499,9 @@ def main():
             "alt_views": views,
             "alt_roles": roles,
             "set": e["kind"],
+            "faces": axes[name][0],
+            "states": axes[name][1],
+            "light": e.get("light", ""),
             "copies": int(e.get("copies", 1)),
             "cells": [max(1, -(-box[2] // CELL)), max(1, -(-box[3] // CELL))],
             "fill": fills[name],

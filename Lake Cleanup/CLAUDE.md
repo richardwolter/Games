@@ -3750,6 +3750,40 @@ an invisible wall in the water — it covers what is behind it and eats clicks. 
 object, anything within `GLUE = 4` px joins it, the rest is a stray. A size threshold is
 the wrong rule — at 8 px that fleck is bigger than plenty of real detail.
 
+### The Second Batch: Switches, Two Axes, Two Finds (2026-09-20, `/grill-me` with Richard)
+Richard's PSD pass: switched-off views for seven pieces, a colour for the oval rug, and the
+aquarium and the rug as new finds. **He kept flat layers** rather than the group convention,
+so these are authored entries; every new view is a whole layer, no rects.
+- **Layers are referenced by group and name, never by slug** (`build_decor.layer_file`,
+  `'Decoration/Drawer#2'`). Moving `Decoration Dirty` above `Decoration` in the file swapped
+  every psd-extract slug (`lamp` became the dirty one). Mapped by **pixels** on the way over:
+  every old sprite has an identical new layer bar three deliberate changes — the counter's
+  new dirty sprite (`Kitchen Counter Empty Dirty`, the old dirty counter layer is gone), 23
+  retouched pixels on the dirty lamp, 11 on painting B. The bed's two views are plain files
+  from another PSD and kept as such.
+- **Every view has a face and a state** (`faces`/`states` in `pieces.json`, `Sheets.turned`/
+  `switched`/`is_on`/`face_of`). R goes to the next face — in the same state where that face
+  was drawn in it, otherwise in whatever state it was — and E flips the state keeping the
+  face, **or does nothing where the other drawing was never made**. Plain rotations count
+  faces, plain switches count states; the two are authored per view only where a piece does
+  both. **Supersedes "the two verbs are exclusive"**: the toilet (front/side × empty/full)
+  and the kitchen counter (front × empty/full, plus a full side with no empty twin) turn
+  *and* switch (Richard: both mechanics, "empty counter face front only").
+- **View 0 is what leaves the store and it faces front, switched off** — the builder refuses
+  anything else. Off is the drawn-as-found state: record player closed, lamps off, water
+  empty. `STATE_ON` is gone: which view is on is the catalogue's to say.
+- **Light is per piece** (`light`: `fire` / `warm` / `cold` / none, `Sheets.light_of`):
+  `fire` is the hearth — the warm pool and the crackle, the only thing that crackles; `warm`
+  the lamps (`LAMP_*`, a smaller softer pool, silent, first guesses); `cold` the open fridge.
+  The record player, the water and the aquarium switch in silence. Until now every switched-on
+  piece that was not an open fridge counted as a fire, which held only while there were two.
+- **The record player is visual only**, by decision. Letting the player pick the song on the
+  lake and in the shed was raised and is **a later pass**.
+- **`SAVE_VERSION` 13**: two finds joined and seven pieces changed what view 0 is.
+- `test_lake` guards R and E each moving only its own axis, the store rule, the toilet's
+  full side, the counter turning empty-to-full and refusing E side on, the light table, a
+  lit lamp pooling without crackling, and the two new finds.
+
 ### The Shed's Shelf (`scripts/shed_shelf.gd`, 2026-09-11)
 The inventory column down the right of the shed is a drawn oak board, the same furniture as
 the upgrades shop and the settings: plank frame, dark `Style.BOARD` face, a title plank over
@@ -3795,10 +3829,10 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   carrying: a placed piece is turned by picking it up again, so one gesture means one thing.
   A three-view set (sofa, armchair, both chairs) gets a fourth face from a mirrored side,
   baked into the sheet by the builder. Two-view sets are front and side as drawn.
-- **E** works a `STATE` piece the player is **standing at** (`REACH`), with an on-screen
-  prompt. Fireplace on/off, fridge open/shut. A lit piece draws a glow on the boards —
-  warm and wide for fire, weaker and whiter for the fridge. Drawn circles, not Light2D:
-  the room is one `_draw` on a Control.
+- **E** works a switchable piece the player is **standing at** (`REACH`), with an on-screen
+  prompt: fireplace, fridge, both lamps, the record player, bathtub, sink, toilet, counter.
+  A lit piece throws a pool through `shed_light.gdshader` by its **light**, not by being
+  on (see The Second Batch below).
 - The view a piece stands in persists in the `decor` row as `"view"`.
 - **Copies**: a find can be hidden more than once — `copies` in `decor_sets.json`, baked
   into `pieces.json`, read via `Sheets.copies_of`. The dining chairs are **4** (a dining table

@@ -406,7 +406,10 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## load and run — and keep its old surface for ever, since a save stores its stacks rather
 ## than its seed. Refused instead: the point of the change is what a lake looks like, and a
 ## save that quietly opted out of it is a save nobody can judge it by.
-const SAVE_VERSION := 12
+## 13: the aquarium and the rug joined the finds, and seven pieces gained a switched-off
+## view as their view 0 (2026-09-20) — a toilet saved facing side on would come back empty
+## and facing front. Richard started fresh rather than have a v12 file read.
+const SAVE_VERSION := 13
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
