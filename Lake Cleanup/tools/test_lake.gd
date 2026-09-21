@@ -3063,6 +3063,23 @@ func _stage_shed() -> void:
 	var full_side := sheets.turned(toilet, sheets.switched(toilet, 0))
 	_check(sheets.is_on(toilet, full_side) and sheets.face_of(toilet, full_side) == 1,
 		"a full toilet turned stays full", "view %d" % full_side)
+	# Pressing E changes what changed and nothing moves: both states of a face are one
+	# frame (build_decor's shared_frame), or the lamp jumped sideways on every switch.
+	var jumps := ""
+	for name: String in sheets.names:
+		var each := StringName(name)
+		for view in sheets.view_count(each):
+			var other := sheets.switched(each, view)
+			if other >= 0 and sheets.view_size_of(each, other) != sheets.view_size_of(each, view):
+				jumps = "%s: %s against %s" % [name, sheets.view_size_of(each, view),
+					sheets.view_size_of(each, other)]
+	_check(jumps.is_empty(), "both states of a switch share one frame", jumps)
+	var toilet_faces := {}
+	for view in sheets.view_count(toilet):
+		toilet_faces[sheets.face_of(toilet, view)] = true
+	_check(toilet_faces.size() == 3, "the toilet turns to either wall",
+		"%d faces" % toilet_faces.size())
+
 	var counter := &"decor_kitchen_counter"
 	var counter_side := sheets.turned(counter, 0)
 	_check(sheets.face_of(counter, counter_side) == 1,

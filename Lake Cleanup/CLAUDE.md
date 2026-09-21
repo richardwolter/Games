@@ -3777,6 +3777,17 @@ so these are authored entries; every new view is a whole layer, no rects.
   the lamps (`LAMP_*`, a smaller softer pool, silent, first guesses); `cold` the open fridge.
   The record player, the water and the aquarium switch in silence. Until now every switched-on
   piece that was not an open fridge counted as a fire, which held only while there were two.
+- **Both states of a face share one frame** (`build_decor.shared_frame`, 2026-09-21,
+  Richard: the lamp and the fridge "getting dislocated sideways"). Each view was cropped to
+  its own drawing and a lit shade or an open door makes that crop a different size, so E
+  moved the piece. The builder slides the on-view over the off-view to where the most pixels
+  match exactly (nearest offset on a tie, within `ALIGN_REACH`) and pads both into the box
+  holding them — measured every build, picked over hand-aligning layers in the PSD. The cost,
+  taken: a switched piece's footprint is the union of both drawings in either state.
+- **A mirror flips every side view** (same day, Richard: the toilet "can be flipped on both
+  sides"): it was the sofa's rule — exactly one `side` — and now takes each view whose role
+  starts with `side`, in its own state, as one new face. The toilet turns front, side, other
+  side, empty or full. Flipped after aligning, so a flipped pair stays aligned.
 - **The record player is visual only**, by decision. Letting the player pick the song on the
   lake and in the shed was raised and is **a later pass**.
 - **`SAVE_VERSION` 13**: two finds joined and seven pieces changed what view 0 is.

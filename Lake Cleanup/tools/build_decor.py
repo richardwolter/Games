@@ -101,6 +101,10 @@ PAD = 2
 ## it, and whatever is left over is somebody else's stray pixel.
 GLUE = 4
 
+## How far, in pixels, one state of a piece may be slid over the other to find where they
+## line up. The lamps needed 3; the rest 0 or 1.
+ALIGN_REACH = 12
+
 ## The grid the shed measures footprints against, and the fill fraction below which a piece
 ## is treated as mostly holes. Both match the old slicer so the catalogue stays one shape.
 CELL = 16
@@ -225,6 +229,44 @@ def rubbish_sprite(book, slug, cache):
             x, y, w, h = piece["region"]
             return cache[key].crop((x, y, x + w, y + h))
     sys.exit("no rubbish kind called %s in the catalogue" % slug)
+
+
+def _matched(a, b, dx, dy):
+    """How many pixels are the same colour with b laid over a at (dx, dy)."""
+    pa, pb = a.load(), b.load()
+    n = 0
+    for y in range(b.height):
+        for x in range(b.width):
+            X, Y = x + dx, y + dy
+            if 0 <= X < a.width and 0 <= Y < a.height:
+                p, q = pa[X, Y], pb[x, y]
+                if p[3] and q[3] and p[:3] == q[:3]:
+                    n += 1
+    return n
+
+
+def shared_frame(a, b):
+    """Two states of one face, padded into one frame with what they share lying still.
+
+    b is slid over a to the offset where the most pixels match exactly — the fridge's
+    body, the lamp's foot — nearest offset winning a tie, and both are padded to the box
+    that holds them. Measured each build, so a redrawn lamp re-aligns itself.
+    """
+    reach = ALIGN_REACH
+    best = None
+    for dy in range(-reach, reach + 1):
+        for dx in range(-reach, reach + 1):
+            k = (_matched(a, b, dx, dy), -abs(dx) - abs(dy))
+            if best is None or k > best[0]:
+                best = (k, dx, dy)
+    _, dx, dy = best
+    x0, y0 = min(0, dx), min(0, dy)
+    x1, y1 = max(a.width, dx + b.width), max(a.height, dy + b.height)
+    out_a = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+    out_b = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+    out_a.paste(a, (-x0, -y0))
+    out_b.paste(b, (dx - x0, dy - y0))
+    return out_a, out_b
 
 
 def fill_of(im):
@@ -390,13 +432,16 @@ def main():
             sys.exit("%s is %s but has one view" % (name, e["kind"]))
         if e["kind"] == "SINGLE" and len(views) != 1:
             sys.exit("%s is SINGLE but has %d views" % (name, len(views)))
-        if e["mirror"] and len(views) != 3:
-            sys.exit("%s asks for a mirror but is not a three-view set" % name)
+        # A mirror flips every side view into the other side: the sofa's one, and the
+        # toilet's two (empty and full), so R turns a toilet to either wall.
+        mirrored = [v for v in views if v["role"].startswith("side")] if e["mirror"] else []
+        if e["mirror"] and not mirrored:
+            sys.exit("%s asks for a mirror but has no side view" % name)
         if int(e.get("copies", 1)) < 1:
             sys.exit("%s asks for %s copies" % (name, e.get("copies")))
         if e.get("place", "floor") not in PLACES:
             sys.exit("%s is placed '%s'; one of %s" % (name, e.get("place"), PLACES))
-        faces = len(views) + (1 if e["mirror"] else 0)
+        faces = len(views) + len(mirrored)
         bases = e.get("base")
         if bases is not None and len(bases) != faces:
             sys.exit("%s has %d views and %d bases" % (name, faces, len(bases)))
@@ -441,17 +486,6 @@ def main():
             clean_sprites[key] = cut
             keys.append(key)
 
-        if e["mirror"]:
-            side = next((v["role"] for v in views if v["role"] == "side"), None)
-            if side is None:
-                sys.exit("%s asks for a mirror but has no 'side' view" % name)
-            key = "%s/side_r" % name
-            clean_sprites[key] = clean_sprites["%s/side" % name].transpose(
-                Image.FLIP_LEFT_RIGHT
-            )
-            # front, side, back, side flipped: facing you, turned, facing away, turned back.
-            keys.append(key)
-
         # Which way each view faces and whether it is switched on — what R and E move
         # along. Authored per view for a piece that does both (the toilet); otherwise the
         # kind says which of the two the views count.
@@ -459,9 +493,30 @@ def main():
         for i, v in enumerate(views):
             faces.append(int(v.get("face", 0 if e["kind"] == "STATE" else i)))
             states.append(int(v.get("state", i if e["kind"] == "STATE" else 0)))
-        if e["mirror"]:
-            faces.append(max(faces) + 1)
-            states.append(0)
+
+        # Both states of one face share one frame, aligned on the pixels they have in
+        # common, so pressing E changes what changed and nothing moves. Each view is cropped
+        # to its own drawing, and a lit lamp's shade or an open fridge door makes that crop
+        # a different size — the piece jumped sideways on every switch (Richard, 2026-09-21).
+        for face in set(faces):
+            off = [k for k, (f, st) in enumerate(zip(faces, states)) if f == face and st == 0]
+            on = [k for k, (f, st) in enumerate(zip(faces, states)) if f == face and st == 1]
+            if off and on:
+                a, b = keys[off[0]], keys[on[0]]
+                clean_sprites[a], clean_sprites[b] = shared_frame(
+                    clean_sprites[a], clean_sprites[b])
+
+        # Then the mirror, off the aligned pictures, so a flipped pair stays aligned.
+        # front, side, back, side flipped: facing you, turned, facing away, turned back.
+        if mirrored:
+            turn_back = max(faces) + 1
+            for v in mirrored:
+                k = views.index(v)
+                key = "%s/%s_r" % (name, v["role"])
+                clean_sprites[key] = clean_sprites[keys[k]].transpose(Image.FLIP_LEFT_RIGHT)
+                keys.append(key)
+                faces.append(turn_back)
+                states.append(states[k])
         pairs = list(zip(faces, states))
         if len(set(pairs)) != len(pairs):
             sys.exit("%s has two views facing the same way in the same state" % name)

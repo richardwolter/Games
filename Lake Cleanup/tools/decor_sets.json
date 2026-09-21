@@ -497,7 +497,7 @@
    "title": "Toilet",
    "dirty": "Decoration Dirty/Toilet",
    "kind": "ROTATE",
-   "mirror": false,
+   "mirror": true,
    "views": [
     {
      "role": "front_empty",
@@ -540,6 +540,8 @@
     2,
     3,
     2,
+    3,
+    3,
     3
    ]
   },
