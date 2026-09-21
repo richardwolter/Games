@@ -5,7 +5,9 @@ what box it has to fit in. Nothing here has moved yet — this is the list to lo
 a single literal is replaced.
 
 Counted by hand off a scan of `scripts/*.gd`, `scenes/main.tscn` and `assets/pieces.json`.
-**203 strings in, 34 dead strings deleted, 5 groups out by decision.**
+**203 strings in, 34 dead strings deleted, 5 groups out by decision.** Since seeded into
+`locale/translations.csv` as **205** keys: the aquarium and the rug joined the finds the same day.
+The CSV is the source of truth from here; this file is the record of how it was drawn up.
 
 Three columns run through every table:
 
@@ -112,7 +114,7 @@ Board 640 wide. Two device columns; a verb's label gets the left column, about 3
 | `CONTROLS_COL_KEY` | Keyboard | `:70` |
 | `CONTROLS_COL_PAD` | Gamepad | `:71` |
 | `CONTROLS_HINT` | Click a cell and press · right-click resets | `:72` | 314 px of empty band |
-| `CONTROLS_MOVED` | ␣␣· moved here | `:402` | flash on the row that lost a binding |
+| `CONTROLS_MOVED` | ␣␣— moved here | `:402` | flash on the row that lost a binding |
 | `CONFIRM_BINDS_TITLE` | Are you sure? | `:76` |
 | `CONFIRM_BINDS_YES` | Set to default | `:80` |
 | `CONFIRM_BINDS_NO` | Keep current | `:81` — cut from "Keep current buttons" (209 px) to fit the 174 door |
