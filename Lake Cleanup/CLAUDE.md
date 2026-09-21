@@ -1430,6 +1430,33 @@ and the letter's re-shot stills are later passes.
 - **The inventory is `docs/ui/strings.md`**: 203 keys, each with its file, its box in design
   pixels and its format placeholders. Read it before adding a key.
 
+**The CSV and its budgets** (2026-09-21, `locale/translations.csv`, 205 keys):
+- **One file carries the words and the room they get.** Beside `keys` and each locale
+  column: `_where` (the script that draws it), `_size` (the rung it is drawn at), `_least`
+  (the smallest it may fall to) and `_width` (its box, design px; 0 is a line that wraps).
+  **Godot's CSV importer skips a column whose name starts with `_`** — checked on import: it
+  makes `translations.en.translation` and `.qps` and nothing else. The `.translation` files
+  are built on import and git-ignored.
+- **`tools/probe_text_fit.gd`** (headless `--script`) measures every cell in **its own
+  locale's face** and walks it down the ladder the way the boards do — fits, shrinks, OVER —
+  and checks every `%d`/`%s` survives. Exits 1 on an OVER or a broken placeholder, except in
+  `qps`, which is read, not gated. `tools/last_text_fit.log`. **An English OVER means the
+  budget is wrong, not the word.** A `_size` off the ladder (the pier sign's 18) is walked a
+  pixel at a time, which is what `Dropoff._draw_sign` does.
+- **The budgets are checked against numbers already on record**: English puts *Double cast*
+  at 115 and *Bonus yard* at 108 against a row's 87, as The Shop Reads measured. English is
+  OVER nowhere and shrinks in six places — the five accepted shop rows and *PLASTIC* by a
+  pixel on its 82 px plank. Two first guesses were caught by that run: the controls hint is
+  drawn at 11, and the sign steps a pixel at a time.
+- **`tools/build_translations.py`** does two mechanical things and nothing else: the
+  `DECOR_*` rows follow `pieces.json` (added, renamed; **a vanished one is reported, never
+  deleted** — a renamed slug looks exactly like a deleted one), and `qps` is rebuilt from
+  `en` — brackets, accented vowels, 40% longer, **Latin-1 only**, because system fallback is
+  off and any glyph Bungee lacks would read as tofu. **Run it after touching `en` or a
+  find's title.** At +40% 24 boxes are OVER: the map of where boards will want widening
+  (worst: the controls hint +120, the start-over line +69, *set by Window* +39).
+- `docs/ui/strings.md` is the record of how the table was drawn up; the CSV is what is true.
+
 **The faces** (Richard, 2026-09-20; `Style.FALLBACK_*`, `tools/shot_fonts.gd`):
 - **Bungee draws every Latin language and nothing else.** 1082 codepoints, measured off its
   own cmap: all of EN, PT-BR, ES, DE and FR including every accent, the arrow and the
@@ -3784,10 +3811,10 @@ so these are authored entries; every new view is a whole layer, no rects.
   its own drawing and a lit shade or an open door makes that crop a different size, so E
   moved the piece. The builder slides the on-view over the off-view to where the most pixels
   match exactly (nearest offset on a tie, within `ALIGN_REACH`) and pads both into the box
-  holding them � measured every build, picked over hand-aligning layers in the PSD. The cost,
+  holding them — measured every build, picked over hand-aligning layers in the PSD. The cost,
   taken: a switched piece's footprint is the union of both drawings in either state.
 - **A mirror flips every side view** (same day, Richard: the toilet "can be flipped on both
-  sides"): it was the sofa's rule � exactly one `side` � and now takes each view whose role
+  sides"): it was the sofa's rule — exactly one `side` — and now takes each view whose role
   starts with `side`, in its own state, as one new face. The toilet turns front, side, other
   side, empty or full. Flipped after aligning, so a flipped pair stays aligned.
 - **The record player is visual only**, by decision. Letting the player pick the song on the
