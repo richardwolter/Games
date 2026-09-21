@@ -374,9 +374,8 @@ const MAX_DOGS := 4
 
 ## World pixels a level of Strong Dogs adds to how wide a piece the pack can carry. Four
 ## levels takes `Dog.CARRY_WIDE` from 16 to 32 — the art's own width times SPRITE_SCALE, so
-## from an 8-pixel drawing to a 16-pixel one, which is every kind in the lake bar
-## `plastic_toy` at 31. That one is left out on purpose: at CARRY_SCALE it would still hang
-## half the dog's length out of its mouth.
+## from an 8-pixel drawing to a 16-pixel one. Anything wider is the net's alone, by decision
+## (2026-09-21): at CARRY_SCALE it would hang half the dog's length out of its mouth.
 const DOG_WIDE_STEP := 4.0
 
 ## How fast the finished lake lights up, as a fraction of the way there a second.
@@ -409,7 +408,10 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## 13: the aquarium and the rug joined the finds, and seven pieces gained a switched-off
 ## view as their view 0 (2026-09-20) — a toilet saved facing side on would come back empty
 ## and facing front. Richard started fresh rather than have a v12 file read.
-const SAVE_VERSION := 13
+## 14: the rubbish is cut from one PSD (2026-09-21): forty-nine kinds joined and five left
+## (`plastic_toy`, `plastic_globe`, `rubber_bone`, `wood_painting3`/`4`), so every index in
+## a saved stack moved.
+const SAVE_VERSION := 14
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -922,7 +924,7 @@ func dog_wait_cut() -> float:
 ## The heaviest weight tier the pack will pick up, and the widest piece it can get its mouth
 ## round, in world pixels. One track raises both: tier on its own would open three kinds in
 ## the whole catalogue, because `def.size.x` is the art's own width at SPRITE_SCALE and that
-## is the gate that actually binds. The top of the track is everything but `plastic_toy`.
+## is the gate that actually binds. The top of the track is everything no wider than 32.
 ## resources/upgrades/dog_strength.tres.
 func dog_carry_tier() -> int:
 	return Dog.CARRY_TIER + int(_upgrades[&"dog_strength"].value(dog_strength_level))
@@ -1641,17 +1643,24 @@ func _dog_brought_back(def_index: int) -> void:
 ## not a name (see lake_grid.gd's `restore`), so an existing save breaks if an entry here
 ## is reordered or removed. Add new kinds at the end only.
 const TRASH_ORDER := [
-	"metal_can1", "metal_can2", "metal_can3", "metal_can4",
-	"metal_hanger", "metal_pan", "metal_phone", "metal_pot",
-	"metal_support", "metal_teapot", "plastic_bowl", "plastic_cup1",
-	"plastic_cup2", "plastic_mug", "plastic_plate", "plastic_sheet",
-	"plastic_wrap", "rubber_ball", "rubber_bone", "rubber_disk",
-	"rubber_duck", "rubber_tire", "wood_box1", "wood_box2",
-	"wood_painting1", "wood_painting2", "wood_piece",
-	# Second batch, art_source/New_Objects_Lake -> assets/lake_objects_new.png.
-	"wood_painting3", "wood_painting4", "metal_lamp", "metal_mirror",
-	"plastic_sign", "plastic_frame", "plastic_toy", "plastic_globe",
-	"rubber_block", "rubber_toy",
+	# The first two batches, kept in their old order.
+	"metal_can1", "metal_can2", "metal_can3", "metal_can4", "metal_hanger", "metal_pan",
+	"metal_phone", "metal_pot", "metal_support", "metal_teapot", "plastic_bowl",
+	"plastic_cup1", "plastic_cup2", "plastic_mug", "plastic_plate", "plastic_sheet",
+	"plastic_wrap", "rubber_ball", "rubber_disk", "rubber_duck", "rubber_tire", "wood_box1",
+	"wood_box2", "wood_painting1", "wood_painting2", "wood_piece", "metal_lamp",
+	"metal_mirror", "plastic_sign", "plastic_frame", "rubber_block", "rubber_toy",
+	# Third batch, 2026-09-21: forty-nine kinds for variety, same PSD.
+	"metal_bar", "metal_box1", "metal_box2", "metal_cart", "metal_controller",
+	"metal_dumbell", "metal_extinguisher", "metal_mirror2", "metal_phone2", "metal_pot2",
+	"metal_radio", "metal_shaker", "metal_sound", "plastic_bottle", "plastic_bottles",
+	"plastic_chair", "plastic_sign2", "plastic_toy1", "plastic_toy2", "plastic_toy3",
+	"plastic_toy4", "plastic_toy5", "plastic_vase", "rubber_ball2", "rubber_ball3",
+	"rubber_ball4", "rubber_shoes", "rubber_tire2", "rubber_toy2", "rubber_toy3",
+	"rubber_toy4", "rubber_toy5", "rubber_utensil", "wood_block", "wood_board", "wood_box3",
+	"wood_box4", "wood_box5", "wood_chair", "wood_door", "wood_drawer", "wood_guitar",
+	"wood_lamp", "wood_plank1", "wood_plank2", "wood_sign", "wood_skateboard", "wood_stool",
+	"wood_toy",
 ]
 
 func _default_defs() -> Array[TrashDef]:
@@ -1738,37 +1747,66 @@ func _hide_treasures() -> void:
 			planted_at.append(Vector2(_grid.tile_of(first)))
 			first = -1
 			continue
-		var planted := false
-		# Spread out: a dart is refused inside FIND_APART of a find already down, until the
-		# darts run low and any deep tile will do. Forty darts found tiles; a hundred and
-		# twenty find spaced ones on a lake this size, and the fallback keeps the guarantee.
-		for attempt in 800:
-			var tx := rng.randi_range(2, Iso.COLS - 3)
-			var ty := rng.randi_range(2, Iso.ROWS - 3)
+		# Every tile in the find's own band, shuffled off the seed; the first one clear of
+		# FIND_APART of every find already down wins, and failing that the one furthest from
+		# all of them. This was 800 darts over the whole square, most of which missed the
+		# band — so the spacing was luck, and the late band is short of room: past MID_OUT
+		# only a few hundred tiles are three deep, bunched towards the bank, for fourteen
+		# finds. A change to the fill (2026-09-21, the third rubbish batch) was enough to tip
+		# it from two crowded pairs to three.
+		# When the band has no tile clear, the spacing wins over the band, as the darts'
+		# fallback always had it: any deep tile in the lake that is clear. Only then the
+		# roomiest tile in the band. `test_lake` allows two finds out of their band.
+		var early := EARLY_FINDS.has(def.piece)
+		var spots := _find_spots(def, early, _find_band(def))
+		_shuffle(spots, rng)
+		var pick := _clear_spot(spots, planted_at)
+		if pick < 0:
+			var anywhere := _find_spots(def, early, Vector2(0.0, INF))
+			_shuffle(anywhere, rng)
+			pick = _clear_spot(anywhere, planted_at)
+		if pick < 0:
+			var roomiest := -1.0
+			for index in spots:
+				var room := _room_from(Vector2(_grid.tile_of(index)), planted_at)
+				if room > roomiest:
+					roomiest = room
+					pick = index
+		if pick < 0:
+			# A collection that cannot be completed is the worse failure.
+			_plant_anywhere(i)
+			continue
+		var down := 0 if early else rng.randi_range(0, 2)
+		_grid.insert(pick, maxi(_grid.height_of(pick) - 1 - down, 0), i)
+		planted_at.append(Vector2(_grid.tile_of(pick)))
+
+
+## The tiles a find may be hidden in: deep enough, wet, inside `band`, and for an early
+## find, under nothing heavier than itself — so early never means waiting on Strength.
+func _find_spots(def: TrashDef, early: bool, band: Vector2) -> PackedInt32Array:
+	var spots := PackedInt32Array()
+	for ty in range(2, Iso.ROWS - 2):
+		for tx in range(2, Iso.COLS - 2):
 			var index := _grid.index_of(tx, ty)
 			var height := _grid.height_of(index)
-			if height < 3:
+			if height < 3 or _grid.dry[index] != 0:
 				continue
-			# Its own band for the first 760 darts, spaced for the first 700 (the darts are
-			# thrown over the whole square, so most miss the band); after that any
-			# deep tile, because a collection that cannot be completed is the worse failure.
-			var early := EARLY_FINDS.has(def.piece)
-			if attempt < 760:
-				var band := _find_band(def)
-				var out := Iso.past_shelf(Vector2(tx, ty))
-				if out < band.x or out > band.y or _grid.dry[index] != 0:
-					continue
-				if early and _grid.def_at(index, height - 1).tier > def.tier:
-					continue
-			if attempt < 700 and _too_near(Vector2(tx, ty), planted_at):
+			var out := Iso.past_shelf(Vector2(tx, ty))
+			if out < band.x or out > band.y:
 				continue
-			var down := 0 if early else rng.randi_range(0, 2)
-			_grid.insert(index, maxi(height - 1 - down, 0), i)
-			planted_at.append(Vector2(tx, ty))
-			planted = true
-			break
-		if not planted:
-			_plant_anywhere(i)
+			if early and _grid.def_at(index, height - 1).tier > def.tier:
+				continue
+			spots.append(index)
+	return spots
+
+
+## Fisher-Yates off the given generator, so the deal is the seed's and nobody else's.
+func _shuffle(spots: PackedInt32Array, rng: RandomNumberGenerator) -> void:
+	for n in range(spots.size() - 1, 0, -1):
+		var k := rng.randi_range(0, n)
+		var held := spots[n]
+		spots[n] = spots[k]
+		spots[k] = held
 
 
 ## The band a find is hidden in, as tiles past the island's shelf (from, to).
@@ -1781,11 +1819,21 @@ func _find_band(def: TrashDef) -> Vector2:
 	return Vector2(MID_OUT, INF)
 
 
-func _too_near(at: Vector2, others: Array[Vector2]) -> bool:
+## The first of `spots` at least FIND_APART from every find already down, or -1.
+func _clear_spot(spots: PackedInt32Array, planted_at: Array[Vector2]) -> int:
+	for index in spots:
+		if _room_from(Vector2(_grid.tile_of(index)), planted_at) >= FIND_APART:
+			return index
+	return -1
+
+
+## How far `at` is from the nearest of `others`; infinite with none.
+func _room_from(at: Vector2, others: Array[Vector2]) -> float:
+	var least := INF
 	for other: Vector2 in others:
-		if at.distance_to(other) < FIND_APART:
-			return true
-	return false
+		least = minf(least, at.distance_to(other))
+	return least
+
 
 
 ## A tile for the first find: floating rubbish in the first band of water past the island's
@@ -1806,7 +1854,7 @@ func _first_find_tile(rng: RandomNumberGenerator) -> int:
 	return pool[rng.randi() % pool.size()]
 
 
-## Put a find somewhere — anywhere — after the random darts all missed.
+## Put a find somewhere — anywhere — when its band has no tile deep enough.
 ##
 ## Forty throws at tiles with three things on them is a fast way to place a find in a full
 ## lake and no guarantee at all in a sparse one: a run where the darts all landed on thin

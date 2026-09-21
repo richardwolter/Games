@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Metal Controller"
+material = 2
+piece = &"metal_controller"
+size = Vector2(22.4, 14.4)
+pollution = 2.8
+haul_cost = 0.98
+tier = 0
+lightness = 2.5
+block_color = Color(0.6, 0.66, 0.7, 1)

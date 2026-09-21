@@ -20,6 +20,11 @@ extends Node
 const Style := preload("res://scripts/style.gd")
 const HudSkin := preload("res://scripts/hud_skin.gd")
 const HudButtons := preload("res://scripts/hud_buttons.gd")
+## What a fresh lake paid per piece at each yard, and the share of its water in each weight
+## tier, before the third batch of rubbish joined (2026-09-21, `probe_fill_economy`). The
+## shop is priced on these; `_check_surface` holds the fill to them.
+const PAY_PRICED := [42.47, 45.06, 34.51, 38.31]
+const TIER_PRICED := [0.351, 0.238, 0.161, 0.089, 0.162]
 const DogArt := preload("res://scripts/dog_art.gd")
 
 const LOG_PATH := "res://tools/last_test.log"
@@ -525,6 +530,33 @@ func _check_surface() -> void:
 			% TrashDef.KIND_NAMES[m].to_lower(),
 			"%.1f%% against the quota's %.0f%%"
 			% [100.0 * stocked, 100.0 * float(LakeGrid.MATERIAL_QUOTA[m])])
+	# The money the shop was priced on (2026-09-21): when the third batch of rubbish joined,
+	# each new kind's tier and pollution were picked so a yard's mean pay per piece and the
+	# water's share of each weight tier stayed where they were. Measured off a fresh lake by
+	# `tools/probe_fill_economy.tscn` before the batch landed. A new kind has to fit inside
+	# these, or the frozen prices are being paid out of a different lake.
+	var pay_by := [0.0, 0.0, 0.0, 0.0]
+	var tier_by := [0, 0, 0, 0, 0]
+	var counted := 0
+	for stack in _grid.stacks:
+		for i in stack:
+			var def := _grid.defs[i]
+			if def.keepsake:
+				continue
+			pay_by[int(def.material)] += float(_main.call(&"piece_pay", i, int(def.material)))
+			tier_by[def.tier] += 1
+			counted += 1
+	for m in 4:
+		var mean := float(pay_by[m]) / maxf(float(all_kind[m]), 1.0)
+		_check(absf(mean / float(PAY_PRICED[m]) - 1.0) < 0.03,
+			"a %s piece pays what the shop was priced on" % TrashDef.KIND_NAMES[m].to_lower(),
+			"%.2f against %.2f" % [mean, float(PAY_PRICED[m])])
+	for t in 5:
+		var tier_share := float(tier_by[t]) / maxf(float(counted), 1.0)
+		_check(absf(tier_share - float(TIER_PRICED[t])) < 0.02,
+			"tier %d holds the share of the water it did" % t,
+			"%.1f%% against %.1f%%" % [100.0 * tier_share, 100.0 * float(TIER_PRICED[t])])
+
 	var seen_metal := float(top_kind[TrashDef.Kind.METAL]) / maxf(float(tiles), 1.0)
 	var seen_rubber := float(top_kind[TrashDef.Kind.RUBBER]) / maxf(float(tiles), 1.0)
 	_check(seen_metal < float(all_kind[TrashDef.Kind.METAL]) / float(pieces)
@@ -6475,19 +6507,25 @@ func _stage_new_tracks() -> void:
 	_check(tier_last == 4 and is_equal_approx(wide_last, 32.0),
 		"to tier 4 and 32 wide at the top", "tier %d, %.0f" % [tier_last, wide_last])
 
-	# What that opens, asked of the catalogue rather than written down twice: everything but
-	# the one kind that would hang half a dog out of its own mouth.
+	# What that opens, asked of the catalogue rather than written down twice: every kind a
+	# dog's mouth is wide enough for (2026-09-21, Richard: the width rule stays; anything
+	# wider is the net's alone). Nothing is turned down for its weight at the top.
 	var refused := []
+	var too_heavy := []
 	var taken := 0
 	for def: TrashDef in _grid.defs:
 		if def.keepsake:
 			continue
 		if def.tier <= tier_last and def.size.x <= wide_last:
 			taken += 1
+		elif def.tier > tier_last:
+			too_heavy.append(String(def.piece))
 		else:
 			refused.append(String(def.piece))
-	_check(taken > 30, "a strong dog will carry most of the lake", "%d kinds" % taken)
-	_check(refused == ["plastic_toy"], "and all it turns down is plastic_toy",
+	_check(taken > 50, "a strong dog will carry most of the lake", "%d kinds" % taken)
+	_check(too_heavy.is_empty(), "and turns nothing down for its weight at the top",
+		", ".join(too_heavy))
+	_check(refused.size() < 12, "only the widest pieces are the net's alone",
 		", ".join(refused))
 
 	_main.call(&"_push_dog_numbers")

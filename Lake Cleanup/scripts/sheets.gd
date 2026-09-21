@@ -7,11 +7,10 @@
 ## texture. Two atlases would be two draw calls and the door open to twenty.
 ##
 ## The regions themselves are not worked out here. tools/build_decor.py packs the
-## decoration sheets and tools/build_lake_objects_new.py cuts the second rubbish batch,
+## decoration sheets and tools/build_lake_objects.py cuts the rubbish,
 ## both offline, both writing assets/pieces.json; this reads that, blits the sheets into
-## one image, and offsets every region into the combined space. The first rubbish sheet's
-## regions were cut once by a slicer that is gone (2026-09-20) and corrected by hand
-## since: they live in the catalogue and in git, and nothing recomputes them.
+## one image, and offsets every region into the combined space. Since 2026-09-21 every
+## rubbish region is cut from art_source/New_Objects_Lake.psd; none is corrected by hand.
 class_name Sheets
 extends RefCounted
 

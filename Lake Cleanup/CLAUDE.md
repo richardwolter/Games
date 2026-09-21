@@ -387,8 +387,10 @@ Two more shop tracks, one on each of the ferry's and the dog's boards.
   width at `SPRITE_SCALE`, so `CARRY_WIDE` 16 means an 8-pixel drawing, and lifting
   `CARRY_TIER` 0 → 4 on its own opens exactly three kinds (`plastic_cup2`, `rubber_disk`,
   `rubber_ball`). 4 levels, matching the net's Strength: tier 0 → 4, width 16 → 32
-  (`Lake.DOG_WIDE_STEP`), which is **everything in the catalogue but `plastic_toy`** — at
-  31 art px it would still hang half a dog's length out of its mouth at `CARRY_SCALE`.
+  (`Lake.DOG_WIDE_STEP`), which is **every kind no wider than 16 art px** — anything wider
+  would hang half a dog's length out of its mouth at `CARRY_SCALE`, and stays the net's.
+  (This said "everything but `plastic_toy`" until the third rubbish batch, 2026-09-21; the
+  width rule was kept and ten of the 81 kinds are over it.)
   `Dog.CARRY_TIER`/`CARRY_WIDE` are the level-0 defaults now; the values are pushed by
   `_push_dog_numbers`, so a `Dog` with no lake behind it fetches what it always did.
 - **No `SAVE_VERSION` bump**: both live in the save's `levels` dictionary and a missing key
@@ -2462,7 +2464,7 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   chamfered, grain dashes in the plank's own tones, all hashed off the yard's name so the
   four are four planks; the pier's outline pass rings the holes. A foot-edge bite is
   steered off the post's column. And an **emblem** carved into the box's lit face:
-  the actual sprite of one of the yard's pieces (`EMBLEM_PIECE`: globe, wood piece, hanger,
+  the actual sprite of one of the yard's pieces (`EMBLEM_PIECE`: bottle, chair, extinguisher,
   duck), laid on the face's own slope, colours sunk `EMBLEM_SOAK` into the plank, grooved in
   the wood's dark and lit-edged left and below (`carve_emblem`). Decoration at 10-13 painted
   px — the face is 16 — and the sign is what tells the yards apart. **Tried and rejected the
@@ -3991,8 +3993,8 @@ went from 24 screen pixels to 3.
   `wood_painting`/`wood_painting_2` (clean) and `_3`/`_4` (dirty; the psd-extract slugs are
   by layer order, so re-check the pairing after any re-extract — the manifest bboxes at
   x 157 and x 139 tell them apart), `rubber_bone_copy`/`rubber_bone`,
-  `plastic_globe`/`plastic_globe_2`. **The rubbish kinds stay in the fill as well** —
-  netting a plain one is rubbish, the find is one extra buried copy that shines. The
+  `plastic_globe`/`plastic_globe_2`. **The rubbish kinds left the fill on 2026-09-21**
+  (the third rubbish batch: the new PSD does not carry them), so these four are finds only. The
   builder's `dirty_piece` (a lake sprite copied onto the dirty sheet, with the clean view
   falling back to it) was the bridge before the paint existed; unused now, kept.
 - **Only a piece's base takes floor** (`base` per view in the catalogue, `Sheets.base_of`,
@@ -4065,9 +4067,14 @@ first pet bed are unchanged.
   a `VARIANT`, so R changes either copy's colour. One bed floats, the other is an early dig.
 - **The rest by rule, not authored**: tier 1-2 between `EARLY_OUT` and `MID_OUT` (25), tier
   `LATE_TIER` (3) and up beyond, buried 1-3 down as before. A new find needs no placement data.
-- **800 darts** (banded for 760, spaced for 700): they are thrown over the whole square and
-  most miss a band; at 160 eight pairs landed inside `FIND_APART`. `_plant_anywhere` is still
-  the last resort. Bands are first guesses (7 / 20 / 13 finds) to judge in play.
+- **Dealt, not darted** (2026-09-21, `_find_spots`, `_clear_spot`): every deep wet tile in
+  the find's band is listed and shuffled off the seed, and the first `FIND_APART` clear of
+  every find down wins; failing that, a clear tile anywhere (spacing beats band, as the old
+  darts' fallback had it — `test_lake` allows two finds out of band); failing that, the
+  roomiest in the band. It was 800 darts over the whole square, and the spacing was luck:
+  **the late band is short of room** — a few hundred tiles three deep past `MID_OUT`,
+  bunched to the bank, for fourteen finds — and the third rubbish batch tipped it from two
+  crowded pairs to three. `_plant_anywhere` is still the last resort. Bands are first guesses (7 / 20 / 13 finds) to judge in play.
 - **`SAVE_VERSION` 11**, everything older refused; the version 9 shed-unit read
   (`SAVE_SHED_CELLS`) is gone, as its own note promised. The v10 save is kept at
   `_builds/lake_cleanup_v10_20260917.save`; **the trailer's shed shot needs a refurnished
@@ -4321,14 +4328,33 @@ sand under every open pixel; beyond that it is under opaque water and not drawn.
 - Island foam ring width in the shader is 1.0 like the bank's (was 1.5 to cover tile corners).
 
 ### Rubbish Sheets
-The regular rubbish (not finds) is drawn from two sheets:
-- `assets/lake_objects.png` — the first 27 kinds, from `art_source/LakeObjects.psd`. Its
-  regions in `pieces.json` were cut once and corrected by hand; nothing regenerates them.
-- `assets/lake_objects_new.png` — the second batch of 10, built from
-  `art_source/New_Objects_Lake` by `tools/build_lake_objects_new.py` (psd-extract venv
-  python, project root). Despecks with `build_decor.py`'s rule, maps the two
-  `Wood Painting` layers to `wood_painting3`/`4` by left-to-right position, and replaces
-  only its own sheet's entries.
+**One PSD, one sheet** (2026-09-21, `/grill-me` with Richard): `art_source/New_Objects_Lake.psd`
+is the only source of the lake's rubbish, 81 kinds, cut by `tools/build_lake_objects.py`
+(psd-extract venv python, project root, **reimport after**) onto `assets/lake_objects.png`.
+It replaced the hand-corrected first sheet and the second batch's `lake_objects_new.png`;
+every kept kind was pixel-checked against its old sprite first (only `rubber_block` was
+retouched). The stale extensionless PSD is deleted.
+- **Layers map to slugs by name and left-to-right position** (`SLUGS` in the builder).
+  A repeated name is a **numbered family** by decision (`rubber_toy`, `rubber_toy2`..5,
+  `plastic_toy1`..5, `wood_box3`..5), which `family_of` reads as look-alikes. Moving a
+  layer across the canvas can swap two slugs; the builder prints each slug's x.
+  `Metal blah` is `metal_controller`.
+- **Five kinds left the lake**: `plastic_toy`, `plastic_globe`, `rubber_bone`,
+  `wood_painting3`/`4` — not in the new PSD. Their finds keep their own decoration art.
+  The plastic pier's emblem went `plastic_globe` to **`plastic_bottle`** (Richard's pick;
+  the basketball he asked for first is `rubber_ball3`, a Rubber layer, and a box carrying a
+  piece its yard does not buy was turned down). The wood and metal emblems went `wood_piece` and `metal_hanger` to **`wood_chair`**
+  and **`metal_extinguisher`** the same day, picked off every candidate carved on its box:
+  the old two read as a smear and as nothing.
+- **The economy was held, not re-priced**: the 49 new kinds' tier, pollution and lightness
+  were picked so each yard's mean pay per piece stays within 2% and each tier's share of the
+  water within 2 points of the lake the shop was priced on (`test_lake` `PAY_PRICED`,
+  `TIER_PRICED`; measured with `tools/probe_fill_economy.tscn`, headless). **A low
+  lightness draws a kind far more often** — the floor end of the band holds few kinds, so
+  each fills a lot of water; new tier-4 kinds sit at 1.7-1.9, not the 1.4-1.5 of the old
+  ones. A kind promoted a tier keeps its pay by carrying lower pollution (tier 1 at 2.4).
+- **`SAVE_VERSION` 14**, v13 refused; the v13 save is kept at
+  `_builds/lake_cleanup_v13_20260921.save`.
 
 **The material is Wood, not Timber** (Richard, 2026-09-13, "in all accounts"):
 `TrashDef.Kind.WOOD`, `KIND_NAMES` "Wood", the piers' sheet key `wood`, the sign reads

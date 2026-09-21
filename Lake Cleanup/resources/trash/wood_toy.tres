@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrashDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/trash_def.gd" id="1_trash"]
+
+[resource]
+script = ExtResource("1_trash")
+display_name = "Wood Toy"
+material = 1
+piece = &"wood_toy"
+size = Vector2(12.8, 17.6)
+pollution = 3.0
+haul_cost = 1.05
+tier = 0
+lightness = 2.5
+block_color = Color(0.66, 0.47, 0.28, 1)
