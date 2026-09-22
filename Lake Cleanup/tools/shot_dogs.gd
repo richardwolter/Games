@@ -1,6 +1,6 @@
 extends Node
 const DogArt := preload("res://scripts/dog_art.gd")
-## The pack, close up: the three breeds running home with a piece in their jaws, and each
+## The pack, close up: the four breeds running home with a piece in their jaws, and each
 ## sitting, laid and asleep — a strip of crops at several frames of the gait, so the carry
 ## can be judged mid-stride (2026-09-22). A probe, not a test: where a bottle sits against
 ## a nose is a thing to look at.
