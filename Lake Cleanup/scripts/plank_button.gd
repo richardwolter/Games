@@ -122,7 +122,9 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	var box := Rect2(Vector2.ZERO, size).grow(HudButtons.swell_by(pulse))
+	# The glow only: a plank in a list does not swell (Richard, 2026-09-22), the HUD's
+	# corner buttons do.
+	var box := Rect2(Vector2.ZERO, size)
 	if _held:
 		box.position.y += Style.PRESS_SINK
 	elif _hovered:

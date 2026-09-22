@@ -468,7 +468,8 @@ const BADGE_SAMPLE := "99"
 ## from behind it, each a tapering triangle fading to nothing at its tip, its length rolled
 ## off its own index and breathing with the pulse.
 const BADGE_SWELL := 2.0
-const BUTTON_SWELL := 3.0
+## Two pixels, down from three (Richard, 2026-09-22: "less aggressive").
+const BUTTON_SWELL := 2.0
 const PULSE_TONE := Color(1.0, 0.84, 0.36)
 const PULSE_RIM := 1.0
 const GLOW_REACH := 10.0

@@ -1448,8 +1448,8 @@ shed's shelf has a door to the wash room.
   "fades out on its own", which lasted an afternoon.
 - **The look is the button swelling and a gold glow with rays behind it** (`HudButtons.pulse`,
   `swell_by`, `BUTTON_SWELL`, `GLOW_REACH`, `RAYS`, `RAY_REACH`): the whole button grows
-  `BUTTON_SWELL` **whole** pixels a side (`_lifted` grows the box, so wood, face and pictures
-  swell together) and the badge `BADGE_SWELL` more; under the wood a halo of eight
+  `BUTTON_SWELL` (2) **whole** pixels a side (`_lifted` grows the box, so wood, face and
+  pictures swell together; **the wash plank does not swell**, only glows — Richard, same day) and the badge `BADGE_SWELL` more; under the wood a halo of eight
   per-vertex-coloured quads runs from gold at the edge to nothing at `GLOW_REACH`, and
   fourteen tapering rays fade out past it, their lengths rolled off their index and
   breathing with the pulse. **Gold, and not subtle** (Richard, same day: a pale blue rim at
