@@ -183,6 +183,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_letter()
 		34:
 			_stage_front()
+		35:
+			_stage_led_cast()
 		_:
 			pass
 
@@ -6605,7 +6607,122 @@ func _stage_front() -> void:
 		3:
 			if float(_main.get(&"_glide")) >= 0.0:
 				return
+			_advance()
+
+
+## The led cast (2026-09-22): a cast press out of reach walks the angler into reach and
+## throws; one no spot on the island reaches walks to the nearest shore and stops; walk
+## input, a board and a new press each end or replace it. Runs on the lake the front stage
+## left playable.
+var _led_step_n: int = 0
+var _led_mark: int = 0
+var _led_spot := Vector2.ZERO
+var _led_start := Vector2.ZERO
+
+
+## Water `out` tiles past the angler, straight away from the island's middle.
+func _water_out(out: float) -> Vector2:
+	var dir := (_angler.tile_pos - Iso.ISLAND_CENTRE).normalized()
+	return Iso.tile_to_world(_angler.tile_pos.x + dir.x * out, _angler.tile_pos.y + dir.y * out)
+
+
+func _stage_led_cast() -> void:
+	match _led_step_n:
+		0:
+			if _net.state != CastNet.State.IDLE:
+				if _in_stage > 2400:
+					_check(false, "the net is home for the led cast", "state %d" % _net.state)
+					_finish()
+				return
+			_stand_on_the_shore()
+			_led_start = _angler.tile_pos
+			# Off the far side of the island: in reach from that shore, not from this one.
+			var dir := (_angler.tile_pos - Iso.ISLAND_CENTRE).normalized()
+			var over: Vector2 = _angler.shore_toward(Iso.ISLAND_CENTRE - dir * 20.0)
+			_led_spot = Iso.tile_to_world(
+				over.x - dir.x * (_net.range_tiles - 0.6), over.y - dir.y * (_net.range_tiles - 0.6))
+			_check(not _net.in_reach(_led_spot), "the spot starts out of reach", "")
+			_main.call(&"_cast_or_walk", _led_spot)
+			_check(_main.get(&"_led_cast") == _led_spot and bool(_main.get(&"_led_throw")),
+				"a press out of reach commits a led cast with a throw owed", "")
+			_check(_angler.walk_to != Vector2.INF, "and the angler is led", str(_angler.walk_to))
+			_check(_net.state == CastNet.State.IDLE, "nothing is thrown yet", "")
+			_led_mark = _in_stage
+			_led_step_n = 1
+		1:
+			if _net.state == CastNet.State.IDLE:
+				if _in_stage - _led_mark > 900:
+					_check(false, "the walk ends in a throw", "still walking, led %s" % _main.get(&"_led_cast"))
+					_finish()
+				return
+			_check(_net.state == CastNet.State.FLYING, "the net is thrown on arrival", "state %d" % _net.state)
+			_check(_angler.tile_pos.distance_to(_led_start) > 0.5, "after a real walk",
+				"%.2f tiles" % _angler.tile_pos.distance_to(_led_start))
+			_check(_net.in_reach(_led_spot), "from a spot that reaches the click", "")
+			_check(_main.get(&"_led_cast") == Vector2.INF and _angler.walk_to == Vector2.INF,
+				"and the lead is dropped", "")
+			_led_mark = _in_stage
+			_led_step_n = 2
+		2:
+			if _net.state != CastNet.State.IDLE:
+				if _in_stage - _led_mark > 2400:
+					_check(false, "the net comes home", "state %d" % _net.state)
+					_finish()
+				return
+			# Nowhere on the island reaches the far bank: the walk ends at the shore, no throw.
+			var far := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y + Iso.RADIUS.y * 0.9)
+			var shore: Vector2 = _angler.shore_toward(Iso.world_to_tile(far))
+			_main.call(&"_cast_or_walk", far)
+			_check(_main.get(&"_led_cast") == far and not bool(_main.get(&"_led_throw")),
+				"a press nothing reaches walks with no throw owed", "")
+			_check(_angler.walk_to == shore, "towards the shore nearest the click", str(shore))
+			_led_spot = shore
+			_led_mark = _in_stage
+			_led_step_n = 3
+		3:
+			if _main.get(&"_led_cast") != Vector2.INF:
+				if _in_stage - _led_mark > 1200:
+					_check(false, "the shore walk ends", "still led")
+					_finish()
+				return
+			_check(_net.state == CastNet.State.IDLE, "nothing thrown at the shore", "state %d" % _net.state)
+			_check(_angler.tile_pos.distance_to(_led_spot) < Angler.LED_CLOSE + 0.5,
+				"the angler stands at that shore", "%.2f off" % _angler.tile_pos.distance_to(_led_spot))
+			# Water off the far side again, for the cancels: out of reach, reachable.
+			var dir := (_angler.tile_pos - Iso.ISLAND_CENTRE).normalized()
+			var over: Vector2 = _angler.shore_toward(Iso.ISLAND_CENTRE - dir * 20.0)
+			var a := Iso.tile_to_world(
+				over.x - dir.x * (_net.range_tiles - 0.6), over.y - dir.y * (_net.range_tiles - 0.6))
+			var b := Iso.tile_to_world(
+				over.x - dir.x * (_net.range_tiles - 1.2), over.y - dir.y * (_net.range_tiles - 1.2))
+			_check(not _net.in_reach(a) and not _net.in_reach(b), "both cancel spots start out of reach", "")
+			# Walk input cancels.
+			_main.call(&"_cast_or_walk", a)
+			var led: bool = _main.get(&"_led_cast") != Vector2.INF
+			Input.action_press(&"walk_left")
+			_main._process(1.0 / 60.0)
+			Input.action_release(&"walk_left")
+			_check(led and _main.get(&"_led_cast") == Vector2.INF and _angler.walk_to == Vector2.INF,
+				"a walk key ends the lead", "")
+			# A board cancels.
+			_main.call(&"_cast_or_walk", a)
+			led = _main.get(&"_led_cast") != Vector2.INF
+			_main.call(&"_set_menu", true)
+			_main._process(1.0 / 60.0)
+			_check(led and _main.get(&"_led_cast") == Vector2.INF, "the shop opening ends it", "")
+			_main.call(&"_set_menu", false)
+			# A new press retargets.
+			_main.call(&"_cast_or_walk", a)
+			_main.call(&"_cast_or_walk", b)
+			_check(_main.get(&"_led_cast") == b, "a second press retargets", "")
+			_main.call(&"_stop_led_cast")
+			# A press in reach throws at once, as it always did.
+			var near := _water_near_angler()
+			_main.call(&"_cast_or_walk", near)
+			_check(_net.state == CastNet.State.FLYING and _main.get(&"_led_cast") == Vector2.INF,
+				"a press in reach is the plain throw", "state %d" % _net.state)
 			_finish()
+
 
 
 func _stage_new_tracks() -> void:

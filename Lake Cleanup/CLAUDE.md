@@ -3337,6 +3337,29 @@ the cursor and nothing takes the view back.
   through a step and a cast, the wheel's hold, the edge push and its out-of-window gate, the
   clamp, recentre staying free, and the way home when switched off.
 
+### The Led Cast (2026-09-22, `/grill-me` with Richard)
+A cast press on water out of reach walks the angler towards it and throws the moment it
+comes into reach, so a better spot no longer needs WASD first. `Lake._cast_or_walk`,
+`_led_step`, `_stop_led_cast`; the walk is `Angler.walk_to`, the arrival's own lead.
+- **One gesture**: the spot is committed at the press (a world point, not the pointer,
+  which stays free); the aim ring draws under the pointer as ever and nothing new is drawn.
+  A press in reach is the plain throw. Both devices: the desk's click and the pad's RT.
+- **Straight line, first spot in range, no path planning**: the angler pushes straight at
+  the spot and `_slide` takes him round the crate, the pump and the hut's faces; the frame
+  `CastNet.in_reach` says yes the walk ends and `_cast_at` fires at the committed point.
+  A walk that makes no ground for `LED_STALL` (0.6 s) is given up.
+- **Unreachable from anywhere** (`Angler.shore_toward`: the ray out of the island's middle
+  through the spot, ending at the last standing point): the walk goes to that shore and
+  stops with no throw, by Richard's call over ignoring the press and over throwing short.
+  The player aims again from there.
+- **Cancelled by** any walk input (WASD, arrows, the left stick), any board, the menu, the
+  arrival, the farewell, or a net no longer idle. A new press retargets. Session only.
+- **Out of scope, by decision**: A* or waypoints, a pinned ring or a stop marker, any
+  change to range, `WALK_LIMIT` or the aim assist, walking to the shed or pump by click.
+- `test_lake`'s `_stage_led_cast` (after the front stage, on the landed lake) guards the
+  walk-then-throw across the island, the shore walk with no throw, the three cancels, the
+  retarget and the plain throw in reach.
+
 ### The Pointer and the Aim Ring (2026-09-16, `/grill-me` with Richard)
 The mouse pointer is a wooden arrow, and the net's aim marker is painted off the palette.
 Both were picked by Richard off one contact sheet, `tools/last_cursor_mockup.png`, written

@@ -293,6 +293,25 @@ func _nearest_standing(tile: Vector2) -> Vector2:
 	return tile
 
 
+## The standing spot on the island's edge in the direction of this tile: out from the
+## island's middle along the ray through it, the last point the boots may stand on. Where
+## a led cast walks when no spot on the island reaches the point clicked (`Lake._cast_or_walk`).
+## The island is near enough an ellipse that the ray's end is the shore nearest the tile.
+func shore_toward(tile: Vector2) -> Vector2:
+	var away := tile - Iso.ISLAND_CENTRE
+	if away.length_squared() < 0.0001:
+		away = Vector2(1.0, 1.0)
+	away = away.normalized()
+	var last := Iso.ISLAND_CENTRE
+	for step in 200:
+		var out := Iso.ISLAND_CENTRE + away * (0.1 * float(step))
+		if _wet_by(out) >= WALK_LIMIT:
+			break
+		if not Iso.in_shed(out.x, out.y, Iso.SHED_KEEP):
+			last = out
+	return last
+
+
 ## How far into the water a spot is, in world pixels, or 0 on the island's drawn ground.
 ##
 ## The curve decides, because the curve is what is drawn: the water shader cuts itself out

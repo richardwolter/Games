@@ -807,6 +807,26 @@ var _arrive: int = Arrive.OFF
 var _letter: Letter
 var _letter_open: bool = false
 
+# The led cast (2026-09-22): a cast press on water the net cannot reach from where the
+# angler stands walks him towards it and throws the moment it comes into reach — one
+# gesture, so a better spot no longer needs WASD first. `_led_cast` is the world point
+# committed at the press (not the pointer, which is free to move), INF for none;
+# `_led_throw` is whether a throw is owed at the end of the walk — false when no standing
+# spot on the island reaches the point, in which case the walk ends at the shore nearest
+# it and the player aims again. Straight line plus `Angler._slide`, no path planning: the
+# island is convex bar three boxes, which is what the dogs make do with. Any walk input,
+# a board, the menu, the arrival or a net no longer idle cancels it; a new press retargets.
+# Session state only, nothing saved.
+var _led_cast := Vector2.INF
+var _led_throw: bool = false
+## Seconds the walk has made no ground (a corner of the hut, the crate's face): past
+## `LED_STALL` it is given up rather than left pushing at a wall for ever.
+var _led_stall: float = 0.0
+var _led_was := Vector2.INF
+const LED_STALL := 0.6
+## Under this many tiles of movement in a frame counts as standing still.
+const LED_STILL := 0.002
+
 ## The pad's reticle and its assist, see scripts/pad_aim.gd. `at` is INF while the mouse is
 ## aiming; `_pad_was` notices the switch so the reticle starts where the pointer was.
 var _aim := PadAim.new()
@@ -2097,7 +2117,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# already coming home is left alone.
 	if _desk_pressed(event, &"cast"):
 		if _net.state == CastNet.State.IDLE:
-			_cast_at(get_global_mouse_position())
+			_cast_or_walk(get_global_mouse_position())
 		_net.set_pulling(true)
 
 
@@ -2223,8 +2243,64 @@ func _pad_buttons(busy: bool) -> void:
 	if Input.is_action_just_pressed(&"cast"):
 		# The click's own gesture: throw from idle, and a net sitting still is set pulling.
 		if _net.state == CastNet.State.IDLE:
-			_cast_at(aim_point())
+			_cast_or_walk(aim_point())
 		_net.set_pulling(true)
+
+
+## The cast press: throw if the spot is in reach, otherwise walk towards it and throw on
+## arrival (see `_led_cast`). A press on the island or the bank is nothing, as it always was.
+func _cast_or_walk(where: Vector2) -> void:
+	if _net.in_reach(where):
+		_stop_led_cast()
+		_cast_at(where)
+		return
+	var tile := Iso.world_to_tile(where)
+	if Iso.island_fraction(tile.x, tile.y) < 1.0 or Iso.shore_fraction(tile.x, tile.y) >= 1.0:
+		return
+	var shore: Vector2 = _angler.shore_toward(tile)
+	_led_cast = where
+	_led_throw = shore.distance_to(tile) <= _net.range_tiles
+	_led_stall = 0.0
+	_led_was = _angler.tile_pos
+	# Reachable: straight at the spot, the frame it comes into reach is the throw. Not:
+	# to the shore nearest it, where the walk ends and nothing is thrown.
+	_angler.walk_to = tile if _led_throw else shore
+	_pan_yielded = true
+
+
+func _stop_led_cast() -> void:
+	if _led_cast == Vector2.INF:
+		return
+	_led_cast = Vector2.INF
+	_led_throw = false
+	_angler.walk_to = Vector2.INF
+
+
+## One frame of the led cast. The walk is the angler's own (`walk_to`); this is what ends it.
+func _led_step(delta: float) -> void:
+	if _led_cast == Vector2.INF:
+		return
+	var pushed := Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down")
+	if _panelled() or _in_menu or _arrive != Arrive.OFF or _farewell != null 			or _net.state != CastNet.State.IDLE or pushed != Vector2.ZERO:
+		_stop_led_cast()
+		return
+	if _led_throw and _net.in_reach(_led_cast):
+		var at := _led_cast
+		_stop_led_cast()
+		_cast_at(at)
+		return
+	if _angler.walk_to == Vector2.INF:
+		# The shore was reached with nothing in range: the player aims again from here.
+		_stop_led_cast()
+		return
+	if _angler.tile_pos.distance_to(_led_was) < LED_STILL:
+		_led_stall += delta
+		if _led_stall >= LED_STALL:
+			_stop_led_cast()
+			return
+	else:
+		_led_stall = 0.0
+	_led_was = _angler.tile_pos
 
 
 ## Throw the net, on the numbers the player has now. The only cap is the net's own hold —
@@ -3133,6 +3209,7 @@ func _enter_menu(at_once: bool) -> void:
 	_set_menu(false)
 	_set_shed(false)
 	_set_wash(false)
+	_stop_led_cast()
 	_pose_world(at_once)
 	_hud_layer.visible = false
 	if _coins != null:
@@ -4446,6 +4523,7 @@ func _process(delta: float) -> void:
 	if not _in_menu:
 		_tick_bonus(delta)
 		_arrival_step()
+		_led_step(delta)
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	# The view: held on the whole lake behind the menu, flown down to the angler when the
