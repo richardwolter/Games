@@ -1341,10 +1341,17 @@ open** for those.
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
 `scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.
 - **The plank says "How to play"**, not "A letter" — the menu's plank already did.
-- **A Welcome card opens it** (Richard, later the same day): the greeting over it, then
-  three sentences each its own paragraph — the lake abandoned, the goal (catch, recycle,
-  bring life back), and that the cards teach how. No pictures; `rows` 6 gives their room to
-  the words, and `_head_base` stands the block in the middle of that room. Five cards now.
+- **A Welcome card opens it** (Richard, later the same day): its plank says **Welcome**
+  (`title`, per card; the rest keep "How to play"), it has no heading (`head` empty), and
+  it is **set like a letter** (`letter`): the greeting at the left as a salutation, three
+  paragraphs ranged right — the lake abandoned, the goal (catch, recycle, bring life back),
+  and that the cards teach how — spread down the page (`LETTER_SPREAD` caps the gap at 2.2
+  rows). No pictures; `rows` 6 gives their room to the words. Five cards now.
+- **The Net card is two paragraphs** (`rows` 4, so both stay at the body size), like the
+  tier card.
+- **The last card has no pager**: no dots, no arrows, their boxes emptied; "Start cleaning"
+  stands centred in the pager's row, so the pictures reach the same foot on every card and
+  the door is the one way on.
 - **Heading, then words, then pictures** on every card (the first cut stood the heading
   under the pictures): the Net card's sentence says "the circles below", so the pictures
   are below. `_head_base` / `_text_foot` / `_art_box` are the top-down walk; the door and
@@ -1363,9 +1370,8 @@ A wording and layout pass over the onboarding cards, off Richard's first-time-pl
 - **The sentences are wrapped, not authored in rows** (`text` per card, `_rows`,
   `SENTENCE_ROWS` 3): body size first, a rung down if that needs more rows. Typos in the
   brief fixed on the way ("indicates", "weight 5 weight tiers", "Strenght").
-- **"Start cleaning" stands centred above the dots**, and its row comes off the last card's
-  pictures alone (second pass, Richard: too much bare paper under the pictures; reserving
-  it on every card lasted an hour). The forward arrow is simply absent there.
+- **"Start cleaning" stood centred above the dots** for an afternoon; see the last card
+  having no pager, below.
 - **A word between asterisks is written in the head ink** (`_tokens`, `_wrap_marked`,
   `_ink_marked`): "*Left click*", "*circles below*", "*5 weight tiers*", "*catches more
   objects and cleans faster*", and the three on the Upgrades card — the lake's name's own

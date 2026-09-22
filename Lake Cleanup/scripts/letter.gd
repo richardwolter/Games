@@ -69,13 +69,18 @@ const GREETING_SIZES := [
 const ART := "res://assets/letter/%s.png"
 
 ## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows (or
-## the card's own `rows`: the welcome card has no pictures and gives their room to words);
+## the card's own `rows`: the welcome card has no pictures and gives their room to words).
+## `title` is the plank's word for that card alone; an empty `head` draws no heading. A
+## `letter` card is set like one: the greeting at the left, the paragraphs ranged right and
+## spread down the page;
 ## `snaps` are [still, caption, ink] triples pinned in a row, left to right. A caption may be
 ## empty; `ink` names a `CAPTION_INKS` entry, `far` for the underlined soft ink, or is empty.
 const CARDS := [
 	{
-		"head": "Welcome",
+		"head": "",
+		"title": "Welcome",
 		"rows": 6,
+		"letter": true,
 		"text": "*It has been abandoned and neglected for too long.*\n"
 			+ "Your goal is to *catch objects with your net, recycle and bring life back to the lake.*\n"
 			+ "The following instructions will *teach you how it works.*",
@@ -83,7 +88,8 @@ const CARDS := [
 	},
 	{
 		"head": "Net",
-		"text": "*Left click* to cast your net and catch objects floating. "
+		"rows": 4,
+		"text": "*Left click* to cast your net and catch objects floating.\n"
 			+ "The *circles below* indicate how your cast will go.",
 		"snaps": [
 			["net_catch", "Guaranteed objects", &"ok"],
@@ -165,6 +171,8 @@ const ART_LEAST := 110.0
 const PARA_GAP := 0.5
 ## A blurbed card: the rows under each picture its sentence may take, at `TEXT_SMALL`.
 const BLURB_ROWS := 3
+## The most a letter card's paragraphs are spread apart, in rows.
+const LETTER_SPREAD := 2.2
 
 ## The pager: the arrow planks and the dots between them.
 const ARROW := Vector2(30.0, 34.0)
@@ -477,20 +485,20 @@ func _lay_out() -> void:
 	var inside := _sheet.grow(-SHEET_PAD)
 	var last := page >= CARDS.size() - 1
 	var row := inside.end.y - PAGER_TALL
-	_back = Rect2(Vector2(inside.position.x, row + (PAGER_TALL - ARROW.y) * 0.5), ARROW)
-	_on = Rect2(Vector2(inside.end.x - ARROW.x, _back.position.y), ARROW)
+	# The last card has no pager at all: the door stands in the pager's row, centred, and
+	# is the one way on. Its arrows' boxes are emptied so a click there is a click on paper.
+	_back = Rect2() if last else Rect2(Vector2(inside.position.x, row + (PAGER_TALL - ARROW.y) * 0.5), ARROW)
+	_on = Rect2() if last else Rect2(Vector2(inside.end.x - ARROW.x, _back.position.y), ARROW)
 	_door.size = DOOR
-	# Centred above the dots, on the row every card reserves; shown on the last.
 	_door.position = Vector2(
-		inside.position.x + (inside.size.x - DOOR.x) * 0.5, row - GAP - DOOR.y
+		inside.position.x + (inside.size.x - DOOR.x) * 0.5, row + (PAGER_TALL - DOOR.y) * 0.5
 	).floor()
 	_door.visible = last
 	_dots.clear()
 	var span := float(CARDS.size() - 1) * DOT_GAP
-	# Centred on the sheet on every card, the last included: dots that slid aside to make
-	# room for the door would be a pager that moves under the hand using it.
+	# Centred on the sheet on every card that has them.
 	var mid := inside.position.x + inside.size.x * 0.5
-	for i in CARDS.size():
+	for i in (0 if last else CARDS.size()):
 		_dots.append(Rect2(
 			Vector2(mid - span * 0.5 + float(i) * DOT_GAP - DOT, row + PAGER_TALL * 0.5 - DOT),
 			Vector2(DOT * 2.0, DOT * 2.0)
@@ -503,11 +511,8 @@ func _lay_out() -> void:
 ## sentence on the first card — down to the door's row.
 func _art_box(inside: Rect2) -> Rect2:
 	var top := _text_foot(inside) + GAP
+	# The pager's row on every card but the last, the door's on that one: the same row.
 	var foot := inside.end.y - PAGER_TALL - GAP
-	# The door's row comes off the last card's pictures alone: reserved on every card it
-	# left a band of bare paper under three of them.
-	if page >= CARDS.size() - 1:
-		foot -= DOOR.y + GAP
 	return Rect2(inside.position.x, top, inside.size.x, maxf(foot - top, 0.0))
 
 
@@ -518,7 +523,10 @@ func _head_base(inside: Rect2) -> float:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if not (card["snaps"] as Array).is_empty():
 		return base
-	var foot := inside.end.y - PAGER_TALL - GAP - (DOOR.y + GAP if page >= CARDS.size() - 1 else 0.0)
+	if bool(card.get("letter", false)):
+		# Set like a letter: from the top, the spread does the rest.
+		return base
+	var foot := inside.end.y - PAGER_TALL - GAP
 	var words := GAP + float(_rows_of(card)) * (float(Style.TEXT_BODY) + LINE_STEP)
 	return floorf(base + maxf(foot - base - words, 0.0) * 0.5)
 
@@ -685,26 +693,29 @@ func _draw() -> void:
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
 	draw_rect(face, Style.BOARD, true)
 	var ribbon := _ribbon()
+	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	Style.board_ribbon(
-		self, ribbon, TITLE, CHIPS, Style.TEXT_HEAD, Style.title_room(ribbon, CLOSE_SIZE),
-		Style.BOARD
+		self, ribbon, String(card.get("title", TITLE)), CHIPS, Style.TEXT_HEAD,
+		Style.title_room(ribbon, CLOSE_SIZE), Style.BOARD
 	)
 	_draw_sheet()
 	var inside := _sheet.grow(-SHEET_PAD)
-	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if page == 0:
 		_draw_greeting(inside)
 	# Top down: the heading with its rules, then the sentence, then the pictures' captions.
 	var head_base := _head_base(inside)
-	_ink(String(card["head"]), Style.TEXT_HEAD, head_base, inside, HEAD_INK)
-	# A ruled line either side of the heading, the way a letter's sections are set off.
-	var head_wide := Style.measure(String(card["head"]), Style.TEXT_HEAD).x
-	var rule_y := floorf(head_base - float(Style.TEXT_HEAD) * 0.36)
-	var mid := inside.position.x + inside.size.x * 0.5
-	draw_line(Vector2(inside.position.x + 24.0, rule_y),
-		Vector2(mid - head_wide * 0.5 - 12.0, rule_y), PAPER_RULE, 1.0)
-	draw_line(Vector2(mid + head_wide * 0.5 + 12.0, rule_y),
-		Vector2(inside.end.x - 24.0, rule_y), PAPER_RULE, 1.0)
+	var head := String(card["head"])
+	if not head.is_empty():
+		_ink(head, Style.TEXT_HEAD, head_base, inside, HEAD_INK)
+		# A ruled line either side of the heading, the way a letter's sections are set off.
+		var head_wide := Style.measure(head, Style.TEXT_HEAD).x
+		var rule_y := floorf(head_base - float(Style.TEXT_HEAD) * 0.36)
+		var mid := inside.position.x + inside.size.x * 0.5
+		draw_line(Vector2(inside.position.x + 24.0, rule_y),
+			Vector2(mid - head_wide * 0.5 - 12.0, rule_y), PAPER_RULE, 1.0)
+		draw_line(Vector2(mid + head_wide * 0.5 + 12.0, rule_y),
+			Vector2(inside.end.x - 24.0, rule_y), PAPER_RULE, 1.0)
+	var letter := bool(card.get("letter", false))
 	var fit := _rows(card)
 	if fit.is_empty() and card.has("text"):
 		fit = {"rows": _wrap_marked(_tokens(String(card["text"])), Style.TEXT_TINY, inside.size.x),
@@ -713,10 +724,21 @@ func _draw() -> void:
 	if not fit.is_empty():
 		var row_tall := float(Style.TEXT_BODY) + LINE_STEP
 		var y_text := head_base + GAP
-		for row: Dictionary in fit["rows"]:
+		var rows: Array = fit["rows"]
+		var para_gap := row_tall * PARA_GAP
+		if letter:
+			# The paragraphs spread down the page: the room under the rows shared out over
+			# the paragraph gaps, up to `LETTER_SPREAD` rows each.
+			var paras := 0
+			for row: Dictionary in rows:
+				paras += 1 if bool(row["para"]) else 0
+			var foot := inside.end.y - PAGER_TALL - GAP
+			var spare := foot - y_text - float(rows.size()) * row_tall
+			para_gap = clampf(spare / float(maxi(paras, 1)), para_gap, row_tall * LETTER_SPREAD)
+		for row: Dictionary in rows:
 			if bool(row["para"]):
-				y_text += row_tall * PARA_GAP
-			_ink_marked(row, int(fit["px"]), y_text + float(fit["px"]), inside, false)
+				y_text += para_gap
+			_ink_marked(row, int(fit["px"]), y_text + float(fit["px"]), inside, 1 if letter else 0)
 			y_text += row_tall
 	for caption: Dictionary in _captions:
 		var text := String(caption["text"])
@@ -735,13 +757,17 @@ func _draw() -> void:
 
 
 ## A row of marked words: the plain ones in the ink, the marked ones in the head ink, on one
-## baseline, centred on `within` or set against its left edge.
-func _ink_marked(row: Dictionary, px: int, base: float, within: Rect2, left: bool) -> void:
+## baseline; `align` is -1 against the left edge, 0 centred on `within`, 1 against the right.
+func _ink_marked(row: Dictionary, px: int, base: float, within: Rect2, align: int) -> void:
 	var plain := _row_plain(row)
 	var span := Style.measure(plain, px).x
 	if span > within.size.x:
 		dropped_lines += 1
-	var x := within.position.x if left else floorf(within.position.x + (within.size.x - span) * 0.5)
+	var x := within.position.x
+	if align == 0:
+		x = floorf(within.position.x + (within.size.x - span) * 0.5)
+	elif align > 0:
+		x = floorf(within.end.x - span)
 	var space := Style.measure(" ", px).x
 	var words: Array = row["words"]
 	for i in words.size():
@@ -764,7 +790,7 @@ func _draw_blurb(text: String, box: Rect2) -> void:
 	var px := int(fit["px"])
 	var y := box.position.y
 	for row: Dictionary in fit["rows"]:
-		_ink_marked(row, px, floorf(y + float(px)), box, false)
+		_ink_marked(row, px, floorf(y + float(px)), box, 0)
 		y += float(px) + LINE_STEP
 
 
@@ -778,7 +804,10 @@ func _draw_greeting(inside: Rect2) -> void:
 	var whole := lead_wide + Style.measure(GREETING_NAME, name_px).x
 	if whole > inside.size.x:
 		dropped_lines += 1
-	var x := floorf(inside.position.x + (inside.size.x - whole) * 0.5)
+	var card: Dictionary = CARDS[0]
+	# A letter's salutation stands at the left; over a card of pictures it is centred.
+	var x := inside.position.x if bool(card.get("letter", false)) \
+		else floorf(inside.position.x + (inside.size.x - whole) * 0.5)
 	var base := inside.position.y + float(name_px)
 	draw_string(Style.font(), Vector2(x, base), GREETING_LEAD,
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0, lead_px, INK)
@@ -798,6 +827,8 @@ func _draw_sheet() -> void:
 
 
 func _draw_pager() -> void:
+	if page >= CARDS.size() - 1:
+		return
 	_draw_arrow(_back, -1, page > 0, _hovered == &"back")
 	if _forward_live():
 		_draw_arrow(_on, 1, true, _hovered == &"on")

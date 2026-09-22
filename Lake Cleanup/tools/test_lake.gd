@@ -7073,8 +7073,12 @@ func _stage_letter() -> void:
 		heads.append(String(card["head"]))
 		if card.has("text") and (letter.call(&"_rows", card) as Dictionary).is_empty():
 			long_cards.append(String(card["head"]))
-	_check(heads == ["Welcome", "Net", "Upgrades", "Object Tier", "Decoration"],
-		"named for what each one teaches", ", ".join(heads))
+	_check(heads == ["", "Net", "Upgrades", "Object Tier", "Decoration"],
+		"named for what each one teaches, the welcome bare", ", ".join(heads))
+	_check(String(Letter.CARDS[0].get("title", "")) == "Welcome"
+		and not Letter.CARDS[1].has("title"),
+		"the plank says Welcome over the first card and How to play over the rest", "")
+	_check(bool(Letter.CARDS[0].get("letter", false)), "and the first is set like a letter", "")
 	_check(long_cards.is_empty(),
 		"and none says more than the rows the board reserves", ", ".join(long_cards))
 	_check(Letter.TITLE == "How to play", "the plank says what the board is", Letter.TITLE)
@@ -7140,16 +7144,21 @@ func _stage_letter() -> void:
 		"with its door on the paper", "")
 	var door_mid := way_out.position.x + way_out.size.x * 0.5
 	var sheet_mid := sheet.position.x + sheet.size.x * 0.5
-	_check(absf(door_mid - sheet_mid) <= 1.0 and way_out.position.y + way_out.size.y <= (dots[0] as Rect2).position.y,
-		"centred above the dots", "door %.0f sheet %.0f" % [door_mid, sheet_mid])
+	var inside_last := sheet.grow(-Letter.SHEET_PAD)
+	_check(absf(door_mid - sheet_mid) <= 1.0
+		and way_out.position.y >= inside_last.end.y - Letter.PAGER_TALL - 1.0,
+		"centred in the pager's row", "door %.0f sheet %.0f" % [door_mid, sheet_mid])
+	_check(dots.is_empty() and (letter.get(&"_back") as Rect2).size == Vector2.ZERO
+		and (letter.get(&"_on") as Rect2).size == Vector2.ZERO,
+		"with no dots and no arrows: the door is the one way on", "%d dots" % dots.size())
 	letter.page = 0
 	letter.call(&"_lay_out")
 	var art_early := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
 	letter.page = Letter.CARDS.size() - 1
 	letter.call(&"_lay_out")
 	var art_last := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
-	_check(is_equal_approx(art_early.end.y - Letter.DOOR.y - Letter.GAP, art_last.end.y),
-		"taking its row off the last card's pictures alone", "%.0f then %.0f" % [art_early.end.y, art_last.end.y])
+	_check(is_equal_approx(art_early.end.y, art_last.end.y),
+		"so the pictures reach the same foot on every card", "%.0f then %.0f" % [art_early.end.y, art_last.end.y])
 	# The words that matter are marked for the head ink, and a mark never reaches the paper.
 	var marked := 0
 	for card: Dictionary in Letter.CARDS:
@@ -7165,6 +7174,12 @@ func _stage_letter() -> void:
 	var tiers: Array = letter.call(&"_rows", Letter.CARDS[3])["rows"]
 	_check(tiers.size() == 2 and bool(tiers[1]["para"]) and not bool(tiers[0]["para"]),
 		"the tier card is two paragraphs", "%d rows" % tiers.size())
+	var net_rows: Array = letter.call(&"_rows", Letter.CARDS[1])["rows"]
+	var net_paras := 0
+	for row: Dictionary in net_rows:
+		net_paras += 1 if bool(row["para"]) else 0
+	_check(net_paras == 1 and int(letter.call(&"_rows", Letter.CARDS[1])["px"]) == Style.TEXT_BODY,
+		"and the net card two, at the body size", "%d rows, %d paragraphs" % [net_rows.size(), net_paras])
 	_check(bool(Letter.CARDS[2].get("blurbs", false)) and not Letter.CARDS[2].has("text"),
 		"the upgrades card stands each board over its own sentence", "")
 	letter.page = 2
@@ -7188,7 +7203,7 @@ func _stage_letter() -> void:
 		var pinned: Array = card["snaps"]
 		if pinned.is_empty() or pinned.size() > Letter.SNAPS_MOST:
 			crowded.append(String(card["head"]))
-	_check(crowded == ["Welcome"], "one to three to a card, bar the welcome, which has words alone",
+	_check(crowded == [""], "one to three to a card, bar the welcome, which has words alone",
 		", ".join(crowded))
 	var welcome: Array = (letter.call(&"_rows", Letter.CARDS[0]) as Dictionary).get("rows", [])
 	_check(welcome.size() >= 3 and bool(welcome[welcome.size() - 1]["para"]),
