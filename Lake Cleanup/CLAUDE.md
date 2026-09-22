@@ -1386,6 +1386,33 @@ of game code, and then off the probe's captures.
   walk ending on the spot, empty and catching sweeps, the pad's five seconds, the flag, and
   the key fallback.
 
+### The Shop Tour (2026-09-22, `/grill-me` with Richard, issue #24)
+The first time a new game opens the upgrades shop, six paper cards walk it, one at a time.
+`ShopSkin.TOUR`, `_draw_tour`, `_tour_input`; the lake starts it and saves it
+(`Lake._shop_tour_done`, `_on_shop_tour_ended`). Approved off `tools/last_shop_tour_mockup.png`.
+- **The cards, in order**: the NET board; the LUCK board's *On a cast* rows ("your net
+  luck", Richard's wording); BOATS; DOGS; *At the yards*; the pricing plate. A group's box is
+  measured as it is drawn (`_group_boxes`, off the heading in `GROUPS`).
+- **Spotlight and card**: everything but the target dimmed (`TOUR_DIM`), a white outline, the
+  down arrow on its top edge, and the recycle note's paper card (`FirstSteps.NOTE_*`) beside
+  it — right of it on the left half of the screen, left of it on the right, above the plate —
+  with "n/6", "Skip" and "Continue" with the mouse click (the pad's A, tile 4, in pad mode).
+- **Drawn on a child layer (`_tour_layer`), kept last**: the ferry, the net and the dog heads
+  are child nodes and draw over anything the board draws itself — the first capture had the
+  ferry standing on the card.
+- **A click (A) goes on, "Skip" ends it for good**, and while it is up nothing can be bought
+  and a click off the boards does not close the shop; the cross and Escape still do.
+- **Closed half way, it picks up at the same card** next time the shop opens (the board keeps
+  `tour` for the session). **Quit half way, it starts over**: only the done flag is saved,
+  as `shop_tour`, absent reads as done, no `SAVE_VERSION` bump. New games only.
+- **The six sentences are literals** in `shop_skin.gd`, not yet in `locale/translations.csv`.
+- **Out of scope, by decision**: tours of the decorate board and the first decoration (to
+  come, #24), changes to the shop's layout, hover tips outside the tour.
+- Probe: `tools/shot_shop_tour.tscn` (desktop build, own save, under its own node) saves
+  `tools/last_shop_tour_{1..6,pad}.png`. `test_lake`'s `_stage_first_steps` also guards the
+  tour starting, keeping its place over a close, blocking a buy, ending saved and not coming
+  back.
+
 ### The Board Reads "How to Play" (2026-09-22, `/grill-me` with Richard)
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
 `scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.

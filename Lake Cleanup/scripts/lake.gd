@@ -832,6 +832,10 @@ const LED_STALL := 0.6
 # before the last step starts the steps over from the walk: nothing of where they had got to
 # is kept, by decision.
 var _steps_done: bool = true
+## The shop's tour (`ShopSkin.tour`), saved as `shop_tour`, absent reads as done. Where it had
+## got to is the board's for the session: closed half way, it picks up there next time the
+## shop opens; quit half way, it starts over.
+var _shop_tour_done: bool = true
 var _steps: FirstSteps
 ## The tile the walk step points at, and the world point the cast step rings.
 var _steps_beach := Vector2.INF
@@ -1282,6 +1286,7 @@ func _ready() -> void:
 	_settings.swap_pressed.connect(_swap_levels)
 	_settings.close_asked.connect(_shut.bind(_set_settings))
 	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
+	_shop_skin.tour_ended.connect(_on_shop_tour_ended)
 	# Not the shed. It has no panel to hang a cross on the corner of any more — the room is
 	# the whole screen — so its own cross sits over the top of the inventory column, where
 	# the thing it closes actually is. See ShedRoom.
@@ -2686,6 +2691,8 @@ func _set_menu(open: bool) -> void:
 	_shop_skin.visible = open
 	if open:
 		_skin.hush_pulse(&"upgrades")
+		if not _shop_tour_done and _shop_skin.tour < 0:
+			_shop_skin.tour = 0
 	_push_rooms()
 	if open:
 		_set_settings(false)
@@ -2960,6 +2967,7 @@ func _start_arrival() -> void:
 	if _intro_done or _boats.is_empty():
 		return
 	_steps_done = false
+	_shop_tour_done = false
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
@@ -3104,6 +3112,12 @@ func _begin_first_steps() -> bool:
 	_steps.crate = Vector2.INF
 	_steps.step = FirstSteps.Step.MOVE
 	return true
+
+
+## The shop's tour is over, read through or skipped: it is not shown again.
+func _on_shop_tour_ended(_skipped: bool) -> void:
+	_shop_tour_done = true
+	save_game()
 
 
 ## The last step is over: the flag, and a save so a Continue does not teach it again.
@@ -3380,6 +3394,7 @@ func _raise_front(loaded: bool) -> void:
 		if not force_intro:
 			_intro_done = true
 			_steps_done = true
+			_shop_tour_done = true
 		force_intro = false
 		if not force_front:
 			return
@@ -5270,6 +5285,7 @@ func _update_hud() -> void:
 	if not _menu_open:
 		return
 	_shop_skin.rows = _shop_rows()
+	_shop_skin.tour_pad = Pad.is_pad()
 	_shop_skin.legend = _shop_legend()
 
 
@@ -5348,6 +5364,7 @@ func save_game() -> bool:
 		"farewell": _farewell_shown,
 		"intro_done": _intro_done,
 		"first_steps": _steps_done,
+		"shop_tour": _shop_tour_done,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -5484,6 +5501,7 @@ func load_game() -> bool:
 	_intro_done = bool(save.get("intro_done", true))
 	# Absent means done, as above. Not done means the steps start over from the walk.
 	_steps_done = bool(save.get("first_steps", true))
+	_shop_tour_done = bool(save.get("shop_tour", true))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

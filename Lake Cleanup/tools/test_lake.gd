@@ -6969,6 +6969,31 @@ func _stage_first_steps() -> void:
 		"the note times out and the steps are done", "")
 	_check(FirstSteps.key_tile("Z") == "key_z" and FirstSteps.key_tile("Y") == "",
 		"a key with a prompt tile gets it, one without falls back", "")
+	# The shop's tour: starts on the first opening, keeps its place over a close, blocks
+	# buying, and ends saved.
+	var shop: ShopSkin = _main.get(&"_shop_skin")
+	_main.set(&"_shop_tour_done", false)
+	shop.tour = -1
+	_main.call(&"_set_menu", true)
+	_check(shop.tour == 0, "the shop's tour starts on its first opening", str(shop.tour))
+	shop.tour_next()
+	shop.tour_next()
+	_main.call(&"_set_menu", false)
+	_main.call(&"_set_menu", true)
+	_check(shop.tour == 2, "a tour closed half way picks up where it was", str(shop.tour))
+	var shop_src := (load("res://scripts/shop_skin.gd") as GDScript).source_code
+	_check(shop_src.find("if tour >= 0:
+		_tour_input(event)
+		return") >= 0,
+		"nothing is bought while the tour is up", "")
+	for i in ShopSkin.TOUR.size():
+		shop.tour_next()
+	_check(shop.tour == -1 and bool(_main.get(&"_shop_tour_done")),
+		"the last card ends the tour and it is saved as done", str(shop.tour))
+	_main.call(&"_set_menu", false)
+	_main.call(&"_set_menu", true)
+	_check(shop.tour == -1, "a finished tour is not shown again", str(shop.tour))
+	_main.call(&"_set_menu", false)
 	_finish()
 
 

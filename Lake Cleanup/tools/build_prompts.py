@@ -10,7 +10,7 @@ T, COLS = 16, 34
 PICKS = {
     "mouse_idle": 76, "mouse_click": 77,
     "key_w": 358, "key_a": 392, "key_s": 393, "key_d": 394, "key_z": 427, "key_q": 357,
-    "stick": 246, "stick_dirs": 253, "pad_rt": 590, "arrow_up": 604,
+    "stick": 246, "stick_dirs": 253, "pad_rt": 590, "pad_a": 4, "arrow_up": 604,
 }
 os.makedirs(OUT, exist_ok=True)
 sheet = Image.open(SHEET).convert("RGBA")

@@ -259,6 +259,46 @@ var _painted: int = 0
 ## off the boards' own rectangle, and only this knows where that is.
 var _close: CloseButton
 
+# The tour (2026-09-22, `/grill-me` with Richard, issue #24): the first time a new game opens
+# the shop, six paper cards walk it, one at a time. Everything is dimmed but the thing a card
+# is about, a click (A) goes on, "Skip" ends it, and nothing can be bought while it is up.
+# The lake decides when it starts and saves that it is over (`Lake._shop_tour_done`); this
+# owns where each card points and what a click does. Picked off
+# `tools/last_shop_tour_mockup.png`.
+#
+# What each card points at: a board, a group's rows by its heading in `GROUPS`, or the
+# pricing plate (`&"legend"`).
+const TOUR := [
+	[&"net", "Your net can be upgraded to catch more objects, higher tiers and for faster cast and reel."],
+	["On a cast", "You can also increase your net luck and double cast chance."],
+	[&"boat", "Boats are essential for money making, make sure to keep them upgraded."],
+	[&"dog", "Dogs will help bring objects to the recycle box."],
+	["At the yards", "You can make more money by giving a bonus to recycling, and catching pigeons earn more."],
+	[&"legend", "You can check the materials average price here, and which recycle has a bonus."],
+]
+const TOUR_DIM := Color(0.0, 0.0, 0.0, 0.58)
+const TOUR_OUTLINE := Color(1.0, 1.0, 1.0, 0.9)
+## Between the target and its card, in canvas pixels.
+const TOUR_GAP := 20.0
+const TOUR_CONTINUE := "Continue"
+const TOUR_SKIP := "Skip"
+
+## The card showing, or -1 for no tour.
+var tour: int = -1
+## Whether the prompt on the card is the pad's A rather than the mouse.
+var tour_pad := false
+## The tour is over: `skipped` if "Skip" ended it.
+signal tour_ended(skipped: bool)
+
+var _group_boxes := {}
+## Drawn last and on top: the ferry, the net and the dog heads are child nodes and would
+## draw over anything the board draws itself, the dimming and the card included.
+var _tour_layer: Control
+var _tour_skip := Rect2()
+var _prompt_mouse: Texture2D = load("res://assets/ui/prompts/mouse_click.png") if ResourceLoader.exists("res://assets/ui/prompts/mouse_click.png") else null
+var _prompt_a: Texture2D = load("res://assets/ui/prompts/pad_a.png") if ResourceLoader.exists("res://assets/ui/prompts/pad_a.png") else null
+var _prompt_arrow: Texture2D = load("res://assets/ui/prompts/arrow_up.png") if ResourceLoader.exists("res://assets/ui/prompts/arrow_up.png") else null
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -511,6 +551,9 @@ func _process(delta: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if tour >= 0:
+		_tour_input(event)
+		return
 	if event is InputEventMouseMotion:
 		var was := _hovered
 		var was_help := _help_hovered
@@ -593,12 +636,17 @@ func _draw() -> void:
 	_row_boxes.clear()
 	_row_index.clear()
 	_help_boxes.clear()
+	_group_boxes.clear()
 	for board in BOARDS:
 		_draw_board(board, _boards[board])
 	if _legend_box.size.y > 0.0:
 		_draw_legend(_legend_box)
-	if _help_hovered >= 0 and _help_hovered < rows.size():
+	if _help_hovered >= 0 and _help_hovered < rows.size() and tour < 0:
 		_draw_blurb(rows[_help_hovered])
+	if tour >= 0:
+		_ensure_tour_layer()
+	if _tour_layer != null:
+		_tour_layer.queue_redraw()
 
 
 ## One board: oak frame, clean-water face, ribbon over the top edge, the sprite, the rows.
@@ -639,6 +687,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 			if not heads or heading.is_empty():
 				continue
 			_draw_group(heading, Rect2(left, y, wide, GROUP_TALL))
+			_group_boxes[heading] = Rect2(left, y, wide, GROUP_TALL)
 			y += GROUP_TALL + GROUP_GAP
 			continue
 		var line := Rect2(left, y, wide, _row_tall)
@@ -647,6 +696,7 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		y += _row_tall + ROW_GAP
 		_row_boxes.append(line)
 		_row_index.append(i)
+		_grow_group(board, i, line)
 		_help_boxes.append(help_box_of(line))
 		_draw_row(rows[i], line, _hovered == i, _help_hovered == i)
 
@@ -1185,4 +1235,144 @@ func _star(at: Vector2, side: float, tint: Color) -> void:
 			at + Vector2(side, 0.0), at + Vector2(0.0, side * 0.34)
 		]),
 		tint
+	)
+
+
+## Stretch the box of the group this row belongs to down over the row.
+func _grow_group(board: StringName, index: int, line: Rect2) -> void:
+	var key := StringName(rows[index].get("key", ""))
+	for group: Array in GROUPS.get(board, []):
+		if key in (group[1] as Array) and _group_boxes.has(group[0]):
+			_group_boxes[group[0]] = (_group_boxes[group[0]] as Rect2).merge(line)
+			return
+
+
+## What the card showing is about, in this control's pixels, or an empty rect.
+func tour_target() -> Rect2:
+	if tour < 0 or tour >= TOUR.size():
+		return Rect2()
+	var at: Variant = TOUR[tour][0]
+	if at is StringName:
+		if at == &"legend":
+			return _legend_box
+		return _boards.get(at, Rect2())
+	return (_group_boxes.get(at, Rect2()) as Rect2).grow(4.0)
+
+
+## A click during the tour: "Skip" ends it, anything else goes on. Nothing is bought and
+## nothing hovers; the way out (a click off the boards) is not a way out while it is up —
+## the cross and Escape still are.
+func _tour_input(event: InputEvent) -> void:
+	var click := event as InputEventMouseButton
+	if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
+		return
+	accept_event()
+	Sfx.ui(&"ui_click")
+	if _tour_skip.has_point(click.position):
+		tour = -1
+		tour_ended.emit(true)
+	else:
+		tour_next()
+	queue_redraw()
+
+
+## The next card, or the end.
+func tour_next() -> void:
+	if tour < 0:
+		return
+	tour += 1
+	if tour >= TOUR.size():
+		tour = -1
+		tour_ended.emit(false)
+	queue_redraw()
+
+
+## The dimming with the target cut out of it, its outline, the arrow on its top edge and
+## the paper card beside it: the recycle note's card (`FirstSteps`), with the count, "Skip"
+## and the prompt to go on.
+func _draw_tour() -> void:
+	if _tour_layer == null:
+		return
+	var target := tour_target()
+	var view := Rect2(Vector2.ZERO, size)
+	if target.size.x <= 0.0:
+		_tour_layer.draw_rect(view, TOUR_DIM, true)
+		target = Rect2(size * 0.5, Vector2.ZERO)
+	else:
+		_tour_layer.draw_rect(Rect2(0.0, 0.0, size.x, target.position.y), TOUR_DIM, true)
+		_tour_layer.draw_rect(Rect2(0.0, target.end.y, size.x, size.y - target.end.y), TOUR_DIM, true)
+		_tour_layer.draw_rect(Rect2(0.0, target.position.y, target.position.x, target.size.y), TOUR_DIM, true)
+		_tour_layer.draw_rect(Rect2(target.end.x, target.position.y, size.x - target.end.x, target.size.y), TOUR_DIM, true)
+		_tour_layer.draw_rect(target, TOUR_OUTLINE, false, 2.0)
+	var px := _prompt_px()
+	if _prompt_arrow != null and target.size.x > 0.0:
+		var a := _prompt_arrow.get_size() * px
+		var corner := Vector2(target.get_center().x - a.x * 0.5, target.position.y - a.y - 2.0).round()
+		_tour_layer.draw_set_transform(corner + Vector2(0.0, a.y), 0.0, Vector2(1.0, -1.0))
+		_tour_layer.draw_texture_rect(_prompt_arrow, Rect2(Vector2.ZERO, a), false)
+		_tour_layer.draw_set_transform(Vector2.ZERO)
+	var face := Style.font()
+	var size_px := FirstSteps.NOTE_SIZE
+	var wide := FirstSteps.NOTE_WIDE
+	var pad := FirstSteps.NOTE_PAD
+	var lines := FirstSteps._wrap(String(TOUR[tour][1]), face, size_px, wide - pad.x * 2.0)
+	var line_tall := face.get_height(size_px) + 1.0
+	var icon := _prompt_a if tour_pad else _prompt_mouse
+	var icon_size := icon.get_size() * px if icon != null else Vector2.ZERO
+	var foot_tall := maxf(line_tall, icon_size.y)
+	var tall := pad.y * 2.0 + line_tall * float(lines.size() + 1) + 4.0 + foot_tall
+	var card := Rect2(Vector2.ZERO, Vector2(wide, tall).round())
+	# Beside the target on whichever side has room; the plate, which fills the foot, above.
+	if TOUR[tour][0] is StringName and TOUR[tour][0] == &"legend":
+		card.position = Vector2(target.get_center().x - wide * 0.5, target.position.y - tall - TOUR_GAP * 2.0)
+	elif target.end.x + TOUR_GAP + wide <= size.x - 4.0 and target.get_center().x < size.x * 0.5:
+		card.position = Vector2(target.end.x + TOUR_GAP, target.position.y + target.size.y * 0.2)
+	else:
+		card.position = Vector2(target.position.x - TOUR_GAP - wide, target.position.y + 10.0)
+	card.position.x = clampf(card.position.x, 4.0, size.x - card.size.x - 4.0)
+	card.position.y = clampf(card.position.y, 4.0, size.y - card.size.y - 4.0)
+	card.position = card.position.round()
+	_tour_layer.draw_rect(card.grow(FirstSteps.NOTE_RIM + 1.0), FirstSteps.NOTE_OUTER, true)
+	_tour_layer.draw_rect(card, Style.PAPER, true)
+	_tour_layer.draw_rect(card.grow(-1.0), Style.PAPER_EDGE, false, FirstSteps.NOTE_RIM)
+	var ascent := face.get_ascent(size_px)
+	var inner := card.grow_individual(-pad.x, -pad.y, -pad.x, -pad.y)
+	_tour_layer.draw_string(face, Vector2(inner.position.x, inner.position.y + ascent), "%d/%d" % [tour + 1, TOUR.size()],
+		HORIZONTAL_ALIGNMENT_RIGHT, inner.size.x, size_px, Style.PAPER_SOFT)
+	var y := inner.position.y + line_tall + ascent
+	for line in lines:
+		_tour_layer.draw_string(face, Vector2(card.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER, card.size.x,
+			size_px, Style.PAPER_INK)
+		y += line_tall
+	var foot_mid := inner.end.y - foot_tall * 0.5
+	var base := foot_mid + ascent * 0.5 - 1.0
+	var skip_wide := face.get_string_size(TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
+	_tour_layer.draw_string(face, Vector2(inner.position.x, base), TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_SOFT)
+	_tour_skip = Rect2(inner.position.x - 4.0, foot_mid - foot_tall * 0.5 - 2.0, skip_wide + 8.0, foot_tall + 4.0)
+	var icon_at := Vector2(inner.end.x - icon_size.x, foot_mid - icon_size.y * 0.5).round()
+	if icon != null:
+		_tour_layer.draw_texture_rect(icon, Rect2(icon_at, icon_size), false)
+	var go_wide := face.get_string_size(TOUR_CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
+	_tour_layer.draw_string(face, Vector2(icon_at.x - 4.0 - go_wide, base), TOUR_CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_INK)
+
+
+## Canvas pixels to one of the prompt pack's: `FirstSteps.PROMPT_PX` physical ones.
+func _prompt_px() -> float:
+	var canvas := get_viewport_rect().size.y
+	var window := float(get_window().size.y) if get_window() != null else canvas
+	return FirstSteps.PROMPT_PX * canvas / maxf(window, 1.0)
+
+
+func _ensure_tour_layer() -> void:
+	if _tour_layer != null:
+		move_child(_tour_layer, get_child_count() - 1)
+		return
+	_tour_layer = Control.new()
+	_tour_layer.name = &"Tour"
+	_tour_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tour_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_tour_layer)
+	_tour_layer.draw.connect(func() -> void:
+		if tour >= 0 and tour < TOUR.size():
+			_draw_tour()
 	)
