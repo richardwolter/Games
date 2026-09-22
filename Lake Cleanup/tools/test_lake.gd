@@ -1569,7 +1569,7 @@ func _stage_dog_idle(dogs: Array) -> void:
 
 ## The pack's coats and gaits, the sit, and the gripped carry (2026-09-22, Richard).
 ##
-## Breeds are fixed by slot — yellow, orange, tan-and-white, yellow again — so the rule is
+## Breeds are fixed by slot — orange, tan-and-white, dark brown, orange again — so the rule is
 ## asked of the slot and of the sheets rather than of any roll. The mouth is measured off
 ## every frame, so a carried piece is asked to sit within a few pixels of it and to move
 ## with the frame; and to be drawn under the dog, since the head is what says "held".
@@ -1599,7 +1599,7 @@ func _stage_dog_breeds(dogs: Array) -> void:
 		_check(dog.slot == i and dog.breed == posmod(i, DogArt.breeds()),
 			"dog %d wears breed slot %% 3" % i, str(slots))
 	_check(DogArt.breed_of(0) == 0 and DogArt.breed_of(3) == 0 and DogArt.breed_of(1) == 1,
-		"the first and fourth dogs are the yellow one", "")
+		"the first and fourth dogs are the same breed", "")
 	_check(DogArt.gait(0, false) == &"run" and DogArt.gait(1, false) == &"run2"
 		and DogArt.gait(0, true) == &"walk" and DogArt.gait(1, true) == &"walk2",
 		"even slots run the first gait pair, odd the second", "")

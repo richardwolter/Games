@@ -7,8 +7,9 @@
 ## corner makes the dog jitter on the spot while it walks. Each frame is shrunk onto its own
 ## pixels and its footline written down, and the game stands the dog on that instead.
 ##
-## Three breeds (2026-09-22, Richard's pick off `tools/last_dog_pack.png`): 22 the yellow
-## dog the game always had, 02 the orange one, 20 the tan-and-white one. One json each,
+## Three breeds (2026-09-22, Richard's pick off `tools/last_dog_pack.png`): 02 the orange
+## dog, 20 the tan-and-white one, 14 the dark brown one. The yellow dog the game shipped
+## with (22) is out — Richard: it is repeated. One json each,
 ## because the trimmed boxes are the drawing's own and no two breeds are drawn identically.
 ##
 ## The mouth is measured, not guessed. The pack pairs every plain sheet with an odd-numbered
@@ -35,7 +36,7 @@ const SHEET := "res://assets/dogs/dog_%02d.png"
 const OUT_JSON := "res://assets/dogs/dog_%02d.json"
 
 ## The pack numbers of the plain sheets, in the order the pack hands them out.
-const BREEDS := [22, 2, 20]
+const BREEDS := [2, 20, 14]
 
 ## The grid the sheets are drawn on.
 const CELL := Vector2i(64, 48)

@@ -221,8 +221,8 @@ var grid: LakeGrid
 var angler: Angler
 
 ## Which of the pack this dog is (0 first) and which breed's sheet it wears. Fixed by
-## order, by decision (2026-09-22): the first dog is the yellow one the game always had,
-## then the orange, then the tan-and-white, then round again — the same on every save, and
+## order, by decision (2026-09-22): the first dog is the orange one, then the
+## tan-and-white, then the dark brown, then round again — the same on every save, and
 ## nothing to write down. The slot also picks the gait pair (`DogArt.gait`), so two dogs
 ## of one breed do not run in step either.
 var slot: int = 0:

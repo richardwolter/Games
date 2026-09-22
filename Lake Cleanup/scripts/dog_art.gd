@@ -11,15 +11,16 @@
 ##
 ## Three breeds since 2026-09-22 (Richard's pick off the Pixel Dogs pack): one cut sheet and
 ## one json each, under assets/dogs/. Every call takes a `breed` index into BREEDS and
-## defaults to 0, the yellow dog the game always had, so a caller that never heard of breeds
-## draws what it always did. The pack hands them out in order — see `Dog.breed`.
+## defaults to 0, the orange dog, so a caller that never heard of breeds — the shop head, the
+## HUD button — draws one dog and the same one every time. The pack hands them out in order — see `Dog.breed`.
 ##
 ## No `class_name`, for the same reason style.gd has none: consumers preload it, and a global
 ## class is registered into an editor-written cache that a headless tool run can find stale.
 extends RefCounted
 
-## The cut sheets, by breed. tools/slice_dog.gd writes them. Index 0 is the yellow dog.
-const BREEDS := [22, 2, 20]
+## The cut sheets, by breed. tools/slice_dog.gd writes them. Index 0 is the orange dog; the
+## yellow one the game shipped with until 2026-09-22 (pack sheet 22) is not among them.
+const BREEDS := [2, 20, 14]
 const ART := "res://assets/dogs/dog_%02d.json"
 
 ## The animations the sheet was cut into, and how long a frame of each is held.
@@ -106,7 +107,7 @@ static func ready(breed: int = 0) -> bool:
 
 
 ## How many breeds there are to hand out, and which one the dog in a given pack slot wears:
-## round the list in order, so the first dog is always the yellow one.
+## round the list in order, so the first dog is always the orange one.
 static func breeds() -> int:
 	return BREEDS.size()
 
