@@ -1413,6 +1413,42 @@ The first time a new game opens the upgrades shop, six paper cards walk it, one 
   tour starting, keeping its place over a close, blocking a buy, ending saved and not coming
   back.
 
+### The Decoration Tour (2026-09-22, `/grill-me` with Richard, issue #24)
+The first time a new game opens the shed, five cards walk washing and placing, in the shop
+tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
+`Lake._decor_tour_step` (the `DecorTour` states, the targets, the room swaps). Approved off
+`tools/last_decor_tour_mockup.png`.
+- **A new game's bed starts at the pump** (`_bed_to_the_pump`, from `_start_arrival`), not
+  standing in the shed, and **washes free** (`WashRoom.free`, the row reads "Free"). Older
+  saves keep their bed where it stands; `_seed_starter_bed` treats a bed waiting at the pump
+  as had.
+- **Two ways in**: the shed opened first starts on card 1; **a find netted before the shed
+  was ever opened** puts a hint on the Decorate button `DECOR_HINT_AFTER` (2.8 s, after the
+  find-caught card) — outline, arrow and a card with no count, **no dimming and clicks
+  passing through**, since the player is being shown where to click. Opening the shed turns
+  it into card 1.
+- **The cards**: the wash plank; the wash list; the stand (pad: "Aim and hold RT…"); the
+  shelf (mouse: drag, R to turn; pad: A to pick up and place, X to turn — **not "X to
+  place"**, which was the brief and matches neither device; key names off `Binds.shown`);
+  the room — the first placed piece with a switch lit, or the whole shed when there is none
+  (`ShedRoom.switch_box`, `room_box` is `_shed_rect`).
+- **Between cards the target keeps a pointer** (outline and arrow, pass-through) until the
+  player does the thing: clicks the plank, washes. **A find coming clean in the tour takes
+  the player back into the shed** `DECOR_BACK_AFTER` (1.6 s, after its shine) — the one
+  place the wash room does not close to the lake.
+- **A card waits for its room**: shut the shed on card 1 and it is there next time. Saved
+  as `decor_tour` once over (read through or skipped), absent reads as done, quit half way
+  starts over.
+- **`TourCard` is hung off the HUD's CanvasLayer and sizes itself to the viewport by hand** —
+  anchors have no parent rect there, and the first capture came out with a zero-size card
+  and no paper.
+- **The shop tour still draws its own copy** (`ShopSkin._draw_tour`); folding it into
+  `TourCard` is owed. The sentences are literals, not yet in `locale/translations.csv`.
+- **Out of scope, by decision**: soap prices, wash mechanics, tours for later finds.
+- Probe: `tools/shot_decor_tour.tscn` saves `tools/last_decor_tour_{hint,1,2,3,3pad,4,4pad,5}.png`.
+  `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
+  cards following the rooms, the free wash, the walk back into the shed and the flag.
+
 ### The Board Reads "How to Play" (2026-09-22, `/grill-me` with Richard)
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
 `scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.

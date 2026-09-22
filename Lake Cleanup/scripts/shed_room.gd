@@ -1421,6 +1421,29 @@ func _switch_near() -> int:
 ## The footprint is left alone on purpose. Both state sets are drawn the same size in both
 ## faces, and re-measuring the floor under a piece the player is only looking at could
 ## shove it out of a room it already fits in.
+## For the decoration tour: the shelf's board, the room, and the first
+## placed piece that works a switch, all in this control's pixels (empty when there is none).
+func shelf_box() -> Rect2:
+	return _board_rect()
+
+
+func room_box() -> Rect2:
+	return _shed_rect()
+
+
+func switch_box() -> Rect2:
+	if sheets == null:
+		return Rect2()
+	for row: Dictionary in decor:
+		var piece := StringName(row["piece"])
+		if sheets.switched(piece, _row_view(row)) < 0:
+			continue
+		var at := Vector2(float(int(row["cell"][0])), float(int(row["cell"][1])))
+		var span := Vector2(span_of(piece, _row_view(row)))
+		return Rect2(_floor_origin() + at * _zoom(), span * _zoom()).grow(4.0)
+	return Rect2()
+
+
 func switch_near() -> bool:
 	var at := _switch_near()
 	if at < 0:

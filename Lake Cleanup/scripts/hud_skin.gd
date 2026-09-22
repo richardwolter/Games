@@ -335,6 +335,11 @@ func _process(delta: float) -> void:
 
 ## Whether the pointer is on one of the two picture buttons: the lake's edge scroll asks, so a
 ## hand going for a corner button does not slide the view out from under itself.
+## The decorate button's box, for the decoration tour's hint to point at.
+func shed_box() -> Rect2:
+	return _shed_box
+
+
 func over_button() -> bool:
 	return _under(get_local_mouse_position()) != &""
 

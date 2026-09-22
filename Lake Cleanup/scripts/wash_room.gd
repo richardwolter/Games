@@ -58,6 +58,8 @@ var flock: Flock
 ## is on the backdrop's water.
 var fleet_size := Callable()
 var rubbish: Array = []
+## Finds washed for nothing: the new game's bed (the decoration tour, 2026-09-22).
+var free: Array[String] = []
 
 var _backdrop: WashBackdrop
 var _stand: WashStand
@@ -144,6 +146,8 @@ static func is_find(book: Sheets, name: String) -> bool:
 ## What a find's soap costs: the catalogue's restored pictures sorted by area and cut in
 ## thirds. Worked out once, off the art, so a find added later prices itself.
 func soap_of(piece: StringName) -> int:
+	if free.has(String(piece)):
+		return 0
 	if sheets == null:
 		return SOAP[0]
 	if _thirds == Vector2.ZERO:
@@ -341,7 +345,8 @@ class Tray:
 		draw_texture_rect_region(
 			room.sheets.atlas, Rect2(slot.get_center() - drawn * 0.5, drawn), cut
 		)
-		var price := "$%d" % room.soap_of(piece)
+		var soap := room.soap_of(piece)
+		var price := "$%d" % soap if soap > 0 else "Free"
 		var price_wide := Style.measure(price, Style.TEXT_BODY).x
 		var words := Rect2(
 			slot.end.x + 8.0, box.position.y, box.size.x - ICON - 30.0 - price_wide, box.size.y

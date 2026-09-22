@@ -836,6 +836,30 @@ var _steps_done: bool = true
 ## got to is the board's for the session: closed half way, it picks up there next time the
 ## shop opens; quit half way, it starts over.
 var _shop_tour_done: bool = true
+
+# The decoration tour (2026-09-22, `/grill-me` with Richard, issue #24; `scripts/tour_card.gd`):
+# the first time a new game opens the shed, five cards walk washing and placing, the new
+# game's bed the first thing washed (free). A find netted before the shed was ever opened
+# puts a hint on the Decorate button first. Saved as `decor_tour`, absent reads as done;
+# where it had got to is the session's.
+enum DecorTour { OFF, HINT, PLANK, PLANK_WAIT, LIST, STAND, WASHING, SHELF, ROOM }
+var _decor_tour_done: bool = true
+var _decor_tour: int = DecorTour.OFF
+var _tour_card: TourCard
+## Seconds before the hint goes up (the find-caught card first), and before a washed find
+## takes the player back into the shed (its shine first).
+var _decor_tour_wait: float = 0.0
+const DECOR_TOUR_CARDS := 5
+const DECOR_HINT_AFTER := 2.8
+const DECOR_BACK_AFTER := 1.6
+const DECOR_HINT := "You caught a decoration! Open Decorate to see it."
+const DECOR_PLANK := "You need to wash objects before it is available for decoration."
+const DECOR_LIST := "Select the object to wash, it costs $5 to $15 depending on size."
+const DECOR_STAND := "Point and click to spray the object with water. It goes to decoration inventory when done."
+const DECOR_STAND_PAD := "Aim and hold %s to spray the object with water. It goes to decoration inventory when done."
+const DECOR_SHELF := "Select and drag the object to its position. Press %s to rotate or change style."
+const DECOR_SHELF_PAD := "Press %s to pick up and place an object. Press %s to rotate or change style."
+const DECOR_ROOM := "You can interact with some objects. It shows when available."
 var _steps: FirstSteps
 ## The tile the walk step points at, and the world point the cast step rings.
 var _steps_beach := Vector2.INF
@@ -2471,6 +2495,9 @@ func _set_wash(open: bool) -> void:
 		_sfx.play(&"shed_open")
 	_wash_open = open
 	_wash.waiting = unwashed
+	_wash.free.assign([STARTER_BED])
+	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT]:
+		_decor_tour = DecorTour.LIST
 	_wash.open(open)
 	_skin.visible = not open
 	if _coins != null:
@@ -2505,6 +2532,9 @@ func _on_find_washed(piece: StringName, soap: int) -> void:
 	unwashed.erase(name)
 	unlocked.append(name)
 	sludge = maxf(sludge - float(soap), 0.0)
+	if _decor_tour in [DecorTour.LIST, DecorTour.STAND, DecorTour.WASHING]:
+		_decor_tour = DecorTour.SHELF
+		_decor_tour_wait = DECOR_BACK_AFTER
 	if _room != null:
 		_room.unlocked = unlocked
 
@@ -2728,6 +2758,8 @@ func _set_shed(open: bool) -> void:
 		_room.carrying = &""
 		_room.opened()
 		_room.queue_redraw()
+		if not _decor_tour_done and _decor_tour <= DecorTour.HINT:
+			_decor_tour = DecorTour.PLANK if not unwashed.is_empty() else DecorTour.SHELF
 	# The lake's own readouts are not readable through a room and are not about it. The coins
 	# go with them: they are drawn over everything, and they are a receipt for the plate.
 	_skin.visible = not open
@@ -2970,6 +3002,8 @@ func _start_arrival() -> void:
 		return
 	_steps_done = false
 	_shop_tour_done = false
+	_decor_tour_done = false
+	_bed_to_the_pump()
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
@@ -3114,6 +3148,128 @@ func _begin_first_steps() -> bool:
 	_steps.crate = Vector2.INF
 	_steps.step = FirstSteps.Step.MOVE
 	return true
+
+
+## A new game's bed starts at the pump, not in the shed: the decoration tour washes it first.
+func _bed_to_the_pump() -> void:
+	unlocked.erase(STARTER_BED)
+	for i in range(decor.size() - 1, -1, -1):
+		if String((decor[i] as Dictionary)["piece"]) == STARTER_BED:
+			decor.remove_at(i)
+	if not unwashed.has(STARTER_BED):
+		unwashed.append(STARTER_BED)
+	if _room != null:
+		_room.unlocked = unlocked
+		_room.unwashed = unwashed
+
+
+## One frame of the decoration tour: what the card points at and says, given which room is
+## up. A card waits for its room — shut the shed on the second card and it is there again
+## the next time the shed opens.
+func _decor_tour_step(delta: float) -> void:
+	if _decor_tour_done or _decor_tour == DecorTour.OFF:
+		if _tour_card != null and _tour_card.visible:
+			_tour_card.show_card(Rect2())
+		return
+	if _tour_card == null:
+		_tour_card = TourCard.new()
+		_tour_card.name = &"DecorTour"
+		_skin.get_parent().add_child(_tour_card)
+		_tour_card.next_asked.connect(_decor_tour_next)
+		_tour_card.skip_asked.connect(_end_decor_tour)
+	# Over every board and room on the layer.
+	_skin.get_parent().move_child(_tour_card, _skin.get_parent().get_child_count() - 1)
+	var pad := Pad.is_pad()
+	_tour_card.pad = pad
+	var off := Rect2()
+	if _decor_tour_wait > 0.0:
+		_decor_tour_wait -= delta
+		_tour_card.show_card(off)
+		if _decor_tour_wait <= 0.0 and _decor_tour == DecorTour.SHELF and _wash_open:
+			_set_wash(false)
+			_set_shed(true)
+		return
+	var room := _room_box_of
+	match _decor_tour:
+		DecorTour.HINT:
+			if _panelled() or _fronted():
+				_tour_card.show_card(off)
+			else:
+				_tour_card.show_card(_skin.shed_box(), DECOR_HINT)
+		DecorTour.PLANK:
+			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, DECOR_PLANK, 1, DECOR_TOUR_CARDS)
+		DecorTour.PLANK_WAIT, DecorTour.WASHING:
+			if _shed_open:
+				_tour_card.show_card(room.call(_room.wash_plank_box()))
+			else:
+				_tour_card.show_card(off)
+		DecorTour.LIST:
+			if _wash_open:
+				_tour_card.show_card(_wash_list_box(), DECOR_LIST, 2, DECOR_TOUR_CARDS)
+			else:
+				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
+		DecorTour.STAND:
+			if _wash_open:
+				var words := DECOR_STAND_PAD % Binds.shown(&"cast", true) if pad else DECOR_STAND
+				_tour_card.show_card(_wash_stand_box(), words, 3, DECOR_TOUR_CARDS)
+			else:
+				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
+		DecorTour.SHELF:
+			var words := DECOR_SHELF % Binds.shown(&"shed_rotate", false)
+			if pad:
+				words = DECOR_SHELF_PAD % ["A", Binds.shown(&"shed_rotate", true)]
+			_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 4, DECOR_TOUR_CARDS)
+		DecorTour.ROOM:
+			var lit: Rect2 = _room.switch_box()
+			if lit.size.x <= 0.0:
+				lit = _room.room_box()
+			_tour_card.show_card(room.call(lit) if _shed_open else off, DECOR_ROOM, 5, DECOR_TOUR_CARDS)
+
+
+## A rect in the shed room's own pixels, on the HUD layer the card is drawn on.
+func _room_box_of(box: Rect2) -> Rect2:
+	if box.size.x <= 0.0:
+		return Rect2()
+	return Rect2(_room.global_position + box.position, box.size)
+
+
+## The wash room's tray (with its title plank) and its stand, on the card's layer.
+func _wash_list_box() -> Rect2:
+	var box := _wash.tray_box()
+	box = box.grow_individual(0.0, WashRoom.TRAY_RIBBON * 0.5, 0.0, 0.0)
+	return Rect2(_wash.global_position + box.position, box.size)
+
+
+func _wash_stand_box() -> Rect2:
+	var view := _wash.size
+	var wide := WashStand.STAND_WIDE
+	return Rect2(
+		_wash.global_position + Vector2(view.x * (1.0 - wide) * 0.5, view.y * 0.17),
+		Vector2(view.x * wide, view.y * 0.76)
+	)
+
+
+func _decor_tour_next() -> void:
+	match _decor_tour:
+		DecorTour.PLANK:
+			_decor_tour = DecorTour.PLANK_WAIT
+		DecorTour.LIST:
+			_decor_tour = DecorTour.STAND
+		DecorTour.STAND:
+			_decor_tour = DecorTour.WASHING
+		DecorTour.SHELF:
+			_decor_tour = DecorTour.ROOM
+		DecorTour.ROOM:
+			_end_decor_tour()
+
+
+## Read through or skipped: not shown again.
+func _end_decor_tour() -> void:
+	_decor_tour = DecorTour.OFF
+	_decor_tour_done = true
+	if _tour_card != null:
+		_tour_card.show_card(Rect2())
+	save_game()
 
 
 ## The shop's tour is over, read through or skipped: it is not shown again.
@@ -3397,6 +3553,7 @@ func _raise_front(loaded: bool) -> void:
 			_intro_done = true
 			_steps_done = true
 			_shop_tour_done = true
+			_decor_tour_done = true
 		force_intro = false
 		if not force_front:
 			return
@@ -3844,7 +4001,8 @@ func _build_trophy() -> void:
 ## the same way: only added when it is not already on the shelf.
 func _seed_starter_bed() -> void:
 	var piece := STARTER_BED
-	if unlocked.has(piece):
+	# Waiting at the pump is still had: a new game's bed goes there (the decoration tour).
+	if unlocked.has(piece) or unwashed.has(piece):
 		return
 	unlocked.append(piece)
 	if _room != null:
@@ -3868,6 +4026,9 @@ func _keep(def: TrashDef) -> void:
 		return
 	# To the pump, not to the shelf (issue #37): it is washed before the shed will have it.
 	unwashed.append(name)
+	if not _decor_tour_done and _decor_tour == DecorTour.OFF:
+		_decor_tour = DecorTour.HINT
+		_decor_tour_wait = DECOR_HINT_AFTER
 	# Held up in the middle of the screen as well as written in the corner. The shed is two
 	# clicks away, so without this the player never sees what they found.
 	if _trophy != null:
@@ -4769,6 +4930,7 @@ func _process(delta: float) -> void:
 		_arrival_step()
 		_led_step(delta)
 		_first_steps_step(delta)
+		_decor_tour_step(delta)
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	# The view: held on the whole lake behind the menu, flown down to the angler when the
@@ -5403,6 +5565,7 @@ func save_game() -> bool:
 		"intro_done": _intro_done,
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
+		"decor_tour": _decor_tour_done,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -5540,6 +5703,7 @@ func load_game() -> bool:
 	# Absent means done, as above. Not done means the steps start over from the walk.
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
+	_decor_tour_done = bool(save.get("decor_tour", true))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

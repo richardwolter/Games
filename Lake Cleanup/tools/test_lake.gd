@@ -6718,8 +6718,10 @@ func _stage_wash() -> void:
 	var soap := room.soap_of(StringName(find))
 	var prices := {}
 	for name: String in sheets.names:
-		if WashRoom.is_find(sheets, name):
+		# The new game's bed washes free (the decoration tour): every other find pays.
+		if WashRoom.is_find(sheets, name) and not room.free.has(name):
 			prices[room.soap_of(StringName(name))] = true
+	_check(room.soap_of(StringName(Lake.STARTER_BED)) == 0, "the starter bed washes free", "")
 	_check(prices.size() == 3 and prices.has(5) and prices.has(10) and prices.has(15),
 		"soap is 5, 10 or 15, and the catalogue has finds at all three", str(prices.keys()))
 	_check(not room.pick(StringName(find)) and room.on_stand() == &"",
@@ -7164,6 +7166,39 @@ func _stage_first_steps() -> void:
 	_main.call(&"_set_menu", true)
 	_check(shop.tour == -1, "a finished tour is not shown again", str(shop.tour))
 	_main.call(&"_set_menu", false)
+	# The decoration tour: the bed at the pump, the hint giving way to the shed, the cards
+	# following the rooms, a washed find walking back into the shed, and the flag.
+	var bed := Lake.STARTER_BED
+	_main.call(&"_bed_to_the_pump")
+	_check((_main.get(&"unwashed") as Array).has(bed) and not (_main.get(&"unlocked") as Array).has(bed),
+		"a new game's bed waits at the pump", "")
+	var placed := false
+	for row: Dictionary in _main.get(&"decor"):
+		placed = placed or String(row["piece"]) == bed
+	_check(not placed, "and does not stand in the shed", "")
+	_main.set(&"_decor_tour_done", false)
+	_main.set(&"_decor_tour", Lake.DecorTour.HINT)
+	_main.call(&"_set_shed", true)
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.PLANK,
+		"opening the shed turns the hint into the wash plank's card", str(_main.get(&"_decor_tour")))
+	_main.call(&"_decor_tour_next")
+	_main.call(&"_shed_to_wash")
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.LIST, "the wash room opens on the list's card", "")
+	_main.call(&"_decor_tour_next")
+	_main.call(&"_decor_tour_next")
+	_check(int(_main.get(&"_decor_tour")) == Lake.DecorTour.WASHING, "then the stand's, then the washing", "")
+	var purse: float = _main.get(&"sludge")
+	_main.call(&"_on_find_washed", StringName(bed), 0)
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse), "the bed cost nothing", "")
+	_main.call(&"_decor_tour_step", Lake.DECOR_BACK_AFTER + 0.1)
+	_check(bool(_main.get(&"_shed_open")) and not bool(_main.get(&"_wash_open"))
+		and int(_main.get(&"_decor_tour")) == Lake.DecorTour.SHELF,
+		"a washed find walks the player back into the shed, on the shelf's card", "")
+	_main.call(&"_decor_tour_next")
+	_main.call(&"_decor_tour_next")
+	_check(bool(_main.get(&"_decor_tour_done")) and int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF,
+		"the room's card ends the tour, saved", "")
+	_main.call(&"_set_shed", false)
 	_finish()
 
 
