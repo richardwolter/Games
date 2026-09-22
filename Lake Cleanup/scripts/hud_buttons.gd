@@ -458,8 +458,11 @@ const BADGE_PAD := 5.0
 const BADGE_INSET := 3.0
 const BADGE_TEXT := 0.82
 const BADGE_SAMPLE := "99"
-## The pulse: how many whole pixels the badge grows at full, how many the button itself
-## swells, the glow's tone and how far it reaches. **Gold, and not subtle** (Richard,
+## The pulse: how far the button lifts at full, the glow's tone and how far it reaches.
+## **A lift, not a swell** (Richard, 2026-09-22, third pass: growing the box "distorts the
+## borders and text" — the border was rebuilt at a new size and the label re-measured): a
+## pulsing button rises `PULSE_LIFT` whole pixels and settles, the hover's own gesture, and
+## nothing on it is laid out again. **Gold, and not subtle** (Richard,
 ## 2026-09-22, after a pale blue rim at 0.75 read as nothing): gold on this HUD is a price,
 ## and this is a thing that can be bought. **No seams** (Richard, same day: three stacked
 ## rects of different shades were "blocky and ugly"): the glow is one halo drawn as quads
@@ -467,9 +470,7 @@ const BADGE_SAMPLE := "99"
 ## is a gradient rather than steps; and `RAYS` soft rays stand off the wood like light thrown
 ## from behind it, each a tapering triangle fading to nothing at its tip, its length rolled
 ## off its own index and breathing with the pulse.
-const BADGE_SWELL := 2.0
-## Two pixels, down from three (Richard, 2026-09-22: "less aggressive").
-const BUTTON_SWELL := 2.0
+const PULSE_LIFT := 2.0
 const PULSE_TONE := Color(1.0, 0.84, 0.36)
 const PULSE_RIM := 1.0
 const GLOW_REACH := 10.0
@@ -478,10 +479,9 @@ const RAY_REACH := 22.0
 const RAY_WIDE := 7.0
 
 
-## How many whole pixels a button grows on each side at this pulse. The callers grow the box
-## they draw the whole button in, so wood, face and pictures swell together.
-static func swell_by(amount: float) -> float:
-	return float(roundi(amount * BUTTON_SWELL))
+## How many whole pixels a button rises at this pulse.
+static func lift_by(amount: float) -> float:
+	return float(roundi(amount * PULSE_LIFT))
 
 
 ## The glow round a button, `amount` 0 to 1. Drawn before the button, so the wood covers the
@@ -528,8 +528,8 @@ static func _edge_point(box: Rect2, dir: Vector2) -> Vector2:
 	return box.get_center() + dir * minf(tx, ty)
 
 
-## `swell` is the pulse (0 to 1): the plate grows `BADGE_SWELL` whole pixels at full and
-## its ink lifts towards the pulse's tone, about its own middle so the corner stays put.
+## `swell` is the pulse (0 to 1): the plate wears a gold ring at its strength. It does not
+## grow — the same complaint the button's own swell drew.
 static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool, swell: float = 0.0) -> void:
 	var height := maxi(LABEL_LEAST, int(BADGE_TALL * BADGE_TEXT))
 	var wide := maxf(
@@ -539,9 +539,7 @@ static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool, swell: f
 		Vector2(face.end.x - BADGE_INSET - wide, face.position.y + BADGE_INSET),
 		Vector2(wide, BADGE_TALL)
 	)
-	var grown := float(roundi(swell * BADGE_SWELL))
-	if grown > 0.0:
-		plate = plate.grow(grown)
+	if swell > 0.01:
 		Style.plate(on, plate.grow(1.0), PULSE_TONE.lerp(Style.BUTTON_SUNK, 1.0 - swell * PULSE_RIM), 2.0)
 	Style.plate(on, plate, Style.BUTTON_SUNK if lit else Style.BUTTON_SUNK.darkened(0.25), 2.0)
 	Style.write(

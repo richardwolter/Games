@@ -730,7 +730,8 @@ class MeterFace extends Control:
 
 
 func _lifted(box: Rect2, name: StringName) -> Rect2:
-	box = box.grow(HudButtons.swell_by(pulse_amount(name)))
+	# A pulse lifts the button the hover's way and the two stack; nothing is resized.
+	box.position.y -= HudButtons.lift_by(pulse_amount(name))
 	if _hovered != name:
 		return box
 	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)
