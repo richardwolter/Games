@@ -3358,6 +3358,12 @@ comes into reach, so a better spot no longer needs WASD first. `Lake._cast_or_wa
 - **A press on the island's ground walks there** (Richard, same day: "walks to there
   instead of standing"), no throw owed; the hut, the crate, the pump and the bank are
   nothing, as `Angler._can_stand` says.
+- **The ring says what a press does** (same day, Richard: the dashed circle only where
+  a cast is really out of bounds): **no ring on the island** — pointer alone, hut and
+  crate included; **solid green/red over any water a press throws at**, now or after the
+  walk (`CastNet.castable_after_walk`: open water within range of `shore_toward`'s spot,
+  the verdict the mouth's at that spot); **dashed** over water no shore reaches and over
+  the outer bank and the piers, where a press is nothing. `in_reach` is untouched.
 - **Cancelled by** any walk input (WASD, arrows, the left stick), any board, the menu, the
   arrival, the farewell, or a net no longer idle. A new press retargets. Session only.
 - **Out of scope, by decision**: A* or waypoints, a pinned ring or a stop marker, any

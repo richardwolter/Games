@@ -6726,6 +6726,24 @@ func _stage_led_cast() -> void:
 			_main.call(&"_cast_or_walk", Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y))
 			_check(_main.get(&"_led_cast") == Vector2.INF and _angler.walk_to == Vector2.INF,
 				"a press on the hut is nothing", "")
+			# The ring: solid over water a walk reaches, dashed over water none does and over
+			# the bank, none at all on the island (the source is read for the island's return).
+			_check(_net.castable_after_walk(a) and not _net.in_reach(a),
+				"far-side water is castable after a walk though not in reach", "")
+			var bank := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y + Iso.RADIUS.y * 0.9)
+			_check(not _net.castable_after_walk(bank), "the far bank's water is not", "")
+			var sand := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y + Iso.RADIUS.y + 2.0)
+			_check(not _net.castable_after_walk(sand) and not _net.in_reach(sand),
+				"nor is the outer bank's sand", "")
+			_check(not _net.castable_after_walk(Iso.tile_to_world(lawn.x, lawn.y)),
+				"nor the island", "")
+			var aim_src := (load("res://scripts/net.gd") as GDScript).source_code
+			var draw_at := aim_src.find("func _draw_aim()")
+			var island_at := aim_src.find("Iso.island_fraction(over.x, over.y) < 1.0:
+		return", draw_at)
+			var legal_at := aim_src.find("castable_after_walk(pointer)", draw_at)
+			_check(draw_at >= 0 and island_at > draw_at and legal_at > island_at,
+				"the ring draws nothing on the island and solid where a walk reaches", "")
 			# A press in reach throws at once, as it always did.
 			var near := _water_near_angler()
 			_main.call(&"_cast_or_walk", near)

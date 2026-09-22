@@ -826,6 +826,20 @@ func in_reach(where: Vector2) -> bool:
 	return Iso.shore_fraction(tile.x, tile.y) < 1.0
 
 
+## Whether a throw could land here from some shore of the island, after the walk the led
+## cast makes (`Lake._cast_or_walk`): open water within range of the standing spot
+## `Angler.shore_toward` finds for it. Read by the aim ring, which draws solid where a press
+## throws; `in_reach` is still what decides a throw from where the angler stands now.
+func castable_after_walk(where: Vector2) -> bool:
+	if angler == null or not angler.has_method(&"shore_toward"):
+		return false
+	var tile := Iso.world_to_tile(where)
+	if Iso.island_fraction(tile.x, tile.y) < 1.0 or Iso.shore_fraction(tile.x, tile.y) >= 1.0:
+		return false
+	var shore: Vector2 = angler.shore_toward(tile)
+	return shore.distance_to(tile) <= range_tiles
+
+
 ## Throw the net.
 ##
 ## `laying` is the difference between the two things a lit net can do. An ordinary cast is
@@ -1641,7 +1655,16 @@ func _reach_along(towards: Vector2) -> Vector2:
 ## The whole point of it is that the range stops being something you learn by throwing.
 func _draw_aim() -> void:
 	var pointer := aim_point()
-	var legal := in_reach(pointer)
+	# No ring on the island (2026-09-22, Richard): land is nowhere to cast, and since a
+	# press there walks the angler, a dashed ring over it said "refused" about a click that
+	# is not. The pointer alone. The bank and the piers keep the dashes: a press there is
+	# nothing, and the dashes say so.
+	var over := Iso.world_to_tile(pointer)
+	if Iso.island_fraction(over.x, over.y) < 1.0:
+		return
+	# Solid wherever a press throws — now, or after the walk the led cast makes
+	# (`castable_after_walk`); the verdict is the mouth's at that spot either way.
+	var legal := in_reach(pointer) or castable_after_walk(pointer)
 	# The open mouth, not the one being pursed: the ring is the next throw, which lands wide
 	# open, so it must not shrink with the net coming home.
 	var span := open_extent()
