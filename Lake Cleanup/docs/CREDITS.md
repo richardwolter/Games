@@ -53,6 +53,11 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   ✅ **CC0 for the art**, free for commercial use, modification allowed; redistribution and
   AI training are not. Credit is appreciated, not required — given anyway as "Kipperfalcon".
 
+- **Input prompts** (`assets/ui/prompts/`, cut by `tools/build_prompts.py` off
+  `art_source/kenney_inputPromptsPixel16×/`; the first-steps hints) — "Input Prompts Pixel 16×"
+  by Kenney (https://kenney.nl). ✅ **CC0**, `License.txt` beside the tiles. Credit is not
+  required; given anyway as "Kenney", the Kipperfalcon rule.
+
 - **Shed** (`assets/shed.png`, via `art_source/shed_tan.png` → `tools/downres_shed.py` →
   `tools/recolor_shed.py`) — "Isoverse Medieval Outdoors" by Zato Pixel Cultist
   (https://zatoart.itch.io/isoverse-medieval-outdoors). ✅ Cleared (purchased 2026-09-16).

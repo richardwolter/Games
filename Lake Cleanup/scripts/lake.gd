@@ -824,6 +824,40 @@ var _led_throw: bool = false
 var _led_stall: float = 0.0
 var _led_was := Vector2.INF
 const LED_STALL := 0.6
+
+# The first steps (2026-09-22, `/grill-me` with Richard, issue #24; `scripts/first_steps.gd`):
+# after the letter closes on a new game, walking and casting are taught on the lake. Move to
+# a spot on the beach (the cast held till then), cast and catch, read the note by the box.
+# `_steps_done` is saved, **absent reads as done** (the `intro_done` rule), and a run saved
+# before the last step starts the steps over from the walk: nothing of where they had got to
+# is kept, by decision.
+var _steps_done: bool = true
+var _steps: FirstSteps
+## The tile the walk step points at, and the world point the cast step rings.
+var _steps_beach := Vector2.INF
+var _steps_water := Vector2.INF
+## The note: whether the catch has landed in the crate yet, and the seconds it has left.
+var _steps_landed: bool = false
+var _steps_left: float = 0.0
+## How long finding the two spots took, for the probe's log.
+var _steps_found_ms: int = 0
+## Within this many tiles of the beach spot counts as standing on it.
+const STEPS_ARRIVE := 0.6
+## The beach spot is at least this far from where the angler stands, so there is a walk.
+const STEPS_WALK_LEAST := 3.0
+## Where along the net's range the cast spot is looked for, as shares of it.
+const STEPS_CAST_FROM := 0.35
+const STEPS_CAST_TO := 0.85
+## The cast ring is this share of the net's open mouth, tested at this many points round it.
+const STEPS_RING_SHARE := 0.5
+const STEPS_RING_TESTS := 12
+## How far in from the last standing point the beach spot sits, in tiles: on the sand.
+const STEPS_BEACH_IN := 0.6
+## The note stays this long after the catch lands, and never longer than `STEPS_NOTE_MOST`.
+const STEPS_NOTE_HOLD := 5.0
+const STEPS_NOTE_MOST := 14.0
+## How far over the crate's foot its mouth is, in world pixels: where the note's arrow points.
+const STEPS_CRATE_UP := 34.0
 ## Under this many tiles of movement in a frame counts as standing still.
 const LED_STILL := 0.002
 
@@ -2116,6 +2150,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# can be sitting still is a panel that was opened over it — and a click on one that is
 	# already coming home is left alone.
 	if _desk_pressed(event, &"cast"):
+		if _steps != null and _steps.note_hit(get_viewport().get_mouse_position()):
+			_end_first_steps()
+			return
 		if _net.state == CastNet.State.IDLE:
 			_cast_or_walk(get_global_mouse_position())
 		_net.set_pulling(true)
@@ -2250,6 +2287,9 @@ func _pad_buttons(busy: bool) -> void:
 ## The cast press: throw if the spot is in reach, otherwise walk towards it and throw on
 ## arrival (see `_led_cast`). A press on the island or the bank is nothing, as it always was.
 func _cast_or_walk(where: Vector2) -> void:
+	if _steps != null and _steps.step == FirstSteps.Step.MOVE:
+		_walk_not_cast(where)
+		return
 	if _net.in_reach(where):
 		_stop_led_cast()
 		_cast_at(where)
@@ -2275,6 +2315,22 @@ func _cast_or_walk(where: Vector2) -> void:
 	# Reachable: straight at the spot, the frame it comes into reach is the throw. Not:
 	# to the shore nearest it, where the walk ends and nothing is thrown.
 	_angler.walk_to = tile if _led_throw else shore
+	_pan_yielded = true
+
+
+## The walk step's press: the cast is held until the angler has walked, so a press on water
+## walks to the shore towards it and throws nothing; a press on the island walks there.
+func _walk_not_cast(where: Vector2) -> void:
+	var tile := Iso.world_to_tile(where)
+	var wet := Iso.island_fraction(tile.x, tile.y) >= 1.0 and Iso.shore_fraction(tile.x, tile.y) < 1.0
+	var to: Vector2 = _angler.shore_toward(tile) if wet else tile
+	if not bool(_angler.call(&"_can_stand", to)):
+		return
+	_led_cast = where
+	_led_throw = false
+	_led_stall = 0.0
+	_led_was = _angler.tile_pos
+	_angler.walk_to = to
 	_pan_yielded = true
 
 
@@ -2903,6 +2959,7 @@ var _arrive_wait: float = 0.0
 func _start_arrival() -> void:
 	if _intro_done or _boats.is_empty():
 		return
+	_steps_done = false
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
@@ -2975,6 +3032,155 @@ func _finish_intro() -> void:
 		boat.moored = false
 	_intro_done = true
 	save_game()
+
+
+## One frame of the first steps: start them once the letter is down and the view is the
+## player's, move them on, and hand the overlay where everything is this frame.
+func _first_steps_step(delta: float) -> void:
+	if _steps_done or not _intro_done or _arrive != Arrive.OFF or _glide >= 0.0:
+		if _steps != null:
+			_steps.visible = false
+		return
+	if _steps == null or _steps.step == FirstSteps.Step.OFF:
+		if not _begin_first_steps():
+			return
+	var hidden := _panelled() or _farewell != null
+	_steps.visible = not hidden
+	_steps.pad = Pad.is_pad()
+	_steps.head = _angler.position + Vector2(0.0, -FirstSteps.HEAD_UP)
+	match _steps.step:
+		FirstSteps.Step.MOVE:
+			if _angler.tile_pos.distance_to(_steps_beach) <= STEPS_ARRIVE:
+				_steps.step = FirstSteps.Step.CAST
+				_steps.beach = Vector2.INF
+		FirstSteps.Step.CAST:
+			# The piece the ring was on can go (a dog, the second net): find another.
+			if not _sure_catch(_steps_water):
+				_push_net_numbers()
+				_steps_water = _cast_spot_from(_angler.tile_pos)
+			_steps.water = _steps_water
+			_steps.water_wide = _steps_ring()
+		FirstSteps.Step.NOTE:
+			_steps.water = Vector2.INF
+			# Over the box's mouth, not its foot: the arrow stands on this point.
+			_steps.crate = _yard.position + Vector2(0.0, -STEPS_CRATE_UP)
+			# A pad has no pointer on the bare lake to click the note shut with.
+			if Pad.is_pad():
+				_steps_left = minf(_steps_left, STEPS_NOTE_HOLD)
+			if not hidden:
+				_steps_left -= delta
+			if _steps_left <= 0.0:
+				_end_first_steps()
+
+
+## Put the steps up: find the beach spot and the water off it, and build the overlay the
+## first time. False (and the steps marked done) where no spot is found, so a lake with no
+## catchable water near the island is never stuck on a hint it cannot finish.
+func _begin_first_steps() -> bool:
+	_push_net_numbers()
+	var started := Time.get_ticks_msec()
+	var beach := _beach_spot()
+	if beach == Vector2.INF:
+		_steps_done = true
+		return false
+	if _steps == null:
+		_steps = FirstSteps.new()
+		_steps.name = &"FirstSteps"
+		var hud := _settings.get_parent()
+		hud.add_child(_steps)
+		# Under every board on the layer: it is hidden while one is up anyway.
+		hud.move_child(_steps, 0)
+	_steps_beach = beach
+	_steps_found_ms = Time.get_ticks_msec() - started
+	_steps_water = _cast_spot_from(beach)
+	_steps.keys = [
+		Binds.label_of(Binds.bound(&"walk_up", "key")),
+		Binds.label_of(Binds.bound(&"walk_left", "key")),
+		Binds.label_of(Binds.bound(&"walk_down", "key")),
+		Binds.label_of(Binds.bound(&"walk_right", "key")),
+	]
+	_steps.beach = Iso.tile_to_world(beach.x, beach.y)
+	_steps.water = Vector2.INF
+	_steps.crate = Vector2.INF
+	_steps.step = FirstSteps.Step.MOVE
+	return true
+
+
+## The last step is over: the flag, and a save so a Continue does not teach it again.
+func _end_first_steps() -> void:
+	if _steps != null:
+		_steps.step = FirstSteps.Step.OFF
+		_steps.visible = false
+	_steps_done = true
+	save_game()
+
+
+## A spot on the island's beach, off which green water is in reach: the nearest such spot
+## at least `STEPS_WALK_LEAST` from the angler, or the nearest at all, or INF.
+func _beach_spot() -> Vector2:
+	var best := Vector2.INF
+	var best_far := Vector2.INF
+	for i in 48:
+		var turn := TAU * float(i) / 48.0
+		var far := Iso.ISLAND_CENTRE + Vector2(cos(turn), sin(turn)) * 30.0
+		var edge: Vector2 = _angler.shore_toward(far)
+		var spot := edge.move_toward(Iso.ISLAND_CENTRE, STEPS_BEACH_IN)
+		if not bool(_angler.call(&"_can_stand", spot)):
+			continue
+		if _cast_spot_from(spot) == Vector2.INF:
+			continue
+		var gap := spot.distance_to(_angler.tile_pos)
+		if gap >= STEPS_WALK_LEAST and (best_far == Vector2.INF or gap < best_far.distance_to(_angler.tile_pos)):
+			best_far = spot
+		if best == Vector2.INF or gap < best.distance_to(_angler.tile_pos):
+			best = spot
+	return best_far if best_far != Vector2.INF else best
+
+
+## Green water in reach of a standing tile, straight out from the island's middle through
+## it: the first spot along that line where the aim ring would read green. A world point.
+func _cast_spot_from(stand: Vector2) -> Vector2:
+	var out := (stand - Iso.ISLAND_CENTRE).normalized()
+	if out == Vector2.ZERO:
+		return Vector2.INF
+	var reach := _net.range_tiles
+	var along := reach * STEPS_CAST_FROM
+	var side := Vector2(-out.y, out.x)
+	var tries: Array[Vector2] = []
+	while along <= reach * STEPS_CAST_TO:
+		# Straight out first, then a tile and two either side of the line.
+		for aside in [0.0, 1.0, -1.0, 2.0, -2.0]:
+			tries.append(stand + out * along + side * aside)
+		along += 0.25
+	for tile in tries:
+		if Iso.island_fraction(tile.x, tile.y) < 1.0 or Iso.shore_fraction(tile.x, tile.y) >= 1.0:
+			continue
+		var at := Iso.tile_to_world(tile.x, tile.y)
+		if Iso.world_to_tile(at).distance_to(stand) + _steps_ring() / (Iso.TILE_W * 0.5) > reach:
+			continue
+		if _sure_catch(at):
+			return at
+	return Vector2.INF
+
+
+## The cast ring's half-width in world pixels: a share of the net's open mouth. What makes
+## a throw anywhere inside it a sure catch is `_sure_catch`, not the size.
+func _steps_ring() -> float:
+	return _net.open_extent() * STEPS_RING_SHARE
+
+
+## Whether a throw landing anywhere in the ring round this spot catches: the aim ring's own
+## verdict at the middle and at `STEPS_RING_TESTS` points round the rim and half way in.
+func _sure_catch(at: Vector2) -> bool:
+	if at == Vector2.INF or not _net.would_catch(at):
+		return false
+	var wide := _steps_ring()
+	for i in STEPS_RING_TESTS:
+		var turn := TAU * float(i) / float(STEPS_RING_TESTS)
+		var rim := Vector2(cos(turn) * wide, sin(turn) * wide * 0.5)
+		if not _net.would_catch(at + rim) or not _net.would_catch(at + rim * 0.5):
+			return false
+	return true
 
 
 ## The cards, on the HUD's layer over everything the lake draws. Built the first time they
@@ -3173,6 +3379,7 @@ func _raise_front(loaded: bool) -> void:
 	if get_parent() != get_tree().root:
 		if not force_intro:
 			_intro_done = true
+			_steps_done = true
 		force_intro = false
 		if not force_front:
 			return
@@ -3365,6 +3572,10 @@ func _on_net_caught(def_index: int) -> void:
 ## is a new pool of clean water in a new shape, and the cap keeps a long drag from piling
 ## them up.
 func _on_net_swept(at: Vector2, taken: int, hold: int, mouth: float, _net_from: CastNet) -> void:
+	if taken > 0 and _net_from == _net and _steps != null and _steps.step == FirstSteps.Step.CAST:
+		_steps.step = FirstSteps.Step.NOTE
+		_steps_landed = false
+		_steps_left = STEPS_NOTE_MOST
 	var radius := patch_radius(taken, hold, mouth)
 	var fresh := {"at": at, "radius": radius, "born": _patch_clock, "seed": _patch_rng.randf()}
 	if _patches.size() < PATCHES:
@@ -3508,6 +3719,9 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 		_on_sold(PackedInt32Array([def_index]), sale.kind)
 		return
 	_yard.put(def_index)
+	if _steps != null and _steps.step == FirstSteps.Step.NOTE and not _steps_landed:
+		_steps_landed = true
+		_steps_left = minf(_steps_left, STEPS_NOTE_HOLD)
 	_ask_the_end()
 
 
@@ -4535,6 +4749,7 @@ func _process(delta: float) -> void:
 		_tick_bonus(delta)
 		_arrival_step()
 		_led_step(delta)
+		_first_steps_step(delta)
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	# The view: held on the whole lake behind the menu, flown down to the angler when the
@@ -5132,6 +5347,7 @@ func save_game() -> bool:
 		# player had set on the menu.
 		"farewell": _farewell_shown,
 		"intro_done": _intro_done,
+		"first_steps": _steps_done,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -5266,6 +5482,8 @@ func load_game() -> bool:
 	_farewell_shown = bool(save.get("farewell", false))
 	# Absent means seen: see the arrival section. A run in progress never plays the intro.
 	_intro_done = bool(save.get("intro_done", true))
+	# Absent means done, as above. Not done means the steps start over from the walk.
+	_steps_done = bool(save.get("first_steps", true))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

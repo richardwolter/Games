@@ -44,6 +44,7 @@ const LINES := [
 	"Graphics created by Penzilla Design",
 	"limezu.itch.io",
 	"Kipperfalcon",
+	"Kenney",
 	"Asset by Zato - https://zatoart.itch.io/",
 	"Pop Shop Packs",
 	"@Pixel_Salvaje",

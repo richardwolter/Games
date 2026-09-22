@@ -1250,9 +1250,10 @@ doors and `MainMenu` is an overlay on it (`Lake`'s "The menu over the lake" sect
 
 ### The Arrival and the Letter (2026-09-19, `/grill-me` with Richard, issue #24)
 A new game opens with the angler and his dog landing by boat and reading a letter on the
-shed door. Five cards (four until the Welcome card, 2026-09-22), and **that is the whole of the tutorial**, by decision: no contextual
-prompts, no unlock pacing that teaches one system at a time, no goal readout. **#24 stays
-open** for those.
+shed door. Five cards (four until the Welcome card, 2026-09-22), then the first steps on the lake (see The First Steps below, which
+**supersedes "that is the whole of the tutorial"** — this line said so until 2026-09-22).
+Still no unlock pacing that teaches one system at a time and no goal readout. **#24 stays
+open** for the hints still to come.
 - **Unskippable, and therefore short** (Richard's call over a skip key): about twelve
   seconds from the glide landing to the cards being up. A skip is an admission that the
   thing is too long.
@@ -1336,6 +1337,54 @@ open** for those.
   cross, the room at 1280x720, every line and caption fitting, every still being shot and
   imported, the greeting's room going to the pictures, the absent-key rule, the close ending
   the arrival, and the menu's plank standing above Credits.
+
+### The First Steps (2026-09-22, `/grill-me` with Richard, issue #24)
+After the letter's cards close on a new game, walking and casting are taught on the lake
+itself. `scripts/first_steps.gd` (`FirstSteps`, draws only) and `Lake._first_steps_step`
+(decides). Every piece was approved off a mockup (`tools/tutorial_mockup.py`) before a line
+of game code, and then off the probe's captures.
+- **Walk**: a pulsing white ring and a down arrow on a spot of the island's beach, the mouse
+  and the four walk keys (the stick in pad mode) over the angler's head. **Ends when he
+  stands on the spot** (`STEPS_ARRIVE`), not on the first press, and the prompts do not fade
+  on input. **The cast is held until then** (`_walk_not_cast`): a press on water walks to the
+  shore towards it and throws nothing. Nothing else is held — the world, the dogs, the boats
+  and the HUD buttons all run.
+- **The spot is found, not authored** (`_beach_spot`): 48 bearings round the island, the
+  standing point pulled `STEPS_BEACH_IN` onto the sand, kept only where a sure cast spot is in
+  reach from it, and the nearest at least `STEPS_WALK_LEAST` from the angler. None found, the
+  steps are marked done rather than stuck. The search is one-off, about 200 ms, on the frame
+  the steps start.
+- **Cast**: a ring on water and the click (RT) over the head. **The ring is a promise**
+  (Richard: "a cast around and inside the circle is guaranteed"): `_sure_catch` asks the aim
+  ring's own verdict at the middle and at `STEPS_RING_TESTS` points on the rim and half way
+  in, and the ring is `STEPS_RING_SHARE` of the net's open mouth. Straight out from the beach
+  spot first, then up to two tiles either side. Re-found if its piece goes (a dog, the double
+  cast). **Any cast that catches ends the step**; an empty one keeps it.
+- **The note**: a paper card beside the recycle box (the letter's paper and inks, a dark
+  rim, 10 px — a pixel under `TEXT_TINY` so the sentence sits in three lines) and the arrow
+  over the box. Closes on a click on the card, or `STEPS_NOTE_HOLD` (5 s) after the catch
+  lands in the crate, never past `STEPS_NOTE_MOST`; **in pad mode 5 s after it appears**,
+  there being no pointer to click it with. The timer pauses under a board. No camera move,
+  by decision: the crate is already on screen.
+- **Prompts are Kenney's Input Prompts Pixel** (CC0, `assets/ui/prompts/`, cut by
+  `tools/build_prompts.py` off Richard's tile picks on `tools/last_prompt_contact.png`),
+  drawn at `PROMPT_PX` (2) physical pixels to one of theirs whatever the window's stretch,
+  in screen space through the camera's transform. **Keys follow the layout**: the walk keys'
+  printed labels (`Binds.label_of`) pick the tile, so AZERTY shows Z Q S D; a label the pack
+  has no tile for falls back to W A S D. The device swaps live (`Pad.is_pad`).
+- **Saved as `first_steps`, absent reads as done** (the `intro_done` rule), no
+  `SAVE_VERSION` bump. **A run saved before the note closes starts over from the walk**, by
+  decision — nothing of where it had got to is kept. A borrowed lake is marked done.
+- **The note's sentence is not in `locale/translations.csv` yet**: it is a literal in
+  `first_steps.gd`, as the letter's are.
+- **Out of scope, by decision**: a skip key, a hint on the first decoration, hints on the
+  upgrades and decorate boards (all to come, #24), path planning for the walk.
+- Probe: `tools/shot_first_steps.tscn` (desktop build, `--fixed-fps 60`, own save, under its
+  own node) saves `tools/last_steps_{move,move_azerty,move_pad,cast,cast_pad,note}.png` and
+  `last_steps.log`, casting near the ring's **edge** to prove the promise. `test_lake`'s
+  `_stage_first_steps` guards the start, the beach spot, the sure ring, the held cast, the
+  walk ending on the spot, empty and catching sweeps, the pad's five seconds, the flag, and
+  the key fallback.
 
 ### The Board Reads "How to Play" (2026-09-22, `/grill-me` with Richard)
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.

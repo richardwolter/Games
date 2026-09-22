@@ -185,6 +185,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_front()
 		35:
 			_stage_led_cast()
+		36:
+			_stage_first_steps()
 		_:
 			pass
 
@@ -6921,7 +6923,53 @@ func _stage_led_cast() -> void:
 			_main.call(&"_cast_or_walk", near)
 			_check(_net.state == CastNet.State.FLYING and _main.get(&"_led_cast") == Vector2.INF,
 				"a press in reach is the plain throw", "state %d" % _net.state)
+			_advance()
+
+
+## The first steps (`scripts/first_steps.gd`): walk to the beach spot with the cast held,
+## a sure-catch ring, the note after a catch, a pad's note shutting on its own, and the
+## flag. Driven by hand through the lake's own step, once the led cast's net is home.
+func _stage_first_steps() -> void:
+	if _net.state != CastNet.State.IDLE:
+		if _in_stage > 2400:
+			_check(false, "the net is home for the first steps", "state %d" % _net.state)
 			_finish()
+		return
+	_main.set(&"_steps_done", false)
+	_main.call(&"_first_steps_step", 0.016)
+	var steps: FirstSteps = _main.get(&"_steps")
+	_check(steps != null and steps.step == FirstSteps.Step.MOVE,
+		"the steps start on the walk", str(steps.step if steps != null else -1))
+	if steps == null:
+		_finish()
+		return
+	var beach: Vector2 = _main.get(&"_steps_beach")
+	var water: Vector2 = _main.get(&"_steps_water")
+	_check(beach != Vector2.INF and bool(_angler.call(&"_can_stand", beach)),
+		"the beach spot is ground the angler can stand on", str(beach))
+	_check(bool(_main.call(&"_sure_catch", water)),
+		"the cast ring is a sure catch all over", str(water))
+	_main.call(&"_cast_or_walk", water)
+	_check(_net.state == CastNet.State.IDLE, "the cast is held on the walk", str(_net.state))
+	_main.call(&"_stop_led_cast")
+	_angler.tile_pos = beach
+	_main.call(&"_first_steps_step", 0.016)
+	_check(steps.step == FirstSteps.Step.CAST, "standing on the spot moves to the cast", "")
+	_main.call(&"_on_net_swept", water, 0, 4, 20.0, _net)
+	_check(steps.step == FirstSteps.Step.CAST, "an empty sweep keeps the cast step", "")
+	_main.call(&"_on_net_swept", water, 1, 4, 20.0, _net)
+	_check(steps.step == FirstSteps.Step.NOTE, "a catching sweep raises the note", "")
+	Pad.set_mode(Pad.Mode.PAD)
+	_main.call(&"_first_steps_step", 0.016)
+	_check(float(_main.get(&"_steps_left")) <= 5.0, "a pad's note shuts after five seconds",
+		str(_main.get(&"_steps_left")))
+	Pad.set_mode(Pad.Mode.MOUSE)
+	_main.call(&"_first_steps_step", 6.0)
+	_check(steps.step == FirstSteps.Step.OFF and bool(_main.get(&"_steps_done")),
+		"the note times out and the steps are done", "")
+	_check(FirstSteps.key_tile("Z") == "key_z" and FirstSteps.key_tile("Y") == "",
+		"a key with a prompt tile gets it, one without falls back", "")
+	_finish()
 
 
 
