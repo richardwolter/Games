@@ -33,6 +33,24 @@ const WATER_SPOTS := 1
 const BANK_REACH := 7.0
 ## Lily pads: this far past the drawn water's edge, in tiles, and no further.
 const PAD_OUT := Vector2(0.5, 1.6)
+## Open water (2026-09-22): clumps of pads and reeds away from both shores. A spot is in a
+## clump where a coarse value noise over `OPEN_CELL` tiles is over `OPEN_AT`, so the pads
+## gather in beds rather than peppering the lake. Kept `OPEN_CLEAR` tiles off the yards'
+## jetties and berths (`avoid`), where the ferries turn.
+const OPEN_CELL := 4.5
+const OPEN_AT := 0.6
+const OPEN_CLEAR := 3.5
+## Bees: at most this many, on the flowers whose rank is under this share of what has grown,
+## one or two to a flower, circling its head. Tiny dots, drawn in one untextured batch.
+const BEES_MOST := 70
+const BEE_SHARE := 0.45
+const BEE_COLOR := Color(0.96, 0.8, 0.28)
+const BEE_BAND := Color(0.18, 0.13, 0.06)
+const BEE_WING := Color(0.93, 0.97, 0.98, 0.55)
+## The plants a bee visits, by the start of the species' name.
+const BEE_HOSTS := ["flower_", "patch_", "tulip_", "daisies", "clover_", "shrub_flowering", "thrift", "beach_flower"]
+## One painted pixel, in world px: a bee is on the art grid like everything else.
+const ART := 2.0
 ## Seconds a plant takes to arrive, and the most its own delay can add.
 const GROW_TIME := 3.5
 const GROW_STAGGER := 2.5
@@ -48,6 +66,8 @@ const SEED := 20260916
 var grid: LakeGrid
 var grounds: Array[Ground] = []
 var crate_tile := Vector2.INF
+## Tile points the open-water clumps keep `OPEN_CLEAR` away from: the yards' feet and berths.
+var avoid := PackedVector2Array()
 ## 0..1, the share of the lake's water that reads clean. Set by `refresh`.
 var stage: float = 0.0
 
@@ -69,12 +89,33 @@ var _uvs := PackedVector2Array()
 var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
 var _dirty := true
+## The flowers bees are circling, and each bee's seed. Parallel.
+var _bee_host := PackedInt32Array()
+var _bee_seed := PackedFloat32Array()
+var _bee_points := PackedVector2Array()
+var _bee_colors := PackedColorArray()
+var _bee_indices := PackedInt32Array()
+## The bees draw on a child of their own, so their frame-by-frame redraw does not send the
+## whole plant batch again with them.
+var _bees: Bees
+
+
+class Bees:
+	extends Node2D
+	var flora: Flora
+
+	func _draw() -> void:
+		flora._draw_bees(self)
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = 3
 	z_as_relative = false
+	_bees = Bees.new()
+	_bees.name = &"Bees"
+	_bees.flora = self
+	add_child(_bees)
 	_sheet = load(SHEET) as Texture2D
 	if FileAccess.file_exists(TABLE):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(TABLE))
@@ -112,6 +153,8 @@ func reset() -> void:
 	_age.fill(-1.0)
 	_growing = 0
 	_alive = 0
+	_bee_host.resize(0)
+	_bee_seed.resize(0)
 	_dirty = true
 	set_process(false)
 	queue_redraw()
@@ -136,7 +179,53 @@ func refresh(clean_share: float) -> void:
 	if _growing > 0:
 		set_process(true)
 	_dirty = true
+	_find_bees()
 	queue_redraw()
+
+
+func bee_count() -> int:
+	return _bee_host.size()
+
+
+## Where the grown pads are, world px: somewhere a frog may sit. Shore pads and open ones.
+func pad_spots() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for k in _foot.size():
+		if _age[k] < _delay[k] + GROW_TIME:
+			continue
+		var name := _species[k]
+		if name.contains("reed"):
+			continue
+		var kind := String(_table[name]["kind"])
+		if kind == "water" or kind == "open":
+			out.append(_foot[k] - Vector2(0.0, 4.0))
+	return out
+
+
+## The flowers with bees at them: the lowest ranks among the grown hosts, up to BEES_MOST.
+func _find_bees() -> void:
+	_bee_host.resize(0)
+	_bee_seed.resize(0)
+	var density := clampf(stage, 0.0, 1.0) * MOST * BEE_SHARE
+	for k in _foot.size():
+		if _bee_host.size() >= BEES_MOST:
+			break
+		if _age[k] < 0.0 or _rank[k] >= density:
+			continue
+		var name := _species[k]
+		var host := false
+		for prefix: String in BEE_HOSTS:
+			if name.begins_with(prefix):
+				host = true
+				break
+		if not host:
+			continue
+		var n := 1 if _hash(float(k) * 1.3, 4.0) < 0.7 else 2
+		for i in n:
+			_bee_host.append(k)
+			_bee_seed.append(_hash(float(k) * 2.1 + float(i) * 5.3, 9.0) * 100.0)
+	if not _bee_host.is_empty():
+		set_process(true)
 
 
 func _process(delta: float) -> void:
@@ -149,10 +238,13 @@ func _process(delta: float) -> void:
 			continue
 		_age[k] += delta
 		still += 1
+	if still > 0 or _growing > 0:
+		_dirty = true
+		queue_redraw()
 	_growing = still
-	_dirty = true
-	queue_redraw()
-	if still == 0:
+	if not _bee_host.is_empty():
+		_bees.queue_redraw()
+	if still == 0 and _bee_host.is_empty():
 		set_process(false)
 
 
@@ -166,6 +258,8 @@ func _sow() -> void:
 			for spot in kinds.size():
 				var kind: String = kinds[spot]
 				var per := LAWN_SPOTS if kind == "lawn" else (BEACH_SPOTS if kind == "beach" else WATER_SPOTS)
+				if kind == "open" and _near_avoid(Vector2(float(tx) + 0.5, float(ty) + 0.5)):
+					continue
 				for n in per:
 					var at := Vector2(
 						float(tx) + 0.1 + 0.8 * _hash(float(tx) * 3.3 + float(n) * 7.1, float(ty) * 1.9 + 2.0),
@@ -233,14 +327,36 @@ func _kind_at(at: Vector2) -> String:
 	var out := -Ground.out_of_water(at.x, at.y)
 	if out > PAD_OUT.x + 1.0 and out < PAD_OUT.y + 1.0:
 		return "water"
+	# Out on the open water, in a bed.
+	if shelf > PAD_OUT.y + 1.5 and out > PAD_OUT.y + 2.5 and _noise(at / OPEN_CELL) > OPEN_AT:
+		return "open"
 	return ""
+
+
+func _near_avoid(at: Vector2) -> bool:
+	for p in avoid:
+		if at.distance_to(p) < OPEN_CLEAR:
+			return true
+	return false
+
+
+## Value noise, 0..1, smooth between whole-number corners.
+func _noise(p: Vector2) -> float:
+	var i := p.floor()
+	var f := p - i
+	f = f * f * (Vector2(3.0, 3.0) - 2.0 * f)
+	var a := _hash(i.x, i.y)
+	var b := _hash(i.x + 1.0, i.y)
+	var c := _hash(i.x, i.y + 1.0)
+	var d := _hash(i.x + 1.0, i.y + 1.0)
+	return lerpf(lerpf(a, b, f.x), lerpf(c, d, f.x), f.y)
 
 
 ## The index of the water tile this spot answers to: itself if it is water, else the first
 ## lake tile walking out from the shore it stands on. -1 if none within WATER_LOOK.
 func _water_beside(at: Vector2, kind: String) -> int:
 	var tile := Vector2i(int(floor(at.x)), int(floor(at.y)))
-	if kind == "water":
+	if kind == "water" or kind == "open":
 		return grid.index_of(tile.x, tile.y)
 	var on_island := Iso.island_fraction(at.x, at.y) < 1.0 + 1.5
 	var dir: Vector2
@@ -269,7 +385,14 @@ func _pick_species(kind: String, at: Vector2) -> String:
 			continue
 		names.append(name)
 		# Shrubs are big and rarer; patches and flowers common.
-		weights.append(0.25 if name.begins_with("shrub") else 1.0)
+		var weight := 1.0
+		if name.begins_with("shrub"):
+			weight = 0.25
+		elif name == "mushroom":
+			weight = 0.35
+		elif name == "fern" or name == "open_reeds":
+			weight = 0.6
+		weights.append(weight)
 	if names.is_empty():
 		return ""
 	var total := 0.0
@@ -336,6 +459,53 @@ func _draw() -> void:
 		get_canvas_item(), _indices, _points, _colors, _uvs,
 		PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
 	)
+
+
+## Each bee circles its flower's head on a wobbling loop, on whole art pixels: a yellow dot,
+## a dark one behind it, and a pale wing pixel flicking over it. One untextured batch.
+func _draw_bees(on: CanvasItem) -> void:
+	if _bee_host.is_empty():
+		return
+	_bee_points.resize(0)
+	_bee_colors.resize(0)
+	_bee_indices.resize(0)
+	var now := float(Time.get_ticks_msec()) * 0.001
+	var flick := int(now * 18.0) % 2 == 0
+	for i in _bee_host.size():
+		var k := _bee_host[i]
+		var t := clampf((_age[k] - _delay[k]) / GROW_TIME, 0.0, 1.0)
+		if t < 1.0:
+			continue
+		var rect: Array = _table[_species[k]]["full"]
+		var head := _foot[k] - Vector2(0.0, float(rect[3]) * SCALE * 0.85)
+		var seed := _bee_seed[i]
+		var rx := 5.0 + fmod(seed, 5.0)
+		var ry := 3.0 + fmod(seed * 1.7, 3.0)
+		var a := now * (2.2 + fmod(seed, 1.3)) + seed
+		var at := head + Vector2(cos(a) * rx + sin(a * 2.3) * 2.0, sin(a * 1.6) * ry - 2.0)
+		at = (at / ART).floor() * ART
+		# The dark band trails the way it is flying.
+		var back := Vector2(signf(sin(a)), 0.0) * ART
+		_bee_quad(at, BEE_COLOR)
+		_bee_quad(at + back, BEE_BAND)
+		if flick:
+			_bee_quad(at + Vector2(0.0, -ART), BEE_WING)
+	if _bee_indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(
+		on.get_canvas_item(), _bee_indices, _bee_points, _bee_colors
+	)
+
+
+func _bee_quad(at: Vector2, color: Color) -> void:
+	var base := _bee_points.size()
+	_bee_points.append(at)
+	_bee_points.append(at + Vector2(ART, 0.0))
+	_bee_points.append(at + Vector2(ART, ART))
+	_bee_points.append(at + Vector2(0.0, ART))
+	for n in 4:
+		_bee_colors.append(color)
+	_bee_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 
 
 func _hash(x: float, y: float) -> float:

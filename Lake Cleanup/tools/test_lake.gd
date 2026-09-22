@@ -5284,15 +5284,27 @@ func _stage_nature() -> void:
 			on_crate += 1
 		var kind: String = c["kind"]
 		var lake_tile := Iso.in_lake(int(floor(at.x)), int(floor(at.y)))
-		if kind == "water" and not lake_tile:
+		var wet_kind := kind == "water" or kind == "open"
+		if wet_kind and not lake_tile:
 			wrong_ground += 1
-		if kind != "water" and Iso.on_island_ground(at) == false and Ground.out_of_water(at.x, at.y) < 0.0:
+		if not wet_kind and Iso.on_island_ground(at) == false and Ground.out_of_water(at.x, at.y) < 0.0:
 			wrong_ground += 1
 	_check(in_hut == 0 and on_crate == 0, "no plant stands in the hut or on the crate",
 		"hut %d crate %d" % [in_hut, on_crate])
 	_check(wrong_ground == 0, "every plant stands on the ground its kind says", "%d off" % wrong_ground)
-	_check(kinds.has("lawn") and kinds.has("beach") and kinds.has("water"),
-		"lawn, beach and water candidates all exist", str(kinds))
+	_check(kinds.has("lawn") and kinds.has("beach") and kinds.has("water") and kinds.has("open"),
+		"lawn, beach, shore-water and open-water candidates all exist", str(kinds))
+	# The open-water beds keep off the yards, where the ferries come in.
+	var by_yard := 0
+	for k in flora.candidate_count():
+		var c := flora.candidate(k)
+		if c["kind"] != "open":
+			continue
+		for p in flora.avoid:
+			if (c["tile"] as Vector2).distance_to(p) < Flora.OPEN_CLEAR - 0.8:
+				by_yard += 1
+	_check(not flora.avoid.is_empty() and by_yard == 0, "no open-water bed at a yard's jetty or berth",
+		"%d of %d avoid points" % [by_yard, flora.avoid.size()])
 	# The stages before this one emptied the lake. Fill it again, as a new game does, and
 	# forget what grew: a fresh lake's share is the island's clean ring and little else.
 	_grid.build(_main._all_defs(), _main._level_seed(), true)
@@ -5382,7 +5394,110 @@ func _stage_nature() -> void:
 		_check((first["heading"] as Vector2).x < 0.0, "and away from the landing", str(first["heading"]))
 	_check(not fish.has_method("catch") and not fish.has_method("pay"),
 		"fish have no catch and no pay", "")
+	_check_bees(flora)
+	_check_wildlife()
 	_advance()
+
+
+## Bees (2026-09-22): only at grown flowers, never more than the cap, none on a fresh lake.
+func _check_bees(flora: Flora) -> void:
+	_check(flora.bee_count() > 0 and flora.bee_count() <= Flora.BEES_MOST,
+		"bees came to the flowers on the cleared half, up to the cap", "%d" % flora.bee_count())
+	var off_flower := 0
+	for k: int in flora._bee_host:
+		var name: String = flora._species[k]
+		var host := false
+		for prefix: String in Flora.BEE_HOSTS:
+			if name.begins_with(prefix):
+				host = true
+		if not host or flora._age[k] < 0.0:
+			off_flower += 1
+	_check(off_flower == 0, "every bee is at a flower that has grown", "%d" % off_flower)
+	for i in 480:
+		flora._process(1.0 / 60.0)
+	_check(not flora.pad_spots().is_empty(),
+		"grown pads are offered to the frogs", "%d" % flora.pad_spots().size())
+
+
+## The animals (2026-09-22): frogs, turtles, ducks, dragonflies. Ambient: no catch, no pay.
+## Asked on the half-cleared lake `_stage_nature` just made.
+func _check_wildlife() -> void:
+	var wild: Wildlife = _main.get(&"_wildlife")
+	_check(wild != null and wild.ready_to_live(), "the wildlife node is there with its art", "")
+	if wild == null or not wild.ready_to_live():
+		return
+	_check(wild.shore_count() > 100, "shore spots found round the island and the bank", "%d" % wild.shore_count())
+	var wet_land := 0
+	var bad_side := 0
+	for s: Dictionary in wild.get(&"_shore"):
+		if wild._wet(s["land"]):
+			wet_land += 1
+		if not wild._wet(s["water"]):
+			bad_side += 1
+	_check(wet_land == 0 and bad_side == 0, "every shore spot is sand behind and water in front",
+		"%d wet, %d dry" % [wet_land, bad_side])
+	# A fresh lake has none of them; this one is half clean. Nobody on a dirty lake.
+	var saved_stage := wild.stage
+	wild.reset()
+	wild.stage = 0.01
+	wild._reckon()
+	_check(wild.frog_count() + wild.turtle_count() + wild.brood_count() + wild.dragonfly_count() == 0,
+		"no animals on a lake that is not yet clean", "")
+	wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"))
+	wild.set(&"_brood_in", 0.0)
+	wild._reckon()
+	var share: float = _main.clean_share()
+	_check(wild.frog_count() == wild._want(Wildlife.FROGS_MOST) and wild.frog_count() > 0,
+		"frogs come in with the clean share", "%d at %.2f" % [wild.frog_count(), share])
+	_check(wild.turtle_count() > 0 and wild.dragonfly_count() > 0 and wild.brood_count() == 1,
+		"turtles, dragonflies and one brood at a time", "%d %d %d" % [wild.turtle_count(), wild.dragonfly_count(), wild.brood_count()])
+	_check(wild.frog_count() <= Wildlife.FROGS_MOST and wild._want(Wildlife.FROGS_MOST) <= Wildlife.FROGS_MOST,
+		"never past the cap", "")
+	# Only at clean shores; a brood lands only on clean water.
+	var foul_home := 0
+	for f: Dictionary in wild.frogs():
+		if _grid.water_state(int((f["spot"] as Dictionary)["index"])) != 0:
+			foul_home += 1
+	for b: Dictionary in wild.broods():
+		if not wild._swimmable(b["to"]):
+			foul_home += 1
+	_check(foul_home == 0, "frogs live by clean water and ducks land on it", "%d" % foul_home)
+	# Run them a while: frogs swim in, the brood flies in and lands.
+	for i in 1200:
+		wild._process(1.0 / 60.0)
+	var swum_home := 0
+	for f: Dictionary in wild.frogs():
+		if int(f["state"]) != Wildlife.Frog.SWIM:
+			swum_home += 1
+	_check(swum_home > 0, "frogs swim ashore and get on with sitting, croaking, hopping", "%d" % swum_home)
+	var landed := 0
+	for b: Dictionary in wild.broods():
+		if float(b["alt"]) <= 0.0:
+			landed += 1
+	_check(landed > 0, "the brood came down onto the water", "%d of %d" % [landed, wild.brood_count()])
+	# A frog on land that the angler walks up to jumps in; the ducks take off at a landing.
+	var sitter: Dictionary = {}
+	for f: Dictionary in wild.frogs():
+		if int(f["state"]) == Wildlife.Frog.SIT:
+			sitter = f
+			break
+	if not sitter.is_empty():
+		wild._frog_step(sitter, 0.016, PackedVector2Array([(sitter["at"] as Vector2) + Vector2(10.0, 0.0)]))
+		_check(int(sitter["state"]) == Wildlife.Frog.JUMP, "a frog jumps into the water when someone walks up", "")
+		for i in 60:
+			wild._frog_step(sitter, 1.0 / 60.0, PackedVector2Array())
+		_check(int(sitter["state"]) == Wildlife.Frog.SWIM, "and swims as a shadow once it is in", "")
+	for b: Dictionary in wild.broods():
+		if float(b["alt"]) <= 0.0:
+			wild.scare(b["at"])
+			_check(int(b["state"]) == Wildlife.Brood.TAKE_OFF, "a net landing by the ducks puts them up", "")
+			break
+	# The frog sheet's rows: a frog heading right looks east, one heading down looks south.
+	_check(Wildlife._row_of(Vector2(1.0, 0.0)) == 6 and Wildlife._row_of(Vector2(0.0, 1.0)) == 0
+		and Wildlife._row_of(Vector2(-1.0, 0.0)) == 2 and Wildlife._row_of(Vector2(0.0, -1.0)) == 4,
+		"frogs face the way they are going", "")
+	_check(not wild.has_method("catch") and not wild.has_method("pay"), "animals have no catch and no pay", "")
+	wild.stage = saved_stage
 
 
 ## The graded grime (2026-09-17): the water's shade follows how much rubbish an area still

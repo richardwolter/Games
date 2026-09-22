@@ -1427,6 +1427,8 @@ var _grounds: Array[Ground] = []
 ## water, both read off the filth map and `_clean_share`. See flora.gd and fish.gd.
 var _flora: Flora
 var _fish: Fish
+## The animals that come back with it (2026-09-22): frogs, turtles, ducks, dragonflies.
+var _wildlife: Wildlife
 ## The share of the lake's water tiles the map calls clean, 0..1, set by each map build.
 var _clean_share: float = 0.0
 ## Every water tile index the map calls clean, as of the last build.
@@ -3698,6 +3700,8 @@ func _push_patches(delta: float) -> void:
 func _on_net_landed(cargo: PackedInt32Array) -> void:
 	if _fish != null:
 		_fish.scare(_net.position)
+	if _wildlife != null:
+		_wildlife.scare(_net.position)
 	var from := _angler.rod_tip()
 	var slot := 0
 	for i in cargo.size():
@@ -5095,6 +5099,8 @@ func _build_filth_map() -> void:
 		_flora.refresh(_clean_share)
 	if _fish != null:
 		_fish.refresh(_clean_share, _clean_tiles)
+	if _wildlife != null:
+		_wildlife.refresh(_clean_share, _clean_tiles)
 
 
 ## How full of rubbish the water round each tile is, 0 to 1: the pieces afloat within
@@ -5205,6 +5211,11 @@ func _grow_nature() -> void:
 	_flora.grid = _grid
 	_flora.grounds = _grounds
 	_flora.crate_tile = _dog.crate_tile
+	var yards := PackedVector2Array()
+	for stop: Dropoff in _dropoffs:
+		yards.append(stop.foot)
+		yards.append(stop.berth)
+	_flora.avoid = yards
 	add_child(_flora)
 	_fish = Fish.new()
 	_fish.name = &"Fish"
@@ -5212,8 +5223,33 @@ func _grow_nature() -> void:
 	_fish.splash = _splash
 	_fish.boats = _boats
 	add_child(_fish)
+	_wildlife = Wildlife.new()
+	_wildlife.name = &"Wildlife"
+	_wildlife.grid = _grid
+	_wildlife.splash = _splash
+	_wildlife.flora = _flora
+	_wildlife.day = _day
+	_wildlife.crate_tile = _dog.crate_tile
+	_wildlife.avoid = yards
+	_wildlife.threats = _wildlife_threats
+	add_child(_wildlife)
 	_flora.refresh(_clean_share)
 	_fish.refresh(_clean_share, _clean_tiles)
+	_wildlife.refresh(_clean_share, _clean_tiles)
+
+
+## What frightens the animals, in world px: the angler, the pack, the hulls.
+func _wildlife_threats() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if _angler != null:
+		out.append(_angler.position)
+	for dog in _dogs:
+		if is_instance_valid(dog) and dog.visible:
+			out.append(dog.position)
+	for boat in _boats:
+		if is_instance_valid(boat) and boat.visible:
+			out.append(boat.position)
+	return out
 
 
 ## Distance from every tile to the nearest source, in tiles, in place: `dist` comes in as 0

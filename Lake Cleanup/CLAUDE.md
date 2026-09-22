@@ -2957,6 +2957,72 @@ ring gives a fresh lake about 0.001).
   (desktop build, `--fixed-fps 60`, own save) saves `tools/last_nature_{fresh,half,clean}.png`
   and `last_nature.log`.
 
+### The Lake Fills With Life (2026-09-22, `/grill-me` with Richard)
+More nature as the lake is cleaned: frogs, turtles, ducks with ducklings, dragonflies, bees,
+more kinds of plant, and beds of pads and reeds out on the open water. `scripts/wildlife.gd`
+(`Wildlife`: frogs, turtles, broods, dragonflies), bees and the open-water beds in
+`scripts/flora.gd`. Builds on Nature Coming Back above, and every rule there holds.
+- **Ambient, but they flee** (Richard's call over fully ambient and over catchable): no
+  catch, no pay, nothing saved. A net landing (`Lake._on_net_landed` → `scare`), and the
+  angler, any dog or any hull coming within reach (`Lake._wildlife_threats`, asked once a
+  frame) send them off: a frog jumps in, a turtle pulls its head in or dives, the brood takes
+  off, a dragonfly darts away. **Silent this pass**, by decision; no recordings exist.
+- **All of them from the first clean water, more as it spreads** (Richard, over a staged
+  ladder like the fish's): `ceil(most * stage)` once `stage` passes 0.02, capped by
+  `FROGS_MOST` 14, `TURTLES_MOST` 8, `BROODS_MOST` 5, `DRAGONFLIES_MOST` 12. Broods come in
+  one at a time, `BROOD_GAP` apart. Only where the honest map says clean, never a catch patch.
+- **Frogs are the Pixel Frog pack, green and brown, recoloured onto the palette and halved**
+  (`tools/build_wildlife.py`, `recolour_frog`, `halve`; blue, purple and the GameBoy sheets
+  are out). The pack is drawn at twice the game's grain — at the game's 2 a whole frog stood
+  as tall as the angler — so each 2x2 block is folded to its commonest colour. Idle, croak,
+  jump and hop, eight facings (`_row_of`: S, SW, W, NW, N, NE, E, SE). They sit on the sand
+  of both shores (`_find_shore`, 220 spots found on the bearings, kept off the hut, crate,
+  pump and yards), croak, hop along the beach, jump in, **swim as a shadow**
+  (`frogswim_<heading>_<frame>`: a rule-built top-down silhouette, eight headings on the
+  plane, three kick frames, drawn in `SHADOW_INK` under the surface at z 3), and climb out
+  onto the sand or onto a grown pad (`Flora.pad_spots`).
+- **Turtles, ducks, ducklings: built by rule** in the same builder, palette swatches, the
+  pack's dark ring (`outline`), facing left and mirrored through `Flock.stamp`. Turtles bask,
+  walk, paddle the shallows, tuck, dive. A brood is a drake alone or a hen with up to five
+  ducklings trailing her wake (`_kids_swim`); it flies in from off the lake, glides down,
+  lands with rings, paddles, dabbles, and takes off when frightened or after `DUCK_STAY`.
+  A flying brood's shadow is its silhouette under `Shade.lying`, the pigeons' bargain.
+  Floating animals sit in torn whole-pixel foam (`_collar`).
+- **Dragonflies and bees are drawn in code, whole art pixels.** A dragonfly is a body along
+  its heading snapped to eighths, two pairs of flicking wings and a shadow pixel; it hovers
+  and darts round a home over a clean shore or a pad. Bees (`Flora._draw_bees`) circle grown
+  flower heads, up to `BEES_MOST` 70, on their own child node (`Flora.Bees`), so their
+  per-frame redraw does not resend the whole plant batch (that cost 1.2 ms).
+- **Layers**: the frog's swim shadow at z 3, everything on the sand and the water at z 6
+  (above the rubbish soup), flying ducks and dragonflies at z 20. Land animals do not sort
+  against the angler (z 9): a frog in front of him is drawn under him, accepted, because it
+  jumps away before he gets there.
+- **The animals may use half the splash layer's rings at most** (`Wildlife._ripple`): at
+  first their rings filled `WaterSplash.MAX_RIPPLES` and a walker's entry ring was refused.
+- **More plants** (`tools/build_flora.py`): tulips, an orange flower, daisies, two clovers,
+  a fern, a mushroom, two flowering shrubs on the lawn; cattails and sea pinks on the beach;
+  a yellow lily and small pads on the shore water. **Open water** is a new kind, `open`:
+  beds of pad clusters, lilies and standing reeds where a coarse value noise
+  (`OPEN_CELL`, `OPEN_AT`) is high, kept `OPEN_CLEAR` tiles off the yards' feet and berths
+  (`Flora.avoid`). The net passes over them; decoration only.
+- **Cost** (`tools/bench_frames.tscn` with the new `BENCH_CLEAN=1`, west half emptied, RTX
+  5060 Ti, 1080p): 5.8 ms mean, worst 8 ms; with wildlife and flora off (`BENCH_OFF="wild
+  flora"`) 4.7. Inside the 8 ms bar.
+- **Out of scope, by decision**: sound, catching or paying, saving, licensed art, floating
+  algae mats (they would read as grime), frog colours other than green and brown.
+- **Numbers are first guesses** — counts, speeds, shyness, `DUCK_STAY`, the open beds'
+  density, the bees' orbit — for Richard to retune in play. Contact sheets:
+  `tools/last_wildlife_sheet.png`, `tools/last_flora_sheet.png`. **Re-run both builders and
+  reimport** after changing either.
+- Probe: `tools/shot_nature.tscn` also saves `last_nature_<stage>_near.png` (the middle at
+  2x) and logs every animal's count; it now hangs its lake under its own node. `test_lake`'s
+  `_check_bees` and `_check_wildlife` (in `_stage_nature`) guard the open beds keeping off
+  the yards, bees only at grown flowers and under the cap, pads offered to frogs, the shore
+  spots being sand behind and water in front, nobody on a dirty lake, counts following the
+  share, homes and landings on clean water, frogs swimming ashore, a frog jumping in and
+  swimming as a shadow when walked up to, the brood taking off at a landing, the facing
+  rows, and no catch or pay.
+
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
 **2026-09-18**: the five sell-by-tier tracks and `tier_pay` are deleted, not shelved.
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
@@ -4869,7 +4935,7 @@ room's own coordinates while the picture is the whole window.
 - `shaders/water.gdshader` — pixel-art lake surface: palette ramps, stepped filth/depth, shore foam
 - `shaders/pixel.gdshaderinc` — shared pixel grid, stepped time (no dither, by decision)
 - `scripts/skirt.gd` — baked painted grass tufts and sand spill round the shed and the box
-- `scripts/flora.gd`, `scripts/fish.gd` — nature coming back as the lake cleans (see Nature Coming Back)
+- `scripts/flora.gd`, `scripts/fish.gd`, `scripts/wildlife.gd` — nature coming back as the lake cleans (see Nature Coming Back, The Lake Fills With Life)
 - `scripts/sfx.gd` — the `Sound` autoload: recordings from `assets/sfx/` (see Sound), plus the few sounds still built in code
 
 ---

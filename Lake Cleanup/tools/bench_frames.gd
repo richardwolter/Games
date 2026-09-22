@@ -52,8 +52,14 @@ func _ready() -> void:
 	Engine.max_fps = 0
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.set(&"autoload_save", false)
+	var half := OS.get_environment("BENCH_CLEAN") == "1"
+	if half:
+		# An emptied lake is not the player's to keep: this run writes its own file.
+		_main.set(&"save_path", "user://bench_clean.save")
 	add_child(_main)
 	_grid = _main.get_node(^"Grid")
+	if half:
+		_half_clean()
 	_walking = OS.get_environment("BENCH_WALK") == "1"
 	var mode := OS.get_environment("BENCH_OFF")
 	if mode.contains("ripple"):
@@ -68,6 +74,28 @@ func _ready() -> void:
 		(_grid as CanvasItem).material = null
 	print("bench mode: ", mode, " walk: ", _walking)
 	_last = Time.get_ticks_usec()
+
+
+## BENCH_CLEAN=1: the west half of the lake emptied, so nature and the animals are out —
+## a fresh lake has none of them and says nothing about what they cost.
+func _half_clean() -> void:
+	for index in _grid.stacks.size():
+		if _grid.tile_of(index).x < int(Iso.CENTRE.x):
+			_grid.stacks[index].resize(0)
+	_grid._rebuild()
+	_main._build_filth_map()
+	var wild: Wildlife = _main.get(&"_wildlife")
+	for n in 6:
+		wild.set(&"_brood_in", 0.0)
+		wild._reckon()
+	var mode := OS.get_environment("BENCH_OFF")
+	if mode.contains("wild"):
+		wild.process_mode = Node.PROCESS_MODE_DISABLED
+		wild.visible = false
+	if mode.contains("flora"):
+		var flora: Flora = _main.get(&"_flora")
+		flora.process_mode = Node.PROCESS_MODE_DISABLED
+		flora.visible = false
 
 
 func _walk(delta: float) -> void:

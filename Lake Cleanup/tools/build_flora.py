@@ -200,9 +200,158 @@ def beach_grass() -> Image.Image:
     return img
 
 
+def tulip(petal) -> Image.Image:
+    """A cup of three petals on a tall stem, with a strap leaf."""
+    w, h = 5, 9
+    img = canvas(w, h)
+    for y in range(3, h):
+        put(img, 2, y, STEM if y > 3 else STEM_LIT)
+    for y in range(4, h):
+        put(img, 1, y, STEM_LIT if y > 5 else (0, 0, 0, 0))
+    for dx in (-1, 0, 1):
+        for dy in (0, 1, 2):
+            if not (dy == 0 and dx == 0):
+                put(img, 2 + dx, dy, petal)
+    put(img, 2, 1, lift(petal, 1.2))
+    put(img, 3, 2, mix(petal, OUTLINE, 0.35))
+    return img
+
+
+def daisies() -> Image.Image:
+    """A low mat of white daisies, yellow eyes, in short grass."""
+    w, h = 12, 6
+    img = canvas(w, h)
+    for i in range(7):
+        x = 1 + rng.randrange(w - 2)
+        for y in range(h - rng.randrange(1, 3), h):
+            put(img, x, y, STEM if i % 2 else STEM_LIT)
+    for cx, cy in ((2, 2), (6, 1), (9, 3)):
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            put(img, cx + dx, cy + dy, WHITE)
+        put(img, cx, cy, YELLOW)
+    return img
+
+
+def clover(head) -> Image.Image:
+    """Three-leaf clover with a round flower head over it."""
+    w, h = 7, 6
+    img = canvas(w, h)
+    for dx, dy in ((1, 4), (2, 5), (4, 4), (5, 5), (3, 3), (2, 4), (4, 5)):
+        put(img, dx, dy, STEM_LIT if (dx + dy) % 2 else STEM)
+    put(img, 3, 2, STEM)
+    for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+        put(img, 3 + dx, 1 + dy, head)
+    put(img, 2, 0, lift(head, 1.15))
+    return img
+
+
+def fern() -> Image.Image:
+    w, h = 11, 8
+    img = canvas(w, h)
+    for frond, (x0, lean) in enumerate(((5, 0), (2, -1), (8, 1))):
+        for y in range(h - 1, 0 if frond == 0 else 2, -1):
+            x = x0 + (lean * (h - y) // 3)
+            put(img, x, y, STEM)
+            if y % 2 == 0:
+                put(img, x - 1, y, STEM_LIT)
+                put(img, x + 1, y, LEAF)
+    return img
+
+
+def mushroom(cap) -> Image.Image:
+    w, h = 6, 5
+    img = canvas(w, h)
+    for x in range(1, 5):
+        put(img, x, 1, cap)
+    for x in range(2, 4):
+        put(img, x, 0, lift(cap, 1.15))
+    put(img, 0, 2, mix(cap, OUTLINE, 0.35))
+    put(img, 5, 2, mix(cap, OUTLINE, 0.35))
+    for x in range(1, 5):
+        put(img, x, 2, cap if x % 3 else WHITE)
+    for y in (3, 4):
+        put(img, 2, y, mix(SAND, WHITE, 0.4))
+        put(img, 3, y, SAND)
+    return img
+
+
+def flowering_bush(petal) -> Image.Image:
+    img = shrub(False)
+    for _ in range(9):
+        x = 3 + rng.randrange(img.width - 6)
+        y = 1 + rng.randrange(img.height - 5)
+        if img.getpixel((x, y))[3]:
+            put(img, x, y, petal)
+    return img
+
+
+def cattail() -> Image.Image:
+    w, h = 7, 18
+    img = canvas(w, h)
+    for x, tall, head in ((3, 17, True), (1, 12, False), (5, 14, True)):
+        for y in range(h - tall, h):
+            put(img, x, y, STEM if x == 3 else STEM_LIT)
+        if head:
+            for y in range(h - tall + 2, h - tall + 6):
+                put(img, x, y, mix(WOOD, OUTLINE, 0.25))
+            put(img, x, h - tall + 2, mix(WOOD, SAND, 0.2))
+    return img
+
+
+def thrift() -> Image.Image:
+    """Sea pink: tufts on the sand with pink pompoms."""
+    w, h = 9, 7
+    img = canvas(w, h)
+    for x in range(1, w - 1):
+        put(img, x, h - 1, PALE_GRASS if x % 2 else STEM_LIT)
+    for cx, cy in ((2, 2), (6, 1)):
+        for y in range(cy + 1, h - 1):
+            put(img, cx, y, STEM_LIT)
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, -1)):
+            put(img, cx + dx, cy + dy, PINK)
+        put(img, cx, cy - 1, lift(PINK, 1.12))
+    return img
+
+
+def pad_small() -> Image.Image:
+    w, h = 7, 4
+    img = canvas(w, h)
+    d = ImageDraw.Draw(img)
+    d.ellipse((0, 0, w - 1, h - 1), fill=PAD, outline=OUTLINE)
+    put(img, 3, 3, (0, 0, 0, 0))
+    put(img, 3, 2, OUTLINE)
+    put(img, 2, 1, PAD_LIT)
+    put(img, 3, 1, PAD_LIT)
+    return img
+
+
+def pad_cluster(bloom) -> Image.Image:
+    """Three pads of different sizes jostling, one maybe in flower: a clump for open water."""
+    w, h = 20, 10
+    img = canvas(w, h)
+    img.alpha_composite(pad_small(), (0, 5))
+    img.alpha_composite(lily(bloom), (5, 2))
+    img.alpha_composite(pad_small(), (12, 0))
+    return img
+
+
+def water_reed() -> Image.Image:
+    """Reeds standing in the water: no ground, a ring of lit water where they go in."""
+    w, h = 9, 15
+    img = canvas(w, h)
+    for i, (x, tall, lean) in enumerate(((4, 14, 0), (2, 9, 1), (6, 11, -1), (3, 6, 0))):
+        c = STEM if i % 2 == 0 else STEM_LIT
+        for y in range(h - 1 - tall, h - 1):
+            dx = lean if y < h - 1 - tall + 3 else 0
+            put(img, x + dx, y, c)
+    for x in range(1, w - 1):
+        put(img, x, h - 1, PAD_LIT if x % 2 else WATER_LIGHT)
+    return img
+
+
 def sprout(kind: str) -> Image.Image:
     """What every plant looks like the moment it arrives: two blades, or a bud on the water."""
-    if kind == "water":
+    if kind in ("water", "open"):
         img = canvas(5, 3)
         for x in range(1, 4):
             put(img, x, 1, PAD)
@@ -237,12 +386,35 @@ PLANTS = [
     ("lily", lily(None), "water"),
     ("lily_pink", lily(PINK), "water"),
     ("lily_white", lily(WHITE), "water"),
+    ("tulip_red", tulip(RED), "lawn"),
+    ("tulip_yellow", tulip(YELLOW), "lawn"),
+    ("tulip_pink", tulip(PINK), "lawn"),
+    ("flower_orange", flower(ORANGE, 2, 4), "lawn"),
+    ("daisies", daisies(), "lawn"),
+    ("clover_white", clover(WHITE), "lawn"),
+    ("clover_pink", clover(PINK), "lawn"),
+    ("fern", fern(), "lawn"),
+    ("mushroom", mushroom(RED), "lawn"),
+    ("shrub_flowering", flowering_bush(PINK), "lawn"),
+    ("shrub_flowering_white", flowering_bush(WHITE), "lawn"),
+    ("cattail", cattail(), "beach"),
+    ("thrift", thrift(), "beach"),
+    ("lily_yellow", lily(YELLOW), "water"),
+    ("pad_small", pad_small(), "water"),
+    ("open_pads", pad_cluster(None), "open"),
+    ("open_pads_pink", pad_cluster(PINK), "open"),
+    ("open_pads_white", pad_cluster(WHITE), "open"),
+    ("open_pads_yellow", pad_cluster(YELLOW), "open"),
+    ("open_lily", lily(None), "open"),
+    ("open_lily_pink", lily(PINK), "open"),
+    ("open_pad_small", pad_small(), "open"),
+    ("open_reeds", water_reed(), "open"),
 ]
 
 
 def pack() -> None:
     gutter = 1
-    sprouts = {kind: sprout(kind) for kind in ("lawn", "beach", "water")}
+    sprouts = {kind: sprout(kind) for kind in ("lawn", "beach", "water", "open")}
     x, y, shelf = gutter, gutter, 0
     wide = 160
     places: dict[str, dict] = {}

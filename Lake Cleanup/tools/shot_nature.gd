@@ -31,7 +31,8 @@ func _ready() -> void:
 	_main.set(&"autoload_save", false)
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
-	get_tree().root.add_child.call_deferred(_main)
+	# Under this node, not the root: a lake hung off the root is the game and wears the menu.
+	add_child.call_deferred(_main)
 	set_physics_process(true)
 
 
@@ -84,17 +85,30 @@ func _set_stage(stage: int) -> void:
 			grid.stacks[index].resize(0)
 	grid._rebuild()
 	_main._build_filth_map()
+	# Broods arrive one at a time a few seconds apart; the picture wants a few of them in.
+	var wild: Wildlife = _main.get(&"_wildlife")
+	wild.set(&"_brood_in", 0.0)
 
 
 func _write(name: String) -> void:
 	var flora: Flora = _main.get(&"_flora")
 	var fish: Fish = _main.get(&"_fish")
+	var wild: Wildlife = _main.get(&"_wildlife")
 	var water: ShaderMaterial = _main.get(&"_water_material")
 	var log := FileAccess.open(LOG, FileAccess.WRITE if _stage == 0 else FileAccess.READ_WRITE)
 	log.seek_end()
-	log.store_line("%s: clean share %.3f glint %.3f plants %d of %d schools %d" % [
+	log.store_line("%s: clean share %.3f glint %.3f plants %d of %d schools %d bees %d" % [
 		name, _main.clean_share(), float(water.get_shader_parameter(&"glint")),
-		flora.alive_count(), flora.candidate_count(), fish.school_count()])
+		flora.alive_count(), flora.candidate_count(), fish.school_count(), flora.bee_count()])
+	log.store_line("  wildlife: shore %d frogs %d turtles %d broods %d dragonflies %d pads %d" % [
+		wild.shore_count(), wild.frog_count(), wild.turtle_count(), wild.brood_count(),
+		wild.dragonfly_count(), flora.pad_spots().size()])
 	log.close()
 	var shot := get_viewport().get_texture().get_image()
 	shot.save_png(ProjectSettings.globalize_path(SHOT % name))
+	# And the middle of it at twice the size, where the animals can be made out.
+	var w := shot.get_width()
+	var h := shot.get_height()
+	var near := shot.get_region(Rect2i(w / 4, h / 4, w / 2, h / 2))
+	near.resize(w, h, Image.INTERPOLATE_NEAREST)
+	near.save_png(ProjectSettings.globalize_path(SHOT % (name + "_near")))
