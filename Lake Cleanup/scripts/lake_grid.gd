@@ -418,6 +418,27 @@ const SURFACE_BAIT := 0.13
 ## Re-measure if either number moves.
 const OPEN_RING := 4.6
 
+## The thin ring round the island, in tiles past the water's drawn edge (player feedback,
+## 2026-09-22). Inside it every stack is `RING_SLOTS` deep and every piece is tier
+## `RING_TIER` or lighter, so the first ten minutes clear whole spots near home rather than
+## skimming the top off nine-deep soup. The depth's own count (`Iso.depth_at`, deepest at
+## the island) is untouched everywhere else, and what the ring gives up is dealt back over
+## the rest of the lake: see `_plan_slots`. 8 covers the level-0 net plus the first couple
+## of Range levels.
+const RING_OUT := 8.0
+
+## Slots a ring tile holds: the near figure over the inner half of the ring, the far one
+## over the outer half. First guesses, to judge in play.
+const RING_SLOTS := Vector2i(2, 3)
+
+## The heaviest tier a ring piece may be: liftable at level 0 or after the first Strength.
+const RING_TIER := 1
+
+## Slots planned per tile by `_plan_slots`, and the most any tile got.
+var _slots := PackedInt32Array()
+var _deepest := 0
+
+
 ## Def index per slot, bottom-first. One entry per tile, indexed ty * Iso.COLS + tx; dry
 ## land is an empty stack.
 var stacks: Array[PackedInt32Array] = []
@@ -1657,21 +1678,32 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 		pool.sort_custom(func(a: int, b: int) -> bool: return defs[a].lightness < defs[b].lightness)
 	_lightness_span = Vector2(floor_end, surface_end)
 
+	_plan_slots()
+	var ring_tiles := PackedInt32Array()
 	for ty in Iso.ROWS:
 		for tx in Iso.COLS:
 			var index := index_of(tx, ty)
 			var stack := PackedInt32Array()
 			emerge[index] = 0.0
 			_reroll_pose(index)
-			if not fill or not Iso.floats_here(tx, ty):
+			if not fill or _slots[index] == 0:
 				stacks[index] = stack
 				continue
-			var slots := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+			var slots := _slots[index]
 			for k in slots:
 				# 0 at the floor, 1 at the surface.
 				var up := float(k) / maxf(float(slots - 1), 1.0)
 				stack.append(_roll_piece(up))
-			stacks[index] = _dress_surface(index, stack, Vector2(tx, ty))
+			stacks[index] = stack
+			if Iso.past_shelf(Vector2(tx, ty)) < RING_OUT:
+				ring_tiles.append(index)
+	if fill:
+		_lighten_ring(ring_tiles)
+		for ty in Iso.ROWS:
+			for tx in Iso.COLS:
+				var index := index_of(tx, ty)
+				if not stacks[index].is_empty():
+					stacks[index] = _dress_surface(index, stacks[index], Vector2(tx, ty))
 
 	if fill:
 		_strand(lake_seed)
@@ -1680,6 +1712,122 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 	_emerging.resize(0)
 	_dirty = true
 	queue_redraw()
+
+
+## How many slots each wet tile gets, before anything is rolled into them. See RING_OUT.
+##
+## Inside the ring a tile holds `RING_SLOTS` (the near figure over the inner half, the far
+## one over the outer half), whatever the depth says. Every slot that came off the depth's
+## own count is dealt back out over the tiles past the ring, one each round and the
+## remainder to a shuffle off the lake's generator, so the lake holds exactly the pieces it
+## held before the ring and a tile past the ring is a slot or two deeper than the depth
+## alone would make it. Planned whether or not the fill runs, because the filth map asks
+## `room_of` on a lake restored from a save as well.
+func _plan_slots() -> void:
+	var count := Iso.COLS * Iso.ROWS
+	_slots.resize(count)
+	_slots.fill(0)
+	_deepest = 0
+	var owed := 0
+	var outer := PackedInt32Array()
+	for ty in Iso.ROWS:
+		for tx in Iso.COLS:
+			if not Iso.floats_here(tx, ty):
+				continue
+			var index := index_of(tx, ty)
+			var by_depth := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+			var out := Iso.past_shelf(Vector2(tx, ty))
+			if out < RING_OUT:
+				_slots[index] = mini(ring_slots(out), by_depth)
+				owed += by_depth - _slots[index]
+			else:
+				_slots[index] = by_depth
+				outer.append(index)
+	if not outer.is_empty():
+		var each := owed / outer.size()
+		var spare := owed % outer.size()
+		for n in range(outer.size() - 1, 0, -1):
+			var k := _rng.randi_range(0, n)
+			var held := outer[n]
+			outer[n] = outer[k]
+			outer[k] = held
+		for n in outer.size():
+			_slots[outer[n]] += each + (1 if n < spare else 0)
+	for index in count:
+		_deepest = maxi(_deepest, _slots[index])
+
+
+## The slots a tile inside the ring holds, by how far out it is. Static so the harness can
+## ask the rule without a lake.
+static func ring_slots(out: float) -> int:
+	if out < RING_OUT * 0.5:
+		return RING_SLOTS.x
+	return RING_SLOTS.y
+
+
+## What the fill put on a tile (or would have, on a restored lake): the tile's own room.
+func room_of(index: int) -> int:
+	if index < 0 or index >= _slots.size():
+		return 0
+	return _slots[index]
+
+
+## The most any tile holds off the fill: the filth map's ceiling.
+func deepest() -> int:
+	return _deepest
+
+
+## Swap every piece over RING_TIER inside the ring for a lighter one from past it.
+##
+## The roll is the same roll everywhere, so the material quota and the tier shares of the
+## whole lake come out exactly as before: a heavy piece the ring cannot have is not thrown
+## away or re-rolled but traded with a light piece that landed further out. Pairs are
+## matched by how far up their stacks they sit (`_up_bin`), so the depth band is carried
+## across with the swap rather than shuffled. A ring piece with no partner left in its bin
+## takes one from any bin; with none at all it stays, and `test_lake` counts those.
+func _lighten_ring(ring_tiles: PackedInt32Array) -> void:
+	var ring := {}
+	for index in ring_tiles:
+		ring[index] = true
+	var light: Array = [[], [], [], []]
+	for index in stacks.size():
+		if ring.has(index) or stacks[index].is_empty():
+			continue
+		var stack := stacks[index]
+		for k in stack.size():
+			if defs[stack[k]].tier <= RING_TIER:
+				light[_up_bin(k, stack.size())].append(Vector2i(index, k))
+	for bin: Array in light:
+		for n in range(bin.size() - 1, 0, -1):
+			var j := _rng.randi_range(0, n)
+			var held: Vector2i = bin[n]
+			bin[n] = bin[j]
+			bin[j] = held
+	for index in ring_tiles:
+		var stack := stacks[index]
+		for k in stack.size():
+			if defs[stack[k]].tier <= RING_TIER:
+				continue
+			var partner := Vector2i(-1, -1)
+			var bin := _up_bin(k, stack.size())
+			for tries in light.size():
+				var b: Array = light[(bin + tries) % light.size()]
+				if not b.is_empty():
+					partner = b.pop_back()
+					break
+			if partner.x < 0:
+				continue
+			var other := stacks[partner.x]
+			var piece := other[partner.y]
+			other[partner.y] = stack[k]
+			stack[k] = piece
+			stacks[partner.x] = other
+		stacks[index] = stack
+
+
+## Which quarter of its stack a slot sits in, floor first.
+static func _up_bin(k: int, slots: int) -> int:
+	return clampi(int(4.0 * float(k) / maxf(float(slots), 1.0)), 0, 3)
 
 
 ## Wash the small stuff up along the outer bank. See STRAND_CHANCE.

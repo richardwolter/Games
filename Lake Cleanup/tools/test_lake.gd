@@ -192,11 +192,11 @@ func _advance() -> void:
 	_in_stage = 0
 
 
-## A tile of genuinely deep water within casting distance of the island's south side.
+## A tile of genuinely deep water off the island's south side, just past the thin ring.
 ## Not the basin's middle any more — the island stands there.
 func _deep_tile() -> int:
 	return _grid.index_of(
-		int(Iso.CENTRE.x), int(Iso.CENTRE.y + Iso.ISLAND_RADIUS.y + 4.0)
+		int(Iso.CENTRE.x), int(Iso.CENTRE.y + Iso.ISLAND_RADIUS.y + LakeGrid.RING_OUT + 4.0)
 	)
 
 
@@ -453,6 +453,10 @@ func _check_surface() -> void:
 	var deep := 0
 	var ring_walls := 0
 	var landmarks := 0
+	var ring_tiles := 0
+	var ring_deep := 0
+	var ring_heavy := 0
+	var ring_pale := 0
 	var at: Array[Vector2i] = []
 	var tops := PackedInt32Array()
 	for index in _grid.stacks.size():
@@ -482,6 +486,20 @@ func _check_surface() -> void:
 				ring_walls += 1
 		elif def.tier > 0 and def.lightness < 1.7:
 			landmarks += 1
+		if out < LakeGrid.RING_OUT:
+			ring_tiles += 1
+			# The finds are planted on top of the fill and are not the fill's.
+			var filled := 0
+			for piece in stack:
+				if _grid.defs[piece].keepsake:
+					continue
+				filled += 1
+				if _grid.defs[piece].tier > LakeGrid.RING_TIER:
+					ring_heavy += 1
+			if filled > LakeGrid.RING_SLOTS.y:
+				ring_deep += 1
+			if _grid.water_state(index) != LakeGrid.FILTH_STATES:
+				ring_pale += 1
 
 	# The band, as it actually comes out rather than as the span says it should: over the
 	# deep stacks, what floats is lighter than what is lying on the floor under it.
@@ -501,6 +519,33 @@ func _check_surface() -> void:
 	# The opening ring: the first casts of a new game can lift everything they can see.
 	_check(ring_walls == 0, "nothing in the opening ring is too heavy for a level-0 net",
 		"%d tiles show one" % ring_walls)
+	# The thin ring (2026-09-22): the first ten minutes clear whole spots. Every stack inside
+	# RING_OUT is RING_SLOTS deep at most and holds nothing over RING_TIER, and what the
+	# ring gave up was dealt back over the rest of the lake, so the count the shop was
+	# priced on is what the lake still holds.
+	_check(ring_tiles > 200, "the ring round the island holds a few hundred tiles",
+		"%d" % ring_tiles)
+	_check(ring_deep == 0, "no stack inside the ring is deeper than the ring allows",
+		"%d tiles" % ring_deep)
+	_check(ring_heavy == 0, "nothing inside the ring is over the ring's tier",
+		"%d pieces" % ring_heavy)
+	_check(ring_pale == 0, "a fresh ring reads as dirty as the rest of the lake",
+		"%d tiles lighter" % ring_pale)
+	var by_depth := 0
+	for ty in Iso.ROWS:
+		for tx in Iso.COLS:
+			if Iso.floats_here(tx, ty):
+				by_depth += maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+	var planned := 0
+	for index in _grid.stacks.size():
+		planned += _grid.room_of(index)
+	_check(planned == by_depth, "the ring's slots were dealt back over the rest of the lake",
+		"%d planned against %d by depth" % [planned, by_depth])
+	# The nine-deep tiles were all by the island and are the ring's now; past it the depth
+	# tops out lower and the dealt-back slots put it back near the old ceiling.
+	_check(_grid.deepest() >= Iso.MAX_SLOTS - 2 and _grid.deepest() <= Iso.MAX_SLOTS + 2,
+		"and the deepest tile past the ring is near the depth's own ceiling",
+		"%d of %d" % [_grid.deepest(), Iso.MAX_SLOTS])
 	# And past it, the bait still puts the occasional heavy thing where it can be seen.
 	_check(landmarks > 20, "past the ring, heavy pieces still break the surface as landmarks",
 		"%d of them" % landmarks)

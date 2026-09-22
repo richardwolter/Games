@@ -559,6 +559,46 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   nothing lives. The surface end is crowded and works. Percentile ends would fix the other
   one; not done.
 
+### The Thin Ring Round the Island (2026-09-22, `/grill-me` with Richard, player feedback)
+Players' first sessions: the water by the island was nine-deep soup, so ten minutes of
+casting skimmed the top off it and nothing ever read as cleared. Now the first stretch out
+from the island is thin and light, and what it gave up is out in the rest of the lake.
+- **`LakeGrid.RING_OUT` 8 tiles past the drawn water edge**: the level-0 net (4 tiles)
+  plus the first couple of Range levels. Inside it every stack holds `RING_SLOTS` (2 over
+  the inner half, 3 over the outer) instead of the depth's 9, and **every tile is still
+  filled** — no gaps, by Richard's call over empty water from the start. Every piece is
+  tier `RING_TIER` (1) or lighter: liftable at level 0 or after the first Strength.
+  `OPEN_RING` (top piece tier 0, 4.6 tiles) still applies inside it.
+- **The total is held, the depth untouched** (`_plan_slots`): `Iso.depth_at` still feeds
+  the water's bands and the old count, and the slots the ring gave up are dealt back one
+  each over the tiles past it, the remainder to a shuffle off the lake's seed. Measured:
+  436 ring tiles, 16264 slots before and after. The nine-deep tiles were all by the island,
+  so the deepest tile is 8 now (`deepest()`), which is what the filth map's ceiling reads
+  in place of `Iso.MAX_SLOTS`.
+- **The roll is the same roll, then traded** (`_lighten_ring`): a heavy piece rolled inside
+  the ring is swapped with a light one from past it, matched by which quarter of its stack
+  it sits in, so the material quota, the tier shares and the depth band come out as before
+  and nothing is re-rolled or thrown away. `test_lake`'s `PAY_PRICED`/`TIER_PRICED` hold
+  within their 2%/3% (tier 0 at 33.3% against 35.1% is the widest). `_dress_surface` runs
+  after the trade, over every tile.
+- **A fresh ring reads dirty, the bank's rule brought inward** (`Lake._room_at`): inside
+  `RING_OUT` a tile's room is its own thin fill, so the ring is one soup with the rest at
+  the start and lightens a piece at a time as it is worked. Honestly-lighter-from-the-start
+  was offered and turned down: the point is to see it cleared, not to be told it nearly is.
+- **Prices stay frozen, by Richard's call**; he judges it on a fresh run. The sim was
+  **not** re-run: its `k_density` is one number for the whole lake and it cannot see a
+  spatial thinning, so a re-run would report no drift and mean nothing. Expect the first
+  ten minutes to land fewer pieces a cast and Catch to bind later; if the run drags, the
+  levers are `RING_SLOTS` and `RING_OUT`, not the prices.
+- **`SAVE_VERSION` 15**, v14 refused (stacks are saved, so an old file would keep its deep
+  ring for ever); the v14 save is at `_builds/lake_cleanup_v14_20260922.save`.
+- **Out of scope, by decision**: empty tiles, `depth_at`, the strand and beach litter, the
+  find bands (`EARLY_FINDS` still land one slot down inside 15 tiles; a 2-deep tile is
+  skipped by `_find_spots`'s `height < 3`, the 3-deep outer half of the ring is not).
+- `test_lake`'s `_check_surface` guards the ring's depth and tier (finds excluded), the
+  fresh ring reading the dirtiest state, the slot total against the depth's own, and the
+  ceiling. `_deep_tile` moved out past the ring. Numbers are first guesses for the run.
+
 ### What the Surface Shows (2026-09-17, `/grill-me` with Richard, `LakeGrid._dress_surface`)
 The top of a stack is the whole first impression of the game, so it is chosen rather than
 left to the roll. **Out of the pieces that stack already holds**: the slots under it are

@@ -411,7 +411,7 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## 14: the rubbish is cut from one PSD (2026-09-21): forty-nine kinds joined and five left
 ## (`plastic_toy`, `plastic_globe`, `rubber_bone`, `wood_painting3`/`4`), so every index in
 ## a saved stack moved.
-const SAVE_VERSION := 14
+const SAVE_VERSION := 15
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -4812,14 +4812,19 @@ func _pooled_share(cols: int, rows: int) -> PackedFloat32Array:
 func _room_at(tx: int, ty: int) -> int:
 	var own := 0
 	if Iso.floats_here(tx, ty):
-		own = maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+		own = maxi(_grid.room_of(_grid.index_of(tx, ty)), 1)
+		# Inside the ring the room is the tile's own thin fill, the bank's rule brought in:
+		# against the deepest tile a two-deep ring read hazy from the first frame, and the
+		# ring exists to be seen lightening as it is worked.
+		if Iso.past_shelf(Vector2(tx, ty)) < LakeGrid.RING_OUT:
+			return own
 	elif Iso.on_strand(tx, ty):
 		own = FILTH_STRAND_ROOM
 	else:
 		return 0
 	var out := Iso.shore_fraction(float(tx) + 0.5, float(ty) + 0.5)
 	var bank := smoothstep(FILTH_BANK_FROM, 1.0, out)
-	return maxi(int(round(lerpf(float(Iso.MAX_SLOTS), float(own), bank))), 1)
+	return maxi(int(round(lerpf(float(_grid.deepest()), float(own), bank))), 1)
 
 
 ## How much of the water reads clean on the map, and which tiles: the stage nature is at.
