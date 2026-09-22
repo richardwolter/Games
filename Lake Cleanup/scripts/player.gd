@@ -180,7 +180,8 @@ const LED_CLOSE := 0.35
 ##
 ## The dog used to be in here too, as a thing to keep out of. It is not any more: an animal
 ## that wanders about the island and pushes back is an animal in the way, and the island is
-## small. It can be walked through.
+## small. It can be walked through — and since 2026-09-22 the dog is what moves: it steps
+## clear of the angler on its own (`Dog._give_way`), so nothing here has to stop for it.
 var crate_tile := Vector2.INF
 
 var _time: float = 0.0

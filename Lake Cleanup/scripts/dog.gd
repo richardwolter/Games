@@ -24,11 +24,32 @@ const Style := preload("res://scripts/style.gd")
 ## to about the knee.
 const HEIGHT := 22.0
 
-## Tiles a second, swimming and on land. It swims slower than it runs, and it runs home
-## faster than it goes out — a dog carrying something is a dog with a purpose.
+## Tiles a second, swimming and on land. It swims slower than it runs. The walk is the
+## wander about the island and nothing else; every land leg of a trip — out to the water
+## after a stick as well as home with it — is run (2026-09-22, Richard: walking slower,
+## and the way out should run, not walk). The walk went 2.4 to 1.6 the same day.
 const SWIM_SPEED := 2.6
-const WALK_SPEED := 2.4
+const WALK_SPEED := 1.6
 const RUN_SPEED := 6.2
+
+## The dog feels this far ahead of itself, in tiles, for the hut, the crate and the pump,
+## and bends round them by their corners instead of walking into a wall and scraping along
+## it (2026-09-22, Richard: "avoid running against it completely"). `AVOID_CLEAR` is how far
+## outside a box's own walk margin the corner it makes for stands. `_hug` and the axis slides
+## stay underneath as the last resort for something already touching.
+const AVOID_AHEAD := 1.0
+const AVOID_CLEAR := 0.35
+## How close to a corner counts as round it. Tighter than `CLOSE`: let go a third of a tile
+## short, the next leg ran along the face inside the clearance and scraped.
+const AVOID_AT := 0.1
+
+## The angler never stops for a dog; a dog inside `NUDGE_REACH` tiles of them is pushed
+## clear at `NUDGE_SPEED` tiles a second, sideways off the angler's walk when they are
+## walking and straight away from them when they are not (2026-09-22, Richard: a small
+## collision, the dog gives way). Dozing dogs are nudged the same. This is the one place
+## the angler and a dog touch; `Angler._slide` still walks through them.
+const NUDGE_REACH := 0.6
+const NUDGE_SPEED := 2.2
 
 ## How far out the dog may walk on the island, as a fraction of its radius, and how close to
 ## the shed it will settle. Under the angler's own limit, so it stays visibly on the grass.
@@ -190,12 +211,19 @@ const GREET_AGAIN := 7.0
 
 ## The dog's noises (2026-09-15, Richard): a bark when it passes the angler or sits about
 ## near them, a sniff when it wanders round them or they walk up. Sparse by rule, because
-## there can be four of it: one gap shared by the whole pack (`_voice_next`), a roll every
-## `VOICE_ROLL` seconds at `VOICE_ODDS`, and only within `HEAR` tiles of the angler. Numbers
+## there can be four of it: a gap per dog (`_voice_next`, so four dogs are heard about four
+## times as often as one — 2026-09-22, Richard: more frequent, growing with the pack), no
+## two of the pack inside `VOICE_APART` of each other (`_pack_hush`), a roll every
+## `VOICE_ROLL` seconds at `VOICE_ODDS` within `HEAR` tiles of the angler, and beyond it a
+## **far bark** at `FAR_SHARE` of those odds and `FAR_DB` down — a dog heard from across the
+## island, faint (Richard, same day). Sniffs stay near only. Numbers
 ## are first guesses, to be tuned by ear.
 const HEAR := 3.5
-const VOICE_GAP_LEAST := 8.0
-const VOICE_GAP_MOST := 18.0
+const VOICE_GAP_LEAST := 6.0
+const VOICE_GAP_MOST := 14.0
+const VOICE_APART := 1.2
+const FAR_SHARE := 0.33
+const FAR_DB := -14.0
 const VOICE_ROLL := 1.5
 const VOICE_ODDS := 0.35
 ## A walk up to the dog is likelier to be answered than a dog merely being nearby.
@@ -340,8 +368,15 @@ static var claims: Dictionary = {}
 ## a fact about the lake rather than about any one animal — and emptied of a dog as it
 ## leaves the tree, with `is_instance_valid` on every read for the frame a scene is swapped.
 static var pack: Array = []
-## The earliest time, in engine seconds, any dog in the pack may make a noise again.
-static var _voice_next: float = 0.0
+## The earliest time, in engine seconds, this dog may make a noise again, and the earliest
+## any of the pack may, so two never bark over each other.
+var _voice_next: float = 0.0
+static var _pack_hush: float = 0.0
+
+## Where the angler stood last frame, for which way they are walking when they meet a dog.
+var _angler_was := Vector2.INF
+## The corner the dog is making for to get round a building, or INF on a straight line.
+var _around := Vector2.INF
 var _voice_roll: float = 0.0
 ## The tile index this dog has claimed, or -1.
 var _claim: int = -1
@@ -470,6 +505,7 @@ func _process(delta: float) -> void:
 		_maybe_speak()
 	_push_wade()
 	_chase_mouth(delta)
+	_give_way(delta)
 	match _state:
 		State.SWIM_OUT:
 			_go_fetch(delta)
@@ -518,29 +554,59 @@ func _chase_mouth(delta: float) -> void:
 	_carry_drop = lerpf(_carry_drop, 0.0, 1.0 - exp(-CARRY_LAG * delta))
 
 
-## Now and then, near the angler: a sniff or a bark wandering past them, a bark sitting about.
+## Now and then, near the angler: a sniff or a bark wandering past them, a bark sitting
+## about. Out of earshot, a faint bark now and then, so the pack is heard being somewhere.
 func _maybe_speak() -> void:
-	if dozing or angler == null or tile_pos.distance_to(angler.tile_pos) > HEAR:
+	if dozing or angler == null:
 		return
-	if _rng.randf() >= VOICE_ODDS:
+	var far := tile_pos.distance_to(angler.tile_pos) > HEAR
+	if _rng.randf() >= VOICE_ODDS * (FAR_SHARE if far else 1.0):
 		return
 	match _state:
 		State.WANDER:
-			_speak(&"sniff" if _rng.randf() < 0.35 else &"bark")
+			_speak(&"bark" if far or _rng.randf() >= 0.35 else &"sniff", far)
 		State.IDLE, State.LOUNGE, State.SIT:
-			_speak(&"bark")
+			_speak(&"bark", far)
 
 
-## One noise, if the pack has been quiet long enough.
-func _speak(what: StringName) -> void:
+## One noise, if this dog has been quiet long enough and no other is mid-bark.
+func _speak(what: StringName, far: bool = false) -> void:
 	var sound := Sfx.main()
-	if sound == null or _now() < _voice_next:
+	if sound == null or _now() < _voice_next or _now() < _pack_hush:
 		return
 	_voice_next = _now() + _rng.randf_range(VOICE_GAP_LEAST, VOICE_GAP_MOST)
+	_pack_hush = _now() + VOICE_APART
 	if what == &"sniff":
 		sound.play_sniff()
+	elif far:
+		sound.play(&"bark", FAR_DB)
 	else:
 		sound.play_bark()
+
+
+## Pushed clear of the angler. Sideways off their walk when they are moving, so a dog in
+## the path steps aside rather than being driven ahead of them; straight away when they
+## are standing. Only onto ground it may stand on, so a nudge never puts a dog in the hut.
+func _give_way(delta: float) -> void:
+	if angler == null:
+		return
+	var here := angler.tile_pos
+	var walk := Vector2.ZERO if _angler_was == Vector2.INF else here - _angler_was
+	_angler_was = here
+	var gap := tile_pos - here
+	var apart := gap.length()
+	if apart >= NUDGE_REACH:
+		return
+	var away := gap / apart if apart > 0.0001 else Vector2(1.0, 0.0)
+	if walk.length_squared() > 0.000001:
+		var side := Vector2(-walk.y, walk.x).normalized()
+		if side.dot(away) < 0.0:
+			side = -side
+		away = side
+	var wanted := tile_pos + away * NUDGE_SPEED * delta
+	if _may_stand(wanted):
+		tile_pos = wanted
+		_around = Vector2.INF
 
 
 ## How many pieces are in this dog's mouth. Asked by the lake, which cannot call the run
@@ -767,7 +833,7 @@ func _go_fetch(delta: float) -> void:
 
 ## The swim out, quicker on a strand run once Beachcomber is trained.
 func _swim_pace() -> float:
-	return SWIM_SPEED
+	return RUN_SPEED if _on_land() else SWIM_SPEED
 
 
 ## Back to the crate, by way of the shore. Swims while it is over water and runs once it is
@@ -909,7 +975,8 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 		_slow(delta)
 		return true
 	_speed = move_toward(_speed, speed, ACCEL * delta)
-	var step := gap.normalized() * minf(_speed * delta, STEP_MOST)
+	var way := _steer(tile, gap)
+	var step := way * minf(_speed * delta, STEP_MOST)
 	_look_along(step)
 	var wanted := tile_pos + step
 	if _may_stand(wanted):
@@ -946,6 +1013,62 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 		_stuck += delta
 		_speed = 0.0
 	return tile_pos.distance_to(tile) <= CLOSE
+
+
+## Which way to step for `tile`: straight at it, unless a building stands within
+## `AVOID_AHEAD` along that line, in which case towards the corner of it that is the
+## shorter way round. The corner is held until it is reached or the line ahead is clear,
+## so the dog does not re-decide at every step and rock. A target inside the building's
+## own margin (the drop spot beside the crate is close to it) is walked at straight: the
+## step's own `_may_stand` still refuses the box.
+func _steer(tile: Vector2, gap: Vector2) -> Vector2:
+	var straight := gap.normalized()
+	if _around != Vector2.INF:
+		if tile_pos.distance_to(_around) <= AVOID_AT:
+			_around = Vector2.INF
+		else:
+			return (_around - tile_pos).normalized()
+	if gap.length() <= AVOID_AHEAD:
+		return straight
+	var box := _bumped(tile_pos + straight * AVOID_AHEAD)
+	if box.is_empty():
+		return straight
+	var mid: Vector2 = box[0]
+	var half: Vector2 = box[1] + Vector2(AVOID_CLEAR, AVOID_CLEAR)
+	if absf(tile.x - mid.x) <= half.x and absf(tile.y - mid.y) <= half.y:
+		return straight
+	# The corner that is the shorter way round, among the ones the dog can see: a corner
+	# whose straight line from here crosses the box is the far corner, and heading for it
+	# is heading through the wall. Not the corner it is standing on — from there the next
+	# corner along the face is the way, and picking itself again is the rock that was
+	# found on the hut.
+	var best := Vector2.INF
+	var shortest := INF
+	for sx: float in [-1.0, 1.0]:
+		for sy: float in [-1.0, 1.0]:
+			var corner := mid + Vector2(half.x * sx, half.y * sy)
+			if tile_pos.distance_to(corner) <= AVOID_AT * 2.0:
+				continue
+			if not _may_stand(corner) or _crosses(tile_pos, corner, mid, box[1]):
+				continue
+			var length := tile_pos.distance_to(corner) + corner.distance_to(tile)
+			if length < shortest:
+				shortest = length
+				best = corner
+	if best == Vector2.INF:
+		return straight
+	_around = best
+	return (best - tile_pos).normalized()
+
+
+## Does the line from `a` to `b` pass through the box? Sampled along its length, which is
+## enough for a box a tile or two across and a line a few tiles long.
+func _crosses(a: Vector2, b: Vector2, mid: Vector2, half: Vector2) -> bool:
+	for i in range(1, 12):
+		var at := a.lerp(b, float(i) / 12.0)
+		if absf(at.x - mid.x) < half.x and absf(at.y - mid.y) < half.y:
+			return true
+	return false
 
 
 ## The thing on the island the dog has just walked into, as `[middle, half-extent]` in tile
@@ -1020,6 +1143,7 @@ func _fresh_aim() -> void:
 	_closest = INF
 	_aiming = Vector2.INF
 	_hug_along = Vector2.ZERO
+	_around = Vector2.INF
 
 
 ## Somewhere off to one side to make for while whatever is in the way is got round.

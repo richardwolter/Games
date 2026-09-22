@@ -1565,6 +1565,96 @@ func _stage_dog_idle(dogs: Array) -> void:
 		"state %d" % int(one.get(&"_state")))
 	_check(int(one.get(&"_state")) != Dog.State.SIT, "nor sitting down on it", "")
 	_stage_dog_breeds(dogs)
+	_stage_dog_manners(dogs)
+
+
+## The pack's manners (2026-09-22, Richard): a dog gives way to the angler, walks slow and
+## runs every land leg, bends round the buildings by their corners before touching them,
+## and the pack barks per dog with no two over each other, faintly from afar.
+func _stage_dog_manners(dogs: Array) -> void:
+	var dog := dogs[0] as Dog
+	var others: Array = dogs.slice(1)
+	for o: Dog in others:
+		o.set(&"_state", Dog.State.NAP)
+		o.set(&"_mood_left", 1000.0)
+		o.tile_pos = Iso.ISLAND_CENTRE + Vector2(-4.0, 3.0)
+	_check(Dog.WALK_SPEED < 2.0 and Dog.WALK_SPEED < Dog.RUN_SPEED * 0.4,
+		"the walk is a walk", "%.1f against %.1f" % [Dog.WALK_SPEED, Dog.RUN_SPEED])
+	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(3.0, -1.0)
+	_check(is_equal_approx(float(dog.call(&"_swim_pace")), Dog.RUN_SPEED), "the way out runs on land", "")
+	dog.tile_pos = Iso.ISLAND_CENTRE + Vector2(Iso.ISLAND_RADIUS.x + 4.0, 0.0)
+	_check(is_equal_approx(float(dog.call(&"_swim_pace")), Dog.SWIM_SPEED), "and swims in the water", "")
+	# Round the crate and round the hut: a straight line through each, walked at running
+	# pace, never touching (`_hug` never engaged, the stuck clock never started) and
+	# arriving.
+	var crate: Vector2 = dog.crate_tile
+	for trial: Array in [
+		["the crate", crate + Vector2(-3.2, 0.1), crate + Vector2(3.2, -0.1)],
+		["the hut", Iso.shed_centre() + Vector2(0.1, 3.4), Iso.shed_centre() + Vector2(-0.1, -3.4)],
+	]:
+		dog.tile_pos = trial[1]
+		dog.set(&"_state", Dog.State.IDLE)
+		dog.call(&"_fresh_aim")
+		dog.set(&"_speed", 0.0)
+		var target: Vector2 = trial[2]
+		var hugged := false
+		var stuck := false
+		var arrived := false
+		var bent := false
+		for i in 900:
+			arrived = bool(dog.call(&"_step_towards", target, Dog.RUN_SPEED, 1.0 / 60.0))
+			if dog.get(&"_hug_along") != Vector2.ZERO:
+				hugged = true
+			if float(dog.get(&"_stuck")) > 0.0:
+				stuck = true
+			if dog.get(&"_around") != Vector2.INF:
+				bent = true
+			if arrived:
+				break
+		_check(arrived, "a dog sent through %s arrives on the far side" % trial[0], str(dog.tile_pos))
+		_check(bent, "having bent round a corner of it", "")
+		_check(not hugged and not stuck, "and never touched it on the way", "hug %s stuck %s" % [hugged, stuck])
+	# The nudge: a still dog beside the angler is pushed clear, the angler does not move.
+	var angler: Angler = _main.get(&"_angler")
+	var angler_was := angler.tile_pos
+	var stood := Iso.ISLAND_CENTRE + Vector2(3.6, 1.2)
+	angler.tile_pos = stood
+	dog.set(&"_state", Dog.State.SIT)
+	dog.set(&"_mood_left", 100.0)
+	dog.tile_pos = stood + Vector2(0.2, 0.0)
+	dog.set(&"_angler_was", Vector2.INF)
+	for i in 30:
+		dog.call(&"_give_way", 0.05)
+	_check(dog.tile_pos.distance_to(stood) >= Dog.NUDGE_REACH - 0.01,
+		"a dog beside a standing angler is pushed clear", "%.2f" % dog.tile_pos.distance_to(stood))
+	_check(angler.tile_pos.is_equal_approx(stood), "and the angler did not move", "")
+	# Walking: the push is sideways off the walk, not ahead of it.
+	dog.tile_pos = stood + Vector2(0.3, 0.0)
+	dog.set(&"_angler_was", stood - Vector2(0.1, 0.0))
+	angler.tile_pos = stood
+	dog.call(&"_give_way", 0.05)
+	var moved: Vector2 = dog.tile_pos - (stood + Vector2(0.3, 0.0))
+	_check(absf(moved.y) > absf(moved.x) * 4.0, "a walking angler pushes the dog sideways", str(moved))
+	_check(dog.get(&"_state") == Dog.State.SIT, "and does not wake or move it on", "")
+	angler.tile_pos = angler_was
+	dog.set(&"_angler_was", Vector2.INF)
+	# Barks: per dog, never two at once, faint from afar.
+	var src := FileAccess.get_file_as_string("res://scripts/dog.gd")
+	_check(src.find("static var _voice_next") < 0 and src.find("var _voice_next") >= 0,
+		"the voice gap is each dog's own", "")
+	_check(Dog.VOICE_GAP_MOST < 18.0, "and shorter than it was", "%.0f" % Dog.VOICE_GAP_MOST)
+	_check(src.find("play(&\"bark\", FAR_DB)") >= 0 and Dog.FAR_DB < -8.0, "a far bark is played faint", "")
+	if Sfx.main() != null:
+		var two := dogs[1] as Dog
+		dog.set(&"_voice_next", 0.0)
+		two.set(&"_voice_next", 0.0)
+		Dog._pack_hush = 0.0
+		dog.call(&"_speak", &"bark")
+		two.call(&"_speak", &"bark")
+		_check(float(dog.get(&"_voice_next")) > 0.0 and is_zero_approx(float(two.get(&"_voice_next"))),
+			"two dogs do not bark over each other", "")
+	for o: Dog in others:
+		o.set(&"_mood_left", 0.0)
 
 
 ## The pack's coats and gaits, the sit, and the gripped carry (2026-09-22, Richard).

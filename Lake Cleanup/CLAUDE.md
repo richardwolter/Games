@@ -4060,6 +4060,44 @@ breeds"). The ball (odd) sheets never ship.
   the roll, the mouth moving through the run and sitting at the front of the head, and the
   piece being drawn under the dog with a lag.
 
+### The Pack's Manners (2026-09-22, `/grill-me` with Richard)
+A dog gives way to the angler, walks slow and runs every land leg, bends round the
+buildings before it touches them, and the pack is heard more, from all over the island.
+- **The angler never stops; the dog gives way** (`Dog._give_way`, `NUDGE_REACH` 0.6,
+  `NUDGE_SPEED` 2.2): a dog inside the reach is pushed sideways off the angler's walk
+  (their heading read off where they stood last frame) or straight away when they stand
+  still, onto ground it may stand on, dozing dogs included. **This reverses the note in
+  `player.gd`** that took the dog out of the angler's collision ("an animal in the way");
+  `Angler._slide` is untouched and still walks through — the push is the dog's own.
+  Picked over the angler sliding round the dog and over a half-each shove.
+- **`WALK_SPEED` 2.4 → 1.6**; the run home stays 6.2; **the land leg out to a stick runs**
+  (`_swim_pace` picks `RUN_SPEED` on land, `SWIM_SPEED` afloat) — it crossed the beach at
+  swim pace before.
+- **Steering, a tile ahead** (`_steer`, `AVOID_AHEAD` 1.0, `AVOID_CLEAR` 0.35, `AVOID_AT`
+  0.1, `_around`, `_crosses`): before each step the dog feels `AVOID_AHEAD` along its line
+  with `_bumped` (the hut, the crate, the pump — the same boxes `_may_stand` refuses); a
+  box there sends it to the corner that is the shorter way round **among the corners it
+  can see** — a corner whose line from here crosses the box is the far one, and heading
+  for it is heading through the wall (found on the crate) — and **never the corner it is
+  standing on** (found on the hut: it picked itself and rocked). Held until reached within
+  `AVOID_AT`, not `CLOSE`: let go a third of a tile short, the next leg ran along the face
+  inside the clearance and scraped. A target inside the box's own margin (the drop spot by
+  the crate) is walked at straight. **`_hug` and the axis slides stay underneath** as the
+  last resort for something already touching; `test_lake` sends a dog through the crate
+  and through the hut and asks `_hug` never engaged. No A*, by decision.
+- **Barks per dog, never over each other, faint from afar** (`_voice_next` is each dog's,
+  `VOICE_GAP` 6-14 s from 8-18 shared; `_pack_hush`/`VOICE_APART` 1.2 s pack-wide;
+  `FAR_SHARE` 0.33 of `VOICE_ODDS` beyond `HEAR`, played through `Sfx.play(&"bark",
+  FAR_DB)` at -14 dB). Four dogs are heard about four times as often as one. Sniffs stay
+  near only. Richard: "no barking at the same time... some barks from afar, very faint".
+- **Out of scope, by decision**: the angler blocked by dogs, dog-to-dog collision, a path
+  search, new recordings, barks from the shed's or wash room's actors, real distance
+  attenuation (one faint level).
+- All numbers first guesses for Richard's eye and ear. `test_lake`'s `_stage_dog_manners`
+  guards the speeds, both walks round, the nudge (clear of a standing angler, sideways off
+  a walking one, the angler unmoved, the dog's mood kept), the per-dog gap, the faint far
+  bark and two dogs not barking together.
+
 ### The Pack in the Shed (2026-09-19, `/grill-me` with Richard, issue #30)
 One dog could be in the shed; up to the whole pack can be now, and they lie on the
 furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
