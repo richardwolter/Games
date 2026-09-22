@@ -7071,7 +7071,7 @@ func _stage_letter() -> void:
 	var long_cards: Array = []
 	for card: Dictionary in Letter.CARDS:
 		heads.append(String(card["head"]))
-		if (letter.call(&"_rows", card) as PackedStringArray).is_empty():
+		if card.has("text") and (letter.call(&"_rows", card) as Dictionary).is_empty():
 			long_cards.append(String(card["head"]))
 	_check(heads == ["Net", "Upgrades", "Object Tier", "Decoration"],
 		"named for what each one teaches", ", ".join(heads))
@@ -7148,8 +7148,34 @@ func _stage_letter() -> void:
 	letter.page = Letter.CARDS.size() - 1
 	letter.call(&"_lay_out")
 	var art_last := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
-	_check(is_equal_approx(art_early.end.y, art_last.end.y),
-		"in a row every card reserves, so the pictures stand still", "")
+	_check(is_equal_approx(art_early.end.y - Letter.DOOR.y - Letter.GAP, art_last.end.y),
+		"taking its row off the last card's pictures alone", "%.0f then %.0f" % [art_early.end.y, art_last.end.y])
+	# The words that matter are marked for the head ink, and a mark never reaches the paper.
+	var marked := 0
+	for card: Dictionary in Letter.CARDS:
+		var words: Array = Letter._tokens(String(card.get("text", "")))
+		for snap: Array in card["snaps"]:
+			words.append_array(Letter._tokens(String(snap[1])))
+		for word: Dictionary in words:
+			for seg: Array in word["segs"]:
+				marked += 1 if bool(seg[1]) else 0
+				if String(seg[0]).contains("*"):
+					marked = -1000
+	_check(marked > 0, "some words are marked for the head ink, and no asterisk is drawn", "%d" % marked)
+	var tiers: Array = letter.call(&"_rows", Letter.CARDS[2])["rows"]
+	_check(tiers.size() == 2 and bool(tiers[1]["para"]) and not bool(tiers[0]["para"]),
+		"the tier card is two paragraphs", "%d rows" % tiers.size())
+	_check(bool(Letter.CARDS[1].get("side", false)) and not Letter.CARDS[1].has("text"),
+		"the upgrades card lays each board beside its own sentence", "")
+	letter.page = 1
+	letter.call(&"_lay_out")
+	var side_caps: Array = letter.get(&"_captions")
+	var stacked := side_caps.size() == 3
+	for i in side_caps.size():
+		var cap: Dictionary = side_caps[i]
+		stacked = stacked and bool(cap.get("side", false)) \
+			and (i == 0 or (cap["box"] as Rect2).position.y > (side_caps[i - 1]["box"] as Rect2).position.y)
+	_check(stacked, "with the three stacked down the card", "%d" % side_caps.size())
 
 	# The pictures are the game's own photographs. A still that is not there is a probe
 	# nobody re-ran, and the card would show a blank print.

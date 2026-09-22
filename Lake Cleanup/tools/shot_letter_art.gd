@@ -40,6 +40,7 @@ const WASH_CROP := Vector2i(540, 390)
 const BOARD_PAD := 8.0
 ## A board's title plank stands over its top edge by half its height; take it whole.
 const BOARD_PLANK := 17.0
+const BOARD_TOP := 250.0
 const ROW_PAD := 6
 ## `shot_shed`'s room, in cells: bookcase and fridge on the wall, paintings, table and pot,
 ## chairs, sofa on rug, the hearth. Kept here rather than read from that probe, since a
@@ -291,7 +292,7 @@ func _pose_find() -> void:
 	_say("NO floating find")
 
 
-## The shop, open: the net, boats and dogs boards one each, plank to foot, and the Strength
+## The shop, open: the top of the net, boats and dogs boards one each, and the Strength
 ## row with the rows either side of it.
 func _shoot_shop() -> void:
 	var shop: ShopSkin = _main.get(&"_shop_skin")
@@ -301,7 +302,10 @@ func _shoot_shop() -> void:
 			_say("NO %s board on the shop" % pair[0])
 			continue
 		var box: Rect2 = boards[pair[0]]
-		box = Rect2(box.position - Vector2(BOARD_PAD, BOARD_PLANK), box.size + Vector2(BOARD_PAD * 2.0, BOARD_PLANK + BOARD_PAD))
+		# The top of the board: title plank, head and the first row or two. The whole board is
+		# three times as tall as a card's picture, and beside a sentence it was a strip.
+		box = Rect2(box.position - Vector2(BOARD_PAD, BOARD_PLANK),
+			Vector2(box.size.x + BOARD_PAD * 2.0, BOARD_TOP))
 		_crop_canvas(String(pair[1]), Rect2(shop.global_position + box.position, box.size))
 	var rows: Array = shop.rows
 	var row_boxes: Array = shop.get(&"_row_boxes")

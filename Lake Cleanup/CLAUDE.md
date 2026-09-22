@@ -1316,11 +1316,10 @@ open** for those.
 - **The greeting is the first card's alone** (Richard, over a letterhead on every card and
   over a fifth opening page); the other three cards give its room to their pictures. **One
   line since 2026-09-22**, the lake's name a size up — see below.
-- **One height whatever card is up** (483 design px of the 680 a 720 window leaves, was
+- **One height whatever card is up** (450 design px of the 680 a 720 window leaves, was
   428): laid out from the top — greeting, heading, sentence — and from the bottom — pager,
-  door — and the pictures take what is left between. The door's row is reserved on every
-  card since 2026-09-22 (below); before that "Start cleaning" stood at the pager's right end
-  in place of the forward arrow.
+  and the door on the last card — and the pictures take what is left between. Before
+  2026-09-22 "Start cleaning" stood at the pager's right end in place of the forward arrow.
 - **Every line is measured against the paper** (`_fitted`, `overruns`, `dropped_lines`):
   `Style.write` neither wraps nor clips, and the first cut's net card ran its second line
   clean over both stiles of the frame. A line too wide drops a size; one still too wide is
@@ -1355,13 +1354,28 @@ A wording and layout pass over the onboarding cards, off Richard's first-time-pl
 - **The greeting is one line** (Richard: "decrease size if needed"), the lead in body ink
   and **"My Dirty Little Lake." a rung up in the head ink** on the same baseline
   (`GREETING_LEAD` / `GREETING_NAME`, `greeting_sizes`, `_draw_greeting`). Bungee has one
-  weight, so bolder is bigger. It fits the 538 px paper only at **11 / 13** — Bungee is a
-  wide face — which is small; widening `BOARD_WIDE` is the lever if it reads too small.
+  weight, so bolder is bigger. On the 678 px paper it lands at **16 / 20** (at 620 wide it
+  was 11 / 13, which Richard read as too small).
 - **The sentences are wrapped, not authored in rows** (`text` per card, `_rows`,
   `SENTENCE_ROWS` 3): body size first, a rung down if that needs more rows. Typos in the
   brief fixed on the way ("indicates", "weight 5 weight tiers", "Strenght").
-- **"Start cleaning" stands centred above the dots**, in a row every card reserves, so the
-  pictures do not grow on the last card. The forward arrow is simply absent there.
+- **"Start cleaning" stands centred above the dots**, and its row comes off the last card's
+  pictures alone (second pass, Richard: too much bare paper under the pictures; reserving
+  it on every card lasted an hour). The forward arrow is simply absent there.
+- **A word between asterisks is written in the head ink** (`_tokens`, `_wrap_marked`,
+  `_ink_marked`): "*Left click*", "*circles below*", "*5 weight tiers*", "*catches more
+  objects and cleans faster*", and the three on the Upgrades card — the lake's name's own
+  red, so a card points at what matters with no second face or size. A `
+` in a card's
+  text is a paragraph: its own row, `PARA_GAP` (half a row) over it. `test_lake` asks that
+  some words are marked and no asterisk reaches the paper.
+- **The Upgrades card is side-laid** (`side`, `_pin_side`, `_draw_side_text`, `SIDE_SHARE`
+  0.42): the top of each board — plank, head, first row or two (`BOARD_TOP` 250 in the
+  probe) — down the left, its own sentence beside it, left-aligned and level with the
+  picture's middle. Three whole boards in a row under one sentence said nothing about
+  which was which.
+- **The board went 620 to 760 wide**, which is what took the greeting from 11 / 13 to
+  **16 / 20**; `ART_LEAST` came 150 to 110 with it, since the room now comes across.
 - **Upgrades shows the three boards** (net, boats, dogs, plank to foot, `BOARD_PAD` /
   `BOARD_PLANK`), shot with the corner HUD skin hidden — the HUD *layer* cannot be, the
   shop lives on it. **Decoration's last still is the shed** furnished as `tools/shot_shed.gd`
