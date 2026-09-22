@@ -83,6 +83,10 @@ const MARGIN := 8.0
 ## part of the floor and a player placing furniture is looking at the floor, not at the list
 ## they have already taken the piece out of.
 const LIST_BUSY := 0.25
+## The wash plank's word, with how many wait; and how far it stands under "Nothing kept
+## yet." on an empty shelf, so the two are not on top of each other.
+const WASH_LABEL := "Wash  %d"
+const WASH_UNDER_EMPTY := 30.0
 
 
 ## The close cross: how big it is drawn. Where it sits on the title plank is
@@ -329,6 +333,21 @@ signal close_asked
 var sheets: Sheets
 var unlocked: Array[String] = []
 
+## The finds waiting at the pump, unwashed — the lake's own list, read for the wash plank
+## on the shelf: shown only while something waits, right after the last row (and scrolling
+## with them, Richard's call, 2026-09-22 — so it counts in the scroll span), or alone under
+## "Nothing kept yet." when the shelf holds nothing. Clicking it asks the lake for the wash
+## room (`wash_asked`): the shed goes down and the room comes up in one click.
+var unwashed: Array[String] = []
+signal wash_asked
+var _wash_plank: PlankButton
+## The plank breathes the HUD's own pulse the first time the shelf opens with more waiting
+## than it last saw (`opened`); session only, nothing saved.
+var _wash_pulse: float = 0.0
+var _wash_seen: int = 0
+const WASH_PULSE_TIME := 4.0
+const WASH_PULSE_BEATS := 3.5
+
 ## Piece name -> what to call it on screen. Filled in by lake.gd from the defs.
 var titles := {}
 var decor: Array = []
@@ -435,6 +454,11 @@ func _ready() -> void:
 	_close.tint = Style.INK
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
+	_wash_plank = PlankButton.new()
+	_wash_plank.name = &"WashPlank"
+	_wash_plank.visible = false
+	_wash_plank.pressed.connect(func() -> void: wash_asked.emit())
+	add_child(_wash_plank)
 	# Under the close cross but over the room, and blind to the mouse: the shelf is drawn
 	# by a node of its own only so it can be faded as one, and every click on it is still
 	# picked up by the room, against the same rects the shelf was handed.
@@ -522,6 +546,10 @@ func _process(delta: float) -> void:
 	# minimised, hands this whatever delta it likes, and speed times that is a dog that
 	# jumps across the room.
 	delta = minf(delta, 0.1)
+	if _wash_pulse > 0.0:
+		_wash_pulse = maxf(_wash_pulse - delta / WASH_PULSE_TIME, 0.0)
+		if _wash_plank != null:
+			_wash_plank.pulse = wash_pulse_amount()
 	_walk_you(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -1552,7 +1580,7 @@ static func _held(value: int, low: int, high: int) -> int:
 
 
 func _scroll_by(amount: float) -> void:
-	var rows := in_store().size()
+	var rows := in_store().size() + (1 if _wash_shown() else 0)
 	var span := maxf(float(rows * ROW_HEIGHT) - _list_rect().size.y, 0.0)
 	_scroll = clampf(_scroll + amount, 0.0, span)
 	queue_redraw()
@@ -2144,6 +2172,59 @@ func _dress_shelf() -> void:
 		})
 	_shelf.rows = rows
 	_shelf.queue_redraw()
+	_dress_wash_plank(store.size())
+
+
+## The wash plank: the row after the last find, in the list's own column and scroll, shown
+## only while something waits at the pump and only when its whole box is on the shelf (the
+## rows' own rule — a plank half off the face is a plank in mid-air). With no finds it is
+## the first row, standing under "Nothing kept yet.".
+func _dress_wash_plank(rows: int) -> void:
+	if _wash_plank == null:
+		return
+	if not _wash_shown():
+		_wash_plank.visible = false
+		return
+	var list := _list_rect()
+	var top := list.position.y + float(rows) * float(ROW_HEIGHT) - _scroll
+	if rows == 0:
+		top += WASH_UNDER_EMPTY
+	var box := Rect2(list.position.x, top, list.size.x, float(ROW_HEIGHT) - SHELF_ROW_GAP)
+	_wash_plank.visible = box.position.y >= list.position.y - 0.5 and box.end.y <= list.end.y + 0.5
+	_wash_plank.position = box.position
+	_wash_plank.size = box.size
+	_wash_plank.label = WASH_LABEL % unwashed.size()
+	_wash_plank.modulate.a = _shelf.modulate.a if _shelf != null else 1.0
+	_wash_plank.pulse = wash_pulse_amount()
+
+
+## Whether the wash plank has anything to point at.
+func _wash_shown() -> bool:
+	return not unwashed.is_empty()
+
+
+## The plank's box on the room, or an empty rect while it is not shown. The harness asks.
+func wash_plank_box() -> Rect2:
+	if _wash_plank == null or not _wash_plank.visible:
+		return Rect2()
+	return Rect2(_wash_plank.position, _wash_plank.size)
+
+
+## The lake says the shed has just come up. More waiting at the pump than the last time
+## starts the plank's pulse; the same or fewer does not.
+func opened() -> void:
+	if unwashed.size() > _wash_seen:
+		_wash_pulse = 1.0
+	_wash_seen = unwashed.size()
+
+
+## The wash plank's pulse as drawn, the HUD's own shape: a slow wave under a fading envelope.
+func wash_pulse_amount() -> float:
+	if _wash_pulse <= 0.0:
+		return 0.0
+	var elapsed := (1.0 - _wash_pulse) * WASH_PULSE_TIME
+	var wave := 0.5 - 0.5 * cos(elapsed * TAU * WASH_PULSE_BEATS / WASH_PULSE_TIME)
+	return wave * _wash_pulse
 
 
 ## Which shelf row the pointer is over, or -1. The same arithmetic `_listed_at` picks with,

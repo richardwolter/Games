@@ -131,7 +131,24 @@ var stock: int = 0
 ## How many upgrades can be paid for right now. Drawn as a tag under the upgrades button:
 ## the money plate says what the player has and the shop says what things cost, and this is
 ## the one line that puts those two together without the shop being open.
-var available: int = 0
+var available: int = 0:
+	set(value):
+		# A rise starts the pulse; a fall or a hold does not, and the first reading of a
+		# sitting only sets the mark — a load is not something turning affordable.
+		if _last_available >= 0 and value > _last_available:
+			_pulse = 1.0
+		_last_available = value
+		available = value
+
+## The pulse on the upgrades button: what is left of it (1 fresh, 0 done), and the count it
+## last saw. It fires only when a new upgrade turns affordable (Richard, 2026-09-22: not a
+## steady loop — something is affordable most of the run), breathes `PULSE_BEATS` times
+## over `PULSE_TIME`, fades out on its own, and is cut short by a hover on the button or by
+## the shop opening (`hush_pulse`).
+var _pulse: float = 0.0
+var _last_available: int = -1
+const PULSE_TIME := 4.0
+const PULSE_BEATS := 3.5
 
 ## A line under the meter, or empty for nothing. Used for the one thing the meter cannot
 ## say: that the lake reads clean and is not.
@@ -274,6 +291,7 @@ func _process(delta: float) -> void:
 	else:
 		_stock_glow = maxf(_stock_glow - delta / STOCK_GLOW, 0.0)
 	_shine = maxf(_shine - delta / SHINE_TIME, 0.0)
+	_pulse = maxf(_pulse - delta / PULSE_TIME, 0.0)
 	if money > _shown_money:
 		_shine = 1.0
 		_shown_money = minf(
@@ -300,6 +318,8 @@ func _gui_input(event: InputEvent) -> void:
 		if was != _hovered:
 			if _hovered != &"":
 				Sfx.ui(&"ui_hover")
+			if _hovered == &"upgrades":
+				_pulse = 0.0
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -343,7 +363,7 @@ func _repaint() -> void:
 func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0),
-		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0),
+		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount() * 64.0),
 		stock, available, hint, _hovered, siege.hash()
 	])
 
@@ -362,6 +382,7 @@ func _draw() -> void:
 	# is a wooden sign, not a web page.
 	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
 	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
+	HudButtons.pulse(self, _lifted(_upgrades_box, &"upgrades"), pulse_amount())
 	_draw_stock()
 	_draw_available()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
@@ -691,6 +712,26 @@ func _ease_shine() -> float:
 	return _shine * _shine
 
 
+## The pulse as drawn: a slow wave, `PULSE_BEATS` over the burst, under an envelope that
+## fades out with what is left of it. Zero when nothing is pulsing.
+func pulse_amount() -> float:
+	if _pulse <= 0.0:
+		return 0.0
+	var elapsed := (1.0 - _pulse) * PULSE_TIME
+	var wave := 0.5 - 0.5 * cos(elapsed * TAU * PULSE_BEATS / PULSE_TIME)
+	return wave * _pulse
+
+
+## Put the pulse out: the shop opening answers what it was asking.
+func hush_pulse() -> void:
+	_pulse = 0.0
+
+
+## Whether the pulse is running — the harness asks.
+func pulsing() -> bool:
+	return _pulse > 0.0
+
+
 ## Where the coin on the money plate is, in the HUD's own coordinates: what a coin flying
 ## in from a sale (CoinFly) aims at. The same sum `HudButtons.draw_money` makes for the
 ## coin's box, so the two cannot drift.
@@ -848,7 +889,7 @@ func _recycle_shapes(box: Rect2) -> Array:
 func _draw_available() -> void:
 	var face := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
 	HudButtons.label(self, face, UPGRADES_LABEL)
-	HudButtons.badge(self, face, str(available), available > 0)
+	HudButtons.badge(self, face, str(available), available > 0, pulse_amount())
 
 
 ## The money plate: the coin, the sunken panel, and the live figure on it.

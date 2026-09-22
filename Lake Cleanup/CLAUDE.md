@@ -1434,6 +1434,40 @@ and moved to the top of its board, and the luck coin animated.
   coin's rest, hop, back and landing. Probes: `tools/shot_shed.tscn`,
   `tools/shot_menus.tscn`, `tools/shot_menu.tscn`, `tools/shot_pump.tscn`.
 
+### The Pulse and the Wash Plank (2026-09-22, `/grill-me` with Richard)
+Two small signals: the upgrades button says when something has just become buyable, and the
+shed's shelf has a door to the wash room.
+- **The upgrades button pulses only when the affordable count rises** (`HudSkin.available`'s
+  setter, `_pulse`, `pulse_amount`, `PULSE_TIME` 4 s, `PULSE_BEATS` 3.5). **Not a steady loop,
+  by decision**: the run ends with 43-56k unspent, so something is affordable most of the
+  time and a loop would run for thirty minutes. A hold or a fall starts nothing; the first
+  reading of a sitting only sets the mark (a load is not a rise). It fades out on its own,
+  and a hover on the button or the shop opening (`hush_pulse`, from `_set_menu`) puts it out.
+- **The look is the badge swelling and a soft rim on the frame** (`HudButtons.pulse`,
+  `badge`'s `swell`, `PULSE_TONE`): the count's plate grows `BADGE_SWELL` **whole** pixels
+  about its own middle and the wood gets a pale two-pass rim outside it. The tone is a pale
+  clean-water blue, **not gold** — gold on this HUD is a price. The arrow, the net, the
+  ferry and the dog do not move. `_paint_key` carries the amount, so the HUD redraws only
+  while it is breathing.
+- **The shelf's wash plank** (`ShedRoom._wash_plank`, a `PlankButton`; `WASH_LABEL`
+  "Wash  %d", `SHELF_WASH_N`): drawn **only while `unwashed` holds something**, right after
+  the last row **and scrolling with the rows** (Richard's call over a fixed foot; it counts
+  in `_scroll_by`'s span and, like a row, is hidden while its box is not wholly on the
+  face), or alone `WASH_UNDER_EMPTY` under "Nothing kept yet." on an empty shelf. Clicking it
+  emits `wash_asked` and the lake swaps rooms (`_shed_to_wash`: shed down, wash room up,
+  one click); the wash room's own close returns to the lake, not to the shed.
+- **It breathes the same pulse** (`PlankButton.pulse`, `ShedRoom.opened`, `_wash_seen`) the
+  first time the shed opens with more waiting than the last time it opened. Session only,
+  nothing saved. The find-caught card is still the announcement; this is the door.
+- **Out of scope, by decision**: a steady pulse, a sound on it, glow on any other button,
+  walking the angler to the pump, going back to the shed after washing, showing the plank
+  with nothing waiting, a fixed-foot plank. Amplitude, tone and beats are first guesses for
+  Richard's eye.
+- `test_lake`'s `_check_upgrades_pulse` and `_check_wash_plank` (inside `_stage_wash`)
+  guard the rise/hold/fall rule, the breathing and the fade, the hover and the shop cutting
+  it, the plank alone and after the rows, its label, its pulse once and not on a reopen, its
+  place at the end of an overfull shelf, its absence with nothing waiting, and the room swap.
+
 ### Every Word Is a Key (issue #28, 2026-09-20, `/grill-me` with Richard)
 The localization pass. **Scope this pass: the pipeline and English only** — extraction, one
 table, the CSV, a pseudo-locale and a Language row. The eight real languages, the CJK font

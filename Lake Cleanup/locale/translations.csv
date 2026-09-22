@@ -121,6 +121,7 @@ HUD_PIECES_LEFT_N,lake.gd,16,13,180,%d is 2 to 50.,%d pieces left,[%d píéçés
 SHELF_TITLE,shed_room.gd,20,13,220,,Decorate,[Déçóráté·ëxtr]
 SHELF_TITLE_N,shed_room.gd,20,13,220,%d is how many pieces are on the shelf.,Decorate  %d,[Déçóráté  %d·ëxtrà]
 SHELF_EMPTY,shed_shelf.gd,13,11,220,,Nothing kept yet.,[Ñóthíñg képt yét.·ëxtràló]
+SHELF_WASH_N,shed_room.gd,20,13,160,The shelf's wash plank; %d is how many finds wait at the pump.,Wash  %d,[Wásh  %d·ëxtr]
 LETTER_TITLE,letter.gd,20,16,540,,A letter,[Á léttér·ëxtr]
 LETTER_GREETING,letter.gd,13,11,0,"""My Dirty Little Lake"" is the game's name: do not translate it.","Congratulations, you are the new owner of My Dirty Little Lake.","[Çóñgrátúlátíóñs, yóú áré thé ñéw ówñér óf My Dírty Líttlé Láké.·ëxtràlóngëxtràlóngëxtràlón]"
 LETTER_NET_HEAD,letter.gd,20,16,540,,Net,[Ñét·ëx]

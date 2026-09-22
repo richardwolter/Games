@@ -11,6 +11,7 @@ class_name PlankButton
 extends Control
 
 const Style := preload("res://scripts/style.gd")
+const HudButtons := preload("res://scripts/hud_buttons.gd")
 
 @export var label: String = "":
 	set(value):
@@ -47,6 +48,15 @@ var lit: bool = false:
 	set(value):
 		lit = value
 		queue_redraw()
+
+## A soft lit rim breathing round the wood, 0 to 1 — the HUD's own `HudButtons.pulse`,
+## driven by whoever owns the button (the shed's wash plank, when a find has arrived at the
+## pump since the shelf was last opened). The button itself keeps no clock.
+var pulse: float = 0.0:
+	set(value):
+		if roundi(value * 64.0) != roundi(pulse * 64.0):
+			queue_redraw()
+		pulse = value
 
 ## How much of the face the word is set to, and how much room is left beside it.
 const LABEL_SHARE := 0.78
@@ -124,6 +134,7 @@ func _draw() -> void:
 		face = face.darkened(0.15)
 	var on := box
 	var behind := Style.BOARD_ROW if accent else Style.BOARD
+	HudButtons.pulse(self, box, pulse)
 	if Style.border_fits(box):
 		on = Style.border_inset(box)
 		draw_rect(on.grow(2.0), behind, true)

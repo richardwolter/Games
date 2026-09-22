@@ -1211,6 +1211,7 @@ func _ready() -> void:
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
 	_room.close_asked.connect(_shut.bind(_set_shed))
+	_room.wash_asked.connect(_shed_to_wash)
 	_open_settings.pressed.connect(_set_settings.bind(true))
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
 	# fills the screen now, and a settings panel drawn beneath that is a settings panel
@@ -2336,6 +2337,16 @@ func _open_wash() -> void:
 	_set_wash(true)
 
 
+## The shelf's wash plank: the shed goes down and the wash room comes up in the one click.
+## The pump stands inside `SHOP_RANGE`, so the player at the shed door is in reach of it;
+## the room's own close returns to the lake, not to the shed.
+func _shed_to_wash() -> void:
+	if not _shed_open:
+		return
+	_set_shed(false)
+	_set_wash(true)
+
+
 ## A find has come clean on the stand: the soap is paid for now, not when it was picked, and
 ## the find goes on the shed's shelf. Saved on the spot, like everything else kept.
 func _on_find_washed(piece: StringName, soap: int) -> void:
@@ -2531,6 +2542,8 @@ func _fit_zoom() -> float:
 func _set_menu(open: bool) -> void:
 	_menu_open = open
 	_shop_skin.visible = open
+	if open:
+		_skin.hush_pulse()
 	_push_rooms()
 	if open:
 		_set_settings(false)
@@ -2557,8 +2570,10 @@ func _set_shed(open: bool) -> void:
 		_settings.visible = false
 		_settings_open = false
 		_room.unlocked = unlocked
+		_room.unwashed = unwashed
 		_room.decor = decor
 		_room.carrying = &""
+		_room.opened()
 		_room.queue_redraw()
 	# The lake's own readouts are not readable through a room and are not about it. The coins
 	# go with them: they are drawn over everything, and they are a receipt for the plate.

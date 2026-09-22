@@ -458,9 +458,28 @@ const BADGE_PAD := 5.0
 const BADGE_INSET := 3.0
 const BADGE_TEXT := 0.82
 const BADGE_SAMPLE := "99"
+## The pulse: how many whole pixels the badge grows at full, the rim's tone (the clean
+## water's blue, not gold — gold on this HUD is a price) and how strong it gets.
+const BADGE_SWELL := 2.0
+const PULSE_TONE := Color(0.62, 0.80, 0.92)
+const PULSE_RIM := 0.75
+const PULSE_WIDE := 2.0
 
 
-static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool) -> void:
+## A soft lit rim round a button, `amount` 0 to 1. Drawn after the button, outside its wood
+## by a pixel, so nothing on the face moves and the wood is not re-tinted. Two passes: a
+## wider fainter one and a one-pixel bright one, so it reads as light rather than a frame.
+static func pulse(on: CanvasItem, box: Rect2, amount: float) -> void:
+	if amount <= 0.01:
+		return
+	var tone := PULSE_TONE
+	on.draw_rect(box.grow(PULSE_WIDE + 1.0), Color(tone.r, tone.g, tone.b, amount * PULSE_RIM * 0.35), false, PULSE_WIDE * 2.0)
+	on.draw_rect(box.grow(1.5), Color(tone.r, tone.g, tone.b, amount * PULSE_RIM), false, 1.0)
+
+
+## `swell` is the pulse (0 to 1): the plate grows `BADGE_SWELL` whole pixels at full and
+## its ink lifts towards the pulse's tone, about its own middle so the corner stays put.
+static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool, swell: float = 0.0) -> void:
 	var height := maxi(LABEL_LEAST, int(BADGE_TALL * BADGE_TEXT))
 	var wide := maxf(
 		Style.measure(BADGE_SAMPLE, height).x, Style.measure(text, height).x
@@ -469,6 +488,10 @@ static func badge(on: CanvasItem, face: Rect2, text: String, lit: bool) -> void:
 		Vector2(face.end.x - BADGE_INSET - wide, face.position.y + BADGE_INSET),
 		Vector2(wide, BADGE_TALL)
 	)
+	var grown := float(roundi(swell * BADGE_SWELL))
+	if grown > 0.0:
+		plate = plate.grow(grown)
+		Style.plate(on, plate.grow(1.0), PULSE_TONE.lerp(Style.BUTTON_SUNK, 1.0 - swell * PULSE_RIM), 2.0)
 	Style.plate(on, plate, Style.BUTTON_SUNK if lit else Style.BUTTON_SUNK.darkened(0.25), 2.0)
 	Style.write(
 		on, text, height,

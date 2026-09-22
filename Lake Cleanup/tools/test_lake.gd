@@ -6088,6 +6088,114 @@ func _check_loading() -> void:
 ## The pump beside the hut and the wash room it opens (issue #37): a find waits at the pump,
 ## is picked off a tray if the purse covers its soap, is washed on the stand, and only then
 ## reaches the shed — paid for when it comes clean, and not at all if the player walks away.
+## The shelf's wash plank (2026-09-22): shown only while a find waits at the pump, right
+## after the last row and scrolling with them, alone under the empty line, pulsing the
+## first time the shelf opens with more waiting, and swapping the shed for the wash room.
+func _check_wash_plank() -> void:
+	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	var unwashed: Array = _main.get(&"unwashed")
+	var unlocked: Array = _main.get(&"unlocked")
+	var shelf_was := unlocked.duplicate()
+	unlocked.clear()
+	room.set(&"_wash_seen", 0)
+	room.set(&"_wash_pulse", 0.0)
+	_main.call(&"_set_shed", true)
+	room.call(&"_dress_shelf")
+	var box: Rect2 = room.wash_plank_box()
+	var list: Rect2 = room.call(&"_list_rect")
+	_check(box.size.x > 0.0, "with a find waiting and nothing kept, the wash plank stands alone", str(box))
+	_check(box.position.y > list.position.y + 8.0 and box.end.y <= list.end.y,
+		"under the empty line and on the shelf", "%s in %s" % [box, list])
+	var plank: PlankButton = room.get(&"_wash_plank")
+	_check(plank.label == "Wash  1", "and says how many wait", plank.label)
+	_check(room.wash_pulse_amount() == 0.0 and float(room.get(&"_wash_pulse")) > 0.0,
+		"it pulses the first time the shelf opens with something waiting", str(room.get(&"_wash_pulse")))
+	room.call(&"_process", 0.3)
+	_check(room.wash_pulse_amount() > 0.0 and plank.pulse > 0.0, "the pulse breathes and reaches the plank", str(plank.pulse))
+	# The room clamps a frame to 0.1 s (a hitch is not a dog across the room), so it is
+	# walked there in short steps.
+	for i in 50:
+		room.call(&"_process", 0.1)
+	_check(room.wash_pulse_amount() == 0.0, "and dies on its own", "")
+	_main.call(&"_set_shed", false)
+	_main.call(&"_set_shed", true)
+	_check(float(room.get(&"_wash_pulse")) == 0.0, "reopened with no more waiting, it does not pulse again", "")
+	unwashed.append(String(unwashed[0]))
+	_main.call(&"_set_shed", false)
+	_main.call(&"_set_shed", true)
+	_check(float(room.get(&"_wash_pulse")) > 0.0, "one more waiting, and it does", "")
+	unwashed.pop_back()
+
+	# Under the rows, and scrolling with them.
+	for i in 3:
+		unlocked.append(String(shelf_was[0]) if not shelf_was.is_empty() else "decor_bed")
+	room.call(&"_dress_shelf")
+	box = room.wash_plank_box()
+	var rows := room.in_store().size()
+	_check(rows == 3 and is_equal_approx(box.position.y, list.position.y + float(rows * ShedRoom.ROW_HEIGHT)),
+		"with finds kept it stands right after the last row", "%d rows, plank at %.0f, list at %.0f" % [rows, box.position.y, list.position.y])
+	var fill := int(list.size.y / float(ShedRoom.ROW_HEIGHT)) + 2
+	while room.in_store().size() < fill:
+		unlocked.append(String(unlocked[0]))
+	room.call(&"_dress_shelf")
+	_check(room.wash_plank_box().size.x == 0.0, "on an overfull shelf it is off the face until scrolled to", "")
+	room.call(&"_scroll_by", 100000.0)
+	room.call(&"_dress_shelf")
+	box = room.wash_plank_box()
+	_check(box.size.x > 0.0 and box.end.y <= list.end.y + 0.5,
+		"scrolled to the end, it is the last thing on the shelf", str(box))
+	room.call(&"_scroll_by", -100000.0)
+
+	# Nothing waiting, no plank.
+	var waiting := unwashed.duplicate()
+	unwashed.clear()
+	room.call(&"_dress_shelf")
+	_check(room.wash_plank_box().size.x == 0.0, "with nothing waiting there is no plank", "")
+	unwashed.append_array(waiting)
+
+	# The click: shed down, wash room up.
+	room.call(&"_dress_shelf")
+	room.wash_asked.emit()
+	_check(not bool(_main.get(&"_shed_open")) and bool(_main.get(&"_wash_open")),
+		"clicking it swaps the shed for the wash room", "shed %s, wash %s" % [_main.get(&"_shed_open"), _main.get(&"_wash_open")])
+	_main.call(&"_set_wash", false)
+	unlocked.clear()
+	unlocked.append_array(shelf_was)
+
+
+## The upgrades button's pulse (2026-09-22): fires when the affordable count rises, never
+## on a hold or a fall, breathes, fades out on its own, and is cut by a hover or the shop.
+func _check_upgrades_pulse() -> void:
+	var skin := _main.get(&"_skin") as HudSkin
+	skin.hush_pulse()
+	var now := skin.available
+	skin.available = now
+	_check(not skin.pulsing(), "the same count again starts no pulse", "")
+	skin.available = now + 1
+	_check(skin.pulsing() and skin.pulse_amount() == 0.0, "one more affordable starts it, from nothing", str(skin.pulse_amount()))
+	skin.call(&"_process", 0.35)
+	_check(skin.pulse_amount() > 0.05, "and it breathes", str(skin.pulse_amount()))
+	skin.available = now
+	_check(skin.pulsing(), "a fall does not reset it", "")
+	skin.call(&"_process", 6.0)
+	_check(not skin.pulsing() and skin.pulse_amount() == 0.0, "it fades out on its own", "")
+	skin.available = now + 1
+	var box: Rect2 = skin.get(&"_upgrades_box")
+	var motion := InputEventMouseMotion.new()
+	motion.position = box.get_center()
+	skin.call(&"_gui_input", motion)
+	_check(not skin.pulsing(), "a hover on the button puts it out", "")
+	motion.position = Vector2(-50.0, -50.0)
+	skin.call(&"_gui_input", motion)
+	skin.available = now + 2
+	_check(skin.pulsing(), "(started again)", "")
+	_main.call(&"_set_menu", true)
+	_check(not skin.pulsing(), "and so does opening the shop", "")
+	_main.call(&"_set_menu", false)
+	skin.available = now
+	skin.hush_pulse()
+
+
 func _stage_wash() -> void:
 	var sheets: Sheets = _main.get(&"_sheets")
 	_check(Pump.tile != Vector2.INF, "the pump stands somewhere", str(Pump.tile))
@@ -6307,6 +6415,8 @@ func _stage_wash() -> void:
 		str(unwashed))
 
 	_main.call(&"_set_wash", false)
+	_check_wash_plank()
+	_check_upgrades_pulse()
 	unwashed.clear()
 	unlocked = _main.get(&"unlocked")
 	unlocked.clear()
