@@ -6167,33 +6167,45 @@ func _check_wash_plank() -> void:
 ## on a hold or a fall, breathes, fades out on its own, and is cut by a hover or the shop.
 func _check_upgrades_pulse() -> void:
 	var skin := _main.get(&"_skin") as HudSkin
-	skin.hush_pulse()
+	skin.hush_pulse(&"upgrades")
 	var now := skin.available
 	skin.available = now
-	_check(not skin.pulsing(), "the same count again starts no pulse", "")
+	_check(not skin.pulsing(&"upgrades"), "the same count again starts no pulse", "")
 	skin.available = now + 1
-	_check(skin.pulsing() and skin.pulse_amount() == 0.0, "one more affordable starts it, from nothing", str(skin.pulse_amount()))
+	_check(skin.pulsing(&"upgrades") and skin.pulse_amount(&"upgrades") == 0.0, "one more affordable starts it, from nothing", str(skin.pulse_amount(&"upgrades")))
 	skin.call(&"_process", 0.35)
-	_check(skin.pulse_amount() > 0.05, "and it breathes", str(skin.pulse_amount()))
+	_check(skin.pulse_amount(&"upgrades") > 0.05, "and it breathes", str(skin.pulse_amount(&"upgrades")))
 	skin.available = now
-	_check(skin.pulsing(), "a fall does not reset it", "")
+	_check(skin.pulsing(&"upgrades"), "a fall does not reset it", "")
 	skin.call(&"_process", 6.0)
-	_check(not skin.pulsing() and skin.pulse_amount() == 0.0, "it fades out on its own", "")
+	_check(not skin.pulsing(&"upgrades") and skin.pulse_amount(&"upgrades") == 0.0, "it fades out on its own", "")
 	skin.available = now + 1
 	var box: Rect2 = skin.get(&"_upgrades_box")
 	var motion := InputEventMouseMotion.new()
 	motion.position = box.get_center()
 	skin.call(&"_gui_input", motion)
-	_check(not skin.pulsing(), "a hover on the button puts it out", "")
+	_check(not skin.pulsing(&"upgrades"), "a hover on the button puts it out", "")
 	motion.position = Vector2(-50.0, -50.0)
 	skin.call(&"_gui_input", motion)
 	skin.available = now + 2
-	_check(skin.pulsing(), "(started again)", "")
+	_check(skin.pulsing(&"upgrades"), "(started again)", "")
 	_main.call(&"_set_menu", true)
-	_check(not skin.pulsing(), "and so does opening the shop", "")
+	_check(not skin.pulsing(&"upgrades"), "and so does opening the shop", "")
 	_main.call(&"_set_menu", false)
 	skin.available = now
-	skin.hush_pulse()
+	skin.hush_pulse(&"upgrades")
+
+	# The decorate button, for a find arriving at the pump.
+	var waiting := skin.waiting
+	skin.waiting = waiting
+	_check(not skin.pulsing(&"shed"), "the decorate button holds still while nothing new waits", "")
+	skin.waiting = waiting + 1
+	_check(skin.pulsing(&"shed") and not skin.pulsing(&"upgrades"),
+		"a find arriving at the pump pulses the decorate button, and only it", "")
+	_main.call(&"_set_shed", true)
+	_check(not skin.pulsing(&"shed"), "opening the shed puts it out", "")
+	_main.call(&"_set_shed", false)
+	skin.waiting = waiting
 
 
 func _stage_wash() -> void:

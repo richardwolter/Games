@@ -2543,7 +2543,7 @@ func _set_menu(open: bool) -> void:
 	_menu_open = open
 	_shop_skin.visible = open
 	if open:
-		_skin.hush_pulse()
+		_skin.hush_pulse(&"upgrades")
 	_push_rooms()
 	if open:
 		_set_settings(false)
@@ -2561,6 +2561,8 @@ func _set_shed(open: bool) -> void:
 		PlayLog.write("shed_open" if open else "shed_close", _play)
 	_shed_open = open
 	_shed.visible = open
+	if open:
+		_skin.hush_pulse(&"shed")
 	# The way to the shop sits in the corner beside Settings rather than on the shed's own
 	# floor, so it is out of the way of both picking a find and putting it down. It is not a
 	# child of the panel any more, so its own visibility has to be said here.
@@ -4955,6 +4957,7 @@ func _update_hud() -> void:
 	_skin.stock = _yard.held.size()
 	var affordable := _affordable()
 	_skin.available = affordable
+	_skin.waiting = unwashed.size()
 	# And on the shed's copy of the same button, which is the only one on screen while the
 	# player is inside.
 	_open_upgrades.note = "%d available" % affordable

@@ -1443,12 +1443,18 @@ shed's shelf has a door to the wash room.
   time and a loop would run for thirty minutes. A hold or a fall starts nothing; the first
   reading of a sitting only sets the mark (a load is not a rise). It fades out on its own,
   and a hover on the button or the shop opening (`hush_pulse`, from `_set_menu`) puts it out.
-- **The look is the badge swelling and a soft rim on the frame** (`HudButtons.pulse`,
-  `badge`'s `swell`, `PULSE_TONE`): the count's plate grows `BADGE_SWELL` **whole** pixels
-  about its own middle and the wood gets a pale two-pass rim outside it. The tone is a pale
-  clean-water blue, **not gold** — gold on this HUD is a price. The arrow, the net, the
-  ferry and the dog do not move. `_paint_key` carries the amount, so the HUD redraws only
-  while it is breathing.
+- **The look is the badge swelling and a gold glow round the wood** (`HudButtons.pulse`,
+  `badge`'s `swell`, `PULSE_TONE`, `PULSE_WIDE`): the count's plate grows `BADGE_SWELL`
+  **whole** pixels about its own middle and three passes of light stand outside the frame —
+  a wide soft halo, a mid band, a one-pixel bright rim. **Gold, and not subtle** (Richard,
+  same day: a pale blue rim at 0.75 was "too subtle"): gold on this HUD is a price, and
+  this is a thing that can be bought. The arrow, the net, the ferry and the dog do not
+  move. `_paint_key` carries the amounts, so the HUD redraws only while one is breathing.
+- **The decorate button pulses the same way when a find arrives at the pump**
+  (`HudSkin.waiting`, pushed from `_update_hud` as `unwashed.size()`; Richard, same day:
+  "nothing happened to the decoration button when something was caught"). Pulses are kept
+  by button name (`_pulses`/`_marks`, `pulse_amount(name)`, `hush_pulse(name)`); opening the
+  shed puts the shed's out, the shop the upgrades'.
 - **The shelf's wash plank** (`ShedRoom._wash_plank`, a `PlankButton`; `WASH_LABEL`
   "Wash  %d", `SHELF_WASH_N`): drawn **only while `unwashed` holds something**, right after
   the last row **and scrolling with the rows** (Richard's call over a fixed foot; it counts

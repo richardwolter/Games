@@ -135,20 +135,32 @@ var available: int = 0:
 	set(value):
 		# A rise starts the pulse; a fall or a hold does not, and the first reading of a
 		# sitting only sets the mark — a load is not something turning affordable.
-		if _last_available >= 0 and value > _last_available:
-			_pulse = 1.0
-		_last_available = value
+		_mark(&"upgrades", value)
 		available = value
 
-## The pulse on the upgrades button: what is left of it (1 fresh, 0 done), and the count it
-## last saw. It fires only when a new upgrade turns affordable (Richard, 2026-09-22: not a
-## steady loop — something is affordable most of the run), breathes `PULSE_BEATS` times
-## over `PULSE_TIME`, fades out on its own, and is cut short by a hover on the button or by
-## the shop opening (`hush_pulse`).
-var _pulse: float = 0.0
-var _last_available: int = -1
+## How many finds wait at the pump, unwashed. A rise pulses the decorate button (Richard,
+## 2026-09-22: "nothing happened to the decoration button when something was caught"), the
+## same way a rise in `available` pulses the upgrades button.
+var waiting: int = 0:
+	set(value):
+		_mark(&"shed", value)
+		waiting = value
+
+## The pulses on the two picture buttons, by name: what is left of each (1 fresh, 0 done),
+## and the count it last saw. A pulse fires only when its count rises (Richard, 2026-09-22:
+## not a steady loop — something is affordable most of the run), breathes `PULSE_BEATS`
+## times over `PULSE_TIME`, fades out on its own, and is cut short by a hover on its button
+## or by that button's board opening (`hush_pulse`).
+var _pulses := {&"upgrades": 0.0, &"shed": 0.0}
+var _marks := {&"upgrades": -1, &"shed": -1}
 const PULSE_TIME := 4.0
 const PULSE_BEATS := 3.5
+
+
+func _mark(name: StringName, value: int) -> void:
+	if int(_marks[name]) >= 0 and value > int(_marks[name]):
+		_pulses[name] = 1.0
+	_marks[name] = value
 
 ## A line under the meter, or empty for nothing. Used for the one thing the meter cannot
 ## say: that the lake reads clean and is not.
@@ -291,7 +303,8 @@ func _process(delta: float) -> void:
 	else:
 		_stock_glow = maxf(_stock_glow - delta / STOCK_GLOW, 0.0)
 	_shine = maxf(_shine - delta / SHINE_TIME, 0.0)
-	_pulse = maxf(_pulse - delta / PULSE_TIME, 0.0)
+	for name: StringName in _pulses:
+		_pulses[name] = maxf(float(_pulses[name]) - delta / PULSE_TIME, 0.0)
 	if money > _shown_money:
 		_shine = 1.0
 		_shown_money = minf(
@@ -318,8 +331,8 @@ func _gui_input(event: InputEvent) -> void:
 		if was != _hovered:
 			if _hovered != &"":
 				Sfx.ui(&"ui_hover")
-			if _hovered == &"upgrades":
-				_pulse = 0.0
+			if _pulses.has(_hovered):
+				_pulses[_hovered] = 0.0
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -363,7 +376,7 @@ func _repaint() -> void:
 func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0),
-		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount() * 64.0),
+		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
 		stock, available, hint, _hovered, siege.hash()
 	])
 
@@ -381,8 +394,9 @@ func _draw() -> void:
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
 	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
+	HudButtons.pulse(self, _lifted(_shed_box, &"shed"), pulse_amount(&"shed"))
 	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
-	HudButtons.pulse(self, _lifted(_upgrades_box, &"upgrades"), pulse_amount())
+	HudButtons.pulse(self, _lifted(_upgrades_box, &"upgrades"), pulse_amount(&"upgrades"))
 	_draw_stock()
 	_draw_available()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
@@ -712,24 +726,25 @@ func _ease_shine() -> float:
 	return _shine * _shine
 
 
-## The pulse as drawn: a slow wave, `PULSE_BEATS` over the burst, under an envelope that
+## A pulse as drawn: a slow wave, `PULSE_BEATS` over the burst, under an envelope that
 ## fades out with what is left of it. Zero when nothing is pulsing.
-func pulse_amount() -> float:
-	if _pulse <= 0.0:
+func pulse_amount(name: StringName) -> float:
+	var left := float(_pulses.get(name, 0.0))
+	if left <= 0.0:
 		return 0.0
-	var elapsed := (1.0 - _pulse) * PULSE_TIME
+	var elapsed := (1.0 - left) * PULSE_TIME
 	var wave := 0.5 - 0.5 * cos(elapsed * TAU * PULSE_BEATS / PULSE_TIME)
-	return wave * _pulse
+	return wave * left
 
 
-## Put the pulse out: the shop opening answers what it was asking.
-func hush_pulse() -> void:
-	_pulse = 0.0
+## Put a pulse out: its board opening answers what it was asking.
+func hush_pulse(name: StringName) -> void:
+	_pulses[name] = 0.0
 
 
-## Whether the pulse is running — the harness asks.
-func pulsing() -> bool:
-	return _pulse > 0.0
+## Whether a pulse is running — the harness asks.
+func pulsing(name: StringName) -> bool:
+	return float(_pulses.get(name, 0.0)) > 0.0
 
 
 ## Where the coin on the money plate is, in the HUD's own coordinates: what a coin flying
@@ -889,7 +904,7 @@ func _recycle_shapes(box: Rect2) -> Array:
 func _draw_available() -> void:
 	var face := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
 	HudButtons.label(self, face, UPGRADES_LABEL)
-	HudButtons.badge(self, face, str(available), available > 0, pulse_amount())
+	HudButtons.badge(self, face, str(available), available > 0, pulse_amount(&"upgrades"))
 
 
 ## The money plate: the coin, the sunken panel, and the live figure on it.

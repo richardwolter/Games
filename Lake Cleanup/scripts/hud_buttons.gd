@@ -458,23 +458,27 @@ const BADGE_PAD := 5.0
 const BADGE_INSET := 3.0
 const BADGE_TEXT := 0.82
 const BADGE_SAMPLE := "99"
-## The pulse: how many whole pixels the badge grows at full, the rim's tone (the clean
-## water's blue, not gold — gold on this HUD is a price) and how strong it gets.
+## The pulse: how many whole pixels the badge grows at full, the glow's tone and how strong
+## it gets. **Gold, and not subtle** (Richard, 2026-09-22, after a pale blue rim at 0.75 read
+## as nothing): gold on this HUD is a price, and this is a thing that can be bought. The
+## glow is three passes outside the wood — a wide soft halo, a mid band and a one-pixel
+## bright rim — so it reads as light thrown off the button rather than a frame drawn on it.
 const BADGE_SWELL := 2.0
-const PULSE_TONE := Color(0.62, 0.80, 0.92)
-const PULSE_RIM := 0.75
-const PULSE_WIDE := 2.0
+const PULSE_TONE := Color(1.0, 0.84, 0.36)
+const PULSE_RIM := 1.0
+const PULSE_WIDE := 4.0
 
 
-## A soft lit rim round a button, `amount` 0 to 1. Drawn after the button, outside its wood
-## by a pixel, so nothing on the face moves and the wood is not re-tinted. Two passes: a
-## wider fainter one and a one-pixel bright one, so it reads as light rather than a frame.
+## A soft lit glow round a button, `amount` 0 to 1. Drawn after the button, outside its
+## wood, so nothing on the face moves and the wood is not re-tinted.
 static func pulse(on: CanvasItem, box: Rect2, amount: float) -> void:
 	if amount <= 0.01:
 		return
 	var tone := PULSE_TONE
-	on.draw_rect(box.grow(PULSE_WIDE + 1.0), Color(tone.r, tone.g, tone.b, amount * PULSE_RIM * 0.35), false, PULSE_WIDE * 2.0)
-	on.draw_rect(box.grow(1.5), Color(tone.r, tone.g, tone.b, amount * PULSE_RIM), false, 1.0)
+	var glow := amount * PULSE_RIM
+	on.draw_rect(box.grow(PULSE_WIDE * 1.5 + 1.0), Color(tone.r, tone.g, tone.b, glow * 0.18), false, PULSE_WIDE * 3.0)
+	on.draw_rect(box.grow(PULSE_WIDE * 0.5 + 1.0), Color(tone.r, tone.g, tone.b, glow * 0.45), false, PULSE_WIDE)
+	on.draw_rect(box.grow(1.5), Color(tone.r, tone.g, tone.b, glow * 0.95), false, 1.0)
 
 
 ## `swell` is the pulse (0 to 1): the plate grows `BADGE_SWELL` whole pixels at full and
