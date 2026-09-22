@@ -1446,13 +1446,17 @@ shed's shelf has a door to the wash room.
   breathing there until the board is opened (`hush_pulse`, from `_set_menu` / `_set_shed`),
   which is the player seeing what was pending. A hover does not put it out. Supersedes
   "fades out on its own", which lasted an afternoon.
-- **The look is the badge swelling and a gold glow round the wood** (`HudButtons.pulse`,
-  `badge`'s `swell`, `PULSE_TONE`, `PULSE_WIDE`): the count's plate grows `BADGE_SWELL`
-  **whole** pixels about its own middle and three passes of light stand outside the frame —
-  a wide soft halo, a mid band, a one-pixel bright rim. **Gold, and not subtle** (Richard,
-  same day: a pale blue rim at 0.75 was "too subtle"): gold on this HUD is a price, and
-  this is a thing that can be bought. The arrow, the net, the ferry and the dog do not
-  move. `_paint_key` carries the amounts, so the HUD redraws only while one is breathing.
+- **The look is the button swelling and a gold glow with rays behind it** (`HudButtons.pulse`,
+  `swell_by`, `BUTTON_SWELL`, `GLOW_REACH`, `RAYS`, `RAY_REACH`): the whole button grows
+  `BUTTON_SWELL` **whole** pixels a side (`_lifted` grows the box, so wood, face and pictures
+  swell together) and the badge `BADGE_SWELL` more; under the wood a halo of eight
+  per-vertex-coloured quads runs from gold at the edge to nothing at `GLOW_REACH`, and
+  fourteen tapering rays fade out past it, their lengths rolled off their index and
+  breathing with the pulse. **Gold, and not subtle** (Richard, same day: a pale blue rim at
+  0.75 was "too subtle"): gold on this HUD is a price, and this is a thing that can be
+  bought. **No stepped rims** (Richard, same day: three rects of different shades were
+  "blocky and ugly") — gradients, drawn under the button so its wood covers the inside.
+  `_paint_key` carries the amounts, so the HUD redraws only while one is breathing.
 - **The decorate button pulses the same way when a find arrives at the pump**
   (`HudSkin.waiting`, pushed from `_update_hud` as `unwashed.size()`; Richard, same day:
   "nothing happened to the decoration button when something was caught"). Pulses are kept

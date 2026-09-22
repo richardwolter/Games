@@ -458,27 +458,73 @@ const BADGE_PAD := 5.0
 const BADGE_INSET := 3.0
 const BADGE_TEXT := 0.82
 const BADGE_SAMPLE := "99"
-## The pulse: how many whole pixels the badge grows at full, the glow's tone and how strong
-## it gets. **Gold, and not subtle** (Richard, 2026-09-22, after a pale blue rim at 0.75 read
-## as nothing): gold on this HUD is a price, and this is a thing that can be bought. The
-## glow is three passes outside the wood — a wide soft halo, a mid band and a one-pixel
-## bright rim — so it reads as light thrown off the button rather than a frame drawn on it.
+## The pulse: how many whole pixels the badge grows at full, how many the button itself
+## swells, the glow's tone and how far it reaches. **Gold, and not subtle** (Richard,
+## 2026-09-22, after a pale blue rim at 0.75 read as nothing): gold on this HUD is a price,
+## and this is a thing that can be bought. **No seams** (Richard, same day: three stacked
+## rects of different shades were "blocky and ugly"): the glow is one halo drawn as quads
+## with per-vertex colour, gold at the wood going to nothing at `GLOW_REACH`, so the falloff
+## is a gradient rather than steps; and `RAYS` soft rays stand off the wood like light thrown
+## from behind it, each a tapering triangle fading to nothing at its tip, its length rolled
+## off its own index and breathing with the pulse.
 const BADGE_SWELL := 2.0
+const BUTTON_SWELL := 3.0
 const PULSE_TONE := Color(1.0, 0.84, 0.36)
 const PULSE_RIM := 1.0
-const PULSE_WIDE := 4.0
+const GLOW_REACH := 10.0
+const RAYS := 14
+const RAY_REACH := 22.0
+const RAY_WIDE := 7.0
 
 
-## A soft lit glow round a button, `amount` 0 to 1. Drawn after the button, outside its
-## wood, so nothing on the face moves and the wood is not re-tinted.
+## How many whole pixels a button grows on each side at this pulse. The callers grow the box
+## they draw the whole button in, so wood, face and pictures swell together.
+static func swell_by(amount: float) -> float:
+	return float(roundi(amount * BUTTON_SWELL))
+
+
+## The glow round a button, `amount` 0 to 1. Drawn before the button, so the wood covers the
+## inside of it and nothing on the face is re-tinted.
 static func pulse(on: CanvasItem, box: Rect2, amount: float) -> void:
 	if amount <= 0.01:
 		return
 	var tone := PULSE_TONE
 	var glow := amount * PULSE_RIM
-	on.draw_rect(box.grow(PULSE_WIDE * 1.5 + 1.0), Color(tone.r, tone.g, tone.b, glow * 0.18), false, PULSE_WIDE * 3.0)
-	on.draw_rect(box.grow(PULSE_WIDE * 0.5 + 1.0), Color(tone.r, tone.g, tone.b, glow * 0.45), false, PULSE_WIDE)
-	on.draw_rect(box.grow(1.5), Color(tone.r, tone.g, tone.b, glow * 0.95), false, 1.0)
+	var near := Color(tone.r, tone.g, tone.b, glow * 0.7)
+	var gone := Color(tone.r, tone.g, tone.b, 0.0)
+	var mid := Color(tone.r, tone.g, tone.b, glow * 0.22)
+	# The rays first, under the halo, out to `RAY_REACH` plus what the pulse adds.
+	var centre := box.get_center()
+	for i in RAYS:
+		var angle := TAU * (float(i) + 0.5) / float(RAYS)
+		var dir := Vector2(cos(angle), sin(angle))
+		var foot := _edge_point(box.grow(2.0), dir)
+		var roll := 0.7 + 0.6 * absf(sin(float(i) * 2.399 + 1.0))
+		var length := (GLOW_REACH + RAY_REACH * roll) * (0.75 + 0.25 * amount)
+		var half := dir.orthogonal() * RAY_WIDE * 0.5
+		on.draw_polygon(
+			PackedVector2Array([foot - half, foot + half, foot + dir * length]),
+			PackedColorArray([mid, mid, gone])
+		)
+	# The halo: eight quads between the wood's edge and `GLOW_REACH` out, gold going to nothing.
+	var inner := box.grow(1.0)
+	var outer := box.grow(1.0 + GLOW_REACH)
+	var ic := [inner.position, Vector2(inner.end.x, inner.position.y), inner.end, Vector2(inner.position.x, inner.end.y)]
+	var oc := [outer.position, Vector2(outer.end.x, outer.position.y), outer.end, Vector2(outer.position.x, outer.end.y)]
+	for k in 4:
+		var n := (k + 1) % 4
+		on.draw_polygon(
+			PackedVector2Array([ic[k], ic[n], oc[n], oc[k]]),
+			PackedColorArray([near, near, gone, gone])
+		)
+
+
+## Where a ray from a box's middle in `dir` leaves the box.
+static func _edge_point(box: Rect2, dir: Vector2) -> Vector2:
+	var half := box.size * 0.5
+	var tx := half.x / maxf(absf(dir.x), 0.0001)
+	var ty := half.y / maxf(absf(dir.y), 0.0001)
+	return box.get_center() + dir * minf(tx, ty)
 
 
 ## `swell` is the pulse (0 to 1): the plate grows `BADGE_SWELL` whole pixels at full and

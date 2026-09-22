@@ -406,10 +406,12 @@ func _draw() -> void:
 	)
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
-	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
+	# A pulsing button swells a few whole pixels and its glow is drawn under it, so the
+	# wood covers the glow's inside and nothing on the face is tinted.
 	HudButtons.pulse(self, _lifted(_shed_box, &"shed"), pulse_amount(&"shed"))
-	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
+	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
 	HudButtons.pulse(self, _lifted(_upgrades_box, &"upgrades"), pulse_amount(&"upgrades"))
+	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
 	_draw_stock()
 	_draw_available()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
@@ -728,6 +730,7 @@ class MeterFace extends Control:
 
 
 func _lifted(box: Rect2, name: StringName) -> Rect2:
+	box = box.grow(HudButtons.swell_by(pulse_amount(name)))
 	if _hovered != name:
 		return box
 	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)

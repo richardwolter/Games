@@ -122,7 +122,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	var box := Rect2(Vector2.ZERO, size)
+	var box := Rect2(Vector2.ZERO, size).grow(HudButtons.swell_by(pulse))
 	if _held:
 		box.position.y += Style.PRESS_SINK
 	elif _hovered:
@@ -135,6 +135,7 @@ func _draw() -> void:
 	var on := box
 	var behind := Style.BOARD_ROW if accent else Style.BOARD
 	HudButtons.pulse(self, box, pulse)
+	# The glow reaches outside the control; a control clips nothing by default, so it shows.
 	if Style.border_fits(box):
 		on = Style.border_inset(box)
 		draw_rect(on.grow(2.0), behind, true)
