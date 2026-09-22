@@ -37,9 +37,11 @@
 ## **A word in the head ink is a word between asterisks** (`_tokens`, `_wrap_marked`,
 ## `_ink_marked`): "*Left click*" is written in `HEAD_INK`, the lake's name's own red, so a
 ## card can point at the two words that matter without a second face or a second size. A
-## newline is a paragraph: its own row with half a row over it. The Upgrades card lays its
-## pictures down the left with each one's sentence beside it (`side`), because three boards
-## in a row and one sentence over them said nothing about which was which.
+## newline is a paragraph: its own row with half a row over it. The Upgrades card stands
+## its three boards in a row with each one's sentence wrapped narrow under it (`blurbs`),
+## because one sentence over three boards said nothing about which was which. Stacked down
+## the left with the words beside them (tried, same day) the boards were 95 px tall — three
+## rows in a 450 board — and Richard read them as too small with the left half bare.
 ##
 ## **Every line is measured against the paper before it is drawn** (`_fitted`, `overruns`).
 ## `Style.write` neither wraps nor clips, and the first cut's net card ran its second line
@@ -82,7 +84,7 @@ const CARDS := [
 	},
 	{
 		"head": "Upgrades",
-		"side": true,
+		"blurbs": true,
 		"snaps": [
 			["upgrades_net", "Upgrade your net to *catch further and more* objects.", &""],
 			["upgrades_boats", "Boats *sell objects to make money*.", &""],
@@ -152,10 +154,8 @@ const GAP := 10.0
 const ART_LEAST := 110.0
 ## The half row a paragraph stands off the one before it.
 const PARA_GAP := 0.5
-## A side-laid card: how much of the paper a picture may take across, and the gap between
-## it and its sentence.
-const SIDE_SHARE := 0.42
-const SIDE_GAP := 24.0
+## A blurbed card: the rows under each picture its sentence may take, at `TEXT_SMALL`.
+const BLURB_ROWS := 3
 
 ## The pager: the arrow planks and the dots between them.
 const ARROW := Vector2(30.0, 34.0)
@@ -328,8 +328,7 @@ static func _tokens(text: String) -> Array:
 				segs.append([seg, marked])
 				seg = ""
 			marked = not marked
-		elif ch == " " or ch == "
-":
+		elif ch == " " or ch == "\n":
 			if not seg.is_empty():
 				segs.append([seg, marked])
 				seg = ""
@@ -337,8 +336,7 @@ static func _tokens(text: String) -> Array:
 				words.append({"segs": segs.duplicate(), "para": para})
 				segs.clear()
 				para = false
-			if ch == "
-":
+			if ch == "\n":
 				para = true
 		else:
 			seg += ch
@@ -405,19 +403,22 @@ func _rows(card: Dictionary) -> Dictionary:
 	return _fit_marked(String(card.get("text", "")), text_wide(), SENTENCE_ROWS)
 
 
-## `text` wrapped to `wide` in at most `most` reserved rows, body size first.
-func _fit_marked(text: String, wide: float, most: float) -> Dictionary:
+## `text` wrapped to `wide` in at most `most` reserved rows, the largest of `sizes` first.
+func _fit_marked(text: String, wide: float, most: float,
+		sizes: Array = [Style.TEXT_BODY, Style.TEXT_SMALL]) -> Dictionary:
 	var words := _tokens(text)
-	for px in [Style.TEXT_BODY, Style.TEXT_SMALL]:
+	for px: int in sizes:
 		var rows := _wrap_marked(words, px, wide)
 		if _rows_tall(rows) <= most:
 			return {"rows": rows, "px": px}
 	return {}
 
 
-## Where a side-laid picture's sentence goes: the paper less the picture's share and the gap.
-func _side_text_wide() -> float:
-	return text_wide() * (1.0 - SIDE_SHARE) - SIDE_GAP
+## The band under a card's pictures: a caption's one row, or a blurb's `BLURB_ROWS`.
+static func _caption_band(card: Dictionary) -> float:
+	if bool(card.get("blurbs", false)):
+		return float(BLURB_ROWS) * (float(Style.TEXT_SMALL) + LINE_STEP)
+	return CAPTION_TALL
 
 
 ## Every line on every card that the paper cannot hold, as "card: line". The harness's
@@ -429,18 +430,17 @@ func overruns() -> PackedStringArray:
 		out.append("greeting: %s" % GREETING)
 	for card: Dictionary in CARDS:
 		var snaps: Array = card["snaps"]
-		if bool(card.get("side", false)):
-			# A side sentence has the paper past its picture, and the rows a third of the
-			# pictures' room allows.
+		var each := (wide - SNAP_GAP * float(snaps.size() - 1)) / float(maxi(snaps.size(), 1))
+		if bool(card.get("blurbs", false)):
+			# A blurb has its picture's width and `BLURB_ROWS` rows at the small size.
 			for snap: Array in snaps:
-				if _fit_marked(String(snap[1]), _side_text_wide(), SENTENCE_ROWS).is_empty():
+				if _fit_marked(String(snap[1]), each, BLURB_ROWS, [Style.TEXT_SMALL]).is_empty():
 					out.append("%s: %s" % [card["head"], snap[1]])
 			continue
 		if _rows(card).is_empty():
 			out.append("%s: %d rows" % [
 				card["head"], _wrap(String(card["text"]), Style.TEXT_SMALL, wide).size()
 			])
-		var each := (wide - SNAP_GAP * float(snaps.size() - 1)) / float(maxi(snaps.size(), 1))
 		for snap: Array in snaps:
 			# A caption has its snapshot's width and no more: its neighbour's starts there.
 			if _fitted(String(snap[1]), Style.TEXT_SMALL, maxf(each, 60.0)) == 0:
@@ -502,11 +502,11 @@ func _head_base(inside: Rect2) -> float:
 	return inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
 
 
-## Where the sentence's rows end: the heading, a gap, then every reserved row. A side-laid
-## card has no sentence block — its words stand beside its pictures.
+## Where the sentence's rows end: the heading, a gap, then every reserved row. A blurbed
+## card has no sentence block — its words stand under its pictures.
 func _text_foot(inside: Rect2) -> float:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
-	if bool(card.get("side", false)):
+	if bool(card.get("blurbs", false)):
 		return _head_base(inside)
 	return _head_base(inside) + GAP + float(SENTENCE_ROWS) * (float(Style.TEXT_BODY) + LINE_STEP)
 
@@ -516,13 +516,12 @@ func _text_foot(inside: Rect2) -> float:
 func _pin_snaps(box: Rect2) -> void:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	var snaps: Array = card["snaps"]
-	if bool(card.get("side", false)):
-		_pin_side(box, snaps)
-		return
+	var blurbs := bool(card.get("blurbs", false))
 	var captioned := false
 	for snap: Array in snaps:
 		captioned = captioned or not String(snap[1]).is_empty()
-	var tall := box.size.y - (CAPTION_TALL if captioned else 0.0) - 6.0
+	var band := _caption_band(card) if captioned else 0.0
+	var tall := box.size.y - band - 6.0
 	var shapes: Array[float] = []
 	var total := 0.0
 	for snap: Array in snaps:
@@ -536,8 +535,7 @@ func _pin_snaps(box: Rect2) -> void:
 		total = room
 	_captions.clear()
 	var x := box.position.x + (box.size.x - total - SNAP_GAP * float(snaps.size() - 1)) * 0.5
-	var y := box.position.y + 4.0 \
-		+ (box.size.y - (CAPTION_TALL if captioned else 0.0) - 6.0 - tall) * 0.5
+	var y := box.position.y + 4.0 + (box.size.y - band - 6.0 - tall) * 0.5
 	for i in _snaps.size():
 		var node := _snaps[i]
 		node.visible = i < snaps.size()
@@ -554,47 +552,10 @@ func _pin_snaps(box: Rect2) -> void:
 		_captions.append({
 			"text": String(snaps[i][1]),
 			"ink": StringName(snaps[i][2]),
-			"box": Rect2(Vector2(x, y + tall + 4.0), Vector2(span.x, CAPTION_TALL)),
+			"blurb": blurbs,
+			"box": Rect2(Vector2(x, y + tall + 4.0), Vector2(span.x, band)),
 		})
 		x += span.x + SNAP_GAP
-
-
-## A side-laid card: the pictures down the left, one under the other, each with its
-## sentence beside it. A picture is as tall as its share of the box and no wider than
-## `SIDE_SHARE` of the paper.
-func _pin_side(box: Rect2, snaps: Array) -> void:
-	_captions.clear()
-	var count := maxi(snaps.size(), 1)
-	var tall := (box.size.y - SNAP_GAP * float(count - 1)) / float(count)
-	var widest := box.size.x * SIDE_SHARE
-	var y := box.position.y
-	for i in _snaps.size():
-		var node := _snaps[i]
-		node.visible = i < snaps.size()
-		if not node.visible:
-			continue
-		var name := String(snaps[i][0])
-		var still := _still(name)
-		var shape := 1.4 if still == null else float(still.get_width()) / float(still.get_height())
-		var mine := minf(tall, widest / shape)
-		var span := Vector2(shape * mine, mine).floor()
-		node.picture = still
-		node.size = span
-		node.pivot_offset = span * 0.5
-		# Right-aligned on the pictures' column, so the sentences start on one line.
-		node.position = Vector2(box.position.x + widest - span.x, y + (tall - mine) * 0.5).floor()
-		node.rotation_degrees = (float(hash(name) % 200) / 100.0 - 1.0) * SNAP_TILT
-		node.queue_redraw()
-		_captions.append({
-			"text": String(snaps[i][1]),
-			"ink": StringName(snaps[i][2]),
-			"side": true,
-			"box": Rect2(
-				Vector2(box.position.x + widest + SIDE_GAP, y),
-				Vector2(box.size.x - widest - SIDE_GAP, tall)
-			),
-		})
-		y += tall + SNAP_GAP
 
 
 func _ribbon() -> Rect2:
@@ -741,8 +702,8 @@ func _draw() -> void:
 		if text.is_empty():
 			continue
 		var box: Rect2 = caption["box"]
-		if bool(caption.get("side", false)):
-			_draw_side_text(text, box)
+		if bool(caption.get("blurb", false)):
+			_draw_blurb(text, box)
 			continue
 		var key := StringName(caption["ink"])
 		var ink: Color = CAPTION_INKS.get(key, SOFT_INK)
@@ -772,21 +733,18 @@ func _ink_marked(row: Dictionary, px: int, base: float, within: Rect2, left: boo
 			x += space
 
 
-## A side-laid picture's sentence: wrapped to its box, left-aligned, the block standing
-## level with the picture's middle.
-func _draw_side_text(text: String, box: Rect2) -> void:
-	var fit := _fit_marked(text, box.size.x, SENTENCE_ROWS)
+## A picture's blurb: wrapped to the picture's width at the small size, each row centred
+## under it, the block hung from the band's top.
+func _draw_blurb(text: String, box: Rect2) -> void:
+	var fit := _fit_marked(text, box.size.x, BLURB_ROWS, [Style.TEXT_SMALL])
 	if fit.is_empty():
 		fit = {"rows": _wrap_marked(_tokens(text), Style.TEXT_TINY, box.size.x), "px": Style.TEXT_TINY}
 		dropped_lines += 1
-	var rows: Array = fit["rows"]
 	var px := int(fit["px"])
-	var row_tall := float(px) + LINE_STEP
-	var block := float(rows.size()) * row_tall - LINE_STEP
-	var y := box.position.y + (box.size.y - block) * 0.5
-	for row: Dictionary in rows:
-		_ink_marked(row, px, floorf(y + float(px)), box, true)
-		y += row_tall
+	var y := box.position.y
+	for row: Dictionary in fit["rows"]:
+		_ink_marked(row, px, floorf(y + float(px)), box, false)
+		y += float(px) + LINE_STEP
 
 
 ## The greeting on one line: the lead in body ink and the lake's name a rung up in the head

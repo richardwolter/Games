@@ -1369,11 +1369,13 @@ A wording and layout pass over the onboarding cards, off Richard's first-time-pl
 ` in a card's
   text is a paragraph: its own row, `PARA_GAP` (half a row) over it. `test_lake` asks that
   some words are marked and no asterisk reaches the paper.
-- **The Upgrades card is side-laid** (`side`, `_pin_side`, `_draw_side_text`, `SIDE_SHARE`
-  0.42): the top of each board — plank, head, first row or two (`BOARD_TOP` 250 in the
-  probe) — down the left, its own sentence beside it, left-aligned and level with the
-  picture's middle. Three whole boards in a row under one sentence said nothing about
-  which was which.
+- **The Upgrades card is three boards over three blurbs** (`blurbs`, `_caption_band`,
+  `_draw_blurb`, `BLURB_ROWS` 3): the top of each board — plank, head, first row or two
+  (`BOARD_TOP` 250 in the probe) — in a row, its own sentence wrapped narrow under it at
+  the small size. **Side by side was tried the same day and rejected** (Richard: the boards
+  too small, the left half bare): stacked down the left with the words beside them, three
+  rows in a 450 board gave each board 95 px however it was cropped, and a taller board
+  would have left bare paper on the other three cards.
 - **The board went 620 to 760 wide**, which is what took the greeting from 11 / 13 to
   **16 / 20**; `ART_LEAST` came 150 to 110 with it, since the room now comes across.
 - **Upgrades shows the three boards** (net, boats, dogs, plank to foot, `BOARD_PAD` /

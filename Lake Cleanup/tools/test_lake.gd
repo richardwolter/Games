@@ -7165,17 +7165,18 @@ func _stage_letter() -> void:
 	var tiers: Array = letter.call(&"_rows", Letter.CARDS[2])["rows"]
 	_check(tiers.size() == 2 and bool(tiers[1]["para"]) and not bool(tiers[0]["para"]),
 		"the tier card is two paragraphs", "%d rows" % tiers.size())
-	_check(bool(Letter.CARDS[1].get("side", false)) and not Letter.CARDS[1].has("text"),
-		"the upgrades card lays each board beside its own sentence", "")
+	_check(bool(Letter.CARDS[1].get("blurbs", false)) and not Letter.CARDS[1].has("text"),
+		"the upgrades card stands each board over its own sentence", "")
 	letter.page = 1
 	letter.call(&"_lay_out")
-	var side_caps: Array = letter.get(&"_captions")
-	var stacked := side_caps.size() == 3
-	for i in side_caps.size():
-		var cap: Dictionary = side_caps[i]
-		stacked = stacked and bool(cap.get("side", false)) \
-			and (i == 0 or (cap["box"] as Rect2).position.y > (side_caps[i - 1]["box"] as Rect2).position.y)
-	_check(stacked, "with the three stacked down the card", "%d" % side_caps.size())
+	var blurb_caps: Array = letter.get(&"_captions")
+	var in_a_row := blurb_caps.size() == 3
+	for i in blurb_caps.size():
+		var cap: Dictionary = blurb_caps[i]
+		in_a_row = in_a_row and bool(cap.get("blurb", false)) \
+			and (cap["box"] as Rect2).size.y > Letter.CAPTION_TALL \
+			and (i == 0 or (cap["box"] as Rect2).position.x > (blurb_caps[i - 1]["box"] as Rect2).position.x)
+	_check(in_a_row, "three in a row, each with rows for its words", "%d" % blurb_caps.size())
 
 	# The pictures are the game's own photographs. A still that is not there is a probe
 	# nobody re-ran, and the card would show a blank print.
