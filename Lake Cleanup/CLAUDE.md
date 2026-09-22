@@ -3355,6 +3355,9 @@ comes into reach, so a better spot no longer needs WASD first. `Lake._cast_or_wa
   through the spot, ending at the last standing point): the walk goes to that shore and
   stops with no throw, by Richard's call over ignoring the press and over throwing short.
   The player aims again from there.
+- **A press on the island's ground walks there** (Richard, same day: "walks to there
+  instead of standing"), no throw owed; the hut, the crate, the pump and the bank are
+  nothing, as `Angler._can_stand` says.
 - **Cancelled by** any walk input (WASD, arrows, the left stick), any board, the menu, the
   arrival, the farewell, or a net no longer idle. A new press retargets. Session only.
 - **Out of scope, by decision**: A* or waypoints, a pinned ring or a stop marker, any

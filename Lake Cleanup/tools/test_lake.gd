@@ -6716,6 +6716,16 @@ func _stage_led_cast() -> void:
 			_main.call(&"_cast_or_walk", b)
 			_check(_main.get(&"_led_cast") == b, "a second press retargets", "")
 			_main.call(&"_stop_led_cast")
+			# A press on the island's ground walks there; on the hut it is nothing.
+			var lawn := Iso.ISLAND_CENTRE + Vector2(0.0, 3.5)
+			_check(bool(_angler.call(&"_can_stand", lawn)), "the lawn spot can be stood on", str(lawn))
+			_main.call(&"_cast_or_walk", Iso.tile_to_world(lawn.x, lawn.y))
+			_check(_angler.walk_to == lawn and not bool(_main.get(&"_led_throw")),
+				"a press on the isle walks there with no throw", str(_angler.walk_to))
+			_main.call(&"_stop_led_cast")
+			_main.call(&"_cast_or_walk", Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y))
+			_check(_main.get(&"_led_cast") == Vector2.INF and _angler.walk_to == Vector2.INF,
+				"a press on the hut is nothing", "")
 			# A press in reach throws at once, as it always did.
 			var near := _water_near_angler()
 			_main.call(&"_cast_or_walk", near)

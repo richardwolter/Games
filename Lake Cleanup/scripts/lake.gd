@@ -2256,6 +2256,16 @@ func _cast_or_walk(where: Vector2) -> void:
 		return
 	var tile := Iso.world_to_tile(where)
 	if Iso.island_fraction(tile.x, tile.y) < 1.0 or Iso.shore_fraction(tile.x, tile.y) >= 1.0:
+		# Not water. A spot on the island the boots may stand on is walked to (Richard,
+		# 2026-09-22: a click on the isle walks there, it does not just stand); the hut,
+		# the crate, the pump and the bank are nothing.
+		if bool(_angler.call(&"_can_stand", tile)):
+			_led_cast = where
+			_led_throw = false
+			_led_stall = 0.0
+			_led_was = _angler.tile_pos
+			_angler.walk_to = tile
+			_pan_yielded = true
 		return
 	var shore: Vector2 = _angler.shore_toward(tile)
 	_led_cast = where
