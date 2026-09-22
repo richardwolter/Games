@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1lknhppcbpld"
-path="res://.godot/imported/upgrades_button.png-4fed34e1d1b4a54a25ed1b74919a88f5.ctex"
+uid="uid://bfcy8l0t4bdq0"
+path="res://.godot/imported/decor_shed.png-ab8734fed1b2d3b3fa5f462f0ec70778.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/letter/upgrades_button.png"
-dest_files=["res://.godot/imported/upgrades_button.png-4fed34e1d1b4a54a25ed1b74919a88f5.ctex"]
+source_file="res://assets/letter/decor_shed.png"
+dest_files=["res://.godot/imported/decor_shed.png-ab8734fed1b2d3b3fa5f462f0ec70778.ctex"]
 
 [params]
 

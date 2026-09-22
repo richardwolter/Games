@@ -20,9 +20,18 @@
 ## HUD means re-running the probe, and the stills carry the game's English UI as it stands.
 ##
 ## **The greeting is the first card's alone**, and the other three give its room to their
-## pictures. **One height whatever card is up**: the board is laid out from the bottom —
-## pager, sentence, heading — and the pictures take what is left, so nothing jumps under the
-## pointer that is paging it.
+## pictures. **One height whatever card is up**: the board is laid out from the top —
+## greeting, heading, sentence — and from the bottom — pager, door — and the pictures take
+## what is left between, so nothing jumps under the pointer that is paging it.
+##
+## **Heading, then words, then pictures** (2026-09-22, `/grill-me` with Richard; the first
+## cut stood the heading under the pictures): the Net card's sentence says "the circles
+## below", and a caption under each ring says what its colour means **in that colour** —
+## the ring's own swatches, darkened until they clear 4.5:1 on the paper (`CAPTION_INKS`),
+## and the out-of-range one in the soft ink with a dashed underline, since a white word on
+## cream is nothing. The greeting is one line, the lake's name a size up in the head ink
+## (Bungee has one weight, so bolder is bigger). "Start cleaning" stands centred above the
+## dots on the last card, in a row every card reserves.
 ##
 ## **Every line is measured against the paper before it is drawn** (`_fitted`, `overruns`).
 ## `Style.write` neither wraps nor clips, and the first cut's net card ran its second line
@@ -33,52 +42,70 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "A letter"
+const TITLE := "How to play"
 
-## The opening line, on the first card only.
-const GREETING := "Congratulations, you are the new owner of My Dirty Little Lake."
+## The opening line, on the first card only: the lead in body ink, the name a rung up in
+## the head ink, on one baseline. `GREETING` is the whole of it, for anything that reads it.
+const GREETING_LEAD := "Congratulations, you are the new owner of "
+const GREETING_NAME := "My Dirty Little Lake."
+const GREETING := GREETING_LEAD + GREETING_NAME
+## The size pairs the greeting is tried at, largest first: [lead, name].
+const GREETING_SIZES := [
+	[Style.TEXT_BODY, Style.TEXT_HEAD], [Style.TEXT_SMALL, Style.TEXT_BODY],
+	[Style.TEXT_TINY, Style.TEXT_SMALL],
+]
 
 ## Where the stills live. One PNG a snapshot, named as the cards name them.
 const ART := "res://assets/letter/%s.png"
 
-## The cards, in order. `snaps` are [still, caption] pairs pinned in a row, left to right;
-## a caption may be empty. `lines` are the sentence, at most `SENTENCE_ROWS` of them.
+## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows;
+## `snaps` are [still, caption, ink] triples pinned in a row, left to right. A caption may be
+## empty; `ink` names a `CAPTION_INKS` entry, `far` for the underlined soft ink, or is empty.
 const CARDS := [
 	{
 		"head": "Net",
-		"lines": ["Cast your net to catch what floats."],
+		"text": "Left click to cast your net and catch objects floating. "
+			+ "The circles below indicate how your cast will go.",
 		"snaps": [
-			["net_catch", "Green: a catch"],
-			["net_nothing", "Red: nothing to lift"],
-			["net_far", "White: out of range"],
+			["net_catch", "Guaranteed objects", &"ok"],
+			["net_nothing", "No object available", &"no"],
+			["net_far", "Out of net range", &"far"],
 		],
 	},
 	{
 		"head": "Upgrades",
-		"lines": [
-			"Upgrade your net, your boats and your dogs",
-			"to clean and recycle faster.",
-		],
-		"snaps": [["upgrades_button", ""], ["upgrades_shop", ""]],
+		"text": "Upgrade your net to catch further and more objects. "
+			+ "Boats sell objects to make money. Dogs help you clean the lake.",
+		"snaps": [["upgrades_net", "", &""], ["upgrades_boats", "", &""], ["upgrades_dogs", "", &""]],
 	},
 	{
-		"head": "Weight",
-		"lines": [
-			"Heavier things sit in five tiers.",
-			"Strength is the upgrade that lifts the next one.",
-		],
-		"snaps": [["weight_heavy", "Too heavy"], ["weight_strength", "Buy Strength"]],
+		"head": "Object Tier",
+		"text": "Objects have 5 weight tiers. "
+			+ "Upgrading Strength catches more objects and cleans faster.",
+		"snaps": [["weight_heavy", "Too heavy", &""], ["weight_strength", "Upgrade Strength", &""]],
 	},
 	{
 		"head": "Decoration",
-		"lines": ["Some catches are furniture for your shed."],
-		"snaps": [["decor_find", "Catch it"], ["decor_wash", "Wash it"], ["decor_button", "Place it"]],
+		"text": "Some catches are decoration for your shed.",
+		"snaps": [
+			["decor_find", "Catch it", &""], ["decor_wash", "Wash it", &""],
+			["decor_shed", "Decorate", &""],
+		],
 	},
 ]
 
-## The last card's way out. It stands at the pager's right end in place of the forward arrow
-## — there is nothing further to turn to — so no card reserves a row for a door it does not
-## have. The first cut hung it under the pager and left a hundred pixels bare on three cards.
+## The caption inks: the aim ring's own green and red, each darkened until it clears 4.5:1
+## on `PAPER` (4.6 and 5.1; the swatches as drawn are 1.3 and 2.9 — they were lifted to
+## carry over dirty water). `far` is the soft ink with a dashed line under it.
+const CAPTION_INKS := {
+	&"ok": Color(0.325, 0.402, 0.191),
+	&"no": Color(0.575, 0.250, 0.150),
+}
+const UNDERLINE_DASH := 4.0
+
+## The last card's way out: centred above the dots (Richard, 2026-09-22), in a row every card
+## reserves so the pictures do not grow on the last card. It stood at the pager's right end
+## in place of the forward arrow before that.
 const DOOR_LABEL := "Start cleaning"
 const DOOR := Vector2(196.0, 48.0)
 
@@ -106,7 +133,7 @@ const SOFT_INK := Style.PAPER_SOFT
 
 ## The blocks, bottom up, and the gaps between them.
 const PAGER_TALL := 48.0
-const SENTENCE_ROWS := 2
+const SENTENCE_ROWS := 3
 const LINE_STEP := 6.0
 const GAP := 10.0
 ## The least the pictures are given on the greeting's card; the other cards get this plus
@@ -231,18 +258,33 @@ func text_wide() -> float:
 	return face.size.x - SHEET_INSET * 2.0 - SHEET_PAD * 2.0
 
 
+## The size pair the greeting fits the paper at on one line, largest first; the last pair
+## when none does, which `overruns` reports.
+func greeting_sizes() -> Array:
+	var wide := text_wide()
+	for pair: Array in GREETING_SIZES:
+		if _greeting_wide(int(pair[0]), int(pair[1])) <= wide:
+			return pair
+	return GREETING_SIZES[GREETING_SIZES.size() - 1]
+
+
+func _greeting_wide(lead_px: int, name_px: int) -> float:
+	return Style.measure(GREETING_LEAD, lead_px).x + Style.measure(GREETING_NAME, name_px).x
+
+
 func _greeting_tall() -> float:
-	return float(_wrap_even(GREETING, Style.TEXT_BODY, text_wide()).size()) \
-		* (float(Style.TEXT_BODY) + LINE_STEP) + GAP
+	return float(int(greeting_sizes()[1])) + LINE_STEP + GAP
 
 
 ## How tall the board wants to be. One number whatever card is up, by construction.
 func wanted_tall() -> float:
 	var wide := minf(BOARD_WIDE, size.x - 40.0)
 	var tall := Style.board_wood_tall(wide, FRAME) + SHEET_INSET * 2.0 + SHEET_PAD * 2.0
-	tall += _greeting_tall() + ART_LEAST + GAP
+	tall += _greeting_tall()
 	tall += float(Style.TEXT_HEAD) + GAP
 	tall += float(SENTENCE_ROWS) * (float(Style.TEXT_BODY) + LINE_STEP) + GAP
+	tall += ART_LEAST + GAP
+	tall += DOOR.y + GAP
 	tall += PAGER_TALL
 	return tall
 
@@ -287,18 +329,38 @@ static func _fitted(text: String, px: int, wide: float) -> int:
 	return down if Style.measure(text, down).x <= wide else 0
 
 
+## A card's sentence wrapped to the rows the board reserves: at the body size, or a rung
+## down when it needs more rows than that. Empty when it fits at neither.
+func _rows(card: Dictionary) -> PackedStringArray:
+	var wide := text_wide()
+	for px in [Style.TEXT_BODY, Style.TEXT_SMALL]:
+		var rows := _wrap_even(String(card["text"]), px, wide)
+		if rows.size() <= SENTENCE_ROWS:
+			return rows
+	return PackedStringArray()
+
+
+## The size `_rows` landed on, for drawing them.
+func _rows_size(card: Dictionary) -> int:
+	var wide := text_wide()
+	for px in [Style.TEXT_BODY, Style.TEXT_SMALL]:
+		if _wrap_even(String(card["text"]), px, wide).size() <= SENTENCE_ROWS:
+			return px
+	return Style.TEXT_TINY
+
+
 ## Every line on every card that the paper cannot hold, as "card: line". The harness's
 ## question, asked of the arithmetic because headless never calls `_draw`.
 func overruns() -> PackedStringArray:
 	var out := PackedStringArray()
 	var wide := text_wide()
+	if _greeting_wide(int(greeting_sizes()[0]), int(greeting_sizes()[1])) > wide:
+		out.append("greeting: %s" % GREETING)
 	for card: Dictionary in CARDS:
-		var lines: Array = card["lines"]
-		if lines.size() > SENTENCE_ROWS:
-			out.append("%s: %d lines" % [card["head"], lines.size()])
-		for line: String in lines:
-			if _fitted(line, Style.TEXT_BODY, wide) == 0:
-				out.append("%s: %s" % [card["head"], line])
+		if _rows(card).is_empty():
+			out.append("%s: %d rows" % [
+				card["head"], _wrap(String(card["text"]), Style.TEXT_SMALL, wide).size()
+			])
 		var snaps: Array = card["snaps"]
 		var each := (wide - SNAP_GAP * float(snaps.size() - 1)) / float(maxi(snaps.size(), 1))
 		for snap: Array in snaps:
@@ -326,7 +388,10 @@ func _lay_out() -> void:
 	_back = Rect2(Vector2(inside.position.x, row + (PAGER_TALL - ARROW.y) * 0.5), ARROW)
 	_on = Rect2(Vector2(inside.end.x - ARROW.x, _back.position.y), ARROW)
 	_door.size = DOOR
-	_door.position = Vector2(inside.end.x - DOOR.x, row).floor()
+	# Centred above the dots, on the row every card reserves; shown on the last.
+	_door.position = Vector2(
+		inside.position.x + (inside.size.x - DOOR.x) * 0.5, row - GAP - DOOR.y
+	).floor()
 	_door.visible = last
 	_dots.clear()
 	var span := float(CARDS.size() - 1) * DOT_GAP
@@ -342,14 +407,22 @@ func _lay_out() -> void:
 	queue_redraw()
 
 
-## What the pictures get: from the top of the writing room — under the greeting on the first
-## card — down to the heading.
+## What the pictures get: from under the sentence — under the greeting, the heading and the
+## sentence on the first card — down to the door's row.
 func _art_box(inside: Rect2) -> Rect2:
-	var top := inside.position.y + (_greeting_tall() if page == 0 else 0.0)
-	var foot := inside.end.y - PAGER_TALL - GAP \
-		- float(SENTENCE_ROWS) * (float(Style.TEXT_BODY) + LINE_STEP) - GAP \
-		- float(Style.TEXT_HEAD) - GAP
+	var top := _text_foot(inside) + GAP
+	var foot := inside.end.y - PAGER_TALL - GAP - DOOR.y - GAP
 	return Rect2(inside.position.x, top, inside.size.x, maxf(foot - top, 40.0))
+
+
+## Where the heading's baseline is, top down.
+func _head_base(inside: Rect2) -> float:
+	return inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
+
+
+## Where the sentence's rows end: the heading, a gap, then every reserved row.
+func _text_foot(inside: Rect2) -> float:
+	return _head_base(inside) + GAP + float(SENTENCE_ROWS) * (float(Style.TEXT_BODY) + LINE_STEP)
 
 
 ## Pin this card's photographs in a row: one height for all of them, each as wide as its own
@@ -391,6 +464,7 @@ func _pin_snaps(box: Rect2) -> void:
 		node.queue_redraw()
 		_captions.append({
 			"text": String(snaps[i][1]),
+			"ink": StringName(snaps[i][2]),
 			"box": Rect2(Vector2(x, y + tall + 4.0), Vector2(span.x, CAPTION_TALL)),
 		})
 		x += span.x + SNAP_GAP
@@ -474,16 +548,24 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Ink on paper: no drop shadow. `Style.write` shades every label for standing on dark wood
 ## or open water, and under dark ink on a pale sheet that shade is a smudge.
-func _ink(text: String, px: int, base: float, within: Rect2, ink: Color) -> void:
+func _ink(text: String, px: int, base: float, within: Rect2, ink: Color) -> Rect2:
 	var sized := _fitted(text, px, within.size.x)
 	if sized == 0:
 		dropped_lines += 1
 		sized = Style.TEXT_TINY
 	var span := Style.measure(text, sized).x
-	draw_string(
-		Style.font(), Vector2(floorf(within.position.x + (within.size.x - span) * 0.5), base),
-		text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, sized, ink
-	)
+	var at := Vector2(floorf(within.position.x + (within.size.x - span) * 0.5), base)
+	draw_string(Style.font(), at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, sized, ink)
+	return Rect2(at - Vector2(0.0, float(sized)), Vector2(span, float(sized)))
+
+
+## A dashed line under a written word: the out-of-range ring's own dashes.
+func _underline(box: Rect2, ink: Color) -> void:
+	var y := floorf(box.end.y + 3.0) + 0.5
+	var x := box.position.x
+	while x < box.end.x:
+		draw_line(Vector2(x, y), Vector2(minf(x + UNDERLINE_DASH, box.end.x), y), ink, 1.0)
+		x += UNDERLINE_DASH * 2.0
 
 
 func _draw() -> void:
@@ -502,30 +584,9 @@ func _draw() -> void:
 	var inside := _sheet.grow(-SHEET_PAD)
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if page == 0:
-		var y := inside.position.y
-		for row in _wrap_even(GREETING, Style.TEXT_BODY, inside.size.x):
-			y += float(Style.TEXT_BODY)
-			_ink(row, Style.TEXT_BODY, y, inside, INK)
-			y += LINE_STEP
-	for caption: Dictionary in _captions:
-		var text := String(caption["text"])
-		if text.is_empty():
-			continue
-		var box: Rect2 = caption["box"]
-		_ink(text, Style.TEXT_SMALL, box.position.y + float(Style.TEXT_SMALL), box, SOFT_INK)
-	# Bottom up from the pager, the way the layout was measured.
-	var lines: Array = card["lines"]
-	var row_tall := float(Style.TEXT_BODY) + LINE_STEP
-	var text_top := inside.end.y - PAGER_TALL - GAP - float(SENTENCE_ROWS) * row_tall
-	# A short sentence stands in the middle of the room two rows leave, not at its top.
-	var y_text := text_top + (float(SENTENCE_ROWS - mini(lines.size(), SENTENCE_ROWS)) * row_tall) * 0.5
-	for i in mini(lines.size(), SENTENCE_ROWS):
-		y_text += float(Style.TEXT_BODY)
-		_ink(String(lines[i]), Style.TEXT_BODY, y_text, inside, INK)
-		y_text += LINE_STEP
-	if lines.size() > SENTENCE_ROWS:
-		dropped_lines += lines.size() - SENTENCE_ROWS
-	var head_base := text_top - GAP
+		_draw_greeting(inside)
+	# Top down: the heading with its rules, then the sentence, then the pictures' captions.
+	var head_base := _head_base(inside)
 	_ink(String(card["head"]), Style.TEXT_HEAD, head_base, inside, HEAD_INK)
 	# A ruled line either side of the heading, the way a letter's sections are set off.
 	var head_wide := Style.measure(String(card["head"]), Style.TEXT_HEAD).x
@@ -535,7 +596,47 @@ func _draw() -> void:
 		Vector2(mid - head_wide * 0.5 - 12.0, rule_y), PAPER_RULE, 1.0)
 	draw_line(Vector2(mid + head_wide * 0.5 + 12.0, rule_y),
 		Vector2(inside.end.x - 24.0, rule_y), PAPER_RULE, 1.0)
+	var rows := _rows(card)
+	var px := _rows_size(card)
+	if rows.is_empty():
+		rows = _wrap(String(card["text"]), Style.TEXT_TINY, inside.size.x)
+		dropped_lines += maxi(rows.size() - SENTENCE_ROWS, 1)
+		rows.resize(mini(rows.size(), SENTENCE_ROWS))
+	var row_tall := float(Style.TEXT_BODY) + LINE_STEP
+	var y_text := head_base + GAP
+	for row in rows:
+		y_text += float(px)
+		_ink(row, px, y_text, inside, INK)
+		y_text += row_tall - float(px)
+	for caption: Dictionary in _captions:
+		var text := String(caption["text"])
+		if text.is_empty():
+			continue
+		var box: Rect2 = caption["box"]
+		var key := StringName(caption["ink"])
+		var ink: Color = CAPTION_INKS.get(key, SOFT_INK)
+		var drawn := _ink(text, Style.TEXT_SMALL, box.position.y + float(Style.TEXT_SMALL), box, ink)
+		if key == &"far":
+			_underline(drawn, ink)
 	_draw_pager()
+
+
+## The greeting on one line: the lead in body ink and the lake's name a rung up in the head
+## ink, both on one baseline, the pair centred together. Sizes step down until it fits.
+func _draw_greeting(inside: Rect2) -> void:
+	var pair := greeting_sizes()
+	var lead_px := int(pair[0])
+	var name_px := int(pair[1])
+	var lead_wide := Style.measure(GREETING_LEAD, lead_px).x
+	var whole := lead_wide + Style.measure(GREETING_NAME, name_px).x
+	if whole > inside.size.x:
+		dropped_lines += 1
+	var x := floorf(inside.position.x + (inside.size.x - whole) * 0.5)
+	var base := inside.position.y + float(name_px)
+	draw_string(Style.font(), Vector2(x, base), GREETING_LEAD,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, lead_px, INK)
+	draw_string(Style.font(), Vector2(x + lead_wide, base), GREETING_NAME,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, name_px, HEAD_INK)
 
 
 ## The sheet: paper with bites torn out of its edges in the planks' own V, a darker line

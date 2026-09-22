@@ -1307,18 +1307,20 @@ open** for those.
   `tools/last_letter_art.png`. The Strength row is cropped **with the rows either side of
   it** (`ROW_CONTEXT`): alone it is a strip 3.5 times as wide as tall, and pinned beside a
   photograph it took the whole card.
-- **The cards**: *Net* — three stills captioned Green / Red / White, one sentence; *Upgrades*
-  — the HUD button and the open shop; *Weight* — a red ring on a heavy piece, the Strength
-  row; *Decoration* — Catch it / Wash it / Place it. One to three stills a card, one height
-  for a row, each as wide as its own shape, the row scaled down together if too wide.
+- **The cards** (reworded 2026-09-22, `/grill-me` with Richard; see The Board Reads
+  "How to Play" below): *Net* — three stills captioned in the ring's own colours; *Upgrades*
+  — the shop's NET / BOATS / DOGS boards, one each; *Object Tier* — a red ring on a heavy
+  piece ("Too heavy"), the Strength row ("Upgrade Strength"); *Decoration* — Catch it / Wash
+  it / Decorate, the last a furnished shed. One to three stills a card, one height for a
+  row, each as wide as its own shape, the row scaled down together if too wide.
 - **The greeting is the first card's alone** (Richard, over a letterhead on every card and
-  over a fifth opening page), wrapped **evenly** (`_wrap_even`) so it does not leave two
-  words alone on its last line; the other three cards give its room to their pictures.
-- **One height whatever card is up** (428 design px of the 680 a 720 window leaves): laid
-  out **from the bottom** — pager, sentence, heading — and the pictures take what is left.
-  **"Start cleaning" stands at the pager's right end in place of the forward arrow**, so no
-  card reserves a row for a door it does not have; hung under the pager, the first cut left
-  a hundred pixels bare on three cards. The dots stay centred on the last card too.
+  over a fifth opening page); the other three cards give its room to their pictures. **One
+  line since 2026-09-22**, the lake's name a size up — see below.
+- **One height whatever card is up** (483 design px of the 680 a 720 window leaves, was
+  428): laid out from the top — greeting, heading, sentence — and from the bottom — pager,
+  door — and the pictures take what is left between. The door's row is reserved on every
+  card since 2026-09-22 (below); before that "Start cleaning" stood at the pager's right end
+  in place of the forward arrow.
 - **Every line is measured against the paper** (`_fitted`, `overruns`, `dropped_lines`):
   `Style.write` neither wraps nor clips, and the first cut's net card ran its second line
   clean over both stiles of the frame. A line too wide drops a size; one still too wide is
@@ -1331,10 +1333,48 @@ open** for those.
   `tools/last_letter_{sailing,walking,card_*}.png` and `last_letter.log`. **A page turned is
   not the frame the capture lands on** — taken on the turn, all four pictures came out as
   card one — so it waits `TURN_SETTLE` frames. `test_lake`'s `_stage_letter` guards the four
-  cards, the pager's clamping, the door on the paper where the forward arrow stood, the
+  cards, the pager's clamping, the door on the paper centred above the dots, the
   cross, the room at 1280x720, every line and caption fitting, every still being shot and
   imported, the greeting's room going to the pictures, the absent-key rule, the close ending
   the arrival, and the menu's plank standing above Credits.
+
+### The Board Reads "How to Play" (2026-09-22, `/grill-me` with Richard)
+A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
+`scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.
+- **The plank says "How to play"**, not "A letter" — the menu's plank already did.
+- **Heading, then words, then pictures** on every card (the first cut stood the heading
+  under the pictures): the Net card's sentence says "the circles below", so the pictures
+  are below. `_head_base` / `_text_foot` / `_art_box` are the top-down walk; the door and
+  the pager come up from the bottom.
+- **The Net captions say their colour in it** (`CAPTION_INKS`): "Guaranteed objects" in the
+  aim ring's green, "No object available" in its red, each **darkened until it clears
+  4.5:1 on the paper** (4.6 / 5.1 — the ring's own swatches are lifted for dirty water and
+  read 1.3 / 2.9 on cream); "Out of net range" in the soft ink with a **dashed underline**
+  (`_underline`). A white-stroked word was asked for and turned down on the pushback: white
+  on cream is nothing. `test_lake` measures both inks against `Style.PAPER`.
+- **The greeting is one line** (Richard: "decrease size if needed"), the lead in body ink
+  and **"My Dirty Little Lake." a rung up in the head ink** on the same baseline
+  (`GREETING_LEAD` / `GREETING_NAME`, `greeting_sizes`, `_draw_greeting`). Bungee has one
+  weight, so bolder is bigger. It fits the 538 px paper only at **11 / 13** — Bungee is a
+  wide face — which is small; widening `BOARD_WIDE` is the lever if it reads too small.
+- **The sentences are wrapped, not authored in rows** (`text` per card, `_rows`,
+  `SENTENCE_ROWS` 3): body size first, a rung down if that needs more rows. Typos in the
+  brief fixed on the way ("indicates", "weight 5 weight tiers", "Strenght").
+- **"Start cleaning" stands centred above the dots**, in a row every card reserves, so the
+  pictures do not grow on the last card. The forward arrow is simply absent there.
+- **Upgrades shows the three boards** (net, boats, dogs, plank to foot, `BOARD_PAD` /
+  `BOARD_PLANK`), shot with the corner HUD skin hidden — the HUD *layer* cannot be, the
+  shop lives on it. **Decoration's last still is the shed** furnished as `tools/shot_shed.gd`
+  lays it out (`SHED_LAYOUT`, copied, every switch on, dogs cleared), cropped to
+  `_shed_rect`; `_room_rect` took lake round the room. The HUD buttons (`upgrades_button`,
+  `decor_button`) and the two-board `upgrades_shop` stills are deleted.
+- **Object Tier** is the Weight card renamed; its stills re-shot on the third rubbish batch
+  and the rimmed Strength row, which the probe did by being run.
+- **Out of scope, by decision**: any card added or removed, a skip key, contextual hints,
+  new painted art, the arrival's timing, the paper's look.
+- `test_lake`'s `_stage_letter` guards the heads, the title, the one-line greeting with the
+  name a size up, the three caption inks and their contrast, heading over words over
+  pictures, the door centred above the dots and its row reserved, and the rest as before.
 
 ### The Boards Are Paper (2026-09-20, `/grill-me` with Richard, issue #7)
 The last UI pass, and what closes #7: every board that opens shares one face. Richard's four

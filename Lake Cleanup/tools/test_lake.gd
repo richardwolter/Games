@@ -7071,14 +7071,41 @@ func _stage_letter() -> void:
 	var long_cards: Array = []
 	for card: Dictionary in Letter.CARDS:
 		heads.append(String(card["head"]))
-		if (card["lines"] as Array).size() > Letter.SENTENCE_ROWS:
+		if (letter.call(&"_rows", card) as PackedStringArray).is_empty():
 			long_cards.append(String(card["head"]))
-	_check(heads == ["Net", "Upgrades", "Weight", "Decoration"],
+	_check(heads == ["Net", "Upgrades", "Object Tier", "Decoration"],
 		"named for what each one teaches", ", ".join(heads))
 	_check(long_cards.is_empty(),
 		"and none says more than the rows the board reserves", ", ".join(long_cards))
-	_check(Letter.GREETING.contains("new owner"),
-		"the greeting stands over every card", Letter.GREETING)
+	_check(Letter.TITLE == "How to play", "the plank says what the board is", Letter.TITLE)
+	_check(Letter.GREETING.contains("new owner") and Letter.GREETING.ends_with(Letter.GREETING_NAME),
+		"the greeting ends on the lake's name", Letter.GREETING)
+	var sizes: Array = letter.greeting_sizes()
+	_check(int(sizes[1]) > int(sizes[0])
+		and letter.call(&"_greeting_wide", sizes[0], sizes[1]) <= letter.text_wide(),
+		"written on one line with the name a size up", "%s of %.0f" % [str(sizes), letter.text_wide()])
+	# The Net card's captions say their colour in it: the ring's green and red darkened to
+	# clear the paper, and the out-of-range one underlined in the soft ink.
+	var net: Dictionary = Letter.CARDS[0]
+	var inks: Array = []
+	for snap: Array in net["snaps"]:
+		inks.append(StringName(snap[2]))
+	_check(inks == [&"ok", &"no", &"far"], "the net card's captions are inked by ring",
+		str(inks))
+	for key: StringName in [&"ok", &"no"]:
+		var ink: Color = Letter.CAPTION_INKS[key]
+		_check(_contrast(ink, Style.PAPER) >= 4.5, "and the %s caption clears the paper" % key,
+			"%.2f:1" % _contrast(ink, Style.PAPER))
+	_check(Letter.CAPTION_INKS[&"ok"].g > Letter.CAPTION_INKS[&"ok"].r
+		and Letter.CAPTION_INKS[&"no"].r > Letter.CAPTION_INKS[&"no"].g,
+		"green reads green and red reads red", "")
+	# Heading over the sentence over the pictures, on every card.
+	var inside_first := (letter.get(&"_sheet") as Rect2).grow(-Letter.SHEET_PAD)
+	var head_at := float(letter.call(&"_head_base", inside_first))
+	var art_first := letter.call(&"_art_box", inside_first) as Rect2
+	_check(head_at < float(letter.call(&"_text_foot", inside_first))
+		and float(letter.call(&"_text_foot", inside_first)) <= art_first.position.y,
+		"the heading stands over the words and the words over the pictures", "")
 
 	# The pager: a dot a card, clamped at both ends rather than wrapping round.
 	_check((letter.get(&"_dots") as Array).size() == Letter.CARDS.size(),
@@ -7108,11 +7135,21 @@ func _stage_letter() -> void:
 	# `dropped_lines` it sets — never runs. `tools/shot_letter.tscn` is what reads that.
 	var sheet := letter.get(&"_sheet") as Rect2
 	var way_out := letter.get(&"_door") as Control
-	var forward := letter.get(&"_on") as Rect2
+	var dots: Array = letter.get(&"_dots")
 	_check(sheet.encloses(Rect2(way_out.position, way_out.size)),
 		"with its door on the paper", "")
-	_check(is_equal_approx(way_out.position.x + way_out.size.x, forward.end.x),
-		"standing where the forward arrow stood, so no card reserves a row for it", "")
+	var door_mid := way_out.position.x + way_out.size.x * 0.5
+	var sheet_mid := sheet.position.x + sheet.size.x * 0.5
+	_check(absf(door_mid - sheet_mid) <= 1.0 and way_out.position.y + way_out.size.y <= (dots[0] as Rect2).position.y,
+		"centred above the dots", "door %.0f sheet %.0f" % [door_mid, sheet_mid])
+	letter.page = 0
+	letter.call(&"_lay_out")
+	var art_early := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
+	letter.page = Letter.CARDS.size() - 1
+	letter.call(&"_lay_out")
+	var art_last := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
+	_check(is_equal_approx(art_early.end.y, art_last.end.y),
+		"in a row every card reserves, so the pictures stand still", "")
 
 	# The pictures are the game's own photographs. A still that is not there is a probe
 	# nobody re-ran, and the card would show a blank print.

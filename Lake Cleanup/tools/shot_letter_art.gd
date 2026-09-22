@@ -37,8 +37,22 @@ const RING_CROP := Vector2i(300, 210)
 const FIND_CROP := Vector2i(220, 250)
 ## The wash room's is in design pixels: it is a crop of a board, not of the world.
 const WASH_CROP := Vector2i(540, 390)
-const BUTTON_PAD := 10
+const BOARD_PAD := 8.0
+## A board's title plank stands over its top edge by half its height; take it whole.
+const BOARD_PLANK := 17.0
 const ROW_PAD := 6
+## `shot_shed`'s room, in cells: bookcase and fridge on the wall, paintings, table and pot,
+## chairs, sofa on rug, the hearth. Kept here rather than read from that probe, since a
+## probe is a scene and not a library.
+const SHED_LAYOUT := [
+	[&"decor_bookcase_tall", 1, -4], [&"decor_fridge", 9, -4],
+	[&"decor_painting_a", 14, -3], [&"decor_painting_b", 18, -4],
+	[&"decor_kitchen_counter", 22, -2], [&"decor_stove", 32, -3],
+	[&"decor_big_table", 4, 8], [&"decor_flower_pot", 6, 6], [&"decor_globe", 9, 5],
+	[&"decor_dining_chair", 12, 10], [&"decor_dining_chair", 14, 10],
+	[&"decor_pet_bed", 24, 14], [&"decor_big_rug", 20, 6], [&"decor_sofa", 22, 8],
+	[&"decor_loveseat", 34, 8], [&"decor_fireplace", 30, 2],
+]
 const ROW_CONTEXT := 38.0
 
 var _main: Node2D
@@ -134,20 +148,21 @@ func _physics_process(delta: float) -> void:
 			_main.set(&"_panning", false)
 			_main.set(&"_pan", Vector2.ZERO)
 		6:
-			var skin: HudSkin = _main.get(&"_skin")
-			var box: Rect2 = skin.get(&"_upgrades_box")
-			_crop_canvas("upgrades_button", Rect2(skin.global_position + box.position, box.size)
-				.grow(float(BUTTON_PAD)))
-			var shed: Rect2 = skin.get(&"_shed_box")
-			_crop_canvas("decor_button", Rect2(skin.global_position + shed.position, shed.size)
-				.grow(float(BUTTON_PAD)))
+			# The HUD's corner plates reach the boards' title planks: the shop alone. The
+			# shop is on the HUD layer itself, so it is the corner skin that goes, not the layer.
+			(_main.get(&"_skin") as Control).visible = false
 			_main.set(&"sludge", 1500.0)
 			_main.call(&"_set_menu", true)
 		7:
 			_shoot_shop()
 			_main.call(&"_set_menu", false)
-			_open_wash()
+			(_main.get(&"_skin") as Control).visible = true
+			_furnish_shed()
 		8:
+			_shoot_shed()
+			_main.call(&"_set_shed", false)
+			_open_wash()
+		9:
 			# Sprayed until the find is about half out of its coat, however long that takes:
 			# the card is a before-and-after in one picture. `WASH_MOST` is the way out.
 			var washing: WashRoom = _main.get(&"_wash")
@@ -156,7 +171,7 @@ func _physics_process(delta: float) -> void:
 				return
 			_say("washed to %.2f in %.1f s" % [washing.stand().share_clean(), _washed_for])
 			_spraying = false
-		9:
+		10:
 			var room: WashRoom = _main.get(&"_wash")
 			var piece := room.stand().piece_box()
 			# The stand's own coordinates: the piece's box is the stand's, not the room's.
@@ -276,20 +291,18 @@ func _pose_find() -> void:
 	_say("NO floating find")
 
 
-## The shop, open: the two left boards' heads and first rows, and the Strength row alone.
+## The shop, open: the net, boats and dogs boards one each, plank to foot, and the Strength
+## row with the rows either side of it.
 func _shoot_shop() -> void:
 	var shop: ShopSkin = _main.get(&"_shop_skin")
 	var boards: Dictionary = shop.get(&"_boards")
-	var wide := Rect2()
-	for key in [&"net", &"boat"]:
-		if boards.has(key):
-			var box: Rect2 = boards[key]
-			wide = box if wide.size == Vector2.ZERO else wide.merge(box)
-	if wide.size != Vector2.ZERO:
-		# The top of the pair: title planks, heads and the first rows. The whole boards are
-		# three times as tall as a card's picture.
-		wide = Rect2(wide.position - Vector2(12.0, 24.0), Vector2(wide.size.x + 24.0, 236.0))
-		_crop_canvas("upgrades_shop", Rect2(shop.global_position + wide.position, wide.size))
+	for pair: Array in [[&"net", "upgrades_net"], [&"boat", "upgrades_boats"], [&"dog", "upgrades_dogs"]]:
+		if not boards.has(pair[0]):
+			_say("NO %s board on the shop" % pair[0])
+			continue
+		var box: Rect2 = boards[pair[0]]
+		box = Rect2(box.position - Vector2(BOARD_PAD, BOARD_PLANK), box.size + Vector2(BOARD_PAD * 2.0, BOARD_PLANK + BOARD_PAD))
+		_crop_canvas(String(pair[1]), Rect2(shop.global_position + box.position, box.size))
 	var rows: Array = shop.rows
 	var row_boxes: Array = shop.get(&"_row_boxes")
 	var row_index: Array = shop.get(&"_row_index")
@@ -304,6 +317,35 @@ func _shoot_shop() -> void:
 			.grow_individual(float(ROW_PAD), ROW_CONTEXT, float(ROW_PAD), ROW_CONTEXT))
 		return
 	_say("NO strength row on the shop")
+
+
+## The shed, furnished the way `tools/shot_shed.gd` lays it out (the same list, in cells),
+## with no dogs in it and every switchable piece on: the last card's picture of the room.
+func _furnish_shed() -> void:
+	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	var decor: Array = _main.get(&"decor")
+	decor.clear()
+	room.decor = decor
+	for want: Array in SHED_LAYOUT:
+		if room.sheets.has(want[0]):
+			var at := Vector2i(int(want[1]), int(want[2])) * ShedRoom.CELL
+			if not room.place(want[0], at):
+				_say("shed: %s refused at %s,%s" % want)
+	for k in room.decor.size():
+		var row: Dictionary = room.decor[k]
+		var piece := StringName(row["piece"])
+		var on := room.sheets.switched(piece, int(row.get("view", 0)))
+		if on >= 0 and not room.sheets.is_on(piece, int(row.get("view", 0))):
+			row["view"] = on
+	_main.call(&"_set_shed", true)
+	room.dogs().clear()
+	_say("shed furnished with %d pieces" % room.decor.size())
+
+
+func _shoot_shed() -> void:
+	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	var box: Rect2 = (room.call(&"_shed_rect") as Rect2).grow(6.0)
+	_crop_canvas("decor_shed", Rect2(room.global_position + box.position, box.size))
 
 
 ## A find on the stand, and the jet left running on it.

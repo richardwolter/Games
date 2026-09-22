@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bugg7m7yfis3s"
-path="res://.godot/imported/decor_button.png-d24ecc19fecc662fad59355043ebc690.ctex"
+uid="uid://b7v43e8lj8mty"
+path="res://.godot/imported/upgrades_net.png-58e1285195fdc969137d1b6480de8f09.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/letter/decor_button.png"
-dest_files=["res://.godot/imported/decor_button.png-d24ecc19fecc662fad59355043ebc690.ctex"]
+source_file="res://assets/letter/upgrades_net.png"
+dest_files=["res://.godot/imported/upgrades_net.png-58e1285195fdc969137d1b6480de8f09.ctex"]
 
 [params]
 

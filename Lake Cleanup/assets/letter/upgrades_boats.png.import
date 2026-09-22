@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dl3g7u6y3cm51"
-path="res://.godot/imported/upgrades_shop.png-3c4e28f39041ff07e47c0d56fae038db.ctex"
+uid="uid://cw6qvgdb83tpt"
+path="res://.godot/imported/upgrades_boats.png-44b599a479b62f12ae02ccf3acfda56a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/letter/upgrades_shop.png"
-dest_files=["res://.godot/imported/upgrades_shop.png-3c4e28f39041ff07e47c0d56fae038db.ctex"]
+source_file="res://assets/letter/upgrades_boats.png"
+dest_files=["res://.godot/imported/upgrades_boats.png-44b599a479b62f12ae02ccf3acfda56a.ctex"]
 
 [params]
 
