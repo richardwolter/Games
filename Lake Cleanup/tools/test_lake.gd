@@ -7065,7 +7065,7 @@ func _stage_letter() -> void:
 	add_child(letter)
 	letter.open()
 
-	_check(Letter.CARDS.size() == 4, "the letter is four cards",
+	_check(Letter.CARDS.size() == 5, "the letter is five cards",
 		"%d" % Letter.CARDS.size())
 	var heads: Array = []
 	var long_cards: Array = []
@@ -7073,7 +7073,7 @@ func _stage_letter() -> void:
 		heads.append(String(card["head"]))
 		if card.has("text") and (letter.call(&"_rows", card) as Dictionary).is_empty():
 			long_cards.append(String(card["head"]))
-	_check(heads == ["Net", "Upgrades", "Object Tier", "Decoration"],
+	_check(heads == ["Welcome", "Net", "Upgrades", "Object Tier", "Decoration"],
 		"named for what each one teaches", ", ".join(heads))
 	_check(long_cards.is_empty(),
 		"and none says more than the rows the board reserves", ", ".join(long_cards))
@@ -7086,7 +7086,7 @@ func _stage_letter() -> void:
 		"written on one line with the name a size up", "%s of %.0f" % [str(sizes), letter.text_wide()])
 	# The Net card's captions say their colour in it: the ring's green and red darkened to
 	# clear the paper, and the out-of-range one underlined in the soft ink.
-	var net: Dictionary = Letter.CARDS[0]
+	var net: Dictionary = Letter.CARDS[1]
 	var inks: Array = []
 	for snap: Array in net["snaps"]:
 		inks.append(StringName(snap[2]))
@@ -7162,12 +7162,12 @@ func _stage_letter() -> void:
 				if String(seg[0]).contains("*"):
 					marked = -1000
 	_check(marked > 0, "some words are marked for the head ink, and no asterisk is drawn", "%d" % marked)
-	var tiers: Array = letter.call(&"_rows", Letter.CARDS[2])["rows"]
+	var tiers: Array = letter.call(&"_rows", Letter.CARDS[3])["rows"]
 	_check(tiers.size() == 2 and bool(tiers[1]["para"]) and not bool(tiers[0]["para"]),
 		"the tier card is two paragraphs", "%d rows" % tiers.size())
-	_check(bool(Letter.CARDS[1].get("blurbs", false)) and not Letter.CARDS[1].has("text"),
+	_check(bool(Letter.CARDS[2].get("blurbs", false)) and not Letter.CARDS[2].has("text"),
 		"the upgrades card stands each board over its own sentence", "")
-	letter.page = 1
+	letter.page = 2
 	letter.call(&"_lay_out")
 	var blurb_caps: Array = letter.get(&"_captions")
 	var in_a_row := blurb_caps.size() == 3
@@ -7188,15 +7188,20 @@ func _stage_letter() -> void:
 		var pinned: Array = card["snaps"]
 		if pinned.is_empty() or pinned.size() > Letter.SNAPS_MOST:
 			crowded.append(String(card["head"]))
-	_check(crowded.is_empty(), "one to three to a card", ", ".join(crowded))
+	_check(crowded == ["Welcome"], "one to three to a card, bar the welcome, which has words alone",
+		", ".join(crowded))
+	var welcome: Array = (letter.call(&"_rows", Letter.CARDS[0]) as Dictionary).get("rows", [])
+	_check(welcome.size() >= 3 and bool(welcome[welcome.size() - 1]["para"]),
+		"the welcome card carries its three sentences whole, each its own paragraph",
+		"%d rows" % welcome.size())
 	# The greeting is the first card's, and the others give its room to their pictures.
 	var inside := sheet.grow(-Letter.SHEET_PAD)
 	letter.page = 0
 	var first := (letter.call(&"_art_box", inside) as Rect2).size.y
 	letter.page = 1
 	var second := (letter.call(&"_art_box", inside) as Rect2).size.y
-	_check(first >= Letter.ART_LEAST - 1.0 and second > first + 20.0,
-		"the greeting's room goes to the pictures after the first card",
+	_check(second >= Letter.ART_LEAST - 1.0 and second > first + 20.0,
+		"the greeting's and the welcome's room goes to the pictures after the first card",
 		"%.0f then %.0f" % [first, second])
 	letter.queue_free()
 

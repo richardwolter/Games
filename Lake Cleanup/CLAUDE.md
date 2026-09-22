@@ -1250,7 +1250,7 @@ doors and `MainMenu` is an overlay on it (`Lake`'s "The menu over the lake" sect
 
 ### The Arrival and the Letter (2026-09-19, `/grill-me` with Richard, issue #24)
 A new game opens with the angler and his dog landing by boat and reading a letter on the
-shed door. Four cards, and **that is the whole of the tutorial**, by decision: no contextual
+shed door. Five cards (four until the Welcome card, 2026-09-22), and **that is the whole of the tutorial**, by decision: no contextual
 prompts, no unlock pacing that teaches one system at a time, no goal readout. **#24 stays
 open** for those.
 - **Unskippable, and therefore short** (Richard's call over a skip key): about twelve
@@ -1308,7 +1308,7 @@ open** for those.
   it** (`ROW_CONTEXT`): alone it is a strip 3.5 times as wide as tall, and pinned beside a
   photograph it took the whole card.
 - **The cards** (reworded 2026-09-22, `/grill-me` with Richard; see The Board Reads
-  "How to Play" below): *Net* — three stills captioned in the ring's own colours; *Upgrades*
+  "How to Play" below): *Welcome* — the greeting and three sentences, no pictures; *Net* — three stills captioned in the ring's own colours; *Upgrades*
   — the shop's NET / BOATS / DOGS boards, one each; *Object Tier* — a red ring on a heavy
   piece ("Too heavy"), the Strength row ("Upgrade Strength"); *Decoration* — Catch it / Wash
   it / Decorate, the last a furnished shed. One to three stills a card, one height for a
@@ -1341,6 +1341,10 @@ open** for those.
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
 `scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.
 - **The plank says "How to play"**, not "A letter" — the menu's plank already did.
+- **A Welcome card opens it** (Richard, later the same day): the greeting over it, then
+  three sentences each its own paragraph — the lake abandoned, the goal (catch, recycle,
+  bring life back), and that the cards teach how. No pictures; `rows` 6 gives their room to
+  the words, and `_head_base` stands the block in the middle of that room. Five cards now.
 - **Heading, then words, then pictures** on every card (the first cut stood the heading
   under the pictures): the Net card's sentence says "the circles below", so the pictures
   are below. `_head_base` / `_text_foot` / `_art_box` are the top-down walk; the door and

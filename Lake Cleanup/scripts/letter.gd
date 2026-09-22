@@ -68,10 +68,19 @@ const GREETING_SIZES := [
 ## Where the stills live. One PNG a snapshot, named as the cards name them.
 const ART := "res://assets/letter/%s.png"
 
-## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows;
+## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows (or
+## the card's own `rows`: the welcome card has no pictures and gives their room to words);
 ## `snaps` are [still, caption, ink] triples pinned in a row, left to right. A caption may be
 ## empty; `ink` names a `CAPTION_INKS` entry, `far` for the underlined soft ink, or is empty.
 const CARDS := [
+	{
+		"head": "Welcome",
+		"rows": 6,
+		"text": "*It has been abandoned and neglected for too long.*\n"
+			+ "Your goal is to *catch objects with your net, recycle and bring life back to the lake.*\n"
+			+ "The following instructions will *teach you how it works.*",
+		"snaps": [],
+	},
 	{
 		"head": "Net",
 		"text": "*Left click* to cast your net and catch objects floating. "
@@ -400,7 +409,12 @@ static func _fitted(text: String, px: int, wide: float) -> int:
 ## A card's sentence wrapped to the rows the board reserves: `{rows, px}` at the body size,
 ## or a rung down when it needs more rows than that. Empty when it fits at neither.
 func _rows(card: Dictionary) -> Dictionary:
-	return _fit_marked(String(card.get("text", "")), text_wide(), SENTENCE_ROWS)
+	return _fit_marked(String(card.get("text", "")), text_wide(), _rows_of(card))
+
+
+## The rows a card reserves for its words: the board's, or its own.
+static func _rows_of(card: Dictionary) -> int:
+	return int(card.get("rows", SENTENCE_ROWS))
 
 
 ## `text` wrapped to `wide` in at most `most` reserved rows, the largest of `sizes` first.
@@ -494,12 +508,19 @@ func _art_box(inside: Rect2) -> Rect2:
 	# left a band of bare paper under three of them.
 	if page >= CARDS.size() - 1:
 		foot -= DOOR.y + GAP
-	return Rect2(inside.position.x, top, inside.size.x, maxf(foot - top, 40.0))
+	return Rect2(inside.position.x, top, inside.size.x, maxf(foot - top, 0.0))
 
 
-## Where the heading's baseline is, top down.
+## Where the heading's baseline is, top down. A card with no pictures stands its words in
+## the middle of the room they would have taken, rather than leaving that room bare.
 func _head_base(inside: Rect2) -> float:
-	return inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
+	var base := inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
+	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
+	if not (card["snaps"] as Array).is_empty():
+		return base
+	var foot := inside.end.y - PAGER_TALL - GAP - (DOOR.y + GAP if page >= CARDS.size() - 1 else 0.0)
+	var words := GAP + float(_rows_of(card)) * (float(Style.TEXT_BODY) + LINE_STEP)
+	return floorf(base + maxf(foot - base - words, 0.0) * 0.5)
 
 
 ## Where the sentence's rows end: the heading, a gap, then every reserved row. A blurbed
@@ -508,7 +529,7 @@ func _text_foot(inside: Rect2) -> float:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if bool(card.get("blurbs", false)):
 		return _head_base(inside)
-	return _head_base(inside) + GAP + float(SENTENCE_ROWS) * (float(Style.TEXT_BODY) + LINE_STEP)
+	return _head_base(inside) + GAP + float(_rows_of(card)) * (float(Style.TEXT_BODY) + LINE_STEP)
 
 
 ## Pin this card's photographs in a row: one height for all of them, each as wide as its own
@@ -688,7 +709,7 @@ func _draw() -> void:
 	if fit.is_empty() and card.has("text"):
 		fit = {"rows": _wrap_marked(_tokens(String(card["text"])), Style.TEXT_TINY, inside.size.x),
 			"px": Style.TEXT_TINY}
-		dropped_lines += maxi(int(ceilf(_rows_tall(fit["rows"]) - SENTENCE_ROWS)), 1)
+		dropped_lines += maxi(int(ceilf(_rows_tall(fit["rows"]) - _rows_of(card))), 1)
 	if not fit.is_empty():
 		var row_tall := float(Style.TEXT_BODY) + LINE_STEP
 		var y_text := head_base + GAP
@@ -747,7 +768,7 @@ func _draw_blurb(text: String, box: Rect2) -> void:
 		y += float(px) + LINE_STEP
 
 
-## The greeting on one line: the lead in body ink and the lake's name a rung up in the head
+## The greeting on one line, over the welcome card: the lead in body ink and the lake's name a rung up in the head
 ## ink, both on one baseline, the pair centred together. Sizes step down until it fits.
 func _draw_greeting(inside: Rect2) -> void:
 	var pair := greeting_sizes()
