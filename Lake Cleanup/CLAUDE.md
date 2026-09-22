@@ -1441,8 +1441,11 @@ shed's shelf has a door to the wash room.
   setter, `_pulse`, `pulse_amount`, `PULSE_TIME` 4 s, `PULSE_BEATS` 3.5). **Not a steady loop,
   by decision**: the run ends with 43-56k unspent, so something is affordable most of the
   time and a loop would run for thirty minutes. A hold or a fall starts nothing; the first
-  reading of a sitting only sets the mark (a load is not a rise). It fades out on its own,
-  and a hover on the button or the shop opening (`hush_pulse`, from `_set_menu`) puts it out.
+  reading of a sitting only sets the mark (a load is not a rise). **After the burst it does
+  not stop** (Richard, same day): the envelope settles to `PULSE_IDLE` (0.45) and keeps
+  breathing there until the board is opened (`hush_pulse`, from `_set_menu` / `_set_shed`),
+  which is the player seeing what was pending. A hover does not put it out. Supersedes
+  "fades out on its own", which lasted an afternoon.
 - **The look is the badge swelling and a gold glow round the wood** (`HudButtons.pulse`,
   `badge`'s `swell`, `PULSE_TONE`, `PULSE_WIDE`): the count's plate grows `BADGE_SWELL`
   **whole** pixels about its own middle and three passes of light stand outside the frame —
@@ -1462,16 +1465,17 @@ shed's shelf has a door to the wash room.
   face), or alone `WASH_UNDER_EMPTY` under "Nothing kept yet." on an empty shelf. Clicking it
   emits `wash_asked` and the lake swaps rooms (`_shed_to_wash`: shed down, wash room up,
   one click); the wash room's own close returns to the lake, not to the shed.
-- **It breathes the same pulse** (`PlankButton.pulse`, `ShedRoom.opened`, `_wash_seen`) the
-  first time the shed opens with more waiting than the last time it opened. Session only,
-  nothing saved. The find-caught card is still the announcement; this is the door.
+- **It breathes the same pulse** (`PlankButton.pulse`, `ShedRoom.opened`, `_wash_seen`,
+  `WASH_PULSE_IDLE`) when the shed opens with more waiting than the last time it opened,
+  and keeps breathing at the idle level until the plank is clicked. Session only, nothing
+  saved. The find-caught card is still the announcement; this is the door.
 - **Out of scope, by decision**: a steady pulse, a sound on it, glow on any other button,
   walking the angler to the pump, going back to the shed after washing, showing the plank
   with nothing waiting, a fixed-foot plank. Amplitude, tone and beats are first guesses for
   Richard's eye.
 - `test_lake`'s `_check_upgrades_pulse` and `_check_wash_plank` (inside `_stage_wash`)
-  guard the rise/hold/fall rule, the breathing and the fade, the hover and the shop cutting
-  it, the plank alone and after the rows, its label, its pulse once and not on a reopen, its
+  guard the rise/hold/fall rule, the breathing, the settle to idle, the hover not cutting it
+  and the board opening cutting it, the plank alone and after the rows, its label, its pulse once and not on a reopen, its
   place at the end of an overfull shelf, its absence with nothing waiting, and the room swap.
 
 ### Every Word Is a Key (issue #28, 2026-09-20, `/grill-me` with Richard)

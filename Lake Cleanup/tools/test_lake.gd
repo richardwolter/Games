@@ -6099,6 +6099,7 @@ func _check_wash_plank() -> void:
 	unlocked.clear()
 	room.set(&"_wash_seen", 0)
 	room.set(&"_wash_pulse", 0.0)
+	room.set(&"_wash_unseen", false)
 	_main.call(&"_set_shed", true)
 	room.call(&"_dress_shelf")
 	var box: Rect2 = room.wash_plank_box()
@@ -6116,7 +6117,15 @@ func _check_wash_plank() -> void:
 	# walked there in short steps.
 	for i in 50:
 		room.call(&"_process", 0.1)
-	_check(room.wash_pulse_amount() == 0.0, "and dies on its own", "")
+	_check(is_equal_approx(float(room.get(&"_wash_pulse")), ShedRoom.WASH_PULSE_IDLE),
+		"after the burst it settles to a quieter breathing and keeps going", str(room.get(&"_wash_pulse")))
+	var before := room.wash_pulse_amount()
+	room.call(&"_process", 0.1)
+	_check(room.wash_pulse_amount() != before or room.wash_pulse_amount() > 0.0, "still moving", str(room.wash_pulse_amount()))
+	plank.pressed.emit()
+	_check(float(room.get(&"_wash_pulse")) == 0.0 and room.wash_pulse_amount() == 0.0,
+		"and clicking the plank is what puts it out", "")
+	_main.call(&"_set_wash", false)
 	_main.call(&"_set_shed", false)
 	_main.call(&"_set_shed", true)
 	_check(float(room.get(&"_wash_pulse")) == 0.0, "reopened with no more waiting, it does not pulse again", "")
@@ -6178,19 +6187,23 @@ func _check_upgrades_pulse() -> void:
 	skin.available = now
 	_check(skin.pulsing(&"upgrades"), "a fall does not reset it", "")
 	skin.call(&"_process", 6.0)
-	_check(not skin.pulsing(&"upgrades") and skin.pulse_amount(&"upgrades") == 0.0, "it fades out on its own", "")
-	skin.available = now + 1
+	_check(skin.pulsing(&"upgrades") and is_equal_approx(float((skin.get(&"_pulses") as Dictionary)[&"upgrades"]), HudSkin.PULSE_IDLE),
+		"after the burst it settles to a quieter breathing and keeps going", str(skin.get(&"_pulses")))
 	var box: Rect2 = skin.get(&"_upgrades_box")
 	var motion := InputEventMouseMotion.new()
 	motion.position = box.get_center()
 	skin.call(&"_gui_input", motion)
-	_check(not skin.pulsing(&"upgrades"), "a hover on the button puts it out", "")
+	_check(skin.pulsing(&"upgrades"), "a hover does not put it out: the shop has not been seen", "")
 	motion.position = Vector2(-50.0, -50.0)
 	skin.call(&"_gui_input", motion)
-	skin.available = now + 2
-	_check(skin.pulsing(&"upgrades"), "(started again)", "")
 	_main.call(&"_set_menu", true)
-	_check(not skin.pulsing(&"upgrades"), "and so does opening the shop", "")
+	_check(not skin.pulsing(&"upgrades") and skin.pulse_amount(&"upgrades") == 0.0, "opening the shop does", "")
+	_main.call(&"_set_menu", false)
+	skin.call(&"_process", 6.0)
+	_check(not skin.pulsing(&"upgrades"), "and it stays out", "")
+	skin.available = now + 2
+	_check(skin.pulsing(&"upgrades"), "one more affordable starts it again", "")
+	_main.call(&"_set_menu", true)
 	_main.call(&"_set_menu", false)
 	skin.available = now
 	skin.hush_pulse(&"upgrades")

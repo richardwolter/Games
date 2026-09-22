@@ -151,15 +151,27 @@ var waiting: int = 0:
 ## not a steady loop — something is affordable most of the run), breathes `PULSE_BEATS`
 ## times over `PULSE_TIME`, fades out on its own, and is cut short by a hover on its button
 ## or by that button's board opening (`hush_pulse`).
+## `_pulses` is the envelope (1 at the burst, easing down), `_clocks` the seconds since the
+## burst (the wave runs on it), `_unseen` whether the board has been opened since. **After
+## the burst the pulse does not stop** (Richard, 2026-09-22): it settles to `PULSE_IDLE` and
+## keeps breathing there until the player opens that board, which is what puts it out. A
+## hover no longer does — the player has not seen what is pending until the board is up.
 var _pulses := {&"upgrades": 0.0, &"shed": 0.0}
+var _clocks := {&"upgrades": 0.0, &"shed": 0.0}
+var _unseen := {&"upgrades": false, &"shed": false}
 var _marks := {&"upgrades": -1, &"shed": -1}
 const PULSE_TIME := 4.0
 const PULSE_BEATS := 3.5
+## Where the envelope settles after the burst, and how many beats a second it breathes there.
+const PULSE_IDLE := 0.45
+const PULSE_IDLE_RATE := PULSE_BEATS / PULSE_TIME
 
 
 func _mark(name: StringName, value: int) -> void:
 	if int(_marks[name]) >= 0 and value > int(_marks[name]):
 		_pulses[name] = 1.0
+		_clocks[name] = 0.0
+		_unseen[name] = true
 	_marks[name] = value
 
 ## A line under the meter, or empty for nothing. Used for the one thing the meter cannot
@@ -304,7 +316,10 @@ func _process(delta: float) -> void:
 		_stock_glow = maxf(_stock_glow - delta / STOCK_GLOW, 0.0)
 	_shine = maxf(_shine - delta / SHINE_TIME, 0.0)
 	for name: StringName in _pulses:
-		_pulses[name] = maxf(float(_pulses[name]) - delta / PULSE_TIME, 0.0)
+		var floor_at := PULSE_IDLE if bool(_unseen[name]) else 0.0
+		_pulses[name] = maxf(float(_pulses[name]) - delta / PULSE_TIME, floor_at)
+		if float(_pulses[name]) > 0.0:
+			_clocks[name] = float(_clocks[name]) + delta
 	if money > _shown_money:
 		_shine = 1.0
 		_shown_money = minf(
@@ -331,8 +346,6 @@ func _gui_input(event: InputEvent) -> void:
 		if was != _hovered:
 			if _hovered != &"":
 				Sfx.ui(&"ui_hover")
-			if _pulses.has(_hovered):
-				_pulses[_hovered] = 0.0
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -726,20 +739,20 @@ func _ease_shine() -> float:
 	return _shine * _shine
 
 
-## A pulse as drawn: a slow wave, `PULSE_BEATS` over the burst, under an envelope that
-## fades out with what is left of it. Zero when nothing is pulsing.
+## A pulse as drawn: a slow wave, `PULSE_BEATS` a burst, under the envelope — full at the
+## burst, `PULSE_IDLE` while the board is still unopened, nothing once it has been.
 func pulse_amount(name: StringName) -> float:
 	var left := float(_pulses.get(name, 0.0))
 	if left <= 0.0:
 		return 0.0
-	var elapsed := (1.0 - left) * PULSE_TIME
-	var wave := 0.5 - 0.5 * cos(elapsed * TAU * PULSE_BEATS / PULSE_TIME)
+	var wave := 0.5 - 0.5 * cos(float(_clocks[name]) * TAU * PULSE_IDLE_RATE)
 	return wave * left
 
 
-## Put a pulse out: its board opening answers what it was asking.
+## Put a pulse out: its board opening is the player seeing what was pending.
 func hush_pulse(name: StringName) -> void:
 	_pulses[name] = 0.0
+	_unseen[name] = false
 
 
 ## Whether a pulse is running — the harness asks.

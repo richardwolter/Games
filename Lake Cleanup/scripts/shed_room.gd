@@ -344,9 +344,14 @@ var _wash_plank: PlankButton
 ## The plank breathes the HUD's own pulse the first time the shelf opens with more waiting
 ## than it last saw (`opened`); session only, nothing saved.
 var _wash_pulse: float = 0.0
+var _wash_clock: float = 0.0
+var _wash_unseen: bool = false
 var _wash_seen: int = 0
 const WASH_PULSE_TIME := 4.0
 const WASH_PULSE_BEATS := 3.5
+## After the burst it settles here and keeps breathing until the plank is clicked (Richard,
+## 2026-09-22), the HUD's own rule.
+const WASH_PULSE_IDLE := 0.45
 
 ## Piece name -> what to call it on screen. Filled in by lake.gd from the defs.
 var titles := {}
@@ -457,7 +462,10 @@ func _ready() -> void:
 	_wash_plank = PlankButton.new()
 	_wash_plank.name = &"WashPlank"
 	_wash_plank.visible = false
-	_wash_plank.pressed.connect(func() -> void: wash_asked.emit())
+	_wash_plank.pressed.connect(func() -> void:
+		_wash_pulse = 0.0
+		_wash_unseen = false
+		wash_asked.emit())
 	add_child(_wash_plank)
 	# Under the close cross but over the room, and blind to the mouse: the shelf is drawn
 	# by a node of its own only so it can be faded as one, and every click on it is still
@@ -547,7 +555,8 @@ func _process(delta: float) -> void:
 	# jumps across the room.
 	delta = minf(delta, 0.1)
 	if _wash_pulse > 0.0:
-		_wash_pulse = maxf(_wash_pulse - delta / WASH_PULSE_TIME, 0.0)
+		_wash_pulse = maxf(_wash_pulse - delta / WASH_PULSE_TIME, WASH_PULSE_IDLE if _wash_unseen else 0.0)
+		_wash_clock += delta
 		if _wash_plank != null:
 			_wash_plank.pulse = wash_pulse_amount()
 	_walk_you(delta)
@@ -2215,6 +2224,8 @@ func wash_plank_box() -> Rect2:
 func opened() -> void:
 	if unwashed.size() > _wash_seen:
 		_wash_pulse = 1.0
+		_wash_clock = 0.0
+		_wash_unseen = true
 	_wash_seen = unwashed.size()
 
 
@@ -2222,8 +2233,7 @@ func opened() -> void:
 func wash_pulse_amount() -> float:
 	if _wash_pulse <= 0.0:
 		return 0.0
-	var elapsed := (1.0 - _wash_pulse) * WASH_PULSE_TIME
-	var wave := 0.5 - 0.5 * cos(elapsed * TAU * WASH_PULSE_BEATS / WASH_PULSE_TIME)
+	var wave := 0.5 - 0.5 * cos(_wash_clock * TAU * WASH_PULSE_BEATS / WASH_PULSE_TIME)
 	return wave * _wash_pulse
 
 
