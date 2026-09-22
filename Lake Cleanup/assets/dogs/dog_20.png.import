@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://drtoky70g3p7y"
-path="res://.godot/imported/Dogs-Sprite-Sheet.png-50b3cef525621c3ad178d16984d0fabc.ctex"
+uid="uid://dio0npcoryiew"
+path="res://.godot/imported/dog_20.png-f811b7a9d3fdd6d73d2e5661a4afc236.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/Dogs-Sprite-Sheet.png"
-dest_files=["res://.godot/imported/Dogs-Sprite-Sheet.png-50b3cef525621c3ad178d16984d0fabc.ctex"]
+source_file="res://assets/dogs/dog_20.png"
+dest_files=["res://.godot/imported/dog_20.png-f811b7a9d3fdd6d73d2e5661a4afc236.ctex"]
 
 [params]
 

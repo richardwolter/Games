@@ -38,7 +38,7 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   "Modern Interiors by LimeZu" as it read until this purchase. The bought zip is
   `art_source/moderninteriors-win.zip`.
 
-- **Dogs** (`assets/dog*`, `scripts/dog.gd`'s art) — "Pixel Dogs" by Benvictus
+- **Dogs** (`assets/dogs/`, three breeds off `art_source/PixelDogsSprites`, `scripts/dog.gd`'s art) — "Pixel Dogs" by Benvictus
   (https://benvictus.itch.io/pixel-dogs). ✅ Cleared (purchased/licensed by Richard,
   2026-09-16). Name-your-own-price; the author allows commercial use and asks for a credit
   where there's no contribution. Credited as "Benvictus".

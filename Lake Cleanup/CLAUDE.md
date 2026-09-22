@@ -4008,6 +4008,55 @@ old scrim rectangle and its 1.5 px ink outline are gone.
   Since 2026-09-19 that constant only says which piece a dog may **walk over** (`_taken`
   leaves it out of the blocked floor). What a dog may **lie on** is the seat below.
 
+### Three Dogs, a Sit, and a Piece in the Jaws (2026-09-22, `/grill-me` with Richard)
+The pack is three visibly different dogs, they sit, and what a dog carries rides in its
+mouth and bobs with its stride. Sheets from the Pixel Dogs pack (`art_source/
+PixelDogsSprites/`, 12 breeds as plain/mouth-open pairs; contact sheet `tools/
+last_dog_pack.png`), Richard's pick: **22** the yellow dog the game always had, **02** the
+orange, **20** the tan-and-white. The ball (odd) sheets never ship.
+- **Fixed by order, nothing saved** (`Dog.slot` → `DogArt.breed_of`): dog 1 is yellow,
+  2 orange, 3 tan-and-white, 4 yellow again — the same on every save, no `SAVE_VERSION`
+  bump. `Lake._add_dog` sets the slot; the scene's first dog is slot 0 by default.
+- **One cut sheet and one json a breed** (`assets/dogs/dog_NN.png`/`.json`,
+  `tools/slice_dog.gd` over `DogArt.BREEDS`): trims and footlines are the drawing's own.
+  `DogArt` keeps a `Book` per breed and **every call takes a trailing `breed`, default 0**,
+  so a caller that never heard of breeds — the shop board's head, the HUD button — draws
+  the yellow dog it always did. `assets/Dogs-Sprite-Sheet.png` and `dog.json` are gone
+  (`dog_22` is that sheet byte for byte).
+- **Eight rows named**: idle, **sit**, laid, run, walk, **run2**, **walk2**, sleep. The beg
+  row stays unnamed. **Odd slots run the second gait pair** (`DogArt.gait(slot, walking)`),
+  so four dogs on one beach do not run in step; a breed without the pair falls back.
+- **Sit is three things** (`Dog.State.SIT`, `_showing`): a still mood of its own on the
+  island (the roll is 30 wander / 20 idle / 20 nap / 16 lounge / 14 sit), the `DROP_WAIT`
+  beat at the crate, and being petted. Shed dogs sit on the floor too (`ShedRoom._dog_think`,
+  never on a seat) and the wash room's hounds rest in it (`REST_POSES`).
+- **The mouth is measured per frame, not guessed** (`slice_dog.gd`, `mouth` in the json,
+  `DogArt.mouth(name, height, facing_left, frame, breed)`): the odd twin's three red
+  tongue pixels give the jaws' height where the twin frame is the same drawing
+  (`TWIN_SAME`), the row's own median where it is not; the x is always the plain frame's
+  nose at that height, `JAW_IN` (2) px in. Taking the tongue's x where found and the
+  nose's where not put the mouth three pixels apart on neighbouring frames. Supersedes the
+  first frame's edge at 0.86 / 0.66, one point whatever the legs did.
+- **The piece is gripped, drawn under the dog** (`Dog._draw_stick`, before `stamp`):
+  `CARRY_AHEAD` (0.42) of its width past the nose, the rest under the head, which covers
+  it — that is what "held in a mouth" looks like; leaning nose-end down `CARRY_TILT`,
+  hanging `CARRY_SAG` per pixel of its own height. **The bob is the gait**: the mouth rides
+  the head, and `_carry_drop` (`_chase_mouth`, `CARRY_LAG`, `CARRY_SWING`) trails it with an
+  exponential ease and swings by the gap, so a gallop rocks it and a sit lets it hang still.
+  In the water the dog's own bob carries it. All first guesses for Richard's eye.
+- **Shed dogs and the wash room's hounds wear their slot's breed and gait**
+  (`ShedDog.slot`/`breed`, `Hound.slot`/`breed`). The shop head and the HUD button keep the
+  yellow dog, by decision.
+- **Out of scope, by decision**: the beg row, the ball sprites, new dog art, per-dog shop
+  rows, saving breeds, a bigger pack.
+- **Probe**: `tools/shot_dogs.tscn` (desktop build, `--fixed-fps 60`, own save, under its
+  own node) — `tools/last_dogs.png`, a strip of every dog over six gait frames carrying a
+  piece, then sit / laid / sleep; `last_dogs.log` has the mouth and the lag per column.
+  Judge the carry on it, zoomed. `test_lake`'s `_stage_dog_breeds` guards the three sheets
+  loading and differing, the slot rule, the gait pairs, the sit in its four places and in
+  the roll, the mouth moving through the run and sitting at the front of the head, and the
+  piece being drawn under the dog with a lag.
+
 ### The Pack in the Shed (2026-09-19, `/grill-me` with Richard, issue #30)
 One dog could be in the shed; up to the whole pack can be now, and they lie on the
 furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.

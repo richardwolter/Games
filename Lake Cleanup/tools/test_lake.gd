@@ -1563,6 +1563,85 @@ func _stage_dog_idle(dogs: Array) -> void:
 		and int(one.get(&"_state")) != Dog.State.LOUNGE,
 		"and a dog that has just delivered walks off rather than settling on the box",
 		"state %d" % int(one.get(&"_state")))
+	_check(int(one.get(&"_state")) != Dog.State.SIT, "nor sitting down on it", "")
+	_stage_dog_breeds(dogs)
+
+
+## The pack's coats and gaits, the sit, and the gripped carry (2026-09-22, Richard).
+##
+## Breeds are fixed by slot — yellow, orange, tan-and-white, yellow again — so the rule is
+## asked of the slot and of the sheets rather than of any roll. The mouth is measured off
+## every frame, so a carried piece is asked to sit within a few pixels of it and to move
+## with the frame; and to be drawn under the dog, since the head is what says "held".
+func _stage_dog_breeds(dogs: Array) -> void:
+	_check(DogArt.breeds() == 3, "three breeds", "%d" % DogArt.breeds())
+	for b in DogArt.breeds():
+		_check(DogArt.ready(b), "breed %d loads its sheet" % b, "")
+		for name: StringName in [&"idle", &"sit", &"laid", &"run", &"walk", &"run2", &"walk2", &"sleep"]:
+			_check(DogArt.length(name, b) >= 4, "breed %d carries %s" % [b, name],
+				"%d frames" % DogArt.length(name, b))
+	# The three sheets are three dogs: the first idle frame's pixels differ between them.
+	var seen := {}
+	for b in DogArt.breeds():
+		var art := DogArt.art_frame(&"idle", 0, b)
+		var image: Image = (art["sheet"] as Texture2D).get_image()
+		var region: Rect2 = art["region"]
+		var sum := 0
+		for y in int(region.size.y):
+			for x in int(region.size.x):
+				sum += image.get_pixel(int(region.position.x) + x, int(region.position.y) + y).to_rgba32()
+		seen[sum] = true
+	_check(seen.size() == DogArt.breeds(), "and no two breeds are the same picture", str(seen.keys()))
+	var slots := []
+	for i in dogs.size():
+		var dog := dogs[i] as Dog
+		slots.append([dog.slot, dog.breed])
+		_check(dog.slot == i and dog.breed == posmod(i, DogArt.breeds()),
+			"dog %d wears breed slot %% 3" % i, str(slots))
+	_check(DogArt.breed_of(0) == 0 and DogArt.breed_of(3) == 0 and DogArt.breed_of(1) == 1,
+		"the first and fourth dogs are the yellow one", "")
+	_check(DogArt.gait(0, false) == &"run" and DogArt.gait(1, false) == &"run2"
+		and DogArt.gait(0, true) == &"walk" and DogArt.gait(1, true) == &"walk2",
+		"even slots run the first gait pair, odd the second", "")
+	# Sit, in the four places.
+	var one := dogs[0] as Dog
+	one.set(&"_state", Dog.State.SIT)
+	_check(one.call(&"_showing") == &"sit", "a sitting dog shows the sit", str(one.call(&"_showing")))
+	one.set(&"_state", Dog.State.DROPPING)
+	_check(one.call(&"_showing") == &"sit", "a dog waiting at the crate sits", str(one.call(&"_showing")))
+	one.set(&"_state", Dog.State.PETTED)
+	_check(one.call(&"_showing") == &"sit", "a petted dog sits", str(one.call(&"_showing")))
+	one.set(&"_state", Dog.State.WANDER)
+	_check(one.call(&"_showing") == &"walk", "the first dog wanders on the first walk", str(one.call(&"_showing")))
+	var two := dogs[1] as Dog
+	two.set(&"_state", Dog.State.WANDER)
+	_check(two.call(&"_showing") == &"walk2", "the second on the second", str(two.call(&"_showing")))
+	var sits := 0
+	for i in 400:
+		one.tile_pos = Vector2(Iso.ISLAND_CENTRE.x - 2.0, Iso.ISLAND_CENTRE.y + 1.6)
+		one.call(&"_settle")
+		if int(one.get(&"_state")) == Dog.State.SIT:
+			sits += 1
+	_check(sits > 10, "the sit is a mood the island roll lands on", "%d of 400" % sits)
+	one.set(&"_state", Dog.State.IDLE)
+	# The mouth moves with the frame: over a run cycle it is not one point.
+	var mouths := {}
+	for f in DogArt.length(&"run"):
+		mouths[DogArt.mouth(&"run", Dog.HEIGHT, true, f)] = true
+	_check(mouths.size() >= 3, "the mouth rides the head through the run", str(mouths.keys()))
+	var left := DogArt.mouth(&"idle", Dog.HEIGHT, true, 0)
+	var right := DogArt.mouth(&"idle", Dog.HEIGHT, false, 0)
+	_check(left.x < 0.0 and right.x > 0.0 and is_equal_approx(left.y, right.y),
+		"the mouth is ahead of the dog whichever way it faces", "%s / %s" % [left, right])
+	var span := DogArt.span(&"idle", Dog.HEIGHT)
+	_check(-left.y > span.y * 0.5 and -left.y < span.y, "and at head height", "%s of %s" % [left, span])
+	_check(absf(left.x) > span.x * 0.25, "and at the front of the picture", "%s of %s" % [left, span])
+	# The held piece is drawn before the dog, so the head covers its back end.
+	var source := FileAccess.get_file_as_string("res://scripts/dog.gd")
+	_check(source.find("_draw_stick(at, name, frame)") < source.find("DogArt.stamp(self, name, frame, at"),
+		"the carried piece is drawn under the dog", "")
+	_check(source.find("_carry_drop") >= 0 and source.find("CARRY_LAG") >= 0,
+		"and trails the mouth with a lag", "")
 
 
 ## The delivery (2026-09-16): whichever side of the crate the dog is already at, and round

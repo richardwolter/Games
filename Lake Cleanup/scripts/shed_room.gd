@@ -383,6 +383,11 @@ class ShedDog extends RefCounted:
 	var age: float = 0.0
 	var mood: float = 0.0
 	var left: bool = false
+	## Which of the pack this is, and so which breed it wears and which gait pair it walks
+	## on — the island dog's own rule (`Dog.slot`), so the dog asleep on the rug is the
+	## same animal as the one that came in from the beach.
+	var slot: int = 0
+	var breed: int = 0
 
 	## The seat this dog holds, as its key in `_seats()`, or "" for a dog on the floor.
 	## Held rather than looked up each frame: a seat is claimed, and a claim is a fact about
@@ -527,10 +532,12 @@ func _room_shown() -> void:
 	_dogs.clear()
 	if not DogArt.ready():
 		return
-	for _which in _pack_wanted():
+	for which in _pack_wanted():
 		if _dog_rng.randf() >= DOG_ODDS:
 			continue
 		var dog := ShedDog.new()
+		dog.slot = which
+		dog.breed = DogArt.breed_of(which)
 		# Appended before it is placed, so the one after it keeps clear of where it stands
 		# and does not take the seat it has just claimed.
 		_dogs.append(dog)
@@ -588,7 +595,7 @@ func _drive_dog(dog: ShedDog, delta: float) -> void:
 		_drop_seat(dog)
 		dog.at = _dog_somewhere(dog)
 		dog.target = dog.at
-	if dog.state == &"walk":
+	if dog.state == &"walk" or dog.state == &"walk2":
 		if _dog_walk(dog, delta) or dog.mood <= 0.0:
 			_dog_think(dog)
 	elif dog.mood <= 0.0:
@@ -872,21 +879,23 @@ func _dog_think(dog: ShedDog) -> void:
 			dog.state = &"sleep"
 			dog.mood = DOG_BED_SLEEP
 		else:
-			dog.state = &"walk"
+			dog.state = DogArt.gait(dog.slot, true, dog.breed)
 			dog.target = seat
 			dog.mood = DOG_MOOD_MOST
 		return
 	var roll := _dog_rng.randf()
 	dog.mood = _dog_rng.randf_range(DOG_MOOD_LEAST, DOG_MOOD_MOST)
-	if roll < 0.45:
-		dog.state = &"walk"
+	if roll < 0.40:
+		dog.state = DogArt.gait(dog.slot, true, dog.breed)
 		dog.target = _dog_somewhere(dog)
-	elif roll < 0.65:
+	elif roll < 0.58:
 		dog.state = &"idle"
-	elif roll < 0.85:
+	elif roll < 0.74:
 		dog.state = &"laid"
-	else:
+	elif roll < 0.88:
 		dog.state = &"sleep"
+	else:
+		dog.state = &"sit" if DogArt.has(&"sit", dog.breed) else &"idle"
 
 
 ## One step towards the target. True once it is there, or once it is stuck.
@@ -1221,7 +1230,8 @@ func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.42))
 	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
 	DogArt.stamp(
-		self, dog.state, DogArt.frame_at(dog.state, dog.age), at, tall, dog.left
+		self, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), at, tall, dog.left,
+		0.0, Color.WHITE, dog.breed
 	)
 
 

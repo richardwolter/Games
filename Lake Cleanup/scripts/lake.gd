@@ -4308,6 +4308,7 @@ func _add_dog() -> void:
 		return
 	var dog := Dog.new()
 	dog.name = &"Dog%d" % _dogs.size()
+	dog.slot = _dogs.size()
 	dog.z_index = _dog.z_index
 	dog.z_as_relative = false
 	dog.tile_pos = _dog.tile_pos + Vector2(0.9, -0.6) * float(_dogs.size())

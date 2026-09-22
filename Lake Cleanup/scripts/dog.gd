@@ -158,6 +158,23 @@ const PET_REACH := 1.9
 ## rather than a plank.
 const CARRY_SCALE := 0.6
 
+## How the carried piece sits in the jaws (2026-09-22, Richard: "close to dog's mouth and
+## bobble with movement"). Drawn *under* the dog, so the head covers its back end and what
+## shows is the part sticking out past the nose — which is what a thing held in a mouth
+## looks like. `CARRY_AHEAD` is how much of the piece's width stands past the mouth;
+## `CARRY_TILT` the lean of the piece, nose end down, in radians; `CARRY_SAG` how far a
+## piece hangs under the jaws per pixel of its own height, so a big find hangs lower than a
+## can. `CARRY_LAG` is how quickly the held piece catches up with the mouth as the head rises
+## and falls through the gait (an exponential ease, per second) and `CARRY_SWING` turns the
+## gap it is behind by into a swing, radians per pixel. The mouth itself is measured per
+## frame (`DogArt.mouth`), so the bob *is* the gait; these only soften it.
+const CARRY_AHEAD := 0.42
+const CARRY_TILT := 0.22
+const CARRY_SAG := 0.14
+const CARRY_LAG := 18.0
+const CARRY_SWING := 0.09
+const CARRY_SWING_MOST := 0.35
+
 ## How long it waits at the crate before going out again, so a delivery is a visible event
 ## rather than a bounce off the box.
 const DROP_WAIT := 0.8
@@ -188,7 +205,7 @@ const GREET_VOICE_ODDS := 0.6
 const HEART_RISE := 18.0
 const HEART_SIDE := 3.4
 
-enum State { IDLE, WANDER, NAP, LOUNGE, SWIM_OUT, CARRY_BACK, DROPPING, PETTED }
+enum State { IDLE, WANDER, NAP, LOUNGE, SWIM_OUT, CARRY_BACK, DROPPING, PETTED, SIT }
 
 ## One piece of rubbish, on its way to the crate. Emitted once per piece: a dog that came
 ## home with a mouthful fires this several times over one delivery.
@@ -202,6 +219,23 @@ signal petted
 ## is what the shed screen and any test without a lake want.
 var grid: LakeGrid
 var angler: Angler
+
+## Which of the pack this dog is (0 first) and which breed's sheet it wears. Fixed by
+## order, by decision (2026-09-22): the first dog is the yellow one the game always had,
+## then the orange, then the tan-and-white, then round again — the same on every save, and
+## nothing to write down. The slot also picks the gait pair (`DogArt.gait`), so two dogs
+## of one breed do not run in step either.
+var slot: int = 0:
+	set(value):
+		slot = maxi(value, 0)
+		breed = DogArt.breed_of(slot)
+var breed: int = 0
+
+## Where the held piece is drawn against the mouth, in world pixels down from it, eased
+## towards the mouth's own height each frame so it trails the head rather than being glued
+## to it; and the last mouth height it was chasing.
+var _carry_drop: float = 0.0
+var _carry_chase: float = 0.0
 
 ## What training has bought, set by lake.gd from the two `dog_*` upgrade tracks. How many
 ## pieces one trip out may bring back, and how many seconds come off the top of the wait
@@ -434,6 +468,7 @@ func _process(delta: float) -> void:
 		_voice_roll = VOICE_ROLL
 		_maybe_speak()
 	_push_wade()
+	_chase_mouth(delta)
 	match _state:
 		State.SWIM_OUT:
 			_go_fetch(delta)
@@ -464,6 +499,24 @@ func _process(delta: float) -> void:
 	_repaint()
 
 
+## The held piece follows the mouth with a little lag: the mouth's height is read off the
+## frame showing now, and the drawn piece eases towards it, so on a gallop it hangs a
+## touch behind the head on the way up and swings under it on the way down. Only the
+## height — sideways the jaws hold it — and only while there is something to hold.
+func _chase_mouth(delta: float) -> void:
+	if _carried.is_empty():
+		_carry_drop = 0.0
+		_carry_chase = 0.0
+		return
+	var name := _showing()
+	var mouth := DogArt.mouth(name, HEIGHT, facing_left, DogArt.frame_at(name, _age, breed), breed)
+	# The gap is measured against where the mouth was, so the lag is in how fast the piece
+	# follows a move, not in where it rests.
+	_carry_drop += _carry_chase - mouth.y
+	_carry_chase = mouth.y
+	_carry_drop = lerpf(_carry_drop, 0.0, 1.0 - exp(-CARRY_LAG * delta))
+
+
 ## Now and then, near the angler: a sniff or a bark wandering past them, a bark sitting about.
 func _maybe_speak() -> void:
 	if dozing or angler == null or tile_pos.distance_to(angler.tile_pos) > HEAR:
@@ -473,7 +526,7 @@ func _maybe_speak() -> void:
 	match _state:
 		State.WANDER:
 			_speak(&"sniff" if _rng.randf() < 0.35 else &"bark")
-		State.IDLE, State.LOUNGE:
+		State.IDLE, State.LOUNGE, State.SIT:
 			_speak(&"bark")
 
 
@@ -563,15 +616,17 @@ func _settle(move_off: bool = false) -> void:
 		_target = _somewhere_on_land()
 		return
 	var roll := _rng.randf()
-	if roll < 0.34:
+	if roll < 0.30:
 		_state = State.WANDER
 		_target = _somewhere_on_land()
-	elif roll < 0.58:
+	elif roll < 0.50:
 		_state = State.IDLE
-	elif roll < 0.82:
+	elif roll < 0.70:
 		_state = State.NAP
-	else:
+	elif roll < 0.86:
 		_state = State.LOUNGE
+	else:
+		_state = State.SIT
 
 
 ## The best tile to go and fetch from, or -1 when there is nothing worth swimming for.
@@ -1129,16 +1184,21 @@ func _place() -> void:
 
 ## Which animation is showing, worked out from what the dog is doing rather than stored, so
 ## there is one place a state's picture is decided.
+##
+## Sitting is three things (2026-09-22, Richard): a still mood of its own, the wait at the
+## crate after a delivery, and being petted. The run and the walk are the slot's own pair.
 func _showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:
-			return &"walk" if not _on_land() else &"run"
+			return DogArt.gait(slot, not _on_land(), breed)
 		State.WANDER:
-			return &"walk"
+			return DogArt.gait(slot, true, breed)
 		State.NAP:
 			return &"sleep"
 		State.LOUNGE:
 			return &"laid"
+		State.SIT, State.DROPPING, State.PETTED:
+			return &"sit" if DogArt.has(&"sit", breed) else &"idle"
 		_:
 			return &"idle"
 
@@ -1153,9 +1213,9 @@ func _sun_key() -> int:
 func _repaint() -> void:
 	var name := _showing()
 	var key := hash([
-		name, DogArt.frame_at(name, _age), facing_left,
+		name, DogArt.frame_at(name, _age, breed), facing_left,
 		(position * 2.0).round(), not _carried.is_empty(), _state,
-		roundi(_greet * 60.0), _sun_key()
+		roundi(_greet * 60.0), _sun_key(), roundi(_carry_drop * 2.0)
 	])
 	if key != _painted:
 		queue_redraw()
@@ -1163,12 +1223,12 @@ func _repaint() -> void:
 
 func _draw() -> void:
 	var name := _showing()
-	var frame := DogArt.frame_at(name, _age)
+	var frame := DogArt.frame_at(name, _age, breed)
 	_painted = hash([
 		name, frame, facing_left, (position * 2.0).round(), not _carried.is_empty(), _state,
-		roundi(_greet * 60.0), _sun_key()
+		roundi(_greet * 60.0), _sun_key(), roundi(_carry_drop * 2.0)
 	])
-	if not DogArt.ready():
+	if not DogArt.ready(breed):
 		if _foam != null:
 			_foam.clear()
 		_draw_blocked()
@@ -1188,7 +1248,7 @@ func _draw() -> void:
 		# And the foam on that cut, bobbing with it: the same edge stamp is about to end the
 		# picture at, so the collar can never sit beside the dog instead of round it.
 		if _foam != null:
-			var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink)
+			var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink, breed)
 			_foam.lay(edge[0], edge[1])
 	else:
 		if _foam != null:
@@ -1198,13 +1258,14 @@ func _draw() -> void:
 		# Paws in the grass: the bottom row goes, and the picture moves down by it so the
 		# cut sits on the ground line. The shadow above keeps whole paws.
 		if Iso.on_lawn(tile_pos):
-			var buried := DogArt.bury(name, frame, HEIGHT, GRASS_BURY)
+			var buried := DogArt.bury(name, frame, HEIGHT, GRASS_BURY, breed)
 			sink = buried[0]
 			at.y += buried[1]
 
-	DogArt.stamp(self, name, frame, at, HEIGHT, facing_left, sink)
+	# The held piece goes on first, so the head is drawn over its back end.
 	if not _carried.is_empty() and grid != null:
-		_draw_stick(at)
+		_draw_stick(at, name, frame)
+	DogArt.stamp(self, name, frame, at, HEIGHT, facing_left, sink, Color.WHITE, breed)
 	if _state == State.PETTED:
 		_draw_hearts(1.0 - clampf(_mood_left / PET_TIME, 0.0, 1.0))
 	elif _greet > 0.0:
@@ -1224,18 +1285,21 @@ func _draw_shadow(name: StringName, frame: int, at: Vector2) -> void:
 		return
 	draw_set_transform_matrix(Shade.lying(at, day.lean, day.stretch))
 	DogArt.stamp(
-		self, name, frame, Vector2.ZERO, HEIGHT, facing_left, 0.0, Shade.tint(day.ink)
+		self, name, frame, Vector2.ZERO, HEIGHT, facing_left, 0.0, Shade.tint(day.ink), breed
 	)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## What it is bringing back, hanging from its mouth. Drawn from the piece's own def, so a dog
+## What it is bringing back, gripped in its jaws. Drawn from the piece's own def, so a dog
 ## carrying a bottle is carrying a bottle.
 ##
-## Hung off the nose the sheet actually draws rather than off a guess at where the head is,
-## and hung *below* it: a dog with something in its mouth carries the weight under its jaw,
-## and a piece centred on the face reads as a dog wearing a bottle.
-func _draw_stick(at: Vector2) -> void:
+## Held at the mouth the sheet actually draws on *this frame* (`DogArt.mouth`, measured off
+## the art), with `CARRY_AHEAD` of its width past the nose and the rest under the head,
+## which is drawn over it. It leans nose-end down, hangs a little lower the bigger it is,
+## and swings by however far it is trailing the mouth (`_carry_drop`), so a gallop rocks it
+## and a sit lets it hang still. Until 2026-09-22 it hung under a guessed nose, clear of
+## the face, and read as a dog wearing a bottle.
+func _draw_stick(at: Vector2, name: StringName, frame: int) -> void:
 	# The last one picked up, whatever else is in there. A dog that swam out three times
 	# without coming in carries one visible stick and the rest on trust: five pieces of
 	# junk drawn round a twenty-two pixel head is a blob, not a mouthful.
@@ -1243,9 +1307,14 @@ func _draw_stick(at: Vector2) -> void:
 	if held < 0 or held >= grid.defs.size():
 		return
 	var def: TrashDef = grid.defs[held]
-	var hold := at + DogArt.mouth(_showing(), HEIGHT, facing_left)
-	hold.y += def.size.y * CARRY_SCALE * 0.4
-	draw_set_transform(hold, 0.0, Vector2(CARRY_SCALE, CARRY_SCALE))
+	var forward := -1.0 if facing_left else 1.0
+	var hold := at + DogArt.mouth(name, HEIGHT, facing_left, frame, breed)
+	var wide := def.size.x * CARRY_SCALE
+	var tall := def.size.y * CARRY_SCALE
+	hold.x += forward * (CARRY_AHEAD - 0.5) * wide
+	hold.y += tall * CARRY_SAG + _carry_drop
+	var swing := clampf(_carry_drop * CARRY_SWING, -CARRY_SWING_MOST, CARRY_SWING_MOST)
+	draw_set_transform(hold, forward * (CARRY_TILT + swing), Vector2(CARRY_SCALE, CARRY_SCALE))
 	def.stamp(self)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 

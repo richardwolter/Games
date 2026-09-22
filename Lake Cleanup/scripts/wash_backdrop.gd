@@ -106,7 +106,7 @@ const DOG_NEAR := 40.0
 const DOG_BOLT := 2.3
 const BOLT_LEAST := 320.0
 const BARK_GAP := 2.0
-const REST_POSES: Array[StringName] = [&"idle", &"idle", &"laid", &"sleep"]
+const REST_POSES: Array[StringName] = [&"idle", &"idle", &"sit", &"laid", &"sleep"]
 
 ## Rubbish afloat: how many on a full lake, how far down the lake (as shares of it) they
 ## lie, how much of each is under water, and the depth past which a piece draws at the full
@@ -233,6 +233,9 @@ class Hound:
 	var age := 0.0
 	var left := false
 	var bolting := false
+	## The pack slot this hound stands for, and so its breed and gait — `Dog.slot`'s rule.
+	var slot := 0
+	var breed := 0
 
 
 func _ready() -> void:
@@ -297,6 +300,8 @@ func reset() -> void:
 		return
 	for k in clampi(pack, 0, 4):
 		var dog := Hound.new()
+		dog.slot = k
+		dog.breed = DogArt.breed_of(k)
 		dog.depth = _roll.randf()
 		dog.at = Vector2(_roll.randf_range(0.1, 0.9) * size.x, 0.0)
 		_send(dog)
@@ -487,7 +492,7 @@ func _send(dog: Hound) -> void:
 	var depth := clampf(dog.depth + _roll.randf_range(-0.3, 0.3), 0.0, 1.0)
 	dog.to = Vector2(_roll.randf_range(0.04, 0.96) * size.x, _lawn_y(depth))
 	dog.left = dog.to.x < dog.at.x
-	dog.pose = &"run" if DogArt.has(&"run") else &"idle"
+	dog.pose = DogArt.gait(dog.slot, false, dog.breed) if DogArt.has(&"run", dog.breed) else &"idle"
 	dog.rest = 0.0
 	dog.bolting = false
 
@@ -508,7 +513,7 @@ func _drive_dogs(delta: float) -> void:
 			dog.bolting = false
 			dog.rest = _roll.randf_range(DOG_REST.x, DOG_REST.y)
 			var pose: StringName = REST_POSES[_roll.randi() % REST_POSES.size()]
-			dog.pose = pose if DogArt.has(pose) else &"idle"
+			dog.pose = pose if DogArt.has(pose, dog.breed) else &"idle"
 			dog.age = 0.0
 
 
@@ -746,14 +751,15 @@ func _draw_dogs() -> void:
 				Shade.lying(dog.at.snapped(Vector2.ONE * PIXEL), shade.x, shade.y)
 			)
 			DogArt.stamp(
-				self, dog.pose, DogArt.frame_at(dog.pose, dog.age), Vector2.ZERO,
-				_dog_tall(dog), dog.left, 0.0, ink
+				self, dog.pose, DogArt.frame_at(dog.pose, dog.age, dog.breed), Vector2.ZERO,
+				_dog_tall(dog), dog.left, 0.0, ink, dog.breed
 			)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for dog: Hound in order:
 		DogArt.stamp(
-			self, dog.pose, DogArt.frame_at(dog.pose, dog.age),
-			dog.at.snapped(Vector2.ONE * PIXEL), _dog_tall(dog), dog.left
+			self, dog.pose, DogArt.frame_at(dog.pose, dog.age, dog.breed),
+			dog.at.snapped(Vector2.ONE * PIXEL), _dog_tall(dog), dog.left, 0.0, Color.WHITE,
+			dog.breed
 		)
 
 
