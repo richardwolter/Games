@@ -5484,7 +5484,11 @@ func _check_wildlife() -> void:
 	if not sitter.is_empty():
 		wild._frog_step(sitter, 0.016, PackedVector2Array([(sitter["at"] as Vector2) + Vector2(10.0, 0.0)]))
 		_check(int(sitter["state"]) == Wildlife.Frog.JUMP, "a frog jumps into the water when someone walks up", "")
-		for i in 60:
+		# Checked on the frame the jump ends: a frog that went in right beside its own shore
+		# can reach it and climb straight out again within a second.
+		for i in 120:
+			if int(sitter["state"]) != Wildlife.Frog.JUMP:
+				break
 			wild._frog_step(sitter, 1.0 / 60.0, PackedVector2Array())
 		_check(int(sitter["state"]) == Wildlife.Frog.SWIM, "and swims as a shadow once it is in", "")
 	for b: Dictionary in wild.broods():
@@ -5493,11 +5497,62 @@ func _check_wildlife() -> void:
 			_check(int(b["state"]) == Wildlife.Brood.TAKE_OFF, "a net landing by the ducks puts them up", "")
 			break
 	# The frog sheet's rows: a frog heading right looks east, one heading down looks south.
-	_check(Wildlife._row_of(Vector2(1.0, 0.0)) == 6 and Wildlife._row_of(Vector2(0.0, 1.0)) == 0
-		and Wildlife._row_of(Vector2(-1.0, 0.0)) == 2 and Wildlife._row_of(Vector2(0.0, -1.0)) == 4,
+	_check(Wildlife._row_of(Vector2(1.0, 0.0)) == 2 and Wildlife._row_of(Vector2(0.0, 1.0)) == 0
+		and Wildlife._row_of(Vector2(-1.0, 0.0)) == 6 and Wildlife._row_of(Vector2(0.0, -1.0)) == 4
+		and Wildlife._row_of(Vector2(1.0, 1.0)) == 1 and Wildlife._row_of(Vector2(-1.0, 1.0)) == 7,
 		"frogs face the way they are going", "")
 	_check(not wild.has_method("catch") and not wild.has_method("pay"), "animals have no catch and no pay", "")
+	_check_beat(wild)
 	wild.stage = saved_stage
+
+
+## The animals move to the music (2026-09-22): every song the lake plays has a measured beat
+## grid, the station counts beats off it whether or not anything is audible, and a frog's hop
+## lands on a beat.
+func _check_beat(wild: Wildlife) -> void:
+	var table = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
+	var missing := []
+	for slug in MusicStation.PLAYLIST + [MusicStation.ENDING_SONG]:
+		if not (table is Dictionary and (table as Dictionary).has(String(slug))):
+			missing.append(slug)
+	_check(missing.is_empty(), "every song the lake plays has a beat grid", str(missing))
+	if not missing.is_empty():
+		return
+	var station := MusicStation.new()
+	station.set(&"_beats", table)
+	var grid: Dictionary = table[String(MusicStation.PLAYLIST[0])]
+	station.set(&"_at", float(grid["offset"]) + 3.0 * 60.0 / float(grid["bpm"]))
+	_check(absf(station.beat_clock() - 3.0) < 0.001 and absf(station.beat_length() - 60.0 / float(grid["bpm"])) < 0.0001,
+		"the station counts beats off the song's own grid", "%.3f" % station.beat_clock())
+	station.free()
+	# A hop is launched early enough to land on its beat. Run on the fallback clock, which
+	# only moves with the node's own time, so the frames here are all it has.
+	var had: MusicStation = wild.music
+	var had_threats: Callable = wild.threats
+	wild.music = null
+	wild.threats = Callable()
+	var landings := 0
+	var off_beat := 0
+	var step := 1.0 / 60.0
+	var slack := 2.5 * step / wild.beat_length()
+	for i in 3600:
+		wild._process(step)
+		for f: Dictionary in wild.frogs():
+			var state: int = f["state"]
+			if int(f.get("test_was", -1)) == Wildlife.Frog.HOP and state != Wildlife.Frog.HOP:
+				landings += 1
+				var into := fposmod(wild.beat(), 1.0)
+				if minf(into, 1.0 - into) > slack:
+					off_beat += 1
+			f["test_was"] = state
+	_check(landings > 0 and off_beat == 0, "frogs' hops land on the beat",
+		"%d landings, %d off the beat" % [landings, off_beat])
+	# A resting turtle's head is up for the first half of every beat, down for the second.
+	var t0 := {"clock": 0.0, "nod_seed": 0.0}
+	var up := "_up" if fposmod(wild.beat(), 1.0) < 0.5 else ""
+	_check(wild._nod(t0) == up, "a resting turtle nods up on the beat and down off it", up)
+	wild.music = had
+	wild.threats = had_threats
 
 
 ## The graded grime (2026-09-17): the water's shade follows how much rubbish an area still

@@ -42,7 +42,7 @@ const OPEN_AT := 0.6
 const OPEN_CLEAR := 3.5
 ## Bees: at most this many, on the flowers whose rank is under this share of what has grown,
 ## one or two to a flower, circling its head. Tiny dots, drawn in one untextured batch.
-const BEES_MOST := 70
+const BEES_MOST := 90
 const BEE_SHARE := 0.45
 const BEE_COLOR := Color(0.96, 0.8, 0.28)
 const BEE_BAND := Color(0.18, 0.13, 0.06)
@@ -51,6 +51,10 @@ const BEE_WING := Color(0.93, 0.97, 0.98, 0.55)
 const BEE_HOSTS := ["flower_", "patch_", "tulip_", "daisies", "clover_", "shrub_flowering", "thrift", "beach_flower"]
 ## One painted pixel, in world px: a bee is on the art grid like everything else.
 const ART := 2.0
+## On each beat of the song a bee's orbit jumps ahead by BEE_PULSE radians, fast at the beat
+## and easing out before the next, so the whole meadow quickens in time. The beat is
+## `music`'s (MusicStation.beat_clock); none, and the orbit runs even.
+const BEE_PULSE := 1.1
 ## Seconds a plant takes to arrive, and the most its own delay can add.
 const GROW_TIME := 3.5
 const GROW_STAGGER := 2.5
@@ -68,6 +72,7 @@ var grounds: Array[Ground] = []
 var crate_tile := Vector2.INF
 ## Tile points the open-water clumps keep `OPEN_CLEAR` away from: the yards' feet and berths.
 var avoid := PackedVector2Array()
+var music: MusicStation
 ## 0..1, the share of the lake's water that reads clean. Set by `refresh`.
 var stage: float = 0.0
 
@@ -207,11 +212,21 @@ func _find_bees() -> void:
 	_bee_host.resize(0)
 	_bee_seed.resize(0)
 	var density := clampf(stage, 0.0, 1.0) * MOST * BEE_SHARE
+	# Every grown host under the density, lowest rank first — the painter's order put all
+	# of them on the far bank — with the island's own flowers well up the queue, since the
+	# island is where the player stands.
+	var hosts: Array = []
 	for k in _foot.size():
-		if _bee_host.size() >= BEES_MOST:
-			break
 		if _age[k] < 0.0 or _rank[k] >= density:
 			continue
+		var tile := Iso.world_to_tile(_foot[k])
+		var near := Iso.island_fraction(tile.x, tile.y) < 1.5
+		hosts.append([_rank[k] * (0.25 if near else 1.0), k])
+	hosts.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	for pair: Array in hosts:
+		var k: int = pair[1]
+		if _bee_host.size() >= BEES_MOST:
+			break
 		var name := _species[k]
 		var host := false
 		for prefix: String in BEE_HOSTS:
@@ -471,6 +486,11 @@ func _draw_bees(on: CanvasItem) -> void:
 	_bee_indices.resize(0)
 	var now := float(Time.get_ticks_msec()) * 0.001
 	var flick := int(now * 18.0) % 2 == 0
+	var pulse := 0.0
+	if music != null:
+		var b := music.beat_clock()
+		var into := b - floorf(b)
+		pulse = (floorf(b) + 1.0 - pow(1.0 - into, 3.0)) * BEE_PULSE
 	for i in _bee_host.size():
 		var k := _bee_host[i]
 		var t := clampf((_age[k] - _delay[k]) / GROW_TIME, 0.0, 1.0)
@@ -481,7 +501,7 @@ func _draw_bees(on: CanvasItem) -> void:
 		var seed := _bee_seed[i]
 		var rx := 5.0 + fmod(seed, 5.0)
 		var ry := 3.0 + fmod(seed * 1.7, 3.0)
-		var a := now * (2.2 + fmod(seed, 1.3)) + seed
+		var a := now * (2.2 + fmod(seed, 1.3)) + seed + pulse
 		var at := head + Vector2(cos(a) * rx + sin(a * 2.3) * 2.0, sin(a * 1.6) * ry - 2.0)
 		at = (at / ART).floor() * ART
 		# The dark band trails the way it is flying.

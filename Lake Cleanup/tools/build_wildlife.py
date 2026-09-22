@@ -12,7 +12,7 @@ Writes:
   assets/wildlife/frog_green.png, frog_brown.png  the pack's top half, halved to cells
       16x16 (the pack is drawn at twice the game's grain; at the game's 2 a whole frog
       stood as tall as the angler),
-      8 rows (S, SW, W, NW, N, NE, E, SE) x 16 columns (idle 0-2, croak 3-6, jump 7-10,
+      8 rows (S, SE, E, NE, N, NW, W, SW) x 16 columns (idle 0-2, croak 3-6, jump 7-10,
       hop 11-15), recoloured
   assets/wildlife/critters.png + critters.json    turtles, ducks, ducklings, swim shadows:
       {"<name>": [x, y, w, h]}, every picture facing LEFT (the game mirrors for right),
@@ -170,35 +170,57 @@ SKIN = mix(GRASS_LIGHT, SAND, 0.35)
 SKIN_DARK = mix(SKIN, GRASS_DARK, 0.45)
 
 
-def turtle(pose: str, step: int = 0) -> Image.Image:
-    w, h = 11, 6
+# Where the two seen legs stand in each walk frame: (front x, back x). Frame 0 is the pose a
+# resting turtle holds; the walk steps the front leg forward, back to rest, then the back
+# leg back, back to rest — one leg at a time, never both.
+TURTLE_STRIDE = [(3, 8), (2, 8), (3, 8), (3, 9)]
+
+
+def turtle(pose: str, step: int = 0, head_up: bool = False) -> Image.Image:
+    """Side on, facing left: a domed shell on four stubby legs (two seen), the head held
+    ahead. `step` is a frame of TURTLE_STRIDE when walking; sitting and tucked stand on frame
+    0, so at rest nothing moves but the head. `head_up` lifts the head a painted pixel, the
+    slow nod the game plays at rest and on the walk."""
+    w, h = 12, 7
     img = canvas(w, h)
     d = ImageDraw.Draw(img)
     swim = pose == "swim"
     top = 1 if not swim else 2
-    bottom = h - 2 if not swim else h - 1
-    hy = 2 if not swim else 3
-    if pose == "walk" and step == 1:
-        hy -= 1
-    if not swim:
-        legs = (3, 7) if step == 0 else (4, 8)
-        for lx in legs:
-            d.line((lx, h - 2, lx, h - 1), fill=SKIN_DARK)
-        put(img, w - 1, h - 2, SKIN_DARK)
+    bottom = h - 3 if not swim else h - 1
+    hy = (2 if not swim else 3) - (1 if head_up else 0)
     if pose != "tuck":
-        d.rectangle((0, hy, 3, hy + 1), fill=SKIN)
-    d.ellipse((3, top, w - 1, bottom + 3), fill=SHELL)
-    d.rectangle((3, bottom + 1, w - 1, bottom + 3), fill=(0, 0, 0, 0))
+        d.rectangle((0, hy - 1, 3, hy + 1), fill=SKIN)
+        # The neck stays joined to the shell when the head is up.
+        d.rectangle((2, hy, 4, hy + 2), fill=SKIN)
+    d.ellipse((3, top, w - 2, bottom + 3), fill=SHELL)
+    d.rectangle((3, bottom + 1, w - 2, bottom + 3), fill=(0, 0, 0, 0))
+    if not swim:
+        put(img, w - 2, bottom, SKIN_DARK)
     img = outline(img, OUTLINE)
-    for px_ in (5, 7):
+    for px_ in (5, 7, 9):
         for y in range(top + 2, bottom + 1):
             if img.getpixel((px_, y))[3] and img.getpixel((px_, y)) != OUTLINE:
                 put(img, px_, y, SHELL_PLATE)
-    for x in range(5, 8):
+    for x in range(5, 9):
         if img.getpixel((x, top + 1))[3] and img.getpixel((x, top + 1)) != OUTLINE:
             put(img, x, top + 1, SHELL_LIT)
     if pose != "tuck":
         put(img, 1, hy, OUTLINE)
+    if swim:
+        # Flippers just breaking the surface either side, paddling by turns.
+        fx = (2, 10) if step == 0 else (3, 9)
+        for x in fx:
+            put(img, x, h - 1, SKIN_DARK)
+        return img
+    # Legs under the shell's rim, after the ring so the ring does not eat them: two pixels
+    # wide, a dark foot under each.
+    front, back = TURTLE_STRIDE[step if pose == "walk" else 0]
+    for lx in (front, back):
+        for y in range(bottom + 1, bottom + 3):
+            put(img, lx, y, SKIN)
+            put(img, lx + 1, y, SKIN_DARK)
+        put(img, lx, bottom + 2, OUTLINE)
+        put(img, lx + 1, bottom + 2, OUTLINE)
     return img
 
 
@@ -322,8 +344,14 @@ def pack() -> None:
         frogs[colour] = recolour_frog(colour)
         frogs[colour].save(os.path.join(OUT_DIR, f"frog_{colour}.png"))
     items: list[tuple[str, Image.Image]] = []
-    for pose, step in (("sit", 0), ("walk", 0), ("walk", 1), ("tuck", 0), ("swim", 0)):
-        items.append((f"turtle_{pose}{step if pose == 'walk' else ''}", turtle(pose, step)))
+    for up in (False, True):
+        tag = "_up" if up else ""
+        items.append((f"turtle_sit{tag}", turtle("sit", 0, up)))
+        for step in range(len(TURTLE_STRIDE)):
+            items.append((f"turtle_walk{step}{tag}", turtle("walk", step, up)))
+    items.append(("turtle_tuck", turtle("tuck")))
+    for step in (0, 1):
+        items.append((f"turtle_swim{step}", turtle("swim", step)))
     for name, kind in (("drake", DRAKE), ("hen", HEN)):
         for pose in ("swim0", "swim1", "dabble", "fly0", "fly1", "fly2"):
             items.append((f"{name}_{pose}", duck(kind, pose)))

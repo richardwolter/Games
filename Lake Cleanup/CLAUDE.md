@@ -2969,13 +2969,14 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   off, a dragonfly darts away. **Silent this pass**, by decision; no recordings exist.
 - **All of them from the first clean water, more as it spreads** (Richard, over a staged
   ladder like the fish's): `ceil(most * stage)` once `stage` passes 0.02, capped by
-  `FROGS_MOST` 14, `TURTLES_MOST` 8, `BROODS_MOST` 5, `DRAGONFLIES_MOST` 12. Broods come in
+  `FROGS_MOST` 30, `TURTLES_MOST` 14, `BROODS_MOST` 5, `DRAGONFLIES_MOST` 20 (raised the
+  same evening, Richard: "more prevalent on shore"). Broods come in
   one at a time, `BROOD_GAP` apart. Only where the honest map says clean, never a catch patch.
 - **Frogs are the Pixel Frog pack, green and brown, recoloured onto the palette and halved**
   (`tools/build_wildlife.py`, `recolour_frog`, `halve`; blue, purple and the GameBoy sheets
   are out). The pack is drawn at twice the game's grain — at the game's 2 a whole frog stood
   as tall as the angler — so each 2x2 block is folded to its commonest colour. Idle, croak,
-  jump and hop, eight facings (`_row_of`: S, SW, W, NW, N, NE, E, SE). They sit on the sand
+  jump and hop, eight facings (`_row_of`: S, SE, E, NE, N, NW, W, SW). They sit on the sand
   of both shores (`_find_shore`, 220 spots found on the bearings, kept off the hut, crate,
   pump and yards), croak, hop along the beach, jump in, **swim as a shadow**
   (`frogswim_<heading>_<frame>`: a rule-built top-down silhouette, eight headings on the
@@ -2992,11 +2993,47 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   its heading snapped to eighths, two pairs of flicking wings and a shadow pixel; it hovers
   and darts round a home over a clean shore or a pad. Bees (`Flora._draw_bees`) circle grown
   flower heads, up to `BEES_MOST` 70, on their own child node (`Flora.Bees`), so their
-  per-frame redraw does not resend the whole plant batch (that cost 1.2 ms).
+  per-frame redraw does not resend the whole plant batch (that cost 1.2 ms). Up to
+  `BEES_MOST` 90, **picked by rank with the island's flowers first**: picked in painter's
+  order every bee went to the far bank and none to the island.
 - **Layers**: the frog's swim shadow at z 3, everything on the sand and the water at z 6
   (above the rubbish soup), flying ducks and dragonflies at z 20. Land animals do not sort
   against the angler (z 9): a frog in front of him is drawn under him, accepted, because it
   jumps away before he gets there.
+- **Second look, same evening** (Richard, on `tools/play_clean.tscn`, a near-clean lake on
+  its own save): **a frog's swim never crosses sand** (`_clear_path` on every swim target,
+  and a step onto land turns it back out along its shore) — its shadow was showing through
+  the island; the shadow is drawn over water only. **Tracks in the sand** (`_track`,
+  `TRACK_LIFE` 14 s, `TRACKS_MOST` 500, dry sand only, `_sandy`): a frog leaves two dents
+  where it takes off and lands, a turtle a foot each side and its shell's drag. **Frogs face
+  the way they go**: the pack's rows run **S, SE, E, NE, N, NW, W, SW** (read off the jump
+  frames), `_row_of` is `2 - k`; it was mirrored and every sideways frog leapt backwards.
+  **Turtles have two legs showing**, and **only walking moves them**: the walk is paced by
+  ground covered (`TURTLE_STEP_PX`), not by the clock, four frames stepping one leg at a
+  time (`TURTLE_STRIDE` in the builder); a timed walk paddled its legs while it crept.
+- **The animals move to the music** (same evening, second `/grill-me` with Richard).
+  `MusicStation.beat_clock()` / `beat_length()` read a beat grid per song,
+  `assets/music/beats.json`, measured off the built files by `tools/measure_beats.py`
+  (spectral flux, low end weighted, whole-song grid score): **beatgucci 135, Save ME 80,
+  Goin 118, Habibs 144**. Habibs measures a crisp 144.0 on the built file where the
+  trailer's cut used 143.55. **Which octave a song is in is the ear's call** (`TEMPO_HINT`:
+  beatgucci's half-time 67.5 outscores its 135); `tools/beat_click.py` writes
+  `tools/last_beat_<slug>.wav` with a click on every measured beat for that check. The
+  heard song drives it: the ending once over half up, the next song once the handover is
+  half done. **The clock runs when nothing is audible**, by decision — muted, muffled or
+  through the shed wall, the animals keep dancing to a silent song.
+  - **Frogs**: each picks its own beats, now and then (`FROG_SIT_BEATS` 3-10 beats of rest,
+    the move `FROG_PICK_AHEAD` 1-3 beats on), a hop or jump launched early enough to
+    **land** on its beat, a croak starting on it and swelling over `FROG_CROAK_BEATS`.
+    Frights stay instant. A cue the clock jumped past (a crossfade's handover moves it) is
+    picked again (`CUE_MISSED`), not fired late.
+  - **Turtles**: a resting turtle nods its head a pixel on every beat, up on the beat and
+    down off it, half of them a half beat behind (Richard's pick over half-time).
+  - **Dragonflies** hover whole beats (`FLY_HOVER_BEATS`) and dart on one. **Bees**' orbits
+    jump ahead `BEE_PULSE` on each beat and ease out (`Flora.music`).
+  - **Out of scope, by decision**: ducks and fish, live audio analysis, the shed's radio
+    song driving the lake. `test_lake`'s `_check_beat` guards a grid for every song, the
+    station counting off it, frogs' hops landing on the beat, and the nod.
 - **The animals may use half the splash layer's rings at most** (`Wildlife._ripple`): at
   first their rings filled `WaterSplash.MAX_RIPPLES` and a walker's entry ring was refused.
 - **More plants** (`tools/build_flora.py`): tulips, an orange flower, daisies, two clovers,

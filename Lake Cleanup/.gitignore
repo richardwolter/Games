@@ -62,3 +62,5 @@ tools/_logs/
 
 # Built from locale/translations.csv on import.
 /locale/*.translation
+/tools/last_*.wav
+/tools/last_*.wav.import

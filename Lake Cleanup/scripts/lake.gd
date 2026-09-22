@@ -5232,6 +5232,8 @@ func _grow_nature() -> void:
 	_wildlife.crate_tile = _dog.crate_tile
 	_wildlife.avoid = yards
 	_wildlife.threats = _wildlife_threats
+	_wildlife.music = MusicStation.main()
+	_flora.music = _wildlife.music
 	add_child(_wildlife)
 	_flora.refresh(_clean_share)
 	_fish.refresh(_clean_share, _clean_tiles)

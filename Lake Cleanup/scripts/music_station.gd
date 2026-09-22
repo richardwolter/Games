@@ -70,6 +70,13 @@ const GAIN_DB := {
 ## crossfade and each song's own levelling, which is what it was always for.
 const OFF_DB := -80.0
 
+## Each song's beat grid, measured off the built files (tools/measure_beats.py): its tempo
+## and where its first beat falls, in seconds. The animals move to it (2026-09-22,
+## `/grill-me` with Richard: frogs hop on beats, turtles nod on every beat, dragonflies dart
+## on one, the bees' orbit pulses). A song with no entry runs at FALLBACK_BPM from nought.
+const BEATS := "res://assets/music/beats.json"
+const FALLBACK_BPM := 120.0
+
 ## Where the player is. Set by the scenes; faded towards a frame at a time.
 var muffled: bool = false
 var indoors: bool = false
@@ -93,6 +100,7 @@ var _ending_at: float = 0.0
 var _players: Dictionary = {}
 var _shed: AudioStreamPlayer
 var _ending: AudioStreamPlayer
+var _beats: Dictionary = {}
 
 
 static func main() -> MusicStation:
@@ -104,6 +112,10 @@ static func main() -> MusicStation:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if FileAccess.file_exists(BEATS):
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(BEATS))
+		if parsed is Dictionary:
+			_beats = parsed
 	for slug in PLAYLIST:
 		_players[slug] = [_player(slug, ""), _player(slug, "_radio")]
 	_shed = _player(SHED_SONG, "_radio", true)
@@ -181,6 +193,36 @@ func now_playing() -> StringName:
 
 func song_time() -> float:
 	return _at
+
+
+## Beats since the start of the song the lake is hearing, as a float: a whole number is a
+## beat. The song is whichever is loudest — the ending over the playlist once it is more
+## than half up, the next song over the one leaving once the handover is half done — so the
+## beat follows what is heard. **The clock runs whether or not anything is audible**
+## (muted, muffled, through the shed wall): by decision, the animals keep dancing to a
+## silent song rather than dropping out of step. It jumps at a change of song; callers
+## counting beats treat a jump backwards as a fresh start.
+func beat_clock() -> float:
+	var song := _heard()
+	var grid: Dictionary = _beats.get(String(song[0]), {})
+	var bpm := float(grid.get("bpm", FALLBACK_BPM))
+	var offset := float(grid.get("offset", 0.0))
+	return (float(song[1]) - offset) * bpm / 60.0
+
+
+## Seconds a beat lasts in the song being heard.
+func beat_length() -> float:
+	var grid: Dictionary = _beats.get(String(_heard()[0]), {})
+	return 60.0 / float(grid.get("bpm", FALLBACK_BPM))
+
+
+## [slug, seconds into it] of the song the beat follows.
+func _heard() -> Array:
+	if _ending_at > 0.5 and _ending != null and _ending.playing:
+		return [ENDING_SONG, _ending.get_playback_position()]
+	if _next >= 0 and _handover() > 0.5:
+		return [PLAYLIST[_next], _at - (_length(_song) - FADE)]
+	return [PLAYLIST[_song], _at]
 
 
 func is_playing(slug: StringName) -> bool:
