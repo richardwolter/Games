@@ -1343,10 +1343,11 @@ A wording and layout pass over the onboarding cards, off Richard's first-time-pl
 - **The plank says "How to play"**, not "A letter" — the menu's plank already did.
 - **A Welcome card opens it** (Richard, later the same day): its plank says **Welcome**
   (`title`, per card; the rest keep "How to play"), it has no heading (`head` empty), and
-  it is **set like a letter** (`letter`): the greeting at the left as a salutation, three
-  paragraphs ranged right — the lake abandoned, the goal (catch, recycle, bring life back),
-  and that the cards teach how — spread down the page (`LETTER_SPREAD` caps the gap at 2.2
-  rows). No pictures; `rows` 6 gives their room to the words. Five cards now.
+  it is **set like a letter** (`letter`): the greeting over three paragraphs — the lake
+  abandoned (plain ink), the goal (catch, recycle, bring life back) and that the cards teach
+  how (both marked) — spread down the page (`LETTER_SPREAD` caps the gap at 2.2 rows),
+  **all centred** (ranged right was asked for and then taken back the same evening). No
+  pictures; `rows` 6 gives their room to the words. Five cards now.
 - **The Net card is two paragraphs** (`rows` 4, so both stay at the body size), like the
   tier card.
 - **The last card has no pager**: no dots, no arrows, their boxes emptied; "Start cleaning"

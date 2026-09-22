@@ -71,8 +71,7 @@ const ART := "res://assets/letter/%s.png"
 ## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows (or
 ## the card's own `rows`: the welcome card has no pictures and gives their room to words).
 ## `title` is the plank's word for that card alone; an empty `head` draws no heading. A
-## `letter` card is set like one: the greeting at the left, the paragraphs ranged right and
-## spread down the page;
+## `letter` card is set like one: its paragraphs spread down the page, all centred;
 ## `snaps` are [still, caption, ink] triples pinned in a row, left to right. A caption may be
 ## empty; `ink` names a `CAPTION_INKS` entry, `far` for the underlined soft ink, or is empty.
 const CARDS := [
@@ -81,7 +80,7 @@ const CARDS := [
 		"title": "Welcome",
 		"rows": 6,
 		"letter": true,
-		"text": "*It has been abandoned and neglected for too long.*\n"
+		"text": "It has been abandoned and neglected for too long.\n"
 			+ "Your goal is to *catch objects with your net, recycle and bring life back to the lake.*\n"
 			+ "The following instructions will *teach you how it works.*",
 		"snaps": [],
@@ -738,7 +737,7 @@ func _draw() -> void:
 		for row: Dictionary in rows:
 			if bool(row["para"]):
 				y_text += para_gap
-			_ink_marked(row, int(fit["px"]), y_text + float(fit["px"]), inside, 1 if letter else 0)
+			_ink_marked(row, int(fit["px"]), y_text + float(fit["px"]), inside, 0)
 			y_text += row_tall
 	for caption: Dictionary in _captions:
 		var text := String(caption["text"])
@@ -804,10 +803,7 @@ func _draw_greeting(inside: Rect2) -> void:
 	var whole := lead_wide + Style.measure(GREETING_NAME, name_px).x
 	if whole > inside.size.x:
 		dropped_lines += 1
-	var card: Dictionary = CARDS[0]
-	# A letter's salutation stands at the left; over a card of pictures it is centred.
-	var x := inside.position.x if bool(card.get("letter", false)) \
-		else floorf(inside.position.x + (inside.size.x - whole) * 0.5)
+	var x := floorf(inside.position.x + (inside.size.x - whole) * 0.5)
 	var base := inside.position.y + float(name_px)
 	draw_string(Style.font(), Vector2(x, base), GREETING_LEAD,
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0, lead_px, INK)
