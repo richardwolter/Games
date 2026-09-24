@@ -98,6 +98,31 @@ SLUGS = {
 YARDS = {"wood": "Wood", "metal": "Metal", "plastic": "Plastic", "rubber": "Rubber"}
 
 
+## The angler's outline is pure black; the rubbish was painted with tinted ones (slate, maroon)
+## that read softer beside him (2026-09-24, Richard: "the same outline as the player has").
+## Every silhouette pixel darker than OUTLINE_UNDER goes black; a lit edge pixel keeps its
+## colour, since that is the painted highlight and not the line.
+OUTLINE_INK = (0, 0, 0, 255)
+OUTLINE_UNDER = 110
+
+
+def ink_outline(im):
+    px = im.load()
+    w, h = im.size
+    edge = []
+    for y in range(h):
+        for x in range(w):
+            c = px[x, y]
+            if c[3] == 0 or 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] >= OUTLINE_UNDER:
+                continue
+            if any(not (0 <= x + dx < w and 0 <= y + dy < h) or px[x + dx, y + dy][3] == 0
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                edge.append((x, y))
+    for spot in edge:
+        px[spot] = OUTLINE_INK
+    return im
+
+
 def main():
     psd = PSDImage.open(PSD)
     layers = {}
@@ -121,6 +146,7 @@ def main():
             im = despeck(layer.composite().convert("RGBA"))
             if im is None:
                 sys.exit("layer %r (%s) is empty" % (name, slug))
+            im = ink_outline(im)
             sprites[slug] = im
             xs[slug] = layer.bbox[0]
             titles.setdefault(slug, slug.replace("_", " ").title())

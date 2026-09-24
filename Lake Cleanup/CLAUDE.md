@@ -2317,6 +2317,11 @@ the whole job.
   silhouette, so the jetties' outline went near-black too). **The island crate draws at
   2.0** (`Yard.ART_SCALE`, was 2.5), so its outline is one art pixel like everyone else's;
   the crate is 20% smaller and its footprint follows.
+- **The rubbish wears the angler's black outline** (same day): `build_lake_objects.py`
+  `ink_outline` turns every silhouette pixel darker than `OUTLINE_UNDER` (110 luma) pure black;
+  lit edge pixels keep their colour, so a pale piece (the bottle, the sheet) has a broken line
+  where it was painted with a highlight. The rebuild rewrote `pieces.json` in another order
+  with identical content; the committed file was kept.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
