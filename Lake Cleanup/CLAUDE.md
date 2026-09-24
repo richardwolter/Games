@@ -2309,6 +2309,11 @@ the whole job.
   painted source and `assets/shed.png` a straight copy of it. **`recolor_shed.py` no longer
   writes the asset** unless given `--overwrite-painted` (or `--out` for a trial); its
   functions are still imported by the pier, nozzle and downres builders.
+- **The hut's and the box's outer outline is near-black** (24,18,17), same day (Richard: the
+  brown read as no outline): every silhouette pixel of `shed_paint.png`/`shed.png` and
+  `Recycle_Box.png` that was (48,37,33) or the rim's (76,29,29). Done on the assets;
+  `tools/trim_box_sides.py` would put the box's brown sides back if re-run. The piers' boxes
+  are baked into `piers.png` and keep the brown until `build_piers.py` is re-run.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
