@@ -117,19 +117,30 @@ func _draw() -> void:
 				_ring(xf, beach, Iso.TILE_W * 0.5 * BEACH_RING)
 				_arrow(xf * beach, px)
 			if head != Vector2.INF:
-				_move_prompts((xf * head).round(), px)
+				_move_prompts(_on_screen(xf * head), px)
 		Step.CAST:
 			if water != Vector2.INF:
 				_ring(xf, water, water_wide)
 				_arrow(xf * water, px)
 			if head != Vector2.INF:
 				var tile := "pad_rt" if pad else _blink("mouse_idle", "mouse_click")
-				_prompt(tile, (xf * head).round(), px, true)
+				_prompt(tile, _on_screen(xf * head), px, true)
 		Step.NOTE:
 			if crate != Vector2.INF:
-				var at := (xf * crate).round()
+				var at := _on_screen(xf * crate)
 				_arrow(at, px)
 				_note(at)
+
+
+## A canvas point put on the window's own pixel grid (2026-09-24). The world is snapped to
+## whole *screen* pixels (`Lake._snap_camera`), and at a 1.5 stretch a canvas pixel is one and
+## a half of those: rounded to whole canvas pixels, the recycle note stepped against the box
+## it stands by on every other frame of a walk, and read as trembling.
+func _on_screen(at: Vector2) -> Vector2:
+	var s := get_viewport().get_final_transform().get_scale().x
+	if s <= 0.0:
+		return at.round()
+	return (at * s).round() / s
 
 
 ## Canvas pixels to one of the pack's: `PROMPT_PX` physical ones through the window stretch.
@@ -215,7 +226,7 @@ func _note(box_at: Vector2) -> void:
 	var lines := _wrap(NOTE_TEXT, face, size_px, NOTE_WIDE - NOTE_PAD.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
 	var tall := line_tall * lines.size() + NOTE_PAD.y * 2.0
-	var box := Rect2((box_at + NOTE_FROM_BOX).round(), Vector2(NOTE_WIDE, tall).round())
+	var box := Rect2(_on_screen(box_at + NOTE_FROM_BOX), Vector2(NOTE_WIDE, tall).round())
 	# Kept on the screen: the box can be near an edge after a pan.
 	var view := get_viewport_rect().size
 	box.position.x = clampf(box.position.x, 4.0, view.x - box.size.x - 4.0)

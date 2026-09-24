@@ -78,12 +78,12 @@ const CARDS := [
 	{
 		"head": "",
 		"title": "Welcome",
-		"rows": 6,
+		"rows": 5,
 		"letter": true,
 		"text": "It has been abandoned and neglected for too long.\n"
 			+ "Your goal is to *catch objects with your net, recycle and bring life back to the lake.*\n"
 			+ "The following instructions will *teach you how it works.*",
-		"snaps": [],
+		"snaps": [["lake_whole", "", &""]],
 	},
 	{
 		"head": "Net",
@@ -173,6 +173,8 @@ const BLURB_ROWS := 3
 ## The most a letter card's paragraphs are spread apart, in rows.
 const LETTER_SPREAD := 2.2
 
+## How tall the letter card's picture stands, under the greeting.
+const LETTER_ART_TALL := 150.0
 ## The pager: the arrow planks and the dots between them.
 const ARROW := Vector2(30.0, 34.0)
 const DOT := 4.0
@@ -484,9 +486,10 @@ func _lay_out() -> void:
 	var inside := _sheet.grow(-SHEET_PAD)
 	var last := page >= CARDS.size() - 1
 	var row := inside.end.y - PAGER_TALL
-	# The last card has no pager at all: the door stands in the pager's row, centred, and
-	# is the one way on. Its arrows' boxes are emptied so a click there is a click on paper.
-	_back = Rect2() if last else Rect2(Vector2(inside.position.x, row + (PAGER_TALL - ARROW.y) * 0.5), ARROW)
+	# The last card has no dots and no forward arrow: the door stands in the pager's row,
+	# centred, and is the one way on. The back arrow stays.
+	# The back arrow stays on the last card (2026-09-24): the way back to a card already read.
+	_back = Rect2(Vector2(inside.position.x, row + (PAGER_TALL - ARROW.y) * 0.5), ARROW)
 	_on = Rect2() if last else Rect2(Vector2(inside.end.x - ARROW.x, _back.position.y), ARROW)
 	_door.size = DOOR
 	_door.position = Vector2(
@@ -509,6 +512,11 @@ func _lay_out() -> void:
 ## What the pictures get: from under the sentence — under the greeting, the heading and the
 ## sentence on the first card — down to the door's row.
 func _art_box(inside: Rect2) -> Rect2:
+	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
+	if bool(card.get("letter", false)):
+		# The letter's picture stands under the greeting, over the paragraphs (2026-09-24).
+		var under := inside.position.y + _greeting_tall() + GAP
+		return Rect2(inside.position.x, under, inside.size.x, LETTER_ART_TALL)
 	var top := _text_foot(inside) + GAP
 	# The pager's row on every card but the last, the door's on that one: the same row.
 	var foot := inside.end.y - PAGER_TALL - GAP
@@ -520,10 +528,13 @@ func _art_box(inside: Rect2) -> Rect2:
 func _head_base(inside: Rect2) -> float:
 	var base := inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
-	if not (card["snaps"] as Array).is_empty():
+	if not (card["snaps"] as Array).is_empty() and not bool(card.get("letter", false)):
 		return base
 	if bool(card.get("letter", false)):
-		# Set like a letter: from the top, the spread does the rest.
+		# Set like a letter: from the top, the spread does the rest. Under its picture, if
+		# it has one.
+		if not (card["snaps"] as Array).is_empty():
+			base += LETTER_ART_TALL + GAP
 		return base
 	var foot := inside.end.y - PAGER_TALL - GAP
 	var words := GAP + float(_rows_of(card)) * (float(Style.TEXT_BODY) + LINE_STEP)
@@ -823,9 +834,9 @@ func _draw_sheet() -> void:
 
 
 func _draw_pager() -> void:
+	_draw_arrow(_back, -1, page > 0, _hovered == &"back")
 	if page >= CARDS.size() - 1:
 		return
-	_draw_arrow(_back, -1, page > 0, _hovered == &"back")
 	if _forward_live():
 		_draw_arrow(_on, 1, true, _hovered == &"on")
 	for i in _dots.size():

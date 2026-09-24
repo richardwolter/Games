@@ -1540,7 +1540,16 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				_put_down()
 	elif wheel.pressed:
-		_pick_up()
+		# A piece still in hand from the shelf goes down on this press.
+		if not carrying.is_empty():
+			_put_down()
+		else:
+			_pick_up()
+	elif _carried_from == -1 and not carrying.is_empty() and not _over_room(_pointer):
+		# Let go of the button over the shelf itself, it stays in hand (2026-09-24, Richard:
+		# one click on a row should be enough): the next press puts it down. A drag out
+		# onto the floor still drops where it is let go.
+		pass
 	else:
 		_put_down()
 	queue_redraw()

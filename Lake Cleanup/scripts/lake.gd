@@ -852,6 +852,13 @@ var _decor_tour_wait: float = 0.0
 const DECOR_TOUR_CARDS := 5
 const DECOR_HINT_AFTER := 2.8
 const DECOR_BACK_AFTER := 1.6
+## How clean the find on the stand has to be before the stand's card gives way: a little of
+## the coat off, so the card is read before the spray takes it down.
+const DECOR_SPRAYED := 0.04
+## How many pieces stood in the room when the shelf's card came up; -1 before it has.
+var _decor_tour_placed := -1
+## How clean the find was when the stand's card came up; -1 before it has.
+var _decor_stand_from := -1.0
 const DECOR_HINT := "You caught a decoration! Open Decorate to see it."
 const DECOR_PLANK := "You need to wash objects before it is available for decoration."
 const DECOR_LIST := "Select the object to wash, it costs $5 to $15 depending on size."
@@ -2983,9 +2990,6 @@ const ARRIVE_ASHORE := 0.82
 ## How far out the hull starts, as a share of the basin's radius — off the drawn lake, so it
 ## comes in over the water rather than fading up on it.
 const ARRIVE_OUT := 1.3
-## Where the angler is led, as a share of `SHOP_RANGE` south of the hut: inside the door's
-## reach, on the side the dock is.
-const ARRIVE_AT_SHED := 0.7
 ## How long the pair stand on the boards before setting off, and how long the note is looked
 ## at before it opens. Two small beats, so neither reads as a snap.
 const ARRIVE_STEP_OFF := 0.6
@@ -3008,7 +3012,7 @@ func _start_arrival() -> void:
 	_arrive_wait = ARRIVE_STEP_OFF
 	var hull := _boats[0]
 	hull.moored = true
-	hull.arrive_from(Iso.basin_point(Iso.basin_angle(hull.dock), ARRIVE_OUT))
+	hull.arrive_from(_arrival_berth(hull))
 	# Standing where the boat comes alongside, out of sight until they step off it. The
 	# berth itself is water, and `stand_at` would walk them off it to the nearest dry tile
 	# — which is inland, so the pair appeared halfway up the island instead of on its beach.
@@ -3018,6 +3022,34 @@ func _start_arrival() -> void:
 		dog.visible = false
 		dog.doze(true, false)
 	_hold_the_angler()
+
+
+## Where the door is along the hut's left front face (the +y face, the one drawn on the
+## picture's left half), as a share of the half-footprint from the middle: `SHED_DOOR` is
+## columns 0.22-0.37 of the picture, whose near corner is at 0.5, so its middle is 0.4 of the
+## face in from that corner — 0.2 of the half-width past the middle.
+const DOOR_ALONG := 0.2
+## How far in front of the wall the angler stops to read the note, in tiles.
+const DOOR_STAND := 0.45
+
+
+## The spot in front of the hut's door (2026-09-24): the arrival leads the angler here, where
+## the note is pinned beside the door.
+func _before_the_door() -> Vector2:
+	var mid := Iso.shed_centre()
+	return Vector2(
+		mid.x + Iso.SHED_FOOT.x * DOOR_ALONG, mid.y + Iso.SHED_FOOT.y + DOOR_STAND
+	)
+
+
+## Where the arriving hull sets off from: the plastic yard's berth, out on the water
+## (2026-09-24). A point off the basin put the hull under way across the forest and the
+## beach before it reached the lake. Off the lake only when there are no yards.
+func _arrival_berth(hull: Boat) -> Vector2:
+	for stop: Dropoff in _dropoffs:
+		if stop.kind == TrashDef.Kind.PLASTIC:
+			return stop.berth
+	return Iso.basin_point(Iso.basin_angle(hull.dock), ARRIVE_OUT)
 
 
 ## The beach on the side a berth is: the island's own ring, taken in a little. Measured off
@@ -3045,11 +3077,7 @@ func _arrival_step() -> void:
 				dog.tile_pos = _ashore_of(_boats[0].dock)
 				dog.visible = true
 				dog.doze(false)
-			var mid := Iso.shed_centre()
-			_angler.walk_to = Vector2(
-				mid.x + SHOP_RANGE * ARRIVE_AT_SHED * 0.7,
-				mid.y + SHOP_RANGE * ARRIVE_AT_SHED * 0.7
-			)
+			_angler.walk_to = _before_the_door()
 			_arrive = Arrive.WALKING
 			_arrive_wait = ARRIVE_READ
 		Arrive.WALKING:
@@ -3197,28 +3225,44 @@ func _decor_tour_step(delta: float) -> void:
 			else:
 				_tour_card.show_card(_skin.shed_box(), DECOR_HINT)
 		DecorTour.PLANK:
-			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, DECOR_PLANK, 1, DECOR_TOUR_CARDS)
+			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, DECOR_PLANK, 1, DECOR_TOUR_CARDS, true)
 		DecorTour.PLANK_WAIT, DecorTour.WASHING:
 			if _shed_open:
 				_tour_card.show_card(room.call(_room.wash_plank_box()))
 			else:
 				_tour_card.show_card(off)
 		DecorTour.LIST:
-			if _wash_open:
-				_tour_card.show_card(_wash_list_box(), DECOR_LIST, 2, DECOR_TOUR_CARDS)
+			# A click on a find in the list puts it on the stand, and the stand's card is up
+			# over it (2026-09-24): the click is the step, not a way past it.
+			if _wash_open and _wash.stand().state != WashStand.State.EMPTY:
+				_decor_tour = DecorTour.STAND
+			elif _wash_open:
+				_tour_card.show_card(_wash_list_box(), DECOR_LIST, 2, DECOR_TOUR_CARDS, true)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.STAND:
-			if _wash_open:
+			if _wash_open and _decor_stand_from < 0.0:
+				_decor_stand_from = _wash.stand().share_clean()
+			if _wash_open and _wash.stand().share_clean() > _decor_stand_from + DECOR_SPRAYED:
+				_decor_tour = DecorTour.WASHING
+			elif _wash_open:
 				var words := DECOR_STAND_PAD % Binds.shown(&"cast", true) if pad else DECOR_STAND
-				_tour_card.show_card(_wash_stand_box(), words, 3, DECOR_TOUR_CARDS)
+				_tour_card.show_card(_wash_stand_box(), words, 3, DECOR_TOUR_CARDS, true)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.SHELF:
 			var words := DECOR_SHELF % Binds.shown(&"shed_rotate", false)
 			if pad:
 				words = DECOR_SHELF_PAD % ["A", Binds.shown(&"shed_rotate", true)]
-			_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 4, DECOR_TOUR_CARDS)
+			# A piece put down on the floor is the step done: the room's card follows.
+			if _decor_tour_placed < 0:
+				_decor_tour_placed = _room.decor.size()
+			if _shed_open and _room.carrying.is_empty() and _room.decor.size() > _decor_tour_placed:
+				_decor_tour = DecorTour.ROOM
+			elif _shed_open and not _room.carrying.is_empty():
+				_tour_card.show_card(off)
+			else:
+				_tour_card.show_card(room.call(_room.shelf_box()) if _shed_open else off, words, 4, DECOR_TOUR_CARDS, true)
 		DecorTour.ROOM:
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
@@ -5874,11 +5918,45 @@ func _draw_shed() -> void:
 		# of the picture is a straight cut, and blades standing along it are what stop the
 		# hut reading as a sticker on the lawn.
 		_shed_grass(picture).over(_island)
+		if not _intro_done:
+			_draw_door_note(picture)
 		# Over the hut, not over the tile: the two are not the same point.
 		_draw_shed_lamp(feet)
 		return
 
 	_draw_shed_blocked(at)
+
+
+## Where the note hangs on the hut's picture: across (a share of its width, just right of the
+## door, which ends at 0.37) and up (a share of its height above the wall's foot there).
+const NOTE_ACROSS := 0.41
+const NOTE_UP := 0.2
+## The note's size in art pixels, before the wall's slope shears it.
+const NOTE_CELLS := Vector2i(5, 6)
+
+
+## The letter pinned beside the door, on a new game until it has been read (2026-09-24):
+## a sheet of the letter's paper laid on the left front wall, sheared to its 2:1 slope, with
+## a few ruled lines and a pin. Whole art pixels, so it sits on the hut's own grain.
+func _draw_door_note(picture: Rect2) -> void:
+	var px := ART_PIXEL
+	# The wall's foot runs up to the left at the diamond's slope from the near corner, which
+	# is the picture's bottom middle.
+	var x := picture.position.x + picture.size.x * NOTE_ACROSS
+	var foot := picture.end.y - (picture.get_center().x - x) * 0.5
+	var at := Vector2(snappedf(x, px), snappedf(foot - picture.size.y * NOTE_UP, px))
+	for i in NOTE_CELLS.x:
+		# Each column one pixel higher every other one: the wall's slope, down to the right.
+		var col := at + Vector2(i * px, floorf(i * 0.5) * px)
+		for j in NOTE_CELLS.y:
+			var ink := Style.PAPER
+			if i == 0 or j == NOTE_CELLS.y - 1:
+				ink = Style.PAPER_EDGE
+			elif j % 2 == 1 and i < NOTE_CELLS.x - 1 and j > 1:
+				ink = Style.PAPER_RULE
+			_island.draw_rect(Rect2(col + Vector2(0.0, (j - NOTE_CELLS.y) * px), Vector2(px, px)), ink)
+	var pin := at + Vector2(floorf(NOTE_CELLS.x * 0.5) * px, (1 - NOTE_CELLS.y) * px)
+	_island.draw_rect(Rect2(pin, Vector2(px, px)), Color(0.72, 0.18, 0.16))
 
 
 ## The node the hut's swept shadow lives on: a child of the island's canvas, drawn behind the

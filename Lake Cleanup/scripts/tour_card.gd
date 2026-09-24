@@ -32,6 +32,11 @@ var count := 0
 var total := 0
 var pad := false
 
+## Whether a click on the lit target reaches what is under it (2026-09-24, Richard: a
+## click on the button a card points at should do what the button does). The card's own
+## paper still takes its clicks.
+var through := false
+var _card := Rect2()
 var _skip := Rect2()
 var _clock := 0.0
 var _mouse: Texture2D = _load("mouse_click")
@@ -49,7 +54,9 @@ func _ready() -> void:
 
 
 ## Put a card up, or a hint (`at` 0), or a pointer (no words); an empty target takes it down.
-func show_card(at: Rect2, words: String = "", place: int = 0, of: int = 0) -> void:
+func show_card(at: Rect2, words: String = "", place: int = 0, of: int = 0,
+		pass_through: bool = false) -> void:
+	through = pass_through
 	target = at
 	text = words
 	count = place
@@ -75,6 +82,13 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
+## Not here over the lit target of a pass-through card, so the GUI picks what is under it.
+func _has_point(point: Vector2) -> bool:
+	if through and is_card() and target.has_point(point) and not _card.has_point(point):
+		return false
+	return Rect2(Vector2.ZERO, size).has_point(point)
+
+
 func _gui_input(event: InputEvent) -> void:
 	if not is_card():
 		return
@@ -91,6 +105,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	_skip = Rect2()
+	_card = Rect2()
 	if target.size.x <= 0.0:
 		return
 	var view := Rect2(Vector2.ZERO, size)
@@ -126,6 +141,7 @@ func _draw() -> void:
 	card.position.y = clampf(card.position.y, 4.0, view.size.y - card.size.y - 4.0)
 	card.position = card.position.round()
 	card.size = card.size.round()
+	_card = card.grow(FirstSteps.NOTE_RIM + 1.0)
 	draw_rect(card.grow(FirstSteps.NOTE_RIM + 1.0), FirstSteps.NOTE_OUTER, true)
 	draw_rect(card, Style.PAPER, true)
 	draw_rect(card.grow(-1.0), Style.PAPER_EDGE, false, FirstSteps.NOTE_RIM)

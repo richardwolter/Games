@@ -7381,13 +7381,22 @@ func _stage_letter() -> void:
 	_check(Letter.CAPTION_INKS[&"ok"].g > Letter.CAPTION_INKS[&"ok"].r
 		and Letter.CAPTION_INKS[&"no"].r > Letter.CAPTION_INKS[&"no"].g,
 		"green reads green and red reads red", "")
-	# Heading over the sentence over the pictures, on every card.
+	# Heading over the sentence over the pictures, on every card but the welcome, whose lake
+	# stands under the greeting and over its paragraphs (2026-09-24).
 	var inside_first := (letter.get(&"_sheet") as Rect2).grow(-Letter.SHEET_PAD)
+	var welcome_art := letter.call(&"_art_box", inside_first) as Rect2
+	_check(not (Letter.CARDS[0]["snaps"] as Array).is_empty()
+		and welcome_art.end.y <= float(letter.call(&"_head_base", inside_first)),
+		"the welcome's lake stands under the greeting and over its words", "")
+	letter.page = 1
+	letter.call(&"_lay_out")
 	var head_at := float(letter.call(&"_head_base", inside_first))
 	var art_first := letter.call(&"_art_box", inside_first) as Rect2
 	_check(head_at < float(letter.call(&"_text_foot", inside_first))
 		and float(letter.call(&"_text_foot", inside_first)) <= art_first.position.y,
 		"the heading stands over the words and the words over the pictures", "")
+	letter.page = 0
+	letter.call(&"_lay_out")
 
 	# The pager: a dot a card, clamped at both ends rather than wrapping round.
 	_check((letter.get(&"_dots") as Array).size() == Letter.CARDS.size(),
@@ -7426,10 +7435,12 @@ func _stage_letter() -> void:
 	_check(absf(door_mid - sheet_mid) <= 1.0
 		and way_out.position.y >= inside_last.end.y - Letter.PAGER_TALL - 1.0,
 		"centred in the pager's row", "door %.0f sheet %.0f" % [door_mid, sheet_mid])
-	_check(dots.is_empty() and (letter.get(&"_back") as Rect2).size == Vector2.ZERO
+	_check(dots.is_empty() and (letter.get(&"_back") as Rect2).size != Vector2.ZERO
 		and (letter.get(&"_on") as Rect2).size == Vector2.ZERO,
-		"with no dots and no arrows: the door is the one way on", "%d dots" % dots.size())
-	letter.page = 0
+		"with no dots and no forward arrow, but the way back", "%d dots" % dots.size())
+	letter.turn(-1)
+	_check(letter.page == Letter.CARDS.size() - 2, "and the last card pages back", "%d" % letter.page)
+	letter.page = 1
 	letter.call(&"_lay_out")
 	var art_early := letter.call(&"_art_box", sheet.grow(-Letter.SHEET_PAD)) as Rect2
 	letter.page = Letter.CARDS.size() - 1
@@ -7481,7 +7492,7 @@ func _stage_letter() -> void:
 		var pinned: Array = card["snaps"]
 		if pinned.is_empty() or pinned.size() > Letter.SNAPS_MOST:
 			crowded.append(String(card["head"]))
-	_check(crowded == [""], "one to three to a card, bar the welcome, which has words alone",
+	_check(crowded.is_empty(), "one to three to a card, the welcome's lake included",
 		", ".join(crowded))
 	var welcome: Array = (letter.call(&"_rows", Letter.CARDS[0]) as Dictionary).get("rows", [])
 	_check(welcome.size() >= 3 and bool(welcome[welcome.size() - 1]["para"]),

@@ -1449,6 +1449,33 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
   `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
   cards following the rooms, the free wash, the walk back into the shed and the flag.
 
+### Onboarding Fixes (2026-09-24, `/grill-me` with Richard)
+- **The boat sets off from the plastic pier's berth** (`Lake._arrival_berth`), moored there
+  while the glide lands, and sails its course home. It used to start off the basin and
+  cross the forest and the beach. The crossing is longer; accepted.
+- **The angler is led to the shed door** (`_before_the_door`, `DOOR_ALONG` 0.2 of the
+  half-footprint along the hut's left front face, `DOOR_STAND` 0.45 tiles out), and a
+  **paper note is pinned beside the door** (`_draw_door_note`, `NOTE_ACROSS`/`NOTE_UP`,
+  whole art pixels sheared to the wall's slope) until `intro_done`. The cards still open
+  by themselves on arrival; the note is gone once they close. `ARRIVE_AT_SHED` is retired.
+- **The Welcome card shows the whole lake** (`lake_whole`, the fresh lake at the far stop,
+  shot first by `shot_letter_art`), under the greeting and over the paragraphs
+  (`LETTER_ART_TALL` 150; the card's `rows` 6 to 5).
+- **The last card keeps its back arrow**; still no dots and no forward arrow.
+- **The recycle note stopped trembling** (`FirstSteps._on_screen`): it was rounded to whole
+  canvas pixels while the world is snapped to whole screen pixels, so at a 1.5 stretch it
+  stepped against the box on alternate frames of a walk. Rounded on the window's grid now.
+- **A tour card's lit target takes the click** (`TourCard.through`, `_has_point`): on the
+  plank, list, stand and shelf cards a click on what is lit does what it does and moves
+  the tour on; Continue and the rest of the screen only advance, as before. The room's
+  card stays blocking. Picking a find in the list puts it on the stand and the stand's
+  card comes up over it; the stand's card gives way once `DECOR_SPRAYED` of the coat is
+  off; the shelf's card gives way while a piece is in hand and the room's follows when it
+  is put down.
+- **A piece clicked out of the shelf stays in hand** (`ShedRoom._gui_input`): let go over
+  the shelf, the next press puts it down. A drag onto the floor still drops where it is
+  let go. For every player, not only in the tour.
+
 ### The Board Reads "How to Play" (2026-09-22, `/grill-me` with Richard)
 A wording and layout pass over the onboarding cards, off Richard's first-time-player notes.
 `scripts/letter.gd`, `tools/shot_letter_art.gd`; nothing in the arrival moved.

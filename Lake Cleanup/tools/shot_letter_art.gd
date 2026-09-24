@@ -55,6 +55,9 @@ const SHED_LAYOUT := [
 	[&"decor_loveseat", 34, 8], [&"decor_fireplace", 30, 2],
 ]
 const ROW_CONTEXT := 38.0
+## The whole lake from the far stop, in window pixels: its piers and a rim of bank.
+const LAKE_CROP := Vector2i(1900, 1000)
+var _pre := 0
 
 var _main: Node2D
 var _net: CastNet
@@ -113,6 +116,26 @@ func _physics_process(delta: float) -> void:
 	if _age < HOLD:
 		return
 	_age = 0.0
+	# The welcome card's still first (2026-09-24): the fresh lake whole, from the far stop,
+	# before any pose thins or moves anything.
+	if _pre == 0:
+		_main.set(&"_in_menu", false)
+		_net = _main.get(&"_net")
+		_angler = _main.get(&"_angler")
+		_camera = _main.get(&"_camera")
+		_hud(false)
+		_main.call(&"_zoom_by", 0.001)
+		_look = Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+		_pre = 1
+		return
+	if _pre == 1:
+		_say("lake_whole at zoom %.3f" % float(_main.get(&"_view_zoom")))
+		_crop_world("lake_whole", _look, LAKE_CROP)
+		_look = Vector2.INF
+		_main.set(&"_panning", false)
+		_main.set(&"_pan", Vector2.ZERO)
+		_pre = 2
+		return
 	match _step:
 		0:
 			_net = _main.get(&"_net")
