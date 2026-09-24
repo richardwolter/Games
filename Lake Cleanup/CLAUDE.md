@@ -2305,6 +2305,10 @@ the whole job.
   and a pass on 6-20 px sprites adds noise, not detail; and the hut rebuilt at 2.0 (muddier).
   **The real gap is pixels per object** (a can is 6x9, the crate 32x33, the angler 44 tall at
   1.0), which only repainting at a bigger source size would close. The rubbish stays as it is.
+- **Then Richard repainted the hut by hand** (same day): `art_source/shed_paint.png` is the
+  painted source and `assets/shed.png` a straight copy of it. **`recolor_shed.py` no longer
+  writes the asset** unless given `--overwrite-painted` (or `--out` for a trial); its
+  functions are still imported by the pier, nozzle and downres builders.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.

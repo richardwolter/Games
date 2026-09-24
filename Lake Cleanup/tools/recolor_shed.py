@@ -216,6 +216,11 @@ def main():
         source = Path(sys.argv[sys.argv.index("--source") + 1])
     if "--out" in sys.argv:
         out_path = Path(sys.argv[sys.argv.index("--out") + 1])
+    elif "--overwrite-painted" not in sys.argv:
+        # 2026-09-24: assets/shed.png is Richard's hand repaint of this script's output
+        # (art_source/shed_paint.png is the painted source). A plain run would throw it away.
+        sys.exit("assets/shed.png is hand-painted now (art_source/shed_paint.png); "
+                 "pass --out for a trial or --overwrite-painted to replace it")
     image = Image.open(source).convert("RGBA")
     w, h = image.size
     px = image.load()
