@@ -2313,7 +2313,10 @@ the whole job.
   brown read as no outline): every silhouette pixel of `shed_paint.png`/`shed.png` and
   `Recycle_Box.png` that was (48,37,33) or the rim's (76,29,29). Done on the assets;
   `tools/trim_box_sides.py` would put the box's brown sides back if re-run. The piers' boxes
-  are baked into `piers.png` and keep the brown until `build_piers.py` is re-run.
+  were re-baked with it (`build_piers.py` reads the box's edge colour for the pier's whole
+  silhouette, so the jetties' outline went near-black too). **The island crate draws at
+  2.0** (`Yard.ART_SCALE`, was 2.5), so its outline is one art pixel like everyone else's;
+  the crate is 20% smaller and its footprint follows.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.

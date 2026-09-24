@@ -25,7 +25,9 @@ const MAX_DRAWN := 24
 ## centred on row 8, and it stands on a matching diamond centred on row 24, so the walls are
 ## 16 art pixels tall and the bottom point is the last row.
 const ART := "res://assets/Recycle_Box.png"
-const ART_SCALE := 2.5
+## 2.0 (2026-09-24, Richard): at 2.5 its one-pixel outline drew a quarter thicker than every
+## other outline in the game. The crate is 20% smaller with it; footprint and drop spots follow.
+const ART_SCALE := 2.0
 const ART_TOP := 8.0
 const ART_GROUND := 24.0
 
@@ -65,7 +67,7 @@ const SHADOW_DROP := 3.0
 const SKIRT_SEED := 9051
 
 ## How tall the crate's blades stand, in art pixels — shorter than the hem's own default.
-## The crate is drawn at 2.5, so one of its painted pixels is two and a half of the game's,
+## The crate was drawn at 2.5 when this was set, so one painted pixel was two and a half of the game's,
 ## and a blade sized for the shed stands a third of the way up this picture. At the default
 ## the tufts on the lower-left edge reached the recycle mark painted just above it.
 const SKIRT_BLADES := Vector2i(1, 2)
