@@ -2831,10 +2831,12 @@ func _stage_art() -> void:
 			"the hut's footprint is the size the hut is drawn",
 			"%.2f x %.2f tiles drawn against %s" % [corner.x, -corner.y, str(Iso.SHED_FOOT)]
 		)
+		# (The deepest row is the one-pixel outline recolor_shed.py rings the hut with; the
+		# walls end the row above it, so `deep` is used where it used to be `deep + 1`.)
 		# And it is in the same place: the near corner of those walls, straight off the
 		# picture, against the line the walking rule stops at.
 		var stands := Iso.shed_centre()
-		var drawn := Iso.tile_to_world(stands.x, stands.y).y 			+ (float(deep + 1) - float(hut.get_height()) * (1.0 - Iso.SHED_ART_GROUND)) * scale
+		var drawn := Iso.tile_to_world(stands.x, stands.y).y 			+ (float(deep) - float(hut.get_height()) * (1.0 - Iso.SHED_ART_GROUND)) * scale
 		var front: float = _main.call(&"_shed_front")
 		_check(absf(drawn - front) < 2.0,
 			"and its near wall is where the walking rule says it is",

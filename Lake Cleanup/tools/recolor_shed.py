@@ -187,6 +187,11 @@ STRIP_SOFT = True
 ## side: the outermost wall pixel of a row whose neighbours above and below start at the
 ## same column. The sloping bottom edges keep the whole border.
 SIDE_TRIM = 1
+## A one-pixel ring in the box's edge colour laid round the whole silhouette, outside it,
+## roof included (2026-09-24, Richard, picked off tools/detail_sample/scene_compare.png:
+## the hut read softer than the crate beside it). The picture grows a pixel on every side,
+## so Iso.SHED_TALL and Iso.SHED_ART_GROUND were moved with it.
+OUTLINE = True
 
 
 def ramp_at(bins, t):
@@ -267,6 +272,21 @@ def main():
                     op[run[y], y] = (0, 0, 0, 0)
                     trimmed += 1
     print("sides: %d pixels cleared" % trimmed)
+    if OUTLINE:
+        ringed = Image.new("RGBA", (w + 2, h + 2))
+        ringed.paste(out, (1, 1))
+        rp = ringed.load()
+        ring = []
+        for y in range(h + 2):
+            for x in range(w + 2):
+                if rp[x, y][3] == 0 and any(
+                        0 <= x + dx < w + 2 and 0 <= y + dy < h + 2 and rp[x + dx, y + dy][3] > 0
+                        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    ring.append((x, y))
+        for x, y in ring:
+            rp[x, y] = (edge[0], edge[1], edge[2], 255)
+        out = ringed
+        print("outline: %d pixels" % len(ring))
     out.save(out_path)
     print("border: %d pixels in %s" % (bordered, edge))
     counts = {}

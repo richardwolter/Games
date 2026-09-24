@@ -113,7 +113,10 @@ static func shore_fraction(tx: float, ty: float) -> float:
 ## did. The footprint re-measured at the new size is within a few hundredths of the values
 ## below and they are left.
 const SHED_FOOT := Vector2(1.15, 0.83)
-const SHED_TALL := 141.4
+## 144.2 (2026-09-24): the recolour lays a one-pixel outline round the hut, so the picture
+## is 103 tall; same 1.4 grain, and SHED_STAND / SHED_ART_GROUND move by that pixel so the
+## walls stand exactly where they did.
+const SHED_TALL := 144.2
 
 ## Where the hut's picture is laid, and where inside that picture the walls stand: the bottom
 ## row of `shed.png` goes this far below the island's middle in tile heights, and the walls'
@@ -123,8 +126,8 @@ const SHED_TALL := 141.4
 ## them into the place the hut *is* — and the lake that draws it and the walkers that are
 ## kept out of it must agree on that or the building is in two places. They were in `lake.gd`
 ## and only the drawing used them, which is exactly how the two drifted apart.
-const SHED_STAND := 0.35
-const SHED_ART_GROUND := 0.233
+const SHED_STAND := 0.39375
+const SHED_ART_GROUND := 0.2382
 
 
 ## Where the hut stands, in tile coordinates: the middle of the diamond its walls' feet make.

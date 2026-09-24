@@ -2295,6 +2295,16 @@ the whole job.
   vertical runs of the silhouette are sides; the sloping edges keep their line. Run it with the psd-extract
   venv python from the project root; **re-run after any re-cut**, copying the fresh cut to
   `shed_tan.png` first. `--mask out.png` writes the classification for checking.
+- **The hut wears a one-pixel outline, roof and all** (2026-09-24, `/grill-me` with Richard: the
+  hut and the rubbish read as lower detail than the crate and the angler). `recolor_shed.py`
+  `OUTLINE` rings the whole silhouette outside it in the box's edge colour, so `shed.png` is
+  105x103; `SHED_TALL` 144.2, `SHED_STAND` 0.39375 and `SHED_ART_GROUND` 0.2382 moved by that
+  pixel so the walls stand where they did. **Tried and rejected the same day**, off a
+  before/after sheet: a rule pass on the rubbish (lit edge, shade edge, per-material texture)
+  and Scale2x rubbish at the angler's 1.0 grain — the pieces are already outlined and shaded
+  and a pass on 6-20 px sprites adds noise, not detail; and the hut rebuilt at 2.0 (muddier).
+  **The real gap is pixels per object** (a can is 6x9, the crate 32x33, the angler 44 tall at
+  1.0), which only repainting at a bigger source size would close. The rubbish stays as it is.
 - Both need the art: a hem is measured off an `Image`, so the blocked-in fallbacks (no sheet)
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
