@@ -28,6 +28,16 @@ const KEEP_NEAR := 4.5
 ## Frames the walk-out starts before the first kept frame, so the angler is already
 ## striding when the trailer fades in.
 const WALK_LEAD := 4
+## The find on the wash stand, how long one sweep of the jet takes, and how many sweeps
+## it takes to work down the picture.
+const WASH_PIECE := "decor_sofa"
+const WASH_SWEEP := 0.9
+const WASH_ROWS := 7.0
+## Frames a posed shot is given before its first kept frame, where the default is short:
+## the wildlife has to arrive.
+const SETTLE_LONG := {}
+## Kept frames the wildlife shot sends a brood in on.
+const WILD_BROODS := [0, 45, 100, 160, 230]
 
 ## Where the angler stands for a cast, in tiles off the island's middle, and which way the
 ## throw goes. Screen-right is +x -y; down the screen is +x +y.
@@ -112,31 +122,55 @@ func _plan() -> void:
 			_follow = _main.get(&"_boats")[0],
 		func(_f: int) -> void:
 			pass],
-		# The same run from the far end: the whole lake with the fleet working it.
-		["ferries_wide", 12.0, func() -> void:
-			_fleet()
-			_zoom(1)
+		# The wash room: the sofa on the stand, sprayed at real speed, a raster down the
+		# picture that never leaves it and never finishes (2026-09-24, Richard's pick).
+		["wash", 6.0, func() -> void:
 			_follow = null
-			_hold = Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y),
-		func(_f: int) -> void:
-			pass],
-		# Four more casts, each from another bank, further and wider, over a lake that is
-		# cleaner each time. The last is the gold one with its double.
-		["cast_2", 5.0, func() -> void:
-			_zoom(6)
+			_hold = Vector2.INF
+			var waiting: Array = _main.get(&"unwashed")
+			waiting.clear()
+			waiting.append(WASH_PIECE)
+			_main.set(&"sludge", 1000.0)
+			(_main.get_node(^"HUD") as CanvasLayer).visible = true
+			_main.call(&"_set_wash", true)
+			_hide_hud_buttons()
+			var room: WashRoom = _main.get(&"_wash")
+			# The tray and the cross are the room's UI, not the washing (Richard, 2026-09-24).
+			(room.get(&"_tray") as CanvasItem).visible = false
+			(room.get(&"_close") as CanvasItem).visible = false
+			_say("  wash: picked %s: %s" % [WASH_PIECE, str(room.pick(StringName(WASH_PIECE)))]),
+		func(f: int) -> void:
+			var room: WashRoom = _main.get(&"_wash")
+			if room == null or f < SETTLE - 20:
+				return
+			_hide_hud_buttons()
+			var box := room.stand().piece_box()
+			var t := float(f - SETTLE + 20) / 60.0
+			# Back and forth across the picture, a row every sweep, working down it.
+			var sweep := t / WASH_SWEEP
+			var across := absf(fmod(sweep, 2.0) - 1.0)
+			var down := clampf(0.12 + 0.8 * t / (WASH_SWEEP * WASH_ROWS), 0.12, 0.92)
+			room.stand().spray(box.position + box.size * Vector2(0.1 + 0.8 * across, down), true)
+			if f % 60 == 0:
+				_say("  wash %d: clean %.2f" % [f - SETTLE, room.stand().share_clean()])],
+		# The pigeons: a few fly in and sit on the rubbish out along one bank, the net comes
+		# down on them, and the head pops in with what they paid. Forced: the pop is a coin
+		# toss in play (`Lake.POP_ODDS`), rolled here off a seed that comes up heads.
+		["pigeon", 8.0, func() -> void:
+			_zoom(5)
 			_main.set(&"net_width_level", 4)
 			_stand(Vector2(3.6, -3.6), ACROSS)
-			_thin(0.25, [_angler.tile_pos + ACROSS.normalized() * 6.0])
-			# The dog beside the angler, sent for a stick out where the net is going.
-			var dog: Node2D = _main.get(&"_dog")
-			dog.set(&"tile_pos", _angler.tile_pos + Vector2(0.7, -0.7))
+			_thin(0.3, [_angler.tile_pos + ACROSS.normalized() * 6.0])
+			_perch_birds(ACROSS, 6.0)
 			_free(),
 		func(f: int) -> void:
-			if f == SETTLE - 10:
-				_send_dogs([_angler.tile_pos + ACROSS.normalized() * 5.0], 1, false)
-			if f == SETTLE + 36:
-				_cast(ACROSS, 6.0)],
+			if f == SETTLE + 150:
+				_force_pop()
+				_cast(ACROSS, 6.0)
+			if f == SETTLE + 150 + 40:
+				_say("  pigeon: %d caught" % int(_main.get(&"birds_caught")))],
 		["cast_3", 5.0, func() -> void:
+			_hide_boats()
 			_zoom(6)
 			_main.set(&"net_width_level", 9)
 			_stand(Vector2(-3.6, 3.6), LEFT)
@@ -145,16 +179,8 @@ func _plan() -> void:
 		func(f: int) -> void:
 			if f == SETTLE + 36:
 				_cast(LEFT, 8.0)],
-		["cast_4", 5.0, func() -> void:
-			_zoom(6)
-			_main.set(&"net_width_level", 14)
-			_stand(Vector2(3.6, 3.6), DOWN)
-			_thin(0.7, [_angler.tile_pos + DOWN.normalized() * 10.0])
-			_free(),
-		func(f: int) -> void:
-			if f == SETTLE + 36:
-				_cast(DOWN, 10.0)],
 		["cast_5", 6.0, func() -> void:
+			_hide_boats()
 			_zoom(6)
 			_main.set(&"net_width_level", 20)
 			_stand(Vector2(3.6, -3.6), ACROSS)
@@ -166,6 +192,7 @@ func _plan() -> void:
 		# The pack on the east beach, well away from the box: idling, and running to the
 		# water for sticks.
 		["dogs", 12.0, func() -> void:
+			_hide_boats()
 			_follow = null
 			_stand(Vector2(3.4, -3.4), ACROSS)
 			_pack()
@@ -174,51 +201,42 @@ func _plan() -> void:
 		func(f: int) -> void:
 			if f == SETTLE - 10:
 				_send_dogs()],
-		# The furnished shed from Richard's own save, the angler walking about in it.
-		["shed", 8.0, func() -> void:
+		# The wildlife coming back (2026-09-24, Richard: "seen growing and coming into the
+		# scene, more frogs and ducks"). The lake is emptied before the shot, then flora and
+		# wildlife are wiped and handed a clean share that climbs over the kept frames, so the
+		# plants sprout on screen; extra frogs swim in to the shore in view, and broods fly in
+		# from a short way off and land in it.
+		["wildlife", 9.0, func() -> void:
 			_follow = null
-			_hold = Vector2.INF
-			_load_shed_save()
-			# A finished lake would put the farewell over the room: count it as already said.
-			_main.set(&"_farewell_shown", true)
-			_main.call(&"_set_shed", true)
-			(_main.get_node(^"HUD") as CanvasLayer).visible = true
-			(_main.get(&"_open_upgrades") as CanvasItem).visible = false
-			(_main.get(&"_open_settings") as CanvasItem).visible = false
-			var room: Control = _main.get(&"_room")
-			(room.get(&"_shelf") as CanvasItem).visible = false
-			(room.get(&"_close") as CanvasItem).visible = false,
+			_unpack()
+			_hide_boats()
+			_stand(Vector2(-2.0, 2.0), LEFT)
+			_thin(0.97, [], 0.0)
+			_zoom(4)
+			_hold = Iso.tile_to_world(Iso.ISLAND_CENTRE.x - 4.0, Iso.ISLAND_CENTRE.y + 5.0),
 		func(f: int) -> void:
-			# A stroll: right, down, left, up, a second each, then round again.
-			if f == SETTLE:
-				var room: Control = _main.get(&"_room")
-				var floor_box: Rect2 = room.call(&"_floor_rect")
-				var wall: float = room.call(&"_wall_tall")
-				var at := room.get_global_transform_with_canvas() * (floor_box.position - Vector2(0.0, wall))
-				var stretch: float = _main.call(&"_stretch")
-				_say("  shed room on screen: x %d y %d w %d h %d (window px)" % [
-					int(at.x * stretch), int(at.y * stretch),
-					int(floor_box.size.x * stretch), int((floor_box.size.y + wall) * stretch)])
-			# A cleaned lake says goodbye over the room; the goodbye is not in the shot.
-			var farewell: Node = _main.get(&"_farewell")
-			if farewell != null:
-				farewell.queue_free()
-				_main.call(&"_drop_farewell")
-			# Straight down the room until the sofa stops the walk, then right along it.
-			var room_now: Control = _main.get(&"_room")
-			var you: Vector2 = room_now.get(&"_you_at")
-			if f >= SETTLE and not _turned and _you_was != Vector2.INF and absf(you.y - _you_was.y) < 0.001:
-				_stuck += 1
-				if _stuck >= 4:
-					_turned = true
-					_say("  shed: turned right at %s on frame %d" % [str(you), f - SETTLE])
-			else:
-				_stuck = 0
-			_you_was = you
-			_walk_dir((&"walk_right" if _turned else &"walk_down") if f >= SETTLE else &"")
-			if f % 60 == 0:
-				var room: Control = _main.get(&"_room")
-				_say("  shed %d: you at %s" % [f - SETTLE, str(room.get(&"_you_at"))])],
+			var wild: Wildlife = _main.get(&"_wildlife")
+			var flora: Flora = _main.get(&"_flora")
+			var k := f - SETTLE
+			if k == -5:
+				flora.reset()
+				wild.reset()
+				wild.set(&"_brood_in", 1.0e9)
+			if k < -5:
+				return
+			if k % 15 == 0:
+				var ramp := clampf(0.05 + float(k) / 300.0, 0.05, 1.0)
+				flora.refresh(ramp)
+				wild.refresh(ramp, _main.get(&"_clean_tiles"))
+			if k >= 20 and k <= 320 and k % 12 == 0:
+				_frog_in_view(wild)
+			if k in WILD_BROODS:
+				_brood_in_view(wild)
+			if k % 120 == 0:
+				_say("  wildlife %d: frogs %d broods %d turtles %d" % [
+					k, wild.frog_count(), wild.brood_count(), wild.turtle_count()])],
+		# The furnished shed is not re-filmed (2026-09-24): the cut keeps the frames it has.
+		# To re-shoot it, put its entry back from git history (d. 2026-09-16).
 	]
 	var only := OS.get_environment("FILM_ONLY")
 	if only != "":
@@ -264,7 +282,7 @@ func _process(_delta: float) -> void:
 			if _net_was == CastNet.State.FLYING:
 				_say("  %s: net lands on kept frame %d" % [shot[0], _kept])
 		_net_was = _net.state
-	if _shot_frame >= SETTLE:
+	if _shot_frame >= _settle_of(shot[0]):
 		var image := get_viewport().get_texture().get_image()
 		image.save_jpg(ProjectSettings.globalize_path(OUT % [shot[0], _kept]), JPG_QUALITY)
 		_kept += 1
@@ -577,3 +595,100 @@ func _pack() -> void:
 		dog.set(&"tile_pos", Iso.ISLAND_CENTRE + Vector2(3.4, -3.4) + Vector2(0.9, 0.9) * float(i - 1))
 		dog.set(&"_state", 0)
 		dog.set(&"_mood_left", 0.5 + 0.7 * float(i))
+
+
+func _settle_of(name: String) -> int:
+	return int(SETTLE_LONG.get(name, SETTLE))
+
+
+## The HUD is up for the wash room, which lives on its layer; its buttons are not in the shot.
+func _hide_hud_buttons() -> void:
+	for key in [&"_open_upgrades", &"_open_settings", &"_free_camera"]:
+		var node: CanvasItem = _main.get(key)
+		if node != null:
+			node.visible = false
+
+
+## A few birds out along `dir`, flying in from a short way off so the landing is in the shot
+## (the flock's own birds come from nine hundred pixels out, six seconds away).
+func _perch_birds(dir: Vector2, tiles: float) -> void:
+	var flock: Flock = _main.get(&"_flock")
+	flock.birds.clear()
+	var centre := _angler.tile_pos + dir.normalized() * tiles
+	var sent := 0
+	for off in [Vector2.ZERO, Vector2(0.9, 0.5), Vector2(-0.6, 0.8), Vector2(0.4, -0.9)]:
+		var tile := Vector2i((centre + off).round())
+		var index := tile.y * Iso.COLS + tile.x
+		if index < 0 or index >= _grid.stacks.size() or _grid.stacks[index].is_empty():
+			continue
+		if not flock.add_bird(index):
+			continue
+		var bird: Dictionary = flock.birds[flock.birds.size() - 1]
+		var to: Vector2 = bird["to"]
+		var from := to + Vector2(-260.0 - 60.0 * sent, -140.0 + 50.0 * sent)
+		bird["at"] = from
+		bird["from"] = from
+		bird["span"] = from.distance_to(to)
+		bird["facing"] = Flock.facing_of(from, to)
+		bird["rest"] = 60.0
+		sent += 1
+	_say("  pigeons sent: %d" % sent)
+
+
+## Every head roll in the next few catches comes up heads: a seed whose first draws are all
+## under `Lake.POP_ODDS`, found by trying seeds.
+func _force_pop() -> void:
+	var rng := RandomNumberGenerator.new()
+	for seed in 10000:
+		rng.seed = seed
+		var heads := true
+		for i in 4:
+			if rng.randf() >= Lake.POP_ODDS:
+				heads = false
+		if heads:
+			var pop_rng: RandomNumberGenerator = _main.get(&"_pop_rng")
+			pop_rng.seed = seed
+			return
+
+
+## The fleet parked at the island blocks the casts' view; the ferries' shot is where it works.
+func _hide_boats() -> void:
+	for boat: Node2D in _main.get(&"_boats"):
+		boat.visible = false
+
+
+## The camera's middle and a radius the wildlife shot's arrivals are kept inside.
+func _view_spot(reach: float) -> Vector2:
+	return _hold + Vector2(randf_range(-1.0, 1.0), randf_range(-0.6, 0.6)) * reach
+
+
+## One more frog, swimming in to a stretch of shore that is in the shot.
+func _frog_in_view(wild: Wildlife) -> void:
+	var shore: Array = wild.get(&"_shore")
+	var near: Array = shore.filter(func(s: Dictionary) -> bool:
+		return (s["land"] as Vector2).distance_to(_hold) < 380.0)
+	if near.is_empty():
+		return
+	var frogs: Array = wild.get(&"_frogs")
+	frogs.append(wild.call(&"_new_frog", near[_rng.randi_range(0, near.size() - 1)]))
+
+
+## A brood flying in from a short way off to water in the shot.
+func _brood_in_view(wild: Wildlife) -> void:
+	for attempt in 20:
+		var to := _view_spot(340.0)
+		if not wild.call(&"_swimmable", to):
+			continue
+		var b: Dictionary = wild.call(&"_new_brood")
+		if b.is_empty():
+			return
+		var from := to + Vector2(-1.0 if _rng.randf() < 0.5 else 1.0, -0.4).normalized() * 520.0
+		b["from"] = from
+		b["at"] = from
+		b["to"] = to
+		b["goal"] = to
+		b["facing"] = Flock.facing_of(from, to)
+		for kid: Dictionary in b["kids"]:
+			kid["at"] = from
+		(wild.get(&"_broods") as Array).append(b)
+		return
