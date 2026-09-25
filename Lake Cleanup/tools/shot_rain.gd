@@ -64,6 +64,7 @@ func _physics_process(_delta: float) -> void:
 		400:
 			puddles.wet = 1.0
 			_shot("far")
+			puddles.sand_wet = 1.0
 			_main.set(&"_view_zoom", 1.5)
 		520:
 			_shot("near")

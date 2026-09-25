@@ -3247,6 +3247,13 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   rain on one rings it. **Reflections**: a clipped child (`clip_children`) draws the hut, the
   pump, the angler and the dogs upside down about their feet (`Angler.reflect_on`,
   `Dog.reflect_on`), only where a puddle is. Nothing saved.
+- **Grass only, one colour, three** (same day, Richard): puddles lie on the lawn
+  (`Iso.on_lawn`), `COUNT` 3, drawn in `water_clean_light` alone at 0.85.
+- **The sand soaks instead** (`Puddles.sand_wet`, `SOAK` 25 s, `SAND_DRY` 90 s): pushed to
+  every `Ground` through `set_wet`, where `ground.gdshader`'s `wet_sand` multiplies sand
+  texels by `wet_ink` and leaves the lawn alone. Before it catches up, every drop on sand
+  leaves a dark whole-pixel spot (`MARK_LIFE` 7 s, `MARKS_MOST` 600) that fades as the
+  beach darkens under it.
 - **Lightning**: in a shower over `FLASH_FROM`, a roll every `FLASH_GAP` at `FLASH_ODDS`; two
   pulses, bright then an echo, and thunder `THUNDER_AFTER` later. No bolt, by decision.
 - **Elsewhere**: the wash room's backdrop rains and rings its lake off `Weather.now` and

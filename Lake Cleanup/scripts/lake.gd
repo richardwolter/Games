@@ -5428,6 +5428,7 @@ func _start_weather() -> void:
 	_puddles.crate_tile = _dog.crate_tile
 	_puddles.statics = _weather_statics
 	_puddles.walkers = _weather_walkers
+	_puddles.grounds = _grounds
 	add_child(_puddles)
 	_weather = Weather.new()
 	_weather.name = &"Weather"

@@ -267,6 +267,12 @@ var lip: bool = LIP
 var tuft_share: float = TUFT_SHARE
 var tuft_reach: float = TUFT_REACH
 
+## How wet the sand is, 0 to 1 (`Puddles`, while it rains). The shader darkens sand by it.
+func set_wet(amount: float) -> void:
+	if _material != null:
+		_material.set_shader_parameter(&"wet_sand", amount)
+
+
 ## The polygon the shader draws the ground on, and its material.
 var _sheet: Polygon2D
 var _material: ShaderMaterial

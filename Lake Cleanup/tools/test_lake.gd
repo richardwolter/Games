@@ -5318,6 +5318,7 @@ func _stage_rain() -> void:
 	day._process(0.0)
 	_check(day.tint.get_luminance() < tint_was.get_luminance(), "the light goes grey under it",
 		"%.3f against %.3f" % [day.tint.get_luminance(), tint_was.get_luminance()])
+	_check(puddles.sand_wet > 0.3, "the sand soaks up the shower", "%.2f" % puddles.sand_wet)
 	var drops: int = (weather.get(&"_drop_at") as PackedVector2Array).size()
 	_check(drops > 0 and drops <= Weather.DROPS_MOST, "drops are falling in view, under the cap", str(drops))
 	_check(is_equal_approx(_main.sludge, money_was) and is_equal_approx(_main.pollution, pollution_was),
@@ -5347,12 +5348,12 @@ func _stage_rain() -> void:
 			lawn_hits += 1
 	_check(lawn_hits == puddles.spots().size(), "a drop on the island lands on the ground", "")
 	# Puddles: laid on dry ground only, filling under the rain.
-	_check(puddles.spots().size() >= 4, "the island has puddle spots", str(puddles.spots().size()))
+	_check(puddles.spots().size() >= 2, "the island has puddle spots", str(puddles.spots().size()))
 	var bad := 0
 	for t: Vector2 in puddles.spots():
 		if not puddles.may_lie(t):
 			bad += 1
-	_check(bad == 0, "every puddle off the water, the hut, the crate and the pump", str(bad))
+	_check(bad == 0, "every puddle on the grass, off the hut, the crate and the pump", str(bad))
 	_check(puddles.wet > 0.2, "and they fill in the rain", "%.2f" % puddles.wet)
 	_check((_main.get(&"_angler") as Node).has_method(&"reflect_on"),
 		"the angler can be drawn in a puddle", "")
@@ -5376,6 +5377,7 @@ func _stage_rain() -> void:
 	weather.next_in = 9999.0
 	weather._process(0.0)
 	puddles.wet = 0.0
+	puddles.sand_wet = 0.0
 	day.overcast = 0.0
 	day.flash = 0.0
 

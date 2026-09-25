@@ -71,6 +71,11 @@ uniform float fringe_depth = 4.0;
 uniform float fringe_share : hint_range(0.0, 1.0) = 0.7;
 uniform vec4 fringe_dark : source_color = vec4(0.196, 0.341, 0.114, 1.0);
 // One art pixel of shadow under the lawn's front edge.
+// How wet the sand is, 0 dry to 1 soaked, pushed by Puddles while it rains (2026-09-25).
+// Darkens the sand only; the lawn is left alone.
+uniform float wet_sand : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 wet_ink = vec3(0.68, 0.7, 0.76);
+
 uniform bool lip = true;
 uniform vec4 lip_color : source_color = vec4(0.118, 0.275, 0.082, 1.0);
 
@@ -334,6 +339,7 @@ void fragment() {
 				shown = texel_of(cell, p, variant);
 			} else {
 				shown = texel_of(cell, p, 0);
+				shown.rgb *= mix(vec3(1.0), wet_ink, wet_sand);
 			}
 		}
 	}

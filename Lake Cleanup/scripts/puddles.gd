@@ -10,7 +10,7 @@ extends Node2D
 
 ## How many, how big at their fullest (tiles across the plane, before the 2:1), and how far
 ## apart and off the island's things they are laid.
-const COUNT := 4
+const COUNT := 3
 const SIZE := Vector2(1.3, 2.2)
 const APART := 4.5
 const OFF_WATER := 40.0
@@ -35,6 +35,20 @@ var walkers: Callable
 var crate_tile := Vector2.INF
 
 var wet: float = 0.0
+
+## The sand: how wet it is (darkens it through `Ground.set_wet`), and the dark spot each drop
+## leaves on it before the whole beach catches up. Seconds to soak, to dry, and how long a
+## spot shows.
+var sand_wet: float = 0.0
+var grounds: Array = []
+const SOAK := 25.0
+const SAND_DRY := 90.0
+const MARK_LIFE := 7.0
+const MARKS_MOST := 600
+var _marks := PackedVector2Array()
+var _mark_age := PackedFloat32Array()
+var _mark_ink: Color
+var _pushed_wet := -1.0
 var _flash: float = 0.0
 var _spots := PackedVector2Array()
 var _sizes := PackedFloat32Array()
@@ -69,13 +83,14 @@ func _ready() -> void:
 	if palette != null:
 		# Rain water on the ground, not a pond: the clean ramp let see-through so the ground
 		# it lies on darkens it rather than it being painted blue over the top.
-		_body = Color(palette.water_clean_shallow, 0.6)
+		_body = Color(palette.water_clean_light, 0.85)
 		_deep = Color(palette.water_clean_mid, 0.7)
 		_rim = palette.water_clean_light
 	else:
 		_body = Color(0.45, 0.6, 0.7)
 		_deep = Color(0.35, 0.5, 0.62)
 		_rim = Color(0.7, 0.8, 0.85)
+	_mark_ink = Color(palette.sand * Color(0.62, 0.6, 0.62), 0.9) if palette != null 		else Color(0.45, 0.4, 0.32, 0.9)
 	_mirror = Mirror.new()
 	_mirror.owner_puddles = self
 	_mirror.modulate = Color(MIRROR_TINT, MIRROR_ALPHA)
@@ -155,7 +170,8 @@ func _noise(k: int, x: float, y: float) -> float:
 
 ## Could a puddle lie on this tile spot.
 func may_lie(t: Vector2) -> bool:
-	if not Iso.on_island_ground(t) or Iso.past_water(t) > -OFF_WATER:
+	# On the grass only (Richard): sand drinks the rain and darkens instead (`sand_wet`).
+	if not Iso.on_lawn(t) or Iso.past_water(t) > -OFF_WATER:
 		return false
 	if Iso.in_shed(t.x, t.y, OFF_SHED):
 		return false
@@ -177,6 +193,24 @@ func tick(rain: float, flash: float, delta: float) -> void:
 		wet = minf(wet + delta * rain / FILL, 1.0)
 	else:
 		wet = maxf(wet - delta / DRY, 0.0)
+	if rain > 0.3:
+		sand_wet = minf(sand_wet + delta * rain / SOAK, 1.0)
+	else:
+		sand_wet = maxf(sand_wet - delta / SAND_DRY, 0.0)
+	if absf(sand_wet - _pushed_wet) > 0.01 or (sand_wet == 0.0 and _pushed_wet != 0.0):
+		_pushed_wet = sand_wet
+		for ground in grounds:
+			if is_instance_valid(ground):
+				ground.set_wet(sand_wet)
+	var marks_were := _marks.size()
+	var m := 0
+	while m < _marks.size():
+		_mark_age[m] += delta
+		if _mark_age[m] >= MARK_LIFE:
+			_marks.remove_at(m)
+			_mark_age.remove_at(m)
+			continue
+		m += 1
 	var flashed := flash != _flash
 	_flash = flash
 	var i := 0
@@ -186,8 +220,8 @@ func tick(rain: float, flash: float, delta: float) -> void:
 			_ripples.remove_at(i)
 			continue
 		i += 1
-	visible = wet > 0.0
-	if visible and (was != wet or flashed or not _ripples.is_empty()):
+	visible = wet > 0.0 or not _marks.is_empty()
+	if visible and (was != wet or flashed or not _ripples.is_empty() or marks_were > 0):
 		queue_redraw()
 	if visible:
 		_mirror.queue_redraw()
@@ -195,6 +229,11 @@ func tick(rain: float, flash: float, delta: float) -> void:
 
 ## A drop landing on the island: a ring if it fell in a puddle.
 func hit(at: Vector2) -> void:
+	var sand := Iso.world_to_tile(at)
+	if not Iso.on_lawn(sand) and _marks.size() < MARKS_MOST:
+		_marks.append(at)
+		_mark_age.append(0.0)
+		visible = true
 	if wet <= 0.05 or _ripples.size() > 40:
 		return
 	var t := Iso.world_to_tile(at)
@@ -207,13 +246,17 @@ func hit(at: Vector2) -> void:
 func _draw() -> void:
 	var cell := Vector2(PIXEL, PIXEL)
 	var body := _body.lerp(Color.WHITE, _flash * 0.6)
-	var deep := _deep.lerp(Color.WHITE, _flash * 0.5)
+	# The drops' spots on the sand, fading as the beach darkens under them.
+	for i in _marks.size():
+		var fade := 1.0 - _mark_age[i] / MARK_LIFE
+		var ink := Color(_mark_ink, _mark_ink.a * fade * (1.0 - sand_wet * 0.6))
+		draw_rect(Rect2(_marks[i].snapped(cell), cell), ink)
 	for k in _cells.size():
 		var cells := _cells[k]
 		var reach := _reach[k]
 		for i in cells.size():
 			if reach[i] <= wet:
-				draw_rect(Rect2(cells[i], cell), deep if reach[i] < wet * 0.45 else body)
+				draw_rect(Rect2(cells[i], cell), body)
 	for ring: Array in _ripples:
 		var age: float = ring[1]
 		var span := 3.0 + age * 18.0
