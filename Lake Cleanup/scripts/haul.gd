@@ -261,6 +261,10 @@ func _draw() -> void:
 		# flight is a sprite sliding over the island rather than a thing above it.
 		var shadow: Vector2 = step["ground"]
 		var high := sin(t * PI)
+		# Back to world space first: the piece before this one left its own turn, spin and
+		# size on the canvas, and a shadow drawn through that landed hundreds of pixels away,
+		# swept round in an arc of dark dots (over the south treeline, on a big catch).
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		draw_circle(
 			shadow, lerpf(13.0, 6.0, high) , Color(0.0, 0.0, 0.0, lerpf(0.22, 0.07, high))
 		)

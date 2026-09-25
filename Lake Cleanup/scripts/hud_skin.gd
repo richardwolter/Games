@@ -315,6 +315,13 @@ func _lay_out() -> void:
 	queue_redraw()
 
 
+## Put the meter on `pollution` at once, with no ease: for a load, where the lake is simply
+## as it was left rather than being cleaned in front of the player.
+func snap_meter() -> void:
+	_shown = clampf(pollution, 0.0, 1.0)
+	_show_meter()
+
+
 func _process(delta: float) -> void:
 	var wanted := clampf(pollution, 0.0, 1.0)
 	if not is_equal_approx(_shown, wanted):
@@ -748,7 +755,10 @@ class MeterFace extends Control:
 		var baseline := track.position.y + track.size.y * 0.5 + float(height) * 0.36
 		Style.write(
 			self,
-			"%d%%" % roundi(shown * 100.0),
+			# Rounded up: "0%" is the finished lake and nothing else (Richard, 2026-09-25).
+			# Rounded to nearest it read 0% with the last half percent still in the water.
+			# `_check_cleaned` zeroes `pollution` outright, so the float dust never holds 1%.
+			"%d%%" % (0 if shown <= 0.0 else maxi(ceili(shown * 100.0 - 0.0001), 1)),
 			height,
 			Vector2(0.0, baseline),
 			Style.INK,

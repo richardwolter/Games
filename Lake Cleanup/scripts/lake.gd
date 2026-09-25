@@ -1334,6 +1334,10 @@ func _ready() -> void:
 	var loaded := false
 	if autoload_save and not start_fresh:
 		loaded = load_game()
+	# The meter starts where the lake is, not eased down from full: a finished lake came
+	# back reading 1% for seconds while the ease crawled its last percent (2026-09-25).
+	_skin.pollution = pollution
+	_skin.snap_meter()
 	start_fresh = false
 	_mark("load game")
 	if _logs_play():
