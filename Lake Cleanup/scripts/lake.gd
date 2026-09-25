@@ -2731,11 +2731,11 @@ func _fit_zoom() -> float:
 func _set_menu(open: bool) -> void:
 	_menu_open = open
 	_shop_skin.visible = open
+	if not open:
+		_skin.purse_over = Rect2()
 	if open:
 		_skin.hush_pulse(&"upgrades")
 		if not _shop_tour_done and _shop_skin.tour < 0:
-	if not open:
-		_skin.purse_over = Rect2()
 			_shop_skin.tour = 0
 	_push_rooms()
 	if open:
@@ -5531,11 +5531,11 @@ func _update_hud() -> void:
 	_open_upgrades.note = "%d available" % affordable
 	_skin.hint = _last_pieces_line()
 
+	# The purse hangs under the shop's first board while it is up, and goes home after.
+	_skin.purse_over = _shop_skin.purse_box(_skin.money_size()) if _menu_open else Rect2()
 	if not _menu_open:
 		return
 	_shop_skin.rows = _shop_rows()
-	# The purse hangs under the shop's first board while it is up, and goes home after.
-	_skin.purse_over = _shop_skin.purse_box(_skin.money_size()) if _menu_open else Rect2()
 	_shop_skin.tour_pad = Pad.is_pad()
 	_shop_skin.legend = _shop_legend()
 

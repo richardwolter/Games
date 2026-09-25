@@ -138,6 +138,9 @@ var _crown_span := PackedFloat32Array()
 ## one's width are read off it, within CROWN_VARY of the drawn shape. The span — the size —
 ## is untouched: the roll is the shape, not the scale.
 var _crown_roll := PackedFloat32Array()
+## Whether each crown throws its plumes. A low one is the mound and the ring alone: an
+## empty net landing on the water, with nothing in the mesh to throw anything up.
+var _crown_tall := PackedByteArray()
 
 ## How far a crown's shape may wander from the drawn one, as a fraction: the side plumes'
 ## lean and heights and the middle plume's width each move by up to this much.
@@ -225,7 +228,7 @@ func _redraw() -> void:
 
 ## Throw up a splash. `strength` is 0..1 — a cup slipping in against a fridge
 ## dropped from the sky.
-func splash(at: Vector2, strength: float) -> void:
+func splash(at: Vector2, strength: float, tall: bool = true) -> void:
 	var force := clampf(strength, 0.0, 1.0)
 	var span := lerpf(40.0, 130.0, force)
 
@@ -233,6 +236,13 @@ func splash(at: Vector2, strength: float) -> void:
 	_crown_age.append(0.0)
 	_crown_span.append(span)
 	_crown_roll.append(randf())
+	_crown_tall.append(1 if tall else 0)
+	# A low splash is the mound and its ring: no spray sheet and no drops, since those are
+	# water thrown up and nothing threw it.
+	if not tall:
+		set_process(true)
+		_redraw()
+		return
 
 	if _burst_age.size() < MAX_BURSTS:
 		_burst_at.append(at)
@@ -361,10 +371,12 @@ func _process(delta: float) -> void:
 			_crown_age[c] = _crown_age[last]
 			_crown_span[c] = _crown_span[last]
 			_crown_roll[c] = _crown_roll[last]
+			_crown_tall[c] = _crown_tall[last]
 			_crown_at.resize(last)
 			_crown_age.resize(last)
 			_crown_span.resize(last)
 			_crown_roll.resize(last)
+			_crown_tall.resize(last)
 			continue
 		_crown_age[c] = age
 		c += 1
@@ -479,6 +491,8 @@ func _draw_crowns(on: CanvasItem) -> void:
 			continue
 		# The mound next, so the plumes stand in it rather than on top of it.
 		on.draw_colored_polygon(_mound(at, width, height * 0.3), Color(FOAM, alpha * 0.9))
+		if _crown_tall[c] == 0:
+			continue
 		# Three plumes: one up the middle and one leaning out each way. Two alone
 		# read as a pair of antlers — there was nothing between them, so the eye
 		# joined the tips instead of the bases. Each crown's roll sets how far the sides

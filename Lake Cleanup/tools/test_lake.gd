@@ -4877,6 +4877,32 @@ func _check_audio_pass(sound: Sfx) -> void:
 	var landing_at := net_source.find("sfx.play_landing(")
 	_check(sweep_at >= 0 and landing_at > sweep_at,
 		"the landing sweeps before it sounds, so the sound knows what was caught", "")
+	var splash_at := net_source.find("splash.splash(world_pos(), 0.45, caught)")
+	_check(splash_at > sweep_at and sweep_at >= 0,
+		"the landing sweeps before it splashes, and tells the splash whether it caught", "")
+	# An empty landing is the mound and its ring: no plumes, no spray sheet, no drops.
+	var low := WaterSplash.new()
+	low.splash(Vector2.ZERO, 0.45, false)
+	_check((low.get(&"_crown_tall") as PackedByteArray) == PackedByteArray([0])
+			and (low.get(&"_burst_age") as PackedFloat32Array).is_empty()
+			and (low.get(&"_drop_life") as PackedFloat32Array).is_empty(),
+		"an empty landing throws a low crown with no spray and no drops", "")
+	low.splash(Vector2.ZERO, 0.45)
+	_check((low.get(&"_crown_tall") as PackedByteArray)[1] == 1
+			and not (low.get(&"_drop_life") as PackedFloat32Array).is_empty(),
+		"and a catching one is the whole splash", "")
+	low.free()
+	# The throws leave the hand on the loose bundle, not the tight coil (2026-09-24).
+	var book: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(CastNet.ART))
+	var art: Dictionary = _net.get(&"_art")
+	for throw: StringName in [&"cast_near", &"cast_far"]:
+		var cells: Array = book["sequences"][String(throw)]
+		var frames: Array = (art[throw] as Dictionary)["frames"]
+		var first: Array = cells[1]["region"]
+		_check(frames.size() == cells.size() - 1
+				and (frames[0] as Dictionary)["region"] == Rect2(
+					float(first[0]), float(first[1]), float(first[2]), float(first[3])),
+			"%s starts on the sheet's second frame" % throw, "%d frames" % frames.size())
 
 	# The catch is answered with one swell and then water draining off the mesh: drips at
 	# times of their own, rolled, so no two catches are the same and none is a row of pops
@@ -5832,6 +5858,8 @@ func _stage_foam() -> void:
 ## the pricing plate standing under the middle two even though the boards are now level.
 func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
+	_check_shop_purse(skin)
+	_check_bonus_panel()
 	var titles: Dictionary = skin.get(&"TITLES")
 	var articled := []
 	for board in titles:
@@ -5862,8 +5890,6 @@ func _stage_shop_shape() -> void:
 				claimed[key] = board
 	_check(twice.is_empty(), "no row is claimed by two groups", ", ".join(twice))
 	var orphans := []
-	_check_shop_purse(skin)
-	_check_bonus_panel()
 	for row: Dictionary in shop_rows:
 		if not claimed.has(row["key"]) or claimed[row["key"]] != row["board"]:
 			orphans.append(String(row["key"]))
@@ -6442,36 +6468,6 @@ func _check_loading() -> void:
 	curtain.queue_free()
 
 
-## The pump beside the hut and the wash room it opens (issue #37): a find waits at the pump,
-## is picked off a tray if the purse covers its soap, is washed on the stand, and only then
-## reaches the shed — paid for when it comes clean, and not at all if the player walks away.
-## The shelf's wash plank (2026-09-22): shown only while a find waits at the pump, right
-## after the last row and scrolling with them, alone under the empty line, pulsing the
-## first time the shelf opens with more waiting, and swapping the shed for the wash room.
-func _check_wash_plank() -> void:
-	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
-	var unwashed: Array = _main.get(&"unwashed")
-	var unlocked: Array = _main.get(&"unlocked")
-	var shelf_was := unlocked.duplicate()
-	unlocked.clear()
-	room.set(&"_wash_seen", 0)
-	room.set(&"_wash_pulse", 0.0)
-	room.set(&"_wash_unseen", false)
-	_main.call(&"_set_shed", true)
-	room.call(&"_dress_shelf")
-	var box: Rect2 = room.wash_plank_box()
-	var list: Rect2 = room.call(&"_list_rect")
-	_check(box.size.x > 0.0, "with a find waiting and nothing kept, the wash plank stands alone", str(box))
-	_check(box.position.y > list.position.y + 8.0 and box.end.y <= list.end.y,
-		"under the empty line and on the shelf", "%s in %s" % [box, list])
-	var plank: PlankButton = room.get(&"_wash_plank")
-	_check(plank.label == "Wash  1", "and says how many wait", plank.label)
-	_check(room.wash_pulse_amount() == 0.0 and float(room.get(&"_wash_pulse")) > 0.0,
-		"it pulses the first time the shelf opens with something waiting", str(room.get(&"_wash_pulse")))
-	room.call(&"_process", 0.3)
-	_check(room.wash_pulse_amount() > 0.0 and plank.pulse > 0.0, "the pulse breathes and reaches the plank", str(plank.pulse))
-	# The room clamps a frame to 0.1 s (a hitch is not a dog across the room), so it is
-	# walked there in short steps.
 ## The purse over the shop (2026-09-24): the HUD's own money plate, hung under the first
 ## board on a node drawn after the shop, and home again when the shop closes.
 func _check_shop_purse(skin: Node) -> void:
@@ -6518,6 +6514,36 @@ func _check_bonus_panel() -> void:
 	_check(bad.is_empty(), "no star touches the words or leaves the plate", ", ".join(bad))
 
 
+## The pump beside the hut and the wash room it opens (issue #37): a find waits at the pump,
+## is picked off a tray if the purse covers its soap, is washed on the stand, and only then
+## reaches the shed — paid for when it comes clean, and not at all if the player walks away.
+## The shelf's wash plank (2026-09-22): shown only while a find waits at the pump, right
+## after the last row and scrolling with them, alone under the empty line, pulsing the
+## first time the shelf opens with more waiting, and swapping the shed for the wash room.
+func _check_wash_plank() -> void:
+	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+	var unwashed: Array = _main.get(&"unwashed")
+	var unlocked: Array = _main.get(&"unlocked")
+	var shelf_was := unlocked.duplicate()
+	unlocked.clear()
+	room.set(&"_wash_seen", 0)
+	room.set(&"_wash_pulse", 0.0)
+	room.set(&"_wash_unseen", false)
+	_main.call(&"_set_shed", true)
+	room.call(&"_dress_shelf")
+	var box: Rect2 = room.wash_plank_box()
+	var list: Rect2 = room.call(&"_list_rect")
+	_check(box.size.x > 0.0, "with a find waiting and nothing kept, the wash plank stands alone", str(box))
+	_check(box.position.y > list.position.y + 8.0 and box.end.y <= list.end.y,
+		"under the empty line and on the shelf", "%s in %s" % [box, list])
+	var plank: PlankButton = room.get(&"_wash_plank")
+	_check(plank.label == "Wash  1", "and says how many wait", plank.label)
+	_check(room.wash_pulse_amount() == 0.0 and float(room.get(&"_wash_pulse")) > 0.0,
+		"it pulses the first time the shelf opens with something waiting", str(room.get(&"_wash_pulse")))
+	room.call(&"_process", 0.3)
+	_check(room.wash_pulse_amount() > 0.0 and plank.pulse > 0.0, "the pulse breathes and reaches the plank", str(plank.pulse))
+	# The room clamps a frame to 0.1 s (a hitch is not a dog across the room), so it is
+	# walked there in short steps.
 	for i in 50:
 		room.call(&"_process", 0.1)
 	_check(is_equal_approx(float(room.get(&"_wash_pulse")), ShedRoom.WASH_PULSE_IDLE),
@@ -6682,6 +6708,11 @@ func _stage_wash() -> void:
 	var room: WashRoom = _main.get(&"_wash")
 	_check(room != null and room.visible and bool(_main.call(&"_panelled")),
 		"working the pump opens the wash room, and it holds the lake's hands", "")
+	# One row on the tray sits wholly on its face, not on the frame's foot (2026-09-24).
+	var tray_face := Style.board_face(room.tray_box(), WashRoom.TRAY_FRAME)
+	var tray_rows := room.row_boxes()
+	_check(tray_rows.size() == 1 and tray_face.encloses(tray_rows[0].grow(1.0)),
+		"a single find on the tray stands inside its face", "%s in %s" % [tray_rows, tray_face])
 	# What is behind the stand: the view from the pump, its water the lake's own.
 	var back := room.backdrop()
 	_check(back != null and back.is_painted() and back.get_index() < room.stand().get_index()
@@ -6712,11 +6743,6 @@ func _stage_wash() -> void:
 	var lawn_top := back.lake_box().end.y
 	var all_on_lawn := true
 	for hound in back.dogs():
-	# One row on the tray sits wholly on its face, not on the frame's foot (2026-09-24).
-	var tray_face := Style.board_face(room.tray_box(), WashRoom.TRAY_FRAME)
-	var tray_rows := room.row_boxes()
-	_check(tray_rows.size() == 1 and tray_face.encloses(tray_rows[0].grow(1.0)),
-		"a single find on the tray stands inside its face", "%s in %s" % [tray_rows, tray_face])
 		all_on_lawn = all_on_lawn and hound.at.y > lawn_top and hound.at.y < room.size.y * 0.9
 	_check(all_on_lawn, "between the beach and the stand's feet", "")
 	var was_clock := back.stepped()

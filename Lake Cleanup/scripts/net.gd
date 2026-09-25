@@ -168,9 +168,14 @@ const ART := "res://assets/net_frames.json"
 ## like being pulled across it. Flattening them as they close lays the bag back down on the
 ## surface: the rim stays where it was, and the body of the net comes down onto the plane
 ## with it. The landing and the throws were drawn already foreshortened and are left alone.
+##
+## `skip` drops that many frames off the front of a sequence as it is read (2026-09-24,
+## Richard): the throws' first frame is a tight coil of rope that did not read as a net, so
+## a throw leaves the hand on the loose bundle instead. The sheet and its measurements are
+## untouched.
 const SEQUENCES := {
-	&"cast_far": {"open": -1, "flatten": [1.0, 1.0]},
-	&"cast_near": {"open": -1, "flatten": [1.0, 1.0]},
+	&"cast_far": {"open": -1, "flatten": [1.0, 1.0], "skip": 1},
+	&"cast_near": {"open": -1, "flatten": [1.0, 1.0], "skip": 1},
 	&"land": {"open": -1, "flatten": [1.0, 1.0]},
 	&"drag": {"open": 0, "flatten": [1.0, 1.0]},
 }
@@ -712,6 +717,7 @@ func _load_art() -> bool:
 				# circle seen from above it is across the middle.
 				"hang": (float(cell["rim_y"]) - region.position.y) / maxf(region.size.y, 1.0),
 			})
+		frames = frames.slice(int((SEQUENCES[StringName(name)] as Dictionary).get("skip", 0)))
 		if frames.is_empty():
 			continue
 		# How wide each frame is against its own sequence's open net. Once a frame carries
@@ -932,16 +938,18 @@ func _process(delta: float) -> void:
 				# sitting there instead.
 				state = State.REELING if _pulling else State.SETTLED
 				_settled_age = 0.0
+				# What the ring came down on is caught as it lands, not a frame into the haul
+				# after the mouth has already slid off it. Before the splash and the sound,
+				# because both say whether it caught: an empty net makes a low foam mound
+				# and rings with no plumes or spray (2026-09-24, Richard), and the sound is
+				# low and whole with something in the mesh, high and quieter on bare water
+				# (`Sfx.play_landing`).
+				var caught := _sweep(true)
 				if splash != null:
-					splash.splash(world_pos(), 0.45)
+					splash.splash(world_pos(), 0.45, caught)
 					# The ring the landing pushes out, on top of the crown's own: this is
 					# the one that is still spreading a second later.
 					splash.ripple(world_pos(), mouth_extent() * 1.2)
-				# What the ring came down on is caught as it lands, not a frame into the haul
-				# after the mouth has already slid off it. Before the sound, because the
-				# sound says whether it caught: low and whole with something in the mesh,
-				# high and quieter on bare water (`Sfx.play_landing`).
-				var caught := _sweep(true)
 				if sfx != null:
 					sfx.play_landing(caught)
 		State.REELING:

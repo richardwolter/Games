@@ -2747,6 +2747,20 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   hull's silhouette in the side and end-on views and only show where they spread past the
   stern — as they did under the old hull. A heading-aware across scale would fix it.
 
+### The Throw and the Quiet Landing (2026-09-24, `/grill-me` with Richard)
+- **A throw leaves the hand on the loose bundle, not the coil** (`CastNet.SEQUENCES`
+  `skip`): frame 0 of `cast_near` and `cast_far`, a tight coil of rope, is dropped as the
+  sheet is read. Frames 1-4 split the flight evenly by distance, 25% each. The sheet, the
+  slicer and the crown measurements are untouched.
+- **The net holds on `land` frame 4, by decision**: frame 3 (weighted rim, dome) was shot
+  in the lake beside it (`tools/shot_nethold.tscn`, `NET_HOLD=3`) and its thin lines
+  vanished at play zoom. Frame 4's dense mesh is what reads as a net.
+- **An empty landing makes no spray** (`WaterSplash.splash`'s `tall`, `_crown_tall`): when
+  the landing sweep takes nothing, the crown is the foam mound and its ring, plus the
+  landing's ripple. No plumes, no speck sheet, no drops. The sweep runs before the splash
+  so it knows. Both nets. A catching landing is unchanged; the lit net laid by LT is too.
+- Out of scope, by decision: `cast_far` frames 2-3, the land settle, the `drag` sheet.
+
 ### The Net Sorts With The Angler (2026-09-16)
 The net node and its rope take **the angler's own walker layer, minus one** (`Lake._sort_walkers`),
 rather than a fixed z 8.
@@ -5075,6 +5089,20 @@ the song started on the grid at 4.273 s) — per-cut drift, `crop` for the shed 
 `fade c=white`, which paints all frames before it), Bungee captions with the logo's sticker rim,
 the stacked v1 logo, "Wishlist now" — and writes `trailer.mp4`, 1080p60 H.264. Re-run the probe
 then the script; retune by editing `shots.json`.
+
+**Re-cut 2026-09-24** (`/grill-me` with Richard, then his notes on the first cut): still
+~31 s, the logo at beat 55. Order: walkout + `cast_3` + gold `cast_5` (casts 2 and 4 cut),
+ferries, **wash** ("Wash your findings": the sofa on the stand, the tray and cross hidden,
+sprayed at real speed by a raster that stays on the piece and ends about half clean), the
+shed (**not re-filmed**, its entry left out of the shot list; old frames kept), dogs,
+**wildlife** ("Bring back wildlife", 14 beats: lake thinned 97%, then flora and wildlife
+reset and handed a clean share ramping 0.05 to 1 over five seconds so plants sprout on
+screen, extra frogs swimming in to the shore in view every 12 frames, five broods flown in
+from 520 px off). Then the logo over the dirty lake as before. **The parked fleet is hidden
+in the casts, the dogs and the wildlife** (`_hide_boats`): it blocked the second cast. A
+**pigeon** shot is still in the probe (forced head pop, `_force_pop`) and **cut from the
+edit**, by Richard's call. `build_trailer.py` needs PIL: run it with the psd-extract venv
+python.
 
 ### Shed Screenshot Probe
 `tools/shot_shed.tscn` opens the lake, fills the shelf, opens the shed and saves
