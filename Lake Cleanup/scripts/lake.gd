@@ -1195,6 +1195,7 @@ func _ready() -> void:
 	# and the finds' beams too — "over everything" was the whole of the instruction, and a
 	# bird that vanishes behind the thing being cast at it is the bug, not the fix.
 	_grow_nature()
+	_start_weather()
 	_mark("nature")
 
 	_flock = Flock.new()
@@ -5413,6 +5414,104 @@ func _wet_tile(index: int) -> bool:
 	return Iso.shore_fraction(float(tile.x) + 0.5, float(tile.y) + 0.5) < 1.0
 
 
+## The rain (2026-09-25): the showers, the puddles on the island, and what a drop can land on.
+## See `Weather` and `Puddles`, and the section in CLAUDE.md.
+var _weather: Weather
+var _puddles: Puddles
+
+
+func _start_weather() -> void:
+	_puddles = Puddles.new()
+	_puddles.name = &"Puddles"
+	_puddles.z_index = 3
+	_puddles.z_as_relative = false
+	_puddles.crate_tile = _dog.crate_tile
+	_puddles.statics = _weather_statics
+	_puddles.walkers = _weather_walkers
+	add_child(_puddles)
+	_weather = Weather.new()
+	_weather.name = &"Weather"
+	_weather.z_index = WEATHER_LAYER
+	_weather.z_as_relative = false
+	_weather.grid = _grid
+	_weather.splash = _splash
+	_weather.day = _day
+	_weather.puddles = _puddles
+	_weather.view = _visible_world_rect
+	_weather.roofs = _weather_roofs
+	_weather.held = _rain_held
+	_weather.paused = func() -> bool: return _in_menu
+	add_child(_weather)
+
+
+## Over the birds: the rain falls past everything on the lake.
+const WEATHER_LAYER := 22
+
+
+## A shower does not start over the intro, the first steps, a tour or the ending.
+func _rain_held() -> bool:
+	return (
+		not _intro_done or not _steps_done or _arrive != Arrive.OFF or _farewell != null
+		or (_shop_skin != null and _shop_skin.tour >= 0) or _decor_tour != DecorTour.OFF
+	)
+
+
+## The hut's picture where it is drawn, as `_draw_shed` lays it.
+func _shed_picture() -> Rect2:
+	if _shed_art == null:
+		return Rect2()
+	var stand := _shed_feet() + Vector2(0.0, Iso.SHED_TALL * Iso.SHED_ART_GROUND)
+	var size := _shed_art.get_size() * (Iso.SHED_TALL / _shed_art.get_size().y)
+	return Rect2(stand - Vector2(size.x * 0.5, size.y), size)
+
+
+## Everything a raindrop can land on top of: the buildings by their silhouettes, the walkers
+## and hulls by a rounded box over their drawing.
+func _weather_roofs() -> Array:
+	var out: Array = []
+	if _shed_art != null:
+		out.append({"image": Art.image(SHED_ART), "rect": _shed_picture()})
+	for thing in [_yard, _pump]:
+		if thing != null:
+			var roof: Dictionary = thing.roof()
+			if not roof.is_empty():
+				out.append(roof)
+	for stop in _dropoffs:
+		var roof := stop.roof()
+		if not roof.is_empty():
+			out.append(roof)
+	if _angler != null and _angler.visible:
+		out.append({"image": null, "rect": Rect2(_angler.position + Vector2(-9.0, -40.0),
+			Vector2(18.0, 40.0))})
+	for dog in _dogs:
+		if is_instance_valid(dog) and dog.visible:
+			out.append({"image": null, "rect": Rect2(dog.position + Vector2(-13.0, -20.0),
+				Vector2(26.0, 20.0))})
+	for boat in _boats:
+		if is_instance_valid(boat) and boat.visible:
+			out.append({"image": null, "rect": Rect2(boat.position + Vector2(-26.0, -62.0),
+				Vector2(52.0, 62.0))})
+	return out
+
+
+## What a puddle can show upside down that does not move: the hut and the pump.
+func _weather_statics() -> Array:
+	var out: Array = []
+	if _shed_art != null:
+		out.append({"texture": _shed_art, "rect": _shed_picture()})
+	if _pump != null:
+		var roof := _pump.roof()
+		if not roof.is_empty():
+			out.append(roof)
+	return out
+
+
+func _weather_walkers() -> Array:
+	var out: Array = [_angler]
+	out.append_array(_dogs)
+	return out
+
+
 ## The share of the lake's water that reads clean on the map, 0..1.
 func clean_share() -> float:
 	return _clean_share
@@ -5621,6 +5720,8 @@ func save_game() -> bool:
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
 		"decor_tour": _decor_tour_done,
+		"showers": _weather.showers if _weather != null else 0,
+		"rain_next": _weather.next_in if _weather != null else -1.0,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -5759,6 +5860,9 @@ func load_game() -> bool:
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
 	_decor_tour_done = bool(save.get("decor_tour", true))
+	# Absent means none yet: a save from before the rain has had no showers.
+	if _weather != null:
+		_weather.restore(int(save.get("showers", 0)), float(save.get("rain_next", -1.0)))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

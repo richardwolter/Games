@@ -291,6 +291,12 @@ func drip(at: Vector2, vel: Vector2, size: float, life: float) -> void:
 ## No crown, no drops: this is not something hitting the water, it is water that has been
 ## pushed. Everything dragged across the lake leaves these, which is the difference between
 ## a surface and a floor.
+## How many rings are out on the water now. The rain and the animals keep to a share of the
+## cap so a walker's entry ring is never refused for want of room.
+func ripples_up() -> int:
+	return _ripple_age.size()
+
+
 func ripple(at: Vector2, span: float) -> void:
 	if _ripple_age.size() >= MAX_RIPPLES:
 		return

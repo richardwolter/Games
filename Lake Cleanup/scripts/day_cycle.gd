@@ -44,6 +44,22 @@ var sun: float = 0.3
 ## How dark a shadow is drawn, as an alpha.
 var ink: float = 0.3
 
+## How grey the sky is, 0 clear to 1 a full shower, pushed by `Weather` (2026-09-25). Folded
+## into the light after the hour has set it, so everything that already reads the day — the
+## world's modulate, every shadow, the wash room's sky — goes grey without knowing it rained.
+var overcast: float = 0.0
+
+## A lightning flash, 0 to 1, pushed by `Weather`. Lifts the tint towards white and the
+## shadows to their hardest for the frames it lasts.
+var flash: float = 0.0
+
+## The rain's own light: cooler and darker than any hour, the ink a shadow keeps under it,
+## and the flash's cold white. First guesses for Richard's eye.
+const RAIN_TINT := Color(0.62, 0.68, 0.78)
+const RAIN_INK := 0.35
+const FLASH_TINT := Color(1.35, 1.4, 1.55)
+const FLASH_INK := 0.55
+
 var _config: DayConfig
 var _tint_ramp: Gradient
 
@@ -62,6 +78,17 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	phase = fposmod(phase + delta / maxf(_config.cycle_seconds, 1.0), 1.0)
 	_settle()
+	_weather()
+
+
+## The shower and the flash, over whatever the hour made of the light.
+func _weather() -> void:
+	if overcast > 0.0:
+		tint = tint.lerp(tint * RAIN_TINT, overcast)
+		ink *= lerpf(1.0, RAIN_INK, overcast)
+	if flash > 0.0:
+		tint = tint.lerp(FLASH_TINT, flash)
+		ink = lerpf(ink, FLASH_INK, flash)
 
 
 ## Where the sun is along its day, 0 at first light and 1 at dusk, for this phase.

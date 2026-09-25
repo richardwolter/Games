@@ -197,6 +197,9 @@ const SHAFT_WIDE := 2.4
 const SHAFT_SPREAD := 0.78
 const SHAFT_LONG := 34.0
 const SUN_POWER := Vector2(0.30, 0.62)
+## How much of the shaft is left in a full shower, and what a lightning flash adds to it.
+const RAIN_SUN := 0.25
+const FLASH_SUN := 1.2
 const SUN_SLOPE := Vector2(0.95, 0.38)
 const SUN_EARLY := Color(1.0, 0.93, 0.74)
 const SUN_LATE := Color(1.0, 0.66, 0.34)
@@ -2346,7 +2349,12 @@ func _dress_light(floor_box: Rect2) -> void:
 	lit.set_shader_parameter(&"art_px", _zoom())
 	lit.set_shader_parameter(&"window_at", Vector2(0.0, shed.size.y * WINDOW_DOWN))
 	lit.set_shader_parameter(&"sun_dir", Vector2(1.0, lerpf(SUN_SLOPE.x, SUN_SLOPE.y, share)))
-	lit.set_shader_parameter(&"sun_power", lerpf(SUN_POWER.x, SUN_POWER.y, share))
+	# A shower outside (2026-09-25, `Weather`): the shaft through the window thins to a grey
+	# glow, and a flash of lightning throws it in white for a moment.
+	var power := lerpf(SUN_POWER.x, SUN_POWER.y, share) * lerpf(1.0, RAIN_SUN, Weather.now)
+	power += Weather.flash_now * FLASH_SUN
+	tone = tone.lerp(Color(0.85, 0.9, 1.0), Weather.flash_now)
+	lit.set_shader_parameter(&"sun_power", power)
 	lit.set_shader_parameter(&"sun_tone", Vector3(tone.r, tone.g, tone.b))
 	lit.set_shader_parameter(&"shaft_wide", SHAFT_WIDE * cell)
 	lit.set_shader_parameter(&"shaft_spread", SHAFT_SPREAD)

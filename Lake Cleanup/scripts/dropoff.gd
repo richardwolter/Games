@@ -449,6 +449,15 @@ func _draw() -> void:
 	_draw_sign(book)
 
 
+## The box on the deck as a roof for the rain, in world px.
+func roof() -> Dictionary:
+	var book := _book()
+	if book.is_empty() or _box_image == null:
+		return {}
+	var box := _box_rect(book)
+	return {"image": _box_image, "rect": Rect2(position + box.position, box.size)}
+
+
 ## Where the box is drawn, in world px.
 func _box_rect(book: Dictionary) -> Rect2:
 	var box := _rect(book["box"])

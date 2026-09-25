@@ -72,6 +72,16 @@ func drawn_wide() -> float:
 	return _art.get_size().x * ART_SCALE
 
 
+## The pump's picture and where it is drawn, in world px: a roof for the rain and a
+## reflection for the puddles.
+func roof() -> Dictionary:
+	if _art == null:
+		return {}
+	var box := _box()
+	return {"image": Art.image(ART), "texture": _art,
+		"rect": Rect2(position + box.position, box.size)}
+
+
 func _box() -> Rect2:
 	var size := _art.get_size() * ART_SCALE
 	return Rect2(Vector2(-size.x * 0.5, -size.y * (1.0 - _ground)), size)

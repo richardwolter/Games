@@ -258,6 +258,18 @@ func _shade() -> Shade.Cast:
 ## The recycle box from its art, standing on the node's point with its ground diamond centred
 ## there. The sun's shadow, then the whole box, then the heap, then the near walls cut from
 ## the same picture over it, which is what puts the catch inside.
+## Where the crate's picture is drawn, in world px, and the picture itself: a roof for the
+## rain (`Weather`). Null image with no art.
+func roof() -> Dictionary:
+	if _art == null:
+		return {}
+	var size := _art.get_size() * ART_SCALE
+	return {
+		"image": Art.image(ART),
+		"rect": Rect2(position + Vector2(-size.x * 0.5, -ART_GROUND * ART_SCALE), size),
+	}
+
+
 func _draw_art() -> void:
 	var size := _art.get_size() * ART_SCALE
 	var box := Rect2(Vector2(-size.x * 0.5, -ART_GROUND * ART_SCALE), size)

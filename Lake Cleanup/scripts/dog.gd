@@ -1312,6 +1312,16 @@ func _place() -> void:
 ##
 ## Sitting is three things (2026-09-22, Richard): a still mood of its own, the wait at the
 ## crate after a delivery, and being petted. The run and the walk are the slot's own pair.
+## The dog again for a puddle's reflection, onto `on`, flipped by the caller about its feet.
+## Only a dog on land has one: a swimming dog is not beside a puddle.
+func reflect_on(on: CanvasItem) -> void:
+	if not DogArt.ready(breed) or not _on_land():
+		return
+	var name := _showing()
+	DogArt.stamp(on, name, DogArt.frame_at(name, _age, breed), Vector2.ZERO, HEIGHT,
+		facing_left, 0.0, Color.WHITE, breed)
+
+
 func _showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:

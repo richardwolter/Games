@@ -171,6 +171,7 @@ func _physics_process(_delta: float) -> void:
 		26:
 			_stage_nature()
 		27:
+			_stage_rain()
 			_stage_foam()
 		28:
 			_stage_new_tracks()
@@ -5294,6 +5295,91 @@ func _stage_pointer() -> void:
 
 ## Nature coming back (2026-09-16): the flora on the shores and the fish in the clean water
 ## follow the filth map and the lake's clean share, and the glint uniform follows the share.
+## The rain (2026-09-25): at most five showers a run, atmosphere only, drops landing on what
+## is drawn — the hut's thatch, the lake, the island — puddles on dry ground, and lightning.
+func _stage_rain() -> void:
+	var weather: Weather = _main.get(&"_weather")
+	var puddles: Puddles = _main.get(&"_puddles")
+	var day: DayCycle = _main.get(&"_day")
+	_check(weather != null and puddles != null, "the lake has its weather and its puddles", "")
+	if weather == null or puddles == null:
+		return
+	_check(Weather.MOST == 5, "five showers a run at most", str(Weather.MOST))
+	var money_was: float = _main.sludge
+	var pollution_was: float = _main.pollution
+	var tint_was := day.tint
+	weather.showers = 0
+	weather.pour(30.0)
+	_check(weather.showers == 1, "a shower counts against the run's five", str(weather.showers))
+	for _i in 30:
+		weather._process(0.5)
+	_check(weather.rain() > 0.95, "the shower comes in", "%.2f" % weather.rain())
+	_check(is_equal_approx(day.overcast, weather.rain()), "and the day is told", "%.2f" % day.overcast)
+	day._process(0.0)
+	_check(day.tint.get_luminance() < tint_was.get_luminance(), "the light goes grey under it",
+		"%.3f against %.3f" % [day.tint.get_luminance(), tint_was.get_luminance()])
+	var drops: int = (weather.get(&"_drop_at") as PackedVector2Array).size()
+	_check(drops > 0 and drops <= Weather.DROPS_MOST, "drops are falling in view, under the cap", str(drops))
+	_check(is_equal_approx(_main.sludge, money_was) and is_equal_approx(_main.pollution, pollution_was),
+		"and rain moves no money and no pollution", "")
+	# Where a drop lands: on the hut's thatch where the hut is drawn, on the lake out in the
+	# water, on the ground on the island's lawn.
+	weather.set(&"_roofs", _main.call(&"_weather_roofs"))
+	var hut: Rect2 = _main.call(&"_shed_picture")
+	var hit: Array = weather.call(&"_landing", hut.get_center())
+	_check(int(hit[0]) == Weather.Hit.ROOF and float((hit[1] as Vector2).y) < hut.get_center().y,
+		"a drop on the hut lands on its roof", "hit %d at %s" % [int(hit[0]), str(hit[1])])
+	var top: float = weather.call(&"_roof_top", (weather.get(&"_roofs") as Array)[0], hut.get_center().x)
+	_check(top > hut.position.y - 0.5, "measured off the thatch, not the picture's box",
+		"%.1f against %.1f" % [top, hut.position.y])
+	var far := Iso.tile_to_world(Iso.ISLAND_CENTRE.x + 20.0, Iso.ISLAND_CENTRE.y)
+	var wet_hits := 0
+	for _i in 20:
+		var landed: Array = weather.call(&"_landing", far)
+		if int(landed[0]) in [Weather.Hit.WATER, Weather.Hit.PIECE]:
+			wet_hits += 1
+	_check(wet_hits == 20, "a drop out on the lake lands on the water or a piece", str(wet_hits))
+	var lawn_hits := 0
+	for t: Vector2 in puddles.spots():
+		var spot := Iso.tile_to_world(t.x, t.y)
+		var landed: Array = weather.call(&"_landing", spot)
+		if int(landed[0]) in [Weather.Hit.GROUND, Weather.Hit.ROOF]:
+			lawn_hits += 1
+	_check(lawn_hits == puddles.spots().size(), "a drop on the island lands on the ground", "")
+	# Puddles: laid on dry ground only, filling under the rain.
+	_check(puddles.spots().size() >= 4, "the island has puddle spots", str(puddles.spots().size()))
+	var bad := 0
+	for t: Vector2 in puddles.spots():
+		if not puddles.may_lie(t):
+			bad += 1
+	_check(bad == 0, "every puddle off the water, the hut, the crate and the pump", str(bad))
+	_check(puddles.wet > 0.2, "and they fill in the rain", "%.2f" % puddles.wet)
+	_check((_main.get(&"_angler") as Node).has_method(&"reflect_on"),
+		"the angler can be drawn in a puddle", "")
+	# Lightning: a flash and gone.
+	weather.strike()
+	weather._process(0.02)
+	_check(weather.get(&"_flash") > 0.5, "a strike flashes", "%.2f" % float(weather.get(&"_flash")))
+	for _i in 10:
+		weather._process(0.1)
+	_check(float(weather.get(&"_flash")) < 0.01, "and is gone within a second", "")
+	# The cap: a sixth shower is not poured.
+	weather.showers = Weather.MOST
+	weather.pour()
+	_check(weather.showers == Weather.MOST, "no sixth shower", str(weather.showers))
+	weather.restore(9, 100.0)
+	_check(weather.showers == Weather.MOST, "a saved count over the cap is held to it", "")
+	# Put the sky back for the stages after.
+	weather.set(&"_left", 0.0)
+	weather.set(&"_rain", 0.0)
+	weather.showers = 0
+	weather.next_in = 9999.0
+	weather._process(0.0)
+	puddles.wet = 0.0
+	day.overcast = 0.0
+	day.flash = 0.0
+
+
 func _stage_nature() -> void:
 	var flora: Flora = _main.get(&"_flora")
 	var fish: Fish = _main.get(&"_fish")

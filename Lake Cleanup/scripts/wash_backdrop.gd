@@ -366,6 +366,9 @@ func _process(delta: float) -> void:
 ## One frame. Its own function so a harness can run the clock by hand.
 func step(delta: float) -> void:
 	_clock += delta
+	# The shower greys the view as it greys the lake; the flash whitens it.
+	var grey := Color.WHITE.lerp(RAIN_TINT, Weather.now).lerp(Color(1.5, 1.5, 1.6), Weather.flash_now)
+	modulate = Color(tint.r * DARKEN * grey.r, tint.g * DARKEN * grey.g, tint.b * DARKEN * grey.b)
 	_bark_in = maxf(_bark_in - delta, 0.0)
 	_drive_birds(delta)
 	_drive_dogs(delta)
@@ -589,10 +592,52 @@ func _draw() -> void:
 	_tile(_lawn, lake.end.y)
 	_draw_dogs()
 	_draw_birds()
+	_draw_rain(lake)
 	# Whatever a tall window leaves under the lawn strip: its last row, carried down.
 	var lawn_end := lake.end.y + _lawn.get_height() * PIXEL
 	if lawn_end < size.y:
 		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light)
+
+
+## The rain over the view from the pump (2026-09-25, see `Weather`): it reads the lake's
+## shower through `Weather.now` rather than being handed one, so the room needs no wiring.
+## No drop is kept: each is a hash of its index and the clock, so the rain costs nothing but
+## the drawing. Rings open on the water where drops land, on the stepped clock.
+const RAIN_DROPS := 150
+const RAIN_SPEED := 520.0
+const RAIN_RINGS := 22
+const RAIN_TINT := Color(0.66, 0.72, 0.82)
+
+
+func _draw_rain(lake: Rect2) -> void:
+	var rain := Weather.now
+	if rain <= 0.0:
+		return
+	var pale := Color(_palette.foam_light, 0.55)
+	var cell := Vector2(PIXEL, PIXEL)
+	var drops := int(RAIN_DROPS * rain)
+	var tall := size.y + 40.0
+	for k in drops:
+		var y := fposmod(_hash(k, 7) * tall + _clock * RAIN_SPEED * (0.8 + 0.4 * _hash(k, 9)), tall) - 20.0
+		var x := fposmod(_hash(k, 8) * (size.x + 60.0) - y * 0.22, size.x + 60.0) - 30.0
+		for step in 4:
+			var at := Vector2(x + float(step) * PIXEL * 0.35, y - float(step) * PIXEL * 1.6)
+			draw_rect(Rect2(at.snapped(cell), cell), pale if step < 2 else Color(pale, 0.25))
+	var now := stepped()
+	var ring_ink := Color(_palette.foam_light, 0.5)
+	for k in int(RAIN_RINGS * rain):
+		var beat := int(now * 2.5 + _hash(k, 3) * 4.0)
+		var age := fposmod(now * 2.5 + _hash(k, 3) * 4.0, 1.0)
+		var at := Vector2(
+			_hash(k, beat) * size.x,
+			lake.position.y + (0.25 + 0.75 * _hash(k, beat + 11)) * lake.size.y
+		)
+		var span := (2.0 + age * 5.0) * PIXEL
+		for side in [-1.0, 1.0]:
+			draw_rect(Rect2((at + Vector2(side * span, 0.0)).snapped(cell), cell),
+				Color(ring_ink, ring_ink.a * (1.0 - age)))
+		draw_rect(Rect2((at + Vector2(-span * 0.5, -PIXEL)).snapped(cell),
+			Vector2(snappedf(span, PIXEL), PIXEL)), Color(ring_ink, ring_ink.a * 0.5 * (1.0 - age)))
 
 
 func _draw_water(lake: Rect2) -> void:

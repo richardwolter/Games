@@ -3215,6 +3215,54 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   swimming as a shadow when walked up to, the brood taking off at a landing, the facing
   rows, and no catch or pay.
 
+### Rain (2026-09-25, `/grill-me` with Richard)
+Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
+the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
+`scripts/puddles.gd` (`Puddles`, z 3 on the island), wired in `Lake._start_weather`.
+- **When**: `Weather.MOST` 5 a run, rolled at random (`FIRST_AFTER` 4-12 min, then `GAP`
+  6-14 min of play), each shower `LASTS` 1-2 min, easing in over `RISE` and out over `CLEAR`.
+  The clock stops behind the menu; a shower already falling keeps falling there. **A shower
+  never starts** over the intro, the first steps, a tour or the ending (`Lake._rain_held`,
+  tried again `HELD_RETRY` later). Saved as `showers` and `rain_next`; absent reads as none
+  yet, so no `SAVE_VERSION` bump. A shower in progress is not saved.
+- **The light goes grey through the day, not beside it**: `DayCycle.overcast` and `flash`,
+  folded over the hour in `DayCycle._weather` (`RAIN_TINT`, `RAIN_INK`, `FLASH_TINT`,
+  `FLASH_INK`). Everything that reads the day (the world's modulate, every shadow) follows
+  with no wiring.
+- **Where a drop lands is decided when it is born**: a spot in the view is picked and asked
+  once what is drawn there (`Weather._landing`): a roof, a floating piece
+  (`LakeGrid.perch_point`, `PIECE_ODDS` of a tile's drops), the lake (`WaterSplash.ripple`,
+  held under `RING_SHARE` of the splash layer's cap through the new `ripples_up`) or the
+  ground. Only drops in view cost anything. Streaks and splash bits are whole art pixels.
+- **Roofs are silhouettes measured off the art** (`_tops`, topmost opaque row per column):
+  the hut, the crate (`Yard.roof`), the pump (`Pump.roof`) and the piers' boxes
+  (`Dropoff.roof`). Walkers and hulls are a rounded box over their drawing. `DRIP_ODDS` of
+  roof drops run to the eave, hang `DRIP_HANG` and fall to the picture's foot.
+- **Puddles**: `COUNT` spots found once off a fixed seed on the island's dry ground, clear of
+  the water's edge (`OFF_WATER`), the hut, the crate and the pump. They fill over `FILL` s
+  of rain and dry over `DRY` s after it. Whole-pixel blobs in the clean ramp, see-through;
+  rain on one rings it. **Reflections**: a clipped child (`clip_children`) draws the hut, the
+  pump, the angler and the dogs upside down about their feet (`Angler.reflect_on`,
+  `Dog.reflect_on`), only where a puddle is. Nothing saved.
+- **Lightning**: in a shower over `FLASH_FROM`, a roll every `FLASH_GAP` at `FLASH_ODDS`; two
+  pulses, bright then an echo, and thunder `THUNDER_AFTER` later. No bolt, by decision.
+- **Elsewhere**: the wash room's backdrop rains and rings its lake off `Weather.now` and
+  greys and flashes its modulate; the shed's window shaft thins to `RAIN_SUN` and flashes by
+  `FLASH_SUN`; the menu's lake rains as the lake does.
+- **Sound is Nuven's, not built**: `Weather` loads `assets/sfx/rain.ogg` and
+  `thunder_1..3.wav` on the Ambience bus when they exist and is silent until then. Add them
+  to `tools/build_sfx.py`'s `PLAN` (rain as a loop) when the recordings arrive.
+- **Out of scope, by decision**: any gameplay effect, a drawn bolt, a settings toggle, rain on
+  a timer.
+- **Numbers are first guesses** for Richard's eye. **Open**: the frame cost of a shower has
+  not been measured on `bench_frames` against the 8 ms bar; the wash room's backdrop greys
+  twice if the room is opened mid-shower (its `tint` is read off a day already grey).
+- `test_lake`'s `_stage_rain` guards the cap, the ease-in, the grey light, drops under the
+  cap, no money or pollution moved, roof/water/ground landings, puddles on allowed ground and
+  filling, the flash coming and going, and a saved count held to the cap. Probe:
+  `tools/shot_rain.tscn` (desktop build, `--fixed-fps 60`, own save, under its own node)
+  saves `tools/last_rain_{far,near,flash}.png` and `last_rain.log`.
+
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
 **2026-09-18**: the five sell-by-tier tracks and `tier_pay` are deleted, not shelved.
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);

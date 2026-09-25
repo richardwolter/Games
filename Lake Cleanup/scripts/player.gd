@@ -873,6 +873,15 @@ func _draw_blocked() -> void:
 ## on top of it.
 ##
 ## No day, no shadow — see Dog._draw_shadow for why a guessed sun is worse than none.
+## The figure again for a puddle's reflection, onto `on`, whose transform the caller has already
+## flipped about the angler's feet (`Puddles.draw_reflections`). The same frame as the figure.
+func reflect_on(on: CanvasItem) -> void:
+	var shown := _frame(0.0, 0.0)
+	if shown.is_empty() or _sheet == null:
+		return
+	on.draw_texture_rect_region(_sheet, shown["box"] as Rect2, shown["region"] as Rect2)
+
+
 func _draw_shadow(sunk: float, land_shift: float) -> void:
 	if day == null:
 		return
