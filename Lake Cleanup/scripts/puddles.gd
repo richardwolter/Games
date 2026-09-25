@@ -15,6 +15,18 @@ const SIZE := Vector2(1.3, 2.2)
 const APART := 4.5
 const OFF_WATER := 40.0
 const OFF_SHED := 0.8
+## A puddle beside the hut runs up towards its walls and stops short (Richard, 2026-09-25:
+## "should not be cut straight like that, it should flow to close to the shed door and
+## walls, but not too close"). `OFF_SHED` only keeps a puddle's *middle* off the hut; its
+## cells come to within `SHED_NEAR` tiles of the walls (`DOOR_NEAR` in front of the door),
+## measured round the footprint's corners, and over the last `SHED_SOFT` their reach is
+## pushed up with the edge noise, so the water fills there last, dries there first and its
+## edge wanders rather than running parallel to the wall.
+const SHED_NEAR := 0.3
+const DOOR_NEAR := 0.75
+const SHED_SOFT := 0.8
+## The door, as a fraction along the hut's front (+y) face; `Lake.DOOR_ALONG`'s number.
+const DOOR_ALONG := 0.2
 const OFF_CRATE := 0.6
 
 ## Seconds of full rain to fill, and seconds to dry after it stops.
@@ -111,7 +123,7 @@ func _lay() -> void:
 			rng.randf_range(-Iso.ISLAND_RADIUS.x, Iso.ISLAND_RADIUS.x),
 			rng.randf_range(-Iso.ISLAND_RADIUS.y, Iso.ISLAND_RADIUS.y)
 		)
-		if not may_lie(t):
+		if not may_lie(t) or Iso.in_shed(t.x, t.y, OFF_SHED):
 			continue
 		var clear := true
 		for other in _spots:
@@ -148,7 +160,10 @@ func _shape(k: int, rng: RandomNumberGenerator) -> void:
 			for lobe in lobes:
 				var d := (t - _spots[k] - Vector2(lobe.x, lobe.y)).length() / lobe.z
 				best = minf(best, d)
-			best *= 1.0 + WOBBLE * (_noise(k, float(gx) / WOBBLE_CELL, float(gy) / WOBBLE_CELL) - 0.5)
+			var wobble := _noise(k, float(gx) / WOBBLE_CELL, float(gy) / WOBBLE_CELL)
+			best *= 1.0 + WOBBLE * (wobble - 0.5)
+			var edge := _shed_clear(t) + SHED_SOFT * (0.4 + 0.8 * wobble)
+			best += clampf((edge - shed_gap(t)) / SHED_SOFT, 0.0, 1.0)
 			if best > 1.0 or not may_lie(t):
 				continue
 			cells.append(at)
@@ -173,7 +188,7 @@ func may_lie(t: Vector2) -> bool:
 	# On the grass only (Richard): sand drinks the rain and darkens instead (`sand_wet`).
 	if not Iso.on_lawn(t) or Iso.past_water(t) > -OFF_WATER:
 		return false
-	if Iso.in_shed(t.x, t.y, OFF_SHED):
+	if shed_gap(t) < _shed_clear(t):
 		return false
 	if crate_tile != Vector2.INF and Yard.covers(crate_tile, t, OFF_CRATE):
 		return false
@@ -201,6 +216,22 @@ func tick(rain: float, flash: float, delta: float) -> void:
 		_pushed_wet = sand_wet
 		for ground in grounds:
 			if is_instance_valid(ground):
+## How far a tile spot is from the hut's walls, in tiles, round the corners; 0 inside.
+static func shed_gap(t: Vector2) -> float:
+	var mid := Iso.shed_centre()
+	var dx := maxf(absf(t.x - mid.x) - Iso.SHED_FOOT.x, 0.0)
+	var dy := maxf(absf(t.y - mid.y) - Iso.SHED_FOOT.y, 0.0)
+	return sqrt(dx * dx + dy * dy)
+
+
+## The least gap the water keeps from the hut here: wider before the door, eased in.
+static func _shed_clear(t: Vector2) -> float:
+	var mid := Iso.shed_centre()
+	var door := Vector2(mid.x + Iso.SHED_FOOT.x * DOOR_ALONG, mid.y + Iso.SHED_FOOT.y)
+	var near := clampf(1.0 - door.distance_to(t) / 1.4, 0.0, 1.0)
+	return lerpf(SHED_NEAR, DOOR_NEAR, smoothstep(0.0, 1.0, near))
+
+
 				ground.set_wet(sand_wet)
 	var marks_were := _marks.size()
 	var m := 0

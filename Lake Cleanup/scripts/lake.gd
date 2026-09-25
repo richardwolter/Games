@@ -2824,6 +2824,7 @@ func _set_settings(open: bool) -> void:
 		_settings.pull_prefs()
 	_settings_open = open
 	_settings.visible = open
+	_pause_world(open and not _in_menu)
 	# Available on every screen except itself now, not just when the shed happens to be
 	# closed — the shed check here was dead in practice anyway (nothing re-ran this when the
 	# shed opened or closed on its own), and the button being covered while the shed was open
@@ -2836,6 +2837,44 @@ func _set_settings(open: bool) -> void:
 	# emptied the screen. What is underneath is none of this panel's business.
 	_push_rooms()
 	_hold_the_angler()
+
+
+## The settings board pauses the game (Richard, 2026-09-25: "ESC and entering settings
+## should pause the game"). **The world stops and the water moves**: every walker, hull,
+## net, flight, bird, animal and the day are switched off where they stand, and the lake's
+## own clocks (the play clock, the autosave, the bonus, the ending's search, the tours) are
+## not run; the water shader, the rubbish's bob, the rain's drops and the sound carry on.
+## Not the shop, the shed or the wash room, by decision. Not a tree pause: the lake itself
+## has to keep reading the board's input and drawing the HUD, and the menu over the lake
+## is a pose of its own. See `_world_frozen` for what is switched off.
+var _world_paused := false
+
+
+func _pause_world(on: bool) -> void:
+	if on == _world_paused:
+		return
+	_world_paused = on
+	var mode := Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
+	for node in _world_frozen():
+		node.process_mode = mode
+
+
+## The nodes a paused game switches off. Whatever moves the run on and is not the water.
+func _world_frozen() -> Array[Node]:
+	var out: Array[Node] = []
+	for node in [_angler, _net, _net2, _haul, _flock, _day, _wildlife, _fish, _flora]:
+		if node != null:
+			out.append(node)
+	for boat in _boats:
+		out.append(boat)
+	for dog in _dogs:
+		out.append(dog)
+	return out
+
+
+## Is the game paused behind the settings board.
+func world_paused() -> bool:
+	return _world_paused
 
 
 ## How often to ask whether the lake is finished.
@@ -2867,6 +2906,12 @@ func _look_for_the_end(delta: float) -> void:
 		return
 	_clean_check_in = CLEAN_CHECK_EVERY
 	_left_over = _grid.piece_count() if _grid != null else 0
+	# The meter measures the water. Empty water reads 0% at once, whether or not the last
+	# piece has landed in the crate yet (2026-09-25: it sat at 1% over a finished lake,
+	# the float dust of thousands of subtractions rounded up).
+	if _grid != null and _left_over == 0:
+		_filth_left = 0.0
+		pollution = 0.0
 	_check_cleaned()
 
 
@@ -4979,7 +5024,7 @@ func _process(delta: float) -> void:
 	_part_the_fleet(delta)
 	_remap_filth(delta)
 	_push_patches(delta)
-	if not _in_menu:
+	if not _in_menu and not _world_paused:
 		_tick_bonus(delta)
 		_arrival_step()
 		_led_step(delta)
@@ -4998,7 +5043,7 @@ func _process(delta: float) -> void:
 
 	# Nothing is decided behind the menu: no ending found, no run clocked, nothing written.
 	# The world there is a pose, and a pose has nothing to save that was not saved going in.
-	if not _in_menu:
+	if not _in_menu and not _world_paused:
 		_look_for_the_end(delta)
 		_tick_play_log(delta)
 
@@ -5441,7 +5486,7 @@ func _start_weather() -> void:
 	_weather.view = _visible_world_rect
 	_weather.roofs = _weather_roofs
 	_weather.held = _rain_held
-	_weather.paused = func() -> bool: return _in_menu
+	_weather.paused = func() -> bool: return _in_menu or _world_paused
 	add_child(_weather)
 
 

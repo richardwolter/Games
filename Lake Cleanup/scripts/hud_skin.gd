@@ -324,7 +324,8 @@ func snap_meter() -> void:
 
 func _process(delta: float) -> void:
 	var wanted := clampf(pollution, 0.0, 1.0)
-	if not is_equal_approx(_shown, wanted):
+	# Exactly, not approximately: a sliver left over the empty lake rounds up to 1%.
+	if _shown != wanted:
 		_shown = lerpf(_shown, wanted, clampf(METER_EASE * delta, 0.0, 1.0))
 		if absf(_shown - wanted) < 0.0005:
 			_shown = wanted

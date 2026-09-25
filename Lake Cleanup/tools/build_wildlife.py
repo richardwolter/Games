@@ -382,7 +382,13 @@ def rabbit(pose: str) -> Image.Image:
     return img
 
 
-FOX_STRIDE = [((3, 4), (10, 11)), ((2, 5), (9, 12)), ((3, 4), (10, 11)), ((4, 3), (11, 10))]
+# A fox's leg is one pixel wide and bends (Richard, 2026-09-25: the first cut's were "too
+# thick and stiff/straight"): hip, joint, foot, three rows down. Each step of the trot swings
+# the near and far legs of a pair opposite ways, `FOX_SWING` pixels at the foot and half that
+# at the joint; the hind leg's hock kicks back a pixel. The far legs draw in the shade.
+FOX_SWING = [0, 1, 0, -1]
+FOX_STRIDE = FOX_SWING
+FOX_LEGS = ((3, False), (5, True), (11, False), (13, True))  # (hip x, is a far leg)
 
 
 def fox(pose: str, step: int = 0) -> Image.Image:
@@ -416,12 +422,21 @@ def fox(pose: str, step: int = 0) -> Image.Image:
     tail_up = back - 4 if run else back - 3
     d.polygon([(12, back - 3), (17, tail_up), (17, tail_up + 2), (12, back - 1)], fill=FOX)
     img = outline(img, OUTLINE_BROWN)
-    fronts, backs = FOX_STRIDE[step]
-    if run:
-        fronts, backs = ((1, 2), (13, 14)) if step % 2 == 0 else ((5, 6), (9, 10))
-    for x in (*fronts, *backs):
-        for y in range(back + 1, base + 1):
-            put(img, x, y, FOX_DARK)
+    swing = (2 if step % 2 == 0 else -2) if run else FOX_SWING[step]
+    for hip, far in FOX_LEGS:
+        hind = hip > 8
+        # A pair's two legs swing opposite ways; front and hind pairs are half a stride apart.
+        s = (-swing if far else swing) * (-1 if hind else 1)
+        joint = hip + (s // 2 if s >= 0 else -((-s) // 2)) + (1 if hind else 0)
+        foot = hip + s
+        ink = mix(FOX_DARK, BLACK, 0.35) if far else FOX_DARK
+        put(img, hip, back + 1, ink)
+        put(img, joint, back + 2, ink)
+        put(img, foot, base, ink)
+        if run and abs(s) >= 2:
+            # Stretched out at a gallop the leg lies longer: fill the gap between the joint
+            # and the foot so it reads as one limb, not two dots.
+            put(img, (joint + foot) // 2, base, ink)
     for x in range(5, 12):
         put(img, x, back - 3, FOX_LIT)
     put(img, 17, tail_up + 1, FOX_WHITE)

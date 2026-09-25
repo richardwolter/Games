@@ -640,7 +640,7 @@ const RAIN_TINT := Color(0.66, 0.72, 0.82)
 ## bolt rather than rolling a second one (`BOLT_HOLD`).
 const BOLT_INK := Color(0.96, 0.95, 1.0)
 const BOLT_GLOW := Color(0.78, 0.8, 1.0, 0.45)
-const BOLT_FROM := 0.5
+const BOLT_FROM := 0.25
 const BOLT_HOLD := 0.6
 const BOLT_STEPS := 14
 const BOLT_ACROSS := Vector2(0.12, 0.88)
@@ -649,7 +649,7 @@ const BOLT_ACROSS := Vector2(0.12, 0.88)
 func _draw_bolt(foot: float) -> void:
 	if not bolt_shown():
 		return
-	var lit := clampf(Weather.flash_now * 1.4, 0.0, 1.0)
+	var lit := clampf(Weather.flash_now / Weather.FLASH_PEAK, 0.0, 1.0)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _bolt_seed
 	var at := Vector2(snappedf(_bolt_x * size.x, PIXEL), 0.0)

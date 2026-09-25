@@ -47,6 +47,11 @@ const FLEE_REACH := 140.0
 const RABBIT_HOP_FPS := 6.0
 const FOX_TROT_FPS := 7.0
 const LAND_PRINT_EVERY := 10.0
+## Where they live (Richard, 2026-09-25: "more concentrated on grass and near forest"): the
+## bank's lawn towards the treeline, `LAND_HOME` tiles out of the water (the woods thicken
+## from `Ground.WOOD_FROM`), and now and then a trip down to the sand and back.
+const LAND_HOME := Vector2(6.0, 9.5)
+const LAND_BEACH_ODDS := 0.15
 ## The meter's reading the late arrivals wait for, and they fill in from it to a cleaned lake.
 const LATE_FROM := 0.6
 ## Seconds between reconciling what should be about with what is.
@@ -914,14 +919,33 @@ enum Land { SIT, MOVE, FLEE }
 
 ## A rabbit or a fox comes out of the trees behind its bit of beach and sits on the sand.
 func _new_land(kind: StringName, spot: Dictionary) -> Dictionary:
-	var land: Vector2 = spot["land"]
 	var inland := -(spot["normal"] as Vector2)
-	var from := land + inland * _rng.randf_range(40.0, 70.0)
+	var home := _inland_to(spot["land"], inland, _rng.randf_range(LAND_HOME.x, LAND_HOME.y))
+	var from := home + inland * _rng.randf_range(40.0, 70.0)
 	return {
-		"kind": kind, "spot": spot, "at": from, "to": land, "state": Land.MOVE,
+		"kind": kind, "spot": spot, "at": from, "to": home, "home": home, "state": Land.MOVE,
 		"timer": 0.0, "facing": 1.0, "clock": _rng.randf() * 3.0, "fade": 0.0, "walked": 0.0,
 		"pose": _rng.randi_range(0, 1),
 	}
+
+
+## From a point on the bank's sand, straight inland until the ground is `out` tiles out of
+## the water. World in, world out.
+func _inland_to(from: Vector2, inland: Vector2, out: float) -> Vector2:
+	var at := from
+	for i in 80:
+		var tile := Iso.world_to_tile(at)
+		if Ground.out_of_water(tile.x, tile.y) >= out:
+			break
+		at += inland * 4.0
+	return at
+
+
+## The bank's ground a rabbit or a fox may walk: dry, off the water's edge, short of the woods.
+func _on_bank(at: Vector2) -> bool:
+	var tile := Iso.world_to_tile(at)
+	var out := Ground.out_of_water(tile.x, tile.y)
+	return out > 0.3 and out < Ground.WOOD_FROM + 0.5
 
 
 func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
@@ -943,8 +967,19 @@ func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 				var spot: Dictionary = c["spot"]
 				var n: Vector2 = spot["normal"]
 				var along := Vector2(-n.y, n.x) * (1.0 if _rng.randf() < 0.5 else -1.0)
-				var to := at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + n * _rng.randf_range(-8.0, 8.0)
-				if _on_sand(to, "bank"):
+				var home: Vector2 = c.get("home", at)
+				var to: Vector2
+				if _rng.randf() < LAND_BEACH_ODDS and not c.get("on_beach", false):
+					# Down to the sand for a look at the water.
+					to = (spot["land"] as Vector2) + along * _rng.randf_range(0.0, 20.0)
+					c["on_beach"] = true
+				elif c.get("on_beach", false):
+					to = home + along * _rng.randf_range(0.0, 20.0)
+					c["on_beach"] = false
+				else:
+					# Grazing along the grass, pulled back towards home.
+					to = at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + (home - at) * 0.4
+				if _on_bank(to):
 					c["to"] = to
 					c["state"] = Land.MOVE
 				else:

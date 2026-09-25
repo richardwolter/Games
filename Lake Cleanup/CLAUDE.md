@@ -3272,6 +3272,52 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   ground. Only drops in view cost anything. Streaks and splash bits are whole art pixels.
 - **Roofs are silhouettes measured off the art** (`_tops`, topmost opaque row per column):
   the hut, the crate (`Yard.roof`), the pump (`Pump.roof`) and the piers' boxes
+### Eight More Fixes (2026-09-25, second `/grill-me` with Richard the same day)
+- **Rabbits and foxes live on the bank's lawn by the trees** (`Wildlife.LAND_HOME` 6-9.5
+  tiles out of the water, the woods thickening from `Ground.WOOD_FROM` 10), grazing along
+  the grass pulled back towards home, a trip to the sand at `LAND_BEACH_ODDS` and back.
+  `_on_bank` is where they may walk. Prints are still sand only.
+- **The fox's legs are one pixel wide and bend** (`FOX_SWING`, `FOX_LEGS`): hip, joint, foot,
+  the pair's legs swinging opposite ways, the hind hock kicked back, the far legs darker.
+- **Lightning at half strength** (`Weather.FLASH_PEAK` 0.5): everything reading the flash
+  follows; the wash room's bolt reads the flash against the peak (`BOLT_FROM` 0.25).
+- **The meter reads 0% over empty water**: `_look_for_the_end` zeroes `pollution` the
+  moment the field holds no piece, not only once the last has landed in the crate, and the
+  HUD's ease compares exactly (`is_equal_approx` let a sliver stand, which rounds up to 1%).
+- **Glints are soft pops** (`water.gdshader`): a 2x2 of art pixels that swells up to
+  `GLINT_UP` (3) steps and back over its cycle, each cell on its own phase, `glint_fps` 0.72
+  cycles a second where it was 5 ticks: a seventh as many, each seen seven times as long.
+  Sun-path glints were offered and turned down (the strips retired in Sep 2026).
+- **A puddle by the hut runs up to the walls and stops short** (`Puddles.shed_gap`,
+  `SHED_NEAR` 0.3, `DOOR_NEAR` 0.75 in front of the door, `SHED_SOFT` 0.8): measured round
+  the footprint's corners, the reach pushed up with the edge noise near the walls, so the
+  edge wanders instead of the old straight cut at `OFF_SHED`, which now only keeps a
+  puddle's middle off the hut. `DOOR_ALONG` must match `Lake.DOOR_ALONG` (`test_lake`).
+- **Half as many fish schools again** (`Fish.TIERS` 27/14/5, per 36/83/360 tiles). Their
+  rings take half the splash layer's cap at most, like the wildlife's: raised, they filled it.
+- **The settings board pauses the game** (`Lake._pause_world`, `_world_frozen`,
+  `world_paused`): the angler, the nets, the haul, the hulls, the dogs, the birds, the
+  wildlife, the fish, the flora and the day are switched off where they stand, and the
+  lake's clocks (play clock, autosave, bonus, ending search, tours, the weather's schedule)
+  do not run. The water, the rubbish's bob, falling rain and the sound carry on. Not a
+  tree pause, by design; not the shop, shed or wash room, by decision.
+
+### Rain (2026-09-25, `/grill-me` with Richard)
+Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
+the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
+`scripts/puddles.gd` (`Puddles`, z 3 on the island), wired in `Lake._start_weather`.
+- **When**: `Weather.MOST` 5 a run, rolled at random (`FIRST_AFTER` 4-12 min, then `GAP`
+  6-14 min of play), each shower `LASTS` 1-2 min, easing in over `RISE` and out over `CLEAR`.
+  The clock stops behind the menu; a shower already falling keeps falling there. **A shower
+  never starts** over the intro, the first steps, a tour or the ending (`Lake._rain_held`,
+  tried again `HELD_RETRY` later). Saved as `showers` and `rain_next`; absent reads as none
+  yet, so no `SAVE_VERSION` bump. A shower in progress is not saved.
+- **The light goes grey through the day, not beside it**: `DayCycle.overcast` and `flash`,
+  folded over the hour in `DayCycle._weather` (`RAIN_TINT`, `RAIN_INK`, `FLASH_TINT`,
+  `FLASH_INK`). Everything that reads the day (the world's modulate, every shadow) follows
+  with no wiring.
+- **Where a drop lands is decided when it is born**: a spot in the view is picked and asked
+  once what is drawn there (`Weather._landing`): a roof, a floating piece
   (`Dropoff.roof`). Walkers and hulls are a rounded box over their drawing. `DRIP_ODDS` of
   roof drops run to the eave, hang `DRIP_HANG` and fall to the picture's foot.
 - **Puddles**: `COUNT` spots found once off a fixed seed on the island's dry ground, clear of

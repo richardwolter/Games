@@ -284,14 +284,20 @@ uniform float patch_soft = 0.42;
 // rather than simply glowing harder. It is the same water, catching the sun at last.
 uniform float sparkle : hint_range(0.0, 1.0) = 0.0;
 
-// The tease of that sparkle on a lake with work left in it: rare single art-pixel pops of
-// the top step on clean water, more of them the cleaner the whole lake is. Nothing while
-// `glint` is zero. One pop per `glint_cell` art pixels square at most, `glint_rate` the
-// odds of a cell popping on a given tick, ticks at `glint_fps`.
+// The tease of that sparkle on a lake with work left in it: rare soft glints on clean
+// water, more of them the cleaner the whole lake is. Nothing while `glint` is zero. One per
+// `glint_cell` art pixels square at most, `glint_rate` the odds of a cell lighting on a
+// cycle, `glint_fps` cycles a second (a glint lives one cycle).
+// **Soft pops since 2026-09-25** (Richard: "too fake and weird, it should look more
+// polished"): a 2x2 of art pixels, not one, that swells up the ramp and back down over its
+// cycle (at most GLINT_UP steps) instead of blinking the top step for a fifth of a second.
+// Each cell runs its own phase, so they never pulse together. Fewer: a cycle is 1.4 s where a
+// tick was 0.2, so a seventh as many, each seen seven times as long.
 uniform float glint : hint_range(0.0, 1.0) = 0.0;
 uniform float glint_cell = 14.0;
 uniform float glint_rate = 0.09;
-uniform float glint_fps = 5.0;
+uniform float glint_fps = 0.72;
+const float GLINT_UP = 3.0;
 
 varying vec2 world_pos;
 
@@ -614,16 +620,19 @@ void fragment() {
 	// finished. Only on water the map calls clean, so a pop never lands in the soup.
 	if (glint > 0.001 && color_t < state_at.x) {
 		vec2 gcell = floor(cell / glint_cell);
-		float tick = floor(TIME * glint_fps);
+		float life = TIME * glint_fps + cell_hash(gcell * 3.1 + vec2(1.3, 7.7));
+		float tick = floor(life);
 		float roll = cell_hash(gcell + vec2(tick * 17.3, tick * 5.9));
 		if (roll < glint * glint_rate) {
 			vec2 inner = cell - gcell * glint_cell;
 			vec2 spot = floor(vec2(
 				cell_hash(gcell * 1.7 + vec2(tick, 3.0)),
 				cell_hash(gcell * 2.3 - vec2(5.0, tick))
-			) * glint_cell);
-			if (inner.x == spot.x && inner.y == spot.y) {
-				shade += 4.0;
+			) * (glint_cell - 1.0));
+			vec2 d = inner - spot;
+			if (d.x >= 0.0 && d.x < 2.0 && d.y >= 0.0 && d.y < 2.0) {
+				// Up the ramp and back, a step at a time: the rounding below makes the fade.
+				shade += sin(fract(life) * PI) * GLINT_UP;
 			}
 		}
 	}

@@ -4749,7 +4749,16 @@ func _stage_music() -> void:
 		_main.call(&"_set_shed", false)
 		_main.call(&"_set_settings", true)
 		_check(station.muffled and not station.indoors, "so does the settings board", "")
+		# And the settings board pauses the game: the world stops, the lake's clock stops.
+		var play_was := float(_main.get(&"_play"))
+		var angler: Node = _main.get(&"_angler")
+		_main._process(0.5)
+		_check(bool(_main.call(&"world_paused")) and angler.process_mode == Node.PROCESS_MODE_DISABLED
+			and is_equal_approx(float(_main.get(&"_play")), play_was),
+			"the settings board pauses the game", "clock %.2f -> %.2f" % [play_was, float(_main.get(&"_play"))])
 		_main.call(&"_set_settings", false)
+		_check(not bool(_main.call(&"world_paused")) and angler.process_mode == Node.PROCESS_MODE_INHERIT,
+			"and closing it lets the game run again", "")
 		_main.call(&"_set_menu", true)
 		_check(station.muffled, "and the upgrades board", "")
 		_main.call(&"_set_menu", false)
@@ -5373,7 +5382,7 @@ func _stage_rain() -> void:
 	# Lightning: a flash and gone.
 	weather.strike()
 	weather._process(0.02)
-	_check(weather.get(&"_flash") > 0.5, "a strike flashes", "%.2f" % float(weather.get(&"_flash")))
+	_check(weather.get(&"_flash") > Weather.FLASH_PEAK * 0.5 and weather.get(&"_flash") <= Weather.FLASH_PEAK, "a strike flashes, no brighter than FLASH_PEAK", "%.2f" % float(weather.get(&"_flash")))
 	for _i in 10:
 		weather._process(0.1)
 	_check(float(weather.get(&"_flash")) < 0.01, "and is gone within a second", "")
@@ -5382,6 +5391,14 @@ func _stage_rain() -> void:
 	weather.pour()
 	_check(weather.showers == Weather.MOST, "no sixth shower", str(weather.showers))
 	weather.restore(9, 100.0)
+	# Up to the hut's walls but not onto them, and no straight cut: the cells keep SHED_NEAR.
+	var closest := INF
+	for cells: PackedVector2Array in puddles.get(&"_cells"):
+		for at in cells:
+			closest = minf(closest, Puddles.shed_gap(Iso.world_to_tile(at)))
+	_check(closest >= Puddles.SHED_NEAR - 0.01, "no puddle water within %.1f tiles of the hut" % Puddles.SHED_NEAR,
+		"%.2f" % closest)
+	_check(Puddles.DOOR_ALONG == float(_main.get(&"DOOR_ALONG")), "the puddles know where the door is", "")
 	_check(weather.showers == Weather.MOST, "a saved count over the cap is held to it", "")
 	# Put the sky back for the stages after.
 	weather.set(&"_left", 0.0)
@@ -5478,7 +5495,7 @@ func _stage_nature() -> void:
 		"and sparsely", "cell %.0f, most %.2f" % [
 			float(_water_material().get_shader_parameter(&"glint_cell")), float(_main.get(&"GLINT_MOST"))])
 	# Early in a run a glint is rare: with three tenths of the water clean, a screen of
-	# nothing but clean water (576 cells at zoom 1, five ticks a second, `glint_rate` a roll)
+	# nothing but clean water (576 cells at zoom 1, `glint_fps` cycles a second, `glint_rate` a roll)
 	# pops less than once in four seconds. The rule, whatever the two constants become.
 	var early := pow(0.3, float(_main.get(&"GLINT_BITE"))) * float(_main.get(&"GLINT_MOST"))
 	# The roll and the tick are the shader's own defaults, which nothing pushes: a material

@@ -74,6 +74,10 @@ const RING_SHARE := 0.45
 const FLASH_FROM := 0.6
 const FLASH_GAP := Vector2(7.0, 18.0)
 const FLASH_ODDS := 0.6
+## How bright a flash gets, 0 to 1: halved on 2026-09-25 (Richard: "reduce flash from
+## lightning"). Everything that reads the flash (the day's tint, the shed's shaft, the wash
+## room) follows.
+const FLASH_PEAK := 0.5
 const THUNDER_AFTER := Vector2(0.6, 3.0)
 
 ## The sounds, when Nuven's recordings exist. Until then the rain is silent, by decision.
@@ -263,7 +267,7 @@ func _tick_flash(delta: float) -> void:
 		if age < 0.45:
 			kept.append(age)
 		if age >= 0.0:
-			var size := 1.0 if i == 0 else 0.6
+			var size := FLASH_PEAK * (1.0 if i == 0 else 0.6)
 			lit = maxf(lit, size * exp(-age * 9.0))
 	_flash_beats = kept
 	_flash = lit
