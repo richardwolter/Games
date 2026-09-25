@@ -5694,6 +5694,20 @@ func _check_land_animals(wild: Wildlife) -> void:
 		if (c["spot"] as Dictionary)["side"] != "bank":
 			island += 1
 	_check(island == 0, "no rabbit or fox on the island", "%d" % island)
+	# The south wood is drawn again over them, the north wood is not.
+	var bank: Ground = null
+	for g: Ground in _main.get(&"_grounds"):
+		if g.layer == Ground.Layer.OUTSIDE:
+			bank = g
+	if bank != null:
+		var middle := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+		var south := Iso.tile_to_world(Iso.CENTRE.x + 42.0, Iso.CENTRE.y + 42.0)
+		var north := Iso.tile_to_world(Iso.CENTRE.x - 42.0, Iso.CENTRE.y - 42.0)
+		_check(bank.covers_at(south) and not bank.covers_at(north) and not bank.covers_at(middle),
+			"the south bank's trees hide the animals behind them, the north's do not", "")
+		_check(Ground.COVER_LAYER > int((wild.get(&"_ground") as Node2D).z_index)
+			and Ground.COVER_LAYER < Lake.IN_FRONT,
+			"over the animals and under the walkers", "")
 	var kept := wild.land_animals().duplicate()
 	var cleared := wild.cleared
 	wild.land_animals().clear()

@@ -1047,6 +1047,15 @@ func _draw_land(on: CanvasItem, c: Dictionary) -> void:
 	else:
 		name = "fox_trot%d" % (int(clock * FOX_TROT_FPS) % 4)
 	var lift := ART if rabbit and state != Land.SIT and name.ends_with("1") else 0.0
+	# The sun's shadow, the dog's own: the silhouette laid on the ground from the feet, in the
+	# day's ink (2026-09-25, Richard: "rabbits and foxes lack shadows"). On the ground, so a
+	# rabbit's hop lifts the animal and leaves its shadow where it is.
+	if day != null:
+		var frame := _region(name)
+		if frame.size.x > 0.0:
+			Flock.stamp(on, _critters, frame, Vector2.ZERO, float(c["facing"]),
+				Shade.tint(day.ink * float(c["fade"])), Shade.lying((c["at"] as Vector2).round(), day.lean, day.stretch),
+				Vector2.ZERO, SCALE / Flock.SCALE)
 	_stamp(on, name, (c["at"] as Vector2).round() - Vector2(0.0, lift), float(c["facing"]), Color(1.0, 1.0, 1.0, float(c["fade"])))
 
 

@@ -3273,6 +3273,14 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
 - **Roofs are silhouettes measured off the art** (`_tops`, topmost opaque row per column):
   the hut, the crate (`Yard.roof`), the pump (`Pump.roof`) and the piers' boxes
 ### Eight More Fixes (2026-09-25, second `/grill-me` with Richard the same day)
+- **The south wood hides what is behind it** (`Ground` `_cover`, `COVER_LAYER` 7,
+  `covers_at`, `COVER_FROM`): the forest trees south of the lake's middle are drawn a second
+  time over the animals (6) and the bees (flora, 3), under the walkers (9). The ground is one
+  layer under everything on land, so a near-side canopy could not hide a rabbit or a bee on
+  the lawn behind it. North trees are not redrawn: their canopies rise away from the lawn,
+  and redrawn they would cover an animal standing in front of them.
+- **Rabbits and foxes throw the sun's shadow** (`_draw_land`, `Shade.lying` in the day's
+  ink, the dog's rule), left on the ground under a rabbit's hop.
 - **Rabbits and foxes live on the bank's lawn by the trees** (`Wildlife.LAND_HOME` 6-9.5
   tiles out of the water, the woods thickening from `Ground.WOOD_FROM` 10), grazing along
   the grass pulled back towards home, a trip to the sand at `LAND_BEACH_ODDS` and back.

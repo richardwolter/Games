@@ -297,6 +297,20 @@ var _prop_points := PackedVector2Array()
 var _prop_uvs := PackedVector2Array()
 var _prop_colors := PackedColorArray()
 var _prop_indices := PackedInt32Array()
+## The south bank's wood drawn a second time, over the animals and the bees (2026-09-25,
+## Richard: "a rabbit and bees over the trees"). The ground is one layer under everything
+## on the land, so a canopy on the near side of the lake could not hide what stands behind
+## it. Only forest trees (`COVER_FROM` tiles out of the water and on) south of the lake's
+## middle: there the canopy rises up the screen over the lawn behind it; on the north bank
+## it rises away from the lawn and covers nothing, and redrawn there it would be drawn over
+## an animal standing in front of it. Under the walkers (9) and the hulls: nobody walks there.
+const COVER_LAYER := 7
+const COVER_FROM := WOOD_FROM - 1.0
+var _cover: Node2D
+var _cover_points := PackedVector2Array()
+var _cover_uvs := PackedVector2Array()
+var _cover_colors := PackedColorArray()
+var _cover_indices := PackedInt32Array()
 
 ## Half the basin's box on the screen's axes, measured once. See `_boxed`.
 var _basin_half := Vector2.ZERO
@@ -594,6 +608,16 @@ func _process(_delta: float) -> void:
 ## was most of what a frame cost. The ground itself is the `Sheet` child, drawn behind this.
 func _draw() -> void:
 	_lay_props()
+	if _cover == null and layer == Layer.OUTSIDE:
+		_cover = Node2D.new()
+		_cover.name = &"Cover"
+		_cover.z_index = COVER_LAYER
+		_cover.z_as_relative = false
+		_cover.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_cover.draw.connect(_draw_cover)
+		add_child(_cover)
+	if _cover != null:
+		_cover.queue_redraw()
 	if not _prop_indices.is_empty():
 		RenderingServer.canvas_item_add_triangle_array(
 			get_canvas_item(),
@@ -605,6 +629,15 @@ func _draw() -> void:
 			PackedFloat32Array(),
 			_prop_atlas.get_rid()
 		)
+
+
+func _draw_cover() -> void:
+	if _cover_indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(
+		_cover.get_canvas_item(), _cover_indices, _cover_points, _cover_colors, _cover_uvs,
+		PackedInt32Array(), PackedFloat32Array(), _prop_atlas.get_rid()
+	)
 
 
 ## The trees, rocks and tufts on one tile, standing on `mid`.
@@ -621,6 +654,27 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
 		uv, Color.WHITE
 	)
+	if covers_at(mid):
+		var base := _cover_points.size()
+		for k in 4:
+			_cover_points.append(_prop_points[_prop_points.size() - 4 + k])
+			_cover_uvs.append(_prop_uvs[_prop_uvs.size() - 4 + k])
+			_cover_colors.append(Color.WHITE)
+		_cover_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+
+
+## Is a prop standing here one of the south wood's, drawn again over the animals.
+func covers_at(foot: Vector2) -> bool:
+	if layer != Layer.OUTSIDE:
+		return false
+	var t := Iso.world_to_tile(foot)
+	var middle := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
+	return foot.y > middle.y and out_of_water(t.x, t.y) >= COVER_FROM
+
+
+## How many props the cover draws again, for the harness.
+func cover_count() -> int:
+	return _cover_indices.size() / 6
 
 
 ## A tree's or a rock's shadow: the same picture again, laid out on the ground away from the
@@ -670,6 +724,10 @@ func _lay_props() -> void:
 	_prop_uvs.resize(0)
 	_prop_colors.resize(0)
 	_prop_indices.resize(0)
+	_cover_points.resize(0)
+	_cover_uvs.resize(0)
+	_cover_colors.resize(0)
+	_cover_indices.resize(0)
 	if _props.is_empty():
 		return
 	if _placed.is_empty():
