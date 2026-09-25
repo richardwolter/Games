@@ -213,11 +213,25 @@ func _rows_shown() -> int:
 
 func tray_box() -> Rect2:
 	var rows := _rows_shown()
-	var tall := TRAY_RIBBON * 0.5 + ROW_PAD * 2.0 + TRAY_FRAME * 2.0 \
+	# The wood's real thickness, not TRAY_FRAME twice (2026-09-24, Richard: the row ran into
+	# the tray's foot): the built border is 16 over and 14 under, so a board sized on 10 and
+	# 10 left its face ten pixels short and the last row sat on the frame.
+	var wood := Style.board_wood_tall(TRAY_WIDE, TRAY_FRAME)
+	var tall := _ribbon_lip() + ROW_PAD * 2.0 + wood \
 			+ rows * ROW_TALL + (rows - 1) * ROW_GAP
 	if waiting.is_empty():
-		tall = TRAY_RIBBON * 0.5 + TRAY_FRAME * 2.0 + 96.0
+		tall = _ribbon_lip() + wood + 96.0
 	return Rect2(TRAY_AT, Vector2(TRAY_WIDE, tall))
+
+
+## How far the title plank's lower half reaches onto the face: it straddles the board's top
+## edge, and the frame's own top plank already hides most of that half, so only what is
+## left over pushes the rows down. Counted as the whole half, the first row stood twice as
+## far from the plank as the last did from the foot.
+func _ribbon_lip() -> float:
+	var box := Rect2(TRAY_AT, Vector2(TRAY_WIDE, 200.0))
+	var frame_top := Style.board_face(box, TRAY_FRAME).position.y - box.position.y
+	return maxf(TRAY_RIBBON * 0.5 - frame_top, 0.0)
 
 
 func _ribbon_box() -> Rect2:
@@ -228,7 +242,7 @@ func _ribbon_box() -> Rect2:
 ## The rows' rectangles, in the room's coordinates, in step with `waiting` from `_scroll`.
 func row_boxes() -> Array[Rect2]:
 	var face := Style.board_face(tray_box(), TRAY_FRAME)
-	var top := face.position.y + TRAY_RIBBON * 0.5 + ROW_PAD
+	var top := face.position.y + _ribbon_lip() + ROW_PAD
 	var out: Array[Rect2] = []
 	for k in mini(waiting.size() - _scroll, ROWS_MOST):
 		out.append(Rect2(
@@ -317,7 +331,7 @@ class Tray:
 			for k in EMPTY_LINES.size():
 				Style.write(
 					self, EMPTY_LINES[k], Style.TEXT_SMALL,
-					Vector2(0.0, face.position.y + TRAY_RIBBON * 0.5 + 30.0 + k * 20.0),
+					Vector2(0.0, face.position.y + room._ribbon_lip() + 30.0 + k * 20.0),
 					Style.PAPER_SOFT, HORIZONTAL_ALIGNMENT_CENTER, face
 				)
 			return

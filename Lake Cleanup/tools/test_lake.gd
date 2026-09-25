@@ -6705,6 +6705,11 @@ func _stage_wash() -> void:
 	var lawn_top := back.lake_box().end.y
 	var all_on_lawn := true
 	for hound in back.dogs():
+	# One row on the tray sits wholly on its face, not on the frame's foot (2026-09-24).
+	var tray_face := Style.board_face(room.tray_box(), WashRoom.TRAY_FRAME)
+	var tray_rows := room.row_boxes()
+	_check(tray_rows.size() == 1 and tray_face.encloses(tray_rows[0].grow(1.0)),
+		"a single find on the tray stands inside its face", "%s in %s" % [tray_rows, tray_face])
 		all_on_lawn = all_on_lawn and hound.at.y > lawn_top and hound.at.y < room.size.y * 0.9
 	_check(all_on_lawn, "between the beach and the stand's feet", "")
 	var was_clock := back.stepped()
