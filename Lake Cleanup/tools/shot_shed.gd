@@ -88,9 +88,18 @@ func _physics_process(_delta: float) -> void:
 		# the lake's own list on the way in, so a shelf filled first showed one row.
 		var names: Array = room.titles.keys()
 		var unlocked: Array[String] = []
-		for i in mini(names.size(), 24):
-			unlocked.append(String(names[i]))
+		# SHED_ONE=1: one find on the shelf and one at the pump, for the wash plank under a
+		# single row (2026-09-24).
+		var one := OS.get_environment("SHED_ONE") == "1"
+		if one:
+			unlocked.append(String(names[names.size() - 1]))
+		else:
+			for i in mini(names.size(), 24):
+				unlocked.append(String(names[i]))
 		room.unlocked = unlocked
+		if one:
+			var waiting: Array[String] = [String(names[names.size() - 2])]
+			room.unwashed = waiting
 		_force_the_pack(room)
 	if _frames == 20:
 		_write()

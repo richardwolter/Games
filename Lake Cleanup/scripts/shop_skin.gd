@@ -157,11 +157,15 @@ const LEGEND_PAD := 12.0
 const LEGEND_LINE := 4.0
 const LEGEND_LEAST := 96.0
 
-## The recycle bonus's glitter on the plate: how many stars, the roll they sit at, and how
-## far above the lit panel's top edge they reach.
+## The recycle bonus's glitter on the plate: how many stars and the roll they sit at.
 const BONUS_STARS := 5
 const BONUS_STAR_SEED := 0x5eed
-const BONUS_LIFT := 3.0
+## Air between the lit panel's edge and the boosted material's name and figure.
+const BONUS_PAD := 6.0
+## The gap between the first board's foot and the purse hung under it while the shop is up.
+const PURSE_GAP := 14.0
+## The panel's wider sides: the stars stand in them, beside the words rather than over them.
+const BONUS_SIDE := 22.0
 
 ## How long the sparkle over a bought board's sprite lasts, how far it reaches, and how
 ## many points it is made of. Short and small on purpose: it is a receipt for a click the
@@ -1086,9 +1090,9 @@ func _draw_legend(box: Rect2) -> void:
 		for y in yards.size():
 			var pair: Array = yards[y]
 			var slot := Rect2(Vector2(at.x + step * float(y), 0.0), Vector2(step, 0.0))
-			var lit := Rect2(
-				Vector2(slot.position.x + 4.0, at.y - float(Style.TEXT_SMALL) - LEGEND_PAD * 0.5),
-				Vector2(step - 8.0, line_tall * 2.0 + LEGEND_PAD * 0.6)
+			var lit := bonus_panel(
+				_ink_box(String(pair[0]), slot, at.y), _ink_box(String(pair[1]), slot, at.y + line_tall),
+				Rect2(Vector2(slot.position.x, plate_top), Vector2(step, plate_foot - plate_top))
 			)
 			if y == boosted:
 				_light_yard(lit)
@@ -1100,10 +1104,8 @@ func _draw_legend(box: Rect2) -> void:
 				Style.PRICE_INK if y != boosted else Style.PRICE_INK * Style.HOVER_WASH,
 				HORIZONTAL_ALIGNMENT_CENTER, slot)
 			if y == boosted:
-				_bonus_glitter(Rect2(
-					Vector2(lit.position.x, lit.position.y - BONUS_LIFT),
-					Vector2(lit.size.x, BONUS_LIFT * 2.0 + 4.0)
-				))
+				_bonus_glitter(lit, _ink_box(String(pair[0]), slot, at.y).merge(
+					_ink_box(String(pair[1]), slot, at.y + line_tall)))
 		at.y += line_tall * 2.0 + LEGEND_GAP_ROW
 	# The bonus's line is reserved whether or not one is running: a plate that grows a line
 	# every thirty seconds re-centres the whole shop every thirty seconds.
@@ -1128,6 +1130,32 @@ func _draw_legend(box: Rect2) -> void:
 		at.y += line_tall
 
 
+## Where a centred line of legend text actually puts ink: its measured width centred in the
+## slot, from the font's ascent over the baseline to its descent under it.
+func _ink_box(text: String, slot: Rect2, baseline: float) -> Rect2:
+	var span := Style.measure(text, Style.TEXT_SMALL)
+	var face := Style.font()
+	var up := face.get_ascent(Style.TEXT_SMALL)
+	return Rect2(
+		Vector2(slot.position.x + (slot.size.x - span.x) * 0.5, baseline - up),
+		Vector2(span.x, up + face.get_descent(Style.TEXT_SMALL))
+	)
+
+
+## The boosted material's lit panel (2026-09-24, Richard: it was cut and out of place). It
+## used to be the whole slot less four pixels, at a height guessed off the line spacing, so
+## it ran off the dark plate at the top and hung past the figure at the foot. Now it is the
+## name and the figure together, `BONUS_PAD` over and under and `BONUS_SIDE` either side, held inside the slot and the plate.
+static func bonus_panel(name_box: Rect2, figure_box: Rect2, room: Rect2) -> Rect2:
+	var want := name_box.merge(figure_box).grow_individual(BONUS_SIDE, BONUS_PAD, BONUS_SIDE, BONUS_PAD)
+	var inner := room.grow(-2.0)
+	var top := maxf(want.position.y, inner.position.y)
+	var foot := minf(want.end.y, inner.end.y)
+	var left := maxf(want.position.x, inner.position.x)
+	var right := minf(want.end.x, inner.end.x)
+	return Rect2(Vector2(left, top), Vector2(right - left, foot - top)).abs()
+
+
 ## The lit panel behind the boosted material: the row's own affordable face and the lit edge
 ## it carries, so "this one is live" is said in the language the rows already say it in.
 func _light_yard(box: Rect2) -> void:
@@ -1136,23 +1164,47 @@ func _light_yard(box: Rect2) -> void:
 
 
 ## The glitter over it: the same four-point gold stars `Dropoff.Shine` puts on the boosted
-## yard's box out at the pier, so the plate and the lake say it with one mark. Along the lit
-## panel's top edge only — scattered over the column they land on the figures, and a star
-## sitting in a price reads as a glyph. Fixed spots off one seed: a plate that twinkles is a
+## yard's box out at the pier, so the plate and the lake say it with one mark. In the panel's
+## side margins only (`bonus_star_at`) — a star sitting in a price reads as a glyph. Fixed spots off one seed: a plate that twinkles is a
 ## plate that redraws every frame, and this one is behind a menu.
-func _bonus_glitter(box: Rect2) -> void:
+func _bonus_glitter(box: Rect2, words: Rect2) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = BONUS_STAR_SEED
 	for i in BONUS_STARS:
-		var at := Vector2(
-			box.position.x + rng.randf() * box.size.x,
-			box.position.y + rng.randf() * box.size.y
-		)
+		var at := bonus_star_at(box, words, i % 2 == 0, rng.randf(), rng.randf())
 		draw_set_transform(at.floor(), 0.0, Vector2.ONE)
 		LakeGrid.GlintTwinkle.draw_star(self, i % 2 == 0, 0.55 + rng.randf() * 0.45)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## Where a star stands on the lit panel: in the side margins `BONUS_SIDE` leaves beside the
+## name and the figure, alternating sides, held a star's reach in from every edge. On the
+## top edge, where they were, they crossed the dark plate's top onto the paper and sat on
+## the name (2026-09-24). `across` and `down` are 0..1; `words` is the name and figure's box.
+static func bonus_star_at(panel: Rect2, words: Rect2, left: bool, across: float, down: float) -> Vector2:
+	var reach := LakeGrid.STAR_PIXEL * (float(LakeGrid.STAR_ARM) + 0.5)
+	var from := panel.position.x + reach if left else words.end.x + reach
+	var to := words.position.x - reach if left else panel.end.x - reach
+	var top := panel.position.y + reach
+	var foot := maxf(panel.end.y - reach, top)
+	return Vector2(lerpf(from, maxf(to, from), across), lerpf(top, foot, down)).floor()
+
+
+## Where the purse stands while the shop is up (2026-09-24, Richard: "money should be shown on
+## upgrade menu"). The HUD's own money plate sits under the first board, so it is hung here
+## instead: under the first board, centred on it, in the room between its foot and the
+## pricing plate's side. `wanted` is the plate's own size. Empty until the boards are laid.
+func purse_box(wanted: Vector2) -> Rect2:
+	var first := Rect2()
+	for box: Rect2 in _boards.values():
+		if first.size.x <= 0.0 or box.position.x < first.position.x:
+			first = box
+	if first.size.x <= 0.0:
+		return Rect2()
+	return Rect2(
+		Vector2(first.position.x + (first.size.x - wanted.x) * 0.5, first.end.y + PURSE_GAP).round(),
+		wanted
+	)
 ## Words folded onto lines no wider than `wide`. `Style.write` has no wrap of its own.
 static func _wrap(text: String, height: int, wide: float) -> Array[String]:
 	var out: Array[String] = []

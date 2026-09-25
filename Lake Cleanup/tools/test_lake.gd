@@ -5855,6 +5855,8 @@ func _stage_shop_shape() -> void:
 				claimed[key] = board
 	_check(twice.is_empty(), "no row is claimed by two groups", ", ".join(twice))
 	var orphans := []
+	_check_shop_purse(skin)
+	_check_bonus_panel()
 	for row: Dictionary in shop_rows:
 		if not claimed.has(row["key"]) or claimed[row["key"]] != row["board"]:
 			orphans.append(String(row["key"]))
@@ -6463,6 +6465,52 @@ func _check_wash_plank() -> void:
 	_check(room.wash_pulse_amount() > 0.0 and plank.pulse > 0.0, "the pulse breathes and reaches the plank", str(plank.pulse))
 	# The room clamps a frame to 0.1 s (a hitch is not a dog across the room), so it is
 	# walked there in short steps.
+## The purse over the shop (2026-09-24): the HUD's own money plate, hung under the first
+## board on a node drawn after the shop, and home again when the shop closes.
+func _check_shop_purse(skin: Node) -> void:
+	var hud: HudSkin = _main.get(&"_skin")
+	_main.call(&"_set_menu", true)
+	skin.call(&"_lay_out")
+	_main.call(&"_update_hud")
+	var box := hud.purse_over
+	var purse: Node = hud.get(&"_purse")
+	_check(box.size.x > 0.0 and purse != null and purse.visible,
+		"with the shop open the purse is hung over it", str(box))
+	_check(purse != null and purse.get_index() > skin.get_index(),
+		"on a node drawn after the shop, so nothing of the shop covers it", "")
+	var boards: Dictionary = skin.get(&"_boards")
+	var clear := true
+	for b: Rect2 in boards.values():
+		clear = clear and not b.intersects(box)
+	var legend: Rect2 = skin.get(&"_legend_box")
+	_check(clear and not legend.intersects(box) and hud.get_rect().encloses(box),
+		"it stands on the screen, clear of every board and the pricing plate", str(box))
+	_check(box.size == hud.money_size(), "the same plate, at the corner plate's own size", "")
+	_check(HudButtons.face_of(box).has_point(hud.coin_centre()), "coins aim at it there", "")
+	_main.call(&"_set_menu", false)
+	_check(hud.purse_over.size.x == 0.0 and not purse.visible, "and it goes home with the shop closed", "")
+
+
+## The bonus's lit panel on the pricing plate (2026-09-24): it holds the name and the figure
+## with room to spare, stays inside the plate, and no star lands on the words.
+func _check_bonus_panel() -> void:
+	var name_box := Rect2(100.0, 30.0, 60.0, 12.0)
+	var figure_box := Rect2(110.0, 50.0, 40.0, 12.0)
+	var room := Rect2(40.0, 20.0, 180.0, 60.0)
+	var panel := ShopSkin.bonus_panel(name_box, figure_box, room)
+	var words := name_box.merge(figure_box)
+	_check(panel.encloses(words), "the bonus panel holds the material's name and figure", str(panel))
+	_check(room.encloses(panel), "and stays inside its slot of the plate", str(panel))
+	var reach := LakeGrid.STAR_PIXEL * (float(LakeGrid.STAR_ARM) + 0.5)
+	var bad := []
+	for i in 40:
+		var at := ShopSkin.bonus_star_at(panel, words, i % 2 == 0, float(i % 7) / 6.0, float(i % 5) / 4.0)
+		var star := Rect2(at - Vector2.ONE * reach, Vector2.ONE * reach * 2.0)
+		if star.intersects(words) or not room.encloses(star):
+			bad.append(str(at))
+	_check(bad.is_empty(), "no star touches the words or leaves the plate", ", ".join(bad))
+
+
 	for i in 50:
 		room.call(&"_process", 0.1)
 	_check(is_equal_approx(float(room.get(&"_wash_pulse")), ShedRoom.WASH_PULSE_IDLE),
@@ -6489,8 +6537,20 @@ func _check_wash_plank() -> void:
 	room.call(&"_dress_shelf")
 	box = room.wash_plank_box()
 	var rows := room.in_store().size()
-	_check(rows == 3 and is_equal_approx(box.position.y, list.position.y + float(rows * ShedRoom.ROW_HEIGHT)),
-		"with finds kept it stands right after the last row", "%d rows, plank at %.0f, list at %.0f" % [rows, box.position.y, list.position.y])
+	_check(rows == 3 and is_equal_approx(box.position.y,
+			list.position.y + float(rows * ShedRoom.ROW_HEIGHT) + ShedRoom.WASH_UNDER_ROWS),
+		"with finds kept it stands after the last row, clear of it", "%d rows, plank at %.0f, list at %.0f" % [rows, box.position.y, list.position.y])
+	# Under one row (2026-09-24): the plank's frame and glow ran up into the row above.
+	while room.in_store().size() > 1:
+		unlocked.pop_back()
+	room.call(&"_dress_shelf")
+	box = room.wash_plank_box()
+	var row_foot := list.position.y + float(ShedRoom.ROW_HEIGHT) - ShedRoom.SHELF_ROW_GAP
+	_check(box.size.x > 0.0 and box.position.y - row_foot >= ShedRoom.WASH_UNDER_ROWS
+			and box.end.y <= list.end.y,
+		"under a single row it stands clear of the row and whole on the shelf", "%s, row foot %.0f" % [box, row_foot])
+	for i in 2:
+		unlocked.append(String(unlocked[0]))
 	var fill := int(list.size.y / float(ShedRoom.ROW_HEIGHT)) + 2
 	while room.in_store().size() < fill:
 		unlocked.append(String(unlocked[0]))

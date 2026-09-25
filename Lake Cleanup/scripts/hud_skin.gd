@@ -217,6 +217,17 @@ var _meter_box := Rect2()
 var _meter_frame_box := Rect2()
 var _shed_box := Rect2()
 var _upgrades_box := Rect2()
+## Where the shop has hung the money plate while it is up; empty the rest of the time.
+var purse_over := Rect2():
+	set(value):
+		if value == purse_over:
+			return
+		purse_over = value
+		queue_redraw()
+		if _purse != null:
+			_purse.visible = value.size.x > 0.0
+			_purse.queue_redraw()
+var _purse: Purse
 var _money_box := Rect2()
 var _stock_box := Rect2()
 var _hovered := &""
@@ -227,6 +238,15 @@ var _painted: int = 0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
+	_purse = Purse.new()
+	_purse.name = &"Purse"
+	_purse.skin = self
+	_purse.visible = false
+	_purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_purse.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_purse.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# After everything else on the HUD layer, the shop included, once the layer is built.
+	get_parent().add_child.call_deferred(_purse)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	# The buttons wear the meter's painted border, which is pixel art and wants its own filter.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -387,6 +407,8 @@ func _under(at: Vector2) -> StringName:
 func _repaint() -> void:
 	if _painted != _paint_key():
 		queue_redraw()
+		if _purse != null and _purse.visible:
+			_purse.queue_redraw()
 
 
 ## Everything the picture is made of, in one number. Quantised where it is eased, so a
@@ -405,10 +427,11 @@ func _draw() -> void:
 	# wood — the plate itself does not move. See `HudButtons.draw_money`.
 	# Warmed rather than blown out: the coin is already the brightest thing on the plate, and
 	# multiplying it half again pushes it past white and out the other side into green.
-	_draw_money(
-		_money_box, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()),
-		1.0 + SHINE_SWELL * _ease_shine()
-	)
+	if not _purse_up():
+		_draw_money(
+			self, _money_box, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()),
+			1.0 + SHINE_SWELL * _ease_shine()
+		)
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
 	# A pulsing button swells a few whole pixels and its glow is drawn under it, so the
@@ -773,10 +796,44 @@ func pulsing(name: StringName) -> bool:
 ## in from a sale (CoinFly) aims at. The same sum `HudButtons.draw_money` makes for the
 ## coin's box, so the two cannot drift.
 func coin_centre() -> Vector2:
-	var face := HudButtons.face_of(_money_box)
+	var face := HudButtons.face_of(money_drawn_box())
 	var side := face.size.y
 	var coin_box := Rect2(face.position, Vector2(side, side)).grow(-3.0)
 	return coin_box.position + coin_box.size * 0.5
+
+
+## Where the money plate is drawn this frame: its corner, or the spot the shop hangs it in.
+func money_drawn_box() -> Rect2:
+	return purse_over if _purse_up() else _money_box
+
+
+## The money plate's own size, for the shop to find it a spot.
+func money_size() -> Vector2:
+	return _money_box.size
+
+
+func _purse_up() -> bool:
+	return purse_over.size.x > 0.0
+
+
+## The money plate over the upgrades shop (2026-09-24, Richard: the player could not see
+## what they had while choosing what to buy). The same plate, drawn by the same function with
+## the same running figure and shine — one purse, not a second readout — on a node that stands
+## after the shop in the HUD layer, so the shop's dimming and boards are under it. The shop
+## says where (`ShopSkin.purse_box`); the lake sets `purse_over` while the board is up and
+## clears it after. Coins in flight aim at it there, through `coin_centre`.
+class Purse:
+	extends Control
+	var skin: HudSkin
+
+	func _draw() -> void:
+		if skin == null or not skin._purse_up():
+			return
+		var shine := skin._ease_shine()
+		skin._draw_money(
+			self, skin.purse_over, Color.WHITE.lerp(Style.SHINE_WASH, shine),
+			1.0 + SHINE_SWELL * shine
+		)
 
 
 ## A coin arrived: light the plate again, for the arrival and not only for the sum, which
@@ -930,8 +987,8 @@ func _draw_available() -> void:
 
 
 ## The money plate: the coin, the sunken panel, and the live figure on it.
-func _draw_money(box: Rect2, wash: Color, swell: float) -> void:
-	var plate := HudButtons.draw_money(self, box, wash, swell)
+func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
+	var plate := HudButtons.draw_money(on, box, wash, swell)
 	var height := Style.step(plate.size.y * 0.72)
 	# The running figure, not the real one: the plate is meant to be watched climbing.
 	var shown := "%d" % roundi(_shown_money)
@@ -941,7 +998,7 @@ func _draw_money(box: Rect2, wash: Color, swell: float) -> void:
 	var glow := _ease_shine()
 	if glow > 0.01:
 		Style.write(
-			self,
+			on,
 			shown,
 			height,
 			Vector2(0.0, baseline - 1.0),
@@ -950,7 +1007,7 @@ func _draw_money(box: Rect2, wash: Color, swell: float) -> void:
 			plate
 		)
 	Style.write(
-		self,
+		on,
 		shown,
 		height,
 		Vector2(0.0, baseline),

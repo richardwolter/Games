@@ -1691,6 +1691,25 @@ shed's shelf has a door to the wash room.
   and the board opening cutting it, the plank alone and after the rows, its label, its pulse once and not on a reopen, its
   place at the end of an overfull shelf, its absence with nothing waiting, and the room swap.
 
+### Three Shop and Shelf Fixes (2026-09-24, `/grill-me` with Richard)
+- **The purse shows over the shop** (`HudSkin.purse_over`, `HudSkin.Purse`,
+  `ShopSkin.purse_box`, `PURSE_GAP`): the HUD's own money plate, same drawing, running
+  figure and shine, hung under the first board while the shop is up, on a node added after
+  the shop in the HUD layer so nothing of the shop covers it. The corner plate is not drawn
+  meanwhile and coins aim at the hung one (`coin_centre` reads `money_drawn_box`). One
+  purse, by decision: no second figure drawn on the shop.
+- **The wash plank stands clear of the last row** (`ShedRoom.WASH_UNDER_ROWS` 14, counted
+  in `_scroll_by`'s span): under a single find its built frame and gold glow ran up into
+  the row above.
+- **The bonus's lit panel is measured, not guessed** (`ShopSkin.bonus_panel`, `_ink_box`,
+  `BONUS_PAD` 6, `BONUS_SIDE` 22): the boosted material's name and figure with padding,
+  held inside its slot of the dark plate. It was the whole slot at a guessed height and ran
+  off the plate. **The stars stand in the panel's side margins** (`bonus_star_at`), not on
+  its top edge, where they crossed the plate onto the paper and sat on the name.
+- Probes: `tools/shot_shop_money.tscn` (desktop build, own save: `tools/last_shop_money.png`),
+  `SHED_ONE=1` on `tools/shot_shed.tscn` (one find, one waiting). `test_lake`'s
+  `_check_shop_purse`, `_check_bonus_panel` and `_check_wash_plank` guard all three.
+
 ### Every Word Is a Key (issue #28, 2026-09-20, `/grill-me` with Richard)
 The localization pass. **Scope this pass: the pipeline and English only** — extraction, one
 table, the CSV, a pseudo-locale and a Language row. The eight real languages, the CJK font

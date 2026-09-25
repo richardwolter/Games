@@ -87,6 +87,11 @@ const LIST_BUSY := 0.25
 ## yet." on an empty shelf, so the two are not on top of each other.
 const WASH_LABEL := "Wash  %d"
 const WASH_UNDER_EMPTY := 30.0
+## The gap between the last find's row and the wash plank (2026-09-24, Richard: under one
+## row the plank's frame and its gold glow ran up into the row above). The plank's wood is
+## a built frame that stands proud of the plain row plates, and its pulse glow reaches
+## `HudButtons.GLOW_REACH` past it, so it needs this much more air than a row does.
+const WASH_UNDER_ROWS := 14.0
 
 
 ## The close cross: how big it is drawn. Where it sits on the title plank is
@@ -1632,7 +1637,10 @@ static func _held(value: int, low: int, high: int) -> int:
 
 func _scroll_by(amount: float) -> void:
 	var rows := in_store().size() + (1 if _wash_shown() else 0)
-	var span := maxf(float(rows * ROW_HEIGHT) - _list_rect().size.y, 0.0)
+	var span := float(rows * ROW_HEIGHT) - _list_rect().size.y
+	if _wash_shown():
+		span += WASH_UNDER_EMPTY if in_store().is_empty() else WASH_UNDER_ROWS
+	span = maxf(span, 0.0)
 	_scroll = clampf(_scroll + amount, 0.0, span)
 	queue_redraw()
 
@@ -2238,8 +2246,7 @@ func _dress_wash_plank(rows: int) -> void:
 		return
 	var list := _list_rect()
 	var top := list.position.y + float(rows) * float(ROW_HEIGHT) - _scroll
-	if rows == 0:
-		top += WASH_UNDER_EMPTY
+	top += WASH_UNDER_EMPTY if rows == 0 else WASH_UNDER_ROWS
 	var box := Rect2(list.position.x, top, list.size.x, float(ROW_HEIGHT) - SHELF_ROW_GAP)
 	_wash_plank.visible = box.position.y >= list.position.y - 0.5 and box.end.y <= list.end.y + 0.5
 	_wash_plank.position = box.position
