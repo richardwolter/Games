@@ -18,9 +18,12 @@ extends Node2D
 ## bird, and which birds fly on this lake. The two are separate for the reason
 ## tools/decor_sets.json is separate from the decoration sheet — gap detection finds the
 ## rectangles, only a person can say what they are. With `BIRDS` missing, every bird flies.
-const CATALOGUE := "res://assets/pigeons.json"
+## The sheet and cut the flock draws are the INKED ones (tools/ink_pigeons.py, 2026-09-25):
+## the pack's birds ringed in one pixel of black like the rubbish, every region grown a pixel
+## a side to hold it. Re-run that after tools/slice_pigeons.gd.
+const CATALOGUE := "res://assets/pigeons_inked.json"
 const BIRDS := "res://assets/pigeon_birds.json"
-const SHEET := "res://assets/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
+const SHEET := "res://assets/pigeons_inked.png"
 
 ## How big a bird is drawn, as a multiple of its own pixels. The art is eleven pixels
 ## across and the lake's rubbish is drawn at twice its own size (`Lake.SPRITE_SCALE`), so

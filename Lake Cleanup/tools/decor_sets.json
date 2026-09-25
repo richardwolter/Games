@@ -146,10 +146,10 @@
     6
    ],
    "seat": [
-    6,
     0,
-    0,
-    0
+    4,
+    4,
+    4
    ]
   },
   {
@@ -197,10 +197,10 @@
     4
    ],
    "seat": [
-    7,
+    3,
+    4,
     0,
-    0,
-    0
+    4
    ]
   },
   {
@@ -821,18 +821,24 @@
    "name": "decor_stove",
    "title": "Stove",
    "dirty": "Decoration Dirty/Stove",
-   "kind": "SINGLE",
+   "kind": "STATE",
    "mirror": false,
    "views": [
     {
-     "role": "front",
+     "role": "off",
      "layer": "Decoration/Stove"
+    },
+    {
+     "role": "on",
+     "layer": "stove_on"
     }
    ],
    "base": [
+    1,
     1
    ],
-   "scale": 0.75
+   "scale": 0.75,
+   "light": "ember"
   },
   {
    "name": "decor_vynil_player",
@@ -1064,16 +1070,16 @@
    "kind": "SINGLE",
    "mirror": false,
    "place": "small",
-   "base": [
-    1
-   ],
    "views": [
     {
      "role": "front",
      "layer": "Decoration/Plastic Globe"
     }
    ],
-   "dirty": "Decoration Dirty/Plastic Globe"
+   "dirty": "Decoration Dirty/Plastic Globe",
+   "base_px": [
+    2
+   ]
   },
   {
    "name": "decor_rug",

@@ -1,0 +1,886 @@
+{
+	"cells": [
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r00_b0_f0",
+			"region": [
+				2,
+				1,
+				10,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r00_b0_f1",
+			"region": [
+				13,
+				1,
+				4,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r00_b0_f2",
+			"region": [
+				18,
+				1,
+				15,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 3,
+			"name": "pigeon_r00_b0_f3",
+			"region": [
+				34,
+				1,
+				9,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 4,
+			"name": "pigeon_r00_b0_f4",
+			"region": [
+				43,
+				1,
+				15,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 5,
+			"name": "pigeon_r00_b0_f5",
+			"region": [
+				59,
+				1,
+				13,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 6,
+			"name": "pigeon_r00_b0_f6",
+			"region": [
+				72,
+				1,
+				11,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r00_b1_f0",
+			"region": [
+				119,
+				1,
+				5,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r00_b2_f0",
+			"region": [
+				135,
+				1,
+				5,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 3,
+			"frame": 0,
+			"name": "pigeon_r00_b3_f0",
+			"region": [
+				151,
+				1,
+				5,
+				15
+			],
+			"row": 0
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r01_b0_f0",
+			"region": [
+				2,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r01_b0_f1",
+			"region": [
+				18,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r01_b0_f2",
+			"region": [
+				34,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r01_b1_f0",
+			"region": [
+				66,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r01_b1_f1",
+			"region": [
+				82,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r01_b1_f2",
+			"region": [
+				98,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r01_b2_f0",
+			"region": [
+				130,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r01_b2_f1",
+			"region": [
+				146,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r01_b2_f2",
+			"region": [
+				162,
+				20,
+				13,
+				11
+			],
+			"row": 1
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r02_b0_f0",
+			"region": [
+				2,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r02_b0_f1",
+			"region": [
+				18,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r02_b0_f2",
+			"region": [
+				34,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r02_b1_f0",
+			"region": [
+				66,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r02_b1_f1",
+			"region": [
+				82,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r02_b1_f2",
+			"region": [
+				98,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r02_b2_f0",
+			"region": [
+				130,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r02_b2_f1",
+			"region": [
+				146,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r02_b2_f2",
+			"region": [
+				162,
+				36,
+				13,
+				11
+			],
+			"row": 2
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r03_b0_f0",
+			"region": [
+				2,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r03_b0_f1",
+			"region": [
+				18,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r03_b0_f2",
+			"region": [
+				34,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r03_b1_f0",
+			"region": [
+				66,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r03_b1_f1",
+			"region": [
+				82,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r03_b1_f2",
+			"region": [
+				98,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r03_b2_f0",
+			"region": [
+				130,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r03_b2_f1",
+			"region": [
+				146,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r03_b2_f2",
+			"region": [
+				162,
+				52,
+				13,
+				11
+			],
+			"row": 3
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r04_b0_f0",
+			"region": [
+				2,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r04_b0_f1",
+			"region": [
+				18,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r04_b0_f2",
+			"region": [
+				34,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r04_b1_f0",
+			"region": [
+				66,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r04_b1_f1",
+			"region": [
+				82,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r04_b1_f2",
+			"region": [
+				98,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r04_b2_f0",
+			"region": [
+				130,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r04_b2_f1",
+			"region": [
+				146,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r04_b2_f2",
+			"region": [
+				162,
+				68,
+				13,
+				11
+			],
+			"row": 4
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r05_b0_f0",
+			"region": [
+				2,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r05_b0_f1",
+			"region": [
+				18,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r05_b0_f2",
+			"region": [
+				34,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r05_b1_f0",
+			"region": [
+				66,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r05_b1_f1",
+			"region": [
+				82,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r05_b1_f2",
+			"region": [
+				98,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r05_b2_f0",
+			"region": [
+				130,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r05_b2_f1",
+			"region": [
+				146,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r05_b2_f2",
+			"region": [
+				162,
+				84,
+				13,
+				11
+			],
+			"row": 5
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r06_b0_f0",
+			"region": [
+				2,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r06_b0_f1",
+			"region": [
+				18,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r06_b0_f2",
+			"region": [
+				34,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 1,
+			"frame": 0,
+			"name": "pigeon_r06_b1_f0",
+			"region": [
+				66,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 1,
+			"frame": 1,
+			"name": "pigeon_r06_b1_f1",
+			"region": [
+				82,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 1,
+			"frame": 2,
+			"name": "pigeon_r06_b1_f2",
+			"region": [
+				98,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 2,
+			"frame": 0,
+			"name": "pigeon_r06_b2_f0",
+			"region": [
+				130,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 2,
+			"frame": 1,
+			"name": "pigeon_r06_b2_f1",
+			"region": [
+				146,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 2,
+			"frame": 2,
+			"name": "pigeon_r06_b2_f2",
+			"region": [
+				162,
+				100,
+				13,
+				11
+			],
+			"row": 6
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r07_b0_f0",
+			"region": [
+				2,
+				116,
+				13,
+				11
+			],
+			"row": 7
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r07_b0_f1",
+			"region": [
+				18,
+				116,
+				13,
+				11
+			],
+			"row": 7
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r07_b0_f2",
+			"region": [
+				34,
+				116,
+				13,
+				11
+			],
+			"row": 7
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r08_b0_f0",
+			"region": [
+				2,
+				132,
+				13,
+				11
+			],
+			"row": 8
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r08_b0_f1",
+			"region": [
+				18,
+				132,
+				13,
+				11
+			],
+			"row": 8
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r08_b0_f2",
+			"region": [
+				34,
+				132,
+				13,
+				11
+			],
+			"row": 8
+		},
+		{
+			"block": 0,
+			"frame": 0,
+			"name": "pigeon_r09_b0_f0",
+			"region": [
+				2,
+				148,
+				13,
+				11
+			],
+			"row": 9
+		},
+		{
+			"block": 0,
+			"frame": 1,
+			"name": "pigeon_r09_b0_f1",
+			"region": [
+				18,
+				148,
+				13,
+				11
+			],
+			"row": 9
+		},
+		{
+			"block": 0,
+			"frame": 2,
+			"name": "pigeon_r09_b0_f2",
+			"region": [
+				34,
+				148,
+				13,
+				11
+			],
+			"row": 9
+		}
+	],
+	"rows": 10,
+	"sheet": "res://assets/pigeons/Original Diminsions/Pigeon Sprite Sheet.png",
+	"size": [
+		176,
+		160
+	]
+}

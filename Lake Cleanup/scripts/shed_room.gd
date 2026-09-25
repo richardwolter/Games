@@ -184,6 +184,11 @@ const FRIDGE_TONE := Color(0.86, 0.93, 1.0)
 const LAMP_REACH := 5.5
 const LAMP_POWER := 0.22
 const LAMP_TONE := Color(1.0, 0.78, 0.46)
+## A lit stove: its burners and oven glow red. A small, low pool, redder than the hearth's
+## and silent (2026-09-25, first guess).
+const EMBER_REACH := 4.0
+const EMBER_POWER := 0.2
+const EMBER_TONE := Color(1.0, 0.36, 0.2)
 ## The window: how far down **the shed's own height** it sits on the left wall, and the shaft
 ## it lets in — half-width where it leaves the window, how fast it opens, and how far it
 ## carries, in cells. **A cone, not a band** (Richard, 2026-09-20): it opens as it crosses the
@@ -2383,6 +2388,8 @@ func _pool(light: StringName) -> Vector2:
 			return Vector2(FRIDGE_REACH, FRIDGE_POWER)
 		&"warm":
 			return Vector2(LAMP_REACH, LAMP_POWER)
+		&"ember":
+			return Vector2(EMBER_REACH, EMBER_POWER)
 	return Vector2(FIRE_REACH, FIRE_POWER)
 
 
@@ -2392,6 +2399,8 @@ func _pool_tone(light: StringName) -> Color:
 			return FRIDGE_TONE
 		&"warm":
 			return LAMP_TONE
+		&"ember":
+			return EMBER_TONE
 	return FIRE_TONE
 
 

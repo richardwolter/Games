@@ -3530,6 +3530,10 @@ func _check_trophy() -> void:
 ## The roll is per dog and random, so the room is opened over and over off a fixed seed
 ## until a full house turns up rather than being forced some other way: what is being
 ## guarded is the real path, `_room_shown`.
+## The sofa's view that shows its cushion to the camera.
+const SOFA_CUSHION := 2
+
+
 func _check_shed_dogs(room: ShedRoom) -> void:
 	var sheets: Sheets = room.sheets
 	if sheets == null or not sheets.has(&"decor_sofa") or not sheets.has(&"decor_pet_bed"):
@@ -3540,9 +3544,10 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 	var was_open: bool = bool(_main.get(&"_shed_open"))
 	_main.call(&"_set_shed", true)
 	var decor: Array = room.decor
-	# A sofa facing front (a seat) and a pet bed (a seat).
+	# A sofa showing its cushion (a seat) and a pet bed (a seat). The sofa's cushion is its
+	# third view: the catalogue's rect called "front" is the backrest (2026-09-25).
 	decor.clear()
-	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 0)
+	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), SOFA_CUSHION)
 	room.place(&"decor_pet_bed", Vector2i(ShedRoom.CELL * 22, ShedRoom.CELL * 16), 0)
 	var seats: Array = room.call(&"_seats")
 	_check(seats.size() == 2,
@@ -3567,15 +3572,23 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 			"a dog on the %s lies on its cushion, not over its back" % piece,
 			"dog top %.2f, piece top %.2f" % [feet.y - dog_tall, top])
 
-	# The sofa turned side on is nobody's seat: a dog laid on that cushion is cut in half by
-	# the backrest, which is why the seat is authored per view rather than per piece.
-	decor.clear()
-	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 1)
-	_check((room.call(&"_seats") as Array).is_empty(),
-		"and a sofa turned side on is no seat at all", "")
-
+	# The sofa showing its backrest is nobody's seat: a dog on it lies over the back
+	# (Richard, 2026-09-25). Side on, and the other way round, it is a seat.
 	decor.clear()
 	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), 0)
+	_check((room.call(&"_seats") as Array).is_empty(),
+		"and a sofa showing its backrest is no seat at all", "")
+	var sides_seat := true
+	for view in [1, 3]:
+		decor.clear()
+		room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), view)
+		sides_seat = sides_seat and (room.call(&"_seats") as Array).size() == 1
+	_check(sides_seat, "but turned side on, either way, it is", "")
+	_check(sheets.seat_of(&"decor_loveseat", 2) == 0 and sheets.seat_of(&"decor_loveseat", 0) > 0,
+		"the armchair seats a dog facing us and not over its back", "")
+
+	decor.clear()
+	room.place(&"decor_sofa", Vector2i(ShedRoom.CELL * 3, ShedRoom.CELL * 3), SOFA_CUSHION)
 	room.place(&"decor_pet_bed", Vector2i(ShedRoom.CELL * 22, ShedRoom.CELL * 16), 0)
 	var was_pack: Callable = room.pack_size
 	room.pack_size = func() -> int: return 4
@@ -5566,7 +5579,13 @@ func _check_wildlife() -> void:
 	wild._reckon()
 	_check(wild.frog_count() + wild.turtle_count() + wild.brood_count() + wild.dragonfly_count() == 0,
 		"no animals on a lake that is not yet clean", "")
-	wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"))
+	# Ducks wait for the meter to read LATE_FROM cleared, whatever the clean water says.
+	wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"), Wildlife.LATE_FROM - 0.1)
+	wild.set(&"_brood_in", 0.0)
+	wild.call(&"_reckon")
+	_check(wild.brood_count() == 0, "no ducks before the meter reads %.0f%% cleaned" % (Wildlife.LATE_FROM * 100.0),
+		"%d" % wild.brood_count())
+	wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"), 0.9)
 	wild.set(&"_brood_in", 0.0)
 	wild._reckon()
 	var share: float = _main.clean_share()
@@ -5591,6 +5610,7 @@ func _check_wildlife() -> void:
 	var swum_home := 0
 	for f: Dictionary in wild.frogs():
 		if int(f["state"]) != Wildlife.Frog.SWIM:
+	_check_land_animals(wild)
 			swum_home += 1
 	_check(swum_home > 0, "frogs swim ashore and get on with sitting, croaking, hopping", "%d" % swum_home)
 	var landed := 0
@@ -5644,6 +5664,43 @@ func _check_beat(wild: Wildlife) -> void:
 	var station := MusicStation.new()
 	station.set(&"_beats", table)
 	var grid: Dictionary = table[String(MusicStation.PLAYLIST[0])]
+## Rabbits and foxes (2026-09-25): on the outer bank's sand only, never the island; rabbits
+## from the first clean shore, foxes only once the meter reads LATE_FROM cleared; both run
+## off into the trees when someone comes near. Asked with the meter at 0.9.
+func _check_land_animals(wild: Wildlife) -> void:
+	_check(wild.rabbit_count() > 0 and wild.rabbit_count() <= Wildlife.RABBITS_MOST,
+		"rabbits on the bank", "%d" % wild.rabbit_count())
+	_check(wild.fox_count() > 0 and wild.fox_count() <= Wildlife.FOXES_MOST,
+		"a fox or two once the lake is mostly clean", "%d" % wild.fox_count())
+	var island := 0
+	for c: Dictionary in wild.land_animals():
+		if (c["spot"] as Dictionary)["side"] != "bank":
+			island += 1
+	_check(island == 0, "no rabbit or fox on the island", "%d" % island)
+	var kept := wild.land_animals().duplicate()
+	var cleared := wild.cleared
+	wild.land_animals().clear()
+	wild.cleared = Wildlife.LATE_FROM - 0.1
+	wild.call(&"_reckon")
+	_check(wild.fox_count() == 0 and wild.rabbit_count() > 0, "rabbits early, no fox before the meter says so",
+		"%d rabbits %d foxes" % [wild.rabbit_count(), wild.fox_count()])
+	wild.cleared = cleared
+	for i in 240:
+		wild._land_step(wild.land_animals()[0], 1.0 / 60.0, PackedVector2Array())
+	var c: Dictionary = wild.land_animals()[0]
+	wild._land_step(c, 0.016, PackedVector2Array([(c["at"] as Vector2) + Vector2(8.0, 0.0)]))
+	_check(int(c["state"]) == Wildlife.Land.FLEE, "a rabbit walked up to runs off", "")
+	var from: Vector2 = c["at"]
+	for i in 240:
+		if c.get("gone", false):
+			break
+		wild._land_step(c, 1.0 / 60.0, PackedVector2Array())
+	_check(c.get("gone", false), "and is gone into the trees", "%.0f px" % from.distance_to(c["at"]))
+	wild.land_animals().clear()
+	for k: Dictionary in kept:
+		wild.land_animals().append(k)
+
+
 	station.set(&"_at", float(grid["offset"]) + 3.0 * 60.0 / float(grid["bpm"]))
 	_check(absf(station.beat_clock() - 3.0) < 0.001 and absf(station.beat_length() - 60.0 / float(grid["bpm"])) < 0.0001,
 		"the station counts beats off the song's own grid", "%.3f" % station.beat_clock())
@@ -6867,6 +6924,18 @@ func _stage_wash() -> void:
 		"picked by the boat's own heading rule: screen-right is tile (1, -1)", "")
 	_check(back.hulls().size() == int(_main.call(&"fleet_size")),
 		"as many ferries cross as the fleet holds", str(back.hulls().size()))
+	# A flash over the pump strikes a bolt in the sky, and it goes with the flash.
+	var was_flash := Weather.flash_now
+	Weather.flash_now = 0.0
+	back.step(0.016)
+	Weather.flash_now = 1.0
+	back.set(&"_bolt_age", INF)
+	back.step(0.016)
+	var struck := back.bolt_shown()
+	Weather.flash_now = 0.0
+	back.step(0.016)
+	_check(struck and not back.bolt_shown(), "a flash while washing strikes a bolt over the far bank, and it goes", "")
+	Weather.flash_now = was_flash
 	back.filth = 1.0
 	var full := back.flotsam_shown()
 	back.filth = 0.5

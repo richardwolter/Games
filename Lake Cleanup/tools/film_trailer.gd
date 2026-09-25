@@ -227,7 +227,7 @@ func _plan() -> void:
 			if k % 15 == 0:
 				var ramp := clampf(0.05 + float(k) / 300.0, 0.05, 1.0)
 				flora.refresh(ramp)
-				wild.refresh(ramp, _main.get(&"_clean_tiles"))
+				wild.refresh(ramp, _main.get(&"_clean_tiles"), 1.0 - _main.pollution)
 			if k >= 20 and k <= 320 and k % 12 == 0:
 				_frog_in_view(wild)
 			if k in WILD_BROODS:

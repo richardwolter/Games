@@ -1442,10 +1442,10 @@
    ],
    "scale": 1.0,
    "seat": [
-    6,
     0,
-    0,
-    0
+    4,
+    4,
+    4
    ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
@@ -1467,14 +1467,14 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     104,
+     129,
      162,
      32,
      32
     ],
     [
-     216,
-     117,
+     2,
+     162,
      23,
      36
     ],
@@ -1485,7 +1485,7 @@
      28
     ],
     [
-     2,
+     27,
      162,
      23,
      36
@@ -1521,10 +1521,10 @@
    ],
    "scale": 1.0,
    "seat": [
-    7,
+    3,
+    4,
     0,
-    0,
-    0
+    4
    ],
    "set": "ROTATE",
    "sheet": "decor_dirty",
@@ -1618,13 +1618,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     27,
+     52,
      162,
      25,
      35
     ],
     [
-     198,
+     230,
      117,
      16,
      41
@@ -2010,7 +2010,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     138,
+     163,
      162,
      16,
      32
@@ -2022,7 +2022,7 @@
      28
     ],
     [
-     156,
+     181,
      162,
      16,
      32
@@ -2100,7 +2100,7 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     54,
+     79,
      162,
      48,
      33
@@ -2367,13 +2367,13 @@
    "alt_sheet": "decor_clean",
    "alt_views": [
     [
-     174,
+     199,
      162,
      23,
      32
     ],
     [
-     199,
+     224,
      162,
      23,
      32
@@ -2658,7 +2658,8 @@
   },
   {
    "alt_roles": [
-    "front"
+    "off",
+    "on"
    ],
    "alt_sheet": "decor_clean",
    "alt_views": [
@@ -2667,9 +2668,16 @@
      117,
      30,
      43
+    ],
+    [
+     198,
+     117,
+     30,
+     43
     ]
    ],
    "base": [
+    1,
     1
    ],
    "base_px": [],
@@ -2679,10 +2687,11 @@
    ],
    "copies": 1,
    "faces": [
+    0,
     0
    ],
    "fill": 0.982,
-   "light": "",
+   "light": "ember",
    "name": "decor_stove",
    "place": "floor",
    "region": [
@@ -2693,10 +2702,11 @@
    ],
    "scale": 0.75,
    "seat": [],
-   "set": "SINGLE",
+   "set": "STATE",
    "sheet": "decor_dirty",
    "states": [
-    0
+    0,
+    1
    ],
    "title": "Stove"
   },
@@ -3318,10 +3328,10 @@
      20
     ]
    ],
-   "base": [
-    1
+   "base": [],
+   "base_px": [
+    2
    ],
-   "base_px": [],
    "cells": [
     1,
     2

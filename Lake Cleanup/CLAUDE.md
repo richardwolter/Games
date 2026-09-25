@@ -3231,6 +3231,42 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   with no wiring.
 - **Where a drop lands is decided when it is born**: a spot in the view is picked and asked
   once what is drawn there (`Weather._landing`): a roof, a floating piece
+### Seven Visual Fixes (2026-09-25, `/grill-me` with Richard)
+- **A dog lies on a sofa's cushion or its side, never its backrest.** The sofa's catalogue
+  rects are labelled the wrong way round: the one called `front` (view 0) is the backrest,
+  the one called `back` (view 2) shows the cushion. Seats are now sofa `[0, 4, 4, 4]` and
+  armchair `[3, 4, 0, 4]` (whose labels are right), sides both ways included. The labels
+  were not swapped, by decision: view 0 is what leaves the store and saves hold view
+  indices. `test_lake`'s `_check_shed_dogs` places the sofa by `SOFA_CUSHION`.
+- **The pigeons wear the rubbish's black outline** (`tools/ink_pigeons.py`): one pixel of
+  pure black outside every bird, baked into `assets/pigeons_inked.png` with the cut grown a
+  pixel a side in `pigeons_inked.json`. `Flock` and `pigeon_contact` read the inked pair;
+  the pack's sheet and `pigeons.json` are untouched. **Re-run it after `slice_pigeons.gd`.**
+  The head pop's portrait is its own drawing and is not outlined.
+- **Ducks wait on the meter** (`Wildlife.cleared`, `LATE_FROM` 0.6, `_want_late`): none
+  until the pollution meter reads 60% cleaned, then filling in to `BROODS_MOST` on a cleaned
+  lake. The lake hands `1 - pollution` through `refresh`. Everything else still follows
+  the clean-water share.
+- **Rabbits and foxes on the outer bank** (`Wildlife.Land`, `_new_land`, `_land_step`,
+  `_land_fright`; sprites `rabbit_*`/`fox_*` in `build_wildlife.py`, the rabbit hand-drawn
+  as letter rows, the fox by rule). Bank shore spots only, never the island. Rabbits from
+  the first clean shore (`RABBITS_MOST` 8), foxes from the late gate (`FOXES_MOST` 3). They
+  come out of the trees, sit, wander along the sand, leave prints, and run inland fading
+  out when the angler, a dog, a hull or a landing net comes near (`RABBIT_SHY`, `FOX_SHY`).
+  Ambient: no catch, no pay, not saved, and they ignore each other. All numbers first guesses.
+- **A bolt over the wash room's far bank** (`WashBackdrop._strike_bolt`, `_draw_bolt`): a
+  flash rising past `BOLT_FROM` rolls a jagged run of whole painted pixels from the sky's
+  top to the treeline, with up to two branches, lit with the flash; the echo relights it
+  (`BOLT_HOLD`). **The only drawn bolt in the game**: the lake keeps its flash without one.
+- **The globe stands on a 2 px base** (`base_px`), like the pots, so it can be pushed up
+  against the shed's back wall.
+- **The stove switches on** (`tools/build_stove_on.py` -> `art_source/decoration_extracted/
+  stove_on.png`, a plain file like the bed's): burner plates flood-found and lit orange
+  with a red rim, the oven window lit red. `STATE`, off first, light `ember` (new:
+  `ShedRoom.EMBER_*`, a small red pool, silent). Built by rule for Richard to polish. **Re-run
+  it after a re-extract of the decoration PSD**, then `build_decor.py`. No `SAVE_VERSION`
+  bump: the def list did not move and view 0 is the plain stove.
+
   (`LakeGrid.perch_point`, `PIECE_ODDS` of a tile's drops), the lake (`WaterSplash.ripple`,
   held under `RING_SHARE` of the splash layer's cap through the new `ripples_up`) or the
   ground. Only drops in view cost anything. Streaks and splash bits are whole art pixels.

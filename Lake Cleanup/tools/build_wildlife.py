@@ -301,6 +301,137 @@ def duckling(pose: str) -> Image.Image:
     return img
 
 
+
+# Rabbits and foxes (2026-09-25): the outer bank's land animals, side on facing left like
+# the turtle and the ducks, in the palette's own browns, the pack's dark ring round them.
+RABBIT = mix(WOOD, SAND, 0.62)
+RABBIT_DARK = mix(WOOD, SAND, 0.38)
+RABBIT_BELLY = mix(SAND, FOAM, 0.55)
+FOX = mix(WOOD, ORANGE, 0.35)
+FOX_LIT = lift(mix(WOOD, ORANGE, 0.5), 1.18)
+FOX_DARK = mix(WOOD, BLACK, 0.35)
+FOX_WHITE = mix(FOAM, SAND, 0.2)
+
+
+# A rabbit is small enough to draw by hand: rows of letters, B body, D shade, W the white
+# of the tail and belly, E the eye, blank is empty. The dark ring goes on after.
+RABBIT_POSES = {
+    "sit0": [
+        " B B       ",
+        " B B       ",
+        " BBB       ",
+        "BEBBB      ",
+        "BBBBBB     ",
+        "  BBBBBB   ",
+        "  BBBBBBBW ",
+        "  WBDDDBB  ",
+        "  BB  BBB  ",
+    ],
+    "sit1": [
+        "           ",
+        " B  BB     ",
+        " BBB  B    ",
+        "BEBBB      ",
+        "BBBBBB     ",
+        "  BBBBBB   ",
+        "  BBBBBBBW ",
+        "  WBDDDBB  ",
+        "  BB  BBB  ",
+    ],
+    "hop0": [
+        "           ",
+        "   B B     ",
+        "   BBB     ",
+        "  BEBBB    ",
+        "  BBBBBBB  ",
+        "   BBBBBBW ",
+        "   WDDDBB  ",
+        "   BB BBB  ",
+        "           ",
+    ],
+    "hop1": [
+        "  BB       ",
+        "   BB      ",
+        " BBBBB     ",
+        "BEBBBBBBB  ",
+        "BBBBBBBBBW ",
+        "  WDDDDBB  ",
+        " BB    BBB ",
+        "B        BB",
+        "           ",
+    ],
+}
+
+
+def rabbit(pose: str) -> Image.Image:
+    """Poses: sit0 (ears up), sit1 (one ear laid back), hop0 (bunched), hop1 (stretched)."""
+    rows = RABBIT_POSES[pose]
+    img = canvas(len(rows[0]), len(rows))
+    inks = {"B": RABBIT, "D": RABBIT_DARK, "W": RABBIT_BELLY, "E": RABBIT}
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in inks:
+                put(img, x, y, inks[ch])
+    img = outline(img, OUTLINE_BROWN)
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch == "E":
+                put(img, x, y, OUTLINE_BROWN)
+            elif ch == "W":
+                put(img, x, y, RABBIT_BELLY)
+    return img
+
+
+FOX_STRIDE = [((3, 4), (10, 11)), ((2, 5), (9, 12)), ((3, 4), (10, 11)), ((4, 3), (11, 10))]
+
+
+def fox(pose: str, step: int = 0) -> Image.Image:
+    """Poses: sit, trot (four steps of FOX_STRIDE), run (the stretched trot)."""
+    w, h = 18, 10
+    img = canvas(w, h)
+    d = ImageDraw.Draw(img)
+    base = h - 1
+    if pose == "sit":
+        d.ellipse((5, base - 6, 10, base), fill=FOX)
+        d.ellipse((2, base - 8, 6, base - 5), fill=FOX)
+        d.line((0, base - 6, 2, base - 6), fill=FOX)
+        d.polygon([(10, base), (15, base - 1), (16, base - 3), (11, base - 2)], fill=FOX)
+        put(img, 3, base - 9, FOX)
+        put(img, 5, base - 9, FOX)
+        img = outline(img, OUTLINE_BROWN)
+        put(img, 16, base - 2, FOX_WHITE)
+        put(img, 15, base - 2, FOX_WHITE)
+        for y in range(base - 4, base):
+            put(img, 5, y, FOX_WHITE)
+        put(img, 3, base - 7, OUTLINE_BROWN)
+        put(img, 0, base - 6, OUTLINE_BROWN)
+        return img
+    run = pose == "run"
+    back = base - 3
+    d.rectangle((4, back - 3, 12, back), fill=FOX)
+    d.ellipse((1, back - 5, 5, back - 1), fill=FOX)
+    d.line((0, back - 3, 1, back - 3), fill=FOX)
+    put(img, 2, back - 6, FOX)
+    put(img, 4, back - 6, FOX)
+    tail_up = back - 4 if run else back - 3
+    d.polygon([(12, back - 3), (17, tail_up), (17, tail_up + 2), (12, back - 1)], fill=FOX)
+    img = outline(img, OUTLINE_BROWN)
+    fronts, backs = FOX_STRIDE[step]
+    if run:
+        fronts, backs = ((1, 2), (13, 14)) if step % 2 == 0 else ((5, 6), (9, 10))
+    for x in (*fronts, *backs):
+        for y in range(back + 1, base + 1):
+            put(img, x, y, FOX_DARK)
+    for x in range(5, 12):
+        put(img, x, back - 3, FOX_LIT)
+    put(img, 17, tail_up + 1, FOX_WHITE)
+    put(img, 16, tail_up + 1, FOX_WHITE)
+    put(img, 2, back - 3, OUTLINE_BROWN)
+    for x in (2, 3):
+        put(img, x, back - 1, FOX_WHITE)
+    return img
+
+
 def frog_swim(heading: float, frame: int) -> Image.Image:
     """The frog under the water seen from above: a silhouette, white, tinted at runtime.
     Built on the plane and squashed 2:1, heading in radians on the plane (0 = screen right).
@@ -357,6 +488,13 @@ def pack() -> None:
             items.append((f"{name}_{pose}", duck(kind, pose)))
     for pose in ("swim0", "swim1", "fly0", "fly1"):
         items.append((f"duckling_{pose}", duckling(pose)))
+    for pose in ("sit0", "sit1", "hop0", "hop1"):
+        items.append((f"rabbit_{pose}", rabbit(pose)))
+    items.append(("fox_sit", fox("sit")))
+    for step in range(len(FOX_STRIDE)):
+        items.append((f"fox_trot{step}", fox("trot", step)))
+    for step in (0, 1):
+        items.append((f"fox_run{step}", fox("run", step)))
     for k in range(8):
         for f in range(3):
             items.append((f"frogswim_{k}_{f}", frog_swim(k * math.tau / 8.0, f)))

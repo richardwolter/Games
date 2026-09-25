@@ -358,14 +358,37 @@ func stepped() -> float:
 	return floorf(_clock * PIXEL_FPS) / PIXEL_FPS
 
 
+var _bolt_seed := 0
+var _bolt_x := -1.0
+var _bolt_age := INF
+var _last_flash := 0.0
+
+
 func _process(delta: float) -> void:
 	if is_visible_in_tree():
 		step(delta)
 
 
+## Is a bolt up this frame, for the harness.
+func bolt_shown() -> bool:
+	return _bolt_x >= 0.0 and Weather.flash_now > 0.05
+
+
+## A flash rising past BOLT_FROM strikes a new bolt, unless the last is still within its hold.
+func _strike_bolt(delta: float) -> void:
+	_bolt_age += delta
+	var flash := Weather.flash_now
+	if flash >= BOLT_FROM and _last_flash < BOLT_FROM and _bolt_age > BOLT_HOLD:
+		_bolt_seed = randi()
+		_bolt_x = randf_range(BOLT_ACROSS.x, BOLT_ACROSS.y)
+		_bolt_age = 0.0
+	_last_flash = flash
+
+
 ## One frame. Its own function so a harness can run the clock by hand.
 func step(delta: float) -> void:
 	_clock += delta
+	_strike_bolt(delta)
 	# The shower greys the view as it greys the lake; the flash whitens it.
 	var grey := Color.WHITE.lerp(RAIN_TINT, Weather.now).lerp(Color(1.5, 1.5, 1.6), Weather.flash_now)
 	modulate = Color(tint.r * DARKEN * grey.r, tint.g * DARKEN * grey.g, tint.b * DARKEN * grey.b)
@@ -584,6 +607,7 @@ func _draw() -> void:
 			sky[0].lerp(sky[1], float(k) / float(SKY_STEPS - 1))
 		)
 	_draw_clouds(open)
+	_draw_bolt(bank_top + bank_tall * CROWNS_AT)
 	_draw_water(lake)
 	_tile(_bank, bank_top)
 	# Over the far bank, not under it: a mast on the far lane stands up in front of the
@@ -607,6 +631,51 @@ const RAIN_DROPS := 150
 const RAIN_SPEED := 520.0
 const RAIN_RINGS := 22
 const RAIN_TINT := Color(0.66, 0.72, 0.82)
+
+## A bolt of lightning over the far bank on each flash (2026-09-25, Richard: "if player is
+## washing and it's raining, they should see lightning"). **The only bolt in the game**: the
+## lake keeps its flash without one, by the rain pass's own decision. A jagged run of whole
+## painted pixels from the top of the sky down to the treeline, with a branch or two, rolled
+## once a strike and shown for as long as the flash lasts. The echo pulse relights the same
+## bolt rather than rolling a second one (`BOLT_HOLD`).
+const BOLT_INK := Color(0.96, 0.95, 1.0)
+const BOLT_GLOW := Color(0.78, 0.8, 1.0, 0.45)
+const BOLT_FROM := 0.5
+const BOLT_HOLD := 0.6
+const BOLT_STEPS := 14
+const BOLT_ACROSS := Vector2(0.12, 0.88)
+
+
+func _draw_bolt(foot: float) -> void:
+	if not bolt_shown():
+		return
+	var lit := clampf(Weather.flash_now * 1.4, 0.0, 1.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _bolt_seed
+	var at := Vector2(snappedf(_bolt_x * size.x, PIXEL), 0.0)
+	var drop := maxf(foot, PIXEL * 4.0) / float(BOLT_STEPS)
+	var branches := 0
+	for i in BOLT_STEPS:
+		var to := Vector2(at.x + snappedf(rng.randf_range(-3.0, 3.0), 1.0) * PIXEL, snappedf(drop * float(i + 1), PIXEL))
+		_bolt_run(at, to, lit, 2.0)
+		if branches < 2 and i > 2 and i < BOLT_STEPS - 3 and rng.randf() < 0.22:
+			branches += 1
+			var b := to
+			var way := -1.0 if rng.randf() < 0.5 else 1.0
+			for k in rng.randi_range(2, 4):
+				var bt := Vector2(b.x + way * snappedf(rng.randf_range(1.0, 3.0), 1.0) * PIXEL, b.y + snappedf(drop * 0.7, PIXEL))
+				_bolt_run(b, bt, lit * 0.7, 1.0)
+				b = bt
+		at = to
+
+
+## One leg of a bolt as whole painted pixels, a softer glow a pixel either side.
+func _bolt_run(a: Vector2, b: Vector2, lit: float, wide: float) -> void:
+	var n := maxi(int(maxf(absf(b.x - a.x), absf(b.y - a.y)) / PIXEL), 1)
+	for i in n + 1:
+		var p := a.lerp(b, float(i) / float(n)).snapped(Vector2(PIXEL, PIXEL))
+		draw_rect(Rect2(p - Vector2(PIXEL, 0.0), Vector2(PIXEL * (wide + 2.0), PIXEL)), Color(BOLT_GLOW, BOLT_GLOW.a * lit))
+		draw_rect(Rect2(p, Vector2(PIXEL * wide, PIXEL)), Color(BOLT_INK, lit))
 
 
 func _draw_rain(lake: Rect2) -> void:

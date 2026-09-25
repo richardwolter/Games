@@ -122,7 +122,7 @@ var seats := {}
 var facings := {}
 var states := {}
 
-## Piece name -> what it gives off while switched on: &"fire", &"warm", &"cold" or &"".
+## Piece name -> what it gives off while switched on: &"fire", &"warm", &"cold", &"ember" or &"".
 var lights := {}
 
 ## Piece name -> how many times bigger than painted the shed draws it. One for nearly

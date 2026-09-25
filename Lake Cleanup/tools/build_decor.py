@@ -310,7 +310,7 @@ PLACES = ("floor", "wall", "small")
 
 ## What a piece gives off while switched on: nothing, the hearth (a warm pool and the
 ## crackle), a lamp (a warm pool, silent), the open fridge (a cold white pool).
-LIGHTS = ("", "fire", "warm", "cold")
+LIGHTS = ("", "fire", "warm", "cold", "ember")
 
 
 ## The two top groups of the PSD: the restored piece, and the piece as the lake shows it.

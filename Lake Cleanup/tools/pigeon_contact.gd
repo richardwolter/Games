@@ -15,9 +15,9 @@
 ##   godot --path . --windowed res://tools/pigeon_contact.tscn
 extends Node
 
-const CATALOGUE := "res://assets/pigeons.json"
+const CATALOGUE := "res://assets/pigeons_inked.json"
 const BIRDS := "res://assets/pigeon_birds.json"
-const SHEET := "res://assets/pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
+const SHEET := "res://assets/pigeons_inked.png"
 const OUT_PNG := "res://assets/pigeon_contact.png"
 
 ## How far up the birds are blown up, and how much room each row gets.

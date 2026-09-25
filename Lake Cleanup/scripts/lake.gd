@@ -5316,7 +5316,7 @@ func _build_filth_map() -> void:
 	if _fish != null:
 		_fish.refresh(_clean_share, _clean_tiles)
 	if _wildlife != null:
-		_wildlife.refresh(_clean_share, _clean_tiles)
+		_wildlife.refresh(_clean_share, _clean_tiles, 1.0 - pollution)
 
 
 ## How full of rubbish the water round each tile is, 0 to 1: the pieces afloat within
@@ -5552,7 +5552,7 @@ func _grow_nature() -> void:
 	add_child(_wildlife)
 	_flora.refresh(_clean_share)
 	_fish.refresh(_clean_share, _clean_tiles)
-	_wildlife.refresh(_clean_share, _clean_tiles)
+	_wildlife.refresh(_clean_share, _clean_tiles, 1.0 - pollution)
 
 
 ## What frightens the animals, in world px: the angler, the pack, the hulls.

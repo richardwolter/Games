@@ -30,6 +30,25 @@ const FROGS_MOST := 30
 const TURTLES_MOST := 14
 const BROODS_MOST := 5
 const DRAGONFLIES_MOST := 20
+## Rabbits and foxes (2026-09-25): the outer bank's land animals, never the island. Rabbits
+## from the first clean shore, foxes rarer and late, both on the bank's sand.
+const RABBITS_MOST := 8
+const FOXES_MOST := 3
+const RABBIT_SHY := 2.2
+const FOX_SHY := 3.0
+const RABBIT_HOP := 26.0
+const FOX_TROT := 20.0
+const FLEE_SPEED := Vector2(70.0, 90.0)
+## How long one sits between moves, how far a move goes along the sand (world px), and how
+## far a frightened one runs before it is out of sight in the trees.
+const LAND_SIT := Vector2(2.0, 7.0)
+const LAND_WANDER := Vector2(18.0, 60.0)
+const FLEE_REACH := 140.0
+const RABBIT_HOP_FPS := 6.0
+const FOX_TROT_FPS := 7.0
+const LAND_PRINT_EVERY := 10.0
+## The meter's reading the late arrivals wait for, and they fill in from it to a cleaned lake.
+const LATE_FROM := 0.6
 ## Seconds between reconciling what should be about with what is.
 const RECKON_EVERY := 2.0
 ## Seconds between one brood arriving and the next, at most one at a time.
@@ -128,6 +147,10 @@ var threats: Callable
 ## silent FALLBACK_BPM of their own.
 var music: MusicStation
 var stage: float = 0.0
+## How much of the lake's rubbish is gone, 0 to 1: the pollution meter's own reading, not
+## the clean-water share. The late arrivals (ducks, foxes) wait on this (Richard, 2026-09-25:
+## "ducks should come later, around 60% of pollution cleaned").
+var cleared: float = 0.0
 
 var _frog_sheets: Array[Texture2D] = []
 var _critters: Texture2D
@@ -141,6 +164,7 @@ var _frogs: Array = []
 var _turtles: Array = []
 var _broods: Array = []
 var _flies: Array = []
+var _critters_on_land: Array = []
 var _reckon_in := 0.0
 var _brood_in := 3.0
 var _now := 0.0
@@ -209,6 +233,18 @@ func brood_count() -> int:
 	return _broods.size()
 
 
+func rabbit_count() -> int:
+	return _critters_on_land.filter(func(c: Dictionary) -> bool: return c["kind"] == &"rabbit").size()
+
+
+func fox_count() -> int:
+	return _critters_on_land.filter(func(c: Dictionary) -> bool: return c["kind"] == &"fox").size()
+
+
+func land_animals() -> Array:
+	return _critters_on_land
+
+
 func dragonfly_count() -> int:
 	return _flies.size()
 
@@ -234,8 +270,9 @@ func flies() -> Array:
 
 
 ## The lake's clean water changed: `clean` is every water tile index the map calls clean.
-func refresh(clean_share: float, clean: PackedInt32Array) -> void:
+func refresh(clean_share: float, clean: PackedInt32Array, cleared_share: float = 0.0) -> void:
 	stage = clean_share
+	cleared = cleared_share
 	_clean = clean
 	_reckon_in = 0.0
 
@@ -246,6 +283,7 @@ func reset() -> void:
 	_turtles.clear()
 	_broods.clear()
 	_flies.clear()
+	_critters_on_land.clear()
 	_track_at.resize(0)
 	_track_age.resize(0)
 
@@ -265,6 +303,9 @@ func scare(at: Vector2, reach_tiles: float = DUCK_SHY) -> void:
 	for d: Dictionary in _flies:
 		if (d["at"] as Vector2).distance_to(at) < reach:
 			_fly_fright(d, at)
+	for c: Dictionary in _critters_on_land:
+		if (c["at"] as Vector2).distance_to(at) < reach:
+			_land_fright(c, at)
 
 
 ## Beats since the song began, and a beat's length in seconds. See MusicStation.beat_clock.
@@ -299,10 +340,13 @@ func _process(delta: float) -> void:
 		_brood_step(b, delta, seen)
 	for d: Dictionary in _flies:
 		_fly_step(d, delta, seen)
+	for c: Dictionary in _critters_on_land:
+		_land_step(c, delta, seen)
 	_frogs = _frogs.filter(func(f: Dictionary) -> bool: return not f.get("gone", false))
 	_turtles = _turtles.filter(func(t: Dictionary) -> bool: return not t.get("gone", false))
 	_broods = _broods.filter(func(b: Dictionary) -> bool: return not b.get("gone", false))
 	_flies = _flies.filter(func(d: Dictionary) -> bool: return not d.get("gone", false))
+	_critters_on_land = _critters_on_land.filter(func(c: Dictionary) -> bool: return not c.get("gone", false))
 	_under.queue_redraw()
 	_ground.queue_redraw()
 	_air.queue_redraw()
@@ -416,6 +460,15 @@ func _want(most: int) -> int:
 	return mini(ceili(float(most) * clampf(stage, 0.0, 1.0)), most)
 
 
+## How many of a late arrival: none until the meter reads LATE_FROM cleared, then filling in
+## to `most` on a cleaned lake.
+func _want_late(most: int) -> int:
+	if cleared < LATE_FROM or stage < 0.02:
+		return 0
+	var t := clampf((cleared - LATE_FROM) / (1.0 - LATE_FROM), 0.0, 1.0)
+	return clampi(ceili(float(most) * maxf(t, 0.001)), 1, most)
+
+
 func _reckon() -> void:
 	if grid == null or not ready_to_live():
 		return
@@ -427,7 +480,13 @@ func _reckon() -> void:
 			_frogs.append(_new_frog(shore[_rng.randi_range(0, shore.size() - 1)]))
 		for n in maxi(_want(TURTLES_MOST) - _turtles.size(), 0):
 			_turtles.append(_new_turtle(shore[_rng.randi_range(0, shore.size() - 1)]))
-	if _broods.size() < _want(BROODS_MOST) and _brood_in <= 0.0 and _clean.size() > 12:
+	var bank := shore.filter(func(sp: Dictionary) -> bool: return sp["side"] == "bank")
+	if not bank.is_empty():
+		for n in maxi(_want(RABBITS_MOST) - rabbit_count(), 0):
+			_critters_on_land.append(_new_land(&"rabbit", bank[_rng.randi_range(0, bank.size() - 1)]))
+		for n in maxi(_want_late(FOXES_MOST) - fox_count(), 0):
+			_critters_on_land.append(_new_land(&"fox", bank[_rng.randi_range(0, bank.size() - 1)]))
+	if _broods.size() < _want_late(BROODS_MOST) and _brood_in <= 0.0 and _clean.size() > 12:
 		var b := _new_brood()
 		if not b.is_empty():
 			_broods.append(b)
@@ -848,6 +907,114 @@ func _turtle_fright(t: Dictionary, _from: Vector2) -> void:
 	t["timer"] = TURTLE_TUCK
 
 
+# ---- rabbits and foxes -------------------------------------------------------------------
+
+enum Land { SIT, MOVE, FLEE }
+
+
+## A rabbit or a fox comes out of the trees behind its bit of beach and sits on the sand.
+func _new_land(kind: StringName, spot: Dictionary) -> Dictionary:
+	var land: Vector2 = spot["land"]
+	var inland := -(spot["normal"] as Vector2)
+	var from := land + inland * _rng.randf_range(40.0, 70.0)
+	return {
+		"kind": kind, "spot": spot, "at": from, "to": land, "state": Land.MOVE,
+		"timer": 0.0, "facing": 1.0, "clock": _rng.randf() * 3.0, "fade": 0.0, "walked": 0.0,
+		"pose": _rng.randi_range(0, 1),
+	}
+
+
+func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
+	c["clock"] = float(c["clock"]) + delta
+	var at: Vector2 = c["at"]
+	var state: int = c["state"]
+	var fox: bool = c["kind"] == &"fox"
+	if state != Land.FLEE:
+		var shy := Iso.tile_circle_extent(FOX_SHY if fox else RABBIT_SHY)
+		for p in seen:
+			if p.distance_to(at) < shy:
+				_land_fright(c, p)
+				return
+	match state:
+		Land.SIT:
+			c["fade"] = minf(float(c["fade"]) + delta, 1.0)
+			c["timer"] = float(c["timer"]) - delta
+			if float(c["timer"]) <= 0.0:
+				var spot: Dictionary = c["spot"]
+				var n: Vector2 = spot["normal"]
+				var along := Vector2(-n.y, n.x) * (1.0 if _rng.randf() < 0.5 else -1.0)
+				var to := at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + n * _rng.randf_range(-8.0, 8.0)
+				if _on_sand(to, "bank"):
+					c["to"] = to
+					c["state"] = Land.MOVE
+				else:
+					c["timer"] = 1.0
+				c["pose"] = _rng.randi_range(0, 1)
+		Land.MOVE, Land.FLEE:
+			var to: Vector2 = c["to"]
+			var step := to - at
+			if absf(step.x) > 0.5:
+				c["facing"] = 1.0 if step.x < 0.0 else -1.0
+			var speed := float(c.get("speed", FOX_TROT if fox else RABBIT_HOP))
+			var go := speed * delta
+			if state == Land.FLEE:
+				c["fade"] = maxf(float(c["fade"]) - delta / 1.4, 0.0)
+				if float(c["fade"]) <= 0.0:
+					c["gone"] = true
+					return
+			else:
+				c["fade"] = minf(float(c["fade"]) + delta / 0.8, 1.0)
+			if step.length() <= go:
+				c["at"] = to
+				if state == Land.FLEE:
+					c["gone"] = true
+					return
+				c["state"] = Land.SIT
+				c["timer"] = _rng.randf_range(LAND_SIT.x, LAND_SIT.y)
+				c.erase("speed")
+			else:
+				c["at"] = at + step.normalized() * go
+			c["walked"] = float(c["walked"]) + go
+			if float(c["walked"]) >= LAND_PRINT_EVERY:
+				c["walked"] = 0.0
+				if _sandy(c["at"]):
+					_track(c["at"])
+
+
+## Off into the trees behind the beach, away from whatever came near, fading as it goes.
+func _land_fright(c: Dictionary, from: Vector2) -> void:
+	if int(c["state"]) == Land.FLEE:
+		return
+	var at: Vector2 = c["at"]
+	var inland := -((c["spot"] as Dictionary)["normal"] as Vector2)
+	var away := (at - from).normalized() if at.distance_to(from) > 0.1 else inland
+	c["to"] = at + (inland * 1.3 + away).normalized() * FLEE_REACH
+	c["state"] = Land.FLEE
+	c["speed"] = _rng.randf_range(FLEE_SPEED.x, FLEE_SPEED.y)
+
+
+func _draw_land(on: CanvasItem, c: Dictionary) -> void:
+	var state: int = c["state"]
+	var clock := float(c["clock"])
+	var name := ""
+	var rabbit: bool = c["kind"] == &"rabbit"
+	if rabbit:
+		if state == Land.SIT:
+			# An ear laid back now and then, not on a beat.
+			name = "rabbit_sit1" if fmod(clock + float(c["pose"]) * 2.3, 5.0) > 4.2 else "rabbit_sit0"
+		else:
+			var fps := RABBIT_HOP_FPS * (1.8 if state == Land.FLEE else 1.0)
+			name = "rabbit_hop%d" % (int(clock * fps) % 2)
+	elif state == Land.SIT:
+		name = "fox_sit"
+	elif state == Land.FLEE:
+		name = "fox_run%d" % (int(clock * FOX_TROT_FPS * 1.6) % 2)
+	else:
+		name = "fox_trot%d" % (int(clock * FOX_TROT_FPS) % 4)
+	var lift := ART if rabbit and state != Land.SIT and name.ends_with("1") else 0.0
+	_stamp(on, name, (c["at"] as Vector2).round() - Vector2(0.0, lift), float(c["facing"]), Color(1.0, 1.0, 1.0, float(c["fade"])))
+
+
 # ---- ducks ------------------------------------------------------------------------------
 
 enum Brood { FLY_IN, SWIM, DABBLE, TAKE_OFF }
@@ -1185,6 +1352,8 @@ func _paint_ground(on: CanvasItem) -> void:
 	for t: Dictionary in _turtles:
 		if int(t["state"]) != Turtle.UNDER:
 			items.append([(t["at"] as Vector2).y, 1, t])
+	for c: Dictionary in _critters_on_land:
+		items.append([(c["at"] as Vector2).y, 4, c])
 	for b: Dictionary in _broods:
 		if float(b["alt"]) <= 0.5:
 			items.append([(b["at"] as Vector2).y, 2, b])
@@ -1201,6 +1370,8 @@ func _paint_ground(on: CanvasItem) -> void:
 				_draw_brood_water(on, item[2])
 			3:
 				_draw_brood_shadow(on, item[2])
+			4:
+				_draw_land(on, item[2])
 
 
 func _paint_air(on: CanvasItem) -> void:
