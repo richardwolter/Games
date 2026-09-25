@@ -3240,7 +3240,10 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   roof drops run to the eave, hang `DRIP_HANG` and fall to the picture's foot.
 - **Puddles**: `COUNT` spots found once off a fixed seed on the island's dry ground, clear of
   the water's edge (`OFF_WATER`), the hut, the crate and the pump. They fill over `FILL` s
-  of rain and dry over `DRY` s after it. Whole-pixel blobs in the clean ramp, see-through;
+  of rain and dry over `DRY` s after it. Each is a spill of `LOBES` overlapping ellipses with
+  its edge bent by a coarse noise (`WOBBLE`), laid once as cells with the wetness each needs,
+  so it grows and dries along its own bays and arms (Richard: "too round and perfect"; four,
+  bigger). Whole art pixels in the clean ramp, see-through;
   rain on one rings it. **Reflections**: a clipped child (`clip_children`) draws the hut, the
   pump, the angler and the dogs upside down about their feet (`Angler.reflect_on`,
   `Dog.reflect_on`), only where a puddle is. Nothing saved.
