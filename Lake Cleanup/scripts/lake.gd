@@ -411,7 +411,10 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## 14: the rubbish is cut from one PSD (2026-09-21): forty-nine kinds joined and five left
 ## (`plastic_toy`, `plastic_globe`, `rubber_bone`, `wood_painting3`/`4`), so every index in
 ## a saved stack moved.
-const SAVE_VERSION := 15
+## 15: the thin ring round the island (2026-09-22).
+## 16: every stack past the ring runs `LakeGrid.DENSITY` (2) times deeper (2026-09-24), so a
+## saved lake would keep half the rubbish at half the pay.
+const SAVE_VERSION := 16
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"

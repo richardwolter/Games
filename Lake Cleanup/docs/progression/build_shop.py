@@ -49,8 +49,13 @@ for f in glob.glob(f"{ROOT}/resources/trash/*.tres"):
     tiers.setdefault(int(d["tier"]), []).append(d["pollution"])
 pollution = {t: sum(v) / len(v) for t, v in tiers.items()}
 
-UNITS = {int(t): n for t, n in cal["units_by_tier"].items()}
+# The lake holds DENSITY times the pieces the calibration probe counted (LakeGrid.DENSITY,
+# 2026-09-24): every stack past the island's ring is that many times deeper, and the strand is
+# untouched. A cast sweeps that many more pieces off the same water, so k_density goes with it.
+DENSITY = 2
 STRAND = cal["strand"]
+UNITS = {int(t): n for t, n in cal["units_by_tier"].items()}
+UNITS = {t: (n - (STRAND if t == 0 else 0)) * DENSITY + (STRAND if t == 0 else 0) for t, n in UNITS.items()}
 LAKE = sum(UNITS.values()) - STRAND
 LAKE_R = math.sqrt(40 * 34)
 ISLAND_R = math.sqrt(8 * 6.8) + 2.2
@@ -70,7 +75,7 @@ stats = {
     "k_bird_swept": 0.0015, "k_bird_aim": 3.0,
     "k_lake_r": round(LAKE_R, 2), "k_island_r": round(ISLAND_R, 2),
     "k_units_total": LAKE, "k_stack": cal["k_stack"],
-    "k_density": cal["k_density"], "k_reel_factor": cal["k_reel_factor"],
+    "k_density": cal["k_density"] * DENSITY, "k_reel_factor": cal["k_reel_factor"],
     "k_aim": cal.get("k_aim", 2.0), "k_cast_share": cal.get("k_cast_share", 0.75), "k_mouth_edge": 0.15,
     "k_shelf": 2.5, "k_reach_far": 35.6,
     "k_catch_scale": cal.get("k_catch_scale", 1.7), "k_ferry_scale": 1.0,

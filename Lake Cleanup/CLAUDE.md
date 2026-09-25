@@ -559,6 +559,38 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   nothing lives. The surface end is crowded and works. Percentile ends would fix the other
   one; not done.
 
+### The Lake Twice as Deep (2026-09-24, `/grill-me` with Richard)
+Richard: Strength 1 was too dear, and at the end of a run "the net is huge but not a lot of
+objects are caught". Catch never bound late: a cast is `min(Catch, swept x density)`, and the
+late lake is thin. So the lake got denser **and** Catch got bigger, with the money held.
+- **`LakeGrid.DENSITY` 2**: every slot the depth asks for is doubled in `_plan_slots`, so
+  what the ring gives up is doubled too and dealt out past it. **The ring stays
+  `RING_SLOTS`**, the strand untouched. About 33k pieces, the deepest tile 16; the filth
+  map's ceiling follows `deepest()` by itself.
+- **Pay per piece halved** (`economy.tres` 1.25 / 3.0, was 2.5 / 6.0): the lake's value
+  moved 330k to 334k. Birds untouched. Because the ring and the strand did not double, the
+  mix leans heavier (tier 0 35% to 29%) and a piece pays 2-6% more than half; `test_lake`'s
+  `PAY_PRICED`/`TIER_PRICED` are re-measured on it. **Accepted**: evening the band out by
+  layering the deep stacks was tried and moved nothing.
+- **Strength 2000 x 3.30** (2000 / 6.6k / 21.8k / 72k), was 3500 x 2.74; the top unchanged.
+  Pinned in `HAND` as before.
+- **Catch 8 + 7 a level, 64 at the top** (was 4 + 1 to 12). **Hold 16 + 6, 64** (was 8 + 3
+  to 32): **one cast at every level, not two** - supersedes "Hold is two casts" in The
+  Boats Run Ahead, by Richard's call ("time can be spent washing and decorating while they
+  sell"). Hold x1.5 was asked first and ran the sim to 61 min; x2 lands 49.9.
+- **Every other price frozen**; `shop_loop.sh` not run. The sim takes `DENSITY` in
+  `build_shop.py` (lake units and `k_density` times it).
+- **Sim** (`shop-report`): focused clears in **49.9 min**, Strength at 7 / 11 / 20 / 29, the
+  box peaking near **970** (was 24 in the sim, 814 in run 1). **The sim buys only 3-4 of
+  Catch's 8 levels**: it thinks a cast is sweep-limited past about 24. Its density is one
+  lake-wide mean and cannot see a thick bay, so read that against a logged run, not as
+  proof Catch is too big.
+- **`SAVE_VERSION` 16**, v15 refused; the v15 save is `_builds/lake_cleanup_v15_20260924.save`.
+- **Out of scope, by decision**: the ring, Reel/Range/Width, every other track's price,
+  the boats beyond Hold, re-running the pricing loop.
+- **Open**: fill and `_rebuild` cost with twice the pieces (bench before trusting the 8 ms
+  bar), and whether the sim's Catch read is right - Richard's next logged run decides.
+
 ### The Thin Ring Round the Island (2026-09-22, `/grill-me` with Richard, player feedback)
 Players' first sessions: the water by the island was nine-deep soup, so ten minutes of
 casting skimmed the top off it and nothing ever read as cleared. Now the first stretch out

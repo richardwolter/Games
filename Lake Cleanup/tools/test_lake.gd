@@ -22,9 +22,13 @@ const HudSkin := preload("res://scripts/hud_skin.gd")
 const HudButtons := preload("res://scripts/hud_buttons.gd")
 ## What a fresh lake paid per piece at each yard, and the share of its water in each weight
 ## tier, before the third batch of rubbish joined (2026-09-21, `probe_fill_economy`). The
-## shop is priced on these; `_check_surface` holds the fill to them.
-const PAY_PRICED := [42.47, 45.06, 34.51, 38.31]
-const TIER_PRICED := [0.351, 0.238, 0.161, 0.089, 0.162]
+## shop is priced on these; `_check_surface` holds the fill to them. Since the lake went
+## `LakeGrid.DENSITY` deep (2026-09-24) a piece pays that share of it, and these are re-measured
+## on the deeper lake: the island's ring and the strand did not double, so the mix leans a little
+## heavier (tier 0 35.1% to 29.4%) and a piece pays 2-6% more. The lake's whole value moved 1.4%
+## (`probe_fill_economy`, 330k to 334k), which is the number the frozen prices care about.
+const PAY_PRICED := [44.01, 45.76, 36.50, 40.58]
+const TIER_PRICED := [0.294, 0.234, 0.196, 0.099, 0.176]
 const DogArt := preload("res://scripts/dog_art.gd")
 
 const LOG_PATH := "res://tools/last_test.log"
@@ -539,7 +543,7 @@ func _check_surface() -> void:
 	for ty in Iso.ROWS:
 		for tx in Iso.COLS:
 			if Iso.floats_here(tx, ty):
-				by_depth += maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+				by_depth += maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1) * LakeGrid.DENSITY
 	var planned := 0
 	for index in _grid.stacks.size():
 		planned += _grid.room_of(index)
@@ -547,9 +551,10 @@ func _check_surface() -> void:
 		"%d planned against %d by depth" % [planned, by_depth])
 	# The nine-deep tiles were all by the island and are the ring's now; past it the depth
 	# tops out lower and the dealt-back slots put it back near the old ceiling.
-	_check(_grid.deepest() >= Iso.MAX_SLOTS - 2 and _grid.deepest() <= Iso.MAX_SLOTS + 2,
+	var ceiling := Iso.MAX_SLOTS * LakeGrid.DENSITY
+	_check(_grid.deepest() >= ceiling - 2 * LakeGrid.DENSITY and _grid.deepest() <= ceiling + 2 * LakeGrid.DENSITY,
 		"and the deepest tile past the ring is near the depth's own ceiling",
-		"%d of %d" % [_grid.deepest(), Iso.MAX_SLOTS])
+		"%d of %d" % [_grid.deepest(), ceiling])
 	# And past it, the bait still puts the occasional heavy thing where it can be seen.
 	_check(landmarks > 20, "past the ring, heavy pieces still break the surface as landmarks",
 		"%d of them" % landmarks)
@@ -596,7 +601,7 @@ func _check_surface() -> void:
 			tier_by[def.tier] += 1
 			counted += 1
 	for m in 4:
-		var mean := float(pay_by[m]) / maxf(float(all_kind[m]), 1.0)
+		var mean := float(pay_by[m]) / maxf(float(all_kind[m]), 1.0) * float(LakeGrid.DENSITY)
 		_check(absf(mean / float(PAY_PRICED[m]) - 1.0) < 0.03,
 			"a %s piece pays what the shop was priced on" % TrashDef.KIND_NAMES[m].to_lower(),
 			"%.2f against %.2f" % [mean, float(PAY_PRICED[m])])
@@ -2034,15 +2039,17 @@ func _stage_market() -> void:
 		"and asking for one takes nothing", "%.0f" % float(_main.get(&"sludge")))
 	# The boats run ahead of the net (2026-09-18, issue #23; supersedes "one track twice"): a
 	# ferry holds two casts at every level, and its Hold is the cheaper of the two to buy.
+	# Since the lake went twice as deep (2026-09-24) it is one cast at least: Catch grew
+	# faster than Hold, by Richard's call, and the backlog waits while he washes and decorates.
 	var hold: UpgradeTrack = tracks[&"net_hold"]
 	var cargo: UpgradeTrack = tracks[&"cargo"]
 	var ahead := hold.level_cap == cargo.level_cap
 	var dearer := ""
 	for l in hold.level_cap + 1:
-		ahead = ahead and int(cargo.value(l)) >= 2 * int(hold.value(l))
+		ahead = ahead and int(cargo.value(l)) >= int(hold.value(l))
 		if l < hold.level_cap and cargo.cost(l) >= hold.cost(l):
 			dearer += " %d" % l
-	_check(ahead, "a ferry holds two casts at every level of Hold and Catch",
+	_check(ahead, "a ferry holds a cast at every level of Hold and Catch",
 		"%d against %d at the top" % [int(cargo.value(cargo.level_cap)), int(hold.value(hold.level_cap))])
 	_check(dearer.is_empty(), "Hold is cheaper than Catch at every level", "dearer at" + dearer)
 	var width: UpgradeTrack = tracks[&"net_width"]

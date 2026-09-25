@@ -430,6 +430,12 @@ const RING_OUT := 8.0
 ## Slots a ring tile holds: the near figure over the inner half of the ring, the far one
 ## over the outer half. First guesses, to judge in play.
 const RING_SLOTS := Vector2i(2, 3)
+## How many times deeper a stack runs than the depth alone makes it (2026-09-24, `/grill-me`
+## with Richard: "the net is huge but not a lot of objects are caught"). Doubles every
+## slot the depth asks for, so what the ring gives up is doubled too and dealt out past it;
+## the ring itself stays `RING_SLOTS`. Pay per piece was halved with it
+## (`resources/economy.tres`), so the lake holds about the money it did.
+const DENSITY := 2
 
 ## The heaviest tier a ring piece may be: liftable at level 0 or after the first Strength.
 const RING_TIER := 1
@@ -1735,7 +1741,7 @@ func _plan_slots() -> void:
 			if not Iso.floats_here(tx, ty):
 				continue
 			var index := index_of(tx, ty)
-			var by_depth := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1)
+			var by_depth := maxi(int(Iso.depth_at(tx, ty) * float(Iso.MAX_SLOTS)), 1) * DENSITY
 			var out := Iso.past_shelf(Vector2(tx, ty))
 			if out < RING_OUT:
 				_slots[index] = mini(ring_slots(out), by_depth)
