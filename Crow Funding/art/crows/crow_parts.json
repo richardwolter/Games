@@ -1,0 +1,45 @@
+{
+    "_comment": "Written by tools/split_crow.py. Offsets are the part's top-left in body-local pixels; pivot is in the wing's own pixels.",
+    "source_size": [
+        629,
+        944
+    ],
+    "body": {
+        "file": "crow_body.png",
+        "offset": [
+            0,
+            0
+        ],
+        "size": [
+            629,
+            944
+        ]
+    },
+    "wing": {
+        "file": "crow_wing.png",
+        "offset": [
+            146,
+            196
+        ],
+        "size": [
+            319,
+            463
+        ],
+        "pivot": [
+            254,
+            29
+        ]
+    },
+    "scarf": {
+        "file": "crow_scarf.png",
+        "offset": [
+            361,
+            164
+        ],
+        "size": [
+            175,
+            163
+        ],
+        "tint": "scarf_color"
+    }
+}

@@ -1,6 +1,6 @@
 @tool
 extends Node2D
-## A single crow character: flat-shape visuals, stats, balcony loitering, and fly out/back motion.
+## A single crow character: pen-and-ink sprite parts, stats, balcony loitering, and fly out/back motion.
 
 const TIER_NAMES: Array[String] = ["Newbie", "Apprentice", "Rookie", "Pro", "Master"]
 # Cumulative XP required to REACH each tier (tier 0 costs 0 XP).
@@ -23,7 +23,19 @@ var perch := Vector2.ZERO
 var carrying := false
 var loitering := false
 
-var body_color := Color(0.17, 0.18, 0.24)
+const BODY_TEX := preload("res://art/crows/crow_body.png")
+const WING_TEX := preload("res://art/crows/crow_wing.png")
+const SCARF_TEX := preload("res://art/crows/crow_scarf.png")
+# From art/crows/crow_parts.json, in source pixels.
+const WING_OFFSET := Vector2(146, 196)
+const WING_PIVOT := Vector2(254, 29)
+const SCARF_OFFSET := Vector2(361, 164)
+const SPRITE_FEET := Vector2(330, 944)
+const BEAK_TIP := Vector2(625, 112)
+const SPRITE_HEIGHT := 46.0
+# The old flat crow's belly sat ~11 px below its origin; the feet go there.
+const FEET_Y := 11.0
+const SPRITE_SCALE := SPRITE_HEIGHT / 944.0
 
 var _tween: Tween
 var _hop_tween: Tween
@@ -36,6 +48,8 @@ var _loiter_timer := 0.0
 
 func _ready() -> void:
 	luck = base_luck
+	# the sprite is drawn at ~5% of its source size; mipmaps keep the ink from shimmering
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -137,35 +151,25 @@ func _draw() -> void:
 	var bob := 0.0
 	if not _flying:
 		bob = sin(_time * 2.0) * 1.3
-	# tail
-	draw_set_transform(Vector2(-12, 1 + bob), 0.0, f)
-	draw_colored_polygon(PackedVector2Array([Vector2(0, -4), Vector2(-7, -8), Vector2(-5, 0)]), body_color)
-	# body
-	draw_set_transform(Vector2(0, 2 + bob), 0.0, Vector2(1.35, 0.95) * f)
-	draw_circle(Vector2.ZERO, 10.0, body_color)
-	# head
-	draw_set_transform(Vector2(12, -6 + bob), 0.0, f)
-	draw_circle(Vector2.ZERO, 6.5, body_color)
-	# beak
-	draw_set_transform(Vector2(0, 0), 0.0, f)
-	draw_colored_polygon(PackedVector2Array([Vector2(16.5, -7 + bob), Vector2(24.5, -5 + bob), Vector2(16.5, -3 + bob)]), Color(0.95, 0.72, 0.2))
-	# eye
-	draw_set_transform(Vector2(14, -7 + bob), 0.0, f)
-	draw_circle(Vector2.ZERO, 2.4, Color(1, 1, 1, 0.95))
-	draw_circle(Vector2(0.6, 0), 1.2, Color(0.12, 0.12, 0.14))
-	# wing
-	var wing_y := 0.0
+	# Pen-and-ink parts cut from art/crows/crow.png (tools/split_crow.py). All
+	# offsets are source pixels; SPRITE_SCALE maps them to world units, with the
+	# origin at the feet so the crow stands on its perch.
+	var root := Transform2D(0.0, f * SPRITE_SCALE, 0.0, Vector2(0, bob + FEET_Y)) * Transform2D(0.0, -SPRITE_FEET)
+	draw_set_transform_matrix(root)
+	draw_texture(BODY_TEX, Vector2.ZERO)
+	# wing hinges at the shoulder and flaps while flying
+	var wing_rot := 0.0
 	if _flying:
-		wing_y = sin(_wing_phase) * 3.2
-	draw_set_transform(Vector2(0, 0), 0.0, f)
-	draw_colored_polygon(PackedVector2Array([Vector2(-8, 1 + wing_y), Vector2(2, -4 + wing_y), Vector2(3, 2 + wing_y)]), Color(0.24, 0.27, 0.34))
-	# scarf
-	draw_set_transform(Vector2(8, bob), 0.0, f)
-	draw_circle(Vector2.ZERO, 3.6, scarf_color)
-	draw_set_transform(Vector2(0, 0), 0.0, Vector2.ONE)
-	draw_colored_polygon(PackedVector2Array([Vector2(6, 1 + bob), Vector2(10, 1 + bob), Vector2(11, 10 + bob), Vector2(5, 10 + bob)]), scarf_color)
+		wing_rot = -absf(sin(_wing_phase)) * 0.9
+	var shoulder := WING_OFFSET + WING_PIVOT
+	draw_set_transform_matrix(root * Transform2D(wing_rot, shoulder) * Transform2D(0.0, -WING_PIVOT))
+	draw_texture(WING_TEX, Vector2.ZERO)
+	# scarf is drawn white and tinted per crow - the one spot colour
+	draw_set_transform_matrix(root)
+	draw_texture(SCARF_TEX, SCARF_OFFSET, scarf_color)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# carried loot (visible while returning home with a find)
 	if carrying:
-		draw_set_transform(Vector2(24, -5 + bob), 0.0, f)
+		draw_set_transform((BEAK_TIP - SPRITE_FEET) * SPRITE_SCALE * f + Vector2(0, bob + FEET_Y), 0.0, f)
 		draw_circle(Vector2.ZERO, 2.6, Color(0.98, 0.83, 0.25))
 		draw_set_transform(Vector2(0, 0), 0.0, Vector2.ONE)

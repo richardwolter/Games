@@ -42,8 +42,24 @@ Shared ComfyUI generator (`_pipeline/tools/generate_art.ps1`, see its `SETUP.md`
   output. Composite on white before pasting or editing, and rebuild alpha by
   flood-filling the exterior, or the white holes paste as nothing.
 
+## In-game rig
+
+- `tools/split_crow.py` cuts `art/crows/crow.png` into `crow_body.png` and
+  `crow_wing.png` (wing polygon + shoulder pivot authored in the script; the hole
+  in the body is filled with solid ink). `tools/draw_scarf.py` draws
+  `crow_scarf.png`, white with ink outline. Both write `art/crows/crow_parts.json`.
+- `crow.gd` `_draw()` draws the three textures; the constants at the top mirror
+  `crow_parts.json` (update both if the split changes). Origin is at the feet,
+  `FEET_Y` below the node; `SPRITE_HEIGHT` (46 px) sets on-screen size. The wing
+  rotates up to ~0.9 rad about the shoulder while flying; the scarf is tinted with
+  `scarf_color` via `draw_texture`'s modulate.
+- The parts import with mipmaps on and the node uses
+  `TEXTURE_FILTER_LINEAR_WITH_MIPMAPS`: the sprite is drawn at ~5% of source size
+  and shimmers without them.
+- The scarf is a hand-coded placeholder shape, stiffer than the ink drawing.
+
 ## Next
 
-1. Split `art/crows/crow.png` into body / wing layers (`_pipeline/tools/split_parts.ps1`).
-2. Scarf layer.
-3. Wire the sprite into `crow.gd` in place of the `_draw()` crow.
+1. Judge the crow in-game (size, flap, scarf) and tune `SPRITE_HEIGHT` / flap angle.
+2. Scarf redraw in the ink style (hand edit + low-denoise img2img, like the tail).
+3. City backdrop in ref-2 style.
