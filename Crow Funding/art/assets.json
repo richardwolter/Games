@@ -106,6 +106,130 @@
             "prompt": "a single crow standing, full body in side view facing right, thick rounded chest, long closed pointed beak, large round white eye ring with a black pupil, long closed wedge tail continuing the line of the back, dark feathered wing",
             "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
             "_note": "crow_edit input with the tail redrawn by tools/_crow_tail.py as one closed wedge continuing the back contour (Richard, 2026-09-26: no straight cut, no separate fanned feathers)."
+        },
+        {
+            "name": "crow_fly",
+            "out": "art/crows/crow_fly.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1024,
+                768
+            ],
+            "seed": 6100,
+            "variants": 6,
+            "prompt": "a single crow flying, full body in side view facing right, both wings spread wide and raised in upstroke, long fingered primary feathers at the wing tips, fanned wedge tail, legs tucked under the body, long closed pointed beak, round white eye ring",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "Flight pose for the flap rig: body + near wing get cut out of this."
+        },
+        {
+            "name": "city_bg",
+            "out": "art/scene/city.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 0.8,
+            "gen": [
+                1344,
+                768
+            ],
+            "seed": 6200,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "prompt": "view from a high balcony over a dense old european city, rows of apartment blocks and rooftops receding to the horizon, chimneys, water towers, antennas, church spire in the distance, empty sky in the upper third",
+            "style": "loose black ink pen urban sketch on white paper, quick confident wobbly lines, sparse hatching, lots of white space, reportage drawing",
+            "negative_extra": "people, birds, crow, text, lettering, signs, colour, grey wash",
+            "_note": "Ref-2 style backdrop. Upper third left empty for the sky tint.",
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0
+        },
+        {
+            "name": "wing_spread",
+            "out": "art/crows/wing_spread.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1216,
+                640
+            ],
+            "seed": 6400,
+            "variants": 6,
+            "prompt": "a single isolated fully outstretched black crow wing, seen from above, horizontal, shoulder on the left, five long separated fingered primary feathers at the right tip, overlapping covert feathers, secondaries along the trailing edge, no bird body",
+            "negative_extra": "bird body, head, beak, two wings, pair of wings, angel wing, white wing",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "Flight wing for the rig: cut into arm (covert+secondaries) and hand (primaries)."
+        },
+        {
+            "name": "tail_fan",
+            "out": "art/crows/tail_fan.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                832,
+                832
+            ],
+            "seed": 6500,
+            "variants": 4,
+            "prompt": "a single isolated black crow tail, feathers spread open in a rounded fan, seen from above, base at the top, no bird body",
+            "negative_extra": "bird body, head, beak, wings, peacock, white feathers",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "Fanned tail for flight."
+        },
+        {
+            "name": "crow_scarf",
+            "out": "art/crows/crow.png",
+            "ref": "art_ref/crow_scarf_in.png",
+            "gen": [
+                640,
+                960
+            ],
+            "seed": 7100,
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "prompt": "a single crow standing, full body in side view facing right, thick rounded chest, long closed pointed beak, large round white eye ring with a black pupil, long closed wedge tail continuing the line of the back, dark feathered wing, wearing a soft knotted cloth scarf around its neck with one loose end hanging down, white scarf with ink folds and creases",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "Approved crow + the placeholder scarf shape; img2img redraws the scarf in ink, then tools/ink_scarf.py cuts only the scarf back out.",
+            "variants": 4
+        },
+        {
+            "name": "crow_fly_body",
+            "out": "art/crows/crow_fly_body.png",
+            "ref": "art_ref/crow_fly_in.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1152,
+                640
+            ],
+            "seed": 7300,
+            "variants": 4,
+            "prompt": "a single crow body in level flight seen from the side facing right, sleek horizontal streamlined body, head forward, long closed pointed beak, round white eye ring, legs tucked away and hidden, long closed wedge tail straight behind, wings not shown",
+            "negative_extra": "wings, spread wings, feet, legs, talons, perched",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "tools/flight_body.py collage (approved crow rotated, legs cut, head re-levelled) blended by img2img. The rig adds the spread wings on top."
+        },
+        {
+            "name": "balcony",
+            "out": "art/scene/balcony_raw.png",
+            "ref": "art_ref/balcony_in.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 0.9,
+            "gen": [
+                1664,
+                256
+            ],
+            "seed": 7500,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "strip_shadow": false,
+            "prompt": "an old wooden balcony railing seen straight from the front, thick top rail, square wooden balusters, wooden deck planks below, wood grain",
+            "negative_extra": "colour, brown, orange, people, birds, city, sky, perspective drawing of a room",
+            "style": "black ink pen drawing on white paper, bold clean outlines, line hatching for shading, hand-drawn comic illustration",
+            "_note": "Front-on railing; geometry from tools/balcony_template.py, alpha from its mask (tools/scene_art.py). Replaces the balcony_rail txt2img attempts (came out coloured and in perspective)."
         }
     ]
 }

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bruwikdox2asc"
-path="res://.godot/imported/_split_debug.png-36623288e5c7dec9dded77b57caad727.ctex"
+uid="uid://bupoika817k7u"
+path="res://.godot/imported/crow_scarf_placeholder.png-18cc385e1968dc0c5b1a2e0ea8ea1352.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tools/_split_debug.png"
-dest_files=["res://.godot/imported/_split_debug.png-36623288e5c7dec9dded77b57caad727.ctex"]
+source_file="res://art/crows/crow_scarf_placeholder.png"
+dest_files=["res://.godot/imported/crow_scarf_placeholder.png-18cc385e1968dc0c5b1a2e0ea8ea1352.ctex"]
 
 [params]
 

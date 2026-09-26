@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://61effelyguyx"
-path="res://.godot/imported/_grid_final.png-81c3480eaed27beb6d5008e825db035f.ctex"
+uid="uid://knsuc8qoy6ex"
+path="res://.godot/imported/balcony_in.png-2fdcf19f01863cd7a7b49b6c34b18edf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tools/_grid_final.png"
-dest_files=["res://.godot/imported/_grid_final.png-81c3480eaed27beb6d5008e825db035f.ctex"]
+source_file="res://art_ref/balcony_in.png"
+dest_files=["res://.godot/imported/balcony_in.png-2fdcf19f01863cd7a7b49b6c34b18edf.ctex"]
 
 [params]
 

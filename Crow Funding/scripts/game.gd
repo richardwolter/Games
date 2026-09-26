@@ -70,6 +70,7 @@ var recruit_count := 0
 
 @onready var crows: Node2D = %Crows
 @onready var city: CityScript = $City
+@onready var balcony: Node2D = $Balcony
 @onready var hud: CanvasLayer = %HUD
 @onready var dispatch_button: Button = %DispatchButton
 @onready var sky = %Sky
@@ -84,6 +85,7 @@ func _ready() -> void:
 	_append_log("Each crow makes %d trips, grabbing coins and loot along the way." % TRIPS_PER_DAY)
 	sky.phase_changed.connect(_on_sky_phase)
 	city.set_night(sky.phase)
+	balcony.set_night(sky.phase)
 	_update_dispatch_state()
 
 func _crows() -> Array[CrowScript]:
@@ -108,6 +110,7 @@ func _perch_x_for_index(i: int, total: int) -> float:
 
 func _on_sky_phase(p: float) -> void:
 	city.set_night(p)
+	balcony.set_night(p)
 
 func _on_dispatch_pressed() -> void:
 	if day_state == DayState.NIGHT:

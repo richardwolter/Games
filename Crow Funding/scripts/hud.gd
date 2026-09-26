@@ -24,6 +24,9 @@ const CrowCardScene = preload("res://scenes/crow_card.tscn")
 
 var game = null
 
+# Ink on paper, like the drawings: every label the HUD builds in code reads this.
+const INK := Color(0.1, 0.1, 0.11)
+
 var _stock_labels: Array[Label] = []
 var _meal_buttons: Array[Button] = []
 var _food_buy_buttons: Array[Button] = []
@@ -36,6 +39,7 @@ var _btn_hover: StyleBoxFlat
 
 func setup(game_node) -> void:
 	game = game_node
+	_apply_ink_theme()
 	title_label.text = "The Crow's Roost"
 	rebuild_roster()
 	_build_pantry(game_node)
@@ -44,6 +48,14 @@ func setup(game_node) -> void:
 	report_start.pressed.connect(game_node.start_new_day)
 	refresh(game_node)
 	render_log(game_node.log_lines)
+
+func _apply_ink_theme() -> void:
+	var theme := Theme.new()
+	theme.set_color("font_color", "Label", INK)
+	theme.set_font_size("font_size", "Label", 12)
+	for child in get_children():
+		if child is Control:
+			(child as Control).theme = theme
 
 func rebuild_roster() -> void:
 	for child in roster.get_children():
@@ -57,8 +69,8 @@ func rebuild_roster() -> void:
 			crew.append(node)
 	for start in range(0, crew.size(), 3):
 		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		row.add_theme_constant_override("separation", 14)
+		row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		row.add_theme_constant_override("separation", 6)
 		roster.add_child(row)
 		var end := mini(start + 3, crew.size())
 		for i in range(start, end):
@@ -69,25 +81,28 @@ func rebuild_roster() -> void:
 
 func _make_wood_button(btn: Button) -> void:
 	if _btn_normal == null:
-		_btn_normal = _wood_style(Color(0.8, 0.62, 0.4))
-		_btn_pressed = _wood_style(Color(0.66, 0.48, 0.28))
-		_btn_hover = _wood_style(Color(0.87, 0.69, 0.45))
+		_btn_normal = _wood_style(Color(0.97, 0.95, 0.9))
+		_btn_pressed = _wood_style(Color(0.8, 0.78, 0.72))
+		_btn_hover = _wood_style(Color(0.9, 0.88, 0.82))
 	btn.add_theme_stylebox_override("normal", _btn_normal)
 	btn.add_theme_stylebox_override("pressed", _btn_pressed)
 	btn.add_theme_stylebox_override("hover", _btn_hover)
-	btn.add_theme_color_override("font_color", Color(0.3, 0.16, 0.09))
-	btn.add_theme_font_size_override("font_size", 13)
+	btn.add_theme_color_override("font_color", INK)
+	btn.add_theme_color_override("font_hover_color", INK)
+	btn.add_theme_color_override("font_pressed_color", INK)
+	btn.add_theme_color_override("font_disabled_color", Color(0.55, 0.55, 0.55))
+	btn.add_theme_font_size_override("font_size", 11)
 
 func _wood_style(col: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
-	sb.set_corner_radius_all(6)
+	sb.set_corner_radius_all(3)
 	sb.set_border_width_all(2)
-	sb.border_color = Color(0.5, 0.34, 0.2)
-	sb.content_margin_left = 10.0
-	sb.content_margin_right = 10.0
-	sb.content_margin_top = 4.0
-	sb.content_margin_bottom = 4.0
+	sb.border_color = INK
+	sb.content_margin_left = 6.0
+	sb.content_margin_right = 6.0
+	sb.content_margin_top = 1.0
+	sb.content_margin_bottom = 1.0
 	return sb
 
 func _build_pantry(game_node) -> void:
@@ -101,15 +116,15 @@ func _build_pantry(game_node) -> void:
 		row.add_theme_constant_override("separation", 8)
 		var name_label := Label.new()
 		name_label.text = str(food.name)
-		name_label.custom_minimum_size = Vector2(76, 0)
+		name_label.custom_minimum_size = Vector2(56, 0)
 		row.add_child(name_label)
 		var stock_label := Label.new()
-		stock_label.custom_minimum_size = Vector2(46, 0)
+		stock_label.custom_minimum_size = Vector2(34, 0)
 		row.add_child(stock_label)
 		_stock_labels.append(stock_label)
 		var effect_label := Label.new()
 		effect_label.text = str(food.effect)
-		effect_label.add_theme_font_size_override("font_size", 11)
+		effect_label.add_theme_font_size_override("font_size", 10)
 		effect_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(effect_label)
 		var buy_button := Button.new()
@@ -144,10 +159,10 @@ func _build_upgrades(game_node) -> void:
 		row.add_theme_constant_override("separation", 6)
 		var name_label := Label.new()
 		name_label.text = str(track.name)
-		name_label.custom_minimum_size = Vector2(90, 0)
+		name_label.custom_minimum_size = Vector2(84, 0)
 		row.add_child(name_label)
 		var level_label := Label.new()
-		level_label.custom_minimum_size = Vector2(46, 0)
+		level_label.custom_minimum_size = Vector2(40, 0)
 		row.add_child(level_label)
 		_upgrade_level_labels.append(level_label)
 		var cost_label := Label.new()
@@ -233,11 +248,11 @@ func show_report(day_n: int, crew: Array) -> void:
 		var tier_label := Label.new()
 		tier_label.text = str(crow.get_tier_name())
 		tier_label.custom_minimum_size = Vector2(92, 0)
-		tier_label.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4, 1))
+		tier_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.31, 1))
 		row.add_child(tier_label)
 		var xp_label := Label.new()
 		xp_label.text = "+%d XP" % crow.day_xp
-		xp_label.custom_minimum_size = Vector2(76, 0)
+		xp_label.custom_minimum_size = Vector2(56, 0)
 		row.add_child(xp_label)
 		var obj_label := Label.new()
 		obj_label.text = "%d objects" % crow.day_objects

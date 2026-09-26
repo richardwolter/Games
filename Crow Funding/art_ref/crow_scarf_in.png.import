@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://o37dqibd5quv"
-path="res://.godot/imported/_scarf_view.png-63763d24993e2ccc427772cd50046838.ctex"
+uid="uid://ck03jo5vyh8h6"
+path="res://.godot/imported/crow_scarf_in.png-e364b8d93368317001158a7ade41af46.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tools/_scarf_view.png"
-dest_files=["res://.godot/imported/_scarf_view.png-63763d24993e2ccc427772cd50046838.ctex"]
+source_file="res://art_ref/crow_scarf_in.png"
+dest_files=["res://.godot/imported/crow_scarf_in.png-e364b8d93368317001158a7ade41af46.ctex"]
 
 [params]
 

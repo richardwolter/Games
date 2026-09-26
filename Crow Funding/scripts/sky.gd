@@ -10,13 +10,16 @@ const DESIGN_SIZE := Vector2(1152, 648)
 const HORIZON := 300.0
 
 const PALETTE_KEYFRAMES: Array[float] = [0.0, 0.32, 0.66, 1.0]
-# 3 gradient stops (top, middle, bottom) at each keyframe: dawn, midday, sunset, night.
+# 3 gradient stops (top, middle, bottom) at each keyframe: dawn, midday, sunset,
+# night. Paper tones rather than sky colours: the ink city multiplies over this, so
+# the whole page warms, yellows and darkens like paper under changing light.
 const PALETTES: Array = [
-	[Color(0.58, 0.76, 0.9), Color(0.99, 0.85, 0.66), Color(1.0, 0.72, 0.5)],
-	[Color(0.55, 0.78, 0.92), Color(0.95, 0.88, 0.74), Color(0.98, 0.8, 0.58)],
-	[Color(0.4, 0.35, 0.62), Color(0.93, 0.5, 0.42), Color(1.0, 0.6, 0.3)],
-	[Color(0.05, 0.05, 0.17), Color(0.1, 0.08, 0.25), Color(0.17, 0.13, 0.32)],
+	[Color(0.9, 0.9, 0.88), Color(0.97, 0.93, 0.86), Color(0.98, 0.9, 0.8)],
+	[Color(0.95, 0.95, 0.93), Color(0.98, 0.97, 0.93), Color(0.98, 0.96, 0.9)],
+	[Color(0.86, 0.8, 0.78), Color(0.96, 0.82, 0.68), Color(0.97, 0.78, 0.6)],
+	[Color(0.2, 0.21, 0.27), Color(0.27, 0.28, 0.35), Color(0.33, 0.33, 0.4)],
 ]
+const INK := Color(0.08, 0.08, 0.09)
 const SUN_RAMP: Array[Color] = [
 	Color(1.0, 0.9, 0.62),
 	Color(1.0, 0.72, 0.38),
@@ -39,6 +42,7 @@ func _ready() -> void:
 			var tex := backdrop.texture.duplicate(true) as GradientTexture2D
 			backdrop.texture = tex
 			_gradient = tex.gradient
+			_update_gradient()
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -112,35 +116,41 @@ func _draw_stars(view: Vector2) -> void:
 	for i in _stars.size():
 		var pos: Vector2 = _stars[i]
 		var tw := 0.7 + 0.3 * sin(_elapsed * 2.0 + float(i) * 1.7)
-		var col := Color(1.0, 1.0, 0.95, alpha * tw)
-		draw_rect(Rect2(pos.x * view.x, pos.y * view.y, 2.2, 2.2), col, true)
+		var p := Vector2(pos.x * view.x, pos.y * view.y)
+		var col := Color(0.96, 0.95, 0.9, alpha * tw)
+		# a little pen cross, like a doodled star
+		draw_line(p - Vector2(2.5, 0), p + Vector2(2.5, 0), col, 1.2)
+		draw_line(p - Vector2(0, 2.5), p + Vector2(0, 2.5), col, 1.2)
 
+# Sun and moon are drawn as pen circles on the page, not as glowing discs.
 func _draw_sun(view: Vector2) -> void:
 	var t := phase
 	var x := lerpf(view.x * 0.2, view.x * 0.76, t)
 	var h := lerpf(210.0, -30.0, smoothstep(0.0, 1.0, t))
 	var pos := Vector2(x, HORIZON - h)
-	var col := _sample_ramp(SUN_RAMP, t)
 	var alpha := clampf((h + 40.0) / 60.0, 0.0, 1.0)
 	if alpha <= 0.01:
 		return
-	col.a = alpha
-	var r := lerpf(24.0, 16.0, t)
-	draw_circle(pos, r * 1.7, Color(col.r, col.g, col.b, alpha * 0.22))
-	draw_circle(pos, r, col)
+	var r := lerpf(24.0, 18.0, t)
+	var fill := _sample_ramp(SUN_RAMP, t)
+	draw_circle(pos, r, Color(fill.r, fill.g, fill.b, alpha * 0.35))
+	draw_arc(pos, r, 0.0, TAU, 48, Color(INK.r, INK.g, INK.b, alpha), 2.0, true)
+	for k in 8:
+		var a := TAU * float(k) / 8.0 + 0.2
+		draw_line(pos + Vector2.from_angle(a) * (r + 5.0), pos + Vector2.from_angle(a) * (r + 12.0), Color(INK.r, INK.g, INK.b, alpha * 0.8), 1.6, true)
 
 func _draw_moon(view: Vector2) -> void:
 	var t := phase
 	var x := lerpf(view.x * 0.78, view.x * 0.24, t)
 	var h := lerpf(-180.0, 220.0, smoothstep(0.0, 1.0, t))
 	var pos := Vector2(x, HORIZON - h)
-	var alpha := clampf((t - 0.5) / 0.3, 0.0, 1.0) * 0.92
+	var alpha := clampf((t - 0.5) / 0.3, 0.0, 1.0) * 0.95
 	if alpha <= 0.01:
 		return
-	draw_circle(pos, 42.0, Color(0.9, 0.94, 1.0, alpha * 0.16))
-	draw_circle(pos, 22.0, Color(0.92, 0.95, 1.0, alpha))
-	draw_circle(pos + Vector2(-7, -5), 4.6, Color(0.8, 0.85, 0.95, alpha * 0.7))
-	draw_circle(pos + Vector2(8, 7), 3.2, Color(0.8, 0.85, 0.95, alpha * 0.6))
+	draw_circle(pos, 20.0, Color(0.95, 0.94, 0.88, alpha))
+	draw_arc(pos, 20.0, 0.0, TAU, 48, Color(INK.r, INK.g, INK.b, alpha), 1.8, true)
+	draw_arc(pos + Vector2(-6, -4), 4.5, 0.0, TAU, 16, Color(INK.r, INK.g, INK.b, alpha * 0.6), 1.2, true)
+	draw_arc(pos + Vector2(7, 6), 3.0, 0.0, TAU, 12, Color(INK.r, INK.g, INK.b, alpha * 0.5), 1.2, true)
 
 func _sample_ramp(ramp: Array, t: float) -> Color:
 	var p := clampf(t, 0.0, 1.0) * float(ramp.size() - 1)

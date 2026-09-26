@@ -11,7 +11,7 @@
             0
         ],
         "size": [
-            629,
+            558,
             944
         ]
     },
@@ -30,16 +30,86 @@
             29
         ]
     },
+    "head": {
+        "file": "crow_head.png",
+        "offset": [
+            317,
+            0
+        ],
+        "size": [
+            312,
+            209
+        ],
+        "pivot": [
+            123,
+            195
+        ]
+    },
+    "tail": {
+        "file": "crow_tail.png",
+        "offset": [
+            0,
+            587
+        ],
+        "size": [
+            226,
+            298
+        ],
+        "pivot": [
+            165,
+            53
+        ]
+    },
     "scarf": {
         "file": "crow_scarf.png",
         "offset": [
-            361,
-            164
+            354,
+            157
         ],
         "size": [
-            175,
-            163
+            188,
+            177
         ],
-        "tint": "scarf_color"
+        "tint": "scarf_color",
+        "source": "art/_preview/crow_scarf_4_d04.png"
+    },
+    "flight": {
+        "body": {
+            "file": "fly_body.png",
+            "size": [
+                864,
+                422
+            ],
+            "shoulder": [
+                520,
+                125
+            ]
+        },
+        "arm": {
+            "file": "wing_arm.png",
+            "size": [
+                367,
+                255
+            ],
+            "pivot": [
+                18,
+                83
+            ],
+            "wrist": [
+                338,
+                108
+            ]
+        },
+        "hand": {
+            "file": "wing_hand.png",
+            "size": [
+                387,
+                258
+            ],
+            "pivot": [
+                18,
+                108
+            ]
+        }
     }
 }

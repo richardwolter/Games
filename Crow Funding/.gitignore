@@ -9,3 +9,4 @@ tools/last_gen.log
 *.bak
 tools/_*.log
 tools/_*.png
+tools/_*.import

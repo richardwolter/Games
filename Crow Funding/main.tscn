@@ -18,100 +18,100 @@ fill_from = Vector2(0.5, 0)
 fill_to = Vector2(0.5, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_plaque"]
-content_margin_left = 14.0
-content_margin_top = 7.0
-content_margin_right = 14.0
-content_margin_bottom = 7.0
-bg_color = Color(0.87, 0.75, 0.55, 0.92)
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.97, 0.95, 0.9, 0.94)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.5, 0.34, 0.2, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_sign"]
 content_margin_left = 24.0
 content_margin_top = 10.0
 content_margin_right = 24.0
 content_margin_bottom = 10.0
-bg_color = Color(0.74, 0.52, 0.3, 1)
+bg_color = Color(0.97, 0.95, 0.9, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.45, 0.28, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_sign_pressed"]
 content_margin_left = 24.0
 content_margin_top = 10.0
 content_margin_right = 24.0
 content_margin_bottom = 10.0
-bg_color = Color(0.62, 0.42, 0.22, 1)
+bg_color = Color(0.8, 0.78, 0.72, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.45, 0.28, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_sign_hover"]
 content_margin_left = 24.0
 content_margin_top = 10.0
 content_margin_right = 24.0
 content_margin_bottom = 10.0
-bg_color = Color(0.82, 0.6, 0.36, 1)
+bg_color = Color(0.9, 0.88, 0.82, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.45, 0.28, 0.16, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_crate"]
-content_margin_left = 14.0
-content_margin_top = 10.0
-content_margin_right = 14.0
-content_margin_bottom = 10.0
-bg_color = Color(0.76, 0.6, 0.42, 0.96)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.45, 0.29, 0.16, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.97, 0.95, 0.9, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_report"]
 content_margin_left = 20.0
 content_margin_top = 16.0
 content_margin_right = 20.0
 content_margin_bottom = 16.0
-bg_color = Color(0.08, 0.06, 0.16, 0.88)
+bg_color = Color(0.97, 0.95, 0.9, 0.97)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 0.85, 0.55, 0.5)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
+border_color = Color(0.08, 0.08, 0.09, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="Game" type="Node2D" unique_id=1404567955]
 script = ExtResource("1_game")
@@ -173,32 +173,29 @@ script = ExtResource("3_hud")
 
 [node name="MoneyLabel" type="Label" parent="HUD" unique_id=1582643266]
 unique_name_in_owner = true
-offset_left = 26.0
-offset_top = 16.0
-offset_right = 320.0
-offset_bottom = 54.0
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
-theme_override_font_sizes/font_size = 22
+offset_left = 16.0
+offset_top = 10.0
+offset_right = 176.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_plaque")
 text = "Money: 0"
 
 [node name="DayLabel" type="Label" parent="HUD" unique_id=1709032986]
 unique_name_in_owner = true
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -130.0
-offset_top = 16.0
-offset_right = 130.0
-offset_bottom = 54.0
-grow_horizontal = 2
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
-theme_override_font_sizes/font_size = 24
+offset_left = 184.0
+offset_top = 10.0
+offset_right = 284.0
+offset_bottom = 42.0
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_plaque")
 text = "Day 1"
 horizontal_alignment = 1
 
 [node name="TitleLabel" type="Label" parent="HUD" unique_id=1900000022]
+visible = false
 unique_name_in_owner = true
 anchors_preset = 10
 anchor_right = 1.0
@@ -207,7 +204,7 @@ offset_top = 16.0
 offset_right = -26.0
 offset_bottom = 54.0
 grow_horizontal = 0
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_plaque")
 text = "The Crow's Roost"
@@ -215,10 +212,10 @@ horizontal_alignment = 1
 
 [node name="Roster" type="VBoxContainer" parent="HUD" unique_id=1753605905]
 unique_name_in_owner = true
-offset_left = 26.0
-offset_top = 64.0
-offset_right = 770.0
-offset_bottom = 268.0
+offset_left = 16.0
+offset_top = 50.0
+offset_right = 600.0
+offset_bottom = 200.0
 mouse_filter = 2
 theme_override_constants/separation = 8
 
@@ -229,19 +226,21 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -150.0
-offset_top = -166.0
-offset_right = 150.0
-offset_bottom = -106.0
+offset_left = -110.0
+offset_top = -54.0
+offset_right = 110.0
+offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
-theme_override_colors/font_pressed_color = Color(0.3, 0.16, 0.09, 1)
-theme_override_colors/font_hover_color = Color(0.3, 0.16, 0.09, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_colors/font_pressed_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_colors/font_hover_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 17
 theme_override_styles/normal = SubResource("StyleBox_sign")
 theme_override_styles/pressed = SubResource("StyleBox_sign_pressed")
 theme_override_styles/hover = SubResource("StyleBox_sign_hover")
+theme_override_styles/disabled = SubResource("StyleBox_sign_pressed")
+theme_override_colors/font_disabled_color = Color(0.3, 0.3, 0.31, 1)
 text = "Dispatch Crows"
 
 [node name="Pantry" type="PanelContainer" parent="HUD" unique_id=1900000001]
@@ -249,21 +248,21 @@ unique_name_in_owner = true
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 26.0
-offset_top = -204.0
-offset_right = 344.0
-offset_bottom = -22.0
+offset_left = 16.0
+offset_top = -146.0
+offset_right = 300.0
+offset_bottom = -8.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_crate")
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Pantry" unique_id=1900000002]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 3
 
 [node name="Title" type="Label" parent="HUD/Pantry/VBox" unique_id=1900000003]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 14
 text = "Pantry"
 
 [node name="MealSelector" type="HBoxContainer" parent="HUD/Pantry/VBox" unique_id=1900000004]
@@ -277,14 +276,16 @@ layout_mode = 2
 theme_override_constants/separation = 4
 
 [node name="Upgrades" type="PanelContainer" parent="HUD" unique_id=1900000006]
+anchor_bottom = 1.0
+anchor_top = 1.0
 unique_name_in_owner = true
-anchors_preset = 1
+anchors_preset = 3
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -344.0
-offset_top = -204.0
-offset_right = -26.0
-offset_bottom = -22.0
+offset_left = -300.0
+offset_top = -146.0
+offset_right = -16.0
+offset_bottom = -8.0
 grow_horizontal = 0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_crate")
@@ -295,8 +296,8 @@ theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="HUD/Upgrades/VBox" unique_id=1900000008]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 14
 text = "Upgrades"
 
 [node name="UpgradeRows" type="VBoxContainer" parent="HUD/Upgrades/VBox" unique_id=1900000009]
@@ -312,41 +313,41 @@ theme_override_constants/separation = 6
 unique_name_in_owner = true
 custom_minimum_size = Vector2(74, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 text = "Crew 3/6"
 
 [node name="RecruitCostLabel" type="Label" parent="HUD/Upgrades/VBox/RecruitRow" unique_id=1900000012]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 text = "Next: 150 c"
 
 [node name="RecruitButton" type="Button" parent="HUD/Upgrades/VBox/RecruitRow" unique_id=1900000013]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 theme_override_font_sizes/font_size = 13
 text = "Recruit"
 
 [node name="LootLog" type="Label" parent="HUD" unique_id=1281377225]
+clip_text = true
 unique_name_in_owner = true
-anchors_preset = -1
+anchors_preset = 1
 anchor_left = 1.0
-anchor_top = 0.1
+anchor_top = 0.0
 anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -330.0
-offset_top = 8.0
-offset_right = -26.0
-offset_bottom = -8.0
+anchor_bottom = 0.0
+offset_left = -316.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = 118.0
 grow_horizontal = 0
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
+theme_override_font_sizes/font_size = 12
 theme_override_styles/normal = SubResource("StyleBox_plaque")
 text = "Loot log:"
-vertical_alignment = 1
+vertical_alignment = 0
 autowrap_mode = 2
 
 [node name="ReportOverlay" type="Control" parent="HUD" unique_id=1900000014]
@@ -381,7 +382,7 @@ theme_override_constants/separation = 8
 [node name="ReportTitle" type="Label" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000018]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.92, 0.7, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 theme_override_font_sizes/font_size = 22
 text = "Day Report"
 horizontal_alignment = 1
@@ -394,7 +395,7 @@ theme_override_constants/separation = 4
 [node name="ReportTotals" type="Label" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000020]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.65, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 theme_override_font_sizes/font_size = 16
 text = "Crew total: 0 coins, 0 objects"
 horizontal_alignment = 1
@@ -402,7 +403,7 @@ horizontal_alignment = 1
 [node name="ReportStartButton" type="Button" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000021]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_colors/font_color = Color(0.1, 0.1, 0.11, 1)
 theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBox_sign")
 theme_override_styles/pressed = SubResource("StyleBox_sign_pressed")
