@@ -7260,6 +7260,47 @@ func _water_out(out: float) -> Vector2:
 	return Iso.tile_to_world(_angler.tile_pos.x + dir.x * out, _angler.tile_pos.y + dir.y * out)
 
 
+## The drawn rope is a smooth curve through the chain: same ends, no corner sharper than a
+## soft bend even where the chain itself zigzags.
+func _check_rope_curve() -> void:
+	var chain := PackedVector2Array()
+	for i in CastNet.ROPE_POINTS:
+		chain.append(Vector2(i * 12.0, 8.0 if i % 2 == 1 else 0.0))
+	var line := CastNet.rope_curve(chain)
+	_check(line[0] == chain[0] and line[line.size() - 1] == chain[chain.size() - 1],
+		"the drawn rope keeps both ends", "")
+	var sharpest := 0.0
+	for i in range(1, line.size() - 1):
+		var a := line[i] - line[i - 1]
+		var b := line[i + 1] - line[i]
+		if a.length() > 0.01 and b.length() > 0.01:
+			sharpest = maxf(sharpest, absf(a.angle_to(b)))
+	_check(sharpest < deg_to_rad(40.0), "the drawn rope bends softly",
+		"%.1f degrees" % rad_to_deg(sharpest))
+	var raw := absf((chain[1] - chain[0]).angle_to(chain[2] - chain[1]))
+	_check(sharpest < raw * 0.7, "softer than the chain it is drawn through",
+		"%.1f against %.1f" % [rad_to_deg(sharpest), rad_to_deg(raw)])
+
+
+## The angler turns to his net while the cast pose is held, snapped to the four views, and
+## not at all without one.
+func _check_cast_facing() -> void:
+	var was: Vector2 = _angler.facing
+	var at: Vector2 = _angler.tile_pos
+	_angler.set(&"_cast_time", -1.0)
+	_angler.face_toward(at + Vector2(-5.0, 5.0))
+	_check(_angler.facing == was, "no cast pose, no turn", "")
+	_angler.set(&"_cast_time", 0.0)
+	# Screen offsets for each view, turned into tile space: right is tile (1, -1).
+	var ways := {&"east": Vector2(4.0, -4.0), &"west": Vector2(-4.0, 4.0),
+		&"south": Vector2(4.0, 4.0), &"north": Vector2(-4.0, -4.0)}
+	for view: StringName in ways:
+		_angler.face_toward(at + ways[view])
+		_check(_angler.call(&"_view") == view, "a net to the %s turns the angler %s" % [view, view],
+			str(_angler.call(&"_view")))
+	_angler.set(&"_cast_time", -1.0)
+	_angler.facing = was
+
 func _stage_led_cast() -> void:
 	match _led_step_n:
 		0:
@@ -7487,6 +7528,16 @@ func _stage_first_steps() -> void:
 	_check(bool(_main.get(&"_decor_tour_done")) and int(_main.get(&"_decor_tour")) == Lake.DecorTour.OFF,
 		"the room's card ends the tour, saved", "")
 	_main.call(&"_set_shed", false)
+	_main.call(&"_set_wash", true)
+	_main.call(&"_wash_to_shed")
+	_check(bool(_main.get(&"_shed_open")) and not bool(_main.get(&"_wash_open")),
+		"closing the wash room lands in the shed, even from the pump", "")
+	_main.call(&"_set_shed", false)
+	_main.call(&"_set_wash", true)
+	_main.call(&"_set_wash", false)
+	_check(not bool(_main.get(&"_shed_open")), "a forced close goes to the lake", "")
+	_check_cast_facing()
+	_check_rope_curve()
 	_finish()
 
 

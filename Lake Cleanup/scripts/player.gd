@@ -448,6 +448,25 @@ func start_cast() -> void:
 		_cast_lock = CAST_LOCK
 
 
+## Turns the angler towards a point in tile space while a cast pose is held, snapped to the
+## sheet's four directions by `_view()`'s own rule, so the figure throws and hauls towards
+## its net. Walking ends the cast pose and with it this: the walk decides the facing then.
+func face_toward(point: Vector2) -> void:
+	if _cast_time < 0.0:
+		return
+	var d := point - tile_pos
+	var on_screen := Vector2(d.x - d.y, (d.x + d.y) * 0.5)
+	if on_screen.length_squared() < 0.0001:
+		return
+	var way := Vector2(signf(on_screen.x), 0.0)
+	if absf(on_screen.x) < absf(on_screen.y) * SIDE_FAVOUR:
+		way = Vector2(0.0, signf(on_screen.y))
+	var turned := Iso.world_to_tile(way * Iso.TILE_W).normalized()
+	if not turned.is_equal_approx(facing):
+		facing = turned
+		_repaint()
+
+
 ## Drops the held cast pose back to idle. Called once the net is home, so a haul that ends
 ## empty-handed lets go of the pose the same as one that comes back full — see net.gd's
 ## _come_home().

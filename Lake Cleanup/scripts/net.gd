@@ -279,7 +279,7 @@ const SHOVE_CLEAR := 5.0
 ## swing dies. A point never moves more than `ROPE_LEAP` in one step, and if either end has
 ## jumped further than `ROPE_JUMP` since the last frame the whole chain is laid out afresh
 ## along the straight line rather than allowed to catch up.
-const ROPE_POINTS := 11
+const ROPE_POINTS := 16
 const ROPE_STEP := 1.0 / 120.0
 const ROPE_PASSES := 4
 const ROPE_GRAVITY := 220.0
@@ -1966,11 +1966,48 @@ static func _draw_bridle(on: CanvasItem, pairs: PackedVector2Array, fade: float)
 	on.draw_multiline(pairs, core, BRIDLE_WIDE * 0.5)
 
 
+## How far apart the drawn rope's points are, in world pixels, along the smooth curve.
+const ROPE_DRAW_STEP := 3.0
+
+
+## The chain's points as a smooth curve (centripetal-free uniform Catmull-Rom, ends doubled
+## so it starts and stops on them), sampled about every `ROPE_DRAW_STEP`. Passes through
+## every chain point, so the ends stay on the rod tip and the crown.
+static func rope_curve(points: PackedVector2Array) -> PackedVector2Array:
+	var n := points.size()
+	if n < 3:
+		return points
+	var out := PackedVector2Array()
+	for i in n - 1:
+		var p0 := points[maxi(i - 1, 0)]
+		var p1 := points[i]
+		var p2 := points[i + 1]
+		var p3 := points[mini(i + 2, n - 1)]
+		var cuts := maxi(1, ceili(p1.distance_to(p2) / ROPE_DRAW_STEP))
+		for k in cuts:
+			var t := float(k) / float(cuts)
+			var t2 := t * t
+			var t3 := t2 * t
+			out.append(0.5 * (
+				2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+				+ (3.0 * p1 - p0 - 3.0 * p2 + p3) * t3))
+	out.append(points[n - 1])
+	return out
+
+
 ## Draw the rope along `line` onto `on`: the edge, the core inside it, then a twist mark every
 ## ROPE_PITCH pixels, slanted across the rope the same way all the way along.
-static func _draw_rope(on: CanvasItem, line: PackedVector2Array) -> void:
+static func _draw_rope(on: CanvasItem, points: PackedVector2Array) -> void:
+	# Drawn through a smooth curve rather than the chain's own points: straight between them,
+	# every bend was a corner, and `draw_polyline` draws no joints, so the thick line's outer
+	# edges parted at each one. Discs at every drawn point fill what is left of a joint.
+	var line := rope_curve(points)
 	on.draw_polyline(line, ROPE_EDGE, ROPE_WIDE)
+	for at in line:
+		on.draw_circle(at, ROPE_WIDE * 0.5, ROPE_EDGE)
 	on.draw_polyline(line, ROPE_CORE, ROPE_WIDE - 1.6)
+	for at in line:
+		on.draw_circle(at, (ROPE_WIDE - 1.6) * 0.5, ROPE_CORE)
 	var half := (ROPE_WIDE - 1.6) * 0.5
 	# Walked by distance rather than by segment, so the twists stay evenly spaced where the
 	# sag bunches the points together and where it stretches them apart.

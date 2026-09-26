@@ -2066,7 +2066,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif _controls_open:
 					_shut(_set_controls)
 				elif _wash_open:
-					_shut(_set_wash)
+					_wash_to_shed()
 				elif _shed_open:
 					_shut(_set_shed)
 				elif _menu_open:
@@ -2109,7 +2109,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _settings_open or _controls_open:
 			return
 		if _wash_open:
-			_shut(_set_wash)
+			_wash_to_shed()
 		elif _shed_open:
 			_shut(_set_shed)
 		elif _menu_open:
@@ -2422,6 +2422,7 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 	if _net.hold <= 0:
 		return
 	if _net.cast_to(where, laying):
+		_face_the_net()
 		# Watching the cast is worth more than whatever the player had panned over to look
 		# at, and they can always pan back.
 		_pan_yielded = true
@@ -2431,6 +2432,14 @@ func _cast_at(where: Vector2, laying: bool = false) -> void:
 			var gap := -1.0 if _play_last_cast < 0.0 else snappedf(_play - _play_last_cast, 0.01)
 			PlayLog.write("cast", _play, {"since_last": gap})
 			_play_last_cast = _play
+
+
+## The angler faces the first net while it is out: where it will land while it flies, where it
+## lies once it has. The double cast's second net turns nobody.
+func _face_the_net() -> void:
+	if _angler == null or _net == null or _net.state == CastNet.State.IDLE:
+		return
+	_angler.face_toward(_net.target if _net.state == CastNet.State.FLYING else _net.tile_pos)
 
 
 ## The two luck rolls on a cast just thrown. A lucky haul goes on the net itself, for this
@@ -2502,7 +2511,7 @@ func _set_wash(open: bool) -> void:
 				_wash.rubbish.append({"sheet": def.atlas, "region": def.region})
 		_wash.flock = _flock
 		_wash.washed.connect(_on_find_washed)
-		_wash.close_asked.connect(_shut.bind(_set_wash))
+		_wash.close_asked.connect(_wash_to_shed)
 		_skin.get_parent().add_child(_wash)
 	if _wash == null:
 		return
@@ -2526,6 +2535,13 @@ func _open_wash() -> void:
 	if _panelled():
 		return
 	_set_wash(true)
+
+
+## The player closing the wash room lands in the shed, however they came in: washing is for
+## decorating. Forced closes (the menu's pose) still call `_set_wash(false)` and go to the lake.
+func _wash_to_shed() -> void:
+	_shut(_set_wash)
+	_set_shed(true)
 
 
 ## The shelf's wash plank: the shed goes down and the wash room comes up in the one click.
@@ -5032,6 +5048,7 @@ func _process(delta: float) -> void:
 		_decor_tour_step(delta)
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
+	_face_the_net()
 	# The view: held on the whole lake behind the menu, flown down to the angler when the
 	# menu lets go, and the player's own the rest of the time.
 	if _in_menu:

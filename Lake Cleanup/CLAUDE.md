@@ -75,6 +75,11 @@ Your job is to build the game incrementally with clean architecture and testable
   the net flies or sits and eases to `ROPE_TAUT` under the haul, so reeling visibly takes
   line up. **This is not the physics the project banned**: no bodies, no collision, nothing
   gameplay reads — it is how the string is drawn. The old sine arc and its `sag` are gone.
+  **Drawn as a smooth curve, not the chain** (2026-09-26, Richard: "pointy curves and
+  splits"): `CastNet.rope_curve` runs a Catmull-Rom through the chain's points every
+  `ROPE_DRAW_STEP` (3 px) and `_draw_rope` puts a disc at every drawn point, because
+  `draw_polyline` draws no joints and the thick line's edges parted at each bend.
+  `ROPE_POINTS` 11 to 16. **Drawing only, by decision**: the motion is untouched.
 
 **Idle (automatic)**:
 - The ferries carry what waits in the crate to the yards and sell it; the dogs fetch small
@@ -1709,7 +1714,7 @@ shed's shelf has a door to the wash room.
   in `_scroll_by`'s span and, like a row, is hidden while its box is not wholly on the
   face), or alone `WASH_UNDER_EMPTY` under "Nothing kept yet." on an empty shelf. Clicking it
   emits `wash_asked` and the lake swaps rooms (`_shed_to_wash`: shed down, wash room up,
-  one click); the wash room's own close returns to the lake, not to the shed.
+  one click); the wash room's own close returns to the shed (2026-09-26, was the lake).
 - **It breathes the same pulse** (`PlankButton.pulse`, `ShedRoom.opened`, `_wash_seen`,
   `WASH_PULSE_IDLE`) when the shed opens with more waiting than the last time it opened,
   and keeps breathing at the idle level until the plank is clicked. Session only, nothing
@@ -3214,6 +3219,18 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   share, homes and landings on clean water, frogs swimming ashore, a frog jumping in and
   swimming as a shadow when walked up to, the brood taking off at a landing, the facing
   rows, and no catch or pay.
+
+### Three Small Fixes (2026-09-26, `/grill-me` with Richard)
+- **The angler faces his net** (`Angler.face_toward`, `Lake._face_the_net`): on the throw and
+  every frame the first net is out, he turns to where it will land (flying) or where it lies,
+  snapped to the sheet's four views by `_view()`'s own rule. Only while the cast pose is held,
+  so walking still decides the facing. The double cast's second net turns nobody.
+- **The ferry's shadow is 10% lighter**: `Boat.SHADE_GAIN` 3.0 to 2.7, `SHADE_MOST` 0.7 to
+  0.63. The piers keep their own constants, unchanged.
+- **Closing the wash room lands in the shed** (`Lake._wash_to_shed`), cross, Escape, E or
+  pad B, whether it was opened from the shelf's plank or the pump. **Supersedes "the wash
+  room's own close returns to the lake"**. Forced closes (the menu's pose) still go to the lake.
+- `test_lake` guards the four facings, no turn without the pose, and both closes.
 
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and

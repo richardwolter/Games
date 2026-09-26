@@ -156,8 +156,8 @@ const HULL_DROP := 2.0
 ## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
 ## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
 ## the same alpha at dawn is a shade of blue nobody can see.
-const SHADE_GAIN := 3.0
-const SHADE_MOST := 0.7
+const SHADE_GAIN := 2.7
+const SHADE_MOST := 0.63
 
 static var _over_cache: Texture2D
 static var _over_missing: bool = false
