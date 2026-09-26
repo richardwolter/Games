@@ -77,6 +77,11 @@ var _time := 0.0
 var _wing_phase := 0.0
 var _flying := false
 var _flight_t := 0.0
+# Trips go INTO the city: the crow shrinks with distance on the way out and fades
+# as it drops among the rooftops, and comes back the same way in reverse.
+const CITY_DEPTH := 0.22
+var _depth_from := 1.0
+var _depth_to := 1.0
 var _loiter_target := 0.0
 var _loiter_timer := 0.0
 # perched idle: head snaps to a new look and holds, tail flicks, hops with a crouch
@@ -191,8 +196,11 @@ func begin_day() -> void:
 func fly_out(target: Vector2, duration: float) -> Tween:
 	is_out = true
 	status = "Flying out"
-	_start_flight(target, duration, 150.0, func() -> void:
+	_depth_from = 1.0
+	_depth_to = CITY_DEPTH
+	_start_flight(target, duration, 90.0, func() -> void:
 		status = "Out working"
+		visible = false
 	)
 	return _tween
 
@@ -200,10 +208,15 @@ func fly_back(target: Vector2, duration: float) -> Tween:
 	is_out = false
 	status = "Returning"
 	carrying = true
-	_start_flight(target, duration, 46.0, func() -> void:
+	_depth_from = CITY_DEPTH
+	_depth_to = 1.0
+	visible = true
+	_start_flight(target, duration, 90.0, func() -> void:
 		status = "Resting"
 		carrying = false
 		_flying = false
+		scale = Vector2.ONE
+		modulate.a = 1.0
 		queue_redraw()
 	)
 	return _tween
@@ -222,7 +235,13 @@ func _start_flight(target: Vector2, duration: float, arc: float, on_done: Callab
 
 func _flight_step(t: float, start: Vector2, target: Vector2, arc: float) -> void:
 	_flight_t = t
+	# climb off the rail first, then descend into the rooftops (or the reverse)
 	global_position = start.lerp(target, t) + Vector2(0, -sin(t * PI) * arc)
+	var depth := lerpf(_depth_from, _depth_to, smoothstep(0.0, 1.0, t))
+	scale = Vector2(depth, depth)
+	# out of sight while down among the buildings
+	var into_city := t if _depth_to < _depth_from else 1.0 - t
+	modulate.a = 1.0 - smoothstep(0.72, 1.0, into_city)
 
 func _draw() -> void:
 	if _flying:

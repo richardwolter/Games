@@ -173,9 +173,10 @@ func _on_crow_day_done() -> void:
 
 func _trip_target(crow: CrowScript, trip: int) -> Vector2:
 	var view := get_viewport_rect().size
+	# a spot down among the rooftops: later trips reach deeper into the city
 	var side := 1.0 if crow.position.x >= view.x * 0.5 else -1.0
-	var x := view.x * 0.5 + side * (view.x * 0.36 + trip * 60.0 + randf_range(-40.0, 40.0))
-	var y := 240.0 - trip * 25.0 - randf_range(0.0, 30.0)
+	var x := view.x * 0.5 + side * randf_range(80.0, view.x * 0.4)
+	var y := 420.0 - trip * 30.0 - randf_range(0.0, 30.0)
 	return Vector2(x, y)
 
 func _on_crow_landed(crow: CrowScript) -> void:

@@ -20,6 +20,12 @@ const PALETTES: Array = [
 	[Color(0.2, 0.21, 0.27), Color(0.27, 0.28, 0.35), Color(0.33, 0.33, 0.4)],
 ]
 const INK := Color(0.08, 0.08, 0.09)
+# Engraved sun and moon (art/scene/sun.png, moon.png). The Sky node draws before
+# the City, whose sky is cut away, so both set behind the buildings.
+const SUN_TEX := preload("res://art/scene/sun.png")
+const MOON_TEX := preload("res://art/scene/moon.png")
+const SUN_SIZE := 78.0
+const MOON_SIZE := 58.0
 const SUN_RAMP: Array[Color] = [
 	Color(1.0, 0.9, 0.62),
 	Color(1.0, 0.72, 0.38),
@@ -35,6 +41,7 @@ var _gradient: Gradient = null
 var _stars: Array[Vector2] = []
 
 func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_build_stars()
 	if not Engine.is_editor_hint():
 		var backdrop := get_node_or_null(backdrop_path) as TextureRect
@@ -122,35 +129,37 @@ func _draw_stars(view: Vector2) -> void:
 		draw_line(p - Vector2(2.5, 0), p + Vector2(2.5, 0), col, 1.2)
 		draw_line(p - Vector2(0, 2.5), p + Vector2(0, 2.5), col, 1.2)
 
-# Sun and moon are drawn as pen circles on the page, not as glowing discs.
 func _draw_sun(view: Vector2) -> void:
 	var t := phase
-	var x := lerpf(view.x * 0.2, view.x * 0.76, t)
-	var h := lerpf(210.0, -30.0, smoothstep(0.0, 1.0, t))
+	# low over the rooftops at dawn, up through the day, down behind the city
+	# around sunset (0.8); kept in the open middle of the sky, clear of the HUD
+	var u := clampf((t + 0.1) / 0.9, 0.0, 1.0)
+	var x := lerpf(view.x * 0.24, view.x * 0.8, u)
+	var h := sin(u * PI) * 230.0 - 30.0
 	var pos := Vector2(x, HORIZON - h)
-	var alpha := clampf((h + 40.0) / 60.0, 0.0, 1.0)
+	var alpha := clampf((h + 60.0) / 40.0, 0.0, 1.0)
 	if alpha <= 0.01:
 		return
-	var r := lerpf(24.0, 18.0, t)
-	var fill := _sample_ramp(SUN_RAMP, t)
-	draw_circle(pos, r, Color(fill.r, fill.g, fill.b, alpha * 0.35))
-	draw_arc(pos, r, 0.0, TAU, 48, Color(INK.r, INK.g, INK.b, alpha), 2.0, true)
-	for k in 8:
-		var a := TAU * float(k) / 8.0 + 0.2
-		draw_line(pos + Vector2.from_angle(a) * (r + 5.0), pos + Vector2.from_angle(a) * (r + 12.0), Color(INK.r, INK.g, INK.b, alpha * 0.8), 1.6, true)
+	# paper-white disc warmed by the time of day; the rays stay ink
+	var tint := Color.WHITE.lerp(_sample_ramp(SUN_RAMP, t), 0.55)
+	tint.a = alpha
+	var size := lerpf(SUN_SIZE, SUN_SIZE * 1.12, t)
+	var rot := _elapsed * 0.03
+	draw_set_transform(pos, rot, Vector2.ONE)
+	draw_texture_rect(SUN_TEX, Rect2(-size * 0.5, -size * 0.5, size, size), false, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_moon(view: Vector2) -> void:
 	var t := phase
-	var x := lerpf(view.x * 0.78, view.x * 0.24, t)
-	var h := lerpf(-180.0, 220.0, smoothstep(0.0, 1.0, t))
+	# rises behind the city after sunset and climbs to mid-sky by full night
+	var u := clampf((t - 0.55) / 0.9, 0.0, 1.0)
+	var x := lerpf(view.x * 0.82, view.x * 0.5, u * 2.0)
+	var h := sin(u * PI) * 200.0 - 30.0
 	var pos := Vector2(x, HORIZON - h)
-	var alpha := clampf((t - 0.5) / 0.3, 0.0, 1.0) * 0.95
+	var alpha := 1.0 if t > 0.55 else 0.0
 	if alpha <= 0.01:
 		return
-	draw_circle(pos, 20.0, Color(0.95, 0.94, 0.88, alpha))
-	draw_arc(pos, 20.0, 0.0, TAU, 48, Color(INK.r, INK.g, INK.b, alpha), 1.8, true)
-	draw_arc(pos + Vector2(-6, -4), 4.5, 0.0, TAU, 16, Color(INK.r, INK.g, INK.b, alpha * 0.6), 1.2, true)
-	draw_arc(pos + Vector2(7, 6), 3.0, 0.0, TAU, 12, Color(INK.r, INK.g, INK.b, alpha * 0.5), 1.2, true)
+	draw_texture_rect(MOON_TEX, Rect2(pos - Vector2(MOON_SIZE, MOON_SIZE) * 0.5, Vector2(MOON_SIZE, MOON_SIZE)), false, Color(0.97, 0.96, 0.9, alpha))
 
 func _sample_ramp(ramp: Array, t: float) -> Color:
 	var p := clampf(t, 0.0, 1.0) * float(ramp.size() - 1)

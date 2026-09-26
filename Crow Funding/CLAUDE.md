@@ -73,23 +73,39 @@ of source size.
 
 ## Scene
 
-- **City** (`city.gd`, `art/scene/city.png`): `city_bg` seed 6200, loose ink
-  sketch in the ref-2 style, ink faded to 60% for distance. Drawn with a multiply
-  blend over the sky backdrop, so its paper takes the time-of-day tint.
-- **Sky** (`sky.gd`): paper tones instead of sky colours, sun and moon as pen
-  circles, stars as pen crosses.
-- **Balcony** (`balcony.gd`, `art/scene/balcony.png`): front-on railing from a
-  drawn template (`tools/balcony_template.py`) inked by img2img (`balcony` d0.5 seed
-  7500); `tools/scene_art.py` turns its greys into pen hatching and cuts the gaps
-  between balusters from the template mask. Plain txt2img railings came out
-  coloured and in perspective.
+Draw order: Backdrop (paper gradient) - Sky (sun, moon, stars) - City - Balcony -
+Crows. The City is opaque with its sky cut away, so the sun and moon set behind the
+buildings instead of showing through them (they did while the city was a multiply
+layer).
+
+- **City** (`city.gd`): `skyline` seed 8101, engraving-style ink panorama.
+  `tools/skyline_art.py <preview>` finds the horizon (first dense row of rooftops),
+  climbs each column up through the towers to cut the sky out, and writes
+  `art/scene/city.png` (ink faded ~20% for distance) plus `city_lights.png`: small
+  upright dark blobs below the horizon, a random third of them lit, with a soft
+  halo. The city takes the lower-sky paper tone, darkens at night, and the lights
+  fade in additively from sunset (`smoothstep(0.62, 0.95, phase)`).
+  `TEX_HORIZON` must match the horizon the script prints.
+- **Sky** (`sky.gd`): paper-tone gradient; engraved sun (`sun` seed 8201, rays
+  left see-through, disc solid, slowly turning, warmed by time of day) rising low
+  over the roofs and setting behind the city around phase 0.8; engraved crescent
+  moon (`moon` seed 8303) rising after sunset; pen-cross stars.
+- **Balcony** (`balcony.gd`): carved stone balustrade (coping ledge, vase
+  balusters, piers). `tools/balcony_template.py` draws the geometry already as line
+  art with pen hatching, img2img inks it (`balcony` d0.5 seed 7601), and
+  `tools/scene_art.py` cuts the gaps between balusters from the template mask. The
+  wooden plank railing it replaces looked flat and awful (Richard, 2026-09-26);
+  grey-filled templates made the model paint grey, hatched ones made it ink.
+- **Trips go into the city**: `crow.gd` scales the crow down to `CITY_DEPTH` on the
+  way out and fades it among the rooftops (hidden while out working); the way back
+  reverses it. `game.gd` `_trip_target` picks spots down among the roofs.
 - **HUD**: paper panels with ink borders and ink text (`hud.gd` applies one ink
   Theme to every control it builds). Coins/Day and compact roster cards top-left,
   loot log top-right, Pantry and Upgrades in the bottom corners, Dispatch on the
   deck under the crows. The title label is hidden.
+- `tools/shot.tscn -- phase=0.75` holds the sky at a time of day for screenshots.
 
 ## Next
 
 1. Judge the crows in-game: size, flap speed, idle timing, the wing-edge flip.
-2. City windows at night (the old flat city had glowing windows; the ink one has none).
-3. Crow-card portraits in the ref-3 dense-hatching style.
+2. Crow-card portraits in the ref-3 dense-hatching style.

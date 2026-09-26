@@ -213,12 +213,12 @@
             "out": "art/scene/balcony_raw.png",
             "ref": "art_ref/balcony_in.png",
             "lora": "InkArtXL_1.2.safetensors",
-            "lora_strength": 0.9,
+            "lora_strength": 1.0,
             "gen": [
                 1664,
                 256
             ],
-            "seed": 7500,
+            "seed": 7600,
             "variants": 4,
             "transparent": false,
             "trim": false,
@@ -226,10 +226,63 @@
             "speckle": 0.0,
             "deadzone": 0,
             "strip_shadow": false,
-            "prompt": "an old wooden balcony railing seen straight from the front, thick top rail, square wooden balusters, wooden deck planks below, wood grain",
-            "negative_extra": "colour, brown, orange, people, birds, city, sky, perspective drawing of a room",
-            "style": "black ink pen drawing on white paper, bold clean outlines, line hatching for shading, hand-drawn comic illustration",
-            "_note": "Front-on railing; geometry from tools/balcony_template.py, alpha from its mask (tools/scene_art.py). Replaces the balcony_rail txt2img attempts (came out coloured and in perspective)."
+            "prompt": "a carved stone balustrade seen straight from the front, heavy stone coping ledge on top, a row of turned vase-shaped stone balusters, stone piers, weathered old european stonework",
+            "negative_extra": "colour, people, birds, city, sky, perspective, wood, planks",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "_note": "Stone balustrade (Richard: the plank railing looked awful). Geometry from tools/balcony_template.py, alpha from its mask (tools/scene_art.py)."
+        },
+        {
+            "name": "skyline",
+            "out": "art/scene/skyline_raw.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 8100,
+            "variants": 6,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "breathtaking panoramic skyline of a dense old european city seen from a high balcony, towering gothic cathedral, great domes, clock tower, bell towers, crowded apartment blocks with many windows, chimneys and water towers, rooftops layered deep to the horizon, dramatic scale, empty plain sky in the upper third",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, colour, grey wash, clouds, sun, moon, frame",
+            "_note": "Skyline v2 (Richard: more detailed and jaw-dropping). Sky is cut out by tools/scene_art.py so the sun and moon pass behind the buildings."
+        },
+        {
+            "name": "sun",
+            "out": "art/scene/sun.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                768,
+                768
+            ],
+            "seed": 8200,
+            "variants": 4,
+            "prompt": "an ornate engraved sun emblem, round disc with alternating straight and wavy flame rays radiating all around, old woodcut almanac illustration, centered, isolated",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "face, colour, yellow, landscape, text",
+            "_note": "Sun sprite, tinted warm in sky.gd."
+        },
+        {
+            "name": "moon",
+            "out": "art/scene/moon.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                768,
+                768
+            ],
+            "seed": 8300,
+            "variants": 4,
+            "prompt": "a full moon engraving, round disc with craters and maria drawn with fine stippling and cross hatching, old astronomical plate illustration, centered, isolated",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "face, colour, landscape, text, stars, crescent",
+            "_note": "Moon sprite."
         }
     ]
 }
