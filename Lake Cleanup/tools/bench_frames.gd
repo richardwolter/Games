@@ -16,6 +16,9 @@
 ##   BENCH_OFF=ripple   the ring layer under the floating junk
 ##   BENCH_OFF=water    every shader on the lake
 ##   BENCH_OFF="ripple water"
+##   BENCH_OFF=raindraw   (with BENCH_RAIN) the rain still falls but is not drawn
+##
+## BENCH_RAIN=1 pours a shower at full strength from the first frame, puddles full.
 ##
 ##   godot --path . res://tools/bench_frames.tscn
 extends Node
@@ -72,6 +75,24 @@ func _ready() -> void:
 		for child in _grid.get_children():
 			(child as CanvasItem).material = null
 		(_grid as CanvasItem).material = null
+	if OS.get_environment("BENCH_RAIN") == "1":
+		var weather: Weather = _main.get(&"_weather")
+		weather.pour(600.0)
+		weather.set(&"_rain", 1.0)
+		var puddles: Puddles = _main.get(&"_puddles")
+		puddles.wet = 1.0
+		puddles.sand_wet = 1.0
+		if mode.contains("rings"):
+			weather.splash = null
+		if mode.contains("puddles"):
+			weather.puddles = null
+			puddles.visible = false
+			puddles.process_mode = Node.PROCESS_MODE_DISABLED
+		if mode.contains("sky"):
+			weather.day = null
+		if mode.contains("raindraw"):
+			weather.self_modulate.a = 0.0
+			weather.visible = false
 	print("bench mode: ", mode, " walk: ", _walking)
 	_last = Time.get_ticks_usec()
 

@@ -150,6 +150,9 @@ const CROWN_VARY := 0.3
 var _ripple_at := PackedVector2Array()
 var _ripple_age := PackedFloat32Array()
 var _ripple_span := PackedFloat32Array()
+## 1 where the ring at its widest lies wholly on open water, so its quads need no dry test.
+## Asked once at birth: the test is a shore walk, and rain keeps forty-odd rings up at once.
+var _ripple_open := PackedByteArray()
 
 ## Live surface-particle bursts: where, how far along, and how wide the sheet draws.
 var _burst_at := PackedVector2Array()
@@ -303,6 +306,7 @@ func ripple(at: Vector2, span: float) -> void:
 	_ripple_at.append(at)
 	_ripple_age.append(0.0)
 	_ripple_span.append(maxf(span, 4.0))
+	_ripple_open.append(1 if _open_round(at, maxf(span, 4.0) * RIPPLE_GROWTH) else 0)
 	set_process(true)
 	_redraw()
 
@@ -411,9 +415,11 @@ func _process(delta: float) -> void:
 			_ripple_at[r] = _ripple_at[last]
 			_ripple_age[r] = _ripple_age[last]
 			_ripple_span[r] = _ripple_span[last]
+			_ripple_open[r] = _ripple_open[last]
 			_ripple_at.resize(last)
 			_ripple_age.resize(last)
 			_ripple_span.resize(last)
+			_ripple_open.resize(last)
 			continue
 		_ripple_age[r] = age
 		r += 1
@@ -434,6 +440,10 @@ func _process(delta: float) -> void:
 ## The ripples, on the Rings child, under everything: a ripple is the surface itself, and
 ## the splash is something happening on top of it.
 func _draw_rings(on: CanvasItem) -> void:
+	# Every ring in one triangle array: one draw command however many are up.
+	var points := PackedVector2Array()
+	var colours := PackedColorArray()
+	var indices := PackedInt32Array()
 	for r in _ripple_age.size():
 		var t := _ripple_age[r] / RIPPLE_LIFE
 		# Out fast and then coasting, the way a ring of water actually leaves what made it.
@@ -444,8 +454,23 @@ func _draw_rings(on: CanvasItem) -> void:
 		# In over the first fifth so a ring does not appear at full strength on top of the
 		# thing that made it, then away for the rest of its life.
 		var alpha := minf(t * 5.0, 1.0) * (1.0 - t) * (1.0 - t) * RIPPLE_ALPHA
-		_band(on, _ripple_at[r], Vector2(wide, wide * 0.5), RIPPLE_THICK * Lake.ART_PIXEL,
-			Color(FOAM, alpha * PEAK_ALPHA))
+		_band_into(points, colours, indices, _ripple_at[r], Vector2(wide, wide * 0.5),
+			RIPPLE_THICK * Lake.ART_PIXEL, Color(FOAM, alpha * PEAK_ALPHA),
+			_ripple_open[r] == 0)
+	if not indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			on.get_canvas_item(), indices, points, colours
+		)
+
+
+## Whether a ring `wide` across at its widest, round `at`, lies wholly on drawn water.
+func _open_round(at: Vector2, wide: float) -> bool:
+	var reach := wide * 0.5 + RIPPLE_THICK * Lake.ART_PIXEL
+	for k in 8:
+		var angle := TAU * float(k) / 8.0
+		if not wet_at(at + Vector2(cos(angle) * reach, sin(angle) * reach * 0.5)):
+			return false
+	return wet_at(at)
 
 
 ## The speck ring, on the Specks child: over the ripples, under the crowns. The burst is spray
@@ -603,11 +628,38 @@ func _mound(origin: Vector2, width: float, height: float) -> PackedVector2Array:
 ## middle, `thick` world px across, drawn as one strip of triangles so the shader has an
 ## area to tear into bubbles. A polyline had no area, and a line the foam cannot break up
 ## is a line, not foam.
-func _band(on: CanvasItem, at: Vector2, extent: Vector2, thick: float, colour: Color) -> void:
-	var steps := 20
+## Whether water is drawn at this world point: off the island's drawn ground and inside the
+## outer bank. The rain's own test (`Weather._landing`). Public for the test.
+static func wet_at(world: Vector2) -> bool:
+	var at := Iso.world_to_tile(world)
+	return not Iso.on_island_ground(at) and Iso.shore_fraction(at.x, at.y) < 1.0
+
+
+## `water_only` drops every quad whose outer edge lies on dry ground (2026-09-26, Richard:
+## rings from the walkers at the shore were drawn over the island's sand). The ripples ask
+## it; the crown's ring is thrown where something hit the water and needs no test.
+func _band(
+	on: CanvasItem, at: Vector2, extent: Vector2, thick: float, colour: Color,
+	water_only: bool = false
+) -> void:
 	var points := PackedVector2Array()
 	var colours := PackedColorArray()
 	var indices := PackedInt32Array()
+	_band_into(points, colours, indices, at, extent, thick, colour, water_only)
+	if indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(
+		on.get_canvas_item(), indices, points, colours
+	)
+
+
+## `_band`'s strip appended to arrays a caller draws, so many bands can be one draw.
+func _band_into(
+	points: PackedVector2Array, colours: PackedColorArray, indices: PackedInt32Array,
+	at: Vector2, extent: Vector2, thick: float, colour: Color, water_only: bool = false
+) -> void:
+	var steps := 20
+	var first := points.size()
 	var half := thick * 0.5
 	for i in steps:
 		var angle := TAU * float(i) / float(steps)
@@ -624,9 +676,12 @@ func _band(on: CanvasItem, at: Vector2, extent: Vector2, thick: float, colour: C
 		points.append(inner)
 		colours.append(colour)
 		colours.append(colour)
-		var base := i * 2
-		var next := ((i + 1) % steps) * 2
+		var base := first + i * 2
+		var next := first + ((i + 1) % steps) * 2
+		if water_only:
+			var mid_angle := TAU * (float(i) + 0.5) / float(steps)
+			var edge := at + Vector2(cos(mid_angle) * (extent.x * 0.5 + half),
+				sin(mid_angle) * (extent.y * 0.5 + half * 0.5))
+			if not wet_at(edge):
+				continue
 		indices.append_array([base, base + 1, next + 1, base, next + 1, next])
-	RenderingServer.canvas_item_add_triangle_array(
-		on.get_canvas_item(), indices, points, colours
-	)

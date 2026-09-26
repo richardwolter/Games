@@ -3371,9 +3371,17 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   to `tools/build_sfx.py`'s `PLAN` (rain as a loop) when the recordings arrive.
 - **Out of scope, by decision**: any gameplay effect, a drawn bolt, a settings toggle, rain on
   a timer.
-- **Numbers are first guesses** for Richard's eye. **Open**: the frame cost of a shower has
-  not been measured on `bench_frames` against the 8 ms bar; the wash room's backdrop greys
+- **Numbers are first guesses** for Richard's eye. **Open**: the wash room's backdrop greys
   twice if the room is opened mid-shower (its `tint` is read off a day already grey).
+- **What a shower costs** (2026-09-26, `/grill-me` with Richard: "performance drops a lot
+  during rain"; `bench_frames` `BENCH_RAIN=1`, RTX 5060 Ti, 1080p, full lake): 2.86 ms mean
+  dry, **6.64 ms** in a shower, **4.90** after the fix. `BENCH_OFF=rings|puddles|sky|raindraw`
+  split it: the rain's own logic was 0.2 ms and its drawing 0.5, and **the rain's ripple rings
+  were 2.4 ms** — each of up to 45 rings ran 20 `WaterSplash.wet_at` shore tests a frame and
+  was its own draw command. Now a ring asks once at birth whether its widest extent is all
+  open water (`_ripple_open`), and every ring goes in one triangle array (`_band_into`).
+  **The look did not change, by decision.** Batching the drops' `draw_rect`s into one array
+  was tried and measured no gain (Godot batches them already), so it is not there.
 - `test_lake`'s `_stage_rain` guards the cap, the ease-in, the grey light, drops under the
   cap, no money or pollution moved, roof/water/ground landings, puddles on allowed ground and
   filling, the flash coming and going, and a saved count held to the cap. Probe:
