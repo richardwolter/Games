@@ -1,0 +1,111 @@
+{
+    "_comment": [
+        "Generated art for Crow Funding. tools/generate_art.ps1 reads this (it forwards",
+        "to the shared generator in Games/_pipeline/tools).",
+        "",
+        "First test (2026-09-26): one crow in the ref-1 pen-and-ink style, two style",
+        "LoRAs x two strengths, 4 seeds each, written to art/_preview/ with -Preview.",
+        "The crow will later be split into body/wing/scarf parts and animated in code,",
+        "so it must be side-on with the wing clearly readable, and the scarf left white",
+        "so crow.gd can tint it with scarf_color (the one spot colour)."
+    ],
+    "defaults": {
+        "model": "sd_xl_base_1.0.safetensors",
+        "steps": 30,
+        "cfg": 7.0,
+        "sampler": "euler",
+        "scheduler": "normal",
+        "transparent": true,
+        "ld_config": "SDXL, Conv Injection",
+        "ld_weight": 1.0,
+        "denoise": 1.0,
+        "deadzone": 145,
+        "speckle": 0.25,
+        "solo": true,
+        "strip_shadow": false,
+        "target": "native",
+        "variants": 4,
+        "gen": [
+            1024,
+            1024
+        ],
+        "seed": 4100,
+        "prompt": "a single cartoon crow standing on its two feet, full body in side view facing right, folded wing clearly outlined on its side, wearing a small plain white scarf knotted around its neck, round white eye with a black pupil, cheeky friendly expression",
+        "negative": "colour, color, grey wash, gradient, shading tones, painterly, photorealistic, photograph, 3d render, multiple birds, duplicate, second crow, background, scenery, ground, branch, rooftop, paper texture, lined paper, drop shadow, cast shadow, text, watermark, signature, frame, border, cropped, cut off, blurry"
+    },
+    "assets": [
+        {
+            "name": "crow_inkart_07",
+            "out": "art/crows/crow.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 0.7,
+            "style": "black ink pen drawing on white, bold clean outlines, sparse cross hatching, white fills, hand-drawn comic illustration"
+        },
+        {
+            "name": "crow_inkart_10",
+            "out": "art/crows/crow.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "style": "black ink pen drawing on white, bold clean outlines, sparse cross hatching, white fills, hand-drawn comic illustration"
+        },
+        {
+            "name": "crow_lineani_07",
+            "out": "art/crows/crow.png",
+            "lora": "LineAniRedmondV2-Lineart-LineAniAF.safetensors",
+            "lora_strength": 0.7,
+            "style": "LineAniAF, lineart, black ink pen drawing on white, bold clean outlines, sparse hatching, white fills"
+        },
+        {
+            "name": "crow_lineani_10",
+            "out": "art/crows/crow.png",
+            "lora": "LineAniRedmondV2-Lineart-LineAniAF.safetensors",
+            "lora_strength": 1.0,
+            "style": "LineAniAF, lineart, black ink pen drawing on white, bold clean outlines, sparse hatching, white fills"
+        },
+        {
+            "name": "crow_merge",
+            "out": "art/crows/crow.png",
+            "ref": "art_ref/crow_collage.png",
+            "gen": [
+                640,
+                960
+            ],
+            "seed": 5200,
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "prompt": "a single crow standing, full body in side view facing right, thick rounded chest, long closed pointed beak, round white eye ring with a black pupil",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "Collage of inkart_10 seed 4101 (body, chest widened ~14%), inkart_07 seed 4102 (beak, mirrored), inkart_07 seed 4101 (eye). img2img blends the seams; sweep denoise with -Denoise."
+        },
+        {
+            "name": "crow_edit",
+            "out": "art/crows/crow.png",
+            "ref": "art_ref/crow_edit.png",
+            "gen": [
+                640,
+                1024
+            ],
+            "seed": 5300,
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "prompt": "a single crow standing, full body in side view facing right, thick rounded chest, long closed pointed beak, large round white eye ring with a black pupil, long pointed layered tail feathers, dark feathered wing",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "crow_merge d045 seed 5203 with hand edits (tools/_crow_edit.py): pointed feathery tail instead of the round blob, bigger white eye ring, shoulder white patch hatched over. Low denoise blends the edits."
+        },
+        {
+            "name": "crow_tail",
+            "out": "art/crows/crow.png",
+            "ref": "art_ref/crow_tail.png",
+            "gen": [
+                704,
+                1024
+            ],
+            "seed": 5400,
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "prompt": "a single crow standing, full body in side view facing right, thick rounded chest, long closed pointed beak, large round white eye ring with a black pupil, long closed wedge tail continuing the line of the back, dark feathered wing",
+            "style": "black ink pen drawing on white, bold clean outlines, dense line hatching feathers, hand-drawn comic illustration",
+            "_note": "crow_edit input with the tail redrawn by tools/_crow_tail.py as one closed wedge continuing the back contour (Richard, 2026-09-26: no straight cut, no separate fanned feathers)."
+        }
+    ]
+}

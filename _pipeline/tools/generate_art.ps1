@@ -395,8 +395,8 @@ function Write-RefCanvas([string]$refPath, [int]$w, [int]$h, [string]$dest) {
 }
 
 function New-Graph($asset, [int]$seed, [bool]$transparent, [string]$refFile, [string]$poseFile) {
-    $w, $h = $asset.gen
-    $prompt = "$($asset.prompt), $(Get-Setting $asset 'style' '')"
+    $w, $h = (Get-Setting $asset 'gen' $null)
+    $prompt = "$(Get-Setting $asset 'prompt' ''), $(Get-Setting $asset 'style' '')"
 
     # `negative` replaces the shared list; `negative_extra` appends to it. Prefer
     # appending: a full override is a copy of the defaults that silently stops
@@ -472,6 +472,20 @@ function New-Graph($asset, [int]$seed, [bool]$transparent, [string]$refFile, [st
         # the plain VAEDecode output.
         $g["6"].inputs.model = @("1", 0)
         $saveFrom = "7"
+    }
+
+    # Style LoRA (models/loras). Sits between the checkpoint and everything that
+    # reads its model or clip, so LayerDiffuse and both prompts see the styled
+    # weights. Absent `lora` leaves the graph exactly as before.
+    $lora = Get-Setting $asset 'lora' ''
+    if ($lora) {
+        $ls = [double](Get-Setting $asset 'lora_strength' 0.8)
+        $g["15"] = @{ class_type = "LoraLoader"; inputs = @{
+                lora_name = $lora; strength_model = $ls; strength_clip = $ls
+                model = @("1", 0); clip = @("1", 1) } }
+        $g["2"].inputs.clip = @("15", 1)
+        $g["3"].inputs.clip = @("15", 1)
+        if ($transparent) { $g["5"].inputs.model = @("15", 0) } else { $g["6"].inputs.model = @("15", 0) }
     }
 
     $g["9"] = @{ class_type = "SaveImage"; inputs = @{ images = @($saveFrom, 0); filename_prefix = "gen_$($asset.name)" } }
@@ -620,7 +634,8 @@ foreach ($asset in $assets) {
                     [double](Get-Setting $asset 'shadow_sat' 0.30))
                 Write-Host "  ref shadow stripped: $n"
             }
-            Write-RefCanvas $refClean $asset.gen[0] $asset.gen[1] (Join-Path $ComfyInput $refFile)
+            $gw, $gh = (Get-Setting $asset 'gen' $null)
+            Write-RefCanvas $refClean $gw $gh (Join-Path $ComfyInput $refFile)
         }
 
         # Stage the ControlNet pose image the same way. It is NOT laid onto a grey
@@ -643,7 +658,7 @@ foreach ($asset in $assets) {
                 elseif ($refFile) { "img2img ref=$refSetting denoise=$den" }
                 else { "txt2img" }
         if ($poseFile) { $mode += " +controlnet pose=$poseSetting str=$(Get-Setting $asset 'control_strength' 0.8)" }
-        Write-Host "gen    $outRel  seed=$seed  $($asset.gen[0])x$($asset.gen[1])  $mode"
+        Write-Host "gen    $outRel  seed=$seed  $((Get-Setting $asset 'gen' $null)[0])x$((Get-Setting $asset 'gen' $null)[1])  $mode"
 
         $raw = Join-Path $tmp "$($asset.name)_$v.png"
         if (-not $useModel) {

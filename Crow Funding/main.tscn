@@ -1,0 +1,410 @@
+[gd_scene format=3 uid="uid://brfkp715k1tbx"]
+
+[ext_resource type="Script" uid="uid://dmotnkw8c50vj" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" uid="uid://dbulxvurcnx63" path="res://scripts/crow.gd" id="2_crow"]
+[ext_resource type="Script" uid="uid://bilvyslj1gcms" path="res://scripts/hud.gd" id="3_hud"]
+[ext_resource type="Script" uid="uid://c81g4p87bkwfq" path="res://scripts/city.gd" id="5_city"]
+[ext_resource type="Script" uid="uid://dl61b86j1rqj2" path="res://scripts/sky.gd" id="6_sky"]
+[ext_resource type="Script" uid="uid://d0rvw3y4lbrgi" path="res://scripts/balcony.gd" id="7_balcony"]
+
+[sub_resource type="Gradient" id="Gradient_sky"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.55, 0.76, 0.86, 1, 0.94, 0.86, 0.68, 1, 0.96, 0.68, 0.44, 1)
+
+[sub_resource type="GradientTexture2D" id="GradTex_sky"]
+gradient = SubResource("Gradient_sky")
+height = 512
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_plaque"]
+content_margin_left = 14.0
+content_margin_top = 7.0
+content_margin_right = 14.0
+content_margin_bottom = 7.0
+bg_color = Color(0.87, 0.75, 0.55, 0.92)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.34, 0.2, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_sign"]
+content_margin_left = 24.0
+content_margin_top = 10.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.74, 0.52, 0.3, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.28, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_sign_pressed"]
+content_margin_left = 24.0
+content_margin_top = 10.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.62, 0.42, 0.22, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.28, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_sign_hover"]
+content_margin_left = 24.0
+content_margin_top = 10.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.82, 0.6, 0.36, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.28, 0.16, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_crate"]
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+bg_color = Color(0.76, 0.6, 0.42, 0.96)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.45, 0.29, 0.16, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_report"]
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+bg_color = Color(0.08, 0.06, 0.16, 0.88)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.85, 0.55, 0.5)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="Game" type="Node2D" unique_id=1404567955]
+script = ExtResource("1_game")
+
+[node name="Backdrop" type="TextureRect" parent="." unique_id=44619796]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -3.0
+offset_top = 3.0
+offset_right = 1152.0
+offset_bottom = 671.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradTex_sky")
+
+[node name="Sky" type="Node2D" parent="." unique_id=2100000001]
+unique_name_in_owner = true
+script = ExtResource("6_sky")
+
+[node name="City" type="Node2D" parent="." unique_id=1793944451]
+script = ExtResource("5_city")
+
+[node name="Balcony" type="Node2D" parent="." unique_id=2100000002]
+script = ExtResource("7_balcony")
+
+[node name="Crows" type="Node2D" parent="." unique_id=533817732]
+unique_name_in_owner = true
+
+[node name="Pip" type="Node2D" parent="Crows" unique_id=401455949]
+position = Vector2(490, 484)
+script = ExtResource("2_crow")
+crow_name = "Pip"
+base_luck = 0.55
+
+[node name="Sable" type="Node2D" parent="Crows" unique_id=2145610700]
+position = Vector2(576, 484)
+script = ExtResource("2_crow")
+crow_name = "Sable"
+scarf_color = Color(0.55, 0.75, 0.9, 1)
+base_luck = 0.65
+
+[node name="Nibbles" type="Node2D" parent="Crows" unique_id=77801039]
+position = Vector2(662, 484)
+script = ExtResource("2_crow")
+crow_name = "Nibbles"
+scarf_color = Color(0.9, 0.6, 0.7, 1)
+base_luck = 0.45
+
+[node name="ReturnTimer" type="Timer" parent="." unique_id=1587384074]
+unique_name_in_owner = true
+wait_time = 12.0
+one_shot = true
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=2021642529]
+unique_name_in_owner = true
+script = ExtResource("3_hud")
+
+[node name="MoneyLabel" type="Label" parent="HUD" unique_id=1582643266]
+unique_name_in_owner = true
+offset_left = 26.0
+offset_top = 16.0
+offset_right = 320.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBox_plaque")
+text = "Money: 0"
+
+[node name="DayLabel" type="Label" parent="HUD" unique_id=1709032986]
+unique_name_in_owner = true
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -130.0
+offset_top = 16.0
+offset_right = 130.0
+offset_bottom = 54.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBox_plaque")
+text = "Day 1"
+horizontal_alignment = 1
+
+[node name="TitleLabel" type="Label" parent="HUD" unique_id=1900000022]
+unique_name_in_owner = true
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = -330.0
+offset_top = 16.0
+offset_right = -26.0
+offset_bottom = 54.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_plaque")
+text = "The Crow's Roost"
+horizontal_alignment = 1
+
+[node name="Roster" type="VBoxContainer" parent="HUD" unique_id=1753605905]
+unique_name_in_owner = true
+offset_left = 26.0
+offset_top = 64.0
+offset_right = 770.0
+offset_bottom = 268.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="DispatchButton" type="Button" parent="HUD" unique_id=555650814]
+unique_name_in_owner = true
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -166.0
+offset_right = 150.0
+offset_bottom = -106.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_colors/font_pressed_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_colors/font_hover_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBox_sign")
+theme_override_styles/pressed = SubResource("StyleBox_sign_pressed")
+theme_override_styles/hover = SubResource("StyleBox_sign_hover")
+text = "Dispatch Crows"
+
+[node name="Pantry" type="PanelContainer" parent="HUD" unique_id=1900000001]
+unique_name_in_owner = true
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 26.0
+offset_top = -204.0
+offset_right = 344.0
+offset_bottom = -22.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBox_crate")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Pantry" unique_id=1900000002]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="HUD/Pantry/VBox" unique_id=1900000003]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+theme_override_font_sizes/font_size = 18
+text = "Pantry"
+
+[node name="MealSelector" type="HBoxContainer" parent="HUD/Pantry/VBox" unique_id=1900000004]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FoodRows" type="VBoxContainer" parent="HUD/Pantry/VBox" unique_id=1900000005]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Upgrades" type="PanelContainer" parent="HUD" unique_id=1900000006]
+unique_name_in_owner = true
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -344.0
+offset_top = -204.0
+offset_right = -26.0
+offset_bottom = -22.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBox_crate")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Upgrades" unique_id=1900000007]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="HUD/Upgrades/VBox" unique_id=1900000008]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+theme_override_font_sizes/font_size = 18
+text = "Upgrades"
+
+[node name="UpgradeRows" type="VBoxContainer" parent="HUD/Upgrades/VBox" unique_id=1900000009]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="RecruitRow" type="HBoxContainer" parent="HUD/Upgrades/VBox" unique_id=1900000010]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CrewLabel" type="Label" parent="HUD/Upgrades/VBox/RecruitRow" unique_id=1900000011]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(74, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+text = "Crew 3/6"
+
+[node name="RecruitCostLabel" type="Label" parent="HUD/Upgrades/VBox/RecruitRow" unique_id=1900000012]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+text = "Next: 150 c"
+
+[node name="RecruitButton" type="Button" parent="HUD/Upgrades/VBox/RecruitRow" unique_id=1900000013]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 13
+text = "Recruit"
+
+[node name="LootLog" type="Label" parent="HUD" unique_id=1281377225]
+unique_name_in_owner = true
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.1
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -330.0
+offset_top = 8.0
+offset_right = -26.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.34, 0.22, 0.12, 1)
+theme_override_font_sizes/font_size = 13
+theme_override_styles/normal = SubResource("StyleBox_plaque")
+text = "Loot log:"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ReportOverlay" type="Control" parent="HUD" unique_id=1900000014]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Center" type="CenterContainer" parent="HUD/ReportOverlay" unique_id=1900000015]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="HUD/ReportOverlay/Center" unique_id=1900000016]
+custom_minimum_size = Vector2(460, 320)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_report")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/ReportOverlay/Center/Panel" unique_id=1900000017]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ReportTitle" type="Label" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000018]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "Day Report"
+horizontal_alignment = 1
+
+[node name="ReportRows" type="VBoxContainer" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000019]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ReportTotals" type="Label" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000020]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.65, 1)
+theme_override_font_sizes/font_size = 16
+text = "Crew total: 0 coins, 0 objects"
+horizontal_alignment = 1
+
+[node name="ReportStartButton" type="Button" parent="HUD/ReportOverlay/Center/Panel/VBox" unique_id=1900000021]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.16, 0.09, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBox_sign")
+theme_override_styles/pressed = SubResource("StyleBox_sign_pressed")
+theme_override_styles/hover = SubResource("StyleBox_sign_hover")
+text = "Start Day 2"
