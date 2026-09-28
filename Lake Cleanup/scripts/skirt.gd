@@ -65,11 +65,8 @@ const HEM_BAND := 0.3
 const HEM_SHORTEST := 0.4
 const HEM_TAPER := 3.0
 
-## The grass, if the master palette is missing. Measured off the pack's own lawn.
-const GRASS_DARK := Color(0.20, 0.36, 0.18)
-const GRASS_LIGHT := Color(0.38, 0.58, 0.27)
 
-## The sand, for the same reason.
+## The sand, if the master palette is missing.
 const SAND := Color(0.80, 0.72, 0.52)
 
 ## How much darker the shaded blades are than the lit ones, and how much a single blade's
@@ -359,10 +356,8 @@ static func _pixel(mesh: Patch, at: Vector2, ink: Color, front: bool, snap := tr
 		mesh.back_ink = inks
 
 
-## The two greens a blade is drawn in: the palette's own lawn, or the pack's if the palette
-## file is missing.
+## The two greens a blade is drawn in: the island lawn's blade and ground greens
+## (`Ground.lawn_shades`), so a hem is the grass it stands in.
 static func _greens() -> Array:
-	var palette := Palette.master()
-	if palette == null:
-		return [GRASS_DARK, GRASS_LIGHT]
-	return [palette.grass_dark.darkened(0.12), palette.grass_light]
+	var shades := Ground.lawn_shades(Ground.GRASS_ISLAND)
+	return [shades[&"lawn_low"], shades[&"lawn_mid"]]

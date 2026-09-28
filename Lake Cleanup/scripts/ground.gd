@@ -6,11 +6,11 @@
 ##
 ## The ground is not laid tile by tile any more. Each layer is one polygon with
 ## `shaders/ground.gdshader` on it, and every pixel of that polygon works out for itself
-## which tile of the plane it lies on, whether that spot is lawn or beach, which patch of
-## the lawn it is in, and so which texel of the pack's own top faces to show. The pictures
+## which tile of the plane it lies on, whether that spot is lawn or beach, and so which
+## texel of the pack's own top faces to show. The pictures
 ## are still the pack's, at their own size, on the same grid the rubbish uses; what is per
-## pixel is the *line* between lawn and beach and the lines between patches, which are
-## curves stepped only at art pixels rather than staircases of whole diamonds. The water
+## pixel is the *line* between lawn and beach, which is a
+## curve stepped only at art pixels rather than staircases of whole diamonds. The water
 ## shader cuts the island's coast the same way, and that is the look this borrows.
 ##
 ## The trees, rocks and tufts still stand on tiles, and this node still lays them out and
@@ -58,11 +58,14 @@ const SHEET_ROWS := 19
 
 ## Which slices go where.
 ##
-## Grass in the open. Two pools: the island is a kept yard and the mainland is not, so the
-## plain lighter tiles belong to one and the darker, tuftier ones to the other. Nothing is in
-## both, which is what keeps the island reading as tended from across the water.
-const GRASS_YARD := [1, 2, 19]
-const GRASS_ROUGH := [18, 20, 21]
+## Grass. The lawn is drawn by the shader in these slices' own greens (`lawn_greens`), not
+## sampled from them (2026-09-28, Richard: the tiles showed their seams and repeated). The
+## island takes slice 18's greens flat; the bank slice 21's, its darker neighbour, under
+## tone blotches.
+const GRASS_ISLAND := 18
+const GRASS_BANK := 21
+const TONE_ISLAND := 0
+const TONE_BANK := 3
 
 ## Sand. One tile, everywhere, whatever is next to it.
 ##
@@ -77,11 +80,8 @@ const GRASS_ROUGH := [18, 20, 21]
 ## whole tiles cannot be anything else. The shader's per-pixel curve is what replaced them.
 const SAND := 67
 
-## The strip the shader reads: the sand first, then the island's pool, then the mainland's.
-## `GRASS_FIRST` for each layer is its pool's first cell in this order.
-const SHEET := [SAND, 1, 2, 19, 18, 20, 21]
-const YARD_FIRST := 1
-const ROUGH_FIRST := 4
+## The strip the shader reads: the sand slab alone.
+const SHEET := [SAND]
 
 ## How far out of the water the lawn starts, in tiles. Wider than the flat-colour band it
 ## replaced (2.8): the dog walks the beach to `Dog.BEACH_WALK` (3.0) and the litter lies
@@ -102,23 +102,10 @@ const WANDER_AMP := 0.7
 const WANDER_SCALE := 260.0
 const WANDER_FINE := 0.3
 
-## How wide a patch of one grass picture is, in tiles, and how far a patch's middle is
-## allowed to wander off the lattice, as a fraction of that width.
-##
-## Grass used to be picked per tile, which on ground made of one repeated diamond is a
-## shimmer: every square a different texture, and no square part of anything. Then it was
-## picked per `floor(tx / 3)` square, which is worse in its own way: those squares are
-## squares in tile space, so on screen they are diamonds, all the same size, all lined up.
-## A patch is now the ground nearest one of a set of scattered points, measured on the
-## screen, and — since the shader — decided per pixel rather than per tile, so a patch's
-## border is a curve through the tiles rather than a run of diamond edges.
-const PATCH_SIZE := 4.5
-const PATCH_WANDER := 0.3
-
 ## The blades hanging off the lawn's cut edge over the beach, drawn per pixel by the shader.
 ## Mode 1 hangs them straight down the screen where the beach is below the lawn; mode 2
 ## points them along the edge's normal wherever it faces. Depth in art pixels, share of
-## columns carrying one. The island has none: a kept yard, a clean lip only.
+## columns carrying one. The island wears them too since 2026-09-28 (Richard: its south edge showed a hard line).
 ##
 ## Short and a little sparse, and no lip under the mainland's edge: the turf's own
 ## overhang and the blades are all the edge wants, and the dark line under it read as a
@@ -258,8 +245,8 @@ var beach_width: float = SAND_OUT
 var wander_amp: float = WANDER_AMP
 var wander_scale: float = WANDER_SCALE
 var wander_fine: float = WANDER_FINE
-var patch_size: float = PATCH_SIZE
-var patch_wander: float = PATCH_WANDER
+## This layer's tone blotches; -1 takes the layer's own.
+var tone_levels: int = -1
 var fringe_mode: int = FRINGE_MODE
 var fringe_depth: float = FRINGE_DEPTH
 var fringe_share: float = FRINGE_SHARE
@@ -376,8 +363,6 @@ func _build_sheet() -> void:
 	_material.set_shader_parameter(&"sheet", _strip())
 	_material.set_shader_parameter(&"cell_wide", int(SPRITE))
 	_material.set_shader_parameter(&"face_top", SHEET_FACE_ROW)
-	_material.set_shader_parameter(&"grass_first", YARD_FIRST if layer == Layer.ISLAND else ROUGH_FIRST)
-	_material.set_shader_parameter(&"grass_count", GRASS_YARD.size())
 	_material.set_shader_parameter(&"layer", 1 if layer == Layer.ISLAND else 0)
 	_material.set_shader_parameter(&"tile_w", Iso.TILE_W)
 	_material.set_shader_parameter(&"tile_h", Iso.TILE_H)
@@ -401,19 +386,22 @@ func _build_sheet() -> void:
 
 
 ## The tunables to the shader. The island keeps its own edge whatever the sliders say: a kept
-## yard has a decided edge and no fringe, so the mainland's wander and blades are not its.
+## yard has a decided edge, so the mainland's wander is not its; the blades are shared.
 func _push_tunables() -> void:
 	var island := layer == Layer.ISLAND
 	_material.set_shader_parameter(&"beach_width", beach_width)
 	_material.set_shader_parameter(&"wander_amp", 0.0 if island else wander_amp)
 	_material.set_shader_parameter(&"wander_scale", wander_scale)
 	_material.set_shader_parameter(&"wander_fine", wander_fine)
-	_material.set_shader_parameter(&"patch_size", patch_size)
-	_material.set_shader_parameter(&"patch_wander", patch_wander)
-	_material.set_shader_parameter(&"fringe_mode", 0 if island else fringe_mode)
+	var tone := tone_levels if tone_levels >= 0 else (TONE_ISLAND if island else TONE_BANK)
+	_material.set_shader_parameter(&"tone_levels", tone)
+	var shades := lawn_shades(GRASS_ISLAND if island else GRASS_BANK)
+	for key: StringName in shades:
+		_material.set_shader_parameter(key, shades[key])
+	_material.set_shader_parameter(&"fringe_mode", fringe_mode)
 	_material.set_shader_parameter(&"fringe_depth", fringe_depth)
 	_material.set_shader_parameter(&"fringe_share", fringe_share)
-	_material.set_shader_parameter(&"lip", true if island else lip)
+	_material.set_shader_parameter(&"lip", lip)
 
 
 ## The sliders moved. Push the picture's numbers to the shader at once, and lay the props
@@ -795,6 +783,10 @@ func _pack_props() -> void:
 		)
 	_prop_atlas = ImageTexture.create_from_image(sheet)
 
+		if not arts[i].resource_path.contains("/Tree"):
+			var shades := lawn_shades(GRASS_ISLAND if layer == Layer.ISLAND else GRASS_BANK)
+			var ramp: Array[Color] = [shades[&"lawn_low"], shades[&"lawn_mid"], shades[&"lawn_light"]]
+			_green_to_lawn(img, ramp)
 
 ## The box of tiles this layer covers. The island is a handful of tiles in the middle; the
 ## ground outside runs to the far edge of the ring, which is well past the tile field the
@@ -804,6 +796,90 @@ func _span() -> Rect2i:
 		var r := Iso.ISLAND_RADIUS + Vector2.ONE * (ISLAND_UNDER + 2.0)
 		return Rect2i(
 			Vector2i(Iso.ISLAND_CENTRE - r), Vector2i(r * 2.0) + Vector2i.ONE
+## The greens of a grass slice's top face, darkest first: every colour at least
+## `LAWN_LEAST` of its pixels wear. What the props' tufts and the buildings' hems are
+## recoloured onto, so they are the lawn they stand in (2026-09-28: they were the old pools'
+## greens and stood out lighter on the one-grass lawn).
+const LAWN_LEAST := 0.004
+static var _lawn_cache := {}
+
+
+## What the drawn lawn is painted in: the slice's commonest green as the ground, the next
+## one down its ramp for the blades and speckle, the next one up for the blade tips.
+static func lawn_shades(slice: int) -> Dictionary:
+	var greens := lawn_greens(slice)
+	var base: Color = _lawn_base[slice]
+	var at := greens.find(base)
+	return {
+		&"lawn_mid": base,
+		&"lawn_low": greens[maxi(at - 1, 0)],
+		&"lawn_light": greens[mini(at + 1, greens.size() - 1)],
+	}
+
+
+static var _lawn_base := {}
+
+
+static func lawn_greens(slice: int) -> Array[Color]:
+	if _lawn_cache.has(slice):
+		return _lawn_cache[slice]
+	var img := (load(TILES % slice) as Texture2D).get_image()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var counts := {}
+	var total := 0
+	for y in range(GRASS_FACE_ROW, GRASS_FACE_ROW + int(FACE)):
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			counts[c] = int(counts.get(c, 0)) + 1
+			total += 1
+	var out: Array[Color] = []
+	for c: Color in counts:
+		if float(counts[c]) >= total * LAWN_LEAST:
+			out.append(c)
+	out.sort_custom(func(a: Color, b: Color) -> bool: return a.get_luminance() < b.get_luminance())
+	var most := 0
+	for c: Color in counts:
+		if int(counts[c]) > most:
+			most = counts[c]
+			_lawn_base[slice] = c
+	_lawn_cache[slice] = out
+	return out
+
+
+## Every green pixel of `img` moved onto `lawn` by where its brightness falls among the
+## picture's own greens: the darkest of them to the lawn's darkest, the lightest to its
+## lightest. A rank, not a tint, so the tuft keeps its shading.
+static func _green_to_lawn(img: Image, lawn: Array[Color]) -> void:
+	if lawn.is_empty():
+		return
+	var low := 1.0
+	var high := 0.0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a >= 0.5 and _is_green(c):
+				low = minf(low, c.get_luminance())
+				high = maxf(high, c.get_luminance())
+	if high < low:
+		return
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5 or not _is_green(c):
+				continue
+			var t := 0.5 if high - low < 0.001 else (c.get_luminance() - low) / (high - low)
+			var pick := lawn[clampi(roundi(t * (lawn.size() - 1)), 0, lawn.size() - 1)]
+			img.set_pixel(x, y, Color(pick.r, pick.g, pick.b, c.a))
+
+
+static func _is_green(c: Color) -> bool:
+	return c.s > 0.3 and c.h > 0.17 and c.h < 0.45
+
+
 		)
 	var out := Iso.RADIUS + Vector2.ONE * (OUTER_OUT * 1.3)
 	return Rect2i(Vector2i(Iso.CENTRE - out), Vector2i(out * 2.0) + Vector2i.ONE)

@@ -2,10 +2,9 @@
 //
 // One polygon per layer (the mainland ring, the island), and every pixel of it decides for
 // itself what it is: which tile of the plane it lies on, whether that spot is lawn or beach,
-// which patch of the lawn it belongs to, and which texel of the pack's own top faces it
+// and which texel of the pack's own top faces it
 // therefore shows. The tiles are still the pack's tiles, sampled at their own size on the
-// same grid the rubbish uses — but the line between lawn and beach, and the lines between
-// patches of the lawn, are curves worked out per pixel and stepped only at art pixels, the
+// same grid the rubbish uses — but the line between lawn and beach is a curve worked out per pixel and stepped only at art pixels, the
 // same way water.gdshader cuts the island's coast. A line drawn by choosing whole tiles is a
 // staircase of diamonds whatever tiles are chosen; that is what this replaces (issue #17).
 //
@@ -20,16 +19,11 @@ render_mode blend_mix;
 
 #include "pixel.gdshaderinc"
 
-// The strip of top faces: one 32-column cell per picture, the sand first and then the
-// grass pool. `face_top` is the row of the strip where a cell's diamond has its top
-// corner; the rows above it are the turf's overhang past the back edges of the diamond
-// (the pack draws its grass bushy, leaning back over the tiles behind), and the rows
-// below the diamond are not in the strip at all — the sides of the cubes are gone.
+// The sand slab's top face, one 32-column cell, its diamond's top corner on row `face_top`.
+// The lawn is not sampled from the pack any more; see `blade_grass`.
 uniform sampler2D sheet : filter_nearest, repeat_disable;
 uniform int cell_wide = 32;
 uniform int face_top = 3;
-uniform int grass_first = 4;
-uniform int grass_count = 3;
 
 // 0 for the mainland ring, 1 for the island.
 uniform int layer = 0;
@@ -57,10 +51,21 @@ uniform float wander_scale = 260.0;
 uniform float wander_fine : hint_range(0.0, 1.0) = 0.3;
 uniform float seed = 20260907.0;
 
-// Patches of the lawn: how wide, in tiles, and how far a patch's middle may wander off the
-// lattice as a fraction of that width. See Ground.grass_patch.
-uniform float patch_size = 4.0;
-uniform float patch_wander : hint_range(0.0, 0.5) = 0.42;
+// The lawn is drawn, not sampled (2026-09-28, Richard: the pack's tiles showed their seams
+// and repeated one blotchy pattern a tile): a ground of the layer's mid green, a little
+// low-green speckle, and thin blades one art pixel wide, two or three tall, in the low green
+// with a lit tip, one in `blade_lean` of them leaning a pixel at the top. The three greens
+// are steps of the layer's pack grass's own ramp (Ground.lawn_shades). `tone_levels` lays soft blotches
+// over it: 0 flat, 2 one darker shade, 3 a darker and a lighter one at two scales.
+uniform vec4 lawn_low : source_color = vec4(0.15, 0.28, 0.12, 1.0);
+uniform vec4 lawn_mid : source_color = vec4(0.2, 0.34, 0.14, 1.0);
+uniform vec4 lawn_light : source_color = vec4(0.3, 0.45, 0.2, 1.0);
+uniform float blade_share = 0.06;
+uniform float blade_lean = 0.2;
+uniform float speckle = 0.08;
+uniform int tone_levels = 0;
+uniform float tone_scale = 220.0;
+uniform float tone_step = 0.08;
 
 // The blades hanging off the lawn's edge over the beach. `fringe_mode` 0 is none, 1 hangs
 // them straight down the screen where the beach is below the lawn, 2 points them along the
@@ -159,48 +164,10 @@ float coverage(vec2 p) {
 	return out_of_water(t) - beach_width - wander(p);
 }
 
-// --- patches ------------------------------------------------------------------------------
+// --- the sand -----------------------------------------------------------------------------
 
-// Which patch of one picture a spot belongs to: the lattice cell of the nearest of a set of
-// scattered points, nearest on the screen rather than in tile space. Mirrors what
-// Ground._patch_of used to do per tile, now per pixel.
-vec2 patch_of(vec2 p, vec2 t) {
-	float size = max(patch_size, 1.0);
-	vec2 home = floor(t / size);
-	vec2 best = home;
-	float best_d = 1e30;
-	for (int dx = -1; dx <= 1; dx++) {
-		for (int dy = -1; dy <= 1; dy++) {
-			vec2 cell = home + vec2(float(dx), float(dy));
-			vec2 jitter = vec2(
-				cell_hash(cell + vec2(seed * 0.0001)) - 0.5,
-				cell_hash(cell.yx + vec2(31.0, -17.0)) - 0.5
-			);
-			vec2 point = (cell + 0.5 + jitter * 2.0 * patch_wander) * size;
-			vec2 d = p - tile_to_world(point);
-			float dist = dot(d, d);
-			if (dist < best_d) {
-				best_d = dist;
-				best = cell;
-			}
-		}
-	}
-	return best;
-}
-
-int variant_at(vec2 p, vec2 t) {
-	vec2 patch = patch_of(p, t);
-	float roll = cell_hash(patch * 1.7 + vec2(5.0, 11.0));
-	return grass_first + int(roll * float(grass_count)) % grass_count;
-}
-
-// --- the pictures -------------------------------------------------------------------------
-
-// The texel of picture `cell_index` that lands on screen point `p` when that picture is
-// drawn on tile `cell`, or transparent where the picture has no pixel there. The picture's
-// diamond is the tile's own diamond; rows above `face_top` are the overhang past its back
-// edges.
-vec4 texel_of(ivec2 cell, vec2 p, int cell_index) {
+// The sand slab's texel at `p` on tile `cell`, or transparent outside its diamond.
+vec4 sand_at(ivec2 cell, vec2 p) {
 	vec2 centre = tile_to_world(vec2(cell) + 0.5);
 	vec2 d = p - centre;
 	int col = int(floor((d.x + tile_w * 0.5) / art_pixel));
@@ -209,16 +176,7 @@ vec4 texel_of(ivec2 cell, vec2 p, int cell_index) {
 	if (col < 0 || col >= cell_wide || row < 0 || row >= size.y) {
 		return vec4(0.0);
 	}
-	return texelFetch(sheet, ivec2(cell_index * cell_wide + col, row), 0);
-}
-
-// Where, just inside tile `cell`'s diamond, the ground is that a pixel above the diamond
-// hangs over: straight down from the pixel to the diamond's top edge, one art pixel in.
-vec2 under_overhang(ivec2 cell, vec2 p) {
-	vec2 centre = tile_to_world(vec2(cell) + 0.5);
-	float dx = p.x - centre.x;
-	float edge_y = centre.y - tile_h * 0.5 + abs(dx) * (tile_h / tile_w);
-	return vec2(p.x, edge_y + art_pixel);
+	return texelFetch(sheet, ivec2(col, row), 0);
 }
 
 // The blades: how far below the lawn's edge this beach pixel is, in art pixels, and how
@@ -273,6 +231,56 @@ int blade_at(vec2 p, float c0) {
 	return k >= h ? 2 : 1;
 }
 
+// The blotch a lawn pixel is in, as a brightness factor.
+float tone_at(vec2 p) {
+	if (tone_levels < 2) {
+		return 1.0;
+	}
+	vec2 off = vec2(seed * 0.0003, seed * 0.0005);
+	float n = blob_noise(p / max(tone_scale, 1.0) + off);
+	if (tone_levels == 2) {
+		return n < 0.4 ? 1.0 - tone_step : 1.0;
+	}
+	float f = blob_noise(p / max(tone_scale * 0.45, 1.0) + off * 1.3 + vec2(7.0, 3.0));
+	float m = mix(n, f, 0.35);
+	if (m < 0.38) {
+		return 1.0 - tone_step;
+	}
+	if (m > 0.62) {
+		return 1.0 + tone_step;
+	}
+	return 1.0;
+}
+
+// The drawn lawn at `p`. A blade is rooted at its bottom pixel; walking the three rows
+// below looks for one reaching up to here, its top pixel shifted by its lean.
+vec3 blade_grass(vec2 p) {
+	vec2 q = floor(p / art_pixel);
+	vec3 col = cell_hash(q * 1.31 + vec2(2.0, 9.0)) < speckle ? lawn_low.rgb : lawn_mid.rgb;
+	for (int k = 0; k < 3; k++) {
+		for (int s = -1; s <= 1; s++) {
+			float shift = k >= 2 ? float(s) : 0.0;
+			if (k < 2 && s != 0) {
+				continue;
+			}
+			vec2 root = vec2(q.x - shift, q.y + float(k));
+			if (cell_hash(root + vec2(seed * 0.0001, 17.0)) > blade_share) {
+				continue;
+			}
+			float lean_roll = cell_hash(root + vec2(11.0, 4.0));
+			float lean = lean_roll < blade_lean ? (cell_hash(root.yx + vec2(3.0, 8.0)) < 0.5 ? -1.0 : 1.0) : 0.0;
+			if (lean != shift) {
+				continue;
+			}
+			float tall = 2.0 + floor(cell_hash(root + vec2(5.0, 23.0)) * 2.0);
+			if (float(k) < tall) {
+				return float(k) == tall - 1.0 ? lawn_light.rgb : lawn_low.rgb;
+			}
+		}
+	}
+	return col;
+}
+
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
@@ -298,54 +306,25 @@ void fragment() {
 
 	ivec2 cell = ivec2(floor(t));
 	float c0 = coverage(p);
-	int variant = variant_at(p, t);
-
-	// The turf of the tiles in front leaning back over this one. Drawn in the order the
-	// tiles used to be painted, nearest last: the tile straight in front, then the two
-	// beside it. Each shows only where the ground under its own edge is lawn, so the
-	// overhang follows the curve and stops where the lawn does.
-	vec4 shown = vec4(0.0);
-	if (c0 > -1.5) {
-		ivec2 fronts[3] = {cell + ivec2(1, 1), cell + ivec2(1, 0), cell + ivec2(0, 1)};
-		for (int i = 0; i < 3; i++) {
-			vec4 over = texel_of(fronts[i], p, variant);
-			if (over.a < 0.5) {
-				continue;
-			}
-			if (c0 > 1.0 || coverage(under_overhang(fronts[i], p)) > 0.0) {
-				shown = over;
-				break;
-			}
+	vec3 shown;
+	if (c0 > 0.0) {
+		shown = blade_grass(p) * tone_at(p);
+		if (lip && coverage(p + vec2(0.0, art_pixel)) <= 0.0) {
+			shown = lip_color.rgb;
 		}
-	}
-
-	if (shown.a < 0.5) {
-		if (c0 > 0.0) {
-			shown = texel_of(cell, p, variant);
-			if (shown.a < 0.5) {
-				// A hole in the turf. The pack's diamonds are solid, so this is belt and
-				// braces: the same column at the widest row of the face.
-				vec2 centre = tile_to_world(vec2(cell) + 0.5);
-				shown = texel_of(cell, vec2(p.x, centre.y + art_pixel * 0.5), variant);
-			}
-			if (lip && coverage(p + vec2(0.0, art_pixel)) <= 0.0) {
-				shown = lip_color;
-			}
+	} else {
+		int blade = blade_at(p, c0);
+		if (blade == 2) {
+			shown = fringe_dark.rgb;
+		} else if (blade == 1) {
+			shown = lawn_low.rgb * tone_at(p);
 		} else {
-			int blade = blade_at(p, c0);
-			if (blade == 2) {
-				shown = fringe_dark;
-			} else if (blade == 1) {
-				shown = texel_of(cell, p, variant);
-			} else {
-				shown = texel_of(cell, p, 0);
-				shown.rgb *= mix(vec3(1.0), wet_ink, wet_sand);
+			vec4 sand = sand_at(cell, p);
+			if (sand.a < 0.5) {
+				discard;
 			}
+			shown = sand.rgb * mix(vec3(1.0), wet_ink, wet_sand);
 		}
 	}
-
-	if (shown.a < 0.5) {
-		discard;
-	}
-	COLOR = vec4(shown.rgb, 1.0);
+	COLOR = vec4(shown, 1.0);
 }

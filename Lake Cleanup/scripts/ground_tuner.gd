@@ -26,8 +26,6 @@ const ROWS := [
 	["wander_amp", 0.0, 2.0, 0.05, true],
 	["wander_scale", 60.0, 600.0, 10.0, true],
 	["wander_fine", 0.0, 1.0, 0.05, true],
-	["patch_size", 1.0, 10.0, 0.5, false],
-	["patch_wander", 0.0, 0.5, 0.02, false],
 	["fringe_mode", 0.0, 2.0, 1.0, false],
 	["fringe_depth", 0.0, 8.0, 1.0, false],
 	["fringe_share", 0.0, 1.0, 0.05, false],

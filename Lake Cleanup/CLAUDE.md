@@ -797,16 +797,32 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
 - **The ground is drawn per pixel, not per tile** (`shaders/ground.gdshader`, issue #17,
   2026-09-11): each `Ground` layer is one `Polygon2D` with the shader on it; every pixel works
   out its tile, whether it is lawn or beach (`coverage` — `out_of_water` less `beach_width`
-  less value-noise `wander`), which lawn patch it is in (per-pixel Voronoi, `patch_size`),
-  and so which texel of the pack's top faces to show off a 7-cell strip (sand, yard pool,
-  rough pool). The lawn/beach line and the patch borders are therefore curves stepped at art
-  pixels, the same way `water.gdshader` cuts the island coast. The front tiles' turf
-  overhang (the pack draws its grass leaning back over the rear diamond edges, rows 0-2
-  above `GRASS_FACE_ROW` 3) is composited per pixel so the lawn stays bushy and its far
-  edge ragged; the near edge gets a 1 art-px `lip` and per-pixel `fringe` blades hanging
-  over the sand (mode 1 straight down, mode 2 along the curve's normal). The island: same
-  shader, no wander, no fringe, lip only. Cube sides are not drawn at all (`GRASS_LIFT`,
-  skirts, `_face_top` gone). **`Ground.coverage_at`/`kind_at` mirror the shader** — the props
+  less value-noise `wander`), and so what it shows: the pack's sand slab (a 1-cell strip),
+  or the lawn **drawn blade by blade** (`blade_grass`).
+  **The lawn is drawn, not sampled** (2026-09-28, `/grill-me` with Richard, picked off
+  `tools/last_grass_*.png` and trial sheets from `tools/shot_grass.tscn`): every pack grass
+  tile showed its diamond seams and repeated one blotchy pattern a tile, and patching the
+  edges, a screen-space swatch and random per-tile crops were each tried and left a grid or a
+  rhythm. Now each art pixel is the layer's ground green, a little speckle (`speckle`), or
+  part of a thin blade one pixel wide, two or three tall, with a lit tip, `blade_share` of
+  pixels rooting one and `blade_lean` of blades leaning a pixel at the top (Richard: "thinner
+  blades, lean only just a bit"). The greens are three steps of the pack's own grass ramp
+  (`Ground.lawn_shades`: the slice's commonest green, one down for the blades, one up for the
+  tips): island off slice 18 (`GRASS_ISLAND`, flat, `TONE_ISLAND` 0), bank off slice 21
+  (`GRASS_BANK`, one step darker, `TONE_BANK` 3: darker and lighter blotches at two scales,
+  hard art-pixel edges). **Supersedes** the Voronoi patches, `patch_size`, the yard/rough
+  pools and the turf overhang (a sampled tile's, gone with the tiles; the lawn's edge is the
+  curve and the fringe). The island wears the bank's fringe and no lip (Richard: its south
+  edge showed a hard line); its edge still does not wander.
+  **The greens round objects are the lawn's**: `_pack_props` remaps every saturated green of
+  the rocks, tufts and leaves (not the trees) onto its layer's three shades by brightness
+  rank (`_green_to_lawn`, `_is_green`: saturation over 0.3, so a rock's greenish grey is left
+  alone), and `Skirt._greens` (the hut's, the crate's and the pump's hems) takes the island's
+  blade and ground greens. The lawn/beach line is a curve stepped at art pixels, the same
+  way `water.gdshader` cuts the island coast; `fringe` blades hang over the sand (mode 1
+  straight down, mode 2 along the curve's normal). Cube sides are not drawn at all
+  (`GRASS_LIFT`, skirts, `_face_top` gone). **`Ground.coverage_at`/`kind_at` mirror the
+  shader** — the props
   (trees, rocks, leaves, and the sparse beach tufts within `TUFT_REACH` of the line at
   sub-tile offsets) are laid by them; the two must move together.
   **Retired, by decision**: the mixed `BLEND` band, `GRASS_BORDER` mounds, `SAND_TUFTED`

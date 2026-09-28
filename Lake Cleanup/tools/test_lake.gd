@@ -410,6 +410,17 @@ func _stage_build() -> void:
 		"and closes on itself round the island",
 		"%.1f waves a lap" % Lake.COAST_WAVES)
 
+	# One grass a layer, no patchwork (2026-09-28): the seams between pack grasses were the
+	# complaint, so the shader must have no patch picking left to put them back.
+	var ground_src := FileAccess.get_file_as_string("res://shaders/ground.gdshader")
+	_check(not ground_src.contains("patch_of") and not ground_src.contains("grass_count"),
+		"the lawn has no patches of different grasses", "")
+	_check(Ground.SHEET == [Ground.SAND] and ground_src.contains("blade_grass"),
+		"and the lawn is drawn, not sampled off a tile", "%s" % [Ground.SHEET])
+	var shades := Ground.lawn_shades(Ground.GRASS_ISLAND)
+	_check(shades[&"lawn_low"].get_luminance() < shades[&"lawn_mid"].get_luminance()
+		and shades[&"lawn_mid"].get_luminance() < shades[&"lawn_light"].get_luminance(),
+		"and it is painted in three steps of the pack grass's own ramp", "%s" % [shades])
 	# The bank's edge is carved by the shader's discard, so the polygon has to reach past the
 	# wave's crest all the way round or the rim clips it flat. Walked rather than worked out:
 	# the rim adds its grow to the wobbled radius while the discard folds the lap in before the
