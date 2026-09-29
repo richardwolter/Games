@@ -1456,8 +1456,8 @@ of game code, and then off the probe's captures.
 - **Saved as `first_steps`, absent reads as done** (the `intro_done` rule), no
   `SAVE_VERSION` bump. **A run saved before the note closes starts over from the walk**, by
   decision — nothing of where it had got to is kept. A borrowed lake is marked done.
-- **The note's sentence is not in `locale/translations.csv` yet**: it is a literal in
-  `first_steps.gd`, as the letter's are.
+- **The note's sentence is `Text.STEPS_NOTE`** in `locale/translations.csv` (this line said
+  it was a literal until 2026-09-29; it had been keyed already, as the letter's are).
 - **Out of scope, by decision**: a skip key, a hint on the first decoration, hints on the
   upgrades and decorate boards (all to come, #24), path planning for the walk.
 - Probe: `tools/shot_first_steps.tscn` (desktop build, `--fixed-fps 60`, own save, under its
@@ -1486,7 +1486,7 @@ The first time a new game opens the upgrades shop, six paper cards walk it, one 
 - **Closed half way, it picks up at the same card** next time the shop opens (the board keeps
   `tour` for the session). **Quit half way, it starts over**: only the done flag is saved,
   as `shop_tour`, absent reads as done, no `SAVE_VERSION` bump. New games only.
-- **The six sentences are literals** in `shop_skin.gd`, not yet in `locale/translations.csv`.
+- **The six sentences are keys** (`TOUR_SHOP_*`) in `locale/translations.csv`.
 - **Out of scope, by decision**: tours of the decorate board and the first decoration (to
   come, #24), changes to the shop's layout, hover tips outside the tour.
 - Probe: `tools/shot_shop_tour.tscn` (desktop build, own save, under its own node) saves
@@ -1524,7 +1524,7 @@ tour's look. `scripts/tour_card.gd` (`TourCard`, draws and reports clicks) and
   anchors have no parent rect there, and the first capture came out with a zero-size card
   and no paper.
 - **The shop tour still draws its own copy** (`ShopSkin._draw_tour`); folding it into
-  `TourCard` is owed. The sentences are literals, not yet in `locale/translations.csv`.
+  `TourCard` is owed. The sentences are keys (`TOUR_DECOR_*`).
 - **Out of scope, by decision**: soap prices, wash mechanics, tours for later finds.
 - Probe: `tools/shot_decor_tour.tscn` saves `tools/last_decor_tour_{hint,1,2,3,3pad,4,4pad,5}.png`.
   `test_lake`'s `_stage_first_steps` guards the bed at the pump, the hint giving way, the
@@ -2018,10 +2018,14 @@ pipeline and English only"** in Every Word Is a Key above.
   `_back_<locale>` back-translation beside it for review (the importer skips `_` columns).
   Not reviewed by a native speaker. Known picks to review: Spanish is neutral ("tomar", not
   "coger"); FR `MATERIAL_RUBBER` is "Caoutch." to fit the sign.
-- **Overflow is reported, not fixed** (`tools/probe_text_fit.gd`, `tools/last_text_fit.log`):
-  CJK fits everywhere; seven Latin OVERs — PT/ES `SHOP_TIER_PREFIX` (+1), DE
-  `CONTROLS_HINT` (+51) and `TOUR_SKIP` (+5), FR `TRACK_LUCKY_HAUL` (+8),
-  `TRACK_DOUBLE_CAST` (+9), `WASH_FREE` (+3). Widen or reword in a later pass.
+- **No real locale is OVER anywhere** (2026-09-29, `tools/probe_text_fit.gd`,
+  `tools/last_text_fit.log`): the Latin OVERs were **reworded, no box widened** — PT `Nív. `
+  and ES `Niv. ` for the tier prefix, ES `Caseta` and DE `Hütte` for the record player's
+  Shed column (`RECORD_SHED`, new since the list was written), DE `Auslassen` for Skip and
+  `Feld klicken, Taste · Rechtsklick: Standard` for the bind hint, FR `Chance`, `Lancer x2`
+  and `Gratis`. `CONTROLS_HINT_PAD` had no translations at all and has drafts now. Machine
+  drafts with their `_back_` columns, still unreviewed; FR `Chance` in particular is a
+  shorter, vaguer name than "Lucky cast". Only `qps` is OVER, which is read, not gated.
 - **A harness never goes through `Prefs.set_language`**: it writes `settings.cfg`. `test_lake`
   sets `TranslationServer`/`Style` to English by hand (the machine's locale may be any of
   the eight). `_check_language` guards the flag, its corner, eight languages each with words
