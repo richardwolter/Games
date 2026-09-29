@@ -4835,6 +4835,15 @@ levelled like the rest; `SOUNDS` holds the mix. All spans, levels and gaps are f
 - **The settings board no longer muffles the music**; the shop and the wash room still do.
   **Supersedes** "the settings board is new here" in The Music.
 
+### Ambience Is the World (2026-09-29, `/grill-me` with Richard)
+- **Every animal, the weather and the beds ride the Ambience bus** (`Sfx.AMBIENT`, `Sfx.bus_of`,
+  set on each voice in `play` and on the coo and fire players): frogs, ducks, geese, forest
+  chirps, bees, pigeon wings and coo, the dogs' barks and sniffs (the shed's and wash room's
+  too), the wading wash, the fireplace, the lake bed, rain and thunder. **SFX keeps what the
+  player does**: net, catch, crate, coins, upgrades, ferry, steps, doors, drops, hose, UI.
+- Bus only, by decision: no level, gap or indoors/shopping gating moved. Ambience at zero now
+  also silences thunder, accepted. `test_lake`'s `_check_buses` guards the split.
+
 ### The Music (2026-09-15, `/grill-me` with Richard, `scripts/music_station.gd`, `tools/build_music.py`)
 One station for the whole session. **Supersedes** the lake's two-player Goin crossfade and the
 menu's own player (both gone, with `%Music` in both scenes and `assets/music_goin*.mp3`).
@@ -4914,8 +4923,12 @@ now only the defaults.
   `SONGS` order from the rim in (beatgucci outermost, Habibs by the label), and **the needle
   stands still in the middle of its song's band** (`band_middle`; Richard's second pass,
   superseding a needle that crept in with the song's progress). The
-  record spins down while the needle is up and back up after (`SPIN_EASE`), stepped at
+  record keeps turning through a skip (2026-09-29; it used to spin down), stepped at
   8 fps off 16 baked frames. **No white sheen on the disc**, by Richard's call.
+- **The label reads "Nuven"** (2026-09-29, `/grill-me` with Richard, `LABEL_WORD`,
+  `label_ink`): a 3x5 hand-set face at `LABEL_SCALE` 1.5 in `OUT` brown on a label grown to 16 art px (grooves from 17), curved round the top of the label, tops
+  outward, baked into every spin frame so it turns with the record. Replaces the amber mark.
+  Not translated.
 - **Saved in the run's save as `records`** (`picks`/`take_picks`); a save without it reads
   as the old fixed lists. No `SAVE_VERSION` bump. **Always applies**, placed or not.
 - **The lid is only a picture**: E opens it and it stays open after the menu closes

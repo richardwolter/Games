@@ -126,6 +126,19 @@ const CHANNELS := {
 }
 ## Of those, the ones that are never cut: with every player busy, the new one is skipped
 ## rather than one playing being stopped. The haul always finishes; the chime rings out.
+## What rides the Ambience bus rather than SFX (2026-09-29, Richard): every animal, the
+## weather and the beds. The world going on round the player, on its own slider; what the
+## player does (net, money, ferry, crate, steps, interface) stays on SFX. One place decides:
+## `play` routes each voice by this set, the dedicated players read it too.
+const AMBIENT := [
+	&"frog", &"duck", &"geese", &"forest", &"bee", &"pigeon_fly", &"pigeon_coo",
+	&"bark", &"sniff", &"wading", &"fireplace", &"lake_ambient", &"rain", &"thunder",
+]
+
+## The bus a named sound plays on.
+static func bus_of(name: StringName) -> StringName:
+	return Prefs.BUS_AMBIENCE if name in AMBIENT else Prefs.BUS_SFX
+
 const NEVER_CUT := [&"haul", &"find_chime", &"ferry_bell", &"boat_move", &"wading"]
 
 ## What the lake is still allowed to make a noise with while the upgrades board is up
@@ -381,10 +394,10 @@ func _ready() -> void:
 			own.append(_player())
 		_channels[name] = own
 		_channel_next[name] = 0
-	_coo_player = _player()
+	_coo_player = _player(null, bus_of(&"pigeon_coo"))
 	_start_player = _player()
-	_ambience_player = _player(_first(&"lake_ambient"), Prefs.BUS_AMBIENCE)
-	_fire_player = _player(_first(&"fireplace"))
+	_ambience_player = _player(_first(&"lake_ambient"), bus_of(&"lake_ambient"))
+	_fire_player = _player(_first(&"fireplace"), bus_of(&"fireplace"))
 
 
 ## Every voice goes to the SFX bus, which is where the player's slider now is. The lake's
@@ -534,6 +547,7 @@ func play(
 	var tune: Array = SOUNDS.get(name, [0.0, 0.0])
 	var spread: float = tune[1]
 	voice.stream = list[take % list.size()] if take >= 0 else list[_rng.randi() % list.size()]
+	voice.bus = bus_of(name)
 	voice.volume_db = float(tune[0]) + db
 	voice.pitch_scale = pitch * _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()

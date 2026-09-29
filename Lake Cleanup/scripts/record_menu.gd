@@ -50,6 +50,22 @@ const TITLES := {
 
 ## The record: its middle and radius in art pixels, and how fast it turns — 33 and a third,
 ## stepped at the lake's own `pixel_fps` so it turns in pixel-art beats.
+## The label says who made the music (2026-09-29, Richard): "Nuven" in a 3x5 hand-set face,
+## a pixel between letters, laid round the top of the label with its tops outward and baked
+## into every spin frame, so it turns with the record. A name, not translated.
+const LABEL_WORD := [
+	["#.#", "###", "###", "#.#", "#.#"],
+	["...", "#.#", "#.#", "#.#", "###"],
+	["...", "#.#", "#.#", "#.#", ".#."],
+	["...", "###", "###", "#..", "###"],
+	["...", "##.", "#.#", "#.#", "#.#"],
+]
+## The letters' tops and the arc their middle runs along, in art pixels from the disc's middle.
+const LABEL_TOP := 15.5
+## Art pixels a letter pixel covers: 1.5 reads where 1 was a smudge (2026-09-29).
+const LABEL_SCALE := 1.5
+const LABEL_MID := 11.75
+
 const DISC_AT := Vector2(52, 56)
 const DISC_R := 31
 const SPIN_RPS := 0.555
@@ -62,16 +78,15 @@ const SPIN_FPS := 8.0
 ## between. The needle stands still in the middle of its song's band. On a change of song it
 ## comes up off the record over `ARM_LIFT` seconds (the head rises `ARM_RISE` art pixels over
 ## its own shadow), crosses straight to the new song's band over `ARM_MOVE`, and sets down
-## over `ARM_DROP` (Richard, 2026-09-28: no swing out past the rim). The record spins down
-## while it is up and back up after (`SPIN_EASE`).
+## over `ARM_DROP` (Richard, 2026-09-28: no swing out past the rim). The record keeps
+## turning through a skip (Richard, 2026-09-29: it used to spin down while the needle was up).
 const ARM_PIVOT := Vector2(80, 24)
 const ARM_ELBOW := Vector2(0, 26)
 const ARM_TIP := Vector2(-12, 36)
 const GROOVE_OUT := 30.0
-const GROOVE_IN := 13.0
+const GROOVE_IN := 17.0
 const GAP_TONE := Color8(20, 14, 16)
 const GROOVE_TONE := Color8(44, 34, 37)
-const SPIN_EASE := 3.0
 const ARM_LIFT := 0.2
 const ARM_MOVE := 0.5
 const ARM_DROP := 0.25
@@ -301,8 +316,7 @@ func _process(delta: float) -> void:
 			_cross = 1.0
 			_lift = -1.0
 			_land_skip()
-	# The record only turns under the needle: it spins down while the needle is up.
-	_speed = move_toward(_speed, 0.0 if _lift >= 0.0 else 1.0, SPIN_EASE * delta)
+	# The record keeps turning through a skip; only the needle moves.
 	_spin = fmod(_spin + delta * _speed, 3600.0)
 	queue_redraw()
 
@@ -348,15 +362,30 @@ func _bake_disc() -> void:
 					else:
 						c = VINYL_HI if int(q) % 2 == 0 else GROOVE_TONE
 				var a := fposmod(atan2(y, x) - turn, TAU)
-				if q <= DISC_R * 0.38:
+				if q <= 16.0:
 					c = AMBER if q > DISC_R * 0.12 else OUT
 					if DISC_R * 0.12 < q and q <= DISC_R * 0.2:
 						c = AMBER_HI
-					# A mark on the label, so the label is seen to turn too.
-					if q > DISC_R * 0.22 and a > PI and a < PI + 0.5:
-						c = AMBER_LO
+					# The name, which is also what shows the label turning.
+					if label_ink(q, a):
+						c = OUT
 				img.set_pixel(x + DISC_R, y + DISC_R, c)
 		_disc.append(ImageTexture.create_from_image(img))
+
+
+## Whether a label pixel at `q` from the middle and turned-back angle `a` is a letter's.
+## Rows count in from `LABEL_TOP`; columns along the arc, centred on the top of the label
+## (3 pi / 2 on screen, clockwise as atan2 runs with y down).
+static func label_ink(q: float, a: float) -> bool:
+	var row := int(floorf((LABEL_TOP - q) / LABEL_SCALE))
+	if row < 0 or row > 4:
+		return false
+	var wide := LABEL_WORD.size() * 4 - 1
+	var along := wrapf(a - PI * 1.5, -PI, PI) * LABEL_MID / LABEL_SCALE
+	var col := int(floorf(along + wide * 0.5))
+	if col < 0 or col >= wide or col % 4 == 3:
+		return false
+	return String(LABEL_WORD[col / 4][row])[col % 4] == "#"
 
 
 func _draw() -> void:

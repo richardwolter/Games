@@ -2568,6 +2568,21 @@ func _check_buses() -> void:
 			if not (voice.bus in [Prefs.BUS_SFX, Prefs.BUS_AMBIENCE]):
 				off.append(voice.bus)
 		_check(off.is_empty(), "every lake voice is on the SFX or Ambience bus", ", ".join(off))
+		# Animals, weather and the beds are the Ambience slider's; what the player does is SFX's.
+		var wrong := PackedStringArray()
+		for name: StringName in [&"frog", &"duck", &"geese", &"forest", &"bee", &"pigeon_fly",
+				&"pigeon_coo", &"bark", &"sniff", &"wading", &"fireplace", &"lake_ambient"]:
+			if Sfx.bus_of(name) != Prefs.BUS_AMBIENCE:
+				wrong.append(name)
+		for name: StringName in [&"net_splash", &"coin", &"upgrade", &"pop", &"ferry_bell", &"ui_click", &"step_grass"]:
+			if Sfx.bus_of(name) != Prefs.BUS_SFX:
+				wrong.append(name)
+		var frog := sound.play(&"frog")
+		if frog != null:
+			if frog.bus != Prefs.BUS_AMBIENCE:
+				wrong.append("frog voice")
+			frog.stop()
+		_check(wrong.is_empty(), "animals and beds ride Ambience, the player's own sounds SFX", ", ".join(wrong))
 	var music := MusicStation.main()
 	if music != null:
 		var stray := 0
@@ -5483,6 +5498,24 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
 		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
 		menu.press(&"sync")
+		# The label says Nuven, in the case's brown, and the word turns with the record.
+		var disc: Array = menu.get(&"_disc")
+		var inked := 0
+		var moved := false
+		if disc.size() >= 5:
+			var one: Image = disc[0].get_image()
+			var other: Image = disc[4].get_image()
+			var c := RecordMenu.DISC_R
+			for y in range(c - 16, c + 17):
+				for x in range(c - 16, c + 17):
+					var q := Vector2(x - c, y - c).length()
+					if q < 7.0 or q > 15.5:
+						continue
+					if one.get_pixel(x, y).is_equal_approx(RecordMenu.OUT):
+						inked += 1
+					if one.get_pixel(x, y) != other.get_pixel(x, y):
+						moved = true
+		_check(inked >= 25 and moved, "the label reads Nuven in brown and turns", "%d px" % inked)
 		var ticked := station.ticked(MusicStation.SHED, &"goin")
 		menu.press(&"tick:shed:goin")
 		_check(station.ticked(MusicStation.SHED, &"goin") != ticked, "a tick in the shed's column", "")
@@ -5492,7 +5525,7 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		menu._process(0.1)
 		_check(station.changes_in(MusicStation.SHED) == changes and menu.needle_up(),
 			"skip lifts the needle and holds the song until it sets down", "")
-		_check(menu.turning() < 1.0, "and the record spins down while it is up",
+		_check(menu.turning() == 1.0, "and the record keeps turning while it is up",
 			"%.2f" % menu.turning())
 		var src := FileAccess.get_file_as_string("res://scripts/record_menu.gd")
 		_check(not src.contains("SHEEN"), "the record wears no white sheen", "")
