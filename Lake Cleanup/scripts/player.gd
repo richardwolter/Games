@@ -502,19 +502,60 @@ const PET_TIME := 1.0
 ## Seconds into the reach the hand lands: the start of the third frame, the arm fully out.
 const PET_TOUCH := 0.34
 
+## The arm is built at these angles (`tools/build_pet_frames.py`, which must match): side
+## views in degrees below straight out, the front view in degrees swung off straight down
+## towards screen right. `start_pet` picks the one pointing nearest the dog's head or body,
+## whichever is nearer the shoulder (Richard, 2026-09-28).
+const PET_SIDE_ANGLES := [0.0, 25.0, 50.0, 75.0]
+const PET_FRONT_ANGLES := [-40.0, -12.0, 12.0, 40.0]
+## Where the arm leaves the body, as a share of HEIGHT up from the feet.
+const PET_SHOULDER := 0.42
+
 ## Seconds into the reach, or negative while none is playing.
 var _pet_time := -1.0
+## Which of the built arm angles is showing.
+var _pet_arm := 0
 var _pet_touched := false
 
 
-func start_pet(toward: Vector2) -> void:
+## `spots` are points in this node's parent's space to aim the hand at — the dog's head and
+## body; the nearer one to the shoulder is taken. Empty keeps the arm straight out.
+func start_pet(toward: Vector2, spots: Array = []) -> void:
 	_cast_time = -1.0
 	_cast_lock = 0.0
 	walk_to = Vector2.INF
 	_pet_time = 0.0
 	_pet_touched = false
 	_turn_to(toward)
+	_pet_arm = pet_arm_for(spots)
 	_repaint()
+
+
+## Which built arm angle points nearest the nearer of `spots`, for the way the angler faces.
+func pet_arm_for(spots: Array) -> int:
+	if spots.is_empty():
+		return 0
+	var shoulder := position + Vector2(0.0, -HEIGHT * PET_SHOULDER)
+	var aim: Vector2 = spots[0]
+	for spot: Vector2 in spots:
+		if shoulder.distance_to(spot) < shoulder.distance_to(aim):
+			aim = spot
+	var d := aim - shoulder
+	var view := _view()
+	var angle := 0.0
+	var angles: Array = PET_SIDE_ANGLES
+	if view == &"east" or view == &"west":
+		angle = rad_to_deg(atan2(d.y, absf(d.x)))
+	elif view == &"south":
+		angles = PET_FRONT_ANGLES
+		angle = rad_to_deg(atan2(d.x, maxf(d.y, 0.001)))
+	else:
+		return 0
+	var best := 0
+	for i in angles.size():
+		if absf(float(angles[i]) - angle) < absf(float(angles[best]) - angle):
+			best = i
+	return best
 
 
 func petting() -> bool:
@@ -837,7 +878,7 @@ func _paint_key() -> int:
 func _pose(walking: bool) -> Dictionary:
 	var dir := _view()
 	if _pet_time >= 0.0:
-		var pose := StringName("pet_%s" % dir)
+		var pose := StringName("pet%d_%s" % [_pet_arm, dir])
 		var frames: Array = _poses.get(pose, [])
 		if not frames.is_empty():
 			var index := mini(int(_pet_time / PET_TIME * frames.size()), frames.size() - 1)

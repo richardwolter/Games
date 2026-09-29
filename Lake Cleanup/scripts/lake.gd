@@ -4897,7 +4897,7 @@ func _pet_dog(dog: Dog) -> void:
 	if dog == null or not dog.can_pet() or _angler.petting():
 		return
 	dog.await_pet()
-	_angler.start_pet(dog.tile_pos)
+	_angler.start_pet(dog.tile_pos, dog.pet_spots())
 	_angler.pet_touched.connect(dog.pet, CONNECT_ONE_SHOT)
 
 

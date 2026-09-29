@@ -1598,9 +1598,23 @@ func _stage_dog_idle(dogs: Array) -> void:
 ## second press does anything, and another dog can be petted meanwhile.
 func _stage_dog_pet(dogs: Array) -> void:
 	var dog := dogs[0] as Dog
-	for pose in ["pet_south", "pet_north", "pet_east", "pet_west"]:
-		_check(not (_angler.get(&"_poses") as Dictionary).get(StringName(pose), []).is_empty(),
-			"the angler has a %s reach" % pose, "")
+	for dir in ["south", "north", "east", "west"]:
+		for k in 4:
+			var pose := "pet%d_%s" % [k, dir]
+			_check(not (_angler.get(&"_poses") as Dictionary).get(StringName(pose), []).is_empty(),
+				"the angler has a %s reach" % pose, "")
+	# The arm aims at the dog: facing east, a spot straight out takes the flat arm and one
+	# well below the shoulder the steepest; the nearer of two spots wins.
+	var was_facing := _angler.facing
+	_angler.facing = Iso.world_to_tile(Vector2(Iso.TILE_W, 0.0)).normalized()
+	var shoulder := _angler.position + Vector2(0.0, -Angler.HEIGHT * Angler.PET_SHOULDER)
+	_check(_angler.pet_arm_for([shoulder + Vector2(20.0, 0.0)]) == 0,
+		"a dog's head level with the shoulder takes the arm straight out", "")
+	_check(_angler.pet_arm_for([shoulder + Vector2(6.0, 20.0)]) == 3,
+		"one well below it the steepest arm", "")
+	_check(_angler.pet_arm_for([shoulder + Vector2(40.0, 0.0), shoulder + Vector2(6.0, 20.0)]) == 3,
+		"and the nearer of head and body is the one aimed at", "")
+	_angler.facing = was_facing
 	var stood := _angler.tile_pos
 	var faced := _angler.facing
 	dog.tile_pos = _angler.tile_pos + Vector2(1.0, 0.0)

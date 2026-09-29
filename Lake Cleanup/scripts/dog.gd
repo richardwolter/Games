@@ -460,6 +460,15 @@ func can_pet() -> bool:
 	)
 
 
+## Where a hand petting this dog could land, in its parent's space: its head (the front of the
+## sitting frame, by the mouth) and the middle of its body.
+func pet_spots() -> Array:
+	var name := &"sit" if DogArt.has(&"sit", breed) else &"idle"
+	var head := position + DogArt.mouth(name, HEIGHT, facing_left, 0, breed) 		+ Vector2(0.0, -2.0)
+	var body := position + Vector2(0.0, -HEIGHT * 0.35)
+	return [head, body]
+
+
 ## The angler has started to reach: sit, turn to them and wait for the hand, so the dog is
 ## still there when it lands. `pet()` follows from `Angler.pet_touched`.
 func await_pet() -> void:

@@ -27,7 +27,12 @@ const ANIMS := [
 	# The reach to pet a dog, built by rule (tools/build_pet_frames.py, 2026-09-28). Every
 	# frame is measured against the first one's ink, which has no arm out: centred on its own
 	# ink the body would slide back as the arm went out.
-	{"prefix": "pet", "slug": "pet", "frames": 6, "ink_first": true},
+	# Four arm angles each (`Angler.PET_SIDE_ANGLES` / `PET_FRONT_ANGLES`), picked at run time
+	# by where the dog's head or body is.
+	{"prefix": "pet0", "slug": "pet0", "frames": 6, "ink_first": true},
+	{"prefix": "pet1", "slug": "pet1", "frames": 6, "ink_first": true},
+	{"prefix": "pet2", "slug": "pet2", "frames": 6, "ink_first": true},
+	{"prefix": "pet3", "slug": "pet3", "frames": 6, "ink_first": true},
 ]
 
 const DIRS := ["south", "north", "east", "west"]
