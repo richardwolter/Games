@@ -533,15 +533,18 @@ func start_pet(toward: Vector2, spots: Array = []) -> void:
 
 ## Which built arm angle points nearest the nearer of `spots`, for the way the angler faces.
 func pet_arm_for(spots: Array) -> int:
+	return arm_toward(_view(), position + Vector2(0.0, -HEIGHT * PET_SHOULDER), spots)
+
+
+## The rule itself, for any figure drawing this sheet: the shed's player asks it too.
+static func arm_toward(view: StringName, shoulder: Vector2, spots: Array) -> int:
 	if spots.is_empty():
 		return 0
-	var shoulder := position + Vector2(0.0, -HEIGHT * PET_SHOULDER)
 	var aim: Vector2 = spots[0]
 	for spot: Vector2 in spots:
 		if shoulder.distance_to(spot) < shoulder.distance_to(aim):
 			aim = spot
 	var d := aim - shoulder
-	var view := _view()
 	var angle := 0.0
 	var angles: Array = PET_SIDE_ANGLES
 	if view == &"east" or view == &"west":

@@ -2718,7 +2718,19 @@ of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
   (`ink_first`), or the body would slide back as the arm went out. **Each dog waits
   `Dog.PET_AGAIN` (10 s) before it can be petted again**, per dog, from the press; a press on
   a waiting dog, a dog in the water, or during a reach does nothing and shows nothing. Not
-  saved. The shed is untouched.
+  saved.
+- **Petting in the shed too** (2026-09-28, second pass): the room's E takes a dog or a
+  switch, **whichever is nearer the player** (Richard's call); a dog still waiting out its
+  ten seconds is no candidate. The same reach frames, aimed by `Angler.arm_toward`, the player
+  held, `Dog.hearts_on` over the dog at the touch, a sniff through `Sfx.room_sniff`. The key
+  prompt stands over the dog when it is the nearer. Each room dog keeps its own cooldown,
+  apart from the lake dog of the same slot, since the room's dogs are rolled each visit.
+- **Walkers are drawn by their feet** (same day, Richard: dogs were drawn over the angler):
+  inside one walker layer the angler and the pack trade tree slots in feet order
+  (`Lake._order_walkers`), the shed's rule; the layer bands are unchanged.
+- **E opens the shed only in front of its door** (same day): `_at_shed` is within
+  `DOOR_RANGE` (0.6 tiles) of `_before_the_door()`, not `SHOP_RANGE` round the hut, and the
+  lamp follows. The Decorate button and the pad's X still open it from anywhere.
 - **Retired, by decision** (2026-09-11): the first angler (three rows + mirrored side, 6
   poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
   marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.

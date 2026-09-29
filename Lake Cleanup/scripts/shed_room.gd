@@ -421,6 +421,12 @@ class ShedDog extends RefCounted:
 	## the dog, not about the furniture.
 	var seat: String = ""
 
+	## Seconds before it can be petted again, and seconds left of its hearts. See
+	## `Dog.PET_AGAIN`, which this shares; separate from the lake's dog of the same slot,
+	## because the room's dogs are rolled fresh every time the door opens.
+	var pet_cool: float = 0.0
+	var hearts: float = 0.0
+
 	## The cells this dog is allowed to stand on although something is standing there — the
 	## foot of the piece whose seat it holds. Without it the sofa's own base refuses the dog
 	## the cushion and `_process`'s unstick shoves it off again every frame.
@@ -618,6 +624,8 @@ func _process(delta: float) -> void:
 func _drive_dog(dog: ShedDog, delta: float) -> void:
 	dog.age += delta
 	dog.mood -= delta
+	dog.pet_cool = maxf(dog.pet_cool - delta, 0.0)
+	dog.hearts = maxf(dog.hearts - delta, 0.0)
 	# The sofa a dog is asleep on can be picked up while it sleeps, or turned to a face that
 	# is nobody's seat. Give the claim up on the spot rather than leaving it holding a key
 	# to furniture that is no longer there.
@@ -724,6 +732,20 @@ func _door_size() -> Vector2:
 ## side of a wardrobe slides along it instead of stopping dead.
 func _walk_you(delta: float) -> void:
 	_you_age += delta
+	# The reach to pet a dog holds the player still, as on the lake (`Angler.start_pet`).
+	if _you_pet >= 0.0:
+		_you_step = 0.0
+		_you_pet += delta
+		if _pet_dog != null and not _pet_touched and _you_pet >= Angler.PET_TOUCH:
+			_pet_touched = true
+			_pet_dog.hearts = Dog.PET_TIME
+			_pet_dog.mood = Dog.PET_TIME
+			if Sfx.main() != null:
+				Sfx.main().room_sniff()
+		if _you_pet >= Angler.PET_TIME:
+			_you_pet = -1.0
+			_pet_dog = null
+		return
 	if record_up():
 		_you_step = 0.0
 		return
@@ -791,11 +813,18 @@ func _draw_you(floor_box: Rect2) -> void:
 
 	var walking := _you_step > 0.0
 	var pose := StringName("%s_%s" % ["run" if walking else "idle", _you_view()])
+	var reach := StringName("pet%d_%s" % [_you_pet_arm, _you_view()])
+	var petting := _you_pet >= 0.0 and _you_poses.has(reach)
+	if petting:
+		pose = reach
 	if not _you_poses.has(pose):
 		return
 	var frames: Array = _you_poses[pose]
 	var held := Angler.RUN_FRAME if walking else Angler.IDLE_FRAME
-	var frame: Dictionary = frames[posmod(int(_you_age / held), frames.size())]
+	var index := posmod(int(_you_age / held), frames.size())
+	if petting:
+		index = mini(int(_you_pet / Angler.PET_TIME * frames.size()), frames.size() - 1)
+	var frame: Dictionary = frames[index]
 	var region: Rect2 = frame["region"]
 	var ink: Rect2 = frame["ink"]
 	# Scaled by how tall the figure is inside its cell, not by the cell. Whole source pixels,
@@ -1275,6 +1304,8 @@ func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 		self, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), at, tall, dog.left,
 		0.0, Color.WHITE, dog.breed
 	)
+	if dog.hearts > 0.0:
+		Dog.hearts_on(self, at, tall / Dog.HEIGHT, 1.0 - dog.hearts / Dog.PET_TIME)
 
 
 ## One of the things that walk about in here, drawn where the sort put it: a dog, or the
@@ -1431,6 +1462,63 @@ func turn_carried() -> void:
 	queue_redraw()
 
 
+## The reach to pet the room's dogs (2026-09-28): what the lake's angler does, drawn on the
+## same sheet and aimed by `Angler.arm_toward`.
+var _you_pet := -1.0
+var _you_pet_arm := 0
+var _pet_dog: ShedDog = null
+var _pet_touched := false
+
+
+## The nearest dog in reach that can be petted now, or null.
+func _dog_near() -> ShedDog:
+	var best: ShedDog = null
+	var best_gap := REACH
+	for dog in _dogs:
+		if dog.pet_cool > 0.0:
+			continue
+		var gap := _you_at.distance_to(dog.at)
+		if gap < best_gap:
+			best_gap = gap
+			best = dog
+	return best
+
+
+## Start the reach at this dog: it sits and turns to the player, the player turns to it, and
+## it is petted when the hand lands (`_walk_you`). A dog lying on its seat keeps the seat.
+func pet_dog(dog: ShedDog) -> void:
+	dog.pet_cool = Dog.PET_AGAIN
+	if dog.seat.is_empty():
+		dog.state = &"sit" if DogArt.has(&"sit", dog.breed) else &"idle"
+	dog.mood = Dog.PET_WAIT + Dog.PET_TIME
+	dog.left = _you_at.x < dog.at.x
+	var toward := dog.at - _you_at
+	if toward.length_squared() > 0.0001:
+		_you_facing = toward.normalized()
+	var shoulder := _you_at - Vector2(0.0, YOU_TALL * Angler.PET_SHOULDER)
+	var head := dog.at + Vector2((-0.35 if dog.left else 0.35) * DOG_TALL, -DOG_TALL * 0.55)
+	var body := dog.at - Vector2(0.0, DOG_TALL * 0.35)
+	_you_pet_arm = Angler.arm_toward(_you_view(), shoulder, [head, body])
+	_you_pet = 0.0
+	_pet_touched = false
+	_pet_dog = dog
+
+
+func petting() -> bool:
+	return _you_pet >= 0.0
+
+
+## The middle of a placed piece's foot, in cells, where `_switch_near` measures from.
+func _switch_middle(i: int) -> Vector2:
+	var row: Dictionary = decor[i]
+	var piece := StringName(row["piece"])
+	var span := span_of(piece, _row_view(row))
+	return Vector2(
+		float(int(row["cell"][0])) + float(span.x) * 0.5,
+		float(int(row["cell"][1])) + float(span.y)
+	) / float(CELL)
+
+
 ## The placed piece the player is standing close enough to work, as an index into `decor`,
 ## or -1. Nearest first, so two switches side by side are not a coin toss.
 func _switch_near() -> int:
@@ -1486,8 +1574,18 @@ func switch_box() -> Rect2:
 	return Rect2()
 
 
+## The shed's E (2026-09-28): a switch or a dog, whichever is nearer the player (Richard:
+## "nearest wins"). A dog still waiting out its ten seconds is not a candidate, so beside one
+## E works the switch or does nothing.
 func switch_near() -> bool:
+	if _you_pet >= 0.0:
+		return true
 	var at := _switch_near()
+	var dog := _dog_near()
+	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
+	if dog != null and _you_at.distance_to(dog.at) < switch_gap:
+		pet_dog(dog)
+		return true
 	if at < 0:
 		return false
 	var row: Dictionary = decor[at]
@@ -2504,16 +2602,26 @@ func _draw_shelf_key() -> void:
 
 
 func _draw_prompt(floor_box: Rect2) -> void:
-	var at := _switch_near()
-	if at < 0:
+	if _you_pet >= 0.0:
 		return
-	var row: Dictionary = decor[at]
-	var piece := StringName(row["piece"])
-	var span := span_of(piece, _row_view(row))
-	var over := floor_box.position + Vector2(
-		(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
-		float(int(row["cell"][1])) * _zoom() - PROMPT_LIFT
-	)
+	var at := _switch_near()
+	var dog := _dog_near()
+	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
+	var over := Vector2.ZERO
+	if dog != null and _you_at.distance_to(dog.at) < switch_gap:
+		# The dog is what E would pet (2026-09-28): the key goes over its head.
+		var step := float(CELL * _zoom())
+		over = floor_box.position + dog.at * step - Vector2(0.0, DOG_TALL * step + PROMPT_LIFT * 0.5)
+	elif at < 0:
+		return
+	else:
+		var row: Dictionary = decor[at]
+		var piece := StringName(row["piece"])
+		var span := span_of(piece, _row_view(row))
+		over = floor_box.position + Vector2(
+			(float(int(row["cell"][0])) + float(span.x) * 0.5) * _zoom(),
+			float(int(row["cell"][1])) * _zoom() - PROMPT_LIFT
+		)
 	var side := 18.0
 	var box := Rect2(over - Vector2(side, side) * 0.5, Vector2(side, side))
 	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.85))

@@ -1566,22 +1566,29 @@ func _draw_stick(at: Vector2, name: StringName, frame: int) -> void:
 ## is saying hello to somebody who has just walked up. `through` is how far through that is,
 ## nought to one, because the two have their own lengths.
 func _draw_hearts(through: float) -> void:
+	hearts_on(self, Vector2.ZERO, 1.0, through)
+
+
+## The hearts over a petted dog standing at `at` on `item`, drawn `scale` times the lake's
+## size: the shed draws its dogs bigger (2026-09-28, petting in the shed).
+static func hearts_on(item: CanvasItem, at: Vector2, scale: float, through: float) -> void:
+	var side := HEART_SIDE * scale
 	for i in 2:
 		var lift := HEART_RISE * clampf(through * 1.4 - float(i) * 0.35, 0.0, 1.0)
 		if lift <= 0.0:
 			continue
 		var fade := 1.0 - smoothstep(0.6, 1.0, through)
-		var at := Vector2(-4.0 + 8.0 * float(i), -HEIGHT - 4.0 - lift)
+		var spot := at + Vector2(-4.0 + 8.0 * float(i), -HEIGHT - 4.0 - lift) * scale
 		var ink := Color(0.95, 0.42, 0.48, fade)
 		# A heart at four pixels is two lobes and a point; anything more careful than that
 		# is detail nobody can see at this size.
-		draw_circle(at + Vector2(-HEART_SIDE * 0.45, 0.0), HEART_SIDE * 0.55, ink)
-		draw_circle(at + Vector2(HEART_SIDE * 0.45, 0.0), HEART_SIDE * 0.55, ink)
-		draw_colored_polygon(
+		item.draw_circle(spot + Vector2(-side * 0.45, 0.0), side * 0.55, ink)
+		item.draw_circle(spot + Vector2(side * 0.45, 0.0), side * 0.55, ink)
+		item.draw_colored_polygon(
 			PackedVector2Array([
-				at + Vector2(-HEART_SIDE, 0.2),
-				at + Vector2(HEART_SIDE, 0.2),
-				at + Vector2(0.0, HEART_SIDE * 1.5)
+				spot + Vector2(-side, 0.2),
+				spot + Vector2(side, 0.2),
+				spot + Vector2(0.0, side * 1.5)
 			]),
 			ink
 		)

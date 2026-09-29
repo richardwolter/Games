@@ -386,7 +386,15 @@ func _stage_build() -> void:
 
 	# The shed is a place you stand at, not a button on the screen.
 	_check(not bool(_main.get(&"_menu_open")), "the shop starts closed", "")
-	_check(bool(_main.call(&"_at_shed")), "the angler starts at the shed", "")
+	# Only right in front of the door (2026-09-28, Richard): the spot the arrival leads the
+	# angler to opens it, the angler's start beside the hut, a tile off it, does not.
+	var start_at := _angler.tile_pos
+	_angler.tile_pos = _main.call(&"_before_the_door")
+	_check(bool(_main.call(&"_at_shed")), "standing in front of the door is at the shed", "")
+	_angler.tile_pos = start_at
+	_check(not bool(_main.call(&"_at_shed")),
+		"beside the hut but a tile off its door is not", "%.2f tiles off" % start_at.distance_to(
+			_main.call(&"_before_the_door")))
 	_main.call(&"_set_menu", true)
 	_check(bool(_main.get(&"_menu_open")) and not _angler.can_walk,
 		"opening the shop stops the angler walking", "")
@@ -1591,6 +1599,21 @@ func _stage_dog_idle(dogs: Array) -> void:
 	_stage_dog_breeds(dogs)
 	_stage_dog_manners(dogs)
 	_stage_dog_pet(dogs)
+	_check_walker_order(dogs)
+
+
+## Walkers are drawn by their feet (2026-09-28, Richard): a dog lower on the screen than the
+## angler is in front of them, one higher is behind, whatever order they were added in.
+func _check_walker_order(dogs: Array) -> void:
+	var dog := dogs[0] as Dog
+	var was_dog := dog.position
+	dog.position = _angler.position + Vector2(0.0, 6.0)
+	_main.call(&"_order_walkers")
+	_check(dog.get_index() > _angler.get_index(), "a dog lower on the screen is drawn over the angler", "")
+	dog.position = _angler.position + Vector2(0.0, -6.0)
+	_main.call(&"_order_walkers")
+	_check(dog.get_index() < _angler.get_index(), "and one higher up is drawn under them", "")
+	dog.position = was_dog
 
 
 ## The reach to pet (2026-09-28, Richard): the angler reaches, held still, and the dog is
@@ -3721,10 +3744,59 @@ func _check_trophy() -> void:
 const SOFA_CUSHION := 2
 
 
+## Petting in the shed (2026-09-28, Richard): E beside a dog reaches, holds the player, and
+## the dog gets its hearts when the hand lands; it waits ten seconds before it can be petted
+## again. Beside a dog and a switch at once, the nearer takes E.
+func _check_shed_pet(room: ShedRoom) -> void:
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var dogs: Array = room.dogs()
+	if dogs.is_empty():
+		var one := ShedRoom.ShedDog.new()
+		dogs.append(one)
+	var dog: ShedRoom.ShedDog = dogs[0]
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	decor.clear()
+	var you := Vector2(10.0, 10.0)
+	room.set(&"_you_at", you)
+	dog.at = you + Vector2(1.5, 0.0)
+	dog.pet_cool = 0.0
+	dog.seat = ""
+	_check(room.switch_near(), "E beside a dog in the shed is taken", "")
+	_check(room.petting(), "by the reach", "")
+	var t := 0.0
+	var touched := -1.0
+	while room.petting() and t < 3.0:
+		room.call(&"_walk_you", 1.0 / 60.0)
+		t += 1.0 / 60.0
+		if touched < 0.0 and dog.hearts > 0.0:
+			touched = t
+	_check(absf(touched - Angler.PET_TOUCH) < 0.05, "and the dog is petted when the hand lands",
+		"%.2f s" % touched)
+	_check(room.get(&"_you_at") == you, "with the player held still", "")
+	_check(not room.switch_near() or not room.petting(),
+		"a second press within ten seconds does not pet it again", "")
+	# A switch nearer than the dog takes E instead.
+	if room.sheets.has(&"decor_lamp"):
+		dog.pet_cool = 0.0
+		dog.at = you + Vector2(3.0, 0.0)
+		room.place(&"decor_lamp", Vector2i(int(you.x * ShedRoom.CELL) - 4, int(you.y * ShedRoom.CELL) - 16), 0)
+		var near_switch: int = room.call(&"_switch_near")
+		if near_switch >= 0:
+			room.switch_near()
+			_check(not room.petting(), "a switch nearer than the dog takes E", "")
+	decor.clear()
+	decor.append_array(kept)
+	if not was_open:
+		_main.call(&"_set_shed", false)
+
+
 func _check_shed_dogs(room: ShedRoom) -> void:
 	var sheets: Sheets = room.sheets
 	if sheets == null or not sheets.has(&"decor_sofa") or not sheets.has(&"decor_pet_bed"):
 		return
+	_check_shed_pet(room)
 	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
 	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
 	# the lake's own array, so the furniture goes down after the door is open, not before.

@@ -2528,7 +2528,7 @@ func _double_spot(target: Vector2) -> Vector2:
 ## tile apart (`Iso.shed_centre`), which on a range of about three tiles is the difference
 ## between the door opening on the near side and on the far one.
 func _at_shed() -> bool:
-	return _angler.tile_pos.distance_to(Iso.shed_centre()) < SHOP_RANGE
+	return _angler.tile_pos.distance_to(_before_the_door()) < DOOR_RANGE
 
 
 ## The wash room, up or down. Built the first time it is asked for, on the HUD's layer over
@@ -3192,6 +3192,10 @@ func _start_arrival() -> void:
 const DOOR_ALONG := 0.2
 ## How far in front of the wall the angler stops to read the note, in tiles.
 const DOOR_STAND := 0.45
+## How near the spot in front of the door the angler has to stand for E to open the shed
+## (2026-09-28, Richard: "only when right in front of door, and nowhere else"). The HUD's
+## Decorate button and the pad's X still open it from anywhere.
+const DOOR_RANGE := 0.6
 
 
 ## The spot in front of the hut's door (2026-09-24): the arrival leads the angler here, where
@@ -5344,6 +5348,40 @@ func _sort_walkers() -> void:
 			_net2.z_index = stood - 1
 	for dog in _dogs:
 		dog.z_index = _walker_layer(dog.position)
+	_order_walkers()
+
+
+## Walkers on one layer are drawn by their feet, the shed's rule (2026-09-28, Richard: the
+## dogs were drawn over the angler whatever the depth): the one lower on the screen in
+## front. A z layer cannot hold that, so within it the tree order does: the angler and the
+## pack trade places among the slots they already hold, in feet order, only on a frame the
+## order is wrong. Nothing else in the tree moves against them.
+var _slots: Array[int] = []
+
+
+func _order_walkers() -> void:
+	var walkers: Array = []
+	if _angler != null and _angler.get_parent() == self:
+		walkers.append(_angler)
+	for dog in _dogs:
+		if dog != null and dog.get_parent() == self:
+			walkers.append(dog)
+	if walkers.size() < 2:
+		return
+	var by_feet := walkers.duplicate()
+	by_feet.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.position.y < b.position.y)
+	var by_tree := walkers.duplicate()
+	by_tree.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.get_index() < b.get_index())
+	if by_feet == by_tree:
+		return
+	_slots.clear()
+	for walker: Node in by_tree:
+		_slots.append(walker.get_index())
+	# Placed from the lowest slot up: every walker still to place sits at or past the slot
+	# being filled, so a move never disturbs one already placed.
+	for i in by_feet.size():
+		var walker: Node2D = by_feet[i]
+		move_child(walker, _slots[i])
 
 
 ## The layer for something standing here. See `_sort_walkers`.

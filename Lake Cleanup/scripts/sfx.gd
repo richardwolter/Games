@@ -562,6 +562,14 @@ func room_bark() -> void:
 	_from_room = false
 
 
+## A dog petted in the shed sniffs through the room's own door (2026-09-28), the way the wash
+## room's backdrop barks: the room's call is what is let in, not the name.
+func room_sniff() -> void:
+	_from_room = true
+	play_sniff()
+	_from_room = false
+
+
 func room_coo() -> void:
 	_from_room = true
 	play_coo()
