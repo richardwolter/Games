@@ -137,8 +137,30 @@ def shoulder_of(im, waist, direction):
         return (max(xs) - 1.5, row)
     if direction == "west":
         return (min(xs) + 1.5, row)
-    # Front: the hand comes forward from the middle of the chest, in front of the body.
-    return ((left + right) / 2 + 2, row + 1)
+    # Front: from the free hand's shoulder (Richard, 2026-09-28: "it should come from free
+    # left hand"), the figure's left, the screen's right; the basket is in the other.
+    return (FREE_SHOULDER[0] + PAD, FREE_SHOULDER[1] + (waist - _WAIST_AT_REST))
+
+
+# The south idle frame's free arm, in that frame's own pixels (measured off
+# `idle_south.png`, frame 0): the sleeve from row 25, the hand and its outline down to row 36, columns 26 to
+# 31 right of the torso's outline at 25. Cleared while the arm is out, so there are not two.
+FREE_ARM = (26, 25, 32, 37)
+FREE_SHOULDER = (26.5, 26.5)
+_WAIST_AT_REST = 0
+
+
+def free_arm_off(figure):
+    """The south figure with its hanging free arm taken off, the torso's edge re-inked."""
+    out = figure.copy()
+    x0, y0, x1, y1 = FREE_ARM
+    for y in range(y0, y1):
+        for x in range(x0 + PAD, x1 + PAD):
+            out.putpixel((x, y), (0, 0, 0, 0))
+        edge = (x0 + PAD - 1, y)
+        if out.getpixel(edge)[3] >= 128:
+            out.putpixel(edge, OUTLINE)
+    return out
 
 
 def heading_of(direction, angle):
@@ -152,10 +174,13 @@ def heading_of(direction, angle):
 
 
 def build(direction, k, angle):
+    global _WAIST_AT_REST
     figure = first_idle(direction)
+    _, _WAIST_AT_REST = crouch(figure, 0)
+    armless = free_arm_off(figure) if direction == "south" else figure
     frames = []
     for drop, reach, lift in FRAMES:
-        frame, waist = crouch(figure, drop)
+        frame, waist = crouch(armless if reach > 0 else figure, drop)
         if reach > 0 and direction != "north":
             arm(frame, shoulder_of(frame, waist, direction), heading_of(direction, angle),
                 reach, lift)
