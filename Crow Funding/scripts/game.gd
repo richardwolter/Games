@@ -1,4 +1,5 @@
 extends Node2D
+const Text = preload("res://scripts/text.gd")
 ## Main game: runs the daily trip loop, day/night cycle, food pantry, upgrades shop,
 ## crow recruiting, and the end-of-day daily report. The crew loiters on the balcony.
 
@@ -6,17 +7,18 @@ const CrowScript = preload("res://scripts/crow.gd")
 const CityScript = preload("res://scripts/city.gd")
 const Care = preload("res://scripts/care.gd")
 const StationsScript = preload("res://scripts/stations.gd")
+const MenuScript = preload("res://scripts/ui/menu.gd")
 
 const LOOT_POOL: Array[Dictionary] = [
-	{"name": "Shiny Button", "value": 3, "weight": 8},
-	{"name": "Loose Change", "value": 4, "weight": 8},
-	{"name": "Twisted Fork", "value": 5, "weight": 6},
-	{"name": "Crown Bottle Cap", "value": 8, "weight": 5},
-	{"name": "Silver Spoon", "value": 10, "weight": 4},
-	{"name": "Pocket Watch", "value": 18, "weight": 3},
-	{"name": "Gold Earring", "value": 22, "weight": 2},
-	{"name": "Gold Ring", "value": 35, "weight": 1},
-	{"name": "Pearl Necklace", "value": 60, "weight": 1},
+	{"name": Text.LOOT_BUTTON, "value": 3, "weight": 8},
+	{"name": Text.LOOT_CHANGE, "value": 4, "weight": 8},
+	{"name": Text.LOOT_FORK, "value": 5, "weight": 6},
+	{"name": Text.LOOT_CAP, "value": 8, "weight": 5},
+	{"name": Text.LOOT_SPOON, "value": 10, "weight": 4},
+	{"name": Text.LOOT_WATCH, "value": 18, "weight": 3},
+	{"name": Text.LOOT_EARRING, "value": 22, "weight": 2},
+	{"name": Text.LOOT_RING, "value": 35, "weight": 1},
+	{"name": Text.LOOT_PEARLS, "value": 60, "weight": 1},
 ]
 
 const TRIPS_PER_DAY := 3
@@ -29,15 +31,15 @@ const FOOD_BATCH := 5
 const RAIL_PERCH_Y := 484.0
 
 const FOODS: Array[Dictionary] = [
-	{"key": "seeds", "name": "Seeds", "cost": 2, "effect": "Baseline meal", "start": 12},
-	{"key": "berries", "name": "Berries", "cost": 5, "effect": "Trips 25% faster", "start": 6, "speed": 0.75},
-	{"key": "worms", "name": "Worms", "cost": 9, "effect": "+luck for the day", "start": 3, "luck": 0.25},
+	{"key": "seeds", "name": Text.FOOD_SEEDS, "cost": 2, "effect": Text.FOOD_SEEDS_EFFECT, "start": 12},
+	{"key": "berries", "name": Text.FOOD_BERRIES, "cost": 5, "effect": Text.FOOD_BERRIES_EFFECT, "start": 6, "speed": 0.75},
+	{"key": "worms", "name": Text.FOOD_WORMS, "cost": 9, "effect": Text.FOOD_WORMS_EFFECT, "start": 3, "luck": 0.25},
 ]
 
 const UPGRADES: Array[Dictionary] = [
-	{"key": "training", "name": "Training", "costs": [50, 90, 150, 240, 380]},
-	{"key": "bags", "name": "Bigger Bags", "costs": [75, 130, 210, 330, 500]},
-	{"key": "speed", "name": "Fleet Speed", "costs": [100, 170, 270, 420, 650]},
+	{"key": "training", "name": Text.UPGRADE_TRAINING, "costs": [50, 90, 150, 240, 380]},
+	{"key": "bags", "name": Text.UPGRADE_BAGS, "costs": [75, 130, 210, 330, 500]},
+	{"key": "speed", "name": Text.UPGRADE_SPEED, "costs": [100, 170, 270, 420, 650]},
 ]
 const UPGRADE_MAX_LEVEL := 5
 const ROSTER_CAP := 6
@@ -78,6 +80,10 @@ var recruit_count := 0
 @onready var sky = %Sky
 
 var stations: StationsScript
+var menu: MenuScript
+## Probes that photograph the menu set this; otherwise only the game's own
+## scene (parented to the root) wears the boot menu.
+static var force_front := false
 
 func _ready() -> void:
 	stations = StationsScript.new()
@@ -90,12 +96,25 @@ func _ready() -> void:
 		food_stock[food.key] = food.start
 	dispatch_button.pressed.connect(_on_dispatch_pressed)
 	hud.setup(self)
-	_append_log("The crew loiters on the balcony. Press Dispatch to start the day.")
-	_append_log("Each crow makes %d trips, grabbing coins and loot along the way." % TRIPS_PER_DAY)
+	_append_log(Text.LOG_INTRO)
+	_append_log(Text.LOG_INTRO_TRIPS % TRIPS_PER_DAY)
 	sky.phase_changed.connect(_on_sky_phase)
 	city.set_night(sky.phase)
 	balcony.set_night(sky.phase)
 	_update_dispatch_state()
+	menu = MenuScript.new()
+	menu.name = "Menu"
+	menu.hud = hud
+	add_child(menu)
+	var is_game := get_parent() == get_tree().root
+	if (is_game or force_front) and not MenuScript.skip_boot:
+		menu.open_boot()
+	MenuScript.skip_boot = false
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"dispatch") and not event.is_echo() and not dispatch_button.disabled:
+		dispatch_button.pressed.emit()
+		get_viewport().set_input_as_handled()
 
 func _crows() -> Array[CrowScript]:
 	var result: Array[CrowScript] = []
@@ -137,12 +156,12 @@ func assign_station(crow: CrowScript, station: int) -> bool:
 	if day_state != DayState.MORNING:
 		return false
 	if not Care.can_assign(crow.injury_days, station):
-		_append_log("%s is hurt and cannot fly today." % crow.crow_name)
+		_append_log(Text.LOG_HURT_NO_TRIP % crow.crow_name)
 		_place_crows()
 		return false
 	if crow.station != station:
 		crow.station = station
-		_append_log("%s goes to the %s." % [crow.crow_name, StationsScript.label_of(station)])
+		_append_log(Text.LOG_TO_STATION % [crow.crow_name, StationsScript.label_of(station)])
 	_place_crows()
 	hud.refresh(self)
 	_update_dispatch_state()
@@ -164,13 +183,13 @@ func _on_dispatch_pressed() -> void:
 		return
 	var crew := _trip_crew()
 	if food_stock[selected_food] < crew.size():
-		_append_log("Not enough %s for the crew." % _food_name(selected_food))
+		_append_log(Text.LOG_NO_FOOD % _food_name(selected_food))
 		return
 	day_state = DayState.RUNNING
 	# consume 1 selected food per crow
 	for i in crew.size():
 		food_stock[selected_food] -= 1
-	_append_log("The crew ate %d %s." % [crew.size(), _food_name(selected_food)])
+	_append_log(Text.LOG_ATE % [crew.size(), _food_name(selected_food)])
 	# apply day effects from the chosen meal and the Fleet Speed upgrade
 	day_speed = _fleet_mult()
 	day_luck_bonus = 0.0
@@ -180,13 +199,13 @@ func _on_dispatch_pressed() -> void:
 	if meal.has("luck"):
 		day_luck_bonus = float(meal.luck)
 	dispatch_button.disabled = true
-	dispatch_button.text = "Crew out working..."
+	dispatch_button.text = Text.DISPATCH_WORKING
 	day_earned = 0
-	_append_log("Day %d: the crew takes off." % day)
+	_append_log(Text.LOG_TAKE_OFF % day)
 	sky.run_day(_planned_day_duration(crew.size()))
 	_days_pending = crew.size()
 	if crew.is_empty():
-		_append_log("Nobody flies today; the crew stays home.")
+		_append_log(Text.LOG_NOBODY_FLIES)
 		get_tree().create_timer(1.0).timeout.connect(_settle_day)
 	for i in crew.size():
 		var crow: CrowScript = crew[i]
@@ -236,19 +255,19 @@ func _on_crow_landed(crow: CrowScript) -> void:
 	money += coin_gain
 	day_earned += coin_gain
 	crow.day_value += coin_gain
-	_append_log("%s brought back %d coins." % [crow.crow_name, coin_gain])
+	_append_log(Text.LOG_COINS % [crow.crow_name, coin_gain])
 	if randf() < _loot_chance(luck) * tired_mult:
 		var item: Dictionary = _roll_loot(luck)
 		money += item.value
 		day_earned += item.value
 		crow.day_objects += 1
 		crow.day_value += item.value
-		_append_log("%s grabbed a %s (+%d c)" % [crow.crow_name, item.name, item.value])
+		_append_log(Text.LOG_LOOT % [crow.crow_name, item.name, item.value])
 	if randf() < 0.18:
 		var fkey: String = str(FOODS[randi() % FOODS.size()].key)
 		var amount := 1 + randi() % 3
 		food_stock[fkey] = int(food_stock[fkey]) + amount
-		_append_log("%s found some %s (+%d)" % [crow.crow_name, _food_name(fkey), amount])
+		_append_log(Text.LOG_FOUND_FOOD % [crow.crow_name, _food_name(fkey), amount])
 	# the trip wears the crow down, and a tired crow can get hurt
 	var hurt_chance: float = Care.injury_chance(crow.stamina)
 	crow.stamina = Care.after_trip(crow.stamina)
@@ -257,7 +276,7 @@ func _on_crow_landed(crow: CrowScript) -> void:
 	var xp_gain := int(round((4.0 + randf_range(0.0, 3.0) + crow.luck * 7.0) * _xp_mult()))
 	var leveled: bool = crow.grant_xp(xp_gain)
 	if leveled:
-		_append_log("%s leveled up to %s!" % [crow.crow_name, crow.get_tier_name()])
+		_append_log(Text.LOG_LEVEL_UP % [crow.crow_name, crow.get_tier_name()])
 	hud.refresh(self)
 	hud.flash_money()
 	_update_dispatch_state()
@@ -279,7 +298,7 @@ func _loot_weight(item: Dictionary, luck: float) -> float:
 func _injure(crow: CrowScript) -> void:
 	crow.injury_days = randi_range(Care.INJURY_DAYS_MIN, Care.INJURY_DAYS_MAX)
 	crow.day_injured = true
-	_append_log("%s got hurt out there!" % crow.crow_name)
+	_append_log(Text.LOG_HURT % crow.crow_name)
 
 ## A day at home: the station's effect, and nothing earned.
 func _care_day(crow: CrowScript) -> void:
@@ -287,12 +306,12 @@ func _care_day(crow: CrowScript) -> void:
 		Care.Station.TRAINING:
 			var leveled: bool = crow.grant_xp(int(round(Care.TRAINING_XP * _xp_mult())))
 			if leveled:
-				_append_log("%s trained up to %s!" % [crow.crow_name, crow.get_tier_name()])
+				_append_log(Text.LOG_TRAINED_UP % [crow.crow_name, crow.get_tier_name()])
 		Care.Station.FIRST_AID:
 			var was := crow.injury_days
 			crow.injury_days = Care.after_heal(crow.injury_days, crow.station)
 			if was > 0 and crow.injury_days == 0:
-				_append_log("%s is patched up." % crow.crow_name)
+				_append_log(Text.LOG_HEALED % crow.crow_name)
 	crow.stamina = Care.after_home_day(crow.stamina, crow.station)
 
 func _settle_day() -> void:
@@ -305,8 +324,8 @@ func _settle_day() -> void:
 	for crow in _trip_crew():
 		var leveled: bool = crow.grant_xp(_day_end_xp(crow))
 		if leveled:
-			_append_log("%s reached %s!" % [crow.crow_name, crow.get_tier_name()])
-	_append_log("Day %d complete: crew earned %d coins today." % [day, day_earned])
+			_append_log(Text.LOG_REACHED % [crow.crow_name, crow.get_tier_name()])
+	_append_log(Text.LOG_DAY_DONE % [day, day_earned])
 	day_speed = 1.0
 	day_luck_bonus = 0.0
 	sky.force_night()
@@ -333,11 +352,11 @@ func buy_food(key: String) -> void:
 	var food: Dictionary = _food(key)
 	var cost := int(food.cost) * FOOD_BATCH
 	if money < cost:
-		_append_log("Not enough coins to buy %s." % food.name)
+		_append_log(Text.LOG_CANT_BUY_FOOD % food.name)
 		return
 	money -= cost
 	food_stock[key] = int(food_stock[key]) + FOOD_BATCH
-	_append_log("Bought %d %s for %d c." % [FOOD_BATCH, food.name, cost])
+	_append_log(Text.LOG_BOUGHT_FOOD % [FOOD_BATCH, food.name, cost])
 	hud.refresh(self)
 	_update_dispatch_state()
 
@@ -346,7 +365,7 @@ func select_food(key: String) -> void:
 		return
 	if selected_food != key:
 		selected_food = key
-		_append_log("Crew meal set to %s." % _food_name(key))
+		_append_log(Text.LOG_MEAL % _food_name(key))
 		hud.refresh(self)
 		_update_dispatch_state()
 
@@ -369,15 +388,15 @@ func buy_upgrade(key: String) -> void:
 	var track: Dictionary = _upgrade(key)
 	var level := int(upgrade_levels[key])
 	if level >= UPGRADE_MAX_LEVEL:
-		_append_log("%s is already maxed out." % track.name)
+		_append_log(Text.LOG_MAXED % track.name)
 		return
 	var cost := _upgrade_cost(key)
 	if money < cost:
-		_append_log("Not enough coins for %s (level %d costs %d c)." % [track.name, level + 1, cost])
+		_append_log(Text.LOG_CANT_UPGRADE % [track.name, level + 1, cost])
 		return
 	money -= cost
 	upgrade_levels[key] = level + 1
-	_append_log("%s upgraded to level %d/%d for %d c." % [track.name, level + 1, UPGRADE_MAX_LEVEL, cost])
+	_append_log(Text.LOG_UPGRADED % [track.name, level + 1, UPGRADE_MAX_LEVEL, cost])
 	hud.refresh(self)
 	_update_dispatch_state()
 
@@ -389,11 +408,11 @@ func recruit_crow() -> void:
 		return
 	var crew := _crows()
 	if crew.size() >= ROSTER_CAP:
-		_append_log("The balcony is full - %d crows is the limit." % ROSTER_CAP)
+		_append_log(Text.LOG_ROSTER_FULL % ROSTER_CAP)
 		return
 	var cost := _recruit_cost()
 	if money < cost:
-		_append_log("Not enough coins to recruit a new crow (%d c)." % cost)
+		_append_log(Text.LOG_CANT_RECRUIT % cost)
 		return
 	money -= cost
 	recruit_count += 1
@@ -404,7 +423,7 @@ func recruit_crow() -> void:
 	crow.luck = crow.base_luck
 	crows.add_child(crow)
 	_place_crows()
-	_append_log("Recruited %s to the crew for %d c." % [crow.crow_name, cost])
+	_append_log(Text.LOG_RECRUITED % [crow.crow_name, cost])
 	hud.rebuild_roster()
 	hud.refresh(self)
 	_update_dispatch_state()
@@ -436,7 +455,7 @@ func start_new_day() -> void:
 	hud.hide_report()
 	hud.refresh(self)
 	_update_dispatch_state()
-	_append_log("Day %d begins. The crew is ready on the balcony." % day)
+	_append_log(Text.LOG_DAY_BEGINS % day)
 
 func can_shop() -> bool:
 	return day_state == DayState.MORNING or day_state == DayState.NIGHT
@@ -454,21 +473,21 @@ func _update_dispatch_state() -> void:
 	match day_state:
 		DayState.RUNNING:
 			dispatch_button.disabled = true
-			dispatch_button.text = "Crew out working..."
+			dispatch_button.text = Text.DISPATCH_WORKING
 		DayState.NIGHT:
 			dispatch_button.disabled = false
-			dispatch_button.text = "Next Day"
+			dispatch_button.text = Text.DISPATCH_NEXT_DAY
 		DayState.REPORT:
 			dispatch_button.disabled = true
-			dispatch_button.text = "Next Day"
+			dispatch_button.text = Text.DISPATCH_NEXT_DAY
 		DayState.MORNING:
 			var need := _trip_crew().size()
 			if food_stock[selected_food] < need:
 				dispatch_button.disabled = true
-				dispatch_button.text = "Not enough %s" % _food_name(selected_food)
+				dispatch_button.text = Text.DISPATCH_NO_FOOD % _food_name(selected_food)
 			else:
 				dispatch_button.disabled = false
-				dispatch_button.text = "Dispatch Crows"
+				dispatch_button.text = Text.DISPATCH
 
 func _append_log(line: String) -> void:
 	log_lines.append(line)

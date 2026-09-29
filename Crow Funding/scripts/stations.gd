@@ -1,4 +1,5 @@
 extends Node2D
+const Text = preload("res://scripts/text.gd")
 ## The four care stations on the balcony rail, drawn in code as flat ink-on-paper
 ## placeholders with labels, and the mouse drag that puts a crow on one. Mornings
 ## only: press on a crow, drag it over a station, let go. The rules live in
@@ -33,10 +34,10 @@ var _hover := -1
 
 static func label_of(station: int) -> String:
 	match station:
-		Care.Station.TRIP: return "Trip"
-		Care.Station.TRAINING: return "Training post"
-		Care.Station.NEST: return "Nest"
-		Care.Station.FIRST_AID: return "First-aid box"
+		Care.Station.TRIP: return Text.STATION_TRIP
+		Care.Station.TRAINING: return Text.STATION_TRAINING
+		Care.Station.NEST: return Text.STATION_NEST
+		Care.Station.FIRST_AID: return Text.STATION_FIRST_AID
 	return "?"
 
 

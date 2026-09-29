@@ -109,9 +109,9 @@ layer).
 
 Two cities, picked freely and **visual only** (loot, economy and save are shared).
 `scripts/environments.gd` lists them (`classic` Old Town, `modern` Downtown); the
-`Settings` autoload stores the choice in `user://settings.cfg` and emits
-`environment_changed`, and City, Sky and Balcony swap live. **F2 cycles it**: there
-is no settings screen yet, so the key stands in for the dropdown.
+`Prefs` autoload (was `Settings`) stores the choice in `user://settings.cfg` and
+emits `environment_changed`, and City, Sky and Balcony swap live. Picked on the
+Settings board's City row; F2 (rebindable, "Next city") still cycles it.
 
 - **City**: `skyline_modern` seed 8912, cut by `tools/skyline_art.py <preview>
   --modern`. It writes `city_modern.png` and `city_modern_lights.json` (window
@@ -155,6 +155,41 @@ box** (right). Rules are pure functions in `scripts/care.gd`; `game.gd`
 - **No save exists**, so care state is in memory like everything else.
 - Test: `tools/test_care.tscn` (headless, writes `tools/last_care_test.log`, exits 1
   on failure).
+
+## UI: ink menus (2026-09-29, unattended pass; structure after Lake Cleanup's menus, not its wood)
+
+- **One look** (`scripts/ink.gd`): a Theme built in code, ink on paper with one spot
+  colour (`SPOT`, the default scarf's ochre, a first guess) for the lit door, slider
+  fill, focus ring and hover tint. Buttons stand on a hard ink shadow; hover tints
+  the paper and thickens the border; pressed sinks the face onto the shadow. The
+  accented door is the `InkAccent` type variation. `Ink.strip` clears old per-node
+  overrides so the theme shows; the HUD, crow cards, pantry, upgrades/recruit and
+  the report all wear it now (report gained a veil, Dispatch and Start Day are lit).
+- **Text** (`scripts/text.gd`): every player-facing string is a const there, read as
+  `Text.KEY` (loot, foods, upgrades, tiers, statuses, log lines, stations, cities,
+  menus). Crow names stay in game.gd (names, not strings).
+- **Prefs** autoload (`scripts/prefs.gd`, replaces `settings.gd`): four buses built
+  at boot (Master/Music/SFX/Ambience, power-law sliders `SLIDER_LAW` 33.2, mute
+  toggles), window mode windowed/borderless/exclusive, windowed resolution (dead
+  in fullscreen), vsync, frame cap, city, binds. Headless runs never write the file.
+  An old `fullscreen=true` reads as borderless. The game has no audio yet, so the
+  buses are ready and silent.
+- **Binds** (`scripts/binds.gd`): the InputMap is built from its table at boot
+  (`dispatch` Space, `toggle_fullscreen` F1, `next_city` F2); project.godot holds no
+  input events now. Physical keys, OS labels. Rebinding swaps with whatever held
+  the key; only overrides are saved. Escape is never bindable (pause/cancel).
+  Space is new: it presses Dispatch / Next Day.
+- **Menu** (`scripts/ui/menu.gd`, a CanvasLayer the game adds at `_ready`): boot
+  menu over the live balcony (New game lit, no Continue: there is no save to
+  continue), Escape in play opens it paused (Continue lit, New game asks, Quit asks).
+  Boards stack over it (`scripts/ui/board.gd`: settings, binds, credits, confirm);
+  Escape closes the top one. The HUD hides while the doors are up. Only the game's
+  own scene (parent is root) shows the boot menu; `game.gd force_front` for probes.
+  Exclusive fullscreen asks "Keep this display?" and reverts after 10 s.
+- **Known**: pausing stops tweens but `create_timer` timers in game.gd run through a
+  pause (Godot's default), so a crow mid-day can get a step out of phase with its
+  flight. Credits are placeholder lines for Richard to settle.
+- Probe: `tools/shot.tscn -- menu=boot|pause|settings|binds|confirm|credits|report`.
 
 ## Next
 

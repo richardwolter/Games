@@ -1,9 +1,11 @@
 extends CanvasLayer
+const Text = preload("res://scripts/text.gd")
 ## HUD: balcony signs and crates (labels, title, roster notice board, Pantry food
 ## panel, Upgrades shop, loot log), plus the end-of-day daily report overlay.
 
 const CrowCardScene = preload("res://scenes/crow_card.tscn")
 const StationsScript = preload("res://scripts/stations.gd")
+const Ink = preload("res://scripts/ink.gd")
 
 @onready var money_label: Label = %MoneyLabel
 @onready var day_label: Label = %DayLabel
@@ -41,7 +43,7 @@ var _btn_hover: StyleBoxFlat
 func setup(game_node) -> void:
 	game = game_node
 	_apply_ink_theme()
-	title_label.text = "The Crow's Roost"
+	title_label.text = Text.HUD_TITLE
 	rebuild_roster()
 	_build_pantry(game_node)
 	_build_upgrades(game_node)
@@ -51,12 +53,42 @@ func setup(game_node) -> void:
 	render_log(game_node.log_lines)
 
 func _apply_ink_theme() -> void:
-	var theme := Theme.new()
-	theme.set_color("font_color", "Label", INK)
-	theme.set_font_size("font_size", "Label", 12)
+	# the one ink look (scripts/ink.gd); the scene's own panel and font-colour
+	# overrides are cleared so it shows through
 	for child in get_children():
 		if child is Control:
-			(child as Control).theme = theme
+			Ink.strip(child)
+			(child as Control).theme = Ink.theme()
+	get_node("Pantry/VBox/Title").text = Text.HUD_PANTRY
+	get_node("Upgrades/VBox/Title").text = Text.HUD_UPGRADES
+	for title in [get_node("Pantry/VBox/Title"), get_node("Upgrades/VBox/Title"), report_title]:
+		title.add_theme_font_size_override("font_size", Ink.TEXT_HEAD)
+	money_label.add_theme_font_size_override("font_size", Ink.TEXT_HEAD)
+	day_label.add_theme_font_size_override("font_size", Ink.TEXT_HEAD)
+	var dispatch: Button = get_node("DispatchButton")
+	dispatch.theme_type_variation = &"InkAccent"
+	dispatch.add_theme_font_size_override("font_size", Ink.TEXT_HEAD)
+	for box in [pantry, get_node("Upgrades")]:
+		var tight := Ink.panel()
+		tight.set_content_margin_all(5)
+		tight.content_margin_left = 8
+		box.add_theme_stylebox_override("panel", tight)
+	loot_log.add_theme_font_size_override("font_size", Ink.TEXT_SMALL)
+	# the loose labels read as paper slips with the panels' ink shadow
+	for slip in [money_label, day_label, loot_log]:
+		var sb := Ink.panel()
+		sb.shadow_offset = Vector2(3, 3)
+		sb.set_content_margin_all(6)
+		slip.add_theme_stylebox_override("normal", sb)
+	# the report sits on a veil like every board
+	var veil := ColorRect.new()
+	veil.color = Color(Ink.PAPER, 0.55)
+	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	report_overlay.add_child(veil)
+	report_overlay.move_child(veil, 0)
+	get_node("ReportOverlay/Center/Panel").custom_minimum_size = Vector2(460, 0)
+	report_start.theme_type_variation = &"InkAccent"
 
 func rebuild_roster() -> void:
 	for child in roster.get_children():
@@ -80,19 +112,9 @@ func rebuild_roster() -> void:
 			if card.has_method("setup"):
 				card.setup(crew[i])
 
+## Buttons built in code take the ink theme from the panel; only the size here.
 func _make_wood_button(btn: Button) -> void:
-	if _btn_normal == null:
-		_btn_normal = _wood_style(Color(0.97, 0.95, 0.9))
-		_btn_pressed = _wood_style(Color(0.8, 0.78, 0.72))
-		_btn_hover = _wood_style(Color(0.9, 0.88, 0.82))
-	btn.add_theme_stylebox_override("normal", _btn_normal)
-	btn.add_theme_stylebox_override("pressed", _btn_pressed)
-	btn.add_theme_stylebox_override("hover", _btn_hover)
-	btn.add_theme_color_override("font_color", INK)
-	btn.add_theme_color_override("font_hover_color", INK)
-	btn.add_theme_color_override("font_pressed_color", INK)
-	btn.add_theme_color_override("font_disabled_color", Color(0.55, 0.55, 0.55))
-	btn.add_theme_font_size_override("font_size", 11)
+	btn.add_theme_font_size_override("font_size", Ink.TEXT_SMALL)
 
 func _wood_style(col: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -129,7 +151,7 @@ func _build_pantry(game_node) -> void:
 		effect_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(effect_label)
 		var buy_button := Button.new()
-		buy_button.text = "Buy 5"
+		buy_button.text = Text.SHOP_BUY_BATCH
 		buy_button.pressed.connect(game_node.buy_food.bind(str(food.key)))
 		_make_wood_button(buy_button)
 		row.add_child(buy_button)
@@ -171,7 +193,7 @@ func _build_upgrades(game_node) -> void:
 		row.add_child(cost_label)
 		_upgrade_cost_labels.append(cost_label)
 		var buy_button := Button.new()
-		buy_button.text = "Buy"
+		buy_button.text = Text.SHOP_BUY
 		buy_button.pressed.connect(game_node.buy_upgrade.bind(str(track.key)))
 		_make_wood_button(buy_button)
 		row.add_child(buy_button)
@@ -179,8 +201,8 @@ func _build_upgrades(game_node) -> void:
 		upgrade_rows.add_child(row)
 
 func refresh(game_node) -> void:
-	money_label.text = "Coins: %d" % game_node.money
-	day_label.text = "Day %d" % game_node.day
+	money_label.text = Text.HUD_COINS % game_node.money
+	day_label.text = Text.HUD_DAY % game_node.day
 	for row in roster.get_children():
 		for card in row.get_children():
 			if card.has_method("refresh"):
@@ -188,7 +210,7 @@ func refresh(game_node) -> void:
 	var shop_allowed: bool = game_node.can_shop()
 	for i in _stock_labels.size():
 		var food: Dictionary = game_node.FOODS[i]
-		_stock_labels[i].text = "x%d" % game_node.food_stock[food.key]
+		_stock_labels[i].text = Text.PANTRY_STOCK % game_node.food_stock[food.key]
 		_food_buy_buttons[i].disabled = not shop_allowed or int(game_node.money) < int(food.cost) * game_node.FOOD_BATCH
 	for i in _meal_buttons.size():
 		var food: Dictionary = game_node.FOODS[i]
@@ -196,7 +218,7 @@ func refresh(game_node) -> void:
 		_meal_buttons[i].button_pressed = selected
 		_meal_buttons[i].disabled = not shop_allowed
 		if selected:
-			_meal_buttons[i].text = str(food.name) + " [x]"
+			_meal_buttons[i].text = str(food.name) + Text.PANTRY_SELECTED
 		else:
 			_meal_buttons[i].text = str(food.name)
 	for i in _upgrade_level_labels.size():
@@ -204,36 +226,36 @@ func refresh(game_node) -> void:
 		var key: String = str(track.key)
 		var level := int(game_node.upgrade_levels[key])
 		var costs: Array = track.costs
-		_upgrade_level_labels[i].text = "Lv %d/%d" % [level, costs.size()]
+		_upgrade_level_labels[i].text = Text.SHOP_LEVEL % [level, costs.size()]
 		if level >= costs.size():
-			_upgrade_cost_labels[i].text = "MAX"
+			_upgrade_cost_labels[i].text = Text.SHOP_MAX_CAPS
 			_upgrade_buttons[i].disabled = true
-			_upgrade_buttons[i].text = "Max"
+			_upgrade_buttons[i].text = Text.SHOP_MAX
 		else:
 			var cost := int(costs[level])
-			_upgrade_cost_labels[i].text = "%d c" % cost
+			_upgrade_cost_labels[i].text = Text.SHOP_PRICE % cost
 			_upgrade_buttons[i].disabled = not shop_allowed or int(game_node.money) < cost
-			_upgrade_buttons[i].text = "Buy"
+			_upgrade_buttons[i].text = Text.SHOP_BUY
 	var crew_total := 0
 	for node in game_node.crows.get_children():
 		if node.has_method("grant_xp"):
 			crew_total += 1
 	var cap := int(game_node.ROSTER_CAP)
 	var full := crew_total >= cap
-	crew_label.text = "Crew %d/%d" % [crew_total, cap]
+	crew_label.text = Text.RECRUIT_CREW % [crew_total, cap]
 	var rec_cost := int(game_node._recruit_cost())
 	var can_recruit: bool = shop_allowed and not full and int(game_node.money) >= rec_cost
 	if full:
-		recruit_cost_label.text = "Full"
+		recruit_cost_label.text = Text.RECRUIT_FULL
 		recruit_button.disabled = true
-		recruit_button.text = "Full"
+		recruit_button.text = Text.RECRUIT_FULL
 	else:
-		recruit_cost_label.text = "Next: %d c" % rec_cost
+		recruit_cost_label.text = Text.RECRUIT_NEXT % rec_cost
 		recruit_button.disabled = not can_recruit
-		recruit_button.text = "Recruit"
+		recruit_button.text = Text.RECRUIT
 
 func show_report(day_n: int, crew: Array) -> void:
-	report_title.text = "Day %d Report" % day_n
+	report_title.text = Text.REPORT_TITLE % day_n
 	for child in report_rows.get_children():
 		report_rows.remove_child(child)
 		child.free()
@@ -252,32 +274,32 @@ func show_report(day_n: int, crew: Array) -> void:
 		tier_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.31, 1))
 		row.add_child(tier_label)
 		var xp_label := Label.new()
-		xp_label.text = "+%d XP" % crow.day_xp
+		xp_label.text = Text.REPORT_XP % crow.day_xp
 		xp_label.custom_minimum_size = Vector2(56, 0)
 		row.add_child(xp_label)
 		var obj_label := Label.new()
-		obj_label.text = "%d objects" % crow.day_objects
+		obj_label.text = Text.REPORT_OBJECTS % crow.day_objects
 		obj_label.custom_minimum_size = Vector2(96, 0)
 		row.add_child(obj_label)
 		var care_label := Label.new()
-		var care := "%s, stamina %d>%d" % [StationsScript.label_of(crow.station), int(round(crow.day_stamina_from)), int(round(crow.stamina))]
+		var care := Text.REPORT_CARE % [StationsScript.label_of(crow.station), int(round(crow.day_stamina_from)), int(round(crow.stamina))]
 		if crow.day_injured:
-			care += ", HURT today"
+			care += Text.REPORT_HURT_TODAY
 		elif crow.injury_days > 0:
-			care += ", hurt (%dd)" % crow.injury_days
+			care += Text.REPORT_HURT_DAYS % crow.injury_days
 		care_label.text = care
 		care_label.custom_minimum_size = Vector2(230, 0)
 		row.add_child(care_label)
 		var val_label := Label.new()
-		val_label.text = "+%d c" % crow.day_value
+		val_label.text = Text.REPORT_VALUE % crow.day_value
 		val_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		val_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(val_label)
 		report_rows.add_child(row)
 		total_value += crow.day_value
 		total_objects += crow.day_objects
-	report_totals.text = "Crew total: %d coins, %d objects found" % [total_value, total_objects]
-	report_start.text = "Start Day %d" % (day_n + 1)
+	report_totals.text = Text.REPORT_TOTALS % [total_value, total_objects]
+	report_start.text = Text.REPORT_START % (day_n + 1)
 	report_overlay.visible = true
 
 func hide_report() -> void:
@@ -291,7 +313,7 @@ func flash_money() -> void:
 
 func render_log(lines: Array) -> void:
 	var tail: Array = lines.slice(-8)
-	var text := "Loot log:"
+	var text := Text.LOG_TITLE
 	for line in tail:
 		text += "\n" + line
 	loot_log.text = text

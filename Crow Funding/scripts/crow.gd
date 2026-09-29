@@ -1,8 +1,9 @@
 @tool
 extends Node2D
+const Text = preload("res://scripts/text.gd")
 ## A single crow character: pen-and-ink sprite rigs (perched and flying), stats, balcony loitering, and fly out/back motion.
 
-const TIER_NAMES: Array[String] = ["Newbie", "Apprentice", "Rookie", "Pro", "Master"]
+const TIER_NAMES: Array[String] = [Text.TIER_NEWBIE, Text.TIER_APPRENTICE, Text.TIER_ROOKIE, Text.TIER_PRO, Text.TIER_MASTER]
 # Cumulative XP required to REACH each tier (tier 0 costs 0 XP).
 const XP_FOR_TIER: Array[int] = [0, 100, 250, 450, 700]
 
@@ -17,7 +18,7 @@ var day_xp := 0
 var day_objects := 0
 var day_value := 0
 var luck := 0.5
-var status := "Resting"
+var status := Text.STATUS_RESTING
 var is_out := false
 var perch := Vector2.ZERO
 var carrying := false
@@ -204,24 +205,24 @@ func begin_day() -> void:
 
 func fly_out(target: Vector2, duration: float) -> Tween:
 	is_out = true
-	status = "Flying out"
+	status = Text.STATUS_FLYING_OUT
 	_depth_from = 1.0
 	_depth_to = CITY_DEPTH
 	_start_flight(target, duration, 90.0, func() -> void:
-		status = "Out working"
+		status = Text.STATUS_OUT
 		visible = false
 	)
 	return _tween
 
 func fly_back(target: Vector2, duration: float) -> Tween:
 	is_out = false
-	status = "Returning"
+	status = Text.STATUS_RETURNING
 	carrying = true
 	_depth_from = CITY_DEPTH
 	_depth_to = 1.0
 	visible = true
 	_start_flight(target, duration, 90.0, func() -> void:
-		status = "Resting"
+		status = Text.STATUS_RESTING
 		carrying = false
 		_flying = false
 		scale = Vector2.ONE

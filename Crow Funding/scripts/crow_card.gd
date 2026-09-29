@@ -1,8 +1,10 @@
 extends PanelContainer
+const Text = preload("res://scripts/text.gd")
 ## A roster card that shows one crow's name, tier, XP bar, and status.
 
 const CrowScript = preload("res://scripts/crow.gd")
 const Care = preload("res://scripts/care.gd")
+const Ink = preload("res://scripts/ink.gd")
 const StationsScript = preload("res://scripts/stations.gd")
 
 var crow: CrowScript
@@ -16,6 +18,13 @@ var care_label: Label
 var stamina_bar: ProgressBar
 
 func _ready() -> void:
+	Ink.strip(self)
+	var face := Ink.panel()
+	face.shadow_offset = Vector2(3, 3)
+	face.set_content_margin_all(6)
+	add_theme_stylebox_override("panel", face)
+	tier_label.add_theme_color_override("font_color", Ink.INK_SOFT)
+	status_label.add_theme_color_override("font_color", Ink.INK_SOFT)
 	# stamina bar and care line, built here so the card scene stays as it was
 	stamina_bar = xp_bar.duplicate()
 	stamina_bar.max_value = Care.STAMINA_MAX
@@ -31,16 +40,16 @@ func setup(crow_node: CrowScript) -> void:
 func refresh() -> void:
 	if crow == null:
 		return
-	tier_label.text = "%s  (Tier %d)" % [crow.get_tier_name(), crow.tier + 1]
+	tier_label.text = Text.CARD_TIER % [crow.get_tier_name(), crow.tier + 1]
 	var lo: int = crow.xp_floor()
 	var hi: int = crow.xp_ceiling()
 	xp_bar.max_value = maxi(1, hi - lo)
 	xp_bar.value = clampi(crow.xp - lo, 0, int(xp_bar.max_value))
 	status_label.text = crow.status
 	stamina_bar.value = crow.stamina
-	var care := "Stamina %d  -  %s" % [int(round(crow.stamina)), StationsScript.label_of(crow.station)]
+	var care := Text.CARD_STAMINA % [int(round(crow.stamina)), StationsScript.label_of(crow.station)]
 	if crow.injury_days > 0:
-		care += "  -  HURT (%dd)" % crow.injury_days
+		care += Text.CARD_HURT % crow.injury_days
 	elif crow.stamina < Care.LOW_STAMINA:
-		care += "  -  tired"
+		care += Text.CARD_TIRED
 	care_label.text = care
