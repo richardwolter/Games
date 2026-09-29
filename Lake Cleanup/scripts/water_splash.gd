@@ -557,10 +557,22 @@ func _draw_crowns(on: CanvasItem) -> void:
 		# one pixel of foam. It glides between pixels as everything moving on the lake does.
 		var side := maxf(roundf(_drop_size[i] * 2.0 / Lake.ART_PIXEL), 1.0) * Lake.ART_PIXEL
 		var corner := _drop_pos[i] - Vector2(side, side) * 0.5
-		_fan_into(points, colours, indices, PackedVector2Array([
-			corner, corner + Vector2(side, 0.0), corner + Vector2(side, side),
-			corner + Vector2(0.0, side),
-		]), Color(FOAM, fade * PEAK_ALPHA))
+		# The square as a two-triangle fan off its corner, written straight in: a drop is
+		# the commonest thing here and an array per drop was most of its cost.
+		var first := points.size()
+		var tone := Color(FOAM, fade * PEAK_ALPHA)
+		points.push_back(corner)
+		points.push_back(corner + Vector2(side, 0.0))
+		points.push_back(corner + Vector2(side, side))
+		points.push_back(corner + Vector2(0.0, side))
+		for k in 4:
+			colours.push_back(tone)
+		indices.push_back(first)
+		indices.push_back(first + 1)
+		indices.push_back(first + 2)
+		indices.push_back(first)
+		indices.push_back(first + 2)
+		indices.push_back(first + 3)
 	if not indices.is_empty():
 		RenderingServer.canvas_item_add_triangle_array(
 			on.get_canvas_item(), indices, points, colours
@@ -578,7 +590,9 @@ func _fan_into(
 		points.append(p)
 		colours.append(colour)
 	for i in range(1, shape.size() - 1):
-		indices.append_array([first, first + i, first + i + 1])
+		indices.push_back(first)
+		indices.push_back(first + i)
+		indices.push_back(first + i + 1)
 
 
 ## A plume as `_plume` lays it out — up one side of the spine and back down the other —
@@ -596,7 +610,12 @@ func _strip_into(
 	for i in half - 1:
 		var up := first + i
 		var down := first + count - 1 - i
-		indices.append_array([up, up + 1, down - 1, up, down - 1, down])
+		indices.push_back(up)
+		indices.push_back(up + 1)
+		indices.push_back(down - 1)
+		indices.push_back(up)
+		indices.push_back(down - 1)
+		indices.push_back(down)
 
 
 ## One plume of a crown: a tapered sheet of water arcing up and outward, built as a
@@ -623,11 +642,17 @@ func _plume(
 
 	# Walk up one side of the spine and back down the other, with the width closing
 	# to nothing at the tip.
+	# Each point's offset worked out once and used for both sides.
+	var count := spine.size()
+	var off := PackedVector2Array()
+	off.resize(count)
+	for i in count:
+		off[i] = _across(spine, i) * thickness * _taper(i, count)
 	var out := PackedVector2Array()
-	for i in spine.size():
-		out.append(spine[i] + _across(spine, i) * thickness * _taper(i, spine.size()))
-	for i in range(spine.size() - 1, -1, -1):
-		out.append(spine[i] - _across(spine, i) * thickness * _taper(i, spine.size()))
+	out.resize(count * 2)
+	for i in count:
+		out[i] = spine[i] + off[i]
+		out[count * 2 - 1 - i] = spine[i] - off[i]
 	return out
 
 
@@ -730,4 +755,9 @@ func _band_into(
 				sin(mid_angle) * (extent.y * 0.5 + half * 0.5))
 			if not wet_at(edge):
 				continue
-		indices.append_array([base, base + 1, next + 1, base, next + 1, next])
+		indices.push_back(base)
+		indices.push_back(base + 1)
+		indices.push_back(next + 1)
+		indices.push_back(base)
+		indices.push_back(next + 1)
+		indices.push_back(next)
