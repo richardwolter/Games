@@ -253,9 +253,13 @@ static func spill(at: Vector2, radius: Vector2, count: int, seed_at: int) -> Pat
 ## open beach. Sand a post has disturbed lies at its foot and in front of it, nowhere else,
 ## so these are scattered downwards only and kept inside the pole's own width plus
 ## MOUND_SIDE. The reach went 0.35 x 0.3 tiles (a patch of beach round the post) to this.
-const MOUND_GRAINS := 7
-const MOUND_FALL := 3.0
+const MOUND_GRAINS := 9
+const MOUND_FALL := 2
 const MOUND_SIDE := 1.0
+## How many art pixels the drift's ground row runs past the wood each side, and how far a
+## grain's tone wanders from the palette's sand either way.
+const MOUND_SPREAD := 3.0
+const MOUND_WANDER := 0.05
 
 
 ## Sand banked over the foot of a post standing on the beach: a low heap of art pixels
@@ -279,32 +283,37 @@ static func mound(at: Vector2, wide: float, seed_at: int) -> Patch:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_at + 7
 
-	# The heap. The bottom row reaches a pixel past the wood either side; the row above is
-	# the wood's own width; the top is that less a pixel each side. Every row is solid —
-	# nothing is rolled away, because a gap in the pile is the dark pole showing through it,
-	# which is the one thing this exists to stop. The randomness is in the tone only.
-	var rows := [wide + 2.0 * PX, wide, maxf(wide - 2.0 * PX, PX)]
+	# A drift, not a heap (2026-09-26, Richard: the old one read as having its own shadow and
+	# came to a point up the pole). Two low rows, the ground row well past the wood either
+	# side and ragged at its ends, the row over it just past the wood, in the sand's own tone
+	# wandering a little both ways — no darker ground row, which is what read as a shadow.
+	# Both rows are solid over the wood itself: a gap there is the pole showing through.
+	var rows := [wide + 2.0 * MOUND_SPREAD * PX, wide + 2.0 * PX]
 	for row in rows.size():
 		var span: float = rows[row]
 		var count := maxi(int(round(span / PX)), 1)
 		var left := base.x - float(count) * PX * 0.5
 		for i in count:
 			var x := left + (float(i) + 0.5) * PX
-			var tone := sand.lightened(rng.randf_range(0.0, 0.14))
-			if row == 0:
-				tone = sand.darkened(rng.randf_range(0.0, 0.08))
+			var outside := absf(x - base.x) > wide * 0.5 + PX
+			# The drift thins towards its ends rather than stopping on a straight cut.
+			if outside and row == 0 and rng.randf() < absf(x - base.x) / (span * 0.5) * 0.6:
+				continue
+			var tone := sand.lightened(rng.randf_range(0.0, MOUND_WANDER))
+			if rng.randf() < 0.5:
+				tone = sand.darkened(rng.randf_range(0.0, MOUND_WANDER))
 			_pixel(mesh, Vector2(x, base.y - float(row) * PX), tone, true, false)
 
-	# And what has fallen off it: single grains below the heap only, thinning downwards,
-	# never wider than the heap's own ground row. Nothing above the foot and nothing out to
-	# the sides, which is what put sand on the deck step behind the pole.
-	var half := wide * 0.5 + MOUND_SIDE * PX
+	# Loose grains round its foot, to either side and a little below, blending it into the
+	# beach rather than standing it on the beach.
+	var half := wide * 0.5 + (MOUND_SPREAD + MOUND_SIDE) * PX
 	for i in MOUND_GRAINS:
-		var down := sqrt(rng.randf())
-		var x := base.x + rng.randf_range(-half, half) * (1.0 - down * 0.5)
-		var y := base.y + PX + down * MOUND_FALL * PX
-		var tone := sand.lightened(rng.randf_range(0.0, 0.12))
-		tone.a = 1.0 - down * 0.35
+		var x := base.x + rng.randf_range(-half, half)
+		var y := base.y + PX * float(rng.randi_range(0, MOUND_FALL))
+		var tone := sand.lightened(rng.randf_range(0.0, MOUND_WANDER))
+		if rng.randf() < 0.5:
+			tone = sand.darkened(rng.randf_range(0.0, MOUND_WANDER))
+		tone.a = rng.randf_range(0.6, 1.0)
 		_pixel(mesh, Vector2(x, y), tone, true, false)
 	return mesh
 

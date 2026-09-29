@@ -69,11 +69,9 @@ const POSE_MIN := 1.2
 const POSE_MAX := 3.5
 const SIT_ODDS := 0.3
 
-## Droppings: how likely one is per second of flight, and how long one lasts. Perched birds
-## go too, at a lower rate — a bird sitting still all day is what actually covers a lake in
-## the stuff.
-const POOP_CHANCE := 0.9
-const POOP_CHANCE_PERCHED := 0.35
+## Droppings: how likely one is per second of flight, and how long one lasts. Only a bird in
+## the air drops anything (2026-09-26, Richard: less of it, and none from a bird sitting idle).
+const POOP_CHANCE := 0.45
 ## Roughly halved, all three (2026-09-16, Richard: they can vanish a little quicker).
 const POOP_LIFE := 28.0
 ## On open water a splat is washed off in a few seconds rather than sitting on a wave.
@@ -127,7 +125,8 @@ const RIM_TONE := Color(0.86, 0.94, 1.0)
 ## wings, and the shortest gap between two of them being heard. A lake with a dozen birds
 ## over it would otherwise be a permanent flutter.
 const WINGS_NEAR := 3.2
-const WINGS_GAP := 1.6
+## 1.6 until 2026-09-28 (Richard: quieter and rarer).
+const WINGS_GAP := 4.0
 
 ## How long a splat rides the angler before it wears off. Landing one on the player is the
 ## joke; making them wear it for a minute is not.
@@ -446,7 +445,6 @@ func _step(bird: Dictionary, delta: float) -> bool:
 			if float(bird["pose_for"]) <= 0.0:
 				_roll_pose(bird)
 			bird["rest"] = float(bird["rest"]) - delta
-			_maybe_poop(bird, delta, POOP_CHANCE_PERCHED)
 			if float(bird["rest"]) <= 0.0:
 				_hop(bird)
 		State.FLYING, State.LEAVING:

@@ -123,6 +123,10 @@ const CLOSE := 0.35
 ## the next, which read as the animal being fired out of the water. Everything it does now
 ## eases into its pace, and the pace it eases towards is what the state asks for.
 const ACCEL := 7.0
+## Since 2026-09-27 the pace eases exponentially, the angler's slip, with this time constant:
+## about 0.4 s from standing to a full run (95%) and the same back down. ACCEL is kept as
+## the floor of the ease, so the last sliver of a change still lands.
+const RUN_EASE := 0.13
 
 ## The foam where the swimming dog cuts the surface. See WaterlineFoam.
 var _foam: WaterlineFoam
@@ -284,6 +288,13 @@ var carry_wide: float = CARRY_WIDE
 ## The lake's own splash system, handed over by the level, for the wake the dog leaves when
 ## it swims. Null until then, and the dog swims the same either way.
 var splash: WaterSplash
+## The dust and splash its paws kick up (KickDust), handed over by the level. Null, nothing.
+var dust: KickDust
+var _kick := KickDust.Tracker.new()
+var _kick_rng := RandomNumberGenerator.new()
+## World pixels swum since the last stroke's splash. See STROKE_EVERY.
+var _stroke := 0.0
+var _stroke_from := Vector2.INF
 
 ## The daylight, handed over by the level. Null in the shed screen and in any test without a
 ## lake, where the dog draws no shadow at all rather than guessing at one.
@@ -331,6 +342,10 @@ var _print_left: bool = false
 ## been shoving at something that will not move; how long the current trip has run; and a
 ## point off to one side it is making for while it gets round whatever that was.
 var _speed: float = 0.0
+## The pace `_step_towards` is easing to, and the gait's own clock: it runs at the share of
+## that pace the dog has actually reached, so the legs speed up with the body.
+var _top_speed: float = 1.0
+var _stride: float = 0.0
 var _stuck: float = 0.0
 
 ## The greeting: how long its hearts have left, how long until it may happen again, and
@@ -486,6 +501,7 @@ func _process(delta: float) -> void:
 	# One long frame is one slow frame, never a jump. See STEP_MOST.
 	delta = minf(delta, 0.1)
 	_age += delta
+	_stride += delta * clampf(_speed / _top_speed, 0.2, 1.0)
 	_mood_left -= delta
 	_trip += delta
 	_greet = maxf(_greet - delta, 0.0)
@@ -531,6 +547,7 @@ func _process(delta: float) -> void:
 			if _mood_left <= 0.0:
 				_settle()
 	_wake(delta)
+	_kick_paws(delta)
 	_place()
 	_leave_print()
 	_repaint()
@@ -546,7 +563,7 @@ func _chase_mouth(delta: float) -> void:
 		_carry_chase = 0.0
 		return
 	var name := _showing()
-	var mouth := DogArt.mouth(name, HEIGHT, facing_left, DogArt.frame_at(name, _age, breed), breed)
+	var mouth := DogArt.mouth(name, HEIGHT, facing_left, DogArt.frame_at(name, _clock(), breed), breed)
 	# The gap is measured against where the mouth was, so the lag is in how fast the piece
 	# follows a move, not in where it rests.
 	_carry_drop += _carry_chase - mouth.y
@@ -641,7 +658,7 @@ static func _now() -> float:
 ## that reaches a full halt on the frame its mood changes reads as a sprite being switched
 ## rather than an animal arriving.
 func _slow(delta: float) -> void:
-	_speed = move_toward(_speed, 0.0, ACCEL * delta)
+	_speed = _eased(_speed, 0.0, delta)
 
 
 ## Pick what to do next.
@@ -924,7 +941,16 @@ func _aim_at(index: int) -> void:
 	_release()
 	_claim = index
 	claims[index] = self
-	_target = Vector2(grid.tile_of(index)) + Vector2(0.5, 0.5)
+	var tile := Vector2(grid.tile_of(index))
+	_target = tile + Vector2(0.5, 0.5)
+	# A shore tile's pieces each lie at their own spot, so the dog goes to the one on top
+	# rather than to the tile's middle (2026-09-27). Held inside the tile, which is what
+	# the arrival reads back as the tile it is swimming for.
+	if grid.shore.size() > index and grid.shore[index] == 1:
+		var spot := Iso.world_to_tile(grid.surface_still(index))
+		_target = Vector2(
+			clampf(spot.x, tile.x + 0.05, tile.x + 0.95), clampf(spot.y, tile.y + 0.05, tile.y + 0.95)
+		)
 
 
 ## Give up the claim, if any.
@@ -956,6 +982,12 @@ func _claimed_by_other(index: int) -> bool:
 ## which slides along whatever it walked into. Only when both of those fail as well is the
 ## dog actually stuck, and being stuck is timed rather than acted on at once — one frame of
 ## nudging a corner is normal, half a second of it is a dog that needs to try something else.
+## The pace eased towards `to`: exponential, RUN_EASE, with ACCEL as its least step.
+func _eased(from: float, to: float, delta: float) -> float:
+	var next := lerpf(from, to, 1.0 - exp(-delta / RUN_EASE))
+	return move_toward(next, to, ACCEL * delta * 0.05)
+
+
 func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 	# A new destination is a fresh start: the progress it was failing to make towards the old
 	# one says nothing about this one.
@@ -974,7 +1006,8 @@ func _step_towards(tile: Vector2, speed: float, delta: float) -> bool:
 		_stuck = 0.0
 		_slow(delta)
 		return true
-	_speed = move_toward(_speed, speed, ACCEL * delta)
+	_top_speed = maxf(speed, 0.01)
+	_speed = _eased(_speed, speed, delta)
 	var way := _steer(tile, gap)
 	var step := way * minf(_speed * delta, STEP_MOST)
 	_look_along(step)
@@ -1264,6 +1297,34 @@ func _somewhere_on_land() -> Vector2:
 
 ## The water it moves: one ring as it goes in, and the streak behind it while it swims.
 ## Rings only on entry, by decision — a swimming dog leaves foam, not rings.
+## A dog's kick is a share of the angler's: dust or water on a start or a hard turn, and a
+## little water every STROKE_EVERY of swimming. No slip, nobody steers it.
+const KICK_SIZE := 0.6
+const STROKE_EVERY := 18.0
+const STROKE_SIZE := 0.3
+
+
+func _kick_paws(delta: float) -> void:
+	var at := Iso.tile_to_world(tile_pos.x, tile_pos.y)
+	var heading := Vector2.ZERO
+	if _stroke_from != Vector2.INF:
+		heading = at - _stroke_from
+	var land := _on_land()
+	if not land and _stroke_from != Vector2.INF:
+		_stroke += heading.length()
+		if _stroke >= STROKE_EVERY:
+			_stroke = 0.0
+			KickDust.splash_at(splash, at, heading, STROKE_SIZE, _kick_rng)
+	_stroke_from = at
+	var kick := _kick.step(tile_pos, delta)
+	if kick == KickDust.Tracker.NONE or dust == null:
+		return
+	if land:
+		dust.puff(at, &"grass" if Iso.on_lawn(tile_pos) else &"sand", heading, KICK_SIZE)
+	else:
+		KickDust.splash_at(splash, at, heading, KICK_SIZE, _kick_rng)
+
+
 func _wake(delta: float) -> void:
 	var swimming := not _on_land()
 	var at := Iso.tile_to_world(tile_pos.x, tile_pos.y)
@@ -1318,7 +1379,7 @@ func reflect_on(on: CanvasItem) -> void:
 	if not DogArt.ready(breed) or not _on_land():
 		return
 	var name := _showing()
-	DogArt.stamp(on, name, DogArt.frame_at(name, _age, breed), Vector2.ZERO, HEIGHT,
+	DogArt.stamp(on, name, DogArt.frame_at(name, _clock(), breed), Vector2.ZERO, HEIGHT,
 		facing_left, 0.0, Color.WHITE, breed)
 
 
@@ -1338,6 +1399,14 @@ func _showing() -> StringName:
 			return &"idle"
 
 
+## The clock a picture is stepped on: the gait's own for a moving dog, the age otherwise.
+func _clock() -> float:
+	match _state:
+		State.SWIM_OUT, State.CARRY_BACK, State.WANDER:
+			return _stride
+	return _age
+
+
 ## The sun, coarsely, for the paint keys. A shadow that swings has to repaint the dog as it
 ## goes, and quantised because the sun moves a hair a frame and a key that tracked it exactly
 ## would repaint every frame forever — which is the thing the keys exist to stop.
@@ -1348,7 +1417,7 @@ func _sun_key() -> int:
 func _repaint() -> void:
 	var name := _showing()
 	var key := hash([
-		name, DogArt.frame_at(name, _age, breed), facing_left,
+		name, DogArt.frame_at(name, _clock(), breed), facing_left,
 		(position * 2.0).round(), not _carried.is_empty(), _state,
 		roundi(_greet * 60.0), _sun_key(), roundi(_carry_drop * 2.0)
 	])
@@ -1358,7 +1427,7 @@ func _repaint() -> void:
 
 func _draw() -> void:
 	var name := _showing()
-	var frame := DogArt.frame_at(name, _age, breed)
+	var frame := DogArt.frame_at(name, _clock(), breed)
 	_painted = hash([
 		name, frame, facing_left, (position * 2.0).round(), not _carried.is_empty(), _state,
 		roundi(_greet * 60.0), _sun_key(), roundi(_carry_drop * 2.0)

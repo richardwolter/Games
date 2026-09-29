@@ -279,6 +279,10 @@ var _standing: Dictionary = {}
 ## they and their shadows are drawn from. See `_pack_props` and `_lay_props`.
 var _prop_atlas: ImageTexture
 var _prop_uv: Dictionary = {}
+## Per picture, the transparent rows under its lowest opaque one, in art pixels. The pack
+## pads its rocks by up to seven: hinged on the picture's bottom edge, a shadow started that
+## far below the stone and read as lying apart from it.
+var _prop_pad: Dictionary = {}
 var _placed: Array = []
 var _prop_points := PackedVector2Array()
 var _prop_uvs := PackedVector2Array()
@@ -635,7 +639,7 @@ func _draw_cover() -> void:
 func _plant(mid: Vector2, art: Texture2D) -> void:
 	var size := Vector2(art.get_width(), art.get_height()) * SCALE
 	var uv: Rect2 = _prop_uv[art]
-	_lay_shadow(mid, size, uv)
+	_lay_shadow(mid, size, uv, float(_prop_pad.get(art, 0)) * SCALE)
 	var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
 	_prop_quad(
 		Transform2D.IDENTITY,
@@ -677,12 +681,15 @@ func cover_count() -> int:
 ## Hinged at the prop's own foot, `mid` plus half a tile down, which is where `_plant` stands
 ## the picture. It was hinged at the layer's origin once, and every shadow in the wood came
 ## out stacked on top of each other in one black streak at the corner of the tile field.
-func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2) -> void:
+##
+## And hinged on the lowest opaque row, not the picture's bottom edge: `pad` is the empty
+## band under the ink, in world px, so the shadow's foot meets the trunk's or the stone's.
+func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2, pad: float = 0.0) -> void:
 	if day == null:
 		return
-	var foot := mid + Vector2(0.0, Iso.TILE_H * 0.5)
-	var lie := Shade.lying(foot, day.lean, day.stretch)
-	var box := Rect2(Vector2(-size.x * 0.5, -size.y), size)
+	var foot := mid + Vector2(0.0, Iso.TILE_H * 0.5 - pad)
+	var lie := Shade.cast(foot, day.lean, day.stretch)
+	var box := Rect2(Vector2(-size.x * 0.5, -size.y + pad), size)
 	_prop_quad(
 		lie,
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
@@ -776,26 +783,19 @@ func _pack_props() -> void:
 		if img.is_compressed():
 			img.decompress()
 		img.convert(Image.FORMAT_RGBA8)
+		if not arts[i].resource_path.contains("/Tree"):
+			var shades := lawn_shades(GRASS_ISLAND if layer == Layer.ISLAND else GRASS_BANK)
+			var ramp: Array[Color] = [shades[&"lawn_low"], shades[&"lawn_mid"], shades[&"lawn_light"]]
+			_green_to_lawn(img, ramp)
 		sheet.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), spots[i])
+		_prop_pad[arts[i]] = _pad_under(img)
 		_prop_uv[arts[i]] = Rect2(
 			Vector2(spots[i]) / Vector2(sheet.get_size()),
 			Vector2(img.get_size()) / Vector2(sheet.get_size())
 		)
 	_prop_atlas = ImageTexture.create_from_image(sheet)
 
-		if not arts[i].resource_path.contains("/Tree"):
-			var shades := lawn_shades(GRASS_ISLAND if layer == Layer.ISLAND else GRASS_BANK)
-			var ramp: Array[Color] = [shades[&"lawn_low"], shades[&"lawn_mid"], shades[&"lawn_light"]]
-			_green_to_lawn(img, ramp)
 
-## The box of tiles this layer covers. The island is a handful of tiles in the middle; the
-## ground outside runs to the far edge of the ring, which is well past the tile field the
-## rubbish uses.
-func _span() -> Rect2i:
-	if layer == Layer.ISLAND:
-		var r := Iso.ISLAND_RADIUS + Vector2.ONE * (ISLAND_UNDER + 2.0)
-		return Rect2i(
-			Vector2i(Iso.ISLAND_CENTRE - r), Vector2i(r * 2.0) + Vector2i.ONE
 ## The greens of a grass slice's top face, darkest first: every colour at least
 ## `LAWN_LEAST` of its pixels wear. What the props' tufts and the buildings' hems are
 ## recoloured onto, so they are the lawn they stand in (2026-09-28: they were the old pools'
@@ -880,6 +880,90 @@ static func _is_green(c: Color) -> bool:
 	return c.s > 0.3 and c.h > 0.17 and c.h < 0.45
 
 
+## How far up from the picture's bottom edge the shadow is hinged, in art pixels: the
+## transparent rows under the ink, plus how deep the thing's own base runs into the picture.
+## A rock is drawn in three-quarter view, so its lowest pixel is the near edge of what it
+## stands on, and a shadow hinged there starts in front of the stone with grass between.
+## The base's depth is a quarter of the ink's width across its bottom few rows (a 2:1
+## footprint, half of it in front of the middle), so a thin trunk moves by a pixel and a
+## broad rock by several, and the prop is drawn over the part tucked under it.
+static func _pad_under(img: Image) -> int:
+	var low := -1
+	for y in range(img.get_height() - 1, -1, -1):
+		for x in img.get_width():
+			if img.get_pixel(x, y).a > 0.0:
+				low = y
+				break
+		if low >= 0:
+			break
+	if low < 0:
+		return 0
+	var wide := 0
+	for y in range(maxi(low - BASE_ROWS + 1, 0), low + 1):
+		var first := -1
+		var last := -1
+		for x in img.get_width():
+			if img.get_pixel(x, y).a > 0.0:
+				if first < 0:
+					first = x
+				last = x
+		if first >= 0:
+			wide = maxi(wide, last - first + 1)
+	return img.get_height() - 1 - low + int(round(float(wide) * 0.25))
+
+
+## The rows at the bottom of a prop's ink measured for the width of its base.
+const BASE_ROWS := 4
+
+
+## Whether a world point is under any tree's or rock's drawn ink on this ground, grown by
+## `grow` px. Flora is drawn over the ground layer, so a flower on the forest floor has to
+## stand where no prop's picture is, or it is painted on the trunk. Tiles on the screen below
+## the point are searched too, since a picture rises from its foot.
+var _prop_images: Dictionary = {}
+
+
+func hidden_by_prop(world: Vector2, grow: float = 2.0) -> bool:
+	var tile := Iso.world_to_tile(world)
+	var cx := int(floor(tile.x))
+	var cy := int(floor(tile.y))
+	for dx in range(-2, 7):
+		for dy in range(-2, 7):
+			var cell := Vector2i(cx + dx, cy + dy)
+			if not _props.has(cell):
+				continue
+			for entry: Array in _props[cell]:
+				var art: Texture2D = entry[0]
+				var foot: Vector2 = entry[1]
+				var size := Vector2(art.get_width(), art.get_height()) * SCALE
+				var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+				if not box.grow(grow).has_point(world):
+					continue
+				if not _prop_images.has(art):
+					var img := art.get_image()
+					if img.is_compressed():
+						img.decompress()
+					_prop_images[art] = img
+				var img: Image = _prop_images[art]
+				var r := int(ceil(grow / SCALE))
+				var px := Vector2i(((world - box.position) / SCALE).floor())
+				for ox in range(-r, r + 1):
+					for oy in range(-r, r + 1):
+						var q := px + Vector2i(ox, oy)
+						if q.x >= 0 and q.y >= 0 and q.x < img.get_width() and q.y < img.get_height() \
+								and img.get_pixel(q.x, q.y).a > 0.0:
+							return true
+	return false
+
+
+## The box of tiles this layer covers. The island is a handful of tiles in the middle; the
+## ground outside runs to the far edge of the ring, which is well past the tile field the
+## rubbish uses.
+func _span() -> Rect2i:
+	if layer == Layer.ISLAND:
+		var r := Iso.ISLAND_RADIUS + Vector2.ONE * (ISLAND_UNDER + 2.0)
+		return Rect2i(
+			Vector2i(Iso.ISLAND_CENTRE - r), Vector2i(r * 2.0) + Vector2i.ONE
 		)
 	var out := Iso.RADIUS + Vector2.ONE * (OUTER_OUT * 1.3)
 	return Rect2i(Vector2i(Iso.CENTRE - out), Vector2i(out * 2.0) + Vector2i.ONE)

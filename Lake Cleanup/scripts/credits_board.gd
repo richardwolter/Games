@@ -29,32 +29,41 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "Credits"
+static var TITLE: String:
+	get: return Text.CREDITS_TITLE
 
-const LINES := [
-	"Design and programming",
-	"Modern Daedalus Studio",
-	"",
-	"Music and sound",
-	"Nuven",
-	"",
-	"Art and Assets",
-	"Benvictus",
-	"xStrax",
-	"Graphics created by Penzilla Design",
-	"limezu.itch.io",
-	"Kipperfalcon",
-	"Kenney",
-	"Asset by Zato - https://zatoart.itch.io/",
-	"Pop Shop Packs",
-	"@Pixel_Salvaje",
-	"",
-	"Tools",
-	"Made with Godot Engine",
-]
+## The pack attributions stay literal: each is the pack's own required wording, verbatim by
+## licence. Only the headings and the Godot line are keyed.
+static var LINES: Array:
+	get: return [
+		Text.CREDITS_HEAD_DESIGN,
+		"Modern Daedalus Studio",
+		"",
+		Text.CREDITS_HEAD_MUSIC,
+		"Nuven",
+		"",
+		Text.CREDITS_HEAD_ART,
+		"Benvictus",
+		"xStrax",
+		"Graphics created by Penzilla Design",
+		"limezu.itch.io",
+		"Kipperfalcon",
+		"Kenney",
+		"Asset by Zato - https://zatoart.itch.io/",
+		"Pop Shop Packs",
+		"@Pixel_Salvaje",
+		"DaFluffyPotato",
+		"",
+		Text.CREDITS_HEAD_TOOLS,
+		Text.CREDITS_GODOT,
+	]
 
 ## Which lines are headings: set a size up, in the ribbon's ink.
-const HEADS := ["Design and programming", "Music and sound", "Art and Assets", "Tools"]
+static var HEADS: Array:
+	get: return [
+		Text.CREDITS_HEAD_DESIGN, Text.CREDITS_HEAD_MUSIC, Text.CREDITS_HEAD_ART,
+		Text.CREDITS_HEAD_TOOLS,
+	]
 
 ## The line the Spotify mark stands beside, and the mark itself.
 ##
@@ -95,7 +104,10 @@ var _icon: TextureRect
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	Prefs.language_changed.connect(_lay_out)
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
@@ -278,3 +290,10 @@ func _draw() -> void:
 			# Out of face. The rest are counted rather than drawn, so the loss is a number
 			# somebody can ask for instead of a credit nobody notices is gone.
 			room = false
+
+
+## The credits have one control, the close cross.
+func pad_focus() -> Array:
+	if _close == null or not _close.visible:
+		return []
+	return [{"box": _close.get_rect(), "key": &"close", "first": true}]

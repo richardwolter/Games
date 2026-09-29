@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/shot_props.gd" id="1_probe"]
+
+[node name="ShotProps" type="Node"]
+script = ExtResource("1_probe")

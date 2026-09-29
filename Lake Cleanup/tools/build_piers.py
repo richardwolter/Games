@@ -129,6 +129,11 @@ BOX_AT = (-1.0, 0.0)
 ## every delivery aimed 8 rows too low, behind the near wall (2026-09-13).
 BOX_TOP = 8
 BOX_STAND = 24
+## How much of the deck's light is left in the first and second rows under the box's foot.
+BOX_CONTACT = (0.55, 0.8)
+## How far in front of a post's foot the deck's footprint must still reach for the post to
+## count as under the pier rather than on its edge, painted px.
+UNDER_PIER = 3
 WITH_HEAP = False
 
 ## The emblem (2026-09-13): the yard's material carved into the box's lit (right) face.
@@ -436,6 +441,24 @@ def carve_emblem(image, x0, y0, crate, sprite, wood, style, wrap):
                 px[x0 + nx, y0 + ny] = lit + (255,)
 
 
+## Each yard's plank is painted in its material's colour (2026-09-26, Richard): metal grey,
+## wood brown, plastic blue, rubber near-black. Weathered, not flat: the wood's own light and
+## grain are kept by painting each pixel at the paint's colour times how light the wood was
+## there, with `SIGN_WEATHER` of the wood left showing through. Dark enough that the runtime's
+## pale lettering (`Dropoff.SIGN_INK`) clears 4.5:1 on every one; `test_lake` measures it.
+SIGN_PAINT = {
+    "metal": (86, 92, 100),
+    "wood": (112, 66, 36),
+    "plastic": (38, 82, 142),
+    "rubber": (34, 32, 34),
+}
+SIGN_WEATHER = 0.15
+
+
+def luma(c):
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
 def draw_sign(sign, wood, foot, centre_x, board_bottom, seed=""):
     """The post and the bare plank, into `sign` (the yard's canvas): the plank with the
     menus' carpentry — grain, chamfered corners and V bites out of its edges, which the
@@ -465,6 +488,18 @@ def draw_sign(sign, wood, foot, centre_x, board_bottom, seed=""):
         tone = wood.plank_lit[3] if g % 2 else wood.plank_lit[4]
         for x in range(gx, min(gx + gl, bx0 + bw - 3)):
             px[x, gy] = tone + (255,)
+    paint = SIGN_PAINT.get(seed)
+    if paint is not None:
+        base = max(luma(wood.plank_lit[1]), 1.0)
+        for y in range(by0 + 1, by0 + bh - 1):
+            for x in range(bx0 + 1, bx0 + bw - 1):
+                r, g, b, a = px[x, y]
+                light = luma((r, g, b)) / base
+                out = []
+                for ch, w in zip(paint, (r, g, b)):
+                    v = ch * light * (1.0 - SIGN_WEATHER) + w * SIGN_WEATHER
+                    out.append(max(0, min(255, int(round(v)))))
+                px[x, y] = tuple(out) + (a,)
 
     def clear(x, y):
         if bx0 <= x < bx0 + bw and by0 <= y < by0 + bh:
@@ -595,6 +630,13 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
             on_platform = -PLATFORM_BACK <= s < 0.0 and abs(t) < PLATFORM_WIDE * 0.5
             if not (on_jetty or on_platform):
                 continue
+            # The deck top owns its pixels (2026-09-26): a far-row post drawn before it rises
+            # into the deck, and left marked as under, those pixels went to the under layer —
+            # holes in the deck with the pole showing through.
+            layer[x][y] = 2
+            # Which deck: the beam, the two shadow masks and the box's contact rows all read
+            # this, and nothing wrote it (found 2026-09-26), so all four came out empty.
+            deck[x][y] = 1 if on_jetty else 2
             # Jetty planks run across the walkway; platform planks run along the shore.
             along = s if on_jetty else t
             index = math.floor(along / PLANK)
@@ -655,7 +697,11 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
     hx, hy = P(*BOX_AT, up=DECK_UP)
     crate = Image.open(BOX).convert("RGBA") if BOX.exists() else None
     crate_tall = crate.getbbox()[3] if crate is not None else 36
-    box_top = int(round(hy - crate_tall))
+    # The box's own stand (the middle of the diamond its walls stand on, row BOX_STAND of the
+    # art) on the platform's middle (2026-09-26). It used to stand the art's *bottom row* —
+    # the near corner of that diamond — on the middle, which put the box half a tile up the
+    # screen, in the platform's back corner.
+    box_top = int(round(hy - BOX_STAND))
     # Where the box stands and where its mouth is, both rows of the picture as pasted.
     # The hole, not the foot (2026-09-13): a piece is thrown into the mouth of the box. It
     # used to be the ground point, and every delivery came down on the box's bottom edge.
@@ -700,8 +746,25 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
         ink = crate.getbbox()
         fx, fy = hx, hy
         x0 = int(round(fx - (ink[0] + ink[2]) * 0.5))
-        y0 = int(round(fy - ink[3]))
+        y0 = box_top
         image.alpha_composite(crate, (x0, y0))
+        # Where the box meets the deck: the two rows of planks under its lowest pixel in
+        # each column, taken down, so it sits on the wood rather than being laid over it.
+        ip = image.load()
+        cp0 = crate.load()
+        for cx in range(crate.width):
+            low = -1
+            for cy in range(crate.height - 1, -1, -1):
+                if cp0[cx, cy][3] > 0:
+                    low = cy
+                    break
+            if low < 0:
+                continue
+            for d, keep in ((1, BOX_CONTACT[0]), (2, BOX_CONTACT[1])):
+                x, y = x0 + cx, y0 + low + d
+                if 0 <= x < W and 0 <= y < H and ip[x, y][3] and deck[x][y] == 2:
+                    r, g, b, a = ip[x, y]
+                    ip[x, y] = (int(r * keep), int(g * keep), int(b * keep), a)
         book["box"] = [x0, y0, crate.width, crate.height]
         cp = crate.load()
         for cy in range(crate.height):
@@ -715,6 +778,8 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
         if piece is not None and emblem is not None:
             carve_emblem(image, x0, y0, crate, piece, wood, emblem, wrap)
     book["sign_layer"] = sign
+    if yard.name in SIGN_PAINT:
+        book["sign_paint"] = list(SIGN_PAINT[yard.name])
 
     if WITH_HEAP:
         # --- the heap (off by default) ----------------------------------------------------------------------
@@ -791,6 +856,21 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
         kept = []
         for gx, gy in book[key]:
             if not (0 <= gx < W and 0 <= gy < H) or pu[gx, gy][3] == 0:
+                continue
+            # And not under the deck top or the box (2026-09-26): the under layer is its own
+            # picture, so a foot the deck covers still survives into it, and its sand and
+            # foam showed on the planks.
+            if po[gx, gy][3] != 0:
+                continue
+            # Nor under the pier (2026-09-26, Richard: sand and foam "seen through under the
+            # pier"): a far-row post's foot shows in the gap under the deck, and dressing it
+            # hung sand and foam in the pier's shadow. The deck's footprint is its top lowered
+            # by DECK_UP; a foot with footprint still in front of it (`UNDER_PIER` rows down)
+            # stands under the pier, and only the near edge's posts are dressed.
+            fs, ft = yard.local_of(gx + 0.5 - ox, gy + UNDER_PIER - oy)
+            if (0.0 <= fs < JETTY_OUT and abs(ft) < JETTY_WIDE * 0.5) or (
+                -PLATFORM_BACK <= fs < 0.0 and abs(ft) < PLATFORM_WIDE * 0.5
+            ):
                 continue
             left = right = gx
             while left - 1 >= 0 and pu[left - 1, gy][3]:

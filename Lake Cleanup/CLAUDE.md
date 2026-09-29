@@ -907,6 +907,17 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   - **`_count_clean` asks which tiles are water once** (`_wet_mask`): it was walking
     `Iso.shore_fraction` for all 8464 tiles on every remap, 12.7 ms of a 20 ms map build —
     mid-haul. The build is 8.5 ms now, graded share (2.7 ms) included.
+  - **The remap runs on a worker thread** (2026-09-26, Richard: "performance is bad when
+    casting net"; `bench_frames` `BENCH_CAST=1`). The build had grown to 9.6 ms (distance
+    map 2.7, pooled share 2.6, clean count 1.6, sources and pixels 2.2), once a cast, and
+    that was the 16-17 ms hitch at every catch. `_remap_filth` now snapshots each tile's
+    count on the main thread (`_filth_counts`, ~1 ms), `_filth_work` builds the pixels and
+    the clean tiles on `WorkerThreadPool` touching no node, and `_land_filth` applies the
+    answer the frame it lands (`_apply_filth`). **The map is a frame or two late, by
+    decision**; nothing waits on it but the shader. `_build_filth_map` is still the whole
+    thing at once, for the load and the harness, and waits out a remap in flight first.
+    Casting: worst frame 17.3 ms to 9.2, mean about 6. The haul's count over the angler
+    measured 0.1 ms and was not the cause.
   - **Probe**: `tools/shot_grime.tscn` (desktop build, own save) lifts a quarter, a half
     and three quarters of the rubbish in uneven pools and saves
     `tools/last_grime_<stage>_{far,near}.png` plus `last_grime.log` — the share of water in
@@ -1300,6 +1311,25 @@ doors and `MainMenu` is an overlay on it (`Lake`'s "The menu over the lake" sect
   full crate sends no ferry, the autosave writes nothing, Escape opens nothing), the doors'
   accent, the release, the glide landing on the play stop, and the way back writing the run
   on the same lake.
+
+### The Doors Hold Water (2026-09-26, `/grill-me` with Richard)
+- **The main menu's six doors are tanks of lake water** (`PlankButton.water`, set only in
+  `menu.gd`): the HUD meter's painted sheet, sampled inside `HudSkin.METER_OPAQUE`, in a
+  **rounded pool** (`POOL_ROUND` corners) `WATER_FILL` (0.4) up the face. Murky in every door,
+  **clean in the accented one** (dimmed `CLEAN_DIM` so the cream word reads), lit edge kept.
+- **Alive, not a line** (second pass the same day, Richard: "a straight line that jiggles"):
+  the body rocks on a spring (`_tilt`, `TILT_*`), climbs each wall (`MENISCUS`), carries three
+  waves, a pale lip with a shade under it, a glint riding the crest and `BUBBLES` rising in
+  whole pixels. A hover throws the water one way (`TILT_KICK`), kicks the waves and jolts the
+  wood once (`JOLT_TIME` 0.3 s, `JOLT_PX` 3); it sloshes back and settles.
+- Out of scope, by decision: other buttons, new sounds or art, water answering a click.
+  All numbers first guesses; judge on `tools/last_menu_main.png`.
+- **A hover drips** (2026-09-27, `/grill-me` with Richard): `DRIPS_ON_HOVER` (2) drips
+  squeeze out under the door's foot, stretch and fall (`_drips`, `_draw_drips`), in the
+  door's own water (`DRIP_MURKY`/`DRIP_CLEAN`, picked off the sheets inside
+  `METER_OPAQUE`). None at rest. **Tried and reverted the same day**: the logo's liquid in
+  the doors (LAKE green in the accent, DIRTY mud in the rest, mottled body, torn lime crest);
+  the meter's water stays.
 
 ### The Arrival and the Letter (2026-09-19, `/grill-me` with Richard, issue #24)
 A new game opens with the angler and his dog landing by boat and reading a letter on the
@@ -1763,6 +1793,70 @@ shed's shelf has a door to the wash room.
   `SHED_ONE=1` on `tools/shot_shed.tscn` (one find, one waiting). `test_lake`'s
   `_check_shop_purse`, `_check_bonus_panel` and `_check_wash_plank` guard all three.
 
+### The Boards Wear Colours (2026-09-26, `/grill-me` with Richard)
+The shop's four boards read apart, a maxed row reads as done, the coin is pixel art, and
+ribbon titles are carved.
+- **Row plates per board** (`ShopSkin.TONES`, `tones_of`): NET blue, BOATS brown, DOGS red
+  rust, LUCK plum, each an [affordable, drawn back] pair. **None is green**: green is a maxed
+  row. `BOARD_INK` and `INK_DIM` clear 6:1 on every pair. The lit edge still marks
+  affordable. The paper face and the frame are untouched, by decision.
+- **The head window** behind each board's sprite is its rows' hue `darkened(HEAD_DARK)`
+  (0.45), replacing the one `Style.BOARD` window.
+- **A maxed row** (`maxed` from `Lake._shop_rows`) is a deep green plate (`MAX_FACE`, ink
+  5.5:1) and its MAX word stands on a pale green badge (`MAX_BADGE`) where the price tag was.
+  **Not gold, by decision**: gold on this board is a price and Strength's rim.
+- **The coin is a sheet** (`tools/build_coin.py`, `assets/coin.png`/`.json`, psd-extract
+  venv python, **reimport after**): Richard's pick C of four rule-built options (`last_coin_options.png`),
+  an 18 px disc with two arrows chasing round a ring, **struck on both faces** (the back
+  mirrored and darker), nine toss frames face to edge to back. `HudButtons.coin` and
+  `coin_turned` draw the frame nearest the turn (`coin_frame_of`) through a nearest-filtered
+  `CanvasTexture`, so the luck board's toss, the money plate and every flying coin are one
+  coin. **Supersedes the code-drawn disc** (`COIN_RIM`/`COIN_RING`/`COIN_GLINT` are unused
+  now); the toss's timing is unchanged. Rules first: Richard may repaint `coin.png`.
+- **Ribbon titles are carved** (`Style.write`'s `cut_in`, `CARVE_DARK`/`CARVE_LIP`/
+  `CARVE_RIM`): a dark rim round the letters and a lit lip two pixels under them in place of
+  the drop shadow. Every ribbon, through `board_ribbon`, not only the shop's.
+- **The head cards are scenes** (second `/grill-me` the same day, `scripts/shop_card.gd`,
+  one `ShopCard` a board, kept first among `ShopSkin`'s children so the hull, wake, mesh and
+  collar draw over it; `clip_contents` so a dog or the pigeon's head can run off it). Drawn
+  in whole 2 px art pixels off the palette's ramps, inside the board's hued plate
+  (`CARD_RIM` of it shows). **A drawn mini-lake, not the player's lake, by decision**
+  (a live view and a snapshot were offered). **Net**: always filthy water, scum, 16 pieces
+  of the lake's own rubbish bobbing (lent as `sprites[&"rubbish"]`, the wash room's
+  list), the catch drawn by the card under the mesh. **Boats**: clean water, three pieces,
+  the ferry as before. **Dogs**: a new strip (trees on the far bank, clean lake with a
+  ferry crossing, lawn) with **all four breeds always**, whatever the pack, running in and
+  out of frame on their own gaits. **Luck**: the recycle box catching a piece every 1.5 s,
+  the coin tossing in the middle, the pigeon's head leaning in off the right edge every
+  6 s. **Always in motion, by decision** ("alive is the point"), over the old rule that the
+  coin only tossed. The dog's idle/sleep head and the halos are retired. Frame cost with
+  the shop open is not benched. **The letter's Upgrades stills show the old heads** until
+  `shot_letter_art` is re-run.
+- All colours and the carve are first guesses. `test_lake`'s `_check_board_tones` guards a
+  tone per board, none green, the inks, the max face and badge, the rows' `maxed`, the coin
+  sheet's nine frames and the carve.
+
+### What Is Drawn Is What Clicks (2026-09-25, `/grill-me` with Richard)
+The shop and the settings board answer only on their drawn controls, not on a whole plate.
+- **Shop**: only a row's price tag buys (`ShopSkin._tag_boxes`, the same `_tag_of` sum the
+  tag is drawn on; `_row_under` asks it). Name, value and plate are for reading; a maxed row
+  has no tag and answers nothing. Hover wash and `ui_hover` follow the tag; the row still
+  lights while its tag is hovered. The rail's "?" is unchanged. A click on a board's dead
+  part is eaten; only off the boards closes.
+- **Settings**: a sound row toggles on its switch alone (`SettingsSkin.switch_box_of`) and
+  drags on its groove and thumb plus `GROOVE_SLACK` (4) (`slider_box_of`); a drag under way
+  still follows anywhere. A chooser's value is a target only on Resolution (it opens the
+  list); the arrows as before. Hover follows the same boxes.
+- **The control lights and swells, the plate does not** (same day, Richard): no row plate on
+  either board takes the hover wash any more. Under the pointer the thing itself washes by
+  `Style.HOVER_WASH` and grows 2 px a side (`ShopSkin.TAG_SWELL`, `SettingsSkin.SWELL`): the
+  price tag, the switch, the slider's thumb (while dragged too), a chooser's arrow, and
+  Resolution's value, which gets a lit plate only while hovered. Hit boxes do not swell.
+- **Out of scope, by decision**: the bind board, `MenuConfirm`, HUD buttons, the shelf,
+  new art, layout moves. `GROOVE_SLACK` is a first guess.
+- `test_lake` guards a tag buying and a name not (`_stage_shop_shape`), and the switch, the
+  slider's box, the label being dead and no value box but Resolution's (settings shape).
+
 ### Every Word Is a Key (issue #28, 2026-09-20, `/grill-me` with Richard)
 The localization pass. **Scope this pass: the pipeline and English only** — extraction, one
 table, the CSV, a pseudo-locale and a Language row. The eight real languages, the CJK font
@@ -1899,6 +1993,45 @@ times and reviewed by native speakers**:
 
 `test_lake` asks that `HUD/Shop` is **gone rather than hidden**, which is the check a
 deleted-because-invisible node needs.
+
+### The Language Flag (2026-09-26, `/grill-me` with Richard, issue #28)
+The pipeline is live and eight languages ship. **Supersedes "a Language row" and "the
+pipeline and English only"** in Every Word Is a Key above.
+- **A flag in the main menu's top right corner** (`MainMenu._flag`, a `PlankButton` with
+  `mark = &"flag"`, `FLAG_BUTTON` 72x56, `FLAG_INSET` 24) opens `LanguageBoard`
+  (`scripts/language_board.gd`): two columns of plates, a flag and the language's name **in
+  itself, in its own face** (`Style` switched per plate). A pick applies at once and closes
+  the board. **Not in settings, by decision**: the menu's corner is the only way in.
+- **Flags are DaFluffyPotato's 15x10** (`marketing/flags_15x10/`, copied to
+  `assets/ui/flags/`, credited on the board and in `docs/CREDITS.md`): EN `us`, PT-BR `br`, ES
+  `es`, DE `de`, FR `fr`, JA `jp`, ZH `cn`, KO `kr`. `qps` wears `unknown` and is offered in
+  **debug builds only** (`Prefs.languages()`).
+- **`Prefs` owns the language** (`LANGUAGES`, `language`, `set_language`, saved as
+  `language` in `settings.cfg`). Empty until chosen: the first launch takes the OS locale if
+  it is one of the eight (whole locale, then its language), otherwise English. Translations
+  are loaded by `Prefs._load_translations`, **not listed in `project.godot`**, which the open
+  editor re-saves from memory. A change redraws every canvas item once (`_redraw_all`) and
+  emits `language_changed`, which boards with cached layouts listen to.
+- **Every call site reads `Text.KEY`** (`scripts/text.gd`, **generated** by
+  `tools/build_translations.py` — never edit it), or `Text.of("KEY")` for a key built at run
+  time (`MATERIAL_*`, `DECOR_*`, `TRACK_*`, `BLURB_*`, `VERB_*`). Strings that were consts
+  are static getters now, so a switch shows on the next draw.
+- **The translations are machine drafts** in `locale/translations.csv`, each with a
+  `_back_<locale>` back-translation beside it for review (the importer skips `_` columns).
+  Not reviewed by a native speaker. Known picks to review: Spanish is neutral ("tomar", not
+  "coger"); FR `MATERIAL_RUBBER` is "Caoutch." to fit the sign.
+- **Overflow is reported, not fixed** (`tools/probe_text_fit.gd`, `tools/last_text_fit.log`):
+  CJK fits everywhere; seven Latin OVERs — PT/ES `SHOP_TIER_PREFIX` (+1), DE
+  `CONTROLS_HINT` (+51) and `TOUR_SKIP` (+5), FR `TRACK_LUCKY_HAUL` (+8),
+  `TRACK_DOUBLE_CAST` (+9), `WASH_FREE` (+3). Widen or reword in a later pass.
+- **A harness never goes through `Prefs.set_language`**: it writes `settings.cfg`. `test_lake`
+  sets `TranslationServer`/`Style` to English by hand (the machine's locale may be any of
+  the eight). `_check_language` guards the flag, its corner, eight languages each with words
+  and a flag, a plate each, and a switch changing the words.
+- Probe: `tools/shot_language.tscn` (desktop build) saves `tools/last_language_{main,board,
+  <locale>}.png`, applying each language by hand and putting the player's back.
+- **Out of scope, by decision**: the letter stills (still English), the siege, the credits'
+  pack lines, the Steam page, widening boards.
 
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
@@ -2373,7 +2506,7 @@ the whole job.
   105x103; `SHED_TALL` 144.2, `SHED_STAND` 0.39375 and `SHED_ART_GROUND` 0.2382 moved by that
   pixel so the walls stand where they did. **Tried and rejected the same day**, off a
   before/after sheet: a rule pass on the rubbish (lit edge, shade edge, per-material texture)
-  and Scale2x rubbish at the angler's 1.0 grain � the pieces are already outlined and shaded
+  and Scale2x rubbish at the angler's 1.0 grain � the pieces are already outlined and shaded
   and a pass on 6-20 px sprites adds noise, not detail; and the hut rebuilt at 2.0 (muddier).
   **The real gap is pixels per object** (a can is 6x9, the crate 32x33, the angler 44 tall at
   1.0), which only repainting at a bigger source size would close. The rubbish stays as it is.
@@ -2930,6 +3063,38 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   one coin of the purchase sound, no more than one per `CHINK_GAP`). `test_lake` guards the
   aim, the sign, the heap and its drain, and the coins' cap and carry.
 
+### The Piers Tidied (2026-09-26, `/grill-me` with Richard)
+- **Only the near edge's posts are dressed** (`build_piers.py`, the post filter): a post whose
+  foot is under the deck top or box, or whose foot has the deck's footprint still in front of
+  it (`UNDER_PIER` 3 px, tested in the yard's own local frame), gets no sand and no foam. The
+  far rows' feet showed in the gap under the jetty, so their sand and foam were seen through
+  under the pier and the foam lifted into the deck with the swell. Jetties went 7-8 wet posts
+  to 3-5, platforms 4-5 dry.
+- **A post on the sand has no mound at all** (`Dropoff._dress`): it stands straight in the
+  beach. A drift of two low rows was tried the same day and still showed a line against the
+  shaded sand round it (Richard: "no visible division"); any drawn heap does. `Skirt.mound` is
+  unused now and left in `skirt.gd`.
+- **The deck top owns its pixels, and the deck mask is written** (`build_piers.py`'s deck
+  loop): a far-row post rising into the deck left those pixels on the under layer, so the
+  deck had holes with the pole showing through; and `deck[x][y]` was never set by that loop,
+  so the edge beam, both shadow masks and the box's contact rows had all been empty. With it
+  set, the near edges carry their beam and the pier throws its shadow again.
+- **The box stands on the platform's middle** (`BOX_STAND` row of the art on it): it stood its
+  art's bottom row there, which is the near corner of its base, so it sat in the back corner.
+  `BOX_CONTACT` takes the two deck rows under its foot down to 0.55 and 0.8.
+- **Each sign is painted** (`SIGN_PAINT`, `SIGN_WEATHER` 0.15, carried as `sign_paint` in
+  `piers.json`): metal grey, wood brown, plastic blue, rubber near-black, the wood's light and
+  grain kept under the paint; the post stays wood. `Dropoff.SIGN_INK` clears 4.5:1 on all
+  four (worst 4.93).
+- **`tools/shot_piers.tscn` hangs its lake off its own node and its own save**
+  (`user://probe_piers.save`): off the root it photographed the main menu and had no save
+  path of its own.
+- Out of scope, by decision: jetty shape, sign placement, the box art. **Open**: the open-water
+  lily beds are drawn over the jetty (`Flora.avoid` keeps them off the feet and berths, not the
+  deck).
+- `test_lake`'s `_check_pier_look` guards the paint and its contrast, the box's stand, no
+  mound, and no hole in the deck top (the old sheet has two).
+
 ### The Pigeons (`scripts/flock.gd`, 2026-09-16, `/grill-me` with Richard)
 The flock is drawn and placed properly, and a sitting bird is worth spotting.
 - **They are drawn over everything** (`Lake.BIRD_LAYER` 21): hulls (12), the haul (8), the
@@ -3236,34 +3401,36 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   swimming as a shadow when walked up to, the brood taking off at a landing, the facing
   rows, and no catch or pay.
 
-### Three Small Fixes (2026-09-26, `/grill-me` with Richard)
-- **The angler faces his net** (`Angler.face_toward`, `Lake._face_the_net`): on the throw and
-  every frame the first net is out, he turns to where it will land (flying) or where it lies,
-  snapped to the sheet's four views by `_view()`'s own rule. Only while the cast pose is held,
-  so walking still decides the facing. The double cast's second net turns nobody.
-- **The ferry's shadow is 10% lighter**: `Boat.SHADE_GAIN` 3.0 to 2.7, `SHADE_MOST` 0.7 to
-  0.63. The piers keep their own constants, unchanged.
-- **Closing the wash room lands in the shed** (`Lake._wash_to_shed`), cross, Escape, E or
-  pad B, whether it was opened from the shelf's plank or the pump. **Supersedes "the wash
-  room's own close returns to the lake"**. Forced closes (the menu's pose) still go to the lake.
-- `test_lake` guards the four facings, no turn without the pose, and both closes.
+### Still Walkers, Prop Shadows, the Pump's Flower, Reeds (2026-09-28, `/grill-me` with Richard)
+- **A still angler or dog frightens nothing; it is an obstacle** (`Lake._sort_walkers_for_wildlife`,
+  `WILDLIFE_STILL_SPEED` 12 px/s, `Wildlife.obstacles`, `_round`, `_taken_by_still`,
+  `OBSTACLE_REACH` 0.9 tiles). Only walkers moving faster than that, hulls and net landings
+  startle. Frogs swimming, turtles and rabbits/foxes walking slide round a still walker's
+  room; hop, walk and wander targets inside it are refused. A startled animal used to come
+  back to an idle angler and startle again, in a loop. Flying things (ducks, dragonflies) are
+  untouched. **Supersedes "the angler, any dog or any hull coming within reach"** in The Lake
+  Fills With Life for the angler and the dogs.
+- **Tree and rock shadows are hinged on their base** (`Ground._prop_pad`, `_pad_under`): the
+  lowest opaque row, plus a quarter of the ink's width over its bottom `BASE_ROWS` (a
+  three-quarter-view rock's lowest pixel is the near edge of what it stands on; the shadow
+  tucks under it). The sprites did not move.
+- **Props and pier signs cast with `Shade.cast`, not `Shade.lying`** (second pass the same
+  day, Richard: still disconnected, and the sign's shadow had no pole): the shear keeps a
+  picture's width level, so when the shadow runs sideways a trunk or a post is a line with
+  no thickness and the crown's or plank's shadow floats. `cast` lays the width across the
+  shadow's own heading. The walkers, hulls and birds keep `lying`. Probe:
+  `tools/shot_props.tscn` (desktop build) saves `tools/last_props_{tree,rock,forest,sign}.png`.
+- **Flowers grow on the forest floor** (`Flora.FOREST_DEEP` 8 tiles past `WOOD_FROM`,
+  `FOREST_SPOTS` 2, kind `forest`: the lawn's plants less the shrubs), never where a tree's
+  or rock's drawing is (`Ground.hidden_by_prop`, alpha-tested, since flora draws over the
+  ground layer). They wait on the clean water off their bank like the rest.
+- **No plant behind the pump's picture** (`Pump.hides`): the footprint alone let a flower grow
+  just up-screen of the pump and read as painted on it. Pump only, by decision; hut and crate
+  unchanged.
+- **Reeds and cattails grow within `Flora.REED_REACH` (1 tile) of the drawn waterline**, on
+  both shores (`_from_water`); further up the sand the spot grows another beach species.
+- `test_lake`'s `_check_still_walkers` guards all four.
 
-### Rain (2026-09-25, `/grill-me` with Richard)
-Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
-the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
-`scripts/puddles.gd` (`Puddles`, z 3 on the island), wired in `Lake._start_weather`.
-- **When**: `Weather.MOST` 5 a run, rolled at random (`FIRST_AFTER` 4-12 min, then `GAP`
-  6-14 min of play), each shower `LASTS` 1-2 min, easing in over `RISE` and out over `CLEAR`.
-  The clock stops behind the menu; a shower already falling keeps falling there. **A shower
-  never starts** over the intro, the first steps, a tour or the ending (`Lake._rain_held`,
-  tried again `HELD_RETRY` later). Saved as `showers` and `rain_next`; absent reads as none
-  yet, so no `SAVE_VERSION` bump. A shower in progress is not saved.
-- **The light goes grey through the day, not beside it**: `DayCycle.overcast` and `flash`,
-  folded over the hour in `DayCycle._weather` (`RAIN_TINT`, `RAIN_INK`, `FLASH_TINT`,
-  `FLASH_INK`). Everything that reads the day (the world's modulate, every shadow) follows
-  with no wiring.
-- **Where a drop lands is decided when it is born**: a spot in the view is picked and asked
-  once what is drawn there (`Weather._landing`): a roof, a floating piece
 ### Seven Visual Fixes (2026-09-25, `/grill-me` with Richard)
 - **A dog lies on a sofa's cushion or its side, never its backrest.** The sofa's catalogue
   rects are labelled the wrong way round: the one called `front` (view 0) is the backrest,
@@ -3300,11 +3467,6 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   it after a re-extract of the decoration PSD**, then `build_decor.py`. No `SAVE_VERSION`
   bump: the def list did not move and view 0 is the plain stove.
 
-  (`LakeGrid.perch_point`, `PIECE_ODDS` of a tile's drops), the lake (`WaterSplash.ripple`,
-  held under `RING_SHARE` of the splash layer's cap through the new `ripples_up`) or the
-  ground. Only drops in view cost anything. Streaks and splash bits are whole art pixels.
-- **Roofs are silhouettes measured off the art** (`_tops`, topmost opaque row per column):
-  the hut, the crate (`Yard.roof`), the pump (`Pump.roof`) and the piers' boxes
 ### Eight More Fixes (2026-09-25, second `/grill-me` with Richard the same day)
 - **The south wood hides what is behind it** (`Ground` `_cover`, `COVER_LAYER` 7,
   `covers_at`, `COVER_FROM`): the forest trees south of the lake's middle are drawn a second
@@ -3343,6 +3505,115 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   do not run. The water, the rubbish's bob, falling rain and the sound carry on. Not a
   tree pause, by design; not the shop, shed or wash room, by decision.
 
+### Three Small Fixes (2026-09-26, `/grill-me` with Richard)
+- **The angler faces his net** (`Angler.face_toward`, `Lake._face_the_net`): on the throw and
+  every frame the first net is out, he turns to where it will land (flying) or where it lies,
+  snapped to the sheet's four views by `_view()`'s own rule. Only while the cast pose is held,
+  so walking still decides the facing. The double cast's second net turns nobody.
+- **The ferry's shadow is 10% lighter**: `Boat.SHADE_GAIN` 3.0 to 2.7, `SHADE_MOST` 0.7 to
+  0.63. The piers keep their own constants, unchanged.
+- **Closing the wash room lands in the shed** (`Lake._wash_to_shed`), cross, Escape, E or
+  pad B, whether it was opened from the shelf's plank or the pump. **Supersedes "the wash
+  room's own close returns to the lake"**. Forced closes (the menu's pose) still go to the lake.
+- `test_lake` guards the four facings, no turn without the pose, and both closes.
+
+### The Blurb and the Nozzle Wait (2026-09-26, `/grill-me` with Richard)
+- **A shop blurb never covers its own row** (`ShopSkin.blurb_at`): its top is `BLURB_OFF.y`
+  under the row's foot (over the row's top when there is no room below); across, it follows
+  the mouse (`_mouse_at`), or on the pad lines up with the row's left edge.
+- **The wash nozzle waits** (`WashStand.awake`, `WAKE_AFTER` 0.4 s): a find put on the stand
+  parks the aim on its middle, and the player's paths (`_gui_input`, `WashRoom._pad_aim`) are
+  deaf until the choosing press is let go and the wait has run. `spray` itself is not gated,
+  so probes still drive it straight away. On the pad the hidden pointer is warped to the find.
+- `test_lake`'s `_check_blurb_and_wake` guards both.
+
+### Five Signals (2026-09-26, `/grill-me` with Richard)
+- **The wildlife moment** (`Lake._on_first_wildlife`, `_start_owed_moment`, `_moment_step`,
+  `MomentCard`, `Wildlife.first_arrived`): the run's first animal (frog, turtle, dragonfly,
+  rabbit, fox or brood, not a plant) glides the view to where it is headed and in to the
+  nearest zoom stop over `MOMENT_IN`, holds `MOMENT_HOLD`, and glides home over `MOMENT_OUT`,
+  with "Wildlife is coming back, great news!" (`Text.WILDLIFE_BACK`) on a paper card low in
+  the window. **The player's hands are held and the world runs**: walking and all input are
+  off, **the net is not held**, so a haul in progress reels itself home off screen, by
+  Richard's call over waiting for the net. Only a board, the menu, the arrival, the letter or
+  the ending make it wait (`_moment_owed`). **The third zoom glide in the game**, after the
+  menu's Continue. Saved as `wildlife_seen`, absent reads as seen (the tours' rule), no
+  `SAVE_VERSION` bump; a new game sets it false in `_start_arrival`.
+- **The last three pieces are marked** (`Lake.LAST_MARKED`, `_mark_last_pieces`,
+  `LakeGrid.mark_last`, `LastArrows`): from three pieces left, every tile holding one wears
+  a **pale** rim in the soup (`PALE_FLAG` 0.3, `rubbish.gdshader`'s `rim_pale`: gold is
+  treasure) and a white column (`LAST_TINT`, the find's beam), and a screen-edge arrow points
+  at each one the view does not hold. Strand pieces the dogs fetch are marked the same.
+  Marking relays the soup once per change, a handful of times a run.
+- **Pigeons drop half as much and never while perched** (`Flock.POOP_CHANCE` 0.9 to 0.45,
+  `POOP_CHANCE_PERCHED` deleted).
+- **A spend runs the purse down** (`HudSkin._process`, `_spent`, `SPENT_*`): at the pace
+  earnings run up, with a red "-X" dropping off the plate and fading over `SPENT_LIFE`, on
+  the corner plate and the one over the shop alike. Supersedes "It simply drops".
+- **The haul's count over the angler** (`HaulCount`, `Lake._haul_count_step`, `_bank_haul`):
+  "7/24", pieces over this cast's room (lucky haul's included), ticking with each grab.
+  **Both nets of a double cast are one count** ("11/32", second pass the same day): a net
+  home banks its catch, and the figure pops and fades once the last net of the cast is home.
+  **Luck shows from the throw** (`throw`): a lucky or double cast is up at "0/..", with a
+  swell; a lucky figure is the finds' gold with art-pixel stars round it, a double wears an
+  "x2" tag, both together swell bigger with more stars. **A full cast is pale red**
+  (`FULL_INK`), so gold means lucky and nothing else. A plain throw shows from its first
+  catch.
+- All numbers first guesses. `test_lake`'s `_check_signals` guards all five.
+
+### Weight in the Walk (2026-09-26, `/grill-me` with Richard)
+- **The angler slips** (`Angler._vel`, `SLIP_TIME` 0.1, `STOP_TIME` 0.09, `_move_by`): the walk
+  is a velocity eased towards the input, so a turn curves and letting go glides about a fifth
+  of a tile. The sprite faces the new input at once; only the body lags. A throw plants the
+  boots (`_vel` zeroed under `_cast_lock`), `stand_at` clears it, a slide keeps only the part
+  of the velocity that went somewhere. Dogs do not slip: nobody steers them.
+- **Feet kick** (`scripts/kick_dust.gd`, `KickDust`, one node on the lake at z 4, and its
+  `Tracker`): on a start from rest or a swing of more than 60 degrees off a settled heading
+  that drifts after the real one, so a gentle curve fires nothing. On land a puff of whole
+  art pixels in the palette's sand or lawn green, the lawn throwing less; on water
+  `KickDust.splash_at` throws `WaterSplash.drip`s and a small ring, under half the ring cap.
+- **The shallows splash on every footfall** at `STEP_SHARE` of a start's burst, on the frames
+  the footstep sound uses; a swimming dog every `Dog.STROKE_EVERY` (18 px) at `STROKE_SIZE`.
+  Dogs kick at `KICK_SIZE` 0.6.
+- **Every foam ring stays on the water** (`WaterSplash.wet_at`, `_band`'s `water_only`): a
+  ripple drops each of its 20 quads whose outer edge lands on dry ground, by the rain's own
+  wet test (off `Iso.on_island_ground`, inside `Iso.shore_fraction`). Before this, rings
+  from the walkers at the shore were drawn over the island's sand.
+- Out of scope, by decision: the shed's walkers, new sounds, the wash room's actors.
+- All numbers first guesses. `test_lake`'s `_check_walk_weight` guards the tracker, the two
+  dust colours, drops off water, the glide stopping and a turn curving. Bench walking: 3.65 ms
+  mean, worst 9.7.
+
+### Ten Fixes (2026-09-27, `/grill-me` with Richard)
+- **Shore pieces lie apart** (`LakeGrid.shore`, `shore_offset`, `SHORE_APART` 0.27): a
+  strand or dry-beach tile keeps its count (up to two) and both are drawn, each at its own
+  fixed spot either side of the tile's middle, the line between them turned by a hash of
+  the tile. The second is an extra quad in the tile's stamp (no shadow of its own). A take
+  leaves the other where it was drawn (no rise, no re-pose); nothing saved. The dog swims
+  to the top piece's drawn spot, held inside its tile (`Dog._aim_at`).
+- **Coins fly over the hung purse** (`CoinFly.fly_from` moves the node last in the HUD
+  layer; each coin re-aims at `coin_centre` every frame), so they land on its coin.
+- **Head cards** (`shop_card.gd`): the dogs' strip has no ferry; the boats' card is water
+  and ferry only (`CLEAN_PIECES` 0); the net's card floats 6 pieces (`DIRTY_PIECES`), its
+  water lifted `NET_WATER_LIFT` towards the lightest step, and the net and its catch are
+  drawn `ShopSkin.NET_GROW` 1.5 times bigger; the luck box starts with a heap
+  (`HEAP_START` 4, growing to `HEAP_MOST` 9 and starting over) and the piece drops into it,
+  the near walls (`Yard._cut_front`) drawn over both.
+- **The pricing plate** spreads its four columns over the whole face and reaches
+  `LEGEND_REACH` (20) into the gaps beside its two boards; one pairing, name at
+  `LEGEND_NAME_PX` (small) over pay at `LEGEND_PAY_PX` (body). Bonus panel and sentence
+  untouched.
+- **Finds shine more**: `BEAM_FAINT` 0.45 to 0.65, `BEAM_SUNK_TALL` 0.6 to 0.85,
+  `STAR_RATE` 2.5 to 4.5, `SPARK_RATE` 8 to 14. Rim and size unchanged.
+- **The dog eases into its run** (`Dog._eased`, `RUN_EASE` 0.13): exponential, about 0.4 s
+  to full and the same down; top speeds unchanged. The gait runs on its own clock
+  (`_stride`, `_clock()`), advanced at the share of the pace reached.
+- **A rug is a rug in any language** (`Sheets.lies_flat`): it read the *shown* title, so in
+  any language but English a rug blocked floor and sorted with the furniture. It reads the
+  catalogue's English title and the piece name now. Flats already block nothing, place
+  anywhere, and draw right after the wall pieces.
+- All numbers first guesses. `test_lake`'s `_check_ten_fixes` guards each.
+
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
 the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
@@ -3359,6 +3630,11 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   with no wiring.
 - **Where a drop lands is decided when it is born**: a spot in the view is picked and asked
   once what is drawn there (`Weather._landing`): a roof, a floating piece
+  (`LakeGrid.perch_point`, `PIECE_ODDS` of a tile's drops), the lake (`WaterSplash.ripple`,
+  held under `RING_SHARE` of the splash layer's cap through the new `ripples_up`) or the
+  ground. Only drops in view cost anything. Streaks and splash bits are whole art pixels.
+- **Roofs are silhouettes measured off the art** (`_tops`, topmost opaque row per column):
+  the hut, the crate (`Yard.roof`), the pump (`Pump.roof`) and the piers' boxes
   (`Dropoff.roof`). Walkers and hulls are a rounded box over their drawing. `DRIP_ODDS` of
   roof drops run to the eave, hang `DRIP_HANG` and fall to the picture's foot.
 - **Puddles**: `COUNT` spots found once off a fixed seed on the island's dry ground, clear of
@@ -3370,6 +3646,14 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   rain on one rings it. **Reflections**: a clipped child (`clip_children`) draws the hut, the
   pump, the angler and the dogs upside down about their feet (`Angler.reflect_on`,
   `Dog.reflect_on`), only where a puddle is. Nothing saved.
+- **The mirror is clipped to the water alone** (`Puddles.Pools`, 2026-09-25): it was clipped
+  to the puddles' whole drawing, which held the drop spots on the sand and the rain's rings
+  too, so the hut and the angler flickered upside down all over the beach after a shower.
+  The spots draw on `Puddles`, the water on `Pools` (the clip parent), the rings on `Rings`
+  over the mirror. `test_lake` guards the mirror's parent. **And `Pools` is hidden until a
+  cell of water is drawn** (`_first_wet`): a clip parent that draws nothing clips nothing, so
+  as a shower began and as the puddles dried the whole mirror (the hut sheared upside down,
+  the angler, the dogs) drew straight onto the island.
 - **Grass only, one colour, three** (same day, Richard): puddles lie on the lawn
   (`Iso.on_lawn`), `COUNT` 3, drawn in `water_clean_light` alone at 0.85.
 - **The sand soaks instead** (`Puddles.sand_wet`, `SOAK` 25 s, `SAND_DRY` 90 s): pushed to
@@ -3872,7 +4156,7 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   can bend the aim but never hold it back. **Green means green on the marker**
   (`would_catch`), picked over counting pieces or favouring finds. The numbers are first
   guesses for Richard to retune.
-- **Menus use a virtual cursor, by decision**, not focus navigation: wherever the scene
+- **Menus used a virtual cursor** (superseded 2026-09-26, above), not focus navigation: wherever the scene
   wants a pointer (`pad_cursor_wanted`: on the lake, while a board, the farewell or the main
   menu is up; a scene without the method always wants one), the right stick moves
   the real pointer (`warp_mouse`) and `Pad` turns buttons into real events tagged
@@ -3882,6 +4166,46 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   and the next A puts it down** (`ShedRoom._gui_input` tells a pad click by its
   `SYNTH_DEVICE` tag; the mouse still drags), and **while a piece is in hand the left stick
   moves it** (`_carry_with_pad`), because the player stands still while carrying anyway.
+- **Boards are walked with the left stick, not pointed at** (2026-09-26, `/grill-me` with
+  Richard). **Supersedes "Menus use a virtual cursor" below**: the right-stick pointer is
+  gone and the mouse's arrow is never shown in pad mode. A board joins `Pad.FOCUS_GROUP` and
+  answers `pad_focus()` with its controls (`box`, optional `at`/`key`/`first`/`ring`); the
+  left stick or the D-pad steps between them (`Pad.step_from`: nearest ahead, sideways
+  counted `NAV_ACROSS` times; a held push repeats after `NAV_FIRST`, then every
+  `NAV_REPEAT`; a push held as a board comes up waits to be let go). **The pick drives the
+  real pointer, hidden**: it is warped onto the control and A is the same left click, so
+  every board's own hover wash, swell and sound come for nothing. Over that, one gold ring
+  (`FocusRing`, `Pad.RING_LAYER` 39, a dark line under it for the paper). Optional hooks:
+  `pad_press(key)` (A taken by the board), `pad_nudge(key, step)` (left/right spent on the
+  control), `pad_scroll(step)` (a step off a scrolling list's end), `pad_hold()` (stick
+  frozen), `pad_free()` + `pad_mark()` (the board reads the stick itself; the ring marks what
+  A would act on). Of every board up, the highest canvas layer then the latest in the tree
+  listens.
+  - **Main menu**: the doors, the accented one first, and the flag. **`MenuConfirm`**: "keep"
+    first. **Settings**: a chooser is one stop stepped by left/right, A on Resolution drops
+    its list (whose entries are then the only stops); a slider moves `PAD_LEVEL_STEP` 0.05 a
+    push and A does nothing on it; switches and buttons are A. **Shop**: one stop a row, the
+    pointer on its tag so A buys, **the row's blurb shows while it is picked**; the tour's
+    card is two stops, go on and skip. **Controls board**: every cell and the reset plank; A
+    captures, **X restores the picked cell** (`_pad_restore`), the stick is held while a cell
+    listens (`pad_hold`), and the hint reads `CONTROLS_HINT_PAD` in pad mode. **Letter**:
+    back, on, the door, the cross, and left/right turn the page from anywhere. **Languages**:
+    the one in use first. **Credits**: the cross. **Farewell**: one unringed stop over the
+    screen while the roll climbs (A skips it), then the menu door. **Tour cards**: the lit
+    target first when it takes the click, then go on and skip.
+  - **Shed, free aim**: the stick walks the player; **A picks up the placed piece the player
+    stands at** (`_piece_near`, within `REACH`, ringed through `pad_mark`) and puts a carried
+    one down where the stick has carried it; Y works a switch, X turns what is in hand.
+    **RB or LB opens the shelf** (`_pad_shelf`, the shoulder shown on a chip on its title
+    plank): its rows, the wash plank and the cross are stops, the list scrolls off its ends,
+    A takes a row into the hands (and the pointer to the player), B puts the shelf away
+    rather than leaving the room.
+  - **Wash room**: nothing on the stand, the tray's rows and the cross are stops. **A find on
+    it, the stick is the nozzle's** (`WashRoom._pad_aim`): it moves the pointer the jet
+    follows, RT or a held A sprays, and B puts the find back on the tray, nothing paid.
+  - `test_lake`'s `_check_pad_focus` guards the step rule, the repeat, the menu's doors, a
+    board over them, the letter paging, A on a slider, the bind board's hold, and the
+    credits' cross.
 - **The aim ring stays up while a cast is out** (2026-09-14, both pad and mouse): drawn over
   the net by `CastNet._draw` so the next throw can be lined up, with the same green/red
   verdict (`in_reach` is `can_cast_to` without the idle check). Not on the double cast's
@@ -4379,6 +4703,45 @@ purpose. What the audit settled, against the shipped design:
   the law is what the travel between the ends is worth. Music, effects and ambience all go
   through it.
 
+### The Second Batch of Sounds (2026-09-28, `/grill-me` with Richard)
+Ten recordings in `art_source/SFX/New SFX - 28-09/`, cut by `tools/build_sfx.py` (`NEW`) and
+levelled like the rest; `SOUNDS` holds the mix. All spans, levels and gaps are first guesses.
+- **Shed doors** (`Sfx.play_door`): the creak replaces `shed_open` when the shed opens, the
+  solid shut replaces `ui_close` when the player closes it (`Lake._shut`). Coming in from the
+  wash room opens no door (`_room_swap`). Both on `WHILE_INDOORS`.
+- **Rain and thunder, cut apart**: the storm recording has thunder baked in at fixed times, so
+  `rain` is its quiet 12-24 s stretch as a loop and its claps, with the lightning-strike file,
+  are `thunder_1..4`. One plays `Weather.THUNDER_AFTER` (1.2-3.2 s, was 0.6) after each
+  flash, never the take played last.
+- **Puddle steps** (`step_puddle`, `Sfx.play_puddle_step`, pitched in steps): a footfall on
+  a wet puddle cell (`Puddles.here.standing_in`) and the angler's first step into the lake.
+  The wading loop is unchanged; dogs get none.
+- **Wildlife, heard only within `Dog.HEAR` of the angler** (`Wildlife.ear`/`hears`,
+  `Flora.ear`), each species on one shared rolled gap (`Sfx._due`): a frog's croak cue
+  (`FROG_GAP` 6-12 s, pitched); a brood calling (`DUCK_GAP` 15-30 s, the mallard's three
+  quacks or `GEESE_ODDS` of four far geese cuts); **the session's first brood always calls**;
+  forest chirp cuts when a plant near the angler starts to show (`FOREST_GAP` 20-45 s); a bee
+  at a heard flower (`BEE_GAP` 60-120 s), **panned left to right in the file** (`PAN_SWEEP`).
+- **Out of scope, by decision**: a forest bed, the whole geese file, dog water steps,
+  replacing the wading loop. `test_lake`'s `_check_new_sounds` guards the takes, the storm's
+  files, the thunder's delay, the doors indoors, the frog's gap, the bee's pan (read off the
+  built file: the import compresses it) and the earshot.
+
+### Softer and Outdoors (2026-09-28, `/grill-me` with Richard)
+- **The crate's and the hold's thud is muffled** (`build_sfx.py` `MUFFLE`, two one-pole low
+  passes at 2.5 kHz on `pop`) and down to -17. Down too: `step_puddle` -16, `net_throw` -8,
+  `pigeon_fly` -18.5, `bee` -17; `Flock.WINGS_GAP` 1.6 to 4 s.
+- **A startled frog within earshot ribbits** `Sfx.FROG_FRIGHT_ODDS` (a third) of the time,
+  held to `FROG_GAP` with its croaks (`Wildlife._frog_fright`).
+- **The wash room is outdoors**: no shed sound on opening it, and `Sfx.indoors` is the shed's
+  alone, so the lake goes on behind the pump. **Supersedes** "The wash room covers the lake
+  as the shed's does" and the barks and coos being shut out (the room's own backdrop calls
+  still come through `room_bark`/`room_coo`). The music stays muffled there.
+- **Ducks are not startled by the ferries** (`Wildlife.walker_threats`, `Lake._wildlife_walkers`):
+  the broods shy from moving walkers and net landings only. Every other animal still flees hulls.
+- **The settings board no longer muffles the music**; the shop and the wash room still do.
+  **Supersedes** "the settings board is new here" in The Music.
+
 ### The Music (2026-09-15, `/grill-me` with Richard, `scripts/music_station.gd`, `tools/build_music.py`)
 One station for the whole session. **Supersedes** the lake's two-player Goin crossfade and the
 menu's own player (both gone, with `%Music` in both scenes and `assets/music_goin*.mp3`).
@@ -4430,6 +4793,51 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
   out, and the lake telling the autoload.
 - **Credits**: every song and recorded sound is by Nuven (Richard, 2026-09-15), in
   `docs/CREDITS.md` and on the credits board.
+
+### The Record Player (2026-09-28, `/grill-me` with Richard)
+E on the record player in the shed lifts its lid and puts up a menu (`scripts/record_menu.gd`,
+`RecordMenu`, a child of `ShedRoom`): which songs play on the lake and which in the shed.
+**Supersedes the fixed playlist and "Indie Boi in the shed"** in The Music above; those are
+now only the defaults.
+- **Two tick columns, Lake and Shed**, over beatgucci, Save ME, Goin, Indie Boi and Habibs.
+  A list plays in `MusicStation.SONGS` order and loops. **Habibs is locked** (padlocks) until
+  the lake has been cleaned (`habibs_open`, from the save's `farewell`). **A list is never
+  empty**: the last tick will not come off.
+- **Sync, an on/off switch centred under the list**: the shed plays the lake's own song
+  through the radio, at the same second; the Shed column greys out and shows the lake's
+  ticks. The radio copy stays, by decision.
+- **Two tracks, each on its own players** (`MusicStation.Track`): one song can be on both
+  lists at different places in it. Every song now has an outdoors and a radio copy
+  (`build_music.py`, `--only`); `indie_boi.mp3` and `habibs_radio.mp3` are new. The ending's
+  Habibs has its own player and loops by hand, since streams are shared.
+- **Now playing and skip** under the record show the **shed's** song (the lake's if synced).
+  Unticking the song playing moves on to the next ticked one.
+- **The needle moves on every change of song**, skipped or played through while the menu is
+  up (`changes_in`): it comes up off the record (the head rises `ARM_RISE` over its shadow),
+  crosses straight to the new song's band and sets down (Richard: no swing out past the rim).
+  **A skip holds the song while the needle is up** (`hold`, `next_in`): it pauses as the
+  needle lifts, and the next song starts only when the needle sets down on its band, about
+  a second later. Closing the menu mid-skip lands it at once. **The record is an album**: five bands of grooves with smooth gaps between,
+  `SONGS` order from the rim in (beatgucci outermost, Habibs by the label), and **the needle
+  stands still in the middle of its song's band** (`band_middle`; Richard's second pass,
+  superseding a needle that crept in with the song's progress). The
+  record spins down while the needle is up and back up after (`SPIN_EASE`), stepped at
+  8 fps off 16 baked frames. **No white sheen on the disc**, by Richard's call.
+- **Saved in the run's save as `records`** (`picks`/`take_picks`); a save without it reads
+  as the old fixed lists. No `SAVE_VERSION` bump. **Always applies**, placed or not.
+- **The lid is only a picture**: E opens it and it stays open after the menu closes
+  (Richard, second pass). The room
+  takes no input and gives up the stick while the menu is up; Escape, E, the cross or a
+  click off the board close it. On the pad the ticks, switch, skip and cross are stops.
+- **Drawn in the sprite's own colours** on 3 px art pixels (option A of
+  `tools/build_record_menu_mockup.py`, picked by Richard with the mode keys cut and Sync
+  moved under the list). Five keys `RECORD_*` in `translations.csv` are machine drafts;
+  song titles are names and not translated.
+- **Out of scope, by decision**: shuffle, per-song volume, a beat grid for Indie Boi (it
+  runs on `FALLBACK_BPM` if ticked for the lake).
+- `test_lake`'s `_check_record_lists` (station) and `_check_record_player` (shed) guard the
+  rules. Probe: `tools/shot_record_menu.tscn` (desktop build, own save) saves
+  `tools/last_record_menu_{apart,synced,skip}.png` and `last_record_menu.log`.
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
@@ -4740,6 +5148,24 @@ furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
   which since The Front means the menu is up and the HUD is hidden, so the probe had been
   photographing a shed that was never laid out (`room size (0.0, 200.0)` in its own log,
   which nobody read). The ending probe learned this in 2026-09-18; read a probe's log.
+
+### Walking the Shed (2026-09-27, `/grill-me` with Richard)
+**Supersedes the cell-blocking parts** of Free Placement and The Pack in the Shed (`_taken`,
+"a cell is blocked when its middle is inside a base", cell sets in `ShedDog.over`).
+- **Walkers collide with rectangles, not cells** (`ShedRoom._blockers`): each standing
+  piece's floor base (`base_of`, placement pixels) grown by `WALK_CLEAR` (3 px) a side. Rugs,
+  paintings, the pet bed and a `small` piece set on a host block nothing; the picture above
+  the base never does. Positions stay floats in cell units; nothing snaps.
+- **A refused step slides** (`_slid`): the whole step, else the longer allowed axis alone,
+  else the other. Player and dogs both; a dog whose slide makes no ground picks a new target.
+- **`ShedDog.over` is a set of piece keys** (`piece@x,y`, the seat key), exempting the dog
+  from that one piece's rectangle.
+- **Sorting**: a walker is behind a piece while its feet are above the base's front edge and
+  in front below it; a dog on its seat is drawn over it (`_walker_key`, unchanged rule).
+- **The carried piece is centred on the pointer to the nearest whole pixel** (`_drop_cell`
+  rounds the float floor position less half the span), so the ghost is where it lands.
+- `test_lake` guards the clearance, a slide along a face making ground, the sort flip at the
+  front edge and the carried piece's centre.
 
 ### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
 Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,
@@ -5254,6 +5680,8 @@ overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild
   stretch that grows shows up by name. **`main.tscn` itself loads in 20 ms**: everything
   heavy is built in `_ready`, on the main thread, which is why there is no loading bar.
 
+**A big net** (2026-09-26, Richard: lag casting, worst lucky or doubled; `bench_frames` `BENCH_CAST=1 BENCH_BIG=1 BENCH_LUCK="lucky double"`): 17.8 ms mean, p99 29 -> about 13 ms, p99 21; big net alone 13.1 -> 10.6; plain cast 5.8 -> 5.0. Four fixes, none visible: every crown, ring and drop of `WaterSplash` in one triangle array (each piece a sweep lifts throws a crown); `LakeGrid._restamp(index, true)` skips the glint refresh for rising and shoved tiles; `Lake._ask_the_end` walks the field only when the last count was under `ASK_WITHIN` (it walked all 8464 stacks on every crate landing); the rope is one mitred strip (`_rope_strip`) with a disc at each end, not one per drawn point. **Still over the 8 ms bar.** Tried and reverted: sending the soup in chunks (no gain, so re-sending it is not the cost).
+
 Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame
 42 ms -> 3-4 ms.
 
@@ -5292,6 +5720,29 @@ in the casts, the dogs and the wildlife** (`_hide_boats`): it blocked the second
 **pigeon** shot is still in the probe (forced head pop, `_force_pop`) and **cut from the
 edit**, by Richard's call. `build_trailer.py` needs PIL: run it with the psd-extract venv
 python.
+
+### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
+An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions
+only, no game UI. Captions are Richard's, in `shots.json`; a later voiceover is written to fit
+the shot lengths, nothing is re-timed for it.
+- **Film**: `film_devlog.gd` extends `film_trailer.gd` (whose save and log paths are vars now,
+  with a wall-clock quit and `_cast`'s gold and double split): the day timelapse and a forced
+  shower with two flashes (phase driven by hand to `turn_at` 0.88, **no fake dawn or dusk**),
+  then three plain casts at Width 0 / 9 / 20 over a lake thinned 15 / 30 / 50%, a gold cast and a
+  double cast over 55%. `_dry()` stops the shower before each cast, or it rains through them.
+  **Never stand the angler at (2, 2) off the island's middle**: the crate hides him there.
+- **Reused from the trailer's film**: `wash`, `wildlife`, `clean_hold` (8.5 s, so the logo
+  ending is 11 beats). **The prototype** is Richard's own recording of the itch build,
+  `marketing/.../Prototype_Recording.mp4`, 30 fps, brought to 60 and muted.
+- **Cut**: `build_devlog.py` (psd-extract venv python) imports `build_trailer.py` and adds a
+  video-file cut, one caption list over the whole timeline (multi-line, per-caption size and
+  height) and no "Wishlist now". A cast cut's `land_beat` must sit close enough to `in` that
+  `land_frame` covers the gap (a beat is 45 frames).
+- **Second pass, same day** (Richard): the middle plain cast is out and the trailer's
+  `ferries` stands in its place; the music is `music_db` -9 under the game's own recordings
+  (`sfx` in `shots.json`, beats, one-shots and looped beds, mixed with `normalize=0`). **No rain
+  or thunder sound exists yet** (`Weather` waits on Nuven's recordings), so the rain shot
+  carries the lake's ambience only.
 
 ### Shed Screenshot Probe
 `tools/shot_shed.tscn` opens the lake, fills the shelf, opens the shed and saves

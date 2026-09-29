@@ -28,7 +28,12 @@ var _hovered: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	tooltip_text = "Close"
+	# Non-empty so the engine asks `_get_tooltip`, which reads the word in the language in play.
+	tooltip_text = "-"
+
+
+func _get_tooltip(_at: Vector2) -> String:
+	return Text.UI_CLOSE
 
 
 func _notification(what: int) -> void:

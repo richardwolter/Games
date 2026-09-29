@@ -53,7 +53,7 @@ const UI_VOICES := 3
 const SOUNDS := {
 	&"ferry_bell": [-17.9, 0.02],
 	&"boat_move": [-12.3, 0.05],
-	&"net_throw": [-6.8, 0.06],
+	&"net_throw": [-8.0, 0.06],
 	&"net_splash": [-14.8, 0.04],
 	&"piece_splash": [-13.9, 0.0],
 	&"drip": [-14.0, 0.05],
@@ -62,7 +62,7 @@ const SOUNDS := {
 	&"find_chime": [-19.7, 0.03],
 	&"coin": [-10.8, 0.08],
 	&"upgrade": [-7.0, 0.0],
-	&"pigeon_fly": [-15.4, 0.08],
+	&"pigeon_fly": [-18.5, 0.08],
 	&"pigeon_coo": [-3.0, 0.06],
 	&"bark": [-5.3, 0.06],
 	&"sniff": [-9.8, 0.05],
@@ -78,9 +78,35 @@ const SOUNDS := {
 	## A piece landing in the island crate: three takes of Richard's own recording, one of
 	## which is played per drop. A small roll on top of three real drops, where one take
 	## pitched about needed a whole ladder of steps to stop being a metronome.
-	&"pop": [-15.0, 0.03],
+	&"pop": [-17.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
+	## The second batch (2026-09-28, `/grill-me` with Richard). Every file is levelled to
+	## the same loudness, so these are the mix: the doors a little under the click, the
+	## puddle a step over the dry steps, the animals well under the dogs' bark, the forest
+	## and the geese far off. First guesses for Richard's ear.
+	&"door_open": [-9.0, 0.03],
+	&"door_close": [-9.0, 0.03],
+	&"step_puddle": [-16.0, 0.03],
+	&"frog": [-14.0, 0.0],
+	&"duck": [-13.0, 0.04],
+	&"geese": [-17.0, 0.03],
+	&"forest": [-18.0, 0.0],
+	&"bee": [-17.0, 0.04],
 }
+
+## The new sounds' pitch ladders, never the step played last (the net splash's rule).
+const PUDDLE_PITCHES: Array[float] = [0.84, 0.92, 1.0, 1.08, 1.16]
+const FROG_PITCHES: Array[float] = [0.8, 0.9, 1.0, 1.1, 1.22]
+## Gaps, rolled each time in seconds, so a species is heard now and then rather than on a
+## beat: one gap a species, shared by every animal of it (the dogs' rule).
+const FROG_GAP := Vector2(6.0, 12.0)
+const DUCK_GAP := Vector2(15.0, 30.0)
+const FOREST_GAP := Vector2(20.0, 45.0)
+const BEE_GAP := Vector2(60.0, 120.0)
+## How often a duck call is the far geese instead of the mallard.
+const GEESE_ODDS := 0.3
+## The share of heard frights a frog ribbits on, held to `FROG_GAP` like its croaks.
+const FROG_FRIGHT_ODDS := 1.0 / 3.0
 
 ## Sounds with players of their own, and how many (2026-09-15, first playtest). Through the
 ## shared pool they were stolen: a sweep lifting a dozen pieces fires a knock each, twelve
@@ -117,6 +143,7 @@ const WHILE_SHOPPING := [&"coin", &"upgrade"]
 ## on: its door, the pieces put down, the fire, and the interface.
 const WHILE_INDOORS := [
 	&"ui_hover", &"ui_click", &"ui_close", &"shed_open", &"drop_big", &"drop_small", &"upgrade",
+	&"door_open", &"door_close",
 	# The wash room is indoors too, and a find coming clean on its stand rings the find's own
 	# sound (issue #37). Nothing in the shed plays it, so the shed is no louder for this.
 	&"find_caught",
@@ -272,6 +299,8 @@ var _last := {}
 
 ## Which step each of the pitched sounds last used, by name. See `_next_pitch`.
 var _pitch_step := {}
+## Name to the time its next play is allowed (`_due`).
+var _next_due := {}
 
 ## The coo and the start sound get players nobody else can take. The coo went through the
 ## pool once, and a cast closing on a pigeon closes on a dozen pieces in the same sweep: eight
@@ -840,6 +869,63 @@ func set_wading(wading: bool, who: Object = null) -> void:
 		if walker != null and not is_instance_valid(walker):
 			_wading.erase(walker)
 	_wade_on = not _wading.is_empty()
+
+
+## A footfall in a puddle, or the first step into the lake.
+func play_puddle_step() -> void:
+	play(&"step_puddle", 0.0, _next_pitch(&"step_puddle", PUDDLE_PITCHES))
+
+
+## The shed's door: the creak going in, the solid shut coming out.
+func play_door(open: bool) -> void:
+	play(&"door_open" if open else &"door_close")
+
+
+## Whether a species' own rolled gap has run out; if so, rolls the next one.
+func _due(name: StringName, gap: Vector2) -> bool:
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if now < float(_next_due.get(name, -1.0)):
+		return false
+	_next_due[name] = now + _rng.randf_range(gap.x, gap.y)
+	return true
+
+
+## A frog within earshot croaking. Sparse by `FROG_GAP`, whatever the frogs are doing.
+func play_frog() -> bool:
+	if not may_play(&"frog") or not _due(&"frog", FROG_GAP):
+		return false
+	play(&"frog", 0.0, _next_pitch(&"frog", FROG_PITCHES))
+	return true
+
+
+## A brood within earshot calling; `arriving` is the first ducks the lake has seen, which
+## always call. Now and then the far geese instead of the mallard.
+func play_duck(arriving: bool = false) -> void:
+	if not may_play(&"duck"):
+		return
+	if not _due(&"duck", DUCK_GAP) and not arriving:
+		return
+	if arriving:
+		_next_due[&"duck"] = float(Time.get_ticks_msec()) / 1000.0 + DUCK_GAP.x
+		play(&"duck", 0.0, 1.0, next_step(&"duck", _count(&"duck")))
+		play(&"geese", -3.0, 1.0, next_step(&"geese", _count(&"geese")))
+		return
+	if _rng.randf() < GEESE_ODDS:
+		play(&"geese", 0.0, 1.0, next_step(&"geese", _count(&"geese")))
+	else:
+		play(&"duck", 0.0, 1.0, next_step(&"duck", _count(&"duck")))
+
+
+## Birds and insects off the woods while a plant near the angler grows in.
+func play_forest() -> void:
+	if may_play(&"forest") and _due(&"forest", FOREST_GAP):
+		play(&"forest", 0.0, 1.0, next_step(&"forest", _count(&"forest")))
+
+
+## A bee going by, left ear to right, baked into the take. Very rare.
+func play_bee() -> void:
+	if may_play(&"bee") and _due(&"bee", BEE_GAP):
+		play(&"bee")
 
 
 func play_bark() -> void:

@@ -215,7 +215,7 @@ func _draw() -> void:
 		self,
 		Rect2(Vector2(board.position.x, board.position.y - RIBBON_TALL * 0.5),
 			Vector2(board.size.x, RIBBON_TALL)),
-		"CONSOLES   %d / %d" % [caught, consoles.size()],
+		Text.CONSOLE_COUNT % [caught, consoles.size()],
 		CHIPS
 	)
 	for i in _boxes.size():

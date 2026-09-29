@@ -95,6 +95,29 @@ var window_size: Vector2i = LEAST_WINDOW
 var vsync: int = DisplayServer.VSYNC_ENABLED
 var fps_cap: int = 0
 
+## The languages the game ships, in the order the flag board lays them out, each with the
+## flag it wears (`assets/ui/flags/<code>.png`, ISO 3166) and its own name in itself.
+## `qps` is the pseudo-locale and is offered in debug builds only.
+const LANGUAGES: Array[Dictionary] = [
+	{"locale": "en", "flag": "us", "name": "English"},
+	{"locale": "pt_BR", "flag": "br", "name": "Português"},
+	{"locale": "es", "flag": "es", "name": "Español"},
+	{"locale": "de", "flag": "de", "name": "Deutsch"},
+	{"locale": "fr", "flag": "fr", "name": "Français"},
+	{"locale": "ja", "flag": "jp", "name": "日本語"},
+	{"locale": "zh_CN", "flag": "cn", "name": "简体中文"},
+	{"locale": "ko", "flag": "kr", "name": "한국어"},
+]
+const PSEUDO := {"locale": "qps", "flag": "unknown", "name": "Pseudo"}
+const TRANSLATIONS := "res://locale/translations.%s.translation"
+const Style := preload("res://scripts/style.gd")
+
+## Empty until chosen: the first launch reads the OS locale (`_os_language`).
+var language: String = ""
+
+## Emitted when the language changes, after `TranslationServer` and `Style` both have it.
+signal language_changed
+
 ## Emitted after any value is stored, so a scene that is up can re-read them. The board
 ## itself does not listen — it is the one that changed them.
 signal changed
@@ -103,6 +126,7 @@ signal changed
 func _ready() -> void:
 	_build_buses()
 	load_prefs()
+	_start_language()
 	apply_audio()
 	apply_window()
 	apply_frames()
@@ -229,6 +253,90 @@ func _take(key: StringName, value: Variant) -> bool:
 			push_error("Prefs.store: no such setting '%s'" % key)
 			return false
 	return true
+
+
+## Every language the chooser offers, the pseudo-locale in debug builds only.
+static func languages() -> Array:
+	var out: Array = LANGUAGES.duplicate()
+	if OS.is_debug_build():
+		out.append(PSEUDO)
+	return out
+
+
+static func _known(locale: String) -> bool:
+	for entry in languages():
+		if entry["locale"] == locale:
+			return true
+	return false
+
+
+## The shipped language nearest the machine's own: the whole locale first (`pt_BR`), then
+## its language alone (`pt` finds `pt_BR`), then English.
+static func _os_language() -> String:
+	var os := OS.get_locale()
+	var lang := os.split("_")[0]
+	for entry in LANGUAGES:
+		if entry["locale"] == os:
+			return entry["locale"]
+	for entry in LANGUAGES:
+		if str(entry["locale"]).split("_")[0] == lang:
+			return entry["locale"]
+	return "en"
+
+
+## The language in play: the one chosen, or the machine's own until one is.
+func current_language() -> String:
+	return language if language != "" else _os_language()
+
+
+## The table entry for the language in play.
+func current_entry() -> Dictionary:
+	var at := current_language()
+	for entry in languages():
+		if entry["locale"] == at:
+			return entry
+	return LANGUAGES[0]
+
+
+## Loaded here rather than listed in `project.godot`, which the open editor re-saves out of
+## its own memory. A locale whose `.translation` is missing is skipped, not an error: its
+## keys fall back to English through `TranslationServer`'s own fallback.
+func _load_translations() -> void:
+	for entry in languages():
+		var path: String = TRANSLATIONS % entry["locale"]
+		if ResourceLoader.exists(path):
+			TranslationServer.add_translation(load(path))
+
+
+func _start_language() -> void:
+	_load_translations()
+	apply_language()
+
+
+func apply_language() -> void:
+	var at := current_language()
+	TranslationServer.set_locale(at)
+	Style.set_locale(at)
+
+
+## Choose a language, apply it and write it.
+func set_language(locale: String) -> void:
+	if not _known(locale):
+		return
+	language = locale
+	apply_language()
+	save_prefs()
+	_redraw_all(get_tree().root)
+	language_changed.emit()
+
+
+## Every board draws its words in `_draw`, which only runs again when asked: a language
+## change asks every canvas item once, so nothing shows the old words until its next change.
+func _redraw_all(node: Node) -> void:
+	if node is CanvasItem:
+		(node as CanvasItem).queue_redraw()
+	for child in node.get_children():
+		_redraw_all(child)
 
 
 ## The binds are the board's to change; this is how they reach the file.

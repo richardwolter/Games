@@ -29,7 +29,8 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "Controls"
+static var TITLE: String:
+	get: return Text.CONTROLS_TITLE
 
 ## The board went 560 to 640 wide on 2026-09-17, to pay for the hint. It is short of room
 ## down the screen — 666 of the 680 the smallest frame leaves — and has plenty across it, and
@@ -61,24 +62,32 @@ const CELL_TALL := 22.0
 
 const CLOSE_SIZE := 44.0
 
-const RESET_LABEL := "Set to default"
-const CAPTURE_WORDS := "Press…"
+static var RESET_LABEL: String:
+	get: return Text.CONTROLS_DEFAULT
+static var CAPTURE_WORDS: String:
+	get: return Text.CONTROLS_CAPTURING
 
 ## What the two columns are, and the gesture the board would otherwise never mention. The
 ## hint stands in the left half of the same band, which is empty — so naming the columns and
 ## saying how to change one cost one row between them, not two.
-const KEY_HEAD := "Keyboard"
-const PAD_HEAD := "Gamepad"
-const HINT := "Click a cell and press · right-click resets"
+static var KEY_HEAD: String:
+	get: return Text.CONTROLS_COL_KEY
+static var PAD_HEAD: String:
+	get: return Text.CONTROLS_COL_PAD
+static var HINT: String:
+	get: return Text.CONTROLS_HINT
+## The same gesture said for the pad: A captures, X restores the picked cell.
+static var HINT_PAD: String:
+	get: return Text.of("CONTROLS_HINT_PAD")
 
 ## Putting every key back throws away fifteen rows of somebody's own arrangement, so it asks
 ## (Richard, 2026-09-17). The board next door's own question board.
-const CONFIRM_TITLE := "Are you sure?"
+const CONFIRM_TITLE := "CONFIRM_BINDS_TITLE"
 ## No line under the title: "Set to default" and "Keep current" each say what they do, and a
 ## sentence saying it a third time is a sentence nobody reads.
 const CONFIRM_WORDS := ""
-const CONFIRM_YES := "Set to default"
-const CONFIRM_NO := "Keep current"
+const CONFIRM_YES := "CONFIRM_BINDS_YES"
+const CONFIRM_NO := "CONFIRM_BINDS_NO"
 
 ## A row that has just had a binding moved into it: the plate a step lighter with a lit edge
 ## along its top, which is how the shop says "this one". It was the frame's oak, a swatch
@@ -117,11 +126,14 @@ const SWAP_SHOWN := 2.0
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
 	resized.connect(_lay_out)
+	Prefs.language_changed.connect(_lay_out)
 	set_process(false)
 	_lay_out()
 
@@ -134,7 +146,7 @@ func _plan() -> Array:
 	for row: Dictionary in Binds.rows():
 		if String(row["group"]) != group:
 			group = String(row["group"])
-			plan.append({"kind": &"head", "label": group})
+			plan.append({"kind": &"head", "label": Text.of(group)})
 		plan.append({"kind": &"bind", "row": row})
 	plan.append({"kind": &"foot"})
 	return plan
@@ -185,7 +197,10 @@ func _ribbon() -> Rect2:
 ## point of it. Handled at once, so a key pressed into a cell never also does what it is
 ## bound to.
 func _input(event: InputEvent) -> void:
-	if not visible or _capture_action == &"":
+	if not visible:
+		return
+	if _capture_action == &"":
+		_pad_restore(event)
 		return
 	if event is InputEventMouseMotion:
 		return
@@ -368,10 +383,11 @@ func _draw_columns(box: Rect2) -> void:
 		return
 	# Said only where it fits whole: a gesture explained halfway is not explained.
 	var room := key_box.position.x - CELL_GAP - box.position.x
-	if Style.measure(HINT, Style.TEXT_TINY).x > room:
+	var hint := HINT_PAD if Pad.is_pad() else HINT
+	if Style.measure(hint, Style.TEXT_TINY).x > room:
 		return
 	Style.write(
-		self, HINT, Style.TEXT_TINY, Vector2(box.position.x, base), Style.PAPER_SOFT
+		self, hint, Style.TEXT_TINY, Vector2(box.position.x, base), Style.PAPER_SOFT
 	)
 	hint_shown = true
 
@@ -397,9 +413,9 @@ func _draw_bind(box: Rect2, row: Dictionary) -> void:
 	Style.plate(self, box, plate)
 	if over:
 		Style.lit_edge(self, box, plate)
-	var label := String(row["label"])
+	var label := Text.of(String(row["label"]))
 	if over:
-		label += "  — moved here"
+		label = Text.CONTROLS_MOVED % label
 	Style.write(
 		self, label, Style.TEXT_SMALL,
 		Vector2(box.position.x + ROW_INSET, box.position.y + (box.size.y + float(Style.TEXT_SMALL) * 0.62) * 0.5),
@@ -468,3 +484,37 @@ func _draw_foot(box: Rect2) -> void:
 		Vector2(0.0, plank.position.y + (plank.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
 		Style.INK if live else Style.BOARD_INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER, plank
 	)
+
+
+## The pad's X on a picked cell puts it back to the table's own: the pad's right-click
+## (2026-09-26, `/grill-me` with Richard).
+func _pad_restore(event: InputEvent) -> void:
+	var button := event as InputEventJoypadButton
+	if button == null or not button.pressed or button.button_index != JOY_BUTTON_X:
+		return
+	if _confirm != null and _confirm.visible:
+		return
+	var key: Variant = Pad.focus_key()
+	if not (key is int) or key < 0 or key >= _cells.size() or _cells[key]["kind"] != &"cell":
+		return
+	Binds.restore(_cells[key]["action"], _cells[key]["column"])
+	Prefs.save_binds()
+	Sfx.ui(&"ui_click")
+	queue_redraw()
+	get_viewport().set_input_as_handled()
+
+
+## Every cell and the reset plank for the pad's stick, and the close cross.
+func pad_focus() -> Array:
+	var out: Array = []
+	for i in _cells.size():
+		out.append({"box": _cells[i]["box"], "key": i, "first": i == 0})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close"})
+	return out
+
+
+## While a cell is listening for its new binding, the stick and the D-pad are what is being
+## bound, not a way off the cell.
+func pad_hold() -> bool:
+	return _capture_action != &""

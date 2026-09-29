@@ -492,7 +492,17 @@ func _draw_specks(on: CanvasItem) -> void:
 
 
 ## The crowns and the drops, on the Crowns child, which bubbles them like the foam collar.
+##
+## Every ring, mound, plume and drop goes into one triangle array: one draw command however
+## many are up (2026-09-26, Richard: a big net lagged, above all lucky or doubled). Every
+## piece a sweep lifts throws a crown of its own, so a full Catch landing with a lucky hold
+## and a second net put sixty-odd crowns up at once, and drawn as four `draw_colored_polygon`s
+## each (every one triangulated and drawn on its own) plus a rect per drop, that was most of
+## the frame for the crowns' whole life. The shapes are laid out exactly as before.
 func _draw_crowns(on: CanvasItem) -> void:
+	var points := PackedVector2Array()
+	var colours := PackedColorArray()
+	var indices := PackedInt32Array()
 	for c in _crown_age.size():
 		var t := _crown_age[c] / CROWN_LIFE
 		var span := _crown_span[c]
@@ -512,8 +522,8 @@ func _draw_crowns(on: CanvasItem) -> void:
 		# On the frame a splash is born the ring has no radius at all, and a band with no
 		# radius is nothing; the old filled disc could not be triangulated there either.
 		if ring > 1.0:
-			_band(
-				on, at, Vector2(ring, ring * 0.5),
+			_band_into(
+				points, colours, indices, at, Vector2(ring, ring * 0.5),
 				maxf(span * RING_THICK, Lake.ART_PIXEL), Color(FOAM, alpha * RING_ALPHA)
 			)
 		# Likewise at the other end: the crown has collapsed to nothing before it has
@@ -521,7 +531,8 @@ func _draw_crowns(on: CanvasItem) -> void:
 		if height <= 0.5 or width <= 0.5:
 			continue
 		# The mound next, so the plumes stand in it rather than on top of it.
-		on.draw_colored_polygon(_mound(at, width, height * 0.3), Color(FOAM, alpha * 0.9))
+		_fan_into(points, colours, indices, _mound(at, width, height * 0.3),
+			Color(FOAM, alpha * 0.9))
 		if _crown_tall[c] == 0:
 			continue
 		# Three plumes: one up the middle and one leaning out each way. Two alone
@@ -532,13 +543,11 @@ func _draw_crowns(on: CanvasItem) -> void:
 		var lean := 1.0 + (_unroll(roll, 1.0) * 2.0 - 1.0) * CROWN_VARY
 		var tilt := (_unroll(roll, 2.0) * 2.0 - 1.0) * CROWN_VARY
 		var broad := 1.0 + (_unroll(roll, 3.0) * 2.0 - 1.0) * CROWN_VARY
-		on.draw_colored_polygon(
-			_plume(at, -1.0, width, height * 0.8 * (1.0 + tilt), lean), ink
-		)
-		on.draw_colored_polygon(
-			_plume(at, 1.0, width, height * 0.8 * (1.0 - tilt), lean), ink
-		)
-		on.draw_colored_polygon(_plume(at, 0.0, width * 0.5 * broad, height), ink)
+		_strip_into(points, colours, indices,
+			_plume(at, -1.0, width, height * 0.8 * (1.0 + tilt), lean), ink)
+		_strip_into(points, colours, indices,
+			_plume(at, 1.0, width, height * 0.8 * (1.0 - tilt), lean), ink)
+		_strip_into(points, colours, indices, _plume(at, 0.0, width * 0.5 * broad, height), ink)
 
 	for i in _drop_life.size():
 		# Drops fade over their last quarter only. Fading from the moment they leave
@@ -547,10 +556,47 @@ func _draw_crowns(on: CanvasItem) -> void:
 		# A drop is a whole number of art pixels square, never a circle: the smallest are
 		# one pixel of foam. It glides between pixels as everything moving on the lake does.
 		var side := maxf(roundf(_drop_size[i] * 2.0 / Lake.ART_PIXEL), 1.0) * Lake.ART_PIXEL
-		on.draw_rect(
-			Rect2(_drop_pos[i] - Vector2(side, side) * 0.5, Vector2(side, side)),
-			Color(FOAM, fade * PEAK_ALPHA)
+		var corner := _drop_pos[i] - Vector2(side, side) * 0.5
+		_fan_into(points, colours, indices, PackedVector2Array([
+			corner, corner + Vector2(side, 0.0), corner + Vector2(side, side),
+			corner + Vector2(0.0, side),
+		]), Color(FOAM, fade * PEAK_ALPHA))
+	if not indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			on.get_canvas_item(), indices, points, colours
 		)
+
+
+## A shape that every point of can see its first point from — the mound (an arc over its own
+## base) and a drop's square — appended as a fan off that point.
+func _fan_into(
+	points: PackedVector2Array, colours: PackedColorArray, indices: PackedInt32Array,
+	shape: PackedVector2Array, colour: Color
+) -> void:
+	var first := points.size()
+	for p in shape:
+		points.append(p)
+		colours.append(colour)
+	for i in range(1, shape.size() - 1):
+		indices.append_array([first, first + i, first + i + 1])
+
+
+## A plume as `_plume` lays it out — up one side of the spine and back down the other —
+## appended as the strip of quads between the two sides.
+func _strip_into(
+	points: PackedVector2Array, colours: PackedColorArray, indices: PackedInt32Array,
+	shape: PackedVector2Array, colour: Color
+) -> void:
+	var first := points.size()
+	for p in shape:
+		points.append(p)
+		colours.append(colour)
+	var count := shape.size()
+	var half := count / 2
+	for i in half - 1:
+		var up := first + i
+		var down := first + count - 1 - i
+		indices.append_array([up, up + 1, down - 1, up, down - 1, down])
 
 
 ## One plume of a crown: a tapered sheet of water arcing up and outward, built as a

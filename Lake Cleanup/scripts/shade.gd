@@ -32,6 +32,19 @@ static func lying(at: Vector2, lean: float, stretch: float) -> Transform2D:
 	)
 
 
+## Like `lying`, but the picture's width is laid across the shadow's own direction rather
+## than kept level. Under the shear a trunk or a post three pixels wide keeps its three
+## pixels *across the screen*, so when the shadow runs mostly sideways it is a line with no
+## thickness and the crown's or the plank's shadow floats apart from what casts it
+## (2026-09-28, Richard). This turns the picture onto the shadow's heading, so a pole's
+## shadow is a pole's width wide whichever way it falls. For props and the piers' signs; the
+## walkers keep `lying`.
+static func cast(at: Vector2, lean: float, stretch: float) -> Transform2D:
+	var down := Vector2(lean, maxf(stretch, 0.02) * 0.5)
+	var across := Vector2(down.y, -down.x).normalized()
+	return Transform2D(across, -down, at)
+
+
 ## The ink a shadow is drawn in, at the strength the day says.
 static func tint(ink: float) -> Color:
 	return Color(INK.r, INK.g, INK.b, clampf(ink, 0.0, 1.0))

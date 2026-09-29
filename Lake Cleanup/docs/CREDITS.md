@@ -97,6 +97,8 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   hand-fixed by Richard in `art_source/Character_Sprite_Sheet.psd`. Same AI-disclosure notes
   as the net art above apply.
 
+- **assets/ui/flags/*.png (language flags)** — DaFluffyPotato's 15x10 pixel flags (`marketing/flags_15x10/`). Free to use, credit not required but appreciated; credited on the in-game credits board as "Flags by DaFluffyPotato". Nine copied: us, br, es, de, fr, jp, cn, kr and unknown (the debug pseudo-locale). Added 2026-09-26 for the language chooser.
+
 ## Font
 
 - **Bungee-Regular.ttf** — Google Font by David Jonathan Ross, "Bungee" family. ✅ **SIL Open

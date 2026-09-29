@@ -49,7 +49,7 @@ const ARROW_BOB := 2.0
 const ARROW_LIFT := 6.0
 
 ## The note: a paper card beside the box, in canvas pixels.
-const NOTE_TEXT := "Objects caught go to the recycle box so boats can take them to piers for money"
+## The note's sentence is `Text.STEPS_NOTE`, read at draw time.
 const NOTE_WIDE := 200.0
 ## A pixel under `Style.TEXT_TINY`, so the sentence sits in four lines with none alone.
 const NOTE_SIZE := 10
@@ -223,7 +223,7 @@ func _ellipse(xf: Transform2D, at: Vector2, half_wide: float) -> PackedVector2Ar
 func _note(box_at: Vector2) -> void:
 	var face := Style.font()
 	var size_px := NOTE_SIZE
-	var lines := _wrap(NOTE_TEXT, face, size_px, NOTE_WIDE - NOTE_PAD.x * 2.0)
+	var lines := _wrap(Text.STEPS_NOTE, face, size_px, NOTE_WIDE - NOTE_PAD.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
 	var tall := line_tall * lines.size() + NOTE_PAD.y * 2.0
 	var box := Rect2(_on_screen(box_at + NOTE_FROM_BOX), Vector2(NOTE_WIDE, tall).round())

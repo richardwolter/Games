@@ -26,6 +26,13 @@ const METER_EASE := 2.2
 ## the first thousand.
 const MONEY_RUN := 6.0
 const MONEY_LEAST := 12.0
+## A spend's "-X" tag: how long it lives, how far it falls in that time (a share of the
+## plate's height), and how many can be up at once. First guesses.
+const SPENT_LIFE := 1.4
+const SPENT_FALL := 0.9
+const SPENT_MOST := 4
+## A warm red, lifted to read over the lake and the shop's dim alike.
+const SPENT_INK := Color(0.93, 0.42, 0.34)
 
 ## How long a payment keeps the plate lit, in seconds, and how far the **coin** swells and
 ## the figure brightens at the moment it lands. Small: this happens every time a boat
@@ -91,7 +98,7 @@ const STOCK_MARK_PAD := 6.0
 ## money and labelled "In stock" it read as a second purse. The word is the whole fix, by
 ## decision: the number rising is the clearest sign the fleet cannot keep up, but saying so
 ## with a trend mark is a fleet readout, and that was left out of this pass.
-const STOCK_LABEL := "Waiting"
+## The plate's word is `Text.HUD_WAITING`, read at draw time so a language switch shows at once.
 
 ## How the count runs toward the true one when it changes — as a fraction of the gap a
 ## second, and the least it may move — and how long the glow behind it lasts after it lands.
@@ -108,7 +115,7 @@ const STOCK_GLOW := 0.5
 const STOCK_SAMPLE := "99999"
 
 ## What the upgrades button calls itself, under the count's badge.
-const UPGRADES_LABEL := "Upgrades"
+## The button's word is `Text.HUD_UPGRADES`, read at draw time.
 const STOCK_PAD := 10.0
 
 ## The sprites the buttons carry, lent by the lake — see `hud_buttons.gd` for the keys.
@@ -192,6 +199,10 @@ const SIEGE_PIP := 13.0
 
 ## The figure actually on the plate, and how brightly it is still lit from the last payment.
 var _shown_money: float = 0.0
+## The money as it was last frame, to tell a spend from the figure still running, and the
+## "-X" tags falling off the plate: `{amount, age}`.
+var _last_money: float = 0.0
+var _spent: Array[Dictionary] = []
 
 ## The stock figure as drawn, running toward `stock`, and how much glow it has left.
 var _shown_stock: float = 0.0
@@ -304,7 +315,7 @@ func _lay_out() -> void:
 	var stock_face := _stock_face_tall()
 	var stock_wide := (
 		float(Style.BORDER_WALL * 2) + STOCK_PAD * 2.0 + (stock_face - STOCK_MARK_PAD * 2.0)
-		+ STOCK_MARK_PAD + Style.measure(STOCK_LABEL, _stock_label_size()).x + STOCK_MARK_PAD
+		+ STOCK_MARK_PAD + Style.measure(Text.HUD_WAITING, _stock_label_size()).x + STOCK_MARK_PAD
 		+ Style.measure(STOCK_SAMPLE, _stock_count_size()).x + 12.0
 	)
 	_stock_box = Rect2(EDGE + 2.0, EDGE, stock_wide, STOCK_TALL)
@@ -355,9 +366,23 @@ func _process(delta: float) -> void:
 			money
 		)
 	elif money < _shown_money:
-		# Spending is not a thing to celebrate, and a price the player just agreed to needs
-		# no announcing. It simply drops.
-		_shown_money = money
+		# Spent (2026-09-26, Richard): the figure runs down at the pace it runs up, and what
+		# left drops off the plate as a "-X" tag. No shine: spending is not a thing to
+		# celebrate. A tag is only made for money that goes while the figure is at rest, so a
+		# second buy during the run adds its own tag rather than folding into the first.
+		if money < _last_money:
+			_spent.append({"amount": roundi(_last_money - money), "age": 0.0})
+			if _spent.size() > SPENT_MOST:
+				_spent.pop_front()
+		_shown_money = maxf(
+			_shown_money - maxf((_shown_money - money) * MONEY_RUN, MONEY_LEAST) * delta,
+			money
+		)
+	_last_money = money
+	for tag: Dictionary in _spent:
+		tag["age"] = float(tag["age"]) + delta
+	while not _spent.is_empty() and float(_spent[0]["age"]) >= SPENT_LIFE:
+		_spent.pop_front()
 	_repaint()
 
 
@@ -423,10 +448,17 @@ func _repaint() -> void:
 ## figure creeping through the sixth decimal does not count as a change.
 func _paint_key() -> int:
 	return hash([
-		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0),
+		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
 		stock, available, hint, _hovered, siege.hash()
 	])
+
+
+func _spent_key() -> int:
+	var key := 0
+	for tag: Dictionary in _spent:
+		key = key * 31 + roundi(float(tag["age"]) * 60.0)
+	return key
 
 
 func _draw() -> void:
@@ -894,10 +926,10 @@ func _draw_stock() -> void:
 	var label_size := _stock_label_size()
 	var count_size := _stock_count_size()
 	Style.write(
-		self, STOCK_LABEL, label_size,
+		self, Text.HUD_WAITING, label_size,
 		Vector2(x, middle + float(label_size) * 0.35), Style.RIBBON_INK
 	)
-	x += Style.measure(STOCK_LABEL, label_size).x + STOCK_MARK_PAD
+	x += Style.measure(Text.HUD_WAITING, label_size).x + STOCK_MARK_PAD
 	# The count, on a sunken panel the colour of the box's hollow, in the mark's blue. The
 	# panel is inset by `HudButtons.PANEL_INSET`, not five pixels: the wood takes thirty of the plate's
 	# height whatever its size, so on a plate this short a generous inset is what would push
@@ -993,7 +1025,7 @@ func _recycle_shapes(box: Rect2) -> Array:
 ## back rather than hidden.
 func _draw_available() -> void:
 	var face := HudButtons.face_of(_lifted(_upgrades_box, &"upgrades"))
-	HudButtons.label(self, face, UPGRADES_LABEL)
+	HudButtons.label(self, face, Text.HUD_UPGRADES)
 	HudButtons.badge(self, face, str(available), available > 0, pulse_amount(&"upgrades"))
 
 
@@ -1026,3 +1058,16 @@ func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
 		HORIZONTAL_ALIGNMENT_CENTER,
 		plate
 	)
+	for tag: Dictionary in _spent:
+		var t := float(tag["age"]) / SPENT_LIFE
+		var fall := roundf(plate.size.y * SPENT_FALL * (1.0 - pow(1.0 - t, 2.0)))
+		var fade := 1.0 - t * t
+		Style.write(
+			on,
+			"-%d" % int(tag["amount"]),
+			Style.step(float(height) * 0.8),
+			Vector2(0.0, baseline + plate.size.y * 0.75 + fall),
+			Color(SPENT_INK.r, SPENT_INK.g, SPENT_INK.b, fade),
+			HORIZONTAL_ALIGNMENT_CENTER,
+			plate
+		)

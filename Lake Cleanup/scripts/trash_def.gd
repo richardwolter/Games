@@ -16,6 +16,12 @@ enum Kind { PLASTIC, WOOD, METAL, RUBBER }
 ## The four, in enum order, for anything that needs to name one.
 const KIND_NAMES := ["Plastic", "Wood", "Metal", "Rubber"]
 
+
+## A material's name as the player reads it, in the language in play. `KIND_NAMES` stays
+## the English identifier.
+static func kind_label(kind: int) -> String:
+	return Text.of("MATERIAL_" + String(KIND_NAMES[kind]).to_upper())
+
 @export var display_name: String = "Bottle"
 
 ## Which of the four dropoffs takes it.

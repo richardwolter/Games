@@ -24,15 +24,15 @@ class_name Farewell
 extends Control
 
 ## The words. Two lines because they are two thoughts: what the player did, and goodbye.
-const LINES := [
-	"You have cleaned your lake and can now live in peace.",
-	"Thanks for playing!",
-]
+static var LINES: Array:
+	get: return [Text.END_LINE_1, Text.END_LINE_2]
 
 ## And under them, the door out of the peace. Only drawn when the screen is given one — the
 ## end of the last level is still an end, and should not be a corridor.
-const ONWARD_HINT := "Something is stirring in the water."
-const ONWARD_LABEL := "Face it"
+static var ONWARD_HINT: String:
+	get: return Text.END_ONWARD_HINT
+static var ONWARD_LABEL: String:
+	get: return Text.END_ONWARD
 
 ## The padding around the door's label. Its text size comes off the shared ladder.
 const ONWARD_PAD := Vector2(34.0, 16.0)
@@ -117,11 +117,12 @@ signal onward
 ## fishing an empty lake is the other choice, not the only one.
 signal to_menu
 
-const MENU_LABEL := "Back to menu"
+static var MENU_LABEL: String:
+	get: return Text.END_BACK
 
 ## The words actually shown. Defaults to LINES, and is set to something else by a level
 ## whose ending is not the cleaned lake.
-var lines: Array = LINES
+var lines: Array = []
 
 var _font: Font
 ## 0 to 1 on the way in, and back to 0 on the way out.
@@ -150,6 +151,8 @@ var _icon: TextureRect
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	_font = Style.font()
@@ -505,9 +508,10 @@ func _draw() -> void:
 	# Lifted a little as it arrives: the words settle onto the lake rather than appearing
 	# on it.
 	top += (1.0 - fade) * size.y * 0.03
-	_line(String(lines[0]), int(first), top + first, ink, shade)
+	var said := lines if not lines.is_empty() else LINES
+	_line(String(said[0]), int(first), top + first, ink, shade)
 	var second_baseline := top + first + first * GAP
-	_line(String(lines[1]), int(second), second_baseline, ink, shade)
+	_line(String(said[1]), int(second), second_baseline, ink, shade)
 	var under := second_baseline
 	# The doors wait for the roll: a plaque under a climbing credit is one nobody can aim at,
 	# and the credits pass over exactly the band they stand in.
@@ -568,3 +572,18 @@ func _line(text: String, height: int, baseline: float, ink: Color, shade: Color)
 		Color(ink.r, ink.g, ink.b, 1.0), HORIZONTAL_ALIGNMENT_CENTER,
 		Rect2(0.0, baseline, size.x, 1.0), ink.a
 	)
+
+
+## The ending for the pad's stick. While the credits climb, one stop over the whole screen
+## and no ring (A runs them off, as a click does); after, the doors under the words.
+func pad_focus() -> Array:
+	if _leaving:
+		return []
+	if _rolling:
+		return [{"box": Rect2(Vector2.ZERO, size), "key": &"skip", "ring": false}]
+	var out: Array = []
+	if _menu_rect.size != Vector2.ZERO:
+		out.append({"box": _menu_rect, "key": &"menu", "first": true})
+	if _has_onward and _onward_rect.size != Vector2.ZERO:
+		out.append({"box": _onward_rect, "key": &"onward"})
+	return out

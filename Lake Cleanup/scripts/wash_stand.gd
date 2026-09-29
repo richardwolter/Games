@@ -391,6 +391,12 @@ func put(what: StringName) -> void:
 	_roll_coat()
 	_fit()
 	state = State.WASHING
+	# Parked on the find, and deaf to the player until the press that chose it is let go and
+	# `WAKE_AFTER` has run (2026-09-26, Richard: the nozzle chased the pointer and the choosing
+	# click sprayed). Only the player's paths ask `awake`; `spray` itself stays open to probes.
+	_aim = piece_box().get_center()
+	_await_release = true
+	_asleep = WAKE_AFTER
 
 
 func _pick_inks() -> void:
@@ -554,6 +560,9 @@ func spray(at: Vector2, on: bool) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if not awake():
+		accept_event()
+		return
 	var button := event as InputEventMouseButton
 	if button != null and button.button_index == MOUSE_BUTTON_LEFT:
 		spray(button.position, button.pressed)
@@ -571,6 +580,7 @@ func _process(delta: float) -> void:
 		return
 	_clock += delta
 	_tick = int(_clock * PIXEL_FPS)
+	_drive_wake(delta)
 	_drive_jet(delta)
 	_drive_runs(delta)
 	_drive_flecks(delta)
@@ -1350,3 +1360,24 @@ static func _hash(a: int, b: int, c: int = 0) -> float:
 	var h := (a * 374761393 + b * 668265263 + c * 1274126177) & 0x7fffffff
 	h = ((h ^ (h >> 13)) * 1103515245) & 0x7fffffff
 	return float(h ^ (h >> 16)) / 2147483648.0
+
+
+## How long the nozzle stays parked after the press that put the find up has been let go.
+const WAKE_AFTER := 0.4
+var _await_release := false
+var _asleep := 0.0
+
+
+## Whether the player's hand has the nozzle yet: the choosing press let go, and the wait run.
+func awake() -> bool:
+	return not _await_release and _asleep <= 0.0
+
+
+func _drive_wake(delta: float) -> void:
+	if _await_release:
+		_await_release = (
+			Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+			or Input.is_action_pressed(&"interact") or Input.is_action_pressed(&"cast")
+		)
+		return
+	_asleep = maxf(_asleep - delta, 0.0)

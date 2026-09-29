@@ -1995,19 +1995,65 @@ static func rope_curve(points: PackedVector2Array) -> PackedVector2Array:
 	return out
 
 
+## A line `wide` across down `line`, as one triangle strip whose every joint is mitred (the
+## miter held to `ROPE_MITER_MOST` widths on a hairpin), capped with a disc at each end.
+static func _rope_strip(on: CanvasItem, line: PackedVector2Array, wide: float, colour: Color) -> void:
+	var n := line.size()
+	if n < 2:
+		return
+	var half := wide * 0.5
+	var verts := PackedVector2Array()
+	verts.resize(n * 2)
+	for i in n:
+		var before := (line[i] - line[maxi(i - 1, 0)]).normalized()
+		var after := (line[mini(i + 1, n - 1)] - line[i]).normalized()
+		if before == Vector2.ZERO:
+			before = after
+		if after == Vector2.ZERO:
+			after = before
+		var tangent := (before + after).normalized()
+		if tangent == Vector2.ZERO:
+			tangent = after
+		var normal := Vector2(-tangent.y, tangent.x)
+		var fit := normal.dot(Vector2(-after.y, after.x))
+		var reach := half / maxf(absf(fit), 1.0 / ROPE_MITER_MOST)
+		verts[i * 2] = line[i] + normal * reach
+		verts[i * 2 + 1] = line[i] - normal * reach
+	var indices := PackedInt32Array()
+	indices.resize((n - 1) * 6)
+	for i in n - 1:
+		var a := i * 2
+		indices[i * 6] = a
+		indices[i * 6 + 1] = a + 1
+		indices[i * 6 + 2] = a + 3
+		indices[i * 6 + 3] = a
+		indices[i * 6 + 4] = a + 3
+		indices[i * 6 + 5] = a + 2
+	var colours := PackedColorArray()
+	colours.resize(n * 2)
+	colours.fill(colour)
+	RenderingServer.canvas_item_add_triangle_array(on.get_canvas_item(), indices, verts, colours)
+	on.draw_circle(line[0], half, colour)
+	on.draw_circle(line[n - 1], half, colour)
+
+
+## How far a mitred joint may reach, in half-widths, before a hairpin is cut short.
+const ROPE_MITER_MOST := 3.0
+
+
 ## Draw the rope along `line` onto `on`: the edge, the core inside it, then a twist mark every
 ## ROPE_PITCH pixels, slanted across the rope the same way all the way along.
 static func _draw_rope(on: CanvasItem, points: PackedVector2Array) -> void:
 	# Drawn through a smooth curve rather than the chain's own points: straight between them,
 	# every bend was a corner, and `draw_polyline` draws no joints, so the thick line's outer
 	# edges parted at each one. Discs at every drawn point fill what is left of a joint.
+	#
+	# Each of the two is one mitred strip, its joints closed by construction, with a disc at
+	# either end only (2026-09-26): a disc at every drawn point — six hundred of them on a
+	# rope thrown to the end of the range — was most of what the rope cost a frame.
 	var line := rope_curve(points)
-	on.draw_polyline(line, ROPE_EDGE, ROPE_WIDE)
-	for at in line:
-		on.draw_circle(at, ROPE_WIDE * 0.5, ROPE_EDGE)
-	on.draw_polyline(line, ROPE_CORE, ROPE_WIDE - 1.6)
-	for at in line:
-		on.draw_circle(at, (ROPE_WIDE - 1.6) * 0.5, ROPE_CORE)
+	_rope_strip(on, line, ROPE_WIDE, ROPE_EDGE)
+	_rope_strip(on, line, ROPE_WIDE - 1.6, ROPE_CORE)
 	var half := (ROPE_WIDE - 1.6) * 0.5
 	# Walked by distance rather than by segment, so the twists stay evenly spaced where the
 	# sag bunches the points together and where it stretches them apart.

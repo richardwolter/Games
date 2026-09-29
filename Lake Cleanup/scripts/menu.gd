@@ -39,13 +39,16 @@ signal reload_asked(fresh: bool)
 ## and the lit edge the shop's affordable rows carry. Only ever one of them, or the accent
 ## says nothing.
 const DOORS := [
-	{"key": &"continue", "label": "Continue"},
-	{"key": &"new", "label": "New game"},
-	{"key": &"settings", "label": "Settings"},
-	{"key": &"how", "label": "How to play"},
-	{"key": &"credits", "label": "Credits"},
-	{"key": &"quit", "label": "Quit"},
+	{"key": &"continue", "label": &"MENU_CONTINUE"},
+	{"key": &"new", "label": &"MENU_NEW"},
+	{"key": &"settings", "label": &"MENU_SETTINGS"},
+	{"key": &"how", "label": &"MENU_HOW"},
+	{"key": &"credits", "label": &"MENU_CREDITS"},
+	{"key": &"quit", "label": &"MENU_QUIT"},
 ]
+## The language flag's button, and its inset from the window's top right corner.
+const FLAG_BUTTON := Vector2(72.0, 56.0)
+const FLAG_INSET := Vector2(24.0, 24.0)
 ## Where the stack stands: **centred on the logo's own axis, directly under it**
 ## (2026-09-17), so the title and the doors read as one block. `DROP` is the gap between the
 ## logo's foot and the first plank, in the design frame.
@@ -90,6 +93,10 @@ var _credits: CreditsBoard
 ## only way back to it once the intro is over.
 var _letter: Letter
 var _confirm: MenuConfirm
+## The language chooser (2026-09-26): a flag in the top right corner, apart from the doors
+## and from the settings, opening a board of flags.
+var _flag: PlankButton
+var _languages: LanguageBoard
 ## Whether the doors answer. Not while the menu is fading either way: a plank pressed on its
 ## way out is a second answer to a question already answered.
 var _live: bool = false
@@ -98,6 +105,7 @@ var _fade: Tween
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
+	add_to_group(Pad.FOCUS_GROUP)
 	# Sized by hand rather than by anchors: the parent is a CanvasLayer, and a Control whose
 	# parent is not a Control is laid out by nobody. See `Farewell._fill`.
 	get_viewport().size_changed.connect(_fill)
@@ -123,13 +131,23 @@ func _ready() -> void:
 	for door: Dictionary in DOORS:
 		var plank := PlankButton.new()
 		plank.name = StringName("Door_" + String(door["key"]))
-		plank.label = String(door["label"])
+		plank.label = Text.of(door["label"])
 		plank.size = PLANK
 		# The doors into the lake play the start sound rather than a click; `_take` decides.
 		plank.clicks = false
+		plank.water = true
 		plank.pressed.connect(_take.bind(door["key"] as StringName))
 		add_child(plank)
 		_planks[door["key"]] = plank
+
+	_flag = PlankButton.new()
+	_flag.name = &"Language"
+	_flag.mark = &"flag"
+	_flag.size = FLAG_BUTTON
+	_flag.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_flag.pressed.connect(_take.bind(&"language"))
+	add_child(_flag)
+	Prefs.language_changed.connect(_on_language)
 
 	_settings = SettingsSkin.new()
 	_settings.name = &"Settings"
@@ -157,6 +175,13 @@ func _ready() -> void:
 	_letter.visible = false
 	_letter.close_asked.connect(_shut.bind(_show_letter))
 	add_child(_letter)
+
+	_languages = LanguageBoard.new()
+	_languages.name = &"Languages"
+	_languages.visible = false
+	_languages.close_asked.connect(_shut.bind(_show_languages))
+	_languages.picked.connect(func(_at: String) -> void: _show_languages(false))
+	add_child(_languages)
 
 	_confirm = MenuConfirm.new()
 	_confirm.name = &"Confirm"
@@ -190,7 +215,7 @@ func _band() -> GradientTexture2D:
 func _fill() -> void:
 	position = Vector2.ZERO
 	size = get_viewport().get_visible_rect().size
-	for over: Control in [_scrim, _settings, _controls, _credits, _letter, _confirm]:
+	for over: Control in [_scrim, _settings, _controls, _credits, _letter, _languages, _confirm]:
 		over.position = Vector2.ZERO
 		over.size = size
 	_lay_out()
@@ -205,6 +230,9 @@ func _lay_out() -> void:
 	var tall := wide * float(LOGO.get_height()) / float(LOGO.get_width())
 	_logo.position = (LOGO_AT * frame).floor()
 	_logo.size = Vector2(wide, tall).floor()
+	_flag.flag = LanguageBoard.flag_of(Prefs.current_entry())
+	_flag.size = FLAG_BUTTON
+	_flag.position = Vector2(size.x - FLAG_INSET.x - FLAG_BUTTON.x, FLAG_INSET.y).floor()
 	var shown: Array = []
 	for door: Dictionary in DOORS:
 		var key: StringName = door["key"]
@@ -229,7 +257,7 @@ func _lay_out() -> void:
 ## cover) or faded in (the way back from the game, out of the dark the pose was struck in).
 func show_up(at_once: bool = false) -> void:
 	_kill_fade()
-	for over: Control in [_settings, _controls, _credits, _letter, _confirm]:
+	for over: Control in [_settings, _controls, _credits, _letter, _languages, _confirm]:
 		over.visible = false
 	visible = true
 	_live = true
@@ -271,7 +299,7 @@ func _take(key: StringName) -> void:
 	var asks := key == &"new" and has_run
 	if key == &"quit":
 		Sfx.ui(&"ui_close")
-	elif key in [&"settings", &"credits", &"how"] or asks:
+	elif key in [&"settings", &"credits", &"how", &"language"] or asks:
 		# A question only; the start sound waits for the answer.
 		Sfx.ui(&"ui_click")
 	match key:
@@ -288,6 +316,8 @@ func _take(key: StringName) -> void:
 			_show_letter(true)
 		&"credits":
 			_show_credits(true)
+		&"language":
+			_show_languages(true)
 		&"quit":
 			get_tree().quit()
 
@@ -355,6 +385,23 @@ func _show_credits(open: bool) -> void:
 		music.set_ending(open)
 
 
+func _show_languages(open: bool) -> void:
+	_languages.visible = open
+
+
+## A language picked: the doors carry their words as labels, so they are set again, and
+## the flag in the corner changes with them.
+func _on_language() -> void:
+	for door: Dictionary in DOORS:
+		(_planks[door["key"]] as PlankButton).label = Text.of(door["label"])
+	_lay_out()
+
+
+## The language board, for the harness and the probes.
+func languages() -> LanguageBoard:
+	return _languages
+
+
 func _show_confirm(open: bool) -> void:
 	_confirm.visible = open
 
@@ -380,6 +427,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			if _confirm.visible:
 				_shut(_show_confirm)
+			elif _languages.visible:
+				_shut(_show_languages)
 			elif _controls.visible:
 				_shut(_show_controls)
 			elif _letter.visible:
@@ -400,3 +449,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			))
 			Prefs.apply_window()
 			get_viewport().set_input_as_handled()
+
+
+## The doors for the pad's stick (scripts/pad.gd): the planks down the stack, the accented
+## one picked first, and the flag in the corner. None while a board is over them — a board
+## that knows the stick answers for itself, and one that does not yet is the pointer's.
+func pad_focus() -> Array:
+	if not live():
+		return []
+	for over: Control in [_settings, _controls, _credits, _letter, _languages, _confirm]:
+		if over.visible:
+			return []
+	var out: Array = []
+	for door: Dictionary in DOORS:
+		var plank: PlankButton = _planks[door["key"]]
+		if plank.visible:
+			out.append({"box": plank.get_rect(), "key": door["key"], "first": plank.accent})
+	out.append({"box": _flag.get_rect(), "key": &"language"})
+	return out

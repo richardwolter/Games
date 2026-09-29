@@ -30,10 +30,10 @@ const ShedShelf := preload("res://scripts/shed_shelf.gd")
 ## anywhere — no modifier, no magnet to a neighbour — by decision: one gesture, one thing.
 ##
 ## `CELL` stays the **walkers'** grid. The player and the dog move in cells (`_you_at`,
-## `_dog_at`, `_feet_keep`, `REACH`, the glow radii) and `_taken` blocks whole cells, because
+## `_dog_at`, `_feet_keep`, `REACH`, the glow radii) and `_blockers` blocks whole cells, because
 ## per-pixel collision is sixty-four times the entries for a difference nobody can feel. The
 ## two units therefore meet in a handful of places, and every one of them divides by `CELL`
-## on the way: `_foot_of` and `_walker_key` (sort keys are in cells), `_taken`, `_bed_cell`,
+## on the way: `_foot_of` and `_walker_key` (sort keys are in cells), `_blockers`, `_bed_cell`,
 ## `_switch_near`.
 const CELL := 8
 const ZOOM := 3
@@ -85,7 +85,8 @@ const MARGIN := 8.0
 const LIST_BUSY := 0.25
 ## The wash plank's word, with how many wait; and how far it stands under "Nothing kept
 ## yet." on an empty shelf, so the two are not on top of each other.
-const WASH_LABEL := "Wash  %d"
+static var WASH_LABEL: String:
+	get: return Text.SHELF_WASH_N
 const WASH_UNDER_EMPTY := 30.0
 ## The gap between the last find's row and the wash plank (2026-09-24, Richard: under one
 ## row the plank's frame and its gold glow ran up into the row above). The plank's wood is
@@ -140,7 +141,7 @@ const DOG_BED_SLEEP := 22.0
 ## stands as with R, so they are one find with two faces rather than two finds. See
 ## Sheets.Set.VARIANT.
 ##
-## Since 2026-09-19 this is only the piece the dogs may *walk over* — `_taken` leaves it out
+## Since 2026-09-19 this is only the piece the dogs may *walk over* — `_blockers` leaves it out
 ## of the blocked floor. **Which pieces they lie on is `Sheets.seat_of`**, authored per view
 ## in tools/decor_sets.json, and the pet bed is one of four. Nothing here tests a view's
 ## role: the bed's views are colours and the pet bed's are shapes, so a gate on the name
@@ -252,6 +253,9 @@ const BORDER_SILL := preload("res://assets/Shed_Border_Baseboard.png")
 ## A little more than the moulding itself, so a walker stands clear of the skirting rather
 ## than with its heels on the line. In cells. See `_feet_keep`.
 const FEET_CLEAR := 0.25
+## How far a walker's feet are held off a standing piece's base, in placement pixels
+## (2026-09-27): the base rectangle grown by this on every side is what blocks.
+const WALK_CLEAR := 3
 
 
 ## How tall the back wall stands, in floor cells.
@@ -340,6 +344,14 @@ signal changed
 ## the room rather than a bar of panel underneath it.
 signal close_asked
 
+## The record player: E at it lifts the lid and puts its menu up over the room
+## (`RecordMenu`, 2026-09-28); closing it leaves the lid open. While the menu is up
+## the room takes no input of its own.
+const RECORD_PIECE := &"decor_vynil_player"
+var _record: RecordMenu
+## The row in `decor` whose lid the menu opened, or -1.
+var _record_row := -1
+
 ## The art, and the two arrays this screen is a view of. Both are owned by lake.gd — the
 ## room edits `decor` in place rather than keeping a copy, so what is on screen and what
 ## gets saved cannot drift apart.
@@ -373,6 +385,8 @@ var decor: Array = []
 ## What is being dragged, as a piece name, and where it came from: the index it had in
 ## `decor`, or -1 when it was picked up off the inventory list.
 var carrying: StringName = &""
+## The pad has the shelf up: the stick walks its rows rather than the player (RB/LB).
+var _pad_shelf := false
 
 ## Which face the carried piece is being held in — an index into its views. Set from the
 ## row it was lifted off so turning a chair, putting it down and picking it up again does
@@ -435,7 +449,7 @@ var _light: ColorRect
 
 var _dog_rng := RandomNumberGenerator.new()
 
-## The seat table, and the `decor.hash()` it was built for. Memoised like `_taken`, and for
+## The seat table, and the `decor.hash()` it was built for. Memoised like `_blockers`, and for
 ## the same reason: `decor` is the lake's own array, edited in place while the room is open.
 var _seat_table: Array = []
 var _seat_table_for: int = -1
@@ -461,10 +475,12 @@ var _you_ink_foot: float = 45.0
 ## Cells something is standing on, rebuilt when `decor` changes. Rugs are not in it: a dog
 ## may walk on a rug, and a room full of rugs it refuses to cross is a room it cannot leave.
 var _blocked := {}
-var _blocked_for: int = 0
+var _blocked_for: int = -1
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# Nearest, for the whole room. Everything drawn in here is pixel art blown up by a whole
 	# number — the floor grid, the furniture, the dog, the player — and the default bilinear
@@ -515,6 +531,11 @@ func _ready() -> void:
 	# in it is happening while nobody is looking at it.
 	visibility_changed.connect(_room_shown)
 	set_process(false)
+	_record = RecordMenu.new()
+	_record.name = &"RecordMenu"
+	_record.visible = false
+	_record.closed.connect(_record_closed)
+	add_child(_record)
 
 
 ## The room came on screen, or went off it.
@@ -531,6 +552,9 @@ func _room_shown() -> void:
 	var showing := is_visible_in_tree()
 	set_process(showing)
 	if not showing:
+		if record_up():
+			_record.visible = false
+			_record_closed()
 		var sound := Sfx.main()
 		if sound != null:
 			sound.set_fireplace(false)
@@ -579,6 +603,7 @@ func _process(delta: float) -> void:
 		_wash_clock += delta
 		if _wash_plank != null:
 			_wash_plank.pulse = wash_pulse_amount()
+	_pad_tick()
 	_walk_you(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -699,6 +724,12 @@ func _door_size() -> Vector2:
 ## side of a wardrobe slides along it instead of stopping dead.
 func _walk_you(delta: float) -> void:
 	_you_age += delta
+	if record_up():
+		_you_step = 0.0
+		return
+	if _pad_shelf and Pad.is_pad():
+		_you_step = 0.0
+		return
 	var push := Vector2(
 		Input.get_axis(&"walk_left", &"walk_right"),
 		Input.get_axis(&"walk_up", &"walk_down")
@@ -709,14 +740,7 @@ func _walk_you(delta: float) -> void:
 	_you_step += delta
 	_you_facing = push.normalized()
 	var step := push.normalized() * minf(YOU_SPEED * delta, YOU_STEP_MOST)
-	var wanted := _you_at + step
-	if _you_may_stand(wanted):
-		_you_at = wanted
-		return
-	if absf(step.x) > 0.0001 and _you_may_stand(_you_at + Vector2(step.x, 0.0)):
-		_you_at += Vector2(step.x, 0.0)
-	elif absf(step.y) > 0.0001 and _you_may_stand(_you_at + Vector2(0.0, step.y)):
-		_you_at += Vector2(0.0, step.y)
+	_you_at = _slid(_you_at, step, _you_may_stand)
 
 
 ## With a piece in hand on a pad, the left stick moves it (Richard, 2026-09-14). It walks the
@@ -913,10 +937,9 @@ func _dog_think(dog: ShedDog) -> void:
 
 ## One step towards the target. True once it is there, or once it is stuck.
 ##
-## The step is refused if the cell it would put the dog in is standing on something. Refused
-## outright rather than slid along, and then a new target is picked: a dog nosing along the
-## side of a wardrobe looking for a way round reads as a bug, where a dog changing its mind
-## reads as a dog.
+## A refused step slides along the face (`_slid`, 2026-09-27) rather than stopping on an
+## invisible wall; a slide that makes no ground towards the target gives up and a new target
+## is picked, since a dog nosing along a wardrobe for ever reads as a bug.
 func _dog_walk(dog: ShedDog, delta: float) -> bool:
 	var gap := dog.target - dog.at
 	if gap.length() <= 0.25:
@@ -924,13 +947,19 @@ func _dog_walk(dog: ShedDog, delta: float) -> bool:
 	var step := gap.normalized() * minf(DOG_SPEED * delta, DOG_STEP_MOST)
 	if absf(step.x) > 0.0001:
 		dog.left = step.x < 0.0
-	var wanted := dog.at + step
 	var others := _others_than(dog)
 	others.append(_you_at)
-	if _clear_of_all(wanted, dog.at, others, dog.over):
-		dog.at = wanted
-		return dog.at.distance_to(dog.target) <= 0.25
-	return true
+	var from := dog.at
+	var may := func(where: Vector2) -> bool:
+		return _clear_of_all(where, from, others, dog.over)
+	var moved := _slid(from, step, may)
+	if moved.is_equal_approx(from):
+		return true
+	dog.at = moved
+	# Slid along a face and made next to no ground towards the target: pick another.
+	if moved.distance_to(dog.target) >= from.distance_to(dog.target) - step.length() * 0.1:
+		return true
+	return dog.at.distance_to(dog.target) <= 0.25
 
 
 ## Somewhere on the floor with nothing on it, and not on top of anybody else.
@@ -973,7 +1002,7 @@ func _others_than(dog: ShedDog) -> Array[Vector2]:
 ## `over` is the cells a particular dog is allowed to stand on although furniture is
 ## standing there — the foot of the piece whose seat it holds. Without it a dog sent to a
 ## sofa would be refused the cushion by the sofa's own base and shoved off by the unstick in
-## `_drive_dog` every frame. The pet bed needs none of this: it is left out of `_taken`
+## `_drive_dog` every frame. The pet bed needs none of this: it is left out of `_blockers`
 ## altogether, which is why it was the only seat that ever worked.
 ##
 ## Kept named for the dog, and kept to one argument's worth of default, because the player
@@ -984,8 +1013,12 @@ func _dog_may_stand(where: Vector2, over: Dictionary = {}) -> bool:
 		return false
 	if where.x > float(COLS) - keep.z or where.y > float(ROWS) - keep.w:
 		return false
-	var cell := Vector2i(int(where.x), int(where.y))
-	return over.has(cell) or not _taken().has(cell)
+	for block: Dictionary in _blockers():
+		if over.has(block["key"]):
+			continue
+		if (block["box"] as Rect2).has_point(where):
+			return false
+	return true
 
 
 ## How far inside the floor's own rectangle a walker's feet have to stay, in cells, as
@@ -1073,7 +1106,7 @@ func _clear_of_all(
 ## the furniture about — the piece and the spot it stands on, not its index in `decor`,
 ## which shifts the moment anything is picked up.
 ##
-## Memoised on `decor.hash()`, like `_taken`: `decor` is the lake's array and is edited in
+## Memoised on `decor.hash()`, like `_blockers`: `decor` is the lake's array and is edited in
 ## place while the room is open.
 func _seats() -> Array:
 	var key := decor.hash()
@@ -1105,28 +1138,10 @@ func _seats() -> Array:
 
 
 ## The cells a piece's own foot stands on, as a set — what a dog lying on it is allowed to
-## stand on although `_taken` says something is there. The same walk `_taken` does, kept
+## stand on although `_blockers` says something is there. The same walk `_blockers` does, kept
 ## apart from it because this is one piece and that is the whole room.
-func _foot_cells(piece: StringName, view: int, cell: Vector2i) -> Dictionary:
-	var cells := {}
-	var span := span_of(piece, view)
-	var base := base_of(piece, view)
-	var foot := Rect2(
-		Vector2(float(cell.x), float(cell.y + span.y - base)),
-		Vector2(float(span.x), float(base))
-	)
-	var from := Vector2i(
-		int(floor(foot.position.x / float(CELL))), int(floor(foot.position.y / float(CELL)))
-	)
-	var to := Vector2i(
-		int(floor((foot.end.x - 1.0) / float(CELL))),
-		int(floor((foot.end.y - 1.0) / float(CELL)))
-	)
-	for cy in range(from.y, to.y + 1):
-		for cx in range(from.x, to.x + 1):
-			if cy >= 0:
-				cells[Vector2i(cx, cy)] = true
-	return cells
+func _foot_cells(piece: StringName, _view: int, cell: Vector2i) -> Dictionary:
+	return {"%s@%d,%d" % [piece, cell.x, cell.y]: true}
 
 
 ## Where the feet of a dog holding this seat go, in cells. The middle of the room for a seat
@@ -1188,44 +1203,58 @@ func _seat_still_there(dog: ShedDog) -> bool:
 ## blocked floor the size of the piece rather than rounding it up to whole cells on all four
 ## sides. A base too small or too thin to hold any cell's middle blocks the one cell its own
 ## middle is in, so nothing standing on the boards is ever walked straight through.
-func _taken() -> Dictionary:
+## What the walkers may not stand in (2026-09-27, `/grill-me` with Richard; supersedes the
+## 8 px cell map `_blockers`): one rectangle a standing piece, its floor base grown by
+## `WALK_CLEAR` on every side, in the walkers' units (cells, as floats). Rugs, paintings, the
+## pet bed and a small piece set on another block nothing; the picture above a base never
+## does. Each carries the piece's key, which `ShedDog.over` holds for the seat it lies on.
+func _blockers() -> Array:
 	var key := decor.hash()
+	if sheets == null:
+		return []
 	if key == _blocked_for:
-		return _blocked
+		return _blocked.get("list", [])
 	_blocked_for = key
-	_blocked = {}
-	for row: Dictionary in decor:
+	var list: Array = []
+	_blocked = {"list": list}
+	var grow := float(WALK_CLEAR) / float(CELL)
+	for i in decor.size():
+		var row: Dictionary = decor[i]
 		var piece := StringName(row["piece"])
-		if piece == DOG_BED or sheets == null or sheets.lies_flat(piece) or sheets.on_wall(piece):
+		if piece == DOG_BED or sheets.lies_flat(piece) or sheets.on_wall(piece):
 			continue
-		var span := span_of(piece, _row_view(row))
+		# A pot on a table stands on the table, not on the floor: the table blocks for both.
+		if sheets.is_small(piece) and _host_of(decor, i) >= 0:
+			continue
+		var view := _row_view(row)
+		var span := span_of(piece, view)
 		var cell := Vector2i(int(row["cell"][0]), int(row["cell"][1]))
-		var base := base_of(piece, _row_view(row))
+		var base := base_of(piece, view)
 		var foot := Rect2(
-			Vector2(float(cell.x), float(cell.y + span.y - base)),
-			Vector2(float(span.x), float(base))
-		)
-		var found := false
-		var from := Vector2i(
-			int(floor(foot.position.x / float(CELL))), int(floor(foot.position.y / float(CELL)))
-		)
-		var to := Vector2i(
-			int(floor((foot.end.x - 1.0) / float(CELL))),
-			int(floor((foot.end.y - 1.0) / float(CELL)))
-		)
-		for cy in range(from.y, to.y + 1):
-			for cx in range(from.x, to.x + 1):
-				var middle := (Vector2(float(cx), float(cy)) + Vector2(0.5, 0.5)) * float(CELL)
-				if not foot.has_point(middle):
-					continue
-				found = true
-				if cy >= 0:
-					_blocked[Vector2i(cx, cy)] = true
-		if not found:
-			var only := (foot.position + foot.size * 0.5) / float(CELL)
-			if only.y >= 0.0:
-				_blocked[Vector2i(int(floor(only.x)), int(floor(only.y)))] = true
-	return _blocked
+			Vector2(float(cell.x), float(cell.y + span.y - base)) / float(CELL),
+			Vector2(float(span.x), float(base)) / float(CELL)
+		).grow(grow)
+		list.append({"key": "%s@%d,%d" % [piece, cell.x, cell.y], "box": foot})
+	return list
+
+
+## Take one step of a walk, sliding along whatever face refuses it (2026-09-27): the whole
+## step, else the longer of its two axes alone that is allowed, else the other. `may` is asked
+## of each candidate. Returns where the walker ends up.
+func _slid(from: Vector2, step: Vector2, may: Callable) -> Vector2:
+	if bool(may.call(from + step)):
+		return from + step
+	var along_x := from + Vector2(step.x, 0.0)
+	var along_y := from + Vector2(0.0, step.y)
+	var x_ok := absf(step.x) > 0.0001 and bool(may.call(along_x))
+	var y_ok := absf(step.y) > 0.0001 and bool(may.call(along_y))
+	if x_ok and y_ok:
+		return along_x if absf(step.x) >= absf(step.y) else along_y
+	if x_ok:
+		return along_x
+	if y_ok:
+		return along_y
+	return from
 
 
 ## The dog, on the floor, at whatever size the room is drawn.
@@ -1334,7 +1363,7 @@ func span_of(piece: StringName, view: int = 0) -> Vector2i:
 ## same thing in the drawing's own pixels; the two are never both authored for one piece.
 ##
 ## What this is **not** is a free unit swap. The number read here is also the walker block
-## (`_taken`), the small piece's host probe (`_host_of`) and the band a walker sorts over
+## (`_blockers`), the small piece's host probe (`_host_of`) and the band a walker sorts over
 ## (`_walker_key`), so a piece given a one- or two-pixel base blocks a single cell, finds
 ## its host from just above its own foot, and is never stood on. That is right for a pot
 ## and would be wrong for a sofa. Author a `base_px` only where the picture's contact with
@@ -1462,10 +1491,41 @@ func switch_near() -> bool:
 	if at < 0:
 		return false
 	var row: Dictionary = decor[at]
+	if StringName(row["piece"]) == RECORD_PIECE:
+		_open_record(at)
+		return true
 	row["view"] = sheets.switched(StringName(row["piece"]), _row_view(row))
 	changed.emit()
 	queue_redraw()
 	return true
+
+
+## Whether the record player's menu is up.
+func record_up() -> bool:
+	return _record != null and _record.visible
+
+
+## Lift the record player's lid and put its menu up.
+func _open_record(at: int) -> void:
+	var row: Dictionary = decor[at]
+	var piece := StringName(row["piece"])
+	if not sheets.is_on(piece, _row_view(row)):
+		row["view"] = sheets.switched(piece, _row_view(row))
+		changed.emit()
+	_record_row = at
+	Sfx.ui(&"ui_click")
+	_record.open()
+	queue_redraw()
+
+
+## The menu went away. The lid it opened stays open.
+func _record_closed() -> void:
+	var at := _record_row
+	_record_row = -1
+	if at < 0 or at >= decor.size():
+		return
+	# The lid stays open (Richard, 2026-09-28): the player is left playing.
+	queue_redraw()
 
 
 ## Whether any fire in the room is burning. What the fireplace's crackle is held on.
@@ -1505,10 +1565,16 @@ func take_back(index: int) -> void:
 ## anywhere else in the room falls through to meaning "leave", the way it always has.
 ## Escape still leaves from anywhere, including the hearth.
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not is_visible_in_tree():
+	if not is_visible_in_tree() or record_up():
 		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
+		return
+	# The pad's B on the shelf puts the shelf away, not the room.
+	if key.keycode == KEY_ESCAPE and _pad_shelf and Pad.is_pad():
+		_pad_shelf = false
+		Sfx.ui(&"ui_close")
+		get_viewport().set_input_as_handled()
 		return
 	# Through the input map since 2026-09-16 (issue #26): the bind board moves these two, and
 	# they are the shed's own actions rather than the lake's, because the buttons that turn a
@@ -1521,6 +1587,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if record_up():
+		return
 	var motion := event as InputEventMouseMotion
 	if motion != null:
 		var row_was := _hovered_row() if carrying.is_empty() else -1
@@ -1621,8 +1689,11 @@ func _put_down() -> void:
 ## being an inch too high. The columns are not held: off the side is off the side.
 func _drop_cell(piece: StringName, view: int = 0) -> Vector2i:
 	var span := span_of(piece, view)
-	var middle := spot_at(_pointer)
-	var cell := middle - Vector2i(span.x / 2, span.y / 2)
+	# Centred on the pointer to the nearest whole pixel (2026-09-27): the floor pixel under
+	# the pointer less half the span in integers put the middle up to a pixel off it.
+	var floor_at := (_pointer - _floor_origin()) / maxf(_zoom(), 0.001)
+	var corner := floor_at - Vector2(span) * 0.5
+	var cell := Vector2i(roundi(corner.x), roundi(corner.y))
 	# Held rather than refused, on both axes (2026-09-16): a wide piece dragged up against a
 	# wall used to be let go over the edge, fail `can_place` and go back to the shelf. It
 	# slides along the wall instead, the way one let go too high slides down.
@@ -1812,6 +1883,8 @@ func _listed_at(where: Vector2) -> String:
 ## "furniture_07" in the inventory — worse than no name at all, because it reads as a bug
 ## rather than as a thing.
 func title_of(piece: String) -> String:
+	if sheets != null and sheets.titles.has(piece):
+		return sheets.title_of(StringName(piece))
 	return String(titles.get(piece, ""))
 
 
@@ -2184,6 +2257,7 @@ func _draw() -> void:
 	# in it, under the light quad, which is a child and so drawn after all of this.
 	draw_rect(_shed_rect(), ROOM_DIM)
 	_draw_prompt(floor_box)
+	_draw_shelf_key()
 	_dress_shelf()
 
 	# The piece in hand off the room — over the shelf, say — follows the cursor over
@@ -2227,7 +2301,7 @@ func _dress_shelf() -> void:
 	_shelf.ribbon = _ribbon_rect()
 	_shelf.title_box = _title_box()
 	_shelf.list = _list_rect()
-	_shelf.title = "Decorate" if store.is_empty() else "Decorate  %d" % store.size()
+	_shelf.title = Text.SHELF_TITLE if store.is_empty() else Text.SHELF_TITLE_N % store.size()
 	_shelf.atlas = sheets.atlas
 	_shelf.scroll = _scroll
 	_shelf.hovered = -1 if not carrying.is_empty() else _hovered_row()
@@ -2279,6 +2353,7 @@ func wash_plank_box() -> Rect2:
 ## The lake says the shed has just come up. More waiting at the pump than the last time
 ## starts the plank's pulse; the same or fewer does not.
 func opened() -> void:
+	_pad_shelf = false
 	if unwashed.size() > _wash_seen:
 		_wash_pulse = 1.0
 		_wash_clock = 0.0
@@ -2409,6 +2484,25 @@ func _pool_tone(light: StringName) -> Color:
 ## The fireplace and the fridge are the only two things in the game worked by standing
 ## rather than clicking, so there is no chance of learning the verb anywhere else: without
 ## this the player walks past a fireplace they own and never finds out it lights.
+## On the pad, the shoulder that opens the shelf, on a chip at the left end of its title
+## plank: the shelf is not reached by walking, so something has to say how it is reached.
+func _draw_shelf_key() -> void:
+	if not Pad.is_pad() or _pad_shelf or not carrying.is_empty():
+		return
+	var plank := _ribbon_rect()
+	var side := 22.0
+	var box := Rect2(
+		Vector2(plank.position.x + 6.0, plank.get_center().y - side * 0.5).round(),
+		Vector2(side + 6.0, side)
+	)
+	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.9))
+	draw_rect(box, Style.INK_DIM, false, 1.0)
+	Style.write(
+		self, Binds.shown(&"zoom_in", true), Style.TEXT_SMALL,
+		Vector2(box.position.x, box.end.y - 6.0), Style.INK, HORIZONTAL_ALIGNMENT_CENTER, box
+	)
+
+
 func _draw_prompt(floor_box: Rect2) -> void:
 	var at := _switch_near()
 	if at < 0:
@@ -2441,3 +2535,105 @@ func _stamp_piece(
 	draw_texture_rect_region(
 		sheets.atlas, Rect2(at, sheets.view_size_of(piece, view) * _zoom()), region, tint
 	)
+
+
+## The pad in the shed (2026-09-26, `/grill-me` with Richard). **The room is free aim**: the
+## left stick walks the player and, with a piece in hand, carries it; A picks up the placed
+## piece the player stands at (ringed) and puts a carried one down; Y works a switch and X
+## turns what is in hand, as before. **The shelf is a list opened with a shoulder** (RB or
+## LB): the stick walks its rows, A takes one into the hands and puts the shelf away, B puts
+## the shelf away.
+func _pad_tick() -> void:
+	if not Pad.is_pad() or not is_visible_in_tree():
+		_pad_shelf = false
+		return
+	if carrying.is_empty() and (
+			Input.is_action_just_pressed(&"zoom_in") or Input.is_action_just_pressed(&"zoom_out")):
+		_pad_shelf = not _pad_shelf
+		Sfx.ui(&"ui_click" if _pad_shelf else &"ui_close")
+	if _pad_shelf and not carrying.is_empty():
+		# Taken off the shelf: into the player's hands, out in the room.
+		_pad_shelf = false
+		var hands := _floor_origin() + _you_at * float(CELL) * _zoom()
+		get_viewport().warp_mouse(get_global_transform_with_canvas() * hands)
+		_pointer = hands
+
+
+func pad_free() -> bool:
+	return not _pad_shelf and not record_up()
+
+
+## The shelf's rows that are on the face, the wash plank, and the close cross.
+func pad_focus() -> Array:
+	if not _pad_shelf:
+		return []
+	var out: Array = []
+	var list := _list_rect()
+	var store := in_store()
+	for i in store.size():
+		var box := Rect2(
+			list.position.x, list.position.y + float(i * ROW_HEIGHT) - _scroll,
+			list.size.x, float(ROW_HEIGHT) - SHELF_ROW_GAP
+		)
+		if box.position.y < list.position.y - 0.5 or box.end.y > list.end.y + 0.5:
+			continue
+		out.append({"box": box, "key": store[i], "first": out.is_empty()})
+	if _wash_plank != null and _wash_plank.visible:
+		out.append({"box": _wash_plank.get_rect(), "key": &"wash", "first": out.is_empty()})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close"})
+	return out
+
+
+func pad_scroll(step: int) -> bool:
+	var was := _scroll
+	_scroll_by(float(step * ROW_HEIGHT))
+	return not is_equal_approx(was, _scroll)
+
+
+## A in the room: pick up the piece the player stands at. A carried piece goes down through
+## the pointer's own click, where the stick has carried it.
+func pad_press(_key: Variant) -> bool:
+	if _pad_shelf or not carrying.is_empty():
+		return false
+	var at := _piece_near()
+	if at >= 0:
+		var box := _piece_box(at)
+		_pointer = box.get_center()
+		get_viewport().warp_mouse(get_global_transform_with_canvas() * _pointer)
+		_pick_up()
+		queue_redraw()
+	return true
+
+
+## What A would pick up, ringed.
+func pad_mark() -> Rect2:
+	if _pad_shelf or not carrying.is_empty():
+		return Rect2()
+	var at := _piece_near()
+	return _piece_box(at) if at >= 0 else Rect2()
+
+
+## The placed piece nearest the player within `REACH`, as an index into `decor`, or -1.
+func _piece_near() -> int:
+	var best := -1
+	var best_gap := REACH
+	for i in decor.size():
+		var row: Dictionary = decor[i]
+		var span := span_of(StringName(row["piece"]), _row_view(row))
+		var middle := Vector2(
+			float(int(row["cell"][0])) + float(span.x) * 0.5,
+			float(int(row["cell"][1])) + float(span.y)
+		) / float(CELL)
+		var gap := _you_at.distance_to(middle)
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+
+func _piece_box(index: int) -> Rect2:
+	var row: Dictionary = decor[index]
+	var at := Vector2(float(int(row["cell"][0])), float(int(row["cell"][1])))
+	var span := Vector2(span_of(StringName(row["piece"]), _row_view(row)))
+	return Rect2(_floor_origin() + at * _zoom(), span * _zoom())

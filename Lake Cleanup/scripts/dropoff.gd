@@ -204,10 +204,10 @@ func kind_name() -> String:
 	return TrashDef.KIND_NAMES[kind]
 
 
-## What the plank says: the material's name through the translation server, so a language
-## file with an entry for "Plastic" changes the sign without touching the sheet.
+## What the plank says: the material's `MATERIAL_*` key in the language in play, so a
+## translation changes the sign without touching the sheet.
 func sign_text() -> String:
-	return tr(kind_name())
+	return TrashDef.kind_label(kind)
 
 
 ## A piece the ferry landed here: onto the heap. The lake pays for it; this only shows it.
@@ -328,7 +328,6 @@ func _dress() -> void:
 			# The middle of the post, not its left edge: `_world` gives the top-left corner
 			# of the foot pixel, and a mound centred there sits half an art pixel left of
 			# the pole and leaves a column of wood showing down its right side.
-			var wide := (float(post[2]) if (post as Array).size() > 2 else POST_WIDE / ART_SCALE) * ART_SCALE
 			var at := _world(post, book) + Vector2(ART_SCALE * 0.5, 0.0)
 			var tile := Iso.world_to_tile(at)
 			if Iso.shore_fraction(tile.x, tile.y) < edge:
@@ -341,8 +340,9 @@ func _dress() -> void:
 				collar.lay(Vector2(-POST_COLLAR, 0.0), Vector2(POST_COLLAR, 0.0))
 				_collars.append(collar)
 				_collar_feet.append(at)
-			else:
-				_mounds.append(Skirt.mound(at, wide, 9101 + kind * 131 + i))
+			# A post on the sand is left standing straight in the beach, no mound (2026-09-26,
+			# Richard: every drawn heap showed a line against the shaded sand round it). The
+			# ground under it is the beach itself, so nothing divides the two.
 			i += 1
 
 
@@ -517,7 +517,7 @@ func _draw_sign(book: Dictionary) -> void:
 		# the sweep is for solids that end in a V. Drawn by this node rather than `Under`,
 		# so it falls across the deck top and the box the way a shadow on the deck does.
 		var at := _world(book["sign_foot"], book)
-		draw_set_transform_matrix(Shade.lying(at, day.lean, day.stretch))
+		draw_set_transform_matrix(Shade.cast(at, day.lean, day.stretch))
 		draw_texture_rect_region(
 			_sheet, Rect2(frame.position - at, frame.size), _rect(book["sign_cut"]),
 			Shade.tint(day.ink)

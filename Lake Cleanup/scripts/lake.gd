@@ -637,6 +637,7 @@ var _shed_skirt: Skirt.Patch
 
 var _splash: WaterSplash
 var _prints: Footprints
+var _dust: KickDust
 var _sfx: Sfx
 var _haul: Haul
 var _camera: Camera2D
@@ -681,6 +682,8 @@ var _bounds := Rect2()
 var _menu_open: bool = false
 var _settings_open: bool = false
 var _shed_open: bool = false
+## Set while the wash room hands over to the shed, which opens no door.
+var _room_swap := false
 ## The bind board, opened from the settings board's Controls row. Made on demand rather than
 ## put in the scene: it is a board a player opens once a run at most.
 var _controls_open: bool = false
@@ -720,6 +723,22 @@ const DOUBLE_APART := 1.5
 ## in the yard through the same signals. Made in `_ready`, hidden whenever it is stowed so
 ## it does not draw a second range ring and marker under the angler's feet.
 var _net2: CastNet
+## The haul's running count over the angler (`HaulCount`).
+var _haul_count: HaulCount
+## This cast, for the count: whether a net is out, what the nets that are home already
+## landed, and the room of both nets taken at the throw (the lucky extra is cleared at home).
+var _haul_out := false
+var _haul_banked := 0
+var _haul_room := 0
+## The wildlife moment: whether this save has had it, seconds into it (-1 while none runs),
+## where it looks, a spot waiting for the boards to close, the zoom it left from, and its card.
+var _wildlife_seen: bool = true
+var _moment: float = -1.0
+var _moment_at: Vector2 = Vector2.INF
+var _moment_owed: Vector2 = Vector2.INF
+var _moment_card: MomentCard
+## Edge arrows at the last few pieces (`LastArrows`), made when first needed.
+var _last_arrows: LastArrows
 
 ## Seconds until the next autosave, and what the HUD says about the last one.
 var _autosave_in: float = AUTOSAVE_EVERY
@@ -747,6 +766,9 @@ var _lane: Array[Dictionary] = []
 var _lane_last: Dictionary[int, Vector2] = {}
 var _lane_seed: float = 0.5
 var _filth_remap_in: float = 0.0
+## The remap running on a worker thread, -1 when none is. Its answer lands in `_filth_done`.
+var _filth_task: int = -1
+var _filth_done: Dictionary = {}
 
 var _filth_total: float = 1.0
 var _filth_left: float = 1.0
@@ -862,14 +884,7 @@ const DECOR_SPRAYED := 0.04
 var _decor_tour_placed := -1
 ## How clean the find was when the stand's card came up; -1 before it has.
 var _decor_stand_from := -1.0
-const DECOR_HINT := "You caught a decoration! Open Decorate to see it."
-const DECOR_PLANK := "You need to wash objects before it is available for decoration."
-const DECOR_LIST := "Select the object to wash, it costs $5 to $15 depending on size."
-const DECOR_STAND := "Point and click to spray the object with water. It goes to decoration inventory when done."
-const DECOR_STAND_PAD := "Aim and hold %s to spray the object with water. It goes to decoration inventory when done."
-const DECOR_SHELF := "Select and drag the object to its position. Press %s to rotate or change style."
-const DECOR_SHELF_PAD := "Press %s to pick up and place an object. Press %s to rotate or change style."
-const DECOR_ROOM := "You can interact with some objects. It shows when available."
+## The decoration tour's sentences are `Text.TOUR_DECOR_*`, read as each card goes up.
 var _steps: FirstSteps
 ## The tile the walk step points at, and the world point the cast step rings.
 var _steps_beach := Vector2.INF
@@ -1113,6 +1128,12 @@ func _ready() -> void:
 	_prints.z_index = 4
 	_prints.z_as_relative = false
 	add_child(_prints)
+	_dust = KickDust.new()
+	_dust.name = &"KickDust"
+	# Over the ground and the prints, under whoever kicked it up.
+	_dust.z_index = 4
+	_dust.z_as_relative = false
+	add_child(_dust)
 
 	_grid.z_index = 5
 	_grid.z_as_relative = false
@@ -1214,7 +1235,9 @@ func _ready() -> void:
 	for dog in _dogs:
 		dog.splash = _splash
 		dog.prints = _prints
+		dog.dust = _dust
 	_angler.prints = _prints
+	_angler.dust = _dust
 	_net.sfx = _sfx
 	_net.angler = _angler
 	_net.flock = _flock
@@ -1222,6 +1245,7 @@ func _ready() -> void:
 	# which is what decides the rim. The player's own net, not the double cast's helper.
 	_flock.net = _net
 	_net.landed.connect(_on_net_landed)
+	_net.landed.connect(_bank_haul)
 	_net.caught.connect(_on_net_caught)
 	_net.swept.connect(_on_net_swept.bind(_net))
 	_net.caught_bird.connect(_on_bird_caught)
@@ -1240,6 +1264,7 @@ func _ready() -> void:
 	_net2.flock = _flock
 	_net2.visible = false
 	_net2.landed.connect(_on_net_landed)
+	_net2.landed.connect(_bank_haul)
 	_net2.caught.connect(_on_net_caught)
 	_net2.swept.connect(_on_net_swept.bind(_net2))
 	_net2.caught_bird.connect(_on_bird_caught)
@@ -1298,6 +1323,12 @@ func _ready() -> void:
 			if _sheets.has(StringName(slug)):
 				catch.append({"sheet": _sheets.atlas, "region": _sheets.region_of(StringName(slug))})
 		_shop_skin.sprites[&"catch"] = catch
+	# The lake's lighter rubbish for the head cards' water (2026-09-26), the wash room's rule.
+	var afloat: Array = []
+	for def: TrashDef in _grid.defs:
+		if not def.keepsake and def.tier <= 2 and def.atlas != null:
+			afloat.append({"sheet": def.atlas, "region": def.region})
+	_shop_skin.sprites[&"rubbish"] = afloat
 	_lend_button_art(ferry, mesh)
 	_mark("shop art")
 	_skin.shed_pressed.connect(_set_shed.bind(true))
@@ -1335,6 +1366,7 @@ func _ready() -> void:
 	var loaded := false
 	if autoload_save and not start_fresh:
 		loaded = load_game()
+	_tell_music_picks()
 	# The meter starts where the lake is, not eased down from full: a finished lake came
 	# back reading 1% for seconds while the ease crawled its last percent (2026-09-25).
 	_skin.pollution = pollution
@@ -1415,6 +1447,9 @@ func level_name() -> String:
 func _on_lake_cleaned() -> void:
 	var owed := not _farewell_shown
 	_farewell_shown = true
+	var station := MusicStation.main()
+	if station != null:
+		station.habibs_open = true
 	if not owed:
 		return
 	# Straight to the words and the end song (2026-09-18, Richard: "no need for the end game
@@ -2051,7 +2086,8 @@ func _def(
 func _unhandled_input(event: InputEvent) -> void:
 	# Behind the menu, and on the way down out of it, the lake reads nothing: the menu's own
 	# boards answer Escape and F11, and a click meant for a plank must not also be a cast.
-	if _fronted() or _arrive != Arrive.OFF:
+	# Nor while the wildlife moment has the view: the player's hands are held for it.
+	if _fronted() or _arrive != Arrive.OFF or _moment >= 0.0:
 		return
 	if _extra_input(event):
 		return
@@ -2253,8 +2289,9 @@ func aim_point() -> Vector2:
 ## into the mouse while a board is up (A, B, the shoulders) are only acted on here when
 ## nothing is, so the two never both answer one press.
 func _pad_tick(delta: float) -> void:
-	# No reticle and no verbs behind the menu: the pad there is the menu's pointer.
-	if _fronted():
+	# No reticle and no verbs behind the menu: the pad there is the menu's pointer. None
+	# while the wildlife moment holds the player's hands either.
+	if _fronted() or _moment >= 0.0:
 		_aim.at = Vector2.INF
 		_net.pad_aim = Vector2.INF
 		_pad_was = false
@@ -2515,8 +2552,7 @@ func _set_wash(open: bool) -> void:
 		_skin.get_parent().add_child(_wash)
 	if _wash == null:
 		return
-	if open and not _wash_open and _sfx != null:
-		_sfx.play(&"shed_open")
+	# No shed sound: the pump is outdoors (2026-09-28).
 	_wash_open = open
 	_wash.waiting = unwashed
 	_wash.free.assign([STARTER_BED])
@@ -2541,7 +2577,10 @@ func _open_wash() -> void:
 ## decorating. Forced closes (the menu's pose) still call `_set_wash(false)` and go to the lake.
 func _wash_to_shed() -> void:
 	_shut(_set_wash)
+	# From one room into the other: no door is opened (2026-09-28).
+	_room_swap = true
 	_set_shed(true)
+	_room_swap = false
 
 
 ## The shelf's wash plank: the shed goes down and the wash room comes up in the one click.
@@ -2769,8 +2808,9 @@ func _set_menu(open: bool) -> void:
 ## already is when they open it, and closed by the cross in its corner or by a click on the
 ## water around it.
 func _set_shed(open: bool) -> void:
-	if open and not _shed_open and _sfx != null:
-		_sfx.play(&"shed_open")
+	# The shed's own door creaks open (2026-09-28), except coming in from the wash room.
+	if open and not _shed_open and _sfx != null and not _room_swap:
+		_sfx.play_door(true)
 	if open != _shed_open and _logs_play():
 		PlayLog.write("shed_open" if open else "shed_close", _play)
 	_shed_open = open
@@ -2812,7 +2852,11 @@ func _set_shed(open: bool) -> void:
 ## A board closed by the player — its cross, a click off it, Escape — rather than put away
 ## by another board opening over it, which is the only case that makes the closing sound.
 func _shut(close: Callable) -> void:
-	Sfx.ui(&"ui_close")
+	# The shed is left through its door, shut solid behind the player (2026-09-28).
+	if close == Callable(self, &"_set_shed") and _shed_open and _sfx != null:
+		_sfx.play_door(false)
+	else:
+		Sfx.ui(&"ui_close")
 	close.call(false)
 
 
@@ -2922,6 +2966,7 @@ func _look_for_the_end(delta: float) -> void:
 		return
 	_clean_check_in = CLEAN_CHECK_EVERY
 	_left_over = _grid.piece_count() if _grid != null else 0
+	_mark_last_pieces()
 	# The meter measures the water. Empty water reads 0% at once, whether or not the last
 	# piece has landed in the crate yet (2026-09-25: it sat at 1% over a finished lake,
 	# the float dust of thousands of subtractions rounded up).
@@ -2931,10 +2976,52 @@ func _look_for_the_end(delta: float) -> void:
 	_check_cleaned()
 
 
+## The last few pieces in the water wear a pale rim and a white column, and an arrow at the
+## window's edge points at any the view does not hold (2026-09-26, `/grill-me` with Richard:
+## "so there isn't too much looking for it"). From `LAST_MARKED` pieces down.
+const LAST_MARKED := 3
+
+
+func _mark_last_pieces() -> void:
+	if _grid == null:
+		return
+	var tiles := PackedInt32Array()
+	if _left_over > 0 and _left_over <= LAST_MARKED:
+		for index in _grid.stacks.size():
+			if not _grid.stacks[index].is_empty():
+				tiles.append(index)
+	_grid.mark_last(tiles)
+	if tiles.is_empty():
+		if _last_arrows != null:
+			_last_arrows.spots = []
+		return
+	if _last_arrows == null:
+		_last_arrows = LastArrows.new()
+		_last_arrows.name = &"LastArrows"
+		var hud := _settings.get_parent()
+		hud.add_child(_last_arrows)
+		hud.move_child(_last_arrows, 0)
+	var spots: Array[Vector2] = []
+	for index in tiles:
+		spots.append(_grid.perch_point(index))
+	_last_arrows.spots = spots
+
+
 ## A piece has just gone into the island's crate: ask on the next frame rather than at the
 ## next half second, so the ending starts as the last one lands. Next frame, not now — the
 ## haul and the dog are both still mid-handover when they call, and would answer "not yet".
+##
+## Only when the last walk left the lake nearly empty (`ASK_WITHIN`): the walk is every stack in
+## the basin, and a big haul lands a piece in the crate most frames, so asking on each one was
+## a full walk a frame for as long as the volley ran (2026-09-26, bench: a max net with lucky
+## and double cast). The field only shrinks, so a count over `ASK_WITHIN` half a second ago
+## cannot be nothing now; the half-second walk still runs regardless.
+const ASK_WITHIN := 400
+
+
 func _ask_the_end() -> void:
+	if _left_over > ASK_WITHIN:
+		return
 	_clean_check_in = 0.0
 
 
@@ -3078,6 +3165,7 @@ func _start_arrival() -> void:
 	_steps_done = false
 	_shop_tour_done = false
 	_decor_tour_done = false
+	_wildlife_seen = false
 	_bed_to_the_pump()
 	_arrive = Arrive.SAILING
 	_arrive_wait = ARRIVE_STEP_OFF
@@ -3294,9 +3382,9 @@ func _decor_tour_step(delta: float) -> void:
 			if _panelled() or _fronted():
 				_tour_card.show_card(off)
 			else:
-				_tour_card.show_card(_skin.shed_box(), DECOR_HINT)
+				_tour_card.show_card(_skin.shed_box(), Text.TOUR_DECOR_HINT)
 		DecorTour.PLANK:
-			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, DECOR_PLANK, 1, DECOR_TOUR_CARDS, true)
+			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, Text.TOUR_DECOR_PLANK, 1, DECOR_TOUR_CARDS, true)
 		DecorTour.PLANK_WAIT, DecorTour.WASHING:
 			if _shed_open:
 				_tour_card.show_card(room.call(_room.wash_plank_box()))
@@ -3308,7 +3396,7 @@ func _decor_tour_step(delta: float) -> void:
 			if _wash_open and _wash.stand().state != WashStand.State.EMPTY:
 				_decor_tour = DecorTour.STAND
 			elif _wash_open:
-				_tour_card.show_card(_wash_list_box(), DECOR_LIST, 2, DECOR_TOUR_CARDS, true)
+				_tour_card.show_card(_wash_list_box(), Text.TOUR_DECOR_LIST, 2, DECOR_TOUR_CARDS, true)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.STAND:
@@ -3317,14 +3405,14 @@ func _decor_tour_step(delta: float) -> void:
 			if _wash_open and _wash.stand().share_clean() > _decor_stand_from + DECOR_SPRAYED:
 				_decor_tour = DecorTour.WASHING
 			elif _wash_open:
-				var words := DECOR_STAND_PAD % Binds.shown(&"cast", true) if pad else DECOR_STAND
+				var words := Text.TOUR_DECOR_STAND_PAD % Binds.shown(&"cast", true) if pad else Text.TOUR_DECOR_STAND
 				_tour_card.show_card(_wash_stand_box(), words, 3, DECOR_TOUR_CARDS, true)
 			else:
 				_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off)
 		DecorTour.SHELF:
-			var words := DECOR_SHELF % Binds.shown(&"shed_rotate", false)
+			var words := Text.TOUR_DECOR_SHELF % Binds.shown(&"shed_rotate", false)
 			if pad:
-				words = DECOR_SHELF_PAD % ["A", Binds.shown(&"shed_rotate", true)]
+				words = Text.TOUR_DECOR_SHELF_PAD % ["A", Binds.shown(&"shed_rotate", true)]
 			# A piece put down on the floor is the step done: the room's card follows.
 			if _decor_tour_placed < 0:
 				_decor_tour_placed = _room.decor.size()
@@ -3338,7 +3426,7 @@ func _decor_tour_step(delta: float) -> void:
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
-			_tour_card.show_card(room.call(lit) if _shed_open else off, DECOR_ROOM, 5, DECOR_TOUR_CARDS)
+			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM, 5, DECOR_TOUR_CARDS)
 
 
 ## A rect in the shed room's own pixels, on the HUD layer the card is drawn on.
@@ -3542,6 +3630,26 @@ func _start_music() -> void:
 	_push_rooms()
 
 
+## The record player's picks as the save last read them: empty on a new game or a save
+## written before the record player, which the station reads as its old fixed lists.
+var _music_saved: Dictionary = {}
+
+
+## Hand the station this run's picks, and whether Habibs may be ticked: once the lake has
+## been cleaned. The station is the session's, so a new game has to put it back too.
+func _tell_music_picks() -> void:
+	var station := MusicStation.main()
+	if station == null:
+		return
+	station.take_picks(_music_saved)
+	station.habibs_open = _farewell_shown
+
+
+func _music_picks() -> Dictionary:
+	var station := MusicStation.main()
+	return station.picks() if station != null else _music_saved
+
+
 ## Tell the station where the player is. The shed is Indie Boi through its wall; the upgrades
 ## board and the settings are the lake's own song through the radio; the closing words are
 ## Habibs. Called whenever one of those opens or closes.
@@ -3550,14 +3658,15 @@ func _push_rooms() -> void:
 	# the radio, the ambience, and the money. See `Sfx.WHILE_SHOPPING`.
 	if _sfx != null:
 		_sfx.shopping = _menu_open
-		# The wash room covers the lake as the shed's does, and is as deaf to it.
-		_sfx.indoors = _shed_open or _wash_open
+		# The wash room is outdoors at the pump (2026-09-28): the lake goes on behind it.
+		_sfx.indoors = _shed_open
 	var music := MusicStation.main()
 	if music == null:
 		return
 	music.indoors = _shed_open
 	# The wash room too (Richard, 2026-09-19): the song through the radio, as behind the shop.
-	music.muffled = _menu_open or _settings_open or _wash_open
+	# Not the settings board (2026-09-28, Richard): the song plays clean behind it.
+	music.muffled = _menu_open or _wash_open
 	music.set_ending(ending())
 
 
@@ -4218,9 +4327,6 @@ const TRACKS := [
 	&"recycle_bonus", &"bird_worth", &"lucky_haul", &"double_cast",
 ]
 
-## What each weight tier is called.
-const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
-
 ## What each upgrade is, one line, for the "?" in the corner of its row. Placeholder
 ## wording for now (2026-09-13): Richard writes the real lines once the rows read right.
 ## What stands between a row's figure now and its figure one level on. A mark rather than
@@ -4229,23 +4335,23 @@ const TIER_NAMES := ["Light", "Small", "Medium", "Heavy", "Bulky"]
 const ARROW := "→"
 
 const BLURBS := {
-	&"net_width": "How wide the net's mouth opens, so one cast covers more water.",
-	&"net_strength": "The heaviest weight tier the net can lift.",
-	&"net_range": "How far from the shore the angler can throw.",
-	&"reel": "How fast the net is reeled back in.",
-	&"net_hold": "How many pieces one cast can carry home.",
-	&"boat_speed": "How fast the ferry sails between the island and the yards.",
-	&"cargo": "How many pieces the ferry carries a trip.",
-	&"boat_volley": "How quickly a ferry throws its load aboard and into the yard's box.",
-	&"fleet": "Another ferry in the water.",
-	&"dog_fetch": "How many pieces the dog brings back a trip.",
-	&"dog_wait": "How long the dog lazes about between trips, at most.",
-	&"dog_count": "Another dog for the pack, trained like the first.",
-	&"dog_strength": "The heaviest and biggest pieces the dogs can carry back.",
-	&"lucky_haul": "Odds that a cast lifts one tier heavier and holds more.",
-	&"double_cast": "Odds that a cast throws a second net beside the first.",
-	&"recycle_bonus": "One yard at a time pays over the odds, and it moves.",
-	&"bird_worth": "What a netted pigeon is worth.",
+	&"net_width": "BLURB_NET_WIDTH",
+	&"net_strength": "BLURB_NET_STRENGTH",
+	&"net_range": "BLURB_NET_RANGE",
+	&"reel": "BLURB_REEL",
+	&"net_hold": "BLURB_NET_HOLD",
+	&"boat_speed": "BLURB_BOAT_SPEED",
+	&"cargo": "BLURB_CARGO",
+	&"boat_volley": "BLURB_BOAT_VOLLEY",
+	&"fleet": "BLURB_FLEET",
+	&"dog_fetch": "BLURB_DOG_FETCH",
+	&"dog_wait": "BLURB_DOG_WAIT",
+	&"dog_count": "BLURB_DOG_COUNT",
+	&"dog_strength": "BLURB_DOG_STRENGTH",
+	&"lucky_haul": "BLURB_LUCKY_HAUL",
+	&"double_cast": "BLURB_DOUBLE_CAST",
+	&"recycle_bonus": "BLURB_RECYCLE_BONUS",
+	&"bird_worth": "BLURB_BIRD_WORTH",
 }
 
 
@@ -4282,45 +4388,45 @@ func _shop_rows() -> Array:
 	# and `s` stay, being marks rather than words, and "Tier" stays, being a concept of the
 	# game with its own names rather than a unit of the row.
 	var listed := [
-		[&"net_width", &"net", "Width", "%", func(l: int) -> String: return _pct_at(&"net_width", l)],
-		[&"net_strength", &"net", "Strength", "", func(l: int) -> String:
-			return "%d" % int(_track_value(&"net_strength", l)), "Tier "],
-		[&"net_range", &"net", "Range", "%", func(l: int) -> String: return _pct_at(&"net_range", l)],
-		[&"reel", &"net", "Reel", "%", func(l: int) -> String: return _pct_at(&"reel", l)],
-		[&"net_hold", &"net", "Catch", "", func(l: int) -> String:
+		[&"net_width", &"net", Text.TRACK_NET_WIDTH, "%", func(l: int) -> String: return _pct_at(&"net_width", l)],
+		[&"net_strength", &"net", Text.TRACK_NET_STRENGTH, "", func(l: int) -> String:
+			return "%d" % int(_track_value(&"net_strength", l)), Text.SHOP_TIER_PREFIX],
+		[&"net_range", &"net", Text.TRACK_NET_RANGE, "%", func(l: int) -> String: return _pct_at(&"net_range", l)],
+		[&"reel", &"net", Text.TRACK_REEL, "%", func(l: int) -> String: return _pct_at(&"reel", l)],
+		[&"net_hold", &"net", Text.TRACK_NET_HOLD, "", func(l: int) -> String:
 			return "%d" % int(_track_value(&"net_hold", l))],
-		[&"boat_speed", &"boat", "Sailing", "%", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
-		[&"cargo", &"boat", "Hold", "", func(l: int) -> String:
+		[&"boat_speed", &"boat", Text.TRACK_BOAT_SPEED, "%", func(l: int) -> String: return _pct_at(&"boat_speed", l)],
+		[&"cargo", &"boat", Text.TRACK_CARGO, "", func(l: int) -> String:
 			return "%d" % int(_track_value(&"cargo", l))],
-		[&"boat_volley", &"boat", "Loading", "%", func(l: int) -> String:
+		[&"boat_volley", &"boat", Text.TRACK_BOAT_VOLLEY, "%", func(l: int) -> String:
 			# How fast the load moves as a share of how fast it moved at level 0, not the cut
 			# itself: a row that says the gap is 40% of what it was is a row about the code.
 			# The gap is what shrinks and the flight never does, so this tops out near 250%.
 			return "%d" % roundi(100.0 / maxf(1.0 - _track_value(&"boat_volley", l), 0.01))],
-		[&"fleet", &"boat", "Fleet", "", func(l: int) -> String: return "%d" % (1 + l)],
-		[&"dog_count", &"dog", "Pack", "", func(l: int) -> String: return "%d" % (1 + l)],
-		[&"dog_strength", &"dog", "Carry", "", func(l: int) -> String:
-			return "%d" % (Dog.CARRY_TIER + int(_track_value(&"dog_strength", l))), "Tier "],
-		[&"dog_fetch", &"dog", "Fetch", "", func(l: int) -> String:
+		[&"fleet", &"boat", Text.TRACK_FLEET, "", func(l: int) -> String: return "%d" % (1 + l)],
+		[&"dog_count", &"dog", Text.TRACK_DOG_COUNT, "", func(l: int) -> String: return "%d" % (1 + l)],
+		[&"dog_strength", &"dog", Text.TRACK_DOG_STRENGTH, "", func(l: int) -> String:
+			return "%d" % (Dog.CARRY_TIER + int(_track_value(&"dog_strength", l))), Text.SHOP_TIER_PREFIX],
+		[&"dog_fetch", &"dog", Text.TRACK_DOG_FETCH, "", func(l: int) -> String:
 			return "%d" % int(_track_value(&"dog_fetch", l))],
-		[&"dog_wait", &"dog", "Keenness", "s", func(l: int) -> String:
+		[&"dog_wait", &"dog", Text.TRACK_DOG_WAIT, "s", func(l: int) -> String:
 			return "%d" % roundi(maxf(
 				Dog.MOOD_MOST - _track_value(&"dog_wait", l), Dog.MOOD_LEAST
 			))],
 		# The odds and the bonus are bare percents, not shares of a base: there is no base to
 		# be a share of, and they start at 0 where a scaling track starts at 100, which is
 		# what tells the two kinds of percent on this board apart.
-		[&"lucky_haul", &"luck", "Lucky cast", "%", func(l: int) -> String:
+		[&"lucky_haul", &"luck", Text.TRACK_LUCKY_HAUL, "%", func(l: int) -> String:
 			return "%d" % roundi(_track_value(&"lucky_haul", l) * 100.0)],
-		[&"double_cast", &"luck", "Double cast", "%", func(l: int) -> String:
+		[&"double_cast", &"luck", Text.TRACK_DOUBLE_CAST, "%", func(l: int) -> String:
 			return "%d" % roundi(_track_value(&"double_cast", l) * 100.0)],
 		# Which yard has the bonus, and how long it has left, is on the pricing plate
 		# (`_shop_legend`): the bonus is a change to what one material pays, and the plate is
 		# the one place that says what materials pay. The row sells a multiplier, so the row
 		# says the multiplier.
-		[&"recycle_bonus", &"luck", "Bonus yard", "%", func(l: int) -> String:
+		[&"recycle_bonus", &"luck", Text.TRACK_RECYCLE_BONUS, "%", func(l: int) -> String:
 			return "%d" % roundi(_track_value(&"recycle_bonus", l) * 100.0)],
-		[&"bird_worth", &"luck", "Pigeons", "", func(l: int) -> String:
+		[&"bird_worth", &"luck", Text.TRACK_BIRD_WORTH, "", func(l: int) -> String:
 			return "%d" % roundi(_economy.bird_bonus * _track_value(&"bird_worth", l)), "$"],
 	]
 	for line: Array in listed:
@@ -4343,11 +4449,12 @@ func _shop_rows() -> Array:
 			"level": str(level),
 			"value": said,
 			# What the upgrade is, for the row's "?".
-			"blurb": String(BLURBS.get(key, "")),
+			"blurb": Text.of(String(BLURBS[key])) if BLURBS.has(key) else "",
 			# A track with nothing left to sell says so in a word: a dash reads as a price
 			# that failed to print.
-			"cost": "Max" if full else "$%d" % roundi(price),
+			"cost": Text.SHOP_MAX if full else "$%d" % roundi(price),
 			"afford": not full and sludge >= price,
+			"maxed": full,
 		})
 	return out
 
@@ -4385,7 +4492,7 @@ func _shop_legend() -> Dictionary:
 	var tiers: Array = []
 	var yards: Array = []
 	for kind in TrashDef.KIND_NAMES.size():
-		yards.append([TrashDef.KIND_NAMES[kind], "$%d" % roundi(_mean_pay_of(kind))])
+		yards.append([Text.of("MATERIAL_" + String(TrashDef.KIND_NAMES[kind]).to_upper()), "$%d" % roundi(_mean_pay_of(kind))])
 	# The recycle bonus lives here rather than in its row: it is a change to what one
 	# material pays, and this is the one place that says what materials pay.
 	#
@@ -4405,7 +4512,7 @@ func _shop_legend() -> Dictionary:
 		"tiers": tiers,
 		"yards": yards,
 		"bonus": bonus,
-		"rule": "Each material sells at its own yard. Heavier pieces always pay more.",
+		"rule": Text.SHOP_LEGEND,
 	}
 
 
@@ -4824,6 +4931,7 @@ func _add_dog() -> void:
 	dog.crate_tile = _dog.crate_tile
 	dog.splash = _splash
 	dog.prints = _prints
+	dog.dust = _dust
 	_dogs.append(dog)
 	_fit_dog(dog)
 	add_child(dog)
@@ -5034,10 +5142,112 @@ func _over_hud(at: Vector2) -> bool:
 	return _skin.over_button()
 
 
+## The wildlife moment (2026-09-26, `/grill-me` with Richard): the first animal of the run
+## comes back, and the view glides to it and zooms in while the player's hands are held and
+## the world runs on, a card says so, and the view glides home. Once a save. Fires at once,
+## mid-haul included (the net reels itself in off screen); only a board, the menu, the
+## arrival or the ending make it wait.
+const MOMENT_IN := 1.4
+const MOMENT_HOLD := 3.2
+const MOMENT_OUT := 1.1
+
+
+func _on_first_wildlife(at: Vector2) -> void:
+	if _wildlife_seen or _cleaned:
+		return
+	_moment_owed = at
+	_start_owed_moment()
+
+
+func _start_owed_moment() -> void:
+	if _moment_owed == Vector2.INF or _moment >= 0.0:
+		return
+	if (
+		_in_menu or _leaving or _glide >= 0.0 or _panelled() or _farewell != null
+		or _arrive != Arrive.OFF or _letter_open
+	):
+		return
+	_moment_at = _moment_owed
+	_moment_owed = Vector2.INF
+	_wildlife_seen = true
+	_moment = 0.0
+	_stop_led_cast()
+	_angler.can_walk = false
+	if _moment_card == null:
+		_moment_card = MomentCard.new()
+		_moment_card.name = &"MomentCard"
+		_settings.get_parent().add_child(_moment_card)
+	_moment_card.text = Text.WILDLIFE_BACK
+	_moment_card.show_for(MOMENT_IN * 0.6, MOMENT_HOLD + MOMENT_IN * 0.4)
+	save_game()
+
+
+## How far along the moment is towards its spot: 0 at either end, 1 while it holds.
+func moment_weight() -> float:
+	if _moment < 0.0:
+		return 0.0
+	var ease_in := clampf(_moment / MOMENT_IN, 0.0, 1.0)
+	var out := clampf((_moment - MOMENT_IN - MOMENT_HOLD) / MOMENT_OUT, 0.0, 1.0)
+	var w := minf(ease_in, 1.0 - out)
+	return w * w * (3.0 - 2.0 * w)
+
+
+func _moment_step(delta: float) -> void:
+	_moment += delta
+	_angler.can_walk = false
+	var w := moment_weight()
+	var stops := _zoom_stops()
+	var near := stops[stops.size() - 1]
+	var zoom := exp(lerpf(log(_view_zoom), log(near), w))
+	_camera.zoom = Vector2(zoom, zoom)
+	_camera.position = _clamped_view(_watching().lerp(_moment_at, w))
+	if _moment < MOMENT_IN + MOMENT_HOLD + MOMENT_OUT:
+		return
+	_moment = -1.0
+	_push_zoom()
+	_hold_the_angler()
+
+
+## A net of this cast is home: keep its catch in the count until the other is home too.
+func _bank_haul(cargo: PackedInt32Array) -> void:
+	_haul_banked += cargo.size()
+
+
+## The "7/24" over the angler's head: made on first use on the HUD's layer, under the boards.
+func _haul_count_step() -> void:
+	if _haul_count == null:
+		if _settings == null:
+			return
+		_haul_count = HaulCount.new()
+		_haul_count.name = &"HaulCount"
+		var hud := _settings.get_parent()
+		hud.add_child(_haul_count)
+		hud.move_child(_haul_count, 0)
+	_haul_count.visible = not (_in_menu or _panelled() or _farewell != null)
+	if _last_arrows != null:
+		_last_arrows.visible = _haul_count.visible
+	# One cast is both nets: the count is what both hold plus what either has already
+	# landed, and it pops once the last of them is home (2026-09-26, Richard).
+	var second := _net2 != null and _net2.state != CastNet.State.IDLE
+	var out := _net.state != CastNet.State.IDLE or second
+	if out and not _haul_out:
+		_haul_banked = 0
+		_haul_room = _net.hold + _net.luck_hold + (_net2.hold if second else 0)
+		_haul_count.throw(_net.lucky(), second)
+	elif not out and _haul_out:
+		_haul_count.pop()
+	_haul_out = out
+	var aboard := _net.catch.size() + (_net2.catch.size() if _net2 != null else 0)
+	_haul_count.count = _haul_banked + aboard if out else 0
+	_haul_count.room = _haul_room
+	_haul_count.head = _angler.position
+
+
 func _process(delta: float) -> void:
 	_pad_tick(delta)
 	_push_daylight()
 	_part_the_fleet(delta)
+	_land_filth()
 	_remap_filth(delta)
 	_push_patches(delta)
 	if not _in_menu and not _world_paused:
@@ -5046,6 +5256,7 @@ func _process(delta: float) -> void:
 		_led_step(delta)
 		_first_steps_step(delta)
 		_decor_tour_step(delta)
+	_haul_count_step()
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	_face_the_net()
@@ -5055,8 +5266,11 @@ func _process(delta: float) -> void:
 		_hold_menu_view()
 	elif _glide >= 0.0:
 		_glide_step(delta)
+	elif _moment >= 0.0:
+		_moment_step(delta)
 	else:
 		_drive_view(delta)
+		_start_owed_moment()
 
 	# Nothing is decided behind the menu: no ending found, no run clocked, nothing written.
 	# The world there is a pose, and a pose has nothing to save that was not saved going in.
@@ -5313,9 +5527,25 @@ func _remap_filth(delta: float) -> void:
 	_filth_remap_in -= delta
 	if not _filth_stale or _filth_remap_in > 0.0:
 		return
+	if _filth_task >= 0:
+		return
 	_filth_stale = false
 	_filth_remap_in = FILTH_REMAP
-	_build_filth_map()
+	# The grid passes run on a worker thread: built on the main thread they were 9.6 ms
+	# once a cast, the hitch at every catch (2026-09-26). Only the snapshot of what each
+	# tile holds is taken here, and the answer is applied when it lands (`_land_filth`).
+	var counts := _filth_counts()
+	_filth_task = WorkerThreadPool.add_task(func() -> void: _filth_done = _filth_work(counts))
+
+
+## A remap started on the worker thread, applied once it is done. Asked every frame.
+func _land_filth() -> void:
+	if _filth_task < 0 or not WorkerThreadPool.is_task_completed(_filth_task):
+		return
+	WorkerThreadPool.wait_for_task_completion(_filth_task)
+	_filth_task = -1
+	_apply_filth(_filth_done)
+	_filth_done = {}
 
 
 ## The filth map: how foul the water is on each tile of the basin, spread out into the water
@@ -5330,22 +5560,45 @@ func _remap_filth(delta: float) -> void:
 ## piece out moves the nearest-piece distance of everything round it. One sweep of a grid
 ## the size of a postage stamp is cheaper than the bookkeeping.
 func _build_filth_map() -> void:
+	if _filth_task >= 0:
+		# A remap still out on the thread would land after this one and undo it.
+		WorkerThreadPool.wait_for_task_completion(_filth_task)
+		_filth_task = -1
+		_filth_done = {}
+	_apply_filth(_filth_work(_filth_counts()))
+
+
+## What each tile holds afloat, for the map: its stack's size, nought on the dry litter —
+## litter on the beach is not in the water. Taken on the main thread, where the stacks live;
+## also builds the two tables that never change, so the thread only ever reads them.
+func _filth_counts() -> PackedInt32Array:
+	var counts := PackedInt32Array()
+	counts.resize(_grid.stacks.size())
+	for index in _grid.stacks.size():
+		if index < _grid.dry.size() and _grid.dry[index] == 1:
+			continue
+		counts[index] = _grid.stacks[index].size()
+	if _filth_room.is_empty():
+		_build_filth_room(Iso.COLS, Iso.ROWS)
+	if _water_tiles == 0:
+		_build_wet_mask()
+	return counts
+
+
+## The map from a snapshot of the counts: `pixels` and the `clean` tiles. Touches no node and
+## no stack, so it may run on a worker thread.
+func _filth_work(counts: PackedInt32Array) -> Dictionary:
 	var cols := Iso.COLS
 	var rows := Iso.ROWS
 	var far := float(FILTH_BLUR + 1)
 	var dist := PackedFloat32Array()
 	dist.resize(cols * rows)
 	dist.fill(far)
-	# The sources: every tile with a piece floating on it. Not the dry ones — litter on the
-	# beach is not in the water.
-	for index in _grid.stacks.size():
-		if _grid.stacks[index].is_empty():
-			continue
-		if index < _grid.dry.size() and _grid.dry[index] == 1:
-			continue
-		dist[index] = 0.0
+	for index in counts.size():
+		if counts[index] > 0:
+			dist[index] = 0.0
 	_chamfer(dist, cols, rows)
-	var share := _pooled_share(cols, rows)
+	var share := _pooled_share(cols, rows, counts)
 
 	var pixels := PackedByteArray()
 	pixels.resize(cols * rows)
@@ -5355,11 +5608,26 @@ func _build_filth_map() -> void:
 			continue
 		var strength := lerpf(FILTH_FLOOR, 1.0, pow(share[i], FILTH_SHARE_BITE))
 		pixels[i] = int(round(pow(near, FILTH_FALL) * strength * 255.0))
+	# A tile reads clean where its byte is under the first state: `LakeGrid.water_state`'s
+	# rule turned round into the one byte it is, so the thread need not ask the grid.
+	var clean_under := int(ceil(pow(float(LakeGrid.FILTH_STATE_AT[0]), 1.0 / LakeGrid.FILTH_STATE_BITE) * 255.0))
+	var clean := PackedInt32Array()
+	for index in _wet_mask.size():
+		if _wet_mask[index] == 1 and pixels[index] < clean_under:
+			clean.append(index)
+	return {"pixels": pixels, "clean": clean}
 
+
+## A finished map handed to the grid, the shader and whatever grows on clean water.
+func _apply_filth(done: Dictionary) -> void:
+	var cols := Iso.COLS
+	var rows := Iso.ROWS
+	var pixels: PackedByteArray = done["pixels"]
 	# The grid keeps a copy for what it draws on the CPU — the ripple rings read the state
 	# of the water under their piece off it, the way the shader does off the texture.
 	_grid.filth = pixels
-	_count_clean()
+	_clean_tiles = done["clean"]
+	_clean_share = float(_clean_tiles.size()) / float(maxi(_water_tiles, 1))
 
 	if _filth_map == null:
 		_filth_map = Image.create_from_data(cols, rows, false, Image.FORMAT_R8, pixels)
@@ -5387,24 +5655,25 @@ func _build_filth_map() -> void:
 ## Two summed-area tables, so the cost is a pass over the grid whatever the pool's width —
 ## this runs on every remap, in the middle of a haul. Whole numbers, so there is no drift
 ## in the sums. The table of what the tiles could hold never changes and is built once.
-func _pooled_share(cols: int, rows: int) -> PackedFloat32Array:
+func _build_filth_room(cols: int, rows: int) -> void:
 	var wide := cols + 1
-	if _filth_room.is_empty():
-		_filth_room.resize(wide * (rows + 1))
-		for ty in rows:
-			var run := 0
-			for tx in cols:
-				run += _room_at(tx, ty)
-				_filth_room[(ty + 1) * wide + tx + 1] = _filth_room[ty * wide + tx + 1] + run
+	_filth_room.resize(wide * (rows + 1))
+	for ty in rows:
+		var run := 0
+		for tx in cols:
+			run += _room_at(tx, ty)
+			_filth_room[(ty + 1) * wide + tx + 1] = _filth_room[ty * wide + tx + 1] + run
+
+
+func _pooled_share(cols: int, rows: int, counts: PackedInt32Array) -> PackedFloat32Array:
+	var wide := cols + 1
 	var held := PackedInt32Array()
 	held.resize(wide * (rows + 1))
 	for ty in rows:
 		var run := 0
 		var row := ty * cols
 		for tx in cols:
-			var index := row + tx
-			if not (index < _grid.dry.size() and _grid.dry[index] == 1):
-				run += _grid.stacks[index].size()
+			run += counts[row + tx]
 			held[(ty + 1) * wide + tx + 1] = held[ty * wide + tx + 1] + run
 
 	var share := PackedFloat32Array()
@@ -5455,16 +5724,22 @@ func _count_clean() -> void:
 	# Which tiles are water is asked once: it is a walk of the shore function per tile, and
 	# at every remap it was most of what the map cost (12.7 ms of 20, tools/shot_grime).
 	if _water_tiles == 0:
-		_wet_mask.resize(_grid.stacks.size())
-		_wet_mask.fill(0)
-		for index in _grid.stacks.size():
-			if _wet_tile(index):
-				_wet_mask[index] = 1
-				_water_tiles += 1
+		_build_wet_mask()
 	for index in _wet_mask.size():
 		if _wet_mask[index] == 1 and _grid.water_state(index) == 0:
 			_clean_tiles.append(index)
 	_clean_share = float(_clean_tiles.size()) / float(maxi(_water_tiles, 1))
+
+
+
+func _build_wet_mask() -> void:
+	_wet_mask.resize(_grid.stacks.size())
+	_wet_mask.fill(0)
+	_water_tiles = 0
+	for index in _grid.stacks.size():
+		if _wet_tile(index):
+			_wet_mask[index] = 1
+			_water_tiles += 1
 
 
 func _wet_tile(index: int) -> bool:
@@ -5588,6 +5863,7 @@ func _grow_nature() -> void:
 	_flora.grid = _grid
 	_flora.grounds = _grounds
 	_flora.crate_tile = _dog.crate_tile
+	_flora.ear = func() -> Vector2: return Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	var yards := PackedVector2Array()
 	for stop: Dropoff in _dropoffs:
 		yards.append(stop.foot)
@@ -5609,26 +5885,76 @@ func _grow_nature() -> void:
 	_wildlife.crate_tile = _dog.crate_tile
 	_wildlife.avoid = yards
 	_wildlife.threats = _wildlife_threats
+	_wildlife.walker_threats = _wildlife_walkers
+	_wildlife.ear = func() -> Vector2: return Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
+	_wildlife.obstacles = _wildlife_obstacles
 	_wildlife.music = MusicStation.main()
 	_flora.music = _wildlife.music
 	add_child(_wildlife)
+	_wildlife.first_arrived.connect(_on_first_wildlife)
 	_flora.refresh(_clean_share)
 	_fish.refresh(_clean_share, _clean_tiles)
 	_wildlife.refresh(_clean_share, _clean_tiles, 1.0 - pollution)
 
 
-## What frightens the animals, in world px: the angler, the pack, the hulls.
+## What frightens the animals, in world px: the angler and the pack while they move, and the
+## hulls always. A walker standing still frightens nothing — it is in `_wildlife_obstacles`,
+## which the animals walk round like a rock, or an idle angler beside a frog would startle
+## it every time it came back.
 func _wildlife_threats() -> PackedVector2Array:
-	var out := PackedVector2Array()
-	if _angler != null:
-		out.append(_angler.position)
-	for dog in _dogs:
-		if is_instance_valid(dog) and dog.visible:
-			out.append(dog.position)
+	_sort_walkers_for_wildlife()
+	var out := _wildlife_moving.duplicate()
 	for boat in _boats:
 		if is_instance_valid(boat) and boat.visible:
 			out.append(boat.position)
 	return out
+
+
+## The moving walkers alone, without the hulls: what the ducks shy from.
+func _wildlife_walkers() -> PackedVector2Array:
+	_sort_walkers_for_wildlife()
+	return _wildlife_moving
+
+
+func _wildlife_obstacles() -> PackedVector2Array:
+	_sort_walkers_for_wildlife()
+	return _wildlife_still
+
+
+## The angler and the dogs split into moving and still, off how far each went since the
+## last frame. Worked out once a frame, by whichever of the two callables asks first.
+var _wildlife_moving := PackedVector2Array()
+var _wildlife_still := PackedVector2Array()
+var _wildlife_last := {}
+var _wildlife_sorted_at := -1
+
+const WILDLIFE_STILL_SPEED := 12.0	## world px a second under which a walker is standing
+
+
+func _sort_walkers_for_wildlife() -> void:
+	var frame := Engine.get_process_frames()
+	if frame == _wildlife_sorted_at:
+		return
+	var dt := maxf(get_process_delta_time(), 0.001)
+	_wildlife_sorted_at = frame
+	_wildlife_moving = PackedVector2Array()
+	_wildlife_still = PackedVector2Array()
+	var walkers: Array[Node2D] = []
+	if _angler != null:
+		walkers.append(_angler)
+	for dog in _dogs:
+		if is_instance_valid(dog) and dog.visible:
+			walkers.append(dog)
+	var now := {}
+	for w in walkers:
+		var id := w.get_instance_id()
+		now[id] = w.position
+		var last: Vector2 = _wildlife_last.get(id, w.position)
+		if w.position.distance_to(last) / dt > WILDLIFE_STILL_SPEED:
+			_wildlife_moving.append(w.position)
+		else:
+			_wildlife_still.append(w.position)
+	_wildlife_last = now
 
 
 ## Distance from every tile to the nearest source, in tiles, in place: `dist` comes in as 0
@@ -5694,7 +6020,7 @@ func _update_hud() -> void:
 	_skin.waiting = unwashed.size()
 	# And on the shed's copy of the same button, which is the only one on screen while the
 	# player is inside.
-	_open_upgrades.note = "%d available" % affordable
+	_open_upgrades.note = Text.HUD_AVAILABLE % affordable
 	_skin.hint = _last_pieces_line()
 
 	# The purse hangs under the shop's first board while it is up, and goes home after.
@@ -5702,6 +6028,9 @@ func _update_hud() -> void:
 	if not _menu_open:
 		return
 	_shop_skin.rows = _shop_rows()
+	# Read every frame the board is up, like the rows, so a language change reaches them.
+	_shop_skin.titles = ShopSkin.spoken(ShopSkin.TITLE_KEYS)
+	_shop_skin.headings = ShopSkin.spoken(ShopSkin.HEADING_KEYS)
 	_shop_skin.tour_pad = Pad.is_pad()
 	_shop_skin.legend = _shop_legend()
 
@@ -5724,8 +6053,8 @@ func _last_pieces_line() -> String:
 	if _cleaned or _left_over <= 0 or _left_over > LAST_PIECES_FROM:
 		return ""
 	if _left_over == 1:
-		return "1 piece left"
-	return "%d pieces left" % _left_over
+		return Text.HUD_PIECES_LEFT_1
+	return Text.HUD_PIECES_LEFT_N % _left_over
 
 
 func _runs_done() -> int:
@@ -5779,10 +6108,13 @@ func save_game() -> bool:
 		# lake. A save that carried its own copy handed it back on load and undid whatever the
 		# player had set on the menu.
 		"farewell": _farewell_shown,
+		# The record player's picks (2026-09-28): which songs play on the lake and in the shed.
+		"records": _music_picks(),
 		"intro_done": _intro_done,
 		"first_steps": _steps_done,
 		"shop_tour": _shop_tour_done,
 		"decor_tour": _decor_tour_done,
+		"wildlife_seen": _wildlife_seen,
 		"showers": _weather.showers if _weather != null else 0,
 		"rain_next": _weather.next_in if _weather != null else -1.0,
 		"angler": _angler.tile_pos,
@@ -5917,12 +6249,16 @@ func load_game() -> bool:
 	# and lit that way from the first frame rather than brightening as if it had just
 	# happened. The thanks are not repeated: they were earned once.
 	_farewell_shown = bool(save.get("farewell", false))
+	_music_saved = save.get("records", {}) if save.get("records", {}) is Dictionary else {}
 	# Absent means seen: see the arrival section. A run in progress never plays the intro.
 	_intro_done = bool(save.get("intro_done", true))
 	# Absent means done, as above. Not done means the steps start over from the walk.
 	_steps_done = bool(save.get("first_steps", true))
 	_shop_tour_done = bool(save.get("shop_tour", true))
 	_decor_tour_done = bool(save.get("decor_tour", true))
+	# Absent means seen, the tours' rule: an older save is past its first animal, or near
+	# enough, and a load would otherwise fire the moment the stock refills the lake.
+	_wildlife_seen = bool(save.get("wildlife_seen", true))
 	# Absent means none yet: a save from before the rain has had no showers.
 	if _weather != null:
 		_weather.restore(int(save.get("showers", 0)), float(save.get("rain_next", -1.0)))
@@ -5984,6 +6320,10 @@ func wipe_save() -> void:
 
 
 func _exit_tree() -> void:
+	# A remap still on the worker thread reads this lake's tables: let it finish first.
+	if _filth_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_filth_task)
+		_filth_task = -1
 	# The station is an autoload too, and the rooms it was told about were this scene's.
 	var music := MusicStation.main()
 	if music != null:

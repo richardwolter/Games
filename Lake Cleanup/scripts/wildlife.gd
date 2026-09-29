@@ -148,6 +148,19 @@ var crate_tile := Vector2.INF
 var avoid := PackedVector2Array()
 ## World points that frighten: the angler, the dogs, the hulls. Asked once a frame.
 var threats: Callable
+## The same without the hulls: the ducks are not frightened by the ferries (2026-09-28,
+## Richard). Unset, the ducks read `threats`.
+var walker_threats: Callable
+## Where the angler stands (world px), for what is within earshot: an animal is heard only
+## inside the dogs' own `Dog.HEAR` (2026-09-28). Unset, nothing is heard.
+var ear: Callable
+## Whether this sitting's first brood has come in yet: its arrival always calls.
+var _ducks_came := false
+## World points that stand still — the angler or a dog not moving. Nothing is frightened by
+## them; the animals walk and swim round them (`_round`) and do not pick a spot on them.
+var obstacles: Callable
+var _still := PackedVector2Array()
+const OBSTACLE_REACH := 0.9	## tiles an animal keeps off a still walker
 ## The beat the animals move to (MusicStation.beat_clock). Without one they keep to a
 ## silent FALLBACK_BPM of their own.
 var music: MusicStation
@@ -166,6 +179,9 @@ var _shore: Array = []
 var _clean := PackedInt32Array()
 var _pads := PackedVector2Array()
 var _frogs: Array = []
+## The lake has gone from no animals to some: the lake's "wildlife is coming back" moment
+## (2026-09-26). Fires on every such turn; the lake keeps the once-per-save flag.
+signal first_arrived(at: Vector2)
 var _turtles: Array = []
 var _broods: Array = []
 var _flies: Array = []
@@ -337,12 +353,14 @@ func _process(delta: float) -> void:
 	var seen := PackedVector2Array()
 	if threats.is_valid():
 		seen = threats.call()
+	_still = obstacles.call() if obstacles.is_valid() else PackedVector2Array()
 	for f: Dictionary in _frogs:
 		_frog_step(f, delta, seen)
 	for t: Dictionary in _turtles:
 		_turtle_step(t, delta, seen)
+	var seen_by_ducks: PackedVector2Array = walker_threats.call() if walker_threats.is_valid() else seen
 	for b: Dictionary in _broods:
-		_brood_step(b, delta, seen)
+		_brood_step(b, delta, seen_by_ducks)
 	for d: Dictionary in _flies:
 		_fly_step(d, delta, seen)
 	for c: Dictionary in _critters_on_land:
@@ -355,6 +373,35 @@ func _process(delta: float) -> void:
 	_under.queue_redraw()
 	_ground.queue_redraw()
 	_air.queue_redraw()
+
+
+## A step from `at` to `next`, bent round every still walker: the part of the step heading
+## into one is taken off, so the animal slides along the edge of its room instead of
+## walking into it, and anything still inside is put back on the edge.
+func _round(at: Vector2, next: Vector2) -> Vector2:
+	if _still.is_empty():
+		return next
+	var r := Iso.tile_circle_extent(OBSTACLE_REACH)
+	for p in _still:
+		var d := next - p
+		if d.length() >= r:
+			continue
+		var n := (at - p).normalized() if (at - p).length() > 0.01 else Vector2.RIGHT
+		var step := next - at
+		step -= n * minf(step.dot(n), 0.0)
+		next = at + step
+		if (next - p).length() < r:
+			next = p + (next - p).normalized() * r if (next - p).length() > 0.01 else p + n * r
+	return next
+
+
+## Is `to` inside a still walker's room — no place to hop to or wander to.
+func _taken_by_still(to: Vector2) -> bool:
+	var r := Iso.tile_circle_extent(OBSTACLE_REACH)
+	for p in _still:
+		if p.distance_to(to) < r:
+			return true
+	return false
 
 
 # ---- where they live --------------------------------------------------------------------
@@ -477,6 +524,7 @@ func _want_late(most: int) -> int:
 func _reckon() -> void:
 	if grid == null or not ready_to_live():
 		return
+	var none_yet := _alive() == 0
 	if flora != null:
 		_pads = flora.pad_spots()
 	var shore := _clean_shore()
@@ -495,10 +543,44 @@ func _reckon() -> void:
 		var b := _new_brood()
 		if not b.is_empty():
 			_broods.append(b)
+			if not _ducks_came and Sfx.main() != null:
+				Sfx.main().play_duck(true)
+			_ducks_came = true
 			_brood_in = _rng.randf_range(BROOD_GAP.x, BROOD_GAP.y)
 	if not shore.is_empty() or not _pads.is_empty():
 		for n in maxi(_want(DRAGONFLIES_MOST) - _flies.size(), 0):
 			_flies.append(_new_fly(shore))
+	if none_yet and _alive() > 0:
+		first_arrived.emit(_first_spot())
+
+
+## Whether a sound at `at` (world px) is in the angler's earshot.
+func hears(at: Vector2) -> bool:
+	if not ear.is_valid():
+		return false
+	return (ear.call() as Vector2).distance_to(at) < Iso.tile_circle_extent(Dog.HEAR)
+
+
+## Every animal on the lake, of every kind.
+func _alive() -> int:
+	return _frogs.size() + _turtles.size() + _broods.size() + _flies.size() + _critters_on_land.size()
+
+
+## Where the first animal of a fresh lake is headed: the spot the moment is framed on. A frog,
+## a turtle or a critter heads for its shore spot's sand, a dragonfly hovers at its home, a
+## brood is on its way in and is framed where it will land.
+func _first_spot() -> Vector2:
+	for f: Dictionary in _frogs:
+		return f["land_at"]
+	for t: Dictionary in _turtles:
+		return (t["spot"] as Dictionary)["land"]
+	for c: Dictionary in _critters_on_land:
+		return c["home"]
+	for d: Dictionary in _flies:
+		return d["home"]
+	for b: Dictionary in _broods:
+		return b.get("to", b.get("at", Vector2.ZERO))
+	return Vector2.ZERO
 
 
 func _nearest(at: Vector2, points: Array) -> Vector2:
@@ -569,7 +651,7 @@ func _frog_step(f: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 			if float(f.get("flee", 0.0)) > 0.0:
 				f["flee"] = float(f["flee"]) - delta
 				go *= 2.2
-			var next := at + step.normalized() * go
+			var next := _round(at, at + step.normalized() * go)
 			if step.length() <= go:
 				f["at"] = to
 				_frog_swum(f)
@@ -635,6 +717,8 @@ func _frog_on_cue(f: Dictionary) -> void:
 			f["state"] = Frog.CROAK
 			f["t"] = 0.0
 			f["croaks"] = int(plan["croaks"])
+			if hears(f["at"]) and Sfx.main() != null:
+				Sfx.main().play_frog()
 		Frog.HOP:
 			_frog_leap(f, plan["to"], Frog.HOP)
 		Frog.JUMP:
@@ -652,7 +736,8 @@ func _frog_plan(f: Dictionary) -> Dictionary:
 		for attempt in 4:
 			var to: Vector2 = (f["at"] as Vector2) + along * _rng.randf_range(-1.0, 1.0) * Iso.tile_circle_extent(FROG_HOP_REACH) \
 				+ (spot["normal"] as Vector2) * _rng.randf_range(-6.0, 4.0)
-			if _on_sand(to, String(spot["side"])) and to.distance_to(spot["land"]) < Iso.tile_circle_extent(1.4):
+			if _on_sand(to, String(spot["side"])) and to.distance_to(spot["land"]) < Iso.tile_circle_extent(1.4) \
+					and not _taken_by_still(to):
 				return {"kind": Frog.HOP, "to": to}
 	if roll < 0.87:
 		return {"kind": Frog.JUMP}
@@ -763,6 +848,9 @@ func _frog_fright(f: Dictionary, from: Vector2) -> void:
 	var state: int = f["state"]
 	if state == Frog.JUMP:
 		return
+	# A heard fright ribbits now and then, on the frogs' own gap (2026-09-28).
+	if Sfx.main() != null and hears(f["at"]) and _rng.randf() < Sfx.FROG_FRIGHT_ODDS:
+		Sfx.main().play_frog()
 	if state == Frog.SWIM:
 		var off := (f["at"] as Vector2) - from
 		if off.length() < 1.0:
@@ -813,7 +901,7 @@ func _turtle_step(t: Dictionary, delta: float, seen: PackedVector2Array) -> void
 				else:
 					var along := Vector2(-(spot["normal"] as Vector2).y, (spot["normal"] as Vector2).x)
 					var to := at + along * _rng.randf_range(-24.0, 24.0)
-					if _on_sand(to, String(spot["side"])):
+					if _on_sand(to, String(spot["side"])) and not _taken_by_still(to):
 						_turtle_walk(t, to)
 					else:
 						t["timer"] = 3.0
@@ -834,7 +922,7 @@ func _turtle_step(t: Dictionary, delta: float, seen: PackedVector2Array) -> void
 				t["at"] = to
 				_turtle_arrived(t)
 			else:
-				t["at"] = at + step.normalized() * go
+				t["at"] = _round(at, at + step.normalized() * go)
 			t["walked"] = float(t.get("walked", 0.0)) + minf(go, step.length())
 			if not wet:
 				t["stride"] = float(t.get("stride", 0.0)) + go
@@ -979,7 +1067,7 @@ func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 				else:
 					# Grazing along the grass, pulled back towards home.
 					to = at + along * _rng.randf_range(LAND_WANDER.x, LAND_WANDER.y) + (home - at) * 0.4
-				if _on_bank(to):
+				if _on_bank(to) and not _taken_by_still(to):
 					c["to"] = to
 					c["state"] = Land.MOVE
 				else:
@@ -1008,7 +1096,8 @@ func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 				c["timer"] = _rng.randf_range(LAND_SIT.x, LAND_SIT.y)
 				c.erase("speed")
 			else:
-				c["at"] = at + step.normalized() * go
+				c["at"] = at + step.normalized() * go if state == Land.FLEE \
+					else _round(at, at + step.normalized() * go)
 			c["walked"] = float(c["walked"]) + go
 			if float(c["walked"]) >= LAND_PRINT_EVERY:
 				c["walked"] = 0.0
@@ -1091,6 +1180,9 @@ func _new_brood() -> Dictionary:
 
 func _brood_step(b: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 	b["clock"] = float(b["clock"]) + delta
+	# A brood in earshot calls now and then; the gap is the station's (`Sfx.DUCK_GAP`).
+	if Sfx.main() != null and hears(b["at"]):
+		Sfx.main().play_duck()
 	var state: int = b["state"]
 	var at: Vector2 = b["at"]
 	match state:

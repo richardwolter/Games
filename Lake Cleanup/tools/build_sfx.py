@@ -38,6 +38,9 @@ import sys
 import wave
 
 SRC = "art_source/SFX"
+NEW = "New SFX - 28-09/"
+WEATHER_BED = ("ESM_Thunderstorm_6_Ambience_Nature_Tribal_Organic_Tennessee_Thunder_Storm_"
+               "Lightning_Strike.wav")
 OUT = "assets/sfx"
 RATE = 44100
 
@@ -125,6 +128,34 @@ PLAN = {
     # and no shut-off, so it is a held loop and the stand eases it in and out on the button.
     # `WashStand` loads it for itself; it is not one of `Sfx`'s names.
     "hose_spray": ("Water_Hose_Spray.wav", ("loop", 1.0, 9.0, 1.0)),
+    # The second batch (2026-09-28, `/grill-me` with Richard), from `NEW`. Spans read off
+    # each recording's envelope; first picks, to be retuned by ear.
+    # The shed's door: the creak opens it, the solid shut closes it. They replace
+    # `shed_open` and `ui_close` for the shed alone.
+    "door_open": (NEW + "BRS_Door_Wood_Cheap_Open_Creak_3.wav", ("trim", 1.9)),
+    "door_close": (NEW + "BRS_Door_Wood_Solid_Cl_Med_1.wav", ("trim", 0.8)),
+    # One splash, pitched in steps by the game: a footfall in a puddle, and the angler's first
+    # step into the lake.
+    "step_puddle": (NEW + "ESM_Fantasy_Game_Footsteps_Water_2.wav", ("trim", 0.5)),
+    # The storm's rain with its thunder left out: the quiet stretch from 12 s to 24 s, where
+    # nothing rumbles. The thunder is cut into takes of its own and played after a flash.
+    "rain": (NEW + WEATHER_BED, ("loop", 12.0, 10.5, 1.5)),
+    "thunder_1": (NEW + WEATHER_BED, ("span", 0.2, 11.5, 2.0)),
+    "thunder_2": (NEW + WEATHER_BED, ("span", 31.8, 35.5, 1.2)),
+    "thunder_3": (NEW + "FF_ES_fx_lighting_strike_brown.wav", ("span", 0.0, 1.8, 0.4)),
+    "thunder_4": (NEW + "FF_ES_fx_lighting_strike_brown.wav", ("span", 1.8, 13.5, 3.0)),
+    # One croak, pitched by the game.
+    "frog": (NEW + "KSHMR_sok5_fx_animal_frog.wav", ("trim", 0.9)),
+    # The mallard's three quacks, and a few geese calls off the distant recording.
+    "duck": (NEW + "SCP_MS_field_rec_birdsong_mallard_rugen.wav",
+             ("takes", [(0.05, 0.55), (0.55, 1.10), (1.10, 1.60)])),
+    "geese": (NEW + "BRS_Bird_Geese_Lake_Distant.wav",
+              ("takes", [(18.2, 20.2), (21.0, 23.0), (68.0, 71.2), (73.3, 75.2)])),
+    # Birds and insects off the forest loop, for plants growing in: its busy moments only.
+    "forest": (NEW + "ESM_WNL_fx_forest_loop_distant_bird_breeze_chirps_insects_02.wav",
+               ("takes", [(15.8, 19.6), (21.2, 22.8), (25.3, 28.2), (46.8, 48.6)])),
+    # A bee passing, panned from the left ear to the right (`PAN_SWEEP`).
+    "bee": (NEW + "BeeFlyBy_BU01.26.wav", ("trim", 3.1)),
 }
 
 ## Names whose low end is rolled off and whose start is eased in: brought up to level, the
@@ -135,6 +166,9 @@ PLAN = {
 ## The long beds stay OGG — the lake's four minutes would be 41 MB of WAV.
 LOOP_WAV = {"wading"}  # also a plain sound now: the game leaves a gap between plays
 SMOOTH = {"step_water"}
+## Names muffled by a low pass at this many Hz (two one-pole passes): the crate's and the
+## hold's thud, softened (2026-09-28, Richard: "softer thump, muffle it a little bit").
+MUFFLE = {"pop": 2500.0}
 SMOOTH_HZ = 500.0
 SMOOTH_IN = 0.03
 ## The faintest onset in a footstep take that is still a footstep, against the loudest.
@@ -149,7 +183,10 @@ STEP_LEAST = 0.25
 ## to a third of them.
 TARGET_LUFS = -22.0
 BED_LUFS = -20.0
-BEDS = {"lake_ambient", "fireplace"}
+BEDS = {"lake_ambient", "fireplace", "rain"}
+## Carried from the left ear to the right over the take, baked into the file: a player has
+## no pan, and one bee is one pass.
+PAN_SWEEP = {"bee"}
 
 ## No cut goes over this, whatever the loudness pass asks for. The spec's own ceiling: a
 ## transient at nought would be the one that clips when the player's slider is at the top.
@@ -234,6 +271,19 @@ def high_pass(samples, hz):
             last_out = a * (last_out + x - last_in)
             last_in = x
             samples[i] = max(-32768, min(32767, int(last_out)))
+    return samples
+
+
+def low_pass(samples, hz):
+    """Two one-pole low passes, per channel: the top taken off, the thud left."""
+    a = math.exp(-2.0 * math.pi * hz / RATE)
+    for _pass in range(2):
+        for c in (0, 1):
+            y = 0.0
+            for f in range(len(samples) // 2):
+                i = f * 2 + c
+                y = (1.0 - a) * samples[i] + a * y
+                samples[i] = max(-32768, min(32767, int(y)))
     return samples
 
 
@@ -407,6 +457,16 @@ def loop(samples, start_s, len_s, cross_s=None):
     return body
 
 
+def sweep(samples):
+    """Left ear to right, in place, equal power."""
+    frames = len(samples) // 2
+    for f in range(frames):
+        t = f / max(1, frames - 1) * math.pi / 2
+        for c, g in ((0, math.cos(t)), (1, math.sin(t))):
+            v = samples[f * 2 + c] * g * 1.2
+            samples[f * 2 + c] = max(-32768, min(32767, int(v)))
+
+
 def write_wav(name, samples):
     path = os.path.join(OUT, name + ".wav")
     with wave.open(path, "wb") as w:
@@ -513,8 +573,12 @@ def main():
 
         target = BED_LUFS if name in BEDS else TARGET_LUFS
         for out_name, clip, how_write in cuts:
+            if name in MUFFLE:
+                low_pass(clip, MUFFLE[name])
             was = loudness(clip)
             gain = level(clip, target)
+            if name in PAN_SWEEP:
+                sweep(clip)
             path = write_wav(out_name, clip) if how_write == "wav" else write_ogg(out_name, clip)
             report.append((out_name, path, len(clip) / 2.0 / RATE, was,
                            loudness(clip), peak_db(clip), gain))

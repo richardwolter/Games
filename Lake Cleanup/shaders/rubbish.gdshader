@@ -40,6 +40,9 @@ uniform float anchor_span = 8192.0;
 uniform vec3 rim_gold : source_color = vec3(1.0, 0.84, 0.35);
 // How solid the rim is. The eight copies overlap along the edge, so this compounds there.
 uniform float rim_fade : hint_range(0.0, 1.0) = 1.0;
+// The last few pieces' rim (LakeGrid.PALE_FLAG, 0.3): pale, not gold, which is treasure.
+uniform vec3 rim_pale : source_color = vec3(0.92, 0.97, 1.0);
+varying flat float pale;
 
 // Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
 varying flat float rim;
@@ -72,6 +75,8 @@ void vertex() {
 	// 0.5 — the placeholder blocks draw at 0.14 and 1.0). Handed on white so the fragment
 	// stage gets the art's own alpha to cut the gold to.
 	rim = abs(COLOR.a - 0.5) < 0.02 ? 1.0 : 0.0;
+	pale = abs(COLOR.a - 0.3) < 0.02 ? 1.0 : 0.0;
+	rim = max(rim, pale);
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.
 	COLOR = rim > 0.5 ? vec4(1.0) : vec4(vec3(COLOR.b), COLOR.a);
@@ -81,7 +86,7 @@ void vertex() {
 // copy that is the art's alpha under white: swap the colour for gold and keep the cut.
 void fragment() {
 	if (rim > 0.5) {
-		COLOR = vec4(rim_gold, COLOR.a * rim_fade);
+		COLOR = vec4(pale > 0.5 ? rim_pale : rim_gold, COLOR.a * rim_fade);
 	}
 }
 

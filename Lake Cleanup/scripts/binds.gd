@@ -44,70 +44,71 @@ const SECTION := "binds"
 ## `key` is the keyboard-or-mouse binding and `pad` the gamepad one — one editable event
 ## each, which is what the board has a column for. `extra` is events that are always on the
 ## action and never shown: the arrow keys beside the walk keys, and the sticks. `group` is
-## only the heading the board draws above the row.
+## only the heading the board draws above the row. `label` and `group` are keys of
+## `locale/translations.csv`, read through `Text.of` where they are drawn.
 const ACTIONS := [
 	{
-		"action": &"walk_up", "label": "Walk up", "group": "Move",
+		"action": &"walk_up", "label": "VERB_WALK_UP", "group": "BIND_GROUP_MOVE",
 		"contexts": [CONTEXT_LAKE, CONTEXT_SHED],
 		"key": "key:87", "pad": "", "extra": ["key:4194320", "axis:1:-1"],
 	},
 	{
-		"action": &"walk_down", "label": "Walk down", "group": "Move",
+		"action": &"walk_down", "label": "VERB_WALK_DOWN", "group": "BIND_GROUP_MOVE",
 		"contexts": [CONTEXT_LAKE, CONTEXT_SHED],
 		"key": "key:83", "pad": "", "extra": ["key:4194322", "axis:1:1"],
 	},
 	{
-		"action": &"walk_left", "label": "Walk left", "group": "Move",
+		"action": &"walk_left", "label": "VERB_WALK_LEFT", "group": "BIND_GROUP_MOVE",
 		"contexts": [CONTEXT_LAKE, CONTEXT_SHED],
 		"key": "key:65", "pad": "", "extra": ["key:4194319", "axis:0:-1"],
 	},
 	{
-		"action": &"walk_right", "label": "Walk right", "group": "Move",
+		"action": &"walk_right", "label": "VERB_WALK_RIGHT", "group": "BIND_GROUP_MOVE",
 		"contexts": [CONTEXT_LAKE, CONTEXT_SHED],
 		"key": "key:68", "pad": "", "extra": ["key:4194321", "axis:0:1"],
 	},
 	{
-		"action": &"cast", "label": "Cast the net", "group": "Net",
+		"action": &"cast", "label": "VERB_CAST", "group": "BIND_GROUP_NET",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:1", "pad": "axis:5:1", "extra": [],
 	},
 	{
-		"action": &"lay_net", "label": "Lay a lit net", "group": "Net",
+		"action": &"lay_net", "label": "VERB_LAY_NET", "group": "BIND_GROUP_NET",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:2", "pad": "axis:4:1", "extra": [],
 	},
 	{
-		"action": &"interact", "label": "Interact", "group": "Net",
+		"action": &"interact", "label": "VERB_INTERACT", "group": "BIND_GROUP_NET",
 		"contexts": [CONTEXT_LAKE], "key": "key:69", "pad": "pad:0", "extra": [],
 	},
 	{
-		"action": &"open_shed", "label": "Open the shed", "group": "Open",
+		"action": &"open_shed", "label": "VERB_OPEN_SHED", "group": "BIND_GROUP_OPEN",
 		"contexts": [CONTEXT_LAKE], "key": "key:67", "pad": "pad:2", "extra": [],
 	},
 	{
-		"action": &"open_upgrades", "label": "Open the upgrades", "group": "Open",
+		"action": &"open_upgrades", "label": "VERB_OPEN_UPGRADES", "group": "BIND_GROUP_OPEN",
 		"contexts": [CONTEXT_LAKE], "key": "key:85", "pad": "pad:3", "extra": [],
 	},
 	{
-		"action": &"open_settings", "label": "Open the settings", "group": "Open",
+		"action": &"open_settings", "label": "VERB_OPEN_SETTINGS", "group": "BIND_GROUP_OPEN",
 		"contexts": [CONTEXT_LAKE], "key": "key:4194305", "pad": "pad:6", "extra": [],
 	},
 	{
-		"action": &"zoom_in", "label": "Zoom in", "group": "View",
+		"action": &"zoom_in", "label": "VERB_ZOOM_IN", "group": "BIND_GROUP_VIEW",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:4", "pad": "pad:10", "extra": [],
 	},
 	{
-		"action": &"zoom_out", "label": "Zoom out", "group": "View",
+		"action": &"zoom_out", "label": "VERB_ZOOM_OUT", "group": "BIND_GROUP_VIEW",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:5", "pad": "pad:9", "extra": [],
 	},
 	{
-		"action": &"recentre", "label": "Look at the angler", "group": "View",
+		"action": &"recentre", "label": "VERB_RECENTRE", "group": "BIND_GROUP_VIEW",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:3", "pad": "pad:8", "extra": [],
 	},
 	{
-		"action": &"shed_rotate", "label": "Turn the piece", "group": "In the shed",
+		"action": &"shed_rotate", "label": "VERB_SHED_ROTATE", "group": "BIND_GROUP_SHED",
 		"contexts": [CONTEXT_SHED], "key": "key:82", "pad": "pad:2", "extra": [],
 	},
 	{
-		"action": &"shed_switch", "label": "Work a switch", "group": "In the shed",
+		"action": &"shed_switch", "label": "VERB_SHED_SWITCH", "group": "BIND_GROUP_SHED",
 		"contexts": [CONTEXT_SHED], "key": "key:69", "pad": "pad:3", "extra": [],
 	},
 ]
@@ -130,7 +131,8 @@ static var _set: Dictionary = {}
 
 ## What the walking stick is called on the board. The sticks are `FIXED` and have no row, so
 ## this is the only place the player is told one exists.
-const STICK_NAME := "Left stick"
+static var STICK_NAME: String:
+	get: return Text.BIND_STICK
 
 ## Xbox names, because that is the pad the game was built against and the one the prompts
 ## already say. Index is `JoyButton`.

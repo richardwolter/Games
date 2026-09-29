@@ -102,7 +102,7 @@ const DECOR_MOST := 0.42
 const DECOR_SPREAD := 0.55
 const DECOR_DIM := Color(0.82, 0.86, 0.88)
 const SHED_TALL := 0.78
-const SHED_LABEL := "Decorate"
+## The button's word is `Text.HUD_DECORATE`, read at draw time.
 
 ## The coin: a disc in the money's gold with a deeper rim, a paler crescent where the light
 ## catches it, and a ring struck into it a little in from the edge.
@@ -380,7 +380,7 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 		var slot := Rect2(room.position + _at(&"hut", rule) * room.size - span * 0.5, span)
 		fit(on, art, slot, 1.0, tint)
 		_trace(&"hut", slot)
-	label(on, face, SHED_LABEL)
+	label(on, face, Text.HUD_DECORATE)
 
 
 ## Where each find stands: a fan around the hut, not a row beside it.
@@ -610,43 +610,66 @@ static func draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float = 1
 	return panel
 
 
-## The coin part-way through a flip: `turn` is the cosine of how far round it is, 1 face on,
-## 0 edge on, under 0 its back. Squashed across through the canvas transform, to a **whole
-## number of pixels** wide so the rim does not shimmer, with the coin's own thickness showing
-## as a second disc behind the face on the side turning away. The back carries the struck
-## ring and no glint: the light is on the side that faces it.
-static func coin_turned(on: CanvasItem, box: Rect2, wash: Color, turn: float, edge := 2.0) -> void:
-	if turn >= 0.999:
-		coin(on, box, wash)
+## The coin is pixel art now (2026-09-26, Richard's pick "C" off `tools/build_coin.py`'s
+## options): a disc with the recycle mark struck on both faces, and its toss drawn as frames
+## from face on through edge on to the back. `turn` is the cosine of how far round it is, 1
+## face on, 0 edge on, -1 the back; the nearest frame is drawn. Missing art falls back to a
+## plain disc so the HUD never loses its coin. `wash` tints the whole picture (a payment's
+## shine), and the disc fills `box` whatever size it is asked for.
+const COIN_SHEET := "res://assets/coin.png"
+const COIN_DATA := "res://assets/coin.json"
+static var _coin_tex: Texture2D
+static var _coin_frame := Vector2.ZERO
+static var _coin_turns: Array = []
+static var _coin_tried := false
+
+
+static func _coin_art() -> bool:
+	if not _coin_tried:
+		_coin_tried = true
+		if ResourceLoader.exists(COIN_SHEET) and FileAccess.file_exists(COIN_DATA):
+			# Wrapped so it draws nearest whatever filter the canvas item it lands on uses:
+			# the money plate, the shop and the flying coins are three different nodes.
+			var sheet := CanvasTexture.new()
+			sheet.diffuse_texture = load(COIN_SHEET)
+			sheet.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			_coin_tex = sheet
+			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(COIN_DATA))
+			if data is Dictionary:
+				var f: Array = data.get("frame", [0, 0])
+				_coin_frame = Vector2(float(f[0]), float(f[1]))
+				_coin_turns = data.get("turns", [])
+	return _coin_tex != null and _coin_frame.x > 0.0 and not _coin_turns.is_empty()
+
+
+## The frame nearest `turn`, from `coin.json`'s own list.
+static func coin_frame_of(turn: float) -> int:
+	var best := 0
+	for i in _coin_turns.size():
+		if absf(float(_coin_turns[i]) - turn) < absf(float(_coin_turns[best]) - turn):
+			best = i
+	return best
+
+
+static func coin_turned(on: CanvasItem, box: Rect2, wash: Color, turn: float, _edge := 2.0) -> void:
+	if not _coin_art():
+		var centre := box.position + box.size * 0.5
+		var r := minf(box.size.x, box.size.y) * 0.5
+		on.draw_circle(centre, r + 1.0, Style.HOLE_RIM)
+		on.draw_circle(centre, r, Style.GOLD * wash)
 		return
-	var centre := (box.position + box.size * 0.5).floor()
-	var r := minf(box.size.x, box.size.y) * 0.5
-	var across := maxf(roundf(r * absf(turn)), 1.0) / r
-	var gold := Color(Style.GOLD.r * wash.r, Style.GOLD.g * wash.g, Style.GOLD.b * wash.b)
-	var deep := Color(Style.GOLD_DEEP.r * wash.r, Style.GOLD_DEEP.g * wash.g, Style.GOLD_DEEP.b * wash.b)
-	var thick := edge * (1.0 - absf(turn))
-	var lean := -thick if turn >= 0.0 else thick
-	on.draw_set_transform(centre + Vector2(lean, 0.0), 0.0, Vector2(across, 1.0))
-	on.draw_circle(Vector2.ZERO, r + 1.0, Style.HOLE_RIM)
-	on.draw_circle(Vector2.ZERO, r, deep)
-	on.draw_set_transform(centre, 0.0, Vector2(across, 1.0))
-	on.draw_circle(Vector2.ZERO, r + 1.0, Style.HOLE_RIM)
-	on.draw_circle(Vector2.ZERO, r, deep)
-	on.draw_circle(Vector2.ZERO, r - COIN_RIM, gold if turn >= 0.0 else gold.darkened(0.12))
-	on.draw_arc(Vector2.ZERO, r * COIN_RING, 0.0, TAU, 24, deep, 1.0)
-	if turn >= 0.0:
-		on.draw_arc(Vector2.ZERO, r - COIN_RIM - 1.0, PI * 1.05, PI * 1.55, 12, COIN_GLINT, 2.0)
-	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var index := coin_frame_of(turn)
+	# The disc is the frame less its two-pixel margin across and one down: fit that to the box.
+	var disc := _coin_frame.x - 4.0
+	var side := minf(box.size.x, box.size.y)
+	var scale := side / disc
+	var drawn := _coin_frame * scale
+	var at := (box.position + box.size * 0.5 - drawn * 0.5).floor()
+	on.draw_texture_rect_region(
+		_coin_tex, Rect2(at, drawn),
+		Rect2(Vector2(_coin_frame.x * index, 0.0), _coin_frame), wash
+	)
 
 
 static func coin(on: CanvasItem, box: Rect2, wash: Color) -> void:
-	var centre := box.position + box.size * 0.5
-	var r := minf(box.size.x, box.size.y) * 0.5
-	var gold := Color(Style.GOLD.r * wash.r, Style.GOLD.g * wash.g, Style.GOLD.b * wash.b)
-	var deep := Color(Style.GOLD_DEEP.r * wash.r, Style.GOLD_DEEP.g * wash.g, Style.GOLD_DEEP.b * wash.b)
-	on.draw_circle(centre, r + 1.0, Style.HOLE_RIM)
-	on.draw_circle(centre, r, deep)
-	on.draw_circle(centre, r - COIN_RIM, gold)
-	# The ring struck into the face, and the crescent of light on its upper left.
-	on.draw_arc(centre, r * COIN_RING, 0.0, TAU, 24, deep, 1.0)
-	on.draw_arc(centre, r - COIN_RIM - 1.0, PI * 1.05, PI * 1.55, 12, COIN_GLINT, 2.0)
+	coin_turned(on, box, wash, 1.0)

@@ -52,13 +52,17 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "How to play"
+static var TITLE: String:
+	get: return Text.LETTER_TITLE
 
 ## The opening line, on the first card only: the lead in body ink, the name a rung up in
 ## the head ink, on one baseline. `GREETING` is the whole of it, for anything that reads it.
-const GREETING_LEAD := "Congratulations, you are the new owner of "
-const GREETING_NAME := "My Dirty Little Lake."
-const GREETING := GREETING_LEAD + GREETING_NAME
+static var GREETING_LEAD: String:
+	get: return Text.LETTER_GREETING_LEAD
+static var GREETING_NAME: String:
+	get: return Text.LETTER_GAME_NAME
+static var GREETING: String:
+	get: return GREETING_LEAD + GREETING_NAME
 ## The size pairs the greeting is tried at, largest first: [lead, name].
 const GREETING_SIZES := [
 	[Style.TEXT_BODY, Style.TEXT_HEAD], [Style.TEXT_SMALL, Style.TEXT_BODY],
@@ -74,52 +78,53 @@ const ART := "res://assets/letter/%s.png"
 ## `letter` card is set like one: its paragraphs spread down the page, all centred;
 ## `snaps` are [still, caption, ink] triples pinned in a row, left to right. A caption may be
 ## empty; `ink` names a `CAPTION_INKS` entry, `far` for the underlined soft ink, or is empty.
-const CARDS := [
-	{
-		"head": "",
-		"title": "Welcome",
-		"rows": 5,
-		"letter": true,
-		"text": "It has been abandoned and neglected for too long.\n"
-			+ "Your goal is to *catch objects with your net, recycle and bring life back to the lake.*\n"
-			+ "The following instructions will *teach you how it works.*",
-		"snaps": [["lake_whole", "", &""]],
-	},
-	{
-		"head": "Net",
-		"rows": 4,
-		"text": "*Left click* to cast your net and catch objects floating.\n"
-			+ "The *circles below* indicate how your cast will go.",
-		"snaps": [
-			["net_catch", "Guaranteed objects", &"ok"],
-			["net_nothing", "No object available", &"no"],
-			["net_far", "Out of net range", &"far"],
-		],
-	},
-	{
-		"head": "Upgrades",
-		"blurbs": true,
-		"snaps": [
-			["upgrades_net", "Upgrade your net to *catch further and more* objects.", &""],
-			["upgrades_boats", "Boats *sell objects to make money*.", &""],
-			["upgrades_dogs", "Dogs help you *clean the lake*.", &""],
-		],
-	},
-	{
-		"head": "Object Tier",
-		"text": "Objects have *5 weight tiers*.\n"
-			+ "Upgrading Strength *catches more objects and cleans faster*.",
-		"snaps": [["weight_heavy", "Too heavy", &""], ["weight_strength", "Upgrade Strength", &""]],
-	},
-	{
-		"head": "Decoration",
-		"text": "Some catches are decoration for your shed.",
-		"snaps": [
-			["decor_find", "Catch it", &""], ["decor_wash", "Wash it", &""],
-			["decor_shed", "Decorate", &""],
-		],
-	},
-]
+## Built on every read, from `Text`, so the cards follow the language in play.
+static var CARDS: Array:
+	get: return [
+		{
+			"head": "",
+			"title": Text.LETTER_WELCOME_TITLE,
+			"rows": 5,
+			"letter": true,
+			"text": Text.LETTER_WELCOME_TEXT,
+			"snaps": [["lake_whole", "", &""]],
+		},
+		{
+			"head": Text.LETTER_NET_HEAD,
+			"rows": 4,
+			"text": Text.LETTER_NET_TEXT,
+			"snaps": [
+				["net_catch", Text.LETTER_NET_GREEN, &"ok"],
+				["net_nothing", Text.LETTER_NET_RED, &"no"],
+				["net_far", Text.LETTER_NET_WHITE, &"far"],
+			],
+		},
+		{
+			"head": Text.LETTER_UPGRADES_HEAD,
+			"blurbs": true,
+			"snaps": [
+				["upgrades_net", Text.LETTER_UPGRADES_NET, &""],
+				["upgrades_boats", Text.LETTER_UPGRADES_BOATS, &""],
+				["upgrades_dogs", Text.LETTER_UPGRADES_DOGS, &""],
+			],
+		},
+		{
+			"head": Text.LETTER_WEIGHT_HEAD,
+			"text": Text.LETTER_WEIGHT_TEXT,
+			"snaps": [
+				["weight_heavy", Text.LETTER_WEIGHT_CAP1, &""],
+				["weight_strength", Text.LETTER_WEIGHT_CAP2, &""],
+			],
+		},
+		{
+			"head": Text.LETTER_DECOR_HEAD,
+			"text": Text.LETTER_DECOR_LINE,
+			"snaps": [
+				["decor_find", Text.LETTER_DECOR_CAP1, &""], ["decor_wash", Text.LETTER_DECOR_CAP2, &""],
+				["decor_shed", Text.LETTER_DECOR_CAP3, &""],
+			],
+		},
+	]
 
 ## The caption inks: the aim ring's own green and red, each darkened until it clears 4.5:1
 ## on `PAPER` (4.6 and 5.1; the swatches as drawn are 1.3 and 2.9 — they were lifted to
@@ -133,7 +138,8 @@ const UNDERLINE_DASH := 4.0
 ## The last card's way out: centred above the dots (Richard, 2026-09-22), in a row every card
 ## reserves so the pictures do not grow on the last card. It stood at the pager's right end
 ## in place of the forward arrow before that.
-const DOOR_LABEL := "Start cleaning"
+static var DOOR_LABEL: String:
+	get: return Text.LETTER_START
 const DOOR := Vector2(196.0, 48.0)
 
 ## The board, in the 1280-wide design frame.
@@ -239,6 +245,8 @@ class Snap extends Control:
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	for i in SNAPS_MOST:
 		var snap := Snap.new()
@@ -250,6 +258,9 @@ func _ready() -> void:
 	add_child(_close)
 	_door = PlankButton.new()
 	_door.label = DOOR_LABEL
+	Prefs.language_changed.connect(func() -> void:
+		_door.label = DOOR_LABEL
+		_lay_out())
 	_door.accent = true
 	_door.size = DOOR
 	_door.pressed.connect(func() -> void: close_asked.emit())
@@ -861,3 +872,24 @@ func _draw_arrow(box: Rect2, step: int, live: bool, hovered: bool) -> void:
 		]),
 		Style.RIBBON_INK if live else Style.FRAME.darkened(0.25)
 	)
+
+
+## The letter for the pad's stick: back and on, the door on the last card, and the close
+## cross. Left and right turn the page from anywhere on it, as the arrow keys do.
+func pad_focus() -> Array:
+	var out: Array = []
+	if page > 0 and _back.size != Vector2.ZERO:
+		out.append({"box": _back, "key": &"back"})
+	if _forward_live() and _on.size != Vector2.ZERO:
+		out.append({"box": _on, "key": &"on", "first": true})
+	if _door != null and _door.visible:
+		out.append({"box": _door.get_rect(), "key": &"door", "first": true})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close"})
+	return out
+
+
+func pad_nudge(_key: Variant, step: int) -> bool:
+	var was := page
+	turn(step)
+	return page != was

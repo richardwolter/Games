@@ -3,7 +3,7 @@
 ## A few spots of the island's ground, found once off its own layout, fill as a shower goes on
 ## and dry out after it. Each is a blob of whole art pixels in the clean water's own ramp, and
 ## what stands beside one — the angler, the dogs, the hut, the pump — is drawn again in it
-## upside down (`Mirror`, clipped to the puddles by `clip_children`), flaring white with the
+## upside down (`Mirror`, clipped to the puddles' water by `Pools`), flaring white with the
 ## lightning. Nothing is saved: a load is dry ground.
 class_name Puddles
 extends Node2D
@@ -68,6 +68,11 @@ var _sizes := PackedFloat32Array()
 ## cell holds water (0 the middle, 1 the fullest edge). Growing and drying just move the line.
 var _cells: Array[PackedVector2Array] = []
 var _reach: Array[PackedFloat32Array] = []
+## The wetness the first cell of any puddle holds water at. Under it `Pools` draws nothing,
+## and a clip parent that draws nothing does not clip at all: its children are drawn whole
+## (2026-09-25, the hut and the angler upside down across the beach as a shower began and
+## again as the puddles dried). So the pools, and the mirror in them, are shown from here.
+var _first_wet := INF
 
 ## The shape: a few overlapping lobes, their edge pushed in and out by a coarse noise, so a
 ## puddle is a spill with bays and arms rather than an oval. `LOBES` how many, `WOBBLE` how
@@ -80,6 +85,26 @@ var _body: Color
 var _deep: Color
 var _rim: Color
 var _mirror: Mirror
+var _pools: Pools
+var _rings: Rings
+
+
+## The water alone, and the mirror clipped to it. Its own node, not the puddles': a clip takes
+## everything its parent draws, and when the drop spots on the sand and the rings were drawn
+## there too the hut and the angler showed upside down through every one of them (2026-09-25,
+## Richard, a flicker of the shed over the beach in the devlog).
+class Pools extends Node2D:
+	var owner_puddles: Puddles
+
+	func _draw() -> void:
+		owner_puddles.draw_pools(self)
+
+
+class Rings extends Node2D:
+	var owner_puddles: Puddles
+
+	func _draw() -> void:
+		owner_puddles.draw_rings(self)
 
 
 class Mirror extends Node2D:
@@ -89,8 +114,38 @@ class Mirror extends Node2D:
 		owner_puddles.draw_reflections(self)
 
 
+## The island's puddles, for a walker asking whether it is standing in one (the pack's
+## registry pattern: which puddles there are is a fact about the lake).
+static var here: Puddles
+
+
+func _enter_tree() -> void:
+	here = self
+
+
+func _exit_tree() -> void:
+	if here == self:
+		here = null
+
+
+## Whether `at` (world px) is on a cell holding water now. Asked on a footfall, not a frame.
+func standing_in(at: Vector2) -> bool:
+	if wet <= 0.0:
+		return false
+	var near := PIXEL * 1.5
+	for k in _cells.size():
+		var t := Iso.world_to_tile(at)
+		if _spots[k].distance_to(t) > _sizes[k] + 1.0:
+			continue
+		var cells := _cells[k]
+		var reach := _reach[k]
+		for i in cells.size():
+			if reach[i] <= wet and absf(cells[i].x + PIXEL * 0.5 - at.x) < near 					and absf(cells[i].y + PIXEL * 0.5 - at.y) < near:
+				return true
+	return false
+
+
 func _ready() -> void:
-	clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	var palette := Palette.master()
 	if palette != null:
 		# Rain water on the ground, not a pond: the clean ramp let see-through so the ground
@@ -103,10 +158,17 @@ func _ready() -> void:
 		_deep = Color(0.35, 0.5, 0.62)
 		_rim = Color(0.7, 0.8, 0.85)
 	_mark_ink = Color(palette.sand * Color(0.62, 0.6, 0.62), 0.9) if palette != null 		else Color(0.45, 0.4, 0.32, 0.9)
+	_pools = Pools.new()
+	_pools.owner_puddles = self
+	_pools.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	add_child(_pools)
 	_mirror = Mirror.new()
 	_mirror.owner_puddles = self
 	_mirror.modulate = Color(MIRROR_TINT, MIRROR_ALPHA)
-	add_child(_mirror)
+	_pools.add_child(_mirror)
+	_rings = Rings.new()
+	_rings.owner_puddles = self
+	add_child(_rings)
 	_lay()
 
 
@@ -170,6 +232,8 @@ func _shape(k: int, rng: RandomNumberGenerator) -> void:
 			reach.append(best)
 	_cells.append(cells)
 	_reach.append(reach)
+	for r in reach:
+		_first_wet = minf(_first_wet, r)
 
 
 ## Smooth value noise on a coarse grid, 0 to 1.
@@ -181,6 +245,22 @@ func _noise(k: int, x: float, y: float) -> float:
 	var top := lerpf(_hash(k, ix, iy), _hash(k, ix + 1, iy), fx)
 	var low := lerpf(_hash(k, ix, iy + 1), _hash(k, ix + 1, iy + 1), fx)
 	return lerpf(top, low, fy)
+
+
+## How far a tile spot is from the hut's walls, in tiles, round the corners; 0 inside.
+static func shed_gap(t: Vector2) -> float:
+	var mid := Iso.shed_centre()
+	var dx := maxf(absf(t.x - mid.x) - Iso.SHED_FOOT.x, 0.0)
+	var dy := maxf(absf(t.y - mid.y) - Iso.SHED_FOOT.y, 0.0)
+	return sqrt(dx * dx + dy * dy)
+
+
+## The least gap the water keeps from the hut here: wider before the door, eased in.
+static func _shed_clear(t: Vector2) -> float:
+	var mid := Iso.shed_centre()
+	var door := Vector2(mid.x + Iso.SHED_FOOT.x * DOOR_ALONG, mid.y + Iso.SHED_FOOT.y)
+	var near := clampf(1.0 - door.distance_to(t) / 1.4, 0.0, 1.0)
+	return lerpf(SHED_NEAR, DOOR_NEAR, smoothstep(0.0, 1.0, near))
 
 
 ## Could a puddle lie on this tile spot.
@@ -216,22 +296,6 @@ func tick(rain: float, flash: float, delta: float) -> void:
 		_pushed_wet = sand_wet
 		for ground in grounds:
 			if is_instance_valid(ground):
-## How far a tile spot is from the hut's walls, in tiles, round the corners; 0 inside.
-static func shed_gap(t: Vector2) -> float:
-	var mid := Iso.shed_centre()
-	var dx := maxf(absf(t.x - mid.x) - Iso.SHED_FOOT.x, 0.0)
-	var dy := maxf(absf(t.y - mid.y) - Iso.SHED_FOOT.y, 0.0)
-	return sqrt(dx * dx + dy * dy)
-
-
-## The least gap the water keeps from the hut here: wider before the door, eased in.
-static func _shed_clear(t: Vector2) -> float:
-	var mid := Iso.shed_centre()
-	var door := Vector2(mid.x + Iso.SHED_FOOT.x * DOOR_ALONG, mid.y + Iso.SHED_FOOT.y)
-	var near := clampf(1.0 - door.distance_to(t) / 1.4, 0.0, 1.0)
-	return lerpf(SHED_NEAR, DOOR_NEAR, smoothstep(0.0, 1.0, near))
-
-
 				ground.set_wet(sand_wet)
 	var marks_were := _marks.size()
 	var m := 0
@@ -254,7 +318,10 @@ static func _shed_clear(t: Vector2) -> float:
 	visible = wet > 0.0 or not _marks.is_empty()
 	if visible and (was != wet or flashed or not _ripples.is_empty() or marks_were > 0):
 		queue_redraw()
-	if visible:
+		_pools.queue_redraw()
+		_rings.queue_redraw()
+	_pools.visible = wet > 0.0 and wet >= _first_wet
+	if _pools.visible:
 		_mirror.queue_redraw()
 
 
@@ -276,18 +343,28 @@ func hit(at: Vector2) -> void:
 
 func _draw() -> void:
 	var cell := Vector2(PIXEL, PIXEL)
-	var body := _body.lerp(Color.WHITE, _flash * 0.6)
 	# The drops' spots on the sand, fading as the beach darkens under them.
 	for i in _marks.size():
 		var fade := 1.0 - _mark_age[i] / MARK_LIFE
 		var ink := Color(_mark_ink, _mark_ink.a * fade * (1.0 - sand_wet * 0.6))
 		draw_rect(Rect2(_marks[i].snapped(cell), cell), ink)
+
+
+## The puddles' water, on `Pools`: the only thing the mirror is clipped to.
+func draw_pools(on: CanvasItem) -> void:
+	var cell := Vector2(PIXEL, PIXEL)
+	var body := _body.lerp(Color.WHITE, _flash * 0.6)
 	for k in _cells.size():
 		var cells := _cells[k]
 		var reach := _reach[k]
 		for i in cells.size():
 			if reach[i] <= wet:
-				draw_rect(Rect2(cells[i], cell), body)
+				on.draw_rect(Rect2(cells[i], cell), body)
+
+
+## The rain's rings on the puddles, over the mirror, on `Rings`.
+func draw_rings(on: CanvasItem) -> void:
+	var cell := Vector2(PIXEL, PIXEL)
 	for ring: Array in _ripples:
 		var age: float = ring[1]
 		var span := 3.0 + age * 18.0
@@ -295,7 +372,7 @@ func _draw() -> void:
 		for step in 12:
 			var angle := TAU * float(step) / 12.0
 			var at: Vector2 = ring[0] + Vector2(cos(angle), sin(angle) * 0.5) * span
-			draw_rect(Rect2(at.snapped(cell), cell), ink)
+			on.draw_rect(Rect2(at.snapped(cell), cell), ink)
 
 
 func _hash(k: int, x: int, y: int) -> float:

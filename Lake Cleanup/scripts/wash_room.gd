@@ -36,8 +36,10 @@ const ROW_PAD := 8.0
 const ROWS_MOST := 9
 const ICON := 40.0
 const CLOSE_SIDE := 44.0
-const TITLE := "To wash"
-const EMPTY_LINES := ["Nothing waiting.", "Net a find and", "bring it here."]
+static var TITLE: String:
+	get: return Text.WASH_TITLE
+static var EMPTY_LINES: Array:
+	get: return [Text.WASH_EMPTY_1, Text.WASH_EMPTY_2, Text.WASH_EMPTY_3]
 
 var sheets: Sheets
 ## The lake's own list of what waits, oldest first. Read, never written.
@@ -71,6 +73,8 @@ var _thirds := Vector2.ZERO
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_backdrop = WashBackdrop.new()
@@ -177,6 +181,10 @@ func pick(piece: StringName) -> bool:
 		return false
 	_on_stand = piece
 	_stand.put(piece)
+	# The pad's hidden pointer starts the nozzle from the find, not from the tray's row.
+	if Pad.is_pad() and is_inside_tree():
+		var middle := _stand.piece_box().get_center()
+		get_viewport().warp_mouse(_stand.get_global_transform_with_canvas() * middle)
 	return true
 
 
@@ -184,9 +192,10 @@ func _on_washed(piece: StringName) -> void:
 	washed.emit(piece, soap_of(piece))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not visible:
 		return
+	_pad_aim(delta)
 	if day != null:
 		if absf(_backdrop.sun - day.sun) > 0.002:
 			_backdrop.sun = day.sun
@@ -322,15 +331,15 @@ class Tray:
 		ribbon.position += off
 		Style.board_wood(self, board, TRAY_FRAME, 3)
 		var count := room.waiting.size()
-		var title := TITLE if count == 0 else "%s  %d" % [TITLE, count]
+		var title: String = WashRoom.TITLE if count == 0 else Text.WASH_TITLE_N % count
 		Style.board_ribbon(
 			self, ribbon, title, 2, Style.TEXT_BODY, Style.title_room(ribbon, CLOSE_SIDE)
 		)
 		if count == 0:
 			var face := Style.board_face(board, TRAY_FRAME)
-			for k in EMPTY_LINES.size():
+			for k in WashRoom.EMPTY_LINES.size():
 				Style.write(
-					self, EMPTY_LINES[k], Style.TEXT_SMALL,
+					self, WashRoom.EMPTY_LINES[k], Style.TEXT_SMALL,
 					Vector2(0.0, face.position.y + room._ribbon_lip() + 30.0 + k * 20.0),
 					Style.PAPER_SOFT, HORIZONTAL_ALIGNMENT_CENTER, face
 				)
@@ -360,7 +369,7 @@ class Tray:
 			room.sheets.atlas, Rect2(slot.get_center() - drawn * 0.5, drawn), cut
 		)
 		var soap := room.soap_of(piece)
-		var price := "$%d" % soap if soap > 0 else "Free"
+		var price := "$%d" % soap if soap > 0 else Text.WASH_FREE
 		var price_wide := Style.measure(price, Style.TEXT_BODY).x
 		var words := Rect2(
 			slot.end.x + 8.0, box.position.y, box.size.x - ICON - 30.0 - price_wide, box.size.y
@@ -371,7 +380,7 @@ class Tray:
 			HORIZONTAL_ALIGNMENT_LEFT, words
 		)
 		Style.write(
-			self, "soap" if not standing else "washing", Style.TEXT_TINY,
+			self, Text.WASH_SOAP if not standing else Text.WASH_WASHING, Style.TEXT_TINY,
 			Vector2(0.0, box.position.y + 39.0), ink, HORIZONTAL_ALIGNMENT_LEFT, words
 		)
 		Style.write(
@@ -388,3 +397,50 @@ class Tray:
 		while cut.length() > 1 and Style.measure(cut + "…", size_px).x > room_wide:
 			cut = cut.left(cut.length() - 1)
 		return cut.strip_edges() + "…"
+
+
+## The pad in the wash room (2026-09-26, `/grill-me` with Richard). With nothing on the
+## stand the tray is a list the stick walks and A picks from. **With a find on it the stick
+## is the nozzle's**: it carries the pointer the jet follows, and RT or a held A sprays. B
+## puts the find back on the tray, the way walking away from it does: nothing paid, coat and all.
+func _pad_aim(delta: float) -> void:
+	if not Pad.is_pad() or _on_stand == &"" or not _stand.awake():
+		return
+	Pad.move_cursor(Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down"), delta)
+	var at := _stand.get_local_mouse_position()
+	var firing := Input.is_action_pressed(&"cast") or Input.is_action_pressed(&"interact")
+	_stand.spray(at, firing)
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if not visible or key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_ESCAPE and Pad.is_pad() and _on_stand != &"" 			and _stand.state != WashStand.State.CLEAN:
+		_on_stand = &""
+		_stand.clear()
+		Sfx.ui(&"ui_close")
+		get_viewport().set_input_as_handled()
+
+
+func pad_free() -> bool:
+	return _on_stand != &""
+
+
+## The tray's rows and the close cross.
+func pad_focus() -> Array:
+	if _on_stand != &"":
+		return []
+	var out: Array = []
+	var boxes := row_boxes()
+	for k in boxes.size():
+		out.append({"box": boxes[k], "key": waiting[_scroll + k], "first": k == 0})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close", "first": out.is_empty()})
+	return out
+
+
+func pad_scroll(step: int) -> bool:
+	var was := _scroll
+	_scroll_by(step)
+	return was != _scroll

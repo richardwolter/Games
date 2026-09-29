@@ -45,6 +45,28 @@ static func covers(at: Vector2, grow: float = 0.0) -> bool:
 	return absf(off.x) < FOOT_HALF + grow and absf(off.y) < FOOT_HALF + grow
 
 
+## Whether a plant standing at this tile-space point would draw into the pump's picture:
+## its foot behind the pump's (up the screen) and inside the drawing's width, plus `margin`
+## world px. The footprint alone let a flower stand just behind the pump and read as
+## painted on it. Flora asks this; nothing else.
+static func hides(at: Vector2, margin: float = 6.0) -> bool:
+	if tile == Vector2.INF:
+		return false
+	var art := Art.texture(ART)
+	if art == null:
+		return false
+	var ground := 0.1
+	var text := FileAccess.get_file_as_string(CONTRACT)
+	var contract: Variant = JSON.parse_string(text) if not text.is_empty() else null
+	if contract is Dictionary:
+		ground = float((contract as Dictionary).get("ground", ground))
+	var size := art.get_size() * ART_SCALE
+	var foot := Iso.tile_to_world(tile.x, tile.y)
+	var p := Iso.tile_to_world(at.x, at.y)
+	return absf(p.x - foot.x) < size.x * 0.5 + margin \
+		and p.y < foot.y + size.y * ground + margin and p.y > foot.y - size.y * (1.0 - ground)
+
+
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_art = Art.texture(ART)

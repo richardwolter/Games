@@ -11,6 +11,7 @@ extends Node
 
 const SHOT := "res://tools/last_pier_%s.png"
 const LOG := "res://tools/last_piers.log"
+const SAVE_PATH := "user://probe_piers.save"
 const CROP := Vector2i(520, 360)
 const ZOOM := 2
 ## Frames the view is given to settle on each yard before the picture is taken.
@@ -28,7 +29,11 @@ var _shot := 0
 func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = load("res://scenes/main.tscn").instantiate()
-	get_tree().root.add_child.call_deferred(_main)
+	# Its own save, and under this node rather than the root (2026-09-26): hung off the root
+	# it was the game's own lake, wore the front and photographed the main menu four times,
+	# and with no save path of its own it was the player's run.
+	_main.set(&"save_path", SAVE_PATH)
+	add_child.call_deferred(_main)
 	set_physics_process(true)
 
 

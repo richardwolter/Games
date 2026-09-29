@@ -40,7 +40,8 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "Settings"
+static var TITLE: String:
+	get: return Text.SETTINGS_TITLE
 
 ## The board, in rows. Widths in the 1280-wide design frame.
 const BOARD_WIDE := 460.0
@@ -96,6 +97,11 @@ const SWITCH_TALL := 20.0
 const GROOVE_TALL := 8.0
 const GROOVE_LINE := 20.0
 const THUMB_WIDE := 12.0
+## How far round a slider's groove and thumb a click still grabs it, design px.
+const GROOVE_SLACK := 4.0
+## How far a control grows under the pointer, whole design px each side. The control lights
+## and swells, the plate it stands on does not (2026-09-25, Richard).
+const SWELL := 2.0
 const ROW_INSET := 10.0
 
 ## The chooser: a plank arrow each side of the value, and the room the value stands in
@@ -106,7 +112,8 @@ const ARROW_GAP := 4.0
 
 ## What a dead Resolution row says instead of its arrows, and the gap between it and the
 ## figure it explains.
-const DEAD_SIZE_NOTE := "set by Window"
+static var DEAD_SIZE_NOTE: String:
+	get: return Text.SETTINGS_DEAD_SIZE
 const NOTE_GAP := 8.0
 
 ## The dropped list the resolution opens: a row each, over the board. The one it is standing
@@ -177,8 +184,10 @@ var menu_mode: bool = false:
 		menu_mode = v
 		_lay_out()
 
-const QUIT_LABEL := "Save and go to menu"
-const CONTROLS_LABEL := "Controls"
+static var QUIT_LABEL: String:
+	get: return Text.SETTINGS_QUIT
+static var CONTROLS_LABEL: String:
+	get: return Text.SETTINGS_CONTROLS
 
 signal controls_asked
 signal wipe_pressed
@@ -214,11 +223,13 @@ var _confirm: MenuConfirm
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	add_to_group(Pad.FOCUS_GROUP)
 	pull_prefs()
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
 	resized.connect(_lay_out)
+	Prefs.language_changed.connect(_lay_out)
 	set_process(false)
 	_lay_out()
 
@@ -254,16 +265,16 @@ func _store(key: StringName, value: Variant) -> void:
 ## two keys the Controls board will never list because neither is rebindable.
 func _plan() -> Array:
 	var plan := [
-		{"kind": &"sound", "key": &"master", "level": &"master_level", "label": "Master"},
-		{"kind": &"head", "label": "Mix"},
-		{"kind": &"sound", "key": &"music", "level": &"music_level", "label": "Music"},
-		{"kind": &"sound", "key": &"sfx", "level": &"sfx_level", "label": "Sound effects"},
-		{"kind": &"sound", "key": &"ambience", "level": &"ambience_level", "label": "Ambience"},
-		{"kind": &"head", "label": "Screen"},
-		{"kind": &"choice", "key": &"window_mode", "label": "Window"},
-		{"kind": &"choice", "key": &"window_size", "label": "Resolution", "list": true},
-		{"kind": &"choice", "key": &"vsync", "label": "VSync"},
-		{"kind": &"choice", "key": &"fps_cap", "label": "Frame cap"},
+		{"kind": &"sound", "key": &"master", "level": &"master_level", "label": Text.SETTINGS_MASTER},
+		{"kind": &"head", "label": Text.SETTINGS_GROUP_MIX},
+		{"kind": &"sound", "key": &"music", "level": &"music_level", "label": Text.SETTINGS_MUSIC},
+		{"kind": &"sound", "key": &"sfx", "level": &"sfx_level", "label": Text.SETTINGS_SFX},
+		{"kind": &"sound", "key": &"ambience", "level": &"ambience_level", "label": Text.SETTINGS_AMBIENCE},
+		{"kind": &"head", "label": Text.SETTINGS_GROUP_SCREEN},
+		{"kind": &"choice", "key": &"window_mode", "label": Text.SETTINGS_WINDOW},
+		{"kind": &"choice", "key": &"window_size", "label": Text.SETTINGS_RESOLUTION, "list": true},
+		{"kind": &"choice", "key": &"vsync", "label": Text.SETTINGS_VSYNC},
+		{"kind": &"choice", "key": &"fps_cap", "label": Text.SETTINGS_FPS},
 		{"kind": &"gap"},
 		{"kind": &"button", "key": &"controls", "label": CONTROLS_LABEL},
 	]
@@ -271,7 +282,7 @@ func _plan() -> Array:
 		return plan
 	plan.append({"kind": &"gap"})
 	if wipe_shown:
-		plan.append({"kind": &"button", "key": &"wipe", "label": "Start the lake over", "warn": true})
+		plan.append({"kind": &"button", "key": &"wipe", "label": Text.SETTINGS_WIPE, "warn": true})
 	if swap_shown:
 		plan.append({"kind": &"button", "key": &"swap", "label": swap_label})
 	plan.append({"kind": &"button", "key": &"quit", "label": QUIT_LABEL, "warn": true})
@@ -438,9 +449,9 @@ func _try_window_mode(mode: int) -> void:
 	_revert_at = REVERT_AFTER
 	if _confirm == null:
 		_confirm = MenuConfirm.new()
-		_confirm.title = "Keep this?"
-		_confirm.yes_label = "Keep it"
-		_confirm.no_label = "Put it back"
+		_confirm.title = "KEEP_MODE_TITLE"
+		_confirm.yes_label = "KEEP_MODE_YES"
+		_confirm.no_label = "KEEP_MODE_NO"
 		_confirm.confirmed.connect(_keep_window_mode)
 		_confirm.cancelled.connect(_revert_window_mode)
 		add_child(_confirm)
@@ -451,7 +462,7 @@ func _try_window_mode(mode: int) -> void:
 
 
 func _revert_words() -> String:
-	return "Putting it back in %d seconds." % maxi(1, ceili(_revert_at))
+	return Text.KEEP_MODE_WORDS % maxi(1, ceili(_revert_at))
 
 
 func _keep_window_mode() -> void:
@@ -536,21 +547,21 @@ func _choice_text(row: StringName, value: Variant) -> String:
 		&"window_mode":
 			match int(value):
 				Prefs.WindowMode.WINDOWED:
-					return "Windowed"
+					return Text.WINDOW_WINDOWED
 				Prefs.WindowMode.EXCLUSIVE:
-					return "Exclusive"
-			return "Borderless"
+					return Text.WINDOW_EXCLUSIVE
+			return Text.WINDOW_BORDERLESS
 		&"window_size":
 			var size: Vector2i = value
 			return "%d x %d" % [size.x, size.y]
 		&"vsync":
 			match int(value):
 				DisplayServer.VSYNC_DISABLED:
-					return "Off"
+					return Text.VSYNC_OFF
 				DisplayServer.VSYNC_ADAPTIVE:
-					return "Adaptive"
-			return "On"
-	return "Uncapped" if int(value) == 0 else str(int(value))
+					return Text.VSYNC_ADAPTIVE
+			return Text.VSYNC_ON
+	return Text.FPS_UNCAPPED if int(value) == 0 else str(int(value))
 
 
 ## What the resolution row shows while it is dead: the screen the window is filling.
@@ -617,12 +628,6 @@ func _key_under(at: Vector2) -> StringName:
 	return &""
 
 
-## The plate a sound row's hover lands on: the whole plate, whichever line the pointer is
-## on, so the row lights as one thing.
-func _row_hovered(line: Dictionary) -> bool:
-	return _hovered == line["key"] or _hovered == line.get("level", &"")
-
-
 func _draw() -> void:
 	if _board.size.x <= 0.0:
 		return
@@ -674,6 +679,11 @@ func _draw() -> void:
 ##
 ## A row that cannot be used is drawn back towards the board, which is the one thing a face
 ## still says.
+## A colour under the pointer: the board's one hover wash.
+static func _washed(face: Color) -> Color:
+	return Color(face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b, face.a)
+
+
 func _row_face(hovered: bool, live: bool) -> Color:
 	var face := Style.BOARD_ROW
 	if not live:
@@ -700,6 +710,26 @@ func _draw_group(heading: String, box: Rect2) -> void:
 
 
 ## A label on the left of a line and a switch on its right.
+## Where a sound row's switch stands on its top line: the one sum the drawing and the click
+## both use.
+static func switch_box_of(line_box: Rect2) -> Rect2:
+	return Rect2(
+		Vector2(line_box.end.x - SWITCH_WIDE - ROW_INSET, line_box.position.y + (line_box.size.y - SWITCH_TALL) * 0.5),
+		Vector2(SWITCH_WIDE, SWITCH_TALL)
+	)
+
+
+## What grabs a volume slider: the groove, as tall as its thumb, and `GROOVE_SLACK` round
+## that so a click just off the thin groove still lands.
+static func slider_box_of(groove: Rect2) -> Rect2:
+	var thumb_tall := GROOVE_LINE - 6.0
+	var rise := maxf(0.0, (thumb_tall - groove.size.y) * 0.5)
+	return groove.grow_individual(
+		THUMB_WIDE * 0.5 + GROOVE_SLACK, rise + GROOVE_SLACK,
+		THUMB_WIDE * 0.5 + GROOVE_SLACK, rise + GROOVE_SLACK
+	)
+
+
 func _draw_label_and_switch(line_box: Rect2, key: StringName, label: String) -> void:
 	var on := _state_of(key)
 	Style.write(
@@ -707,21 +737,22 @@ func _draw_label_and_switch(line_box: Rect2, key: StringName, label: String) -> 
 		Vector2(line_box.position.x + ROW_INSET, line_box.position.y + (line_box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
 		Style.BOARD_INK
 	)
-	var track := Rect2(
-		Vector2(line_box.end.x - SWITCH_WIDE - ROW_INSET, line_box.position.y + (line_box.size.y - SWITCH_TALL) * 0.5),
-		Vector2(SWITCH_WIDE, SWITCH_TALL)
-	)
+	var track := switch_box_of(line_box)
+	var lit := _hovered == key
+	if lit:
+		track = track.grow(SWELL)
 	draw_rect(track.grow(1.0), Style.SEAM, true)
 	# The clean water, not the money's gold: the groove under this switch already fills in
 	# `ON_WATER` when the row is on, so one row said "on" in two colours — and gold on the
 	# shop's board is a price.
-	draw_rect(track, Style.ON_WATER if on else Style.BOARD, true)
-	var thumb_wide := SWITCH_TALL - 2.0
+	var track_face := Style.ON_WATER if on else Style.BOARD
+	draw_rect(track, _washed(track_face) if lit else track_face, true)
+	var thumb_wide := track.size.y - 2.0
 	var thumb := Rect2(
 		Vector2(track.end.x - thumb_wide - 1.0 if on else track.position.x + 1.0, track.position.y + 1.0),
-		Vector2(thumb_wide, SWITCH_TALL - 2.0)
+		Vector2(thumb_wide, track.size.y - 2.0)
 	)
-	Style.plank(self, thumb, int(track.position.y), Style.FRAME, 2.0)
+	Style.plank(self, thumb, int(track.position.y), _washed(Style.FRAME) if lit else Style.FRAME, 2.0)
 
 
 ## A row with a label and a chooser on its right: `◂ value ▸`. The arrows are their own
@@ -730,12 +761,7 @@ func _draw_label_and_switch(line_box: Rect2, key: StringName, label: String) -> 
 func _draw_choice(box: Rect2, line: Dictionary) -> void:
 	var row: StringName = line["key"]
 	var live := _screen_row_live(row)
-	var hovered := (
-		_hovered == StringName(String(row) + "_less")
-		or _hovered == StringName(String(row) + "_more")
-		or _hovered == row
-	)
-	Style.plate(self, box, _row_face(hovered, live))
+	Style.plate(self, box, _row_face(false, live))
 	Style.write(
 		self, String(line["label"]), Style.TEXT_BODY,
 		Vector2(box.position.x + ROW_INSET, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
@@ -764,9 +790,14 @@ func _draw_choice(box: Rect2, line: Dictionary) -> void:
 		"kind": &"arrow", "key": StringName(String(row) + "_more"), "row": row,
 		"step": 1, "box": more,
 	})
-	_lines.append({"kind": &"value", "key": row, "row": row, "box": value})
-	_draw_arrow(less, -1)
-	_draw_arrow(more, 1)
+	# Only the resolution's value answers a click (it drops the list); on every other chooser
+	# the value is for reading, and a box there would light and click for nothing.
+	if row == &"window_size":
+		_lines.append({"kind": &"value", "key": row, "row": row, "box": value})
+		if _hovered == row:
+			Style.plate(self, value.grow(SWELL), _washed(Style.BOARD_ROW))
+	_draw_arrow(less, -1, _hovered == StringName(String(row) + "_less"))
+	_draw_arrow(more, 1, _hovered == StringName(String(row) + "_more"))
 	Style.write(
 		self, _shown_choice(row), Style.TEXT_SMALL,
 		Vector2(0.0, value.position.y + (value.size.y + float(Style.TEXT_SMALL) * 0.62) * 0.5),
@@ -801,8 +832,11 @@ func _draw_dead_choice(row: StringName, box: Rect2) -> void:
 	)
 
 
-func _draw_arrow(box: Rect2, step: int) -> void:
-	Style.plank(self, box, int(box.position.y) * 7 + step, Style.FRAME, 2.0)
+func _draw_arrow(box: Rect2, step: int, lit: bool = false) -> void:
+	var seed := int(box.position.y) * 7 + step
+	if lit:
+		box = box.grow(SWELL)
+	Style.plank(self, box, seed, _washed(Style.FRAME) if lit else Style.FRAME, 2.0)
 	var ink := Style.RIBBON_INK
 	# The point goes the way the arrow steps: the left one points left.
 	var mid := box.get_center()
@@ -858,9 +892,13 @@ func _draw_sound(box: Rect2, line: Dictionary) -> void:
 		Vector2(under.position.x + ROW_INSET, under.position.y + (under.size.y - GROOVE_TALL) * 0.5 - 2.0),
 		Vector2(under.size.x - ROW_INSET * 2.0, GROOVE_TALL)
 	)
-	_lines.append({"kind": &"switch", "key": key, "box": top})
-	_lines.append({"kind": &"slider", "key": level_key, "box": under, "groove": groove})
-	Style.plate(self, box, _row_face(_row_hovered(line), true))
+	# Only the drawn controls answer (2026-09-25, Richard): the switch on the switch, the drag
+	# on the groove and its thumb. The label and the rest of the plate are for reading.
+	_lines.append({"kind": &"switch", "key": key, "box": switch_box_of(top)})
+	_lines.append({
+		"kind": &"slider", "key": level_key, "box": slider_box_of(groove), "groove": groove,
+	})
+	Style.plate(self, box, _row_face(false, true))
 	_draw_label_and_switch(top, key, String(line["label"]))
 	draw_rect(groove.grow(1.0), Style.SEAM, true)
 	draw_rect(groove, Style.FRAME_SHADOW, true)
@@ -871,7 +909,13 @@ func _draw_sound(box: Rect2, line: Dictionary) -> void:
 		Vector2(groove.position.x + groove.size.x * level - THUMB_WIDE * 0.5, groove.position.y + (groove.size.y - thumb_tall) * 0.5),
 		Vector2(THUMB_WIDE, thumb_tall)
 	)
-	Style.plank(self, thumb, int(groove.position.y) + level_key.hash() % 97, Style.FRAME, 2.0)
+	var held := _hovered == level_key or _dragging == level_key
+	if held:
+		thumb = thumb.grow(SWELL)
+	Style.plank(
+		self, thumb, int(groove.position.y) + level_key.hash() % 97,
+		_washed(Style.FRAME) if held else Style.FRAME, 2.0
+	)
 
 
 func _state_of(key: StringName) -> bool:
@@ -925,3 +969,99 @@ func _draw_button(box: Rect2, line: Dictionary) -> void:
 		Vector2(0.0, box.position.y + (box.size.y + float(Style.TEXT_BODY) * 0.62) * 0.5),
 		ink, HORIZONTAL_ALIGNMENT_CENTER, box
 	)
+
+
+## How far one push of the pad's stick moves a slider.
+const PAD_LEVEL_STEP := 0.05
+
+
+## The board's controls for the pad's stick (scripts/pad.gd). **A chooser is one stop**, its
+## two arrows and its value together, stepped by left and right; a slider is one stop moved
+## by left and right; the switches and the buttons are pressed with A. While the resolution's
+## list is down, its entries are the only stops.
+func pad_focus() -> Array:
+	var out: Array = []
+	if _listing != &"":
+		for entry: Dictionary in _list_boxes:
+			out.append({
+				"box": entry["box"], "key": entry["value"],
+				"first": entry["value"] == _choice_of(_listing),
+			})
+		return out
+	var choosers := {}
+	for line: Dictionary in _lines:
+		match line["kind"]:
+			&"arrow", &"value":
+				var row: StringName = line["row"]
+				var box: Rect2 = line["box"]
+				choosers[row] = (choosers[row] as Rect2).merge(box) if choosers.has(row) else box
+			&"slider":
+				var groove: Rect2 = line["groove"]
+				var thumb := groove.position + Vector2(
+					groove.size.x * _level_of(line["key"]), groove.size.y * 0.5
+				)
+				out.append({"box": line["box"], "key": line["key"], "at": thumb})
+			_:
+				out.append({"box": line["box"], "key": line["key"]})
+	for row: StringName in choosers:
+		var whole: Rect2 = choosers[row]
+		# The pointer sits in the gap between the value and its right arrow, where it lights
+		# nothing and a stray click does nothing.
+		out.append({
+			"box": whole, "key": row, "at": Vector2(whole.end.x - ARROW_WIDE - ARROW_GAP * 0.5, whole.get_center().y),
+		})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close"})
+	var first := 0
+	var top := INF
+	for i in out.size():
+		var y := (out[i]["box"] as Rect2).position.y
+		if y < top:
+			top = y
+			first = i
+	if not out.is_empty():
+		out[first]["first"] = true
+	return out
+
+
+## A on a stop the board answers itself: a slider does nothing (left and right move it), a
+## chooser opens the resolution's list or does nothing. Everything else is the pointer's click.
+func pad_press(key: Variant) -> bool:
+	if _listing != &"":
+		return false
+	if key is StringName and String(key).ends_with("_level"):
+		return true
+	for line: Dictionary in _lines:
+		if line["kind"] == &"arrow" and line["row"] == key:
+			if key == &"window_size" and _screen_row_live(&"window_size"):
+				Sfx.ui(&"ui_click")
+				_listing = &"window_size"
+				queue_redraw()
+			return true
+	return false
+
+
+## Left and right on a slider or a chooser.
+func pad_nudge(key: Variant, step: int) -> bool:
+	if _listing != &"" or not (key is StringName):
+		return false
+	if String(key).ends_with("_level"):
+		var row := _row_of(key)
+		if not _state_of(row):
+			_set_state(row, true)
+			_store(StringName(String(row) + "_on"), true)
+		var level := clampf(roundf((_level_of(key) + PAD_LEVEL_STEP * step) * 100.0) / 100.0, 0.0, 1.0)
+		_set_level(key, level)
+		_store(key, level)
+		Sfx.ui(&"ui_hover")
+		queue_redraw()
+		return true
+	for line: Dictionary in _lines:
+		if line["kind"] == &"arrow" and line["row"] == key:
+			if not _screen_row_live(key):
+				return true
+			Sfx.ui(&"ui_click")
+			_step_choice(key, step)
+			queue_redraw()
+			return true
+	return false

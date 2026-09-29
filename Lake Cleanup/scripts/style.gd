@@ -162,6 +162,14 @@ const FRAME_GRAIN := Color(0.48, 0.30, 0.22)
 const FRAME_GRAIN_LIT := Color(0.71, 0.55, 0.45)
 ## The title plank over each board is the frame's own oak; only its ink is its own.
 const RIBBON_INK := Color(0.94, 0.85, 0.75)
+## Carved lettering on a ribbon (`write`'s `cut_in`): the cut's dark all round the letters and
+## the lit lip below them. First guesses for Richard's eye.
+const CARVE_DARK := Color(0.16, 0.08, 0.04, 0.9)
+const CARVE_LIP := Color(0.86, 0.62, 0.40, 0.55)
+const CARVE_RIM: Array[Vector2] = [
+	Vector2(-1, -1), Vector2(0, -1), Vector2(1, -1), Vector2(-1, 0), Vector2(1, 0),
+	Vector2(-1, 1), Vector2(0, 1), Vector2(1, 1),
+]
 
 ## The three things the UI says with colour rather than words.
 const DANGER := Color(0.80, 0.24, 0.19)
@@ -395,6 +403,10 @@ static func _no_system(face: Font) -> void:
 
 ## Which locale the face is picked for. `"pt_BR"` and `"pt"` are one chain: the part before
 ## the underscore is what decides a script.
+static func locale() -> StringName:
+	return _locale
+
+
 static func set_locale(locale: String) -> void:
 	var cut := locale.find("_")
 	_locale = StringName(locale.substr(0, cut) if cut > 0 else locale)
@@ -473,7 +485,8 @@ static func write(
 	ink: Color = INK,
 	align: int = HORIZONTAL_ALIGNMENT_LEFT,
 	within: Rect2 = Rect2(),
-	alpha: float = 1.0
+	alpha: float = 1.0,
+	cut_in: bool = false
 ) -> Vector2:
 	var face := font()
 	var span := face.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
@@ -486,9 +499,22 @@ static func write(
 			start.x = within.position.x + (within.size.x - span.x) * 0.5
 		elif align == HORIZONTAL_ALIGNMENT_RIGHT:
 			start.x = within.end.x - span.x
+	# Carved into wood (2026-09-26, Richard): a dark rim all round the letters, the cut's
+	# floor, and one lit pixel under them, the lip the light catches below the cut. Drawn in
+	# place of the drop shadow, which reads as letters floating over the plank.
+	if cut_in:
+		for step: Vector2 in CARVE_RIM:
+			on.draw_string(
+				face, start + step, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px,
+				Color(CARVE_DARK.r, CARVE_DARK.g, CARVE_DARK.b, CARVE_DARK.a * alpha)
+			)
+		on.draw_string(
+			face, start + Vector2(0.0, 2.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px,
+			Color(CARVE_LIP.r, CARVE_LIP.g, CARVE_LIP.b, CARVE_LIP.a * alpha)
+		)
 	# Dark ink is ink on paper, and the shade under it is a smudge (the letter's `_ink` found
 	# this first). Pale ink is a label on wood or water and keeps it.
-	if ink.get_luminance() > SHADE_UNDER:
+	elif ink.get_luminance() > SHADE_UNDER:
 		on.draw_string(
 			face,
 			start + Vector2(1.0, 1.0),
@@ -1378,7 +1404,7 @@ static func board_ribbon(
 	write(
 		on, title, size_px,
 		Vector2(0.0, wood.position.y + (wood.size.y + float(size_px) * 0.62) * 0.5),
-		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, text_box
+		RIBBON_INK, HORIZONTAL_ALIGNMENT_CENTER, text_box, 1.0, true
 	)
 
 

@@ -53,7 +53,7 @@ const RIM_SHADER := preload("res://shaders/rim.gdshader")
 ## It says where the find went, not what it is (2026-09-19, Richard): since the pump, a
 ## netted find waits at the pump and the shed will not take it until it has been washed.
 ## "You got a new decoration" was true and led nowhere.
-const TITLE := "New decoration available to wash"
+## The line is `Text.TROPHY_FOUND`, read at draw time.
 
 ## The three parts of one showing, in seconds: the pop in, how long it is held, and the
 ## fade out. Short — this happens mid-cast, and a player who is fishing should not be made
@@ -320,7 +320,7 @@ func _draw() -> void:
 	var named := float(Style.TEXT_BODY)
 	var ink := Color(Style.INK.r, Style.INK.g, Style.INK.b, fade)
 	var shade := Color(Style.SHADE.r, Style.SHADE.g, Style.SHADE.b, Style.SHADE.a * fade)
-	_line(TITLE, int(title), centre.y - tall * 0.5 - title * 0.7, ink, shade)
+	_line(Text.TROPHY_FOUND, int(title), centre.y - tall * 0.5 - title * 0.7, ink, shade)
 	# The piece's own name in gold, so the line that changes is the one the eye goes to.
 	# Nothing at all for a piece that has not been named: the card is the picture, and a
 	# card that says "Find 07" under it is worse than a card that says nothing.

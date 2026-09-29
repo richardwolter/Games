@@ -21,8 +21,7 @@ signal skip_asked
 const DIM := Color(0.0, 0.0, 0.0, 0.58)
 const OUTLINE := Color(1.0, 1.0, 1.0, 0.9)
 const GAP := 20.0
-const CONTINUE := "Continue"
-const SKIP := "Skip"
+## The foot's two words are `Text.TOUR_SKIP` and `Text.TOUR_CONTINUE`, read at draw time.
 
 ## What is pointed at, in this control's pixels. Empty: nothing up.
 var target := Rect2()
@@ -50,6 +49,8 @@ static func _load(name_of: String) -> Texture2D:
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd, `pad_focus` below).
+	add_to_group(Pad.FOCUS_GROUP)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
@@ -159,14 +160,14 @@ func _draw() -> void:
 		return
 	var foot_mid := inner.end.y - foot_tall * 0.5
 	var base := foot_mid + ascent * 0.5 - 1.0
-	var skip_wide := face.get_string_size(SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
-	draw_string(face, Vector2(inner.position.x, base), SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_SOFT)
+	var skip_wide := face.get_string_size(Text.TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
+	draw_string(face, Vector2(inner.position.x, base), Text.TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_SOFT)
 	_skip = Rect2(inner.position.x - 4.0, foot_mid - foot_tall * 0.5 - 2.0, skip_wide + 8.0, foot_tall + 4.0)
 	var icon_at := Vector2(inner.end.x - icon_size.x, foot_mid - icon_size.y * 0.5).round()
 	if icon != null:
 		draw_texture_rect(icon, Rect2(icon_at, icon_size), false)
-	var go_wide := face.get_string_size(CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
-	draw_string(face, Vector2(icon_at.x - 4.0 - go_wide, base), CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_INK)
+	var go_wide := face.get_string_size(Text.TOUR_CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
+	draw_string(face, Vector2(icon_at.x - 4.0 - go_wide, base), Text.TOUR_CONTINUE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_INK)
 
 
 ## Where the card goes: inside the top right of a target that fills most of the screen, under
@@ -187,3 +188,19 @@ func _px() -> float:
 	var canvas := get_viewport_rect().size.y
 	var window := float(get_window().size.y) if get_window() != null else canvas
 	return FirstSteps.PROMPT_PX * canvas / maxf(window, 1.0)
+
+
+## A card for the pad's stick: go on, skip, and on a card whose lit target takes the click,
+## the target itself, picked first. A hint (no card) offers nothing and the board under it
+## keeps the stick.
+func pad_focus() -> Array:
+	if not is_card() or _card.size == Vector2.ZERO:
+		return []
+	var out: Array = []
+	if through:
+		out.append({"box": target, "key": &"target", "first": true})
+	var go := Rect2(_card.position, Vector2(_card.size.x, _card.size.y * 0.5))
+	out.append({"box": _card, "at": go.get_center(), "key": &"next", "first": not through})
+	if _skip.size != Vector2.ZERO:
+		out.append({"box": _skip, "key": &"skip"})
+	return out

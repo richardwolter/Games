@@ -25,6 +25,14 @@ const WALK_SPEED := 5.4
 ## and long enough that starting and stopping reads as a body with some heft to move.
 const ACCEL_TIME := 0.12
 const ACCEL := WALK_SPEED / ACCEL_TIME
+## A little weight in the walk (2026-09-26, Richard: "slips a little bit"): the velocity takes
+## SLIP_TIME to swing onto a new heading at full pace, so a turn curves rather than snapping,
+## and STOP_TIME to come to rest, so letting go glides a few pixels. The sprite faces the new
+## input at once; only the body lags.
+const SLIP_TIME := 0.1
+const SLIP_ACCEL := WALK_SPEED / SLIP_TIME
+const STOP_TIME := 0.09
+const STOP_ACCEL := WALK_SPEED / STOP_TIME
 
 ## How far out the character may walk past the water's drawn edge, in world pixels.
 ##
@@ -192,6 +200,15 @@ var _run_frame: int = -1
 ## Tiles a second, eased towards WALK_SPEED (or zero) rather than snapped to it. See
 ## ACCEL_TIME.
 var _speed: float = 0.0
+## The walk as a velocity, tiles a second: eased towards what the input asks rather than set
+## to it, so a turn curves and letting go glides. `_speed` is its length. See SLIP_TIME.
+var _vel := Vector2.ZERO
+
+## The dust and splash the boots kick up, handed over by the level like `splash`. Null until
+## then, and nothing is kicked.
+var dust: KickDust
+var _kick := KickDust.Tracker.new()
+var _kick_rng := RandomNumberGenerator.new()
 
 ## Bookkeeping for the footprint trail: where the last mark was drawn from, how far the boots
 ## have come since, and which foot is due next.
@@ -274,6 +291,9 @@ func stand_at(tile: Vector2) -> void:
 	tile_pos = _nearest_standing(tile)
 	_place()
 	_last_print_pos = position
+	_vel = Vector2.ZERO
+	_speed = 0.0
+	_kick.reset()
 
 
 ## The nearest spot to this one that is on the grass and not inside the shed, found by
@@ -516,7 +536,9 @@ func _process(delta: float) -> void:
 	if _cast_lock > 0.0:
 		_cast_lock = maxf(_cast_lock - delta, 0.0)
 		_step = 0.0
-		_speed = move_toward(_speed, 0.0, ACCEL * delta)
+		# The throw plants the boots: no glide out from under it.
+		_vel = Vector2.ZERO
+		_speed = 0.0
 		_cast_time += delta
 		_repaint()
 		return
@@ -541,7 +563,13 @@ func _process(delta: float) -> void:
 		)
 	if push == Vector2.ZERO:
 		_step = 0.0
-		_speed = move_toward(_speed, 0.0, ACCEL * delta)
+		_vel = _vel.move_toward(Vector2.ZERO, STOP_ACCEL * delta)
+		_speed = _vel.length()
+		if _speed > 0.0:
+			_move_by(_vel * delta)
+			_place()
+			_leave_print()
+		_kick_feet(delta)
 		if _cast_time >= 0.0:
 			_cast_time += delta
 		_repaint()
@@ -557,18 +585,44 @@ func _process(delta: float) -> void:
 	# screen rather than along a diagonal the player cannot see.
 	var step := Iso.world_to_tile(push.normalized() * Iso.TILE_W).normalized()
 	facing = step
-	_speed = move_toward(_speed, WALK_SPEED, ACCEL * delta)
-	var move := step * _speed * delta
+	_vel = _vel.move_toward(step * WALK_SPEED, SLIP_ACCEL * delta)
+	_speed = _vel.length()
+	_move_by(_vel * delta)
+	_step += delta
+	_place()
+	_leave_print()
+	_footfall()
+	_kick_feet(delta)
+	_repaint()
+
+
+## One step of the walk: straight on where the ground allows it, slid along what is in the way
+## where it does not. A slide keeps only the part of the velocity that went somewhere, so a
+## glide into the hut's wall does not carry on pushing at it.
+func _move_by(move: Vector2) -> void:
+	var from := tile_pos
 	var wanted := tile_pos + move
 	if _can_stand(wanted):
 		tile_pos = wanted
 	else:
 		tile_pos = _slide(move)
-	_step += delta
-	_place()
-	_leave_print()
-	_footfall()
-	_repaint()
+		var went := tile_pos - from
+		if move.length_squared() > 0.000001:
+			_vel = _vel * clampf(went.length() / move.length(), 0.0, 1.0)
+
+
+## Dust off the ground or water off the shallows when the boots start or turn hard. See
+## KickDust.
+func _kick_feet(delta: float) -> void:
+	var kick := _kick.step(tile_pos, delta)
+	if kick == KickDust.Tracker.NONE or dust == null:
+		return
+	var heading := Vector2(_vel.x - _vel.y, (_vel.x + _vel.y) * 0.5)
+	var on := step_surface()
+	if on == &"water":
+		KickDust.splash_at(splash, position, heading, 1.0, _kick_rng)
+	else:
+		dust.puff(position, on, heading, 1.0)
 
 
 ## A footstep, on the run frames a foot comes down on, off what is under the boots: the
@@ -584,13 +638,21 @@ func _footfall() -> void:
 	var down := false
 	for fall: float in FOOTFALLS:
 		down = down or at == int(fall * float(frames.size()))
-	var sound := Sfx.main()
-	if not down or sound == null:
+	if not down:
 		return
 	var on := step_surface()
-	# The shallows are the wading loop, not a footfall: see `_push_wade`.
-	if on != &"water":
-		sound.play_step(on)
+	if on == &"water":
+		# A little water off every step in the shallows, a share of a start's burst.
+		KickDust.splash_at(
+			splash, position, Vector2(_vel.x - _vel.y, (_vel.x + _vel.y) * 0.5), KickDust.STEP_SHARE, _kick_rng)
+	var sound := Sfx.main()
+	# The shallows are the wading loop, not a footfall: see `_push_wade`. A puddle on the
+	# lawn is a splash of its own (2026-09-28).
+	if sound != null and on != &"water":
+		if Puddles.here != null and Puddles.here.standing_in(Iso.tile_to_world(tile_pos.x, tile_pos.y)):
+			sound.play_puddle_step()
+		else:
+			sound.play_step(on)
 
 
 ## The water the boots move, held while they are moving it. Pushed every frame, including the
@@ -632,6 +694,9 @@ func _wake(delta: float) -> void:
 	var cut := Vector2(0.0, _cut_y(_wading(), 0.0))
 	if wading and not _was_wading and splash != null:
 		splash.ripple(Iso.tile_to_world(tile_pos.x, tile_pos.y) + cut, ENTRY_SPAN)
+		# The first step into the lake splashes (2026-09-28).
+		if Sfx.main() != null:
+			Sfx.main().play_puddle_step()
 	_was_wading = wading
 	if _streak == null:
 		return

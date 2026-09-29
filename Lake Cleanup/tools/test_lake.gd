@@ -37,7 +37,7 @@ const LOG_PATH := "res://tools/last_test.log"
 ## not being played. The shop boards are a menu, and a menu that let clicks through onto the
 ## water behind it would cast the net while the player was shopping. Buttons are exempt
 ## everywhere — the engine's own and the drawn ones (`UiButton`, `CloseButton`).
-const CLICK_EATERS := ["Shop", "ShopSkin", "Settings", "Shed", "Room", "GroundTuner"]
+const CLICK_EATERS := ["Shop", "ShopSkin", "Settings", "Shed", "Room", "GroundTuner", "RecordMenu"]
 
 ## The harness's own save file, so a test run never touches the player's.
 const SAVE_PATH := "user://test_lake.save"
@@ -102,6 +102,10 @@ func _ready() -> void:
 	if FileAccess.file_exists(LOG_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(LOG_PATH))
 	_log("--- test_lake start")
+	# The checks read English. Set on the server, not through `Prefs`, which would write it
+	# into the player's `settings.cfg`; this machine's own locale may be any of the eight.
+	TranslationServer.set_locale("en")
+	Style.set_locale("en")
 	_main = load("res://scenes/main.tscn").instantiate()
 	# A save file of the harness's own, started empty: the tests are about a fresh lake,
 	# and they must not read or overwrite whatever the player has been playing.
@@ -377,6 +381,7 @@ func _stage_build() -> void:
 	_main.set(&"_panning", false)
 	_main.set(&"_pan", Vector2.ZERO)
 	_check_free_view(cam)
+	_check_signals(cam)
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -405,11 +410,6 @@ func _stage_build() -> void:
 		"%.2f tiles" % Lake.COAST_WAVE)
 	_check(Lake.COAST_WAVE < Ground.BEACH_IN, "and never reaches the lawn",
 		"%.2f tiles of a %.1f-tile beach" % [Lake.COAST_WAVE, Ground.BEACH_IN])
-	# Whole waves per lap, or the ring seams where atan() wraps from pi to minus pi.
-	_check(is_equal_approx(Lake.COAST_WAVES, roundf(Lake.COAST_WAVES)) and Lake.COAST_WAVES >= 1.0,
-		"and closes on itself round the island",
-		"%.1f waves a lap" % Lake.COAST_WAVES)
-
 	# One grass a layer, no patchwork (2026-09-28): the seams between pack grasses were the
 	# complaint, so the shader must have no patch picking left to put them back.
 	var ground_src := FileAccess.get_file_as_string("res://shaders/ground.gdshader")
@@ -421,6 +421,11 @@ func _stage_build() -> void:
 	_check(shades[&"lawn_low"].get_luminance() < shades[&"lawn_mid"].get_luminance()
 		and shades[&"lawn_mid"].get_luminance() < shades[&"lawn_light"].get_luminance(),
 		"and it is painted in three steps of the pack grass's own ramp", "%s" % [shades])
+	# Whole waves per lap, or the ring seams where atan() wraps from pi to minus pi.
+	_check(is_equal_approx(Lake.COAST_WAVES, roundf(Lake.COAST_WAVES)) and Lake.COAST_WAVES >= 1.0,
+		"and closes on itself round the island",
+		"%.1f waves a lap" % Lake.COAST_WAVES)
+
 	# The bank's edge is carved by the shader's discard, so the polygon has to reach past the
 	# wave's crest all the way round or the rim clips it flat. Walked rather than worked out:
 	# the rim adds its grow to the wobbled radius while the discard folds the lap in before the
@@ -2105,7 +2110,7 @@ func _stage_market() -> void:
 		# the row does not need and a translation would have to carry.
 		if not String(row.get("level", "")).is_valid_int():
 			no_level.append(String(row["key"]))
-		if String(row["cost"]) != "Max" and not (" %s " % _main.get(&"ARROW")) in value:
+		if String(row["cost"]) != Text.SHOP_MAX and not (" %s " % _main.get(&"ARROW")) in value:
 			no_next.append("%s: %s" % [row["key"], value])
 	_check(decimals.is_empty(), "no row's value carries a decimal", ", ".join(decimals))
 	_check(no_next.is_empty(), "every unmaxed row reads now-arrow-next", ", ".join(no_next))
@@ -2142,8 +2147,9 @@ func _stage_market() -> void:
 		var dog_box: Rect2 = skin_boards[&"dog"]
 		_check(legend_box.position.y >= maxf(boat_box.end.y, dog_box.end.y)
 			and legend_box.end.y <= table.end.y + 0.5
-			and is_equal_approx(legend_box.position.x, boat_box.position.x)
-			and is_equal_approx(legend_box.end.x, dog_box.end.x),
+			and is_equal_approx(legend_box.position.x, boat_box.position.x - ShopSkin.LEGEND_REACH)
+			and is_equal_approx(legend_box.end.x, dog_box.end.x + ShopSkin.LEGEND_REACH)
+			and ShopSkin.LEGEND_REACH < ShopSkin.BOARD_GAP * 0.5,
 			"and stands under the ferry's and the dog's boards, inside the table",
 			"legend %s boat %s dog %s table %s" % [legend_box, boat_box, dog_box, table])
 	# The rail (2026-09-17): a column down the left of a row, the "?" answering in its top
@@ -2366,7 +2372,69 @@ func _stage_settings() -> void:
 		_check(sound._ambience_duck, "and goes under while the shed is open", "")
 		_main.call(&"_set_shed", false)
 		_check(not sound._ambience_duck, "and comes back when it closes", "")
+		_check_new_sounds(sound)
+		# The wash room is outdoors: the lake is heard behind it, the shed is not.
+		_main.call(&"_set_wash", true)
+		_check(not sound.indoors, "the wash room lets the lake through", "")
+		_main.call(&"_set_wash", false)
 	_advance()
+
+
+## The second batch (2026-09-28): the doors, the storm, the puddles and the wildlife.
+func _check_new_sounds(sound: Sfx) -> void:
+	_check((sound._streams[&"duck"] as Array).size() == 3
+		and (sound._streams[&"geese"] as Array).size() == 4
+		and (sound._streams[&"forest"] as Array).size() == 4,
+		"the ducks, geese and woods come in their takes", "")
+	var thunders := 0
+	for path: String in Weather.THUNDER_SOUNDS:
+		thunders += 1 if ResourceLoader.exists(path) else 0
+	_check(thunders == 4 and ResourceLoader.exists(Weather.RAIN_SOUND),
+		"the storm's rain and its four thunders are there", "%d thunders" % thunders)
+	_check(Weather.THUNDER_AFTER.x >= 1.0, "thunder comes a little after the flash, not on it",
+		"%.1f s" % Weather.THUNDER_AFTER.x)
+	_check(&"door_open" in Sfx.WHILE_INDOORS and &"door_close" in Sfx.WHILE_INDOORS,
+		"the shed's doors are heard from inside it", "")
+	# One species, one gap: a second frog straight after the first is refused.
+	sound._next_due.erase(&"frog")
+	var first := sound.play_frog()
+	var second := sound.play_frog()
+	_check(first and not second, "frogs are held to their gap", "%s %s" % [first, second])
+	var lake_boats: Array = _main.get(&"_boats")
+	var walkers: PackedVector2Array = _main.call(&"_wildlife_walkers")
+	var all: PackedVector2Array = _main.call(&"_wildlife_threats")
+	_check(lake_boats.is_empty() or all.size() > walkers.size()
+		or not (lake_boats[0] as Node2D).visible,
+		"the ducks' threats leave the hulls out", "%d of %d" % [walkers.size(), all.size()])
+	_check(Sfx.FROG_FRIGHT_ODDS > 0.0 and Sfx.FROG_FRIGHT_ODDS < 1.0,
+		"a startled frog ribbits only sometimes", "")
+	sound._next_due.erase(&"frog")
+	# The bee is baked left to right: its left ear leads and its right ear ends.
+	# Read off the built file: the import compresses it, so the stream's data is not PCM.
+	var raw := FileAccess.get_file_as_bytes("res://assets/sfx/bee.wav")
+	if raw.size() > 44:
+		var data := raw.slice(44)
+		var frames := data.size() / 4
+		var early := _ear_energy(data, 0, frames / 5)
+		var late := _ear_energy(data, frames * 4 / 5, frames)
+		_check(early.x > early.y * 2.0 and late.y > late.x * 2.0,
+			"a bee passes from the left ear to the right", "%s %s" % [early, late])
+	# The ear: wildlife hears only inside the dogs' range.
+	var wild := Wildlife.new()
+	wild.ear = func() -> Vector2: return Vector2.ZERO
+	var reach := Iso.tile_circle_extent(Dog.HEAR)
+	_check(wild.hears(Vector2(reach * 0.5, 0.0)) and not wild.hears(Vector2(reach * 1.5, 0.0)),
+		"an animal is heard only within earshot", "")
+	wild.free()
+
+
+## Summed absolute level of each ear over frames [from, to) of 16-bit stereo data.
+func _ear_energy(data: PackedByteArray, from: int, to: int) -> Vector2:
+	var sum := Vector2.ZERO
+	for f in range(from, to, 16):
+		sum.x += absf(float(data.decode_s16(f * 4)))
+		sum.y += absf(float(data.decode_s16(f * 4 + 2)))
+	return sum
 
 
 ## The mix is four audio buses (2026-09-16, issue #26), and every voice is on one of them:
@@ -2883,13 +2951,18 @@ func _stage_art() -> void:
 	var verts: PackedVector2Array = _grid.get(&"_mesh_points")
 	var slot_base: PackedInt32Array = _grid.get(&"_slot_base")
 	var rimmed := 0
+	# And a shore tile holding two draws its second piece beside the top one (2026-09-27).
+	var paired := 0
 	for i in slot_base.size():
 		if slot_base[i] >= 0 and bool(_grid.call(&"_holds_find", i)):
 			rimmed += 1
+		if slot_base[i] >= 0 and _grid.shore[i] == 1 and _grid.stacks[i].size() >= 2:
+			paired += 1
 	_check(rimmed > 0, "some drawn tiles hold a find", str(rimmed))
-	_check(verts.size() == _grid.drawn_pieces * 4 + rimmed * LakeGrid.RIM_VERTS,
+	_check(verts.size() == _grid.drawn_pieces * 4 + rimmed * LakeGrid.RIM_VERTS + paired * 4,
 		"a piece of rubbish is its picture and nothing else, plus a rim's room over a find",
-		"%d corners for %d pieces, %d with a find" % [verts.size(), _grid.drawn_pieces, rimmed])
+		"%d corners for %d pieces, %d with a find, %d shore pairs" % [
+			verts.size(), _grid.drawn_pieces, rimmed, paired])
 
 	# And no two of them lie the same way.
 	var turns := {}
@@ -3152,17 +3225,55 @@ func _stage_shed() -> void:
 		_check(not room.can_place(tall, Vector2i(inside.x, tall_base - tall_span.y - 1)),
 			"a base off the floor is refused whatever the wall", "")
 		room.place(tall, Vector2i(inside.x, top))
-		var blocked: Dictionary = room.call(&"_taken")
-		# The blocked map is in walker cells, the piece in pixels: the cell the foot stands
-		# in is blocked, and the one a base-and-a-half above it is not.
-		var foot_cell := (top + tall_span.y - 1) / ShedRoom.CELL
-		var air_cell := (top + tall_span.y - 1 - tall_base - ShedRoom.CELL) / ShedRoom.CELL
-		var post := inside.x / ShedRoom.CELL
+		# The walkers are held off the base by WALK_CLEAR pixels and no more; the picture
+		# above it blocks nothing (2026-09-27).
+		var cellf := float(ShedRoom.CELL)
+		decor.clear()
+		var mid := Vector2i(16 * ShedRoom.CELL, 10 * ShedRoom.CELL)
+		room.place(tall, mid)
+		var post := (float(mid.x) + float(tall_span.x) * 0.5) / cellf
+		var base_top := float(mid.y + tall_span.y - tall_base) / cellf
+		var clear := float(ShedRoom.WALK_CLEAR) / cellf
 		_check(
-			blocked.has(Vector2i(post, foot_cell))
-			and not blocked.has(Vector2i(post, air_cell)),
-			"and only its base blocks the walkers",
-			"foot cell %d, air cell %d, %d blocked" % [foot_cell, air_cell, blocked.size()])
+			not bool(room.call(&"_dog_may_stand", Vector2(post, base_top + 0.1)))
+			and not bool(room.call(&"_dog_may_stand", Vector2(post, base_top - clear * 0.5)))
+			and bool(room.call(&"_dog_may_stand", Vector2(post, base_top - clear - 0.05)))
+			and bool(room.call(&"_dog_may_stand", Vector2(post, base_top - 1.5))),
+			"and only its base, grown by the clearance, blocks the walkers",
+			"base top %.2f, clear %.2f" % [base_top, clear])
+		# Sliding along its front face makes ground: no snagging on invisible walls.
+		var front := float(mid.y + tall_span.y) / cellf + clear
+		var start := Vector2(float(mid.x) / cellf + 0.2, front + 0.03)
+		var may := func(where: Vector2) -> bool: return bool(room.call(&"_dog_may_stand", where))
+		var at := start
+		for _i in 60:
+			at = room.call(&"_slid", at, Vector2(0.15, -0.05), may)
+		_check(at.x > float(mid.x + tall_span.x) / cellf + clear,
+			"a walker pushing along a piece's face slides past it",
+			"%.2f to %.2f" % [start.x, at.x])
+		_check(at.y - front < clear + 0.1,
+			"and stays within the clearance of it", "%.2f off the face" % (at.y - front))
+		# The draw order flips at the base's front edge.
+		var foot_row := float(mid.y + tall_span.y) / cellf
+		var ahead: float = room.call(&"_walker_key", Vector2(post, foot_row + 0.05), decor)
+		var back: float = room.call(&"_walker_key", Vector2(post, base_top - clear - 0.1), decor)
+		_check(ahead > foot_row and back < foot_row,
+			"a walker sorts in front below a piece's front edge and behind above it",
+			"%.2f / %.2f against %.2f" % [ahead, back, foot_row])
+		# A piece in hand is drawn centred on the pointer from the first frame (2026-09-27).
+		var floor_box: Rect2 = room.call(&"_floor_rect")
+		room.set(&"_pointer", floor_box.get_center() + Vector2(0.37, 0.61))
+		room.carrying = &"decor_bookcase_tall"
+		room.set(&"_carry_view", 0)
+		var ghost: Dictionary = room.call(&"_ghost")
+		room.carrying = &""
+		var zoom: float = room.call(&"_zoom")
+		var drawn_middle: Vector2 = floor_box.position + (
+			Vector2(float(ghost["cell"][0]), float(ghost["cell"][1])) + Vector2(tall_span) * 0.5
+		) * zoom
+		var off: Vector2 = drawn_middle - (floor_box.get_center() + Vector2(0.37, 0.61))
+		_check(absf(off.x) <= zoom * 0.5 + 0.01 and absf(off.y) <= zoom * 0.5 + 0.01,
+			"a carried piece is drawn centred on the pointer", str(off))
 		decor.clear()
 	# The walkers stay on the boards (2026-09-16): the moulded frame is drawn inside the
 	# floor's own rectangle and both of them used to stand on it.
@@ -3210,8 +3321,8 @@ func _stage_shed() -> void:
 		_check(not room.can_place(painting, Vector2i(inside.x, -ShedRoom.PLACE_WALL - 1)),
 			"and not over the top of the wall", "")
 		room.place(painting, Vector2i(inside.x, -hang.y))
-		var blocked: Dictionary = room.call(&"_taken")
-		_check(blocked.is_empty(), "and it blocks nothing", "%d cells" % blocked.size())
+		var blocked: Array = room.call(&"_blockers")
+		_check(blocked.is_empty(), "and it blocks nothing", "%d boxes" % blocked.size())
 		var order: Array = room.call(&"_order")
 		_check(int((order[0] as Dictionary)["layer"]) == 0, "and is drawn first", "")
 		decor.clear()
@@ -3373,6 +3484,7 @@ func _stage_shed() -> void:
 		"the oval rug restyles with R", "")
 	_check(sheets.has(&"decor_rug") and sheets.has(&"decor_aquarium"),
 		"the rug and the aquarium are finds", "")
+	_check_record_player(room, sheets)
 
 	# A lamp lit is a pool of light and no crackle; only the hearth crackles.
 	var kept_decor := room.decor.duplicate()
@@ -3487,8 +3599,8 @@ func _check_trophy() -> void:
 	if card == null:
 		_check(false, "the find card was built", "")
 		return
-	_check(Trophy.TITLE == "New decoration available to wash",
-		"the card says the find is waiting to be washed", Trophy.TITLE)
+	_check(Text.TROPHY_FOUND == "New decoration available to wash",
+		"the card says the find is waiting to be washed", Text.TROPHY_FOUND)
 
 	# The retired drawing, gone rather than left unused: the disc, the wheel of rays and the
 	# motes, and the restored sprite it used to hold up.
@@ -4560,6 +4672,8 @@ func _stage_pad() -> void:
 			if event is InputEventJoypadMotion and (event as InputEventJoypadMotion).axis == pair[1]:
 				found = true
 		_check(found, "%s answers to its stick" % pair[0], "")
+	_check_pad_focus(pad)
+	_check_blurb_and_wake()
 	for pair: Array in [
 		[&"interact", JOY_BUTTON_A], [&"pad_back", JOY_BUTTON_B], [&"open_shed", JOY_BUTTON_X],
 		[&"open_upgrades", JOY_BUTTON_Y], [&"open_settings", JOY_BUTTON_START],
@@ -4719,7 +4833,7 @@ func _stage_music() -> void:
 	music.indoors = true
 	_run_music(music, 0.4)
 	g = music.gains()
-	_check(is_equal_approx(float(g["indie_boi_radio"]), 1.0)
+	_check(is_equal_approx(float(g["shed_indie_boi"]), 1.0)
 		and is_zero_approx(float(g["beatgucci"])) and music.is_playing(&"beatgucci")
 		and music.is_playing(&"indie_boi"),
 		"indoors, Indie Boi through the wall, the playlist running muted under it", "%s" % g)
@@ -4728,7 +4842,7 @@ func _stage_music() -> void:
 	_run_music(music, 0.4)
 	g = music.gains()
 	_check(is_equal_approx(float(g["beatgucci_radio"]), 1.0)
-		and is_zero_approx(float(g["beatgucci"])) and is_zero_approx(float(g["indie_boi_radio"])),
+		and is_zero_approx(float(g["beatgucci"])) and is_zero_approx(float(g["shed_indie_boi"])),
 		"a board open: the lake's own song through the radio", "%s" % g)
 	music.muffled = false
 	_run_music(music, 0.4)
@@ -4736,20 +4850,21 @@ func _stage_music() -> void:
 	music.set_ending(true)
 	_run_music(music, fade * 0.5)
 	g = music.gains()
-	_check(float(g["habibs"]) > 0.2 and float(g["habibs"]) < 0.9 and music.is_playing(&"habibs"),
+	_check(float(g["end"]) > 0.2 and float(g["end"]) < 0.9 and music.is_playing(&"habibs"),
 		"the end song fades in over the playlist", "%s" % g)
 	_run_music(music, fade * 0.5 + 0.2)
 	var at := music.song_time()
 	g = music.gains()
-	_check(is_equal_approx(float(g["habibs"]), 1.0) and is_zero_approx(float(g["beatgucci"]))
+	_check(is_equal_approx(float(g["end"]), 1.0) and is_zero_approx(float(g["beatgucci"]))
 		and music.is_playing(&"beatgucci"),
 		"and has the whole of it, the playlist still running under", "%s" % g)
 	music.set_ending(false)
 	_run_music(music, fade + 0.2)
 	g = music.gains()
-	_check(is_zero_approx(float(g["habibs"])) and not music.is_playing(&"habibs")
+	_check(is_zero_approx(float(g["end"])) and not music.is_playing(&"habibs")
 		and is_equal_approx(float(g["beatgucci"]), 1.0) and music.song_time() > at,
 		"closing it fades back to the playlist where it has got to", "%s" % g)
+	_check_record_lists(music)
 	music.queue_free()
 
 	var station := MusicStation.main()
@@ -4759,7 +4874,8 @@ func _stage_music() -> void:
 		_check(station.indoors and not station.muffled, "the shed tells the station", "")
 		_main.call(&"_set_shed", false)
 		_main.call(&"_set_settings", true)
-		_check(station.muffled and not station.indoors, "so does the settings board", "")
+		_check(not station.muffled and not station.indoors,
+			"the settings board leaves the song clean (2026-09-28)", "")
 		# And the settings board pauses the game: the world stops, the lake's clock stops.
 		var play_was := float(_main.get(&"_play"))
 		var angler: Node = _main.get(&"_angler")
@@ -5044,6 +5160,121 @@ func _check_audio_pass(sound: Sfx) -> void:
 
 
 ## Drive a hand-held station on by `seconds`, a frame at a time.
+## The record player's lists on the station (2026-09-28): ticking keeps a list in `SONGS`'
+## order and never empty, Habibs stays locked until the lake is cleaned, one song can play on
+## both lists, sync sends the lake's song into the shed, a skip moves on, and the picks go
+## round a save.
+func _check_record_lists(music: MusicStation) -> void:
+	music.indoors = false
+	music.take_picks({})
+	_check(music.list_of(MusicStation.LAKE) == MusicStation.PLAYLIST
+		and music.list_of(MusicStation.SHED) == [MusicStation.SHED_SONG] and not music.synced,
+		"no picks in the save read as the old fixed lists", str(music.picks()))
+	_check(not music.toggle(MusicStation.SHED, MusicStation.SHED_SONG),
+		"the last song on a list cannot be unticked", "")
+	music.habibs_open = false
+	_check(not music.toggle(MusicStation.LAKE, &"habibs"),
+		"Habibs is locked before the lake is cleaned", "")
+	music.habibs_open = true
+	_check(music.toggle(MusicStation.LAKE, &"habibs")
+		and music.list_of(MusicStation.LAKE).back() == &"habibs",
+		"and can be ticked after, taking its place in the order", str(music.list_of(MusicStation.LAKE)))
+	_check(music.toggle(MusicStation.SHED, &"goin"), "the shed can take a lake song too", "")
+	var was := music.playing_in(MusicStation.LAKE)
+	var changes := music.changes_in(MusicStation.LAKE)
+	music.toggle(MusicStation.LAKE, was)
+	_check(music.playing_in(MusicStation.LAKE) != was and music.changes_in(MusicStation.LAKE) > changes,
+		"unticking the song playing moves the lake on to the next", "%s" % music.playing_in(MusicStation.LAKE))
+	music.toggle(MusicStation.LAKE, was)
+	changes = music.changes_in(MusicStation.SHED)
+	var shed_was := music.playing_in(MusicStation.SHED)
+	music.skip(MusicStation.SHED)
+	_check(music.changes_in(MusicStation.SHED) == changes + 1
+		and music.playing_in(MusicStation.SHED) != shed_was,
+		"a skip moves the shed on and counts for the needle", "")
+	music.indoors = true
+	music.set_synced(true)
+	_run_music(music, 0.6)
+	var g := music.gains()
+	var lake_song := String(music.playing_in(MusicStation.LAKE))
+	_check(music.playing_in(MusicStation.SHED) == music.playing_in(MusicStation.LAKE)
+		and float(g[lake_song + "_radio"]) > 0.95
+		and is_zero_approx(float(g["shed_" + String(MusicStation.SHED_SONG)]))
+		and is_zero_approx(float(g["shed_goin"])),
+		"synced, the shed hears the lake's own song through the radio", "%s" % g)
+	var saved := music.picks()
+	music.take_picks({})
+	music.take_picks(JSON.parse_string(JSON.stringify(saved)))
+	_check(music.picks() == saved, "the picks go round a save", "%s / %s" % [music.picks(), saved])
+	music.take_picks({"lake": ["nonsense"], "shed": []})
+	_check(music.list_of(MusicStation.LAKE) == MusicStation.PLAYLIST,
+		"an unreadable list falls back rather than going silent", "")
+	music.indoors = false
+	music.take_picks({})
+
+
+## The record player in the shed: E at it lifts the lid and puts the menu up; the room is
+## deaf behind it; the menu's controls work the station; closing shuts the lid.
+func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
+	var station := MusicStation.main()
+	if station == null:
+		_check(false, "the record player needs the station", "")
+		return
+	var kept_decor := room.decor.duplicate()
+	var kept := station.picks()
+	room.decor.clear()
+	room.decor.append({"piece": "decor_vynil_player", "cell": [40, 40], "view": 0})
+	room.call(&"_open_record", 0)
+	var menu := room.get_node_or_null(^"RecordMenu") as RecordMenu
+	_check(menu != null and room.record_up(), "E on the record player puts its menu up", "")
+	_check(sheets.is_on(&"decor_vynil_player", int(room.decor[0]["view"])),
+		"and lifts its lid", "view %d" % int(room.decor[0]["view"]))
+	_check(not room.pad_free(), "the room gives up the stick while the menu is up", "")
+	if menu != null:
+		var synced := station.synced
+		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
+		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
+		menu.press(&"sync")
+		var ticked := station.ticked(MusicStation.SHED, &"goin")
+		menu.press(&"tick:shed:goin")
+		_check(station.ticked(MusicStation.SHED, &"goin") != ticked, "a tick in the shed's column", "")
+		var changes := station.changes_in(MusicStation.SHED)
+		var going_to := station.next_in(MusicStation.SHED)
+		menu.press(&"skip")
+		menu._process(0.1)
+		_check(station.changes_in(MusicStation.SHED) == changes and menu.needle_up(),
+			"skip lifts the needle and holds the song until it sets down", "")
+		_check(menu.turning() < 1.0, "and the record spins down while it is up",
+			"%.2f" % menu.turning())
+		var src := FileAccess.get_file_as_string("res://scripts/record_menu.gd")
+		_check(not src.contains("SHEEN"), "the record wears no white sheen", "")
+		var reaches: Array[float] = []
+		var inward := true
+		for i in MusicStation.SONGS.size():
+			reaches.append(RecordMenu.band_middle(i))
+			if i > 0 and reaches[i] >= reaches[i - 1] - 2.0:
+				inward = false
+		_check(inward and reaches[0] > RecordMenu.GROOVE_OUT - RecordMenu.band_wide(),
+			"every song has its own band, beatgucci at the rim and in down the list", str(reaches))
+		var angles := {}
+		for r in reaches:
+			angles[snappedf(float(menu.call(&"_angle_for", r)), 0.01)] = true
+		_check(angles.size() == reaches.size(), "and its own place for the needle", str(angles.keys()))
+		menu._process(2.0)
+		menu._process(0.1)
+		_check(not menu.needle_up() and station.changes_in(MusicStation.SHED) == changes + 1
+			and station.playing_in(MusicStation.SHED) == going_to,
+			"then the needle sets down and the next song plays", "")
+		_check(menu.pad_focus().size() >= 8, "the pad walks its ticks, switch, skip and cross",
+			"%d" % menu.pad_focus().size())
+		menu.close()
+	_check(not room.record_up() and sheets.is_on(&"decor_vynil_player", int(room.decor[0]["view"])),
+		"closing the menu leaves the lid open", "")
+	station.take_picks(kept)
+	room.decor.clear()
+	room.decor.append_array(kept_decor)
+
+
 func _run_music(music: MusicStation, seconds: float) -> void:
 	var left := seconds
 	while left > 0.0:
@@ -5099,6 +5330,140 @@ func _find_greedy_controls(node: Node, into: Array[String]) -> void:
 ## The free camera (2026-09-20): the toggle beside the gear pins the view, and neither a cast
 ## nor a step takes it back. The pointer is declared out of the window for the pinning checks
 ## — a headless pointer sits at the origin, which is an edge.
+## The five signals of 2026-09-26: fewer droppings, the purse running down, the haul's count
+## over the angler, the last pieces marked, and the wildlife moment.
+func _check_signals(cam: Camera2D) -> void:
+	# Pigeons: only a bird in the air drops anything, and at half the old rate.
+	var flock_src := FileAccess.get_file_as_string("res://scripts/flock.gd")
+	_check(Flock.POOP_CHANCE <= 0.45 and not flock_src.contains("POOP_CHANCE_PERCHED"),
+		"a perched pigeon drops nothing and a flying one half as often", str(Flock.POOP_CHANCE))
+
+	# The purse runs down on a spend and hangs a tag off the plate.
+	var skin: HudSkin = _main.get(&"_skin")
+	var money_was := skin.money
+	skin.money = 1000.0
+	skin.set(&"_shown_money", 1000.0)
+	skin.set(&"_last_money", 1000.0)
+	skin._process(0.0)
+	skin.money = 400.0
+	skin._process(1.0 / 60.0)
+	var shown: float = skin.get(&"_shown_money")
+	var spent: Array = skin.get(&"_spent")
+	_check(shown < 1000.0 and shown > 400.0, "a spend runs the purse down rather than dropping it",
+		"%.1f" % shown)
+	_check(spent.size() == 1 and int(spent[0]["amount"]) == 600, "and hangs a -600 off the plate",
+		str(spent))
+	for i in 240:
+		skin._process(1.0 / 60.0)
+	_check(is_equal_approx(float(skin.get(&"_shown_money")), 400.0)
+		and (skin.get(&"_spent") as Array).is_empty(), "then lands on the sum and the tag is gone", "")
+	skin.money = money_was
+	skin.set(&"_shown_money", money_was)
+	skin.set(&"_last_money", money_was)
+
+	# The haul's count: up while there is a catch, popped and gone once it lands.
+	var count := HaulCount.new()
+	add_child(count)
+	count.head = Vector2.ZERO
+	count.count = 3
+	count.room = 8
+	count._process(0.016)
+	_check(count.showing(), "a catch aboard shows its count over the angler", "")
+	count.pop()
+	count.count = 0
+	count._process(HaulCount.POP_TIME + 0.01)
+	count._process(0.016)
+	_check(not count.showing(), "and the count pops and goes when the catch lands", "")
+	count.throw(true, true)
+	count._process(0.016)
+	_check(count.showing() and count.lucky and count.double,
+		"a lucky double throw is up at nought, before anything is caught", "")
+	count.pop()
+	count._process(HaulCount.POP_TIME + 0.01)
+	count._process(0.016)
+	count.throw(false, false)
+	count._process(0.016)
+	_check(not count.showing(), "a plain throw waits for a catch", "")
+	_check(HaulCount.FULL_INK != HaulCount.LUCKY_INK, "a full net is not drawn in the lucky gold", "")
+	count.free()
+	var hauled: HaulCount = _main.get(&"_haul_count")
+	_check(hauled != null, "the lake keeps a haul count on the HUD", "")
+	if hauled != null:
+		# One net home while the other is out: its catch stays in the count.
+		_main.set(&"_haul_out", true)
+		_main.set(&"_haul_banked", 0)
+		_main.call(&"_bank_haul", PackedInt32Array([0, 0, 0]))
+		_check(int(_main.get(&"_haul_banked")) == 3, "a net home banks its catch for the count", "")
+		_main.call(&"_haul_count_step")
+		_check(not bool(_main.get(&"_haul_out")), "and the count lets go once no net is out", "")
+
+	# The last pieces: a pale rim's room in the soup, a column, and an arrow off screen.
+	var full := -1
+	for index in _grid.stacks.size():
+		if not _grid.stacks[index].is_empty():
+			full = index
+			break
+	if full >= 0:
+		var top := _grid.defs[_grid.stacks[full][_grid.stacks[full].size() - 1]]
+		var bare: int = _grid.call(&"_stamp_len", top, full)
+		_grid.mark_last(PackedInt32Array([full]))
+		var ringed: int = _grid.call(&"_stamp_len", top, full)
+		_check(ringed == bare + LakeGrid.RIM_VERTS or _grid.call(&"_holds_find", full),
+			"a last piece carries a rim's room in the soup", "%d against %d" % [ringed, bare])
+		_grid.mark_last(PackedInt32Array())
+	var arrows := LastArrows.new()
+	add_child(arrows)
+	arrows.size = Vector2(1280.0, 720.0)
+	var xf := get_viewport().get_canvas_transform().affine_inverse()
+	arrows.spots = [xf * Vector2(640.0, 360.0), xf * Vector2(5000.0, 360.0)]
+	var drawn := arrows.arrows()
+	_check(drawn.size() == 1 and Rect2(Vector2.ZERO, arrows.size).has_point(drawn[0]["at"])
+		and (drawn[0]["way"] as Vector2).x > 0.9,
+		"only the piece off screen gets an arrow, at the edge, pointing at it", str(drawn))
+	arrows.free()
+	var source := FileAccess.get_file_as_string("res://shaders/rubbish.gdshader")
+	_check(source.contains("rim_pale"), "the soup's shader paints the pale rim", "")
+
+	# The wildlife moment: once a save, the view there and back, the hands held, the card.
+	_main.set(&"_wildlife_seen", false)
+	var zoom_was: float = _main.get(&"_view_zoom")
+	_main.set(&"_view_zoom", 0.62)
+	_main.call(&"_push_zoom")
+	var home_zoom: float = _main.get(&"_view_zoom")
+	var spot := _angler.position + Vector2(300.0, 120.0)
+	_main.call(&"_on_first_wildlife", spot)
+	_check(float(_main.get(&"_moment")) >= 0.0 and bool(_main.get(&"_wildlife_seen")),
+		"the first animal starts the moment and marks the save", "")
+	var steps := int((Lake.MOMENT_IN + Lake.MOMENT_HOLD * 0.5) * 60.0)
+	for i in steps:
+		_main.call(&"_moment_step", 1.0 / 60.0)
+	# Headless, the window allows one zoom stop, and there is nowhere closer to go.
+	var one_stop := (_main.call(&"_zoom_stops") as Array).size() < 2
+	_check(not _angler.can_walk and (one_stop or cam.zoom.x > home_zoom + 0.01),
+		"mid-moment the hands are held and the view is in close",
+		"zoom %.2f against %.2f, moment %.2f, steps %d, stops %s" % [cam.zoom.x, home_zoom,
+		_main.get(&"_moment"), steps, _main.call(&"_zoom_stops")])
+	_check(cam.position.distance_to(_main.call(&"_clamped_view", spot)) < 4.0,
+		"on the animal", "%s against %s" % [cam.position, spot])
+	var card: MomentCard = _main.get(&"_moment_card")
+	card._process(Lake.MOMENT_IN)
+	_check(card != null and card.showing() and card.text == Text.WILDLIFE_BACK,
+		"the card says wildlife is coming back", "")
+	for i in int((Lake.MOMENT_HOLD + Lake.MOMENT_OUT) * 60.0) + 10:
+		if float(_main.get(&"_moment")) < 0.0:
+			break
+		_main.call(&"_moment_step", 1.0 / 60.0)
+	_check(float(_main.get(&"_moment")) < 0.0 and is_equal_approx(cam.zoom.x, home_zoom),
+		"then the view comes home at the zoom it left",
+		"zoom %.2f against %.2f, moment %.2f" % [cam.zoom.x, home_zoom, _main.get(&"_moment")])
+	_main.call(&"_on_first_wildlife", spot)
+	_check(float(_main.get(&"_moment")) < 0.0, "and never again on that save",
+		str(_main.get(&"_moment")))
+	_main.set(&"_view_zoom", zoom_was)
+	_main.call(&"_push_zoom")
+	_main.call(&"_hold_the_angler")
+
+
 func _check_free_view(cam: Camera2D) -> void:
 	var button: PlankButton = _main.get(&"_free_camera")
 	var gear: PlankButton = _main.get(&"_open_settings")
@@ -5382,11 +5747,34 @@ func _stage_rain() -> void:
 	_check(lawn_hits == puddles.spots().size(), "a drop on the island lands on the ground", "")
 	# Puddles: laid on dry ground only, filling under the rain.
 	_check(puddles.spots().size() >= 2, "the island has puddle spots", str(puddles.spots().size()))
+	# The mirror is clipped to the water alone: clipped to the puddles' whole drawing, the
+	# drop spots on the sand showed the hut upside down through every one of them.
+	var mirror: Node = puddles.get(&"_mirror")
+	_check(mirror.get_parent() == puddles.get(&"_pools") and not puddles.clip_children,
+		"the reflections clip to the puddles' water only", str(mirror.get_parent()))
+	# A clip parent that draws nothing clips nothing, so the pools stay hidden until a cell
+	# of water is drawn: just under the first cell's wetness, no mirror at all.
+	var first: float = puddles.get(&"_first_wet")
+	var wet_was := puddles.wet
+	puddles.wet = first * 0.5
+	puddles.tick(0.0, 0.0, 0.0)
+	_check(not (puddles.get(&"_pools") as CanvasItem).visible,
+		"a puddle with no water drawn shows no reflection", "wet %.3f first %.3f" % [puddles.wet, first])
+	puddles.wet = wet_was
+	puddles.tick(0.0, 0.0, 0.0)
 	var bad := 0
 	for t: Vector2 in puddles.spots():
 		if not puddles.may_lie(t):
 			bad += 1
 	_check(bad == 0, "every puddle on the grass, off the hut, the crate and the pump", str(bad))
+	# Up to the hut's walls but not onto them, and no straight cut: the cells keep SHED_NEAR.
+	var closest := INF
+	for cells: PackedVector2Array in puddles.get(&"_cells"):
+		for at in cells:
+			closest = minf(closest, Puddles.shed_gap(Iso.world_to_tile(at)))
+	_check(closest >= Puddles.SHED_NEAR - 0.01, "no puddle water within %.1f tiles of the hut" % Puddles.SHED_NEAR,
+		"%.2f" % closest)
+	_check(Puddles.DOOR_ALONG == float(_main.get(&"DOOR_ALONG")), "the puddles know where the door is", "")
 	_check(puddles.wet > 0.2, "and they fill in the rain", "%.2f" % puddles.wet)
 	_check((_main.get(&"_angler") as Node).has_method(&"reflect_on"),
 		"the angler can be drawn in a puddle", "")
@@ -5402,14 +5790,6 @@ func _stage_rain() -> void:
 	weather.pour()
 	_check(weather.showers == Weather.MOST, "no sixth shower", str(weather.showers))
 	weather.restore(9, 100.0)
-	# Up to the hut's walls but not onto them, and no straight cut: the cells keep SHED_NEAR.
-	var closest := INF
-	for cells: PackedVector2Array in puddles.get(&"_cells"):
-		for at in cells:
-			closest = minf(closest, Puddles.shed_gap(Iso.world_to_tile(at)))
-	_check(closest >= Puddles.SHED_NEAR - 0.01, "no puddle water within %.1f tiles of the hut" % Puddles.SHED_NEAR,
-		"%.2f" % closest)
-	_check(Puddles.DOOR_ALONG == float(_main.get(&"DOOR_ALONG")), "the puddles know where the door is", "")
 	_check(weather.showers == Weather.MOST, "a saved count over the cap is held to it", "")
 	# Put the sky back for the stages after.
 	weather.set(&"_left", 0.0)
@@ -5585,6 +5965,68 @@ func _check_bees(flora: Flora) -> void:
 
 ## The animals (2026-09-22): frogs, turtles, ducks, dragonflies. Ambient: no catch, no pay.
 ## Asked on the half-cleared lake `_stage_nature` just made.
+## A still angler or dog frightens nothing and is walked round; a moving one frightens.
+## Plus the other three fixes of that pass: shadows hinged on the ink, no plant behind the
+## pump, reeds by the water.
+func _check_still_walkers(wild: Wildlife) -> void:
+	var angler: Node2D = _main.get(&"_angler")
+	_main.call(&"_sort_walkers_for_wildlife")
+	_main.set(&"_wildlife_sorted_at", -1)
+	_main.call(&"_sort_walkers_for_wildlife")
+	var still: PackedVector2Array = _main.call(&"_wildlife_obstacles")
+	var moving: PackedVector2Array = _main.call(&"_wildlife_threats")
+	_check(still.has(angler.position) and not moving.has(angler.position),
+		"a standing angler is an obstacle, not a threat", "%d still" % still.size())
+	var p := Vector2(1000.0, 1000.0)
+	wild.set(&"_still", PackedVector2Array([p]))
+	var r := Iso.tile_circle_extent(Wildlife.OBSTACLE_REACH)
+	var at := p + Vector2(-r - 4.0, 0.0)
+	var walked := at
+	for i in 80:
+		walked = wild._round(walked, walked + (p + Vector2(r + 40.0, 3.0) - walked).normalized() * 2.0)
+		if walked.distance_to(p) < r - 0.01:
+			break
+	_check(walked.distance_to(p) >= r - 0.01, "an animal never steps inside a still walker's room",
+		"%.1f of %.1f" % [walked.distance_to(p), r])
+	_check(walked.x > at.x + 4.0, "and slides round it rather than stopping", "%.1f" % (walked.x - at.x))
+	_check(wild._taken_by_still(p + Vector2(2.0, 0.0)) and not wild._taken_by_still(p + Vector2(r * 2.0, 0.0)),
+		"a spot on a still walker is no place to hop to", "")
+	wild.set(&"_still", PackedVector2Array())
+	# Shadows: every rock and tree hinged on its lowest opaque row.
+	var padded := 0
+	for g: Ground in _main.get(&"_grounds"):
+		for art: Texture2D in (g.get(&"_prop_pad") as Dictionary).keys():
+			if int(g.get(&"_prop_pad")[art]) > 0:
+				padded += 1
+	_check(padded > 0, "prop shadows know the padding under their pictures", "%d" % padded)
+	# Flora: nothing behind the pump, reeds by the water.
+	var flora: Flora = _main.get(&"_flora")
+	if flora != null:
+		var behind := 0
+		var far_reeds := 0
+		var feet: PackedVector2Array = flora.get(&"_foot")
+		var species: PackedStringArray = PackedStringArray(flora.get(&"_species"))
+		for k in feet.size():
+			var at_tile := Iso.world_to_tile(feet[k])
+			if Pump.covers(at_tile, 2.5) and Pump.hides(at_tile):
+				behind += 1
+			if Flora.REEDS.has(species[k]) and flora._from_water(at_tile) > Flora.REED_REACH + 0.01:
+				far_reeds += 1
+		_check(behind == 0, "no plant grows behind the pump's picture", "%d" % behind)
+		var forest := 0
+		var on_trees := 0
+		for k in feet.size():
+			var at_tile := Iso.world_to_tile(feet[k])
+			if flora._kind_at(at_tile) != "forest":
+				continue
+			forest += 1
+			if flora._under_a_prop(feet[k]):
+				on_trees += 1
+		_check(forest > 200, "flowers are sown on the forest floor", "%d" % forest)
+		_check(on_trees == 0, "and none of them on a tree's or a rock's drawing", "%d" % on_trees)
+		_check(far_reeds == 0, "reeds stand within a tile of the water", "%d" % far_reeds)
+
+
 func _check_wildlife() -> void:
 	var wild: Wildlife = _main.get(&"_wildlife")
 	_check(wild != null and wild.ready_to_live(), "the wildlife node is there with its art", "")
@@ -5600,6 +6042,7 @@ func _check_wildlife() -> void:
 			bad_side += 1
 	_check(wet_land == 0 and bad_side == 0, "every shore spot is sand behind and water in front",
 		"%d wet, %d dry" % [wet_land, bad_side])
+	_check_still_walkers(wild)
 	# A fresh lake has none of them; this one is half clean. Nobody on a dirty lake.
 	var saved_stage := wild.stage
 	wild.reset()
@@ -5623,6 +6066,7 @@ func _check_wildlife() -> void:
 		"turtles, dragonflies and one brood at a time", "%d %d %d" % [wild.turtle_count(), wild.dragonfly_count(), wild.brood_count()])
 	_check(wild.frog_count() <= Wildlife.FROGS_MOST and wild._want(Wildlife.FROGS_MOST) <= Wildlife.FROGS_MOST,
 		"never past the cap", "")
+	_check_land_animals(wild)
 	# Only at clean shores; a brood lands only on clean water.
 	var foul_home := 0
 	for f: Dictionary in wild.frogs():
@@ -5638,7 +6082,6 @@ func _check_wildlife() -> void:
 	var swum_home := 0
 	for f: Dictionary in wild.frogs():
 		if int(f["state"]) != Wildlife.Frog.SWIM:
-	_check_land_animals(wild)
 			swum_home += 1
 	_check(swum_home > 0, "frogs swim ashore and get on with sitting, croaking, hopping", "%d" % swum_home)
 	var landed := 0
@@ -5677,21 +6120,6 @@ func _check_wildlife() -> void:
 	wild.stage = saved_stage
 
 
-## The animals move to the music (2026-09-22): every song the lake plays has a measured beat
-## grid, the station counts beats off it whether or not anything is audible, and a frog's hop
-## lands on a beat.
-func _check_beat(wild: Wildlife) -> void:
-	var table = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
-	var missing := []
-	for slug in MusicStation.PLAYLIST + [MusicStation.ENDING_SONG]:
-		if not (table is Dictionary and (table as Dictionary).has(String(slug))):
-			missing.append(slug)
-	_check(missing.is_empty(), "every song the lake plays has a beat grid", str(missing))
-	if not missing.is_empty():
-		return
-	var station := MusicStation.new()
-	station.set(&"_beats", table)
-	var grid: Dictionary = table[String(MusicStation.PLAYLIST[0])]
 ## Rabbits and foxes (2026-09-25): on the outer bank's sand only, never the island; rabbits
 ## from the first clean shore, foxes only once the meter reads LATE_FROM cleared; both run
 ## off into the trees when someone comes near. Asked with the meter at 0.9.
@@ -5743,6 +6171,21 @@ func _check_land_animals(wild: Wildlife) -> void:
 		wild.land_animals().append(k)
 
 
+## The animals move to the music (2026-09-22): every song the lake plays has a measured beat
+## grid, the station counts beats off it whether or not anything is audible, and a frog's hop
+## lands on a beat.
+func _check_beat(wild: Wildlife) -> void:
+	var table = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
+	var missing := []
+	for slug in MusicStation.PLAYLIST + [MusicStation.ENDING_SONG]:
+		if not (table is Dictionary and (table as Dictionary).has(String(slug))):
+			missing.append(slug)
+	_check(missing.is_empty(), "every song the lake plays has a beat grid", str(missing))
+	if not missing.is_empty():
+		return
+	var station := MusicStation.new()
+	station.set(&"_beats", table)
+	var grid: Dictionary = table[String(MusicStation.PLAYLIST[0])]
 	station.set(&"_at", float(grid["offset"]) + 3.0 * 60.0 / float(grid["bpm"]))
 	_check(absf(station.beat_clock() - 3.0) < 0.001 and absf(station.beat_length() - 60.0 / float(grid["bpm"])) < 0.0001,
 		"the station counts beats off the song's own grid", "%.3f" % station.beat_clock())
@@ -6046,7 +6489,9 @@ func _stage_foam() -> void:
 func _stage_shop_shape() -> void:
 	var skin := _main.get_node(^"HUD/ShopSkin")
 	_check_shop_purse(skin)
+	_check_ten_fixes(skin)
 	_check_bonus_panel()
+	_check_board_tones()
 	var titles: Dictionary = skin.get(&"TITLES")
 	var articled := []
 	for board in titles:
@@ -6093,6 +6538,26 @@ func _stage_shop_shape() -> void:
 		if "Lvl" in value or "next)" in value:
 			wordy.append("%s: %s" % [row["key"], value])
 	_check(wordy.is_empty(), "no row's value says Lvl or next", ", ".join(wordy))
+
+	# Only the price tag buys: the name and value are for reading. The tag's box is the same
+	# sum `_draw_tag` stands on, so a row laid by hand here is the row the board would draw.
+	var row_box := Rect2(Vector2(100.0, 100.0), Vector2(240.0, ShopSkin.ROW_TALL))
+	var tag_box: Rect2 = skin.call(&"_tag_of", row_box, row_box.size.x * ShopSkin.TAG_SHARE,
+		"$120", Style.TEXT_BODY)
+	var kept_rows: Array[Rect2] = skin.get(&"_row_boxes").duplicate()
+	var kept_index: Array[int] = skin.get(&"_row_index").duplicate()
+	var kept_tags: Array[Rect2] = skin.get(&"_tag_boxes").duplicate()
+	skin.set(&"_row_boxes", [row_box] as Array[Rect2])
+	skin.set(&"_row_index", [0] as Array[int])
+	skin.set(&"_tag_boxes", [tag_box] as Array[Rect2])
+	var name_at := Vector2(row_box.position.x + ShopSkin.RAIL_WIDE + 12.0, row_box.get_center().y)
+	_check(int(skin.call(&"_row_under", tag_box.get_center())) == 0,
+		"a row's price tag buys", str(tag_box))
+	_check(int(skin.call(&"_row_under", name_at)) == -1,
+		"and its name does not", str(name_at))
+	skin.set(&"_row_boxes", kept_rows)
+	skin.set(&"_row_index", kept_index)
+	skin.set(&"_tag_boxes", kept_tags)
 
 	# The plate used to live in the height difference between the net board and the middle
 	# two. The grouping levels them, so this is the check that it no longer depends on that.
@@ -6212,11 +6677,11 @@ func _stage_shop_shape() -> void:
 	# The information pass (2026-09-17): the crate's plate says what it holds is waiting, and
 	# the upgrades button's foot says what the button is with the count on a badge whose width
 	# does not move with it.
-	_check(HudSkin.STOCK_LABEL != "In stock",
-		"the crate's plate no longer reads as a second purse", HudSkin.STOCK_LABEL)
-	_check(not "available" in HudSkin.UPGRADES_LABEL.to_lower()
-		and not "%d" in HudSkin.UPGRADES_LABEL,
-		"the upgrades button's foot is a name, not a count", HudSkin.UPGRADES_LABEL)
+	_check(Text.HUD_WAITING != "In stock",
+		"the crate's plate no longer reads as a second purse", Text.HUD_WAITING)
+	_check(not "available" in Text.HUD_UPGRADES.to_lower()
+		and not "%d" in Text.HUD_UPGRADES,
+		"the upgrades button's foot is a name, not a count", Text.HUD_UPGRADES)
 	# Sized to the widest count it can ever hold, so one affordable upgrade and ninety-nine
 	# draw the same plate.
 	var narrow := _badge_width("1")
@@ -6397,6 +6862,30 @@ func _stage_settings_shape() -> void:
 		_check(live_rows.is_empty(),
 			"a dead Resolution row offers nothing to press", ", ".join(live_rows))
 
+	# Only the drawn controls answer: the switch on its pill, the slider on its groove, the
+	# chooser's value only on Resolution. A label is for reading.
+	var music_switch := Rect2()
+	var music_slider := Rect2()
+	var dead_values := []
+	for line: Dictionary in board.get(&"_lines"):
+		if line["key"] == &"music":
+			music_switch = line["box"]
+		elif line["key"] == &"music_level":
+			music_slider = line["box"]
+		elif line["kind"] == &"value" and line["row"] != &"window_size":
+			dead_values.append(String(line["row"]))
+	_check(music_switch.size.x > 0.0 and music_switch.size.x <= SettingsSkin.SWITCH_WIDE + 0.5,
+		"a sound row's switch answers only on the drawn switch", str(music_switch))
+	_check(music_slider.size.y > 0.0 and music_slider.size.y < SettingsSkin.GROOVE_LINE + 12.0,
+		"and its slider only round the groove", str(music_slider))
+	var label_at := Vector2(music_switch.position.x - 120.0, music_switch.get_center().y)
+	_check(board.call(&"_key_under", label_at) == &"",
+		"the sound row's label is not a button", str(board.call(&"_key_under", label_at)))
+	_check(board.call(&"_key_under", music_switch.get_center()) == &"music",
+		"and the switch is", str(board.call(&"_key_under", music_switch.get_center())))
+	_check(dead_values.is_empty(),
+		"no chooser but Resolution clicks on its value", ", ".join(dead_values))
+
 	# And the board fits the smallest frame the game can hand it: 1280x720 is the floor, and
 	# a line that does not fit is dropped. `dropped_lines` exists so that is a failure here
 	# rather than "Save and go to menu" quietly missing on somebody's monitor.
@@ -6503,10 +6992,10 @@ func _stage_binds_shape() -> void:
 	# door label wider than the board it is on simply runs off the wood — which is how the
 	# menu's own "The saved lake will be thrown away." had been overrunning by ten pixels.
 	for asked: Array in [
-		[MenuConfirm.BOARD_WIDE, ControlsSkin.CONFIRM_WORDS,
-			ControlsSkin.CONFIRM_YES, ControlsSkin.CONFIRM_NO, "the bind board's question"],
-		[MenuConfirm.BOARD_WIDE, MenuConfirm.WORDS,
-			MenuConfirm.YES, MenuConfirm.NO, "the menu's own"],
+		[MenuConfirm.BOARD_WIDE, Text.of(ControlsSkin.CONFIRM_WORDS),
+			Text.of(ControlsSkin.CONFIRM_YES), Text.of(ControlsSkin.CONFIRM_NO), "the bind board's question"],
+		[MenuConfirm.BOARD_WIDE, Text.of(MenuConfirm.WORDS),
+			Text.of(MenuConfirm.YES), Text.of(MenuConfirm.NO), "the menu's own"],
 	]:
 		var line := float(asked[0]) - float(Style.BORDER_WALL) * 2.0 - MenuConfirm.BOARD_PAD * 2.0
 		var door := (line - MenuConfirm.ROW_GAP) * 0.5
@@ -6538,6 +7027,50 @@ func _badge_width(text: String) -> float:
 
 
 ## WCAG 2.1 relative-luminance contrast between two opaque colours.
+## Each board's rows wear their own hue, a maxed row is green and wears a MAX badge, the coin
+## is the picked pixel sheet, and a ribbon's title is carved (2026-09-26).
+func _check_board_tones() -> void:
+	var seen := []
+	for board: StringName in ShopSkin.BOARDS:
+		var pair := ShopSkin.tones_of(board)
+		_check(ShopSkin.TONES.has(board), "every board has its own tone", String(board))
+		_check(not seen.has(pair[0]), "no two boards share a tone", String(board))
+		seen.append(pair[0])
+		var up: Color = pair[0]
+		_check(up.g < maxf(up.r, up.b) or up.g < 0.3, "no board is green (green is max)", String(board))
+		_check(_contrast(Style.BOARD_INK, pair[0]) >= 4.5, "ink clears 4.5:1 on a board's row", String(board))
+		_check(_contrast(ShopSkin.INK_DIM, pair[1]) >= 4.5, "dim ink clears 4.5:1 on a drawn-back row", String(board))
+	var green := ShopSkin.MAX_FACE
+	_check(green.g > green.r and green.g > green.b, "a maxed row is green", str(green))
+	_check(_contrast(Style.BOARD_INK, green) >= 4.5, "ink clears 4.5:1 on a maxed row", "")
+	_check(_contrast(ShopSkin.MAX_BADGE_INK, ShopSkin.MAX_BADGE) >= 4.5, "MAX badge reads", "")
+	var rows: Array = _main.call(&"_shop_rows")
+	_check(rows.size() > 0 and rows[0].has("maxed"), "rows say whether they are maxed", "")
+	_check(ResourceLoader.exists(HudButtons.COIN_SHEET), "the coin sheet is imported", "")
+	_check(HudButtons._coin_art(), "the coin sheet and its json load", "")
+	_check(HudButtons._coin_turns.size() == 9, "the coin has nine toss frames", str(HudButtons._coin_turns.size()))
+	_check(
+		HudButtons.coin_frame_of(1.0) == 0 and HudButtons.coin_frame_of(0.0) == 4
+		and HudButtons.coin_frame_of(-1.0) == 8,
+		"a turn picks face, edge and back", ""
+	)
+	var src := FileAccess.get_file_as_string("res://scripts/style.gd")
+	_check(src.contains("HORIZONTAL_ALIGNMENT_CENTER, text_box, 1.0, true"), "ribbon titles are carved", "")
+	# The head cards (2026-09-26): one scene a board, under the skin's own nodes.
+	var skin := _main.get_node(^"HUD/ShopSkin")
+	var cards: Dictionary = skin.get(&"_cards")
+	_check(cards.size() == ShopSkin.BOARDS.size(), "a head card for every board", str(cards.size()))
+	for board: StringName in cards:
+		var card: Control = cards[board]
+		_check(card.get(&"kind") == board, "a card draws its own board's scene", String(board))
+		_check(card.clip_contents, "a card clips what runs off it", String(board))
+		_check(card.get_index() < ShopSkin.BOARDS.size(), "a card is under the hull and the mesh", String(board))
+	var shop_sprites: Dictionary = skin.get(&"sprites")
+	_check(not (shop_sprites.get(&"rubbish", []) as Array).is_empty(), "the lake lends the cards its rubbish", "")
+	if cards.has(&"dog"):
+		_check((cards[&"dog"].get(&"_dogs") as Array).size() == 4, "all four dogs run on the dog card", "")
+
+
 func _contrast(a: Color, b: Color) -> float:
 	var one := _luminance(a)
 	var two := _luminance(b)
@@ -6679,6 +7212,90 @@ func _check_shop_purse(skin: Node) -> void:
 	_check(HudButtons.face_of(box).has_point(hud.coin_centre()), "coins aim at it there", "")
 	_main.call(&"_set_menu", false)
 	_check(hud.purse_over.size.x == 0.0 and not purse.visible, "and it goes home with the shop closed", "")
+
+
+## Ten Fixes (2026-09-27, `/grill-me` with Richard): one guard each, where one can be had.
+func _check_ten_fixes(skin: Node) -> void:
+	var hud: HudSkin = _main.get(&"_skin")
+	# 2. Coins over the hung purse, aimed at its coin.
+	var coins: CoinFly = _main.get(&"_coins")
+	_main.call(&"_set_menu", true)
+	skin.call(&"_lay_out")
+	_main.call(&"_update_hud")
+	coins.fly_from(Vector2(20.0, 20.0))
+	coins._process(0.01)
+	var flying: Array = coins.get(&"_flying")
+	var up := coins.get_parent()
+	_check(coins.get_index() == up.get_child_count() - 1,
+		"a coin flying over the shop is drawn last in the HUD layer, over the hung purse", "")
+	_check(not flying.is_empty() and (flying[0]["to"] as Vector2).is_equal_approx(hud.coin_centre())
+		and HudButtons.face_of(hud.purse_over).has_point(flying[0]["to"]),
+		"and aims at the hung purse's coin", "")
+	coins.clear()
+	_main.call(&"_set_menu", false)
+	# 3-6. The head cards.
+	var card_src := FileAccess.get_file_as_string("res://scripts/shop_card.gd")
+	_check(not card_src.contains("_ferry"), "the dogs' card has no ferry crossing", "")
+	_check(ShopSkin.ShopCard.CLEAN_PIECES == 0 and ShopSkin.ShopCard.DIRTY_PIECES == 6,
+		"the boats' card floats nothing and the net's six", "")
+	_check(ShopSkin.NET_GROW == 1.5 and ShopSkin.ShopCard.NET_WATER_LIFT > 0.0,
+		"the net is drawn half as big again over lighter water", "")
+	_check(card_src.contains("_box_front") and card_src.find("_box_front, Rect2") > card_src.find("HEAP_START + posmod"),
+		"the luck box's near walls are drawn over its heap", "")
+	# 7. The pricing plate's one pairing.
+	_check(ShopSkin.LEGEND_NAME_PX == Style.TEXT_SMALL and ShopSkin.LEGEND_PAY_PX == Style.TEXT_BODY,
+		"the pricing plate pairs one name size with one pay size", "")
+	# 8. The finds shine more.
+	_check(LakeGrid.BEAM_FAINT >= 0.6 and LakeGrid.BEAM_SUNK_TALL >= 0.8
+		and LakeGrid.STAR_RATE > 2.5 and LakeGrid.SPARK_RATE > 8.0,
+		"buried beams are brighter and taller, stars and sparks commoner", "")
+	# 9. The dog eases into its run.
+	var v := 0.0
+	var dog := Dog.new()
+	for i in 24:
+		v = dog._eased(v, Dog.RUN_SPEED, 1.0 / 60.0)
+	var early := v
+	for i in 60:
+		v = dog._eased(v, Dog.RUN_SPEED, 1.0 / 60.0)
+	dog.free()
+	_check(early > Dog.RUN_SPEED * 0.9 and early < Dog.RUN_SPEED and is_equal_approx(v, Dog.RUN_SPEED),
+		"a dog reaches its run in about 0.4 s, eased", "%.2f then %.2f" % [early, v])
+	# 10. A rug is a rug in any language.
+	var sheets: Sheets = _grid.sheets
+	var rugs := 0
+	for name in [&"decor_rug", &"decor_big_rug", &"decor_oval_rug", &"decor_old_rug"]:
+		if sheets.lies_flat(name):
+			rugs += 1
+	var src := FileAccess.get_file_as_string("res://scripts/sheets.gd")
+	var at := src.find("func lies_flat")
+	_check(rugs == 4 and not src.substr(at, 400).contains("title_of("),
+		"every rug lies flat, read off the catalogue rather than the shown words", str(rugs))
+	# 1. Shore pieces lie apart, and the one left stays where it was drawn.
+	var tile := -1
+	for i in _grid.stacks.size():
+		if _grid.shore[i] == 1 and _grid.dry[i] == 1:
+			tile = i
+			break
+	if tile < 0:
+		_check(false, "a shore tile to test on", "")
+		return
+	var kept: PackedInt32Array = _grid.stacks[tile]
+	var small := -1
+	for d in _grid.defs.size():
+		if not _grid.defs[d].keepsake and _grid.defs[d].tier == 0:
+			small = d
+			break
+	_grid.stacks[tile] = PackedInt32Array([small, small])
+	var a0 := _grid.shore_offset(tile, 0)
+	var a1 := _grid.shore_offset(tile, 1)
+	var under_spot := _grid.surface_still(tile) - a1 + a0
+	_check(a0.distance_to(a1) >= LakeGrid.STRAND_WIDE * 2.0,
+		"two shore pieces lie a piece's width apart", "%.1f" % a0.distance_to(a1))
+	_grid.take(tile, 1)
+	_check(_grid.surface_still(tile).is_equal_approx(under_spot),
+		"the one left is where it was drawn", "")
+	_grid.stacks[tile] = kept
+	_grid.call(&"_restamp", tile)
 
 
 ## The bonus's lit panel on the pricing plate (2026-09-24): it holds the name and the figure
@@ -6907,6 +7524,18 @@ func _stage_wash() -> void:
 		"the room has a painted backdrop under the stand, and the stand draws no wall", "")
 	_check(WashBackdrop.state_of(1.0) == LakeGrid.FILTH_STATES and WashBackdrop.state_of(0.0) == 0,
 		"its water is the dirtiest state on a full lake and clean on an empty one", "")
+	# A flash over the pump strikes a bolt in the sky, and it goes with the flash.
+	var was_flash := Weather.flash_now
+	Weather.flash_now = 0.0
+	back.step(0.016)
+	Weather.flash_now = 1.0
+	back.set(&"_bolt_age", INF)
+	back.step(0.016)
+	var struck := back.bolt_shown()
+	Weather.flash_now = 0.0
+	back.step(0.016)
+	_check(struck and not back.bolt_shown(), "a flash while washing strikes a bolt over the far bank, and it goes", "")
+	Weather.flash_now = was_flash
 	var pal := Palette.master()
 	_check(back.ramp_of(0)[2] == pal.water_clean and back.ramp_of(4)[2] == pal.water_dirty
 		and back.ramp_of(2)[0] == pal.water_murky_deep,
@@ -6966,18 +7595,6 @@ func _stage_wash() -> void:
 		"picked by the boat's own heading rule: screen-right is tile (1, -1)", "")
 	_check(back.hulls().size() == int(_main.call(&"fleet_size")),
 		"as many ferries cross as the fleet holds", str(back.hulls().size()))
-	# A flash over the pump strikes a bolt in the sky, and it goes with the flash.
-	var was_flash := Weather.flash_now
-	Weather.flash_now = 0.0
-	back.step(0.016)
-	Weather.flash_now = 1.0
-	back.set(&"_bolt_age", INF)
-	back.step(0.016)
-	var struck := back.bolt_shown()
-	Weather.flash_now = 0.0
-	back.step(0.016)
-	_check(struck and not back.bolt_shown(), "a flash while washing strikes a bolt over the far bank, and it goes", "")
-	Weather.flash_now = was_flash
 	back.filth = 1.0
 	var full := back.flotsam_shown()
 	back.filth = 0.5
@@ -7007,8 +7624,9 @@ func _stage_wash() -> void:
 		"a jet that is off tells the backdrop nothing", "")
 	var sound := Sfx.main()
 	if sound != null:
-		_check(not sound.may_play(&"bark") and not sound.may_play(&"pigeon_coo"),
-			"the lake's own barks and coos are still shut out of the room", "")
+		# Outdoors since 2026-09-28: the lake's own barks and coos carry on behind the pump.
+		_check(sound.may_play(&"bark") and sound.may_play(&"pigeon_coo"),
+			"the lake's own barks and coos are heard at the pump", "")
 	_check(not room.stand().bare_room and room.stand().ground_tone.v <= 1.0,
 		"the stand is lent the lawn's tone for the grass at its feet", "")
 	_check(WashStand.HISS_OFF_PIECE - WashStand.HISS_ON_PIECE < 0.15
@@ -7125,6 +7743,7 @@ func _stage_front() -> void:
 			_check(bool(_main.get(&"_in_menu")), "the menu goes up over the lake", "")
 			var menu := _main.get(&"_menu") as MainMenu
 			_check(menu != null and menu.live(), "and its doors answer", "")
+			_check_language(menu)
 			var asleep := 0
 			var ashore := 0
 			for dog: Dog in dogs:
@@ -7270,47 +7889,6 @@ func _water_out(out: float) -> Vector2:
 	var dir := (_angler.tile_pos - Iso.ISLAND_CENTRE).normalized()
 	return Iso.tile_to_world(_angler.tile_pos.x + dir.x * out, _angler.tile_pos.y + dir.y * out)
 
-
-## The drawn rope is a smooth curve through the chain: same ends, no corner sharper than a
-## soft bend even where the chain itself zigzags.
-func _check_rope_curve() -> void:
-	var chain := PackedVector2Array()
-	for i in CastNet.ROPE_POINTS:
-		chain.append(Vector2(i * 12.0, 8.0 if i % 2 == 1 else 0.0))
-	var line := CastNet.rope_curve(chain)
-	_check(line[0] == chain[0] and line[line.size() - 1] == chain[chain.size() - 1],
-		"the drawn rope keeps both ends", "")
-	var sharpest := 0.0
-	for i in range(1, line.size() - 1):
-		var a := line[i] - line[i - 1]
-		var b := line[i + 1] - line[i]
-		if a.length() > 0.01 and b.length() > 0.01:
-			sharpest = maxf(sharpest, absf(a.angle_to(b)))
-	_check(sharpest < deg_to_rad(40.0), "the drawn rope bends softly",
-		"%.1f degrees" % rad_to_deg(sharpest))
-	var raw := absf((chain[1] - chain[0]).angle_to(chain[2] - chain[1]))
-	_check(sharpest < raw * 0.7, "softer than the chain it is drawn through",
-		"%.1f against %.1f" % [rad_to_deg(sharpest), rad_to_deg(raw)])
-
-
-## The angler turns to his net while the cast pose is held, snapped to the four views, and
-## not at all without one.
-func _check_cast_facing() -> void:
-	var was: Vector2 = _angler.facing
-	var at: Vector2 = _angler.tile_pos
-	_angler.set(&"_cast_time", -1.0)
-	_angler.face_toward(at + Vector2(-5.0, 5.0))
-	_check(_angler.facing == was, "no cast pose, no turn", "")
-	_angler.set(&"_cast_time", 0.0)
-	# Screen offsets for each view, turned into tile space: right is tile (1, -1).
-	var ways := {&"east": Vector2(4.0, -4.0), &"west": Vector2(-4.0, 4.0),
-		&"south": Vector2(4.0, 4.0), &"north": Vector2(-4.0, -4.0)}
-	for view: StringName in ways:
-		_angler.face_toward(at + ways[view])
-		_check(_angler.call(&"_view") == view, "a net to the %s turns the angler %s" % [view, view],
-			str(_angler.call(&"_view")))
-	_angler.set(&"_cast_time", -1.0)
-	_angler.facing = was
 
 func _stage_led_cast() -> void:
 	match _led_step_n:
@@ -7549,7 +8127,166 @@ func _stage_first_steps() -> void:
 	_check(not bool(_main.get(&"_shed_open")), "a forced close goes to the lake", "")
 	_check_cast_facing()
 	_check_rope_curve()
+	_check_walk_weight()
+	_check_pier_look()
 	_finish()
+
+
+## The piers (2026-09-26): every sign painted, its lettering clear on the paint; the box
+## standing on the platform's middle; and no dressed post whose foot is inside the deck's
+## footprint rather than on its near edge.
+func _check_pier_look() -> void:
+	var book: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/piers.json"))
+	var pieces: Dictionary = book["pieces"]
+	var worst := 99.0
+	for kind: String in pieces:
+		var piece: Dictionary = pieces[kind]
+		_check(piece.has("sign_paint"), "the %s sign is painted" % kind, "")
+		if piece.has("sign_paint"):
+			var paint: Array = piece["sign_paint"]
+			worst = minf(worst, _contrast(Dropoff.SIGN_INK,
+				Color8(int(paint[0]), int(paint[1]), int(paint[2]))))
+		var plat: Array = piece["platform"]
+		var middle := Vector2.ZERO
+		for c: Array in plat:
+			middle += Vector2(float(c[0]), float(c[1])) / float(plat.size())
+		var stand: Array = piece["box_ground"]
+		# The platform's corners are on the ground; the box stands on the deck, `deck_up` over it.
+		var off := Vector2(float(stand[0]), float(stand[1]) + float(piece["deck_up"])) - middle
+		_check(off.length() <= 3.0, "the %s box stands on its platform's middle" % kind,
+			"%.1f px off" % off.length())
+	_check(worst >= 4.5, "every sign's lettering clears 4.5:1 on its paint", "worst %.2f" % worst)
+	var mounds := 0
+	for stop: Dropoff in _main.get(&"_dropoffs"):
+		mounds += (stop.get(&"_mounds") as Array).size()
+	_check(mounds == 0, "a post on the sand stands straight in the beach, no mound", "%d mounds" % mounds)
+	var sheet := Image.load_from_file("res://assets/piers.png")
+	var holes := 0
+	for kind: String in pieces:
+		var piece: Dictionary = pieces[kind]
+		var r: Array = piece["region"]
+		var deck: Array = piece["jetty"]
+		# Inside the jetty's top, up by the deck's height: every pixel there is deck.
+		var mid := Vector2.ZERO
+		for c: Array in deck:
+			mid += Vector2(float(c[0]), float(c[1])) / float(deck.size())
+		var up := Vector2(0.0, float(piece["deck_up"]))
+		for c: Array in deck:
+			for f: float in [0.2, 0.4, 0.6]:
+				var p := mid.lerp(Vector2(float(c[0]), float(c[1])), f) - up
+				if sheet.get_pixel(int(r[0]) + int(p.x), int(r[1]) + int(p.y)).a < 0.5:
+					holes += 1
+	_check(holes == 0, "the deck top has no holes for a post to show through", "%d" % holes)
+
+
+## The walk's weight: the tracker fires on a start and a hard turn and not on a straight line
+## or a gentle curve; the dust takes the ground's colour; the water throws drops; a turn
+## curves and letting go glides to a stop.
+func _check_walk_weight() -> void:
+	var t := KickDust.Tracker.new()
+	var dt := 1.0 / 60.0
+	var at := Vector2.ZERO
+	var got: Array[int] = [t.step(at, dt)]
+	for i in 20:
+		at += Vector2(0.1, 0.0)
+		got.append(t.step(at, dt))
+	_check(got.count(KickDust.Tracker.START) == 1 and got.count(KickDust.Tracker.TURN) == 0,
+		"a start from rest kicks once, a straight walk no more", str(got))
+	var turned := KickDust.Tracker.NONE
+	for i in 20:
+		at += Vector2(0.0, 0.1)
+		turned = maxi(turned, t.step(at, dt))
+	_check(turned == KickDust.Tracker.TURN, "a hard turn kicks", "")
+	var way := Vector2(0.0, 0.1)
+	var curve := KickDust.Tracker.NONE
+	for i in 90:
+		way = way.rotated(deg_to_rad(1.0))
+		at += way
+		curve = maxi(curve, t.step(at, dt))
+	_check(curve == KickDust.Tracker.NONE, "a gentle curve does not", "")
+
+	var dust: KickDust = _main.get(&"_dust")
+	_check(dust != null and _angler.dust == dust, "the lake hands the angler its dust", "")
+	if dust != null:
+		_check(dust.ink_of(&"sand") != dust.ink_of(&"grass"), "sand and grass kick different dust", "")
+		var was := dust.grains()
+		dust.puff(Vector2(0.0, 0.0), &"sand", Vector2.RIGHT)
+		var sand := dust.grains() - was
+		was = dust.grains()
+		dust.puff(Vector2(0.0, 0.0), &"grass", Vector2.RIGHT)
+		_check(sand > 0 and dust.grains() - was < sand, "a puff throws grains, fewer off the lawn",
+			"sand %d" % sand)
+	var splash: WaterSplash = _main.get(&"_splash")
+	var drops := (splash.get(&"_drop_life") as PackedFloat32Array).size()
+	KickDust.splash_at(splash, Vector2(0.0, 0.0), Vector2.RIGHT, 1.0, RandomNumberGenerator.new())
+	_check((splash.get(&"_drop_life") as PackedFloat32Array).size() > drops,
+		"a kick in the water throws drops", "")
+	var island := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
+	var lake := Iso.tile_to_world(Iso.ISLAND_CENTRE.x + 12.0, Iso.ISLAND_CENTRE.y + 12.0)
+	_check(not WaterSplash.wet_at(island) and WaterSplash.wet_at(lake),
+		"a ring is drawn on the water and not on the island", "")
+
+	var could: bool = _angler.can_walk
+	var from: Vector2 = _angler.tile_pos
+	_angler.stand_at(Iso.ISLAND_CENTRE + Vector2(1.5, 1.5))
+	_angler.can_walk = false
+	_angler.set(&"_vel", Vector2(Angler.WALK_SPEED, 0.0))
+	var start: Vector2 = _angler.tile_pos
+	for i in 30:
+		_angler.call(&"_process", dt)
+	var slid: float = _angler.tile_pos.distance_to(start)
+	_check(slid > 0.05 and slid < 0.6 and (_angler.get(&"_vel") as Vector2) == Vector2.ZERO,
+		"letting go glides a little and stops", "%.2f tiles" % slid)
+	_angler.set(&"_vel", Vector2(Angler.WALK_SPEED, 0.0))
+	_angler.walk_to = _angler.tile_pos + Vector2(0.0, 3.0)
+	_angler.call(&"_process", dt)
+	var v: Vector2 = _angler.get(&"_vel")
+	_check(v.x > 0.5 * Angler.WALK_SPEED, "a turn curves rather than snapping", str(v))
+	_angler.walk_to = Vector2.INF
+	_angler.stand_at(from)
+	_angler.can_walk = could
+
+
+## The drawn rope is a smooth curve through the chain: same ends, no corner sharper than a
+## soft bend even where the chain itself zigzags.
+func _check_rope_curve() -> void:
+	var chain := PackedVector2Array()
+	for i in CastNet.ROPE_POINTS:
+		chain.append(Vector2(i * 12.0, 8.0 if i % 2 == 1 else 0.0))
+	var line := CastNet.rope_curve(chain)
+	_check(line[0] == chain[0] and line[line.size() - 1] == chain[chain.size() - 1],
+		"the drawn rope keeps both ends", "")
+	var sharpest := 0.0
+	for i in range(1, line.size() - 1):
+		var a := line[i] - line[i - 1]
+		var b := line[i + 1] - line[i]
+		if a.length() > 0.01 and b.length() > 0.01:
+			sharpest = maxf(sharpest, absf(a.angle_to(b)))
+	_check(sharpest < deg_to_rad(40.0), "the drawn rope bends softly",
+		"%.1f degrees" % rad_to_deg(sharpest))
+	var raw := absf((chain[1] - chain[0]).angle_to(chain[2] - chain[1]))
+	_check(sharpest < raw * 0.7, "softer than the chain it is drawn through",
+		"%.1f against %.1f" % [rad_to_deg(sharpest), rad_to_deg(raw)])
+
+
+## The angler turns to his net while the cast pose is held, snapped to the four views, and
+## not at all without one.
+func _check_cast_facing() -> void:
+	var was: Vector2 = _angler.facing
+	var at: Vector2 = _angler.tile_pos
+	_angler.set(&"_cast_time", -1.0)
+	_angler.face_toward(at + Vector2(-5.0, 5.0))
+	_check(_angler.facing == was, "no cast pose, no turn", "")
+	_angler.set(&"_cast_time", 0.0)
+	# Screen offsets for each view, turned into tile space: right is tile (1, -1).
+	var ways := {&"east": Vector2(4.0, -4.0), &"west": Vector2(-4.0, 4.0),
+		&"south": Vector2(4.0, 4.0), &"north": Vector2(-4.0, -4.0)}
+	for view: StringName in ways:
+		_angler.face_toward(at + ways[view])
+		_check(_angler.call(&"_view") == view, "a net to the %s turns the angler %s" % [view, view],
+			str(_angler.call(&"_view")))
+	_angler.set(&"_cast_time", -1.0)
+	_angler.facing = was
 
 
 
@@ -7925,3 +8662,132 @@ func _forget_catch(sound: Sfx) -> void:
 	(sound.get(&"_drips") as Array).clear()
 	(sound.get(&"_last") as Dictionary).erase(&"swell")
 	(sound.get(&"_last") as Dictionary).erase(&"grab")
+
+
+## The language chooser (2026-09-26): a flag in the menu's top right corner, a board of every
+## shipped language, each with a translation loaded and a flag on disk. Switched on the
+## server by hand, never through `Prefs.set_language`, which writes the player's file.
+func _check_language(menu: MainMenu) -> void:
+	var flag := menu.get_node_or_null(^"Language") as PlankButton
+	_check(flag != null and flag.visible and flag.mark == &"flag" and flag.flag != null,
+		"the menu wears the language's flag", "")
+	if flag != null:
+		var box := flag.get_rect()
+		_check(box.end.x > menu.size.x - 60.0 and box.position.y < 60.0,
+			"in the top right corner", str(box))
+	var loaded := TranslationServer.get_loaded_locales()
+	var missing: Array = []
+	for entry: Dictionary in Prefs.LANGUAGES:
+		if not (entry["locale"] in loaded) or LanguageBoard.flag_of(entry) == null:
+			missing.append(entry["locale"])
+	_check(Prefs.LANGUAGES.size() == 8 and missing.is_empty(),
+		"eight languages, each with its words and its flag", str(missing))
+	var board := menu.languages()
+	menu.call(&"_show_languages", true)
+	board.queue_redraw()
+	board.call(&"_draw")
+	var rows := 0
+	for entry: Dictionary in Prefs.languages():
+		if board.row_box_of(entry["locale"]).size.x > 0.0:
+			rows += 1
+	_check(rows == Prefs.languages().size(), "the board has a plate for each",
+		"%d of %d" % [rows, Prefs.languages().size()])
+	menu.call(&"_show_languages", false)
+	var english := Text.MENU_QUIT
+	TranslationServer.set_locale("de")
+	var german := Text.MENU_QUIT
+	TranslationServer.set_locale("ja")
+	var japanese := Text.MENU_QUIT
+	TranslationServer.set_locale("en")
+	_check(english == "Quit" and german != english and japanese != german
+		and german != "MENU_QUIT", "a switch changes the words",
+		"%s / %s / %s" % [english, german, japanese])
+
+
+## Pad focus (2026-09-26): the stick snaps between a board's controls. Guards the step rule,
+## the held-push repeat, the main menu and the confirm offering their doors, a pointer board
+## blocking the focus board under it, and a slider taking A as nothing.
+func _check_pad_focus(pad: Node) -> void:
+	var grid: Array = []
+	for y in 3:
+		for x in 3:
+			grid.append({"box": Rect2(x * 100.0, y * 50.0, 80.0, 30.0)})
+	_check(pad.call(&"step_from", grid, 4, Vector2.RIGHT) == 5, "a step right lands on the right", "")
+	_check(pad.call(&"step_from", grid, 4, Vector2.UP) == 1, "a step up lands above", "")
+	_check(pad.call(&"step_from", grid, 2, Vector2.RIGHT) == -1, "nothing past the edge", "")
+	_check(pad.call(&"step_from", [grid[0], {"box": Rect2(150, 60, 80, 30)}, {"box": Rect2(400, 0, 80, 30)}], 0, Vector2.RIGHT) == 1,
+		"a step prefers near over straight", "")
+	pad.call(&"nav_from", Vector2.ZERO, 0.0)
+	var first: Vector2i = pad.call(&"nav_from", Vector2(1, 0.2), 0.016)
+	var held: Vector2i = pad.call(&"nav_from", Vector2(1, 0.2), 0.1)
+	var later: Vector2i = pad.call(&"nav_from", Vector2(1, 0.2), 0.3)
+	var soft: Vector2i = pad.call(&"nav_from", Vector2(0.3, 0.0), 0.016)
+	_check(first == Vector2i.RIGHT and held == Vector2i.ZERO and later == Vector2i.RIGHT and soft == Vector2i.ZERO,
+		"a push steps once, waits, repeats, and a light push is nothing",
+		"%s %s %s %s" % [first, held, later, soft])
+
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	var menu := MainMenu.new()
+	layer.add_child(menu)
+	add_child(layer)
+	menu.has_run = true
+	menu.show_up(true)
+	var doors: Array = menu.pad_focus()
+	var accent: Variant = null
+	for door: Dictionary in doors:
+		if door.get("first", false):
+			accent = door["key"]
+	_check(doors.size() >= 6 and accent == &"continue", "the menu offers its doors, Continue first", "%d %s" % [doors.size(), accent])
+	_check(pad.call(&"focus_owner") == menu, "the menu is the board the stick picks on", "")
+	var confirm: MenuConfirm = menu.get_node(^"Confirm")
+	confirm.visible = true
+	confirm.queue_redraw()
+	_check(menu.pad_focus().is_empty(), "a board over the doors takes them off the stick", "")
+	confirm.visible = false
+	var letter: Control = menu.get_node(^"Letter")
+	letter.visible = true
+	_check(pad.call(&"focus_owner") == letter, "the letter over the menu takes the stick", "")
+	var was_page: int = letter.get(&"page")
+	_check(letter.call(&"pad_nudge", null, 1) and int(letter.get(&"page")) == was_page + 1,
+		"right on the letter turns the page", "")
+	letter.call(&"turn", -1)
+	letter.visible = false
+	var settings: SettingsSkin = menu.get_node(^"Settings")
+	_check(settings.pad_press(&"music_level"), "A on a slider is taken by the board, not clicked", "")
+	_check(not settings.pad_press(&"music"), "A on a switch is the pointer's click", "")
+	var binds: ControlsSkin = menu.get_node(^"Controls")
+	_check(not binds.pad_hold(), "the bind board lets the stick move when not capturing", "")
+	binds.set(&"_capture_action", &"cast")
+	_check(binds.pad_hold(), "and holds it while a cell listens", "")
+	binds.set(&"_capture_action", &"")
+	var credits: CreditsBoard = menu.get_node(^"Credits")
+	_check(credits.pad_focus().size() == 1, "the credits offer their close cross", "")
+	layer.queue_free()
+	var ring := FocusRing.new()
+	_check(ring.box == Rect2(), "the ring starts on nothing", "")
+	ring.free()
+
+
+## The shop's blurb never stands over its own row, top of the window or bottom, and the wash
+## stand's nozzle waits for the choosing press to be let go and then `WAKE_AFTER`.
+func _check_blurb_and_wake() -> void:
+	var shop := ShopSkin.new()
+	shop.size = Vector2(1280.0, 720.0)
+	var wanted := Vector2(260.0, 120.0)
+	for row: Rect2 in [Rect2(100, 120, 200, 40), Rect2(900, 660, 200, 40)]:
+		shop.set(&"_mouse_at", row.get_center())
+		var at := shop.blurb_at(row, wanted)
+		_check(not Rect2(at, wanted).intersects(row), "the blurb stands clear of its row",
+			"%s against %s" % [Rect2(at, wanted), row])
+		_check(Rect2(Vector2.ZERO, shop.size).encloses(Rect2(at, wanted)), "and inside the window", "")
+	shop.free()
+	var stand := WashStand.new()
+	stand.set(&"_await_release", true)
+	stand.set(&"_asleep", WashStand.WAKE_AFTER)
+	_check(not stand.awake(), "a find just put up does not take the nozzle yet", "")
+	stand.call(&"_drive_wake", 0.016)
+	_check(not stand.awake(), "the press let go, it still waits", "")
+	stand.call(&"_drive_wake", WashStand.WAKE_AFTER + 0.01)
+	_check(stand.awake(), "and then the nozzle is the player's", "")
+	stand.free()

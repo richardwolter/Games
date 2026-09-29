@@ -23,12 +23,14 @@ SOURCE = "art_source/Music"
 OUT = "assets/music"
 
 # slug: (source file, cut at seconds or None, outdoors copy, radio copy)
+# Every song has both copies since the record player (2026-09-28): the player may send any
+# song to the lake or to the shed. `--only a,b` builds the named slugs alone.
 PLAN = {
     "beatgucci": ("beatgucci (Zé)#3.mp3", 132.0, True, True),
     "save_me": ("Save ME #sketch.mp3", None, True, True),
     "goin": ("Goin (edit2)#2.2.mp3", None, True, True),
-    "indie_boi": ("INDIE BOI #sketch.mp3", None, False, True),
-    "habibs": ("Habibs 2#1.mp3", None, True, False),
+    "indie_boi": ("INDIE BOI #sketch.mp3", None, True, True),
+    "habibs": ("Habibs 2#1.mp3", None, True, True),
 }
 
 # Trailing silence under this is taken off the end.
@@ -52,7 +54,12 @@ def main():
     if not os.path.isdir(SOURCE):
         sys.exit("run from the project root: no %s" % SOURCE)
     os.makedirs(OUT, exist_ok=True)
+    only = None
+    if "--only" in sys.argv:
+        only = set(sys.argv[sys.argv.index("--only") + 1].split(","))
     for slug, (name, cut, outdoors, radio) in PLAN.items():
+        if only is not None and slug not in only:
+            continue
         src = os.path.join(SOURCE, name)
         trim = []
         if cut is not None:

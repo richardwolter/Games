@@ -95,9 +95,9 @@ const GLINT_BREATH := 2.3
 ## out once from the defs (`GlintBeam.width`), so a lamp and a sofa throw the same column.
 const BEAM_SHADER := preload("res://shaders/beam.gdshader")
 const BEAM_TALL := 2.5
-const BEAM_SUNK_TALL := 0.6
+const BEAM_SUNK_TALL := 0.85
 const BEAM_BRIGHT := 0.85
-const BEAM_FAINT := 0.45
+const BEAM_FAINT := 0.65
 ## How far under the waterline the column's foot starts, so with the shader's soft foot it
 ## comes up out of the water rather than standing on a line cut across it.
 const BEAM_SINK := 8.0
@@ -109,6 +109,11 @@ const BEAM_SINK := 8.0
 ## Thin, by decision (Richard, 2026-09-13): half an art pixel, the four sides only — a
 ## whole art pixel all round with the corners filled read as a border, not a shine.
 const RIM_FLAG := 0.5
+## The last few pieces' pale rim (2026-09-26): the same stamp as a find's, flagged by its own
+## alpha so rubbish.gdshader paints it `rim_pale` rather than gold. Gold is treasure here.
+const PALE_FLAG := 0.3
+## Their column: the find's beam, in white.
+const LAST_TINT := Color(0.92, 0.97, 1.0)
 const RIM_STEP := 1.0
 const RIM_OFFSETS: Array[Vector2] = [
 	Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
@@ -122,10 +127,10 @@ const RIM_VERTS := 4 * 4
 ## spots are kept per find, how many stars and sparks a find spawns a second, how long each
 ## lives, and a star's longest arm in art pixels.
 const STAR_SPOTS := 48
-const STAR_RATE := 2.5
+const STAR_RATE := 4.5
 const STAR_LIFE := 0.5
 const STAR_ARM := 3
-const SPARK_RATE := 8.0
+const SPARK_RATE := 14.0
 const SPARK_LIFE := 0.22
 const STAR_PIXEL := 2.0
 const STAR_WHITE := Color(1.0, 0.97, 0.85)
@@ -481,6 +486,14 @@ var _shoved := PackedInt32Array()
 ## build from `Iso.on_beach`. See BEACH_CHANCE.
 var dry := PackedByteArray()
 
+## 1 for a shore tile — the strand line or the dry beach — whose pieces each lie at their
+## own spot in the tile rather than stacked on one (2026-09-27): a tile keeps its count, up
+## to two, and both are drawn side by side (`shore_offset`), the one under the top as well.
+var shore := PackedByteArray()
+## How far apart two shore pieces lie, as a fraction of a tile's width either side of its
+## middle: the widest strand piece is 32 world px, so the two just clear each other.
+const SHORE_APART := 0.27
+
 ## The biggest drawn size among the defs, per axis. Worked out once per build, for
 ## `footprint_reach`.
 var _widest := Vector2.ZERO
@@ -571,6 +584,7 @@ var _mesh_colors := PackedColorArray()
 var _mesh_indices := PackedInt32Array()
 var _dirty: bool = true
 
+
 ## What the soup was last laid out to cover, the view plus `BUILT_MARGIN`; the floating
 ## pieces that rebuild found, and where each one sits; and whether every def has art, which
 ## is what makes the detail level irrelevant to the geometry.
@@ -632,6 +646,19 @@ var _ripples: RippleLayer
 var _shadows: ShadowLayer
 var _foam: FoamLayer
 var _glints: GlintLayer
+## Tiles whose top piece is one of the lake's last few (`Lake.LAST_MARKED`): pale rim and a
+## white column, so the player does not have to hunt the water for them. Set by the lake.
+var marked: PackedInt32Array = PackedInt32Array()
+
+
+## Mark the last pieces' tiles. A change lays the soup out again (the rim needs room in a
+## tile's stamp), which happens a handful of times a run, at its very end.
+func mark_last(tiles: PackedInt32Array) -> void:
+	if tiles == marked:
+		return
+	marked = tiles
+	_dirty = true
+	_glints.set_marked(tiles)
 
 ## The atlas's solid-white block, as texture coordinates. Cached: every untextured quad in
 ## the soup samples it, and it never moves.
@@ -708,11 +735,16 @@ class GlintLayer extends Node2D:
 		_beam.z_index = 20
 		add_child(_beam)
 
+	func set_marked(tiles: PackedInt32Array) -> void:
+		_beam.marked = tiles
+		set_process(not finds.is_empty() or not tiles.is_empty())
+		_beam.queue_redraw()
+
 	func set_finds(list: Array[Vector2i]) -> void:
 		finds = list
 		_beam.finds = list
 		_twinkle.set_finds(list.filter(func(f: Vector2i) -> bool: return f.y == 0))
-		set_process(not finds.is_empty())
+		set_process(not finds.is_empty() or not _beam.marked.is_empty())
 		_beam.queue_redraw()
 		_twinkle.queue_redraw()
 
@@ -750,6 +782,7 @@ class GlintLayer extends Node2D:
 class GlintBeam extends Node2D:
 	var grid: LakeGrid
 	var finds: Array[Vector2i] = []
+	var marked: PackedInt32Array = PackedInt32Array()
 	var age: float = 0.0
 	var _width := 0.0
 
@@ -773,6 +806,21 @@ class GlintBeam extends Node2D:
 
 	func _draw() -> void:
 		var wide := width()
+		# The last pieces' columns: the find's beam at full strength, in white.
+		for index in marked:
+			var stack := grid.stacks[index]
+			if stack.is_empty():
+				continue
+			var top := grid.defs[stack[stack.size() - 1]]
+			var edge := LakeGrid.waterline_of(
+				grid.surface_pos(index), top.size * grid.swing[index], grid.tilt[index]
+			)
+			var foot: Vector2 = (edge[0] + edge[1]) * 0.5 + Vector2(0.0, BEAM_SINK)
+			var tall := maxf(maxf(top.size.x, top.size.y) * grid.swing[index] * BEAM_TALL, wide * 3.0)
+			var beat := 0.5 + 0.5 * sin(age * GLINT_BREATH + float(index) * 0.7)
+			var glow := LAST_TINT
+			glow.a = BEAM_BRIGHT * (0.7 + 0.3 * beat)
+			draw_rect(Rect2(foot - Vector2(wide * 0.5, tall), Vector2(wide, tall)), glow)
 		for find: Vector2i in finds:
 			var index := find.x
 			var sunk := find.y
@@ -1649,6 +1697,11 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 	for ty in Iso.ROWS:
 		for tx in Iso.COLS:
 			dry[index_of(tx, ty)] = 1 if Iso.on_beach(tx, ty) else 0
+	shore.resize(count)
+	for ty in Iso.ROWS:
+		for tx in Iso.COLS:
+			var si := index_of(tx, ty)
+			shore[si] = 1 if dry[si] == 1 or Iso.on_strand(tx, ty) else 0
 	_shove_at.resize(count)
 	_shoved.resize(0)
 	_surface_shown.resize(count)
@@ -2216,7 +2269,10 @@ func reachable_slot(
 ## This is what goes into the geometry, because the bob is added by the vertex shader.
 func surface_still(index: int) -> Vector2:
 	var tile := tile_of(index)
-	var at := Iso.tile_to_world(float(tile.x) + 0.5, float(tile.y) + 0.5) + nudge[index]
+	var off := nudge[index]
+	if shore[index] == 1 and not stacks[index].is_empty():
+		off = shore_offset(index, stacks[index].size() - 1)
+	var at := Iso.tile_to_world(float(tile.x) + 0.5, float(tile.y) + 0.5) + off
 	at.y += emerge[index]
 	return at + shove[index]
 
@@ -2226,6 +2282,16 @@ func surface_still(index: int) -> Vector2:
 ## over. Read by the net's aim marker for its chime.
 func shining_finds() -> Array[Vector2i]:
 	return _glints.finds
+
+## Where slot `k` of a shore tile lies off the tile's middle: slot 0 one side, slot 1 the
+## other, the line between them turned by a hash of the tile so the beach is not a row of
+## pairs all lined up the same way. Fixed per slot, so the piece left after a take is still
+## where it was drawn, and nothing about it needs saving.
+func shore_offset(index: int, k: int) -> Vector2:
+	var turn := (float(posmod(index * 7919, 1000)) / 1000.0 - 0.5) * 1.1
+	var way := Vector2(cos(turn), 0.5 * sin(turn)) * Iso.TILE_W * SHORE_APART
+	return -way if k == 0 else way
+
 
 ## Where a tile's floating piece actually is, bob included. What gameplay asks — where to
 ## put a splash, where the net found something — because the piece on screen is at the
@@ -2269,7 +2335,8 @@ func take(index: int, k: int) -> int:
 	var def_index := stacks[index][k]
 	stacks[index].remove_at(k)
 	# On dry sand the piece underneath is simply there: nothing rises out of a beach.
-	if not stacks[index].is_empty() and dry[index] == 0:
+	# A shore tile's other piece is already lying in view at its own spot.
+	if not stacks[index].is_empty() and shore[index] == 0:
 		emerge[index] = EMERGE_DROP
 		_emerge_age[index] = 0.0
 		if not _emerging.has(index):
@@ -2306,7 +2373,7 @@ func shove_to(index: int, wanted: Vector2, delta: float) -> void:
 	shove[index] = shove[index].move_toward(wanted, SHOVE_SPEED * delta)
 	if not _shoved.has(index):
 		_shoved.append(index)
-	_restamp(index)
+	_restamp(index, true)
 
 
 ## Let every pushed piece nobody is pushing any more drift back to its place.
@@ -2323,9 +2390,9 @@ func _settle_shoves(delta: float) -> void:
 			shove[index] *= drift
 			if shove[index].length_squared() < 0.04:
 				shove[index] = Vector2.ZERO
-				_restamp(index)
+				_restamp(index, true)
 				continue
-			_restamp(index)
+			_restamp(index, true)
 		keep.append(index)
 	_shoved = keep
 
@@ -2425,7 +2492,7 @@ func _process(delta: float) -> void:
 		# A rising piece is the one thing whose geometry actually changes between frames —
 		# and it is one tile's worth of it, so it rewrites its own corner of the soup
 		# rather than asking for the whole lake to be laid out again.
-		_restamp(index)
+		_restamp(index, true)
 	_emerging = still_rising
 
 
@@ -2527,7 +2594,7 @@ func _rebuild() -> void:
 	# Room for the worst the walk below could ask for, taken in one go. The walk then
 	# writes by index and the arrays are cut back to what was actually used, so a rebuild
 	# costs two resizes rather than one allocation per piece.
-	_reserve(box.size.x * box.size.y * PIECE_VERTS + _find_count * RIM_VERTS)
+	_reserve(box.size.x * box.size.y * PIECE_VERTS + (_find_count + marked.size()) * RIM_VERTS)
 
 	# Row by row, near-tile last: tile-confined pieces come out in painter's order, and a
 	# triangle array keeps the order it was given.
@@ -2623,7 +2690,11 @@ func _spread_over(list: PackedInt32Array, most: int) -> PackedInt32Array:
 ## Falls back to a full rebuild whenever the tile's new contents will not fit the space
 ## the old ones were given: a different vertex count means the whole soup after this tile
 ## shifts, and shifting it is a rebuild by another name.
-func _restamp(index: int) -> void:
+## `moved_only`: the tile holds what it held and only its pose changed — rising, bobbing,
+## shoved or drifting back. Those callers run every frame for every such tile (a big net's
+## landing puts sixty-odd up at once), and the find glint cannot have changed, so its
+## refresh — close to half the cost of a patch — is skipped (2026-09-26).
+func _restamp(index: int, moved_only: bool = false) -> void:
 	# A rebuild is already coming this frame; it will draw the new state anyway.
 	if _dirty:
 		return
@@ -2632,13 +2703,8 @@ func _restamp(index: int) -> void:
 	queue_redraw()
 
 	var stack: PackedInt32Array = stacks[index]
-	# The shine follows the patch. It used to be set only by the rebuild, so a find netted
-	# out of a tile left its beam and stars over whatever rubbish came up under it until the
-	# view next moved, and a find uncovered by the net did not shine until then either.
-	var depth := _glint_at(stack)
-	if depth == 0 and _glints.depth_of(index) != 0:
-		find_surfaced.emit(index)
-	_glints.refresh(index, depth)
+	if not moved_only:
+		_reglint(index, stack)
 	var base := _slot_base[index]
 	if base < 0:
 		# Not in the soup: culled, or drawn by the sprite layer. Nothing to patch, and if
@@ -2647,7 +2713,20 @@ func _restamp(index: int) -> void:
 			_dirty = true
 			from_patch += 1
 		return
+	_repatch(index, stack, base)
 
+
+## The shine follows the patch. It used to be set only by the rebuild, so a find netted
+## out of a tile left its beam and stars over whatever rubbish came up under it until the
+## view next moved, and a find uncovered by the net did not shine until then either.
+func _reglint(index: int, stack: PackedInt32Array) -> void:
+	var depth := _glint_at(stack)
+	if depth == 0 and _glints.depth_of(index) != 0:
+		find_surfaced.emit(index)
+	_glints.refresh(index, depth)
+
+
+func _repatch(index: int, stack: PackedInt32Array, base: int) -> void:
 	var span := _slot_len[index]
 	if stack.is_empty():
 		_blank_slot(base, span)
@@ -2705,10 +2784,12 @@ func _uv_of(def: TrashDef) -> Rect2:
 
 func _stamp_len(def: TrashDef, index: int) -> int:
 	var own := 4 if def.atlas != null else (16 if _detailed else 8)
+	if def.atlas != null and shore[index] == 1 and stacks[index].size() >= 2:
+		own += 4
 	# A tile with a find anywhere in it carries the rim's room whether or not the find is
 	# up, so uncovering it — and taking it — patches the tile in place rather than laying
 	# the whole soup out again (`_restamp` blanks what a smaller stamp leaves).
-	return own + RIM_VERTS if _holds_find(index) else own
+	return own + RIM_VERTS if _holds_find(index) or marked.has(index) else own
 
 
 ## Whether any slot of a tile's stack is a find.
@@ -2742,12 +2823,21 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 		# each way, laid before the piece so the piece covers the middle and only the edge
 		# shows. In the soup rather than on a layer over it, by decision (2026-09-13): the
 		# rubbish nearer the camera covers the rim as it covers the piece.
-		if held and def.keepsake:
+		var ringed := marked.has(index)
+		if (held and def.keepsake) or ringed:
+			var flag := RIM_FLAG if held and def.keepsake else PALE_FLAG
 			for step: Vector2 in RIM_OFFSETS:
 				_sprite(
 					at + step * RIM_STEP, def.size * swing[index], lean, sheets.uv_of(def.region),
-					facing[index] == 1, RIM_FLAG
+					facing[index] == 1, flag
 				)
+		# A shore tile's second piece, at its own spot beside the top one.
+		var stack := stacks[index]
+		if shore[index] == 1 and stack.size() >= 2:
+			var under := defs[stack[stack.size() - 2]]
+			var there := at - shore_offset(index, stack.size() - 1) + shore_offset(index, stack.size() - 2)
+			var uv := sheets.uv_of(under.region) if under.atlas != null else _white_uv
+			_sprite(there, under.size * swing[index], -lean, uv, facing[index] == 0)
 		# The art is the whole of the piece. There is no plate of pale water under it any
 		# more: at the size these are drawn it read as a grey square behind every single
 		# thing in the lake, which is worse than no ripple at all.
@@ -2756,7 +2846,7 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 			facing[index] == 1
 		)
 		# A find still buried keeps the rim's room, empty, so it can come up in place.
-		if held and not def.keepsake:
+		if held and not def.keepsake and not ringed:
 			for i in RIM_OFFSETS.size():
 				_blank_quad()
 		return

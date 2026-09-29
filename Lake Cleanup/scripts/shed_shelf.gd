@@ -58,7 +58,7 @@ func _draw() -> void:
 	if rows.is_empty():
 		Style.write(
 			self,
-			"Nothing kept yet.",
+			Text.SHELF_EMPTY,
 			Style.TEXT_SMALL,
 			list.position + Vector2(2.0, float(Style.TEXT_SMALL) + 8.0),
 			Style.PAPER_SOFT

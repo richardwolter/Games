@@ -16,9 +16,13 @@ extends Node
 ## follow, the cast look-in and the way home never move the view: the drift the trailer wants
 ## is put on in the edit, where it can be retuned without a re-shoot.
 
-const SAVE_PATH := "user://film_trailer.save"
+## Vars, not consts, so `film_devlog.gd` films to a save and a log of its own.
+var SAVE_PATH := "user://film_trailer.save"
 const OUT := "res://tools/film/%s/%05d.jpg"
-const LOG_PATH := "res://tools/film/last_film.log"
+var LOG_PATH := "res://tools/film/last_film.log"
+## A wall clock the probe quits on whatever state it is in, so a stalled run never sits on
+## the lake.
+const QUIT_AFTER_MS := 20 * 60 * 1000
 const JPG_QUALITY := 0.94
 ## Frames the lake is given after a shot is posed before the first frame is kept: the zoom's
 ## rebuild and the filth map have to land, and a thinned lake has to settle.
@@ -266,6 +270,10 @@ func _say(line: String) -> void:
 
 func _process(_delta: float) -> void:
 	_frames += 1
+	if Time.get_ticks_msec() > QUIT_AFTER_MS:
+		_say("--- wall clock, quitting")
+		get_tree().quit()
+		return
 	if _frames == 3:
 		_setup()
 		_plan()
@@ -491,13 +499,14 @@ func _free() -> void:
 
 ## Throw `tiles` out along `dir`. `lucky` is the gold net and the double cast beside it,
 ## rolled by hand rather than by the odds.
-func _cast(dir: Vector2, tiles: float, lucky: bool = false) -> void:
+func _cast(dir: Vector2, tiles: float, lucky: bool = false, double: bool = lucky) -> void:
 	_main.call(&"_push_net_numbers")
 	var where := _target(dir, tiles)
 	if where != Vector2.INF and _net.cast_to(where):
 		if lucky:
 			_net.luck_power = 1
 			_net.luck_hold = Lake.LUCKY_EXTRA
+		if double:
 			var net2: CastNet = _main.get(&"_net2")
 			var spot: Vector2 = _main.call(&"_double_spot", Iso.world_to_tile(where))
 			if net2 != null and spot != Vector2.INF:

@@ -16,10 +16,13 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 
-const TITLE := "Start over?"
-const WORDS := "The saved lake will be thrown away."
-const YES := "Start over"
-const NO := "Keep it"
+## The menu's own words, as keys of `locale/translations.csv`. Each of the four vars below may
+## hold a key or plain text: it goes through `Text.of` when drawn, so a key follows a language
+## change and text that is not a key (a countdown already formatted) is drawn as it is.
+const TITLE := "CONFIRM_NEW_TITLE"
+const WORDS := "CONFIRM_NEW_WORDS"
+const YES := "CONFIRM_NEW_YES"
+const NO := "CONFIRM_NEW_NO"
 
 var title: String = TITLE:
 	set(v):
@@ -134,12 +137,12 @@ func _draw() -> void:
 	Style.dim(self, Rect2(Vector2.ZERO, size), Style.SCRIM)
 	var face := Style.board_wood(self, _board, FRAME, CHIPS)
 	draw_rect(face, Style.PAPER, true)
-	Style.board_ribbon(self, _ribbon(), title, CHIPS, Style.TEXT_HEAD)
+	Style.board_ribbon(self, _ribbon(), Text.of(title), CHIPS, Style.TEXT_HEAD)
 
 	var y := face.position.y + BOARD_PAD + (0.0 if not words.is_empty() else WORDLESS_AIR)
 	if not words.is_empty():
 		Style.write(
-			self, words, Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
+			self, Text.of(words), Style.TEXT_BODY, Vector2(0.0, y + float(Style.TEXT_BODY) * 0.9),
 			Style.PAPER_INK, HORIZONTAL_ALIGNMENT_CENTER, face
 		)
 		y += WORDS_TALL + ROW_GAP
@@ -147,8 +150,8 @@ func _draw() -> void:
 	_doors.clear()
 	var left := face.position.x + BOARD_PAD
 	var wide := (face.size.x - BOARD_PAD * 2.0 - ROW_GAP) * 0.5
-	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", yes_label, true)
-	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", no_label, false)
+	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", Text.of(yes_label), true)
+	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", Text.of(no_label), false)
 
 
 ## A door: the settings board's dark foot plate, ringed in the seam and lit along the top.

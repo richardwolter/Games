@@ -31,6 +31,13 @@ const WATER_SPOTS := 1
 ## the eye is, and a wood full of flowers a screen from any water is not "the lake coming
 ## back".
 const BANK_REACH := 7.0
+## The forest floor (2026-09-28, Richard: "grow more inside the forest... not over trees"):
+## flowers, patches, ferns and mushrooms on the lawn between the trees, from BANK_REACH out
+## to FOREST_DEEP tiles past the woods' edge, never where a tree's or a rock's drawing is
+## (`Ground.hidden_by_prop`). They wait on the clean water off their stretch of bank, like
+## the rest.
+const FOREST_DEEP := 8.0
+const FOREST_SPOTS := 2
 ## Lily pads: this far past the drawn water's edge, in tiles, and no further.
 const PAD_OUT := Vector2(0.5, 1.6)
 ## Open water (2026-09-22): clumps of pads and reeds away from both shores. A spot is in a
@@ -87,6 +94,12 @@ var _water_index := PackedInt32Array()
 ## -1 not due, otherwise seconds since it became due.
 var _age := PackedFloat32Array()
 var _growing := 0
+## Where the angler stands (world px): a plant growing in, or a bee, is heard only inside the
+## dogs' `Dog.HEAR` of it (2026-09-28). Unset, nothing is heard.
+var ear: Callable
+## Seconds to the next look for a bee within earshot; one host asked a look.
+var _bee_listen := 0.0
+const BEE_LISTEN := 1.0
 var _alive := 0
 
 var _points := PackedVector2Array()
@@ -243,6 +256,10 @@ func _find_bees() -> void:
 		set_process(true)
 
 
+func _heard(at: Vector2) -> bool:
+	return ear.is_valid() and (ear.call() as Vector2).distance_to(at) < Iso.tile_circle_extent(Dog.HEAR)
+
+
 func _process(delta: float) -> void:
 	var still := 0
 	for k in _age.size():
@@ -251,14 +268,24 @@ func _process(delta: float) -> void:
 		var done := _delay[k] + GROW_TIME
 		if _age[k] >= done:
 			continue
+		var was := _age[k]
 		_age[k] += delta
 		still += 1
+		# A plant showing itself near the angler: the woods answer (`Sfx.play_forest`).
+		if was < _delay[k] and _age[k] >= _delay[k] and _heard(_foot[k]) and Sfx.main() != null:
+			Sfx.main().play_forest()
 	if still > 0 or _growing > 0:
 		_dirty = true
 		queue_redraw()
 	_growing = still
 	if not _bee_host.is_empty():
 		_bees.queue_redraw()
+		_bee_listen -= delta
+		if _bee_listen <= 0.0:
+			_bee_listen = BEE_LISTEN
+			var k := _bee_host[randi() % _bee_host.size()]
+			if _heard(_foot[k]) and Sfx.main() != null:
+				Sfx.main().play_bee()
 	if still == 0 and _bee_host.is_empty():
 		set_process(false)
 
@@ -272,7 +299,8 @@ func _sow() -> void:
 			var kinds := _kinds_at(tx, ty)
 			for spot in kinds.size():
 				var kind: String = kinds[spot]
-				var per := LAWN_SPOTS if kind == "lawn" else (BEACH_SPOTS if kind == "beach" else WATER_SPOTS)
+				var per := LAWN_SPOTS if kind == "lawn" else (BEACH_SPOTS if kind == "beach"
+					else (FOREST_SPOTS if kind == "forest" else WATER_SPOTS))
 				if kind == "open" and _near_avoid(Vector2(float(tx) + 0.5, float(ty) + 0.5)):
 					continue
 				for n in per:
@@ -287,7 +315,11 @@ func _sow() -> void:
 						continue
 					if Pump.covers(at, 0.5):
 						continue
+					if Pump.covers(at, 2.5) and Pump.hides(at):
+						continue
 					if crate_tile != Vector2.INF and Yard.covers(crate_tile, at, 0.6):
+						continue
+					if kind == "forest" and _under_a_prop(Iso.tile_to_world(at.x, at.y)):
 						continue
 					var water := _water_beside(at, kind)
 					if water < 0:
@@ -326,7 +358,11 @@ func _kind_at(at: Vector2) -> String:
 		if ground.layer == Ground.Layer.OUTSIDE:
 			var out := Ground.out_of_water(at.x, at.y)
 			# Past the shore band, or on the sand that runs out under the water.
-			if out > BANK_REACH or out < 0.3:
+			if out < 0.3:
+				return ""
+			if out > BANK_REACH:
+				if k == Ground.Kind.GRASS and out <= Ground.WOOD_FROM + FOREST_DEEP:
+					return "forest"
 				return ""
 		elif Iso.past_shelf(at) > -0.6:
 			# The island's drowned sand, as its tufts are kept off it.
@@ -346,6 +382,13 @@ func _kind_at(at: Vector2) -> String:
 	if shelf > PAD_OUT.y + 1.5 and out > PAD_OUT.y + 2.5 and _noise(at / OPEN_CELL) > OPEN_AT:
 		return "open"
 	return ""
+
+
+func _under_a_prop(world: Vector2) -> bool:
+	for ground in grounds:
+		if ground.layer == Ground.Layer.OUTSIDE and ground.hidden_by_prop(world):
+			return true
+	return false
 
 
 func _near_avoid(at: Vector2) -> bool:
@@ -373,7 +416,7 @@ func _water_beside(at: Vector2, kind: String) -> int:
 	var tile := Vector2i(int(floor(at.x)), int(floor(at.y)))
 	if kind == "water" or kind == "open":
 		return grid.index_of(tile.x, tile.y)
-	var on_island := Iso.island_fraction(at.x, at.y) < 1.0 + 1.5
+	var on_island := kind != "forest" and Iso.island_fraction(at.x, at.y) < 1.0 + 1.5
 	var dir: Vector2
 	if on_island:
 		dir = (at - Iso.ISLAND_CENTRE)
@@ -382,7 +425,10 @@ func _water_beside(at: Vector2, kind: String) -> int:
 	if dir.length() < 0.001:
 		return -1
 	dir = dir.normalized()
-	for step in range(1, WATER_LOOK * 2):
+	var look := WATER_LOOK
+	if kind == "forest":
+		look += int(Ground.WOOD_FROM + FOREST_DEEP)
+	for step in range(1, look * 2):
 		var p := at + dir * float(step) * 0.5
 		var t := Vector2i(int(floor(p.x)), int(floor(p.y)))
 		if not Iso.in_lake(t.x, t.y):
@@ -392,11 +438,32 @@ func _water_beside(at: Vector2, kind: String) -> int:
 	return -1
 
 
+## Reeds stand at the water's edge, not up the sand: on either shore, a beach spot further
+## than REED_REACH tiles from the drawn waterline grows something else.
+const REEDS := ["reed", "cattail"]
+const REED_REACH := 1.0
+
+
+## Tiles from the drawn water's edge, for a spot on sand: the island's shelf line or the
+## outer bank's, whichever it is nearer.
+func _from_water(at: Vector2) -> float:
+	if Iso.island_fraction(at.x, at.y) < 2.5:
+		return maxf(-Iso.past_shelf(at), 0.0)
+	return maxf(Ground.out_of_water(at.x, at.y), 0.0)
+
+
 func _pick_species(kind: String, at: Vector2) -> String:
 	var names: Array = []
 	var weights: Array = []
 	for name: String in _table.keys():
-		if String(_table[name]["kind"]) != kind:
+		var table_kind := String(_table[name]["kind"])
+		if kind == "forest":
+			# The lawn's own plants, less the shrubs, which would stand like more trees.
+			if table_kind != "lawn" or name.begins_with("shrub"):
+				continue
+		elif table_kind != kind:
+			continue
+		if kind == "beach" and REEDS.has(name) and _from_water(at) > REED_REACH:
 			continue
 		names.append(name)
 		# Shrubs are big and rarer; patches and flowers common.

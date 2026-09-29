@@ -19,12 +19,31 @@ extends Control
 
 const Style := preload("res://scripts/style.gd")
 const DogArt := preload("res://scripts/dog_art.gd")
+const ShopCard := preload("res://scripts/shop_card.gd")
 
 ## The boards, in the order they stand, and what each is called.
 const BOARDS: Array[StringName] = [&"net", &"boat", &"dog", &"luck"]
 ## No "The" (2026-09-17): four boards standing side by side are already a list, and the
 ## article is a word every translation would have to carry for nothing.
 const TITLES := {&"net": "Net", &"boat": "Boats", &"dog": "Dogs", &"luck": "Luck"}
+## The keys of `locale/translations.csv` the lake reads `titles` and `headings` from.
+const TITLE_KEYS := {
+	&"net": "SHOP_BOARD_NET", &"boat": "SHOP_BOARD_BOATS",
+	&"dog": "SHOP_BOARD_DOGS", &"luck": "SHOP_BOARD_LUCK",
+}
+const HEADING_KEYS := {
+	"The run": "SHOP_GROUP_RUN", "The fleet": "SHOP_GROUP_FLEET",
+	"The pack": "SHOP_GROUP_PACK", "The trip": "SHOP_GROUP_TRIP",
+	"On a cast": "SHOP_GROUP_ON_CAST", "At the yards": "SHOP_GROUP_AT_YARDS",
+}
+
+
+## A map of keys of `locale/translations.csv` as the words they read in the language in play.
+static func spoken(keys: Dictionary) -> Dictionary:
+	var out := {}
+	for at in keys:
+		out[at] = Text.of(String(keys[at]))
+	return out
 
 ## Which rows sit under which heading on each board, in reading order. `UPGRADE_ORDER` is
 ## the order the tracks load in, which is not a reading order; this is.
@@ -116,6 +135,8 @@ const NET_WATERLINE := 0.78
 const NET_COLLAR := 0.86
 const CATCH_AT := [Vector2(-0.22, 0.05), Vector2(0.08, -0.12), Vector2(0.24, 0.14)]
 const CATCH_SCALE := 2.0
+## How much bigger than its slot's fit the net head is drawn, and its catch with it.
+const NET_GROW := 1.5
 
 ## The dog on its board is the dog: it rolls idle or asleep each time the shop opens and
 ## plays that loop while it is up. Even odds.
@@ -144,6 +165,32 @@ const RAIL_GAP := 8.0
 ## the same day and two files writing one colour down is how two colours start. The shed's
 ## shelf still inks in `BOARD_INK_DIM` and is owed the same pass.
 const INK_DIM := Style.BOARD_INK_SOFT
+## Each board's row plates in a hue of its own (2026-09-26, Richard: the boards should stand
+## apart): [affordable, drawn back]. None is green, because green is a maxed row. Every pair
+## measured: `BOARD_INK` on the first and `INK_DIM` on the second both clear 6:1. The lit edge
+## still carries affordable, the second channel for a colourblind player. A board not listed
+## keeps the shared murky water.
+const TONES := {
+	&"net": [Color(0.19, 0.33, 0.50), Color(0.13, 0.22, 0.33)],
+	&"boat": [Color(0.38, 0.29, 0.20), Color(0.26, 0.20, 0.14)],
+	&"dog": [Color(0.55, 0.19, 0.14), Color(0.38, 0.13, 0.10)],
+	&"luck": [Color(0.37, 0.21, 0.38), Color(0.25, 0.15, 0.26)],
+}
+## A maxed row: deep green, done (Richard: "completely different"), and a MAX badge where the
+## price tag stood, green on a pale face. `BOARD_INK` on the plate is 5.5:1.
+const MAX_FACE := Color(0.16, 0.40, 0.18)
+const MAX_BADGE := Color(0.72, 0.90, 0.58)
+const MAX_BADGE_INK := Color(0.08, 0.22, 0.09)
+## How far a board's head window is taken down from its rows' hue: dark enough that the
+## ferry's foam, the black net and the coin still read on it.
+const HEAD_DARK := 0.45
+## How much of the board's hued plate shows round a head card.
+const CARD_RIM := 3.0
+
+
+## A board's two row faces, [affordable, drawn back].
+static func tones_of(board: StringName) -> Array:
+	return TONES.get(board, [Style.BOARD_ROW, Style.BOARD_ROW_OFF])
 ## The blurb's plate: how wide its writing may run, its padding, and the gap off the "?".
 const BLURB_WIDE := 250.0
 const BLURB_PAD := 12.0
@@ -154,6 +201,13 @@ const BLURB_OFF := Vector2(10.0, 4.0)
 ## Drawn only where the room under those two boards comes to at least `LEGEND_LEAST`.
 const LEGEND_GAP := 22.0
 const LEGEND_PAD := 12.0
+## The pricing plate's one pairing (2026-09-27): every material's name at LEGEND_NAME_PX
+## over its mean pay at LEGEND_PAY_PX, the figure a rung up because it is the thing read.
+## The columns are spread over the plate's whole face, and the plate reaches LEGEND_REACH
+## out into the gaps either side of the two boards it hangs under.
+const LEGEND_NAME_PX := Style.TEXT_SMALL
+const LEGEND_PAY_PX := Style.TEXT_BODY
+const LEGEND_REACH := 20.0
 const LEGEND_LINE := 4.0
 const LEGEND_LEAST := 96.0
 
@@ -222,7 +276,16 @@ var _hovered: int = -1
 ## Every drawn row's "?" box, parallel to `_row_boxes`, and which row's is under the
 ## pointer, or -1.
 var _help_boxes: Array[Rect2] = []
+## Where the mouse last was over the shop: the blurb follows it across.
+var _mouse_at := Vector2.ZERO
 var _help_hovered: int = -1
+
+## Every drawn row's price tag, parallel to `_row_boxes`: the only part of a row that buys
+## (2026-09-25, Richard: what is marked is what clicks, not the whole plate). A maxed row has
+## no price and a zero-sized box, so nothing on it answers.
+var _tag_boxes: Array[Rect2] = []
+## How far a tag grows under the pointer, whole design px each side.
+const TAG_SWELL := 2.0
 
 ## Where the legend stands this frame; zero-sized when there is no room for it.
 var _legend_box := Rect2()
@@ -233,6 +296,8 @@ var _legend_box := Rect2()
 ## (HullFoam sets itself behind its parent, which under a boat is right and under a board
 ## would bury it; the shop puts it back in front.)
 var _wake: HullFoam
+## Each board's head card, a `ShopCard` scene, by board.
+var _cards := {}
 var _hull: Polygon2D
 var _wake_heading := Vector2.RIGHT
 
@@ -271,21 +336,23 @@ var _close: CloseButton
 # `tools/last_shop_tour_mockup.png`.
 #
 # What each card points at: a board, a group's rows by its heading in `GROUPS`, or the
-# pricing plate (`&"legend"`).
+# pricing plate (`&"legend"`); and its sentence, as a key of `locale/translations.csv`.
 const TOUR := [
-	[&"net", "Your net can be upgraded to catch more objects, higher tiers and for faster cast and reel."],
-	["On a cast", "You can also increase your net luck and double cast chance."],
-	[&"boat", "Boats are essential for money making, make sure to keep them upgraded."],
-	[&"dog", "Dogs will help bring objects to the recycle box."],
-	["At the yards", "You can make more money by giving a bonus to recycling, and catching pigeons earn more."],
-	[&"legend", "You can check the materials average price here, and which recycle has a bonus."],
+	[&"net", "TOUR_SHOP_NET"],
+	["On a cast", "TOUR_SHOP_ON_CAST"],
+	[&"boat", "TOUR_SHOP_BOATS"],
+	[&"dog", "TOUR_SHOP_DOGS"],
+	["At the yards", "TOUR_SHOP_AT_YARDS"],
+	[&"legend", "TOUR_SHOP_LEGEND"],
 ]
 const TOUR_DIM := Color(0.0, 0.0, 0.0, 0.58)
 const TOUR_OUTLINE := Color(1.0, 1.0, 1.0, 0.9)
 ## Between the target and its card, in canvas pixels.
 const TOUR_GAP := 20.0
-const TOUR_CONTINUE := "Continue"
-const TOUR_SKIP := "Skip"
+static var TOUR_CONTINUE: String:
+	get: return Text.TOUR_CONTINUE
+static var TOUR_SKIP: String:
+	get: return Text.TOUR_SKIP
 
 ## The card showing, or -1 for no tour.
 var tour: int = -1
@@ -299,6 +366,8 @@ var _group_boxes := {}
 ## draw over anything the board draws itself, the dimming and the card included.
 var _tour_layer: Control
 var _tour_skip := Rect2()
+## The tour's card as last drawn, for the pad's stick.
+var _tour_card := Rect2()
 var _prompt_mouse: Texture2D = load("res://assets/ui/prompts/mouse_click.png") if ResourceLoader.exists("res://assets/ui/prompts/mouse_click.png") else null
 var _prompt_a: Texture2D = load("res://assets/ui/prompts/pad_a.png") if ResourceLoader.exists("res://assets/ui/prompts/pad_a.png") else null
 var _prompt_arrow: Texture2D = load("res://assets/ui/prompts/arrow_up.png") if ResourceLoader.exists("res://assets/ui/prompts/arrow_up.png") else null
@@ -306,11 +375,23 @@ var _prompt_arrow: Texture2D = load("res://assets/ui/prompts/arrow_up.png") if R
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	add_to_group(Pad.FOCUS_GROUP)
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
 	resized.connect(_lay_out)
 	visibility_changed.connect(_on_shown)
+	# The head cards, first among the skin's children so the hull, wake, mesh and collar
+	# draw over them (2026-09-26).
+	for board: StringName in BOARDS:
+		var card := ShopCard.new()
+		card.name = "Card_%s" % board
+		card.kind = board
+		card.skin = self
+		card.visible = false
+		add_child(card)
+		move_child(card, 0)
+		_cards[board] = card
 	_wake = HullFoam.new()
 	_wake.z_index = 0
 	_wake.visible = false
@@ -478,8 +559,8 @@ func _lay_out() -> void:
 		var free := _table.end.y - top_y
 		if free >= LEGEND_LEAST:
 			_legend_box = Rect2(
-				Vector2(one.position.x, top_y),
-				Vector2(two.end.x - one.position.x, minf(free, _legend_tall()))
+				Vector2(one.position.x - LEGEND_REACH, top_y),
+				Vector2(two.end.x - one.position.x + LEGEND_REACH * 2.0, minf(free, _legend_tall()))
 			)
 	if _close != null and _boards.has(BOARDS[BOARDS.size() - 1]):
 		# Nailed to the right end of the last board's title plank, as the shed's shelf has it,
@@ -562,8 +643,13 @@ func _gui_input(event: InputEvent) -> void:
 		var was := _hovered
 		var was_help := _help_hovered
 		var at := (event as InputEventMouseMotion).position
+		_mouse_at = at
 		_hovered = _row_under(at)
 		_help_hovered = _help_under(at)
+		# On the pad a row picked is a row being read: its blurb comes up with it, there being
+		# no pointer to hold over the "?" (2026-09-26, `/grill-me` with Richard).
+		if _help_hovered < 0 and Pad.is_pad():
+			_help_hovered = _hovered
 		if was != _hovered or was_help != _help_hovered:
 			if (_hovered >= 0 and _hovered != was) or (_help_hovered >= 0 and _help_hovered != was_help):
 				Sfx.ui(&"ui_hover")
@@ -572,20 +658,22 @@ func _gui_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
 		return
+	# The "?" is for reading, not buying: a click on it is eaten. A tag itself makes no click:
+	# a purchase is heard as the purchase, and one that cannot be afforded is silent.
+	if _help_under(click.position) >= 0:
+		accept_event()
+		Sfx.ui(&"ui_click")
+		return
 	var index := _row_under(click.position)
 	if index < 0 or index >= rows.size():
 		# Anywhere off the boards is the way out: the boards are things on a table, and
-		# clicking the table puts them down.
+		# clicking the table puts them down. The rest of a board, a row's name included, is
+		# eaten and does nothing.
 		if not _on_a_board(click.position):
-			accept_event()
 			close_asked.emit()
+		accept_event()
 		return
 	accept_event()
-	# The "?" is for reading, not buying: a click on it is eaten. A row itself makes no click:
-	# a purchase is heard as the purchase, and one that cannot be afforded is silent.
-	if _help_under(click.position) >= 0:
-		Sfx.ui(&"ui_click")
-		return
 	var row: Dictionary = rows[index]
 	if bool(row.get("afford", false)):
 		bought.emit(StringName(row["key"]))
@@ -598,10 +686,11 @@ func _on_a_board(at: Vector2) -> bool:
 	return false
 
 
-## Which entry in `rows` is under the pointer, or -1.
+## Which entry in `rows` has its price tag under the pointer, or -1. The tag, not the row:
+## the name and the value are for reading.
 func _row_under(at: Vector2) -> int:
-	for i in _row_boxes.size():
-		if _row_boxes[i].has_point(at):
+	for i in _tag_boxes.size():
+		if _tag_boxes[i].has_point(at):
 			return _row_index[i]
 	return -1
 
@@ -627,7 +716,9 @@ static func help_box_of(row_box: Rect2) -> Rect2:
 
 
 func _paint_key() -> int:
-	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame])
+	# The blurb follows the pointer across, so while one is up the pointer moves the picture.
+	var follow := _mouse_at.round() if _help_hovered >= 0 else Vector2.ZERO
+	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame, follow])
 
 
 func _draw() -> void:
@@ -640,6 +731,7 @@ func _draw() -> void:
 	_row_boxes.clear()
 	_row_index.clear()
 	_help_boxes.clear()
+	_tag_boxes.clear()
 	_group_boxes.clear()
 	for board in BOARDS:
 		_draw_board(board, _boards[board])
@@ -674,7 +766,17 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 	)
 	# The head stands in a window of the boards' old dark water: the ferry's foam, the net's
 	# black and the coin were all picked against it, and white foam on cream is nothing.
-	Style.plate(self, slot.grow_individual(-BOARD_PAD, 0.0, -BOARD_PAD, 0.0), Style.BOARD, 3.0)
+	var window := slot.grow_individual(-BOARD_PAD, 0.0, -BOARD_PAD, 0.0)
+	Style.plate(self, window, (tones_of(board)[0] as Color).darkened(HEAD_DARK), 3.0)
+	# The scene stands inside the plate, whose rim keeps the board's hue round it.
+	var card: ShopCard = _cards.get(board)
+	if card != null:
+		var inner := window.grow(-CARD_RIM)
+		card.position = inner.position.floor()
+		card.size = inner.size.floor()
+		card.visible = true
+		if card.rubbish.is_empty():
+			card.rubbish = sprites.get(&"rubbish", [])
 	_draw_sprite(board, slot)
 	if _sparkle > 0.0 and board == _sparkling:
 		_draw_sparkle(slot)
@@ -702,6 +804,9 @@ func _draw_board(board: StringName, box: Rect2) -> void:
 		_row_index.append(i)
 		_grow_group(board, i, line)
 		_help_boxes.append(help_box_of(line))
+		_tag_boxes.append(_tag_of(
+			line, line.size.x * TAG_SHARE, String(rows[i].get("cost", "")), Style.TEXT_BODY
+		))
 		_draw_row(rows[i], line, _hovered == i, _help_hovered == i)
 
 
@@ -767,6 +872,8 @@ func _ribbon_of(box: Rect2) -> Rect2:
 func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	var fill := float(SPRITE_FILL.get(board, 1.0))
 	var middle := slot.position + slot.size * 0.5
+	if board == &"dog" or board == &"luck":
+		return
 	if board == &"dog" and DogArt.has(_dog_pose):
 		# Standing height is the slot's; the sleeper keeps its own proportion to that.
 		var tall := slot.size.y * fill
@@ -799,12 +906,14 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	# steps.
 	if board == &"boat":
 		scale = maxf(floor(scale), 1.0)
+	# The net drawn half as big again (2026-09-27): it is what the card is about.
+	if board == &"net":
+		scale *= NET_GROW
 	var drawn := region.size * scale
 	# Never wider than the slot.
 	if drawn.x > slot.size.x:
 		drawn *= slot.size.x / drawn.x
 	var box := Rect2(middle - drawn * 0.5, drawn)
-	_halo(box)
 	match board:
 		&"boat":
 			box.position.y += float(_bob_px)
@@ -841,12 +950,13 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_collar.visible = visible
 			# The catch here, under everything; then the collar; then the net, black, over
 			# both, so the foam is round the mesh and not across it.
-			for i in mini(CATCH_AT.size(), (sprites.get(&"catch", []) as Array).size()):
-				var piece: Dictionary = sprites[&"catch"][i]
-				var art: Rect2 = piece["region"]
-				var size := art.size * CATCH_SCALE
-				var at := here + (CATCH_AT[i] as Vector2) * drawn - size * 0.5
-				draw_texture_rect_region(piece["sheet"], Rect2(at, size), art)
+			# Drawn by the card, which is under this skin's own drawing.
+			var card: ShopCard = _cards.get(&"net")
+			if card != null:
+				card.catch = sprites.get(&"catch", [])
+				card.catch_at = CATCH_AT
+				card.catch_box = Rect2(here - drawn * 0.5, drawn)
+				card.catch_scale = CATCH_SCALE * NET_GROW
 			_mesh.texture = sheet
 			_mesh.region_rect = region
 			_mesh.position = box.position
@@ -900,12 +1010,15 @@ func _draw_featured(box: Rect2, afford: bool) -> void:
 func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> void:
 	var afford := bool(row.get("afford", false))
 	var lit := hovered and afford
-	var face := Style.BOARD_ROW if afford else Style.BOARD_ROW_OFF
-	if lit:
-		face = Color(
-			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
-		)
+	# The plate does not light: the tag is what buys, so the tag is what lights and swells
+	# (2026-09-25, Richard).
+	var maxed := bool(row.get("maxed", false))
+	var tones := tones_of(StringName(row.get("board", "")))
+	var face: Color = tones[0] if afford else tones[1]
 	var ink := Style.BOARD_INK if afford else INK_DIM
+	if maxed:
+		face = MAX_FACE
+		ink = Style.BOARD_INK
 	Style.plate(self, box, face)
 	# A row you can buy carries the lit edge along its top; one you cannot does not. The two
 	# faces are 1.30:1 apart in luminance, so told apart by hue alone they are one face to a
@@ -955,7 +1068,7 @@ func _draw_row(row: Dictionary, box: Rect2, hovered: bool, help_lit: bool) -> vo
 			Vector2(box.end.x - tag_wide - 6.0, box.position.y + 8.0),
 			Vector2(tag_wide, box.size.y - 16.0)
 		),
-		String(row.get("cost", "")), Style.TEXT_BODY, afford, lit
+		String(row.get("cost", "")), Style.TEXT_BODY, afford, lit, maxed
 	)
 
 
@@ -1034,12 +1147,9 @@ func _draw_blurb(row: Dictionary) -> void:
 	)
 	# Sized so the face holds the writing whichever wood the box gets: the painted border
 	# is thicker than the drawn frame, and `board_face` knows which it will be.
-	var box := Rect2(
-		Vector2(anchor.end.x, anchor.position.y) + BLURB_OFF, inner + Vector2(FRAME, FRAME) * 2.0
-	)
+	var box := Rect2(anchor.position, inner + Vector2(FRAME, FRAME) * 2.0)
 	box.size += inner - Style.board_face(box, FRAME).size
-	box.position.x = clampf(box.position.x, 4.0, size.x - box.size.x - 4.0)
-	box.position.y = clampf(box.position.y, 4.0, size.y - box.size.y - 4.0)
+	box.position = blurb_at(_row_boxes[i], box.size)
 	var face := Style.board_wood(self, box, FRAME, CHIPS)
 	var at := face.position + Vector2(BLURB_PAD, BLURB_PAD + float(Style.TEXT_BODY) * 0.8)
 	Style.write(self, title, Style.TEXT_BODY, at, Style.PAPER_HEAD)
@@ -1054,8 +1164,13 @@ func _draw_blurb(row: Dictionary) -> void:
 func _legend_tall() -> float:
 	var line := float(Style.TEXT_SMALL) + LEGEND_LINE
 	# Five lines: the materials over their prices, the bonus's own line, and two of rule.
-	var inner := LEGEND_PAD * 2.0 + line * 5.0 + LEGEND_GAP_ROW * 2.0
+	var inner := LEGEND_PAD * 2.0 + line * 5.0 + LEGEND_GAP_ROW * 2.0 + _pay_drop()
 	return inner + Style.board_wood_tall(BOARDS_WIDE * 0.5, FRAME)
+
+
+## How much lower the pay line sits than a small line would: it is drawn a rung up.
+func _pay_drop() -> float:
+	return float(LEGEND_PAY_PX - LEGEND_NAME_PX)
 
 
 ## The gap between the legend's three parts.
@@ -1080,38 +1195,41 @@ func _draw_legend(box: Rect2) -> void:
 	# above its baseline: measured off `at.y`'s walk rather than guessed, or the plate runs
 	# under the sentence and cuts it in half.
 	var plate_top := face.position.y + LEGEND_PAD * 0.5
-	var plate_foot := at.y + line_tall * 3.0 + LEGEND_GAP_ROW - float(Style.TEXT_SMALL) - 4.0
+	var pay_at := at.y + line_tall + _pay_drop()
+	var plate_foot := at.y + line_tall * 3.0 + LEGEND_GAP_ROW + _pay_drop() - float(Style.TEXT_SMALL) - 4.0
 	Style.plate(self, Rect2(
 		Vector2(face.position.x + LEGEND_PAD * 0.5, plate_top),
 		Vector2(face.size.x - LEGEND_PAD, plate_foot - plate_top)
 	), Style.BOARD, 3.0)
 	if not yards.is_empty():
-		var step := wide / float(yards.size())
+		# Spread over the whole face, not the padded width: even columns, as wide as they go.
+		var from_x := face.position.x + LEGEND_PAD * 0.5
+		var step := (face.size.x - LEGEND_PAD) / float(yards.size())
 		for y in yards.size():
 			var pair: Array = yards[y]
-			var slot := Rect2(Vector2(at.x + step * float(y), 0.0), Vector2(step, 0.0))
+			var slot := Rect2(Vector2(from_x + step * float(y), 0.0), Vector2(step, 0.0))
 			var lit := bonus_panel(
-				_ink_box(String(pair[0]), slot, at.y), _ink_box(String(pair[1]), slot, at.y + line_tall),
+				_ink_box(String(pair[0]), slot, at.y), _ink_box(String(pair[1]), slot, pay_at, LEGEND_PAY_PX),
 				Rect2(Vector2(slot.position.x, plate_top), Vector2(step, plate_foot - plate_top))
 			)
 			if y == boosted:
 				_light_yard(lit)
-			Style.write(self, String(pair[0]), Style.TEXT_SMALL, Vector2(0.0, at.y), Style.BOARD_INK,
+			Style.write(self, String(pair[0]), LEGEND_NAME_PX, Vector2(0.0, at.y), Style.BOARD_INK,
 				HORIZONTAL_ALIGNMENT_CENTER, slot)
 			# The figure is already the boosted one for the boosted kind: `_mean_pay_of` goes
 			# through `piece_pay`, which multiplies it. Nothing here recomputes it.
-			Style.write(self, String(pair[1]), Style.TEXT_SMALL, Vector2(0.0, at.y + line_tall),
+			Style.write(self, String(pair[1]), LEGEND_PAY_PX, Vector2(0.0, pay_at),
 				Style.PRICE_INK if y != boosted else Style.PRICE_INK * Style.HOVER_WASH,
 				HORIZONTAL_ALIGNMENT_CENTER, slot)
 			if y == boosted:
 				_bonus_glitter(lit, _ink_box(String(pair[0]), slot, at.y).merge(
-					_ink_box(String(pair[1]), slot, at.y + line_tall)))
-		at.y += line_tall * 2.0 + LEGEND_GAP_ROW
+					_ink_box(String(pair[1]), slot, pay_at, LEGEND_PAY_PX)))
+		at.y += line_tall * 2.0 + LEGEND_GAP_ROW + _pay_drop()
 	# The bonus's line is reserved whether or not one is running: a plate that grows a line
 	# every thirty seconds re-centres the whole shop every thirty seconds.
 	if not bonus.is_empty():
 		Style.write(
-			self, "Bonus yard: %s for %ds" % [String(bonus.get("pct", "")), int(bonus.get("seconds", 0))],
+			self, Text.SHOP_BONUS_LINE % [String(bonus.get("pct", "")), int(bonus.get("seconds", 0))],
 			Style.TEXT_SMALL, Vector2(0.0, at.y), Style.PRICE_INK,
 			HORIZONTAL_ALIGNMENT_CENTER, Rect2(Vector2(at.x, 0.0), Vector2(wide, 0.0))
 		)
@@ -1132,13 +1250,13 @@ func _draw_legend(box: Rect2) -> void:
 
 ## Where a centred line of legend text actually puts ink: its measured width centred in the
 ## slot, from the font's ascent over the baseline to its descent under it.
-func _ink_box(text: String, slot: Rect2, baseline: float) -> Rect2:
-	var span := Style.measure(text, Style.TEXT_SMALL)
+func _ink_box(text: String, slot: Rect2, baseline: float, px: int = Style.TEXT_SMALL) -> Rect2:
+	var span := Style.measure(text, px)
 	var face := Style.font()
-	var up := face.get_ascent(Style.TEXT_SMALL)
+	var up := face.get_ascent(px)
 	return Rect2(
 		Vector2(slot.position.x + (slot.size.x - span.x) * 0.5, baseline - up),
-		Vector2(span.x, up + face.get_descent(Style.TEXT_SMALL))
+		Vector2(span.x, up + face.get_descent(px))
 	)
 
 
@@ -1224,7 +1342,7 @@ static func _wrap(text: String, height: int, wide: float) -> Array[String]:
 ## The price, on an oak tag shrunk onto the number in the money plate's gold, so a cost
 ## and a purse read as one substance — and a five-figure price and a two-figure one both
 ## sit in the middle of their own tag rather than one rattling around a fixed box.
-func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -> void:
+func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool, maxed := false) -> void:
 	if cost.is_empty():
 		return
 	var span := Style.measure(cost, height)
@@ -1232,6 +1350,16 @@ func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool) -
 	var tag := Rect2(
 		box.position + Vector2(box.size.x - wide, 0.0), Vector2(wide, box.size.y)
 	)
+	if maxed:
+		Style.plate(self, tag, MAX_BADGE)
+		Style.write(
+			self, cost, height,
+			Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
+			MAX_BADGE_INK, HORIZONTAL_ALIGNMENT_CENTER, tag
+		)
+		return
+	if lit:
+		tag = tag.grow(TAG_SWELL)
 	var face := Style.FRAME if afford else Style.FRAME_LOW
 	if lit:
 		face = Color(
@@ -1367,7 +1495,7 @@ func _draw_tour() -> void:
 	var size_px := FirstSteps.NOTE_SIZE
 	var wide := FirstSteps.NOTE_WIDE
 	var pad := FirstSteps.NOTE_PAD
-	var lines := FirstSteps._wrap(String(TOUR[tour][1]), face, size_px, wide - pad.x * 2.0)
+	var lines := FirstSteps._wrap(Text.of(String(TOUR[tour][1])), face, size_px, wide - pad.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
 	var icon := _prompt_a if tour_pad else _prompt_mouse
 	var icon_size := icon.get_size() * px if icon != null else Vector2.ZERO
@@ -1401,6 +1529,7 @@ func _draw_tour() -> void:
 	var skip_wide := face.get_string_size(TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
 	_tour_layer.draw_string(face, Vector2(inner.position.x, base), TOUR_SKIP, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px, Style.PAPER_SOFT)
 	_tour_skip = Rect2(inner.position.x - 4.0, foot_mid - foot_tall * 0.5 - 2.0, skip_wide + 8.0, foot_tall + 4.0)
+	_tour_card = card
 	var icon_at := Vector2(inner.end.x - icon_size.x, foot_mid - icon_size.y * 0.5).round()
 	if icon != null:
 		_tour_layer.draw_texture_rect(icon, Rect2(icon_at, icon_size), false)
@@ -1428,3 +1557,39 @@ func _ensure_tour_layer() -> void:
 		if tour >= 0 and tour < TOUR.size():
 			_draw_tour()
 	)
+
+
+## The rows for the pad's stick (scripts/pad.gd): one stop a row, the pointer on its price
+## tag so A buys, and the close cross. None during the tour, whose cards are the pointer's.
+func pad_focus() -> Array:
+	if tour >= 0:
+		if _tour_card.size == Vector2.ZERO:
+			return []
+		var go := Rect2(_tour_card.position, Vector2(_tour_card.size.x, _tour_card.size.y * 0.5))
+		return [
+			{"box": _tour_card, "at": go.get_center(), "key": &"next", "first": true},
+			{"box": _tour_skip, "key": &"skip"},
+		]
+	var out: Array = []
+	for i in _row_boxes.size():
+		out.append({
+			"box": _row_boxes[i], "key": _row_index[i], "at": _tag_boxes[i].get_center(),
+			"first": i == 0,
+		})
+	if _close != null and _close.visible:
+		out.append({"box": _close.get_rect(), "key": &"close"})
+	return out
+
+
+## Where a blurb of `wanted` size stands for a row (2026-09-26, Richard: it covered the row
+## being hovered). **Never over the row**: its top is `BLURB_OFF.y` under the row's foot, or
+## its foot as far over the row's top when there is no room below. Across, it follows the
+## mouse, starting `BLURB_OFF.x` right of it; on the pad, with no pointer, it lines up with
+## the row's left edge. Held on the window either way.
+func blurb_at(row: Rect2, wanted: Vector2) -> Vector2:
+	var x := row.position.x if Pad.is_pad() else _mouse_at.x + BLURB_OFF.x
+	var y := row.end.y + BLURB_OFF.y
+	if y + wanted.y > size.y - 4.0:
+		y = row.position.y - BLURB_OFF.y - wanted.y
+	x = clampf(x, 4.0, maxf(size.x - wanted.x - 4.0, 4.0))
+	return Vector2(x, maxf(y, 4.0))

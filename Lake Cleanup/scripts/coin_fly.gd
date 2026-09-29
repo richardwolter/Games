@@ -75,6 +75,11 @@ func fly_from(from: Vector2) -> void:
 		var last: Dictionary = _flying.back()
 		last["carry"] = int(last["carry"]) + 1
 		return
+	# Last in the layer, so a coin is drawn over the purse the shop hangs (2026-09-27): the
+	# purse is added after this node, and a coin behind it missed the coin it aimed at.
+	var up := get_parent()
+	if up != null and get_index() != up.get_child_count() - 1:
+		up.move_child(self, -1)
 	_flying.append({
 		"from": from,
 		"to": _target(),
@@ -104,6 +109,8 @@ func _process(delta: float) -> void:
 	for i in range(_flying.size() - 1, -1, -1):
 		var coin: Dictionary = _flying[i]
 		coin["age"] = float(coin["age"]) + delta
+		# Aimed where the plate is now: the shop opening mid-flight hangs the purse elsewhere.
+		coin["to"] = _target()
 		if float(coin["age"]) >= FLIGHT:
 			landed.emit(int(coin["carry"]))
 			_flying.remove_at(i)

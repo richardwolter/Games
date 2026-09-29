@@ -513,7 +513,13 @@ func switched(name: StringName, view: int) -> int:
 ## What to call this piece on screen. Empty for anything with no name — the rubbish, which
 ## is counted rather than collected.
 func title_of(name: StringName) -> String:
-	return String(titles.get(String(name), ""))
+	var said := String(titles.get(String(name), ""))
+	if said.is_empty():
+		return said
+	## The catalogue's title is the fallback; the words shown are the `DECOR_*` key.
+	var key := "DECOR_" + String(name).trim_prefix("decor_").to_upper()
+	var shown := Text.of(key)
+	return said if shown == key else shown
 
 
 func cells_of(name: StringName) -> Vector2i:
@@ -554,8 +560,13 @@ func _cells_across(box: Vector2, cell: int) -> Vector2i:
 ## Read off the find's own name rather than guessed from the pixels: a rug drawn with a
 ## fringe or a hole in the middle does not fill its box, and guessing gave it a collider and
 ## drew it over the armchair standing on it. Anything called a rug or a mat is floor.
+##
+## The catalogue's own English title and the piece's name, never the shown words
+## (2026-09-27): read through `title_of` a rug stopped being a rug the moment the language
+## was not English — "Alfombra" contains no "rug" — and blocked the floor and sorted with
+## the furniture standing on it.
 func lies_flat(name: StringName) -> bool:
-	var title := title_of(name).to_lower()
+	var title := (String(titles.get(String(name), "")) + " " + String(name)).to_lower()
 	for word: String in FLAT_WORDS:
 		if title.contains(word):
 			return true

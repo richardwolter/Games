@@ -78,14 +78,17 @@ const FLASH_ODDS := 0.6
 ## lightning"). Everything that reads the flash (the day's tint, the shed's shaft, the wash
 ## room) follows.
 const FLASH_PEAK := 0.5
-const THUNDER_AFTER := Vector2(0.6, 3.0)
+## The thunder comes a little after the flash, never on it (2026-09-28, Richard).
+const THUNDER_AFTER := Vector2(1.2, 3.2)
 
-## The sounds, when Nuven's recordings exist. Until then the rain is silent, by decision.
+## The storm's rain with its thunder cut out, and the thunder in takes of its own played
+## after a flash (2026-09-28, `tools/build_sfx.py`).
 const RAIN_SOUND := "res://assets/sfx/rain.ogg"
 const THUNDER_SOUNDS := [
 	"res://assets/sfx/thunder_1.wav",
 	"res://assets/sfx/thunder_2.wav",
 	"res://assets/sfx/thunder_3.wav",
+	"res://assets/sfx/thunder_4.wav",
 ]
 const RAIN_DB := -10.0
 const RAIN_INDOORS_DB := -12.0
@@ -168,7 +171,10 @@ func _ready() -> void:
 	_rain_voice.bus = Prefs.BUS_AMBIENCE
 	_rain_voice.volume_db = -80.0
 	if ResourceLoader.exists(RAIN_SOUND):
-		_rain_voice.stream = load(RAIN_SOUND)
+		var bed: AudioStream = load(RAIN_SOUND)
+		if bed is AudioStreamOggVorbis:
+			(bed as AudioStreamOggVorbis).loop = true
+		_rain_voice.stream = bed
 	add_child(_rain_voice)
 	_thunder_voice = AudioStreamPlayer.new()
 	_thunder_voice.bus = Prefs.BUS_AMBIENCE
@@ -275,7 +281,7 @@ func _tick_flash(delta: float) -> void:
 		_thunder_in -= delta
 		if _thunder_in < 0.0 and not _thunders.is_empty() and Sfx.main() != null \
 				and Sfx.main().may_play(&"lake_ambient"):
-			_thunder_voice.stream = _thunders[_rng.randi() % _thunders.size()]
+			_thunder_voice.stream = _thunders[Sfx.main().next_step(&"thunder", _thunders.size())]
 			_thunder_voice.volume_db = THUNDER_DB + _rng.randf_range(-3.0, 1.0)
 			_thunder_voice.pitch_scale = _rng.randf_range(0.9, 1.08)
 			_thunder_voice.play()
