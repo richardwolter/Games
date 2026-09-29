@@ -4981,7 +4981,7 @@ func _stage_pad() -> void:
 	for pair: Array in [
 		[&"walk_left", 0], [&"walk_right", 0], [&"walk_up", 1], [&"walk_down", 1],
 		[&"aim_left", 2], [&"aim_right", 2], [&"aim_up", 3], [&"aim_down", 3],
-		[&"cast", 5], [&"lay_net", 4],
+		[&"cast", 5],
 	]:
 		var found := false
 		for event: InputEvent in InputMap.action_get_events(pair[0]):

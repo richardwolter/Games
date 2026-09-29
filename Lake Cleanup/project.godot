@@ -64,10 +64,6 @@ cast={
 "deadzone": 0.2,
 "events": []
 }
-lay_net={
-"deadzone": 0.2,
-"events": []
-}
 interact={
 "deadzone": 0.2,
 "events": []

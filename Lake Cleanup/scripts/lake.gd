@@ -2216,14 +2216,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_recentre()
 		return
 
-	# A lit net is laid: the cast goes out, stays where it lands, and burns or freezes there.
-	# It does nothing at all with an unlit net, which is why it is the second button — the
-	# first one is the game, and this is the thing the charms buy.
-	if _desk_pressed(event, &"lay_net"):
-		if _net.state == CastNet.State.IDLE and _net.enchanted():
-			_cast_at(get_global_mouse_position(), true)
-		return
-
 	# Letting go is not part of the gesture any more: the net reels itself in from wherever
 	# it lands, and a cast is one click rather than a click held down for the length of a
 	# drag across the basin.
@@ -2357,9 +2349,6 @@ func _pad_buttons(busy: bool) -> void:
 		_zoom_by(ZOOM_STEP, aim_point())
 	if Input.is_action_just_pressed(&"zoom_out"):
 		_zoom_by(1.0 / ZOOM_STEP, aim_point())
-	if Input.is_action_just_pressed(&"lay_net"):
-		if _net.state == CastNet.State.IDLE and _net.enchanted():
-			_cast_at(aim_point(), true)
 	if Input.is_action_just_pressed(&"cast"):
 		# The click's own gesture: throw from idle, and a net sitting still is set pulling.
 		if _net.state == CastNet.State.IDLE:
@@ -2456,17 +2445,16 @@ func _led_step(delta: float) -> void:
 
 ## Throw the net, on the numbers the player has now. The only cap is the net's own hold —
 ## the yard takes whatever comes back, however much of it there is.
-func _cast_at(where: Vector2, laying: bool = false) -> void:
+func _cast_at(where: Vector2) -> void:
 	_push_net_numbers()
 	if _net.hold <= 0:
 		return
-	if _net.cast_to(where, laying):
+	if _net.cast_to(where):
 		_face_the_net()
 		# Watching the cast is worth more than whatever the player had panned over to look
 		# at, and they can always pan back.
 		_pan_yielded = true
-		if not laying:
-			_roll_luck(where)
+		_roll_luck(where)
 		if _logs_play():
 			var gap := -1.0 if _play_last_cast < 0.0 else snappedf(_play - _play_last_cast, 0.01)
 			PlayLog.write("cast", _play, {"since_last": gap})
@@ -5234,6 +5222,11 @@ func _haul_count_step() -> void:
 
 
 func _process(delta: float) -> void:
+	var __t := Time.get_ticks_usec()
+	__x_process(delta)
+	ProfTmp.add("lake:5224:_process", Time.get_ticks_usec() - __t)
+
+func __x_process(delta: float) -> void:
 	_pad_tick(delta)
 	_push_daylight()
 	_part_the_fleet(delta)

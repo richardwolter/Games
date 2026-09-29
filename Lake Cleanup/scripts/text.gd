@@ -167,9 +167,6 @@ static var VERB_WALK_RIGHT: String:
 static var VERB_CAST: String:
 	get: return TranslationServer.translate(&"VERB_CAST")
 
-static var VERB_LAY_NET: String:
-	get: return TranslationServer.translate(&"VERB_LAY_NET")
-
 static var VERB_INTERACT: String:
 	get: return TranslationServer.translate(&"VERB_INTERACT")
 

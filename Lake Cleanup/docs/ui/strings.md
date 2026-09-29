@@ -125,7 +125,6 @@ Verb labels and their group headings (`binds.gd:48–111`):
 |---|---|---|
 | `VERB_WALK_UP` / `_DOWN` / `_LEFT` / `_RIGHT` | Walk up / down / left / right | `GROUP_MOVE` = Move |
 | `VERB_CAST` | Cast the net | `GROUP_NET` = Net |
-| `VERB_LAY_NET` | Lay a lit net | ” |
 | `VERB_INTERACT` | Interact | ” |
 | `VERB_OPEN_SHED` | Open the shed | `GROUP_OPEN` = Open |
 | `VERB_OPEN_UPGRADES` | Open the upgrades | ” |

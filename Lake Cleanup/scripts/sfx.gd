@@ -161,21 +161,14 @@ const WHILE_INDOORS := [
 	&"find_caught",
 ]
 
-## One take lands every cast, so it is dropped onto one of a few pitches rather than rolled
-## about one (2026-09-15, Richard: "not too repetitive"). Never the pitch it landed on last,
-## and SOUNDS' own small roll on top, so two casts at the same step are still not identical.
-## Six steps over a wider spread since 2026-09-17 (Richard: more varied): four steps a tenth
-## apart still read as the same splash four ways on a long session of casting.
-const NET_SPLASH_PITCHES: Array[float] = [0.66, 0.78, 0.9, 1.02, 1.14, 1.26]
-
 ## **A landing says whether it caught** (2026-09-18, `/grill-me` with Richard: "there isn't
 ## much of a difference when I cast a net and it catches nothing"). The ladder is split, and
 ## the split is what the extra pitches were spent on: a landing that took something draws
 ## from the low, heavy half and an empty one from the high, light half, `EMPTY_SPLASH_DB`
 ## quieter. Random across the whole range, pitch could not also mean anything. Six steps a
 ## half, so either kind of cast has as many to fall on as every cast had before. Each half
-## keeps its own "never the last one" memory. The whole ladder above is still what a laid
-## net lands on: nothing is caught by laying one, so there is nothing for it to say.
+## keeps its own "never the last one" memory. (The single six-step ladder went with the lit
+## net, deleted 2026-09-29.)
 const NET_SPLASH_CAUGHT: Array[float] = [0.62, 0.68, 0.74, 0.81, 0.88, 0.95]
 const NET_SPLASH_EMPTY: Array[float] = [1.0, 1.06, 1.12, 1.18, 1.24, 1.3]
 const EMPTY_SPLASH_DB := -5.0
@@ -443,6 +436,11 @@ func _first(name: StringName) -> AudioStream:
 
 
 func _process(delta: float) -> void:
+	var __t := Time.get_ticks_usec()
+	__x_process(delta)
+	ProfTmp.add("sfx:438:_process", Time.get_ticks_usec() - __t)
+
+func __x_process(delta: float) -> void:
 	if _haul_effort > 0.0 and not shopping:
 		_haul_wait -= delta
 		if _haul_wait <= 0.0:
@@ -630,11 +628,6 @@ func play_splash(strength: float) -> void:
 		return
 	var weight := clampf(strength, 0.0, 1.0)
 	play(&"piece_splash", lerpf(-4.0, 2.0, weight), lerpf(1.15, 0.85, weight))
-
-
-## The net coming down on the water with nothing to say about a catch: a lit net laid.
-func play_net_splash() -> void:
-	play(&"net_splash", 0.0, _next_pitch(&"net_splash", NET_SPLASH_PITCHES))
 
 
 ## A thrown net landing. `caught` is whether the landing's own sweep took anything, so the

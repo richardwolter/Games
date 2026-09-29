@@ -2062,11 +2062,12 @@ The second level is gone, not shelved: `siege.gd`/`.tscn`, `defeat.gd`, `ward.gd
 (`END_ONWARD`, `END_ONWARD_HINT`), the net's charm sweep and `caught_charm`, and the siege's
 built chime in `Sfx` (`play_chime`, `_fire`, `_make_chime`). `check_real_save` lost its
 `-- siege` mode.
-- **Kept, and open for Richard**: the lit net laid by LT (`lay_net`, `CastNet.enchant`/
-  `enchanted`/`charm_left`/`_leave_it_there`/`left_behind`, the laid-net ghost). On the lake
-  nothing ever calls `enchant`, so `enchanted()` is always false and LT does nothing — it is
-  dead in practice, but it is a bind on the Controls board and was named a lake feature, so
-  deleting it is his call.
+- **The lit net laid by LT is deleted too** (2026-09-29, Richard's call): `lay_net` (the
+  bind, its `project.godot` entry, `VERB_LAY_NET`), `CastNet.enchant`/`enchanted`/
+  `charm_left`/`Charm`/`_leave_it_there`/`left_behind`/`field_radius`, the laid-net ghost
+  (`_draw_lay_ghost`), the pad's LT, and `Sfx.play_net_splash` with its one ladder. Nothing
+  on the lake ever called `enchant`, so LT did nothing. An old `settings.cfg` line for
+  `lay_net` is dropped by `Binds.load_from`.
 
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
@@ -2986,7 +2987,7 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
 - **An empty landing makes no spray** (`WaterSplash.splash`'s `tall`, `_crown_tall`): when
   the landing sweep takes nothing, the crown is the foam mound and its ring, plus the
   landing's ripple. No plumes, no speck sheet, no drops. The sweep runs before the splash
-  so it knows. Both nets. A catching landing is unchanged; the lit net laid by LT is too.
+  so it knows. Both nets. A catching landing is unchanged.
 - Out of scope, by decision: `cast_far` frames 2-3, the land settle, the `drag` sheet.
 
 ### The Net Sorts With The Angler (2026-09-16)
@@ -3957,7 +3958,7 @@ fifteen verbs on two devices does not belong under a volume slider.
   physical binds were pointed out): there is nothing for the player to get wrong and it works
   for every layout rather than the two we thought of. A real ZQSD keycode preset would move
   the keys *away* from the fingers.
-- **Every verb is in the map now**: `cast`, `lay_net`, `interact`, `open_shed`,
+- **Every verb is in the map now**: `cast`, `interact`, `open_shed`,
   `open_upgrades`, `open_settings`, `zoom_in`, `zoom_out`, `recentre`, `shed_rotate`,
   `shed_switch` beside the four `walk_*`. The `KEY_E` / `KEY_R` checks and the raw wheel and
   mouse-button reads in `Lake._unhandled_input` and `ShedRoom._unhandled_key_input` are gone.
@@ -4492,8 +4493,7 @@ after a re-run**). The sheet still draws every option that was offered.
   ring sits on water running from soup green to clean blue, so a toned green over dirty
   water had nothing to stand on. **The one thing beyond the three swatches**, by Richard's
   call; the 1.5 px line, the alphas, the dashes and the 48-point ellipse are untouched.
-- **Out of scope, by decision**: `_draw_lay_ghost` (the charm ring) keeps its warm/cold
-  tint — the siege is shelved and repainting a ring nobody sees has no judge. Hover, pressed
+- **Out of scope, by decision**: hover, pressed
   and drag cursor shapes. Pad mode's hidden pointer, which is unchanged.
 - `test_lake`'s `_stage_pointer` guards the picture, its outline, that the hotspot lands on
   the arrow, that the retired second picture is gone rather than merely unused, the ripple's
@@ -4656,8 +4656,8 @@ purpose. What the audit settled, against the shipped design:
     each with its own never-the-last memory. Richard asked for more pitches in the same
     breath, and **random across the whole range a pitch cannot also mean anything** — so the
     extra steps were spent on the split. Low comes to mean "got something". Picked over
-    random-with-level-only and over pitch following catch size. A laid lit net keeps the
-    whole ladder (`play_net_splash`): nothing is caught by laying one.
+    random-with-level-only and over pitch following catch size. (The laid lit net's
+    whole ladder and `play_net_splash` were deleted with the lit net, 2026-09-29.)
   - **Caught means the landing's own sweep took anything** — rubbish, a find, a bird, a
     charm. `CastNet._sweep` returns it, and **the landing sweeps before it sounds**; it used
     to sound first. `test_lake` reads the source for that order.

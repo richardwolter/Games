@@ -72,10 +72,6 @@ const ACTIONS := [
 		"contexts": [CONTEXT_LAKE], "key": "mouse:1", "pad": "axis:5:1", "extra": [],
 	},
 	{
-		"action": &"lay_net", "label": "VERB_LAY_NET", "group": "BIND_GROUP_NET",
-		"contexts": [CONTEXT_LAKE], "key": "mouse:2", "pad": "axis:4:1", "extra": [],
-	},
-	{
 		"action": &"interact", "label": "VERB_INTERACT", "group": "BIND_GROUP_NET",
 		"contexts": [CONTEXT_LAKE], "key": "key:69", "pad": "pad:0", "extra": [],
 	},
