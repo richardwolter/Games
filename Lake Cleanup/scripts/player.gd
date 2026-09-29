@@ -474,6 +474,10 @@ func start_cast() -> void:
 func face_toward(point: Vector2) -> void:
 	if _cast_time < 0.0:
 		return
+	_turn_to(point)
+
+
+func _turn_to(point: Vector2) -> void:
 	var d := point - tile_pos
 	var on_screen := Vector2(d.x - d.y, (d.x + d.y) * 0.5)
 	if on_screen.length_squared() < 0.0001:
@@ -485,6 +489,36 @@ func face_toward(point: Vector2) -> void:
 	if not turned.is_equal_approx(facing):
 		facing = turned
 		_repaint()
+
+
+## The reach to pet a dog (2026-09-28, /grill-me with Richard): the angler turns to the dog,
+## bends and puts a hand out, held still for `PET_TIME`. `pet_touched` fires on the frame the
+## hand lands (`PET_TOUCH`), which is when the dog is told; it is the lake's job to have
+## stopped the dog on the press so it is still there. Frames are `tools/build_pet_frames.py`'s
+## rule-built strips. With no art the touch still comes, so petting works either way.
+signal pet_touched
+
+const PET_TIME := 1.0
+## Seconds into the reach the hand lands: the start of the third frame, the arm fully out.
+const PET_TOUCH := 0.34
+
+## Seconds into the reach, or negative while none is playing.
+var _pet_time := -1.0
+var _pet_touched := false
+
+
+func start_pet(toward: Vector2) -> void:
+	_cast_time = -1.0
+	_cast_lock = 0.0
+	walk_to = Vector2.INF
+	_pet_time = 0.0
+	_pet_touched = false
+	_turn_to(toward)
+	_repaint()
+
+
+func petting() -> bool:
+	return _pet_time >= 0.0
 
 
 ## Drops the held cast pose back to idle. Called once the net is home, so a haul that ends
@@ -528,6 +562,20 @@ func _process(delta: float) -> void:
 	_time += delta
 	_push_wade()
 	_wake(delta)
+
+	# The reach holds the boots still, like the throw; see start_pet().
+	if _pet_time >= 0.0:
+		_pet_time += delta
+		_step = 0.0
+		_vel = Vector2.ZERO
+		_speed = 0.0
+		if not _pet_touched and _pet_time >= PET_TOUCH:
+			_pet_touched = true
+			pet_touched.emit()
+		if _pet_time >= PET_TIME:
+			_pet_time = -1.0
+		_repaint()
+		return
 
 	# The throw itself holds the boots still — a cast that let the player walk out from
 	# under it never finished playing. Input is read and thrown away rather than skipped,
@@ -788,6 +836,12 @@ func _paint_key() -> int:
 ## so the two can never disagree about which frame that is.
 func _pose(walking: bool) -> Dictionary:
 	var dir := _view()
+	if _pet_time >= 0.0:
+		var pose := StringName("pet_%s" % dir)
+		var frames: Array = _poses.get(pose, [])
+		if not frames.is_empty():
+			var index := mini(int(_pet_time / PET_TIME * frames.size()), frames.size() - 1)
+			return {"pose": pose, "index": index}
 	if _cast_time >= 0.0 and not walking:
 		var pose := StringName("cast_%s" % dir)
 		var frames: Array = _poses.get(pose, [])

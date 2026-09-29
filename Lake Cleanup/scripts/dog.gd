@@ -443,6 +443,35 @@ func within_reach(of: Vector2) -> bool:
 	return tile_pos.distance_to(of) <= PET_REACH
 
 
+## Seconds before this dog can be petted again (2026-09-28, Richard: no spamming the pet).
+## Per dog, counted from the press: the next dog in the pack can be petted at once. Not saved.
+const PET_AGAIN := 10.0
+## How long a dog waits, sat, for the angler's hand once the reach has started.
+const PET_WAIT := 1.5
+var _pet_cool := 0.0
+
+
+## Whether a press beside this dog starts a pet now. False while it waits out `PET_AGAIN`,
+## asleep, or out in the water with a job on — and then the press does nothing at all.
+func can_pet() -> bool:
+	return (
+		_pet_cool <= 0.0 and not dozing
+		and _state != State.SWIM_OUT and _state != State.CARRY_BACK
+	)
+
+
+## The angler has started to reach: sit, turn to them and wait for the hand, so the dog is
+## still there when it lands. `pet()` follows from `Angler.pet_touched`.
+func await_pet() -> void:
+	_pet_cool = PET_AGAIN
+	_state = State.SIT
+	_age = 0.0
+	_mood_left = PET_WAIT
+	if angler != null:
+		_look_along(angler.tile_pos - tile_pos)
+	queue_redraw()
+
+
 ## Somebody said hello. Ignored while the dog is out in the water with a job on — it is a
 ## dog, not a butler, and it finishes the stick first.
 func pet() -> void:
@@ -503,6 +532,7 @@ func _process(delta: float) -> void:
 	_age += delta
 	_stride += delta * clampf(_speed / _top_speed, 0.2, 1.0)
 	_mood_left -= delta
+	_pet_cool = maxf(_pet_cool - delta, 0.0)
 	_trip += delta
 	_greet = maxf(_greet - delta, 0.0)
 	_greet_wait = maxf(_greet_wait - delta, 0.0)

@@ -2157,7 +2157,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif _dog_in_reach() != null:
 			# Standing next to a dog with nothing else under the key: the same button that
 			# opens the shed says hello.
-			_dog_in_reach().pet()
+			_pet_dog(_dog_in_reach())
 		return
 	if _desk_pressed(event, &"open_shed") and not _panelled():
 		_set_shed(true)
@@ -2349,7 +2349,7 @@ func _pad_buttons(busy: bool) -> void:
 		elif _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
-			_dog_in_reach().pet()
+			_pet_dog(_dog_in_reach())
 		return
 	if Input.is_action_just_pressed(&"recentre"):
 		_aim.at = _angler.position
@@ -2370,6 +2370,8 @@ func _pad_buttons(busy: bool) -> void:
 ## The cast press: throw if the spot is in reach, otherwise walk towards it and throw on
 ## arrival (see `_led_cast`). A press on the island or the bank is nothing, as it always was.
 func _cast_or_walk(where: Vector2) -> void:
+	if _angler.petting():
+		return
 	if _steps != null and _steps.step == FirstSteps.Step.MOVE:
 		_walk_not_cast(where)
 		return
@@ -4886,6 +4888,17 @@ func _push_dog_numbers() -> void:
 ## How many dogs the pack has: the first plus what `dog_count` bought. The tree has one.
 func dog_count() -> int:
 	return 1 + dog_count_level
+
+
+## A press beside a dog: the angler reaches, the dog sits and waits, and it is petted when the
+## hand lands (2026-09-28). A dog still waiting out its `Dog.PET_AGAIN`, or one busy in the
+## water, takes nothing and shows nothing; so does a press while a reach is already playing.
+func _pet_dog(dog: Dog) -> void:
+	if dog == null or not dog.can_pet() or _angler.petting():
+		return
+	dog.await_pet()
+	_angler.start_pet(dog.tile_pos)
+	_angler.pet_touched.connect(dog.pet, CONNECT_ONE_SHOT)
 
 
 ## The nearest dog the angler could pet from where they stand, or null.

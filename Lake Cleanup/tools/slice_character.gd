@@ -24,6 +24,10 @@ const ANIMS := [
 	{"prefix": "idle", "slug": "idle", "frames": 9},
 	{"prefix": "run", "slug": "running", "frames": 17, "skip": 3},
 	{"prefix": "cast", "slug": "casting", "frames": 16},
+	# The reach to pet a dog, built by rule (tools/build_pet_frames.py, 2026-09-28). Every
+	# frame is measured against the first one's ink, which has no arm out: centred on its own
+	# ink the body would slide back as the arm went out.
+	{"prefix": "pet", "slug": "pet", "frames": 6, "ink_first": true},
 ]
 
 const DIRS := ["south", "north", "east", "west"]
@@ -80,6 +84,7 @@ func _init() -> void:
 				"art": image,
 				"frames": frames,
 				"skip": int(anim.get("skip", 0)),
+				"ink_first": bool(anim.get("ink_first", false)),
 				"cell_w": cell_w,
 				"cell_h": image.get_height(),
 			})
@@ -105,6 +110,9 @@ func _init() -> void:
 			var right := int(round((column + 1) * cell_w))
 			var box := Rect2i(left, y, right - left, cell_h)
 			var ink := _ink(atlas, box)
+			if strip["ink_first"] and not frames.is_empty():
+				var first: Array = frames[0]["ink"]
+				ink = Rect2i(first[0] + box.position.x, first[1] + box.position.y, first[2], first[3])
 			frames.append({
 				"region": [box.position.x, box.position.y, box.size.x, box.size.y],
 				"ink": (

@@ -1590,6 +1590,56 @@ func _stage_dog_idle(dogs: Array) -> void:
 	_check(int(one.get(&"_state")) != Dog.State.SIT, "nor sitting down on it", "")
 	_stage_dog_breeds(dogs)
 	_stage_dog_manners(dogs)
+	_stage_dog_pet(dogs)
+
+
+## The reach to pet (2026-09-28, Richard): the angler reaches, held still, and the dog is
+## petted when the hand lands, not on the press; each dog then waits `Dog.PET_AGAIN` before a
+## second press does anything, and another dog can be petted meanwhile.
+func _stage_dog_pet(dogs: Array) -> void:
+	var dog := dogs[0] as Dog
+	for pose in ["pet_south", "pet_north", "pet_east", "pet_west"]:
+		_check(not (_angler.get(&"_poses") as Dictionary).get(StringName(pose), []).is_empty(),
+			"the angler has a %s reach" % pose, "")
+	var stood := _angler.tile_pos
+	var faced := _angler.facing
+	dog.tile_pos = _angler.tile_pos + Vector2(1.0, 0.0)
+	dog.set(&"_state", Dog.State.IDLE)
+	dog.set(&"_pet_cool", 0.0)
+	dog.dozing = false
+	_check(dog.can_pet(), "a dog can be petted to begin with", "")
+	_main.call(&"_pet_dog", dog)
+	_check(_angler.petting(), "a press starts the reach", "")
+	_check(int(dog.get(&"_state")) == Dog.State.SIT, "and the dog sits and waits for it", "")
+	_check(_angler.facing.x > 0.5, "the angler turns to the dog", str(_angler.facing))
+	var from := _angler.tile_pos
+	var touched_at := -1.0
+	var t := 0.0
+	while _angler.petting() and t < 3.0:
+		_angler.call(&"_process", 1.0 / 60.0)
+		t += 1.0 / 60.0
+		if touched_at < 0.0 and int(dog.get(&"_state")) == Dog.State.PETTED:
+			touched_at = t
+	_check(touched_at > 0.2 and absf(touched_at - Angler.PET_TOUCH) < 0.05,
+		"the dog is petted when the hand lands, not on the press", "%.2f s" % touched_at)
+	_check(absf(t - Angler.PET_TIME) < 0.05, "the reach lasts about a second", "%.2f s" % t)
+	_check(_angler.tile_pos == from, "and holds the angler still", "")
+	dog.set(&"_state", Dog.State.IDLE)
+	_main.call(&"_pet_dog", dog)
+	_check(not _angler.petting() and int(dog.get(&"_state")) == Dog.State.IDLE,
+		"a second press within ten seconds does nothing", "")
+	if dogs.size() > 1:
+		var other := dogs[1] as Dog
+		other.dozing = false
+		other.set(&"_state", Dog.State.IDLE)
+		other.set(&"_pet_cool", 0.0)
+		_check(other.can_pet(), "another dog can be petted meanwhile", "")
+	dog.set(&"_pet_cool", 0.05)
+	dog.call(&"_process", 0.1)
+	_check(dog.can_pet(), "and the first can again once its ten seconds are up", "")
+	dog.set(&"_state", Dog.State.IDLE)
+	_angler.tile_pos = stood
+	_angler.facing = faced
 
 
 ## The pack's manners (2026-09-22, Richard): a dog gives way to the angler, walks slow and

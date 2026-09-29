@@ -2701,6 +2701,19 @@ of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
   run rows from it (`SHEET_BANDS`, each at its old strip's band and width, so no frame
   boundary moves); idle and cast still come from `character_extracted/`. The first three run
   frames are still dropped. The repaint changed only the east run's legs (303 px).
+- **The reach to pet** (2026-09-28, `/grill-me` with Richard): E (or A) beside a dog turns
+  the angler to it and plays `pet_<dir>`, six frames over `Angler.PET_TIME` (1 s) with the
+  boots held; the dog sits and waits (`Dog.await_pet`) and is petted on
+  `Angler.pet_touched`, at `PET_TOUCH` (0.34 s, the arm fully out), not on the press.
+  **Built by rule** (`tools/build_pet_frames.py`, logo venv python, writes
+  `character_extracted/pet_*.png` and `tools/last_pet_frames.png`): the idle frame's upper
+  body lowered over the legs, an arm out and down at the waist on the side views, a hand
+  forward on the front view, the crouch alone from behind. For Richard to polish; a re-run
+  overwrites the strips. The slicer measures every pet frame against the first's ink
+  (`ink_first`), or the body would slide back as the arm went out. **Each dog waits
+  `Dog.PET_AGAIN` (10 s) before it can be petted again**, per dog, from the press; a press on
+  a waiting dog, a dog in the water, or during a reach does nothing and shows nothing. Not
+  saved. The shed is untouched.
 - **Retired, by decision** (2026-09-11): the first angler (three rows + mirrored side, 6
   poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
   marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.
