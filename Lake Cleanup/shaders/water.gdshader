@@ -297,6 +297,25 @@ uniform float glint : hint_range(0.0, 1.0) = 0.0;
 uniform float glint_cell = 14.0;
 uniform float glint_rate = 0.09;
 uniform float glint_fps = 0.72;
+
+// The sky in the clean water (2026-09-28, `/grill-me` with Richard, off a reference and
+// option C of tools/last_sky_mockup.png): cloud-shaped patches one step up the ramp, their
+// rim broken into dashed rows, drifting across the lake. Only on water the honest map calls
+// clean — a catch patch or the reel's lane shows none — and faint, by decision: the glints
+// were cut four times for being busy. `sky_reflect` is 1 while the lake shows its sky; `sky_tint` is the day's
+// low sky, a hint of it mixed in. Sizes are in art pixels.
+uniform float sky_reflect : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 sky_tint : source_color = vec4(0.72, 0.86, 0.94, 1.0);
+uniform float sky_tint_mix : hint_range(0.0, 1.0) = 0.2;
+uniform float sky_cloud = 26.0;
+// A storm (same day, Richard): the reflections stay and turn to storm cloud — a step down the
+// ramp mixed towards `sky_storm_ink` — and spread wider (`sky_storm`, the day's overcast). A
+// strike lights them (`sky_flash`, 0 to 1).
+uniform float sky_storm : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 sky_storm_ink : source_color = vec4(0.2, 0.24, 0.31, 1.0);
+uniform float sky_flash : hint_range(0.0, 1.0) = 0.0;
+uniform float sky_stretch = 3.0;
+uniform float sky_drift = 1.5;
 const float GLINT_UP = 3.0;
 
 varying vec2 world_pos;
@@ -564,6 +583,7 @@ void fragment() {
 	// while the next one over is still soup), `pollution` where it is not.
 	float local = texture(filth_map, (tile + 0.5) / filth_tiles).r;
 	float filth = mix(pollution, local, filth_mapped);
+	float honest = filth;
 	// The clean patches and the reel's lane, on the plane.
 	float patched = 0.0;
 	for (int i = 0; i < 14; i++) {
@@ -668,6 +688,24 @@ void fragment() {
 	vec3 col = ramp(step_at, state);
 	// What the shore foam and its tint go on: 0 clean, 1 murky, 2 dirty, as they always did.
 	float murk_state = state * 0.5;
+
+	// The sky in it: see `sky_reflect`. Whole art pixels, the plane drifting in whole steps.
+	if (sky_reflect > 0.001 && pow(honest, color_bite) < state_at.x) {
+		vec2 sky_cell = vec2(cell.x - floor(clock * sky_drift), cell.y);
+		vec2 sky_p = vec2(sky_cell.x / (sky_cloud * sky_stretch), sky_cell.y / sky_cloud);
+		float cloud = blob_noise(sky_p + vec2(11.3, 4.7)) * 0.57
+			+ blob_noise(sky_p * 2.0 - vec2(3.1, 8.2)) * 0.29
+			+ blob_noise(sky_p * 4.0 + vec2(6.6, 1.9)) * 0.14;
+		float cut = mix(0.95, mix(0.64, 0.52, sky_storm), sky_reflect);
+		float dash = step(0.5, mod(cell.y, 2.0)) < 0.5
+			? step(0.4, cell_hash(vec2(floor(cell.x / 4.0), cell.y))) : 0.0;
+		float lit = step(cut + 0.04, cloud) + step(cut, cloud) * (1.0 - step(cut + 0.04, cloud)) * dash;
+		vec3 sky_col = mix(ramp(min(step_at + 1.0, 4.0), 0.0), sky_tint.rgb, sky_tint_mix);
+		vec3 storm_col = mix(ramp(max(step_at - 1.0, 0.0), 0.0), sky_storm_ink.rgb, 0.55);
+		sky_col = mix(sky_col, storm_col, sky_storm);
+		sky_col = mix(sky_col, vec3(0.86, 0.9, 0.98), sky_flash * sky_storm * 0.8);
+		col = mix(col, sky_col, lit);
+	}
 
 	// The scum film, on foul and dirty water only. Clumps from a blob noise, broken into
 	// whole art pixels by a cell hash.

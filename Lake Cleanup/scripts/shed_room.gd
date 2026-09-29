@@ -154,6 +154,9 @@ const DOG_BED := &"decor_pet_bed"
 ## things at the same row, so they are small and one is bigger than the other.
 const OVER_HOST := 0.01
 const OVER_PIECE := 0.02
+## How far to either side of a piece, in cells, a walker still counts as next to it for
+## drawing: about half the widest walker's drawing.
+const BESIDE := 1.5
 
 ## How close the player has to stand to work a switch, in cells, and how far above the
 ## piece the prompt floats.
@@ -1960,7 +1963,12 @@ func _walker_key(feet: Vector2, rows: Array) -> float:
 		var top := foot - float(base_of(piece, view)) / float(CELL)
 		var left := float(int(row["cell"][0])) / float(CELL)
 		var right := left + float(span.x) / float(CELL)
-		if feet.x >= left and feet.x < right and feet.y >= top and feet.y < foot:
+		# Behind a piece only with the feet past its base's back edge. Anywhere else near
+		# it — in front, or standing beside it level with its base — the walker is drawn
+		# over it (Richard, 2026-09-29): beside a sofa the angler was drawn under its arm.
+		# "Near" is the piece's width plus `BESIDE` either side, the most of a walker's
+		# drawing that can reach over it; further off, their feet decide as ever.
+		if feet.x >= left - BESIDE and feet.x < right + BESIDE and feet.y >= top:
 			key = maxf(key, foot + OVER_PIECE)
 	return key
 

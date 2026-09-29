@@ -32,6 +32,7 @@ do. The ranks behind are the same trees multiplied down (`RANKS`' third number),
 colour here is not the pack's own.
 """
 import json
+import math
 import random
 
 from PIL import Image
@@ -69,51 +70,118 @@ EDGE_WANDER = 2
 BLADE_ODDS = 0.22
 
 
-# The clouds: (wide, tall) each, in painted pixels. Built by rule — puffs standing on one
-# flat base, whole pixels, two tones: the body, and a shaded foot `CLOUD_FOOT` rows deep
-# that follows the base's own outline. The colours are the palette's foam and a step under
-# it; the day's tint and the backdrop's darkening do the rest at runtime.
-CLOUDS = [(46, 12), (70, 17), (104, 22), (58, 13), (88, 19), (34, 9)]
-CLOUD_BODY = (238, 246, 251, 255)
-CLOUD_SHADE = (196, 213, 228, 255)
-CLOUD_FOOT = 0.3
+# The clouds (2026-09-28, `/grill-me` with Richard, off a reference and option 3 of
+# tools/last_sky_mockup.png, written by tools/sky_reflect_mockup.py). One noisy mass on a
+# flat base, rounding off as it rises — not a heap of round puffs, which read as snowballs.
+# One sun, top left: the mass is lit on its upper left, each billow on its own upper left,
+# and the lower part falls into shade. **White is the majority**; the shade is a blue-grey
+# between the cloud grey and the sky, and the base melts into shade rather than wearing a
+# dark band. The thin edge is half see-through, so the cloud sits in whatever sky the hour
+# paints behind it. (wide, tall, seed) in painted pixels; `CLOUDS` ride the near layer,
+# `FAR_CLOUDS` the far one, `WISPS` are the small scraps high up.
+CLOUDS = [(124, 48, 4), (138, 43, 8), (100, 52, 12), (116, 40, 17)]
+FAR_CLOUDS = [(70, 24, 21), (84, 26, 25), (58, 22, 29)]
+WISPS = [(12, 3, 31), (18, 3, 32), (9, 2, 33), (15, 4, 34), (22, 3, 35)]
+C_LIT = (255, 255, 255, 255)
+C_BODY = (238, 246, 251, 255)
+C_GREY = (204, 222, 240, 255)
+C_UNDER = (158, 184, 219, 255)
+C_SKY = (125, 184, 230, 255)
+EDGE_ALPHA = 140
 
 
-def cloud(roll, wide, tall):
+def _mix(a, b, t):
+    return tuple(int(a[k] + (b[k] - a[k]) * t) for k in range(4))
+
+
+C_SHADE = _mix(C_GREY, C_UNDER, 0.45)
+C_DEEP = _mix(C_UNDER, C_SKY, 0.25)
+
+
+def _hash(x, y, s):
+    n = (x * 374761393 + y * 668265263 + s * 1442695041) & 0xffffffff
+    n = (n ^ (n >> 13)) * 1274126177 & 0xffffffff
+    return (n & 0xffff) / 65535.0
+
+
+def _vnoise(x, y, s):
+    xi, yi = math.floor(x), math.floor(y)
+    fx, fy = x - xi, y - yi
+    fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    a, b = _hash(xi, yi, s), _hash(xi + 1, yi, s)
+    d, e = _hash(xi, yi + 1, s), _hash(xi + 1, yi + 1, s)
+    return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy
+
+
+def _fbm(x, y, s):
+    return sum(_vnoise(x * 2 ** o, y * 2 ** o, s + o) / 2 ** o for o in range(3)) / 1.75
+
+
+def cloud(wide, tall, seed):
+    """One cloud, `wide` x `tall` painted pixels, base on the bottom row."""
+    k = wide / 86.0            # the mockup's cloud was 86 across; its noise scales with it
+    cx, base = wide / 2.0, tall - 1
+
+    def dens(x, y):
+        up = (base - y) / (tall * 0.8)
+        if up < 0 or up > 1.02:
+            return 0.0
+        half = wide * 0.5 * 0.8 * math.sqrt(max(0.0, 1 - (up / 1.1) ** 2))             * (0.8 + 0.4 * _fbm(y / (14 * k), seed, seed + 5))
+        side = 1 - abs(x - cx) / max(half, 1)
+        n = _fbm(x / (18 * k), y / (15 * k), seed)
+        return side * 1.4 + (n - 0.5) * 1.6 - max(0, up - 0.85) * 3
+
     im = Image.new("RGBA", (wide, tall))
-    puffs = []
-    x = 0.0
-    while x < wide:
-        # Tallest in the middle third, so it is a heap and not a hedge.
-        mid = 1.0 - abs((x / wide) * 2.0 - 1.0)
-        r = max(3.0, tall * (0.35 + 0.65 * mid) * roll.uniform(0.7, 1.0))
-        puffs.append((x + r * 0.5, r))
-        x += r * roll.uniform(0.7, 1.2)
-    for px in range(wide):
-        for py in range(tall):
-            for cx, r in puffs:
-                # A puff is the top half of an ellipse twice as wide as tall, on the base.
-                dx = (px + 0.5 - cx) / (r * 1.1)
-                dy = (tall - py - 0.5) / r
-                if 0 <= cx - r * 1.1 and cx + r * 1.1 <= wide and dx * dx + dy * dy <= 1.0:
-                    foot = tall - py <= max(2, int(tall * CLOUD_FOOT))
-                    im.putpixel((px, py), CLOUD_SHADE if foot else CLOUD_BODY)
-                    break
+    off = max(3, int(round(6 * k)))
+    for y in range(tall):
+        for x in range(wide):
+            d = dens(x, y)
+            if d < 0.35:
+                continue
+            nb = dens(x + off, y + off) if y + off <= base and dens(x, y + off) > 0 else d
+            mass = (d - nb) * 1.6
+            bill = (_fbm(x / (12 * k), y / (10 * k), seed + 31)
+                    - _fbm((x + 3 * k) / (12 * k), (y + 3 * k) / (10 * k), seed + 31)) * 4
+            height = (base - y) / max(tall * 0.8, 1)
+            lit = mass * 1.4 + bill + (height - 0.5) * 1.8 + (cx - x) / (60 * k)
+            lit -= max(0.0, 1 - (base - y) / (12 * k)) * 0.8
+            if d < 0.48:
+                col = C_SHADE if lit < 0.2 else C_BODY
+                col = col[:3] + (EDGE_ALPHA,)
+            elif lit > -0.3:
+                col = C_LIT
+            elif lit > -0.55:
+                col = C_BODY
+            elif lit > -0.95:
+                col = C_SHADE
+            else:
+                col = C_DEEP
+            im.putpixel((x, y), col)
+    return im
+
+
+def wisp(wide, tall, seed):
+    im = Image.new("RGBA", (wide, tall))
+    for x in range(wide):
+        mid = 1 - abs(x / max(wide - 1, 1) * 2 - 1)
+        rows = max(1, int(round(tall * (0.4 + 0.6 * mid) * (0.6 + 0.5 * _hash(x // 3, 0, seed)))))
+        for y in range(tall - rows, tall):
+            im.putpixel((x, y), C_BODY if y < tall - 1 or mid > 0.6 else C_GREY)
     return im
 
 
 def build_clouds(roll):
+    arts = [("near", cloud(*c)) for c in CLOUDS] + [("far", cloud(*c)) for c in FAR_CLOUDS]         + [("wisp", wisp(*c)) for c in WISPS]
     pad = 2
-    sheet = Image.new("RGBA", (sum(w + pad for w, _ in CLOUDS), max(t for _, t in CLOUDS)))
-    boxes = []
+    sheet = Image.new("RGBA", (sum(a.width + pad for _, a in arts), max(a.height for _, a in arts)))
+    boxes = {"near": [], "far": [], "wisp": []}
     x = 0
-    for wide, tall in CLOUDS:
-        art = cloud(roll, wide, tall)
-        box = art.getbbox() or (0, 0, wide, tall)
+    for kind, art in arts:
+        box = art.getbbox() or (0, 0, art.width, art.height)
         art = art.crop(box)
         sheet.alpha_composite(art, (x, 0))
-        boxes.append([x, 0, art.width, art.height])
-        x += wide + pad
+        boxes[kind].append([x, 0, art.width, art.height])
+        x += art.width + pad
     return sheet, boxes
 
 
@@ -231,7 +299,9 @@ def main():
             "bank_sand": BANK_SAND,
             "lawn_tall": LAWN_TALL,
             "lawn_sand": sand_tall,
-            "clouds": cloud_boxes,
+            "clouds": cloud_boxes["near"],
+            "far_clouds": cloud_boxes["far"],
+            "wisps": cloud_boxes["wisp"],
         }, out, indent=1)
     sheet = Image.new("RGBA", (WIDE, BANK_TALL + 60 + LAWN_TALL), (60, 110, 150, 255))
     sheet.alpha_composite(bank, (0, 0))

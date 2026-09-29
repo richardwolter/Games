@@ -4572,6 +4572,24 @@ func _push_daylight() -> void:
 	# sun moves. One uniform, every frame; see LakeGrid.sun_lean.
 	if _grid != null:
 		_grid.sun_lean(_day.lean)
+	# The sky in the clean water: turns to storm cloud under the rain's overcast, takes a hint
+	# of the low sky's colour for the hour (see water.gdshader `sky_reflect`).
+	if _water_material != null:
+		_water_material.set_shader_parameter(&"sky_reflect", 1.0)
+		_water_material.set_shader_parameter(&"sky_storm", clampf(_day.overcast, 0.0, 1.0))
+		_water_material.set_shader_parameter(&"sky_flash", clampf(Weather.flash_now / Weather.FLASH_PEAK, 0.0, 1.0))
+		_water_material.set_shader_parameter(&"sky_tint", sky_low(_day.sun))
+
+
+## The low sky's colour for where the sun is along its day: the wash room's own sky swatches,
+## morning to noon to afternoon.
+static func sky_low(at: float) -> Color:
+	var palette := Palette.master()
+	if palette == null:
+		return Color(0.72, 0.86, 0.94)
+	if at < 0.5:
+		return palette.sky_morning_low.lerp(palette.sky_noon_low, clampf(at / 0.5, 0.0, 1.0))
+	return palette.sky_noon_low.lerp(palette.sky_afternoon_low, clampf((at - 0.5) / 0.5, 0.0, 1.0))
 
 
 ## The other level, as a scene and as the words on the button that goes there. The lake is

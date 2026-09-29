@@ -562,6 +562,8 @@ def main():
             "fill": fills[name],
             "place": e.get("place", "floor"),
             "scale": float(e.get("scale", 1.0)),
+            # How much bigger the wash stand draws it than its fitted size (tuning only).
+            "wash_scale": float(e.get("wash_scale", 1.0)),
             # Per view, in view order; the shed reads a missing list as its own default.
             "base": [int(b) for b in e["base"]] if e.get("base") else [],
             "base_px": [int(b) for b in e["base_px"]] if e.get("base_px") else [],

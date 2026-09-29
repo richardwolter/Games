@@ -128,6 +128,8 @@ var lights := {}
 ## Piece name -> how many times bigger than painted the shed draws it. One for nearly
 ## everything; the bed is 1.5. The lake never reads it.
 var scales := {}
+## How much bigger the wash stand draws a find than its fitted size (`wash_scale`).
+var wash_scales := {}
 
 ## Piece name -> what to call it on screen.
 ##
@@ -237,6 +239,7 @@ func load_all() -> bool:
 		titles[name] = String(entry.get("title", ""))
 		places[name] = _place_of(String(entry.get("place", "floor")))
 		scales[name] = maxf(float(entry.get("scale", 1.0)), 0.1)
+		wash_scales[name] = maxf(float(entry.get("wash_scale", 1.0)), 0.1)
 		var depths := PackedInt32Array()
 		for depth in entry.get("base", []) as Array:
 			depths.append(maxi(int(depth), 1))
@@ -323,6 +326,11 @@ func _place_of(word: String) -> Place:
 ## How many times bigger than painted the shed draws a piece.
 func scale_of(name: StringName) -> float:
 	return float(scales.get(String(name), 1.0))
+
+
+## How much bigger the wash stand draws this find than the size it would be fitted to.
+func wash_scale_of(name: StringName) -> float:
+	return float(wash_scales.get(String(name), 1.0))
 
 
 ## How big one restored view is drawn in the shed, in source pixels: the art times the

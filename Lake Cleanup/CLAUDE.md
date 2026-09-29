@@ -3727,6 +3727,52 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   `tools/shot_rain.tscn` (desktop build, `--fixed-fps 60`, own save, under its own node)
   saves `tools/last_rain_{far,near,flash}.png` and `last_rain.log`.
 
+### The Sky in the Water (2026-09-28, `/grill-me` with Richard, off a reference picture)
+Picked off `tools/last_sky_mockup.png` (`tools/sky_reflect_mockup.py`, offline, psd-extract
+venv python; the sheet still shows lake option C and wash sky option 3 as judged).
+- **Clean water mirrors clouds** (`water.gdshader` `sky_reflect`, `sky_tint`, `sky_cloud`,
+  `sky_stretch`, `sky_drift`): cloud-shaped patches one step up the ramp, their rim broken
+  into dashed rows (option C), drifting in whole art pixels. **Only where the honest map is
+  clean** (`honest`, the filth before patches and the lane), on every clean tile from the
+  first bay, and faint, by decision: the glints were cut four times for being busy. **This is
+  the exception to "no pale strips on clean water"**: the patches are cloud-shaped and one
+  ramp step, not streaks.
+- **It follows the day** (`Lake._push_daylight`, `Lake.sky_low`): `sky_tint` is the low sky
+  swatch for the hour, mixed in at `sky_tint_mix` (0.2). **In a storm they turn to storm
+  cloud** (second pass, Richard): `sky_storm` (the overcast) takes them a step down the ramp
+  towards `sky_storm_ink` and spreads them wider, and a strike lights them (`sky_flash`). They
+  first shrank away in rain; supersedes that. `sky_cloud` went 44 to 26 and the fair-day cut
+  up to 0.64 (Richard: toned down, closer to option C). Probe: `tools/shot_rain.tscn` saves a
+  nearly cleaned lake as `last_rain_fair.png` before the shower.
+- **The wash room's clouds are one noisy mass each** (`build_wash_backdrop.py` `cloud`,
+  **reimport after**): a flat base rounding off as it rises, not a heap of round puffs
+  ("made of snowballs"). One sun, top left: the mass and each billow lit on their upper
+  left, **white the majority**, shade a blue-grey between cloud grey and sky, the base
+  melting into shade with no dark band, the thin edge half see-through (`EDGE_ALPHA`) so it
+  sits in any sky. Three sets on the sheet: `clouds` (near), `far_clouds`, `wisps`, each a
+  layer in `WashBackdrop.CLOUD_LAYERS`. **Every cloud's foot is held above the trees**
+  (`CLOUD_FOOT` 0.86 of the open sky, Richard: a tip sat on the ground in the mockup).
+- **The wash room's lake mirrors its clouds** (`_draw_cloud_reflections`): each cloud flipped
+  under the far shore, squashed by `REFLECT_SQUASH`, dashed rows at `REFLECT_MIX`, only when
+  the lake's state is clean.
+- **Open**: the wash room's sky is short (the trees start at 12% of the window), so the near
+  clouds draw at scale 1. All numbers first guesses for Richard's eye.
+- **The sky is left out of the wash room's `DARKEN`** (same day, Richard: the room read darker
+  than the lake): the darkening that keeps the grime readable is now a black veil from the far
+  waterline down plus the far bank's strip drawn at `DARKEN`, so the sky and clouds keep the
+  day's tint alone. Masts standing above the far waterline are not darkened, accepted.
+- **A storm darkens and fills the wash room's sky** (same day, Richard's picks 1 and 2 of
+  three): the clouds are multiplied towards `STORM_INK` with the rain, so white goes grey-blue
+  and the shade goes darker, and two storm-only layers (flagged `true` in `CLOUD_LAYERS`) come
+  in one cloud at a time as the rain rises (`_cloud_shown`). Flat overcast was the option not
+  taken. `shot_pump` saves `tools/last_wash_room_{storm,flash}.png`.
+  **Second pass** (Richard: much more cover, darker, the flash hitting the clouds): 28 storm
+  clouds in three layers, `STORM_INK` 0.36-0.48, the sky's steps sinking to `STORM_SKY` by
+  `STORM_SKY_MIX`, and a strike lighting the clouds from inside (`FLASH_CLOUD`, `_flash_lit`)
+  more than the sky behind them (`FLASH_SKY`).
+- `test_lake`'s `_check_sky_reflect` guards the honest-map rule, the push, the hour's tint and
+  the clouds' feet. Probes: `tools/shot_pump.tscn`, `tools/shot_nature.tscn`.
+
 ### The Market Board and the Luck Tracks (2026-09-13, old shop only)
 **2026-09-18**: the five sell-by-tier tracks and `tier_pay` are deleted, not shelved.
 **2026-09-14**: the five sell-by-tier tracks are shelved (`Lake.SHELVED`, no rows, at par);
@@ -4022,6 +4068,14 @@ A find is washed before the shed will have it. The one named exception to the sc
   `WashStand.STAND_WIDE` (0.54) of the window, just over the `ROOM_WIDE` the widest find is
   fitted to; drops slide to its real ends through `_stand_pad` (cells, per piece).
   `test_lake` puts a sofa, a lamp and nothing on it and asks for the same top.
+- **Some finds draw bigger on the stand** (2026-09-28, `/grill-me` with Richard): a
+  per-entry `wash_scale` in `tools/decor_sets.json` (carried in `pieces.json`,
+  `Sheets.wash_scale_of`) multiplies the fitted zoom, past `ROOM_WIDE`/`ROOM_TALL`. Zoom
+  still moves in steps of `FINE`, so a scale only counts once it reaches the next step:
+  old clock 1.5 (zoom 6 to 10), fridge 1.34 and tall bookcase 1.2 (6 to 8). **`tuning`
+  only reaches PSD-group pieces**; an authored entry carries it on the entry. And **the
+  lowest painted row stands on the plank** (`WashStand._stood`): a switched piece's view
+  is padded to its pair's box, and the fridge floated on five empty rows.
 - **Nothing rests on the stand** (Richard: the puddle looked bad): a drop that lands slides
   to the nearer end or turns over the front edge, creeps down the plank's face, falls, splats
   on the floor and is gone. `_pool` is retired.
@@ -5205,6 +5259,18 @@ furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
   rounds the float floor position less half the span), so the ghost is where it lands.
 - `test_lake` guards the clearance, a slide along a face making ground, the sort flip at the
   front edge and the carried piece's centre.
+- **Every turning piece's base is in pixels, on every face** (2026-09-29, `/grill-me` with
+  Richard: side views blocked the floor behind them). Side bases were whole cells authored
+  by eye and reached far up the picture (a tall bookcase side 40 of 48 px). The rule now: a
+  piece is as tall on every face, so **side base = side picture height less (front height
+  less front base)**, in `base_px` (drawn, scaled pixels). Sofa, armchair, dining chair,
+  dresser, nightstand, both bookcases, big table, side desk, counter, toilet; plus bed and
+  bathtub, which read as too deep. Other pieces stay in cells. Review sheet:
+  `tools/bases/overlay.py` writes `tools/last_shed_bases.png` (base red, clearance yellow).
+- **A walker is drawn over a piece unless it is behind it** (same day): behind means feet
+  past the base's back edge. In front, or beside it level with its base (within
+  `ShedRoom.BESIDE`, 1.5 cells, of either side), it is drawn over. Beside used to sort by
+  feet alone and the angler went under a sofa's arm.
 
 ### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
 Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,

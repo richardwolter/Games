@@ -3272,11 +3272,26 @@ func _stage_shed() -> void:
 			and not room.can_place(the_pot, Vector2i(inside.x, -(the_pot_span.y - 1))),
 			"so it stands six pixels nearer the back wall than a cell would let it",
 			"span %s" % str(the_pot_span))
-	var sofa := &"decor_sofa"
-	if sheets.has(sofa):
-		_check(not sheets.has_base_px(sofa, 0) and room.base_of(sofa) % ShedRoom.CELL == 0,
+	var hearth := &"decor_fireplace"
+	if sheets.has(hearth):
+		_check(not sheets.has_base_px(hearth, 0) and room.base_of(hearth) % ShedRoom.CELL == 0,
 			"and a piece with no pixel base still measures in whole cells",
-			"%d px" % room.base_of(sofa))
+			"%d px" % room.base_of(hearth))
+	# Walking the shed, second pass (2026-09-29): every piece that turns has its base in
+	# pixels on every face, measured as the picture less the piece's height off its front,
+	# so a side view no longer blocks the floor behind it in whole cells.
+	var cell_sides := []
+	for turner in [&"decor_sofa", &"decor_loveseat", &"decor_dining_chair", &"decor_dresser",
+			&"decor_nightstand", &"decor_bookcase_drawers", &"decor_bookcase_tall",
+			&"decor_big_table", &"decor_side_desk", &"decor_kitchen_counter", &"decor_toilet"]:
+		for v in sheets.view_count(turner):
+			if not sheets.has_base_px(turner, v):
+				cell_sides.append("%s/%d" % [turner, v])
+	_check(cell_sides.is_empty(), "every turning piece measures its base in pixels on every face",
+		str(cell_sides))
+	_check(room.base_of(&"decor_bookcase_tall", 1) < room.span_of(&"decor_bookcase_tall", 1).y / 3,
+		"a tall bookcase on its side blocks only its foot, not the floor behind it",
+		"%d of %d" % [room.base_of(&"decor_bookcase_tall", 1), room.span_of(&"decor_bookcase_tall", 1).y])
 	# Free placement (2026-09-16): the unit is one source pixel, so a piece may be nudged by
 	# one — the whole point of the change. Placed at a pixel that is not a cell boundary and
 	# read back unrounded.
@@ -3347,6 +3362,12 @@ func _stage_shed() -> void:
 		_check(ahead > foot_row and back < foot_row,
 			"a walker sorts in front below a piece's front edge and behind above it",
 			"%.2f / %.2f against %.2f" % [ahead, back, foot_row])
+		# Beside a piece, level with its base, the walker is drawn over it (2026-09-29).
+		var beside_x := float(mid.x + tall_span.x) / cellf + clear + 0.3
+		var beside: float = room.call(&"_walker_key",
+			Vector2(beside_x, foot_row - 0.3), decor)
+		_check(beside > foot_row, "a walker standing beside a piece is drawn over it",
+			"%.2f against %.2f" % [beside, foot_row])
 		# A piece in hand is drawn centred on the pointer from the first frame (2026-09-27).
 		var floor_box: Rect2 = room.call(&"_floor_rect")
 		room.set(&"_pointer", floor_box.get_center() + Vector2(0.37, 0.61))
@@ -6075,11 +6096,39 @@ func _stage_nature() -> void:
 	_check(not fish.has_method("catch") and not fish.has_method("pay"),
 		"fish have no catch and no pay", "")
 	_check_bees(flora)
+	_check_sky_reflect()
 	_check_wildlife()
 	_advance()
 
 
 ## Bees (2026-09-22): only at grown flowers, never more than the cap, none on a fresh lake.
+## The sky in the clean water and the wash room's clouds (2026-09-28): the reflection reads
+## the honest map, not the patched filth; the lake pushes it off the overcast and the hour;
+## the wash room holds every cloud's foot above the trees and mirrors only on clean water.
+func _check_sky_reflect() -> void:
+	var src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
+	_check(src.contains("uniform float sky_reflect") and src.contains("pow(honest, color_bite) < state_at.x"),
+		"the sky reflects on honest clean water only", "")
+	var mat := _water_material()
+	_main.call(&"_push_daylight")
+	var shown = mat.get_shader_parameter(&"sky_reflect") if mat != null else null
+	_check(shown != null and float(shown) > 0.0, "the lake pushes the sky's reflection", str(shown))
+	var morning := Lake.sky_low(0.0)
+	var late := Lake.sky_low(1.0)
+	_check(not morning.is_equal_approx(late), "the reflection's tint follows the hour", "%s %s" % [morning, late])
+	var back := WashBackdrop.new()
+	back.size = Vector2(1280, 720)
+	add_child(back)
+	var sky := 200.0
+	var worst := 0.0
+	for cloud: Array in back.get(&"_clouds"):
+		var at: Array = back.call(&"_cloud_rect", cloud, sky)
+		worst = maxf(worst, (at[0] as Rect2).end.y)
+	_check(worst <= sky * WashBackdrop.CLOUD_FOOT + 0.01, "no wash room cloud's foot reaches the trees",
+		"%.1f of %.1f" % [worst, sky])
+	back.queue_free()
+
+
 func _check_bees(flora: Flora) -> void:
 	_check(flora.bee_count() > 0 and flora.bee_count() <= Flora.BEES_MOST,
 		"bees came to the flowers on the cleared half, up to the cap", "%d" % flora.bee_count())
@@ -8926,4 +8975,35 @@ func _check_blurb_and_wake() -> void:
 	_check(not stand.awake(), "the press let go, it still waits", "")
 	stand.call(&"_drive_wake", WashStand.WAKE_AFTER + 0.01)
 	_check(stand.awake(), "and then the nozzle is the player's", "")
+	stand.free()
+	_check_wash_sizes()
+
+
+## The clock, the fridge and the tall bookcase draw bigger on the wash stand than they are
+## fitted to (`wash_scale`), and every find's lowest painted row stands on the plank.
+func _check_wash_sizes() -> void:
+	var book: Sheets = _main.get(&"_sheets")
+	var stand := WashStand.new()
+	stand.size = Vector2(1280.0, 720.0)
+	stand.sheets = book
+	add_child(stand)
+	for name: StringName in [&"decor_old_clock", &"decor_fridge", &"decor_bookcase_tall"]:
+		_check(book.wash_scale_of(name) > 1.0, "%s has a wash scale" % name, "")
+		stand.put(name)
+		var grown: int = stand.get(&"_zoom")
+		stand.set(&"_grow", 1.0)
+		stand.call(&"_fit")
+		_check(grown > int(stand.get(&"_zoom")), "%s draws bigger on the stand" % name,
+			"%d against %d" % [grown, stand.get(&"_zoom")])
+	var art: Image = book.atlas.get_image()
+	for name: String in book.names:
+		if not WashRoom.is_find(book, name):
+			continue
+		stand.put(StringName(name))
+		var region: Rect2 = stand.get(&"_region")
+		var y := int(region.end.y) - 1
+		var painted := false
+		for x in range(int(region.position.x), int(region.end.x)):
+			painted = painted or art.get_pixel(x, y).a > 0.0
+		_check(painted, "%s stands its lowest painted row on the plank" % name, "")
 	stand.free()

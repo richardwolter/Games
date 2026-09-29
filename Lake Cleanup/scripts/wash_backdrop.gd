@@ -65,9 +65,37 @@ const CONTRACT := "res://assets/wash_backdrop.json"
 const PIXEL_FPS := 8.0
 const SKY_STEPS := 5
 ## The clouds: how many ride each layer, each layer's pace in canvas pixels a second, how
-## big it draws, and how far down the sky (as a share of it) its clouds may sit. The far
-## layer is smaller, slower and lower.
-const CLOUD_LAYERS := [[4, 3.0, 1.0, Vector2(0.35, 0.8)], [3, 6.0, 2.0, Vector2(0.05, 0.5)]]
+## big it draws, how far down the sky (as a share of it) its clouds' tops may sit, and which
+## of the builder's sets it draws from. Far, small and slow, then the wisps high up, then
+## the big near clouds (2026-09-28, the reference pass). A cloud's foot is held clear of the
+## trees (`CLOUD_FOOT`): tall ones drew their base down on the treeline.
+const CLOUD_LAYERS := [
+	[3, 3.0, 1.0, Vector2(0.2, 0.5), "far_clouds"],
+	[7, 4.0, 1.0, Vector2(0.02, 0.3), "wisps"],
+	[3, 6.0, 1.0, Vector2(0.0, 0.2), "clouds"],
+	[9, 5.0, 1.0, Vector2(0.0, 0.3), "clouds", true],
+	[9, 4.2, 1.0, Vector2(-0.25, 0.1), "clouds", true],
+	[10, 3.5, 1.0, Vector2(0.15, 0.55), "far_clouds", true],
+]
+## A storm (2026-09-28, Richard): as the shower rises the clouds sink into their shade
+## (`STORM_INK` at full rain, multiplied over the picture, so white goes to grey-blue and the
+## shade goes darker), and the layers flagged `true` above come in one cloud at a time, so the
+## sky fills. The flash still lights the lot through the backdrop's modulate.
+const STORM_INK := Color(0.36, 0.4, 0.48)
+## The sky behind a storm: its steps sink towards `STORM_SKY` by `STORM_SKY_MIX` at full rain.
+const STORM_SKY := Color(0.26, 0.3, 0.38)
+const STORM_SKY_MIX := 0.85
+## A flash lights the clouds from inside: their ink is pushed past white by up to
+## `FLASH_CLOUD` at the strike's peak, so the shade lights up as much as the tops; the sky
+## behind lifts by `FLASH_SKY`, less, so the clouds stand out against it.
+const FLASH_CLOUD := Color(1.05, 1.08, 1.2)
+const FLASH_SKY := 0.35
+const CLOUD_FOOT := 0.86
+## The clouds in the wash room's lake: their picture mirrored under the far shore, squashed
+## by `REFLECT_SQUASH`, broken into dashed rows and laid over the water at `REFLECT_MIX`.
+## Only on clean water, the main lake's rule.
+const REFLECT_SQUASH := 0.5
+const REFLECT_MIX := 0.5
 const CLOUD_SEED := 611
 ## The streaks' drift along the shore at the far and the near shore, canvas pixels a second,
 ## how long one stays before it is rolled again, and how many are showing at once.
@@ -141,6 +169,10 @@ const PIXEL := 2.0
 const HORIZON := 0.52
 const LAKE_TALL := 44
 const DARKEN := 0.66
+## The sky and its clouds are left out of `DARKEN` (2026-09-28, Richard): it was there for
+## the grime against the lawn, and it greyed the clouds' white. The ground, the water and
+## everything on them are darkened by a black veil laid over them in `_draw`, from the far
+## waterline down, and the far bank's strip is drawn at `DARKEN`; the birds and the rain are drawn over it.
 ## How far down the bank strip the treetops are, as a share of it: where the sky ends.
 const CROWNS_AT := 0.12
 
@@ -173,7 +205,7 @@ var sun := 0.3:
 var tint := Color.WHITE:
 	set(value):
 		tint = value
-		modulate = Color(tint.r * DARKEN, tint.g * DARKEN, tint.b * DARKEN)
+		modulate = Color(tint.r, tint.g, tint.b)
 
 ## How many dogs are in the player's pack, and the flock's sheet and birds (`Flock.kinds`).
 ## Lent by the room; with none there are simply no dogs or no pigeons.
@@ -189,7 +221,7 @@ var rubbish: Array = []
 var _bank: Texture2D
 var _lawn: Texture2D
 var _cloud_art: Texture2D
-var _cloud_boxes: Array[Rect2] = []
+var _cloud_boxes := {}
 var _palette: Palette
 var _streaks: Array = []
 var _clouds: Array = []
@@ -265,18 +297,24 @@ func _load_clouds() -> void:
 	if not (book is Dictionary) or not (book as Dictionary).has("clouds"):
 		return
 	_cloud_art = load(CLOUD_ART)
-	for box: Array in book["clouds"]:
-		_cloud_boxes.append(Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3])))
+	for key: String in ["clouds", "far_clouds", "wisps"]:
+		var boxes: Array[Rect2] = []
+		for box: Array in book.get(key, []):
+			boxes.append(Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3])))
+		_cloud_boxes[key] = boxes
 	var roll := RandomNumberGenerator.new()
 	roll.seed = CLOUD_SEED
 	for layer in CLOUD_LAYERS.size():
+		var set: Array = _cloud_boxes[CLOUD_LAYERS[layer][4]]
+		if set.is_empty():
+			continue
 		var count := int(CLOUD_LAYERS[layer][0])
 		for k in count:
 			# Which picture, where across (a share of the lap, spread and then shoved), how
 			# far down its layer's band.
 			_clouds.append([
-				layer, roll.randi() % _cloud_boxes.size(),
-				(float(k) + roll.randf_range(-0.3, 0.3)) / float(count), roll.randf()
+				layer, roll.randi() % set.size(),
+				(float(k) + roll.randf_range(-0.3, 0.3)) / float(count), roll.randf(), k
 			])
 
 
@@ -391,7 +429,7 @@ func step(delta: float) -> void:
 	_strike_bolt(delta)
 	# The shower greys the view as it greys the lake; the flash whitens it.
 	var grey := Color.WHITE.lerp(RAIN_TINT, Weather.now).lerp(Color(1.5, 1.5, 1.6), Weather.flash_now)
-	modulate = Color(tint.r * DARKEN * grey.r, tint.g * DARKEN * grey.g, tint.b * DARKEN * grey.b)
+	modulate = Color(tint.r * grey.r, tint.g * grey.g, tint.b * grey.b)
 	_bark_in = maxf(_bark_in - delta, 0.0)
 	_drive_birds(delta)
 	_drive_dogs(delta)
@@ -602,25 +640,28 @@ func _draw() -> void:
 		var to := lake.position.y
 		if k < SKY_STEPS - 1:
 			to = snappedf(open * float(k + 1) / float(SKY_STEPS), PIXEL)
-		draw_rect(
-			Rect2(0.0, from, size.x, to - from),
-			sky[0].lerp(sky[1], float(k) / float(SKY_STEPS - 1))
-		)
+		var step := sky[0].lerp(sky[1], float(k) / float(SKY_STEPS - 1))
+		step = step.lerp(STORM_SKY, clampf(Weather.now, 0.0, 1.0) * STORM_SKY_MIX)
+		step = step.lerp(Color(0.85, 0.87, 0.95), _flash_lit() * FLASH_SKY)
+		draw_rect(Rect2(0.0, from, size.x, to - from), step)
 	_draw_clouds(open)
 	_draw_bolt(bank_top + bank_tall * CROWNS_AT)
 	_draw_water(lake)
-	_tile(_bank, bank_top)
+	_draw_cloud_reflections(open, lake)
+	_tile(_bank, bank_top, Color(DARKEN, DARKEN, DARKEN))
 	# Over the far bank, not under it: a mast on the far lane stands up in front of the
 	# trees, and drawn under the strip the hull sailed with its sail behind the sand.
 	_draw_afloat(lake)
 	_tile(_lawn, lake.end.y)
 	_draw_dogs()
+	# The veil: `DARKEN` over the ground and the water, not the sky.
+	draw_rect(Rect2(0.0, lake.position.y, size.x, size.y - lake.position.y), Color(0.0, 0.0, 0.0, 1.0 - DARKEN))
 	_draw_birds()
 	_draw_rain(lake)
 	# Whatever a tall window leaves under the lawn strip: its last row, carried down.
 	var lawn_end := lake.end.y + _lawn.get_height() * PIXEL
 	if lawn_end < size.y:
-		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light)
+		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light * Color(DARKEN, DARKEN, DARKEN))
 
 
 ## The rain over the view from the pump (2026-09-25, see `Weather`): it reads the lake's
@@ -760,25 +801,82 @@ func _draw_water(lake: Rect2) -> void:
 		span += 1
 
 
+## Where a cloud is drawn, and its picture's rectangle on the sheet.
+func _cloud_rect(cloud: Array, sky_tall: float) -> Array:
+	var layer: Array = CLOUD_LAYERS[int(cloud[0])]
+	var box: Rect2 = (_cloud_boxes[layer[4]] as Array)[int(cloud[1])]
+	var band: Vector2 = layer[3]
+	var lap := size.x + 520.0
+	var drawn := box.size * PIXEL * float(layer[2])
+	var x := fposmod(float(cloud[2]) * lap + stepped() * float(layer[1]), lap) - 500.0
+	var y := minf(sky_tall * lerpf(band.x, band.y, float(cloud[3])), sky_tall * CLOUD_FOOT - drawn.y)
+	return [Rect2(Vector2(snappedf(x, PIXEL), snappedf(maxf(y, 0.0), PIXEL)), drawn), box]
+
+
 func _draw_clouds(sky_tall: float) -> void:
 	if _cloud_art == null:
 		return
-	var now := stepped()
-	var lap := size.x + 260.0
+	var rain := clampf(Weather.now, 0.0, 1.0)
+	var ink := Color.WHITE.lerp(STORM_INK, rain).lerp(FLASH_CLOUD, _flash_lit())
 	for cloud: Array in _clouds:
-		var layer: Array = CLOUD_LAYERS[int(cloud[0])]
-		var box: Rect2 = _cloud_boxes[int(cloud[1])]
-		var band: Vector2 = layer[3]
-		var x := fposmod(float(cloud[2]) * lap + now * float(layer[1]), lap) - 240.0
-		var y := sky_tall * lerpf(band.x, band.y, float(cloud[3]))
-		draw_texture_rect_region(
-			_cloud_art,
-			Rect2(
-				Vector2(snappedf(x, PIXEL), snappedf(y, PIXEL)),
-				box.size * PIXEL * float(layer[2])
-			),
-			box
-		)
+		var shown := _cloud_shown(cloud, rain)
+		if shown <= 0.0:
+			continue
+		var at := _cloud_rect(cloud, sky_tall)
+		draw_texture_rect_region(_cloud_art, at[0], at[1], Color(ink, shown))
+
+
+## How lit the storm is by lightning, 0 to 1.
+func _flash_lit() -> float:
+	return clampf(Weather.flash_now / Weather.FLASH_PEAK, 0.0, 1.0)
+
+
+## How much of a cloud shows: fair-weather ones always, a storm layer's one at a time as the
+## rain rises, each easing in over a slice of it.
+func _cloud_shown(cloud: Array, rain: float) -> float:
+	var layer: Array = CLOUD_LAYERS[int(cloud[0])]
+	if layer.size() < 6 or not bool(layer[5]):
+		return 1.0
+	var count := float(layer[0])
+	var k := float(cloud[4])
+	return clampf((rain * count - k) * 1.5, 0.0, 1.0)
+
+
+## The clouds in the lake: each near cloud's picture flipped under the far shore and cut
+## into dashed rows, only while the water reads clean.
+func _draw_cloud_reflections(sky_tall: float, lake: Rect2) -> void:
+	if _cloud_art == null or state_of(filth) != 0:
+		return
+	var horizon := lake.position.y
+	for cloud: Array in _clouds:
+		if _cloud_shown(cloud, clampf(Weather.now, 0.0, 1.0)) <= 0.0:
+			continue
+		var at: Array = _cloud_rect(cloud, sky_tall)
+		var drawn: Rect2 = at[0]
+		var box: Rect2 = at[1]
+		var from := horizon + (horizon - drawn.end.y) * REFLECT_SQUASH * 0.5
+		var tall := drawn.size.y * REFLECT_SQUASH
+		var rows := int(tall / PIXEL)
+		for r in rows:
+			if r % 2 == 1:
+				continue
+			var y := snappedf(from + float(r) * PIXEL, PIXEL)
+			if y < horizon + PIXEL or y >= lake.end.y - PIXEL:
+				continue
+			# Bottom of the cloud first: a mirror turns it over.
+			var src_y := box.end.y - 1.0 - floorf(float(r) / float(rows) * box.size.y)
+			var seg := 0.0
+			while seg < drawn.size.x:
+				var long := PIXEL * 4.0
+				if _hash(int(seg / long) + int(cloud[1]) * 97, int(y)) > 0.4:
+					var src_x := box.position.x + floorf(seg / drawn.size.x * box.size.x)
+					draw_texture_rect_region(
+						_cloud_art,
+						Rect2(drawn.position.x + seg, y, long, PIXEL),
+						Rect2(src_x, src_y, maxf(box.size.x * long / drawn.size.x, 1.0), 1.0),
+						Color(1, 1, 1, REFLECT_MIX)
+					)
+				seg += long
 
 
 ## What is on the water, far to near: the rubbish and the hulls sorted together by their
@@ -905,9 +1003,9 @@ static func _hash(a: int, b: int) -> float:
 
 
 ## A strip laid across the window at `top`, as many times as the window is wide.
-func _tile(strip: Texture2D, top: float) -> void:
+func _tile(strip: Texture2D, top: float, ink := Color.WHITE) -> void:
 	var box := Vector2(strip.get_width(), strip.get_height()) * PIXEL
 	var x := 0.0
 	while x < size.x:
-		draw_texture_rect(strip, Rect2(Vector2(x, top), box), false)
+		draw_texture_rect(strip, Rect2(Vector2(x, top), box), false, ink)
 		x += box.x

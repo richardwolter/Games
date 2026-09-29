@@ -59,6 +59,25 @@ func _physics_process(_delta: float) -> void:
 	var puddles: Puddles = _main.get(&"_puddles")
 	match _frames:
 		30:
+			# A lake nearly cleaned first, so the sky's reflection in clean water shows on a fair
+			# day and can be seen going as the shower comes in.
+			var grid: LakeGrid = _main.get(&"_grid")
+			for index in grid.stacks.size():
+				var tile := grid.tile_of(index)
+				var h := sin(float(tile.x) * 12.9898 + float(tile.y) * 78.233) * 43758.5453
+				if h - floor(h) >= 0.04:
+					grid.stacks[index] = PackedInt32Array()
+			grid._rebuild()
+			grid.queue_redraw()
+			_main._build_filth_map()
+			get_viewport().warp_mouse(Vector2(8.0, 8.0))
+		150:
+			var left := 0
+			for st in (_main.get(&"_grid") as LakeGrid).stacks:
+				if not st.is_empty():
+					left += 1
+			_say("stacks left %d" % left)
+			_shot("fair")
 			weather.pour(600.0)
 		# Fill the puddles in a hurry: the look is the thing, not the minutes it takes.
 		400:

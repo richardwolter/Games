@@ -134,4 +134,20 @@ func _physics_process(delta: float) -> void:
 			if _age < 0.3:
 				return
 			get_viewport().get_texture().get_image().save_png("res://tools/last_wash_room_clean.png")
+			# And in a storm: a shower poured and let rise, then a strike.
+			var weather: Weather = _lake.get(&"_weather")
+			weather.pour(600.0)
+			_step = 4
+			_age = 0.0
+		4:
+			if _age < 12.0:
+				return
+			get_viewport().get_texture().get_image().save_png("res://tools/last_wash_room_storm.png")
+			(_lake.get(&"_weather") as Weather).strike()
+			_step = 5
+			_age = 0.0
+		5:
+			if _age < 0.05:
+				return
+			get_viewport().get_texture().get_image().save_png("res://tools/last_wash_room_flash.png")
 			get_tree().quit()

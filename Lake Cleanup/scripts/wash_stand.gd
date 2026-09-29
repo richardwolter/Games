@@ -247,6 +247,8 @@ var _rows := 0
 var _zoom := 4
 var _cell := 2.0
 var _origin := Vector2.ZERO
+## The find's `wash_scale`: multiplies the fitted zoom, past `ROOM_WIDE`/`ROOM_TALL`.
+var _grow := 1.0
 
 var _solid := PackedByteArray()
 var _grime := PackedFloat32Array()
@@ -383,7 +385,8 @@ func put(what: StringName) -> void:
 		return
 	if _art == null:
 		_art = sheets.atlas.get_image()
-	_region = sheets.view_region_of(what, 0)
+	_region = _stood(sheets.view_region_of(what, 0))
+	_grow = sheets.wash_scale_of(what)
 	_cols = int(_region.size.x) * FINE
 	_rows = int(_region.size.y) * FINE
 	_roll.seed = hash(String(what))
@@ -519,12 +522,28 @@ func _wear(cx: int, cy: int, take: float) -> float:
 	return before - after
 
 
+## The region less any empty rows under the drawing, so the lowest painted row stands on
+## the plank. A switched piece's view is padded to its pair's box (`shared_frame`), and the
+## fridge carried five empty rows it stood on in the air.
+func _stood(region: Rect2) -> Rect2:
+	var x0 := int(region.position.x)
+	var y0 := int(region.position.y)
+	var rows := int(region.size.y)
+	while rows > 1:
+		var y := y0 + rows - 1
+		for x in range(x0, x0 + int(region.size.x)):
+			if _art.get_pixel(x, y).a > 0.0:
+				return Rect2(region.position, Vector2(region.size.x, rows))
+		rows -= 1
+	return Rect2(region.position, Vector2(region.size.x, rows))
+
+
 func _fit() -> void:
 	if _cols == 0:
 		return
 	var wide := _region.size.x
 	var tall := _region.size.y
-	var zoom := int(floor(minf(size.x * ROOM_WIDE / wide, size.y * ROOM_TALL / tall)))
+	var zoom := int(floor(minf(size.x * ROOM_WIDE / wide, size.y * ROOM_TALL / tall) * _grow))
 	zoom = clampi(zoom, ZOOM_LEAST, ZOOM_MOST)
 	zoom = maxi(zoom - zoom % FINE, FINE)
 	_zoom = zoom

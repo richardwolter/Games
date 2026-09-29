@@ -82,8 +82,9 @@ func _set_stage(stage: int) -> void:
 			var h := sin(float(tile.x) * 12.9898 + float(tile.y) * 78.233) * 43758.5453
 			keep = (h - floor(h)) < 0.04
 		if not keep:
-			grid.stacks[index].resize(0)
+			grid.stacks[index] = PackedInt32Array()
 	grid._rebuild()
+	grid.queue_redraw()
 	_main._build_filth_map()
 	# Broods arrive one at a time a few seconds apart; the picture wants a few of them in.
 	var wild: Wildlife = _main.get(&"_wildlife")
