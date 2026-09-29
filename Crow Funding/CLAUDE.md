@@ -105,6 +105,30 @@ layer).
   deck under the crows. The title label is hidden.
 - `tools/shot.tscn -- phase=0.75` holds the sky at a time of day for screenshots.
 
+## Environments (level 2: Downtown, added 2026-09-26)
+
+Two cities, picked freely and **visual only** (loot, economy and save are shared).
+`scripts/environments.gd` lists them (`classic` Old Town, `modern` Downtown); the
+`Settings` autoload stores the choice in `user://settings.cfg` and emits
+`environment_changed`, and City, Sky and Balcony swap live. **F2 cycles it**: there
+is no settings screen yet, so the key stands in for the dropdown.
+
+- **City**: `skyline_modern` seed 8912, cut by `tools/skyline_art.py <preview>
+  --modern`. It writes `city_modern.png` and `city_modern_lights.json` (window
+  rects, neon spots, blinker tips, street lines, horizon); `city.gd` reads the
+  horizon from the JSON and animates the lights live.
+- **Night**: window grids switching on and off, flickering neon signs, red aviation
+  blinkers from dusk, traffic streaks and a street glow. Neon breaks the one-colour
+  rule on purpose; it stays saturated while the scarves are pastel.
+- **Balcony**: glass panels under a steel handrail. `tools/balcony_modern_template.py`
+  writes the template and mask, img2img `balcony_modern` d0.4 seed 9101, then
+  `tools/scene_art_modern.py` composites it (glass is a faint tint, ink is opaque).
+- **Sun and moon**: drawn in code (`sky.gd` `_draw_flat_sun` / `_draw_flat_moon`) as
+  a flat disc and a sharp crescent with ink rings. Only a few stars (light pollution).
+- `tools/shot.tscn -- env=modern` shoots the chosen city without saving it.
+  `tools/_py.sh` runs Python with PIL/cv2 (ComfyUI's interpreter); plain `python`
+  on this machine has neither.
+
 ## Next
 
 1. Judge the crows in-game: size, flap speed, idle timing, the wing-edge flip.

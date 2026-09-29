@@ -283,6 +283,51 @@
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
             "negative_extra": "face, colour, landscape, text, stars, crescent",
             "_note": "Moon sprite."
+        },
+        {
+            "name": "skyline_modern",
+            "out": "art/scene/skyline_modern_raw.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 8910,
+            "variants": 6,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "breathtaking panoramic skyline of a dense modern downtown seen from far away across the rooftops, glass and steel skyscrapers with regular grids of windows, office towers, construction cranes, rooftop antennas, water tanks and air conditioning units, billboards on rooftops, elevated highway, streets deep below, dramatic scale, empty plain sky in the upper third",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, colour, grey wash, clouds, sun, moon, frame, gothic, domes, cathedral, old european, balcony, railing, interior, furniture, window frame, foreground",
+            "_note": "Level 2 modern city skyline (Richard 2026-09-26: modern environment beside the classic one). Cut by tools/skyline_art.py --modern."
+        },
+        {
+            "name": "balcony_modern",
+            "out": "art/scene/balcony_modern_raw.png",
+            "ref": "art_ref/balcony_modern_in.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1664,
+                256
+            ],
+            "seed": 9100,
+            "variants": 4,
+            "denoise": 0.4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "strip_shadow": false,
+            "prompt": "a modern apartment balcony railing seen straight from the front, frameless clear glass panels, round brushed steel handrail on top, slim steel posts with clamps, minimal contemporary architecture",
+            "negative_extra": "colour, people, birds, city, sky, perspective, wood, stone, balusters, ornament",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "_note": "Level 2 glass + steel balcony. Geometry from tools/balcony_modern_template.py, alpha from its mask (tools/scene_art.py --modern)."
         }
     ]
 }

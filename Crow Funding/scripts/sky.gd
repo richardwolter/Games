@@ -6,6 +6,8 @@ extends Node2D
 
 signal phase_changed(p: float)
 
+const Envs = preload("res://scripts/environments.gd")
+
 const DESIGN_SIZE := Vector2(1152, 648)
 const HORIZON := 300.0
 
@@ -26,6 +28,9 @@ const SUN_TEX := preload("res://art/scene/sun.png")
 const MOON_TEX := preload("res://art/scene/moon.png")
 const SUN_SIZE := 78.0
 const MOON_SIZE := 58.0
+# Modern city: bold graphic shapes instead of engravings - a flat disc and a sharp
+# crescent, poster-like, with an ink ring. Light pollution leaves few stars.
+const MODERN_STAR_COUNT := 6
 const SUN_RAMP: Array[Color] = [
 	Color(1.0, 0.9, 0.62),
 	Color(1.0, 0.72, 0.38),
@@ -39,10 +44,13 @@ var _elapsed := 0.0
 var _tween: Tween
 var _gradient: Gradient = null
 var _stars: Array[Vector2] = []
+var _env: String = Envs.CLASSIC
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_build_stars()
+	_env = Envs.current(self)
+	Envs.watch(self, _on_env)
 	if not Engine.is_editor_hint():
 		var backdrop := get_node_or_null(backdrop_path) as TextureRect
 		if backdrop != null and backdrop.texture is GradientTexture2D:
@@ -50,6 +58,10 @@ func _ready() -> void:
 			backdrop.texture = tex
 			_gradient = tex.gradient
 			_update_gradient()
+	queue_redraw()
+
+func _on_env(id: String) -> void:
+	_env = id
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -120,7 +132,8 @@ func _draw_stars(view: Vector2) -> void:
 	var alpha := clampf((phase - 0.6) / 0.35, 0.0, 1.0)
 	if alpha <= 0.01:
 		return
-	for i in _stars.size():
+	var count := _stars.size() if _env == Envs.CLASSIC else MODERN_STAR_COUNT
+	for i in count:
 		var pos: Vector2 = _stars[i]
 		var tw := 0.7 + 0.3 * sin(_elapsed * 2.0 + float(i) * 1.7)
 		var p := Vector2(pos.x * view.x, pos.y * view.y)
@@ -144,6 +157,9 @@ func _draw_sun(view: Vector2) -> void:
 	var tint := Color.WHITE.lerp(_sample_ramp(SUN_RAMP, t), 0.55)
 	tint.a = alpha
 	var size := lerpf(SUN_SIZE, SUN_SIZE * 1.12, t)
+	if _env == Envs.MODERN:
+		_draw_flat_sun(pos, size * 0.42, t, alpha)
+		return
 	var rot := _elapsed * 0.03
 	draw_set_transform(pos, rot, Vector2.ONE)
 	draw_texture_rect(SUN_TEX, Rect2(-size * 0.5, -size * 0.5, size, size), false, tint)
@@ -159,7 +175,46 @@ func _draw_moon(view: Vector2) -> void:
 	var alpha := 1.0 if t > 0.55 else 0.0
 	if alpha <= 0.01:
 		return
+	if _env == Envs.MODERN:
+		_draw_flat_moon(pos, MOON_SIZE * 0.4, alpha)
+		return
 	draw_texture_rect(MOON_TEX, Rect2(pos - Vector2(MOON_SIZE, MOON_SIZE) * 0.5, Vector2(MOON_SIZE, MOON_SIZE)), false, Color(0.97, 0.96, 0.9, alpha))
+
+# A flat disc: solid paper-warm fill, a clean ink ring, and one offset ring echo
+# like a screen-print misregistration.
+func _draw_flat_sun(pos: Vector2, r: float, t: float, alpha: float) -> void:
+	var fill := _sample_ramp(SUN_RAMP, t).lerp(Color.WHITE, 0.15)
+	fill.a = alpha
+	draw_circle(pos + Vector2(4, 3), r, Color(INK, 0.18 * alpha))
+	draw_circle(pos, r, fill)
+	draw_arc(pos, r, 0.0, TAU, 64, Color(INK, alpha), 2.5, true)
+	draw_arc(pos, r + 7.0, -0.4, 1.9, 32, Color(INK, 0.8 * alpha), 2.0, true)
+
+# A sharp crescent: the outer disc minus an offset disc, traced as one polygon -
+# the outer circle where it clears the cut, then the cut circle back inside it.
+func _draw_flat_moon(pos: Vector2, r: float, alpha: float) -> void:
+	var off := Vector2(r * 0.5, -r * 0.25)
+	var c2 := pos + off
+	var r2 := r * 0.92
+	var base := (-off).angle()
+	var n := 48
+	var pts := PackedVector2Array()
+	for k in range(-n, n + 1):
+		var a := base + PI * float(k) / n
+		var q := pos + Vector2(cos(a), sin(a)) * r
+		if q.distance_to(c2) >= r2:
+			pts.append(q)
+	for k in range(n, -n - 1, -1):
+		var a := base + PI * float(k) / n
+		var q := c2 + Vector2(cos(a), sin(a)) * r2
+		if q.distance_to(pos) < r:
+			pts.append(q)
+	if pts.size() < 3:
+		return
+	draw_colored_polygon(pts, Color(0.97, 0.96, 0.9, alpha))
+	var ring := pts.duplicate()
+	ring.append(pts[0])
+	draw_polyline(ring, Color(INK, alpha), 2.0, true)
 
 func _sample_ramp(ramp: Array, t: float) -> Color:
 	var p := clampf(t, 0.0, 1.0) * float(ramp.size() - 1)

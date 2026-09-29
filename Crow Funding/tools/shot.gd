@@ -3,7 +3,8 @@ extends Node
 ## Run windowed (a headless run has no renderer):
 ##   <godot> --path . tools/shot.tscn --log-file tools/_shot.log
 ## Optional user args after `--`: out=<path> frames=<n> fly=1 (sends the crew out)
-## phase=<0..1> (holds the sky at that time of day: 0.66 sunset, 1 night).
+## phase=<0..1> (holds the sky at that time of day: 0.66 sunset, 1 night)
+## env=<classic|modern> (which city; set in memory only, never saved).
 
 var _frames := 0
 var _target := 90
@@ -21,6 +22,7 @@ func _ready() -> void:
 				"frames": _target = int(kv[1])
 				"fly": _fly = kv[1] == "1"
 				"phase": _phase = float(kv[1])
+				"env": get_node("/root/Settings").environment = kv[1]
 	_game = load("res://main.tscn").instantiate()
 	add_child(_game)
 
