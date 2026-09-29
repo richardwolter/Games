@@ -34,6 +34,10 @@ DIRS = ["south", "north", "east", "west"]
 # Must match `Angler.PET_SIDE_ANGLES` / `PET_FRONT_ANGLES`.
 SIDE_ANGLES = [0, 25, 50, 75]
 FRONT_ANGLES = [-40, -12, 12, 40]
+# Back view: degrees the arm swings off straight up the screen, towards screen right
+# (`Angler.PET_BACK_ANGLES`). Mostly out to the left, the free hand's side, where the hat's
+# brim does not hide it.
+BACK_ANGLES = [-70, -45, -20, 5]
 
 # Per frame: how many rows the upper body drops, how far the arm is out (0 none, 0.55 half,
 # 1 full) and the hand's lift in pixels (the pat).
@@ -89,7 +93,7 @@ def crouch(figure, drop):
     return out, waist + drop
 
 
-def arm(im, shoulder, heading, reach, lift):
+def arm(im, shoulder, heading, reach, lift, behind=False):
     """Paints the arm from `shoulder` along `heading` (a unit vector), `reach` of its length."""
     long = ARM_LONG * reach
     # Only the fist and forearm when half out: the sleeve is always there.
@@ -115,6 +119,10 @@ def arm(im, shoulder, heading, reach, lift):
             if abs(s) > half:
                 continue
             cells[(x, y)] = shade if s > half - 1.0 else colour
+    if behind:
+        # Reaching away from the camera: the arm is behind the body and the hat, so only
+        # what shows past their edges is drawn.
+        cells = {c: v for c, v in cells.items() if im.getpixel(c)[3] < 128}
     for (x, y), colour in cells.items():
         im.putpixel((x, y), colour)
     for (x, y) in list(cells):
@@ -126,6 +134,8 @@ def arm(im, shoulder, heading, reach, lift):
             # smear of cream on cream. Only where the arm is in front of it (the front view)
             # does that line show; on the side views the shoulder end is inside the arm's
             # own drawing.
+            if behind and im.getpixel(n)[3] >= 128:
+                continue
             im.putpixel(n, OUTLINE)
 
 
@@ -137,27 +147,36 @@ def shoulder_of(im, waist, direction):
         return (max(xs) - 1.5, row)
     if direction == "west":
         return (min(xs) + 1.5, row)
-    # Front: from the free hand's shoulder (Richard, 2026-09-28: "it should come from free
-    # left hand"), the figure's left, the screen's right; the basket is in the other.
-    return (FREE_SHOULDER[0] + PAD, FREE_SHOULDER[1] + (waist - _WAIST_AT_REST))
+    # Front and back: from the free hand's shoulder (Richard, 2026-09-28: "it should come
+    # from free left hand"). The figure's left is the screen's right seen from the front and
+    # the screen's left seen from behind; the basket is in the other hand.
+    free = FREE_ARMS[direction]
+    shoulder = free["shoulder"]
+    return (shoulder[0] + PAD, shoulder[1] + (waist - _WAIST_AT_REST))
 
 
-# The south idle frame's free arm, in that frame's own pixels (measured off
-# `idle_south.png`, frame 0): the sleeve from row 25, the hand and its outline down to row 36, columns 26 to
-# 31 right of the torso's outline at 25. Cleared while the arm is out, so there are not two.
-FREE_ARM = (26, 25, 32, 37)
-FREE_SHOULDER = (26.5, 26.5)
+# The free arm on the front and back idle frames, in that frame's own pixels (measured off
+# `idle_<dir>.png`, frame 0): the box it hangs in, outline included, which is cleared while
+# the reach is out so there are not two; the column the torso's edge is re-inked on; and
+# where the new arm leaves the shoulder. Re-measure if either idle frame is repainted.
+FREE_ARMS = {
+    # Sleeve from row 25, hand down to 35, its outline on 36; columns 26-31, torso at 25.
+    "south": {"box": (26, 25, 32, 37), "edge": 25, "shoulder": (26.5, 26.5)},
+    # Sleeve from row 22, hand down to 32, its outline on 33; columns 0-5, torso at 6.
+    "north": {"box": (0, 22, 6, 34), "edge": 6, "shoulder": (4.5, 23.5)},
+}
 _WAIST_AT_REST = 0
 
 
-def free_arm_off(figure):
-    """The south figure with its hanging free arm taken off, the torso's edge re-inked."""
+def free_arm_off(figure, direction):
+    """The figure with its hanging free arm taken off, the torso's edge re-inked."""
     out = figure.copy()
-    x0, y0, x1, y1 = FREE_ARM
+    free = FREE_ARMS[direction]
+    x0, y0, x1, y1 = free["box"]
     for y in range(y0, y1):
         for x in range(x0 + PAD, x1 + PAD):
             out.putpixel((x, y), (0, 0, 0, 0))
-        edge = (x0 + PAD - 1, y)
+        edge = (free["edge"] + PAD, y)
         if out.getpixel(edge)[3] >= 128:
             out.putpixel(edge, OUTLINE)
     return out
@@ -169,6 +188,9 @@ def heading_of(direction, angle):
         return (math.cos(a), math.sin(a))
     if direction == "west":
         return (-math.cos(a), math.sin(a))
+    if direction == "north":
+        # Back: straight up the screen, swung by the angle.
+        return (math.sin(a), -math.cos(a))
     # Front: straight down the screen, swung by the angle.
     return (math.sin(a), math.cos(a))
 
@@ -177,13 +199,13 @@ def build(direction, k, angle):
     global _WAIST_AT_REST
     figure = first_idle(direction)
     _, _WAIST_AT_REST = crouch(figure, 0)
-    armless = free_arm_off(figure) if direction == "south" else figure
+    armless = free_arm_off(figure, direction) if direction in FREE_ARMS else figure
     frames = []
     for drop, reach, lift in FRAMES:
         frame, waist = crouch(armless if reach > 0 else figure, drop)
-        if reach > 0 and direction != "north":
+        if reach > 0:
             arm(frame, shoulder_of(frame, waist, direction), heading_of(direction, angle),
-                reach, lift)
+                reach, lift, behind=direction == "north")
         frames.append(frame)
     strip = Image.new("RGBA", (figure.width * len(frames), figure.height), (0, 0, 0, 0))
     for i, frame in enumerate(frames):
@@ -195,7 +217,8 @@ def build(direction, k, angle):
 def main():
     rows = []
     for direction in DIRS:
-        angles = SIDE_ANGLES if direction in ("east", "west") else FRONT_ANGLES
+        angles = {"east": SIDE_ANGLES, "west": SIDE_ANGLES, "south": FRONT_ANGLES,
+                  "north": BACK_ANGLES}[direction]
         for k, angle in enumerate(angles):
             rows.append(build(direction, k, angle))
     wide = max(r.width for r in rows)

@@ -508,6 +508,9 @@ const PET_TOUCH := 0.34
 ## whichever is nearer the shoulder (Richard, 2026-09-28).
 const PET_SIDE_ANGLES := [0.0, 25.0, 50.0, 75.0]
 const PET_FRONT_ANGLES := [-40.0, -12.0, 12.0, 40.0]
+## The back view (2026-09-28, Richard: the left hand reaches north too): degrees off straight
+## up the screen, towards screen right, from the free (screen-left) shoulder.
+const PET_BACK_ANGLES := [-70.0, -45.0, -20.0, 5.0]
 ## Where the arm leaves the body, as a share of HEIGHT up from the feet.
 const PET_SHOULDER := 0.42
 
@@ -553,7 +556,8 @@ static func arm_toward(view: StringName, shoulder: Vector2, spots: Array) -> int
 		angles = PET_FRONT_ANGLES
 		angle = rad_to_deg(atan2(d.x, maxf(d.y, 0.001)))
 	else:
-		return 0
+		angles = PET_BACK_ANGLES
+		angle = rad_to_deg(atan2(d.x, maxf(-d.y, 0.001)))
 	var best := 0
 	for i in angles.size():
 		if absf(float(angles[i]) - angle) < absf(float(angles[best]) - angle):

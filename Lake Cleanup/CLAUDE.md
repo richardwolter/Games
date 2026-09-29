@@ -2712,8 +2712,12 @@ of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
   (Richard, same day: head or body, whichever is nearer): every view is built at four arm
   angles (`pet0`..`pet3`, `Angler.PET_SIDE_ANGLES` 0-75 degrees below straight out,
   `PET_FRONT_ANGLES` -40..40 off straight down), and `Angler.pet_arm_for` takes the one
-  pointing nearest the nearer of `Dog.pet_spots()` from the shoulder. From behind the arm is
-  hidden, so the crouch alone. For Richard to polish; a re-run
+  pointing nearest the nearer of `Dog.pet_spots()` from the shoulder. **Front and back reach
+  with the free hand** (screen-right from the front, screen-left from behind; the basket is
+  in the other): that idle frame's hanging arm is cleared while the reach is out
+  (`FREE_ARMS` in the builder, measured in pixels off the idle frames: re-measure if they are
+  repainted), and from behind the arm rises up the screen behind the body and hat
+  (`PET_BACK_ANGLES`). For Richard to polish; a re-run
   overwrites the strips. The slicer measures every pet frame against the first's ink
   (`ink_first`), or the body would slide back as the arm went out. **Each dog waits
   `Dog.PET_AGAIN` (10 s) before it can be petted again**, per dog, from the press; a press on
