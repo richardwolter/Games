@@ -164,18 +164,9 @@ var ambience_level: float = 0.7:
 		ambience_level = clampf(v, 0.0, 1.0)
 		queue_redraw()
 
-## What the level-swap button says; the lake names the other level.
-var swap_label: String = "Go to the siege":
-	set(v):
-		swap_label = v
-		queue_redraw()
-
 ## The lake-over button is not shown, as it was not on the old panel; the F6 key still
 ## does it.
 var wipe_shown: bool = false
-
-## The level swap is not shown either (2026-09-12): the siege is set aside for now.
-var swap_shown: bool = false
 
 ## The board as the main menu shows it: sound, screen and controls. No way out of a lake the
 ## player is not in.
@@ -191,7 +182,6 @@ static var CONTROLS_LABEL: String:
 
 signal controls_asked
 signal wipe_pressed
-signal swap_pressed
 signal quit_pressed
 signal close_asked
 
@@ -283,8 +273,6 @@ func _plan() -> Array:
 	plan.append({"kind": &"gap"})
 	if wipe_shown:
 		plan.append({"kind": &"button", "key": &"wipe", "label": Text.SETTINGS_WIPE, "warn": true})
-	if swap_shown:
-		plan.append({"kind": &"button", "key": &"swap", "label": swap_label})
 	plan.append({"kind": &"button", "key": &"quit", "label": QUIT_LABEL, "warn": true})
 	return plan
 
@@ -385,8 +373,6 @@ func _gui_input(event: InputEvent) -> void:
 			controls_asked.emit()
 		&"wipe":
 			wipe_pressed.emit()
-		&"swap":
-			swap_pressed.emit()
 		&"quit":
 			quit_pressed.emit()
 		_:

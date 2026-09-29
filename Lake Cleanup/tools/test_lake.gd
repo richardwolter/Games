@@ -4765,8 +4765,8 @@ func _stage_ending_on_load() -> void:
 		_check(farewell != null and farewell.has_signal(&"to_menu")
 			and farewell.is_connected(&"to_menu", Callable(_main, &"_quit")),
 			"and it carries the door back to the menu", "")
-		_check(String(_main.call(&"_next_scene")) == "",
-			"and no door on to a siege", "%s" % _main.call(&"_next_scene"))
+		_check(not _main.has_method(&"_next_scene"),
+			"and no door on to a siege", "")
 		# Now the same lake a second time, with the thanks already paid (2026-09-19). The
 		# words and the roll are once per save: a continue into a finished lake is the lit
 		# clean water and nothing written over it. The reason they used to come back every

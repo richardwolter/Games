@@ -36,10 +36,6 @@ signal swept(at: Vector2, taken: int, hold: int, mouth: float)
 ## carried home: a bird is not cargo, and it is certainly not going in the yard.
 signal caught_bird(at: Vector2)
 
-## A charm the net closed on, as a CharmField.Kind. Like a bird, it never becomes cargo:
-## it goes straight to the box on the island the moment the mouth shuts on it.
-signal caught_charm(kind: int)
-
 ## A lit cast has landed and been left there: where it is, how far it reaches, and what is
 ## on it. The net itself is already back in the angler's hands by the time this is heard —
 ## whoever is listening owns the thing on the water now.
@@ -406,10 +402,6 @@ var sfx: Sfx
 var angler: Angler
 ## The birds. Optional — with no flock the net simply catches rubbish.
 var flock: Flock
-
-## The charms floating on the water, when there are any. Null in the first lake, which is
-## what keeps every charm-shaped branch below out of that game entirely.
-var charms: CharmField
 
 ## Seconds of fire and of ice left on the net, indexed by Charm. Two independent clocks
 ## rather than one enchantment slot: catching ice while the net is already burning should
@@ -1179,30 +1171,8 @@ func _sweep(landing: bool = false) -> bool:
 			took = true
 			caught_bird.emit(flock.take(perched))
 
-	# Charms, on the same terms as the birds: on top of everything, free to lift, and gone
-	# from the water the instant the mouth passes over them. They are the whole reason the
-	# second lake is worth casting into, so nothing about the net's strength or its hold
-	# gets a say in whether one is picked up.
-	if charms != null:
-		for i in range(charms.charms.size() - 1, -1, -1):
-			if not charms.is_up(charms.charms[i]):
-				continue
-			var drawn := charms.footprint(i)
-			if not _touches(at, mouth, drawn[0], drawn[1]):
-				continue
-			var kind := charms.take(i)
-			if splash != null:
-				splash.splash(_within_mouth(drawn[0]), 0.4)
-			# The same weight the drawn splash is given: a charm comes out of the water
-			# like anything else, and the knock that used to stand in for it is cut.
-			_lifted.append(0.4)
-			took = true
-			caught_charm.emit(kind)
-
-	# Only the rubbish is limited by what the net can hold. A bird and a charm are lifted
-	# off the surface by a net that is already full, which is why the hold is not checked
-	# until here: a cast that swept over a charm and left it floating because it had three
-	# lumps of tar in it would read as the net being broken.
+	# Only the rubbish is limited by what the net can hold. A bird is lifted off the surface
+	# by a net that is already full, which is why the hold is not checked until here.
 	var before := catch.size()
 	if room_left() > 0:
 		# Asked again for each layer: what a take uncovers is a new piece at a new size and

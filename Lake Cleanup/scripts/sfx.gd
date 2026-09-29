@@ -2,9 +2,8 @@
 ##
 ## Recorded, mostly (2026-09-15, Richard): the sounds are files in `assets/sfx/`, cut from the
 ## recordings in `art_source/SFX` by `tools/build_sfx.py`. This header used to promise there
-## would never be a folder of sound files; that was the placeholders talking. What has no
-## recording yet — the lake coming clean and the siege's chime — is still built here, a few
-## hundred lines of arithmetic into a buffer at startup.
+## would never be a folder of sound files; that was the placeholders talking. The last built
+## sound, the siege's chime, went with the siege (2026-09-29, issue #38).
 ##
 ## The knock of a piece coming up in the mesh is **cut, by decision** (2026-09-16): every
 ## place that played it already drew a splash, dropped a piece in the crate or knocked the
@@ -249,12 +248,6 @@ const COIN_PITCHES: Array[float] = [0.88, 0.96, 1.04, 1.14]
 ## held over a find hears a ring now and then, not a peal.
 const CHIME_GAP := 6.0
 
-## The built sounds' balance, as before the recordings came. The crate's thud is a recording
-## now and its balance is in SOUNDS with the rest of the mix.
-##
-## The lake-cleaned note (`play_found`, `_make_found`) is gone (2026-09-18, Richard: "no need
-## for the end game bell"): the end song is what the ending sounds like.
-const CHIME_DB := -10.0
 
 ## The two long beds. The lake's recording is quiet (it peaks at a fifth of full scale), so it
 ## sits up where the short sounds sit down.
@@ -305,7 +298,6 @@ const BED_FADE := 18.0
 ## under `step_sand`).
 var _streams := {}
 
-var _chime: AudioStreamWAV
 
 ## When each gap-limited sound last played, in seconds.
 var _last := {}
@@ -382,7 +374,6 @@ var _from_room := false
 
 func _ready() -> void:
 	_rng.randomize()
-	_build()
 	_load_recordings()
 	for i in VOICES:
 		_voices.append(_player())
@@ -807,11 +798,6 @@ func play_berth() -> void:
 		play(&"ferry_bell")
 
 
-## One struck note: the siege's.
-func play_chime() -> void:
-	_fire(_chime, CHIME_DB, 1.0)
-
-
 ## A find brought up in the net.
 func play_find_caught() -> void:
 	play(&"find_caught")
@@ -983,86 +969,6 @@ func play_start() -> void:
 	_start_player.stream = list[0]
 	_start_player.volume_db = float(SOUNDS[&"game_start"][0])
 	_start_player.play()
-
-
-## Take the next player in the pool and let it go, for the built sounds.
-func _fire(stream: AudioStreamWAV, db: float, pitch: float) -> void:
-	# The built sounds are the siege's chime and the cleaned note; neither is money, so the
-	# board holds both.
-	if stream == null or _voices.is_empty() or shopping:
-		return
-	var voice := _idle(_voices)
-	if voice == null:
-		voice = _voices[_next_voice]
-		_next_voice = (_next_voice + 1) % _voices.size()
-	voice.stream = stream
-	voice.volume_db = db
-	voice.pitch_scale = pitch
-	voice.play()
-
-
-func _build() -> void:
-	_chime = _make_chime()
-
-
-## A two-pole resonator, as its coefficients and its two remembered samples. Wide bandwidth
-## means a dull ring and a short one, which is what turns noise into a knock.
-func _resonator(hz: float, bandwidth: float) -> Array:
-	var decay := exp(-PI * bandwidth / RATE)
-	return [2.0 * decay * cos(TAU * hz / RATE), -decay * decay, 0.0, 0.0]
-
-
-## One sample through one resonator. The state lives in the array, which is the point of it.
-func _ring(filter: Array, sample: float) -> float:
-	var out: float = sample + filter[0] * filter[2] + filter[1] * filter[3]
-	filter[3] = filter[2]
-	filter[2] = out
-	return out
-
-
-## The chime: a bell rather than a horn, which is a matter of what is in it and how it
-## leaves rather than of how it starts. The partials are not harmonics — a struck bar rings
-## at ratios that do not divide, which is what stops a note sounding like an organ — and each
-## one dies at its own rate, the high ones first, so the note darkens as it fades the way a
-## real one does. Two seconds of tail, nearly all of it under the game.
-func _make_chime() -> AudioStreamWAV:
-	var length := 2.2
-	var count := int(length * RATE)
-	var out := PackedFloat32Array()
-	out.resize(count)
-
-	var root := 528.0
-	# Ratio, how loud, and how fast it goes. The strike is in the top pair and the note that
-	# is left after half a second is the bottom one.
-	var partials := [
-		[0.5, 0.42, 1.1],
-		[1.0, 1.00, 1.5],
-		[2.02, 0.44, 2.8],
-		[2.98, 0.22, 4.2],
-		[5.43, 0.10, 7.0],
-	]
-	var peak := 0.0
-	for i in count:
-		var t := float(i) / RATE
-		var note := 0.0
-		for partial: Array in partials:
-			note += (
-				sin(TAU * root * float(partial[0]) * t)
-				* float(partial[1])
-				* exp(-t * float(partial[2]))
-			)
-		# Three milliseconds in. A bell has an attack; a bell with no attack is a sine wave
-		# being turned up.
-		var swell := minf(t / 0.003, 1.0) * clampf((length - t) / 0.35, 0.0, 1.0)
-		# The knock of the striker, gone almost before it is there, and what makes it read
-		# as hit rather than switched on.
-		var strike := _rng.randf_range(-1.0, 1.0) * exp(-t * 220.0) * 0.16
-		out[i] = (note * 0.5 + strike) * swell
-		peak = maxf(peak, absf(out[i]))
-	if peak > 0.0001:
-		for i in count:
-			out[i] = out[i] / peak * 0.8
-	return _to_wav(out, false)
 
 
 ## Float buffer to a 16-bit mono wave, clipped rather than normalised so a sound that was

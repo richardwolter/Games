@@ -197,7 +197,7 @@ recolor). See `Lake Cleanup/CLAUDE.md` for the full pipeline.
 2. **Check GitHub Issues** for that project (filter by label + milestone).
 3. **If you edit code that affects design**: update CLAUDE.md and close stale issues.
 4. **If you find a contradiction**: point it out before proceeding.
-5. **Test harness**: Lake Cleanup (`tools/test_lake.tscn` / `tools/test_siege.tscn` headless), Sickest Man Alive (`tools/test_pipeline.gd` headless).
+5. **Test harness**: Lake Cleanup (`tools/test_lake.tscn` headless), Sickest Man Alive (`tools/test_pipeline.gd` headless).
 
 ---
 
@@ -209,7 +209,7 @@ Located in `_pipeline/tools/`:
 - Build & slice tools (per-project, see individual CLAUDE.md files)
 
 ### Test Harnesses
-- **Lake Cleanup**: `tools/test_lake.tscn` (the lake — `tools/last_test.log`) and `tools/test_siege.tscn` (the siege — `tools/last_siege_test.log`), both headless scenes
+- **Lake Cleanup**: `tools/test_lake.tscn` (the lake — `tools/last_test.log`), headless
 - **Sickest Man Alive**: `tools/test_pipeline.gd` (stat order-independence, headless)
 - See project CLAUDE.md for invocation details.
 

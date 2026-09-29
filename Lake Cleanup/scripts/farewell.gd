@@ -27,13 +27,6 @@ extends Control
 static var LINES: Array:
 	get: return [Text.END_LINE_1, Text.END_LINE_2]
 
-## And under them, the door out of the peace. Only drawn when the screen is given one — the
-## end of the last level is still an end, and should not be a corridor.
-static var ONWARD_HINT: String:
-	get: return Text.END_ONWARD_HINT
-static var ONWARD_LABEL: String:
-	get: return Text.END_ONWARD
-
 ## The padding around the door's label. Its text size comes off the shared ladder.
 const ONWARD_PAD := Vector2(34.0, 16.0)
 ## How far below the second line the door sits, as a multiple of its own text size.
@@ -108,10 +101,6 @@ const WASH := Style.SCRIM
 ## give the angler their legs back.
 signal dismissed
 
-## Emitted when the player takes the door onward instead of closing the screen. The lake
-## does the scene change; this only says which of the two was clicked.
-signal onward
-
 ## Emitted when the player takes the door back to the main menu (2026-09-12). Always
 ## drawn: a finished lake has to lead somewhere, and clicking the words away to keep
 ## fishing an empty lake is the other choice, not the only one.
@@ -129,11 +118,7 @@ var _font: Font
 var _shown: float = 0.0
 var _leaving: bool = false
 var _age: float = 0.0
-## Whether there is anywhere to go on to, and where the button was last drawn so a click
-## can be tested against the same rectangle the player was looking at.
-var _has_onward: bool = false
-var _onward_rect := Rect2()
-var _onward_hot: bool = false
+## Where the menu door was last drawn, so a click is tested against what the player saw.
 var _menu_rect := Rect2()
 var _menu_hot: bool = false
 
@@ -414,21 +399,6 @@ func _roll_start(row: Dictionary, text: String, px: int) -> float:
 	return (size.x - span - float(row["icon"])) * 0.5 + float(row["icon"])
 
 
-## Offer the way on. Called before the screen is added to the tree.
-func offer_onward() -> void:
-	_has_onward = true
-	mouse_default_cursor_shape = Control.CURSOR_ARROW
-
-
-## The player has taken the door. Fades the same way a dismissal does, so the words leave
-## the lake rather than being cut off it, and the lake changes scene when they have.
-func take_onward() -> void:
-	if _leaving or _age < SETTLE:
-		return
-	_leaving = true
-	onward.emit()
-
-
 ## The player has taken the door home. Fades out like the others; the lake changes scene.
 func take_menu() -> void:
 	if _leaving or _age < SETTLE:
@@ -448,12 +418,10 @@ func dismiss() -> void:
 func _gui_input(event: InputEvent) -> void:
 	var moved := event as InputEventMouseMotion
 	if moved != null:
-		var over := _has_onward and not _rolling and _onward_rect.has_point(moved.position)
 		var home := not _rolling and _menu_rect.has_point(moved.position)
-		if over != _onward_hot or home != _menu_hot:
-			if (over and not _onward_hot) or (home and not _menu_hot):
+		if home != _menu_hot:
+			if home:
 				Sfx.ui(&"ui_hover")
-			_onward_hot = over
 			_menu_hot = home
 			queue_redraw()
 		return
@@ -463,10 +431,6 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 	# The door is a rectangle inside the screen, and the screen is dismissed by clicking
 	# anywhere else on it. Testing the door first is what keeps the two apart.
-	if _has_onward and not _rolling and _onward_rect.has_point(click.position):
-		Sfx.ui(&"ui_click")
-		take_onward()
-		return
 	if not _rolling and _menu_rect.has_point(click.position):
 		Sfx.ui(&"ui_click")
 		take_menu()
@@ -517,17 +481,12 @@ func _draw() -> void:
 	# and the credits pass over exactly the band they stand in.
 	if _rolling:
 		_menu_rect = Rect2()
-		_onward_rect = Rect2()
 		return
-	if _has_onward:
-		_draw_onward(under, float(Style.TEXT_BODY), fade, shade)
-		under = _onward_rect.end.y
 	_draw_menu_door(under, float(Style.TEXT_BODY), fade, shade)
 
 
 ## The way home: a box under the words, in the frame's deep brown rather than the danger's
-## red. Set the same way the onward door is, so the two are one kind of thing when both
-## show.
+## red.
 func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> void:
 	var wide := Style.measure(MENU_LABEL, int(height)).x
 	var box := Vector2(wide, height) + ONWARD_PAD * 2.0
@@ -538,28 +497,6 @@ func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> 
 	_line(
 		MENU_LABEL, int(height),
 		_menu_rect.position.y + ONWARD_PAD.y + height * 0.82,
-		Color(Style.INK.r, Style.INK.g, Style.INK.b, fade), shade
-	)
-
-
-## The way on: a line of warning, and a box under it to click. Drawn rather than built from
-## a Button for the same reason the rest of this screen is — one screen from a different
-## game is one too many.
-func _draw_onward(under: float, height: float, fade: float, shade: Color) -> void:
-	var warn := Color(Style.GOLD.r, Style.GOLD.g, Style.GOLD.b, fade * 0.9)
-	_line(ONWARD_HINT, int(height), under + height * 1.9, warn, shade)
-
-	var wide := Style.measure(ONWARD_LABEL, int(height)).x
-	var box := Vector2(wide, height) + ONWARD_PAD * 2.0
-	_onward_rect = Rect2(
-		Vector2((size.x - box.x) * 0.5, under + height * ONWARD_DROP), box
-	)
-	var lit := 0.22 if _onward_hot else 0.12
-	var face := Style.DANGER.darkened(0.5)
-	Style.plaque(self, _onward_rect, Color(face.r, face.g, face.b, minf(1.0, 0.55 + lit)), fade)
-	_line(
-		ONWARD_LABEL, int(height),
-		_onward_rect.position.y + ONWARD_PAD.y + height * 0.82,
 		Color(Style.INK.r, Style.INK.g, Style.INK.b, fade), shade
 	)
 
@@ -584,6 +521,4 @@ func pad_focus() -> Array:
 	var out: Array = []
 	if _menu_rect.size != Vector2.ZERO:
 		out.append({"box": _menu_rect, "key": &"menu", "first": true})
-	if _has_onward and _onward_rect.size != Vector2.ZERO:
-		out.append({"box": _onward_rect, "key": &"onward"})
 	return out

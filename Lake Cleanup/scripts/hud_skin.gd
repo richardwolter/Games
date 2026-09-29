@@ -185,18 +185,6 @@ func _mark(name: StringName, value: int) -> void:
 ## say: that the lake reads clean and is not.
 var hint: String = ""
 
-## The siege's readouts, or an empty dictionary in the first lake — which is what keeps
-## every line of the block below out of that game. Filled in by siege.gd with `health`,
-## `shield`, `wave`, `note`, and the three effect clocks `ammo`, `fire` and `ice`.
-var siege := {}
-
-## How the siege block is laid out: its width, the height of one bar, the gap between the
-## things in it, and how far under the stock plate it starts.
-const SIEGE_WIDE := 210.0
-const SIEGE_BAR := 16.0
-const SIEGE_GAP := 6.0
-const SIEGE_PIP := 13.0
-
 ## The figure actually on the plate, and how brightly it is still lit from the last payment.
 var _shown_money: float = 0.0
 ## The money as it was last frame, to tell a spend from the figure still running, and the
@@ -450,7 +438,7 @@ func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
-		stock, available, hint, _hovered, siege.hash()
+		stock, available, hint, _hovered
 	])
 
 
@@ -484,8 +472,6 @@ func _draw() -> void:
 	_draw_available()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
 	_place_hint()
-	if not siege.is_empty():
-		_draw_siege()
 
 
 ## A line of plain text over the meter. No plate behind it: it is a note about the lake, and
@@ -572,71 +558,6 @@ func _place_hint() -> void:
 	_hint_line.baseline = _hint_baseline()
 	_hint_line.across = hint_span()
 	_hint_line.queue_redraw()
-
-
-## What is happening to the shed, and what the player is holding.
-##
-## Two bars and a row of pips, under the money plate: the shed's health, the shield stacked
-## in front of it, and one pip per live effect counting itself down. Drawn from flat rects
-## rather than from the sheet, because the sheet is a painting of a fishing game and there
-## is no plate in it for this.
-func _draw_siege() -> void:
-	var left := _money_box.position.x
-	var top := _money_box.position.y + _money_box.size.y + GAP * 2.0
-
-	var wave := int(siege.get("wave", 1))
-	var waves := int(siege.get("waves", 0))
-	var counted := "Wave %d" % wave if waves <= 0 else "Wave %d of %d" % [wave, waves]
-	var note := String(siege.get("note", ""))
-	var head := counted if note.is_empty() else "%s  —  %s" % [counted, note]
-	# A big wave is named in its own colour, so the warning is not one more line of text to
-	# read but a thing that has visibly changed.
-	Style.write(
-		self,
-		head,
-		Style.TEXT_SMALL,
-		Vector2(left, top),
-		Style.DANGER.lerp(Style.INK, 0.55) if bool(siege.get("big", false)) else Style.INK
-	)
-	top += SIEGE_GAP + 8.0
-
-	_bar(
-		Rect2(left, top, SIEGE_WIDE, SIEGE_BAR), float(siege.get("health", 1.0)),
-		Style.DANGER, "Shed"
-	)
-	top += SIEGE_BAR + SIEGE_GAP
-	_bar(
-		Rect2(left, top, SIEGE_WIDE, SIEGE_BAR), float(siege.get("shield", 0.0)),
-		Style.COOL, "Shield"
-	)
-	top += SIEGE_BAR + SIEGE_GAP + 2.0
-
-	# One pip per thing that is currently true, in the order of the charms themselves.
-	var pips := [
-		[float(siege.get("ammo", 0.0)), CharmField.KIND_COLOURS[CharmField.Kind.AMMO]],
-		[float(siege.get("fire", 0.0)), CharmField.KIND_COLOURS[CharmField.Kind.FIRE]],
-		[float(siege.get("ice", 0.0)), CharmField.KIND_COLOURS[CharmField.Kind.ICE]],
-	]
-	var at := left
-	for pip: Array in pips:
-		var left_for := float(pip[0])
-		if left_for <= 0.0:
-			continue
-		var tint: Color = pip[1]
-		draw_circle(Vector2(at + SIEGE_PIP * 0.5, top + SIEGE_PIP * 0.5), SIEGE_PIP * 0.5, tint)
-		Style.write(
-			self,
-			"%ds" % ceili(left_for),
-			Style.TEXT_SMALL,
-			Vector2(at + SIEGE_PIP + 4.0, top + SIEGE_PIP)
-		)
-		at += SIEGE_PIP + 32.0
-
-
-## One labelled bar, filled left to right. The pollution meter, the shed's health and the
-## shield in front of it are the same object, so they are the same helper.
-func _bar(box: Rect2, fill: float, tint: Color, label: String) -> void:
-	Style.bar(self, box, fill, tint, label)
 
 
 ## The meter's nodes. Four sheets over one another: the murky water (with the shader that

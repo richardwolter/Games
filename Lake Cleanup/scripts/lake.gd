@@ -782,7 +782,7 @@ var _filth_left: float = 1.0
 ## It gated nothing between 2026-09-12 and then, and that is worth knowing why: the way on
 ## to the second lake was a door on that screen, so a lake that showed its ending last week
 ## and refused to show it again was a lake with nothing to do on it and no way off it. The
-## siege is set aside and `_next_scene()` has returned "" ever since, so the farewell's only
+## siege was set aside and then deleted (2026-09-29, issue #38), so the farewell's only
 ## door is the menu's — which the settings board offers on any run. The reason died with the
 ## onward door; the gate is back.
 ##
@@ -1348,8 +1348,6 @@ func _ready() -> void:
 	_settings.controls_asked.connect(_set_controls.bind(true))
 	_settings.quit_pressed.connect(_quit)
 	_settings.wipe_pressed.connect(wipe_save)
-	_settings.swap_label = _other_level_name()
-	_settings.swap_pressed.connect(_swap_levels)
 	_settings.close_asked.connect(_shut.bind(_set_settings))
 	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
 	_shop_skin.tour_ended.connect(_on_shop_tour_ended)
@@ -3086,15 +3084,9 @@ func _show_farewell() -> void:
 	_farewell = Farewell.new()
 	_farewell.dismissed.connect(_drop_farewell)
 	_farewell.to_menu.connect(_quit)
-	# A cleaned lake is not the end of the game any more, only the end of the quiet part.
-	var onward := _next_scene()
-	if onward != "":
-		_farewell.offer_onward()
-		_farewell.onward.connect(_go_onward.bind(onward))
-	else:
-		# A lake with nowhere to go on to is the end of the game, so the credits roll under
-		# the words (2026-09-16). A level that leads somewhere does not end anything.
-		_farewell.roll_credits()
+	# The cleaned lake is the end of the game, so the credits roll under the words
+	# (2026-09-16).
+	_farewell.roll_credits()
 	# Its own layer, above the HUD rather than beside it: the closing words are the one thing
 	# in the game that everything else — the island, the meter, the money — goes behind.
 	var over := CanvasLayer.new()
@@ -3108,21 +3100,6 @@ func _show_farewell() -> void:
 
 ## The player has read it. Let go of it at once rather than when it finishes fading, so the
 ## angler gets their legs back on the click rather than half a second after it.
-## Where the ending leads, or an empty string for a level that is the last one. The siege
-## is set aside (2026-09-12): the cleaned lake ends here, and the farewell's door is the
-## menu's.
-func _next_scene() -> String:
-	return ""
-
-
-## Take the door. The run is written first: what carries into the next level is read back
-## out of the save, so the save has to be the finished one before the scene goes away.
-func _go_onward(scene: String) -> void:
-	save_game()
-	_farewell = null
-	get_tree().change_scene_to_file(scene)
-
-
 func _drop_farewell() -> void:
 	_farewell = null
 	_push_rooms()
@@ -4592,29 +4569,6 @@ static func sky_low(at: float) -> Color:
 	if at < 0.5:
 		return palette.sky_morning_low.lerp(palette.sky_noon_low, clampf(at / 0.5, 0.0, 1.0))
 	return palette.sky_noon_low.lerp(palette.sky_afternoon_low, clampf((at - 0.5) / 0.5, 0.0, 1.0))
-
-
-## The other level, as a scene and as the words on the button that goes there. The lake is
-## level one, so its door leads to the siege; the siege overrides both halves.
-##
-## Not the same door as the ending: that one is earned and only opens once the water is
-## clean. This one is a way to walk between the two lakes at any time, which is what makes
-## either of them worth looking at twice.
-func _other_level_scene() -> String:
-	return "res://scenes/siege.tscn"
-
-
-func _other_level_name() -> String:
-	return "Go to the siege  (level 2, fresh)"
-
-
-## Take the door. The level left is written on the way out — the siege reads the first
-## lake's save for the upgrades a player arrives with, so it has to be the finished one —
-## and the level walked into is built from scratch rather than from its own save.
-func _swap_levels() -> void:
-	save_game()
-	start_fresh = true
-	get_tree().change_scene_to_file(_other_level_scene())
 
 
 ## Cost of the next level on a track.

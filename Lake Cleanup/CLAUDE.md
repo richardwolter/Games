@@ -344,9 +344,8 @@ for what they do, and Strength is the game changer that belongs in the middle of
   `lake-tree.json`/`.md` and the tree's pricing scripts), the skimmer (`Boat`'s skim fields,
   sweep and drawing, `Lake.skim_*`, `BuySkimmer` in `main.tscn`, the probe's skim phase) and
   the five sell-by-tier tracks (`sell_N.tres`, `tier_pay`, `SHELVED`, `MAX_LEVELS`,
-  `PRICES`). `calibration.json` stays: the shop's model reads it. **The siege is not
-  deleted** — it is a whole level (`siege.gd`, charms, wards, laid nets) and its cleanup is
-  its own job; nothing routes to it.
+  `PRICES`). `calibration.json` stays: the shop's model reads it. **The siege was
+  deleted later**, as its own job — see The Siege Deleted.
 
 ### The Shop Balance Pass (2026-09-14, `/grill-me` with Richard; supersedes the tree)
 **Superseded in part 2026-09-18 — see The Boats Run Ahead above.**
@@ -1062,9 +1061,8 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   and both the menu's board and the lake's are one set of settings. The board's bottom
   button is **"Save and go to menu"** (`Lake._quit`: a dip to dark, the menu's pose struck
   behind it, the run written, the menu up — no scene change since 2026-09-17, see The Front);
-  quitting the game is the menu's Quit or the window's cross. The level swap row is off
-  (`swap_shown`, default false): **the siege is set aside** — `Lake._next_scene` returns "",
-  the farewell offers no onward door, and nothing new should route to `siege.tscn`.
+  quitting the game is the menu's Quit or the window's cross. The level swap row, `_next_scene`
+  and the farewell's onward door are gone with the siege (see The Siege Deleted).
 
 
   **And the settings board reads in the shop's language** (2026-09-17, `/grill-me` with
@@ -2032,6 +2030,20 @@ pipeline and English only"** in Every Word Is a Key above.
   <locale>}.png`, applying each language by hand and putting the player's back.
 - **Out of scope, by decision**: the letter stills (still English), the siege, the credits'
   pack lines, the Steam page, widening boards.
+
+### The Siege Deleted (2026-09-29, issue #38)
+The second level is gone, not shelved: `siege.gd`/`.tscn`, `defeat.gd`, `ward.gd`,
+`charm.gd` (`CharmField`), `charm_box.gd`, `sludge.gd`, `volley.gd`, `laid_net.gd`,
+`test_siege`, the HUD's wave block, the settings board's level-swap row, `Lake._next_scene`/
+`_go_onward`/`_swap_levels`/`_other_level_*`, the farewell's onward door and its two strings
+(`END_ONWARD`, `END_ONWARD_HINT`), the net's charm sweep and `caught_charm`, and the siege's
+built chime in `Sfx` (`play_chime`, `_fire`, `_make_chime`). `check_real_save` lost its
+`-- siege` mode.
+- **Kept, and open for Richard**: the lit net laid by LT (`lay_net`, `CastNet.enchant`/
+  `enchanted`/`charm_left`/`_leave_it_there`/`left_behind`, the laid-net ghost). On the lake
+  nothing ever calls `enchant`, so `enchanted()` is always false and LT does nothing — it is
+  dead in practice, but it is a bind on the Controls board and was named a lake feature, so
+  deleting it is his call.
 
 ### The Ending (2026-09-16, `/grill-me` with Richard, issue #1)
 A cleaned lake ends on a beat of clean water, then the words, then the credits.
@@ -4524,8 +4536,8 @@ The code-built placeholder sounds are replaced by Richard's recordings. **Supers
   splash's spread** (0.9-1.12 against the splash's 0.66-1.26, which was 0.72-1.1 until
   Richard asked for more variety on 2026-09-17): the throw is the rope leaving the hand, and
   a wide swing on it reads as a different net rather than the same one thrown again.
-- **Still built in code** (no recording): the siege's chime, and nothing else — the
-  lake-cleaned note (`play_found`) was cut on 2026-09-18, see The Ending. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
+- **Nothing is built in code any more**: the siege's chime went with the siege
+  (2026-09-29), and the lake-cleaned note (`play_found`) was cut on 2026-09-18, see The Ending. **The catch knock is cut, by decision** (2026-09-16, issue #1): every place
   that played it already drew a splash, dropped a piece in the crate or knocked the box, so
   the knock under those was one event sounded twice. A charm lifted out of the water plays
   the piece splash instead and a dog delivering to the crate plays the crate's own thud
@@ -5926,7 +5938,7 @@ room's own coordinates while the picture is the whole window.
 - `print` and `printerr` don't reach shell on GUI Godot builds (Desktop is GUI-based)
 - **Write to file**: headless harness writes `tools/last_test.log`, flushed per line
 - Test harnesses: `tools/test_lake.tscn` (the lake: heap, angler, net, yard, save, art —
-  `tools/last_test.log`) and `tools/test_siege.tscn` (the siege — `tools/last_siege_test.log`)
+  `tools/last_test.log`). `test_siege` went with the siege (2026-09-29).
 
 ### GDScript Coroutines
 - Errors inside coroutines abort **silently** and leave the tree spinning

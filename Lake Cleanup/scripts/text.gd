@@ -692,12 +692,6 @@ static var LETTER_WEIGHT_TEXT: String:
 static var CREDITS_GODOT: String:
 	get: return TranslationServer.translate(&"CREDITS_GODOT")
 
-static var END_ONWARD_HINT: String:
-	get: return TranslationServer.translate(&"END_ONWARD_HINT")
-
-static var END_ONWARD: String:
-	get: return TranslationServer.translate(&"END_ONWARD")
-
 static var WASH_TITLE_N: String:
 	get: return TranslationServer.translate(&"WASH_TITLE_N")
 

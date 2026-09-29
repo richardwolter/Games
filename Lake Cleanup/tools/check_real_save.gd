@@ -2,12 +2,9 @@
 ## fires. Read-only: the copy is what is loaded and written to, never the original.
 extends Node
 
-## Which save to open, and which scene to open it in. Passed on the command line as
-## `-- siege` for the second lake; the first is the default.
+## Which save to open.
 const FROM := "user://lake_cleanup.save"
 const COPY := "user://real_save_check.save"
-const SIEGE_FROM := "user://lake_cleanup_siege.save"
-const SIEGE_COPY := "user://real_siege_check.save"
 const OUT := "res://tools/last_real_save_check.log"
 
 var _main: Node2D
@@ -15,10 +12,9 @@ var _frames: int = 0
 
 
 func _ready() -> void:
-	var siege := OS.get_cmdline_user_args().has("siege")
-	var from := SIEGE_FROM if siege else FROM
-	var copy_to := SIEGE_COPY if siege else COPY
-	var scene := "res://scenes/siege.tscn" if siege else "res://scenes/main.tscn"
+	var from := FROM
+	var copy_to := COPY
+	var scene := "res://scenes/main.tscn"
 	_say("--- opening %s in %s" % [from, scene])
 	var source := FileAccess.open(from, FileAccess.READ)
 	if source == null:
@@ -46,11 +42,6 @@ func _process(_delta: float) -> void:
 	_say("cleaned: %s" % str(bool(_main.get(&"_cleaned"))))
 	_say("farewell shown before: %s" % str(bool(_main.get(&"_farewell_shown"))))
 	_say("closing words on screen: %s" % str(_main.get_node_or_null(^"Farewell") != null))
-	var ward := _main.get_node_or_null(^"Ward") as Ward
-	if ward != null:
-		_say("siege wave: %d" % int(_main.get(&"wave")))
-		_say("shed: %.1f, shield: %.1f" % [ward.health, ward.shield])
-		_say("monsters in the water: %d" % (_main.get_node(^"Swarm") as SludgeSwarm).alive())
 	get_tree().quit()
 
 
