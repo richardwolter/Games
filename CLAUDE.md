@@ -10,6 +10,7 @@ This is a monorepo holding 5 independent Godot 4.7+ game prototypes under develo
 - **Sickest Man Alive** — twisted roguelite in a shrinking kid's body, top-down twin-stick
 - **Semi Secret Wars** — (status: active, CLAUDE.md at `Semi Secret Wars/CLAUDE.md`)
 - **Roguelite Football Manager** — (status: active, CLAUDE.md at `Roguelite Football Manager/CLAUDE.md`)
+- **Crow Funding** — crows fly trips from a balcony to steal shiny loot, pen-and-ink art (CLAUDE.md at `Crow Funding/CLAUDE.md`)
 
 ---
 
@@ -56,6 +57,12 @@ Games/
 │   ├── CLAUDE.md
 │   ├── project.godot
 │   └── .claude/
+│
+├── Crow Funding/
+│   ├── CLAUDE.md
+│   ├── project.godot
+│   ├── scripts/
+│   └── art/
 │
 └── .claude/
     └── settings.local.json            ← Monorepo defaults (projects override locally)

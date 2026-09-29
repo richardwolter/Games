@@ -129,6 +129,33 @@ is no settings screen yet, so the key stands in for the dropdown.
   `tools/_py.sh` runs Python with PIL/cv2 (ComfyUI's interpreter); plain `python`
   on this machine has neither.
 
+## Crow care stations (2026-09-29, unattended pass; numbers are first guesses)
+
+Every crow has **stamina** (0-100) and **injury days**. Each morning the player drags
+crows (mouse, `scripts/stations.gd`) onto one of four stations on the rail: **Trip**
+(the middle of the rail, default), **Training post** (left), **Nest** and **First-aid
+box** (right). Rules are pure functions in `scripts/care.gd`; `game.gd`
+`assign_station` / `_care_day` / `_injure` apply them.
+
+- A trip costs `TRIP_STAMINA_COST`; under `LOW_STAMINA` loot (coins and object
+  chance) falls to `LOOT_MULT_SPENT` at zero and the per-trip injury chance climbs
+  from `INJURY_CHANCE_RESTED` to `INJURY_CHANCE_SPENT`.
+- An injury lasts 1-2 days, ends the crow's remaining trips that day, moves it to
+  the First-aid box for the night, and it cannot be put on Trip until healed. Only
+  the First-aid box heals (one day per night).
+- Kept home earns nothing. Nest gives `NEST_RESTORE`, Training and First aid
+  `HOME_RESTORE`; Training grants `TRAINING_XP` (times the Training upgrade).
+- **Only the Trip crew eats and flies**; a day with nobody on Trip just passes.
+  Assignments persist day to day. Reassigning is mornings only.
+- Stations are flat ink placeholders drawn in code; a refused drop is struck
+  through (no red: one spot colour). Labels sit above the props because the
+  Pantry and Upgrades panels cover the deck under the rail.
+- Crow cards show a stamina bar and a care line; the report shows station and
+  stamina from > to, and HURT.
+- **No save exists**, so care state is in memory like everything else.
+- Test: `tools/test_care.tscn` (headless, writes `tools/last_care_test.log`, exits 1
+  on failure).
+
 ## Next
 
 1. Judge the crows in-game: size, flap speed, idle timing, the wing-edge flip.

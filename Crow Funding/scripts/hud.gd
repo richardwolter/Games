@@ -3,6 +3,7 @@ extends CanvasLayer
 ## panel, Upgrades shop, loot log), plus the end-of-day daily report overlay.
 
 const CrowCardScene = preload("res://scenes/crow_card.tscn")
+const StationsScript = preload("res://scripts/stations.gd")
 
 @onready var money_label: Label = %MoneyLabel
 @onready var day_label: Label = %DayLabel
@@ -258,6 +259,15 @@ func show_report(day_n: int, crew: Array) -> void:
 		obj_label.text = "%d objects" % crow.day_objects
 		obj_label.custom_minimum_size = Vector2(96, 0)
 		row.add_child(obj_label)
+		var care_label := Label.new()
+		var care := "%s, stamina %d>%d" % [StationsScript.label_of(crow.station), int(round(crow.day_stamina_from)), int(round(crow.stamina))]
+		if crow.day_injured:
+			care += ", HURT today"
+		elif crow.injury_days > 0:
+			care += ", hurt (%dd)" % crow.injury_days
+		care_label.text = care
+		care_label.custom_minimum_size = Vector2(230, 0)
+		row.add_child(care_label)
 		var val_label := Label.new()
 		val_label.text = "+%d c" % crow.day_value
 		val_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL

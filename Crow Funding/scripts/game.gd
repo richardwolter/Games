@@ -4,6 +4,8 @@ extends Node2D
 
 const CrowScript = preload("res://scripts/crow.gd")
 const CityScript = preload("res://scripts/city.gd")
+const Care = preload("res://scripts/care.gd")
+const StationsScript = preload("res://scripts/stations.gd")
 
 const LOOT_POOL: Array[Dictionary] = [
 	{"name": "Shiny Button", "value": 3, "weight": 8},
@@ -75,7 +77,14 @@ var recruit_count := 0
 @onready var dispatch_button: Button = %DispatchButton
 @onready var sky = %Sky
 
+var stations: StationsScript
+
 func _ready() -> void:
+	stations = StationsScript.new()
+	stations.name = "Stations"
+	add_child(stations)
+	move_child(stations, crows.get_index())
+	stations.setup(self)
 	_place_crows()
 	for food in FOODS:
 		food_stock[food.key] = food.start
@@ -96,13 +105,48 @@ func _crows() -> Array[CrowScript]:
 	return result
 
 func _place_crows() -> void:
-	var crew := _crows()
-	for i in crew.size():
-		var crow: CrowScript = crew[i]
-		var x := _perch_x_for_index(i, crew.size())
-		crow.position = Vector2(x, RAIL_PERCH_Y)
-		crow.perch = crow.position
-		crow.set_loiter(true)
+	# Each crow perches on the rail at its care station; the Trip crew spreads
+	# over the middle of the rail as before.
+	var groups: Dictionary = {}
+	for crow in _crows():
+		if not groups.has(crow.station):
+			groups[crow.station] = []
+		groups[crow.station].append(crow)
+	for st in groups:
+		var members: Array = groups[st]
+		for i in members.size():
+			var crow: CrowScript = members[i]
+			var x: float
+			if st == Care.Station.TRIP:
+				x = _perch_x_for_index(i, members.size())
+			else:
+				x = stations.slot_x(st, i, members.size())
+			crow.position = Vector2(x, RAIL_PERCH_Y)
+			crow.perch = crow.position
+			crow.set_loiter(true)
+
+func _trip_crew() -> Array[CrowScript]:
+	var result: Array[CrowScript] = []
+	for crow in _crows():
+		if crow.station == Care.Station.TRIP and crow.injury_days <= 0:
+			result.append(crow)
+	return result
+
+## Puts a crow on a care station. Mornings only; an injured crow cannot fly.
+func assign_station(crow: CrowScript, station: int) -> bool:
+	if day_state != DayState.MORNING:
+		return false
+	if not Care.can_assign(crow.injury_days, station):
+		_append_log("%s is hurt and cannot fly today." % crow.crow_name)
+		_place_crows()
+		return false
+	if crow.station != station:
+		crow.station = station
+		_append_log("%s goes to the %s." % [crow.crow_name, StationsScript.label_of(station)])
+	_place_crows()
+	hud.refresh(self)
+	_update_dispatch_state()
+	return true
 
 func _perch_x_for_index(i: int, total: int) -> float:
 	var view := get_viewport_rect().size
@@ -118,11 +162,11 @@ func _on_dispatch_pressed() -> void:
 		return
 	if day_state != DayState.MORNING:
 		return
-	if food_stock[selected_food] < _crows().size():
+	var crew := _trip_crew()
+	if food_stock[selected_food] < crew.size():
 		_append_log("Not enough %s for the crew." % _food_name(selected_food))
 		return
 	day_state = DayState.RUNNING
-	var crew := _crows()
 	# consume 1 selected food per crow
 	for i in crew.size():
 		food_stock[selected_food] -= 1
@@ -141,6 +185,9 @@ func _on_dispatch_pressed() -> void:
 	_append_log("Day %d: the crew takes off." % day)
 	sky.run_day(_planned_day_duration(crew.size()))
 	_days_pending = crew.size()
+	if crew.is_empty():
+		_append_log("Nobody flies today; the crew stays home.")
+		get_tree().create_timer(1.0).timeout.connect(_settle_day)
 	for i in crew.size():
 		var crow: CrowScript = crew[i]
 		var offset := 0.4 + i * 0.15 + randf_range(0.0, 0.3)
@@ -155,6 +202,8 @@ func _planned_day_duration(crew_size: int) -> float:
 
 func _run_crow_day(crow: CrowScript, index: int) -> void:
 	for trip in range(TRIPS_PER_DAY):
+		if crow.injury_days > 0:
+			break
 		var target := _trip_target(crow, trip)
 		var out_tween: Tween = crow.fly_out(target, FLY_OUT_DURATION * day_speed)
 		await out_tween.finished
@@ -181,12 +230,14 @@ func _trip_target(crow: CrowScript, trip: int) -> Vector2:
 
 func _on_crow_landed(crow: CrowScript) -> void:
 	var luck: float = crow.luck + day_luck_bonus
-	var coin_gain := int(round(3.0 + randf_range(0.0, 5.0) + luck * 6.0))
+	# a tired crow brings back less (loot scaled by the stamina it left with)
+	var tired_mult: float = Care.loot_mult(crow.stamina)
+	var coin_gain := int(round((3.0 + randf_range(0.0, 5.0) + luck * 6.0) * tired_mult))
 	money += coin_gain
 	day_earned += coin_gain
 	crow.day_value += coin_gain
 	_append_log("%s brought back %d coins." % [crow.crow_name, coin_gain])
-	if randf() < _loot_chance(luck):
+	if randf() < _loot_chance(luck) * tired_mult:
 		var item: Dictionary = _roll_loot(luck)
 		money += item.value
 		day_earned += item.value
@@ -198,6 +249,11 @@ func _on_crow_landed(crow: CrowScript) -> void:
 		var amount := 1 + randi() % 3
 		food_stock[fkey] = int(food_stock[fkey]) + amount
 		_append_log("%s found some %s (+%d)" % [crow.crow_name, _food_name(fkey), amount])
+	# the trip wears the crow down, and a tired crow can get hurt
+	var hurt_chance: float = Care.injury_chance(crow.stamina)
+	crow.stamina = Care.after_trip(crow.stamina)
+	if randf() < hurt_chance:
+		_injure(crow)
 	var xp_gain := int(round((4.0 + randf_range(0.0, 3.0) + crow.luck * 7.0) * _xp_mult()))
 	var leveled: bool = crow.grant_xp(xp_gain)
 	if leveled:
@@ -220,8 +276,33 @@ func _roll_loot(luck: float) -> Dictionary:
 func _loot_weight(item: Dictionary, luck: float) -> float:
 	return float(item.weight) * (1.0 + luck * 0.25 * float(item.value) / 5.0)
 
+func _injure(crow: CrowScript) -> void:
+	crow.injury_days = randi_range(Care.INJURY_DAYS_MIN, Care.INJURY_DAYS_MAX)
+	crow.day_injured = true
+	_append_log("%s got hurt out there!" % crow.crow_name)
+
+## A day at home: the station's effect, and nothing earned.
+func _care_day(crow: CrowScript) -> void:
+	match crow.station:
+		Care.Station.TRAINING:
+			var leveled: bool = crow.grant_xp(int(round(Care.TRAINING_XP * _xp_mult())))
+			if leveled:
+				_append_log("%s trained up to %s!" % [crow.crow_name, crow.get_tier_name()])
+		Care.Station.FIRST_AID:
+			var was := crow.injury_days
+			crow.injury_days = Care.after_heal(crow.injury_days, crow.station)
+			if was > 0 and crow.injury_days == 0:
+				_append_log("%s is patched up." % crow.crow_name)
+	crow.stamina = Care.after_home_day(crow.stamina, crow.station)
+
 func _settle_day() -> void:
 	for crow in _crows():
+		if crow.station != Care.Station.TRIP:
+			_care_day(crow)
+		elif crow.day_injured:
+			# hurt today: straight to the First-aid box for the night
+			crow.station = Care.Station.FIRST_AID
+	for crow in _trip_crew():
 		var leveled: bool = crow.grant_xp(_day_end_xp(crow))
 		if leveled:
 			_append_log("%s reached %s!" % [crow.crow_name, crow.get_tier_name()])
@@ -230,6 +311,7 @@ func _settle_day() -> void:
 	day_luck_bonus = 0.0
 	sky.force_night()
 	day_state = DayState.NIGHT
+	_place_crows()
 	hud.refresh(self)
 	_update_dispatch_state()
 
@@ -380,7 +462,7 @@ func _update_dispatch_state() -> void:
 			dispatch_button.disabled = true
 			dispatch_button.text = "Next Day"
 		DayState.MORNING:
-			var need := _crows().size()
+			var need := _trip_crew().size()
 			if food_stock[selected_food] < need:
 				dispatch_button.disabled = true
 				dispatch_button.text = "Not enough %s" % _food_name(selected_food)

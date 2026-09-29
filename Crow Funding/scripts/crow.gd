@@ -22,6 +22,13 @@ var is_out := false
 var perch := Vector2.ZERO
 var carrying := false
 var loitering := false
+# Care (scripts/care.gd): stamina drains on trips, an injury keeps the crow off
+# trips until the First-aid box heals it. station is a care.gd Station value.
+var stamina := 100.0
+var injury_days := 0
+var station := 0
+var day_injured := false
+var day_stamina_from := 100.0
 
 const BODY_TEX := preload("res://art/crows/crow_body.png")
 const WING_TEX := preload("res://art/crows/crow_wing.png")
@@ -189,6 +196,8 @@ func grant_xp(amount: int) -> bool:
 	return leveled
 
 func begin_day() -> void:
+	day_injured = false
+	day_stamina_from = stamina
 	day_xp = 0
 	day_objects = 0
 	day_value = 0
