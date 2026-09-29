@@ -328,6 +328,111 @@
             "negative_extra": "colour, people, birds, city, sky, perspective, wood, stone, balusters, ornament",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
             "_note": "Level 2 glass + steel balcony. Geometry from tools/balcony_modern_template.py, alpha from its mask (tools/scene_art.py --modern)."
+        },
+        {
+            "name": "env_water_tower",
+            "out": "art/env/env_water_tower.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 11100,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "a wooden rooftop water tower on steel legs standing on a flat tar roof of an old apartment block, ladder, pipes, chimneys and neighbouring rooftops behind, empty plain sky in the upper third",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
+            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+        },
+        {
+            "name": "env_fire_escape",
+            "out": "art/env/env_fire_escape.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 11200,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "a narrow city alley between tall brick tenements, zigzag iron fire escapes with ladders and landings on the walls, hanging laundry lines, trash cans and puddles below, strip of plain sky above",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
+            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+        },
+        {
+            "name": "env_belfry",
+            "out": "art/env/env_belfry.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 11300,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "inside an old church belfry high above the city, a great bronze bell hanging from heavy timber beams, arched stone openings looking out over rooftops and a distant skyline, empty plain sky through the arches",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
+            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+        },
+        {
+            "name": "env_harbour_crane",
+            "out": "art/env/env_harbour_crane.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 11400,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "an old harbour with a tall steel dockside crane, jib reaching over the water, moored cargo ship, bollards, stacked crates, warehouses along the quay, empty plain sky in the upper third",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
+            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+        },
+        {
+            "name": "env_park_lamp",
+            "out": "art/env/env_park_lamp.png",
+            "lora": "InkArtXL_1.2.safetensors",
+            "lora_strength": 1.0,
+            "gen": [
+                1536,
+                832
+            ],
+            "seed": 11500,
+            "variants": 4,
+            "transparent": false,
+            "trim": false,
+            "solo": false,
+            "speckle": 0.0,
+            "deadzone": 0,
+            "prompt": "a city park at night, an ornate cast iron lamp post glowing beside a bench, bare trees, gravel path, dark hatched night sky, the lamp light leaving a pool of white paper around it",
+            "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
+            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
         }
     ]
 }
