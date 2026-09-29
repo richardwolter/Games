@@ -2036,6 +2036,8 @@ func _stage_save() -> void:
 	# back on load and undid whatever had been set on the menu.
 	var file := FileAccess.open(_main.get(&"save_path") as String, FileAccess.READ)
 	var written: Dictionary = (file.get_var(true) as Dictionary) if file != null else {}
+	if file != null:
+		file.close()
 	var settings_in_save := PackedStringArray()
 	for key: String in ["music", "music_level", "sfx", "sfx_level", "fullscreen"]:
 		if written.has(key):
@@ -2098,7 +2100,58 @@ func _stage_save() -> void:
 	_check(float(_main.get(&"pollution")) < 1.0 and float(_main.get(&"pollution")) > 0.0,
 		"the meter was re-read from the field",
 		"%.5f" % float(_main.get(&"pollution")))
+	_check_save_hardening()
 	_advance()
+
+
+## The save is written safely (2026-09-29, issue #25): a temp file moved over the save, the
+## save before kept as `.bak`, and a load that finds the save missing or unreadable reads
+## the backup. Run on the harness's own path; leaves a good save behind.
+func _check_save_hardening() -> void:
+	var path := String(_main.get(&"save_path"))
+	_check(path != "user://lake_cleanup.save", "the hardening checks run on a save of their own", path)
+	if path == "user://lake_cleanup.save":
+		return
+	var backup := path + ".bak"
+	var temp := path + ".tmp"
+	_main.set(&"sludge", 111.0)
+	_check(bool(_main.call(&"save_game")), "a first save writes", "")
+	_main.set(&"sludge", 222.0)
+	_check(bool(_main.call(&"save_game")), "a second save writes", "")
+	_check(FileAccess.file_exists(backup), "the save before is kept as a backup", backup)
+	_check(not FileAccess.file_exists(temp), "no half-written temp is left behind", temp)
+	var old := FileAccess.open(backup, FileAccess.READ)
+	var old_save: Dictionary = (old.get_var(true) as Dictionary) if old != null else {}
+	if old != null:
+		old.close()
+	_check(is_equal_approx(float(old_save.get("sludge", -1.0)), 111.0),
+		"and the backup is the save before, not a copy of the new one",
+		"%s" % old_save.get("sludge", "none"))
+
+	# A save cut short: garbage where the file was. The load reads the backup.
+	var bad := FileAccess.open(path, FileAccess.WRITE)
+	bad.store_buffer(PackedByteArray([1, 2, 3, 4, 5, 6, 7]))
+	bad.close()
+	_main.set(&"sludge", 0.0)
+	_check(bool(_main.call(&"load_game")), "a corrupt save loads from its backup", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), 111.0),
+		"and what came back is the backup's run", "%.1f" % float(_main.get(&"sludge")))
+
+	# A save gone altogether, as a crash between the two renames would leave it.
+	DirAccess.remove_absolute(path)
+	_check(bool(_main.call(&"has_save")), "a backup alone still counts as a save", "")
+	_main.set(&"sludge", 0.0)
+	_check(bool(_main.call(&"load_game")), "a missing save loads from its backup", "")
+	_check(is_equal_approx(float(_main.get(&"sludge")), 111.0),
+		"and it is the backup's run again", "%.1f" % float(_main.get(&"sludge")))
+
+	# Nothing at all: no save.
+	DirAccess.remove_absolute(backup)
+	_check(not bool(_main.call(&"has_save")), "with neither file there is no save", "")
+	_check(not bool(_main.call(&"load_game")), "and nothing loads", "")
+	_check(bool(_main.call(&"save_game")), "the run can be written again", "")
+	_check(FileAccess.file_exists(path) and not FileAccess.file_exists(backup),
+		"a first save has no backup yet", "")
 
 
 ## The market board and the net's two luck tracks (2026-09-13): every track loads; a tier's

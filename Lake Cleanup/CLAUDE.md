@@ -2031,6 +2031,25 @@ pipeline and English only"** in Every Word Is a Key above.
 - **Out of scope, by decision**: the letter stills (still English), the siege, the credits'
   pack lines, the Steam page, widening boards.
 
+### The Save Is Written Safely (2026-09-29, issue #25)
+- **Temp, then rename** (`Lake.save_game`, `_swap_in_save`): the run is written to
+  `<save>.tmp`, checked for a write error, and only then moved over the save; the save it
+  replaces is kept as `<save>.bak` (`SAVE_TEMP`, `SAVE_BACKUP`). Remove-then-rename, because
+  Windows will not rename over a file: a crash between the two leaves no save and a good
+  backup.
+- **The load falls back** (`load_game`, `_read_save`): a save that is missing, empty or will
+  not parse is read from the `.bak`. A save that parses but is refused (another
+  `SAVE_VERSION`, another seed) does **not** fall back — the backup is the same run one
+  write earlier and would be refused too. `has_save` counts a backup alone.
+- **New game and F6 remove all three files** (`_remove_save_files`), or a wiped run would
+  come back from its backup.
+- **A save held open by another reader cannot be swapped on Windows**: `save_game` returns
+  false and leaves the `.tmp`, which the next save overwrites. `test_lake` had exactly that
+  bug (a `FileAccess` left open in `_stage_save`); a tool that reads a save must close it.
+- No `SAVE_VERSION` bump. `test_lake`'s `_check_save_hardening` (end of `_stage_save`, on
+  the harness's own path) guards the backup, no temp left, a corrupt save and a missing one
+  both loading the backup's run, and no save with neither file.
+
 ### The Siege Deleted (2026-09-29, issue #38)
 The second level is gone, not shelved: `siege.gd`/`.tscn`, `defeat.gd`, `ward.gd`,
 `charm.gd` (`CharmField`), `charm_box.gd`, `sludge.gd`, `volley.gd`, `laid_net.gd`,

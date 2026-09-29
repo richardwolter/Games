@@ -3926,8 +3926,7 @@ func _reload_as(fresh: bool) -> void:
 		_wiping = true
 		if fresh:
 			# This run's own file: a harness plays on a path of its own.
-			if FileAccess.file_exists(save_path):
-				DirAccess.remove_absolute(save_path)
+			_remove_save_files()
 		skip_menu = true
 		if get_parent() == get_tree().root:
 			get_tree().change_scene_to_file(BOOT_SCENE)
@@ -6095,9 +6094,15 @@ func _runs_done() -> int:
 ## stacks are, because what has been pulled out of them is the progress. A ferry out on
 ## the water is saved as its cargo and nothing else: reconstructing a half-finished lap
 ## down to its waypoints would be a lot of file for a boat that can simply set off again.
+##
+## Written safely (2026-09-29, issue #25): the run goes to `<path>.tmp` first, and only a
+## file written whole is moved over the save, the save before it being kept as `<path>.bak`.
+## A crash or a full disk mid-write leaves the last good save where it was, and `load_game`
+## falls back to the `.bak` when the save itself is missing or cannot be read.
 func save_game() -> bool:
 	_autosave_in = AUTOSAVE_EVERY
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	var temp := save_path + SAVE_TEMP
+	var file := FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
 			return false
 
@@ -6153,12 +6158,54 @@ func save_game() -> bool:
 	save["play"] = _play
 	_save_extra(save)
 	file.store_var(save, true)
+	var wrote := file.get_error() == OK
 	file.close()
-	return true
+	if not wrote:
+		DirAccess.remove_absolute(temp)
+		return false
+	return _swap_in_save(temp)
+
+
+## The suffixes of the two files beside a save: the one being written and the one before.
+const SAVE_TEMP := ".tmp"
+const SAVE_BACKUP := ".bak"
+
+
+## Move a whole written file over the save, keeping the save it replaces as the backup.
+## Remove-then-rename rather than a rename over, which Windows refuses; if the game dies
+## between the two, the save is missing and the backup is what `load_game` reads.
+func _swap_in_save(temp: String) -> bool:
+	var backup := save_path + SAVE_BACKUP
+	if FileAccess.file_exists(save_path):
+		if FileAccess.file_exists(backup):
+			DirAccess.remove_absolute(backup)
+		if DirAccess.rename_absolute(save_path, backup) != OK:
+			return false
+	return DirAccess.rename_absolute(temp, save_path) == OK
+
+
+## A save file read back as its dictionary, or null for a file that is missing or cannot be
+## parsed.
+static func _read_save(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null or file.get_length() == 0:
+		return {}
+	var raw: Variant = file.get_var(true)
+	file.close()
+	return raw as Dictionary if raw is Dictionary else {}
+
+
+## Every file this run's save is made of: the save, its backup and a half-written temp.
+func _remove_save_files() -> void:
+	for path in [save_path, save_path + SAVE_BACKUP, save_path + SAVE_TEMP]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 
 
 func has_save() -> bool:
-	return FileAccess.file_exists(save_path)
+	return FileAccess.file_exists(save_path) or FileAccess.file_exists(save_path + SAVE_BACKUP)
 
 
 ## Read a run back. Anything wrong with the file — missing, from another lake, from an
@@ -6166,15 +6213,17 @@ func has_save() -> bool:
 func load_game() -> bool:
 	if not has_save():
 		return false
-	var file := FileAccess.open(save_path, FileAccess.READ)
-	if file == null:
+	# The save, or the one before it when the save is missing or will not parse. A save that
+	# parses but is refused (another version, another lake) does not fall back: the backup
+	# is the same run a write earlier and would be refused for the same reason.
+	var save := _read_save(save_path)
+	if save.is_empty():
+		save = _read_save(save_path + SAVE_BACKUP)
+	if save.is_empty():
 		return false
-	var raw: Variant = file.get_var(true)
-	file.close()
-	var save := raw as Dictionary
-	var written := 0 if save == null else int(save.get("version", 0))
+	var written := int(save.get("version", 0))
 	var readable := written == SAVE_VERSION
-	if save == null or not readable 			or int(save.get("seed", 0)) != _level_seed():
+	if not readable or int(save.get("seed", 0)) != _level_seed():
 		return false
 	if not _grid.restore(save.get("stacks", []) as Array):
 		return false
@@ -6337,10 +6386,10 @@ func wipe_save() -> void:
 	_wiping = true
 	# Straight back into the lake: this is a key pressed in play, not a trip to the menu.
 	skip_menu = true
-	if has_save():
-		# The engine's own path, not a globalized one: on the web there is no such thing as
-		# an absolute path to a save, and user:// is understood everywhere.
-		DirAccess.remove_absolute(save_path)
+	# The engine's own path, not a globalized one: on the web there is no such thing as an
+	# absolute path to a save, and user:// is understood everywhere. The backup goes too,
+	# or a wiped run would come back from it.
+	_remove_save_files()
 	get_tree().reload_current_scene()
 
 
