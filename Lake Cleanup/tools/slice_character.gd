@@ -28,6 +28,19 @@ const ANIMS := [
 
 const DIRS := ["south", "north", "east", "west"]
 
+## The run rows are read off Richard's flat sheet instead (2026-09-28, the repainted run):
+## `art_source/character.png` holds all twelve rows stacked, touching, so each run row is cut
+## at the band and width its old strip had. Measured by matching the strips against the
+## sheet: idle, cast and three run rows came out pixel for pixel, so the bands are exact and
+## no frame boundary moves.
+const SHEET := "res://art_source/character.png"
+const SHEET_BANDS := {
+	"running_south": Rect2i(0, 179, 1056, 47),
+	"running_north": Rect2i(0, 226, 1054, 43),
+	"running_east": Rect2i(0, 269, 1053, 45),
+	"running_west": Rect2i(0, 314, 1054, 44),
+}
+
 const OUT_PNG := "res://assets/character.png"
 const OUT_JSON := "res://assets/character.json"
 const DEBUG_PNG := "res://assets/sliced_character.png"
@@ -44,8 +57,13 @@ func _init() -> void:
 	var packed_tall := 0
 	for anim: Dictionary in ANIMS:
 		for dir in DIRS:
-			var path := "%s%s_%s.png" % [SOURCE_DIR, anim["slug"], dir]
+			var slug := "%s_%s" % [anim["slug"], dir]
+			var path := "%s%s.png" % [SOURCE_DIR, slug]
+			if SHEET_BANDS.has(slug):
+				path = SHEET
 			var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+			if image != null and SHEET_BANDS.has(slug):
+				image = image.get_region(SHEET_BANDS[slug])
 			if image == null:
 				printerr("could not read %s" % path)
 				quit(1)

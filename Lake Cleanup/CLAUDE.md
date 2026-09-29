@@ -2696,6 +2696,11 @@ psd-extract left in `art_source/character_extracted/` (source `Character_Sprite_
 Four real directions (south/north/east/west), `idle` 9, `run` 17, `cast` 16 frames; the straw
 hat is painted in. Frames are centred on their ink, not their cell (cells are an even split
 of a hand-trimmed strip). The shed draws the same sheet, idle and run only.
+- **The run rows come from `art_source/character.png`** (2026-09-28, Richard's repaint of
+  the walk): a flat sheet of all twelve rows stacked. `slice_character.gd` reads only the
+  run rows from it (`SHEET_BANDS`, each at its old strip's band and width, so no frame
+  boundary moves); idle and cast still come from `character_extracted/`. The first three run
+  frames are still dropped. The repaint changed only the east run's legs (303 px).
 - **Retired, by decision** (2026-09-11): the first angler (three rows + mirrored side, 6
   poses), the separately drawn straw hat (`straw_hat.png`, `slice_hat.gd`, per-frame head
   marks) and the F9 sheet toggle. Don't bring back a worn hat: the art has one.
