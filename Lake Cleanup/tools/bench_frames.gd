@@ -28,6 +28,8 @@
 ##   Git Bash rewrites a leading slash into a Windows path.
 ## Frames over 12 ms are listed after the summary with the net's state, the node count and the
 ## renderer's own CPU and GPU time for that frame.
+## BENCH_SHOT="200 260" saves the frame at each of those frame counts to
+##   tools/last_bench_shot_<n>.png (run with --fixed-fps 60 for a repeatable picture).
 ## BENCH_RAIN=1 pours a shower at full strength from the first frame, puddles full.
 ##
 ##   godot --path . res://tools/bench_frames.tscn
@@ -223,6 +225,11 @@ func _process(delta: float) -> void:
 	var ms := float(now - _last) / 1000.0
 	_last = now
 	_n += 1
+	if str(_n) in OS.get_environment("BENCH_SHOT").split(" ", false):
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(
+			"res://tools/last_bench_shot_%d.png" % _n
+		)
 	if _n <= WARMUP:
 		if _n == WARMUP:
 			_start = _counters()

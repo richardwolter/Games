@@ -5295,6 +5295,30 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(bool((sound.get(&"_pitch_step") as Dictionary).has(&"pop")),
 		"but the angler's own throw into the crate still does", "")
 
+	# The flights are one triangle array (2026-09-29): a shadow disc, a waterline diamond and
+	# a picture a piece, all off the atlas. tools/probe_same_frame.tscn is what proves it draws
+	# what the old loop drew; this guards that the batch is taken and holds every piece.
+	_check(Haul.batched, "the haul draws its flights as one batch", "")
+	var batch_haul := Haul.new()
+	batch_haul.grid = _grid
+	add_child(batch_haul)
+	var arted := -1
+	for i in _grid.defs.size():
+		if _grid.defs[i].atlas != null and not _grid.defs[i].keepsake:
+			arted = i
+			break
+	for i in 3:
+		batch_haul.send(arted, Vector2.ZERO, Vector2(200.0, 0.0))
+	batch_haul._process(0.2)
+	_check(bool(batch_haul.call(&"_batch")), "and it can batch pieces off the atlas", "")
+	var per := Haul.CIRCLE_SEGMENTS + 1 + 8
+	var laid := (batch_haul.get(&"_points") as PackedVector2Array).size()
+	_check(laid == 3 * per and (batch_haul.get(&"_indices") as PackedInt32Array).size()
+		== 3 * (Haul.CIRCLE_SEGMENTS * 3 + 12),
+		"three pieces in the air are three shadows, waterlines and pictures in it",
+		"%d points" % laid)
+	batch_haul.queue_free()
+
 	# The crate's thud is its own recording, in three takes, one of which is played per drop
 	# and never the one played last (2026-09-17). The shed's furniture thud is untouched and
 	# is still its own file.

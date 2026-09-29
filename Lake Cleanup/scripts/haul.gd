@@ -247,9 +247,125 @@ func _at(piece: Dictionary) -> Dictionary:
 	}
 
 
+## The flights as one triangle array rather than three draw commands a piece (2026-09-29).
+## At a big net's landing a hundred-odd pieces are in the air, and a shadow, a waterline and
+## a picture each, every one under its own `draw_set_transform`, was about a millisecond of
+## script and three hundred canvas commands. Everything here is on the atlas — the shadow
+## and the waterline sample its solid-white block — so one array carries it all, in the
+## order the old loop drew it: shadow, waterline, picture, piece after piece. The corners
+## are the old transform worked out here instead of on the GPU. `batched` false draws the
+## old way, for the harness to compare; so does any piece with no art on the atlas.
+static var batched := true
+
+## `canvas_item_add_circle`'s own count, so a shadow here covers the pixels draw_circle did.
+const CIRCLE_SEGMENTS := 64
+
+var _points := PackedVector2Array()
+var _colors := PackedColorArray()
+var _uvs := PackedVector2Array()
+var _indices := PackedInt32Array()
+var _unit_circle := PackedVector2Array()
+
+
 func _draw() -> void:
 	if grid == null:
 		return
+	if batched and _batch():
+		return
+	_draw_each()
+
+
+## False when something cannot go in the batch, and nothing has been drawn.
+func _batch() -> bool:
+	var sheets := grid.sheets
+	if sheets == null or sheets.atlas == null:
+		return false
+	for piece: Dictionary in _flying:
+		if grid.defs[int(piece["def"])].atlas != sheets.atlas:
+			return false
+	if _unit_circle.is_empty():
+		for i in CIRCLE_SEGMENTS:
+			var angle := float(i) * TAU / float(CIRCLE_SEGMENTS)
+			_unit_circle.append(Vector2(cos(angle), sin(angle)))
+	var white_uv := sheets.uv_of(sheets.white)
+	var white := white_uv.position + white_uv.size * 0.5
+	_points.clear()
+	_colors.clear()
+	_uvs.clear()
+	_indices.clear()
+	for piece: Dictionary in _flying:
+		var step := _at(piece)
+		if step.is_empty():
+			continue
+		var t: float = step["t"]
+		var at: Vector2 = step["at"]
+		var high := sin(t * PI)
+		_add_circle(
+			step["ground"], lerpf(13.0, 6.0, high), Color(0.0, 0.0, 0.0, lerpf(0.22, 0.07, high)),
+			white
+		)
+		var size := lerpf(SIZE_FROM, SIZE_TO, t) + sin(t * PI) * SIZE_PEAK
+		var turn := Transform2D(float(piece["spin"]) * t * TAU * 0.25, Vector2(size, size), 0.0, at)
+		var def: TrashDef = grid.defs[int(piece["def"])]
+		# TrashDef.stamp_iso, corner for corner: the waterline diamond, then the picture.
+		var foot := Vector2(0.0, def.size.y * 0.18)
+		var extent := Vector2(def.size.x * 1.15, def.size.x * 1.15 * 0.5)
+		_add_quad(
+			turn * (foot + Vector2(0.0, -extent.y * 0.5)), turn * (foot + Vector2(extent.x * 0.5, 0.0)),
+			turn * (foot + Vector2(0.0, extent.y * 0.5)), turn * (foot + Vector2(-extent.x * 0.5, 0.0)),
+			Color(1.0, 1.0, 1.0, 0.14), Rect2(white, Vector2.ZERO)
+		)
+		var half := def.size * 0.5
+		_add_quad(
+			turn * Vector2(-half.x, -half.y), turn * Vector2(half.x, -half.y),
+			turn * Vector2(half.x, half.y), turn * Vector2(-half.x, half.y),
+			Color.WHITE, sheets.uv_of(def.region)
+		)
+	if not _indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), _indices, _points, _colors, _uvs,
+			PackedInt32Array(), PackedFloat32Array(), sheets.atlas.get_rid()
+		)
+	return true
+
+
+func _add_circle(centre: Vector2, radius: float, colour: Color, uv: Vector2) -> void:
+	var base := _points.size()
+	for i in CIRCLE_SEGMENTS:
+		_points.append(_unit_circle[i] * radius + centre)
+		_colors.append(colour)
+		_uvs.append(uv)
+	_points.append(centre)
+	_colors.append(colour)
+	_uvs.append(uv)
+	for i in CIRCLE_SEGMENTS:
+		_indices.append(base + i)
+		_indices.append(base + (i + 1) % CIRCLE_SEGMENTS)
+		_indices.append(base + CIRCLE_SEGMENTS)
+
+
+func _add_quad(a: Vector2, b: Vector2, c: Vector2, d: Vector2, colour: Color, uv: Rect2) -> void:
+	var base := _points.size()
+	_points.append(a)
+	_points.append(b)
+	_points.append(c)
+	_points.append(d)
+	_uvs.append(uv.position)
+	_uvs.append(uv.position + Vector2(uv.size.x, 0.0))
+	_uvs.append(uv.position + uv.size)
+	_uvs.append(uv.position + Vector2(0.0, uv.size.y))
+	for i in 4:
+		_colors.append(colour)
+	_indices.append(base)
+	_indices.append(base + 1)
+	_indices.append(base + 2)
+	_indices.append(base)
+	_indices.append(base + 2)
+	_indices.append(base + 3)
+
+
+## The old way: a shadow and `stamp_iso` for each piece, under its own transform.
+func _draw_each() -> void:
 	for piece: Dictionary in _flying:
 		var step := _at(piece)
 		if step.is_empty():
