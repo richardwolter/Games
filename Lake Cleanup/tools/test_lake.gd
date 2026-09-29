@@ -7856,8 +7856,12 @@ func _stage_wash() -> void:
 		and back.sky_at(1.0)[0] == pal.sky_afternoon_high
 		and pal.sky_noon_high != Color.WHITE,
 		"the sky is the palette's, by the day's hour", "")
-	_check(back.modulate.v < 0.95 and back.mouse_filter == Control.MOUSE_FILTER_IGNORE,
-		"the whole of it is darkened behind the find, and takes no clicks", "%.2f" % back.modulate.v)
+	# Since 2026-09-28 the sky keeps the day's tint and a veil darkens the ground and water.
+	var back_src := FileAccess.get_file_as_string("res://scripts/wash_backdrop.gd")
+	_check(WashBackdrop.DARKEN < 0.95 and back_src.contains("1.0 - DARKEN")
+		and back.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the ground and water are veiled behind the find, the sky is not, and it takes no clicks",
+		"%.2f" % WashBackdrop.DARKEN)
 	_check(room.stand().hiss_is_recorded(), "the jet is the recording, not the built noise", "")
 	# The view is alive, and answers the jet.
 	var station := MusicStation.main()
