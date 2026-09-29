@@ -167,6 +167,58 @@ const BESIDE := 1.5
 const REACH := 3.2
 const PROMPT_LIFT := 8.0
 
+## Resting on the furniture (2026-09-29, `/grill-me` with Richard, picked off
+## `tools/last_pose_mockup.png`): E at a seat sits the player on it, at a bed lies them in it,
+## at a bookcase they reach up for a book and read it facing the room. Per piece, per view:
+## the kind, the hips' height in the drawing's own pixels up from its bottom edge, and how far
+## off the drawing's middle the player sits, in the same pixels. A view that is not listed
+## offers nothing: **side views are left out by decision** (Richard, after three passes at a
+## side-on sit). `front` faces the room and is drawn over the piece; `back` turns away from it
+## and is drawn behind it, so only the hat and shoulders show over the backrest.
+##
+## The sofa's view 0 is its back and its view 2 its cushion: the catalogue's labels are the
+## wrong way round for the sofa only (`SOFA_CUSHION` in the harness), and the rests follow the
+## pictures, not the labels. On the sofa the player sits left of middle so a dog can have the
+## other half. Numbers by eye off the mockup; retune here.
+const RESTS := {
+	&"decor_sofa": {0: [&"back", 10, 0], 2: [&"front", 12, -10]},
+	&"decor_loveseat": {0: [&"front", 13, 0], 2: [&"back", 11, 0]},
+	&"decor_dining_chair": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
+	&"decor_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0]},
+	&"decor_bookcase_tall": {0: [&"read", 0, 0]},
+	&"decor_bookcase_drawers": {0: [&"read", 0, 0]},
+	&"decor_tiny_bookcase": {0: [&"read", 0, 0]},
+}
+## How far above the ink's foot the hips are in each sitting strip, in the figure's own
+## pixels. What `tools/build_rest_frames.py` draws: move them together.
+const SIT_HIP := {&"south": 7, &"north": 8}
+## Pieces a dog and the player cannot share: a dog lying on one hops off when the player sits.
+## The sofa and the bed are shared, and the dog keeps to the middle of either: moved over on
+## the sofa it lay on the arm (Richard, 2026-09-29: "just middle").
+const SEAT_FOR_ONE := [&"decor_loveseat", &"decor_dining_chair"]
+## How many books `tools/build_rest_frames.py` draws on the reading strip, two frames each.
+const BOOKS := 5
+## Pieces that stand on the floor and block nothing, besides the flats and the pet bed: a
+## chew toy is something to step over (Richard, 2026-09-29).
+const WALK_OVER := [&"decor_chew_toy"]
+## The odds a dog with nowhere to lie climbs up on the piece the player has just sat or lain
+## on, when that piece has a free seat.
+const JOIN_ODDS := 0.6
+## The breath: seconds a cycle, and the share of it spent breathing in.
+const BREATH := 2.4
+const BREATH_IN := 0.35
+## Lying down, seconds before the player falls asleep and the Zs come.
+const SLEEP_AFTER := 6.0
+## Reading: the reach up to the shelf (the petting reach from behind, `pet3_north`, the arm
+## nearly straight up), then a page turned every so often.
+const READ_REACH_ARM := 3
+const PAGE_EVERY := 4.0
+const PAGE_TIME := 0.45
+## The shade the player sitting facing the room presses into the cushion: their own figure,
+## shifted and darkened (Richard: "closer to the player, less round").
+const SIT_SHADE := Color(0.14, 0.09, 0.07, 0.45)
+const SIT_SHADE_AT := Vector2(2.0, 1.0)
+
 ## The light in the room (2026-09-20, Richard: "sunlight coming through the left side... no
 ## circled rings like current fireplace, it looks blocky and ugly"). One additive quad over
 ## the shed, `shaders/shed_light.gdshader`: the sun's shaft from the round window in the left
@@ -476,6 +528,16 @@ var _you_age: float = 0.0
 var _you_sheet: Texture2D
 var _you_poses := {}
 
+## The piece the player is resting on (its key, as `_seats` keys them, "" when standing),
+## what kind of rest it is, how long it has lasted and where the player stood before it, which
+## is where they get up to.
+var _rest_key := ""
+var _rest_kind: StringName = &""
+var _rest_age: float = 0.0
+var _rest_from := Vector2.ZERO
+## Which of the `BOOKS` came off the shelf this time.
+var _read_book := 0
+
 ## How tall the figure draws inside its cell, and where its feet sit in that cell. See
 ## `_load_you`.
 var _you_ink_tall: float = 43.0
@@ -574,6 +636,7 @@ func _room_shown() -> void:
 	_you_facing = Vector2(0.0, 1.0)
 	_you_step = 0.0
 	_you_age = 0.0
+	_rest_key = ""
 
 	_dogs.clear()
 	if not DogArt.ready():
@@ -752,6 +815,16 @@ func _walk_you(delta: float) -> void:
 	if record_up():
 		_you_step = 0.0
 		return
+	# Resting: any walk input gets up, and so does the piece going away under the player.
+	if not _rest_key.is_empty():
+		_you_step = 0.0
+		_rest_age += delta
+		var moving := Vector2(
+			Input.get_axis(&"walk_left", &"walk_right"), Input.get_axis(&"walk_up", &"walk_down")
+		)
+		if moving != Vector2.ZERO or _rest_row() < 0:
+			stand_up()
+		return
 	if _pad_shelf and Pad.is_pad():
 		_you_step = 0.0
 		return
@@ -804,6 +877,9 @@ func _you_view() -> StringName:
 func _draw_you(floor_box: Rect2) -> void:
 	if _you_sheet == null:
 		return
+	if not _rest_key.is_empty() and _rest_kind != &"read":
+		_draw_resting(floor_box)
+		return
 	var step := float(CELL * _zoom())
 	var at := floor_box.position + _you_at * step
 	var tall := YOU_TALL * step
@@ -820,6 +896,12 @@ func _draw_you(floor_box: Rect2) -> void:
 	var petting := _you_pet >= 0.0 and _you_poses.has(reach)
 	if petting:
 		pose = reach
+	var reading := _rest_kind == &"read" and not _rest_key.is_empty()
+	var reaching := reading and _rest_age < Angler.PET_TIME
+	if reaching:
+		pose = StringName("pet%d_north" % READ_REACH_ARM)
+	elif reading:
+		pose = &"read_south"
 	if not _you_poses.has(pose):
 		return
 	var frames: Array = _you_poses[pose]
@@ -827,6 +909,11 @@ func _draw_you(floor_box: Rect2) -> void:
 	var index := posmod(int(_you_age / held), frames.size())
 	if petting:
 		index = mini(int(_you_pet / Angler.PET_TIME * frames.size()), frames.size() - 1)
+	elif reaching:
+		index = mini(int(_rest_age / Angler.PET_TIME * frames.size()), frames.size() - 1)
+	elif reading:
+		var turning := fmod(_rest_age - Angler.PET_TIME, PAGE_EVERY) > PAGE_EVERY - PAGE_TIME
+		index = mini(_read_book * 2 + (1 if turning else 0), frames.size() - 1)
 	var frame: Dictionary = frames[index]
 	var region: Rect2 = frame["region"]
 	var ink: Rect2 = frame["ink"]
@@ -1253,7 +1340,7 @@ func _blockers() -> Array:
 	for i in decor.size():
 		var row: Dictionary = decor[i]
 		var piece := StringName(row["piece"])
-		if piece == DOG_BED or sheets.lies_flat(piece) or sheets.on_wall(piece):
+		if piece == DOG_BED or piece in WALK_OVER or sheets.lies_flat(piece) or sheets.on_wall(piece):
 			continue
 		# A pot on a table stands on the table, not on the floor: the table blocks for both.
 		if sheets.is_small(piece) and _host_of(decor, i) >= 0:
@@ -1583,10 +1670,19 @@ func switch_box() -> Rect2:
 func switch_near() -> bool:
 	if _you_pet >= 0.0:
 		return true
+	if not _rest_key.is_empty():
+		stand_up()
+		return true
 	var at := _switch_near()
 	var dog := _dog_near()
+	var rest := _rest_near()
 	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
-	if dog != null and _you_at.distance_to(dog.at) < switch_gap:
+	var dog_gap := INF if dog == null else _you_at.distance_to(dog.at)
+	var rest_gap := INF if rest < 0 else _you_at.distance_to(_switch_middle(rest))
+	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
+		rest_on(rest)
+		return true
+	if dog != null and dog_gap < switch_gap:
 		pet_dog(dog)
 		return true
 	if at < 0:
@@ -1662,9 +1758,8 @@ func take_back(index: int) -> void:
 ## the lake can light.
 ##
 ## `_unhandled_key_input` runs before the lake's own `_unhandled_input`, which is what puts
-## the fireplace ahead of the door: E lights the fire the player is standing at, and E
-## anywhere else in the room falls through to meaning "leave", the way it always has.
-## Escape still leaves from anywhere, including the hearth.
+## the fireplace ahead of the door: E lights the fire the player is standing at. E anywhere
+## else does nothing since 2026-09-29 (Richard): only Escape and the cross leave the room.
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or record_up():
 		return
@@ -2334,7 +2429,7 @@ func _draw() -> void:
 	for dog in _dogs:
 		walkers.append({"key": _walker_key(dog.at, rows), "dog": dog})
 	if _you_sheet != null:
-		walkers.append({"key": _walker_key(_you_at, rows), "dog": null})
+		walkers.append({"key": _you_key(rows), "dog": null})
 	walkers.sort_custom(func(a, b): return float(a["key"]) < float(b["key"]))
 	var next_walker := 0
 	for entry: Dictionary in _order(ghost):
@@ -2610,13 +2705,20 @@ func _draw_shelf_key() -> void:
 
 
 func _draw_prompt(floor_box: Rect2) -> void:
-	if _you_pet >= 0.0:
+	if _you_pet >= 0.0 or not _rest_key.is_empty():
 		return
 	var at := _switch_near()
 	var dog := _dog_near()
+	var rest := _rest_near()
 	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
+	var dog_gap := INF if dog == null else _you_at.distance_to(dog.at)
+	var rest_gap := INF if rest < 0 else _you_at.distance_to(_switch_middle(rest))
+	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
+		# A seat, a bed or a bookcase is what E would use: the key goes over it.
+		at = rest
+		dog = null
 	var over := Vector2.ZERO
-	if dog != null and _you_at.distance_to(dog.at) < switch_gap:
+	if dog != null and dog_gap < switch_gap:
 		# The dog is what E would pet (2026-09-28): the key goes over its head.
 		var step := float(CELL * _zoom())
 		over = floor_box.position + dog.at * step - Vector2(0.0, DOG_TALL * step + PROMPT_LIFT * 0.5)
@@ -2753,3 +2855,195 @@ func _piece_box(index: int) -> Rect2:
 	var at := Vector2(float(int(row["cell"][0])), float(int(row["cell"][1])))
 	var span := Vector2(span_of(StringName(row["piece"]), _row_view(row)))
 	return Rect2(_floor_origin() + at * _zoom(), span * _zoom())
+
+
+## Resting on the furniture (see `RESTS`). -----------------------------------------------
+
+## What resting on this view of this piece offers, [kind, hip lift, sideways], or empty.
+func rest_of(piece: StringName, view: int) -> Array:
+	var views: Dictionary = RESTS.get(piece, {})
+	return views.get(view, [])
+
+
+## The placed piece the player is close enough to rest on, as an index into `decor`, or -1.
+## Measured from the middle of its foot, the way a switch is.
+func _rest_near() -> int:
+	if sheets == null:
+		return -1
+	var best := -1
+	var best_gap := REACH
+	for i in decor.size():
+		var row: Dictionary = decor[i]
+		if rest_of(StringName(row["piece"]), _row_view(row)).is_empty():
+			continue
+		var gap := _you_at.distance_to(_switch_middle(i))
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+
+## The row the player is resting on, or -1 when it has gone: picked up, or turned to a face
+## with a different rest or none. Asked every frame, since the player can do both while
+## sitting there.
+func _rest_row() -> int:
+	for i in decor.size():
+		var row: Dictionary = decor[i]
+		var key := "%s@%d,%d" % [row["piece"], int(row["cell"][0]), int(row["cell"][1])]
+		if key != _rest_key:
+			continue
+		var spec := rest_of(StringName(row["piece"]), _row_view(row))
+		return i if not spec.is_empty() and StringName(spec[0]) == _rest_kind else -1
+	return -1
+
+
+## What the player is doing on the furniture: &"front", &"back", &"lie", &"read", or &"".
+func resting() -> StringName:
+	return &"" if _rest_key.is_empty() else _rest_kind
+
+
+## Sit, lie or read at this piece. A dog lying on a seat for one hops off; on the sofa and the
+## bed it stays. A dog with nowhere to lie may come up and join the player.
+func rest_on(index: int) -> void:
+	var row: Dictionary = decor[index]
+	var piece := StringName(row["piece"])
+	var spec := rest_of(piece, _row_view(row))
+	if spec.is_empty():
+		return
+	_rest_key = "%s@%d,%d" % [piece, int(row["cell"][0]), int(row["cell"][1])]
+	_rest_kind = spec[0]
+	_rest_age = 0.0
+	_rest_from = _you_at
+	_you_step = 0.0
+	_you_facing = Vector2(0.0, -1.0) if _rest_kind == &"back" else Vector2(0.0, 1.0)
+	if _rest_kind == &"read":
+		_read_book = _dog_rng.randi_range(0, BOOKS - 1)
+		return
+	var taken := false
+	for dog in _dogs:
+		if dog.seat != _rest_key:
+			continue
+		if piece in SEAT_FOR_ONE:
+			_drop_seat(dog)
+			dog.state = DogArt.gait(dog.slot, true, dog.breed)
+			dog.target = _dog_somewhere(dog)
+			dog.mood = DOG_MOOD_MOST
+		else:
+			taken = true
+	if taken or piece in SEAT_FOR_ONE or _dog_rng.randf() >= JOIN_ODDS:
+		return
+	for seat: Dictionary in _seats():
+		if String(seat["key"]) != _rest_key:
+			continue
+		for dog in _dogs:
+			if dog.seat.is_empty():
+				dog.seat = _rest_key
+				dog.over = seat["over"]
+				dog.state = DogArt.gait(dog.slot, true, dog.breed)
+				dog.target = seat["feet"]
+				dog.mood = DOG_MOOD_MOST
+				return
+
+
+## Get up, back to where the player stood before.
+func stand_up() -> void:
+	if _rest_key.is_empty():
+		return
+	_rest_key = ""
+	_you_at = _rest_from
+	_you_facing = Vector2(0.0, 1.0)
+	_you_age = 0.0
+
+
+## Where the player sorts among the furniture: over a piece they sit on facing the room or lie
+## in, behind one they sit on with their back to the room, and by their feet otherwise.
+func _you_key(rows: Array) -> float:
+	var at := _rest_row()
+	if at < 0 or _rest_kind == &"read":
+		return _walker_key(_you_at, rows)
+	var foot := _foot_of(decor[at])
+	return foot - OVER_PIECE if _rest_kind == &"back" else foot + OVER_PIECE
+
+
+## The player sitting on or lying in the piece they rest on.
+func _draw_resting(floor_box: Rect2) -> void:
+	var at := _rest_row()
+	if at < 0:
+		return
+	var row: Dictionary = decor[at]
+	var piece := StringName(row["piece"])
+	var view := _row_view(row)
+	var spec := rest_of(piece, view)
+	var zoom := _zoom()
+	var drawn := sheets.scale_of(piece) * zoom
+	var box := Rect2(
+		floor_box.position
+			+ Vector2(float(int(row["cell"][0])), float(int(row["cell"][1]))) * zoom,
+		sheets.view_size_of(piece, view) * zoom
+	)
+	var tall := YOU_TALL * float(CELL) * zoom
+	var scale := maxf(1.0, roundf(tall / _you_ink_tall / YOU_STEP) * YOU_STEP)
+	var pose := &"sit_south"
+	if _rest_kind == &"lie":
+		pose = &"lie_south"
+	elif _rest_kind == &"back":
+		pose = &"sit_north"
+	if not _you_poses.has(pose):
+		return
+	var frames: Array = _you_poses[pose]
+	var index := 0
+	if _rest_kind != &"lie" and fmod(_rest_age, BREATH) > BREATH * (1.0 - BREATH_IN):
+		index = mini(1, frames.size() - 1)
+	var region: Rect2 = (frames[index] as Dictionary)["region"]
+	var ink: Rect2 = (frames[0] as Dictionary)["ink"]
+	var middle := box.get_center().x + float(spec[2]) * drawn
+	var origin := Vector2(middle - (ink.position.x + ink.size.x * 0.5) * scale, 0.0)
+	if _rest_kind == &"lie":
+		# The head on the pillow, two drawn pixels under the headboard's top.
+		origin.y = box.position.y + 2.0 * drawn - ink.position.y * scale
+	else:
+		var hip: int = SIT_HIP[&"north" if _rest_kind == &"back" else &"south"]
+		var foot := box.end.y - float(spec[1]) * drawn + float(hip) * scale
+		origin.y = foot - (ink.position.y + ink.size.y) * scale
+	origin = origin.round()
+	var size := region.size * scale
+	if _rest_kind == &"front":
+		draw_texture_rect_region(
+			_you_sheet, Rect2(origin + SIT_SHADE_AT * scale, size), region, SIT_SHADE
+		)
+	if _rest_kind == &"lie":
+		_draw_blanket(box, drawn, middle)
+	draw_texture_rect_region(_you_sheet, Rect2(origin, size), region)
+	if _rest_kind == &"lie" and _rest_age >= SLEEP_AFTER:
+		_draw_zs(Vector2(middle + ink.size.x * 0.4 * scale, origin.y + ink.position.y * scale), scale)
+
+
+## The body under the blanket: two folds down it and a lit turn-down over the shoulders, in
+## shade and light rather than a colour, so the green bed and the blue one both wear them.
+func _draw_blanket(box: Rect2, drawn: float, middle: float) -> void:
+	var top := box.position.y + 16.5 * drawn
+	var bottom := box.end.y - 15.0 * drawn
+	var side := 6.5 * drawn
+	var px := maxf(1.0, roundf(drawn))
+	for toward: float in [-1.0, 1.0]:
+		draw_rect(
+			Rect2(
+				Vector2(roundf(middle + toward * side), roundf(top + px * 1.5)),
+				Vector2(px, maxf(bottom - top, 0.0))
+			),
+			Color(0.0, 0.0, 0.0, 0.22)
+		)
+	draw_rect(
+		Rect2(Vector2(roundf(middle - side), roundf(top)), Vector2(roundf(side * 2.0) + px, px * 1.5)),
+		Color(1.0, 1.0, 1.0, 0.22)
+	)
+
+
+## Three Zs rising off the sleeper, a size apart, each fading in and out in turn.
+func _draw_zs(from: Vector2, scale: float) -> void:
+	for i in 3:
+		var phase := fmod(_rest_age * 0.6 + float(i) / 3.0, 1.0)
+		var at := from + Vector2(float(i) * 5.0, -float(i) * 7.0 - phase * 6.0) * scale * 0.5
+		Style.write(
+			self, "z", Style.TEXT_SMALL + i * 3, at.round(), Color(1.0, 1.0, 1.0, sin(phase * PI))
+		)

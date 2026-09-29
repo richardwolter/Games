@@ -33,6 +33,13 @@ const ANIMS := [
 	{"prefix": "pet1", "slug": "pet1", "frames": 6, "ink_first": true},
 	{"prefix": "pet2", "slug": "pet2", "frames": 6, "ink_first": true},
 	{"prefix": "pet3", "slug": "pet3", "frames": 6, "ink_first": true},
+	# Resting in the shed, built by rule (tools/build_rest_frames.py, 2026-09-29). Only the
+	# directions each was drawn in: sitting faces the room or turns its back on it, and lying
+	# and reading face the room. Measured against the first frame's ink, so a breath moves the
+	# body and never the anchor.
+	{"prefix": "sit", "slug": "sit", "frames": 2, "ink_first": true, "dirs": ["south", "north"]},
+	{"prefix": "lie", "slug": "lie", "frames": 1, "dirs": ["south"]},
+	{"prefix": "read", "slug": "read", "frames": 10, "ink_first": true, "dirs": ["south"]},
 ]
 
 const DIRS := ["south", "north", "east", "west"]
@@ -65,7 +72,7 @@ func _init() -> void:
 	var packed_wide := 0
 	var packed_tall := 0
 	for anim: Dictionary in ANIMS:
-		for dir in DIRS:
+		for dir: String in anim.get("dirs", DIRS):
 			var slug := "%s_%s" % [anim["slug"], dir]
 			var path := "%s%s.png" % [SOURCE_DIR, slug]
 			if SHEET_BANDS.has(slug):

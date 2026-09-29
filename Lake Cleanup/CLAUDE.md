@@ -4735,7 +4735,7 @@ purpose. What the audit settled, against the shipped design:
   - Interface: hover on everything clickable (`HOVER_GAP`), a click on **press** (a
     `PlankButton` used to click on release, heard late), **no click on a
     shop row** (the purchase sound is the answer; an unaffordable row is silent). `Close_Tab`
-    when the player closes a board — cross, click off it, Escape, E out of the shed
+    when the player closes a board — cross, click off it, Escape (E no longer leaves the shed, 2026-09-29)
     (`Lake._shut`, `MainMenu._shut`) — never when another board opening puts it away.
     The menu's Quit closes rather than clicks.
     `NewGame_Continue_Sound` on New game / Continue (and "Start over" confirmed) on the
@@ -5271,6 +5271,54 @@ furniture. `ShedRoom`'s seven `_dog_*` members are a list of `ShedDog` rows.
   past the base's back edge. In front, or beside it level with its base (within
   `ShedRoom.BESIDE`, 1.5 cells, of either side), it is drawn over. Beside used to sort by
   feet alone and the angler went under a sofa's arm.
+
+### Sitting, Lying and Reading in the Shed (2026-09-29, `/grill-me` with Richard)
+E at a seat sits the player on it, at the bed lies them in it, at a bookcase they reach up
+for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
+(`tools/build_pose_mockup.py`) over four passes before any game code.
+- **Where, per view** (`ShedRoom.RESTS`: kind, the hips' height in drawn pixels up from the
+  picture's bottom, sideways offset): sofa, armchair and dining chair **front** (facing the
+  room, drawn over the piece) and **back** (turned away, drawn behind it, only hat and
+  shoulders over the backrest); both beds' colours **lie**; the three bookcases' front
+  **read**. **No side views, by decision** (Richard, after three passes: "looks really bad,
+  lets not work with it"). The sofa's rests follow its pictures, not its swapped labels:
+  view 0 is the back, view 2 the cushion. On the sofa the player sits left of middle.
+- **E is one choice among three**: the nearest of a dog, a switch and a rest wins
+  (`switch_near`, `_draw_prompt`), measured from the foot's middle like a switch. **Any walk
+  key, E again, the piece going away** (picked up or turned) **or leaving the shed** gets up,
+  at once, where the player stood before (`stand_up`, `_rest_from`). Nothing is saved.
+- **E no longer leaves the shed** (Richard, same day): it is the room's own verb in there,
+  and only Escape and the cross close the room (`Lake._unhandled_input`'s interact).
+- **The strips are built by rule** (`tools/build_rest_frames.py`, psd-extract venv python,
+  project root, then `slice_character.gd` and a reimport): `sit_south` and `sit_north` (rest
+  and a breath in: **the chest opens a pixel either side, the head stays**, `chest_breath`;
+  the first cut lowered the whole upper body and read as the head bobbing), `lie_south` (the head and hat alone; the
+  blanket is the bed's own art with two folds and a lit turn-down drawn over it in shade and
+  light, so both bed colours wear them), `read_south` (the book's back cover to the room, a
+  page lifting; **five books**, `COVERS`, two frames each, one picked each read,
+  `ShedRoom.BOOKS`/`_read_book`). For Richard to polish; a re-run overwrites. `ShedRoom.SIT_HIP` must match
+  the rows the builder cuts. The slicer takes a `dirs` list per animation now.
+- **Front sitting presses a shade into the cushion**: the figure itself drawn again
+  `SIT_SHADE_AT` right and down in `SIT_SHADE` (Richard: "closer to the player, less
+  round" than the ellipse it replaced). The basket stays in hand sitting and **vanishes
+  while reading**, by decision.
+- **Reading reuses the petting reach from behind** (`pet3_north`, the arm near straight up)
+  for `Angler.PET_TIME`, then reads; a page turns every `PAGE_EVERY`. No reach frames of
+  its own, by decision.
+- **Idle life**: a breath every `BREATH`; lying, Zs after `SLEEP_AFTER`.
+- **Dogs**: on the sofa and the bed a dog already lying there stays, **in the middle**
+  (moved over to the free half it lay on the sofa's arm, Richard); on the armchair and chair (`SEAT_FOR_ONE`) it hops
+  off. A dog with nowhere to lie climbs up on a free seat of the piece at `JOIN_ODDS`. **The
+  dogs' seats went up a little** (Richard, same day): sofa cushion 4 to 6, armchair 3 to 5,
+  bed 21 to 24, in `decor_sets.json` and `pieces.json` by hand (the builder was not run).
+- **The chew toy blocks nothing** (`ShedRoom.WALK_OVER`, Richard, same day): stepped over,
+  like the pet bed and the rugs.
+- **Out of scope, by decision**: side sitting, get-up frames, sounds, a carried book,
+  reading anywhere else, the lake.
+- `test_lake`'s `_check_shed_rest` guards the strips, no side-view rest, E resting and E
+  standing up where the player stood, the dog hopping off the armchair and staying on the
+  sofa, and the seat going away. Probe: `tools/shot_rest.tscn` (desktop build, own save,
+  whole pack forced) saves `tools/last_rest_{sofa,sofa_back,armchair,chair_back,bed,read}.png`.
 
 ### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
 Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,

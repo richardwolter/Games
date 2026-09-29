@@ -3813,11 +3813,102 @@ func _check_shed_pet(room: ShedRoom) -> void:
 		_main.call(&"_set_shed", false)
 
 
+## Sitting, lying and reading in the shed (2026-09-29): E at a seat, a bed or a bookcase rests
+## the player on it, a walk key or E gets them up where they stood, a side view offers
+## nothing, a dog on a seat for one hops off and one on the sofa stays, and the strips exist.
+func _check_shed_rest(room: ShedRoom) -> void:
+	var sheets: Sheets = room.sheets
+	if sheets == null or not sheets.has(&"decor_loveseat") or not sheets.has(&"decor_bed"):
+		return
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	var book: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Angler.ART))
+	var poses: Dictionary = book.get("poses", {})
+	for pose in ["sit_south", "sit_north", "lie_south", "read_south"]:
+		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
+	_check((poses.get("sit_south", []) as Array).size() == 2, "sitting breathes, two frames", "")
+	# Side views offer nothing, by decision.
+	for piece: StringName in [&"decor_sofa", &"decor_loveseat", &"decor_dining_chair"]:
+		_check(room.rest_of(piece, 1).is_empty() and room.rest_of(piece, 3).is_empty(),
+			"%s side on is no seat for the player" % piece, "")
+	_check(StringName(room.rest_of(&"decor_sofa", 2)[0]) == &"front",
+		"the sofa's cushion view faces the room", "")
+	_check(StringName(room.rest_of(&"decor_sofa", 0)[0]) == &"back",
+		"its backrest view turns away", "")
+	var you := Vector2(10.0, 12.0)
+	var cases := [
+		[&"decor_loveseat", 0, &"front"],
+		[&"decor_loveseat", 2, &"back"],
+		[&"decor_bed", 0, &"lie"],
+		[&"decor_bookcase_tall", 0, &"read"],
+	]
+	for case: Array in cases:
+		if not sheets.has(case[0]):
+			continue
+		decor.clear()
+		var span: Vector2i = room.span_of(case[0], case[1])
+		room.place(case[0], Vector2i(int(you.x * ShedRoom.CELL) - span.x / 2,
+			int(you.y * ShedRoom.CELL) - span.y - 4), case[1])
+		room.set(&"_you_at", you)
+		room.set(&"_you_pet", -1.0)
+		_check(room.switch_near() and room.resting() == case[2],
+			"E at %s view %d is %s" % [case[0], case[1], case[2]], String(room.resting()))
+		room.switch_near()
+		_check(room.resting() == &"" and room.get(&"_you_at") == you,
+			"and E again gets up where the player stood", "")
+	# A dog on the armchair hops off; on the sofa it stays.
+	var dogs: Array = room.dogs()
+	if dogs.is_empty():
+		dogs.append(ShedRoom.ShedDog.new())
+	var dog: ShedRoom.ShedDog = dogs[0]
+	for case: Array in [[&"decor_loveseat", 0, false], [&"decor_sofa", 2, true]]:
+		decor.clear()
+		var span: Vector2i = room.span_of(case[0], case[1])
+		var cell := Vector2i(int(you.x * ShedRoom.CELL) - span.x / 2,
+			int(you.y * ShedRoom.CELL) - span.y - 4)
+		room.place(case[0], cell, case[1])
+		room.set(&"_you_at", you)
+		dog.seat = "%s@%d,%d" % [case[0], cell.x, cell.y]
+		room.rest_on(0)
+		_check((dog.seat != "") == case[2],
+			"a dog on the %s %s" % [case[0], "stays" if case[2] else "hops off"], dog.seat)
+		room.stand_up()
+	dog.seat = ""
+	# Picking the piece up from under the player gets them up.
+	decor.clear()
+	room.place(&"decor_loveseat", Vector2i(60, 60), 0)
+	room.set(&"_you_at", Vector2(60.0 + 16.0, 60.0 + 36.0) / float(ShedRoom.CELL))
+	room.rest_on(0)
+	decor.clear()
+	room.call(&"_walk_you", 1.0 / 60.0)
+	_check(room.resting() == &"", "the seat going away gets the player up", "")
+	# E does not leave the shed (2026-09-29): only Escape and the cross.
+	decor.clear()
+	var press := InputEventKey.new()
+	for ev: InputEvent in InputMap.action_get_events(&"interact"):
+		if ev is InputEventKey:
+			press = (ev as InputEventKey).duplicate()
+	press.pressed = true
+	_main.call(&"_unhandled_input", press)
+	_check(bool(_main.get(&"_shed_open")), "E in the shed does not leave it", "")
+	# The chew toy is stepped over.
+	if sheets.has(&"decor_chew_toy"):
+		room.place(&"decor_chew_toy", Vector2i(40, 80), 0)
+		_check((room.call(&"_blockers") as Array).is_empty(), "the chew toy blocks nothing", "")
+	decor.clear()
+	decor.append_array(kept)
+	if not was_open:
+		_main.call(&"_set_shed", false)
+
+
 func _check_shed_dogs(room: ShedRoom) -> void:
 	var sheets: Sheets = room.sheets
 	if sheets == null or not sheets.has(&"decor_sofa") or not sheets.has(&"decor_pet_bed"):
 		return
 	_check_shed_pet(room)
+	_check_shed_rest(room)
 	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
 	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
 	# the lake's own array, so the furniture goes down after the door is open, not before.

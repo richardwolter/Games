@@ -2147,7 +2147,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _wash_open:
 			_wash_to_shed()
 		elif _shed_open:
-			_shut(_set_shed)
+			# E is the room's own verb in here (a switch, a dog, a seat) and no longer
+			# leaves (Richard, 2026-09-29): Escape and the cross close the shed.
+			pass
 		elif _menu_open:
 			_shut(_set_menu)
 		elif _at_pump():
