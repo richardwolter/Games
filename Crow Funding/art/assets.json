@@ -345,10 +345,10 @@
             "solo": false,
             "speckle": 0.0,
             "deadzone": 0,
-            "prompt": "a wooden rooftop water tower on steel legs standing on a flat tar roof of an old apartment block, ladder, pipes, chimneys and neighbouring rooftops behind, empty plain sky in the upper third",
+            "prompt": "from the edge of a tall apartment rooftop, a low brick parapet in the near foreground, a big wooden water tower on steel legs beside it, high vantage point view looking out and down over a dense city far below, rooftops and streets receding to the horizon, empty plain sky in the upper third",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
-            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
-            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, clouds, sun, moon, frame, border, ground level view, street level",
+            "_note": "Environment CANDIDATE (redo 2026-09-29, Richard: every environment is seen FROM a high perch, perch in the foreground, city below). Settings match skyline/skyline_modern. Not wired into the game. See art/env_candidates.png. Rerolls: v3,v4 rerolled (seeds 11113,11114) with 'clear blank white sky' + (clouds:1.5) negative; v1,v2 still have clouds. Files saved as 8-bit grayscale, optimized."
         },
         {
             "name": "env_fire_escape",
@@ -366,10 +366,10 @@
             "solo": false,
             "speckle": 0.0,
             "deadzone": 0,
-            "prompt": "a narrow city alley between tall brick tenements, zigzag iron fire escapes with ladders and landings on the walls, hanging laundry lines, trash cans and puddles below, strip of plain sky above",
+            "prompt": "from the top landing of an iron fire escape high up on a tall brick building, iron railing in the near foreground, high vantage point view looking out and down over a dense city far below, rooftops and streets receding to the horizon, empty plain sky in the upper third",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
-            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
-            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, clouds, sun, moon, frame, border, ground level view, street level",
+            "_note": "Environment CANDIDATE (redo 2026-09-29, Richard: every environment is seen FROM a high perch, perch in the foreground, city below). Settings match skyline/skyline_modern. Not wired into the game. See art/env_candidates.png. Rerolls: v3 rerolled (seed 11213). Files saved as 8-bit grayscale, optimized."
         },
         {
             "name": "env_belfry",
@@ -387,10 +387,10 @@
             "solo": false,
             "speckle": 0.0,
             "deadzone": 0,
-            "prompt": "inside an old church belfry high above the city, a great bronze bell hanging from heavy timber beams, arched stone openings looking out over rooftops and a distant skyline, empty plain sky through the arches",
+            "prompt": "from the stone ledge of an old church belfry high above the city, a great bronze bell hanging from timber beams inside the arch, stone sill in the near foreground, high vantage point view looking out and down over a dense city far below, rooftops and streets receding to the horizon, empty plain sky in the upper third",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
-            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
-            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, clouds, sun, moon, frame, border, ground level view, street level",
+            "_note": "Environment CANDIDATE (redo 2026-09-29, Richard: every environment is seen FROM a high perch, perch in the foreground, city below). Settings match skyline/skyline_modern. Not wired into the game. See art/env_candidates.png. Rerolls: v3,v4 rerolled (seeds 11313,11314) with 'huge bronze bell in the foreground'; v2 has no bell. Files saved as 8-bit grayscale, optimized."
         },
         {
             "name": "env_harbour_crane",
@@ -408,10 +408,10 @@
             "solo": false,
             "speckle": 0.0,
             "deadzone": 0,
-            "prompt": "an old harbour with a tall steel dockside crane, jib reaching over the water, moored cargo ship, bollards, stacked crates, warehouses along the quay, empty plain sky in the upper third",
+            "prompt": "from the top of a tall steel harbour crane jib, lattice girders in the near foreground, looking down over the docks far below, cargo ships, quays, warehouses and the city beyond, empty plain sky in the upper third",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
-            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
-            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, clouds, sun, moon, frame, border, ground level view, street level",
+            "_note": "Environment CANDIDATE (redo 2026-09-29, Richard: every environment is seen FROM a high perch, perch in the foreground, city below). Settings match skyline/skyline_modern. Not wired into the game. See art/env_candidates.png. Rerolls: v2 rerolled (seed 11412). Files saved as 8-bit grayscale, optimized."
         },
         {
             "name": "env_park_lamp",
@@ -429,10 +429,10 @@
             "solo": false,
             "speckle": 0.0,
             "deadzone": 0,
-            "prompt": "a city park at night, an ornate cast iron lamp post glowing beside a bench, bare trees, gravel path, dark hatched night sky, the lamp light leaving a pool of white paper around it",
+            "prompt": "from the top of a tall ornate cast iron park lamp post at dusk, the lamp head in the near foreground, looking down over a city park far below with paths, trees, a pond and benches, city buildings beyond, light airy linework, mostly white paper, empty plain sky in the upper third",
             "style": "detailed black ink pen illustration on white paper, fine cross hatching, intricate confident linework, engraving style",
-            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, frame, border",
-            "_note": "Environment CANDIDATE (2026-09-29), not wired into the game. Settings match skyline/city entries. See art/env_candidates.png."
+            "negative_extra": "people, birds, crow, text, lettering, colour, grey wash, clouds, sun, moon, frame, border, ground level view, street level, solid black sky, night",
+            "_note": "Environment CANDIDATE (redo 2026-09-29, Richard: every environment is seen FROM a high perch, perch in the foreground, city below). Settings match skyline/skyline_modern. Not wired into the game. See art/env_candidates.png. Rerolls: v2,v3 rerolled (seeds 11512,11513) as aerial bird's-eye; v1,v4 remain ground level (rerolls spent). Files saved as 8-bit grayscale, optimized."
         }
     ]
 }

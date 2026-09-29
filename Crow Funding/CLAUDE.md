@@ -18,6 +18,10 @@ the loop); everything on screen is still drawn with `_draw()` flat shapes.
   `crow.gd` keeps animating flap and hop in code. No frame animation.
 - **The scarf is its own layer**, drawn or generated separately and left white so
   code can tint it. The model ignores the scarf in the prompt when the LoRA is on.
+- **Every environment is seen FROM a high perch** (Richard, 2026-09-29): the top of a
+  balcony, roof or other tall structure, looking out and down over the city, like the
+  balcony scene. The perch (railing, parapet, roof edge, ledge) is in the foreground where
+  the crows stand; the city is below and beyond. No ground-level views, no clouds.
 
 ## Generation pipeline
 
