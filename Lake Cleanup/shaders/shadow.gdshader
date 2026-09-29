@@ -55,6 +55,11 @@ uniform float round_off = 0.55;
 // Where in its own quad this fragment is, 0 to 1 across and down.
 varying vec2 local;
 
+// A tile still rising into place (LakeGrid.RISE_SLOTS, 2026-09-29): its emerge, in pixels
+// down, by the slot its vertices carry. Stamped at rest and moved here, so the grid does not
+// re-stamp it every frame. Mirrors LakeGrid._push_rise.
+uniform float rise[126];
+
 void vertex() {
 	// The piece's anchor x, packed into red and green as one sixteen-bit number by
 	// LakeGrid.pack_anchor. Per piece, not per vertex: every corner of one shadow reads the
@@ -62,7 +67,15 @@ void vertex() {
 	float high = floor(COLOR.r * 255.0 + 0.5);
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
-	local = COLOR.ba;
+	// Blue is the corner flag, 0 or 1, or for a rising tile 2 + slot * 2 + flag.
+	float code = floor(COLOR.b * 255.0 + 0.5);
+	float across = COLOR.b;
+	if (code > 1.5 && code < 253.5) {
+		float slot = floor((code - 2.0) * 0.5);
+		across = code - 2.0 - slot * 2.0;
+		VERTEX.y += rise[int(slot)];
+	}
+	local = vec2(across, COLOR.a);
 
 	// Off the piece, towards where a sun in the southeast puts it. Before the anchor test,
 	// so a piece lying dry on the beach still throws its shadow the same way as one afloat —

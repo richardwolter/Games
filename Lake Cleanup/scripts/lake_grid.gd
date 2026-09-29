@@ -41,6 +41,23 @@ const BOB_FREQ := 11.0
 const BOB_DAMP := 3.5
 const BOB_TIME := 1.4
 
+## The rise and bob are moved in the soup's shaders, not re-stamped (2026-09-29, Richard
+## approved: nothing visible). A rising tile is stamped once at its resting place with a
+## slot number in a spare vertex channel (the soup's blue, 1.0 on every piece with art; the
+## shadow's blue beside its corner flag; the foam collar's empty blue), and `rise[slot]` in
+## all three shaders is the `emerge` that used to go into the corners. Same curve, same
+## clock; the tile is stamped again at rest once it is still. A tile gets a slot only while
+## one is free and the soup is all art (`_rise_live`); otherwise it is patched every frame
+## as before. `gpu_rise` false is the old way, for the harness to compare.
+const RISE_SLOTS := 126
+var gpu_rise := true
+var _rise_slot := PackedInt32Array()
+var _rise := PackedFloat32Array()
+var _rise_free: Array[int] = []
+var _rise_dirty := false
+## The slot of the tile being stamped, or -1.
+var _stamp_slot := -1
+
 ## How far into its bobble a piece has to be before something passing can set it bobbing
 ## again, in seconds. Without it a hull sitting over a piece restarts the bob every frame and
 ## the piece is held frozen at the start of it.
@@ -1069,10 +1086,11 @@ class ShadowLayer extends Node2D:
 	## in is a uniform. Written per corner rather than once at startup because the anchor
 	## belongs to the piece, and which piece sits in which slot changes every rebuild.
 	func add(
-		at: Vector2, size: Vector2, swing: float, uv: Rect2, mirrored: bool, still: bool = false
+		at: Vector2, size: Vector2, swing: float, uv: Rect2, mirrored: bool, still: bool = false,
+		rise_slot: int = -1
 	) -> int:
 		var slot := _count
-		if not write(slot, at, size, swing, uv, mirrored, still):
+		if not write(slot, at, size, swing, uv, mirrored, still, rise_slot):
 			return -1
 		_count += 1
 		return slot
@@ -1091,9 +1109,10 @@ class ShadowLayer extends Node2D:
 	## has almost no height to lean.
 	## `still` is a piece lying on the beach: its shadow is packed with DRY_ANCHOR so the
 	## shader leaves it where it is, like the piece.
+	## `rise_slot` rides in blue beside the corner flag, as 2 + slot * 2 + flag.
 	func write(
 		slot: int, at: Vector2, size: Vector2, swing: float, uv: Rect2, mirrored: bool,
-		still: bool = false
+		still: bool = false, rise_slot: int = -1
 	) -> bool:
 		var base := slot * CORNERS
 		if slot < 0 or base + CORNERS > _points.size():
@@ -1121,6 +1140,8 @@ class ShadowLayer extends Node2D:
 		for i in CORNERS:
 			var c := anchor
 			c.b = 1.0 if i == 1 or i == 2 else 0.0
+			if rise_slot >= 0:
+				c.b = float(2 + rise_slot * 2 + int(c.b)) / 255.0
 			c.a = 1.0 if i >= 2 else 0.0
 			_colors[base + i] = c
 		return true
@@ -1232,9 +1253,9 @@ class FoamLayer extends Node2D:
 		)
 		material = skin
 
-	func add(at: Vector2, size: Vector2, swing: float, lean: float) -> int:
+	func add(at: Vector2, size: Vector2, swing: float, lean: float, rise_slot: int = -1) -> int:
 		var slot := _count
-		if not write(slot, at, size, swing, lean):
+		if not write(slot, at, size, swing, lean, rise_slot):
 			return -1
 		_count += 1
 		return slot
@@ -1243,7 +1264,10 @@ class FoamLayer extends Node2D:
 	## bottom of its art — the same number the piece was cut at, taken the same way, because
 	## a collar half a pixel off the cut is a white line beside a straight edge instead of
 	## over it.
-	func write(slot: int, at: Vector2, size: Vector2, swing: float, lean: float) -> bool:
+	## `rise_slot` rides in the empty blue, as slot + 1.
+	func write(
+		slot: int, at: Vector2, size: Vector2, swing: float, lean: float, rise_slot: int = -1
+	) -> bool:
 		var base := slot * CORNERS
 		if slot < 0 or base + CORNERS > _points.size():
 			return false
@@ -1253,6 +1277,8 @@ class FoamLayer extends Node2D:
 		var edge := LakeGrid.waterline_of(at, span, lean)
 		var corners := LakeGrid.collar_corners(edge[0], edge[1])
 		var anchor := LakeGrid.pack_anchor(at.x, 0.0, 1.0)
+		if rise_slot >= 0:
+			anchor.b = float(rise_slot + 1) / 255.0
 		for i in CORNERS:
 			_points[base + i] = corners[i]
 			_colors[base + i] = anchor
@@ -1691,6 +1717,8 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 	facing.resize(count)
 	emerge.resize(count)
 	_emerge_age.resize(count)
+	_rise_slot.resize(count)
+	_clear_rise()
 	shove.resize(count)
 	shove.fill(Vector2.ZERO)
 	dry.resize(count)
@@ -1769,6 +1797,7 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 
 	_surface_shown.resize(0)
 	_emerging.resize(0)
+	_clear_rise()
 	_dirty = true
 	queue_redraw()
 
@@ -2208,6 +2237,7 @@ func restore(saved: Array) -> bool:
 		emerge[index] = 0.0
 		shove[index] = Vector2.ZERO
 	_emerging.resize(0)
+	_clear_rise()
 	_shoved.resize(0)
 	_dirty = true
 	queue_redraw()
@@ -2268,12 +2298,22 @@ func reachable_slot(
 ##
 ## This is what goes into the geometry, because the bob is added by the vertex shader.
 func surface_still(index: int) -> Vector2:
+	return _surface(index, true)
+
+
+## Where a tile's piece is stamped: `surface_still`, less the rise when the shaders carry it.
+func _stamp_at(index: int) -> Vector2:
+	return _surface(index, _rise_slot[index] < 0)
+
+
+func _surface(index: int, rising: bool) -> Vector2:
 	var tile := tile_of(index)
 	var off := nudge[index]
 	if shore[index] == 1 and not stacks[index].is_empty():
 		off = shore_offset(index, stacks[index].size() - 1)
 	var at := Iso.tile_to_world(float(tile.x) + 0.5, float(tile.y) + 0.5) + off
-	at.y += emerge[index]
+	if rising:
+		at.y += emerge[index]
 	return at + shove[index]
 
 
@@ -2342,6 +2382,7 @@ func take(index: int, k: int) -> int:
 		if not _emerging.has(index):
 			_emerging.append(index)
 		_reroll_pose(index)
+		_take_rise_slot(index)
 	_restamp(index)
 	return def_index
 
@@ -2473,7 +2514,9 @@ func _process(delta: float) -> void:
 		return
 	var rise_time := EMERGE_DROP / EMERGE_SPEED
 	var still_rising := PackedInt32Array()
+	var live := _rise_live()
 	for index: int in _emerging:
+		var moving := true
 		_emerge_age[index] += delta
 		var age := _emerge_age[index]
 		if age < rise_time:
@@ -2489,11 +2532,27 @@ func _process(delta: float) -> void:
 				still_rising.append(index)
 			else:
 				emerge[index] = 0.0
+				moving = false
+		var slot := _rise_slot[index]
+		if not moving:
+			# Still: an ordinary tile again, stamped at rest.
+			_give_rise_slot(index)
+			_restamp(index, true)
+			continue
+		if slot < 0 and live:
+			slot = _take_rise_slot(index)
+			if slot >= 0:
+				_restamp(index, true)
+		if slot >= 0:
+			_rise[slot] = emerge[index]
+			_rise_dirty = true
+			continue
 		# A rising piece is the one thing whose geometry actually changes between frames —
 		# and it is one tile's worth of it, so it rewrites its own corner of the soup
 		# rather than asking for the whole lake to be laid out again.
 		_restamp(index, true)
 	_emerging = still_rising
+	_push_rise()
 
 
 ## The visible tiles, as a range of the tile field. The cull is arithmetic: the view
@@ -2538,6 +2597,7 @@ func _draw() -> void:
 		return
 	if _dirty:
 		_rebuild()
+	_push_rise()
 	if _mesh_indices.is_empty():
 		return
 	# One texture for the whole surface, which is why the art had to go into one atlas: a
@@ -2613,21 +2673,26 @@ func _rebuild() -> void:
 			if glint >= 0:
 				glinting.append(Vector2i(index, glint))
 			var def := defs[stack[stack.size() - 1]]
+			_stamp_slot = _rise_slot[index]
+			var rest := at if _stamp_slot < 0 else _stamp_at(index)
 			_shadow_at[index] = _shadows.add(
-				at, def.size, swing[index], _uv_of(def), facing[index] == 1, dry[index] == 1
+				rest, def.size, swing[index], _uv_of(def), facing[index] == 1, dry[index] == 1,
+				_stamp_slot
 			)
 			# Same slot, written in the same walk: the two layers are laid out in lockstep,
 			# so one index serves both and neither can drift onto another piece's row.
-			_foam.add(at, def.size, swing[index], tilt[index])
+			_foam.add(rest, def.size, swing[index], tilt[index], _stamp_slot)
 			# A piece on the sand has no waterline to wear foam on. Its slot is still taken,
 			# to keep the lockstep, and simply left empty.
 			if dry[index] == 1:
 				_foam.blank(_shadow_at[index])
 			if def.sprite != null:
+				_stamp_slot = -1
 				textured.append(index)
 				continue
 			var base := _fill
-			_stamp(def, at, index)
+			_stamp(def, rest, index)
+			_stamp_slot = -1
 			_slot_base[index] = base
 			_slot_len[index] = _fill - base
 			drawn_pieces += 1
@@ -2747,7 +2812,8 @@ func _repatch(index: int, stack: PackedInt32Array, base: int) -> void:
 		from_patch += 1
 		return
 
-	var at := surface_still(index)
+	var at := _stamp_at(index)
+	_stamp_slot = _rise_slot[index]
 	_write_at = base
 	_stamp(def, at, index)
 	# What the new stamp did not need of the old slot — the rim's room once the find is
@@ -2760,14 +2826,15 @@ func _repatch(index: int, stack: PackedInt32Array, base: int) -> void:
 	# like it had come off its own footing.
 	if _shadows.write(
 		_shadow_at[index], at, def.size, swing[index], _uv_of(def), facing[index] == 1,
-		dry[index] == 1
+		dry[index] == 1, _stamp_slot
 	):
 		_shadows.queue_redraw()
 	if dry[index] == 1:
 		_foam.blank(_shadow_at[index])
 		_foam.queue_redraw()
-	elif _foam.write(_shadow_at[index], at, def.size, swing[index], tilt[index]):
+	elif _foam.write(_shadow_at[index], at, def.size, swing[index], tilt[index], _stamp_slot):
 		_foam.queue_redraw()
+	_stamp_slot = -1
 
 
 ## How many vertices `_stamp` will lay down for a piece. Mirrors the branches in `_stamp`
@@ -2935,6 +3002,8 @@ func _quad(
 	anchor: Vector2, uv: Rect2
 ) -> void:
 	var packed := pack_anchor(anchor.x, grey, alpha)
+	if _stamp_slot >= 0:
+		packed.b = float(_stamp_slot) / 255.0
 	if _dry_now:
 		packed.r = DRY_ANCHOR.r
 		packed.g = DRY_ANCHOR.g
@@ -2990,3 +3059,68 @@ static func unpack_anchor_x(packed: Color) -> float:
 	var high := float(round(packed.r * 255.0))
 	var low := float(round(packed.g * 255.0))
 	return (high * 256.0 + low) / 65535.0 * ANCHOR_SPAN - ANCHOR_SPAN * 0.5
+
+
+## Whether a rising tile may be handed to the shaders: asked for, and a soup of art only,
+## since a blocked-in placeholder's grey is in the blue the slot rides in.
+func _rise_live() -> bool:
+	return gpu_rise and _all_art
+
+
+func _take_rise_slot(index: int) -> int:
+	if _rise_slot[index] >= 0:
+		return _rise_slot[index]
+	if not _rise_live() or _rise_free.is_empty():
+		return -1
+	var slot: int = _rise_free.pop_back()
+	_rise_slot[index] = slot
+	_rise[slot] = emerge[index]
+	_rise_dirty = true
+	return slot
+
+
+func _give_rise_slot(index: int) -> void:
+	var slot := _rise_slot[index]
+	if slot < 0:
+		return
+	_rise_slot[index] = -1
+	_rise[slot] = 0.0
+	_rise_free.append(slot)
+	_rise_dirty = true
+
+
+func _clear_rise() -> void:
+	_rise_slot.fill(-1)
+	_rise.resize(RISE_SLOTS)
+	_rise.fill(0.0)
+	_rise_free.clear()
+	for slot in range(RISE_SLOTS - 1, -1, -1):
+		_rise_free.append(slot)
+	_rise_dirty = true
+
+
+## The slots' heights onto the three shaders that read them.
+func _push_rise() -> void:
+	if not _rise_dirty:
+		return
+	_rise_dirty = false
+	for layer: CanvasItem in [self, _shadows, _foam]:
+		if layer != null and layer.material is ShaderMaterial:
+			var skin := layer.material as ShaderMaterial
+			skin.set_shader_parameter(&"rise", _rise)
+			if layer == self:
+				skin.set_shader_parameter(&"rise_on", _rise_live())
+
+
+## Hand the rising tiles to the shaders or take them back, restamping each. The harness's
+## switch between the two ways; the game never calls it.
+func set_gpu_rise(on: bool) -> void:
+	gpu_rise = on
+	for index: int in _emerging:
+		if on:
+			_take_rise_slot(index)
+		else:
+			_give_rise_slot(index)
+		_restamp(index, true)
+	_rise_dirty = true
+	_push_rise()

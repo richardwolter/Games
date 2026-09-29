@@ -1098,6 +1098,41 @@ func _stage_draw_batch() -> void:
 		"%d rebuilds" % (_grid.rebuilds - _rebuilds_before))
 	_rebuilds_before = _grid.rebuilds
 
+	# The piece coming up under it rises in the soup's shaders (2026-09-29): stamped once at
+	# rest with its slot in the spare blue, its height a uniform, stamped at rest again when
+	# still. tools/probe_same_frame.tscn (PROBE_WHAT=rise) is what proves the picture is the
+	# same; this guards the bookkeeping.
+	if bool(_grid.get(&"_all_art")):
+		var slot: int = (_grid.get(&"_rise_slot") as PackedInt32Array)[lifted]
+		_check(slot >= 0, "a piece rising after a take is handed to the shaders", "slot %d" % slot)
+		var colours := _grid.get(&"_mesh_colors") as PackedColorArray
+		var base: int = (_grid.get(&"_slot_base") as PackedInt32Array)[lifted]
+		_check(base >= 0 and int(round(colours[base].b * 255.0)) == slot,
+			"and its corners carry the slot", "")
+		var rest: Vector2 = _grid.call(&"_stamp_at", lifted)
+		_check(is_equal_approx(rest.y + _grid.emerge[lifted], _grid.surface_still(lifted).y)
+			and _grid.emerge[lifted] > 0.0,
+			"stamped at rest, the rise left to the shader", "%.2f px" % _grid.emerge[lifted])
+		var skin := _grid.material as ShaderMaterial
+		for i in 20:
+			_grid._process(0.05)
+		var shown := skin.get_shader_parameter(&"rise") as PackedFloat32Array
+		_check(shown.size() == LakeGrid.RISE_SLOTS and is_equal_approx(shown[slot], _grid.emerge[lifted]),
+			"the shader is told the rise as it goes", "%.2f" % _grid.emerge[lifted])
+		_check(bool(skin.get_shader_parameter(&"rise_on")), "with the slots switched on", "")
+		for i in 40:
+			_grid._process(0.05)
+		colours = _grid.get(&"_mesh_colors") as PackedColorArray
+		_check((_grid.get(&"_rise_slot") as PackedInt32Array)[lifted] == -1
+			and colours[base].b == 1.0 and _grid.emerge[lifted] == 0.0,
+			"and once still it is an ordinary tile again", "")
+		_check(_grid.rebuilds == _rebuilds_before, "all without a rebuild", "")
+		for path in ["rubbish", "shadow", "foam"]:
+			var text := FileAccess.get_file_as_string("res://shaders/%s.gdshader" % path)
+			_check(text.contains("uniform float rise[%d]" % LakeGrid.RISE_SLOTS),
+				"%s.gdshader holds a height for every slot" % path, "")
+	_rebuilds_before = _grid.rebuilds
+
 	# Zooming out far enough drops the details that are then sub-pixel.
 	var detailed_pieces := _grid.drawn_pieces
 	_grid.set_detailed(false)

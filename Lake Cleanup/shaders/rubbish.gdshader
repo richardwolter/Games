@@ -47,7 +47,22 @@ varying flat float pale;
 // Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
 varying flat float rim;
 
+// A tile still rising into place (LakeGrid.RISE_SLOTS, 2026-09-29): its emerge, in pixels
+// down, by the slot its vertices carry. Stamped at rest and moved here, so the grid does not
+// re-stamp it every frame. Mirrors LakeGrid._push_rise.
+uniform float rise[126];
+// Only while the soup is all art: a blocked-in placeholder's grey rides in the same blue.
+uniform bool rise_on = false;
+
 void vertex() {
+	// A rising tile's slot, in the blue that is 1.0 on every other piece with art.
+	if (rise_on) {
+		float code = floor(COLOR.b * 255.0 + 0.5);
+		if (code < 254.5) {
+			VERTEX.y += rise[int(code)];
+			COLOR.b = 1.0;
+		}
+	}
 	// The piece's own anchor position is packed into the red and green channels as one
 	// sixteen-bit number, and the colour it should actually be drawn in is the grey level
 	// in blue. UV cannot carry the anchor any more: the lake is drawn from an atlas now,

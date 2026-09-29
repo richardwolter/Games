@@ -55,6 +55,11 @@ uniform float anchor_span = 8192.0;
 // two constants it builds the quad from.
 uniform float cut_at = 0.48;
 
+// A tile still rising into place (LakeGrid.RISE_SLOTS, 2026-09-29): its emerge, in pixels
+// down, by the slot its vertices carry. Stamped at rest and moved here, so the grid does not
+// re-stamp it every frame. Mirrors LakeGrid._push_rise.
+uniform float rise[126];
+
 // What the foam is drawn in, alpha included. The vertex colours carry the anchor instead.
 uniform vec4 foam : source_color = vec4(0.93, 0.97, 1.0, 0.5);
 
@@ -94,6 +99,12 @@ void vertex() {
 	float low = floor(COLOR.g * 255.0 + 0.5);
 	float x = (high * 256.0 + low) / 65535.0 * anchor_span - anchor_span * 0.5;
 	seed = x;
+	// A rising tile: its slot + 1 in the otherwise empty blue. Before `local`, which the
+	// pixel grid is snapped in and which used to carry the rise in the corners.
+	float code = floor(COLOR.b * 255.0 + 0.5);
+	if (code > 0.5) {
+		VERTEX.y += rise[int(code) - 1];
+	}
 	local = VERTEX;
 
 	float t = lake_clock * wave_speed;

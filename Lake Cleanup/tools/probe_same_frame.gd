@@ -9,6 +9,7 @@
 ##
 ## PROBE_WHAT=haul   Haul's batched flights against one draw per piece (Haul.batched).
 ## PROBE_WHAT=rise   the rising tiles' bob in the soup's shaders against the patch
+##                   (PROBE_RISING=n waits for n tiles rising, default 20)
 ##                   (LakeGrid.gpu_rise).
 ##
 ##   godot --path . --fixed-fps 60 --log-file <path> res://tools/probe_same_frame.tscn
@@ -60,7 +61,8 @@ func _process(_delta: float) -> void:
 
 func _ready_to_shoot() -> bool:
 	if _what == "rise":
-		return _grid.get(&"_emerging").size() >= 20
+		var want := OS.get_environment("PROBE_RISING")
+		return _grid.get(&"_emerging").size() >= (int(want) if want != "" else 20)
 	var haul: Haul = _main.get(&"_haul")
 	return haul.flying() >= 40
 
@@ -107,6 +109,14 @@ func _shoot() -> void:
 	var before: Image = await _grab()
 	_set_new(true)
 	var after: Image = await _grab()
+	if _what == "rise":
+		var held := 0
+		var most := 0.0
+		for slot: int in _grid.get(&"_rise_slot"):
+			if slot >= 0:
+				held += 1
+				most = maxf(most, absf((_grid.get(&"_rise") as PackedFloat32Array)[slot]))
+		_say("tiles moved by the shaders %d, highest rise %.2f px" % [held, most])
 	_set_new(false)
 	var again: Image = await _grab()
 	_set_new(true)
