@@ -6331,8 +6331,27 @@ func _stage_nature() -> void:
 		_check((first["heading"] as Vector2).x < 0.0, "and away from the landing", str(first["heading"]))
 	_check(not fish.has_method("catch") and not fish.has_method("pay"),
 		"fish have no catch and no pay", "")
+	# Seen fish (2026-09-30): the sheet loads, every tier's species is on it, each school is
+	# one of its tier's species, and the bodies draw through the fish shader.
+	var fish_kinds: Array = fish.get(&"_species")
+	var listed := true
+	for spec: Dictionary in Fish.TIERS:
+		for kind: String in spec["species"]:
+			listed = listed and fish_kinds.has(kind)
+	_check(fish.get(&"_sheet") is Texture2D and listed, "every tier's fish is on the fish sheet", str(fish_kinds))
+	var right_kind := true
+	for s: Dictionary in fish.schools():
+		right_kind = right_kind and (Fish.TIERS[int(s["tier"])]["species"] as Array).has(s["species"])
+	_check(right_kind, "each school is one of its tier's species", "")
+	var bodies := fish.get_node_or_null(^"Bodies") as Node2D
+	_check(bodies != null and bodies.material is ShaderMaterial, "the fish's bodies draw through the fish shader", "")
+	var shallow := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.97, Iso.CENTRE.y))
+	var deep := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.4, Iso.CENTRE.y))
+	_check(shallow < 0.3 and deep > shallow, "a fish's depth is shallow by the bank and deeper out",
+		"%.2f %.2f" % [shallow, deep])
 	_check_bees(flora)
 	_check_sky_reflect()
+	_check_lakebed()
 	_check_wildlife()
 	_advance()
 
@@ -6341,6 +6360,34 @@ func _stage_nature() -> void:
 ## The sky in the clean water and the wash room's clouds (2026-09-28): the reflection reads
 ## the honest map, not the patched filth; the lake pushes it off the overcast and the hour;
 ## the wash room holds every cloud's foot above the trees and mirrors only on clean water.
+## The lakebed through clean water (2026-09-30): the baked map and its ramps reach the
+## shader, the bed shows only on clean or hazy water, what grows back reads the honest map,
+## the shallow bands keep the sky's clouds off it, and the growth never falls back.
+func _check_lakebed() -> void:
+	var src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
+	_check(src.contains("if (bed_on > 0.5 && state < 1.5)"), "the bed shows on clean or hazy water only", "")
+	_check(src.contains("bool grown_here = pow(honest, color_bite) < state_at.y"),
+		"what grows on the bed reads the honest map, not the patches", "")
+	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallow bands", "")
+	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(Lake.BED_JSON))
+	var mats: Array = spec["materials"] if spec is Dictionary else []
+	_check(mats.size() * 5 == 55, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
+	var mat := _water_material()
+	var on = mat.get_shader_parameter(&"bed_on") if mat != null else null
+	var ramps = mat.get_shader_parameter(&"bed_ramps") if mat != null else null
+	var map = mat.get_shader_parameter(&"bed_map") if mat != null else null
+	_check(on != null and float(on) > 0.5 and map is Texture2D and ramps is PackedVector3Array
+		and (ramps as PackedVector3Array).size() == 55, "the lake hands the water its bed", "%s" % [on])
+	if map is Texture2D:
+		var size: Array = spec["size"]
+		_check((map as Texture2D).get_width() == int(size[0]) and (map as Texture2D).get_height() == int(size[1]),
+			"the bed map is the size its json says", "%dx%d" % [(map as Texture2D).get_width(), (map as Texture2D).get_height()])
+	var before := float(_main.get(&"_bed_growth"))
+	_main.call(&"_build_filth_map")
+	_check(float(_main.get(&"_bed_growth")) >= before, "the bed's growth never falls back",
+		"%.3f then %.3f" % [before, float(_main.get(&"_bed_growth"))])
+
+
 func _check_sky_reflect() -> void:
 	var src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
 	_check(src.contains("uniform float sky_reflect") and src.contains("pow(honest, color_bite) < state_at.x"),
@@ -6488,27 +6535,8 @@ func _check_wildlife() -> void:
 	_check(wild.frog_count() <= Wildlife.FROGS_MOST and wild._want(Wildlife.FROGS_MOST) <= Wildlife.FROGS_MOST,
 		"never past the cap", "")
 	_check_land_animals(wild)
-	# Seen fish (2026-09-30): the sheet loads, every tier's species is on it, each school is
-	# one of its tier's species, and the bodies draw through the fish shader.
-	var fish_kinds: Array = fish.get(&"_species")
-	var listed := true
-	for spec: Dictionary in Fish.TIERS:
-		for kind: String in spec["species"]:
-			listed = listed and fish_kinds.has(kind)
-	_check(fish.get(&"_sheet") is Texture2D and listed, "every tier's fish is on the fish sheet", str(fish_kinds))
-	var right_kind := true
-	for s: Dictionary in fish.schools():
-		right_kind = right_kind and (Fish.TIERS[int(s["tier"])]["species"] as Array).has(s["species"])
-	_check(right_kind, "each school is one of its tier's species", "")
-	var bodies := fish.get_node_or_null(^"Bodies") as Node2D
-	_check(bodies != null and bodies.material is ShaderMaterial, "the fish's bodies draw through the fish shader", "")
-	var shallow := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.97, Iso.CENTRE.y))
-	var deep := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.4, Iso.CENTRE.y))
-	_check(shallow < 0.3 and deep > shallow, "a fish's depth is shallow by the bank and deeper out",
-		"%.2f %.2f" % [shallow, deep])
 	# Only at clean shores; a brood lands only on clean water.
 	var foul_home := 0
-	_check_lakebed()
 	for f: Dictionary in wild.frogs():
 		if _grid.water_state(int((f["spot"] as Dictionary)["index"])) != 0:
 			foul_home += 1
@@ -6517,34 +6545,6 @@ func _check_wildlife() -> void:
 			foul_home += 1
 	_check(foul_home == 0, "frogs live by clean water and ducks land on it", "%d" % foul_home)
 	# Run them a while: frogs swim in, the brood flies in and lands.
-## The lakebed through clean water (2026-09-30): the baked map and its ramps reach the
-## shader, the bed shows only on clean or hazy water, what grows back reads the honest map,
-## the shallow bands keep the sky's clouds off it, and the growth never falls back.
-func _check_lakebed() -> void:
-	var src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
-	_check(src.contains("if (bed_on > 0.5 && state < 1.5)"), "the bed shows on clean or hazy water only", "")
-	_check(src.contains("bool grown_here = pow(honest, color_bite) < state_at.y"),
-		"what grows on the bed reads the honest map, not the patches", "")
-	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallow bands", "")
-	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(Lake.BED_JSON))
-	var mats: Array = spec["materials"] if spec is Dictionary else []
-	_check(mats.size() * 5 == 55, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
-	var mat := _water_material()
-	var on = mat.get_shader_parameter(&"bed_on") if mat != null else null
-	var ramps = mat.get_shader_parameter(&"bed_ramps") if mat != null else null
-	var map = mat.get_shader_parameter(&"bed_map") if mat != null else null
-	_check(on != null and float(on) > 0.5 and map is Texture2D and ramps is PackedVector3Array
-		and (ramps as PackedVector3Array).size() == 55, "the lake hands the water its bed", "%s" % [on])
-	if map is Texture2D:
-		var size: Array = spec["size"]
-		_check((map as Texture2D).get_width() == int(size[0]) and (map as Texture2D).get_height() == int(size[1]),
-			"the bed map is the size its json says", "%dx%d" % [(map as Texture2D).get_width(), (map as Texture2D).get_height()])
-	var before := float(_main.get(&"_bed_growth"))
-	_main.call(&"_build_filth_map")
-	_check(float(_main.get(&"_bed_growth")) >= before, "the bed's growth never falls back",
-		"%.3f then %.3f" % [before, float(_main.get(&"_bed_growth"))])
-
-
 	for i in 1200:
 		wild._process(1.0 / 60.0)
 	var swum_home := 0
