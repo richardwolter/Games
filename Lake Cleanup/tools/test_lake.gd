@@ -6349,6 +6349,23 @@ func _stage_nature() -> void:
 	var deep := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.4, Iso.CENTRE.y))
 	_check(shallow < 0.3 and deep > shallow, "a fish's depth is shallow by the bank and deeper out",
 		"%.2f %.2f" % [shallow, deep])
+	# The rest of the lake's life through clean water (2026-09-30): swimming frogs and dived
+	# turtles drawn through the fish shader, and the water plants' stems and shadows behind them.
+	var wild: Node = _main.get(&"_wildlife")
+	var sunk := wild.get_node_or_null(^"Submerged") as Node2D if wild != null else null
+	_check(sunk != null and sunk.material is ShaderMaterial, "the wildlife draws what is under water through the fish shader", "")
+	var dives := 0
+	if wild != null:
+		for colour: String in ["green", "brown"]:
+			for k in 8:
+				for f in 3:
+					if (wild.call(&"_region", "frogdive_%s_%d_%d" % [colour, k, f]) as Rect2).size.x > 0.0:
+						dives += 1
+	_check(dives == 48, "a swimming frog has its own colours at every heading and kick", "%d of 48" % dives)
+	var below := flora.get_node_or_null(^"Below") as Node2D
+	_check(below != null and below.show_behind_parent, "the water plants' stems and shadows draw behind them", "")
+	var seen := Fish.under_water(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.9, Iso.CENTRE.y), Color.RED)
+	_check(seen.a == 1.0 and seen.r < 1.0 and seen.b > 0.0, "something under the water is mixed towards it", str(seen))
 	_check_bees(flora)
 	_check_sky_reflect()
 	_check_lakebed()

@@ -483,6 +483,47 @@ def frog_swim(heading: float, frame: int) -> Image.Image:
     return img
 
 
+def frog_dive(heading: float, frame: int, colour: str) -> Image.Image:
+    """The frog under clean water, seen through it (2026-09-30, the lakebed pass): the same
+    shape as `frog_swim` and on the same canvas, so the silhouette is its shadow on the bed,
+    but in its own colours: a lighter stripe down the back, darker legs, two dark eyes on the
+    head, ringed in the ramp's darkest step. The game mixes it towards the water by depth."""
+    w, h = 11, 7
+    img = canvas(w, h)
+    ramp = FROG_RAMPS[colour]
+    ch, sh = math.cos(heading), math.sin(heading)
+    kick = (0.0, 2.2, 4.0)[frame]
+    spread = (3.0, 4.0, 2.2)[frame]
+
+    def part(u: float, v: float) -> str:
+        if ((u - 4.0) / 2.2) ** 2 + (v / 2.2) ** 2 <= 1.0:
+            return "eye" if u > 4.2 and abs(abs(v) - 1.2) < 0.7 else "head"
+        if (u / 4.6) ** 2 + (v / 3.2) ** 2 <= 1.0:
+            return "stripe" if abs(v) < 0.9 else "body"
+        for s_ in (-1.0, 1.0):
+            if abs(v - s_ * spread) <= 1.25 and -4.5 - kick <= u <= -1.5:
+                return "leg"
+            if abs(v - s_ * 3.0) <= 1.1 and 0.8 <= u <= 2.8:
+                return "leg"
+        return ""
+
+    tone = {"head": ramp[3], "body": ramp[2], "stripe": ramp[4], "leg": ramp[1], "eye": ramp[0]}
+    for y in range(h):
+        for x in range(w):
+            px_ = (x + 0.5 - w / 2) * 1.35
+            py_ = (y + 0.5 - h / 2) * 2.7
+            u = px_ * ch + py_ * sh
+            v = -px_ * sh + py_ * ch
+            k = part(u, v)
+            if k:
+                img.putpixel((x, y), tone[k])
+    eyes = [(x, y) for y in range(h) for x in range(w) if img.getpixel((x, y)) == tone["eye"]]
+    outline(img, ramp[0])
+    for x, y in eyes:
+        img.putpixel((x, y), BLACK)
+    return img
+
+
 def pack() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     frogs = {}
@@ -513,6 +554,8 @@ def pack() -> None:
     for k in range(8):
         for f in range(3):
             items.append((f"frogswim_{k}_{f}", frog_swim(k * math.tau / 8.0, f)))
+            for colour in ("green", "brown"):
+                items.append((f"frogdive_{colour}_{k}_{f}", frog_dive(k * math.tau / 8.0, f, colour)))
     gutter, wide = 1, 160
     x, y, shelf = gutter, gutter, 0
     spots = {}

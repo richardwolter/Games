@@ -14,8 +14,12 @@ const LOG := "res://tools/last_nature.log"
 const SAVE_PATH := "user://shot_nature.save"
 ## Frames each stage is given to grow in and swim before its picture.
 const HOLD := 420
-const STAGES := ["fresh", "half", "clean"]
+const STAGES := ["fresh", "half", "clean", "under"]
 
+## "under" (2026-09-30, the lakebed pass): on the clean lake, every frog sent into the water,
+## every turtle under it and a brood let in, and close crops of each saved as
+## `last_nature_under_<what>.png`, since the full frame is too far out to judge them by.
+const UNDER_HOLD := 90
 var _main: Node
 var _frames := 0
 var _stage := 0
@@ -53,7 +57,7 @@ func _physics_process(_delta: float) -> void:
 			get_tree().quit()
 			return
 		_set_stage(_stage)
-		_due = _frames + HOLD
+		_due = _frames + (UNDER_HOLD if STAGES[_stage] == "under" else HOLD)
 
 
 func _look() -> void:
@@ -69,6 +73,21 @@ func _look() -> void:
 func _set_stage(stage: int) -> void:
 	var grid: LakeGrid = _main.get(&"_grid")
 	if stage == 0:
+		return
+	if STAGES[stage] == "under":
+		var wild: Wildlife = _main.get(&"_wildlife")
+		for f: Dictionary in wild.frogs():
+			wild.call(&"_frog_jump_in", f, (f["at"] as Vector2) + Vector2(0.0, -20.0))
+		var k := 0
+		for t: Dictionary in wild.turtles():
+			if true:
+				t["at"] = (t["spot"] as Dictionary)["water"]
+				t["state"] = 4 if k % 2 == 0 else 3        # Turtle.UNDER, then SWIM by turns
+				t["timer"] = 30.0
+				t["then"] = 3
+			k += 1
+		wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"), 1.0)
+		wild.set(&"_brood_in", 0.0)
 		return
 	for index in grid.stacks.size():
 		if grid.stacks[index].is_empty():
@@ -113,3 +132,30 @@ func _write(name: String) -> void:
 	var near := shot.get_region(Rect2i(w / 4, h / 4, w / 2, h / 2))
 	near.resize(w, h, Image.INTERPOLATE_NEAREST)
 	near.save_png(ProjectSettings.globalize_path(SHOT % (name + "_near")))
+	if name == "under":
+		var picks := {}
+		for f: Dictionary in wild.frogs():
+			if int(f["state"]) == 4 and not picks.has("frog"):
+				picks["frog"] = f["at"]
+		for t: Dictionary in wild.turtles():
+			var key := "turtle_under" if int(t["state"]) == 4 else ("turtle_swim" if int(t["state"]) == 3 else "")
+			if key != "" and not picks.has(key):
+				picks[key] = t["at"]
+		for b: Dictionary in wild.broods():
+			if float(b["alt"]) <= 0.5 and not picks.has("duck"):
+				picks["duck"] = b["at"]
+		var vp := get_viewport()
+		var to_screen := vp.get_final_transform() * vp.get_canvas_transform()
+		var log2 := FileAccess.open(LOG, FileAccess.READ_WRITE)
+		log2.seek_end()
+		log2.store_line("  under crops: %s" % [picks.keys()])
+		log2.close()
+		for what: String in picks:
+			var at: Vector2 = to_screen * (picks[what] as Vector2)
+			var box := Rect2i(Vector2i(at) - Vector2i(80, 50), Vector2i(160, 100))
+			box = box.intersection(Rect2i(0, 0, w, h))
+			if box.size.x < 20 or box.size.y < 20:
+				continue
+			var crop := shot.get_region(box)
+			crop.resize(box.size.x * 4, box.size.y * 4, Image.INTERPOLATE_NEAREST)
+			crop.save_png(ProjectSettings.globalize_path(SHOT % ("under_" + what)))

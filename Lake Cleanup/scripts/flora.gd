@@ -107,6 +107,15 @@ var _uvs := PackedVector2Array()
 var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
 var _dirty := true
+var _below: Below
+## What is under the water plants through clean water (2026-09-30, the lakebed pass): each
+## pad's shadow on the bed, and a stem from each pad or reed down to a root on the bed. Laid
+## with the plants in `_lay` as (kind, from, to) rows; drawn by `Below`, behind the plants.
+var _below_rows: Array = []
+const STEM := Color(0.3, 0.44, 0.2)
+const ROOT := Color(0.2, 0.26, 0.12)
+## The water's share over a stem: it runs from the surface to the bed, so its mean depth.
+const STEM_WATER := [0.3, 0.48, 0.64]
 ## The flowers bees are circling, and each bee's seed. Parallel.
 var _bee_host := PackedInt32Array()
 var _bee_seed := PackedFloat32Array()
@@ -130,6 +139,11 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = 3
 	z_as_relative = false
+	_below = Below.new()
+	_below.name = &"Below"
+	_below.flora = self
+	_below.show_behind_parent = true
+	add_child(_below)
 	_bees = Bees.new()
 	_bees.name = &"Bees"
 	_bees.flora = self
@@ -489,6 +503,7 @@ func _pick_species(kind: String, at: Vector2) -> String:
 
 
 func _lay() -> void:
+	_below_rows.clear()
 	_points.resize(0)
 	_uvs.resize(0)
 	_colors.resize(0)
@@ -515,6 +530,14 @@ func _lay() -> void:
 		var foot := _foot[k]
 		var box := Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h))
 		var uv := Rect2(Vector2(rect[0], rect[1]) / sheet_size, Vector2(rect[2], rect[3]) / sheet_size)
+		var kind := String(entry["kind"])
+		if (kind == "water" or kind == "open") and t >= SPROUT_UNTIL and Fish.bed_shows(grid, foot):
+			var drop := Fish.shadow_drop(foot)
+			var standing := _species[k] == "open_reeds"
+			var top := foot if standing else box.get_center()
+			_below_rows.append([&"stem", top, top + drop])
+			if not standing:
+				_below_rows.append([&"shadow", Rect2(box.position + drop, box.size), Rect2(Vector2(rect[0], rect[1]), Vector2(rect[2], rect[3]))])
 		var base := _points.size()
 		_points.append(box.position)
 		_points.append(Vector2(box.end.x, box.position.y))
@@ -528,6 +551,8 @@ func _lay() -> void:
 			_colors.append(Color.WHITE)
 		_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 	_dirty = false
+	if _below != null:
+		_below.queue_redraw()
 
 
 func _draw() -> void:
@@ -541,6 +566,32 @@ func _draw() -> void:
 		get_canvas_item(), _indices, _points, _colors, _uvs,
 		PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
 	)
+
+
+## Under the water plants, behind them: shadows first, then the stems over them, each a
+## column of whole art pixels stepping sideways as it goes down, and a root on the bed.
+class Below:
+	extends Node2D
+	var flora: Flora
+
+	func _draw() -> void:
+		if flora == null or flora._sheet == null:
+			return
+		for row: Array in flora._below_rows:
+			if row[0] == &"shadow":
+				draw_texture_rect_region(flora._sheet, row[1], row[2], Color(0.02, 0.06, 0.08, Fish.SHADOW_INK))
+		for row: Array in flora._below_rows:
+			if row[0] != &"stem":
+				continue
+			var from: Vector2 = (row[1] as Vector2 / ART).floor() * ART
+			var to: Vector2 = (row[2] as Vector2 / ART).floor() * ART
+			var stem := Fish.under_water(from, STEM, STEM_WATER[0], STEM_WATER[1], STEM_WATER[2])
+			var root := Fish.under_water(from, ROOT, STEM_WATER[0], STEM_WATER[1], STEM_WATER[2])
+			var rows := maxi(int((to.y - from.y) / ART), 1)
+			for i in rows:
+				var x := roundf(lerpf(from.x, to.x, float(i) / float(rows)) / ART) * ART
+				draw_rect(Rect2(Vector2(x, from.y + float(i) * ART), Vector2(ART, ART)), stem)
+			draw_rect(Rect2(to + Vector2(-ART, 0.0), Vector2(ART * 3.0, ART)), root)
 
 
 ## Each bee circles its flower's head on a wobbling loop, on whole art pixels: a yellow dot,

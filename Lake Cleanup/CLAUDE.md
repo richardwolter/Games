@@ -3866,6 +3866,30 @@ over four passes off `tools/lakebed_mockup.py` (`tools/last_lakebed_mockup.png`)
   pixel at a time**, the foam's rule. The flat shadow falls on the bed at `SHADOW_INK`, further
   down the screen the deeper the water (`SHADOW_NEAR`/`SHADOW_FAR`). Big fish looked blocky when
   swept as a flat outline, and that is why the body is sections.
+- **The rest of the lake's life is seen through the water too** (same day, Richard: "make sure
+  we integrate frog, turtle and current wildlife"; all four options picked). Shared helpers on
+  `Fish`: `water_over`/`under_water`/`through_tint` (the bed's depth steps, a share of water
+  given per caller), `shadow_drop`, and `bed_shows` (clean or hazy water, and water under it:
+  the map reads a dry tile as clean).
+  - **A swimming frog is a frog**: `frogdive_<green|brown>_<heading>_<kick>` in the critters
+    sheet (`build_wildlife.py` `frog_dive`, the silhouette's own shape: a lighter back stripe,
+    darker legs, black eyes, the ramp's dark ring), drawn through the fish shader on the
+    wildlife's `Submerged` layer (z 3, over `Under`). **A dived turtle stays in sight** under
+    the surface, fainter than a frog (more water over it) until it comes up.
+  - **Shadows on the bed** (`Wildlife._shadow_of`): swimming frogs, dived and swimming turtles,
+    floating ducks and ducklings, each its own picture in ink at `Fish.SHADOW_INK`, dropped by
+    depth. The frog's white `frogswim` silhouette is its shadow now, not the frog.
+  - **Legs under the surface**: a floating duck paddles two orange legs with webbed feet by
+    turns (`_duck_legs`, a duckling's shorter), a swimming turtle strokes its flippers over its
+    shell's underside (`_turtle_flippers`), all mixed towards the water (`LEGS_WATER`).
+  - **Water plants are anchored** (`Flora.Below`, `show_behind_parent`, laid in `_lay`): every
+    lily pad and pad bed casts its shadow on the bed, and a stem of whole art pixels runs from
+    the pad's middle, or from a standing reed's foot, down to a three-pixel root on the bed where
+    its shadow falls, leaning with the drop. Only where the bed shows.
+  - Probe: `tools/shot_nature.tscn`'s fourth stage, `under`, sends every frog into the water,
+    puts turtles under it and lets a brood in, and saves close crops
+    (`tools/last_nature_under_<frog|turtle_under|turtle_swim|duck>.png`). The duck's legs were
+    not caught by the probe on 2026-09-30 (no brood on the water at the shot).
 - **Still to build, from the approved plan**: crawling crayfish (the mockup has them, rule-built,
   flat at a 0.78 squash so the claws read) and plant sway (`g`'s high nibble already holds each
   plant pixel's height). Snails and mussels are placeholders.

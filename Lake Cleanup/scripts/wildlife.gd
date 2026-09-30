@@ -195,6 +195,7 @@ var _track_age := PackedFloat32Array()
 var _rng := RandomNumberGenerator.new()
 
 var _under: Layer
+var _submerged: Layer
 var _ground: Layer
 var _air: Layer
 
@@ -221,6 +222,12 @@ func _ready() -> void:
 		if parsed is Dictionary:
 			_table = parsed
 	_under = _layer(&"Under", 3, _paint_under)
+	# Over the shadows and the legs, still under the surface: what is under the water drawn
+	# through it, by the fish's shader (see `_paint_submerged`).
+	_submerged = _layer(&"Submerged", 3, _paint_submerged)
+	var through := ShaderMaterial.new()
+	through.shader = load("res://shaders/fish.gdshader")
+	_submerged.material = through
 	_ground = _layer(&"Ground", 6, _paint_ground)
 	_air = _layer(&"Air", 20, _paint_air)
 	if grid != null:
@@ -371,6 +378,7 @@ func _process(delta: float) -> void:
 	_flies = _flies.filter(func(d: Dictionary) -> bool: return not d.get("gone", false))
 	_critters_on_land = _critters_on_land.filter(func(c: Dictionary) -> bool: return not c.get("gone", false))
 	_under.queue_redraw()
+	_submerged.queue_redraw()
 	_ground.queue_redraw()
 	_air.queue_redraw()
 
@@ -1459,6 +1467,10 @@ func _stamp(on: CanvasItem, name: String, at: Vector2, facing: float, tint: Colo
 	Flock.stamp(on, _critters, frame, at, facing, tint, Transform2D.IDENTITY, Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 
 
+## Tracks on the sand, then what lies on the lakebed through clean water (2026-09-30, the
+## lakebed pass): every swimming or floating animal's shadow on the bed, further down the
+## screen the deeper the water (`Fish.shadow_drop`), and the legs of what floats, under the
+## waterline. All of it only where the bed shows (`Fish.bed_shows`).
 func _paint_under(on: CanvasItem) -> void:
 	for i in _track_at.size():
 		var fade := 1.0 - _track_age[i] / TRACK_LIFE
@@ -1467,17 +1479,101 @@ func _paint_under(on: CanvasItem) -> void:
 		if int(f["state"]) != Frog.SWIM or not _wet(f["at"]):
 			continue
 		var frame: int = [0, 1, 2, 1][int(float(f["clock"]) * FROG_SWIM_FPS) % 4]
-		var name := "frogswim_%d_%d" % [int(f["row"]), frame]
-		var ink := Color(SHADOW_INK, FROG_SHADOW * float(f["fade"]))
-		var r := _region(name)
 		var at: Vector2 = f["at"]
-		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r, ink)
+		_shadow_of(on, "frogswim_%d_%d" % [int(f["row"]), frame], at, 1.0, float(f["fade"]))
+	for t: Dictionary in _turtles:
+		var state := int(t["state"])
+		if state == Turtle.UNDER:
+			_shadow_of(on, "turtle_swim0", t["at"], float(t["facing"]), float(t["fade"]))
+		elif state == Turtle.SWIM:
+			_shadow_of(on, "turtle_swim0", (t["at"] as Vector2) + Vector2(0.0, ART * 2.0),
+				float(t["facing"]), float(t["fade"]))
+			_turtle_flippers(on, t)
+	for b: Dictionary in _broods:
+		if float(b["alt"]) > 0.5:
+			continue
+		var kind := String(b["kind"])
+		for kid: Dictionary in b["kids"]:
+			_shadow_of(on, "duckling_swim0", kid["at"], float(kid.get("facing", b["facing"])), 1.0)
+			_duck_legs(on, kid["at"], float(b["clock"]) + float(kid["wobble"]), true)
+		_shadow_of(on, "%s_swim0" % kind, b["at"], float(b["facing"]), 1.0)
+		_duck_legs(on, b["at"], float(b["clock"]), false)
+
+
+## Something's own picture laid on the bed under it as a shadow, where the bed shows.
+func _shadow_of(on: CanvasItem, name: String, at: Vector2, facing: float, fade: float) -> void:
+	if not Fish.bed_shows(grid, at):
+		return
+	_stamp(on, name, at + Fish.shadow_drop(at), facing, Color(SHADOW_INK, Fish.SHADOW_INK * fade))
+
+
+## Under a floating duck, two legs paddling by turns, a webbed foot on each; a duckling's
+## are a pixel shorter. Mixed towards the water over them.
+const DUCK_FOOT := Color(0.86, 0.52, 0.2)
+const LEGS_WATER := [0.3, 0.46, 0.6]
+func _duck_legs(on: CanvasItem, at: Vector2, clock: float, small: bool) -> void:
+	if not Fish.bed_shows(grid, at):
+		return
+	var ink := Fish.under_water(at, DUCK_FOOT, LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
+	var dark := Fish.under_water(at, DUCK_FOOT.darkened(0.35), LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
+	var beat := int(clock * 3.0) % 2
+	var reach := 1 if small else 2
+	var base := (at / ART).floor() * ART + Vector2(0.0, ART)
+	for s in [-1, 1]:
+		var forward := (1 if (s > 0) == (beat == 0) else 0)
+		var x := base.x + float(s) * ART * (1.0 if small else 2.0)
+		for k in reach:
+			on.draw_rect(Rect2(Vector2(x, base.y + float(k) * ART), Vector2(ART, ART)), dark)
+		var foot := Vector2(x + float(forward * 2 - 1) * ART, base.y + float(reach) * ART)
+		on.draw_rect(Rect2(foot, Vector2(ART * (1.0 if small else 2.0), ART)), ink)
+
+
+## A swimming turtle's flippers and the underside of its shell, below the waterline: the
+## front pair reaching forward and back by turns, the back pair trailing.
+const TURTLE_SKIN := Color(0.6, 0.62, 0.38)
+func _turtle_flippers(on: CanvasItem, t: Dictionary) -> void:
+	var at: Vector2 = (t["at"] as Vector2) + Vector2(0.0, ART * 2.0)
+	if not Fish.bed_shows(grid, at):
+		return
+	var skin := Fish.under_water(at, TURTLE_SKIN, LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
+	var belly := Fish.under_water(at, TURTLE_SKIN.darkened(0.45), LEGS_WATER[0], LEGS_WATER[1], LEGS_WATER[2])
+	var ahead := -float(t["facing"])            # the picture faces left at +1
+	var stroke := 1.0 if int(float(t["clock"]) * 1.2) % 2 == 0 else -1.0
+	var base := (at / ART).floor() * ART
+	on.draw_rect(Rect2(base + Vector2(-ART * 3.0, ART), Vector2(ART * 6.0, ART)), belly)
+	for s in [-1.0, 1.0]:
+		var front := base + Vector2(ahead * ART * (3.0 + stroke), ART * (1.0 + (s + 1.0)))
+		on.draw_rect(Rect2(front, Vector2(ART * 2.0, ART)), skin)
+		var back := base + Vector2(-ahead * ART * (4.0 - stroke * 0.5), ART * (1.0 + (s + 1.0) * 0.5))
+		on.draw_rect(Rect2(back.floor(), Vector2(ART, ART)), skin)
+
+
+## What is under the water, drawn through it: a swimming frog in its own colours, kicking,
+## and a turtle that has dived, deeper and so fainter. The vertex colour is
+## `Fish.through_tint`, the fish shader's packing.
+func _paint_submerged(on: CanvasItem) -> void:
+	for f: Dictionary in _frogs:
+		if int(f["state"]) != Frog.SWIM or not _wet(f["at"]):
+			continue
+		var at: Vector2 = f["at"]
+		if not Fish.bed_shows(grid, at):
+			continue
+		var frame: int = [0, 1, 2, 1][int(float(f["clock"]) * FROG_SWIM_FPS) % 4]
+		var colour := "green" if int(f["sheet"]) == 0 else "brown"
+		var r := _region("frogdive_%s_%d_%d" % [colour, int(f["row"]), frame])
+		if r.size.x <= 0.0:
+			continue
+		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
+			Fish.through_tint(at, float(f["fade"]), 0.18, 0.36, 0.5))
 	for t: Dictionary in _turtles:
 		if int(t["state"]) != Turtle.UNDER:
 			continue
-		var r := _region("frogswim_0_1")
 		var at: Vector2 = t["at"]
-		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE * Vector2(1.2, 1.0)), r, Color(SHADOW_INK, 0.2))
+		if not Fish.bed_shows(grid, at):
+			continue
+		var frame := _region("turtle_swim%d" % (int(float(t["clock"]) * 1.2) % 2))
+		Flock.stamp(on, _critters, frame, at, float(t["facing"]), Fish.through_tint(at, float(t["fade"]), 0.32, 0.48, 0.62),
+			Transform2D.IDENTITY, Vector2.ZERO, SCALE / Flock.SCALE)
 
 
 func _paint_ground(on: CanvasItem) -> void:

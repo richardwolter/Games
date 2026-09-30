@@ -82,9 +82,9 @@ var _headings := 16
 var _species: Array = []
 var _rows_per := 4
 var _bodies: Node2D
-## The water's ramp over a fish: deep to light, the palette's clean swatches.
-var _water: Array[Color] = [Color(0.173, 0.302, 0.431), Color(0.255, 0.42, 0.573),
-	Color(0.353, 0.525, 0.678), Color(0.498, 0.655, 0.776), Color(0.769, 0.859, 0.91)]
+## The water's ramp over anything under it: deep to light, the palette's clean swatches.
+## Static, because the wildlife and the flora ask it too (see `through_tint`).
+static var _water: Array[Color] = []
 
 
 func _ready() -> void:
@@ -101,10 +101,6 @@ func _ready() -> void:
 			_headings = int(spec["headings"])
 			_species = spec["species"]
 			_rows_per = int(spec["rows_per_species"])
-	var palette := Palette.master()
-	if palette != null:
-		_water = [palette.water_clean_deep, palette.water_clean_mid, palette.water_clean,
-			palette.water_clean_shallow, palette.water_clean_light]
 	# The bodies over the shadows, on a child with the fish shader: the shadows are this
 	# node's own drawing, so they sit under every fish of every school.
 	_bodies = Node2D.new()
@@ -309,8 +305,7 @@ func _draw() -> void:
 	for f: Array in _fish_spots():
 		var s: Dictionary = f[0]
 		var spot: Vector2 = f[2]
-		var d := depth_at(spot)
-		var drop := SHADOW_NEAR.lerp(SHADOW_FAR, d)
+		var drop := shadow_drop(spot)
 		var region := _region(String(s["species"]), _heading_index(s, int(f[1])), _rows_per - 1)
 		draw_texture_rect_region(_sheet, Rect2(spot + drop - _cell * ART * 0.5, _cell * ART), region,
 			Color(0.02, 0.06, 0.08, SHADOW_INK * float(s["fade"])))
@@ -329,13 +324,8 @@ func _draw_bodies() -> void:
 		var beat := BEAT * (BEAT_FLEE if float(s["flee"]) > 0.0 else 1.0)
 		var wag: int = [0, 1, 2, 1][posmod(int(floor(t * beat * 2.0 + float(s["seed"]) + float(i) * 0.61)), 4)]
 		var region := _region(String(s["species"]), _heading_index(s, i), wag)
-		var d := depth_at(spot)
-		var q := floorf(clampf(d / BAND_END, 0.0, 0.999) * float(LEVELS)) / float(LEVELS - 1)
-		var share := MIX_DEEP if d >= BAND_END else lerpf(MIX_SHALLOW, MIX_BAND_END, q)
-		var water: Color = _water[clampi(int(roundf(3.0 - 2.0 * q)), 0, 4)] if d < BAND_END else _water[1]
-		var packed := int(roundf(share * 15.0)) * 16 + int(roundf(clampf(float(s["fade"]), 0.0, 1.0) * 15.0))
-		water.a = float(packed) / 255.0
-		_bodies.draw_texture_rect_region(_sheet, Rect2(spot - _cell * ART * 0.5, _cell * ART), region, water)
+		_bodies.draw_texture_rect_region(_sheet, Rect2(spot - _cell * ART * 0.5, _cell * ART), region,
+			through_tint(spot, float(s["fade"])))
 
 
 ## Which of the sheet's sixteen headings a member faces: the school's, swung a little by its
@@ -350,6 +340,74 @@ func _heading_index(s: Dictionary, i: int) -> int:
 func _region(species: String, heading: int, row: int) -> Rect2:
 	var si := maxi(_species.find(species), 0)
 	return Rect2(Vector2(heading, si * _rows_per + row) * _cell, _cell)
+
+
+## The clean water's ramp, deep to light, off the master palette.
+static func water_ramp() -> Array[Color]:
+	if _water.is_empty():
+		_water = [Color(0.173, 0.302, 0.431), Color(0.255, 0.42, 0.573),
+			Color(0.353, 0.525, 0.678), Color(0.498, 0.655, 0.776), Color(0.769, 0.859, 0.91)]
+		var palette := Palette.master()
+		if palette != null:
+			_water = [palette.water_clean_deep, palette.water_clean_mid, palette.water_clean,
+				palette.water_clean_shallow, palette.water_clean_light]
+	return _water
+
+
+## How much water lies between the eye and something under the surface at `at`, and its
+## colour there: the bed's five depth steps, with the shares given (a fish's by default; a
+## thing deeper down takes larger ones).
+static func water_over(at: Vector2, shallow := MIX_SHALLOW, band_end := MIX_BAND_END,
+		deep := MIX_DEEP) -> Color:
+	var ramp := water_ramp()
+	var d := depth_at(at)
+	var q := floorf(clampf(d / BAND_END, 0.0, 0.999) * float(LEVELS)) / float(LEVELS - 1)
+	var share := deep if d >= BAND_END else lerpf(shallow, band_end, q)
+	var water: Color = ramp[clampi(int(roundf(3.0 - 2.0 * q)), 0, 4)] if d < BAND_END else ramp[1]
+	water.a = share
+	return water
+
+
+## A colour of something under the surface, as the eye sees it: `own` mixed towards the
+## water over it. Opaque; for pictures drawn in code rather than through the fish shader.
+static func under_water(at: Vector2, own: Color, shallow := MIX_SHALLOW, band_end := MIX_BAND_END,
+		deep := MIX_DEEP) -> Color:
+	var water := water_over(at, shallow, band_end, deep)
+	var out := own.lerp(water, water.a)
+	out.a = own.a
+	return out
+
+
+## The vertex colour `shaders/fish.gdshader` reads: the water's colour at `at`, and in its
+## alpha the water's share in fifteenths times sixteen plus how far in the thing has faded.
+static func through_tint(at: Vector2, fade: float, shallow := MIX_SHALLOW, band_end := MIX_BAND_END,
+		deep := MIX_DEEP) -> Color:
+	var water := water_over(at, shallow, band_end, deep)
+	var packed := int(roundf(water.a * 15.0)) * 16 + int(roundf(clampf(fade, 0.0, 1.0) * 15.0))
+	water.a = float(packed) / 255.0
+	return water
+
+
+## How far a shadow on the bed falls from the thing at `at`: further down the screen the
+## deeper the water.
+static func shadow_drop(at: Vector2) -> Vector2:
+	return SHADOW_NEAR.lerp(SHADOW_FAR, depth_at(at))
+
+
+## Something under the surface at `at` is drawn over a bed the eye can see: the water shader
+## shows the bed on clean and hazy water.
+static func bed_shows(grid: LakeGrid, at: Vector2) -> bool:
+	if grid == null:
+		return true
+	var tile := Iso.world_to_tile(at)
+	var tx := int(floor(tile.x))
+	var ty := int(floor(tile.y))
+	if tx < 0 or ty < 0 or tx >= Iso.COLS or ty >= Iso.ROWS:
+		return false
+	# Water under it, not the beach: the map reads a dry tile as clean too.
+	if Iso.shore_fraction(tile.x, tile.y) >= 1.0 or Iso.island_fraction(tile.x, tile.y) < 1.0:
+		return false
+	return grid.water_state(grid.index_of(tx, ty)) <= 1
 
 
 ## The water shader's depth: 0 at the bank, 1 over the deepest water, shoaling up to the

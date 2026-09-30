@@ -245,141 +245,429 @@
   11,
   7
  ],
- "frogswim_0_1": [
+ "frogdive_green_0_0": [
   127,
   33,
   11,
   7
  ],
- "frogswim_0_2": [
+ "frogdive_brown_0_0": [
   139,
   33,
   11,
   7
  ],
- "frogswim_1_0": [
+ "frogswim_0_1": [
   1,
   44,
   11,
   7
  ],
- "frogswim_1_1": [
+ "frogdive_green_0_1": [
   13,
   44,
   11,
   7
  ],
- "frogswim_1_2": [
+ "frogdive_brown_0_1": [
   25,
   44,
   11,
   7
  ],
- "frogswim_2_0": [
+ "frogswim_0_2": [
   37,
   44,
   11,
   7
  ],
- "frogswim_2_1": [
+ "frogdive_green_0_2": [
   49,
   44,
   11,
   7
  ],
- "frogswim_2_2": [
+ "frogdive_brown_0_2": [
   61,
   44,
   11,
   7
  ],
- "frogswim_3_0": [
+ "frogswim_1_0": [
   73,
   44,
   11,
   7
  ],
- "frogswim_3_1": [
+ "frogdive_green_1_0": [
   85,
   44,
   11,
   7
  ],
- "frogswim_3_2": [
+ "frogdive_brown_1_0": [
   97,
   44,
   11,
   7
  ],
- "frogswim_4_0": [
+ "frogswim_1_1": [
   109,
   44,
   11,
   7
  ],
- "frogswim_4_1": [
+ "frogdive_green_1_1": [
   121,
   44,
   11,
   7
  ],
- "frogswim_4_2": [
+ "frogdive_brown_1_1": [
   133,
   44,
   11,
   7
  ],
- "frogswim_5_0": [
+ "frogswim_1_2": [
   145,
   44,
   11,
   7
  ],
- "frogswim_5_1": [
+ "frogdive_green_1_2": [
   1,
   52,
   11,
   7
  ],
- "frogswim_5_2": [
+ "frogdive_brown_1_2": [
   13,
   52,
   11,
   7
  ],
- "frogswim_6_0": [
+ "frogswim_2_0": [
   25,
   52,
   11,
   7
  ],
- "frogswim_6_1": [
+ "frogdive_green_2_0": [
   37,
   52,
   11,
   7
  ],
- "frogswim_6_2": [
+ "frogdive_brown_2_0": [
   49,
   52,
   11,
   7
  ],
- "frogswim_7_0": [
+ "frogswim_2_1": [
   61,
   52,
   11,
   7
  ],
- "frogswim_7_1": [
+ "frogdive_green_2_1": [
   73,
   52,
   11,
   7
  ],
- "frogswim_7_2": [
+ "frogdive_brown_2_1": [
   85,
   52,
+  11,
+  7
+ ],
+ "frogswim_2_2": [
+  97,
+  52,
+  11,
+  7
+ ],
+ "frogdive_green_2_2": [
+  109,
+  52,
+  11,
+  7
+ ],
+ "frogdive_brown_2_2": [
+  121,
+  52,
+  11,
+  7
+ ],
+ "frogswim_3_0": [
+  133,
+  52,
+  11,
+  7
+ ],
+ "frogdive_green_3_0": [
+  145,
+  52,
+  11,
+  7
+ ],
+ "frogdive_brown_3_0": [
+  1,
+  60,
+  11,
+  7
+ ],
+ "frogswim_3_1": [
+  13,
+  60,
+  11,
+  7
+ ],
+ "frogdive_green_3_1": [
+  25,
+  60,
+  11,
+  7
+ ],
+ "frogdive_brown_3_1": [
+  37,
+  60,
+  11,
+  7
+ ],
+ "frogswim_3_2": [
+  49,
+  60,
+  11,
+  7
+ ],
+ "frogdive_green_3_2": [
+  61,
+  60,
+  11,
+  7
+ ],
+ "frogdive_brown_3_2": [
+  73,
+  60,
+  11,
+  7
+ ],
+ "frogswim_4_0": [
+  85,
+  60,
+  11,
+  7
+ ],
+ "frogdive_green_4_0": [
+  97,
+  60,
+  11,
+  7
+ ],
+ "frogdive_brown_4_0": [
+  109,
+  60,
+  11,
+  7
+ ],
+ "frogswim_4_1": [
+  121,
+  60,
+  11,
+  7
+ ],
+ "frogdive_green_4_1": [
+  133,
+  60,
+  11,
+  7
+ ],
+ "frogdive_brown_4_1": [
+  145,
+  60,
+  11,
+  7
+ ],
+ "frogswim_4_2": [
+  1,
+  68,
+  11,
+  7
+ ],
+ "frogdive_green_4_2": [
+  13,
+  68,
+  11,
+  7
+ ],
+ "frogdive_brown_4_2": [
+  25,
+  68,
+  11,
+  7
+ ],
+ "frogswim_5_0": [
+  37,
+  68,
+  11,
+  7
+ ],
+ "frogdive_green_5_0": [
+  49,
+  68,
+  11,
+  7
+ ],
+ "frogdive_brown_5_0": [
+  61,
+  68,
+  11,
+  7
+ ],
+ "frogswim_5_1": [
+  73,
+  68,
+  11,
+  7
+ ],
+ "frogdive_green_5_1": [
+  85,
+  68,
+  11,
+  7
+ ],
+ "frogdive_brown_5_1": [
+  97,
+  68,
+  11,
+  7
+ ],
+ "frogswim_5_2": [
+  109,
+  68,
+  11,
+  7
+ ],
+ "frogdive_green_5_2": [
+  121,
+  68,
+  11,
+  7
+ ],
+ "frogdive_brown_5_2": [
+  133,
+  68,
+  11,
+  7
+ ],
+ "frogswim_6_0": [
+  145,
+  68,
+  11,
+  7
+ ],
+ "frogdive_green_6_0": [
+  1,
+  76,
+  11,
+  7
+ ],
+ "frogdive_brown_6_0": [
+  13,
+  76,
+  11,
+  7
+ ],
+ "frogswim_6_1": [
+  25,
+  76,
+  11,
+  7
+ ],
+ "frogdive_green_6_1": [
+  37,
+  76,
+  11,
+  7
+ ],
+ "frogdive_brown_6_1": [
+  49,
+  76,
+  11,
+  7
+ ],
+ "frogswim_6_2": [
+  61,
+  76,
+  11,
+  7
+ ],
+ "frogdive_green_6_2": [
+  73,
+  76,
+  11,
+  7
+ ],
+ "frogdive_brown_6_2": [
+  85,
+  76,
+  11,
+  7
+ ],
+ "frogswim_7_0": [
+  97,
+  76,
+  11,
+  7
+ ],
+ "frogdive_green_7_0": [
+  109,
+  76,
+  11,
+  7
+ ],
+ "frogdive_brown_7_0": [
+  121,
+  76,
+  11,
+  7
+ ],
+ "frogswim_7_1": [
+  133,
+  76,
+  11,
+  7
+ ],
+ "frogdive_green_7_1": [
+  145,
+  76,
+  11,
+  7
+ ],
+ "frogdive_brown_7_1": [
+  1,
+  84,
+  11,
+  7
+ ],
+ "frogswim_7_2": [
+  13,
+  84,
+  11,
+  7
+ ],
+ "frogdive_green_7_2": [
+  25,
+  84,
+  11,
+  7
+ ],
+ "frogdive_brown_7_2": [
+  37,
+  84,
   11,
   7
  ]
