@@ -3890,11 +3890,26 @@ over four passes off `tools/lakebed_mockup.py` (`tools/last_lakebed_mockup.png`)
     puts turtles under it and lets a brood in, and saves close crops
     (`tools/last_nature_under_<frog|turtle_under|turtle_swim|duck>.png`). The duck's legs were
     not caught by the probe on 2026-09-30 (no brood on the water at the shot).
-- **Still to build, from the approved plan**: crawling crayfish (the mockup has them, rule-built,
-  flat at a 0.78 squash so the claws read) and plant sway (`g`'s high nibble already holds each
-  plant pixel's height). Snails and mussels are placeholders.
+- **The bed's plants sway** (`lakebed`, `bed_texel`, `bed_sway_from` 5, `bed_sway_speed` 0.9,
+  `bed_sway_cell` 40; same day): a slow current, one swing a patch of the lake on the stepped
+  clock, stands a plant pixel five art pixels above its root one pixel over and one ten above
+  two over; a pixel shows whichever plant pixel swayed onto it, or the ground where its own
+  swayed off. Roots, rocks and shells never move. The height is the map's `g` high nibble.
+- **Crayfish crawl the bed** (`Wildlife` "crayfish on the lakebed", `crayfish_<heading>_<step>`
+  in the critters sheet, `build_wildlife.py` `crayfish`): the mockup's rule-built crayfish at
+  eight headings and two steps, squashed 0.78 so the claws read, legs drawn as one-pixel lines.
+  Up to `CRAYFISH_MOST` (12) with the clean share, on clean water no deeper than
+  `CRAY_DEEPEST` (0.55); they rest and crawl, turn off anything else, and **dart backwards,
+  tail first**, from a threat within `CRAY_SHY` or a landing net. Drawn through the fish shader
+  with the bed's own water shares, a small shadow under each. Not counted for the wildlife
+  moment. All numbers first guesses.
+- **Snails, mussels and clams** (`build_lakebed.py` `snail`, `mussels`, `clam`, material
+  `mussel`, so twelve ramps and `bed_ramps[60]`): hand-set river snails with a lit spiral shell
+  and a pale foot (two poses, mirrored at random), mussel beds of three to six blue-black shells
+  kept apart so the bed does not run into one blob, and pale clams half in the sand. They come
+  back with the growth, as the plants do.
 - **First guesses**: `bed_mix`, `bed_bands`, `bed_hazy` 0.22, `BED_GROWN_AT`, the plan's
-  counts in the builder (about 450 rocks, 160 branches, 1050 plants, 480 shells).
+  counts in the builder (about 450 rocks, 160 branches, 1050 plants, 350 shell groups).
 - `test_lake`'s `_check_lakebed` guards the gating, the honest map for growth, the sky rule,
   the ramps filling the array, the map reaching the shader at its size, and growth never
   falling back. Probe: `tools/shot_nature.tscn`.

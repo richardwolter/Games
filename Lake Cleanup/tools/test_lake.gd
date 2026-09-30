@@ -6364,6 +6364,33 @@ func _stage_nature() -> void:
 	_check(dives == 48, "a swimming frog has its own colours at every heading and kick", "%d of 48" % dives)
 	var below := flora.get_node_or_null(^"Below") as Node2D
 	_check(below != null and below.show_behind_parent, "the water plants' stems and shadows draw behind them", "")
+	# Crayfish on the bed (2026-09-30): their sixteen pictures, only on clean shallow-enough
+	# water, and a fright sends one darting.
+	var crays := 0
+	if wild != null:
+		for k in 8:
+			for f in 2:
+				if (wild.call(&"_region", "crayfish_%d_%d" % [k, f]) as Rect2).size.x > 0.0:
+					crays += 1
+	_check(crays == 16, "a crayfish has a picture at every heading and step", "%d of 16" % crays)
+	if wild != null:
+		# The ones already out may be on water the test has just dirtied; they fade on their
+		# own. What is asked is where new ones come.
+		(wild.crayfish() as Array).clear()
+		wild.call(&"_reckon")
+		var bad := 0
+		for c: Dictionary in wild.crayfish():
+			if not wild.call(&"_cray_ok", c["at"]):
+				bad += 1
+		_check(wild.crayfish_count() > 0 and bad == 0, "crayfish come to clean water and only there",
+			"%d, %d off it" % [wild.crayfish_count(), bad])
+		if wild.crayfish_count() > 0:
+			var c0: Dictionary = wild.crayfish()[0]
+			wild.scare(c0["at"] as Vector2 + Vector2(4.0, 0.0), 1.0)
+			_check(int(c0["state"]) == 2, "a crayfish darts away when something lands by it", str(c0["state"]))
+	var water_src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
+	_check(water_src.contains("uniform float bed_sway_from") and water_src.contains("bed_texel(tx - ivec2(sway * k, 0)"),
+		"the bed's plants sway with the current", "")
 	var seen := Fish.under_water(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.9, Iso.CENTRE.y), Color.RED)
 	_check(seen.a == 1.0 and seen.r < 1.0 and seen.b > 0.0, "something under the water is mixed towards it", str(seen))
 	_check_bees(flora)
@@ -6388,13 +6415,13 @@ func _check_lakebed() -> void:
 	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallow bands", "")
 	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(Lake.BED_JSON))
 	var mats: Array = spec["materials"] if spec is Dictionary else []
-	_check(mats.size() * 5 == 55, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
+	_check(mats.size() * 5 == 60, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
 	var mat := _water_material()
 	var on = mat.get_shader_parameter(&"bed_on") if mat != null else null
 	var ramps = mat.get_shader_parameter(&"bed_ramps") if mat != null else null
 	var map = mat.get_shader_parameter(&"bed_map") if mat != null else null
 	_check(on != null and float(on) > 0.5 and map is Texture2D and ramps is PackedVector3Array
-		and (ramps as PackedVector3Array).size() == 55, "the lake hands the water its bed", "%s" % [on])
+		and (ramps as PackedVector3Array).size() == 60, "the lake hands the water its bed", "%s" % [on])
 	if map is Texture2D:
 		var size: Array = spec["size"]
 		_check((map as Texture2D).get_width() == int(size[0]) and (map as Texture2D).get_height() == int(size[1]),

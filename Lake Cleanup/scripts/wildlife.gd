@@ -56,6 +56,19 @@ const LAND_BEACH_ODDS := 0.15
 const LATE_FROM := 0.6
 ## Seconds between reconciling what should be about with what is.
 const RECKON_EVERY := 2.0
+## Crayfish on the lakebed (2026-09-30, the lakebed pass): how many at most, how deep they
+## go (the shader's depth; the bed is sharp to about here), their crawl and their dart in
+## world px a second, how long they rest and crawl, and how near a threat has to come, in
+## tiles. They flee backwards, tail first, the way a crayfish does.
+const CRAYFISH_MOST := 12
+const CRAY_DEEPEST := 0.55
+const CRAY_CRAWL := 7.0
+const CRAY_DART := 70.0
+const CRAY_DART_TIME := 0.45
+const CRAY_REST := Vector2(2.0, 6.0)
+const CRAY_WALK := Vector2(1.5, 4.0)
+const CRAY_SHY := 1.2
+const CRAY_STEP_PX := 3.0
 ## Seconds between one brood arriving and the next, at most one at a time.
 const BROOD_GAP := Vector2(6.0, 16.0)
 
@@ -307,6 +320,7 @@ func refresh(clean_share: float, clean: PackedInt32Array, cleared_share: float =
 
 ## Forget every animal. For the harness, which refills the lake.
 func reset() -> void:
+	_crays.clear()
 	_frogs.clear()
 	_turtles.clear()
 	_broods.clear()
@@ -319,6 +333,9 @@ func reset() -> void:
 ## Something hit the water at `at` (world): everything within reach runs.
 func scare(at: Vector2, reach_tiles: float = DUCK_SHY) -> void:
 	var reach := Iso.tile_circle_extent(reach_tiles)
+	for c: Dictionary in _crays:
+		if (c["at"] as Vector2).distance_to(at) < reach:
+			_cray_fright(c, at)
 	for f: Dictionary in _frogs:
 		if (f["at"] as Vector2).distance_to(at) < reach:
 			_frog_fright(f, at)
@@ -363,6 +380,9 @@ func _process(delta: float) -> void:
 	_still = obstacles.call() if obstacles.is_valid() else PackedVector2Array()
 	for f: Dictionary in _frogs:
 		_frog_step(f, delta, seen)
+	for c: Dictionary in _crays:
+		_cray_step(c, delta, seen)
+	_crays = _crays.filter(func(c: Dictionary) -> bool: return not c.get("gone", false))
 	for t: Dictionary in _turtles:
 		_turtle_step(t, delta, seen)
 	var seen_by_ducks: PackedVector2Array = walker_threats.call() if walker_threats.is_valid() else seen
@@ -555,6 +575,10 @@ func _reckon() -> void:
 				Sfx.main().play_duck(true)
 			_ducks_came = true
 			_brood_in = _rng.randf_range(BROOD_GAP.x, BROOD_GAP.y)
+	for n in maxi(_want(CRAYFISH_MOST) - _crays.size(), 0):
+		var c := _new_cray()
+		if not c.is_empty():
+			_crays.append(c)
 	if not shore.is_empty() or not _pads.is_empty():
 		for n in maxi(_want(DRAGONFLIES_MOST) - _flies.size(), 0):
 			_flies.append(_new_fly(shore))
@@ -1467,6 +1491,95 @@ func _stamp(on: CanvasItem, name: String, at: Vector2, facing: float, tint: Colo
 	Flock.stamp(on, _critters, frame, at, facing, tint, Transform2D.IDENTITY, Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 
 
+# ---- crayfish on the lakebed -----------------------------------------------------------
+
+enum Cray { REST, CRAWL, DART }
+var _crays: Array = []
+
+
+func crayfish_count() -> int:
+	return _crays.size()
+
+
+func crayfish() -> Array:
+	return _crays
+
+
+## Water a crayfish may be on: clean on the honest map, over the bed, not too deep.
+func _cray_ok(at: Vector2) -> bool:
+	if grid == null or not _wet(at) or not Fish.bed_shows(grid, at):
+		return false
+	var tile := Iso.world_to_tile(at)
+	if grid.water_state(grid.index_of(int(floor(tile.x)), int(floor(tile.y)))) != 0:
+		return false
+	return Fish.depth_at(at) < CRAY_DEEPEST
+
+
+func _new_cray() -> Dictionary:
+	if _clean.is_empty():
+		return {}
+	for attempt in 12:
+		var tile := grid.tile_of(_clean[_rng.randi_range(0, _clean.size() - 1)])
+		var at := Iso.tile_to_world(float(tile.x) + _rng.randf(), float(tile.y) + _rng.randf())
+		if _cray_ok(at):
+			return {"at": at, "angle": _rng.randf_range(0.0, TAU), "state": Cray.REST,
+				"timer": _rng.randf_range(CRAY_REST.x, CRAY_REST.y), "fade": 0.0, "walked": 0.0}
+	return {}
+
+
+func _cray_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
+	var at: Vector2 = c["at"]
+	var ok := _cray_ok(at)
+	c["fade"] = clampf(float(c["fade"]) + (delta if ok else -delta) / 0.8, 0.0, 1.0)
+	if not ok and float(c["fade"]) <= 0.0:
+		c["gone"] = true
+		return
+	var reach := Iso.tile_circle_extent(CRAY_SHY)
+	for p in seen:
+		if p.distance_to(at) < reach:
+			_cray_fright(c, p)
+			break
+	c["timer"] = float(c["timer"]) - delta
+	var state: int = c["state"]
+	if state == Cray.REST:
+		if float(c["timer"]) <= 0.0:
+			c["state"] = Cray.CRAWL
+			c["angle"] = float(c["angle"]) + _rng.randf_range(-1.2, 1.2)
+			c["timer"] = _rng.randf_range(CRAY_WALK.x, CRAY_WALK.y)
+		return
+	var a := float(c["angle"])
+	var dir := Vector2(cos(a), sin(a) * 0.5).normalized()
+	var speed := CRAY_CRAWL
+	if state == Cray.DART:
+		dir = -dir                                   # backwards, tail first
+		speed = CRAY_DART
+	var next := _round(at, at + dir * speed * delta)
+	if not _cray_ok(next):
+		c["angle"] = a + PI * _rng.randf_range(0.5, 0.9) * (1.0 if _rng.randf() < 0.5 else -1.0)
+		c["state"] = Cray.REST
+		c["timer"] = _rng.randf_range(CRAY_REST.x, CRAY_REST.y) * 0.5
+		return
+	c["walked"] = float(c["walked"]) + at.distance_to(next)
+	c["at"] = next
+	if float(c["timer"]) <= 0.0:
+		c["state"] = Cray.REST
+		c["timer"] = _rng.randf_range(CRAY_REST.x, CRAY_REST.y)
+
+
+## Something came near: face it and shoot away backwards.
+func _cray_fright(c: Dictionary, from: Vector2) -> void:
+	var off := from - (c["at"] as Vector2)
+	c["angle"] = atan2(off.y * 2.0, off.x)
+	c["state"] = Cray.DART
+	c["timer"] = CRAY_DART_TIME
+
+
+func _cray_frame(c: Dictionary) -> String:
+	var k := posmod(roundi(float(c["angle"]) / (TAU / 8.0)), 8)
+	var f := int(float(c["walked"]) / CRAY_STEP_PX) % 2
+	return "crayfish_%d_%d" % [k, f]
+
+
 ## Tracks on the sand, then what lies on the lakebed through clean water (2026-09-30, the
 ## lakebed pass): every swimming or floating animal's shadow on the bed, further down the
 ## screen the deeper the water (`Fish.shadow_drop`), and the legs of what floats, under the
@@ -1481,6 +1594,12 @@ func _paint_under(on: CanvasItem) -> void:
 		var frame: int = [0, 1, 2, 1][int(float(f["clock"]) * FROG_SWIM_FPS) % 4]
 		var at: Vector2 = f["at"]
 		_shadow_of(on, "frogswim_%d_%d" % [int(f["row"]), frame], at, 1.0, float(f["fade"]))
+	for c: Dictionary in _crays:
+		var r := _region(_cray_frame(c))
+		var at: Vector2 = c["at"]
+		if r.size.x > 0.0 and Fish.bed_shows(grid, at):
+			on.draw_texture_rect_region(_critters, Rect2(at + Vector2(ART, ART * 1.5) - r.size * SCALE * 0.5, r.size * SCALE), r,
+				Color(SHADOW_INK, 0.22 * float(c["fade"])))
 	for t: Dictionary in _turtles:
 		var state := int(t["state"])
 		if state == Turtle.UNDER:
@@ -1552,6 +1671,14 @@ func _turtle_flippers(on: CanvasItem, t: Dictionary) -> void:
 ## and a turtle that has dived, deeper and so fainter. The vertex colour is
 ## `Fish.through_tint`, the fish shader's packing.
 func _paint_submerged(on: CanvasItem) -> void:
+	# Crayfish lie on the bed, so as much water is over them as over it (the shader's bed_mix).
+	for c: Dictionary in _crays:
+		var at: Vector2 = c["at"]
+		var r := _region(_cray_frame(c))
+		if r.size.x <= 0.0 or not Fish.bed_shows(grid, at):
+			continue
+		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
+			Fish.through_tint(at, float(c["fade"]), 0.38, 0.52, 0.72))
 	for f: Dictionary in _frogs:
 		if int(f["state"]) != Frog.SWIM or not _wet(f["at"]):
 			continue

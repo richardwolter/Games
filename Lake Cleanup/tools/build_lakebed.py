@@ -110,6 +110,7 @@ MATERIALS = [
     ("chara", ramp5((.24, .3, .2), (.38, .46, .3), (.54, .62, .42), (.7, .76, .56), (.84, .88, .72))),
     ("shell", ramp5((.14, .12, .1), (.3, .24, .18), (.5, .42, .3), (.7, .6, .44), (.86, .78, .62))),
     ("moss", ramp5((.12, .24, .1), (.2, .34, .14), (.29, .44, .19), (.43, .55, .25), (.6, .7, .36))),
+    ("mussel", ramp5((.1, .12, .17), (.19, .22, .3), (.31, .35, .45), (.49, .54, .62), (.72, .76, .8))),
 ]
 MAT_ID = {name: i for i, (name, _) in enumerate(MATERIALS)}
 
@@ -389,17 +390,98 @@ PLANTS = [eelgrass, waterweed, hornwort, pondweed, stonewort]
 
 # ---- shells ------------------------------------------------------------------------------
 
-SHELLS = [
-    [".oo.", "oSDo", "oDSoo"],             # snail
-    ["MM.M", ".MMM"],                      # mussels
-    ["..o", ".MM", "MMM."],                # a mussel pair, turned
+# River snails, hand set: a coiled shell lit on its upper left, the whorl a step down, the
+# pale foot and a feeler out front. Two poses, and each is mirrored at random.
+SNAILS = [
+    ["...oooo....",
+     "..oLLSSo...",
+     ".oLSDDSSo..",
+     ".oSDLLDSo..",
+     ".oSDSoDSo..",
+     "..oDDSDoFFF",
+     "...ooooF..F"],
+    ["..oooo...",
+     ".oLLSSo..",
+     "oLSDDSSo.",
+     "oSDLSDSo.",
+     ".oDSDDoFF",
+     "..ooooF.F"],
 ]
-SHELL_OFF = {"S": 1, "D": -1, "o": -2, "M": -2}
+SNAIL_OFF = {"L": 1, "S": 0, "D": -1, "o": -2, "F": 2}
 
 
-def shell(i):
-    return {(x, y): (SHELL_OFF[ch], "shell", 0) for y, row in enumerate(SHELLS[i])
-            for x, ch in enumerate(row) if ch != "."}
+def snail(seed):
+    r = random.Random(seed)
+    rows = SNAILS[r.randrange(len(SNAILS))]
+    flip = r.random() < .5
+    out = {}
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch != ".":
+                out[((len(row) - 1 - x) if flip else x, y)] = (SNAIL_OFF[ch], "shell", 0)
+    return out
+
+
+def mussels(seed):
+    """A mussel bed: three to six blue-black shells lying every which way in a clump, each
+    lit along its top, ringed dark, one or two half sunk in the sand."""
+    r = random.Random(seed)
+    out = {}
+    for m in range(r.randint(3, 6)):
+        cx, cy = r.randint(-6, 6), r.randint(-3, 3)
+        long_ = r.choice(((2, 1), (3, 1), (1, 1)))
+        shell_ = {}
+        for i in range(-long_[0], long_[0] + 1):
+            for j in range(-long_[1], long_[1] + 1):
+                if (i / (long_[0] + .5)) ** 2 + (j / (long_[1] + .5)) ** 2 > 1:
+                    continue
+                off = 1 if j == -long_[1] else (-1 if j == long_[1] else 0)
+                shell_[(cx + i, cy + j)] = (off, "mussel", 0)
+        ring = {}
+        for (x, y) in shell_:
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                if (x + dx, y + dy) not in shell_: ring[(x + dx, y + dy)] = (-2, "mussel", 0)
+        whole = {**shell_, **ring}
+        # Each shell apart from the others, or the bed runs into one blob.
+        if any((x + dx, y + dy) in out for (x, y) in whole for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+            continue
+        out.update(whole)
+    if not out:
+        out[(0, 0)] = (0, "mussel", 0)
+    foot = {}
+    for (x, y) in out: foot[x] = max(foot.get(x, -99), y)
+    for x, fy in foot.items():
+        if r.random() < .35:
+            out[(x, fy)] = (1, "ground", 0)
+    return out
+
+
+def clam(seed):
+    """A freshwater clam half in the sand: a pale ridged shell, its bottom rows under a lit
+    drift, a dark hinge line."""
+    r = random.Random(seed)
+    w = r.choice((3, 4))
+    out = {}
+    for i in range(-w, w + 1):
+        for j in range(-2, 2):
+            if (i / (w + .5)) ** 2 + ((j + .5) / 2.2) ** 2 > 1:
+                continue
+            off = 1 if j == -2 else (0 if (i + j) % 2 else -1)
+            out[(i, j)] = (off, "shell", 0)
+    for (x, y) in list(out):
+        for dx, dy in ((1, 0), (-1, 0), (0, -1)):
+            if (x + dx, y + dy) not in out: out[(x + dx, y + dy)] = (-2, "shell", 0)
+    for i in range(-w - 1, w + 2):
+        out[(i, 1)] = (1, "ground", 0)
+        out.setdefault((i, 2), (-1, "ground", 0))
+    return out
+
+
+SHELL_MAKERS = [snail, snail, mussels, clam]
+
+
+def shell(seed):
+    return SHELL_MAKERS[random.Random(seed).randrange(len(SHELL_MAKERS))](seed)
 
 
 # ---- laying it all out ------------------------------------------------------------------
@@ -445,7 +527,7 @@ def main():
         for (x, y), (off, mat, height) in pix.items():
             i = (v0 + y) * W + u0 + x
             R[i] = MAT_ID[mat]; G[i] = (off + 4) | (min(height, 15) << 4)
-            B[i] = rank if mat in ("ground",) and rank else (rank if mat not in ("rock", "wood", "moss") else 0)
+            B[i] = rank if mat not in ("rock", "wood", "moss") else 0
             A[i] = 255
         for (x, y) in pix:                                  # and a pixel of room round it
             for dy in (-1, 0, 1):
@@ -473,7 +555,7 @@ def main():
                 elif what == "plant":
                     pix = rng.choice(PLANTS)(seed)
                 else:
-                    pix = shell(rng.randrange(len(SHELLS)))
+                    pix = shell(seed)
                 x0, y0, w, h = bbox(pix)
                 if not fits(pix, u - x0 - w // 2, v - y0 - h + 1): continue
                 rank = 0 if what in ("rock", "branch") else rng.randint(1, 255)

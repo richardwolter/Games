@@ -88,6 +88,16 @@ func _set_stage(stage: int) -> void:
 			k += 1
 		wild.refresh(_main.clean_share(), _main.get(&"_clean_tiles"), 1.0)
 		wild.set(&"_brood_in", 0.0)
+		# The crayfish nearest the view, brought into it: they live out on the bed, and the
+		# view is on the island's shore.
+		var angler: Node2D = _main.get(&"_angler")
+		var view: Vector2 = angler.position + (_main.get(&"_pan") as Vector2)
+		var best: Dictionary = {}
+		for c: Dictionary in wild.crayfish():
+			if best.is_empty() or (c["at"] as Vector2).distance_to(view) < (best["at"] as Vector2).distance_to(view):
+				best = c
+		if not best.is_empty():
+			_main.set(&"_pan", (best["at"] as Vector2) + Vector2(0.0, -60.0) - angler.position)
 		return
 	for index in grid.stacks.size():
 		if grid.stacks[index].is_empty():
@@ -144,6 +154,9 @@ func _write(name: String) -> void:
 		for b: Dictionary in wild.broods():
 			if float(b["alt"]) <= 0.5 and not picks.has("duck"):
 				picks["duck"] = b["at"]
+		for c: Dictionary in wild.crayfish():
+			if not picks.has("crayfish"):
+				picks["crayfish"] = c["at"]
 		var vp := get_viewport()
 		var to_screen := vp.get_final_transform() * vp.get_canvas_transform()
 		var log2 := FileAccess.open(LOG, FileAccess.READ_WRITE)

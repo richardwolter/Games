@@ -524,6 +524,114 @@ def frog_dive(heading: float, frame: int, colour: str) -> Image.Image:
     return img
 
 
+# The crayfish on the lakebed (2026-09-30, the lakebed pass, off tools/lakebed_mockup.py): a
+# rust-brown body and red-orange claws, each a five-step ramp, darkest first.
+CRAY_RAMP = [(41, 20, 13, 255), (87, 46, 26, 255), (133, 77, 41, 255), (173, 112, 61, 255), (214, 158, 97, 255)]
+CLAW_RAMP = [(77, 20, 10, 255), (133, 41, 20, 255), (189, 77, 36, 255), (219, 117, 56, 255), (240, 168, 102, 255)]
+
+
+def _raster(shapes, heading: float, squash: float, scale: float, size: int = 48, s_: int = 4) -> dict:
+    """Labelled shapes drawn in a body frame (x forward) at `heading`, laid on the plane and
+    squashed; each pixel takes the label covering most of it, if at least 40% is covered."""
+    from PIL import ImageDraw
+    ca, sa = math.cos(heading), math.sin(heading)
+    im = Image.new("L", (size * s_, size * s_), 0)
+    dr = ImageDraw.Draw(im)
+
+    def tr(p):
+        x, y = p[0] * scale, p[1] * scale
+        return ((x * ca - y * sa) * s_ + size * s_ / 2, (x * sa + y * ca) * squash * s_ + size * s_ / 2)
+    for i, sh in enumerate(shapes):
+        if sh[1] == "line":
+            dr.line([tr(p) for p in sh[2]], fill=i + 1, width=max(1, int(sh[3] * s_ * scale)))
+        else:
+            dr.polygon([tr(p) for p in sh[2]], fill=i + 1)
+    px = im.load()
+    out = {}
+    for y in range(size):
+        for x in range(size):
+            count = {}
+            for yy in range(s_):
+                for xx in range(s_):
+                    v = px[x * s_ + xx, y * s_ + yy]
+                    if v: count[v] = count.get(v, 0) + 1
+            if count and sum(count.values()) >= s_ * s_ * .4:
+                v = max(count.items(), key=lambda kv: (kv[1], kv[0]))[0]
+                out[(x - size // 2, y - size // 2)] = shapes[v - 1][0]
+    return out
+
+
+def _ellipse(cx, cy, rx, ry, n=14):
+    return [(cx + math.cos(2 * math.pi * i / n) * rx, cy + math.sin(2 * math.pi * i / n) * ry) for i in range(n)]
+
+
+def crayfish(heading: float, frame: int) -> Image.Image:
+    """Seen from above at the game's view, squashed a little less than the plane (0.78) so the
+    claws read: carapace and rostrum, five tail segments and a fan, two claws on bent arms with
+    a dark gap in each pincer, walking legs and long feelers. Frame 1 has the claws open wider
+    and the legs a step on. A lit rim on the carapace and claws, alternate tail segments a step
+    down, a dark ring round all but the legs and feelers."""
+    open_ = (.25, .45)[frame]
+    step = (0.0, .45)[frame]
+    shapes = []
+    for s_ in (-1, 1):
+        shapes.append(("feeler", "line", [(4.5, s_ * .5), (8, s_ * 2.4), (12, s_ * 4.2)], .3))
+        for k in range(3):
+            lx = 1.2 - k * 1.3 + (step if k % 2 == (0 if s_ > 0 else 1) else -step)
+            shapes.append(("leg", "line", [(lx, s_ * 1.4), (lx - .4, s_ * 2.8), (lx - 1.2, s_ * 3.6)], .45))
+    for s_ in (-1, 1):
+        shapes.append(("arm", "line", [(2.8, s_ * 1.3), (4.4, s_ * 2.9), (6.0, s_ * 3.4)], 1.1))
+        shapes.append(("claw", "poly", [(5.6, s_ * 2.6), (7.4, s_ * 2.2), (10.4, s_ * (2.4 - open_ * 1.4)),
+                                        (10.8, s_ * 2.9), (10.6, s_ * 3.6), (9.0, s_ * 4.6), (6.6, s_ * 4.6),
+                                        (5.4, s_ * 3.8)]))
+        shapes.append(("gap", "line", [(8.2, s_ * 3.1), (10.8, s_ * 3.1)], .45))
+    for k in range(5):
+        shapes.append(("seg%d" % (k % 2), "poly", _ellipse(-1 - k * 1.25 - .6, 0, .8, 1.5 - k * .16)))
+    shapes.append(("fan", "poly", [(-7, 0), (-8.8, -2), (-9.4, -.8), (-9.4, .8), (-8.8, 2)]))
+    shapes.append(("shell", "poly", _ellipse(1.2, 0, 2.6, 1.7, 18)))
+    shapes.append(("rostrum", "poly", [(3.4, -.6), (5.2, 0), (3.4, .6)]))
+    lab = _raster(shapes, heading, .78, 1.1)
+    cells = set(lab)
+    body = {k for k, v in lab.items() if v not in ("feeler", "leg", "gap")}
+    xs = [k[0] for k in lab] + [k[0] + 1 for k in body] + [k[0] - 1 for k in body]
+    ys = [k[1] for k in lab] + [k[1] + 1 for k in body] + [k[1] - 1 for k in body]
+    w, h = 26, 20
+    img = canvas(w, h)
+
+    def put_(x, y, c):
+        put(img, x + w // 2, y + h // 2, c)
+    for (x, y), l in lab.items():
+        up = (x, y - 1) not in cells or lab.get((x, y - 1)) in ("feeler", "leg")
+        if l in ("feeler", "leg"): c = CRAY_RAMP[1]
+        elif l == "claw": c = CLAW_RAMP[3 if up else 2]
+        elif l == "gap": c = CLAW_RAMP[0]
+        elif l in ("arm", "shell"): c = CRAY_RAMP[3 if up else 2]
+        elif l == "rostrum": c = CRAY_RAMP[3]
+        elif l == "seg1": c = CRAY_RAMP[1]
+        else: c = CRAY_RAMP[2]
+        put_(x, y, c)
+    for (x, y) in body:
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            q = (x + dx, y + dy)
+            if q not in body:
+                put_(q[0], q[1], CRAY_RAMP[0])
+    # The legs and feelers, one pixel wide: too thin for the coverage cut, so drawn as lines
+    # of whole pixels between their projected joints, under the body.
+    ca, sa = math.cos(heading), math.sin(heading)
+    for sh in shapes:
+        if sh[0] not in ("feeler", "leg"):
+            continue
+        pts = [((p[0] * ca - p[1] * sa) * 1.1, (p[0] * sa + p[1] * ca) * .78 * 1.1) for p in sh[2]]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            n = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 1
+            for i in range(n + 1):
+                q = (round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n))
+                if q not in body and (q[0] + 1, q[1]) not in body or q not in body and sh[0] == "feeler":
+                    if img.getpixel((min(max(q[0] + w // 2, 0), w - 1), min(max(q[1] + h // 2, 0), h - 1)))[3] == 0:
+                        put_(q[0], q[1], CRAY_RAMP[1] if sh[0] == "leg" else CRAY_RAMP[2])
+    return img
+
+
 def pack() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     frogs = {}
@@ -551,6 +659,9 @@ def pack() -> None:
         items.append((f"fox_trot{step}", fox("trot", step)))
     for step in (0, 1):
         items.append((f"fox_run{step}", fox("run", step)))
+    for k in range(8):
+        for f in range(2):
+            items.append((f"crayfish_{k}_{f}", crayfish(k * math.tau / 8.0, f)))
     for k in range(8):
         for f in range(3):
             items.append((f"frogswim_{k}_{f}", frog_swim(k * math.tau / 8.0, f)))

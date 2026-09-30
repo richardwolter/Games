@@ -336,7 +336,7 @@ uniform float bed_on : hint_range(0.0, 1.0) = 0.0;
 uniform sampler2D bed_map : filter_nearest, repeat_disable;
 uniform vec2 bed_origin = vec2(-2944.0, 0.0);
 uniform vec2 bed_size = vec2(2944.0, 1472.0);
-uniform vec3 bed_ramps[55];
+uniform vec3 bed_ramps[60];
 uniform float bed_growth : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 bed_bands = vec3(0.3, 0.58, 0.85);
 uniform vec3 bed_mix = vec3(0.38, 0.52, 0.72);
@@ -348,6 +348,11 @@ uniform float bed_caustic = 0.016;
 uniform float bed_wobble = 0.16;
 uniform float bed_lobe = 60.0;
 uniform float bed_levels = 5.0;
+// See `lakebed`: how high up a plant a pixel sways one over (twice this, two over), how fast
+// the current swings, and how many art pixels one patch of it covers.
+uniform float bed_sway_from = 5.0;
+uniform float bed_sway_speed = 0.9;
+uniform float bed_sway_cell = 40.0;
 
 varying vec2 world_pos;
 
@@ -533,7 +538,7 @@ void vertex() {
 
 // One step of one of the bed's ramps.
 vec3 bed_ramp(int mat, float s) {
-	return bed_ramps[clamp(mat, 0, 10) * 5 + int(clamp(s, 0.0, 4.0))];
+	return bed_ramps[clamp(mat, 0, 11) * 5 + int(clamp(s, 0.0, 4.0))];
 }
 
 // The depth the bed reads its bands off: the true depth, its contours broken into lobes and
@@ -547,6 +552,24 @@ float bed_depth(vec2 cell, float d) {
 	return d + n * bed_wobble;
 }
 
+// One texel of the bed map as (material, step offset, height above a plant's root), or
+// material 0 where nothing is, off the map, or not grown back here yet.
+vec3 bed_texel(ivec2 tx, bool grown_here) {
+	if (tx.x < 0 || tx.y < 0 || tx.x >= int(bed_size.x) || tx.y >= int(bed_size.y)) {
+		return vec3(0.0);
+	}
+	vec4 b = texelFetch(bed_map, tx, 0);
+	if (b.a < 0.5) {
+		return vec3(0.0);
+	}
+	float rank = floor(b.b * 255.0 + 0.5);
+	if (rank > 0.5 && !(grown_here && rank <= bed_growth * 255.0)) {
+		return vec3(0.0);
+	}
+	float g = floor(b.g * 255.0 + 0.5);
+	return vec3(floor(b.r * 255.0 + 0.5), mod(g, 16.0) - 4.0, floor(g / 16.0));
+}
+
 // The lakebed at this art pixel, through the water. `water` is the colour the water would
 // have been, `state` 0 clean or 1 hazy, `grown_here` whether life may show (the honest map),
 // `d` the depth, `bands` the surface's own swing, `clock` the stepped time.
@@ -558,18 +581,24 @@ vec3 lakebed(vec2 cell, vec3 water, float state, bool grown_here, float d, float
 		float clock, float step_at) {
 	float dn = bed_depth(cell, d);
 	ivec2 tx = ivec2(cell - floor(bed_origin / foam_pixel));
-	int mat = 0;
-	float off = 0.0;
-	if (tx.x >= 0 && tx.y >= 0 && tx.x < int(bed_size.x) && tx.y < int(bed_size.y)) {
-		vec4 b = texelFetch(bed_map, tx, 0);
-		if (b.a > 0.5) {
-			float rank = floor(b.b * 255.0 + 0.5);
-			if (rank < 0.5 || (grown_here && rank <= bed_growth * 255.0)) {
-				mat = int(floor(b.r * 255.0 + 0.5));
-				off = mod(floor(b.g * 255.0 + 0.5), 16.0) - 4.0;
-			}
+	// The plants sway with a slow current (2026-09-30): a plant pixel `bed_sway_from` art
+	// pixels above its root stands one pixel over, one twice that high two, by `sway`, which
+	// the current sets for this bit of the lake on the stepped clock. What shows here is
+	// whichever plant pixel has swayed onto it: two over, one over, or its own if it did not
+	// move. A pixel whose own plant swayed off it shows the ground.
+	float wave = sin(clock * bed_sway_speed + blob_noise(cell / bed_sway_cell) * 6.2832);
+	int sway = wave > 0.45 ? 1 : (wave < -0.45 ? -1 : 0);
+	vec3 got = vec3(0.0, 0.0, -1.0);
+	for (int k = sway == 0 ? 0 : 2; k >= 0; k--) {
+		vec3 c = bed_texel(tx - ivec2(sway * k, 0), grown_here);
+		int moves = c.z >= bed_sway_from * 2.0 ? 2 : (c.z >= bed_sway_from ? 1 : 0);
+		if (c.x > 0.5 && moves * abs(sway) == k) {
+			got = c;
+			break;
 		}
 	}
+	int mat = got.z < -0.5 ? 0 : int(got.x);
+	float off = got.z < -0.5 ? 0.0 : got.y;
 	if (dn >= bed_bands.z) {
 		// The deep: only the dark shapes of things.
 		return (mat > 1 && off <= -1.0) ? ramp(max(step_at - 1.0, 0.0), state) : water;
