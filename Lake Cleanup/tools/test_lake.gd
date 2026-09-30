@@ -6488,6 +6488,24 @@ func _check_wildlife() -> void:
 	_check(wild.frog_count() <= Wildlife.FROGS_MOST and wild._want(Wildlife.FROGS_MOST) <= Wildlife.FROGS_MOST,
 		"never past the cap", "")
 	_check_land_animals(wild)
+	# Seen fish (2026-09-30): the sheet loads, every tier's species is on it, each school is
+	# one of its tier's species, and the bodies draw through the fish shader.
+	var fish_kinds: Array = fish.get(&"_species")
+	var listed := true
+	for spec: Dictionary in Fish.TIERS:
+		for kind: String in spec["species"]:
+			listed = listed and fish_kinds.has(kind)
+	_check(fish.get(&"_sheet") is Texture2D and listed, "every tier's fish is on the fish sheet", str(fish_kinds))
+	var right_kind := true
+	for s: Dictionary in fish.schools():
+		right_kind = right_kind and (Fish.TIERS[int(s["tier"])]["species"] as Array).has(s["species"])
+	_check(right_kind, "each school is one of its tier's species", "")
+	var bodies := fish.get_node_or_null(^"Bodies") as Node2D
+	_check(bodies != null and bodies.material is ShaderMaterial, "the fish's bodies draw through the fish shader", "")
+	var shallow := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.97, Iso.CENTRE.y))
+	var deep := Fish.depth_at(Iso.tile_to_world(Iso.CENTRE.x + Iso.RADIUS.x * 0.4, Iso.CENTRE.y))
+	_check(shallow < 0.3 and deep > shallow, "a fish's depth is shallow by the bank and deeper out",
+		"%.2f %.2f" % [shallow, deep])
 	# Only at clean shores; a brood lands only on clean water.
 	var foul_home := 0
 	_check_lakebed()

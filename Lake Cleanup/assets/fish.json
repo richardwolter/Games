@@ -1,0 +1,18 @@
+{
+ "cell": [
+  48,
+  40
+ ],
+ "headings": 16,
+ "wags": 3,
+ "species": [
+  "minnow",
+  "roach",
+  "perch",
+  "rudd",
+  "tench",
+  "carp"
+ ],
+ "rows_per_species": 4,
+ "note": "row (species * rows_per_species + wag) holds a heading per column; the last row of a species is its shadow; heading 0 faces +x on the plane, counting towards +y (down the screen)"
+}
