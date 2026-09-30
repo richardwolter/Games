@@ -318,6 +318,37 @@ uniform float sky_stretch = 3.0;
 uniform float sky_drift = 1.5;
 const float GLINT_UP = 3.0;
 
+// The lakebed through clean water (2026-09-30, `/grill-me` with Richard, off
+// tools/lakebed_mockup.py). Only where the water is clean, or hazy, which shows it fainter.
+// The ground is worked out here (sand to mud, broad silt patches a step down, sand ripples
+// and drifting light lines a step up in the shallows); every rock, branch, plant and shell is
+// baked by tools/build_lakebed.py into `bed_map`, one texel an art pixel:
+//   r  material (0: nothing, the ground here), an index into `bed_ramps`, five steps each
+//   g  (step offset + 4) | (height above a plant's root << 4)
+//   b  growth rank: 0 is always there, 1..255 shows once `bed_growth` has passed it — life
+//      coming back — and only on water the honest map calls clean or hazy
+//   a  1 where anything is
+// A step is mixed `bed_mix` of the way towards the water's own step, one share per depth
+// band (`bed_bands`), so each band is a small palette of its own with hard steps. Past the
+// last band only the dark shapes of things show, one step down. `bed_on` is 0 until the lake
+// hands the map over, so a lake with no bed draws the water it always did.
+uniform float bed_on : hint_range(0.0, 1.0) = 0.0;
+uniform sampler2D bed_map : filter_nearest, repeat_disable;
+uniform vec2 bed_origin = vec2(-2944.0, 0.0);
+uniform vec2 bed_size = vec2(2944.0, 1472.0);
+uniform vec3 bed_ramps[55];
+uniform float bed_growth : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 bed_bands = vec3(0.3, 0.58, 0.85);
+uniform vec3 bed_mix = vec3(0.38, 0.52, 0.72);
+uniform float bed_hazy = 0.22;
+uniform float bed_silt = 22.0;
+uniform float bed_caustic = 0.016;
+// See `bed_depth` and `lakebed`: how far the band edges wander, in depth, and over how many
+// art pixels a lobe runs; and how many steps the water's share takes from shallow to deep.
+uniform float bed_wobble = 0.16;
+uniform float bed_lobe = 60.0;
+uniform float bed_levels = 5.0;
+
 varying vec2 world_pos;
 
 // The inverse projection, mirroring Iso.world_to_tile.
@@ -500,6 +531,79 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
+// One step of one of the bed's ramps.
+vec3 bed_ramp(int mat, float s) {
+	return bed_ramps[clamp(mat, 0, 10) * 5 + int(clamp(s, 0.0, 4.0))];
+}
+
+// The depth the bed reads its bands off: the true depth, its contours broken into lobes and
+// inlets by two octaves of blob noise on the art-pixel grid (2026-09-30, Richard: the band
+// edges were "that straight separation", smooth ellipses of equal depth). Static: the bed
+// does not move, the surface over it does.
+float bed_depth(vec2 cell, float d) {
+	vec2 flat_cell = vec2(cell.x, cell.y * 2.0);
+	float n = (blob_noise(flat_cell / bed_lobe + vec2(17.3, 4.1)) - 0.5)
+		+ (blob_noise(flat_cell / (bed_lobe * 0.38) - vec2(6.2, 11.9)) - 0.5) * 0.5;
+	return d + n * bed_wobble;
+}
+
+// The lakebed at this art pixel, through the water. `water` is the colour the water would
+// have been, `state` 0 clean or 1 hazy, `grown_here` whether life may show (the honest map),
+// `d` the depth, `bands` the surface's own swing, `clock` the stepped time.
+//
+// The water's share runs `bed_mix.x` in the shallowest water to `bed_mix.z` at the last band,
+// through `bed_mix.y` half way, in `bed_levels` hard steps rather than three: smaller jumps
+// between neighbours, on edges that wander (`bed_depth`).
+vec3 lakebed(vec2 cell, vec3 water, float state, bool grown_here, float d, float bands,
+		float clock, float step_at) {
+	float dn = bed_depth(cell, d);
+	ivec2 tx = ivec2(cell - floor(bed_origin / foam_pixel));
+	int mat = 0;
+	float off = 0.0;
+	if (tx.x >= 0 && tx.y >= 0 && tx.x < int(bed_size.x) && tx.y < int(bed_size.y)) {
+		vec4 b = texelFetch(bed_map, tx, 0);
+		if (b.a > 0.5) {
+			float rank = floor(b.b * 255.0 + 0.5);
+			if (rank < 0.5 || (grown_here && rank <= bed_growth * 255.0)) {
+				mat = int(floor(b.r * 255.0 + 0.5));
+				off = mod(floor(b.g * 255.0 + 0.5), 16.0) - 4.0;
+			}
+		}
+	}
+	if (dn >= bed_bands.z) {
+		// The deep: only the dark shapes of things.
+		return (mat > 1 && off <= -1.0) ? ramp(max(step_at - 1.0, 0.0), state) : water;
+	}
+	bool ground = mat == 0;
+	if (ground) {
+		mat = 1;
+		// Broad silt patches a step down; long sand ripples a step up in the shallows.
+		float silt = blob_noise(cell / vec2(bed_silt, bed_silt * 0.73)) * 0.6
+			+ blob_noise(cell / vec2(bed_silt * 0.5, bed_silt * 0.36) + vec2(3.1, 7.7)) * 0.4;
+		off -= step(0.64, silt);
+		if (dn < bed_bands.x) {
+			float rip = sin((cell.x * 0.35 - cell.y * 0.9) * 0.6
+				+ blob_noise(cell / 25.0 + vec2(1.7, 9.2)) * 4.0);
+			off += step(0.9, rip);
+		}
+	}
+	float s = 2.0 + off;
+	// Light lines on the ground in the shallower water, drifting on the stepped clock.
+	if (ground && dn < bed_bands.y) {
+		vec2 cp = cell + vec2(clock * 1.5, clock * 0.8);
+		float ca = blob_noise(cp / vec2(13.0, 9.0) + vec2(5.3, 2.9));
+		float cb = blob_noise(cp / vec2(11.0, 9.0) - vec2(8.1, 4.4));
+		s += step(abs(ca - cb), bed_caustic);
+	}
+	float levels = max(bed_levels, 2.0);
+	float q = floor(clamp(dn / bed_bands.z, 0.0, 0.999) * levels) / (levels - 1.0);
+	float k = q < 0.5 ? mix(bed_mix.x, bed_mix.y, q * 2.0) : mix(bed_mix.y, bed_mix.z, q * 2.0 - 1.0);
+	float toward_at = floor(3.0 - 2.0 * q + 0.5);
+	vec3 toward = ramp(clamp(toward_at + floor(bands * 0.6 + 0.5), 0.0, 4.0), state);
+	k += state > 0.5 ? bed_hazy : 0.0;
+	return mix(bed_ramp(mat, s), toward, min(k, 1.0));
+}
+
 // How clear one patch leaves the water at `px`: 0 untouched, 1 clean. `patch` is (x, y)
 // world centre, (z) radius along the long axis, (w) how open; `seed` its roll. The 2:1
 // squash is taken out first, where a mouth is a circle. See `patches` above for the shape.
@@ -621,6 +725,8 @@ void fragment() {
 	// dead still, which is what foul water round the island did while the cleaner water
 	// outside it kept moving. `dirty_bands` is the floor.
 	shade += bands * max(band_steps * (1.0 - filth * 0.75), dirty_bands);
+	// What the sparkle and the glints add from here on, kept so the bed can carry them too.
+	float shade_bare = shade;
 
 	// And, on a finished lake, the glitter: two fast waves crossed at an angle and cut off
 	// near their peaks, which is a scatter of moving points rather than a sheen. Costs
@@ -686,11 +792,21 @@ void fragment() {
 	float state = step(state_at.x + lean, state_t) + step(state_at.y + lean, state_t)
 		+ step(state_at.z + lean, state_t) + step(state_at.w + lean, state_t);
 	vec3 col = ramp(step_at, state);
+	// The lakebed, where the water is clean or hazy (see `bed_map`). The patches and the lane
+	// show it; what grows back shows only where the honest map says so.
+	if (bed_on > 0.5 && state < 1.5) {
+		bool grown_here = pow(honest, color_bite) < state_at.y;
+		col = lakebed(cell, col, state, grown_here, d, bands, clock, step_at);
+		col = mix(col, ramp(4.0, state), step(0.5, shade - shade_bare) * 0.55);
+	}
 	// What the shore foam and its tint go on: 0 clean, 1 murky, 2 dirty, as they always did.
 	float murk_state = state * 0.5;
 
 	// The sky in it: see `sky_reflect`. Whole art pixels, the plane drifting in whole steps.
-	if (sky_reflect > 0.001 && pow(honest, color_bite) < state_at.x) {
+	// Kept off the two shallow bands while the bed shows there: a flat cloud laid over rocks
+	// and weed read as a hole cut in the picture, not as sky on the water.
+	bool sky_over_bed = bed_on > 0.5 && bed_depth(cell, d) < bed_bands.y;
+	if (sky_reflect > 0.001 && !sky_over_bed && pow(honest, color_bite) < state_at.x) {
 		vec2 sky_cell = vec2(cell.x - floor(clock * sky_drift), cell.y);
 		vec2 sky_p = vec2(sky_cell.x / (sky_cloud * sky_stretch), sky_cell.y / sky_cloud);
 		float cloud = blob_noise(sky_p + vec2(11.3, 4.7)) * 0.57

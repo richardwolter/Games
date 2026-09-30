@@ -1588,6 +1588,17 @@ const SHORE_LAP := 0.45
 const COAST_WAVE := 0.32
 const COAST_WAVES := 3.0
 const COAST_WAVE_SPEED := 0.75
+## The lakebed seen through clean water (2026-09-30, `/grill-me` with Richard). Rocks,
+## branches, water plants and shells are baked by tools/build_lakebed.py into one map the
+## water shader reads (`bed_map`); the ground under them is the shader's own. See the
+## shader's `bed_map` note for what the map holds.
+const BED_MAP := "res://assets/lakebed.png"
+const BED_JSON := "res://assets/lakebed.json"
+## How far the lake's clean share has to go before every plant and shell has come back:
+## `bed_growth` is the share over this, and it never falls back. First guess.
+const BED_GROWN_AT := 0.6
+var _bed_growth := 0.0
+
 
 ## How far past the waterline the water polygon is actually drawn, in tiles: the lap, the
 ## wave's crest, and slack enough that the crest is never clipped by the rim.
@@ -1699,6 +1710,7 @@ func _shape_island() -> void:
 	_grounds.append(ground)
 
 	_island = Node2D.new()
+	_dress_bed()
 	_island.name = &"IslandShed"
 	# Above the layer a walker gets when it is behind the hut, and below the one it gets
 	# when it is past it. See `_sort_walkers`.
@@ -5952,6 +5964,33 @@ func _sort_walkers_for_wildlife() -> void:
 	var frame := Engine.get_process_frames()
 	if frame == _wildlife_sorted_at:
 		return
+## Hand the water the baked lakebed: the map, where it lies in the world, and each
+## material's ramp. A missing map leaves `bed_on` at 0 and the water as it was.
+func _dress_bed() -> void:
+	if not ResourceLoader.exists(BED_MAP) or not FileAccess.file_exists(BED_JSON):
+		return
+	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(BED_JSON))
+	if not spec is Dictionary:
+		return
+	var ramps := PackedVector3Array()
+	for material: Dictionary in spec["materials"]:
+		var ramp: Variant = material["ramp"]
+		for step in 5:
+			if ramp is Array:
+				var rgb: Array = ramp[step]
+				ramps.append(Vector3(rgb[0], rgb[1], rgb[2]))
+			else:
+				ramps.append(Vector3.ZERO)
+	var origin: Array = spec["origin"]
+	var size: Array = spec["size"]
+	_water_material.set_shader_parameter(&"bed_map", load(BED_MAP))
+	_water_material.set_shader_parameter(&"bed_origin", Vector2(origin[0], origin[1]))
+	_water_material.set_shader_parameter(&"bed_size", Vector2(size[0], size[1]))
+	_water_material.set_shader_parameter(&"bed_ramps", ramps)
+	_water_material.set_shader_parameter(&"bed_growth", _bed_growth)
+	_water_material.set_shader_parameter(&"bed_on", 1.0)
+
+
 	var dt := maxf(get_process_delta_time(), 0.001)
 	_wildlife_sorted_at = frame
 	_wildlife_moving = PackedVector2Array()
@@ -5975,6 +6014,8 @@ func _sort_walkers_for_wildlife() -> void:
 
 
 ## Distance from every tile to the nearest source, in tiles, in place: `dist` comes in as 0
+		_bed_growth = maxf(_bed_growth, clampf(_clean_share / BED_GROWN_AT, 0.0, 1.0))
+		_water_material.set_shader_parameter(&"bed_growth", _bed_growth)
 ## on the sources and something big everywhere else, and goes out as the distance. Two
 ## sweeps of the grid, forwards then back, each cell taking the least of its already-swept
 ## neighbours plus the step to them — a chamfer transform, which is the distance to within

@@ -3921,6 +3921,58 @@ fifteen verbs on two devices does not belong under a volume slider.
   Resolution, VSync (Off / On / Adaptive) and Frame cap (uncapped, 30, 60, 120, 144).
 - **The resolution is a windowed-mode setting, by decision**: in either fullscreen the row is
   dimmed and reads the monitor's own size, and picking one does nothing. So no display row
+### The Lakebed Through Clean Water (2026-09-30, `/grill-me` with Richard, after Spilled!)
+Clean water is see-through to a lakebed of sand, rocks, branches, water plants and shells. The
+bottom showing is the reward for clearing a bay, the way oil lifting is in Spilled!. Picked
+over four passes off `tools/lakebed_mockup.py` (`tools/last_lakebed_mockup.png`).
+- **Only on clean water, and fainter on hazy** (`water.gdshader` `lakebed`, `bed_on`): murky,
+  foul and dirty water stay opaque. **The catch patches and the reel's lane show the bed**
+  (rocks, branches, ground); **what grows back** (plants, shells: rank over 0) **shows only
+  where the honest map is clean or hazy** (`grown_here`), as fish and flora do.
+- **Drawn in steps, not colours**: every bed pixel is a material and a step offset on that
+  material's own five-step ramp, mixed `bed_mix` (0.38 / 0.52 / 0.72) of the way towards the
+  water's own step, one share per depth band (`bed_bands` 0.3 / 0.58 / 0.85 on the shader's
+  `d`). Each band is a small palette of hard steps, so the band edges read as depth contours.
+  Past the last band only the dark shapes of things show, one step down.
+  **The band edges wander** (`bed_depth`, `bed_wobble` 0.16, `bed_lobe` 60 art px; same day,
+  Richard: the edges were "that straight separation"): the depth the bed reads is broken by
+  two octaves of noise into lobes and inlets, and the water's share steps from `bed_mix.x` to
+  `bed_mix.z` through `.y` in `bed_levels` (5) hard steps rather than three, so neighbours are
+  closer. Static: the bed does not move, the surface does. **Tinting by
+  brightness was tried first and failed**: rocks came out as hollow rings, their bodies melting
+  into the sand.
+- **The ground is the shader's** (sand to mud, broad silt patches a step down, sand ripples in
+  the shallowest band, light lines drifting on the stepped clock in the two shallow bands).
+  **Everything on it is baked** by `tools/build_lakebed.py` into `assets/lakebed.png`, one texel
+  per art pixel over the whole basin (2944x1472, RGBA: material, step | height << 4, growth
+  rank, present), with `assets/lakebed.json` holding its place in the world and the eleven
+  material ramps (`bed_ramps`, 55 entries). Offline because the geometry is the same on every
+  save (it mirrors `Iso` and the shader's shore functions), so the bed is too. **Re-run and
+  reimport** if the basin, the island or a ramp changes; the import has `fix_alpha_border` off.
+  Review sheet: `tools/last_lakebed_sheet.png`.
+- **Rocks are the Forest pack's own five slices**, ranked by brightness into four steps, moss
+  onto its own ramp, **sunk**: a wavy sand line over the bottom 2-4 rows, a lit drift spilling
+  past the sides, a shaded row under the foot, loose grains. **Branches are drawn by rule**: a
+  wandering, tapering limb with twigs, bark cracks and knots, a pale broken end, an outline, a
+  stretch buried. **Plants** (eelgrass, waterweed, hornwort, pondweed, stonewort) stand up off
+  the bed side on, each in a sand heap; **shells** are the old snail and mussel stamps.
+- **Life returns** (`bed_growth`, the clean share over `Lake.BED_GROWN_AT` 0.6, never falling
+  back): a plant or shell shows once the growth passes its rank. Rocks and branches are there
+  from the start.
+- **The sky's cloud reflections keep off the two shallow bands** (`sky_over_bed`): laid over the
+  bed they read as holes cut in the picture. Glints and the finished sparkle lift the bed's
+  colour towards the light step where they fire.
+- **Cost**: `bench_frames` `BENCH_CLEAN=1` 7.2 ms without the bed, 7.3-7.5 with it.
+- **Still to build, from the approved plan**: crawling crayfish (the mockup has them, rule-built,
+  flat at a 0.78 squash so the claws read), fish as lit 3D bodies in six coloured species over
+  clean water with their shadow on the bed (mockup: `fish_render`), plant sway (`g`'s high
+  nibble already holds each plant pixel's height). Snails and mussels are placeholders.
+- **First guesses**: `bed_mix`, `bed_bands`, `bed_hazy` 0.22, `BED_GROWN_AT`, the plan's
+  counts in the builder (about 450 rocks, 160 branches, 1050 plants, 480 shells).
+- `test_lake`'s `_check_lakebed` guards the gating, the honest map for growth, the sky rule,
+  the ramps filling the array, the map reaching the shader at its size, and growth never
+  falling back. Probe: `tools/shot_nature.tscn`.
+
   can hand a screen a mode it will not show except exclusive, which asks (below). The list is
   **measured against the monitor**, floored at `Prefs.LEAST_WINDOW` (1280x720, under which
   the drawn boards stop fitting).

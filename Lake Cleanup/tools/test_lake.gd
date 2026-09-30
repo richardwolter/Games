@@ -6490,6 +6490,7 @@ func _check_wildlife() -> void:
 	_check_land_animals(wild)
 	# Only at clean shores; a brood lands only on clean water.
 	var foul_home := 0
+	_check_lakebed()
 	for f: Dictionary in wild.frogs():
 		if _grid.water_state(int((f["spot"] as Dictionary)["index"])) != 0:
 			foul_home += 1
@@ -6498,6 +6499,34 @@ func _check_wildlife() -> void:
 			foul_home += 1
 	_check(foul_home == 0, "frogs live by clean water and ducks land on it", "%d" % foul_home)
 	# Run them a while: frogs swim in, the brood flies in and lands.
+## The lakebed through clean water (2026-09-30): the baked map and its ramps reach the
+## shader, the bed shows only on clean or hazy water, what grows back reads the honest map,
+## the shallow bands keep the sky's clouds off it, and the growth never falls back.
+func _check_lakebed() -> void:
+	var src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
+	_check(src.contains("if (bed_on > 0.5 && state < 1.5)"), "the bed shows on clean or hazy water only", "")
+	_check(src.contains("bool grown_here = pow(honest, color_bite) < state_at.y"),
+		"what grows on the bed reads the honest map, not the patches", "")
+	_check(src.contains("!sky_over_bed"), "the sky's clouds keep off the bed in the shallow bands", "")
+	var spec: Variant = JSON.parse_string(FileAccess.get_file_as_string(Lake.BED_JSON))
+	var mats: Array = spec["materials"] if spec is Dictionary else []
+	_check(mats.size() * 5 == 55, "the bed's materials fill the shader's ramp array", "%d" % mats.size())
+	var mat := _water_material()
+	var on = mat.get_shader_parameter(&"bed_on") if mat != null else null
+	var ramps = mat.get_shader_parameter(&"bed_ramps") if mat != null else null
+	var map = mat.get_shader_parameter(&"bed_map") if mat != null else null
+	_check(on != null and float(on) > 0.5 and map is Texture2D and ramps is PackedVector3Array
+		and (ramps as PackedVector3Array).size() == 55, "the lake hands the water its bed", "%s" % [on])
+	if map is Texture2D:
+		var size: Array = spec["size"]
+		_check((map as Texture2D).get_width() == int(size[0]) and (map as Texture2D).get_height() == int(size[1]),
+			"the bed map is the size its json says", "%dx%d" % [(map as Texture2D).get_width(), (map as Texture2D).get_height()])
+	var before := float(_main.get(&"_bed_growth"))
+	_main.call(&"_build_filth_map")
+	_check(float(_main.get(&"_bed_growth")) >= before, "the bed's growth never falls back",
+		"%.3f then %.3f" % [before, float(_main.get(&"_bed_growth"))])
+
+
 	for i in 1200:
 		wild._process(1.0 / 60.0)
 	var swum_home := 0
