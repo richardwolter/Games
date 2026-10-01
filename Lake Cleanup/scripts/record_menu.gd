@@ -23,20 +23,24 @@ const UNIT := 3.0
 ## The board in art pixels.
 const ART := Vector2(200, 140)
 
-const OUT := Color8(62, 14, 14)
-const LID := Color8(104, 71, 78)
-const LID_LO := Color8(97, 65, 72)
-const WALNUT := Color8(99, 54, 31)
-const WALNUT_LO := Color8(78, 28, 16)
-const WALNUT_HI := Color8(138, 69, 48)
-const AMBER := Color8(194, 96, 18)
-const AMBER_HI := Color8(191, 110, 55)
-const AMBER_LO := Color8(180, 85, 20)
-const CREAM := Color8(245, 232, 200)
-const DIM := Color8(170, 140, 140)
-const GHOST := Color8(150, 110, 100)
-const VINYL := Color8(28, 20, 22)
-const VINYL_HI := Color8(58, 44, 48)
+# The pack turntable's own colours (2026-10-01): the record player in the shed is the
+# 0_mem0ry one now, black and greys with a silver deck, so the board it opens is drawn in
+# them. Names kept from the walnut cabinet it was: WALNUT is the dark body, LID the panels,
+# AMBER the silver accent.
+const OUT := Color8(8, 8, 8)
+const LID := Color8(58, 58, 58)
+const LID_LO := Color8(48, 48, 48)
+const WALNUT := Color8(69, 69, 69)
+const WALNUT_LO := Color8(33, 33, 33)
+const WALNUT_HI := Color8(110, 110, 110)
+const AMBER := Color8(192, 192, 192)
+const AMBER_HI := Color8(218, 218, 218)
+const AMBER_LO := Color8(130, 130, 130)
+const CREAM := Color8(240, 240, 236)
+const DIM := Color8(150, 150, 150)
+const GHOST := Color8(101, 101, 101)
+const VINYL := Color8(14, 14, 14)
+const VINYL_HI := Color8(48, 48, 48)
 const SCRIM := Color(0.0, 0.0, 0.0, 0.45)
 
 ## How the songs are written. Names, not words: not translated.
@@ -85,8 +89,8 @@ const ARM_ELBOW := Vector2(0, 26)
 const ARM_TIP := Vector2(-12, 36)
 const GROOVE_OUT := 30.0
 const GROOVE_IN := 17.0
-const GAP_TONE := Color8(20, 14, 16)
-const GROOVE_TONE := Color8(44, 34, 37)
+const GAP_TONE := Color8(10, 10, 10)
+const GROOVE_TONE := Color8(36, 36, 36)
 const ARM_LIFT := 0.2
 const ARM_MOVE := 0.5
 const ARM_DROP := 0.25

@@ -1873,12 +1873,22 @@ func _default_defs() -> Array[TrashDef]:
 ## The furniture is the collection. Exactly one of each is hidden in the water, none of it
 ## is sold, and pulling one out is what puts it in the shed — so its defs are generated
 ## from the art rather than written out, and a new sheet is new things to find.
+## Finds re-drawn from the 0_mem0ry packs on their old catalogue entries.
+const REDRAWN_FINDS := [&"decor_vynil_player"]
+
+
 func _all_defs() -> Array[TrashDef]:
 	var all := _default_defs()
 	if _sheets == null or not _sheets.by_sheet.has("decor_dirty"):
 		_dress(all)
 		return all
-	for name: String in _sheets.by_sheet["decor_dirty"] as PackedStringArray:
+	# The finds are the old decoration sheet's pieces, plus the ones re-drawn from the
+	# 0_mem0ry packs that took over an old find's entry (`tools/build_pack_decor.py`
+	# REPLACES), in catalogue order so the def list and every save stay as they were.
+	var old_finds: PackedStringArray = _sheets.by_sheet["decor_dirty"]
+	for name: String in _sheets.names:
+		if not old_finds.has(name) and not REDRAWN_FINDS.has(StringName(name)):
+			continue
 		# Nameless pieces are not finds. Every decoration is named in tools/decor_sets.json
 		# by hand, so this should never fire now — it fired when the collection was cut off a
 		# sprite sheet by a slicer that kept anything big enough to be an item, offcuts
