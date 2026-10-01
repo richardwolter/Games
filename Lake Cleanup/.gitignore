@@ -64,3 +64,6 @@ tools/_logs/
 /locale/*.translation
 /tools/last_*.wav
 /tools/last_*.wav.import
+
+# Third-party packs whose licence forbids redistribution (0_mem0ry): never committed.
+art_source/packs_local/

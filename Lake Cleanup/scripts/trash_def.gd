@@ -5,7 +5,9 @@
 ##
 ## Deliberately small. There is no physics in this game, so there is no mass, no heft,
 ## no buoyancy coefficient, no collision shape and no polygon decomposition to author —
-## a kind of rubbish is a picture and four numbers, and adding one is a two-minute job.
+## a kind of rubbish is a picture, a material and a weight tier (2026-10-01: pollution,
+## lightness and haul cost are gone; pay is `EconomyConfig.piece_prices`, the meter counts
+## pieces, the fill rolls tier by depth), and adding one is a two-minute job.
 class_name TrashDef
 extends Resource
 
@@ -46,20 +48,8 @@ var region := Rect2()
 ## sprite at a different pixel size does not change how the piece reads.
 @export var size: Vector2 = Vector2(18.0, 20.0)
 
-## How much of the lake's filth this piece accounts for. Arbitrary units — the meter is
-## normalised against the total the lake was built with.
-@export var pollution: float = 1.0
-
-## Seconds of hauling at rate 1.0. This is the number that replaced mass: a cup comes out
-## instantly, a fridge is a commitment.
-@export var haul_cost: float = 0.4
-
 ## Minimum carry-strength level, or boat net power, needed to shift it at all.
 @export var tier: int = 0
-
-## Where it settles in the heap. Higher floats nearer the surface; this is the only thing
-## the old buoyancy number is still doing, and it is a sort key rather than a force.
-@export var lightness: float = 1.6
 
 ## Placeholder fill, used only while sprite is null.
 @export var block_color: Color = Color(0.78, 0.74, 0.66)

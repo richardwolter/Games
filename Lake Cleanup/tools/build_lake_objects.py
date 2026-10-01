@@ -124,6 +124,10 @@ def ink_outline(im):
 
 
 def main():
+    # RETIRED 2026-10-01: the lake's rubbish comes from the 0_mem0ry packs now, built by
+    # tools/build_pack_rubbish.py. Running this would put the old PSD's sprites back over it.
+    sys.exit("retired: use tools/build_pack_rubbish.py")
+
     psd = PSDImage.open(PSD)
     layers = {}
     for layer in psd.descendants():

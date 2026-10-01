@@ -352,6 +352,14 @@ const SPRITE_SCALE := 2.0
 const SPRITE_SMALLEST := 11.0
 const SPRITE_LARGEST := 68.0
 
+## The rubbish is the 0_mem0ry packs' art since 2026-10-01 (tools/build_pack_rubbish.py), drawn
+## at one painted pixel to one world pixel: the angler's grain, so a can and the hand that nets
+## it are one resolution (Richard: the old rubbish at 2x read "washed out, no detail or volume").
+## SPRITE_SCALE and its limits are the finds' now. A crumb under RUBBISH_SMALLEST scales up by
+## whole steps; nothing in the packs' rubbish is near SPRITE_LARGEST.
+const RUBBISH_SCALE := 1.0
+const RUBBISH_SMALLEST := 6.0
+
 ## The finds float smaller than the rubbish (Richard, 2026-09-13: "objects floating on
 ## lake too big, scale down 1.2x" — the decorations only, not every piece of rubbish).
 ## Divides SPRITE_SCALE and SPRITE_LARGEST for a keepsake def, so a find draws at 1.67
@@ -414,7 +422,13 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## 15: the thin ring round the island (2026-09-22).
 ## 16: every stack past the ring runs `LakeGrid.DENSITY` (2) times deeper (2026-09-24), so a
 ## saved lake would keep half the rubbish at half the pay.
-const SAVE_VERSION := 16
+## 17: the ring leans tier 0 (2026-09-29).
+## 18: the rubbish is the 0_mem0ry packs' 121 kinds (2026-10-01), so every saved def index
+## moved; the v17 save is _builds/lake_cleanup_v17_20261001.save.
+## 19: a kind is material and tier only (2026-10-01): pay from a price table, the meter
+## counts pieces, the fill rolls tier by depth. The v18 save is
+## _builds/lake_cleanup_v18_20261001.save.
+const SAVE_VERSION := 19
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_bed"
@@ -1319,7 +1333,7 @@ func _ready() -> void:
 	# A few pieces of rubbish for the net to lie over, off the lake's own atlas.
 	if _sheets != null and _sheets.atlas != null:
 		var catch: Array = []
-		for slug in ["metal_can1", "plastic_cup1", "rubber_duck"]:
+		for slug in ["metal_can1", "plastic_cup", "rubber_ball"]:
 			if _sheets.has(StringName(slug)):
 				catch.append({"sheet": _sheets.atlas, "region": _sheets.region_of(StringName(slug))})
 		_shop_skin.sprites[&"catch"] = catch
@@ -1772,7 +1786,7 @@ func _dog_brought_back(def_index: int) -> void:
 	_yard.put(def_index)
 	# The meter moves for the dog's pieces too. It did not, so a lake the pack helped clear
 	# never read empty — and the ending, which waited on the meter, never came.
-	_filth_left = maxf(_filth_left - _grid.defs[def_index].pollution, 0.0)
+	_filth_left = maxf(_filth_left - 1.0, 0.0)
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 	_filth_stale = true
 	_ask_the_end()
@@ -1789,24 +1803,54 @@ func _dog_brought_back(def_index: int) -> void:
 ## not a name (see lake_grid.gd's `restore`), so an existing save breaks if an entry here
 ## is reordered or removed. Add new kinds at the end only.
 const TRASH_ORDER := [
-	# The first two batches, kept in their old order.
-	"metal_can1", "metal_can2", "metal_can3", "metal_can4", "metal_hanger", "metal_pan",
-	"metal_phone", "metal_pot", "metal_support", "metal_teapot", "plastic_bowl",
-	"plastic_cup1", "plastic_cup2", "plastic_mug", "plastic_plate", "plastic_sheet",
-	"plastic_wrap", "rubber_ball", "rubber_disk", "rubber_duck", "rubber_tire", "wood_box1",
-	"wood_box2", "wood_painting1", "wood_painting2", "wood_piece", "metal_lamp",
-	"metal_mirror", "plastic_sign", "plastic_frame", "rubber_block", "rubber_toy",
-	# Third batch, 2026-09-21: forty-nine kinds for variety, same PSD.
-	"metal_bar", "metal_box1", "metal_box2", "metal_cart", "metal_controller",
-	"metal_dumbell", "metal_extinguisher", "metal_mirror2", "metal_phone2", "metal_pot2",
-	"metal_radio", "metal_shaker", "metal_sound", "plastic_bottle", "plastic_bottles",
-	"plastic_chair", "plastic_sign2", "plastic_toy1", "plastic_toy2", "plastic_toy3",
-	"plastic_toy4", "plastic_toy5", "plastic_vase", "rubber_ball2", "rubber_ball3",
-	"rubber_ball4", "rubber_shoes", "rubber_tire2", "rubber_toy2", "rubber_toy3",
-	"rubber_toy4", "rubber_toy5", "rubber_utensil", "wood_block", "wood_board", "wood_box3",
-	"wood_box4", "wood_box5", "wood_chair", "wood_door", "wood_drawer", "wood_guitar",
-	"wood_lamp", "wood_plank1", "wood_plank2", "wood_sign", "wood_skateboard", "wood_stool",
-	"wood_toy",
+	# The 0_mem0ry packs' rubbish, tagged on the Lake Pack Tagger (tools/build_pack_rubbish.py).
+	"metal_can1", "metal_can2", "metal_can3", "metal_clock", "metal_jar", "metal_pc_tower",
+	"metal_phone1", "metal_pliers", "metal_soda1", "metal_soda2", "metal_tin1", "metal_tin2",
+	"metal_bolt", "metal_can4", "metal_canister", "metal_clock2", "metal_keypad",
+	"metal_lamp_globe", "metal_pipe", "metal_soda3", "metal_square", "metal_stove",
+	"metal_tin3", "metal_toolbox", "metal_aircon", "metal_bank_lamp", "metal_crate",
+	"metal_hob", "metal_kettle", "metal_kettle2", "metal_lamp", "metal_phone2", "metal_pole",
+	"metal_shovel", "metal_socket", "metal_tap", "metal_bar", "metal_barrel3",
+	"metal_barrel4", "metal_barrel5", "metal_candelabra", "metal_case", "metal_desk_lamp",
+	"metal_gas_bottle", "metal_locker", "metal_sheet2", "metal_shelf", "metal_valve",
+	"metal_barrel1", "metal_barrel2", "metal_bin", "metal_bin2", "metal_bin3",
+	"metal_camp_chair", "metal_chair", "metal_desk", "metal_oven", "metal_rod",
+	"metal_sheet1", "metal_stand", "plastic_bag1", "plastic_bag2", "plastic_bottle1",
+	"plastic_bottle2", "plastic_cracker", "plastic_cup", "plastic_frame", "plastic_glass2",
+	"plastic_jar", "plastic_mug1", "plastic_nutcracker", "plastic_sign1", "plastic_bottle3",
+	"plastic_bottle7", "plastic_bottle8", "plastic_bucket1", "plastic_crates", "plastic_cup2",
+	"plastic_cups", "plastic_flask", "plastic_glass", "plastic_packet", "plastic_sauce",
+	"plastic_vase2", "plastic_bottle5", "plastic_bottle6", "plastic_bottle9",
+	"plastic_bucket2", "plastic_bucket3", "plastic_floor_lamp", "plastic_gnome",
+	"plastic_lamp", "plastic_ornament", "plastic_pot", "plastic_slipper", "plastic_vase",
+	"plastic_bottle4", "plastic_cabinet", "plastic_chair", "plastic_chair2", "plastic_crate",
+	"plastic_jerrycan2", "plastic_laptop", "plastic_milk", "plastic_mop_bucket",
+	"plastic_mug2", "plastic_pendant", "plastic_poster", "plastic_computer", "plastic_cooler",
+	"plastic_heater", "plastic_ironing_board", "plastic_jerrycan", "plastic_jug1",
+	"plastic_jug2", "plastic_jug3", "plastic_lamp2", "plastic_office_chair", "plastic_sign2",
+	"plastic_water_jug", "rubber_bag1", "rubber_bag2", "rubber_barrel2", "rubber_cables",
+	"rubber_cap", "rubber_pebble", "rubber_pebble2", "rubber_plug", "rubber_rod",
+	"rubber_roll1", "rubber_roll2", "rubber_sleeping_bag", "rubber_badge", "rubber_candy",
+	"rubber_cassette", "rubber_clock", "rubber_crumb", "rubber_eraser", "rubber_gamepad",
+	"rubber_gas_mask1", "rubber_knife", "rubber_scrap", "rubber_screwdriver",
+	"rubber_screwdriver2", "rubber_clamp", "rubber_crate", "rubber_jacket1", "rubber_jacket2",
+	"rubber_jacket3", "rubber_ketchup", "rubber_mat", "rubber_mattress", "rubber_ring",
+	"rubber_shoes", "rubber_slick", "rubber_sock", "rubber_ball", "rubber_barrel",
+	"rubber_clover", "rubber_dome", "rubber_gas_mask2", "rubber_lump", "rubber_pillows",
+	"rubber_slab", "rubber_speaker", "rubber_strip", "rubber_tire5", "rubber_vase",
+	"rubber_blocks", "rubber_chair", "rubber_laptop", "rubber_puck", "rubber_rubble",
+	"rubber_screen", "rubber_stain", "rubber_tablet", "rubber_tire1", "rubber_tire2",
+	"rubber_tire3", "rubber_tire4", "wood_block", "wood_brush", "wood_brushes", "wood_frame2",
+	"wood_hook", "wood_log3", "wood_nutcracker", "wood_pencil", "wood_rod", "wood_scrap",
+	"wood_stick", "wood_sticks", "wood_candle", "wood_chair", "wood_drawer1", "wood_fence2",
+	"wood_log1", "wood_peg", "wood_plank", "wood_planter", "wood_stake2", "wood_stool",
+	"wood_stump1", "wood_tile", "wood_door", "wood_fence1", "wood_lamp", "wood_painting1",
+	"wood_pallet1", "wood_plant", "wood_plaque", "wood_shelf", "wood_splinter", "wood_spoon",
+	"wood_stake", "wood_table2", "wood_branch", "wood_cabinet", "wood_chair2", "wood_chair3",
+	"wood_floor_lamp", "wood_ladder", "wood_log2", "wood_painting2", "wood_picture1",
+	"wood_picture2", "wood_wardrobe", "wood_wardrobe2", "wood_bench", "wood_bench2",
+	"wood_boxes", "wood_desk", "wood_desk2", "wood_door2", "wood_drawer2", "wood_frame1",
+	"wood_pallet2", "wood_stump2", "wood_table", "wood_table3",
 ]
 
 func _default_defs() -> Array[TrashDef]:
@@ -1853,8 +1897,6 @@ func _all_defs() -> Array[TrashDef]:
 			_pretty(name),
 			TrashDef.Kind.WOOD if bulk % 2 == 0 else TrashDef.Kind.METAL,
 			Vector2(26.0, 26.0),
-			# Heavy: a wardrobe belongs at the bottom of a stack, under the mugs.
-			0.22, 2.0 + 0.4 * float(bulk), 2.0 + 0.5 * float(bulk),
 			clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
 		)
 		find.keepsake = true
@@ -2055,7 +2097,13 @@ func _dress(defs: Array[TrashDef]) -> void:
 		# it, and rounding their scales inverted the proportion — a 44-pixel mirror rounded up
 		# to 88 while a 55-pixel sofa rounded down to 55. Those few draw at exactly
 		# SPRITE_LARGEST, slightly off the grid, and the biggest picture stays the biggest thing.
-		var shrink := FIND_SHRINK if def.keepsake else 1.0
+		if not def.keepsake:
+			var whole := RUBBISH_SCALE
+			if longest * whole < RUBBISH_SMALLEST:
+				whole = ceilf(RUBBISH_SMALLEST / longest)
+			def.size = art * whole
+			continue
+		var shrink := FIND_SHRINK
 		var scale := SPRITE_SCALE / shrink
 		if longest * scale < SPRITE_SMALLEST:
 			scale = ceilf(SPRITE_SMALLEST / longest)
@@ -2065,16 +2113,13 @@ func _dress(defs: Array[TrashDef]) -> void:
 
 
 func _def(
-	name: String, material: TrashDef.Kind, size: Vector2, lightness: float, filth: float,
-	cost: float, tier: int, colour: Color, piece: StringName = &""
+	name: String, material: TrashDef.Kind, size: Vector2, tier: int, colour: Color,
+	piece: StringName = &""
 ) -> TrashDef:
 	var d := TrashDef.new()
 	d.display_name = name
 	d.material = material
 	d.size = size
-	d.lightness = lightness
-	d.pollution = filth
-	d.haul_cost = cost
 	d.tier = tier
 	d.block_color = colour
 	d.piece = piece
@@ -3943,7 +3988,7 @@ func _reload_as(fresh: bool) -> void:
 ## not whenever the haul happens to finish crossing the lake to the angler.
 func _on_net_caught(def_index: int) -> void:
 	var def := _grid.defs[def_index]
-	_filth_left = maxf(_filth_left - def.pollution, 0.0)
+	_filth_left = maxf(_filth_left - 1.0, 0.0)
 	_filth_stale = true
 	pollution = clampf(_filth_left / _filth_total, 0.0, 1.0)
 
@@ -4257,16 +4302,12 @@ func _on_sold(cargo: PackedInt32Array, kind: int) -> void:
 	sold_by_kind[kind] += cargo.size()
 
 
-## What one piece pays landed at the `kind` yard right now: the flat fee and the filth cut
-## (`EconomyConfig`), times its weight tier's sell track, times the Recycle Bonus if that
+## What one piece pays landed at the `kind` yard right now: its material and tier's price
+## (`EconomyConfig.piece_prices`), times the Recycle Bonus if that
 ## yard is the boosted one this moment.
 func piece_pay(def_index: int, kind: int) -> float:
 	var def := _grid.defs[def_index]
-	var pay := _economy.piece_base_pay + def.pollution * _economy.piece_filth_pay
-	# Heavier tiers always pay more than the tiers before them (Richard, 2026-09-14): a
-	# step of the whole per tier, on top of the piece's own filth. `test_lake` guards the
-	# order piece by piece, so a kind's pollution has to stay inside its tier's band.
-	pay *= 1.0 + _economy.tier_pay_step * float(def.tier)
+	var pay := _economy.price_of(def.material, def.tier)
 	if kind == _bonus_kind:
 		pay *= 1.0 + recycle_bonus()
 	return pay
@@ -5234,11 +5275,6 @@ func _haul_count_step() -> void:
 
 
 func _process(delta: float) -> void:
-	var __t := Time.get_ticks_usec()
-	__x_process(delta)
-	ProfTmp.add("lake:5224:_process", Time.get_ticks_usec() - __t)
-
-func __x_process(delta: float) -> void:
 	_pad_tick(delta)
 	_push_daylight()
 	_part_the_fleet(delta)

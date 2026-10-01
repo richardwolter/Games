@@ -156,8 +156,14 @@ const STAR_WHITE := Color(1.0, 0.97, 0.85)
 ## of its own tile, as a fraction of a tile, and how much bigger or smaller than its drawn
 ## size it may ride. Rubbish in water lies every which way, and this is what stops eight
 ## thousand pictures reading as wallpaper.
+##
+## DRIFT is along the tile's own two axes, so a piece can sit anywhere in its diamond rather
+## than in a box round the middle (2026-10-01, Richard, with the pack rubbish drawn at 1x:
+## "spread out a bit to be less sparse"). At 0.3 in a box the pieces kept to the tiles'
+## middles and the lake read as a grid with the gaps between; 0.45 reaches almost to the
+## diamond's edges and leaves a hair's room so a shore tile's piece stays on its own water.
 const TURN := 0.55
-const DRIFT := 0.3
+const DRIFT := 0.45
 const SIZE_SPREAD := 0.18
 
 ## How wide a span of world the packed anchor covers, centred on zero. Mirrors
@@ -343,19 +349,26 @@ const RIPPLE_MOST := 110
 ## piece lands where should not quietly change which yard gets the traffic.
 const MATERIAL_QUOTA := [0.24, 0.21, 0.42, 0.13]
 
-## How wide a band of the lightness range is drawn from at one depth, as a fraction of the
-## full range end to end.
+## The share of each weight tier at each depth, five bands from the floor (row 0) to the
+## surface (row 4), columns tier 0 to 4. What a slot's tier is rolled from once the quota
+## has picked its material (`_roll_piece`); then any kind of that material and tier, all
+## equally likely.
 ##
-## This is what replaced sorting the whole basin into one line from lightest to heaviest.
-## A tile's depth still points at a rough weight class — see `up` in `build` — but the
-## band is wide enough that which piece within it turns up is not the same piece every
-## time, and not obviously the next one down from its neighbour either. Narrower and every
-## tile at a depth reads as the same again; wider and the band stops meaning anything, which
-## is `FRINGE_BAIT` below rather than the general case.
-const FILL_BAND := 0.55
+## Measured, not tuned (2026-10-01, `/grill-me` with Richard: "balance the lake only by
+## object type and weight tier"): the tier mix the lake had at each depth when a kind's
+## lightness still decided it (`tools/probe_fill_economy.tscn`, `depth_tiers`), so the
+## lake reads as it did and the shares stay what the shop was priced on. Each row is
+## normalised where it is read, so a row need not sum to 1. Rescale a column to move a
+## tier's share of the water; `tools/last_fill_economy.log` says where it landed.
+const TIER_BY_DEPTH := [
+	[0.346, 0.258, 0.196, 0.046, 0.154],
+	[0.337, 0.230, 0.243, 0.033, 0.156],
+	[0.291, 0.269, 0.213, 0.060, 0.168],
+	[0.234, 0.230, 0.197, 0.132, 0.208],
+	[0.208, 0.202, 0.187, 0.208, 0.196],
+]
 
-## How often a slot ignores its depth's band entirely and draws from the material's whole
-## range instead.
+## How often a slot ignores its depth's row entirely and rolls any tier, all five equally.
 ##
 ## Without this, nothing heavy ever floats near the surface, which is exactly the
 ## in-sequence read this was meant to break: skim long enough and the shape of what is
@@ -384,9 +397,13 @@ const SURFACE_QUOTA := [0.32, 0.16, 0.22, 0.30]
 ## is deliberately not here — a new kind would silently repeat until somebody set it.
 const SURFACE_APART := 3.0
 
+## The surface's tiebreak: how much a tier lighter counts for, against `MATERIAL_PULL` and
+## the repeat costs. 0.7 a tier spans the 0.6 to 2.7 the per-kind lightness used to.
+const FLOAT_STEP := 0.7
+
 ## What a repeat costs the piece that would make one, against `MATERIAL_PULL` for a piece
 ## of the material the surface asked for. Both sit over a tiebreak of the piece's own
-## lightness, which runs about 0.6 to 2.7, so the three are three bands rather than one sum.
+## lightness (`FLOAT_STEP` a tier lighter, 0 to 2.8), so the three are three bands rather than one sum.
 ##
 ## `REPEAT_ANY` is charged for a repeat at any distance at all and `REPEAT_COST` on top of
 ## it, falling off to nothing at `SURFACE_APART`. Two terms because the two jobs are
@@ -541,17 +558,9 @@ var _dry_now := false
 
 var defs: Array[TrashDef] = []
 
-## The non-keepsake defs, split by material and each sorted by lightness. What `build`
-## draws a slot's piece from: the quota picks one of these four, the band narrows it, and
-## sorted order is what makes "narrows it" a contiguous slice rather than a filter over
-## the whole list every slot.
-var _by_material: Array = [[], [], [], []]
-
-## The two ends of the lightness range, across every material together, so a depth's band
-## means the same weight class whichever material the quota happens to draw. `x` is the
-## floor end (the lowest lightness: the heaviest thing in the lake), `y` the surface end
-## (the highest: the most buoyant). Not "lightest and heaviest" — see `build`.
-var _lightness_span := Vector2(0.0, 1.0)
+## The non-keepsake defs, split by material and then by tier: `_by_cell[material][tier]`
+## is what a slot draws from once its material and tier are rolled.
+var _by_cell: Array = []
 
 ## The smallest and largest drawn area a piece of rubbish covers, in square world pixels.
 ## What `_apart_of` spreads `SURFACE_APART` across. Measured off `defs`, which `Lake._dress`
@@ -1737,33 +1746,20 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 
 	# The one-off finds are not part of the fill. They are planted afterwards, one of each,
 	# and a fill that dealt them out would put a wardrobe on every third tile.
-	_by_material = [[], [], [], []]
-	# `lightness` is buoyancy, not weight: higher floats nearer the surface (see TrashDef).
-	# So the floor end of the span is the *lowest* lightness there is and the surface end is
-	# the highest. These two were named `lightest`/`heaviest` and handed over the other way
-	# round, which put the one def at the bottom of the range — `wood_box2`, a tier-4 crate —
-	# on top of every deep stack, and left every other material's surface band empty and
-	# falling back to a uniform roll. A fifth of the visible lake was one crate. Named for
-	# which end of the water they are rather than for how heavy they are, so it cannot
-	# silently invert again.
-	var floor_end := INF
-	var surface_end := -INF
+	_by_cell = []
+	for m in 4:
+		_by_cell.append([[], [], [], [], []])
 	var smallest := INF
 	var biggest := -INF
 	for i in defs.size():
 		if defs[i].keepsake:
 			continue
-		_by_material[defs[i].material].append(i)
-		floor_end = minf(floor_end, defs[i].lightness)
-		surface_end = maxf(surface_end, defs[i].lightness)
+		_by_cell[defs[i].material][clampi(defs[i].tier, 0, 4)].append(i)
 		var area := defs[i].size.x * defs[i].size.y
 		smallest = minf(smallest, area)
 		biggest = maxf(biggest, area)
 	_area_span = Vector2(smallest, maxf(biggest, smallest + 1.0))
 	_name_families()
-	for pool: Array in _by_material:
-		pool.sort_custom(func(a: int, b: int) -> bool: return defs[a].lightness < defs[b].lightness)
-	_lightness_span = Vector2(floor_end, surface_end)
 
 	_plan_slots()
 	var ring_tiles := PackedInt32Array()
@@ -2009,11 +2005,11 @@ func _dress_surface(index: int, stack: PackedInt32Array, tile: Vector2) -> Packe
 			score -= REPEAT_ANY + REPEAT_COST * (1.0 - away / apart)
 		if landmark:
 			# Any of the heavy half will do, so which one is a roll rather than an order.
-			score += _rng.randf() * BAIT_SPREAD if def.lightness <= heavy_from else 0.0
+			score += _rng.randf() * BAIT_SPREAD if float(def.tier) >= heavy_from else 0.0
 		else:
 			if def.material == want:
 				score += MATERIAL_PULL
-			score += def.lightness
+			score += FLOAT_STEP * float(4 - def.tier)
 		if score > best_score:
 			best_score = score
 			best = k
@@ -2042,7 +2038,7 @@ func _apart_of(def: TrashDef) -> float:
 	return SURFACE_APART * lerpf(1.0, BIG_ROOM, clampf(across, 0.0, 1.0))
 
 
-## The lightness at or under which a piece counts as one of the heavier half of this stack.
+## The tier at or over which a piece counts as one of the heavier half of this stack.
 ## `near_shore` drops the pieces the opening ring will not have anyway, so the half is the
 ## half of what can really be picked rather than of what happens to be lying there.
 func _heavier_half(stack: PackedInt32Array, near_shore: bool) -> float:
@@ -2050,11 +2046,11 @@ func _heavier_half(stack: PackedInt32Array, near_shore: bool) -> float:
 	for piece in stack:
 		if near_shore and defs[piece].tier > 0:
 			continue
-		weights.append(defs[piece].lightness)
+		weights.append(float(defs[piece].tier))
 	if weights.is_empty():
 		return INF
 	weights.sort()
-	return weights[(weights.size() - 1) / 2]
+	return weights[weights.size() / 2]
 
 
 ## Which material the surface wants here: the materials this stack actually holds, weighted
@@ -2168,61 +2164,52 @@ func _name_families() -> void:
 ## some; the walk over all four is there so adding a material without one cannot crash the
 ## fill, and -1 says there is nothing to put in, which leaves the roll alone.
 func _tier_zero_of(material: int) -> int:
-	var picks: Array[int] = []
-	for idx: int in _by_material[material]:
-		if defs[idx].tier == 0:
-			picks.append(idx)
+	var picks: Array = _by_cell[material][0]
 	if picks.is_empty():
-		for pool: Array in _by_material:
-			for idx: int in pool:
-				if defs[idx].tier == 0:
-					picks.append(idx)
+		picks = []
+		for cells: Array in _by_cell:
+			picks.append_array(cells[0])
 	if picks.is_empty():
 		return -1
 	return picks[_rng.randi_range(0, picks.size() - 1)]
 
 
-## One slot's piece: a material by `MATERIAL_QUOTA`, then a weight within it by `up` and
-## `FILL_BAND` — or, `FILL_BAIT_CHANCE` of the time, any weight the material has at all.
-##
-## Quota first, band second, deliberately not the other way round. Banding first and then
-## asking which materials are actually in that band would answer "what's heavy here" before
-## "how much metal does the whole lake need", and a band with only one material in it would
-## silently spend that tile's quota-share regardless — plastic has nothing heavier than a
-## jug, so every deep slot would starve it. Asking the quota first and then narrowing what
-## it drew keeps the four yards' traffic what `MATERIAL_QUOTA` says even where a material's
-## whole range sits at one end of the lake.
+## One slot's piece: a material by `MATERIAL_QUOTA`, then a tier by `TIER_BY_DEPTH` at
+## `up` (or, `FILL_BAIT_CHANCE` of the time, any tier), then any kind of that material and
+## tier. Material first, so the four yards' traffic is what `MATERIAL_QUOTA` says whatever
+## the depth. A cell with no kinds in it falls to the nearest tier that has some.
 func _roll_piece(up: float) -> int:
 	var roll := _rng.randf()
 	var material := MATERIAL_QUOTA.size() - 1
 	var at := 0.0
 	for m in MATERIAL_QUOTA.size():
 		at += MATERIAL_QUOTA[m]
-		if roll < at and not _by_material[m].is_empty():
+		if roll < at:
 			material = m
 			break
-	var pool: Array = _by_material[material]
-	if pool.is_empty():
-		pool = _by_material.filter(func(p: Array) -> bool: return not p.is_empty())[0]
-	if _rng.randf() < FILL_BAIT_CHANCE:
-		return pool[_rng.randi_range(0, pool.size() - 1)]
-
-	# `up` runs floor (0) to surface (1); `_lightness_span` runs the same way, heaviest
-	# first. A band this wide either end of the target simply clips against the pool's own
-	# ends rather than wrapping, which is what keeps the deepest slots from occasionally
-	# fishing up the lightest thing the material has.
-	var span := _lightness_span.y - _lightness_span.x
-	var target := _lightness_span.x + up * span
-	var half := FILL_BAND * span * 0.5
-	var lo := target - half
-	var hi := target + half
-	var band: Array[int] = []
-	for idx: int in pool:
-		if defs[idx].lightness >= lo and defs[idx].lightness <= hi:
-			band.append(idx)
-	if band.is_empty():
-		return pool[_rng.randi_range(0, pool.size() - 1)]
-	return band[_rng.randi_range(0, band.size() - 1)]
+	var tier := _rng.randi_range(0, 4)
+	if _rng.randf() >= FILL_BAIT_CHANCE:
+		var row: Array = TIER_BY_DEPTH[mini(int(up * TIER_BY_DEPTH.size()), TIER_BY_DEPTH.size() - 1)]
+		var total := 0.0
+		for share: float in row:
+			total += share
+		var pick := _rng.randf() * total
+		tier = row.size() - 1
+		for t in row.size():
+			pick -= row[t]
+			if pick < 0.0:
+				tier = t
+				break
+	var cells: Array = _by_cell[material]
+	for reach in 5:
+		for t in [tier - reach, tier + reach]:
+			if t >= 0 and t < 5 and not cells[t].is_empty():
+				return cells[t][_rng.randi_range(0, cells[t].size() - 1)]
+	for other: Array in _by_cell:
+		for cell: Array in other:
+			if not cell.is_empty():
+				return cell[_rng.randi_range(0, cell.size() - 1)]
+	return 0
 
 
 ## Put a saved field back. The stacks are the only part of the lake that is not implied by
@@ -2248,10 +2235,10 @@ func restore(saved: Array) -> bool:
 ## roll, in one place, so the fill and a piece newly uncovered pose the same way.
 func _reroll_pose(index: int) -> void:
 	tilt[index] = _rng.randf_range(-TURN, TURN)
-	nudge[index] = Vector2(
-		_rng.randf_range(-Iso.TILE_W * DRIFT, Iso.TILE_W * DRIFT),
-		_rng.randf_range(-Iso.TILE_H * DRIFT, Iso.TILE_H * DRIFT)
-	)
+	# Along the tile's axes, then onto the screen as Iso does: anywhere in the diamond.
+	var along := _rng.randf_range(-DRIFT, DRIFT)
+	var across := _rng.randf_range(-DRIFT, DRIFT)
+	nudge[index] = Vector2((along - across) * Iso.TILE_W * 0.5, (along + across) * Iso.TILE_H * 0.5)
 	swing[index] = _rng.randf_range(1.0 - SIZE_SPREAD, 1.0 + SIZE_SPREAD)
 	facing[index] = 1 if _rng.randf() < 0.5 else 0
 
@@ -2468,13 +2455,13 @@ func def_at(index: int, k: int) -> TrashDef:
 	return defs[stacks[index][k]]
 
 
-## Total filth still in the lake. Walked rather than tracked, and only ever asked for at
+## Total filth still in the lake: one a piece, finds included. Walked rather than tracked, and only ever asked for at
 ## build time — lake.gd decrements its own running total as pieces are banked.
 func filth_left() -> float:
 	var total := 0.0
 	for index in stacks.size():
 		for k in stacks[index].size():
-			total += defs[stacks[index][k]].pollution
+			total += 1.0
 	return total
 
 

@@ -436,11 +436,6 @@ func _first(name: StringName) -> AudioStream:
 
 
 func _process(delta: float) -> void:
-	var __t := Time.get_ticks_usec()
-	__x_process(delta)
-	ProfTmp.add("sfx:438:_process", Time.get_ticks_usec() - __t)
-
-func __x_process(delta: float) -> void:
 	if _haul_effort > 0.0 and not shopping:
 		_haul_wait -= delta
 		if _haul_wait <= 0.0:

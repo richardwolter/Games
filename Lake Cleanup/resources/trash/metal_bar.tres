@@ -4,12 +4,9 @@
 
 [resource]
 script = ExtResource("1_trash")
-display_name = "Metal Bar"
+display_name = "Bar"
 material = 2
 piece = &"metal_bar"
-size = Vector2(27.2, 12.8)
-pollution = 2.4
-haul_cost = 0.84
-tier = 1
-lightness = 2.3
+size = Vector2(6, 40)
+tier = 3
 block_color = Color(0.6, 0.66, 0.7, 1)

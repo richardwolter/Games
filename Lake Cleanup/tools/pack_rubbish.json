@@ -1,0 +1,3362 @@
+[
+ {
+  "slug": "metal_can1",
+  "id": 179,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   197,
+   51,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_can2",
+  "id": 186,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   68,
+   83,
+   9,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_can3",
+  "id": 192,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   259,
+   83,
+   9,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_clock",
+  "id": 1291,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   327,
+   7,
+   18,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_jar",
+  "id": 1694,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   68,
+   226,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_pc_tower",
+  "id": 1337,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   39,
+   181,
+   11,
+   28
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_phone1",
+  "id": 1418,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   8,
+   401,
+   14,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_pliers",
+  "id": 1733,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   5,
+   321,
+   7,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_soda1",
+  "id": 214,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   4,
+   147,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_soda2",
+  "id": 224,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   197,
+   179,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_tin1",
+  "id": 88,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   276,
+   20,
+   8,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_tin2",
+  "id": 89,
+  "material": "metal",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   292,
+   19,
+   8,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bolt",
+  "id": 1622,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   11,
+   416,
+   10,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_can4",
+  "id": 1697,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   164,
+   226,
+   8,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_canister",
+  "id": 1675,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   272,
+   163,
+   13,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_clock2",
+  "id": 32,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "50s-diner-furniture-set-free/50s_Diner/50sdiner_set.png",
+  "box": [
+   423,
+   231,
+   17,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_keypad",
+  "id": 1408,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   198,
+   391,
+   23,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_lamp_globe",
+  "id": 6,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "50s-diner-furniture-set-free/50s_Diner/50sdiner_set.png",
+  "box": [
+   209,
+   17,
+   14,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_pipe",
+  "id": 1587,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   11,
+   320,
+   10,
+   32
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_soda3",
+  "id": 1122,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   173,
+   426,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_square",
+  "id": 1738,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   145,
+   325,
+   13,
+   9
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_stove",
+  "id": 136,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   19,
+   233,
+   11,
+   20
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_tin3",
+  "id": 1543,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   266,
+   205,
+   12,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_toolbox",
+  "id": 1689,
+  "material": "metal",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   259,
+   208,
+   26,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_aircon",
+  "id": 1239,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_BuildingTiles_32x32.png",
+  "box": [
+   352,
+   0,
+   32,
+   32
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bank_lamp",
+  "id": 282,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "classic-furniture-set-free/Classic_Furniture/classic_furnitureset.png",
+  "box": [
+   225,
+   195,
+   14,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_crate",
+  "id": 227,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   102,
+   203,
+   21,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_hob",
+  "id": 59,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "50s-diner-furniture-set-free/50s_Diner/50sdiner_set.png",
+  "box": [
+   195,
+   386,
+   26,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_kettle",
+  "id": 143,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   96,
+   240,
+   16,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_kettle2",
+  "id": 139,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   112,
+   224,
+   16,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_lamp",
+  "id": 1748,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   147,
+   352,
+   10,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_phone2",
+  "id": 1405,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   105,
+   385,
+   16,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_pole",
+  "id": 1453,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   38,
+   102,
+   22,
+   52
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_shovel",
+  "id": 84,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   436,
+   1,
+   9,
+   30
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_socket",
+  "id": 1758,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   114,
+   419,
+   14,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_tap",
+  "id": 58,
+  "material": "metal",
+  "tier": 2,
+  "sheet": "50s-diner-furniture-set-free/50s_Diner/50sdiner_set.png",
+  "box": [
+   178,
+   391,
+   11,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bar",
+  "id": 931,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   390,
+   21,
+   6,
+   40
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_barrel3",
+  "id": 516,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_OilBarrel.png",
+  "box": [
+   102,
+   0,
+   20,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_barrel4",
+  "id": 521,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_OilBarrel.png",
+  "box": [
+   262,
+   14,
+   20,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_barrel5",
+  "id": 525,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_OilBarrel.png",
+  "box": [
+   198,
+   38,
+   20,
+   25
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_candelabra",
+  "id": 383,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "fancy-mansion-furniture-set-free/FancyMansion_Furniture/fancy_mansion_furnitureset.png",
+  "box": [
+   70,
+   72,
+   20,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_case",
+  "id": 930,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   358,
+   16,
+   21,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_desk_lamp",
+  "id": 1209,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   360,
+   304,
+   22,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_gas_bottle",
+  "id": 80,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   224,
+   9,
+   16,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_locker",
+  "id": 99,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   257,
+   53,
+   20,
+   42
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_sheet2",
+  "id": 1696,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   100,
+   228,
+   24,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_shelf",
+  "id": 1664,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   483,
+   38,
+   42,
+   57
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_valve",
+  "id": 1762,
+  "material": "metal",
+  "tier": 3,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   0,
+   436,
+   16,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_barrel1",
+  "id": 519,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_OilBarrel.png",
+  "box": [
+   198,
+   0,
+   20,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_barrel2",
+  "id": 1644,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   103,
+   481,
+   18,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bin",
+  "id": 1406,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   136,
+   388,
+   16,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bin2",
+  "id": 1010,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   7,
+   34,
+   18,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_bin3",
+  "id": 1012,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   71,
+   33,
+   18,
+   30
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_camp_chair",
+  "id": 107,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   132,
+   88,
+   24,
+   39
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_chair",
+  "id": 1505,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   104,
+   86,
+   16,
+   36
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_desk",
+  "id": 1318,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   10,
+   118,
+   42,
+   39
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_oven",
+  "id": 1102,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   196,
+   345,
+   24,
+   37
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_rod",
+  "id": 1015,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   245,
+   53,
+   5,
+   72
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_sheet1",
+  "id": 1472,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   301,
+   352,
+   37,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "metal_stand",
+  "id": 1248,
+  "material": "metal",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   353,
+   5,
+   28,
+   57
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bag1",
+  "id": 1016,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   8,
+   73,
+   14,
+   20
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bag2",
+  "id": 1022,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   40,
+   99,
+   16,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle1",
+  "id": 81,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   260,
+   13,
+   8,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle2",
+  "id": 1535,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   268,
+   170,
+   8,
+   20
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cracker",
+  "id": 2342,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   257,
+   337,
+   14,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cup",
+  "id": 1813,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "professional-kitchen-set-free/professional_kitchen/professional_kitchen.png",
+  "box": [
+   228,
+   4,
+   8,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_frame",
+  "id": 1372,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   202,
+   296,
+   12,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_glass2",
+  "id": 434,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "fancy-mansion-furniture-set-free/FancyMansion_Furniture/fancy_mansion_furnitureset.png",
+  "box": [
+   183,
+   339,
+   8,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jar",
+  "id": 170,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   260,
+   20,
+   9,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_mug1",
+  "id": 71,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "50s-diner-furniture-set-free/50s_Diner/50sdiner_set.png",
+  "box": [
+   339,
+   421,
+   10,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_nutcracker",
+  "id": 2302,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   307,
+   249,
+   13,
+   38
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_sign1",
+  "id": 1651,
+  "material": "plastic",
+  "tier": 0,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   390,
+   487,
+   20,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle3",
+  "id": 936,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   148,
+   76,
+   8,
+   19
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle7",
+  "id": 1715,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   36,
+   272,
+   8,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle8",
+  "id": 1718,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   85,
+   272,
+   6,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bucket1",
+  "id": 642,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_PlasticBucket.png",
+  "box": [
+   256,
+   22,
+   16,
+   9
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_crates",
+  "id": 1615,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   459,
+   386,
+   19,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cup2",
+  "id": 946,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   212,
+   82,
+   10,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cups",
+  "id": 1812,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "professional-kitchen-set-free/professional_kitchen/professional_kitchen.png",
+  "box": [
+   212,
+   13,
+   8,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_flask",
+  "id": 91,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   324,
+   16,
+   10,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_glass",
+  "id": 1207,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   324,
+   308,
+   9,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_packet",
+  "id": 929,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   290,
+   17,
+   10,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_sauce",
+  "id": 174,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   37,
+   51,
+   6,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_vase2",
+  "id": 415,
+  "material": "plastic",
+  "tier": 1,
+  "sheet": "fancy-mansion-furniture-set-free/FancyMansion_Furniture/fancy_mansion_furnitureset.png",
+  "box": [
+   321,
+   226,
+   14,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle5",
+  "id": 1837,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "professional-kitchen-set-free/professional_kitchen/professional_kitchen.png",
+  "box": [
+   3,
+   48,
+   10,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle6",
+  "id": 935,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   132,
+   76,
+   8,
+   19
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle9",
+  "id": 1121,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   141,
+   427,
+   6,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bucket2",
+  "id": 643,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_PlasticBucket.png",
+  "box": [
+   320,
+   19,
+   16,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bucket3",
+  "id": 1055,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   268,
+   131,
+   16,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_floor_lamp",
+  "id": 1075,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   291,
+   208,
+   29,
+   41
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_gnome",
+  "id": 2323,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   274,
+   301,
+   12,
+   34
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_lamp",
+  "id": 1057,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   361,
+   131,
+   14,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_ornament",
+  "id": 2355,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   305,
+   370,
+   13,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_pot",
+  "id": 167,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   164,
+   20,
+   9,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_slipper",
+  "id": 1086,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   390,
+   266,
+   16,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_vase",
+  "id": 371,
+  "material": "plastic",
+  "tier": 2,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   419,
+   370,
+   10,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_bottle4",
+  "id": 2200,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "stylish-furniture-set-free/Stylish_Furniture/stylish_furnitureset.png",
+  "box": [
+   339,
+   295,
+   10,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cabinet",
+  "id": 989,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   288,
+   227,
+   16,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_chair",
+  "id": 1003,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   163,
+   23,
+   26,
+   40
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_chair2",
+  "id": 1004,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   197,
+   25,
+   23,
+   37
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_crate",
+  "id": 983,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   389,
+   197,
+   22,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jerrycan2",
+  "id": 1501,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   7,
+   67,
+   18,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_laptop",
+  "id": 974,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   389,
+   165,
+   22,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_milk",
+  "id": 945,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   179,
+   80,
+   10,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_mop_bucket",
+  "id": 1934,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "public-bathroom-furniture-set-free/Public_Bathroom/clean_publicbathroom_set.png",
+  "box": [
+   370,
+   161,
+   13,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_mug2",
+  "id": 1429,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   171,
+   434,
+   11,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_pendant",
+  "id": 382,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "fancy-mansion-furniture-set-free/FancyMansion_Furniture/fancy_mansion_furnitureset.png",
+  "box": [
+   2,
+   74,
+   12,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_poster",
+  "id": 922,
+  "material": "plastic",
+  "tier": 3,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   322,
+   13,
+   11,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_computer",
+  "id": 1336,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   13,
+   183,
+   22,
+   34
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_cooler",
+  "id": 957,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   99,
+   139,
+   26,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_heater",
+  "id": 1492,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   262,
+   25,
+   20,
+   38
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_ironing_board",
+  "id": 1104,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   265,
+   347,
+   46,
+   35
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jerrycan",
+  "id": 1495,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   7,
+   35,
+   18,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jug1",
+  "id": 1402,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   488,
+   356,
+   16,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jug2",
+  "id": 1536,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   298,
+   167,
+   12,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_jug3",
+  "id": 1391,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   488,
+   324,
+   16,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_lamp2",
+  "id": 1198,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   512,
+   299,
+   32,
+   52
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_office_chair",
+  "id": 1397,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   617,
+   343,
+   17,
+   34
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_sign2",
+  "id": 1654,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   482,
+   484,
+   28,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "plastic_water_jug",
+  "id": 1368,
+  "material": "plastic",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   66,
+   288,
+   23,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_bag1",
+  "id": 1017,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   70,
+   67,
+   22,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_bag2",
+  "id": 1478,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   7,
+   14,
+   18,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_barrel2",
+  "id": 446,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_BlueBarrel.png",
+  "box": [
+   6,
+   0,
+   20,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_cables",
+  "id": 1711,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   355,
+   258,
+   25,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_cap",
+  "id": 171,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   1,
+   51,
+   9,
+   6
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_pebble",
+  "id": 1282,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   355,
+   355,
+   6,
+   6
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_pebble2",
+  "id": 1520,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   6,
+   129,
+   8,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_plug",
+  "id": 1749,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   134,
+   372,
+   4,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_rod",
+  "id": 1695,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   81,
+   227,
+   11,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_roll1",
+  "id": 85,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   65,
+   17,
+   27,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_roll2",
+  "id": 106,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   65,
+   81,
+   27,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_sleeping_bag",
+  "id": 156,
+  "material": "rubber",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   67,
+   389,
+   11,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_badge",
+  "id": 1358,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   364,
+   266,
+   8,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_candy",
+  "id": 2111,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "retro-bathroom-furniture-set-free/Retro_Bathroom/retro_bathroom_set.png",
+  "box": [
+   114,
+   374,
+   12,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_cassette",
+  "id": 1369,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   102,
+   303,
+   8,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_clock",
+  "id": 365,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   115,
+   370,
+   11,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_crumb",
+  "id": 1380,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   329,
+   311,
+   7,
+   7
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_eraser",
+  "id": 1750,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   132,
+   390,
+   8,
+   4
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_gamepad",
+  "id": 928,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   257,
+   20,
+   15,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_gas_mask1",
+  "id": 1555,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   10,
+   235,
+   12,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_knife",
+  "id": 1834,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "professional-kitchen-set-free/professional_kitchen/professional_kitchen.png",
+  "box": [
+   243,
+   36,
+   9,
+   9
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_scrap",
+  "id": 1264,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   359,
+   199,
+   16,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_screwdriver",
+  "id": 1753,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   5,
+   416,
+   6,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_screwdriver2",
+  "id": 1754,
+  "material": "rubber",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   20,
+   416,
+   8,
+   32
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_clamp",
+  "id": 1668,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   130,
+   132,
+   11,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_crate",
+  "id": 199,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "canned-goods-free/canned food and drink updated.png",
+  "box": [
+   262,
+   107,
+   21,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_jacket1",
+  "id": 1566,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   38,
+   269,
+   20,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_jacket2",
+  "id": 1576,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   38,
+   301,
+   20,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_jacket3",
+  "id": 1588,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   38,
+   333,
+   20,
+   17
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_ketchup",
+  "id": 1119,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   76,
+   426,
+   8,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_mat",
+  "id": 1476,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   451,
+   515,
+   26,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_mattress",
+  "id": 1485,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   516,
+   8,
+   24,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_ring",
+  "id": 1477,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   483,
+   515,
+   26,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_shoes",
+  "id": 1090,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   229,
+   298,
+   24,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_slick",
+  "id": 1245,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   98,
+   9,
+   61,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_sock",
+  "id": 1094,
+  "material": "rubber",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   364,
+   299,
+   9,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_ball",
+  "id": 1021,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   9,
+   106,
+   14,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_barrel",
+  "id": 448,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_BlueBarrel.png",
+  "box": [
+   70,
+   0,
+   20,
+   31
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_clover",
+  "id": 2347,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   226,
+   354,
+   12,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_dome",
+  "id": 1540,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   10,
+   203,
+   12,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_gas_mask2",
+  "id": 1565,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Furniture_32x32.png",
+  "box": [
+   10,
+   266,
+   12,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_lump",
+  "id": 1246,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   227,
+   8,
+   25,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_pillows",
+  "id": 333,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   423,
+   144,
+   20,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_slab",
+  "id": 1278,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   360,
+   331,
+   22,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_speaker",
+  "id": 1163,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   167,
+   160,
+   18,
+   29
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_strip",
+  "id": 2253,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "stylish-furniture-set-free/Stylish_Furniture/stylish_modularfurniture.png",
+  "box": [
+   240,
+   252,
+   16,
+   4
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tire5",
+  "id": 720,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_RubberTire.png",
+  "box": [
+   292,
+   27,
+   24,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_vase",
+  "id": 1214,
+  "material": "rubber",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   322,
+   336,
+   12,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_blocks",
+  "id": 1281,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   354,
+   355,
+   29,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_chair",
+  "id": 2170,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "stylish-furniture-set-free/Stylish_Furniture/stylish_furnitureset.png",
+  "box": [
+   312,
+   87,
+   16,
+   41
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_laptop",
+  "id": 958,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   262,
+   134,
+   19,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_puck",
+  "id": 2244,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "stylish-furniture-set-free/Stylish_Furniture/stylish_modularfurniture.png",
+  "box": [
+   244,
+   131,
+   8,
+   9
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_rubble",
+  "id": 1266,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Exterior_32x32.png",
+  "box": [
+   321,
+   225,
+   62,
+   60
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_screen",
+  "id": 904,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "graveyard-set-free/Graveyard/Graveyard_Set.png",
+  "box": [
+   53,
+   457,
+   22,
+   23
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_stain",
+  "id": 2330,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   2,
+   322,
+   29,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tablet",
+  "id": 963,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   230,
+   144,
+   19,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tire1",
+  "id": 1464,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   323,
+   262,
+   26,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tire2",
+  "id": 1465,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   387,
+   262,
+   26,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tire3",
+  "id": 1466,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   419,
+   257,
+   26,
+   28
+  ],
+  "flip": false
+ },
+ {
+  "slug": "rubber_tire4",
+  "id": 715,
+  "material": "rubber",
+  "tier": 4,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_RubberTire.png",
+  "box": [
+   197,
+   1,
+   24,
+   30
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_block",
+  "id": 1723,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   49,
+   295,
+   13,
+   7
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_brush",
+  "id": 1704,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   197,
+   241,
+   6,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_brushes",
+  "id": 1678,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   39,
+   179,
+   21,
+   42
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_frame2",
+  "id": 295,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "classic-furniture-set-free/Classic_Furniture/classic_furnitureset.png",
+  "box": [
+   261,
+   242,
+   10,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_hook",
+  "id": 1306,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   327,
+   50,
+   10,
+   9
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_log3",
+  "id": 145,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   36,
+   267,
+   9,
+   18
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_nutcracker",
+  "id": 2303,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   323,
+   249,
+   13,
+   38
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_pencil",
+  "id": 1304,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   337,
+   41,
+   5,
+   8
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_rod",
+  "id": 1693,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   50,
+   230,
+   11,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_scrap",
+  "id": 1724,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   81,
+   291,
+   12,
+   11
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stick",
+  "id": 1730,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   114,
+   306,
+   12,
+   12
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_sticks",
+  "id": 1701,
+  "material": "wood",
+  "tier": 0,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   144,
+   242,
+   14,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_candle",
+  "id": 1308,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   332,
+   79,
+   8,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_chair",
+  "id": 1059,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   232,
+   148,
+   16,
+   34
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_drawer1",
+  "id": 1083,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   293,
+   262,
+   20,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_fence2",
+  "id": 1030,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   163,
+   170,
+   28,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_log1",
+  "id": 150,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   97,
+   272,
+   46,
+   16
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_peg",
+  "id": 934,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   260,
+   43,
+   6,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_plank",
+  "id": 1722,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   37,
+   293,
+   6,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_planter",
+  "id": 995,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   1,
+   9,
+   30,
+   22
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stake2",
+  "id": 582,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_PlantBases.png",
+  "box": [
+   228,
+   2,
+   7,
+   30
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stool",
+  "id": 1062,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   264,
+   162,
+   16,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stump1",
+  "id": 144,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   0,
+   264,
+   16,
+   20
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_tile",
+  "id": 1732,
+  "material": "wood",
+  "tier": 1,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   145,
+   305,
+   13,
+   13
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_door",
+  "id": 885,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "graveyard-set-free/Graveyard/Graveyard_Set.png",
+  "box": [
+   259,
+   308,
+   26,
+   55
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_fence1",
+  "id": 1031,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Exterior_32x32.png",
+  "box": [
+   293,
+   197,
+   27,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_lamp",
+  "id": 1063,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   329,
+   163,
+   14,
+   21
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_painting1",
+  "id": 1037,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   292,
+   4,
+   26,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_pallet1",
+  "id": 1469,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   364,
+   300,
+   39,
+   42
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_plant",
+  "id": 298,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "classic-furniture-set-free/Classic_Furniture/classic_furnitureset.png",
+  "box": [
+   228,
+   267,
+   20,
+   52
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_plaque",
+  "id": 1846,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "professional-kitchen-set-free/professional_kitchen/professional_kitchen.png",
+  "box": [
+   210,
+   81,
+   12,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_shelf",
+  "id": 1233,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   484,
+   434,
+   40,
+   46
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_splinter",
+  "id": 1728,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   83,
+   304,
+   7,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_spoon",
+  "id": 2325,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "xmas-decorations-free/Xmas/Xmas_Decorations.png",
+  "box": [
+   4,
+   307,
+   10,
+   10
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stake",
+  "id": 587,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "garden-planters-free/Garden_Planters/Garden_Planters_PlantBases.png",
+  "box": [
+   387,
+   2,
+   9,
+   28
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_table2",
+  "id": 1174,
+  "material": "wood",
+  "tier": 2,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   65,
+   217,
+   46,
+   38
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_branch",
+  "id": 902,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "graveyard-set-free/Graveyard/Graveyard_Set.png",
+  "box": [
+   407,
+   384,
+   19,
+   63
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_cabinet",
+  "id": 1048,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   392,
+   84,
+   16,
+   36
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_chair2",
+  "id": 1206,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   293,
+   310,
+   16,
+   34
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_chair3",
+  "id": 1381,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   5,
+   331,
+   22,
+   36
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_floor_lamp",
+  "id": 1068,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   322,
+   201,
+   30,
+   48
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_ladder",
+  "id": 337,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   272,
+   215,
+   16,
+   72
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_log2",
+  "id": 149,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   64,
+   273,
+   16,
+   46
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_painting2",
+  "id": 1177,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   355,
+   227,
+   42,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_picture1",
+  "id": 360,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   369,
+   362,
+   14,
+   20
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_picture2",
+  "id": 369,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "coastal-furniture-set-free/Coastal_Furniture/coastal_furnitureset.png",
+  "box": [
+   354,
+   369,
+   12,
+   14
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_wardrobe",
+  "id": 1043,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   3,
+   69,
+   26,
+   56
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_wardrobe2",
+  "id": 1143,
+  "material": "wood",
+  "tier": 3,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   332,
+   76,
+   19,
+   51
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_bench",
+  "id": 1346,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   419,
+   215,
+   58,
+   39
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_bench2",
+  "id": 1752,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   354,
+   407,
+   60,
+   40
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_boxes",
+  "id": 970,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   262,
+   162,
+   20,
+   26
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_desk",
+  "id": 1662,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apocalyptic-workshop-set-free/PostApoc_Workshop/PostApoc_Workshop.png",
+  "box": [
+   292,
+   24,
+   53,
+   40
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_desk2",
+  "id": 1345,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   355,
+   215,
+   58,
+   39
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_door2",
+  "id": 1218,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "midcentury-modern-furniture-set-free/midcentury_modern_furnitureset.png",
+  "box": [
+   64,
+   363,
+   15,
+   84
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_drawer2",
+  "id": 1084,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "messy-furniture-set-mega-bundle-free/Messy Asset Pack/Messy 32x32 Grid/Messy_Furniture_32x32.png",
+  "box": [
+   325,
+   259,
+   24,
+   27
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_frame1",
+  "id": 293,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "classic-furniture-set-free/Classic_Furniture/classic_furnitureset.png",
+  "box": [
+   272,
+   225,
+   12,
+   15
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_pallet2",
+  "id": 1460,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apoc-shelter-mega-bundle-free/Post Apoc Shelter - Asset Pack/Post Apoc - Shelter 32x32 Grid/Shelter_Exterior_32x32.png",
+  "box": [
+   461,
+   174,
+   38,
+   36
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_stump2",
+  "id": 151,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "camping-furniture-set-free/Camping_Set/Camping_Furnitureset.png",
+  "box": [
+   0,
+   295,
+   16,
+   24
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_table",
+  "id": 927,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "makeshift-furniture-set-free/makeshift_furnitureset.png",
+  "box": [
+   199,
+   29,
+   18,
+   35
+  ],
+  "flip": false
+ },
+ {
+  "slug": "wood_table3",
+  "id": 1367,
+  "material": "wood",
+  "tier": 4,
+  "sheet": "post-apoc-office-mega-bundle-free/Post Apoc Office - Asset Pack/Post Apoc - Office 32x32 Grid/Office_Furniture_32x32.png",
+  "box": [
+   13,
+   291,
+   38,
+   27
+  ],
+  "flip": false
+ }
+]

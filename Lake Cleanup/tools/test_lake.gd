@@ -471,10 +471,9 @@ func _stage_build() -> void:
 ## no one kind covers the water, and that leaning the surface towards the colourful materials
 ## has not quietly moved what the yards are paid for.
 func _check_surface() -> void:
-	var span: Vector2 = _grid.get(&"_lightness_span")
-	_check(span.x < span.y,
-		"the depth band runs heavy at the floor and light at the surface",
-		"floor end %.1f, surface end %.1f" % [span.x, span.y])
+	_check(LakeGrid.TIER_BY_DEPTH.size() == 5 and LakeGrid.TIER_BY_DEPTH.all(
+			func(row: Array) -> bool: return row.size() == 5),
+		"the fill rolls a tier from five depth rows of five tiers", "")
 
 	var shown := {}
 	var top_kind := [0, 0, 0, 0]
@@ -511,13 +510,13 @@ func _check_surface() -> void:
 		tops.append(stack[stack.size() - 1])
 		if stack.size() >= 4:
 			deep += 1
-			top_light += def.lightness
-			floor_light += _grid.defs[stack[0]].lightness
+			top_light += float(def.tier)
+			floor_light += float(_grid.defs[stack[0]].tier)
 		var out := Iso.past_shelf(Vector2(_grid.tile_of(index)))
 		if out < LakeGrid.OPEN_RING:
 			if def.tier > 0:
 				ring_walls += 1
-		elif def.tier > 0 and def.lightness < 1.7:
+		elif def.tier >= 3:
 			landmarks += 1
 		if out < LakeGrid.RING_OUT:
 			ring_tiles += 1
@@ -537,16 +536,11 @@ func _check_surface() -> void:
 	# The band, as it actually comes out rather than as the span says it should: over the
 	# deep stacks, what floats is lighter than what is lying on the floor under it.
 	#
-	# A trend, and a slight one — about 0.16 of lightness between the two ends. The span is
-	# stretched to 0.6 by one def (`wood_box2`) and the next heaviest thing in the lake is at
-	# 1.4, so the band around the floor's target lands where almost nothing lives and most
-	# floor slots fall through to a uniform roll over their material. The surface end is
-	# crowded and works; the floor end barely bites. That was as true before the band was put
-	# the right way up, and it is the fill's business rather than the surface's, so the bar
-	# here is the direction and not a size.
-	_check(deep > 100 and top_light / float(deep) > floor_light / float(deep) + 0.1,
+	# The surface picks the lightest it can out of each stack (`FLOAT_STEP`), so over the
+	# deep stacks the top's mean tier is under the floor's.
+	_check(deep > 100 and top_light / float(deep) < floor_light / float(deep) - 0.1,
 		"and the lake bears that out: what floats is lighter than what is under it",
-		"top %.2f, floor %.2f over %d deep stacks"
+		"top tier %.2f, floor tier %.2f over %d deep stacks"
 		% [top_light / maxf(float(deep), 1.0), floor_light / maxf(float(deep), 1.0), deep])
 
 	# The opening ring: the first casts of a new game can lift everything they can see.
@@ -609,11 +603,10 @@ func _check_surface() -> void:
 			% TrashDef.KIND_NAMES[m].to_lower(),
 			"%.1f%% against the quota's %.0f%%"
 			% [100.0 * stocked, 100.0 * float(LakeGrid.MATERIAL_QUOTA[m])])
-	# The money the shop was priced on (2026-09-21): when the third batch of rubbish joined,
-	# each new kind's tier and pollution were picked so a yard's mean pay per piece and the
-	# water's share of each weight tier stayed where they were. Measured off a fresh lake by
-	# `tools/probe_fill_economy.tscn` before the batch landed. A new kind has to fit inside
-	# these, or the frozen prices are being paid out of a different lake.
+	# The money the shop was priced on (2026-09-21): a yard's mean pay per piece and the
+	# water's share of each weight tier. Since 2026-10-01 pay is `EconomyConfig.piece_prices`
+	# (fitted by `tools/fit_prices.py`) and the shares are `LakeGrid.TIER_BY_DEPTH`. Measured off a fresh lake by
+	# `tools/probe_fill_economy.tscn`.
 	var pay_by := [0.0, 0.0, 0.0, 0.0]
 	var tier_by := [0, 0, 0, 0, 0]
 	var counted := 0
@@ -4407,8 +4400,12 @@ func _stage_pigeon_look() -> void:
 	_angler.tile_pos = Iso.world_to_tile(_grid.surface_pos(perch))
 	_net.range_tiles = 40.0
 	_check(_flock.catchable(bird), "a perched bird the net can reach is rimmed", "")
+	# Back on the island for this one: an angler put on the perch's tile is walked to the
+	# nearest dry ground, and a perch near enough the shore is in reach of that at any range.
+	_angler.tile_pos = stood
 	_net.range_tiles = 0.2
 	_check(not _flock.catchable(bird), "one out of range is not", "")
+	_angler.tile_pos = Iso.world_to_tile(_grid.surface_pos(perch))
 	_net.range_tiles = 40.0
 	bird["state"] = Flock.State.FLYING
 	_check(not _flock.catchable(bird), "and neither is one in the air", "")
@@ -8903,8 +8900,10 @@ func _stage_new_tracks() -> void:
 	_check(taken > 50, "a strong dog will carry most of the lake", "%d kinds" % taken)
 	_check(too_heavy.is_empty(), "and turns nothing down for its weight at the top",
 		", ".join(too_heavy))
-	_check(refused.size() < 12, "only the widest pieces are the net's alone",
-		", ".join(refused))
+	# A share of the catalogue, not a count: it was "under 12" against 81 kinds, and the pack
+	# rubbish (2026-10-01) runs to a few hundred.
+	_check(refused.size() < (taken + refused.size()) * 0.12, "only the widest pieces are the net's alone",
+		"%d of %d: %s" % [refused.size(), taken + refused.size(), ", ".join(refused)])
 
 	_main.call(&"_push_dog_numbers")
 	var untold := 0

@@ -2,1383 +2,6 @@
  "cell": 16,
  "pieces": [
   {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Can1",
-   "fill": 0.926,
-   "name": "metal_can1",
-   "region": [
-    75,
-    65,
-    6,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Can2",
-   "fill": 0.926,
-   "name": "metal_can2",
-   "region": [
-    83,
-    65,
-    6,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Can3",
-   "fill": 0.926,
-   "name": "metal_can3",
-   "region": [
-    91,
-    65,
-    6,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Can4",
-   "fill": 0.926,
-   "name": "metal_can4",
-   "region": [
-    99,
-    65,
-    6,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Hanger",
-   "fill": 0.289,
-   "name": "metal_hanger",
-   "region": [
-    107,
-    65,
-    10,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Lamp",
-   "fill": 0.74,
-   "name": "metal_lamp",
-   "region": [
-    28,
-    31,
-    12,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Mirror2",
-   "fill": 0.933,
-   "name": "metal_mirror2",
-   "region": [
-    108,
-    31,
-    11,
-    15
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Mirror",
-   "fill": 0.778,
-   "name": "metal_mirror",
-   "region": [
-    42,
-    31,
-    9,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Pan",
-   "fill": 0.742,
-   "name": "metal_pan",
-   "region": [
-    202,
-    65,
-    16,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Phone",
-   "fill": 0.705,
-   "name": "metal_phone",
-   "region": [
-    30,
-    50,
-    13,
-    12
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Phone2",
-   "fill": 0.785,
-   "name": "metal_phone2",
-   "region": [
-    34,
-    65,
-    13,
-    10
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Pot",
-   "fill": 0.813,
-   "name": "metal_pot",
-   "region": [
-    215,
-    31,
-    14,
-    13
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Metal Pot2",
-   "fill": 0.713,
-   "name": "metal_pot2",
-   "region": [
-    200,
-    2,
-    16,
-    17
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Support",
-   "fill": 0.483,
-   "name": "metal_support",
-   "region": [
-    96,
-    50,
-    13,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Teapot",
-   "fill": 0.614,
-   "name": "metal_teapot",
-   "region": [
-    111,
-    50,
-    16,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    2,
-    1
-   ],
-   "display_name": "Metal Bar",
-   "fill": 0.735,
-   "name": "metal_bar",
-   "region": [
-    220,
-    65,
-    17,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Box1",
-   "fill": 1.0,
-   "name": "metal_box1",
-   "region": [
-    129,
-    50,
-    10,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Box2",
-   "fill": 0.969,
-   "name": "metal_box2",
-   "region": [
-    53,
-    31,
-    8,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Metal Cart",
-   "fill": 0.67,
-   "name": "metal_cart",
-   "region": [
-    35,
-    2,
-    22,
-    26
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Controller",
-   "fill": 0.762,
-   "name": "metal_controller",
-   "region": [
-    119,
-    65,
-    14,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Dumbell",
-   "fill": 0.885,
-   "name": "metal_dumbell",
-   "region": [
-    231,
-    31,
-    8,
-    13
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Metal Extinguisher",
-   "fill": 0.701,
-   "name": "metal_extinguisher",
-   "region": [
-    218,
-    2,
-    12,
-    17
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Radio",
-   "fill": 0.806,
-   "name": "metal_radio",
-   "region": [
-    239,
-    65,
-    9,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Metal Shaker",
-   "fill": 0.748,
-   "name": "metal_shaker",
-   "region": [
-    121,
-    31,
-    9,
-    15
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Metal Sound",
-   "fill": 1.0,
-   "name": "metal_sound",
-   "region": [
-    132,
-    2,
-    15,
-    18
-   ],
-   "sheet": "lake_objects",
-   "yard": "Metal"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Bowl",
-   "fill": 0.829,
-   "name": "plastic_bowl",
-   "region": [
-    130,
-    78,
-    10,
-    7
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Cup1",
-   "fill": 0.844,
-   "name": "plastic_cup1",
-   "region": [
-    141,
-    50,
-    7,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Cup2",
-   "fill": 0.653,
-   "name": "plastic_cup2",
-   "region": [
-    170,
-    31,
-    7,
-    14
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Frame",
-   "fill": 1.0,
-   "name": "plastic_frame",
-   "region": [
-    63,
-    31,
-    12,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Mug",
-   "fill": 0.711,
-   "name": "plastic_mug",
-   "region": [
-    135,
-    65,
-    10,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Plate",
-   "fill": 0.857,
-   "name": "plastic_plate",
-   "region": [
-    2,
-    78,
-    14,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Sheet",
-   "fill": 0.901,
-   "name": "plastic_sheet",
-   "region": [
-    147,
-    65,
-    9,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Wrap",
-   "fill": 0.688,
-   "name": "plastic_wrap",
-   "region": [
-    18,
-    78,
-    8,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Plastic Sign2",
-   "fill": 0.912,
-   "name": "plastic_sign2",
-   "region": [
-    2,
-    31,
-    24,
-    17
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Sign",
-   "fill": 1.0,
-   "name": "plastic_sign",
-   "region": [
-    158,
-    65,
-    12,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Bottle",
-   "fill": 0.912,
-   "name": "plastic_bottle",
-   "region": [
-    241,
-    31,
-    7,
-    13
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Plastic Bottles",
-   "fill": 0.954,
-   "name": "plastic_bottles",
-   "region": [
-    59,
-    2,
-    13,
-    25
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Chair",
-   "fill": 0.898,
-   "name": "plastic_chair",
-   "region": [
-    77,
-    31,
-    11,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    2,
-    1
-   ],
-   "display_name": "Plastic Toy1",
-   "fill": 1.0,
-   "name": "plastic_toy1",
-   "region": [
-    179,
-    31,
-    20,
-    14
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Toy2",
-   "fill": 0.672,
-   "name": "plastic_toy2",
-   "region": [
-    132,
-    31,
-    12,
-    15
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Toy3",
-   "fill": 0.929,
-   "name": "plastic_toy3",
-   "region": [
-    28,
-    78,
-    14,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Toy4",
-   "fill": 1.0,
-   "name": "plastic_toy4",
-   "region": [
-    2,
-    50,
-    11,
-    13
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Toy5",
-   "fill": 1.0,
-   "name": "plastic_toy5",
-   "region": [
-    150,
-    50,
-    13,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Plastic Vase",
-   "fill": 0.78,
-   "name": "plastic_vase",
-   "region": [
-    165,
-    50,
-    12,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Plastic"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Ball",
-   "fill": 0.812,
-   "name": "rubber_ball",
-   "region": [
-    44,
-    78,
-    8,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Ball2",
-   "fill": 0.875,
-   "name": "rubber_ball2",
-   "region": [
-    54,
-    78,
-    12,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Ball3",
-   "fill": 0.87,
-   "name": "rubber_ball3",
-   "region": [
-    49,
-    65,
-    10,
-    10
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Ball4",
-   "fill": 0.885,
-   "name": "rubber_ball4",
-   "region": [
-    68,
-    78,
-    12,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Block",
-   "fill": 0.964,
-   "name": "rubber_block",
-   "region": [
-    142,
-    78,
-    8,
-    7
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Disk",
-   "fill": 0.925,
-   "name": "rubber_disk",
-   "region": [
-    178,
-    78,
-    8,
-    5
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Duck",
-   "fill": 0.636,
-   "name": "rubber_duck",
-   "region": [
-    172,
-    65,
-    11,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Rubber Tire2",
-   "fill": 0.842,
-   "name": "rubber_tire2",
-   "region": [
-    110,
-    2,
-    20,
-    19
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Tire",
-   "fill": 0.75,
-   "name": "rubber_tire",
-   "region": [
-    82,
-    78,
-    14,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Toy2",
-   "fill": 0.896,
-   "name": "rubber_toy2",
-   "region": [
-    179,
-    50,
-    7,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Rubber Toy3",
-   "fill": 0.595,
-   "name": "rubber_toy3",
-   "region": [
-    149,
-    2,
-    17,
-    18
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Toy4",
-   "fill": 0.886,
-   "name": "rubber_toy4",
-   "region": [
-    152,
-    78,
-    10,
-    7
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Toy5",
-   "fill": 0.893,
-   "name": "rubber_toy5",
-   "region": [
-    45,
-    50,
-    7,
-    12
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Toy",
-   "fill": 0.582,
-   "name": "rubber_toy",
-   "region": [
-    188,
-    50,
-    10,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Shoes",
-   "fill": 0.756,
-   "name": "rubber_shoes",
-   "region": [
-    185,
-    65,
-    15,
-    9
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Rubber Utensil",
-   "fill": 0.45,
-   "name": "rubber_utensil",
-   "region": [
-    146,
-    31,
-    8,
-    15
-   ],
-   "sheet": "lake_objects",
-   "yard": "Rubber"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Box1",
-   "fill": 0.972,
-   "name": "wood_box1",
-   "region": [
-    54,
-    50,
-    12,
-    12
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Box2",
-   "fill": 0.988,
-   "name": "wood_box2",
-   "region": [
-    90,
-    31,
-    16,
-    16
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Box3",
-   "fill": 0.9,
-   "name": "wood_box3",
-   "region": [
-    156,
-    31,
-    12,
-    15
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Box4",
-   "fill": 0.946,
-   "name": "wood_box4",
-   "region": [
-    98,
-    78,
-    14,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    2,
-    1
-   ],
-   "display_name": "Wood Box5",
-   "fill": 0.747,
-   "name": "wood_box5",
-   "region": [
-    200,
-    50,
-    18,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Painting1",
-   "fill": 0.976,
-   "name": "wood_painting1",
-   "region": [
-    201,
-    31,
-    12,
-    14
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Painting2",
-   "fill": 0.977,
-   "name": "wood_painting2",
-   "region": [
-    220,
-    50,
-    16,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Piece",
-   "fill": 0.885,
-   "name": "wood_piece",
-   "region": [
-    68,
-    50,
-    13,
-    12
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Block",
-   "fill": 0.8,
-   "name": "wood_block",
-   "region": [
-    61,
-    65,
-    12,
-    10
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Board",
-   "fill": 0.893,
-   "name": "wood_board",
-   "region": [
-    164,
-    78,
-    12,
-    7
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Wood Chair",
-   "fill": 0.878,
-   "name": "wood_chair",
-   "region": [
-    168,
-    2,
-    10,
-    18
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Wood Door",
-   "fill": 1.0,
-   "name": "wood_door",
-   "region": [
-    74,
-    2,
-    15,
-    23
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Wood Drawer",
-   "fill": 0.893,
-   "name": "wood_drawer",
-   "region": [
-    91,
-    2,
-    17,
-    22
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Wood Guitar",
-   "fill": 0.647,
-   "name": "wood_guitar",
-   "region": [
-    2,
-    2,
-    13,
-    27
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    2
-   ],
-   "display_name": "Wood Lamp",
-   "fill": 0.47,
-   "name": "wood_lamp",
-   "region": [
-    17,
-    2,
-    16,
-    27
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    2,
-    1
-   ],
-   "display_name": "Wood Plank1",
-   "fill": 0.65,
-   "name": "wood_plank1",
-   "region": [
-    2,
-    65,
-    20,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Plank2",
-   "fill": 0.955,
-   "name": "wood_plank2",
-   "region": [
-    114,
-    78,
-    14,
-    8
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Sign",
-   "fill": 1.0,
-   "name": "wood_sign",
-   "region": [
-    83,
-    50,
-    11,
-    12
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    2,
-    2
-   ],
-   "display_name": "Wood Skateboard",
-   "fill": 0.475,
-   "name": "wood_skateboard",
-   "region": [
-    180,
-    2,
-    18,
-    18
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Stool",
-   "fill": 0.769,
-   "name": "wood_stool",
-   "region": [
-    15,
-    50,
-    13,
-    13
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
-   "cells": [
-    1,
-    1
-   ],
-   "display_name": "Wood Toy",
-   "fill": 0.807,
-   "name": "wood_toy",
-   "region": [
-    24,
-    65,
-    8,
-    11
-   ],
-   "sheet": "lake_objects",
-   "yard": "Wood"
-  },
-  {
    "alt_roles": [
     "front",
     "side",
@@ -3492,6 +2115,4086 @@
    ],
    "title": "Aquarium",
    "wash_scale": 1.0
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Can",
+   "fill": 0.885,
+   "name": "metal_can1",
+   "region": [
+    71,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Can",
+   "fill": 0.897,
+   "name": "metal_can2",
+   "region": [
+    81,
+    545,
+    9,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Can",
+   "fill": 0.872,
+   "name": "metal_can3",
+   "region": [
+    92,
+    545,
+    9,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Clock",
+   "fill": 0.79,
+   "name": "metal_clock",
+   "region": [
+    80,
+    468,
+    18,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Jar",
+   "fill": 0.856,
+   "name": "metal_jar",
+   "region": [
+    103,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Pc Tower",
+   "fill": 0.964,
+   "name": "metal_pc_tower",
+   "region": [
+    20,
+    335,
+    11,
+    28
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Phone",
+   "fill": 0.681,
+   "name": "metal_phone1",
+   "region": [
+    186,
+    510,
+    14,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Pliers",
+   "fill": 0.829,
+   "name": "metal_pliers",
+   "region": [
+    202,
+    510,
+    7,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Soda",
+   "fill": 0.885,
+   "name": "metal_soda1",
+   "region": [
+    113,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Soda",
+   "fill": 0.885,
+   "name": "metal_soda2",
+   "region": [
+    123,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Tin",
+   "fill": 0.864,
+   "name": "metal_tin1",
+   "region": [
+    196,
+    561,
+    8,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Tin",
+   "fill": 0.875,
+   "name": "metal_tin2",
+   "region": [
+    31,
+    561,
+    8,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bolt",
+   "fill": 0.667,
+   "name": "metal_bolt",
+   "region": [
+    211,
+    510,
+    10,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Can",
+   "fill": 0.875,
+   "name": "metal_can4",
+   "region": [
+    41,
+    561,
+    8,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Canister",
+   "fill": 0.899,
+   "name": "metal_canister",
+   "region": [
+    135,
+    302,
+    13,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Clock",
+   "fill": 0.765,
+   "name": "metal_clock2",
+   "region": [
+    35,
+    490,
+    17,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Keypad",
+   "fill": 0.698,
+   "name": "metal_keypad",
+   "region": [
+    195,
+    394,
+    23,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Lamp Globe",
+   "fill": 0.656,
+   "name": "metal_lamp_globe",
+   "region": [
+    72,
+    335,
+    14,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Pipe",
+   "fill": 0.675,
+   "name": "metal_pipe",
+   "region": [
+    113,
+    265,
+    10,
+    32
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Soda",
+   "fill": 0.885,
+   "name": "metal_soda3",
+   "region": [
+    133,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Square",
+   "fill": 0.607,
+   "name": "metal_square",
+   "region": [
+    104,
+    576,
+    13,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stove",
+   "fill": 0.791,
+   "name": "metal_stove",
+   "region": [
+    234,
+    445,
+    11,
+    20
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Tin",
+   "fill": 0.863,
+   "name": "metal_tin3",
+   "region": [
+    54,
+    490,
+    12,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Toolbox",
+   "fill": 0.947,
+   "name": "metal_toolbox",
+   "region": [
+    156,
+    490,
+    26,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Aircon",
+   "fill": 0.996,
+   "name": "metal_aircon",
+   "region": [
+    125,
+    265,
+    32,
+    32
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bank Lamp",
+   "fill": 0.643,
+   "name": "metal_bank_lamp",
+   "region": [
+    51,
+    561,
+    14,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Crate",
+   "fill": 0.991,
+   "name": "metal_crate",
+   "region": [
+    0,
+    445,
+    21,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Hob",
+   "fill": 0.963,
+   "name": "metal_hob",
+   "region": [
+    150,
+    302,
+    26,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Kettle",
+   "fill": 0.704,
+   "name": "metal_kettle",
+   "region": [
+    223,
+    510,
+    16,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Kettle",
+   "fill": 0.704,
+   "name": "metal_kettle2",
+   "region": [
+    0,
+    528,
+    16,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Lamp",
+   "fill": 0.583,
+   "name": "metal_lamp",
+   "region": [
+    178,
+    302,
+    10,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Phone",
+   "fill": 0.801,
+   "name": "metal_phone2",
+   "region": [
+    206,
+    561,
+    16,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Pole",
+   "fill": 0.302,
+   "name": "metal_pole",
+   "region": [
+    0,
+    86,
+    22,
+    52
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Shovel",
+   "fill": 0.689,
+   "name": "metal_shovel",
+   "region": [
+    69,
+    302,
+    9,
+    30
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Socket",
+   "fill": 0.886,
+   "name": "metal_socket",
+   "region": [
+    27,
+    576,
+    14,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Tap",
+   "fill": 0.533,
+   "name": "metal_tap",
+   "region": [
+    94,
+    420,
+    11,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Bar",
+   "fill": 0.883,
+   "name": "metal_bar",
+   "region": [
+    90,
+    140,
+    6,
+    40
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.91,
+   "name": "metal_barrel3",
+   "region": [
+    169,
+    265,
+    20,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.865,
+   "name": "metal_barrel4",
+   "region": [
+    68,
+    490,
+    20,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.888,
+   "name": "metal_barrel5",
+   "region": [
+    226,
+    366,
+    20,
+    25
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Candelabra",
+   "fill": 0.579,
+   "name": "metal_candelabra",
+   "region": [
+    0,
+    394,
+    20,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Case",
+   "fill": 1.0,
+   "name": "metal_case",
+   "region": [
+    18,
+    528,
+    21,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Desk Lamp",
+   "fill": 0.46,
+   "name": "metal_desk_lamp",
+   "region": [
+    184,
+    490,
+    22,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Gas Bottle",
+   "fill": 0.821,
+   "name": "metal_gas_bottle",
+   "region": [
+    220,
+    394,
+    16,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Locker",
+   "fill": 0.864,
+   "name": "metal_locker",
+   "region": [
+    193,
+    86,
+    20,
+    42
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Sheet",
+   "fill": 0.88,
+   "name": "metal_sheet2",
+   "region": [
+    0,
+    366,
+    24,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    3,
+    4
+   ],
+   "display_name": "Shelf",
+   "fill": 0.774,
+   "name": "metal_shelf",
+   "region": [
+    127,
+    0,
+    42,
+    57
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Valve",
+   "fill": 0.594,
+   "name": "metal_valve",
+   "region": [
+    170,
+    576,
+    16,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.91,
+   "name": "metal_barrel1",
+   "region": [
+    191,
+    265,
+    20,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.908,
+   "name": "metal_barrel2",
+   "region": [
+    190,
+    302,
+    18,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bin",
+   "fill": 0.885,
+   "name": "metal_bin",
+   "region": [
+    26,
+    366,
+    16,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Bin",
+   "fill": 0.908,
+   "name": "metal_bin2",
+   "region": [
+    210,
+    302,
+    18,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Bin",
+   "fill": 0.911,
+   "name": "metal_bin3",
+   "region": [
+    80,
+    302,
+    18,
+    30
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Camp Chair",
+   "fill": 0.778,
+   "name": "metal_camp_chair",
+   "region": [
+    0,
+    184,
+    24,
+    39
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.741,
+   "name": "metal_chair",
+   "region": [
+    99,
+    225,
+    16,
+    36
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Desk",
+   "fill": 0.996,
+   "name": "metal_desk",
+   "region": [
+    26,
+    184,
+    42,
+    39
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Oven",
+   "fill": 0.975,
+   "name": "metal_oven",
+   "region": [
+    48,
+    225,
+    24,
+    37
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    5
+   ],
+   "display_name": "Rod",
+   "fill": 0.836,
+   "name": "metal_rod",
+   "region": [
+    17,
+    0,
+    5,
+    72
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    3,
+    2
+   ],
+   "display_name": "Sheet",
+   "fill": 0.932,
+   "name": "metal_sheet1",
+   "region": [
+    213,
+    265,
+    37,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Stand",
+   "fill": 0.422,
+   "name": "metal_stand",
+   "region": [
+    171,
+    0,
+    28,
+    57
+   ],
+   "sheet": "lake_objects",
+   "yard": "Metal"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bag",
+   "fill": 0.686,
+   "name": "plastic_bag1",
+   "region": [
+    0,
+    468,
+    14,
+    20
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bag",
+   "fill": 0.638,
+   "name": "plastic_bag2",
+   "region": [
+    22,
+    394,
+    16,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bottle",
+   "fill": 0.833,
+   "name": "plastic_bottle1",
+   "region": [
+    100,
+    468,
+    8,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bottle",
+   "fill": 0.85,
+   "name": "plastic_bottle2",
+   "region": [
+    16,
+    468,
+    8,
+    20
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Cracker",
+   "fill": 0.388,
+   "name": "plastic_cracker",
+   "region": [
+    142,
+    528,
+    14,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Cup",
+   "fill": 0.818,
+   "name": "plastic_cup",
+   "region": [
+    224,
+    561,
+    8,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Frame",
+   "fill": 0.978,
+   "name": "plastic_frame",
+   "region": [
+    41,
+    528,
+    12,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Glass",
+   "fill": 0.729,
+   "name": "plastic_glass2",
+   "region": [
+    67,
+    561,
+    8,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Jar",
+   "fill": 0.87,
+   "name": "plastic_jar",
+   "region": [
+    77,
+    561,
+    9,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Mug",
+   "fill": 0.77,
+   "name": "plastic_mug1",
+   "region": [
+    43,
+    576,
+    10,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Nutcracker",
+   "fill": 0.769,
+   "name": "plastic_nutcracker",
+   "region": [
+    190,
+    184,
+    13,
+    38
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Sign",
+   "fill": 0.994,
+   "name": "plastic_sign1",
+   "region": [
+    208,
+    490,
+    20,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bottle",
+   "fill": 0.855,
+   "name": "plastic_bottle3",
+   "region": [
+    60,
+    468,
+    8,
+    19
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bottle",
+   "fill": 0.766,
+   "name": "plastic_bottle7",
+   "region": [
+    230,
+    490,
+    8,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bottle",
+   "fill": 0.833,
+   "name": "plastic_bottle8",
+   "region": [
+    240,
+    490,
+    6,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bucket",
+   "fill": 0.903,
+   "name": "plastic_bucket1",
+   "region": [
+    119,
+    576,
+    16,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Crates",
+   "fill": 0.604,
+   "name": "plastic_crates",
+   "region": [
+    23,
+    445,
+    19,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Cup",
+   "fill": 0.857,
+   "name": "plastic_cup2",
+   "region": [
+    158,
+    528,
+    10,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Cups",
+   "fill": 0.861,
+   "name": "plastic_cups",
+   "region": [
+    110,
+    468,
+    8,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Flask",
+   "fill": 0.762,
+   "name": "plastic_flask",
+   "region": [
+    0,
+    510,
+    10,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Glass",
+   "fill": 0.593,
+   "name": "plastic_glass",
+   "region": [
+    88,
+    561,
+    9,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Packet",
+   "fill": 0.993,
+   "name": "plastic_packet",
+   "region": [
+    170,
+    528,
+    10,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Sauce",
+   "fill": 0.821,
+   "name": "plastic_sauce",
+   "region": [
+    143,
+    545,
+    6,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Vase",
+   "fill": 0.776,
+   "name": "plastic_vase2",
+   "region": [
+    44,
+    445,
+    14,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bottle",
+   "fill": 0.838,
+   "name": "plastic_bottle5",
+   "region": [
+    12,
+    510,
+    10,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bottle",
+   "fill": 0.855,
+   "name": "plastic_bottle6",
+   "region": [
+    70,
+    468,
+    8,
+    19
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bottle",
+   "fill": 0.821,
+   "name": "plastic_bottle9",
+   "region": [
+    151,
+    545,
+    6,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Bucket",
+   "fill": 0.885,
+   "name": "plastic_bucket2",
+   "region": [
+    99,
+    561,
+    16,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bucket",
+   "fill": 0.776,
+   "name": "plastic_bucket3",
+   "region": [
+    40,
+    394,
+    16,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Floor Lamp",
+   "fill": 0.24,
+   "name": "plastic_floor_lamp",
+   "region": [
+    41,
+    140,
+    29,
+    41
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Gnome",
+   "fill": 0.635,
+   "name": "plastic_gnome",
+   "region": [
+    20,
+    265,
+    12,
+    34
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Lamp",
+   "fill": 0.646,
+   "name": "plastic_lamp",
+   "region": [
+    60,
+    445,
+    14,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Ornament",
+   "fill": 0.527,
+   "name": "plastic_ornament",
+   "region": [
+    159,
+    545,
+    13,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Pot",
+   "fill": 0.87,
+   "name": "plastic_pot",
+   "region": [
+    117,
+    561,
+    9,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Slipper",
+   "fill": 0.492,
+   "name": "plastic_slipper",
+   "region": [
+    24,
+    510,
+    16,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Vase",
+   "fill": 0.769,
+   "name": "plastic_vase",
+   "region": [
+    174,
+    545,
+    10,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Bottle",
+   "fill": 0.67,
+   "name": "plastic_bottle4",
+   "region": [
+    238,
+    394,
+    10,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Cabinet",
+   "fill": 0.981,
+   "name": "plastic_cabinet",
+   "region": [
+    44,
+    366,
+    16,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.76,
+   "name": "plastic_chair",
+   "region": [
+    98,
+    140,
+    26,
+    40
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.653,
+   "name": "plastic_chair2",
+   "region": [
+    74,
+    225,
+    23,
+    37
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Crate",
+   "fill": 0.992,
+   "name": "plastic_crate",
+   "region": [
+    58,
+    394,
+    22,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Jerrycan",
+   "fill": 0.922,
+   "name": "plastic_jerrycan2",
+   "region": [
+    88,
+    335,
+    18,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Laptop",
+   "fill": 0.992,
+   "name": "plastic_laptop",
+   "region": [
+    82,
+    394,
+    22,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Milk",
+   "fill": 0.838,
+   "name": "plastic_milk",
+   "region": [
+    42,
+    510,
+    10,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Mop Bucket",
+   "fill": 0.83,
+   "name": "plastic_mop_bucket",
+   "region": [
+    230,
+    302,
+    13,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Mug",
+   "fill": 0.802,
+   "name": "plastic_mug2",
+   "region": [
+    234,
+    561,
+    11,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Pendant",
+   "fill": 0.611,
+   "name": "plastic_pendant",
+   "region": [
+    76,
+    445,
+    12,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Poster",
+   "fill": 0.97,
+   "name": "plastic_poster",
+   "region": [
+    120,
+    468,
+    11,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Computer",
+   "fill": 0.82,
+   "name": "plastic_computer",
+   "region": [
+    34,
+    265,
+    22,
+    34
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Cooler",
+   "fill": 0.919,
+   "name": "plastic_cooler",
+   "region": [
+    90,
+    445,
+    26,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Heater",
+   "fill": 0.905,
+   "name": "plastic_heater",
+   "region": [
+    205,
+    184,
+    20,
+    38
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Ironing Board",
+   "fill": 0.469,
+   "name": "plastic_ironing_board",
+   "region": [
+    199,
+    225,
+    46,
+    35
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Jerrycan",
+   "fill": 0.922,
+   "name": "plastic_jerrycan",
+   "region": [
+    108,
+    335,
+    18,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Jug",
+   "fill": 0.788,
+   "name": "plastic_jug1",
+   "region": [
+    62,
+    366,
+    16,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Jug",
+   "fill": 0.812,
+   "name": "plastic_jug2",
+   "region": [
+    0,
+    420,
+    12,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Jug",
+   "fill": 0.788,
+   "name": "plastic_jug3",
+   "region": [
+    80,
+    366,
+    16,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Lamp",
+   "fill": 0.313,
+   "name": "plastic_lamp2",
+   "region": [
+    24,
+    86,
+    32,
+    52
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Office Chair",
+   "fill": 0.623,
+   "name": "plastic_office_chair",
+   "region": [
+    58,
+    265,
+    17,
+    34
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Sign",
+   "fill": 0.987,
+   "name": "plastic_sign2",
+   "region": [
+    107,
+    420,
+    28,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Water Jug",
+   "fill": 0.673,
+   "name": "plastic_water_jug",
+   "region": [
+    0,
+    302,
+    23,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Plastic"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Bag",
+   "fill": 0.657,
+   "name": "rubber_bag1",
+   "region": [
+    128,
+    335,
+    22,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Bag",
+   "fill": 0.913,
+   "name": "rubber_bag2",
+   "region": [
+    54,
+    510,
+    18,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.871,
+   "name": "rubber_barrel2",
+   "region": [
+    25,
+    302,
+    20,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Cables",
+   "fill": 0.573,
+   "name": "rubber_cables",
+   "region": [
+    128,
+    561,
+    25,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Cap",
+   "fill": 0.667,
+   "name": "rubber_cap",
+   "region": [
+    15,
+    589,
+    9,
+    6
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Pebble",
+   "fill": 0.639,
+   "name": "rubber_pebble",
+   "region": [
+    26,
+    589,
+    6,
+    6
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Pebble",
+   "fill": 0.75,
+   "name": "rubber_pebble2",
+   "region": [
+    188,
+    576,
+    8,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Plug",
+   "fill": 0.875,
+   "name": "rubber_plug",
+   "region": [
+    198,
+    576,
+    4,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Rod",
+   "fill": 0.388,
+   "name": "rubber_rod",
+   "region": [
+    0,
+    576,
+    11,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Roll",
+   "fill": 0.841,
+   "name": "rubber_roll1",
+   "region": [
+    182,
+    528,
+    27,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Roll",
+   "fill": 0.841,
+   "name": "rubber_roll2",
+   "region": [
+    211,
+    528,
+    27,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Sleeping Bag",
+   "fill": 0.958,
+   "name": "rubber_sleeping_bag",
+   "region": [
+    98,
+    366,
+    11,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Badge",
+   "fill": 0.904,
+   "name": "rubber_badge",
+   "region": [
+    186,
+    545,
+    8,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Candy",
+   "fill": 0.583,
+   "name": "rubber_candy",
+   "region": [
+    204,
+    576,
+    12,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Cassette",
+   "fill": 0.938,
+   "name": "rubber_cassette",
+   "region": [
+    218,
+    576,
+    8,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Clock",
+   "fill": 0.788,
+   "name": "rubber_clock",
+   "region": [
+    155,
+    561,
+    11,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Crumb",
+   "fill": 0.694,
+   "name": "rubber_crumb",
+   "region": [
+    235,
+    576,
+    7,
+    7
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Eraser",
+   "fill": 0.875,
+   "name": "rubber_eraser",
+   "region": [
+    34,
+    589,
+    8,
+    4
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Gamepad",
+   "fill": 0.813,
+   "name": "rubber_gamepad",
+   "region": [
+    55,
+    576,
+    15,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Gas Mask",
+   "fill": 0.744,
+   "name": "rubber_gas_mask1",
+   "region": [
+    55,
+    528,
+    12,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Knife",
+   "fill": 0.432,
+   "name": "rubber_knife",
+   "region": [
+    137,
+    576,
+    9,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Scrap",
+   "fill": 0.801,
+   "name": "rubber_scrap",
+   "region": [
+    74,
+    510,
+    16,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Screwdriver",
+   "fill": 0.643,
+   "name": "rubber_screwdriver",
+   "region": [
+    240,
+    528,
+    6,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Screwdriver",
+   "fill": 0.531,
+   "name": "rubber_screwdriver2",
+   "region": [
+    159,
+    265,
+    8,
+    32
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Clamp",
+   "fill": 0.768,
+   "name": "rubber_clamp",
+   "region": [
+    133,
+    468,
+    11,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Crate",
+   "fill": 0.973,
+   "name": "rubber_crate",
+   "region": [
+    118,
+    445,
+    21,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Jacket",
+   "fill": 0.894,
+   "name": "rubber_jacket1",
+   "region": [
+    90,
+    490,
+    20,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Jacket",
+   "fill": 0.894,
+   "name": "rubber_jacket2",
+   "region": [
+    112,
+    490,
+    20,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Jacket",
+   "fill": 0.894,
+   "name": "rubber_jacket3",
+   "region": [
+    134,
+    490,
+    20,
+    17
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Ketchup",
+   "fill": 0.766,
+   "name": "rubber_ketchup",
+   "region": [
+    92,
+    510,
+    8,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Mat",
+   "fill": 0.773,
+   "name": "rubber_mat",
+   "region": [
+    14,
+    420,
+    26,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Mattress",
+   "fill": 0.972,
+   "name": "rubber_mattress",
+   "region": [
+    137,
+    420,
+    24,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Ring",
+   "fill": 0.773,
+   "name": "rubber_ring",
+   "region": [
+    42,
+    420,
+    26,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Shoes",
+   "fill": 0.497,
+   "name": "rubber_shoes",
+   "region": [
+    69,
+    528,
+    24,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    4,
+    2
+   ],
+   "display_name": "Slick",
+   "fill": 0.606,
+   "name": "rubber_slick",
+   "region": [
+    146,
+    468,
+    61,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Sock",
+   "fill": 0.684,
+   "name": "rubber_sock",
+   "region": [
+    196,
+    545,
+    9,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Ball",
+   "fill": 0.802,
+   "name": "rubber_ball",
+   "region": [
+    207,
+    545,
+    14,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Barrel",
+   "fill": 0.871,
+   "name": "rubber_barrel",
+   "region": [
+    47,
+    302,
+    20,
+    31
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Clover",
+   "fill": 0.674,
+   "name": "rubber_clover",
+   "region": [
+    168,
+    561,
+    12,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Dome",
+   "fill": 0.774,
+   "name": "rubber_dome",
+   "region": [
+    0,
+    545,
+    12,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Gas Mask",
+   "fill": 0.833,
+   "name": "rubber_gas_mask2",
+   "region": [
+    95,
+    528,
+    12,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Lump",
+   "fill": 0.74,
+   "name": "rubber_lump",
+   "region": [
+    209,
+    468,
+    25,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Pillows",
+   "fill": 0.728,
+   "name": "rubber_pillows",
+   "region": [
+    102,
+    510,
+    20,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Slab",
+   "fill": 0.654,
+   "name": "rubber_slab",
+   "region": [
+    0,
+    490,
+    22,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Speaker",
+   "fill": 0.881,
+   "name": "rubber_speaker",
+   "region": [
+    0,
+    335,
+    18,
+    29
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Strip",
+   "fill": 0.969,
+   "name": "rubber_strip",
+   "region": [
+    44,
+    589,
+    16,
+    4
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Tire",
+   "fill": 0.788,
+   "name": "rubber_tire5",
+   "region": [
+    223,
+    545,
+    24,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Vase",
+   "fill": 0.719,
+   "name": "rubber_vase",
+   "region": [
+    124,
+    510,
+    12,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Blocks",
+   "fill": 0.786,
+   "name": "rubber_blocks",
+   "region": [
+    111,
+    366,
+    29,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.753,
+   "name": "rubber_chair",
+   "region": [
+    72,
+    140,
+    16,
+    41
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Laptop",
+   "fill": 0.996,
+   "name": "rubber_laptop",
+   "region": [
+    106,
+    394,
+    19,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Puck",
+   "fill": 0.806,
+   "name": "rubber_puck",
+   "region": [
+    148,
+    576,
+    8,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    4,
+    4
+   ],
+   "display_name": "Rubble",
+   "fill": 0.63,
+   "name": "rubber_rubble",
+   "region": [
+    63,
+    0,
+    62,
+    60
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Screen",
+   "fill": 0.992,
+   "name": "rubber_screen",
+   "region": [
+    70,
+    420,
+    22,
+    23
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Stain",
+   "fill": 0.798,
+   "name": "rubber_stain",
+   "region": [
+    163,
+    420,
+    29,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    1
+   ],
+   "display_name": "Tablet",
+   "fill": 0.985,
+   "name": "rubber_tablet",
+   "region": [
+    14,
+    545,
+    19,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Tire",
+   "fill": 0.857,
+   "name": "rubber_tire1",
+   "region": [
+    141,
+    445,
+    26,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Tire",
+   "fill": 0.857,
+   "name": "rubber_tire2",
+   "region": [
+    169,
+    445,
+    26,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Tire",
+   "fill": 0.893,
+   "name": "rubber_tire3",
+   "region": [
+    33,
+    335,
+    26,
+    28
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Tire",
+   "fill": 0.892,
+   "name": "rubber_tire4",
+   "region": [
+    100,
+    302,
+    24,
+    30
+   ],
+   "sheet": "lake_objects",
+   "yard": "Rubber"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Block",
+   "fill": 0.802,
+   "name": "wood_block",
+   "region": [
+    0,
+    589,
+    13,
+    7
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Brush",
+   "fill": 0.81,
+   "name": "wood_brush",
+   "region": [
+    35,
+    545,
+    6,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Brushes",
+   "fill": 0.745,
+   "name": "wood_brushes",
+   "region": [
+    215,
+    86,
+    21,
+    42
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Frame",
+   "fill": 1.0,
+   "name": "wood_frame2",
+   "region": [
+    72,
+    576,
+    10,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Hook",
+   "fill": 0.467,
+   "name": "wood_hook",
+   "region": [
+    158,
+    576,
+    10,
+    9
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Log",
+   "fill": 0.895,
+   "name": "wood_log3",
+   "region": [
+    24,
+    490,
+    9,
+    18
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Nutcracker",
+   "fill": 0.769,
+   "name": "wood_nutcracker",
+   "region": [
+    227,
+    184,
+    13,
+    38
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Pencil",
+   "fill": 0.5,
+   "name": "wood_pencil",
+   "region": [
+    228,
+    576,
+    5,
+    8
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Rod",
+   "fill": 0.299,
+   "name": "wood_rod",
+   "region": [
+    197,
+    445,
+    11,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Scrap",
+   "fill": 0.5,
+   "name": "wood_scrap",
+   "region": [
+    13,
+    576,
+    12,
+    11
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Stick",
+   "fill": 0.361,
+   "name": "wood_stick",
+   "region": [
+    182,
+    561,
+    12,
+    12
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Sticks",
+   "fill": 0.473,
+   "name": "wood_sticks",
+   "region": [
+    0,
+    561,
+    14,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Candle",
+   "fill": 0.75,
+   "name": "wood_candle",
+   "region": [
+    109,
+    528,
+    8,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.732,
+   "name": "wood_chair",
+   "region": [
+    77,
+    265,
+    16,
+    34
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Drawer",
+   "fill": 0.933,
+   "name": "wood_drawer1",
+   "region": [
+    127,
+    394,
+    20,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Fence",
+   "fill": 0.529,
+   "name": "wood_fence2",
+   "region": [
+    194,
+    420,
+    28,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    1
+   ],
+   "display_name": "Log",
+   "fill": 0.982,
+   "name": "wood_log1",
+   "region": [
+    138,
+    510,
+    46,
+    16
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Peg",
+   "fill": 0.933,
+   "name": "wood_peg",
+   "region": [
+    84,
+    576,
+    6,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Plank",
+   "fill": 0.929,
+   "name": "wood_plank",
+   "region": [
+    210,
+    445,
+    6,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Planter",
+   "fill": 0.747,
+   "name": "wood_planter",
+   "region": [
+    224,
+    420,
+    30,
+    22
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stake",
+   "fill": 0.386,
+   "name": "wood_stake2",
+   "region": [
+    126,
+    302,
+    7,
+    30
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stool",
+   "fill": 0.812,
+   "name": "wood_stool",
+   "region": [
+    142,
+    366,
+    16,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stump",
+   "fill": 0.85,
+   "name": "wood_stump1",
+   "region": [
+    26,
+    468,
+    16,
+    20
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Tile",
+   "fill": 0.568,
+   "name": "wood_tile",
+   "region": [
+    16,
+    561,
+    13,
+    13
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Door",
+   "fill": 0.997,
+   "name": "wood_door",
+   "region": [
+    229,
+    0,
+    26,
+    55
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Fence",
+   "fill": 0.49,
+   "name": "wood_fence1",
+   "region": [
+    152,
+    335,
+    27,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Lamp",
+   "fill": 0.646,
+   "name": "wood_lamp",
+   "region": [
+    218,
+    445,
+    14,
+    21
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Painting",
+   "fill": 0.583,
+   "name": "wood_painting1",
+   "region": [
+    149,
+    394,
+    26,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Pallet",
+   "fill": 0.899,
+   "name": "wood_pallet1",
+   "region": [
+    0,
+    140,
+    39,
+    42
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Plant",
+   "fill": 0.471,
+   "name": "wood_plant",
+   "region": [
+    58,
+    86,
+    20,
+    52
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Plaque",
+   "fill": 0.952,
+   "name": "wood_plaque",
+   "region": [
+    43,
+    545,
+    12,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Shelf",
+   "fill": 0.591,
+   "name": "wood_shelf",
+   "region": [
+    133,
+    86,
+    40,
+    46
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Splinter",
+   "fill": 0.762,
+   "name": "wood_splinter",
+   "region": [
+    119,
+    528,
+    7,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Spoon",
+   "fill": 0.41,
+   "name": "wood_spoon",
+   "region": [
+    92,
+    576,
+    10,
+    10
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stake",
+   "fill": 0.448,
+   "name": "wood_stake",
+   "region": [
+    61,
+    335,
+    9,
+    28
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Table",
+   "fill": 0.722,
+   "name": "wood_table2",
+   "region": [
+    0,
+    225,
+    46,
+    38
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Branch",
+   "fill": 0.602,
+   "name": "wood_branch",
+   "region": [
+    42,
+    0,
+    19,
+    63
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Cabinet",
+   "fill": 0.885,
+   "name": "wood_cabinet",
+   "region": [
+    117,
+    225,
+    16,
+    36
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.575,
+   "name": "wood_chair2",
+   "region": [
+    95,
+    265,
+    16,
+    34
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Chair",
+   "fill": 0.793,
+   "name": "wood_chair3",
+   "region": [
+    135,
+    225,
+    22,
+    36
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Floor Lamp",
+   "fill": 0.327,
+   "name": "wood_floor_lamp",
+   "region": [
+    101,
+    86,
+    30,
+    48
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    5
+   ],
+   "display_name": "Ladder",
+   "fill": 0.946,
+   "name": "wood_ladder",
+   "region": [
+    24,
+    0,
+    16,
+    72
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    3
+   ],
+   "display_name": "Log",
+   "fill": 0.935,
+   "name": "wood_log2",
+   "region": [
+    175,
+    86,
+    16,
+    46
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    2
+   ],
+   "display_name": "Painting",
+   "fill": 1.0,
+   "name": "wood_painting2",
+   "region": [
+    160,
+    366,
+    42,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Picture",
+   "fill": 1.0,
+   "name": "wood_picture1",
+   "region": [
+    44,
+    468,
+    14,
+    20
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Picture",
+   "fill": 1.0,
+   "name": "wood_picture2",
+   "region": [
+    57,
+    545,
+    12,
+    14
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Wardrobe",
+   "fill": 0.946,
+   "name": "wood_wardrobe",
+   "region": [
+    201,
+    0,
+    26,
+    56
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    4
+   ],
+   "display_name": "Wardrobe",
+   "fill": 0.872,
+   "name": "wood_wardrobe2",
+   "region": [
+    80,
+    86,
+    19,
+    51
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    4,
+    3
+   ],
+   "display_name": "Bench",
+   "fill": 0.974,
+   "name": "wood_bench",
+   "region": [
+    70,
+    184,
+    58,
+    39
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    4,
+    3
+   ],
+   "display_name": "Bench",
+   "fill": 0.748,
+   "name": "wood_bench2",
+   "region": [
+    126,
+    140,
+    60,
+    40
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Boxes",
+   "fill": 0.942,
+   "name": "wood_boxes",
+   "region": [
+    204,
+    366,
+    20,
+    26
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    4,
+    3
+   ],
+   "display_name": "Desk",
+   "fill": 0.927,
+   "name": "wood_desk",
+   "region": [
+    188,
+    140,
+    53,
+    40
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    4,
+    3
+   ],
+   "display_name": "Desk",
+   "fill": 0.805,
+   "name": "wood_desk2",
+   "region": [
+    130,
+    184,
+    58,
+    39
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    6
+   ],
+   "display_name": "Door",
+   "fill": 0.831,
+   "name": "wood_door2",
+   "region": [
+    0,
+    0,
+    15,
+    84
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    2
+   ],
+   "display_name": "Drawer",
+   "fill": 0.827,
+   "name": "wood_drawer2",
+   "region": [
+    181,
+    335,
+    24,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    1
+   ],
+   "display_name": "Frame",
+   "fill": 1.0,
+   "name": "wood_frame1",
+   "region": [
+    128,
+    528,
+    12,
+    15
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    3
+   ],
+   "display_name": "Pallet",
+   "fill": 0.944,
+   "name": "wood_pallet2",
+   "region": [
+    159,
+    225,
+    38,
+    36
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    1,
+    2
+   ],
+   "display_name": "Stump",
+   "fill": 0.875,
+   "name": "wood_stump2",
+   "region": [
+    177,
+    394,
+    16,
+    24
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    2,
+    3
+   ],
+   "display_name": "Table",
+   "fill": 0.919,
+   "name": "wood_table",
+   "region": [
+    0,
+    265,
+    18,
+    35
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
+  },
+  {
+   "cells": [
+    3,
+    2
+   ],
+   "display_name": "Table",
+   "fill": 0.781,
+   "name": "wood_table3",
+   "region": [
+    207,
+    335,
+    38,
+    27
+   ],
+   "sheet": "lake_objects",
+   "yard": "Wood"
   }
  ],
  "sheets": {
@@ -3513,7 +6216,7 @@
    "file": "res://assets/lake_objects.png",
    "size": [
     256,
-    88
+    596
    ]
   }
  }

@@ -141,10 +141,10 @@ WITH_HEAP = False
 ## its rows follow the face's slope, so it sits on the wood rather than in front of it —
 ## sized to fill the face inside a margin off the rim, the corner seam and the outline.
 EMBLEM_PIECE = {
-    "plastic": "plastic_bottle",
+    "plastic": "plastic_bottle1",
     "wood": "wood_chair",
-    "metal": "metal_extinguisher",
-    "rubber": "rubber_duck",
+    "metal": "metal_canister",
+    "rubber": "rubber_ball",
 }
 ## "carved": the sprite's own colours, sunk EMBLEM_SOAK of the way towards the plank under
 ## them, ringed by a groove in the wood's darkest tone with a lit edge along its left and
@@ -208,14 +208,14 @@ HEAP_RADII = (0.75, 0.6)
 
 ## Which of the lake's sprites each yard heaps up. Rubber's tyres are stacked, not scattered.
 HEAPS = {
-    "plastic": ["plastic_cup1", "plastic_cup2", "plastic_bowl", "plastic_plate",
-                "plastic_mug", "plastic_wrap", "plastic_sheet", "plastic_cup1",
-                "plastic_sign", "plastic_bowl"],
-    "wood": ["wood_box2", "wood_box1", "wood_piece", "wood_painting2", "wood_box1",
-               "wood_piece", "wood_painting1"],
-    "metal": ["metal_can1", "metal_can2", "metal_can3", "metal_can4", "metal_pan",
-              "metal_pot", "metal_teapot", "metal_hanger", "metal_can1"],
-    "rubber": ["rubber_ball", "rubber_duck", "rubber_disk", "rubber_ball2", "rubber_block"],
+    "plastic": ["plastic_cup", "plastic_cups", "plastic_bucket1", "plastic_bottle1",
+                "plastic_mug1", "plastic_bag1", "plastic_bottle2", "plastic_cup",
+                "plastic_sauce", "plastic_bucket2"],
+    "wood": ["wood_block", "wood_scrap", "wood_tile", "wood_stick", "wood_scrap",
+               "wood_splinter", "wood_peg"],
+    "metal": ["metal_can1", "metal_can2", "metal_can3", "metal_soda1", "metal_soda2",
+              "metal_tin1", "metal_tin2", "metal_jar", "metal_can1"],
+    "rubber": ["rubber_ball", "rubber_sock", "rubber_eraser", "rubber_plug", "rubber_puck"],
 }
 TYRE_STACKS = [((-1.15, -0.45), 3), ((-0.75, 0.15), 2)]
 

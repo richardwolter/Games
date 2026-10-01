@@ -541,27 +541,32 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   longer at one piece off one line sorted lightest to heaviest.
 
 ### Item Data
-- `TrashDef` now holds: sprite, size, pollution value, haul_cost, tier, lightness (weight class, not force)
-- No physics-derived properties
-- **Lightness** used to be a sort key for the whole basin's fill — every stack drawn from
-  one line, lightest on top, heaviest at the floor. That read as a schedule: skim long
-  enough and the next tier down was always the very next entry. `LakeGrid._roll_piece`
-  replaced it — a material by `MATERIAL_QUOTA`, then a lightness band around the slot's
-  depth (`FILL_BAND`), with `FILL_BAIT_CHANCE` of slots ignoring the band so a rare heavy
-  piece can float near the surface as a landmark rather than a hazard. Material quota is
-  measured off the old fill, not guessed, so the four yards keep the traffic they had.
-- **That band did nothing at all until 2026-09-17.** `_lightness_span` was handed
-  `Vector2(max_lightness, min_lightness)` under the names `heaviest`/`lightest`, so `span`
-  came out negative and `half` with it — every slot's `lo` was above its `hi`, the filter
-  matched nothing, and **every slot in the lake fell through to a uniform roll over its
-  material**. Depth pointed at nothing, in either direction, anywhere. `lightness` is
-  buoyancy (higher floats), the two ends are named `floor_end`/`surface_end` now for which
-  end of the water they are rather than for how heavy they are, and `test_lake` asks the
-  lake itself — over the deep stacks, what floats is lighter than what is under it.
-  **The floor end still barely bites**: one def (`wood_box2`, 0.6) stretches the span and the
-  next heaviest thing is at 1.4, so the band around the floor's target lands where almost
-  nothing lives. The surface end is crowded and works. Percentile ends would fix the other
-  one; not done.
+- `TrashDef` holds: sprite, size, material, tier. **Nothing else balances a kind**
+  (2026-10-01, `/grill-me` with Richard: "balance the lake only by object type and weight
+  tier"). `pollution`, `lightness` and `haul_cost` are deleted from the class and from
+  every `.tres`. **Supersedes** every per-kind pollution and lightness note below (the
+  band, `_lightness_span`, "a new kind's pollution has to keep that order", the third
+  batch's fitted values) and the old Item Data notes on `FILL_BAND`.
+- **Pay** is `EconomyConfig.piece_prices` (`resources/economy.tres`), one price per
+  material per tier, `material * 5 + tier`. Fitted by `tools/fit_prices.py` off the
+  probe's per-material tier mix so each yard's mean pay holds (22.00 / 22.88 / 18.25 /
+  20.29 per piece), shaped `SHAPE` 1 / 1.5 / 2 / 2.6 / 3.4 so every step clears the 1.25
+  the yards spread by and every heavier tier still pays more than any piece of the tier
+  below. `piece_base_pay`, `piece_filth_pay` and `tier_pay_step` are gone.
+- **The meter counts pieces**: every piece out of the water (net, dog, tornado) is 1,
+  finds included, so the meter and "n pieces left" agree.
+- **The fill** (`LakeGrid._roll_piece`): a material by `MATERIAL_QUOTA`, a tier from
+  `TIER_BY_DEPTH` (five depth rows of five tier shares, **measured off the lake as it was**,
+  `depth_tiers` in `tools/last_fill_economy.log`), or any tier `FILL_BAIT_CHANCE` of the
+  time, then any kind of that material and tier, all equal (`_by_cell`). With 12 kinds in
+  each of the 20 cells the commonest kind is about 1% of the water. Shares landed at
+  28.6 / 22.9 / 20.6 / 10.7 / 17.3%.
+- **Known**: the measured table is not light-on-top: its surface row is heavier than its
+  floor row, because the old fitted lightness had stopped sorting by weight. What the
+  player sees is still light, because `_dress_surface` breaks ties `FLOAT_STEP` (0.7) a
+  tier lighter. Flip or steepen the rows to bring back "skim light first" in depth.
+- `tools/solve_pack_rubbish.py`, `fit_pack_rubbish.py` and their json are deleted.
+- **`SAVE_VERSION` 19**, v18 refused; the v18 save is `_builds/lake_cleanup_v18_20261001.save`.
 
 ### The Lake Twice as Deep (2026-09-24, `/grill-me` with Richard)
 Richard: Strength 1 was too dear, and at the end of a run "the net is huge but not a lot of

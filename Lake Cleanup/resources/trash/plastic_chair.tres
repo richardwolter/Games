@@ -4,12 +4,9 @@
 
 [resource]
 script = ExtResource("1_trash")
-display_name = "Plastic Chair"
+display_name = "Chair"
 material = 0
 piece = &"plastic_chair"
-size = Vector2(17.6, 25.6)
-pollution = 3.5
-haul_cost = 1.22
+size = Vector2(26, 40)
 tier = 3
-lightness = 2.0
-block_color = Color(0.85, 0.72, 0.25, 1)
+block_color = Color(0.45, 0.62, 0.8, 1)

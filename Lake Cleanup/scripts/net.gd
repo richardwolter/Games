@@ -478,11 +478,6 @@ class RopeLayer extends Node2D:
 	var far := PackedVector2Array()
 
 	func _draw() -> void:
-		var __t := Time.get_ticks_usec()
-		__x_draw()
-		ProfTmp.add("net:480:_draw", Time.get_ticks_usec() - __t)
-
-	func __x_draw() -> void:
 		if line.size() < 2:
 			return
 		# Far bridles first and faint, then the near ones, then the line over the lot.
@@ -519,11 +514,6 @@ class CatchRim extends CatchShine:
 		show_behind_parent = true
 
 	func _draw() -> void:
-		var __t := Time.get_ticks_usec()
-		__x_draw()
-		ProfTmp.add("net:516:_draw", Time.get_ticks_usec() - __t)
-
-	func __x_draw() -> void:
 		for find: Array in finds:
 			var def: TrashDef = grid.defs[find[0]]
 			if def.atlas == null:
@@ -551,20 +541,10 @@ class CatchBeam extends CatchShine:
 	# Its own clock for the breath: the net only redraws when it moves, and a beam that
 	# breathed only while the bag swung would hold its breath on a landed net.
 	func _process(delta: float) -> void:
-		var __t := Time.get_ticks_usec()
-		__x_process(delta)
-		ProfTmp.add("net:543:_process", Time.get_ticks_usec() - __t)
-
-	func __x_process(delta: float) -> void:
 		age += delta
 		queue_redraw()
 
 	func _draw() -> void:
-		var __t := Time.get_ticks_usec()
-		__x_draw()
-		ProfTmp.add("net:547:_draw", Time.get_ticks_usec() - __t)
-
-	func __x_draw() -> void:
 		if grid == null:
 			return
 		var wide := grid.beam_width()
@@ -590,11 +570,6 @@ class CatchStars extends CatchShine:
 	var _rng := RandomNumberGenerator.new()
 
 	func _process(delta: float) -> void:
-		var __t := Time.get_ticks_usec()
-		__x_process(delta)
-		ProfTmp.add("net:572:_process", Time.get_ticks_usec() - __t)
-
-	func __x_process(delta: float) -> void:
 		age += delta
 		var kept: Array = []
 		var shown := {}
@@ -625,11 +600,6 @@ class CatchStars extends CatchShine:
 		return found
 
 	func _draw() -> void:
-		var __t := Time.get_ticks_usec()
-		__x_draw()
-		ProfTmp.add("net:602:_draw", Time.get_ticks_usec() - __t)
-
-	func __x_draw() -> void:
 		var shown := {}
 		for find: Array in finds:
 			shown[find[0]] = find
@@ -861,11 +831,6 @@ func world_pos() -> Vector2:
 
 
 func _process(delta: float) -> void:
-	var __t := Time.get_ticks_usec()
-	__x_process(delta)
-	ProfTmp.add("net:833:_process", Time.get_ticks_usec() - __t)
-
-func __x_process(delta: float) -> void:
 	_time += delta
 	_push_bow(delta)
 	_lean_into_pull(delta)
@@ -1931,11 +1896,6 @@ static func _draw_rope(on: CanvasItem, points: PackedVector2Array) -> void:
 
 ## The range ring, the line, the net, and whatever is being dragged in it.
 func _draw() -> void:
-	var __t := Time.get_ticks_usec()
-	__x_draw()
-	ProfTmp.add("net:1898:_draw", Time.get_ticks_usec() - __t)
-
-func __x_draw() -> void:
 	if angler == null:
 		return
 	var ink := Color(0.11, 0.09, 0.1)

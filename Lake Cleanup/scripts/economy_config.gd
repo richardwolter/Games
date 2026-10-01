@@ -1,17 +1,21 @@
 ## What money comes from: what a netted pigeon pays on the spot, and what a piece pays at
-## a merchant — a flat fee for anything landed, plus a cut of what its filth was worth.
-##
-## The flat/filth split is deliberate (see lake.gd's `_on_sold`): the flat half is why
-## early, cheap pieces pay anything at all, and the filth half is why a late hold of heavy
-## pieces outearns an early hold of light ones. Lives here so a money pass is a `.tres`
-## edit, not a `lake.gd` edit.
+## a merchant. Lives here so a money pass is a `.tres` edit, not a `lake.gd` edit.
 class_name EconomyConfig
 extends Resource
 
-@export var piece_base_pay: float = 4.0
-@export var piece_filth_pay: float = 9.0
+## What a piece of rubbish pays, by material and weight tier: row `material` (Plastic,
+## Wood, Metal, Rubber), column `tier` (0 to 4), flattened as `material * 5 + tier`.
+## A kind is its art, its material and its tier, and nothing else (2026-10-01, Richard):
+## every tier-2 metal pays the same. Heavier tiers always pay more than any piece of the
+## tier below, across all four yards (test_lake guards it).
+@export var piece_prices: PackedFloat32Array = PackedFloat32Array([
+	4.0, 6.0, 8.0, 10.0, 13.0,
+	4.0, 6.0, 8.0, 10.0, 13.0,
+	4.0, 6.0, 8.0, 10.0, 13.0,
+	4.0, 6.0, 8.0, 10.0, 13.0,
+])
 @export var bird_bonus: float = 26.0
-## How much more each weight tier pays than the one below, as a fraction of the whole: a
-## tier-4 piece pays 1 + 4 * step times what its filth alone would. Heavier tiers always pay
-## more than the tiers before them (2026-09-14), and test_lake guards that piece by piece.
-@export var tier_pay_step: float = 0.5
+
+
+func price_of(material: int, tier: int) -> float:
+	return piece_prices[clampi(material, 0, 3) * 5 + clampi(tier, 0, 4)]
