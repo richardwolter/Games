@@ -32,6 +32,13 @@ const ROWS := [
 	["lip", 0.0, 1.0, 1.0, false],
 	["tuft_share", 0.0, 1.0, 0.02, true],
 	["tuft_reach", 0.0, 3.0, 0.1, true],
+	["clump_cut", 0.4, 1.0, 0.01, false],
+	["clump_share", 0.0, 1.0, 0.02, false],
+	["gust_cut", 0.3, 1.0, 0.01, false],
+	["tide_at", 0.3, 2.0, 0.05, false],
+	["ripple_field", 0.3, 1.0, 0.01, false],
+	["ripple_gap", 2.0, 10.0, 1.0, false],
+	["wet_step", 0.1, 2.0, 0.05, false],
 ]
 
 ## The island's coast wave, straight onto the water material. Same columns as `ROWS`; nothing

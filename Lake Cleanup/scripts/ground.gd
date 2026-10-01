@@ -120,6 +120,22 @@ const LIP := false
 const TUFT_SHARE := 0.36
 const TUFT_REACH := 0.9
 
+## The ground's volume (2026-10-01, picked off tools/last_ground_volume_mockup3.png, 1b): the
+## lawn in clumps that sway, the beach in bands along the shore. Shader-side, all of it; these
+## are the numbers the F4 tuner moves, and the shader's own defaults are the same picks.
+## `CLUMP_CUT`/`CLUMP_SHARE` how much of the lawn is clumps and how thick; `GUST_CUT` how much
+## of it a gust tips at once; `TIDE_AT` how far up the beach the wrack lies, in tiles;
+## `RIPPLE_FIELD` how few patches of ripples (higher is fewer) and `RIPPLE_GAP` their spacing in
+## art pixels; `WET_STEP` the seconds between the wave's remembered reaches, so six of them is
+## how long sand the wave left takes to dry.
+const CLUMP_CUT := 0.7
+const CLUMP_SHARE := 0.42
+const GUST_CUT := 0.68
+const TIDE_AT := 0.55
+const RIPPLE_FIELD := 0.66
+const RIPPLE_GAP := 5.0
+const WET_STEP := 0.6
+
 ## How far in from the island's waterline the grass starts, in tiles. Everything outside it
 ## is beach.
 ##
@@ -253,11 +269,31 @@ var fringe_share: float = FRINGE_SHARE
 var lip: bool = LIP
 var tuft_share: float = TUFT_SHARE
 var tuft_reach: float = TUFT_REACH
+var clump_cut: float = CLUMP_CUT
+var clump_share: float = CLUMP_SHARE
+var gust_cut: float = GUST_CUT
+var tide_at: float = TIDE_AT
+var ripple_field: float = RIPPLE_FIELD
+var ripple_gap: float = RIPPLE_GAP
+var wet_step: float = WET_STEP
 
 ## How wet the sand is, 0 to 1 (`Puddles`, while it rains). The shader darkens sand by it.
 func set_wet(amount: float) -> void:
 	if _material != null:
 		_material.set_shader_parameter(&"wet_sand", amount)
+
+
+## How stormy it is, 0 to 1 (the day's overcast, pushed by `Lake._push_daylight`): the lawn's
+## clumps sway harder and faster under it. Only sent when it moves, since it is every frame.
+func set_storm(amount: float) -> void:
+	amount = clampf(amount, 0.0, 1.0)
+	if _material == null or is_equal_approx(amount, _storm):
+		return
+	_storm = amount
+	_material.set_shader_parameter(&"storm", amount)
+
+
+var _storm := 0.0
 
 
 ## The polygon the shader draws the ground on, and its material.
@@ -380,6 +416,10 @@ func _build_sheet() -> void:
 	_material.set_shader_parameter(&"island_under", ISLAND_UNDER)
 	_material.set_shader_parameter(&"beach_in", BEACH_IN)
 	_material.set_shader_parameter(&"seed", float(SEED))
+	# The wet edge the coast wave leaves is the water's own wave, read the same way.
+	_material.set_shader_parameter(&"coast_wave", Lake.COAST_WAVE)
+	_material.set_shader_parameter(&"coast_waves", Lake.COAST_WAVES)
+	_material.set_shader_parameter(&"coast_wave_speed", Lake.COAST_WAVE_SPEED)
 	var palette := Palette.master()
 	if palette != null:
 		_material.set_shader_parameter(&"fringe_dark", palette.grass_dark)
@@ -406,6 +446,9 @@ func _push_tunables() -> void:
 	_material.set_shader_parameter(&"fringe_depth", fringe_depth)
 	_material.set_shader_parameter(&"fringe_share", fringe_share)
 	_material.set_shader_parameter(&"lip", lip)
+	for key: StringName in [&"clump_cut", &"clump_share", &"gust_cut", &"tide_at",
+			&"ripple_field", &"ripple_gap", &"wet_step"]:
+		_material.set_shader_parameter(key, get(key))
 
 
 ## The sliders moved. Push the picture's numbers to the shader at once, and lay the props
@@ -814,6 +857,8 @@ static func lawn_shades(slice: int) -> Dictionary:
 		&"lawn_mid": base,
 		&"lawn_low": greens[maxi(at - 1, 0)],
 		&"lawn_light": greens[mini(at + 1, greens.size() - 1)],
+		# The clumps' sunward tips: one step further up the same ramp.
+		&"lawn_hi": greens[mini(at + 2, greens.size() - 1)],
 	}
 
 

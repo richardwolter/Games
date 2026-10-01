@@ -41,7 +41,7 @@ func _say(line: String) -> void:
 func _spots() -> Array:
 	var isle := Iso.tile_to_world(Iso.ISLAND_CENTRE.x - 2.5, Iso.ISLAND_CENTRE.y + 3.5)
 	var t := Iso.CENTRE
-	while Ground.out_of_water(t.x, t.y) < Ground.SAND_OUT + 2.5:
+	while Ground.out_of_water(t.x, t.y) < Ground.SAND_OUT * 0.75:
 		t -= Vector2(0.25, 0.25)
 	return [["isle", isle], ["bank", Iso.tile_to_world(t.x, t.y)]]
 

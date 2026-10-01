@@ -3807,6 +3807,55 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   `tools/shot_rain.tscn` (desktop build, `--fixed-fps 60`, own save, under its own node)
   saves `tools/last_rain_{far,near,flash}.png` and `last_rain.log`.
 
+### The Ground Has Volume (2026-10-01, `/grill-me` with Richard)
+The lawn and the beach read flat: one green with sparse blades, one sand. Picked off
+`tools/last_ground_volume_mockup3.png`, panel **1b** (`tools/ground_volume_mockup.py`, offline,
+three passes: A raised turf, C lit mounds and dunes turned down; B clumps quieter and with a
+lighter dark; the sand's bands laid along the water line, tide line, fewer ripples). All of it is
+`shaders/ground.gdshader`, both shores; `Ground.coverage_at` and the props are untouched.
+- **The lawn grows in clumps** (`blade_grass`, `CLUMP_CUT` 0.7, `CLUMP_SHARE` 0.42,
+  `clump_scale` 5 art px): where a coarse noise passes the cut, blades stand 3-4 tall, root
+  pixel `lawn_low`, body `lawn_soft` (half way low to mid: Richard's "lighter dark"), tip
+  `lawn_hi` (`Ground.lawn_shades`, one more step up the pack ramp) on the clump's east side and
+  `lawn_light` on its west. Between clumps the old sparse two-pixel blades. The bank keeps its
+  tone blotches under them.
+- **The clumps sway** (`gust_*`, `storm`): a gust noise drifts over the lawn on the stepped
+  clock and tips blade tops (row 2 up) one art pixel where it passes `GUST_CUT`. `storm` is the
+  day's overcast (`Ground.set_storm` from `Lake._push_daylight`): a lower cut, a faster drift,
+  and past half a second pixel on row 3 up, so rain and the tornado both blow harder. The gust
+  is read at the pixel, not the blade's root; a blade straddling a gust's edge can tear by a
+  pixel for a frame, accepted.
+- **The beach is banded by its distance from the drawn waterline** (`shore_at`, mirroring
+  water.gdshader's island and bank fractions), so every band runs along the shore. Distances
+  are tiles; thicknesses are art pixels across the line, through the distance's own gradient.
+  From the water up: the **wet edge**, a dashed **tide line** of wrack at `TIDE_AT` (0.55)
+  tiles wandering `tide_wander` with a shell now and then, sparse short **ripples** only in
+  patches (`RIPPLE_FIELD` 0.66, `RIPPLE_GAP` 5 px, from `ripple_from` past the tide line),
+  scattered **pebbles** (body, lit pixel over, shade down-left) and **shells**, and a pale
+  **dry strip** `dry_strip` px under the lawn. The pack slab's texel is still the plain sand.
+  Rain's `wet_sand` darkens all of it as before.
+- **The wet edge follows the coast wave** (`coast_lap`/`coast_lobes`, copied from
+  water.gdshader, `test_lake` holds the two bodies equal): sand the crest covered within the
+  last `wet_steps` x `WET_STEP` (6 x 0.6 s) is `sand_wet` if lately, `sand_damp` if longer
+  ago, dry after. Nothing saved: the wave is a function of the clock and is read back. So it
+  only shows where the water is pulling back; at a crest there is no band. `Ground` is handed
+  `Lake.COAST_WAVE*`. **Move the water's wave and the ground's together.**
+- **Static, by decision**: the tide line, ripples, pebbles and shells do not change with
+  cleaning.
+- **Tuning**: F4's `GroundTuner` has `clump_cut`, `clump_share`, `gust_cut`, `tide_at`,
+  `ripple_field`, `ripple_gap`, `wet_step`; bake picks into `Ground`'s constants. Colours are
+  shader defaults off the mockup (`sand_*`, `pebble*`, `shell`). All first guesses.
+- **Cost** (`bench_frames`, RTX 5060 Ti, 1080p): 3.65 ms mean standing, 4.13 walking, 5.81 in
+  a shower, worst 9.0, nothing over 16.7.
+- **Re-shot**: `assets/loading_lake.png` and `assets/boot_splash.png` (`shot_loading`). The
+  letter's stills still show the old ground.
+- **Out of scope, by decision**: a raised turf edge, lit mounds and dunes, the tide line
+  following the cleaning, new painted art, prop changes.
+- Probe: `tools/shot_grass.tscn` (desktop build) saves `tools/film/grass/now_{isle,bank}.png`;
+  its bank spot now stands on the beach. `test_lake`'s `_check_ground_volume` guards the
+  uniforms, the wave's two copies being one, the tips' step, the push of the wave and the tide,
+  and the storm reaching the sway.
+
 ### The Sky in the Water (2026-09-28, `/grill-me` with Richard, off a reference picture)
 Picked off `tools/last_sky_mockup.png` (`tools/sky_reflect_mockup.py`, offline, psd-extract
 venv python; the sheet still shows lake option C and wash sky option 3 as judged).

@@ -84,6 +84,59 @@ uniform vec3 wet_ink = vec3(0.68, 0.7, 0.76);
 uniform bool lip = true;
 uniform vec4 lip_color : source_color = vec4(0.118, 0.275, 0.082, 1.0);
 
+// --- volume (2026-10-01, `/grill-me` with Richard, picked off
+// tools/last_ground_volume_mockup3.png, panel 1b) -----------------------------------------
+//
+// The lawn grows in clumps: where a coarse noise (`clump_scale` art pixels a blob) passes
+// `clump_cut`, blades root at `clump_share` and stand 3-4 tall, their root pixel the low
+// green, their bodies `lawn_soft` (half way from low to mid, the "lighter dark"), their tips
+// lit on the clump's sunward side (`lawn_hi`, one step up the ramp from the light) and the
+// plain light on the other. Between clumps the old sparse two-pixel blades at `blade_share`.
+uniform vec4 lawn_hi : source_color = vec4(0.54, 0.62, 0.31, 1.0);
+uniform float clump_scale = 5.0;
+uniform float clump_cut = 0.7;
+uniform float clump_share = 0.42;
+// The clumps sway: a gust noise `gust_scale` art pixels a blob drifts across the lawn on the
+// stepped clock, and where it passes `gust_cut` the blades' tops (rows 2 and up) tip one art
+// pixel downwind. `storm` (the day's overcast, 0 to 1) lowers the cut and quickens the drift,
+// and from half a storm up tips the tallest rows a second pixel.
+uniform float gust_scale = 40.0;
+uniform float gust_speed = 0.35;
+uniform float gust_cut = 0.68;
+uniform float storm : hint_range(0.0, 1.0) = 0.0;
+uniform float pixel_fps = 8.0;
+
+// The beach is laid in bands by its distance from the drawn waterline, so every band runs
+// along the shore: the wet edge the coast wave leaves, a dashed tide line of wrack with a
+// shell now and then, sparse short ripples in patches, pebbles, and a dry strip under the
+// lawn. Distances along the shore are tiles; thicknesses are art pixels, measured across the
+// line through its own gradient so a line is as thick on every face of the shore.
+uniform vec4 sand_wet : source_color = vec4(0.706, 0.588, 0.408, 1.0);
+uniform vec4 sand_damp : source_color = vec4(0.745, 0.639, 0.463, 1.0);
+uniform vec4 sand_down : source_color = vec4(0.808, 0.694, 0.494, 1.0);
+uniform vec4 sand_light : source_color = vec4(0.941, 0.863, 0.675, 1.0);
+uniform vec4 pebble : source_color = vec4(0.588, 0.533, 0.439, 1.0);
+uniform vec4 pebble_lit : source_color = vec4(0.769, 0.722, 0.62, 1.0);
+uniform vec4 shell : source_color = vec4(0.957, 0.91, 0.839, 1.0);
+uniform float tide_at = 0.55;
+uniform float tide_wander = 0.12;
+uniform float tide_thick = 1.3;
+uniform float ripple_gap = 5.0;
+uniform float ripple_field = 0.66;
+uniform float ripple_from = 2.5;
+uniform float dry_strip = 3.5;
+uniform float pebble_odds = 0.004;
+uniform float shell_odds = 0.0025;
+// The coast wave, mirrored from water.gdshader (`coast_lap`, Lake.COAST_WAVE*) so the wet
+// edge follows the water it is the trace of. Sand the crest covered within the last
+// `wet_steps` x `wet_step` seconds is dark, the more lately the darker, in two steps.
+uniform float coast_wave = 0.32;
+uniform float coast_waves = 3.0;
+uniform float coast_wave_speed = 0.75;
+uniform float wave_speed = 1.0;
+uniform float wet_step = 0.6;
+uniform int wet_steps = 6;
+
 varying vec2 world_pos;
 
 // --- the plane ---------------------------------------------------------------------------
@@ -252,33 +305,176 @@ float tone_at(vec2 p) {
 	return 1.0;
 }
 
-// The drawn lawn at `p`. A blade is rooted at its bottom pixel; walking the three rows
-// below looks for one reaching up to here, its top pixel shifted by its lean.
+// The drawn lawn at `p`. A blade is rooted at its bottom pixel; walking the rows below looks
+// for one reaching up to here, its upper pixels shifted by its lean and the gust.
 vec3 blade_grass(vec2 p) {
 	vec2 q = floor(p / art_pixel);
-	vec3 col = cell_hash(q * 1.31 + vec2(2.0, 9.0)) < speckle ? lawn_low.rgb : lawn_mid.rgb;
-	for (int k = 0; k < 3; k++) {
-		for (int s = -1; s <= 1; s++) {
-			float shift = k >= 2 ? float(s) : 0.0;
-			if (k < 2 && s != 0) {
+	vec3 lawn_soft = mix(lawn_low.rgb, lawn_mid.rgb, 0.45);
+	float clock = stepped_time(TIME, pixel_fps);
+	vec2 drift = vec2(-1.0, 0.3) * clock * gust_speed * (1.0 + storm * 1.5);
+	float gust = blob_noise(q / max(gust_scale, 1.0) + drift + vec2(seed * 0.0002, 31.0));
+	float cut = gust_cut - storm * 0.22;
+	int sway = gust > cut ? 1 : 0;
+	int sway_hard = (storm > 0.5 && gust > cut + 0.08) ? 1 : 0;
+	vec2 off = vec2(seed * 0.0001, 17.0);
+	vec2 dens_off = vec2(seed * 0.0003, 5.0);
+	float most = max(clump_share, blade_share);
+	for (int k = 0; k < 5; k++) {
+		for (int s = -1; s <= 3; s++) {
+			vec2 root = vec2(q.x - float(s), q.y + float(k));
+			float roll = cell_hash(root + off);
+			if (roll > most) {
 				continue;
 			}
-			vec2 root = vec2(q.x - shift, q.y + float(k));
-			if (cell_hash(root + vec2(seed * 0.0001, 17.0)) > blade_share) {
+			float dens = blob_noise(root / max(clump_scale, 1.0) + dens_off);
+			bool in_clump = dens > clump_cut;
+			if (roll > (in_clump ? clump_share : blade_share)) {
 				continue;
 			}
-			float lean_roll = cell_hash(root + vec2(11.0, 4.0));
-			float lean = lean_roll < blade_lean ? (cell_hash(root.yx + vec2(3.0, 8.0)) < 0.5 ? -1.0 : 1.0) : 0.0;
-			if (lean != shift) {
+			float tall = in_clump ? 3.0 + floor(cell_hash(root + vec2(5.0, 23.0)) * 2.0) : 2.0;
+			if (float(k) >= tall) {
 				continue;
 			}
-			float tall = 2.0 + floor(cell_hash(root + vec2(5.0, 23.0)) * 2.0);
-			if (float(k) < tall) {
-				return float(k) == tall - 1.0 ? lawn_light.rgb : lawn_low.rgb;
+			// Where this blade's pixel on row k stands: its lean and the gust's tip from row
+			// 2, the storm's second pixel from row 3.
+			int shift = 0;
+			if (k >= 2) {
+				float lr = cell_hash(root + vec2(11.0, 4.0));
+				shift = lr < blade_lean ? -1 : (lr > 1.0 - blade_lean ? 1 : 0);
+				shift += sway;
+				if (k >= 3) {
+					shift += sway_hard;
+				}
 			}
+			if (shift != s) {
+				continue;
+			}
+			if (float(k) == tall - 1.0) {
+				if (!in_clump) {
+					return lawn_light.rgb;
+				}
+				float east = blob_noise((root + vec2(2.0, 0.0)) / max(clump_scale, 1.0) + dens_off);
+				return east < dens ? lawn_hi.rgb : lawn_light.rgb;
+			}
+			if (k == 0 && in_clump) {
+				return lawn_low.rgb;
+			}
+			return in_clump ? lawn_soft : lawn_low.rgb;
 		}
 	}
-	return col;
+	return cell_hash(q * 1.31 + vec2(2.0, 9.0)) < speckle ? lawn_low.rgb : lawn_mid.rgb;
+}
+
+// --- the beach's bands --------------------------------------------------------------------
+
+// How far up the beach the coast wave reaches at this angle round a shore, in tiles. Mirrors
+// water.gdshader's `coast_lap` and `coast_lobes`; the two must move together.
+float coast_lap(float angle, float clock, float lobes) {
+	float t = clock * wave_speed * coast_wave_speed;
+	float drift = max(round(lobes * 0.37), 1.0);
+	float s = sin(angle * lobes + t + sin(angle * drift - t * 0.31) * 1.6) * 0.5 + 0.5;
+	return max(coast_wave, 0.0) * s;
+}
+
+float coast_lobes(float mean) {
+	float isl = max((island_radius.x + island_radius.y) * 0.5 - water_lap, 0.5);
+	return max(round(coast_waves * mean / isl), 1.0);
+}
+
+// Tiles up the beach from the drawn waterline (the edge water.gdshader draws with no wave),
+// with the angle and the shore's mean radius the wave is read with. Mirrors water.gdshader:
+// the island's fraction is over the radii less the lap, the bank's over the radii plus it.
+vec3 shore_at(vec2 t) {
+	if (layer == 1) {
+		vec2 d = t - island_centre;
+		float mean = max((island_radius.x + island_radius.y) * 0.5 - water_lap, 0.5);
+		return vec3((1.0 - island_ring_fraction(t, water_lap)) * mean, atan(d.y, d.x), mean);
+	}
+	vec2 d = (t - basin_centre) / (basin_radius + vec2(water_lap));
+	float r = length(d);
+	float angle = atan(d.y, d.x);
+	float wobble = 1.0 + 0.09 * sin(angle * 3.0) + 0.05 * sin(angle * 5.0 + 1.3);
+	float mean = (basin_radius.x + basin_radius.y) * 0.5 + water_lap;
+	return vec3((r / wobble - 1.0) * mean, angle, mean);
+}
+
+// The sand at `p`, given its slab texel and this pixel's lawn coverage `c0`.
+vec3 beach(vec2 p, vec3 texel, float c0) {
+	vec2 q = floor(p / art_pixel);
+	vec3 here = shore_at(world_to_tile(p));
+	float dw = here.x;
+
+	// Pebbles first, each a body, a lit pixel above it and a shade down and to the left.
+	vec2 pk = vec2(71.0, 3.0);
+	if (cell_hash(q + vec2(0.0, 1.0) + pk) < pebble_odds) {
+		return pebble_lit.rgb;
+	}
+	if (cell_hash(q + pk) < pebble_odds) {
+		return pebble.rgb;
+	}
+	if (cell_hash(q + vec2(1.0, -1.0) + pk) < pebble_odds) {
+		return sand_down.rgb;
+	}
+	if (cell_hash(q + vec2(73.0, 9.0)) < shell_odds) {
+		return shell.rgb;
+	}
+
+	// The wet edge: the latest moment the wave covered this sand decides how dark it is.
+	if (dw < coast_wave) {
+		float clock = stepped_time(TIME, pixel_fps);
+		float lobes = coast_lobes(here.z);
+		float wet = 0.0;
+		for (int k = 1; k <= wet_steps; k++) {
+			if (dw < coast_lap(here.y, clock - float(k) * wet_step, lobes)) {
+				wet = 1.0 - float(k - 1) / float(wet_steps);
+				break;
+			}
+		}
+		if (wet > 0.6) {
+			return sand_wet.rgb;
+		}
+		if (wet > 0.0) {
+			return sand_damp.rgb;
+		}
+	}
+
+	// How many tiles one art pixel is across the shore here, and across the lawn's line.
+	float step_w = max(length(vec2(
+		shore_at(world_to_tile(p + vec2(art_pixel, 0.0))).x - dw,
+		shore_at(world_to_tile(p + vec2(0.0, art_pixel))).x - dw)), 0.0001);
+	float step_l = max(length(vec2(
+		coverage(p + vec2(art_pixel, 0.0)) - c0,
+		coverage(p + vec2(0.0, art_pixel)) - c0)), 0.0001);
+
+	// The tide line: a dashed dark line of wrack along the shore, wandering.
+	float tide = tide_at + (blob_noise(q / 24.0 + vec2(99.0, seed * 0.0001)) - 0.5) * 2.0 * tide_wander;
+	float into_tide = (dw - tide) / step_w;
+	if (into_tide >= 0.0 && into_tide < tide_thick && blob_noise(q / 5.0 + vec2(95.0, 1.0)) > 0.4) {
+		if (cell_hash(q + vec2(97.0, 5.0)) < 0.07) {
+			return shell.rgb;
+		}
+		return into_tide < tide_thick * 0.55 ? sand_wet.rgb : sand_down.rgb;
+	}
+
+	// The dry strip under the lawn.
+	if (-c0 / step_l < dry_strip) {
+		return cell_hash(q + vec2(5.0, 2.0)) > 0.08 ? sand_light.rgb : texel;
+	}
+
+	// Ripples along the shore, sparse: only in patches, dashed, lit on the shore's side.
+	if (into_tide > tide_thick + ripple_from
+			&& blob_noise(q / 14.0 + vec2(103.0, 7.0)) > ripple_field
+			&& blob_noise(q / 4.0 + vec2(83.0, 2.0)) >= 0.48) {
+		float w = dw / step_w + (blob_noise(q / 9.0 + vec2(109.0, 4.0)) - 0.5) * 2.0;
+		float f = fract(w / max(ripple_gap, 1.0));
+		if (f < 0.17) {
+			return sand_down.rgb;
+		}
+		if (f < 0.3) {
+			return sand_light.rgb;
+		}
+	}
+	return texel;
 }
 
 void vertex() {
@@ -323,7 +519,7 @@ void fragment() {
 			if (sand.a < 0.5) {
 				discard;
 			}
-			shown = sand.rgb * mix(vec3(1.0), wet_ink, wet_sand);
+			shown = beach(p, sand.rgb, c0) * mix(vec3(1.0), wet_ink, wet_sand);
 		}
 	}
 	COLOR = vec4(shown, 1.0);

@@ -4613,6 +4613,9 @@ func _push_daylight() -> void:
 		_water_material.set_shader_parameter(&"sky_storm", clampf(_day.overcast, 0.0, 1.0))
 		_water_material.set_shader_parameter(&"sky_flash", clampf(Weather.flash_now / Weather.FLASH_PEAK, 0.0, 1.0))
 		_water_material.set_shader_parameter(&"sky_tint", sky_low(_day.sun))
+	# The lawn's clumps sway harder under the rain's overcast (Ground.set_storm).
+	for ground in _grounds:
+		ground.set_storm(_day.overcast)
 
 
 ## The low sky's colour for where the sun is along its day: the wash room's own sky swatches,

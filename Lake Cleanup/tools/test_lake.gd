@@ -429,6 +429,7 @@ func _stage_build() -> void:
 	_check(shades[&"lawn_low"].get_luminance() < shades[&"lawn_mid"].get_luminance()
 		and shades[&"lawn_mid"].get_luminance() < shades[&"lawn_light"].get_luminance(),
 		"and it is painted in three steps of the pack grass's own ramp", "%s" % [shades])
+	_check_ground_volume(ground_src)
 	# Whole waves per lap, or the ring seams where atan() wraps from pi to minus pi.
 	_check(is_equal_approx(Lake.COAST_WAVES, roundf(Lake.COAST_WAVES)) and Lake.COAST_WAVES >= 1.0,
 		"and closes on itself round the island",
@@ -5853,6 +5854,51 @@ func _check_signals(cam: Camera2D) -> void:
 	_main.call(&"_push_zoom")
 	_main.call(&"_hold_the_angler")
 
+
+## The ground's volume (2026-10-01): clumps that sway in the lawn, bands along the beach, and a
+## wet edge that is the coast wave's own trace. Source checks, since headless draws nothing;
+## `tools/shot_grass.tscn` is what shows it.
+func _check_ground_volume(ground_src: String) -> void:
+	for key in ["clump_cut", "clump_share", "lawn_hi", "storm", "gust_cut", "tide_at",
+			"ripple_field", "ripple_gap", "sand_wet", "sand_damp", "wet_step", "coast_wave"]:
+		_check(ground_src.contains("uniform") and ground_src.contains(" %s" % key),
+			"the ground shader takes %s" % key, "")
+	# The wet edge follows the water's wave only while both read it the same way.
+	var water_src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
+	for fn in ["float coast_lap(", "float coast_lobes("]:
+		_check(_body_of(ground_src, fn) != ""
+			and _body_of(ground_src, fn).replace("water_lap", "shore_lap") == _body_of(water_src, fn),
+			"the ground's %s) is the water's own" % fn.trim_suffix("("), "")
+	var shades := Ground.lawn_shades(Ground.GRASS_ISLAND)
+	_check(shades.has(&"lawn_hi")
+		and shades[&"lawn_hi"].get_luminance() >= shades[&"lawn_light"].get_luminance(),
+		"the clumps' sunward tips are a step up the same ramp", "%s" % [shades.get(&"lawn_hi")])
+	var ground := Ground.new()
+	ground.layer = Ground.Layer.ISLAND
+	add_child(ground)
+	var material := (ground.get_node(^"Sheet") as Polygon2D).material as ShaderMaterial
+	_check(is_equal_approx(float(material.get_shader_parameter(&"coast_wave")), Lake.COAST_WAVE)
+		and is_equal_approx(float(material.get_shader_parameter(&"coast_wave_speed")), Lake.COAST_WAVE_SPEED),
+		"the ground is handed the water's coast wave", "")
+	_check(is_equal_approx(float(material.get_shader_parameter(&"tide_at")), Ground.TIDE_AT),
+		"and its own tide line", "")
+	ground.set_storm(0.8)
+	_check(is_equal_approx(float(material.get_shader_parameter(&"storm")), 0.8),
+		"a storm reaches the lawn's sway", "")
+	ground.set_storm(3.0)
+	_check(is_equal_approx(float(material.get_shader_parameter(&"storm")), 1.0),
+		"and is held to 1", "")
+	ground.queue_free()
+
+
+## The text of a shader function from its signature to its closing brace at the margin.
+func _body_of(src: String, signature: String) -> String:
+	var at := src.find(signature)
+	if at < 0:
+		return ""
+	var end := src.find("
+}", at)
+	return src.substr(at, end - at) if end > 0 else ""
 
 func _check_free_view(cam: Camera2D) -> void:
 	var button: PlankButton = _main.get(&"_free_camera")
