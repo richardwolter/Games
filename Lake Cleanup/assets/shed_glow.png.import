@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dysplsdtak5kq"
-path="res://.godot/imported/shed.png-14e3aec6d678646242e990f7a39b1ace.ctex"
+uid="uid://ce0f08r20etl1"
+path="res://.godot/imported/shed_glow.png-d659b73a1c430ef89aac6765e7c98482.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/shed.png"
-dest_files=["res://.godot/imported/shed.png-14e3aec6d678646242e990f7a39b1ace.ctex"]
+source_file="res://assets/shed_glow.png"
+dest_files=["res://.godot/imported/shed_glow.png-d659b73a1c430ef89aac6765e7c98482.ctex"]
 
 [params]
 

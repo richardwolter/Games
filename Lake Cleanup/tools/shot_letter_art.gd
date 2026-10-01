@@ -77,6 +77,10 @@ func _ready() -> void:
 	process_priority = 100
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_log = FileAccess.open(LOG, FileAccess.WRITE)
+	# The stills carry the game's English UI whatever the machine's settings say, set by hand
+	# as test_lake does: nothing here may write `settings.cfg`.
+	TranslationServer.set_locale("en")
+	preload("res://scripts/style.gd").set_locale("en")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/letter"))
 	if FileAccess.file_exists(SAVE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))

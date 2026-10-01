@@ -192,6 +192,11 @@ class Cast extends CanvasGroup:
 		_face = Face.new()
 		add_child(_face)
 
+	## Drops what was laid, so the next `lay` sweeps again: the picture has changed under the
+	## same box (the hut going from one stage to the next).
+	func forget() -> void:
+		_key = ""
+
 	## The shadow for this picture at this hour. Cheap to call every frame: the geometry is
 	## only rebuilt when the sun has actually moved, or when the picture or its box changes.
 	func lay(

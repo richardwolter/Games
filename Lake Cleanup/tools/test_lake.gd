@@ -3062,12 +3062,12 @@ func _stage_art() -> void:
 		"%d pairs overlap" % overlaps)
 
 	# The hut's collision is its drawing. Iso.SHED_FOOT and Iso.SHED_ART_GROUND are both
-	# measured off shed.png by hand, so nothing but this stops a re-cut of the hut leaving the
+	# measured off the hut picture (all three stages share one silhouette), so nothing but this stops a re-cut of the hut leaving the
 	# walking rule on the old building: a walker stopped short of one wall and standing inside
 	# the opposite one. Measured here the same way they were: the walls' feet are a
 	# parallelogram, and its left and right corners are the lowest row of the outermost columns
 	# that reach the ground band (the eaves overhang far higher up and are not it).
-	var hut := Art.image("res://assets/shed.png")
+	var hut := Art.image(Lake.SHED_ARTS[0])
 	if hut != null:
 		var rows := PackedInt32Array()
 		var deep := -1

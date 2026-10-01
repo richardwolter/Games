@@ -641,9 +641,13 @@ const EDGE_SPEED := 0.9
 ## Where the angler was last frame, for noticing that they have started walking.
 var _angler_was := Vector2.INF
 
-## The hut on the island, cut out of the shed button. Null-safe: with no picture the lake
-## falls back to the blocked-in one it drew before.
+## The hut on the island, the picture for the stage the meter is at. Null-safe: with no
+## picture the lake falls back to the blocked-in one it drew before.
 var _shed_art: Texture2D
+## Which of `SHED_ARTS` is up: -1 until the first draw picks one off the meter.
+var _shed_stage: int = -1
+## The lit window's pixels, drawn over the hut warmer late in the day and in a storm.
+var _shed_glow: Texture2D
 
 ## The grass growing round the hut's walls, baked the first time it is drawn. Static, by
 ## decision — no sway — so one bake lasts the run.
@@ -1104,7 +1108,8 @@ func _ready() -> void:
 	_tune_ground()
 	_mark("shapes and ground")
 
-	_shed_art = Art.texture(SHED_ART)
+	_shed_glow = Art.texture(SHED_GLOW_ART)
+	_restage_shed()
 
 	# The autoload, so the start sound pressed on the menu is still playing as the lake comes
 	# up. A run without it — a tool scene — gets its own board.
@@ -5912,7 +5917,7 @@ func _shed_picture() -> Rect2:
 func _weather_roofs() -> Array:
 	var out: Array = []
 	if _shed_art != null:
-		out.append({"image": Art.image(SHED_ART), "rect": _shed_picture()})
+		out.append({"image": _shed_image(), "rect": _shed_picture()})
 	for thing in [_yard, _pump]:
 		if thing != null:
 			var roof: Dictionary = thing.roof()
@@ -6532,8 +6537,33 @@ func _tiles_in_radius(radius: float) -> int:
 ## hut had something to stand on. Gone, by decision (2026-09-12): the grass along the bottom
 ## line is what says the hut meets the ground now, and a dark pool under a skirt of blades
 ## read as two shadows.
-const SHED_ART := "res://assets/shed.png"
 const SHED_SEED := 4477
+
+## The hut by the meter (2026-10-01, `tools/build_shed_v2.py`): neglected until half the lake is
+## cleaned, tidied from there, cosy from nine tenths. Picked off `pollution` each draw and
+## nothing saved, so a loaded run shows the hut its meter has earned. One silhouette for all
+## three; only what grows on and round it changes.
+const SHED_ARTS: Array[String] = [
+	"res://assets/shed_neglected.png", "res://assets/shed_tidied.png", "res://assets/shed_cosy.png",
+]
+## The share of the lake cleaned where each later stage begins.
+const SHED_STAGE_AT: Array[float] = [0.5, 0.9]
+
+## The lit window (`shed_glow.png`, the glass's pixels alone), drawn over the hut in a warm
+## white whose alpha rises late in the afternoon and under a storm's grey: the window is the one
+## thing on the island that is lit from inside. Dimmer on the neglected hut, whose glass is
+## cracked and grimed. All first guesses for Richard's eye.
+const SHED_GLOW_ART := "res://assets/shed_glow.png"
+const SHED_GLOW := Color(1.0, 0.94, 0.72)
+const SHED_GLOW_LEAST := 0.08
+const SHED_GLOW_LATE := 0.5
+const SHED_GLOW_STORM := 0.45
+const SHED_GLOW_MOST := 0.8
+const SHED_GLOW_DIM := 0.5
+
+## The hut soaked: roof and walls darken and cool as the rain soaks in and dry as it goes,
+## on the sand's own clock (`Puddles.sand_wet`).
+const SHED_WET := Color(0.76, 0.77, 0.86)
 
 ## The doorway across the hut's picture, as fractions of its width, kept clear of grass.
 ##
@@ -6559,6 +6589,7 @@ const SHED_DOOR := Vector2(0.22, 0.37)
 ## picture for the thing and the button that opens it: the player learns what the button
 ## means by having walked up to it.
 func _draw_shed() -> void:
+	_restage_shed()
 	var at := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
 	# Where the bottom row of the picture is laid, and where inside the picture the walls
 	# actually stand. Everything cast from the hut hangs off the second one.
@@ -6582,10 +6613,12 @@ func _draw_shed() -> void:
 		# from a picture whose base is the near corner of a diamond. See Shade.sweep.
 		if _day != null:
 			_shed_shade().lay(
-				Art.image(SHED_ART), picture, _day.lean, _day.stretch,
+				_shed_image(), picture, _day.lean, _day.stretch,
 				Iso.SHED_ART_GROUND, _day.ink
 			)
-		_island.draw_texture_rect(_shed_art, picture, false)
+		_island.draw_texture_rect(_shed_art, picture, false, _shed_wet_tint())
+		if _shed_glow != null:
+			_island.draw_texture_rect(_shed_glow, picture, false, Color(SHED_GLOW, _shed_glow_alpha()))
 		# And the grass over the bottom line, which is the whole point of it: the last row
 		# of the picture is a straight cut, and blades standing along it are what stop the
 		# hut reading as a sticker on the lawn.
@@ -6631,6 +6664,51 @@ func _draw_door_note(picture: Rect2) -> void:
 	_island.draw_rect(Rect2(pin, Vector2(px, px)), Color(0.72, 0.18, 0.16))
 
 
+## Which picture the meter has earned (see `SHED_ARTS`).
+func shed_stage_for(cleared: float) -> int:
+	var stage := 0
+	for at: float in SHED_STAGE_AT:
+		if cleared >= at:
+			stage += 1
+	return stage
+
+
+## Puts up the hut the meter has earned. On a change the grass and the shadow, both measured
+## off the picture, are rebuilt, and the decorate button is handed the new hut.
+func _restage_shed() -> void:
+	var stage := shed_stage_for(1.0 - pollution)
+	if stage == _shed_stage:
+		return
+	_shed_stage = stage
+	_shed_art = Art.texture(SHED_ARTS[stage])
+	_shed_skirt = null
+	if _shed_cast != null:
+		_shed_cast.forget()
+	if _skin != null and _skin.sprites.has("shed") and _shed_art != null:
+		_skin.sprites["shed"] = _shed_art
+		_skin.queue_redraw()
+
+
+## The current hut's picture as an image, for what measures its silhouette.
+func _shed_image() -> Image:
+	return Art.image(SHED_ARTS[maxi(_shed_stage, 0)])
+
+
+func _shed_glow_alpha() -> float:
+	if _day == null:
+		return SHED_GLOW_LEAST
+	var late := smoothstep(0.5, 0.8, _day.sun)
+	var a := SHED_GLOW_LEAST + SHED_GLOW_LATE * late + SHED_GLOW_STORM * _day.overcast
+	if _shed_stage == 0:
+		a *= SHED_GLOW_DIM
+	return clampf(a, 0.0, SHED_GLOW_MOST)
+
+
+func _shed_wet_tint() -> Color:
+	var wet := _puddles.sand_wet if _puddles != null else 0.0
+	return Color.WHITE.lerp(SHED_WET, wet)
+
+
 ## The node the hut's swept shadow lives on: a child of the island's canvas, drawn behind the
 ## island's own commands so the hut covers the half of the sweep that is under it. Made on
 ## first use, because the picture has to be there before there is anything to cast.
@@ -6648,7 +6726,7 @@ func _shed_shade() -> Shade.Cast:
 func _shed_grass(box: Rect2) -> Skirt.Patch:
 	if _shed_skirt == null:
 		_shed_skirt = Skirt.hem(
-			Art.image(SHED_ART), box, SHED_SEED, PackedVector2Array([SHED_DOOR])
+			_shed_image(), box, SHED_SEED, PackedVector2Array([SHED_DOOR])
 		)
 	return _shed_skirt
 

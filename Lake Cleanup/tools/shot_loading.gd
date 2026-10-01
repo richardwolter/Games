@@ -25,6 +25,8 @@ extends Node
 ## On a save of its own, started empty and never the player's. **Re-run both if the menu's
 ## view, the island, the fill or the loading screen's layout change.**
 
+const Style := preload("res://scripts/style.gd")
+
 const SAVE_PATH := "user://probe_loading.save"
 const LAKE_OUT := "res://assets/loading_lake.png"
 const SPLASH_OUT := "res://assets/boot_splash.png"
@@ -43,6 +45,10 @@ var _log: FileAccess
 func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_log = FileAccess.open(LOG_PATH, FileAccess.WRITE)
+	# The picture ships in every language, so it is shot in English whatever the machine's
+	# settings say, set by hand as test_lake does: nothing here may write `settings.cfg`.
+	TranslationServer.set_locale("en")
+	Style.set_locale("en")
 	_splash = OS.get_environment("SHOT_SPLASH") == "1"
 	if _splash:
 		_screen = LoadingScreen.new()

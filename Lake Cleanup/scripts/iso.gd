@@ -116,7 +116,11 @@ const SHED_FOOT := Vector2(1.15, 0.83)
 ## 144.2 (2026-09-24): the recolour lays a one-pixel outline round the hut, so the picture
 ## is 103 tall; same 1.4 grain, and SHED_STAND / SHED_ART_GROUND move by that pixel so the
 ## walls stand exactly where they did.
-const SHED_TALL := 144.2
+## 144 (2026-10-01): the hut is redrawn at the angler's grain, one world px an art px, by
+## `tools/build_shed_v2.py`: three pictures by the meter (`shed_neglected/tidied/cosy.png`),
+## each 147x144, laid on the old hut's corners times 1.4. Its bottom edge lands 0.2 px from the
+## old one's, so `SHED_STAND` stays and `SHED_ART_GROUND` keeps the same 34.35 world px.
+const SHED_TALL := 144.0
 
 ## Where the hut's picture is laid, and where inside that picture the walls stand: the bottom
 ## row of `shed.png` goes this far below the island's middle in tile heights, and the walls'
@@ -127,7 +131,7 @@ const SHED_TALL := 144.2
 ## kept out of it must agree on that or the building is in two places. They were in `lake.gd`
 ## and only the drawing used them, which is exactly how the two drifted apart.
 const SHED_STAND := 0.39375
-const SHED_ART_GROUND := 0.2382
+const SHED_ART_GROUND := 0.23853
 
 
 ## Where the hut stands, in tile coordinates: the middle of the diamond its walls' feet make.

@@ -58,8 +58,9 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   by Kenney (https://kenney.nl). ✅ **CC0**, `License.txt` beside the tiles. Credit is not
   required; given anyway as "Kenney", the Kipperfalcon rule.
 
-- **Shed** (`assets/shed.png`, via `art_source/shed_tan.png` → `tools/downres_shed.py` →
-  `tools/recolor_shed.py`) — "Isoverse Medieval Outdoors" by Zato Pixel Cultist
+- **Shed** (until 2026-10-01 `assets/shed.png`, via `art_source/shed_tan.png` → `tools/downres_shed.py` →
+  `tools/recolor_shed.py`; now `assets/shed_*.png`, rule-built by `tools/build_shed_v2.py` on
+  the old hut's outline only, no pixels of the pack — whether the credit is still owed is open) — "Isoverse Medieval Outdoors" by Zato Pixel Cultist
   (https://zatoart.itch.io/isoverse-medieval-outdoors). ✅ Cleared (purchased 2026-09-16).
   **CC BY 4.0**, which makes the attribution mandatory and fixes its wording: the board
   carries the pack's own string, `Asset by Zato - https://zatoart.itch.io/`, verbatim. NFTs

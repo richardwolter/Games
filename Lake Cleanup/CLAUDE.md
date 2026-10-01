@@ -2572,6 +2572,44 @@ the whole job.
   grow nothing. **Shed and box only**, this pass. The four dropoff piers have the same hard
   bottom edge on the bank and are the obvious next ones.
 
+### The Hut Redrawn (2026-10-01, `/grill-me` with Richard)
+The hut is redrawn at the angler's grain, one world px an art px, and grows with the run.
+**Supersedes** `assets/shed.png` (Richard's repaint, `art_source/shed_paint.png`, kept as the
+old source) and the 1.4 grain notes above for what the lake draws.
+- **Same silhouette, by decision**: `tools/build_shed_v2.py` lays the old hut's corners times
+  1.4, so each picture is 147x144 and the footprint, door, note, hem, sweep and walking rule
+  stay. `Iso.SHED_TALL` 144, `SHED_ART_GROUND` 0.23853 (the same 34.35 world px), `SHED_STAND`
+  unchanged. Rule-built, then picked off `tools/last_shed_mockup.png` over five passes:
+  oak-moss palette, lap siding on every wall (the "small planks"), fascia, frieze and barge as
+  planks of the same wood, corner boards, sage shutters with a heart cut out.
+- **Three stages by the meter** (`Lake.SHED_ARTS`, `SHED_STAGE_AT` 0.5 / 0.9 cleaned,
+  `shed_stage_for`, `_restage_shed`): picked off `pollution` each draw, nothing saved, no
+  `SAVE_VERSION` bump. A change rebuilds the hem (`_shed_skirt`), re-sweeps the shadow
+  (`Shade.Cast.forget`) and hands the decorate button the new hut.
+  - **Neglected**: broken roof (holes onto the rafters, cracked shingles, gaps in the ridge
+    cap), heavy moss, cracked and knotted boards, missing board pieces, a cobweb under the
+    eave, one shutter sagging and the other dangling from one strap, a dim cracked window,
+    weeds, dock, dead ivy, mushrooms.
+  - **Tidied**: the holes filled with fresh tan shingles and boards, a third of the cracks
+    left, young ivy, pots, a watering can, shrubs, a young rose, daisies.
+  - **Cosy**: clean, no moss on the roof, the repairs weathered in; roses over the door,
+    hollyhocks, a flower box, a birdhouse, a lantern, ivy climbing onto the roof and vines
+    falling off the eave with pink blooms and wisteria.
+  - Damage is seeded once, so the boards and shingles broken in stage 1 are the ones mended
+    in stage 2. **Plants, not fishing gear**, by Richard's call.
+- **The window glows** (`shed_glow.png`, `SHED_GLOW_*`): the glass's pixels drawn over the hut
+  in a warm white, stronger late in the afternoon (`DayCycle.sun`) and under a storm
+  (`overcast`), half on the neglected hut.
+- **The hut gets wet** (`SHED_WET`): tinted darker and cooler by `Puddles.sand_wet`, the
+  sand's own soak and dry.
+- **Pipeline**: `--write` overwrites `art_source/shed_v2_<stage>.png` and the glow mask (for
+  Richard to polish by hand), `--ship` copies them to `assets/shed_*.png`; reimport after.
+  Base python with the psd-extract venv's site-packages on `PYTHONPATH`.
+- **Credit, open**: the old hut was cut from Zato's CC BY pack; the new one copies none of its
+  pixels, only its outline's corners. `docs/CREDITS.md` still credits it until Richard decides.
+- Out of scope, by decision: animation (smoke, flicker), a new footprint, the shed's interior,
+  porch items that echo placed finds, the trailer.
+
 ### The Sun Is in the Southeast (`day_config.gd`, `shadow.gdshader`, 2026-09-12)
 Every painted asset in the game is lit from the right: the shed's and the recycle box's own
 pixels are measurably brighter down that side. The day cycle used to swing the sun across
