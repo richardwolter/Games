@@ -3075,10 +3075,20 @@ dots. It is redrawn as pixel art by rule, picked off `tools/last_net_mockup.png`
 - **Draw order**: this node draws the catch; its first child `NetMesh` (the shader) the net
   over it; then the rope and the stars; the aim ring is on the last child (`AimLayer`), so
   nothing hides it.
-- **One net everywhere**: `CastNet.bake_picture` renders a lying net once in a
-  `SubViewport` with the same shader and the lake lends it (`_lend_net_picture`) to the
-  shop board's head (drawn at whole steps) and the upgrades button. Headless renders nothing
-  and lends nothing. `Style.NET_INK` no longer tints them. The letter's stills were re-shot.
+- **One net everywhere**: the shop's NET card draws the lake's own net itself
+  (`ShopCard._lay_net`, a `CastNet.NetMesh` child, same shader), at the lake's grain, one
+  card px a net px, `NET_FILL` (0.94) of the card's width; the card being 3.5 times wider
+  than tall, the net is seen from lower down, its height squashed to what the card leaves
+  (`NetShape.squash`, never under `NET_SQUASH_LEAST`), wandering `NET_SWAY` whole px as one
+  picture. **Its shape never moves**: a rim ripple shifted it by fractions of a pixel a
+  frame and the strands hopping between pixels shimmered (Richard: "looks glitched"). Its catch and the rubbish round it are at 1x too (Richard, same day: the
+  card's net was too small; "lake's grain, fills the card" picked over a chunky 2 px net
+  cropped by the card). The upgrades button (HUD and shed copy) draws a picture rendered
+  once by the same shader in a `SubViewport` (`CastNet.bake_picture`, lent by
+  `_lend_net_picture`) at whole steps. Headless renders and lends nothing. `Style.NET_INK`
+  tints nothing in the game. **Retired** with it: the card's foam collar
+  (`NET_WATERLINE`/`NET_COLLAR`, laid at the old etching's waterline), `NET_GROW`,
+  `CATCH_SCALE`. The letter's stills were re-shot.
 - **Retired**: `assets/net_frames.png`/`.json`, `assets/sliced_net.png`, `tools/slice_net.gd`,
   `tools/shot_nethold`; the two etching JPEGs moved to `art_source/retired_assets/net/`.
 - **Cost** (`bench_frames`, RTX 5060 Ti, 1080p): a plain cast 5.1 ms mean; the worst case
@@ -3773,7 +3783,8 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
 - **Head cards** (`shop_card.gd`): the dogs' strip has no ferry; the boats' card is water
   and ferry only (`CLEAN_PIECES` 0); the net's card floats 6 pieces (`DIRTY_PIECES`), its
   water lifted `NET_WATER_LIFT` towards the lightest step, and the net and its catch are
-  drawn `ShopSkin.NET_GROW` 1.5 times bigger; the luck box starts with a heap
+  drawn `ShopSkin.NET_GROW` 1.5 times bigger (**superseded 2026-10-02**: the card draws the
+  lake's own net across its width, see The Net Drawn by Rule); the luck box starts with a heap
   (`HEAP_START` 4, growing to `HEAP_MOST` 9 and starting over) and the piece drops into it,
   the near walls (`Yard._cut_front`) drawn over both.
 - **The pricing plate** spreads its four columns over the whole face and reaches

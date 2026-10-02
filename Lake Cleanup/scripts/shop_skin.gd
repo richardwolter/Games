@@ -124,17 +124,9 @@ const HALO_GROW := 0.34
 ## The net on its board is thrown over a catch: the rubbish the lake lends
 ## (`sprites[&"catch"]`, a list of `{sheet, region}`) shows through the mesh.
 
-## The net on the water wanders a pixel or two, as a floating piece does, and wears the
-## lake's foam collar where it cuts the surface — how far it wanders, how fast, and where
-## across the picture the waterline runs (a fraction of its height from the top).
-const NET_SWAY := Vector2(2.0, 1.0)
-const NET_SWAY_HZ := Vector2(0.084, 0.065)
-const NET_WATERLINE := 0.78
-const NET_COLLAR := 0.86
+## Where the catch lies under the card's net, as fractions of the net's drawn box about its
+## middle. The card draws the net itself (`ShopCard`, 2026-10-02).
 const CATCH_AT := [Vector2(-0.22, 0.05), Vector2(0.08, -0.12), Vector2(0.24, 0.14)]
-const CATCH_SCALE := 2.0
-## How much bigger than its slot's fit the net head is drawn, and its catch with it.
-const NET_GROW := 1.5
 
 ## The dog on its board is the dog: it rolls idle or asleep each time the shop opens and
 ## plays that loop while it is up. Even odds.
@@ -302,9 +294,6 @@ var _wake_heading := Vector2.RIGHT
 ## The net's foam collar, the net over it, and where the swell has them this frame. The
 ## net is a node for the same reason the hull is: the collar has to lie under the mesh,
 ## and a child draws after this control, so the mesh must be a later child still.
-var _collar: WaterlineFoam
-var _mesh: Sprite2D
-var _sway_px := Vector2i.ZERO
 var _bob_age: float = 0.0
 var _bob_px: int = 0
 
@@ -400,16 +389,6 @@ func _ready() -> void:
 	_hull.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_hull.visible = false
 	add_child(_hull)
-	_collar = WaterlineFoam.new()
-	_collar.z_index = 0
-	_collar.visible = false
-	add_child(_collar)
-	_mesh = Sprite2D.new()
-	_mesh.region_enabled = true
-	_mesh.centered = false
-	_mesh.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_mesh.visible = false
-	add_child(_mesh)
 	_lay_out()
 
 
@@ -600,13 +579,6 @@ func _process(delta: float) -> void:
 		var bob := roundi(sin(_bob_age * TAU * BOB_HZ) * BOB_PX)
 		if bob != _bob_px:
 			_bob_px = bob
-			queue_redraw()
-		var sway := Vector2i(
-			roundi(sin(_bob_age * TAU * NET_SWAY_HZ.x) * NET_SWAY.x),
-			roundi(cos(_bob_age * TAU * NET_SWAY_HZ.y) * NET_SWAY.y)
-		)
-		if sway != _sway_px:
-			_sway_px = sway
 			queue_redraw()
 		_wake.lay(_wake_heading, 1.0, delta)
 		_drive_toss(delta)
@@ -871,6 +843,14 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	var middle := slot.position + slot.size * 0.5
 	if board == &"dog" or board == &"luck":
 		return
+	# The net's card draws the net itself, with the lake's own shader at the lake's grain
+	# (2026-10-02): it is handed the catch to lay under it.
+	if board == &"net":
+		var card: ShopCard = _cards.get(&"net")
+		if card != null:
+			card.catch = sprites.get(&"catch", [])
+			card.catch_at = CATCH_AT
+		return
 	if board == &"dog" and DogArt.has(_dog_pose):
 		# Standing height is the slot's; the sleeper keeps its own proportion to that.
 		var tall := slot.size.y * fill
@@ -893,9 +873,6 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 		if board == &"boat":
 			_wake.visible = false
 			_hull.visible = false
-		elif board == &"net":
-			_collar.visible = false
-			_mesh.visible = false
 		return
 	var region: Rect2 = lent["region"]
 	var scale := minf(slot.size.x / region.size.x, slot.size.y / region.size.y) * fill
@@ -903,11 +880,6 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	# steps.
 	if board == &"boat":
 		scale = maxf(floor(scale), 1.0)
-	# The net drawn half as big again (2026-09-27): it is what the card is about. At whole
-	# steps, like the ferry: the picture is the lake's own pixel net (2026-10-02), and a
-	# fraction of a step drops strands.
-	if board == &"net":
-		scale = maxf(floorf(scale * NET_GROW), 1.0)
 	var drawn := region.size * scale
 	# Never wider than the slot.
 	if drawn.x > slot.size.x:
@@ -937,30 +909,6 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 			_hull.position = box.position
 			_hull.scale = box.size / region.size
 			_hull.visible = visible
-		&"net":
-			# The net and its catch ride the swell together; the collar is a node of its
-			# own laid on the waterline across the picture, drawn after the board face.
-			box.position += Vector2(_sway_px)
-			var here := middle + Vector2(_sway_px)
-			var cut_y := box.position.y + box.size.y * NET_WATERLINE
-			var half := box.size.x * NET_COLLAR * 0.5
-			_collar.position = Vector2(here.x, cut_y)
-			_collar.lay(Vector2(-half, 0.0), Vector2(half, 0.0))
-			_collar.visible = visible
-			# The catch here, under everything; then the collar; then the net, black, over
-			# both, so the foam is round the mesh and not across it.
-			# Drawn by the card, which is under this skin's own drawing.
-			var card: ShopCard = _cards.get(&"net")
-			if card != null:
-				card.catch = sprites.get(&"catch", [])
-				card.catch_at = CATCH_AT
-				card.catch_box = Rect2(here - drawn * 0.5, drawn)
-				card.catch_scale = CATCH_SCALE * NET_GROW
-			_mesh.texture = sheet
-			_mesh.region_rect = region
-			_mesh.position = box.position
-			_mesh.scale = box.size / region.size
-			_mesh.visible = visible
 		_:
 			draw_texture_rect_region(sheet, box, region)
 

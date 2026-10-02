@@ -16,10 +16,23 @@ var kind: StringName = &""
 var rubbish: Array = []
 ## The pieces the net lies over, drawn by the card so the mesh node covers them.
 var catch: Array = []
-## Where the catch lies, as fractions of the net's drawn box about its middle, and that box.
+## Where the catch lies, as fractions of the net's drawn box about its middle.
 var catch_at: Array = []
-var catch_box := Rect2()
-var catch_scale := 2.0
+
+## The net card's net (2026-10-02, Richard: the card's net was too small, "fix all uses of
+## net to match current style"): the lake's own (`CastNet.NetMesh`, the same shader) at the
+## lake's grain, one card px a net px, filling `NET_FILL` of the card's width. The card is
+## far wider than a 2:1 net lying flat is tall, so it is seen from a little lower: its height
+## squashed to what the card leaves (`NetShape.squash`, never under `NET_SQUASH_LEAST`). It
+## wanders `NET_SWAY` whole px on the swell, as one picture, and its catch and the rubbish
+## round it are at the lake's grain too. **Its shape never moves**: a ripple round the rim
+## (tried first) shifted it by fractions of a pixel every frame, and the strands hopping
+## between pixels read as a shimmer, a glitch (Richard, 2026-10-02).
+const NET_FILL := 0.94
+const NET_SQUASH_LEAST := 0.45
+const NET_SWAY := Vector2(2.0, 1.0)
+const NET_SWAY_HZ := Vector2(0.084, 0.065)
+var _net: Node2D
 const DogArt := preload("res://scripts/dog_art.gd")
 const HudButtons := preload("res://scripts/hud_buttons.gd")
 
@@ -96,6 +109,10 @@ func _ready() -> void:
 		_spots.append({"x": _roll.randf(), "y": _roll.randf(), "kind": _roll.randi(), "phase": _roll.randf() * TAU})
 	for slot in DogArt.BREEDS.size():
 		_dogs.append(_new_run(slot, true))
+	if kind == &"net":
+		_net = CastNet.NetMesh.new()
+		_net.name = &"Net"
+		add_child(_net)
 
 
 func _process(delta: float) -> void:
@@ -112,8 +129,8 @@ func _draw() -> void:
 	match kind:
 		&"net":
 			_draw_water(box, _lifted(_ramp_dirty), true)
-			_draw_afloat(box, DIRTY_PIECES)
-			_draw_catch()
+			_draw_afloat(box, DIRTY_PIECES, 1.0)
+			_lay_net(box)
 		&"boat":
 			_draw_water(box, _ramp_clean, false)
 		&"dog":
@@ -169,7 +186,7 @@ func _draw_water(box: Rect2, ramp: Array, scum: bool) -> void:
 
 ## Rubbish afloat: the lake's own sprites, bobbing a pixel on a stepped clock, their feet
 ## cut a pixel into the water.
-func _draw_afloat(box: Rect2, count: int) -> void:
+func _draw_afloat(box: Rect2, count: int, grain: float = PIXEL) -> void:
 	if rubbish.is_empty():
 		return
 	var step := floorf(_time * 4.0)
@@ -181,8 +198,8 @@ func _draw_afloat(box: Rect2, count: int) -> void:
 		var s: Dictionary = _spots[i]
 		var art: Dictionary = rubbish[int(s["kind"]) % rubbish.size()]
 		var region: Rect2 = art["region"]
-		var drawn := region.size * PIXEL
-		var bob := PIXEL if int(step + i) % 2 == 0 else 0.0
+		var drawn := region.size * grain
+		var bob := grain if int(step + i) % 2 == 0 else 0.0
 		var at := Vector2(
 			_snap(float(s["x"]) * (box.size.x - drawn.x)),
 			_snap(box.size.y * (0.15 + 0.75 * float(s["y"])) - drawn.y * 0.5) + bob
@@ -190,14 +207,28 @@ func _draw_afloat(box: Rect2, count: int) -> void:
 		draw_texture_rect_region(art["sheet"], Rect2(at, drawn), region)
 
 
-func _draw_catch() -> void:
-	var here := catch_box.position + catch_box.size * 0.5 - position
+## The net, sized to the card, with its catch drawn here under it.
+func _lay_net(box: Rect2) -> void:
+	if _net == null:
+		return
+	var half := floorf(box.size.x * NET_FILL * 0.5)
+	var shape := NetShape.lying(half)
+	shape.squash = clampf((box.size.y - shape.h - 8.0) / maxf(half, 1.0), NET_SQUASH_LEAST, 1.0)
+	var sway := Vector2(
+		roundf(sin(_time * TAU * NET_SWAY_HZ.x) * NET_SWAY.x),
+		roundf(cos(_time * TAU * NET_SWAY_HZ.y) * NET_SWAY.y)
+	)
+	var middle := (box.size * 0.5 + Vector2(0.0, shape.h * 0.5) + sway).round()
+	var drawn := Vector2(half * 2.0, half * shape.squash)
 	for i in mini(catch.size(), catch_at.size()):
 		var piece: Dictionary = catch[i]
 		var art: Rect2 = piece["region"]
-		var drawn := art.size * catch_scale
-		var at := here + (catch_at[i] as Vector2) * catch_box.size - drawn * 0.5
-		draw_texture_rect_region(piece["sheet"], Rect2(at, drawn), art)
+		var at := middle + (catch_at[i] as Vector2) * drawn - art.size * 0.5
+		draw_texture_rect_region(piece["sheet"], Rect2(at.round(), art.size), art)
+	_net.shape = shape
+	_net.origin = middle
+	_net.shown = true
+	_net.queue_redraw()
 
 
 ## The dogs' strip: a far bank of dark trees on sand, a band of clean lake (no ferry since

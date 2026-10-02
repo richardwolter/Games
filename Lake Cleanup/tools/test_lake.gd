@@ -7852,8 +7852,9 @@ func _check_ten_fixes(skin: Node) -> void:
 	_check(not card_src.contains("_ferry"), "the dogs' card has no ferry crossing", "")
 	_check(ShopSkin.ShopCard.CLEAN_PIECES == 0 and ShopSkin.ShopCard.DIRTY_PIECES == 6,
 		"the boats' card floats nothing and the net's six", "")
-	_check(ShopSkin.NET_GROW == 1.5 and ShopSkin.ShopCard.NET_WATER_LIFT > 0.0,
-		"the net is drawn half as big again over lighter water", "")
+	_check(ShopSkin.ShopCard.NET_FILL > 0.8 and ShopSkin.ShopCard.NET_WATER_LIFT > 0.0
+			and card_src.contains("CastNet.NetMesh"),
+		"the net card draws the lake's own net across the card, over lighter water", "")
 	_check(card_src.contains("_box_front") and card_src.find("_box_front, Rect2") > card_src.find("HEAP_START + posmod"),
 		"the luck box's near walls are drawn over its heap", "")
 	# 7. The pricing plate's one pairing.

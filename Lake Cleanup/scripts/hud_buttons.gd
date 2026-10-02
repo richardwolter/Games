@@ -252,8 +252,12 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	_trace(&"face_upgrades", face)
 	if sprites.has("net"):
 		# The lake's own net, rendered by its shader (`CastNet.bake_picture`): the colours are
-		# the picture's, so it takes only the hover's tint.
-		var net_span := span_of(sprites["net"], face.size, _scale(&"net_fill", NET_FILL))
+		# the picture's, so it takes only the hover's tint. At whole steps, so its cord stays
+		# a pixel wide as it is on the lake rather than dropping strands.
+		var net_region: Rect2 = (sprites["net"] as Dictionary).get("region", Rect2())
+		var net_span := net_region.size * maxf(roundf(
+			span_of(sprites["net"], face.size, _scale(&"net_fill", NET_FILL)).x
+			/ maxf(net_region.size.x, 1.0)), 1.0)
 		var net_at := _at(&"net", Vector2(0.5, 0.5))
 		var net_box := Rect2(face.position + net_at * face.size - net_span * 0.5, net_span)
 		fit(on, sprites["net"], net_box, 1.0, tint, false)

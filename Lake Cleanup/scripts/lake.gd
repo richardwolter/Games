@@ -1426,17 +1426,15 @@ func _lend_button_art(ferry: Dictionary) -> void:
 	UiButton.sprites = lent
 
 
-## The half-width the net's picture is rendered at for the shop board's head and the HUD's
-## upgrades button. They scale it to their slots.
+## The half-width the net's picture is rendered at for the HUD's upgrades button, which
+## draws it at whole steps.
 const NET_PICTURE_HALF := 40.0
 
 
-## The net's picture, rendered (`CastNet.bake_picture`): to the shop's head and to the
-## upgrades button, the HUD's and the shed's copy alike. Never called headless.
+## The net's picture, rendered (`CastNet.bake_picture`): to the upgrades button, the HUD's
+## and the shed's copy alike. The shop's net card draws its own (`ShopCard`). Never called
+## headless.
 func _lend_net_picture(picture: Dictionary) -> void:
-	if _shop_skin != null:
-		_shop_skin.sprites[&"net"] = picture
-		_shop_skin.queue_redraw()
 	if _skin != null:
 		_skin.sprites["net"] = picture
 		_skin.queue_redraw()

@@ -78,12 +78,14 @@ func _physics_process(delta: float) -> void:
 	if _frames < 30:
 		return
 	if not _picture_saved:
-		var lent: Dictionary = (_main.get(&"_shop_skin") as Node).get(&"sprites").get(&"net", {})
+		var lent: Dictionary = (_main.get(&"_skin") as Node).get(&"sprites").get("net", {})
 		if lent.has("sheet"):
 			var image := (lent["sheet"] as Texture2D).get_image()
 			image.save_png("res://tools/last_net_picture.png")
 			_say("picture %s" % str(image.get_size()))
 			_picture_saved = true
+			# The whole screen, for the HUD's upgrades button that carries it.
+			get_viewport().get_texture().get_image().save_png("res://tools/last_net_hud.png")
 	if _net.state == CastNet.State.IDLE and (_cast < 0 or _landed >= 0.0):
 		_cast += 1
 		if _cast >= CASTS.size():
