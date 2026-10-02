@@ -31,43 +31,38 @@ Your job is to build the game incrementally with clean architecture and testable
   for drawing, sweep and marker, including the `HOME_SIZE` shrink on the haul. The sweep also
   runs on the landing frame. Tiles only narrow the search (`LakeGrid.footprint_reach`).
   `net_width.tres` was left as it was, to be retuned after playtesting the honest ring.
-- **The hauled net bends, by decision** (2026-09-11, `net.gd` `_draw_warped`): the landed
-  frame is drawn as a `WARP_COLS` x `WARP_ROWS` sheet of quads laid out as one triangle
-  array, so the rim tips towards the rope (`LEAN_TIP`), the body trails behind the pull
-  (`LEAN_TRAIL`) and the belly sags and spreads with the load (`BULGE_DEEP`/`BULGE_WIDE`).
-  `_lean` and `_pull` are eased, and fall back out when the haul ends. **The `drag` sheet
-  stays retired** — this bends the net that landed, it does not replace it. A net in flight,
-  and an empty one lying still, are drawn flat as before.
+- **The net is drawn by rule, and the haul lays it out again** (2026-10-02, see The Net
+  Drawn by Rule): the hauled net is a pear-shaped bag dragged from its crown along the
+  water, not a picture bent. Supersedes the warped sheet (`_draw_warped`, `WARP_*`,
+  `LEAN_TIP`/`LEAN_TRAIL`, `BULGE_*`). `_lean` and `_pull` are still eased and fall back out
+  when the haul ends.
 - **The catch fills the bag** (`_draw_catch`, `_shown_count`): the drawn count is as many of
   `catch` as cover `CATCH_FILL` of the mouth's area at the packed scale — so a wider net and
   a fuller hold both show more — capped at what is really aboard. No filler pieces: what is
   drawn was caught. Every piece is scaled to `CATCH_FIT` of the mouth and scattered over the
-  mouth **less its own half-size**, so nothing cuts through the rim; the pile rides `_belly`,
-  back against the pull and down under the load. The old out-of-the-mouth stacking
-  (`CATCH_RISE`) is gone.
+  mouth **less its own half-size**, so nothing cuts through the rim; every spot is laid out on
+  the net's shape (`_on_shape`), so the pile rides the bag and settles towards its back under
+  the haul (`CATCH_BACK`). The old out-of-the-mouth stacking (`CATCH_RISE`) and `_belly` are
+  gone.
 - **The haul shoves what it will not take** (`_shove_aside`): pieces over the net's strength,
   and everything once the hold is full, are pushed clear of the rim through
   `LakeGrid.shove_to` — the hulls' own call — outwards from the middle of the mouth, with a
   piece dead centre parted to a side picked off its tile. Nothing catchable is ever shoved.
   Haul only: the throw flies over the water.
-- **The rope ties to the crown, not the rim** (`_line_end`, `_bridle_points`, `_crown_frame`,
-  2026-09-11): a cast net is hauled from its gathered apex through a bridle, so the hand line
-  ends at a horn over the crown (lifted `HORN_LIFT`, pulled `HORN_LEAN` towards the rod with
-  the lean) and `BRIDLES` short lines fan from it onto the crown ring, flattened by
-  `BRIDLE_SQUASH`. **Both numbers are fractions of the crown's own width**, not the frame's,
-  so the bridle stays in proportion to the ring it is tied to at any drawn size. Every point
-  goes through `_warp_point`, so horn and bridle bend with the mesh. Far-side bridles draw at
-  `BRIDLE_FAR`. `test_lake` guards that no little rope reaches the rim.
-- **The crown is measured, not authored** (`tools/slice_net.gd` `_crown`): the ink centroid
-  and width across the top `CROWN_BAND` of each frame, baked into `net_frames.json` as
-  `crown_x`/`crown_y`/`crown_w` and read back as fractions of the frame's box. It lands on the
-  apex dome of the landed net and on the top of the bundle in a throw. **Re-run the slicer if
-  the net sheets change**; `CROWN_FALLBACK` keeps an older cut running.
+- **The rope ties to the crown, not the rim** (`_line_end`, `_bridle_points`, 2026-09-11):
+  a cast net is hauled from its gathered apex through a bridle, so the hand line ends at a
+  horn over the crown (lifted `HORN_LIFT` of the crown's width, never more than `HORN_MOST`
+  px and nothing under the haul; pulled `HORN_LEAN` towards the rod with the lean) and
+  `BRIDLES` short lines fan from it onto a ring of the net's own shape (`NetShape.at`), so
+  they bend with it. The crown is `CROWN_WIDE` of the mouth's half-width, what the etching's
+  apex measured. Far-side bridles draw at `BRIDLE_FAR`. `test_lake` guards that no little
+  rope reaches the rim.
 - **Retired anchors, in order**: the rope ending at the top of the frame's box (a point in
   the air above a net lying flat); that plus a guessed lean offset (came apart from the mesh
   the moment the net bent); the rope tied to one point on the near rim (on the net, but read
   as a line to a hoop); bridles fanning from the horn all the way to the rim (little ropes
-  drawn straight across the mesh they are supposed to be gathering).
+  drawn straight across the mesh they are supposed to be gathering); the crown measured off
+  the etching (`tools/slice_net.gd`, deleted with it).
 - **The rope is a verlet chain, drawn only** (`_drive_rope`, `_rope_tick`): `ROPE_POINTS`
   pinned at `rod_tip()` and the rim anchor, fixed `ROPE_STEP`s banked across frames,
   `ROPE_PASSES` of tightening, per-step `ROPE_LEAP` clamp, re-seeded straight on every
@@ -3020,18 +3015,81 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   stern — as they did under the old hull. A heading-aware across scale would fix it.
 
 ### The Throw and the Quiet Landing (2026-09-24, `/grill-me` with Richard)
-- **A throw leaves the hand on the loose bundle, not the coil** (`CastNet.SEQUENCES`
-  `skip`): frame 0 of `cast_near` and `cast_far`, a tight coil of rope, is dropped as the
-  sheet is read. Frames 1-4 split the flight evenly by distance, 25% each. The sheet, the
-  slicer and the crown measurements are untouched.
-- **The net holds on `land` frame 4, by decision**: frame 3 (weighted rim, dome) was shot
-  in the lake beside it (`tools/shot_nethold.tscn`, `NET_HOLD=3`) and its thin lines
-  vanished at play zoom. Frame 4's dense mesh is what reads as a net.
+- **Superseded 2026-10-02** (The Net Drawn by Rule): the throw's frames, the `skip` of the
+  coil and the hold on `land` frame 4 went with the etched sheet.
 - **An empty landing makes no spray** (`WaterSplash.splash`'s `tall`, `_crown_tall`): when
   the landing sweep takes nothing, the crown is the foam mound and its ring, plus the
   landing's ripple. No plumes, no speck sheet, no drops. The sweep runs before the splash
   so it knows. Both nets. A catching landing is unchanged.
 - Out of scope, by decision: `cast_far` frames 2-3, the land settle, the `drag` sheet.
+
+### The Net Drawn by Rule (2026-10-02, `/grill-me` with Richard)
+The etched net read washed out: an AI etching off a JPEG, drawn 2-3x smaller than its frames
+and point-sampled since nearest became the default, so its hairline mesh broke into faint
+dots. It is redrawn as pixel art by rule, picked off `tools/last_net_mockup.png`
+(`tools/net_mockup.py`, offline, two passes: look A, then the bend).
+- **`NetShape`** (`scripts/net_shape.gd`) is the shape: `rho` 0 at the crown to 1 at the
+  rim, `theta` round it, laid out by `at`. **`shaders/net_mesh.gdshader`** draws it: the
+  vertex stage runs the same shape (`shape`, **written twice, change both**; `test_lake`
+  compares the constants), the fragment stage decides per pixel of the net's own grid
+  (snapped through the derivatives, so the grid travels with the gliding net) whether it is
+  a strand, the rim cord, a lead bead, the crown's knot, the shade pixel under any of them,
+  or nothing.
+- **Look A**: a diamond mesh, `CELL` 12 plane px (12 x 6 on screen), cord a pixel wide in a
+  lighter brown than the hand line (Richard: "a little bit of a lighter brown"), a lit top
+  row on the rim, the far side a step down, one `SHADE` pixel under every strand, lead beads
+  every `BEAD_EVERY` px. **The cell is fixed, so a wider net has more cells** (spokes a
+  multiple of 32, halving towards the crown with a tuck ring over each seam). A pursing net
+  keeps its cells and draws them smaller. Where the cord bunches it thins: a strand family
+  closer than `MIN_GAP` px drops every other strand, then every fourth.
+- **The haul lays the net out again** (Richard: "the bend should look much more natural and
+  distort the net accordingly"): the crown leads towards the rope (`LEAD_OUT`), the rim
+  purses into a pear with its tip just ahead of the crown and its back dragging
+  (`RIM_BACK`, `TIP_GAP`, `REAR`, `PURSE_ACROSS`, `PINCH`), so the cells stretch along the
+  pull; the load sinks and spreads the back (`SAG`, `SPREAD`), the bag swings (`SWAY`) and
+  its rim ripples (`CastNet.HAUL_RIPPLE`). Driven by `_lean` (0.45 empty to 1 full).
+- **It drags on the water, nothing lifts it** (Richard, same day, on a big net: "looks like
+  it's being pulled by a crane from top"): no crown lift, the dome capped at `DOME_MOST`
+  (8 px) lying and flattened out by the haul, the landing's dome capped at `LAND_DOME_MOST`,
+  and the horn kept low (`HORN_MOST`) and on the water under the haul.
+- **The throw is a bundle opening** (`shape_now`, `FLY_*`): it leaves the hand `FLY_FROM`
+  of its width, a tall bell (`FLY_DOME`) with a squashed, wobbling rim, and opens to a low
+  dome as it flies, rising `FLY_ARC` over its path (`draw_at`). Unbent in the air.
+- **A lucky cast shines, the cord stays tan** (second `/grill-me` the same day, Richard: the
+  flat gold cord "looks ugly"; look B picked off `tools/last_net_lucky_mockup.png` and its
+  GIFs, `tools/net_lucky_mockup.py`): the rim cord (three px deep, `GOLD_RIM_HALF`) and the
+  beads go gold on a ramp off the finds' own (`NetShape.GOLD_DEEP`..`GOLD_PALE`), and the
+  gold creeps in from the rim over `FADE_CELLS` (2.2) cells. **On the splash** two heads of
+  light run round the rim both ways from the front (`BURST_RUN`, `BURST_TAIL`,
+  `BURST_FADE`), lighting the beads and the outer cells, while the finds' four-point stars
+  pop round it and sparks fly off (`CastNet.LuckStars`, `LUCK_BURST_STARS`, `LUCK_SPARKS`).
+  **Then** a glint `GLINT_WIDE` of the net sweeps it diagonally `LUCK_GLINT_FROM` after the
+  splash and every `LUCK_GLINT_EVERY` (1.5 s), lifting the cord to pale gold and white, with
+  `LUCK_TWINKLES` stars twinkling on the cord, until the net is home (`_lucky_age`). In
+  flight only the gold rim and beads. The burst and glint numbers are written again in the
+  shader; `test_lake` compares them. Boosted once in the game over the mockup (rim three
+  deep, the creep, the glint to white, eight twinkles): judged at 3x it was faint at play
+  zoom. `NET_FILM=1` on `tools/shot_net.tscn` films a lucky haul into
+  `tools/film/net_lucky/` (`tools/last_net_lucky_game.gif` is built from it). All numbers
+  first guesses.
+- **Draw order**: this node draws the catch; its first child `NetMesh` (the shader) the net
+  over it; then the rope and the stars; the aim ring is on the last child (`AimLayer`), so
+  nothing hides it.
+- **One net everywhere**: `CastNet.bake_picture` renders a lying net once in a
+  `SubViewport` with the same shader and the lake lends it (`_lend_net_picture`) to the
+  shop board's head (drawn at whole steps) and the upgrades button. Headless renders nothing
+  and lends nothing. `Style.NET_INK` no longer tints them. The letter's stills were re-shot.
+- **Retired**: `assets/net_frames.png`/`.json`, `assets/sliced_net.png`, `tools/slice_net.gd`,
+  `tools/shot_nethold`; the two etching JPEGs moved to `art_source/retired_assets/net/`.
+- **Cost** (`bench_frames`, RTX 5060 Ti, 1080p): a plain cast 5.1 ms mean; the worst case
+  (`BENCH_BIG=1 BENCH_LUCK="lucky double"`, two max nets) 12.3-12.7 against about 11.6-12.0
+  with the mesh off, so the net costs about half a millisecond there. That case was over the
+  bar before.
+- Probe: `tools/shot_net.tscn` (desktop build, `--fixed-fps 60`, own save, under its own
+  node) casts at three widths, the last lucky, and saves `tools/last_net_<cast>_<moment>.png`,
+  `tools/last_net.png` and `tools/last_net_picture.png`. It is what compiles the shader.
+  `test_lake`'s `_check_net_shape` guards the shape's rules, the constants and the retirement.
+- All numbers are first guesses for Richard's eye.
 
 ### The Net Sorts With The Angler (2026-09-16)
 The net node and its rope take **the angler's own walker layer, minus one** (`Lake._sort_walkers`),

@@ -76,7 +76,11 @@ Still wanted, hand-drawn:
 
 ## 3. The net (the player's main verb)
 
-**Status: real art, wrong format.** Four 5-frame sequences in `assets/net_frames.json`:
+**Status: superseded 2026-10-02.** The net is drawn by rule in code now (`NetShape`,
+`shaders/net_mesh.gdshader`, see CLAUDE.md, The Net Drawn by Rule); the sheets below are
+retired. What follows is the old brief, kept for the record.
+
+Was: four 5-frame sequences in `assets/net_frames.json`:
 `cast_far`, `cast_near`, `land`, `drag`. Sliced from two JPGs.
 
 Wanted:

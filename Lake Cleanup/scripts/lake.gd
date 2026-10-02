@@ -1332,9 +1332,9 @@ func _ready() -> void:
 		ferry["half_width"] = Boat.HULL_WIDTH * 0.5 * to_frame
 		ferry["frame"] = frame
 		_shop_skin.sprites[&"boat"] = ferry
-	var mesh: Dictionary = _net.art_frame(&"land", -1)
-	if not mesh.is_empty() and _net.art_sheet() != null:
-		_shop_skin.sprites[&"net"] = {"sheet": _net.art_sheet(), "region": mesh["region"]}
+	# The net is drawn by rule now (2026-10-02), so the boards and the button get a picture
+	# of it rendered by its own shader, the frame after this: see `_lend_net_picture`.
+	_net.bake_picture(NET_PICTURE_HALF, _lend_net_picture)
 	# A few pieces of rubbish for the net to lie over, off the lake's own atlas.
 	if _sheets != null and _sheets.atlas != null:
 		var catch: Array = []
@@ -1348,7 +1348,7 @@ func _ready() -> void:
 		if not def.keepsake and def.tier <= 2 and def.atlas != null:
 			afloat.append({"sheet": def.atlas, "region": def.region})
 	_shop_skin.sprites[&"rubbish"] = afloat
-	_lend_button_art(ferry, mesh)
+	_lend_button_art(ferry)
 	_mark("shop art")
 	_skin.shed_pressed.connect(_set_shed.bind(true))
 	_skin.upgrades_pressed.connect(_set_menu.bind(true))
@@ -1410,12 +1410,10 @@ const BUTTON_DECOR := [
 ]
 
 
-func _lend_button_art(ferry: Dictionary, mesh: Dictionary) -> void:
+func _lend_button_art(ferry: Dictionary) -> void:
 	var lent := {}
 	if not ferry.is_empty():
 		lent["boat"] = ferry
-	if not mesh.is_empty() and _net.art_sheet() != null:
-		lent["net"] = {"sheet": _net.art_sheet(), "region": mesh["region"]}
 	if _shed_art != null:
 		lent["shed"] = _shed_art
 	if _sheets != null and _sheets.atlas != null:
@@ -1426,6 +1424,23 @@ func _lend_button_art(ferry: Dictionary, mesh: Dictionary) -> void:
 		lent["decor"] = decor
 	_skin.sprites = lent
 	UiButton.sprites = lent
+
+
+## The half-width the net's picture is rendered at for the shop board's head and the HUD's
+## upgrades button. They scale it to their slots.
+const NET_PICTURE_HALF := 40.0
+
+
+## The net's picture, rendered (`CastNet.bake_picture`): to the shop's head and to the
+## upgrades button, the HUD's and the shed's copy alike. Never called headless.
+func _lend_net_picture(picture: Dictionary) -> void:
+	if _shop_skin != null:
+		_shop_skin.sprites[&"net"] = picture
+		_shop_skin.queue_redraw()
+	if _skin != null:
+		_skin.sprites["net"] = picture
+		_skin.queue_redraw()
+	UiButton.sprites["net"] = picture
 
 
 ## The bank: the land the lake sits in, drawn as the shore ring grown outward. Two flat

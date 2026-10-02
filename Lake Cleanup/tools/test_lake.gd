@@ -2776,6 +2776,75 @@ func _check_binds() -> void:
 
 
 ## The ferry's art: one baked frame per heading, and the right one picked for each.
+## The net is drawn by rule (2026-10-02): `NetShape` lays it out, the shader draws it. The
+## shape's rules, and the shader carrying the same numbers as `NetShape` (its `shape` is
+## written twice, so the constants are what can be compared).
+func _check_net_shape() -> void:
+	var lying := NetShape.lying(60.0)
+	var rim_front := lying.at(1.0, 0.0)
+	_check(is_equal_approx(rim_front.x, 60.0) and absf(rim_front.y) < 0.001
+			and is_equal_approx(lying.at(1.0, PI * 0.5).y, 30.0),
+		"a lying net's rim is the mouth's 2:1 ellipse", "%s" % rim_front)
+	_check(lying.at(0.0, 0.0).y < -5.0 and NetShape.lying(224.0).at(0.0, 0.0).y >= -NetShape.DOME_MOST,
+		"and its crown stands a little over the water, never a tent", "%s" % lying.at(0.0, 0.0))
+	var hauled := NetShape.lying(60.0)
+	hauled.haul = 1.0
+	hauled.pull = Vector2(-1.0, 0.0)
+	var crown := hauled.at(0.0, 0.0)
+	var tip := hauled.at(1.0, PI)
+	var tail := hauled.at(1.0, 0.0)
+	var side := hauled.at(1.0, PI * 0.5)
+	_check(crown.x < -15.0 and tip.x < crown.x and tail.x > 45.0,
+		"hauled left, the crown leads, the bag's front tip just ahead of it and its back trailing",
+		"crown %.1f, tip %.1f, tail %.1f" % [crown.x, tip.x, tail.x])
+	var front_wide := absf(hauled.at(1.0, PI * 0.75).y - hauled.at(1.0, PI * 1.25).y)
+	var back_wide := absf(hauled.at(1.0, PI * 0.25).y - hauled.at(1.0, -PI * 0.25).y)
+	_check(side.y < 30.0 and front_wide < back_wide,
+		"and the rim purses into a pear, narrowest towards the rope",
+		"front %.1f px, back %.1f px" % [front_wide, back_wide])
+	var full := NetShape.lying(60.0)
+	full.haul = 1.0
+	full.pull = Vector2(-1.0, 0.0)
+	full.load = 1.0
+	_check(full.at(0.5, 0.0).y > hauled.at(0.5, 0.0).y,
+		"a full bag sags at the back", "%.1f against %.1f" % [full.at(0.5, 0.0).y, hauled.at(0.5, 0.0).y])
+	_check(NetShape.rim_spokes(40.0) % 32 == 0 and NetShape.rim_spokes(220.0) > NetShape.rim_spokes(40.0),
+		"a wider net has more strands, not bigger cells", "%d at 40, %d at 220" % [
+			NetShape.rim_spokes(40.0), NetShape.rim_spokes(220.0)])
+	var made := NetShape.mesh(60.0)
+	_check((made["indices"] as PackedInt32Array).size() % 3 == 0
+			and (made["points"] as PackedVector2Array).size() == (made["uvs"] as PackedVector2Array).size(),
+		"the mesh is whole triangles with a (rho, theta) on every point", "")
+	var source := FileAccess.get_file_as_string("res://shaders/net_mesh.gdshader")
+	var mirrored := true
+	var off := ""
+	for name in ["LEAD_OUT", "RIM_BACK", "TIP_GAP", "REAR", "PURSE_ACROSS", "PINCH",
+			"SAG", "SPREAD", "SWAY", "BURST_RUN", "BURST_TAIL", "BURST_FADE", "GLINT_WIDE"]:
+		var want := "const float %s = %s;" % [name, _net_const(name)]
+		if source.find(want) < 0:
+			mirrored = false
+			off += name + " "
+	_check(mirrored, "the shader's shape carries NetShape's numbers", off)
+	# A lucky net keeps its tan cord: the gold is on the rim, the beads and the shine.
+	var mat := ShaderMaterial.new()
+	mat.shader = NetShape.SHADER
+	var lucky := NetShape.lying(60.0)
+	lucky.gold = true
+	lucky.push(mat)
+	_check(Color(mat.get_shader_parameter(&"cord")).is_equal_approx(NetShape.CORD)
+			and float(mat.get_shader_parameter(&"lucky")) == 1.0,
+		"a lucky net keeps its tan cord and is told it is lucky", "")
+	_check(not FileAccess.file_exists("res://assets/net_frames.json")
+			and not FileAccess.file_exists("res://assets/Net_Cast_spritesheet.jpg"),
+		"the etched net is retired, not left shipping", "")
+
+
+func _net_const(name: String) -> String:
+	var value: float = NetShape.new().get_script().get_script_constant_map()[name]
+	var text := str(value)
+	return text if text.find(".") >= 0 else text + ".0"
+
+
 func _stage_ferry_art() -> void:
 	var sheet: Texture2D = _boat.call(&"_sheet")
 	_check(sheet != null, "the ferry has a sheet of headings", "")
@@ -5415,17 +5484,7 @@ func _check_audio_pass(sound: Sfx) -> void:
 			and not (low.get(&"_drop_life") as PackedFloat32Array).is_empty(),
 		"and a catching one is the whole splash", "")
 	low.free()
-	# The throws leave the hand on the loose bundle, not the tight coil (2026-09-24).
-	var book: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(CastNet.ART))
-	var art: Dictionary = _net.get(&"_art")
-	for throw: StringName in [&"cast_near", &"cast_far"]:
-		var cells: Array = book["sequences"][String(throw)]
-		var frames: Array = (art[throw] as Dictionary)["frames"]
-		var first: Array = cells[1]["region"]
-		_check(frames.size() == cells.size() - 1
-				and (frames[0] as Dictionary)["region"] == Rect2(
-					float(first[0]), float(first[1]), float(first[2]), float(first[3])),
-			"%s starts on the sheet's second frame" % throw, "%d frames" % frames.size())
+	_check_net_shape()
 
 	# The catch is answered with one swell and then water draining off the mesh: drips at
 	# times of their own, rolled, so no two catches are the same and none is a row of pops
@@ -8561,7 +8620,7 @@ func _stage_led_cast() -> void:
 			_check(not _net.castable_after_walk(Iso.tile_to_world(lawn.x, lawn.y)),
 				"nor the island", "")
 			var aim_src := (load("res://scripts/net.gd") as GDScript).source_code
-			var draw_at := aim_src.find("func _draw_aim()")
+			var draw_at := aim_src.find("func _draw_aim(")
 			var island_at := aim_src.find("Iso.island_fraction(over.x, over.y) < 1.0:
 		return", draw_at)
 			var legal_at := aim_src.find("castable_after_walk(pointer)", draw_at)

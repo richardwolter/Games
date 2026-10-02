@@ -79,6 +79,9 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   ✅ Commercial use explicitly allowed; credit appreciated, not required.
 
 - **Net_Cast_spritesheet.jpg, Net_Closing_Drag.jpg, Net_Upgrades_Menu.jpg** — AI-generated.
+  The two net sheets are retired (2026-10-02): the net is drawn by rule in code
+  (`scripts/net_shape.gd`, `shaders/net_mesh.gdshader`), and the JPEGs sit in
+  `art_source/retired_assets/net/`, which does not ship.
   Decision (2026-09-06): keep as-is, not disclosed as AI-generated. Fact check on that
   decision: itch.io's generative-AI disclosure requirement is **mandatory only for asset
   packs published for reuse by other developers**; for a finished game like this one,

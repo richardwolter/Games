@@ -251,13 +251,12 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	# it centred rather than stood, so an over-fill spills evenly rather than out of the top.
 	_trace(&"face_upgrades", face)
 	if sprites.has("net"):
-		# `Style.NET_INK`, the shop board's own black, so the net is one net wherever it is
-		# drawn as a picture of itself. It was a pale grey dim until 2026-09-12.
-		var ink := Style.NET_INK
+		# The lake's own net, rendered by its shader (`CastNet.bake_picture`): the colours are
+		# the picture's, so it takes only the hover's tint.
 		var net_span := span_of(sprites["net"], face.size, _scale(&"net_fill", NET_FILL))
 		var net_at := _at(&"net", Vector2(0.5, 0.5))
 		var net_box := Rect2(face.position + net_at * face.size - net_span * 0.5, net_span)
-		fit(on, sprites["net"], net_box, 1.0, Color(ink.r * tint.r, ink.g * tint.g, ink.b * tint.b, ink.a), false)
+		fit(on, sprites["net"], net_box, 1.0, tint, false)
 		_trace(&"net", net_box)
 	# The ferry in the left half, a little up off the foot; the dog in the right half. Both
 	# mirrored from how their sheets face, so they look outwards, and both drawn before the

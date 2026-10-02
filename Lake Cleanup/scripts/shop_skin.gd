@@ -121,10 +121,8 @@ const BOB_HZ := 0.4
 const HALO_ALPHA := [0.006, 0.011, 0.017]
 const HALO_GROW := 0.34
 
-## The net on its board is thrown over a catch: drawn black, so the rubbish the lake lends
-## (`sprites[&"catch"]`, a list of `{sheet, region}`) shows through the mesh. Where each
-## piece lies, as a fraction of the net's drawn size from its middle, and how big.
-const NET_INK := Color(0.08, 0.07, 0.07, 0.92)
+## The net on its board is thrown over a catch: the rubbish the lake lends
+## (`sprites[&"catch"]`, a list of `{sheet, region}`) shows through the mesh.
 
 ## The net on the water wanders a pixel or two, as a floating piece does, and wears the
 ## lake's foam collar where it cuts the surface — how far it wanders, how fast, and where
@@ -410,7 +408,6 @@ func _ready() -> void:
 	_mesh.region_enabled = true
 	_mesh.centered = false
 	_mesh.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_mesh.modulate = NET_INK
 	_mesh.visible = false
 	add_child(_mesh)
 	_lay_out()
@@ -906,9 +903,11 @@ func _draw_sprite(board: StringName, slot: Rect2) -> void:
 	# steps.
 	if board == &"boat":
 		scale = maxf(floor(scale), 1.0)
-	# The net drawn half as big again (2026-09-27): it is what the card is about.
+	# The net drawn half as big again (2026-09-27): it is what the card is about. At whole
+	# steps, like the ferry: the picture is the lake's own pixel net (2026-10-02), and a
+	# fraction of a step drops strands.
 	if board == &"net":
-		scale *= NET_GROW
+		scale = maxf(floorf(scale * NET_GROW), 1.0)
 	var drawn := region.size * scale
 	# Never wider than the slot.
 	if drawn.x > slot.size.x:
