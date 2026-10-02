@@ -220,6 +220,9 @@ var _broods: Array = []
 var _flies: Array = []
 var _critters_on_land: Array = []
 var _reckon_in := 0.0
+## A probe's hold: while set, no animal arrives or is topped up (the store shots lay the
+## life out by hand and must not have it refilled behind them).
+var held := false
 var _brood_in := 3.0
 var _now := 0.0
 ## One track mark each: world point (snapped to the art grid), age.
@@ -229,6 +232,12 @@ var _rng := RandomNumberGenerator.new()
 
 var _under: Layer
 var _submerged: Layer
+## The crayfish and their shadows, on the lakebed itself: under the fish (2026-10-02,
+## Richard: fish were drawn under the crayfish). Two layers handed to the lake
+## (`bed_layers`), which puts them in its tree before the fish, since a fish and the bed share
+## z 3 and only the tree's order between them decides.
+var _bed_shade: Layer
+var _bed: Layer
 var _ground: Layer
 var _air: Layer
 
@@ -261,10 +270,39 @@ func _ready() -> void:
 	var through := ShaderMaterial.new()
 	through.shader = load("res://shaders/fish.gdshader")
 	_submerged.material = through
+	_bed_shade = _layer(&"BedShade", 3, _paint_bed_shade)
+	_bed = _layer(&"Bed", 3, _paint_bed)
+	_bed.material = through
 	_ground = _layer(&"Ground", 6, _paint_ground)
 	_air = _layer(&"Air", 20, _paint_air)
 	if grid != null:
 		_find_shore()
+
+
+## The two bed layers, for the lake to put before its fish.
+func bed_layers() -> Array[Node2D]:
+	return [_bed_shade, _bed]
+
+
+## Crayfish shadows on the bed itself, thrown only by their own height, not the water's depth.
+func _paint_bed_shade(on: CanvasItem) -> void:
+	for c: Dictionary in _crays:
+		var r := _region(_cray_frame(c))
+		var at: Vector2 = c["at"]
+		if r.size.x > 0.0 and Fish.bed_shows(grid, at):
+			on.draw_texture_rect_region(_critters, Rect2(at + Shade.drop(day, CRAY_SHADE_UP) - r.size * SCALE * 0.5, r.size * SCALE), r,
+				Shade.tint_on(day, Shade.On.BED, float(c["fade"])))
+
+
+## Crayfish lie on the bed, so as much water is over them as over it (the shader's bed_mix).
+func _paint_bed(on: CanvasItem) -> void:
+	for c: Dictionary in _crays:
+		var at: Vector2 = c["at"]
+		var r := _region(_cray_frame(c))
+		if r.size.x <= 0.0 or not Fish.bed_shows(grid, at):
+			continue
+		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
+			Fish.through_tint(at, float(c["fade"]), 0.38, 0.52, 0.72))
 
 
 func _layer(name: StringName, z: int, paint: Callable) -> Layer:
@@ -416,6 +454,9 @@ func _process(delta: float) -> void:
 	_critters_on_land = _critters_on_land.filter(func(c: Dictionary) -> bool: return not c.get("gone", false))
 	_under.queue_redraw()
 	_submerged.queue_redraw()
+	if is_instance_valid(_bed):
+		_bed.queue_redraw()
+		_bed_shade.queue_redraw()
 	_ground.queue_redraw()
 	_air.queue_redraw()
 
@@ -573,7 +614,7 @@ func _want_late(most: int) -> int:
 
 
 func _reckon() -> void:
-	if grid == null or not ready_to_live():
+	if held or grid == null or not ready_to_live():
 		return
 	var none_yet := _alive() == 0
 	if flora != null:
@@ -1636,13 +1677,6 @@ func _paint_under(on: CanvasItem) -> void:
 		var frame: int = [0, 1, 2, 1][int(float(f["clock"]) * FROG_SWIM_FPS) % 4]
 		var at: Vector2 = f["at"]
 		_shadow_of(on, "frogswim_%d_%d" % [int(f["row"]), frame], at, 1.0, float(f["fade"]))
-	for c: Dictionary in _crays:
-		var r := _region(_cray_frame(c))
-		var at: Vector2 = c["at"]
-		if r.size.x > 0.0 and Fish.bed_shows(grid, at):
-			# On the bed itself, so thrown only by its own height, not by the water's depth.
-			on.draw_texture_rect_region(_critters, Rect2(at + Shade.drop(day, CRAY_SHADE_UP) - r.size * SCALE * 0.5, r.size * SCALE), r,
-				Shade.tint_on(day, Shade.On.BED, float(c["fade"])))
 	for t: Dictionary in _turtles:
 		var state := int(t["state"])
 		if state == Turtle.UNDER:
@@ -1715,14 +1749,6 @@ func _turtle_flippers(on: CanvasItem, t: Dictionary) -> void:
 ## and a turtle that has dived, deeper and so fainter. The vertex colour is
 ## `Fish.through_tint`, the fish shader's packing.
 func _paint_submerged(on: CanvasItem) -> void:
-	# Crayfish lie on the bed, so as much water is over them as over it (the shader's bed_mix).
-	for c: Dictionary in _crays:
-		var at: Vector2 = c["at"]
-		var r := _region(_cray_frame(c))
-		if r.size.x <= 0.0 or not Fish.bed_shows(grid, at):
-			continue
-		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
-			Fish.through_tint(at, float(c["fade"]), 0.38, 0.52, 0.72))
 	for f: Dictionary in _frogs:
 		if int(f["state"]) != Frog.SWIM or not _wet(f["at"]):
 			continue

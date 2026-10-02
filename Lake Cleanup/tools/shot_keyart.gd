@@ -86,20 +86,28 @@ func _pose_split(level: int) -> void:
 	day.phase = 0.35
 
 
+## How much of the clean side's life is called up, and how far apart any two animals stand
+## (world px): enough to say the water is alive, never a crowd on one beach (Richard).
+const LIFE := 0.45
+const FLORA := 0.3
+const APART := 70.0
+
+
 func _run_split(f: int) -> void:
+	_dress_island()
 	var wild: Wildlife = _main.get(&"_wildlife")
 	var flora: Flora = _main.get(&"_flora")
 	var k := f - SETTLE
 	if k == -20:
 		wild.set(&"_brood_in", 1.0e9)
-	if k >= -20 and k % 15 == 0:
-		flora.refresh(0.9)
-		wild.refresh(0.9, _main.get(&"_clean_tiles"), 1.0)
-		(_main.get(&"_fish") as Node).call(&"refresh", 0.9, _main.get(&"_clean_tiles"))
-	if k >= 0 and k <= 200 and k % 20 == 0:
-		_frog_in_view(wild)
-	if k in [0, 20, 40, 60, 80, 100, 120]:
+	if k >= -20 and k <= 0 and k % 10 == 0:
+		flora.refresh(FLORA)
+		wild.refresh(LIFE, _main.get(&"_clean_tiles"), 1.0)
+		(_main.get(&"_fish") as Node).call(&"refresh", LIFE, _main.get(&"_clean_tiles"))
+	if k == 10 or k == 50:
 		_brood_in_view(wild)
+	if k == 90:
+		_spread_life(APART)
 	if k == 300:
 		_cast(_throw_dir, THROW)
 	if k == 300 + 10:

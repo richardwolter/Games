@@ -199,6 +199,8 @@ const PIXEL_FPS := 14.0
 const NOZZLE_ART := "res://assets/nozzle.png"
 const NOZZLE_CONTRACT := "res://assets/nozzle.json"
 const NOZZLE_SCALE := 4.0
+## The share of the stream's dashes left out, so it reads as a jet and not a bar.
+const JET_GAPS := 0.08
 const NOZZLE_RISE := 17.0
 ## **One drawing, the straight one, and it glides** (Richard, 2026-09-19, second look: a
 ## picture that changed with every move read as a different nozzle each time, and the
@@ -1148,9 +1150,11 @@ func _draw() -> void:
 	_draw_gleams()
 	_draw_impact()
 	_draw_flecks()
-	_draw_stream()
 	_draw_stars()
 	_draw_nozzle()
+	# Over the nozzle, not under it (2026-10-02, Richard: the water came from underneath the
+	# tip): drawn first, the brass hid the stream's start and it showed below the bore.
+	_draw_stream()
 
 
 func _cell_box(cx: float, cy: float, cells: float = 1.0) -> Rect2:
@@ -1461,11 +1465,18 @@ func _drive_nozzle(delta: float) -> void:
 
 ## Dashes of water from the nozzle to the aim, flowing forwards, spreading as they go. From
 ## `_tail` to `_reach` of the way, so it grows out of the nozzle and lets go of it.
+##
+## Every dash is centred on the line and put on a grid counted from the tip itself (Richard,
+## 2026-10-02): on the screen's grid the first dash could sit up to half a cell beside the
+## bore. The first dash is the tip's own cell, never behind it, so nothing is drawn over the
+## brass. `JET_GAPS` of the dashes are left out (it was a fifth, which read thin).
 func _draw_stream() -> void:
 	if _reach <= 0.0 or _tail >= 1.0:
 		return
-	var from := _nozzle_tip()
+	var tip := _nozzle_tip()
 	var to := _aim
+	# Half a cell out of the bore, so the first dash stands just past the lip, not on the brass.
+	var from := tip + (to - tip).normalized() * _cell * 0.5
 	var along := to - from
 	var count := int(along.length() / _cell)
 	if count <= 0:
@@ -1475,15 +1486,16 @@ func _draw_stream() -> void:
 		var t := float(i) / float(count)
 		if t < _tail or t > _reach:
 			continue
-		if _hash(i - _tick * 3, 9, 0) < 0.2:
+		if _hash(i - _tick * 3, 9, 0) < JET_GAPS:
 			continue
 		var spread := lerpf(0.2, 1.7, t) * _cell
 		var at := from + along * t + across * (_hash(i, _tick, 4) - 0.5) * 2.0 * spread
-		at = (at / _cell).floor() * _cell
 		var ink: Color = _ink_water[int(_hash(i, _tick, 6) * 3.0) % 3]
-		# A pixel wider a hose level, the far half of the stream wider still.
-		var wide := _cell * ((2.0 if t > 0.55 else 1.0) + float(clampi(hose_level, 1, 3) - 1))
-		draw_rect(Rect2(at, Vector2(wide, wide)), ink)
+		# A cell wider a hose level, the far half of the stream wider still.
+		var cells := (2.0 if t > 0.55 else 1.0) + float(clampi(hose_level, 1, 3) - 1)
+		var middle := from + ((at - from) / _cell).round() * _cell
+		var corner := middle - Vector2.ONE * floorf(cells * 0.5) * _cell
+		draw_rect(Rect2(corner, Vector2.ONE * cells * _cell), ink)
 
 
 func _draw_nozzle() -> void:

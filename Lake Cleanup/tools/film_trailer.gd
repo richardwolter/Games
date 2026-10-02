@@ -326,6 +326,7 @@ func _next() -> void:
 		if _main.get(&"_shed_open"):
 			_main.call(&"_set_shed", false)
 		(_main.get_node(^"HUD") as CanvasLayer).visible = false
+		(_main.get(&"_wildlife") as Wildlife).held = false
 	_shot += 1
 	if _shot >= _shots.size():
 		_say("--- film_trailer done")
@@ -587,6 +588,52 @@ func _fleet() -> void:
 		boat.patrol = false
 
 
+## The island as the store shows it (2026-10-02, Richard): the hut in its second look, the
+## tidied one, and the crate heaped full. Cheap enough to call every frame; the crate is only
+## topped up, never emptied, and hidden hulls are moored so they do not carry it off.
+func _dress_island() -> void:
+	_main.set(&"shed_stage_pin", 1)
+	var yard: Yard = _main.get(&"_yard")
+	if yard.held.size() < Yard.CRATE_FULL + 6:
+		var rubbish: Array = []
+		for i in _grid.defs.size():
+			if not _grid.defs[i].keepsake:
+				rubbish.append(i)
+		while yard.held.size() < Yard.CRATE_FULL + 6:
+			yard.put(rubbish[_rng.randi_range(0, rubbish.size() - 1)])
+	for boat: Boat in _main.get(&"_boats"):
+		if not boat.visible:
+			boat.moored = true
+
+
+## Nature spread out rather than heaped (2026-10-02, Richard: "it should look natural and
+## spread out on the shot"): of every kind of animal, one closer than `apart` world px to one
+## already kept is sent away, so no beach is a crowd of frogs and turtles. Kinds are spaced
+## against every kind, not only their own.
+func _spread_life(apart: float) -> void:
+	var wild: Wildlife = _main.get(&"_wildlife")
+	var kept: Array[Vector2] = []
+	var left := 0
+	for key in [&"_broods", &"_turtles", &"_frogs", &"_critters_on_land", &"_flies"]:
+		var list: Array = wild.get(key)
+		var keep: Array = []
+		for a: Dictionary in list:
+			var at: Vector2 = a.get("to", a["at"]) if key == &"_broods" else a["at"]
+			var near := false
+			for k in kept:
+				if k.distance_to(at) < apart:
+					near = true
+					break
+			if near:
+				continue
+			kept.append(at)
+			keep.append(a)
+		list.assign(keep)
+		left += keep.size()
+	wild.held = true
+	_say("  life spread %.0f px: %d kept" % [apart, left])
+
+
 ## The pack back to the one dog, so the casts and the ferries are not full of dogs.
 func _unpack() -> void:
 	var dogs: Array = _main.get(&"_dogs")
@@ -667,6 +714,9 @@ func _force_pop() -> void:
 func _hide_boats() -> void:
 	for boat: Node2D in _main.get(&"_boats"):
 		boat.visible = false
+		# Moored as well as hidden (2026-10-02, Richard): a hidden hull still loaded a full
+		# crate, so pieces flew to nothing and its bow spray crossed the water on its own.
+		boat.set(&"moored", true)
 
 
 ## The camera's middle and a radius the wildlife shot's arrivals are kept inside.

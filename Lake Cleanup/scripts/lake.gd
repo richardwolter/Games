@@ -687,6 +687,9 @@ var _angler_was := Vector2.INF
 var _shed_art: Texture2D
 ## Which of `SHED_ARTS` is up: -1 until the first draw picks one off the meter.
 var _shed_stage: int = -1
+## A probe's hold on the hut's stage (the store art shows the tidied hut whatever the meter
+## says); under nought the meter decides, as in play.
+var shed_stage_pin: int = -1
 ## The lit window's pixels, drawn over the hut warmer late in the day and in a storm.
 var _shed_glow: Texture2D
 
@@ -6517,6 +6520,11 @@ func _grow_nature() -> void:
 	_wildlife.music = MusicStation.main()
 	_flora.music = _wildlife.music
 	add_child(_wildlife)
+	# The crayfish's bed layers go before the fish in the tree: same z, and a fish swims over
+	# what crawls on the bed.
+	for layer: Node2D in _wildlife.bed_layers():
+		layer.reparent(self)
+		move_child(layer, _fish.get_index())
 	_wildlife.first_arrived.connect(_on_first_wildlife)
 	_flora.refresh(_clean_share)
 	_fish.refresh(_clean_share, _clean_tiles)
@@ -7233,7 +7241,7 @@ func shed_stage_for(cleared: float) -> int:
 ## Puts up the hut the meter has earned. On a change the grass and the shadow, both measured
 ## off the picture, are rebuilt, and the decorate button is handed the new hut.
 func _restage_shed() -> void:
-	var stage := shed_stage_for(1.0 - pollution)
+	var stage := shed_stage_pin if shed_stage_pin >= 0 else shed_stage_for(1.0 - pollution)
 	if stage == _shed_stage:
 		return
 	_shed_stage = stage

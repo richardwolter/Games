@@ -4748,10 +4748,20 @@ A find is washed before the shed will have it. The one named exception to the sc
   the lake's own rule that stepping a moving thing on the grid is what reads as stiff —
   kicks back while it sprays, breathes at rest, hangs a bead or two on its lip when let go,
   and runs a glint down the brass on the press and on the finish.
+- **The water leaves the bore** (2026-10-02, Richard: it came from underneath the tip):
+  `_draw_stream` runs after `_draw_nozzle`, and each dash is centred on the stream's line
+  before it is put on the grid. Drawn first, the brass hid the stream's start; anchored by
+  its corner, every dash hung down and right of the line. The contract's `tip` was right.
 - **The hose is laid out every frame** (`_draw_hose`), not baked: a curve from the grip's
   foot, leaving along the nozzle's own axis, to an anchor low and to one side
   (`HOSE_SIDE`), its belly trailing a nozzle that moves. The builder's canvas tones and
   edge colour come through `nozzle.json`, on the nozzle picture's own pixel grid.
+- **The jet starts on the tip's own cell** (2026-10-02, Richard, third pass): every dash of
+  `_draw_stream` is centred on the line and put on a grid counted from the tip, not the
+  screen's (on that grid the stream sat beside the bore), and only `JET_GAPS` (0.08, was a
+  fifth) of the dashes are left out. **Tried and reverted the same day**: a solid jet as
+  wide as the bore started inside the nozzle (too thick, lost the dashes' style, and drew
+  over the brass).
 - **The jet is Nuven's recording** (2026-09-19, `/grill-me` with Richard):
   `art_source/SFX/Water_Hose_Spray.wav`, a steady spray with no tap-on or shut-off in it,
   cut to a 9 s seamless loop and levelled by `build_sfx.py` as `hose_spray` (`--only a,b`
@@ -6758,6 +6768,60 @@ and the lanes as shares of the lake in The Pump and the Wash Room.
   `--fixed-fps 60`, own save, under its own node): bare renders of a lake split clean and
   dirty, into `Marketing/.../source/keyart/`, cut by that folder's `capsules_v2.py` at whole
   pixel ratios. `FILM_ONLY=tall_z2` runs alone (the shots share one lake).
+- **How the store dresses the lake** (2026-10-02, Richard): `film_trailer.gd`'s
+  `_dress_island()` pins the hut to its second look (`Lake.shed_stage_pin` 1, under nought
+  the meter decides as in play) and keeps the crate heaped past `Yard.CRATE_FULL`;
+  `_spread_life(apart)` sends away any animal within `apart` world px of one kept and sets
+  `Wildlife.held`, which stops `_reckon` refilling behind it. `shot_steam` resets the flora
+  to the shot's own share, and `_hide_boats` moors what it hides (a hidden hull loaded the
+  crate and its spray crossed the water on its own). The
+  capsules use the two-line lockup only, may lie over the island's far sand, and the small
+  capsule centres it on its drawn pixels. **The store's clips ship as WEBM** (VP9, 30 fps,
+  no audio): Steam's About This Game froze MP4s on their first frame; GIFs are 780 wide.
+- **The pier shot pours a big hold, the west clip leaves a clean spot** (same day, Richard):
+  the ferry lands `PIER_HOLD` 64 at the Loading track's top (`PIER_VOLLEY`), so a thick line
+  of pieces is in the air, onto a box held at a low heap (`PIER_BOX_START`) until the hold
+  starts landing, so the heap is seen stacking. The west clip is cast on an almost grimy
+  lake (`WEST_CLEAN` 0.08); as each net lands `_empty_under` takes what is left under its
+  mouth (`WEST_EMPTY` of it), so once the catch patch closes the honest map shows a clean
+  spot, and the clip runs `WEST_CLIP_FRAMES` to see it.
+- **The tornado shot** (`shot_steam` `FILM_ONLY=tornado`, same day): a funnel pinned
+  `TORN_OUT` tiles off the island's screen-right beach (`TORN_ANGLE`; left to wander it
+  hugged the shore, and straight down-screen its cloud covered the angler), a whirl topped up
+  past `Tornado.CARRY_MOST` to `TORN_CARRY` by hand (`_feed_tornado`, the event's own entry)
+  and spread wider and lower (`_spread_whirl`), and the net aimed `TORN_SHORT` of its mouth
+  short of the foot so it is caught flying at the funnel, not landed over it.
+  **Second pass** (Richard: farther out, zoomed out, net midway, a grimier lake with
+  contrast): `TORN_OUT` 13, `TORN_ZOOM` 2, `TORN_CLEAN` 0.45 with a ring `TORN_CLEAR` tiles
+  round the foot emptied (`_clear_round`) so the whirl reads on clean water, no flings
+  (they would land on the ring), `TORN_CARRY` 56 spread `TORN_BAND`/`TORN_MARGIN`, and the
+  net aimed at the foot itself and caught half way.
+- **The wash-and-place loop** (`tools/shot_wash_place.tscn`, same day): on a copy of
+  `play_decor`'s save, the globe is taken off the floor and put at the pump with
+  `TRAY_MORE` other finds on the tray (an illusion of more to wash), washed by a jet that
+  walks to the nearest grime left (`_dirtiest_near`; a fixed raster missed cells and never
+  reached `DONE_AT`), then the room's own close into the shed, and the globe carried off the
+  shelf and put down where it stood. Frames in `tools/film/steam/wash_place/`. **Real time,
+  by Richard's call** (a 3x wash looked bad): the jet sweeps the find in rows over its own
+  width (`ROW_GAP`, `SWEEP_PACE`), then chases what is left; about six seconds at hose
+  level 3, which is the wear rate, not the path. The cut drops the room swap and opens on a
+  close crop of the shelf and the room, with the wooden cursor drawn in afterwards off
+  `pointer.txt` (the capture has no hardware cursor). `06_wash_place.gif`/`.mp4`.
+- **The start shot** (`shot_steam` `FILM_ONLY=dirty`, same day): a new game's lake, nothing
+  thinned, at the far stop (`_zoom(1)`), the boats hidden, the angler on the island's west
+  shore facing west and a dog sat beside him facing the same way. **A facing set from
+  outside needs `Angler._repaint`**: the sheet is only redrawn on a change it notices
+  itself, so `facing` alone left him facing the camera. `07_dirty_start.png`.
+- **Grime to beauty** (`shot_steam` `FILM_ONLY=beauty`, same day): the island centred at
+  zoom 3, no HUD, the angler beside the crate with a dog, the lake cleaned in a wave out
+  from the island (tiles ordered by `Iso.past_shelf` plus noise, paced by distance squared
+  so the shot's own water takes most of the film), stopping at `BEAUTY_MOST` so the run does
+  not end and raise the farewell. The hut mends off the meter, the hive takes its colony at
+  `BEAUTY_HIVE_AT`, water plants held to `BEAUTY_PADS`, crowds thinned, one duck family
+  flown in to the south. Cut to 11.8 s: `08_grime_to_beauty.gif`/`.mp4`.
+- **The crayfish crawl under the fish** (same day, Richard): they and their shadows are on
+  `Wildlife`'s two bed layers (`bed_layers`), which the lake reparents before `Fish` in its
+  tree; same z 3, so the tree's order is what puts the fish over them.
 
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions
