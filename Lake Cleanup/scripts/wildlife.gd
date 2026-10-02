@@ -13,8 +13,19 @@ extends Node2D
 ##
 ## Art: the frogs are the Pixel Frog pack recoloured onto the palette, everything else is
 ## built by rule (tools/build_wildlife.py). Pictures face left and are mirrored for right.
-## Three draw layers: under the water's surface (the swimming frog's shadow), on it and the
-## beaches, and in the air (flying ducks, dragonflies).
+## Four draw layers: under the water's surface (tracks, and every shadow on the lakebed),
+## what is under the water drawn through it, on the water and the beaches (the animals, and
+## every shadow on the land or the water's surface, the flying ones' included), and in the
+## air (flying ducks, dragonflies). Nothing is drawn on the air layer but the fliers
+## themselves: a shadow lies on the surface it falls on.
+##
+## **One sun** (2026-10-02, `/grill-me` with Richard): every shadow here is `Shade`'s ink for
+## the surface it falls on (`Shade.On`: land, the water's surface, the bed), at the day's
+## strength, so it greys with the weather and flashes with the lightning like the rest of
+## the lake. What stands on the ground is its own picture laid down by `Shade.lying`; what
+## is up in the air throws it from the ground point plus `Shade.drop` of its height; what is
+## under the water throws it onto the bed by the depth (`Fish.shadow_drop`). No caster here
+## picks its own colour, alpha or gain.
 
 const FROG_SHEETS := ["res://assets/wildlife/frog_green.png", "res://assets/wildlife/frog_brown.png"]
 const CRITTERS := "res://assets/wildlife/critters.png"
@@ -61,7 +72,10 @@ const RECKON_EVERY := 2.0
 ## world px a second, how long they rest and crawl, and how near a threat has to come, in
 ## tiles. They flee backwards, tail first, the way a crayfish does.
 const CRAYFISH_MOST := 12
-const CRAY_DEEPEST := 0.55
+## 2026-10-01 (Richard): off the shallows, into the middle and deep bands, and they never
+## dart from anything — not walkers, hulls or nets. `_cray_fright` is unused now.
+const CRAY_SHALLOWEST := 0.3
+const CRAY_DEEPEST := 0.85
 const CRAY_CRAWL := 7.0
 const CRAY_DART := 70.0
 const CRAY_DART_TIME := 0.45
@@ -94,7 +108,6 @@ const FROG_JUMP_TIME := 0.62
 const FROG_JUMP_HIGH := 14.0
 const FROG_SWIM_SPEED := 22.0
 const FROG_SWIM_FPS := 6.0
-const FROG_SHADOW := 0.34
 ## How far a frog will swim for a pad, tiles.
 const FROG_PAD_REACH := 7.0
 
@@ -124,10 +137,15 @@ const DUCKLINGS := Vector2i(0, 5)
 ## Leader positions kept for the ducklings to follow, one every TRAIL_STEP seconds.
 const TRAIL_STEP := 0.12
 const TRAIL_GAP := 4
-## A flying duck's shadow: the pigeons' bargain.
-const SHADE_GAIN := 2.4
-const SHADE_MOST := 0.45
+## A flying brood's shadow shrinks and thins with the height the flight has carried it to,
+## as the pigeons' does: a shadow the same size at every height reads as a duck sliding
+## along the surface. Shares at the top of the climb (`DUCK_ALT`). The ink itself is
+## `Shade`'s, for whatever surface the shadow lands on.
 const SHADE_SHRINK := 0.35
+const SHADE_THIN := 0.5
+## What floats sits low in the water, so its shadow on the surface is short: this share of
+## the sun's lean and stretch, laid from the waterline.
+const FLOAT_SHADE := 0.45
 
 ## Dragonflies.
 const FLY_ALT := Vector2(10.0, 18.0)
@@ -142,7 +160,9 @@ const FLY_HOVER_BEATS := Vector2i(1, 5)
 
 ## The foam pixels a floating animal sits in.
 const FOAM := Color(0.933, 0.965, 0.984, 0.8)
-const SHADOW_INK := Color(0.02, 0.06, 0.08)
+## How far over the bed a crayfish's shadow is thrown from, world px: it walks on the bed,
+## so only its own height. About the 3 px it always fell at midday.
+const CRAY_SHADE_UP := 16.0
 ## Tracks in the sand (2026-09-22, Richard): a frog's hop leaves a pair of dents where it
 ## lands, a turtle leaves two rows of footprints either side of the drag of its shell. They
 ## fade over TRACK_LIFE; at most TRACKS_MOST are kept, oldest dropped. Sand only.
@@ -333,9 +353,6 @@ func reset() -> void:
 ## Something hit the water at `at` (world): everything within reach runs.
 func scare(at: Vector2, reach_tiles: float = DUCK_SHY) -> void:
 	var reach := Iso.tile_circle_extent(reach_tiles)
-	for c: Dictionary in _crays:
-		if (c["at"] as Vector2).distance_to(at) < reach:
-			_cray_fright(c, at)
 	for f: Dictionary in _frogs:
 		if (f["at"] as Vector2).distance_to(at) < reach:
 			_frog_fright(f, at)
@@ -475,6 +492,10 @@ func _add_shore(land: Vector2, water: Vector2, normal: Vector2, side: String) ->
 		return
 	if Pump.covers(land, 1.0):
 		return
+	# Nor at the beehive (2026-09-30): it stands well inside the lawn today, so this never
+	# bites, but a spot beside it would put a frog under the bees if the hive were moved.
+	if Hive.covers(land, 1.0):
+		return
 	if crate_tile != Vector2.INF and Yard.covers(crate_tile, land, 1.0):
 		return
 	for p in avoid:
@@ -499,6 +520,8 @@ func _shore_clean(spot: Dictionary) -> bool:
 func _on_sand(at: Vector2, side: String) -> bool:
 	var tile := Iso.world_to_tile(at)
 	if Iso.in_shed(tile.x, tile.y, Iso.SHED_COVER + 0.3) or Pump.covers(tile, 0.6):
+		return false
+	if Hive.covers(tile, 0.6):
 		return false
 	if crate_tile != Vector2.INF and Yard.covers(crate_tile, tile, 0.6):
 		return false
@@ -1168,15 +1191,10 @@ func _draw_land(on: CanvasItem, c: Dictionary) -> void:
 	else:
 		name = "fox_trot%d" % (int(clock * FOX_TROT_FPS) % 4)
 	var lift := ART if rabbit and state != Land.SIT and name.ends_with("1") else 0.0
-	# The sun's shadow, the dog's own: the silhouette laid on the ground from the feet, in the
-	# day's ink (2026-09-25, Richard: "rabbits and foxes lack shadows"). On the ground, so a
-	# rabbit's hop lifts the animal and leaves its shadow where it is.
-	if day != null:
-		var frame := _region(name)
-		if frame.size.x > 0.0:
-			Flock.stamp(on, _critters, frame, Vector2.ZERO, float(c["facing"]),
-				Shade.tint(day.ink * float(c["fade"])), Shade.lying((c["at"] as Vector2).round(), day.lean, day.stretch),
-				Vector2.ZERO, SCALE / Flock.SCALE)
+	# The sun's shadow, the dog's own: the silhouette laid on the land from the feet
+	# (2026-09-25, Richard: "rabbits and foxes lack shadows"), in the land's ink. On the
+	# ground, so a rabbit's hop lifts the animal and leaves its shadow where it is.
+	_lay(on, name, (c["at"] as Vector2).round(), float(c["facing"]), Shade.On.LAND, float(c["fade"]))
 	_stamp(on, name, (c["at"] as Vector2).round() - Vector2(0.0, lift), float(c["facing"]), Color(1.0, 1.0, 1.0, float(c["fade"])))
 
 
@@ -1491,6 +1509,33 @@ func _stamp(on: CanvasItem, name: String, at: Vector2, facing: float, tint: Colo
 	Flock.stamp(on, _critters, frame, at, facing, tint, Transform2D.IDENTITY, Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
 
 
+## The sun's lean and stretch as `Shade.lying` takes them: the day's, or the lake's own
+## (`Shade.sun_of`); with neither, the fallback `Shade.drop` uses, so a laid shadow and a
+## dropped one agree.
+func _sun() -> Vector2:
+	var sun := Shade.sun_of(day)
+	if sun == null:
+		return Vector2(-0.2, 0.8)
+	return Vector2(sun.lean, sun.stretch)
+
+
+## The surface a shadow at `at` (world) falls on: the water as it is drawn, or the land.
+func _surface_at(at: Vector2) -> int:
+	return Shade.On.WATER if _wet(at) else Shade.On.LAND
+
+
+## A critter picture's shadow: the picture laid down from `at` by the sun (`Shade.lying`), in
+## `Shade`'s ink for `surface`. `reach` shortens it (a floating body, `FLOAT_SHADE`).
+func _lay(on: CanvasItem, name: String, at: Vector2, facing: float, surface: int, fade: float,
+		scale_by: float = 1.0, reach: float = 1.0) -> void:
+	var frame := _region(name)
+	if frame.size.x <= 0.0:
+		return
+	var sun := _sun() * reach
+	Flock.stamp(on, _critters, frame, Vector2.ZERO, facing, Shade.tint_on(day, surface, fade),
+		Shade.lying(at, sun.x, sun.y), Vector2.ZERO, scale_by * SCALE / Flock.SCALE)
+
+
 # ---- crayfish on the lakebed -----------------------------------------------------------
 
 enum Cray { REST, CRAWL, DART }
@@ -1512,7 +1557,8 @@ func _cray_ok(at: Vector2) -> bool:
 	var tile := Iso.world_to_tile(at)
 	if grid.water_state(grid.index_of(int(floor(tile.x)), int(floor(tile.y)))) != 0:
 		return false
-	return Fish.depth_at(at) < CRAY_DEEPEST
+	var depth := Fish.depth_at(at)
+	return depth >= CRAY_SHALLOWEST and depth < CRAY_DEEPEST
 
 
 func _new_cray() -> Dictionary:
@@ -1534,11 +1580,6 @@ func _cray_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 	if not ok and float(c["fade"]) <= 0.0:
 		c["gone"] = true
 		return
-	var reach := Iso.tile_circle_extent(CRAY_SHY)
-	for p in seen:
-		if p.distance_to(at) < reach:
-			_cray_fright(c, p)
-			break
 	c["timer"] = float(c["timer"]) - delta
 	var state: int = c["state"]
 	if state == Cray.REST:
@@ -1581,9 +1622,10 @@ func _cray_frame(c: Dictionary) -> String:
 
 
 ## Tracks on the sand, then what lies on the lakebed through clean water (2026-09-30, the
-## lakebed pass): every swimming or floating animal's shadow on the bed, further down the
-## screen the deeper the water (`Fish.shadow_drop`), and the legs of what floats, under the
-## waterline. All of it only where the bed shows (`Fish.bed_shows`).
+## lakebed pass): every swimming or floating animal's shadow on the bed, in the bed's ink
+## and thrown along the sun by the depth of the water (`Fish.shadow_drop`, one sun since
+## 2026-10-02), and the legs of what floats, under the waterline. All of it only where the
+## bed shows (`Fish.bed_shows`).
 func _paint_under(on: CanvasItem) -> void:
 	for i in _track_at.size():
 		var fade := 1.0 - _track_age[i] / TRACK_LIFE
@@ -1598,8 +1640,9 @@ func _paint_under(on: CanvasItem) -> void:
 		var r := _region(_cray_frame(c))
 		var at: Vector2 = c["at"]
 		if r.size.x > 0.0 and Fish.bed_shows(grid, at):
-			on.draw_texture_rect_region(_critters, Rect2(at + Vector2(ART, ART * 1.5) - r.size * SCALE * 0.5, r.size * SCALE), r,
-				Color(SHADOW_INK, 0.22 * float(c["fade"])))
+			# On the bed itself, so thrown only by its own height, not by the water's depth.
+			on.draw_texture_rect_region(_critters, Rect2(at + Shade.drop(day, CRAY_SHADE_UP) - r.size * SCALE * 0.5, r.size * SCALE), r,
+				Shade.tint_on(day, Shade.On.BED, float(c["fade"])))
 	for t: Dictionary in _turtles:
 		var state := int(t["state"])
 		if state == Turtle.UNDER:
@@ -1619,11 +1662,12 @@ func _paint_under(on: CanvasItem) -> void:
 		_duck_legs(on, b["at"], float(b["clock"]), false)
 
 
-## Something's own picture laid on the bed under it as a shadow, where the bed shows.
+## Something's own picture laid on the bed under it as a shadow, where the bed shows: thrown
+## along the sun by the depth of the water (`Fish.shadow_drop`), in the bed's ink.
 func _shadow_of(on: CanvasItem, name: String, at: Vector2, facing: float, fade: float) -> void:
 	if not Fish.bed_shows(grid, at):
 		return
-	_stamp(on, name, at + Fish.shadow_drop(at), facing, Color(SHADOW_INK, Fish.SHADOW_INK * fade))
+	_stamp(on, name, at + Fish.shadow_drop(at, day), facing, Shade.tint_on(day, Shade.On.BED, fade))
 
 
 ## Under a floating duck, two legs paddling by turns, a webbed foot on each; a duckling's
@@ -1704,6 +1748,10 @@ func _paint_submerged(on: CanvasItem) -> void:
 
 
 func _paint_ground(on: CanvasItem) -> void:
+	# The dragonflies' shadows first, flat on whatever they fall on: the fliers are on the air
+	# layer, and a shadow is never drawn there.
+	for d: Dictionary in _flies:
+		_draw_fly_shadow(on, d)
 	var items: Array = []
 	for f: Dictionary in _frogs:
 		if int(f["state"]) != Frog.SWIM:
@@ -1760,15 +1808,19 @@ func _draw_frog(on: CanvasItem, f: Dictionary) -> void:
 			col = 7 if t < 0.12 else (9 if t < 0.5 else (10 if t < 0.88 else 8))
 			lift = sin(t * PI) * FROG_JUMP_HIGH
 	var at: Vector2 = f["at"]
-	if lift > 0.5:
-		# A small shadow on the ground under a frog in the air.
-		var shade := PackedVector2Array()
-		for i in 8:
-			var a := TAU * float(i) / 8.0
-			shade.append(at + Vector2(cos(a) * 5.0, sin(a) * 2.0))
-		on.draw_colored_polygon(shade, Color(SHADOW_INK, 0.18 * float(f["fade"])))
 	var row: int = f["row"]
 	var src := Rect2(float(col) * FROG_CELL, float(row) * FROG_CELL, FROG_CELL, FROG_CELL)
+	# The sun's shadow: the frog's own picture laid down from its feet, sitting or in a hop.
+	# In the air it is thrown from the ground under it by the hop's height, so the shadow
+	# slides out along the sun as the frog rises. On a pad, or over the water, the water's
+	# ink; on the sand, the land's.
+	var ground := at + Shade.drop(day, lift)
+	var surface := Shade.On.WATER if bool(f["on_pad"]) or _wet(ground) else Shade.On.LAND
+	var sun := _sun()
+	on.draw_set_transform_matrix(Shade.lying(ground.round(), sun.x, sun.y))
+	on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * SCALE, Vector2(FROG_CELL, FROG_CELL) * SCALE), src,
+		Shade.tint_on(day, surface, float(f["fade"])))
+	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var box := Rect2((at - FROG_FOOT * SCALE - Vector2(0.0, lift)).round(), Vector2(FROG_CELL, FROG_CELL) * SCALE)
 	on.draw_texture_rect_region(sheet, box, src, Color(1.0, 1.0, 1.0, float(f["fade"])))
 
@@ -1794,6 +1846,12 @@ func _draw_turtle(on: CanvasItem, t: Dictionary) -> void:
 		bob = ART if fmod(float(t["clock"]), 6.0) > 5.0 else 0.0
 		at += Vector2(0.0, ART * 2.0)
 	var tint := Color(1.0, 1.0, 1.0, float(t["fade"]))
+	# The sun's shadow: on the land from the feet, or, swimming, a short one on the water from
+	# the waterline (it floats low, `FLOAT_SHADE`). Its shadow on the bed is `_paint_under`'s.
+	if state == Turtle.SWIM:
+		_lay(on, name, at, float(t["facing"]), Shade.On.WATER, float(t["fade"]), 1.0, FLOAT_SHADE)
+	else:
+		_lay(on, name, at, float(t["facing"]), _surface_at(at), float(t["fade"]))
 	_stamp(on, name, at + Vector2(0.0, -bob), float(t["facing"]), tint)
 	if state == Turtle.SWIM:
 		_collar(on, at + Vector2(0.0, -bob), 16.0, float(t["clock"]), float(t["fade"]))
@@ -1808,26 +1866,43 @@ func _nod(t: Dictionary) -> String:
 func _draw_brood_water(on: CanvasItem, b: Dictionary) -> void:
 	var kind := String(b["kind"])
 	var clock := float(b["clock"])
+	var pose := "dabble" if int(b["state"]) == Brood.DABBLE else "swim%d" % (int(clock * 1.6) % 2)
+	var at: Vector2 = b["at"]
+	# Every shadow of the brood on the water's surface first, so none lies over a duck: each
+	# its own picture laid from the waterline, short, as what floats sits low (`FLOAT_SHADE`).
+	# Their shadows on the bed are `_paint_under`'s.
+	for kid: Dictionary in b["kids"]:
+		var name := "duckling_swim%d" % (int(clock * 2.0 + float(kid["wobble"])) % 2)
+		_lay(on, name, (kid["at"] as Vector2).round(), float(kid.get("facing", b["facing"])),
+			Shade.On.WATER, 1.0, 1.0, FLOAT_SHADE)
+	_lay(on, "%s_%s" % [kind, pose], at.round(), float(b["facing"]), Shade.On.WATER, 1.0, 1.0, FLOAT_SHADE)
 	for kid: Dictionary in b["kids"]:
 		var kat: Vector2 = kid["at"]
 		var name := "duckling_swim%d" % (int(clock * 2.0 + float(kid["wobble"])) % 2)
 		_stamp(on, name, kat.round(), float(kid.get("facing", b["facing"])))
 		_collar(on, kat, 9.0, clock + float(kid["wobble"]), 1.0)
-	var pose := "dabble" if int(b["state"]) == Brood.DABBLE else "swim%d" % (int(clock * 1.6) % 2)
-	var at: Vector2 = b["at"]
 	_stamp(on, "%s_%s" % [kind, pose], at.round(), float(b["facing"]))
 	_collar(on, at, 20.0, clock, 1.0)
 
 
-## A flying brood's shadow on the water: its own silhouette laid down by the sun.
+## A flying brood's shadows, the ducklings' with the leader's: each its own silhouette laid
+## down by the sun, thrown from the ground point under it by the height it flies at
+## (`Shade.drop`), in the ink of whatever it lands on — the water's, or the land's while the
+## brood is still coming in over the bank. Drawn on this layer, the surface's, never on the
+## air's. Shrunk and thinned with the height (`SHADE_SHRINK`, `SHADE_THIN`).
 func _draw_brood_shadow(on: CanvasItem, b: Dictionary) -> void:
-	if day == null:
-		return
-	var up := clampf(float(b["alt"]) / DUCK_ALT, 0.0, 1.0)
-	var ink := minf(day.ink * SHADE_GAIN, SHADE_MOST) * (1.0 - 0.5 * up)
-	var frame := _region("%s_%s" % [String(b["kind"]), _fly_pose(b)])
-	Flock.stamp(on, _critters, frame, Vector2.ZERO, float(b["facing"]), Shade.tint(ink),
-		Shade.lying(b["at"], day.lean, day.stretch), Vector2.ZERO, (1.0 - SHADE_SHRINK * up) * SCALE / Flock.SCALE)
+	var alt := float(b["alt"])
+	var up := clampf(alt / DUCK_ALT, 0.0, 1.0)
+	var fade := 1.0 - SHADE_THIN * up
+	var shrink := 1.0 - SHADE_SHRINK * up
+	var lift := Shade.drop(day, alt)
+	var clock := float(b["clock"])
+	for kid: Dictionary in b["kids"]:
+		var kat: Vector2 = (kid["at"] as Vector2) + lift
+		var name := "duckling_fly%d" % (int(clock * 14.0 + float(kid["wobble"])) % 2)
+		_lay(on, name, kat, float(kid.get("facing", b["facing"])), _surface_at(kat), fade, shrink)
+	var at: Vector2 = (b["at"] as Vector2) + lift
+	_lay(on, "%s_%s" % [String(b["kind"]), _fly_pose(b)], at, float(b["facing"]), _surface_at(at), fade, shrink)
 
 
 func _fly_pose(b: Dictionary) -> String:
@@ -1856,12 +1931,20 @@ func _collar(on: CanvasItem, at: Vector2, wide: float, clock: float, fade: float
 		on.draw_rect(Rect2(x0 + float(i) * ART, y - ART * 0.5, ART, ART), Color(FOAM, FOAM.a * fade))
 
 
+## A dragonfly's shadow, one art pixel: thrown from the ground point under it by the height
+## it hovers at (`Shade.drop`), snapped to the art grid, in the ink of what it falls on.
+## Drawn by the ground layer (`_paint_ground`), never the air's.
+func _draw_fly_shadow(on: CanvasItem, d: Dictionary) -> void:
+	var ground := ((d["at"] as Vector2) / ART).floor() * ART
+	var at := (ground + Shade.drop(day, float(d["alt"]))).snapped(Vector2(ART, ART))
+	on.draw_rect(Rect2(at, Vector2(ART, ART)), Shade.tint_on(day, _surface_at(at), float(d["fade"])))
+
+
 ## A dragonfly on whole art pixels: head, thorax and a long abdomen along its heading
-## (snapped to eighths), two pairs of wings flicking, a faint dot of shadow on the water.
+## (snapped to eighths), two pairs of wings flicking. Its shadow is `_draw_fly_shadow`.
 func _draw_fly(on: CanvasItem, d: Dictionary) -> void:
 	var fade := float(d["fade"])
 	var ground := ((d["at"] as Vector2) / ART).floor() * ART
-	on.draw_rect(Rect2(ground, Vector2(ART, ART)), Color(SHADOW_INK, 0.18 * fade))
 	var at := ground + Vector2(0.0, -float(d["alt"])).snapped(Vector2(ART, ART)) + (d["jit"] as Vector2)
 	var h: Vector2 = d["heading"]
 	var k := posmod(roundi(atan2(h.y, h.x) / (PI / 4.0)), 8)

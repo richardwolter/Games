@@ -77,13 +77,22 @@ const GEAR_TOOTH := 0.26
 const GEAR_WIDTH := 0.46
 const GEAR_HUB := 0.34
 
-## The camera: the body's width and height as shares of the face, the viewfinder block on its
-## top-left shoulder, and the lens's radius as a share of the body's height. Square cuts, like
-## the gear. First guesses.
-const CAMERA_WIDE := 0.74
-const CAMERA_TALL := 0.46
-const CAMERA_FINDER := Vector2(0.3, 0.2)
-const CAMERA_LENS := 0.36
+## The free camera's mark: a video icon (a box with a wedge on its right) with a padlock over
+## its bottom-right corner, shut while the view follows the angler and open while it is
+## pinned. All shares of the face's shorter side; chamfered, like the gear's square cuts.
+## First guesses.
+const CAMERA_BODY := Vector2(0.62, 0.5)
+const CAMERA_CUT := 0.07
+const CAMERA_WEDGE := 0.26
+const CAMERA_WEDGE_GAP := 0.03
+const CAMERA_WEDGE_NARROW := 0.16
+const CAMERA_WEDGE_WIDE := 0.44
+const CAMERA_SHIFT := Vector2(0.0, 0.0)
+const LOCK_BODY := Vector2(0.36, 0.28)
+const LOCK_AT := Vector2(0.66, 0.6)
+const LOCK_SHACKLE := Vector2(0.24, 0.18)
+const LOCK_STROKE := 0.08
+const LOCK_LIFT := 0.1
 
 signal pressed
 
@@ -440,30 +449,78 @@ static func draw_flag(on: CanvasItem, box: Rect2, texture: Texture2D, fill: floa
 	on.draw_texture_rect(texture, Rect2(at, drawn), false)
 
 
-## A boxy camera: a body, a viewfinder block on its shoulder, and a lens that is a hole like
-## the gear's hub. On whole pixels, so the black rim is one pixel all round.
+## The free camera's mark: a video icon with a padlock on its corner. `lit` is free mode, so
+## a lit button wears the lock open and the clean water's blue; unlit, the view follows the
+## angler and the lock is shut. On whole pixels, the black rim one pixel all round, the
+## keyhole a hole in the button's own face like the gear's hub.
 func _draw_camera(face: Rect2, behind: Color) -> void:
 	var ink := Style.ON_WATER if lit else Style.RIBBON_INK
 	var side := minf(face.size.x, face.size.y)
-	var middle := (face.position + face.size * 0.5).round()
+	var middle := (face.position + face.size * 0.5 + CAMERA_SHIFT * side).round()
+	var body_size := (CAMERA_BODY * side).round()
+	var wedge := roundf(CAMERA_WEDGE * side)
+	var gap := maxf(1.0, roundf(CAMERA_WEDGE_GAP * side))
+	var whole := body_size.x + gap + wedge
 	var body := Rect2(
-		middle - Vector2(side * CAMERA_WIDE, side * CAMERA_TALL) * 0.5
-			+ Vector2(0.0, side * CAMERA_FINDER.y * 0.5),
-		Vector2(side * CAMERA_WIDE, side * CAMERA_TALL)
+		(middle - Vector2(whole * 0.5, body_size.y * 0.5)).round(), body_size
 	)
-	body = Rect2(body.position.round(), body.size.round())
-	var finder := Rect2(
-		body.position + Vector2(side * 0.08, -side * CAMERA_FINDER.y).round(),
-		(side * CAMERA_FINDER).round() + Vector2(0.0, 1.0)
-	)
+	var cut := maxf(1.0, roundf(CAMERA_CUT * side))
+	var cy := body.position.y + body.size.y * 0.5
+	var near := body.end.x + gap
+	var tip := near + wedge
+	var narrow := roundf(CAMERA_WEDGE_NARROW * side)
+	var wide := roundf(CAMERA_WEDGE_WIDE * side)
+	draw_colored_polygon(_chamfered(body.grow(1.0), cut + 1.0), Style.HOLE_RIM)
+	draw_colored_polygon(_wedge(near - 1.0, tip + 1.0, cy, narrow + 1.0, wide + 1.0), Style.HOLE_RIM)
+	draw_colored_polygon(_chamfered(body, cut), ink)
+	draw_colored_polygon(_wedge(near, tip, cy, narrow, wide), ink)
+	_draw_lock(face, side, ink, behind)
+
+
+## The padlock over the camera's corner. Shut: both legs of the shackle in the body. Open:
+## the shackle lifted `LOCK_LIFT` with its right leg clear of the body.
+func _draw_lock(face: Rect2, side: float, ink: Color, behind: Color) -> void:
+	var centre := face.position + face.size * 0.5 + LOCK_AT * side
+	var size := (LOCK_BODY * side).round()
+	var body := Rect2((centre - size * 0.5).round(), size)
+	var stroke := maxf(2.0, roundf(LOCK_STROKE * side))
+	var span := roundf(LOCK_SHACKLE.x * side)
+	var tall := roundf(LOCK_SHACKLE.y * side)
+	var lift := roundf(LOCK_LIFT * side) if lit else 0.0
+	var left := roundf(body.position.x + (body.size.x - span) * 0.5)
+	var top := body.position.y - tall - lift
+	var bars: Array[Rect2] = [
+		Rect2(left, top, span, stroke),
+		Rect2(left, top, stroke, tall + lift + 1.0),
+	]
+	var right_foot := body.position.y + 1.0 if not lit else body.position.y - lift * 0.5
+	bars.append(Rect2(left + span - stroke, top, stroke, right_foot - top))
+	for bar in bars:
+		draw_rect(bar.grow(1.0), Style.HOLE_RIM, true)
 	draw_rect(body.grow(1.0), Style.HOLE_RIM, true)
-	draw_rect(finder.grow(1.0), Style.HOLE_RIM, true)
+	for bar in bars:
+		draw_rect(bar, ink, true)
 	draw_rect(body, ink, true)
-	draw_rect(finder, ink, true)
-	var lens := body.position + body.size * 0.5
-	var radius := body.size.y * CAMERA_LENS
-	draw_circle(lens, radius + 1.0, Style.HOLE_RIM)
-	draw_circle(lens, radius, behind)
+	var hole := Vector2(maxf(2.0, roundf(side * 0.05)), maxf(3.0, roundf(side * 0.08)))
+	draw_rect(Rect2((body.position + (body.size - hole) * 0.5).round(), hole), behind, true)
+
+
+func _chamfered(box: Rect2, cut: float) -> PackedVector2Array:
+	var a := box.position
+	var b := box.end
+	return PackedVector2Array([
+		Vector2(a.x + cut, a.y), Vector2(b.x - cut, a.y), Vector2(b.x, a.y + cut),
+		Vector2(b.x, b.y - cut), Vector2(b.x - cut, b.y), Vector2(a.x + cut, b.y),
+		Vector2(a.x, b.y - cut), Vector2(a.x, a.y + cut),
+	])
+
+
+## The video icon's wedge: narrow where it meets the body, wide at its right end.
+func _wedge(near: float, tip: float, cy: float, narrow: float, wide: float) -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(near, cy - narrow * 0.5), Vector2(tip, cy - wide * 0.5),
+		Vector2(tip, cy + wide * 0.5), Vector2(near, cy + narrow * 0.5),
+	])
 
 
 ## A cog's outline:`GEAR_TEETH` teeth standing off a rim, each `GEAR_WIDTH` of its pitch

@@ -274,6 +274,11 @@ func may_lie(t: Vector2) -> bool:
 		return false
 	if Pump.tile != Vector2.INF and Pump.covers(t, OFF_CRATE):
 		return false
+	# Off the beehive's footprint, and out from under its picture (2026-09-30): the hive and
+	# its shelf stand tall, and a puddle up the screen of them would lie under the drawing
+	# and hold its upside-down mirror there.
+	if Hive.tile != Vector2.INF and (Hive.covers(t, OFF_CRATE) or Hive.hides(t, 0.0)):
+		return false
 	return true
 
 

@@ -55,30 +55,35 @@ const HULL_WIDTH := 50.0
 ## in the hold.
 const HULL_HEIGHT := 16.0
 
-## The open hold, as a fraction of the hull: where along it the cargo deck starts and ends,
-## how far across it reaches, and how high above the water it is, in HULL_HEIGHTs. Taken off
-## the drawing — the cabin sits over the stern and the mast is amidships, so the load goes in
-## the well round the mast, on the foredeck side of it. Kept short of the bow: the frames draw
-## the bow-on deck higher than the plane's projection puts it, and a load laid to the bow rail
-## by the projection floats past the cut bow.
-##
-## Down in the boat rather than on top of it (2026-09-12): the lift is what decides whether a
-## piece reads as stowed or as balanced on the deck, and the sail overlay is what lets the
-## load sit round the mast at all — before it, anything that high cut through the cloth.
+## Where along the hull the pile's middle lies, as a fraction of the hull forward of the mast:
+## the cabin sits over the stern and the mast is amidships, so the load goes in the well on
+## the foredeck side of it. Laid on the plane and then held inside the frame's own well.
 const HOLD_FROM := 0.02
 const HOLD_TO := 0.20
-const HOLD_ACROSS := 0.26
-const HOLD_LIFT := 0.55
 
-## How the hold fills: how many pieces are drawn, how big, how many lie in one layer before
-## the next starts on top of them, and how far each layer rides above the one under it, in
-## HULL_HEIGHTs. It fills bottom up like the recycle box — a ferry with one piece aboard has
-## it lying on the boards, and a full one is heaped — rather than spreading flat, which reads
-## as a deck cargo lashed down. Twelve is what a heap needs; six read as a handful.
+## The load is the recycle box's heap in a hull (2026-10-02, Richard: pieces were sticking
+## out over the boat's sides). The builder finds each frame's near rail off the blue stripe
+## and the well the load may stand across (`well` in the sheet's json), and copies the hull
+## from that rail down into a sheet of its own (`boat_hold_front.png`). The pile is drawn
+## standing on the rail, then that front over it, then the sail over both — the box's near
+## walls over its heap — so a piece's foot is always inside the hull and it never reaches
+## past the well's ends, at every heading.
+##
+## How it fills: as many pieces are drawn as the hold is full (cargo over capacity, of
+## HOLD_SHOWN), HOLD_LAYER to a layer, each layer HOLD_STEP frame px over the last and a
+## little narrower, the odd piece of a layer HOLD_BACK up the deck. A bottom-layer piece's
+## foot is HOLD_SINK under the rail, so the hull hides it. The pile spreads over HOLD_SPREAD
+## of the well, and a piece is drawn at HOLD_SCALE at most and never wider than HOLD_FIT of
+## its slot — the box's shrink, so a sofa in the hold is a sofa-shaped crumb, not a sofa.
 const HOLD_SHOWN := 12
-const HOLD_SCALE := 0.5
+const HOLD_SCALE := 0.7
 const HOLD_LAYER := 4
-const HOLD_STACK := 0.3
+const HOLD_STEP := 3.0
+const HOLD_BACK := 2.0
+const HOLD_SINK := 3.0
+const HOLD_SPREAD := 0.55
+const HOLD_FIT := 1.6
+const HOLD_FRONT_PATH := "res://assets/boat_hold_front.png"
 
 ## How many screen pixels one tile of travel covers, for laying things out on the deck in
 ## tiles rather than in pixels.
@@ -153,18 +158,17 @@ const COLLAR_TEAR := 1.45
 ## boat sits down into its own foam rather than on top of it.
 const HULL_DROP := 2.0
 
-## How much darker than the day's ink the boat's shadow is drawn, and the most it may be.
-## The day's ink is set for shadows on sand and grass; on the lake, darker to begin with,
-## the same alpha at dawn is a shade of blue nobody can see.
-const SHADE_GAIN := 2.7
-const SHADE_MOST := 0.63
-
 static var _over_cache: Texture2D
 static var _over_missing: bool = false
 static var _sheet_cache: Texture2D
 static var _sheet_missing: bool = false
 static var _anchor := HULL_ANCHOR
 static var _cuts: Array[PackedVector2Array] = []
+## Per frame, the well the load may stand across: {x0, x1, rails}, rails the near rail's row
+## at each column from x0, frame px. Empty for a frame without one.
+static var _wells: Array[Dictionary] = []
+static var _front_cache: Texture2D
+static var _front_missing: bool = false
 static var _boxes: Dictionary = {}
 
 ## How close to the end of a leg counts as arrived, in tiles.
@@ -434,7 +438,7 @@ func dispatch() -> bool:
 	# stowage spot it will sit in. The berth is held until the last one lands: a boat that
 	# sails out from under its own cargo is worse than no animation at all.
 	cargo = PackedInt32Array()
-	var shown := mini(lot.size(), HOLD_SHOWN)
+	var shown := hold_shown(lot.size())
 	for i in lot.size():
 		haul.send(
 			lot[i], yard.drop_point(), hold_spot(mini(i, shown - 1), shown),
@@ -624,7 +628,8 @@ func _repaint() -> void:
 ## Where the sun is, coarsely, for the repaint key: a shadow that only moves when the boat
 ## does is a shadow stuck to the morning. Mirrors Dog._sun_key.
 func _sun_key() -> int:
-	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
+	var sun := Shade.sun_of(day)
+	return 0 if sun == null else roundi(sun.lean * 60.0) * 1000 + roundi(sun.ink * 200.0)
 
 
 ## Spray off the bow while under way. The same splash the net and the falling rubbish make,
@@ -988,12 +993,16 @@ func _draw() -> void:
 	# later ones heap on top of them, each row drawn back to front. Then the sail goes over
 	# the lot, so nothing in the hold cuts through the cloth.
 	if grid != null:
-		var shown := mini(cargo.size(), HOLD_SHOWN)
+		var shown := hold_shown(cargo.size())
+		var order: Array[int] = []
 		for i in shown:
-			var spot := hold_spot(i, shown)
-			draw_set_transform(spot, 0.0, Vector2(HOLD_SCALE, HOLD_SCALE))
-			grid.defs[cargo[i]].stamp_iso(self)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			order.append(i)
+		# Back to front: up the deck first, so the pieces nearer the rail cover them.
+		order.sort_custom(func(a: int, b: int) -> bool:
+			return hold_spot(a, shown).y < hold_spot(b, shown).y)
+		for i in order:
+			_draw_held(grid.defs[cargo[i]], hold_spot(i, shown))
+		_draw_front()
 	_draw_sail_over()
 
 	# No pennant, by decision (2026-09-12): the flag in the colour of the yard it was running
@@ -1024,7 +1033,7 @@ func _draw_hull(half_l: float, half_w: float, ink: Color) -> void:
 		_hull_uvs = uvs
 		return
 	_hull_mesh = PackedVector2Array()
-	_shade.visible = false
+	_shade.lay_blot(half_l * 2.0, half_w, day)
 	_collar.visible = false
 
 	var along := _screen_heading()
@@ -1057,35 +1066,102 @@ func _under_way() -> bool:
 	)
 
 
-## Where the i-th piece of a load of `shown` sits, in this node's own space.
-##
-## Laid out in tile space and then projected, not offset around the screen. The plane is
-## seen at an angle: a step of one tile across the deck is a short step on screen when the
-## boat is pointing north and a long one when it is pointing east, and stowing cargo by
-## screen offsets floats half of it off the side of the hull.
+## How many pieces of a load of `count` are drawn: as many as the hold is full, of
+## HOLD_SHOWN, so the pile rises with the load rather than with the count alone — one piece
+## aboard is one piece, a full hold is a heap.
+func hold_shown(count: int) -> int:
+	if count <= 0:
+		return 0
+	var full := float(count) / float(maxi(capacity, 1))
+	return clampi(ceili(float(HOLD_SHOWN) * full), 1, mini(count, HOLD_SHOWN))
+
+
+## The well for a frame, {x0, x1, rails} in frame px, or empty without one.
+static func well_of(index: int) -> Dictionary:
+	_sheet()
+	if index < _wells.size():
+		return _wells[index]
+	return {}
+
+
+## The near rail's row at a column of a frame's well, frame px.
+static func rail_at(well: Dictionary, x: float) -> float:
+	var rails: PackedFloat32Array = well["rails"]
+	var k := clampi(roundi(x - float(well["x0"])), 0, rails.size() - 1)
+	return rails[k]
+
+
+## How wide one slot of the pile is, in frame px, for a frame's well.
+static func hold_slot(well: Dictionary) -> float:
+	return (float(well["x1"]) - float(well["x0"])) * HOLD_SPREAD / float(HOLD_LAYER)
+
+
+## Where the i-th piece of a load of `shown` stands, in this node's own space: the middle of
+## its foot. Laid across the frame's well behind its near rail (see HOLD_SHOWN), so it is the
+## same rule at every heading.
 func hold_spot(i: int, shown: int) -> Vector2:
-	var beam := Vector2(-heading.y, heading.x).normalized()
-	# Which layer this piece is in and where it sits within it. A layer is HOLD_LAYER pieces
-	# laid out over the well; the next starts on top once it is full, so the heap grows
-	# upwards and the boat is visibly laden before it is visibly full.
+	var index := heading_frame()
+	var well := well_of(index)
+	var scale := HULL_LENGTH / HULL_IN_FRAME
+	# The pile's middle along the hull, forward of the mast, laid on the plane.
+	var along := heading.normalized() * lerpf(HOLD_FROM, HOLD_TO, 0.5) * (HULL_LENGTH / TILE_REACH)
+	var middle := Iso.tile_to_world(along.x, along.y)
+	if well.is_empty():
+		return middle + Vector2(0.0, HULL_DROP - HULL_HEIGHT * 0.55)
+	var slot := hold_slot(well)
 	var layer := i / HOLD_LAYER
 	var within := i % HOLD_LAYER
-	var rows := maxf(float((HOLD_LAYER - 1) / 2), 1.0)
-	var down_hold := float(within / 2) / rows
-	var across_hold := -1.0 if within % 2 == 0 else 1.0
-	if shown == 1:
-		across_hold = 0.0
-	# Each layer sits a little further aft and a little narrower than the one under it, so a
-	# heap comes to a point rather than standing as a column.
-	var taper := 1.0 - 0.18 * float(layer)
-	var in_tiles := (
-		heading.normalized() * lerpf(HOLD_FROM, HOLD_TO, down_hold) * taper
-		* (HULL_LENGTH / TILE_REACH)
-		+ beam * across_hold * (HULL_WIDTH / TILE_REACH) * HOLD_ACROSS * 0.5 * taper
-	)
-	var lift := HULL_HEIGHT * (HOLD_LIFT + HOLD_STACK * float(layer))
-	# Down with the hull it is stowed in, or the heap floats a pixel over its own deck.
-	return Iso.tile_to_world(in_tiles.x, in_tiles.y) + Vector2(0.0, HULL_DROP - lift)
+	var in_layer := mini(HOLD_LAYER, shown - layer * HOLD_LAYER)
+	# Held in so the outermost piece, at its widest, stays inside the well.
+	var reach := (float(HOLD_LAYER - 1) * 0.5 + HOLD_FIT * 0.5) * slot
+	var x0 := float(well["x0"]) + reach
+	var x1 := float(well["x1"]) - reach
+	var centre := clampf(middle.x / scale + _anchor.x, minf(x0, x1), maxf(x0, x1))
+	var taper := 1.0 - 0.2 * float(layer)
+	var fx := centre + (float(within) - float(in_layer - 1) * 0.5) * slot * taper
+	var back := HOLD_BACK if within % 2 == 1 else 0.0
+	var fy := rail_at(well, fx) + HOLD_SINK - back - HOLD_STEP * float(layer)
+	return Vector2((fx - _anchor.x) * scale, (fy - _anchor.y) * scale + HULL_DROP)
+
+
+## How big a piece is drawn in the hold: HOLD_SCALE at most, and never wider than HOLD_FIT
+## of its slot on this heading.
+func hold_scale(def: TrashDef) -> float:
+	var well := well_of(heading_frame())
+	if well.is_empty() or def.size.x <= 0.0:
+		return HOLD_SCALE * 0.7
+	var room := hold_slot(well) * HOLD_FIT * (HULL_LENGTH / HULL_IN_FRAME)
+	return minf(HOLD_SCALE, room / def.size.x)
+
+
+## One piece of the load, standing on its foot at `foot`.
+func _draw_held(def: TrashDef, foot: Vector2) -> void:
+	var size := def.size * hold_scale(def)
+	if def.atlas != null:
+		draw_texture_rect_region(
+			def.atlas, Rect2(foot - Vector2(size.x * 0.5, size.y), size), def.region
+		)
+		return
+	draw_set_transform(foot - Vector2(0.0, size.y * 0.5), 0.0, Vector2.ONE * hold_scale(def))
+	def.stamp_iso(self)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The hull from the near rail down, over the load: the same polygon and texture
+## coordinates the hull was drawn with, off the front sheet.
+func _draw_front() -> void:
+	var front := _hold_front()
+	if front == null or _hull_mesh.is_empty():
+		return
+	draw_polygon(_hull_mesh, PackedColorArray([Color.WHITE]), _hull_uvs, front)
+
+
+static func _hold_front() -> Texture2D:
+	if _front_cache == null and not _front_missing:
+		if ResourceLoader.exists(HOLD_FRONT_PATH):
+			_front_cache = load(HOLD_FRONT_PATH) as Texture2D
+		_front_missing = _front_cache == null
+	return _front_cache
 
 
 ## Which frame shows the boat pointing the way it is pointing: how far round the compass
@@ -1280,6 +1356,7 @@ static func _sheet() -> Texture2D:
 static func _read_meta() -> void:
 	_anchor = HULL_ANCHOR
 	_cuts = []
+	_wells = []
 	if not FileAccess.file_exists(FRAMES_META):
 		return
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FRAMES_META))
@@ -1293,6 +1370,16 @@ static func _read_meta() -> void:
 			for pair in line:
 				points.append(Vector2(float(pair[0]), float(pair[1])))
 			_cuts.append(points)
+	_wells = []
+	if parsed.has("well"):
+		for well: Variant in parsed["well"]:
+			if well is Array and (well as Array).size() == 3:
+				var rails := PackedFloat32Array()
+				for row: Variant in (well as Array)[2]:
+					rails.append(float(row))
+				_wells.append({"x0": float(well[0]), "x1": float(well[1]), "rails": rails})
+			else:
+				_wells.append({})
 
 
 ## Which way the boat points on screen. The tile field is seen at an angle, so a heading of
@@ -1308,15 +1395,28 @@ func _screen_heading() -> Vector2:
 ## heading — sails and all — and leans and stretches as the day goes. Not the rubbish's
 ## squashed crescent (LakeGrid.ShadowLayer): that is eighteen thousand shadows that cannot
 ## afford to follow the sun, and under a hull it was a sliver nobody could see. A child so
-## it sits under the collar and the bow wave as well as the hull. Without a day, no shadow.
+## it rides the hull's bob. Without a day (its own or the lake's), no shadow.
+##
+## **One sun** (2026-10-02, `/grill-me` with Richard): the ink is the water's
+## (`Shade.On.WATER`), which is this shadow's old gain and cap promoted to the one every
+## shadow on the lake takes — the hull was the one tuned by eye against the water. And it is
+## drawn on the water's shadow layer (`SHADOW_LAYER`, 4, with the piers' and the rubbish's),
+## not just under the hull: at the hull's z less two it lay over a wading angler or a
+## swimming dog (9) beside the boat.
 class HullShade extends Node2D:
+	## The water's shadow layer: under the floating rubbish (5) and every walker.
+	const SHADOW_LAYER := 4
+
 	var _sheet: Texture2D
 	var _points := PackedVector2Array()
 	var _uvs := PackedVector2Array()
 	var _day: DayCycle
+	## The placeholder hull's shadow, when there is no sheet: a blot this long and this beam.
+	var _blot := Vector2.ZERO
 
 	func _init() -> void:
-		z_index = -2
+		z_as_relative = false
+		z_index = SHADOW_LAYER
 
 	## The boat above the water, in the parent's space, with its texture coordinates on the
 	## sheet, 0 to 1 — the same polygon the hull is drawn from.
@@ -1325,15 +1425,32 @@ class HullShade extends Node2D:
 		_points = points
 		_uvs = uvs
 		_day = day
+		_blot = Vector2.ZERO
+		visible = true
+		queue_redraw()
+
+	## The blocked-in placeholder's shadow, with no sheet to draw the boat's own from: a flat
+	## 2:1 blot as long as the hull, slid along the sun by half its beam.
+	func lay_blot(long: float, beam: float, day: DayCycle) -> void:
+		_sheet = null
+		_points = PackedVector2Array()
+		_uvs = PackedVector2Array()
+		_day = day
+		_blot = Vector2(long, beam)
 		visible = true
 		queue_redraw()
 
 	func _draw() -> void:
-		if _sheet == null or _points.is_empty() or _day == null:
+		var sun := Shade.sun_of(_day)
+		if sun == null:
 			return
-		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, _day.lean, _day.stretch))
-		var ink := minf(_day.ink * Boat.SHADE_GAIN, Boat.SHADE_MOST)
-		draw_polygon(_points, PackedColorArray([Shade.tint(ink)]), _uvs, _sheet)
+		var tint := Shade.tint_on(sun, Shade.On.WATER)
+		if _sheet == null or _points.is_empty():
+			if _blot.x > 0.0:
+				Shade.blot(self, Shade.drop(sun, _blot.y * 0.5), _blot.x, tint)
+			return
+		draw_set_transform_matrix(Shade.lying(Vector2.ZERO, sun.lean, sun.stretch))
+		draw_polygon(_points, PackedColorArray([tint]), _uvs, _sheet)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

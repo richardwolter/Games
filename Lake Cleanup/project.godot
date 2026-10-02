@@ -28,6 +28,7 @@ Prefs="*res://scripts/prefs.gd"
 Pad="*res://scripts/pad.gd"
 Sound="*res://scripts/sfx.gd"
 Music="*res://scripts/music_station.gd"
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
 
@@ -41,6 +42,10 @@ window/dpi/allow_hidpi=false
 [dotnet]
 
 project/assembly_name="Lake Cleanup"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
 
 [input]
 

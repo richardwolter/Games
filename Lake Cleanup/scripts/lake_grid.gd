@@ -90,6 +90,14 @@ const BEACH_CHANCE := 0.35
 ## piece can reach (it is past the edge of the tile field), read by rubbish.gdshader and
 ## shadow.gdshader as "do not move". Only its red and green are used.
 const DRY_ANCHOR := Color(1.0, 1.0, 0.0, 0.0)
+## A beach piece's bedding into the sand, world px, and its cap as a share of its height.
+const DRY_SINK := 2.0
+const DRY_SINK_MOST := 0.15
+## A beach piece's shadow is the land's (2026-10-02, one sun): `Shade.On.LAND` at the day's
+## ink, the same as the angler standing beside it. The sand-brown it wore before was the one
+## shadow in the game in its own colour.
+## How far above the piece's foot a beach piece's shadow is centred, as a share of its height.
+const DRY_SHADOW_UP := 0.04
 
 ## How many slots below the top of a stack a keepsake still shows through.
 ##
@@ -129,6 +137,12 @@ const RIM_FLAG := 0.5
 ## The last few pieces' pale rim (2026-09-26): the same stamp as a find's, flagged by its own
 ## alpha so rubbish.gdshader paints it `rim_pale` rather than gold. Gold is treasure here.
 const PALE_FLAG := 0.3
+## The part of a floating piece under its waterline (2026-10-02, Richard: "the objects floating
+## on clean water should be able to see the submerged part"): the art the cut took off, laid
+## again below the waterline and flagged by its own alpha, so rubbish.gdshader shows it only
+## where the filth map says the water is clean or hazy, mixed towards the water's colour. In
+## grime it is discarded, which is what grime is for.
+const SUNK_FLAG := 0.7
 ## Their column: the find's beam, in white.
 const LAST_TINT := Color(0.92, 0.97, 1.0)
 const RIM_STEP := 1.0
@@ -225,15 +239,21 @@ const SHADOW_SPAN := 1.0
 ## and a silhouette laid down on it has to be squashed to the same degree or it stands up
 ## behind the piece like a second copy of it.
 const SHADOW_SQUASH := 0.5
-const SHADOW_ALPHA := 0.15
-const SHADOW_DROP := 0.22
-const SHADOW_COLOUR := Color(0.03, 0.08, 0.11, 1.0)
+## How far under its piece's waterline a crescent's middle sits, as a share of the piece's
+## height (2026-10-02, Richard: "closer to its body"). On the waterline itself, give or take:
+## half the flattened silhouette is under the drawn piece and half peeks out on the water just
+## past it, so the shadow belongs to the piece. It used to sit a fifth of the whole picture
+## below the piece's middle, which on a tall piece left water between the two.
+const SHADOW_DROP := 0.04
 
-## How far a shadow slides off its piece, in world pixels, per unit of DayCycle.lean. The sun
-## is in the southeast, so a negative lean carries every crescent to the left of the piece
-## throwing it, the same side the angler's and the ferry's shadows fall on. Flat rather than
-## scaled by the piece: see shaders/shadow.gdshader for why the quads cannot be re-laid.
-const SHADOW_SUN_REACH := 3.0
+## How far a crescent slides along the sun, as a share of how much of its piece stands above
+## the waterline (2026-10-02, one sun): `Shade.drop` of that height, worked out in the shader
+## off the day's lean and stretch. A floating piece is mostly under the water, so its shadow
+## stays short; a tall piece throws a longer one, and late in the day all of them lengthen.
+## The height rides in each corner's alpha (see `ShadowLayer.write`), whole pixels, at most
+## `SHADOW_TALLEST`.
+const SHADOW_SUN_SHARE := 0.25
+const SHADOW_TALLEST := 127
 
 ## How many shadows there is room for. Everything on screen gets one — unlike the rings,
 ## which are sampled — so this is the worst case the view cull can hand over rather than a
@@ -266,6 +286,13 @@ const WATERLINE_MOST := 0.55
 ## and when those were two expressions that were supposed to agree they did not — the collar
 ## sat half a cut above the art's edge, which on a ten pixel piece is a white line floating
 ## beside a bottle rather than around it.
+## How far a piece lying on the sand is bedded into it (2026-09-29): one art pixel, never more
+## than `DRY_SINK_MOST` of its height, so its foot is in the beach rather than a hard cut
+## standing on top of it.
+static func dry_sunk_by(span: Vector2) -> float:
+	return minf(DRY_SINK, span.y * DRY_SINK_MOST)
+
+
 static func sunk_by(span: Vector2) -> float:
 	return minf(maxf(WATERLINE, span.y * WATERLINE_SHARE), span.y * WATERLINE_MOST)
 
@@ -468,7 +495,7 @@ const RING_OUT := 8.0
 
 ## Slots a ring tile holds: the near figure over the inner half of the ring, the far one
 ## over the outer half. First guesses, to judge in play.
-const RING_SLOTS := Vector2i(2, 3)
+const RING_SLOTS := Vector2i(3, 4)
 ## How many times deeper a stack runs than the depth alone makes it (2026-09-24, `/grill-me`
 ## with Richard: "the net is huge but not a lot of objects are caught"). Doubles every
 ## slot the depth asks for, so what the ring gives up is doubled too and dealt out past it;
@@ -476,8 +503,20 @@ const RING_SLOTS := Vector2i(2, 3)
 ## (`resources/economy.tres`), so the lake holds about the money it did.
 const DENSITY := 2
 
-## The heaviest tier a ring piece may be: liftable at level 0 or after the first Strength.
-const RING_TIER := 1
+## The heaviest tier a ring piece may be (2026-09-29, `/grill-me` with Richard: the start
+## leaned too hard on Strength). The ring is tier 0 but for bait: `RING_BAIT` of its pieces
+## may be tier 1 or 2, a teaser of what Strength opens, never a wall — see `RING_BAIT_TOP`.
+const RING_TIER := 2
+## Share of ring pieces that may stay tier 1 or 2 where the roll put them. First guess.
+const RING_BAIT := 0.15
+## Chance a ring tile past `OPEN_RING` may show a bait piece on top, and how far apart two
+## such tops must stand, in tiles. Every other ring top is tier 0, so a level-0 net always
+## has something in reach. First guesses.
+const RING_BAIT_TOP := 0.15
+const RING_BAIT_APART := 2.0
+
+## Ring tiles given a bait top this fill, for `RING_BAIT_APART`.
+var _bait_tops: Array[Vector2] = []
 
 ## Slots planned per tile by `_plan_slots`, and the most any tile got.
 var _slots := PackedInt32Array()
@@ -649,6 +688,8 @@ var _slot_len := PackedInt32Array()
 ## Which shadow in the shadow layer belongs to each tile, so a patch can move a piece's
 ## shadow with it. -1 for a tile that has none.
 var _shadow_at := PackedInt32Array()
+## A shore tile's second piece's own shadow and foam slot (2026-09-29): -1 where there is none.
+var _shadow2_at := PackedInt32Array()
 
 ## Where `_quad` writes. -1 to append, which is what a rebuild does; anything else is a
 ## patch overwriting one tile's vertices in place. The winding never changes, so a patch
@@ -998,7 +1039,7 @@ class GlintTwinkle extends Node2D:
 			# the other side. A spot below the cut is under water and not drawn.
 			var size := def.size * grid.swing[index]
 			var lean := grid.tilt[index]
-			var sink := 0.0 if grid.dry[index] == 1 else LakeGrid.sunk_by(size)
+			var sink := LakeGrid.dry_sunk_by(size) if grid.dry[index] == 1 else LakeGrid.sunk_by(size)
 			var kept := maxf(size.y - sink, 1.0)
 			var down := spot.y * size.y
 			if down > kept:
@@ -1071,17 +1112,15 @@ class ShadowLayer extends Node2D:
 	## The shader that does the moving, and the colour it draws in. Taken once: a material
 	## per rebuild would be a new resource sixty times a second in a lake being cleared.
 	func _dress() -> void:
-		var shade := LakeGrid.SHADOW_COLOUR
-		shade.a = LakeGrid.SHADOW_ALPHA
 		var skin := ShaderMaterial.new()
 		skin.shader = load("res://shaders/shadow.gdshader") as Shader
 		skin.set_shader_parameter("sway", LakeGrid.SWAY)
 		skin.set_shader_parameter("wave_speed", LakeGrid.WAVE_SPEED)
 		skin.set_shader_parameter("wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 		skin.set_shader_parameter("anchor_span", LakeGrid.ANCHOR_SPAN)
-		skin.set_shader_parameter("shade", shade)
-		skin.set_shader_parameter("sun_reach", LakeGrid.SHADOW_SUN_REACH)
+		skin.set_shader_parameter("sun_share", LakeGrid.SHADOW_SUN_SHARE)
 		material = skin
+		sun(null)
 		# Linear, not the nearest the rest of the lake uses: the shadow is the art squashed
 		# to half its height, and nearest sampling of that is a staircase of two-pixel
 		# blocks. Softened further in the shader — see `soften` there.
@@ -1110,12 +1149,13 @@ class ShadowLayer extends Node2D:
 	## The piece's own quad, flattened into the plane and pushed down it, in the piece's own
 	## UVs so the ink comes out the shape of the art.
 	##
-	## Not swung by the sun here. The quads are square to the world and the sun's lean is
-	## applied in the vertex shader instead (`sun_lean` there), because eighteen thousand
+	## Not swung by the sun here. The quads are square to the world and the sun is applied in
+	## the vertex shader instead (`sun_lean`, `sun_stretch` there), because eighteen thousand
 	## quads re-laid every time the sun moved would be the rebuild this whole layer exists
-	## to avoid. What the shader does is slide the whole shadow; it does not lean the
-	## silhouette over the way Shade.lying does on land, since a piece of floating rubbish
-	## has almost no height to lean.
+	## to avoid. What the shader does is slide the whole shadow along `Shade.drop` of the
+	## piece's height above the water, which it reads out of the corner's alpha; it does not
+	## lean the silhouette over the way Shade.lying does on land, since a piece of floating
+	## rubbish has almost no height to lean.
 	## `still` is a piece lying on the beach: its shadow is packed with DRY_ANCHOR so the
 	## shader leaves it where it is, like the piece.
 	## `rise_slot` rides in blue beside the corner flag, as 2 + slot * 2 + flag.
@@ -1128,11 +1168,25 @@ class ShadowLayer extends Node2D:
 			return false
 		var span := size * swing * LakeGrid.SHADOW_SPAN
 		var half := Vector2(span.x * 0.5, span.y * LakeGrid.SHADOW_SQUASH * 0.5)
-		var centre := Vector2(at.x, at.y + size.y * LakeGrid.SHADOW_DROP)
+		var drawn := size * swing
+		var centre := Vector2(
+			at.x,
+			at.y + drawn.y * (0.5 + LakeGrid.SHADOW_DROP) - LakeGrid.sunk_by(drawn)
+		)
+		if still:
+			# On the sand the shadow is the piece's own silhouette laid flat with its middle
+			# on the piece's foot: half under the piece, half on the sand just below it, so it
+			# hugs the base. Tucked higher, the piece hid it; thrown aside, it read as a
+			# second thing lying beside it (2026-09-29).
+			centre.y = at.y + size.y * (0.5 - LakeGrid.DRY_SHADOW_UP)
 		var box := uv
 		if mirrored:
 			box = Rect2(uv.position + Vector2(uv.size.x, 0.0), Vector2(-uv.size.x, uv.size.y))
 		var anchor := LakeGrid.pack_anchor(at.x, 0.0, 1.0)
+		# What of the piece stands above the water (or the sand), whole pixels: how far its
+		# shadow slides along the sun.
+		var cut := LakeGrid.dry_sunk_by(size * swing) if still else LakeGrid.sunk_by(size * swing)
+		var above := clampi(roundi(size.y * swing - cut), 0, LakeGrid.SHADOW_TALLEST)
 		if still:
 			anchor.r = LakeGrid.DRY_ANCHOR.r
 			anchor.g = LakeGrid.DRY_ANCHOR.g
@@ -1146,12 +1200,14 @@ class ShadowLayer extends Node2D:
 		_uvs[base + 3] = box.position + Vector2(0.0, box.size.y)
 		# Blue and alpha carry which corner this is, so the shader can read where in its
 		# own quad a fragment sits and round the shadow's corners off — see `local` there.
+		# Alpha also carries the height above water under its top bit: bottom corners are
+		# 128 + height, top ones the height alone.
 		for i in CORNERS:
 			var c := anchor
 			c.b = 1.0 if i == 1 or i == 2 else 0.0
 			if rise_slot >= 0:
 				c.b = float(2 + rise_slot * 2 + int(c.b)) / 255.0
-			c.a = 1.0 if i >= 2 else 0.0
+			c.a = float((128 if i >= 2 else 0) + above) / 255.0
 			_colors[base + i] = c
 		return true
 
@@ -1165,11 +1221,18 @@ class ShadowLayer extends Node2D:
 			_points[base + i] = Vector2.ZERO
 
 	## Where the sun is, onto the shader. Called every frame from the lake's daylight push:
-	## it is one uniform on one material, not a rebuild, which is the whole reason the lean
-	## lives in the shader rather than in the quads.
-	func sun(lean: float) -> void:
-		if material != null:
-			(material as ShaderMaterial).set_shader_parameter("sun_lean", lean)
+	## a few uniforms on one material, not a rebuild, which is the whole reason the sun lives
+	## in the shader rather than in the quads. The ink is the water's (`Shade.On.WATER`), and
+	## a piece on the beach takes the land's, as the angler beside it does.
+	func sun(day: DayCycle) -> void:
+		if material == null:
+			return
+		day = Shade.sun_of(day)
+		var skin := material as ShaderMaterial
+		skin.set_shader_parameter("sun_lean", day.lean if day != null else -0.2)
+		skin.set_shader_parameter("sun_stretch", day.stretch if day != null else 0.8)
+		skin.set_shader_parameter("shade", Shade.tint_on(day, Shade.On.WATER))
+		skin.set_shader_parameter("dry_shade", Shade.tint_on(day, Shade.On.LAND))
 
 	func begin() -> void:
 		_count = 0
@@ -1459,12 +1522,12 @@ class RippleLayer extends Node2D:
 		)
 
 
-## Where the sun is, onto the floating shadows. The lake calls this with DayCycle.lean every
-## time it pushes the daylight; the land's casters take the same number through Shade.lying,
-## so the whole world agrees about which way the light is coming from.
-func sun_lean(lean: float) -> void:
+## Where the sun is, onto the floating shadows. The lake calls this with its day every time
+## it pushes the daylight; the land's casters take the same numbers through Shade.lying, so
+## the whole world agrees about which way the light is coming from and how dark it lies.
+func sun(day: DayCycle) -> void:
 	if _shadows != null:
-		_shadows.sun(lean)
+		_shadows.sun(day)
 
 
 func _ready() -> void:
@@ -1782,6 +1845,7 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 				ring_tiles.append(index)
 	if fill:
 		_lighten_ring(ring_tiles)
+		_bait_tops.clear()
 		for ty in Iso.ROWS:
 			for tx in Iso.COLS:
 				var index := index_of(tx, ty)
@@ -1879,7 +1943,7 @@ func _lighten_ring(ring_tiles: PackedInt32Array) -> void:
 			continue
 		var stack := stacks[index]
 		for k in stack.size():
-			if defs[stack[k]].tier <= RING_TIER:
+			if defs[stack[k]].tier == 0:
 				light[_up_bin(k, stack.size())].append(Vector2i(index, k))
 	for bin: Array in light:
 		for n in range(bin.size() - 1, 0, -1):
@@ -1890,7 +1954,8 @@ func _lighten_ring(ring_tiles: PackedInt32Array) -> void:
 	for index in ring_tiles:
 		var stack := stacks[index]
 		for k in stack.size():
-			if defs[stack[k]].tier <= RING_TIER:
+			var tier := defs[stack[k]].tier
+			if tier == 0 or (tier <= RING_TIER and _rng.randf() < RING_BAIT):
 				continue
 			var partner := Vector2i(-1, -1)
 			var bin := _up_bin(k, stack.size())
@@ -1974,7 +2039,13 @@ func _dress_surface(index: int, stack: PackedInt32Array, tile: Vector2) -> Packe
 	if stack.is_empty():
 		return stack
 	var top := stack.size() - 1
-	var near_shore := Iso.past_shelf(tile) < OPEN_RING
+	var out := Iso.past_shelf(tile)
+	var near_shore := out < OPEN_RING
+	# Past the opening ring the thin ring's tops are tier 0 too, bar a spaced few bait tops.
+	if not near_shore and out < RING_OUT:
+		near_shore = not (_rng.randf() < RING_BAIT_TOP and _bait_room(tile))
+		if not near_shore:
+			_bait_tops.append(tile)
 	var landmark := _rng.randf() < SURFACE_BAIT
 	var want := _surface_material(stack)
 	# Only as far as this tile's own pieces could ask for. Asked at the widest any piece in
@@ -2027,6 +2098,14 @@ func _dress_surface(index: int, stack: PackedInt32Array, tile: Vector2) -> Packe
 		stack[top] = was
 	_surface_shown[index] = family_of(stack[top])
 	return stack
+
+
+## Whether a bait top may stand here: none other within `RING_BAIT_APART`.
+func _bait_room(tile: Vector2) -> bool:
+	for other in _bait_tops:
+		if other.distance_to(tile) < RING_BAIT_APART:
+			return false
+	return true
 
 
 ## How near a kind may show to itself, in tiles, for a piece this big: `SURFACE_APART` for
@@ -2350,7 +2429,7 @@ func perch_point(index: int) -> Vector2:
 	if def.atlas == null:
 		# The blocked-in fallback: no waterline cut, and a body 0.72 of the def's height.
 		return at + Vector2(0.0, -size.y * 0.72 * 0.5).rotated(lean)
-	var sink := 0.0 if dry[index] == 1 else sunk_by(size)
+	var sink := dry_sunk_by(size) if dry[index] == 1 else sunk_by(size)
 	var kept := maxf(size.y - sink, 1.0)
 	var sat := at - Vector2(0.0, sink * 0.5).rotated(lean)
 	return sat + Vector2(0.0, -kept * 0.5).rotated(lean)
@@ -2620,9 +2699,11 @@ func _rebuild() -> void:
 		_slot_base.resize(stacks.size())
 		_slot_len.resize(stacks.size())
 		_shadow_at.resize(stacks.size())
+		_shadow2_at.resize(stacks.size())
 	_slot_base.fill(-1)
 	_slot_len.fill(0)
 	_shadow_at.fill(-1)
+	_shadow2_at.fill(-1)
 	drawn_pieces = 0
 	var textured: Array[int] = []
 	_afloat.resize(0)
@@ -2673,6 +2754,7 @@ func _rebuild() -> void:
 			# to keep the lockstep, and simply left empty.
 			if dry[index] == 1:
 				_foam.blank(_shadow_at[index])
+			_shade_second(index, rest)
 			if def.sprite != null:
 				_stamp_slot = -1
 				textured.append(index)
@@ -2784,11 +2866,14 @@ func _repatch(index: int, stack: PackedInt32Array, base: int) -> void:
 		_blank_slot(base, span)
 		_shadows.blank(_shadow_at[index])
 		_foam.blank(_shadow_at[index])
+		_shadows.blank(_shadow2_at[index])
+		_foam.blank(_shadow2_at[index])
 		_shadows.queue_redraw()
 		_foam.queue_redraw()
 		_slot_base[index] = -1
 		_slot_len[index] = 0
 		_shadow_at[index] = -1
+		_shadow2_at[index] = -1
 		drawn_pieces -= 1
 		return
 
@@ -2822,6 +2907,59 @@ func _repatch(index: int, stack: PackedInt32Array, base: int) -> void:
 	elif _foam.write(_shadow_at[index], at, def.size, swing[index], tilt[index], _stamp_slot):
 		_foam.queue_redraw()
 	_stamp_slot = -1
+	_reshade_second(index, at)
+
+
+## Where a shore tile's second piece is drawn, from where its top piece is stamped. The
+## soup and the shadow both ask this, so the two cannot part.
+func _second_at(index: int, at: Vector2) -> Vector2:
+	var n := stacks[index].size()
+	return at - shore_offset(index, n - 1) + shore_offset(index, n - 2)
+
+
+## A shore tile's second piece throws its own shadow and, afloat on the strand, wears its own
+## foam (2026-09-29): it used to lie there with neither. Its slot is taken on the end of both
+## layers together, so they stay in lockstep.
+func _shade_second(index: int, at: Vector2) -> void:
+	var stack := stacks[index]
+	if shore[index] != 1 or stack.size() < 2:
+		return
+	var under := defs[stack[stack.size() - 2]]
+	var there := _second_at(index, at)
+	var slot := _shadows.add(
+		there, under.size, swing[index], _uv_of(under), facing[index] == 0, dry[index] == 1
+	)
+	if slot < 0:
+		return
+	_foam.add(there, under.size, swing[index], -tilt[index])
+	if dry[index] == 1:
+		_foam.blank(slot)
+	_shadow2_at[index] = slot
+
+
+## The same on a patch: the second piece's shadow follows a take, and goes once the tile is
+## down to one piece.
+func _reshade_second(index: int, at: Vector2) -> void:
+	var slot := _shadow2_at[index]
+	if slot < 0:
+		return
+	var stack := stacks[index]
+	if stack.size() < 2:
+		_shadows.blank(slot)
+		_foam.blank(slot)
+		_shadow2_at[index] = -1
+	else:
+		var under := defs[stack[stack.size() - 2]]
+		var there := _second_at(index, at)
+		_shadows.write(
+			slot, there, under.size, swing[index], _uv_of(under), facing[index] == 0, dry[index] == 1
+		)
+		if dry[index] == 1:
+			_foam.blank(slot)
+		else:
+			_foam.write(slot, there, under.size, swing[index], -tilt[index], -1)
+	_shadows.queue_redraw()
+	_foam.queue_redraw()
 
 
 ## How many vertices `_stamp` will lay down for a piece. Mirrors the branches in `_stamp`
@@ -2837,9 +2975,11 @@ func _uv_of(def: TrashDef) -> Rect2:
 
 
 func _stamp_len(def: TrashDef, index: int) -> int:
-	var own := 4 if def.atlas != null else (16 if _detailed else 8)
+	# A piece with art is two quads: what shows above the water and what is under it
+	# (`SUNK_FLAG`), the second blank on the sand.
+	var own := 8 if def.atlas != null else (16 if _detailed else 8)
 	if def.atlas != null and shore[index] == 1 and stacks[index].size() >= 2:
-		own += 4
+		own += 8
 	# A tile with a find anywhere in it carries the rim's room whether or not the find is
 	# up, so uncovering it — and taking it — patches the tile in place rather than laying
 	# the whole soup out again (`_restamp` blanks what a smaller stamp leaves).
@@ -2889,7 +3029,7 @@ func _stamp(def: TrashDef, at: Vector2, index: int) -> void:
 		var stack := stacks[index]
 		if shore[index] == 1 and stack.size() >= 2:
 			var under := defs[stack[stack.size() - 2]]
-			var there := at - shore_offset(index, stack.size() - 1) + shore_offset(index, stack.size() - 2)
+			var there := _second_at(index, at)
 			var uv := sheets.uv_of(under.region) if under.atlas != null else _white_uv
 			_sprite(there, under.size * swing[index], -lean, uv, facing[index] == 0)
 		# The art is the whole of the piece. There is no plate of pale water under it any
@@ -2937,7 +3077,7 @@ func _sprite(
 	# a swimming dog, and the reason the drawn waterline is the world's waterline rather
 	# than a line painted across a sprite standing on top of the water.
 	# Lying on the sand, the whole picture shows: there is no water to take the bottom off.
-	var sink := 0.0 if _dry_now else sunk_by(size)
+	var sink := dry_sunk_by(size) if _dry_now else sunk_by(size)
 	var kept := maxf(size.y - sink, 1.0)
 	var shown := Vector2(size.x, kept)
 	var half := shown * 0.5
@@ -2957,6 +3097,27 @@ func _sprite(
 		edge = [
 			sat + Vector2(-half.x, half.y).rotated(lean), sat + Vector2(half.x, half.y).rotated(lean)
 		]
+	# The piece itself (not a rim copy) carries what the cut took off, under the waterline,
+	# before its own quad: rubbish.gdshader shows it through clean water and drops it in grime.
+	# On the sand there is nothing under, and the room is kept blank so a tile's length holds.
+	if alpha == 1.0:
+		if _dry_now:
+			_blank_quad()
+		else:
+			var full := size * 0.5
+			var under := Rect2(
+				uv.position + Vector2(0.0, uv.size.y * (kept / maxf(size.y, 0.01))),
+				Vector2(uv.size.x, uv.size.y * (1.0 - kept / maxf(size.y, 0.01)))
+			)
+			if mirrored:
+				under = Rect2(
+					under.position + Vector2(under.size.x, 0.0), Vector2(-under.size.x, under.size.y)
+				)
+			_quad(
+				edge[0], edge[1],
+				at + Vector2(full.x, full.y).rotated(lean), at + Vector2(-full.x, full.y).rotated(lean),
+				1.0, SUNK_FLAG, at, under
+			)
 	_quad(
 		sat + Vector2(-half.x, -half.y).rotated(lean),
 		sat + Vector2(half.x, -half.y).rotated(lean),

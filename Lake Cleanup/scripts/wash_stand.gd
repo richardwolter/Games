@@ -30,7 +30,11 @@ signal washed(piece: StringName)
 ## pixels, which at seven or eight screen pixels apiece is a handful of blocks a second; at 2
 ## the jet has an edge worth looking at. **A knob for Richard's eye**: 2 mixes two pixel
 ## sizes on one picture, and 1 is the purist's answer.
-const FINE := 2
+##
+## **1 since the pack decoration** (2026-10-01): the 0_mem0ry pieces are small pictures drawn
+## up to 14 screen pixels an art pixel, and half-pixel grime read as a second, coarser
+## picture laid over the art. At 1 the grime is the art's own pixels coming clean.
+const FINE := 1
 
 ## The room the piece is fitted into, as shares of this control, and how far down the stand's
 ## top stands. The zoom is the largest whole number of canvas pixels to a painted one that
@@ -38,7 +42,9 @@ const FINE := 2
 const ROOM_WIDE := 0.46
 ## The stand came up from 0.72 (Richard, 2026-09-19: "a bit further away from the hose"),
 ## and the piece's room came in with it so a tall find still clears the top of the screen.
-const ROOM_TALL := 0.5
+## 0.7 since the pallet (2026-10-01): one zoom for every find is set by the tallest, and at
+## 0.5 that left the rest small with half the screen bare above them.
+const ROOM_TALL := 0.7
 const STAND_AT := 0.63
 const ZOOM_LEAST := 2
 const ZOOM_MOST := 14
@@ -47,6 +53,15 @@ const ZOOM_MOST := 14
 ## there is comes off in under half a second; at its edge, not at all.
 const JET_RADIUS := 3.2
 const JET_POWER := 2.6
+
+## The hose upgrade (2026-10-01, `/grill-me` with Richard): bought in the wash room, levels 1
+## to 3, each a share of the jet's width and power over level 1 — gentle, by decision, so
+## washing stays a job done by hand. The stream draws a pixel wider a level and the spray,
+## gleams and drips scale with the power.
+const HOSE_GROW := [1.0, 1.2, 1.45]
+
+## The hose's level, set by the room off the lake's save. 1 is the hose the pump came with.
+var hose_level := 1
 ## How long the water takes to get from the nozzle to where it is aimed, and to stop arriving
 ## once the button is let go. Short enough not to be a delay, long enough to be seen.
 const JET_TRAVEL := 0.07
@@ -103,6 +118,18 @@ const BUBBLE_ODDS := 0.4
 const BUBBLE_LIFE := Vector2(0.10, 0.28)
 const BUBBLE_MOST := 220
 
+## The gleam a cell gives off the instant it comes clean (2026-10-01, Richard: "cleaning
+## feels satisfying"): the clean pixel flashes pale and steps back to its own colour, in two
+## hard steps rather than a fade, and now and then a gold four-point star pops on it — the
+## finds' own sparkle. Every cleared cell gleams, so the jet leaves a bright wake behind it.
+const GLEAM_LIFE := 0.32
+const GLEAM_HI := 0.6
+const GLEAM_LO := 0.25
+const GLEAM_MOST := 600
+const GLEAM_STAR_ODDS := 0.05
+const GLEAM_STAR_LIFE := 0.4
+const GLEAM_GOLD := Color(1.0, 0.86, 0.42)
+
 ## How far the stand's top runs past the piece each side, in cells, and how much faster a
 ## drop slides along the wood than it ran down the piece. **Nothing rests on the stand**
 ## (Richard, 2026-09-19: the puddle under the piece looked bad): a drop that lands runs to
@@ -122,6 +149,39 @@ const SLIDE_PACE := 1.5
 const FRONT_ON_LANDING := 0.35
 const FRONT_A_CELL := 0.05
 const FRONT_CREEP := 0.55
+
+## The pallet the find stands on (2026-10-01, `/grill-me` with Richard): a low wooden pallet
+## on the lawn, seen a little from above, drawn by rule in the 0_mem0ry pieces' style (black
+## outline, three wood tones, grain) at the finds' own zoom so the two are one grain.
+## **Supersedes the plank table on two legs.** One size whatever is on it: as wide as the
+## widest find plus `PALLET_MARGIN` art px a side.
+##
+## In art px: the top deck is `PALLET_BOARDS` boards of `PALLET_BOARD` rows with one-row
+## gaps, the front face `PALLET_FACE` rows (the front deck board over three blocks), and a
+## find stands with its lowest row `PALLET_STAND` rows down the deck. `PALLET_GROUND` is
+## where the pallet's foot is on the screen, a share of the height.
+const PALLET_MARGIN := 7
+const PALLET_BOARDS := 4
+const PALLET_BOARD := 2
+const PALLET_FACE := 5
+const PALLET_STAND := 7
+const PALLET_GROUND := 0.8
+const PALLET_OUT := Color8(24, 16, 10)
+const PALLET_LIT := Color8(198, 150, 96)
+const PALLET_MID := Color8(162, 112, 66)
+const PALLET_LOW := Color8(120, 78, 44)
+const PALLET_GAP := Color8(46, 34, 24)
+
+## Runoff goes through the slats and soaks in (2026-10-01, Richard, over drops sliding off
+## the ends): `THROUGH_ODDS` of the drops landing on the pallet vanish into a gap, the rest
+## run over the front edge and drip. Either way the grass in front of the pallet darkens at
+## that column, `WET_PER` a drop up to 1, in whole art pixels up to `WET_DEEP` rows deep, and
+## dries at `WET_DRY` a second. No standing pool: the puddle on the old table was turned down.
+const THROUGH_ODDS := 0.7
+const WET_PER := 0.14
+const WET_DEEP := 3
+const WET_DRY := 0.12
+const WET_INK := Color(0.02, 0.05, 0.03, 0.34)
 const STAND_TALL := 20.0
 const FLOOR_AT := 0.9
 
@@ -245,10 +305,22 @@ var _region := Rect2()
 var _cols := 0
 var _rows := 0
 var _zoom := 4
+## The one zoom every find is drawn at, and the pallet with them (2026-10-01): the largest
+## find fills the room, the rest keep the shed's proportions. Worked out per control size.
+var _shared_zoom := 0
+var _shared_for := Vector2.ZERO
+var _widest := 0.0
+var _pallet_tex: ImageTexture
+## The pallet's picture in art px (the one `_pallet_tex` is made from) and the node its swept
+## shadow is drawn by. The sweep is a few hundred overlapping triangles, so it goes through a
+## `Shade.Cast` — a `CanvasGroup` that composites them once — behind the stand's own drawing.
+var _pallet_img: Image
+var _pallet_cast: Shade.Cast
+var _pallet_size := Vector2i.ZERO
+var _pallet_at := Vector2.ZERO
+var _wet := PackedFloat32Array()
 var _cell := 2.0
 var _origin := Vector2.ZERO
-## The find's `wash_scale`: multiplies the fitted zoom, past `ROOM_WIDE`/`ROOM_TALL`.
-var _grow := 1.0
 
 var _solid := PackedByteArray()
 var _grime := PackedFloat32Array()
@@ -279,17 +351,29 @@ var bare_room := true
 ## day). The room lends the lawn's tone — the backdrop is darkened and day-tinted and the
 ## stand is not, so blades in the palette's own greens would glow — and the day's shadow as
 ## (lean, stretch, ink). With neither, neither is drawn.
+##
+## **One sun** (2026-10-02): both shadows are drawn in the ink every shadow on land takes
+## (`Shade.On.LAND`), not a gain and cap of the stand's own. The pallet's is its own
+## silhouette swept along the sun (`Shade.sweep`, through `_pallet_cast`): it is a solid seen
+## front on, a deck receding over a front face, and what it hides from the sun is its deck
+## dragged by the face's height — where a filled rectangle under a shear stood in for it.
 var ground_tone := Color.WHITE
 var shade := Vector3.ZERO
 const TUFT_PIXEL := 2.0
 const TUFT_REACH := 9.0
 const TUFT_BLADES := 9
 const TUFT_TALL := Vector2i(2, 6)
-const SHADE_GAIN := 1.6
+## The find's shadow is the day's own shortened to this share, and kept so on purpose: the
+## find stands on the deck, a hand's height of it at most, so a full-length shadow ran off the
+## deck and down the pallet's front face as if the deck were not there. Short, it lies on the
+## boards under the piece, which is where a shadow cast onto a deck lands.
+const PIECE_SHADE := 0.35
 
 var _runs: Array[Run] = []
 var _flecks: Array[Fleck] = []
 var _bubbles: Array = []
+## [cell, seconds left, star] per cell that has just come clean.
+var _gleams: Array = []
 var _stars: Array = []
 
 var _clock := 0.0
@@ -335,6 +419,10 @@ func _ready() -> void:
 	_pick_inks()
 	_load_nozzle()
 	_build_hiss()
+	_pallet_cast = Shade.Cast.new()
+	_pallet_cast.name = &"PalletShade"
+	_pallet_cast.visible = false
+	add_child(_pallet_cast)
 	resized.connect(_fit)
 
 
@@ -352,6 +440,7 @@ func clear() -> void:
 	state = State.EMPTY
 	_runs.clear()
 	_bubbles.clear()
+	_gleams.clear()
 	_stars.clear()
 	_stand_bare()
 
@@ -377,6 +466,7 @@ func put(what: StringName) -> void:
 	_runs.clear()
 	_flecks.clear()
 	_bubbles.clear()
+	_gleams.clear()
 	_stars.clear()
 	_firing = false
 	_reach = 0.0
@@ -386,7 +476,6 @@ func put(what: StringName) -> void:
 	if _art == null:
 		_art = sheets.atlas.get_image()
 	_region = _stood(sheets.view_region_of(what, 0))
-	_grow = sheets.wash_scale_of(what)
 	_cols = int(_region.size.x) * FINE
 	_rows = int(_region.size.y) * FINE
 	_roll.seed = hash(String(what))
@@ -517,6 +606,9 @@ func _wear(cx: int, cy: int, take: float) -> float:
 	if step != _step_of(before):
 		_coat.set_pixel(cx, cy, _ink_of(after, cx, cy))
 		_coat_stale = true
+		if step == 0 and _gleams.size() < GLEAM_MOST:
+			var star := _roll.randf() < GLEAM_STAR_ODDS
+			_gleams.append([Vector2i(cx, cy), GLEAM_STAR_LIFE if star else GLEAM_LIFE, star])
 		if step == 0 and _bubbles.size() < BUBBLE_MOST and _roll.randf() < BUBBLE_ODDS:
 			_bubbles.append([Vector2i(cx, cy), _roll.randf_range(BUBBLE_LIFE.x, BUBBLE_LIFE.y)])
 	return before - after
@@ -538,20 +630,141 @@ func _stood(region: Rect2) -> Rect2:
 	return Rect2(region.position, Vector2(region.size.x, rows))
 
 
+## Where across the stage stands, in this control (2026-10-02, Richard: centre the pallet in
+## the room the tray leaves, not on the window). Below nought, the window's middle. The
+## pallet, the find, the nozzle and the hose all stand on it.
+var centre_x := -1.0:
+	set(value):
+		if is_equal_approx(value, centre_x):
+			return
+		centre_x = value
+		_fit()
+		queue_redraw()
+
+
+func _mid() -> float:
+	return centre_x if centre_x >= 0.0 else size.x * 0.5
+
+
 func _fit() -> void:
 	if _cols == 0:
 		return
 	var wide := _region.size.x
 	var tall := _region.size.y
-	var zoom := int(floor(minf(size.x * ROOM_WIDE / wide, size.y * ROOM_TALL / tall) * _grow))
-	zoom = clampi(zoom, ZOOM_LEAST, ZOOM_MOST)
-	zoom = maxi(zoom - zoom % FINE, FINE)
+	var zoom := _zoom_for_all()
 	_zoom = zoom
 	_cell = float(zoom) / float(FINE)
-	_origin = Vector2(
-		round(size.x * 0.5 - wide * zoom * 0.5),
-		round(size.y * STAND_AT - tall * zoom)
+	_build_pallet()
+	_pallet_at = Vector2(
+		round(_mid() - _pallet_size.x * zoom * 0.5),
+		round(size.y * PALLET_GROUND - _pallet_size.y * zoom)
 	)
+	_origin = Vector2(
+		round(_mid() - wide * zoom * 0.5),
+		_pallet_at.y + (PALLET_STAND - tall) * zoom
+	)
+
+
+## The finds the stand may hold: the lake's (`Lake.FIND_SHEET` and the redrawn ones), or the
+## whole catalogue where there are none, for a probe on old art.
+func _wash_finds() -> PackedStringArray:
+	var out := PackedStringArray()
+	if sheets == null:
+		return out
+	out.append_array(sheets.by_sheet.get(Lake.FIND_SHEET, PackedStringArray()) as PackedStringArray)
+	for name: StringName in Lake.REDRAWN_FINDS:
+		if sheets.has(name):
+			out.append(String(name))
+	if out.is_empty():
+		out = sheets.names
+	return out
+
+
+## The zoom at which the largest find's first view fills `ROOM_WIDE` by `ROOM_TALL`: every
+## find is drawn at it, so a cactus reads small and a bed big, as in the shed.
+func _zoom_for_all() -> int:
+	if _shared_zoom > 0 and _shared_for == size:
+		return _shared_zoom
+	# The least zoom any one find fits at, each find measured on its own (a componentwise
+	# biggest would pair the widest find's width with the tallest's height).
+	var fit := INF
+	_widest = BARE.x
+	for name: String in _wash_finds():
+		var view := sheets.view_region_of(StringName(name), 0).size
+		if view.x <= 0.0 or view.y <= 0.0:
+			continue
+		_widest = maxf(_widest, view.x)
+		fit = minf(fit, minf(size.x * ROOM_WIDE / view.x, size.y * ROOM_TALL / view.y))
+	if fit == INF:
+		fit = ZOOM_LEAST
+	var zoom := int(floor(fit))
+	zoom = clampi(zoom, ZOOM_LEAST, ZOOM_MOST)
+	_shared_zoom = maxi(zoom - zoom % FINE, FINE)
+	_shared_for = size
+	_pallet_tex = null
+	return _shared_zoom
+
+
+## The pallet, painted once into a texture in art px. The deck, top to bottom: boards lit on
+## their top row, and between them gaps that show the dark under the pallet, or the stringer
+## running under it where a block is. Then the front face, low and boxy rather than on legs:
+## the front deck board, the blocks with dark openings between them (where a fork goes), and
+## the bottom board along the ground.
+func _build_pallet() -> void:
+	if _pallet_tex != null:
+		return
+	var w := int(maxf(_widest, BARE.x)) + PALLET_MARGIN * 2
+	var deck := PALLET_BOARDS * (PALLET_BOARD + 1)
+	var h := deck + PALLET_FACE
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var block := 6
+	var mid := w / 2 - block / 2
+	for y in h:
+		for x in w:
+			var on_block := x < block or x >= w - block or (x >= mid and x < mid + block)
+			var ink := PALLET_MID
+			if y < deck:
+				var on := y % (PALLET_BOARD + 1)
+				if on == PALLET_BOARD:
+					ink = PALLET_LOW if on_block else PALLET_GAP
+				elif on == 0:
+					ink = PALLET_LIT
+				elif _hash(x / 3, y, 7) < 0.18:
+					# Grain: short darker dashes, never on the lit row.
+					ink = PALLET_LOW
+			else:
+				var face := y - deck
+				if face == 0:
+					ink = PALLET_MID
+				elif face == 1:
+					ink = PALLET_LOW
+				elif face < PALLET_FACE - 1:
+					ink = PALLET_LOW if on_block else PALLET_GAP
+				else:
+					ink = PALLET_MID
+			img.set_pixel(x, y, ink)
+	# The pack's black outline: every solid pixel on the silhouette's edge.
+	var lined := img.duplicate() as Image
+	for y in h:
+		for x in w:
+			if img.get_pixel(x, y).a <= 0.0:
+				continue
+			var edge := x == 0 or y == 0 or x == w - 1 or y == h - 1
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nx := x + d.x
+				var ny := y + d.y
+				if nx >= 0 and ny >= 0 and nx < w and ny < h and img.get_pixel(nx, ny).a <= 0.0:
+					edge = true
+			if edge:
+				lined.set_pixel(x, y, PALLET_OUT)
+	_pallet_img = lined
+	_pallet_tex = ImageTexture.create_from_image(lined)
+	if _pallet_cast != null:
+		_pallet_cast.forget()
+	_pallet_size = Vector2i(w, h)
+	_wet.resize(w)
+	_wet.fill(0.0)
 
 
 ## Where the jet is landing when it is landing **off the find**, or `Vector2.INF`: what the
@@ -630,17 +843,17 @@ func _drive_jet(delta: float) -> void:
 	_hitting = false
 	if not landing:
 		return
-	var removed := _wash_at(_aim_cell(), JET_RADIUS * FINE, JET_POWER * delta)
+	var removed := _wash_at(_aim_cell(), jet_radius() * FINE, jet_power() * delta)
 	_loosened += removed
 	while _loosened >= RUN_PER:
 		_loosened -= RUN_PER
-		_let_run(_aim_cell(), JET_RADIUS * FINE * 0.8, 1.0)
+		_let_run(_aim_cell(), jet_radius() * FINE * 0.8, 1.0)
 	if _hitting:
-		_clear_bank += RUN_CLEAR * delta
+		_clear_bank += RUN_CLEAR * _grow_of() * delta
 		while _clear_bank >= 1.0:
 			_clear_bank -= 1.0
-			_let_run(_aim_cell(), JET_RADIUS * FINE * 0.6, 0.0)
-	_spray_bank += (SPRAY_ON if _hitting else SPRAY_OFF) * delta
+			_let_run(_aim_cell(), jet_radius() * FINE * 0.6, 0.0)
+	_spray_bank += (SPRAY_ON if _hitting else SPRAY_OFF) * _grow_of() * delta
 	while _spray_bank >= 1.0:
 		_spray_bank -= 1.0
 		_let_fleck(_aim_cell(), _under > SPRAY_DIRTY_OVER and _hitting)
@@ -706,6 +919,9 @@ func _let_fleck(at: Vector2, dirty: bool) -> void:
 
 
 func _drive_runs(delta: float) -> void:
+	for i in _wet.size():
+		if _wet[i] > 0.0:
+			_wet[i] = maxf(_wet[i] - WET_DRY * delta, 0.0)
 	var kept: Array[Run] = []
 	for run: Run in _runs:
 		run.age += delta
@@ -762,11 +978,12 @@ func _fall(run: Run, delta: float) -> bool:
 	var row := int(run.y)
 	if run.off:
 		# Still on the plank's face: a creep, not a fall.
-		if run.y < float(_rows) + STAND_TALL / _cell:
+		if run.y < _floor_row():
 			run.fall = run.pace * FRONT_CREEP
 		if run.y >= _floor_row():
 			for splat in 2:
 				_let_fleck(Vector2(run.at.x + 0.5, _floor_row() - 0.5), run.dirt > 0.5)
+			_soak(run.at.x)
 			return false
 		run.at.y = row
 		return true
@@ -787,13 +1004,16 @@ func _fall(run: Run, delta: float) -> bool:
 func _land(run: Run) -> void:
 	run.at = Vector2i(run.at.x, _rows)
 	run.falling = false
-	run.sliding = -1 if run.at.x * 2 < _cols else 1
 	run.trail.clear()
 	run.bank = 0.0
 	run.age = 0.0
 	_let_fleck(Vector2(run.at.x + 0.5, float(_rows) - 0.5), run.dirt > 0.5)
-	if _roll.randf() < FRONT_ON_LANDING:
-		_go_over(run)
+	# Through the slats and into the grass, or over the front edge and down its face.
+	if _roll.randf() < THROUGH_ODDS:
+		_soak(run.at.x)
+		run.age = RUN_LIFE + 1.0
+		return
+	_go_over(run)
 
 
 ## One cell along the stand's top, and off its end into the air.
@@ -820,7 +1040,17 @@ func _go_over(run: Run) -> void:
 
 
 func _floor_row() -> float:
-	return (size.y * FLOOR_AT - _origin.y) / _cell
+	return (_pallet_at.y + _pallet_size.y * _zoom - _origin.y) / _cell
+
+
+## A drop into the grass at this cell of the find: the column of the pallet it is over.
+func _soak(cx: int) -> void:
+	if _wet.is_empty():
+		return
+	var col := int(floor((_origin.x + (cx + 0.5) * _cell - _pallet_at.x) / float(_zoom)))
+	for side: int in [-1, 0, 1]:
+		var at := clampi(col + side, 0, _wet.size() - 1)
+		_wet[at] = minf(_wet[at] + WET_PER * (1.0 if side == 0 else 0.4), 1.0)
 
 
 func _drive_flecks(delta: float) -> void:
@@ -842,6 +1072,12 @@ func _drive_bubbles(delta: float) -> void:
 		if float(bubble[1]) > 0.0:
 			kept.append(bubble)
 	_bubbles = kept
+	var lit: Array = []
+	for gleam: Array in _gleams:
+		gleam[1] = float(gleam[1]) - delta
+		if float(gleam[1]) > 0.0:
+			lit.append(gleam)
+	_gleams = lit
 
 
 func _begin_rinse() -> void:
@@ -897,9 +1133,9 @@ func _draw() -> void:
 	if bare_room:
 		draw_rect(Rect2(Vector2.ZERO, size), WALL)
 		draw_rect(Rect2(0.0, floor_y, size.x, size.y - floor_y), FLOOR)
-	else:
-		_draw_shade(floor_y)
+	_draw_shade(floor_y)
 	_draw_stand(floor_y)
+	_draw_piece_shade()
 	if state != State.EMPTY:
 		draw_texture_rect_region(
 			sheets.atlas, Rect2(_origin, _region.size * float(_zoom)), _region
@@ -909,6 +1145,7 @@ func _draw() -> void:
 		_draw_rinse_line()
 	_draw_runs()
 	_draw_bubbles()
+	_draw_gleams()
 	_draw_impact()
 	_draw_flecks()
 	_draw_stream()
@@ -922,30 +1159,50 @@ func _cell_box(cx: float, cy: float, cells: float = 1.0) -> Rect2:
 	)
 
 
-func _draw_stand(floor_y: float) -> void:
-	var top := _stand_top()
-	var leg_tall := floor_y - top.end.y + 6.0
-	for side in 2:
-		var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
-		Style.plank(self, Rect2(x, top.end.y - 2.0, 16.0, leg_tall), 11 + side)
-	Style.plank(self, top, 5)
+func _draw_stand(_floor_y: float) -> void:
+	if _pallet_tex == null:
+		return
+	_draw_wet()
+	draw_texture_rect(_pallet_tex, Rect2(_pallet_at, Vector2(_pallet_size) * _zoom), false)
 	if not bare_room:
-		for side in 2:
-			var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
-			_draw_tuft(Vector2(x + 8.0, top.end.y - 2.0 + leg_tall), 31 + side)
+		var foot := _pallet_at.y + _pallet_size.y * _zoom
+		_draw_tuft(Vector2(_pallet_at.x + 4.0 * _zoom, foot), 31)
+		_draw_tuft(Vector2(_pallet_at.x + (_pallet_size.x - 4.0) * _zoom, foot), 32)
+		_draw_tuft(Vector2(_pallet_at.x + _pallet_size.x * 0.5 * _zoom, foot), 33)
 
 
-## Where the stand's top is, the one sum `_draw_stand` and `_draw_shade` share.
+## The wet grass in front of the pallet: per column, whole art pixels down from its foot,
+## deeper the wetter, ragged off a hash so the patch has an edge.
+func _draw_wet() -> void:
+	var foot := _pallet_at.y + _pallet_size.y * _zoom
+	for x in _wet.size():
+		var wet := _wet[x]
+		if wet < 0.05:
+			continue
+		var rows := 1 + int(wet * float(WET_DEEP) + _hash(x, 3, 11) * 0.8)
+		var ink := WET_INK
+		ink.a *= 1.0 if wet > 0.45 else 0.55
+		for k in rows:
+			var c := ink
+			if k == rows - 1:
+				c.a *= 0.5
+			draw_rect(Rect2(_pallet_at.x + x * _zoom, foot - _zoom + k * _zoom, _zoom, _zoom), c)
+
+
+## Where the stand's top is, the one sum `_draw_stand` and `_draw_shade` share: the pallet's
+## deck, the same rectangle whatever stands on it.
 func _stand_top() -> Rect2:
-	var wide := snappedf(size.x * STAND_WIDE, 2.0)
-	return Rect2(
-		round(size.x * 0.5 - wide * 0.5), _origin.y + _rows * _cell, wide, STAND_TALL
-	)
+	return Rect2(_pallet_at, Vector2(_pallet_size.x, PALLET_BOARDS * (PALLET_BOARD + 1)) * _zoom)
 
 
-## How far the top runs past the piece each side, in this piece's cells.
+## The whole pallet, in this control's coordinates: what the backdrop's dogs keep clear of.
+func pallet_rect() -> Rect2:
+	return Rect2(_pallet_at, Vector2(_pallet_size) * _zoom)
+
+
+## How far the deck runs past the piece each side, in this piece's cells.
 func _stand_pad() -> float:
-	return maxf((size.x * STAND_WIDE - _cols * _cell) * 0.5 / maxf(_cell, 0.001), 1.0)
+	return maxf((_pallet_size.x * _zoom - _cols * _cell) * 0.5 / maxf(_cell, 0.001), 1.0)
 
 
 ## Blades over a leg's foot: columns of whole painted pixels, tallest at the leg and cut
@@ -966,24 +1223,36 @@ func _draw_tuft(foot: Vector2, seed_at: int) -> void:
 		draw_rect(Rect2(x, down - tall * TUFT_PIXEL, TUFT_PIXEL, tall * TUFT_PIXEL), ink)
 
 
-## The sun's shadow of the stand and what is on it, lying down the lawn from the feet.
-func _draw_shade(floor_y: float) -> void:
-	if shade.z <= 0.0:
+## The sun's shadow of the pallet, swept off its own picture down the lawn. `ground` is the
+## deck's share of the picture: the deck is depth, receding over the front face, so only the
+## face stands up and only the face's height drags the shadow.
+func _draw_shade(_floor_y: float) -> void:
+	if _pallet_cast == null:
 		return
-	var top := _stand_top()
-	var feet := Vector2(top.get_center().x, floor_y + 4.0)
-	var ink := Shade.tint(minf(shade.z * SHADE_GAIN, 0.6))
-	draw_set_transform_matrix(Shade.lying(feet, shade.x, shade.y))
-	# In the shadow's own space the feet are the origin and up is up.
-	var lift := Vector2(-feet.x, -feet.y)
-	for side in 2:
-		var x := top.position.x + 18.0 if side == 0 else top.end.x - 18.0 - 16.0
-		draw_rect(Rect2(Vector2(x, top.end.y) + lift, Vector2(16.0, feet.y - top.end.y)), ink)
-	draw_rect(Rect2(top.position + lift, top.size), ink)
-	if state != State.EMPTY:
-		draw_texture_rect_region(
-			sheets.atlas, Rect2(_origin + lift, _region.size * float(_zoom)), _region, ink
-		)
+	var showing := shade.z > 0.0 and _pallet_img != null and not bare_room
+	_pallet_cast.visible = showing
+	if not showing:
+		return
+	var deck := float(PALLET_BOARDS * (PALLET_BOARD + 1))
+	_pallet_cast.lay(
+		_pallet_img, Rect2(_pallet_at, Vector2(_pallet_size) * _zoom), shade.x, shade.y,
+		deck / float(maxi(_pallet_img.get_height(), 1)), Shade.ink_on(shade.z, Shade.On.LAND)
+	)
+
+
+## The find's own shadow, lying on the deck from its base (2026-10-01, Richard: hung off the
+## pallet's foot it fell on the grass below the pallet, away from the piece). Short, because
+## the deck is right under the piece: `PIECE_SHADE` of the day's stretch. Drawn after the
+## pallet, under the piece.
+func _draw_piece_shade() -> void:
+	if shade.z <= 0.0 or state == State.EMPTY or bare_room:
+		return
+	var base := Vector2(_origin.x + _region.size.x * _zoom * 0.5, _origin.y + _region.size.y * _zoom)
+	var ink := Shade.tint(Shade.ink_on(shade.z, Shade.On.LAND))
+	draw_set_transform_matrix(Shade.lying(base, shade.x * PIECE_SHADE, shade.y * PIECE_SHADE))
+	draw_texture_rect_region(
+		sheets.atlas, Rect2(_origin - base, _region.size * float(_zoom)), _region, ink
+	)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -1015,13 +1284,42 @@ func _draw_bubbles() -> void:
 		draw_rect(_cell_box(at.x, at.y), _ink_water[1])
 
 
+## A just-cleaned cell: pale, then paler, then gone; a star's arms one cell each way.
+func _draw_gleams() -> void:
+	for gleam: Array in _gleams:
+		var at: Vector2i = gleam[0]
+		var life := float(gleam[1])
+		if bool(gleam[2]):
+			var a := 1.0 if life > GLEAM_STAR_LIFE * 0.5 else 0.5
+			var gold := Color(GLEAM_GOLD, a)
+			draw_rect(_cell_box(at.x, at.y), Color(1.0, 1.0, 1.0, a))
+			for arm: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				draw_rect(_cell_box(at.x + arm.x, at.y + arm.y), gold)
+			continue
+		var share := GLEAM_HI if life > GLEAM_LIFE * 0.5 else GLEAM_LO
+		draw_rect(_cell_box(at.x, at.y), Color(1.0, 1.0, 1.0, share))
+
+
+## The jet at the hose's level: how wide it washes, in art px, and how hard, a second.
+func jet_radius() -> float:
+	return JET_RADIUS * _grow_of()
+
+
+func jet_power() -> float:
+	return JET_POWER * _grow_of()
+
+
+func _grow_of() -> float:
+	return float(HOSE_GROW[clampi(hose_level, 1, HOSE_GROW.size()) - 1])
+
+
 ## The froth where the jet lands: a handful of cells picked again every tick.
 func _draw_impact() -> void:
 	if _reach < 1.0 or _tail >= 1.0:
 		return
 	var centre := _aim_cell()
 	var inks := _ink_dirty if (_hitting and _under > SPRAY_DIRTY_OVER) else _ink_water
-	var reach := JET_RADIUS * FINE * (0.7 if _hitting else 0.4)
+	var reach := jet_radius() * FINE * (0.7 if _hitting else 0.4)
 	for k in 14:
 		var turn := _hash(k, _tick, 1) * TAU
 		var out := sqrt(_hash(k, _tick, 2)) * reach
@@ -1070,7 +1368,7 @@ func _has_nozzle() -> bool:
 func _nozzle_wants() -> Vector2:
 	var high := clampf(1.0 - _aim.y / maxf(size.y, 1.0), 0.0, 1.0)
 	return Vector2(
-		size.x * 0.5 + (_aim.x - size.x * 0.5) * NOZZLE_FOLLOW,
+		_mid() + (_aim.x - _mid()) * NOZZLE_FOLLOW,
 		size.y - (NOZZLE_RISE + NOZZLE_LIFT * high) * NOZZLE_SCALE
 	)
 
@@ -1117,7 +1415,7 @@ func _nozzle_tip() -> Vector2:
 	if _has_nozzle():
 		return _nozzle_point(_nozzle_frame(), "tip")
 	var base := Vector2(
-		size.x * 0.5 + (_aim.x - size.x * 0.5) * NOZZLE_FOLLOW, size.y + PLAIN_UNDER
+		_mid() + (_aim.x - _mid()) * NOZZLE_FOLLOW, size.y + PLAIN_UNDER
 	)
 	return base + (_aim - base).normalized() * PLAIN_LONG
 
@@ -1183,7 +1481,8 @@ func _draw_stream() -> void:
 		var at := from + along * t + across * (_hash(i, _tick, 4) - 0.5) * 2.0 * spread
 		at = (at / _cell).floor() * _cell
 		var ink: Color = _ink_water[int(_hash(i, _tick, 6) * 3.0) % 3]
-		var wide := _cell * (2.0 if t > 0.55 else 1.0)
+		# A pixel wider a hose level, the far half of the stream wider still.
+		var wide := _cell * ((2.0 if t > 0.55 else 1.0) + float(clampi(hose_level, 1, 3) - 1))
 		draw_rect(Rect2(at, Vector2(wide, wide)), ink)
 
 
@@ -1220,7 +1519,7 @@ func _draw_nozzle() -> void:
 func _draw_hose(from: Vector2, grid: Vector2, heading: float) -> void:
 	if _hose_inks.size() < 3:
 		return
-	var middle := size.x * 0.5
+	var middle := _mid()
 	# A pixel up inside the grip, so the wood's own outline closes over the join.
 	# It leaves along the nozzle's own axis, whichever way that is pointing.
 	var turn := deg_to_rad(heading)
@@ -1278,7 +1577,7 @@ func _draw_hose(from: Vector2, grid: Vector2, heading: float) -> void:
 func _draw_nozzle_plain() -> void:
 	var tip := _nozzle_tip()
 	var base := Vector2(
-		size.x * 0.5 + (_aim.x - size.x * 0.5) * NOZZLE_FOLLOW, size.y + PLAIN_UNDER
+		_mid() + (_aim.x - _mid()) * NOZZLE_FOLLOW, size.y + PLAIN_UNDER
 	)
 	var way := (tip - base).normalized()
 	draw_line(base, tip, Style.HOLE_RIM, 22.0)

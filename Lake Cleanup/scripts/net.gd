@@ -39,6 +39,9 @@ signal swept(at: Vector2, taken: int, hold: int, mouth: float)
 ## A pigeon the net closed on, in world coordinates. Paid for on the spot rather than
 ## carried home: a bird is not cargo, and it is certainly not going in the yard.
 signal caught_bird(at: Vector2)
+## The net has just come down on the water, after its landing sweep: where, and how wide its
+## mouth is. What the tornado listens for (a landing on its foot is a hit).
+signal touched_down(at: Vector2, mouth: float)
 
 enum State { IDLE, FLYING, SETTLED, REELING }
 
@@ -1029,6 +1032,7 @@ func _process(delta: float) -> void:
 					splash.ripple(world_pos(), mouth_extent() * 1.2)
 				if sfx != null:
 					sfx.play_landing(caught)
+				touched_down.emit(world_pos(), mouth_extent())
 				# A lucky net's burst starts on the splash (`LuckStars`, the shader's rim).
 				_lucky_age = 0.0 if lucky() else -1.0
 		State.REELING:

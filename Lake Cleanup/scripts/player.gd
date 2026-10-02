@@ -102,6 +102,11 @@ var _was_wading := false
 const STREAK_LONG := 11.0
 const STREAK_WIDE := 6.0
 const ENTRY_SPAN := 30.0
+## World px past the water's edge the boots must go before a wade counts as entered, and
+## the entry ring and splash fire. Leaving needs them back on the sand (past 0 or under).
+## Without the gap a walk along the waterline, or out of the water, flickered across the
+## line and splashed as if going in (2026-09-30).
+const ENTRY_DEEP := 4.0
 
 ## How tall the figure draws, in pixels — asked for rather than promised. The drawing is
 ## scaled by whole source pixels (see `_frame`), so what comes out is the nearest whole
@@ -333,6 +338,45 @@ func shore_toward(tile: Vector2) -> Vector2:
 	return last
 
 
+## Where to stand to throw at `tile` (2026-10-01, Richard: walk to the ideal spot, not at
+## the click): of the island's standing points, the one nearest the angler from which the
+## tile is within `reach` less `CAST_SPARE`; none in range, the standing point nearest the
+## tile. Sampled every `CAST_GRID` tiles over the island's box, once per press.
+const CAST_GRID := 0.25
+const CAST_SPARE := 0.3
+
+
+func cast_stand(tile: Vector2, reach: float) -> Vector2:
+	var want := maxf(reach - CAST_SPARE, 0.0)
+	if tile.distance_to(tile_pos) <= want:
+		return tile_pos
+	var half := Iso.ISLAND_RADIUS + Vector2(1.0, 1.0)
+	var best := Vector2.INF
+	var best_d := INF
+	var near := Vector2.INF
+	var near_d := INF
+	var x := Iso.ISLAND_CENTRE.x - half.x
+	while x <= Iso.ISLAND_CENTRE.x + half.x:
+		var y := Iso.ISLAND_CENTRE.y - half.y
+		while y <= Iso.ISLAND_CENTRE.y + half.y:
+			var at := Vector2(x, y)
+			var to_tile := at.distance_to(tile)
+			if (to_tile <= want or to_tile < near_d) and _can_stand(at) 					and not Iso.in_shed(at.x, at.y, Iso.SHED_KEEP):
+				if to_tile <= want:
+					var d := at.distance_to(tile_pos)
+					if d < best_d:
+						best_d = d
+						best = at
+				if to_tile < near_d:
+					near_d = to_tile
+					near = at
+			y += CAST_GRID
+		x += CAST_GRID
+	if best != Vector2.INF:
+		return best
+	return near if near != Vector2.INF else shore_toward(tile)
+
+
 ## How far into the water a spot is, in world pixels, or 0 on the island's drawn ground.
 ##
 ## The curve decides, because the curve is what is drawn: the water shader cuts itself out
@@ -371,6 +415,15 @@ func _slide(move: Vector2) -> Vector2:
 		var by := Vector2(0.0, move.y) if absf(from.x) >= edge else Vector2(move.x, 0.0)
 		if by.length_squared() > 0.0000001 and _can_stand(tile_pos + by):
 			return tile_pos + by
+	# The beehive, the pump's way, but its footprint is a rectangle and not centred on the
+	# tile it stands on: measured from the footprint's own middle, with each axis's own extent,
+	# or the face the angler hit is guessed off the wrong point and the slide runs into it.
+	if Hive.covers(tile_pos + move, Hive.WALK_KEEP) and not Hive.covers(tile_pos, Hive.WALK_KEEP):
+		var off_hive := tile_pos - Hive.tile - Hive.centre
+		var face_hive := Hive.half + Vector2(Hive.WALK_KEEP, Hive.WALK_KEEP)
+		var slide := Vector2(0.0, move.y) if absf(off_hive.x) >= face_hive.x else Vector2(move.x, 0.0)
+		if slide.length_squared() > 0.0000001 and _can_stand(tile_pos + slide):
+			return tile_pos + slide
 	# And against the hut, the same way: its footprint is a rectangle in tile space now, so
 	# its walls are tile axes too. Without this the shore's slide below took over and walked
 	# the angler round the island's curve instead of along the wall — which is exactly what
@@ -584,8 +637,11 @@ func end_cast() -> void:
 ## height, which was open air beside the figure — the rope started in nothing and the gap
 ## between it and the angler read as a line nobody was holding. A few pixels out at the waist
 ## is inside the silhouette from every side, so the rope always starts on the body.
+##
+## 0.36 of the height, not half (2026-10-02, Richard): with the hat on top, half way up the
+## figure is the beard, and the rope read as coming out of the neck at every angle.
 const HAND_REACH := 4.0
-const HAND_HEIGHT := 0.5
+const HAND_HEIGHT := 0.36
 
 
 ## Where the rope is held and where the catch is thrown from, in world space.
@@ -786,13 +842,14 @@ func _wading() -> float:
 ## are moving in it. From the foam on the cut, not from the boots under it: the wake is the
 ## water they part.
 func _wake(delta: float) -> void:
-	var wading := _wet_by(tile_pos) > 0.0
+	var past := Iso.past_water(tile_pos)
+	var wading := past > ENTRY_DEEP if not _was_wading else past > 0.0
 	var cut := Vector2(0.0, _cut_y(_wading(), 0.0))
 	if wading and not _was_wading and splash != null:
 		splash.ripple(Iso.tile_to_world(tile_pos.x, tile_pos.y) + cut, ENTRY_SPAN)
 		# The first step into the lake splashes (2026-09-28).
 		if Sfx.main() != null:
-			Sfx.main().play_puddle_step()
+			Sfx.main().play_lake_entry()
 	_was_wading = wading
 	if _streak == null:
 		return
@@ -840,6 +897,10 @@ func _can_stand(at: Vector2) -> bool:
 	# Nor through the pump, on the same terms: somebody standing in it may always leave.
 	if Pump.covers(at, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
 		return false
+	# Nor through the beehive and its jar shelf (2026-09-30): the same terms again, over the
+	# rectangle the builder measured off the stand's legs and the shelf's posts.
+	if Hive.covers(at, Hive.WALK_KEEP) and not Hive.covers(tile_pos, Hive.WALK_KEEP):
+		return false
 	# Standing inside it already — an old save, or the shed being moved under them — means
 	# every step out is also a step through, and refusing those leaves them walled in
 	# forever. So the rule is only enforced on someone who is outside it.
@@ -867,7 +928,8 @@ func _repaint() -> void:
 ## The sun, coarsely, so a swinging shadow repaints the figure without repainting it every
 ## frame. Mirrors Dog._sun_key.
 func _sun_key() -> int:
-	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
+	var sun := Shade.sun_of(day)
+	return 0 if sun == null else roundi(sun.lean * 60.0) * 1000 + roundi(sun.ink * 200.0)
 
 
 func _paint_key() -> int:
@@ -1058,7 +1120,11 @@ func _draw_blocked() -> void:
 ## boots off the picture takes them off the shadow, so what is under the water does not cast
 ## on top of it.
 ##
-## No day, no shadow — see Dog._draw_shadow for why a guessed sun is worse than none.
+## **One sun** (2026-10-02): the land's ink on dry ground and the water's while wading, where
+## the shadow lies on the lake (`Shade.On`), never an ink of its own.
+##
+## No day (its own or the lake's), no shadow — see Dog._draw_shadow for why a guessed sun is
+## worse than none.
 ## The figure again for a puddle's reflection, onto `on`, whose transform the caller has already
 ## flipped about the angler's feet (`Puddles.draw_reflections`). The same frame as the figure.
 func reflect_on(on: CanvasItem) -> void:
@@ -1069,17 +1135,11 @@ func reflect_on(on: CanvasItem) -> void:
 
 
 func _draw_shadow(sunk: float, land_shift: float) -> void:
-	if day == null:
+	var sun := Shade.sun_of(day)
+	if sun == null:
 		return
-	var ink := Shade.tint(day.ink)
-	# Rooted where the picture ends: the cut line while wading, the feet on dry land. Rooted at
-	# the hidden feet, the shadow started below the foam and left a strip of water between.
-	var down := Shade.lying(Vector2(0.0, land_shift), day.lean, day.stretch)
-	if sunk > 0.0:
-		# lying() folds about local y 0; slide the picture so the cut sits on that fold and
-		# stays put, then back to where the cut is drawn.
-		var cut := _cut_y(sunk, land_shift)
-		down = Shade.lying(Vector2(0.0, cut), day.lean, day.stretch) 			* Transform2D(0.0, Vector2(0.0, -cut))
+	var ink := Shade.tint_on(sun, Shade.On.WATER if sunk > 0.0 else Shade.On.LAND)
+	var down := _shadow_lay(sun, sunk, land_shift)
 	var shown := _frame(sunk, land_shift)
 	if shown.is_empty():
 		return
@@ -1088,14 +1148,33 @@ func _draw_shadow(sunk: float, land_shift: float) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The shadow under the figure: a flat ellipse lying on the plane.
+## The transform the figure's own frame is laid down under to be its shadow.
 ##
-## It was four points — a diamond, the shape of a tile — which is right for a tile and wrong
-## for a person: nothing about a standing figure has corners, and at twenty pixels across the
-## two straight edges facing the camera read as a square patch of dirt rather than as shade.
-## The same two-to-one flattening either way, so it still lies on the ground.
-func _blot(at: Vector2, extent: Vector2, colour: Color) -> void:
-	draw_colored_polygon(_oval(at, extent), colour)
+## Rooted where the picture ends: the cut line while wading, the feet on dry land. Rooted at
+## the hidden feet, the shadow started below the foam and left a strip of water between.
+func _shadow_lay(sun: DayCycle, sunk: float, land_shift: float) -> Transform2D:
+	if sunk > 0.0:
+		# lying() folds about local y 0; slide the picture so the cut sits on that fold and
+		# stays put, then back to where the cut is drawn.
+		var cut := _cut_y(sunk, land_shift)
+		return Shade.lying(Vector2(0.0, cut), sun.lean, sun.stretch) 			* Transform2D(0.0, Vector2(0.0, -cut))
+	return Shade.lying(Vector2(0.0, land_shift), sun.lean, sun.stretch)
+
+
+## Where a point on the drawn figure, in the angler's parent's space, lands in the figure's
+## own shadow (2026-10-02). The rope's shadow starts here, so it leaves the hands of the
+## shadow rather than a guess beside them: the picture is drawn `LAND_SINK` low on dry land
+## and folded about its feet, and a rope shadow worked out from `rod_tip` alone came off a few
+## pixels short of the body's whenever the throw went east or west.
+func shadow_point(world: Vector2) -> Vector2:
+	var sun := Shade.sun_of(day)
+	if sun == null:
+		return world
+	var sunk := _wading()
+	var land_shift := 0.0 if sunk > 0.0 else LAND_SINK
+	# The picture is drawn `land_shift` low; the hands with it.
+	var local := world - position + Vector2(0.0, land_shift)
+	return position + _shadow_lay(sun, sunk, land_shift) * local
 
 
 ## A flat ellipse as points, going round once. Sixteen sides: at the sizes anything here is

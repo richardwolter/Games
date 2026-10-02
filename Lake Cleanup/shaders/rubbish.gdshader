@@ -47,6 +47,26 @@ varying flat float pale;
 // Whether this quad is a rim copy rather than a piece. Flat: the four corners agree.
 varying flat float rim;
 
+// The part of a piece under its waterline (LakeGrid.SUNK_FLAG, 2026-10-02): seen only where
+// the water is clean or hazy by the honest filth map, mixed towards the water's own colour
+// (`sunk_mix`, more on hazy water), and dropped in grime. The map and its cutoffs mirror
+// water.gdshader's (`filth_map`, `color_bite`, `state_at`); the lake pushes the same texture
+// to both.
+varying flat float sunk;
+varying vec2 world;
+uniform sampler2D filth_map : filter_linear, repeat_disable;
+uniform vec2 filth_tiles = vec2(92.0, 92.0);
+uniform float filth_mapped = 0.0;
+uniform float tile_w = 64.0;
+uniform float tile_h = 32.0;
+uniform float color_bite = 1.4;
+uniform vec4 state_at = vec4(0.15, 0.35, 0.55, 0.75);
+uniform vec3 sunk_clean : source_color = vec3(0.35, 0.62, 0.68);
+uniform vec3 sunk_hazy : source_color = vec3(0.42, 0.6, 0.55);
+uniform float sunk_mix = 0.5;
+uniform float sunk_hazy_more = 0.15;
+uniform float sunk_alpha = 0.9;
+
 // A tile still rising into place (LakeGrid.RISE_SLOTS, 2026-09-29): its emerge, in pixels
 // down, by the slot its vertices carry. Stamped at rest and moved here, so the grid does not
 // re-stamp it every frame. Mirrors LakeGrid._push_rise.
@@ -86,6 +106,9 @@ void vertex() {
 		VERTEX.y += cos(t * 0.41 + x * 0.023) * sway * 0.5;
 	}
 
+	world = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
+	sunk = abs(COLOR.a - 0.7) < 0.02 ? 1.0 : 0.0;
+
 	// A rim copy: flagged by an alpha nothing else in the soup uses (LakeGrid.RIM_FLAG,
 	// 0.5 — the placeholder blocks draw at 0.14 and 1.0). Handed on white so the fragment
 	// stage gets the art's own alpha to cut the gold to.
@@ -94,13 +117,29 @@ void vertex() {
 	rim = max(rim, pale);
 	// Hand the fragment stage a real colour, so nothing downstream has to know about the
 	// packing.
-	COLOR = rim > 0.5 ? vec4(1.0) : vec4(vec3(COLOR.b), COLOR.a);
+	COLOR = rim > 0.5 || sunk > 0.5 ? vec4(1.0) : vec4(vec3(COLOR.b), COLOR.a);
 }
 
 // COLOR arrives as the vertex colour times the texture (see the note below), so for a rim
 // copy that is the art's alpha under white: swap the colour for gold and keep the cut.
 void fragment() {
-	if (rim > 0.5) {
+	if (sunk > 0.5) {
+		if (filth_mapped < 0.5) {
+			discard;
+		}
+		// Mirrors Iso.world_to_tile.
+		float a = world.x / (tile_w * 0.5);
+		float b = world.y / (tile_h * 0.5);
+		vec2 tile = vec2((b + a) * 0.5, (b - a) * 0.5);
+		float t = pow(texture(filth_map, (tile + 0.5) / filth_tiles).r, color_bite);
+		if (t >= state_at.y) {
+			discard;
+		}
+		bool hazy = t >= state_at.x;
+		vec3 water = hazy ? sunk_hazy : sunk_clean;
+		float k = sunk_mix + (hazy ? sunk_hazy_more : 0.0);
+		COLOR = vec4(mix(COLOR.rgb, water, k), COLOR.a * sunk_alpha);
+	} else if (rim > 0.5) {
 		COLOR = vec4(pale > 0.5 ? rim_pale : rim_gold, COLOR.a * rim_fade);
 	}
 }

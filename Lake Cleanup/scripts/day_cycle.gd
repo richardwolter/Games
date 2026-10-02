@@ -63,8 +63,13 @@ const FLASH_INK := 0.55
 var _config: DayConfig
 var _tint_ramp: Gradient
 
+## The day the lake is lit by, for what draws a shadow and has no day handed to it (the fish,
+## the flora, the net, the haul). Last in wins, the way `Puddles.here` does.
+static var here: DayCycle
+
 
 func _ready() -> void:
+	here = self
 	_config = load(CONFIG_PATH) as DayConfig
 	if _config == null:
 		# A missing resource is a plain day, not a crash and not a black lake. The rest of
@@ -73,6 +78,11 @@ func _ready() -> void:
 		_config = DayConfig.new()
 	_tint_ramp = _config.tint if _config.tint != null else DayConfig.default_tint()
 	_settle()
+
+
+func _exit_tree() -> void:
+	if here == self:
+		here = null
 
 
 func _process(delta: float) -> void:

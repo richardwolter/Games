@@ -176,6 +176,7 @@ func _physics_process(_delta: float) -> void:
 			_stage_nature()
 		27:
 			_stage_rain()
+			_stage_tornado()
 			_stage_foam()
 		28:
 			_stage_new_tracks()
@@ -196,6 +197,8 @@ func _physics_process(_delta: float) -> void:
 			_stage_led_cast()
 		36:
 			_stage_first_steps()
+		37:
+			_stage_hive()
 		_:
 			pass
 
@@ -489,6 +492,9 @@ func _check_surface() -> void:
 	var ring_tiles := 0
 	var ring_deep := 0
 	var ring_heavy := 0
+	var ring_pieces := 0
+	var ring_bait := 0
+	var ring_bait_tops := 0
 	var ring_pale := 0
 	var at: Array[Vector2i] = []
 	var tops := PackedInt32Array()
@@ -527,8 +533,13 @@ func _check_surface() -> void:
 				if _grid.defs[piece].keepsake:
 					continue
 				filled += 1
+				ring_pieces += 1
+				if _grid.defs[piece].tier > 0:
+					ring_bait += 1
 				if _grid.defs[piece].tier > LakeGrid.RING_TIER:
 					ring_heavy += 1
+			if def.tier > 0 and not def.keepsake:
+				ring_bait_tops += 1
 			if filled > LakeGrid.RING_SLOTS.y:
 				ring_deep += 1
 			if _grid.water_state(index) != LakeGrid.FILTH_STATES:
@@ -557,6 +568,12 @@ func _check_surface() -> void:
 		"%d tiles" % ring_deep)
 	_check(ring_heavy == 0, "nothing inside the ring is over the ring's tier",
 		"%d pieces" % ring_heavy)
+	# 2026-09-29: the ring is tier 0 but for bait, a few tier 1-2 pieces and a spaced few
+	# tops, so a level-0 net always has something to lift near home.
+	_check(ring_bait > 0 and ring_bait < ring_pieces * LakeGrid.RING_BAIT * 1.6,
+		"the ring is mostly tier 0, with a little bait", "%d of %d" % [ring_bait, ring_pieces])
+	_check(ring_bait_tops < ring_tiles * LakeGrid.RING_BAIT_TOP,
+		"bait tops in the ring are few", "%d of %d tiles" % [ring_bait_tops, ring_tiles])
 	_check(ring_pale == 0, "a fresh ring reads as dirty as the rest of the lake",
 		"%d tiles lighter" % ring_pale)
 	var by_depth := 0
@@ -2569,6 +2586,48 @@ func _check_new_sounds(sound: Sfx) -> void:
 	var first := sound.play_frog()
 	var second := sound.play_frog()
 	_check(first and not second, "frogs are held to their gap", "%s %s" % [first, second])
+	# Going into the water is never one pitch (2026-09-30): the entry splash and the wading
+	# wash each step through four or more pitches, never the one played last, and the entry
+	# keeps its own memory apart from the lawn's puddle steps.
+	for ladder: Array in [Sfx.ENTRY_PITCHES, Sfx.WADE_PITCHES]:
+		var distinct := {}
+		for p: float in ladder:
+			distinct[p] = true
+		_check(distinct.size() >= 4, "a water entry sound has at least four pitches", str(ladder))
+	var repeats := 0
+	for ladder_name: StringName in [&"lake_entry", &"wading"]:
+		var ladder: Array[float] = Sfx.ENTRY_PITCHES if ladder_name == &"lake_entry" else Sfx.WADE_PITCHES
+		var last := -1.0
+		for i in 40:
+			var p := sound._next_pitch(ladder_name, ladder)
+			repeats += 1 if p == last else 0
+			last = p
+	_check(repeats == 0, "the entry and the wash never play one pitch twice running", "%d" % repeats)
+	sound._next_pitch(&"lake_entry", Sfx.ENTRY_PITCHES)
+	var entry_was: int = sound._pitch_step[&"lake_entry"]
+	sound.play_puddle_step()
+	_check(sound._pitch_step[&"lake_entry"] == entry_was,
+		"a puddle on the lawn does not move the lake entry's ladder", "")
+	# The wash that opens a wade is the loudest thing on the way in, so it swings as widely
+	# as the entry splash; the repeats after it stay on the narrow ladder.
+	var opens := {}
+	for i in 12:
+		sound._wade_fresh = true
+		opens[sound.wade_pitch()] = true
+	var then := sound.wade_pitch()
+	_check(opens.size() >= 4 and then in Sfx.WADE_PITCHES and not sound._wade_fresh,
+		"the wash opening a wade swings wide, the repeats stay narrow", "%d opening pitches" % opens.size())
+	sound._wade_fresh = false
+	# Only the angler's entry opens a wade: the wash stopping and starting again in the water
+	# (a cast holds the feet) stays on the narrow ladder.
+	sound._process(0.016)
+	_check(not sound._wade_fresh, "a wash starting again in the water is not a new wade", "")
+	sound.play_lake_entry()
+	_check(sound._wade_fresh, "the angler's entry makes the next wash a new wade", "")
+	sound._wade_fresh = false
+	_check_entry_edge(sound)
+	_check(FileAccess.get_file_as_string("res://scripts/player.gd").contains("play_lake_entry()"),
+		"the angler's first step into the lake plays the entry ladder", "")
 	var lake_boats: Array = _main.get(&"_boats")
 	var walkers: PackedVector2Array = _main.call(&"_wildlife_walkers")
 	var all: PackedVector2Array = _main.call(&"_wildlife_threats")
@@ -2595,6 +2654,35 @@ func _check_new_sounds(sound: Sfx) -> void:
 	_check(wild.hears(Vector2(reach * 0.5, 0.0)) and not wild.hears(Vector2(reach * 1.5, 0.0)),
 		"an animal is heard only within earshot", "")
 	wild.free()
+
+
+## The entry splash fires going in, once, and not on the way out or while the boots wobble
+## on the waterline (2026-09-30). Walked by hand along one bearing out of the island.
+func _check_entry_edge(sound: Sfx) -> void:
+	var home := _angler.tile_pos
+	var was_wading: bool = _angler._was_wading
+	var at := func(past: float) -> Vector2:
+		var t := 0.0
+		while t < 40.0 and Iso.past_water(Iso.ISLAND_CENTRE + Vector2(t, 0.0)) < past:
+			t += 0.005
+		return Iso.ISLAND_CENTRE + Vector2(t, 0.0)
+	var path: Array[float] = [-6.0, 1.0, -1.0, 2.0, 0.5, 3.0, Angler.ENTRY_DEEP + 3.0,
+		2.0, Angler.ENTRY_DEEP + 3.0, 1.0, 0.2, -3.0, 1.0, -2.0]
+	var fired := PackedInt32Array()
+	for past: float in path:
+		var before: int = sound._pitch_step.get(&"lake_entry", -1)
+		sound._pitch_step[&"lake_entry"] = -1
+		_angler.tile_pos = at.call(past)
+		_angler._wake(0.016)
+		fired.append(1 if int(sound._pitch_step[&"lake_entry"]) != -1 else 0)
+		sound._pitch_step[&"lake_entry"] = before
+	# Wobbling on the line and out again: nothing. Past the margin: once. In and out of the
+	# shallows without reaching the sand: nothing. Onto the sand and back to the line: nothing.
+	_check(fired == PackedInt32Array([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]),
+		"the entry splash fires once going in, never on the line or coming out", str(fired))
+	_angler.tile_pos = home
+	_angler._was_wading = was_wading
+	sound._wade_fresh = false
 
 
 ## Summed absolute level of each ear over frames [from, to) of 16-bit stereo data.
@@ -2898,23 +2986,45 @@ func _stage_ferry_art() -> void:
 		"and one running south is drawn heading down and left",
 		"%.2f, %.2f" % [on_screen.x, on_screen.y])
 
-	# The load has to sit in the hold at every heading. Laying it out in screen offsets
-	# instead of in tiles floats half of it off the side of a boat running north.
+	# The load has to sit in the hold at every heading (2026-10-02, the box's rule): every
+	# piece, at its widest, inside the frame's well, and the bottom layer's feet under the
+	# near rail, where the hull's front is drawn over them.
 	var strays := 0
+	var unsunk := 0
 	var worst_heading := Vector2.ZERO
+	var hold_k := Boat.HULL_LENGTH / Boat.HULL_IN_FRAME
+	var hold_at: Vector2 = Boat._anchor
+	var welled := 0
 	for i in 24:
 		var turn := TAU * float(i) / 24.0
 		_boat.heading = Vector2(cos(turn), sin(turn))
-		var along: Vector2 = _boat.call(&"_screen_heading")
-		var across := Vector2(-along.y, along.x)
+		var well: Dictionary = Boat.well_of(_boat.heading_frame())
+		if well.is_empty():
+			continue
+		welled += 1
+		var half := Boat.hold_slot(well) * Boat.HOLD_FIT * 0.5
 		for slot in Boat.HOLD_SHOWN:
 			var spot: Vector2 = _boat.hold_spot(slot, Boat.HOLD_SHOWN)
-			spot.y += Boat.HULL_HEIGHT * Boat.HOLD_LIFT
-			if absf(spot.dot(along)) > Boat.HULL_LENGTH * 0.5 					or absf(spot.dot(across)) > Boat.HULL_WIDTH * 0.5:
+			var fx := spot.x / hold_k + hold_at.x
+			var fy := (spot.y - Boat.HULL_DROP) / hold_k + hold_at.y
+			if fx - half < float(well["x0"]) - 0.01 or fx + half > float(well["x1"]) + 0.01:
 				strays += 1
 				worst_heading = _boat.heading
-	_check(strays == 0, "the load stays inside the hull at every heading",
+			if slot < Boat.HOLD_LAYER and fy <= Boat.rail_at(well, fx):
+				unsunk += 1
+	_check(welled == 24, "every heading has a well to stow the load in", "%d of 24" % welled)
+	_check(strays == 0, "the load stays inside the hull's well at every heading",
 		"%d slots stray, worst at %s" % [strays, str(worst_heading)])
+	_check(unsunk == 0, "and the bottom layer stands behind the near rail",
+		"%d stand on it" % unsunk)
+	var had_room: int = _boat.capacity
+	_boat.capacity = 40
+	_check(_boat.hold_shown(0) == 0 and _boat.hold_shown(1) == 1
+			and _boat.hold_shown(20) == Boat.HOLD_SHOWN / 2 and _boat.hold_shown(40) == Boat.HOLD_SHOWN,
+		"the pile drawn follows how full the hold is",
+		"%d %d %d %d" % [_boat.hold_shown(0), _boat.hold_shown(1), _boat.hold_shown(20), _boat.hold_shown(40)])
+	_boat.capacity = had_room
+	_check(ResourceLoader.exists(Boat.HOLD_FRONT_PATH), "the hull's front sheet is built", "")
 	_advance()
 
 
@@ -3069,9 +3179,13 @@ func _stage_art() -> void:
 		"%d outside; early/mid/late %s" % [misplaced, str(banded)])
 	_check(blocked == 0, "no early find lies under something heavier than itself",
 		"%d do" % blocked)
-	_check(int(laid.get(&"decor_pet_bed", 0)) == 2 and int(laid.get(&"decor_chew_toy", 0)) == 2,
-		"two pet beds and two chew toys are in the lake", str(laid.get(&"decor_pet_bed", 0)))
-	_check(first_tile >= 0, "a pet bed floats on top by the island", "")
+	var doubled: Array = []
+	for find_name: Variant in laid:
+		if int(laid[find_name]) > 1:
+			doubled.append(find_name)
+	_check(doubled.is_empty() and int(laid.get(&"decor_pk_diner_chair", 0)) == 1,
+		"every find is in the lake once, the diner chair too", str(doubled))
+	_check(first_tile >= 0, "the first find floats on top by the island", "")
 	if first_tile >= 0:
 		var out := Iso.past_shelf(Vector2(_grid.tile_of(first_tile)))
 		_check(out >= near and out <= near + Lake.FIRST_FIND_OUT,
@@ -3212,8 +3326,16 @@ func _stage_art() -> void:
 		if slot_base[i] >= 0 and _grid.shore[i] == 1 and _grid.stacks[i].size() >= 2:
 			paired += 1
 	_check(rimmed > 0, "some drawn tiles hold a find", str(rimmed))
-	_check(verts.size() == _grid.drawn_pieces * 4 + rimmed * LakeGrid.RIM_VERTS + paired * 4,
-		"a piece of rubbish is its picture and nothing else, plus a rim's room over a find",
+	# The part under the waterline reads the same filth map the water does, so it shows only
+	# through clean or hazy water (2026-10-02).
+	var soup := _grid.material as ShaderMaterial
+	_check(soup != null and soup.get_shader_parameter(&"filth_map") != null
+			and float(soup.get_shader_parameter(&"filth_mapped")) == 1.0,
+		"the soup reads the filth map, for what of a piece shows under clean water", "")
+	# Each picture is two quads since 2026-10-02: above the water and the part under it
+	# (LakeGrid.SUNK_FLAG, seen only through clean water).
+	_check(verts.size() == _grid.drawn_pieces * 8 + rimmed * LakeGrid.RIM_VERTS + paired * 8,
+		"a piece of rubbish is its picture and what is under its waterline, plus a rim's room over a find",
 		"%d corners for %d pieces, %d with a find, %d shore pairs" % [
 			verts.size(), _grid.drawn_pieces, rimmed, paired])
 
@@ -3345,12 +3467,28 @@ func _stage_shed() -> void:
 	# more. Netting the same chair five times has to leave four on the shelf: four is a
 	# dining set, five is a bug that would let a player farm one tile for furniture.
 	var many := ""
-	for name: String in sheets.names:
-		if sheets.copies_of(StringName(name)) > 1:
-			many = name
+	for def: TrashDef in _grid.defs:
+		if def.keepsake and sheets.copies_of(def.piece) > 1:
+			many = String(def.piece)
 			break
 	if many.is_empty():
-		_check(false, "there is a find that comes in more than one", "")
+		# Every find is unique since 2026-10-01 (Richard: three of the same diner chair):
+		# netting one twice keeps it once.
+		var one_index := -1
+		for i in _grid.defs.size():
+			if _grid.defs[i].keepsake:
+				one_index = i
+				break
+		var one := String(_grid.defs[one_index].piece)
+		unlocked.clear()
+		unwashed.clear()
+		_main.call(&"_on_net_landed", PackedInt32Array([one_index]))
+		_main.call(&"_on_net_landed", PackedInt32Array([one_index]))
+		var kept_once := (unlocked + unwashed).count(one)
+		while unwashed.has(one):
+			_main.call(&"_on_find_washed", StringName(one), 0)
+		_check(kept_once == 1, "every find is unique: netted twice, it is kept once",
+			"%s: %d kept" % [one, kept_once])
 	else:
 		var wanted := sheets.copies_of(StringName(many))
 		var many_index := -1
@@ -3648,19 +3786,22 @@ func _stage_shed() -> void:
 			"key %.2f" % behind)
 		decor.clear()
 
-	# The finds float smaller than the rubbish: Lake.FIND_SHRINK off SPRITE_SCALE.
+	# The finds float at the rubbish's grain since the pack decoration (2026-10-01): one
+	# world pixel an art pixel, a crumb scaled up by whole steps.
 	var shrunk := true
 	var shrunk_detail := ""
 	for def: TrashDef in _grid.defs:
 		if not def.keepsake or def.region.size == Vector2.ZERO:
 			continue
 		var longest := maxf(def.region.size.x, def.region.size.y)
-		var want := longest * Lake.SPRITE_SCALE / Lake.FIND_SHRINK
+		var whole := Lake.RUBBISH_SCALE
+		if longest * whole < Lake.RUBBISH_SMALLEST:
+			whole = ceilf(Lake.RUBBISH_SMALLEST / longest)
 		var got := maxf(def.size.x, def.size.y)
-		if got > want + 0.01 or got > Lake.SPRITE_LARGEST / Lake.FIND_SHRINK + 0.01:
+		if absf(got - longest * whole) > 0.01:
 			shrunk = false
 			shrunk_detail = "%s draws %.1f, art %.0f" % [def.piece, got, longest]
-	_check(shrunk, "a find floats at SPRITE_SCALE over FIND_SHRINK, capped in proportion",
+	_check(shrunk, "a find floats at the rubbish's grain, one world px an art px",
 		shrunk_detail)
 	# The footprint is the object, not the tile it fits in: rounded to nearest, so a piece
 	# 27 pixels across is three cells of eight and not four.
@@ -3873,8 +4014,8 @@ func _check_trophy() -> void:
 	if card == null:
 		_check(false, "the find card was built", "")
 		return
-	_check(Text.TROPHY_FOUND == "New decoration available to wash",
-		"the card says the find is waiting to be washed", Text.TROPHY_FOUND)
+	_check(Text.TROPHY_FOUND == "Found a decoration!",
+		"the card says a decoration was found (Richard's wording, 2026-09-29)", Text.TROPHY_FOUND)
 
 	# The retired drawing, gone rather than left unused: the disc, the wheel of rays and the
 	# motes, and the restored sprite it used to hold up.
@@ -4869,6 +5010,7 @@ func _stage_sun() -> void:
 	_check(reach.end.x <= box.end.x + 0.5,
 		"and none of it spills out on the sunlit side",
 		"sweep ends at %.1f, picture at %.1f" % [reach.end.x, box.end.x])
+	_check_one_sun(day)
 	day.queue_free()
 	# Walkers bury their feet by Iso.on_lawn; it must be the lawn Ground draws.
 	var island := Ground.new()
@@ -4884,6 +5026,57 @@ func _stage_sun() -> void:
 	_check(disagree == 0, "feet are buried exactly where the island draws grass",
 		"%d points disagree" % disagree)
 	_advance()
+
+
+## The names a shadow's strength used to hide behind, one per caster, before the one-sun pass
+## (2026-10-02). Any of them defined again in a script is a shadow with its own ink.
+const OWN_INKS := ["SHADE_GAIN", "SHADE_MOST", "SHADOW_INK", "SHADOW_COLOUR", "SHADOW_ALPHA",
+	"DOG_SHADE_GAIN", "DRY_SHADE"]
+
+
+## One sun (2026-10-02, `/grill-me` with Richard): one ink, one gain per surface, every shadow
+## falling down and to the left. The gains are free to be retuned; their order, the colour and
+## the side are not, and no caster may grow its own ink again.
+func _check_one_sun(day: DayCycle) -> void:
+	_check(Shade.GAIN.size() == 3 and Shade.MOST.size() == 3,
+		"one shadow gain and cap per surface: land, water, bed", "%d gains" % Shade.GAIN.size())
+	_check(is_equal_approx(Shade.GAIN[Shade.On.LAND], 1.0)
+			and Shade.GAIN[Shade.On.WATER] > Shade.GAIN[Shade.On.LAND],
+		"land takes the day's ink as it is and water more of it", "%s" % [Shade.GAIN])
+	var colours := 0
+	for on in 3:
+		var tint := Shade.tint_on(day, on)
+		if Color(tint.r, tint.g, tint.b) == Color(Shade.INK.r, Shade.INK.g, Shade.INK.b):
+			colours += 1
+	_check(colours == 3, "every surface's shadow is the one ink", "%d of 3" % colours)
+	var wrong := 0
+	for step in 50:
+		day.phase = float(step) / 50.0
+		day.call(&"_settle")
+		var off := Shade.drop(day, 10.0)
+		if off.x >= 0.0 or off.y <= 0.0:
+			wrong += 1
+	_check(wrong == 0, "a raised or sunk thing's shadow falls down and left all loop",
+		"%d phases wrong" % wrong)
+	day.overcast = 1.0
+	day.call(&"_weather")
+	var grey := Shade.tint_on(day, Shade.On.WATER).a
+	day.overcast = 0.0
+	day.call(&"_settle")
+	_check(grey < Shade.tint_on(day, Shade.On.WATER).a,
+		"and the rain thins it", "%.2f in a shower" % grey)
+	var own := PackedStringArray()
+	for file in DirAccess.get_files_at("res://scripts"):
+		if not file.ends_with(".gd") or file == "shade.gd":
+			continue
+		var text := FileAccess.get_file_as_string("res://scripts/" + file)
+		for name in OWN_INKS:
+			if text.contains("const %s " % name) or text.contains("const %s:" % name):
+				own.append("%s %s" % [file, name])
+	_check(own.is_empty(), "no caster keeps a shadow ink of its own", ", ".join(own))
+	var shader := FileAccess.get_file_as_string("res://shaders/shadow.gdshader")
+	_check(shader.contains("sun_stretch") and not shader.contains("sun_reach"),
+		"the rubbish's crescents lean and stretch with the sun", "")
 
 
 func _stage_ending_on_load() -> void:
@@ -5413,13 +5606,48 @@ func _check_audio_pass(sound: Sfx) -> void:
 		batch_haul.send(arted, Vector2.ZERO, Vector2(200.0, 0.0))
 	batch_haul._process(0.2)
 	_check(bool(batch_haul.call(&"_batch")), "and it can batch pieces off the atlas", "")
-	var per := Haul.CIRCLE_SEGMENTS + 1 + 8
+	# The shadows are their own batch, on the water's layer under the walkers (2026-10-02,
+	# one sun); the flights' batch is the waterline and the picture a piece.
 	var laid := (batch_haul.get(&"_points") as PackedVector2Array).size()
-	_check(laid == 3 * per and (batch_haul.get(&"_indices") as PackedInt32Array).size()
-		== 3 * (Haul.CIRCLE_SEGMENTS * 3 + 12),
+	var shades := (batch_haul.get(&"_shade_points") as PackedVector2Array).size()
+	_check(laid == 3 * 8 and (batch_haul.get(&"_indices") as PackedInt32Array).size() == 3 * 12
+			and shades == 3 * (Haul.CIRCLE_SEGMENTS + 1)
+			and (batch_haul.get(&"_shade_indices") as PackedInt32Array).size()
+				== 3 * Haul.CIRCLE_SEGMENTS * 3,
 		"three pieces in the air are three shadows, waterlines and pictures in it",
-		"%d points" % laid)
+		"%d points, %d shadow points" % [laid, shades])
 	batch_haul.queue_free()
+
+	# Over the island's buildings, and into the box rather than onto it (2026-10-02): the
+	# flights are drawn above the crate's layer, where the hive is; the last stretch into a box
+	# is the box's to draw, under its near walls; a thrown piece lands inside the mouth; and a
+	# piece leaving the hand throws no shadow yet, so a catch does not stack a blotch there.
+	_check(haul.z_index > Lake.CRATE_LAYER and not haul.z_as_relative,
+		"the flights are drawn over the crate's layer, where the hive stands", "%d" % haul.z_index)
+	var box_haul := Haul.new()
+	box_haul.grid = _grid
+	add_child(box_haul)
+	for i in 12:
+		box_haul.send(arted, Vector2.ZERO, Vector2(200.0, 0.0))
+	var inside := true
+	for piece: Dictionary in box_haul.get(&"_flying"):
+		var off: Vector2 = (piece["to"] as Vector2) - Vector2(200.0, 0.0)
+		inside = inside and absf(off.x) <= Haul.BOX_SCATTER.x and absf(off.y) <= Haul.BOX_SCATTER.y
+	_check(inside, "a piece thrown into the crate lands inside its mouth", "")
+	var lone: Dictionary = (box_haul.get(&"_flying") as Array)[0]
+	lone["age"] = Haul.FLIGHT * (Haul.LAND_FROM + 0.1)
+	lone["wait"] = 0.0
+	_check(bool(box_haul.call(&"_handed_over", lone)),
+		"on its last stretch it is handed to the box", "")
+	var crate: Yard = _main.get(&"_yard")
+	_check(crate.haul == haul, "and the crate knows the flights it draws the end of", "")
+	_check(is_zero_approx(Haul._aloft(0.0)) and is_zero_approx(Haul._aloft(1.0))
+		and is_equal_approx(Haul._aloft(0.5), 1.0),
+		"a piece's shadow shows only while it is in the air", "")
+	box_haul.queue_free()
+	# The rope leaves the chest, not the neck: the hands sit well under the hat.
+	_check(Angler.HAND_HEIGHT < 0.45, "the rope leaves the angler's chest, not the neck",
+		"%.2f" % Angler.HAND_HEIGHT)
 
 	# The crate's thud is its own recording, in three takes, one of which is played per drop
 	# and never the one played last (2026-09-17). The shed's furniture thud is untouched and
@@ -5731,6 +5959,15 @@ func _run_music(music: MusicStation, seconds: float) -> void:
 		var dt := minf(0.05, left)
 		music.step(dt)
 		left -= dt
+
+
+## Water just past the angler's reach, out the way they face from the island's middle.
+func _led_spot_probe() -> Vector2:
+	var away := (_angler.tile_pos - Iso.ISLAND_CENTRE)
+	if away.length_squared() < 0.01:
+		away = Vector2(1.0, 0.0)
+	return Iso.tile_to_world(_angler.tile_pos.x + away.normalized().x * (_net.range_tiles + 0.2),
+		_angler.tile_pos.y + away.normalized().y * (_net.range_tiles + 0.2))
 
 
 func _finish() -> void:
@@ -6190,6 +6427,146 @@ func _stage_pointer() -> void:
 ## follow the filth map and the lake's clean share, and the glint uniform follows the share.
 ## The rain (2026-09-25): at most five showers a run, atmosphere only, drops landing on what
 ## is drawn — the hut's thatch, the lake, the island — puddles on dry ground, and lightning.
+## The tornado (2026-09-30): the gate and the cap, the lift and fling keeping every piece,
+## three hits collapsing it into the net, the untamed wander-off, the fleet and the pack held
+## and let go, a save ending it, and the ending waiting on what it carries.
+func _stage_tornado() -> void:
+	var t: Node2D = _main.get(&"_tornado")
+	_check(t != null, "the lake has its tornado", "")
+	if t == null:
+		return
+	var grid: LakeGrid = _main.get(&"_grid")
+	var net: CastNet = _main.get(&"_net")
+	var weather: Weather = _main.get(&"_weather")
+	var was_count: int = t.count
+	var was_most: int = t.most
+	var was_next: float = t.next_in
+	var showers_was := weather.showers
+	t.process_mode = Node.PROCESS_MODE_DISABLED
+	var step := func(seconds: float) -> void:
+		var n := int(seconds * 60.0)
+		for _i in n:
+			t._process(1.0 / 60.0)
+	# The gate: nothing is rolled under 80% cleaned; past it one is rolled, held by a board,
+	# and started once nothing holds it.
+	t.count = 0
+	t.most = 2
+	t.next_in = -1.0
+	t.tick_schedule(1.0, 0.7, false)
+	_check(t.next_in < 0.0 and not t.active(), "no tornado is rolled under 80% cleaned", "%.1f" % t.next_in)
+	t.tick_schedule(1.0, 0.82, false)
+	_check(t.next_in > 0.0 and not t.active(), "past 80% the first is rolled", "%.1f" % t.next_in)
+	t.tick_schedule(999.0, 0.82, true)
+	_check(not t.active(), "a held tornado does not start", "")
+	t.tick_schedule(999.0, 0.82, false)
+	_check(t.active(), "and starts once nothing holds it", "")
+	_check(weather.showers == showers_was, "its storm is not one of the run's showers", str(weather.showers))
+	t.settle_now()
+	_check(not t.active() and t.count == 1, "settling ends it and counts it", str(t.count))
+	t.count = t.most
+	t.next_in = 0.0
+	t.tick_schedule(999.0, 0.95, false)
+	_check(not t.active(), "no more than the run's %d" % t.most, "")
+	_check(Tornado_MOST_OK(t), "two or three a run", "%d-%d" % [t.MOST_RANGE.x, t.MOST_RANGE.y])
+
+	# Lifting and flinging keep every piece.
+	t.count = 0
+	var total := grid.piece_count()
+	t.start(0.4)
+	var boats_held := true
+	for boat in _main.get(&"_boats"):
+		boats_held = boats_held and boat.moored
+	var dogs_held := true
+	for dog in _main.get(&"_dogs"):
+		dogs_held = dogs_held and dog.dozing
+	_check(boats_held and dogs_held, "the fleet is moored and the pack dozes while it is out", "")
+	step.call(18.0)
+	var in_net := func() -> int: return net.catch.size()
+	_check(t.lifted > 0, "it lifts pieces into its orbit", "lifted %d landed %d carrying %d" % [t.lifted, t.landed, t.carrying()])
+	_check(grid.piece_count() + t.carrying() == total, "every lifted piece is in the water or the air",
+		"%d + %d against %d" % [grid.piece_count(), t.carrying(), total])
+	_check(t.carrying() <= t.CARRY_MOST + t.get(&"_flung").size(), "it carries %d at most" % t.CARRY_MOST, str(t.carrying()))
+	var base: Vector2 = t.base()
+	var off_foot := base + Vector2(300.0, 0.0)
+	_check(not t.net_down(net, off_foot, 20.0), "a net landing off its foot is no hit", "")
+	if t.carrying() > 0:
+		_check(not _main._all_landed(), "the ending waits while it carries pieces", str(t.carrying()))
+	# Three hits: the third collapses it into the net.
+	net.catch = PackedInt32Array()
+	var hit_ok := 0
+	for k in 3:
+		if t.net_down(net, t.base(), 40.0):
+			hit_ok += 1
+		if k == 0:
+			_check(not t.net_down(net, t.base(), 40.0), "a second landing at once is the same throw", "")
+		step.call(1.2)
+	_check(hit_ok == 3 and t.hits() == 3, "three landings on its foot are three hits", str(t.hits()))
+	step.call(5.0)
+	_check(not t.active(), "the third hit collapses it", "")
+	_check(t.carrying() == 0, "nothing left in the air", str(t.carrying()))
+	_check(grid.piece_count() + in_net.call() == total, "what it carried fell into the net or the water",
+		"%d + %d in the net against %d" % [grid.piece_count(), in_net.call(), total])
+	_check(t.netted == in_net.call(), "the net holds what it caught of it", "%d / %d" % [t.netted, in_net.call()])
+	for d in net.catch:
+		var at := grid.tile_at(base)
+		grid.insert(at, grid.height_of(at), d)
+	net.catch = PackedInt32Array()
+	var boats_free := true
+	for boat in _main.get(&"_boats"):
+		boats_free = boats_free and not boat.moored
+	var dogs_free := true
+	for dog in _main.get(&"_dogs"):
+		dogs_free = dogs_free and not dog.dozing
+	_check(boats_free and dogs_free, "and the fleet and the pack are let go", "")
+	_check(t.count == 1, "a tamed tornado counts", str(t.count))
+
+	# Untamed, it wanders off after its life and drops everything on the water.
+	total = grid.piece_count()
+	var pol_was: float = _main.pollution
+	t.start(2.2)
+	step.call(t.BREW + t.TOUCH_END + t.LIFE + t.GONE_AFTER + 1.0)
+	_check(not t.active() and t.carrying() == 0, "untamed, it wanders off with nothing left carried", str(t.carrying()))
+	_check(grid.piece_count() == total, "and every piece is back in the water",
+		"%d against %d" % [grid.piece_count(), total])
+	_check(absf(_main.pollution - pol_was) < 0.001, "and the meter comes back where it was",
+		"%.4f against %.4f" % [_main.pollution, pol_was])
+	# A base stays within the net's reach of the island's shore.
+	var reach: float = net.range_tiles
+	_check(t.get(&"_grow") <= maxf(reach - t.RANGE_SPARE, t.GROW_LEAST + 0.3) + 0.01,
+		"it keeps within the net's reach of the shore", "%.2f of %.2f" % [t.get(&"_grow"), reach])
+
+	# A save mid-event ends it and keeps every piece.
+	total = grid.piece_count()
+	t.start(1.0)
+	step.call(16.0)
+	_check(_main.call(&"_tornado_active"), "a tornado is out before the save", "carrying %d" % t.carrying())
+	_main.save_game()
+	_check(not t.active(), "a save ends the tornado", "")
+	_check(grid.piece_count() == total, "and puts what it carried back in the water first",
+		"%d against %d" % [grid.piece_count(), total])
+	var file := FileAccess.open(_main.save_path, FileAccess.READ)
+	var saved: Variant = null
+	if file != null:
+		saved = file.get_var(true)
+		file.close()
+	_check(saved is Dictionary and (saved as Dictionary).has("tornadoes"), "the run's count is saved",
+		str((saved as Dictionary).get("tornadoes", "none")) if saved is Dictionary else "unreadable")
+	t.count = was_count
+	t.most = was_most
+	t.next_in = was_next
+	weather.clear_storm()
+	t.process_mode = Node.PROCESS_MODE_INHERIT
+	# Its rings run out, so the next stage finds the splash layer as it left it.
+	var splash: WaterSplash = _main.get(&"_splash")
+	for _i in 12:
+		splash._process(0.5)
+
+
+func Tornado_MOST_OK(t: Node) -> bool:
+	var r: Vector2i = t.MOST_RANGE
+	return r.x == 2 and r.y == 3 and t.most >= 1
+
+
 func _stage_rain() -> void:
 	var weather: Weather = _main.get(&"_weather")
 	var puddles: Puddles = _main.get(&"_puddles")
@@ -6489,7 +6866,11 @@ func _stage_nature() -> void:
 		if wild.crayfish_count() > 0:
 			var c0: Dictionary = wild.crayfish()[0]
 			wild.scare(c0["at"] as Vector2 + Vector2(4.0, 0.0), 1.0)
-			_check(int(c0["state"]) == 2, "a crayfish darts away when something lands by it", str(c0["state"]))
+			_check(int(c0["state"]) != 2, "a crayfish does not dart when something lands by it",
+				str(c0["state"]))
+			var depth := Fish.depth_at(c0["at"] as Vector2)
+			_check(depth >= Wildlife.CRAY_SHALLOWEST and depth < Wildlife.CRAY_DEEPEST,
+				"a crayfish is off the shallows", str(depth))
 	var water_src := FileAccess.get_file_as_string("res://shaders/water.gdshader")
 	_check(water_src.contains("uniform float bed_sway_from") and water_src.contains("bed_texel(tx - ivec2(sway * k, 0)"),
 		"the bed's plants sway with the current", "")
@@ -6553,7 +6934,7 @@ func _check_sky_reflect() -> void:
 	for cloud: Array in back.get(&"_clouds"):
 		var at: Array = back.call(&"_cloud_rect", cloud, sky)
 		worst = maxf(worst, (at[0] as Rect2).end.y)
-	_check(worst <= sky * WashBackdrop.CLOUD_FOOT + 0.01, "no wash room cloud's foot reaches the trees",
+	_check(worst <= sky * WashBackdrop.CLOUD_FOOT + 0.01, "no wash room cloud's foot comes out under the wood (it may stand behind it)",
 		"%.1f of %.1f" % [worst, sky])
 	back.queue_free()
 
@@ -7072,7 +7453,8 @@ func _stage_foam() -> void:
 	var wet := dry
 	for i in 80:
 		wet += Vector2(0.2, 0.2)
-		if float(_angler.call(&"_wet_by", wet)) > 0.0:
+		# Past the entry margin, since 2026-09-30: the line alone no longer counts as in.
+		if Iso.past_water(wet) > Angler.ENTRY_DEEP:
 			break
 	_angler.tile_pos = dry
 	_angler.set(&"_was_wading", false)
@@ -8164,7 +8546,8 @@ func _stage_wash() -> void:
 		"the sky is the palette's, by the day's hour", "")
 	# Since 2026-09-28 the sky keeps the day's tint and a veil darkens the ground and water.
 	var back_src := FileAccess.get_file_as_string("res://scripts/wash_backdrop.gd")
-	_check(WashBackdrop.DARKEN < 0.95 and back_src.contains("1.0 - DARKEN")
+	# `darken` since the hive room (2026-09-30): a var per backdrop, `DARKEN` its default.
+	_check(WashBackdrop.DARKEN < 0.95 and back_src.contains("1.0 - darken")
 		and back.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"the ground and water are veiled behind the find, the sky is not, and it takes no clicks",
 		"%.2f" % WashBackdrop.DARKEN)
@@ -8554,11 +8937,15 @@ func _stage_led_cast() -> void:
 				return
 			# Nowhere on the island reaches the far bank: the walk ends at the shore, no throw.
 			var far := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y + Iso.RADIUS.y * 0.9)
-			var shore: Vector2 = _angler.shore_toward(Iso.world_to_tile(far))
+			var shore: Vector2 = _angler.cast_stand(Iso.world_to_tile(far), _net.range_tiles)
 			_main.call(&"_cast_or_walk", far)
 			_check(_main.get(&"_led_cast") == far and not bool(_main.get(&"_led_throw")),
 				"a press nothing reaches walks with no throw owed", "")
 			_check(_angler.walk_to == shore, "towards the shore nearest the click", str(shore))
+			var want: Vector2 = Iso.world_to_tile(_led_spot_probe())
+			var stand: Vector2 = _angler.cast_stand(want, _net.range_tiles)
+			_check(stand.distance_to(want) <= _net.range_tiles and stand.distance_to(_angler.tile_pos) 					<= want.distance_to(_angler.tile_pos),
+				"a led cast stands at the nearest spot in range, not at the click", "%s want %s from %s range %.1f" % [stand, want, _angler.tile_pos, _net.range_tiles])
 			_led_spot = shore
 			_led_mark = _in_stage
 			_led_step_n = 3
@@ -8748,7 +9135,7 @@ func _stage_first_steps() -> void:
 	_check_rope_curve()
 	_check_walk_weight()
 	_check_pier_look()
-	_finish()
+	_advance()
 
 
 ## The piers (2026-09-26): every sign painted, its lettering clear on the paint; the box
@@ -8796,6 +9183,30 @@ func _check_pier_look() -> void:
 				if sheet.get_pixel(int(r[0]) + int(p.x), int(r[1]) + int(p.y)).a < 0.5:
 					holes += 1
 	_check(holes == 0, "the deck top has no holes for a post to show through", "%d" % holes)
+	# Drawn nearest, like every other picture on the lake (2026-10-02): the project's default
+	# is linear, and the hut and the piers drew smoothed beside a crisp angler.
+	var smoothed := 0
+	for stop: Dropoff in _main.get(&"_dropoffs"):
+		if stop.texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+			smoothed += 1
+	var hut: CanvasItem = _main.get(&"_island")
+	if hut.texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+		smoothed += 1
+	_check(smoothed == 0, "the hut and the piers are drawn nearest, not smoothed", "%d" % smoothed)
+	_check(get_tree().root.canvas_item_default_texture_filter
+			== Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST,
+		"pixel art draws nearest unless it asks otherwise (the root's default)", "")
+	# The plants move with the water (2026-10-02): Flora and the island's tufts wear the sway.
+	var flora: Flora = _main.get(&"_flora")
+	var island_ground: Ground = null
+	for g: Ground in _main.get(&"_grounds"):
+		if g.layer == Ground.Layer.ISLAND:
+			island_ground = g
+	var swaying := flora.material is ShaderMaterial 		and (flora.material as ShaderMaterial).shader.resource_path == Flora.SWAY_SHADER 		and island_ground != null and island_ground.material is ShaderMaterial
+	_check(swaying, "the flora and the island's tufts sway with the water", "")
+	var top := LakeGrid.pack_anchor(123.0, Flora.TOP, 1.0)
+	_check(absf(LakeGrid.unpack_anchor_x(top) - 123.0) < 0.2 and is_equal_approx(top.b, Flora.TOP),
+		"a plant's foot rides packed in its corners", str(top))
 
 
 ## The walk's weight: the tracker fires on a start and a hard turn and not on a straight line
@@ -8907,6 +9318,510 @@ func _check_cast_facing() -> void:
 	_angler.set(&"_cast_time", -1.0)
 	_angler.facing = was
 
+
+
+## The beehive (2026-09-30, the beehive sidequest; `docs/hive/contract.md` section 10): where
+## it stands and who it keeps out, who is drawn behind it, what grows round it, the swarm's
+## gate and its moment, the room and its steps driven through their hooks the way
+## `_stage_wash` drives the stand, the refill, the save, the sounds and the words. The last
+## stage: everything it moves on the lake it puts back, and the hive goes back to what it was.
+func _stage_hive() -> void:
+	var hive: Hive = _main.get(&"_hive")
+	_check(hive != null and Hive.tile != Vector2.INF, "the beehive stands somewhere", str(Hive.tile))
+	if hive == null or Hive.tile == Vector2.INF:
+		_finish()
+		return
+	var hive_was := hive.to_save()
+	var play_was: float = _main.get(&"_play")
+	var wildlife_was: bool = _main.get(&"_wildlife_seen")
+	var cleaned_was: bool = _main.get(&"_cleaned")
+	var stood := _angler.tile_pos
+	var room_mid := Hive.tile + Hive.centre
+	_check(hive.held, "a borrowed lake holds the hive's arc", "")
+	hive.held = false
+	hive.from_save({})
+
+	# Where it stands: on the lawn, whole, clear of the hut, the crate and the pump.
+	var corners: Array[Vector2] = []
+	for sx: float in [-1.0, 1.0]:
+		for sy: float in [-1.0, 1.0]:
+			corners.append(room_mid + Vector2(sx * Hive.half.x, sy * Hive.half.y))
+	var on_lawn := true
+	var off_things := true
+	for c in corners:
+		on_lawn = on_lawn and Iso.on_lawn(c)
+		off_things = off_things and not Iso.in_shed(c.x, c.y, 0.3) \
+			and not Yard.covers(_angler.crate_tile, c, 1.0) and not Pump.covers(c, 0.5)
+	_check(on_lawn, "the hive's whole footprint is on the lawn", str(corners))
+	_check(off_things, "clear of the hut's walls, the crate and the pump", "")
+	_check(is_equal_approx(fposmod(hive.position.x, 2.0), 0.0) and is_equal_approx(fposmod(hive.position.y, 2.0), 0.0),
+		"and it stands on the art grid", str(hive.position))
+	var box := hive.picture_rect()
+	var shed_pic: Rect2 = _main.call(&"_shed_picture")
+	_check(hive.position.x + box.end.x < shed_pic.position.x,
+		"its picture ends short of the hut's, so nobody behind it draws over the hut",
+		"%.0f against %.0f" % [hive.position.x + box.end.x, shed_pic.position.x])
+	_check(Hive.covers(room_mid) and not Hive.covers(room_mid + Vector2(Hive.half.x + 0.05, 0.0))
+		and not Hive.covers(room_mid - Vector2(Hive.half.x + 0.05, 0.0))
+		and not Hive.covers(room_mid + Vector2(0.0, Hive.half.y + 0.05))
+		and not Hive.covers(room_mid - Vector2(0.0, Hive.half.y + 0.05)),
+		"its footprint covers its own rectangle and no more", "%s half %s" % [room_mid, Hive.half])
+	_angler.tile_pos = room_mid + Vector2(0.0, Hive.half.y + 0.45)
+	_check(not bool(_angler.call(&"_can_stand", room_mid)), "the angler cannot stand in it", "")
+	_check(not bool(_main.call(&"_at_hive")), "an empty hive beside him is scenery: E is not the hive's", "")
+
+	# Who is drawn behind it: north of it under the picture, south of it over, at the stand
+	# and at the far end of the shelf.
+	var ends := {"the hive": Vector2(-0.3, 0.0), "the shelf's far end": Vector2(-1.45, 0.0)}
+	for end: String in ends:
+		var along: Vector2 = ends[end]
+		var north := Iso.tile_to_world(Hive.tile.x + along.x, Hive.tile.y - Hive.half.y - 0.35)
+		var south := Iso.tile_to_world(Hive.tile.x + along.x + 0.1, Hive.tile.y + Hive.half.y + 0.35)
+		var under := int(_main.call(&"_walker_layer", north))
+		var over := int(_main.call(&"_walker_layer", south))
+		_check(under < hive.z_index and over > hive.z_index,
+			"somebody north of %s is drawn behind it and somebody south in front" % end,
+			"%d / %d against %d" % [under, over, hive.z_index])
+
+	# What grows round it: nothing on it, nothing behind its picture; the hut first on the roofs.
+	var flora: Flora = _main.get(&"_flora")
+	if flora != null:
+		var on_it := 0
+		var behind := 0
+		var feet: PackedVector2Array = flora.get(&"_foot")
+		for k in feet.size():
+			var at_tile := Iso.world_to_tile(feet[k])
+			if Hive.covers(at_tile, 0.5):
+				on_it += 1
+			elif Hive.covers(at_tile, 3.5) and Hive.hides(at_tile):
+				behind += 1
+		_check(on_it == 0 and behind == 0, "no plant grows on the hive or behind its picture",
+			"%d on it, %d behind" % [on_it, behind])
+	var puddles := Puddles.here
+	if puddles != null:
+		_check(not puddles.may_lie(room_mid) and not puddles.may_lie(Hive.tile),
+			"and no puddle lies on its footprint", "")
+	var roofs: Array = _main.call(&"_weather_roofs")
+	var hive_roof := hive.roof()
+	var roofed := false
+	for roof: Dictionary in roofs:
+		roofed = roofed or (roof.get("rect", Rect2()) as Rect2).is_equal_approx(hive_roof.get("rect", Rect2(1, 1, 0, 0)))
+	_check(not roofs.is_empty() and (roofs[0]["rect"] as Rect2).is_equal_approx(shed_pic) and roofed,
+		"the rain lands on the hive, and the hut is still the first roof", "%d roofs" % roofs.size())
+	_check(not hive_roof.is_empty() and hive.roof()["image"] == hive_roof["image"],
+		"and its picture is cut once and handed back, not copied every frame", "")
+
+	# The gate: a quarter of an hour and six grown bee flowers, or twenty-five minutes and one.
+	var ages_was := PackedFloat32Array()
+	var hosts: Array[int] = []
+	if flora != null:
+		ages_was = (flora.get(&"_age") as PackedFloat32Array).duplicate()
+		var species: PackedStringArray = flora.get(&"_species")
+		var feet: PackedVector2Array = flora.get(&"_foot")
+		for k in feet.size():
+			if Flora.is_host(species[k]) and Iso.on_island_ground(Iso.world_to_tile(feet[k])):
+				hosts.append(k)
+	_check(hosts.size() >= Lake.SWARM_HOSTS, "the island has room for the swarm's flowers", str(hosts.size()))
+	var due := func(play: float, grown: int) -> bool:
+		_hive_hosts(flora, ages_was, hosts, grown)
+		_main.set(&"_play", play)
+		return bool(_main.call(&"_swarm_due"))
+	_check(not due.call(Lake.SWARM_AFTER - 1.0, Lake.SWARM_HOSTS), "no swarm before a quarter of an hour", "")
+	_check(due.call(Lake.SWARM_AFTER + 1.0, Lake.SWARM_HOSTS)
+		and int(flora.island_hosts()) == Lake.SWARM_HOSTS,
+		"it comes once the six flowers have grown", str(flora.island_hosts()))
+	_check(not due.call(Lake.SWARM_AFTER + 1.0, Lake.SWARM_HOSTS - 1), "not under the six", "")
+	_check(due.call(Lake.SWARM_LATE + 1.0, 1) and not due.call(Lake.SWARM_LATE + 1.0, 0),
+		"late in the run one flower is enough, and none is not", "")
+	due.call(Lake.SWARM_LATE + 1.0, Lake.SWARM_HOSTS)
+	hive.held = true
+	_main.set(&"_hive_tick", 0.0)
+	_main.call(&"_hive_step", 0.1)
+	_check(hive.stage == Hive.Stage.EMPTY, "a held hive waits whatever the gate says", "")
+	_main.set(&"_moment", -1.0)
+	(_main.get(&"_moments") as Array).clear()
+	hive.held = false
+	_main.set(&"_hive_tick", 0.0)
+	_main.call(&"_hive_step", 0.1)
+	_check(hive.stage == Hive.Stage.SWARM and hive.shrub_grown() < 1.0,
+		"the gate passed, the swarm comes and its shrub grows in", str(hive.stage))
+	if flora != null:
+		flora.set(&"_age", ages_was)
+	# The moment: the swarm's own card, in words.
+	var card: MomentCard = _main.get(&"_moment_card")
+	_check(float(_main.get(&"_moment")) >= 0.0 and hive.moment_seen and card != null
+		and card.text == Text.HIVE_SWARM and card.text != "HIVE_SWARM",
+		"the swarm glides the view over with its card, in words", card.text if card != null else "")
+	_hive_run_moment()
+	_check(_angler.can_walk and float(_main.get(&"_moment")) < 0.0, "and gives the hands back", "")
+	# Owed together behind a board, both are shown, one after the other.
+	_main.set(&"_cleaned", false)
+	_main.set(&"_wildlife_seen", false)
+	hive.moment_seen = false
+	_main.call(&"_set_menu", true)
+	_main.call(&"_on_first_wildlife", _angler.position + Vector2(200.0, 60.0))
+	_main.call(&"_owe_swarm")
+	var owed: Array = _main.get(&"_moments")
+	_check(owed.size() == 2 and float(_main.get(&"_moment")) < 0.0,
+		"the wildlife's moment and the swarm's both wait behind a board", str(owed.size()))
+	_main.call(&"_set_menu", false)
+	_main.call(&"_start_owed_moment")
+	_check(card.text == Text.WILDLIFE_BACK and bool(_main.get(&"_wildlife_seen")) and not hive.moment_seen,
+		"the first owed runs first: wildlife coming back", card.text)
+	_hive_run_moment()
+	_main.call(&"_start_owed_moment")
+	_check(card.text == Text.HIVE_SWARM and hive.moment_seen and owed.is_empty(),
+		"then the swarm's", card.text)
+	_hive_run_moment()
+	_main.set(&"_wildlife_seen", wildlife_was)
+	_main.set(&"_cleaned", cleaned_was)
+
+	# E, the door and the pump: never two keys on one spot.
+	_angler.tile_pos = room_mid + Vector2(0.0, Hive.half.y + 0.45)
+	_check(bool(_main.call(&"_at_hive")), "beside a swarm, E is the hive's", "")
+	_angler.tile_pos = _main.call(&"_before_the_door")
+	_check(bool(_main.call(&"_at_shed")) and not bool(_main.call(&"_at_hive")),
+		"at the door it is the door's", "")
+	_angler.tile_pos = Pump.tile + Vector2(1.0, 1.0)
+	_check(not bool(_main.call(&"_at_hive")), "and beside the pump it is not the hive's", "")
+	var both := 0
+	for gx in 33:
+		for gy in 33:
+			_angler.tile_pos = room_mid + Vector2(float(gx) * 0.25 - 3.0, float(gy) * 0.25 - 3.0)
+			if bool(_main.call(&"_at_hive")) and bool(_main.call(&"_at_shed")):
+				both += 1
+	_check(both == 0, "nowhere round it are the hive and the door both in reach", "%d spots" % both)
+
+	# The room: E beside a swarm opens it, and it holds the lake's hands.
+	var sound := Sfx.main()
+	var station := MusicStation.main()
+	_angler.tile_pos = room_mid + Vector2(0.0, Hive.half.y + 0.45)
+	_press_action(&"interact")
+	var room: HiveRoom = _main.get(&"_hive_room")
+	_check(room != null and room.visible and bool(_main.get(&"_hive_open")),
+		"E beside the swarm opens the hive room", "")
+	if room == null:
+		_hive_restore(hive_was, play_was, stood)
+		_finish()
+		return
+	_check(room.size.x > 0.0 and room.size.y > 0.0, "the room has a size", str(room.size))
+	_check(bool(_main.call(&"_panelled")) and not _angler.can_walk and bool(_main.call(&"pad_cursor_wanted")),
+		"it is a board: panelled, the angler held, the pointer wanted", "")
+	_check(station == null or station.muffled, "the song goes through the radio behind it", "")
+	_check(sound == null or not sound.indoors, "and the lake is not behind a wall: it is outdoors", "")
+	_press_action(&"open_upgrades")
+	_check(not bool(_main.get(&"_menu_open")), "the shop's key does not open the shop under it", "")
+	_check(room.plan() == Hive.PLAN_SWARM and room.step_name() == &"catch",
+		"a swarm is caught, smoked and crowned: three steps from the catch", str(room.plan()))
+	_check(room.hint_text() == Text.HIVE_HINT_CATCH and not room.hint_text().begins_with("HIVE_"),
+		"the hint card reads the catch's words", room.hint_text())
+	_press_escape()
+	_check(not bool(_main.get(&"_hive_open")) and not room.visible and _angler.can_walk,
+		"Escape closes it and gives the hands back", "")
+	_check(hive.stage == Hive.Stage.SWARM, "and closed before the catch, the swarm still hangs there", "")
+	_check(station == null or not station.muffled, "the song comes back out of the radio", "")
+
+	# The first harvest, driven through the steps' own hooks.
+	var purse: float = _main.get(&"sludge")
+	var shelf: Array = (_main.get(&"unlocked") as Array).duplicate()
+	var waiting: Array = (_main.get(&"unwashed") as Array).duplicate()
+	var crate := _yard.held.size()
+	var levels: Array = [_main.get(&"net_width_level"), _main.get(&"net_strength_level"), _main.get(&"cargo_level")]
+	_main.call(&"_open_hive_room")
+	var played := _hive_play_plan(room, hive)
+	_check(played == Hive.PLAN_SWARM, "the three steps play through by their hooks", str(played))
+	_check(hive.stage == Hive.Stage.BUSY and hive.jars == 0 and hive.harvests == 0 and hive.first_done,
+		"a new colony ends on its queen: no jars yet, the colony making its first honey",
+		"stage %d, jars %d, harvests %d" % [hive.stage, hive.jars, hive.harvests])
+	_check(room.is_done() and room.hint_text() == Text.HIVE_HINT_SETTLED and not room.hint_text().begins_with("HIVE_"),
+		"the settled card is up, in words", room.hint_text())
+	for k in 60:
+		room.call(&"_process", 0.05)
+	_check(not bool(_main.get(&"_hive_open")) and _angler.can_walk, "and the room closes by itself", "")
+	var span := hive.refill_at - hive.refill_from
+	_check(span >= Lake.HIVE_REFILL_LEAST * 60.0 - 0.01 and span <= Lake.HIVE_REFILL_MOST * 60.0 + 0.01,
+		"the next harvest is five to eleven minutes of play away", "%.0f s" % span)
+	_check(not bool(_main.call(&"_at_hive")), "a colony at work is scenery again", "")
+
+	# The refill, on the play clock.
+	_main.set(&"_play", hive.refill_at - 0.5)
+	_main.set(&"_hive_tick", 0.0)
+	_main.call(&"_hive_step", 0.1)
+	_check(hive.stage == Hive.Stage.BUSY, "short of the refill it is still busy", "")
+	_main.set(&"_play", hive.refill_at)
+	_main.set(&"_hive_tick", 0.0)
+	_main.call(&"_hive_step", 0.1)
+	_check(hive.stage == Hive.Stage.READY and hive.actionable(), "at the refill it is ready", str(hive.stage))
+	# The first honey has its moment: a glide to the hive and its own card; a later one has none.
+	var owed_ready: Array = _main.get(&"_moments")
+	var queued := float(_main.get(&"_moment")) >= 0.0
+	for due_ready: Dictionary in owed_ready:
+		queued = queued or due_ready["kind"] == &"honey"
+	_check(queued, "the first honey is owed its moment", "")
+	if float(_main.get(&"_moment")) < 0.0:
+		_main.call(&"_start_owed_moment")
+	var ready_card: MomentCard = _main.get(&"_moment_card")
+	_check(ready_card != null and ready_card.text == Text.HIVE_READY and not ready_card.text.begins_with("HIVE_")
+		and hive.ready_seen, "its card reads the honey is ready, in words",
+		ready_card.text if ready_card != null else "<none>")
+	_hive_run_moment()
+	hive.ready_seen = false
+	hive.harvests = 1
+	_main.call(&"_owe_ready")
+	var owed_later := false
+	for due_later: Dictionary in (_main.get(&"_moments") as Array):
+		owed_later = owed_later or due_later["kind"] == &"honey"
+	_check(not owed_later, "a later refill has no moment, only the world's mark", "")
+	hive.harvests = 0
+	hive.ready_seen = true
+
+	# The plans: a colony caught and not crowned is smoked and crowned; every harvest, the
+	# first included, is the uncapping and the pour.
+	hive.set_stage(Hive.Stage.SETTLE)
+	_check(hive.plan() == Hive.PLAN_SETTLE and hive.actionable(), "a caught colony left early is smoked and crowned",
+		str(hive.plan()))
+	hive.set_stage(Hive.Stage.READY)
+	_check(hive.plan() == Hive.PLAN_LATER, "a harvest is the uncapping and the pour", str(hive.plan()))
+	# Saves from before the second pass: a READY never crowned was a caught colony.
+	var mapped := Hive.new()
+	mapped.from_save({"stage": Hive.Stage.READY, "first_done": false, "moment_seen": true})
+	var mapped_settle := mapped.stage == Hive.Stage.SETTLE
+	mapped.from_save({"stage": Hive.Stage.READY, "first_done": true, "harvests": 1, "jars": 3})
+	_check(mapped_settle and mapped.stage == Hive.Stage.READY and mapped.ready_seen,
+		"an old save mid-ceremony reads as a caught colony, an old harvest as a harvest", "")
+	mapped.free()
+
+	# The hum: loud by a ready hive, silent far off, silent behind the shop and in the shed.
+	if sound != null:
+		_main.call(&"_push_hive_hum")
+		_check(float(sound.get(&"_hive_want")) > Sfx.SILENT, "the colony hums beside a ready hive", "")
+		_angler.tile_pos = room_mid + Vector2(12.0, 12.0)
+		_main.call(&"_push_hive_hum")
+		_check(float(sound.get(&"_hive_want")) <= Sfx.SILENT, "and not out of earshot", "")
+		var shopping_was := sound.shopping
+		var indoors_was := sound.indoors
+		var hum: AudioStreamPlayer = sound.get(&"_hive_player")
+		sound.set_hive_hum(1.0)
+		sound.indoors = true
+		sound.shopping = false
+		sound.call(&"_process", 10.0)
+		var in_shed := float(sound.get(&"_hive_at")) <= Sfx.SILENT + 0.01 and (hum == null or not hum.playing)
+		sound.indoors = false
+		sound.shopping = true
+		sound.call(&"_process", 10.0)
+		var in_shop := float(sound.get(&"_hive_at")) <= Sfx.SILENT + 0.01 and (hum == null or not hum.playing)
+		sound.shopping = false
+		sound.call(&"_process", 10.0)
+		var by_it := float(sound.get(&"_hive_at")) > Sfx.SILENT
+		_check(in_shed and in_shop and by_it, "the hum is silent in the shed and behind the shop, and heard out by the hive",
+			"shed %s shop %s out %s" % [in_shed, in_shop, by_it])
+		sound.set_hive_hum(0.0)
+		sound.call(&"_process", 10.0)
+		sound.shopping = shopping_was
+		sound.indoors = indoors_was
+		var unbuilt: Array[StringName] = []
+		for name: StringName in HiveSounds.BOOT:
+			if int(sound.call(&"_count", name)) < 1:
+				unbuilt.append(name)
+		_check(unbuilt.is_empty(), "every hive sound is loaded, built where no recording stands", str(unbuilt))
+
+	# The first harvest, and a later one: two steps each, three jars each.
+	_angler.tile_pos = room_mid + Vector2(0.0, Hive.half.y + 0.45)
+	_press_action(&"interact")
+	_check(bool(_main.get(&"_hive_open")) and room.plan() == Hive.PLAN_LATER,
+		"a harvest opens on two steps", str(room.plan()))
+	played = _hive_play_plan(room, hive)
+	_check(played == Hive.PLAN_LATER and hive.jars == Hive.JARS_PER and hive.harvests == 1
+		and hive.stage == Hive.Stage.BUSY, "the first harvest puts three jars on the shelf",
+		"jars %d" % hive.jars)
+	_check(room.is_done() and room.hint_text() == Text.HIVE_HINT_DONE, "the harvest's done card is up", room.hint_text())
+	_main.call(&"_set_hive_room", false)
+	hive.set_stage(Hive.Stage.READY)
+	_main.call(&"_open_hive_room")
+	played = _hive_play_plan(room, hive)
+	_check(played == Hive.PLAN_LATER and hive.jars == 2 * Hive.JARS_PER and hive.stage == Hive.Stage.BUSY,
+		"and a later one three more", "jars %d" % hive.jars)
+	_main.call(&"_set_hive_room", false)
+	# The fourth: capped at twelve, and the colony left alone for good.
+	hive.jars = 11
+	hive.harvests = Hive.HARVESTS_MOST - 1
+	hive.set_stage(Hive.Stage.READY)
+	_main.call(&"_open_hive_room")
+	_hive_play_plan(room, hive)
+	_main.call(&"_set_hive_room", false)
+	_check(hive.jars == Hive.JARS_PER * Hive.HARVESTS_MOST and hive.stage == Hive.Stage.DONE
+		and not hive.actionable(), "the fourth fills the shelf to twelve and no more, and the hive is done",
+		"jars %d, stage %d" % [hive.jars, hive.stage])
+	hive.jars = 40
+	_check(hive.jars == 12, "a shelf never holds more than twelve", str(hive.jars))
+	# Nothing is kept and nothing is charged.
+	var levels_now: Array = [_main.get(&"net_width_level"), _main.get(&"net_strength_level"), _main.get(&"cargo_level")]
+	_check(is_equal_approx(float(_main.get(&"sludge")), purse) and levels_now == levels,
+		"no money moved and nothing was bought", "%.0f against %.0f" % [float(_main.get(&"sludge")), purse])
+	_check(_main.get(&"unlocked") == shelf and _main.get(&"unwashed") == waiting and _yard.held.size() == crate,
+		"no find was kept and the crate is as it was", "")
+
+	# The save: the round trip, and a save with no hive in it is the empty hive.
+	hive.from_save({"stage": Hive.Stage.BUSY, "jars": 6, "harvests": 2, "first_done": true,
+		"refill_at": 1234.5, "refill_from": 900.0, "moment_seen": true})
+	_check(bool(_main.call(&"save_game")), "a hive at work is written out", "")
+	hive.from_save({})
+	_check(hive.stage == Hive.Stage.EMPTY and hive.jars == 0 and not hive.first_done and not hive.moment_seen,
+		"an absent hive reads as the empty one, arc not started", "")
+	_check(bool(_main.call(&"load_game")), "and read back", "")
+	hive = _main.get(&"_hive")
+	_check(hive.stage == Hive.Stage.BUSY and hive.jars == 6 and hive.harvests == 2 and hive.first_done
+		and is_equal_approx(hive.refill_at, 1234.5) and is_equal_approx(hive.refill_from, 900.0) and hive.moment_seen,
+		"with every field as it was", str(hive.to_save()))
+	var saved := Lake._read_save(SAVE_PATH)
+	saved.erase("hive")
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_var(saved, true)
+		file.close()
+	_check(bool(_main.call(&"load_game")) and hive.stage == Hive.Stage.EMPTY and hive.jars == 0,
+		"a save written before the hive loads it empty", str(hive.to_save()))
+
+	# The words: every hive key reads as words.
+	var raw: Array[String] = []
+	var keys := 0
+	for line in FileAccess.get_file_as_string("res://locale/translations.csv").split("\n"):
+		if line.begins_with("HIVE_"):
+			var key := line.get_slice(",", 0)
+			keys += 1
+			if Text.of(key) == key or Text.of(key).is_empty():
+				raw.append(key)
+	_check(keys >= 14 and raw.is_empty() and not FileAccess.file_exists("res://scripts/hive_step_crank.gd"), "every HIVE_ key reads back as words", "%d keys, raw %s" % [keys, raw])
+
+	# The menu's pose closes the room.
+	_main.call(&"_set_hive_room", true)
+	_main.call(&"_enter_menu", false)
+	_check(not bool(_main.get(&"_hive_open")) and not room.visible, "going to the menu closes the hive room", "")
+	_main.call(&"_begin_glide")
+	_main.call(&"_glide_step", Lake.GLIDE_TIME + 0.1)
+	_hive_restore(hive_was, play_was, stood)
+	_finish()
+
+
+## Exactly `grown` of the island's bee flowers grown in, the rest of them not yet: the gate
+## counts grown hosts on the island's ground, and this is the one way to hand it a number.
+func _hive_hosts(flora: Flora, ages_was: PackedFloat32Array, hosts: Array[int], grown: int) -> void:
+	if flora == null:
+		return
+	var ages := ages_was.duplicate()
+	var delay: PackedFloat32Array = flora.get(&"_delay")
+	for n in hosts.size():
+		var k := hosts[n]
+		ages[k] = delay[k] + Flora.GROW_TIME + 1.0 if n < grown else -1.0
+	flora.set(&"_age", ages)
+
+
+## The moment in hand, run to its end a sixtieth at a time.
+func _hive_run_moment() -> void:
+	var total := Lake.MOMENT_IN + Lake.MOMENT_HOLD + Lake.MOMENT_OUT
+	for i in int(total * 60.0) + 10:
+		if float(_main.get(&"_moment")) < 0.0:
+			break
+		_main.call(&"_moment_step", 1.0 / 60.0)
+	_main.call(&"_hold_the_angler")
+
+
+## Play the room's plan to its end through each step's own hook, the room's clock run between
+## them. Each step's loop player, where it has one, is checked on the way. Returns the steps
+## played, in order.
+func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
+	var played: Array[StringName] = []
+	for guard in 10:
+		var name := room.step_name()
+		if name == &"" or room.is_done():
+			break
+		var step := room.step()
+		played.append(name)
+		match name:
+			&"catch":
+				# A clump dragged to the box and let go pours in; one let go on the lawn does not.
+				var first := int(step.call(&"grab_at", step.call(&"clump_pos", 0)))
+				step.call(&"drag_to", Vector2(20.0, 340.0))
+				step.call(&"let_go")
+				_check(first == 0 and is_zero_approx(float(step.call(&"boxed_share"))),
+					"a clump grabbed and let go on the lawn stays out of the box", "")
+				for k in int(step.call(&"clump_count")):
+					step.call(&"box_clump", k)
+				_check(bool(step.call(&"caught")) and float(step.call(&"boxed_share")) >= 0.8,
+					"the clumps in the box: the swarm is caught", "")
+				for k in 40:
+					step.call(&"_process", 0.05)
+				_check(hive.stage == Hive.Stage.SETTLE, "and the lake is told: a colony to settle", str(hive.stage))
+			&"smoke":
+				step.call(&"smoke_ring", 1, 0.5)
+				_check(float(step.call(&"calm", 1)) > 0.0 and int(step.call(&"rings_done")) == 0,
+					"half a smoke calms a ring part way", "")
+				for k in int(step.call(&"ring_count")):
+					step.call(&"smoke_ring", k, 3.0)
+				_check(int(step.call(&"rings_done")) == 3, "every ring smoked quiet, in any order", "")
+				step.call(&"settle")
+			&"queen":
+				var q: Vector2 = step.call(&"queen_pos")
+				_check(not bool(step.call(&"find_at", q + Vector2(60.0, 0.0))), "a click off her finds nobody", "")
+				_check(int(step.call(&"flown")) >= 1, "and the bee clicked buzzes off", "")
+				_check(bool(step.call(&"find_at", step.call(&"queen_pos"))), "the lens on her finds the queen", "")
+				step.call(&"settle")
+			&"uncap":
+				var sizzle: AudioStreamPlayer = step.call(&"sizzle_player")
+				_check(sizzle != null and sizzle.bus == Prefs.BUS_SFX, "the knife's sizzle is on the SFX bus", "")
+				step.call(&"cut_to", 1.0)
+				_check(int(step.call(&"faces_done")) == 1, "the knife uncaps the frame's face", "")
+				for k in 60:
+					step.call(&"_process", 0.05)
+				_check(float(step.call(&"bucket_level")) > 0.0, "the honey runs down the gutter into the bucket",
+					"%.2f" % float(step.call(&"bucket_level")))
+				step.call(&"settle")
+				_check(room.honey >= 0.995, "every drop reaches the bucket, and the room keeps its level",
+					"%.2f" % room.honey)
+			&"pour":
+				var glug := step.get_node_or_null(^"Glug") as AudioStreamPlayer
+				_check(glug != null and glug.bus == Prefs.BUS_SFX, "the pour's glug is on the SFX bus", "")
+				step.call(&"pour", 0.5)
+				_check(float(step.call(&"lever_open")) > 0.9 and not bool(step.call(&"release")),
+					"the lever held turns open; let go short, the jar waits", "")
+				for k in 3:
+					step.call(&"pour", 2.6)
+					step.call(&"release")
+				_check(int(step.call(&"jars_done")) == 3, "three jars filled and lidded, overfilled or not", "")
+				step.call(&"release")
+		if not step.is_done():
+			_check(false, "the %s step finishes by its hooks" % name, "")
+			room.skip_step()
+		# The settle to the next step, on the room's own clock.
+		for k in 40:
+			if room.is_done() or room.step_name() != name:
+				break
+			room.call(&"_process", 0.05)
+	return played
+
+
+## Everything the stage moved, put back: the hive as it was, the play clock, the angler.
+func _hive_restore(hive_was: Dictionary, play_was: float, stood: Vector2) -> void:
+	_main.call(&"_set_hive_room", false)
+	var hive: Hive = _main.get(&"_hive")
+	hive.from_save(hive_was)
+	hive.held = true
+	_main.set(&"_play", play_was)
+	_angler.tile_pos = stood
+	_main.call(&"_hold_the_angler")
+	_main.call(&"_push_rooms")
+	_main.call(&"save_game")
+
+
+## A key the player has bound to `action`, pressed, as the lake's desk sees it. The
+## player's own binds are read rather than assumed: `settings.cfg` may have moved it.
+func _press_action(action: StringName) -> void:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var key := (event as InputEventKey).duplicate() as InputEventKey
+			key.pressed = true
+			_main.call(&"_unhandled_input", key)
+			return
 
 
 func _stage_new_tracks() -> void:
@@ -9320,7 +10235,7 @@ func _check_language(menu: MainMenu) -> void:
 	TranslationServer.set_locale("ja")
 	var japanese := Text.MENU_QUIT
 	TranslationServer.set_locale("en")
-	_check(english == "Quit" and german != english and japanese != german
+	_check(english == "Save and quit" and german != english and japanese != german
 		and german != "MENU_QUIT", "a switch changes the words",
 		"%s / %s / %s" % [english, german, japanese])
 
@@ -9413,24 +10328,70 @@ func _check_blurb_and_wake() -> void:
 	_check(stand.awake(), "and then the nozzle is the player's", "")
 	stand.free()
 	_check_wash_sizes()
+	_check_hose()
 
 
-## The clock, the fridge and the tall bookcase draw bigger on the wash stand than they are
-## fitted to (`wash_scale`), and every find's lowest painted row stands on the plank.
+## The wash room's hose (2026-10-01): two levels, $1,500 and $6,000, refused by a purse that
+## cannot cover them; each wider and harder; saved. And the money and Waiting plates stay up.
+func _check_hose() -> void:
+	var purse_was: float = _main.get(&"sludge")
+	var level_was: int = _main.get(&"hose_level")
+	_main.set(&"hose_level", 1)
+	_main.call(&"_set_wash", true)
+	var room: WashRoom = _main.get(&"_wash")
+	var skin: HudSkin = _main.get(&"_skin")
+	_check(skin.visible and skin.plates_only, "the money and Waiting plates stay up in the wash room", "")
+	_main.set(&"sludge", 1000.0)
+	room.hose_level = 1
+	_check(room.hose_price() == 1500 and not room.buy_hose(),
+		"the hose's next level costs $1,500 and a short purse is refused", room.hose_label())
+	_main.set(&"sludge", 10000.0)
+	_check(room.buy_hose() and int(_main.get(&"hose_level")) == 2
+		and is_equal_approx(float(_main.get(&"sludge")), 8500.0),
+		"a full purse buys level 2", "%s, %.0f" % [_main.get(&"hose_level"), _main.get(&"sludge")])
+	var stand := room.stand()
+	_check(is_equal_approx(stand.jet_radius(), WashStand.JET_RADIUS * 1.2)
+		and is_equal_approx(stand.jet_power(), WashStand.JET_POWER * 1.2),
+		"level 2 is a fifth wider and harder", "%.2f" % stand.jet_radius())
+	_check(room.buy_hose() and int(_main.get(&"hose_level")) == 3
+		and is_equal_approx(float(_main.get(&"sludge")), 2500.0), "and $6,000 buys level 3", "")
+	_check(not room.buy_hose() and room.hose_value() == "3" and room.hose_cost() == Text.SHOP_MAX,
+		"and there is no level 4: the row reads its level and MAX", room.hose_label())
+	# The hose row is the shop's: only its tag buys (What Is Drawn Is What Clicks).
+	room.hose_level = 1
+	var tag := room.hose_tag_box()
+	var row := room.hose_box()
+	_check(tag.size.x > 0.0 and row.encloses(tag) and tag.position.x > row.get_center().x,
+		"the hose row's tag stands at its right end, inside the row", "%s in %s" % [tag, row])
+	room.hose_level = 3
+	_check(bool(_main.call(&"save_game")), "the hose saves", "")
+	_main.set(&"hose_level", 1)
+	_check(bool(_main.call(&"load_game")) and int(_main.get(&"hose_level")) == 3,
+		"and loads back at 3", str(_main.get(&"hose_level")))
+	_main.call(&"_set_wash", false)
+	_check(not skin.plates_only, "and the whole HUD comes back when the room goes", "")
+	_main.set(&"hose_level", level_was)
+	_main.set(&"sludge", purse_was)
+
+
+## Every find draws at one zoom on the wash stand, the shed's proportions (2026-10-01): a
+## cactus smaller than a sofa, the largest still inside the room; and every find's lowest
+## painted row stands on the pallet.
 func _check_wash_sizes() -> void:
 	var book: Sheets = _main.get(&"_sheets")
 	var stand := WashStand.new()
 	stand.size = Vector2(1280.0, 720.0)
 	stand.sheets = book
 	add_child(stand)
-	for name: StringName in [&"decor_old_clock", &"decor_fridge", &"decor_bookcase_tall"]:
-		_check(book.wash_scale_of(name) > 1.0, "%s has a wash scale" % name, "")
+	var zooms := {}
+	for name: StringName in [&"decor_pk_cactus", &"decor_pk_sofa", &"decor_pk_fancy_bed"]:
 		stand.put(name)
-		var grown: int = stand.get(&"_zoom")
-		stand.set(&"_grow", 1.0)
-		stand.call(&"_fit")
-		_check(grown > int(stand.get(&"_zoom")), "%s draws bigger on the stand" % name,
-			"%d against %d" % [grown, stand.get(&"_zoom")])
+		zooms[int(stand.get(&"_zoom"))] = true
+	_check(zooms.size() == 1, "every find draws at one zoom on the stand", str(zooms.keys()))
+	stand.put(&"decor_pk_fancy_bed")
+	var bed: Rect2 = stand.piece_box()
+	_check(bed.position.y >= 0.0 and bed.end.x <= 1280.0 and bed.position.x >= 0.0,
+		"and the largest find is inside the room", str(bed))
 	var art: Image = book.atlas.get_image()
 	for name: String in book.names:
 		if not WashRoom.is_find(book, name):
@@ -9441,5 +10402,5 @@ func _check_wash_sizes() -> void:
 		var painted := false
 		for x in range(int(region.position.x), int(region.end.x)):
 			painted = painted or art.get_pixel(x, y).a > 0.0
-		_check(painted, "%s stands its lowest painted row on the plank" % name, "")
+		_check(painted, "%s stands its lowest painted row on the pallet" % name, "")
 	stand.free()

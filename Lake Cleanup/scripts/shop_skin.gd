@@ -1054,6 +1054,10 @@ func _draw_rail(box: Rect2, row: Dictionary, afford: bool, help_lit: bool) -> vo
 
 ## Where a row's price tag will stand, without drawing it: the same sum `_draw_tag` makes.
 func _tag_of(box: Rect2, tag_wide: float, cost: String, height: int) -> Rect2:
+	return tag_box_of(box, tag_wide, cost, height)
+
+
+static func tag_box_of(box: Rect2, tag_wide: float, cost: String, height: int) -> Rect2:
 	if cost.is_empty():
 		return Rect2()
 	var slot := Rect2(
@@ -1290,6 +1294,15 @@ static func _wrap(text: String, height: int, wide: float) -> Array[String]:
 ## and a purse read as one substance — and a five-figure price and a two-figure one both
 ## sit in the middle of their own tag rather than one rattling around a fixed box.
 func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool, maxed := false) -> void:
+	draw_tag_on(self, box, cost, height, afford, lit, maxed)
+
+
+## The price tag drawn onto `canvas`: what `_draw_tag` draws, for the wash room's hose row
+## to wear the shop's own tag (2026-10-02, Richard: match the upgrade buttons).
+static func draw_tag_on(
+	canvas: CanvasItem, box: Rect2, cost: String, height: int, afford: bool, lit: bool,
+	maxed := false
+) -> void:
 	if cost.is_empty():
 		return
 	var span := Style.measure(cost, height)
@@ -1298,9 +1311,9 @@ func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool, m
 		box.position + Vector2(box.size.x - wide, 0.0), Vector2(wide, box.size.y)
 	)
 	if maxed:
-		Style.plate(self, tag, MAX_BADGE)
+		Style.plate(canvas, tag, MAX_BADGE)
 		Style.write(
-			self, cost, height,
+			canvas, cost, height,
 			Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
 			MAX_BADGE_INK, HORIZONTAL_ALIGNMENT_CENTER, tag
 		)
@@ -1312,13 +1325,13 @@ func _draw_tag(box: Rect2, cost: String, height: int, afford: bool, lit: bool, m
 		face = Color(
 			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
 		)
-	Style.plate(self, tag, face)
+	Style.plate(canvas, tag, face)
 	Style.highlight(
-		self, tag.position + Vector2(CLIP, 0.0), Vector2(tag.size.x - CLIP * 2.0, 0.0),
+		canvas, tag.position + Vector2(CLIP, 0.0), Vector2(tag.size.x - CLIP * 2.0, 0.0),
 		int(tag.position.x)
 	)
 	Style.write(
-		self, cost, height,
+		canvas, cost, height,
 		Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
 		Style.PRICE_INK if afford else Style.PRICE_INK.lerp(Style.FRAME_LOW, 0.5),
 		HORIZONTAL_ALIGNMENT_CENTER, tag

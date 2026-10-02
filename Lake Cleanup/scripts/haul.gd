@@ -48,6 +48,21 @@ const SIZE_FROM := 0.62
 const SIZE_TO := 0.78
 const SIZE_PEAK := 0.24
 
+## The last stretch of a flight into a box is drawn by the box, not by this node
+## (2026-10-02, Richard: pieces covered the box's rim and clipped under the beehive). Past
+## `LAND_FROM` of its flight a piece bound for the island crate (untagged) or a pier's box
+## (tagged with its `Dropoff`) is handed to that box, which draws it between its heap and its
+## near walls, shrinking to the heap's own size as it goes in, so it drops into the box
+## rather than landing on its face. Everything before that, and every other flight, is drawn
+## here, above the island's buildings.
+const LAND_FROM := 0.7
+## How far a piece thrown into a box may land off the middle of its mouth, in world px: the
+## mouth is 64 by 32, and a piece scattered past this hung over the rim.
+const BOX_SCATTER := Vector2(10.0, 4.0)
+
+## Emitted every frame a piece is inside a box's last stretch, so the boxes redraw it.
+signal landing_moved
+
 ## Emitted the moment a piece lands. Whatever it was thrown to takes it here; until then it
 ## belongs to nothing. `tag` is whatever the thrower passed in, which is how one node can
 ## serve the yard and every hull without knowing what either of them is.
@@ -129,9 +144,10 @@ func send(
 	var heft := clampf(def.size.x / 44.0, 0.0, 1.0) if def != null else 0.0
 	# A fixed target is scattered over, so a volley lands as a heap instead of a column. A
 	# followed one is a stowage spot that was worked out on purpose, so it is left alone.
+	var reach := BOX_SCATTER if _into_box(tag) else Vector2(26.0, 11.0)
 	var scatter := (
 		Vector2.ZERO if follow != null
-		else Vector2(_rng.randf_range(-26.0, 26.0), _rng.randf_range(-11.0, 11.0))
+		else Vector2(_rng.randf_range(-reach.x, reach.x), _rng.randf_range(-reach.y, reach.y))
 	)
 	_flying.append({
 		"def": def_index,
@@ -192,7 +208,71 @@ func _source_of(piece: Dictionary) -> Vector2:
 	return from if lead == null or not is_instance_valid(lead) else lead.position + from
 
 
+## Whether a flight with this tag ends in a box: the island crate's (untagged) or a pier's.
+static func _into_box(tag: Variant) -> bool:
+	return tag == null or tag is Dropoff
+
+
+## Whether this piece is in its last stretch into a box, and so drawn by the box.
+func _handed_over(piece: Dictionary) -> bool:
+	return (
+		float(piece["wait"]) <= 0.0 and _into_box(piece["tag"])
+		and float(piece["age"]) / FLIGHT >= LAND_FROM
+	)
+
+
+## Draw onto `canvas` the pieces in their last stretch into the box `tag` names, shrinking to
+## `heap_size` as they go in. Returns whether there were any.
+func draw_landing_on(canvas: CanvasItem, tag: Variant, heap_size: float) -> bool:
+	if grid == null:
+		return false
+	var any := false
+	var to_canvas := canvas.get_global_transform().affine_inverse() * get_global_transform()
+	for piece: Dictionary in _flying:
+		if piece["tag"] != tag or not _handed_over(piece):
+			continue
+		var step := _at(piece)
+		var t: float = step["t"]
+		var u := clampf((t - LAND_FROM) / (1.0 - LAND_FROM), 0.0, 1.0)
+		var size := lerpf(_size_at(t), heap_size, u * u * (3.0 - 2.0 * u))
+		canvas.draw_set_transform(
+			to_canvas * (step["at"] as Vector2), float(piece["spin"]) * t * TAU * 0.25,
+			Vector2(size, size)
+		)
+		grid.defs[int(piece["def"])].stamp_iso(canvas)
+		any = true
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	return any
+
+
+## How much of a piece's shadow shows: none on the ground at either end, full once it is
+## `SHADOW_IN` of its flight up (2026-10-02, Richard): drawn from the first frame, every piece
+## of a catch left a full-strength shadow at the angler's hand and they stacked into a black
+## blotch behind the figure.
+const SHADOW_IN := 0.18
+
+
+## How much fainter a piece's shadow is at the top of its arc than near the ground (it was
+## 0.22 down to 0.07 when the ink was a fixed black).
+const SHADOW_THIN := 0.65
+
+## The layer the shadows lie on (2026-10-02, one sun): the ground's and the water's, under
+## the floating rubbish (5) and every walker (9), where the splashes and the prints are. The
+## flights themselves stay over the island's buildings at `Lake.IN_FRONT + 1`; a shadow drawn
+## with them lay on top of the angler whose hand the piece had just left.
+const SHADOW_LAYER := 4
+
+
+static func _aloft(t: float) -> float:
+	return clampf(minf(t, 1.0 - t) / SHADOW_IN, 0.0, 1.0)
+
+
+static func _size_at(t: float) -> float:
+	return lerpf(SIZE_FROM, SIZE_TO, t) + sin(t * PI) * SIZE_PEAK
+
+
 func _process(delta: float) -> void:
+	var landing := false
 	for i in range(_flying.size() - 1, -1, -1):
 		var piece: Dictionary = _flying[i]
 		if float(piece["wait"]) > 0.0:
@@ -203,6 +283,11 @@ func _process(delta: float) -> void:
 			_pop(piece["tag"])
 			arrived.emit(int(piece["def"]), piece["tag"])
 			_flying.remove_at(i)
+			landing = landing or _into_box(piece["tag"])
+		elif _handed_over(piece):
+			landing = true
+	if landing:
+		landing_moved.emit()
 	if _flying.is_empty():
 		set_process(false)
 	queue_redraw()
@@ -257,8 +342,9 @@ func _at(piece: Dictionary) -> Dictionary:
 ## old way, for the harness to compare; so does any piece with no art on the atlas.
 static var batched := true
 
-## `canvas_item_add_circle`'s own count, so a shadow here covers the pixels draw_circle did.
-const CIRCLE_SEGMENTS := 64
+## Points round a shadow's ellipse. 64 while it was `canvas_item_add_circle`'s own disc; a
+## 2:1 ellipse a dozen pixels across needs far fewer.
+const CIRCLE_SEGMENTS := 16
 
 var _points := PackedVector2Array()
 var _colors := PackedColorArray()
@@ -266,8 +352,64 @@ var _uvs := PackedVector2Array()
 var _indices := PackedInt32Array()
 var _unit_circle := PackedVector2Array()
 
+## The shadows, as one triangle array of their own, on `_shade_item`.
+var _shade_points := PackedVector2Array()
+var _shade_colors := PackedColorArray()
+var _shade_uvs := PackedVector2Array()
+var _shade_indices := PackedInt32Array()
+
+## A bare canvas item under this node at `SHADOW_LAYER`, so the shadows are one more draw
+## call in all rather than one a piece, and lie under the walkers while the flights do not.
+## Cleared and refilled on every draw of this node.
+var _shade_rid := RID()
+
+## The one sun's two inks this draw (`Shade.tint_on`), by the surface a shadow falls on, and
+## the ground offset per pixel of height (`Shade.drop`).
+var _ink_land := Color()
+var _ink_water := Color()
+var _drop_per := Vector2.ZERO
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _shade_rid.is_valid():
+		RenderingServer.free_rid(_shade_rid)
+		_shade_rid = RID()
+
+
+func _shade_item() -> RID:
+	if not _shade_rid.is_valid():
+		_shade_rid = RenderingServer.canvas_item_create()
+		RenderingServer.canvas_item_set_parent(_shade_rid, get_canvas_item())
+		RenderingServer.canvas_item_set_z_as_relative_to_parent(_shade_rid, false)
+		RenderingServer.canvas_item_set_z_index(_shade_rid, SHADOW_LAYER)
+	return _shade_rid
+
+
+## Ready the sun for this draw: one ink for each surface and the drop per pixel up.
+func _ready_sun() -> void:
+	var sun := Shade.sun_of(null)
+	_ink_land = Shade.tint_on(sun, Shade.On.LAND)
+	_ink_water = Shade.tint_on(sun, Shade.On.WATER)
+	_drop_per = Shade.drop(sun, 1.0)
+
+
+## A piece's shadow, as `[where, half-width, ink]`. **One sun** (2026-10-02, `/grill-me` with
+## Richard): it used to be a black disc straight under the piece at a fixed alpha, the one
+## shadow on the island that took no notice of the hour, the cloud or the water. Now it is a
+## 2:1 ellipse lying where `Shade.drop` puts the ground under a thing that high up, in the
+## land's ink or the water's by what it falls on, fading as it rises and while the piece is
+## barely off the hand (`_aloft`).
+func _shadow_of(step: Dictionary, lift: float) -> Array:
+	var t: float = step["t"]
+	var high := sin(t * PI)
+	var at: Vector2 = (step["ground"] as Vector2) + _drop_per * (high * lift)
+	var ink := _ink_water if WaterSplash.wet_at(at + position) else _ink_land
+	ink.a *= (1.0 - SHADOW_THIN * high) * _aloft(t)
+	return [at, lerpf(13.0, 6.0, high), ink]
+
 
 func _draw() -> void:
+	RenderingServer.canvas_item_clear(_shade_item())
 	if grid == null:
 		return
 	if batched and _batch():
@@ -289,21 +431,24 @@ func _batch() -> bool:
 			_unit_circle.append(Vector2(cos(angle), sin(angle)))
 	var white_uv := sheets.uv_of(sheets.white)
 	var white := white_uv.position + white_uv.size * 0.5
+	_ready_sun()
 	_points.clear()
 	_colors.clear()
 	_uvs.clear()
 	_indices.clear()
+	_shade_points.clear()
+	_shade_colors.clear()
+	_shade_uvs.clear()
+	_shade_indices.clear()
 	for piece: Dictionary in _flying:
 		var step := _at(piece)
-		if step.is_empty():
+		if step.is_empty() or _handed_over(piece):
 			continue
 		var t: float = step["t"]
 		var at: Vector2 = step["at"]
-		var high := sin(t * PI)
-		_add_circle(
-			step["ground"], lerpf(13.0, 6.0, high), Color(0.0, 0.0, 0.0, lerpf(0.22, 0.07, high)),
-			white
-		)
+		var shadow := _shadow_of(step, float(piece["lift"]))
+		if (shadow[2] as Color).a > 0.002:
+			_add_circle(shadow[0], shadow[1], shadow[2], white)
 		var size := lerpf(SIZE_FROM, SIZE_TO, t) + sin(t * PI) * SIZE_PEAK
 		var turn := Transform2D(float(piece["spin"]) * t * TAU * 0.25, Vector2(size, size), 0.0, at)
 		var def: TrashDef = grid.defs[int(piece["def"])]
@@ -321,6 +466,11 @@ func _batch() -> bool:
 			turn * Vector2(half.x, half.y), turn * Vector2(-half.x, half.y),
 			Color.WHITE, sheets.uv_of(def.region)
 		)
+	if not _shade_indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			_shade_item(), _shade_indices, _shade_points, _shade_colors, _shade_uvs,
+			PackedInt32Array(), PackedFloat32Array(), sheets.atlas.get_rid()
+		)
 	if not _indices.is_empty():
 		RenderingServer.canvas_item_add_triangle_array(
 			get_canvas_item(), _indices, _points, _colors, _uvs,
@@ -329,19 +479,21 @@ func _batch() -> bool:
 	return true
 
 
+## A shadow's 2:1 ellipse, `radius` its half-width, into the shadows' own array.
 func _add_circle(centre: Vector2, radius: float, colour: Color, uv: Vector2) -> void:
-	var base := _points.size()
+	var base := _shade_points.size()
+	var half := Vector2(radius, radius * 0.5)
 	for i in CIRCLE_SEGMENTS:
-		_points.append(_unit_circle[i] * radius + centre)
-		_colors.append(colour)
-		_uvs.append(uv)
-	_points.append(centre)
-	_colors.append(colour)
-	_uvs.append(uv)
+		_shade_points.append(_unit_circle[i] * half + centre)
+		_shade_colors.append(colour)
+		_shade_uvs.append(uv)
+	_shade_points.append(centre)
+	_shade_colors.append(colour)
+	_shade_uvs.append(uv)
 	for i in CIRCLE_SEGMENTS:
-		_indices.append(base + i)
-		_indices.append(base + (i + 1) % CIRCLE_SEGMENTS)
-		_indices.append(base + CIRCLE_SEGMENTS)
+		_shade_indices.append(base + i)
+		_shade_indices.append(base + (i + 1) % CIRCLE_SEGMENTS)
+		_shade_indices.append(base + CIRCLE_SEGMENTS)
 
 
 func _add_quad(a: Vector2, b: Vector2, c: Vector2, d: Vector2, colour: Color, uv: Rect2) -> void:
@@ -364,26 +516,34 @@ func _add_quad(a: Vector2, b: Vector2, c: Vector2, d: Vector2, colour: Color, uv
 	_indices.append(base + 3)
 
 
-## The old way: a shadow and `stamp_iso` for each piece, under its own transform.
+## The old way: a shadow and `stamp_iso` for each piece, under its own transform. The
+## shadows still go on `_shade_item`, so they lie under the walkers here too.
 func _draw_each() -> void:
+	_ready_sun()
+	if _unit_circle.is_empty():
+		for i in CIRCLE_SEGMENTS:
+			var angle := float(i) * TAU / float(CIRCLE_SEGMENTS)
+			_unit_circle.append(Vector2(cos(angle), sin(angle)))
 	for piece: Dictionary in _flying:
 		var step := _at(piece)
-		if step.is_empty():
+		if step.is_empty() or _handed_over(piece):
 			continue
 		var t: float = step["t"]
 		var at: Vector2 = step["at"]
 
-		# A shadow on the ground under it, shrinking as it rises. Without one a piece in
-		# flight is a sprite sliding over the island rather than a thing above it.
-		var shadow: Vector2 = step["ground"]
-		var high := sin(t * PI)
-		# Back to world space first: the piece before this one left its own turn, spin and
-		# size on the canvas, and a shadow drawn through that landed hundreds of pixels away,
-		# swept round in an arc of dark dots (over the south treeline, on a big catch).
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		draw_circle(
-			shadow, lerpf(13.0, 6.0, high) , Color(0.0, 0.0, 0.0, lerpf(0.22, 0.07, high))
-		)
+		# A shadow on the ground the sun puts under it, shrinking as it rises. Without one a
+		# piece in flight is a sprite sliding over the island rather than a thing above it.
+		# Laid on `_shade_item` in this node's own space, so no transform left on the canvas
+		# by the piece before can carry it off.
+		var shadow := _shadow_of(step, float(piece["lift"]))
+		if (shadow[2] as Color).a > 0.002:
+			var ring := PackedVector2Array()
+			var half := Vector2(shadow[1], float(shadow[1]) * 0.5)
+			for point in _unit_circle:
+				ring.append(point * half + (shadow[0] as Vector2))
+			RenderingServer.canvas_item_add_polygon(
+				_shade_item(), ring, PackedColorArray([shadow[2]])
+			)
 
 		var size := lerpf(SIZE_FROM, SIZE_TO, t) + sin(t * PI) * SIZE_PEAK
 		draw_set_transform(at, float(piece["spin"]) * t * TAU * 0.25, Vector2(size, size))

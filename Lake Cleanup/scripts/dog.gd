@@ -32,7 +32,8 @@ const SWIM_SPEED := 2.6
 const WALK_SPEED := 1.6
 const RUN_SPEED := 6.2
 
-## The dog feels this far ahead of itself, in tiles, for the hut, the crate and the pump,
+## The dog feels this far ahead of itself, in tiles, for the hut, the crate, the pump and
+## the beehive (the last a rectangle off its own tile, see `_bumped`),
 ## and bends round them by their corners instead of walking into a wall and scraping along
 ## it (2026-09-22, Richard: "avoid running against it completely"). `AVOID_CLEAR` is how far
 ## outside a box's own walk margin the corner it makes for stands. `_hug` and the axis slides
@@ -68,6 +69,10 @@ const LAND_LIMIT := 0.84
 const IDLE_CLEAR := 3.2
 const SHED_CLEAR := 4.0
 const PACK_APART := 3.6
+## And clear of the beehive (2026-09-30): a dog loafing against the shelf is a dog lying in
+## the bees' way. Less than the crate's, because the hive stands out on the lawn with only
+## the hut beside it and the island has no room to give it the same.
+const HIVE_CLEAR := 2.0
 
 ## How many spots are tried before the best of them is taken. Darts, like everything else
 ## here that picks a place: the island is a few hundred tiles and a dog wants one of them.
@@ -632,6 +637,8 @@ func _speak(what: StringName, far: bool = false) -> void:
 		return
 	_voice_next = _now() + _rng.randf_range(VOICE_GAP_LEAST, VOICE_GAP_MOST)
 	_pack_hush = _now() + VOICE_APART
+	if what == &"bark":
+		_barked_at = _now()
 	if what == &"sniff":
 		sound.play_sniff()
 	elif far:
@@ -1164,6 +1171,10 @@ func _bumped(where: Vector2) -> Array:
 	if Pump.covers(where, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
 		var side := Pump.FOOT_HALF + Pump.WALK_KEEP
 		return [Pump.tile, Vector2(side, side)]
+	# The beehive's footprint is a rectangle whose middle is off the tile it stands on, so
+	# the box handed back is that middle and each axis's own extent, not the tile and a square.
+	if Hive.covers(where, Hive.WALK_KEEP) and not Hive.covers(tile_pos, Hive.WALK_KEEP):
+		return [Hive.tile + Hive.centre, Hive.half + Vector2(Hive.WALK_KEEP, Hive.WALK_KEEP)]
 	return []
 
 
@@ -1254,6 +1265,9 @@ func _may_stand(tile: Vector2) -> bool:
 	# Round the pump, on the same terms.
 	if Pump.covers(tile, Pump.WALK_KEEP) and not Pump.covers(tile_pos, Pump.WALK_KEEP):
 		return false
+	# And round the beehive and its shelf, the same way.
+	if Hive.covers(tile, Hive.WALK_KEEP) and not Hive.covers(tile_pos, Hive.WALK_KEEP):
+		return false
 	# Round the crate, not through it; and never refused to a dog already inside, which would
 	# wall it in.
 	if Yard.covers(crate_tile, tile, Yard.WALK_KEEP) \
@@ -1289,6 +1303,8 @@ func _elbow_room(tile: Vector2) -> float:
 		tile.distance_to(crate_tile) / IDLE_CLEAR,
 		tile.distance_to(Iso.shed_centre()) / SHED_CLEAR
 	)
+	if Hive.tile != Vector2.INF:
+		room = minf(room, tile.distance_to(Hive.tile + Hive.centre) / HIVE_CLEAR)
 	for other in pack:
 		var dog: Dog = other as Dog
 		if dog == self or not is_instance_valid(dog):
@@ -1423,6 +1439,23 @@ func reflect_on(on: CanvasItem) -> void:
 
 
 func _showing() -> StringName:
+	var still := _still_showing()
+	if _barking() and DogArt.has(StringName(String(still) + "_bark"), breed):
+		return StringName(String(still) + "_bark")
+	return still
+
+
+## The mouth opens only while a bark is sounding (2026-10-01): `BARK_OPEN` seconds from the
+## bark, the head-up frames of the still rows. A moving dog barks with its mouth shut.
+const BARK_OPEN := 0.45
+var _barked_at := -100.0
+
+
+func _barking() -> bool:
+	return _now() - _barked_at < BARK_OPEN
+
+
+func _still_showing() -> StringName:
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK:
 			return DogArt.gait(slot, not _on_land(), breed)
@@ -1440,6 +1473,8 @@ func _showing() -> StringName:
 
 ## The clock a picture is stepped on: the gait's own for a moving dog, the age otherwise.
 func _clock() -> float:
+	if _barking() and String(_showing()).ends_with("_bark"):
+		return _now() - _barked_at
 	match _state:
 		State.SWIM_OUT, State.CARRY_BACK, State.WANDER:
 			return _stride
@@ -1450,7 +1485,8 @@ func _clock() -> float:
 ## goes, and quantised because the sun moves a hair a frame and a key that tracked it exactly
 ## would repaint every frame forever — which is the thing the keys exist to stop.
 func _sun_key() -> int:
-	return 0 if day == null else roundi(day.lean * 60.0) * 1000 + roundi(day.ink * 200.0)
+	var sun := Shade.sun_of(day)
+	return 0 if sun == null else roundi(sun.lean * 60.0) * 1000 + roundi(sun.ink * 200.0)
 
 
 func _repaint() -> void:
@@ -1488,10 +1524,13 @@ func _draw() -> void:
 		# pushes out can be drawn around the dog rather than under it.
 		at.y += sin(_age * BOB_RATE) * BOB + SINK * HEIGHT
 		sink = SINK
+		var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink, breed)
+		# Its shadow on the water, cut where the picture is: what is under the surface
+		# casts nothing on top of it, the wading angler's rule.
+		_draw_shadow(name, frame, at, sink, (edge[0] as Vector2).y)
 		# And the foam on that cut, bobbing with it: the same edge stamp is about to end the
 		# picture at, so the collar can never sit beside the dog instead of round it.
 		if _foam != null:
-			var edge := DogArt.cut_edge(name, frame, at, HEIGHT, facing_left, sink, breed)
 			_foam.lay(edge[0], edge[1])
 	else:
 		if _foam != null:
@@ -1521,15 +1560,37 @@ func _draw() -> void:
 ## actually making — ears, tail, a leg mid-stride — rather than the ellipse that used to sit
 ## under it whatever it was doing.
 ##
-## Without a day to ask, no shadow. A guessed sun is worse than none: it would disagree with
-## every other shadow in the scene the moment one of them knew better.
-func _draw_shadow(name: StringName, frame: int, at: Vector2) -> void:
-	if day == null:
+## **One sun** (2026-10-02, `/grill-me` with Richard): on land in the land's ink, and a
+## swimming dog casts too, in the water's (`Shade.On`). It used to cast nothing in the lake.
+## Swimming, the shadow is cut where the picture is (`sink`) and folds about that cut line
+## (`cut`), the way the wading angler's does, so what is under the water casts nothing on
+## top of it and the shadow starts at the foam rather than below it.
+##
+## Without a day to ask (its own or the lake's), no shadow. A guessed sun is worse than none:
+## it would disagree with every other shadow in the scene the moment one of them knew better.
+func _draw_shadow(
+	name: StringName, frame: int, at: Vector2, sink: float = 0.0, cut: float = NAN
+) -> void:
+	var sun := Shade.sun_of(day)
+	if sun == null:
 		return
-	draw_set_transform_matrix(Shade.lying(at, day.lean, day.stretch))
-	DogArt.stamp(
-		self, name, frame, Vector2.ZERO, HEIGHT, facing_left, 0.0, Shade.tint(day.ink), breed
-	)
+	if sink > 0.0 and not is_nan(cut):
+		# `lying` folds about its own y; slide the picture so the cut sits on that fold and
+		# stays put, then back to where the cut is drawn.
+		draw_set_transform_matrix(
+			Shade.lying(Vector2(0.0, cut), sun.lean, sun.stretch)
+				* Transform2D(0.0, Vector2(0.0, -cut))
+		)
+		DogArt.stamp(
+			self, name, frame, at, HEIGHT, facing_left, sink,
+			Shade.tint_on(sun, Shade.On.WATER), breed
+		)
+	else:
+		draw_set_transform_matrix(Shade.lying(at, sun.lean, sun.stretch))
+		DogArt.stamp(
+			self, name, frame, Vector2.ZERO, HEIGHT, facing_left, 0.0,
+			Shade.tint_on(sun, Shade.On.LAND), breed
+		)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

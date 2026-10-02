@@ -75,7 +75,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-import recolor_shed  # noqa: E402  the box's wood ramp and edge colour
+import build_recycle_box  # noqa: E402  the box itself and the wood ramps
 
 PIECES = ROOT / "assets" / "pieces.json"
 BOX = ROOT / "assets" / "Recycle_Box.png"
@@ -84,10 +84,14 @@ BOAT_JSON = ROOT / "assets" / "boat_sail_frames.json"
 
 # --- the plane -----------------------------------------------------------------------------
 ## Half a tile on screen in painted pixels: Iso.TILE_W / 2 / ART_PIXEL, Iso.TILE_H / 2 / ART_PIXEL.
-HALF_W = 16.0
-HALF_H = 8.0
-## World px per painted px (Lake.ART_PIXEL). Only used to write world-space numbers.
-ART_PIXEL = 2.0
+## At the angler's grain since 2026-10-02 (one painted px a world px, was two): twice the
+## pixels at the same world size, so every count below that was painted px doubled.
+HALF_W = 32.0
+HALF_H = 16.0
+## World px per painted px. Only used to write world-space numbers.
+ART_PIXEL = 1.0
+## Which wood ramp (build_recycle_box.RAMPS) the pier and its box wear.
+PALETTE_NAME = "brown"
 
 ## The four yards: name, basin angle (Lake._shape_dropoffs) and tint. The jetty runs from
 ## the waterline towards the lake's middle, which at the four cardinal banks is along a tile
@@ -103,22 +107,23 @@ YARDS = [
 ## Deck top height above the water, in painted px, and how thick the edge beam under it is.
 ## Six, so that four rows of post show under the far edges: a deck a pier is a floor you
 ## can see under, and at four the posts vanished into the beam.
-DECK_UP = 6
-BEAM = 2
+DECK_UP = 12
+BEAM = 4
 ## Jetty: tiles out from the waterline, and tiles across.
 JETTY_OUT = 3.0
 JETTY_WIDE = 1.0
 ## Platform on the sand: tiles landward from the waterline, and tiles across.
 PLATFORM_BACK = 2.0
 PLATFORM_WIDE = 2.0
-## Plank width, in tiles along the deck: five painted px along the diagonal, the box's own
-## plank pitch (rows 12-16 of Recycle_Box.png repeat every five).
-PLANK = 5.0 / math.hypot(16.0, 8.0)
+## Plank width, in tiles along the deck: ten painted px along the diagonal (the old five at
+## twice the grain), each board a lit row, body with grain, a darker row and the gap.
+PLANK_PX = 10
+PLANK = PLANK_PX / math.hypot(HALF_W, HALF_H)
 ## Post spacing along an edge, in tiles, and the post's width on screen.
 POST_EVERY = 1.0
-POST_WIDE = 3
+POST_WIDE = 6
 ## Bollards at the jetty's end: how far they rise above the deck.
-BOLLARD_UP = 5
+BOLLARD_UP = 10
 ## The box: where it stands on the platform (local s, t).
 BOX_AT = (-1.0, 0.0)
 ## Two rows of Recycle_Box.png (Yard.ART_TOP, Yard.ART_GROUND): the middle of the mouth's
@@ -127,13 +132,13 @@ BOX_AT = (-1.0, 0.0)
 ## corner: the first bake took the mouth as 16 rows above the bottom corner (the wall's
 ## height above the *ground diamond's middle*, which the corner is 8 rows below), and
 ## every delivery aimed 8 rows too low, behind the near wall (2026-09-13).
-BOX_TOP = 8
-BOX_STAND = 24
+BOX_TOP = build_recycle_box.ART_TOP
+BOX_STAND = build_recycle_box.ART_GROUND
 ## How much of the deck's light is left in the first and second rows under the box's foot.
-BOX_CONTACT = (0.55, 0.8)
+BOX_CONTACT = (0.55, 0.65, 0.8, 0.9)
 ## How far in front of a post's foot the deck's footprint must still reach for the post to
 ## count as under the pier rather than on its edge, painted px.
-UNDER_PIER = 3
+UNDER_PIER = 6
 WITH_HEAP = False
 
 ## The emblem (2026-09-13): the yard's material carved into the box's lit (right) face.
@@ -142,8 +147,8 @@ WITH_HEAP = False
 ## sized to fill the face inside a margin off the rim, the corner seam and the outline.
 EMBLEM_PIECE = {
     "plastic": "plastic_bottle1",
-    "wood": "wood_chair",
-    "metal": "metal_canister",
+    "wood": "wood_stump1",
+    "metal": "metal_kettle",
     "rubber": "rubber_ball",
 }
 ## "carved": the sprite's own colours, sunk EMBLEM_SOAK of the way towards the plank under
@@ -160,10 +165,10 @@ EMBLEM_WRAP = False
 ## the last, its top edge dropping half a row per column from FACE_TOP at the corner, and it
 ## stands FACE_TALL rows. Margins keep the emblem off the rim above, the outline at the far
 ## edge and below, and the seam down the corner.
-FACE_CORNER = 16
-FACE_TOP = 15.5
-FACE_TALL = 17.0
-FACE_MARGIN = (2.0, 1.5, 1.0, 1.0)  # in from the corner, down from the rim, in from the far edge, up from the foot
+FACE_CORNER = build_recycle_box.MID
+FACE_TOP = 2 * build_recycle_box.ART_TOP - 0.5
+FACE_TALL = float(build_recycle_box.WALL_TALL)
+FACE_MARGIN = (5.0, 3.0, 5.0, 4.0)  # in from the corner, down from the rim, in from the far edge, up from the foot
 
 ## The sign (2026-09-13): a post carrying a bare plank. The runtime writes the yard's name
 ## on the plank (Dropoff.sign_text), which is what makes the name translatable; the plank's
@@ -182,11 +187,11 @@ FACE_MARGIN = (2.0, 1.5, 1.0, 1.0)  # in from the corner, down from the rim, in 
 ##     plank across the waterline was the objection, and the sign may stand apart from the
 ##     box as long as it stands on the pier.
 SIGN_BACK = 0.45
-SIGN_BOARD = (44, 13)
-SIGN_GAP = 4
+SIGN_BOARD = (88, 26)
+SIGN_GAP = 8
 SIGN_INSET = 0.12
-SIGN_POST = 12
-SIGN_HANG = 14
+SIGN_POST = 24
+SIGN_HANG = 28
 ## The plank's carpentry (2026-09-13, Richard: "the sign frames should have the crevices
 ## like the menus"): V notches bitten out of its edges the way every drawn plank in the
 ## HUD has them (Style._border_bites / v_rows — widest at the edge, narrowing to a blunt
@@ -195,12 +200,12 @@ SIGN_HANG = 14
 ## long edge and per end: how many, how deep they go, how wide they open, all painted px,
 ## kept SIGN_BITE_CLEAR in from the corners. A foot-edge bite is steered off the post's
 ## column, or the hole opens onto the post standing behind the plank.
-SIGN_BITES = (2, 1)
-SIGN_BITE_DEEP = (2, 1)
-SIGN_BITE_WIDE = (4, 3)
+SIGN_BITES = (3, 1)
+SIGN_BITE_DEEP = (3, 2)
+SIGN_BITE_WIDE = (6, 4)
 SIGN_BITE_TIP = 0.2
-SIGN_BITE_CLEAR = 4
-SIGN_GRAIN = 4
+SIGN_BITE_CLEAR = 8
+SIGN_GRAIN = 14
 assert SIGN_HANG < SIGN_BOARD[0] // 2 - 2, "the post has to meet the plank"
 ## The heap: centre (s, t) and radii (s, t) of the ellipse the pieces are scattered in.
 HEAP_AT = (-1.0, -0.35)
@@ -252,31 +257,35 @@ def luma_key(c):
 
 
 class Wood:
-    """Tones off the box's plank ramp: darkest to lightest."""
+    """Tones off one of the box's wood ramps (build_recycle_box.RAMPS), darkest to lightest,
+    named the way the 2x build named them, so the drawing code reads the same."""
 
-    def __init__(self):
-        bins = recolor_shed.box_ramp()
-        distinct = []
-        for b in bins:
-            c = tuple(int(round(v)) for v in b)
-            if not distinct or distinct[-1] != c:
-                distinct.append(c)
-        self.edge = tuple(recolor_shed.box_edge())
-        # Named picks by rank through the distinct tones.
-        n = len(distinct)
-        pick = lambda f: distinct[min(n - 1, int(round(f * (n - 1))))]
-        self.dark = pick(0.18)
-        self.mid_dark = pick(0.32)
-        self.mid = pick(0.48)
-        self.mid_light = pick(0.62)
-        self.light = pick(0.76)
-        self.pale = pick(0.9)
+    def __init__(self, palette=None):
+        name = palette or PALETTE_NAME
+        self.name = name
+        r = build_recycle_box.RAMPS[name]
+        self.ramp = r
+        self.moss = name == "oak"
+        self.edge = build_recycle_box.INK
+        self.dark = r[1]
+        self.mid_dark = r[2]
+        self.mid = r[3]
+        self.mid_light = r[4]
+        self.light = r[5]
+        self.pale = r[6]
         self.planks = [self.mid, self.mid_light, self.light]
-        # The box's plank, row by row, off its lit (right) face and its shaded (left) face:
-        # a lit line, two rows of body, a lighter row, the seam.
-        self.plank_lit = [(160, 119, 87), (111, 82, 60), (111, 82, 60), (123, 92, 68), (99, 73, 53)]
-        self.plank_shade = [(123, 92, 68), (94, 62, 47), (94, 62, 47), (99, 73, 53), (88, 52, 41)]
-        self.rim = (76, 29, 29)
+        # A plank's rows, lit (a deck top, the sign) and shaded (posts and beams): a lit
+        # line, two of body, a lighter row, the seam — the 2x build's five, by index.
+        self.plank_lit = [r[5], r[4], r[4], mix(r[4], r[5], 0.35), r[2]]
+        self.plank_shade = [r[4], r[2], r[2], r[3], r[1]]
+        self.rim = r[0]
+
+
+def mix(a, b, t):
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+
+
+MOSS = build_recycle_box.MOSS
 
 
 class Yard:
@@ -389,6 +398,10 @@ def carve_emblem(image, x0, y0, crate, sprite, wood, style, wrap):
     u_hi = FACE_CORNER - right
     v_lo, v_hi = top, FACE_TALL - bottom
     k = min((u_hi - u_lo) / sw, (v_hi - v_lo) / sh)
+    # Whole steps where it fits: the rubbish is drawn at this grain too, so at one step the
+    # emblem is the piece's own pixels.
+    if k >= 1.0:
+        k = float(math.floor(k))
     eu = (u_lo + u_hi) * 0.5 - sw * k * 0.5
     ev = (v_lo + v_hi) * 0.5 - sh * k * 0.5
     cp = crate.load()
@@ -469,14 +482,24 @@ def draw_sign(sign, wood, foot, centre_x, board_bottom, seed=""):
     bw, bh = SIGN_BOARD
     bx0 = int(round(centre_x)) - bw // 2
     by0 = board_bottom - bh
-    # The post, three wide like the jetty's, from its foot up into the plank's middle.
-    for i, tone in enumerate((wood.plank_shade[4], wood.plank_shade[1], wood.plank_shade[0])):
-        x = fx - 1 + i
+    # The post, four wide, from its foot up into the plank's middle.
+    r = wood.ramp
+    for i, tone in enumerate((r[1], r[2], r[3], r[4])):
+        x = fx - 2 + i
         draw.line([(x, by0 + bh // 2), (x, fy)], fill=tone + (255,))
     # The plank: a lit top row, body, a dark seam row along the foot, the box's outline round.
     draw.rectangle([bx0, by0, bx0 + bw - 1, by0 + bh - 1], fill=wood.plank_lit[1] + (255,))
-    draw.line([(bx0 + 1, by0 + 1), (bx0 + bw - 2, by0 + 1)], fill=wood.plank_lit[0] + (255,))
-    draw.line([(bx0 + 1, by0 + bh - 2), (bx0 + bw - 2, by0 + bh - 2)], fill=wood.plank_lit[4] + (255,))
+    # Two boards, one over the other: each a lit row under its top, body, a darker row and
+    # the seam between them.
+    mid = by0 + bh // 2
+    for top, foot in ((by0, mid), (mid, by0 + bh)):
+        draw.line([(bx0 + 1, top + 1), (bx0 + bw - 2, top + 1)], fill=wood.plank_lit[0] + (255,))
+        draw.line([(bx0 + 1, foot - 2), (bx0 + bw - 2, foot - 2)], fill=wood.plank_lit[3] + (255,))
+        draw.line([(bx0 + 1, foot - 1), (bx0 + bw - 2, foot - 1)], fill=wood.plank_lit[4] + (255,))
+    # Nails at each end of both boards.
+    for nx in (bx0 + 4, bx0 + bw - 5):
+        for ny in (by0 + bh // 4, mid + bh // 4):
+            draw.point((nx, ny), fill=wood.ramp[0] + (255,))
     draw.rectangle([bx0, by0, bx0 + bw - 1, by0 + bh - 1], outline=wood.edge + (255,))
     px = sign.load()
     # Grain: short dashes in the plank's lighter and darker rows, inside the lit and seam
@@ -484,7 +507,7 @@ def draw_sign(sign, wood, foot, centre_x, board_bottom, seed=""):
     for g in range(SIGN_GRAIN):
         gx = bx0 + 3 + int(hash01(seed, "grain", g) * (bw - 12))
         gy = by0 + 3 + int(hash01(seed, "grain row", g) * (bh - 6))
-        gl = 3 + int(hash01(seed, "grain length", g) * 5)
+        gl = 4 + int(hash01(seed, "grain length", g) * 9)
         tone = wood.plank_lit[3] if g % 2 else wood.plank_lit[4]
         for x in range(gx, min(gx + gl, bx0 + bw - 3)):
             px[x, gy] = tone + (255,)
@@ -536,6 +559,49 @@ def draw_sign(sign, wood, foot, centre_x, board_bottom, seed=""):
     return [bx0, by0, bw, bh]
 
 
+## Where the nails go across a board: over the stringers under each long edge, in tiles in
+## from the edge, and how many of them are missing.
+NAIL_IN = 0.1
+NAIL_GONE = 0.25
+
+
+def deck_tone(wood, name, on_jetty, index, row_in, across, seam_along):
+    """One pixel of deck top. A board is PLANK_PX rows along the deck: a lit row where it
+    catches the sun, body with grain dashes, a darker row, and the gap between boards. The
+    odd board a step darker or lighter, worn ends, nails over the stringers, a knot."""
+    r = wood.ramp
+    shade = hash01(name, on_jetty, index)
+    body = r[4] if shade > 0.3 else r[3]
+    if shade > 0.85:
+        body = mix(r[4], r[5], 0.4)
+    if row_in == PLANK_PX - 1:
+        return r[1]
+    if row_in == PLANK_PX - 2:
+        return mix(body, r[2], 0.6)
+    if row_in == 0:
+        return mix(body, r[6], 0.45)
+    half = (JETTY_WIDE if on_jetty else PLATFORM_BACK) * 0.5
+    off = across if on_jetty else across + PLATFORM_BACK * 0.5
+    # The board's end grain where it meets the deck's edge: a step darker, worn.
+    if abs(off) > half - seam_along * 2.5:
+        return mix(body, r[2], 0.45)
+    # Nails over the stringers, two to a board, on the body's middle rows.
+    if row_in in (3, 4) and abs(abs(off) - (half - NAIL_IN)) < seam_along * 0.8:
+        if hash01(name, on_jetty, index, "nail", off > 0) > NAIL_GONE:
+            return r[0] if row_in == 3 else r[2]
+    # Grain: dashes along the board, a step darker, each on its own row.
+    lane = int((off + half) / (seam_along * 6))
+    g = hash01(name, on_jetty, index, "grain", lane)
+    if g < 0.45 and row_in == 2 + int(g * 20) % 5:
+        return mix(body, r[2], 0.55)
+    # A knot now and then.
+    if hash01(name, on_jetty, index, "knot") < 0.18:
+        kn = (hash01(name, on_jetty, index, "kx") - 0.5) * half * 1.2
+        if abs(off - kn) < seam_along * 1.2 and row_in in (4, 5):
+            return r[2] if row_in == 4 else r[1]
+    return body
+
+
 def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
     """Draw one yard. Returns (image, book) with every point in painted px from the anchor."""
     jetty = rect_corners(0.0, JETTY_OUT, -JETTY_WIDE * 0.5, JETTY_WIDE * 0.5)
@@ -548,7 +614,7 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
         pts.append(yard.at(*c, up=DECK_UP + BOLLARD_UP))
     hx, hy = yard.at(*HEAP_AT, up=DECK_UP + 40)
     pts += [(hx - 40, hy), (hx + 40, hy)]
-    box_tall = Image.open(BOX).height if BOX.exists() else 36
+    box_tall = build_recycle_box.H
     bx, by = yard.at(*BOX_AT, up=DECK_UP + box_tall + SIGN_GAP + SIGN_BOARD[1] + 2)
     pts += [(bx - SIGN_BOARD[0] // 2 - 2, by), (bx + SIGN_BOARD[0] // 2 + 2, by)]
     for t in (-(PLATFORM_WIDE * 0.5 - SIGN_INSET), PLATFORM_WIDE * 0.5 - SIGN_INSET):
@@ -603,20 +669,25 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
         if not wet:
             posts.append((s0 + inset, 0.0, False))
     posts.sort(key=lambda p: P(p[0], p[1])[1])
+    px0 = image.load()
     for s, t, wet in posts:
         gx, gy = P(s, t)
         gx, gy = int(round(gx)), int(round(gy))
         top = gy - (DECK_UP - BEAM)
         half = POST_WIDE // 2
-        for x in range(gx - half, gx - half + POST_WIDE):
-            tone = wood.plank_shade[1]
-            if x == gx - half:
-                tone = wood.plank_shade[4]
-            elif x == gx - half + POST_WIDE - 1:
-                tone = wood.plank_shade[0]
-            draw.line([(x, top), (x, gy)], fill=tone + (255,))
+        r = wood.ramp
+        # A round pile: dark down its left, body, lit down its right; a ring of grain every
+        # few rows; weed on its foot where it stands in the water.
+        cols = [r[0], r[1], r[2], r[2], r[3], r[4]]
+        for i, x in enumerate(range(gx - half, gx - half + POST_WIDE)):
             for y in range(top, gy + 1):
+                tone = cols[min(i, len(cols) - 1)]
+                if (gy - y) % 5 == 0 and 0 < i < POST_WIDE - 1:
+                    tone = mix(tone, r[0], 0.4)
+                if wet and wood.moss and gy - y < 3 + int(hash01(yard.name, s, t, i) * 3):
+                    tone = MOSS[min(i // 2, 2)]
                 if 0 <= x < W and 0 <= y < H:
+                    px0[x, y] = tone + (255,)
                     layer[x][y] = 1
         (book["posts_wet"] if wet else book["posts_dry"]).append([gx, gy])
 
@@ -639,20 +710,11 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
             deck[x][y] = 1 if on_jetty else 2
             # Jetty planks run across the walkway; platform planks run along the shore.
             along = s if on_jetty else t
+            across = t if on_jetty else s
             index = math.floor(along / PLANK)
             frac = along - index * PLANK
-            row_in = min(4, int(frac / seam_along))
-            tone = wood.plank_lit[row_in]
-            # The odd plank a shade darker, so the deck is boards and not a texture.
-            if row_in in (1, 2) and hash01(yard.name, on_jetty, index) < 0.3:
-                tone = wood.plank_lit[3]
-            # A knot now and then.
-            if row_in in (1, 2) and hash01(yard.name, on_jetty, index, "knot") < 0.2:
-                across = t if on_jetty else s
-                kn = (hash01(yard.name, on_jetty, index, "kx") - 0.5) * 0.7
-                if abs(across - kn) < seam_along * 0.6:
-                    tone = wood.plank_shade[1]
-            px[x, y] = tone + (255,)
+            row_in = min(PLANK_PX - 1, int(frac / seam_along))
+            px[x, y] = deck_tone(wood, yard.name, on_jetty, index, row_in, across, seam_along) + (255,)
     # --- the edge beam, per pixel: the rows under the deck top's lower boundary --------
     # The camera-facing edges of a slab on the plane are exactly where the deck-top region
     # ends going down the screen, so the beam is BEAM rows painted under each such pixel.
@@ -669,7 +731,8 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
             if is_top[x][y] and not is_top[x][y + 1]:
                 for k in range(1, BEAM + 1):
                     if y + k < H and not is_top[x][y + k]:
-                        tone = wood.plank_shade[4] if k == BEAM else wood.plank_shade[1]
+                        tone = (wood.ramp[1] if k == BEAM else
+                                (wood.ramp[3] if k == 1 else wood.ramp[2]))
                         px[x, y + k] = tone + (255,)
                         layer[x][y + k] = 1
 
@@ -677,12 +740,17 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
     for t in (-JETTY_WIDE * 0.5 + 0.12, JETTY_WIDE * 0.5 - 0.12):
         bx, by = P(JETTY_OUT - 0.12, t, up=DECK_UP)
         bx, by = int(round(bx)), int(round(by))
-        for x in range(bx - 1, bx + 2):
-            tone = wood.dark if x == bx - 1 else (wood.light if x == bx + 1 else wood.mid_dark)
-            draw.line([(x, by - BOLLARD_UP), (x, by)], fill=tone + (255,))
-        draw.line([(bx - 1, by - BOLLARD_UP - 1), (bx + 1, by - BOLLARD_UP - 1)],
+        tones = [wood.ramp[1], wood.ramp[2], wood.ramp[3], wood.ramp[5]]
+        for i, x in enumerate(range(bx - 2, bx + 2)):
+            draw.line([(x, by - BOLLARD_UP), (x, by)], fill=tones[i] + (255,))
+        # Its cut top, lit, and a band of rope round it.
+        draw.line([(bx - 2, by - BOLLARD_UP - 1), (bx + 1, by - BOLLARD_UP - 1)],
                   fill=wood.pale + (255,))
-        for x in range(bx - 1, bx + 2):
+        rope = [(108, 96, 70), (150, 136, 98), (190, 176, 130), (150, 136, 98)]
+        for k, x in enumerate(range(bx - 2, bx + 2)):
+            for y in (by - 5, by - 4):
+                image.putpixel((x, y), rope[(k + y) % 4] + (255,))
+        for x in range(bx - 2, bx + 2):
             for y in range(by - BOLLARD_UP - 1, by + 1):
                 if 0 <= x < W and 0 <= y < H:
                     layer[x][y] = 2
@@ -695,7 +763,7 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
     sign = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bt = yard.local_to_tile(*BOX_AT)
     hx, hy = P(*BOX_AT, up=DECK_UP)
-    crate = Image.open(BOX).convert("RGBA") if BOX.exists() else None
+    crate = build_recycle_box.build_box(wood.name)
     crate_tall = crate.getbbox()[3] if crate is not None else 36
     # The box's own stand (the middle of the diamond its walls stand on, row BOX_STAND of the
     # art) on the platform's middle (2026-09-26). It used to stand the art's *bottom row* —
@@ -760,7 +828,7 @@ def build_yard(yard, wood, sprites, emblem=EMBLEM_STYLE, wrap=EMBLEM_WRAP):
                     break
             if low < 0:
                 continue
-            for d, keep in ((1, BOX_CONTACT[0]), (2, BOX_CONTACT[1])):
+            for d, keep in enumerate(BOX_CONTACT, 1):
                 x, y = x0 + cx, y0 + low + d
                 if 0 <= x < W and 0 <= y < H and ip[x, y][3] and deck[x][y] == 2:
                     r, g, b, a = ip[x, y]
@@ -956,7 +1024,11 @@ def load_boat():
         for y in range(cy + 1, frame):
             for x in range(frame):
                 bp[x, y] = (0, 0, 0, 0)
-    return boat, book.get("anchor", [frame // 2, frame // 2])
+    # The ferry draws at two world px a painted px; the pier at one.
+    grow = int(round(2.0 / ART_PIXEL))
+    anchor = book.get("anchor", [frame // 2, frame // 2])
+    boat = boat.resize((frame * grow, frame * grow), Image.NEAREST)
+    return boat, [anchor[0] * grow, anchor[1] * grow]
 
 
 def render_panel(yard, image, book, boat, boat_anchor, tile_s=8.5, tile_t=6.0):
@@ -965,7 +1037,7 @@ def render_panel(yard, image, book, boat, boat_anchor, tile_s=8.5, tile_t=6.0):
     be found on it."""
     pts = [yard.at(s, t) for s in (-tile_s * 0.55, tile_s * 0.45) for t in (-tile_t * 0.5, tile_t * 0.5)]
     minx = math.floor(min(p[0] for p in pts))
-    miny = math.floor(min(p[1] for p in pts)) - 40
+    miny = math.floor(min(p[1] for p in pts)) - 80
     maxx = math.ceil(max(p[0] for p in pts))
     maxy = math.ceil(max(p[1] for p in pts))
     W, H = maxx - minx, maxy - miny
@@ -1013,9 +1085,9 @@ def render_panel(yard, image, book, boat, boat_anchor, tile_s=8.5, tile_t=6.0):
     # Foam collars at the wet posts.
     for gx, gy, _pw in book["posts_wet"]:
         cx, cy = gx + place[0], gy + place[1]
-        for dx in range(-3, 4):
-            yy = cy + (1 if abs(dx) < 2 else 0)
-            tone = PALETTE["foam_light"] if abs(dx) < 2 else PALETTE["foam"]
+        for dx in range(-6, 7):
+            yy = cy + (1 if abs(dx) < 4 else 0)
+            tone = PALETTE["foam_light"] if abs(dx) < 4 else PALETTE["foam"]
             if 0 <= cx + dx < W and 0 <= yy < H:
                 px[cx + dx, yy] = tone + (255,)
     # The ferry alongside the jetty's end, for scale only (one side view, not the
@@ -1052,7 +1124,7 @@ def mockup(yards, wood, sprites, scale, out):
         cx = (i % 2) * (pw + gap) * scale
         cy = (i // 2) * (ph + gap + 6) * scale
         sheet.alpha_composite(big, (cx, cy))
-        draw.text((cx + 4, cy + panel.height * scale + 2), name + "  (3 tiles out, box at 2.0, noon, ferry side view for scale)", fill=(230, 230, 230, 255))
+        draw.text((cx + 4, cy + panel.height * scale + 2), name + "  (1x grain, noon, ferry side view at 2x for scale)", fill=(230, 230, 230, 255))
     sheet.save(out)
 
 
@@ -1064,7 +1136,7 @@ def sign_mockup(wood, sprites, scale, out):
     on the lit face, wrapped round the corner, unpainted relief), 2026-09-13; `variants`
     takes any list of (EMBLEM_STYLE, EMBLEM_WRAP) to see the others again."""
     variants = [(EMBLEM_STYLE, EMBLEM_WRAP)]
-    half = (76, 60, 76, 22)  # left, up, right, down from the box's ground point, painted px
+    half = (152, 120, 152, 44)  # left, up, right, down from the box's ground point, painted px
     cw, ch = half[0] + half[2], half[1] + half[3]
     font_path = ROOT / "assets" / "Bungee-Regular.ttf"
     try:
@@ -1130,6 +1202,46 @@ def sign_mockup(wood, sprites, scale, out):
     sheet.save(out)
 
 
+def palette_mockup(sprites, scale, out, yard_name="wood"):
+    """The pick sheet (2026-10-02): one yard built in each wood ramp, with the hut and the
+    angler beside it at the same grain, at `scale` and at 1x."""
+    hut = Image.open(ROOT / "assets" / "shed_tidied.png").convert("RGBA")
+    char = None
+    cj = ROOT / "assets" / "character.json"
+    if cj.exists():
+        book = json.loads(cj.read_text(encoding="utf-8"))
+        sheet = Image.open(ROOT / "assets" / "character.png").convert("RGBA")
+        pose = (book.get("poses") or {}).get("idle_south")
+        if pose:
+            r = pose[0]["region"]
+            char = sheet.crop((r[0], r[1], r[0] + r[2], r[1] + r[3]))
+    boat, boat_anchor = load_boat()
+    panels = []
+    for palette in build_recycle_box.RAMPS:
+        wood = Wood(palette)
+        axis, tint = next((a, t) for n, a, t in YARDS if n == yard_name)
+        yard = Yard(yard_name, axis, tint)
+        image, book = build_yard(yard, wood, sprites)
+        panel, _ = render_panel(yard, image, book, boat, boat_anchor, tile_s=7.0, tile_t=4.6)
+        panels.append((palette, panel))
+    pw = max(p.width for _, p in panels)
+    ph = max(p.height for _, p in panels)
+    side = hut.width + 40
+    W = (pw + side) * scale
+    sheet = Image.new("RGBA", (W, (ph + 16) * scale * len(panels)), (24, 24, 28, 255))
+    draw = ImageDraw.Draw(sheet)
+    for i, (palette, panel) in enumerate(panels):
+        y = i * (ph + 16) * scale
+        canvas = Image.new("RGBA", (pw + side, ph), PALETTE["grass"] + (255,))
+        canvas.alpha_composite(panel, (0, 0))
+        canvas.alpha_composite(hut, (pw + 10, ph - hut.height - 10))
+        if char is not None:
+            canvas.alpha_composite(char, (pw + 10 + hut.width - char.width, ph - char.height - 4))
+        sheet.alpha_composite(canvas.resize((canvas.width * scale, canvas.height * scale), Image.NEAREST), (0, y))
+        draw.text((6, y + ph * scale + 2), "%s  (%dx; hut and angler at the same grain)" % (palette, scale), fill=(230, 230, 230, 255))
+    sheet.save(out)
+
+
 def main():
     args = sys.argv[1:]
     out_base = ROOT / "assets" / "piers"
@@ -1138,6 +1250,13 @@ def main():
         out_base = ROOT / args[args.index("--out") + 1]
     if "--scale" in args:
         scale = int(args[args.index("--scale") + 1])
+    if "--palettes" in args:
+        palette_mockup(load_pieces(), scale, ROOT / "tools" / "last_pier_palettes.png")
+        print("wrote tools/last_pier_palettes.png")
+        return
+    if "--palette" in args:
+        global PALETTE_NAME
+        PALETTE_NAME = args[args.index("--palette") + 1]
     wood = Wood()
     sprites = load_pieces()
     built = []

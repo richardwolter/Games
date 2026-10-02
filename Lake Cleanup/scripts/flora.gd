@@ -15,7 +15,8 @@ extends Node2D
 ##
 ## One batch, one draw call, off assets/flora.png (tools/build_flora.py): the island redraws
 ## every frame, and the rule from Ground's props holds — anything in the hundreds goes in a
-## triangle array, never a loop of draw_texture_rect.
+## triangle array, never a loop of draw_texture_rect. Their shadows are a second batch off
+## the same sheet, drawn first (2026-10-02, one sun: see `_lay`).
 
 const SHEET := "res://assets/flora.png"
 const TABLE := "res://assets/flora.json"
@@ -67,6 +68,8 @@ const GROW_TIME := 3.5
 const GROW_STAGGER := 2.5
 ## A sprout shows until this far through the grow; the full picture rises after.
 const SPROUT_UNTIL := 0.4
+## How often a growing plant's picture is laid out again, a second.
+const GROW_FPS := 12.0
 ## How far the filth map is followed to find "the water beside this spot", in tiles.
 const WATER_LOOK := 9
 ## The map's byte under which water is clean enough for something to grow beside it. The
@@ -80,6 +83,10 @@ var crate_tile := Vector2.INF
 ## Tile points the open-water clumps keep `OPEN_CLEAR` away from: the yards' feet and berths.
 var avoid := PackedVector2Array()
 var music: MusicStation
+## The daylight, for the plants' shadows. Unset, `Shade` asks the lake's own
+## (`DayCycle.here`); with no day at all the plants throw no shadow on land or water, as the
+## ground's props do not.
+var day: DayCycle
 ## 0..1, the share of the lake's water that reads clean. Set by `refresh`.
 var stage: float = 0.0
 
@@ -107,11 +114,32 @@ var _uvs := PackedVector2Array()
 var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
 var _dirty := true
+var _grow_tick := 0.0
+## The land plants' and the standing reeds' shadows (2026-10-02, one sun): every plant on
+## the lawn, the beach and the forest floor is laid again along the sun under itself, like the
+## ground's props, and a reed standing in the lake throws one on the water. Their own batch,
+## drawn first in `_draw`, so every shadow is under every plant; corners packed like the
+## plants' (see `SHADE_LAND`), so they sway with them and take the day's ink every frame.
+var _shade_points := PackedVector2Array()
+var _shade_uvs := PackedVector2Array()
+var _shade_colors := PackedColorArray()
+var _shade_indices := PackedInt32Array()
+## The sun the shadows were laid for. They are geometry, so they are laid again only when it
+## has moved `Ground.SUN_STEP`, the ground's own bargain; the ink is a uniform and follows
+## every frame.
+var _sun_lean := INF
+var _sun_stretch := INF
 var _below: Below
 ## What is under the water plants through clean water (2026-09-30, the lakebed pass): each
 ## pad's shadow on the bed, and a stem from each pad or reed down to a root on the bed. Laid
 ## with the plants in `_lay` as (kind, from, to) rows; drawn by `Below`, behind the plants.
 var _below_rows: Array = []
+## The pads' shadows on the bed, as one batch on `Below`'s own child (`BedShade`), packed
+## afloat so each bobs with the pad it is the shadow of.
+var _bed_points := PackedVector2Array()
+var _bed_uvs := PackedVector2Array()
+var _bed_colors := PackedColorArray()
+var _bed_indices := PackedInt32Array()
 const STEM := Color(0.3, 0.44, 0.2)
 const ROOT := Color(0.2, 0.26, 0.12)
 ## The water's share over a stem: it runs from the surface to the bed, so its mean depth.
@@ -137,6 +165,12 @@ class Bees:
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# The shadows' ink and their packed corners are the shader's to read, so it is always on;
+	# the bench's A/B (`BENCH_OFF=sway`) stills the motion instead of taking the shader off.
+	var bench_still := OS.is_debug_build() and OS.get_environment("BENCH_OFF").contains("sway")
+	material = sway_material()
+	if bench_still:
+		_still(material as ShaderMaterial)
 	z_index = 3
 	z_as_relative = false
 	_below = Below.new()
@@ -144,6 +178,14 @@ func _ready() -> void:
 	_below.flora = self
 	_below.show_behind_parent = true
 	add_child(_below)
+	_below.shade = BedShade.new()
+	_below.shade.name = &"BedShade"
+	_below.shade.flora = self
+	_below.shade.show_behind_parent = true
+	_below.shade.material = sway_material()
+	if bench_still:
+		_still(_below.shade.material as ShaderMaterial)
+	_below.add_child(_below.shade)
 	_bees = Bees.new()
 	_bees.name = &"Bees"
 	_bees.flora = self
@@ -155,7 +197,65 @@ func _ready() -> void:
 			_table = parsed
 	if grid != null and _sheet != null and not _table.is_empty():
 		_sow()
-	set_process(false)
+	# Always: the shadows' ink is pushed every frame (`_follow_sun`), and on an idle frame that
+	# is all this does.
+	set_process(true)
+
+
+## The plants move with the water (2026-10-02): afloat ones ride the lake's swell with the
+## rubbish, land ones lean their tops in its rhythm. See shaders/flora_sway.gdshader; the
+## island ground's tufts share it (Ground). Children (the stems below, the bees) do not.
+const SWAY_SHADER := "res://shaders/flora_sway.gdshader"
+## A land plant's top leans this many art px at the swell's crest, rounded to whole ones.
+const LEAN := 1.4
+## What a corner does, in the blue of its packed colour (see the shader).
+const AFLOAT := 1.0
+const TOP := 0.5
+const FOOT := 0.0
+## What a shadow's corner carries in its alpha, which is also the surface it falls on and so
+## the ink the shader draws it in (2026-10-02, one sun). A plant is alpha 1; any other alpha
+## is not packed. The ground's props use the same three (Ground).
+const SHADE_WATER := 0.25
+const SHADE_LAND := 0.5
+const SHADE_BED := 0.75
+
+
+static func sway_material() -> ShaderMaterial:
+	var skin := ShaderMaterial.new()
+	skin.shader = load(SWAY_SHADER) as Shader
+	skin.set_shader_parameter(&"wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
+	skin.set_shader_parameter(&"wave_speed", LakeGrid.WAVE_SPEED)
+	skin.set_shader_parameter(&"sway", LakeGrid.SWAY)
+	skin.set_shader_parameter(&"anchor_span", LakeGrid.ANCHOR_SPAN)
+	skin.set_shader_parameter(&"art_pixel", ART)
+	skin.set_shader_parameter(&"lean", LEAN)
+	return skin
+
+
+## The shadows' inks on a sway material, one a surface, for the day as it is this frame —
+## overcast and lightning included, since both are in the day's ink. `Shade.tint_on` decides
+## every one of them; nothing here picks a colour. `day` may be null.
+static func shade_skin(skin: ShaderMaterial, day: DayCycle) -> void:
+	if skin == null:
+		return
+	skin.set_shader_parameter(&"land_ink", Shade.tint_on(day, Shade.On.LAND))
+	skin.set_shader_parameter(&"water_ink", Shade.tint_on(day, Shade.On.WATER))
+	skin.set_shader_parameter(&"bed_ink", Shade.tint_on(day, Shade.On.BED))
+
+
+## Where a picture's width lies on the ground under this sun: the x axis of `Shade.cast`,
+## which a leaning top's shadow moves along. Pushed whenever a batch's shadows are laid, so
+## it always matches the geometry it moves.
+static func shade_across(skin: ShaderMaterial, lean: float, stretch: float) -> void:
+	if skin != null:
+		skin.set_shader_parameter(&"shadow_across", Shade.cast(Vector2.ZERO, lean, stretch).x)
+
+
+## A sway material with the motion taken out, for the bench's A/B.
+static func _still(skin: ShaderMaterial) -> void:
+	skin.set_shader_parameter(&"wave_amplitude", 0.0)
+	skin.set_shader_parameter(&"sway", 0.0)
+	skin.set_shader_parameter(&"lean", 0.0)
 
 
 ## Whether the art is in the project and read.
@@ -188,7 +288,6 @@ func reset() -> void:
 	_bee_host.resize(0)
 	_bee_seed.resize(0)
 	_dirty = true
-	set_process(false)
 	queue_redraw()
 
 
@@ -217,6 +316,46 @@ func refresh(clean_share: float) -> void:
 
 func bee_count() -> int:
 	return _bee_host.size()
+
+
+## Whether a species is one the bees visit: its name starts with one of `BEE_HOSTS`.
+static func is_host(name: String) -> bool:
+	for prefix: String in BEE_HOSTS:
+		if name.begins_with(prefix):
+			return true
+	return false
+
+
+## How many bee-host plants have grown in on the island's own ground (2026-09-30, the
+## beehive: the swarm waits on these). Not `bee_count`, which is lake-wide, capped and holds
+## a flower once or twice over; not `_find_bees`' "near", which reaches the shore water. A
+## plant counts once it has finished growing in, and only on the island's ground.
+func island_hosts() -> int:
+	var count := 0
+	for k in _foot.size():
+		if _island_host(k):
+			count += 1
+	return count
+
+
+## Where those same plants hold their heads up, in the lake's space (the flora's own, which
+## is the hive's): where the hive's bees fly to and from.
+func island_host_spots() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for k in _foot.size():
+		if _island_host(k):
+			var rect: Array = _table[_species[k]]["full"]
+			out.append(_foot[k] - Vector2(0.0, float(rect[3]) * SCALE * 0.85))
+	return out
+
+
+func _island_host(k: int) -> bool:
+	if _age[k] < 0.0 or _age[k] < _delay[k] + GROW_TIME:
+		return false
+	if not is_host(_species[k]):
+		return false
+	var tile := Iso.world_to_tile(_foot[k])
+	return Iso.on_island_ground(tile)
 
 
 ## Where the grown pads are, world px: somewhere a frog may sit. Shore pads and open ones.
@@ -263,6 +402,9 @@ func _find_bees() -> void:
 		if not host:
 			continue
 		var n := 1 if _hash(float(k) * 1.3, 4.0) < 0.7 else 2
+		# Never past the cap: a host with two bees taken as the last one under it put the
+		# count one over (found when the beehive's footprint moved which flowers are sown).
+		n = mini(n, BEES_MOST - _bee_host.size())
 		for i in n:
 			_bee_host.append(k)
 			_bee_seed.append(_hash(float(k) * 2.1 + float(i) * 5.3, 9.0) * 100.0)
@@ -275,23 +417,32 @@ func _heard(at: Vector2) -> bool:
 
 
 func _process(delta: float) -> void:
-	var still := 0
-	for k in _age.size():
-		if _age[k] < 0.0:
-			continue
-		var done := _delay[k] + GROW_TIME
-		if _age[k] >= done:
-			continue
-		var was := _age[k]
-		_age[k] += delta
-		still += 1
-		# A plant showing itself near the angler: the woods answer (`Sfx.play_forest`).
-		if was < _delay[k] and _age[k] >= _delay[k] and _heard(_foot[k]) and Sfx.main() != null:
-			Sfx.main().play_forest()
-	if still > 0 or _growing > 0:
-		_dirty = true
-		queue_redraw()
-	_growing = still
+	_follow_sun()
+	if _growing > 0:
+		var still := 0
+		for k in _age.size():
+			if _age[k] < 0.0:
+				continue
+			var done := _delay[k] + GROW_TIME
+			if _age[k] >= done:
+				continue
+			var was := _age[k]
+			_age[k] += delta
+			still += 1
+			# A plant showing itself near the angler: the woods answer (`Sfx.play_forest`).
+			if was < _delay[k] and _age[k] >= _delay[k] and _heard(_foot[k]) and Sfx.main() != null:
+				Sfx.main().play_forest()
+		# Laid out again at GROW_FPS while anything grows, not every frame (2026-10-02): the
+		# whole batch is rebuilt each time, about a millisecond on a cleaned half lake, and
+		# after a clean everything that comes due grows in together for several seconds.
+		# Stepped, the way the lake's other pattern animation ticks; the last step always
+		# lands.
+		_grow_tick += delta
+		if (still > 0 and _grow_tick >= 1.0 / GROW_FPS) or still == 0:
+			_grow_tick = 0.0
+			_dirty = true
+			queue_redraw()
+		_growing = still
 	if not _bee_host.is_empty():
 		_bees.queue_redraw()
 		_bee_listen -= delta
@@ -300,8 +451,28 @@ func _process(delta: float) -> void:
 			var k := _bee_host[randi() % _bee_host.size()]
 			if _heard(_foot[k]) and Sfx.main() != null:
 				Sfx.main().play_bee()
-	if still == 0 and _bee_host.is_empty():
-		set_process(false)
+
+
+## Every frame: the shadows' inks for the day as it is (uniforms, so a flash reaches them the
+## frame it strikes), and a fresh lay once the sun has moved far enough that the shadows'
+## geometry is worth laying again. Nothing grown, nothing to lay.
+var _ink_seen := Color(-1.0, -1.0, -1.0, -1.0)
+
+
+func _follow_sun() -> void:
+	var sun := Shade.sun_of(day)
+	var ink := Shade.tint_on(sun, Shade.On.LAND)
+	if ink != _ink_seen:
+		_ink_seen = ink
+		shade_skin(material as ShaderMaterial, sun)
+		if _below != null and _below.shade != null:
+			shade_skin(_below.shade.material as ShaderMaterial, sun)
+	if sun == null or _alive == 0:
+		return
+	if absf(sun.lean - _sun_lean) >= Ground.SUN_STEP \
+			or absf(sun.stretch - _sun_stretch) >= Ground.SUN_STEP:
+		_dirty = true
+		queue_redraw()
 
 
 ## Every spot a plant could stand, rolled once. Lawn and beach tiles of both grounds within
@@ -330,6 +501,14 @@ func _sow() -> void:
 					if Pump.covers(at, 0.5):
 						continue
 					if Pump.covers(at, 2.5) and Pump.hides(at):
+						continue
+					# And off the beehive and out from behind its picture (2026-09-30): the
+					# hive and its shelf are about eighty pixels tall, so the reach asked of
+					# `hides` is wider than the pump's, and the shrub and swarm it puts up
+					# later count as picture too.
+					if Hive.covers(at, 0.5):
+						continue
+					if Hive.covers(at, 3.5) and Hive.hides(at):
 						continue
 					if crate_tile != Vector2.INF and Yard.covers(crate_tile, at, 0.6):
 						continue
@@ -502,12 +681,35 @@ func _pick_species(kind: String, at: Vector2) -> String:
 	return names[names.size() - 1]
 
 
+## Every grown plant into the batch, with its shadows: the shadow on the land or the water
+## under it (`_shade_*`), the pad's on the bed (`_bed_*`), and the stems (`_below_rows`).
+##
+## A shadow is the plant's own quad laid along the sun from its foot (`Shade.cast`, the
+## ground's props' rule), so it is exactly as big as the picture is this frame: a sprout's
+## shadow is a sprout's, and a plant rising in casts a shadow rising with it. Its corners
+## carry the plant's own packed foot and role, so the sway shader moves its far end as it
+## leans the plant's top, and an afloat reed's shadow rides the swell with the reed. On land
+## for the lawn, the beach and the forest floor; on the water for a reed standing in the
+## lake; none for a pad lying flat on it, which throws its shadow on the bed instead.
 func _lay() -> void:
 	_below_rows.clear()
 	_points.resize(0)
 	_uvs.resize(0)
 	_colors.resize(0)
 	_indices.resize(0)
+	_shade_points.resize(0)
+	_shade_uvs.resize(0)
+	_shade_colors.resize(0)
+	_shade_indices.resize(0)
+	_bed_points.resize(0)
+	_bed_uvs.resize(0)
+	_bed_colors.resize(0)
+	_bed_indices.resize(0)
+	var sun := Shade.sun_of(day)
+	if sun != null:
+		_sun_lean = sun.lean
+		_sun_stretch = sun.stretch
+		shade_across(material as ShaderMaterial, sun.lean, sun.stretch)
 	var sheet_size := Vector2(_sheet.get_width(), _sheet.get_height())
 	for k in _foot.size():
 		if _age[k] < 0.0:
@@ -531,35 +733,86 @@ func _lay() -> void:
 		var box := Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h))
 		var uv := Rect2(Vector2(rect[0], rect[1]) / sheet_size, Vector2(rect[2], rect[3]) / sheet_size)
 		var kind := String(entry["kind"])
-		if (kind == "water" or kind == "open") and t >= SPROUT_UNTIL and Fish.bed_shows(grid, foot):
-			var drop := Fish.shadow_drop(foot)
-			var standing := _species[k] == "open_reeds"
-			var top := foot if standing else box.get_center()
-			_below_rows.append([&"stem", top, top + drop])
+		# Afloat, the whole picture rides the swell; on land, only the top corners lean.
+		var afloat := kind == "water" or kind == "open"
+		var standing := _species[k] == "open_reeds"
+		if afloat and t >= SPROUT_UNTIL and Fish.bed_shows(grid, foot):
+			var drop := Fish.shadow_drop(foot, sun)
+			var from := foot if standing else box.get_center()
+			_below_rows.append([&"stem", from, from + drop])
 			if not standing:
-				_below_rows.append([&"shadow", Rect2(box.position + drop, box.size), Rect2(Vector2(rect[0], rect[1]), Vector2(rect[2], rect[3]))])
+				var lies := Rect2(box.position + drop, box.size)
+				var bob := LakeGrid.pack_anchor(foot.x, AFLOAT, SHADE_BED)
+				_bed_quad(_corners(Transform2D.IDENTITY, lies), uv, bob, bob)
+		if sun != null and (standing or not afloat):
+			var lie := Shade.cast(foot, sun.lean, sun.stretch)
+			var flag := SHADE_WATER if afloat else SHADE_LAND
+			var far := LakeGrid.pack_anchor(foot.x, AFLOAT if afloat else TOP, flag)
+			var near := LakeGrid.pack_anchor(foot.x, AFLOAT if afloat else FOOT, flag)
+			_shade_quad(_corners(lie, Rect2(Vector2(-w * 0.5, -h), Vector2(w, h))), uv, far, near)
 		var base := _points.size()
-		_points.append(box.position)
-		_points.append(Vector2(box.end.x, box.position.y))
-		_points.append(box.end)
-		_points.append(Vector2(box.position.x, box.end.y))
+		_points.append_array(_corners(Transform2D.IDENTITY, box))
 		_uvs.append(uv.position)
 		_uvs.append(Vector2(uv.end.x, uv.position.y))
 		_uvs.append(uv.end)
 		_uvs.append(Vector2(uv.position.x, uv.end.y))
-		for i in 4:
-			_colors.append(Color.WHITE)
+		var top := LakeGrid.pack_anchor(foot.x, AFLOAT if afloat else TOP, 1.0)
+		var still := LakeGrid.pack_anchor(foot.x, AFLOAT if afloat else FOOT, 1.0)
+		_colors.append_array(PackedColorArray([top, top, still, still]))
 		_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 	_dirty = false
 	if _below != null:
 		_below.queue_redraw()
+		if _below.shade != null:
+			_below.shade.queue_redraw()
 
 
+## A box's corners, top-left, top-right, bottom-right, bottom-left, put through `xform`: the
+## top two are the picture's top, whatever the transform lays them out as.
+static func _corners(xform: Transform2D, box: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([
+		xform * box.position, xform * Vector2(box.end.x, box.position.y),
+		xform * box.end, xform * Vector2(box.position.x, box.end.y),
+	])
+
+
+## One shadow quad into the land-and-water batch: `far` on the picture's top corners, `near`
+## on its foot.
+func _shade_quad(corners: PackedVector2Array, uv: Rect2, far: Color, near: Color) -> void:
+	var base := _shade_points.size()
+	_shade_points.append_array(corners)
+	_shade_uvs.append(uv.position)
+	_shade_uvs.append(Vector2(uv.end.x, uv.position.y))
+	_shade_uvs.append(uv.end)
+	_shade_uvs.append(Vector2(uv.position.x, uv.end.y))
+	_shade_colors.append_array(PackedColorArray([far, far, near, near]))
+	_shade_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+
+
+## One pad's shadow into the bed's batch.
+func _bed_quad(corners: PackedVector2Array, uv: Rect2, far: Color, near: Color) -> void:
+	var base := _bed_points.size()
+	_bed_points.append_array(corners)
+	_bed_uvs.append(uv.position)
+	_bed_uvs.append(Vector2(uv.end.x, uv.position.y))
+	_bed_uvs.append(uv.end)
+	_bed_uvs.append(Vector2(uv.position.x, uv.end.y))
+	_bed_colors.append_array(PackedColorArray([far, far, near, near]))
+	_bed_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+
+
+## The shadows first, as their own triangle array, so every one is under every plant; then
+## the plants. Two draw calls for the whole of the flora, off one sheet and one material.
 func _draw() -> void:
 	if _sheet == null or _foot.is_empty():
 		return
 	if _dirty:
 		_lay()
+	if not _shade_indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), _shade_indices, _shade_points, _shade_colors, _shade_uvs,
+			PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
+		)
 	if _indices.is_empty():
 		return
 	RenderingServer.canvas_item_add_triangle_array(
@@ -568,18 +821,17 @@ func _draw() -> void:
 	)
 
 
-## Under the water plants, behind them: shadows first, then the stems over them, each a
-## column of whole art pixels stepping sideways as it goes down, and a root on the bed.
+## Under the water plants, behind them: the pads' shadows on the bed (`shade`, its own
+## child, drawn behind this), then the stems over them, each a column of whole art pixels
+## stepping sideways as it goes down, and a root on the bed.
 class Below:
 	extends Node2D
 	var flora: Flora
+	var shade: BedShade
 
 	func _draw() -> void:
 		if flora == null or flora._sheet == null:
 			return
-		for row: Array in flora._below_rows:
-			if row[0] == &"shadow":
-				draw_texture_rect_region(flora._sheet, row[1], row[2], Color(0.02, 0.06, 0.08, Fish.SHADOW_INK))
 		for row: Array in flora._below_rows:
 			if row[0] != &"stem":
 				continue
@@ -592,6 +844,24 @@ class Below:
 				var x := roundf(lerpf(from.x, to.x, float(i) / float(rows)) / ART) * ART
 				draw_rect(Rect2(Vector2(x, from.y + float(i) * ART), Vector2(ART, ART)), stem)
 			draw_rect(Rect2(to + Vector2(-ART, 0.0), Vector2(ART * 3.0, ART)), root)
+
+
+## The pads' shadows on the lakebed, one batch: each the pad's picture where `Fish.shadow_drop`
+## puts it along the sun, in the bed's ink (`Shade.On.BED`, pushed every frame), and packed
+## afloat on the pad's own foot so it bobs and wanders with the pad over it. Its own node with
+## its own sway material, because the stems drawn on `Below` are plain colours that a sway
+## material would read as packed.
+class BedShade:
+	extends Node2D
+	var flora: Flora
+
+	func _draw() -> void:
+		if flora == null or flora._sheet == null or flora._bed_indices.is_empty():
+			return
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), flora._bed_indices, flora._bed_points, flora._bed_colors,
+			flora._bed_uvs, PackedInt32Array(), PackedFloat32Array(), flora._sheet.get_rid()
+		)
 
 
 ## Each bee circles its flower's head on a wobbling loop, on whole art pixels: a yellow dot,

@@ -71,9 +71,9 @@ func _physics_process(delta: float) -> void:
 			var sheets: Sheets = _lake.get(&"_sheets")
 			var waiting: Array = _lake.get(&"unwashed")
 			for name: String in sheets.names:
-				if WashRoom.is_find(sheets, name) and name != "decor_bed" and waiting.size() < 3:
+				if WashRoom.is_find(sheets, name) and name.begins_with("decor_pk_") and waiting.size() < 3:
 					waiting.append(name)
-			_lake.set(&"sludge", 12.0)
+			_lake.set(&"sludge", 20.0)
 			_lake.call(&"_set_wash", true)
 			var room: WashRoom = _lake.get(&"_wash")
 			# A purse of 12: the big ones are drawn back, and the first it can cover goes on.

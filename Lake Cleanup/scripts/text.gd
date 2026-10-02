@@ -479,9 +479,6 @@ static var CREDITS_HEAD_ART: String:
 static var CREDITS_HEAD_TOOLS: String:
 	get: return TranslationServer.translate(&"CREDITS_HEAD_TOOLS")
 
-static var CONSOLE_COUNT: String:
-	get: return TranslationServer.translate(&"CONSOLE_COUNT")
-
 static var DECOR_SOFA: String:
 	get: return TranslationServer.translate(&"DECOR_SOFA")
 
@@ -638,9 +635,6 @@ static var TOUR_DECOR_ROOM: String:
 static var UI_CLOSE: String:
 	get: return TranslationServer.translate(&"UI_CLOSE")
 
-static var SETTINGS_WIPE: String:
-	get: return TranslationServer.translate(&"SETTINGS_WIPE")
-
 static var TOUR_SHOP_NET: String:
 	get: return TranslationServer.translate(&"TOUR_SHOP_NET")
 
@@ -695,9 +689,6 @@ static var WASH_TITLE_N: String:
 static var WASH_FREE: String:
 	get: return TranslationServer.translate(&"WASH_FREE")
 
-static var WASH_SOAP: String:
-	get: return TranslationServer.translate(&"WASH_SOAP")
-
 static var WASH_WASHING: String:
 	get: return TranslationServer.translate(&"WASH_WASHING")
 
@@ -718,3 +709,204 @@ static var RECORD_NOW: String:
 
 static var RECORD_SYNC: String:
 	get: return TranslationServer.translate(&"RECORD_SYNC")
+
+static var HIVE_SWARM: String:
+	get: return TranslationServer.translate(&"HIVE_SWARM")
+
+static var HIVE_STEP_CATCH: String:
+	get: return TranslationServer.translate(&"HIVE_STEP_CATCH")
+
+static var HIVE_STEP_SMOKE: String:
+	get: return TranslationServer.translate(&"HIVE_STEP_SMOKE")
+
+static var HIVE_STEP_QUEEN: String:
+	get: return TranslationServer.translate(&"HIVE_STEP_QUEEN")
+
+static var HIVE_STEP_UNCAP: String:
+	get: return TranslationServer.translate(&"HIVE_STEP_UNCAP")
+
+static var HIVE_STEP_POUR: String:
+	get: return TranslationServer.translate(&"HIVE_STEP_POUR")
+
+static var HIVE_HINT_CATCH: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_CATCH")
+
+static var HIVE_HINT_SMOKE: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_SMOKE")
+
+static var HIVE_HINT_QUEEN: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_QUEEN")
+
+static var HIVE_HINT_UNCAP: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_UNCAP")
+
+static var HIVE_HINT_POUR: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_POUR")
+
+static var HIVE_HINT_DONE: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_DONE")
+
+static var HIVE_HINT_SETTLED: String:
+	get: return TranslationServer.translate(&"HIVE_HINT_SETTLED")
+
+static var HIVE_READY: String:
+	get: return TranslationServer.translate(&"HIVE_READY")
+
+static var HOSE_NAME: String:
+	get: return TranslationServer.translate(&"HOSE_NAME")
+
+static var DECOR_PK_ARMCHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_ARMCHAIR")
+
+static var DECOR_PK_OLD_SEAT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_OLD_SEAT")
+
+static var DECOR_PK_BATHTUB: String:
+	get: return TranslationServer.translate(&"DECOR_PK_BATHTUB")
+
+static var DECOR_PK_BED: String:
+	get: return TranslationServer.translate(&"DECOR_PK_BED")
+
+static var DECOR_PK_BOOKSHELF: String:
+	get: return TranslationServer.translate(&"DECOR_PK_BOOKSHELF")
+
+static var DECOR_PK_CHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_CHAIR")
+
+static var DECOR_PK_COFFEE_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_COFFEE_TABLE")
+
+static var DECOR_PK_CORNER_DESK: String:
+	get: return TranslationServer.translate(&"DECOR_PK_CORNER_DESK")
+
+static var DECOR_PK_DRAWER: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DRAWER")
+
+static var DECOR_PK_DRAWER_DESK: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DRAWER_DESK")
+
+static var DECOR_PK_FANCY_BED: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FANCY_BED")
+
+static var DECOR_PK_FANCY_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FANCY_TABLE")
+
+static var DECOR_PK_FILE_CABINET: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FILE_CABINET")
+
+static var DECOR_PK_FIREPLACE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FIREPLACE")
+
+static var DECOR_PK_KITCHEN_COUNTER: String:
+	get: return TranslationServer.translate(&"DECOR_PK_KITCHEN_COUNTER")
+
+static var DECOR_PK_MICROWAVE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_MICROWAVE")
+
+static var DECOR_PK_SOFA: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SOFA")
+
+static var DECOR_PK_STOVE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_STOVE")
+
+static var DECOR_PK_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_TABLE")
+
+static var DECOR_PK_TOILET: String:
+	get: return TranslationServer.translate(&"DECOR_PK_TOILET")
+
+static var DECOR_PK_DINER_CHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DINER_CHAIR")
+
+static var DECOR_PK_GREEN_CHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_GREEN_CHAIR")
+
+static var DECOR_PK_WOOD_CHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_WOOD_CHAIR")
+
+static var DECOR_PK_CARVED_CHAIR: String:
+	get: return TranslationServer.translate(&"DECOR_PK_CARVED_CHAIR")
+
+static var DECOR_PK_WHITE_SOFA: String:
+	get: return TranslationServer.translate(&"DECOR_PK_WHITE_SOFA")
+
+static var DECOR_PK_NIGHTSTAND: String:
+	get: return TranslationServer.translate(&"DECOR_PK_NIGHTSTAND")
+
+static var DECOR_PK_BONSAI: String:
+	get: return TranslationServer.translate(&"DECOR_PK_BONSAI")
+
+static var DECOR_PK_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_RUG")
+
+static var DECOR_PK_COAT_STAND: String:
+	get: return TranslationServer.translate(&"DECOR_PK_COAT_STAND")
+
+static var DECOR_PK_LANDSCAPE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_LANDSCAPE")
+
+static var DECOR_PK_PORTRAIT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_PORTRAIT")
+
+static var DECOR_PK_GRANDFATHER_CLOCK: String:
+	get: return TranslationServer.translate(&"DECOR_PK_GRANDFATHER_CLOCK")
+
+static var DECOR_PK_GLOBE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_GLOBE")
+
+static var DECOR_PK_SCULPTURE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SCULPTURE")
+
+static var DECOR_PK_BLUE_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_BLUE_RUG")
+
+static var DECOR_PK_FRIDGE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FRIDGE")
+
+static var DECOR_PK_SIDE_DESK: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SIDE_DESK")
+
+static var DECOR_PK_SINK: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SINK")
+
+static var DECOR_PK_DINER_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DINER_TABLE")
+
+static var DECOR_PK_FLOWER_VASE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FLOWER_VASE")
+
+static var DECOR_PK_FLOWER_POT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FLOWER_POT")
+
+static var DECOR_PK_CAR_PICTURE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_CAR_PICTURE")
+
+static var DECOR_PK_DOTTED_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DOTTED_RUG")
+
+static var DECOR_PK_ALOE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_ALOE")
+
+static var DECOR_PK_CACTUS: String:
+	get: return TranslationServer.translate(&"DECOR_PK_CACTUS")
+
+static var DECOR_PK_DINER_SEAT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DINER_SEAT")
+
+static var DECOR_PK_GLASS_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_GLASS_TABLE")
+
+static var DECOR_PK_SMALL_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SMALL_TABLE")
+
+static var DECOR_PK_PLANT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_PLANT")
+
+static var DECOR_PK_SPROUT_POT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_SPROUT_POT")
+
+static var DECOR_PK_POTTED_TREE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_POTTED_TREE")
+
+static var DECOR_PK_TABLE_LAMP: String:
+	get: return TranslationServer.translate(&"DECOR_PK_TABLE_LAMP")

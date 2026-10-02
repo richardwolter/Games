@@ -40,7 +40,7 @@ PAIRED = {}
 # forgiving early, so Hold and Sailing start cheap and their ladders take up the difference.
 BASE_MOST = {"fleet": 200.0, "cargo": 40.0, "boat_speed": 60.0}
 # Priced by Richard off his logged run of 2026-09-18 (docs/progression/playtests/), not by
-# the fit, and left alone by this script: Strength from 3500 with its top kept where he maxed
+# the fit, and left alone by this script: Strength from 1700 (2026-09-29; 3500 on the logged run) with its top kept where he maxed
 # it at 40 minutes; Range cheap to start and dear to finish (the tier-0 water in reach ran dry
 # at minutes 5 to 15 on Range 2 to 5); Pigeons cheap and early (he netted 196 birds and did
 # not buy a level until minute 50); the Pack cheap and the rest of the dogs dearer (he bought

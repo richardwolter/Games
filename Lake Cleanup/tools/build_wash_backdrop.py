@@ -53,11 +53,15 @@ WIDE = 960
 
 # The far bank, top to bottom: room for the tallest tree, the rough grass the trees stand
 # in, the sand.
-BANK_TALL = 118
-BANK_GRASS = 18
-BANK_SAND = 7
+# At one canvas pixel a painted one (`WashBackdrop.FAR_PIXEL`), 33 tiles out: the far
+# sand three tiles deep is three rows, the grass behind it before the trees a handful.
+BANK_TALL = 96
+BANK_GRASS = 5
+BANK_SAND = 3
 # Back to front: how far up the bank a rank's feet are, its spacing, and its tone.
-RANKS = [(14, 19, 0.62), (8, 23, 0.8), (2, 27, 1.0)]
+# A dense back rank, darker, first (2026-10-02, Richard: the wood's top read cut): its
+# crowns close the gaps, so the skyline is a run of bumps rather than flat fills.
+RANKS = [(10, 13, 0.5), (7, 17, 0.58), (5, 21, 0.66), (3, 25, 0.82), (1, 30, 1.0)]
 RANK_JITTER = 7
 
 # The near bank: block heights from the waterline down. Sand first, then lawn; the last
@@ -68,6 +72,35 @@ GRASS_ROWS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8]
 BLOCK = (16, 8)
 EDGE_WANDER = 2
 BLADE_ODDS = 0.22
+
+# The ground in the island's own rules (2026-10-02, Richard: match the lake's current looks,
+# and more sand, to the island's proportions). Not the pack's tiles any more: the lawn is
+# drawn blade by blade in `Ground.lawn_shades`' greens the way `ground.gdshader`'s
+# `blade_grass` draws it, and the beach carries its bands, waterline up: the wet edge, the
+# tide line of wrack, ripples in patches, pebbles and shells, the pale dry strip under the
+# lawn, and the lawn's blades hanging over it. Read off the pack's slices as `Ground` reads
+# them, and the shader's own sand swatches. A fake perspective: blades shorter and clumps
+# smaller towards the waterline. Everything is periodic across `WIDE`, so the strip wraps.
+GRASS_ISLAND = 18
+GRASS_BANK = 21
+LAWN_LEAST = 0.004
+# The island's sand from the near waterline to the lawn, in near rows: what
+# `WashBackdrop.y_at` puts between `LAWN_D` and `SHORE_D` on a 720-line window.
+NEAR_SAND = 38
+BANK_SAND_NEW = 9
+SPECKLE = 0.08
+BLADE_SHARE = 0.06
+CLUMP_SHARE = 0.42
+CLUMP_CUT = 0.74
+BLADE_LEAN = 0.2
+SAND_WET = (180, 150, 104, 255)
+SAND_DAMP = (190, 163, 118, 255)
+SAND_DOWN = (206, 177, 126, 255)
+SAND_LIGHT = (240, 220, 172, 255)
+PEBBLE = (150, 136, 112, 255)
+PEBBLE_LIT = (196, 184, 158, 255)
+SHELL = (244, 232, 214, 255)
+FRINGE = (50, 87, 29, 255)
 
 
 # The clouds (2026-09-28, `/grill-me` with Richard, off a reference and option 3 of
@@ -115,6 +148,130 @@ def _vnoise(x, y, s):
 
 def _fbm(x, y, s):
     return sum(_vnoise(x * 2 ** o, y * 2 ** o, s + o) / 2 ** o for o in range(3)) / 1.75
+
+
+def _pnoise(x, y, cell, s):
+    """Value noise that repeats across `WIDE`: the lattice wraps every WIDE / cell cells."""
+    period = max(1, round(WIDE / cell))
+    gx, gy = x / cell, y / cell
+    xi, yi = math.floor(gx), math.floor(gy)
+    fx, fy = gx - xi, gy - yi
+    fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    h = lambda i, j: _hash(i % period, j, s)
+    a, b = h(xi, yi), h(xi + 1, yi)
+    d, e = h(xi, yi + 1), h(xi + 1, yi + 1)
+    return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy
+
+
+def lawn_shades(slice_n):
+    """`Ground.lawn_shades`, in Python: the slice's greens on its top face by brightness, the
+    commonest as the ground, one down, one up, two up."""
+    im = Image.open(PACK + "Tileset/Slice %d.png" % slice_n).convert("RGBA")
+    counts = {}
+    total = 0
+    for y in range(GRASS_FACE_ROW, GRASS_FACE_ROW + 16):
+        for x in range(im.width):
+            c = im.getpixel((x, y))
+            if c[3] < 128:
+                continue
+            counts[c] = counts.get(c, 0) + 1
+            total += 1
+    greens = sorted([c for c in counts if counts[c] >= total * LAWN_LEAST],
+                    key=lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2])
+    base = max(counts, key=lambda c: counts[c])
+    at = greens.index(base)
+    low = greens[max(at - 1, 0)]
+    return {
+        "mid": base, "low": low,
+        "light": greens[min(at + 1, len(greens) - 1)],
+        "hi": greens[min(at + 2, len(greens) - 1)],
+        "soft": _mix(low, base, 0.45),
+    }
+
+
+def sand_texel():
+    im = Image.open(PACK + "Tileset/Slice %d.png" % SAND_TILE).convert("RGBA")
+    counts = {}
+    for y in range(SAND_FACE_ROW + 4, SAND_FACE_ROW + 12):
+        for x in range(8, 24):
+            c = im.getpixel((x, y))
+            if c[3] >= 128:
+                counts[c] = counts.get(c, 0) + 1
+    return max(counts, key=lambda c: counts[c])
+
+
+def draw_lawn(out, top, bottom, shades, near_scale, s, tone=0):
+    """The island's lawn between rows `top` and `bottom`: the ground green and its speckle,
+    then blades rooted on every row, back to front, tall in clumps and short alone, leaning
+    a pixel at the top, lit on the clump's sunward side. `near_scale(y)` is 0 far, 1 near.
+    `tone` > 0 lays the bank's darker and lighter blotches under it."""
+    for y in range(top, bottom):
+        for x in range(WIDE):
+            c = shades["low"] if _hash(x, y, s + 1) < SPECKLE else shades["mid"]
+            if tone:
+                m = _pnoise(x, y * 2, 28, s + 7)
+                f = 1.0 - 0.08 if m < 0.38 else (1.0 + 0.08 if m > 0.62 else 1.0)
+                c = tuple(min(255, int(c[k] * f)) for k in range(3)) + (255,)
+            out.putpixel((x, y), c)
+    for y in range(top, bottom):
+        near = near_scale(y)
+        cell = 3 + 4 * near
+        for x in range(WIDE):
+            roll = _hash(x, y, s + 3)
+            if roll > CLUMP_SHARE:
+                continue
+            dens = _pnoise(x, y * 2, cell, s + 5)
+            clump = dens > CLUMP_CUT
+            if roll > (CLUMP_SHARE if clump else BLADE_SHARE):
+                continue
+            tall = (2 + round(near * 1.5) + (1 if _hash(x, y, s + 9) > 0.5 else 0)) if clump \
+                else 1 + round(near)
+            lean = _hash(x, y, s + 11)
+            shift = -1 if lean < BLADE_LEAN else (1 if lean > 1 - BLADE_LEAN else 0)
+            east = _pnoise(x + 2, y * 2, cell, s + 5) < dens
+            for k in range(tall):
+                yy = y - k
+                if yy < top - 1:
+                    break
+                xx = (x + (shift if k >= 2 else 0)) % WIDE
+                if k == tall - 1:
+                    c = (shades["hi"] if east else shades["light"]) if clump else shades["light"]
+                elif k == 0 and clump:
+                    c = shades["low"]
+                else:
+                    c = shades["soft"] if clump else shades["low"]
+                out.putpixel((xx, yy), c)
+
+
+def draw_beach(out, top, rows, texel, s, near_first=True, dry_from=None):
+    """A beach `rows` tall from row `top`, in the island's bands. `near_first` puts the water
+    at the top (the near bank); the far bank has it at the bottom."""
+    for r in range(rows):
+        dw = r if near_first else rows - 1 - r
+        y = top + r
+        for x in range(WIDE):
+            c = texel
+            dry = dw >= (dry_from if dry_from is not None else rows - max(2, rows // 7))
+            if dw == 0:
+                c = SAND_WET
+            elif dw == 1 and _pnoise(x, 0, 18, s + 21) > 0.45:
+                c = SAND_DAMP
+            elif dry:
+                c = SAND_LIGHT if _hash(x, y, s + 23) > 0.08 else texel
+            else:
+                tide = max(3, round(rows * 0.2)) + round((_pnoise(x, 0, 30, s + 25) - 0.5) * 2)
+                if tide <= dw < tide + 2 and _pnoise(x, 0, 6, s + 27) > 0.4:
+                    c = SHELL if _hash(x, y, s + 29) < 0.07 else (SAND_WET if dw == tide else SAND_DOWN)
+                elif dw > tide + 3 and _pnoise(x, dw * 3, 16, s + 31) > 0.7 \
+                        and _pnoise(x, dw, 5, s + 33) >= 0.5 and (dw - tide) % 4 == 0:
+                    c = SAND_DOWN if _hash(x, y, s + 35) > 0.4 else SAND_LIGHT
+                elif _hash(x, y, s + 37) < 0.004:
+                    c = PEBBLE
+                elif _hash(x, y + 1, s + 37) < 0.004:
+                    c = PEBBLE_LIT
+                elif _hash(x, y, s + 39) < 0.0025:
+                    c = SHELL
+            out.putpixel((x, y), c)
 
 
 def cloud(wide, tall, seed):
@@ -239,11 +396,10 @@ def stamp(canvas, art, x, y):
 
 def build_bank(roll):
     bank = Image.new("RGBA", (WIDE, BANK_TALL))
-    rough = [face(t, GRASS_FACE_ROW) for t in ROUGH_TILES]
-    sand = [face(SAND_TILE, SAND_FACE_ROW)]
     grass_top = BANK_TALL - BANK_SAND - BANK_GRASS
-    bank.paste(ground(roll, rough, [2, 2, 2, 3, 3], BANK_GRASS, WIDE), (0, grass_top))
-    bank.paste(ground(roll, sand, [2, 2, 3], BANK_SAND, WIDE), (0, BANK_TALL - BANK_SAND))
+    sand_top = BANK_TALL - BANK_SAND
+    draw_lawn(bank, grass_top, sand_top, lawn_shades(GRASS_BANK), lambda y: 0.0, 400, tone=3)
+    draw_beach(bank, sand_top, BANK_SAND, sand_texel(), 500, near_first=False)
     trees = [Image.open(PACK + p).convert("RGBA") for p in TREES]
     dead = [Image.open(PACK + p).convert("RGBA") for p in DEAD]
     feet_base = BANK_TALL - BANK_SAND
@@ -258,29 +414,69 @@ def build_bank(roll):
             at = (x - art.width // 2, feet - art.height)
             stamp(bank, art, at[0], at[1])
             x += gap + roll.randrange(-RANK_JITTER, RANK_JITTER + 1)
+    close_canopy(bank, grass_top)
     return bank
 
 
+# The far wood is one mass (2026-10-02, Richard: "the tree line should not have gaps that
+# you can see the sky"): every see-through pixel under the canopy with crown on both sides
+# of it within `CANOPY_REACH`, or crown above it in its own column, is filled with the
+# deep shade of the trees behind. The skyline keeps its crowns' points; only the V's
+# between them, down to the grass, are closed.
+CANOPY_REACH = 4
+CANOPY_SHADE = 0.42
+
+
+def close_canopy(bank, grass_top):
+    w, h = bank.size
+    px = bank.load()
+    solid = [[px[x, y][3] > 0 for x in range(w)] for y in range(h)]
+    # The deep shade: the darkest of the common greens in the crowns, darker still.
+    counts = {}
+    for y in range(grass_top):
+        for x in range(w):
+            c = px[x, y]
+            if c[3] > 0 and c[1] > c[0] and c[1] > c[2]:
+                counts[c[:3]] = counts.get(c[:3], 0) + 1
+    common = sorted(counts, key=lambda c: -counts[c])[:12]
+    deep = min(common, key=lambda c: c[0] + c[1] + c[2]) if common else (30, 52, 34)
+    fill = tuple(int(v * CANOPY_SHADE / 0.62) for v in deep) + (255,)
+    above = [False] * w
+    for y in range(grass_top):
+        row = solid[y]
+        for x in range(w):
+            if row[x]:
+                above[x] = True
+                continue
+            closed = above[x]
+            if not closed:
+                left = any(row[(x - k) % w] for k in range(1, CANOPY_REACH + 1))
+                right = any(row[(x + k) % w] for k in range(1, CANOPY_REACH + 1))
+                closed = left and right
+            if closed:
+                px[x, y] = fill
+                above[x] = True
+
+
 def build_lawn(roll):
-    lawn_faces = [face(t, GRASS_FACE_ROW) for t in LAWN_TILES]
-    sand_faces = [face(SAND_TILE, SAND_FACE_ROW)]
-    sand_tall = sum(SAND_ROWS)
-    out = ground(roll, sand_faces, SAND_ROWS, LAWN_TALL, WIDE)
-    grass = ground(roll, lawn_faces, GRASS_ROWS, LAWN_TALL, WIDE)
-    # The lawn's far edge wanders and throws blades over the sand: a ruled line between two
-    # patchworks is a seam, not a beach.
-    edge = 0
+    sand_tall = NEAR_SAND
+    out = Image.new("RGBA", (WIDE, LAWN_TALL))
+    # A few rows past the sand's own, under the lawn's wandering edge.
+    draw_beach(out, 0, sand_tall + EDGE_WANDER + 1, sand_texel(), 600, dry_from=sand_tall - 3)
+    lawn = Image.new("RGBA", (WIDE, LAWN_TALL))
+    draw_lawn(lawn, sand_tall - 3, LAWN_TALL, lawn_shades(GRASS_ISLAND),
+              lambda y: max(0.0, min(1.0, (y - sand_tall) / float(LAWN_TALL - sand_tall))), 700)
+    # The lawn's edge wanders a little and hangs blades over the sand, the island's fringe.
+    edge_tip = lawn_shades(GRASS_ISLAND)["light"]
     for x in range(WIDE):
-        if roll.random() < 0.3:
-            edge = max(-EDGE_WANDER, min(EDGE_WANDER, edge + roll.choice((-1, 1))))
-        # Come back to nought by the right edge so the strip wraps.
-        if x > WIDE - 12:
-            edge = int(edge * (WIDE - x) / 12)
-        top = sand_tall + edge
-        if roll.random() < BLADE_ODDS:
-            top -= roll.randrange(1, 4)
-        for y in range(top, LAWN_TALL):
-            out.putpixel((x, y), grass.getpixel((x, max(y - sand_tall, 0))))
+        edge = sand_tall + round((_pnoise(x, 0, 24, 710) - 0.5) * 2 * EDGE_WANDER)
+        for y in range(edge, LAWN_TALL):
+            out.putpixel((x, y), lawn.getpixel((x, y)))
+        # Blades of the lawn's edge standing up over the sand, darkest at the root.
+        if _hash(x, 0, 720) < 0.35:
+            rise = 1 + int(_hash(x, 2, 722) * 3)
+            for k in range(rise):
+                out.putpixel((x, edge - 1 - k), FRINGE if k < rise - 1 else edge_tip)
     return out, sand_tall
 
 

@@ -595,6 +595,26 @@ late lake is thin. So the lake got denser **and** Catch got bigger, with the mon
 - **Open**: fill and `_rebuild` cost with twice the pieces (bench before trusting the 8 ms
   bar), and whether the sim's Catch read is right - Richard's next logged run decides.
 
+### The Ring Leans Tier 0 (2026-09-29, `/grill-me` with Richard)
+The start was slow and leaned too hard on Strength. **Supersedes, in The Thin Ring below**:
+`RING_SLOTS` 2/3 and "every piece is tier 1 or lighter".
+- **Thicker, not wider**: `RING_SLOTS` 3/4 (the ring is not multiplied by `DENSITY`),
+  `RING_OUT` 8 unchanged, the extra slots taken from past the ring as before.
+- **Tier 0 but for bait**: `_lighten_ring` trades every ring piece that is not tier 0 for a
+  tier-0 one from past it, except `RING_BAIT` (0.15) of tier 1-2 pieces left where rolled
+  (`RING_TIER` 2). Measured: 97 of 1638 ring pieces are bait; tier 0 still 29.3% of the lake.
+- **Tops are tier 0**: `_dress_surface` holds the whole ring to the opening ring's rule, bar
+  `RING_BAIT_TOP` (0.15) of tiles past `OPEN_RING` that may show bait, no two within
+  `RING_BAIT_APART` (2) tiles. It lands about 1 bait top a lake: most bait rolls find a
+  tier-0 top to prefer anyway.
+- **Early finds skip the ring's inner half** (`_find_band`): it was 2 deep and so skipped by
+  `height < 3`; now 3 deep, a find there went in the first casts.
+- **Strength 1700 x 3.47** (1700 / 5.9k / 20.5k / 71k), top kept, pinned in `HAND`;
+  `shop.json` rebuilt, the pricing loop not run, the sim not re-run.
+- **`SAVE_VERSION` 17**, v16 refused; the v16 save is `_builds/lake_cleanup_v16_20260929.save`.
+- Out of scope: a wider ring, other prices. Bait numbers are first guesses; the next logged
+  run judges them.
+
 ### The Thin Ring Round the Island (2026-09-22, `/grill-me` with Richard, player feedback)
 Players' first sessions: the water by the island was nine-deep soup, so ten minutes of
 casting skimmed the top off it and nothing ever read as cleared. Now the first stretch out
@@ -2035,6 +2055,25 @@ pipeline and English only"** in Every Word Is a Key above.
 - **Out of scope, by decision**: the letter stills (still English), the siege, the credits'
   pack lines, the Steam page, widening boards.
 
+### Portuguese Is the Source (2026-09-29, Richard)
+Richard rewrote 85 strings in Portuguese in an artifact (see memory `lake-pt-rewrite-artifact`);
+`tools/pt_source_pass.py` merged them and retranslated en and the six others from his meaning.
+- **pt_BR is the source text now**; en follows it. Machine drafts still unreviewed for es/de/fr/ja/zh/ko.
+- **Player-facing words changed**: the shed is **the house** (casa) in every visible string (code
+  names stay `shed`), yards are **piers**, the ferry is **the boats**. Shop names: Speed, Loading,
+  Capacity, Carry, Luck, Size, $ Bonus, Reel; groups Progress / Number of boats / Helping / At the
+  piers. PT has "Carrega" on both Capacity (boats) and Carry (dogs): the uniqueness guard reads English.
+- **Shorter find titles** (Rug, Table, Bookcase, Chair, Mirror, Small table, Clock, Painting, Lamp,
+  Pet toy), set in `decor_sets.json` and `pieces.json`, since `build_translations.py` makes DECOR_*
+  follow them. Two rugs and two bookcases now share a name, by decision.
+- **The letter's name line reads "Dirty Little Lake."** (no "My"), this line only; the game's title is unchanged.
+- **Code**: the menu's Quit is "Save and quit" and saves before closing (`MainMenu.quit_asked`,
+  `Lake._save_and_quit`); the settings board's never-shown wipe row is deleted (F6 stays);
+  the wash tray no longer writes "soap" (only "Washing" while on the stand); the room card names
+  the key (`TOUR_DECOR_ROOM` takes `%s`, `Binds.shown(&"shed_switch", pad)`); the console spike
+  (`console_shelf.gd`, `console_spike`) and `CONSOLE_COUNT` are deleted.
+- The letter stills still show the old English UI; re-shoot with `shot_letter_art` when wanted.
+
 ### The Save Is Written Safely (2026-09-29, issue #25)
 - **Temp, then rename** (`Lake.save_game`, `_swap_in_save`): the run is written to
   `<save>.tmp`, checked for a write error, and only then moved over the save; the save it
@@ -2600,10 +2639,119 @@ old source) and the 1.4 grain notes above for what the lake draws.
 - **Pipeline**: `--write` overwrites `art_source/shed_v2_<stage>.png` and the glow mask (for
   Richard to polish by hand), `--ship` copies them to `assets/shed_*.png`; reimport after.
   Base python with the psd-extract venv's site-packages on `PYTHONPATH`.
+- **Contrast and volume** (2026-10-02, Richard: beside the 1x recycle box the hut read washed
+  out, "lines and details less visible, less volume"): siding boards `Hut.ROW` 7 rows (was
+  5) and `SEG` 32 long (was 16), each seam a dark row with a shadow row under it and a lit
+  top edge, board tone wandering `TONE` 0.28 (was 0.45), the shaded front at `FRONT` 2.8 and
+  the sunlit gable at `GABLE` 4.4 (were 3.3 and 4), less grime. Roof shingles 6x9 (were
+  5x6), moss in fewer, larger patches, a rounder ridge cap (lit crown, body, underside,
+  shadow), a **verge board down the roof's left end**, and the far slope past the gable's
+  right rake drawn as a verge (lit lip, course joints, dark underside) over a **rake board**
+  on the gable, where it was a flat two-tone strip that read cut. Shipped over all three
+  stages (`--write --ship`); no hand polish was lost, the art_source pictures matched.
+- **The recycle box is the hut's carpentry** (same day, Richard: "same wood treatment and
+  construction, so it perfectly matches"): `build_recycle_box.hut_wall` lays the hut's own
+  siding rules and corner boards on the box's faces, in the hut's `WALL` ramp, the left face
+  as the hut's front and the right as its gable. The pier decks keep the brown ramp.
 - **Credit, open**: the old hut was cut from Zato's CC BY pack; the new one copies none of its
   pixels, only its outline's corners. `docs/CREDITS.md` still credits it until Richard decides.
 - Out of scope, by decision: animation (smoke, flicker), a new footprint, the shed's interior,
   porch items that echo placed finds, the trailer.
+
+### One Sun (2026-10-02, `/grill-me` with Richard)
+Every shadow in the game follows one light model. **Supersedes every per-caster shadow gain,
+cap, colour and drop below** (the hull's 2.7/0.63, the piers' 3.0/0.7, the pigeons' and the
+ducks' 2.4/0.45, the tornado's 1.1/0.36, the wash room's 1.6 and 1.5, `LakeGrid.SHADOW_ALPHA`
+0.15, `DRY_SHADE`, `Fish.SHADOW_INK` and `SHADOW_NEAR`/`FAR`, the shed's black ellipses, the
+hive steps' green-grey, the haul's round black disc).
+- **One ink, one gain per surface** (`Shade.On` LAND / WATER / BED, `Shade.GAIN` 1.0 / 2.7 /
+  1.4, `Shade.MOST` 1.0 / 0.63 / 0.42, `ink_on`, `tint_on`): `Shade.INK` at the day's ink, which
+  already carries the overcast and the flash, so every shadow thins in rain. Water is the
+  hull's old pair; the bed's numbers are first guesses. **No caster keeps an ink of its own**:
+  `test_lake` fails on any `SHADE_GAIN`, `SHADE_MOST`, `SHADOW_INK`, `SHADOW_COLOUR`,
+  `SHADOW_ALPHA`, `DOG_SHADE_GAIN` or `DRY_SHADE` const in `scripts/`.
+- **Everything falls down and left along the day** (`Shade.drop(day, height)`, the offset
+  `lying` gives a pixel that high). Air casters put their shadow at the ground point plus the
+  drop of their height (pigeons, ducks, dragonflies, the haul, tornado debris, the net in
+  flight); things under the water put theirs at the drop of their depth (fish, frogs, turtles,
+  ducks' bed shadows, crayfish, lily pads), so a bed shadow lengthens late in the day.
+  `DayCycle.here` is the day for a caster nobody handed one (`Shade.sun_of`).
+- **A shadow draws on the layer of what it falls on**: the water's shadow layer is absolute
+  z 4 (under the floating soup at 5 and every walker). Pigeons' shadows came off the bird layer
+  (21), dragonflies' off the air layer, the haul's and the hull's off z 10; the haul's are their
+  own batch (`Haul.SHADOW_LAYER`, 2:1 ellipses, `CIRCLE_SEGMENTS` 16). The angler's and the
+  dogs' still draw at their own walker z, under their sprites.
+- **The rubbish's crescent leans and stretches** (`shadow.gdshader` `sun_lean`/`sun_stretch`,
+  `LakeGrid.SHADOW_SUN_SHARE` 0.25): slid by `Shade.drop` of a quarter of the piece's height
+  above its waterline, which rides in each corner's alpha under the top/bottom bit
+  (`ShadowLayer.write`, `SHADOW_TALLEST` 127). **Centred on the waterline**
+  (`SHADOW_DROP` 0.04 of the piece's height under it; second pass, Richard: "closer to its
+  body"): half under the drawn piece, half peeking out. It sat a fifth of the picture below
+  the piece's middle and a tall piece's shadow came away from it. Water ink afloat, land ink
+  on the beach. `LakeGrid.sun(day)` replaces `sun_lean`. **Four times as dark as the old
+  0.15**: the first thing to judge in play.
+- **What is under the waterline shows through clean water** (`LakeGrid.SUNK_FLAG` 0.7,
+  rubbish.gdshader `sunk`; second pass, Richard): every piece with art is two quads now, the
+  part above the water and the part the cut takes off, laid under the waterline before it
+  (on the sand that room is a blank quad). The soup reads the same `filth_map` the water does
+  (pushed by `Lake._build_filth_map`), shows the under-part only where the honest map is
+  clean or hazy (the floor under a piece makes its own tile hazy), mixed `sunk_mix` 0.5 towards
+  `water_clean_mid` (hazy: `water_hazy_mid`, 0.15 more) at `sunk_alpha` 0.9, and discards it
+  in grime. **`_stamp_len` counts 8 a piece and 8 a shore pair**; `test_lake` guards it.
+  Probe: `tools/shot_sunk.tscn` (desktop build, own save) thins the lake to scattered singles
+  and saves `tools/last_sunk.png` and `last_sunk_near.png`.
+- **The rope's shadow leaves the hands of the body's** (`Angler.shadow_point`, second pass,
+  Richard: a gap east and west): its near end is where the drawn hands land in the angler's
+  own laid-down frame (drawn `LAND_SINK` low, folded about the feet), the difference eased out
+  along the chain so the far end still meets the net's. Probe: `tools/shot_rope.tscn`.
+- **New shadows**: perched pigeons; ducklings in flight; frogs sitting and hopping (water ink on
+  a pad); turtles on land and swimming; a short surface shadow under floating ducks and
+  turtles; swimming dogs, cut at the waterline like the wading angler; every land plant,
+  shrub, reed and cattail (baked into the flora batch, ink by uniform, swaying and growing in
+  with its plant); the island tufts' shadows sway now too; the net (its rim, one faint fan,
+  `CastNet.ShadowLayer`, `SHADOW_FADE` 0.35) and its rope (one strip, tapering from the hand's
+  height to the water); the placeholder hull (a blot).
+- **The props' ink follows the weather without a rebake**: `flora_sway.gdshader` takes
+  `land_ink`/`water_ink`/`bed_ink` and reads a shadow vertex by its alpha (0.25 / 0.5 / 0.75,
+  `Flora.SHADE_*`); geometry still rebakes on `Ground.SUN_STEP`. Both ground layers use the sway
+  material, with trees and rocks packed still.
+- **The shed's light is its window, a point** (`ShedRoom._window_at`, `_room_away(feet)`,
+  `_room_reach(feet)`, `_room_light(feet)`, `_room_ink`; second pass, Richard: "objects closer
+  to the light source should have a darker shadow, and there should be a stretch"): every
+  shadow falls straight away from the round window, up the room for a caster above it and down
+  for one below (third pass, `_lay` lets the stretch go negative), and is
+  as long as its caster is tall `WINDOW_HIGH` (16) cells out, longer further away, times the
+  hour (`HOUR_REACH` 0.9..1.1), held to `REACH_LEAST`..`REACH_MOST` (0.12..0.42 of the caster's
+  height; fourth pass, Richard: "keep it more grounded and close to the object base"). **The window is tiny** (Richard: "a
+  cone of light coming from the center, not like the entire wall is the window"): the shaft
+  leaves it `SHAFT_WIDE` 0.6 cells wide and opens at `SHAFT_SPREAD` 0.36 (were 2.4 and 0.78).
+  **It stands half way down the floor's left edge and points straight across** (`_window_at`,
+  `CONE_AXIS`; third pass, Richard: "the cone comes from center wall and from up"): the old
+  `WINDOW_DOWN` and the hour's slope (`SUN_SLOPE`) are retired.
+  The shadow group draws through `SHADE_FALL_CODE`: darker by the window (`NEAR_DARK` 1.3 to
+  `FAR_DARK` 0.45 over `DARK_REACH` 34 cells) and **only inside the cone**, the shaft's own
+  Gaussian, down to `OUTSIDE_DARK` 0.18 out of it, in `DARK_STEPS` hard steps. Walkers lay their own frames
+  (`_paint_walker_shades`, a white-silhouette shader); every standing floor piece sweeps one
+  shadow into a single `Shade.Face` (wall, flat and hosted pieces cast nothing), rebuilt only on
+  a layout change or a light step. The floor and the shadows are drawn by two children behind
+  the room (`_paint_room`, `_build_shade_layers`). A sitter or a dog on its seat casts nothing
+  on the floor.
+- **The wash and hive rooms use the outdoor sun, land ink**: the pallet sweeps its own picture
+  (`PIECE_SHADE` 0.35 kept, so the find's shadow stays on the deck); the hive steps' contact
+  ellipses take the shared ink, nudged by `Shade.drop(null, CONTACT_RISE)`, and are **not**
+  2:1, by decision of the pass: those steps are seen from eye height.
+- **Deleted**: `Player._blot`, `Wildlife.FROG_SHADOW`, the switched-off cloud and spout shadows
+  in `tornado_water.gdshader`; the tornado's cloud and rag shadows used half the projection
+  everything else does and now use `Shade.drop`.
+- **Cost** (`bench_frames`, RTX 5060 Ti, 1080p): standing 3.8 ms mean, rain 5.9, cleaned and
+  grown 6.4, big lucky double 12.4-12.7 (still over the bar, as before; the net's shadow
+  measured within noise, A/B'd). `BENCH_OFF=sway` now stills the motion rather than removing
+  the shader, since the plants' shadows need it.
+- **`tools/shot_shed.tscn` furnishes with the pack decoration** (`decor_pk_*`), not the old
+  PSD finds (Richard: "stop using the old decoration as reference").
+- **Out of scope, by decision**: bees, the hive swarm, pier box heaps, coins, splashes, rain;
+  shadows in the surface's own ramp colour; the UI cards (trophy, record player); the lakebed's
+  baked items. All gains are first guesses for Richard's eye, judged in play.
 
 ### The Sun Is in the Southeast (`day_config.gd`, `shadow.gdshader`, 2026-09-12)
 Every painted asset in the game is lit from the right: the shed's and the recycle box's own
@@ -2638,6 +2786,7 @@ in front of the player.
 - **A narrow arc, by decision** — not a pinned sun. Pinning would take the movement out of
   the light for no gain; a wide arc is what contradicted the paint. `stretch`, `ink` and the
   tint gradient are untouched: the sun's *height* through the day was never the problem.
+- **Superseded by One Sun (2026-10-02)**: the crescent now leans and stretches by height.
 - **The floating rubbish's crescents lean too** (`shadow.gdshader` `sun_lean`/`sun_reach`,
   `LakeGrid.sun_lean`, pushed every frame from `Lake._push_daylight`). They used to be
   centred under their pieces with no sun in them at all, which read as the only thing on the
@@ -2881,7 +3030,8 @@ The hull is the PixZels blue boat (`art_source/Blue_Boat/blue_boat_16dir.png`, a
   This **supersedes the 2026-09-11 call** that the load draws over the picture, sails and
   all: that weighed hand-cutting sixteen headings into two layers, and the builder detects
   the cloth instead.
-- **The hold fills bottom up, like the box it feeds** (`hold_spot`, 2026-09-12): the load
+- **Superseded 2026-10-02** (see The Piers, the Box and the Hold at the Angler's Grain):
+  **The hold fills bottom up, like the box it feeds** (`hold_spot`, 2026-09-12): the load
   lies in the well round the mast (`HOLD_FROM` 0.02 to `HOLD_TO` 0.20, `HOLD_LIFT` 0.55 hull
   heights — down in the boat, which only the overlay makes possible), `HOLD_LAYER` (4) pieces
   to a layer, each layer `HOLD_STACK` (0.3) hull heights above the last and tapered in, so a
@@ -3280,6 +3430,75 @@ stay behind `WITH_HEAP` / the retired `ICONS` history in the builder's docstring
   deck).
 - `test_lake`'s `_check_pier_look` guards the paint and its contrast, the box's stand, no
   mound, and no hole in the deck top (the old sheet has two).
+
+### The Piers, the Box and the Hold at the Angler's Grain (2026-10-02, `/grill-me` with Richard)
+The piers and the recycle box read coarse beside the redrawn hut, the angler and the pack
+rubbish, and a ferry's load stuck out over its sides. **Supersedes** "drawn at 2.0" for the
+piers and both boxes (The Piers above, the island crate at 2.0 under The Hut), and "The hold
+fills bottom up" under The Ferry.
+- **One box, drawn by rule at 1x** (since the same afternoon in the hut's own siding, see
+  The Hut Redrawn; the board/post description below is the first pass) (`tools/build_recycle_box.py`, writes
+  `assets/Recycle_Box.png` 64x66; the old 32x33 painting is kept as
+  `art_source/recycle_box_2x.png`): the same box at twice the pixels, so it is the same size
+  in the world. Top diamond centred on row 16 (`Yard.ART_TOP`), ground on row 48
+  (`ART_GROUND`), walls 32 rows. Horizontal boards (`BOARD` 8 rows: lit row, body with grain,
+  darker row, seam), corner posts, nails, a knot, a 3-row rim (`RIM`, `Yard.ART_RIM`, which
+  the front cut keeps), the recycle mark on the shaded left face (picked off four: radius
+  7.5, bar 2.2, arcs of 100 degrees, heads 5 by 4.5), near-black outline. **Both the island
+  crate (`Yard.ART_SCALE` 1.0) and the four piers' boxes**; the luck card's box follows
+  (`ShopCard.BOX_SCALE` 0.75).
+- **Brown, by Richard's pick** off `tools/last_pier_palettes.png` (`build_piers.py
+  --palettes`): the old box's own browns (`RAMPS["brown"]`) over the hut's oak with moss.
+  `oak` is still in the table.
+- **The piers at 1x** (`build_piers.py`, `HALF_W`/`HALF_H` 32/16, `ART_PIXEL` 1,
+  `Dropoff.ART_SCALE` 1.0): every painted-px count doubled (deck 12 up, beam 4, posts 6
+  wide, bollards 10, sign 88x26), the layout untouched. Deck boards `PLANK_PX` 10 rows with a
+  lit row, grain dashes, nails over the stringers (`NAIL_IN`, `NAIL_GONE` missing), worn
+  ends and knots (`deck_tone`); round piles with grain rings; bollards with a rope band; the
+  sign two boards with nails. **Emblems re-picked at native size** (the rubbish is 1x now):
+  plastic bottle, `wood_stump1`, `metal_kettle`, `rubber_ball`, drawn at whole steps.
+- **The hold is the box's heap in a hull** (`Boat.hold_spot`, `hold_shown`, `hold_scale`,
+  `_draw_held`, `_draw_front`): `build_boat_sheet.py` finds each frame's near rail
+  `RAIL_ABOVE` (3) rows over the blue stripe, the well the load stands across (the stripe's
+  span less `WELL_TRIM`), writes both as `well` in the sheet's json, and copies the hull from
+  the rail down into `assets/boat_hold_front.png`. The pile stands on the rail
+  (`HOLD_SINK` under it, `HOLD_STEP` a layer, `HOLD_BACK` up the deck for the odd piece),
+  spreads over `HOLD_SPREAD` of the well and is held in by the widest a piece may be
+  (`HOLD_FIT` of its slot, `HOLD_SCALE` 0.7 at most); then the front, then the sail. **The
+  pile drawn follows how full the hold is** (cargo over capacity, of `HOLD_SHOWN`). Rule, not
+  a table: the same at all sixteen headings. The hull frames themselves are unchanged.
+- **The hut and the piers draw nearest** (`_island.texture_filter`, `Dropoff._ready`, same
+  day, Richard: the hut "still looks a bit off"): the project's default filter is linear and
+  neither node set one, so both drew smoothed beside a crisp angler, crate and pump. Any new
+  node that draws a picture sets `TEXTURE_FILTER_NEAREST` itself. Probe:
+  `tools/shot_hut_px.tscn` (desktop build, own save) photographs the hut at every zoom stop
+  with the screen px per world px in `tools/last_hut_px.log`. Note the 1x art at the 1.0
+  stop on 1080p draws 1.5 screen px per world px, unevenly, as the angler always has.
+- **Every picture draws nearest unless it asks otherwise** (same day, Richard: "make sure we
+  don't have any other assets with the same issue"): `Prefs._ready` sets the root viewport's
+  `canvas_item_default_texture_filter` to nearest. **Not in `project.godot`**, which the open
+  editor re-saves from memory. `tools/probe_filters.tscn` walked the live tree first and found
+  the rubbish, the dogs, the net, the pigeons, the haul, the wildlife, the tornado, the shop's
+  head cards, the find-caught card and the settings board all drawing smoothed. Linear on
+  purpose, and set so: the rubbish shadows, the logo, the loading picture, the letter's
+  stills, Spotify's mark, the curtain's frozen frame, and the menu's scrim gradient (set
+  linear here, or 256 px stretched over the window steps). The probe lists any item still
+  linear; `test_lake` guards the root default.
+- **The plants move with the water** (same day, Richard: "the sway should be with the water,
+  not wind"; all flora, the water's rhythm): `shaders/flora_sway.gdshader` on `Flora` and on
+  the island `Ground`'s prop batch (its tufts). A plant's foot rides packed in its corners'
+  colour (`LakeGrid.pack_anchor`, the blue saying what the corner does: `Flora.AFLOAT`,
+  `TOP`, `FOOT`). Afloat (pads, open beds, standing reeds) it rides the rubbish's own swell
+  and wander on `lake_clock`; on land its top corners lean `Flora.LEAN` (1.4) art px with
+  the swell at its foot, rounded to whole art px, a pixel-art shear. **Open**: a pad's stem
+  and shadow under the water (`Flora.Below`) do not bob with it. Probe: `tools/shot_sway.tscn`
+  (`tools/last_sway.png`, six frames 1.2 s apart).
+- **`tools/shot_boat.tscn` has its own node and save** (`user://probe_boat.save`): off the
+  root it was the game's lake and wrote a session line into the playtest log (taken out).
+- Out of scope, by decision: the ferry's own art (still 2x), the jetty's shape, the sail.
+  All numbers first guesses for Richard's eye.
+- `test_lake` guards every heading having a well, every slot at its widest inside it, the
+  bottom layer behind the rail, the pile following the fill, and the front sheet.
 
 ### The Pigeons (`scripts/flock.gd`, 2026-09-16, `/grill-me` with Richard)
 The flock is drawn and placed properly, and a sitting bird is worth spotting.
@@ -3697,6 +3916,7 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   every frame the first net is out, he turns to where it will land (flying) or where it lies,
   snapped to the sheet's four views by `_view()`'s own rule. Only while the cast pose is held,
   so walking still decides the facing. The double cast's second net turns nobody.
+- **Superseded by One Sun (2026-10-02)**: the hull's pair is now `Shade.On.WATER`.
 - **The ferry's shadow is 10% lighter**: `Boat.SHADE_GAIN` 3.0 to 2.7, `SHADE_MOST` 0.7 to
   0.63. The piers keep their own constants, unchanged.
 - **Closing the wash room lands in the shed** (`Lake._wash_to_shed`), cross, Escape, E or
@@ -3802,6 +4022,54 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   anywhere, and draw right after the wall pieces.
 - All numbers first guesses. `test_lake`'s `_check_ten_fixes` guards each.
 
+### Six Small Fixes (2026-10-01, `/grill-me` with Richard)
+- **Going into the water is 20 dB quieter, angler and dogs** (`Sfx.ENTRY_DB`, second pass
+  the same day: -10 was still too loud): the entry splash (`play_lake_entry`) and the first
+  wash of every wade (`_wade_opening`). The wading wash itself came down 6 dB (-19.9).
+- **A dog's mouth opens only while it barks** (`DogArt.BARK_TAIL`, `BARK_ROWS`,
+  `WALK2_QUIET`, `Dog._barking`, `BARK_OPEN` 0.45 s): the pack's idle, sit and laid rows end
+  on two head-up open-mouth frames, which looped as a silent bark. They are cut off into
+  `<row>_bark` and shown only for the bark's length. **`run2`/`walk2` are the first pair
+  started half a cycle on** (second pass: the pack's second gaits bark through their stride,
+  worst on the dark brown dog), so odd slots still run out of step. A moving dog barks with its mouth shut. Shed dogs and hounds lose the frames.
+- **Crayfish live from depth 0.3 to 0.85** (`CRAY_SHALLOWEST`, `CRAY_DEEPEST`) and **never
+  dart**: not from walkers, hulls or nets. **Supersedes** "dart backwards, tail first" and
+  "no deeper than 0.55" in The Lakebed Through Clean Water.
+- **Fish draw under everything on the surface** (moved before `Flora` in the tree, both at
+  z 3) and take `Fish.DEEPER` (0.15) more water over each depth step.
+- **Pigeons draw at 1.5** (`Flock.SCALE`, was 2.0); the wildlife's critters keep their size
+  through their own ratio.
+- **The forest is 25% thinner** (`Ground.WOOD_DENSITY` 0.75 over every share, two passes).
+- `test_lake` asks that a crayfish does not dart and stands in its band.
+- **A led cast walks to the best spot, not at the click** (`Angler.cast_stand`,
+  `CAST_GRID` 0.25, `CAST_SPARE` 0.3): of the island's standing points, the one nearest the
+  angler from which the click is in range less the spare; none, the standing point nearest
+  the click (no throw). Sampled once per press over the island's box. **Supersedes "straight
+  line" and `shore_toward` as the walk's end** in The Led Cast; the aim ring's
+  `castable_after_walk` still asks `shore_toward` (cheap, per frame).
+- **A catch pops** (`Sfx._make_pops`, `_pop_ladder`, `catch_pop`, 6 channels): a soft
+  bubble pop built in code (a rising sine, 3 takes) per piece, `POP_FIRST` after the net's
+  splash, `POP_DB` -12, pitch climbing `POP_PITCH` 0.4 to 0.7 over `POP_TOP_STEPS` and
+  `POP_LOUDER` dB a pop. **No beat**: `POP_CLUMP` (a third) land within `POP_TOGETHER` of
+  the last and overlap it, the rest after an uneven `POP_GAP` (0.05-0.16 s). `POPS_MOST` 14.
+  Grabs on the reel carry on the cast's ladder; a new landing past `SWELL_GAP` starts it
+  over. **A recording since the same evening**: Ben Paramore's
+  `868713__benparamoreaudio__bubble_5.wav` (freesound, in `art_source/`), cut whole by
+  `build_sfx.py` to `assets/sfx/catch_pop.wav`; the built pops stay as the fallback. Numbers
+  by ear (three passes the same day).
+  **Fourth pass**: `POP_DB` -10, `POP_CLUMP` 0.5, one pop a piece up to `POPS_MOST` 80 with
+  the gaps squeezed past `POP_EVEN` (14), and **the haul count over the angler steps up one
+  figure a pop** (`Sfx.pops_heard`/`pops_waiting`, `HaulCount._heard`), snapping to the
+  truth when no pops are waiting. The crate's `pop` -17 to **-21** (three passes), `ferry_bell` -17.9 to
+  **-20.9**, and 3 dB off `boat_move` (-15.3, stepped over `BOAT_MOVE_PITCHES` 0.8-1.18, never the last), `net_throw` (-11) and `net_splash` (-17.8). `game_start` (New game / Continue) -9.1 to **-21.1**.
+- **The potted tree's fallen leaf is gone** (`build_pack_decor.py` `main_island`, a cut box's
+  fifth element `"main"`): the leaf reached into the tree's box at its bottom left and the
+  crown is as wide, so the piece keeps its largest 8-connected island.
+- **A dog lies on any bed, on every face** (`build_pack_decor.py` `SEATS`): the pack bed
+  front 18 / side 12 / back 18, the fancy bed 22 / 15 / 26 / 15, by eye off
+  `tools/last_beds.png` (the mattress's near edge). **Supersedes "front views only" for the
+  beds**; sofas and chairs keep it.
+
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
 the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
@@ -3875,6 +4143,81 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   filling, the flash coming and going, and a saved count held to the cap. Probe:
   `tools/shot_rain.tscn` (desktop build, `--fixed-fps 60`, own save, under its own node)
   saves `tools/last_rain_{far,near,flash}.png` and `last_rain.log`.
+
+### The Tornado (2026-09-30, `/grill-me` with Richard)
+A late-game event: a waterspout comes down on a nearly cleaned lake, stirs the rubbish up and
+is tamed with the net. `scripts/tornado.gd` (the event, ported from the mock's harness),
+`scripts/tornado_look.gd` + `shaders/tornado_spout.gdshader`/`tornado_water.gdshader` (the
+drawing, the mock's **look D, approved as it is**), `scripts/tornado_debris_draw.gd`, wired
+in `Lake`'s "The tornado" block. The mock (`tools/tornado_mock/`) stays as the record.
+- **When**: once the meter reads `Tornado.GATE` (80%) cleaned, `MOST_RANGE` 2-3 a run (rolled
+  once, saved as `tornado_most`), the first `FIRST_AFTER` 20-70 s of play after the gate,
+  then `GAP` 150-300 s. Never over what `_rain_held` holds, a board (`_panelled`), the ending,
+  the glide or the wildlife moment; a due one is asked again every `HELD_RETRY`. **Only the
+  game's own lake rolls them** (`get_parent() == root`, or `tornado_schedule`); a harness or
+  probe starts one with `start()`.
+- **Its own storm**: `Weather.storm`/`clear_storm`, the shower's rain, grey light and
+  flashes, **not one of the five showers**. `BREW` 6 s of storm, then the touchdown (2 s,
+  the look's gather), with a strike at touchdown and at the vanish.
+- **Wanders within reach**: round the island on smooth sines (`_wander`), between
+  `GROW_LEAST` (2.2) tiles past the shore and the net's range less `RANGE_SPARE` (1.2), so
+  it is always castable from the beach. `SPEED_ROAM` 60 px/s (the mock's 72 was for a 16 s
+  film), `SPEED_HURT` 34 after a hit.
+- **The lake is the mock's**: the top piece of a tile under the foot (`LIFT_REACH` 0.9,
+  never a find, tier 3 at most) lifted with `LakeGrid.take` into the orbit (`CARRY_MOST`
+  14), flung `FLING_EVERY` 2.5-4.5 tiles onto floating water and `insert`ed as that tile's
+  top (it can dirty cleaned water; finds under a lifted piece surface on their own), pieces
+  round it shoved tangentially and bumped. The meter moves per piece (`filth_moved`), the
+  filth map is remapped on `REMAP_EVERY` (0.5 s) through the worker-thread path, never per
+  piece. Rings only, no crown splashes (look D's harness options).
+- **No piece is ever lost**: a piece is in the grid, the orbit, the air or a net's catch.
+  `carrying()` (orbit + air) keeps `_all_landed` false, so the ending cannot fire under it.
+  A throw with nowhere to land goes back to the tile it came from.
+- **Tamed by three landings**: `CastNet.touched_down` (new, after the landing sweep) whose
+  mouth touches the foot (`FOOT` 30x15 px, `CastNet._touches`); two within `HIT_APART`
+  (0.5 s, the double cast) are one hit. Each hit steps it down (`HIT_STRENGTH` 0.74, 0.5),
+  knocks it away from the angler and shakes two pieces loose; the third puts what it carries
+  **into that net up to its room** (appended to `catch`, no `caught` signal: the meter already
+  moved at the lift) and sheds the rest onto the water, and the look's vanish runs.
+- **Untamed**: after `LIFE` (60 s) the same vanish, everything carried dropped onto the water.
+  The look is handed three hits for it, so its vanish carries a small last burst; accepted.
+- **Holds**: while one is out every hull is `moored` (a sailing one finishes its leg and
+  stays) and every dog dozes, its mouthful put in the crate; kept up each frame so a hull or
+  dog bought mid-storm is held too, let go on `ended`. Wildlife treats the foot as a threat
+  (ducks too); fish are scared off it every `SCARE_EVERY`.
+- **Not saved mid-event**: `save_game` calls `settle_now()` first (every carried piece put
+  back on the water, the event ended and counted), the menu's pose does the same, and the
+  autosave waits while one is out (the last save already has those pieces in the water).
+  Saved: `tornadoes`, `tornado_next`, `tornado_most`; absent reads as none yet. No
+  `SAVE_VERSION` bump.
+- **The one change to the look**: painting the cloud cell by cell was ~45 ms of GDScript a
+  frame (the mock filmed at a fixed step). The same painters now run on a `WorkerThreadPool`
+  task over a copy of the frame's shape (`_pump_paint`, `_paint_off_thread`) into one
+  triangle array each for the cloud and the lip, drawn a frame or three late and shifted by
+  whole art pixels to follow the base. The mock's fixed `COLLAPSE_AT` (12.5 s) is read off
+  `since_hit` instead, and its eye log is gone. Nothing else in `look_d.gd` moved.
+- **Sound**: the storm's rain and thunder (Ambience). `Tornado.WIND_SOUND`
+  (`assets/sfx/wind.ogg`) plays on the Ambience bus while it is down once Nuven records one;
+  silent until then.
+- **Cost** (`bench_frames` `BENCH_TORNADO=1`, RTX 5060 Ti, 1080p, full lake, touchdown and
+  the start of the roam): 5.89 ms mean, p99 7.95, worst 9.67, against 3.3 with none. Inside
+  the bar. Before the threaded paint: 63 ms.
+- **F9 in a debug build calls one down at once** (`Lake._unhandled_input`), whatever the
+  meter says, for judging whether `GATE` should come earlier.
+- **First guesses**: `GATE`, the counts and gaps, `LIFE`, `SPEED_ROAM`, the grow band,
+  `FOOT`, `BREW`. The rest are the mock's numbers.
+- **Out of scope, by decision**: feeding ducks and fish (its own pass), wind recordings,
+  new art, any price or sim change, saving a tornado in progress.
+- `test_lake`'s `_stage_tornado` guards the gate, the hold, the cap, the storm being
+  uncounted, lift and fling keeping every piece, the carry cap, a miss not hitting, the
+  ending waiting, three hits collapsing it into the net, the fleet and pack held and let go,
+  the untamed wander-off returning every piece and the meter, the reach, and a save ending
+  it with everything back in the water and the count saved. Probe: `tools/shot_tornado.tscn`
+  (desktop build, `--fixed-fps 60`, own save, under its own node) forces one on a lake 88%
+  cleaned, casts the real net at it three times and saves
+  `tools/last_tornado_{touchdown,roam,hit1,hit2,collapse,calm}.png`, frames in
+  `tools/film/tornado/` and `last_tornado.log`; `ffmpeg -framerate 30 -i
+  tools/film/tornado/f_%04d.png ... tools/last_tornado.mp4` makes the film.
 
 ### The Ground Has Volume (2026-10-01, `/grill-me` with Richard)
 The lawn and the beach read flat: one green with sparse blades, one sand. Picked off
@@ -4640,9 +4983,13 @@ the cursor and nothing takes the view back.
   is false and the view follows as ever, because the reticle's lean and `hold_in` need it;
   free mode resumes when the mouse is picked up. No bind: the Controls board is 666 of 680.
 - **The button** is a `PlankButton` at the gear's size to its left (`%FreeCamera`,
-  `mark = &"camera"`, `_draw_camera`): a boxy camera on whole pixels, its lens a hole like the
-  gear's hub. **On is two channels** (`PlankButton.lit`): the mark in `Style.ON_WATER`, the
-  settings board's switch colour, and the lit edge. Hidden while any board is up.
+  `mark = &"camera"`, `_draw_camera`, `_draw_lock`): a video icon (a chamfered box with a
+  wedge on its right) with a padlock over its bottom-right corner, on whole pixels (2026-09-29,
+  `/grill-me` with Richard, over the boxy photo camera). **The lock is shut while the view
+  follows the angler and open while it is pinned**; it snaps, no animation. **Free is two
+  channels** (`PlankButton.lit`): the open lock and the mark in `Style.ON_WATER`, the
+  settings board's switch colour, plus the lit edge. Probe: `tools/shot_camera_mark.gd`
+  (desktop `--script`) saves `tools/last_camera_mark.png`. Hidden while any board is up.
 - **Out of scope, by decision**: left-drag or WASD panning, a pad free camera, a settings
   row, persistence, an off-screen-angler marker.
 - `test_lake`'s `_check_free_view` guards the button, the unlit start, the view holding
@@ -5109,7 +5456,21 @@ levelled like the rest; `SOUNDS` holds the mix. All spans, levels and gaps are f
   flash, never the take played last.
 - **Puddle steps** (`step_puddle`, `Sfx.play_puddle_step`, pitched in steps): a footfall on
   a wet puddle cell (`Puddles.here.standing_in`) and the angler's first step into the lake.
-  The wading loop is unchanged; dogs get none.
+  Dogs get none. **Going into the water is never one pitch** (2026-09-30, `/grill-me` with
+  Richard): the first step in is `Sfx.play_lake_entry`, the puddle's take on its own ladder
+  (`ENTRY_PITCHES`, six steps 0.72-1.24, memory `lake_entry`, apart from the lawn's
+  `PUDDLE_PITCHES`), and every play of the wading wash steps through `WADE_PITCHES` (five,
+  0.88-1.12, narrower because it repeats every second). Never the step played last; the dogs
+  share the wash's ladder. **The wash that opens a wade takes the entry's wide ladder**
+  (`wade_pitch`, `_wade_fresh`, memory `wade_entry`): it lands a frame or two after the
+  entry splash and is louder, so on the narrow ladder every entry still sounded alike.
+  **Only a real entry counts** (same day, Richard: it fired in the water and coming out):
+  `Angler._wake` calls the boots in once `Iso.past_water` passes `ENTRY_DEEP` (4 px) and out
+  only back on the sand (0 or under), so a walk along the line or out of the lake splashes
+  nothing; and only `play_lake_entry` sets `_wade_fresh`, so the wash stopping and starting
+  in the water (a cast holds the feet) or a dog going in stays on the narrow ladder. The
+  entry ring follows the same rule.
+  First guesses by ear.
 - **Wildlife, heard only within `Dog.HEAR` of the angler** (`Wildlife.ear`/`hears`,
   `Flora.ear`), each species on one shared rolled gap (`Sfx._due`): a frog's croak cue
   (`FROG_GAP` 6-12 s, pitched); a brood calling (`DUCK_GAP` 15-30 s, the mallard's three
@@ -5245,6 +5606,52 @@ now only the defaults.
 - `test_lake`'s `_check_record_lists` (station) and `_check_record_player` (shed) guard the
   rules. Probe: `tools/shot_record_menu.tscn` (desktop build, own save) saves
   `tools/last_record_menu_{apart,synced,skip}.png` and `last_record_menu.log`.
+
+### The Beehive (2026-09-30, second pass off `tools/hive_mockup2.py`, Richard)
+An old hive on the island's lawn takes a swarm mid-run and makes honey. Build contract:
+`docs/hive/contract.md` (first pass; this section supersedes it where they differ). `Hive`
+(`scripts/hive.gd`), `HiveRoom`, one `HiveStep` script a step, art by `tools/build_hive.py`.
+- **The arc is split** (`Hive.PLAN_*`): a swarm visit is **Catch, Smoke, Queen**, and ends
+  there: the colony goes `BUSY` on the ordinary refill clock (`_on_colony_settled`), the card
+  reads `HIVE_HINT_SETTLED`. A colony caught and left before its queen is `SETTLE` (appended to
+  the enum, so saved numbers keep their meaning) and plays Smoke, Queen. **Every harvest, the
+  first included, is Uncap, Pour.** The crank is deleted (`hive_step_crank.gd` gone, nothing of
+  it was saved).
+- **The first honey has a moment**: the wildlife moment's queue (`_owe_moment`), a glide to the
+  hive and "The honey is ready!" (`HIVE_READY`), once (`Hive.ready_seen`, saved; absent reads as
+  seen when a harvest was already taken). Later refills show only in the world's ready mark.
+- **Old saves**: a `READY` saved with `first_done` false was a caught colony mid-ceremony and
+  loads as `SETTLE`. No `SAVE_VERSION` bump.
+- **No hands anywhere**: the pointer holds every tool.
+  - **Catch**: no branch. Five clumps of real bee sprites in the air; press on one and drag,
+    its bees chase their places at their own paces so it trails the pointer; let go over the box
+    and it pours in, `MISS` of it flying back to a cloud. The heap over the bars and five comb
+    pips on the box's front fill; done at 80% boxed (`ENOUGH`), the rest pours in by itself.
+  - **Smoke**: the smoker is held by its bellows at the pointer. Three rings over the swarm on the
+    hive, any order; hold with the nozzle in reach of one and billows (the builder's
+    `billow_*`, four greys) curl to it; its bees fold their wings and file down into the
+    entrance, the ring goes green with stars. ~400 bees over a dark core. No penalty.
+  - **Queen**: the brood frame in a pine uncapping rest (`rest`), 330 workers, the queen a
+    subtly longer bee (`queen_long`, no dot, no court). The lens as before; a miss sends the bee
+    clicked buzzing off and wobbles the glass; after `HINT_AFTER` (20 s) a faint glint winks on
+    her.
+  - **Uncap**: one face in the same rest, the knife following the pointer down. Curtains run off
+    the cut into a slanted tin gutter; the honey is fatter than the tin, bulges over its rim,
+    spills over the lip, and falls off the low end as a sprung rope with a swelling bead that
+    snaps, recoils and leaves a thread, into the bucket, where it lands in folding coils.
+    **Every unit is kept** and the bucket's level is handed on (`HiveRoom.honey`).
+  - **Pour**: the same bucket on the bottling table, its level carried over; a brass lever with a
+    wooden grip on the gate: hold on it and it turns sideways and honey runs, thicker as it
+    opens; let go and it springs shut. Fill each jar to the dashed line; over it the jar crowns
+    and runs, no penalty. Jars are the builder's `jar2_*` layers (blue-grey glass edge, faint
+    tint, highlight streaks, small gingham lid), the honey drawn between them with a meniscus.
+- **Honey motion is drawn only** (the rope's bargain): springs and eases on whole art pixels,
+  nothing gameplay reads but the jar count.
+- Harness hooks per step, never gated on `awake` (see each script's header); `test_lake`'s
+  `_stage_hive` drives them. Probe: `tools/shot_hive.tscn` (desktop build) saves
+  `tools/last_hive_{empty,swarm,moment,ready,busy,honey}.png` and
+  `tools/last_hive_room_{catch,smoke,queen,settled,uncap,pour,done}.png`.
+- All numbers are first guesses for Richard's eye.
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
@@ -5634,6 +6041,58 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   sofa, and the seat going away. Probe: `tools/shot_rest.tscn` (desktop build, own save,
   whole pack forced) saves `tools/last_rest_{sofa,sofa_back,armchair,chair_back,bed,read}.png`.
 
+### The Pack Decoration Replaces the Finds (2026-10-01, Richard)
+The finds in the lake are the 0_mem0ry packs' decoration, picked on the Lake Pack Tagger and
+built by `tools/build_pack_decor.py` (`decor_pk_*`, sheets `decor_pack_dirty`/`_clean`).
+**Supersedes** the PSD finds as what the lake hides; the old `decor_dirty` pieces stay in the
+catalogue (the shed's tests still use them) and are no longer dealt (`Lake.FIND_SHEET`).
+- **The builder is the table**: every piece's views by catalogue id, cut to one island where a
+  sprite holds several objects, faces (R) and states (E), a mirrored copy of a flagged side
+  view, the two states of a face aligned into one frame (`shared_frame`, so E never moves a
+  piece), footprints (`FRONT_BASE`, the old finds' rule: side = side height less the front's
+  height above its footprint), dog seats (`SEATS`), copies (`COPIES`, empty: every find is unique since 2026-10-01, the diner chair
+  was four), and
+  the tier tagged on the tagger (`Sheets.tier_of`, read by `_all_defs`). Drawn at
+  `SHED_SCALE` 0.74 in the shed (Richard's pick). The grimy sprite is rule-built murk.
+- **The record player is the first find** (`FIRST_FIND`), afloat by the island at tier 0. It is
+  the old `decor_vynil_player` entry redrawn as the pack turntable (`REPLACES`), a small piece
+  that sits on furniture; the song menu is drawn in its greys.
+- **The shed starts with the pack bed** (`STARTER_BED` `decor_pk_bed`). Early finds:
+  record player, flower vase, nightstand, coat stand (tier 0), sofa, coffee table, chair (1).
+  Sit/lie/read spots for the pack seats, beds and bookshelf are in `ShedRoom.RESTS` (first
+  guesses).
+- **Finds float at the rubbish's grain**, one world px an art px (`_is_pack_find` in `_dress`).
+- **55 finds where there were 37**: `FIND_APART` 7 to 6 and `MID_OUT` 25 to 27 so they deal.
+- **The wash stand's grime is the art's own pixels** (`WashStand.FINE` 1, was 2): the pack
+  pieces are drawn up to 14 screen px an art px and half-pixel grime read as a second picture.
+  **Every cleared cell gleams** (`GLEAM_*`): pale, paler, gone, and now and then a gold star.
+- **The wash stand draws every find at one zoom** (`WashStand._zoom_for_all`, second
+  `/grill-me` the same day): the least zoom at which each find's first view fits
+  `ROOM_WIDE` by `ROOM_TALL` (0.7), so a cactus reads small and a bed big, as in the shed.
+  **Supersedes fitting each find on its own** and `wash_scale` (no longer read).
+- **The find stands on a pallet, not a table** (`PALLET_*`, `_build_pallet`): built by rule
+  in the pack's style at the finds' zoom, low and boxy (deck boards and gaps, stringers
+  under the gaps at the blocks, dark fork openings), its foot at `PALLET_GROUND` 0.8. Runoff
+  goes through the slats (`THROUGH_ODDS`) or over the front edge, and either way darkens the
+  grass in front in whole art pixels (`_wet`, `WET_*`), drying back. No standing pool.
+- **The hose upgrades in the wash room** (2026-10-01, `/grill-me` with Richard): a plank
+  under the tray (`WashRoom.hose_box`, `buy_hose`, `HOSE_PRICES` 1500 / 6000) takes the hose
+  from level 1 to 3, each wider and harder (`WashStand.HOSE_GROW` x1.2 / x1.45, gentle by
+  decision), the stream a pixel wider a level and the spray scaled with it. Paid from the
+  purse in `Lake._on_hose_bought`, saved as `hose` (absent reads as 1, no bump). Not a shop
+  row, by decision. Words `HOSE_UP` / `HOSE_TOP` (machine drafts).
+- **The money and Waiting plates stay up in the wash room** (`HudSkin.plates_only`, same
+  day): the room sits under the HUD skin, which draws only those two plates and takes no
+  clicks; the tray moved down to `TRAY_AT` y 172 (`ROWS_MOST` 7) to clear them, and the
+  gear is hidden while the room is open.
+- `SAVE_VERSION` 20; the v19 save is `_builds/lake_cleanup_v19_20261001.save`. **21** since the
+  diner chair went from four copies to one (Richard: finds are unique); the v20 save is
+  `_builds/lake_cleanup_v20_20261001.save`.
+- **Open**: the letter's decoration stills still show the old finds (re-run
+  `shot_letter_art`); dog seats and rest heights are first guesses; 1146 and 1172 are named
+  "Sculpture" and "Blue Rug" until Richard says otherwise. `tools/play_decor.tscn` opens a
+  shed holding all of them.
+
 ### Free Placement in the Shed (2026-09-16, `/grill-me` with Richard)
 Furniture stands on **any whole source pixel**, not on the 8 px cell grid: Richard's call,
 "the snap is too tight to adjust exactly where I want the decoration". At ZOOM 3 the step
@@ -5990,6 +6449,18 @@ nothing near the island is fetchable), with its own trip limit (`STRAND_TRIP_MOS
   which rubbish.gdshader and shadow.gdshader read as "still"), no waterline cut, no foam, no
   rise, no bump/shove. The dog may walk up the bank's beach to `Dog.BEACH_WALK` to fetch
   them. Any new code that moves or cuts pieces must respect `dry`.
+- **Beach pieces throw a sand-coloured shadow and sit in the sand** (2026-09-29, Richard:
+  "no shadows"). They always had one, in the water's ink at 0.15, which cannot be seen on
+  sand and lay tucked under the piece. On a `DRY_ANCHOR` shadow `shadow.gdshader` draws
+  `dry_shade` (`LakeGrid.DRY_SHADE`, sand's dark at 0.6), and `ShadowLayer.write` centres it
+  on the piece's foot (`DRY_SHADOW_UP`), half under the piece and half on the sand, hugging
+  the base; thrown down and left beside the piece was tried the same day and read as a
+  second object. A dry piece is bedded
+  `dry_sunk_by` into the sand (`DRY_SINK` 2 px, at most `DRY_SINK_MOST` of its height),
+  in `_sprite`, `perch_point` and the sprite layer alike. **A shore tile's second piece has
+  its own shadow and, on the strand, its own foam** (`_shade_second`/`_reshade_second`,
+  `_shadow2_at`, `_second_at`); it had neither. Probe: `tools/shot_beach.tscn` (desktop
+  build) saves `tools/last_beach_{dry,strand}.png`. Numbers are first guesses.
 
 ### Island Coast (under the water, cut by the shader)
 The island's ground (`Ground.Layer.ISLAND`) draws **under** the water at z 1, same as the
@@ -6158,6 +6629,17 @@ overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild
 Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame
 42 ms -> 3-4 ms.
 
+**The cleaned lake, 2026-10-02** (`BENCH_CLEAN=1`, and the new `BENCH_GROWN=1` that grows
+every plant in at once to measure the lake as it stands): 8.4-8.7 ms mean, over the bar, but
+6.9 settled. The difference was the plants growing in after a clean: `Flora._lay` rebuilds
+the whole batch (about 1.2 ms) and ran every frame for the several seconds everything due
+grows together. It runs at `Flora.GROW_FPS` (12) now, the last step always landing. The fish
+(about 1.8 ms) worked their spots out in each of two draws and asked the lake's depth three
+times a fish; now once a frame in `_process` (`Fish._spots`, `_water_at`, `_tint_at`), the
+same values. After: **6.0 ms** mean during the grow-in and settled, 6.4 walking, worst under
+10. The plants' water sway measured at noise (`BENCH_OFF=sway` for the A/B), and nearest
+sampling everywhere at nothing.
+
 ---
 
 ### The Trailer (2026-09-16, `tools/film_trailer.tscn`, `marketing/My Dirty Little Lake/trailer/`)
@@ -6193,6 +6675,80 @@ in the casts, the dogs and the wildlife** (`_hide_boats`): it blocked the second
 **pigeon** shot is still in the probe (forced head pop, `_force_pop`) and **cut from the
 edit**, by Richard's call. `build_trailer.py` needs PIL: run it with the psd-extract venv
 python.
+
+### The Haul Goes Into the Box (2026-10-02, Richard, off the store clip)
+- **The flights draw over the island's buildings** (`Haul` at `Lake.IN_FRONT + 1`): it sat on
+  `CRATE_LAYER` before the hive in the tree, so every piece crossing the hive went under it.
+  Over the walkers too: a thrown piece is in the air.
+- **The last stretch into a box is the box's** (`Haul.LAND_FROM` 0.7, `draw_landing_on`,
+  `landing_moved`): past it, a piece bound for the island crate (untagged) or a pier's box
+  (tagged with its `Dropoff`) is not drawn by the haul; the box draws it between its heap and
+  its near walls, shrinking to its heap's size (`Yard.HEAP_SIZE` 0.62, `Dropoff.HEAP_SIZE`
+  0.5). It lands within `BOX_SCATTER` (10 x 4 px) of the mouth's middle, not the old 26 x 11,
+  which hung pieces over the rim. Hull loading and other flights are unchanged.
+- **A flight's shadow shows only while it is up** (`Haul._aloft`, `SHADOW_IN` 0.18): from the
+  first frame, a whole catch's shadows stacked at the angler's hand into a black blotch.
+- **The rope leaves the chest** (`Angler.HAND_HEIGHT` 0.5 to 0.36): half way up the figure is
+  the beard under the hat. `tools/shot_rope.tscn` (desktop build) saves the four directions,
+  `tools/last_rope_<dir>.png`.
+- `test_lake` guards the layer, the scatter, the hand-over, the crate's reference, the shadow
+  and the hand height.
+
+### The Wash Room in First Person (2026-10-02, Richard, off the Steam screenshot)
+**Supersedes** `HORIZON`/`LAKE_TALL`, `DOG_TALL`/`DOG_BAND`, the pack-tile patchwork ground
+and the lanes as shares of the lake in The Pump and the Wash Room.
+- **One perspective model** (`WashBackdrop.y_at`/`d_at`, `EYE` 0.43, `NEAR_D` 1.6): ground
+  `d` tiles out stands at the eye line plus `(1 - EYE) * NEAR_D / d` of the window. The lawn
+  meets the sand at `LAWN_D` 4, the near waterline is `SHORE_D` 7.5 (the island's 3.5-tile
+  beach), the far one `FAR_D` 33.5. The lake box, the ferries' lanes (`BOAT_LANES` by
+  distance, 26 and 12 tiles, grains 1 and 2), the rubbish's grain (`_grain_at`) and the dogs
+  (`DOG_D` 7 to 3 tiles, drawn `DOG_SIZE / d` tall) all come off it. `BANDS` thin towards
+  the far shore. The dogs trot at `DOG_PACE` 140 (was 95).
+- **The far bank is drawn at one canvas px a painted one** (`FAR_PIXEL`): the pack's trees at
+  native size are about a tenth of the window tall. Its strip (`build_wash_backdrop.py`
+  `BANK_TALL` 96, grass 5, sand 3 rows) closes the gaps between crowns (`close_canopy`:
+  any see-through pixel under the canopy with crown either side within `CANOPY_REACH` or
+  above it goes the trees' deep shade), so no sky shows through the wood.
+- **The ground is the island's own rules in Python** (`draw_lawn`, `draw_beach`,
+  `lawn_shades`, `_pnoise` periodic across `WIDE` so the strips wrap): blades in
+  `Ground.lawn_shades`' greens with clumps, the bank's tone blotches on the far grass; the
+  sand's wet edge, tide line with shells, ripples in patches, pebbles, pale dry strip, and
+  the lawn's blades standing over its edge. `NEAR_SAND` 38 rows must match what `y_at` puts
+  between `LAWN_D` and `SHORE_D` on a 720-line window.
+- **The sky's steps are dithered** (`SKY_STEPS` 8, `_blend_sky`, `SKY_BLEND` 2): across
+  each edge the next step's colour comes in at a quarter, then a half, and the old one goes
+  out at a half, then a quarter, through a 2x2 ordered pattern of whole painted pixels (one
+  tiled texture draw a band). **The water keeps no dither, by its own decision**; the sky
+  is the one place it is used.
+- **The hose is a shop row** (`WashRoom.HoseRow`, `hose_value`/`hose_cost`/`hose_tag_box`,
+  `ShopSkin.draw_tag_on`/`tag_box_of`): the NET board's plate, a rail with the level,
+  "Hose" (`Text.HOSE_NAME`, replacing `HOSE_UP`/`HOSE_TOP`) over "1 → 2", and the shop's
+  price tag, which is the one part that buys; at the top the maxed row's green and MAX.
+- **A long tray name drops to `TEXT_TINY` before it is cut** (the shop's ladder).
+- **The stage stands in the middle of what the tray leaves** (`WashStand.centre_x`, `_mid`,
+  set by `WashRoom._lay_out` to halfway between the tray's right edge and the window's): the
+  pallet, the find, the nozzle and the hose. Below nought it is the window's middle.
+- **A cloud bank sits low along the horizon** (the first two `CLOUD_LAYERS`, `CLOUD_FOOT`
+  1.06, Richard: "lower and more prominent, covering the skyline"): the feet stand behind the
+  wood, never out under it. **Supersedes "every cloud's foot is held above the trees"** in
+  The Sky in the Water. The far wood has two more dark back ranks of crowns (`RANKS`), so the
+  canopy fill (`CANOPY_REACH` 4) only closes small gaps and the skyline is bumps, not plateaus.
+- **Grandfather Clock is "Old Clock"** (`build_pack_decor.py`, `pieces.json`, the CSV).
+- Probe: `tools/shot_steam.tscn` `FILM_ONLY=wash` (desktop build, own save) poses the white
+  sofa half washed with eight finds waiting, two ferries and three dogs staged by distance.
+  All numbers first guesses for Richard's eye.
+
+### The Screenshot Key and the Key Art (2026-10-02, Steam page)
+- **F12 in a debug build saves the screen** (`scripts/shot_key.gd`, a child of the `Pad`
+  autoload so `project.godot` is untouched): a PNG at the window's own size, HUD and all, to
+  `Games/Marketing/My Dirty Little Lake/screenshots/raw/` (`user://screenshots/` where
+  `res://` is not a folder). **Shift+F12 takes it bare**: every CanvasLayer hidden for one
+  drawn frame. A faint blink answers the press after the grab. Store screenshots are taken
+  by hand with it, by Richard's call.
+- **The capsules and library art come from `tools/shot_keyart.tscn`** (desktop build,
+  `--fixed-fps 60`, own save, under its own node): bare renders of a lake split clean and
+  dirty, into `Marketing/.../source/keyart/`, cut by that folder's `capsules_v2.py` at whole
+  pixel ratios. `FILM_ONLY=tall_z2` runs alone (the shots share one lake).
 
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions

@@ -122,6 +122,10 @@ var seats := {}
 var facings := {}
 var states := {}
 
+## Piece name -> its weight tier as a find, as tagged on the Lake Pack Tagger (-1: none
+## said, and the lake works one out from its size).
+var tiers := {}
+
 ## Piece name -> what it gives off while switched on: &"fire", &"warm", &"cold", &"ember" or &"".
 var lights := {}
 
@@ -266,6 +270,7 @@ func load_all() -> bool:
 		facings[name] = turns
 		states[name] = lit
 		lights[name] = StringName(String(entry.get("light", "")))
+		tiers[name] = int(entry.get("tier", -1))
 
 		cells[name] = Vector2i(
 			maxi(int(ceil(float(box[2]) / cell)), 1), maxi(int(ceil(float(box[3]) / cell)), 1)
@@ -528,6 +533,10 @@ func title_of(name: StringName) -> String:
 	var key := "DECOR_" + String(name).trim_prefix("decor_").to_upper()
 	var shown := Text.of(key)
 	return said if shown == key else shown
+
+
+func tier_of(name: StringName) -> int:
+	return int(tiers.get(String(name), -1))
 
 
 func cells_of(name: StringName) -> Vector2i:

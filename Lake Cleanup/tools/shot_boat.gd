@@ -7,6 +7,7 @@ extends Node
 ## Run it with the desktop build, not --headless: nothing renders under the dummy driver.
 
 const SHOT := "res://tools/last_boat_%d.png"
+const SAVE_PATH := "user://probe_boat.save"
 const CROP := 340
 const ZOOM := 2
 
@@ -23,7 +24,10 @@ var _shot := 0
 func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = load("res://scenes/main.tscn").instantiate()
-	get_tree().root.add_child.call_deferred(_main)
+	# Its own save, and under this node rather than the root (2026-10-02): hung off the root
+	# it was the game's own lake, and wrote a session line into the player's playtest log.
+	_main.set(&"save_path", SAVE_PATH)
+	add_child.call_deferred(_main)
 	set_physics_process(true)
 
 

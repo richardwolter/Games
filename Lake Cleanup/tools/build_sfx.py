@@ -111,6 +111,9 @@ PLAN = {
     "net_splash": ("Net_Splash.wav", ("trim", 1.3)),
     "game_start": ("NewGame_Continue_Sound.wav", ("trim", 2.8)),
     "piece_splash": ("Object_Splash.wav", ("trim", 1.1)),
+    # The catch's pop (2026-10-01): Ben Paramore's bubble from freesound, a 30 ms take,
+    # kept whole from its attack. Lives in art_source/, not SFX/.
+    "catch_pop": ("../868713__benparamoreaudio__bubble_5.wav", ("trim", 0.1, 0.0005)),
     # Water draining off the mesh after a catch, and the plip of a grab on the way home
     # (2026-09-18). Both recordings were retired as the angler's wet step for sounding like
     # drips rather than like wading, which is exactly what is wanted of them here. The spans

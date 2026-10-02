@@ -54,6 +54,7 @@ var lucky := false
 var double := false
 
 var _shown_count: int = 0
+var _heard: int = 0
 var _shown_room: int = 0
 var _tick: float = 0.0
 var _burst: float = 0.0
@@ -113,10 +114,19 @@ func _process(delta: float) -> void:
 			double = false
 		queue_redraw()
 		return
+	# Up one figure a catch pop while the pops are still sounding, so the count and the
+	# sound are one run (2026-10-01); with none waiting it snaps to the truth.
+	var sound := Sfx.main()
+	var heard := sound.pops_heard if sound != null else 0
+	var stepped := heard - _heard
+	_heard = heard
 	if count != _shown_count:
-		if count > _shown_count:
+		var to := count
+		if count > _shown_count and sound != null and sound.pops_waiting() > 0:
+			to = mini(count, _shown_count + stepped)
+		if to > _shown_count:
 			_tick = TICK_TIME
-		_shown_count = count
+		_shown_count = to
 	_shown_room = room
 	_tick = maxf(_tick - delta, 0.0)
 	_burst = maxf(_burst - delta, 0.0)

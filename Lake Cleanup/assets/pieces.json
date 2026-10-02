@@ -233,7 +233,7 @@
     0,
     0
    ],
-   "title": "Dining chair",
+   "title": "Chair",
    "wash_scale": 1.0
   },
   {
@@ -343,7 +343,7 @@
     0,
     0
    ],
-   "title": "Nightstand",
+   "title": "Small table",
    "wash_scale": 1.0
   },
   {
@@ -453,7 +453,7 @@
     0,
     0
    ],
-   "title": "Tall bookcase",
+   "title": "Bookcase",
    "wash_scale": 1.2
   },
   {
@@ -508,7 +508,7 @@
     0,
     0
    ],
-   "title": "Dining table",
+   "title": "Table",
    "wash_scale": 1.0
   },
   {
@@ -775,7 +775,7 @@
     0,
     0
    ],
-   "title": "Big rug",
+   "title": "Rug",
    "wash_scale": 1.0
   },
   {
@@ -827,7 +827,7 @@
     0,
     0
    ],
-   "title": "Runner rug",
+   "title": "Rug",
    "wash_scale": 1.0
   },
   {
@@ -1163,7 +1163,7 @@
     0,
     1
    ],
-   "title": "Floor lamp",
+   "title": "Lamp",
    "wash_scale": 1.0
   },
   {
@@ -1208,7 +1208,7 @@
    "states": [
     0
    ],
-   "title": "Old clock",
+   "title": "Clock",
    "wash_scale": 1.5
   },
   {
@@ -1298,7 +1298,7 @@
    "states": [
     0
    ],
-   "title": "Standing mirror",
+   "title": "Mirror",
    "wash_scale": 1.0
   },
   {
@@ -1698,7 +1698,7 @@
    "states": [
     0
    ],
-   "title": "Small bookcase",
+   "title": "Bookcase",
    "wash_scale": 1.0
   },
   {
@@ -1926,7 +1926,7 @@
    "states": [
     0
    ],
-   "title": "Landscape",
+   "title": "Painting",
    "wash_scale": 1.0
   },
   {
@@ -1971,7 +1971,7 @@
    "states": [
     0
    ],
-   "title": "Chew toy",
+   "title": "Pet toy",
    "wash_scale": 1.0
   },
   {
@@ -6259,7 +6259,12 @@
     42
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    6,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -6335,7 +6340,12 @@
     42
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    6,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -6468,7 +6478,11 @@
     64
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    18,
+    12,
+    18
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -6969,7 +6983,12 @@
     77
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    22,
+    15,
+    26,
+    15
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -6996,7 +7015,7 @@
      40
     ],
     [
-     159,
+     136,
      142,
      32,
      53
@@ -7355,7 +7374,12 @@
     36
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    7,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -7953,7 +7977,12 @@
     39
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    7,
+    0,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -8299,7 +8328,7 @@
     0
    ],
    "tier": 3,
-   "title": "Grandfather Clock",
+   "title": "Old Clock",
    "wash_scale": 1.0
   },
   {
@@ -8450,13 +8479,13 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     193,
+     170,
      142,
      29,
      53
     ],
     [
-     224,
+     201,
      142,
      29,
      53
@@ -8513,7 +8542,7 @@
    "name": "decor_pk_fridge",
    "place": "floor",
    "region": [
-    370,
+    347,
     0,
     29,
     53
@@ -9068,7 +9097,11 @@
     40
    ],
    "scale": 0.74,
-   "seat": [],
+   "seat": [
+    6,
+    0,
+    0
+   ],
    "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
@@ -9291,10 +9324,10 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     136,
+     232,
      142,
      21,
-     54
+     53
     ]
    ],
    "base": [],
@@ -9309,15 +9342,15 @@
    "faces": [
     0
    ],
-   "fill": 0.604,
+   "fill": 0.61,
    "light": "",
    "name": "decor_pk_potted_tree",
    "place": "floor",
    "region": [
-    347,
+    378,
     0,
     21,
-    54
+    53
    ],
    "scale": 0.74,
    "seat": [],

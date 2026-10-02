@@ -63,13 +63,17 @@ const CONTRACT := "res://assets/wash_backdrop.json"
 
 ## How many times a second anything here steps: the lake's own `pixel_fps`.
 const PIXEL_FPS := 8.0
-const SKY_STEPS := 5
+const SKY_STEPS := 8
 ## The clouds: how many ride each layer, each layer's pace in canvas pixels a second, how
 ## big it draws, how far down the sky (as a share of it) its clouds' tops may sit, and which
 ## of the builder's sets it draws from. Far, small and slow, then the wisps high up, then
 ## the big near clouds (2026-09-28, the reference pass). A cloud's foot is held clear of the
 ## trees (`CLOUD_FOOT`): tall ones drew their base down on the treeline.
 const CLOUD_LAYERS := [
+	# A bank low along the horizon, sitting behind the wood (2026-10-02, Richard: lower and
+	# more prominent, covering the skyline): far ones first, then the near clouds' bank.
+	[12, 2.0, 1.0, Vector2(0.72, 1.0), "far_clouds"],
+	[9, 2.6, 1.0, Vector2(0.55, 0.9), "clouds"],
 	[3, 3.0, 1.0, Vector2(0.2, 0.5), "far_clouds"],
 	[7, 4.0, 1.0, Vector2(0.02, 0.3), "wisps"],
 	[3, 6.0, 1.0, Vector2(0.0, 0.2), "clouds"],
@@ -90,7 +94,8 @@ const STORM_SKY_MIX := 0.85
 ## behind lifts by `FLASH_SKY`, less, so the clouds stand out against it.
 const FLASH_CLOUD := Color(1.05, 1.08, 1.2)
 const FLASH_SKY := 0.35
-const CLOUD_FOOT := 0.86
+## (0.86 until 2026-10-02: the horizon bank stands with its foot behind the trees.)
+const CLOUD_FOOT := 1.06
 ## The clouds in the wash room's lake: their picture mirrored under the far shore, squashed
 ## by `REFLECT_SQUASH`, broken into dashed rows and laid over the water at `REFLECT_MIX`.
 ## Only on clean water, the main lake's rule.
@@ -121,14 +126,14 @@ const FLAP := 0.09
 const PUFF_BITS := 7
 const PUFF_LIFE := 0.45
 
-## Dogs: a standing dog's height at the beach and at the stand's feet, the band of lawn they
-## keep to as shares of the window's height below the near waterline, their trot, how long
-## they stop, and the jet's reach. A bolt is `DOG_BOLT` times the trot and at least
-## `BOLT_LEAST` long.
-## (26 to 54 until Richard's first look: "too small in comparison".)
-const DOG_TALL := Vector2(36.0, 72.0)
-const DOG_BAND := Vector2(0.07, 0.3)
-const DOG_PACE := 95.0
+## Dogs: how far away they keep, in tiles (far on the island's sand, near behind the stand),
+## a standing dog's height times its distance (so its drawn height is `DOG_SIZE / d`), their
+## trot at the near end, how long they stop, and the jet's reach. A bolt is `DOG_BOLT` times
+## the trot and at least `BOLT_LEAST` long.
+const DOG_D := Vector2(7.0, 3.0)
+const DOG_SIZE := 400.0
+## (95 until 2026-10-02, Richard: the trot read slow for the legs.)
+const DOG_PACE := 140.0
 const DOG_REST := Vector2(1.5, 6.0)
 const DOG_NEAR := 40.0
 const DOG_BOLT := 2.3
@@ -137,18 +142,18 @@ const BARK_GAP := 2.0
 const REST_POSES: Array[StringName] = [&"idle", &"idle", &"sit", &"laid", &"sleep"]
 
 ## Rubbish afloat: how many on a full lake, how far down the lake (as shares of it) they
-## lie, how much of each is under water, and the depth past which a piece draws at the full
-## `PIXEL` rather than half of it — what is far is small.
+## lie, how much of each is under water. Its grain follows its distance (`_grain_at`).
 const RUBBISH_MOST := 40
 const RUBBISH_SEED := 2909
 const RUBBISH_BAND := Vector2(0.12, 0.94)
 const RUBBISH_SUNK := 0.3
-const RUBBISH_NEAR_FROM := 0.55
 const BOB_PACE := 0.35
-## Ferries: each lane's waterline down the lake, its canvas pixels to a painted one, and its
-## pace. A hull crosses, waits out of sight `BOAT_WAIT`, and comes back the other way.
-## (20 and 38 until Richard's look: "can seem a little bit quicker".)
-const BOAT_LANES := [[0.2, 1.0, 32.0], [0.72, 2.0, 60.0]]
+## Ferries: each lane's distance in tiles, its canvas pixels to a painted one, and its pace
+## in canvas px a second. A hull crosses, waits out of sight `BOAT_WAIT`, and comes back the
+## other way. The far lane at half the near one's grain and pace: twice as far is half the
+## size and half the speed on the screen. A ferry is about a tile and a half long; by
+## `y_at`'s sums that is about a hundred canvas pixels twelve tiles out.
+const BOAT_LANES := [[26.0, 1.0, 30.0], [12.0, 2.0, 60.0]]
 ## The foam collar where a piece or a hull meets the water (Richard, same look: "it lacks
 ## the objects' foams"): the lake's own collar said in this grain — a torn row of whole foam
 ## pixels along the waterline and a thinner one under it, re-torn `FOAM_BEATS` times a
@@ -158,21 +163,45 @@ const FOAM_BEATS := 2.0
 const FOAM_ROWS := [0.75, 0.35]
 const FOAM_PAST := 1
 ## The dogs throw the sun's shadow (`Shade.lying`, the day's lean, stretch and ink lent by
-## the room as `shade`), at `DOG_SHADE_GAIN` of the ink: the lawn is already darkened.
-const DOG_SHADE_GAIN := 1.5
+## the room as `shade`), in the one ink every shadow on land takes (`Shade.On.LAND`, 2026-10-02,
+## one sun). It used to carry a gain of its own over the darkened lawn; it does not any more.
 const BOAT_WAIT := Vector2(6.0, 20.0)
 const BOAT_MARGIN := 140.0
 
 const PIXEL := 2.0
-## Where the near waterline stands down the window, and how tall the lake is drawn, in
-## painted pixels. First guesses: judge on `tools/last_wash_room.png`.
-const HORIZON := 0.52
-const LAKE_TALL := 44
+## The view is a first-person perspective (2026-10-02, Richard: "like you really went to a
+## first person perspective"): a point on the ground `d` tiles away stands at
+## `y_at(d)` = the eye line plus `(1 - EYE) * NEAR_D / d` of the window, the window's foot
+## being `NEAR_D` tiles out. Every distance in the view is one of these, in tiles: the
+## island's lawn gives way to its sand at `LAWN_D` (just past the pallet), the near waterline
+## is `SHORE_D` (the island's beach is 3.5 tiles wide), the far one `FAR_D` across the lake,
+## the far bank's sand and trees just past it. So the far bank is a thin line low under the
+## sky and its trees are small, the lake narrows towards it, and the near beach is broad.
+const EYE := 0.43
+const NEAR_D := 1.6
+const LAWN_D := 4.0
+const SHORE_D := 7.5
+const FAR_D := 33.5
+## The far bank's strip is drawn at one canvas pixel a painted one, half the near grain:
+## at that distance the pack's trees stand about a tenth of the window tall.
+const FAR_PIXEL := 1.0
 const DARKEN := 0.66
 ## The sky and its clouds are left out of `DARKEN` (2026-09-28, Richard): it was there for
 ## the grime against the lawn, and it greyed the clouds' white. The ground, the water and
 ## everything on them are darkened by a black veil laid over them in `_draw`, from the far
 ## waterline down, and the far bank's strip is drawn at `DARKEN`; the birds and the rain are drawn over it.
+##
+## **What is drawn is `darken`, and `DARKEN` is only its default** (2026-09-30, the hive
+## room): the hive room stands this same view behind its steps, and its pieces are the
+## thing being looked at rather than grime that has to read against the lawn, so it veils
+## less (0.82). The wash room never sets it and looks exactly as it did. The constant stays
+## as the wash room's own number, so what the wash room is tuned to is still written down.
+var darken := DARKEN
+## How far the far bank's strip is slid along, in canvas pixels (2026-09-30, the hive
+## room): the same trees in the same order behind the hive room read as standing at the
+## pump, so the hive room shifts them to be somewhere else on the shore. Nought is the wash
+## room's own view. Stepped to whole painted pixels, like everything else here.
+var bank_offset := 0.0
 ## How far down the bank strip the treetops are, as a share of it: where the sky ends.
 const CROWNS_AT := 0.12
 
@@ -181,7 +210,7 @@ const STATE_NAMES: Array[String] = ["clean", "hazy", "murky", "foul", "dirty"]
 ## The lake from the far shore to the near one: a share of its height, and the ramp's step
 ## (0 deep to 4 light). Shallow at both shores, deep in the middle, and the far bands thinner
 ## than the near ones, which is all the perspective flat water has.
-const BANDS := [[0.08, 3], [0.12, 2], [0.18, 1], [0.28, 0], [0.18, 1], [0.10, 2], [0.06, 3]]
+const BANDS := [[0.04, 3], [0.07, 2], [0.14, 1], [0.30, 0], [0.22, 1], [0.14, 2], [0.09, 3]]
 ## From this state up the shore's foam line is the filthy foam.
 const FOAM_DIRTY_FROM := 3
 ## Streaks: dashes one step up the ramp from the band they lie on, rolled once off a fixed
@@ -214,6 +243,14 @@ var bird_sheet: Texture2D
 var bird_kinds: Array[Dictionary] = []
 ## The day's shadow as (lean, stretch, ink); nought draws none.
 var shade := Vector3.ZERO
+## The pallet's box in this control, which the dogs keep behind or go round (2026-10-01,
+## Richard: "dogs are running under the pallet, they should be around and behind"). The
+## backdrop is drawn under the stand, so a dog whose feet are inside it is drawn under the
+## pallet. Set by the room every frame; empty keeps nothing out.
+var keep_out := Rect2()
+## How far clear of the pallet a dog's feet stay, across and behind, in canvas px.
+const KEEP_SIDE := 44.0
+const KEEP_BEHIND := 6.0
 ## How many ferries the fleet holds, and the lake's rubbish as `{sheet, region}` rows.
 var fleet := 1
 var rubbish: Array = []
@@ -268,6 +305,8 @@ class Hound:
 	## The pack slot this hound stands for, and so its breed and gait — `Dog.slot`'s rule.
 	var slot := 0
 	var breed := 0
+	## A corner of the pallet to go round on the way to `to`, or INF for a straight line.
+	var via := Vector2.INF
 
 
 func _ready() -> void:
@@ -450,7 +489,8 @@ func sprayed_at(point: Vector2) -> void:
 			if sound != null:
 				sound.room_coo()
 	for dog in _dogs:
-		var reach := DOG_NEAR * _dog_tall(dog) / DOG_TALL.y
+		# Never less than the dog's own body: a far dog is small, but a jet on it is on it.
+		var reach := maxf(DOG_NEAR * _dog_tall(dog) / (DOG_SIZE / DOG_D.y), _dog_tall(dog) * 0.6)
 		if dog.bolting or (dog.at - Vector2(0.0, _dog_tall(dog) * 0.5)).distance_to(point) > reach:
 			continue
 		# Away from the jet, a good way, along the lawn.
@@ -458,10 +498,10 @@ func sprayed_at(point: Vector2) -> void:
 		dog.bolting = true
 		dog.rest = 0.0
 		dog.pose = &"run"
-		dog.to = Vector2(
+		_aim(dog, Vector2(
 			clampf(dog.at.x + away * maxf(BOLT_LEAST, size.x * 0.3), -80.0, size.x + 80.0),
 			dog.at.y
-		)
+		))
 		dog.left = away < 0.0
 		if _bark_in <= 0.0:
 			_bark_in = BARK_GAP
@@ -541,12 +581,26 @@ func _drive_birds(delta: float) -> void:
 # --- Dogs --------------------------------------------------------------------------------
 
 func _dog_tall(dog: Hound) -> float:
-	return lerpf(DOG_TALL.x, DOG_TALL.y, dog.depth)
+	return DOG_SIZE / lerpf(DOG_D.x, DOG_D.y, dog.depth)
 
 
 func _lawn_y(depth: float) -> float:
-	var near := lake_box().end.y
-	return near + size.y * lerpf(DOG_BAND.x, DOG_BAND.y, depth)
+	return y_at(lerpf(DOG_D.x, DOG_D.y, depth))
+
+
+## Where the ground `d` tiles away stands down the window (see `EYE`).
+func y_at(d: float) -> float:
+	return size.y * (EYE + (1.0 - EYE) * NEAR_D / maxf(d, 0.01))
+
+
+## How far away the ground at row `y` is, in tiles: `y_at` the other way.
+func d_at(y: float) -> float:
+	return (1.0 - EYE) * NEAR_D * size.y / maxf(y - EYE * size.y, 0.01)
+
+
+## A thing on the water `d` tiles away is drawn at this many canvas pixels a painted one.
+static func _grain_at(d: float) -> float:
+	return PIXEL if d < 16.0 else 1.0
 
 
 ## Somewhere new to trot to: mostly along the lawn, a little nearer or further.
@@ -554,7 +608,7 @@ func _send(dog: Hound) -> void:
 	if dog.at.y == 0.0:
 		dog.at.y = _lawn_y(dog.depth)
 	var depth := clampf(dog.depth + _roll.randf_range(-0.3, 0.3), 0.0, 1.0)
-	dog.to = Vector2(_roll.randf_range(0.04, 0.96) * size.x, _lawn_y(depth))
+	_aim(dog, Vector2(_roll.randf_range(0.04, 0.96) * size.x, _lawn_y(depth)))
 	dog.left = dog.to.x < dog.at.x
 	dog.pose = DogArt.gait(dog.slot, false, dog.breed) if DogArt.has(&"run", dog.breed) else &"idle"
 	dog.rest = 0.0
@@ -562,15 +616,25 @@ func _send(dog: Hound) -> void:
 
 
 func _drive_dogs(delta: float) -> void:
+	var out := _kept_out()
 	for dog in _dogs:
 		dog.age += delta
+		# A dog laid out before the room knew where the pallet was stands behind it.
+		if out.size.x > 0.0 and out.has_point(dog.at) and dog.via == Vector2.INF:
+			dog.at.y = out.position.y
+			if out.has_point(dog.to):
+				dog.to.y = out.position.y
 		if dog.rest > 0.0:
 			dog.rest -= delta
 			if dog.rest <= 0.0:
 				_send(dog)
 			continue
-		var pace := DOG_PACE * (DOG_BOLT if dog.bolting else 1.0) * _dog_tall(dog) / DOG_TALL.y
-		dog.at = dog.at.move_toward(dog.to, pace * delta)
+		var pace := DOG_PACE * (DOG_BOLT if dog.bolting else 1.0) * _dog_tall(dog) / (DOG_SIZE / DOG_D.y)
+		var going := dog.to if dog.via == Vector2.INF else dog.via
+		dog.at = dog.at.move_toward(going, pace * delta)
+		if dog.via != Vector2.INF and dog.at.distance_to(dog.via) < 1.0:
+			dog.via = Vector2.INF
+			continue
 		# How big it draws follows where it is, all the way there.
 		dog.depth = clampf(inverse_lerp(_lawn_y(0.0), _lawn_y(1.0), dog.at.y), 0.0, 1.0)
 		if dog.at.distance_to(dog.to) < 1.0:
@@ -579,6 +643,42 @@ func _drive_dogs(delta: float) -> void:
 			var pose: StringName = REST_POSES[_roll.randi() % REST_POSES.size()]
 			dog.pose = pose if DogArt.has(pose, dog.breed) else &"idle"
 			dog.age = 0.0
+
+
+## The pallet grown by a dog's clearance: behind it, and either side of it.
+func _kept_out() -> Rect2:
+	if keep_out.size.x <= 0.0:
+		return Rect2()
+	return keep_out.grow_individual(KEEP_SIDE, KEEP_BEHIND, KEEP_SIDE, size.y)
+
+
+## Send a dog to `spot`, kept off the pallet: a spot inside it is moved behind it, and a
+## straight line through it goes by the nearer of its two back corners instead.
+func _aim(dog: Hound, spot: Vector2) -> void:
+	dog.via = Vector2.INF
+	var out := _kept_out()
+	if out.size.x <= 0.0:
+		dog.to = spot
+		return
+	if out.has_point(spot):
+		spot.y = out.position.y
+	dog.to = spot
+	if _crosses(dog.at, spot, out):
+		var left := Vector2(out.position.x, out.position.y)
+		var right := Vector2(out.end.x, out.position.y)
+		var by_left := dog.at.distance_to(left) + left.distance_to(spot)
+		var by_right := dog.at.distance_to(right) + right.distance_to(spot)
+		dog.via = left if by_left <= by_right else right
+	dog.left = (dog.to if dog.via == Vector2.INF else dog.via).x < dog.at.x
+
+
+## Whether the segment from `a` to `b` passes through the box (sampled: the box is big and
+## the dogs' legs are short, so a handful of points is plenty).
+static func _crosses(a: Vector2, b: Vector2, box: Rect2) -> bool:
+	for k in range(1, 24):
+		if box.has_point(a.lerp(b, float(k) / 24.0)):
+			return true
+	return false
 
 
 ## Whether both strips loaded: without them it is the old flat wall.
@@ -619,9 +719,9 @@ func sky_at(at: float) -> Array[Color]:
 
 ## The lake's box in this control, far shore to near.
 func lake_box() -> Rect2:
-	var near := snappedf(size.y * HORIZON, PIXEL)
-	var tall := LAKE_TALL * PIXEL
-	return Rect2(0.0, near - tall, size.x, tall)
+	var near := snappedf(y_at(SHORE_D), PIXEL)
+	var far := snappedf(y_at(FAR_D), PIXEL)
+	return Rect2(0.0, far, size.x, near - far)
 
 
 func _draw() -> void:
@@ -629,12 +729,14 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), FALLBACK)
 		return
 	var lake := lake_box()
-	var bank_tall := _bank.get_height() * PIXEL
+	var bank_tall := _bank.get_height() * FAR_PIXEL
 	# The sky: flat steps from the high swatch down to the low one, the last standing behind
 	# the treetops — spread over what the crowns leave showing, or the trees hide the lot.
 	var sky := sky_at(sun)
 	var bank_top := lake.position.y - bank_tall
 	var open := maxf(bank_top + bank_tall * CROWNS_AT, PIXEL * SKY_STEPS)
+	var steps: Array[Color] = []
+	var edges: Array[float] = []
 	for k in SKY_STEPS:
 		var from := snappedf(open * float(k) / float(SKY_STEPS), PIXEL)
 		var to := lake.position.y
@@ -644,24 +746,67 @@ func _draw() -> void:
 		step = step.lerp(STORM_SKY, clampf(Weather.now, 0.0, 1.0) * STORM_SKY_MIX)
 		step = step.lerp(Color(0.85, 0.87, 0.95), _flash_lit() * FLASH_SKY)
 		draw_rect(Rect2(0.0, from, size.x, to - from), step)
+		steps.append(step)
+		edges.append(to)
+	_blend_sky(steps, edges)
 	_draw_clouds(open)
 	_draw_bolt(bank_top + bank_tall * CROWNS_AT)
 	_draw_water(lake)
 	_draw_cloud_reflections(open, lake)
-	_tile(_bank, bank_top, Color(DARKEN, DARKEN, DARKEN))
+	_tile(_bank, bank_top, Color(darken, darken, darken), bank_offset, FAR_PIXEL)
 	# Over the far bank, not under it: a mast on the far lane stands up in front of the
 	# trees, and drawn under the strip the hull sailed with its sail behind the sand.
 	_draw_afloat(lake)
 	_tile(_lawn, lake.end.y)
 	_draw_dogs()
-	# The veil: `DARKEN` over the ground and the water, not the sky.
-	draw_rect(Rect2(0.0, lake.position.y, size.x, size.y - lake.position.y), Color(0.0, 0.0, 0.0, 1.0 - DARKEN))
+	# The veil: `darken` over the ground and the water, not the sky.
+	draw_rect(Rect2(0.0, lake.position.y, size.x, size.y - lake.position.y), Color(0.0, 0.0, 0.0, 1.0 - darken))
 	_draw_birds()
 	_draw_rain(lake)
 	# Whatever a tall window leaves under the lawn strip: its last row, carried down.
 	var lawn_end := lake.end.y + _lawn.get_height() * PIXEL
 	if lawn_end < size.y:
-		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light * Color(DARKEN, DARKEN, DARKEN))
+		draw_rect(Rect2(0.0, lawn_end, size.x, size.y - lawn_end), _palette.grass_light * Color(darken, darken, darken))
+
+
+## The sky's steps run into each other through a pixel-art dither (2026-10-02, Richard: "the
+## seams on the skyline are too visible"): across every edge, `SKY_BLEND` bands of whole
+## painted pixels, each the next step's colour laid at a quarter, a half and three quarters
+## through a 2x2 ordered pattern, so a step gives way to the next in a run of checks rather
+## than at a line. The pattern is a tiny texture tiled across the window, one draw a band.
+const SKY_BLEND := 2
+var _dither: Array[Texture2D] = []
+
+
+func _dither_tile(level: int) -> Texture2D:
+	if _dither.is_empty():
+		# 2x2 Bayer cells, PIXEL canvas px each: which cells are lit at a quarter, a half,
+		# three quarters.
+		var lit := [[Vector2i(0, 0)], [Vector2i(0, 0), Vector2i(1, 1)],
+				[Vector2i(0, 0), Vector2i(1, 1), Vector2i(1, 0)]]
+		var cell := int(PIXEL)
+		for cells: Array in lit:
+			var image := Image.create(cell * 2, cell * 2, false, Image.FORMAT_RGBA8)
+			for at: Vector2i in cells:
+				image.fill_rect(Rect2i(at * cell, Vector2i(cell, cell)), Color.WHITE)
+			_dither.append(ImageTexture.create_from_image(image))
+	return _dither[level]
+
+
+func _blend_sky(steps: Array[Color], edges: Array[float]) -> void:
+	var band := PIXEL * 2.0
+	for k in steps.size() - 1:
+		var edge := edges[k]
+		var upper := steps[k]
+		var lower := steps[k + 1]
+		# Above the edge: the lower colour coming in at a quarter, then a half.
+		for b in SKY_BLEND:
+			var y := edge - band * float(SKY_BLEND - b)
+			draw_texture_rect(_dither_tile(b), Rect2(0.0, y, size.x, band), true, lower)
+		# Below it: the upper colour going out at a half, then a quarter.
+		for b in SKY_BLEND:
+			var y := edge + band * float(b)
+			draw_texture_rect(_dither_tile(SKY_BLEND - 1 - b), Rect2(0.0, y, size.x, band), true, upper)
 
 
 ## The rain over the view from the pump (2026-09-25, see `Weather`): it reads the lake's
@@ -890,7 +1035,7 @@ func _draw_afloat(lake: Rect2) -> void:
 		rows.append([lake.position.y + lake.size.y * deep, piece, deep])
 	for hull in _hulls:
 		if hull.wait <= 0.0:
-			rows.append([lake.position.y + lake.size.y * float(BOAT_LANES[hull.lane][0]), hull, 0.0])
+			rows.append([y_at(float(BOAT_LANES[hull.lane][0])), hull, 0.0])
 	rows.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
 	for row: Array in rows:
 		var line := snappedf(float(row[0]), PIXEL)
@@ -900,12 +1045,12 @@ func _draw_afloat(lake: Rect2) -> void:
 		var piece: Dictionary = row[1]
 		var art: Dictionary = rubbish[int(piece["kind"])]
 		var region: Rect2 = art["region"]
-		var grain := PIXEL if float(row[2]) >= RUBBISH_NEAR_FROM else PIXEL * 0.5
+		var grain := _grain_at(d_at(float(row[0])))
 		# The bottom of the picture is under the water: not drawn, the dog's own way.
 		var kept := Rect2(region.position, Vector2(region.size.x, ceilf(region.size.y * (1.0 - RUBBISH_SUNK))))
 		var bob := grain if sin((now * BOB_PACE + float(piece["beat"])) * TAU) > 0.0 else 0.0
 		var span := kept.size * grain
-		var at := Vector2(snappedf(float(piece["across"]) * size.x, PIXEL), line - span.y + bob)
+		var at := Vector2(snappedf(float(piece["across"]) * size.x, PIXEL), line - span.y + snappedf(bob, 1.0))
 		if bool(piece["flip"]):
 			draw_set_transform(Vector2(at.x * 2.0 + span.x, 0.0), 0.0, Vector2(-1.0, 1.0))
 		draw_texture_rect_region(art["sheet"], Rect2(at, span), kept)
@@ -957,7 +1102,7 @@ func _draw_dogs() -> void:
 	var order := _dogs.duplicate()
 	order.sort_custom(func(a: Hound, b: Hound) -> bool: return a.at.y < b.at.y)
 	if shade.z > 0.0:
-		var ink := Shade.tint(minf(shade.z * DOG_SHADE_GAIN, 0.6))
+		var ink := Shade.tint(Shade.ink_on(shade.z, Shade.On.LAND))
 		for dog: Hound in order:
 			draw_set_transform_matrix(
 				Shade.lying(dog.at.snapped(Vector2.ONE * PIXEL), shade.x, shade.y)
@@ -1002,10 +1147,12 @@ static func _hash(a: int, b: int) -> float:
 	return float(h & 0xffff) / 65535.0
 
 
-## A strip laid across the window at `top`, as many times as the window is wide.
-func _tile(strip: Texture2D, top: float, ink := Color.WHITE) -> void:
-	var box := Vector2(strip.get_width(), strip.get_height()) * PIXEL
-	var x := 0.0
+## A strip laid across the window at `top`, as many times as the window is wide, slid
+## `offset` canvas pixels along (whole painted pixels; the strips wrap, so any slide is a
+## seamless one).
+func _tile(strip: Texture2D, top: float, ink := Color.WHITE, offset := 0.0, grain := PIXEL) -> void:
+	var box := Vector2(strip.get_width(), strip.get_height()) * grain
+	var x := -snappedf(fposmod(offset, box.x), grain)
 	while x < size.x:
 		draw_texture_rect(strip, Rect2(Vector2(x, top), box), false, ink)
 		x += box.x

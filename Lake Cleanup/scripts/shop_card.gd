@@ -68,9 +68,12 @@ const HEAD_IN := 0.35
 const HEAD_HOLD := 1.4
 const HEAD_LEAN := 54.0
 const BOX_ART := "res://assets/Recycle_Box.png"
-## The box art's mouth: its middle row, measured from the top (`Dropoff.BOX_TOP`).
-const BOX_MOUTH := 8.0
-const BOX_SCALE := 1.5
+## The box art's mouth: its middle row, measured from the top (`Yard.ART_TOP`).
+const BOX_MOUTH := Yard.ART_TOP
+## 0.75 of the 1x box (2026-10-02), the size the old 2x painting was drawn here at 1.5.
+const BOX_SCALE := 0.75
+## Card px per old box px, for the heap's offsets, which were set against the 2x box.
+const BOX_STEP := BOX_SCALE * 2.0
 
 var _time := 0.0
 var _roll := RandomNumberGenerator.new()
@@ -325,14 +328,14 @@ func _draw_luck(box: Rect2) -> void:
 				var size_px := region.size * PIXEL * 0.8
 				var spot := mouth + Vector2(
 					(float((k * 37) % 11) / 10.0 - 0.5) * drawn.x * 0.45,
-					BOX_SCALE * (5.0 - float(k) * 0.5)
+					BOX_STEP * (5.0 - float(k) * 0.5)
 				)
 				draw_texture_rect_region(art["sheet"], Rect2((spot - size_px * 0.5).snapped(Vector2.ONE * PIXEL), size_px), region)
 			# The piece in the air, arcing in from off the left edge and down into the heap.
 			if t < 1.0:
 				var art: Dictionary = rubbish[drops % rubbish.size()]
 				var region: Rect2 = art["region"]
-				var into := mouth + Vector2(0.0, BOX_SCALE * 4.0)
+				var into := mouth + Vector2(0.0, BOX_STEP * 4.0)
 				var from := Vector2(-10.0, mouth.y - 10.0)
 				var p := from.lerp(into, t) - Vector2(0.0, sin(t * PI) * box.size.y * 0.5)
 				var size_px := region.size * PIXEL

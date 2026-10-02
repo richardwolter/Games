@@ -45,6 +45,78 @@ static func cast(at: Vector2, lean: float, stretch: float) -> Transform2D:
 	return Transform2D(across, -down, at)
 
 
+## One sun (2026-10-02, `/grill-me` with Richard): every shadow in the lake world is the
+## same ink (`INK` times the day's `ink`, which already carries the overcast and the flash),
+## and what differs is only the surface it falls on. A shadow on dark water at the land's
+## alpha cannot be seen, which is why the hull, the piers and the birds each grew their own
+## gain; now there is one gain per surface and every caster on that surface takes it, so a
+## hull, a pier and a piece of rubbish on the water read alike.
+enum On { LAND, WATER, BED }
+
+## The gain on the day's ink, and the most it may reach, per surface (`On`). Water is the
+## hull's old pair, which was the one tuned by eye against the lake; the bed is under the
+## water, so lighter. First guesses for the bed.
+const GAIN: Array[float] = [1.0, 2.7, 1.4]
+const MOST: Array[float] = [1.0, 0.63, 0.42]
+
+## The ink a shadow takes when there is no day to ask (a harness, a probe off the root).
+const NO_DAY_INK := 0.3
+
+## The day given, or the lake's own when none was (`DayCycle.here`).
+static func sun_of(day: DayCycle) -> DayCycle:
+	if day != null and is_instance_valid(day):
+		return day
+	return DayCycle.here if is_instance_valid(DayCycle.here) else null
+
+
+## The strength of a shadow on `on`, from the day's ink.
+static func ink_on(ink: float, on: int) -> float:
+	return minf(ink * GAIN[on], MOST[on])
+
+
+## The colour a shadow on `on` is drawn in, `fade` times through. `day` may be null.
+static func tint_on(day: DayCycle, on: int, fade: float = 1.0) -> Color:
+	day = sun_of(day)
+	var ink := NO_DAY_INK if day == null else day.ink
+	return Color(INK.r, INK.g, INK.b, clampf(ink_on(ink, on) * fade, 0.0, 1.0))
+
+
+## Where the ground point under something `height` world px up lands along the sun: the same
+## mapping `lying` gives a pixel at that height, as an offset. Every caster that is off the
+## ground (a bird, the net in flight, a piece in the haul) or under it (a fish, the lakebed)
+## puts its shadow here, so they all fall the way the angler's does.
+static func drop(day: DayCycle, height: float) -> Vector2:
+	day = sun_of(day)
+	if day == null:
+		return Vector2(-0.2, 0.4) * height
+	return Vector2(day.lean, maxf(day.stretch, 0.02) * 0.5) * height
+
+
+## A flat ellipse of shadow, 2:1 like the plane, `wide` px across. For what is too small or
+## too far up to throw a picture of itself (a piece in the haul, a bee-sized speck).
+static func blot(on: CanvasItem, at: Vector2, wide: float, colour: Color) -> void:
+	var half := Vector2(wide * 0.5, wide * 0.25)
+	if half.x <= 0.0:
+		return
+	var ring := PackedVector2Array()
+	for i in 12:
+		var a := TAU * float(i) / 12.0
+		ring.append(at + Vector2(cos(a) * half.x, sin(a) * half.y))
+	on.draw_colored_polygon(ring, colour)
+
+
+## The tint a built thing wears in the rain (2026-10-01, `/grill-me` with Richard): darker and
+## cooler as a shower soaks in, drying on the sand's own clock (`Puddles.sand_wet`). The hut,
+## the pump, the hive and its shelf, the island crate and the piers all draw with it; walkers,
+## hulls, trees and rubbish do not, by decision. One colour, so they all get wet alike.
+const WET := Color(0.76, 0.77, 0.86)
+
+
+static func wet_tint() -> Color:
+	var wet := Puddles.here.sand_wet if is_instance_valid(Puddles.here) else 0.0
+	return Color.WHITE.lerp(WET, wet)
+
+
 ## The ink a shadow is drawn in, at the strength the day says.
 static func tint(ink: float) -> Color:
 	return Color(INK.r, INK.g, INK.b, clampf(ink, 0.0, 1.0))

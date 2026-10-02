@@ -14,8 +14,8 @@
 ##
 ## The values themselves are `Prefs`' (2026-09-12): the board reads them on its way in and
 ## stores every press, so the menu's board and the lake's are one set of settings, kept
-## across scenes and sessions. In `menu_mode` the lake's own rows — the wipe, the level
-## swap, the way out — are left off: the menu is already outside the lake.
+## across scenes and sessions. In `menu_mode` the lake's own row — the way out — is left off:
+## the menu is already outside the lake.
 ##
 ## **The sound rows are four now and the screen rows four** (2026-09-16, issue #26, decided
 ## with `/grill-me`): a Master slider over the three, and Window / Resolution / VSync /
@@ -164,10 +164,6 @@ var ambience_level: float = 0.7:
 		ambience_level = clampf(v, 0.0, 1.0)
 		queue_redraw()
 
-## The lake-over button is not shown, as it was not on the old panel; the F6 key still
-## does it.
-var wipe_shown: bool = false
-
 ## The board as the main menu shows it: sound, screen and controls. No way out of a lake the
 ## player is not in.
 var menu_mode: bool = false:
@@ -181,7 +177,6 @@ static var CONTROLS_LABEL: String:
 	get: return Text.SETTINGS_CONTROLS
 
 signal controls_asked
-signal wipe_pressed
 signal quit_pressed
 signal close_asked
 
@@ -271,8 +266,6 @@ func _plan() -> Array:
 	if menu_mode:
 		return plan
 	plan.append({"kind": &"gap"})
-	if wipe_shown:
-		plan.append({"kind": &"button", "key": &"wipe", "label": Text.SETTINGS_WIPE, "warn": true})
 	plan.append({"kind": &"button", "key": &"quit", "label": QUIT_LABEL, "warn": true})
 	return plan
 
@@ -371,8 +364,6 @@ func _gui_input(event: InputEvent) -> void:
 			_drag_to(click.position)
 		&"controls":
 			controls_asked.emit()
-		&"wipe":
-			wipe_pressed.emit()
 		&"quit":
 			quit_pressed.emit()
 		_:

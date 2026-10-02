@@ -34,6 +34,7 @@ const Style := preload("res://scripts/style.gd")
 ## Master palette colors. See scripts/palette.gd and resources/palette.tres.
 const Palette := preload("res://scripts/palette.gd")
 const DogArt := preload("res://scripts/dog_art.gd")
+const Tornado := preload("res://scripts/tornado.gd")
 
 
 ## The lake is laid out from this, once, at load. Same seed, same lake, every run — which
@@ -328,9 +329,37 @@ const SHOP_RANGE := 3.2
 ## right wall, clear of the roof's overhang, on the side the door is not. And how close the
 ## angler has to be to work it — well inside `SHOP_RANGE`, which the pump stands within, so
 ## beside the pump the key is the pump's and everywhere else round the hut it is the door's.
-## By eye on `tools/shot_pump.tscn`.
-const PUMP_AT := Vector2(2.1, -0.5)
+## By eye on `tools/shot_pump.tscn`. Moved from (2.1, -0.5) with the smaller pump
+## (2026-10-01, Richard: "smaller and closer to the shed"): slid along the gable towards the
+## near corner, which is what brings it in on the screen. It cannot come in along x: a dog
+## rounds the hut `Dog.AVOID_CLEAR` past its keep (1.62 tiles out), and the pump's square
+## and keep have to start beyond that or the dog brushes it (`test_lake`'s "never touched").
+const PUMP_AT := Vector2(2.05, 0.3)
 const PUMP_RANGE := 1.5
+
+## The beehive (2026-09-30, the beehive sidequest; `docs/hive/contract.md` section 9): where
+## it stands, in tiles off the middle of the hut's walls — on the free lawn left of the hut
+## on screen, level with its middle — and how close to the footprint's own middle the angler
+## has to be to open its room. The door's stand is about three tiles from that middle, so
+## the two ranges never meet and E is never both.
+const HIVE_AT := Vector2(-2.02, 1.98)
+const HIVE_RANGE := 1.5
+## The swarm's gate (contract section 1): a quarter of an hour of play and `SWARM_HOSTS`
+## grown bee flowers on the island, or `SWARM_LATE` of play and any one. So a player who
+## cleans round the island gets the swarm mid-run, and one who does not still gets it.
+const SWARM_AFTER := 15.0 * 60.0
+const SWARM_LATE := 25.0 * 60.0
+const SWARM_HOSTS := 6
+## How long a harvest takes to come back, in seconds of play: from `HIVE_REFILL_MOST`
+## minutes on a bare island down to `HIVE_REFILL_LEAST` with `HIVE_HOSTS_FULL` flowers.
+const HIVE_REFILL_MOST := 11.0
+const HIVE_REFILL_LEAST := 5.0
+const HIVE_HOSTS_FULL := 40.0
+## The gate and the refill are asked this often, in seconds: nothing about them is quick.
+const HIVE_TICK := 1.0
+## The colony's hum at the hive, as a share of `Sfx.HIVE_HUM_DB`: loudest while there is
+## something to do there (a swarm, a harvest), half while the colony is just living in it.
+const HIVE_HUM_BUSY := 0.5
 
 ## How art is sized when it is floating in the lake.
 ##
@@ -428,37 +457,46 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## 19: a kind is material and tier only (2026-10-01): pay from a price table, the meter
 ## counts pieces, the fill rolls tier by depth. The v18 save is
 ## _builds/lake_cleanup_v18_20261001.save.
-const SAVE_VERSION := 19
+## 20: the finds are the 0_mem0ry pack decoration (2026-10-01), so the def list after the
+## rubbish changed; the v19 save is _builds/lake_cleanup_v19_20261001.save.
+## 21: every find is unique, the diner chair one def instead of four (2026-10-01); the v20
+## save is _builds/lake_cleanup_v20_20261001.save.
+const SAVE_VERSION := 21
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
-const STARTER_BED := "decor_bed"
+const STARTER_BED := "decor_pk_bed"
 
 ## The one find that starts on the surface, by the island, so the first casts have a
 ## decoration to bring home; and how far past the rubbish's inner edge it may lie. Kept
 ## inside a level-0 throw: the shelf is 2.3 tiles out and the rod starts at 3.4, so the
 ## band is narrow, and the piece is tier 0 (see `_all_defs`).
-const FIRST_FIND := &"decor_pet_bed"
+## The record player since the pack decoration (2026-10-01, Richard): the first find is
+## the one that brings music into the house.
+const FIRST_FIND := &"decor_vynil_player"
 const FIRST_FIND_OUT := 0.8
 
 ## How far apart the hidden finds are dealt, in tiles: two a cast apart read as a hoard.
-const FIND_APART := 7.0
+## 6 since the pack decoration (2026-10-01): 55 finds where there were 37.
+const FIND_APART := 6.0
 
 ## The finds a new shed wants first, and the net tier each is lifted at whatever its bulk
 ## says (Richard, 2026-09-17): the small ones by the first net, the furniture after the
 ## first Strength buy. They are hidden within `EARLY_OUT` tiles of the island's shelf, one
 ## slot down, under nothing heavier than themselves — early means never waiting on Strength.
 const EARLY_FINDS := {
-	&"decor_pet_bed": 0,
-	&"decor_chew_toy": 0,
-	&"decor_lamp": 0,
-	&"decor_vynil_player": 1,
-	&"decor_loveseat": 1,
-	&"decor_center_table": 1,
+	&"decor_vynil_player": 0,
+	&"decor_pk_flower_vase": 0,
+	&"decor_pk_nightstand": 0,
+	&"decor_pk_coat_stand": 0,
+	&"decor_pk_sofa": 1,
+	&"decor_pk_coffee_table": 1,
+	&"decor_pk_chair": 1,
 }
 ## The bands the rest are dealt into by tier, in tiles past the shelf: tiers 1-2 between
 ## `EARLY_OUT` and `MID_OUT`, tiers 3-4 beyond. By rule, so a new find needs no authoring.
 const EARLY_OUT := 15.0
-const MID_OUT := 25.0
+## 27 since the pack decoration (2026-10-01): 34 finds in the middle band, not 20.
+const MID_OUT := 27.0
 const LATE_TIER := 3
 const AUTOSAVE_EVERY := 20.0
 
@@ -587,6 +625,9 @@ var unlocked: Array[String] = []
 ## once it has come clean on the wash stand. Saved as names; an older save has no such key
 ## and everything it holds in `unlocked` is simply washed already.
 var unwashed: Array[String] = []
+## The wash room's hose, levels 1 to 3 (2026-10-01): wider and harder a level. Saved as
+## `hose`; a save without it reads as 1.
+var hose_level := 1
 
 ## What the player has put where, as `{piece, cell}` rows. Owned here rather than by the
 ## room so it saves with everything else.
@@ -670,6 +711,13 @@ var _yard: Yard
 var _pump: Pump
 var _wash: WashRoom
 var _wash_open := false
+## The beehive on the lawn and its room (2026-09-30). See `Hive` and `HiveRoom`. The room is
+## built the first time it opens, on the HUD's layer, the wash room's way.
+var _hive: Hive
+var _hive_room: HiveRoom
+var _hive_open := false
+## Seconds until the hive's gate and refill are next asked (`_hive_step`).
+var _hive_tick := 0.0
 
 ## The dog. It fetches, it dozes on the grass, and it can be petted; see scripts/dog.gd.
 var _dog: Dog
@@ -748,12 +796,13 @@ var _haul_count: HaulCount
 var _haul_out := false
 var _haul_banked := 0
 var _haul_room := 0
-## The wildlife moment: whether this save has had it, seconds into it (-1 while none runs),
-## where it looks, a spot waiting for the boards to close, the zoom it left from, and its card.
+## The moments (the wildlife's, then the swarm's): whether this save has had the wildlife
+## one, seconds into the one running (-1 while none runs), where it looks, the ones waiting
+## for the boards to close, and the card. See `_owe_moment`.
 var _wildlife_seen: bool = true
 var _moment: float = -1.0
 var _moment_at: Vector2 = Vector2.INF
-var _moment_owed: Vector2 = Vector2.INF
+var _moments: Array[Dictionary] = []
 var _moment_card: MomentCard
 ## Edge arrows at the last few pieces (`LastArrows`), made when first needed.
 var _last_arrows: LastArrows
@@ -1122,15 +1171,23 @@ func _ready() -> void:
 	_grid.find_surfaced.connect(func(_index: int) -> void: _sfx.play_find_chime())
 	_mark("sfx")
 
-	# Over the island and the shed: the catch is thrown across them, not through them.
+	# Over the island's buildings and the walkers: the catch is thrown across them, not
+	# through them. It sat on the crate's layer, before the hive in the tree, so the hive was
+	# drawn over every piece crossing it (2026-10-02). The last stretch into a box is drawn by
+	# the box itself, under its near walls (`Haul.LAND_FROM`).
 	_haul = Haul.new()
 	_haul.name = &"Haul"
-	_haul.z_index = 8
+	_haul.z_index = IN_FRONT + 1
 	_haul.z_as_relative = false
 	_haul.grid = _grid
 	_haul.sfx = _sfx
 	_haul.arrived.connect(_on_haul_arrived)
 	add_child(_haul)
+	_yard.haul = _haul
+	_haul.landing_moved.connect(_yard.queue_redraw)
+	for stop: Dropoff in _dropoffs:
+		stop.haul = _haul
+		_haul.landing_moved.connect(stop.queue_redraw)
 
 	_splash = WaterSplash.new()
 	_splash.name = &"Splash"
@@ -1166,6 +1223,17 @@ func _ready() -> void:
 	bob.shader = load("res://shaders/rubbish.gdshader")
 	bob.set_shader_parameter(&"wave_amplitude", LakeGrid.WAVE_AMPLITUDE)
 	bob.set_shader_parameter(&"wave_speed", LakeGrid.WAVE_SPEED)
+	# The submerged part of a piece is the clean water's colour pulled over it (see
+	# rubbish.gdshader `sunk`), off the palette like the water itself.
+	var swatches := Palette.master()
+	if swatches != null:
+		bob.set_shader_parameter(&"sunk_clean", swatches.water_clean_mid)
+		bob.set_shader_parameter(&"sunk_hazy", swatches.water_hazy_mid)
+	bob.set_shader_parameter(&"color_bite", LakeGrid.FILTH_STATE_BITE)
+	bob.set_shader_parameter(&"state_at", Vector4(
+		LakeGrid.FILTH_STATE_AT[0], LakeGrid.FILTH_STATE_AT[1],
+		LakeGrid.FILTH_STATE_AT[2], LakeGrid.FILTH_STATE_AT[3]
+	))
 	_grid.material = bob
 	_sheets = Sheets.new()
 	if not _sheets.load_all():
@@ -1229,6 +1297,25 @@ func _ready() -> void:
 	_pump.position = Iso.tile_to_world(Pump.tile.x, Pump.tile.y)
 	add_child(_pump)
 
+	# The beehive, the pump's way and on its layer, and for the same reason set here: its
+	# static must be in place before `_grow_nature` and `_start_weather` below, whose flora,
+	# shore spots and puddles are each worked out once, at build, round it. Its origin is put
+	# on an even world pixel (one art pixel is two), so the picture, its grass and its shadow
+	# all land on the art grid, and `Hive.tile` is read back off that spot so the two agree.
+	_hive = Hive.new()
+	_hive.name = &"Hive"
+	_hive.day = _day
+	_hive.z_index = CRATE_LAYER
+	var hive_spot := Iso.shed_centre() + HIVE_AT
+	_hive.position = (Iso.tile_to_world(hive_spot.x, hive_spot.y) * 0.5).round() * 2.0
+	Hive.tile = Iso.world_to_tile(_hive.position)
+	Hive.contract()
+	# Where the bees go: the island's grown bee flowers, asked when the hive asks, since the
+	# flora is built after this.
+	_hive.host_spots = func() -> PackedVector2Array:
+		return _flora.island_host_spots() if _flora != null else PackedVector2Array()
+	add_child(_hive)
+
 	# The flock is drawn over the whole lake (2026-09-16, Richard's call): birds are the one
 	# thing here that is genuinely in the air, and at z 6 they were cut in half by a pier
 	# deck, hidden behind a moored hull and walked in front of by the angler. Above the net
@@ -1288,6 +1375,7 @@ func _ready() -> void:
 	_net2.swept.connect(_on_net_swept.bind(_net2))
 	_net2.caught_bird.connect(_on_bird_caught)
 	add_child(_net2)
+	_start_tornado()
 	_mark("flock and nets")
 
 	# The ferry lives on the island's south side and works its way round the bank from
@@ -1366,7 +1454,6 @@ func _ready() -> void:
 	# `Prefs` and nothing has to be pushed from here. What is left is the doors it opens.
 	_settings.controls_asked.connect(_set_controls.bind(true))
 	_settings.quit_pressed.connect(_quit)
-	_settings.wipe_pressed.connect(wipe_save)
 	_settings.close_asked.connect(_shut.bind(_set_settings))
 	_shop_skin.close_asked.connect(_shut.bind(_set_menu))
 	_shop_skin.tour_ended.connect(_on_shop_tour_ended)
@@ -1403,10 +1490,11 @@ func _ready() -> void:
 ## button. Whatever is missing is left out, and the button draws without it.
 ## Tall pieces first — they make the back row — then the low ones for the row in front.
 const BUTTON_DECOR := [
-	&"decor_bookcase_tall", &"decor_fridge", &"decor_old_clock", &"decor_mirror",
-	&"decor_coat_hanger", &"decor_standing_lamp", &"decor_stove", &"decor_kitchen_counter",
-	&"decor_sofa", &"decor_dresser", &"decor_nightstand", &"decor_vynil_player",
-	&"decor_center_table", &"decor_lamp", &"decor_pet_bed", &"decor_flower_pot",
+	&"decor_pk_bookshelf", &"decor_pk_fridge", &"decor_pk_grandfather_clock",
+	&"decor_pk_coat_stand", &"decor_pk_potted_tree", &"decor_pk_file_cabinet",
+	&"decor_pk_stove", &"decor_pk_kitchen_counter", &"decor_pk_sofa", &"decor_pk_drawer",
+	&"decor_pk_nightstand", &"decor_vynil_player", &"decor_pk_coffee_table",
+	&"decor_pk_table_lamp", &"decor_pk_armchair", &"decor_pk_flower_pot",
 ]
 
 
@@ -1744,6 +1832,9 @@ func _shape_island() -> void:
 
 	_island = Node2D.new()
 	_island.name = &"IslandShed"
+	# Nearest (2026-10-02, Richard: the hut "still looks a bit off"): the project's default is
+	# linear and nothing set it here, so the hut drew smoothed beside a crisp angler and crate.
+	_island.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# Above the layer a walker gets when it is behind the hut, and below the one it gets
 	# when it is past it. See `_sort_walkers`.
 	_island.z_index = SHED_LAYER
@@ -1894,18 +1985,22 @@ func _default_defs() -> Array[TrashDef]:
 ## Finds re-drawn from the 0_mem0ry packs on their old catalogue entries.
 const REDRAWN_FINDS := [&"decor_vynil_player"]
 
+## The sheet the lake's finds are dealt from (2026-10-01): the 0_mem0ry packs' decoration
+## (`tools/build_pack_decor.py`), which replaced the PSD's. The old pieces stay in the
+## catalogue for the shed's own tests and are no longer hidden in the lake.
+const FIND_SHEET := "decor_pack_dirty"
+
 
 func _all_defs() -> Array[TrashDef]:
 	var all := _default_defs()
-	if _sheets == null or not _sheets.by_sheet.has("decor_dirty"):
+	if _sheets == null or not _sheets.by_sheet.has(FIND_SHEET):
 		_dress(all)
 		return all
-	# The finds are the old decoration sheet's pieces, plus the ones re-drawn from the
-	# 0_mem0ry packs that took over an old find's entry (`tools/build_pack_decor.py`
-	# REPLACES), in catalogue order so the def list and every save stay as they were.
-	var old_finds: PackedStringArray = _sheets.by_sheet["decor_dirty"]
+	# The pack's pieces, plus the old record player's entry the pack redrew, in catalogue
+	# order.
+	var pack_finds: PackedStringArray = _sheets.by_sheet[FIND_SHEET]
 	for name: String in _sheets.names:
-		if not old_finds.has(name) and not REDRAWN_FINDS.has(StringName(name)):
+		if not pack_finds.has(name) and not REDRAWN_FINDS.has(StringName(name)):
 			continue
 		# Nameless pieces are not finds. Every decoration is named in tools/decor_sets.json
 		# by hand, so this should never fire now — it fired when the collection was cut off a
@@ -1927,6 +2022,9 @@ func _all_defs() -> Array[TrashDef]:
 			Vector2(26.0, 26.0),
 			clampi(bulk / 2, 1, 4), Color(0.58, 0.44, 0.32), StringName(name)
 		)
+		# The tier tagged on the Lake Pack Tagger, where there is one.
+		if _sheets.tier_of(StringName(name)) >= 0:
+			find.tier = clampi(_sheets.tier_of(StringName(name)), 0, 4)
 		find.keepsake = true
 		# The first find is for the first net: tier 0, or a net at power 0 cannot lift it.
 		if EARLY_FINDS.has(StringName(name)):
@@ -2029,7 +2127,9 @@ func _shuffle(spots: PackedInt32Array, rng: RandomNumberGenerator) -> void:
 func _find_band(def: TrashDef) -> Vector2:
 	var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
 	if EARLY_FINDS.has(def.piece):
-		return Vector2(near, EARLY_OUT)
+		# Not in the ring's inner half: it was two deep and skipped by `height < 3` until the
+		# ring thickened (2026-09-29), and a find there is scooped on the first casts.
+		return Vector2(maxf(near, LakeGrid.RING_OUT * 0.5), EARLY_OUT)
 	if def.tier < LATE_TIER:
 		return Vector2(EARLY_OUT, MID_OUT)
 	return Vector2(MID_OUT, INF)
@@ -2125,7 +2225,8 @@ func _dress(defs: Array[TrashDef]) -> void:
 		# it, and rounding their scales inverted the proportion — a 44-pixel mirror rounded up
 		# to 88 while a 55-pixel sofa rounded down to 55. Those few draw at exactly
 		# SPRITE_LARGEST, slightly off the grid, and the biggest picture stays the biggest thing.
-		if not def.keepsake:
+		# The pack's finds (2026-10-01) are the rubbish's grain too: one world px an art px.
+		if not def.keepsake or _is_pack_find(def.piece):
 			var whole := RUBBISH_SCALE
 			if longest * whole < RUBBISH_SMALLEST:
 				whole = ceilf(RUBBISH_SMALLEST / longest)
@@ -2138,6 +2239,10 @@ func _dress(defs: Array[TrashDef]) -> void:
 		elif longest * scale > SPRITE_LARGEST / shrink:
 			scale = maxf(SPRITE_LARGEST / shrink / longest, SPRITE_SMALLEST / longest)
 		def.size = art * scale
+
+
+func _is_pack_find(piece: StringName) -> bool:
+	return (_sheets.by_sheet.get(FIND_SHEET, PackedStringArray()) as PackedStringArray).has(String(piece)) 		or REDRAWN_FINDS.has(piece)
 
 
 func _def(
@@ -2186,6 +2291,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_shut(_set_controls)
 				elif _wash_open:
 					_wash_to_shed()
+				elif _hive_open:
+					_shut(_set_hive_room)
 				elif _shed_open:
 					_shut(_set_shed)
 				elif _menu_open:
@@ -2208,6 +2315,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F7:
 				_tune_buttons()
 				return
+			KEY_F9:
+				# Debug only: call a tornado down now, whatever the meter says.
+				if OS.is_debug_build() and _tornado != null and not _in_menu:
+					_tornado.start()
+				return
 
 	var drag := event as InputEventMouseMotion
 	if drag != null and _panning:
@@ -2229,6 +2341,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if _wash_open:
 			_wash_to_shed()
+		elif _hive_open:
+			# The hive room is closed by E as the wash room is: back to the lake beside it.
+			_shut(_set_hive_room)
 		elif _shed_open:
 			# E is the room's own verb in here (a switch, a dog, a seat) and no longer
 			# leaves (Richard, 2026-09-29): Escape and the cross close the shed.
@@ -2237,6 +2352,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_shut(_set_menu)
 		elif _at_pump():
 			_open_wash()
+		elif _at_hive():
+			_open_hive_room()
 		elif _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
@@ -2247,7 +2364,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _desk_pressed(event, &"open_shed") and not _panelled():
 		_set_shed(true)
 		return
-	if _desk_pressed(event, &"open_upgrades") and not _shed_open and not _settings_open 			and not _controls_open:
+	if _desk_pressed(event, &"open_upgrades") and not _shed_open and not _settings_open 			and not _controls_open and not _hive_open:
 		_set_menu(not _menu_open)
 		return
 	if _desk_pressed(event, &"open_settings") and not _panelled():
@@ -2329,7 +2446,7 @@ func _desk_pressed(event: InputEvent, action: StringName) -> bool:
 func _panelled() -> bool:
 	return (
 		_settings_open or _menu_open or _shed_open or _controls_open or _wash_open
-		or _letter_open
+		or _letter_open or _hive_open
 	)
 
 
@@ -2349,7 +2466,7 @@ func _flip_fullscreen() -> void:
 func pad_cursor_wanted() -> bool:
 	return (
 		_menu_open or _settings_open or _shed_open or _controls_open or _farewell != null
-		or _in_menu or _wash_open or _letter_open
+		or _in_menu or _wash_open or _letter_open or _hive_open
 	)
 
 
@@ -2397,6 +2514,10 @@ func _pad_tick(delta: float) -> void:
 
 
 func _pad_buttons(busy: bool) -> void:
+	# The hive room is a room of its own hands: Start, Y and the rest open nothing under it,
+	# and B (a synthetic Escape) is what closes it.
+	if _hive_open:
+		return
 	if Input.is_action_just_pressed(&"open_settings"):
 		_set_settings(not _settings_open)
 		return
@@ -2423,6 +2544,8 @@ func _pad_buttons(busy: bool) -> void:
 	if Input.is_action_just_pressed(&"interact"):
 		if _at_pump():
 			_open_wash()
+		elif _at_hive():
+			_open_hive_room()
 		elif _at_shed():
 			_set_shed(true)
 		elif _dog_in_reach() != null:
@@ -2457,7 +2580,7 @@ func _cast_or_walk(where: Vector2) -> void:
 	if Iso.island_fraction(tile.x, tile.y) < 1.0 or Iso.shore_fraction(tile.x, tile.y) >= 1.0:
 		# Not water. A spot on the island the boots may stand on is walked to (Richard,
 		# 2026-09-22: a click on the isle walks there, it does not just stand); the hut,
-		# the crate, the pump and the bank are nothing.
+		# the crate, the pump, the beehive and the bank are nothing.
 		if bool(_angler.call(&"_can_stand", tile)):
 			_led_cast = where
 			_led_throw = false
@@ -2466,14 +2589,14 @@ func _cast_or_walk(where: Vector2) -> void:
 			_angler.walk_to = tile
 			_pan_yielded = true
 		return
-	var shore: Vector2 = _angler.shore_toward(tile)
+	var stand: Vector2 = _angler.cast_stand(tile, _net.range_tiles)
 	_led_cast = where
-	_led_throw = shore.distance_to(tile) <= _net.range_tiles
+	_led_throw = stand.distance_to(tile) <= _net.range_tiles
 	_led_stall = 0.0
 	_led_was = _angler.tile_pos
-	# Reachable: straight at the spot, the frame it comes into reach is the throw. Not:
-	# to the shore nearest it, where the walk ends and nothing is thrown.
-	_angler.walk_to = tile if _led_throw else shore
+	# Reachable: to the nearest standing point it is in range from, the frame it comes into
+	# reach is the throw. Not: to the standing point nearest it, where nothing is thrown.
+	_angler.walk_to = stand
 	_pan_yielded = true
 
 
@@ -2623,8 +2746,11 @@ func _set_wash(open: bool) -> void:
 				_wash.rubbish.append({"sheet": def.atlas, "region": def.region})
 		_wash.flock = _flock
 		_wash.washed.connect(_on_find_washed)
+		_wash.hose_bought.connect(_on_hose_bought)
 		_wash.close_asked.connect(_wash_to_shed)
 		_skin.get_parent().add_child(_wash)
+		# Under the HUD skin, which shows the money and Waiting plates over the room.
+		_skin.get_parent().move_child(_wash, _skin.get_index())
 	if _wash == null:
 		return
 	# No shed sound: the pump is outdoors (2026-09-28).
@@ -2633,8 +2759,12 @@ func _set_wash(open: bool) -> void:
 	_wash.free.assign([STARTER_BED])
 	if open and _decor_tour in [DecorTour.PLANK, DecorTour.PLANK_WAIT]:
 		_decor_tour = DecorTour.LIST
+	_wash.hose_level = hose_level
 	_wash.open(open)
-	_skin.visible = not open
+	# The money and Waiting plates stay up over the wash room; the rest of the HUD does not.
+	_skin.plates_only = open
+	# The gear is the lake's: under the room since the room sits under the HUD skin.
+	_open_settings.visible = not open
 	if _coins != null:
 		_coins.visible = not open
 		if open:
@@ -2670,6 +2800,16 @@ func _shed_to_wash() -> void:
 
 ## A find has come clean on the stand: the soap is paid for now, not when it was picked, and
 ## the find goes on the shed's shelf. Saved on the spot, like everything else kept.
+## The wash room's hose plank: the next level bought out of the purse, saved on the spot.
+func _on_hose_bought(level: int, cost: int) -> void:
+	if level <= hose_level or float(cost) > sludge:
+		return
+	sludge -= float(cost)
+	hose_level = level
+	Sfx.main().play(&"upgrade")
+	save_game()
+
+
 func _on_find_washed(piece: StringName, soap: int) -> void:
 	var name := String(piece)
 	if not unwashed.has(name):
@@ -2687,6 +2827,198 @@ func _on_find_washed(piece: StringName, soap: int) -> void:
 ## Close enough to the pump to work it. Asked before `_at_shed`, which it stands inside.
 func _at_pump() -> bool:
 	return Pump.tile != Vector2.INF and _angler.tile_pos.distance_to(Pump.tile) < PUMP_RANGE
+
+
+## Close enough to the beehive to open its room, **and there is something to do there**: a
+## swarm to catch or a harvest ready (`Hive.actionable`). An empty or busy hive is scenery,
+## and E beside it falls through to whatever else is in reach. Measured to the footprint's
+## own middle, which is not the tile the hive stands on: the shelf runs off one side of it.
+func _at_hive() -> bool:
+	if Hive.tile == Vector2.INF or _hive == null or not _hive.actionable():
+		return false
+	return _angler.tile_pos.distance_to(Hive.tile + Hive.centre) < HIVE_RANGE
+
+
+## The hive room, up or down: the wash room's shape, with the two holes the map found in the
+## wash room's plumbing closed rather than copied. The angler is held while it is up
+## (`_hold_the_angler`), so the left stick that works a step does not also walk him behind
+## the room, and the shop, the settings and the pad's Start stay shut under it. Closing,
+## however it is done, lands on the lake beside the hive: the room is outdoors.
+func _set_hive_room(open: bool) -> void:
+	if open and _hive_room == null:
+		_hive_room = HiveRoom.new()
+		_hive_room.name = &"HiveRoom"
+		_hive_room.day = _day
+		_hive_room.filth_left = func() -> float: return pollution
+		_hive_room.pack_size = func() -> int: return _dogs.size()
+		_hive_room.fleet_size = func() -> int: return fleet_size()
+		# The lake's own rubbish for the water behind, the wash room's pick of it.
+		for def: TrashDef in _grid.defs:
+			if not def.keepsake and def.tier <= 2 and def.atlas != null:
+				_hive_room.rubbish.append({"sheet": def.atlas, "region": def.region})
+		_hive_room.flock = _flock
+		_hive_room.hive = _hive
+		_hive_room.close_asked.connect(_shut.bind(_set_hive_room))
+		_hive_room.swarm_caught.connect(_on_swarm_caught)
+		_hive_room.harvested.connect(_on_harvested)
+		_hive_room.settled.connect(_on_colony_settled)
+		_skin.get_parent().add_child(_hive_room)
+	if _hive_room == null:
+		return
+	_hive_open = open
+	_hive_room.open(open)
+	_skin.visible = not open
+	if _coins != null:
+		_coins.visible = not open
+		if open:
+			_coins.clear()
+	_push_rooms()
+	_hold_the_angler()
+
+
+## E at the hive: only over the bare lake, the pump's rule, and only with something to do.
+func _open_hive_room() -> void:
+	if _panelled() or _hive == null or not _hive.actionable():
+		return
+	_set_hive_room(true)
+
+
+## The catch is done: the colony is in and the paint comes back, still to be smoked and
+## crowned (`SETTLE`). Written at once — a caught swarm stays caught however the room is left.
+func _on_swarm_caught() -> void:
+	if _hive == null:
+		return
+	_hive.moment_seen = true
+	_hive.set_stage(Hive.Stage.SETTLE)
+	save_game()
+
+
+## The queen is found: the new colony is home and makes its first honey on the refill clock
+## (the second pass, 2026-09-30: a new colony's visit ends here, and the first honey is
+## announced by its own moment when it is ready).
+func _on_colony_settled() -> void:
+	if _hive == null:
+		return
+	_hive.first_done = true
+	_hive.refill_from = _play
+	_hive.refill_at = _play + _hive_refill()
+	_hive.play_now = _play
+	_hive.set_stage(Hive.Stage.BUSY)
+	save_game()
+
+
+## A harvest's last step: three jars on the shelf, the ceremony marked played, and the
+## colony left to make the next one — `refill_at` on the play clock, sooner the more bee
+## flowers the island has grown — or, after the fourth, left alone for good. Nothing is paid
+## and nothing is kept but the jars (contract section 1).
+func _on_harvested() -> void:
+	if _hive == null:
+		return
+	_hive.jars += Hive.JARS_PER
+	_hive.harvests = mini(_hive.harvests + 1, Hive.HARVESTS_MOST)
+	_hive.first_done = true
+	_hive.refill_from = _play
+	_hive.refill_at = _play + _hive_refill()
+	_hive.play_now = _play
+	if _hive.harvests >= Hive.HARVESTS_MOST:
+		_hive.set_stage(Hive.Stage.DONE)
+	else:
+		_hive.set_stage(Hive.Stage.BUSY)
+	save_game()
+
+
+## Seconds of play until the next harvest, off the island's grown bee flowers now.
+func _hive_refill() -> float:
+	var hosts := float(_flora.island_hosts()) if _flora != null else 0.0
+	var share := clampf(hosts / HIVE_HOSTS_FULL, 0.0, 1.0)
+	return lerpf(HIVE_REFILL_MOST, HIVE_REFILL_LEAST, share) * 60.0
+
+
+## The hive's slow clock, once a `HIVE_TICK` of play: the swarm's gate, the refill, and the
+## play clock pushed to the node for its window. Forward only — nothing here moves the hive
+## back, and nothing reads the flora to decide what a loaded hive is: the flora is not saved
+## and reads bare for the first seconds of every sitting.
+func _hive_step(delta: float) -> void:
+	if _hive == null:
+		return
+	_hive_tick -= delta
+	if _hive_tick > 0.0:
+		return
+	_hive_tick = HIVE_TICK
+	_hive.play_now = _play
+	match _hive.stage:
+		Hive.Stage.EMPTY:
+			if not _hive.held and _swarm_due():
+				_hive.set_stage(Hive.Stage.SWARM)
+				_owe_swarm()
+				save_game()
+		Hive.Stage.SWARM:
+			# A swarm that came while a board was up and was saved before its moment ran (or a
+			# moment dropped by a load) is still owed its moment.
+			if not _hive.moment_seen and not _hive.held:
+				_owe_swarm()
+		Hive.Stage.BUSY:
+			if _play >= _hive.refill_at:
+				_hive.set_stage(Hive.Stage.READY)
+				_owe_ready()
+				save_game()
+		Hive.Stage.READY:
+			# The first honey's moment, owed again if a board or a load dropped it.
+			_owe_ready()
+
+
+## Whether the swarm may come now (contract section 1).
+func _swarm_due() -> bool:
+	if _play < SWARM_AFTER:
+		return false
+	var hosts := _flora.island_hosts() if _flora != null else 0
+	return (hosts >= SWARM_HOSTS) or (_play >= SWARM_LATE and hosts >= 1)
+
+
+## Queue the swarm's moment over the shrub it hangs from, unless it is already queued.
+func _owe_swarm() -> void:
+	var at := _hive.position + Hive.swarm_box().get_center()
+	_owe_moment(&"swarm", at, "HIVE_SWARM", _mark_swarm_seen)
+
+
+## The first honey's moment: a glide to the hive and "The honey is ready!". Only the first
+## harvest's; later refills show only in the world (the ready mark).
+func _owe_ready() -> void:
+	if _hive == null or _hive.held or _hive.ready_seen or _hive.harvests > 0:
+		return
+	var at := _hive.position + _hive.ready_point()
+	_owe_moment(&"honey", at, "HIVE_READY", _mark_ready_seen)
+
+
+func _mark_ready_seen() -> void:
+	if _hive != null:
+		_hive.ready_seen = true
+
+
+func _mark_swarm_seen() -> void:
+	if _hive != null:
+		_hive.moment_seen = true
+
+
+## The colony's hum, every frame: silent while the hive is empty, and otherwise its share
+## (full for a swarm or a harvest waiting, `HIVE_HUM_BUSY` for a colony just living there)
+## falling off with the angler's distance from the entrance over the dogs' hearing.
+func _push_hive_hum() -> void:
+	if _sfx == null:
+		return
+	var share := 0.0
+	if _hive != null and Hive.tile != Vector2.INF:
+		var loud := 0.0
+		match _hive.stage:
+			Hive.Stage.SWARM, Hive.Stage.READY, Hive.Stage.SETTLE:
+				loud = 1.0
+			Hive.Stage.BUSY, Hive.Stage.DONE:
+				loud = HIVE_HUM_BUSY
+		if loud > 0.0:
+			var ear := Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
+			var gap := ear.distance_to(_hive.position + _hive.entrance_point())
+			share = loud * clampf(1.0 - gap / Iso.tile_circle_extent(Dog.HEAR), 0.0, 1.0)
+	_sfx.set_hive_hum(share)
 
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
@@ -2997,7 +3329,7 @@ func _pause_world(on: bool) -> void:
 ## The nodes a paused game switches off. Whatever moves the run on and is not the water.
 func _world_frozen() -> Array[Node]:
 	var out: Array[Node] = []
-	for node in [_angler, _net, _net2, _haul, _flock, _day, _wildlife, _fish, _flora]:
+	for node in [_angler, _net, _net2, _haul, _flock, _day, _wildlife, _fish, _flora, _tornado, _hive]:
 		if node != null:
 			out.append(node)
 	for boat in _boats:
@@ -3141,6 +3473,10 @@ func _all_landed() -> bool:
 	# Only the flights bound for the crate, which are the ones the net throws and the ones
 	# alone that carry no tag (`_on_haul_arrived`): cargo crossing to a hull and cargo a
 	# ferry is landing at a pier are both tagged, and both are stock already.
+	# A tornado's orbit and the pieces it has flung are out of the water and not yet back in
+	# it or in a net (2026-09-30).
+	if _tornado != null and _tornado.carrying() > 0:
+		return false
 	return _haul == null or _haul.flying_to(null) == 0
 
 
@@ -3484,7 +3820,7 @@ func _decor_tour_step(delta: float) -> void:
 			var lit: Rect2 = _room.switch_box()
 			if lit.size.x <= 0.0:
 				lit = _room.room_box()
-			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM, 5, DECOR_TOUR_CARDS)
+			_tour_card.show_card(room.call(lit) if _shed_open else off, Text.TOUR_DECOR_ROOM % Binds.shown(&"shed_switch", pad), 5, DECOR_TOUR_CARDS)
 
 
 ## A rect in the shed room's own pixels, on the HUD layer the card is drawn on.
@@ -3667,6 +4003,7 @@ func _hold_the_angler() -> void:
 	var busy := (
 		_menu_open or _settings_open or _shed_open or _controls_open
 		or _farewell != null or _fronted() or _letter_open or _arrive != Arrive.OFF
+		or _hive_open
 	)
 	_angler.can_walk = not busy
 	# The net is held where it is for as long as the panel is up, and goes back to reeling
@@ -3724,7 +4061,8 @@ func _push_rooms() -> void:
 	music.indoors = _shed_open
 	# The wash room too (Richard, 2026-09-19): the song through the radio, as behind the shop.
 	# Not the settings board (2026-09-28, Richard): the song plays clean behind it.
-	music.muffled = _menu_open or _wash_open
+	# And the hive room, which stands outdoors by the hive as the wash room does by the pump.
+	music.muffled = _menu_open or _wash_open or _hive_open
 	music.set_ending(ending())
 
 
@@ -3803,6 +4141,9 @@ var force_front: bool = false
 ## For the one probe that photographs the arrival: play it although the lake is borrowed.
 ## Read once, the way `skip_menu` is, so it cannot leak into the next lake of the session.
 static var force_intro: bool = false
+## For the probes that play the beehive's arc on a borrowed lake (`tools/shot_hive.tscn`):
+## let the swarm come although the lake is borrowed. Read once, like `force_intro`.
+static var force_hive: bool = false
 
 var _in_menu: bool = false
 ## On the way to the menu: the view is dimming and the lake has stopped answering.
@@ -3826,6 +4167,14 @@ func _fronted() -> bool:
 func _raise_front(loaded: bool) -> void:
 	var playing := skip_menu
 	skip_menu = false
+	# A borrowed lake holds the beehive's arc as it skips the tours (every harness and probe
+	# plays past the swarm's quarter of an hour sooner or later, and a swarm arriving holds
+	# the player's hands for its moment), unless it asks for the arc with `force_hive`.
+	# Read once, like `force_intro`, so it cannot leak into the next lake of the session.
+	var hive_wanted := force_hive
+	force_hive = false
+	if _hive != null:
+		_hive.held = get_parent() != get_tree().root and not hive_wanted
 	# Borrowed by a tool: see the header. A borrowed lake also never plays the arrival —
 	# a harness that raises the menu by hand and glides down out of it is not a new game,
 	# and a probe photographing the front is not one either — unless it says so, which is
@@ -3866,6 +4215,7 @@ func _build_menu() -> void:
 	_menu.visible = false
 	_menu.play_asked.connect(_begin_glide)
 	_menu.reload_asked.connect(_reload_as)
+	_menu.quit_asked.connect(_save_and_quit)
 	over.add_child(_menu)
 
 
@@ -3882,6 +4232,7 @@ func _enter_menu(at_once: bool) -> void:
 	_set_menu(false)
 	_set_shed(false)
 	_set_wash(false)
+	_set_hive_room(false)
 	_stop_led_cast()
 	_pose_world(at_once)
 	_hud_layer.visible = false
@@ -3908,6 +4259,10 @@ func _enter_menu(at_once: bool) -> void:
 ## is lost to it — a catch, a hold and a mouthful all end up in the crate, which is the
 ## rule a save already keeps for a hold afloat — and nothing is sold by it.
 func _pose_world(scatter: bool) -> void:
+	# A tornado ends at once, everything it carried back on the water, before the nets are
+	# stowed (a tamed tornado may have just put pieces in one).
+	if _tornado != null:
+		_tornado.settle_now()
 	for net: CastNet in [_net, _net2]:
 		if net != null:
 			net.stow()
@@ -4616,9 +4971,9 @@ func _push_daylight() -> void:
 		_daylight.color = _day.tint
 	($Sky/Fill as ColorRect).color = BEYOND * _day.tint
 	# The floating rubbish's shadows, which are shader-driven and so cannot be re-laid as the
-	# sun moves. One uniform, every frame; see LakeGrid.sun_lean.
+	# sun moves. A few uniforms, every frame; see LakeGrid.sun.
 	if _grid != null:
-		_grid.sun_lean(_day.lean)
+		_grid.sun(_day)
 	# The sky in the clean water: turns to storm cloud under the rain's overcast, takes a hint
 	# of the low sky's colour for the hour (see water.gdshader `sky_reflect`).
 	if _water_material != null:
@@ -5217,21 +5572,45 @@ const MOMENT_OUT := 1.1
 func _on_first_wildlife(at: Vector2) -> void:
 	if _wildlife_seen or _cleaned:
 		return
-	_moment_owed = at
+	_owe_moment(&"wildlife", at, "WILDLIFE_BACK", _mark_wildlife_seen)
+
+
+func _mark_wildlife_seen() -> void:
+	_wildlife_seen = true
+
+
+## A moment waiting its turn (2026-09-30, the beehive: the swarm's arrival has the wildlife
+## moment's treatment). It was one slot holding a spot, with the wildlife's words and its
+## flag written into `_start_owed_moment` — so a swarm owed while the first animal's moment
+## was waiting behind a board would have taken the slot, dropped the animal's for good and
+## marked the wildlife seen. Now a queue: each entry says where it looks (`at`), which words
+## its card reads (`text`, a key read when the card goes up, so a language change between
+## the owing and the showing is followed), and what it marks done when it starts (`seen`).
+## One of each `kind` at most; owing one again moves its spot. They run one after another,
+## in the order they were owed, each waiting for the same things the wildlife's always did.
+func _owe_moment(kind: StringName, at: Vector2, text: String, seen: Callable) -> void:
+	for owed: Dictionary in _moments:
+		if owed["kind"] == kind:
+			owed["at"] = at
+			_start_owed_moment()
+			return
+	_moments.append({"kind": kind, "at": at, "text": text, "seen": seen})
 	_start_owed_moment()
 
 
 func _start_owed_moment() -> void:
-	if _moment_owed == Vector2.INF or _moment >= 0.0:
+	if _moments.is_empty() or _moment >= 0.0:
 		return
 	if (
 		_in_menu or _leaving or _glide >= 0.0 or _panelled() or _farewell != null
 		or _arrive != Arrive.OFF or _letter_open
 	):
 		return
-	_moment_at = _moment_owed
-	_moment_owed = Vector2.INF
-	_wildlife_seen = true
+	var owed: Dictionary = _moments.pop_front()
+	_moment_at = owed["at"]
+	var seen: Callable = owed["seen"]
+	if seen.is_valid():
+		seen.call()
 	_moment = 0.0
 	_stop_led_cast()
 	_angler.can_walk = false
@@ -5239,7 +5618,7 @@ func _start_owed_moment() -> void:
 		_moment_card = MomentCard.new()
 		_moment_card.name = &"MomentCard"
 		_settings.get_parent().add_child(_moment_card)
-	_moment_card.text = Text.WILDLIFE_BACK
+	_moment_card.text = Text.of(String(owed["text"]))
 	_moment_card.show_for(MOMENT_IN * 0.6, MOMENT_HOLD + MOMENT_IN * 0.4)
 	save_game()
 
@@ -5318,7 +5697,13 @@ func _process(delta: float) -> void:
 		_led_step(delta)
 		_first_steps_step(delta)
 		_decor_tour_step(delta)
+		_hive_step(delta)
 	_haul_count_step()
+	# The hive's lamp, here and not in a draw callback (the pump's is set from the hut's draw
+	# and can land a frame late), and its hum.
+	if _hive != null:
+		_hive.lit = _at_hive() and not _menu_open and not _hive_open
+	_push_hive_hum()
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	_face_the_net()
@@ -5337,15 +5722,20 @@ func _process(delta: float) -> void:
 	# Nothing is decided behind the menu: no ending found, no run clocked, nothing written.
 	# The world there is a pose, and a pose has nothing to save that was not saved going in.
 	if not _in_menu and not _world_paused:
+		_tornado_step(delta)
 		_look_for_the_end(delta)
 		_tick_play_log(delta)
 
 		_autosave_in -= delta
-		if _autosave_in <= 0.0:
+		# Not while a tornado is down: a save ends it (`save_game` settles it first), and
+		# the last save already holds every piece it is carrying, in the water.
+		if _autosave_in <= 0.0 and not _tornado_active():
 			save_game()
 
-	# Not during the glide, which writes the zoom itself: this puts it on a stop.
-	if _glide < 0.0:
+	# Not during the glide, which writes the zoom itself: this puts it on a stop. Nor during a
+	# moment, which writes it too: this used to put the zoom back on the stop the moment left
+	# from every frame, so in play the moment panned to its spot and never went in.
+	if _glide < 0.0 and _moment < 0.0:
 		_push_zoom()
 	_snap_camera()
 
@@ -5463,6 +5853,11 @@ func _walker_layer(at: Vector2) -> int:
 		if from.x < Pump.FOOT_HALF and from.y < Pump.FOOT_HALF \
 				and absf(at.x - _pump.position.x) < _pump.drawn_wide() * 0.5:
 			return BEHIND_CRATE
+	# And behind the beehive and its shelf, on the same layer: north of the footprint's near
+	# faces and inside the picture's real span across, which is not centred on the hive (the
+	# shelf runs off up-left). The hive asks it of its own geometry.
+	if _hive != null and _hive.walker_behind(at):
+		return BEHIND_CRATE
 	return IN_FRONT
 
 
@@ -5763,6 +6158,13 @@ func _apply_filth(done: Dictionary) -> void:
 		_water_material.set_shader_parameter(&"filth_map", _filth_texture)
 		_water_material.set_shader_parameter(&"filth_tiles", Vector2(cols, rows))
 		_water_material.set_shader_parameter(&"filth_mapped", 1.0)
+	# The soup reads the same map for what of a piece shows under clean water.
+	var soup := _grid.material as ShaderMaterial if _grid != null else null
+	if soup != null:
+		soup.set_shader_parameter(&"filth_map", _filth_texture)
+		soup.set_shader_parameter(&"filth_tiles", Vector2(cols, rows))
+		soup.set_shader_parameter(&"filth_mapped", 1.0)
+	if _water_material != null:
 		_water_material.set_shader_parameter(&"glint", pow(_clean_share, GLINT_BITE) * GLINT_MOST)
 		_bed_growth = maxf(_bed_growth, clampf(_clean_share / BED_GROWN_AT, 0.0, 1.0))
 		_water_material.set_shader_parameter(&"bed_growth", _bed_growth)
@@ -5882,6 +6284,96 @@ var _weather: Weather
 var _puddles: Puddles
 
 
+# ======================================================================================
+# The tornado (2026-09-30, `/grill-me` with Richard; CLAUDE.md "The Tornado")
+# ======================================================================================
+
+var _tornado: Node2D
+## A borrowed lake (harness, probe) runs the tornado schedule only with this set.
+var tornado_schedule := false
+## The fleet and the pack are being held for a tornado.
+var _held_for_tornado := false
+
+
+func _start_tornado() -> void:
+	_tornado = Tornado.new()
+	_tornado.name = &"Tornado"
+	_tornado.grid = _grid
+	_tornado.splash = _splash
+	_tornado.weather = _weather
+	_tornado.day = _day
+	_tornado.angler = _angler
+	_tornado.fish = _fish
+	_tornado.net_range = func() -> float: return _net.range_tiles
+	_tornado.filth_moved.connect(_tornado_filth)
+	_tornado.remap_owed.connect(func() -> void: _filth_stale = true)
+	_tornado.began.connect(_on_tornado_began)
+	_tornado.ended.connect(_on_tornado_ended)
+	add_child(_tornado)
+	for net: CastNet in [_net, _net2]:
+		net.touched_down.connect(_on_net_touched_down.bind(net))
+
+
+func _tornado_active() -> bool:
+	return _tornado != null and _tornado.active()
+
+
+## The schedule, and the holds kept for as long as one is out.
+func _tornado_step(delta: float) -> void:
+	if _tornado == null or _grid == null:
+		return
+	if _tornado.fish == null:
+		_tornado.fish = _fish
+	var held := _rain_held() or _panelled() or _cleaned or _glide >= 0.0 or _moment >= 0.0
+	# Only the game's own lake rolls tornadoes by itself; a harness or a probe's lake starts
+	# one when it asks (`Tornado.start`), or sets `tornado_schedule`.
+	if tornado_schedule or get_parent() == get_tree().root:
+		_tornado.tick_schedule(delta, 1.0 - pollution, held)
+	if _held_for_tornado:
+		_hold_for_tornado()
+
+
+## A piece lifted into the funnel (negative) or landed back on the water (positive). The meter
+## moves; the filth map is remapped on the tornado's own beat (`remap_owed`), not per piece.
+func _tornado_filth(by: float) -> void:
+	_filth_left = clampf(_filth_left + by, 0.0, _filth_total)
+	pollution = clampf(_filth_left / maxf(_filth_total, 0.001), 0.0, 1.0)
+
+
+## Ferries finish the leg they are on and then stay at the island; the pack drops what it
+## carries in the crate and dozes. Kept up every frame, so a hull or a dog bought mid-storm
+## is held too.
+func _hold_for_tornado() -> void:
+	for boat in _boats:
+		boat.moored = true
+	for dog in _dogs:
+		if not dog.dozing:
+			for piece in dog.doze(true):
+				_dog_brought_back(piece)
+
+
+func _on_tornado_began() -> void:
+	_held_for_tornado = true
+	_hold_for_tornado()
+
+
+func _on_tornado_ended(_tamed: bool) -> void:
+	_held_for_tornado = false
+	# The menu's pose keeps its own hold (it settles the tornado first, then moors).
+	if _in_menu:
+		return
+	for boat in _boats:
+		boat.moored = false
+	for dog in _dogs:
+		dog.doze(false)
+	_ask_the_end()
+
+
+func _on_net_touched_down(at: Vector2, mouth: float, net: CastNet) -> void:
+	if _tornado != null:
+		_tornado.net_down(net, at, mouth)
+
+
 func _start_weather() -> void:
 	_puddles = Puddles.new()
 	_puddles.name = &"Puddles"
@@ -5934,7 +6426,8 @@ func _weather_roofs() -> Array:
 	var out: Array = []
 	if _shed_art != null:
 		out.append({"image": _shed_image(), "rect": _shed_picture()})
-	for thing in [_yard, _pump]:
+	# The hive after the yard and the pump: the hut stays first, which the rain stage reads.
+	for thing in [_yard, _pump, _hive]:
 		if thing != null:
 			var roof: Dictionary = thing.roof()
 			if not roof.is_empty():
@@ -5966,6 +6459,10 @@ func _weather_statics() -> Array:
 		var roof := _pump.roof()
 		if not roof.is_empty():
 			out.append(roof)
+	if _hive != null:
+		var hive_roof := _hive.roof()
+		if not hive_roof.is_empty():
+			out.append(hive_roof)
 	return out
 
 
@@ -5987,6 +6484,7 @@ func _grow_nature() -> void:
 	_flora.name = &"Flora"
 	_flora.grid = _grid
 	_flora.grounds = _grounds
+	_flora.day = _day
 	_flora.crate_tile = _dog.crate_tile
 	_flora.ear = func() -> Vector2: return Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	var yards := PackedVector2Array()
@@ -6001,6 +6499,9 @@ func _grow_nature() -> void:
 	_fish.splash = _splash
 	_fish.boats = _boats
 	add_child(_fish)
+	# Under everything on the surface (2026-10-01): same z as the flora's pads, so first in
+	# the tree is what puts the fish below them.
+	move_child(_fish, _flora.get_index())
 	_wildlife = Wildlife.new()
 	_wildlife.name = &"Wildlife"
 	_wildlife.grid = _grid
@@ -6032,12 +6533,18 @@ func _wildlife_threats() -> PackedVector2Array:
 	for boat in _boats:
 		if is_instance_valid(boat) and boat.visible:
 			out.append(boat.position)
+	if _tornado != null and _tornado.down():
+		out.append(_tornado.base())
 	return out
 
 
 ## The moving walkers alone, without the hulls: what the ducks shy from.
 func _wildlife_walkers() -> PackedVector2Array:
 	_sort_walkers_for_wildlife()
+	if _tornado != null and _tornado.down():
+		var out := _wildlife_moving.duplicate()
+		out.append(_tornado.base())
+		return out
 	return _wildlife_moving
 
 
@@ -6202,6 +6709,10 @@ func _runs_done() -> int:
 ## falls back to the `.bak` when the save itself is missing or cannot be read.
 func save_game() -> bool:
 	_autosave_in = AUTOSAVE_EVERY
+	# A tornado is never saved mid-event: it ends here, every piece it carried put back on
+	# the water, so the stacks written below hold the whole lake.
+	if _tornado != null:
+		_tornado.settle_now()
 	var temp := save_path + SAVE_TEMP
 	var file := FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
@@ -6246,12 +6757,18 @@ func save_game() -> bool:
 		"shop_tour": _shop_tour_done,
 		"decor_tour": _decor_tour_done,
 		"wildlife_seen": _wildlife_seen,
+		# The beehive, all under one key (2026-09-30). Absent reads as the empty hive.
+		"hive": _hive.to_save() if _hive != null else {},
 		"showers": _weather.showers if _weather != null else 0,
 		"rain_next": _weather.next_in if _weather != null else -1.0,
+		"tornadoes": _tornado.count if _tornado != null else 0,
+		"tornado_next": _tornado.next_in if _tornado != null else -1.0,
+		"tornado_most": _tornado.most if _tornado != null else 0,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
 		"unwashed": unwashed,
+		"hose": hose_level,
 		"decor": decor,
 		"afloat": afloat,
 		"stacks": _grid.stacks,
@@ -6374,6 +6891,8 @@ func load_game() -> bool:
 			unlocked.append(name)
 	# What was waiting at the pump. No such key in an older save, and nothing waiting.
 	unwashed.clear()
+	# The wash room's hose (2026-10-01). Absent reads as the hose the pump came with.
+	hose_level = clampi(int(save.get("hose", 1)), 1, WashRoom.HOSE_MOST)
 	for name: String in save.get("unwashed", []) as Array:
 		if _pretty(name).is_empty():
 			continue
@@ -6434,9 +6953,26 @@ func load_game() -> bool:
 	# Absent means seen, the tours' rule: an older save is past its first animal, or near
 	# enough, and a load would otherwise fire the moment the stock refills the lake.
 	_wildlife_seen = bool(save.get("wildlife_seen", true))
+	# A moment owed before the load is the old sitting's: the flags it would mark are the
+	# file's now, and a swarm owed its moment is owed it again by `_hive_step`.
+	_moments.clear()
+	# The beehive, **absent means empty and not started**: the opposite of the tours' rule,
+	# by decision. A file written before the hive belongs to a run whose arc has not begun.
+	# Assigned every load, so a load onto a live lake keeps nothing of the lake's hive.
+	if _hive != null:
+		var hive_saved: Variant = save.get("hive", {})
+		_hive.from_save(hive_saved if hive_saved is Dictionary else {})
+		_hive.play_now = _play
+	_hive_tick = 0.0
 	# Absent means none yet: a save from before the rain has had no showers.
 	if _weather != null:
 		_weather.restore(int(save.get("showers", 0)), float(save.get("rain_next", -1.0)))
+	# Absent means none yet, the showers' rule.
+	if _tornado != null:
+		_tornado.restore(
+			int(save.get("tornadoes", 0)), float(save.get("tornado_next", -1.0)),
+			int(save.get("tornado_most", 0))
+		)
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved
@@ -6522,6 +7058,14 @@ func _notification(what: int) -> void:
 		_mouse_inside = true
 
 
+## The menu's Quit: the run is written before the game closes, the way the window's cross
+## writes it, so a Quit never costs what happened since the last autosave.
+func _save_and_quit() -> void:
+	if not _wiping and _grid != null:
+		save_game()
+	get_tree().quit()
+
+
 ## What each of the four merchants has taken, as one line. The four yards only read as
 ## four choices if the player can see they are being used unevenly.
 func _sold_tally() -> String:
@@ -6577,9 +7121,6 @@ const SHED_GLOW_STORM := 0.45
 const SHED_GLOW_MOST := 0.8
 const SHED_GLOW_DIM := 0.5
 
-## The hut soaked: roof and walls darken and cool as the rain soaks in and dry as it goes,
-## on the sand's own clock (`Puddles.sand_wet`).
-const SHED_WET := Color(0.76, 0.77, 0.86)
 
 ## The doorway across the hut's picture, as fractions of its width, kept clear of grass.
 ##
@@ -6720,9 +7261,9 @@ func _shed_glow_alpha() -> float:
 	return clampf(a, 0.0, SHED_GLOW_MOST)
 
 
+## The hut soaked, as every built thing is (`Shade.wet_tint`).
 func _shed_wet_tint() -> Color:
-	var wet := _puddles.sand_wet if _puddles != null else 0.0
-	return Color.WHITE.lerp(SHED_WET, wet)
+	return Shade.wet_tint()
 
 
 ## The node the hut's swept shadow lives on: a child of the island's canvas, drawn behind the
@@ -6796,7 +7337,7 @@ func _draw_shed_lamp(at: Vector2) -> void:
 	# Beside the pump the key is the pump's, and the lamp is over that instead.
 	if _pump != null:
 		_pump.lit = _at_pump() and not _menu_open
-	if not _at_shed() or _at_pump() or _menu_open:
+	if not _at_shed() or _at_pump() or _at_hive() or _menu_open:
 		return
 	var over := at + Vector2(0.0, -Iso.SHED_TALL - 10.0)
 	_island.draw_circle(over, 7.0, Color(1.0, 0.92, 0.62, 0.9))

@@ -17,6 +17,7 @@
 ##   BENCH_OFF=water    every shader on the lake
 ##   BENCH_OFF="ripple water"
 ##   BENCH_OFF=raindraw   (with BENCH_RAIN) the rain still falls but is not drawn
+##   BENCH_OFF=sway   the plants' water sway shader (Flora), for an A/B on a clean lake
 ##
 ## BENCH_CAST=1 casts the net again at the nearest green spot each time it comes home.
 ## BENCH_OFF=count (with BENCH_CAST) hides the haul's count over the angler.
@@ -30,6 +31,7 @@
 ## renderer's own CPU and GPU time for that frame.
 ## BENCH_SHOT="200 260" saves the frame at each of those frame counts to
 ##   tools/last_bench_shot_<n>.png (run with --fixed-fps 60 for a repeatable picture).
+## BENCH_TORNADO=1 puts a tornado down at once, the view on its foot.
 ## BENCH_RAIN=1 pours a shower at full strength from the first frame, puddles full.
 ##
 ##   godot --path . res://tools/bench_frames.tscn
@@ -111,6 +113,11 @@ func _ready() -> void:
 		if mode.contains("raindraw"):
 			weather.self_modulate.a = 0.0
 			weather.visible = false
+	if _tornado_bench:
+		# A tornado down from the first frame (no brew), the view pinned on its foot.
+		var t: Node2D = _main.get(&"_tornado")
+		t.start(0.6)
+		t.set(&"_clock", t.BREW)
 	for v in OS.get_environment("BENCH_HIDE").split(" ", false):
 		var hd = _main.get(StringName(v)) if not v.begins_with("@") else _main.get_node(NodePath(v.substr(1)))
 		hd.visible = false
@@ -124,6 +131,8 @@ func _ready() -> void:
 	_last = Time.get_ticks_usec()
 
 
+## BENCH_GROWN=1 (with BENCH_CLEAN) grows every plant in at once: the steady lake, not the
+## few seconds after a clean while they grow in.
 ## BENCH_CLEAN=1: the west half of the lake emptied, so nature and the animals are out —
 ## a fresh lake has none of them and says nothing about what they cost.
 func _half_clean() -> void:
@@ -136,6 +145,19 @@ func _half_clean() -> void:
 	for n in 6:
 		wild.set(&"_brood_in", 0.0)
 		wild._reckon()
+	# BENCH_GROWN=1: every plant the clean half buys grown in at once, so the run measures the
+	# lake as it stands rather than the few seconds of plants growing in after a clean.
+	if OS.get_environment("BENCH_GROWN") == "1":
+		var flora: Flora = _main.get(&"_flora")
+		flora.refresh(float(_main.get(&"_clean_share")))
+		var ages: PackedFloat32Array = flora.get(&"_age")
+		var delay: PackedFloat32Array = flora.get(&"_delay")
+		for k in ages.size():
+			if ages[k] >= 0.0:
+				ages[k] = delay[k] + Flora.GROW_TIME + 1.0
+		flora.set(&"_age", ages)
+		flora.set(&"_dirty", true)
+		flora.queue_redraw()
 	var mode := OS.get_environment("BENCH_OFF")
 	if mode.contains("wild"):
 		wild.process_mode = Node.PROCESS_MODE_DISABLED
@@ -218,7 +240,17 @@ func _counters() -> Dictionary:
 	}
 
 
+## BENCH_TORNADO=1: a tornado touches down at once and the view follows its foot.
+var _tornado_bench: bool = OS.get_environment("BENCH_TORNADO") == "1"
+
+
 func _process(delta: float) -> void:
+	if _tornado_bench:
+		var t: Node2D = _main.get(&"_tornado")
+		if t.active():
+			_main.set(&"_free_view", true)
+			_main.set(&"_free_at", t.base() - Vector2(0.0, 130.0))
+			_main.set(&"_mouse_inside", false)
 	_walk(delta)
 	_cast_again()
 	var now := Time.get_ticks_usec()

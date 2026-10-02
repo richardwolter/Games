@@ -72,6 +72,9 @@ var _turned := false
 var _stuck := 0
 var _you_was := Vector2.INF
 var _noise := FastNoiseLite.new()
+## The noise `_thin` cleans the lake in pools off. A var, so another shot can lay its pools
+## out differently.
+var thin_seed := 11
 var _rng := RandomNumberGenerator.new()
 
 
@@ -526,7 +529,7 @@ func _cast(dir: Vector2, tiles: float, lucky: bool = false, double: bool = lucky
 ## is left between them is spots of grime, not a ring. Taken the way the net takes, so the
 ## meter and the filth map follow.
 func _thin(share: float, keeps: Array = [], keep_near: float = KEEP_NEAR) -> void:
-	_noise.seed = 11
+	_noise.seed = thin_seed
 	_noise.frequency = 0.11
 	_noise.fractal_octaves = 3
 	var values := PackedFloat32Array()

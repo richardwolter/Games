@@ -137,6 +137,9 @@ func _ready() -> void:
 	ring = FocusRing.new()
 	over.add_child(ring)
 	add_child(over)
+	# F12 saves the screen for the store screenshots; debug builds only (`shot_key.gd`).
+	if OS.is_debug_build():
+		add_child(preload("res://scripts/shot_key.gd").new())
 
 
 ## Put the wooden arrow on. Missing art leaves the system pointer alone rather than

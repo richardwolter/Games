@@ -28,6 +28,9 @@ extends Node2D
 ## guessing at a sun the rest of the scene would disagree with.
 var day: DayCycle
 var _sun_baked: float = INF
+var _stretch_baked: float = INF
+## The shadows' ink last pushed to the batch's material (see `_process`).
+var _ink_pushed := Color(-1.0, -1.0, -1.0, -1.0)
 
 ## Where the pack's individual tiles live.
 const TILES := "res://assets/Forest Isometric Pack Free/Tileset/Slice %d.png"
@@ -223,6 +226,8 @@ const WOOD_CORNER_FROM := 1.0
 const WOOD_CORNER_FULL := 1.12
 const WOOD_THIN := 0.03
 const WOOD_THICK := 0.4
+## The whole forest thinned 25% (2026-10-01, Richard, two passes), over every share above.
+const WOOD_DENSITY := 0.75
 
 ## How much of the open ground gets a rock, and how much of everything gets a leaf.
 const ROCK_SHARE := 0.16
@@ -358,6 +363,15 @@ func _ready() -> void:
 	# Nearest, or the pack's pixels come out smeared. Set here rather than on the project so
 	# the rest of the art keeps the filtering it was drawn against.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# The island's tufts lean with the water (2026-10-02). Its props are only tufts, so the
+	# whole batch wears the sway shader, and their shadows lean with them through it.
+	#
+	# Both layers wear it since the one-sun pass (2026-10-02): the shader is what draws a
+	# shadow in the day's ink, pushed every frame as a uniform, so the overcast and the
+	# lightning reach a batch that is only baked again when the sun moves. The outside
+	# layer's trees, rocks and tufts are packed standing still (`_corner_colours`), so the
+	# shader moves nothing there; it only inks the shadows.
+	material = Flora.sway_material()
 	# Both layers sit under the water. The water's edge is a curve, and laying the water over
 	# the sand is what gives a shore a coastline. See `Layer`, and ISLAND_UNDER for what that
 	# asks of the island's sand.
@@ -515,7 +529,7 @@ func _sow() -> void:
 				0.0, 1.0
 			)
 			share = maxf(share, lerpf(WOOD_THIN, WOOD_THICK, corner))
-			if out < WOOD_FROM or _hash(at.x * 3.1, at.y * 2.7) > share:
+			if out < WOOD_FROM or _hash(at.x * 3.1, at.y * 2.7) > share * WOOD_DENSITY:
 				continue
 			_stand(Vector2i(tx, ty), load(TREES[
 				int(_hash(at.y * 5.3, at.x * 1.9) * float(TREES.size())) % TREES.size()
@@ -631,9 +645,14 @@ const SUN_STEP := 0.06
 func _process(_delta: float) -> void:
 	if day == null:
 		return
-	if absf(day.lean - _sun_baked) < SUN_STEP:
+	# The ink every frame, cheaply: a uniform, not a bake. The day's ink carries the overcast
+	# and the flash, which change far faster than the sun moves.
+	var ink := Shade.tint_on(day, Shade.On.LAND)
+	if ink != _ink_pushed:
+		_ink_pushed = ink
+		Flora.shade_skin(material as ShaderMaterial, day)
+	if absf(day.lean - _sun_baked) < SUN_STEP and absf(day.stretch - _stretch_baked) < SUN_STEP:
 		return
-	_sun_baked = day.lean
 	queue_redraw()
 
 
@@ -684,10 +703,12 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 	var uv: Rect2 = _prop_uv[art]
 	_lay_shadow(mid, size, uv, float(_prop_pad.get(art, 0)) * SCALE)
 	var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+	# The island's tufts lean with the water, like Flora's plants (2026-10-02): this layer's
+	# batch wears Flora's sway shader, and a tuft's top corners carry its foot packed in.
 	_prop_quad(
 		Transform2D.IDENTITY,
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
-		uv, Color.WHITE
+		uv, Color.WHITE, _corner_colours(mid.x, 1.0)
 	)
 	if covers_at(mid):
 		var base := _cover_points.size()
@@ -696,6 +717,17 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 			_cover_uvs.append(_prop_uvs[_prop_uvs.size() - 4 + k])
 			_cover_colors.append(Color.WHITE)
 		_cover_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+
+
+## A prop's four corners, packed for the sway shader (`Flora.sway_material`): its foot's x,
+## and what each corner does — on the island the top two lean with the water, out on the bank
+## nothing moves. `flag` is the alpha: 1 for the prop itself, `Flora.SHADE_LAND` for its
+## shadow, which the shader then draws in the land's ink. The shadow carries the prop's own
+## roles, so its far end, which is the picture's top laid along the sun, leans as the top does.
+func _corner_colours(x: float, flag: float) -> PackedColorArray:
+	var top := LakeGrid.pack_anchor(x, Flora.TOP if layer == Layer.ISLAND else Flora.FOOT, flag)
+	var foot := LakeGrid.pack_anchor(x, Flora.FOOT, flag)
+	return PackedColorArray([top, top, foot, foot])
 
 
 ## Is a prop standing here one of the south wood's, drawn again over the animals.
@@ -721,6 +753,12 @@ func cover_count() -> int:
 ## minute day that is a handful of rebuilds, against sixty a second for a shadow nobody can
 ## see moving anyway.
 ##
+## **The ink is not baked** (2026-10-02, one sun): the corners carry the prop's packed foot
+## with `Flora.SHADE_LAND` in the alpha, and the sway shader draws them in the land's ink
+## (`Shade.tint_on`), a uniform `_process` pushes every frame. Baked in, the ink only moved
+## with the sun, so a shower's grey and a lightning flash never reached the wood's shadows.
+## Overlapping shadows still stack, as they always have: each is its own translucent quad.
+##
 ## Hinged at the prop's own foot, `mid` plus half a tile down, which is where `_plant` stands
 ## the picture. It was hinged at the layer's origin once, and every shadow in the wood came
 ## out stacked on top of each other in one black streak at the corner of the tile field.
@@ -736,17 +774,20 @@ func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2, pad: float = 0.0) -> vo
 	_prop_quad(
 		lie,
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
-		uv, Shade.tint(day.ink)
+		uv, Color.WHITE, _corner_colours(mid.x, Flora.SHADE_LAND)
 	)
 
 
 ## One picture into the prop batch: four corners (top-left, top-right, bottom-right,
 ## bottom-left) put through `xform`, the atlas rectangle, and the colour it is multiplied by.
-func _prop_quad(xform: Transform2D, corners: Array, uv: Rect2, tint: Color) -> void:
+func _prop_quad(
+	xform: Transform2D, corners: Array, uv: Rect2, tint: Color,
+	per_corner: PackedColorArray = PackedColorArray()
+) -> void:
 	var base := _prop_points.size()
-	for corner: Vector2 in corners:
-		_prop_points.append(xform * corner)
-		_prop_colors.append(tint)
+	for i in corners.size():
+		_prop_points.append(xform * (corners[i] as Vector2))
+		_prop_colors.append(per_corner[i] if per_corner.size() == corners.size() else tint)
 	_prop_uvs.append(uv.position)
 	_prop_uvs.append(Vector2(uv.end.x, uv.position.y))
 	_prop_uvs.append(uv.end)
@@ -756,8 +797,14 @@ func _prop_quad(xform: Transform2D, corners: Array, uv: Rect2, tint: Color) -> v
 	)
 
 
-## Lay every prop and its shadow into the batch, for the sun as it is now.
+## Lay every prop and its shadow into the batch, for the sun as it is now, and tell the
+## shader which way a picture's width lies under that sun, so a leaning tuft's shadow moves
+## along the shadow and not across it.
 func _lay_props() -> void:
+	if day != null:
+		_sun_baked = day.lean
+		_stretch_baked = day.stretch
+		Flora.shade_across(material as ShaderMaterial, day.lean, day.stretch)
 	_prop_points.resize(0)
 	_prop_uvs.resize(0)
 	_prop_colors.resize(0)

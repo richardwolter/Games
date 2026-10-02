@@ -188,6 +188,21 @@ const RESTS := {
 	&"decor_bookcase_tall": {0: [&"read", 0, 0]},
 	&"decor_bookcase_drawers": {0: [&"read", 0, 0]},
 	&"decor_tiny_bookcase": {0: [&"read", 0, 0]},
+	# The 0_mem0ry pack's pieces (2026-10-01): their views run front, side, back, so the
+	# back is view 2 on every one. First guesses, drawn at 0.74; retune by eye.
+	&"decor_pk_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0]},
+	&"decor_pk_white_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0]},
+	&"decor_pk_armchair": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
+	&"decor_pk_old_seat": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
+	&"decor_pk_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_diner_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_green_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_wood_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_carved_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_diner_seat": {0: [&"front", 11, 0]},
+	&"decor_pk_bed": {0: [&"lie", 0, 0]},
+	&"decor_pk_fancy_bed": {0: [&"lie", 0, 0]},
+	&"decor_pk_bookshelf": {0: [&"read", 0, 0]},
 }
 ## How far above the ink's foot the hips are in each sitting strip, in the figure's own
 ## pixels. What `tools/build_rest_frames.py` draws: move them together.
@@ -195,7 +210,9 @@ const SIT_HIP := {&"south": 7, &"north": 8}
 ## Pieces a dog and the player cannot share: a dog lying on one hops off when the player sits.
 ## The sofa and the bed are shared, and the dog keeps to the middle of either: moved over on
 ## the sofa it lay on the arm (Richard, 2026-09-29: "just middle").
-const SEAT_FOR_ONE := [&"decor_loveseat", &"decor_dining_chair"]
+const SEAT_FOR_ONE := [&"decor_loveseat", &"decor_dining_chair", &"decor_pk_armchair",
+	&"decor_pk_old_seat", &"decor_pk_chair", &"decor_pk_diner_chair", &"decor_pk_green_chair",
+	&"decor_pk_wood_chair", &"decor_pk_carved_chair", &"decor_pk_diner_seat"]
 ## How many books `tools/build_rest_frames.py` draws on the reading strip, two frames each.
 const BOOKS := 5
 ## Pieces that stand on the floor and block nothing, besides the flats and the pet bed: a
@@ -215,9 +232,10 @@ const READ_REACH_ARM := 3
 const PAGE_EVERY := 4.0
 const PAGE_TIME := 0.45
 ## The shade the player sitting facing the room presses into the cushion: their own figure,
-## shifted and darkened (Richard: "closer to the player, less round").
-const SIT_SHADE := Color(0.14, 0.09, 0.07, 0.45)
-const SIT_SHADE_AT := Vector2(2.0, 1.0)
+## shifted and darkened (Richard: "closer to the player, less round"). In the room's one ink
+## since 2026-10-02 (one sun), and shifted `SIT_SHADE_REACH` source px along the room's light
+## — away from the window, right and down — where it was a brown of its own two pixels right.
+const SIT_SHADE_REACH := 2.0
 
 ## The light in the room (2026-09-20, Richard: "sunlight coming through the left side... no
 ## circled rings like current fireplace, it looks blocky and ugly"). One additive quad over
@@ -253,15 +271,29 @@ const EMBER_TONE := Color(1.0, 0.36, 0.2)
 ## light falls across the room) and its tone all run morning to late afternoon on
 ## `DayCycle.sun`: a pale, short, steep shaft early, a long low orange one late. With no day
 ## handed over the room sits at `SUN_NO_DAY`. All by eye.
-const WINDOW_DOWN := 0.48
-const SHAFT_WIDE := 2.4
-const SHAFT_SPREAD := 0.78
+##
+## **The window is tiny** (2026-10-02, Richard: "a cone of light coming from the center, not
+## like the entire wall is the window"): the shaft leaves the window's middle `SHAFT_WIDE`
+## cells wide, about the round pane itself, and opens at `SHAFT_SPREAD` into a cone. It was
+## 2.4 cells wide at the wall and opened at 0.78, which lit the whole left of the room as if
+## the wall were glass. The shadows obey the same cone (`SHADE_FALL_CODE`).
+##
+## **From the middle of the left wall, straight across** (2026-10-02, third pass, Richard: "the
+## cone comes from center wall and from up. Objects on top should have shadow distorted up and
+## objects down should have distorted down"): the window stands half way down the floor's left
+## edge (`_window_at`), high up the wall (`WINDOW_HIGH`), and the cone's axis is level
+## (`CONE_AXIS`), so it spreads up and down the room alike. It used to leave `WINDOW_DOWN` of
+## the shed's height down the wall and slope down the room by the hour (`SUN_SLOPE`, retired),
+## which threw every shadow down whatever side of the window its caster stood on. The hour
+## still lengthens the shadows (`HOUR_REACH`) and warms the light.
+const CONE_AXIS := Vector2(1.0, 0.0)
+const SHAFT_WIDE := 0.6
+const SHAFT_SPREAD := 0.36
 const SHAFT_LONG := 34.0
 const SUN_POWER := Vector2(0.30, 0.62)
 ## How much of the shaft is left in a full shower, and what a lightning flash adds to it.
 const RAIN_SUN := 0.25
 const FLASH_SUN := 1.2
-const SUN_SLOPE := Vector2(0.95, 0.38)
 const SUN_EARLY := Color(1.0, 0.93, 0.74)
 const SUN_LATE := Color(1.0, 0.66, 0.34)
 const SUN_HOURS := Vector2(0.15, 0.8)
@@ -274,6 +306,94 @@ const ROOM_SCRIM := Color(0.09, 0.055, 0.03, 0.66)
 ## shaft reads as a pale wash rather than as sun: the room is dimmed a little and the window
 ## gives it back where the light falls.
 const ROOM_DIM := Color(0.05, 0.03, 0.02, 0.26)
+
+## The room's shadows (2026-10-02, one sun, decided with Richard). The light in here is the
+## sun through the round window in the left wall, so everything in the room — the player, the
+## dogs and every standing piece of furniture — throws its shadow **away from the window**:
+## see "The window is the light" below for where and how far. `ROOM_SHADE_NO_DAY` is a
+## shadow's length with no day to ask (a harness, a probe).
+##
+## The ink is the land's (`Shade.On.LAND`): the day's own, the overcast and the lightning in
+## it, so a shower thins the room's shadows as it thins the shaft and a strike hardens them.
+## Walkers are their own frame laid under `Shade.lying`, the lake's rule; furniture is a
+## front-on painting of a solid, so it is swept (`Shade.sweep`'s rule, worked here off cached
+## runs, see `_runs_of`). All of it lies on the floor under every piece and walker, in one
+## `CanvasGroup` (`_shades`) so overlaps composite once.
+const ROOM_SHADE_NO_DAY := 0.35
+
+## The window is the light (2026-10-02, second pass, Richard: "the window should be what
+## affects shadow, so objects closer to the light source should have a darker shadow, and
+## there should be a stretch on shadows cast"). A point light, not a sun: every shadow falls
+## straight away from the window (`_window_at`), and the further a caster stands from it the
+## lower the light comes in and the longer its shadow is laid — `WINDOW_HIGH` cells is how
+## high the window is over the floor, so a caster that far out throws a shadow as long as it
+## is tall, times the hour's own lengthening (`HOUR_REACH`, morning to late afternoon), held
+## between `REACH_LEAST` and `REACH_MOST`. A caster above the window throws its shadow up
+## the room and one below it down (third pass): the window is in the middle of the wall, so
+## nothing holds a shadow to falling down the screen any more (`AWAY_DOWN`, retired), and the
+## shadows are laid by `_lay`, which lets the stretch go negative where `Shade.lying` would not.
+##
+## And darker near it: the group of shadows is drawn through `SHADE_FALL_CODE`, which takes
+## each pixel of shadow from `NEAR_DARK` of the ink by the window to `FAR_DARK` of it
+## `DARK_REACH` cells away, in `DARK_STEPS` hard steps (the shaft's own pixel-art rule).
+##
+## **Only inside the cone**: a shadow is light that is not getting through, and outside the
+## shaft there was none to stop — only the room's bounce. So each pixel of shadow is kept by
+## how far inside the shaft it lies, the shaft's own Gaussian (`SHAFT_WIDE`, `SHAFT_SPREAD`
+## along `sun_dir`), down to `OUTSIDE_DARK` of itself out of it. All first guesses for
+## Richard's eye.
+## Kept low and close to the base (2026-10-02, fourth pass, Richard: "too stretched out and huge,
+## the light isn't that strong, keep it more grounded"): the window counted twice as high, the
+## longest shadow under half its caster's height, the hour moving it less. Were 8, 0.3..1.5 and
+## 0.8..1.3; the dark by the window came down with them (`NEAR_DARK` 1.7 to 1.3).
+const WINDOW_HIGH := 16.0
+const HOUR_REACH := Vector2(0.9, 1.1)
+const REACH_LEAST := 0.12
+const REACH_MOST := 0.42
+const NEAR_DARK := 1.3
+const FAR_DARK := 0.45
+const DARK_REACH := 34.0
+const DARK_STEPS := 5.0
+const OUTSIDE_DARK := 0.18
+const SHADE_FALL_CODE := """shader_type canvas_item;
+render_mode unshaded;
+uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_nearest;
+uniform vec2 window_at = vec2(0.0);
+uniform float near_dark = 1.7;
+uniform float far_dark = 0.45;
+uniform float dark_reach = 300.0;
+uniform float dark_steps = 5.0;
+uniform float art_px = 2.0;
+uniform vec2 sun_dir = vec2(0.85, 0.52);
+uniform float shaft_wide = 10.0;
+uniform float shaft_spread = 0.36;
+uniform float outside_dark = 0.18;
+varying vec2 local;
+void vertex() {
+	local = VERTEX;
+}
+void fragment() {
+	vec4 c = textureLod(screen_texture, SCREEN_UV, 0.0);
+	if (c.a > 0.0001) {
+		c.rgb /= c.a;
+	}
+	vec2 at = floor(local / art_px) * art_px;
+	float far = clamp(distance(at, window_at) / dark_reach, 0.0, 1.0);
+	far = floor(far * dark_steps + 0.5) / dark_steps;
+	vec2 from = at - window_at;
+	vec2 dir = normalize(sun_dir);
+	float along = dot(from, dir);
+	float across = dot(from, vec2(-dir.y, dir.x));
+	float wide = shaft_wide + max(along, 0.0) * shaft_spread;
+	float lit = exp(-(across * across) / (wide * wide)) * step(0.0, along);
+	lit = floor(lit * dark_steps + 0.5) / dark_steps;
+	COLOR *= c;
+	COLOR.a = clamp(COLOR.a * mix(near_dark, far_dark, far) * mix(outside_dark, 1.0, lit), 0.0, 1.0);
+}
+"""
+## The walkers' shadows are drawn white and inked by the group, like `Shade.Face`'s triangles:
+## a sprite cannot be turned white by a modulate, so this does it.
+const SILHOUETTE_CODE := "shader_type canvas_item;\nvoid fragment() {\n\tCOLOR.rgb = vec3(1.0);\n}\n"
 
 ## What a piece leaves the store as: view 0, which the catalogue guarantees faces front and
 ## is switched off. Which view is "on" is the catalogue's to say (`Sheets.is_on`), not a
@@ -508,6 +628,24 @@ var pack_size := Callable()
 var day: DayCycle
 var _light: ColorRect
 
+## The room behind everything (`_paint_room`) and the shadows lying on it, both children drawn
+## behind the room's own `_draw`, in that order. `_shades` holds the furniture's swept
+## triangles (one `Shade.Face` for everything standing, rebuilt when the layout or the light
+## steps), the piece in hand's (its own face, moved with the hand rather than rebuilt), and the
+## walkers' frames.
+var _floor_layer: Node2D
+var _shades: CanvasGroup
+var _furniture_shade: Shade.Face
+var _ghost_shade: Shade.Face
+var _walker_shades: Node2D
+var _furniture_shade_for := ""
+var _ghost_shade_for := ""
+## The atlas as an image, read once, and each standing view's casting runs (`_runs_of`).
+var _atlas_image: Image
+var _shade_runs := {}
+## The floor layer's pen while it paints, null otherwise (`_pen`).
+var _pen_on: CanvasItem
+
 var _dog_rng := RandomNumberGenerator.new()
 
 ## The seat table, and the `decor.hash()` it was built for. Memoised like `_blockers`, and for
@@ -596,6 +734,7 @@ func _ready() -> void:
 	# and the furniture, not on the board standing beside them.
 	move_child(_shelf, 0)
 	move_child(_light, 1)
+	_build_shade_layers()
 	_dog_rng.randomize()
 	_load_you()
 	# The dog only runs while the room is on screen: it is a picture of a room, and nothing
@@ -873,22 +1012,29 @@ func _you_view() -> StringName:
 	return &"south" if _you_facing.y > 0.0 else &"north"
 
 
-## The player, standing on the floor of the room.
+## The player, standing on the floor of the room. Their shadow is not drawn here: it lies on
+## the floor under everything, with the furniture's (`_paint_walker_shades`).
 func _draw_you(floor_box: Rect2) -> void:
 	if _you_sheet == null:
 		return
 	if not _rest_key.is_empty() and _rest_kind != &"read":
 		_draw_resting(floor_box)
 		return
+	var shown := _you_shown(floor_box)
+	if shown.is_empty():
+		return
+	draw_texture_rect_region(_you_sheet, shown["box"] as Rect2, shown["region"] as Rect2)
+
+
+## The standing player's frame as {"at": feet, "box": where it is drawn, "region": the cut
+## off the sheet}, or empty when there is nothing to draw. One sum for the figure and for the
+## shadow it throws, so the two are always the same frame.
+func _you_shown(floor_box: Rect2) -> Dictionary:
+	if _you_sheet == null:
+		return {}
 	var step := float(CELL * _zoom())
 	var at := floor_box.position + _you_at * step
 	var tall := YOU_TALL * step
-
-	var ring := PackedVector2Array()
-	for i in 13:
-		var angle := TAU * float(i) / 12.0
-		ring.append(at + Vector2(cos(angle) * tall * 0.26, sin(angle) * tall * 0.11))
-	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
 
 	var walking := _you_step > 0.0
 	var pose := StringName("%s_%s" % ["run" if walking else "idle", _you_view()])
@@ -903,7 +1049,7 @@ func _draw_you(floor_box: Rect2) -> void:
 	elif reading:
 		pose = &"read_south"
 	if not _you_poses.has(pose):
-		return
+		return {}
 	var frames: Array = _you_poses[pose]
 	var held := Angler.RUN_FRAME if walking else Angler.IDLE_FRAME
 	var index := posmod(int(_you_age / held), frames.size())
@@ -927,7 +1073,7 @@ func _draw_you(floor_box: Rect2) -> void:
 	var box := Rect2(
 		at - Vector2((ink.position.x + ink.size.x * 0.5) * scale, _you_ink_foot * scale), size
 	)
-	draw_texture_rect_region(_you_sheet, box, region)
+	return {"at": at, "box": box, "region": region}
 
 
 ## Where the door's own empty rect sits, in screen pixels: the dark opening only, not the
@@ -965,7 +1111,7 @@ func _draw_door(wall: Rect2) -> void:
 	var corner := BORDER_TOP_LEFT.get_size() * zoom
 	var left := opening.position.x - jamb_wide
 	var right := opening.end.x
-	draw_rect(opening, DOOR_OPEN)
+	_pen().draw_rect(opening, DOOR_OPEN)
 	_draw_room_frame(wall, false, Vector2(left, right + jamb_wide))
 	# The lintel: the run's top band only, between the two corners.
 	_tile_rect(
@@ -986,8 +1132,8 @@ func _draw_door(wall: Rect2) -> void:
 		false,
 		true
 	)
-	draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, wall.position.y), corner), false)
-	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
+	_pen().draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, wall.position.y), corner), false)
+	_pen().draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, wall.position.y), corner), false)
 
 
 ## Where the jambs come down onto the floor's frame: the top joint upside down. The
@@ -1012,8 +1158,8 @@ func _draw_threshold(opening: Rect2, floor_box: Rect2) -> void:
 	)
 	# Negative height flips the piece in place, the same way a negative width mirrors one.
 	var upright := Vector2(corner.x, -corner.y)
-	draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, top), upright), false)
-	draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, top), upright), false)
+	_pen().draw_texture_rect(BORDER_TOP_RIGHT, Rect2(Vector2(left, top), upright), false)
+	_pen().draw_texture_rect(BORDER_TOP_LEFT, Rect2(Vector2(right, top), upright), false)
 
 
 ## Pick what the dog does next: go somewhere, stand about, lie down, or sleep on its bed.
@@ -1378,18 +1524,13 @@ func _slid(from: Vector2, step: Vector2, may: Callable) -> Vector2:
 
 ## The dog, on the floor, at whatever size the room is drawn.
 ##
-## On its own shadow, the way everything else in this game that stands on a surface is: the
-## room is drawn flat and a dog with nothing under it hovers over the boards.
+## Its shadow is its own frame laid along the room's light, drawn under everything with the
+## rest of the room's shadows (`_paint_walker_shades`): a dog with nothing under it hovers over
+## the boards. It used to stand on a black ellipse of its own here.
 func _draw_dog(floor_box: Rect2, dog: ShedDog) -> void:
 	var step := CELL * _zoom()
 	var at := floor_box.position + dog.at * float(step)
 	var tall := DOG_TALL * float(step)
-	var ring := PackedVector2Array()
-	var wide := tall * (0.34 if dog.state == &"sleep" or dog.state == &"laid" else 0.44)
-	for i in 13:
-		var angle := TAU * float(i) / 12.0
-		ring.append(at + Vector2(cos(angle) * wide, sin(angle) * wide * 0.42))
-	draw_colored_polygon(ring, Color(0.0, 0.0, 0.0, 0.16))
 	DogArt.stamp(
 		self, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), at, tall, dog.left,
 		0.0, Color.WHITE, dog.breed
@@ -2250,7 +2391,7 @@ func _tile_rect(tex: Texture2D, rect: Rect2) -> void:
 		var tall := minf(step.y, rect.size.y - float(row) * step.y)
 		for col in cols:
 			var wide := minf(step.x, rect.size.x - float(col) * step.x)
-			draw_texture_rect_region(
+			_pen().draw_texture_rect_region(
 				tex,
 				Rect2(rect.position + Vector2(float(col), float(row)) * step, Vector2(wide, tall)),
 				Rect2(Vector2.ZERO, Vector2(wide, tall) / zoom)
@@ -2281,15 +2422,15 @@ func _draw_room_frame(frame: Rect2, bottom: bool = true, top_gap: Vector2 = Vect
 	var bl := BORDER_BOTTOM_LEFT.get_size() * _zoom() if bottom else Vector2.ZERO
 	var br := BORDER_BOTTOM_RIGHT.get_size() * _zoom() if bottom else Vector2.ZERO
 
-	draw_texture_rect(BORDER_TOP_LEFT, Rect2(frame.position, tl), false)
-	draw_texture_rect(
+	_pen().draw_texture_rect(BORDER_TOP_LEFT, Rect2(frame.position, tl), false)
+	_pen().draw_texture_rect(
 		BORDER_TOP_RIGHT, Rect2(Vector2(frame.end.x - tr.x, frame.position.y), tr), false
 	)
 	if bottom:
-		draw_texture_rect(
+		_pen().draw_texture_rect(
 			BORDER_BOTTOM_LEFT, Rect2(Vector2(frame.position.x, frame.end.y - bl.y), bl), false
 		)
-		draw_texture_rect(BORDER_BOTTOM_RIGHT, Rect2(frame.end - br, br), false)
+		_pen().draw_texture_rect(BORDER_BOTTOM_RIGHT, Rect2(frame.end - br, br), false)
 		# Bottom run: the sill, corner to corner.
 		_tile_run(
 			BORDER_SILL,
@@ -2352,15 +2493,19 @@ func _tile_run(tex: Texture2D, at: Vector2, length: float, along_x: bool, flip: 
 		var src := Rect2(Vector2.ZERO, draw_size / zoom)
 		if flip:
 			draw_size.x = -draw_size.x
-		draw_texture_rect_region(tex, Rect2(pos, draw_size), src)
+		_pen().draw_texture_rect_region(tex, Rect2(pos, draw_size), src)
 
 
-func _draw() -> void:
+## The room behind everything in it: the scrim over the lake, the back wall with its door,
+## the floor and the moulding round it. Drawn by `_floor_layer`, a child behind the room's own
+## `_draw`, rather than by `_draw` itself (2026-10-02, one sun): the shadows (`_shades`) have
+## to lie on the floor and under every piece and walker, and a node's own drawing cannot be
+## split round a child. `pen` is the layer; `_pen` hands it to the helpers that tile.
+func _paint_room(pen: CanvasItem) -> void:
 	if sheets == null:
 		return
-	_place_close()
-	draw_rect(Rect2(-global_position, get_viewport_rect().size), ROOM_SCRIM)
-
+	_pen_on = pen
+	pen.draw_rect(Rect2(-global_position, get_viewport_rect().size), ROOM_SCRIM)
 	var floor_box := _floor_rect()
 
 	# The room: a back wall standing above the floor, so the space has a direction and the
@@ -2370,14 +2515,14 @@ func _draw() -> void:
 		Vector2(floor_box.position.x, maxf(floor_box.position.y - wall_tall, 0.0)),
 		Vector2(floor_box.size.x, minf(wall_tall, floor_box.position.y))
 	)
-	draw_rect(wall, Color(0.30, 0.26, 0.24))
+	pen.draw_rect(wall, Color(0.30, 0.26, 0.24))
 	_tile_rect(WALLPAPER_TILE, wall)
 	_draw_door(wall)
 
 	# The floor: the new tile, laid both ways across the whole box. Backed by a flat fill
 	# first so a box whose size does not divide evenly never shows a gap at the far edge —
 	# the last row and column are cut to it.
-	draw_rect(floor_box, Color(0.47, 0.36, 0.26))
+	pen.draw_rect(floor_box, Color(0.47, 0.36, 0.26))
 	_tile_rect(FLOOR_TILE, floor_box)
 
 	# The room's walls carry on down the floor's own sides and along its front edge, the
@@ -2391,6 +2536,22 @@ func _draw() -> void:
 		floor_box, true, Vector2(opening.position.x - jamb_wide, opening.end.x + jamb_wide)
 	)
 	_draw_threshold(opening, floor_box)
+	_pen_on = null
+
+
+## What the room's floor helpers draw on: the floor layer while it paints, the room otherwise.
+func _pen() -> CanvasItem:
+	return _pen_on if _pen_on != null else self
+
+
+func _draw() -> void:
+	if sheets == null:
+		return
+	_place_close()
+	var floor_box := _floor_rect()
+	# The scrim, the wall and the floor are drawn by `_floor_layer`, behind this, and the
+	# room's shadows by `_shades` over them (see `_paint_room`).
+	_dress_shades(floor_box)
 
 	# The faint cell grid under a carried piece is gone (2026-09-16): it was drawn to show
 	# what the drop was snapping to, and the drop snaps to whole art pixels now — a grid of
@@ -2628,8 +2789,8 @@ func _dress_light(floor_box: Rect2) -> void:
 		tone = tone * day.tint
 	lit.set_shader_parameter(&"box_px", shed.size)
 	lit.set_shader_parameter(&"art_px", _zoom())
-	lit.set_shader_parameter(&"window_at", Vector2(0.0, shed.size.y * WINDOW_DOWN))
-	lit.set_shader_parameter(&"sun_dir", Vector2(1.0, lerpf(SUN_SLOPE.x, SUN_SLOPE.y, share)))
+	lit.set_shader_parameter(&"window_at", _window_at() - shed.position)
+	lit.set_shader_parameter(&"sun_dir", CONE_AXIS)
 	# A shower outside (2026-09-25, `Weather`): the shaft through the window thins to a grey
 	# glow, and a flash of lightning throws it in white for a moment.
 	var power := lerpf(SUN_POWER.x, SUN_POWER.y, share) * lerpf(1.0, RAIN_SUN, Weather.now)
@@ -2655,6 +2816,298 @@ func _dress_light(floor_box: Rect2) -> void:
 	lit.set_shader_parameter(&"lamp_count", rows.size())
 	lit.set_shader_parameter(&"lamps", spots)
 	lit.set_shader_parameter(&"lamp_tones", tones)
+
+
+## The floor layer and the shadow group, both behind the room's own drawing and first among
+## the children, the floor first: children shown behind their parent draw in tree order.
+func _build_shade_layers() -> void:
+	_floor_layer = Node2D.new()
+	_floor_layer.name = &"Floor"
+	_floor_layer.show_behind_parent = true
+	_floor_layer.draw.connect(func() -> void: _paint_room(_floor_layer))
+	add_child(_floor_layer)
+	move_child(_floor_layer, 0)
+	_shades = CanvasGroup.new()
+	_shades.name = &"Shades"
+	_shades.show_behind_parent = true
+	# Darker by the window (`SHADE_FALL_CODE`): the group's own pass, over what it composited.
+	var fall := ShaderMaterial.new()
+	var fall_code := Shader.new()
+	fall_code.code = SHADE_FALL_CODE
+	fall.shader = fall_code
+	_shades.material = fall
+	_furniture_shade = Shade.Face.new()
+	_shades.add_child(_furniture_shade)
+	_ghost_shade = Shade.Face.new()
+	_shades.add_child(_ghost_shade)
+	_walker_shades = Node2D.new()
+	var white := ShaderMaterial.new()
+	var code := Shader.new()
+	code.code = SILHOUETTE_CODE
+	white.shader = code
+	_walker_shades.material = white
+	_walker_shades.draw.connect(func() -> void: _paint_walker_shades(_walker_shades))
+	_shades.add_child(_walker_shades)
+	add_child(_shades)
+	move_child(_shades, 1)
+
+
+## Where the light comes in, in the room's own space: the round window half way down the
+## floor's left edge, the point the shaft is drawn from (`window_at` in `_dress_light`).
+func _window_at() -> Vector2:
+	var floor_box := _floor_rect()
+	return Vector2(floor_box.position.x, floor_box.get_center().y)
+
+
+## The way a shadow falls from a caster standing at `feet` (room space): straight away from
+## the window, up the room above it and down the room below it.
+func _room_away(feet: Vector2) -> Vector2:
+	var away := feet - _window_at()
+	if away.length_squared() < 0.0001:
+		return CONE_AXIS
+	return away.normalized()
+
+
+## A walker's frame laid down along the room's light from `feet`: `Shade.lying`'s mapping, but
+## with the stretch free to be negative, so a shadow can fall up the room.
+static func _lay(feet: Vector2, light: Vector2) -> Transform2D:
+	return Transform2D(Vector2(1.0, 0.0), Vector2(-light.x, -light.y * 0.5), feet)
+
+
+## How long a shadow is per unit of its caster's height, standing at `feet`: as far from the
+## window as the window is high is a shadow as long as the caster, the hour lengthening it.
+func _room_reach(feet: Vector2) -> float:
+	var cell := float(CELL * _zoom())
+	var out := feet.distance_to(_window_at()) / maxf(WINDOW_HIGH * cell, 1.0)
+	out *= lerpf(HOUR_REACH.x, HOUR_REACH.y, sun_share())
+	return clampf(out, REACH_LEAST, REACH_MOST)
+
+
+## The room's light at `feet` as `Shade.lying` takes it: (lean, stretch), the lean positive
+## to fall right and the stretch twice the drop down the screen, `lying` halving it.
+func _room_light(feet: Vector2) -> Vector2:
+	var away := _room_away(feet) * _room_reach(feet)
+	return Vector2(away.x, away.y * 2.0)
+
+
+## The ink of a shadow in the room: the land's, from the day.
+func _room_ink() -> float:
+	var sun := Shade.sun_of(day)
+	return Shade.ink_on(Shade.NO_DAY_INK if sun == null else sun.ink, Shade.On.LAND)
+
+
+## Brings the room's shadows up to date for this frame: the group's ink, the furniture's
+## sweep when the layout, the room's size or the light has moved by `Shade.SWEEP_STEP`, the
+## piece in hand's, and a redraw of the floor and the walkers, who move every frame.
+func _dress_shades(floor_box: Rect2) -> void:
+	if _shades == null:
+		return
+	_floor_layer.queue_redraw()
+	_walker_shades.queue_redraw()
+	_shades.self_modulate = Shade.tint(_room_ink())
+	var fall := _shades.material as ShaderMaterial
+	if fall != null:
+		var cell := float(CELL * _zoom())
+		fall.set_shader_parameter(&"window_at", _window_at())
+		fall.set_shader_parameter(&"near_dark", NEAR_DARK)
+		fall.set_shader_parameter(&"far_dark", FAR_DARK)
+		fall.set_shader_parameter(&"dark_reach", DARK_REACH * cell)
+		fall.set_shader_parameter(&"dark_steps", DARK_STEPS)
+		fall.set_shader_parameter(&"art_px", float(_zoom()))
+		fall.set_shader_parameter(&"sun_dir", CONE_AXIS)
+		fall.set_shader_parameter(&"shaft_wide", SHAFT_WIDE * cell)
+		fall.set_shader_parameter(&"shaft_spread", SHAFT_SPREAD)
+		fall.set_shader_parameter(&"outside_dark", OUTSIDE_DARK)
+	# Each piece's light is its own (the window is a point), so the key is the hour's step:
+	# where every piece stands is already in the layout's hash.
+	var hour := snappedf(sun_share(), Shade.SWEEP_STEP)
+	var key := "%d|%s|%.2f" % [decor.hash(), floor_box, hour]
+	if key != _furniture_shade_for:
+		_furniture_shade_for = key
+		var points := PackedVector2Array()
+		for i in decor.size():
+			_sweep_row_into(points, decor, i, floor_box.position, floor_box.position)
+		_furniture_shade.points = points
+		_furniture_shade.queue_redraw()
+	# The piece in hand: swept at its own corner and moved, since it moves every frame; swept
+	# again when where it stands has moved its light by a step.
+	var ghost := _ghost()
+	var ghost_key := ""
+	var ghost_at := Vector2.ZERO
+	if not ghost.is_empty():
+		ghost_at = floor_box.position + Vector2(
+			float(int(ghost["cell"][0])), float(int(ghost["cell"][1]))
+		) * _zoom()
+		var light := _room_light(ghost_at).snapped(Vector2.ONE * Shade.SWEEP_STEP)
+		ghost_key = "%s|%d|%.2f|%.2f|%.3f" % [
+			ghost["piece"], _row_view(ghost), light.x, light.y, _zoom()
+		]
+	if ghost_key != _ghost_shade_for:
+		_ghost_shade_for = ghost_key
+		var points := PackedVector2Array()
+		if not ghost.is_empty():
+			var rows: Array = decor.duplicate()
+			rows.append(ghost)
+			var corner := Vector2(float(int(ghost["cell"][0])), float(int(ghost["cell"][1])))
+			_sweep_row_into(points, rows, rows.size() - 1, -corner * _zoom(), ghost_at - corner * _zoom())
+		_ghost_shade.points = points
+		_ghost_shade.queue_redraw()
+	_ghost_shade.visible = not ghost.is_empty()
+	if not ghost.is_empty():
+		_ghost_shade.position = floor_box.position + Vector2(
+			float(int(ghost["cell"][0])), float(int(ghost["cell"][1]))
+		) * _zoom()
+
+
+## One row of `rows`, swept along the room's light into `into`, its cell measured from
+## `origin`. Only what stands on the floor casts: nothing hung on the wall, nothing lying flat,
+## and nothing small set on a host (a pot on a table is on the table, and the table casts).
+## `room_origin` is where `origin` is in the room's own space, so the light can be asked at
+## the piece's foot when it is swept somewhere else (the piece in hand).
+func _sweep_row_into(
+	into: PackedVector2Array, rows: Array, index: int, origin: Vector2, room_origin: Vector2
+) -> void:
+	var row: Dictionary = rows[index]
+	var piece := StringName(row["piece"])
+	if sheets.on_wall(piece) or sheets.lies_flat(piece):
+		return
+	if sheets.is_small(piece) and _host_of(rows, index) >= 0:
+		return
+	var view := _row_view(row)
+	var runs := _runs_of(piece, view)
+	if runs.is_empty():
+		return
+	var art: Vector2 = runs["size"]
+	var zoom := _zoom()
+	var box := Rect2(
+		origin + Vector2(float(int(row["cell"][0])), float(int(row["cell"][1]))) * zoom,
+		sheets.view_size_of(piece, view) * zoom
+	)
+	var step := box.size / art
+	var rise := box.size.y * (1.0 - float(runs["ground"]))
+	# The light at the middle of the piece's foot, in the room's own space.
+	var foot := box.position - origin + room_origin + Vector2(box.size.x * 0.5, box.size.y)
+	var light := _room_light(foot)
+	var drag := Vector2(light.x, light.y * 0.5) * rise
+	if drag.is_zero_approx():
+		return
+	for run: Vector3 in runs["runs"]:
+		_smear_into(
+			into,
+			Rect2(
+				box.position + Vector2(run.x * step.x, run.y * step.y),
+				Vector2(step.x, run.z * step.y)
+			),
+			drag
+		)
+
+
+## The opaque runs of one view that cast, in its art's own pixels as (column, top row,
+## length): `Shade.sweep`'s rule — per column and per run, and only the columns whose lowest
+## pixel is within the piece's base of the deepest row, an overhang casting nothing — worked
+## out once per view and kept. `ground` is the base's share of the picture: depth, not height,
+## so only the rest of the picture drags the shadow. Sweeping the pixels afresh whenever the
+## light stepped would read every piece's every pixel twice; the runs make a step cheap.
+func _runs_of(piece: StringName, view: int) -> Dictionary:
+	var key := "%s|%d" % [piece, view]
+	if _shade_runs.has(key):
+		return _shade_runs[key]
+	var out := {}
+	if _atlas_image == null and sheets.atlas != null:
+		_atlas_image = sheets.atlas.get_image()
+	var region := Rect2i(sheets.view_region_of(piece, view))
+	if _atlas_image == null or region.size.x <= 0 or region.size.y <= 0:
+		_shade_runs[key] = out
+		return out
+	var art := _atlas_image.get_region(region)
+	var wide := art.get_width()
+	var tall := art.get_height()
+	var ground := clampf(
+		float(base_of(piece, view)) / float(maxi(span_of(piece, view).y, 1)), 0.0, 1.0
+	)
+	var foot := PackedInt32Array()
+	foot.resize(wide)
+	var deepest := -1
+	for col in wide:
+		foot[col] = -1
+		for row in range(tall - 1, -1, -1):
+			if art.get_pixel(col, row).a > 0.5:
+				foot[col] = row
+				deepest = maxi(deepest, row)
+				break
+	var runs: Array[Vector3] = []
+	var band := maxf(float(tall) * ground, 1.0)
+	if deepest >= 0:
+		for col in wide:
+			if foot[col] < 0 or float(deepest - foot[col]) > band:
+				continue
+			var top := -1
+			for row in tall + 1:
+				var solid := row < tall and art.get_pixel(col, row).a > 0.5
+				if solid and top < 0:
+					top = row
+				elif not solid and top >= 0:
+					runs.append(Vector3(col, top, row - top))
+					top = -1
+	out = {"size": Vector2(wide, tall), "ground": ground, "runs": runs}
+	_shade_runs[key] = out
+	return out
+
+
+## One run swept: the hull of its corners and the same four moved along the drag, fanned.
+## `Shade._smear`'s own, kept here so the room does not lean on another file's private.
+static func _smear_into(into: PackedVector2Array, cell: Rect2, drag: Vector2) -> void:
+	var both := PackedVector2Array([
+		cell.position,
+		cell.position + Vector2(cell.size.x, 0.0),
+		cell.end,
+		cell.position + Vector2(0.0, cell.size.y),
+	])
+	for k in 4:
+		both.append(both[k] + drag)
+	var hull := Geometry2D.convex_hull(both)
+	if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.remove_at(hull.size() - 1)
+	for i in range(1, hull.size() - 1):
+		into.append(hull[0])
+		into.append(hull[i])
+		into.append(hull[i + 1])
+
+
+## The walkers' shadows, onto `pen` (the white silhouette layer in `_shades`): each one's own
+## frame laid along the room's light from its feet, as the lake lays the angler's and the
+## dogs'. A dog on its seat casts none here, being on the furniture rather than the floor,
+## and nor does the player sitting or lying, whose shade is pressed into the cushion
+## (`_draw_resting`). Reading, they stand, and cast.
+func _paint_walker_shades(pen: CanvasItem) -> void:
+	if sheets == null:
+		return
+	var floor_box := _floor_rect()
+	var step := float(CELL * _zoom())
+	for dog in _dogs:
+		if not dog.seat.is_empty() and dog.at.distance_to(_seat_point(dog.seat)) < 0.3:
+			continue
+		var feet := floor_box.position + dog.at * step
+		var light := _room_light(feet)
+		pen.draw_set_transform_matrix(_lay(feet, light))
+		DogArt.stamp(
+			pen, dog.state, DogArt.frame_at(dog.state, dog.age, dog.breed), Vector2.ZERO,
+			DOG_TALL * step, dog.left, 0.0, Color.WHITE, dog.breed
+		)
+	pen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if not _rest_key.is_empty() and _rest_kind != &"read":
+		return
+	var shown := _you_shown(floor_box)
+	if shown.is_empty():
+		return
+	var at: Vector2 = shown["at"]
+	var box: Rect2 = shown["box"]
+	var you := _room_light(at)
+	pen.draw_set_transform_matrix(_lay(at, you))
+	pen.draw_texture_rect_region(
+		_you_sheet, Rect2(box.position - at, box.size), shown["region"] as Rect2
+	)
+	pen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## A light's pool as (reach in cells, power).
@@ -3008,8 +3461,10 @@ func _draw_resting(floor_box: Rect2) -> void:
 	origin = origin.round()
 	var size := region.size * scale
 	if _rest_kind == &"front":
+		var away := _room_away(origin + size * 0.5)
 		draw_texture_rect_region(
-			_you_sheet, Rect2(origin + SIT_SHADE_AT * scale, size), region, SIT_SHADE
+			_you_sheet, Rect2(origin + (away * SIT_SHADE_REACH).round() * scale, size), region,
+			Shade.tint(_room_ink())
 		)
 	if _rest_kind == &"lie":
 		_draw_blanket(box, drawn, middle)

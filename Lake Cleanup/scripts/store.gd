@@ -21,19 +21,23 @@ const Style := preload("res://scripts/style.gd")
 ## either way, and the draw cost of a late-game store is not worth paying.
 const MAX_DRAWN := 24
 
-## The recycle box art. An isometric box 32 art pixels wide: its top face is a 32x16 diamond
-## centred on row 8, and it stands on a matching diamond centred on row 24, so the walls are
-## 16 art pixels tall and the bottom point is the last row.
+## The recycle box art (tools/build_recycle_box.py). An isometric box 64 art pixels wide: its
+## top face is a 64x32 diamond centred on row 16, and it stands on a matching diamond centred
+## on row 48, so the walls are 32 art pixels tall and the bottom point is the last row.
 const ART := "res://assets/Recycle_Box.png"
-## 2.0 (2026-09-24, Richard): at 2.5 its one-pixel outline drew a quarter thicker than every
-## other outline in the game. The crate is 20% smaller with it; footprint and drop spots follow.
-const ART_SCALE := 2.0
-const ART_TOP := 8.0
-const ART_GROUND := 24.0
+## 1.0 (2026-10-02): redrawn by rule at the angler's grain, twice the pixels of the old 32x33
+## painting that drew at 2.0, so the crate is the same size in the world. (2.0 came in on
+## 2026-09-24 over 2.5, whose outline drew a quarter thicker than every other.)
+const ART_SCALE := 1.0
+const ART_TOP := 16.0
+const ART_GROUND := 48.0
+## Rows of rim the front cut keeps above the mouth's near edges: the near walls' top boards,
+## which is what covers the heap's foot (build_recycle_box.RIM).
+const ART_RIM := 3.0
 
 ## How wide and deep the crate is on the plane, and how tall its walls stand. Read off the
 ## art, so the layering in lake.gd and the drop point agree with the picture.
-const CRATE := Vector2(32.0, 16.0) * ART_SCALE
+const CRATE := Vector2(64.0, 32.0) * ART_SCALE
 const CRATE_TALL := (ART_GROUND - ART_TOP) * ART_SCALE
 
 ## Half the crate's side in tiles. Its footprint is a square in tile space, which is exactly
@@ -44,6 +48,8 @@ const FOOT_HALF := CRATE.x / Iso.TILE_W * 0.5
 ## height above the ground point. Starts sunk behind the near walls and ends a little proud
 ## of the rim, so a full box reads as full at a glance.
 const HEAP_FLOOR := 0.55
+## How big a piece in the heap is drawn, and what a piece thrown in shrinks to.
+const HEAP_SIZE := 0.62
 const HEAP_CLIMB := 0.7
 
 ## The crate's shadow: how much bigger than its footprint it is drawn, and how far down the
@@ -67,10 +73,10 @@ const SHADOW_DROP := 3.0
 const SKIRT_SEED := 9051
 
 ## How tall the crate's blades stand, in art pixels — shorter than the hem's own default.
-## The crate was drawn at 2.5 when this was set, so one painted pixel was two and a half of the game's,
-## and a blade sized for the shed stands a third of the way up this picture. At the default
-## the tufts on the lower-left edge reached the recycle mark painted just above it.
-const SKIRT_BLADES := Vector2i(1, 2)
+## Set when the crate was drawn at 2.5 (1-2 of those pixels); at the 1x grain it is the same
+## world height in twice the pixels. At the hem's default the tufts on the lower-left edge
+## reached the recycle mark painted just above it.
+const SKIRT_BLADES := Vector2i(2, 4)
 const SPILL_REACH := Vector2(1.10, 1.10)
 const SPILL_GRAINS := 26
 const SPILL_SEED := 9052
@@ -93,6 +99,8 @@ var held := PackedInt32Array()
 
 ## Set by lake.gd, for drawing the pieces.
 var grid: LakeGrid
+## The flights, whose last stretch into this crate the crate draws (Haul.LAND_FROM).
+var haul: Haul
 
 var _rng := RandomNumberGenerator.new()
 
@@ -111,6 +119,7 @@ var _cast: Shade.Cast
 var _front: Texture2D
 ## The sun the shadow was last drawn for.
 var _sun := Vector3(INF, INF, INF)
+var _wet := Color(0, 0, 0, 0)
 
 
 func _ready() -> void:
@@ -126,9 +135,12 @@ func _process(_delta: float) -> void:
 	if day == null or _art == null:
 		return
 	var sun := Vector3(day.lean, day.stretch, day.ink)
-	if sun.is_equal_approx(_sun):
+	# The rain's tint moves too (`Shade.wet_tint`), so a soaking redraws the crate as well.
+	var wet := Shade.wet_tint()
+	if sun.is_equal_approx(_sun) and wet.is_equal_approx(_wet):
 		return
 	_sun = sun
+	_wet = wet
 	queue_redraw()
 
 
@@ -155,7 +167,7 @@ static func _cut_front(image: Image) -> Texture2D:
 	for y in out.get_height():
 		for x in out.get_width():
 			var edge := mouth_low - absf(float(x) + 0.5 - mid) * 0.5
-			if float(y) + 0.5 < edge - 1.0:
+			if float(y) + 0.5 < edge - ART_RIM:
 				out.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
 	return ImageTexture.create_from_image(out)
 
@@ -212,8 +224,9 @@ func _draw() -> void:
 	# The ground it stands on, and the inside of the box seen over the near wall. The shadow
 	# is the crate's own footprint — a square on the plane, which is this diamond on screen —
 	# rather than a soft pool bigger than the box: nothing else here casts one of those, and
-	# a crate is a box sitting flat on the sand.
-	_diamond(Vector2(0.0, SHADOW_DROP), CRATE * SHADOW_SPREAD, Color(0.0, 0.0, 0.0, 0.22))
+	# a crate is a box sitting flat on the sand. In the one sun's land ink (2026-10-02), not
+	# a black of its own.
+	_diamond(Vector2(0.0, SHADOW_DROP), CRATE * SHADOW_SPREAD, Shade.tint_on(day, Shade.On.LAND))
 	_ground().over(self)
 	draw_colored_polygon(
 		PackedVector2Array([
@@ -282,13 +295,18 @@ func _draw_art() -> void:
 	if day != null:
 		_shade().lay(
 			_art.get_image(), box, day.lean, day.stretch,
-			1.0 - ART_GROUND / float(maxi(_art.get_height(), 1)), day.ink
+			1.0 - ART_GROUND / float(maxi(_art.get_height(), 1)),
+			Shade.ink_on(day.ink, Shade.On.LAND)
 		)
-	draw_texture_rect(_art, box, false)
-	if grid != null and not held.is_empty():
+	var wet := Shade.wet_tint()
+	draw_texture_rect(_art, box, false, wet)
+	var filled := grid != null and not held.is_empty()
+	if filled:
 		_draw_heap()
-		if _front != null:
-			draw_texture_rect(_front, box, false)
+	# A piece thrown in, on its last stretch: drawn by the crate so its near walls cover it.
+	var landing := haul != null and haul.draw_landing_on(self, null, HEAP_SIZE)
+	if (filled or landing) and _front != null:
+		draw_texture_rect(_front, box, false, wet)
 	# And the blades along the bottom line, hiding the V the crate's picture ends on.
 	_grass(box).over(self)
 
@@ -341,7 +359,7 @@ func _draw_heap() -> void:
 		)
 	spots.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.y < b.y)
 	for i in count:
-		draw_set_transform(spots[i], _rng.randf_range(-0.2, 0.2), Vector2(0.62, 0.62))
+		draw_set_transform(spots[i], _rng.randf_range(-0.2, 0.2), Vector2(HEAP_SIZE, HEAP_SIZE))
 		grid.defs[held[i]].stamp_iso(self)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 

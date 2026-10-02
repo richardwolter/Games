@@ -1,9 +1,9 @@
 {
  "wide": 960,
- "bank_tall": 118,
- "bank_sand": 7,
+ "bank_tall": 96,
+ "bank_sand": 3,
  "lawn_tall": 200,
- "lawn_sand": 14,
+ "lawn_sand": 38,
  "clouds": [
   [
    0,

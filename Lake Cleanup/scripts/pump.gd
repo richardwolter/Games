@@ -16,10 +16,11 @@ extends Node2D
 const ART := "res://assets/pump.png"
 const CONTRACT := "res://assets/pump.json"
 
-## World pixels to a painted one: the lake's own sprite scale, a whole art pixel.
-const ART_SCALE := 2.0
+## World pixels to a painted one: 1.0 since the pump was redrawn at the hut's grain
+## (2026-10-01, `tools/build_pump.py`); it was the lake's sprite scale, 2.0, before.
+const ART_SCALE := 1.0
 ## Half the square it stands on, in tiles, and how much wider a pair of boots keeps off it.
-const FOOT_HALF := 0.32
+const FOOT_HALF := 0.22
 const WALK_KEEP := 0.12
 const SKIRT_SEED := 3707
 const SKIRT_BLADES := Vector2i(1, 2)
@@ -120,8 +121,12 @@ func _draw() -> void:
 			_cast = Shade.Cast.new()
 			_cast.name = &"PumpShade"
 			add_child(_cast)
-		_cast.lay(Art.image(ART), box, day.lean, day.stretch, _ground, day.ink)
-	draw_texture_rect(_art, box, false)
+		# The land's ink (one sun, 2026-10-02): the pump stands on the island's grass.
+		_cast.lay(
+			Art.image(ART), box, day.lean, day.stretch, _ground,
+			Shade.ink_on(day.ink, Shade.On.LAND)
+		)
+	draw_texture_rect(_art, box, false, Shade.wet_tint())
 	if _skirt == null:
 		_skirt = Skirt.hem(Art.image(ART), box, SKIRT_SEED, PackedVector2Array(), SKIRT_BLADES)
 	_skirt.over(self)

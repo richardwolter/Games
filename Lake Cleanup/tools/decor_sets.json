@@ -205,7 +205,7 @@
   },
   {
    "name": "decor_dining_chair",
-   "title": "Dining chair",
+   "title": "Chair",
    "dirty": "Decoration Dirty/Dining Chair",
    "kind": "ROTATE",
    "mirror": true,
@@ -284,7 +284,7 @@
   },
   {
    "name": "decor_nightstand",
-   "title": "Nightstand",
+   "title": "Small table",
    "dirty": "Decoration Dirty/Drawer#2",
    "kind": "ROTATE",
    "mirror": false,
@@ -351,7 +351,7 @@
   {
    "name": "decor_bookcase_tall",
    "wash_scale": 1.2,
-   "title": "Tall bookcase",
+   "title": "Bookcase",
    "dirty": "Decoration Dirty/Bookcase#2",
    "kind": "ROTATE",
    "mirror": false,
@@ -384,7 +384,7 @@
   },
   {
    "name": "decor_big_table",
-   "title": "Dining table",
+   "title": "Table",
    "dirty": "Decoration Dirty/Big Table",
    "kind": "ROTATE",
    "mirror": false,
@@ -548,7 +548,7 @@
   },
   {
    "name": "decor_big_rug",
-   "title": "Big rug",
+   "title": "Rug",
    "dirty": "Decoration Dirty/Big Rug",
    "kind": "ROTATE",
    "mirror": false,
@@ -577,7 +577,7 @@
   },
   {
    "name": "decor_old_rug",
-   "title": "Runner rug",
+   "title": "Rug",
    "dirty": "Decoration Dirty/Old Rug",
    "kind": "ROTATE",
    "mirror": false,
@@ -750,7 +750,7 @@
   },
   {
    "name": "decor_standing_lamp",
-   "title": "Floor lamp",
+   "title": "Lamp",
    "dirty": "Decoration Dirty/Standing Lamp",
    "kind": "STATE",
    "mirror": false,
@@ -773,7 +773,7 @@
   {
    "name": "decor_old_clock",
    "wash_scale": 1.5,
-   "title": "Old clock",
+   "title": "Clock",
    "dirty": "Decoration Dirty/Old Clock",
    "kind": "SINGLE",
    "mirror": false,
@@ -806,7 +806,7 @@
   },
   {
    "name": "decor_mirror",
-   "title": "Standing mirror",
+   "title": "Mirror",
    "dirty": "Decoration Dirty/Mirror",
    "kind": "SINGLE",
    "mirror": false,
@@ -956,7 +956,7 @@
   },
   {
    "name": "decor_tiny_bookcase",
-   "title": "Small bookcase",
+   "title": "Bookcase",
    "dirty": "Decoration Dirty/Tiny Bookcase",
    "kind": "SINGLE",
    "mirror": false,
@@ -1037,7 +1037,7 @@
   },
   {
    "name": "decor_painting_b",
-   "title": "Landscape",
+   "title": "Painting",
    "kind": "SINGLE",
    "mirror": false,
    "place": "wall",
@@ -1052,7 +1052,7 @@
   {
    "name": "decor_chew_toy",
    "copies": 2,
-   "title": "Chew toy",
+   "title": "Pet toy",
    "kind": "SINGLE",
    "mirror": false,
    "place": "small",

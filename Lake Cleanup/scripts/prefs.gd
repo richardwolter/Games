@@ -124,6 +124,13 @@ signal changed
 
 
 func _ready() -> void:
+	# Pixel art draws nearest unless it asks otherwise (2026-10-02, Richard: the hut and the
+	# piers read soft). The project's default canvas filter is linear and only some nodes set
+	# their own, so the rubbish, the dogs, the net, the birds, the wildlife and half the boards
+	# were all drawn smoothed. Set on the root viewport rather than in project.godot, which
+	# the open editor re-saves from memory. What wants to be smooth (the logo, a photograph, a
+	# vector mark, a gradient) sets `TEXTURE_FILTER_LINEAR` itself, and keeps it.
+	get_tree().root.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 	_build_buses()
 	load_prefs()
 	_start_language()

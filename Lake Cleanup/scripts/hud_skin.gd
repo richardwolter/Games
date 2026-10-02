@@ -227,6 +227,20 @@ var purse_over := Rect2():
 			_purse.visible = value.size.x > 0.0
 			_purse.queue_redraw()
 var _purse: Purse
+## The wash room's view of the HUD (2026-10-01, Richard: "show money and waiting UI on
+## washing station"): only the money and Waiting plates, in their own corner, over the room.
+## The meter, the buttons and the hint are hidden, and the skin takes no clicks, so the room
+## under it answers them.
+var plates_only := false:
+	set(value):
+		if value == plates_only:
+			return
+		plates_only = value
+		mouse_filter = Control.MOUSE_FILTER_IGNORE if value else Control.MOUSE_FILTER_PASS
+		for child in get_children():
+			(child as CanvasItem).visible = not value
+		_hovered = &""
+		queue_redraw()
 var _money_box := Rect2()
 var _stock_box := Rect2()
 var _hovered := &""
@@ -438,7 +452,7 @@ func _paint_key() -> int:
 	return hash([
 		roundi(_shown * 4096.0), roundi(_shown_money * 64.0), roundi(_shine * 255.0), _spent_key(),
 		roundi(_shown_stock * 16.0), roundi(_stock_glow * 255.0), roundi(pulse_amount(&"upgrades") * 64.0), roundi(pulse_amount(&"shed") * 64.0),
-		stock, available, hint, _hovered
+		stock, available, hint, _hovered, plates_only
 	])
 
 
@@ -451,6 +465,13 @@ func _spent_key() -> int:
 
 func _draw() -> void:
 	_painted = _paint_key()
+	if plates_only:
+		_draw_money(
+			self, _money_box, Color.WHITE.lerp(Style.SHINE_WASH, _ease_shine()),
+			1.0 + SHINE_SWELL * _ease_shine()
+		)
+		_draw_stock()
+		return
 	# The coin swells a little while the plate is lit, about its own middle and inside the
 	# wood — the plate itself does not move. See `HudButtons.draw_money`.
 	# Warmed rather than blown out: the coin is already the brightest thing on the plate, and

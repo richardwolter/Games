@@ -28,9 +28,10 @@
 ## What the lake adds round the picture, none of it baked into the sheet:
 ##   * the sun's shadow: a flat slab's shadow is its own silhouette slid along the day's
 ##     lean by the deck's height, so the deck top's silhouette (`shade_wet` over the water,
-##     `shade_dry` over the sand, from the sheet) is drawn in the day's ink under the posts,
-##     the wet half at the hull's gain (SHADE_GAIN) because the day's ink is set for sand,
-##     and **the wet half rides the swell**: the water is what the shadow falls on, so it
+##     `shade_dry` over the sand, from the sheet) is drawn under the posts in the one sun's
+##     ink for what it falls on (2026-10-02): the land's on the sand, the water's on the lake
+##     (`Shade.On`), where it used to keep a gain and cap of its own (3.0, 0.7). And
+##     **the wet half rides the swell**: the water is what the shadow falls on, so it
 ##     rises and falls with it, at the same swell the rubbish beside it bobs on
 ##     (LakeGrid._swell, off the grid's clock). The box on the platform is swept by
 ##     `Shade.Cast` like the island's crate;
@@ -43,8 +44,9 @@
 ## The yard's name is on a sign (2026-09-13): the builder paints the post and a bare plank
 ## (`sign`, `sign_foot`, `sign_cut` in the json) and this node writes the name on it every
 ## draw, through `tr()`, so a translation changes the sign without a repaint. The sign is a
-## billboard on a post, so its shadow is `Shade.lying` from the post's foot, like the
-## angler's — not the sweep the box gets. The material's emblem carved into the box's lit
+## billboard on a post, so its shadow is laid down from the post's foot by `Shade.cast` (the
+## picture turned onto the shadow's heading, so the post keeps its width), in the land's ink
+## — not the sweep the box gets. The material's emblem carved into the box's lit
 ## face is baked; nothing here knows about it.
 ## The old front-on paintings (Piers_Asset_Sheet.jpg, tools/slice_piers.gd) are retired.
 class_name Dropoff
@@ -60,7 +62,7 @@ const BOX_ART := "res://assets/Recycle_Box.png"
 
 ## World px per painted px. The sheet is drawn at 2.0 like every sprite in the lake
 ## (Lake.ART_PIXEL); the json's numbers are painted px and are scaled by this on the way in.
-const ART_SCALE := 2.0
+const ART_SCALE := 1.0
 
 ## How far the jetty runs out from the waterline, in tiles. Must match the builder's
 ## JETTY_OUT — the berth is placed off it, and a berth past the end of the drawn jetty is a
@@ -76,11 +78,6 @@ const BERTH_ASIDE := 1.3
 ## running alongside the jetty rather than nosing into it from wherever it was — the same
 ## thing Boat._dock_approach does for the island's dock.
 const APPROACH := 2.5
-
-## The shadow over water: the day's ink is set for sand and grass and cannot be seen on the
-## lake, so the jetty's shadow takes Boat's gain and cap.
-const SHADE_GAIN := 3.0
-const SHADE_MOST := 0.7
 
 ## Where the posts and beams draw: under the floating rubbish (5), over the water (2).
 const UNDER_LAYER := 4
@@ -153,12 +150,15 @@ var aside := Vector2(1.0, 0.0)
 ## fallback paints its crates with it.
 var tint := Color(0.7, 0.7, 0.7)
 
-## The day, for the shadow. Set by the lake; no day, no shadow.
+## The day, for the shadow. Set by the lake; without it the lake's own (`DayCycle.here`), and
+## with neither, no shadow.
 var day: DayCycle
 
 ## The lake's grid, for its clock: the swell the wet shadow and the collars ride. Set by the
 ## lake; without it the water under the pier is flat.
 var grid: LakeGrid
+## The flights, whose last stretch into this box the box draws (Haul.LAND_FROM).
+var haul: Haul
 
 ## The sheet, read once for all four yards rather than once each.
 static var _sheet: Texture2D
@@ -282,6 +282,10 @@ func swell() -> float:
 
 
 func _ready() -> void:
+	# Nearest, like every other picture on the lake (2026-10-02): the project's default is
+	# linear, and nothing set it here, so the piers drew smoothed. The under layer, the box's
+	# shadow and the shine inherit it.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_dress()
 	_shine = Shine.new()
 	_shine.name = &"Shine"
@@ -408,7 +412,7 @@ func _process(delta: float) -> void:
 	for i in _collars.size():
 		_collars[i].position = _collar_feet[i] + Vector2(0.0, rise)
 	_under.queue_redraw()
-	if day != null:
+	if Shade.sun_of(day) != null:
 		queue_redraw()
 
 
@@ -437,14 +441,17 @@ func _draw() -> void:
 	if book.is_empty():
 		_draw_blocked()
 		return
-	if day != null and _box_cast != null and _box_image != null:
+	var sun := Shade.sun_of(day)
+	if sun != null and _box_cast != null and _box_image != null:
 		# The box stands on the deck: its shadow is swept from its base there, the way the
-		# island's crate is swept from its own (Yard._draw), so the two crates cast alike.
+		# island's crate is swept from its own (Yard._draw), so the two crates cast alike, in
+		# the land's ink (it falls on the deck and the sand).
 		_box_cast.lay(
-			_box_image, _box_rect(book), day.lean, day.stretch,
-			1.0 - Yard.ART_GROUND / float(maxi(_box_image.get_height(), 1)), day.ink
+			_box_image, _box_rect(book), sun.lean, sun.stretch,
+			1.0 - Yard.ART_GROUND / float(maxi(_box_image.get_height(), 1)),
+			Shade.ink_on(sun.ink, Shade.On.LAND)
 		)
-	draw_texture_rect_region(_sheet, _frame(book), _rect(book["region"]))
+	draw_texture_rect_region(_sheet, _frame(book), _rect(book["region"]), Shade.wet_tint())
 	_draw_heap(book)
 	_draw_sign(book)
 
@@ -469,10 +476,17 @@ func _box_rect(book: Dictionary) -> Rect2:
 ## Scattered inside the mouth's diamond and stacked upward as it fills, drawn back to front,
 ## then the box's near walls over the top of it, which is what puts the heap inside.
 func _draw_heap(book: Dictionary) -> void:
-	if grid == null or _held.is_empty() or not book.has("box"):
+	if grid == null or not book.has("box"):
+		return
+	# A delivery on its last stretch, drawn here so the near walls cover it (Haul.LAND_FROM).
+	if _held.is_empty():
+		if haul != null and haul.draw_landing_on(self, self, HEAP_SIZE):
+			var cut := _front_cut(book)
+			if cut != null:
+				draw_texture_rect(cut, _box_rect(book), false, Shade.wet_tint())
 		return
 	var ground := _world(book["box_ground"], book)
-	var mouth := Vector2(32.0, 16.0) * ART_SCALE
+	var mouth := Yard.CRATE
 	# Fixed seed: the pile's scatter should not reshuffle itself every time a piece lands.
 	_heap_rng.seed = 90210 + kind
 	var count := mini(_held.size(), HEAP_DRAWN)
@@ -490,9 +504,11 @@ func _draw_heap(book: Dictionary) -> void:
 		draw_set_transform(spots[i], _heap_rng.randf_range(-0.2, 0.2), Vector2(HEAP_SIZE, HEAP_SIZE))
 		grid.defs[_held[i]].stamp_iso(self)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if haul != null:
+		haul.draw_landing_on(self, self, HEAP_SIZE)
 	var front := _front_cut(book)
 	if front != null:
-		draw_texture_rect(front, _box_rect(book), false)
+		draw_texture_rect(front, _box_rect(book), false, Shade.wet_tint())
 
 
 ## The near walls of this yard's own box, cut off the sheet the first time they are asked
@@ -512,15 +528,17 @@ func _draw_sign(book: Dictionary) -> void:
 	if not book.has("sign"):
 		return
 	var frame := _frame(book)
-	if day != null and book.has("sign_cut") and book.has("sign_foot"):
-		# A billboard on a post lies down from its foot, sheared, like the angler does —
-		# the sweep is for solids that end in a V. Drawn by this node rather than `Under`,
-		# so it falls across the deck top and the box the way a shadow on the deck does.
+	var sun := Shade.sun_of(day)
+	if sun != null and book.has("sign_cut") and book.has("sign_foot"):
+		# A billboard on a post lies down from its foot through `Shade.cast`, which turns
+		# the picture onto the shadow's heading so the post keeps its width — the sweep is
+		# for solids that end in a V. Drawn by this node rather than `Under`, so it falls
+		# across the deck top and the box the way a shadow on the deck does: land's ink.
 		var at := _world(book["sign_foot"], book)
-		draw_set_transform_matrix(Shade.cast(at, day.lean, day.stretch))
+		draw_set_transform_matrix(Shade.cast(at, sun.lean, sun.stretch))
 		draw_texture_rect_region(
 			_sheet, Rect2(frame.position - at, frame.size), _rect(book["sign_cut"]),
-			Shade.tint(day.ink)
+			Shade.tint_on(sun, Shade.On.LAND)
 		)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# The name, rasterised at the size it lands on the screen at: the drawing is done in
@@ -661,31 +679,31 @@ class Under extends Node2D:
 		if book.is_empty():
 			return
 		var frame := yard._frame(book)
-		draw_texture_rect_region(Dropoff._sheet, frame, Dropoff._rect(book["under"]))
+		draw_texture_rect_region(Dropoff._sheet, frame, Dropoff._rect(book["under"]), Shade.wet_tint())
 		# The sand before the shadow, the posts before the sand: the sand is heaped against
 		# a pole, so it covers the pole's own bottom row, and it is ground, so the pier's
 		# shadow falls on it. Drawn after the shadow it stood out in full daylight colour
 		# inside the shade the platform throws — a handful of bright grains on dark sand.
 		for mound in yard._mounds:
 			mound.over(self)
-		if yard.day == null:
+		var sun := Shade.sun_of(yard.day)
+		if sun == null:
 			return
-		var day := yard.day
 		var up := float(book["deck_up"]) * Dropoff.ART_SCALE
-		# A point `up` above the ground lands this far from the ground point (Shade.lying's
-		# transform on a point at that height); the deck top's silhouette is drawn `up`
-		# above its footprint, so the footprint is that much lower first.
-		var slide := Vector2(day.lean * up, day.stretch * 0.5 * up + up)
+		# A point `up` above the ground lands `Shade.drop` from the ground point; the deck
+		# top's silhouette is drawn `up` above its footprint, so the footprint is that much
+		# lower first.
+		var slide := Shade.drop(sun, up) + Vector2(0.0, up)
 		# Over the posts as well as the ground, and rightly: a post stands under the deck
-		# and is in the deck's own shade.
+		# and is in the deck's own shade. The land's ink on the sand.
 		draw_texture_rect_region(
 			Dropoff._sheet, Rect2(frame.position + slide, frame.size),
-			Dropoff._rect(book["shade_dry"]), Shade.tint(day.ink)
+			Dropoff._rect(book["shade_dry"]), Shade.tint_on(sun, Shade.On.LAND)
 		)
-		# On the water, and moving with it.
+		# On the water, and moving with it, in the water's ink: the one every shadow on the
+		# lake takes, the hull's beside it included.
 		draw_texture_rect_region(
 			Dropoff._sheet,
 			Rect2(frame.position + slide + Vector2(0.0, yard.swell()), frame.size),
-			Dropoff._rect(book["shade_wet"]),
-			Shade.tint(minf(day.ink * Dropoff.SHADE_GAIN, Dropoff.SHADE_MOST))
+			Dropoff._rect(book["shade_wet"]), Shade.tint_on(sun, Shade.On.WATER)
 		)

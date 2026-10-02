@@ -5,6 +5,11 @@
 ## would never be a folder of sound files; that was the placeholders talking. The last built
 ## sound, the siege's chime, went with the siege (2026-09-29, issue #38).
 ##
+## **Built again for the hive** (2026-09-30, the beehive sidequest): its seven names arrived
+## before their recordings, so `HiveSounds` makes them in code and `_build_hive` puts them in
+## `_streams` for any name the file pass found nothing for. A recording dropped into
+## `assets/sfx/` under the same name wins on the next boot with nothing here edited.
+##
 ## The knock of a piece coming up in the mesh is **cut, by decision** (2026-09-16): every
 ## place that played it already drew a splash, dropped a piece in the crate or knocked the
 ## box, so the knock under those was the same event sounded twice. Don't put it back.
@@ -30,6 +35,11 @@ const RATE := 22050
 const VOICES := 12
 const UI_VOICES := 3
 
+## The colony's hum at the hive itself, when the lake says the angler is right beside a
+## swarm or a hive ready to harvest (`set_hive_hum`). A built loop, peak-normalised rather than
+## levelled, so this is by ear and not the builder's: about as far under the mix as the bee.
+const HIVE_HUM_DB := -26.0
+
 ## Every recording: its loudness against the others in decibels, and how far its pitch is
 ## rolled either side of true on each play. A balance, not a volume — the player's setting
 ## rides on top.
@@ -50,10 +60,10 @@ const UI_VOICES := 3
 ## The angler's own noises are close and the lake's far: the ferry's bell is across the
 ## island, the splash is at arm's length.
 const SOUNDS := {
-	&"ferry_bell": [-17.9, 0.02],
-	&"boat_move": [-12.3, 0.05],
-	&"net_throw": [-8.0, 0.06],
-	&"net_splash": [-14.8, 0.04],
+	&"ferry_bell": [-20.9, 0.02],
+	&"boat_move": [-15.3, 0.05],
+	&"net_throw": [-11.0, 0.06],
+	&"net_splash": [-17.8, 0.04],
 	&"piece_splash": [-13.9, 0.0],
 	&"drip": [-14.0, 0.05],
 	&"haul": [-13.0, 0.0],
@@ -67,17 +77,18 @@ const SOUNDS := {
 	&"sniff": [-9.8, 0.05],
 	&"step_grass": [-14.9, 0.08],
 	&"step_sand": [-15.9, 0.08],
-	&"wading": [-13.9, 0.04],
+	&"wading": [-19.9, 0.04],
+	&"catch_pop": [0.0, 0.0],
 	&"ui_hover": [-15.6, 0.03],
 	&"ui_click": [-6.0, 0.02],
 	&"ui_close": [-15.4, 0.0],
 	&"shed_open": [-10.5, 0.0],
-	&"game_start": [-9.1, 0.0],
+	&"game_start": [-21.1, 0.0],
 	&"drop_big": [-5.1, 0.05],
 	## A piece landing in the island crate: three takes of Richard's own recording, one of
 	## which is played per drop. A small roll on top of three real drops, where one take
 	## pitched about needed a whole ladder of steps to stop being a metronome.
-	&"pop": [-17.0, 0.03],
+	&"pop": [-21.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
 	## The second batch (2026-09-28, `/grill-me` with Richard). Every file is levelled to
 	## the same loudness, so these are the mix: the doors a little under the click, the
@@ -91,10 +102,45 @@ const SOUNDS := {
 	&"geese": [-17.0, 0.03],
 	&"forest": [-18.0, 0.0],
 	&"bee": [-17.0, 0.04],
+	## The hive (2026-09-30): built in code by `HiveSounds` until a recording takes the name.
+	## **Not levelled like everything above**: a built take is peak-normalised to 0.8, which
+	## for a held buzz is some ten decibels louder than the builder's -22 LUFS, so these read
+	## lower than the recordings they sit beside for the same place in the mix. First guesses
+	## for Richard's ear, and every one wants moving when its recording drops in. The swarm is
+	## across the lawn and heard as it lands; the puff, the crackle and the lid are the player's
+	## own hands in the room; the crown and the flourish are the payoffs. The hum's figure is
+	## the bed's (`HIVE_HUM_DB`), written here so the name is loaded and checked with the rest.
+	&"hive_swarm": [-20.0, 0.03],
+	&"hive_hum": [HIVE_HUM_DB, 0.0],
+	&"hive_puff": [-15.0, 0.08],
+	&"hive_crackle": [-17.0, 0.12],
+	&"hive_pop": [-10.0, 0.06],
+	&"hive_crown": [-11.0, 0.0],
+	&"hive_done": [-12.0, 0.0],
 }
+
+## The hive's builders. Preloaded rather than named, so this autoload parses before the class
+## cache has heard of `HiveSounds`: a sound board that fails to parse takes every sound with it.
+const HIVE_SOUNDS := preload("res://scripts/hive_sounds.gd")
+## The hive's one-shots that can come thick and fast, and the least gap between two of each:
+## the uncap step cracks a row of wax for every row the knife passes, and a fast hand passes
+## a lot of them (contract section 6: twenty a second at most).
+const HIVE_GAPS := {&"hive_crackle": 1.0 / 20.0}
 
 ## The new sounds' pitch ladders, never the step played last (the net splash's rule).
 const PUDDLE_PITCHES: Array[float] = [0.84, 0.92, 1.0, 1.08, 1.16]
+## The first step into the lake: the puddle's recording on a ladder of its own, wider than a
+## footstep's, because it is heard once a wade and one pitch read as one take (2026-09-30).
+## Going into the water, angler or dog: the entry splash and the wash that opens a wade are
+## played this far under their own level (2026-10-01, Richard: "volume down a lot for all").
+const ENTRY_DB := -20.0
+## The water a hull pushes, stepped like the net's splash so no two departures or berthings
+## sound alike (2026-10-01, Richard). Never the step played last.
+const BOAT_MOVE_PITCHES: Array[float] = [0.8, 0.88, 0.95, 1.02, 1.1, 1.18]
+const ENTRY_PITCHES: Array[float] = [0.72, 0.82, 0.92, 1.02, 1.13, 1.24]
+## The wading wash, stepped too: narrower than the entry, since it repeats every `WADE_EVERY`
+## while the boots move and a wide swing would read as different water.
+const WADE_PITCHES: Array[float] = [0.88, 0.94, 1.0, 1.06, 1.12]
 const FROG_PITCHES: Array[float] = [0.8, 0.9, 1.0, 1.1, 1.22]
 ## Gaps, rolled each time in seconds, so a species is heard now and then rather than on a
 ## beat: one gap a species, shared by every animal of it (the dogs' rule).
@@ -122,6 +168,12 @@ const CHANNELS := {
 	&"bark": 1,
 	&"wading": 1,
 	&"sniff": 1,
+	# The hive's long payoffs, so a room full of crackles cannot take their voices: the swarm
+	# landing, the crown, and the flourish at the end of a harvest.
+	&"hive_swarm": 1,
+	&"hive_crown": 1,
+	&"hive_done": 1,
+	&"catch_pop": 6,
 }
 ## Of those, the ones that are never cut: with every player busy, the new one is skipped
 ## rather than one playing being stopped. The haul always finishes; the chime rings out.
@@ -132,6 +184,8 @@ const CHANNELS := {
 const AMBIENT := [
 	&"frog", &"duck", &"geese", &"forest", &"bee", &"pigeon_fly", &"pigeon_coo",
 	&"bark", &"sniff", &"wading", &"fireplace", &"lake_ambient", &"rain", &"thunder",
+	# The colony is the world going on; the player's hands in the hive room stay on SFX.
+	&"hive_swarm", &"hive_hum",
 ]
 
 ## The bus a named sound plays on.
@@ -333,10 +387,21 @@ var _ambience_at: float = SILENT
 var _fire_player: AudioStreamPlayer
 var _fire_on: bool = false
 var _fire_at: float = SILENT
+## The colony's hum: the level the lake last asked for and the level it has eased to.
+var _hive_player: AudioStreamPlayer
+var _hive_want: float = SILENT
+var _hive_at: float = SILENT
 var _wade_on: bool = false
 ## Who is in the shallows: the angler and any dog, as a set. See `set_wading`.
 var _wading: Dictionary = {}
 var _wade_wait: float = 0.0
+## Whether the next wash opens a wade: set only by the angler's entry (`play_lake_entry`),
+## so stopping and walking on in the water, or a dog going in, is not a new wade. That wash
+## is the loudest thing on the way in, landing a frame or two after the entry splash, so it
+## takes the entry's wide ladder; the repeats keep the narrow one (2026-09-30).
+var _wade_fresh: bool = false
+## The wash's first play since the wade began, angler or dog: played at ENTRY_DB.
+var _wade_opening: bool = true
 
 var _rng := RandomNumberGenerator.new()
 
@@ -368,6 +433,12 @@ var _from_room := false
 func _ready() -> void:
 	_rng.randomize()
 	_load_recordings()
+	# After the file pass and before any bed takes its first stream: a recording found above
+	# is kept, and the hum bed below gets whichever it is.
+	_build_hive()
+	# Ben Paramore's bubble (assets/sfx/catch_pop.wav); the built pops only without it.
+	if (_streams.get(&"catch_pop", []) as Array).is_empty():
+		_streams[&"catch_pop"] = _make_pops()
 	for i in VOICES:
 		_voices.append(_player())
 	for i in UI_VOICES:
@@ -382,6 +453,7 @@ func _ready() -> void:
 	_start_player = _player()
 	_ambience_player = _player(_first(&"lake_ambient"), bus_of(&"lake_ambient"))
 	_fire_player = _player(_first(&"fireplace"), bus_of(&"fireplace"))
+	_hive_player = _player(_first(&"hive_hum"), bus_of(&"hive_hum"))
 
 
 ## Every voice goes to the SFX bus, which is where the player's slider now is. The lake's
@@ -425,6 +497,25 @@ func _load_recordings() -> void:
 		_streams[name] = found
 
 
+## The hive's names with no file behind them, built (`HiveSounds`): one take each, three of
+## the puff and the crackle so `next_step` has something to step between. Here, at boot and
+## not on first play, because test_lake asks that every name in SOUNDS is loaded.
+##
+## A recorded hum has no loop point written into it, and the bed pass above cannot give it
+## one — it assumes a stereo file — so a found `hive_hum` is looped here on a copy, counted
+## in its own frames.
+func _build_hive() -> void:
+	for name: StringName in HIVE_SOUNDS.BOOT:
+		var found: Array = _streams.get(name, [])
+		if found.is_empty():
+			_streams[name] = HIVE_SOUNDS.takes(name)
+		elif name == &"hive_hum":
+			var looped: Array[AudioStream] = []
+			for stream: AudioStream in found:
+				looped.append(HIVE_SOUNDS.looped(stream))
+			_streams[name] = looped
+
+
 ## How many recordings a name loaded, so a caller picking one by hand does not have to know.
 func _count(name: StringName) -> int:
 	return int((_streams.get(name, []) as Array).size())
@@ -456,6 +547,11 @@ func _process(delta: float) -> void:
 		ambience_want = AMBIENCE_DB + (AMBIENCE_DUCK if _ambience_duck else 0.0)
 	_ambience_at = _bed(_ambience_player, _ambience_at, ambience_want, delta)
 	_fire_at = _bed(_fire_player, _fire_at, FIRE_DB if _fire_on else SILENT, delta)
+	# The colony. `_bed` asks nothing of where the player is, so the gate is here: behind the
+	# upgrades board and inside the shed the hive is out of earshot like the rest of the lake.
+	# The hive room is outdoors and is not `indoors`, so the hum goes on under it.
+	var hive_want := _hive_want if (not shopping and not indoors) else SILENT
+	_hive_at = _bed(_hive_player, _hive_at, hive_want, delta)
 	# The held sounds go quiet with the rest of the lake while the board is up. The ambience
 	# above does not: it is the bed the lake plays under everything, board or no board.
 	# The wading wash: while the boots are moving water, play it, let it finish, wait
@@ -467,7 +563,7 @@ func _process(delta: float) -> void:
 			_wade_wait -= delta
 			if _wade_wait <= 0.0:
 				_wade_wait = WADE_EVERY
-				play(&"wading")
+				play(&"wading", 0.0, wade_pitch())
 	else:
 		_wade_wait = 0.0
 
@@ -500,6 +596,7 @@ func hush() -> void:
 	_ambience_on = false
 	_ambience_duck = false
 	_fire_on = false
+	_hive_want = SILENT
 	_wade_on = false
 	_wade_wait = 0.0
 
@@ -657,8 +754,12 @@ static func swell_size(weights: Array[float]) -> float:
 func play_lifted(weights: Array[float]) -> void:
 	if weights.is_empty() or not may_play(&"piece_splash"):
 		return
+	var fresh := _gap(&"swell", SWELL_GAP)
+	if fresh:
+		_pop_rung = 0
+	_pop_ladder(weights.size(), POP_FIRST)
 	var size := swell_size(weights)
-	if _gap(&"swell", SWELL_GAP):
+	if fresh:
 		_swell_wait = _rng.randf_range(SWELL_AFTER.x, SWELL_AFTER.y)
 		_swell_size = size
 	else:
@@ -681,8 +782,94 @@ func play_lifted(weights: Array[float]) -> void:
 		})
 
 
+## The catch's pops (2026-10-01, Richard: "a soft pop when objects are caught, satisfying
+## as it gets more items"; second pass: louder and lower): one soft built bubble pop a
+## piece, after the net's splash, each a step up `POP_PITCH` from the last and a
+## touch louder, the gaps tightening, so a full net is a rising run. Capped at `POPS_MOST`.
+## Grabs on the way home carry on the same cast's ladder. Built in code until Nuven records
+## one; since 2026-10-01 it is the recording `catch_pop.wav`, the built takes a fallback.
+const POP_DB := -10.0
+const POPS_MOST := 80
+## A run longer than `POP_EVEN` pieces has its gaps shrunk to fit about as long as that
+## many would take, so a full net is a quick rattle rather than a five-second count.
+const POP_EVEN := 14
+const POP_FIRST := 0.14
+## Third pass: the pitch climbs `POP_PITCH` from the first pop to the `POPS_MOST`th, and the
+## run is not a beat: `POP_CLUMP` of pops land within `POP_TOGETHER` of the one before
+## (overlapping it), the rest after an uneven `POP_GAP`.
+const POP_GAP := Vector2(0.05, 0.16)
+const POP_CLUMP := 0.5
+const POP_TOGETHER := 0.02
+const POP_PITCH := Vector2(0.4, 0.7)
+const POP_LOUDER := 0.35
+const POP_TOP_STEPS := 14
+var _pop_rung := 0
+var _pops: Array = []
+## Pops sounded so far, ever: the haul count over the angler steps up one figure a pop
+## (`HaulCount`, 2026-10-01: "match the number going up on player head").
+var pops_heard := 0
+
+
+func pops_waiting() -> int:
+	return _pops.size()
+
+
+func _pop_ladder(count: int, after: float) -> void:
+	var wait := after
+	for i in mini(count, POPS_MOST):
+		if _pops.size() >= POPS_MOST:
+			return
+		var rung := mini(_pop_rung, POP_TOP_STEPS)
+		_pops.append({
+			"wait": wait,
+			"pitch": lerpf(POP_PITCH.x, POP_PITCH.y, float(rung) / float(POP_TOP_STEPS))
+				* _rng.randf_range(0.97, 1.03),
+			"db": POP_DB + POP_LOUDER * float(rung) + _rng.randf_range(-1.0, 0.5),
+		})
+		_pop_rung += 1
+		var squeeze := minf(1.0, float(POP_EVEN) / float(maxi(count, 1)))
+		if _rng.randf() < POP_CLUMP:
+			wait += _rng.randf_range(0.0, POP_TOGETHER)
+		else:
+			wait += _rng.randf_range(POP_GAP.x, POP_GAP.y) * squeeze
+
+
+func _tick_pops(delta: float) -> void:
+	for i in range(_pops.size() - 1, -1, -1):
+		var pop: Dictionary = _pops[i]
+		pop["wait"] = float(pop["wait"]) - delta
+		if float(pop["wait"]) <= 0.0:
+			_pops.remove_at(i)
+			pops_heard += 1
+			play(&"catch_pop", float(pop["db"]), float(pop["pitch"]))
+
+
+## Three soft bubble pops: a sine gliding up as the bubble closes, a quick attack and a short
+## decay, a little second harmonic for body. Peak 0.5, so `POP_DB` is the mix.
+func _make_pops() -> Array[AudioStream]:
+	var takes: Array[AudioStream] = []
+	for k in 3:
+		var length := 0.07 + 0.012 * float(k)
+		var n := int(RATE * length)
+		var samples := PackedFloat32Array()
+		samples.resize(n)
+		var phase := 0.0
+		var from := 430.0 + 40.0 * float(k)
+		for i in n:
+			var t := float(i) / RATE
+			var u := t / length
+			var freq := from * (1.0 + 0.9 * (1.0 - exp(-u * 6.0)))
+			phase += TAU * freq / RATE
+			var env := minf(t / 0.003, 1.0) * exp(-t / (0.018 + 0.004 * float(k)))
+			samples[i] = 0.5 * env * (sin(phase) + 0.18 * sin(phase * 2.0))
+		takes.append(_to_wav(samples, false))
+	return takes
+
+
 ## A grab on the way home. See GRAB_GAP.
 func play_grab(weights: Array[float]) -> void:
+	if not weights.is_empty() and may_play(&"piece_splash"):
+		_pop_ladder(weights.size(), 0.0)
 	if weights.is_empty() or not _gap(&"grab", GRAB_GAP):
 		return
 	var size := swell_size(weights)
@@ -696,12 +883,14 @@ func _drip(db: float, pitch: float) -> void:
 ## The swell and the drips, each on its own clock. Dropped whole the moment the lake may not
 ## be heard: a board opening over a catch is not owed the rest of it when it shuts.
 func _tick_catch(delta: float) -> void:
-	if _swell_wait < 0.0 and _drips.is_empty():
+	if _swell_wait < 0.0 and _drips.is_empty() and _pops.is_empty():
 		return
 	if not may_play(&"piece_splash"):
 		_swell_wait = -1.0
 		_drips.clear()
+		_pops.clear()
 		return
+	_tick_pops(delta)
 	if _swell_wait >= 0.0:
 		_swell_wait -= delta
 		if _swell_wait < 0.0:
@@ -769,7 +958,7 @@ func play_pop() -> void:
 func play_bell() -> void:
 	# The water the hull pushes as it leaves, one hull at a time; the bell over it, now and then.
 	if not is_playing(&"boat_move") and _gap(&"boat_move", BOAT_MOVE_GAP):
-		play(&"boat_move")
+		play(&"boat_move", 0.0, _next_pitch(&"boat_move", BOAT_MOVE_PITCHES))
 	if not is_playing(&"ferry_bell") and _gap(&"ferry_bell", BELL_GAP):
 		play(&"ferry_bell")
 
@@ -781,7 +970,7 @@ func play_bell() -> void:
 ## player stands, and the coins are what say a delivery landed.
 func play_berth() -> void:
 	if not is_playing(&"boat_move") and _gap(&"boat_move", BOAT_MOVE_GAP):
-		play(&"boat_move")
+		play(&"boat_move", 0.0, _next_pitch(&"boat_move", BOAT_MOVE_PITCHES))
 	if not is_playing(&"ferry_bell") and _gap(&"ferry_bell", BERTH_BELL_GAP):
 		play(&"ferry_bell")
 
@@ -867,9 +1056,25 @@ func set_wading(wading: bool, who: Object = null) -> void:
 	_wade_on = not _wading.is_empty()
 
 
-## A footfall in a puddle, or the first step into the lake.
+## The pitch of the next wash: the entry's wide ladder when it opens a wade, the narrow one
+## after. Public so the harness can ask it without a player in the tree.
+func wade_pitch() -> float:
+	if _wade_fresh:
+		_wade_fresh = false
+		return _next_pitch(&"wade_entry", ENTRY_PITCHES)
+	return _next_pitch(&"wading", WADE_PITCHES)
+
+
+## A footfall in a puddle on the lawn.
 func play_puddle_step() -> void:
 	play(&"step_puddle", 0.0, _next_pitch(&"step_puddle", PUDDLE_PITCHES))
+
+
+## The first step into the lake: the puddle's splash on `ENTRY_PITCHES`, with a memory of its
+## own so a puddle on the lawn does not decide the next entry's pitch.
+func play_lake_entry() -> void:
+	play(&"step_puddle", ENTRY_DB, _next_pitch(&"lake_entry", ENTRY_PITCHES))
+	_wade_fresh = true
 
 
 ## The shed's door: the creak going in, the solid shut coming out.
@@ -940,6 +1145,32 @@ func play_drop(small: bool) -> void:
 ## Whether a lit fireplace is in the room the player is looking at.
 func set_fireplace(lit: bool) -> void:
 	_fire_on = lit
+
+
+## How loud the colony is where the angler stands, 0 to 1 of `HIVE_HUM_DB`: pushed every
+## frame by the lake off the distance to the hive (1 beside a swarm or a hive ready to harvest,
+## less for a colony at work, nothing for an empty hive or one out of earshot). A share, not
+## decibels, so the lake's falloff is a straight line and this is the one place that turns it
+## into a level. Nought, or anything the ear cannot hear, is silence, and the bed stops.
+func set_hive_hum(share: float) -> void:
+	var loud := clampf(share, 0.0, 1.0)
+	if loud <= 0.0:
+		_hive_want = SILENT
+	else:
+		_hive_want = maxf(HIVE_HUM_DB + linear_to_db(loud), SILENT)
+
+
+## One of the hive's one-shots, for the room and the lake. A name with takes (the puff, the
+## crackle) never plays the one it played last; a name in `HIVE_GAPS` is held to its gap and
+## gives back null when it is too soon. `pitch_roll` false plays it at true pitch, for a sound
+## a step is pitching itself; `db` is added to its balance.
+func play_hive(name: StringName, pitch_roll: bool = true, db: float = 0.0) -> AudioStreamPlayer:
+	if HIVE_GAPS.has(name) and not _gap(name, float(HIVE_GAPS[name])):
+		return null
+	var voice := play(name, db, 1.0, next_step(name, _count(name)))
+	if voice != null and not pitch_roll:
+		voice.pitch_scale = 1.0
+	return voice
 
 
 ## Whether the lake is up, and whether it is being heard through the shed's wall.

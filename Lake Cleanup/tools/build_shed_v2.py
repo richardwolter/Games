@@ -143,7 +143,7 @@ class Hut:
 		self.roof = poly_mask([self.ridge_l, self.ridge_r, self.eave_r, self.eave_l])
 		rb = self.back_r
 		self.back = poly_mask([self.ridge_r, rb, (rb[0] - 3, rb[1] + 3), self.right_t,
-			(self.ridge_r[0], self.ridge_r[1] + 4)]) & ~self.gable
+			(self.ridge_r[0] - 1, self.ridge_r[1] + 5)]) & ~self.gable
 		self.glow = np.zeros((H, W), bool)
 
 	# --- lines ---
@@ -173,14 +173,21 @@ class Hut:
 		return Image.fromarray(self.cv.c, "RGBA"), self.glow
 
 	# --- walls: lap siding all round, the front in shade, the gable in the sun ---
-	ROW = 5    # a board's height
-	SEG = 16   # a board's length
+	# Contrast and volume (2026-10-02, Richard: beside the 1x recycle box the hut read washed
+	# out, "the lines and details less visible"): boards the box's height and longer, each
+	# seam a dark row with its shadow under it and a lit top edge, less tone noise between
+	# boards, and the two faces further apart in light.
+	ROW = 7    # a board's height
+	SEG = 32   # a board's length
+	TONE = 0.28  # how far one board's tone wanders from its face's
+	FRONT = 2.8  # the front's tone on the wall ramp, in shade
+	GABLE = 4.4  # the gable's, in the sun
 
 	def walls_front(self):
-		self.siding(self.front, self.front_base, int(self.wall_tl[0]), 3.3, 1)
+		self.siding(self.front, self.front_base, int(self.wall_tl[0]), self.FRONT, 1)
 
 	def walls_gable(self):
-		self.siding(self.gable, self.gable_base, int(self.near_b[0]), 4, 2)
+		self.siding(self.gable, self.gable_base, int(self.near_b[0]), self.GABLE, 2)
 		# the frieze at eave height, the front's fascia carried round the corner
 		xn, xr = int(self.near_b[0]), int(self.right_t[0])
 		for x in range(xn, xr + 1):
@@ -194,7 +201,7 @@ class Hut:
 	def board(self, face, row, seg):
 		"""What one board is: its tone, grain, and the damage it carries through the stages."""
 		r = random.Random(face * 100003 + row * 1009 + seg * 31 + self.seed)
-		b = dict(tone=r.uniform(-0.45, 0.45), gx=r.randint(3, self.SEG - 7), gl=r.randint(2, 4))
+		b = dict(tone=r.uniform(-self.TONE, self.TONE), gx=r.randint(3, self.SEG - 7), gl=r.randint(3, 7))
 		roll = r.random()
 		b["missing"] = roll < 0.07 and row >= 1
 		b["crack"] = None
@@ -232,13 +239,15 @@ class Hut:
 				b = boards[key]
 				t = base + b["tone"]
 				if lap < 1:
-					t -= 1.7          # the board's own lower edge, in its shadow
+					t = 0.6           # the seam: the board's lower edge over the next, dark
+				elif lap < 2:
+					t -= 1.0          # the shadow it throws on the board under it
 				elif lap >= ROW - 1:
-					t += 0.8          # its top, catching the light
+					t += 1.3          # its top, catching the light
 				if pu == 0 and lap >= 1:
-					t -= 1.6          # the butt joint
+					t = 0.9           # the butt joint
 				elif pu == 1 and lap >= 1:
-					t += 0.4
+					t += 0.6
 				elif lap == 2 and b["gx"] <= pu < b["gx"] + b["gl"]:
 					t -= 0.7          # grain
 				elif lap == 3 and pu == b["gx"] + b["gl"] + 2:
@@ -277,7 +286,7 @@ class Hut:
 						t -= 1
 				if d < 5:
 					t -= 0.6
-				if grime[y, x] > (0.66, 0.8, 9)[lvl]:
+				if grime[y, x] > (0.72, 0.86, 9)[lvl]:
 					t -= 0.8
 				if c is None:
 					if fresh is not None:
@@ -489,17 +498,19 @@ class Hut:
 	def roof_and_trim(self):
 		lvl, seed = self.lvl, self.seed
 		el, er = self.eave_l, self.eave_r
-		moss_n = noise(seed + 9, 8) * 0.65 + noise(seed + 10, 3) * 0.35
-		cut = (0.47, 0.6, 9.0)[lvl]   # the cosy roof carries no moss
-		row_h, sw = 5, 6
+		# Bigger shingles and moss in fewer, larger patches (2026-10-02): the five-by-six courses
+		# and the fine moss speckle were the busiest thing in the picture and read as noise.
+		moss_n = noise(seed + 9, 12) * 0.8 + noise(seed + 10, 5) * 0.2
+		cut = (0.5, 0.62, 9.0)[lvl]   # the cosy roof carries no moss
+		row_h, sw = 6, 9
 		rng = random.Random(seed + 77)
 		holes = set()
-		for _ in range(10):  # clusters of broken shingles
-			row, col = rng.randint(2, 11), rng.randint(2, 16)
+		for _ in range(8):  # clusters of broken shingles
+			row, col = rng.randint(2, 9), rng.randint(2, 11)
 			holes.add((row, col))
 			for _ in range(rng.randint(1, 4)):
 				holes.add((row + rng.choice((0, 0, 1, -1)), col + rng.choice((-1, 1))))
-		cracked = {(rng.randint(1, 12), rng.randint(1, 18)) for _ in range(30)}
+		cracked = {(rng.randint(1, 10), rng.randint(1, 12)) for _ in range(22)}
 		moss = np.zeros((H, W), bool)
 		info = {}
 		for y in range(H):
@@ -513,7 +524,7 @@ class Hut:
 				col = int((x + off) // sw)
 				pc = (x + off) % sw
 				info[(x, y)] = (row, pr, col, pc)
-				m = moss_n[y, x] + random.Random(row * 97 + col).random() * 0.08
+				m = moss_n[y, x] + random.Random(row * 97 + col).random() * 0.04
 				if m > cut and (row, col) not in holes:
 					moss[y, x] = True
 		for (x, y), (row, pr, col, pc) in info.items():
@@ -535,7 +546,7 @@ class Hut:
 				t = 1
 			elif pc == 1 and pr > row_h - 2.2:
 				t += 1
-			if (x * 5 + y * 3 + row) % 13 == 0 and pr >= 1:
+			if (x * 5 + y * 3 + row) % 19 == 0 and pr >= 1:
 				t -= 1
 			if key in cracked and (lvl == 0 or lvl == 1 and (key[0] + key[1]) % 4 == 0) and pr >= 1 and pc - 1 == int(pr):
 				t = 0
@@ -552,17 +563,42 @@ class Hut:
 				mt = 2 + (not above) + (not above and r.random() < 0.4) - (not below)
 				if pr < 1 and above:
 					mt -= 1
-				if (x + y * 3) % 7 == 0:
+				if (x + y * 3) % 11 == 0:
 					mt += 1
 				c = MOSS[max(0, min(4, mt))]
 				if lvl == 2 and not above and (x * 13 + y * 7) % 19 == 0:
 					c = (WHITE[2], YELLOW[1], PINK[2])[(x + y) % 3]   # flowers in the moss
 			self.put(x, y, c)
-		# back strip past the gable
+		# back strip past the gable: the far slope's verge, seen edge on (2026-10-02, Richard:
+		# the diagonal read cut flat). The shingles' lit lip along the outer edge, their body,
+		# a course joint every few px, and the dark underside where the verge overhangs the
+		# gable; then the gable's own rake board under it, the twin of the barge board.
+		rr, rb = self.ridge_r, self.back_r
 		for y in range(H):
 			for x in range(W):
-				if self.back[y, x]:
-					self.put(x, y, ROOF[1] if (x + y) % 5 else ROOF[0])
+				if not self.back[y, x]:
+					continue
+				k = y - line_y(rr, rb, x)
+				under = self.gable[min(y + 1, H - 1), x] or self.gable[min(y + 2, H - 1), x]
+				if under:
+					c = ROOF[0]
+				elif k < 1.5:
+					c = ROOF[4]
+				elif k < 2.5:
+					c = ROOF[3]
+				else:
+					c = ROOF[2]
+				if (x - int(rr[0])) % 7 == 0 and not under and k >= 1.5:
+					c = ROOF[1]
+				self.put(x, y, c)
+		rt = self.right_t
+		for x in range(int(rr[0]), int(rt[0]) + 1):
+			y0 = line_y(rr, rt, x)
+			for dy, t in ((0, 5), (1, 4), (2, 2)):
+				yy = int(round(y0 + dy))
+				if 0 <= yy < H and self.gable[yy, x]:
+					j = (x - int(rr[0])) % 17 == 8
+					self.put(x, yy, WALL[t - 2 if j and dy < 2 else t])
 		# fascia along the eave: a plank of the front's own wood
 		for x in range(int(el[0]), int(er[0]) + 2):
 			y = line_y(el, er, x)
@@ -574,18 +610,29 @@ class Hut:
 			if lvl < 2 and 0 < y < H and moss[int(y) - 1, x]:
 				for k in range(1 + (x * 7) % (3 if lvl == 0 else 2)):
 					self.put(x, y + 1 + k, MOSS[1 + (k == 0)])
-		# ridge cap: little caps along the ridge
+		# ridge cap: little caps along the ridge, rounded (2026-10-02, Richard: the top read cut
+		# off and flat): a lit crown, a body, its underside, and its shadow on the shingles.
 		rl, rr = self.ridge_l, self.ridge_r
 		for x in range(int(rl[0]), int(rr[0]) + 1):
 			y = line_y(rl, rr, x)
 			seg = (x - int(rl[0])) % 6
-			for dy, t in ((0, 5), (1, 4), (2, 2), (3, 0)):
-				tt = t - (seg == 0) * 2
+			for dy, t in ((0, 5), (1, 5), (2, 4), (3, 2), (4, 0)):
+				tt = t - (seg == 0 and 0 < dy < 4) * 2
 				gone = lvl == 0 and (x - int(rl[0])) // 6 in (2, 5, 6)
 				if gone:
-					self.put(x, y + dy, HOLE[1] if dy < 3 else ROOF[0])
+					self.put(x, y + dy, HOLE[1] if dy < 4 else ROOF[0])
 					continue
-				self.put(x, y + dy, ROOF[max(0, tt)] if dy < 3 else ROOF[0])
+				self.put(x, y + dy, ROOF[max(0, tt)] if dy < 4 else ROOF[0])
+		# verge board down the roof's left end, the barge board's twin on the far gable, with
+		# its shadow on the shingles: without it the shingles ran out to a bare cut edge.
+		n = int(abs(el[1] - rl[1]))
+		for i in range(n + 1):
+			px = rl[0] + (el[0] - rl[0]) * i / n
+			py = rl[1] + (el[1] - rl[1]) * i / n
+			j = i % 17 == 8
+			for dx, t in ((0, 3), (1, 5), (2, 4), (3, 2)):
+				self.put(px + dx, py, WALL[t - 2 if j and dx else t])
+			self.put(px + 4, py, ROOF[0])
 		# barge board down the roof's right end: a plank of the gable's wood
 		n = int(abs(self.eave_r[1] - rr[1]))
 		for i in range(n + 1):

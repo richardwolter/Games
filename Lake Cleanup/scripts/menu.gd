@@ -28,6 +28,9 @@ const LOGO := preload("res://assets/mdll_logo_stacked.png")
 signal play_asked
 ## This lake is thrown away for another: a fresh run (`fresh`).
 signal reload_asked(fresh: bool)
+## Quit pressed. The lake saves the run and closes the game; with no lake listening the
+## menu closes it itself.
+signal quit_asked
 
 ## The stack: one plank per door, in this order. **Credits is in the stack, above Quit**
 ## (2026-09-17, Richard); it used to stand alone in the bottom-right corner, which was where
@@ -116,6 +119,9 @@ func _ready() -> void:
 	_scrim.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_scrim.stretch_mode = TextureRect.STRETCH_SCALE
 	_scrim.texture = _band()
+	# Linear: a 256-px gradient stretched across the window steps visibly under nearest, which
+	# is the root's default (Prefs).
+	_scrim.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(_scrim)
 
 	_logo = TextureRect.new()
@@ -319,7 +325,10 @@ func _take(key: StringName) -> void:
 		&"language":
 			_show_languages(true)
 		&"quit":
-			get_tree().quit()
+			if quit_asked.get_connections().is_empty():
+				get_tree().quit()
+			else:
+				quit_asked.emit()
 
 
 ## "Start over?", answered yes. The lake deletes the file: it knows which one is its own.

@@ -29,6 +29,9 @@ const ART := "res://assets/dogs/dog_%02d.json"
 ## is a gallop and a gallop drawn at a walk's rate reads as a dog in treacle.
 const HELD := {
 	&"idle": 0.16,
+	&"idle_bark": 0.22,
+	&"sit_bark": 0.22,
+	&"laid_bark": 0.22,
 	&"sit": 0.16,
 	&"laid": 0.22,
 	&"run": 0.07,
@@ -40,6 +43,13 @@ const HELD := {
 
 ## The two gaits the sheet carries, by which of the pair a dog runs on. Dogs in the odd slots
 ## of the pack use the second pair, so four dogs on one beach do not run in step.
+## The pack's still rows end on two head-up frames with the mouth open: a bark, drawn into
+## the loop. Played as part of the loop the dog barked silently on every cycle (Richard,
+## 2026-10-01: "just opens mouths when barks"), so they are cut off into `<row>_bark`, shown
+## only while a bark is sounding (`Dog._showing`).
+const BARK_TAIL := 2
+const BARK_ROWS := [&"idle", &"sit", &"laid"]
+
 const GAITS := [[&"run", &"walk"], [&"run2", &"walk2"]]
 
 ## One breed's sheet the right way round and mirrored, and its frames keyed on animation
@@ -99,7 +109,19 @@ static func ready(breed: int = 0) -> bool:
 				"foot": Vector2(foot[0], foot[1]),
 				"mouth": Vector2(mouth[0], mouth[1]),
 			})
-		book.frames[StringName(name)] = frames
+		var key := StringName(name)
+		if key in BARK_ROWS and frames.size() > BARK_TAIL:
+			book.frames[StringName(name + "_bark")] = frames.slice(frames.size() - BARK_TAIL)
+			frames = frames.slice(0, frames.size() - BARK_TAIL)
+		book.frames[key] = frames
+	# The second gait pair barks with every stride (open mouths through `run2` and `walk2`,
+	# second pass the same day: "specially dark brown dog"), so it is the first pair again,
+	# started half a cycle on. Odd slots still run out of step with even ones.
+	for pair: Array in [[&"run2", &"run"], [&"walk2", &"walk"]]:
+		if book.frames.has(pair[1]):
+			var first: Array = book.frames[pair[1]]
+			var half := first.size() / 2
+			book.frames[pair[0]] = first.slice(half) + first.slice(0, half)
 	if book.frames.is_empty():
 		return false
 	_books[breed] = book

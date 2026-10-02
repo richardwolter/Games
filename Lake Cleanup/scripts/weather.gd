@@ -210,6 +210,19 @@ func pour(lasting: float = -1.0) -> void:
 	_flash_in = _rng.randf_range(FLASH_GAP.x * 0.5, FLASH_GAP.y)
 
 
+## A storm the tornado brings (2026-09-30): the same rain and grey light as a shower, but not
+## one of the run's `MOST` showers and not counted. Poured for `lasting` seconds, or until
+## `clear_storm` lets it go.
+func storm(lasting: float) -> void:
+	_left = maxf(_left, lasting)
+	_flash_in = minf(_flash_in, _rng.randf_range(1.0, 4.0))
+
+
+## The tornado's storm is over: the rain eases off over `CLEAR` as a shower's end does.
+func clear_storm() -> void:
+	_left = 0.0
+
+
 ## A flash now, for the harness and the probe.
 func strike() -> void:
 	_flash_beats = [0.0, 0.16]

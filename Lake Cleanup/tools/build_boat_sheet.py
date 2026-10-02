@@ -43,6 +43,10 @@ OUT_JSON = ROOT / "assets" / "boat_sail_frames.json"
 ## the finished frame, so the main sheet is untouched and nothing can come out with a hole in
 ## it — the boat draws the hull, then the load, then this over both.
 OUT_SAIL_PNG = ROOT / "assets" / "boat_sail_over.png"
+## The hull in front of the hold, frame for frame (2026-10-02): every pixel of the hull from
+## the near rail down, the sail excepted, drawn over the load the way the recycle box's near
+## walls are drawn over its heap. A copy like the sail's, not a cut.
+OUT_FRONT_PNG = ROOT / "assets" / "boat_hold_front.png"
 
 FRAME = 128
 FRAMES = 16
@@ -552,6 +556,62 @@ def sail_layer(frame):
     return out
 
 
+## The near rail is found off the blue stripe, which runs along the hull's near side in every
+## heading: a column's rail is RAIL_ABOVE rows over the top of the stripe in it, which is the
+## bulwark's height in this drawing (measured on frames 0, 2 and 4). Columns the stripe skips
+## are filled in from their neighbours. The well, where the load may stand, is the stripe's
+## span less WELL_TRIM at each end, where the hull narrows to the stem and the transom.
+STRIPE = "bB"
+RAIL_ABOVE = 3
+WELL_TRIM = 3
+
+
+def well_of(frame):
+    """(x0, x1, rails) for one finished frame, rails[k] the rail's row at column x0 + k, or
+    None when the frame shows no stripe."""
+    px = frame.load()
+    stripe = {INK[c] for c in STRIPE}
+    tops = {}
+    for x in range(FRAME):
+        for y in range(FRAME):
+            if px[x, y] in stripe:
+                tops[x] = y
+                break
+    if not tops:
+        return None
+    lo, hi = min(tops), max(tops)
+    rails = []
+    for x in range(lo, hi + 1):
+        if x in tops:
+            rails.append(tops[x] - RAIL_ABOVE)
+            continue
+        left = max(k for k in tops if k < x)
+        right = min(k for k in tops if k > x)
+        t = (x - left) / float(right - left)
+        rails.append(int(round(tops[left] + (tops[right] - tops[left]) * t)) - RAIL_ABOVE)
+    x0, x1 = lo + WELL_TRIM, hi - WELL_TRIM
+    return (x0, x1, rails[WELL_TRIM:len(rails) - WELL_TRIM])
+
+
+def front_layer(frame, sail):
+    """The hull from the near rail down, across the stripe's whole span, sail excepted."""
+    out = Image.new("RGBA", (FRAME, FRAME), (0, 0, 0, 0))
+    well = well_of(frame)
+    if well is None:
+        return out
+    px, sp, op = frame.load(), sail.load(), out.load()
+    x0, x1, rails = well
+    # The whole span, not just the well: a piece near the well's end must not show past the
+    # hull narrowing round it.
+    lo, hi = x0 - WELL_TRIM, x1 + WELL_TRIM
+    for x in range(lo, hi + 1):
+        k = min(max(x - x0, 0), len(rails) - 1)
+        for y in range(rails[k], FRAME):
+            if px[x, y][3] and not sp[x, y][3]:
+                op[x, y] = px[x, y]
+    return out
+
+
 def write(frames):
     sheet = Image.new("RGBA", (FRAME * FRAMES, FRAME), (0, 0, 0, 0))
     for n, frame in enumerate(frames):
@@ -561,6 +621,14 @@ def write(frames):
     for n, frame in enumerate(frames):
         over.paste(sail_layer(frame), (n * FRAME, 0))
     over.save(OUT_SAIL_PNG)
+    front = Image.new("RGBA", (FRAME * FRAMES, FRAME), (0, 0, 0, 0))
+    for n, frame in enumerate(frames):
+        front.paste(front_layer(frame, sail_layer(frame)), (n * FRAME, 0))
+    front.save(OUT_FRONT_PNG)
+    wells = []
+    for frame in frames:
+        w = well_of(frame)
+        wells.append([w[0], w[1], w[2]] if w else None)
     OUT_JSON.write_text(json.dumps({
         "source": "art_source/Blue_Boat/blue_boat_16dir.png",
         "frames": FRAMES,
@@ -572,6 +640,11 @@ def write(frames):
                  "box's brown, recycle mark on the square sail, by tools/build_boat_sheet.py",
         "sail_over": "assets/boat_sail_over.png — the sail alone, frame for frame, drawn "
                      "over the boat's load",
+        "hold_front": "assets/boat_hold_front.png — the hull from the near rail down, frame "
+                      "for frame, drawn over the load and under the sail",
+        "well": wells,
+        "well_note": "per frame: [x0, x1, rails], the columns the load may stand across and "
+                     "the near rail's row at each, in frame pixels",
     }, indent="\t") + "\n")
 
 
@@ -663,8 +736,9 @@ def main(argv):
     write(frames)
     if "--contact" in argv:
         contact(frames, argv[argv.index("--contact") + 1])
-    print("wrote %s and %s (%d frames)"
-          % (OUT_PNG.relative_to(ROOT), OUT_SAIL_PNG.relative_to(ROOT), len(frames)))
+    print("wrote %s, %s and %s (%d frames)"
+          % (OUT_PNG.relative_to(ROOT), OUT_SAIL_PNG.relative_to(ROOT),
+             OUT_FRONT_PNG.relative_to(ROOT), len(frames)))
 
 
 if __name__ == "__main__":

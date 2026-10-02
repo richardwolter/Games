@@ -13,8 +13,9 @@ extends Node2D
 ## were fish-shaped shadows and nothing else. Now each is a lit body in one of six species
 ## (tools/build_fish.py, assets/fish.png: sixteen headings, three tail beats), mixed towards
 ## the water's colour by depth (shaders/fish.gdshader), with its flat shadow on the bed
-## further down the screen the deeper the water. One species a school; the tier says which
-## species it may be. Sizes are the sheet's own, at `ART` world px an art pixel.
+## thrown along the sun, further the deeper the water (one sun, 2026-10-02: see
+## `shadow_drop`). One species a school; the tier says which species it may be. Sizes are
+## the sheet's own, at `ART` world px an art pixel.
 
 ## Clean share at which each tier appears, and what a school of it is.
 ##
@@ -43,13 +44,21 @@ const BEAT_FLEE := 2.5
 const MIX_SHALLOW := 0.12
 const MIX_BAND_END := 0.36
 const MIX_DEEP := 0.5
+## More water over the fish than over the rest of the life seen through it (2026-10-01,
+## Richard: they should read as under the water, not on it).
+const DEEPER := 0.15
 const BAND_END := 0.85
 const LEVELS := 5
-## The shadow on the bed: how dark, and how far it falls, in world px, from the fish, at the
-## shallows and at the deepest water.
-const SHADOW_INK := 0.3
-const SHADOW_NEAR := Vector2(6.0, 16.0)
-const SHADOW_FAR := Vector2(18.0, 40.0)
+## The shadow on the bed (one sun, 2026-10-02, `/grill-me` with Richard): `Shade`'s ink for
+## the bed (`Shade.On.BED`), thrown along the sun the way the angler's is, as though the fish
+## stood this many world px over the bed — `SHADOW_DEPTH_NEAR` in the shallows to
+## `SHADOW_DEPTH_FAR` over the deepest water. So it falls the same way as every other shadow
+## in the lake, lengthens late in the day and greys with the weather. The two depths put it
+## where the old drop fell (16 and 40 px down the screen) in the middle of the day's swing.
+## Retired: `SHADOW_NEAR`/`SHADOW_FAR`, a fixed drop straight down the screen whatever the
+## hour, and the shadow's own colour and alpha.
+const SHADOW_DEPTH_NEAR := 40.0
+const SHADOW_DEPTH_FAR := 100.0
 
 ## Seconds between reconciling what should be swimming with what is.
 const RECKON_EVERY := 2.0
@@ -82,6 +91,10 @@ var _headings := 16
 var _species: Array = []
 var _rows_per := 4
 var _bodies: Node2D
+## Every fish this frame, worked out once in `_process` and drawn twice (shadows, bodies):
+## [school, member, spot, shadow drop, body tint]. It was worked out in each draw, with the
+## lake's depth asked three times a fish (2026-10-02, the clean-lake bench).
+var _spots: Array = []
 ## The water's ramp over anything under it: deep to light, the palette's clean swatches.
 ## Static, because the wildlife and the flora ask it too (see `through_tint`).
 static var _water: Array[Color] = []
@@ -156,6 +169,7 @@ func _process(delta: float) -> void:
 			gone.append(s)
 	for s in gone:
 		_schools.erase(s)
+	_spots = _fish_spots()
 	queue_redraw()
 	_bodies.queue_redraw()
 
@@ -283,32 +297,38 @@ static func _flat(v: Vector2) -> Vector2:
 	return Vector2(v.x, v.y)
 
 
-## Every fish, as (school, member index, where) in draw order: back to front.
+## Every fish, as (school, member index, where, shadow drop, body tint) in draw order: back
+## to front. The depth under each is asked once, for both the drop and the tint.
 func _fish_spots() -> Array:
 	var out: Array = []
 	var t := float(Time.get_ticks_msec()) * 0.001
+	# The sun's drop for one world px of water, asked once a frame rather than once a fish.
+	var sun := Shade.drop(null, 1.0)
 	for s: Dictionary in _schools:
 		var m: PackedVector2Array = s["members"]
 		for i in m.size():
 			var ts := t + float(s["seed"])
 			var spot: Vector2 = (s["at"] as Vector2) + m[i] \
 				+ Vector2(sin(ts * 1.3 + float(i)), cos(ts * 1.1 + float(i) * 0.7) * 0.5) * 3.0
-			out.append([s, i, spot])
+			var d := depth_at(spot)
+			out.append([s, i, spot, sun * lerpf(SHADOW_DEPTH_NEAR, SHADOW_DEPTH_FAR, d),
+				_tint_at(d, float(s["fade"]), MIX_SHALLOW + DEEPER, MIX_BAND_END + DEEPER, MIX_DEEP + DEEPER)])
 	out.sort_custom(func(a: Array, b: Array) -> bool: return (a[2] as Vector2).y < (b[2] as Vector2).y)
 	return out
 
 
-## The shadows, on the bed under each fish.
+## The shadows, on the bed under each fish, in the bed's ink (`Shade.On.BED`).
 func _draw() -> void:
 	if _sheet == null:
 		return
-	for f: Array in _fish_spots():
+	var ink := Shade.tint_on(null, Shade.On.BED)
+	for f: Array in _spots:
 		var s: Dictionary = f[0]
 		var spot: Vector2 = f[2]
-		var drop := shadow_drop(spot)
+		var drop: Vector2 = f[3]
 		var region := _region(String(s["species"]), _heading_index(s, int(f[1])), _rows_per - 1)
 		draw_texture_rect_region(_sheet, Rect2(spot + drop - _cell * ART * 0.5, _cell * ART), region,
-			Color(0.02, 0.06, 0.08, SHADOW_INK * float(s["fade"])))
+			Color(ink, ink.a * float(s["fade"])))
 
 
 ## The bodies, on the child with the fish shader. The vertex colour carries the water's
@@ -317,15 +337,14 @@ func _draw_bodies() -> void:
 	if _sheet == null:
 		return
 	var t := float(Time.get_ticks_msec()) * 0.001
-	for f: Array in _fish_spots():
+	for f: Array in _spots:
 		var s: Dictionary = f[0]
 		var i: int = f[1]
 		var spot: Vector2 = f[2]
 		var beat := BEAT * (BEAT_FLEE if float(s["flee"]) > 0.0 else 1.0)
 		var wag: int = [0, 1, 2, 1][posmod(int(floor(t * beat * 2.0 + float(s["seed"]) + float(i) * 0.61)), 4)]
 		var region := _region(String(s["species"]), _heading_index(s, i), wag)
-		_bodies.draw_texture_rect_region(_sheet, Rect2(spot - _cell * ART * 0.5, _cell * ART), region,
-			through_tint(spot, float(s["fade"])))
+		_bodies.draw_texture_rect_region(_sheet, Rect2(spot - _cell * ART * 0.5, _cell * ART), region, f[4])
 
 
 ## Which of the sheet's sixteen headings a member faces: the school's, swung a little by its
@@ -359,8 +378,12 @@ static func water_ramp() -> Array[Color]:
 ## thing deeper down takes larger ones).
 static func water_over(at: Vector2, shallow := MIX_SHALLOW, band_end := MIX_BAND_END,
 		deep := MIX_DEEP) -> Color:
+	return _water_at(depth_at(at), shallow, band_end, deep)
+
+
+## `water_over` at a depth already known.
+static func _water_at(d: float, shallow: float, band_end: float, deep: float) -> Color:
 	var ramp := water_ramp()
-	var d := depth_at(at)
 	var q := floorf(clampf(d / BAND_END, 0.0, 0.999) * float(LEVELS)) / float(LEVELS - 1)
 	var share := deep if d >= BAND_END else lerpf(shallow, band_end, q)
 	var water: Color = ramp[clampi(int(roundf(3.0 - 2.0 * q)), 0, 4)] if d < BAND_END else ramp[1]
@@ -382,16 +405,29 @@ static func under_water(at: Vector2, own: Color, shallow := MIX_SHALLOW, band_en
 ## alpha the water's share in fifteenths times sixteen plus how far in the thing has faded.
 static func through_tint(at: Vector2, fade: float, shallow := MIX_SHALLOW, band_end := MIX_BAND_END,
 		deep := MIX_DEEP) -> Color:
-	var water := water_over(at, shallow, band_end, deep)
+	return _tint_at(depth_at(at), fade, shallow, band_end, deep)
+
+
+## `through_tint` at a depth already known.
+static func _tint_at(d: float, fade: float, shallow: float, band_end: float, deep: float) -> Color:
+	var water := _water_at(d, shallow, band_end, deep)
 	var packed := int(roundf(water.a * 15.0)) * 16 + int(roundf(clampf(fade, 0.0, 1.0) * 15.0))
 	water.a = float(packed) / 255.0
 	return water
 
 
-## How far a shadow on the bed falls from the thing at `at`: further down the screen the
-## deeper the water.
-static func shadow_drop(at: Vector2) -> Vector2:
-	return SHADOW_NEAR.lerp(SHADOW_FAR, depth_at(at))
+## How far a shadow on the bed falls from the thing at `at`: along the sun (`Shade.drop`),
+## further the deeper the water (`shadow_depth`). The shared helper for everything that
+## throws a shadow onto the bed — the fish, the wildlife, the flora's pads and stems. `day`
+## may be null: `Shade` then asks the lake's own.
+static func shadow_drop(at: Vector2, day: DayCycle = null) -> Vector2:
+	return Shade.drop(day, shadow_depth(at))
+
+
+## The height over the bed a shadow at `at` is thrown from, in world px: the depth of water
+## under it, shallows to deepest.
+static func shadow_depth(at: Vector2) -> float:
+	return lerpf(SHADOW_DEPTH_NEAR, SHADOW_DEPTH_FAR, depth_at(at))
 
 
 ## Something under the surface at `at` is drawn over a bed the eye can see: the water shader

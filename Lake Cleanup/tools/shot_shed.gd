@@ -31,29 +31,28 @@ func _physics_process(_delta: float) -> void:
 		return
 	if _frames == 8:
 		var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
-		# Enough finds to fill the shelf past its bottom edge, so the scrollbar is in shot.
-		# A room in use, for the placement rules to be looked at (2026-09-13): the tall
-		# bookcase and the fridge against the wall, a painting hung over them, the table
-		# with a pot set on it, two chairs on one row, and the bed. Every name that the
-		# catalogue does not know is skipped, so a re-cut costs the probe nothing.
+		# A room in use, for the placement rules and the window's light to be looked at,
+		# furnished from the pack decoration the lake deals now (2026-10-02, Richard: "stop
+		# using the old decoration"): a bookshelf, the fridge and the clock against the wall,
+		# pictures hung over them, a table with a vase set on it, chairs, a rug under the
+		# sofa, the armchair, the bed and the fire. Every name that the catalogue does not
+		# know is skipped, so a re-cut costs the probe nothing.
 		var decor: Array = _main.get(&"decor")
 		decor.clear()
 		room.decor = decor
 		for want: Array in [
-			[&"decor_bookcase_tall", 1, -4], [&"decor_fridge", 9, -4],
-			[&"decor_painting_a", 14, -3], [&"decor_painting_b", 18, -4],
-			[&"decor_kitchen_counter", 22, -2], [&"decor_stove", 32, -3],
-			[&"decor_big_table", 4, 8], [&"decor_flower_pot", 6, 6], [&"decor_globe", 9, 5],
-			[&"decor_dining_chair", 12, 10], [&"decor_dining_chair", 14, 10],
-			[&"decor_pet_bed", 24, 14], [&"decor_big_rug", 20, 6], [&"decor_sofa", 22, 8],
-			# The potted plant pushed as far up the back wall as the room will let it
-			# (2026-09-19, issue #30): what its pixel base bought is a thing to look at,
-			# and neither pot in the list above was standing against the wall.
-			[&"decor_loveseat", 34, 8],
-			# Lit, for the light the room throws (2026-09-20): the pools are what the three
-			# ringed circles were replaced by, and a probe that never lights a fire is a
-			# probe that cannot show them.
-			[&"decor_fireplace", 30, 2],
+			[&"decor_pk_bookshelf", 1, -4], [&"decor_pk_fridge", 9, -4],
+			[&"decor_pk_landscape", 14, -3], [&"decor_pk_portrait", 18, -4],
+			[&"decor_pk_kitchen_counter", 22, -2], [&"decor_pk_stove", 33, -1],
+			[&"decor_pk_grandfather_clock", 28, -4],
+			[&"decor_pk_table", 4, 8], [&"decor_pk_flower_vase", 6, 6], [&"decor_pk_globe", 9, 5],
+			[&"decor_pk_chair", 12, 10], [&"decor_pk_wood_chair", 14, 10],
+			[&"decor_pk_bed", 24, 14], [&"decor_pk_rug", 20, 6], [&"decor_pk_sofa", 22, 8],
+			[&"decor_pk_armchair", 34, 8], [&"decor_pk_coat_stand", 2, 14],
+			[&"decor_pk_potted_tree", 36, 14],
+			# Lit, for the light the room throws (2026-09-20): a probe that never lights a
+			# fire is a probe that cannot show the pools.
+			[&"decor_pk_fireplace", 30, 2],
 		]:
 			if room.sheets.has(want[0]):
 				# Written in cells, which is what the eye lays a room out in; the room places
@@ -65,7 +64,7 @@ func _physics_process(_delta: float) -> void:
 		# issue #30): what its pixel base bought is a thing to look at, and neither pot in
 		# the list above is standing against a wall. In pixels, not cells — the whole point
 		# is that its limit is not a whole cell.
-		var pot := &"decor_plant_pot"
+		var pot := &"decor_pk_flower_pot"
 		if room.sheets.has(pot):
 			var top := room.base_of(pot) - room.span_of(pot).y
 			if not room.place(pot, Vector2i(28 * ShedRoom.CELL, top)):
@@ -132,7 +131,7 @@ func _write() -> void:
 		f.store_line("  dog  %-28s at %s  %s" % [
 			dog.seat if not dog.seat.is_empty() else "(floor)", str(dog.at), dog.state
 		])
-	var pot := &"decor_plant_pot"
+	var pot := &"decor_pk_flower_pot"
 	if room.sheets != null and room.sheets.has(pot):
 		f.store_line("pot   base     %d px of %d" % [
 			room.base_of(pot), room.span_of(pot).y

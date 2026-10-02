@@ -53,7 +53,9 @@ CUT = {
     # 2158 holds a dark armchair's back, the glass table side-on, and a scrap: the table.
     "glass_side": [0, 43, 22, 85],
     # The potted tree, without the leaf fallen beside it.
-    "tree": [4, 0, 25, 53],
+    # The fallen leaf reaches into that box at its bottom left (2026-10-01, Richard: "little
+    # slice of green"), and the crown is as wide, so the piece keeps its biggest island too.
+    "tree": [4, 0, 25, 53, "main"],
 }
 
 # name, title, set, place, light, views
@@ -116,7 +118,7 @@ PIECES = [
     ("coat_stand", "Coat Stand", "SINGLE", "floor", "", [(328, None, F, 0, 0, 0)]),
     ("landscape", "Landscape", "SINGLE", "wall", "", [(385, None, F, 0, 0, 0)]),
     ("portrait", "Portrait", "SINGLE", "wall", "", [(389, None, F, 0, 0, 0)]),
-    ("grandfather_clock", "Grandfather Clock", "SINGLE", "floor", "", [(427, None, F, 0, 0, 0)]),
+    ("grandfather_clock", "Old Clock", "SINGLE", "floor", "", [(427, None, F, 0, 0, 0)]),
     ("globe", "Globe", "SINGLE", "floor", "", [(430, None, F, 0, 0, 0)]),
     ("sculpture", "Sculpture", "SINGLE", "floor", "", [(1146, None, F, 0, 0, 0)]),
     ("blue_rug", "Blue Rug", "SINGLE", "floor", "", [(1172, None, F, 0, 0, 0)]),
@@ -197,6 +199,19 @@ FRONT_BASE = {
 }
 SIDE_ROLES = ("side", "top")
 
+# How many of a piece are hidden in the lake. Every find is unique (2026-10-01, Richard:
+# "I caught 3 of the same diner chair"); this was four diner chairs to the diner table.
+COPIES = {}
+
+# Where a dog's feet go on a piece it may lie on, per view, in drawn pixels up from the
+# picture's bottom (Sheets.seat_of): front views only, where nothing is in front of the
+# cushion. First guesses at 0.74; retune on tools/shot_shed.
+SEATS = {"sofa": {0: 7}, "white_sofa": {0: 7}, "armchair": {0: 6}, "old_seat": {0: 6},
+         "diner_seat": {0: 6},
+         # Every face of a bed takes a dog (2026-10-01, Richard: "sleep in any bed"): a bed's
+         # rails are low, so nothing in front hides a dog lying on it from the side or back.
+         "bed": {0: 18, 1: 12, 2: 18}, "fancy_bed": {0: 22, 1: 15, 2: 26, 3: 15}}
+
 
 def bases_of(name, roles, heights):
     front = FRONT_BASE.get(name)
@@ -256,6 +271,38 @@ def fill_of(im):
     return round(sum(1 for v in a.getdata() if v > 0) / (im.width * im.height), 3)
 
 
+def main_island(im):
+    """Only the largest 8-connected island of opaque pixels; the rest cleared."""
+    w, h = im.size
+    px = im.load()
+    seen, best = set(), []
+    for sy in range(h):
+        for sx in range(w):
+            if (sx, sy) in seen or px[sx, sy][3] == 0:
+                continue
+            group, stack = [], [(sx, sy)]
+            seen.add((sx, sy))
+            while stack:
+                x, y = stack.pop()
+                group.append((x, y))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        n = (x + dx, y + dy)
+                        if 0 <= n[0] < w and 0 <= n[1] < h and n not in seen and px[n][3] > 0:
+                            seen.add(n)
+                            stack.append(n)
+            if len(group) > len(best):
+                best = group
+    keep = set(best)
+    out = im.copy()
+    po = out.load()
+    for y in range(h):
+        for x in range(w):
+            if (x, y) not in keep:
+                po[x, y] = (0, 0, 0, 0)
+    return out
+
+
 def main():
     cat = {e["id"]: e for e in json.loads((PACKS / "catalogue.json").read_text())}
     sheets = {}
@@ -268,6 +315,8 @@ def main():
         im = sheets[e["sheet"]].crop((x, y, x + w, y + h))
         if box:
             im = im.crop((box[0], box[1], box[2] + 1, box[3] + 1))
+            if len(box) > 4 and box[4] == "main":
+                im = main_island(im)
         return im.crop(im.getbbox())
 
     clean, dirty, plan = [], [], []
@@ -322,10 +371,11 @@ def main():
             "name": "decor_pk_" + name, "title": title, "set": kind, "place": place,
             "light": light, "sheet": DIRTY, "region": box, "alt_sheet": CLEAN,
             "alt_views": clean_boxes[first:first + n], "alt_roles": roles,
-            "faces": faces, "states": states, "base": [], "seat": [],
+            "faces": faces, "states": states, "base": [],
+            "seat": [SEATS.get(name, {}).get(i, 0) for i in range(n)] if name in SEATS else [],
             "base_px": [] if place == "wall" else bases_of(name, roles, [b[3] for b in clean_boxes[first:first + n]]),
             "tier": tier_of(views),
-            "copies": 1, "scale": SHED_SCALE, "wash_scale": 1.0, "fill": fill_of(front),
+            "copies": COPIES.get(name, 1), "scale": SHED_SCALE, "wash_scale": 1.0, "fill": fill_of(front),
             "cells": [max(1, -(-box[2] // CELL)), max(1, -(-box[3] // CELL))],
         })
     book["sheets"][CLEAN] = {"file": "res://assets/decor_pack_clean.png", "size": list(clean_sheet.size)}

@@ -27,8 +27,9 @@ const SHEET := "res://assets/pigeons_inked.png"
 
 ## How big a bird is drawn, as a multiple of its own pixels. The art is eleven pixels
 ## across and the lake's rubbish is drawn at twice its own size (`Lake.SPRITE_SCALE`), so
-## this keeps a pigeon and a floating mug in proportion — and whole, so it sits on the art grid.
-const SCALE := 2.0
+## this kept a pigeon and a floating mug in proportion. 1.5 since 2026-10-01 (Richard:
+## "a little bit smaller"), not a whole art pixel, so a bird glides between them.
+const SCALE := 1.5
 
 ## One bird per this many pieces of rubbish on screen, up to a cap. The flock is a reading
 ## of how dirty the water in front of the player is.
@@ -94,14 +95,18 @@ const POOP_SPECK_OUT := 3
 const POOP_INK := Color(0.94, 0.94, 0.90, 0.85)
 const POOP_INK_DRY := Color(0.86, 0.86, 0.80, 0.70)
 
-## A flying bird's shadow, as a multiple of the day's own ink and the most it may reach.
+## The layers a bird's shadow lies on. One sun (2026-10-02, `/grill-me` with Richard): a
+## shadow is drawn on the layer of the surface it falls on, never over a walker (9) or a hull
+## (12). It used to be drawn with the birds at 21, so a pigeon's shadow crossing the angler
+## lay on top of him.
 ##
-## The day's ink is set for sand and grass. On the lake — darker, and darker still away
-## from the island — it cannot be seen at all, which is the bargain `Boat.SHADE_GAIN`
-## already strikes for the hull. Lighter than the hull's, because a pigeon is not a boat.
-## By eye; retune freely.
-const SHADE_GAIN := 2.4
-const SHADE_MOST := 0.45
+## A flying bird's falls on the water or the ground, so it lies at 4 with the splashes and
+## the haul's shadows, under the floating rubbish (5) as the rubbish's own shadows are. A
+## perched bird's falls on the piece it is standing on, so it lies at the soup's own 5 — the
+## flock is added to the lake after `LakeGrid`, so at the same z it is drawn over the pieces.
+## Nothing walks at 5 out on the water (only behind the hut), which is where perches are.
+const SHADOW_LAYER := 4
+const PERCHED_SHADOW_LAYER := 5
 
 ## What height takes off a shadow: at the top of its arc a bird's shadow is this much
 ## smaller and this much fainter than it is on the water.
@@ -143,8 +148,9 @@ var grid: LakeGrid
 var angler: Angler
 ## The noises. Optional — a silent flock still flies.
 var sfx: Sfx
-## The daylight, for the flying birds' shadows. Without one, no shadow: a guessed sun is
-## worse than none, since it would disagree with every other shadow in the scene.
+## The daylight, for the birds' shadows. Without one the lake's own (`DayCycle.here`) is
+## asked; with neither, no shadow: a guessed sun is worse than none, since it would disagree
+## with every other shadow in the scene.
 var day: DayCycle
 ## The player's net, asked whether a perched bird is inside reach and so worth rimming.
 ## Optional — with no net, nothing is rimmed.
@@ -174,6 +180,11 @@ var _rethink: float = 0.0
 ## node's drawing, because the rim is a shader trick and the birds themselves are not.
 var _rim: BirdRim
 
+## The birds' shadows, on two children of their own: the flying birds' at `SHADOW_LAYER`,
+## the perched birds' at `PERCHED_SHADOW_LAYER`.
+var _shades: BirdShade
+var _perched_shades: BirdShade
+
 ## Whether the flock that should already be here has been put here. See `settle`.
 var _settled: bool = false
 var _rng := RandomNumberGenerator.new()
@@ -189,6 +200,19 @@ func _ready() -> void:
 	_rim.name = &"BirdRim"
 	_rim.flock = self
 	add_child(_rim)
+	_shades = BirdShade.new()
+	_shades.name = &"BirdShade"
+	_shades.flock = self
+	_shades.z_as_relative = false
+	_shades.z_index = SHADOW_LAYER
+	add_child(_shades)
+	_perched_shades = BirdShade.new()
+	_perched_shades.name = &"PerchedShade"
+	_perched_shades.flock = self
+	_perched_shades.perched = true
+	_perched_shades.z_as_relative = false
+	_perched_shades.z_index = PERCHED_SHADOW_LAYER
+	add_child(_perched_shades)
 
 
 ## Read the cut sheet and the authored birds. False means no art, and the flock stays
@@ -398,6 +422,8 @@ func _process(delta: float) -> void:
 		# The rim is a child with its own drawing, and what it draws changes as the angler
 		# walks even when no bird has moved.
 		_rim.queue_redraw()
+		_shades.queue_redraw()
+		_perched_shades.queue_redraw()
 
 
 ## Call birds in or send them away, so the flock matches the water it is over.
@@ -721,36 +747,80 @@ func _draw() -> void:
 		if fade <= 0.0:
 			continue
 
-		if int(bird["state"]) != State.PERCHED:
-			_draw_shadow(bird, frame, ground, fade)
-
 		stamp(self, _sheet, frame, at, float(bird["facing"]), Color(1.0, 1.0, 1.0, fade))
 
 
-## A flying bird's shadow on the water: its own frame again, laid out away from the sun by
-## `Shade.lying`, the way the angler, the dog, the trees and the hull all cast.
+## A bird's shadow: its own frame again, laid out away from the sun by `Shade.lying`, the
+## way the angler, the dog, the trees and the hull all cast. Drawn by `BirdShade`, on the
+## surface's layer rather than the birds'.
 ##
 ## It used to be a black disc under the bird — the one shadow left on the lake that was not
 ## the shape of the thing making it, and the one that ignored the sun the rest of the world
 ## leans away from.
 ##
-## Drawn from the shadow's own anchor on the water rather than from the bird, and shrunk and
-## thinned by how high the arc has carried it: a shadow the same size whatever the height is
-## what makes a bird look like it is sliding along the surface.
-func _draw_shadow(bird: Dictionary, frame: Rect2, ground: Vector2, fade: float) -> void:
-	if day == null:
+## **One sun** (2026-10-02): a flying bird is up in the air, so its shadow stands where the
+## sun puts the ground point under it (`Shade.drop` from its height), not straight below it,
+## and it takes the ink of whatever it falls on — the water's or the land's (`Shade.On`),
+## never a gain of its own. Shrunk and thinned by how high the arc has carried it: a shadow
+## the same size whatever the height is what makes a bird look like it is sliding along the
+## surface.
+##
+## A perched bird casts too, from its feet on the piece it stands on: it used to cast none,
+## the one thing standing on the lake the sun went through.
+func draw_shadow_on(
+	on: CanvasItem, bird: Dictionary, frame: Rect2, ground: Vector2, fade: float
+) -> void:
+	var sun := Shade.sun_of(day)
+	if sun == null:
 		return
-	var up := sin(float(bird["travel"]) * PI)
-	var ink := minf(day.ink * SHADE_GAIN, SHADE_MOST) * fade * (1.0 - SHADE_THIN * up)
-	if ink <= 0.002:
+	var up := 0.0
+	if int(bird["state"]) != State.PERCHED:
+		up = sin(float(bird["travel"]) * PI)
+	var lands := ground + Shade.drop(sun, up * ARC_HEIGHT)
+	var surface := Shade.On.WATER if WaterSplash.wet_at(lands + position) else Shade.On.LAND
+	var tint := Shade.tint_on(sun, surface, fade * (1.0 - SHADE_THIN * up))
+	if tint.a <= 0.002:
 		return
 	# Standing on the origin of the shadow's own frame: `lying` has already put that origin
 	# where the bird's feet would be.
 	stamp(
-		self, _sheet, frame, Vector2.ZERO, float(bird["facing"]), Shade.tint(ink),
-		Shade.lying(ground, day.lean, day.stretch), Vector2.ZERO,
+		on, _sheet, frame, Vector2.ZERO, float(bird["facing"]), tint,
+		Shade.lying(lands, sun.lean, sun.stretch), Vector2.ZERO,
 		1.0 - SHADE_SHRINK * up
 	)
+
+
+## Where a bird's shadow is drawn from, and how much of it: the ground under the bird (its
+## flight's arc taken back off) and the bank's fade. Asked by `BirdShade`.
+func shadow_ground(bird: Dictionary) -> Vector2:
+	var at: Vector2 = bird["at"]
+	if int(bird["state"]) == State.PERCHED:
+		return at
+	return Vector2(at.x, at.y + sin(float(bird["travel"]) * PI) * ARC_HEIGHT)
+
+
+func shadow_fade(ground: Vector2) -> float:
+	return _over_water(ground)
+
+
+## The birds' shadows, on the layer of the surface they fall on, so a walker or a hull
+## passing under a pigeon is drawn over its shadow rather than under it. One for the birds in
+## the air, one for the birds sitting on a piece (`perched`).
+class BirdShade extends Node2D:
+	var flock: Flock
+	var perched := false
+
+	func _draw() -> void:
+		if flock == null or flock.sheet() == null:
+			return
+		for bird: Dictionary in flock.birds:
+			if (int(bird["state"]) == Flock.State.PERCHED) != perched:
+				continue
+			var ground := flock.shadow_ground(bird)
+			var fade := flock.shadow_fade(ground)
+			if fade <= 0.0:
+				continue
+			flock.draw_shadow_on(self, bird, flock.frame_of(bird), ground, fade)
 
 
 ## The pale rim round a perched bird the net could reach.

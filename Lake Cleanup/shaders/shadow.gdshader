@@ -25,19 +25,24 @@ global uniform float lake_clock;
 uniform float wave_amplitude = 5.0;
 uniform float anchor_span = 8192.0;
 
-// Where the sun is, as DayCycle.lean, and how far a shadow slides off its piece per unit of
-// that. The land shadows are laid out under Shade.lying, which leans them by the caster's
-// own height; these cannot be, because their quads are built once per rebuild and re-laying
-// eighteen thousand of them every time the sun moved is the rebuild this layer exists to
-// avoid. So the whole shadow is slid by a flat world distance instead: a piece of rubbish is
-// a hand's breadth of floating junk, not a building, and one distance for all of them reads
-// as the same sun without costing a rebuild. `sun_reach` is in world pixels per unit lean.
-uniform float sun_lean = -1.0;
-uniform float sun_reach = 3.0;
+// Where the sun is, as DayCycle.lean and DayCycle.stretch (2026-10-02, one sun). The land
+// shadows are laid out under Shade.lying, which leans them by the caster's own height; these
+// cannot be re-laid, because their quads are built once per rebuild and re-laying eighteen
+// thousand of them every time the sun moved is the rebuild this layer exists to avoid. So
+// the whole shadow is slid along Shade.drop of the piece's height above the water, which each
+// corner carries in its alpha, times `sun_share` (LakeGrid.SHADOW_SUN_SHARE).
+uniform float sun_lean = -0.2;
+uniform float sun_stretch = 0.8;
+uniform float sun_share = 0.5;
 
-// What a shadow is drawn in, alpha included. Held here rather than in the vertex colours
-// because those carry the anchor instead.
-uniform vec4 shade : source_color = vec4(0.03, 0.08, 0.11, 0.16);
+// What a shadow is drawn in, alpha included: Shade.tint_on for the water, pushed with the
+// sun, so it is the hull's ink and follows the rain. Held here rather than in the vertex
+// colours because those carry the anchor instead.
+uniform vec4 shade : source_color = vec4(0.04, 0.06, 0.09, 0.5);
+
+// A piece lying on the beach takes the land's ink (Shade.On.LAND), as the angler beside it.
+uniform vec4 dry_shade : source_color = vec4(0.04, 0.06, 0.09, 0.3);
+varying float on_sand;
 
 // How far the silhouette's edge is blurred, in source texels. The art is squashed to half
 // its height here and drawn at twice its size, and its hard pixel edge came out as a
@@ -75,15 +80,22 @@ void vertex() {
 		across = code - 2.0 - slot * 2.0;
 		VERTEX.y += rise[int(slot)];
 	}
-	local = vec2(across, COLOR.a);
+	// Alpha is the corner's top or bottom (its top bit) over the piece's height above the
+	// water in whole pixels. See LakeGrid.ShadowLayer.write.
+	float packed = floor(COLOR.a * 255.0 + 0.5);
+	float bottom = step(127.5, packed);
+	float above = packed - bottom * 128.0;
+	local = vec2(across, bottom);
 
-	// Off the piece, towards where a sun in the southeast puts it. Before the anchor test,
-	// so a piece lying dry on the beach still throws its shadow the same way as one afloat —
-	// what the anchor decides is whether the shadow bobs, not whether the sun is out.
-	VERTEX.x += sun_lean * sun_reach;
+	// Off the piece along the sun, as far as Shade.drop puts what stands above the water.
+	// Before the anchor test, so a piece lying dry on the beach still throws its shadow the
+	// same way as one afloat — the anchor decides whether the shadow bobs, not whether the
+	// sun is out.
+	VERTEX += vec2(sun_lean, max(sun_stretch, 0.02) * 0.5) * above * sun_share;
 
 	// The top anchor value is reserved for a piece lying on the beach, whose shadow stays put
 	// like the piece does. See LakeGrid.DRY_ANCHOR.
+	on_sand = (high < 255.0 || low < 255.0) ? 0.0 : 1.0;
 	if (high < 255.0 || low < 255.0) {
 		float t = lake_clock * wave_speed;
 		VERTEX.y += (sin(x * 0.011 + t) * 0.62 + sin(x * 0.029 - t * 1.7) * 0.38) * wave_amplitude;
@@ -118,5 +130,6 @@ void fragment() {
 	vec2 q = abs(local * 2.0 - 1.0);
 	float edge = pow(q.x * q.x * q.x + q.y * q.y * q.y, 1.0 / 3.0);
 	float mask = 1.0 - smoothstep(1.0 - round_off, 1.05, edge);
-	COLOR = vec4(shade.rgb, shade.a * a / 14.0 * mask);
+	vec4 ink = mix(shade, dry_shade, on_sand);
+	COLOR = vec4(ink.rgb, ink.a * a / 14.0 * mask);
 }
