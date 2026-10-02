@@ -146,14 +146,21 @@ const CLOSE_BUNCH := 0.55
 const FLY_FROM := 0.22
 const FLY_DOME := 0.85
 const FLY_SQUASH := 0.6
-const FLY_WOBBLE := 0.14
+const FLY_WOBBLE := 0.2
 const FLY_ARC := 0.5
+## The dangle's clock and how much of it is left as the net opens (`NetShape.flutter`): the
+## rim flaps `FLY_FLAP` radians a second and wobbles at `FLY_WOB_RATE`, both on the clock rather
+## than on the distance flown, so a short throw wiggles as much as a long one; `FLY_OPEN_KEEP`
+## of the flutter and the wobble are still on as it lands, and the landing settles them out.
+const FLY_FLAP := 11.0
+const FLY_WOB_RATE := 8.0
+const FLY_OPEN_KEEP := 0.45
 ## On landing the dome drops from `LAND_DOME` of the half-width (never more than
 ## `LAND_DOME_MOST` px) to the lying net's own over `LAND_TIME`, with the rim's wobble
 ## settling out.
 const LAND_DOME := 0.3
 const LAND_DOME_MOST := 16.0
-const LAND_WOBBLE := 0.05
+const LAND_WOBBLE := 0.09
 ## Under the haul the dome flattens out (by `_lean`) and a ripple runs round the rim as it
 ## drags, `HAUL_RIPPLE` of the mouth at full lean, travelling at `RIPPLE_RATE` radians a
 ## second: a net dragged over water is never still, and one that was read as held up.
@@ -1481,6 +1488,8 @@ func shape_now() -> NetShape:
 
 var _shape_was: NetShape
 var _shape_key := Vector4.INF
+## The way the last throw flew, on the plane, kept for the landing's dangle to run out along.
+var _trail := Vector2(1.0, 0.0)
 
 
 func _shape_fresh() -> NetShape:
@@ -1507,14 +1516,26 @@ func _shape_fresh() -> NetShape:
 			s.w = open * lerpf(FLY_FROM, 1.0, e)
 			s.h = s.w * lerpf(FLY_DOME, NetShape.DOME, e)
 			s.squash = lerpf(FLY_SQUASH, 1.0, e)
-			s.wobble = FLY_WOBBLE * (1.0 - e)
-			s.wob_phase = gone * 6.0
+			s.wobble = FLY_WOBBLE * lerpf(1.0, FLY_OPEN_KEEP, e)
+			s.wob_phase = _time * FLY_WOB_RATE
+			# Dangly: the skirt streams behind the way it flies and hangs in flapping lobes.
+			s.flutter = lerpf(1.0, FLY_OPEN_KEEP, e)
+			s.flap = _time * FLY_FLAP
+			var flying := Iso.tile_to_world(tile_pos.x, tile_pos.y) \
+				- Iso.tile_to_world(_cast_from.x, _cast_from.y)
+			if flying.length_squared() > 0.0001:
+				s.trail = Vector2(flying.x, flying.y * 2.0).normalized()
+				_trail = s.trail
 		State.SETTLED, State.REELING:
 			var k := clampf(_settled_age / LAND_TIME, 0.0, 1.0)
 			var settle := 1.0 - pow(1.0 - k, 3.0)
 			s.h = lerpf(minf(s.w * LAND_DOME, LAND_DOME_MOST), s.h, settle) * (1.0 - _lean)
 			s.wobble = LAND_WOBBLE * (1.0 - settle) + HAUL_RIPPLE * _lean
 			s.wob_phase = _settled_age * 9.0 * (1.0 - settle) + _time * RIPPLE_RATE
+			# The throw's dangle runs out as it settles, the lobes still flapping as they drop.
+			s.flutter = FLY_OPEN_KEEP * (1.0 - settle) * (1.0 - _lean)
+			s.flap = _time * FLY_FLAP
+			s.trail = _trail
 	return s
 
 

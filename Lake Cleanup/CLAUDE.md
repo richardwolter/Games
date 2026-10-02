@@ -3205,6 +3205,15 @@ dots. It is redrawn as pixel art by rule, picked off `tools/last_net_mockup.png`
 - **The throw is a bundle opening** (`shape_now`, `FLY_*`): it leaves the hand `FLY_FROM`
   of its width, a tall bell (`FLY_DOME`) with a squashed, wobbling rim, and opens to a low
   dome as it flies, rising `FLY_ARC` over its path (`draw_at`). Unbent in the air.
+- **And it dangles** (2026-10-02, Richard: "it shouldn't be a straight circle, it should be
+  dangly"): `NetShape.flutter`/`trail`/`flap` (and the shader's copy, `TRAIL`, `TUCK`,
+  `DANGLE`, `LOBES`): the skirt streams `TRAIL` of the half-width out behind the way it
+  flies, tucks `TUCK` in at the front, and hangs below the plane in `LOBES` lobes up to
+  `DANGLE` of the half-width, the trailing side lowest, flapping at `CastNet.FLY_FLAP` rad/s.
+  The rim's wobble runs on the clock (`FLY_WOB_RATE`) at `FLY_WOBBLE` 0.2 rather than off the
+  distance flown; `FLY_OPEN_KEEP` of both is still on at the landing, which settles them out
+  (`LAND_WOBBLE` 0.09). The net's shadow, the catch and the horn follow, all being `at`.
+  `test_lake` guards the trail, the tuck and the uneven droop.
 - **A lucky cast shines, the cord stays tan** (second `/grill-me` the same day, Richard: the
   flat gold cord "looks ugly"; look B picked off `tools/last_net_lucky_mockup.png` and its
   GIFs, `tools/net_lucky_mockup.py`): the rim cord (three px deep, `GOLD_RIM_HALF`) and the

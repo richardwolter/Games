@@ -2899,6 +2899,23 @@ func _check_net_shape() -> void:
 	_check(NetShape.rim_spokes(40.0) % 32 == 0 and NetShape.rim_spokes(220.0) > NetShape.rim_spokes(40.0),
 		"a wider net has more strands, not bigger cells", "%d at 40, %d at 220" % [
 			NetShape.rim_spokes(40.0), NetShape.rim_spokes(220.0)])
+	# A thrown net dangles (2026-10-02): its skirt streams out behind the way it flies, tucks
+	# in at the front, and hangs below the plane in lobes, so its rim is no circle.
+	var thrown := NetShape.lying(60.0)
+	thrown.flutter = 1.0
+	thrown.trail = Vector2(1.0, 0.0)
+	var behind := thrown.at(1.0, PI)
+	var ahead := thrown.at(1.0, 0.0)
+	var lows := PackedFloat32Array()
+	for k in 12:
+		var theta := TAU * float(k) / 12.0
+		lows.append(thrown.at(1.0, theta).y - lying.at(1.0, theta).y)
+	var spread := 0.0
+	for low in lows:
+		spread = maxf(spread, absf(low - lows[0]))
+	_check(absf(behind.x) > 60.0 and ahead.x < 60.0 and spread > 2.0,
+		"a thrown net trails its skirt, tucks its front and hangs in uneven lobes",
+		"behind %.1f, ahead %.1f, droop spread %.1f px" % [behind.x, ahead.x, spread])
 	var made := NetShape.mesh(60.0)
 	_check((made["indices"] as PackedInt32Array).size() % 3 == 0
 			and (made["points"] as PackedVector2Array).size() == (made["uvs"] as PackedVector2Array).size(),
@@ -2907,7 +2924,8 @@ func _check_net_shape() -> void:
 	var mirrored := true
 	var off := ""
 	for name in ["LEAD_OUT", "RIM_BACK", "TIP_GAP", "REAR", "PURSE_ACROSS", "PINCH",
-			"SAG", "SPREAD", "SWAY", "BURST_RUN", "BURST_TAIL", "BURST_FADE", "GLINT_WIDE"]:
+			"SAG", "SPREAD", "SWAY", "TRAIL", "TUCK", "DANGLE", "LOBES",
+			"BURST_RUN", "BURST_TAIL", "BURST_FADE", "GLINT_WIDE"]:
 		var want := "const float %s = %s;" % [name, _net_const(name)]
 		if source.find(want) < 0:
 			mirrored = false

@@ -44,6 +44,16 @@ const PINCH := 0.55
 const SAG := 0.22
 const SPREAD := 0.18
 const SWAY := 0.1
+## A thrown net dangles (2026-10-02, Richard: "it shouldn't be a straight circle, it should be
+## dangly"): its skirt streams out behind the way it flies (`TRAIL` of the half-width at the
+## back) and tucks in at the front (`TUCK`), and its rim hangs in lobes, `LOBES` round it,
+## drooping up to `DANGLE` of the half-width below the plane, the trailing side the most, all
+## of it flapping on `flap`. `flutter` is how much of this is on: 1 leaving the hand, easing
+## off as it opens and gone once it has settled on the water.
+const TRAIL := 0.38
+const TUCK := 0.16
+const DANGLE := 0.2
+const LOBES := 5.0
 
 ## Screen px between neighbouring strands of one family before the mesh is thinned: every
 ## other strand under it, then every fourth, every eighth. Where the bridle gathers the
@@ -107,6 +117,11 @@ var sway: float = 0.0
 var squash: float = 1.0
 var wobble: float = 0.0
 var wob_phase: float = 0.0
+## The dangle (`TRAIL`, `DANGLE`): how much is on, which way the net is flying on the plane
+## (screen y doubled, unit length) and the flap's phase.
+var flutter: float = 0.0
+var trail := Vector2(1.0, 0.0)
+var flap: float = 0.0
 var gold: bool = false
 ## Seconds since a lucky net landed (the burst), and the glint's phase 0 to 1; -1 for none.
 var landed: float = -1.0
@@ -130,6 +145,8 @@ func at(rho: float, theta: float) -> Vector2:
 	var front := maxf(cf, 0.0)
 	var back := maxf(-cf, 0.0)
 	var wob := 1.0 + wobble * sin(3.0 * theta + wob_phase) + wobble * 0.5 * sin(5.0 * theta - wob_phase)
+	var tf := cos(theta - atan2(trail.y, trail.x))
+	wob *= 1.0 + flutter * (TRAIL * maxf(-tf, 0.0) - TUCK * maxf(tf, 0.0))
 	var mid := -RIM_BACK * haul
 	var reach_front := (1.0 - haul) + haul * (LEAD_OUT + RIM_BACK + TIP_GAP)
 	var reach_back := (1.0 - haul) + haul * REAR
@@ -144,6 +161,8 @@ func at(rho: float, theta: float) -> Vector2:
 	var plane := (pull * a + across * b) * w
 	var z := h * pow(maxf(1.0 - rho, 0.0), 1.4)
 	z -= SAG * w * load * sin(PI * clampf(rho, 0.0, 1.0)) * (0.35 + 0.65 * back)
+	z -= flutter * DANGLE * w * rho * rho * (0.5 + 0.5 * sin(LOBES * theta + flap)) \
+		* (0.55 + 0.45 * maxf(-tf, 0.0))
 	return Vector2(plane.x, plane.y * 0.5 * squash - z)
 
 
@@ -158,6 +177,9 @@ func push(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter(&"squash", squash)
 	mat.set_shader_parameter(&"wobble", wobble)
 	mat.set_shader_parameter(&"wob_phase", wob_phase)
+	mat.set_shader_parameter(&"flutter", flutter)
+	mat.set_shader_parameter(&"trail", trail)
+	mat.set_shader_parameter(&"flap", flap)
 	mat.set_shader_parameter(&"radial_cells", w_open / CELL)
 	mat.set_shader_parameter(&"n_rim", float(rim_spokes(w_open)))
 	mat.set_shader_parameter(&"max_lvl", float(levels(w_open)))

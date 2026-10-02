@@ -21,6 +21,9 @@ uniform float sway = 0.0;
 uniform float squash = 1.0;
 uniform float wobble = 0.0;
 uniform float wob_phase = 0.0;
+uniform float flutter = 0.0;
+uniform vec2 trail = vec2(1.0, 0.0);
+uniform float flap = 0.0;
 
 uniform float radial_cells = 3.3;
 uniform float n_rim = 32.0;
@@ -71,6 +74,10 @@ const float PINCH = 0.55;
 const float SAG = 0.22;
 const float SPREAD = 0.18;
 const float SWAY = 0.1;
+const float TRAIL = 0.38;
+const float TUCK = 0.16;
+const float DANGLE = 0.2;
+const float LOBES = 5.0;
 
 const int NONE = 0;
 const int STRAND = 1;
@@ -91,6 +98,8 @@ vec2 shape(float rho, float theta) {
 	float front = max(cf, 0.0);
 	float back = max(-cf, 0.0);
 	float wob = 1.0 + wobble * sin(3.0 * theta + wob_phase) + wobble * 0.5 * sin(5.0 * theta - wob_phase);
+	float tf = cos(theta - atan(trail.y, trail.x));
+	wob *= 1.0 + flutter * (TRAIL * max(-tf, 0.0) - TUCK * max(tf, 0.0));
 	float mid = -RIM_BACK * haul;
 	float reach_front = (1.0 - haul) + haul * (LEAD_OUT + RIM_BACK + TIP_GAP);
 	float reach_back = (1.0 - haul) + haul * REAR;
@@ -105,6 +114,8 @@ vec2 shape(float rho, float theta) {
 	vec2 plane = (pull * a + across * b) * w;
 	float z = h * pow(max(1.0 - rho, 0.0), 1.4);
 	z -= SAG * w * load * sin(PI * clamp(rho, 0.0, 1.0)) * (0.35 + 0.65 * back);
+	z -= flutter * DANGLE * w * rho * rho * (0.5 + 0.5 * sin(LOBES * theta + flap))
+		* (0.55 + 0.45 * max(-tf, 0.0));
 	return vec2(plane.x, plane.y * 0.5 * squash - z);
 }
 
