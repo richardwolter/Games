@@ -528,10 +528,10 @@ func _apply(player: AudioStreamPlayer, gain: float, slug: StringName) -> void:
 
 
 func _player(slug: StringName, suffix: String, prefix: String) -> AudioStreamPlayer:
-	var path := DIR + String(slug) + suffix + ".mp3"
+	var path := DIR + String(slug) + suffix + ".ogg"
 	if not ResourceLoader.exists(path):
 		return null
-	var stream := load(path) as AudioStreamMP3
+	var stream := load(path) as AudioStreamOggVorbis
 	if stream == null:
 		return null
 	var player := AudioStreamPlayer.new()

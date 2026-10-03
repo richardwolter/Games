@@ -9,12 +9,13 @@ This does exactly two mechanical things to it and nothing else:
    piece: added when a find is added, its `en` updated when a title is renamed. A row whose
    piece is gone is **reported, not deleted** — its translations are somebody's work, and a
    renamed slug looks exactly like a deleted one from here.
-2. **The `qps` pseudo-locale is rebuilt from `en`.** Every string wrapped in brackets,
-   its vowels accented and padded about 40% longer, so in play a word the game still hard
-   codes stands out as the one with no brackets, and a box too small for a longer language
-   overflows before any real translation exists. `%d` and `%s` are carried through intact.
-   **Only glyphs Bungee has**: system font fallback is off (`Style._no_system`), so anything
-   else would draw as tofu and be mistaken for a bug in the words.
+2. **The CJK fonts are cut down to the characters the table uses.** The full faces live in
+   `art_source/fonts/` (22 MB, every glyph in their scripts); `assets/fonts/` gets each one
+   subset to every character of its locale's column plus `CJK_ALWAYS` (2026-10-03, the
+   pre-release size pass). Bungee draws all Latin first (`Style.FALLBACKS`), so only what
+   Bungee lacks is ever asked of these. **Re-run after any CSV edit**, or a new character
+   draws as tofu; `tools/probe_text_fit.gd` reports a glyph a face does not carry. Needs
+   fontTools (`pip install --user fonttools`). Reimport afterwards.
 
 3. **`scripts/text.gd` is written from the keys.** One static getter a key, each asking
    `TranslationServer` in the language in play, so a call site reads `Text.MENU_QUIT` and
@@ -25,7 +26,6 @@ Every other cell is left exactly as it was found.
 import csv
 import io
 import json
-import math
 import re
 import sys
 
@@ -33,30 +33,6 @@ CSV_PATH = "locale/translations.csv"
 PIECES = "assets/pieces.json"
 FIND_NOTE = "A piece of furniture the player finds."
 FIND_BUDGET = ("13", "11", "180")
-
-# Latin-1 accents only: all of these are in Bungee's 1082 codepoints, measured.
-ACCENT = str.maketrans({
-    "a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú", "n": "ñ", "c": "ç",
-    "A": "Á", "E": "É", "I": "Í", "O": "Ó", "U": "Ú", "N": "Ñ", "C": "Ç",
-})
-PAD = "ëxtràlóng"
-GROW = 0.4
-MARK = re.compile(r"%[ds]")
-
-
-def pseudo(text: str) -> str:
-    if not text:
-        return ""
-    # Accent the words, never a placeholder: `%d` must survive for the `%` operator.
-    parts = MARK.split(text)
-    marks = MARK.findall(text)
-    out = parts[0].translate(ACCENT)
-    for mark, part in zip(marks, parts[1:]):
-        out += mark + part.translate(ACCENT)
-    want = math.ceil(len(text) * GROW)
-    pad = (PAD * (want // len(PAD) + 1))[:want]
-    return "[" + out + "·" + pad + "]"
-
 
 TEXT_PATH = "scripts/text.gd"
 
@@ -85,11 +61,68 @@ def write_text(keys) -> None:
     open(TEXT_PATH, "w", encoding="utf-8", newline="").write(chr(10).join(lines) + chr(10))
 
 
+FONT_SOURCE = "art_source/fonts"
+FONT_OUT = "assets/fonts"
+## Locale column -> the face Style.FALLBACKS draws it in when Bungee cannot.
+CJK_FACES = {
+    "ja": "MPLUSRounded1c-Regular.ttf",
+    "zh_CN": "NotoSansSC-Variable.ttf",
+    "ko": "NotoSansKR-Variable.ttf",
+}
+## Kept in every subset whatever the table says: CJK and full-width punctuation, the
+## ideographic space, full-width digits and letters, so a later string reaching for one of
+## them does not draw tofu before this is re-run.
+CJK_ALWAYS = (
+    "".join(chr(c) for c in range(0x3000, 0x3040))
+    + "".join(chr(c) for c in range(0xFF01, 0xFF5F))
+)
+## Every hiragana and katakana, for the Japanese face only.
+KANA = "".join(chr(c) for c in range(0x3040, 0x3100))
+
+
+def subset_fonts(body, col) -> None:
+    import os
+    from fontTools import subset
+
+    # Text written straight into the scripts, not the table: the flag board names each
+    # language in itself (Prefs.LANGUAGES), drawn in that language's face. And the sample
+    # words tools/shot_fonts.tscn photographs, so the probe never shows tofu the game cannot.
+    script_cjk = set()
+    sources = [os.path.join("scripts", n) for n in os.listdir("scripts") if n.endswith(".gd")]
+    sources.append(os.path.join("tools", "font_samples.gd"))
+    for source in sources:
+        if os.path.exists(source):
+            text = open(source, encoding="utf-8").read()
+            script_cjk.update(ch for ch in text if ord(ch) >= 0x2E80)
+    for column, face in CJK_FACES.items():
+        src = os.path.join(FONT_SOURCE, face)
+        if not os.path.exists(src):
+            print("  no %s: fonts left as they are" % src)
+            continue
+        used = set(CJK_ALWAYS) | script_cjk | (set(KANA) if column == "ja" else set())
+        for row in body:
+            used.update(row[col[column]])
+        used = {ch for ch in used if ord(ch) > 0x7F}
+        options = subset.Options()
+        options.layout_features = ["*"]
+        options.name_IDs = ["*"]
+        options.notdef_outline = True
+        font = subset.load_font(src, options)
+        subsetter = subset.Subsetter(options)
+        subsetter.populate(unicodes=[ord(ch) for ch in used])
+        subsetter.subset(font)
+        out = os.path.join(FONT_OUT, face)
+        subset.save_font(font, out, options)
+        print("  %s: %d characters, %.0f KB" % (face, len(used), os.path.getsize(out) / 1024))
+
+
 def main() -> int:
     rows = list(csv.reader(open(CSV_PATH, encoding="utf-8")))
     head = rows[0]
-    if "qps" not in head:
-        head.append("qps")
+    if "qps" in head:  # the pseudo-locale was a debug aid, dropped 2026-10-03
+        drop = head.index("qps")
+        rows = [r[:drop] + r[drop + 1:] for r in rows]
+        head = rows[0]
     col = {name: i for i, name in enumerate(head)}
     body = [r + [""] * (len(head) - len(r)) for r in rows[1:]]
     by_key = {r[col["keys"]]: r for r in body}
@@ -117,9 +150,6 @@ def main() -> int:
             row[col["en"]] = title
     orphans = [k for k in by_key if k.startswith("DECOR_") and k not in titles]
 
-    for row in body:
-        row[col["qps"]] = pseudo(row[col["en"]])
-
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(head)
@@ -127,6 +157,7 @@ def main() -> int:
     open(CSV_PATH, "w", encoding="utf-8", newline="").write(out.getvalue())
 
     write_text([r[col["keys"]] for r in body])
+    subset_fonts(body, col)
 
     print("%d rows, %d find titles" % (len(body), len(titles)))
     for key in added:

@@ -79,7 +79,7 @@ def measure(slug: str) -> dict:
     wins, except that a winner under DOUBLE_UNDER whose double scores within DOUBLE_NEAR of
     it is taken at the double: a song's half-time always scores well (Habibs' 72 beat its
     own 144 by a hair), and a turtle nodding at half the song's pace reads as off the beat."""
-    env = onsets(decode(os.path.join(DIR, slug + ".mp3")))
+    env = onsets(decode(os.path.join(DIR, slug + ".ogg")))
     env = np.maximum(env, np.maximum(np.roll(env, 1), np.roll(env, -1)))
     scored = {}
     for bpm in np.arange(MIN_BPM, MAX_BPM + 0.001, 0.05):

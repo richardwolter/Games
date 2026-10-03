@@ -15,8 +15,12 @@ extends SceneTree
 ## And the placeholders: every `%d` / `%s` in `en` must appear the same number of times in a
 ## translation, or the game's `%` operator throws at the call site.
 ##
+## And the glyphs: every character must be in the locale's face or its fallback. The CJK
+## fonts ship cut down to the characters the table used when `tools/build_translations.py`
+## last ran (2026-10-03), so a new word draws as tofu until that is re-run; this catches it.
+##
 ## Writes `tools/last_text_fit.log` (by locale, worst first) and exits 1 if anything is OVER
-## or a placeholder is wrong, so it can gate a commit. **English is expected to fit
+## a placeholder is wrong or a glyph is missing, so it can gate a commit. **English is expected to fit
 ## everywhere** — an English OVER means the budget is wrong, not the word.
 
 const Style := preload("res://scripts/style.gd")
@@ -24,7 +28,6 @@ const Style := preload("res://scripts/style.gd")
 const CSV_PATH := "res://locale/translations.csv"
 const LOG_PATH := "res://tools/last_text_fit.log"
 const LADDER: Array[int] = [26, 20, 16, 13, 11]
-const PSEUDO := "qps"
 
 
 func _init() -> void:
@@ -51,6 +54,7 @@ func _init() -> void:
 		var over: Array[String] = []
 		var marks: Array[String] = []
 		var empty := 0
+		var missing := {}
 		for r in range(1, rows.size()):
 			var row: PackedStringArray = rows[r]
 			var key := row[col["keys"]]
@@ -58,6 +62,9 @@ func _init() -> void:
 			if text.is_empty():
 				empty += 1
 				continue
+			for ch in text:
+				if ch.unicode_at(0) >= 0x20 and not face.has_char(ch.unicode_at(0)):
+					missing[ch] = key
 			var en := _cell(row, col, "en")
 			if not _same_marks(en, text):
 				marks.append("  %s  '%s'  (en: '%s')" % [key, text, en])
@@ -94,11 +101,14 @@ func _init() -> void:
 					text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, least).x
 				over.append("  %-24s %4.0f px at %d against %3.0f (+%.0f)  '%s'" % [
 					key, at_least, least, width, at_least - width, text])
-		# The pseudo-locale is built to overflow; it is read, not gated. Its placeholders
-		# still count, because a pseudo string that breaks `%` breaks the game in `qps`.
-		bad += marks.size() + (0 if locale == PSEUDO else over.size())
-		lines.append("== %s  (%s)   fits %d  shrinks %d  OVER %d  bad marks %d  empty %d" % [
-			locale, face.get_font_name(), fits, shrinks.size(), over.size(), marks.size(), empty])
+		bad += marks.size() + over.size() + missing.size()
+		lines.append("== %s  (%s)   fits %d  shrinks %d  OVER %d  bad marks %d  empty %d  missing %d" % [
+			locale, face.get_font_name(), fits, shrinks.size(), over.size(), marks.size(), empty,
+			missing.size()])
+		if not missing.is_empty():
+			lines.append(" glyphs the face does not carry (re-run tools/build_translations.py):")
+			for ch: String in missing:
+				lines.append("  U+%04X '%s'  first in %s" % [ch.unicode_at(0), ch, missing[ch]])
 		if not over.is_empty():
 			lines.append(" OVER — the board must widen, or the words must change:")
 			lines.append_array(over)

@@ -4,7 +4,8 @@
 
 Writes `assets/music/`: each song as delivered, cut where the game stops it and with its
 trailing silence taken off, and the songs heard indoors a second time as a radio through a
-wall (the same file, squeezed into a band, a little drive, a slap of room, mono, 64 kbps).
+wall (the same file, squeezed into a band, a little drive, a slap of room, mono). Ogg Vorbis,
+see SONG_Q / RADIO_Q.
 Reimport afterwards (`<exe> --path . --headless --import`).
 
 Why cut the end in the file rather than at runtime: the station (`scripts/music_station.gd`)
@@ -35,6 +36,11 @@ PLAN = {
 
 # Trailing silence under this is taken off the end.
 SILENCE_DB = -50
+## Ogg Vorbis quality: 5 is about 160 kbps, half the 320 kbps MP3 the songs used to ship as
+## (2026-10-03, the pre-release size pass). The radio copy is mono and band-limited, so
+## quality 0 (about 64 kbps) loses nothing it still has.
+SONG_Q = "5"
+RADIO_Q = "0"
 
 RADIO = ",".join([
     "pan=mono|c0=0.5*c0+0.5*c1",
@@ -71,12 +77,12 @@ def main():
         ]
         chain = ",".join(trim)
         if outdoors:
-            ffmpeg(["-i", src, "-af", chain, "-c:a", "libmp3lame", "-b:a", "320k",
-                    "-map_metadata", "-1", os.path.join(OUT, slug + ".mp3")])
+            ffmpeg(["-i", src, "-af", chain, "-c:a", "libvorbis", "-q:a", SONG_Q,
+                    "-map_metadata", "-1", os.path.join(OUT, slug + ".ogg")])
         if radio:
-            ffmpeg(["-i", src, "-af", chain + "," + RADIO, "-c:a", "libmp3lame",
-                    "-b:a", "64k", "-map_metadata", "-1",
-                    os.path.join(OUT, slug + "_radio.mp3")])
+            ffmpeg(["-i", src, "-af", chain + "," + RADIO, "-c:a", "libvorbis",
+                    "-q:a", RADIO_Q, "-map_metadata", "-1",
+                    os.path.join(OUT, slug + "_radio.ogg")])
         print("built", slug)
 
 

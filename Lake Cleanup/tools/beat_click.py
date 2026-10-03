@@ -17,7 +17,7 @@ SECONDS = 40.0
 
 table = json.load(open(os.path.join("assets", "music", "beats.json"), encoding="utf-8"))
 for slug, beat in table.items():
-    raw = subprocess.run(["ffmpeg", "-v", "quiet", "-i", os.path.join("assets", "music", slug + ".mp3"),
+    raw = subprocess.run(["ffmpeg", "-v", "quiet", "-i", os.path.join("assets", "music", slug + ".ogg"),
                           "-t", str(SECONDS), "-ac", "1", "-ar", str(RATE), "-f", "f32le", "-"],
                          capture_output=True, check=True).stdout
     x = np.frombuffer(raw, dtype=np.float32).copy() * 0.6
