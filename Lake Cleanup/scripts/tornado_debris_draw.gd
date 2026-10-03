@@ -43,21 +43,6 @@ static func draw_piece(
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## Every carried piece on one side of the funnel: `front` true for the half nearer the
-## camera (sin(angle) > 0, lower on the screen), false for the half behind. Back to front
-## within the half, so a piece passing in front of another covers it. `s` is the state the
-## harness hands `tick`; `s.debris[i].local` is relative to the base, which is the look's
-## own position.
-static func draw_debris(canvas: CanvasItem, s: Dictionary, front: bool, tint: Color = Color.WHITE) -> void:
-	var list: Array = []
-	for d: Dictionary in s.get("debris", []):
-		if bool(d["front"]) == front:
-			list.append(d)
-	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["depth"]) < float(b["depth"]))
-	for d: Dictionary in list:
-		draw_piece(canvas, d["def"], d["local"], float(d["rot"]), float(d["scale"]), float(d["alpha"]), tint)
-
-
 ## A filled ellipse of whole art pixels, centred on `centre` (local), half-width `rx` and
 ## half-height `ry` in world px. Rows of one art pixel; each row's ends snapped to the grid.
 static func pixel_ellipse(canvas: Node2D, centre: Vector2, rx: float, ry: float, colour: Color) -> void:
@@ -74,46 +59,6 @@ static func pixel_ellipse(canvas: Node2D, centre: Vector2, rx: float, ry: float,
 		if half < ART * 0.5:
 			continue
 		canvas.draw_rect(Rect2(c.x - half, c.y + float(r) * ART, half * 2.0, ART), colour)
-
-
-## An ellipse outline `thick` art pixels wide, the same grid as `pixel_ellipse`. `from`/`to`
-## (radians, 0 = right, PI/2 = front/down) draw only an arc of it; the default is all of it.
-static func pixel_ring(
-	canvas: Node2D, centre: Vector2, rx: float, ry: float, colour: Color, thick: int = 1,
-	from: float = 0.0, to: float = TAU
-) -> void:
-	if rx < 1.0 or colour.a <= 0.0:
-		return
-	var origin := canvas.global_position
-	var c := origin + snap(canvas, centre)
-	var steps := maxi(int((to - from) * maxf(rx, ry) / ART * 1.2), 8)
-	var done := {}
-	for i in steps + 1:
-		var a := lerpf(from, to, float(i) / float(steps))
-		var p := c + Vector2(cos(a) * rx, sin(a) * ry)
-		var cell := Vector2i(int(floor(p.x / ART)), int(floor(p.y / ART)))
-		for k in thick:
-			var key := cell + Vector2i(0, k)
-			if done.has(key):
-				continue
-			done[key] = true
-			canvas.draw_rect(Rect2(Vector2(key) * ART - origin, Vector2(ART, ART)), colour)
-
-
-## A line of whole art pixels from `a` to `b` (local), `thick` pixels square per step.
-static func pixel_line(canvas: Node2D, a: Vector2, b: Vector2, colour: Color, thick: int = 1) -> void:
-	var origin := canvas.global_position
-	var pa := origin + a
-	var pb := origin + b
-	var steps := maxi(int(ceil(pa.distance_to(pb) / ART)), 1)
-	var done := {}
-	for i in steps + 1:
-		var p := pa.lerp(pb, float(i) / float(steps))
-		var cell := Vector2i(int(floor(p.x / ART)), int(floor(p.y / ART)))
-		if done.has(cell):
-			continue
-		done[cell] = true
-		canvas.draw_rect(Rect2(Vector2(cell) * ART - origin, Vector2(ART * thick, ART * thick)), colour)
 
 
 ## A soft-free shadow on the water: a flat 2:1 ellipse of whole art pixels, `half_w` wide and

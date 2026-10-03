@@ -55,15 +55,6 @@ const CROWN_LIFE := 0.42
 ## drops are small and read better falling a little faster than the junk does.
 const DROP_GRAVITY := 1400.0
 
-## Below this there is no splash at all. A piece drifting down onto the water under
-## buoyancy alone is settling, not landing, and giving that a crown makes the lake
-## look permanently agitated.
-const MIN_SPEED := 135.0
-
-## Shortest gap between two splashes from the same body. Junk jostling on the
-## surface crosses the waterline many times a second, and without this every one of
-## those is a full crown.
-const RETRIGGER_DELAY := 0.22
 
 ## How far a ring spreads, as a multiple of its crown's span. Isometric, so a splash also
 ## gets the flat ring a side view could never show.
@@ -324,25 +315,6 @@ func wake(body: Object, at: Vector2, span: float, every: float = 0.16) -> void:
 	_last_ripple[id] = now
 	ripple(at, span)
 
-
-## Splash for a body that has just crossed the surface, if it was moving fast
-## enough to be worth one and hasn't splashed a moment ago.
-##
-## `width` is how wide the thing is in world units, which is most of what decides
-## how big a splash looks right — a pallet going in flat throws a long low sheet, a
-## bottle a small one, at the same speed.
-func splash_for(body: Node2D, speed: float, width: float) -> void:
-	if speed < MIN_SPEED:
-		return
-	var id := body.get_instance_id()
-	var now := float(Time.get_ticks_msec()) * 0.001
-	if now - float(_last_splash.get(id, -99.0)) < RETRIGGER_DELAY:
-		return
-	_last_splash[id] = now
-
-	var from_speed := clampf(speed / 720.0, 0.0, 1.0)
-	var from_size := clampf(width / 300.0, 0.15, 1.0)
-	splash(body.global_position, from_speed * 0.65 + from_size * 0.35)
 
 
 func _process(delta: float) -> void:

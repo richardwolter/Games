@@ -754,17 +754,6 @@ func _head_back() -> void:
 		_next_stop()
 
 
-## How hard this hull is working its engine, 0 to 1. Loading and unloading is the crane
-## hauling rubbish on and off at the island, which is the loudest the boat ever gets; under
-## way it is a cruise; docked it is off.
-func engine_effort() -> float:
-	match state:
-		State.LOADING, State.UNLOADING:
-			return 1.0
-		State.SAILING, State.RETURNING:
-			return 0.45
-	return 0.0
-
 
 ## One frame of travel along the current leg list.
 ## Returns true once the last waypoint is reached.

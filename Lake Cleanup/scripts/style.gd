@@ -127,10 +127,6 @@ const ROW_SCREEN := Color(0.227, 0.353, 0.141)
 const ROW_SAVE := Color(0.62, 0.46, 0.36)
 const ON_GOLD := Color(0.72, 0.52, 0.14)
 const ON_WATER := Color(0.353, 0.525, 0.678)
-## The net, wherever it is drawn as a picture of itself rather than as the thing in the lake:
-## on the shop's board and on the upgrades button. Near black, so the rubbish under it on the
-## board and the arrow beside it on the button both read against it.
-const NET_INK := Color(0.08, 0.07, 0.07, 0.92)
 
 ## The level on an upgrades row, after its name: the slider's clean-water blue, lifted a
 ## step so it reads on the row's murky plate. A level is not a price, so not the gold.
@@ -174,7 +170,6 @@ const CARVE_RIM: Array[Vector2] = [
 ## The three things the UI says with colour rather than words.
 const DANGER := Color(0.80, 0.24, 0.19)
 const SAFE := Color(0.44, 0.78, 0.42)
-const COOL := Color(0.36, 0.66, 0.74)
 
 ## How the angler is brought into the game's own light: how much saturation comes out, what
 ## colour the figure leans toward and how far, and how much of its brightness goes.
@@ -214,9 +209,7 @@ static func figure_tone(art: Color) -> Color:
 ## One near-black, three weights of it: a light veil for a disc behind a trophy, the normal
 ## dim behind a board, and the heavy wash a defeat screen puts over the whole game.
 const SCRIM_RGB := Color(0.03, 0.04, 0.05)
-const SCRIM_LIGHT := 0.35
 const SCRIM := 0.55
-const SCRIM_HEAVY := 0.72
 
 # ---------------------------------------------------------------------------------------
 # Interaction
@@ -327,12 +320,7 @@ const TEXT_TINY := 11
 # Layout
 # ---------------------------------------------------------------------------------------
 
-## The height of a stock button, the padding inside a panel, and the gap between the things
-## in it. PAD is the shed's existing value on purpose: the shed's floor is whatever is left
-## after its inventory list, so moving its padding moves where a dragged piece lands.
-const CONTROL_H := 40.0
 const PAD := Vector2(20.0, 16.0)
-const SEP := 8.0
 
 ## The margin around the HUD, and the gap between the pieces of it.
 const EDGE := 18.0
@@ -541,12 +529,6 @@ static func measure(text: String, size_px: int) -> Vector2:
 	return font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
 
 
-## The box a label wants, with the standard padding around it, placed with `at` as its top
-## left. For callers that size a button to its text rather than the other way round.
-static func button_box(label: String, size_px: int, at: Vector2) -> Rect2:
-	var span := measure(label, size_px)
-	return Rect2(at, span + LABEL_PAD * 2.0)
-
 
 ## A plaque with a label centred on it, and the hover and press the whole game shares.
 ##
@@ -686,14 +668,6 @@ static func ribbon_bites(box: Rect2, seed: int, chips: int) -> Array[Rect2]:
 	out.append(Rect2(box.end.x - 3.0, y + 6.0, 4.0, 8.0))
 	return out
 
-
-## The bites a button plank takes: one out of the top edge, one out of the bottom.
-static func button_bites(box: Rect2, seed: int) -> Array[Rect2]:
-	var wide := 5.0 + float(seed % 3)
-	var out: Array[Rect2] = []
-	out.append(Rect2(floorf(box.position.x + box.size.x * (0.2 + 0.5 * float(seed % 7) / 7.0)), box.position.y - 1.0, wide, 3.0))
-	out.append(Rect2(floorf(box.end.x - box.size.x * (0.15 + 0.4 * float(seed % 5) / 5.0)), box.end.y - 2.0, wide, 3.0))
-	return out
 
 
 static func rect_poly(box: Rect2) -> PackedVector2Array:

@@ -315,10 +315,6 @@ const BEDS: Array[StringName] = [&"lake_ambient", &"fireplace"]
 ## How far the lake goes under while the shed is open: heard through its wall.
 const AMBIENCE_DUCK := -14.0
 
-## Shortest gaps between repeats. A sweep lifting a dozen pieces in a second is a burst of
-## splashes, not a pile of them; coins landing on the same frame are one chink; a pointer
-## dragged across a board full of rows is not a drum roll.
-const SPLASH_GAP := 0.08
 const CHINK_GAP := 0.06
 const HOVER_GAP := 0.05
 ## The fleet rings no more than once in this many seconds, however many hulls set off, and
@@ -406,8 +402,6 @@ var _wade_wait: float = 0.0
 ## is the loudest thing on the way in, landing a frame or two after the entry splash, so it
 ## takes the entry's wide ladder; the repeats keep the narrow one (2026-09-30).
 var _wade_fresh: bool = false
-## The wash's first play since the wade began, angler or dog: played at ENTRY_DB.
-var _wade_opening: bool = true
 
 var _rng := RandomNumberGenerator.new()
 
@@ -718,14 +712,6 @@ func _gap(name: StringName, gap: float) -> bool:
 	_last[name] = now
 	return true
 
-
-## A piece coming up out of the water. `strength` runs 0 to 1 and is the number the drawn
-## splash is given: a heavier piece is louder and lower. No more than one every SPLASH_GAP.
-func play_splash(strength: float) -> void:
-	if not _gap(&"piece_splash", SPLASH_GAP):
-		return
-	var weight := clampf(strength, 0.0, 1.0)
-	play(&"piece_splash", lerpf(-4.0, 2.0, weight), lerpf(1.15, 0.85, weight))
 
 
 ## A thrown net landing. `caught` is whether the landing's own sweep took anything, so the

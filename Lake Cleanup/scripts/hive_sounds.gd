@@ -55,9 +55,6 @@ const BOOT: Array[StringName] = [
 	&"hive_swarm", &"hive_puff", &"hive_crackle", &"hive_pop", &"hive_crown", &"hive_done",
 	&"hive_hum",
 ]
-## The loops the room's steps own and play on their own players (`loop_stream`). Built on
-## first asking, never at boot.
-const ROOM_LOOPS: Array[StringName] = [&"hive_sizzle", &"hive_whirr", &"hive_pour"]
 ## How many takes a name is built in. `Sfx.next_step` never plays the same one twice in a row,
 ## so three is what stops a puff pumped five times from reading as one sound repeated.
 const TAKES := {&"hive_puff": 3, &"hive_crackle": 3}
@@ -188,18 +185,6 @@ static func loop_stream(name: StringName) -> AudioStream:
 		_cache[name] = make(name)
 	return _cache[name] as AudioStream
 
-
-## Whether a name is a recording rather than built, for the harness and for a step that wants
-## to know. A one-shot's numbered takes count.
-static func is_recorded(name: StringName) -> bool:
-	for path: String in [
-		DIR + String(name) + ".ogg",
-		DIR + String(name) + ".wav",
-		DIR + String(name) + "_1.wav",
-	]:
-		if ResourceLoader.exists(path):
-			return true
-	return false
 
 
 ## A copy of `stream` set to loop over the whole of itself. A wave file's loop end is in frames:

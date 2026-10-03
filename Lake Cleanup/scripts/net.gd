@@ -215,9 +215,6 @@ const CATCH_FIT := 0.9
 const CATCH_SCALE := 0.7
 const CATCH_PACKED := 0.62
 
-## How far a throw steps while looking for the first place along it that a cast stops being
-## legal, in tiles. `_reach_along` walks in these, and the aiming marker is what it feeds.
-const RING_STEP := 0.2
 
 ## How much lean an empty net has, against a full one, and how fast the lean follows the
 ## pull. Eased rather than set, so a net that changes direction or speed bends into it
@@ -1644,28 +1641,6 @@ func _within_mouth(at: Vector2) -> Vector2:
 		return at
 	return centre + gap / out
 
-
-## How far a throw in this direction actually gets, in tile coordinates: stepped out from
-## the angler until the range runs out or the water does. `towards` need not be normalised.
-##
-## This is the one place that answers "how far can I throw that way", and both the ring and
-## the aiming marker are built on it, so the drawn edge and the marker cannot disagree with
-## each other or with `can_cast_to`.
-func _reach_along(towards: Vector2) -> Vector2:
-	var from := angler.tile_pos
-	if towards.length_squared() < 0.000001:
-		return from
-	var step := towards.normalized() * RING_STEP
-	var reach := from
-	var out := from + step
-	while out.distance_to(from) <= range_tiles:
-		if Iso.island_fraction(out.x, out.y) < 1.0:
-			break
-		if Iso.shore_fraction(out.x, out.y) >= 1.0:
-			break
-		reach = out
-		out += step
-	return reach
 
 
 ## The pointer, answered before anything is thrown: a ghost of the mouth where the cast

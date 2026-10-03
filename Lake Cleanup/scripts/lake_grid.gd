@@ -1679,25 +1679,6 @@ func tile_of(index: int) -> Vector2i:
 	return Vector2i(index % Iso.COLS, index / Iso.COLS)
 
 
-## The tiles within `radius` of one, itself included. A diamond rather than a square, so
-## the worked area is a circle on the plane rather than a screen-space rhombus.
-##
-## Lives here rather than on any one tool: the net and the boat's skimmer take their bite
-## out of the lake the same way, and the shape of that bite is a property of the tile
-## field.
-func tiles_around(index: int, radius: int) -> PackedInt32Array:
-	var out := PackedInt32Array()
-	var centre := tile_of(index)
-	for dy in range(-radius, radius + 1):
-		var span := radius - absi(dy)
-		for dx in range(-span, span + 1):
-			var tx := centre.x + dx
-			var ty := centre.y + dy
-			if tx < 0 or ty < 0 or tx >= Iso.COLS or ty >= Iso.ROWS:
-				continue
-			out.append(index_of(tx, ty))
-	return out
-
 
 ## The tiles whose centres are within `radius` tiles of one, itself included.
 ##

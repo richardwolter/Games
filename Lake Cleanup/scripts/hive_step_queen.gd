@@ -322,10 +322,6 @@ func queen_pos() -> Vector2:
 	return _queen.pos
 
 
-## Where the glass's middle is now, painted pixels.
-func lens_pos() -> Vector2:
-	return _lens
-
 
 ## Put the glass at `p` and hold it there until the pointer or the stick moves: for a probe's
 ## picture, which has no hand on the mouse.
@@ -333,9 +329,6 @@ func aim(p: Vector2) -> void:
 	_lens = p
 	_hold = true
 
-
-func is_found() -> bool:
-	return _found
 
 
 ## Find her where she stands and say `finished` at once, the payoff cut short.
@@ -446,11 +439,6 @@ func _find() -> void:
 		)
 	_hive_sound(&"hive_crown")
 
-
-## A miss for the harness, as a click beside her would be.
-func miss_at(p: Vector2) -> void:
-	if not _found:
-		_miss(p)
 
 
 ## How many workers have buzzed off the frame after a miss.

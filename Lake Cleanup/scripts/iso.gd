@@ -409,19 +409,6 @@ static func basin_extent(grow: float = 0.0) -> Vector2:
 	return hi - lo
 
 
-## One point on the shore, at an angle round the lake and a distance out past the waterline,
-## in world space. `shore_outline` is this walked all the way round; anything scattered
-## along the bank wants one point at a time instead.
-##
-## The same wobble as `shore_outline` and `shore_fraction`, and it has to stay the same: the
-## sand drawn here and the water's own edge are the same line seen from two sides.
-static func shore_point(angle: float, grow: float = 0.0) -> Vector2:
-	var wobble := 1.0 + 0.09 * sin(angle * 3.0) + 0.05 * sin(angle * 5.0 + 1.3)
-	return tile_to_world(
-		CENTRE.x + cos(angle) * (RADIUS.x * wobble + grow),
-		CENTRE.y + sin(angle) * (RADIUS.y * wobble + grow)
-	)
-
 
 ## A point on the basin, in tile coordinates, at `angle` around the middle and `inset` of
 ## the way out to the shore. 1.0 lands exactly on the waterline.
@@ -458,57 +445,6 @@ static func island_point(angle: float, grow: float = 0.0) -> Vector2:
 	)
 
 
-## How far past the island's waterline a spot is, in world pixels. Negative on the beach,
-## zero on the waterline, positive out in the water.
-##
-## `island_fraction` answers the same question as a fraction of the island's radius, which
-## is not the same distance twice: the island is an ellipse in tile space and the projection
-## stretches one diagonal against the other, so a tenth of a radius is four times as many
-## pixels off the eastern shore as it is off the northern one. Anything that wants to be the
-## same distance out all the way round — where a walker may stand, how deep it is standing —
-## has to ask in pixels.
-##
-## Both the spot and the edge below it lie on the same ray out of the island's middle, in
-## tile space and so also on screen, because the projection is linear. That makes this a
-## comparison of two lengths along one line rather than a search for the nearest point on a
-## wobbling outline.
-static func past_island(at: Vector2) -> float:
-	var middle := tile_to_world(ISLAND_CENTRE.x, ISLAND_CENTRE.y)
-	var here := tile_to_world(at.x, at.y) - middle
-	if here.length_squared() < 0.0001:
-		return -island_point(0.0).distance_to(middle)
-	var edge := island_point(basin_angle_of_island(at)) - middle
-	return here.length() - edge.length()
-
-
-## The angle round the island a spot sits at, as `island_point` takes it.
-static func basin_angle_of_island(at: Vector2) -> float:
-	return atan2(
-		(at.y - ISLAND_CENTRE.y) / ISLAND_RADIUS.y, (at.x - ISLAND_CENTRE.x) / ISLAND_RADIUS.x
-	)
-
-
-## The island as the water shader sees it, with both its radii pulled in by `shrink` tiles.
-##
-## Not the same curve as `island_outline(-shrink)`, and the difference is the whole point.
-## That one pushes the outline along its own radius, which is one distance; this one shrinks
-## the ellipse, which on a shape half again as wide as it is tall is a third of a tile
-## further in at the ends of the long axis than at the ends of the short one. The shader
-## shrinks, so anything meant to sit on the water's edge has to shrink too.
-static func island_ring(shrink: float, steps: int = 96) -> PackedVector2Array:
-	var r := ISLAND_RADIUS - Vector2(shrink, shrink)
-	var out := PackedVector2Array()
-	for i in steps:
-		var angle := TAU * float(i) / float(steps)
-		var wobble := (
-			1.0 + 0.07 * sin(angle * 3.0 + 0.7) + 0.035 * sin(angle * 5.0 - 0.4)
-			+ 0.02 * sin(angle * 7.0 + 2.1)
-		)
-		out.append(tile_to_world(
-			ISLAND_CENTRE.x + cos(angle) * r.x * wobble,
-			ISLAND_CENTRE.y + sin(angle) * r.y * wobble
-		))
-	return out
 
 
 ## How far out a spot is on that same shrunken island, as a fraction: 1 exactly on the
@@ -526,16 +462,3 @@ static func island_ring_fraction(at: Vector2, shrink: float) -> float:
 	)
 	return len / wobble
 
-
-static func island_outline(grow: float = 0.0, steps: int = 96) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for i in steps:
-		var angle := TAU * float(i) / float(steps)
-		var wobble := (
-			1.0 + 0.07 * sin(angle * 3.0 + 0.7) + 0.035 * sin(angle * 5.0 - 0.4)
-			+ 0.02 * sin(angle * 7.0 + 2.1)
-		)
-		var tx := ISLAND_CENTRE.x + cos(angle) * (ISLAND_RADIUS.x * wobble + grow)
-		var ty := ISLAND_CENTRE.y + sin(angle) * (ISLAND_RADIUS.y * wobble + grow)
-		out.append(tile_to_world(tx, ty))
-	return out

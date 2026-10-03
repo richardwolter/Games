@@ -261,7 +261,7 @@ enum Kind { NONE, WATER, SAND, GRASS }
 var layer: Layer = Layer.OUTSIDE
 
 ## The tunables, as the ground is drawn now. Constants above are the defaults; these are
-## what the debug tuner (`GroundTuner`, F4) moves, and what `retune` pushes to the shader.
+## what `retune` pushes to the shader (`tools/shot_grass.gd` moves them).
 var beach_width: float = SAND_OUT
 var wander_amp: float = WANDER_AMP
 var wander_scale: float = WANDER_SCALE
@@ -738,10 +738,6 @@ func covers_at(foot: Vector2) -> bool:
 	var middle := Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)
 	return foot.y > middle.y and out_of_water(t.x, t.y) >= COVER_FROM
 
-
-## How many props the cover draws again, for the harness.
-func cover_count() -> int:
-	return _cover_indices.size() / 6
 
 
 ## A tree's or a rock's shadow: the same picture again, laid out on the ground away from the

@@ -200,16 +200,6 @@ var _blobs: Array[Vector3] = []
 var _blob_shift := Vector2.ZERO
 
 
-func harness_opts() -> Dictionary:
-	# The crown splash of every lift and the harness's own foot drips are the pale wedge and
-	# squares the critic found at B's foot; this look draws its own foot. The net lands beside
-	# the foot instead of round it. The crop is taller, so the cloud's towers are in the frame.
-	# Landings and hits make no crown splash either (a ring only): the look draws its own burst
-	# at the foot on a hit, in single art pixels.
-	return {"lift_splash": false, "foot_spray": false, "land_splash": false, "hit_spray": false,
-		"net_beside": true, "net_off": 130.0,
-		"crop": Rect2i(400, 0, 1120, 800)}
-
 
 func setup(ctx: Dictionary) -> void:
 	_ctx = ctx
@@ -692,16 +682,6 @@ func _lay_lip(eye_c: Vector2, touch: bool) -> void:
 	_lip_lobes.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["depth"]) < float(y["depth"]))
 
 
-func _paint_lip(on: Node2D) -> void:
-	if _s.is_empty() or _lip_lobes.is_empty():
-		return
-	var flash: float = _s.get("flash", 0.0)
-	var up := 1 if flash > 0.35 else 0
-	var buf := {}
-	for lb: Dictionary in _lip_lobes:
-		_paint_dissolving(buf, on.global_position, lb, int(lb["tone"]) - up)
-	_draw_buffer(on, buf)
-
 
 # ======================================================================================
 # The cloud and the lip, painted off the main thread (the port's one change to the drawing)
@@ -861,13 +841,6 @@ func _events(s: Dictionary) -> void:
 func _hits_react(s: Dictionary) -> void:
 	_hits_seen = s["hits"]
 
-
-func _puff_lobes() -> Array[Vector3]:
-	var out: Array[Vector3] = [Vector3(0.0, 0.0, 1.0)]
-	out.append(Vector3(_rng.randf_range(-1.0, -0.6), _rng.randf_range(-0.05, 0.15), _rng.randf_range(0.55, 0.75)))
-	if _rng.randf() < 0.7:
-		out.append(Vector3(_rng.randf_range(0.6, 1.0), _rng.randf_range(-0.15, 0.05), _rng.randf_range(0.45, 0.7)))
-	return out
 
 
 func _tick_puffs(delta: float) -> void:
@@ -1043,19 +1016,6 @@ func _shade(idx: int, alpha: float) -> Color:
 # The cloud (z 23)
 # ======================================================================================
 
-func _paint_cloud(on: Node2D) -> void:
-	if _s.is_empty():
-		return
-	var flash: float = _s.get("flash", 0.0)
-	var up := 1 if flash > 0.35 else 0
-	var origin := on.global_position
-	var buf := {}
-	_blobs.clear()
-	_lobes.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["depth"]) < float(y["depth"]))
-	for lb: Dictionary in _lobes:
-		_paint_dissolving(buf, origin, lb, int(lb["tone"]) - up)
-	_paint_vortex(buf, origin, up)
-	_draw_buffer(on, buf)
 
 
 ## A lobe that is still whole, being bitten away, or broken into small puffs drifting apart.

@@ -49,31 +49,10 @@ const WAX_WALL := Color(190 / 255.0, 150 / 255.0, 84 / 255.0)
 ## A bee drawn in code rather than off the sheet: gold, stripe, thorax, head, and the wings.
 const BEE_GOLD := Color(244 / 255.0, 184 / 255.0, 40 / 255.0)
 const BEE_STRIPE := Color(44 / 255.0, 30 / 255.0, 20 / 255.0)
-const BEE_THORAX := Color(116 / 255.0, 76 / 255.0, 40 / 255.0)
-const BEE_HEAD := Color(34 / 255.0, 24 / 255.0, 18 / 255.0)
-const WING := Color(226 / 255.0, 240 / 255.0, 250 / 255.0, 210 / 255.0)
-const WING_EDGE := Color(255 / 255.0, 255 / 255.0, 255 / 255.0, 235 / 255.0)
 ## The finds' star gold, the hive's white trim, and the near-black every piece is inked in.
 const GOLD := Color(255 / 255.0, 204 / 255.0, 77 / 255.0)
 const TRIM := Color(248 / 255.0, 244 / 255.0, 232 / 255.0)
-const TRIM_SHADE := Color(208 / 255.0, 200 / 255.0, 184 / 255.0)
 const OUT := Color(24 / 255.0, 18 / 255.0, 17 / 255.0)
-## An empty honey window: the dark of the box behind the glass.
-const DARK_GLASS := Color(70 / 255.0, 50 / 255.0, 34 / 255.0)
-## The smoker's puffs, lit to shaded.
-const SMOKE_LIT := Color(250 / 255.0, 252 / 255.0, 252 / 255.0)
-const SMOKE := Color(222 / 255.0, 228 / 255.0, 232 / 255.0)
-const SMOKE_SHADE := Color(184 / 255.0, 192 / 255.0, 200 / 255.0)
-## The sky blue paint, lit to deep, and the coral roof: for anything drawn in the hive's own
-## colours at runtime (a lid, a flake).
-const SKY_LIT := Color(206 / 255.0, 230 / 255.0, 248 / 255.0)
-const SKY := Color(150 / 255.0, 190 / 255.0, 228 / 255.0)
-const SKY_SHADE := Color(108 / 255.0, 150 / 255.0, 198 / 255.0)
-const SKY_DEEP := Color(72 / 255.0, 106 / 255.0, 152 / 255.0)
-const CORAL_LIT := Color(246 / 255.0, 140 / 255.0, 104 / 255.0)
-const CORAL := Color(220 / 255.0, 98 / 255.0, 72 / 255.0)
-const CORAL_SHADE := Color(180 / 255.0, 68 / 255.0, 52 / 255.0)
-const CORAL_DEEP := Color(136 / 255.0, 46 / 255.0, 38 / 255.0)
 ## The white a star's middle burns at: the lake's own `LakeGrid.STAR_WHITE`, so a star in
 ## the room and a star on a find out on the water are one star.
 const STAR_WHITE := Color(1.0, 0.97, 0.85)
@@ -212,17 +191,6 @@ static func comb() -> Dictionary:
 	_load()
 	return _comb.duplicate()
 
-
-## The top left of comb cell (q, r) inside the frame, in painted pixels: the builder's own
-## rule, odd rows shoved `offset` along. Zero with no comb.
-static func comb_cell(q: int, r: int) -> Vector2:
-	_load()
-	if _comb.is_empty():
-		return Vector2.ZERO
-	var inner: Rect2 = _comb["inner"]
-	var pitch: Vector2 = _comb["pitch"]
-	var shove := float(_comb["offset"]) if r % 2 == 1 else 0.0
-	return inner.position + Vector2(q * pitch.x + shove, r * pitch.y)
 
 
 ## Draw a piece with its anchor `anchor_name` landing on `at`, in the canvas pixels of the

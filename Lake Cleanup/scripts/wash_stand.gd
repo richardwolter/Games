@@ -45,7 +45,6 @@ const ROOM_WIDE := 0.46
 ## 0.7 since the pallet (2026-10-01): one zoom for every find is set by the tallest, and at
 ## 0.5 that left the rest small with half the screen bare above them.
 const ROOM_TALL := 0.7
-const STAND_AT := 0.63
 const ZOOM_LEAST := 2
 const ZOOM_MOST := 14
 
@@ -143,10 +142,6 @@ const GLEAM_GOLD := Color(1.0, 0.86, 0.42)
 ## (`_stand_pad`), which is how far past the piece the wood runs for this piece, in cells.
 const STAND_WIDE := 0.54
 const SLIDE_PACE := 1.5
-## And over the front of it (Richard, same day): some of what lands goes straight over the
-## near edge, and a drop sliding along may turn over it at any cell. It creeps down the
-## plank's face at `FRONT_CREEP` of its pace, then lets go and falls.
-const FRONT_ON_LANDING := 0.35
 const FRONT_A_CELL := 0.05
 const FRONT_CREEP := 0.55
 
@@ -182,7 +177,6 @@ const WET_PER := 0.14
 const WET_DEEP := 3
 const WET_DRY := 0.12
 const WET_INK := Color(0.02, 0.05, 0.03, 0.34)
-const STAND_TALL := 20.0
 const FLOOR_AT := 0.9
 
 ## How many times a second the patterns step: the stream's dashes, the impact's froth, the

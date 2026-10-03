@@ -364,19 +364,6 @@ const ROOM_SCRIM := Color(0.09, 0.055, 0.03, 0.66)
 ## gives it back where the light falls.
 const ROOM_DIM := Color(0.05, 0.03, 0.02, 0.26)
 
-## The room's shadows (2026-10-02, one sun, decided with Richard). The light in here is the
-## sun through the round window in the left wall, so everything in the room — the player, the
-## dogs and every standing piece of furniture — throws its shadow **away from the window**:
-## see "The window is the light" below for where and how far. `ROOM_SHADE_NO_DAY` is a
-## shadow's length with no day to ask (a harness, a probe).
-##
-## The ink is the land's (`Shade.On.LAND`): the day's own, the overcast and the lightning in
-## it, so a shower thins the room's shadows as it thins the shaft and a strike hardens them.
-## Walkers are their own frame laid under `Shade.lying`, the lake's rule; furniture is a
-## front-on painting of a solid, so it is swept (`Shade.sweep`'s rule, worked here off cached
-## runs, see `_runs_of`). All of it lies on the floor under every piece and walker, in one
-## `CanvasGroup` (`_shades`) so overlaps composite once.
-const ROOM_SHADE_NO_DAY := 0.35
 
 ## The window is the light (2026-10-02, second pass, Richard: "the window should be what
 ## affects shadow, so objects closer to the light source should have a darker shadow, and
@@ -452,10 +439,6 @@ void fragment() {
 ## a sprite cannot be turned white by a modulate, so this does it.
 const SILHOUETTE_CODE := "shader_type canvas_item;\nvoid fragment() {\n\tCOLOR.rgb = vec3(1.0);\n}\n"
 
-## What a piece leaves the store as: view 0, which the catalogue guarantees faces front and
-## is switched off. Which view is "on" is the catalogue's to say (`Sheets.is_on`), not a
-## fixed index: the toilet has two faces in each state.
-const STATE_OFF := 0
 
 ## How wide a floorboard is, in source pixels. The boards are the room, not the grid: the
 ## grid is half this and drawing a line every four screen pixels reads as corduroy.
@@ -1649,20 +1632,6 @@ func _trim() -> Vector4:
 		side, float(BORDER_HORIZONTAL.get_height()), side, float(BORDER_SILL.get_height())
 	)
 
-
-## The same question, asked by one of the two things that walk about in here, with the other
-## one counted as furniture.
-##
-## Tight, like the rule outdoors: the dog is meant to be able to come and stand beside you,
-## and only walking through you is refused. Enforced only on somebody not already inside the
-## other — a chair put down on the pair of them, or a dog that padded up while the room was
-## being rearranged, must not leave either of them pinned.
-func _clear_of(where: Vector2, from: Vector2, other: Vector2, over: Dictionary = {}) -> bool:
-	if not _dog_may_stand(where, over):
-		return false
-	if from.distance_to(other) < ROOM_PERSONAL:
-		return true
-	return where.distance_to(other) >= ROOM_PERSONAL
 
 
 ## The same, against several others at once — the pack, or the pack and the player.

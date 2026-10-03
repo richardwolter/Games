@@ -179,7 +179,6 @@ const PIXEL := 2.0
 ## sky and its trees are small, the lake narrows towards it, and the near beach is broad.
 const EYE := 0.43
 const NEAR_D := 1.6
-const LAWN_D := 4.0
 const SHORE_D := 7.5
 const FAR_D := 33.5
 ## The far bank's strip is drawn at one canvas pixel a painted one, half the near grain:

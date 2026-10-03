@@ -11,8 +11,6 @@ const PATH := "res://resources/palette.tres"
 ## values are Color objects. Populated from tile histogram at generation time.
 var colors: Dictionary = {}
 
-## Raw histogram of all pixels in the pack (color -> count). Sorted by frequency.
-var histogram: Dictionary = {}
 
 ## Dominant grass color (most frequent from grass tiles).
 @export var grass_light: Color = Color.WHITE
@@ -100,12 +98,3 @@ static func dress_foam(material: ShaderMaterial, alpha: float) -> void:
 	material.set_shader_parameter(&"foam", body)
 	material.set_shader_parameter(&"foam_core", palette.foam_light)
 
-
-## Get a named color from the palette.
-func get_color(name: String) -> Color:
-	return colors.get(name, Color.WHITE)
-
-
-## Set a named color.
-func set_color(name: String, color: Color) -> void:
-	colors[name] = color

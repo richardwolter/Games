@@ -280,24 +280,6 @@ func faces_done() -> int:
 	return _faces_done
 
 
-## The rows open on the face in hand, of `rows_total()`.
-func rows_open() -> int:
-	return _rows
-
-
-func rows_total() -> int:
-	return _rows_total
-
-
-## The share of the face in hand that is open, by rows.
-func cut_share() -> float:
-	return float(_rows) / float(maxi(_rows_total, 1))
-
-
-## The blade's top edge on the art grid, painted pixels.
-func knife_y() -> float:
-	return _knife
-
 
 ## The knife's own sizzle player, for the harness (it must be on SFX). Null with no stream.
 func sizzle_player() -> AudioStreamPlayer:
@@ -1031,27 +1013,6 @@ func _span(x: float, from: float, to: float, ink: Color, alpha: float) -> void:
 		_box(Vector2(x, from), Vector2(1.0, to - from), _ink(ink, alpha))
 
 
-## The capping tray: steel, a pool of honey rising with what has been cut, the heap of wax in
-## it.
-func _draw_tray() -> void:
-	var t := _tray
-	_box(t.position + Vector2(0.0, -1.0), t.size, HiveArt.OUT)
-	_box(t.position + Vector2(1.0, 0.0), t.size - Vector2(2.0, 2.0), STEEL_BASE)
-	_box(t.position + Vector2(1.0, 0.0), Vector2(t.size.x - 2.0, 3.0), STEEL_HI)
-	_box(t.position + Vector2(1.0, t.size.y - 4.0), Vector2(t.size.x - 2.0, 1.0), STEEL_SHADE)
-	_box(t.position + Vector2(1.0, 3.0), Vector2(1.0, t.size.y - 7.0), STEEL_LIT)
-	var pool := roundf(_pool)
-	var top := t.position.y + 9.0 - pool
-	_box(Vector2(t.position.x + 5.0, top), Vector2(t.size.x - 10.0, pool), HiveArt.HONEY)
-	_box(Vector2(t.position.x + 5.0, top), Vector2(t.size.x - 10.0, 1.0), HiveArt.HONEY_LIGHT)
-	if pool >= 3.0:
-		for k in 3:
-			_box(Vector2(t.position.x + 58.0 + k * 70.0, top + 2.0), Vector2(14.0, 1.0), HiveArt.HONEY_SHINE)
-	for bit: Dictionary in _heap:
-		var at: Vector2 = bit["at"]
-		var ink: Color = HiveArt.WAX_LIT if bool(bit["lit"]) else HiveArt.WAX_SHADE
-		_box(at, Vector2(float(bit["w"]), float(bit["h"])), ink)
-
 
 ## What is in the air: beads of honey, crumbs of wax, and the sheet on its way to the tray.
 func _draw_falling() -> void:
@@ -1166,7 +1127,6 @@ const CURTAIN_FALL := 120.0
 const RUN_BASE := 80.0
 const RUN_DEEP := 8.0
 const SPREAD_RATE := 6.0
-const SPILL_AT := 5.2
 const DEEP_MOST := 11.0
 ## The tin's rim is this deep: honey over it bulges above the rim.
 const RIM := 3.0

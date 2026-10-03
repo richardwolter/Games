@@ -333,10 +333,6 @@ func scale_of(name: StringName) -> float:
 	return float(scales.get(String(name), 1.0))
 
 
-## How much bigger the wash stand draws this find than the size it would be fitted to.
-func wash_scale_of(name: StringName) -> float:
-	return float(wash_scales.get(String(name), 1.0))
-
 
 ## How big one restored view is drawn in the shed, in source pixels: the art times the
 ## piece's scale. Every shed measurement — footprint, stamp, ghost — goes through this.
@@ -407,14 +403,6 @@ func seat_of(name: StringName, view: int) -> int:
 		return 0
 	return mini(rests[posmod(view, rests.size())], int(view_size_of(name, view).y))
 
-
-## Is there any view of this piece a dog may lie on? Asked when the shed builds its seat
-## table, so a piece nobody authored a seat for is never walked to.
-func has_seat(name: StringName) -> bool:
-	for lift in seats.get(String(name), PackedInt32Array()) as PackedInt32Array:
-		if lift > 0:
-			return true
-	return false
 
 
 ## How many restored faces a piece has. One means there is nothing for R or E to do.
@@ -543,9 +531,6 @@ func cells_of(name: StringName) -> Vector2i:
 	return cells.get(String(name), Vector2i.ONE) as Vector2i
 
 
-func fill_of(name: StringName) -> float:
-	return float(fill.get(String(name), 1.0))
-
 
 ## How many cells of a given size a piece covers, rounded to the nearest rather than up.
 ##
@@ -594,11 +579,3 @@ func lies_flat(name: StringName) -> bool:
 func uv_of(box: Rect2) -> Rect2:
 	return Rect2(box.position / _size, box.size / _size)
 
-
-## One piece as a texture in its own right, for the HUD: buttons and inventory rows want
-## something they can hand to a TextureRect rather than a rectangle they have to draw.
-func texture_of(name: StringName, cleaned: bool = false) -> AtlasTexture:
-	var cut := AtlasTexture.new()
-	cut.atlas = atlas
-	cut.region = alt_region_of(name) if cleaned else region_of(name)
-	return cut

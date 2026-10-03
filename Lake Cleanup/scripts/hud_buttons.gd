@@ -44,7 +44,6 @@ const SIDE_TALL := 0.52
 const SIDE_HALF := 0.46
 const BOAT_TALL := 0.64
 const BOAT_LIFT := 0.12
-const SIDE_IN := 0.04
 ## How much of the ferry and the dog the arrow covers, as a fraction of their own width.
 ## Placed by their **drawn** edges rather than by a slot, because a slot centres whatever it
 ## is given and the ferry came out almost entirely behind the arrow.
@@ -94,12 +93,8 @@ const FAN_ASPECT := 1.4
 ## `DECOR_DIM`. Depth the eye reads without having to measure sizes.
 const FAN_FADE := 0.4
 
-## Retired with the band (2026-09-17): every find sat between these two fractions down the
-## face, which put the whole heap in the lower 58% of it.
-const DECOR_BAND := Vector2(0.42, 0.98)
 const DECOR_LEAST := 0.18
 const DECOR_MOST := 0.42
-const DECOR_SPREAD := 0.55
 const DECOR_DIM := Color(0.82, 0.86, 0.88)
 const SHED_TALL := 0.78
 ## The button's word is `Text.HUD_DECORATE`, read at draw time.
@@ -112,9 +107,6 @@ const SHED_TALL := 0.78
 ## shorter plates a generous inset is what drops the figure a rung.
 const PANEL_INSET := 2.0
 
-const COIN_RIM := 2.0
-const COIN_RING := 0.72
-const COIN_GLINT := Color(1.0, 0.94, 0.72)
 
 
 # ---------------------------------------------------------------------------------------
@@ -122,16 +114,13 @@ const COIN_GLINT := Color(1.0, 0.94, 0.72)
 # ---------------------------------------------------------------------------------------
 
 ## Every picture on a button asks `_at` where its middle goes and `_scale` how big it is, and
-## gets **the rule's own answer** unless a number has been laid over it. Three layers, first
-## one wins: `tune`, which the tuner writes while it is open; `BAKED`, which is what was
-## picked and kept; and the rule the constants above describe.
+## gets **the rule's own answer** unless `BAKED` lays a number over it: what was picked
+## and kept, then the rule the constants above describe.
 ##
 ## A position is the drawn picture's **middle**, as a fraction of the face (or of the room,
 ## for the shed's); a scale is a fraction of the face's height, except the arrow's width and
 ## the net's fill, which are of the width and of the fit. Fractions, so a button drawn at
 ## another size puts everything in the same place.
-##
-## Bake by pasting what `ButtonTuner` writes to `user://button_tune.log` into `BAKED`.
 ##
 ## Laid out by hand on the canvas, 2026-09-12, and re-tuned over the new fan on 2026-09-17.
 ## The net rides high and a little left of the middle and is drawn a fifth over its fit; the
@@ -152,31 +141,12 @@ const BAKED := {
 	&"hut_tall": 1.0200,
 }
 
-## The tuner's live overrides. Empty in a real run, so the game draws what `BAKED` and the
-## rules say and pays nothing for this.
-static var tune := {}
-
-## Where each picture landed, in the drawing item's own pixels, for the tuner to hit-test
-## against. Filled only while `tracing`.
-static var tracing := false
-static var traced := {}
-
-
 static func _at(key: StringName, rule: Vector2) -> Vector2:
-	if tune.has(key):
-		return tune[key]
 	return BAKED.get(key, rule)
 
 
 static func _scale(key: StringName, rule: float) -> float:
-	if tune.has(key):
-		return float(tune[key])
 	return float(BAKED.get(key, rule))
-
-
-static func _trace(key: StringName, box: Rect2) -> void:
-	if tracing:
-		traced[key] = box
 
 
 ## The face inside a button of this size: what `board` fills and hands back, for a caller
@@ -249,7 +219,6 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	# The net, behind, filling the face and dimmed into it. Clipped to the face by drawing
 	# it centred rather than stood, so an over-fill spills evenly rather than out of the top.
-	_trace(&"face_upgrades", face)
 	if sprites.has("net"):
 		# The lake's own net, rendered by its shader (`CastNet.bake_picture`): the colours are
 		# the picture's, so it takes only the hover's tint. At whole steps, so its cord stays
@@ -261,7 +230,6 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 		var net_at := _at(&"net", Vector2(0.5, 0.5))
 		var net_box := Rect2(face.position + net_at * face.size - net_span * 0.5, net_span)
 		fit(on, sprites["net"], net_box, 1.0, tint, false)
-		_trace(&"net", net_box)
 	# The ferry in the left half, a little up off the foot; the dog in the right half. Both
 	# mirrored from how their sheets face, so they look outwards, and both drawn before the
 	# arrow, which stands over the middle of them.
@@ -282,7 +250,6 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 		) - face.position) / face.size
 		var slot := Rect2(face.position + _at(&"boat", rule) * face.size - span * 0.5, span)
 		fit(on, sprites["boat"], slot, 1.0, tint, true, true)
-		_trace(&"boat", slot)
 	if Dogs.has(&"idle"):
 		var dog_tall := face.size.y * _scale(&"dog_tall", SIDE_TALL * 0.9)
 		var dog_span := Dogs.span(&"idle", dog_tall)
@@ -293,7 +260,6 @@ static func draw_upgrades(on: CanvasItem, box: Rect2, hovered: bool, sprites: Di
 		) - face.position) / face.size
 		var middle := face.position + _at(&"dog", rule) * face.size
 		Dogs.stamp(on, &"idle", 0, Vector2(middle.x, middle.y + dog_span.y * 0.5), dog_tall, false, 0.0, tint)
-		_trace(&"dog", Rect2(middle - dog_span * 0.5, dog_span))
 	arrow(on, face, tint)
 
 
@@ -308,7 +274,6 @@ static func arrow(on: CanvasItem, face: Rect2, tint: Color) -> void:
 	var where := _at(&"arrow", Vector2(0.5, 0.5))
 	var mid := floorf(face.position.x + face.size.x * where.x)
 	var top := floorf(face.position.y + face.size.y * where.y - tall * 0.5)
-	_trace(&"arrow", Rect2(mid - wide * 0.5, top, wide, tall))
 	var shape := PackedVector2Array([
 		Vector2(mid, top),
 		Vector2(mid + wide * 0.5, top + head),
@@ -342,7 +307,6 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 	var face := board(on, box, hovered, Style.BUTTON_FACE)
 	var tint := Style.HOVER_WASH if hovered else Color.WHITE
 	var room := room_of(face)
-	_trace(&"face_shed", face)
 	var decor: Array = sprites.get("decor", [])
 	if not decor.is_empty():
 		var dim := Color(DECOR_DIM.r * tint.r, DECOR_DIM.g * tint.g, DECOR_DIM.b * tint.b)
@@ -368,7 +332,6 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 			var back := float(spot.get("back", 0.0))
 			fit(on, decor[spot["at"]], stood, 1.0, dim.lerp(Style.BUTTON_FACE, back * FAN_FADE))
 			whole = stood if whole.size == Vector2.ZERO else whole.merge(stood)
-		_trace(&"decor", whole)
 	var hut: Texture2D = sprites.get("shed")
 	if hut != null:
 		var art := {"sheet": hut, "region": Rect2(Vector2.ZERO, hut.get_size())}
@@ -382,7 +345,6 @@ static func draw_shed(on: CanvasItem, box: Rect2, hovered: bool, sprites: Dictio
 		) - room.position) / room.size
 		var slot := Rect2(room.position + _at(&"hut", rule) * room.size - span * 0.5, span)
 		fit(on, art, slot, 1.0, tint)
-		_trace(&"hut", slot)
 	label(on, face, Text.HUD_DECORATE)
 
 

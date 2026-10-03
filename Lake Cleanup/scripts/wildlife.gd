@@ -114,10 +114,8 @@ const CRAY_SHALLOWEST := 0.3
 const CRAY_DEEPEST := 0.85
 const CRAY_CRAWL := 7.0
 const CRAY_DART := 70.0
-const CRAY_DART_TIME := 0.45
 const CRAY_REST := Vector2(2.0, 6.0)
 const CRAY_WALK := Vector2(1.5, 4.0)
-const CRAY_SHY := 1.2
 const CRAY_STEP_PX := 3.0
 ## Seconds between one brood arriving and the next, at most one at a time.
 const BROOD_GAP := Vector2(6.0, 16.0)
@@ -748,16 +746,6 @@ func _first_spot() -> Vector2:
 		return s.get("to", s.get("at", Vector2.ZERO))
 	return Vector2.ZERO
 
-
-func _nearest(at: Vector2, points: Array) -> Vector2:
-	var best := Vector2.INF
-	var bd := INF
-	for p: Vector2 in points:
-		var d := p.distance_to(at)
-		if d < bd:
-			bd = d
-			best = p
-	return best
 
 
 # ---- frogs ------------------------------------------------------------------------------
@@ -1840,9 +1828,6 @@ func _age_tracks(delta: float) -> void:
 		_track_age = _track_age.slice(drop)
 
 
-func track_count() -> int:
-	return _track_at.size()
-
 
 ## Sand, of either shore, and dry: the only ground that takes a print.
 func _sandy(at: Vector2) -> bool:
@@ -1995,13 +1980,6 @@ func _cray_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 		c["state"] = Cray.REST
 		c["timer"] = _rng.randf_range(CRAY_REST.x, CRAY_REST.y)
 
-
-## Something came near: face it and shoot away backwards.
-func _cray_fright(c: Dictionary, from: Vector2) -> void:
-	var off := from - (c["at"] as Vector2)
-	c["angle"] = atan2(off.y * 2.0, off.x)
-	c["state"] = Cray.DART
-	c["timer"] = CRAY_DART_TIME
 
 
 func _cray_frame(c: Dictionary) -> String:

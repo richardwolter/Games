@@ -274,10 +274,6 @@ func is_done() -> bool:
 	return _phase == Phase.DONE
 
 
-## How many of this visit's steps are done.
-func steps_done() -> int:
-	return _done_count
-
 
 func backdrop() -> WashBackdrop:
 	return _backdrop

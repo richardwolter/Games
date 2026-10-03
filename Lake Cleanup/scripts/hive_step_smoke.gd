@@ -141,9 +141,6 @@ func ring_count() -> int:
 	return RINGS.size()
 
 
-func ring_pos(i: int) -> Vector2:
-	return RINGS[clampi(i, 0, RINGS.size() - 1)]
-
 
 ## Smoke ring `i` for `seconds` at once.
 func smoke_ring(i: int, seconds: float) -> void:

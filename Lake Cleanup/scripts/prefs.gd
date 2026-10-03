@@ -97,7 +97,6 @@ var fps_cap: int = 0
 
 ## The languages the game ships, in the order the flag board lays them out, each with the
 ## flag it wears (`assets/ui/flags/<code>.png`, ISO 3166) and its own name in itself.
-## `qps` is the pseudo-locale and is offered in debug builds only.
 const LANGUAGES: Array[Dictionary] = [
 	{"locale": "en", "flag": "us", "name": "English"},
 	{"locale": "pt_BR", "flag": "br", "name": "Português"},
@@ -108,7 +107,6 @@ const LANGUAGES: Array[Dictionary] = [
 	{"locale": "zh_CN", "flag": "cn", "name": "简体中文"},
 	{"locale": "ko", "flag": "kr", "name": "한국어"},
 ]
-const PSEUDO := {"locale": "qps", "flag": "unknown", "name": "Pseudo"}
 const TRANSLATIONS := "res://locale/translations.%s.translation"
 const Style := preload("res://scripts/style.gd")
 
@@ -262,12 +260,9 @@ func _take(key: StringName, value: Variant) -> bool:
 	return true
 
 
-## Every language the chooser offers, the pseudo-locale in debug builds only.
+## Every language the chooser offers.
 static func languages() -> Array:
-	var out: Array = LANGUAGES.duplicate()
-	if OS.is_debug_build():
-		out.append(PSEUDO)
-	return out
+	return LANGUAGES.duplicate()
 
 
 static func _known(locale: String) -> bool:

@@ -323,8 +323,6 @@ const DETAIL_ZOOM := 0.5
 ## `EconomyConfig`) now, loaded into `_economy` by `_load_upgrades()`.
 var _economy: EconomyConfig
 
-## How close to the shed the angler has to stand to open it, in tiles.
-const SHOP_RANGE := 3.2
 ## Where the pump stands, in tiles off the middle of the hut's walls: out past the near
 ## right wall, clear of the roof's overhang, on the side the door is not. And how close the
 ## angler has to be to work it — well inside `SHOP_RANGE`, which the pump stands within, so
@@ -418,9 +416,6 @@ const DOG_WIDE_STEP := 4.0
 ## How fast the finished lake lights up, as a fraction of the way there a second.
 const SPARKLE_RISE := 0.5
 
-## The corner cross on a panel: how big it is and how far in from the corner it sits.
-const CLOSE_BOX := 34.0
-const CLOSE_INSET := 12.0
 
 ## Where a run is kept between sessions, and how often it writes itself there.
 ##
@@ -538,13 +533,8 @@ static func _mark(label: String) -> void:
 		(boot_marks as Array).append([label, Time.get_ticks_usec()])
 
 
-## Seconds of play in this shop run, saved with it, and the playtest log's clocks (`PlayLog`).
+## Seconds of play in this run, saved with it.
 var _play: float = 0.0
-var _play_progress_in: float = 0.0
-var _play_last_cast: float = -1.0
-const PLAY_PROGRESS_EVERY := 30.0
-## Pieces in the lake when it was built, for the log's cleared share.
-var _pieces_full: int = 0
 
 ## 0 clean, 1 filthy. The one number the shader, the HUD, and every upgrade agree on.
 var pollution: float = 1.0
@@ -1178,7 +1168,6 @@ func _ready() -> void:
 	_shape_water(shore)
 	_shape_island()
 	_shape_dropoffs()
-	_tune_ground()
 	_mark("shapes and ground")
 
 	_shed_glow = Art.texture(SHED_GLOW_ART)
@@ -1268,7 +1257,6 @@ func _ready() -> void:
 	_mark("grid build")
 	_hide_treasures()
 	_mark("hide treasures")
-	_pieces_full = _grid.piece_count()
 	_filth_total = maxf(_grid.filth_left(), 0.001)
 	_filth_left = _filth_total
 	pollution = 1.0
@@ -1502,8 +1490,6 @@ func _ready() -> void:
 	_skin.snap_meter()
 	start_fresh = false
 	_mark("load game")
-	if _logs_play():
-		_begin_play_session(loaded)
 	_seed_starter_bed()
 	_mark("end")
 	_raise_front(loaded)
@@ -1692,32 +1678,6 @@ const BED_JSON := "res://assets/lakebed.json"
 const BED_GROWN_AT := 0.6
 var _bed_growth := 0.0
 
-
-## The corner buttons' canvas, F7, debug builds only. See ButtonTuner. Built on the key
-## rather than at start-up: it is a panel over the whole screen, and one that is up whenever
-## the game is is a panel in the way.
-func _tune_buttons() -> void:
-	if not OS.is_debug_build():
-		return
-	var open := get_node_or_null(^"ButtonTuner")
-	if open != null:
-		open.queue_free()
-		return
-	var tuner := ButtonTuner.new()
-	tuner.name = &"ButtonTuner"
-	tuner.sprites = _skin.sprites
-	add_child(tuner)
-
-
-## The ground's sliders, F4, debug builds only. See GroundTuner.
-func _tune_ground() -> void:
-	if not OS.is_debug_build():
-		return
-	var tuner := GroundTuner.new()
-	tuner.name = &"GroundTuner"
-	tuner.grounds = _grounds
-	tuner.water = _water_material
-	add_child(tuner)
 
 ## How far the drawn water is carried past the waterline, in tiles — about sixteen screen
 ## pixels, which is a tile's worth of wet sand.
@@ -2334,17 +2294,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_settings.music_on = not _settings.music_on
 				Prefs.store(&"music_on", _settings.music_on)
 				return
-			KEY_F6:
-				wipe_save()
-				return
-			KEY_F7:
-				_tune_buttons()
-				return
-			KEY_F9:
-				# Debug only: call a tornado down now, whatever the meter says.
-				if OS.is_debug_build() and _tornado != null and not _in_menu:
-					_tornado.start()
-				return
 
 	var drag := event as InputEventMouseMotion
 	if drag != null and _panning:
@@ -2688,10 +2637,6 @@ func _cast_at(where: Vector2) -> void:
 		# at, and they can always pan back.
 		_pan_yielded = true
 		_roll_luck(where)
-		if _logs_play():
-			var gap := -1.0 if _play_last_cast < 0.0 else snappedf(_play - _play_last_cast, 0.01)
-			PlayLog.write("cast", _play, {"since_last": gap})
-			_play_last_cast = _play
 
 
 ## The angler faces the first net while it is out: where it will land while it flies, where it
@@ -3243,8 +3188,6 @@ func _set_shed(open: bool) -> void:
 	# The shed's own door creaks open (2026-09-28), except coming in from the wash room.
 	if open and not _shed_open and _sfx != null and not _room_swap:
 		_sfx.play_door(true)
-	if open != _shed_open and _logs_play():
-		PlayLog.write("shed_open" if open else "shed_close", _play)
 	_shed_open = open
 	_shed.visible = open
 	if open:
@@ -4000,27 +3943,6 @@ func _set_letter(open: bool) -> void:
 	_push_rooms()
 	_hold_the_angler()
 
-
-## Hang a cross in a panel's top right corner.
-##
-## The cross is a child of the HUD rather than of the panel: a PanelContainer stretches what
-## it is given to fill itself, which is right for the contents and wrong for something meant
-## to sit in a corner of them. So it is pinned to the panel's rectangle instead, and moves
-## with it when the window changes shape.
-func _pin_close(panel: Control, closing: Callable) -> void:
-	var cross := CloseButton.new()
-	cross.size = Vector2(CLOSE_BOX, CLOSE_BOX)
-	cross.pressed.connect(closing)
-	panel.get_parent().add_child(cross)
-	var place := func() -> void:
-		cross.visible = panel.visible
-		cross.position = Vector2(
-			panel.position.x + panel.size.x - CLOSE_BOX - CLOSE_INSET,
-			panel.position.y + CLOSE_INSET
-		)
-	place.call()
-	panel.item_rect_changed.connect(place)
-	panel.visibility_changed.connect(place)
 
 
 ## The angler stays put while anything is open over the lake, so holding a key to reach a
@@ -5140,73 +5062,9 @@ func _buy(what: StringName) -> void:
 	if _sfx != null:
 		_sfx.play_bought()
 	_shop_skin.cheer(what)
-	if _logs_play():
-		PlayLog.write("purchase", _play, {
-			"id": String(what),
-			"rank": _level_of(what),
-			"cost": roundi(price),
-			"sludge_after": roundi(sludge),
-			"cleared": snappedf(_cleared_share(), 0.0001),
-			"box": _yard.held.size(),
-		})
 	_push_net_numbers()
 	_push_boat_numbers()
 	_push_dog_numbers()
-
-
-# ------------------------------------------------------------------ playtest log
-
-## Whether this lake writes the playtest log: the player's own run and nothing else — the lake
-## run as the game (the root's own child) on the player's own save path. A harness hangs its
-## lake under a node of its own and a probe plays on a save of its own, and either is enough
-## to keep it out: `tools/shot_menus` did neither once and wrote two lines into the real log.
-func _logs_play() -> bool:
-	return save_path == SAVE_PATH and is_inside_tree() and get_parent() == get_tree().root
-
-
-## A sitting of the shop run has begun, fresh or from its save.
-func _begin_play_session(loaded: bool) -> void:
-	if not loaded:
-		_play = 0.0
-	_play_progress_in = 0.0
-	_play_last_cast = -1.0
-	var levels := {}
-	for key: StringName in TRACKS:
-		levels[String(key)] = _level_of(key)
-	PlayLog.write("session", _play, {
-		"started": "continue" if loaded else "new",
-		"levels": levels,
-		"sludge": roundi(sludge),
-		"cleared": snappedf(_cleared_share(), 0.0001),
-	})
-
-
-## The shop run's clock, and a line of where the run stands every `PLAY_PROGRESS_EVERY`. `box`
-## is the HUD's Waiting figure: the boats are meant to stay ahead of it (issue #23).
-func _tick_play_log(delta: float) -> void:
-	_play += delta
-	if not _logs_play():
-		return
-	_play_progress_in -= delta
-	if _play_progress_in > 0.0:
-		return
-	_play_progress_in = PLAY_PROGRESS_EVERY
-	PlayLog.write("progress", _play, {
-		"cleared": snappedf(_cleared_share(), 0.0001),
-		"pieces_left": _grid.piece_count(),
-		"sludge": roundi(sludge),
-		"birds": birds_caught,
-		"box": _yard.held.size(),
-		"ferries": fleet_size(),
-		"dogs": dog_count(),
-		"in_shed": _shed_open,
-		"shop_open": _menu_open,
-	})
-
-
-## Share of the lake's pieces gone since it was built, for the playtest log.
-func _cleared_share() -> float:
-	return 1.0 - float(_grid.piece_count()) / float(maxi(_pieces_full, 1))
 
 
 ## How close two hulls may come, in tiles, and how fast they ease apart when they are closer
@@ -5792,7 +5650,7 @@ func _process(delta: float) -> void:
 	if not _in_menu and not _world_paused:
 		_tornado_step(delta)
 		_look_for_the_end(delta)
-		_tick_play_log(delta)
+		_play += delta
 
 		_autosave_in -= delta
 		# Not while a tornado is down: a save ends it (`save_game` settles it first), and
@@ -7098,19 +6956,6 @@ func load_game() -> bool:
 	return true
 
 
-## Throw the save away and start the lake again. The scene is reloaded rather than reset
-## in place: a fresh run is exactly what the first frame of the game already builds.
-func wipe_save() -> void:
-	_wiping = true
-	# Straight back into the lake: this is a key pressed in play, not a trip to the menu.
-	skip_menu = true
-	# The engine's own path, not a globalized one: on the web there is no such thing as an
-	# absolute path to a save, and user:// is understood everywhere. The backup goes too,
-	# or a wiped run would come back from it.
-	_remove_save_files()
-	get_tree().reload_current_scene()
-
-
 func _exit_tree() -> void:
 	# A remap still on the worker thread reads this lake's tables: let it finish first.
 	if _filth_task >= 0:
@@ -7146,29 +6991,6 @@ func _save_and_quit() -> void:
 		save_game()
 	get_tree().quit()
 
-
-## What each of the four merchants has taken, as one line. The four yards only read as
-## four choices if the player can see they are being used unevenly.
-func _sold_tally() -> String:
-	var parts := PackedStringArray()
-	for kind in TrashDef.KIND_NAMES.size():
-		parts.append("%s %d" % [TrashDef.KIND_NAMES[kind], sold_by_kind[kind]])
-	return "  ".join(parts)
-
-
-## Tiles in a diamond of this radius. Shown in the shop, because "radius 3" means nothing
-## and "25 tiles" is the thing being bought.
-## How many tiles a cast of this radius covers. Counted rather than derived: the sweep takes
-## every tile centre inside a circle, and there is no closed form for how many of those
-## there are at a fractional radius.
-func _tiles_in_radius(radius: float) -> int:
-	var count := 0
-	var span := int(ceil(radius))
-	for dy in range(-span, span + 1):
-		for dx in range(-span, span + 1):
-			if float(dx * dx + dy * dy) <= radius * radius:
-				count += 1
-	return count
 
 
 ## The hut's picture, and the roll its grass comes off. A fixed seed: the same hut grows the

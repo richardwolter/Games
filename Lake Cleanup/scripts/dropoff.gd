@@ -86,10 +86,6 @@ const UNDER_LAYER := 4
 ## froth rings it rather than hiding behind it.
 const POST_COLLAR := 8.0
 
-## The post's width on screen, in world px, when the sheet does not say. The sheet records
-## each post as [middle column, bottom row, width] in painted px, and the width is what the
-## sand is sized to.
-const POST_WIDE := 6.0
 
 ## The heap in the box: the ferry's last delivery, drawn inside it and sinking away again.
 ## `DRAIN_HOLD` seconds after the last piece lands the pile starts to go, one piece every
