@@ -558,11 +558,24 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   `depth_tiers` in `tools/last_fill_economy.log`), or any tier `FILL_BAIT_CHANCE` of the
   time, then any kind of that material and tier, all equal (`_by_cell`). With 12 kinds in
   each of the 20 cells the commonest kind is about 1% of the water. Shares landed at
-  28.6 / 22.9 / 20.6 / 10.7 / 17.3%.
+  28.6 / 22.9 / 20.6 / 10.7 / 17.3% (superseded below).
+- **The shares are a smooth ladder** (2026-10-03, `/grill-me` with Richard): **30 / 25 /
+  23 / 12 / 10%** in the water. Tier 3 had been the thinnest and tier 4 heavier than it.
+  Each `TIER_BY_DEPTH` column was scaled, every band keeping its own lean, by
+  `tools/fit_tier_shares.py` (base python, a loop: probe, script, until within 0.4 points),
+  then `fit_prices.py` refitted the pay so each yard's mean pay and the lake's value held
+  (672,663 to 672,712; every piece about 6% dearer). The probe also logs `surface_tiers`
+  now, the top piece of every wet tile: past the ring 39.6 / 24.6 / 18.9 / 9.9 / 6.9%
+  (was 38.9 / 24.3 / 16.5 / 8.8 / 11.5), the ring all tier 0. `test_lake`'s `TIER_PRICED`
+  follows; `PAY_PRICED` did not move. No new kinds: a tier's share is the roll, not its
+  kind count. Out of scope, by decision: `FLOAT_STEP`, the ring, light-on-top depth, the
+  shop and the sim. **`SAVE_VERSION` 22**, v21 refused; the v21 save is
+  `_builds/lake_cleanup_v21_20261003.save`.
 - **Known**: the measured table is not light-on-top: its surface row is heavier than its
   floor row, because the old fitted lightness had stopped sorting by weight. What the
   player sees is still light, because `_dress_surface` breaks ties `FLOAT_STEP` (0.7) a
-  tier lighter. Flip or steepen the rows to bring back "skim light first" in depth.
+  tier lighter. Flip or steepen the rows to bring back "skim light first" in depth. The
+  ladder's rescale sharpened it: tier 3 is 24% of the top band and 4-7% of the floor ones.
 - `tools/solve_pack_rubbish.py`, `fit_pack_rubbish.py` and their json are deleted.
 - **`SAVE_VERSION` 19**, v18 refused; the v18 save is `_builds/lake_cleanup_v18_20261001.save`.
 

@@ -87,6 +87,20 @@ func _count() -> void:
 			var up := float(k) / float(stack.size() - 1)
 			bands[mini(int(up * 5.0), 4)][def.tier] += 1
 	out.store_line("depth_tiers " + JSON.stringify(bands))
+	# What the player sees: the tier of each stack's top piece, inside the thin ring and past
+	# it, wet tiles only (the strand and beach litter are tier 0 by rule).
+	var tops := {"ring": [0, 0, 0, 0, 0], "past": [0, 0, 0, 0, 0]}
+	for index in grid.stacks.size():
+		var stack: PackedInt32Array = grid.stacks[index]
+		if stack.is_empty() or grid.dry[index]:
+			continue
+		var def := grid.defs[stack[stack.size() - 1]]
+		if def.keepsake:
+			continue
+		var tile := Vector2(index % Iso.COLS, index / Iso.COLS)
+		var band := "ring" if Iso.past_shelf(tile) < LakeGrid.RING_OUT else "past"
+		tops[band][def.tier] += 1
+	out.store_line("surface_tiers " + JSON.stringify(tops))
 	var names := kinds.keys()
 	names.sort_custom(func(a, b): return kinds[a] > kinds[b])
 	for n in names:

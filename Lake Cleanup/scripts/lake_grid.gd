@@ -387,12 +387,18 @@ const MATERIAL_QUOTA := [0.24, 0.21, 0.42, 0.13]
 ## lake reads as it did and the shares stay what the shop was priced on. Each row is
 ## normalised where it is read, so a row need not sum to 1. Rescale a column to move a
 ## tier's share of the water; `tools/last_fill_economy.log` says where it landed.
+##
+## Rescaled 2026-10-03 (`/grill-me` with Richard) to a smooth ladder of shares, 30 / 25 /
+## 23 / 12 / 10: tier 3 had been the thinnest at 10.7% and tier 4 heavier than it at 17.3%.
+## Each column was scaled and every band kept its own lean (`tools/fit_tier_shares.py`, a
+## loop against the probe), then `tools/fit_prices.py` refitted the pay so the lake's value
+## held.
 const TIER_BY_DEPTH := [
-	[0.346, 0.258, 0.196, 0.046, 0.154],
-	[0.337, 0.230, 0.243, 0.033, 0.156],
-	[0.291, 0.269, 0.213, 0.060, 0.168],
-	[0.234, 0.230, 0.197, 0.132, 0.208],
-	[0.208, 0.202, 0.187, 0.208, 0.196],
+	[0.364, 0.281, 0.217, 0.053, 0.085],
+	[0.355, 0.251, 0.270, 0.038, 0.086],
+	[0.307, 0.293, 0.237, 0.069, 0.093],
+	[0.251, 0.255, 0.222, 0.155, 0.116],
+	[0.220, 0.221, 0.208, 0.242, 0.108],
 ]
 
 ## How often a slot ignores its depth's row entirely and rolls any tier, all five equally.

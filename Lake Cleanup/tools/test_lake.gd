@@ -27,8 +27,10 @@ const HudButtons := preload("res://scripts/hud_buttons.gd")
 ## on the deeper lake: the island's ring and the strand did not double, so the mix leans a little
 ## heavier (tier 0 35.1% to 29.4%) and a piece pays 2-6% more. The lake's whole value moved 1.4%
 ## (`probe_fill_economy`, 330k to 334k), which is the number the frozen prices care about.
+## The tier shares moved on 2026-10-03 to a smooth ladder (`LakeGrid.TIER_BY_DEPTH`) and the
+## prices were refitted to hold `PAY_PRICED`, which did not move.
 const PAY_PRICED := [44.01, 45.76, 36.50, 40.58]
-const TIER_PRICED := [0.294, 0.234, 0.196, 0.099, 0.176]
+const TIER_PRICED := [0.300, 0.250, 0.230, 0.120, 0.101]
 const DogArt := preload("res://scripts/dog_art.gd")
 
 const LOG_PATH := "res://tools/last_test.log"

@@ -461,7 +461,10 @@ const SAVE_PATH := "user://lake_cleanup.save"
 ## rubbish changed; the v19 save is _builds/lake_cleanup_v19_20261001.save.
 ## 21: every find is unique, the diner chair one def instead of four (2026-10-01); the v20
 ## save is _builds/lake_cleanup_v20_20261001.save.
-const SAVE_VERSION := 21
+## 22: the tier shares are a smooth ladder and every price was refitted (2026-10-03), so a
+## v21 lake would keep its old mix under the new prices and pay about 6% over. The v21 save
+## is _builds/lake_cleanup_v21_20261003.save.
+const SAVE_VERSION := 22
 
 ## The piece of furniture the shed starts with, and so the one find not in the lake.
 const STARTER_BED := "decor_pk_bed"
