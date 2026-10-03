@@ -67,3 +67,17 @@ tools/_logs/
 
 # Third-party packs whose licence forbids redistribution (0_mem0ry): never committed.
 art_source/packs_local/
+
+# Probe and harness output in tools/: every picture, film, sound and log a probe writes.
+# The scripts and scenes that make them are committed; their output never is (2026-10-03).
+/tools/*.png
+/tools/*.png.import
+/tools/*.gif
+/tools/*.mp4
+/tools/*.wav
+/tools/*.wav.import
+/tools/*.log
+/tools/*/
+!/tools/bases/
+!/tools/film/
+/tools/film/*.log

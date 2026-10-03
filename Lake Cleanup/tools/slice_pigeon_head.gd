@@ -12,7 +12,7 @@
 ##   godot --headless --path . --script res://tools/slice_pigeon_head.gd
 extends SceneTree
 
-const SHEET := "res://assets/Pigeons/Pidgeon_head.jpg"
+const SHEET := "res://art_source/Pigeons/Pidgeon_head.jpg"
 const OUT_PNG := "res://assets/pigeon_head.png"
 
 ## What counts as page: bright, and near enough to grey that a pale part of the bird is not

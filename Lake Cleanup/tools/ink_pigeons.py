@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from PIL import Image
 
-SHEET = Path("assets/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png")
+SHEET = Path("art_source/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png")
 CUT = Path("assets/pigeons.json")
 OUT_PNG = Path("assets/pigeons_inked.png")
 OUT_JSON = Path("assets/pigeons_inked.json")

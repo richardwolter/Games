@@ -12,7 +12,7 @@
 ##   godot --headless --path . --script res://tools/slice_pigeons.gd
 extends SceneTree
 
-const SHEET := "res://assets/pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
+const SHEET := "res://art_source/Pigeons/Original Diminsions/Pigeon Sprite Sheet.png"
 const OUT_JSON := "res://assets/pigeons.json"
 
 ## Anything at or under this alpha is background.

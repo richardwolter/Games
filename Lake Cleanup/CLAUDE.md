@@ -205,7 +205,7 @@ comment — "drawn back rather than hidden: the point of a shop is knowing what 
 - **Probes**: `tools/probe_shop_text.gd` (headless, what cuts and where),
   `tools/probe_shop_glyphs.gd` (Bungee's separator glyphs), `tools/shop_mock.gd` +
   `tools/shot_shop_mock.tscn` (desktop build — the three layouts and the three ways of showing
-  the bonus, kept as the record of what was judged). `test_lake`'s `_stage_shop_shape` guards
+  the bonus, kept as the record of what was judged; both deleted 2026-10-03). `test_lake`'s `_stage_shop_shape` guards
   the titles, the unique names, every row being claimed by exactly one group, the heading
   rule, the grammar, the plate's room now the boards are level, the bonus reaching the plate
   without a figure of its own, and both inks clearing 4.5:1.
@@ -260,7 +260,7 @@ for what they do, and Strength is the game changer that belongs in the middle of
 - **Sim, before the logged runs** (after them: focused 54 min, band 48-68): focused 64 min, casual 110 min (the band asked 68-82: a WARN, left for the logged
   run to settle, because the bot never stops casting and the calibration is from a tree
   run). `python docs/progression/shop_schedule.py` prints bought-against-wanted per track.
-- **The player's own run writes a playtest log** (`scripts/play_log.gd`, `PlayLog`,
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** **The player's own run writes a playtest log** (`scripts/play_log.gd`, `PlayLog`,
   `user://shop_playtest.log`, JSON lines: session with every level, purchase with cost and
   Waiting, progress every 30 s, cast, shed open/close; `Lake._play` is the run's clock,
   saved as `play`). **Only the game's own lake on the player's own save path writes it**
@@ -865,7 +865,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   batched mesh, and the pack's grass/sand join tiles (tried 2026-09-11, a corner set that
   reads as a staircase of cuts). A line drawn by choosing whole tiles is a staircase
   whatever the tiles; don't go back to tile picking for the edge.
-  **Tuning**: F4 in a debug build opens `GroundTuner` (sliders for every ground uniform, plus
+  **Deleted 2026-10-03 (The Pre-Release Cleanup).** **Tuning**: F4 in a debug build opens `GroundTuner` (sliders for every ground uniform, plus
   the island's coast wave, values written to `user://ground_tune.log`); bake picks into
   `Ground`'s constants, or `Lake`'s for the coast rows. The
   beach cannot go under `beach_width - wander_amp` = 3.5 tiles (`Dog.BEACH_WALK`,
@@ -1911,7 +1911,7 @@ and the letter's re-shot stills are later passes.
 - **Back-translation is the offensive-language guard**, by decision: every non-EN cell
   carries a machine back-translation to EN beside it and drift is flagged for a human. No
   blocklist. Nothing is judged by a machine alone.
-- **The pseudo-locale is the success test**: a generated `qps` that wraps every string and
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** The `qps` pseudo-locale. **The pseudo-locale is the success test**: a generated `qps` that wraps every string and
   runs ~40% longer, reachable from the Language row, so a missed literal and an overflow
   both show themselves in play before a real translation exists.
 - **Out, by decision**: the credits' pack-attribution strings (verbatim by licence — the
@@ -2023,7 +2023,7 @@ times and reviewed by native speakers**:
   the string never drawn.
 - **`Lake._polish_panel_controls`**, found by the cut: with the shop panel gone it pointed
   only at `HUD/Shed/Pad/Lines/Title`/`Note`, **which are not in the scene** — so it had
-  already been styling nothing. `scripts/wood_ui.gd` is unreferenced now; the file is left on
+  already been styling nothing. `scripts/wood_ui.gd` was deleted on 2026-10-03; it was left on
   disk pending Richard's call.
 
 `test_lake` asks that `HUD/Shop` is **gone rather than hidden**, which is the check a
@@ -2412,7 +2412,7 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   tiling eight-pixel slices of a long grain turned the oak into corduroy and flattened the
   chamfer off its corners. Don't nine-patch painted wood.
 
-- **Where each picture on a button stands is tunable by hand** (`HudButtons.BAKED`/`tune`/
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** The tuner and `shot_buttons`; `BAKED` stays. **Where each picture on a button stands is tunable by hand** (`HudButtons.BAKED`/`tune`/
   `_at`/`_scale`, `scripts/button_tuner.gd`, **F7** in a debug build, 2026-09-12): three
   layers, first one wins — the tuner's live overrides, the `BAKED` dictionary of what was
   picked and kept, and the rule the constants describe. Rules are the right way to start (they
@@ -4258,7 +4258,7 @@ A late-game event: a waterspout comes down on a nearly cleaned lake, stirs the r
 is tamed with the net. `scripts/tornado.gd` (the event, ported from the mock's harness),
 `scripts/tornado_look.gd` + `shaders/tornado_spout.gdshader`/`tornado_water.gdshader` (the
 drawing, the mock's **look D, approved as it is**), `scripts/tornado_debris_draw.gd`, wired
-in `Lake`'s "The tornado" block. The mock (`tools/tornado_mock/`) stays as the record.
+in `Lake`'s "The tornado" block. The mock (`tools/tornado_mock/`) was the record until it was deleted on 2026-10-03.
 - **When**: once the meter reads `Tornado.GATE` (80%) cleaned, `MOST_RANGE` 2-3 a run (rolled
   once, saved as `tornado_most`), the first `FIRST_AFTER` 20-70 s of play after the gate,
   then `GAP` 150-300 s. Never over what `_rain_held` holds, a board (`_panelled`), the ending,
@@ -4311,7 +4311,7 @@ in `Lake`'s "The tornado" block. The mock (`tools/tornado_mock/`) stays as the r
 - **Cost** (`bench_frames` `BENCH_TORNADO=1`, RTX 5060 Ti, 1080p, full lake, touchdown and
   the start of the roam): 5.89 ms mean, p99 7.95, worst 9.67, against 3.3 with none. Inside
   the bar. Before the threaded paint: 63 ms.
-- **F9 in a debug build calls one down at once** (`Lake._unhandled_input`), whatever the
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** **F9 in a debug build calls one down at once** (`Lake._unhandled_input`), whatever the
   meter says, for judging whether `GATE` should come earlier.
 - **First guesses**: `GATE`, the counts and gaps, `LIFE`, `SPEED_ROAM`, the grow band,
   `FOOT`, `BREW`. The rest are the mock's numbers.
@@ -4363,7 +4363,7 @@ lighter dark; the sand's bands laid along the water line, tide line, fewer rippl
   `Lake.COAST_WAVE*`. **Move the water's wave and the ground's together.**
 - **Static, by decision**: the tide line, ripples, pebbles and shells do not change with
   cleaning.
-- **Tuning**: F4's `GroundTuner` has `clump_cut`, `clump_share`, `gust_cut`, `tide_at`,
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** **Tuning**: F4's `GroundTuner` has `clump_cut`, `clump_share`, `gust_cut`, `tide_at`,
   `ripple_field`, `ripple_gap`, `wet_step`; bake picks into `Ground`'s constants. Colours are
   shader defaults off the mockup (`sand_*`, `pebble*`, `shell`). All first guesses.
 - **Cost** (`bench_frames`, RTX 5060 Ti, 1080p): 3.65 ms mean standing, 4.13 walking, 5.81 in
@@ -6769,7 +6769,7 @@ sand under every open pixel; beyond that it is under opaque water and not drawn.
   and the bank's beach litter (`Iso.BEACH_LITTER`, 2.4 tiles up) can take a wash from a crest.
   That is wanted — the pieces are `dry`-flagged and do not bob, so the water moving over them
   is the only thing that says they are at the waterline.
-- Tuning: F4's `GroundTuner` carries the three coast sliders beside the ground's (they go to
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** Tuning: F4's `GroundTuner` carries the three coast sliders beside the ground's (they go to
   the water material, not the `Ground` nodes); bake picks into `Lake`'s constants.
 - **Retired, by decision**: the island standing above the water with a drowned-sand shelf
   stepping down into the lake (`SINK_*`, `ISLAND_DEEP`, `IslandShallows`), and the flat
@@ -6780,7 +6780,14 @@ sand under every open pixel; beyond that it is under opaque water and not drawn.
 - Island foam ring width in the shader is 1.0 like the bank's (was 1.5 to cover tile corners).
 
 ### Rubbish Sheets
-**One PSD, one sheet** (2026-09-21, `/grill-me` with Richard): `art_source/New_Objects_Lake.psd`
+**The rubbish is the 0_mem0ry packs' art since 2026-10-01**: `tools/build_pack_rubbish.py`
+(fed by `fetch_mem0ry_packs.py`, `cut_packs.py`, the Lake Pack Tagger and
+`tools/pack_rubbish.json`) writes `assets/lake_objects.png`, the `lake_objects` entries of
+`pieces.json`, one `.tres` a kind and `TRASH_ORDER`. 121 kinds. **Supersedes the PSD
+pipeline below**, whose builder (`build_lake_objects.py`) was deleted on 2026-10-03; the
+naming rules (numbered families) still hold.
+
+**Superseded: one PSD, one sheet** (2026-09-21, `/grill-me` with Richard): `art_source/New_Objects_Lake.psd`
 is the only source of the lake's rubbish, 81 kinds, cut by `tools/build_lake_objects.py`
 (psd-extract venv python, project root, **reimport after**) onto `assets/lake_objects.png`.
 It replaced the hand-corrected first sheet and the second batch's `lake_objects_new.png`;
@@ -6843,6 +6850,52 @@ shipping, which also means **no Godot tool can load them**; a builder off them i
 like `build_decor.py`.
 
 ---
+
+### The Pre-Release Cleanup (2026-10-03, `/grill-me` with Richard)
+The game is close to done, so the download, the project folder and the code were cut down.
+Audit and method: `docs/cleanup-audit.md`. **Nothing a player sees moved**; the music is
+re-encoded and the fonts cut down. **Supersedes** every note elsewhere in this file that
+tells you to use one of the things below.
+- **Shipped size**: the stock Godot exe stays (109 MB, by decision: no custom template). The
+  pack lost the 9 MB pirate-ship JSON (`assets/Blue_Boat/`, shipped only through the old
+  `*.json` include filter, which is now `assets/*.json`), the music halved and the CJK fonts
+  cut to under 1 MB.
+- **Music is Ogg Vorbis** (`build_music.py` `SONG_Q` 5, about 160 kbps; radio `RADIO_Q` 0),
+  `MusicStation` loads `.ogg`. **Supersedes the `.mp3` files** named in The Music and The
+  Record Player. `measure_beats.py` measured the same grid off the Ogg files.
+- **The CJK fonts are subset** by `build_translations.py` (`subset_fonts`, `CJK_FACES`,
+  `CJK_ALWAYS`): every character of the locale's column, plus the language names written in
+  the scripts, plus CJK punctuation and full-width forms. The full faces live in
+  `art_source/fonts/`. **Re-run `build_translations.py` after any CSV edit**, or a new
+  character draws as tofu; `probe_text_fit.gd` now reports glyphs a face does not carry.
+  Needs fontTools (`pip install --user fonttools`).
+- **Desktop only**: the Web export preset is gone.
+- **Debug code removed outright, not gated**: `GroundTuner` (F4), `ButtonTuner` (F7) and
+  `HudButtons.tune`/`tracing`/`traced`, the perf overlay (F3, `perf_hud.gd`), `PlayLog` and
+  the playtest log, the screenshot key (F12, `shot_key.gd`), F6 wipe-reload (`wipe_save`),
+  F9 tornado, and the `qps` pseudo-locale (its CSV column, its Language entry, its
+  `unknown` flag). `HudButtons.BAKED` stays as the picked numbers; `Ground.retune` stays for
+  `tools/shot_grass`. The `BENCH_*` hooks stay with `bench_frames`.
+- **Dead files deleted**: `scripts/wood_ui.gd`, the console spike's sheets, the slicer debug
+  pictures, `resources/trash/_old/`, 37 unused Forest tileset slices (kept 1, 2, 18-21, 67).
+  The pigeon pack's sheets and the head painting moved to `art_source/Pigeons/` (they were
+  shipping), read there by `slice_pigeons.gd`, `slice_pigeon_head.gd` and `ink_pigeons.py`.
+  About 90 unused functions and constants left the scripts.
+- **tools/ kept**: `test_lake`, `bench_frames`, `census`, the probe and shot scenes, the
+  builders whose output ships, and `film_trailer` (`shot_rope` extends it). **Deleted**:
+  mockups and one-offs (`tornado_mock/`, every `*_mockup.py`, `shop_mock`, `shot_shop_mock`,
+  `shot_pack_mock`), the Steam and devlog film probes (`shot_steam`, `shot_keyart`,
+  `shot_wash_place`, `film_devlog`), `shot_buttons` (it drove the tuner), builders for
+  retired art (`build_consoles`, `build_lake_objects`, `recolor_shed`, `recolor_box`,
+  `downres_shed`, `trim_box_sides`), and scratch (`specks/`, `hd_rubbish/`, `menu_bg/`,
+  `cursor/`, every `last_*` and stray log). `tools/film/` stays.
+- **Probe output never reaches git**: `.gitignore` takes every picture, film, sound and log in
+  `tools/` and every subfolder but `bases/` and `film/`.
+- **The rubbish's source**: see Rubbish Sheets, rewritten. The section said a PSD and 81
+  kinds while the code had moved to the 0_mem0ry packs on 2026-10-01.
+- **Left alone, by decision**: git history (no rewrite); the old PSD finds in
+  `decor_clean/dirty.png` and `pieces.json` (no longer dealt, but removing them shifts every
+  def index and needs a `SAVE_VERSION` bump); `Claude outputs/`.
 
 ## Performance
 
@@ -6997,7 +7050,7 @@ and the lanes as shares of the lake in The Pump and the Wash Room.
   All numbers first guesses for Richard's eye.
 
 ### The Screenshot Key and the Key Art (2026-10-02, Steam page)
-- **F12 in a debug build saves the screen** (`scripts/shot_key.gd`, a child of the `Pad`
+- **Deleted 2026-10-03 (The Pre-Release Cleanup).** So were `shot_keyart`, `shot_steam` and `shot_wash_place`; the frames in `tools/film/` stay. **F12 in a debug build saves the screen** (`scripts/shot_key.gd`, a child of the `Pad`
   autoload so `project.godot` is untouched): a PNG at the window's own size, HUD and all, to
   `Games/Marketing/My Dirty Little Lake/screenshots/raw/` (`user://screenshots/` where
   `res://` is not a folder). **Shift+F12 takes it bare**: every CanvasLayer hidden for one
@@ -7063,6 +7116,7 @@ and the lanes as shares of the lake in The Pump and the Wash Room.
   tree; same z 3, so the tree's order is what puts the fish over them.
 
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
+**Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions
 only, no game UI. Captions are Richard's, in `shots.json`; a later voiceover is written to fit
 the shot lengths, nothing is re-timed for it.

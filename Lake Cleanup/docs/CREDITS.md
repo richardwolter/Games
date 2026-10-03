@@ -74,7 +74,7 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   courtesy. (`PixZels` is the author's pixel-art *program*, not the pack — this file used to
   name it as the source.)
 
-- **Pigeon sprites** (`assets/Pigeons/`, `pigeon_contact.png`, `pigeons.json`) — "Pigeons 2D
+- **Pigeon sprites** (`art_source/Pigeons/` → `assets/pigeons_inked.png`, `pigeons.json`) — "Pigeons 2D
   Pixel Asset Pack" by Pop Shop Packs (https://pop-shop-packs.itch.io/pigeons-2d-pixel-asset-pack).
   ✅ Commercial use explicitly allowed; credit appreciated, not required.
 
