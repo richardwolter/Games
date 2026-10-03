@@ -62,6 +62,12 @@ var _rebuild_ms_total: float = 0.0
 var _seen_rebuilds: int = 0
 var _process_ms_total: float = 0.0
 var _draws_total: int = 0
+## The renderer's own CPU and GPU time per sampled frame, and the most video memory seen,
+## for reading a frame's cost apart into script, render submission and the card.
+var _render_cpu_total: float = 0.0
+var _render_gpu_total: float = 0.0
+var _render_gpu_worst: float = 0.0
+var _video_mem_most: float = 0.0
 
 
 func _ready() -> void:
@@ -280,6 +286,12 @@ func _process(delta: float) -> void:
 		_seen_rebuilds = rebuilds
 	_process_ms_total += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 	_draws_total += int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	var vp := get_viewport().get_viewport_rid()
+	_render_cpu_total += RenderingServer.viewport_get_measured_render_time_cpu(vp)
+	var gpu := RenderingServer.viewport_get_measured_render_time_gpu(vp)
+	_render_gpu_total += gpu
+	_render_gpu_worst = maxf(_render_gpu_worst, gpu)
+	_video_mem_most = maxf(_video_mem_most, Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED))
 	if _times.size() < SAMPLES:
 		return
 	_report()
@@ -311,9 +323,16 @@ func _report() -> void:
 	var engine := "rebuilds %.2f ms/frame  process %.2f ms/frame  draw calls %.0f/frame  pieces %d" % [
 		_rebuild_ms_total / count, _process_ms_total / count, float(_draws_total) / count, _grid.get("drawn_pieces")
 	]
-	var label := "%s | walk %s | off '%s'" % [
-		OS.get_environment("BENCH_LABEL"), _walking, OS.get_environment("BENCH_OFF")
+	var label := "%s | walk %s | off '%s' | window %s" % [
+		OS.get_environment("BENCH_LABEL"), _walking, OS.get_environment("BENCH_OFF"),
+		DisplayServer.window_get_size()
 	]
+	var render := "render cpu %.2f ms/frame  gpu %.2f ms/frame (worst %.2f)  video mem peak %.0f MB  static mem peak %.0f MB" % [
+		_render_cpu_total / count, _render_gpu_total / count, _render_gpu_worst,
+		_video_mem_most / 1048576.0, float(OS.get_static_memory_peak_usage()) / 1048576.0
+	]
+	engine += "
+" + render
 	for text in [label, line, causes, engine]:
 		print(text)
 	for text in _spikes.slice(0, 40):

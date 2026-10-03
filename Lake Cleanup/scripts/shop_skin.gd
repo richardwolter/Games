@@ -22,7 +22,7 @@ const DogArt := preload("res://scripts/dog_art.gd")
 const ShopCard := preload("res://scripts/shop_card.gd")
 
 ## The boards, in the order they stand, and what each is called.
-const BOARDS: Array[StringName] = [&"net", &"boat", &"dog", &"luck"]
+const BOARDS: Array[StringName] = [&"net", &"luck", &"boat", &"dog"]
 ## No "The" (2026-09-17): four boards standing side by side are already a list, and the
 ## article is a word every translation would have to carry for nothing.
 const TITLES := {&"net": "Net", &"boat": "Boats", &"dog": "Dogs", &"luck": "Luck"}
@@ -53,7 +53,7 @@ static func spoken(keys: Dictionary) -> Dictionary:
 ## row whose key is missing here is drawn after the groups rather than dropped.
 const GROUPS := {
 	&"net": [
-		["", [&"net_strength", &"net_width", &"net_range", &"reel", &"net_hold"]],
+		["", [&"net_strength", &"net_hold", &"net_width", &"net_range", &"reel"]],
 	],
 	&"boat": [
 		["The run", [&"boat_speed", &"cargo", &"boat_volley"]],

@@ -35,6 +35,9 @@ var pad := false
 ## click on the button a card points at should do what the button does). The card's own
 ## paper still takes its clicks.
 var through := false
+## A hint the player can close by clicking its paper (2026-10-03, the camera tip): the card
+## takes that click and says so with `next_asked`, everything else passes straight through.
+var closable := false
 var _card := Rect2()
 var _skip := Rect2()
 var _clock := 0.0
@@ -62,7 +65,7 @@ func show_card(at: Rect2, words: String = "", place: int = 0, of: int = 0,
 	text = words
 	count = place
 	total = of
-	var blocking := at.size.x > 0.0 and count > 0
+	var blocking := at.size.x > 0.0 and (count > 0 or closable)
 	mouse_filter = Control.MOUSE_FILTER_STOP if blocking else Control.MOUSE_FILTER_IGNORE
 	visible = at.size.x > 0.0
 	queue_redraw()
@@ -85,18 +88,24 @@ func _process(delta: float) -> void:
 
 ## Not here over the lit target of a pass-through card, so the GUI picks what is under it.
 func _has_point(point: Vector2) -> bool:
+	if closable and count <= 0:
+		return _card.has_point(point)
 	if through and is_card() and target.has_point(point) and not _card.has_point(point):
 		return false
 	return Rect2(Vector2.ZERO, size).has_point(point)
 
 
 func _gui_input(event: InputEvent) -> void:
-	if not is_card():
+	if not is_card() and not (closable and visible):
 		return
 	var click := event as InputEventMouseButton
 	if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
 		return
 	accept_event()
+	if not is_card():
+		Sfx.ui(&"ui_close")
+		next_asked.emit()
+		return
 	Sfx.ui(&"ui_click")
 	if _skip.has_point(click.position):
 		skip_asked.emit()
@@ -120,10 +129,15 @@ func _draw() -> void:
 	if _arrow != null:
 		var a := _arrow.get_size() * px
 		var bob := roundf(sin(_clock * TAU / FirstSteps.PULSE_TIME) * FirstSteps.ARROW_BOB) * px
-		var corner := Vector2(target.get_center().x - a.x * 0.5, target.position.y - a.y - 2.0 + bob).round()
-		draw_set_transform(corner + Vector2(0.0, a.y), 0.0, Vector2(1.0, -1.0))
-		draw_texture_rect(_arrow, Rect2(Vector2.ZERO, a), false)
-		draw_set_transform(Vector2.ZERO)
+		if _arrow_below(a):
+			# No room over a target at the top of the screen: under it, pointing up.
+			var under := Vector2(target.get_center().x - a.x * 0.5, target.end.y + 2.0 - bob).round()
+			draw_texture_rect(_arrow, Rect2(under, a), false)
+		else:
+			var corner := Vector2(target.get_center().x - a.x * 0.5, target.position.y - a.y - 2.0 + bob).round()
+			draw_set_transform(corner + Vector2(0.0, a.y), 0.0, Vector2(1.0, -1.0))
+			draw_texture_rect(_arrow, Rect2(Vector2.ZERO, a), false)
+			draw_set_transform(Vector2.ZERO)
 	if text.is_empty():
 		return
 	var face := Style.font()
@@ -176,12 +190,20 @@ func _card_at(card: Vector2) -> Vector2:
 	if target.size.x > size.x * 0.45 and target.size.y > size.y * 0.55:
 		return Vector2(target.end.x - card.x - GAP, target.position.y + GAP)
 	if target.end.y < size.y * 0.25:
-		return Vector2(target.get_center().x - card.x, target.end.y + GAP)
+		var below := target.end.y + GAP
+		if _arrow != null and _arrow_below(_arrow.get_size() * _px()):
+			below += _arrow.get_size().y * _px()
+		return Vector2(target.get_center().x - card.x, below)
 	if target.position.y > size.y * 0.7:
 		return Vector2(target.get_center().x - card.x * 0.5, target.position.y - card.y - GAP * 2.0)
 	if target.get_center().x < size.x * 0.5:
 		return Vector2(target.end.x + GAP, target.position.y + minf(target.size.y * 0.2, 60.0))
 	return Vector2(target.position.x - GAP - card.x, target.position.y + 10.0)
+
+
+## Whether the arrow goes under the target: there is no room for it over one at the top.
+func _arrow_below(arrow: Vector2) -> bool:
+	return target.position.y < arrow.y + 8.0
 
 
 func _px() -> float:

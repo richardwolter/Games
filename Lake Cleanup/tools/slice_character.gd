@@ -38,7 +38,7 @@ const ANIMS := [
 	# and reading face the room. Measured against the first frame's ink, so a breath moves the
 	# body and never the anchor.
 	{"prefix": "sit", "slug": "sit", "frames": 2, "ink_first": true, "dirs": ["south", "north"]},
-	{"prefix": "lie", "slug": "lie", "frames": 1, "dirs": ["south"]},
+	{"prefix": "lie", "slug": "lie", "frames": 1, "dirs": ["south", "north", "west", "east"]},
 	{"prefix": "read", "slug": "read", "frames": 10, "ink_first": true, "dirs": ["south"]},
 ]
 

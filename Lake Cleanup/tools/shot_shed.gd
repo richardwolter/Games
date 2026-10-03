@@ -7,6 +7,8 @@ extends Node
 ## Run it with the desktop build, not --headless: nothing renders under the dummy driver.
 
 const SHOT := "res://tools/last_shed.png"
+const SHOT_CUES := "res://tools/last_shed_cues.png"
+const SHOT_TURN := "res://tools/last_shed_turn.png"
 const LOG := "res://tools/last_shed.log"
 
 var _main: Node
@@ -41,7 +43,7 @@ func _physics_process(_delta: float) -> void:
 		decor.clear()
 		room.decor = decor
 		for want: Array in [
-			[&"decor_pk_bookshelf", 1, -4], [&"decor_pk_fridge", 9, -4],
+			[&"decor_pk_bookshelf", 1, -4], [&"decor_pk_fridge", 9, -3],
 			[&"decor_pk_landscape", 14, -3], [&"decor_pk_portrait", 18, -4],
 			[&"decor_pk_kitchen_counter", 22, -2], [&"decor_pk_stove", 33, -1],
 			[&"decor_pk_grandfather_clock", 28, -4],
@@ -50,6 +52,8 @@ func _physics_process(_delta: float) -> void:
 			[&"decor_pk_bed", 24, 14], [&"decor_pk_rug", 20, 6], [&"decor_pk_sofa", 22, 8],
 			[&"decor_pk_armchair", 34, 8], [&"decor_pk_coat_stand", 2, 14],
 			[&"decor_pk_potted_tree", 36, 14],
+			# Both lamps (2026-10-03): lit with the rest below, for their warm pools.
+			[&"decor_pk_floor_lamp", 38, 3], [&"decor_pk_table_lamp", 5, 6],
 			# Lit, for the light the room throws (2026-09-20): a probe that never lights a
 			# fire is a probe that cannot show the pools.
 			[&"decor_pk_fireplace", 30, 2],
@@ -100,9 +104,32 @@ func _physics_process(_delta: float) -> void:
 			var waiting: Array[String] = [String(names[names.size() - 2])]
 			room.unwashed = waiting
 		_force_the_pack(room)
+		# SHED_CUES=1 (2026-10-02): the pointing hands over every switch, none tried
+		# (last_shed_cues.png), then an armchair in hand with its turn chip up
+		# (last_shed_turn.png). The switches are put back off: the room as a player meets it.
+		if OS.get_environment("SHED_CUES") == "1":
+			room.switch_tried.clear()
+			for row: Dictionary in room.decor:
+				var piece := StringName(row["piece"])
+				if room.sheets.is_on(piece, int(row.get("view", 0))):
+					row["view"] = room.sheets.switched(piece, int(row.get("view", 0)))
+	# The hands are hidden while a piece is in hand, so the turn chip is its own picture.
+	if _frames == 22 and OS.get_environment("SHED_CUES") == "1":
+		var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+		room.carrying = &"decor_pk_armchair"
+		room.set(&"_carry_view", 0)
+		var floor_box: Rect2 = room.call(&"_floor_rect")
+		room.set(&"_pointer", floor_box.position + floor_box.size * Vector2(0.55, 0.7))
 	if _frames == 20:
 		_write()
-	if _frames >= 24:
+	if _frames == 28 and OS.get_environment("SHED_CUES") == "1":
+		var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
+		get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(SHOT_TURN))
+		var f := FileAccess.open(LOG, FileAccess.READ_WRITE)
+		f.seek_end()
+		f.store_line("turn chip      %.2f (carrying)" % room.turn_hint_alpha())
+		f.close()
+	if _frames >= 32:
 		get_tree().quit()
 
 
@@ -139,7 +166,14 @@ func _write() -> void:
 	f.flush()
 	f.close()
 	var shot := get_viewport().get_texture().get_image()
-	shot.save_png(ProjectSettings.globalize_path(SHOT))
+	shot.save_png(ProjectSettings.globalize_path(
+		SHOT_CUES if OS.get_environment("SHED_CUES") == "1" else SHOT
+	))
+	f = FileAccess.open(LOG, FileAccess.READ_WRITE)
+	f.seek_end()
+	f.store_line("hands          %s" % str(room.hand_rows()))
+	f.store_line("turn chip      %.2f" % room.turn_hint_alpha())
+	f.close()
 	# The two seams worth looking at close up: where the room's top edge meets the board's,
 	# and where their bottom edges meet. Scaled up, because a one-pixel step is the whole
 	# question and it is invisible at window size.

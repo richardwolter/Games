@@ -632,6 +632,10 @@ var hose_level := 1
 ## What the player has put where, as `{piece, cell}` rows. Owned here rather than by the
 ## room so it saves with everything else.
 var decor: Array = []
+## The shed's switchable kinds the player has worked once, by piece name (2026-10-02): a kind
+## not in it wears the pointing hand in the room. Saved as `switch_tried`; a save without it
+## reads as nothing tried, so an old run gets the hands too (Richard's call).
+var switch_tried: Array[String] = []
 
 var _grid: LakeGrid
 ## The zoom the player set with the wheel, and how far a cast in progress is leaning on top
@@ -803,6 +807,20 @@ var _haul_room := 0
 ## one, seconds into the one running (-1 while none runs), where it looks, the ones waiting
 ## for the boards to close, and the card. See `_owe_moment`.
 var _wildlife_seen: bool = true
+
+## The camera tip (2026-10-03, `/grill-me` with Richard): once a run has played
+## `CAMERA_TIP_AT` seconds, a paper card with the arrow points at the camera lock button and
+## says what it is for. The game runs on under it; a click on the card or the button, or
+## `CAMERA_TIP_HOLD` seconds, takes it down, and it never comes back on that save. It waits
+## while a board, the menu, a tour, a moment or the ending is up, and in pad mode (the
+## button is the mouse's alone). Saved as `camera_tip`; **a save without the key reads as
+## not seen**, so a run already past ten minutes gets it on its next load (Richard's call,
+## against the tours' rule).
+const CAMERA_TIP_AT := 600.0
+const CAMERA_TIP_HOLD := 8.0
+var _camera_tip_seen: bool = false
+var _camera_tip_left: float = -1.0
+var _camera_tip: TourCard
 var _moment: float = -1.0
 var _moment_at: Vector2 = Vector2.INF
 var _moments: Array[Dictionary] = []
@@ -1391,6 +1409,7 @@ func _ready() -> void:
 	_room.sheets = _sheets
 	_room.unlocked = unlocked
 	_room.decor = decor
+	_room.switch_tried = switch_tried
 	# How many dogs may be in the shed at once. A Callable rather than a number, because the
 	# pack grows mid-run (`_add_dog`) and a count pushed here would hold the room at one dog
 	# for the whole session. The wash room's own pattern.
@@ -3238,6 +3257,7 @@ func _set_shed(open: bool) -> void:
 		_room.unlocked = unlocked
 		_room.unwashed = unwashed
 		_room.decor = decor
+		_room.switch_tried = switch_tried
 		_room.carrying = &""
 		_room.opened()
 		_room.queue_redraw()
@@ -4188,6 +4208,7 @@ func _raise_front(loaded: bool) -> void:
 			_steps_done = true
 			_shop_tour_done = true
 			_decor_tour_done = true
+			_camera_tip_seen = true
 		force_intro = false
 		if not force_front:
 			return
@@ -5494,6 +5515,8 @@ func _free_now() -> bool:
 ## The toggle beside the gear. On, the view is pinned where it stands; off, the follow eases
 ## it home from wherever it was left, with no pan to unwind.
 func _toggle_free_view() -> void:
+	if _camera_tip_left >= 0.0:
+		_end_camera_tip()
 	_free_view = not _free_view
 	_free_camera.lit = _free_view
 	_free_at = _camera.position
@@ -5601,6 +5624,44 @@ func _owe_moment(kind: StringName, at: Vector2, text: String, seen: Callable) ->
 	_start_owed_moment()
 
 
+## One frame of the camera tip. See `CAMERA_TIP_AT`.
+func _camera_tip_step(delta: float) -> void:
+	if _camera_tip_seen:
+		return
+	var held := (
+		_panelled() or _fronted() or _farewell != null or _moment >= 0.0
+		or _arrive != Arrive.OFF or _letter_open or Pad.is_pad() or not _steps_done
+		or (_tour_card != null and _tour_card.visible) or not _free_camera.visible
+	)
+	if _camera_tip_left < 0.0:
+		if _play < CAMERA_TIP_AT or held:
+			return
+		_camera_tip_left = CAMERA_TIP_HOLD
+	if _camera_tip == null:
+		_camera_tip = TourCard.new()
+		_camera_tip.name = &"CameraTip"
+		_camera_tip.closable = true
+		_settings.get_parent().add_child(_camera_tip)
+		_camera_tip.next_asked.connect(_end_camera_tip)
+	_settings.get_parent().move_child(_camera_tip, _settings.get_parent().get_child_count() - 1)
+	if held:
+		_camera_tip.show_card(Rect2())
+		return
+	_camera_tip_left -= delta
+	if _camera_tip_left <= 0.0:
+		_end_camera_tip()
+		return
+	_camera_tip.show_card(_free_camera.get_global_rect(), Text.CAMERA_TIP)
+
+
+## The camera tip is read: down for good on this save.
+func _end_camera_tip() -> void:
+	_camera_tip_seen = true
+	_camera_tip_left = -1.0
+	if _camera_tip != null:
+		_camera_tip.show_card(Rect2())
+
+
 func _start_owed_moment() -> void:
 	if _moments.is_empty() or _moment >= 0.0:
 		return
@@ -5700,6 +5761,7 @@ func _process(delta: float) -> void:
 		_led_step(delta)
 		_first_steps_step(delta)
 		_decor_tour_step(delta)
+		_camera_tip_step(delta)
 		_hive_step(delta)
 	_haul_count_step()
 	# The hive's lamp, here and not in a draw callback (the pump's is set from the hut's draw
@@ -6765,6 +6827,7 @@ func save_game() -> bool:
 		"shop_tour": _shop_tour_done,
 		"decor_tour": _decor_tour_done,
 		"wildlife_seen": _wildlife_seen,
+		"camera_tip": _camera_tip_seen,
 		# The beehive, all under one key (2026-09-30). Absent reads as the empty hive.
 		"hive": _hive.to_save() if _hive != null else {},
 		"showers": _weather.showers if _weather != null else 0,
@@ -6778,6 +6841,7 @@ func save_game() -> bool:
 		"unwashed": unwashed,
 		"hose": hose_level,
 		"decor": decor,
+		"switch_tried": switch_tried,
 		"afloat": afloat,
 		"stacks": _grid.stacks,
 	}
@@ -6906,6 +6970,10 @@ func load_game() -> bool:
 			continue
 		if _sheets == null or _sheets.has(StringName(name)):
 			unwashed.append(name)
+	switch_tried.clear()
+	for name: Variant in save.get("switch_tried", []) as Array:
+		if not switch_tried.has(String(name)):
+			switch_tried.append(String(name))
 	decor.clear()
 	for row: Dictionary in save.get("decor", []) as Array:
 		var name := String(row.get("piece", ""))
@@ -6961,6 +7029,7 @@ func load_game() -> bool:
 	# Absent means seen, the tours' rule: an older save is past its first animal, or near
 	# enough, and a load would otherwise fire the moment the stock refills the lake.
 	_wildlife_seen = bool(save.get("wildlife_seen", true))
+	_camera_tip_seen = bool(save.get("camera_tip", false))
 	# A moment owed before the load is the old sitting's: the flags it would mark are the
 	# file's now, and a swarm owed its moment is owed it again by `_hive_step`.
 	_moments.clear()
@@ -6998,6 +7067,7 @@ func load_game() -> bool:
 	if _room != null:
 		_room.unlocked = unlocked
 		_room.decor = decor
+		_room.switch_tried = switch_tried
 	_set_auto_ferry(bool(save.get("auto_ferry", true)))
 	_angler.stand_at(save.get("angler", _angler.tile_pos) as Vector2)
 	if _trophy != null:

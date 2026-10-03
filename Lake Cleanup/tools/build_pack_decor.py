@@ -42,6 +42,10 @@ WIDTH, GAP, CELL = 512, 2, 16
 SHED_SCALE = 0.74
 
 F, S, B, R = "front", "side", "back", "side_r"
+# A view's `cut` may be TURN: the whole object turned a quarter, for the rugs, which the
+# packs draw flat and only one way round (2026-10-03, Richard: "all rugs can be turned
+# sideways"). A rug is a flat pattern, so a quarter turn is a rug lying the other way.
+TURN = "turn"
 # The two armchairs and the kitchen kit, cut to the island that is the piece.
 CUT = {
     "chair_front": [0, 0, 30, 42], "chair_back": [32, 10, 62, 42],
@@ -57,6 +61,49 @@ CUT = {
     # slice of green"), and the crown is as wide, so the piece keeps its biggest island too.
     "tree": [4, 0, 25, 53, "main"],
 }
+
+# The Messy pack draws a puddle under the fridge's front, its open front and its open side
+# (2026-10-03, Richard: "it should be just the fridge"). The puddle is these four blue-greys
+# and lies outside the fridge's own outline, so clearing them in the bottom rows leaves the
+# fridge whole; the bottom rows only, because a magnet higher up is blue too.
+DRY = {1049, 1050, 1054}
+
+# The floor lamp's shade lit (2026-10-03, Richard: lamps switch): the Coastal lamp's three
+# shade blues and its bulb mapped onto the lit table lamp's own yellows (1064), darkest to
+# darkest, in the shade's rows only (the stand has none of these colours, but the rows keep
+# it so).
+LIT = {
+    (120, 159, 168): (244, 160, 1),
+    (149, 189, 198): (244, 191, 33),
+    (188, 227, 236): (255, 216, 100),
+    (236, 212, 143): (255, 244, 190),
+    (255, 231, 162): (255, 255, 236),
+}
+LIT_ROWS = 17
+
+
+def lit(im):
+    out = im.copy()
+    po = out.load()
+    for y in range(min(LIT_ROWS, out.height)):
+        for x in range(out.width):
+            if po[x, y][3] and po[x, y][:3] in LIT:
+                po[x, y] = LIT[po[x, y][:3]] + (po[x, y][3],)
+    return out
+PUDDLE = {(185, 204, 204), (121, 140, 140), (165, 184, 184), (209, 228, 228)}
+PUDDLE_ROWS = 10
+
+
+def dried(im):
+    out = im.copy()
+    po = out.load()
+    w, h = out.size
+    for y in range(max(0, h - PUDDLE_ROWS), h):
+        for x in range(w):
+            if po[x, y][3] and po[x, y][:3] in PUDDLE:
+                po[x, y] = (0, 0, 0, 0)
+    return out
+
 
 # name, title, set, place, light, views
 PIECES = [
@@ -79,13 +126,13 @@ PIECES = [
     ("drawer", "Drawer", "ROTATE", "floor", "", [
         (2150, None, F, 0, 0, 0), (2149, None, "front_open", 0, 1, 0), (2151, None, S, 1, 0, 1)]),
     ("drawer_desk", "Drawer Desk", "ROTATE", "floor", "", [
-        (412, None, F, 0, 0, 0), (413, None, "front_open", 0, 1, 0), (414, None, B, 1, 0, 0)]),
+        (412, None, F, 0, 0, 0), (413, None, "front_open", 0, 1, 0), (414, None, B, 2, 0, 0)]),
     ("fancy_bed", "Fancy Bed", "ROTATE", "floor", "", [
         (443, None, F, 0, 0, 0), (445, None, S, 1, 0, 1), (444, None, B, 2, 0, 0)]),
     ("fancy_table", "Fancy Table", "ROTATE", "floor", "", [
         (395, None, F, 0, 0, 0), (394, None, S, 1, 0, 0)]),
     ("file_cabinet", "File Cabinet", "ROTATE", "floor", "", [
-        (1324, None, F, 0, 0, 0), (1323, None, "front_open", 0, 1, 0), (1325, None, S, 1, 0, 1)]),
+        (1324, None, F, 0, 0, 0), (1323, None, "front_open", 0, 1, 0), (1327, None, S, 1, 0, 1)]),
     ("fireplace", "Fireplace", "STATE", "floor", "fire", [
         (435, None, "off", 0, 0, 0), (436, None, "on", 0, 1, 0)]),
     ("kitchen_counter", "Kitchen Counter", "VARIANT", "floor", "", [
@@ -114,28 +161,28 @@ PIECES = [
     ("nightstand", "Nightstand", "ROTATE", "floor", "", [
         (437, None, F, 0, 0, 0), (438, None, "front_open", 0, 1, 0), (439, None, B, 1, 0, 0)]),
     ("bonsai", "Bonsai", "SINGLE", "small", "", [(297, None, F, 0, 0, 0)]),
-    ("rug", "Gold Rug", "SINGLE", "floor", "", [(300, None, F, 0, 0, 0)]),
+    ("rug", "Gold Rug", "ROTATE", "floor", "", [(300, None, F, 0, 0, 0), (300, TURN, S, 1, 0, 0)]),
     ("coat_stand", "Coat Stand", "SINGLE", "floor", "", [(328, None, F, 0, 0, 0)]),
     ("landscape", "Landscape", "SINGLE", "wall", "", [(385, None, F, 0, 0, 0)]),
     ("portrait", "Portrait", "SINGLE", "wall", "", [(389, None, F, 0, 0, 0)]),
     ("grandfather_clock", "Old Clock", "SINGLE", "floor", "", [(427, None, F, 0, 0, 0)]),
     ("globe", "Globe", "SINGLE", "floor", "", [(430, None, F, 0, 0, 0)]),
     ("sculpture", "Sculpture", "SINGLE", "floor", "", [(1146, None, F, 0, 0, 0)]),
-    ("blue_rug", "Blue Rug", "SINGLE", "floor", "", [(1172, None, F, 0, 0, 0)]),
+    ("blue_rug", "Blue Rug", "ROTATE", "floor", "", [(1172, None, F, 0, 0, 0), (1172, TURN, S, 1, 0, 0)]),
     # The second batch (2026-10-01).
     ("fridge", "Fridge", "ROTATE", "floor", "cold", [
         (1049, None, F, 0, 0, 0), (1050, None, "front_open", 0, 1, 0),
         (1052, None, S, 1, 0, 1), (1054, CUT["fridge_side_open"], "side_open", 1, 1, 1)]),
     ("side_desk", "Side Desk", "ROTATE", "floor", "", [
         (1150, None, F, 0, 0, 0), (1149, None, "front_open", 0, 1, 0),
-        (1153, None, S, 1, 0, 1), (1152, None, B, 2, 0, 0)]),
+        (1152, None, S, 1, 0, 1), (1151, None, B, 2, 0, 0)]),
     ("sink", "Sink", "ROTATE", "floor", "", [
         (2008, None, F, 0, 0, 0), (2010, None, S, 1, 0, 1), (2009, None, B, 2, 0, 0)]),
     ("diner_table", "Diner Table", "SINGLE", "floor", "", [(4, None, F, 0, 0, 0)]),
     ("flower_vase", "Flower Vase", "SINGLE", "small", "", [(361, None, F, 0, 0, 0)]),
     ("flower_pot", "Flower Pot", "SINGLE", "floor", "", [(505, None, F, 0, 0, 0)]),
     ("car_picture", "Car Picture", "SINGLE", "wall", "", [(964, None, F, 0, 0, 0)]),
-    ("dotted_rug", "Dotted Rug", "SINGLE", "floor", "", [(1192, None, F, 0, 0, 0)]),
+    ("dotted_rug", "Dotted Rug", "ROTATE", "floor", "", [(1192, None, F, 0, 0, 0), (1192, TURN, S, 1, 0, 0)]),
     ("aloe", "Aloe", "SINGLE", "small", "", [(1213, None, F, 0, 0, 0)]),
     ("cactus", "Cactus", "SINGLE", "small", "", [(2138, None, F, 0, 0, 0)]),
     # The third batch (2026-10-01).
@@ -147,12 +194,44 @@ PIECES = [
     ("plant", "Plant", "SINGLE", "small", "", [(471, None, F, 0, 0, 0)]),
     ("sprout_pot", "Sprout Pot", "SINGLE", "small", "", [(673, None, F, 0, 0, 0)]),
     ("potted_tree", "Potted Tree", "SINGLE", "floor", "", [(1019, CUT["tree"], F, 0, 0, 0)]),
-    ("table_lamp", "Table Lamp", "SINGLE", "small", "", [(1064, None, F, 0, 0, 0)]),
+    # The Messy pack draws the table lamp off (1063) and lit (1064); E switches it
+    # (2026-10-03). It was 1064 alone, so a lamp saved before reads as off.
+    ("table_lamp", "Table Lamp", "STATE", "small", "warm", [
+        (1063, None, "off", 0, 0, 0), (1064, None, "on", 0, 1, 0)]),
     # The record player is the old find's own entry, re-drawn (see REPLACES): lid down from
     # above (2222), lid up (2214). The menu E opens is drawn in these colours.
     ("record_player", "Record player", "STATE", "small", "", [
         (2222, None, "closed", 0, 0, 0), (2214, None, "open", 0, 1, 0)]),
+    # The fourth batch (2026-10-03). 299 holds a rose in a vase over a potted plant, and is
+    # two finds; 332 is the floor lamp with two cushions beside it, cut to the lamp. Rugs
+    # turn a quarter (TURN). 1232 / 1229 are the tagger's "Decorated Table" set, front and
+    # side of an open shelf dressed with books and plants.
+    ("rose_vase", "Rose Vase", "SINGLE", "small", "", [(299, [0, 0, 10, 24], F, 0, 0, 0)]),
+    ("leafy_pot", "Leafy Pot", "SINGLE", "floor", "", [(299, [2, 27, 24, 57], F, 0, 0, 0)]),
+    # The Coastal pack has no lit floor lamp, so its "on" is the same cut with the shade lit
+    # by rule (LIT).
+    ("floor_lamp", "Floor Lamp", "STATE", "floor", "warm", [
+        (332, [0, 0, 13, 42, "main"], "off", 0, 0, 0),
+        (332, [0, 0, 13, 42, "main", "lit"], "on", 0, 1, 0)]),
+    ("drinks_cart", "Drinks Cart", "SINGLE", "floor", "", [(428, None, F, 0, 0, 0)]),
+    ("striped_rug", "Striped Rug", "ROTATE", "floor", "", [(1097, None, F, 0, 0, 0), (1097, TURN, S, 1, 0, 0)]),
+    ("oval_rug", "Oval Rug", "ROTATE", "floor", "", [(1112, None, F, 0, 0, 0), (1112, TURN, S, 1, 0, 0)]),
+    ("runner_rug", "Runner Rug", "ROTATE", "floor", "", [(2156, None, F, 0, 0, 0), (2156, TURN, S, 1, 0, 0)]),
+    ("decorated_table", "Decorated Table", "ROTATE", "floor", "", [
+        (1232, None, F, 0, 0, 0), (1229, None, S, 1, 0, 1)]),
 ]
+
+# Views added after a piece was first built, appended after every view (and mirror) it
+# already had, so a saved `view` index still points at the same picture (2026-10-03, the
+# counterpart review). Each is (id, cut, role, face, state, mirror), as in PIECES.
+LATE = {
+    # The side with its drawer pulled out; the side view used to be this one, as if shut.
+    "side_desk": [(1153, None, "side_open", 1, 1, 1)],
+    # The cabinet's back, which stood in for its side, and the side with a drawer out.
+    "file_cabinet": [(1325, None, B, 2, 0, 0), (1326, None, "side_open", 1, 1, 1)],
+    # The desk's side, shut and with its drawer out, which the pack drew and nobody used.
+    "drawer_desk": [(409, None, S, 1, 0, 1), (410, None, "side_open", 1, 1, 1)],
+}
 
 # Pieces that take over an existing find's catalogue entry rather than joining as a new
 # decor_pk_* one: the entry keeps its name, its place in the catalogue (so the lake's def
@@ -196,6 +275,7 @@ FRONT_BASE = {
     "flower_vase": 2, "flower_pot": 4, "aloe": 2, "cactus": 2, "diner_seat": 20,
     "glass_table": 16, "small_table": 10, "plant": 2, "sprout_pot": 2, "potted_tree": 6,
     "table_lamp": 2, "record_player": 6,
+    "rose_vase": 2, "leafy_pot": 4, "floor_lamp": 4, "drinks_cart": 10, "decorated_table": 10,
 }
 SIDE_ROLES = ("side", "top")
 
@@ -210,7 +290,9 @@ SEATS = {"sofa": {0: 7}, "white_sofa": {0: 7}, "armchair": {0: 6}, "old_seat": {
          "diner_seat": {0: 6},
          # Every face of a bed takes a dog (2026-10-01, Richard: "sleep in any bed"): a bed's
          # rails are low, so nothing in front hides a dog lying on it from the side or back.
-         "bed": {0: 18, 1: 12, 2: 18}, "fancy_bed": {0: 22, 1: 15, 2: 26, 3: 15}}
+         # Off the pillow on the faces whose pillow is at the near end (2026-10-03): there the
+         # dog lay over the sleeper's head, so it lies at the far end, over the feet.
+         "bed": {0: 32, 1: 12, 2: 18}, "fancy_bed": {0: 22, 1: 15, 2: 37, 3: 15}}
 
 
 def bases_of(name, roles, heights):
@@ -313,19 +395,34 @@ def main():
             sheets[e["sheet"]] = Image.open(PACKS / e["sheet"]).convert("RGBA")
         x, y, w, h = e["box"]
         im = sheets[e["sheet"]].crop((x, y, x + w, y + h))
-        if box:
+        if oid in DRY:
+            im = dried(im)
+        if box == TURN:
+            im = im.transpose(Image.ROTATE_90)
+        elif box:
             im = im.crop((box[0], box[1], box[2] + 1, box[3] + 1))
-            if len(box) > 4 and box[4] == "main":
+            if "main" in box[4:]:
                 im = main_island(im)
-        return im.crop(im.getbbox())
+        im = im.crop(im.getbbox())
+        if box and box != TURN and "lit" in box[4:]:
+            im = lit(im)
+        return im
 
     clean, dirty, plan = [], [], []
     for name, title, kind, place, light, views in PIECES:
-        roles, faces, states, ims = [], [], [], []
-        top = max(v[3] for v in views)
-        mirrored = []
-        for oid, box, role, face, state, mirror in views:
+        roles, faces, states, ims, flips = [], [], [], [], []
+        late = LATE.get(name, [])
+        everything = list(views) + late
+        top = max(v[3] for v in everything)
+        # A mirrored face gets a face of its own past every drawn one, shared by both its
+        # states; mirrors of two different faces get two.
+        flipped_face = {}
+        for v in everything:
+            if v[5] and v[3] not in flipped_face:
+                flipped_face[v[3]] = top + 1 + len(flipped_face)
+        for oid, box, role, face, state, mirror in everything:
             ims.append(cut(oid, box)); roles.append(role); faces.append(face); states.append(state)
+            flips.append(mirror)
         # A face's on view shares one frame with its off view, slid to where they match,
         # so switching it (E) never moves the piece: the open fridge's door swings out of
         # the same body. Only a piece that turns is aligned; a switch of one face (the
@@ -335,17 +432,22 @@ def main():
                 j = next((j for j in range(len(ims)) if faces[j] == faces[i] and states[j] == 0), None)
                 if j is not None:
                     ims[j], ims[i] = shared_frame(ims[j], ims[i])
-        for i, (oid, box, role, face, state, mirror) in enumerate(views):
-            if mirror:
-                mirrored.append((ims[i].transpose(Image.FLIP_LEFT_RIGHT), role + "_r", state))
-        for k, (im, role, state) in enumerate(mirrored):
-            ims.append(im); roles.append(role); states.append(state)
-            # one new face for the mirrored side; both states of it share it
-            faces.append(top + 1)
+        # Order: the first views, their mirrors, then the late views and theirs, so the
+        # indices a save already holds never move.
+        drawn = list(zip(ims, roles, faces, states, flips))
+        first_n = len(views)
+
+        def mirrors(part):
+            return [(im.transpose(Image.FLIP_LEFT_RIGHT), role + "_r", flipped_face[face], state, 0)
+                    for im, role, face, state, flip in part if flip]
+
+        ordered = drawn[:first_n] + mirrors(drawn[:first_n]) + drawn[first_n:] + mirrors(drawn[first_n:])
+        ims = [o[0] for o in ordered]; roles = [o[1] for o in ordered]
+        faces = [o[2] for o in ordered]; states = [o[3] for o in ordered]
         first = len(clean)
         clean.extend(ims)
         dirty.append(grime(ims[0], name))
-        plan.append((name, title, kind, place, light, roles, faces, states, first, len(ims), ims[0], views))
+        plan.append((name, title, kind, place, light, roles, faces, states, first, len(ims), ims[0], everything))
 
     clean_sheet, clean_boxes = pack(clean)
     dirty_sheet, dirty_boxes = pack(dirty)

@@ -128,6 +128,18 @@ const DOG_SPEED := 2.6
 ## The longest step allowed in one frame, in cells. See the delta clamp in `_process`.
 const DOG_STEP_MOST := 0.6
 
+## A dog finds its way round the furniture (2026-10-03, `/grill-me` with Richard: dogs got
+## stuck walking against furniture). The floor is a grid of `PATH_RES` points a cell, each
+## free where `_dog_may_stand` says a dog may stand; a walk is an A* path over it, pulled
+## straight wherever the line between two of its points is clear (`PATH_LOOK`, the step the
+## line is sampled at), and a dog only ever picks a spot it can reach. Other walkers are not
+## on the grid: they move, so a dog slides past them and, held up `DOG_BLOCKED` seconds,
+## thinks again. The lake's dogs keep their own rule (no search); the shed's clutter is what
+## needs one.
+const PATH_RES := 2
+const PATH_LOOK := 0.2
+const DOG_BLOCKED := 0.7
+
 ## How long the dog keeps doing one thing, in seconds, and how long it settles for when it
 ## has found the bed.
 const DOG_MOOD_LEAST := 2.5
@@ -154,6 +166,9 @@ const DOG_BED := &"decor_pet_bed"
 ## things at the same row, so they are small and one is bigger than the other.
 const OVER_HOST := 0.01
 const OVER_PIECE := 0.02
+## A dog sharing the player's sofa or bed sorts this far past the player: over them, and
+## still well short of the next piece down the room.
+const SHARED_OVER := 0.005
 ## How far to either side of a piece, in cells, a walker still counts as next to it for
 ## drawing: about half the widest walker's drawing.
 const BESIDE := 1.5
@@ -173,37 +188,79 @@ const PROMPT_LIFT := 8.0
 ## the kind, the hips' height in the drawing's own pixels up from its bottom edge, and how far
 ## off the drawing's middle the player sits, in the same pixels. A view that is not listed
 ## offers nothing: **side views are left out by decision** (Richard, after three passes at a
-## side-on sit). `front` faces the room and is drawn over the piece; `back` turns away from it
-## and is drawn behind it, so only the hat and shoulders show over the backrest.
+## side-on sit). `front` faces the room and is drawn over the piece; `back` turns away from it,
+## sits **over the seat and under the backrest** (2026-10-03, Richard; it used to be drawn
+## behind the whole piece and read as standing behind it): drawn over the piece, and then the
+## piece's rows from the fourth number down (the drawing's own rows from its top, by eye off
+## each back view) drawn again over the player. A chair's back view draws its seat cushion
+## below the backrest, and the player sits **on** it: the fifth number is where the backrest
+## ends, and only the rows between are drawn over him (second pass the same day, Richard: "it
+## should be between cushion and back rest"), with the hips raised to the cushion. A sofa or
+## an armchair from behind is all backrest and has no fifth. The sixth is the cushion's foot:
+## the player is not drawn below it, since a sitter's legs go forward under the seat. The
+## basket is put down for a back sit (`build_pose_mockup.drop_basket`).
 ##
 ## The sofa's view 0 is its back and its view 2 its cushion: the catalogue's labels are the
 ## wrong way round for the sofa only (`SOFA_CUSHION` in the harness), and the rests follow the
 ## pictures, not the labels. On the sofa the player sits left of middle so a dog can have the
 ## other half. Numbers by eye off the mockup; retune here.
 const RESTS := {
-	&"decor_sofa": {0: [&"back", 10, 0], 2: [&"front", 12, -10]},
-	&"decor_loveseat": {0: [&"front", 13, 0], 2: [&"back", 11, 0]},
-	&"decor_dining_chair": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
+	&"decor_sofa": {0: [&"back", 10, 0, 5], 2: [&"front", 12, -10]},
+	&"decor_loveseat": {0: [&"front", 13, 0], 2: [&"back", 11, 0, 6]},
+	&"decor_dining_chair": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 2, 9, 14]},
 	&"decor_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0]},
 	&"decor_bookcase_tall": {0: [&"read", 0, 0]},
 	&"decor_bookcase_drawers": {0: [&"read", 0, 0]},
 	&"decor_tiny_bookcase": {0: [&"read", 0, 0]},
 	# The 0_mem0ry pack's pieces (2026-10-01): their views run front, side, back, so the
 	# back is view 2 on every one. First guesses, drawn at 0.74; retune by eye.
-	&"decor_pk_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0]},
-	&"decor_pk_white_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0]},
-	&"decor_pk_armchair": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
-	&"decor_pk_old_seat": {0: [&"front", 12, 0], 2: [&"back", 10, 0]},
-	&"decor_pk_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
-	&"decor_pk_diner_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
-	&"decor_pk_green_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
-	&"decor_pk_wood_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
-	&"decor_pk_carved_chair": {0: [&"front", 11, 0], 2: [&"back", 9, 0]},
+	&"decor_pk_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0, 5]},
+	&"decor_pk_white_sofa": {0: [&"front", 11, -8], 2: [&"back", 9, 0, 6]},
+	&"decor_pk_armchair": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 4]},
+	&"decor_pk_old_seat": {0: [&"front", 12, 0], 2: [&"back", 10, 0, 4]},
+	&"decor_pk_chair": {0: [&"front", 11, 0], 2: [&"back", 18, 0, 2, 9, 18]},
+	&"decor_pk_diner_chair": {0: [&"front", 11, 0], 2: [&"back", 14, 0, 2, 13, 18]},
+	&"decor_pk_green_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 10, 16]},
+	&"decor_pk_wood_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 10, 15]},
+	&"decor_pk_carved_chair": {0: [&"front", 11, 0], 2: [&"back", 13, 0, 2, 12, 17]},
 	&"decor_pk_diner_seat": {0: [&"front", 11, 0]},
-	&"decor_pk_bed": {0: [&"lie", 0, 0]},
-	&"decor_pk_fancy_bed": {0: [&"lie", 0, 0]},
+	&"decor_pk_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0], 2: [&"lie", 0, 0]},
+	&"decor_pk_fancy_bed": {0: [&"lie", 0, 0], 1: [&"lie", 0, 0], 2: [&"lie", 0, 0],
+		3: [&"lie", 0, 0]},
 	&"decor_pk_bookshelf": {0: [&"read", 0, 0]},
 }
+## Where the head goes on every face of every bed (2026-10-03, Richard: "mind their
+## positioning and where the pillows are"), in the view's own drawn pixels, measured off the
+## pack pictures by eye. A face is where the pillow is: `up` at the far end (the face-up head,
+## `lie_south`), `down` behind the board nearest the camera (the back of the hat, `lie_north`),
+## `west`/`east` at the left or right end of a side view (the head turned a quarter). `at` is
+## the chin for up and the sides, the head's foot for down; `cover` is the bed's own picture
+## drawn back over the head from there on towards the feet, so the blanket comes up to the
+## chin or the near board hides the pillow; `clip` is the headboard's inner edge, which a
+## sideways head is not drawn past; `feet` is where the body under the blanket ends, for its
+## folds. The pack bed's view 0 is its foot end's view of the pillow end, the pillow hidden by
+## the near board, and its view 2 the pillow far: its labels run the other way round from the
+## fancy bed's, as the sofa's do. On the double bed the player takes one pillow, the same one
+## from every side.
+const LIES := {
+	&"decor_bed": {
+		0: {"face": &"up", "at": Vector2(11.5, 11.0), "feet": 27.0},
+		1: {"face": &"up", "at": Vector2(11.5, 11.0), "feet": 27.0},
+	},
+	&"decor_pk_bed": {
+		0: {"face": &"down", "at": Vector2(15.5, 43.0), "cover": 40.0, "feet": 12.0},
+		1: {"face": &"west", "at": Vector2(20.0, 25.0), "cover": 21.0, "clip": 4.0, "feet": 55.0},
+		2: {"face": &"up", "at": Vector2(15.5, 23.0), "cover": 22.0, "feet": 48.0},
+	},
+	&"decor_pk_fancy_bed": {
+		0: {"face": &"up", "at": Vector2(15.5, 30.0), "cover": 29.0, "feet": 53.0},
+		1: {"face": &"west", "at": Vector2(24.0, 22.0), "cover": 25.0, "clip": 4.0, "feet": 68.0},
+		2: {"face": &"down", "at": Vector2(41.5, 48.0), "cover": 46.0, "feet": 16.0},
+		3: {"face": &"east", "at": Vector2(49.0, 22.0), "cover": 49.0, "clip": 70.0, "feet": 5.0},
+	},
+}
+## Half the width of the body's folds under the blanket, in the bed's drawn pixels.
+const LIE_FOLD := 5.0
 ## How far above the ink's foot the hips are in each sitting strip, in the figure's own
 ## pixels. What `tools/build_rest_frames.py` draws: move them together.
 const SIT_HIP := {&"south": 7, &"north": 8}
@@ -556,6 +613,89 @@ const WASH_PULSE_IDLE := 0.45
 ## Piece name -> what to call it on screen. Filled in by lake.gd from the defs.
 var titles := {}
 var decor: Array = []
+## The switchable kinds the player has worked at least once, by piece name (2026-10-02).
+## Owned by the lake, which saves it, and shared by reference like `decor`. A kind not in it
+## wears the pointing hand (`hand_rows`).
+var switch_tried: Array[String] = []
+
+## The cues (2026-10-02, `/grill-me` with Richard). The turn chip rides beside a carried piece
+## that R would change, whole for `TURN_HINT_HOLD` from the moment it is picked up and then
+## fading over `TURN_HINT_FADE`. The hand bobs over every placed switch of a kind never worked.
+const TURN_HINT_HOLD := 2.0
+const TURN_HINT_FADE := 0.6
+const TURN_HINT_GAP := 6.0
+## The hand, the angler's own (2026-10-03, Richard's pick C off `tools/last_hand_mockup.png`,
+## `tools/hand_mockup.py`): the silhouette pointing down, seen from the back, the shirt's cuff
+## over the top `HAND_CUFF` rows, the thumb bulging left, the curled fingers along the bottom
+## right, the index finger down the left. Outlined, toned and creased by rule in `_hand_image`,
+## lit from the right like every painted asset, and drawn at the furniture's grain.
+const HAND := [
+	"....########....",
+	"...##########...",
+	"...##########...",
+	"...##########...",
+	"..############..",
+	".##############.",
+	"################",
+	"################",
+	"################",
+	".###############",
+	".##############.",
+	"..#####.##.##...",
+	"..####..........",
+	"..####..........",
+	"..####..........",
+	"..####..........",
+	"..####..........",
+	"..####..........",
+	"...##...........",
+]
+const HAND_CUFF := 4
+## The fingertip's foot, in the silhouette's own pixels.
+const HAND_TIP := Vector2(3.5, 19.0)
+## The angler's skin (off `assets/character.png`) and his shirt's cream, by tone.
+const HAND_SKIN := {
+	&"body": Color8(243, 166, 119), &"mid": Color8(228, 143, 101), &"lit": Color8(252, 198, 158),
+	&"low": Color8(192, 87, 63), &"line": Color8(196, 98, 68),
+}
+const HAND_SHIRT := {
+	&"body": Color8(236, 218, 177), &"mid": Color8(222, 202, 160), &"lit": Color8(250, 240, 214),
+	&"low": Color8(185, 160, 121), &"line": Color8(150, 124, 90),
+}
+const HAND_INK := Color8(24, 18, 17)
+const HAND_NAIL := [Color8(250, 206, 186), Color8(236, 178, 160)]
+## The star winking at the fingertip, the finds' gold.
+const HAND_STAR_AT := Vector2i(8, 15)
+const HAND_STAR_GOLD := Color8(255, 205, 77)
+const HAND_STAR_PALE := Color8(255, 245, 200)
+## The soft shadow down and to the left.
+const HAND_SHADE := Color(0.0, 0.0, 0.0, 0.27)
+## The furniture's grain: the pack pieces are drawn at this many room pixels an art pixel
+## (`build_pack_decor.py`'s SHED_SCALE).
+const HAND_GRAIN := 0.74
+## Four frames: how many art px up it bobs on each, how long each is held, and the star's
+## arm on each (0 a single gold pixel).
+const HAND_BOBS := [0, 1, 1, 0]
+const HAND_HOLDS := [0.3, 0.18, 0.18, 0.3]
+const HAND_ARMS := [0, 3, 2, 0]
+var _hand_frames: Array[ImageTexture] = []
+## Where the silhouette's (0, 0) stands in each frame's picture.
+var _hand_origin := Vector2i.ZERO
+## A turning arrow beside the key on the turn chip, in screen pixels of `TURN_GLYPH_PX`.
+const TURN_GLYPH := [
+	"..OOOO....",
+	".O....O...",
+	"O......O..",
+	"O....O.O.O",
+	"O.....OOO.",
+	".O.....O..",
+	"..OOO.....",
+]
+const TURN_GLYPH_PX := 2.0
+## The hand's tip stands this many of its own pixels over the top of the piece's drawing.
+const HAND_LIFT := 2.0
+var _turn_hint := INF
+var _carried_was: StringName = &""
 
 ## What is being dragged, as a piece name, and where it came from: the index it had in
 ## `decor`, or -1 when it was picked up off the inventory list.
@@ -607,6 +747,17 @@ class ShedDog extends RefCounted:
 	## the cushion and `_process`'s unstick shoves it off again every frame.
 	var over: Dictionary = {}
 
+	## The way to `target`: the points still to walk, in cells, the target last. Worked out
+	## when the target changes (`routed_to`), and how long the dog has been held up.
+	var path: Array[Vector2] = []
+	var routed_to := Vector2(INF, INF)
+	var blocked: float = 0.0
+
+
+## The walking grids `_path_grid` has built, by exemption, for the furniture `_grids_for`
+## hashes.
+var _grids: Dictionary = {}
+var _grids_for: int = 0
 
 ## The dogs that are in, none to `DOGS_MOST`. Empty is a room with nobody in it.
 var _dogs: Array[ShedDog] = []
@@ -815,6 +966,7 @@ func _process(delta: float) -> void:
 		if _wash_plank != null:
 			_wash_plank.pulse = wash_pulse_amount()
 	_pad_tick()
+	_tick_turn_hint(delta)
 	_walk_you(delta)
 	_carry_with_pad(delta)
 	var sound := Sfx.main()
@@ -876,10 +1028,11 @@ func _load_you() -> void:
 		for cell: Dictionary in book["poses"][name]:
 			var region: Array = cell["region"]
 			var ink: Array = cell["ink"]
-			frames.append({
-				"region": Rect2(region[0], region[1], region[2], region[3]),
-				"ink": Rect2(ink[0], ink[1], ink[2], ink[3]),
-			})
+			var cut := Rect2(region[0], region[1], region[2], region[3])
+			var frame := {"region": cut, "ink": Rect2(ink[0], ink[1], ink[2], ink[3])}
+			if name.begins_with("sit_"):
+				frame["axis"] = _body_axis(image, cut)
+			frames.append(frame)
 		_you_poses[StringName(name)] = frames
 
 	# What the figure measures inside its cell, taken from one frame and used for every one
@@ -892,6 +1045,28 @@ func _load_you() -> void:
 		var ink: Rect2 = first["ink"]
 		_you_ink_tall = maxf(ink.size.y, 1.0)
 		_you_ink_foot = ink.position.y + ink.size.y
+
+
+## Where the figure's body stands across its cell, in the cell's own pixels: the median of
+## every row's middle (2026-10-03, Richard: a back sit stood off the chair's middle). Its ink
+## box is not it: sitting with his back to the room the hand hangs out on one side and puts
+## the box's middle a pixel and a half off the body's, which is what a narrow chair shows.
+static func _body_axis(image: Image, cell: Rect2) -> float:
+	var middles: Array[float] = []
+	for y in range(int(cell.position.y), int(cell.end.y)):
+		var low := -1
+		var high := -1
+		for x in range(int(cell.position.x), int(cell.end.x)):
+			if image.get_pixel(x, y).a > 0.0:
+				if low < 0:
+					low = x
+				high = x
+		if low >= 0:
+			middles.append(float(low + high) * 0.5 + 0.5 - cell.position.x)
+	if middles.is_empty():
+		return cell.size.x * 0.5
+	middles.sort()
+	return middles[middles.size() / 2]
 
 
 ## A copy of the sheet with the game's own light on it. See Style.figure_tone.
@@ -1206,10 +1381,26 @@ func _dog_think(dog: ShedDog) -> void:
 ## invisible wall; a slide that makes no ground towards the target gives up and a new target
 ## is picked, since a dog nosing along a wardrobe for ever reads as a bug.
 func _dog_walk(dog: ShedDog, delta: float) -> bool:
-	var gap := dog.target - dog.at
-	if gap.length() <= 0.25:
+	if dog.at.distance_to(dog.target) <= 0.25:
 		return true
-	var step := gap.normalized() * minf(DOG_SPEED * delta, DOG_STEP_MOST)
+	# A new target is routed once; a target nothing leads to is given up on the spot.
+	if not dog.routed_to.is_equal_approx(dog.target):
+		dog.routed_to = dog.target
+		dog.blocked = 0.0
+		dog.path = _route(dog.at, dog.target, dog.over)
+		if dog.path.is_empty():
+			return true
+	if dog.path.is_empty():
+		return true
+	# Pull the path straight: skip a corner whenever the next point is in plain sight.
+	while dog.path.size() > 1 and _line_clear(dog.at, dog.path[1], dog.over):
+		dog.path.remove_at(0)
+	var aim: Vector2 = dog.path[0]
+	var gap := aim - dog.at
+	if gap.length() <= 0.12:
+		dog.path.remove_at(0)
+		return dog.path.is_empty()
+	var step := gap.normalized() * minf(minf(DOG_SPEED * delta, DOG_STEP_MOST), gap.length())
 	if absf(step.x) > 0.0001:
 		dog.left = step.x < 0.0
 	var others := _others_than(dog)
@@ -1218,13 +1409,143 @@ func _dog_walk(dog: ShedDog, delta: float) -> bool:
 	var may := func(where: Vector2) -> bool:
 		return _clear_of_all(where, from, others, dog.over)
 	var moved := _slid(from, step, may)
-	if moved.is_equal_approx(from):
-		return true
+	# Held up by the player or another dog: wait a moment, then think again.
+	if moved.distance_to(aim) >= from.distance_to(aim) - step.length() * 0.25:
+		dog.blocked += delta
+		if dog.blocked >= DOG_BLOCKED:
+			return true
+	else:
+		dog.blocked = 0.0
 	dog.at = moved
-	# Slid along a face and made next to no ground towards the target: pick another.
-	if moved.distance_to(dog.target) >= from.distance_to(dog.target) - step.length() * 0.1:
-		return true
 	return dog.at.distance_to(dog.target) <= 0.25
+
+
+## The floor's walking grid for a dog allowed to stand on `over`: an `AStarGrid2D` with a
+## point solid wherever `_dog_may_stand` refuses it, and every free point labelled with the
+## patch of floor it belongs to, so whether a dog can get somewhere is one comparison.
+## Memoised on the furniture and the exemption; the furniture moving throws the lot away.
+func _path_grid(over: Dictionary) -> Dictionary:
+	var furniture := decor.hash()
+	if furniture != _grids_for:
+		_grids_for = furniture
+		_grids.clear()
+	var key := ",".join(PackedStringArray(over.keys()))
+	if _grids.has(key):
+		return _grids[key]
+	var wide := COLS * PATH_RES
+	var tall := ROWS * PATH_RES
+	var grid := AStarGrid2D.new()
+	grid.region = Rect2i(0, 0, wide, tall)
+	grid.cell_size = Vector2.ONE
+	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	grid.update()
+	var free := PackedByteArray()
+	free.resize(wide * tall)
+	for y in tall:
+		for x in wide:
+			var ok := _dog_may_stand(_grid_at(Vector2i(x, y)), over)
+			free[y * wide + x] = 1 if ok else 0
+			if not ok:
+				grid.set_point_solid(Vector2i(x, y), true)
+	# Patches of floor, by flood fill over the same eight neighbours the search walks.
+	var label := PackedInt32Array()
+	label.resize(wide * tall)
+	label.fill(-1)
+	var patch := 0
+	for i in wide * tall:
+		if free[i] == 0 or label[i] >= 0:
+			continue
+		var stack: Array[int] = [i]
+		label[i] = patch
+		while not stack.is_empty():
+			var at: int = stack.pop_back()
+			var ax := at % wide
+			var ay := at / wide
+			for dy: int in [-1, 0, 1]:
+				for dx: int in [-1, 0, 1]:
+					var nx: int = ax + dx
+					var ny: int = ay + dy
+					if nx < 0 or ny < 0 or nx >= wide or ny >= tall:
+						continue
+					var n: int = ny * wide + nx
+					if free[n] == 0 or label[n] >= 0:
+						continue
+					# A diagonal only where both sides of the corner are free, as the search.
+					if dx != 0 and dy != 0 and (free[ay * wide + nx] == 0 or free[ny * wide + ax] == 0):
+						continue
+					label[n] = patch
+					stack.append(n)
+		patch += 1
+	var out := {"grid": grid, "free": free, "label": label}
+	_grids[key] = out
+	return out
+
+
+## A grid point's place on the floor, in cells.
+func _grid_at(point: Vector2i) -> Vector2:
+	return (Vector2(point) + Vector2(0.5, 0.5)) / float(PATH_RES)
+
+
+## The free grid point nearest a spot on the floor, or (-1, -1) if none is near.
+func _grid_near(where: Vector2, paths: Dictionary) -> Vector2i:
+	var wide := COLS * PATH_RES
+	var tall := ROWS * PATH_RES
+	var free: PackedByteArray = paths["free"]
+	var mid := Vector2i((where * float(PATH_RES)).floor())
+	var best := Vector2i(-1, -1)
+	var best_gap := INF
+	for ring in 4:
+		for dy in range(-ring, ring + 1):
+			for dx in range(-ring, ring + 1):
+				var point := mid + Vector2i(dx, dy)
+				if point.x < 0 or point.y < 0 or point.x >= wide or point.y >= tall:
+					continue
+				if free[point.y * wide + point.x] == 0:
+					continue
+				var gap := _grid_at(point).distance_squared_to(where)
+				if gap < best_gap:
+					best_gap = gap
+					best = point
+		if best.x >= 0:
+			return best
+	return best
+
+
+## Can a dog standing at `from` walk to `to`? Both on the same patch of floor.
+func _reaches(from: Vector2, to: Vector2, over: Dictionary = {}) -> bool:
+	var paths := _path_grid(over)
+	var a := _grid_near(from, paths)
+	var b := _grid_near(to, paths)
+	if a.x < 0 or b.x < 0:
+		return false
+	var label: PackedInt32Array = paths["label"]
+	var wide := COLS * PATH_RES
+	return label[a.y * wide + a.x] == label[b.y * wide + b.x]
+
+
+## The way from `from` to `to` round the furniture, in cells, `to` last; empty when there is
+## none.
+func _route(from: Vector2, to: Vector2, over: Dictionary = {}) -> Array[Vector2]:
+	var way: Array[Vector2] = []
+	if not _reaches(from, to, over):
+		return way
+	var paths := _path_grid(over)
+	var grid: AStarGrid2D = paths["grid"]
+	for point: Vector2i in grid.get_id_path(_grid_near(from, paths), _grid_near(to, paths)):
+		way.append(_grid_at(point))
+	way.append(to)
+	return way
+
+
+## Is the straight line between two spots on the floor clear of the furniture?
+func _line_clear(from: Vector2, to: Vector2, over: Dictionary = {}) -> bool:
+	var steps := maxi(1, ceili(from.distance_to(to) / PATH_LOOK))
+	for i in range(1, steps + 1):
+		if not _dog_may_stand(from.lerp(to, float(i) / float(steps)), over):
+			return false
+	return true
 
 
 ## Somewhere on the floor with nothing on it, and not on top of anybody else.
@@ -1236,12 +1557,15 @@ func _dog_walk(dog: ShedDog, delta: float) -> bool:
 func _dog_somewhere(dog: ShedDog) -> Vector2:
 	var others := _others_than(dog)
 	others.append(_you_at)
+	# Only a spot it can walk to — unless it is not standing anywhere yet (the door has just
+	# opened) or is wedged in furniture, when anywhere on the floor will do.
+	var placed := _dog_may_stand(dog.at, dog.over)
 	for _try in IDLE_DARTS:
 		var where := Vector2(
 			_dog_rng.randf_range(1.0, float(COLS) - 1.0),
 			_dog_rng.randf_range(1.0, float(ROWS) - 1.0)
 		)
-		if not _dog_may_stand(where, dog.over):
+		if not _dog_may_stand(where, dog.over) or (placed and not _reaches(dog.at, where, dog.over)):
 			continue
 		var room := true
 		for other: Vector2 in others:
@@ -1693,6 +2017,55 @@ func turn_carried() -> void:
 	queue_redraw()
 
 
+## The turn chip's clock: back to nought the frame a piece comes into the hands, from the
+## shelf or off the floor. Turning does not restart it.
+func _tick_turn_hint(delta: float) -> void:
+	if carrying.is_empty():
+		_turn_hint = INF
+	elif _carried_was.is_empty():
+		_turn_hint = 0.0
+	else:
+		_turn_hint += delta
+	_carried_was = carrying
+
+
+## How much of the turn chip is drawn, 0 to 1. Nothing when R would leave the piece in hand
+## as it is: a pot has one face, and a counter turned side on may have nowhere to go.
+func turn_hint_alpha() -> float:
+	if carrying.is_empty() or sheets == null or _turn_hint == INF:
+		return 0.0
+	if sheets.turned(carrying, _carry_view) == _carry_view:
+		return 0.0
+	if _turn_hint <= TURN_HINT_HOLD:
+		return 1.0
+	return clampf(1.0 - (_turn_hint - TURN_HINT_HOLD) / TURN_HINT_FADE, 0.0, 1.0)
+
+
+## A switchable kind has been worked: its hands go, every copy at once.
+func _tried(piece: StringName) -> void:
+	if not switch_tried.has(String(piece)):
+		switch_tried.append(String(piece))
+
+
+## The placed pieces wearing the hand, as indices into `decor`: every piece of a kind never
+## worked that switches **in the face it stands in** (2026-10-03, Richard: a counter turned
+## side on, where E does nothing, wore the hand because some other face of it switched), bar
+## the one the player stands in E's reach of (the key chip is over it then). None while a
+## piece is in hand, so the turn chip has the room to itself.
+func hand_rows() -> Array[int]:
+	var out: Array[int] = []
+	if sheets == null or not carrying.is_empty() or record_up():
+		return out
+	var near := _switch_near()
+	for i in decor.size():
+		if i == near:
+			continue
+		var piece := StringName(decor[i]["piece"])
+		if switch_tried.has(String(piece)) or sheets.switched(piece, _row_view(decor[i])) < 0:
+			continue
+		out.append(i)
+	return out
+
 ## The reach to pet the room's dogs (2026-09-28): what the lake's angler does, drawn on the
 ## same sheet and aimed by `Angler.arm_toward`.
 var _you_pet := -1.0
@@ -1819,7 +2192,10 @@ func switch_near() -> bool:
 	var rest := _rest_near()
 	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
 	var dog_gap := INF if dog == null else _you_at.distance_to(dog.at)
-	var rest_gap := INF if rest < 0 else _you_at.distance_to(_switch_middle(rest))
+	var rest_gap := INF if rest < 0 else _rest_gap(rest)
+	if rest >= 0 and _dog_on(rest, dog):
+		# The dog lying on the piece is part of it: E lies down beside it, not pets it.
+		dog_gap = INF
 	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
 		rest_on(rest)
 		return true
@@ -1829,6 +2205,7 @@ func switch_near() -> bool:
 	if at < 0:
 		return false
 	var row: Dictionary = decor[at]
+	_tried(StringName(row["piece"]))
 	if StringName(row["piece"]) == RECORD_PIECE:
 		_open_record(at)
 		return true
@@ -1847,6 +2224,7 @@ func record_up() -> bool:
 func _open_record(at: int) -> void:
 	var row: Dictionary = decor[at]
 	var piece := StringName(row["piece"])
+	_tried(piece)
 	if not sheets.is_on(piece, _row_view(row)):
 		row["view"] = sheets.switched(piece, _row_view(row))
 		changed.emit()
@@ -2586,11 +2964,18 @@ func _draw() -> void:
 		rows.append(ghost)
 	# The walkers, in the order they sort among the furniture: every dog, then the player at
 	# the same key, which keeps the person in front of an animal standing level with them.
+	# A dog lying on the sofa or the bed the player is sitting or lying on is drawn just after
+	# them, over their lap (2026-10-03, Richard): at the same key it fell under them.
 	var walkers: Array = []
+	var you_key := _you_key(rows) if _you_sheet != null else 0.0
+	var sharing := not _rest_key.is_empty() and _rest_kind != &"read"
 	for dog in _dogs:
-		walkers.append({"key": _walker_key(dog.at, rows), "dog": dog})
+		var key := _walker_key(dog.at, rows)
+		if sharing and dog.seat == _rest_key:
+			key = you_key + SHARED_OVER
+		walkers.append({"key": key, "dog": dog})
 	if _you_sheet != null:
-		walkers.append({"key": _you_key(rows), "dog": null})
+		walkers.append({"key": you_key, "dog": null})
 	walkers.sort_custom(func(a, b): return float(a["key"]) < float(b["key"]))
 	var next_walker := 0
 	for entry: Dictionary in _order(ghost):
@@ -2618,6 +3003,7 @@ func _draw() -> void:
 	# The shade the window's light is lifted out of. Over the room and everything standing
 	# in it, under the light quad, which is a child and so drawn after all of this.
 	draw_rect(_shed_rect(), ROOM_DIM)
+	_draw_hands(floor_box)
 	_draw_prompt(floor_box)
 	_draw_shelf_key()
 	_dress_shelf()
@@ -2631,6 +3017,7 @@ func _draw() -> void:
 			_carry_view,
 			Color(1.0, 1.0, 1.0, 0.75)
 		)
+	_draw_turn_hint(floor_box)
 
 
 ## The piece in hand as a row of `decor` would hold it, where it would land, or nothing
@@ -3157,6 +3544,181 @@ func _draw_shelf_key() -> void:
 	)
 
 
+## The pointing hand over every switch of a kind never worked (2026-10-02): drawn over the
+## room's dim, like the key chip, so a piece further down the floor never hides it. At the
+## furniture's grain (`HAND_GRAIN`), its fingertip `HAND_LIFT` over the top of the piece's
+## drawing, on a four-frame loop: a pixel's bob and the star winking.
+func _draw_hands(floor_box: Rect2) -> void:
+	var rows := hand_rows()
+	if rows.is_empty():
+		return
+	if _hand_frames.is_empty():
+		for f in HAND_BOBS.size():
+			_hand_frames.append(ImageTexture.create_from_image(_hand_image(f)))
+	var frame := hand_frame(float(Time.get_ticks_msec()) * 0.001)
+	var room_px := _zoom()
+	var px := room_px * HAND_GRAIN
+	var picture: ImageTexture = _hand_frames[frame]
+	for i in rows:
+		var row: Dictionary = decor[i]
+		var piece := StringName(row["piece"])
+		var view := _row_view(row)
+		var top := floor_box.position + Vector2(
+			float(int(row["cell"][0])) * room_px, float(int(row["cell"][1])) * room_px
+		)
+		var across := sheets.view_size_of(piece, view).x * room_px
+		var tip := Vector2(top.x + across * 0.5, top.y - HAND_LIFT * px)
+		# The picture's corner is the silhouette's pixel `_hand_origin`; the tip is HAND_TIP.
+		var corner := tip - (HAND_TIP - Vector2(_hand_origin) + Vector2(0.0, float(HAND_BOBS[frame]))) * px
+		draw_texture_rect(
+			picture,
+			Rect2(corner.round(), Vector2(picture.get_size()) * px), false
+		)
+
+
+## Which of the hand's four frames is up at `time` seconds.
+static func hand_frame(time: float) -> int:
+	var total := 0.0
+	for hold: float in HAND_HOLDS:
+		total += hold
+	var at := fposmod(time, total)
+	for f in HAND_HOLDS.size():
+		at -= float(HAND_HOLDS[f])
+		if at < 0.0:
+			return f
+	return HAND_HOLDS.size() - 1
+
+
+## The hand's pixels on one frame, as silhouette pixel -> colour, shadow not included.
+static func hand_pixels(frame: int) -> Dictionary:
+	var fill := {}
+	for y in HAND.size():
+		var line: String = HAND[y]
+		for x in line.length():
+			if line[x] == "#":
+				fill[Vector2i(x, y)] = true
+	var px := {}
+	for p: Vector2i in fill:
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var n := p + Vector2i(dx, dy)
+				if not fill.has(n):
+					px[n] = HAND_INK
+	for p: Vector2i in fill:
+		var tones: Dictionary = HAND_SHIRT if p.y < HAND_CUFF else HAND_SKIN
+		px[p] = tones[_hand_tone(fill, p)]
+	# The cuff's foot, where it meets the hand.
+	for x in range(4, 13):
+		if fill.has(Vector2i(x, HAND_CUFF - 1)):
+			px[Vector2i(x, HAND_CUFF - 1)] = HAND_SHIRT[&"low"]
+	# The shirt's cuff turned back.
+	for x in range(4, 12):
+		px[Vector2i(x, 1)] = HAND_SHIRT[&"lit"]
+	# The curled fingers part from each other and from the index finger, their knuckles lit.
+	for p: Vector2i in [Vector2i(7, 10), Vector2i(7, 9), Vector2i(10, 10), Vector2i(13, 10)]:
+		px[p] = HAND_SKIN[&"line"]
+	for p: Vector2i in [Vector2i(9, 11), Vector2i(12, 11)]:
+		px[p] = HAND_SKIN[&"lit"]
+	# The thumb's crease, the finger's joint and its nail.
+	for p: Vector2i in [Vector2i(2, 6), Vector2i(2, 7), Vector2i(3, 8)]:
+		px[p] = HAND_SKIN[&"line"]
+	for x in [3, 4]:
+		px[Vector2i(x, 14)] = HAND_SKIN[&"mid"]
+	px[Vector2i(3, 17)] = HAND_NAIL[0]
+	px[Vector2i(4, 17)] = HAND_NAIL[1]
+	# The star at the fingertip: a gold pixel at rest, a four-point wink on the middle frames.
+	var arm: int = HAND_ARMS[frame]
+	if arm == 0:
+		px[HAND_STAR_AT] = HAND_STAR_GOLD
+	else:
+		px[HAND_STAR_AT] = HAND_STAR_PALE
+		for k in range(1, arm + 1):
+			for d: Vector2i in [Vector2i(k, 0), Vector2i(-k, 0), Vector2i(0, k), Vector2i(0, -k)]:
+				px[HAND_STAR_AT + d] = HAND_STAR_GOLD
+	return px
+
+
+## Lit from the right: the right edge lit, the left and the bottom edges shaded.
+static func _hand_tone(fill: Dictionary, p: Vector2i) -> StringName:
+	var right := fill.has(p + Vector2i(1, 0))
+	if not right or (not fill.has(p + Vector2i(1, -1)) and not fill.has(p + Vector2i(0, -1))):
+		return &"lit"
+	if not fill.has(p + Vector2i(-1, 0)) or not fill.has(p + Vector2i(0, 1)):
+		return &"low"
+	if not fill.has(p + Vector2i(-2, 0)) or not fill.has(p + Vector2i(0, 2)):
+		return &"mid"
+	return &"body"
+
+
+## One frame as a picture, its soft shadow down and to the left under it.
+func _hand_image(frame: int) -> Image:
+	var px := hand_pixels(frame)
+	var low := Vector2i(1 << 20, 1 << 20)
+	var high := -low
+	for p: Vector2i in px:
+		for q: Vector2i in [p, p + Vector2i(-1, 1)]:
+			low = Vector2i(mini(low.x, q.x), mini(low.y, q.y))
+			high = Vector2i(maxi(high.x, q.x), maxi(high.y, q.y))
+	_hand_origin = low
+	var image := Image.create(high.x - low.x + 1, high.y - low.y + 1, false, Image.FORMAT_RGBA8)
+	for p: Vector2i in px:
+		image.set_pixelv(p + Vector2i(-1, 1) - low, HAND_SHADE)
+	for p: Vector2i in px:
+		image.set_pixelv(p - low, px[p])
+	return image
+
+
+## A small picture authored as rows of letters, one rect a pixel.
+func _draw_bits(rows: Array, corner: Vector2, px: float, inks: Dictionary, alpha: float = 1.0) -> void:
+	for y in rows.size():
+		var line: String = rows[y]
+		for x in line.length():
+			var ink: Variant = inks.get(line[x])
+			if ink == null:
+				continue
+			var colour: Color = ink
+			colour.a *= alpha
+			draw_rect(Rect2(corner + Vector2(float(x), float(y)) * px, Vector2(px, px)), colour)
+
+
+## The turn chip beside the piece in hand (2026-10-02): the key `shed_rotate` is bound to,
+## as this keyboard prints it (the pad's button in pad mode), and a turning arrow, on the key
+## chip's own wood. To the right of the piece, or to its left where the right runs off.
+func _draw_turn_hint(floor_box: Rect2) -> void:
+	var alpha := turn_hint_alpha()
+	if alpha <= 0.0:
+		return
+	var px := _zoom()
+	var piece_size := sheets.view_size_of(carrying, _carry_view) * px
+	var piece_box := Rect2(_pointer - piece_size * 0.5, piece_size)
+	var ghost := _ghost()
+	if not ghost.is_empty():
+		piece_box = Rect2(
+			floor_box.position + Vector2(float(int(ghost["cell"][0])), float(int(ghost["cell"][1]))) * px,
+			piece_size
+		)
+	var key := Binds.shown(&"shed_rotate", Pad.is_pad())
+	var key_wide := Style.measure(key, Style.TEXT_SMALL).x
+	var glyph := Vector2(float((TURN_GLYPH[0] as String).length()), float(TURN_GLYPH.size())) * TURN_GLYPH_PX
+	var chip := Vector2(5.0 + key_wide + 4.0 + glyph.x + 5.0, 18.0)
+	var at := Vector2(piece_box.end.x + TURN_HINT_GAP, piece_box.position.y)
+	if at.x + chip.x > size.x:
+		at.x = piece_box.position.x - TURN_HINT_GAP - chip.x
+	at = Vector2(roundf(at.x), roundf(clampf(at.y, 0.0, size.y - chip.y)))
+	var box := Rect2(at, chip)
+	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.85 * alpha))
+	draw_rect(box, Color(Style.INK_DIM.r, Style.INK_DIM.g, Style.INK_DIM.b, alpha), false, 1.0)
+	Style.write(
+		self, key, Style.TEXT_SMALL, box.position + Vector2(5.0, 14.0), Style.INK,
+		HORIZONTAL_ALIGNMENT_LEFT, Rect2(), alpha
+	)
+	_draw_bits(
+		TURN_GLYPH,
+		box.position + Vector2(5.0 + key_wide + 4.0, roundf((chip.y - glyph.y) * 0.5)),
+		TURN_GLYPH_PX, {"O": Style.INK}, alpha
+	)
+
+
 func _draw_prompt(floor_box: Rect2) -> void:
 	if _you_pet >= 0.0 or not _rest_key.is_empty():
 		return
@@ -3165,7 +3727,10 @@ func _draw_prompt(floor_box: Rect2) -> void:
 	var rest := _rest_near()
 	var switch_gap := INF if at < 0 else _you_at.distance_to(_switch_middle(at))
 	var dog_gap := INF if dog == null else _you_at.distance_to(dog.at)
-	var rest_gap := INF if rest < 0 else _you_at.distance_to(_switch_middle(rest))
+	var rest_gap := INF if rest < 0 else _rest_gap(rest)
+	if rest >= 0 and _dog_on(rest, dog):
+		# The dog lying on the piece is part of it: E lies down beside it, not pets it.
+		dog_gap = INF
 	if rest >= 0 and rest_gap < switch_gap and rest_gap < dog_gap:
 		# A seat, a bed or a bookcase is what E would use: the key goes over it.
 		at = rest
@@ -3318,8 +3883,36 @@ func rest_of(piece: StringName, view: int) -> Array:
 	return views.get(view, [])
 
 
+## How far the player stands from a piece they might rest on, in cells: to the nearest edge of
+## its footprint (2026-10-03, Richard: E did nothing beside the fancy bed). It was measured
+## from the middle of the foot, the way a switch is, and a bed five cells deep could only be
+## got into from its foot.
+func _rest_gap(index: int) -> float:
+	var row: Dictionary = decor[index]
+	var piece := StringName(row["piece"])
+	var view := _row_view(row)
+	var span := span_of(piece, view)
+	var base := base_of(piece, view)
+	var foot := Rect2(
+		Vector2(float(int(row["cell"][0])), float(int(row["cell"][1]) + span.y - base)) / float(CELL),
+		Vector2(float(span.x), float(base)) / float(CELL)
+	)
+	var nearest := Vector2(
+		clampf(_you_at.x, foot.position.x, foot.end.x), clampf(_you_at.y, foot.position.y, foot.end.y)
+	)
+	return _you_at.distance_to(nearest)
+
+
+## Whether this dog is lying on the piece at `index`.
+func _dog_on(index: int, dog: ShedDog) -> bool:
+	if dog == null:
+		return false
+	var row: Dictionary = decor[index]
+	return dog.seat == "%s@%d,%d" % [row["piece"], int(row["cell"][0]), int(row["cell"][1])]
+
+
 ## The placed piece the player is close enough to rest on, as an index into `decor`, or -1.
-## Measured from the middle of its foot, the way a switch is.
+## Measured to the nearest edge of its footprint (`_rest_gap`).
 func _rest_near() -> int:
 	if sheets == null:
 		return -1
@@ -3329,7 +3922,7 @@ func _rest_near() -> int:
 		var row: Dictionary = decor[i]
 		if rest_of(StringName(row["piece"]), _row_view(row)).is_empty():
 			continue
-		var gap := _you_at.distance_to(_switch_middle(i))
+		var gap := _rest_gap(i)
 		if gap < best_gap:
 			best_gap = gap
 			best = i
@@ -3408,14 +4001,15 @@ func stand_up() -> void:
 	_you_age = 0.0
 
 
-## Where the player sorts among the furniture: over a piece they sit on facing the room or lie
-## in, behind one they sit on with their back to the room, and by their feet otherwise.
+## Where the player sorts among the furniture: over a piece they sit or lie on, either way
+## round (a back sit draws the backrest over them itself, `_draw_resting`), and by their
+## feet otherwise.
 func _you_key(rows: Array) -> float:
 	var at := _rest_row()
 	if at < 0 or _rest_kind == &"read":
 		return _walker_key(_you_at, rows)
 	var foot := _foot_of(decor[at])
-	return foot - OVER_PIECE if _rest_kind == &"back" else foot + OVER_PIECE
+	return foot + OVER_PIECE
 
 
 ## The player sitting on or lying in the piece they rest on.
@@ -3436,28 +4030,27 @@ func _draw_resting(floor_box: Rect2) -> void:
 	)
 	var tall := YOU_TALL * float(CELL) * zoom
 	var scale := maxf(1.0, roundf(tall / _you_ink_tall / YOU_STEP) * YOU_STEP)
-	var pose := &"sit_south"
 	if _rest_kind == &"lie":
-		pose = &"lie_south"
-	elif _rest_kind == &"back":
+		_draw_lying(piece, view, box, drawn, scale)
+		return
+	var pose := &"sit_south"
+	if _rest_kind == &"back":
 		pose = &"sit_north"
 	if not _you_poses.has(pose):
 		return
 	var frames: Array = _you_poses[pose]
 	var index := 0
-	if _rest_kind != &"lie" and fmod(_rest_age, BREATH) > BREATH * (1.0 - BREATH_IN):
+	if fmod(_rest_age, BREATH) > BREATH * (1.0 - BREATH_IN):
 		index = mini(1, frames.size() - 1)
 	var region: Rect2 = (frames[index] as Dictionary)["region"]
 	var ink: Rect2 = (frames[0] as Dictionary)["ink"]
 	var middle := box.get_center().x + float(spec[2]) * drawn
-	var origin := Vector2(middle - (ink.position.x + ink.size.x * 0.5) * scale, 0.0)
-	if _rest_kind == &"lie":
-		# The head on the pillow, two drawn pixels under the headboard's top.
-		origin.y = box.position.y + 2.0 * drawn - ink.position.y * scale
-	else:
-		var hip: int = SIT_HIP[&"north" if _rest_kind == &"back" else &"south"]
-		var foot := box.end.y - float(spec[1]) * drawn + float(hip) * scale
-		origin.y = foot - (ink.position.y + ink.size.y) * scale
+	# Sitting, the body's own axis goes on the seat's middle, not the ink box's (`_body_axis`).
+	var axis: float = (frames[0] as Dictionary).get("axis", ink.position.x + ink.size.x * 0.5)
+	var origin := Vector2(middle - axis * scale, 0.0)
+	var hip: int = SIT_HIP[&"north" if _rest_kind == &"back" else &"south"]
+	var foot := box.end.y - float(spec[1]) * drawn + float(hip) * scale
+	origin.y = foot - (ink.position.y + ink.size.y) * scale
 	origin = origin.round()
 	var size := region.size * scale
 	if _rest_kind == &"front":
@@ -3466,32 +4059,123 @@ func _draw_resting(floor_box: Rect2) -> void:
 			_you_sheet, Rect2(origin + (away * SIT_SHADE_REACH).round() * scale, size), region,
 			Shade.tint(_room_ink())
 		)
-	if _rest_kind == &"lie":
-		_draw_blanket(box, drawn, middle)
-	draw_texture_rect_region(_you_sheet, Rect2(origin, size), region)
-	if _rest_kind == &"lie" and _rest_age >= SLEEP_AFTER:
-		_draw_zs(Vector2(middle + ink.size.x * 0.4 * scale, origin.y + ink.position.y * scale), scale)
+	var shown_region := region
+	var shown_size := size
+	if _rest_kind == &"back" and spec.size() > 5:
+		# Not below the cushion's foot: the legs go forward under the seat.
+		var floor_at := box.position.y + float(int(spec[5])) * drawn
+		var keep := clampf((floor_at - origin.y) / scale, 0.0, region.size.y)
+		shown_region = Rect2(region.position, Vector2(region.size.x, roundf(keep)))
+		shown_size = shown_region.size * scale
+	draw_texture_rect_region(_you_sheet, Rect2(origin, shown_size), shown_region)
+	if _rest_kind == &"back" and spec.size() > 3:
+		# The backrest over the player: the piece's rows from the cut down, drawn again.
+		var piece_region := sheets.view_region_of(piece, view)
+		var cut := float(int(spec[3]))
+		var end := piece_region.size.y if spec.size() < 5 else minf(float(int(spec[4])), piece_region.size.y)
+		if cut < end:
+			draw_texture_rect_region(
+				sheets.atlas,
+				Rect2(box.position + Vector2(0.0, cut * drawn), Vector2(box.size.x, (end - cut) * drawn)),
+				Rect2(piece_region.position + Vector2(0.0, cut), Vector2(piece_region.size.x, end - cut))
+			)
 
 
-## The body under the blanket: two folds down it and a lit turn-down over the shoulders, in
-## shade and light rather than a colour, so the green bed and the blue one both wear them.
-func _draw_blanket(box: Rect2, drawn: float, middle: float) -> void:
-	var top := box.position.y + 16.5 * drawn
-	var bottom := box.end.y - 15.0 * drawn
-	var side := 6.5 * drawn
+## Lying in bed (`LIES`): the head on the pillow, the bed's own picture drawn back over it
+## from the chin (or the near board) towards the feet, a sideways head held inside the
+## headboard, and two folds down the body under the blanket.
+func _draw_lying(piece: StringName, view: int, box: Rect2, drawn: float, scale: float) -> void:
+	var spot: Dictionary = (LIES.get(piece, {}) as Dictionary).get(view, {})
+	if spot.is_empty():
+		return
+	var face := StringName(spot["face"])
+	var pose := {&"up": &"lie_south", &"down": &"lie_north", &"west": &"lie_west",
+		&"east": &"lie_east"}.get(face, &"lie_south") as StringName
+	if not _you_poses.has(pose):
+		return
+	var frame: Dictionary = (_you_poses[pose] as Array)[0]
+	var region: Rect2 = frame["region"]
+	var ink: Rect2 = frame["ink"]
+	var at: Vector2 = spot["at"]
+	var mark := box.position + at * drawn
+	# Which point of the ink goes on `at`: the chin (or the head's foot) for up and down, the
+	# chin's side for a sideways head.
+	var anchor := Vector2(ink.get_center().x, ink.end.y)
+	if face == &"west":
+		anchor = Vector2(ink.end.x, ink.get_center().y)
+	elif face == &"east":
+		anchor = Vector2(ink.position.x, ink.get_center().y)
+	var origin := (mark - anchor * scale).round()
+	var shown := Rect2(origin, region.size * scale)
+	if spot.has("clip"):
+		var edge := box.position.x + float(spot["clip"]) * drawn
+		var keep := Rect2(Vector2(edge, -1e6), Vector2(1e7, 2e6)) if face == &"west" 			else Rect2(Vector2(-1e7, -1e6), Vector2(1e7 + edge, 2e6))
+		shown = shown.intersection(keep)
+	if shown.size.x > 0.0 and shown.size.y > 0.0:
+		var source := Rect2(region.position + ((shown.position - origin) / scale).round(),
+			(shown.size / scale).round())
+		draw_texture_rect_region(_you_sheet, Rect2(origin + (source.position - region.position) * scale,
+			source.size * scale), source)
+	# The bed over the head from the cover line on: the blanket up to the chin, or the near
+	# board in front of the pillow.
+	var picture := sheets.view_region_of(piece, view)
+	var cover := float(spot.get("cover", at.x if face == &"west" or face == &"east" else at.y))
+	var over := Rect2(Vector2.ZERO, picture.size)
+	match face:
+		&"up", &"down":
+			over = Rect2(Vector2(0.0, cover), Vector2(picture.size.x, picture.size.y - cover))
+		&"west":
+			over = Rect2(Vector2(cover, 0.0), Vector2(picture.size.x - cover, picture.size.y))
+		&"east":
+			over = Rect2(Vector2.ZERO, Vector2(cover, picture.size.y))
+	if over.size.x > 0.0 and over.size.y > 0.0:
+		draw_texture_rect_region(sheets.atlas,
+			Rect2(box.position + over.position * drawn, over.size * drawn),
+			Rect2(picture.position + over.position, over.size))
+	_draw_blanket(box, drawn, spot, cover)
+	if _rest_age >= SLEEP_AFTER:
+		var top := Vector2(origin.x + ink.get_center().x * scale, origin.y + ink.position.y * scale)
+		_draw_zs(top + Vector2(ink.size.x * 0.3 * scale, 0.0), scale)
+
+
+## The body under the blanket: two folds along it from the cover line to the feet and a lit
+## turn-down across it, in shade and light rather than a colour, so every bed wears them.
+func _draw_blanket(box: Rect2, drawn: float, spot: Dictionary, cover: float) -> void:
+	var face := StringName(spot["face"])
+	var at: Vector2 = spot["at"]
+	var feet := float(spot.get("feet", cover))
 	var px := maxf(1.0, roundf(drawn))
-	for toward: float in [-1.0, 1.0]:
-		draw_rect(
-			Rect2(
-				Vector2(roundf(middle + toward * side), roundf(top + px * 1.5)),
-				Vector2(px, maxf(bottom - top, 0.0))
-			),
-			Color(0.0, 0.0, 0.0, 0.22)
-		)
-	draw_rect(
-		Rect2(Vector2(roundf(middle - side), roundf(top)), Vector2(roundf(side * 2.0) + px, px * 1.5)),
-		Color(1.0, 1.0, 1.0, 0.22)
-	)
+	var shade := Color(0.0, 0.0, 0.0, 0.22)
+	var lit := Color(1.0, 1.0, 1.0, 0.22)
+	var side := LIE_FOLD * drawn
+	if face == &"up" or face == &"down":
+		var middle := box.position.x + at.x * drawn
+		var from := box.position.y + minf(cover, feet) * drawn
+		var to := box.position.y + maxf(cover, feet) * drawn
+		if face == &"up":
+			from += px * 1.5
+		else:
+			to -= px * 1.5
+		for toward: float in [-1.0, 1.0]:
+			draw_rect(Rect2(Vector2(roundf(middle + toward * side), roundf(from)),
+				Vector2(px, maxf(roundf(to - from), 0.0))), shade)
+		var line := box.position.y + cover * drawn - (0.0 if face == &"up" else px * 1.5)
+		draw_rect(Rect2(Vector2(roundf(middle - side), roundf(line)),
+			Vector2(roundf(side * 2.0) + px, px * 1.5)), lit)
+	else:
+		var middle := box.position.y + at.y * drawn
+		var from := box.position.x + minf(cover, feet) * drawn
+		var to := box.position.x + maxf(cover, feet) * drawn
+		if face == &"west":
+			from += px * 1.5
+		else:
+			to -= px * 1.5
+		for toward: float in [-1.0, 1.0]:
+			draw_rect(Rect2(Vector2(roundf(from), roundf(middle + toward * side)),
+				Vector2(maxf(roundf(to - from), 0.0), px)), shade)
+		var line := box.position.x + cover * drawn - (0.0 if face == &"west" else px * 1.5)
+		draw_rect(Rect2(Vector2(roundf(line), roundf(middle - side)),
+			Vector2(px * 1.5, roundf(side * 2.0) + px)), lit)
 
 
 ## Three Zs rising off the sleeper, a size apart, each fading in and out in turn.

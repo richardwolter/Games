@@ -8,7 +8,11 @@ paint over the strips; re-running this overwrites them.
 
     sit_south   2 frames  facing the room: rest, breath in (the chest opens, the head stays)
     sit_north   2 frames  back to the room: rest, breath in
-    lie_south   1 frame   head and hat on the pillow (the blanket is the bed's own art)
+    lie_south   1 frame   face up on a pillow at the far end, down to the chin
+    lie_north   1 frame   the back of the hat, for a pillow behind the near board
+    lie_west    1 frame   lie_south turned a quarter, crown to the left (a side view)
+    lie_east    1 frame   the same, crown to the right
+                          (the blanket over the rest is the bed's own art, `ShedRoom.LIES`)
     read_south  10 frames five books, each read then page turning (`pose.COVERS`)
 
 Every frame of a strip shares one canvas, bottom aligned, so the ink's foot is the anchor and
@@ -43,6 +47,9 @@ def main():
         "sit_south": [pose.sit_front(0)[0], pose.sit_front(1)[0]],
         "sit_north": [pose.sit_back(0)[0], pose.sit_back(1)[0]],
         "lie_south": [pose.lying()],
+        "lie_north": [pose.lying_back()],
+        "lie_west": [pose.lying_side(True)],
+        "lie_east": [pose.lying_side(False)],
         "read_south": [
             pose.book_reader(page, cover)
             for cover in range(len(pose.COVERS))

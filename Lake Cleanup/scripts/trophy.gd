@@ -88,8 +88,9 @@ const BEAM_SINK := 0.06
 ## couple of screen pixels instead: it is an outline, not a frame.
 const RIM_STEP := 2.0
 
-## How much faster the rim fades than the picture in front of it. See `_draw_rim`.
-const RIM_FADE := 3.0
+## How far past the picture's box the faded group keeps its pixels: the rim's step and a
+## star's arms reach out of it, and a group clips to what it measured.
+const GROUP_MARGIN := 24.0
 
 ## How big a star is drawn here, as a multiple of `LakeGrid.STAR_PIXEL`. The lake's stars
 ## are one art pixel against a piece drawn at 2; the card's piece is four or five times
@@ -144,6 +145,11 @@ var _beam: Node2D
 var _rim: Node2D
 var _art: Node2D
 var _glitter: Node2D
+## The rim, the picture and the glitter are drawn into one buffer and faded as one
+## (2026-10-03, Richard: the gold outline was left behind as the find faded out). Faded one
+## by one, the picture going see-through let the four gold copies behind it through and the
+## card went out as a gold silhouette, however fast the rim's own alpha fell.
+var _group: CanvasGroup
 
 
 func _ready() -> void:
@@ -163,6 +169,11 @@ func _ready() -> void:
 	_beam.material = lit
 	_beam.draw.connect(_draw_beam)
 	add_child(_beam)
+	_group = CanvasGroup.new()
+	_group.name = &"Fade"
+	_group.fit_margin = GROUP_MARGIN
+	_group.clear_margin = GROUP_MARGIN
+	add_child(_group)
 	# The gold outline, under the piece so the piece covers all but its edge.
 	_rim = Node2D.new()
 	_rim.name = &"Rim"
@@ -170,17 +181,17 @@ func _ready() -> void:
 	gold.shader = RIM_SHADER
 	_rim.material = gold
 	_rim.draw.connect(_draw_rim)
-	add_child(_rim)
+	_group.add_child(_rim)
 	# After the light and the rim, so the piece is lit from behind rather than through.
 	_art = Node2D.new()
 	_art.name = &"Piece"
 	_art.draw.connect(_draw_piece)
-	add_child(_art)
+	_group.add_child(_art)
 	# Over the picture: the glitter is on the find, not behind it.
 	_glitter = Node2D.new()
 	_glitter.name = &"Glitter"
 	_glitter.draw.connect(_draw_stars)
-	add_child(_glitter)
+	_group.add_child(_glitter)
 	set_process(false)
 	visible = false
 
@@ -315,6 +326,7 @@ func _draw() -> void:
 	_solid = fade
 	for child in [_beam, _rim, _art, _glitter]:
 		child.position = centre
+	_group.self_modulate.a = fade
 
 	var title := float(Style.TEXT_HEAD)
 	var named := float(Style.TEXT_BODY)
@@ -340,13 +352,12 @@ func _draw_piece() -> void:
 		return
 	var region := _region
 	var span := _box
-	var fade := _solid
 	var box := Rect2(-span * 0.5, span)
 	_art.draw_texture_rect_region(
 		sheets.atlas, Rect2(box.position + Vector2(0.0, span.y * 0.04), box.size),
-		region, Color(0.0, 0.0, 0.0, 0.35 * fade)
+		region, Color(0.0, 0.0, 0.0, 0.35)
 	)
-	_art.draw_texture_rect_region(sheets.atlas, box, region, Color(1.0, 1.0, 1.0, fade))
+	_art.draw_texture_rect_region(sheets.atlas, box, region, Color.WHITE)
 
 
 ## Is there a picture to draw right now? Asked by every shine layer, so none of them has to
@@ -383,21 +394,16 @@ func _draw_beam() -> void:
 ##
 ## The step is in screen pixels rather than scaled with the picture — see `RIM_STEP`.
 ##
-## Its own alpha is `RIM_FADE`'d: the rim is four whole copies of the picture and only their
-## edges are meant to show, which holds while the piece over them is opaque and stops
-## holding the moment the card starts fading. At the same alpha as the piece, a find on its
-## way out went gold — the picture let the copies behind it through and what was left was a
-## silhouette. Cubed, the gold is all but gone by the time the picture is see-through, and
-## at full card it is still 0.8 of the way there.
+## Drawn whole: the rim is four copies of the picture and only their edges are meant to
+## show, so it is faded with the picture as one (`_group`), never on its own.
 func _draw_rim() -> void:
 	if not _showing():
 		return
 	var box := Rect2(-_box * 0.5, _box)
-	var gold := pow(_solid, RIM_FADE)
 	for step: Vector2 in LakeGrid.RIM_OFFSETS:
 		_rim.draw_texture_rect_region(
 			sheets.atlas, Rect2(box.position + step * RIM_STEP, box.size), _region,
-			Color(0.0, 1.0, 0.0, gold)
+			Color(0.0, 1.0, 0.0, 1.0)
 		)
 
 
@@ -414,7 +420,7 @@ func _draw_stars() -> void:
 		var life := clampf((_age - float(star[1])) / span, 0.0, 1.0)
 		var local := (spot - Vector2(0.5, 0.5)) * _box
 		_glitter.draw_set_transform(local, 0.0, Vector2.ONE * STAR_BIG)
-		LakeGrid.GlintTwinkle.draw_star(_glitter, big, sin(life * PI) * _solid)
+		LakeGrid.GlintTwinkle.draw_star(_glitter, big, sin(life * PI))
 	_glitter.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

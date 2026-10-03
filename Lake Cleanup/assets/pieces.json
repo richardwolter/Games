@@ -1364,14 +1364,14 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     198,
-     244,
+     337,
+     302,
      22,
      39
     ],
     [
-     222,
-     244,
+     361,
+     302,
      22,
      39
     ]
@@ -1395,8 +1395,8 @@
    "name": "decor_vynil_player",
    "place": "small",
    "region": [
-    434,
-    79,
+    100,
+    129,
     22,
     39
    ],
@@ -6206,26 +6206,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     75,
-     199,
+     223,
+     257,
      30,
      42
     ],
     [
-     340,
-     142,
+     358,
+     202,
      27,
      45
     ],
     [
-     474,
-     286,
+     171,
+     383,
      30,
      32
     ],
     [
-     369,
-     142,
+     387,
+     202,
      27,
      45
     ]
@@ -6253,7 +6253,7 @@
    "name": "decor_pk_armchair",
    "place": "floor",
    "region": [
-    27,
+    197,
     79,
     30,
     42
@@ -6287,26 +6287,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     107,
-     199,
+     255,
+     257,
      30,
      42
     ],
     [
-     456,
-     142,
+     0,
+     257,
      26,
      43
     ],
     [
-     258,
-     324,
+     25,
+     420,
      30,
      30
     ],
     [
-     484,
-     142,
+     28,
+     257,
      26,
      43
     ]
@@ -6334,7 +6334,7 @@
    "name": "decor_pk_old_seat",
    "place": "floor",
    "region": [
-    59,
+    229,
     79,
     30,
     42
@@ -6367,13 +6367,13 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     187,
-     199,
+     335,
+     257,
      60,
      40
     ],
     [
-     262,
+     264,
      79,
      28,
      58
@@ -6406,7 +6406,7 @@
    "name": "decor_pk_bathtub",
    "place": "floor",
    "region": [
-    91,
+    261,
     79,
     60,
     40
@@ -6439,8 +6439,8 @@
      64
     ],
     [
-     276,
-     142,
+     222,
+     202,
      62,
      48
     ],
@@ -6479,7 +6479,7 @@
    ],
    "scale": 0.74,
    "seat": [
-    18,
+    32,
     12,
     18
    ],
@@ -6580,26 +6580,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     428,
-     244,
+     139,
+     344,
      16,
      36
     ],
     [
-     446,
-     244,
+     157,
+     344,
      16,
      36
     ],
     [
-     158,
-     324,
+     391,
+     383,
      16,
      31
     ],
     [
-     464,
-     244,
+     175,
+     344,
      16,
      36
     ]
@@ -6627,8 +6627,8 @@
    "name": "decor_pk_chair",
    "place": "floor",
    "region": [
-    42,
-    124,
+    222,
+    129,
     16,
     36
    ],
@@ -6655,20 +6655,20 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     281,
-     358,
+     173,
+     453,
      26,
      25
     ],
     [
-     309,
-     358,
+     201,
+     453,
      26,
      25
     ],
     [
-     337,
-     358,
+     229,
+     453,
      26,
      25
     ]
@@ -6694,8 +6694,8 @@
    "name": "decor_pk_coffee_table",
    "place": "floor",
    "region": [
-    12,
-    163,
+    265,
+    171,
     26,
     25
    ],
@@ -6721,20 +6721,20 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     154,
-     286,
+     347,
+     344,
      38,
      35
     ],
     [
-     194,
-     286,
+     387,
+     344,
      38,
      35
     ],
     [
-     234,
-     286,
+     427,
+     344,
      38,
      35
     ]
@@ -6760,8 +6760,8 @@
    "name": "decor_pk_corner_desk",
    "place": "floor",
    "region": [
-    178,
-    124,
+    358,
+    129,
     38,
     35
    ],
@@ -6788,26 +6788,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     42,
-     358,
+     429,
+     420,
      22,
      27
     ],
     [
-     66,
-     358,
+     453,
+     420,
      22,
      27
     ],
     [
-     334,
-     324,
+     169,
+     420,
      16,
      29
     ],
     [
-     352,
-     324,
+     187,
+     420,
      16,
      29
     ]
@@ -6835,8 +6835,8 @@
    "name": "decor_pk_drawer",
    "place": "floor",
    "region": [
-    378,
-    124,
+    118,
+    171,
     22,
     27
    ],
@@ -6858,34 +6858,66 @@
    "alt_roles": [
     "front",
     "front_open",
-    "back"
+    "back",
+    "side",
+    "side_open",
+    "side_r",
+    "side_open_r"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
+     441,
      302,
-     244,
      40,
      37
     ],
     [
+     0,
      344,
-     244,
      40,
      37
     ],
     [
-     386,
-     244,
+     42,
+     344,
      40,
      37
+    ],
+    [
+     423,
+     142,
+     21,
+     53
+    ],
+    [
+     446,
+     142,
+     21,
+     53
+    ],
+    [
+     469,
+     142,
+     21,
+     53
+    ],
+    [
+     0,
+     202,
+     21,
+     53
     ]
    ],
    "base": [],
    "base_px": [
     9,
     9,
-    9
+    9,
+    21,
+    21,
+    21,
+    21
    ],
    "cells": [
     3,
@@ -6895,15 +6927,19 @@
    "faces": [
     0,
     0,
-    1
+    2,
+    1,
+    1,
+    3,
+    3
    ],
    "fill": 0.9,
    "light": "",
    "name": "decor_pk_drawer_desk",
    "place": "floor",
    "region": [
-    0,
-    124,
+    180,
+    129,
     40,
     37
    ],
@@ -6914,7 +6950,11 @@
    "states": [
     0,
     1,
-    0
+    0,
+    0,
+    1,
+    0,
+    1
    ],
    "tier": 4,
    "title": "Drawer Desk",
@@ -6986,7 +7026,7 @@
    "seat": [
     22,
     15,
-    26,
+    37,
     15
    ],
    "set": "ROTATE",
@@ -7009,14 +7049,14 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     249,
-     199,
+     397,
+     257,
      48,
      40
     ],
     [
-     136,
-     142,
+     23,
+     202,
      32,
      53
     ]
@@ -7040,7 +7080,7 @@
    "name": "decor_pk_fancy_table",
    "place": "floor",
    "region": [
-    153,
+    323,
     79,
     48,
     40
@@ -7062,37 +7102,61 @@
     "front",
     "front_open",
     "side",
-    "side_r"
+    "side_r",
+    "back",
+    "side_open",
+    "side_open_r"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     30,
+     68,
      79,
      22,
      60
     ],
     [
-     54,
+     92,
      79,
      22,
      60
     ],
     [
-     78,
+     116,
+     79,
+     29,
+     60
+    ],
+    [
+     147,
+     79,
+     29,
+     60
+    ],
+    [
+     178,
      79,
      22,
      60
     ],
     [
-     102,
+     202,
      79,
-     22,
+     29,
+     60
+    ],
+    [
+     233,
+     79,
+     29,
      60
     ]
    ],
    "base": [],
    "base_px": [
+    6,
+    6,
+    6,
     6,
     6,
     6,
@@ -7107,7 +7171,10 @@
     0,
     0,
     1,
-    2
+    3,
+    2,
+    1,
+    3
    ],
    "fill": 0.997,
    "light": "",
@@ -7127,7 +7194,10 @@
     0,
     1,
     0,
-    0
+    0,
+    0,
+    1,
+    1
    ],
    "tier": 0,
    "title": "File Cabinet",
@@ -7141,14 +7211,14 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     299,
-     199,
+     447,
+     257,
      42,
      40
     ],
     [
-     343,
-     199,
+     0,
+     302,
      42,
      40
     ]
@@ -7172,7 +7242,7 @@
    "name": "decor_pk_fireplace",
    "place": "floor",
    "region": [
-    203,
+    373,
     79,
     42,
     40
@@ -7197,14 +7267,14 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     398,
-     142,
+     416,
+     202,
      31,
      45
     ],
     [
-     387,
-     199,
+     44,
+     302,
      31,
      40
     ]
@@ -7228,8 +7298,8 @@
    "name": "decor_pk_kitchen_counter",
    "place": "floor",
    "region": [
-    422,
-    0,
+    72,
+    79,
     31,
     45
    ],
@@ -7254,20 +7324,20 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     370,
-     324,
+     205,
+     420,
      28,
      29
     ],
     [
-     400,
-     324,
+     235,
+     420,
      28,
      29
     ],
     [
-     182,
-     358,
+     74,
+     453,
      28,
      26
     ]
@@ -7293,8 +7363,8 @@
    "name": "decor_pk_microwave",
    "place": "small",
    "region": [
-    306,
-    124,
+    46,
+    171,
     28,
     29
    ],
@@ -7321,25 +7391,25 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     0,
-     286,
+     193,
+     344,
      52,
      36
     ],
     [
-     28,
+     315,
      142,
      26,
      54
     ],
     [
-     430,
-     324,
+     265,
+     420,
      52,
      29
     ],
     [
-     56,
+     343,
      142,
      26,
      54
@@ -7368,8 +7438,8 @@
    "name": "decor_pk_sofa",
    "place": "floor",
    "region": [
-    60,
-    124,
+    240,
+    129,
     52,
     36
    ],
@@ -7400,14 +7470,14 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     420,
-     199,
+     77,
+     302,
      29,
      40
     ],
     [
-     451,
-     199,
+     108,
+     302,
      29,
      40
     ]
@@ -7431,7 +7501,7 @@
    "name": "decor_pk_stove",
    "place": "floor",
    "region": [
-    247,
+    417,
     79,
     29,
     40
@@ -7457,8 +7527,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     0,
-     244,
+     139,
+     302,
      54,
      40
     ],
@@ -7496,7 +7566,7 @@
    "name": "decor_pk_table",
    "place": "floor",
    "region": [
-    278,
+    448,
     79,
     54,
     40
@@ -7526,38 +7596,38 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
+     56,
+     257,
+     22,
+     43
+    ],
+    [
+     467,
+     344,
+     27,
+     35
+    ],
+    [
      0,
-     199,
+     383,
+     27,
+     35
+    ],
+    [
+     80,
+     257,
      22,
      43
     ],
     [
-     274,
-     286,
+     29,
+     383,
      27,
      35
     ],
     [
-     303,
-     286,
-     27,
-     35
-    ],
-    [
-     24,
-     199,
-     22,
-     43
-    ],
-    [
-     332,
-     286,
-     27,
-     35
-    ],
-    [
-     361,
-     286,
+     58,
+     383,
      27,
      35
     ]
@@ -7589,8 +7659,8 @@
    "name": "decor_pk_toilet",
    "place": "floor",
    "region": [
-    480,
-    0,
+    130,
+    79,
     22,
     43
    ],
@@ -7620,26 +7690,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     54,
-     286,
+     247,
+     344,
      16,
      36
     ],
     [
-     390,
-     286,
+     87,
+     383,
      16,
      35
     ],
     [
-     484,
-     324,
+     319,
+     420,
      16,
      29
     ],
     [
-     408,
-     286,
+     105,
+     383,
      16,
      35
     ]
@@ -7667,8 +7737,8 @@
    "name": "decor_pk_diner_chair",
    "place": "floor",
    "region": [
-    114,
-    124,
+    294,
+    129,
     16,
     36
    ],
@@ -7696,26 +7766,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     454,
-     286,
+     151,
+     383,
      18,
      34
     ],
     [
-     72,
-     286,
+     265,
+     344,
      16,
      36
     ],
     [
-     212,
-     358,
+     104,
+     453,
      18,
      26
     ],
     [
-     90,
-     286,
+     283,
+     344,
      16,
      36
     ]
@@ -7743,8 +7813,8 @@
    "name": "decor_pk_green_chair",
    "place": "floor",
    "region": [
-    218,
-    124,
+    398,
+    129,
     18,
     34
    ],
@@ -7772,26 +7842,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     0,
-     324,
+     203,
+     383,
      18,
      32
     ],
     [
-     20,
-     324,
+     223,
+     383,
      16,
      32
     ],
     [
-     365,
-     358,
+     257,
+     453,
      18,
      25
     ],
     [
-     38,
-     324,
+     241,
+     383,
      16,
      32
     ]
@@ -7819,8 +7889,8 @@
    "name": "decor_pk_wood_chair",
    "place": "floor",
    "region": [
-    238,
-    124,
+    418,
+    129,
     18,
     32
    ],
@@ -7848,26 +7918,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     108,
-     286,
+     301,
+     344,
      16,
      36
     ],
     [
-     56,
-     324,
+     259,
+     383,
      16,
      32
     ],
     [
-     90,
-     358,
+     477,
+     420,
      16,
      27
     ],
     [
-     74,
-     324,
+     277,
+     383,
      16,
      32
     ]
@@ -7895,8 +7965,8 @@
    "name": "decor_pk_carved_chair",
    "place": "floor",
    "region": [
-    132,
-    124,
+    312,
+    129,
     16,
     36
    ],
@@ -7924,25 +7994,25 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     100,
-     244,
+     239,
+     302,
      54,
      39
     ],
     [
-     479,
-     79,
+     127,
+     142,
      26,
      55
     ],
     [
-     176,
-     324,
+     409,
+     383,
      54,
      31
     ],
     [
-     0,
+     155,
      142,
      26,
      55
@@ -7971,8 +8041,8 @@
    "name": "decor_pk_white_sofa",
    "place": "floor",
    "region": [
-    378,
-    79,
+    44,
+    129,
     54,
     39
    ],
@@ -8004,20 +8074,20 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     398,
-     358,
+     303,
+     453,
      20,
      24
     ],
     [
-     420,
-     358,
+     325,
+     453,
      20,
      24
     ],
     [
-     442,
-     358,
+     347,
+     453,
      20,
      24
     ]
@@ -8043,8 +8113,8 @@
    "name": "decor_pk_nightstand",
    "place": "floor",
    "region": [
-    53,
-    163,
+    319,
+    171,
     20,
     24
    ],
@@ -8068,8 +8138,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     232,
-     358,
+     124,
+     453,
      19,
      26
     ]
@@ -8091,8 +8161,8 @@
    "name": "decor_pk_bonsai",
    "place": "small",
    "region": [
-    476,
-    124,
+    216,
+    171,
     19,
     26
    ],
@@ -8109,12 +8179,19 @@
   },
   {
    "alt_roles": [
-    "front"
+    "front",
+    "side"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     292,
+     294,
+     79,
+     58,
+     58
+    ],
+    [
+     354,
      79,
      58,
      58
@@ -8128,7 +8205,8 @@
    ],
    "copies": 1,
    "faces": [
-    0
+    0,
+    1
    ],
    "fill": 0.999,
    "light": "",
@@ -8142,9 +8220,10 @@
    ],
    "scale": 0.74,
    "seat": [],
-   "set": "SINGLE",
+   "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
+    0,
     0
    ],
    "tier": 2,
@@ -8158,8 +8237,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     255,
-     142,
+     119,
+     202,
      19,
      52
     ]
@@ -8181,7 +8260,7 @@
    "name": "decor_pk_coat_stand",
    "place": "floor",
    "region": [
-    401,
+    409,
     0,
     19,
     52
@@ -8204,8 +8283,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     464,
-     358,
+     369,
+     453,
      20,
      24
     ]
@@ -8225,8 +8304,8 @@
    "name": "decor_pk_landscape",
    "place": "wall",
    "region": [
-    75,
-    163,
+    341,
+    171,
     20,
     24
    ],
@@ -8248,8 +8327,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     232,
-     324,
+     465,
+     383,
      24,
      31
     ]
@@ -8269,8 +8348,8 @@
    "name": "decor_pk_portrait",
    "place": "wall",
    "region": [
-    258,
-    124,
+    438,
+    129,
     24,
     31
    ],
@@ -8292,8 +8371,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     457,
-     79,
+     105,
+     142,
      20,
      56
     ]
@@ -8338,8 +8417,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     126,
-     286,
+     319,
+     344,
      26,
      36
     ]
@@ -8361,8 +8440,8 @@
    "name": "decor_pk_globe",
    "place": "floor",
    "region": [
-    150,
-    124,
+    330,
+    129,
     26,
     36
    ],
@@ -8384,8 +8463,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     48,
-     199,
+     104,
+     257,
      25,
      43
     ]
@@ -8407,7 +8486,7 @@
    "name": "decor_pk_sculpture",
    "place": "floor",
    "region": [
-    0,
+    154,
     79,
     25,
     43
@@ -8425,13 +8504,20 @@
   },
   {
    "alt_roles": [
-    "front"
+    "front",
+    "side"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     352,
+     414,
      79,
+     58,
+     58
+    ],
+    [
+     0,
+     142,
      58,
      58
     ]
@@ -8444,7 +8530,8 @@
    ],
    "copies": 1,
    "faces": [
-    0
+    0,
+    1
    ],
    "fill": 0.999,
    "light": "",
@@ -8458,9 +8545,10 @@
    ],
    "scale": 0.74,
    "seat": [],
-   "set": "SINGLE",
+   "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
+    0,
     0
    ],
    "tier": 2,
@@ -8479,50 +8567,50 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     170,
+     140,
+     202,
+     25,
+     52
+    ],
+    [
+     167,
+     202,
+     25,
+     52
+    ],
+    [
+     183,
      142,
-     29,
-     53
+     31,
+     55
     ],
     [
-     201,
+     216,
      142,
-     29,
-     53
+     31,
+     55
     ],
     [
-     126,
-     79,
-     32,
-     59
+     249,
+     142,
+     31,
+     55
     ],
     [
-     160,
-     79,
-     32,
-     59
-    ],
-    [
-     194,
-     79,
-     32,
-     59
-    ],
-    [
-     228,
-     79,
-     32,
-     59
+     282,
+     142,
+     31,
+     55
     ]
    ],
    "base": [],
    "base_px": [
     7,
     7,
-    12,
-    12,
-    12,
-    12
+    10,
+    10,
+    10,
+    10
    ],
    "cells": [
     2,
@@ -8537,15 +8625,15 @@
     2,
     2
    ],
-   "fill": 0.79,
+   "fill": 0.885,
    "light": "cold",
    "name": "decor_pk_fridge",
    "place": "floor",
    "region": [
-    347,
+    430,
     0,
-    29,
-    53
+    25,
+    52
    ],
    "scale": 0.74,
    "seat": [],
@@ -8569,37 +8657,51 @@
     "front_open",
     "side",
     "back",
-    "side_r"
+    "side_r",
+    "side_open",
+    "side_open_r"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     290,
-     324,
+     57,
+     420,
      20,
      30
     ],
     [
-     312,
-     324,
+     79,
+     420,
      20,
      30
     ],
     [
-     92,
-     324,
+     295,
+     383,
      22,
      32
     ],
     [
-     116,
-     324,
-     16,
+     101,
+     420,
+     20,
+     30
+    ],
+    [
+     319,
+     383,
+     22,
      32
     ],
     [
-     134,
-     324,
+     343,
+     383,
+     22,
+     32
+    ],
+    [
+     367,
+     383,
      22,
      32
     ]
@@ -8610,6 +8712,8 @@
     7,
     9,
     7,
+    9,
+    9,
     9
    ],
    "cells": [
@@ -8622,6 +8726,8 @@
     0,
     1,
     2,
+    3,
+    1,
     3
    ],
    "fill": 0.89,
@@ -8629,8 +8735,8 @@
    "name": "decor_pk_side_desk",
    "place": "floor",
    "region": [
-    284,
-    124,
+    489,
+    129,
     20,
     30
    ],
@@ -8643,7 +8749,9 @@
     1,
     0,
     0,
-    0
+    0,
+    1,
+    1
    ],
    "tier": 2,
    "title": "Side Desk",
@@ -8659,26 +8767,26 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     246,
-     244,
+     385,
+     302,
      26,
      38
     ],
     [
-     156,
-     244,
+     295,
+     302,
      19,
      39
     ],
     [
-     426,
-     286,
+     123,
+     383,
      26,
      35
     ],
     [
-     177,
-     244,
+     316,
+     302,
      19,
      39
     ]
@@ -8706,8 +8814,8 @@
    "name": "decor_pk_sink",
    "place": "floor",
    "region": [
-    458,
-    79,
+    124,
+    129,
     26,
     38
    ],
@@ -8732,8 +8840,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     274,
-     244,
+     413,
+     302,
      26,
      38
     ]
@@ -8755,8 +8863,8 @@
    "name": "decor_pk_diner_table",
    "place": "floor",
    "region": [
-    486,
-    79,
+    152,
+    129,
     26,
     38
    ],
@@ -8778,8 +8886,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     385,
-     358,
+     277,
+     453,
      11,
      25
     ]
@@ -8801,8 +8909,8 @@
    "name": "decor_pk_flower_vase",
    "place": "small",
    "region": [
-    40,
-    163,
+    293,
+    171,
     11,
     25
    ],
@@ -8824,8 +8932,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     0,
-     358,
+     337,
+     420,
      22,
      29
     ]
@@ -8847,8 +8955,8 @@
    "name": "decor_pk_flower_pot",
    "place": "floor",
    "region": [
-    336,
-    124,
+    76,
+    171,
     22,
     29
    ],
@@ -8870,8 +8978,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     108,
-     358,
+     0,
+     453,
      32,
      27
     ]
@@ -8891,8 +8999,8 @@
    "name": "decor_pk_car_picture",
    "place": "wall",
    "region": [
-    402,
-    124,
+    142,
+    171,
     32,
     27
    ],
@@ -8909,15 +9017,22 @@
   },
   {
    "alt_roles": [
-    "front"
+    "front",
+    "side"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     412,
-     79,
+     60,
+     142,
      43,
      58
+    ],
+    [
+     131,
+     257,
+     58,
+     43
     ]
    ],
    "base": [],
@@ -8928,7 +9043,8 @@
    ],
    "copies": 1,
    "faces": [
-    0
+    0,
+    1
    ],
    "fill": 0.998,
    "light": "",
@@ -8942,9 +9058,10 @@
    ],
    "scale": 0.74,
    "seat": [],
-   "set": "SINGLE",
+   "set": "ROTATE",
    "sheet": "decor_pack_dirty",
    "states": [
+    0,
     0
    ],
    "tier": 3,
@@ -8958,8 +9075,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     253,
-     358,
+     145,
+     453,
      14,
      26
     ]
@@ -8981,8 +9098,8 @@
    "name": "decor_pk_aloe",
    "place": "small",
    "region": [
-    497,
-    124,
+    237,
+    171,
     14,
     26
    ],
@@ -9004,8 +9121,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     269,
-     358,
+     161,
+     453,
      10,
      26
     ]
@@ -9027,8 +9144,8 @@
    "name": "decor_pk_cactus",
    "place": "small",
    "region": [
-    0,
-    163,
+    253,
+    171,
     10,
     26
    ],
@@ -9052,19 +9169,19 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     56,
-     244,
+     195,
+     302,
      42,
      40
     ],
     [
-     84,
+     371,
      142,
      24,
      54
     ],
     [
-     110,
+     397,
      142,
      24,
      54
@@ -9091,8 +9208,8 @@
    "name": "decor_pk_diner_seat",
    "place": "floor",
    "region": [
-    334,
-    79,
+    0,
+    129,
     42,
     40
    ],
@@ -9122,20 +9239,20 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     142,
-     358,
+     34,
+     453,
      38,
      27
     ],
     [
-     139,
-     199,
+     287,
+     257,
      22,
      42
     ],
     [
-     163,
-     199,
+     311,
+     257,
      22,
      42
     ]
@@ -9161,8 +9278,8 @@
    "name": "decor_pk_glass_table",
    "place": "floor",
    "region": [
-    436,
-    124,
+    176,
+    171,
     38,
     27
    ],
@@ -9186,8 +9303,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     486,
-     358,
+     391,
+     453,
      18,
      24
     ]
@@ -9209,8 +9326,8 @@
    "name": "decor_pk_small_table",
    "place": "floor",
    "region": [
-    97,
-    163,
+    363,
+    171,
     18,
     24
    ],
@@ -9232,8 +9349,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     431,
-     142,
+     449,
+     202,
      23,
      44
     ]
@@ -9255,8 +9372,8 @@
    "name": "decor_pk_plant",
    "place": "small",
    "region": [
-    455,
-    0,
+    105,
+    79,
     23,
     44
    ],
@@ -9278,8 +9395,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     24,
-     358,
+     361,
+     420,
      16,
      29
     ]
@@ -9301,8 +9418,8 @@
    "name": "decor_pk_sprout_pot",
    "place": "small",
    "region": [
-    360,
-    124,
+    100,
+    171,
     16,
     29
    ],
@@ -9324,8 +9441,8 @@
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     232,
-     142,
+     57,
+     202,
      21,
      53
     ]
@@ -9347,7 +9464,7 @@
    "name": "decor_pk_potted_tree",
    "place": "floor",
    "region": [
-    378,
+    347,
     0,
     21,
     53
@@ -9365,15 +9482,71 @@
   },
   {
    "alt_roles": [
+    "off",
+    "on"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     411,
+     453,
+     14,
+     21
+    ],
+    [
+     427,
+     453,
+     14,
+     21
+    ]
+   ],
+   "base": [],
+   "base_px": [
+    1,
+    1
+   ],
+   "cells": [
+    1,
+    2
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
+   "fill": 0.646,
+   "light": "warm",
+   "name": "decor_pk_table_lamp",
+   "place": "small",
+   "region": [
+    383,
+    171,
+    14,
+    21
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "STATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    1
+   ],
+   "tier": 2,
+   "title": "Table Lamp",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
     "front"
    ],
    "alt_sheet": "decor_pack_clean",
    "alt_views": [
     [
-     0,
-     389,
-     14,
-     21
+     290,
+     453,
+     11,
+     25
     ]
    ],
    "base": [],
@@ -9388,15 +9561,15 @@
    "faces": [
     0
    ],
-   "fill": 0.646,
+   "fill": 0.662,
    "light": "",
-   "name": "decor_pk_table_lamp",
+   "name": "decor_pk_rose_vase",
    "place": "small",
    "region": [
-    117,
-    163,
-    14,
-    21
+    306,
+    171,
+    11,
+    25
    ],
    "scale": 0.74,
    "seat": [],
@@ -9405,8 +9578,381 @@
    "states": [
     0
    ],
+   "tier": 1,
+   "title": "Rose Vase",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     0,
+     420,
+     23,
+     31
+    ]
+   ],
+   "base": [],
+   "base_px": [
+    3
+   ],
+   "cells": [
+    2,
+    2
+   ],
+   "copies": 1,
+   "faces": [
+    0
+   ],
+   "fill": 0.546,
+   "light": "",
+   "name": "decor_pk_leafy_pot",
+   "place": "floor",
+   "region": [
+    464,
+    129,
+    23,
+    31
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "SINGLE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0
+   ],
+   "tier": 1,
+   "title": "Leafy Pot",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "off",
+    "on"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     191,
+     257,
+     14,
+     43
+    ],
+    [
+     207,
+     257,
+     14,
+     43
+    ]
+   ],
+   "base": [],
+   "base_px": [
+    3,
+    3
+   ],
+   "cells": [
+    1,
+    3
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    0
+   ],
+   "fill": 0.651,
+   "light": "warm",
+   "name": "decor_pk_floor_lamp",
+   "place": "floor",
+   "region": [
+    181,
+    79,
+    14,
+    43
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "STATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    1
+   ],
    "tier": 2,
-   "title": "Table Lamp",
+   "title": "Floor Lamp",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     194,
+     202,
+     26,
+     52
+    ]
+   ],
+   "base": [],
+   "base_px": [
+    7
+   ],
+   "cells": [
+    2,
+    4
+   ],
+   "copies": 1,
+   "faces": [
+    0
+   ],
+   "fill": 0.76,
+   "light": "",
+   "name": "decor_pk_drinks_cart",
+   "place": "floor",
+   "region": [
+    457,
+    0,
+    26,
+    52
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "SINGLE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0
+   ],
+   "tier": 3,
+   "title": "Drinks Cart",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     80,
+     202,
+     37,
+     53
+    ],
+    [
+     84,
+     344,
+     53,
+     37
+    ]
+   ],
+   "base": [],
+   "base_px": [],
+   "cells": [
+    3,
+    4
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
+   "fill": 0.921,
+   "light": "",
+   "name": "decor_pk_striped_rug",
+   "place": "floor",
+   "region": [
+    370,
+    0,
+    37,
+    53
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "ROTATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    0
+   ],
+   "tier": 1,
+   "title": "Striped Rug",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     123,
+     420,
+     44,
+     30
+    ],
+    [
+     474,
+     202,
+     30,
+     44
+    ]
+   ],
+   "base": [],
+   "base_px": [],
+   "cells": [
+    3,
+    2
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
+   "fill": 0.964,
+   "light": "",
+   "name": "decor_pk_oval_rug",
+   "place": "floor",
+   "region": [
+    0,
+    171,
+    44,
+    30
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "ROTATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    0
+   ],
+   "tier": 0,
+   "title": "Oval Rug",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     286,
+     202,
+     28,
+     48
+    ],
+    [
+     379,
+     420,
+     48,
+     28
+    ]
+   ],
+   "base": [],
+   "base_px": [],
+   "cells": [
+    2,
+    3
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    1
+   ],
+   "fill": 0.946,
+   "light": "",
+   "name": "decor_pk_runner_rug",
+   "place": "floor",
+   "region": [
+    0,
+    79,
+    28,
+    48
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "ROTATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    0
+   ],
+   "tier": 1,
+   "title": "Runner Rug",
+   "wash_scale": 1.0
+  },
+  {
+   "alt_roles": [
+    "front",
+    "side",
+    "side_r"
+   ],
+   "alt_sheet": "decor_pack_clean",
+   "alt_views": [
+    [
+     316,
+     202,
+     40,
+     46
+    ],
+    [
+     30,
+     79,
+     17,
+     61
+    ],
+    [
+     49,
+     79,
+     17,
+     61
+    ]
+   ],
+   "base": [],
+   "base_px": [
+    7,
+    18,
+    18
+   ],
+   "cells": [
+    3,
+    3
+   ],
+   "copies": 1,
+   "faces": [
+    0,
+    1,
+    2
+   ],
+   "fill": 0.73,
+   "light": "",
+   "name": "decor_pk_decorated_table",
+   "place": "floor",
+   "region": [
+    30,
+    79,
+    40,
+    46
+   ],
+   "scale": 0.74,
+   "seat": [],
+   "set": "ROTATE",
+   "sheet": "decor_pack_dirty",
+   "states": [
+    0,
+    0,
+    0
+   ],
+   "tier": 2,
+   "title": "Decorated Table",
    "wash_scale": 1.0
   }
  ],
@@ -9429,14 +9975,14 @@
    "file": "res://assets/decor_pack_clean.png",
    "size": [
     512,
-    410
+    480
    ]
   },
   "decor_pack_dirty": {
    "file": "res://assets/decor_pack_dirty.png",
    "size": [
     512,
-    189
+    201
    ]
   },
   "lake_objects": {

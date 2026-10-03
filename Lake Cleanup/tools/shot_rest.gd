@@ -11,12 +11,27 @@ const LOG := "res://tools/last_rest.log"
 
 const SHOTS := [
 	# name, piece, view, rest age, a dog on its seat
-	["sofa", &"decor_sofa", 2, 0.5, true],
-	["sofa_back", &"decor_sofa", 0, 0.5, false],
-	["armchair", &"decor_loveseat", 0, 2.2, false],
-	["chair_back", &"decor_dining_chair", 2, 0.5, false],
-	["bed", &"decor_bed", 0, 8.0, true],
-	["read", &"decor_bookcase_tall", 0, 5.0, false],
+	# The pack's pieces since 2026-10-03 (the reference the lake deals): their views run
+	# front, side, back, so the back is view 2 on every one.
+	["sofa", &"decor_pk_sofa", 0, 0.5, true],
+	["sofa_back", &"decor_pk_sofa", 2, 0.5, false],
+	["armchair", &"decor_pk_armchair", 0, 2.2, false],
+	["armchair_back", &"decor_pk_armchair", 2, 0.5, false],
+	["chair_back", &"decor_pk_wood_chair", 2, 0.5, false],
+	["diner_back", &"decor_pk_diner_chair", 2, 0.5, false],
+	["carved_back", &"decor_pk_carved_chair", 2, 0.5, false],
+	["plain_back", &"decor_pk_chair", 2, 0.5, false],
+	["green_back", &"decor_pk_green_chair", 2, 0.5, false],
+	["bed", &"decor_pk_bed", 0, 8.0, true],
+	["fancy_bed", &"decor_pk_fancy_bed", 0, 8.0, true],
+	# Every face of both beds (2026-10-03): where the pillow is moves with the turn.
+	["bed_side", &"decor_pk_bed", 1, 0.5, true],
+	["bed_back", &"decor_pk_bed", 2, 0.5, true],
+	["fancy_side", &"decor_pk_fancy_bed", 1, 0.5, true],
+	["fancy_back", &"decor_pk_fancy_bed", 2, 0.5, true],
+	["fancy_side_r", &"decor_pk_fancy_bed", 3, 0.5, true],
+	["old_bed", &"decor_bed", 0, 0.5, false],
+	["read", &"decor_pk_bookshelf", 0, 5.0, false],
 ]
 
 var _lake: Node
@@ -58,6 +73,15 @@ func _physics_process(_delta: float) -> void:
 		get_tree().quit()
 		return
 	var shot: Array = SHOTS[_shot]
+	# REST_ONLY=bed,fancy: only the shots whose name holds one of the words.
+	var only := OS.get_environment("REST_ONLY")
+	var wanted := only.is_empty()
+	for word in only.split(",", false):
+		wanted = wanted or String(shot[0]).contains(word)
+	if phase == 0 and not wanted:
+		_shot += 1
+		_frames -= 1
+		return
 	var room := _room()
 	if phase == 0:
 		var decor: Array = room.decor

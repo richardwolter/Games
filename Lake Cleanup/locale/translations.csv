@@ -379,3 +379,12 @@ DECOR_PK_PLANT,pieces.json,13,11,180,A piece of furniture the player finds.,Plan
 DECOR_PK_SPROUT_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Sprout Pot,[Spróút Pót·ëxtr],,,,,,,,,,,,,,
 DECOR_PK_POTTED_TREE,pieces.json,13,11,180,A piece of furniture the player finds.,Potted Tree,[Póttéd Tréé·ëxtrà],,,,,,,,,,,,,,
 DECOR_PK_TABLE_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Table Lamp,[Táblé Lámp·ëxtr],,,,,,,,,,,,,,
+CAMERA_TIP,lake.gd,10,10,0,"The tip over the camera lock button, once a save after ten minutes of play. Wrapped on the note's paper.","Here you can choose between camera locked on player, or free roam.","[Héré yóú çáñ çhóósé bétwééñ çámérá lóçkéd óñ pláyér, ór fréé róám.·ëxtràlóngëxtràlóngëxtràlóng]",Aqui você escolhe entre a câmera presa no jogador ou livre.,Aquí puedes elegir entre la cámara fija en el jugador o libre.,Hier wählst du zwischen Kamera am Spieler oder freier Kamera.,"Ici, choisis entre la caméra fixée sur le joueur ou libre.",ここでカメラをプレイヤー固定か自由移動か選べます。,在这里选择镜头锁定玩家，或自由移动。,여기서 카메라를 플레이어 고정 또는 자유 이동으로 선택할 수 있어요.,Here you choose between the camera locked on the player or free.,Here you can choose between the camera fixed on the player or free.,Here you choose between camera on the player or free camera.,"Here, choose between the camera fixed on the player or free.",Here you can choose whether the camera is fixed to the player or moves freely.,"Here choose the camera locked to the player, or moving freely.",Here you can choose the camera fixed to the player or free movement.
+DECOR_PK_ROSE_VASE,pieces.json,13,11,180,A piece of furniture the player finds.,Rose Vase,[Rósé Vásé·ëxtr],,,,,,,,,,,,,,
+DECOR_PK_LEAFY_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Leafy Pot,[Léáfy Pót·ëxtr],,,,,,,,,,,,,,
+DECOR_PK_FLOOR_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Floor Lamp,[Flóór Lámp·ëxtr],,,,,,,,,,,,,,
+DECOR_PK_DRINKS_CART,pieces.json,13,11,180,A piece of furniture the player finds.,Drinks Cart,[Dríñks Çárt·ëxtrà],,,,,,,,,,,,,,
+DECOR_PK_STRIPED_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Striped Rug,[Strípéd Rúg·ëxtrà],,,,,,,,,,,,,,
+DECOR_PK_OVAL_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Oval Rug,[Óvál Rúg·ëxtr],,,,,,,,,,,,,,
+DECOR_PK_RUNNER_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Runner Rug,[Rúññér Rúg·ëxtr],,,,,,,,,,,,,,
+DECOR_PK_DECORATED_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Decorated Table,[Déçórátéd Táblé·ëxtràl],,,,,,,,,,,,,,

@@ -116,7 +116,8 @@ dropped their level at the top of their track, and "Recycle Bonus" was cut insid
 name at every level. An unaffordable row's value line read **1.82:1** contrast at 11 px
 (`BOARD_INK_DIM` lerped a quarter into the face), against the intent stated in its own
 comment — "drawn back rather than hidden: the point of a shop is knowing what is coming".
-- **Four boards, renamed, no article**: `NET` / `BOATS` / `DOGS` / `LUCK`. The market board is
+- **Four boards, renamed, no article**: `NET` / `BOATS` / `DOGS` / `LUCK` (standing NET / LUCK /
+  BOATS / DOGS since 2026-10-03, see Seven Adjustments). The market board is
   gone; **Lucky cast and Double cast moved off the net's board** to stand with Bonus yard and
   Pigeons, so the boards are **5/4/4/4** instead of 7/4/4/2. The luck board keeps the coin as
   its head.
@@ -1845,7 +1846,8 @@ ribbon titles are carved.
   of the lake's own rubbish bobbing (lent as `sprites[&"rubbish"]`, the wash room's
   list), the catch drawn by the card under the mesh. **Boats**: clean water, three pieces,
   the ferry as before. **Dogs**: a new strip (trees on the far bank, clean lake with a
-  ferry crossing, lawn) with **all four breeds always**, whatever the pack, running in and
+  ferry crossing, lawn; since 2026-10-03 the wash room's view in miniature, see Seven
+  Adjustments) with **all four breeds always**, whatever the pack, running in and
   out of frame on their own gaits. **Luck**: the recycle box catching a piece every 1.5 s,
   the coin tossing in the middle, the pigeon's head leaning in off the right edge every
   6 s. **Always in motion, by decision** ("alive is the point"), over the old rule that the
@@ -4110,6 +4112,60 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   `tools/last_beds.png` (the mattress's near edge). **Supersedes "front views only" for the
   beds**; sofas and chairs keep it.
 
+### Seven Adjustments (2026-10-03, `/grill-me` with Richard)
+- **The shop**: Catch is the second row of the NET board, under Strength
+  (`ShopSkin.GROUPS`), and the boards stand **NET / LUCK / BOATS / DOGS** (`BOARDS`). The
+  pricing plate follows `_mid_boards` and stands under Luck and Boats; the purse still hangs
+  under the first board, the close cross on the last (Dogs). The shop tour's order is
+  unchanged, by decision.
+- **The dogs card is the wash room's view in miniature** (`ShopCard._draw_strip`,
+  `HORIZON`/`SHORE`/`LAWN`, `LAKE_BANDS`, `LAKE_BEND`): stepped sky, the far wood on the
+  horizon, the lake in murky bands widening towards the eye with drifting streaks and scum
+  flecks, `DOG_LAKE_PIECES` (5) small rubbish pieces (`DOG_PIECE_MOST` 9 art px, bigger ones
+  stand half as tall as the lake), the island's beach and the lawn the pack runs on. **Always
+  murky**, by decision, not the player's lake. No ferry.
+- **The camera tip** (`Lake.CAMERA_TIP_AT` 600 s of play, `CAMERA_TIP_HOLD` 8 s,
+  `_camera_tip_step`, `Text.CAMERA_TIP`): a `TourCard` hint with the arrow on the camera lock
+  button, "Here you can choose between camera locked on player, or free roam." The game runs
+  on; a click on the card (`TourCard.closable`: the card takes that click, everything else
+  passes through) or on the button, or 8 s, takes it down for good. Waits while a board, the
+  menu, a tour, the first steps, a moment, the letter or the ending is up, and in pad mode.
+  Saved as `camera_tip`; **a save without the key reads as not seen** (Richard's call, against
+  the tours' rule), so old runs past ten minutes get it on their next load. A borrowed lake
+  is marked seen. `TourCard` now puts its arrow **under** a target at the top of the screen,
+  pointing up, and the card under the arrow. Machine drafts for the seven other languages.
+- **Decoration views checked against the packs** (`build_pack_decor.py`, `LATE`): the
+  **Side Desk**'s side was the open-drawer drawing (1153) standing as shut and its "back"
+  was its shut side (1152); now side 1152, back 1151, side open 1153. The **File Cabinet**'s
+  "side" was its back (1325); now side 1327, back 1325, side open 1326. The **Drawer Desk**
+  gains the side the pack drew (409, open 410). **Views added after a piece was built go in
+  `LATE`**, appended after every view and mirror it had, so a saved `view` index never moves:
+  no `SAVE_VERSION` bump. Where the pack draws no open counterpart (Drawer, Nightstand,
+  Coffee Table, Corner Desk and Microwave sides) the face stays shut and E does nothing on
+  it, by decision.
+- **Every rug turns** (`TURN`: the object rotated a quarter, the packs drawing a rug one way
+  round only): Gold Rug, Blue Rug, Dotted Rug and the three new ones are `ROTATE`.
+- **The fourth batch of finds**, off the tagger (`art_source/packs_local/tagger/pull`, the
+  previous pull kept as `pull_20261001`): Rose Vase and Leafy Pot (299 is two objects, cut
+  apart), Floor Lamp (332, cut off its cushions; no lit drawing, so no switch), Drinks Cart
+  (428), Striped Rug (1097), Oval Rug (1112), Runner Rug (2156), and the tagger's
+  "Decorated Table" set (1232 front, 1229 side, mirrored), named as tagged. **Appended to
+  `PIECES`, so every old find keeps its def index: no `SAVE_VERSION` bump, and a save made
+  before carries none of them in its water** (a new game deals them). Dealt by tier like the
+  rest: 60 finds, early / mid / late 6 / 38 / 15, none closer than `FIND_APART`.
+- **Shed dogs find their way** (`ShedRoom._path_grid`, `_route`, `_reaches`, `_line_clear`,
+  `PATH_RES` 2, `PATH_LOOK`, `DOG_BLOCKED` 0.7 s): an `AStarGrid2D` over the floor at two
+  points a cell, solid where `_dog_may_stand` refuses, memoised on the furniture and the
+  dog's `over`; the path is pulled straight wherever the next point is in plain sight. A
+  dog only picks a spot on its own patch of floor (a flood-fill label), and a walker in the
+  way is slid past and, after `DOG_BLOCKED`, thought round. **The lake's dogs keep their no-
+  search rule**; the shed's clutter is what needed one. Supersedes "a slide that makes no
+  ground gives up and picks a new target".
+- **The find-caught card fades as one**: see The Find-Caught Card.
+- `test_lake` guards the board order and the Catch row, the camera tip (none before ten
+  minutes, up on the button after, gone for good on a click, the save rule), a shed dog
+  walking round a sofa, and the card's faded group.
+
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
 the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
@@ -6049,11 +6105,29 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
 (`tools/build_pose_mockup.py`) over four passes before any game code.
 - **Where, per view** (`ShedRoom.RESTS`: kind, the hips' height in drawn pixels up from the
   picture's bottom, sideways offset): sofa, armchair and dining chair **front** (facing the
-  room, drawn over the piece) and **back** (turned away, drawn behind it, only hat and
-  shoulders over the backrest); both beds' colours **lie**; the three bookcases' front
+  room, drawn over the piece) and **back** (turned away); both beds' colours **lie**; the
+  three bookcases' front
   **read**. **No side views, by decision** (Richard, after three passes: "looks really bad,
   lets not work with it"). The sofa's rests follow its pictures, not its swapped labels:
   view 0 is the back, view 2 the cushion. On the sofa the player sits left of middle.
+- **A back sit is over the seat and under the backrest** (2026-10-03, Richard; it was drawn
+  behind the whole piece and read as standing behind it): the player sorts over the piece
+  like a front sit (`_you_key`), and `_draw_resting` then draws the piece's rows from the
+  back entry's fourth number down (the drawing's own rows from its top, by eye off every
+  back view: sofas 5-6, armchairs 4, chairs 2) over the player. **A chair's back view draws
+  its seat cushion below the backrest, and the player sits on it** (second pass, Richard: "it
+  should be between cushion and back rest"): the fifth number is where the backrest ends and
+  only the band between is redrawn, the sixth is the cushion's foot and the figure is not
+  drawn below it (the legs go forward under the seat), and the chairs' hips went up to the
+  cushion (13-18). Sofas and armchairs from behind are all backrest and have neither. **The basket is put down**
+  for it (`build_pose_mockup.drop_basket`, rebuilt into `sit_north`): with the seat under
+  him it hung beside a narrow chair. **A sitter is centred on the body, not the ink box**
+  (`_body_axis`, the median of every row's middle, stored as each `sit_` frame's `axis`):
+  from behind the hand hangs out on one side and put the box's middle 1.5 frame px off the
+  body's, so the player sat left of a narrow chair; the front sit moved a pixel too.
+  First guesses; `tools/shot_rest.tscn` photographs the
+  pack's seats now (`last_rest_{sofa,armchair}_back`, `chair_back`, `diner_back`,
+  `carved_back`).
 - **E is one choice among three**: the nearest of a dog, a switch and a rest wins
   (`switch_near`, `_draw_prompt`), measured from the foot's middle like a switch. **Any walk
   key, E again, the piece going away** (picked up or turned) **or leaving the shed** gets up,
@@ -6063,9 +6137,8 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
 - **The strips are built by rule** (`tools/build_rest_frames.py`, psd-extract venv python,
   project root, then `slice_character.gd` and a reimport): `sit_south` and `sit_north` (rest
   and a breath in: **the chest opens a pixel either side, the head stays**, `chest_breath`;
-  the first cut lowered the whole upper body and read as the head bobbing), `lie_south` (the head and hat alone; the
-  blanket is the bed's own art with two folds and a lit turn-down drawn over it in shade and
-  light, so both bed colours wear them), `read_south` (the book's back cover to the room, a
+  the first cut lowered the whole upper body and read as the head bobbing), `lie_south`,
+  `lie_north`, `lie_west`, `lie_east` (see Lying in Every Bed below), `read_south` (the book's back cover to the room, a
   page lifting; **five books**, `COVERS`, two frames each, one picked each read,
   `ShedRoom.BOOKS`/`_read_book`). For Richard to polish; a re-run overwrites. `ShedRoom.SIT_HIP` must match
   the rows the builder cuts. The slicer takes a `dirs` list per animation now.
@@ -6082,6 +6155,34 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   off. A dog with nowhere to lie climbs up on a free seat of the piece at `JOIN_ODDS`. **The
   dogs' seats went up a little** (Richard, same day): sofa cushion 4 to 6, armchair 3 to 5,
   bed 21 to 24, in `decor_sets.json` and `pieces.json` by hand (the builder was not run).
+- **A dog sharing the piece lies over the player's lap** (2026-10-03, Richard): a dog whose
+  seat is the piece the player rests on sorts `SHARED_OVER` past the player's own key, so on
+  the sofa and both beds it is drawn over them, not under.
+- **A rest is reached from anywhere along the piece** (`_rest_gap`, same day, Richard: E
+  beside the fancy bed did nothing or petted the dog): the distance is to the piece's base
+  rectangle, not its middle, so a wide bed is got into from its side. **A dog lying on the
+  piece yields E** (`_dog_on`): with the player at that piece the dog's own distance is
+  ignored and E rests rather than pets. The cost, accepted: that dog cannot be petted from
+  beside its own bed. `shot_rest` photographs `fancy_bed` too.
+- **Lying in every bed, on every face, the head on the pillow** (2026-10-03, Richard: "fix
+  lying on beds, and mind their positioning and where the pillows are"; the head had been the
+  hat brim alone, put two pixels under the picture's top, which on the fancy bed is the
+  headboard and on the pack bed's view 0 is the foot). `ShedRoom.LIES` says, per bed and
+  view, where the pillow is and which way the head lies, measured off the pack pictures:
+  **up** (pillow at the far end, `lie_south`: the face down to the chin), **down** (pillow
+  behind the board nearest the camera, `lie_north`: the back of the hat), **west**/**east**
+  (a side view, `lie_west`/`lie_east`: the face-up head turned a whole quarter, held inside the
+  headboard by `clip`). The bed's own picture is drawn back over the head from `cover` towards
+  the feet (`_draw_lying`), so the blanket comes up to the chin and the near board hides the
+  pillow; the folds run from there to `feet` (`_draw_blanket`). **The pack bed's labels run
+  the other way round from the fancy bed's**: its view 0 has the pillow at the near end and
+  view 2 at the far end. On the double bed the player takes one pillow, the same from every
+  side, the far one on a side view (the near one put the head over the dog). **The dog's
+  seat moved off the near pillow** on the two "down" faces (pack bed view 0 18 to 32, fancy
+  bed view 2 26 to 37, `build_pack_decor.SEATS` and `pieces.json` by hand): it lay over the
+  sleeper's head. Probe: `REST_ONLY=bed,fancy` on `tools/shot_rest.tscn` shoots all eight
+  faces (`last_rest_{bed,bed_side,bed_back,old_bed,fancy_bed,fancy_side,fancy_back,
+  fancy_side_r}.png`). All numbers first guesses for Richard's eye.
 - **The chew toy blocks nothing** (`ShedRoom.WALK_OVER`, Richard, same day): stepped over,
   like the pet bed and the rugs.
 - **Out of scope, by decision**: side sitting, get-up frames, sounds, a carried book,
@@ -6090,6 +6191,48 @@ for a book and read it facing the room. Picked off `tools/last_pose_mockup.png`
   standing up where the player stood, the dog hopping off the armchair and staying on the
   sofa, and the seat going away. Probe: `tools/shot_rest.tscn` (desktop build, own save,
   whole pack forced) saves `tools/last_rest_{sofa,sofa_back,armchair,chair_back,bed,read}.png`.
+
+### The Shed's Cues (2026-10-02, `/grill-me` with Richard)
+A carried piece says it can turn, and a switch nobody has tried points at itself.
+- **The turn chip** (`ShedRoom._draw_turn_hint`, `turn_hint_alpha`, `TURN_HINT_HOLD` 2 s,
+  `TURN_HINT_FADE` 0.6 s): the `shed_rotate` key as `Binds.shown` names it (the pad's button
+  in pad mode) and a turning arrow (`TURN_GLYPH`) on the E chip's wood, beside the piece in
+  hand, right of it or left where the right runs off the room. Whole from the pick-up, then
+  fading; turning does not restart it. **Only where R would change the piece**
+  (`Sheets.turned` != the view in hand), so a pot shows nothing. No words, nothing saved.
+- **No place or store chips, by decision**: the drag explains itself.
+- **The pointing hand** (`hand_rows`, `_draw_hands`): over the top of every placed piece of
+  a kind never worked **that switches in the face it stands in** (2026-10-03: it asked
+  whether any face switched, so a counter turned side on wore it). Seats, beds and bookcases get none, by
+  decision. Drawn over the room's dim with the key chip, so nothing in front hides it. Not
+  over the switch in E's reach (the key chip is there), not while a piece is in hand or the
+  record menu is up.
+- **It is the angler's own hand** (2026-10-03, Richard's pick C of three off
+  `tools/last_hand_mockup.png`/`.gif`, `tools/hand_mockup.py`; a cartoon glove and a carved
+  oak hand were the others): `HAND` is the silhouette, and `hand_pixels` outlines, tones
+  (lit from the right, `_hand_tone`) and creases it in the angler's skin and his cream shirt
+  cuff (`HAND_SKIN`, `HAND_SHIRT`), with a pink nail and the finds' gold star at the
+  fingertip winking on the middle two of four frames (`HAND_HOLDS`, `HAND_BOBS`, `HAND_ARMS`,
+  `hand_frame`), a pixel's bob with it, and a soft shadow down and to the left
+  (`HAND_SHADE`). Baked once to four textures (`_hand_image`) and drawn at the furniture's
+  grain (`HAND_GRAIN` 0.74, `build_pack_decor.py`'s `SHED_SCALE`), its tip `HAND_LIFT`
+  over the drawing. **Supersedes** the paper hand with a blue cuff at the room's zoom.
+- **Per kind, saved** (`switch_tried`, piece names; `ShedRoom._tried` from `switch_near` and
+  `_open_record`): working one lamp takes the hand off every copy. Owned by `Lake`, shared
+  with the room by reference like `decor`, saved as `switch_tried`. **A save without it reads
+  as nothing tried**, so old runs get the hands too (Richard's call). No `SAVE_VERSION` bump.
+- **Out of scope, by decision**: cues on seats, beds, bookcases or dogs; a setting to turn
+  them off; the decoration tour; new art or sounds.
+- **The fridge stands without the pack's puddle** (2026-10-03, Richard): the Messy pack
+  draws a blue-grey puddle under its front, open front and open side. `build_pack_decor.py`
+  clears those four colours from the bottom `PUDDLE_ROWS` of those views (`DRY`, `PUDDLE`,
+  `dried`), so the pictures are a pixel or four shorter and narrower; a fridge already placed
+  keeps its cell.
+- All numbers first guesses. `test_lake`'s `_check_shed_cues` guards the chip's hold, fade
+  and one-face rule, the hand on every copy and none on a sofa, none while carrying, none in
+  reach, the hand going on a press, the list saving, the hand's loop and tones, and no
+  puddle pixel under any fridge view. Probe: `SHED_CUES=1` on
+  `tools/shot_shed.tscn` saves `tools/last_shed_cues.png` (hands) and `last_shed_turn.png`.
 
 ### The Pack Decoration Replaces the Finds (2026-10-01, Richard)
 The finds in the lake are the 0_mem0ry packs' decoration, picked on the Lake Pack Tagger and
@@ -6104,6 +6247,12 @@ catalogue (the shed's tests still use them) and are no longer dealt (`Lake.FIND_
   was four), and
   the tier tagged on the tagger (`Sheets.tier_of`, read by `_all_defs`). Drawn at
   `SHED_SCALE` 0.74 in the shed (Richard's pick). The grimy sprite is rule-built murk.
+- **Both lamps switch** (2026-10-03, Richard): the table lamp is the Messy pack's own pair,
+  1063 off and 1064 lit (it was 1064 alone, so one saved before reads as off); the Coastal
+  floor lamp has no lit drawing, so its "on" is the same cut with the shade's blues and bulb
+  mapped onto the table lamp's yellows (`LIT`, `LIT_ROWS`, a `"lit"` flag in the cut box).
+  Both `STATE` with light `warm` (the lamp pool, silent), so both wear the hand. A Messy floor
+  lamp with its own pair (1068/1069) exists and was not taken.
 - **The record player is the first find** (`FIRST_FIND`), afloat by the island at tier 0. It is
   the old `decor_vynil_player` entry redrawn as the pack turntable (`REPLACES`), a small piece
   that sits on furniture; the song menu is drawn in its greys.
@@ -6331,10 +6480,11 @@ is older than this note; what the note records is the pass that made it the game
 - **The rim is what lets the grimy picture be held up at all.** The disc's own comment said a
   chair drawn straight onto the lake is a chair lost in a field of bottles, and it was right
   about the problem; a gold outline separates the piece from the water without laying a
-  circle over the game. It **fades faster than the picture** (`RIM_FADE` 3): the rim is four
-  whole copies of the sprite and only their edges are meant to show, which stops being true
-  the moment the picture in front of them goes see-through — a find on its way out went
-  entirely gold.
+  circle over the game. **The rim, the picture and the glitter fade as one** (2026-10-03, a
+  `CanvasGroup` named `Fade`, `self_modulate.a` the card's fade): the rim is four whole
+  copies of the sprite and only their edges are meant to show, so faded one by one the
+  picture went see-through and the gold was left behind. **Supersedes `RIM_FADE`**, which
+  cubed the rim's own alpha and still left a gold ghost.
 - **Copied from `CastNet`'s `CatchRim`/`CatchBeam`/`CatchStars`, not from `LakeGrid`'s own
   `GlintBeam`/`GlintTwinkle`**: those are tile-bound (every line indexes `grid.stacks[i]`,
   `grid.swing[i]`, `grid.surface_pos(i)`) and a card has no tile. Only the two statics and

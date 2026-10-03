@@ -384,6 +384,7 @@ func _stage_build() -> void:
 	_main.set(&"_panning", false)
 	_main.set(&"_pan", Vector2.ZERO)
 	_check_free_view(cam)
+	_check_camera_tip()
 	_check_signals(cam)
 	cam.zoom = Vector2(0.62, 0.62)
 
@@ -2363,8 +2364,8 @@ func _stage_market() -> void:
 		"the legend lists four yards and no tiers", str(legend))
 	var legend_decimals := "." in str(legend.get("tiers", []))
 	_check(not legend_decimals, "the legend's tier rates are percents", str(legend.get("tiers", [])))
-	# The shop skin: a "?" box in every row's corner, the legend under the ferry's and the
-	# dog's boards, inside the table, and the level written small.
+	# The shop skin: a "?" box in every row's corner, the legend under the middle two boards
+	# (luck and boats since 2026-10-03), inside the table, and the level written small.
 	var skin := _main.get_node(^"HUD/ShopSkin")
 	skin.set(&"rows", _main.call(&"_shop_rows"))
 	skin.set(&"legend", legend)
@@ -2375,15 +2376,19 @@ func _stage_market() -> void:
 	_check(legend_box.size.y > 0.0, "the legend has room under the boards",
 		"table %s boat %s dog %s" % [table, skin_boards.get(&"boat"), skin_boards.get(&"dog")])
 	if legend_box.size.y > 0.0:
-		var boat_box: Rect2 = skin_boards[&"boat"]
-		var dog_box: Rect2 = skin_boards[&"dog"]
+		var boat_box: Rect2 = skin_boards[ShopSkin.BOARDS[1]]
+		var dog_box: Rect2 = skin_boards[ShopSkin.BOARDS[2]]
 		_check(legend_box.position.y >= maxf(boat_box.end.y, dog_box.end.y)
 			and legend_box.end.y <= table.end.y + 0.5
 			and is_equal_approx(legend_box.position.x, boat_box.position.x - ShopSkin.LEGEND_REACH)
 			and is_equal_approx(legend_box.end.x, dog_box.end.x + ShopSkin.LEGEND_REACH)
 			and ShopSkin.LEGEND_REACH < ShopSkin.BOARD_GAP * 0.5,
-			"and stands under the ferry's and the dog's boards, inside the table",
-			"legend %s boat %s dog %s table %s" % [legend_box, boat_box, dog_box, table])
+			"and stands under the middle two boards, inside the table",
+			"legend %s left %s right %s table %s" % [legend_box, boat_box, dog_box, table])
+		_check(ShopSkin.BOARDS == [&"net", &"luck", &"boat", &"dog"]
+			and (ShopSkin.GROUPS[&"net"][0][1] as Array).slice(0, 2) == [&"net_strength", &"net_hold"],
+			"the boards stand net, luck, boats, dogs, and Catch is under Strength",
+			str(ShopSkin.BOARDS))
 	# The rail (2026-09-17): a column down the left of a row, the "?" answering in its top
 	# half and the level's figure standing in its bottom. Both inside the plate, where the
 	# old corner tag hung outside it.
@@ -4094,14 +4099,26 @@ func _check_trophy() -> void:
 
 	# Four layers, in the one order they can be drawn in: the light, the gold outline, the
 	# picture over both, the glitter over that.
+	# The rim, the picture and the glitter sit in one CanvasGroup faded as one (2026-10-03),
+	# so the gold outline cannot be left behind as the card goes.
 	var layers: Array[String] = []
 	for child in card.get_children():
 		layers.append(String(child.name))
-	_check(layers == ["Beam", "Rim", "Piece", "Glitter"],
-		"the card draws light, rim, picture, glitter, in that order", ", ".join(layers))
+	var group := card.get_node_or_null(^"Fade")
+	var inside: Array[String] = []
+	if group != null:
+		for child in group.get_children():
+			inside.append(String(child.name))
+	_check(layers == ["Beam", "Fade"] and group is CanvasGroup
+		and inside == ["Rim", "Piece", "Glitter"],
+		"the card draws light, then rim, picture, glitter in one faded group",
+		", ".join(layers) + " / " + ", ".join(inside))
+	var source_fade := FileAccess.get_file_as_string("res://scripts/trophy.gd")
+	_check(not source_fade.contains("RIM_FADE") and source_fade.contains("self_modulate.a = fade"),
+		"and the rim has no fade of its own", "")
 	var beam := card.get_node_or_null(^"Beam")
-	var rim := card.get_node_or_null(^"Rim")
-	var art := card.get_node_or_null(^"Piece")
+	var rim := card.get_node_or_null(^"Fade/Rim")
+	var art := card.get_node_or_null(^"Fade/Piece")
 	_check(beam != null and beam.material is ShaderMaterial
 		and (beam.material as ShaderMaterial).shader == LakeGrid.BEAM_SHADER,
 		"the light is the lake's own beam shader", "")
@@ -4124,6 +4141,54 @@ func _check_trophy() -> void:
 		_check(spots.size() > 0,
 			"and the glitter has spots to land on, off the grimy picture",
 			"%d spots" % spots.size())
+
+
+## A shed dog finds its way round furniture (2026-10-03, Richard: dogs got stuck walking
+## against it). A sofa stands between the dog and where it is going; walked frame by frame
+## through `_dog_walk`, the dog goes round and arrives, never standing in the sofa's base.
+func _check_shed_paths(room: ShedRoom) -> void:
+	var sheets: Sheets = room.sheets
+	var sofa := &"decor_pk_white_sofa"
+	if sheets == null or not sheets.has(sofa):
+		return
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	decor.clear()
+	room.place(sofa, Vector2i(ShedRoom.CELL * 14, ShedRoom.CELL * 12), 0)
+	var blocks: Array = room.call(&"_blockers")
+	if blocks.is_empty():
+		_check(false, "a sofa blocks floor for the path check", "")
+		decor.assign(kept)
+		_main.call(&"_set_shed", was_open)
+		return
+	var box: Rect2 = blocks[0]["box"]
+	var dog := ShedRoom.ShedDog.new()
+	dog.at = Vector2(box.get_center().x, box.end.y + 0.8)
+	dog.target = Vector2(box.get_center().x, box.position.y - 0.8)
+	dog.state = &"walk"
+	_check(bool(room.call(&"_dog_may_stand", dog.at)) and bool(room.call(&"_dog_may_stand", dog.target)),
+		"the path check stands either side of the sofa", "%s / %s" % [dog.at, dog.target])
+	var inside := false
+	var arrived := false
+	var dogs: Array = room.dogs()
+	var kept_dogs := dogs.duplicate()
+	dogs.clear()
+	for _i in 900:
+		if bool(room.call(&"_dog_walk", dog, 1.0 / 60.0)):
+			arrived = dog.at.distance_to(dog.target) <= 0.3
+			break
+		inside = inside or box.has_point(dog.at)
+	_check(arrived and not inside, "a shed dog walks round a sofa in its way to the far side",
+		"at %s target %s" % [dog.at, dog.target])
+	# A spot boxed in by nothing it can reach is never picked: `_reaches` says no across a
+	# wall of furniture the whole width of the floor.
+	_check(bool(room.call(&"_reaches", dog.at, dog.target)) or arrived,
+		"and the far side counts as reachable", "")
+	dogs.assign(kept_dogs)
+	decor.assign(kept)
+	_main.call(&"_set_shed", was_open)
 
 
 ## The pack in the shed (2026-09-19, issue #30): up to as many dogs as the player owns, each
@@ -4200,6 +4265,24 @@ func _check_shed_rest(room: ShedRoom) -> void:
 	for pose in ["sit_south", "sit_north", "lie_south", "read_south"]:
 		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
 	_check((poses.get("sit_south", []) as Array).size() == 2, "sitting breathes, two frames", "")
+	# Every face of a bed is lain in, the head on that face's pillow (2026-10-03).
+	for pose in ["lie_north", "lie_west", "lie_east"]:
+		_check(poses.has(pose), "the angler's sheet has %s" % pose, "")
+	for bed: StringName in [&"decor_pk_bed", &"decor_pk_fancy_bed", &"decor_bed"]:
+		if not sheets.has(bed):
+			continue
+		var faces: int = sheets.view_count(bed)
+		var bad := PackedStringArray()
+		for view in faces:
+			var spot: Dictionary = (ShedRoom.LIES.get(bed, {}) as Dictionary).get(view, {})
+			var rest := room.rest_of(bed, view)
+			var size: Vector2 = sheets.view_region_of(bed, view).size
+			var at: Vector2 = spot.get("at", Vector2(-1.0, -1.0))
+			if rest.is_empty() or StringName(rest[0]) != &"lie" or spot.is_empty() \
+					or not Rect2(Vector2.ZERO, size).has_point(at):
+				bad.append(str(view))
+		_check(faces > 0 and bad.is_empty(), "every face of %s is lain in, its pillow on the picture" % bed,
+			"bad views %s" % ",".join(bad))
 	# Side views offer nothing, by decision.
 	for piece: StringName in [&"decor_sofa", &"decor_loveseat", &"decor_dining_chair"]:
 		_check(room.rest_of(piece, 1).is_empty() and room.rest_of(piece, 3).is_empty(),
@@ -4264,10 +4347,212 @@ func _check_shed_rest(room: ShedRoom) -> void:
 	press.pressed = true
 	_main.call(&"_unhandled_input", press)
 	_check(bool(_main.get(&"_shed_open")), "E in the shed does not leave it", "")
+	# A big bed is got into from its side, and a dog lying on it does not take the E
+	# (2026-10-03, Richard: E beside the fancy bed did nothing or petted the dog).
+	var fancy := &"decor_pk_fancy_bed"
+	if sheets.has(fancy):
+		decor.clear()
+		var at := Vector2i(10 * ShedRoom.CELL, 6 * ShedRoom.CELL)
+		room.place(fancy, at, 0)
+		var span: Vector2i = room.span_of(fancy, 0)
+		var base: int = room.base_of(fancy, 0)
+		var beside := Vector2(float(at.x + span.x) + 4.0, float(at.y + span.y) - float(base) * 0.5) / float(ShedRoom.CELL)
+		room.set(&"_you_at", beside)
+		room.set(&"_you_pet", -1.0)
+		var bed_dogs: Array = room.dogs()
+		if bed_dogs.is_empty():
+			bed_dogs.append(ShedRoom.ShedDog.new())
+		var bed_dog: ShedRoom.ShedDog = bed_dogs[0]
+		bed_dog.seat = "%s@%d,%d" % [fancy, at.x, at.y]
+		bed_dog.at = beside + Vector2(-1.0, 0.0)
+		bed_dog.pet_cool = 0.0
+		_check(room.switch_near() and room.resting() == &"lie",
+			"E beside the fancy bed's side lies down, a dog on it or not", String(room.resting()))
+		room.stand_up()
+		bed_dog.seat = ""
+		bed_dog.at = Vector2(3.0, 12.0)
+		decor.clear()
 	# The chew toy is stepped over.
 	if sheets.has(&"decor_chew_toy"):
 		room.place(&"decor_chew_toy", Vector2i(40, 80), 0)
 		_check((room.call(&"_blockers") as Array).is_empty(), "the chew toy blocks nothing", "")
+	decor.clear()
+	decor.append_array(kept)
+	if not was_open:
+		_main.call(&"_set_shed", false)
+
+
+## The shed's cues (2026-10-02): the turn chip beside a turnable piece in hand, fading, and
+## the pointing hand over every switch of a kind never worked.
+func _check_shed_cues(room: ShedRoom) -> void:
+	var sheets: Sheets = room.sheets
+	if sheets == null or not sheets.has(&"decor_loveseat"):
+		return
+	var was_open: bool = bool(_main.get(&"_shed_open"))
+	_main.call(&"_set_shed", true)
+	var decor: Array = room.decor
+	var kept := decor.duplicate(true)
+	var tried: Array[String] = room.switch_tried
+	var tried_kept := tried.duplicate()
+	decor.clear()
+	room.carrying = &""
+	room.call(&"_tick_turn_hint", 0.0)
+	# The turn chip: whole on the pick-up, gone after its hold and fade, not for a one-face piece.
+	room.carrying = &"decor_loveseat"
+	room.set(&"_carry_view", 0)
+	room.call(&"_tick_turn_hint", 0.0)
+	_check(is_equal_approx(room.turn_hint_alpha(), 1.0), "a turnable piece in hand shows the turn chip", "%.2f" % room.turn_hint_alpha())
+	room.turn_carried()
+	room.call(&"_tick_turn_hint", ShedRoom.TURN_HINT_HOLD * 0.5)
+	_check(is_equal_approx(room.turn_hint_alpha(), 1.0), "turning does not cut the chip short", "%.2f" % room.turn_hint_alpha())
+	room.call(&"_tick_turn_hint", ShedRoom.TURN_HINT_HOLD + ShedRoom.TURN_HINT_FADE)
+	_check(room.turn_hint_alpha() == 0.0, "and it fades out", "%.2f" % room.turn_hint_alpha())
+	var single := &""
+	for name: String in sheets.facings.keys():
+		if sheets.has(StringName(name)) and not sheets.turnable(StringName(name)):
+			single = StringName(name)
+			break
+	if single != &"":
+		room.carrying = &""
+		room.call(&"_tick_turn_hint", 0.0)
+		room.carrying = single
+		room.set(&"_carry_view", 0)
+		room.call(&"_tick_turn_hint", 0.0)
+		_check(room.turn_hint_alpha() == 0.0, "a piece with one face shows no turn chip", String(single))
+	room.carrying = &""
+	room.call(&"_tick_turn_hint", 0.0)
+	# The hand: on every copy of an untried switch, gone from all of them once one is worked.
+	var lamp := &""
+	for name: String in sheets.states.keys():
+		if sheets.has(StringName(name)) and sheets.switchable(StringName(name)) \
+				and sheets.switched(StringName(name), 0) >= 0 and StringName(name) != ShedRoom.RECORD_PIECE:
+			lamp = StringName(name)
+			break
+	if lamp != &"":
+		tried.clear()
+		room.place(lamp, Vector2i(ShedRoom.CELL * 4, ShedRoom.CELL * 8), 0)
+		room.place(lamp, Vector2i(ShedRoom.CELL * 26, ShedRoom.CELL * 8), 0)
+		room.place(&"decor_loveseat", Vector2i(ShedRoom.CELL * 14, ShedRoom.CELL * 16), 0)
+		room.set(&"_you_at", Vector2(14.0, 30.0))
+		_check(room.hand_rows().size() == 2, "an untried switch wears the hand, every copy, and a sofa none",
+			str(room.hand_rows()))
+		room.carrying = &"decor_loveseat"
+		_check(room.hand_rows().is_empty(), "no hands while a piece is in hand", "")
+		room.carrying = &""
+		var span: Vector2i = room.span_of(lamp, 0)
+		room.set(&"_you_at", Vector2(4.0 + float(span.x) * 0.5 / ShedRoom.CELL,
+			8.0 + float(span.y) / ShedRoom.CELL))
+		room.set(&"_you_pet", -1.0)
+		# Out of the running for E, so the press below works the lamp and not a dog.
+		var cools: Array[float] = []
+		for dog: ShedRoom.ShedDog in room.dogs():
+			cools.append(dog.pet_cool)
+			dog.pet_cool = 99.0
+		var near_rows := room.hand_rows()
+		_check(near_rows.size() == 1 and near_rows[0] == 1, "the one in E's reach gives its hand to the key chip",
+			str(room.hand_rows()))
+		room.switch_near()
+		_check(tried.has(String(lamp)) and room.hand_rows().is_empty(),
+			"working one takes the hand off every %s" % lamp, str(room.hand_rows()))
+		_check(_main.get(&"switch_tried") == tried, "the lake owns the tried list it saves", "")
+		_check(bool(_main.call(&"save_game")), "the tried list saves", "")
+		tried.clear()
+		_check(bool(_main.call(&"load_game")) and tried.has(String(lamp)),
+			"and loads back", str(tried))
+		var dogs: Array = room.dogs()
+		for i in mini(dogs.size(), cools.size()):
+			(dogs[i] as ShedRoom.ShedDog).pet_cool = cools[i]
+	# The angler's hand (2026-10-03): four frames, a pixel's bob on the middle two, the star
+	# winking on them, and nothing in it but its own tones, the ink, the nail and the gold.
+	_check(ShedRoom.HAND_BOBS == [0, 1, 1, 0] and ShedRoom.hand_frame(0.0) == 0
+		and ShedRoom.hand_frame(0.35) == 1 and ShedRoom.hand_frame(0.96) == 0,
+		"the hand loops on four frames, bobbing on the middle two", "")
+	var allowed := [ShedRoom.HAND_INK, ShedRoom.HAND_STAR_GOLD, ShedRoom.HAND_STAR_PALE]
+	allowed.append_array(ShedRoom.HAND_SKIN.values())
+	allowed.append_array(ShedRoom.HAND_SHIRT.values())
+	allowed.append_array(ShedRoom.HAND_NAIL)
+	var stray := 0
+	for f in 4:
+		for c: Color in ShedRoom.hand_pixels(f).values():
+			if not allowed.has(c):
+				stray += 1
+	var rest := ShedRoom.hand_pixels(0)
+	var wink := ShedRoom.hand_pixels(1)
+	_check(stray == 0 and wink.size() > rest.size()
+		and wink.get(ShedRoom.HAND_STAR_AT) == ShedRoom.HAND_STAR_PALE,
+		"the hand is the angler's tones only, and its star winks", "%d stray" % stray)
+	# The hand asks the face the piece stands in (2026-10-03): a piece turned to a face where E
+	# does nothing wears none, and wears it again turned back.
+	var two_faced := &""
+	var dead_view := -1
+	var live_view := -1
+	for name: String in sheets.states.keys():
+		var piece := StringName(name)
+		if not sheets.has(piece):
+			continue
+		var dead := -1
+		var live := -1
+		for v in sheets.view_count(piece):
+			if sheets.switched(piece, v) < 0:
+				dead = v
+			else:
+				live = v
+		if dead >= 0 and live >= 0:
+			two_faced = piece
+			dead_view = dead
+			live_view = live
+			break
+	if two_faced != &"":
+		tried.clear()
+		decor.clear()
+		room.carrying = &""
+		room.place(two_faced, Vector2i(ShedRoom.CELL * 10, ShedRoom.CELL * 10), dead_view)
+		room.set(&"_you_at", Vector2(30.0, 30.0))
+		_check(room.hand_rows().is_empty(), "no hand over a %s turned to a face that does not switch" % two_faced,
+			"view %d" % dead_view)
+		decor[0]["view"] = live_view
+		_check(room.hand_rows().size() == 1, "and the hand back when it is turned to one that does", "")
+		decor.clear()
+	else:
+		_check(false, "a piece with a face that switches and one that does not, for the hand", "")
+	# Every back sit says where its backrest begins, and lies inside its own picture.
+	var bad_backs := []
+	for piece: StringName in ShedRoom.RESTS:
+		var views: Dictionary = ShedRoom.RESTS[piece]
+		for v: int in views:
+			var spec: Array = views[v]
+			if StringName(spec[0]) != &"back":
+				continue
+			if spec.size() < 4 or (sheets.has(piece)
+					and int(spec[3]) >= int(sheets.view_region_of(piece, v).size.y)):
+				bad_backs.append("%s/%d" % [piece, v])
+	_check(bad_backs.is_empty(), "every back sit has its backrest row inside its picture", str(bad_backs))
+	# Both lamps switch (2026-10-03): off out of the store, lit on E, a warm pool.
+	for light_piece: StringName in [&"decor_pk_table_lamp", &"decor_pk_floor_lamp"]:
+		if not sheets.has(light_piece):
+			_check(false, "%s is in the catalogue" % light_piece, "")
+			continue
+		_check(sheets.switched(light_piece, 0) >= 0 and not sheets.is_on(light_piece, 0)
+			and sheets.is_on(light_piece, sheets.switched(light_piece, 0))
+			and sheets.light_of(light_piece) == &"warm",
+			"%s comes out off, switches on and gives a warm light" % light_piece,
+			String(sheets.light_of(light_piece)))
+	# The fridge stands without the pack's puddle under it (2026-10-03).
+	if sheets.has(&"decor_pk_fridge"):
+		var atlas := Image.load_from_file(ProjectSettings.globalize_path("res://assets/decor_pack_clean.png"))
+		var puddle := [Color8(185, 204, 204).to_rgba32(), Color8(121, 140, 140).to_rgba32(),
+			Color8(165, 184, 184).to_rgba32(), Color8(209, 228, 228).to_rgba32()]
+		var wet := 0
+		for v in sheets.view_count(&"decor_pk_fridge"):
+			var r := sheets.view_region_of(&"decor_pk_fridge", v)
+			for y in range(int(r.end.y) - 10, int(r.end.y)):
+				for x in range(int(r.position.x), int(r.end.x)):
+					var c := atlas.get_pixel(x, y)
+					if c.a > 0.0 and puddle.has(Color(c.r, c.g, c.b, 1.0).to_rgba32()):
+						wet += 1
+		_check(wet == 0, "no puddle under any face of the fridge", "%d puddle pixels" % wet)
+	tried.clear()
+	tried.append_array(tried_kept)
 	decor.clear()
 	decor.append_array(kept)
 	if not was_open:
@@ -4280,6 +4565,8 @@ func _check_shed_dogs(room: ShedRoom) -> void:
 		return
 	_check_shed_pet(room)
 	_check_shed_rest(room)
+	_check_shed_cues(room)
+	_check_shed_paths(room)
 	# The room has to be on screen: `_room_shown` is what rolls the dogs, and it does
 	# nothing at all for a room nobody is looking at. Opening it also re-points `decor` at
 	# the lake's own array, so the furniture goes down after the door is open, not before.
@@ -6083,6 +6370,42 @@ func _find_greedy_controls(node: Node, into: Array[String]) -> void:
 ## — a headless pointer sits at the origin, which is an edge.
 ## The five signals of 2026-09-26: fewer droppings, the purse running down, the haul's count
 ## over the angler, the last pieces marked, and the wildlife moment.
+## The camera tip (2026-10-03, Richard): nothing before ten minutes of play, the card on the
+## camera button after, gone for good on a click, saved, and an old save without the key
+## reading as not seen.
+func _check_camera_tip() -> void:
+	var was_play: float = _main.get(&"_play")
+	var was_seen: bool = _main.get(&"_camera_tip_seen")
+	_main.set(&"_camera_tip_seen", false)
+	_main.set(&"_camera_tip_left", -1.0)
+	_main.set(&"_play", Lake.CAMERA_TIP_AT - 5.0)
+	_main.call(&"_camera_tip_step", 0.1)
+	var tip: TourCard = _main.get(&"_camera_tip")
+	_check(tip == null or not tip.visible, "no camera tip before ten minutes of play", "")
+	_main.set(&"_play", Lake.CAMERA_TIP_AT + 1.0)
+	_main.call(&"_camera_tip_step", 0.1)
+	tip = _main.get(&"_camera_tip")
+	var button: Control = _main.get(&"_free_camera")
+	if Pad.is_pad() or not button.visible:
+		_check(true, "camera tip skipped: pad mode or no button in this run", "")
+	else:
+		_check(tip != null and tip.visible and tip.closable
+			and tip.target == button.get_global_rect() and tip.text == Text.CAMERA_TIP,
+			"after ten minutes the tip points at the camera button with its words",
+			str(tip.target) if tip != null else "none")
+		tip.next_asked.emit()
+		_check(bool(_main.get(&"_camera_tip_seen")) and not tip.visible,
+			"a click on the card takes it down for good", "")
+		_main.call(&"_camera_tip_step", 0.1)
+		_check(not tip.visible, "and it does not come back", "")
+	var source := FileAccess.get_file_as_string("res://scripts/lake.gd")
+	_check(source.contains('"camera_tip": _camera_tip_seen')
+		and source.contains('save.get("camera_tip", false)'),
+		"the save carries the flag, and a save without it reads as not seen", "")
+	_main.set(&"_play", was_play)
+	_main.set(&"_camera_tip_seen", was_seen)
+
+
 func _check_signals(cam: Camera2D) -> void:
 	# Pigeons: only a bird in the air drops anything, and at half the old rate.
 	var flock_src := FileAccess.get_file_as_string("res://scripts/flock.gd")

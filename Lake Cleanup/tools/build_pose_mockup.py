@@ -121,7 +121,21 @@ def sit_back(breathe=0):
     """Back to the camera: three rows of leg out, the piece in front hides what is left."""
     im = rows_cut(idle("north"), 32, 3)
     im = chest_breath(im, 19, 28, 14) if breathe else chest_breath(im, None, None, None)
-    return im, 30
+    return drop_basket(im), 30
+
+
+def drop_basket(im):
+    """The basket put down while sitting with his back to the room (2026-10-03, Richard): the
+    seat is drawn under him now and only the backrest over him, so the basket hanging by his
+    side showed beside a narrow chair. Cleared from under the hand (the hand stays, its
+    fingertip given an outline pixel under it). Measured off the north idle frame."""
+    im = im.copy()
+    for y in range(im.height):
+        for x in range(im.width):
+            if (y >= 32 and x >= 24) or (y == 31 and x >= 29):
+                im.putpixel((x, y), (0, 0, 0, 0))
+    im.putpixel((27, 32), INK)
+    return im
 
 
 # The books off the shelf: a cover colour, its spine's shade, and what is on the cover. One is
@@ -198,8 +212,22 @@ def basket():
 
 
 def lying():
-    """Head on the pillow, the blanket over the rest (bed art is front-on, headboard up)."""
-    return idle("south").crop((0, 0, 32, 16))
+    """Face up on a pillow at the bed's far end: the hat, the face and the beard down to the
+    chin (2026-10-03: it was the hat alone, sixteen rows, and read as a hat on the headboard).
+    The room draws the bed's own blanket back over the chin (`ShedRoom.LIES`)."""
+    return idle("south").crop((0, 0, 32, 24))
+
+
+def lying_back():
+    """The pillow at the bed's near end, behind the board nearest the camera: the back of the
+    hat, which the room cuts off at the board's top."""
+    return idle("north").crop((0, 0, 32, 15))
+
+
+def lying_side(head_left=True):
+    """Seen from the side: the face-up head turned a quarter, the crown towards the pillow.
+    A whole quarter turn, so no pixel is resampled."""
+    return lying().rotate(90 if head_left else -90, expand=True)
 
 
 def big(im, k=MAN):

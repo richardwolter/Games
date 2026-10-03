@@ -910,3 +910,30 @@ static var DECOR_PK_POTTED_TREE: String:
 
 static var DECOR_PK_TABLE_LAMP: String:
 	get: return TranslationServer.translate(&"DECOR_PK_TABLE_LAMP")
+
+static var CAMERA_TIP: String:
+	get: return TranslationServer.translate(&"CAMERA_TIP")
+
+static var DECOR_PK_ROSE_VASE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_ROSE_VASE")
+
+static var DECOR_PK_LEAFY_POT: String:
+	get: return TranslationServer.translate(&"DECOR_PK_LEAFY_POT")
+
+static var DECOR_PK_FLOOR_LAMP: String:
+	get: return TranslationServer.translate(&"DECOR_PK_FLOOR_LAMP")
+
+static var DECOR_PK_DRINKS_CART: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DRINKS_CART")
+
+static var DECOR_PK_STRIPED_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_STRIPED_RUG")
+
+static var DECOR_PK_OVAL_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_OVAL_RUG")
+
+static var DECOR_PK_RUNNER_RUG: String:
+	get: return TranslationServer.translate(&"DECOR_PK_RUNNER_RUG")
+
+static var DECOR_PK_DECORATED_TABLE: String:
+	get: return TranslationServer.translate(&"DECOR_PK_DECORATED_TABLE")

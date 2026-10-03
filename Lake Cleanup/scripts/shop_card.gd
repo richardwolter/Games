@@ -52,9 +52,25 @@ const NET_WATER_LIFT := 0.45
 ## The luck box's heap: what it starts with, and the most it grows to before starting over.
 const HEAP_START := 4
 const HEAP_MOST := 9
-## The dogs' strip: far bank, lake band, lawn, as shares of the card's height.
-const BANK_TO := 0.26
-const LAKE_TO := 0.50
+## The dogs' card is the wash room's view from the island in miniature (2026-10-03,
+## `/grill-me` with Richard: "current 1st person view, with less detailing... a bit
+## grimy"): stepped sky, the far wood on the horizon, the lake running towards the eye in
+## bands that widen as they come near, the island's beach and the lawn the dogs run on. As
+## shares of the card's height: where the far wood stands, where the lake meets the beach
+## and where the beach meets the lawn.
+const HORIZON := 0.30
+const SHORE := 0.60
+const LAWN := 0.68
+## How many bands the lake is drawn in, the far one thinnest (`LAKE_BEND` the power the
+## band edges are spread by), and how many pieces float on it.
+const LAKE_BANDS := 5
+const LAKE_BEND := 1.8
+const DOG_LAKE_PIECES := 5
+## Only pieces no bigger than this, in art px, float on the dogs' card: the card is a few
+## dozen pixels tall and a bottle at the lake's grain would stand half as tall as the lake.
+const DOG_PIECE_MOST := 9.0
+## The far wood's crowns: how tall the tallest stands over the horizon, as a share of it.
+const WOOD_TALL := 0.42
 ## A dog's run: pixels a second, and the wait off frame before it comes back.
 const DOG_SPEED := Vector2(70.0, 120.0)
 const DOG_WAIT := Vector2(0.4, 2.6)
@@ -86,6 +102,8 @@ var _ramp_dirty: Array = []
 var _ramp_clean: Array = []
 var _grass: Array = []
 var _bank: Array = []
+var _ramp_murky: Array = []
+var _sky: Array = []
 
 
 func _ready() -> void:
@@ -98,11 +116,15 @@ func _ready() -> void:
 		_ramp_clean = [pal.water_clean_deep, pal.water_clean_mid, pal.water_clean_shallow, pal.water_clean_light]
 		_grass = [pal.grass_dark, pal.grass_light]
 		_bank = [pal.grass_dark.darkened(0.45), pal.grass_dark.darkened(0.25), pal.sand]
+		_ramp_murky = [pal.water_murky_deep, pal.water_murky_mid, pal.water_murky, pal.water_murky_shallow, pal.water_murky_light]
+		_sky = [pal.sky_noon_high, pal.sky_noon_high.lerp(pal.sky_noon_low, 0.5), pal.sky_noon_low]
 	else:
 		_ramp_dirty = [Color(0.16, 0.2, 0.1), Color(0.22, 0.28, 0.12), Color(0.3, 0.36, 0.16), Color(0.4, 0.46, 0.22)]
 		_ramp_clean = [Color(0.1, 0.3, 0.5), Color(0.15, 0.4, 0.6), Color(0.25, 0.55, 0.7), Color(0.5, 0.75, 0.85)]
 		_grass = [Color(0.2, 0.4, 0.15), Color(0.35, 0.55, 0.2)]
 		_bank = [Color(0.08, 0.2, 0.08), Color(0.12, 0.28, 0.1), Color(0.8, 0.7, 0.5)]
+		_ramp_murky = [Color(0.12, 0.22, 0.2), Color(0.16, 0.28, 0.24), Color(0.2, 0.34, 0.28), Color(0.27, 0.42, 0.33), Color(0.36, 0.5, 0.4)]
+		_sky = [Color(0.45, 0.65, 0.85), Color(0.55, 0.72, 0.88), Color(0.65, 0.8, 0.9)]
 	if ResourceLoader.exists(BOX_ART):
 		_box = load(BOX_ART)
 		_box_front = Yard._cut_front(Art.image(BOX_ART))
@@ -234,29 +256,68 @@ func _lay_net(box: Rect2) -> void:
 	_net.queue_redraw()
 
 
-## The dogs' strip: a far bank of dark trees on sand, a band of clean lake (no ferry since
-## 2026-09-27), and the lawn the four dogs run across.
+## The dogs' card: the view from the island (see `HORIZON`), murky water with a few pieces
+## of the lake's rubbish on it, and the pack running across the lawn in front.
 func _draw_strip(box: Rect2) -> void:
-	var bank_to := _snap(box.size.y * BANK_TO)
-	var lake_to := _snap(box.size.y * LAKE_TO)
-	draw_rect(Rect2(0.0, 0.0, box.size.x, bank_to), _bank[0], true)
-	# Tree crowns: stepped bumps along the top, two tones.
-	var x := 0.0
+	var w := box.size.x
+	var h := box.size.y
+	var horizon := _snap(h * HORIZON)
+	var shore := _snap(h * SHORE)
+	var lawn := _snap(h * LAWN)
+	# The sky, in flat steps from high to low.
+	for i in _sky.size():
+		var top := _snap(horizon * float(i) / float(_sky.size()))
+		draw_rect(Rect2(0.0, top, w, horizon - top), _sky[i], true)
+	# The far wood: crowns of two greens standing on the horizon, a strip of sand under them.
+	var x := -PIXEL * 2.0
 	var k := 0
-	while x < box.size.x:
-		var wide := _snap(10.0 + float((k * 37) % 9) * 2.0)
-		var tall := _snap(6.0 + float((k * 53) % 7) * 2.0)
-		draw_rect(Rect2(x, bank_to - tall - PIXEL * 2.0, wide, tall), _bank[1], true)
-		draw_rect(Rect2(x + PIXEL, bank_to - tall - PIXEL * 2.0, PIXEL * 2.0, PIXEL), _grass[0], true)
-		x += wide - PIXEL
+	while x < w:
+		var wide := _snap(8.0 + float((k * 37) % 7) * 2.0)
+		var tall := _snap(horizon * WOOD_TALL * (0.55 + 0.45 * float((k * 53) % 5) / 4.0))
+		draw_rect(Rect2(x, horizon - tall, wide, tall), _bank[0] if k % 3 == 0 else _bank[1], true)
+		draw_rect(Rect2(x + PIXEL, horizon - tall, PIXEL * 2.0, PIXEL), _grass[0], true)
+		x += wide - PIXEL * 2.0
 		k += 1
-	draw_rect(Rect2(0.0, bank_to - PIXEL * 2.0, box.size.x, PIXEL * 2.0), _bank[2], true)
-	_draw_water(Rect2(0.0, bank_to, box.size.x, lake_to - bank_to), _ramp_clean, false)
-	draw_rect(Rect2(0.0, lake_to, box.size.x, PIXEL * 2.0), _bank[2], true)
-	draw_rect(Rect2(0.0, lake_to + PIXEL * 2.0, box.size.x, box.size.y), _grass[1], true)
+	draw_rect(Rect2(0.0, horizon - PIXEL, w, PIXEL), _bank[2].darkened(0.15), true)
+	# The lake, in bands that widen towards the eye: deep and dark far off, lighter near.
+	var lake := Rect2(0.0, horizon, w, shore - horizon)
+	for b in LAKE_BANDS:
+		var t := pow(float(b) / float(LAKE_BANDS), LAKE_BEND)
+		var y := _snap(lake.position.y + lake.size.y * t)
+		draw_rect(Rect2(0.0, y, w, shore - y), _ramp_murky[mini(b, _ramp_murky.size() - 2)], true)
+	# Streaks one step up the ramp, drifting faster the nearer they are, blinking in and out.
+	var step := floorf(_time * 8.0) / 8.0
+	for i in 10:
+		var spot: Dictionary = _spots[i]
+		var near := float(spot["y"])
+		var y := _snap(lake.position.y + lake.size.y * pow(near, 1.0 / LAKE_BEND))
+		if not sin(step * 1.3 + float(spot["phase"])) > -0.3:
+			continue
+		var long := _snap(4.0 + 10.0 * near)
+		var at := fposmod(float(spot["x"]) * w + step * (2.0 + 6.0 * near), w + 20.0) - 10.0
+		draw_rect(Rect2(_snap(at), y, long, PIXEL), _ramp_murky[4], true)
+	# A few flecks of scum, the "bit grimy".
+	var scum := Color(_ramp_murky[4], 0.7)
+	var pal := Palette.master()
+	if pal != null:
+		scum = Color(pal.foam_dirty, 0.55)
+	for i in range(10, 22):
+		var spot: Dictionary = _spots[i]
+		var at := Vector2(
+			fposmod(float(spot["x"]) * w + step * 2.0, w),
+			lake.position.y + lake.size.y * pow(float(spot["y"]), 0.7)
+		)
+		for j in 3:
+			var off := Vector2(float((j * 5 + i) % 3) - 1.0, float((j * 3 + i) % 2)) * PIXEL
+			draw_rect(Rect2((at + off).snapped(Vector2.ONE * PIXEL), Vector2.ONE * PIXEL), scum, true)
+	_draw_lake_pieces(lake)
+	# The island's beach, its wet edge, and the lawn.
+	draw_rect(Rect2(0.0, shore, w, lawn - shore), _bank[2], true)
+	draw_rect(Rect2(0.0, shore, w, PIXEL), _bank[2].darkened(0.25), true)
+	draw_rect(Rect2(0.0, lawn, w, h - lawn), _grass[1], true)
 	for i in 14:
-		var s: Dictionary = _spots[i]
-		var at := Vector2(float(s["x"]) * box.size.x, lake_to + PIXEL * 3.0 + float(s["y"]) * (box.size.y - lake_to))
+		var spot: Dictionary = _spots[i]
+		var at := Vector2(float(spot["x"]) * w, lawn + PIXEL + float(spot["y"]) * (h - lawn))
 		draw_rect(Rect2(at.snapped(Vector2.ONE * PIXEL), Vector2(PIXEL, PIXEL * 2.0)), _grass[0], true)
 	var order: Array = _dogs.duplicate()
 	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["y"]) < float(b["y"]))
@@ -266,13 +327,44 @@ func _draw_strip(box: Rect2) -> void:
 		var slot := int(dog["slot"])
 		var breed := slot
 		var pose: StringName = DogArt.gait(slot, false, breed)
-		var foot := Vector2(_snap(float(dog["x"])), lake_to + (box.size.y - lake_to) * float(dog["y"]))
+		var foot := Vector2(_snap(float(dog["x"])), lawn + (h - lawn) * float(dog["y"]))
 		var shade := Color(0.0, 0.0, 0.0, 0.25)
 		draw_rect(Rect2(foot.x - float(dog["tall"]) * 0.45, foot.y - PIXEL, float(dog["tall"]) * 0.9, PIXEL * 2.0), shade, true)
 		DogArt.stamp(
 			self, pose, DogArt.frame_at(pose, float(dog["age"]), breed), foot,
 			float(dog["tall"]), float(dog["way"]) < 0.0, 0.0, Color.WHITE, breed
 		)
+
+
+## The rubbish on the dogs' card's lake: the lake's own sprites at its grain, smaller the
+## further off, bobbing a pixel, cut at the waterline so they float rather than stand.
+func _draw_lake_pieces(lake: Rect2) -> void:
+	var small: Array = []
+	for art: Dictionary in rubbish:
+		var region: Rect2 = art["region"]
+		if maxf(region.size.x, region.size.y) <= DOG_PIECE_MOST:
+			small.append(art)
+	if small.is_empty():
+		return
+	var step := floorf(_time * 4.0)
+	var order: Array = []
+	for i in DOG_LAKE_PIECES:
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return float(_spots[a]["y"]) < float(_spots[b]["y"]))
+	for i: int in order:
+		var spot: Dictionary = _spots[i]
+		var near := 0.25 + 0.7 * float(spot["y"])
+		var art: Dictionary = small[int(spot["kind"]) % small.size()]
+		var region: Rect2 = art["region"]
+		var grain := 1.0
+		var drawn := (region.size * grain).round()
+		var water := lake.position.y + lake.size.y * near
+		var bob := 1.0 if int(step + i) % 2 == 0 else 0.0
+		var x := roundf(float(spot["x"]) * (lake.size.x - drawn.x))
+		# The bottom fifth is under the water.
+		var shown := Rect2(region.position, Vector2(region.size.x, region.size.y * 0.8))
+		var at := Vector2(x, roundf(water - drawn.y * 0.8) + bob)
+		draw_texture_rect_region(art["sheet"], Rect2(at, Vector2(drawn.x, roundf(drawn.y * 0.8))), shown)
 
 
 func _step_dogs(delta: float) -> void:
@@ -290,13 +382,13 @@ func _step_dogs(delta: float) -> void:
 
 func _new_run(slot: int, first: bool) -> Dictionary:
 	var way := 1.0 if _roll.randf() < 0.5 else -1.0
-	var y := _roll.randf_range(0.55, 1.0)
+	var y := _roll.randf_range(0.6, 1.0)
 	return {
 		"slot": slot, "way": way, "y": y,
 		# The first runs start somewhere across the card, so it is never empty when opened.
 		"x": _roll.randf_range(20.0, 280.0) if first else (-40.0 if way > 0.0 else maxf(size.x, 300.0) + 40.0),
 		"speed": _roll.randf_range(DOG_SPEED.x, DOG_SPEED.y),
-		"tall": lerpf(DOG_TALL.x, DOG_TALL.y, (y - 0.55) / 0.45),
+		"tall": lerpf(DOG_TALL.x, DOG_TALL.y, (y - 0.6) / 0.4),
 		"age": _roll.randf() * 2.0,
 		"wait": 0.0 if first else _roll.randf_range(DOG_WAIT.x, DOG_WAIT.y),
 	}
