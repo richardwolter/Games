@@ -4423,6 +4423,51 @@ venv python; the sheet still shows lake option C and wash sky option 3 as judged
 - `test_lake`'s `_check_sky_reflect` guards the honest-map rule, the push, the hour's tint and
   the clouds' feet. Probes: `tools/shot_pump.tscn`, `tools/shot_nature.tscn`.
 
+### Songbirds on the Shores (2026-10-03, `/grill-me` with Richard)
+Kelano Studio's Wild Birds pack (bought, `art_source/birds/`): sparrow, tit, bluebird and
+cardinal. **The cockatoo and the parrot are not used, by decision.** `Wildlife` "songbirds".
+- **Art**: `tools/build_wildlife.py` `songbird` reads the four 32 px sheets (fly 4, idle,
+  peck and walk 5 frames each), halves them by the frog rule (`halve_inked`: each 2x2 block
+  to its commonest colour, but an edge pixel keeps its block's darkest pixel if that is
+  outline-dark, `BIRD_INK`, so the painted outline survives) and mirrors them to face left
+  like every critter. They go onto `critters.png` as `bird_<species>_<anim><n>`, the ground
+  poses on one shared crop and the flight on another, so a bird does not shift between
+  frames. **The painted colours are kept** (Richard), not recoloured onto the palette.
+  Drawn at one world px a painted px (`BIRD_SCALE` 0.5 of the critters' 2), about 16x12.
+  Contact sheet: `tools/last_bird_sheet.png` (not written by the builder; the session's).
+- **Where**: the sand of both shores and the island's lawn (`_bird_ground`), never the water
+  and never the bank's lawn, off the hut, the pump, the hive and the crate.
+  `_find_bird_spots` deals `BIRD_SPOTS_PER_SHORE` spots round every shore spot, up to
+  `BIRD_WATER_REACH` (3.5) tiles inland, each keeping its shore spot.
+- **When**: a spot is open only while its shore spot's water is clean on the honest map
+  (Richard: "they should come in as there is clean water close"). The count is
+  `ceil(SONGBIRDS_MOST * stage)` (24) from the first clean water; one flies in at a time,
+  `BIRD_GAP` apart, from `BIRD_FROM` off the lake. Species in equal shares.
+- **Behaviour**: on the ground a bird idles, walks a little (pulled back to its spot) or
+  pecks one to `PECKS_MOST` times, **each peck's lowest frame on the beat** (`_peck_lead`,
+  `_bird_on_cue`, the frogs' cue rule). Something moving inside `BIRD_WARY` (2.6 tiles)
+  sends it walking off; inside `BIRD_SHY` (1.4) or a net landing, it flushes to another open
+  spot `BIRD_FLUSH_LEAST`..`BIRD_FLUSH_REACH` tiles off, or off the lake if there is none.
+  They read the walkers' threats only, as the ducks do: a ferry at the island berth would
+  flush the island's birds every few seconds. Still walkers are obstacles.
+- **Shadows (One Sun)**: on the ground the bird's own picture laid by `_lay` in the ink of
+  what it stands on; in flight the silhouette thrown from the ground point plus
+  `Shade.drop` of its height, shrunk and thinned with it (`BIRD_SHADE_ALT`). Grounded at z 6
+  with the other animals, flying at z 20, shadows on the ground layer.
+- **Sound** (Ambience bus, within `Dog.HEAR`): `Sfx.play_songbird`, one of the forest chirp
+  takes on its own `SONGBIRD_GAP` at `SONGBIRD_DB`; `Sfx.play_flush`, the pigeon's wings at
+  `FLUSH_DB` and pitch 1.25 on `FLUSH_GAP`.
+- **A songbird counts for the wildlife moment** and is likely the first animal of a run.
+- Credited as "Kelano Studio" on the credits board (not asked for; the Kipperfalcon rule).
+- **Out of scope, by decision**: the cockatoo and the parrot, palette recolouring, landing on
+  water or perching on rubbish (the pigeons'), the bank's lawn, sand prints, new recordings.
+- All numbers first guesses. `test_lake`'s `_check_songbirds` guards the spots (dry, none on
+  the bank's lawn, some on the island's), every frame, no cockatoo or parrot, none before the
+  first clean water, one at a time, only to an open spot, the landing on dry ground, the
+  peck's lead, the walk away and the flush, and the shadow code. Probe:
+  `tools/shot_nature.tscn`'s "birds" stage saves `tools/last_nature_bird_<species>.png` and
+  `last_nature_bird_fly.png`.
+
 ### The Lakebed Through Clean Water (2026-09-30, `/grill-me` with Richard, after Spilled!)
 Clean water is see-through to a lakebed of sand, rocks, branches, water plants and shells. The
 bottom showing is the reward for clearing a bay, the way oil lifting is in Spilled!. Picked

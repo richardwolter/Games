@@ -41,6 +41,42 @@ const FROGS_MOST := 30
 const TURTLES_MOST := 14
 const BROODS_MOST := 5
 const DRAGONFLIES_MOST := 20
+## Songbirds (2026-10-03, `/grill-me` with Richard): Kelano Studio's Wild Birds, four kinds,
+## on the sand of both shores and the island's lawn, never on the water. A landing spot is
+## open only when the shore water beside it is clean; how many are about is the clean share.
+const SONGBIRDS_MOST := 24
+const BIRD_SPECIES: Array[String] = ["sparrow", "tit", "bluebird", "cardinal"]
+## The pack's 32 px cells are halved by the builder; drawn at one world px a painted px.
+const BIRD_SCALE := 0.5
+## How far up the beach (or onto the island's lawn) from its shore water a spot may be, tiles.
+const BIRD_WATER_REACH := 3.5
+## Spots dealt round each shore spot, once, at build.
+const BIRD_SPOTS_PER_SHORE := 3
+## Something moving inside BIRD_WARY walks a bird away; inside BIRD_SHY it flies. Tiles.
+const BIRD_WARY := 2.6
+const BIRD_SHY := 1.4
+## How far a flushed bird looks for somewhere else to land, tiles; none, it leaves the lake.
+const BIRD_FLUSH_REACH := 7.0
+const BIRD_FLUSH_LEAST := 2.0
+const BIRD_WALK := 12.0
+const BIRD_SCURRY := 30.0
+const BIRD_FLY := 120.0
+const BIRD_HOP_ARC := 28.0
+const BIRD_FROM := 700.0
+const BIRD_IN_ALT := 140.0
+const BIRD_GAP := Vector2(1.5, 5.0)
+const BIRD_IDLE := Vector2(1.0, 4.0)
+const BIRD_IDLE_FPS := 5.0
+const BIRD_FLY_FPS := 12.0
+## One walk frame every this many world px walked: the feet step with the ground covered.
+const BIRD_STEP_PX := 2.5
+## A peck: PECK_TIME seconds over the five frames, the head lowest at PECK_HIT of the way,
+## which is what lands on the beat. A bird pecks one to PECKS_MOST times, a beat apart.
+const PECK_TIME := 0.42
+const PECK_HIT := 0.5
+const PECKS_MOST := 3
+## The flying shadow shrinks and thins with height, as the ducks' does, up to this altitude.
+const BIRD_SHADE_ALT := 120.0
 ## Rabbits and foxes (2026-09-25): the outer bank's land animals, never the island. Rabbits
 ## from the first clean shore, foxes rarer and late, both on the bank's sand.
 const RABBITS_MOST := 8
@@ -219,6 +255,10 @@ var _turtles: Array = []
 var _broods: Array = []
 var _flies: Array = []
 var _critters_on_land: Array = []
+## Songbirds, and every spot one may land on: {at (world), shore (index into `_shore`), side}.
+var _birds: Array = []
+var _bird_spots: Array = []
+var _bird_in := 2.0
 var _reckon_in := 0.0
 ## A probe's hold: while set, no animal arrives or is topped up (the store shots lay the
 ## life out by hand and must not have it refilled behind them).
@@ -352,6 +392,18 @@ func shore_count() -> int:
 	return _shore.size()
 
 
+func songbird_count() -> int:
+	return _birds.size()
+
+
+func songbirds() -> Array:
+	return _birds
+
+
+func bird_spots() -> Array:
+	return _bird_spots
+
+
 func frogs() -> Array:
 	return _frogs
 
@@ -384,6 +436,7 @@ func reset() -> void:
 	_broods.clear()
 	_flies.clear()
 	_critters_on_land.clear()
+	_birds.clear()
 	_track_at.resize(0)
 	_track_age.resize(0)
 
@@ -406,6 +459,9 @@ func scare(at: Vector2, reach_tiles: float = DUCK_SHY) -> void:
 	for c: Dictionary in _critters_on_land:
 		if (c["at"] as Vector2).distance_to(at) < reach:
 			_land_fright(c, at)
+	for s: Dictionary in _birds:
+		if (s["at"] as Vector2).distance_to(at) < maxf(reach, Iso.tile_circle_extent(BIRD_SHY)):
+			_bird_flush(s, at)
 
 
 ## Beats since the song began, and a beat's length in seconds. See MusicStation.beat_clock.
@@ -447,7 +503,11 @@ func _process(delta: float) -> void:
 		_fly_step(d, delta, seen)
 	for c: Dictionary in _critters_on_land:
 		_land_step(c, delta, seen)
-	_frogs = _frogs.filter(func(f: Dictionary) -> bool: return not f.get("gone", false))
+	_bird_in -= delta
+	for s: Dictionary in _birds:
+		_bird_step(s, delta, seen_by_ducks)
+	_birds = _birds.filter(func(s: Dictionary) -> bool: return not s.get("gone", false))
+	_frogs =_frogs.filter(func(f: Dictionary) -> bool: return not f.get("gone", false))
 	_turtles = _turtles.filter(func(t: Dictionary) -> bool: return not t.get("gone", false))
 	_broods = _broods.filter(func(b: Dictionary) -> bool: return not b.get("gone", false))
 	_flies = _flies.filter(func(d: Dictionary) -> bool: return not d.get("gone", false))
@@ -511,6 +571,7 @@ func _find_shore() -> void:
 		if edge == Vector2.INF:
 			continue
 		_add_shore(edge + dir * 1.0, edge - dir * 1.1, -dir, "bank")
+	_find_bird_spots()
 
 
 ## Where along a ray a function goes from negative to positive, to a twentieth of a tile.
@@ -646,6 +707,12 @@ func _reckon() -> void:
 	if not shore.is_empty() or not _pads.is_empty():
 		for n in maxi(_want(DRAGONFLIES_MOST) - _flies.size(), 0):
 			_flies.append(_new_fly(shore))
+	# Songbirds fly in one at a time, `BIRD_GAP` apart, to a spot with clean water beside it.
+	if _birds.size() < _want(SONGBIRDS_MOST) and _bird_in <= 0.0:
+		var s := _new_bird()
+		if not s.is_empty():
+			_birds.append(s)
+			_bird_in = _rng.randf_range(BIRD_GAP.x, BIRD_GAP.y)
 	if none_yet and _alive() > 0:
 		first_arrived.emit(_first_spot())
 
@@ -659,7 +726,8 @@ func hears(at: Vector2) -> bool:
 
 ## Every animal on the lake, of every kind.
 func _alive() -> int:
-	return _frogs.size() + _turtles.size() + _broods.size() + _flies.size() + _critters_on_land.size()
+	return _frogs.size() + _turtles.size() + _broods.size() + _flies.size() + _critters_on_land.size() \
+		+ _birds.size()
 
 
 ## Where the first animal of a fresh lake is headed: the spot the moment is framed on. A frog,
@@ -676,6 +744,8 @@ func _first_spot() -> Vector2:
 		return d["home"]
 	for b: Dictionary in _broods:
 		return b.get("to", b.get("at", Vector2.ZERO))
+	for s: Dictionary in _birds:
+		return s.get("to", s.get("at", Vector2.ZERO))
 	return Vector2.ZERO
 
 
@@ -1239,6 +1309,284 @@ func _draw_land(on: CanvasItem, c: Dictionary) -> void:
 	_stamp(on, name, (c["at"] as Vector2).round() - Vector2(0.0, lift), float(c["facing"]), Color(1.0, 1.0, 1.0, float(c["fade"])))
 
 
+# ---- songbirds ---------------------------------------------------------------------------
+
+enum Bird { GROUND, FLY }
+enum Pose { IDLE, WALK, PECK }
+
+
+## Every spot a songbird may land: dealt once round each shore spot, from its own sand up to
+## `BIRD_WATER_REACH` tiles inland (onto the island's lawn, never the bank's), each keeping
+## the shore spot whose water decides whether it is open.
+func _find_bird_spots() -> void:
+	_bird_spots.clear()
+	var keep := RandomNumberGenerator.new()
+	keep.seed = 20261003
+	for i in _shore.size():
+		var spot: Dictionary = _shore[i]
+		var inland := -(spot["normal"] as Vector2)
+		var along := Vector2(-inland.y, inland.x)
+		var side := String(spot["side"])
+		for k in BIRD_SPOTS_PER_SHORE:
+			var at: Vector2 = (spot["land"] as Vector2) \
+				+ inland * Iso.tile_circle_extent(keep.randf_range(0.0, BIRD_WATER_REACH)) \
+				+ along * Iso.tile_circle_extent(keep.randf_range(-0.6, 0.6))
+			if _bird_ground(at, side):
+				_bird_spots.append({"at": at, "shore": i, "side": side})
+
+
+## Ground a songbird may stand or walk on: the island's sand and lawn, or the bank's sand, dry
+## and off the hut, the pump, the hive and the crate.
+func _bird_ground(at: Vector2, side: String) -> bool:
+	if _wet(at):
+		return false
+	if side == "bank":
+		return _on_sand(at, "bank")
+	var tile := Iso.world_to_tile(at)
+	if Iso.past_shelf(tile) > -0.15:
+		return false
+	if Iso.in_shed(tile.x, tile.y, Iso.SHED_COVER + 0.3) or Pump.covers(tile, 0.6) or Hive.covers(tile, 0.6):
+		return false
+	return crate_tile == Vector2.INF or not Yard.covers(crate_tile, tile, 0.6)
+
+
+## Is this spot open: is the water beside it clean, on the honest map.
+func _bird_open(spot: Dictionary) -> bool:
+	return _shore_clean(_shore[int(spot["shore"])])
+
+
+## A bird flies in from off the lake to an open spot.
+func _new_bird() -> Dictionary:
+	var open := _bird_spots.filter(func(sp: Dictionary) -> bool: return _bird_open(sp) and not _taken_by_still(sp["at"]))
+	if open.is_empty():
+		return {}
+	var spot: Dictionary = open[_rng.randi_range(0, open.size() - 1)]
+	var to: Vector2 = spot["at"]
+	var a := _rng.randf_range(0.0, TAU)
+	var from := to + Vector2(cos(a), sin(a) * 0.5) * BIRD_FROM
+	var s := {
+		"species": BIRD_SPECIES[_rng.randi_range(0, BIRD_SPECIES.size() - 1)],
+		"at": from, "alt": BIRD_IN_ALT, "fade": 0.0, "clock": _rng.randf() * 3.0,
+		"facing": 1.0, "spot": spot, "pose": Pose.IDLE, "timer": 0.0, "walked": 0.0,
+	}
+	_bird_fly(s, to, BIRD_IN_ALT, 0.0, 0.0)
+	return s
+
+
+## Off on a flight: from where it is (at `alt_from`) to `to` (at `alt_to`), arcing `arc`
+## higher in the middle. The ground point moves in a line; the height is the arc.
+func _bird_fly(s: Dictionary, to: Vector2, alt_from: float, alt_to: float, arc: float) -> void:
+	s["state"] = Bird.FLY
+	s["from"] = s["at"]
+	s["to"] = to
+	s["alt_from"] = alt_from
+	s["alt_to"] = alt_to
+	s["arc"] = arc
+	s["t"] = 0.0
+	s["facing"] = Flock.facing_of(s["at"], to)
+	s.erase("cue")
+
+
+func _bird_step(s: Dictionary, delta: float, seen: PackedVector2Array) -> void:
+	s["clock"] = float(s["clock"]) + delta
+	var at: Vector2 = s["at"]
+	if int(s["state"]) == Bird.FLY:
+		var span := (s["from"] as Vector2).distance_to(s["to"])
+		s["t"] = float(s["t"]) + delta * BIRD_FLY / maxf(span, 1.0)
+		var t := minf(float(s["t"]), 1.0)
+		s["at"] = (s["from"] as Vector2).lerp(s["to"], t)
+		s["alt"] = lerpf(float(s["alt_from"]), float(s["alt_to"]), t) + float(s["arc"]) * sin(t * PI)
+		if bool(s.get("leaving", false)):
+			s["fade"] = clampf((1.0 - t) / 0.3, 0.0, 1.0)
+		else:
+			s["fade"] = minf(float(s["fade"]) + delta / 0.6, 1.0)
+		if t >= 1.0:
+			if bool(s.get("leaving", false)):
+				s["gone"] = true
+				return
+			s["state"] = Bird.GROUND
+			s["alt"] = 0.0
+			_bird_idle(s)
+		return
+	# On the ground: anything moving close sends it off, a little closer and it flies.
+	var wary := Iso.tile_circle_extent(BIRD_WARY)
+	var shy := Iso.tile_circle_extent(BIRD_SHY)
+	for p in seen:
+		var d := p.distance_to(at)
+		if d < shy:
+			_bird_flush(s, p)
+			return
+		if d < wary and not bool(s.get("scurry", false)):
+			_bird_away(s, p)
+			break
+	if hears(at) and Sfx.main() != null and _rng.randf() < delta * 0.5:
+		Sfx.main().play_songbird()
+	match int(s["pose"]):
+		Pose.IDLE:
+			if s.has("cue"):
+				_bird_on_cue(s)
+			else:
+				s["timer"] = float(s["timer"]) - delta
+				if float(s["timer"]) <= 0.0:
+					_bird_choose(s)
+		Pose.PECK:
+			s["t"] = float(s["t"]) + delta / PECK_TIME
+			if float(s["t"]) >= 1.0:
+				s["pecks"] = int(s["pecks"]) - 1
+				if int(s["pecks"]) > 0:
+					s["pose"] = Pose.IDLE
+					s["cue"] = floorf(beat() + _peck_lead()) + 1.0
+				else:
+					_bird_idle(s)
+		Pose.WALK:
+			var to: Vector2 = s["to"]
+			var step := to - at
+			var go := (BIRD_SCURRY if bool(s.get("scurry", false)) else BIRD_WALK) * delta
+			if absf(step.x) > 0.3:
+				s["facing"] = Flock.facing_of(at, to)
+			if step.length() <= go:
+				s["at"] = to
+				s.erase("scurry")
+				_bird_idle(s)
+			else:
+				var next := _round(at, at + step.normalized() * go)
+				if not _bird_ground(next, String((s["spot"] as Dictionary)["side"])):
+					s.erase("scurry")
+					_bird_idle(s)
+				else:
+					s["walked"] = float(s["walked"]) + at.distance_to(next)
+					s["at"] = next
+
+
+func _bird_idle(s: Dictionary) -> void:
+	s["pose"] = Pose.IDLE
+	s["timer"] = _rng.randf_range(BIRD_IDLE.x, BIRD_IDLE.y)
+	s.erase("cue")
+
+
+## How many beats before its beat a peck starts so its lowest frame lands on it.
+func _peck_lead() -> float:
+	return PECK_TIME * PECK_HIT / beat_length()
+
+
+## What a standing bird does next: a run of pecks on its own coming beats, a few steps, or
+## another look round.
+func _bird_choose(s: Dictionary) -> void:
+	var roll := _rng.randf()
+	if roll < 0.5:
+		s["pecks"] = _rng.randi_range(1, PECKS_MOST)
+		s["cue"] = floorf(beat() + _peck_lead()) + float(_rng.randi_range(1, 2))
+		return
+	if roll < 0.85:
+		var side := String((s["spot"] as Dictionary)["side"])
+		for attempt in 4:
+			var a := _rng.randf_range(0.0, TAU)
+			var to: Vector2 = (s["at"] as Vector2) + Vector2(cos(a), sin(a) * 0.5) * Iso.tile_circle_extent(_rng.randf_range(0.3, 1.0))
+			# Pulled back towards its spot, so it does not wander off up the island.
+			to = to.lerp((s["spot"] as Dictionary)["at"], 0.3)
+			if _bird_ground(to, side) and not _taken_by_still(to):
+				s["pose"] = Pose.WALK
+				s["to"] = to
+				return
+	_bird_idle(s)
+
+
+## A peck starts once its beat is near enough for the head to be down on it; a cue the clock
+## jumped past (a song changing) is picked again, as the frogs' are.
+func _bird_on_cue(s: Dictionary) -> void:
+	var lead := _peck_lead()
+	var now := beat()
+	var start := float(s["cue"]) - lead
+	if start - now > 8.0 or now - start > CUE_MISSED:
+		s["cue"] = floorf(now + lead) + 1.0
+	if now < float(s["cue"]) - lead:
+		return
+	s.erase("cue")
+	s["pose"] = Pose.PECK
+	s["t"] = 0.0
+
+
+## Something moving came near, not near enough to fly: a quick walk directly away.
+func _bird_away(s: Dictionary, from: Vector2) -> void:
+	var at: Vector2 = s["at"]
+	var off := at - from
+	if off.length() < 0.5:
+		off = Vector2.RIGHT
+	var to := at + off.normalized() * Iso.tile_circle_extent(0.8)
+	if _bird_ground(to, String((s["spot"] as Dictionary)["side"])) and not _taken_by_still(to):
+		s["pose"] = Pose.WALK
+		s["to"] = to
+		s["scurry"] = true
+		s.erase("cue")
+
+
+## Up and away from `from`: to another open spot a few tiles off, or off the lake if none.
+func _bird_flush(s: Dictionary, from: Vector2) -> void:
+	if int(s["state"]) == Bird.FLY:
+		return
+	var at: Vector2 = s["at"]
+	if hears(at) and Sfx.main() != null:
+		Sfx.main().play_flush()
+	var near: Array = []
+	var reach := Iso.tile_circle_extent(BIRD_FLUSH_REACH)
+	var least := Iso.tile_circle_extent(BIRD_FLUSH_LEAST)
+	var shy := Iso.tile_circle_extent(BIRD_WARY)
+	for sp: Dictionary in _bird_spots:
+		var p: Vector2 = sp["at"]
+		var d := p.distance_to(at)
+		if d < reach and d > least and p.distance_to(from) > shy and _bird_open(sp) and not _taken_by_still(p):
+			near.append(sp)
+	s.erase("scurry")
+	if near.is_empty():
+		var off := at - from
+		if off.length() < 0.5:
+			off = Vector2.UP
+		s["leaving"] = true
+		_bird_fly(s, at + off.normalized() * BIRD_FROM, 0.0, BIRD_IN_ALT, 0.0)
+		return
+	var spot: Dictionary = near[_rng.randi_range(0, near.size() - 1)]
+	s["spot"] = spot
+	_bird_fly(s, spot["at"], 0.0, 0.0, BIRD_HOP_ARC + at.distance_to(spot["at"]) * 0.15)
+
+
+## The picture a bird shows this instant.
+func _bird_frame(s: Dictionary) -> String:
+	var species := String(s["species"])
+	if int(s["state"]) == Bird.FLY:
+		return "bird_%s_fly%d" % [species, int(float(s["clock"]) * BIRD_FLY_FPS) % 4]
+	match int(s["pose"]):
+		Pose.PECK:
+			return "bird_%s_peck%d" % [species, mini(int(float(s["t"]) * 5.0), 4)]
+		Pose.WALK:
+			return "bird_%s_walk%d" % [species, int(float(s["walked"]) / BIRD_STEP_PX) % 5]
+	return "bird_%s_idle%d" % [species, int(float(s["clock"]) * BIRD_IDLE_FPS) % 5]
+
+
+## A bird on the ground: its own picture laid down by the sun from its feet, in the ink of
+## what it stands on, then the bird.
+func _draw_bird_ground(on: CanvasItem, s: Dictionary) -> void:
+	var name := _bird_frame(s)
+	var at := (s["at"] as Vector2).round()
+	var fade := float(s["fade"])
+	_lay(on, name, at, float(s["facing"]), _surface_at(at), fade, BIRD_SCALE)
+	_stamp(on, name, at, float(s["facing"]), Color(1.0, 1.0, 1.0, fade), BIRD_SCALE)
+
+
+## A flying bird's shadow: its silhouette thrown from the ground point under it by its height
+## (`Shade.drop`), on whatever it falls on, shrunk and thinned with the height.
+func _draw_bird_shadow(on: CanvasItem, s: Dictionary) -> void:
+	var alt := float(s["alt"])
+	var up := clampf(alt / BIRD_SHADE_ALT, 0.0, 1.0)
+	var ground := (s["at"] as Vector2) + Shade.drop(day, alt)
+	_lay(on, _bird_frame(s), ground.round(), float(s["facing"]), _surface_at(ground),
+		float(s["fade"]) * (1.0 - SHADE_THIN * up), BIRD_SCALE * (1.0 - SHADE_SHRINK * up))
+
+
+func _draw_bird_air(on: CanvasItem, s: Dictionary) -> void:
+	var at := ((s["at"] as Vector2) - Vector2(0.0, float(s["alt"]))).round()
+	_stamp(on, _bird_frame(s), at, float(s["facing"]), Color(1.0, 1.0, 1.0, float(s["fade"])), BIRD_SCALE)
+
+
 # ---- ducks ------------------------------------------------------------------------------
 
 enum Brood { FLY_IN, SWIM, DABBLE, TAKE_OFF }
@@ -1792,6 +2140,8 @@ func _paint_ground(on: CanvasItem) -> void:
 			items.append([(b["at"] as Vector2).y, 2, b])
 		else:
 			items.append([(b["at"] as Vector2).y, 3, b])
+	for s: Dictionary in _birds:
+		items.append([(s["at"] as Vector2).y, 6 if float(s["alt"]) > 0.5 else 5, s])
 	items.sort_custom(func(a: Array, c: Array) -> bool: return float(a[0]) < float(c[0]))
 	for item: Array in items:
 		match int(item[1]):
@@ -1805,6 +2155,10 @@ func _paint_ground(on: CanvasItem) -> void:
 				_draw_brood_shadow(on, item[2])
 			4:
 				_draw_land(on, item[2])
+			5:
+				_draw_bird_ground(on, item[2])
+			6:
+				_draw_bird_shadow(on, item[2])
 
 
 func _paint_air(on: CanvasItem) -> void:
@@ -1813,6 +2167,9 @@ func _paint_air(on: CanvasItem) -> void:
 			_draw_brood_air(on, b)
 	for d: Dictionary in _flies:
 		_draw_fly(on, d)
+	for s: Dictionary in _birds:
+		if float(s["alt"]) > 0.5:
+			_draw_bird_air(on, s)
 
 
 func _draw_frog(on: CanvasItem, f: Dictionary) -> void:

@@ -766,5 +766,461 @@
   157,
   11,
   7
+ ],
+ "bird_sparrow_idle0": [
+  61,
+  157,
+  16,
+  12
+ ],
+ "bird_sparrow_idle1": [
+  78,
+  157,
+  16,
+  12
+ ],
+ "bird_sparrow_idle2": [
+  95,
+  157,
+  16,
+  12
+ ],
+ "bird_sparrow_idle3": [
+  112,
+  157,
+  16,
+  12
+ ],
+ "bird_sparrow_idle4": [
+  129,
+  157,
+  16,
+  12
+ ],
+ "bird_sparrow_peck0": [
+  1,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_peck1": [
+  18,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_peck2": [
+  35,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_peck3": [
+  52,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_peck4": [
+  69,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_walk0": [
+  86,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_walk1": [
+  103,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_walk2": [
+  120,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_walk3": [
+  137,
+  170,
+  16,
+  12
+ ],
+ "bird_sparrow_walk4": [
+  1,
+  183,
+  16,
+  12
+ ],
+ "bird_sparrow_fly0": [
+  18,
+  183,
+  16,
+  16
+ ],
+ "bird_sparrow_fly1": [
+  35,
+  183,
+  16,
+  16
+ ],
+ "bird_sparrow_fly2": [
+  52,
+  183,
+  16,
+  16
+ ],
+ "bird_sparrow_fly3": [
+  69,
+  183,
+  16,
+  16
+ ],
+ "bird_tit_idle0": [
+  86,
+  183,
+  15,
+  12
+ ],
+ "bird_tit_idle1": [
+  102,
+  183,
+  15,
+  12
+ ],
+ "bird_tit_idle2": [
+  118,
+  183,
+  15,
+  12
+ ],
+ "bird_tit_idle3": [
+  134,
+  183,
+  15,
+  12
+ ],
+ "bird_tit_idle4": [
+  1,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_peck0": [
+  17,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_peck1": [
+  33,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_peck2": [
+  49,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_peck3": [
+  65,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_peck4": [
+  81,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_walk0": [
+  97,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_walk1": [
+  113,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_walk2": [
+  129,
+  200,
+  15,
+  12
+ ],
+ "bird_tit_walk3": [
+  1,
+  213,
+  15,
+  12
+ ],
+ "bird_tit_walk4": [
+  17,
+  213,
+  15,
+  12
+ ],
+ "bird_tit_fly0": [
+  33,
+  213,
+  16,
+  16
+ ],
+ "bird_tit_fly1": [
+  50,
+  213,
+  16,
+  16
+ ],
+ "bird_tit_fly2": [
+  67,
+  213,
+  16,
+  16
+ ],
+ "bird_tit_fly3": [
+  84,
+  213,
+  16,
+  16
+ ],
+ "bird_bluebird_idle0": [
+  101,
+  213,
+  16,
+  12
+ ],
+ "bird_bluebird_idle1": [
+  118,
+  213,
+  16,
+  12
+ ],
+ "bird_bluebird_idle2": [
+  135,
+  213,
+  16,
+  12
+ ],
+ "bird_bluebird_idle3": [
+  1,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_idle4": [
+  18,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_peck0": [
+  35,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_peck1": [
+  52,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_peck2": [
+  69,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_peck3": [
+  86,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_peck4": [
+  103,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_walk0": [
+  120,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_walk1": [
+  137,
+  230,
+  16,
+  12
+ ],
+ "bird_bluebird_walk2": [
+  1,
+  243,
+  16,
+  12
+ ],
+ "bird_bluebird_walk3": [
+  18,
+  243,
+  16,
+  12
+ ],
+ "bird_bluebird_walk4": [
+  35,
+  243,
+  16,
+  12
+ ],
+ "bird_bluebird_fly0": [
+  52,
+  243,
+  15,
+  14
+ ],
+ "bird_bluebird_fly1": [
+  68,
+  243,
+  15,
+  14
+ ],
+ "bird_bluebird_fly2": [
+  84,
+  243,
+  15,
+  14
+ ],
+ "bird_bluebird_fly3": [
+  100,
+  243,
+  15,
+  14
+ ],
+ "bird_cardinal_idle0": [
+  116,
+  243,
+  16,
+  13
+ ],
+ "bird_cardinal_idle1": [
+  133,
+  243,
+  16,
+  13
+ ],
+ "bird_cardinal_idle2": [
+  1,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_idle3": [
+  18,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_idle4": [
+  35,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_peck0": [
+  52,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_peck1": [
+  69,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_peck2": [
+  86,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_peck3": [
+  103,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_peck4": [
+  120,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_walk0": [
+  137,
+  258,
+  16,
+  13
+ ],
+ "bird_cardinal_walk1": [
+  1,
+  272,
+  16,
+  13
+ ],
+ "bird_cardinal_walk2": [
+  18,
+  272,
+  16,
+  13
+ ],
+ "bird_cardinal_walk3": [
+  35,
+  272,
+  16,
+  13
+ ],
+ "bird_cardinal_walk4": [
+  52,
+  272,
+  16,
+  13
+ ],
+ "bird_cardinal_fly0": [
+  69,
+  272,
+  16,
+  14
+ ],
+ "bird_cardinal_fly1": [
+  86,
+  272,
+  16,
+  14
+ ],
+ "bird_cardinal_fly2": [
+  103,
+  272,
+  16,
+  14
+ ],
+ "bird_cardinal_fly3": [
+  120,
+  272,
+  16,
+  14
  ]
 }

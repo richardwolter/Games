@@ -16,7 +16,8 @@ Writes:
       hop 11-15), recoloured
   assets/wildlife/critters.png + critters.json    turtles, ducks, ducklings, swim shadows:
       {"<name>": [x, y, w, h]}, every picture facing LEFT (the game mirrors for right),
-      its foot the middle of its bottom row
+      its foot the middle of its bottom row; and the songbirds, `bird_<species>_<anim><n>`
+      (Kelano Studio's Wild Birds, art_source/birds, halved and mirrored, see `songbird`)
   tools/last_wildlife_sheet.png                   contact sheet at 4x
 
 Run from the project root, then reimport:
@@ -632,6 +633,73 @@ def crayfish(heading: float, frame: int) -> Image.Image:
     return img
 
 
+# ---- songbirds ----------------------------------------------------------------------------
+# Kelano Studio's Wild Birds pack (bought, art_source/birds/<species>/<species>_<anim>.png):
+# 32 px cells, side on, facing right, painted with their own dark outline. Halved like the
+# frogs (the pack is drawn at twice the game's grain) and mirrored to face LEFT like every
+# other critter. The cockatoo and the parrot are in the folder and never read, by decision.
+
+BIRDS_SRC = os.path.join("art_source", "birds")
+BIRD_SPECIES = ("sparrow", "tit", "bluebird", "cardinal")
+BIRD_ANIMS = {"fly": 4, "idle": 5, "peck": 5, "walk": 5}
+BIRD_CELL = 32
+# A block whose darkest pixel is under this luma counts as carrying the painted outline.
+BIRD_INK = 70.0
+
+
+def halve_inked(img: Image.Image) -> Image.Image:
+    """`halve`, then every pixel on the halved picture's own edge takes the darkest pixel of
+    its 2x2 block if that one is outline-dark: the commonest colour of an edge block is often
+    the fill, and the painted outline came out broken."""
+    out = halve(img)
+    p = img.load()
+    q = out.load()
+    src = out.copy().load()
+    for y in range(out.height):
+        for x in range(out.width):
+            if src[x, y][3] == 0:
+                continue
+            edge = False
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if nx < 0 or ny < 0 or nx >= out.width or ny >= out.height or src[nx, ny][3] == 0:
+                    edge = True
+                    break
+            if not edge:
+                continue
+            block = [p[2 * x + i, 2 * y + j] for i in (0, 1) for j in (0, 1)]
+            dark = min((c for c in block if c[3] > 0), key=luma)
+            if luma(dark) < BIRD_INK:
+                q[x, y] = dark
+    return out
+
+
+def songbird(species: str) -> list[tuple[str, Image.Image]]:
+    """Every frame of one species as `bird_<species>_<anim><n>`, halved, mirrored to face left.
+    The ground poses (idle, peck, walk) share one crop and the flight its own, so a bird does
+    not shift between frames: its foot is the middle of the shared crop's bottom row."""
+    frames: dict[str, list[Image.Image]] = {}
+    for anim, count in BIRD_ANIMS.items():
+        sheet = Image.open(os.path.join(BIRDS_SRC, species, f"{species}_{anim}.png")).convert("RGBA")
+        frames[anim] = [
+            halve_inked(sheet.crop((k * BIRD_CELL, 0, (k + 1) * BIRD_CELL, BIRD_CELL)).transpose(Image.FLIP_LEFT_RIGHT))
+            for k in range(count)
+        ]
+    out: list[tuple[str, Image.Image]] = []
+    for group in (("idle", "peck", "walk"), ("fly",)):
+        box = None
+        for anim in group:
+            for im in frames[anim]:
+                b = im.getbbox()
+                if b is None:
+                    continue
+                box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+        for anim in group:
+            for k, im in enumerate(frames[anim]):
+                out.append((f"bird_{species}_{anim}{k}", im.crop(box)))
+    return out
+
+
 def pack() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     frogs = {}
@@ -667,6 +735,8 @@ def pack() -> None:
             items.append((f"frogswim_{k}_{f}", frog_swim(k * math.tau / 8.0, f)))
             for colour in ("green", "brown"):
                 items.append((f"frogdive_{colour}_{k}_{f}", frog_dive(k * math.tau / 8.0, f, colour)))
+    for species in BIRD_SPECIES:
+        items.extend(songbird(species))
     gutter, wide = 1, 160
     x, y, shelf = gutter, gutter, 0
     spots = {}

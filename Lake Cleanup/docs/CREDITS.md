@@ -78,6 +78,14 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   Pixel Asset Pack" by Pop Shop Packs (https://pop-shop-packs.itch.io/pigeons-2d-pixel-asset-pack).
   ✅ Commercial use explicitly allowed; credit appreciated, not required.
 
+- **Songbirds** (`art_source/birds/` → halved into `assets/wildlife/critters.png` by
+  `tools/build_wildlife.py`, `bird_<species>_*`; sparrow, tit, bluebird and cardinal — the
+  cockatoo and the parrot are in the folder and not used) — "Wild Birds - 32x32 Animated
+  Birds" by Kelano Studio (https://kelano-studio.itch.io/wild-birds). ✅ Cleared (purchased
+  by Richard, 2026-10-03). "Free for personal and commercial projects. Don't resell or
+  redistribute the assets themselves." Credit is not asked for; given anyway as
+  "Kelano Studio", the Kipperfalcon rule.
+
 - **Net_Cast_spritesheet.jpg, Net_Closing_Drag.jpg, Net_Upgrades_Menu.jpg** — AI-generated.
   The two net sheets are retired (2026-10-02): the net is drawn by rule in code
   (`scripts/net_shape.gd`, `shaders/net_mesh.gdshader`), and the JPEGs sit in

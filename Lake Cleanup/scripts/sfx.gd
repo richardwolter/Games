@@ -148,6 +148,12 @@ const FROG_GAP := Vector2(6.0, 12.0)
 const DUCK_GAP := Vector2(15.0, 30.0)
 const FOREST_GAP := Vector2(20.0, 45.0)
 const BEE_GAP := Vector2(60.0, 120.0)
+## Songbirds (2026-10-03): a chirp off the forest's takes from a bird within earshot, on its own
+## gap; a flush of wings when one flies up, quieter than a pigeon going over.
+const SONGBIRD_GAP := Vector2(8.0, 18.0)
+const FLUSH_GAP := Vector2(1.2, 2.5)
+const SONGBIRD_DB := -4.0
+const FLUSH_DB := -6.0
 ## How often a duck call is the far geese instead of the mallard.
 const GEESE_ODDS := 0.3
 ## The share of heard frights a frog ribbits on, held to `FROG_GAP` like its croaks.
@@ -1121,6 +1127,18 @@ func play_duck(arriving: bool = false) -> void:
 func play_forest() -> void:
 	if may_play(&"forest") and _due(&"forest", FOREST_GAP):
 		play(&"forest", 0.0, 1.0, next_step(&"forest", _count(&"forest")))
+
+
+## A songbird within earshot singing: one of the forest's takes, on the songbirds' own gap.
+func play_songbird() -> void:
+	if may_play(&"forest") and _due(&"songbird", SONGBIRD_GAP):
+		play(&"forest", SONGBIRD_DB, 1.0, next_step(&"forest", _count(&"forest")))
+
+
+## A songbird flushed within earshot: the pigeon's wings, quieter, on their own gap.
+func play_flush() -> void:
+	if may_play(&"pigeon_fly") and _due(&"flush", FLUSH_GAP):
+		play(&"pigeon_fly", FLUSH_DB, 1.25)
 
 
 ## A bee going by, left ear to right, baked into the take. Very rare.

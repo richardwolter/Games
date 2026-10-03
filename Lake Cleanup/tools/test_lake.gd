@@ -7451,6 +7451,7 @@ func _check_wildlife() -> void:
 	_check(wild.frog_count() <= Wildlife.FROGS_MOST and wild._want(Wildlife.FROGS_MOST) <= Wildlife.FROGS_MOST,
 		"never past the cap", "")
 	_check_land_animals(wild)
+	_check_songbirds(wild)
 	# Only at clean shores; a brood lands only on clean water.
 	var foul_home := 0
 	for f: Dictionary in wild.frogs():
@@ -7553,6 +7554,90 @@ func _check_land_animals(wild: Wildlife) -> void:
 	wild.land_animals().clear()
 	for k: Dictionary in kept:
 		wild.land_animals().append(k)
+
+
+## Songbirds (2026-10-03): Kelano Studio's four kinds, on the sand of both shores and the
+## island's lawn, never on the water or the bank's lawn; a spot is open only beside clean
+## water; one flies in at a time; landed, a bird walks off from something moving near and
+## flies from something nearer; a peck starts so its lowest frame lands on the beat; on the
+## ground and in the air it throws the sun's shadow.
+func _check_songbirds(wild: Wildlife) -> void:
+	var spots: Array = wild.bird_spots()
+	var wet := 0
+	var lawn := 0
+	var bank_lawn := 0
+	for sp: Dictionary in spots:
+		var tile := Iso.world_to_tile(sp["at"])
+		if wild._wet(sp["at"]):
+			wet += 1
+		if sp["side"] == "island" and Iso.on_lawn(tile):
+			lawn += 1
+		if sp["side"] == "bank" and Ground.out_of_water(tile.x, tile.y) >= 2.4:
+			bank_lawn += 1
+	_check(spots.size() > 200, "songbird spots dealt round both shores", "%d" % spots.size())
+	_check(wet == 0 and bank_lawn == 0, "no songbird spot on the water or the bank's lawn", "%d %d" % [wet, bank_lawn])
+	_check(lawn > 0, "some on the island's lawn", "%d" % lawn)
+	var frames := 0
+	for species: String in Wildlife.BIRD_SPECIES:
+		for anim: String in ["idle", "peck", "walk", "fly"]:
+			for k in (4 if anim == "fly" else 5):
+				if (wild.call(&"_region", "bird_%s_%s%d" % [species, anim, k]) as Rect2).size.x > 0.0:
+					frames += 1
+	_check(frames == 4 * 19, "every songbird has every frame", "%d of 76" % frames)
+	_check(not Wildlife.BIRD_SPECIES.has("cockatoo") and not Wildlife.BIRD_SPECIES.has("parrot")
+		and (wild.call(&"_region", "bird_parrot_idle0") as Rect2).size.x == 0.0,
+		"no cockatoo, no parrot", "")
+	var stage := wild.stage
+	wild.songbirds().clear()
+	wild.stage = 0.01
+	wild.set(&"_bird_in", 0.0)
+	wild._reckon()
+	_check(wild.songbird_count() == 0, "no songbird before the first clean water", "%d" % wild.songbird_count())
+	wild.stage = stage
+	wild.set(&"_bird_in", 0.0)
+	wild._reckon()
+	wild._reckon()
+	_check(wild.songbird_count() == 1, "songbirds fly in one at a time", "%d" % wild.songbird_count())
+	if wild.songbird_count() == 0:
+		return
+	var s: Dictionary = wild.songbirds()[0]
+	_check(wild._bird_open(s["spot"]), "and only to a spot with clean water beside it", "")
+	_check(float(s["alt"]) > 0.0 and int(s["state"]) == Wildlife.Bird.FLY, "it comes in from the air", "")
+	for i in 1800:
+		wild._bird_step(s, 1.0 / 60.0, PackedVector2Array())
+		if int(s["state"]) == Wildlife.Bird.GROUND:
+			break
+	_check(int(s["state"]) == Wildlife.Bird.GROUND and float(s["alt"]) == 0.0 and not wild._wet(s["at"]),
+		"and lands on dry ground", "%s" % [s["at"]])
+	# Pecks: started early by the lead, so the head is down on the beat.
+	s["pose"] = Wildlife.Pose.IDLE
+	s["pecks"] = 1
+	s["cue"] = wild.beat() + wild._peck_lead() + 1.0
+	wild._bird_on_cue(s)
+	_check(int(s["pose"]) == Wildlife.Pose.IDLE, "a peck waits for its beat", "")
+	s["cue"] = wild.beat() + wild._peck_lead()
+	wild._bird_on_cue(s)
+	_check(int(s["pose"]) == Wildlife.Pose.PECK, "and starts a lead ahead of it", "")
+	wild._bird_idle(s)
+	# Something moving near: a walk away; nearer: up and off.
+	var at: Vector2 = s["at"]
+	var mid := Iso.tile_circle_extent((Wildlife.BIRD_SHY + Wildlife.BIRD_WARY) * 0.5)
+	var dirs := [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN]
+	var walked := false
+	for d: Vector2 in dirs:
+		wild._bird_step(s, 0.016, PackedVector2Array([at + d * mid]))
+		if int(s["pose"]) == Wildlife.Pose.WALK:
+			walked = true
+			break
+	_check(walked and int(s["state"]) == Wildlife.Bird.GROUND, "a bird walks off from something moving near", "")
+	wild._bird_step(s, 0.016, PackedVector2Array([(s["at"] as Vector2) + Vector2(6.0, 0.0)]))
+	_check(int(s["state"]) == Wildlife.Bird.FLY, "and flies from something closer", "")
+	_check(bool(s.get("leaving", false)) or wild._bird_open(s["spot"]), "to another open spot, or off the lake", "")
+	var src := FileAccess.get_file_as_string("res://scripts/wildlife.gd")
+	_check(src.contains("_lay(on, name, at, float(s[\"facing\"]), _surface_at(at), fade, BIRD_SCALE)")
+		and src.contains("var ground := (s[\"at\"] as Vector2) + Shade.drop(day, alt)"),
+		"a songbird throws the sun's shadow on the ground and from the air", "")
+	wild.songbirds().clear()
 
 
 ## The animals move to the music (2026-09-22): every song the lake plays has a measured beat

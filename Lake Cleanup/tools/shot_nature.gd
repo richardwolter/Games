@@ -14,12 +14,17 @@ const LOG := "res://tools/last_nature.log"
 const SAVE_PATH := "user://shot_nature.save"
 ## Frames each stage is given to grow in and swim before its picture.
 const HOLD := 420
-const STAGES := ["fresh", "half", "clean", "under"]
+const STAGES := ["fresh", "half", "clean", "under", "birds"]
 
 ## "under" (2026-09-30, the lakebed pass): on the clean lake, every frog sent into the water,
 ## every turtle under it and a brood let in, and close crops of each saved as
 ## `last_nature_under_<what>.png`, since the full frame is too far out to judge them by.
 const UNDER_HOLD := 90
+## "birds" (2026-10-03, the songbird pass): one of each songbird stood on the open spots
+## nearest the view, by turns idle, pecking and walking, and one more flying low over the
+## sand, each cropped as `last_nature_bird_<species>.png` and `last_nature_bird_fly.png`:
+## which way they face and where their shadows fall is judged on those.
+const BIRDS_HOLD := 40
 var _main: Node
 var _frames := 0
 var _stage := 0
@@ -57,7 +62,7 @@ func _physics_process(_delta: float) -> void:
 			get_tree().quit()
 			return
 		_set_stage(_stage)
-		_due = _frames + (UNDER_HOLD if STAGES[_stage] == "under" else HOLD)
+		_due = _frames + (UNDER_HOLD if STAGES[_stage] == "under" else (BIRDS_HOLD if STAGES[_stage] == "birds" else HOLD))
 
 
 func _look() -> void:
@@ -73,6 +78,9 @@ func _look() -> void:
 func _set_stage(stage: int) -> void:
 	var grid: LakeGrid = _main.get(&"_grid")
 	if stage == 0:
+		return
+	if STAGES[stage] == "birds":
+		_lay_birds()
 		return
 	if STAGES[stage] == "under":
 		var wild: Wildlife = _main.get(&"_wildlife")
@@ -120,6 +128,51 @@ func _set_stage(stage: int) -> void:
 	wild.set(&"_brood_in", 0.0)
 
 
+## One of each songbird on the open spots nearest the island's south-west shore, and one in
+## the air over them, the view brought onto them.
+func _lay_birds() -> void:
+	var wild: Wildlife = _main.get(&"_wildlife")
+	var angler: Node2D = _main.get(&"_angler")
+	var view := Iso.tile_to_world(Iso.ISLAND_CENTRE.x - 4.0, Iso.ISLAND_CENTRE.y + 5.0)
+	var open := wild.bird_spots().filter(func(sp: Dictionary) -> bool: return wild._bird_open(sp))
+	open.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return (a["at"] as Vector2).distance_to(view) < (b["at"] as Vector2).distance_to(view))
+	wild.held = true
+	wild.songbirds().clear()
+	var kept: Array = []
+	for sp: Dictionary in open:
+		if kept.size() >= Wildlife.BIRD_SPECIES.size():
+			break
+		var far := true
+		for k: Dictionary in kept:
+			if (k["at"] as Vector2).distance_to(sp["at"]) < 40.0:
+				far = false
+		if far:
+			kept.append(sp)
+	for i in kept.size():
+		var sp: Dictionary = kept[i]
+		wild.songbirds().append({
+			"species": Wildlife.BIRD_SPECIES[i], "at": sp["at"], "alt": 0.0, "fade": 1.0,
+			"clock": float(i), "facing": 1.0 if i % 2 == 0 else -1.0, "spot": sp,
+			"state": Wildlife.Bird.GROUND, "pose": [Wildlife.Pose.IDLE, Wildlife.Pose.PECK, Wildlife.Pose.WALK, Wildlife.Pose.IDLE][i],
+			"timer": 99.0, "walked": 0.0, "t": 0.3, "pecks": 99, "to": sp["at"],
+		})
+	if not kept.is_empty():
+		var sp: Dictionary = kept[0]
+		var fly := {
+			"species": "cardinal", "at": (sp["at"] as Vector2) + Vector2(-60.0, 10.0), "alt": 36.0,
+			"fade": 1.0, "clock": 0.0, "facing": -1.0, "spot": sp, "pose": Wildlife.Pose.IDLE,
+			"timer": 0.0, "walked": 0.0,
+		}
+		wild.songbirds().append(fly)
+		wild._bird_fly(fly, (sp["at"] as Vector2) + Vector2(400.0, 10.0), 36.0, 36.0, 0.0)
+		_main.set(&"_pan", (sp["at"] as Vector2) + Vector2(0.0, -20.0) - angler.position)
+	var log := FileAccess.open(LOG, FileAccess.READ_WRITE)
+	log.seek_end()
+	log.store_line("  birds: %d open spots, %d laid" % [open.size(), wild.songbird_count()])
+	log.close()
+
+
 func _write(name: String) -> void:
 	var flora: Flora = _main.get(&"_flora")
 	var fish: Fish = _main.get(&"_fish")
@@ -142,6 +195,20 @@ func _write(name: String) -> void:
 	var near := shot.get_region(Rect2i(w / 4, h / 4, w / 2, h / 2))
 	near.resize(w, h, Image.INTERPOLATE_NEAREST)
 	near.save_png(ProjectSettings.globalize_path(SHOT % (name + "_near")))
+	if name == "birds":
+		var vp0 := get_viewport()
+		var to_screen0 := vp0.get_final_transform() * vp0.get_canvas_transform()
+		for b: Dictionary in wild.songbirds():
+			var tag := "fly" if int(b["state"]) == Wildlife.Bird.FLY else String(b["species"])
+			var at0: Vector2 = to_screen0 * ((b["at"] as Vector2) - Vector2(0.0, float(b["alt"]) * 0.5))
+			var half0 := Vector2i(100, 110) if tag == "fly" else Vector2i(60, 50)
+			var box0 := Rect2i(Vector2i(at0) - half0, half0 * 2).intersection(Rect2i(0, 0, w, h))
+			if box0.size.x < 20 or box0.size.y < 20:
+				continue
+			var crop0 := shot.get_region(box0)
+			crop0.resize(box0.size.x * 4, box0.size.y * 4, Image.INTERPOLATE_NEAREST)
+			crop0.save_png(ProjectSettings.globalize_path(SHOT % ("bird_" + tag)))
+		return
 	if name == "under":
 		var picks := {}
 		for f: Dictionary in wild.frogs():

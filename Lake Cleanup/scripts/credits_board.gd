@@ -51,6 +51,7 @@ static var LINES: Array:
 		"Kenney",
 		"Asset by Zato - https://zatoart.itch.io/",
 		"Pop Shop Packs",
+		"Kelano Studio",
 		"@Pixel_Salvaje",
 		"DaFluffyPotato",
 		"",
