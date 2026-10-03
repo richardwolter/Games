@@ -69,11 +69,6 @@ const HOME_DISTANCE := 0.35
 ## this is the net reaching further than its upgrade says.
 const MOUTH_EDGE := 0.15
 
-## How many layers deep a cast works. The net comes down from above: it closes on what is
-## floating first, everywhere it can reach, and only then takes what that was sitting on.
-## Each layer is a fresh pass over the top of the stacks, never a reach past a piece too
-## heavy to lift — a cast cannot pull a bag out from under a fridge.
-const SWEEP_LAYERS := 2
 
 ## How the net purses as it comes in: over the last `CLOSE_SHARE` of the haul, never less
 ## than `CLOSE_LEAST` tiles of it.
@@ -1196,12 +1191,13 @@ func _advance_towards(to: Vector2, speed: float, delta: float) -> void:
 
 ## One frame of sweeping.
 ##
-## Three passes over the same tiles, in the order a net actually closes. The birds sitting
-## on the water go first, because a bird is on top of everything by definition and costs
-## the cast nothing. Then everything floating, across the whole width of the mouth. Only
-## once there is nothing left on the surface does it bite into what is underneath — which
-## is what makes a cast read as scooping a patch clean rather than picking one thing off
-## each tile it crosses and leaving the patch looking untouched.
+## Passes over the same tiles, in the order a net actually closes. The birds sitting on the
+## water go first, because a bird is on top of everything by definition and costs the cast
+## nothing. Then everything floating, across the whole width of the mouth. Only once there
+## is nothing left on the surface does it bite into what is underneath, and then the layer
+## under that, until the bag is full — which is what makes a cast read as scooping a patch
+## clean rather than picking one thing off each tile it crosses. Never past a piece too
+## heavy to lift: a cast cannot pull a bag out from under a fridge.
 ##
 ## Nearest first within each pass, so the mouth closes from the middle out.
 ##
@@ -1228,11 +1224,22 @@ func _sweep(landing: bool = false) -> bool:
 	# Only the rubbish is limited by what the net can hold. A bird is lifted off the surface
 	# by a net that is already full, which is why the hold is not checked until here.
 	var before := catch.size()
-	if room_left() > 0:
-		# Asked again for each layer: what a take uncovers is a new piece at a new size and
-		# pose, and whether the mouth touches it is a new question.
-		for layer in SWEEP_LAYERS:
-			_take_from(_reach(at, mouth, strength()))
+	# Layer after layer until the bag is full or the mouth has nothing left it can lift: a net
+	# that lands on a pile takes the pile, rather than its top two layers with the rest
+	# floating up behind it (2026-10-03, Richard). Asked again for each layer: what a take
+	# uncovers is a new piece, and one the mouth now touches is in. **And a tile it has taken
+	# from stays in**: the piece under a take is rolled a new drift and starts `EMERGE_DROP`
+	# low to rise into view, so asked of its drawing alone it often fell out of the ring it
+	# was under and floated up behind the net. The column under a piece the net closed on is
+	# under the net. Ends because every pass that goes round again took a piece.
+	var dug := {}
+	while room_left() > 0:
+		var layer := _reach(at, mouth, strength())
+		for index: int in dug:
+			if not layer.has(index) and grid.reachable_slot(index, 1, strength()) >= 0:
+				layer.append(index)
+		if _take_from(layer, dug) == 0:
+			break
 	if sfx != null and not _lifted.is_empty():
 		if landing:
 			sfx.play_lifted(_lifted)
@@ -1336,14 +1343,18 @@ func _birds_touched(at: Vector2, mouth: float) -> Array[int]:
 
 
 ## One layer: every tile in turn gives up whatever is on top of it, if the net is strong
-## enough to lift it and there is room left in the cast.
-func _take_from(reach: Array[int]) -> void:
+## enough to lift it and there is room left in the cast. How many it took; every tile taken
+## from goes in `dug`.
+func _take_from(reach: Array[int], dug: Dictionary = {}) -> int:
+	var took := 0
 	for index in reach:
 		if room_left() <= 0:
-			return
+			return took
 		var k := grid.reachable_slot(index, 1, strength())
 		if k < 0:
 			continue
+		took += 1
+		dug[index] = true
 		var at := grid.surface_pos(index)
 		var def := grid.def_at(index, k)
 		var taken := grid.take(index, k)
@@ -1357,6 +1368,7 @@ func _take_from(reach: Array[int]) -> void:
 			splash.splash(_within_mouth(at), weight)
 		# Heard once for the whole sweep, not piece by piece: see `_sweep`.
 		_lifted.append(weight)
+	return took
 
 
 func _come_home() -> void:

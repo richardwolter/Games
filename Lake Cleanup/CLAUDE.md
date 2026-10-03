@@ -23,7 +23,9 @@ Your job is to build the game incrementally with clean architecture and testable
   mouth touches and Strength can lift comes back, up to Catch. **There is no hold-to-haul
   and no progress ring** — these two lines said so until 2026-09-18, off a design from
   before the net. `TrashDef.haul_cost` is still in the data and nothing reads it.
-- Net bites a configurable depth from each water column it passes, gated by tier
+- **A sweep digs until the bag is full** (2026-10-03, see The Net Digs the Pile): layer
+  after layer under the mouth, never past a piece too heavy to lift. This line said "bites a
+  configurable depth" (`SWEEP_LAYERS` 2) until then.
 - **The ring is the catch, by decision** (2026-09-11, `net.gd` `_touches`/`_reach`): a piece,
   bird or charm is caught when any of its *drawing* (an ellipse at its drawn position and
   size) touches the mouth — not when its tile is inside a tile radius. The aiming marker's
@@ -3259,6 +3261,35 @@ dots. It is redrawn as pixel art by rule, picked off `tools/last_net_mockup.png`
   `tools/last_net.png` and `tools/last_net_picture.png`. It is what compiles the shader.
   `test_lake`'s `_check_net_shape` guards the shape's rules, the constants and the retirement.
 - All numbers are first guesses for Richard's eye.
+
+### The Net Digs the Pile (2026-10-03, `/grill-me` with Richard)
+Richard: a full-strength, full-width cast on a pile came home with a few pieces, and the
+rest "floated up" behind it. **The sweep took two layers a tile** (`SWEEP_LAYERS`, deleted):
+open water filled the bag (80-odd tiles x 2), a tight deep pile did not (9 tiles x 2 = 18).
+- **A sweep takes layer after layer until the bag is full or nothing under the mouth can be
+  lifted** (`CastNet._sweep`, `_take_from` returns its count). Same order as before: the
+  whole top layer across the mouth, nearest first, then the next, so a bag that fills part
+  way leaves an even patch. Never past a piece too heavy to lift.
+- **A tile the sweep has taken from stays in it** (`dug` in `_sweep`). The piece under a take
+  is rolled a new drift and starts `EMERGE_DROP` (16 px) low to rise into view, so asked of
+  its drawing alone it often fell outside the ring and floated up behind the net: one
+  nine-deep tile under the smallest mouth gave 1 / 1 / 1 / 3 / 3 / 9 over six landings, 9
+  every time since. A big net lost its rim tiles the same way. **The column under a piece
+  the net closed on is under the net** — an extension of "the ring is the catch", not a
+  reversal: a tile still has to be touched once to be dug.
+- **Landing and reel alike, both nets**: a haul dragged over a second pile scoops it too.
+- **Cost**: none measurable. `bench_frames` big lucky double, two runs each: two layers 13.5
+  / 14.4 ms mean, dug to full 11.7 / 14.6 (the machine was noisy that day). On a full lake a
+  maxed net filled its bag on the landing before too, so the bench's work is the same.
+- **Pacing: accepted, judged in play** (Richard). Catch now binds on any pile, so the run
+  shortens by an amount the sim cannot see (one lake-wide density). Prices frozen, sim not
+  re-run; the next logged run decides.
+- Probe: `tools/probe_catch.tscn` (headless, maxed net, own save, `tools/last_probe_catch.log`):
+  fresh lake 64/64 every cast before and after; `PROBE_THIN=0.85` a thinned lake;
+  `PROBE_PILE=1` an empty lake but a 3x3 / 5x5 / 7x7 pile nine deep: the 3x3 landing now
+  takes 64, was capped at 18. `test_lake`'s `_check_dig_to_full` (in `_stage_net_ring`)
+  guards a roomy sweep leaving nothing liftable under the mouth, deeper than two layers, and
+  a small bag stopping at the bag.
 
 ### The Net Sorts With The Angler (2026-09-16)
 The net node and its rope take **the angler's own walker layer, minus one** (`Lake._sort_walkers`),

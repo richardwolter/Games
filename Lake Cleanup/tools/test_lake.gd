@@ -889,6 +889,51 @@ func _stage_yard_cap() -> void:
 ## The ring tells the truth: a piece is caught when its drawing touches the mouth, wherever
 ## its tile is, and not when it does not; the haul catches at the size the net is drawn; and
 ## the catch starts the frame the net lands.
+## A sweep digs layer after layer until the bag is full (2026-10-03, Richard: a net landing on
+## a pile took its top two layers and the rest floated up behind it). With room to spare it
+## leaves nothing it can lift under the mouth, deeper than two layers; with a small bag it
+## stops at the bag. Called with the net strong and roomy, idle on the lake.
+func _check_dig_to_full(mouth: float) -> void:
+	# Two deep stacks well apart, so the first sweep cannot touch the second.
+	var deep: Array[int] = []
+	for cell in _grid.tile_count():
+		if _grid.stacks[cell].size() < 5 or _grid.dry[cell] == 1:
+			continue
+		if not deep.is_empty() and Vector2(_grid.tile_of(cell)).distance_to(
+				Vector2(_grid.tile_of(deep[0]))) < 10.0:
+			continue
+		deep.append(cell)
+		if deep.size() >= 2:
+			break
+	_check(deep.size() >= 2, "there are deep stacks to dig", "")
+	if deep.size() < 2:
+		return
+	var at := _grid.surface_pos(deep[0])
+	var under: Array = _net.call(&"_reach", at, mouth, _net.power)
+	var pieces := 0
+	for index: int in under:
+		pieces += _grid.stacks[index].size()
+	_net.tile_pos = Iso.world_to_tile(at)
+	_net.call(&"_sweep", true)
+	var left: Array = _net.call(&"_reach", at, mouth, _net.power)
+	# Two layers a tile was the old cap, and the middle stack is at least five deep, so the
+	# old sweep came home short of every piece under the mouth.
+	_check(left.is_empty() and _net.catch.size() >= mini(pieces, _net.hold),
+		"a sweep with room digs every layer it can lift under the mouth",
+		"%d tiles, %d pieces, took %d, %d still liftable" % [
+			under.size(), pieces, _net.catch.size(), left.size()])
+	_net.catch.resize(0)
+	var was := _net.hold
+	_net.hold = 3
+	at = _grid.surface_pos(deep[1])
+	_net.tile_pos = Iso.world_to_tile(at)
+	_net.call(&"_sweep", true)
+	_check(_net.catch.size() == 3 and not (_net.call(&"_reach", at, mouth, _net.power) as Array).is_empty(),
+		"and stops when the bag is full", "%d taken" % _net.catch.size())
+	_net.hold = was
+	_net.catch.resize(0)
+
+
 func _stage_net_ring() -> void:
 	var was_radius := _net.radius
 	var was_power := _net.power
@@ -954,6 +999,7 @@ func _stage_net_ring() -> void:
 		"and a wider net shows more still",
 		"%d at twice the width" % int(_net.call(&"_shown_count", mouth * 2.0)))
 	_net.catch.resize(0)
+	_check_dig_to_full(mouth)
 
 	# What it cannot lift is pushed out of the way instead of passed through.
 	var heavy := -1
