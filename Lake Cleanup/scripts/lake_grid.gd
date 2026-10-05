@@ -734,13 +734,34 @@ var _glints: GlintLayer
 var marked: PackedInt32Array = PackedInt32Array()
 
 
-## Mark the last pieces' tiles. A change lays the soup out again (the rim needs room in a
-## tile's stamp), which happens a handful of times a run, at its very end.
+## Mark the last pieces' tiles. A tile newly marked needs the rim's room in its stamp, so
+## that lays the soup out again: once when the marking starts, and again only if a piece
+## turns up on a tile that was not marked (a tornado's fling). A tile leaving the set is a
+## tile the net or a dog has just emptied, already patched in place, so a shrinking set is
+## no rebuild (2026-10-05: with thirty marked, a rebuild a piece was thirty hitches).
 func mark_last(tiles: PackedInt32Array) -> void:
 	if tiles == marked:
 		return
+	var grows := false
+	for index in tiles:
+		if not marked.has(index):
+			grows = true
+			break
+	var gone := PackedInt32Array()
+	for index in marked:
+		if not tiles.has(index):
+			gone.append(index)
 	marked = tiles
-	_dirty = true
+	if grows:
+		# Asked for now: `_dirty` alone waits for something else to redraw the soup, and
+		# meanwhile every take's patch stands down for the rebuild that is not coming, so
+		# a netted piece stayed drawn (2026-10-05, Richard: "pieces marked at game end are
+		# not disappearing after being caught").
+		_dirty = true
+		queue_redraw()
+	else:
+		for index in gone:
+			_restamp(index)
 	_glints.set_marked(tiles)
 
 ## The atlas's solid-white block, as texture coordinates. Cached: every untextured quad in

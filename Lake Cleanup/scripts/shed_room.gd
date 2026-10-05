@@ -90,8 +90,8 @@ static var WASH_LABEL: String:
 const WASH_UNDER_EMPTY := 30.0
 ## The gap between the last find's row and the wash plank (2026-09-24, Richard: under one
 ## row the plank's frame and its gold glow ran up into the row above). The plank's wood is
-## a built frame that stands proud of the plain row plates, and its pulse glow reaches
-## `HudButtons.GLOW_REACH` past it, so it needs this much more air than a row does.
+## a built frame that stands proud of the plain row plates, so it needs this much more air
+## than a row does.
 const WASH_UNDER_ROWS := 14.0
 
 

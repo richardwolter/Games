@@ -388,6 +388,7 @@ func _stage_build() -> void:
 	_check_free_view(cam)
 	_check_camera_tip()
 	_check_signals(cam)
+	_check_end_fixes()
 	cam.zoom = Vector2(0.62, 0.62)
 
 	# The shed is a place you stand at, not a button on the screen.
@@ -2612,6 +2613,7 @@ func _stage_settings() -> void:
 		_main.call(&"_set_shed", false)
 		_check(not sound._ambience_duck, "and comes back when it closes", "")
 		_check_new_sounds(sound)
+		_check_crowds(sound)
 		# The wash room is outdoors: the lake is heard behind it, the shed is not.
 		_main.call(&"_set_wash", true)
 		_check(not sound.indoors, "the wash room lets the lake through", "")
@@ -8929,11 +8931,29 @@ func _check_upgrades_pulse() -> void:
 	_check(skin.pulsing(&"upgrades") and skin.pulse_amount(&"upgrades") == 0.0, "one more affordable starts it, from nothing", str(skin.pulse_amount(&"upgrades")))
 	skin.call(&"_process", 0.35)
 	_check(skin.pulse_amount(&"upgrades") > 0.05, "and it breathes", str(skin.pulse_amount(&"upgrades")))
+	# 2026-10-05: the burst hops the button in whole pixels and throws gold motes off it.
+	var rest_box: Rect2 = skin.get(&"_upgrades_box")
+	var hopped: Rect2 = skin.call(&"_lifted", rest_box, &"upgrades")
+	var hop_motes: int = ((skin.get(&"_motes") as Dictionary)[&"upgrades"] as HudButtons.Motes).alive()
+	_check(skin.hop_of(&"upgrades").x > 0.0 and hopped.position.y < rest_box.position.y
+		and is_equal_approx(hopped.position.y, roundf(hopped.position.y)) and hop_motes > 0,
+		"the burst hops the button up whole pixels and throws motes off it",
+		"hop %s, %.1f against %.1f, %d motes" % [skin.hop_of(&"upgrades"), hopped.position.y,
+			rest_box.position.y, hop_motes])
+	_check(HudButtons.hop_shape(0.9).y > 0.0 and HudButtons.hop_shape(0.9).x == 0.0
+		and HudButtons.squash_about(rest_box, 1.0).get_scale().y < 1.0,
+		"a hop lands in a squash about the button's foot", "")
 	skin.available = now
 	_check(skin.pulsing(&"upgrades"), "a fall does not reset it", "")
 	skin.call(&"_process", 6.0)
 	_check(skin.pulsing(&"upgrades") and is_equal_approx(float((skin.get(&"_pulses") as Dictionary)[&"upgrades"]), HudSkin.PULSE_IDLE),
 		"after the burst it settles to a quieter breathing and keeps going", str(skin.get(&"_pulses")))
+	var idle_most := 0.0
+	for i in 90:
+		skin.call(&"_process", 0.1)
+		idle_most = maxf(idle_most, skin.hop_of(&"upgrades").x)
+	_check(idle_most > 0.0 and idle_most <= HudSkin.IDLE_HOP + 0.001,
+		"settled, it still hops now and then, lower than the burst", "%.2f" % idle_most)
 	var box: Rect2 = skin.get(&"_upgrades_box")
 	var motion := InputEventMouseMotion.new()
 	motion.position = box.get_center()
@@ -10907,3 +10927,100 @@ func _check_wash_sizes() -> void:
 			painted = painted or art.get_pixel(x, y).a > 0.0
 		_check(painted, "%s stands its lowest painted row on the pallet" % name, "")
 	stand.free()
+
+
+## 2026-10-05: a piece lifted off the dry beach throws sand, not a crown; the last thirty
+## are marked with grouped arrows, and a shrinking mark is no rebuild.
+func _check_end_fixes() -> void:
+	var splash: WaterSplash = _net.splash
+	var dust: KickDust = _net.dust
+	_check(dust != null, "the net has the lake's dust to throw", "")
+	var beach := -1
+	for index in _grid.stacks.size():
+		if _grid.dry[index] == 1 and not _grid.stacks[index].is_empty() \
+				and _grid.reachable_slot(index, 1, _net.strength()) >= 0:
+			beach = index
+			break
+	if beach >= 0 and splash != null and dust != null:
+		var crowns := splash._crown_at.size()
+		var grains := dust.grains()
+		var reach: Array[int] = [beach]
+		var took: int = _net.call(&"_take_from", reach)
+		_check(took == 1 and splash._crown_at.size() == crowns and dust.grains() > grains,
+			"a piece off the dry beach throws sand and no splash",
+			"took %d, crowns %d to %d, grains %d to %d" % [took, crowns,
+				splash._crown_at.size(), grains, dust.grains()])
+		if took == 1:
+			var def_index: int = _net.catch[_net.catch.size() - 1]
+			_net.catch.remove_at(_net.catch.size() - 1)
+			_grid.insert(beach, _grid.stacks[beach].size(), def_index)
+	else:
+		_check(false, "a liftable piece lies on the dry beach for the sand test", "")
+	_check(Lake.LAST_MARKED == 30, "the last thirty pieces are marked", str(Lake.LAST_MARKED))
+	# A shrinking mark patches in place; only a newly marked tile lays the soup out again.
+	# Laid out first, so the tiles asked about are in the soup rather than culled.
+	_grid.call(&"_rebuild")
+	var tiles := PackedInt32Array()
+	for index in _grid.stacks.size():
+		if not _grid.stacks[index].is_empty() and index < _grid._slot_base.size() \
+				and _grid._slot_base[index] >= 0:
+			tiles.append(index)
+			if tiles.size() == 3:
+				break
+	_grid.mark_last(tiles)
+	_grid.set(&"_dirty", false)
+	_grid.mark_last(tiles.slice(0, 2))
+	var shrunk_dirty: bool = _grid.get(&"_dirty")
+	_grid.mark_last(tiles)
+	var grown_dirty: bool = _grid.get(&"_dirty")
+	_check(not shrunk_dirty and grown_dirty,
+		"a mark that shrinks is patched in place, one that grows lays the soup out",
+		"shrunk %s grown %s, %d tiles" % [shrunk_dirty, grown_dirty, tiles.size()])
+	_grid.mark_last(PackedInt32Array())
+	# A growing mark has to ask for the redraw: _dirty alone waited for something else to
+	# redraw the soup, and every take's patch stood down meanwhile, so netted pieces stayed.
+	var mark_src := FileAccess.get_file_as_string("res://scripts/lake_grid.gd")
+	var mark_body := mark_src.substr(mark_src.find("func mark_last"), 1600)
+	_check(mark_body.contains("queue_redraw()"), "a growing mark asks for the soup's redraw", "")
+	# Pieces off screen the same way share an arrow, with their count on it.
+	var arrows := LastArrows.new()
+	add_child(arrows)
+	arrows.size = Vector2(1280.0, 720.0)
+	var xf := get_viewport().get_canvas_transform().affine_inverse()
+	arrows.spots = [
+		xf * Vector2(5000.0, 360.0), xf * Vector2(5000.0, 500.0), xf * Vector2(5000.0, 200.0),
+		xf * Vector2(640.0, -4000.0), xf * Vector2(640.0, 360.0),
+	]
+	var drawn := arrows.arrows()
+	var counts: Array[int] = []
+	for arrow in drawn:
+		counts.append(int(arrow["count"]))
+	counts.sort()
+	_check(counts == [1, 3], "off-screen pieces one way share one arrow with their count",
+		str(counts))
+	arrows.free()
+
+
+## 2026-10-05: a species' gap shrinks with how many of it are within earshot.
+func _check_crowds(sound: Sfx) -> void:
+	sound.set_crowd(&"frog", 0)
+	var bare := sound.crowd_scale(&"frog")
+	sound.set_crowd(&"frog", 1)
+	var one := sound.crowd_scale(&"frog")
+	sound.set_crowd(&"frog", 4)
+	var some := sound.crowd_scale(&"frog")
+	sound.set_crowd(&"frog", 100)
+	var crowd := sound.crowd_scale(&"frog")
+	_check(bare == 1.0 and one == 1.0 and some < 1.0 and some > crowd
+		and is_equal_approx(crowd, Sfx.CROWD_LEAST),
+		"a crowd of frogs in earshot shortens their gap, down to a quarter",
+		"%.2f %.2f %.2f %.2f" % [bare, one, some, crowd])
+	_check(sound.crowd_scale(&"flush") == 1.0, "a sound with no crowd keeps its gap", "")
+	sound.set_crowd(&"frog", 100)
+	sound._next_due.erase(&"frog")
+	sound._due(&"frog", Sfx.FROG_GAP)
+	var wait := float(sound._next_due[&"frog"]) - float(Time.get_ticks_msec()) / 1000.0
+	_check(wait <= Sfx.FROG_GAP.y * Sfx.CROWD_LEAST + 0.05,
+		"and the next frog is rolled on the crowded gap", "%.2f s" % wait)
+	sound.set_crowd(&"frog", 0)
+	sound._next_due.erase(&"frog")

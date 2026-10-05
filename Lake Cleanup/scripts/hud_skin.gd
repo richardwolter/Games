@@ -172,6 +172,21 @@ const PULSE_BEATS := 3.5
 ## Where the envelope settles after the burst, and how many beats a second it breathes there.
 const PULSE_IDLE := 0.45
 const PULSE_IDLE_RATE := PULSE_BEATS / PULSE_TIME
+## The hop (2026-10-05, pick A off `tools/last_pulse_mockup.gif`): the burst hops on each of
+## its first `BURST_HOPS` beats at full height; once it has settled the button hops once
+## every `IDLE_HOP_EVERY` seconds (rolled) at `IDLE_HOP` of the height, until the board is
+## opened. Motes drift up off the button at `MOTES_BURST` a second in the burst and
+## `MOTES_IDLE` after it.
+const BURST_HOPS := 3
+const IDLE_HOP := 0.6
+const IDLE_HOP_EVERY := Vector2(4.0, 6.0)
+const MOTES_BURST := 30.0
+const MOTES_IDLE := 8.0
+## Per button: seconds into an idle hop (-1 none), seconds to the next one, the motes.
+var _idle_hop := {&"upgrades": -1.0, &"shed": -1.0}
+var _idle_wait := {&"upgrades": 0.0, &"shed": 0.0}
+var _motes := {&"upgrades": HudButtons.Motes.new(11), &"shed": HudButtons.Motes.new(23)}
+var _hop_rng := RandomNumberGenerator.new()
 
 
 func _mark(name: StringName, value: int) -> void:
@@ -361,6 +376,7 @@ func _process(delta: float) -> void:
 		_pulses[name] = maxf(float(_pulses[name]) - delta / PULSE_TIME, floor_at)
 		if float(_pulses[name]) > 0.0:
 			_clocks[name] = float(_clocks[name]) + delta
+		_step_hop(name, delta)
 	if money > _shown_money:
 		_shine = 1.0
 		_shown_money = minf(
@@ -386,6 +402,57 @@ func _process(delta: float) -> void:
 	while not _spent.is_empty() and float(_spent[0]["age"]) >= SPENT_LIFE:
 		_spent.pop_front()
 	_repaint()
+
+
+## The idle hop's clock and the motes for one button. The burst's hops are read straight
+## off its clock (`hop_of`); only the idle ones are scheduled.
+func _step_hop(name: StringName, delta: float) -> void:
+	var live := float(_pulses[name]) > 0.0
+	var clock := float(_clocks[name])
+	var burst := live and clock < PULSE_TIME
+	if live and not burst:
+		if float(_idle_hop[name]) >= 0.0:
+			_idle_hop[name] = float(_idle_hop[name]) + delta
+			if float(_idle_hop[name]) >= _beat():
+				_idle_hop[name] = -1.0
+				_idle_wait[name] = _hop_rng.randf_range(IDLE_HOP_EVERY.x, IDLE_HOP_EVERY.y)
+		else:
+			_idle_wait[name] = float(_idle_wait[name]) - delta
+			if float(_idle_wait[name]) <= 0.0:
+				_idle_hop[name] = 0.0
+	else:
+		_idle_hop[name] = -1.0
+		_idle_wait[name] = _hop_rng.randf_range(IDLE_HOP_EVERY.x, IDLE_HOP_EVERY.y) * 0.5
+	var rate := 0.0
+	if live:
+		rate = MOTES_BURST if burst else MOTES_IDLE
+	var box := _upgrades_box if name == &"upgrades" else _shed_box
+	(_motes[name] as HudButtons.Motes).step(delta, rate, _lifted(box, name))
+
+
+static func _beat() -> float:
+	return PULSE_TIME / PULSE_BEATS
+
+
+## How high a button is in its hop (0 to 1) and how squashed (0 to 1), its strength in.
+func hop_of(name: StringName) -> Vector2:
+	if float(_pulses.get(name, 0.0)) <= 0.0:
+		return Vector2.ZERO
+	var clock := float(_clocks[name])
+	if clock < _beat() * BURST_HOPS:
+		return HudButtons.hop_shape(fmod(clock, _beat()) / _beat())
+	var t := float(_idle_hop[name])
+	if t < 0.0:
+		return Vector2.ZERO
+	return HudButtons.hop_shape(t / _beat()) * IDLE_HOP
+
+
+## Whether anything of a pulse is moving: a hop in the air or motes still drifting.
+func _pulse_moving() -> bool:
+	for name: StringName in _pulses:
+		if hop_of(name) != Vector2.ZERO or (_motes[name] as HudButtons.Motes).alive() > 0:
+			return true
+	return false
 
 
 ## Whether the pointer is on one of the two picture buttons: the lake's edge scroll asks, so a
@@ -440,7 +507,7 @@ func _under(at: Vector2) -> StringName:
 ## then stop — so the honest trigger is "a number I draw from has changed", and between
 ## sales that is nobody.
 func _repaint() -> void:
-	if _painted != _paint_key():
+	if _painted != _paint_key() or _pulse_moving():
 		queue_redraw()
 		if _purse != null and _purse.visible:
 			_purse.queue_redraw()
@@ -483,14 +550,19 @@ func _draw() -> void:
 		)
 	# A hovered button lifts a pixel and brightens, which is the whole of the feedback. It
 	# is a wooden sign, not a web page.
-	# A pulsing button swells a few whole pixels and its glow is drawn under it, so the
-	# wood covers the glow's inside and nothing on the face is tinted.
-	HudButtons.pulse(self, _lifted(_shed_box, &"shed"), pulse_amount(&"shed"))
-	HudButtons.draw_shed(self, _lifted(_shed_box, &"shed"), _hovered == &"shed", sprites)
-	HudButtons.pulse(self, _lifted(_upgrades_box, &"upgrades"), pulse_amount(&"upgrades"))
-	HudButtons.draw_upgrades(self, _lifted(_upgrades_box, &"upgrades"), _hovered == &"upgrades", sprites)
-	_draw_stock()
+	# A pulsing button hops and squashes as it lands (`hop_of`, `_lifted`): the squash is a
+	# transform over the whole drawing (`HudButtons.base`), so nothing is laid out again.
+	var shed := _lifted(_shed_box, &"shed")
+	_squash(shed, hop_of(&"shed").y)
+	HudButtons.draw_shed(self, shed, _hovered == &"shed", sprites)
+	var upgrades := _lifted(_upgrades_box, &"upgrades")
+	_squash(upgrades, hop_of(&"upgrades").y)
+	HudButtons.draw_upgrades(self, upgrades, _hovered == &"upgrades", sprites)
 	_draw_available()
+	_squash(Rect2(), 0.0)
+	for name: StringName in _motes:
+		(_motes[name] as HudButtons.Motes).draw(self)
+	_draw_stock()
 	# The hint is its own node over the meter's sheets. See `HintLine`.
 	_place_hint()
 
@@ -742,9 +814,15 @@ class MeterFace extends Control:
 		)
 
 
+## Squash what is drawn next about a box's foot, or put the canvas straight with nought.
+func _squash(box: Rect2, squash: float) -> void:
+	HudButtons.base = HudButtons.squash_about(box, squash)
+	draw_set_transform_matrix(HudButtons.base)
+
+
 func _lifted(box: Rect2, name: StringName) -> Rect2:
-	# A pulse lifts the button the hover's way and the two stack; nothing is resized.
-	box.position.y -= HudButtons.lift_by(pulse_amount(name))
+	# A hop lifts the button the hover's way and the two stack, in whole pixels.
+	box.position.y -= roundf(hop_of(name).x * HudButtons.HOP_PX)
 	if _hovered != name:
 		return box
 	return Rect2(box.position - Vector2(0.0, Style.HOVER_LIFT), box.size)

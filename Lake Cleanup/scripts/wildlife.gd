@@ -481,6 +481,10 @@ func _process(delta: float) -> void:
 	if _reckon_in <= 0.0:
 		_reckon_in = RECKON_EVERY
 		_reckon()
+	_crowd_in -= delta
+	if _crowd_in <= 0.0:
+		_crowd_in = CROWD_EVERY
+		_push_crowds()
 	_brood_in -= delta
 	_age_tracks(delta)
 	var seen := PackedVector2Array()
@@ -713,6 +717,31 @@ func _reckon() -> void:
 			_bird_in = _rng.randf_range(BIRD_GAP.x, BIRD_GAP.y)
 	if none_yet and _alive() > 0:
 		first_arrived.emit(_first_spot())
+
+
+## How often the animals within earshot are counted for the sound's crowd
+## (`Sfx.set_crowd`, 2026-10-05): the more of a kind round the angler, the shorter its gap.
+const CROWD_EVERY := 1.0
+var _crowd_in := 0.0
+
+
+## Counts the frogs, broods and songbirds within earshot and hands them to the sound.
+func _push_crowds() -> void:
+	var sfx := Sfx.main()
+	if sfx == null:
+		return
+	sfx.set_crowd(&"frog", _heard_of(_frogs))
+	sfx.set_crowd(&"duck", _heard_of(_broods))
+	sfx.set_crowd(&"songbird", _heard_of(_birds))
+
+
+## How many of a list of animals stand within earshot.
+func _heard_of(list: Array) -> int:
+	var count := 0
+	for a: Dictionary in list:
+		if a.has("at") and hears(a["at"]):
+			count += 1
+	return count
 
 
 ## Whether a sound at `at` (world px) is in the angler's earshot.

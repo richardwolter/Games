@@ -55,14 +55,21 @@ var lit: bool = false:
 		lit = value
 		queue_redraw()
 
-## A soft lit rim breathing round the wood, 0 to 1 — the HUD's own `HudButtons.pulse`,
+## Gold motes drifting up off the wood, 0 to 1 — the HUD buttons' own (`HudButtons.Motes`),
 ## driven by whoever owns the button (the shed's wash plank, when a find has arrived at the
-## pump since the shelf was last opened). The button itself keeps no clock.
+## pump since the shelf was last opened). Motes only: a plank in a list does not hop
+## (2026-10-05; it glowed until then, `HudButtons.pulse`, retired with the halo).
 var pulse: float = 0.0:
 	set(value):
 		if roundi(value * 64.0) != roundi(pulse * 64.0):
 			queue_redraw()
 		pulse = value
+		if pulse > 0.0:
+			set_process(true)
+
+## Motes a second at a full pulse.
+const PULSE_MOTES := 18.0
+var _motes: HudButtons.Motes
 
 ## How much of the face the word is set to, and how much room is left beside it.
 const LABEL_SHARE := 0.78
@@ -170,6 +177,15 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
+		return
+	if pulse > 0.0 or (_motes != null and _motes.alive() > 0):
+		if _motes == null:
+			_motes = HudButtons.Motes.new(get_instance_id())
+		_motes.step(delta, PULSE_MOTES * pulse, Rect2(Vector2.ZERO, size))
+		queue_redraw()
+	elif not water:
+		set_process(false)
+	if not water:
 		return
 	_clock += delta
 	var drive := sin(_clock * 1.1) * TILT_IDLE * TILT_STIFF * 0.3
@@ -366,8 +382,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	# The glow only: a plank in a list does not swell (Richard, 2026-09-22), the HUD's
-	# corner buttons do.
+	# Motes only: a plank in a list does not hop, the HUD's corner buttons do.
 	var box := Rect2(Vector2.ZERO, size)
 	if _held:
 		box.position.y += Style.PRESS_SINK
@@ -381,8 +396,6 @@ func _draw() -> void:
 		face = face.darkened(0.15)
 	var on := box
 	var behind := Style.BOARD_ROW if accent else Style.BOARD
-	HudButtons.pulse(self, box, pulse)
-	# The glow reaches outside the control; a control clips nothing by default, so it shows.
 	if Style.border_fits(box):
 		on = Style.border_inset(box)
 		draw_rect(on.grow(2.0), Style.BOARD if water else behind, true)
@@ -395,6 +408,8 @@ func _draw() -> void:
 			Style.lit_edge(self, on.grow(2.0), behind)
 	else:
 		Style.plank(self, box, int(global_position.x) * 7 + int(global_position.y) + 3, face, Style.CLIP)
+	if _motes != null:
+		_motes.draw(self)
 	if not mark.is_empty():
 		_draw_mark(on, behind)
 		return

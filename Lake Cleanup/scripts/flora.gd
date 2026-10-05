@@ -107,6 +107,14 @@ var ear: Callable
 ## Seconds to the next look for a bee within earshot; one host asked a look.
 var _bee_listen := 0.0
 const BEE_LISTEN := 1.0
+## The woods heard from what has grown back (2026-10-05): about once a second the grown
+## plants and bee flowers within earshot are counted for `Sfx.set_crowd`, and with at least
+## `FOREST_LEAST` plants grown round the angler the woods chirp on their own gap, not only
+## as a plant shows itself. A bare shore stays quiet.
+const FOREST_LISTEN := 1.0
+const FOREST_LEAST := 5
+var _listen_at := 0
+var _listen_grown := 0
 var _alive := 0
 
 var _points := PackedVector2Array()
@@ -412,6 +420,35 @@ func _find_bees() -> void:
 		set_process(true)
 
 
+## Counts what has grown back within earshot for the sound's crowd, and lets the woods
+## chirp off a grown shore. The candidates are walked a slice a frame, the whole list once
+## every `FOREST_LISTEN`, so no frame pays for thousands of plants at once.
+func _listen_for_crowds(delta: float) -> void:
+	var sfx := Sfx.main()
+	if sfx == null or not ear.is_valid() or _age.is_empty():
+		return
+	var here: Vector2 = ear.call()
+	var reach := Iso.tile_circle_extent(Dog.HEAR)
+	var count := _age.size()
+	var slice := mini(count - _listen_at, ceili(float(count) * delta / FOREST_LISTEN))
+	for k in range(_listen_at, _listen_at + slice):
+		if _age[k] >= 0.0 and _age[k] >= _delay[k] and here.distance_to(_foot[k]) < reach:
+			_listen_grown += 1
+	_listen_at += slice
+	if _listen_at < count:
+		return
+	_listen_at = 0
+	var hosts := 0
+	for k in _bee_host:
+		if here.distance_to(_foot[k]) < reach:
+			hosts += 1
+	sfx.set_crowd(&"forest", _listen_grown)
+	sfx.set_crowd(&"bee", hosts)
+	if _listen_grown >= FOREST_LEAST:
+		sfx.play_forest()
+	_listen_grown = 0
+
+
 func _heard(at: Vector2) -> bool:
 	return ear.is_valid() and (ear.call() as Vector2).distance_to(at) < Iso.tile_circle_extent(Dog.HEAR)
 
@@ -443,6 +480,7 @@ func _process(delta: float) -> void:
 			_dirty = true
 			queue_redraw()
 		_growing = still
+	_listen_for_crowds(delta)
 	if not _bee_host.is_empty():
 		_bees.queue_redraw()
 		_bee_listen -= delta

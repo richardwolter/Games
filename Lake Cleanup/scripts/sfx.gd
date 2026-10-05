@@ -154,6 +154,17 @@ const SONGBIRD_GAP := Vector2(8.0, 18.0)
 const FLUSH_GAP := Vector2(1.2, 2.5)
 const SONGBIRD_DB := -4.0
 const FLUSH_DB := -6.0
+## The crowd (2026-10-05, `/grill-me` with Richard: "wildlife ambient sound should get
+## progressively more constant as the player cleans the lake and there are more
+## creatures"): a species' gap shrinks with how many of it are within earshot, down to
+## `CROWD_LEAST` of itself at `CROWD_FULL` of them. One of a kind, or none counted, is the
+## gap as written; a bare shore stays as sparse as it always was. The counts are pushed by
+## `Wildlife` and `Flora` about once a second (`set_crowd`). A species still never stacks
+## on itself; different species may overlap.
+const CROWD_LEAST := 0.25
+const CROWD_FULL := {
+	&"frog": 8, &"duck": 3, &"songbird": 8, &"forest": 30, &"bee": 6,
+}
 ## How often a duck call is the far geese instead of the mallard.
 const GEESE_ODDS := 0.3
 ## The share of heard frights a frog ribbits on, held to `FROG_GAP` like its croaks.
@@ -355,6 +366,8 @@ var _last := {}
 var _pitch_step := {}
 ## Name to the time its next play is allowed (`_due`).
 var _next_due := {}
+## How many of each species are within earshot, as last pushed (`set_crowd`).
+var _crowd := {}
 
 ## The coo and the start sound get players nobody else can take. The coo went through the
 ## pool once, and a cast closing on a pigeon closes on a dozen pieces in the same sweep: eight
@@ -1074,13 +1087,29 @@ func play_door(open: bool) -> void:
 	play(&"door_open" if open else &"door_close")
 
 
-## Whether a species' own rolled gap has run out; if so, rolls the next one.
+## Whether a species' own rolled gap has run out; if so, rolls the next one, shortened by
+## the crowd within earshot (`crowd_scale`).
 func _due(name: StringName, gap: Vector2) -> bool:
 	var now := float(Time.get_ticks_msec()) / 1000.0
 	if now < float(_next_due.get(name, -1.0)):
 		return false
-	_next_due[name] = now + _rng.randf_range(gap.x, gap.y)
+	_next_due[name] = now + _rng.randf_range(gap.x, gap.y) * crowd_scale(name)
 	return true
+
+
+## How many of a species are within earshot now. Set by the wildlife and the flora.
+func set_crowd(name: StringName, count: int) -> void:
+	_crowd[name] = count
+
+
+## What a species' gap is multiplied by for the crowd within earshot: 1 for one or none,
+## easing to `CROWD_LEAST` at `CROWD_FULL`. A species with no crowd entry is not scaled.
+func crowd_scale(name: StringName) -> float:
+	if not CROWD_FULL.has(name):
+		return 1.0
+	var full := maxi(2, int(CROWD_FULL[name]))
+	var share := clampf(float(int(_crowd.get(name, 0)) - 1) / float(full - 1), 0.0, 1.0)
+	return lerpf(1.0, CROWD_LEAST, share)
 
 
 ## A frog within earshot croaking. Sparse by `FROG_GAP`, whatever the frogs are doing.

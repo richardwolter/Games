@@ -195,11 +195,11 @@ static func fit(on: CanvasItem, art: Dictionary, box: Rect2, fill: float, tint: 
 	# `draw_texture_rect_region` — it degenerates, and the ferry drew as scraps for a day
 	# before that was spotted (2026-09-12). Turn the canvas over instead.
 	var middle := rect.position.x + drawn.x * 0.5
-	on.draw_set_transform(Vector2(middle, 0.0), 0.0, Vector2(-1.0, 1.0))
+	on.draw_set_transform_matrix(base * Transform2D(0.0, Vector2(-1.0, 1.0), 0.0, Vector2(middle, 0.0)))
 	on.draw_texture_rect_region(
 		sheet, Rect2(Vector2(-drawn.x * 0.5, rect.position.y), drawn), region, tint
 	)
-	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	on.draw_set_transform_matrix(base)
 	return rect
 
 
@@ -423,74 +423,134 @@ const BADGE_PAD := 5.0
 const BADGE_INSET := 3.0
 const BADGE_TEXT := 0.82
 const BADGE_SAMPLE := "99"
-## The pulse: how far the button lifts at full, the glow's tone and how far it reaches.
-## **A lift, not a swell** (Richard, 2026-09-22, third pass: growing the box "distorts the
-## borders and text" — the border was rebuilt at a new size and the label re-measured): a
-## pulsing button rises `PULSE_LIFT` whole pixels and settles, the hover's own gesture, and
-## nothing on it is laid out again. **Gold, and not subtle** (Richard,
-## 2026-09-22, after a pale blue rim at 0.75 read as nothing): gold on this HUD is a price,
-## and this is a thing that can be bought. **No seams** (Richard, same day: three stacked
-## rects of different shades were "blocky and ugly"): the glow is one halo drawn as quads
-## with per-vertex colour, gold at the wood going to nothing at `GLOW_REACH`, so the falloff
-## is a gradient rather than steps; and `RAYS` soft rays stand off the wood like light thrown
-## from behind it, each a tapering triangle fading to nothing at its tip, its length rolled
-## off its own index and breathing with the pulse.
-const PULSE_LIFT := 2.0
+## The pulse (2026-10-05, `/grill-me` with Richard, pick A off `tools/last_pulse_mockup.gif`:
+## "much more appealing"): **the button hops and gold motes drift up off it.** It rises
+## `HOP_PX` whole pixels and falls under gravity over `HOP_AIR` of a hop, then squashes on
+## landing for the rest (`HOP_SQUASH` of its height, half that wider, about its foot). The
+## squash scales the drawing through `base` — the border is not rebuilt and nothing is laid
+## out again, which is what the old swell got wrong. Motes (`Motes`) are whole pixels of
+## gold with a dark rim, some 2x2 and some four-point stars, fading in hard steps.
+## **Supersedes** the lift of 2 px, the halo and the rays (2026-09-22). Gold, still: gold on
+## this HUD is a price, and this is a thing that can be bought.
 const PULSE_TONE := Color(1.0, 0.84, 0.36)
 const PULSE_RIM := 1.0
-const GLOW_REACH := 10.0
-const RAYS := 14
-const RAY_REACH := 22.0
-const RAY_WIDE := 7.0
+const HOP_PX := 6.0
+const HOP_AIR := 0.8
+const HOP_SQUASH := 0.08
+const MOTE_GOLD := Color(1.0, 0.84, 0.36)
+const MOTE_LIT := Color(1.0, 0.957, 0.745)
+const MOTE_DEEP := Color(0.84, 0.59, 0.16)
+const MOTE_RIM := Color(0.094, 0.071, 0.067)
+
+## A transform every drawing in here is laid under, so a caller can squash a whole button
+## (the mirror in `fit` composes with it rather than replacing it). Identity the rest of the
+## time; whoever sets it puts it back.
+static var base := Transform2D.IDENTITY
 
 
-## How many whole pixels a button rises at this pulse.
-static func lift_by(amount: float) -> float:
-	return float(roundi(amount * PULSE_LIFT))
+## How high a hop is (0 to 1) and how squashed (0 to 1), `phase` 0 to 1 through it.
+static func hop_shape(phase: float) -> Vector2:
+	if phase <= 0.0 or phase >= 1.0:
+		return Vector2.ZERO
+	if phase < HOP_AIR:
+		var p := phase / HOP_AIR
+		return Vector2(4.0 * p * (1.0 - p), 0.0)
+	return Vector2(0.0, sin((phase - HOP_AIR) / (1.0 - HOP_AIR) * PI))
 
 
-## The glow round a button, `amount` 0 to 1. Drawn before the button, so the wood covers the
-## inside of it and nothing on the face is re-tinted.
-static func pulse(on: CanvasItem, box: Rect2, amount: float) -> void:
-	if amount <= 0.01:
-		return
-	var tone := PULSE_TONE
-	var glow := amount * PULSE_RIM
-	var near := Color(tone.r, tone.g, tone.b, glow * 0.7)
-	var gone := Color(tone.r, tone.g, tone.b, 0.0)
-	var mid := Color(tone.r, tone.g, tone.b, glow * 0.22)
-	# The rays first, under the halo, out to `RAY_REACH` plus what the pulse adds.
-	var centre := box.get_center()
-	for i in RAYS:
-		var angle := TAU * (float(i) + 0.5) / float(RAYS)
-		var dir := Vector2(cos(angle), sin(angle))
-		var foot := _edge_point(box.grow(2.0), dir)
-		var roll := 0.7 + 0.6 * absf(sin(float(i) * 2.399 + 1.0))
-		var length := (GLOW_REACH + RAY_REACH * roll) * (0.75 + 0.25 * amount)
-		var half := dir.orthogonal() * RAY_WIDE * 0.5
-		on.draw_polygon(
-			PackedVector2Array([foot - half, foot + half, foot + dir * length]),
-			PackedColorArray([mid, mid, gone])
-		)
-	# The halo: eight quads between the wood's edge and `GLOW_REACH` out, gold going to nothing.
-	var inner := box.grow(1.0)
-	var outer := box.grow(1.0 + GLOW_REACH)
-	var ic := [inner.position, Vector2(inner.end.x, inner.position.y), inner.end, Vector2(inner.position.x, inner.end.y)]
-	var oc := [outer.position, Vector2(outer.end.x, outer.position.y), outer.end, Vector2(outer.position.x, outer.end.y)]
-	for k in 4:
-		var n := (k + 1) % 4
-		on.draw_polygon(
-			PackedVector2Array([ic[k], ic[n], oc[n], oc[k]]),
-			PackedColorArray([near, near, gone, gone])
-		)
+## The transform that squashes a box about the middle of its foot.
+static func squash_about(box: Rect2, squash: float) -> Transform2D:
+	if squash <= 0.0:
+		return Transform2D.IDENTITY
+	var foot := Vector2(box.get_center().x, box.end.y)
+	var scale := Vector2(1.0 + HOP_SQUASH * 0.5 * squash, 1.0 - HOP_SQUASH * squash)
+	return Transform2D(0.0, scale, 0.0, foot) * Transform2D(0.0, -foot)
 
 
-## Where a ray from a box's middle in `dir` leaves the box.
-static func _edge_point(box: Rect2, dir: Vector2) -> Vector2:
-	var half := box.size * 0.5
-	var tx := half.x / maxf(absf(dir.x), 0.0001)
-	var ty := half.y / maxf(absf(dir.y), 0.0001)
-	return box.get_center() + dir * minf(tx, ty)
+## Gold motes drifting up off a box: spawned off its top and its sides at a rate, rising
+## and swaying, fading in hard steps (whole, then a dithered three fifths, then a third) the
+## way the foam dissolves. Whole pixels on the canvas. Drawing only.
+class Motes:
+	var _at: Array[Vector2] = []
+	var _rise: Array[float] = []
+	var _sway: Array[float] = []
+	var _age: Array[float] = []
+	var _life: Array[float] = []
+	var _kind: Array[int] = []
+	var _carry := 0.0
+	var _rng := RandomNumberGenerator.new()
+
+	func _init(seed_by: int = 0) -> void:
+		_rng.seed = seed_by
+
+	func alive() -> int:
+		return _age.size()
+
+	func step(delta: float, rate: float, box: Rect2) -> void:
+		_carry += rate * delta
+		while _carry >= 1.0 and _age.size() < 80:
+			_carry -= 1.0
+			var side := _rng.randf()
+			var at: Vector2
+			if side < 0.6:
+				at = Vector2(_rng.randf_range(box.position.x + 4.0, box.end.x - 4.0),
+					box.position.y + _rng.randf_range(-2.0, 6.0))
+			elif side < 0.8:
+				at = Vector2(box.position.x - _rng.randf_range(0.0, 3.0),
+					box.position.y + _rng.randf_range(8.0, box.size.y * 0.7))
+			else:
+				at = Vector2(box.end.x + _rng.randf_range(0.0, 3.0),
+					box.position.y + _rng.randf_range(8.0, box.size.y * 0.7))
+			_at.append(at)
+			_rise.append(_rng.randf_range(10.0, 22.0))
+			_sway.append(_rng.randf() * TAU)
+			_age.append(0.0)
+			_life.append(_rng.randf_range(0.9, 1.6))
+			var roll := _rng.randf()
+			_kind.append(2 if roll < 0.2 else (1 if roll < 0.6 else 0))
+		if rate <= 0.0:
+			_carry = 0.0
+		var k := 0
+		while k < _age.size():
+			_age[k] += delta
+			if _age[k] >= _life[k]:
+				for list: Array in [_at, _rise, _sway, _age, _life, _kind]:
+					list.remove_at(k)
+				continue
+			_at[k] += Vector2(sin(_age[k] * 4.0 + _sway[k]) * 6.0, -_rise[k]) * delta
+			k += 1
+
+	func draw(on: CanvasItem) -> void:
+		for k in _age.size():
+			var t := _age[k] / _life[k]
+			var alpha := 1.0 if t < 0.55 else (0.6 if t < 0.8 else 0.3)
+			var at := _at[k].round()
+			match _kind[k]:
+				2:
+					if t >= 0.7:
+						_px(on, at, MOTE_GOLD, alpha)
+						continue
+					for d: Vector2 in [Vector2(2, 0), Vector2(-2, 0), Vector2(0, 2), Vector2(0, -2),
+							Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+						_px(on, at + d, MOTE_RIM, alpha * 0.5)
+					for d: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+						_px(on, at + d, MOTE_GOLD, alpha)
+					_px(on, at, MOTE_LIT, alpha)
+				1:
+					for d: Vector2 in [Vector2(-1, 0), Vector2(2, 0), Vector2(-1, 1), Vector2(2, 1),
+							Vector2(0, -1), Vector2(1, -1), Vector2(0, 2), Vector2(1, 2)]:
+						_px(on, at + d, MOTE_RIM, alpha * 0.6)
+					_px(on, at, MOTE_LIT, alpha)
+					_px(on, at + Vector2(1, 0), MOTE_GOLD, alpha)
+					_px(on, at + Vector2(0, 1), MOTE_GOLD, alpha)
+					_px(on, at + Vector2(1, 1), MOTE_DEEP, alpha)
+				_:
+					for d: Vector2 in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
+						_px(on, at + d, MOTE_RIM, alpha * 0.5)
+					_px(on, at, MOTE_LIT, alpha)
+
+	static func _px(on: CanvasItem, at: Vector2, colour: Color, alpha: float) -> void:
+		on.draw_rect(Rect2(at, Vector2.ONE), Color(colour.r, colour.g, colour.b, colour.a * alpha))
 
 
 ## `swell` is the pulse (0 to 1): the plate wears a gold ring at its strength. It does not

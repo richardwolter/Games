@@ -1769,6 +1769,9 @@ shed's shelf has a door to the wash room.
   breathing there until the board is opened (`hush_pulse`, from `_set_menu` / `_set_shed`),
   which is the player seeing what was pending. A hover does not put it out. Supersedes
   "fades out on its own", which lasted an afternoon.
+- **Superseded 2026-10-05** (see Four End-Game Fixes): the button hops and throws gold
+  motes; the lift, halo and rays below are gone, and the wash plank throws motes instead of
+  glowing.
 - **The look is the button lifting and a gold glow with rays behind it** (`HudButtons.pulse`,
   `lift_by`, `PULSE_LIFT`, `GLOW_REACH`, `RAYS`, `RAY_REACH`): the button rises `PULSE_LIFT`
   (2) **whole** pixels and settles, the hover's own gesture, stacked on it. **Not a swell**:
@@ -4001,6 +4004,8 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   the ending make it wait (`_moment_owed`). **The third zoom glide in the game**, after the
   menu's Continue. Saved as `wildlife_seen`, absent reads as seen (the tours' rule), no
   `SAVE_VERSION` bump; a new game sets it false in `_start_arrival`.
+- **Superseded 2026-10-05** (see Four End-Game Fixes): thirty pieces, arrows grouped, and a
+  shrinking mark is patched in place.
 - **The last three pieces are marked** (`Lake.LAST_MARKED`, `_mark_last_pieces`,
   `LakeGrid.mark_last`, `LastArrows`): from three pieces left, every tile holding one wears
   a **pale** rim in the soup (`PALE_FLAG` 0.3, `rubbish.gdshader`'s `rim_pale`: gold is
@@ -5764,6 +5769,51 @@ levelled like the rest; `SOUNDS` holds the mix. All spans, levels and gaps are f
   player does**: net, catch, crate, coins, upgrades, ferry, steps, doors, drops, hose, UI.
 - Bus only, by decision: no level, gap or indoors/shopping gating moved. Ambience at zero now
   also silences thunder, accepted. `test_lake`'s `_check_buses` guards the split.
+
+### Four End-Game Fixes (2026-10-05, `/grill-me` with Richard)
+- **A piece lifted off the dry beach throws sand, not a crown** (`CastNet._take_from`,
+  `SAND_PUFF`, `CastNet.dust` = the lake's `KickDust`): a `grid.dry` tile puffs whole-pixel
+  sand grains where the piece lay. The catch's sound is unchanged; strand pieces (in the
+  shallows) still splash.
+- **The last 30 pieces are marked** (`Lake.LAST_MARKED` 30, was 3): pale rim and white
+  column on every one. **Off-screen pieces share an arrow by direction** (`LastArrows.arrows`,
+  `GROUP_ANGLE` 22 degrees seen from the window's middle) with their count behind it when
+  more than one. **A shrinking mark is no rebuild** (`LakeGrid.mark_last`): only a newly
+  marked tile lays the soup out (once when the marking starts, again only if a piece lands
+  on an unmarked tile, a tornado's fling); a tile leaving the set is restamped in place.
+  Supersedes "relays the soup once per change".
+  **A growing mark asks for the redraw itself** (same day, Richard: marked pieces stayed drawn
+  after being netted): `_dirty` alone waited for something else to redraw the soup, and
+  every take's `_restamp` stands down while `_dirty` is set, so nothing was patched until
+  the view moved. `tools/probe_last_marked.tscn` (desktop build, own save) thins a new lake
+  to 12 pieces, nets each and logs what the soup still holds for the tile.
+- **Wildlife calls quicken with the crowd in earshot** (`Sfx.set_crowd`, `crowd_scale`,
+  `CROWD_FULL`, `CROWD_LEAST` 0.25): a species' rolled gap shrinks linearly from one of it
+  (as written) to `CROWD_FULL` of it (a quarter): frogs 8, ducks 3, songbirds 8, grown plants
+  30 (forest), bee flowers 6. `Wildlife._push_crowds` counts frogs, broods and songbirds in
+  `Dog.HEAR` every `CROWD_EVERY` (1 s); `Flora._listen_for_crowds` walks its candidates a
+  slice a frame (the whole list once a `FOREST_LISTEN`) for grown plants and bee hosts, and
+  **with `FOREST_LEAST` (5) plants grown round the angler the woods chirp on their own gap**,
+  not only as a plant shows itself. A species never stacks on itself; different species may
+  overlap. A bare shore keeps the old gaps.
+- **The HUD buttons hop and throw gold motes** (picked A off `tools/last_pulse_mockup.gif`,
+  `tools/pulse_mockup.py`; rays and both-at-once were the others): the burst hops on its
+  first `HudSkin.BURST_HOPS` (3) beats, `HudButtons.HOP_PX` (6) whole pixels, rising and
+  falling over `HOP_AIR` of the beat and squashing `HOP_SQUASH` on landing about the foot.
+  **The squash is a transform over the drawing** (`HudButtons.base`, which `fit`'s mirror
+  composes with), so nothing is rebuilt. Settled, it hops once every `IDLE_HOP_EVERY` (4-6 s)
+  at `IDLE_HOP` (0.6) until the board is opened. Motes (`HudButtons.Motes`: whole pixels of
+  gold with a dark rim, some 2x2, some four-point stars, fading in hard steps) drift up off
+  the top and sides at `MOTES_BURST` 30 / `MOTES_IDLE` 8 a second. The badge keeps its gold
+  ring. **The wash plank throws motes and does not hop** (`PlankButton.PULSE_MOTES`). The
+  halo, the rays, `PULSE_LIFT`, `lift_by` and `HudButtons.pulse` are deleted. When a pulse
+  fires and what stops it are unchanged.
+- Probe: `tools/shot_pulse_base.tscn` (desktop build, own save, under its own node) saves the
+  buttons at rest for the mockup; `PULSE_FILM=1` films the real pulse into
+  `tools/film/pulse/`. All numbers first guesses for Richard's eye and ear.
+- `test_lake`'s `_check_end_fixes` (sand, the thirty, the shrinking mark, grouped arrows),
+  `_check_crowds`, and `_check_upgrades_pulse` (hop in whole pixels, motes, the squash, the
+  idle hop) guard it.
 
 ### The Music (2026-09-15, `/grill-me` with Richard, `scripts/music_station.gd`, `tools/build_music.py`)
 One station for the whole session. **Supersedes** the lake's two-player Goin crossfade and the

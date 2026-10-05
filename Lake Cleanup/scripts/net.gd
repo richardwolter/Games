@@ -356,6 +356,9 @@ var helper: bool = false
 ## to fetch for it — it is the thing doing the catching.
 var grid: LakeGrid
 var splash: WaterSplash
+## The sand a piece lifted off the dry beach throws instead of a crown (2026-10-05,
+## Richard: "objects caught on sand shouldn't show splash animation"). Optional.
+var dust: KickDust
 ## The noises. Optional — a net with no sound board still fishes.
 var sfx: Sfx
 var angler: Angler
@@ -1366,6 +1369,10 @@ func _birds_touched(at: Vector2, mouth: float) -> Array[int]:
 	return out
 
 
+## How big a sand puff a piece lifted off the dry beach throws, before its weight.
+const SAND_PUFF := 0.6
+
+
 ## One layer: every tile in turn gives up whatever is on top of it, if the net is strong
 ## enough to lift it and there is room left in the cast. How many it took; every tile taken
 ## from goes in `dug`.
@@ -1385,7 +1392,11 @@ func _take_from(reach: Array[int], dug: Dictionary = {}) -> int:
 		catch.append(taken)
 		caught.emit(taken)
 		var weight := clampf(0.2 + def.size.x / 40.0, 0.0, 0.85)
-		if splash != null:
+		if index < grid.dry.size() and grid.dry[index] != 0:
+			# Off the beach, not out of the water: a puff of sand where it lay.
+			if dust != null:
+				dust.puff(at, &"sand", Vector2.ZERO, SAND_PUFF + weight)
+		elif splash != null:
 			# Inside the mouth, always. A piece's drawn position carries the drift it was
 			# scattered with, and a crown of water blooming outside the ring the player is
 			# holding reads as the net catching things it visibly did not touch.

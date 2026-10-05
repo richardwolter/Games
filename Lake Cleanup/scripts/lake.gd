@@ -1365,6 +1365,7 @@ func _ready() -> void:
 
 	_net.grid = _grid
 	_net.splash = _splash
+	_net.dust = _dust
 	_angler.splash = _splash
 	for dog in _dogs:
 		dog.splash = _splash
@@ -1393,6 +1394,7 @@ func _ready() -> void:
 	_net2.z_index = _net.z_index
 	_net2.grid = _grid
 	_net2.splash = _splash
+	_net2.dust = _dust
 	_net2.sfx = _sfx
 	_net2.angler = _angler
 	_net2.flock = _flock
@@ -3370,8 +3372,10 @@ func _look_for_the_end(delta: float) -> void:
 
 ## The last few pieces in the water wear a pale rim and a white column, and an arrow at the
 ## window's edge points at any the view does not hold (2026-09-26, `/grill-me` with Richard:
-## "so there isn't too much looking for it"). From `LAST_MARKED` pieces down.
-const LAST_MARKED := 3
+## "so there isn't too much looking for it"). From `LAST_MARKED` pieces down: 3 until
+## 2026-10-05, then 30 (Richard: "lets shine the last 30 objects and point them out"), with
+## the off-screen arrows grouped by direction (`LastArrows.GROUP_ANGLE`).
+const LAST_MARKED := 30
 
 
 func _mark_last_pieces() -> void:
