@@ -74,6 +74,15 @@ var sfx: Sfx
 
 ## Pieces in the air, as `{def, from, lead, to, follow, tag, age, wait, spin, lift}`.
 var _flying: Array = []
+## How many of `_flying` are drawn. See `SHOWN_MOST`.
+var _shown := 0
+
+## The most throws into the island crate drawn in the air at once (2026-10-05, Richard: a
+## maxed lucky double stuttered). A catch past it still flies — same timing, same landing,
+## same sale — it is just not drawn: nobody counts the hundred-and-thirtieth piece of a
+## heap in the air, and every one drawn is a few microseconds of script a frame. Throws to a
+## hull or a pier are always drawn: those are a handful.
+const SHOWN_MOST := 48
 
 ## When the last pop was heard, on the engine's own clock. A stamp rather than a countdown
 ## because this node stops processing the moment the air is empty, and a countdown that is
@@ -102,6 +111,7 @@ func flying() -> int:
 func land_all() -> void:
 	var lot := _flying.duplicate()
 	_flying.clear()
+	_shown = 0
 	for piece: Dictionary in lot:
 		arrived.emit(int(piece["def"]), piece["tag"])
 	set_process(false)
@@ -149,7 +159,11 @@ func send(
 		Vector2.ZERO if follow != null
 		else Vector2(_rng.randf_range(-reach.x, reach.x), _rng.randf_range(-reach.y, reach.y))
 	)
+	var hidden := tag == null and _shown >= SHOWN_MOST
+	if not hidden:
+		_shown += 1
 	_flying.append({
+		"hidden": hidden,
 		"def": def_index,
 		# Held as an offset from whatever it is coming off, so it goes on coming off it.
 		"from": from - lead.position if lead != null else from,
@@ -229,7 +243,7 @@ func draw_landing_on(canvas: CanvasItem, tag: Variant, heap_size: float) -> bool
 	var any := false
 	var to_canvas := canvas.get_global_transform().affine_inverse() * get_global_transform()
 	for piece: Dictionary in _flying:
-		if piece["tag"] != tag or not _handed_over(piece):
+		if piece["tag"] != tag or not _handed_over(piece) or piece["hidden"]:
 			continue
 		var step := _at(piece)
 		var t: float = step["t"]
@@ -282,6 +296,8 @@ func _process(delta: float) -> void:
 		if float(piece["age"]) >= FLIGHT:
 			_pop(piece["tag"])
 			arrived.emit(int(piece["def"]), piece["tag"])
+			if not piece["hidden"]:
+				_shown -= 1
 			_flying.remove_at(i)
 			landing = landing or _into_box(piece["tag"])
 		elif _handed_over(piece):
@@ -442,7 +458,7 @@ func _batch() -> bool:
 	_shade_indices.clear()
 	for piece: Dictionary in _flying:
 		var step := _at(piece)
-		if step.is_empty() or _handed_over(piece):
+		if step.is_empty() or _handed_over(piece) or piece["hidden"]:
 			continue
 		var t: float = step["t"]
 		var at: Vector2 = step["at"]
@@ -526,7 +542,7 @@ func _draw_each() -> void:
 			_unit_circle.append(Vector2(cos(angle), sin(angle)))
 	for piece: Dictionary in _flying:
 		var step := _at(piece)
-		if step.is_empty() or _handed_over(piece):
+		if step.is_empty() or _handed_over(piece) or piece["hidden"]:
 			continue
 		var t: float = step["t"]
 		var at: Vector2 = step["at"]

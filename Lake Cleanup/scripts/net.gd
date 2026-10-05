@@ -1153,21 +1153,42 @@ func _shove_aside(delta: float) -> void:
 		return
 	var at := world_pos()
 	var mouth := mouth_extent()
-	var pushed := _reach(at, mouth, strength(), 0, true)
-	if room_left() <= 0:
-		# Nothing is being taken, so everything the mouth meets is in its way.
-		pushed.append_array(_reach(at, mouth, strength()))
+	# Its own walk of the tiles, not `_reach` (2026-10-05, Richard: big hauls stuttered):
+	# `_reach` asks of every tile whether the mouth touches its drawing and then sorts the
+	# lot, and this already cuts by how far out each piece is; on a maxed net that was a
+	# millisecond or two of every frame of the haul, twice on a double cast. A full net
+	# pushes everything; otherwise only what it cannot lift.
+	var everything := room_left() <= 0
+	var power := strength()
 	var clear := 1.0 + SHOVE_CLEAR / maxf(mouth, 1.0)
-	for index in pushed:
-		var rel := grid.surface_pos(index) - at
-		# Measured where the mouth is a unit circle, so "out of the net" is one number.
-		var norm := Vector2(rel.x / maxf(mouth, 1.0), rel.y / maxf(mouth * 0.5, 1.0))
-		var out := norm.length()
-		if out >= clear:
-			continue
-		var way := norm / out if out > 0.05 else _side_of(index)
-		var want := Vector2(way.x * mouth, way.y * mouth * 0.5) * (clear - out)
-		grid.shove_to(index, want, delta)
+	var centre := Iso.world_to_tile(at)
+	var bound := mouth * clear / Iso.tile_circle_extent(1.0) + grid.footprint_reach()
+	var span := int(ceil(bound)) + 1
+	var cx := int(floor(centre.x))
+	var cy := int(floor(centre.y))
+	for ty in range(maxi(cy - span, 0), mini(cy + span + 1, Iso.ROWS)):
+		for tx in range(maxi(cx - span, 0), mini(cx + span + 1, Iso.COLS)):
+			if Vector2(float(tx) + 0.5, float(ty) + 0.5).distance_squared_to(centre) > bound * bound:
+				continue
+			var index := grid.index_of(tx, ty)
+			if grid.top_slot(index) < 0:
+				continue
+			if not everything and grid.reachable_slot(index, 1, power) >= 0:
+				continue
+			_shove_one(index, at, mouth, clear, delta)
+
+
+## Push one piece clear of a mouth at `at`, if it is inside `clear` of it. See `_shove_aside`.
+func _shove_one(index: int, at: Vector2, mouth: float, clear: float, delta: float) -> void:
+	var rel := grid.surface_pos(index) - at
+	# Measured where the mouth is a unit circle, so "out of the net" is one number.
+	var norm := Vector2(rel.x / maxf(mouth, 1.0), rel.y / maxf(mouth * 0.5, 1.0))
+	var out := norm.length()
+	if out >= clear:
+		return
+	var way := norm / out if out > 0.05 else _side_of(index)
+	var want := Vector2(way.x * mouth, way.y * mouth * 0.5) * (clear - out)
+	grid.shove_to(index, want, delta)
 
 
 ## Which way a piece sitting under the middle of the mouth is parted, from its own tile, so
@@ -1292,7 +1313,8 @@ static func _touches(at: Vector2, mouth: float, centre: Vector2, half: Vector2) 
 ## `refused` turns it around: the tiles holding something this net will *not* take, which is
 ## what the haul shoves aside.
 func _reach(
-	at: Vector2, mouth: float, strength: int, most: int = 0, refused: bool = false
+	at: Vector2, mouth: float, strength: int, most: int = 0, refused: bool = false,
+	sorted: bool = true, everything: bool = false
 ) -> Array[int]:
 	var out: Array[int] = []
 	if grid == null:
@@ -1308,7 +1330,10 @@ func _reach(
 				continue
 			var index := grid.index_of(tx, ty)
 			var liftable := grid.reachable_slot(index, 1, strength) >= 0
-			if refused:
+			if everything:
+				if grid.top_slot(index) < 0:
+					continue
+			elif refused:
 				if liftable or grid.top_slot(index) < 0:
 					continue
 			elif not liftable:
@@ -1320,6 +1345,8 @@ func _reach(
 				return out
 	# Nearest first, measured to where each piece is drawn, so the mouth closes from the
 	# middle out and the order does not jump as the net crosses a tile edge.
+	if not sorted:
+		return out
 	out.sort_custom(
 		func(p: int, q: int) -> bool:
 			return grid.surface_pos(p).distance_squared_to(at) < grid.surface_pos(q).distance_squared_to(at)

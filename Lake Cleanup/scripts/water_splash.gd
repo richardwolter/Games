@@ -220,9 +220,22 @@ func _redraw() -> void:
 		_crowns.queue_redraw()
 
 
+## The most crowns on the water at once, for a light piece and a heavy one. See `splash`.
+const CROWNS_MOST := 24
+const CROWNS_HEAVY := 32
+## What counts as heavy, of `splash`'s strength.
+const HEAVY_FROM := 0.6
+
+
 ## Throw up a splash. `strength` is 0..1 — a cup slipping in against a fridge
 ## dropped from the sky.
 func splash(at: Vector2, strength: float, tall: bool = true) -> void:
+	# A sweep of a maxed net throws a crown a piece, and past CROWNS_MOST on the water at once
+	# another is lost in the spray of the rest and costs script time every frame it lives
+	# (2026-10-05, Richard: big catches stuttered). The light ones go first: a heavy piece
+	# still gets its crown up to CROWNS_HEAVY.
+	if _crown_age.size() >= (CROWNS_HEAVY if strength >= HEAVY_FROM else CROWNS_MOST):
+		return
 	var force := clampf(strength, 0.0, 1.0)
 	var span := lerpf(40.0, 130.0, force)
 

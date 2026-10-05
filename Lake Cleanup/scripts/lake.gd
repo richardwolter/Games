@@ -91,7 +91,10 @@ const ZOOM_OUT_TILES := 4.0
 ## The far corners of the ground are wood and nothing else — no lake, no piers, nothing to
 ## do — so a drag that reaches them is a drag that takes the player away from the game and
 ## makes them come back.
-const DRAG_PULL := 1.5
+##
+## 1.0 since 2026-10-05 (Richard: a cast near the border slid the view along the limit and
+## read as dizzy): the view may go as far as the ground goes, for the drag as for the follow.
+const DRAG_PULL := 1.0
 
 ## What is behind everything, where there is no ground drawn: the `Sky` layer's fill, which
 ## sits under the whole scene and used to be a flat grey.
@@ -150,10 +153,9 @@ const LOOK_SPEED := 3.4
 ##
 ## Measured against where the net will land while it flies, so the view is on its way to
 ## the landing from the throw rather than chasing the net there and arriving late — taken
-## up over the first `FRAME_BY` of the flight rather than all at once, or the view jumped
-## a hundred pixels on the frame of the click. The rest of the flight is for the follow
-## to close on it, and the flying net itself pushes the view the last of the way if it
-## has not (see `_process`): a short throw is over before the ease has done much.
+## up over the first `FRAME_BY` of the flight on a smoothstep. Until 2026-10-05 the flying
+## net also pushed the camera the last of the way if the ease had fallen behind, and that
+## push was one of the jolts; the spring in `_glide_to` now gets there on its own.
 const LAND_INSET := 0.25
 const FRAME_BY := 0.6
 
@@ -642,6 +644,20 @@ var _cast_look: float = 0.0
 ## the net beating the view home is the whole reason for the cap, so the cap cannot be
 ## allowed to lift the moment the net arrives.
 var _homing: bool = false
+
+## The view's own velocity, world px a second, for the spring `_glide_to` drives it with.
+## Zeroed whenever something other than the spring put the camera where it is (a drag, the
+## menu, the glide, a zoom), see `_cam_left`.
+var _cam_vel := Vector2.ZERO
+## Where the spring last left the camera. A camera found anywhere else was moved by something
+## else, and the velocity it carried no longer means anything.
+var _cam_left := Vector2.INF
+## The speed cap the spring runs under, eased between `HOME_SPEED` and `NO_CAP`.
+var _home_cap := NO_CAP
+## Where the view was when the net left the hand; INF while no throw is in the air.
+var _throw_from := Vector2.INF
+## Whether that throw left while the view was still on its way home from a haul.
+var _throw_out := false
 
 ## Where the player has dragged the view to with the middle button, as an offset in world
 ## units from wherever the camera would otherwise be. It stays where it is put: a view that
@@ -5254,12 +5270,6 @@ func _set_auto_ferry(on: bool) -> void:
 		boat.auto_ferry = on
 
 
-## How fast the view drifts to keep up with the angler: the share of the gap it closes a
-## second, see `_ease`. Its speed is its distance from what it is following, which is what
-## makes a fast net a fast camera — `HOME_SPEED` is the ceiling over it on the way home.
-const FOLLOW_SPEED := 6.0
-
-
 ## The net's wash, pushed every frame.
 ##
 ## The fleet's own engine loop went with the diesel it was built from (2026-09-15): the ferry
@@ -5339,6 +5349,11 @@ func _drive_view(delta: float) -> void:
 	# the angler walking off once the net is in, since the view is then following them and
 	# not coming home from anything. A hand on the mouse snaps the view to wherever it
 	# wants to be, which ends the way home as surely as arriving does.
+	if _net.state != CastNet.State.FLYING:
+		_throw_from = Vector2.INF
+	elif _throw_from == Vector2.INF:
+		_throw_from = _camera.position
+		_throw_out = _homing
 	match _net.state:
 		CastNet.State.REELING:
 			_homing = true
@@ -5350,20 +5365,29 @@ func _drive_view(delta: float) -> void:
 
 	# Eased while it is following something, and snapped while the player is dragging it:
 	# a view that lags a hand on the mouse feels like a view being argued with.
+	#
+	# What is clamped is where the view wants to be, not where the ease left it (2026-10-05,
+	# Richard: the haul home stuttered zoomed out). Clamped after the ease, the follow pushed
+	# the view out each frame and the clamp pushed it back, two pushes a frame that never
+	# agreed, and the camera jolted along the edge. A clamped target moves continuously, so a
+	# spring chasing it does too, and it eases into the edge rather than hitting it.
 	if _panning:
 		_camera.position = _clamped_view(_watching())
+		_cam_vel = Vector2.ZERO
 	else:
-		var step := (_watching() - _camera.position) * _ease(FOLLOW_SPEED, delta)
+		# The cap comes on and off eased too: switched, the spring's aim jumped the frame the
+		# view reached home and let go of it.
+		# Coming on, it starts from the pace the view already has rather than from no cap at
+		# all, and closes on HOME_SPEED from there.
 		if _homing:
-			step = step.limit_length(HOME_SPEED * delta)
-		var at := _camera.position + step
-		# The flying net pushes the view along if the ease has fallen behind it, so it
-		# comes down inside the margin however short the throw was. The throw only: on
-		# the haul the cap outranks the frame, and the net is coming towards the middle of
-		# the screen anyway.
+			_home_cap = minf(_home_cap, maxf(_cam_vel.length(), HOME_SPEED))
+		_home_cap = lerpf(_home_cap, HOME_SPEED if _homing else NO_CAP, _ease(CAP_EASE, delta))
+		# A throw closes on its landing a little quicker as it flies, so a short one still
+		# comes down framed; eased in, so the stiffening is not itself a jolt.
+		var time := FOLLOW_TIME
 		if _net.state == CastNet.State.FLYING:
-			at = _framed_on(at, _net.tile_pos)
-		_camera.position = _clamped_view(at)
+			time = lerpf(FOLLOW_TIME, THROW_TIME, clampf(_net.cast_progress() / CastNet.THROW_SHARE, 0.0, 1.0))
+		_glide_to(_clamped_view(_watching()), _home_cap, delta, time)
 
 
 ## Whether the view is the player's own this frame: the toggle is on and the mouse is the
@@ -5371,6 +5395,47 @@ func _drive_view(delta: float) -> void:
 ## mode the view follows as ever and free mode waits for the mouse to come back.
 func _free_now() -> bool:
 	return _free_view and not Pad.is_pad()
+
+
+## How long the spring takes to catch up, seconds (`_glide_to`). About the time the old
+## exponential follow (rate 6, `_ease`) took to close most of the gap, but with no kick on
+## the first frame: the old ease started at full speed, which is a jolt every time the
+## target moved off.
+const FOLLOW_TIME := 0.22
+## What `FOLLOW_TIME` tightens to by the end of a throw.
+const THROW_TIME := 0.1
+## "No cap", as a number the cap can ease to and from.
+const NO_CAP := 20000.0
+## How fast the cap eases on and off, a second (`_ease`).
+const CAP_EASE := 6.0
+
+
+## Move the camera towards `to` on a critically damped spring (Unity's SmoothDamp, Game
+## Programming Gems 4 §1.10): velocity carries over frame to frame, so the view speeds up
+## and slows down rather than starting and stopping. `most` caps its speed — `HOME_SPEED`
+## on the way home — and the cap is reached by easing, not by clipping a step: a view still
+## running out with the throw when the haul starts slows, turns and settles to the cap over
+## a few tenths of a second rather than being cut to it.
+func _glide_to(to: Vector2, most: float, delta: float, time := FOLLOW_TIME) -> void:
+	if _cam_left == Vector2.INF or not _camera.position.is_equal_approx(_cam_left):
+		_cam_vel = Vector2.ZERO
+	var omega := 2.0 / time
+	var x := omega * delta
+	var decay := 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
+	var gap := _camera.position - to
+	var limit := most * time
+	if gap.length() > limit:
+		gap = gap.limit_length(limit)
+	var aim := _camera.position - gap
+	var temp := (_cam_vel + omega * gap) * delta
+	_cam_vel = (_cam_vel - omega * temp) * decay
+	var at := aim + (gap + temp) * decay
+	# Never past where it was going: the spring's own overshoot guard.
+	if (to - _camera.position).dot(at - to) > 0.0:
+		at = to
+		_cam_vel = Vector2.ZERO
+	_camera.position = at
+	_cam_left = at
 
 
 ## The toggle beside the gear. On, the view is pinned where it stands; off, the follow eases
@@ -5403,8 +5468,9 @@ func _drive_free_view(delta: float) -> void:
 	_free_at = _clamped_view(_free_at + _edge_scroll() * delta)
 	if _panning:
 		_camera.position = _free_at
+		_cam_vel = Vector2.ZERO
 	else:
-		_camera.position = _camera.position.lerp(_free_at, _ease(FOLLOW_SPEED, delta))
+		_glide_to(_free_at, INF, delta)
 
 
 ## How fast the window's edges are pushing the view, in world px a second. Nothing while the
@@ -5817,15 +5883,30 @@ func _watching() -> Vector2:
 	if _cast_look > 0.001:
 		at = at.lerp(Iso.tile_to_world(_net.tile_pos.x, _net.tile_pos.y), _cast_look)
 	# And out past that as far as the landing needs, see LAND_INSET: towards where the net
-	# is going while it flies, taken up over the first FRAME_BY of the flight; and towards
+	# is going while it flies, taken up over the first FRAME_BY of the flight on a
+	# smoothstep, so the target itself starts and stops gently; and towards
 	# where it is once it is down, where the pull shrinks as the net comes in and hands the
 	# view back to CAST_LOOK's point on its own — no seam where it lets go.
+	#
+	# Framed with the pan already in: a pan still easing away under a cast would otherwise
+	# carry the framed view back off the net. The flying net used to push the camera itself
+	# after the ease, which hid this, and that push was a jolt (2026-10-05).
 	match _net.state:
 		CastNet.State.FLYING:
+			# From wherever the view was at the click, not from the angler: a throw made
+			# before the last haul's view got home goes straight on to the new net rather
+			# than swinging back to the angler first (2026-10-05, Richard).
+			# And a throw made while the view is still out from the last haul (`_throw_out`)
+			# moves it only as far as framing the new net needs, from where it is: no lean
+			# back towards the angler at all.
+			if _throw_from == Vector2.INF:
+				_throw_from = _camera.position
+				_throw_out = _homing
 			var flown := _net.cast_progress() / CastNet.THROW_SHARE
-			at = at.lerp(_framed_on(at, _net.target), clampf(flown / FRAME_BY, 0.0, 1.0))
+			var framed := _framed_on(_throw_from if _throw_out else at + _pan, _net.target)
+			return _throw_from.lerp(framed, smoothstep(0.0, FRAME_BY, flown))
 		CastNet.State.SETTLED, CastNet.State.REELING:
-			at = _framed_on(at, _net.tile_pos)
+			return _framed_on(at + _pan, _net.tile_pos)
 		CastNet.State.IDLE:
 			if _aim.at != Vector2.INF:
 				at = _pad_framed(at)
@@ -5891,7 +5972,7 @@ func _clamped_view(at: Vector2) -> Vector2:
 ## `Ground.OUTER_OUT` where the ground itself runs out. Past `Ground.WOOD_FULL` (19), so a
 ## corner pulled in to clear this is a corner sitting in full canopy, not on the bare last row
 ## of sand.
-const CORNER_MARGIN := 4.0
+const CORNER_MARGIN := 0.5
 
 
 ## How far out of the water the furthest of the view's four actual corners is, in tiles.

@@ -22,6 +22,7 @@
 ## BENCH_CAST=1 casts the net again at the nearest green spot each time it comes home.
 ## BENCH_OFF=count (with BENCH_CAST) hides the haul's count over the angler.
 ##
+## BENCH_FAR=1 (with BENCH_CAST) throws each cast near the net's full range, round the island.
 ## BENCH_BIG=1 (with BENCH_CAST) maxes the net's Width, Catch, Strength, Range and Reel first.
 ## BENCH_LUCK="lucky double" (with BENCH_CAST) makes every cast lucky and/or doubled.
 ## BENCH_HIDE / BENCH_STOP: space-separated lake members to hide / stop processing, by variable
@@ -191,6 +192,17 @@ func _cast_again() -> void:
 		_placed = true
 		angler.stand_at(angler.shore_toward(Iso.ISLAND_CENTRE + Vector2(1.0, 1.0) * 20.0))
 	var spot := net.nearest_catch(angler.position, 400.0)
+	# BENCH_FAR=1: throw as far as the net reaches instead, round the island in turn, so the
+	# long drag home over thick water is what is measured.
+	if OS.get_environment("BENCH_FAR") == "1":
+		spot = Vector2.INF
+		for k in 24:
+			var dir := Vector2.RIGHT.rotated(TAU * float((_casts * 7 + k) % 24) / 24.0)
+			var tile: Vector2 = angler.tile_pos + dir * net.range_tiles * 0.92
+			var at := Iso.tile_to_world(tile.x, tile.y)
+			if net.in_reach(at):
+				spot = at
+				break
 	if spot == Vector2.INF:
 		# No green spot: throw straight out at three quarters of the range.
 		var out := (angler.position - Iso.tile_to_world(Iso.CENTRE.x, Iso.CENTRE.y)).normalized()

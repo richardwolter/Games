@@ -5179,6 +5179,42 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   click, wheel and Escape land where the pointer is in a stretched window
   (`tools/last_pad_cursor.log`).
 
+### The Camera Glides on a Spring (2026-10-05, `/grill-me` with Richard)
+Richard: the haul home stuttered in steps, worst zoomed out on a long cast near the edge.
+`tools/probe_camera.tscn` measured it (`PROBE_FAR=1` for the far stop, eight long casts):
+11 of 16 casts jolted, the velocity jumping up to 300 px/s in one frame.
+- **The causes**: the follow eased the camera, then `_clamped_view` clamped it (a box per
+  axis, then `_pulled_to_forest` radially), two pushes a frame that disagreed at the edge;
+  `HOME_SPEED` clipped each step with `limit_length`; the flying net pushed the camera after
+  the ease (`_framed_on` on the position); and the exponential ease starts at full speed.
+- **Now** (`Lake._glide_to`): the clamp is applied to the **target**, and the camera chases
+  it on a critically damped spring (SmoothDamp), `FOLLOW_TIME` 0.22 s, tightening to
+  `THROW_TIME` 0.1 over a throw so a short one still lands framed. Velocity carries frame to
+  frame (`_cam_vel`, zeroed when anything else moved the camera, `_cam_left`). The way home's
+  cap is the spring's speed limit, eased on from the pace the view already has and off again
+  (`_home_cap`, `NO_CAP`, `CAP_EASE`), so `HOME_SPEED` 260 is reached by easing, not
+  clipping. The flight's push is gone; `_watching` frames the net **with the pan already
+  in**, which is what the push had been hiding. The free camera rides the same spring.
+  `FOLLOW_SPEED` is gone.
+- **Looser edge**: `CORNER_MARGIN` 4 to **2** tiles of forest under a screen corner, then
+  (second `/grill-me` the same day, Richard: a cast near the border slid the view along
+  the limit and read as dizzy) to **0.5**, and `DRAG_PULL` 1.5 to **1.0**: one limit for the
+  drag, the follow and the cast, the forest's edge. `probe_camera` checks every frame that
+  no corner of the view is past the ground.
+- **A re-cast goes straight to the new net** (same pass): the throw's frame-in ramps from
+  where the view was at the click (`_throw_from`), not from the angler; and a throw made
+  while the view was still on its way home (`_throw_out`) is framed from where the view is,
+  with no lean back towards the angler at all. `PROBE_RECAST=1` throws the next cast the
+  moment the net is home and allows `BACK_MOST` (8) frames of the homeward pace carrying on
+  as the view turns. **Known**: a short throw right after a max-reel long haul, in another
+  direction, lands just off-frame (the view is thousands of px out and the throw lasts 12
+  frames) and the view catches up fast; the old push that framed it was a jolt.
+- **Zoom still snaps**, by decision.
+- Probe after: far stop 0 of 16 fail, near stop 0 of 8, `test_lake` passes. The one change
+  left over the old 50 threshold is the frame a net lands (the target stops dead, ~60 px/s a
+  frame at 500 px/s); `JUMP` is 70 and says why. The probe now logs every jolt with its
+  phase. All numbers first guesses for Richard's eye.
+
 ### The Free Camera (2026-09-20, `/grill-me` with Richard; a trial, to judge in play)
 A toggle beside the gear pins the view to a spot in the world, so the player aims and casts by
 the cursor and nothing takes the view back.
@@ -6995,6 +7031,13 @@ overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild
 **The haul is one batch** (2026-09-29, Richard approved: "nothing visible"): `Haul._draw` lays every flight's shadow disc (`CIRCLE_SEGMENTS` 64, `canvas_item_add_circle`'s own count), waterline diamond and picture into one triangle array off the atlas, the shadow and diamond sampling `Sheets.white`, in the old loop's order, corners worked out on the CPU from the old `draw_set_transform`. `Haul.batched` false, or any flight with no art on the atlas, draws the old way. Big lucky double, three runs each: mean 12.90 -> 12.33 ms, draw calls ~483 -> ~286 a frame, frames over 16.7 ms 7-10% -> 3-5.5%. **Proved on one frozen frame** by `tools/probe_same_frame.tscn` (desktop build, `--fixed-fps 60`, `PROBE_WHAT=haul`; tree paused and time scale nought, old / new / old photographed, `tools/last_same_frame.log`): old against old again 0 pixels, old against new **20 pixels of 2.07 million**, all on the two edge columns of one axis-aligned piece just leaving the hand, where a pixel centre sits on the picture's edge and the CPU's corner and the GPU's round to opposite sides of it. Not reproducible bit for bit; accepted as noise.
 
 **The rise is the shaders'** (2026-09-29, same approval): a tile coming up after a take, or bobbing after a bump, is stamped once at rest with a slot (`LakeGrid.RISE_SLOTS` 126) in a spare vertex channel (the soup's blue, 1.0 on every piece with art; the shadow's blue as 2 + slot * 2 + its corner flag; the foam collar's empty blue as slot + 1), and `rubbish`/`shadow`/`foam.gdshader`'s `uniform float rise[126]` add the `emerge` the CPU still works out every frame; the tile is stamped at rest again once still. `LakeGrid._process` no longer `_restamp`s rising tiles. Foam adds the rise before `local`, which its pixel grid is snapped in. **Only while the soup is all art** (`rise_on`): a placeholder's grey rides in the same blue; with no free slot, or `gpu_rise` false, a tile is patched every frame as before. `surface_pos`/`surface_still` still include the rise, so gameplay sees nothing new; `_stamp_at` is where the stamp goes. Three runs each, with the batched haul: 11.91 -> 11.13 ms mean, frames over 16.7 ms 1.7-3.8% -> 0.7-1.7%. `probe_same_frame` `PROBE_WHAT=rise` over 63 tiles moved by the shaders: **0 pixels differ** (a copy handed a zeroed `rise` differs in 22,079, so the probe sees it). Big lucky double is now about 11.1 ms from 13.5 this morning; **still over the 8 ms bar**.
+
+**The long big catch, 2026-10-05** (`/grill-me` with Richard: "stuttering when too many objects are caught, late game, big net, long cast"). New `BENCH_FAR=1` (with `BENCH_CAST`) throws every cast near the net's full range, round the island. Before: plain far casts 10.9 ms mean, 8% of frames over 16.7; lucky double far 13.9 mean, p99 28, **20% over**. Measured by stopping processes one at a time and timing inside them, the cost was not the splashes but **the pieces the haul pushes aside**:
+- `LakeGrid._settle_shoves` restamped every shoved tile every frame as it drifted back, about 300 on a maxed haul, ~3 ms. Now a tile is restamped only once its offset moved `SHOVE_STAMP` (0.5 world px) since it was drawn (`_stamp_shove`, `_shove_drawn`).
+- `shove_to` asked `_shoved.has()` per piece (a list of 300); now a flag array (`_is_shoved`).
+- `CastNet._shove_aside` went through `_reach`, which runs the exact drawing-touch test on every tile and sorts the result, twice when the net is full; ~1-2 ms per net per frame. It walks the tiles itself now, cut by the same distance it already used (`_shove_one`). Behaviour: a piece is pushed when its middle is inside the mouth plus `SHOVE_CLEAR`, no longer also asking that its drawing touch the mouth; the same pieces in practice.
+- **Caps on huge catches, by Richard's call ("subtle thinning OK")**: `WaterSplash.CROWNS_MOST` 24 crowns on the water at once (`CROWNS_HEAVY` 32 for a piece at `HEAVY_FROM` 0.6 strength); `LakeGrid.RISING_MOST` 48 tiles rising after a take, past it the piece under is simply there; `Haul.SHOWN_MOST` 48 throws into the island crate drawn in the air, past it a piece flies undrawn with the same timing, landing and sale (hull and pier throws always drawn). An ordinary cast meets none of them.
+After, two runs each: plain far 7.7 ms mean, **0 frames over**; lucky double far 9.3-9.7 mean, p99 16.5-16.6, **0.7-0.8% over** (was 20%). Near lucky double (`BENCH_CAST BENCH_BIG`) before the last two fixes 11.4 / 3.2%. All caps first guesses for Richard's eye.
 
 Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame
 42 ms -> 3-4 ms.

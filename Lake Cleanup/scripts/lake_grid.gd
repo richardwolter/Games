@@ -70,6 +70,11 @@ const BUMP_REARM := 0.5
 const SHOVE_MOST := 22.0
 const SHOVE_SPEED := 40.0
 const SHOVE_RETURN := 1.4
+## A pushed piece is restamped only once its offset has moved this far, world px, since it
+## was last drawn (2026-10-05). A maxed net's haul shoves three hundred pieces aside at once
+## and restamping each one every frame was 3 ms of a big catch's frame; half a world pixel
+## is under a screen pixel at every zoom stop but the nearest, and the drift is slow.
+const SHOVE_STAMP := 0.5
 
 ## The washed-up rubbish along the outer bank: the share of strand tiles holding any, the
 ## chance one of those holds a second piece under the first, and the widest piece that can
@@ -557,9 +562,14 @@ var _emerge_age := PackedFloat32Array()
 ## was last pushed. See shove().
 var shove := PackedVector2Array()
 var _shove_at := PackedFloat32Array()
+## The shove each tile was last stamped with. See `SHOVE_STAMP`.
+var _shove_drawn := PackedVector2Array()
 
 ## Tiles with a piece pushed off its place, still to drift back.
 var _shoved := PackedInt32Array()
+## 1 where a tile is in `_shoved`: asked once a piece a frame on a big haul, and `has` on a
+## list three hundred long was most of `_shove_aside`'s cost (2026-10-05).
+var _is_shoved := PackedByteArray()
 
 ## 1 for a tile on the outer bank's beach, where rubbish lies on dry sand. Worked out once per
 ## build from `Iso.on_beach`. See BEACH_CHANCE.
@@ -1790,7 +1800,11 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 			var si := index_of(tx, ty)
 			shore[si] = 1 if dry[si] == 1 or Iso.on_strand(tx, ty) else 0
 	_shove_at.resize(count)
+	_shove_drawn.resize(count)
+	_shove_drawn.fill(Vector2.ZERO)
 	_shoved.resize(0)
+	_is_shoved.resize(count)
+	_is_shoved.fill(0)
 	_surface_shown.resize(count)
 	_surface_shown.fill(-1)
 
@@ -2292,6 +2306,7 @@ func restore(saved: Array) -> bool:
 	_emerging.resize(0)
 	_clear_rise()
 	_shoved.resize(0)
+	_is_shoved.fill(0)
 	_dirty = true
 	queue_redraw()
 	return true
@@ -2422,6 +2437,10 @@ func perch_point(index: int) -> Vector2:
 	return sat + Vector2(0.0, -kept * 0.5).rotated(lean)
 
 
+## The most tiles rising after a take at once. See `take`.
+const RISING_MOST := 48
+
+
 ## Take a piece out. Whatever is under it becomes the tile's visible piece, and rises into
 ## place rather than appearing.
 func take(index: int, k: int) -> int:
@@ -2429,7 +2448,10 @@ func take(index: int, k: int) -> int:
 	stacks[index].remove_at(k)
 	# On dry sand the piece underneath is simply there: nothing rises out of a beach.
 	# A shore tile's other piece is already lying in view at its own spot.
-	if not stacks[index].is_empty() and shore[index] == 0:
+	# Past RISING_MOST tiles rising at once the piece under is simply there, as on the
+	# beach: a maxed net's sweep uncovers a hundred tiles in a frame, and each one rising is
+	# a frame's work until it settles (2026-10-05, the big catch's stutter).
+	if not stacks[index].is_empty() and shore[index] == 0 and _emerging.size() < RISING_MOST:
 		emerge[index] = EMERGE_DROP
 		_emerge_age[index] = 0.0
 		if not _emerging.has(index):
@@ -2465,9 +2487,17 @@ func shove_to(index: int, wanted: Vector2, delta: float) -> void:
 	if wanted.length_squared() <= shove[index].length_squared():
 		return
 	shove[index] = shove[index].move_toward(wanted, SHOVE_SPEED * delta)
-	if not _shoved.has(index):
+	if _is_shoved[index] == 0:
+		_is_shoved[index] = 1
 		_shoved.append(index)
-	_restamp(index, true)
+	_stamp_shove(index)
+
+
+## Restamp a pushed tile if its shove has moved `SHOVE_STAMP` since it was drawn, or `now`.
+func _stamp_shove(index: int, now := false) -> void:
+	if now or shove[index].distance_squared_to(_shove_drawn[index]) >= SHOVE_STAMP * SHOVE_STAMP:
+		_shove_drawn[index] = shove[index]
+		_restamp(index, true)
 
 
 ## Let every pushed piece nobody is pushing any more drift back to its place.
@@ -2479,14 +2509,16 @@ func _settle_shoves(delta: float) -> void:
 	for index: int in _shoved:
 		if stacks[index].is_empty():
 			shove[index] = Vector2.ZERO
+			_is_shoved[index] = 0
 			continue
 		if _time - _shove_at[index] > 0.1:
 			shove[index] *= drift
 			if shove[index].length_squared() < 0.04:
 				shove[index] = Vector2.ZERO
-				_restamp(index, true)
+				_stamp_shove(index, true)
+				_is_shoved[index] = 0
 				continue
-			_restamp(index, true)
+			_stamp_shove(index)
 		keep.append(index)
 	_shoved = keep
 
