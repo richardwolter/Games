@@ -94,13 +94,15 @@ float streak(float a, float h, float k, vec2 cell) {
 	float tw = mix(0.0022, 0.0052, hash(vec2(k, 5.3)));
 	float wid = mix(0.045, 0.075, hash(vec2(k, 7.7)));
 	float rate = mix(0.8, 1.25, hash(vec2(k, 9.1)));
-	float v = fract((a - spin * rate) / 6.2831853 + h * tw + ph);
+	// Counter-clockwise seen from above (2026-10-05): the front runs left to right, and the
+	// twist is the other hand, so the streaks still wind upwards as they turn.
+	float v = fract((a + spin * rate) / 6.2831853 - h * tw + ph);
 	float off = min(v, 1.0 - v);
 	if (off > wid) {
 		return 0.0;
 	}
 	float len = mix(22.0, 64.0, hash(vec2(k, 11.9)));
-	float s = (h - pat_t * 190.0) / len + ph * 5.0;
+	float s = (h - pat_t * 260.0) / len + ph * 5.0;
 	float seg = floor(s);
 	if (hash(vec2(seg, k + 0.5)) < 0.33) {
 		return 0.0;
@@ -118,7 +120,7 @@ float streak(float a, float h, float k, vec2 cell) {
 // the eye's wall and throat at the very top, where the rope goes up into the hole.
 int band_at(float h, float a) {
 	float g = h / max(top_h, 1.0);
-	float hel = fract((a - spin * 0.9) / 6.2831853 * 3.0 + h * 0.0045);
+	float hel = fract((a + spin * 0.9) / 6.2831853 * 3.0 - h * 0.0045);
 	float gg = g + (hel - 0.5) * 0.035;
 	if (gg < 0.1) return 0;
 	if (gg < 0.23) return 1;
@@ -127,7 +129,7 @@ int band_at(float h, float a) {
 	if (gg < 0.9) return 4;
 	// Into the throat's swatch on a torn line (clumps of two art pixels, turning with the
 	// rope), so the rope has no flat top where it meets the hole.
-	float torn = hash(floor(vec2(a * 4.0 - spin * 2.0, h / (art * 2.0)))) - 0.5;
+	float torn = hash(floor(vec2(a * 4.0 + spin * 2.0, h / (art * 2.0)))) - 0.5;
 	if (gg + torn * 0.07 < 0.945) return 5;
 	return 6;
 }
@@ -170,7 +172,7 @@ vec4 column(vec2 p, vec2 cell) {
 	// The top end is torn into the throat, so the rope has no ruler-straight end in the eye.
 	if (h > top_h - 14.0) {
 		float up_by = (h - (top_h - 14.0)) / 14.0;
-		if (clump(cell + vec2(spin * 2.0, 0.0), vec2(13.0, 3.0)) < up_by * 0.9) {
+		if (clump(cell - vec2(spin * 2.0, 0.0), vec2(13.0, 3.0)) < up_by * 0.9) {
 			return vec4(0.0);
 		}
 	}
@@ -198,7 +200,7 @@ vec4 column(vec2 p, vec2 cell) {
 	if (au > 1.0) {
 		// Loose clumps flying off the edge, a step lighter than the rope there.
 		float out_by = (au - 1.0) * re;
-		vec2 rise = vec2(0.0, pat_t * 12.0);
+		vec2 rise = vec2(0.0, pat_t * 18.0);
 		if (out_by < 6.0 && t0 <= 4 && clump(cell + rise, vec2(side, 2.0)) > 0.92 && frayed < 0.5) {
 			int tc = max(t0 - 1 - dl, 0);
 			return vec4(t0 <= 1 ? foam.rgb : ramp(tc), REMNANT);
@@ -206,7 +208,7 @@ vec4 column(vec2 p, vec2 cell) {
 		return vec4(0.0);
 	}
 	if (frayed > 0.0) {
-		float tear = noise(vec2(u * 3.0 + spin * 0.5, h / 7.0));
+		float tear = noise(vec2(u * 3.0 - spin * 0.5, h / 7.0));
 		if (tear < frayed) {
 			return tear > frayed - 0.12 ? vec4(ramp(max(t0 - 1, 0)), REMNANT) : vec4(0.0);
 		}
@@ -268,7 +270,7 @@ vec4 mound(vec2 p, vec2 cell) {
 		return vec4(0.0);
 	}
 	float k = clamp(x / mound_r, -1.0, 1.0);
-	float tongue = noise(vec2(x / 6.0 + spin * 1.2, pat_t * 3.0));
+	float tongue = noise(vec2(x / 6.0 - spin * 1.2, pat_t * 3.0));
 	float top = mound_h * sqrt(max(1.0 - k * k, 0.0)) * (0.72 + 0.5 * tongue);
 	float u = x / mound_r;
 	if (hgt < 0.0) {
@@ -292,7 +294,7 @@ vec4 mound(vec2 p, vec2 cell) {
 	if (hgt > top - art * 2.0 && hgt > 0.0) {
 		col = foam_hi.rgb;
 	}
-	float g = clump(cell + vec2(spin * 3.0, pat_t * 8.0), vec2(5.0, 5.0));
+	float g = clump(cell + vec2(-spin * 3.0, pat_t * 8.0), vec2(5.0, 5.0));
 	if (g < 0.16 && hgt < top - art * 2.0) {
 		col = u > 0.2 ? foam.rgb : r0.rgb;
 		a = REMNANT;

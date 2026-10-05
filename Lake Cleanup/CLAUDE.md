@@ -4254,6 +4254,10 @@ the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and
   saves `tools/last_rain_{far,near,flash}.png` and `last_rain.log`.
 
 ### The Tornado (2026-09-30, `/grill-me` with Richard)
+**Superseded in part 2026-10-05 — see The Tornado, Second Pass below**: the 80% gate, the
+2-3 a run and the time gaps, the three hits, "the third puts what it carries into that net up
+to its room", the hit's two pieces shaken loose, the wander on sines and its speeds, and
+the clockwise turn.
 A late-game event: a waterspout comes down on a nearly cleaned lake, stirs the rubbish up and
 is tamed with the net. `scripts/tornado.gd` (the event, ported from the mock's harness),
 `scripts/tornado_look.gd` + `shaders/tornado_spout.gdshader`/`tornado_water.gdshader` (the
@@ -4327,6 +4331,61 @@ in `Lake`'s "The tornado" block. The mock (`tools/tornado_mock/`) was the record
   `tools/last_tornado_{touchdown,roam,hit1,hit2,collapse,calm}.png`, frames in
   `tools/film/tornado/` and `last_tornado.log`; `ffmpeg -framerate 30 -i
   tools/film/tornado/f_%04d.png ... tools/last_tornado.mp4` makes the film.
+
+### The Tornado, Second Pass (2026-10-05, `/grill-me` with Richard)
+More often, from earlier, bigger, wilder, and every hit pays. Supersedes the parts of The
+Tornado named at its head.
+- **Four a run, by the meter** (`Tornado.MARKS` 20 / 40 / 60 / 80% cleaned, each rolled
+  `MARK_JITTER` 0.03 either way): the first as the meter passes 20%, the next at 40%, and so
+  on, `CALM_FIRST` (2 s) after nothing holds it (the old holds). `count` is how many marks are
+  behind; a mark the meter is already `MARK_SKIP` (0.12) past is **skipped, not owed**, so a
+  save from before the marks or a rushed stretch does not get tornadoes back to back.
+  `tornado_next` is the rolled share now (an old save's seconds are rolled again);
+  `tornado_most` is no longer saved. No `SAVE_VERSION` bump.
+- **3 / 4 / 4 / 5 hits** to tame the run's first to fourth (`HITS_NEEDED`), the later ones
+  meeting a wider net. Untamed it goes after `life()` = `LIFE` 40 + `LIFE_PER_HIT` 12 a hit
+  (76 to 100 s).
+- **It starts big and shrinks** (`SIZE_START` 1.5, `SIZE_LAST` 0.5, `_size`, eased): each
+  hit takes it a step, reaching 0.5 with one hit to go. Height, radius, the foot a net must
+  touch, the look (column, eye, cloud, skirt, rings, plumes: `TornadoLook._size`, every
+  length multiplied, the pixel grid untouched) and what it carries (`carry_most()`,
+  `CARRY_MOST` 14 times the size: 21 to 7) all follow. Strength no longer steps down with
+  hits (`HIT_STRENGTH` gone); it only takes a hit's jolt. The look's hit beats read
+  `weak` (1 down to 0.65 over the hits) and `hit_no` from the tornado, since the count of
+  hits differs per tornado.
+- **It hunts** (`_hunt`, `_pick_goal`, `_richness`): `HUNT_SAMPLES` spots in its band (the
+  old band: `GROW_LEAST` to the net's reach less `RANGE_SPARE`, always castable from the
+  beach) within `HUNT_ARC` of where it is, scored by the pieces within `HUNT_REACH` tiles (the
+  grime is where the rubbish is) over distance; it darts to the best at `SPEED_DART` (150,
+  easing up over `DART_RISE`, slowing inside `ARRIVE_SLOW`), churns over it at
+  `SPEED_CHURN` for `CHURN` seconds, then hunts again. Moved in the band's own terms, so a
+  goal round the island is reached round the ring. **Chaos**: the heading wanders up to
+  `JITTER_TURN` off the line, the foot shakes `JITTER_PX`, the column snakes and leans harder
+  and the look's top lags the foot further. Supersedes `_wander`, `SPEED_ROAM`, `SPEED_HURT`.
+- **A hit reels it, then it flees**: knocked `KNOCK` (40) away from the angler, and after the
+  hit's beat it darts to a new goal off the way it was going (`FLEE_DOT`) and `FLEE_CLEAR`
+  from the old one.
+- **Every hit puts everything it carries into that net, past the net's room, its Strength
+  and its Catch** (`_into_net`, `netted_into`). A hit no longer shakes pieces loose. The last
+  hit collapses it as before. Lifting is still up to tier 3: an early-run windfall, by
+  decision.
+- **The storm tally** (`HaulCount.storm_hit`, `Lake._on_tornado_netted`): from a hit to the
+  end of that cast the count over the angler runs past the bag ("38/24") in storm grey-blue
+  (`STORM_INK`), with white whole-pixel specks circling it counter-clockwise, a little funnel
+  of pixels beside it and a jolt on every hit.
+- **It turns counter-clockwise and draws the lake in**: the water's arms used to slide
+  *outwards* while their comment said in. Now the water's arms, the skirt, the spout's bands
+  and streaks (the twist flipped with the turn, so they still climb, faster: 260 px/s), the
+  plumes, the debris orbit, the cloud's arms and eye wall and its ring puffs all turn
+  counter-clockwise seen from above, the arms winding in; the water is shoved round and
+  drawn in harder. `test_lake` reads the two shader lines.
+- **Cost** (`bench_frames` `BENCH_TORNADO=1`): 7.8 ms mean, none over 16.7. The size is not
+  the cost: 8.8 at size 1 on a noisy run.
+- All numbers first guesses for Richard's eye. Out of scope: new art or sounds, more
+  flinging, the sim and prices, saving one mid-event.
+- `test_lake`'s `_stage_tornado` guards the marks, the skip, the four, the hit counts, the
+  CCW shader lines, the carry at size, a goal in the band, every hit netting all it carried
+  past the room, the storm tally, the shrink, the flee, and the rest as before.
 
 ### The Ground Has Volume (2026-10-01, `/grill-me` with Richard)
 The lawn and the beach read flat: one green with sparse blades, one sand. Picked off

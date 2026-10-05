@@ -107,7 +107,9 @@ void fragment() {
 			float band = d / outer;
 			float keep = ring_keep;
 			vec4 ring = vec4(deep.rgb, band < 0.62 ? 0.62 : 0.4);
-			float flow = ang - spin * 0.55 + log(max(d, 4.0)) * 1.25;
+			// Counter-clockwise, and the arms slide in towards the foot as they turn
+			// (2026-10-05: the lake is drawn up into it; they used to slide out).
+			float flow = ang + spin * 0.55 + log(max(d, 4.0)) * 1.25;
 			float arms = flow * 3.0 / 6.2831853;
 			float line = fract(arms);
 			float which = floor(arms);
@@ -135,11 +137,11 @@ void fragment() {
 
 	// The skirt: a boiling disk of foam, turning, its rim torn into tongues.
 	if (skirt_keep > 0.0 && d < skirt_r * 1.2) {
-		float ta = ang - spin * 0.9;
+		float ta = ang + spin * 0.9;
 		float tongue = noise(vec2(cos(ta), sin(ta)) * 2.4 + vec2(pat_t * 1.1, 0.0));
 		float edge = skirt_r * (0.86 + 0.24 * tongue);
 		if (d < edge) {
-			float rot = -spin * 0.8 + d / 16.0;
+			float rot = spin * 0.8 + d / 16.0;
 			vec2 rq = vec2(q.x * cos(rot) - q.y * sin(rot), q.x * sin(rot) + q.y * cos(rot));
 			float n = noise(rq / 10.0 + vec2(0.0, pat_t * 1.2)) * 0.8 + noise(rq / 5.0 - vec2(pat_t, 0.0)) * 0.2;
 			vec4 sk;

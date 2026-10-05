@@ -6235,6 +6235,7 @@ func _start_tornado() -> void:
 	_tornado.remap_owed.connect(func() -> void: _filth_stale = true)
 	_tornado.began.connect(_on_tornado_began)
 	_tornado.ended.connect(_on_tornado_ended)
+	_tornado.netted_into.connect(_on_tornado_netted)
 	add_child(_tornado)
 	for net: CastNet in [_net, _net2]:
 		net.touched_down.connect(_on_net_touched_down.bind(net))
@@ -6298,6 +6299,14 @@ func _on_tornado_ended(_tamed: bool) -> void:
 func _on_net_touched_down(at: Vector2, mouth: float, net: CastNet) -> void:
 	if _tornado != null:
 		_tornado.net_down(net, at, mouth)
+
+
+## A hit put what the funnel carried into a net: the count over the angler turns into the
+## storm tally (`HaulCount.storm_hit`) for the rest of the cast.
+func _on_tornado_netted(_net_hit: Node, _pieces: int) -> void:
+	_haul_count_step()
+	if _haul_count != null:
+		_haul_count.storm_hit()
 
 
 func _start_weather() -> void:
@@ -6695,7 +6704,6 @@ func save_game() -> bool:
 		"rain_next": _weather.next_in if _weather != null else -1.0,
 		"tornadoes": _tornado.count if _tornado != null else 0,
 		"tornado_next": _tornado.next_in if _tornado != null else -1.0,
-		"tornado_most": _tornado.most if _tornado != null else 0,
 		"angler": _angler.tile_pos,
 		"yard_held": _yard.held,
 		"unlocked": unlocked,
@@ -6907,10 +6915,7 @@ func load_game() -> bool:
 		_weather.restore(int(save.get("showers", 0)), float(save.get("rain_next", -1.0)))
 	# Absent means none yet, the showers' rule.
 	if _tornado != null:
-		_tornado.restore(
-			int(save.get("tornadoes", 0)), float(save.get("tornado_next", -1.0)),
-			int(save.get("tornado_most", 0))
-		)
+		_tornado.restore(int(save.get("tornadoes", 0)), float(save.get("tornado_next", -1.0)))
 	# An empty lake and a finished run are two different facts, and loading one must not
 	# assert the other. `_cleaned` is the flag that says the ending has been dealt with, so
 	# setting it from the piece count alone swallowed the ending of every run that was saved

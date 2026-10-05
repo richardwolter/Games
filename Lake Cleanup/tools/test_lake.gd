@@ -6828,7 +6828,6 @@ func _stage_tornado() -> void:
 	var net: CastNet = _main.get(&"_net")
 	var weather: Weather = _main.get(&"_weather")
 	var was_count: int = t.count
-	var was_most: int = t.most
 	var was_next: float = t.next_in
 	var showers_was := weather.showers
 	t.process_mode = Node.PROCESS_MODE_DISABLED
@@ -6836,27 +6835,37 @@ func _stage_tornado() -> void:
 		var n := int(seconds * 60.0)
 		for _i in n:
 			t._process(1.0 / 60.0)
-	# The gate: nothing is rolled under 80% cleaned; past it one is rolled, held by a board,
-	# and started once nothing holds it.
+	# The schedule (2026-10-05): four a run, one as the meter passes each mark; held, it
+	# waits; free, it waits a moment and starts; a mark already well behind is skipped.
+	_check(t.MARKS == [0.2, 0.4, 0.6, 0.8] and t.HITS_NEEDED == [3, 4, 4, 5],
+		"four a run, at 20/40/60/80% cleaned, tamed in 3/4/4/5 hits", str(t.MARKS))
 	t.count = 0
-	t.most = 2
 	t.next_in = -1.0
-	t.tick_schedule(1.0, 0.7, false)
-	_check(t.next_in < 0.0 and not t.active(), "no tornado is rolled under 80% cleaned", "%.1f" % t.next_in)
-	t.tick_schedule(1.0, 0.82, false)
-	_check(t.next_in > 0.0 and not t.active(), "past 80% the first is rolled", "%.1f" % t.next_in)
-	t.tick_schedule(999.0, 0.82, true)
+	t.tick_schedule(1.0, 0.1, false)
+	_check(absf(t.next_in - 0.2) <= t.MARK_JITTER + 0.001 and not t.active(),
+		"the first is due near 20% cleaned", "%.3f" % t.next_in)
+	t.tick_schedule(5.0, 0.3, true)
 	_check(not t.active(), "a held tornado does not start", "")
-	t.tick_schedule(999.0, 0.82, false)
-	_check(t.active(), "and starts once nothing holds it", "")
+	t.tick_schedule(0.5, 0.3, false)
+	_check(not t.active(), "it waits a moment once nothing holds it", "")
+	t.tick_schedule(t.CALM_FIRST, 0.3, false)
+	_check(t.active(), "and then starts", "")
+	_check(t.hits_needed() == 3 and absf(t.size() - t.SIZE_START) < 0.01,
+		"the first takes three hits and comes down at full size", "%d, %.2f" % [t.hits_needed(), t.size()])
 	_check(weather.showers == showers_was, "its storm is not one of the run's showers", str(weather.showers))
 	t.settle_now()
 	_check(not t.active() and t.count == 1, "settling ends it and counts it", str(t.count))
-	t.count = t.most
-	t.next_in = 0.0
-	t.tick_schedule(999.0, 0.95, false)
-	_check(not t.active(), "no more than the run's %d" % t.most, "")
-	_check(Tornado_MOST_OK(t), "two or three a run", "%d-%d" % [t.MOST_RANGE.x, t.MOST_RANGE.y])
+	t.tick_schedule(1.0, 0.75, false)
+	_check(t.count == 3 and not t.active(), "marks well behind the meter are skipped, not owed", str(t.count))
+	_check(t.hits_needed() == 5, "the last one takes five hits", str(t.hits_needed()))
+	t.count = t.MARKS.size()
+	t.next_in = -1.0
+	t.tick_schedule(999.0, 0.99, false)
+	_check(not t.active(), "no more than four a run", "")
+	var water_src := FileAccess.get_file_as_string("res://shaders/tornado_water.gdshader")
+	var spout_src := FileAccess.get_file_as_string("res://shaders/tornado_spout.gdshader")
+	_check(water_src.contains("ang + spin * 0.55") and spout_src.contains("(a + spin * rate) / 6.2831853 - h * tw"),
+		"it turns counter-clockwise, the water sliding in and the streaks climbing", "")
 
 	# Lifting and flinging keep every piece.
 	t.count = 0
@@ -6874,21 +6883,47 @@ func _stage_tornado() -> void:
 	_check(t.lifted > 0, "it lifts pieces into its orbit", "lifted %d landed %d carrying %d" % [t.lifted, t.landed, t.carrying()])
 	_check(grid.piece_count() + t.carrying() == total, "every lifted piece is in the water or the air",
 		"%d + %d against %d" % [grid.piece_count(), t.carrying(), total])
-	_check(t.carrying() <= t.CARRY_MOST + t.get(&"_flung").size(), "it carries %d at most" % t.CARRY_MOST, str(t.carrying()))
+	_check(t.carrying() <= t.carry_most() + t.get(&"_flung").size(),
+		"it carries %d at most at full size" % t.carry_most(), str(t.carrying()))
+	_check(t.carry_most() > t.CARRY_MOST, "and more than at size one", str(t.carry_most()))
+	var goal_grow: float = t.get(&"_goal_grow")
+	_check(bool(t.get(&"_goal_set")) and goal_grow >= t.GROW_LEAST - 0.01
+		and goal_grow <= maxf(net.range_tiles - t.RANGE_SPARE, t.GROW_LEAST + 0.3) + 0.01,
+		"it hunts a goal inside its band", "%.2f" % goal_grow)
 	var base: Vector2 = t.base()
 	var off_foot := base + Vector2(300.0, 0.0)
 	_check(not t.net_down(net, off_foot, 20.0), "a net landing off its foot is no hit", "")
 	if t.carrying() > 0:
 		_check(not _main._all_landed(), "the ending waits while it carries pieces", str(t.carrying()))
-	# Three hits: the third collapses it into the net.
+	# Three hits: every one puts what it carries in the net, past the net's room; each takes it
+	# a step smaller and sends it off a new way; the third collapses it.
 	net.catch = PackedInt32Array()
+	var hold_was := net.hold
+	net.hold = 1
 	var hit_ok := 0
+	var size_was: float = t.size()
 	for k in 3:
+		var carried: int = (t.get(&"_debris") as Array).size()
+		var in_before := net.catch.size()
+		var goal_was: Vector2 = t.get(&"_goal_at")
 		if t.net_down(net, t.base(), 40.0):
 			hit_ok += 1
+		_check(net.catch.size() - in_before == carried, "hit %d puts all %d it carried in the net" % [k + 1, carried],
+			str(net.catch.size() - in_before))
 		if k == 0:
 			_check(not t.net_down(net, t.base(), 40.0), "a second landing at once is the same throw", "")
+			var tally: HaulCount = _main.get(&"_haul_count")
+			_check(tally != null and tally.storm, "the count over the angler turns into the storm tally", "")
 		step.call(1.2)
+		if k < 2:
+			_check(t.size() < size_was - 0.3, "hit %d takes it a step smaller" % (k + 1), "%.2f from %.2f" % [t.size(), size_was])
+			size_was = t.size()
+			_check((t.get(&"_goal_at") as Vector2).distance_to(goal_was) >= t.FLEE_CLEAR - 0.5,
+				"and it darts off somewhere else", "")
+		# A fuller whirl before the next hit.
+		step.call(2.0)
+	_check(net.catch.size() > net.hold, "the net holds more than its room", "%d of %d" % [net.catch.size(), net.hold])
+	net.hold = hold_was
 	_check(hit_ok == 3 and t.hits() == 3, "three landings on its foot are three hits", str(t.hits()))
 	step.call(5.0)
 	_check(not t.active(), "the third hit collapses it", "")
@@ -6913,7 +6948,7 @@ func _stage_tornado() -> void:
 	total = grid.piece_count()
 	var pol_was: float = _main.pollution
 	t.start(2.2)
-	step.call(t.BREW + t.TOUCH_END + t.LIFE + t.GONE_AFTER + 1.0)
+	step.call(t.BREW + t.TOUCH_END + t.life() + t.GONE_AFTER + 1.0)
 	_check(not t.active() and t.carrying() == 0, "untamed, it wanders off with nothing left carried", str(t.carrying()))
 	_check(grid.piece_count() == total, "and every piece is back in the water",
 		"%d against %d" % [grid.piece_count(), total])
@@ -6941,7 +6976,6 @@ func _stage_tornado() -> void:
 	_check(saved is Dictionary and (saved as Dictionary).has("tornadoes"), "the run's count is saved",
 		str((saved as Dictionary).get("tornadoes", "none")) if saved is Dictionary else "unreadable")
 	t.count = was_count
-	t.most = was_most
 	t.next_in = was_next
 	weather.clear_storm()
 	t.process_mode = Node.PROCESS_MODE_INHERIT
@@ -6949,11 +6983,6 @@ func _stage_tornado() -> void:
 	var splash: WaterSplash = _main.get(&"_splash")
 	for _i in 12:
 		splash._process(0.5)
-
-
-func Tornado_MOST_OK(t: Node) -> bool:
-	var r: Vector2i = t.MOST_RANGE
-	return r.x == 2 and r.y == 3 and t.most >= 1
 
 
 func _stage_rain() -> void:

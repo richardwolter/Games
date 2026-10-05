@@ -144,6 +144,10 @@ var _wall_rot := 0.0
 var _wall_shown := 0.0
 var _cc := -1.0
 var _size_s := 0.0
+## The funnel's size against the mock's (2026-10-05, `Tornado.SIZE_START`..`SIZE_LAST`),
+## eased: every length of the column, the eye, the cloud and the water's rings is multiplied
+## by it. The pixel grid is untouched (nothing is scaled as a picture).
+var _size := 1.0
 var _lead := Vector2.ZERO
 var _flare := 0.0
 
@@ -358,10 +362,13 @@ func tick(delta: float, s: Dictionary) -> void:
 	_cc = _time - _collapse_at if hits >= 3 else -1.0
 	if _cc < 0.0:
 		_size_s = lerpf(_size_s, strength, 1.0 - exp(-8.0 * delta))
+		_size = lerpf(_size, float(s.get("size", 1.0)), 1.0 - exp(-8.0 * delta))
 	_flare = float(s["hit_flash"])
 	var closing := smoothstep(1.0, 2.0, _cc) if _cc >= 0.0 else 0.0
-	_arm_rot += delta * ARM_RATE * (1.0 + 2.2 * closing + 2.5 * _flare)
-	_wall_rot += delta * WALL_RATE * (1.0 + 1.5 * closing + 1.5 * _flare)
+	# Counter-clockwise seen from above (2026-10-05): the angles run down, so the cloud's arms
+	# and the eye's wall wind in towards the throat as they turn.
+	_arm_rot -= delta * ARM_RATE * (1.0 + 2.2 * closing + 2.5 * _flare)
+	_wall_rot -= delta * WALL_RATE * (1.0 + 1.5 * closing + 1.5 * _flare)
 	var step := int(floorf(_time * FPS))
 	if step != _step:
 		_step = step
@@ -371,11 +378,12 @@ func tick(delta: float, s: Dictionary) -> void:
 		_wall_shown = _wall_rot
 	# The cloud leads along the base's way, eased; the foot drags.
 	var v: Vector2 = s["velocity"]
-	if v.length() > 110.0:
-		v = v.normalized() * 110.0
+	if v.length() > 170.0:
+		v = v.normalized() * 170.0
 	if _cc >= 0.0:
 		v = Vector2.ZERO
-	_lead = _lead.lerp(Vector2(v.x * 0.6, v.y * 0.3), 1.0 - exp(-1.6 * delta))
+	# Eased slower than the foot moves (2026-10-05: wobblier), so the top lags further.
+	_lead = _lead.lerp(Vector2(v.x * 0.7, v.y * 0.35), 1.0 - exp(-1.15 * delta))
 	# Zoomed out (the camera's scale on the canvas), everything that carries the eye's read is
 	# drawn an art pixel bolder.
 	_bold = 2 if get_viewport().get_canvas_transform().get_scale().x < 0.85 else 1
@@ -403,7 +411,7 @@ func _axis(h: float) -> Vector2:
 	var sm := g * g * (3.0 - 2.0 * g)
 	var belly := sin(PI * g) * 0.55 * (1.0 - g)
 	var x := _lead.x * (sm - belly)
-	x += sin(_time * 1.7 + g * 3.0) * 7.0 * g
+	x += (sin(_time * 1.7 + g * 3.0) * 11.0 + sin(_time * 3.3 + g * 6.5) * 5.0) * g * _size
 	x += sin(_time * 40.0) * 9.0 * _flare * g * (1.0 - g) * 2.0
 	if _cc >= 0.0:
 		var wig := 12.0 * smoothstep(0.05, 0.45, _cc) * (1.0 - smoothstep(1.1, 1.5, _cc))
@@ -417,7 +425,7 @@ func _shape(s: Dictionary) -> void:
 	var st := clampf(_size_s, 0.0, 1.0)
 	if _cc < 0.0:
 		var hs := 1.0 if phase == "touchdown" else st
-		_top_h = TOP_H * lerpf(0.84, 1.0, hs)
+		_top_h = TOP_H * _size * lerpf(0.84, 1.0, hs)
 	_vis_lo = 0.0
 	_vis_hi = _top_h
 	_rope = 1.0
@@ -433,7 +441,7 @@ func _shape(s: Dictionary) -> void:
 	# water and drops back, the rope lights two steps then one.
 	var since: float = s["since_hit"]
 	if hits > 0 and since < 0.5:
-		var weak := 1.0 if hits == 1 else (0.8 if hits == 2 else 0.65)
+		var weak := _weak()
 		_pinch = smoothstep(0.0, 0.06, since) * (1.0 - smoothstep(0.24, 0.46, since)) * weak
 		_lift = 2.0 if since < 0.1 else (1.0 if since < 0.22 else 0.0)
 		# Every hit reads, however weak: at least a beat two steps lighter and one more a step
@@ -449,11 +457,11 @@ func _shape(s: Dictionary) -> void:
 		_foot = 1.0 - smoothstep(0.3, 0.75, _cc)
 	if float(s["flash"]) > 0.35:
 		_lift = maxf(_lift, 1.0)
-	_skirt_r = SKIRT_R * lerpf(0.7, 1.0, st) * maxf(_foot, 0.3)
+	_skirt_r = SKIRT_R * _size * lerpf(0.7, 1.0, st) * maxf(_foot, 0.3)
 
 	# The eye, which the column's top flares out to meet. Its opening and shutting are read off
 	# the stepped clock, so the hole grows and shrinks a beat at a time (5-6 beats each way).
-	_eye_rx = EYE_RX * lerpf(0.72, 1.0, st) * (1.0 + 0.3 * _flare)
+	_eye_rx = EYE_RX * _size * lerpf(0.72, 1.0, st) * (1.0 + 0.3 * _flare)
 	var ts := _pt
 	var ccs := _pt - _collapse_at if _cc >= 0.0 else -1.0
 	_vx = 1.0
@@ -463,7 +471,7 @@ func _shape(s: Dictionary) -> void:
 	if phase == "touchdown":
 		# The arms wind in over the gathering cloud into a knot, then the eye opens out of the
 		# knot and the lit lips run outwards along the arms as it does.
-		_eye_rx = EYE_RX * lerpf(0.8, 1.0, st)
+		_eye_rx = EYE_RX * _size * lerpf(0.8, 1.0, st)
 		_vx = smoothstep(0.4, 0.8, ts)
 		_eye_open = smoothstep(0.6, 1.3, ts)
 		_lip_hi = lerpf(1.0, VORTEX_OUT, smoothstep(0.65, 1.4, ts))
@@ -476,10 +484,10 @@ func _shape(s: Dictionary) -> void:
 
 	var radius_at: Callable = s["radius_at"]
 	var hs2: float = float(s["height"]) * float(s["strength"])
-	var scale := lerpf(0.55, 1.0, st)
+	var scale := lerpf(0.55, 1.0, st) * _size
 	# A funnel: it widens steadily all the way up to a neck the throat can swallow (not the
 	# eye's whole width), and never narrows again on the way up.
-	var neck_r := clampf(_eye_rx * maxf(_eye_open, 0.4) * 0.55, 12.0, 36.0 * scale)
+	var neck_r := clampf(_eye_rx * maxf(_eye_open, 0.4) * 0.55, 12.0 * _size, 36.0 * scale)
 	var foot_r := 6.0 * scale
 	var widest := 0.0
 	_prof.resize(N)
@@ -519,7 +527,7 @@ func _lay_cloud() -> void:
 		_dissolve = clampf((_cc - BREAK_FROM) / BREAK_LONG, 0.0, 1.0)
 		_cloud_up = CLOUD_RISE * smoothstep(BREAK_FROM, BREAK_FROM + BREAK_LONG, _cc)
 	var st := clampf(_size_s, 0.0, 1.0)
-	_cloud_rx = CLOUD_RX * lerpf(0.84, 1.0, st) * lerpf(0.5, 1.0, _cloud_amt) * (1.0 + 0.15 * _dissolve)
+	_cloud_rx = CLOUD_RX * _size * lerpf(0.84, 1.0, st) * lerpf(0.5, 1.0, _cloud_amt) * (1.0 + 0.15 * _dissolve)
 	var isle: Vector2 = (get_parent() as Node2D).global_transform * Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
 	var way: Vector2 = global_position - isle
 	_away = way.normalized() if way.length() > 1.0 else Vector2.RIGHT
@@ -556,7 +564,7 @@ func _lay_cloud() -> void:
 				"wisp": grow < 0.55,
 			})
 			continue
-		var ang: float = float(p["ang"]) + _pt * float(p["turn"])
+		var ang: float = float(p["ang"]) - _pt * float(p["turn"])
 		var ring: float = float(p["ring"]) * (1.0 + 0.12 * _dissolve)
 		var depth := sin(ang) * ring
 		var fringe: bool = p["fringe"]
@@ -731,12 +739,15 @@ func _pump_paint() -> void:
 	if _paint_task < 0:
 		if _painter == null:
 			_painter = (get_script() as GDScript).new()
-		_painter._s = {"flash": _s.get("flash", 0.0), "hits": _s.get("hits", 0), "since_hit": _s.get("since_hit", 99.0)}
+		_painter._s = {
+			"flash": _s.get("flash", 0.0), "hits": _s.get("hits", 0), "since_hit": _s.get("since_hit", 99.0),
+			"weak": _weak(),
+		}
 		_painter._lobes = _lobes.duplicate(true)
 		_painter._lip_lobes = _lip_lobes.duplicate(true)
 		for key: StringName in [&"_cloud_c", &"_away", &"_eye_rx", &"_eye_c", &"_cloud_up", &"_vx",
 				&"_eye_open", &"_arm_shown", &"_wall_shown", &"_bold", &"_lip_lo", &"_lip_hi", &"_ramp",
-				&"_time", &"_pt"]:
+				&"_time", &"_pt", &"_size"]:
 			_painter.set(key, get(key))
 		_paint_origin = global_position
 		_painter._paint_origin = _paint_origin
@@ -842,6 +853,16 @@ func _hits_react(s: Dictionary) -> void:
 	_hits_seen = s["hits"]
 
 
+## How hard this hit lands, 1 for the first down to 0.65 for the last (the tornado hands it
+## over, since how many hits there are differs from one tornado to the next); the mock's
+## three-hit rule when it does not.
+func _weak() -> float:
+	if _s.has("weak"):
+		return float(_s["weak"])
+	var hits: int = _s.get("hits", 0)
+	return 1.0 if hits == 1 else (0.8 if hits == 2 else 0.65)
+
+
 
 func _tick_puffs(delta: float) -> void:
 	var i := 0
@@ -879,9 +900,10 @@ func _burst(n: int, power: float) -> void:
 func _tick_chunks(delta: float, s: Dictionary) -> void:
 	var base: Vector2 = s["base"]
 	var hits: int = s["hits"]
-	if hits > _burst_hits:
-		_burst_hits = hits
-		var weak := 1.0 if hits == 1 else (0.8 if hits == 2 else 0.65)
+	var hit_no: int = s.get("hit_no", hits)
+	if hit_no > _burst_hits:
+		_burst_hits = hit_no
+		var weak := _weak()
 		_burst(int(18.0 * weak), weak)
 	if _cc >= 0.75 and not _burst_left:
 		_burst_left = true
@@ -924,7 +946,7 @@ func _push(s: Dictionary) -> void:
 	_sp(&"split_y", _split_y)
 	_sp(&"bold", float(_bold))
 
-	var sz := lerpf(0.6, 1.0, st) * _foot
+	var sz := lerpf(0.6, 1.0, st) * _foot * _size
 	_sp(&"mound_r", 26.0 * sz)
 	_sp(&"mound_h", 30.0 * sz)
 	var lo := Vector2(-40.0, -_top_h - 12.0)
@@ -947,26 +969,26 @@ func _push(s: Dictionary) -> void:
 		# A's spray ring, the skirt collapsing into it: out to 1.3 times the disturbed ring at
 		# most, and a step thinner every beat until it is gone.
 		var sc := floorf((_cc - 0.55) * FPS) / FPS
-		spread_r = lerpf(SKIRT_R, RING_R * 1.3, 1.0 - pow(1.0 - clampf(sc / 1.6, 0.0, 1.0), 2.0))
+		spread_r = lerpf(SKIRT_R * _size, RING_R * _size * 1.3, 1.0 - pow(1.0 - clampf(sc / 1.6, 0.0, 1.0), 2.0))
 		spread_keep = clampf(1.0 - sc * FPS / 12.0, 0.0, 1.0)
 	var burst_keep := 0.0
 	var burst_r := 0.0
 	if hits > 0 and since_hit < 0.8:
-		var weak := 1.0 if hits == 1 else (0.8 if hits == 2 else 0.65)
-		burst_r = minf(SKIRT_R * (0.9 + since_hit * 5.0 * weak), RING_R * 1.1)
+		var weak := _weak()
+		burst_r = minf(SKIRT_R * _size * (0.9 + since_hit * 5.0 * weak), RING_R * _size * 1.1)
 		burst_keep = (1.0 - since_hit / 0.8) * weak
 	_water_mat.set_shader_parameter(&"base", gpos)
 	_water_mat.set_shader_parameter(&"pat_t", _pt)
 	_water_mat.set_shader_parameter(&"spin", _pat_spin)
 	_water_mat.set_shader_parameter(&"skirt_r", _skirt_r)
 	_water_mat.set_shader_parameter(&"skirt_keep", _foot)
-	_water_mat.set_shader_parameter(&"ring_r", RING_R * lerpf(0.75, 1.0, strength if _cc < 0.0 else 0.6))
+	_water_mat.set_shader_parameter(&"ring_r", RING_R * _size * lerpf(0.75, 1.0, strength if _cc < 0.0 else 0.6))
 	_water_mat.set_shader_parameter(&"ring_keep", ring_keep)
 	_water_mat.set_shader_parameter(&"burst_r", burst_r)
 	_water_mat.set_shader_parameter(&"burst_keep", burst_keep)
 	_water_mat.set_shader_parameter(&"spread_r", spread_r)
 	_water_mat.set_shader_parameter(&"spread_keep", spread_keep)
-	var reach := maxf(maxf(RING_R * 1.3, spread_r * 1.25 + 20.0), burst_r * 1.25 + 20.0)
+	var reach := maxf(maxf(RING_R * _size * 1.3, spread_r * 1.25 + 20.0), burst_r * 1.25 + 20.0)
 	_water.rect = Rect2(Vector2(-reach, -reach * 0.5 - 8.0), Vector2(reach * 2.0, reach + 16.0))
 
 
@@ -1212,7 +1234,7 @@ func _paint_vortex(buf: Dictionary, origin: Vector2, up: int) -> void:
 	var ring_beat := hits > 0 and hits < 3 and since < 1.0 / FPS
 	var pop := 0.0
 	if hits > 0 and hits < 3 and since < 2.0 / FPS:
-		pop = ART * (2.0 if hits == 1 else 1.0)
+		pop = ART * (2.0 if _weak() > 0.85 else 1.0)
 	for cy in range(y0, y1 + 1):
 		var dy := (float(cy) + 0.5) * ART - ew.y
 		for cx in range(x0, x1 + 1):
@@ -1465,7 +1487,7 @@ func _paint_crown(cells: Dictionary, front: bool) -> void:
 	var spin: float = _s["spin"]
 	var foam := _pal.foam
 	var hi := _pal.foam_light
-	var peak := 40.0 * _foot * lerpf(0.65, 1.0, strength)
+	var peak := 40.0 * _foot * _size * lerpf(0.65, 1.0, strength)
 	for k in PLUMES:
 		var fk := float(k)
 		var period := 0.62 + 0.4 * _fhash(fk, 1.0)
@@ -1473,7 +1495,7 @@ func _paint_crown(cells: Dictionary, front: bool) -> void:
 		var beat := floorf(cycle)
 		var u := cycle - beat
 		var roll := _fhash(fk * 13.0 + beat, 3.0)
-		var th := fk / float(PLUMES) * TAU + spin * 0.8 + (roll - 0.5) * 0.7
+		var th := fk / float(PLUMES) * TAU - spin * 0.8 + (roll - 0.5) * 0.7
 		var sn := sin(th)
 		if (sn > 0.0) != front:
 			continue
@@ -1520,7 +1542,7 @@ func _paint_waist_ring(cells: Dictionary, front: bool) -> void:
 	var since: float = _s["since_hit"]
 	if hits == 0 or since > 0.6:
 		return
-	var weak := 1.0 if hits == 1 else (0.8 if hits == 2 else 0.65)
+	var weak := _weak()
 	var waist := _prof_at(_pinch_h)
 	var rr := waist.z + 10.0 + since * 180.0 * weak
 	var sink := 80.0 * since * since

@@ -10,6 +10,12 @@ extends Control
 ## double cast wears an "x2" tag, and both together swell bigger with more stars. A full cast
 ## is pale red, so gold means lucky and nothing else.
 ##
+## A net landed on a tornado (2026-10-05, `/grill-me` with Richard): what the funnel carried
+## is in the net past its room, so the figure runs over the bag ("38/24"), and for the rest of
+## the cast it is the storm tally: storm grey-blue, white specks of whole pixels circling it
+## counter-clockwise like the funnel's debris, a little funnel mark beside it, and a jolt on
+## every hit (`storm_hit`).
+##
 ## Screen space on the HUD's layer, placed through the canvas transform the way
 ## `FirstSteps` places its prompts, so the figure is the font's own size at every zoom.
 ## Draws only: the lake hands it `count`, `room` and `head` every frame, `throw` at a cast and
@@ -44,6 +50,17 @@ const LUCKY_INK := Color(1.0, 0.84, 0.35)
 ## Full: a pale red, so a full plain net cannot read as a lucky one.
 const FULL_INK := Color(1.0, 0.55, 0.45)
 const TAG_INK := Color(0.62, 0.9, 1.0)
+## The storm tally: its ink, the specks round it (how many, how far out past the figure's box,
+## how fast they go round, radians a second), the jolt a hit gives it (seconds, px, swell) and
+## the funnel mark's rows of pixels, widest first.
+const STORM_INK := Color(0.72, 0.82, 0.94)
+const STORM_SPECKS := 10
+const STORM_OUT := Vector2(9.0, 6.0)
+const STORM_TURN := 3.2
+const STORM_JOLT := 0.4
+const STORM_SHAKE := 3.0
+const STORM_SWELL := 0.45
+const FUNNEL_ROWS: Array[int] = [6, 5, 4, 3, 2, 2, 1]
 
 ## Pieces aboard, room this cast, and the angler's feet in world space.
 var count: int = 0
@@ -52,6 +69,9 @@ var head: Vector2 = Vector2.INF
 ## This cast's luck, set by `throw`.
 var lucky := false
 var double := false
+## A tornado hit this cast: the storm tally.
+var storm := false
+var _jolt: float = 0.0
 
 var _shown_count: int = 0
 var _heard: int = 0
@@ -84,8 +104,20 @@ func throw(is_lucky: bool, is_double: bool) -> void:
 	lucky = is_lucky
 	double = is_double
 	_armed = lucky or double
+	storm = false
+	_jolt = 0.0
 	_shown_count = 0
 	_burst = BURST_TIME if _armed else 0.0
+	queue_redraw()
+
+
+## A net of this cast hit a tornado: the storm tally, up even at nought, with a jolt.
+func storm_hit() -> void:
+	storm = true
+	_armed = true
+	_popping = -1.0
+	_jolt = STORM_JOLT
+	_tick = TICK_TIME
 	queue_redraw()
 
 
@@ -112,6 +144,7 @@ func _process(delta: float) -> void:
 			_armed = false
 			lucky = false
 			double = false
+			storm = false
 		queue_redraw()
 		return
 	# Up one figure a catch pop while the pops are still sounding, so the count and the
@@ -130,7 +163,8 @@ func _process(delta: float) -> void:
 	_shown_room = room
 	_tick = maxf(_tick - delta, 0.0)
 	_burst = maxf(_burst - delta, 0.0)
-	if _shown_count > 0 or _armed:
+	_jolt = maxf(_jolt - delta, 0.0)
+	if _shown_count > 0 or _armed or storm:
 		# The angler walks, the camera eases and the stars twinkle: keep up with all three.
 		queue_redraw()
 
@@ -145,6 +179,11 @@ func _draw() -> void:
 	if _burst > 0.0:
 		var b := _burst / BURST_TIME
 		swell += (BOTH_SWELL if both else BURST_SWELL) * sin(b * PI)
+	var jolt := _jolt / STORM_JOLT
+	if storm:
+		swell += STORM_SWELL * jolt
+		at.x += sin(_clock * 70.0) * STORM_SHAKE * jolt
+		at.y += cos(_clock * 53.0) * STORM_SHAKE * 0.5 * jolt
 	var alpha := 1.0
 	if _popping >= 0.0:
 		var t := _popping / POP_TIME
@@ -154,12 +193,14 @@ func _draw() -> void:
 	var full := _shown_room > 0 and _shown_count >= _shown_room
 	var size_px := Style.step(Style.TEXT_BODY * swell)
 	var text := "%d/%d" % [_shown_count, _shown_room]
-	var ink := FULL_INK if full else (LUCKY_INK if lucky else INK)
+	var ink := STORM_INK if storm else (FULL_INK if full else (LUCKY_INK if lucky else INK))
 	var face := Style.font()
 	var wide := face.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x
 	var box := Rect2(at.x - wide * 0.5, at.y - face.get_ascent(size_px), wide, face.get_height(size_px))
 	if lucky:
 		_draw_stars(box, STARS_BOTH if both else STARS, alpha)
+	if storm:
+		_draw_specks(box, alpha, jolt, false)
 	Style.write(
 		self, text, size_px, Vector2(0.0, at.y), Color(ink.r, ink.g, ink.b, alpha),
 		HORIZONTAL_ALIGNMENT_CENTER, Rect2(at.x - 100.0, at.y - 40.0, 200.0, 80.0)
@@ -170,6 +211,44 @@ func _draw() -> void:
 			self, "x2", tag_px, Vector2(box.end.x + 4.0, at.y - float(size_px) * 0.35),
 			Color(TAG_INK.r, TAG_INK.g, TAG_INK.b, alpha)
 		)
+	if storm:
+		_draw_funnel(Vector2(box.end.x + (30.0 if double else 6.0), at.y - float(size_px) * 0.7), alpha)
+		_draw_specks(box, alpha, jolt, true)
+
+
+## The storm tally's specks: whole white pixels going round the figure counter-clockwise on a
+## flat ellipse, each with a pixel of trail, the near half drawn over the figure and the far
+## half under it (`front`). A jolt flings them wider.
+func _draw_specks(box: Rect2, alpha: float, jolt: float, front: bool) -> void:
+	var c := box.get_center()
+	var r := box.size * 0.5 + STORM_OUT * (1.0 + jolt)
+	for i in STORM_SPECKS:
+		var fi := float(i)
+		var a := -_clock * STORM_TURN * (0.8 + 0.4 * fposmod(fi * 0.37, 1.0)) + fi * TAU / float(STORM_SPECKS)
+		var near := sin(a) > 0.0
+		if near != front:
+			continue
+		var wob := 1.0 + 0.18 * sin(_clock * 5.0 + fi * 1.7)
+		var spot := c + Vector2(cos(a) * r.x, sin(a) * r.y) * wob
+		spot = (spot / STAR_PIXEL).round() * STAR_PIXEL
+		var tail := c + Vector2(cos(a + 0.18) * r.x, sin(a + 0.18) * r.y) * wob
+		tail = (tail / STAR_PIXEL).round() * STAR_PIXEL
+		var tone := Color(1.0, 1.0, 1.0, alpha * (1.0 if near else 0.55))
+		draw_rect(Rect2(tail, Vector2.ONE * STAR_PIXEL), Color(STORM_INK.r, STORM_INK.g, STORM_INK.b, tone.a * 0.7))
+		draw_rect(Rect2(spot, Vector2.ONE * STAR_PIXEL), tone)
+
+
+## A little funnel of whole pixels beside the figure, its rows swaying out of step.
+func _draw_funnel(top_left: Vector2, alpha: float) -> void:
+	var widest := float(FUNNEL_ROWS[0])
+	for row in FUNNEL_ROWS.size():
+		var w := float(FUNNEL_ROWS[row])
+		var sway := roundf(sin(_clock * 6.0 - float(row) * 0.9) * float(row) * 0.25)
+		var x := top_left.x + ((widest - w) * 0.5 + sway) * STAR_PIXEL
+		var y := top_left.y + float(row) * STAR_PIXEL
+		var tone := Color.WHITE if row == 0 else STORM_INK
+		tone.a = alpha
+		draw_rect(Rect2(Vector2(x, y).round(), Vector2(w * STAR_PIXEL, STAR_PIXEL)), tone)
 
 
 ## Four-point stars of whole pixels round the figure, each on its own cycle, popping in and

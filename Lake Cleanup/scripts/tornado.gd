@@ -1,8 +1,15 @@
 extends Node2D
 ## The tornado (2026-09-30, `/grill-me` with Richard; CLAUDE.md "The Tornado"): a waterspout
-## that comes down on a nearly cleaned lake, wanders within the net's reach of the island,
-## lifts the top piece off the tiles it passes into its orbit and flings some back out onto
-## open water, and is tamed by landing the net on its foot three times.
+## that comes down on the lake, wanders within the net's reach of the island, lifts the top
+## piece off the tiles it passes into its orbit and flings some back out onto open water, and
+## is tamed by landing the net on its foot.
+##
+## Second pass (2026-10-05, `/grill-me` with Richard): four a run, one as the meter passes
+## each of `MARKS`; 3 / 4 / 4 / 5 hits to tame them (`HITS_NEEDED`); it comes down at
+## `SIZE_START` and every hit takes it a step smaller; it hunts the fullest water in its band,
+## darting and churning on a jittery path (`_hunt`); a hit knocks it back and sends it off a
+## new way, and puts everything it carries into that net, past the net's room
+## (`netted_into`). It turns counter-clockwise and the water runs into its foot.
 ##
 ## Everything that happens to the lake is done here, ported from the approved mock's harness
 ## (tools/tornado_mock/harness.gd); the drawing is `tornado_look.gd`, the mock's look D, driven
@@ -24,24 +31,32 @@ signal ended(tamed: bool)
 signal filth_moved(by: float)
 ## Something moved the water enough that the filth map should be remapped.
 signal remap_owed
+## A hit put `pieces` of what it carried into `net` (the lake's storm tally). Sent on every
+## hit, nought included.
+signal netted_into(net: Node, pieces: int)
 
 # --- The schedule ----------------------------------------------------------------------
-## Cleaned share (1 - pollution) past which a run may have tornadoes.
-const GATE := 0.8
-## How many a run: rolled once, from this range, inclusive.
-const MOST_RANGE := Vector2i(2, 3)
-## Seconds of play after the gate first opens, then between tornadoes.
-const FIRST_AFTER := Vector2(20.0, 70.0)
-const GAP := Vector2(150.0, 300.0)
-## A due tornado that is held (a board, a tour) is asked again this often.
-const HELD_RETRY := 4.0
+## Four a run, one as the meter passes each of these cleaned shares (1 - pollution), each
+## rolled up to `MARK_JITTER` either way (2026-10-05). Supersedes the 80% gate and the time
+## gaps between tornadoes.
+const MARKS: Array[float] = [0.2, 0.4, 0.6, 0.8]
+const MARK_JITTER := 0.03
+## A mark the meter is already this far past is skipped, not owed: a save from before the
+## marks, or a stretch cleared in a rush, does not get tornadoes back to back.
+const MARK_SKIP := 0.12
+## Hits to tame each of the run's tornadoes, in order: the later ones meet a wider net.
+const HITS_NEEDED: Array[int] = [3, 4, 4, 5]
+## A due tornado waits this long once nothing holds it (a board just closed, a tour ended).
+const CALM_FIRST := 2.0
 
 # --- The event, seconds ----------------------------------------------------------------
 ## The storm comes in (rain, grey light) before the funnel touches down.
 const BREW := 6.0
 const TOUCH_END := 2.0
-## Untamed, it wanders off this long after touching down.
-const LIFE := 60.0
+## Untamed, it wanders off this long after touching down, plus `LIFE_PER_HIT` for every hit
+## it takes to tame (`life()`): 76 s for a three-hit one, 100 s for the last.
+const LIFE := 40.0
+const LIFE_PER_HIT := 12.0
 const HIT_LONG := 0.6
 const COLLAPSE_LONG := 1.5
 ## From the vanish starting to the event being over: the look's cloud is gone by 2.85 s.
@@ -55,26 +70,55 @@ const STORM_LONG := 600.0
 const HEIGHT := 300.0
 const BASE_R := 12.0
 const TOP_R := 72.0
-const HIT_STRENGTH: Array[float] = [0.74, 0.5]
-## The foot a net's mouth has to touch, half-extents in world px, at full strength.
+## The funnel's size against the mock's (2026-10-05): it comes down at `SIZE_START`, and each
+## hit takes it a step towards `SIZE_LAST`, reached with one hit to go. Height, radius, foot,
+## the look and how much it carries all follow it.
+const SIZE_START := 1.5
+const SIZE_LAST := 0.5
+const SIZE_EASE := 6.0
+## The foot a net's mouth has to touch, half-extents in world px, at size 1.
 const FOOT := Vector2(30.0, 15.0)
 
 # --- Moving ----------------------------------------------------------------------------
 const SPEED_TOUCH := 10.0
-const SPEED_ROAM := 60.0
-const SPEED_HURT := 34.0
 const SPEED_COLLAPSE := 12.0
+## The hunt (2026-10-05): it samples `HUNT_SAMPLES` spots in its band within `HUNT_ARC` of
+## where it is, scores each by the pieces within `HUNT_REACH` tiles (the grime is where the
+## rubbish is), a spot `HUNT_NEAR` px off counting half, darts to the best at `SPEED_DART`
+## and churns over it at `SPEED_CHURN` for `CHURN` seconds, then hunts again.
+const HUNT_SAMPLES := 18
+const HUNT_ARC := 1.6
+const HUNT_REACH := 2.5
+const HUNT_NEAR := 360.0
+## A goal is somewhere else: at least this far off, px.
+const HUNT_LEAST := 70.0
+const SPEED_DART := 150.0
+const SPEED_CHURN := 34.0
+const CHURN := Vector2(2.5, 5.0)
+## A dart eases up to speed over this long and slows inside `ARRIVE_SLOW` px of its goal.
+const DART_RISE := 0.35
+const ARRIVE_SLOW := 70.0
+const ARRIVE := 16.0
+## Chaos: the heading wanders up to `JITTER_TURN` radians off the line on short noise, and
+## the foot shakes `JITTER_PX` world px round where it is going.
+const JITTER_TURN := 0.75
+const JITTER_PX := 6.0
+## After a hit the new goal is off the way it was going: its direction's dot with the old
+## heading under `FLEE_DOT`, and `FLEE_CLEAR` px from the old goal.
+const FLEE_DOT := 0.3
+const FLEE_CLEAR := 140.0
 ## Tiles past the island's shore it keeps between; the far end is the net's range less
 ## `RANGE_SPARE`, so the player can always reach it from the beach.
 const GROW_LEAST := 2.2
 const GROW_MOST := 16.0
 const RANGE_SPARE := 1.2
-const KNOCK := 26.0
+const KNOCK := 40.0
 
 # --- Debris (the mock's numbers) -------------------------------------------------------
 const LIFT_REACH := 0.9
 const LIFT_GAP := 0.14
 const RELIFT_AFTER := 3.0
+## How much it carries at size 1; `carry_most()` scales it with the size.
 const CARRY_MOST := 14
 const LIFT_TIME := 0.9
 const FLING_EVERY := 1.2
@@ -104,9 +148,24 @@ var fish: Node
 var net_range: Callable
 
 ## Saved: how many this run, how many it will have, seconds until the next (-1 unrolled).
+## `count` is how many of `MARKS` are behind (had or skipped); `next_in` the rolled cleaned
+## share of the next, -1 unrolled; `most` is always `MARKS.size()`.
 var count := 0
-var most := 0
+var most := MARKS.size()
 var next_in := -1.0
+var _calm := 0.0
+## Hits this one takes to tame, set at `start`.
+var _need := 3
+var _size := SIZE_START
+var _goal_theta := 0.0
+var _goal_grow := 4.0
+var _goal_set := false
+var _goal_at := Vector2.ZERO
+var _fleeing := false
+var _churn := 0.0
+var _dart_t := 0.0
+var _heading := Vector2.ZERO
+var _path := Vector2.ZERO
 
 var _rng := RandomNumberGenerator.new()
 var _active := false
@@ -160,41 +219,61 @@ var netted := 0
 
 func _ready() -> void:
 	_rng.randomize()
-	if most <= 0:
-		most = _rng.randi_range(MOST_RANGE.x, MOST_RANGE.y)
 
 
 # ======================================================================================
 # The schedule
 # ======================================================================================
 
-## Saved values back in. Absent keys read as none yet.
-func restore(done: int, next: float, run_most: int) -> void:
-	count = maxi(done, 0)
-	next_in = next
-	if run_most > 0:
-		most = run_most
+## Saved values back in. Absent keys read as none yet. A `next` outside 0..1 is from before
+## the marks (it was seconds) and is rolled again.
+func restore(done: int, next: float) -> void:
+	count = clampi(done, 0, MARKS.size())
+	next_in = next if next >= 0.0 and next <= 1.0 else -1.0
 
 
 ## Once a frame from the lake, while the world runs. `cleaned` is 1 - pollution; `held` is
 ## true while a tornado must not start (intro, tours, boards, the ending).
 func tick_schedule(delta: float, cleaned: float, held: bool) -> void:
-	if _active or count >= most:
+	if _active:
+		return
+	while count < MARKS.size() and cleaned > MARKS[count] + MARK_SKIP:
+		count += 1
+		next_in = -1.0
+	if count >= MARKS.size():
 		return
 	if next_in < 0.0:
-		if cleaned >= GATE:
-			next_in = _rng.randf_range(FIRST_AFTER.x, FIRST_AFTER.y) if count == 0 \
-				else _rng.randf_range(GAP.x, GAP.y)
-		return
-	if cleaned < GATE:
-		return
-	next_in -= delta
-	if next_in > 0.0:
+		next_in = clampf(MARKS[count] + _rng.randf_range(-MARK_JITTER, MARK_JITTER), 0.05, 0.95)
+	if cleaned < next_in:
+		_calm = 0.0
 		return
 	if held:
-		next_in = HELD_RETRY
+		_calm = 0.0
 		return
+	_calm += delta
+	if _calm < CALM_FIRST:
+		return
+	_calm = 0.0
 	start()
+
+
+## Hits the next tornado (or this one, while out) takes to tame.
+func hits_needed() -> int:
+	return _need if _active else HITS_NEEDED[clampi(count, 0, HITS_NEEDED.size() - 1)]
+
+
+## Seconds it roams before wandering off untamed.
+func life() -> float:
+	return LIFE + LIFE_PER_HIT * float(_need)
+
+
+## How many pieces it may carry at its size now.
+func carry_most() -> int:
+	return maxi(int(round(float(CARRY_MOST) * _size)), 4)
+
+
+func size() -> float:
+	return _size
 
 
 func active() -> bool:
@@ -250,6 +329,14 @@ func start(angle: float = NAN) -> void:
 	landed = 0
 	netted = 0
 	_seed = _rng.randf() * TAU
+	_need = HITS_NEEDED[clampi(count, 0, HITS_NEEDED.size() - 1)]
+	_size = SIZE_START
+	_goal_set = false
+	_goal_at = Vector2.ZERO
+	_fleeing = false
+	_churn = 0.0
+	_dart_t = 0.0
+	_heading = Vector2.ZERO
 	if is_nan(angle):
 		if angler != null:
 			var at := Iso.world_to_tile(angler.position) - Iso.ISLAND_CENTRE
@@ -261,6 +348,7 @@ func start(angle: float = NAN) -> void:
 	_grow = lerpf(GROW_LEAST, _grow_most(), 0.5)
 	_base = Iso.island_point(_theta, _grow)
 	_base_was = _base
+	_path = _base
 	if weather != null:
 		weather.storm(STORM_LONG)
 	began.emit()
@@ -281,8 +369,8 @@ func _finish() -> void:
 	_active = false
 	_phase = "off"
 	_t = -1.0
-	count += 1
-	next_in = _rng.randf_range(GAP.x, GAP.y) if count < most else -1.0
+	count = mini(count + 1, MARKS.size())
+	next_in = -1.0
 	if _remap_dirty:
 		remap_owed.emit()
 	ended.emit(_tamed)
@@ -348,7 +436,7 @@ func _set_phase(p: String) -> void:
 
 func _step(delta: float) -> void:
 	var t := _t
-	if _end_at < 0.0 and t >= TOUCH_END + LIFE:
+	if _end_at < 0.0 and t >= TOUCH_END + life():
 		_begin_end(false)
 	if _end_at >= 0.0:
 		if t >= _end_at + GONE_AFTER:
@@ -362,24 +450,33 @@ func _step(delta: float) -> void:
 	else:
 		_set_phase("roam")
 	_strength = _strength_at(t)
+	if _end_at < 0.0:
+		_size = lerpf(_size, _size_target(), 1.0 - exp(-SIZE_EASE * delta))
 	_hit_flash = maxf(_hit_flash - delta * 2.2, 0.0)
 	_spin += delta * lerpf(3.0, 7.0, _strength)
 
-	var speed := SPEED_ROAM
 	match _phase:
-		"touchdown": speed = SPEED_TOUCH
-		"hit": speed = SPEED_HURT * 0.4
-		"collapse": speed = SPEED_COLLAPSE
-		"gone": speed = 0.0
-		_: speed = SPEED_HURT if _hits > 0 else SPEED_ROAM
-	_wander(speed, delta)
+		"touchdown": _hunt(delta, SPEED_TOUCH)
+		"hit": pass
+		"collapse": _hunt(delta, SPEED_COLLAPSE)
+		"gone": pass
+		_: _hunt(delta, INF)
 	_knock *= exp(-2.5 * delta)
-	var meander := Vector2(sin(t * 1.3) * 10.0, cos(t * 0.9) * 4.0) * minf(_strength * 1.5, 1.0)
+	var calm := minf(_strength * 1.5, 1.0)
+	var meander := Vector2(sin(t * 1.3) * 10.0, cos(t * 0.9) * 4.0) * calm
+	var shake := Vector2(
+		sin(t * 7.3 + _seed) * 0.6 + sin(t * 12.1 + _seed * 2.0) * 0.4,
+		cos(t * 6.1 + _seed * 3.0) * 0.6 + sin(t * 10.7) * 0.4
+	) * Vector2(JITTER_PX, JITTER_PX * 0.5) * calm
 	_base_was = _base
-	_base = Iso.island_point(_theta, _grow) + meander + _knock
+	var on_path := Iso.island_point(_theta, _grow)
+	if on_path.distance_to(_path) > 0.5:
+		_heading = (on_path - _path).normalized()
+	_path = on_path
+	_base = on_path + meander + shake + _knock
 	_velocity = (_base - _base_was) / maxf(delta, 0.0001)
-	var want_lean := -_velocity * 0.55 + Vector2(sin(t * 0.8) * 14.0, 0.0)
-	_lean = _lean.lerp(want_lean, 1.0 - exp(-2.0 * delta))
+	var want_lean := -_velocity.limit_length(220.0) * 0.75 + Vector2(sin(t * 0.8) * 18.0, 0.0)
+	_lean = _lean.lerp(want_lean, 1.0 - exp(-2.6 * delta))
 
 	_track_carried(delta)
 	if _strength > 0.35 and _end_at < 0.0:
@@ -403,18 +500,106 @@ func _step(delta: float) -> void:
 	_push_state(delta)
 
 
-## Round the island at a speed of `speed` world px/s, turning back now and then, in and out
-## between the beach and the net's reach, all on smooth sines off the event's own seed.
-func _wander(speed: float, delta: float) -> void:
-	var p0 := Iso.island_point(_theta, _grow)
-	var per_rad := p0.distance_to(Iso.island_point(_theta + 0.01, _grow)) / 0.01
-	var way := clampf(sin(_t * 0.09 + _seed) * 1.8 + 0.25, -1.0, 1.0)
-	_theta += way * speed * delta / maxf(per_rad, 1.0)
+func _size_target() -> float:
+	if _need <= 1:
+		return SIZE_START
+	return lerpf(SIZE_START, SIZE_LAST, clampf(float(_hits) / float(_need - 1), 0.0, 1.0))
+
+
+## The hunt (2026-10-05): dart to the fullest water in the band, churn over it, hunt again.
+## Moves in the band's own terms (`_theta` round the island, `_grow` tiles out), so a goal on
+## the far side is reached round the ring and never across the island; each step is laid in
+## world px, bent off the line by the jitter, and solved back into those terms. `cap` holds
+## the pace down (touchdown, the collapse).
+func _hunt(delta: float, cap: float) -> void:
 	var lo := GROW_LEAST
 	var hi := _grow_most()
-	var want := lerpf(lo, hi, 0.5 + 0.5 * sin(_t * 0.23 + _seed * 1.7))
-	_grow = move_toward(_grow, want, delta * 0.8)
-	_grow = clampf(_grow, lo, hi)
+	if not _goal_set:
+		_pick_goal(_fleeing)
+		_fleeing = false
+	_goal_grow = clampf(_goal_grow, lo, hi)
+	var here := Iso.island_point(_theta, _grow)
+	var tang := (Iso.island_point(_theta + 0.01, _grow) - here) / 0.01
+	var norm := (Iso.island_point(_theta, _grow + 0.1) - here) / 0.1
+	var dth := wrapf(_goal_theta - _theta, -PI, PI)
+	var dgr := _goal_grow - _grow
+	var speed := SPEED_DART
+	if _churn > 0.0:
+		# Churning: a small loop round the goal, slow.
+		_churn -= delta
+		dth += sin(_t * 1.7 + _seed) * 0.06
+		dgr += cos(_t * 1.3 + _seed) * 0.7
+		speed = SPEED_CHURN
+		if _churn <= 0.0:
+			_goal_set = false
+	var line := tang * dth + norm * dgr
+	var left := line.length()
+	if _churn <= 0.0 and _goal_set:
+		_dart_t += delta
+		speed *= smoothstep(0.0, DART_RISE, _dart_t) * 0.85 + 0.15
+		speed *= clampf(left / ARRIVE_SLOW, 0.3, 1.0)
+		if left < ARRIVE:
+			_churn = _rng.randf_range(CHURN.x, CHURN.y)
+	speed = minf(speed, cap)
+	if left < 0.001 or speed <= 0.0:
+		return
+	var turn := JITTER_TURN * (
+		sin(_t * 2.9 + _seed) * 0.6 + sin(_t * 6.3 + _seed * 2.0) * 0.4
+	)
+	var w := line.normalized().rotated(turn) * minf(speed * delta, left)
+	var det := tang.x * norm.y - tang.y * norm.x
+	if absf(det) < 0.0001:
+		return
+	_theta += (w.x * norm.y - w.y * norm.x) / det
+	_grow = clampf(_grow + (tang.x * w.y - tang.y * w.x) / det, lo, hi)
+
+
+## The fullest water within `HUNT_ARC` of here in the band. Fleeing (just hit), it may not go
+## on the way it was going, nor back to where it was headed.
+func _pick_goal(fleeing: bool) -> void:
+	var lo := GROW_LEAST
+	var hi := _grow_most()
+	var here := _path
+	var best := -1.0
+	var pick := Vector2(_theta, _grow)
+	for k in HUNT_SAMPLES:
+		var th := _theta + _rng.randf_range(-HUNT_ARC, HUNT_ARC)
+		var gr := _rng.randf_range(lo, hi)
+		var at := Iso.island_point(th, gr)
+		var dist := at.distance_to(here)
+		if dist < HUNT_LEAST:
+			continue
+		if fleeing:
+			if _heading != Vector2.ZERO and (at - here).normalized().dot(_heading) > FLEE_DOT:
+				continue
+			if _goal_at != Vector2.ZERO and at.distance_to(_goal_at) < FLEE_CLEAR:
+				continue
+		var score := (1.0 + _richness(at)) * _rng.randf_range(0.8, 1.2) / (1.0 + dist / HUNT_NEAR)
+		if score > best:
+			best = score
+			pick = Vector2(th, gr)
+	if best < 0.0:
+		pick = Vector2(_theta + _rng.randf_range(-HUNT_ARC, HUNT_ARC), _rng.randf_range(lo, hi))
+	_goal_theta = pick.x
+	_goal_grow = pick.y
+	_goal_at = Iso.island_point(pick.x, pick.y)
+	_goal_set = true
+	_churn = 0.0
+	_dart_t = 0.0
+
+
+## Pieces in the water round `at`: the rubbish, and the grime that is wherever it is.
+func _richness(at: Vector2) -> float:
+	if grid == null:
+		return 0.0
+	var idx := grid.tile_at(at)
+	if idx < 0:
+		return 0.0
+	var n := 0
+	for i: int in grid.tiles_within(idx, HUNT_REACH):
+		if grid.dry[i] == 0:
+			n += grid.stacks[i].size()
+	return float(n)
 
 
 func _strength_at(t: float) -> float:
@@ -425,24 +610,23 @@ func _strength_at(t: float) -> float:
 		return _end_from * (1.0 - u) * (1.0 - u) * (1.0 + 0.15 * sin(u * 20.0) * (1.0 - u))
 	if _hits == 0:
 		return 1.0
-	var target: float = HIT_STRENGTH[_hits - 1]
+	# The size carries the shrink; strength only takes the hit's jolt.
 	var since := t - _hit_at
-	var dip := 0.14 * exp(-since * 5.0) * cos(since * 14.0)
-	var from := 1.0 if _hits == 1 else HIT_STRENGTH[_hits - 2]
-	var u2 := smoothstep(0.0, 0.25, since)
-	return lerpf(from, target, u2) - dip
+	return 1.0 - 0.14 * exp(-since * 5.0) * cos(since * 14.0)
 
 
 func axis_at(frac: float) -> Vector2:
-	var h := HEIGHT * _strength * frac
-	var snake := Vector2(sin(_t * 1.7 + frac * 3.0) * 7.0 * frac, 0.0)
+	var h := HEIGHT * _size * _strength * frac
+	var snake := Vector2(
+		(sin(_t * 1.7 + frac * 3.0) * 12.0 + sin(_t * 3.4 + frac * 6.0 + _seed) * 6.0) * frac, 0.0
+	)
 	var jolt := Vector2(sin(_t * 40.0) * 10.0 * _hit_flash * frac, 0.0)
 	return Vector2(_lean.x * frac * frac, _lean.y * 0.2 * frac) + snake + jolt - Vector2(0.0, h)
 
 
 func radius_at(frac: float) -> float:
 	var r := lerpf(BASE_R, TOP_R, pow(clampf(frac, 0.0, 1.0), 1.4))
-	return r * lerpf(0.45, 1.0, _strength) * (1.0 + 0.25 * _hit_flash)
+	return r * _size * lerpf(0.45, 1.0, _strength) * (1.0 + 0.25 * _hit_flash)
 
 
 # ======================================================================================
@@ -453,7 +637,7 @@ func radius_at(frac: float) -> float:
 func touches(at: Vector2, mouth: float) -> bool:
 	if not down() or _end_at >= 0.0 or _phase == "touchdown":
 		return false
-	var s := clampf(_strength, 0.5, 1.0)
+	var s := clampf(_strength, 0.5, 1.0) * _size
 	return CastNet._touches(at, mouth, _base, FOOT * s)
 
 
@@ -468,36 +652,40 @@ func net_down(net: Node, at: Vector2, mouth: float) -> bool:
 	_hit_flash = 1.0
 	var away := (_base - angler.position).normalized() if angler != null else Vector2.RIGHT
 	_knock += away * KNOCK
+	var ring := 22.0 * _size
 	for k in 8:
 		var a := TAU * float(k) / 8.0
-		splash.ripple(_base + Vector2(cos(a) * 22.0, sin(a) * 11.0), 10.0)
-	splash.ripple(_base, 30.0)
-	if _hits < 3:
-		_look_hits = _hits
-		for k in mini(2, _debris.size()):
-			_throw(_rng.randi_range(0, _debris.size() - 1), _rng.randf_range(2.0, 3.5), 0.4)
+		splash.ripple(_base + Vector2(cos(a) * ring, sin(a) * ring * 0.5), 10.0)
+	splash.ripple(_base, 30.0 * _size)
+	netted_into.emit(net, _into_net(net))
+	if _hits < _need:
+		_look_hits = 1
+		# Reel, then flee: the knock carries it back, and once the hit's beat is over it darts
+		# off a new way (`_pick_goal` with `fleeing`).
+		_goal_set = false
+		_fleeing = true
+		_churn = 0.0
 		_fling_in = maxf(_fling_in, 0.6)
 	else:
 		_tamed = true
 		_catch_net = net
-		_into_net(net)
 		_begin_end(true)
 	return true
 
 
-## The third hit: what the funnel carries falls into that net, up to its room. The rest is
-## let go onto the water by `_tick_collapse`.
-func _into_net(net: Node) -> void:
-	if net == null or not net.has_method(&"room_left"):
-		return
-	# Highest first, as it sheds.
-	_debris.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["height"]) > float(b["height"]))
-	while not _debris.is_empty() and int(net.room_left()) > 0:
-		var d: Dictionary = _debris.pop_front()
-		var held: PackedInt32Array = net.get(&"catch")
+## Every hit (2026-10-05): all it carries falls into that net, past the net's room, its
+## Strength and its Catch. Returns how many.
+func _into_net(net: Node) -> int:
+	if net == null or not (&"catch" in net):
+		return 0
+	var held: PackedInt32Array = net.get(&"catch")
+	for d: Dictionary in _debris:
 		held.append(int(d["def_index"]))
-		net.set(&"catch", held)
 		netted += 1
+	var n := _debris.size()
+	_debris.clear()
+	net.set(&"catch", held)
+	return n
 
 
 ## The vanish: the look's collapse, tamed or not. Untamed it drops what it carries onto the
@@ -533,7 +721,7 @@ func _tick_collapse(delta: float) -> void:
 
 func _lift(delta: float) -> void:
 	_lift_in -= delta
-	if _lift_in > 0.0 or _debris.size() >= CARRY_MOST:
+	if _lift_in > 0.0 or _debris.size() >= carry_most():
 		return
 	var here := Iso.world_to_tile(_base)
 	var centre := grid.tile_at(_base)
@@ -584,7 +772,8 @@ func _track_carried(delta: float) -> void:
 		var rr := 0.0
 		var band: float = d["band"]
 		var w := lerpf(3.4, 1.9, band) * float(d["whirl"]) * lerpf(0.7, 1.0, _strength)
-		d["angle"] = float(d["angle"]) + w * delta
+		# Counter-clockwise seen from above (2026-10-05): the angle runs down.
+		d["angle"] = float(d["angle"]) - w * delta
 		if d["state"] == "lift":
 			var u := clampf(float(d["age"]) / LIFT_TIME, 0.0, 1.0)
 			var e := 1.0 - pow(1.0 - u, 3.0)
@@ -625,7 +814,7 @@ func _fling_now(delta: float) -> void:
 			break
 	if pick >= 0:
 		_throw(pick, _rng.randf_range(2.5, 4.5), 0.75)
-	if _debris.size() >= CARRY_MOST - 1:
+	if _debris.size() >= carry_most() - 1:
 		_fling_in = FLING_FULL
 
 
@@ -652,7 +841,7 @@ func _throw(i: int, tiles: float, tangent: float) -> void:
 	_debris.remove_at(i)
 	var a: float = d["angle"]
 	var out := Vector2(cos(a), sin(a))
-	var tan := Vector2(-sin(a), cos(a))
+	var tan := Vector2(sin(a), -cos(a))
 	var dir := (tan * tangent + out * (1.0 - tangent * 0.5)).normalized()
 	var from: Vector2 = _base + (d["ground"] as Vector2)
 	var target := _landing_tile(from, dir, tiles, int(d["from_tile"]))
@@ -729,9 +918,10 @@ func _water(delta: float) -> void:
 				continue
 			var w := rel.normalized()
 			var world_rel := Iso.tile_to_world(w.x, w.y) - Iso.tile_to_world(0.0, 0.0)
-			var tangent := Vector2(-world_rel.y * 2.0, world_rel.x * 0.5).normalized()
+			# Counter-clockwise round the foot and drawn in towards it.
+			var tangent := Vector2(world_rel.y * 2.0, -world_rel.x * 0.5).normalized()
 			var fall := 1.0 - dist / SHOVE_REACH
-			var want := (tangent * 0.85 - world_rel.normalized() * 0.3) * SHOVE_PUSH * s * (0.4 + 0.6 * fall)
+			var want := (tangent * 0.8 - world_rel.normalized() * 0.45) * SHOVE_PUSH * s * (0.4 + 0.6 * fall)
 			grid.shove_to(index, want, delta)
 		_bump_in -= delta
 		if _bump_in <= 0.0:
@@ -743,13 +933,13 @@ func _water(delta: float) -> void:
 	if _ripple_in <= 0.0:
 		_ripple_in = 0.1
 		var k := fmod(_t * 10.0, 7.0)
-		var a := _spin * 0.35 + k * 0.9
-		var r := (8.0 + k * 7.0) * lerpf(0.6, 1.0, s)
+		var a := -_spin * 0.35 - k * 0.9
+		var r := (8.0 + k * 7.0) * lerpf(0.6, 1.0, s) * _size
 		splash.ripple(_base + Vector2(cos(a) * r, sin(a) * r * 0.5), 5.0 + k)
 	_core_ripple_in -= delta
 	if _core_ripple_in <= 0.0:
 		_core_ripple_in = 0.42
-		splash.ripple(_base, 18.0 * s + 6.0)
+		splash.ripple(_base, (18.0 * s + 6.0) * _size)
 
 
 # ======================================================================================
@@ -799,7 +989,9 @@ func _push_state(delta: float) -> void:
 		return
 	_state = {
 		"phase": _phase, "t": _phase_t, "time": _t, "strength": _strength, "hits": _look_hits,
-		"hit_flash": _hit_flash, "velocity": _velocity, "spin": _spin, "height": HEIGHT,
+		"hit_flash": _hit_flash, "velocity": _velocity, "spin": _spin, "height": HEIGHT * _size,
+		"size": _size, "hit_no": _hits,
+		"weak": lerpf(1.0, 0.65, clampf(float(_hits - 1) / float(maxi(_need - 1, 1)), 0.0, 1.0)),
 		"lean": _lean, "base": _base, "debris": _debris, "flung": _flung,
 		"axis_at": axis_at, "radius_at": radius_at, "net": {},
 		"since_hit": _t - _hit_at,
