@@ -41,7 +41,9 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
 - **Dogs** (`assets/dogs/`, three breeds off `art_source/PixelDogsSprites`, `scripts/dog.gd`'s art) — "Pixel Dogs" by Benvictus
   (https://benvictus.itch.io/pixel-dogs). ✅ Cleared (purchased/licensed by Richard,
   2026-09-16). Name-your-own-price; the author allows commercial use and asks for a credit
-  where there's no contribution. Credited as "Benvictus".
+  where there's no contribution. Credited as "Benvictus". The game's icon (`icon.png`,
+  `icon.ico`, the Steam icons, `tools/build_icon.py`) is the orange dog's first sit frame
+  from this pack.
 
 - **Recycle box** (`assets/Recycle_Box.png`, and everything painted out of its wood — the
   piers, the ferry's hull, the shed's walls) — by xStrax (https://straxportfolio.carrd.co/).

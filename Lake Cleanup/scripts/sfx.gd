@@ -442,6 +442,11 @@ var shopping: bool = false
 var indoors: bool = false
 var _from_room := false
 
+## Every recording started, with the level and pitch it went out at: what the trailer's film
+## probe listens to, to lay the game's own sounds under the edit in step with the picture.
+## Nothing in the game connects to it.
+signal played(path: String, db: float, pitch: float)
+
 
 func _ready() -> void:
 	_rng.randomize()
@@ -645,6 +650,7 @@ func play(
 	voice.volume_db = float(tune[0]) + db
 	voice.pitch_scale = pitch * _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
+	played.emit(voice.stream.resource_path, voice.volume_db, voice.pitch_scale)
 	return voice
 
 

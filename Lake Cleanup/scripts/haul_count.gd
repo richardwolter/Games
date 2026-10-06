@@ -123,8 +123,14 @@ func storm_hit() -> void:
 
 ## The cast is home: hold the last figure, swell it and let it go.
 func pop() -> void:
-	if _shown_count <= 0 and not _armed:
+	if _shown_count <= 0 and not _armed and count <= 0:
 		return
+	# The last figure is the whole catch, not wherever the pops had got to: a big haul comes
+	# home before its pops have all sounded, and the count froze part way (2026-10-03,
+	# Richard: "the numbers shown are just part of what the catch is").
+	if count > _shown_count:
+		_shown_count = count
+		_tick = TICK_TIME
 	_popping = 0.0
 	queue_redraw()
 

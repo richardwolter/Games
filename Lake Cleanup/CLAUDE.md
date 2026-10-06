@@ -7619,6 +7619,75 @@ and the lanes as shares of the lake in The Pump and the Wash Room.
   `Wildlife`'s two bed layers (`bed_layers`), which the lake reparents before `Fish` in its
   tree; same z 3, so the tree's order is what puts the fish over them.
 
+### The Store Re-shoot (2026-10-04, `/grill-me` with Richard, `tools/shot_steam.tscn`)
+`shot_steam` is back, rewritten on the trailer v2 probe (`film_trailer.gd`, which it extends),
+for four store assets. **One shot a run** (`FILM_ONLY=s_west` and so on): thinning only cleans,
+so a shot after the beauty's wave finds an empty lake. Frames go to `tools/film/<shot>/`, the log
+to `tools/film/last_steam.log`; the clips are cut with ffmpeg into
+`Marketing/.../screenshots/candidates/` (1170x658 30 fps WEBM and MP4, 640-wide 15 fps GIF), and
+the files they replaced are in `candidates/old_20261002/`.
+- **`s_west`** (`01_cast_west`): one gold net thrown 14 tiles off the west beach over a lake 8%
+  cleaned, the landing stocked so the bag fills; the count climbs gold to 54/54 and turns its
+  pale red (the trailer's `HaulCount.pop` fix), and what the net leaves under it is emptied, so a
+  clean spot shows once the patch closes (filmed, but cut: Richard, the clip ends a beat after
+  the count turns red, kept frames 50 to 240, 3.2 s). The camera eases from `WEST_LEAN_REST` of the way to
+  the landing out to `WEST_LEAN_OUT` with the net and back to `WEST_LEAN_BACK` on the haul.
+- **`s_beauty`** (`08_grime_to_beauty`): the trailer's `t2_beauty` as it stands, kept from the
+  wave's first frame, 12 s.
+- **`s_tornado`** (`09_tornado_orbit`, new): no nets; over a lake 25% cleaned the funnel circles
+  the island at `ORBIT_OUT` tiles past the beach, one lap in `ORBIT_LAP` s, its whirl topped up to
+  `ORBIT_CARRY` and flinging as in play; the camera follows its foot. Kept from 3.5 s after
+  touchdown, filmed 14 s and cut to its first 7 (Richard: too long).
+- **`s_bignet`** (`01_cast`): one plain net at Width 20 thrown north, saved as PNGs through the
+  flight in `tools/film/s_bignet_png/`; `big_06` is the still. Replaces the double-net still.
+- All numbers first guesses for Richard's eye.
+
+### The Icon (2026-10-03, `/grill-me` with Richard, `tools/build_icon.py`)
+The game's own icon, in place of Godot's: the orange dog (slot 1, `dog_02`) sitting, mouth
+closed, its first sit frame **mirrored to face right**, a bust running off the icon's bottom and
+right edges, over a rounded square split on a stepped diagonal, murky `water_dirty` bottom-
+left, clean `water_clean` top-right. Picked off `tools/last_icon_sheet.png`.
+- **Native pixels only**: masters at 16, 24 and 32; 48 is 24 doubled, 64/128/256 are 32 in
+  whole steps. **16 px is the cut head alone** (the bust's head is 17 wide), drawn over the
+  corners; the bust is clipped by them. No outline, the corners cut transparent.
+- **The cut head filling the icon was the other layout and lost** ("B is much better"),
+  as were sound lines, an oak frame and a 2x redraw. **The bark frame was built first and
+  swapped for the closed mouth** (Richard, same session), at the same spot in the icon.
+- **Where**: `icon.png` (256, `config/icon`), `icon.ico` (16-256, `config/windows_native_icon`
+  and the Windows preset's `application/icon` and `console_wrapper_icon`). **Godot 4.7 writes
+  the .exe's icon itself, no rcedit**: a test export's embedded 32 px icon matched the master
+  pixel for pixel. Steam's client icon (`.ico`) and community icon (184 JPG, the bust on a
+  square 23 px backing x8) go to `Marketing/My Dirty Little Lake/steam/icons/`.
+- Re-run with `--write` (base python, the psd-extract site-packages on `PYTHONPATH`) after the
+  dog sheet or the water swatches change, then reimport. Out of scope: the web/PWA icons.
+
+### The Vertical Trailer (2026-10-05, `/grill-me` with Richard)
+The wishlist trailer (v2, `shots2.json`) for TikTok, Reels, Stories and Shorts: the same edit,
+song, beats, captions and 37.2 s, **re-filmed in portrait, not cropped**.
+- **Film**: `FILM_TALL=1` on `tools/film_trailer.tscn` (same three runs as v2) opens a
+  1080x1920 borderless window (taller than the 1080p monitor; the viewport renders all of it)
+  with canvas 720x1280, so the stretch is 1.5 and every zoom level and UI size is v2's. Frames
+  go to `tools/film/v_<shot>/`, the log to `last_film_tall.log`. The shop shots open
+  2196x1920 at canvas 1220 wide (stretch 1.8) and hide the HUD skin and the pricing plate, so
+  the edit crops the NET and LUCK boards and the purse 1:1. The opening's push starts at zoom
+  2 (zoom 1's view is taller than the ground) and its camera rides the edit's virtual camera.
+  The tornado stands up and to the right of the island (`TORN_ANGLE` -1.95, out 15), so the
+  column rises over the angler. **Casts stay sideways, by decision**: iso tiles are 2:1, so an
+  up-screen throw is half as long on screen.
+- **`tools/shot_wash_place.tscn` is back** (deleted 2026-10-03), with `FILM_TALL`. It copies
+  `user://play_decor.save` and raises the copy's version to the game's. At the room swap the
+  vertical film opens a 1650x1920 window (canvas 1100 wide), so the room draws at zoom 2
+  rather than the portrait canvas's 1 (Richard: "decoration should be much more zoomed in"),
+  and the edit crops it 1:1.
+- **The wash room's lawn strip is 360 rows** (`build_wash_backdrop.py` `LAWN_TALL`, was 200;
+  `LAWN_NEAR` 200 keeps the near scale): a 9:16 window showed a flat green block under it.
+  The first 200 rows are pixel-identical, so a landscape window is unchanged.
+- **Cut**: `marketing/.../trailer/shots_vertical.json` through `build_trailer2.py` into
+  `trailer/vertical/Wishlist Trailer Vertical.mp4`. The wash is two cuts, the washing zoomed
+  1.7x onto the stand (Richard: "more focused on washing and less on the menu"). Captions sit
+  at 128 px (`caption_px`, up to 76% of the width) inside the feeds' safe area (clear of the top 14%, bottom 25%, right 12%) and off the action,
+  checked frame by frame; `vertical/review_sheet.py` makes the stills sheet.
+
 ### The Devlog (2026-09-25, `/grill-me` with Richard, `tools/film_devlog.tscn`, `marketing/My Dirty Little Lake/devlog/`)
 **Deleted 2026-10-03 (The Pre-Release Cleanup).** `film_devlog` only; the cut in `marketing/` and the frames stay.
 An 83 s YouTube devlog cut to Save ME (80 BPM, grid from `assets/music/beats.json`), captions

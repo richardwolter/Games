@@ -66,7 +66,11 @@ RANK_JITTER = 7
 
 # The near bank: block heights from the waterline down. Sand first, then lawn; the last
 # height repeats to the bottom.
-LAWN_TALL = 200
+# 360 rows (2026-10-05, the vertical trailer): a 9:16 window leaves more under the stand than
+# 200 did, and the room filled the rest with one flat green. The near scale still grows over
+# the first `LAWN_NEAR` rows, so the rows a landscape window shows are what they were.
+LAWN_TALL = 360
+LAWN_NEAR = 200
 SAND_ROWS = [2, 2, 3, 3, 4]
 GRASS_ROWS = [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8]
 BLOCK = (16, 8)
@@ -465,7 +469,7 @@ def build_lawn(roll):
     draw_beach(out, 0, sand_tall + EDGE_WANDER + 1, sand_texel(), 600, dry_from=sand_tall - 3)
     lawn = Image.new("RGBA", (WIDE, LAWN_TALL))
     draw_lawn(lawn, sand_tall - 3, LAWN_TALL, lawn_shades(GRASS_ISLAND),
-              lambda y: max(0.0, min(1.0, (y - sand_tall) / float(LAWN_TALL - sand_tall))), 700)
+              lambda y: max(0.0, min(1.0, (y - sand_tall) / float(LAWN_NEAR - sand_tall))), 700)
     # The lawn's edge wanders a little and hangs blades over the sand, the island's fringe.
     edge_tip = lawn_shades(GRASS_ISLAND)["light"]
     for x in range(WIDE):

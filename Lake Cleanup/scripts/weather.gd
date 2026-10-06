@@ -298,6 +298,8 @@ func _tick_flash(delta: float) -> void:
 			_thunder_voice.volume_db = THUNDER_DB + _rng.randf_range(-3.0, 1.0)
 			_thunder_voice.pitch_scale = _rng.randf_range(0.9, 1.08)
 			_thunder_voice.play()
+			Sfx.main().played.emit(_thunder_voice.stream.resource_path, _thunder_voice.volume_db,
+					_thunder_voice.pitch_scale)
 
 
 func _tick_sound() -> void:
