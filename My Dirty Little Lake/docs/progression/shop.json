@@ -1,0 +1,1197 @@
+{
+ "game": "My Dirty Little Lake (shop, 2026-09-18 pass)",
+ "currency": "sludge",
+ "maxMinutes": 300,
+ "startMoney": 0,
+ "stats": {
+  "piece_base_pay": 1.25,
+  "piece_filth_pay": 3.0,
+  "net_radius": 0.6,
+  "net_power": 0,
+  "net_range": 4.0,
+  "reel": 5.0,
+  "net_hold": 8,
+  "boat_speed": 8.0,
+  "cargo": 16,
+  "boats": 1,
+  "boat_volley_cut": 0.0,
+  "dog_fetch": 1,
+  "dog_wait_cut": 0,
+  "dog": 1,
+  "dog_tier": 0,
+  "dog_beach": 0.35,
+  "dog_strand_speed": 1.0,
+  "dog_reach": 6,
+  "lucky_odds": 0.0,
+  "double_odds": 0.0,
+  "recycle_bonus": 0.0,
+  "bird_worth": 1.0,
+  "bird_bonus": 26.0,
+  "k_lucky_extra": 4,
+  "k_double_found": 1.0,
+  "k_bonus_share": 0.25,
+  "k_bird_swept": 0.0015,
+  "k_bird_aim": 3.0,
+  "k_lake_r": 36.88,
+  "k_island_r": 9.58,
+  "k_units_total": 32528,
+  "k_stack": 4.071,
+  "k_density": 1.4,
+  "k_reel_factor": 0.977,
+  "k_aim": 0.8,
+  "k_cast_share": 0.65,
+  "k_mouth_edge": 0.15,
+  "k_shelf": 2.5,
+  "k_reach_far": 35.6,
+  "k_catch_scale": 1.3,
+  "k_ferry_scale": 1.0,
+  "k_ferry_leg": 103.29,
+  "k_ferry_fixed": 8.4,
+  "k_ferry_per_piece": 0.059,
+  "k_dog_trip": 8,
+  "k_dog_carry": 2.2,
+  "k_dog_carry_share": 0.5,
+  "k_strand": 448,
+  "k_strand_band": 2.5,
+  "k_units_t0": 12674,
+  "k_units_t1": 7792,
+  "k_units_t2": 5538,
+  "k_units_t3": 3102,
+  "k_units_t4": 3422
+ },
+ "derived": [
+  [
+   "coverage",
+   "(min(k_lake_r, k_island_r + (net_range * (k_lake_r - k_island_r) / k_reach_far)) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2)"
+  ],
+  [
+   "dog_coverage",
+   "(min(k_lake_r, k_island_r + dog_reach) ^ 2 - k_island_r ^ 2) / (k_lake_r ^ 2 - k_island_r ^ 2) * k_dog_carry_share"
+  ],
+  [
+   "strand_reach",
+   "clamp((k_island_r + (net_range * (k_lake_r - k_island_r) / k_reach_far) + net_radius - k_lake_r) / k_strand_band, 0, 1)"
+  ],
+  [
+   "access_now",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - coverage)) * (net_power >= 0) + max(0, pool_lake_t1 - k_units_t1 * (1 - coverage)) * (net_power >= 1) + max(0, pool_lake_t2 - k_units_t2 * (1 - coverage)) * (net_power >= 2) + max(0, pool_lake_t3 - k_units_t3 * (1 - coverage)) * (net_power >= 3) + max(0, pool_lake_t4 - k_units_t4 * (1 - coverage)) * (net_power >= 4) + max(0, pool_strand - k_strand * (1 - strand_reach))"
+  ],
+  [
+   "density",
+   "k_density * access_now / max(coverage * k_units_total + strand_reach * k_strand, 1)"
+  ],
+  [
+   "cast_dist",
+   "net_range * k_cast_share"
+  ],
+  [
+   "mouth",
+   "net_radius + k_mouth_edge"
+  ],
+  [
+   "swept",
+   "2 * mouth * max(0, cast_dist - k_shelf) + (cast_dist > k_shelf ? PI * mouth ^ 2 : 0)"
+  ],
+  [
+   "per_cast",
+   "min(net_hold, swept * density)"
+  ],
+  [
+   "cast_cycle",
+   "k_aim + cast_dist / 26 + k_reel_factor * cast_dist / reel"
+  ],
+  [
+   "ferry_trip",
+   "k_ferry_fixed + 2 * k_ferry_leg / boat_speed + k_ferry_per_piece * cargo * (1 - boat_volley_cut)"
+  ],
+  [
+   "ferry_rate",
+   "k_ferry_scale * (boats * cargo / ferry_trip)"
+  ],
+  [
+   "access_lucky",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - coverage)) * (net_power + 1 >= 0) + max(0, pool_lake_t1 - k_units_t1 * (1 - coverage)) * (net_power + 1 >= 1) + max(0, pool_lake_t2 - k_units_t2 * (1 - coverage)) * (net_power + 1 >= 2) + max(0, pool_lake_t3 - k_units_t3 * (1 - coverage)) * (net_power + 1 >= 3) + max(0, pool_lake_t4 - k_units_t4 * (1 - coverage)) * (net_power + 1 >= 4) + max(0, pool_strand - k_strand * (1 - strand_reach))"
+  ],
+  [
+   "density_lucky",
+   "k_density * access_lucky / max(coverage * k_units_total + strand_reach * k_strand, 1)"
+  ],
+  [
+   "lucky_cast",
+   "min(net_hold + k_lucky_extra, swept * density_lucky)"
+  ],
+  [
+   "double_cast",
+   "per_cast * k_double_found"
+  ],
+  [
+   "catch_rate",
+   "k_catch_scale * (per_cast + lucky_odds * max(0, lucky_cast - per_cast) + double_odds * double_cast) / cast_cycle"
+  ],
+  [
+   "lake_left",
+   "(pool_lake_t0 + pool_lake_t1 + pool_lake_t2 + pool_lake_t3 + pool_lake_t4) / k_units_total"
+  ],
+  [
+   "bird_rate",
+   "k_bird_swept * k_bird_aim * swept * (1 + double_odds) * min(1, lake_left * 2) / cast_cycle"
+  ],
+  [
+   "dog_near_left",
+   "max(0, pool_lake_t0 - k_units_t0 * (1 - dog_coverage))"
+  ],
+  [
+   "dog_beach_share",
+   "dog_near_left > 5 ? dog_beach : 1"
+  ],
+  [
+   "dog_rate",
+   "dog * min(dog_fetch, k_dog_carry) / (k_dog_trip + max(10 - dog_wait_cut, 3))"
+  ]
+ ],
+ "pools": {
+  "lake_t0": {
+   "units": "k_units_t0",
+   "value": "(piece_base_pay + 3.05 * piece_filth_pay) * 1.00"
+  },
+  "lake_t1": {
+   "units": "k_units_t1",
+   "value": "(piece_base_pay + 3.09 * piece_filth_pay) * 1.50"
+  },
+  "lake_t2": {
+   "units": "k_units_t2",
+   "value": "(piece_base_pay + 3.42 * piece_filth_pay) * 2.00"
+  },
+  "lake_t3": {
+   "units": "k_units_t3",
+   "value": "(piece_base_pay + 3.44 * piece_filth_pay) * 2.50"
+  },
+  "lake_t4": {
+   "units": "k_units_t4",
+   "value": "(piece_base_pay + 3.50 * piece_filth_pay) * 3.00"
+  },
+  "strand": {
+   "units": 448,
+   "value": "piece_base_pay + 3.05 * piece_filth_pay"
+  },
+  "box": {
+   "units": 0
+  },
+  "pier": {
+   "units": 0,
+   "sell": true,
+   "payMult": "1 + recycle_bonus * k_bonus_share"
+  },
+  "flock": {
+   "units": "inf",
+   "value": "bird_bonus * bird_worth"
+  },
+  "purse": {
+   "units": 0,
+   "sell": true
+  }
+ },
+ "flows": [
+  {
+   "id": "catch",
+   "label": "net catch",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "gate": "net_power >= 0",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t1",
+     "gate": "net_power >= 1",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t2",
+     "gate": "net_power >= 2",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t3",
+     "gate": "net_power >= 3",
+     "share": "coverage"
+    },
+    {
+     "pool": "lake_t4",
+     "gate": "net_power >= 4",
+     "share": "coverage"
+    },
+    {
+     "pool": "strand",
+     "share": "strand_reach"
+    }
+   ],
+   "to": "box",
+   "rate": "catch_rate",
+   "active": true
+  },
+  {
+   "id": "dog",
+   "label": "dog fetch",
+   "from": [
+    {
+     "pool": "lake_t0",
+     "gate": "dog_tier >= 0",
+     "share": "dog_coverage"
+    },
+    {
+     "pool": "lake_t1",
+     "gate": "dog_tier >= 1",
+     "share": "dog_coverage"
+    },
+    {
+     "pool": "lake_t2",
+     "gate": "dog_tier >= 2",
+     "share": "dog_coverage"
+    },
+    {
+     "pool": "lake_t3",
+     "gate": "dog_tier >= 3",
+     "share": "dog_coverage"
+    },
+    {
+     "pool": "lake_t4",
+     "gate": "dog_tier >= 4",
+     "share": "dog_coverage"
+    }
+   ],
+   "to": "box",
+   "rate": "dog_rate * (1 - dog_beach_share)"
+  },
+  {
+   "id": "dog_beach",
+   "label": "dog strand runs",
+   "from": [
+    "strand"
+   ],
+   "to": "box",
+   "rate": "dog_rate * dog_beach_share * dog_strand_speed"
+  },
+  {
+   "id": "ferry",
+   "label": "ferry haul",
+   "from": [
+    "box"
+   ],
+   "to": "pier",
+   "rate": "ferry_rate"
+  },
+  {
+   "id": "birds",
+   "label": "pigeons netted",
+   "from": [
+    "flock"
+   ],
+   "to": "purse",
+   "rate": "bird_rate",
+   "active": true
+  }
+ ],
+ "goal": {
+  "pools": [
+   "lake_t0",
+   "lake_t1",
+   "lake_t2",
+   "lake_t3",
+   "lake_t4",
+   "strand"
+  ],
+  "clearAt": 0.995
+ },
+ "links": [
+  {
+   "up": "catch",
+   "down": "ferry",
+   "band": [
+    1.0,
+    2.5
+   ],
+   "buffer": "box"
+  }
+ ],
+ "trees": [
+  "net",
+  "ferry",
+  "dog",
+  "luck"
+ ],
+ "nodes": [
+  {
+   "id": "net_width",
+   "tree": "net",
+   "group": "net_width",
+   "name": "Width",
+   "ranks": 20,
+   "cost": [
+    450.0,
+    544.5,
+    658.8,
+    797.2,
+    964.6,
+    1167.2,
+    1412.3,
+    1708.9,
+    2067.7,
+    2502.0,
+    3027.4,
+    3663.1,
+    4432.4,
+    5363.2,
+    6489.4,
+    7852.2,
+    9501.2,
+    11496.5,
+    13910.7,
+    16832.0
+   ],
+   "effects": [
+    {
+     "stat": "net_radius",
+     "add": [
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.21
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    1.5,
+    4.5,
+    7.4,
+    10.4,
+    13.4,
+    16.4,
+    19.3,
+    22.3,
+    25.3,
+    28.3,
+    31.2,
+    34.2,
+    37.2,
+    40.2,
+    43.1,
+    46.1,
+    49.1,
+    52.1,
+    55.0,
+    58.0
+   ]
+  },
+  {
+   "id": "net_strength",
+   "tree": "net",
+   "group": "net_strength",
+   "name": "Strength",
+   "ranks": 4,
+   "cost": [
+    1700.0,
+    5899.0,
+    20469.5,
+    71029.3
+   ],
+   "effects": [
+    {
+     "stat": "net_power",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    10,
+    20,
+    30,
+    40
+   ]
+  },
+  {
+   "id": "net_range",
+   "tree": "net",
+   "group": "net_range",
+   "name": "Range",
+   "ranks": 20,
+   "cost": [
+    150.0,
+    190.5,
+    241.9,
+    307.3,
+    390.2,
+    495.6,
+    629.4,
+    799.3,
+    1015.1,
+    1289.2,
+    1637.3,
+    2079.4,
+    2640.8,
+    3353.8,
+    4259.4,
+    5409.4,
+    6869.9,
+    8724.8,
+    11080.5,
+    14072.2
+   ],
+   "effects": [
+    {
+     "stat": "net_range",
+     "add": [
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    1.0,
+    3.2,
+    5.3,
+    7.5,
+    9.6,
+    11.8,
+    13.9,
+    16.1,
+    18.3,
+    20.4,
+    22.6,
+    24.7,
+    26.9,
+    29.1,
+    31.2,
+    33.4,
+    35.5,
+    37.7,
+    39.8,
+    42.0
+   ]
+  },
+  {
+   "id": "reel",
+   "tree": "net",
+   "group": "reel",
+   "name": "Reel",
+   "ranks": 20,
+   "cost": [
+    450.0,
+    531.0,
+    626.6,
+    739.4,
+    872.4,
+    1029.5,
+    1214.8,
+    1433.5,
+    1691.5,
+    1996.0,
+    2355.2,
+    2779.2,
+    3279.4,
+    3869.7,
+    4566.3,
+    5388.2,
+    6358.1,
+    7502.5,
+    8853.0,
+    10446.5
+   ],
+   "effects": [
+    {
+     "stat": "reel",
+     "add": [
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      1.2,
+      0.2
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    2.0,
+    4.9,
+    7.9,
+    10.8,
+    13.8,
+    16.7,
+    19.7,
+    22.6,
+    25.6,
+    28.5,
+    31.5,
+    34.4,
+    37.4,
+    40.3,
+    43.3,
+    46.2,
+    49.2,
+    52.1,
+    55.1,
+    58.0
+   ]
+  },
+  {
+   "id": "net_hold",
+   "tree": "net",
+   "group": "net_hold",
+   "name": "Catch",
+   "ranks": 8,
+   "cost": [
+    1000.0,
+    1800.0,
+    3240.0,
+    5832.0,
+    10497.6,
+    18895.7,
+    34012.2,
+    61222.0
+   ],
+   "effects": [
+    {
+     "stat": "net_hold",
+     "add": [
+      7,
+      7,
+      7,
+      7,
+      7,
+      7,
+      7,
+      7
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    8.0,
+    16.3,
+    24.6,
+    32.9,
+    41.1,
+    49.4,
+    57.7,
+    66.0
+   ]
+  },
+  {
+   "id": "lucky_haul",
+   "tree": "luck",
+   "group": "lucky_haul",
+   "name": "Lucky cast",
+   "ranks": 10,
+   "cost": [
+    350.0,
+    476.0,
+    647.4,
+    880.4,
+    1197.4,
+    1628.4,
+    2214.6,
+    3011.9,
+    4096.2,
+    5570.8
+   ],
+   "effects": [
+    {
+     "stat": "lucky_odds",
+     "add": [
+      0.031,
+      0.033,
+      0.035,
+      0.037,
+      0.039,
+      0.041,
+      0.043,
+      0.045,
+      0.047,
+      0.049
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    3.0,
+    7.0,
+    11.0,
+    15.0,
+    19.0,
+    23.0,
+    27.0,
+    31.0,
+    35.0,
+    39.0
+   ]
+  },
+  {
+   "id": "double_cast",
+   "tree": "luck",
+   "group": "double_cast",
+   "name": "Double cast",
+   "ranks": 10,
+   "cost": [
+    400.0,
+    616.0,
+    948.6,
+    1460.9,
+    2249.8,
+    3464.7,
+    5335.6,
+    8216.8,
+    12653.9,
+    19487.1
+   ],
+   "effects": [
+    {
+     "stat": "double_odds",
+     "add": [
+      0.0215,
+      0.0245,
+      0.0275,
+      0.0305,
+      0.0335,
+      0.0365,
+      0.0395,
+      0.0425,
+      0.0455,
+      0.0485
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    5.0,
+    10.2,
+    15.4,
+    20.7,
+    25.9,
+    31.1,
+    36.3,
+    41.6,
+    46.8,
+    52.0
+   ]
+  },
+  {
+   "id": "boat_speed",
+   "tree": "ferry",
+   "group": "boat_speed",
+   "name": "Sailing",
+   "ranks": 20,
+   "cost": [
+    60.0,
+    84.0,
+    117.6,
+    164.6,
+    230.5,
+    322.7,
+    451.8,
+    632.5,
+    885.5,
+    1239.7,
+    1735.5,
+    2429.7,
+    3401.6,
+    4762.3,
+    6667.2,
+    9334.1,
+    13067.7,
+    18294.8,
+    25612.7,
+    35857.8
+   ],
+   "effects": [
+    {
+     "stat": "boat_speed",
+     "add": [
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6,
+      1.6
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    1.0,
+    3.8,
+    6.6,
+    9.4,
+    12.2,
+    14.9,
+    17.7,
+    20.5,
+    23.3,
+    26.1,
+    28.9,
+    31.7,
+    34.5,
+    37.3,
+    40.1,
+    42.8,
+    45.6,
+    48.4,
+    51.2,
+    54.0
+   ]
+  },
+  {
+   "id": "cargo",
+   "tree": "ferry",
+   "group": "cargo",
+   "name": "Hold",
+   "ranks": 8,
+   "cost": [
+    40.0,
+    100.0,
+    250.0,
+    625.0,
+    1562.5,
+    3906.2,
+    9765.6,
+    24414.1
+   ],
+   "effects": [
+    {
+     "stat": "cargo",
+     "add": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    0.5,
+    7.3,
+    14.1,
+    20.9,
+    27.6,
+    34.4,
+    41.2,
+    48.0
+   ]
+  },
+  {
+   "id": "fleet",
+   "tree": "ferry",
+   "group": "fleet",
+   "name": "Fleet",
+   "ranks": 3,
+   "cost": [
+    200.0,
+    500.0,
+    1250.0
+   ],
+   "effects": [
+    {
+     "stat": "boats",
+     "add": [
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    2,
+    9,
+    20
+   ]
+  },
+  {
+   "id": "boat_volley",
+   "tree": "ferry",
+   "group": "boat_volley",
+   "name": "Loading",
+   "ranks": 4,
+   "cost": [
+    160.0,
+    398.4,
+    992.0,
+    2470.1
+   ],
+   "effects": [
+    {
+     "stat": "boat_volley_cut",
+     "add": [
+      0.15,
+      0.15,
+      0.15,
+      0.15
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    6,
+    16,
+    28,
+    42
+   ]
+  },
+  {
+   "id": "dog_fetch",
+   "tree": "dog",
+   "group": "dog_fetch",
+   "name": "Fetch",
+   "ranks": 4,
+   "cost": [
+    500.0,
+    900.0,
+    1620.0,
+    2916.0
+   ],
+   "effects": [
+    {
+     "stat": "dog_fetch",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    8,
+    16,
+    24,
+    32
+   ]
+  },
+  {
+   "id": "dog_wait",
+   "tree": "dog",
+   "group": "dog_wait",
+   "name": "Keenness",
+   "ranks": 3,
+   "cost": [
+    600.0,
+    1320.0,
+    2904.0
+   ],
+   "effects": [
+    {
+     "stat": "dog_wait_cut",
+     "add": [
+      2,
+      2,
+      2
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    12,
+    22,
+    32
+   ]
+  },
+  {
+   "id": "dog_count",
+   "tree": "dog",
+   "group": "dog_count",
+   "name": "Pack",
+   "ranks": 3,
+   "cost": [
+    200.0,
+    400.0,
+    800.0
+   ],
+   "effects": [
+    {
+     "stat": "dog",
+     "add": [
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    4,
+    9,
+    15
+   ]
+  },
+  {
+   "id": "dog_strength",
+   "tree": "dog",
+   "group": "dog_strength",
+   "name": "Carry",
+   "ranks": 4,
+   "cost": [
+    1200.0,
+    2640.0,
+    5808.0,
+    12777.6
+   ],
+   "effects": [
+    {
+     "stat": "dog_tier",
+     "add": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    12,
+    22,
+    32,
+    42
+   ]
+  },
+  {
+   "id": "recycle_bonus",
+   "tree": "luck",
+   "group": "recycle_bonus",
+   "name": "Bonus yard",
+   "ranks": 8,
+   "cost": [
+    1500.0,
+    2415.0,
+    3888.2,
+    6259.9,
+    10078.5,
+    16226.3,
+    26124.4,
+    42060.3
+   ],
+   "effects": [
+    {
+     "stat": "recycle_bonus",
+     "add": [
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25
+     ]
+    }
+   ],
+   "tags": [],
+   "schedule": [
+    6.0,
+    12.9,
+    19.7,
+    26.6,
+    33.4,
+    40.3,
+    47.1,
+    54.0
+   ]
+  },
+  {
+   "id": "bird_worth",
+   "tree": "luck",
+   "group": "bird_worth",
+   "name": "Pigeons",
+   "ranks": 8,
+   "cost": [
+    120.0,
+    216.0,
+    388.8,
+    699.8,
+    1259.7,
+    2267.5,
+    4081.5,
+    7346.6
+   ],
+   "effects": [
+    {
+     "stat": "bird_worth",
+     "add": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3
+     ]
+    }
+   ],
+   "tags": [
+    "utility"
+   ],
+   "schedule": [
+    2.0,
+    6.0,
+    10.0,
+    14.0,
+    18.0,
+    22.0,
+    26.0,
+    30.0
+   ]
+  }
+ ],
+ "bots": [
+  {
+   "id": "focused",
+   "policy": "value",
+   "thinkEvery": 5
+  },
+  {
+   "id": "casual",
+   "policy": "mixed",
+   "noise": 0.15,
+   "attention": 0.9,
+   "offline": {
+    "every": 600,
+    "for": 240
+   },
+   "thinkEvery": 20,
+   "seeds": 3
+  },
+  {
+   "id": "cheapest",
+   "policy": "cheapest",
+   "thinkEvery": 5
+  }
+ ],
+ "targets": {
+  "clearMinutes": {
+   "focused": [
+    48,
+    68
+   ]
+  },
+  "paybackCurve": [
+   [
+    0,
+    30
+   ],
+   [
+    10,
+    90
+   ],
+   [
+    30,
+    240
+   ],
+   [
+    60,
+    480
+   ],
+   [
+    90,
+    720
+   ]
+  ]
+ },
+ "gapCurve": [
+  [
+   0,
+   7
+  ],
+  [
+   10,
+   14
+  ],
+  [
+   30,
+   26
+  ],
+  [
+   60,
+   42
+  ],
+  [
+   90,
+   60
+  ]
+ ]
+}

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Godot Lake Cleanup",
+      "name": "Godot My Dirty Little Lake",
       "runtimeExecutable": "C:\\Users\\Administrador\\Documents\\Games\\Godot_v4.7.1-stable_win64.exe",
-      "runtimeArgs": ["--path", "Lake Cleanup"],
+      "runtimeArgs": ["--path", "My Dirty Little Lake"],
       "port": 6007
     }
   ]

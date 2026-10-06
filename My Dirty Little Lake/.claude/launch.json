@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Godot My Dirty Little Lake",
+      "runtimeExecutable": "godot",
+      "runtimeArgs": ["--path", ".", "-d"],
+      "port": 6007
+    },
+    {
+      "name": "My Dirty Little Lake web build",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8060", "--directory", "build/web"],
+      "port": 8060
+    }
+  ]
+}

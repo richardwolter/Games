@@ -15,7 +15,7 @@ Files: <arquivos principais modificados>
 ```
 Commit: 7fdc489
 Palette integration completa: água lê cores do palette.tres, shader atualizado para cor local por tile.
-Files: shaders/water.gdshader, Lake Cleanup/CLAUDE.md
+Files: shaders/water.gdshader, My Dirty Little Lake/CLAUDE.md
 ```
 
 ### Issue #4: Update water shader colors
