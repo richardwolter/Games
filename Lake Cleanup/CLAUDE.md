@@ -2493,9 +2493,9 @@ A cleaned lake ends on a beat of clean water, then the words, then the credits.
   it was cut into its board); the swell-and-shine on payment stays. Same places as before.
   The lake lends the sprites once (`Lake._lend_button_art`) to `HudSkin.sprites` and the
   static `UiButton.sprites`, so the shed's copy of the upgrades button is the same drawing.
-  **Retired**: `assets/buttons.png`/`.json` and `tools/slice_buttons.gd`. `assets/ui.png`/
-  `ui.json` stay only because `tools/slice_shed.gd` cuts the hut off them; nothing draws
-  from them at runtime. The shed icon does not track the collection, by decision.
+  **Retired**: `assets/buttons.png`/`.json` and `tools/slice_buttons.gd`; `assets/ui.png`/
+  `ui.json`, `UI_Buttons.jpg`, `tools/slice_ui.gd` and `tools/slice_shed.gd` are deleted
+  (2026-10-03: AI placeholders nothing drew). The shed icon does not track the collection, by decision.
 
 ### The Shed and the Box Stand in Grass (`scripts/skirt.gd`, 2026-09-12)
 The hut on the island and the recycle box are front-on pictures set on a lawn, and the row

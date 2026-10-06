@@ -2,7 +2,7 @@
 ##
 ## Every sheet in this game was read with `Image.load_from_file` on a globalized path, which
 ## works beautifully right up until the game is not being run out of its own source folder.
-## In an export there is no `res://assets/ui.png` on disk — the file is inside the pack — and
+## In an export there is no `res://assets/lake_objects.png` on disk — the file is inside the pack — and
 ## on the web there is no disk at all, so every one of those calls returns null and the whole
 ## game falls back to its placeholders at once.
 ##

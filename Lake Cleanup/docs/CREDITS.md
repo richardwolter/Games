@@ -137,9 +137,8 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   this specific net art could be freely copied by others without legal recourse. Not a
   lawyer — flagging the facts, the keep-and-don't-disclose call stands as made.
 
-- **UI_Buttons.jpg, ui.png** — AI-generated placeholder. Flagged as feeling "ugly" —
-  planned for a rework later (design/quality issue, not a licensing one). `shed.png` used to
-  be listed here; it is Zato's pack art now (see **Shed** above), corrected 2026-09-16.
+- **UI_Buttons.jpg, ui.png** — AI-generated placeholders, never drawn; deleted 2026-10-03
+  with `tools/slice_ui.gd` and `tools/slice_shed.gd`. The angler is the only AI art in the build.
 
 - **character.png (angler)** — AI-generated with [PixelLab](https://pixellab.ai/), then
   hand-fixed by Richard in `art_source/Character_Sprite_Sheet.psd`. Same AI-disclosure notes

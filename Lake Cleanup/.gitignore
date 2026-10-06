@@ -81,3 +81,9 @@ art_source/packs_local/
 !/tools/bases/
 !/tools/film/
 /tools/film/*.log
+
+# Zip leftovers from macOS-made packs
+__MACOSX/
+
+# Loose review pictures dropped next to the film folders
+tools/film/*.png
