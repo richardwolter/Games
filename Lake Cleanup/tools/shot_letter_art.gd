@@ -19,6 +19,11 @@ extends Node
 ## moved island does not leave the probe photographing empty water. What it could not find
 ## it says in the log and leaves the old still alone. Read the log.
 ##
+## `LETTER_ONLY=net_catch,net_nothing` writes only the stills named and leaves the rest as they
+## are (the aim ring's re-shoot, 2026-10-03, which had no reason to move the shop's or the
+## shed's). The ring is photographed calm (`CastNet.calm_ring`): no halo caught half
+## dissolved, no dash caught mid-march.
+##
 ## On a save of its own and under its own node, like every probe since `shot_ending`. The
 ## view is held from `_process` at priority 100 — after the lake's own, which would put the
 ## camera and the aim back — the way `tools/film_trailer.gd` does it.
@@ -125,6 +130,7 @@ func _physics_process(delta: float) -> void:
 	if _pre == 0:
 		_main.set(&"_in_menu", false)
 		_net = _main.get(&"_net")
+		_net.calm_ring = true
 		_angler = _main.get(&"_angler")
 		_camera = _main.get(&"_camera")
 		_hud(false)
@@ -285,9 +291,11 @@ func _crowd(tile: Vector2i) -> int:
 ## A red ring over something that is there: a piece on top the net's Strength cannot lift.
 func _pose_heavy() -> void:
 	var power := int(_main.call(&"net_power"))
+	# The biggest heavy piece in reach, aimed at where it is drawn rather than at its tile's
+	# middle (2026-10-03): a small sock off-centre left the "Too heavy" ring round bare water.
+	var best := {}
+	var best_size := 0.0
 	for spot: Dictionary in _spots():
-		if _net.would_catch(spot["at"]):
-			continue
 		var index := _grid.index_of(spot["tile"].x, spot["tile"].y)
 		var top := _grid.top_slot(index)
 		if top < 0:
@@ -295,11 +303,20 @@ func _pose_heavy() -> void:
 		var def: TrashDef = _grid.defs[_grid.stacks[index][top]]
 		if def.tier <= power or def.keepsake:
 			continue
-		_aim = spot["at"]
-		_look = _aim
-		_say("heavy: %s (tier %d) at tile %s" % [String(def.piece), def.tier, str(spot["tile"])])
+		var at := _grid.surface_pos(index)
+		if _net.would_catch(at) or not _net.in_reach(at):
+			continue
+		var size := def.size.x * def.size.y
+		if size > best_size:
+			best_size = size
+			best = {"at": at, "def": def, "tile": spot["tile"]}
+	if best.is_empty():
+		_say("NO heavy piece found in reach")
 		return
-	_say("NO heavy piece found in reach")
+	_aim = best["at"]
+	_look = _aim
+	var def: TrashDef = best["def"]
+	_say("heavy: %s (tier %d) at tile %s" % [String(def.piece), def.tier, str(best["tile"])])
 
 
 ## The find a new game floats by the island, under its beam. No ring: the card is about
@@ -453,6 +470,10 @@ func _save(name: String, on_canvas: Vector2, crop: Vector2i, anchor: Vector2) ->
 
 
 func _write(name: String, picture: Image) -> void:
+	var only := OS.get_environment("LETTER_ONLY").split(",", false)
+	if not only.is_empty() and not only.has(name):
+		_say("%-16s left alone: not in LETTER_ONLY" % name)
+		return
 	picture.convert(Image.FORMAT_RGB8)
 	picture.save_png(ProjectSettings.globalize_path(OUT % name))
 	_made.append({"name": name, "picture": picture})

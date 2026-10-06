@@ -5526,18 +5526,68 @@ after a re-run**). The sheet still draws every option that was offered.
   the pack's measured `grass_light` and its `wood` red-brown, each **lifted by `AIM_LIFT`**
   (1.52), and the lake's `foam` white — in place of the screen green and fire-engine red
   they were. **The meanings do not move** — green is will-catch, red is nothing-to-lift,
-  pale is out-of-range — only the swatches, so nobody has to relearn the marker.
+  white is out-of-range — only the swatches, so nobody has to relearn the marker.
   **The lift is what makes them carry over dirty water without being invented beside the
   palette**: repaint the pack and the ring moves with it, which is what `test_lake` asks.
-  The sheet's row C is the pick; its pale was within four parts in 255 of `foam`, and at
-  `AIM_FAR_ALPHA` over water that is under a pixel step, so the palette's own swatch stands.
-- **Plus a dark backing line** (`AIM_BACK`, `AIM_BACK_SHARE` 0.55, `AIM_BACK_WIDE` 3.5):
-  the same ring drawn once underneath in `Style.HOLE_RIM`'s black, wider, carrying a share
-  of whatever the coloured line carries — so the dashed out-of-range ring is backed as
-  faintly as it is drawn. Palette swatches are duller than the ones they replaced and the
-  ring sits on water running from soup green to clean blue, so a toned green over dirty
-  water had nothing to stand on. **The one thing beyond the three swatches**, by Richard's
-  call; the 1.5 px line, the alphas, the dashes and the 48-point ellipse are untouched.
+  (It went 1.15 and 0.7 for an afternoon on 2026-10-03 under a white rim; the pixel ring
+  below put it back.)
+- **The ring is pixel art** (2026-10-03, `/grill-me` with Richard: the smooth ring was hard
+  to see, off-style, and its verdict unclear; `scripts/aim_ring.gd`, `AimRing`). Picked off
+  `tools/last_aim_sheet.png` (`tools/shot_aim.tscn`, desktop build, own save: the real lake
+  at play zoom over dirty, murky and clean water, the level-0 and a 2.4-tile net), candidate
+  **A2** of four (A black outline / B white outline with a black edge, body 1 or 2 art px):
+  a stepped 2:1 ellipse of whole art pixels on the mouth's own size, a body `THICK` 2 art
+  px with its top row lit (`LIT`), ringed by one art pixel of `AIM_BACK` black, its middle
+  snapped to the art grid. **The shape carries the verdict as well as the colour**, so it
+  reads with the colour off: catch is a whole ring with four ticks pointing in
+  (`TICK_SHARE` of the half-height, `TICK_LEAST` 3..`TICK_MOST` 6 art px); nothing is four
+  arcs, the gaps (`GAP`) on the diagonals; out of range is bold white dashes (`DASH`).
+  **Supersedes** the smooth ring, its backing line (`AIM_BACK_SHARE`/`AIM_BACK_WIDE`), the
+  white rim and the dark colours, the 48-point ellipse and the alphas. Rejected on the sheet:
+  B (the white swallowed the colour, catch and nothing both read "white ring"); offered and
+  turned down: lighting the pieces that will be caught, a centre icon, a fill, a count, and
+  quieter dashes. A layout is the cells whose middles lie in the band (signed distance
+  through the gradient, position round the perimeter by arc length), only the band walked
+  and one quarter mirrored, the rim grown eight-neighbour so it wraps every end; **cached as
+  triangle arrays** (`_mesh`, `CACHE_MOST`) and drawn with one
+  `canvas_item_add_triangle_array`, whose `count` is in triangles.
+- **The marker moves** (2026-10-03, `/grill-me` with Richard; `CastNet.Mark`, `_note_mark`,
+  `mark_halos`, `HALO_*`, `FAR_*`). **The ring itself never changes size**: it is the mouth,
+  and a ring that swelled past it would claim a wider catch than the net has. What swells is
+  a halo: the ring's body alone (`HALO_POP_THICK` 2 / `HALO_THICK` 1 art px, no outline),
+  opening from `HALO_OUTSIDE` past the ring's middle line (or the ring's own outline covers
+  it), growing against at least `HALO_SPAN_LEAST` (or the level-0 ring's never leaves it),
+  and **dissolving pixel by pixel** (the foam's rule: the mesh's cells are bucketed by a hash
+  and a shorter prefix is drawn). **Green**: a big halo the moment it turns green
+  (`HALO_POP_*`), then **the song's own beat** (`MusicStation.beat_clock`, the animals'
+  clock, handed in as `CastNet.music`): big on every `HALO_POP_BEATS`th (4) beat of the
+  song's grid, small on the beats between, each small halo at most `HALO_OK_LIFE_SHARE` of a
+  beat. The clock runs muted or muffled, as it does for the frogs. With no station (a
+  harness) it keeps beatgucci's `HALO_OK_BPM` 135 on the net's own clock. **Red**: the same
+  halo, smaller and slower (1.6 s), no pop. **Out of range**: no halo (a halo means a cast
+  lands here); the dashes march round `FAR_MARCH` art px a second (`phase`, so a dash period
+  is a dozen cached layouts) and the ring breathes (`FAR_BREATHE`, the layer's
+  `self_modulate`). **Only while the net is idle**: with a cast out the ring is still, so the
+  pop fires the moment the net is home on a green spot. Led-cast spots pulse as green does.
+  Drawing only; idle, `_repaint` redraws the ring alone while it is up. Halo strengths went
+  up for the pixel ring (0.95 / 0.8 / 0.6): at the smooth ring's alphas a dissolving pixel
+  halo could not be seen.
+  **Cost** (`bench_frames` `BENCH_AIM=1`, new, sweeps the reticle round the angler): 3.86 ms
+  mean against 3.79 with no aim; with `BENCH_BIG` (the widest net) 4.20 mean, worst 8.0 —
+  12.7 at p95 before the layout walked a quarter and bucketed rather than sorted.
+  **The How to Play cards show it** (same day): the Net card's three stills and the Object
+  Tier card's "Too heavy" re-shot with `LETTER_ONLY=net_catch,net_nothing,net_far,
+  weight_heavy` on `tools/shot_letter_art.tscn` (new: names the stills to write, the rest
+  left alone), the ring photographed calm (`CastNet.calm_ring`, probes only: no halo, still
+  dashes). The heavy pose now aims at the **biggest** heavy piece in reach **where it is
+  drawn** (`surface_pos`), not at its tile's middle: before, a small sock off-centre left the
+  red ring round bare water. The other stills, the shed's and the shop's included, still
+  show what they did.
+  Out of scope: sounds, `FirstSteps`' sure ring. All numbers first guesses.
+  `test_lake`'s `_check_aim_ring` guards the mouth's size, the ticks, the arcs on the
+  diagonals, the dashes sparser and marching, every body pixel ringed, the halo plain, and
+  the cache; `_check_aim_halos` the pop, the loops, red milder than green, no halo out of
+  range or with the net out, none inside the ring, and the halo opening clear of the ring.
 - **Out of scope, by decision**: hover, pressed
   and drag cursor shapes. Pad mode's hidden pointer, which is unchanged.
 - `test_lake`'s `_stage_pointer` guards the picture, its outline, that the hotspot lands on

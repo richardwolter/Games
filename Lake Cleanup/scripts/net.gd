@@ -286,44 +286,75 @@ const CROWN_WIDE := 0.8
 
 ## The aiming marker: what a throw at the pointer would look like before it is thrown.
 ##
-## Three readings, on two axes. Whether the throw is allowed at all is the line: solid for a
-## legal cast, dashed for one the rod refuses — too far, or over the island. Whether the
-## throw is worth making is the colour: green over water with something in it, red over water
-## with nothing the net could lift. A refused throw gets no colour, because a verdict on a
-## cast that cannot happen is noise.
+## Three readings. Whether the throw is allowed at all, and whether it is worth making: green
+## over water with something the net would lift, red over water with nothing it could, white
+## dashes for a throw the rod refuses — too far, or over the bank. Since 2026-10-03 it is drawn
+## as pixel art by `AimRing` (the sheet's candidate A2, see there), and **the shape carries the
+## verdict as well as the colour**: green a whole ring with inward ticks, red four arcs, white
+## dashes.
 ##
-## **The three are the palette's own** (2026-09-16, `/grill-me` with Richard, picked off
-## `tools/last_cursor_mockup.png`): the pack's measured `grass_light` and its `wood`
-## red-brown, each **lifted by `AIM_LIFT`**, and the lake's `foam` white — in place of the
-## screen green and fire-engine red they were. The meanings do not move — green is still
-## will-catch, red still nothing-to-lift, pale still out-of-range — only the swatches, so
-## nobody has to relearn the marker.
-##
-## The lift is what makes them carry over dirty water without being invented beside the
-## palette: repaint the pack and these move with it. The pale is `foam` at every strength,
-## because the picked row's was within four parts in 255 of it and at `AIM_FAR_ALPHA` over
-## water that is under a pixel step.
+## **The three are the palette's own** (2026-09-16, `/grill-me` with Richard): the pack's
+## measured `grass_light` and its `wood` red-brown, each **lifted by `AIM_LIFT`**, and the
+## lake's `foam` white. The lift is what makes them carry over dirty water without being
+## invented beside the palette: repaint the pack and these move with it. It went 1.15 and 0.7
+## for an afternoon (2026-10-03) under a white rim; the pixel ring's black outline put it back
+## to 1.52, picked off the sheet.
 const AIM_LIFT := 1.52
 const AIM_OK := Color(0.649, 0.804, 0.382)
 const AIM_NO := Color(0.822, 0.357, 0.214)
 const AIM_FAR := Color(0.933, 0.965, 0.984)
 
-## How solid each of those reads. The verdict colours carry the whole point of the marker, so
-## they sit well above the pale ghost this used to be.
-const AIM_ALPHA := 0.8
-const AIM_FAR_ALPHA := 0.55
-
-## The backing: the same ring drawn once underneath in black, wider, at a share of whatever
-## the coloured line is carrying. Palette swatches are duller than the ones they replaced and
-## the ring sits on water running from soup green to clean blue, so a toned green over dirty
-## water had nothing to stand on. This is the black every hole in the menus' wood is rimmed
-## with (`Style.HOLE_RIM`), doing the same job: telling the drawing from what is behind it.
-##
-## **The one thing beyond the three swatches**, by Richard's call. Everything else about the
-## marker is untouched — the 1.5 px line, the alphas, the dashes, the 48-point ellipse.
+## The outline every ring wears, one art pixel of it (`AimRing.OUTLINE`): the black every hole
+## in the menus' wood is rimmed with (`Style.HOLE_RIM`), doing the same job — telling the
+## drawing from what is behind it.
 const AIM_BACK := Color(0.0, 0.0, 0.0)
-const AIM_BACK_SHARE := 0.55
-const AIM_BACK_WIDE := 3.5
+
+## The marker moves (2026-10-03, `/grill-me` with Richard). **The ring itself never changes
+## size**: it is the mouth, the promise of what is caught, and a ring that swelled past it
+## would claim a wider catch than the net has. What swells is a halo — the ring's body alone,
+## opening out and **dissolving pixel by pixel** (the foam's rule), `HALO_*_THICK` art px.
+## - **Green**: a big halo the moment the ring turns green (`HALO_POP_*`), then the song's
+##   beat: big on every `HALO_POP_BEATS`th, small on the beats between.
+## - **Red**: the same halo, small, faint and slower. No pop: red is not news.
+## - **Out of range**: no halo, which would mean "a cast lands here". The dashes march round
+##   (`FAR_MARCH` art px a second) and the ring breathes (`FAR_BREATHE`).
+## Only while a throw would go now (the net idle); while a cast is out the ring is still, as
+## it always was, so the pop fires the moment the net is home on a green spot. Drawing only —
+## nothing reads it. All numbers first guesses for Richard's eye.
+enum Mark { NONE, FAR, NO, OK }
+const HALO_POP_GROW := 0.45
+const HALO_POP_LIFE := 0.5
+const HALO_POP_ALPHA := 0.95
+const HALO_POP_THICK := 2
+## Green's loop keeps time to the song being heard (Richard: "go with each song beat"): a
+## small halo on every beat of `MusicStation.beat_clock`, the animals' own clock, and the big
+## one on every `HALO_POP_BEATS`th beat of the song's grid. Muted or muffled the clock still
+## runs, as it does for the frogs. With no station (a harness) it keeps beatgucci's tempo,
+## `HALO_OK_BPM`, on the net's own clock; `test_lake` holds that to the json.
+const HALO_OK_BPM := 135.0
+## How long a small halo lasts, at most: never longer than most of a beat, so a quick song's
+## halos do not run into each other.
+const HALO_OK_LIFE := 0.4
+const HALO_OK_LIFE_SHARE := 0.9
+const HALO_POP_BEATS := 4
+const HALO_OK_GROW := 0.22
+const HALO_OK_ALPHA := 0.8
+const HALO_THICK := 1
+## Red was invisible at 0.08 / 0.2 on the smooth ring: still under green on both.
+const HALO_NO_EVERY := 1.6
+const HALO_NO_LIFE := 1.0
+const HALO_NO_GROW := 0.14
+const HALO_NO_ALPHA := 0.6
+## Where a halo opens from and how far: it starts `HALO_OUTSIDE` world px out past the ring's
+## middle line (clear of its body and outline, which would otherwise cover its first half),
+## and its growth is measured against at least `HALO_SPAN_LEAST`, or the level-0 ring's halos
+## never leave its own outline. Drawn opaque-ish and dissolving, a pixel ring at a low alpha
+## could not be seen (sheet, 2026-10-03).
+const HALO_OUTSIDE := 6.0
+const HALO_SPAN_LEAST := 60.0
+const FAR_MARCH := 10.0
+const FAR_BREATHE := 0.25
+const FAR_BREATHE_EVERY := 2.2
 
 ## How far into the mouth a piece's middle is put when the pad's assist looks for a green
 ## spot beside it (`nearest_catch`): inside the rim, so the spot is green by a margin rather
@@ -402,6 +433,18 @@ var _aim_was := Vector2.INF
 ## the lake every frame (`Lake._pad_tick`); `aim_point` is the one place the net asks.
 var pad_aim := Vector2.INF
 var _idle_was := Vector2.INF
+
+## What the marker read on its last live frame (`Mark`) and since when (`_time`). NONE
+## whenever the ring is not up or the net is out, so coming back to a green spot from either
+## pops again. See `_note_mark`.
+var _mark := Mark.NONE
+var _mark_since := 0.0
+## The song the green halos keep time to (`MusicStation.beat_clock`), set by the lake. With
+## none the marker keeps beatgucci's tempo on its own clock.
+var music: MusicStation
+## The ring at rest: no halos, the dashes still and not breathing. For probes photographing
+## it for a still (`tools/shot_letter_art`); the game never sets it.
+var calm_ring := false
 
 ## How far the net is pursed, 0 wide open and 1 drawn in, and how near the rod it has come
 ## on the same scale. Worked out once a frame and kept here, because the drawing, the swept
@@ -1118,6 +1161,9 @@ func _repaint() -> void:
 	if state == State.IDLE:
 		var aim := aim_point()
 		if aim.is_equal_approx(_aim_was) and tile_pos.is_equal_approx(_idle_was):
+			# The net stands still, but a marker that is up moves: repaint the ring alone.
+			if _aim != null and _mark != Mark.NONE:
+				_aim.queue_redraw()
 			return
 		_aim_was = aim
 		_idle_was = tile_pos
@@ -1691,12 +1737,14 @@ func _draw_aim(on: CanvasItem) -> void:
 	if helper or angler == null:
 		return
 	var pointer := aim_point()
+	on.self_modulate.a = 1.0
 	# No ring on the island (2026-09-22, Richard): land is nowhere to cast, and since a
 	# press there walks the angler, a dashed ring over it said "refused" about a click that
 	# is not. The pointer alone. The bank and the piers keep the dashes: a press there is
 	# nothing, and the dashes say so.
 	var over := Iso.world_to_tile(pointer)
 	if Iso.island_fraction(over.x, over.y) < 1.0:
+		_note_mark(Mark.NONE)
 		return
 	# Solid wherever a press throws — now, or after the walk the led cast makes
 	# (`castable_after_walk`); the verdict is the mouth's at that spot either way.
@@ -1711,33 +1759,101 @@ func _draw_aim(on: CanvasItem) -> void:
 	# The refusal itself is worth showing — a click that does nothing is worse than a click
 	# the game says no to.
 	var tint := AIM_FAR
-	var alpha := AIM_FAR_ALPHA
+	var kind := Mark.FAR
+	var verdict := AimRing.Verdict.FAR
 	if legal:
 		var takes := _would_catch(pointer)
 		tint = AIM_OK if takes else AIM_NO
-		alpha = AIM_ALPHA
-	# 48 points rather than 24: the dashes are drawn as every other segment of this same
-	# ring, and a coarse circle broken in half reads as a polygon rather than as a dashed
-	# line. The solid case is happy to be smoother too.
-	var ghost := PackedVector2Array()
-	for i in 49:
-		var angle := TAU * float(i % 48) / 48.0
-		ghost.append(pointer + Vector2(cos(angle) * span, sin(angle) * span * 0.5))
-	var ink := Color(tint.r, tint.g, tint.b, alpha)
-	# The backing goes down first, carrying its share of whatever the coloured line carries,
-	# so the dashed out-of-range ring is backed as faintly as it is drawn.
-	var back := Color(AIM_BACK.r, AIM_BACK.g, AIM_BACK.b,
-		AIM_BACK_SHARE * alpha / AIM_ALPHA)
-	if legal:
-		on.draw_polyline(ghost, back, AIM_BACK_WIDE)
-		on.draw_polyline(ghost, ink, 1.5)
-	else:
-		# Dashed, because a refused throw is a rule rather than a thing on the water — the
-		# same reason the laid-net ghost is dashed.
-		for i in 24:
-			on.draw_line(ghost[i * 2], ghost[i * 2 + 1], back, AIM_BACK_WIDE)
-		for i in 24:
-			on.draw_line(ghost[i * 2], ghost[i * 2 + 1], ink, 1.5)
+		kind = Mark.OK if takes else Mark.NO
+		verdict = AimRing.Verdict.OK if takes else AimRing.Verdict.NO
+	# Live only while a throw would go now; a cast out keeps the ring still.
+	var live := state == State.IDLE
+	_note_mark(kind if live else Mark.NONE)
+	# The out-of-range ring breathes and its dashes march round; still while the net is out.
+	var phase := 0
+	var breath := 1.0
+	if _mark == Mark.FAR and not calm_ring:
+		var age := _time - _mark_since
+		phase = int(age * FAR_MARCH) % AimRing.dash_period()
+		breath = 1.0 - FAR_BREATHE * 0.5 * (1.0 - cos(TAU * age / FAR_BREATHE_EVERY))
+	on.self_modulate.a = breath
+	# On the art grid, like everything drawn in art pixels: the ring steps a whole art pixel
+	# at a time as the pointer glides.
+	on.draw_set_transform(AimRing.snap(pointer))
+	# The halos go down first, under the ring they open out of.
+	for halo in mark_halos():
+		AimRing.draw_halo(on, halo_span(span, halo.x), tint, int(halo.z), halo.w, halo.y)
+	AimRing.draw_ring(on, span, verdict, tint, phase)
+	on.draw_set_transform(Vector2.ZERO)
+
+
+## Tell the marker what it reads this frame (`Mark`). A change restarts its clock, and a change
+## to green fires the pop (green's first beat).
+func _note_mark(kind: int) -> void:
+	if kind == _mark:
+		return
+	_mark = kind
+	_mark_since = _time
+
+
+## The halos the marker draws now, each (size against the ring, share of its pixels still
+## standing, thickness in art px, strength). Empty while the net is out, over the island and
+## out of range. Green: the pop, then the song's beats once the pop is over; red: the mild
+## loop from the start.
+func mark_halos() -> Array[Vector4]:
+	var halos: Array[Vector4] = []
+	if calm_ring:
+		return halos
+	var age := _time - _mark_since
+	match _mark:
+		Mark.OK:
+			# The pop the moment it turns green, whatever the beat; the song's beats take over
+			# once it is over, so the two never draw at once.
+			if age < HALO_POP_LIFE:
+				halos.append(_halo(age / HALO_POP_LIFE, HALO_POP_GROW, HALO_POP_THICK,
+					HALO_POP_ALPHA))
+				return halos
+			var length := beat_length()
+			var at := beat_now()
+			var into := (at - floorf(at)) * length
+			if posmod(int(floorf(at)), HALO_POP_BEATS) == 0:
+				if into < HALO_POP_LIFE:
+					halos.append(_halo(into / HALO_POP_LIFE, HALO_POP_GROW, HALO_POP_THICK,
+						HALO_POP_ALPHA))
+			else:
+				var life := minf(HALO_OK_LIFE, length * HALO_OK_LIFE_SHARE)
+				if into < life:
+					halos.append(_halo(into / life, HALO_OK_GROW, HALO_THICK, HALO_OK_ALPHA))
+		Mark.NO:
+			var t := fmod(age, HALO_NO_EVERY) / HALO_NO_LIFE
+			if t < 1.0:
+				halos.append(_halo(t, HALO_NO_GROW, HALO_THICK, HALO_NO_ALPHA))
+	return halos
+
+
+## Beats into the song being heard, and a beat's length in seconds: the station's, or
+## beatgucci's tempo on the net's own clock when there is none.
+func beat_now() -> float:
+	if music != null:
+		return music.beat_clock()
+	return _time * HALO_OK_BPM / 60.0
+
+
+func beat_length() -> float:
+	if music != null:
+		return music.beat_length()
+	return 60.0 / HALO_OK_BPM
+
+
+## A halo's half-width, for a ring of `span` and a halo of size `size` (`mark_halos`' x).
+static func halo_span(span: float, size: float) -> float:
+	return span + HALO_OUTSIDE + (size - 1.0) * maxf(span, HALO_SPAN_LEAST)
+
+
+## A halo `t` of the way through its life: out fast and slowing, its pixels going the whole way.
+static func _halo(t: float, grow: float, thick: int, strength: float) -> Vector4:
+	var left := 1.0 - t
+	return Vector4(1.0 + grow * (1.0 - left * left), left * left, float(thick), strength)
 
 
 ## What the player is aiming at: the pad's reticle while there is one, else the mouse.

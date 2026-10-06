@@ -6807,11 +6807,183 @@ func _stage_pointer() -> void:
 	_check(CastNet.AIM_BACK.get_luminance() < darkest,
 		"the backing is darker than every colour it backs",
 		"%.3f under %.3f" % [CastNet.AIM_BACK.get_luminance(), darkest])
-	_check(CastNet.AIM_BACK_WIDE > 1.5 and CastNet.AIM_BACK_SHARE > 0.0
-		and CastNet.AIM_BACK_SHARE <= 1.0,
-		"and it is wider than the line and carries a share of it",
-		"%.1f px at %.2f" % [CastNet.AIM_BACK_WIDE, CastNet.AIM_BACK_SHARE])
+	_check(AimRing.OUTLINE.is_equal_approx(CastNet.AIM_BACK),
+		"and it is the outline the pixel ring wears", "")
+	_check_aim_ring()
+	_check_aim_halos()
 	_advance()
+
+
+## The marker moves (2026-10-03): halos open out of a ring that never changes size, a pop on
+## turning green, a mild loop on red, none out of range or with the net out.
+func _check_aim_halos() -> void:
+	var net: CastNet = _main.get(&"_net")
+	if net == null:
+		_check(false, "the lake has a net to aim", "")
+		return
+	var saved_time: float = net.get(&"_time")
+	var saved_mark: int = net.get(&"_mark")
+	var station: MusicStation = net.music
+	net.music = null
+	var src := FileAccess.get_file_as_string("res://scripts/net.gd")
+	_check(src.contains("AimRing.draw_ring(on, span, verdict, tint, phase)"),
+		"the ring itself is drawn at the mouth's own size, whatever the halos do", "")
+	_check(src.contains("_note_mark(kind if live else Mark.NONE)"),
+		"the marker is only live while a throw would go now", "")
+	net.call(&"_note_mark", CastNet.Mark.NONE)
+	_check(net.mark_halos().is_empty(), "no halo with the ring down or the net out", "")
+	net.call(&"_note_mark", CastNet.Mark.FAR)
+	var far_none := true
+	for i in 30:
+		net.set(&"_time", saved_time + float(i) * 0.1)
+		if not net.mark_halos().is_empty():
+			far_none = false
+	_check(far_none, "out of range draws no halo", "")
+	net.set(&"_time", 100.0)
+	net.call(&"_note_mark", CastNet.Mark.OK)
+	var pop := net.mark_halos()
+	_check(pop.size() == 1, "turning green pops at once", "%d halos" % pop.size())
+	var biggest_ok := 0.0
+	var smallest := INF
+	var looped := false
+	for i in 60:
+		net.set(&"_time", 100.0 + float(i) * 0.05)
+		for halo: Vector4 in net.mark_halos():
+			biggest_ok = maxf(biggest_ok, halo.x)
+			smallest = minf(smallest, halo.x)
+			if net.get(&"_time") > 100.0 + CastNet.HALO_POP_LIFE:
+				looped = true
+	_check(looped, "and keeps pulsing while it stays green", "")
+	# Then the song's beat: big on every fourth, small between. Read with no station, on the
+	# net's own beatgucci clock, a fifth of a second into each beat, where a big halo is wider
+	# than any small one gets.
+	var length := net.beat_length()
+	net.set(&"_time", 0.0)
+	net.call(&"_note_mark", CastNet.Mark.NONE)
+	net.call(&"_note_mark", CastNet.Mark.OK)
+	var bigs: Array[int] = []
+	var smalls := 0
+	for beat in range(4, 12):
+		net.set(&"_time", float(beat) * length + 0.2)
+		for halo: Vector4 in net.mark_halos():
+			if halo.x > 1.0 + CastNet.HALO_OK_GROW:
+				if not bigs.has(beat):
+					bigs.append(beat)
+			else:
+				smalls += 1
+	_check(bigs == [4, 8] and smalls == 6, "the big pulse is every fourth beat, small between",
+		"big on %s, %d small" % [bigs, smalls])
+	_check(smallest >= 1.0, "a halo never draws inside the ring", "%.3f" % smallest)
+	net.set(&"_time", 100.0)
+	net.call(&"_note_mark", CastNet.Mark.NO)
+	var red_first := net.mark_halos()
+	_check(red_first.size() == 1 and red_first[0].x < 1.0 + CastNet.HALO_POP_GROW * 0.01,
+		"turning red does not pop, only starts its own loop", "%s" % [red_first])
+	var biggest_no := 0.0
+	var brightest_no := 0.0
+	for i in 60:
+		net.set(&"_time", 100.0 + float(i) * 0.05)
+		for halo: Vector4 in net.mark_halos():
+			biggest_no = maxf(biggest_no, halo.x)
+			brightest_no = maxf(brightest_no, halo.y)
+	_check(biggest_no > 1.0 and biggest_no < biggest_ok
+		and CastNet.HALO_NO_ALPHA < CastNet.HALO_OK_ALPHA,
+		"red pulses, milder than green", "red %.2f, green %.2f" % [biggest_no, biggest_ok])
+	var beats = JSON.parse_string(FileAccess.get_file_as_string(MusicStation.BEATS))
+	var gucci := 0.0
+	if beats is Dictionary and beats.has("beatgucci"):
+		gucci = float(beats["beatgucci"]["bpm"])
+	_check(is_equal_approx(CastNet.HALO_OK_BPM, gucci) and CastNet.HALO_OK_LIFE_SHARE < 1.0,
+		"with no song the marker keeps beatgucci's beat, each halo gone before the next",
+		"%.1f against %.1f BPM" % [CastNet.HALO_OK_BPM, gucci])
+	# A halo opens clear of the ring's body and outline, and a small ring's halo still travels.
+	var ring_edge := (float(AimRing.THICK) * 0.5 + 1.0) * Lake.ART_PIXEL
+	_check(CastNet.halo_span(34.0, 1.0) >= 34.0 + ring_edge
+		and CastNet.halo_span(34.0, 1.0 + CastNet.HALO_OK_GROW)
+			- CastNet.halo_span(34.0, 1.0) >= CastNet.HALO_OK_GROW * CastNet.HALO_SPAN_LEAST - 0.01,
+		"a halo opens outside the ring's outline and a small ring's halo still travels",
+		"%.1f from a 34 px ring" % CastNet.halo_span(34.0, 1.0))
+	net.music = station
+	_check(station != null and is_equal_approx(net.beat_now(), station.beat_clock())
+		and is_equal_approx(net.beat_length(), station.beat_length()),
+		"with the lake's station it keeps the song's own beat", "")
+	net.set(&"_time", saved_time)
+	net.call(&"_note_mark", saved_mark)
+
+
+## The pixel ring (2026-10-03, `AimRing`, the sheet's A2): whole art pixels on the mouth's
+## own size, the verdict in the shape, every body pixel ringed in black, cached.
+func _check_aim_ring() -> void:
+	var px := Lake.ART_PIXEL
+	var span := 115.0
+	var ok := AimRing.lay(span, AimRing.Verdict.OK)
+	var no := AimRing.lay(span, AimRing.Verdict.NO)
+	var far := AimRing.lay(span, AimRing.Verdict.FAR)
+	# On the mouth: the body's outermost cell on the long axis is at the span, give or take
+	# the band's half.
+	var reach := 0
+	for cell: Vector2i in no["body"]:
+		reach = maxi(reach, cell.x + 1)
+	_check(absf(float(reach) * px - span) <= float(AimRing.THICK) * px * 0.5 + px,
+		"the ring is drawn on the mouth's own size", "%.0f px against %.0f" % [reach * px, span])
+	# The shape carries the verdict: catch has ticks inside the band, nothing has gaps, far
+	# is dashes.
+	var inside := 0
+	for cell: Vector2i in ok["body"]:
+		if absf(float(cell.y) + 0.5) < 1.0 and (float(cell.x) + 0.5) * px < span \
+				- float(AimRing.THICK) * px:
+			inside += 1
+	_check(inside >= 2, "a catch ring has ticks pointing in", "%d tick cells on the axis" % inside)
+	_check(no["body"].size() < ok["body"].size() and far["body"].size() < no["body"].size(),
+		"nothing is broken into arcs, out of range into sparser dashes",
+		"%d / %d / %d cells" % [ok["body"].size(), no["body"].size(), far["body"].size()])
+	var diagonal := false
+	var a := span
+	var b := span * 0.5
+	for cell: Vector2i in no["body"]:
+		var q := (Vector2(cell) + Vector2(0.5, 0.5)) * px
+		var u := AimRing.around(q, a, b)
+		if absf(u - 0.125) < AimRing.GAP * 0.4:
+			diagonal = true
+	_check(not diagonal, "the arcs' gaps are on the diagonals", "")
+	# Every body pixel is ringed: none of its eight neighbours is bare.
+	var ringed := true
+	for lay: Dictionary in [ok, no, far]:
+		var taken := {}
+		for cell: Vector2i in lay["body"]:
+			taken[cell] = true
+		for cell: Vector2i in lay["rim"]:
+			taken[cell] = true
+		for cell: Vector2i in lay["body"]:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					if not taken.has(cell + Vector2i(dx, dy)):
+						ringed = false
+	_check(ringed, "every body pixel wears the black outline, ends of arcs and dashes too", "")
+	var halo := AimRing.lay(span, AimRing.Verdict.NO, 1, 0, true)
+	_check(halo["rim"].is_empty() and halo["body"].size() > 0,
+		"a halo is the body alone, a whole ring, no outline", "")
+	var marched := AimRing.lay(span, AimRing.Verdict.FAR, AimRing.THICK, 5)
+	_check(marched["body"].size() > 0 and not _same_cells(marched["body"], far["body"]),
+		"the dashes march with the phase", "")
+	# A ring of the same size, verdict and phase is laid once.
+	var first := AimRing._mesh(span, AimRing.Verdict.OK, CastNet.AIM_OK, 0, false,
+		AimRing.THICK, 1.0)
+	var again := AimRing._mesh(span + 0.4, AimRing.Verdict.OK, CastNet.AIM_OK, 0, false,
+		AimRing.THICK, 1.0)
+	_check(is_same(first, again), "a ring of the same size is laid once and kept", "")
+
+
+func _same_cells(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	var seen := {}
+	for cell: Vector2i in a:
+		seen[cell] = true
+	for cell: Vector2i in b:
+		if not seen.has(cell):
+			return false
+	return true
 
 
 ## Nature coming back (2026-09-16): the flora on the shores and the fish in the clean water
@@ -9814,6 +9986,7 @@ func _stage_led_cast() -> void:
 			var aim_src := (load("res://scripts/net.gd") as GDScript).source_code
 			var draw_at := aim_src.find("func _draw_aim(")
 			var island_at := aim_src.find("Iso.island_fraction(over.x, over.y) < 1.0:
+		_note_mark(Mark.NONE)
 		return", draw_at)
 			var legal_at := aim_src.find("castable_after_walk(pointer)", draw_at)
 			_check(draw_at >= 0 and island_at > draw_at and legal_at > island_at,

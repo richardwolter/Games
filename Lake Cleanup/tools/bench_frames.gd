@@ -33,6 +33,7 @@
 ## BENCH_SHOT="200 260" saves the frame at each of those frame counts to
 ##   tools/last_bench_shot_<n>.png (run with --fixed-fps 60 for a repeatable picture).
 ## BENCH_TORNADO=1 puts a tornado down at once, the view on its foot.
+## BENCH_AIM=1 sweeps the aim round the angler, the ring drawn every frame (see `_aim_round`).
 ## BENCH_RAIN=1 pours a shower at full strength from the first frame, puddles full.
 ##
 ##   godot --path . res://tools/bench_frames.tscn
@@ -270,6 +271,7 @@ func _process(delta: float) -> void:
 			_main.set(&"_free_at", t.base() - Vector2(0.0, 130.0))
 			_main.set(&"_mouse_inside", false)
 	_walk(delta)
+	_aim_round(delta)
 	_cast_again()
 	var now := Time.get_ticks_usec()
 	var ms := float(now - _last) / 1000.0
@@ -359,3 +361,21 @@ func _report() -> void:
 	if _held != &"":
 		Input.action_release(_held)
 	get_tree().quit()
+
+
+## BENCH_AIM=1 sweeps the aim (the pad's reticle) round the angler, in and out of reach, so
+## the pixel ring (`AimRing`) is drawn every frame with its halos and through every verdict.
+## With BENCH_BIG the ring is the widest net's.
+var _aiming: bool = OS.get_environment("BENCH_AIM") == "1"
+var _aim_clock: float = 0.0
+
+
+func _aim_round(delta: float) -> void:
+	if not _aiming:
+		return
+	_aim_clock += delta
+	var net: CastNet = _main.get(&"_net")
+	var angler: Node2D = _main.get(&"_angler")
+	var reach := 260.0 + 220.0 * sin(_aim_clock * 0.7)
+	var angle := _aim_clock * 0.4
+	net.pad_aim = angler.position + Vector2(cos(angle), sin(angle) * 0.5) * reach

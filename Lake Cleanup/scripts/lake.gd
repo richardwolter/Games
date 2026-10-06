@@ -1376,6 +1376,7 @@ func _ready() -> void:
 	_net.sfx = _sfx
 	_net.angler = _angler
 	_net.flock = _flock
+	_net.music = MusicStation.main()
 	# And back the other way: the flock asks the net whether a perched bird is inside reach,
 	# which is what decides the rim. The player's own net, not the double cast's helper.
 	_flock.net = _net
@@ -7148,14 +7149,13 @@ const SHED_DOOR := Vector2(0.22, 0.37)
 ## the walls' feet are an isometric diamond and the art's last row is that diamond's **near
 ## corner**, not its middle, so the building stands about two thirds of a tile north of where
 ## the picture bottoms out. Drawing off one number and colliding off another is what put the
-## footprint off the hut. Re-measure `SHED_ART_GROUND` if the hut is re-cut
-## (`tools/slice_shed.gd`): it is the diamond's side corners, rows 93 and 103 of 127, as a
-## fraction of the picture's height up from the bottom.
+## footprint off the hut. Re-measure `SHED_ART_GROUND` if the hut is redrawn: it is the
+## diamond's side corners, as a fraction of the picture's height up from the bottom.
 
 
 ## The shed, and the prompt over it when the angler is close enough to use it.
 ##
-## The same hut that is drawn on the shed button, cut out of it by tools/slice_shed.gd. One
+## The same hut that is drawn on the shed button (`tools/build_shed_v2.py`). One
 ## picture for the thing and the button that opens it: the player learns what the button
 ## means by having walked up to it.
 func _draw_shed() -> void:
