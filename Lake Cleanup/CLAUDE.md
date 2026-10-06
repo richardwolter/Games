@@ -2093,6 +2093,14 @@ Richard rewrote 85 strings in Portuguese in an artifact (see memory `lake-pt-rew
   the key (`TOUR_DECOR_ROOM` takes `%s`, `Binds.shown(&"shed_switch", pad)`); the console spike
   (`console_shelf.gd`, `console_spike`) and `CONSOLE_COUNT` are deleted.
 - The letter stills still show the old English UI; re-shoot with `shot_letter_art` when wanted.
+- **The pack finds' names are in every language** (2026-10-04, Richard reviewed the PT): the
+  60 `DECOR_PK_*` rows had English only, so they showed in English whatever was set. PT is
+  his, the other six are machine drafts from it. Repeats by decision (Old Seat and Armchair
+  are both "Poltrona", Small Rug is "Tapete"). Oval Rug became **Small Rug** and Car Picture
+  **Poster** in English too (`build_pack_decor.py`, `pieces.json`). `test_lake` fails on any
+  `DECOR_*` row missing a language. Needs fontTools: the base Python313, not `.local`.
+- **The shop's blurb draws over the hung purse** (`ShopSkin._blurb_layer`, z 1): the Reel
+  row's ran under it, the purse being a later sibling of the shop.
 
 ### The Save Is Written Safely (2026-09-29, issue #25)
 - **Temp, then rename** (`Lake.save_game`, `_swap_in_save`): the run is written to

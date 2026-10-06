@@ -9155,6 +9155,11 @@ func _check_shop_purse(skin: Node) -> void:
 		"with the shop open the purse is hung over it", str(box))
 	_check(purse != null and purse.get_index() > skin.get_index(),
 		"on a node drawn after the shop, so nothing of the shop covers it", "")
+	skin.call(&"_ensure_blurb_layer")
+	var blurb: CanvasItem = skin.get(&"_blurb_layer")
+	_check(blurb != null and purse is CanvasItem
+		and blurb.get(&"z_index") > (purse as CanvasItem).z_index,
+		"but a row's blurb draws over the purse (the Reel row's ran under it)", "")
 	var boards: Dictionary = skin.get(&"_boards")
 	var clear := true
 	for b: Rect2 in boards.values():
@@ -11229,6 +11234,23 @@ func _check_language(menu: MainMenu) -> void:
 		var box := flag.get_rect()
 		_check(box.end.x > menu.size.x - 60.0 and box.position.y < 60.0,
 			"in the top right corner", str(box))
+	# Every find's name has every language (2026-10-04: the 60 pack finds had English only,
+	# so they showed in English whatever was set).
+	var untold: Array = []
+	var csv := FileAccess.open("res://locale/translations.csv", FileAccess.READ)
+	if csv != null:
+		var head := csv.get_csv_line()
+		while not csv.eof_reached():
+			var cells := csv.get_csv_line()
+			if cells.size() < head.size() or not cells[0].begins_with("DECOR_"):
+				continue
+			for entry: Dictionary in Prefs.LANGUAGES:
+				var col := head.find(String(entry["locale"]))
+				if col >= 0 and cells[col].strip_edges().is_empty():
+					untold.append("%s/%s" % [cells[0], entry["locale"]])
+		csv.close()
+	_check(csv != null and untold.is_empty(), "every find's name is written in every language",
+		", ".join(untold.slice(0, 8)))
 	var loaded := TranslationServer.get_loaded_locales()
 	var missing: Array = []
 	for entry: Dictionary in Prefs.LANGUAGES:

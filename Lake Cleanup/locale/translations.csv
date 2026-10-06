@@ -322,64 +322,64 @@ HIVE_HINT_DONE,hive_room.gd,20,16,600,Hive room (2026-09-30),*Harvest* done! The
 HIVE_HINT_SETTLED,hive_room.gd,20,16,600,Hive room (2026-09-30),*Home!* The honey will come in time,*Em casa!* O mel vem com o tempo,*¡En casa!* La miel llegará con el tiempo,*Zuhause!* Der Honig kommt mit der Zeit,*Chez elles !* Le miel viendra avec le temps,*おかえり！*はちみつはそのうちに,*到家了！*蜂蜜过些时候就有,*새 집!* 꿀은 곧 생겨요,Home! The honey will come in time,Home! The honey will come in time,Home! The honey will come in time,Home! The honey will come in time,Home! The honey will come in time,Home! The honey will come in time,Home! The honey will come in time
 HIVE_READY,moment_card.gd,20,16,1190,Hive room (2026-09-30),The honey is ready!,O mel está pronto!,¡La miel está lista!,Der Honig ist fertig!,Le miel est prêt !,はちみつができたよ！,蜂蜜好了！,꿀이 준비됐어요!,The honey is ready!,The honey is ready!,The honey is ready!,The honey is ready!,The honey is ready!,The honey is ready!,The honey is ready!
 HOSE_NAME,wash_room.gd,16,11,95,"Wash room: the hose upgrade's name, on a row like the upgrade shop's.",Hose,Mangueira,Manguera,Schlauch,Tuyau,ホース,水管,호스,Hose,Hose,Hose,Hose,Hose,Hose,Hose
-DECOR_PK_ARMCHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Armchair,,,,,,,,,,,,,,
-DECOR_PK_OLD_SEAT,pieces.json,13,11,180,A piece of furniture the player finds.,Old Seat,,,,,,,,,,,,,,
-DECOR_PK_BATHTUB,pieces.json,13,11,180,A piece of furniture the player finds.,Bathtub,,,,,,,,,,,,,,
-DECOR_PK_BED,pieces.json,13,11,180,A piece of furniture the player finds.,Bed,,,,,,,,,,,,,,
-DECOR_PK_BOOKSHELF,pieces.json,13,11,180,A piece of furniture the player finds.,Bookshelf,,,,,,,,,,,,,,
-DECOR_PK_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Chair,,,,,,,,,,,,,,
-DECOR_PK_COFFEE_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Coffee Table,,,,,,,,,,,,,,
-DECOR_PK_CORNER_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Corner Desk,,,,,,,,,,,,,,
-DECOR_PK_DRAWER,pieces.json,13,11,180,A piece of furniture the player finds.,Drawer,,,,,,,,,,,,,,
-DECOR_PK_DRAWER_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Drawer Desk,,,,,,,,,,,,,,
-DECOR_PK_FANCY_BED,pieces.json,13,11,180,A piece of furniture the player finds.,Fancy Bed,,,,,,,,,,,,,,
-DECOR_PK_FANCY_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Fancy Table,,,,,,,,,,,,,,
-DECOR_PK_FILE_CABINET,pieces.json,13,11,180,A piece of furniture the player finds.,File Cabinet,,,,,,,,,,,,,,
-DECOR_PK_FIREPLACE,pieces.json,13,11,180,A piece of furniture the player finds.,Fireplace,,,,,,,,,,,,,,
-DECOR_PK_KITCHEN_COUNTER,pieces.json,13,11,180,A piece of furniture the player finds.,Kitchen Counter,,,,,,,,,,,,,,
-DECOR_PK_MICROWAVE,pieces.json,13,11,180,A piece of furniture the player finds.,Microwave,,,,,,,,,,,,,,
-DECOR_PK_SOFA,pieces.json,13,11,180,A piece of furniture the player finds.,Sofa,,,,,,,,,,,,,,
-DECOR_PK_STOVE,pieces.json,13,11,180,A piece of furniture the player finds.,Stove,,,,,,,,,,,,,,
-DECOR_PK_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Table,,,,,,,,,,,,,,
-DECOR_PK_TOILET,pieces.json,13,11,180,A piece of furniture the player finds.,Toilet,,,,,,,,,,,,,,
-DECOR_PK_DINER_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Chair,,,,,,,,,,,,,,
-DECOR_PK_GREEN_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Green Chair,,,,,,,,,,,,,,
-DECOR_PK_WOOD_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Wooden Chair,,,,,,,,,,,,,,
-DECOR_PK_CARVED_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Carved Chair,,,,,,,,,,,,,,
-DECOR_PK_WHITE_SOFA,pieces.json,13,11,180,A piece of furniture the player finds.,White Sofa,,,,,,,,,,,,,,
-DECOR_PK_NIGHTSTAND,pieces.json,13,11,180,A piece of furniture the player finds.,Nightstand,,,,,,,,,,,,,,
-DECOR_PK_BONSAI,pieces.json,13,11,180,A piece of furniture the player finds.,Bonsai,,,,,,,,,,,,,,
-DECOR_PK_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Gold Rug,,,,,,,,,,,,,,
-DECOR_PK_COAT_STAND,pieces.json,13,11,180,A piece of furniture the player finds.,Coat Stand,,,,,,,,,,,,,,
-DECOR_PK_LANDSCAPE,pieces.json,13,11,180,A piece of furniture the player finds.,Landscape,,,,,,,,,,,,,,
-DECOR_PK_PORTRAIT,pieces.json,13,11,180,A piece of furniture the player finds.,Portrait,,,,,,,,,,,,,,
-DECOR_PK_GRANDFATHER_CLOCK,pieces.json,13,11,180,A piece of furniture the player finds.,Old Clock,,,,,,,,,,,,,,
-DECOR_PK_GLOBE,pieces.json,13,11,180,A piece of furniture the player finds.,Globe,,,,,,,,,,,,,,
-DECOR_PK_SCULPTURE,pieces.json,13,11,180,A piece of furniture the player finds.,Sculpture,,,,,,,,,,,,,,
-DECOR_PK_BLUE_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Blue Rug,,,,,,,,,,,,,,
-DECOR_PK_FRIDGE,pieces.json,13,11,180,A piece of furniture the player finds.,Fridge,,,,,,,,,,,,,,
-DECOR_PK_SIDE_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Side Desk,,,,,,,,,,,,,,
-DECOR_PK_SINK,pieces.json,13,11,180,A piece of furniture the player finds.,Sink,,,,,,,,,,,,,,
-DECOR_PK_DINER_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Table,,,,,,,,,,,,,,
-DECOR_PK_FLOWER_VASE,pieces.json,13,11,180,A piece of furniture the player finds.,Flower Vase,,,,,,,,,,,,,,
-DECOR_PK_FLOWER_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Flower Pot,,,,,,,,,,,,,,
-DECOR_PK_CAR_PICTURE,pieces.json,13,11,180,A piece of furniture the player finds.,Car Picture,,,,,,,,,,,,,,
-DECOR_PK_DOTTED_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Dotted Rug,,,,,,,,,,,,,,
-DECOR_PK_ALOE,pieces.json,13,11,180,A piece of furniture the player finds.,Aloe,,,,,,,,,,,,,,
-DECOR_PK_CACTUS,pieces.json,13,11,180,A piece of furniture the player finds.,Cactus,,,,,,,,,,,,,,
-DECOR_PK_DINER_SEAT,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Seat,,,,,,,,,,,,,,
-DECOR_PK_GLASS_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Glass Table,,,,,,,,,,,,,,
-DECOR_PK_SMALL_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Small Table,,,,,,,,,,,,,,
-DECOR_PK_PLANT,pieces.json,13,11,180,A piece of furniture the player finds.,Plant,,,,,,,,,,,,,,
-DECOR_PK_SPROUT_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Sprout Pot,,,,,,,,,,,,,,
-DECOR_PK_POTTED_TREE,pieces.json,13,11,180,A piece of furniture the player finds.,Potted Tree,,,,,,,,,,,,,,
-DECOR_PK_TABLE_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Table Lamp,,,,,,,,,,,,,,
+DECOR_PK_ARMCHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Armchair,Poltrona,Sillón,Sessel,Fauteuil,アームチェア,扶手椅,안락의자,Armchair,Armchair,Armchair,Armchair,Armchair,Armchair,Armchair
+DECOR_PK_OLD_SEAT,pieces.json,13,11,180,A piece of furniture the player finds.,Old Seat,Poltrona,Sillón viejo,Alter Sessel,Vieux siège,古い椅子,旧座椅,낡은 의자,Old Seat,Old Seat,Old Seat,Old Seat,Old Seat,Old Seat,Old Seat
+DECOR_PK_BATHTUB,pieces.json,13,11,180,A piece of furniture the player finds.,Bathtub,Banheira,Bañera,Badewanne,Baignoire,浴槽,浴缸,욕조,Bathtub,Bathtub,Bathtub,Bathtub,Bathtub,Bathtub,Bathtub
+DECOR_PK_BED,pieces.json,13,11,180,A piece of furniture the player finds.,Bed,Cama,Cama,Bett,Lit,ベッド,床,침대,Bed,Bed,Bed,Bed,Bed,Bed,Bed
+DECOR_PK_BOOKSHELF,pieces.json,13,11,180,A piece of furniture the player finds.,Bookshelf,Estante,Librero,Bücherregal,Étagère,本棚,书架,책장,Bookshelf,Bookshelf,Bookshelf,Bookshelf,Bookshelf,Bookshelf,Bookshelf
+DECOR_PK_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Chair,Cadeira,Silla,Stuhl,Chaise,椅子,椅子,의자,Chair,Chair,Chair,Chair,Chair,Chair,Chair
+DECOR_PK_COFFEE_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Coffee Table,Mesa de Centro,Mesa de centro,Couchtisch,Table basse,ローテーブル,茶几,커피 테이블,Coffee Table,Coffee Table,Coffee Table,Coffee Table,Coffee Table,Coffee Table,Coffee Table
+DECOR_PK_CORNER_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Corner Desk,Mesa de Canto,Escritorio esquinero,Eckschreibtisch,Bureau d'angle,コーナーデスク,转角书桌,코너 책상,Corner Desk,Corner Desk,Corner Desk,Corner Desk,Corner Desk,Corner Desk,Corner Desk
+DECOR_PK_DRAWER,pieces.json,13,11,180,A piece of furniture the player finds.,Drawer,Gaveteiro,Cajonera,Kommode,Commode,引き出し,抽屉柜,서랍장,Drawer,Drawer,Drawer,Drawer,Drawer,Drawer,Drawer
+DECOR_PK_DRAWER_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Drawer Desk,Escrivaninha,Escritorio,Schreibtisch,Bureau,机,书桌,서랍 책상,Drawer Desk,Drawer Desk,Drawer Desk,Drawer Desk,Drawer Desk,Drawer Desk,Drawer Desk
+DECOR_PK_FANCY_BED,pieces.json,13,11,180,A piece of furniture the player finds.,Fancy Bed,Cama Chique,Cama elegante,Prunkbett,Lit chic,豪華なベッド,华丽的床,고급 침대,Fancy Bed,Fancy Bed,Fancy Bed,Fancy Bed,Fancy Bed,Fancy Bed,Fancy Bed
+DECOR_PK_FANCY_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Fancy Table,Mesa Chique,Mesa elegante,Prunktisch,Table chic,豪華なテーブル,华丽的桌子,고급 탁자,Fancy Table,Fancy Table,Fancy Table,Fancy Table,Fancy Table,Fancy Table,Fancy Table
+DECOR_PK_FILE_CABINET,pieces.json,13,11,180,A piece of furniture the player finds.,File Cabinet,Gabinete,Archivador,Aktenschrank,Classeur,書類棚,文件柜,서류함,File Cabinet,File Cabinet,File Cabinet,File Cabinet,File Cabinet,File Cabinet,File Cabinet
+DECOR_PK_FIREPLACE,pieces.json,13,11,180,A piece of furniture the player finds.,Fireplace,Lareira,Chimenea,Kamin,Cheminée,暖炉,壁炉,벽난로,Fireplace,Fireplace,Fireplace,Fireplace,Fireplace,Fireplace,Fireplace
+DECOR_PK_KITCHEN_COUNTER,pieces.json,13,11,180,A piece of furniture the player finds.,Kitchen Counter,Balcão,Encimera,Küchentheke,Plan de travail,キッチン台,厨房台面,주방 조리대,Kitchen Counter,Kitchen Counter,Kitchen Counter,Kitchen Counter,Kitchen Counter,Kitchen Counter,Kitchen Counter
+DECOR_PK_MICROWAVE,pieces.json,13,11,180,A piece of furniture the player finds.,Microwave,Microondas,Microondas,Mikrowelle,Micro-ondes,電子レンジ,微波炉,전자레인지,Microwave,Microwave,Microwave,Microwave,Microwave,Microwave,Microwave
+DECOR_PK_SOFA,pieces.json,13,11,180,A piece of furniture the player finds.,Sofa,Sofá,Sofá,Sofa,Canapé,ソファ,沙发,소파,Sofa,Sofa,Sofa,Sofa,Sofa,Sofa,Sofa
+DECOR_PK_STOVE,pieces.json,13,11,180,A piece of furniture the player finds.,Stove,Fogão,Estufa,Herd,Cuisinière,コンロ,炉灶,가스레인지,Stove,Stove,Stove,Stove,Stove,Stove,Stove
+DECOR_PK_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Table,Mesa,Mesa,Tisch,Table,テーブル,桌子,탁자,Table,Table,Table,Table,Table,Table,Table
+DECOR_PK_TOILET,pieces.json,13,11,180,A piece of furniture the player finds.,Toilet,Privada,Inodoro,Toilette,Toilettes,トイレ,马桶,변기,Toilet,Toilet,Toilet,Toilet,Toilet,Toilet,Toilet
+DECOR_PK_DINER_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Chair,Cadeira de Bar,Silla de bar,Barstuhl,Chaise de bar,バーの椅子,餐厅椅,식당 의자,Diner Chair,Diner Chair,Diner Chair,Diner Chair,Diner Chair,Diner Chair,Diner Chair
+DECOR_PK_GREEN_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Green Chair,Cadeira Verde,Silla verde,Grüner Stuhl,Chaise verte,緑の椅子,绿椅子,초록 의자,Green Chair,Green Chair,Green Chair,Green Chair,Green Chair,Green Chair,Green Chair
+DECOR_PK_WOOD_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Wooden Chair,Cadeira,Silla de madera,Holzstuhl,Chaise en bois,木の椅子,木椅,나무 의자,Wooden Chair,Wooden Chair,Wooden Chair,Wooden Chair,Wooden Chair,Wooden Chair,Wooden Chair
+DECOR_PK_CARVED_CHAIR,pieces.json,13,11,180,A piece of furniture the player finds.,Carved Chair,Cadeira Entalhada,Silla tallada,Geschnitzter Stuhl,Chaise sculptée,彫刻の椅子,雕花椅,조각 의자,Carved Chair,Carved Chair,Carved Chair,Carved Chair,Carved Chair,Carved Chair,Carved Chair
+DECOR_PK_WHITE_SOFA,pieces.json,13,11,180,A piece of furniture the player finds.,White Sofa,Sofá Branco,Sofá blanco,Weißes Sofa,Canapé blanc,白いソファ,白沙发,흰 소파,White Sofa,White Sofa,White Sofa,White Sofa,White Sofa,White Sofa,White Sofa
+DECOR_PK_NIGHTSTAND,pieces.json,13,11,180,A piece of furniture the player finds.,Nightstand,Criado-mudo,Mesita de noche,Nachttisch,Table de chevet,ナイトテーブル,床头柜,협탁,Nightstand,Nightstand,Nightstand,Nightstand,Nightstand,Nightstand,Nightstand
+DECOR_PK_BONSAI,pieces.json,13,11,180,A piece of furniture the player finds.,Bonsai,Bonsai,Bonsái,Bonsai,Bonsaï,盆栽,盆景,분재,Bonsai,Bonsai,Bonsai,Bonsai,Bonsai,Bonsai,Bonsai
+DECOR_PK_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Gold Rug,Tapete Dourado,Alfombra dorada,Goldteppich,Tapis doré,金の絨毯,金色地毯,금색 러그,Gold Rug,Gold Rug,Gold Rug,Gold Rug,Gold Rug,Gold Rug,Gold Rug
+DECOR_PK_COAT_STAND,pieces.json,13,11,180,A piece of furniture the player finds.,Coat Stand,Cabideiro,Perchero,Garderobe,Portemanteau,コート掛け,衣帽架,옷걸이,Coat Stand,Coat Stand,Coat Stand,Coat Stand,Coat Stand,Coat Stand,Coat Stand
+DECOR_PK_LANDSCAPE,pieces.json,13,11,180,A piece of furniture the player finds.,Landscape,Paisagem,Paisaje,Landschaft,Paysage,風景画,风景画,풍경화,Landscape,Landscape,Landscape,Landscape,Landscape,Landscape,Landscape
+DECOR_PK_PORTRAIT,pieces.json,13,11,180,A piece of furniture the player finds.,Portrait,Retrato,Retrato,Porträt,Portrait,肖像画,肖像画,초상화,Portrait,Portrait,Portrait,Portrait,Portrait,Portrait,Portrait
+DECOR_PK_GRANDFATHER_CLOCK,pieces.json,13,11,180,A piece of furniture the player finds.,Old Clock,Relógio Antigo,Reloj antiguo,Alte Uhr,Vieille horloge,古時計,老钟,옛날 시계,Old Clock,Old Clock,Old Clock,Old Clock,Old Clock,Old Clock,Old Clock
+DECOR_PK_GLOBE,pieces.json,13,11,180,A piece of furniture the player finds.,Globe,Globo,Globo,Globus,Globe,地球儀,地球仪,지구본,Globe,Globe,Globe,Globe,Globe,Globe,Globe
+DECOR_PK_SCULPTURE,pieces.json,13,11,180,A piece of furniture the player finds.,Sculpture,Escultura,Escultura,Skulptur,Sculpture,彫刻,雕塑,조각상,Sculpture,Sculpture,Sculpture,Sculpture,Sculpture,Sculpture,Sculpture
+DECOR_PK_BLUE_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Blue Rug,Tapete Azul,Alfombra azul,Blauer Teppich,Tapis bleu,青い絨毯,蓝色地毯,파란 러그,Blue Rug,Blue Rug,Blue Rug,Blue Rug,Blue Rug,Blue Rug,Blue Rug
+DECOR_PK_FRIDGE,pieces.json,13,11,180,A piece of furniture the player finds.,Fridge,Geladeira,Nevera,Kühlschrank,Frigo,冷蔵庫,冰箱,냉장고,Fridge,Fridge,Fridge,Fridge,Fridge,Fridge,Fridge
+DECOR_PK_SIDE_DESK,pieces.json,13,11,180,A piece of furniture the player finds.,Side Desk,Mesa Lateral,Mesa auxiliar,Beistelltisch,Table d'appoint,サイドデスク,边桌,보조 책상,Side Desk,Side Desk,Side Desk,Side Desk,Side Desk,Side Desk,Side Desk
+DECOR_PK_SINK,pieces.json,13,11,180,A piece of furniture the player finds.,Sink,Pia,Lavabo,Waschbecken,Lavabo,洗面台,水槽,세면대,Sink,Sink,Sink,Sink,Sink,Sink,Sink
+DECOR_PK_DINER_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Table,Mesa de Bar,Mesa de bar,Bartisch,Table de bar,バーのテーブル,餐厅桌,식당 탁자,Diner Table,Diner Table,Diner Table,Diner Table,Diner Table,Diner Table,Diner Table
+DECOR_PK_FLOWER_VASE,pieces.json,13,11,180,A piece of furniture the player finds.,Flower Vase,Vaso de Flores,Florero,Blumenvase,Vase à fleurs,花瓶,花瓶,꽃병,Flower Vase,Flower Vase,Flower Vase,Flower Vase,Flower Vase,Flower Vase,Flower Vase
+DECOR_PK_FLOWER_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Flower Pot,Vaso de Planta,Maceta,Blumentopf,Pot de fleurs,植木鉢,花盆,화분,Flower Pot,Flower Pot,Flower Pot,Flower Pot,Flower Pot,Flower Pot,Flower Pot
+DECOR_PK_CAR_PICTURE,pieces.json,13,11,180,A piece of furniture the player finds.,Poster,Poster,Póster,Poster,Affiche,ポスター,海报,포스터,Poster,Poster,Poster,Poster,Poster,Poster,Poster
+DECOR_PK_DOTTED_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Dotted Rug,Tapete de Bolinhas,Alfombra de lunares,Gepunkteter Teppich,Tapis à pois,水玉の絨毯,圆点地毯,땡땡이 러그,Dotted Rug,Dotted Rug,Dotted Rug,Dotted Rug,Dotted Rug,Dotted Rug,Dotted Rug
+DECOR_PK_ALOE,pieces.json,13,11,180,A piece of furniture the player finds.,Aloe,Babosa,Aloe,Aloe,Aloès,アロエ,芦荟,알로에,Aloe,Aloe,Aloe,Aloe,Aloe,Aloe,Aloe
+DECOR_PK_CACTUS,pieces.json,13,11,180,A piece of furniture the player finds.,Cactus,Cacto,Cactus,Kaktus,Cactus,サボテン,仙人掌,선인장,Cactus,Cactus,Cactus,Cactus,Cactus,Cactus,Cactus
+DECOR_PK_DINER_SEAT,pieces.json,13,11,180,A piece of furniture the player finds.,Diner Seat,Banco de Bar,Banqueta de bar,Barbank,Banquette,バーの長椅子,餐厅卡座,식당 벤치,Diner Seat,Diner Seat,Diner Seat,Diner Seat,Diner Seat,Diner Seat,Diner Seat
+DECOR_PK_GLASS_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Glass Table,Mesa de Vidro,Mesa de cristal,Glastisch,Table en verre,ガラスのテーブル,玻璃桌,유리 탁자,Glass Table,Glass Table,Glass Table,Glass Table,Glass Table,Glass Table,Glass Table
+DECOR_PK_SMALL_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Small Table,Mesinha,Mesita,Tischchen,Petite table,小さなテーブル,小桌,작은 탁자,Small Table,Small Table,Small Table,Small Table,Small Table,Small Table,Small Table
+DECOR_PK_PLANT,pieces.json,13,11,180,A piece of furniture the player finds.,Plant,Planta,Planta,Pflanze,Plante,観葉植物,植物,식물,Plant,Plant,Plant,Plant,Plant,Plant,Plant
+DECOR_PK_SPROUT_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Sprout Pot,Vaso de Muda,Maceta con brote,Setzling,Pot de pousse,芽の鉢,幼苗盆,새싹 화분,Sprout Pot,Sprout Pot,Sprout Pot,Sprout Pot,Sprout Pot,Sprout Pot,Sprout Pot
+DECOR_PK_POTTED_TREE,pieces.json,13,11,180,A piece of furniture the player finds.,Potted Tree,Árvore no Vaso,Árbol en maceta,Topfbaum,Arbre en pot,鉢植えの木,盆栽树,화분 나무,Potted Tree,Potted Tree,Potted Tree,Potted Tree,Potted Tree,Potted Tree,Potted Tree
+DECOR_PK_TABLE_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Table Lamp,Abajur,Lámpara de mesa,Tischlampe,Lampe de table,卓上ランプ,台灯,탁상 램프,Table Lamp,Table Lamp,Table Lamp,Table Lamp,Table Lamp,Table Lamp,Table Lamp
 CAMERA_TIP,lake.gd,10,10,0,"The tip over the camera lock button, once a save after ten minutes of play. Wrapped on the note's paper.","Here you can choose between camera locked on player, or free roam.",Aqui você escolhe entre a câmera presa no jogador ou livre.,Aquí puedes elegir entre la cámara fija en el jugador o libre.,Hier wählst du zwischen Kamera am Spieler oder freier Kamera.,"Ici, choisis entre la caméra fixée sur le joueur ou libre.",ここでカメラをプレイヤー固定か自由移動か選べます。,在这里选择镜头锁定玩家，或自由移动。,여기서 카메라를 플레이어 고정 또는 자유 이동으로 선택할 수 있어요.,Here you choose between the camera locked on the player or free.,Here you can choose between the camera fixed on the player or free.,Here you choose between camera on the player or free camera.,"Here, choose between the camera fixed on the player or free.",Here you can choose whether the camera is fixed to the player or moves freely.,"Here choose the camera locked to the player, or moving freely.",Here you can choose the camera fixed to the player or free movement.
-DECOR_PK_ROSE_VASE,pieces.json,13,11,180,A piece of furniture the player finds.,Rose Vase,,,,,,,,,,,,,,
-DECOR_PK_LEAFY_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Leafy Pot,,,,,,,,,,,,,,
-DECOR_PK_FLOOR_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Floor Lamp,,,,,,,,,,,,,,
-DECOR_PK_DRINKS_CART,pieces.json,13,11,180,A piece of furniture the player finds.,Drinks Cart,,,,,,,,,,,,,,
-DECOR_PK_STRIPED_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Striped Rug,,,,,,,,,,,,,,
-DECOR_PK_OVAL_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Oval Rug,,,,,,,,,,,,,,
-DECOR_PK_RUNNER_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Runner Rug,,,,,,,,,,,,,,
-DECOR_PK_DECORATED_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Decorated Table,,,,,,,,,,,,,,
+DECOR_PK_ROSE_VASE,pieces.json,13,11,180,A piece of furniture the player finds.,Rose Vase,Vaso de Rosas,Jarrón de rosas,Rosenvase,Vase de roses,バラの花瓶,玫瑰花瓶,장미 꽃병,Rose Vase,Rose Vase,Rose Vase,Rose Vase,Rose Vase,Rose Vase,Rose Vase
+DECOR_PK_LEAFY_POT,pieces.json,13,11,180,A piece of furniture the player finds.,Leafy Pot,Vaso de Folhagem,Maceta frondosa,Blattpflanze,Pot feuillu,葉の鉢,绿叶盆栽,잎 화분,Leafy Pot,Leafy Pot,Leafy Pot,Leafy Pot,Leafy Pot,Leafy Pot,Leafy Pot
+DECOR_PK_FLOOR_LAMP,pieces.json,13,11,180,A piece of furniture the player finds.,Floor Lamp,Luminária,Lámpara de pie,Stehlampe,Lampadaire,フロアランプ,落地灯,스탠드,Floor Lamp,Floor Lamp,Floor Lamp,Floor Lamp,Floor Lamp,Floor Lamp,Floor Lamp
+DECOR_PK_DRINKS_CART,pieces.json,13,11,180,A piece of furniture the player finds.,Drinks Cart,Bar Móvel,Carrito de bar,Barwagen,Chariot à boissons,ワゴンバー,酒水推车,음료 카트,Drinks Cart,Drinks Cart,Drinks Cart,Drinks Cart,Drinks Cart,Drinks Cart,Drinks Cart
+DECOR_PK_STRIPED_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Striped Rug,Tapete Listrado,Alfombra a rayas,Streifenteppich,Tapis rayé,縞の絨毯,条纹地毯,줄무늬 러그,Striped Rug,Striped Rug,Striped Rug,Striped Rug,Striped Rug,Striped Rug,Striped Rug
+DECOR_PK_OVAL_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Small Rug,Tapete,Alfombra pequeña,Kleiner Teppich,Petit tapis,小さな絨毯,小地毯,작은 러그,Small Rug,Small Rug,Small Rug,Small Rug,Small Rug,Small Rug,Small Rug
+DECOR_PK_RUNNER_RUG,pieces.json,13,11,180,A piece of furniture the player finds.,Runner Rug,Passadeira,Alfombra larga,Läufer,Tapis de couloir,細長い絨毯,长条地毯,긴 러그,Runner Rug,Runner Rug,Runner Rug,Runner Rug,Runner Rug,Runner Rug,Runner Rug
+DECOR_PK_DECORATED_TABLE,pieces.json,13,11,180,A piece of furniture the player finds.,Decorated Table,Mesa Decorada,Mesa decorada,Dekorierter Tisch,Table décorée,飾られたテーブル,装饰桌,장식 탁자,Decorated Table,Decorated Table,Decorated Table,Decorated Table,Decorated Table,Decorated Table,Decorated Table

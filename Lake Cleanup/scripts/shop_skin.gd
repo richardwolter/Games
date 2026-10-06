@@ -352,6 +352,9 @@ var _group_boxes := {}
 ## Drawn last and on top: the ferry, the net and the dog heads are child nodes and would
 ## draw over anything the board draws itself, the dimming and the card included.
 var _tour_layer: Control
+## The blurb draws here, one z step up, so it lands over the purse the lake hangs under the
+## first board (`HudSkin.Purse`, a later sibling) rather than under it.
+var _blurb_layer: Control
 var _tour_skip := Rect2()
 ## The tour's card as last drawn, for the pad's stick.
 var _tour_card := Rect2()
@@ -706,8 +709,8 @@ func _draw() -> void:
 		_draw_board(board, _boards[board])
 	if _legend_box.size.y > 0.0:
 		_draw_legend(_legend_box)
-	if _help_hovered >= 0 and _help_hovered < rows.size() and tour < 0:
-		_draw_blurb(rows[_help_hovered])
+	_ensure_blurb_layer()
+	_blurb_layer.queue_redraw()
 	if tour >= 0:
 		_ensure_tour_layer()
 	if _tour_layer != null:
@@ -1081,7 +1084,22 @@ static func _cut_to(text: String, height: int, wide: float) -> String:
 ## The "?" tag: the price tag's oak, the mark in the price's ink, lit under the pointer.
 ## A row's blurb on a plate of the boards' own wood, hung off its "?" and kept inside the
 ## window. Drawn last, over every board.
-func _draw_blurb(row: Dictionary) -> void:
+func _ensure_blurb_layer() -> void:
+	if _blurb_layer != null:
+		return
+	_blurb_layer = Control.new()
+	_blurb_layer.name = &"Blurb"
+	_blurb_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_blurb_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_blurb_layer.z_index = 1
+	add_child(_blurb_layer)
+	_blurb_layer.draw.connect(func() -> void:
+		if _help_hovered >= 0 and _help_hovered < rows.size() and tour < 0:
+			_draw_blurb(rows[_help_hovered], _blurb_layer)
+	)
+
+
+func _draw_blurb(row: Dictionary, on: CanvasItem = self) -> void:
 	var i := _row_index.find(_help_hovered)
 	if i < 0:
 		return
@@ -1101,12 +1119,12 @@ func _draw_blurb(row: Dictionary) -> void:
 	var box := Rect2(anchor.position, inner + Vector2(FRAME, FRAME) * 2.0)
 	box.size += inner - Style.board_face(box, FRAME).size
 	box.position = blurb_at(_row_boxes[i], box.size)
-	var face := Style.board_wood(self, box, FRAME, CHIPS)
+	var face := Style.board_wood(on, box, FRAME, CHIPS)
 	var at := face.position + Vector2(BLURB_PAD, BLURB_PAD + float(Style.TEXT_BODY) * 0.8)
-	Style.write(self, title, Style.TEXT_BODY, at, Style.PAPER_HEAD)
+	Style.write(on, title, Style.TEXT_BODY, at, Style.PAPER_HEAD)
 	at.y += 6.0 + line_tall
 	for line in lines:
-		Style.write(self, line, Style.TEXT_SMALL, at, Style.PAPER_INK)
+		Style.write(on, line, Style.TEXT_SMALL, at, Style.PAPER_INK)
 		at.y += line_tall
 
 

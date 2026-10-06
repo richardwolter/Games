@@ -181,7 +181,7 @@ PIECES = [
     ("diner_table", "Diner Table", "SINGLE", "floor", "", [(4, None, F, 0, 0, 0)]),
     ("flower_vase", "Flower Vase", "SINGLE", "small", "", [(361, None, F, 0, 0, 0)]),
     ("flower_pot", "Flower Pot", "SINGLE", "floor", "", [(505, None, F, 0, 0, 0)]),
-    ("car_picture", "Car Picture", "SINGLE", "wall", "", [(964, None, F, 0, 0, 0)]),
+    ("car_picture", "Poster", "SINGLE", "wall", "", [(964, None, F, 0, 0, 0)]),
     ("dotted_rug", "Dotted Rug", "ROTATE", "floor", "", [(1192, None, F, 0, 0, 0), (1192, TURN, S, 1, 0, 0)]),
     ("aloe", "Aloe", "SINGLE", "small", "", [(1213, None, F, 0, 0, 0)]),
     ("cactus", "Cactus", "SINGLE", "small", "", [(2138, None, F, 0, 0, 0)]),
@@ -215,7 +215,7 @@ PIECES = [
         (332, [0, 0, 13, 42, "main", "lit"], "on", 0, 1, 0)]),
     ("drinks_cart", "Drinks Cart", "SINGLE", "floor", "", [(428, None, F, 0, 0, 0)]),
     ("striped_rug", "Striped Rug", "ROTATE", "floor", "", [(1097, None, F, 0, 0, 0), (1097, TURN, S, 1, 0, 0)]),
-    ("oval_rug", "Oval Rug", "ROTATE", "floor", "", [(1112, None, F, 0, 0, 0), (1112, TURN, S, 1, 0, 0)]),
+    ("oval_rug", "Small Rug", "ROTATE", "floor", "", [(1112, None, F, 0, 0, 0), (1112, TURN, S, 1, 0, 0)]),
     ("runner_rug", "Runner Rug", "ROTATE", "floor", "", [(2156, None, F, 0, 0, 0), (2156, TURN, S, 1, 0, 0)]),
     ("decorated_table", "Decorated Table", "ROTATE", "floor", "", [
         (1232, None, F, 0, 0, 0), (1229, None, S, 1, 0, 1)]),
