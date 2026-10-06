@@ -1,224 +1,14 @@
 {
- "flower_red": {
-  "full": [
-   1,
-   1,
-   7,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_yellow": {
-  "full": [
-   9,
-   1,
-   7,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_white": {
-  "full": [
-   17,
-   1,
-   7,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_blue": {
-  "full": [
-   25,
-   1,
-   9,
-   11
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_pink": {
-  "full": [
-   35,
-   1,
-   9,
-   12
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_violet": {
-  "full": [
-   45,
-   1,
-   5,
-   6
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "patch_red": {
-  "full": [
-   51,
-   1,
-   11,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "patch_yellow": {
-  "full": [
-   63,
-   1,
-   11,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "patch_white": {
-  "full": [
-   75,
-   1,
-   11,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "patch_blue": {
-  "full": [
-   87,
-   1,
-   11,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "shrub": {
-  "full": [
-   99,
-   1,
-   15,
-   12
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "shrub_berries": {
-  "full": [
-   115,
-   1,
-   15,
-   12
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "reed": {
-  "full": [
-   131,
-   1,
-   7,
-   17
-  ],
-  "sprout": [
-   23,
-   51,
-   3,
-   4
-  ],
-  "kind": "beach"
- },
- "beach_grass": {
-  "full": [
-   139,
-   1,
-   9,
-   8
-  ],
-  "sprout": [
-   23,
-   51,
-   3,
-   4
-  ],
-  "kind": "beach"
- },
  "beach_flower": {
   "full": [
-   149,
+   1,
    1,
    7,
    8
   ],
   "sprout": [
-   23,
-   51,
+   144,
+   173,
    3,
    4
   ],
@@ -226,44 +16,29 @@
  },
  "beach_flower_white": {
   "full": [
+   9,
    1,
-   19,
    5,
    5
   ],
   "sprout": [
-   23,
-   51,
+   144,
+   173,
    3,
    4
   ],
   "kind": "beach"
  },
- "lily": {
-  "full": [
-   7,
-   19,
-   13,
-   8
-  ],
-  "sprout": [
-   27,
-   51,
-   5,
-   3
-  ],
-  "kind": "water"
- },
  "lily_pink": {
   "full": [
-   21,
-   19,
+   15,
+   1,
    13,
    8
   ],
   "sprout": [
-   27,
-   51,
+   148,
+   173,
    5,
    3
   ],
@@ -271,104 +46,29 @@
  },
  "lily_white": {
   "full": [
-   35,
-   19,
+   29,
+   1,
    13,
    8
   ],
   "sprout": [
-   27,
-   51,
+   148,
+   173,
    5,
    3
   ],
   "kind": "water"
  },
- "tulip_red": {
-  "full": [
-   49,
-   19,
-   5,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "tulip_yellow": {
-  "full": [
-   55,
-   19,
-   5,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "tulip_pink": {
-  "full": [
-   61,
-   19,
-   5,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "flower_orange": {
-  "full": [
-   67,
-   19,
-   7,
-   9
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "daisies": {
-  "full": [
-   75,
-   19,
-   12,
-   6
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
  "clover_white": {
   "full": [
-   88,
-   19,
+   43,
+   1,
    7,
    6
   ],
   "sprout": [
-   19,
-   51,
+   140,
+   173,
    3,
    4
   ],
@@ -376,44 +76,14 @@
  },
  "clover_pink": {
   "full": [
-   96,
-   19,
+   51,
+   1,
    7,
    6
   ],
   "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "fern": {
-  "full": [
-   104,
-   19,
-   11,
-   8
-  ],
-  "sprout": [
-   19,
-   51,
-   3,
-   4
-  ],
-  "kind": "lawn"
- },
- "mushroom": {
-  "full": [
-   116,
-   19,
-   6,
-   5
-  ],
-  "sprout": [
-   19,
-   51,
+   140,
+   173,
    3,
    4
   ],
@@ -421,14 +91,14 @@
  },
  "shrub_flowering": {
   "full": [
-   123,
-   19,
+   59,
+   1,
    15,
    12
   ],
   "sprout": [
-   19,
-   51,
+   140,
+   173,
    3,
    4
   ],
@@ -436,74 +106,44 @@
  },
  "shrub_flowering_white": {
   "full": [
-   139,
-   19,
+   75,
+   1,
    15,
    12
   ],
   "sprout": [
-   19,
-   51,
+   140,
+   173,
    3,
    4
   ],
   "kind": "lawn"
  },
- "cattail": {
-  "full": [
-   1,
-   32,
-   7,
-   18
-  ],
-  "sprout": [
-   23,
-   51,
-   3,
-   4
-  ],
-  "kind": "beach"
- },
  "thrift": {
   "full": [
-   9,
-   32,
+   91,
+   1,
    9,
    7
   ],
   "sprout": [
-   23,
-   51,
+   144,
+   173,
    3,
    4
   ],
   "kind": "beach"
  },
- "lily_yellow": {
-  "full": [
-   19,
-   32,
-   13,
-   8
-  ],
-  "sprout": [
-   27,
-   51,
-   5,
-   3
-  ],
-  "kind": "water"
- },
  "pad_small": {
   "full": [
-   33,
-   32,
+   101,
+   1,
    7,
    4
   ],
   "sprout": [
-   27,
-   51,
+   148,
+   173,
    5,
    3
   ],
@@ -511,14 +151,14 @@
  },
  "open_pads": {
   "full": [
-   41,
-   32,
+   109,
+   1,
    20,
    10
   ],
   "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
@@ -526,14 +166,14 @@
  },
  "open_pads_pink": {
   "full": [
-   62,
-   32,
+   130,
+   1,
    20,
    10
   ],
   "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
@@ -541,14 +181,14 @@
  },
  "open_pads_white": {
   "full": [
-   83,
-   32,
+   1,
+   14,
    20,
    10
   ],
   "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
@@ -556,29 +196,14 @@
  },
  "open_pads_yellow": {
   "full": [
-   104,
-   32,
+   22,
+   14,
    20,
    10
   ],
   "sprout": [
-   33,
-   51,
-   5,
-   3
-  ],
-  "kind": "open"
- },
- "open_lily": {
-  "full": [
-   125,
-   32,
-   13,
-   8
-  ],
-  "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
@@ -586,14 +211,14 @@
  },
  "open_lily_pink": {
   "full": [
-   139,
-   32,
+   43,
+   14,
    13,
    8
   ],
   "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
@@ -601,32 +226,1946 @@
  },
  "open_pad_small": {
   "full": [
-   1,
-   51,
+   57,
+   14,
    7,
    4
   ],
   "sprout": [
-   33,
-   51,
+   154,
+   173,
    5,
    3
   ],
   "kind": "open"
  },
- "open_reeds": {
+ "pk_flower_0": {
+  "full": [
+   65,
+   14,
+   7,
+   8
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_1": {
+  "full": [
+   73,
+   14,
+   7,
+   8
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_2": {
+  "full": [
+   81,
+   14,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_3": {
+  "full": [
+   88,
+   14,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_4": {
+  "full": [
+   95,
+   14,
+   7,
+   8
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_5": {
+  "full": [
+   103,
+   14,
+   7,
+   8
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_6": {
+  "full": [
+   111,
+   14,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_7": {
+  "full": [
+   118,
+   14,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_8": {
+  "full": [
+   125,
+   14,
+   5,
+   7
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_9": {
+  "full": [
+   131,
+   14,
+   5,
+   7
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_10": {
+  "full": [
+   137,
+   14,
+   3,
+   5
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_11": {
+  "full": [
+   141,
+   14,
+   3,
+   5
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_12": {
+  "full": [
+   145,
+   14,
+   5,
+   7
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_13": {
+  "full": [
+   151,
+   14,
+   5,
+   7
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_14": {
+  "full": [
+   1,
+   25,
+   3,
+   5
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_flower_15": {
+  "full": [
+   5,
+   25,
+   3,
+   5
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.6,
+  "host": true
+ },
+ "pk_bed_0": {
   "full": [
    9,
+   25,
+   30,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_1": {
+  "full": [
+   40,
+   25,
+   29,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_2": {
+  "full": [
+   70,
+   25,
+   30,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_3": {
+  "full": [
+   101,
+   25,
+   29,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_4": {
+  "full": [
+   1,
+   40,
+   30,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_5": {
+  "full": [
+   32,
+   40,
+   29,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_6": {
+  "full": [
+   62,
+   40,
+   30,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "pk_bed_7": {
+  "full": [
+   93,
+   40,
+   29,
+   14
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5,
+  "host": true
+ },
+ "shrub_pk_0": {
+  "full": [
+   123,
+   40,
+   27,
+   24
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.12
+ },
+ "shrub_pk_1": {
+  "full": [
+   1,
+   65,
+   16,
+   13
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.12
+ },
+ "shrub_pk_2": {
+  "full": [
+   18,
+   65,
+   32,
+   21
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.12
+ },
+ "shrub_pk_3": {
+  "full": [
    51,
-   9,
+   65,
+   22,
+   26
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.12
+ },
+ "shrub_pk_4": {
+  "full": [
+   74,
+   65,
+   50,
+   20
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.12
+ },
+ "pk_fern": {
+  "full": [
+   1,
+   92,
+   37,
+   24
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.5
+ },
+ "pk_leafy_a": {
+  "full": [
+   39,
+   92,
+   43,
+   32
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.25
+ },
+ "pk_leafy_b": {
+  "full": [
+   83,
+   92,
+   33,
+   33
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.25
+ },
+ "pk_sprout": {
+  "full": [
+   117,
+   92,
+   16,
+   11
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.3
+ },
+ "pk_mushroom_0": {
+  "full": [
+   134,
+   92,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.1
+ },
+ "pk_mushroom_1": {
+  "full": [
+   141,
+   92,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.1
+ },
+ "pk_mushroom_2": {
+  "full": [
+   148,
+   92,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.1
+ },
+ "pk_mushroom_3": {
+  "full": [
+   1,
+   126,
+   6,
+   6
+  ],
+  "sprout": [
+   140,
+   173,
+   3,
+   4
+  ],
+  "kind": "lawn",
+  "scale": 1,
+  "weight": 0.1
+ },
+ "pk_grass_0": {
+  "full": [
+   8,
+   126,
+   16,
+   13
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_1": {
+  "full": [
+   25,
+   126,
+   15,
    15
   ],
   "sprout": [
-   33,
-   51,
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_2": {
+  "full": [
+   41,
+   126,
+   14,
+   15
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_3": {
+  "full": [
+   56,
+   126,
+   13,
+   14
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_4": {
+  "full": [
+   70,
+   126,
+   12,
+   8
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_5": {
+  "full": [
+   83,
+   126,
+   11,
+   10
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_6": {
+  "full": [
+   95,
+   126,
+   13,
+   11
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_grass_7": {
+  "full": [
+   109,
+   126,
+   11,
+   11
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "weight": 0.15
+ },
+ "pk_reed_0": {
+  "full": [
+   121,
+   126,
+   19,
+   19
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_0_big": {
+  "full": [
+   121,
+   126,
+   19,
+   19
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_0": {
+  "full": [
+   121,
+   126,
+   19,
+   19
+  ],
+  "sprout": [
+   154,
+   173,
    5,
    3
   ],
-  "kind": "open"
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_0_big": {
+  "full": [
+   121,
+   126,
+   19,
+   19
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_1": {
+  "full": [
+   141,
+   126,
+   18,
+   19
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_1_big": {
+  "full": [
+   141,
+   126,
+   18,
+   19
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_1": {
+  "full": [
+   141,
+   126,
+   18,
+   19
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_1_big": {
+  "full": [
+   141,
+   126,
+   18,
+   19
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_2": {
+  "full": [
+   1,
+   146,
+   20,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_2_big": {
+  "full": [
+   1,
+   146,
+   20,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_2": {
+  "full": [
+   1,
+   146,
+   20,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_2_big": {
+  "full": [
+   1,
+   146,
+   20,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_3": {
+  "full": [
+   22,
+   146,
+   19,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_3_big": {
+  "full": [
+   22,
+   146,
+   19,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_3": {
+  "full": [
+   22,
+   146,
+   19,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_3_big": {
+  "full": [
+   22,
+   146,
+   19,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_4": {
+  "full": [
+   42,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_4_big": {
+  "full": [
+   42,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_4": {
+  "full": [
+   42,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_4_big": {
+  "full": [
+   42,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_6": {
+  "full": [
+   60,
+   146,
+   18,
+   22
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_6_big": {
+  "full": [
+   60,
+   146,
+   18,
+   22
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_6": {
+  "full": [
+   60,
+   146,
+   18,
+   22
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_6_big": {
+  "full": [
+   60,
+   146,
+   18,
+   22
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_7": {
+  "full": [
+   79,
+   146,
+   21,
+   26
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_7_big": {
+  "full": [
+   79,
+   146,
+   21,
+   26
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_7": {
+  "full": [
+   79,
+   146,
+   21,
+   26
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_7_big": {
+  "full": [
+   79,
+   146,
+   21,
+   26
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_9": {
+  "full": [
+   101,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_9_big": {
+  "full": [
+   101,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_9": {
+  "full": [
+   101,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_9_big": {
+  "full": [
+   101,
+   146,
+   17,
+   18
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_10": {
+  "full": [
+   119,
+   146,
+   23,
+   20
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_10_big": {
+  "full": [
+   119,
+   146,
+   23,
+   20
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_10": {
+  "full": [
+   119,
+   146,
+   23,
+   20
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_10_big": {
+  "full": [
+   119,
+   146,
+   23,
+   20
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_14": {
+  "full": [
+   1,
+   173,
+   18,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_14_big": {
+  "full": [
+   1,
+   173,
+   18,
+   25
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_14": {
+  "full": [
+   1,
+   173,
+   18,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_14_big": {
+  "full": [
+   1,
+   173,
+   18,
+   25
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_5": {
+  "full": [
+   20,
+   173,
+   13,
+   12
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_5_big": {
+  "full": [
+   20,
+   173,
+   13,
+   12
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_5": {
+  "full": [
+   20,
+   173,
+   13,
+   12
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_5_big": {
+  "full": [
+   20,
+   173,
+   13,
+   12
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_8": {
+  "full": [
+   34,
+   173,
+   23,
+   17
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_8_big": {
+  "full": [
+   34,
+   173,
+   23,
+   17
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_8": {
+  "full": [
+   34,
+   173,
+   23,
+   17
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_8_big": {
+  "full": [
+   34,
+   173,
+   23,
+   17
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_reed_15": {
+  "full": [
+   58,
+   173,
+   15,
+   15
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "scale": 1,
+  "reed": true,
+  "weight": 0.1275
+ },
+ "pk_reed_15_big": {
+  "full": [
+   58,
+   173,
+   15,
+   15
+  ],
+  "sprout": [
+   144,
+   173,
+   3,
+   4
+  ],
+  "kind": "beach",
+  "reed": true,
+  "scale": 2,
+  "weight": 0.0225
+ },
+ "pk_open_reed_15": {
+  "full": [
+   58,
+   173,
+   15,
+   15
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "stand": true,
+  "weight": 0.0425
+ },
+ "pk_open_reed_15_big": {
+  "full": [
+   58,
+   173,
+   15,
+   15
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "stand": true,
+  "scale": 2,
+  "weight": 0.0075
+ },
+ "pk_pad_0": {
+  "full": [
+   74,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 1,
+  "weight": 0.425
+ },
+ "pk_pad_0_big": {
+  "full": [
+   74,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 2,
+  "weight": 0.075
+ },
+ "pk_open_pad_0": {
+  "full": [
+   74,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "weight": 0.2805
+ },
+ "pk_open_pad_0_big": {
+  "full": [
+   74,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 2,
+  "weight": 0.0495
+ },
+ "pk_pad_1": {
+  "full": [
+   95,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 1,
+  "weight": 0.425
+ },
+ "pk_pad_1_big": {
+  "full": [
+   95,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 2,
+  "weight": 0.075
+ },
+ "pk_open_pad_1": {
+  "full": [
+   95,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "weight": 0.2805
+ },
+ "pk_open_pad_1_big": {
+  "full": [
+   95,
+   173,
+   20,
+   13
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 2,
+  "weight": 0.0495
+ },
+ "pk_lotus": {
+  "full": [
+   116,
+   173,
+   23,
+   11
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 1,
+  "weight": 0.425
+ },
+ "pk_lotus_big": {
+  "full": [
+   116,
+   173,
+   23,
+   11
+  ],
+  "sprout": [
+   148,
+   173,
+   5,
+   3
+  ],
+  "kind": "water",
+  "scale": 2,
+  "weight": 0.075
+ },
+ "pk_open_lotus": {
+  "full": [
+   116,
+   173,
+   23,
+   11
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 1,
+  "weight": 0.2805
+ },
+ "pk_open_lotus_big": {
+  "full": [
+   116,
+   173,
+   23,
+   11
+  ],
+  "sprout": [
+   154,
+   173,
+   5,
+   3
+  ],
+  "kind": "open",
+  "scale": 2,
+  "weight": 0.0495
  }
 }

@@ -96,6 +96,12 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   - Turtle (`turtle_<anim>*`: Idle, Sit, Sleep, Hide, Walking, from `art_source/Fauna/TurtlePaid`)
     — Toffeecraft's turtle pack (https://toffeecraft.itch.io/), the bunnies' artist. ✅ Bought
     by Richard (2026-10-05), the paid pack. Credited with the bunnies, "Toffeecraft".
+  - Round trees, forest-floor wood and plants (`assets/trees/round_dark.png`, `round_light.png`,
+    `floor.png` by `tools/build_trees.py`; the `pk_*` and `shrub_pk_*` entries of
+    `assets/flora.png` by `tools/build_flora.py`, from `art_source/Fauna/AnimatedTreesUpdates`
+    and `art_source/Fauna/LakePlants`) — Toffeecraft's animated trees and lake plants, the
+    bunnies' artist. ✅ Bought by Richard (2026-10-05) in the same mega deal as the bunnies.
+    Credited with them, "Toffeecraft".
   - Snakes (`snake_<coat>_*`: SnakeBlue, SnakeCorn) — "Snake Sprites" by Carysaurus
     (https://carysaurus.itch.io/snake-sprites). ✅ Free and commercial; no redistribution or
     resale. **Credit must be given**: "Carysaurus" on the board.

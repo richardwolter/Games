@@ -56,7 +56,8 @@ const BEE_COLOR := Color(0.96, 0.8, 0.28)
 const BEE_BAND := Color(0.18, 0.13, 0.06)
 const BEE_WING := Color(0.93, 0.97, 0.98, 0.55)
 ## The plants a bee visits, by the start of the species' name.
-const BEE_HOSTS := ["flower_", "patch_", "tulip_", "daisies", "clover_", "shrub_flowering", "thrift", "beach_flower"]
+const BEE_HOSTS := ["flower_", "patch_", "tulip_", "daisies", "clover_", "shrub_flowering", "thrift", "beach_flower",
+	"pk_flower_", "pk_bed_"]
 ## One painted pixel, in world px: a bee is on the art grid like everything else.
 const ART := 2.0
 ## On each beat of the song a bee's orbit jumps ahead by BEE_PULSE radians, fast at the beat
@@ -228,6 +229,10 @@ const LEAN := 1.4
 const AFLOAT := 1.0
 const TOP := 0.5
 const FOOT := 0.0
+## The ground's trees (2026-10-05): an old Forest tree's top corner, leaning on the wind, and
+## every corner of an animated tree, stepped through its frames. See the shader.
+const WIND := 0.375
+const FRAMES := 0.125
 ## What a shadow's corner carries in its alpha, which is also the surface it falls on and so
 ## the ink the shader draws it in (2026-10-02, one sun). A plant is alpha 1; any other alpha
 ## is not packed. The ground's props use the same three (Ground).
@@ -272,6 +277,8 @@ static func _still(skin: ShaderMaterial) -> void:
 	skin.set_shader_parameter(&"wave_amplitude", 0.0)
 	skin.set_shader_parameter(&"sway", 0.0)
 	skin.set_shader_parameter(&"lean", 0.0)
+	skin.set_shader_parameter(&"wind_lean", 0.0)
+	skin.set_shader_parameter(&"tree_fps", 0.0)
 
 
 ## Whether the art is in the project and read.
@@ -361,7 +368,7 @@ func island_host_spots() -> PackedVector2Array:
 	for k in _foot.size():
 		if _island_host(k):
 			var rect: Array = _table[_species[k]]["full"]
-			out.append(_foot[k] - Vector2(0.0, float(rect[3]) * SCALE * 0.85))
+			out.append(_foot[k] - Vector2(0.0, float(rect[3]) * _grain_of(_species[k]) * 0.85))
 	return out
 
 
@@ -683,6 +690,17 @@ const REEDS := ["reed", "cattail"]
 const REED_REACH := 1.0
 
 
+## World px a painted px of a species' full picture (the json's "scale", 2 when absent).
+func _grain_of(name: String) -> float:
+	return float((_table.get(name, {}) as Dictionary).get("scale", SCALE))
+
+
+## A beach plant that only grows by the water: our old reed and cattail, or a pack entry
+## marked "reed" (Toffeecraft's cattails and reeds, 2026-10-05).
+func is_reed(name: String) -> bool:
+	return REEDS.has(name) or bool((_table.get(name, {}) as Dictionary).get("reed", false))
+
+
 ## Tiles from the drawn water's edge, for a spot on sand: the island's shelf line or the
 ## outer bank's, whichever it is nearer.
 func _from_water(at: Vector2) -> float:
@@ -702,17 +720,17 @@ func _pick_species(kind: String, at: Vector2) -> String:
 				continue
 		elif table_kind != kind:
 			continue
-		if kind == "beach" and REEDS.has(name) and _from_water(at) > REED_REACH:
+		if kind == "beach" and is_reed(name) and _from_water(at) > REED_REACH:
 			continue
 		names.append(name)
-		# Shrubs are big and rarer; patches and flowers common.
+		# Shrubs are big and rarer; patches and flowers common. The pack's entries carry
+		# their own weight (tools/build_flora.py), so a kind's many small entries add up to
+		# what one of ours used to be.
 		var weight := 1.0
-		if name.begins_with("shrub"):
+		if (_table[name] as Dictionary).has("weight"):
+			weight = float(_table[name]["weight"])
+		elif name.begins_with("shrub"):
 			weight = 0.25
-		elif name == "mushroom":
-			weight = 0.35
-		elif name == "fern" or name == "open_reeds":
-			weight = 0.6
 		weights.append(weight)
 	if names.is_empty():
 		return ""
@@ -776,15 +794,18 @@ func _lay() -> void:
 			rect = entry["full"]
 			var u := (t - SPROUT_UNTIL) / (1.0 - SPROUT_UNTIL)
 			rise = 0.5 + 0.5 * (1.0 - (1.0 - u) * (1.0 - u))
-		var w := float(rect[2]) * SCALE
-		var h := float(rect[3]) * SCALE * rise
+		# World px a painted px: the pack's plants are drawn at 1, a big lake plant and ours
+		# at 2 (the json's "scale"). A sprout is ours, so always at 2.
+		var grain := SCALE if t < SPROUT_UNTIL else float(entry.get("scale", SCALE))
+		var w := float(rect[2]) * grain
+		var h := float(rect[3]) * grain * rise
 		var foot := _foot[k]
 		var box := Rect2(foot - Vector2(w * 0.5, h), Vector2(w, h))
 		var uv := Rect2(Vector2(rect[0], rect[1]) / sheet_size, Vector2(rect[2], rect[3]) / sheet_size)
 		var kind := String(entry["kind"])
 		# Afloat, the whole picture rides the swell; on land, only the top corners lean.
 		var afloat := kind == "water" or kind == "open"
-		var standing := _species[k] == "open_reeds"
+		var standing := bool(entry.get("stand", false))
 		if afloat and t >= SPROUT_UNTIL and Fish.bed_shows(grid, foot):
 			var drop := Fish.shadow_drop(foot, sun)
 			var from := foot if standing else box.get_center()
@@ -1031,7 +1052,7 @@ func _draw_bees(on: CanvasItem) -> void:
 		if t < 1.0:
 			continue
 		var rect: Array = _table[_species[k]]["full"]
-		var head := _foot[k] - Vector2(0.0, float(rect[3]) * SCALE * 0.85)
+		var head := _foot[k] - Vector2(0.0, float(rect[3]) * _grain_of(_species[k]) * 0.85)
 		var seed := _bee_seed[i]
 		var rx := 5.0 + fmod(seed, 5.0)
 		var ry := 3.0 + fmod(seed * 1.7, 3.0)

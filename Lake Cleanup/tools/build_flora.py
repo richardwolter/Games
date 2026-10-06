@@ -367,49 +367,105 @@ def sprout(kind: str) -> Image.Image:
 
 
 PLANTS = [
-    ("flower_red", flower(RED, 2), "lawn"),
-    ("flower_yellow", flower(YELLOW, 2, 3), "lawn"),
-    ("flower_white", flower(WHITE, 2, 4), "lawn"),
-    ("flower_blue", flower(BLUE, 3, 4), "lawn"),
-    ("flower_pink", flower(PINK, 3, 5), "lawn"),
-    ("flower_violet", flower(VIOLET, 1, 3), "lawn"),
-    ("patch_red", cluster(RED), "lawn"),
-    ("patch_yellow", cluster(YELLOW, 4), "lawn"),
-    ("patch_white", cluster(WHITE), "lawn"),
-    ("patch_blue", cluster(BLUE, 4), "lawn"),
-    ("shrub", shrub(False), "lawn"),
-    ("shrub_berries", shrub(True), "lawn"),
-    ("reed", reed(), "beach"),
-    ("beach_grass", beach_grass(), "beach"),
     ("beach_flower", flower(ORANGE, 2, 3, leaves=False), "beach"),
     ("beach_flower_white", flower(WHITE, 1, 2, leaves=False), "beach"),
-    ("lily", lily(None), "water"),
     ("lily_pink", lily(PINK), "water"),
     ("lily_white", lily(WHITE), "water"),
-    ("tulip_red", tulip(RED), "lawn"),
-    ("tulip_yellow", tulip(YELLOW), "lawn"),
-    ("tulip_pink", tulip(PINK), "lawn"),
-    ("flower_orange", flower(ORANGE, 2, 4), "lawn"),
-    ("daisies", daisies(), "lawn"),
     ("clover_white", clover(WHITE), "lawn"),
     ("clover_pink", clover(PINK), "lawn"),
-    ("fern", fern(), "lawn"),
-    ("mushroom", mushroom(RED), "lawn"),
     ("shrub_flowering", flowering_bush(PINK), "lawn"),
     ("shrub_flowering_white", flowering_bush(WHITE), "lawn"),
-    ("cattail", cattail(), "beach"),
     ("thrift", thrift(), "beach"),
-    ("lily_yellow", lily(YELLOW), "water"),
     ("pad_small", pad_small(), "water"),
     ("open_pads", pad_cluster(None), "open"),
     ("open_pads_pink", pad_cluster(PINK), "open"),
     ("open_pads_white", pad_cluster(WHITE), "open"),
     ("open_pads_yellow", pad_cluster(YELLOW), "open"),
-    ("open_lily", lily(None), "open"),
     ("open_lily_pink", lily(PINK), "open"),
     ("open_pad_small", pad_small(), "open"),
-    ("open_reeds", water_reed(), "open"),
 ]
+
+
+# Toffeecraft's plants (2026-10-05, /grill-me with Richard, option D off
+# tools/flora_look/mock2_*.png): bought with the bunnies, cut from
+# art_source/Fauna/AnimatedTreesUpdates/.../Decorations and LakePlants. Where the pack has a
+# twin of one of ours (flowers, beds, shrubs, fern, mushrooms, beach grass, reeds, cattails,
+# lily pads) the pack's replaces it and ours is gone from PLANTS above; ours stays only where
+# the pack has nothing (clovers, thrift, beach flowers, coloured lilies, open beds, flowering
+# shrubs). Drawn at one world px a painted px ("scale": 1), the bunnies' grain, except a lake
+# plant now and then (`LAKE_BIG`) at 2: a "_big" entry on the same rectangle.
+#
+# Extra keys the game reads (scripts/flora.gd): "scale" world px a painted px (2 when
+# absent), "weight" how often it is picked against its kind, "reed" grows only by the water
+# (beach), "stand" stands in the water rather than lying on it (open), "host" bees visit it.
+PACK_DIR = os.path.join("art_source", "Fauna", "AnimatedTreesUpdates", "AnimatedTreesUpdates", "Decorations")
+LAKE_PNG = os.path.join("art_source", "Fauna", "LakePlants", "LakePlants", "lakeplants.png")
+LAKE_BIG = 0.15
+
+
+def _clean(path: str) -> Image.Image:
+    """The pack's baked black shadows and its half pixels dropped."""
+    img = Image.open(path).convert("RGBA")
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a < 128 or (a < 200 and max(r, g, b) < 30):
+                px[x, y] = (0, 0, 0, 0)
+            else:
+                px[x, y] = (r, g, b, 255)
+    return img
+
+
+def _cut(img: Image.Image, box) -> Image.Image:
+    x, y, w, h = box
+    piece = img.crop((x, y, x + w, y + h))
+    return piece.crop(piece.getbbox())
+
+
+def pack_plants() -> list:
+    """[(name, image or the name of the entry whose picture it shares, kind, extras)]."""
+    if not os.path.isdir(PACK_DIR):
+        return []
+    plants = _clean(os.path.join(PACK_DIR, "Plants.png"))
+    flowers = _clean(os.path.join(PACK_DIR, "Flowers.png"))
+    lake = _clean(LAKE_PNG)
+    out = []
+    one = {"scale": 1}
+    for i in range(16):
+        out.append(("pk_flower_%d" % i, _cut(flowers, ((i % 4) * 16, (i // 4) * 16, 16, 16)), "lawn",
+                    {**one, "weight": 0.6, "host": True}))
+    beds = [(224, 18), (224, 33), (257, 18), (257, 33), (224, 66), (224, 81), (257, 66), (257, 81)]
+    for i, (x, y) in enumerate(beds):
+        out.append(("pk_bed_%d" % i, _cut(plants, (x, y, 30, 15)), "lawn", {**one, "weight": 0.5, "host": True}))
+    bushes = [(3, 21, 27, 26), (31, 31, 17, 16), (16, 57, 32, 21), (53, 53, 22, 26), (94, 60, 50, 20)]
+    for i, box in enumerate(bushes):
+        out.append(("shrub_pk_%d" % i, _cut(plants, box), "lawn", {**one, "weight": 0.12}))
+    out.append(("pk_fern", _cut(plants, (149, 58, 37, 24)), "lawn", {**one, "weight": 0.5}))
+    out.append(("pk_leafy_a", _cut(plants, (2, 88, 43, 32)), "lawn", {**one, "weight": 0.25}))
+    out.append(("pk_leafy_b", _cut(plants, (56, 87, 33, 33)), "lawn", {**one, "weight": 0.25}))
+    out.append(("pk_sprout", _cut(plants, (32, 17, 16, 11)), "lawn", {**one, "weight": 0.3}))
+    for i, (x, y) in enumerate([(193, 65), (200, 65), (193, 72), (200, 72)]):
+        out.append(("pk_mushroom_%d" % i, _cut(plants, (x, y, 7, 7)), "lawn", {**one, "weight": 0.1}))
+    tufts = [(81, 15, 16, 16), (97, 15, 16, 16), (81, 31, 16, 16), (97, 31, 16, 16),
+             (114, 22, 12, 8), (130, 20, 11, 10), (114, 35, 13, 11), (131, 35, 11, 11)]
+    for i, box in enumerate(tufts):
+        out.append(("pk_grass_%d" % i, _cut(plants, box), "beach", {**one, "weight": 0.15}))
+
+    def lake_cell(i):
+        return _cut(lake, ((i % 4) * 32, (i // 4) * 32, 32, 32))
+
+    def both(name, img, kind, extras, weight):
+        out.append((name, img, kind, {**one, **extras, "weight": round(weight * (1 - LAKE_BIG), 4)}))
+        out.append((name + "_big", name, kind, {**extras, "scale": 2, "weight": round(weight * LAKE_BIG, 4)}))
+
+    for i in [0, 1, 2, 3, 4, 6, 7, 9, 10, 14, 5, 8, 15]:
+        both("pk_reed_%d" % i, lake_cell(i), "beach", {"reed": True}, 0.15)
+        both("pk_open_reed_%d" % i, "pk_reed_%d" % i, "open", {"stand": True}, 0.05)
+    for name, cell in [("pad_0", 12), ("pad_1", 13), ("lotus", 11)]:
+        both("pk_" + name, lake_cell(cell), "water", {}, 0.5)
+        both("pk_open_" + name, "pk_" + name, "open", {}, 0.33)
+    return out
 
 
 def pack() -> None:
@@ -418,7 +474,11 @@ def pack() -> None:
     x, y, shelf = gutter, gutter, 0
     wide = 160
     places: dict[str, dict] = {}
+    extra = pack_plants()
     items: list[tuple[str, Image.Image]] = [(n, im) for n, im, _ in PLANTS]
+    # An entry that shares another's picture names it instead of carrying one: each picture
+    # goes on the sheet once.
+    items += [(n, im) for n, im, _, _ in extra if not isinstance(im, str)]
     items += [("sprout_" + k, im) for k, im in sprouts.items()]
     spots: dict[str, tuple[int, int]] = {}
     for name, im in items:
@@ -440,6 +500,18 @@ def pack() -> None:
             "sprout": [*spots["sprout_" + kind], sp.width, sp.height],
             "kind": kind,
         }
+    pictures = {n: im for n, im, _, _ in extra}
+    for name, im, kind, extras in extra:
+        src = name
+        while isinstance(pictures[src], str):
+            src = pictures[src]
+        sp = sprouts[kind]
+        places[name] = {
+            "full": [*spots[src], pictures[src].width, pictures[src].height],
+            "sprout": [*spots["sprout_" + kind], sp.width, sp.height],
+            "kind": kind,
+            **extras,
+        }
     sheet.save(OUT_PNG)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(places, f, indent=1)
@@ -447,7 +519,7 @@ def pack() -> None:
     big = Image.new("RGBA", (wide * 4, tall * 4), GRASS_LIGHT)
     big.alpha_composite(sheet.resize((wide * 4, tall * 4), Image.NEAREST))
     big.save(SHEET_PNG)
-    print(f"wrote {OUT_PNG} {wide}x{tall}, {len(PLANTS)} plants, contact sheet {SHEET_PNG}")
+    print(f"wrote {OUT_PNG} {wide}x{tall}, {len(PLANTS)} ours + {len(extra)} pack entries, contact sheet {SHEET_PNG}")
 
 
 if __name__ == "__main__":

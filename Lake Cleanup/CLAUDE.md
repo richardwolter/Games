@@ -4655,6 +4655,51 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   `tools/last_fauna_{bunny,bunny_isle,fox,wolf,snake,capy,peacock,behind_plant,turtle,turtle_swim,capy_swim}.png` and
   `last_fauna.log`.
 
+### The Wood and the Pack Plants (2026-10-05, `/grill-me` with Richard)
+More tree and plant variety from Toffeecraft's animated trees and lake plants (bought in the
+bunnies' mega deal), mixed with what was there. Picked off an offline mockup laid on the
+game's own plates: option D of `tools/flora_look/mock2_*.png` (`tools/shot_flora_base.tscn`
+shoots the plates and logs where every prop and plant stands; `tools/flora_look/flora_mockup.py`,
+scratch, lays the pack art on those feet). **Supersedes** the dead trees in `Ground.TREES`,
+"out on the bank nothing moves" for the trees, and our rule-built flowers, patches, shrubs,
+fern, mushroom, beach grass, reeds, cattails and plain/yellow lilies.
+- **The wood is a fifth old Forest trees, two fifths each of the dark and light green round
+  trees** (`Ground.TREES` is the weighting: three old, six of each new). **No dead trees, no
+  pines** (the pre-autumn pine read as a brown wall), no other season. Round trees at 2x, the
+  Forest trees' grain. `test_lake` guards the share (measured 20%) and no dead tree.
+- **The trees move on one wind** (`flora_sway.gdshader`, two new blue roles, `Flora.WIND`
+  0.375 and `Flora.FRAMES` 0.125): a round tree steps through its 16 frames (`tree_fps` 8),
+  the uv moved along its strip in the atlas, its phase hashed off its packed x (jittered by
+  under a pixel off its y so a column is not in step); an old Forest tree leans its top
+  whole art pixels on a gust running across the wood (`wind_lean` 1, `wind_speed`). The
+  clock is `Ground._wind`, pushed every frame, running at `WIND_CALM` (0.6) on a calm day and
+  climbing to full pace with the overcast, so a shower or a tornado brings the first pace
+  back (Richard: it was too fast as the everyday wind). Shadows
+  follow (same roles). The south wood's cover redraw wears the batch's material, or it would
+  stand still over moving trees.
+- **The strips are built** (`tools/build_trees.py` -> `assets/trees/round_{dark,light}.png`,
+  `trees.json`): the pack's baked black shadow and half pixels dropped, every frame cut to one
+  shared box, 2 px gutter; `_pack_props` lays a strip into the atlas whole.
+- **The wood's floor from a new game** (`FLOOR_SHARE` 0.03 of open forest-floor tiles past
+  `FLOOR_FROM`, never on a tree's tile): logs, mossy logs, sticks, a stump; and driftwood
+  now and then on the bank's beach (`DRIFTWOOD_SHARE`). At 1x (`Ground._one_x`,
+  `_scale_of`). `assets/trees/floor.png`.
+- **The pack's plants grow back with cleaning** (`tools/build_flora.py` `pack_plants`, the
+  `pk_*`/`shrub_pk_*` entries): flowers, flower beds, bushes, fern, leafy plants, mushrooms,
+  beach grass, cattails and reeds, pads and the lotus, at 1x (the bunnies' grain), with
+  `LAKE_BIG` (15%) of the lake plants a `_big` twin at 2x on the same rectangle. **Where the
+  pack has a twin, ours is gone; ours stays where it has none** (clovers, thrift, beach
+  flowers, pink/white lilies, open beds, flowering shrubs). The json gained `scale`, `weight`,
+  `reed` (beach, by the water only, `Flora.is_reed`), `stand` (open, standing in the water)
+  and `host`; `BEE_HOSTS` takes `pk_flower_`/`pk_bed_`. Sprouts stay ours at 2x.
+- **Out of scope, by decision**: seasons, pines, falling leaves, the clay pots and cacti, the
+  pack's tileset. **Open**: the lake plants' amount and the 15% (Richard: judge in play).
+- **Cost** (`bench_frames`): standing 3.8 ms; cleaned 8.3-8.5 ms mean, and 9.0-9.3 with the
+  old flora sheet swapped back, so the plants cost nothing new. The cleaned lake is over the
+  8 ms bar on the wildlife (3 ms, `BENCH_OFF=wild` 5.4), not on this.
+- `test_lake` guards the wood's mix, no dead trees, the floor wood, the shader's roles, the
+  wind clock, the plants' grain, the twins gone and ours kept, and bees on the pack flowers.
+
 ### The Lakebed Through Clean Water (2026-09-30, `/grill-me` with Richard, after Spilled!)
 Clean water is see-through to a lakebed of sand, rocks, branches, water plants and shells. The
 bottom showing is the reward for clearing a bay, the way oil lifting is in Spilled!. Picked

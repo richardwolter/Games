@@ -7414,6 +7414,47 @@ func _check_still_walkers(wild: Wildlife) -> void:
 			if int(g.get(&"_prop_pad")[art]) > 0:
 				padded += 1
 	_check(padded > 0, "prop shadows know the padding under their pictures", "%d" % padded)
+	# The wood (2026-10-05, option D): Toffeecraft's round trees stepping through their frames,
+	# the old Forest trees leaning on the wind, no dead trees, logs and sticks on the floor.
+	var animated := 0
+	var old_trees := 0
+	var dead := 0
+	var floor_wood := 0
+	var floor_big := 0
+	for g: Ground in _main.get(&"_grounds"):
+		if g.layer != Ground.Layer.OUTSIDE:
+			continue
+		var placed: Array = g.get(&"_placed")
+		for i in range(1, placed.size(), 2):
+			var art: Texture2D = placed[i]
+			if g.is_animated(art):
+				animated += 1
+			elif art.resource_path.contains("death_"):
+				dead += 1
+			elif art.resource_path.contains("/Trees/"):
+				old_trees += 1
+			elif g.is_one_x(art):
+				floor_wood += 1
+				if art.get_width() > 40:
+					floor_big += 1
+	var tree_share := float(old_trees) / float(maxi(old_trees + animated, 1))
+	_check(animated > 0 and tree_share > 0.12 and tree_share < 0.28,
+		"the wood is about a fifth old Forest trees, the rest the round trees",
+		"%d old, %d round" % [old_trees, animated])
+	_check(dead == 0, "no dead trees in the wood", "%d" % dead)
+	_check(floor_wood > 20, "logs and sticks lie on the wood's floor", "%d (driftwood %d)" % [floor_wood, floor_big])
+	var sway_src := FileAccess.get_file_as_string("res://shaders/flora_sway.gdshader")
+	_check(sway_src.contains("COLOR.b - 0.125") and sway_src.contains("COLOR.b - 0.375")
+		and is_equal_approx(Flora.FRAMES, 0.125) and is_equal_approx(Flora.WIND, 0.375),
+		"the sway shader knows the trees' two roles, as Flora names them", "")
+	var bank: Ground = null
+	for g: Ground in _main.get(&"_grounds"):
+		if g.layer == Ground.Layer.OUTSIDE:
+			bank = g
+	if bank != null:
+		var clock := float((bank.material as ShaderMaterial).get_shader_parameter(&"wind_clock"))
+		_check(clock > 0.0 and float((bank.material as ShaderMaterial).get_shader_parameter(&"tree_stride")) > 1.0,
+			"the wood's wind clock runs and its frame stride is set", "%.2f" % clock)
 	# Flora: nothing behind the pump, reeds by the water.
 	var flora: Flora = _main.get(&"_flora")
 	if flora != null:
@@ -7425,7 +7466,7 @@ func _check_still_walkers(wild: Wildlife) -> void:
 			var at_tile := Iso.world_to_tile(feet[k])
 			if Pump.covers(at_tile, 2.5) and Pump.hides(at_tile):
 				behind += 1
-			if Flora.REEDS.has(species[k]) and flora._from_water(at_tile) > Flora.REED_REACH + 0.01:
+			if flora.is_reed(species[k]) and flora._from_water(at_tile) > Flora.REED_REACH + 0.01:
 				far_reeds += 1
 		_check(behind == 0, "no plant grows behind the pump's picture", "%d" % behind)
 		var forest := 0
@@ -7440,6 +7481,27 @@ func _check_still_walkers(wild: Wildlife) -> void:
 		_check(forest > 200, "flowers are sown on the forest floor", "%d" % forest)
 		_check(on_trees == 0, "and none of them on a tree's or a rock's drawing", "%d" % on_trees)
 		_check(far_reeds == 0, "reeds stand within a tile of the water", "%d" % far_reeds)
+		# The pack's plants (2026-10-05): at 1x, a lake plant now and then at 2x, and our twins
+		# of them gone from the sheet.
+		var table: Dictionary = flora.get(&"_table")
+		var pack_one := 0
+		var lake_big := 0
+		for name: String in table:
+			var entry: Dictionary = table[name]
+			if name.begins_with("pk_") or name.begins_with("shrub_pk"):
+				if float(entry.get("scale", Flora.SCALE)) == 1.0:
+					pack_one += 1
+				elif name.ends_with("_big"):
+					lake_big += 1
+		_check(pack_one > 60 and lake_big > 10, "the pack's plants are drawn at 1x, some lake plants at 2x",
+			"%d at 1x, %d big" % [pack_one, lake_big])
+		var twins := ["flower_red", "patch_red", "shrub", "reed", "cattail", "lily", "fern",
+			"mushroom", "beach_grass", "daisies", "tulip_red", "open_reeds", "open_lily"]
+		_check(twins.all(func(n: String) -> bool: return not table.has(n)),
+			"where the pack has a twin, ours is gone", "")
+		_check(table.has("shrub_flowering") and table.has("clover_white") and table.has("open_pads"),
+			"and ours stays where the pack has nothing", "")
+		_check(Flora.is_host("pk_flower_3") and Flora.is_host("pk_bed_2"), "bees visit the pack's flowers", "")
 
 
 func _check_wildlife() -> void:

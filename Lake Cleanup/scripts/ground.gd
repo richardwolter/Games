@@ -183,22 +183,38 @@ const ISLAND_UNDER := 1.0
 ## canopy by the outer edge, which is what hides where the ground stops rather than leaving
 ## the map to end on a row of tiles. Rocks fill open ground between them and never sit on a
 ## trunk. Leaves are undergrowth and may lie under anything.
-## The living trees are listed three times each and the dead ones once, which is the whole of
-## the weighting: the pack has two dead trees to three living, and a wood that is two fifths
-## dead reads as a blight rather than as a wood.
+## The list is the whole of the weighting (2026-10-05, Richard, picked off
+## tools/flora_look/mock2_*.png, option D): the Forest pack's three living trees once each,
+## Toffeecraft's dark and light green round trees (assets/trees, `tools/build_trees.py`)
+## six times each, so the wood is a fifth old trees and two fifths each new. **No dead trees
+## and no pines**, by decision: the dead ones read as a blight, and the pack's pre-autumn
+## pine read as a brown wall. The round trees step through their own 16 frames; the old
+## ones lean their tops on the same wind (see the sway shader).
 const TREES := [
 	"res://assets/Forest Isometric Pack Free/Trees/Tree_1.png",
 	"res://assets/Forest Isometric Pack Free/Trees/Tree_2.png",
 	"res://assets/Forest Isometric Pack Free/Trees/Tree_3.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_1.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_2.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_3.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_1.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_2.png",
-	"res://assets/Forest Isometric Pack Free/Trees/Tree_3.png",
-	"res://assets/Forest Isometric Pack Free/Trees/death_Tree_2.png",
-	"res://assets/Forest Isometric Pack Free/Trees/death_Tree_3.png",
+	"round_dark", "round_dark", "round_dark", "round_dark", "round_dark", "round_dark",
+	"round_light", "round_light", "round_light", "round_light", "round_light", "round_light",
 ]
+const TREE_SHEET := "res://assets/trees/%s.png"
+const TREE_TABLE := "res://assets/trees/trees.json"
+const FLOOR_SHEET := "res://assets/trees/floor.png"
+## How fast the wind runs on a calm day, as a share of a storm's (2026-10-05, Richard: the
+## first pace was too fast, and is the pace a shower or a tornado brings): the clock runs at
+## `WIND_CALM` and climbs to 1 with the overcast.
+const WIND_CALM := 0.6
+
+## The wood's floor (2026-10-05): logs, sticks and a stump off Toffeecraft's sheet, there from
+## a new game, on open forest floor `FLOOR_FROM` tiles out and on, never on a tree's tile;
+## and now and then a piece of driftwood on the bank's beach. Drawn at one world px a painted
+## px (`_one_x`), the plants' grain, not the trees' 2.
+const FLOOR_FROM := WOOD_FROM - 1.0
+const FLOOR_SHARE := 0.03
+const FLOOR_PIECES := ["log0", "log1", "log_moss0", "log_moss1", "stick0", "stick1", "stick2",
+	"stick3", "stump"]
+const DRIFTWOOD_SHARE := 0.004
+const DRIFTWOOD_BAND := Vector2(0.6, 2.2)
 const ROCKS := "res://assets/Forest Isometric Pack Free/Rocks/Slice %d.png"
 const ROCK_COUNT := 5
 const LEAVES := "res://assets/Forest Isometric Pack Free/Leaves/Slice %d.png"
@@ -300,6 +316,15 @@ func set_storm(amount: float) -> void:
 
 var _storm := 0.0
 
+## The wood's wind clock (see the sway shader), and the art the trees and the floor wood are
+## cut from: a tree's frame 0 as its prop picture and the strip it steps through, and which
+## pictures are drawn at one world px a painted px.
+var _wind := 0.0
+var _tree_table: Dictionary = {}
+var _tree_art_cache: Dictionary = {}
+var _strips: Dictionary = {}
+var _one_x: Dictionary = {}
+
 
 ## The polygon the shader draws the ground on, and its material.
 var _sheet: Polygon2D
@@ -368,9 +393,9 @@ func _ready() -> void:
 	#
 	# Both layers wear it since the one-sun pass (2026-10-02): the shader is what draws a
 	# shadow in the day's ink, pushed every frame as a uniform, so the overcast and the
-	# lightning reach a batch that is only baked again when the sun moves. The outside
-	# layer's trees, rocks and tufts are packed standing still (`_corner_colours`), so the
-	# shader moves nothing there; it only inks the shadows.
+	# lightning reach a batch that is only baked again when the sun moves. Out on the bank
+	# the rocks and tufts are packed standing still; the trees move on the wood's wind
+	# (2026-10-05, `_roles_of`): the old ones lean, the round ones step through their frames.
 	material = Flora.sway_material()
 	# Both layers sit under the water. The water's edge is a curve, and laying the water over
 	# the sand is what gives a shore a coastline. See `Layer`, and ISLAND_UNDER for what that
@@ -531,9 +556,9 @@ func _sow() -> void:
 			share = maxf(share, lerpf(WOOD_THIN, WOOD_THICK, corner))
 			if out < WOOD_FROM or _hash(at.x * 3.1, at.y * 2.7) > share * WOOD_DENSITY:
 				continue
-			_stand(Vector2i(tx, ty), load(TREES[
+			_stand(Vector2i(tx, ty), _tree_art(TREES[
 				int(_hash(at.y * 5.3, at.x * 1.9) * float(TREES.size())) % TREES.size()
-			]) as Texture2D)
+			]))
 
 	# Then the rocks, on open ground only: not on a tree, and not beside one, because a
 	# canopy hangs over the tile in front of it and a rock under that reads as a mistake.
@@ -559,6 +584,24 @@ func _sow() -> void:
 			if _hash(at.x * 1.3, at.y * 8.9) > LEAF_SHARE:
 				continue
 			_litter(Vector2i(tx, ty), at)
+
+	# The wood's floor, then a piece of driftwood now and then on the bank's beach.
+	for tx in range(span.position.x, span.end.x + 1):
+		for ty in range(span.position.y, span.end.y + 1):
+			var at := Vector2(float(tx) + 0.5, float(ty) + 0.5)
+			var k: Kind = kinds[Vector2i(tx, ty)]
+			if k != Kind.GRASS and k != Kind.SAND:
+				continue
+			var out := out_of_water(at.x, at.y)
+			if k == Kind.GRASS and out >= FLOOR_FROM and not _standing.has(Vector2i(tx, ty)):
+				if _hash(at.x * 5.9 + 2.0, at.y * 3.3 - 7.0) < FLOOR_SHARE:
+					var piece: String = FLOOR_PIECES[
+						int(_hash(at.y * 2.7, at.x * 8.3) * float(FLOOR_PIECES.size())) % FLOOR_PIECES.size()
+					]
+					_litter_art(Vector2i(tx, ty), at, _floor_art(piece))
+			elif k == Kind.SAND and out >= DRIFTWOOD_BAND.x and out <= DRIFTWOOD_BAND.y:
+				if _hash(at.x * 3.1 - 5.0, at.y * 6.7 + 1.0) < DRIFTWOOD_SHARE:
+					_litter_art(Vector2i(tx, ty), at, _floor_art("driftwood"))
 
 	# The tufts on the beach, just past the lawn's line. Each is rolled a spot inside its
 	# tile rather than standing on the middle, so the scatter does not line up with the
@@ -617,6 +660,82 @@ func _litter(cell: Vector2i, at: Vector2) -> void:
 		_props[cell] = [entry]
 
 
+## A piece of the floor's wood, lying under whatever else is on the tile, like a tuft.
+func _litter_art(cell: Vector2i, at: Vector2, art: Texture2D) -> void:
+	if art == null:
+		return
+	var entry := [art, Iso.tile_to_world(at.x, at.y)]
+	if _props.has(cell):
+		_props[cell].insert(0, entry)
+	else:
+		_props[cell] = [entry]
+
+
+## A tree's prop picture: the Forest pack's own texture, or frame 0 of one of the animated
+## trees' strips, which `_pack_props` lays into the atlas whole.
+func _tree_art(name: String) -> Texture2D:
+	if name.begins_with("res://"):
+		return load(name) as Texture2D
+	if _tree_art_cache.has(name):
+		return _tree_art_cache[name]
+	var table := _trees_table()
+	var strip := load(TREE_SHEET % name) as Texture2D
+	if strip == null or table.is_empty():
+		return load(TREES[0]) as Texture2D
+	var frame: Array = table["frame"]
+	var art := AtlasTexture.new()
+	art.atlas = strip
+	art.region = Rect2(0.0, 0.0, float(frame[0]), float(frame[1]))
+	_strips[art] = strip
+	_tree_art_cache[name] = art
+	return art
+
+
+## One of the floor's pieces off its sheet, drawn at one world px a painted px.
+func _floor_art(name: String) -> Texture2D:
+	if _tree_art_cache.has(name):
+		return _tree_art_cache[name]
+	var table := _trees_table()
+	var sheet := load(FLOOR_SHEET) as Texture2D
+	if sheet == null or not (table.get("floor", {}) as Dictionary).has(name):
+		return null
+	var r: Array = table["floor"][name]
+	var art := AtlasTexture.new()
+	art.atlas = sheet
+	art.region = Rect2(float(r[0]), float(r[1]), float(r[2]), float(r[3]))
+	_one_x[art] = true
+	_tree_art_cache[name] = art
+	return art
+
+
+func _trees_table() -> Dictionary:
+	if _tree_table.is_empty() and FileAccess.file_exists(TREE_TABLE):
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(TREE_TABLE))
+		if parsed is Dictionary:
+			_tree_table = parsed
+	return _tree_table
+
+
+## World px a painted px of a prop's picture.
+func _scale_of(art: Texture2D) -> float:
+	return 1.0 if _one_x.has(art) else SCALE
+
+
+## A tree, old or new (not a rock, a tuft or the floor's wood).
+func _is_tree(art: Texture2D) -> bool:
+	return _strips.has(art) or art.resource_path.contains("/Trees/")
+
+
+## Whether a prop is one of the animated trees, and whether one is drawn at one world px a
+## painted px. Read by the harness.
+func is_animated(art: Texture2D) -> bool:
+	return _strips.has(art)
+
+
+func is_one_x(art: Texture2D) -> bool:
+	return _one_x.has(art)
+
+
 ## One thing standing on a tile's middle, claiming it against anything else that stands.
 func _stand(cell: Vector2i, art: Texture2D) -> void:
 	var entry := [art, Iso.tile_to_world(float(cell.x) + 0.5, float(cell.y) + 0.5)]
@@ -642,7 +761,11 @@ func _wooded(tx: int, ty: int) -> bool:
 const SUN_STEP := 0.06
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# The wood's wind, every frame (a uniform): slow on a calm day, full pace in a storm.
+	_wind += delta * lerpf(WIND_CALM, 1.0, _storm)
+	if material is ShaderMaterial:
+		(material as ShaderMaterial).set_shader_parameter(&"wind_clock", _wind)
 	if day == null:
 		return
 	# The ink every frame, cheaply: a uniform, not a bake. The day's ink carries the overcast
@@ -668,6 +791,9 @@ func _draw() -> void:
 		_cover.z_index = COVER_LAYER
 		_cover.z_as_relative = false
 		_cover.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		# The batch's own material, so the trees redrawn over the animals sway and step
+		# through their frames in step with the ones under them.
+		_cover.use_parent_material = true
 		_cover.draw.connect(_draw_cover)
 		add_child(_cover)
 	if _cover != null:
@@ -699,9 +825,11 @@ func _draw_cover() -> void:
 ## Sat on the plane by their feet, not their middles: everything in the pack is drawn as a
 ## thing standing on the ground, and hanging it by the centre would bury half of every trunk.
 func _plant(mid: Vector2, art: Texture2D) -> void:
-	var size := Vector2(art.get_width(), art.get_height()) * SCALE
+	var px := _scale_of(art)
+	var size := Vector2(art.get_width(), art.get_height()) * px
 	var uv: Rect2 = _prop_uv[art]
-	_lay_shadow(mid, size, uv, float(_prop_pad.get(art, 0)) * SCALE)
+	var roles := _roles_of(art, mid)
+	_lay_shadow(mid, size, uv, float(_prop_pad.get(art, 0)) * px, roles)
 	var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
 	if art.resource_path.contains("/Leaves/"):
 		_tuft_quads.append(_prop_points.size())
@@ -711,14 +839,14 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 	_prop_quad(
 		Transform2D.IDENTITY,
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
-		uv, Color.WHITE, _corner_colours(mid.x, 1.0)
+		uv, Color.WHITE, _corner_colours(roles[2], 1.0, roles[0], roles[1])
 	)
-	if covers_at(mid):
+	if covers_at(mid) and _is_tree(art):
 		var base := _cover_points.size()
 		for k in 4:
 			_cover_points.append(_prop_points[_prop_points.size() - 4 + k])
 			_cover_uvs.append(_prop_uvs[_prop_uvs.size() - 4 + k])
-			_cover_colors.append(Color.WHITE)
+			_cover_colors.append(_prop_colors[_prop_colors.size() - 4 + k])
 		_cover_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 
 
@@ -727,10 +855,25 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 ## nothing moves. `flag` is the alpha: 1 for the prop itself, `Flora.SHADE_LAND` for its
 ## shadow, which the shader then draws in the land's ink. The shadow carries the prop's own
 ## roles, so its far end, which is the picture's top laid along the sun, leans as the top does.
-func _corner_colours(x: float, flag: float) -> PackedColorArray:
-	var top := LakeGrid.pack_anchor(x, Flora.TOP if layer == Layer.ISLAND else Flora.FOOT, flag)
-	var foot := LakeGrid.pack_anchor(x, Flora.FOOT, flag)
+func _corner_colours(x: float, flag: float, top_role: float, foot_role: float) -> PackedColorArray:
+	var top := LakeGrid.pack_anchor(x, top_role, flag)
+	var foot := LakeGrid.pack_anchor(x, foot_role, flag)
 	return PackedColorArray([top, top, foot, foot])
+
+
+## What a prop's corners do in the sway shader, and the x packed for it: [top, foot, x].
+## The island's tufts lean with the water; out on the bank an old tree's top leans on the
+## wind and an animated tree steps through its frames (its x jittered by under a pixel off
+## its y, which the shader hashes for the phase, so a column of trees is not in step); the
+## rest stands still.
+func _roles_of(art: Texture2D, mid: Vector2) -> Array:
+	if layer == Layer.ISLAND:
+		return [Flora.TOP, Flora.FOOT, mid.x]
+	if _strips.has(art):
+		return [Flora.FRAMES, Flora.FRAMES, mid.x + fposmod(mid.y * 0.6180339, 1.0) * 0.9]
+	if _is_tree(art):
+		return [Flora.WIND, Flora.FOOT, mid.x]
+	return [Flora.FOOT, Flora.FOOT, mid.x]
 
 
 ## Is a prop standing here one of the south wood's, drawn again over the animals.
@@ -764,7 +907,7 @@ func covers_at(foot: Vector2) -> bool:
 ##
 ## And hinged on the lowest opaque row, not the picture's bottom edge: `pad` is the empty
 ## band under the ink, in world px, so the shadow's foot meets the trunk's or the stone's.
-func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2, pad: float = 0.0) -> void:
+func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2, pad: float = 0.0, roles: Array = []) -> void:
 	if day == null:
 		return
 	var foot := mid + Vector2(0.0, Iso.TILE_H * 0.5 - pad)
@@ -773,7 +916,10 @@ func _lay_shadow(mid: Vector2, size: Vector2, uv: Rect2, pad: float = 0.0) -> vo
 	_prop_quad(
 		lie,
 		[box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)],
-		uv, Color.WHITE, _corner_colours(mid.x, Flora.SHADE_LAND)
+		uv, Color.WHITE, _corner_colours(
+			roles[2] if not roles.is_empty() else mid.x, Flora.SHADE_LAND,
+			roles[0] if not roles.is_empty() else Flora.FOOT,
+			roles[1] if not roles.is_empty() else Flora.FOOT)
 	)
 
 
@@ -857,36 +1003,47 @@ func _pack_props() -> void:
 			if not arts.has(art):
 				arts.append(art)
 	arts.sort_custom(func(a: Texture2D, b: Texture2D) -> bool: return a.get_height() > b.get_height())
+	# An animated tree is packed as its whole strip of frames, frame 0 first: the shader
+	# steps the uv along it.
+	var images: Array[Image] = []
+	for art in arts:
+		var img := (_strips[art] as Texture2D).get_image() if _strips.has(art) else art.get_image()
+		if img.is_compressed():
+			img.decompress()
+		img.convert(Image.FORMAT_RGBA8)
+		images.append(img)
 	var spots: Array[Vector2i] = []
 	var x := ATLAS_GUTTER
 	var y := ATLAS_GUTTER
 	var shelf := 0
-	for art in arts:
-		if x + art.get_width() + ATLAS_GUTTER > ATLAS_WIDE:
+	for i in arts.size():
+		if x + images[i].get_width() + ATLAS_GUTTER > ATLAS_WIDE:
 			x = ATLAS_GUTTER
 			y += shelf + ATLAS_GUTTER
 			shelf = 0
 		spots.append(Vector2i(x, y))
-		x += art.get_width() + ATLAS_GUTTER
-		shelf = maxi(shelf, art.get_height())
+		x += images[i].get_width() + ATLAS_GUTTER
+		shelf = maxi(shelf, images[i].get_height())
 	var tall := y + shelf + ATLAS_GUTTER
 	var sheet := Image.create_empty(ATLAS_WIDE, maxi(tall, 1), false, Image.FORMAT_RGBA8)
 	for i in arts.size():
-		var img := arts[i].get_image()
-		if img.is_compressed():
-			img.decompress()
-		img.convert(Image.FORMAT_RGBA8)
-		if not arts[i].resource_path.contains("/Tree"):
+		var img := images[i]
+		if not _is_tree(arts[i]):
 			var shades := lawn_shades(GRASS_ISLAND if layer == Layer.ISLAND else GRASS_BANK)
 			var ramp: Array[Color] = [shades[&"lawn_low"], shades[&"lawn_mid"], shades[&"lawn_light"]]
 			_green_to_lawn(img, ramp)
 		sheet.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), spots[i])
-		_prop_pad[arts[i]] = _pad_under(img)
+		var own := Vector2i(arts[i].get_width(), arts[i].get_height())
+		_prop_pad[arts[i]] = _pad_under(img.get_region(Rect2i(Vector2i.ZERO, own)))
 		_prop_uv[arts[i]] = Rect2(
 			Vector2(spots[i]) / Vector2(sheet.get_size()),
-			Vector2(img.get_size()) / Vector2(sheet.get_size())
+			Vector2(own) / Vector2(sheet.get_size())
 		)
 	_prop_atlas = ImageTexture.create_from_image(sheet)
+	var table := _trees_table()
+	if material is ShaderMaterial and table.has("stride"):
+		(material as ShaderMaterial).set_shader_parameter(&"tree_stride", float(table["stride"]))
+		(material as ShaderMaterial).set_shader_parameter(&"tree_frames", float(table["frames"]))
 
 
 ## The greens of a grass slice's top face, darkest first: every colour at least
@@ -1030,7 +1187,8 @@ func hidden_by_prop(world: Vector2, grow: float = 2.0) -> bool:
 			for entry: Array in _props[cell]:
 				var art: Texture2D = entry[0]
 				var foot: Vector2 = entry[1]
-				var size := Vector2(art.get_width(), art.get_height()) * SCALE
+				var px := _scale_of(art)
+				var size := Vector2(art.get_width(), art.get_height()) * px
 				var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
 				if not box.grow(grow).has_point(world):
 					continue
@@ -1040,11 +1198,11 @@ func hidden_by_prop(world: Vector2, grow: float = 2.0) -> bool:
 						img.decompress()
 					_prop_images[art] = img
 				var img: Image = _prop_images[art]
-				var r := int(ceil(grow / SCALE))
-				var px := Vector2i(((world - box.position) / SCALE).floor())
+				var r := int(ceil(grow / px))
+				var spot := Vector2i(((world - box.position) / px).floor())
 				for ox in range(-r, r + 1):
 					for oy in range(-r, r + 1):
-						var q := px + Vector2i(ox, oy)
+						var q := spot + Vector2i(ox, oy)
 						if q.x >= 0 and q.y >= 0 and q.x < img.get_width() and q.y < img.get_height() \
 								and img.get_pixel(q.x, q.y).a > 0.0:
 							return true
@@ -1167,7 +1325,8 @@ func clashes(feet: Vector2, half: float, tall: float) -> bool:
 			var entry: Array = (_props[cell] as Array).back()
 			var art: Texture2D = entry[0]
 			var foot: Vector2 = entry[1]
-			var size := Vector2(art.get_width(), art.get_height()) * SCALE
+			var px := _scale_of(art)
+			var size := Vector2(art.get_width(), art.get_height()) * px
 			var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
 			if not _prop_ink.has(art):
 				var img := art.get_image()
@@ -1175,7 +1334,7 @@ func clashes(feet: Vector2, half: float, tall: float) -> bool:
 					img.decompress()
 				_prop_ink[art] = Rect2(img.get_used_rect())
 			var used: Rect2 = _prop_ink[art]
-			var ink := Rect2(box.position + used.position * SCALE, used.size * SCALE)
+			var ink := Rect2(box.position + used.position * px, used.size * px)
 			if not ink.intersects(body):
 				continue
 			var base := ink.end.y
