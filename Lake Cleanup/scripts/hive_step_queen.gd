@@ -1,10 +1,17 @@
 ## The third step of a new colony: find the queen (2026-09-30, the beehive; the second pass,
 ## Richard, off `tools/hive_mockup2.py` `room_queen`).
 ##
-## **No hands.** A brood frame stands upright in a pine uncapping rest (the builder's `rest`),
-## and the comb is crowded: `WORKERS` workers crawl over it on slow, curving walks, packed the
-## mockup's way. **The queen is only a subtly longer bee** (`queen_long`, no dot, no court), so
-## she has to be looked for. **The pointer is a magnifying glass**: inside its brass rim the comb
+## **No hands.** The hive is open and seen from above at a tilt (2026-10-04, Richard: "should
+## feel like I'm looking inside the bee hive box, not a hanging rack"; the builder's
+## `well_back` and `well_front`): rows of frame top bars run across the box with bees crawling
+## on them, and the middle frame is tipped back so its comb shows between its neighbours. The
+## comb is crowded: `WORKERS` workers crawl over it on slow, curving walks, packed the
+## mockup's way. **The queen is a longer bee that moves differently** (`queen_long`, 18 by 7,
+## no dot; 2026-10-04, Richard: "move a bit differently to give more visual cues... a bit
+## bigger"): the workers crawl in stops and starts and twitch round, while she **glides** at one
+## steady pace on slow arcs; the workers in her path **shuffle aside** and a loose court of
+## `COURT` faces her; and when she stops she **lays**, her abdomen dipping into a cell in beats
+## (`queen_lay`). She still has to be looked for. **The pointer is a magnifying glass**: inside its brass rim the comb
 ## and its bees are drawn at twice the size.
 ##
 ## - **Click (pad A or RT) with her inside the inner half of the glass** finds her: a gold
@@ -40,22 +47,22 @@ const COMB_TL := Vector2(20.0, 10.0)
 const COMB_BR := Vector2(306.0, 175.0)
 const EAR_L := Vector2(9.0, 5.0)
 const EAR_R := Vector2(316.0, 5.0)
-## The rest's shadow on the lawn under its feet: middle and half size.
-const HIVE_SHADE_MID := Vector2(320.0, 297.0)
-const HIVE_SHADE_HALF := Vector2(200.0, 6.0)
-## The shadow on the lawn under what stands in this step: a contact ellipse in the one ink
-## every shadow on land takes (`Shade.tint_on`, 2026-10-02, one sun), nudged along the sun
-## (`Shade.drop`) as if from `CONTACT_RISE` painted px up, so it falls down and to the left
-## like every other shadow on the island. Kept an ellipse and kept flat, by decision: the
-## step is seen from eye height over the lawn, where a footprint is a thin band, and a
-## silhouette cast off the close-up would be the one shadow in the room not lying on it.
-const CONTACT_RISE := 4.0
+## Bees on the box's frame bars: how many, their crawl (painted px a second), how often one
+## turns or stops, and how many of the bars (counted from the back) lie behind the tipped frame.
+const BAR_BEES := 30
+const BAR_SPEED := Vector2(3.0, 9.0)
+const BAR_TURN := Vector2(0.6, 2.4)
+const BAR_STOP_ODDS := 0.35
+const BARS_BEHIND := 2
 ## A faint glint winks on her after this long unfound, every `HINT_EVERY`.
 const HINT_AFTER := 20.0
 const HINT_EVERY := 2.4
 
 ## The walks are rolled off this, so every visit and every harness run is the same comb.
 const SEED := 4
+## A few loose bees in the air behind the frame (`HiveStep.wanderers`).
+const AIR := 8
+const AIR_BOX := Rect2(10.0, 10.0, 620.0, 300.0)
 ## The queen starts where the mockup put her, two thirds across and a little below the middle.
 const QUEEN_START := Vector2(367.0, 150.0)
 
@@ -67,10 +74,13 @@ const QUEEN_START := Vector2(367.0, 150.0)
 ## cell (`WORKER_REST_ODDS`, for `WORKER_REST` seconds).
 const WORKERS := 330
 const WORKER_SPACE := Vector2(7.0, 4.0)
-const WORKER_CLEAR := 8.0
+const WORKER_CLEAR := 14.0
 const WORKER_SPEED := Vector2(4.0, 8.0)
-const WORKER_SPIN := 1.8
-const RETARGET := Vector2(0.6, 1.8)
+const WORKER_SPIN := 2.6
+const RETARGET := Vector2(0.25, 0.9)
+## A worker crawls in stops and starts: its pace beats between `STUTTER` and full this fast.
+const STUTTER := 0.25
+const STUTTER_RATE := 7.0
 const SPIN_EASE := 3.0
 const WORKER_REST_ODDS := 0.25
 const WORKER_REST := Vector2(0.4, 1.6)
@@ -79,19 +89,30 @@ const TURN_HOME := 2.5
 ## A worker's patch is the comb less this much a side.
 const ROAM_IN := 6.0
 
-## The queen: slower, stopping more, turning less, and kept this far in from the comb's edges
-## so the court round her stays on the comb.
-const QUEEN_SPEED := 2.6
-const QUEEN_SPIN := 0.9
-const QUEEN_REST_ODDS := 0.45
-const QUEEN_REST := Vector2(0.8, 2.4)
+## The queen: one steady pace, a slow arc that swings from one side to the other
+## (`QUEEN_ARC` radians a second at most, swinging at `QUEEN_ARC_RATE`), never a twitch, and
+## kept this far in from the comb's edges so the court round her stays on the comb. Every
+## `QUEEN_LAY_EVERY` she may stop to lay (`QUEEN_LAY_ODDS`) for `QUEEN_LAY` seconds, her abdomen
+## dipping into a cell every `QUEEN_LAY_BEAT`.
+const QUEEN_SPEED := 4.0
+const QUEEN_ARC := 0.7
+const QUEEN_ARC_RATE := 0.45
+const QUEEN_LAY_EVERY := Vector2(2.5, 4.5)
+const QUEEN_LAY_ODDS := 0.6
+const QUEEN_LAY := Vector2(1.4, 2.4)
+const QUEEN_LAY_BEAT := 0.4
 const QUEEN_MARGIN := Vector2(34.0, 22.0)
+## The workers in front of her step aside: within `PART_REACH` of a spot `PART_AHEAD` ahead of
+## her, pushed sideways off her heading at up to `PART_SPEED` painted px a second.
+const PART_AHEAD := 10.0
+const PART_REACH := 16.0
+const PART_SPEED := 22.0
 
-## Her court: eight bees on an ellipse round her (the mockup's 19 by 12), all facing in, the
-## ring turning slowly and each bee easing after its place on it, so the court follows her
-## with a lag rather than being carried. Drawn in when she is found (`COURT_TIGHT`).
-const COURT := 0
-const COURT_RING := Vector2(19.0, 12.0)
+## Her court: a few bees on a loose ellipse round her, all facing in, the ring turning slowly
+## and each bee easing after its place on it, so the court follows her with a lag rather than
+## being carried. Drawn in when she is found (`COURT_TIGHT`).
+const COURT := 5
+const COURT_RING := Vector2(24.0, 15.0)
 const COURT_TURN := 0.12
 const COURT_EASE := 3.0
 const COURT_TIGHT := 0.82
@@ -113,7 +134,7 @@ const SETTLE_EASE := 6.0
 ## Found: she is within the inner `FIND_SHARE` of the glass as seen (so a quarter of its
 ## radius on the comb, at twice the size), plus `QUEEN_GRACE` painted pixels for her body.
 const FIND_SHARE := 0.5
-const QUEEN_GRACE := 4.0
+const QUEEN_GRACE := 6.0
 const FIND_REACH := LENS_R * FIND_SHARE / ZOOM + QUEEN_GRACE
 ## Two clicks closer than this are one (a pad's A arrives as a click and as the action).
 const TRY_GAP := 0.15
@@ -152,26 +173,14 @@ const MISS_PITCH := 1.7
 const WARM_EASE := 6.0
 const WARM_HALO := 0.3
 
-## Found: the halo eases in, the workers slow to `CALM` of their pace, the crown rises
-## `CROWN_UP` over her over `CROWN_RISE` seconds and pops to twice its size over
-## `CROWN_POP` with an overshoot, stars burst (`BURST`: the mockup's five round her, then
-## `RING_STARS` round the rim) and keep twinkling by the crown every `TWINKLE_EVERY`, and
+## Found: the halo eases in, the workers slow to `CALM` of their pace, the shared ending plays
+## over her (`HiveStep.payoff`: rays, twinkling stars, the crown dropping in, 2026-10-04), and
 ## `finished` is said `PAYOFF_HOLD` seconds in.
 const HALO_EASE := 8.0
 const CALM := 0.35
 const CALM_EASE := 2.0
-const CROWN_UP := 56.0
-const CROWN_RISE := 0.45
-const CROWN_POP := 0.35
-const CROWN_SCALE := 2.0
-const STAR_LIFE := 0.8
-const TWINKLE_EVERY := 0.22
-const RING_STARS := 6
-const BURST: Array[Vector3] = [
-	Vector3(-30, -40, 2), Vector3(30, -42, 3), Vector3(44, -8, 2), Vector3(-46, -4, 1),
-	Vector3(-24, 42, 1),
-]
-const PAYOFF_HOLD := 1.2
+const PAYOFF_WIDE := 44.0
+const PAYOFF_HOLD := 1.8
 
 ## The glass's colours: the builder's brass and dark wood (`tools/build_hive.py`), a faint
 ## tint over what the glass shows, the sheen on its upper left and the one bright glint.
@@ -220,16 +229,16 @@ var _warm := 0.0
 var _found := false
 var _found_age := 0.0
 var _halo := 0.0
-var _twinkle := 0.0
-## `{at (painted px), age, life, arm}`.
-var _stars: Array[Dictionary] = []
 ## Laid out once: runs of one colour along a row, `[Vector2i start, int long, Color]`,
 ## relative to the glass's middle pixel.
 var _disc_runs: Array = []
 var _rim_runs: Array = []
 var _handle_runs: Array = []
 var _halo_runs: Array = []
-var _shade_rows: Array[Rect2] = []
+## The box's bars, `Rect2`s on the grid, back to front, off `well_front`'s anchors; and the
+## bees on them, `{bar, x, dir, speed, turn, stop, phase}`.
+var _bars: Array[Rect2] = []
+var _bar_bees: Array[Dictionary] = []
 var _glass: Part
 var _zoom: Part
 var _rim: Part
@@ -240,7 +249,7 @@ func _ready() -> void:
 	_rim_runs = _rim_pixels()
 	_handle_runs = _handle_pixels()
 	_halo_runs = _halo_pixels()
-	_shade_rows = _hive_shade()
+	_bars = _read_bars()
 	# The disc is the clip; its child draws the scene magnified and is shown only inside it.
 	# **A clip parent that draws nothing clips nothing** (the puddles' mirror, CLAUDE.md), so
 	# the disc is drawn on every frame the glass is up.
@@ -280,8 +289,6 @@ func begin() -> void:
 	_press = 0.0
 	_since_try = TRY_GAP
 	_hold = false
-	_twinkle = 0.0
-	_stars.clear()
 	_pull = Vector2.ZERO
 	_court_spin = 0.0
 	_court_ring = 1.0
@@ -292,6 +299,8 @@ func begin() -> void:
 	_queen.retarget = 1.0
 	_place_workers()
 	_place_court()
+	_place_bar_bees()
+	wanderers(AIR, AIR_BOX, SEED + 7)
 	_lens = _comb_box.get_center()
 	if is_inside_tree():
 		_last_pointer = art_mouse()
@@ -365,6 +374,7 @@ func _process(delta: float) -> void:
 		_attempt()
 	_walk_queen(delta)
 	_walk_court(delta)
+	_walk_bar_bees(delta)
 	_walk_workers(delta)
 	_drive_payoff(delta)
 	if _glass != null:
@@ -427,16 +437,7 @@ func _assist(delta: float, moved: Vector2) -> void:
 func _find() -> void:
 	_found = true
 	_found_age = 0.0
-	var q := _queen.pos
-	for k in BURST.size():
-		var burst: Vector3 = BURST[k]
-		_add_star(q + Vector2(burst.x, burst.y), int(burst.z), -0.04 * k)
-	for k in RING_STARS:
-		var angle := TAU * k / RING_STARS + _roll.randf_range(-0.3, 0.3)
-		_add_star(
-			q + Vector2.from_angle(angle) * (LENS_R + 9.0), 1 + _roll.randi() % 2,
-			-_roll.randf_range(0.05, 0.3)
-		)
+	payoff(_queen.pos, PAYOFF_WIDE)
 	_hive_sound(&"hive_crown")
 
 
@@ -495,12 +496,8 @@ func _scatter(b: Crawler, p: Vector2, share: float) -> bool:
 	return true
 
 
-func _add_star(at: Vector2, arm: int, age_now: float) -> void:
-	_stars.append({"at": at, "age": age_now, "life": STAR_LIFE, "arm": arm})
-
-
-## The eases that are not the walks: the shake and the press dying away, the warmth, the
-## stars, and once she is found the halo, the twinkles and `finished`.
+## The eases that are not the walks: the shake and the press dying away, the warmth, and once
+## she is found the halo and `finished`.
 func _drive_payoff(delta: float) -> void:
 	_shake *= exp(-SHAKE_EASE * delta)
 	if _shake < 0.01:
@@ -508,23 +505,10 @@ func _drive_payoff(delta: float) -> void:
 	_press *= exp(-PRESS_EASE * delta)
 	var sees := not _found and _lens.distance_to(_queen.pos) <= LENS_R / ZOOM
 	_warm = lerpf(_warm, 1.0 if sees else 0.0, 1.0 - exp(-WARM_EASE * delta))
-	var kept: Array[Dictionary] = []
-	for star: Dictionary in _stars:
-		star["age"] = float(star["age"]) + delta
-		if float(star["age"]) < float(star["life"]):
-			kept.append(star)
-	_stars = kept
 	if not _found:
 		return
 	_found_age += delta
 	_halo = lerpf(_halo, 1.0, 1.0 - exp(-HALO_EASE * delta))
-	_twinkle -= delta
-	if _twinkle <= 0.0:
-		_twinkle = TWINKLE_EVERY
-		_add_star(
-			_crown_at() + Vector2(_roll.randf_range(-14.0, 14.0), _roll.randf_range(-8.0, 8.0)),
-			1, 0.0
-		)
 	if _found_age >= PAYOFF_HOLD and not is_done():
 		done_once()
 
@@ -625,7 +609,9 @@ func _walk_workers(delta: float) -> void:
 		if b.rest > 0.0:
 			b.rest -= delta
 		else:
-			step = Vector2.from_angle(b.dir) * b.speed * _calm
+			var stutter := lerpf(STUTTER, 1.0, absf(sin(age * STUTTER_RATE + b.phase * 3.0)))
+			step = Vector2.from_angle(b.dir) * b.speed * _calm * stutter
+		step += _parting(b)
 		b.pos += (step + b.kick) * delta
 		b.kick = b.kick.lerp(Vector2.ZERO, settle_kick)
 		b.buzz = maxf(b.buzz - delta, 0.0)
@@ -647,17 +633,18 @@ func _walk_queen(delta: float) -> void:
 		return
 	q.retarget -= delta
 	if q.retarget <= 0.0:
-		q.retarget = _roll.randf_range(RETARGET.x, RETARGET.y) * 1.5
-		q.spin_want = _roll.randf_range(-QUEEN_SPIN, QUEEN_SPIN)
-		if _roll.randf() < QUEEN_REST_ODDS:
-			q.rest = _roll.randf_range(QUEEN_REST.x, QUEEN_REST.y)
-	q.spin = lerpf(q.spin, q.spin_want, 1.0 - exp(-SPIN_EASE * delta))
-	q.dir += q.spin * delta
-	_steer_home(q, _queen_roam, delta)
+		q.retarget = _roll.randf_range(QUEEN_LAY_EVERY.x, QUEEN_LAY_EVERY.y)
+		if q.rest <= 0.0 and _roll.randf() < QUEEN_LAY_ODDS:
+			q.rest = _roll.randf_range(QUEEN_LAY.x, QUEEN_LAY.y)
+			q.lay = 0.0
 	var step := Vector2.ZERO
 	if q.rest > 0.0:
 		q.rest -= delta
+		q.lay += delta
 	else:
+		# The glide: one pace, a slow arc swinging side to side.
+		q.dir += QUEEN_ARC * sin(age * QUEEN_ARC_RATE + q.phase) * delta
+		_steer_home(q, _queen_roam, delta)
 		step = Vector2.from_angle(q.dir) * QUEEN_SPEED
 	q.pos += step * delta
 	q.pos = q.pos.clamp(_queen_roam.position - Vector2.ONE * 3.0, _queen_roam.end + Vector2.ONE * 3.0)
@@ -688,6 +675,29 @@ func _walk_court(delta: float) -> void:
 		b.face = _face_of(_queen.pos - b.pos, b.face)
 
 
+## The shove a worker gets from the queen coming at it: sideways off her heading, harder the
+## nearer it is to the spot just ahead of her. Nothing while she lays or once she is found.
+func _parting(b: Crawler) -> Vector2:
+	if _found or _queen.rest > 0.0:
+		return Vector2.ZERO
+	var heading := Vector2.from_angle(_queen.dir)
+	var ahead := _queen.pos + heading * PART_AHEAD
+	var off := b.pos - ahead
+	var d := off.length()
+	if d >= PART_REACH:
+		return Vector2.ZERO
+	var side := heading.orthogonal()
+	if off.dot(side) < 0.0:
+		side = -side
+	b.rest = 0.0
+	return side * PART_SPEED * (1.0 - d / PART_REACH)
+
+
+## Whether she is dipping her abdomen this moment: laying, on the down half of each beat.
+func laying_dip() -> bool:
+	return _queen.rest > 0.0 and fmod(_queen.lay, QUEEN_LAY_BEAT * 2.0) >= QUEEN_LAY_BEAT
+
+
 ## Off its patch, a walker turns back towards the patch's middle.
 func _steer_home(b: Crawler, box: Rect2, delta: float) -> void:
 	if box.has_point(b.pos):
@@ -713,25 +723,6 @@ static func _face_of(v: Vector2, was: int) -> int:
 			top = scores[k]
 			best = k
 	return best
-
-
-func _crown_at() -> Vector2:
-	var rise := _ease_out(clampf(_found_age / CROWN_RISE, 0.0, 1.0))
-	var bob := 0.0
-	if _found_age > CROWN_RISE:
-		bob = roundf(sin((_found_age - CROWN_RISE) * 4.0))
-	return _queen.pos + Vector2(0.0, -lerpf(4.0, CROWN_UP, rise) + bob)
-
-
-static func _ease_out(t: float) -> float:
-	return 1.0 - pow(1.0 - t, 3.0)
-
-
-## Overshoots a little and comes back: a pop.
-static func _back_out(t: float) -> float:
-	var over := 1.70158
-	var s := t - 1.0
-	return 1.0 + (over + 1.0) * s * s * s + over * s * s
 
 
 ## A hive sound through `Sfx.play_hive` where the sounds have it, else straight through
@@ -794,6 +785,7 @@ func _lens_canvas() -> Vector2:
 
 func _draw() -> void:
 	_draw_scene(self, Vector2.ZERO, 0.0)
+	draw_wanderers()
 	var at := _lens_canvas()
 	var pulse := 0.85 + 0.15 * sin(age * 5.0)
 	var glow := maxf(_halo * pulse, _warm * WARM_HALO)
@@ -818,32 +810,15 @@ func _draw_part(ci: CanvasItem, what: int) -> void:
 			ci.draw_rect(Rect2(middle - Vector2.ONE * half, Vector2.ONE * half * 2.0), GLASS_TINT)
 		PART_RIM:
 			_draw_runs(ci, _rim_runs, at)
-			if _found:
-				var grow := CROWN_SCALE * _back_out(clampf(_found_age / CROWN_POP, 0.0, 1.0))
-				if grow > 0.05:
-					HiveArt.draw(
-						ci, &"crown", to_canvas(_crown_at().floor()), &"c", false,
-						clampf(_found_age / 0.1, 0.0, 1.0), grow
-					)
-			for star: Dictionary in _stars:
-				var star_age := float(star["age"])
-				if star_age < 0.0:
-					continue
-				var t := clampf(star_age / float(star["life"]), 0.0, 1.0)
-				var bright := sin(t * PI)
-				HiveArt.star(ci, to_canvas(star["at"]), int(roundf(float(star["arm"]) * bright)), bright)
+			draw_payoff(ci)
 
 
 ## The hive and its shadow, the frame, the workers, the court, the queen and the gloves. With
 ## a `reach`, only the bees within it of `near` are drawn (the magnified pass, where the rest
 ## would be clipped away anyway).
 func _draw_scene(ci: CanvasItem, near: Vector2, reach: float) -> void:
-	# Whole painted px along the sun, so the rows stay on the picture's grid.
-	var nudge := Shade.drop(null, CONTACT_RISE).round()
-	var shade_ink := Shade.tint_on(null, Shade.On.LAND)
-	for row: Rect2 in _shade_rows:
-		ci.draw_rect(Rect2(to_canvas(row.position + nudge), row.size * HiveArt.PIXEL), shade_ink)
-	HiveArt.draw(ci, &"rest", to_canvas(FRAME_AT), &"frame_tl")
+	HiveArt.draw(ci, &"well_back", to_canvas(Vector2.ZERO), &"tl")
+	_draw_bar_bees(ci, true, near, reach)
 	if HiveArt.has(&"frame_brood"):
 		HiveArt.draw(ci, &"frame_brood", to_canvas(FRAME_AT))
 	else:
@@ -860,20 +835,22 @@ func _draw_scene(ci: CanvasItem, near: Vector2, reach: float) -> void:
 		_draw_bee(ci, b)
 	var queen_at := to_canvas(_queen.pos.floor())
 	if HiveArt.has(&"queen_long"):
-		HiveArt.draw(ci, &"queen_long", queen_at, &"c", _queen.face == FACE_L)
+		var pose := &"queen_lay" if laying_dip() and HiveArt.has(&"queen_lay") else &"queen_long"
+		HiveArt.draw(ci, pose, queen_at, &"c", _queen.face == FACE_L)
 	else:
 		ci.draw_rect(Rect2(queen_at - Vector2(5.0, 2.0) * HiveArt.PIXEL, Vector2(10.0, 4.0) * HiveArt.PIXEL), HiveArt.BEE_GOLD)
 		ci.draw_rect(Rect2(queen_at, Vector2.ONE * HiveArt.PIXEL), HiveArt.TRIM)
-	# Two workers always over her back, so she has to be looked for.
-	for k in 2:
-		var over := _queen.pos + Vector2(-3.0 + k * 6.0, -3.0 + k * 3.0)
-		if reach <= 0.0 or over.distance_to(near) <= reach:
-			HiveArt.draw(ci, &"bee_r_rest", to_canvas(over.floor()), &"c", k == 0)
+	# One worker always over her back, so she still has to be looked for.
+	var over := _queen.pos + Vector2(-4.0, -3.0)
+	if reach <= 0.0 or over.distance_to(near) <= reach:
+		HiveArt.draw(ci, &"bee_r_rest", to_canvas(over.floor()), &"c", true)
 	# Unfound long enough, a faint glint winks on her.
 	if not _found and age > HINT_AFTER:
 		var wink := fmod(age - HINT_AFTER, HINT_EVERY) / 0.6
 		if wink < 1.0:
 			HiveArt.star(ci, to_canvas(_queen.pos + Vector2(2.0, -4.0)), 1, 0.45 * sin(wink * PI))
+	HiveArt.draw(ci, &"well_front", to_canvas(Vector2.ZERO), &"tl")
+	_draw_bar_bees(ci, false, near, reach)
 
 
 ## One bee on its whole painted pixel, drawn the way it faces; a scattered one side on with
@@ -1017,20 +994,70 @@ static func _halo_pixels() -> Array:
 
 
 ## The hive's shadow on the lawn, as whole-pixel rows of the mockup's ellipse (painted px).
-static func _hive_shade() -> Array[Rect2]:
-	var rows: Array[Rect2] = []
-	var top := floori(HIVE_SHADE_MID.y - HIVE_SHADE_HALF.y)
-	var foot := ceili(HIVE_SHADE_MID.y + HIVE_SHADE_HALF.y)
-	for y in range(top, foot):
-		var dy := (y + 0.5 - HIVE_SHADE_MID.y) / HIVE_SHADE_HALF.y
-		if absf(dy) >= 1.0:
+## The box's bars off the front layer's anchors (`bar<k>_l` its top left, `bar<k>_r` its bottom
+## right), less the pixel the ink adds: the same numbers the builder drew them at.
+static func _read_bars() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var marks := HiveArt.anchors(&"well_front")
+	var k := 0
+	while marks.has(StringName("bar%d_l" % k)):
+		var tl: Vector2 = marks[StringName("bar%d_l" % k)] - Vector2.ONE
+		var br: Vector2 = marks[StringName("bar%d_r" % k)] - Vector2.ONE
+		out.append(Rect2(tl, br - tl))
+		k += 1
+	return out
+
+
+func _place_bar_bees() -> void:
+	_bar_bees.clear()
+	if _bars.is_empty():
+		return
+	for k in BAR_BEES:
+		var bar := _roll.randi() % _bars.size()
+		var box := _bars[bar]
+		_bar_bees.append({
+			"bar": bar, "x": _roll.randf_range(box.position.x + 6.0, box.end.x - 6.0),
+			"dir": -1.0 if _roll.randf() < 0.5 else 1.0,
+			"speed": _roll.randf_range(BAR_SPEED.x, BAR_SPEED.y),
+			"turn": _roll.randf_range(BAR_TURN.x, BAR_TURN.y), "stop": 0.0,
+			"phase": _roll.randf() * 2.0,
+		})
+
+
+## Along their bars, turning now and then and stopping to look about; turned back at the walls.
+func _walk_bar_bees(delta: float) -> void:
+	for b: Dictionary in _bar_bees:
+		var box := _bars[int(b["bar"])]
+		b["turn"] = float(b["turn"]) - delta
+		if float(b["turn"]) <= 0.0:
+			b["turn"] = _roll.randf_range(BAR_TURN.x, BAR_TURN.y)
+			if _roll.randf() < BAR_STOP_ODDS:
+				b["stop"] = _roll.randf_range(0.4, 1.4)
+			elif _roll.randf() < 0.5:
+				b["dir"] = -float(b["dir"])
+		if float(b["stop"]) > 0.0:
+			b["stop"] = float(b["stop"]) - delta
 			continue
-		var half := HIVE_SHADE_HALF.x * sqrt(1.0 - dy * dy)
-		var from := roundf(HIVE_SHADE_MID.x - half)
-		var to := roundf(HIVE_SHADE_MID.x + half)
-		if to > from:
-			rows.append(Rect2(from, y, to - from, 1.0))
-	return rows
+		var x := float(b["x"]) + float(b["dir"]) * float(b["speed"]) * _calm * delta
+		if x < box.position.x + 4.0 or x > box.end.x - 4.0:
+			b["dir"] = -float(b["dir"])
+			x = clampf(x, box.position.x + 4.0, box.end.x - 4.0)
+		b["x"] = x
+
+
+## The bees on the bars behind the tipped frame (`behind`) or in front of it.
+func _draw_bar_bees(ci: CanvasItem, behind: bool, near: Vector2, reach: float) -> void:
+	for b: Dictionary in _bar_bees:
+		var bar := int(b["bar"])
+		if (bar < BARS_BEHIND) != behind:
+			continue
+		var box := _bars[bar]
+		var at := Vector2(float(b["x"]), box.position.y + box.size.y * 0.35)
+		if reach > 0.0 and at.distance_to(near) > reach:
+			continue
+		var moving := float(b["stop"]) <= 0.0
+		var piece := &"bee_r" if moving and fmod(age * FLUTTER * 0.4 + float(b["phase"]), 2.0) < 1.0 else &"bee_r_rest"
+		HiveArt.draw(ci, piece, to_canvas(at.floor()), &"c", float(b["dir"]) < 0.0)
 
 
 ## A bee on the comb, the queen included: where it is, which way it walks and how it turns,
@@ -1046,6 +1073,8 @@ class Crawler:
 	var spin_want := 0.0
 	var retarget := 0.0
 	var rest := 0.0
+	## Seconds the queen has been laying this stop: the beat of her dip.
+	var lay := 0.0
 	var kick := Vector2.ZERO
 	var buzz := 0.0
 	## Seconds left of a flight off the frame after a miss; negative while it is on the comb.

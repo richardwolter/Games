@@ -6155,18 +6155,17 @@ An old hive on the island's lawn takes a swarm mid-run and makes honey. Build co
     and it pours in, `MISS` of it flying back to a cloud. The heap over the bars and five comb
     pips on the box's front fill; done at 80% boxed (`ENOUGH`), the rest pours in by itself.
   - **Smoke**: the smoker is held by its bellows at the pointer. Three rings over the swarm on the
-    hive, any order; hold with the nozzle in reach of one and billows (the builder's
-    `billow_*`, four greys) curl to it; its bees fold their wings and file down into the
-    entrance, the ring goes green with stars. ~400 bees over a dark core. No penalty.
-  - **Queen**: the brood frame in a pine uncapping rest (`rest`), 330 workers, the queen a
-    subtly longer bee (`queen_long`, no dot, no court). The lens as before; a miss sends the bee
-    clicked buzzing off and wobbles the glass; after `HINT_AFTER` (20 s) a faint glint winks on
-    her.
-  - **Uncap**: one face in the same rest, the knife following the pointer down. Curtains run off
-    the cut into a slanted tin gutter; the honey is fatter than the tin, bulges over its rim,
-    spills over the lip, and falls off the low end as a sprung rope with a swelling bead that
-    snaps, recoils and leaves a thread, into the bucket, where it lands in folding coils.
-    **Every unit is kept** and the bucket's level is handed on (`HiveRoom.honey`).
+    hive; hold with the nozzle in reach of one and billows (the builder's `billow_*`, four
+    greys) curl to it; its bees fold their wings, the ring goes green with stars. ~400 bees over
+    a dark core. No penalty. **Top to bottom since 2026-10-04** (see Hive Fixes below).
+  - **Queen**: the brood frame in a pine uncapping rest (`rest`), 330 workers. The lens as
+    before; a miss sends the bee clicked buzzing off and wobbles the glass; after `HINT_AFTER`
+    (20 s) a faint glint winks on her. Bigger and moving differently since 2026-10-04.
+  - **Uncap**: one face in the same rest, the knife dragged down the comb. Curtains run off the
+    cut into a slanted tin gutter; the honey is fatter than the tin, bulges over its rim, spills
+    over the lip, and runs off the low end into the bucket, where it lands in folding coils.
+    **Every unit is kept** and the bucket's level is handed on (`HiveRoom.honey`). The stream,
+    the knife's drag and the gutter's look are 2026-10-04's (below).
   - **Pour**: the same bucket on the bottling table, its level carried over; a brass lever with a
     wooden grip on the gate: hold on it and it turns sideways and honey runs, thicker as it
     opens; let go and it springs shut. Fill each jar to the dashed line; over it the jar crowns
@@ -6179,6 +6178,133 @@ An old hive on the island's lawn takes a swarm mid-run and makes honey. Build co
   `tools/last_hive_{empty,swarm,moment,ready,busy,honey}.png` and
   `tools/last_hive_room_{catch,smoke,queen,settled,uncap,pour,done}.png`.
 - All numbers are first guesses for Richard's eye.
+
+### Hive Fixes (2026-10-04, `/grill-me` with Richard)
+**Supersedes, above**: "Later refills show only in the world's ready mark" (the mark is over
+every actionable hive now), "Three rings ... any order", "the queen a subtly longer bee (no
+court)", "falls off the low end as a sprung rope", and the pour's glug.
+- **The gold mark and the key** (`Hive.mark`, `_draw_chip`, `CHIP`): the orb bobs over the roof
+  whenever there is something to do (a swarm, a colony to settle, honey ready). With the angler
+  in reach (`lit`, `_at_hive`) it turns into a wooden key chip, the shed room's prompt, naming
+  the `interact` key (the pad's button in pad mode). **Hive only**: the pump and the door keep
+  their lamp. The lamp is left only over the no-picture post; `lamp_point`/`LAMP_OVER` gone.
+- **Messier bees**: the swarm on the lake has `SWARM_SPECKS` 22 bees each circling its own spot
+  out to `SWARM_REACH` and peeling off on loops (`SWARM_PEEL`). In the room, **every step has
+  loose bees wandering the air** (`HiveStep.wanderers`/`draw_wanderers`, `WANDER_*`: goals rolled
+  anywhere in a box, weaving, turning on a lag, drawn behind the work): catch 28 over the sky,
+  smoke 36 over the whole scene (its old cloud of 60 round the swarm gone), queen 8, uncap 7
+  (its five figure-eight bees gone), pour 6. Catch's clumps are looser too (`SPREAD` 34x20,
+  `JITTER` 4) and each bee now and then strays out of its clump on a loop (`STRAY` 46, `_stray`).
+- **Smoke goes top to bottom** (`hive_step_smoke.gd`, `RINGS`/`RING_HALVES`, `BAND_TO`): the top
+  of the beard, its middle, then the entrance slit. **One ring lit at a time** (`_now`), a faint
+  pulsing arrow down to the next; smoke anywhere else only drifts; `smoke_ring` refuses an
+  out-of-order stop. While a band is smoked its quiet bees sag towards the entrance (`SAG`);
+  once quiet its bees walk down the face and crowd the landing board (`Walk.DOWN`/`CROWD`,
+  `CROWD_HALF`), and the done ring fades green (`DONE_FADE`). The entrance quiet, the crowd and
+  the bottom of the beard file in; done once all are in or `IN_WAIT` after.
+- **The queen** (`build_hive.py` `queen_long`, `_QUEEN_SHAPE`): **18 by 7**, banded two gold to
+  one dark in a richer orange gold (`QUEEN_GOLD`, `QUEEN_LIT`), and a laying pose (`queen_lay`,
+  her tail dipped a pixel). She **glides** at one pace (`QUEEN_SPEED` 4) on a slow arc swinging
+  side to side (`QUEEN_ARC`), never a twitch, while the workers crawl in stops and starts
+  (`STUTTER`) and turn sharper and oftener (`WORKER_SPIN` 2.6, `RETARGET` 0.25-0.9). **Workers
+  in her path shuffle aside** (`_parting`, `PART_*`); a loose court of `COURT` 5 faces her;
+  every 2.5-4.5 s she may stop to lay, dipping her abdomen on `QUEEN_LAY_BEAT`. One worker on
+  her back, not two. `WORKER_CLEAR` 14, `QUEEN_GRACE` 6 for the bigger body.
+- **The knife drags** (`hive_step_uncap.gd`): `EASE` 5 and `MOST_SPEED` 55 (a face in three
+  seconds, was one), pad paces under the same cap. Pulled more than `STRAIN_FROM` ahead it
+  strains (`_strain`): the blade shudders a pixel, the sizzle swells and drops in pitch, a
+  crackle every `STRAIN_CRACKLE`, and a taut dashed line runs from the handle to the pointer
+  (`_draw_taut`, mouse only). Never fails, never faster.
+- **Honey tips are round** (`_curtain`): a curtain on its way down ends in a bead (`TIP`), and
+  one no longer fed necks to a thread at its top (`NECK`), where both ended in a flat cut.
+- **The gutter is juicier**: a rounded tin channel (back wall with a lit rolled edge, a rolled
+  front rim drawn over the honey's foot, honey lapping over it when deep), iron `STRAPS` up to
+  the frame, end caps and a pouring lip; honey with a lit top, an amber core, ripples running
+  downhill (`RIPPLE_*`), glints sliding down with the flow (`GLINTS`), air bubbles riding along
+  and popping at the low end (`_bubbles`, `BUBBLE_*`), and spills leave smears down the tin
+  (`_smears`, kept for the visit).
+- **One stream, drips only at the end** (`_drive_rope`, `_draw_stream`): while the gutter runs
+  the honey leaves the lip as one wobbling stream (`STREAM_*`), its head falling to the pool, a
+  little heap and coils where it lands (`COIL_EVERY`). When the flow drops under `STREAM_OFF`
+  it lets go of the lip and its tail falls in after; only then does what is left on the lip
+  bead and drip (the old rope's spring, `SNAP_MASS` 10). Every unit still counted
+  (`honey_left` holds `_stream_mass`).
+- **The bucket fills from empty** (`_draw_pool`, `_pool_y`, `POOL_DEEP` 12): the honey's surface
+  starts down inside the bucket and is clipped to the mouth, a crescent at its foot rising to
+  the whole mouth at the brim. It used to sit at the brim from the first drop.
+- **The jar-fill sound is rebuilt** (`HiveSounds._pour`, `_bubble`, `_glop`, `POUR_*`): no hiss;
+  a low thick bed breathing three times a 2.4 s loop under round bubble blips that climb in
+  pitch, some popping twice, some on a low glop. The step still raises its pitch as the jar
+  fills. By ear.
+- All numbers first guesses. `test_lake`'s `_stage_hive` guards the orb and the chip, loose
+  bees in every step, the smoke's order and the bees gathering at the entrance, the queen's
+  size and pose, the knife's cap and strain, the empty bucket, the stream with no drops while it
+  runs, and the bucket filling.
+- Playable: `tools/play_hive.tscn` (desktop build, own save removed on the way in): a swarm on
+  the hive and the angler a few steps off; F1 swarm, F2 honey ready, F3 colony to settle, F5
+  back to the hive.
+
+### Hive Fixes, Second Pass (2026-10-04, `/grill-me` with Richard, off `play_hive`)
+**Supersedes, above**: the queen at 18 by 7, the uncapping rest under the queen's frame, the
+catch box's glow, and each step's own crown and star burst.
+- **The bucket's near wall** (`build_hive.py` `bucket_front`, the bucket's pixels below the
+  mouth's middle less its inside): drawn over the stream and the drips in the uncap step, so
+  honey ends on the pool. Where the stream lands, a low mound in the pool's colours and rings
+  of light spreading through the surface (`_draw_landing`, `LANDING_RING_*`), everything
+  clipped to what of the surface shows in the mouth (`_on_pool`). The bucket's label is gone
+  (one picture, both steps).
+- **The pour's bucket empties** (`_draw_level`, `POOL_DEEP`): the uncap step's rising-surface
+  picture run backwards, from `HiveRoom.honey` to nothing over the three jars (it moved 3 px).
+- **Honey into a jar sits in the honey** (`_draw_coils`, `MOUND_TALL`, `FOLD_TALL`,
+  `SINK_DEEP`): a mound in the surface's light where the stream lands, each fold a pair of
+  humps sliding out along the surface and settling, a darker swirl sinking under; inside the
+  glass. The floating rings are gone.
+- **The catch**:
+  - the three yellow ellipses gone; the mouth lights while a clump in hand is over it
+    (`MOUTH_LIT`, `_over_mouth`);
+  - the box's shadow a solid core and a checkered fringe (`SHADE_CORE`, `SHADE_FRINGE`);
+  - the five comb cells round and centred on the box's front (`PIP_Y`, `PIP_R`, `_disc`);
+  - a dashed ring breathing and turning round each clump in the air (`_draw_marks`,
+    `MARK_*`), hidden on the one in hand;
+  - once caught, the pile crawls down through the cracks between the top bars, top last
+    (`CRACK_*`, `DRAIN_*`), `PAYOFF_HOLD` 2.6;
+  - sound (`HiveSounds._whoomp`, `_chime`, the step's own `Buzz`/`Whoomp`/`Chime` players on
+    SFX): the colony's hum while a clump is in hand, up `BUZZ_FADE`, higher the faster it is
+    dragged; a whoomp and a chime a step up `CHIME_STEPS` for each clump poured. The old
+    `hive_swarm` on a pour is gone. By ear.
+- **One ending for every step** (`HiveStep.payoff`, `draw_payoff`, `payoff_crown_at`): gold
+  rays of whole pixels fanning up out of the thing finished (`RAYS`, `RAY_*`), stars twinkling
+  in and out each on its own beat (`PAYOFF_STARS`, `STAR_COME`, `STAR_SHOW`), the crown
+  dropping in with a bounce and a soft gold halo (`CROWN_*`). Catch over the box, smoke over
+  the hive, queen over her (drawn on the lens's rim), uncap over the comb at the sweep's foot,
+  pour over the jars on the board. The steps' own crown pops and star bursts are deleted;
+  smoke's per-ring stars, uncap's sweep stars and pour's lid stars stay.
+- **The queen is 15 by 5** (`_QUEEN_WIDE`, `_QUEEN_SHAPE`; 17 by 9 inked): the banding, gold,
+  laying pose and her ways unchanged.
+- **She is looked for down in the open hive** (`build_hive.py` `hive_well`, `well_back` and
+  `well_front`, `WELL_*`): the box seen from above at a tilt over the whole grid, its back wall
+  and side walls, rows of frame top bars (two behind the tipped frame, seven in front, growing
+  nearer), the next frame's comb dim either side, and the middle frame (`frame_brood`) tipped
+  back between them. The bars come to the step as `well_front`'s `bar<k>_l`/`_r` anchors
+  (`_read_bars`); `BAR_BEES` crawl along them, stopping and turning (`_walk_bar_bees`). The
+  rest and the lawn shadow are gone from this step (the uncap step keeps its rest).
+- All numbers first guesses. `test_lake` guards the queen's length, the open hive and its bar
+  bees, the catch's payoff, and the bucket's near wall.
+- **Third round, same day** (Richard, off `play_hive`):
+  - **The smoker puffs**: the bellows are three pictures (`build_hive.py` `smoker(squeeze)`,
+    `smoker`, `smoker_half`, `smoker_shut`), the back board swinging in and out over each
+    `PUMP` (`_bellows`), and every squeeze plays `hive_puff` (`_say_puff`, `PUFF_DB`).
+  - **No shadow behind the swarm**: the beard's dark core rows and the settle under the ring
+    being smoked are deleted.
+  - **The curtains sink into the gutter's honey** (`_curtain`'s `join`, drawn after the honey
+    in the tin): `SINK` px in, flaring `FLARE_WIDE` over the last `FLARE` rows in the honey's
+    top colours with no dark edge (`_soft_row`). **A falling foot is a teardrop of the curtain
+    itself** (`_tip_width`, `TIP_*`), and the stream's head into the bucket the same; the
+    ringed `_blob` on their ends is gone (`TIP` retired).
+  - **The drag buzz hums rather than revs**: pitch rises a few percent at most
+    (`BUZZ_PITCH_PER` 0.0004, `BUZZ_PITCH_MOST` 1.08), speed makes it louder
+    (`BUZZ_LOUDER`, `BUZZ_FAST`), and it wavers (`BUZZ_WAVER`). The chime is up to A5
+    (`CHIME_HZ` 880, was E5).
 
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.

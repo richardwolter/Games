@@ -10456,6 +10456,12 @@ func _stage_hive() -> void:
 	# E, the door and the pump: never two keys on one spot.
 	_angler.tile_pos = room_mid + Vector2(0.0, Hive.half.y + 0.45)
 	_check(bool(_main.call(&"_at_hive")), "beside a swarm, E is the hive's", "")
+	var lit_was := hive.lit
+	hive.lit = false
+	_check(hive.mark() == &"orb", "a swarm wears the gold mark over the roof", str(hive.mark()))
+	hive.lit = true
+	_check(hive.mark() == &"chip", "and with the angler in reach the mark turns into the key chip", str(hive.mark()))
+	hive.lit = lit_was
 	_angler.tile_pos = _main.call(&"_before_the_door")
 	_check(bool(_main.call(&"_at_shed")) and not bool(_main.call(&"_at_hive")),
 		"at the door it is the door's", "")
@@ -10714,6 +10720,7 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 			break
 		var step := room.step()
 		played.append(name)
+		_check(int(step.call(&"wanderer_count")) > 0, "loose bees wander the %s step's air" % name, "")
 		match name:
 			&"catch":
 				# A clump dragged to the box and let go pours in; one let go on the lawn does not.
@@ -10726,18 +10733,33 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 					step.call(&"box_clump", k)
 				_check(bool(step.call(&"caught")) and float(step.call(&"boxed_share")) >= 0.8,
 					"the clumps in the box: the swarm is caught", "")
-				for k in 40:
+				_check(float(step.call(&"payoff_age")) >= 0.0, "and the shared ending plays over the box", "")
+				for k in 70:
 					step.call(&"_process", 0.05)
 				_check(hive.stage == Hive.Stage.SETTLE, "and the lake is told: a colony to settle", str(hive.stage))
 			&"smoke":
 				step.call(&"smoke_ring", 1, 0.5)
-				_check(float(step.call(&"calm", 1)) > 0.0 and int(step.call(&"rings_done")) == 0,
-					"half a smoke calms a ring part way", "")
+				_check(is_zero_approx(float(step.call(&"calm", 1))) and int(step.call(&"stop_now")) == 0,
+					"the middle takes no smoke before the top", "")
+				step.call(&"smoke_ring", 0, 0.5)
+				_check(float(step.call(&"calm", 0)) > 0.0 and int(step.call(&"rings_done")) == 0,
+					"half a smoke calms the top part way", "")
+				step.call(&"smoke_ring", 0, 3.0)
+				for k in 100:
+					step.call(&"_process", 0.05)
+				_check(int(step.call(&"stop_now")) == 1 and int(step.call(&"gathered")) > 0,
+					"the top quiet, its bees walk down to the entrance and the middle lights", str(step.call(&"gathered")))
 				for k in int(step.call(&"ring_count")):
 					step.call(&"smoke_ring", k, 3.0)
-				_check(int(step.call(&"rings_done")) == 3, "every ring smoked quiet, in any order", "")
+				_check(int(step.call(&"rings_done")) == 3, "the middle, then the entrance: every stop quiet", "")
 				step.call(&"settle")
 			&"queen":
+				var queen_long := HiveArt.size(&"queen_long").x / HiveArt.size(&"bee_r").x
+				_check(queen_long >= 1.5 and queen_long <= 2.0 and HiveArt.has(&"queen_lay"),
+					"the queen is half again a worker's length or more, with a laying pose", str(HiveArt.size(&"queen_long")))
+				_check(HiveArt.has(&"well_back") and HiveArt.has(&"well_front") and (step.get(&"_bars") as Array).size() > 3
+					and (step.get(&"_bar_bees") as Array).size() > 0,
+					"she is looked for down in the open hive, bees on its frame bars", "")
 				var q: Vector2 = step.call(&"queen_pos")
 				_check(not bool(step.call(&"find_at", q + Vector2(60.0, 0.0))), "a click off her finds nobody", "")
 				_check(int(step.call(&"flown")) >= 1, "and the bee clicked buzzes off", "")
@@ -10746,11 +10768,30 @@ func _hive_play_plan(room: HiveRoom, hive: Hive) -> Array[StringName]:
 			&"uncap":
 				var sizzle: AudioStreamPlayer = step.call(&"sizzle_player")
 				_check(sizzle != null and sizzle.bus == Prefs.BUS_SFX, "the knife's sizzle is on the SFX bus", "")
+				_check(is_zero_approx(float(step.call(&"bucket_level"))), "the bucket starts empty", "")
+				_check(HiveArt.has(&"bucket_front"), "and its near wall is drawn over what falls below the brim", "")
+				var top: float = step.get(&"_knife")
+				step.set(&"_want", top + 150.0)
+				for k in 20:
+					step.call(&"_process", 0.05)
+				var gone := float(step.get(&"_knife")) - top
+				_check(gone > 10.0 and gone <= HiveStepUncap.MOST_SPEED + 1.0,
+					"the wax holds the knife back: a second of pulling moves it no more than its pace", "%.0f" % gone)
+				_check(float(step.get(&"_strain")) > 0.5, "pulled far ahead of the blade, it strains", "")
 				step.call(&"cut_to", 1.0)
 				_check(int(step.call(&"faces_done")) == 1, "the knife uncaps the frame's face", "")
+				var streamed := false
+				var drips_in_stream := 0
+				var level_seen := PackedFloat32Array()
 				for k in 60:
 					step.call(&"_process", 0.05)
-				_check(float(step.call(&"bucket_level")) > 0.0, "the honey runs down the gutter into the bucket",
+					if bool(step.call(&"streaming")):
+						streamed = true
+						drips_in_stream += (step.get(&"_falls") as Array).size()
+					level_seen.append(float(step.call(&"bucket_level")))
+				_check(streamed and drips_in_stream == 0, "off the lip the honey runs as one stream, no drops while it runs", "")
+				_check(float(step.call(&"bucket_level")) > 0.0 and level_seen[5] < level_seen[level_seen.size() - 1],
+					"the honey runs down the gutter and the bucket fills as it lands",
 					"%.2f" % float(step.call(&"bucket_level")))
 				step.call(&"settle")
 				_check(room.honey >= 0.995, "every drop reaches the bucket, and the room keeps its level",

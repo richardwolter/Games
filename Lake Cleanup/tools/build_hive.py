@@ -843,8 +843,12 @@ def room_hive(paint, window=0.6, lid=True, open_top=False):
     return inked(a.im), (cx, top + 3 * LH - 5)
 
 
-def smoker():
+def smoker(squeeze=0.0):
+    """The smoker. `squeeze` 0..1 closes the bellows: the outer board swings in towards the
+    can about its hinge, the leather between them folding up (2026-10-04, Richard: the back of
+    the smoker should move when it puffs)."""
     a = Art(112, 104)
+    ox, oy = 104 - 18 * squeeze, 34 + 7 * squeeze
     # the bellows first, behind the can: two boards hinged at the foot, open in a V, the
     # leather between them pleated
     hinge = (70, 96)
@@ -853,11 +857,11 @@ def smoker():
         ang = math.atan2(hinge[1] - y, x - hinge[0])
         return LEATHER["lit"] if int(ang * 26) % 2 == 0 else LEATHER["shade"]
 
-    a.fill_by([(70, 40), (96, 34), (78, 96), (70, 96)], pleats)
+    a.fill_by([(70, 40), (ox - 8, oy), (78, 96), (70, 96)], pleats)
     a.poly([(64, 38), (71, 38), (71, 98), (64, 98)], DARK_WOOD)
     a.rect(64, 38, 2, 60, DARK_WOOD_HI)
-    a.poly([(72, 98), (79, 98), (104, 34), (97, 31)], DARK_WOOD_HI)
-    a.poly([(76, 98), (79, 98), (104, 34), (101, 33)], PINE_SHADE)
+    a.poly([(72, 98), (79, 98), (ox, oy), (ox - 7, oy - 3)], DARK_WOOD_HI)
+    a.poly([(76, 98), (79, 98), (ox, oy), (ox - 3, oy - 1)], PINE_SHADE)
     a.rect(69, 94, 6, 5, BRASS["shade"])
     # the can, round and steel, with its perforated guard
     def can(x, y):
@@ -1398,17 +1402,62 @@ def uncap_rest(fw, fh, fx=40, fy=12):
     return inked(a.im), (fx + 1, fy + 1), foot + 1
 
 
-QUEEN_LONG = ["...kgkgkg.....", ".gkgkgkgkgtt..", "gkgkgkgkgktth.", ".gkgkgkgkgtt..", "...kgkgkg....."]
+# The queen, 15 by 5 (2026-10-04, Richard: first "a bit bigger", 18 by 7, then "can be
+# smaller"; was 14 by 5): a long tapering abdomen in a richer orange gold, a broad thorax, her
+# wings folded short over her back.
+QUEEN_GOLD = (236, 150, 30, 255)
+QUEEN_LIT = (252, 196, 72, 255)
+QUEEN_KEY = dict(BEE_KEY, q=QUEEN_GOLD, l=QUEEN_LIT)
+# Per row: the abdomen's span and the thorax's (inclusive columns), and whether the head
+# shows. Banded down its length, two gold to one dark, the top band lit.
+_QUEEN_WIDE = 15
+_QUEEN_SHAPE = [((2, 7), None, False), ((1, 9), (10, 12), False), ((0, 9), (10, 12), True),
+                ((1, 9), (10, 12), False), ((2, 7), None, False)]
 
 
-def queen_long():
-    """The queen as the second pass has her: a bee a third longer than a worker, no dot, her
-    wings folded (mockup2 `queen_bee`)."""
-    body = inked(sprite(QUEEN_LONG, BEE_KEY))
+def _queen_rows():
+    rows = []
+    for y, (abd, thorax, head) in enumerate(_QUEEN_SHAPE):
+        row = ["."] * _QUEEN_WIDE
+        for x in range(abd[0], abd[1] + 1):
+            dark = x % 3 == 2
+            row[x] = "k" if dark else ("l" if y <= 1 else "q")
+        if thorax:
+            for x in range(thorax[0], thorax[1] + 1):
+                row[x] = "t"
+        if head:
+            row[_QUEEN_WIDE - 2] = row[_QUEEN_WIDE - 1] = "h"
+        rows.append("".join(row))
+    return rows
+
+
+QUEEN_LONG = _queen_rows()
+# How many columns from her tail the abdomen dips when she lays.
+QUEEN_TAIL = 6
+
+
+def queen_long(laying=False):
+    """The queen as the third pass has her: half as long again as a worker, no dot, her wings
+    folded. `laying` dips the tail of her abdomen a pixel, as if into a cell: the step shows it
+    in beats while she stops."""
+    rows = list(QUEEN_LONG)
+    body = sprite(rows, QUEEN_KEY)
+    if laying:
+        dipped = Image.new("RGBA", (body.width, body.height + 1), (0, 0, 0, 0))
+        dipped.alpha_composite(body.crop((QUEEN_TAIL, 0, body.width, body.height)), (QUEEN_TAIL, 0))
+        dipped.alpha_composite(body.crop((0, 0, QUEEN_TAIL, body.height)), (0, 1))
+        body = dipped
+    else:
+        padded = Image.new("RGBA", (body.width, body.height + 1), (0, 0, 0, 0))
+        padded.alpha_composite(body, (0, 0))
+        body = padded
+    body = inked(body)
     im = Image.new("RGBA", (body.width, body.height + 1), (0, 0, 0, 0))
     im.alpha_composite(body, (0, 1))
-    for x in (9, 10, 11):
-        im.putpixel((x, 1), WING)
+    for x in (8, 9, 10, 11):
+        im.putpixel((x, 2), WING)
+    for x in (9, 10):
+        im.putpixel((x, 1), WING_EDGE)
     return im
 
 
@@ -1461,12 +1510,156 @@ def honey_bucket_bare():
     art.poly([(2, 10), (106, 10), (98, 90), (10, 90)], ENAMEL["base"])
     art.fill_by([(2, 10), (106, 10), (98, 90), (10, 90)],
                 lambda x, y: ENAMEL["shade"] if x < 18 else ENAMEL["lit"] if 72 < x < 84 else None)
-    art.rect(42, 40, 26, 16, CREAM)
-    art.rect(42, 40, 26, 2, GINGHAM_RED)
     art.ell(1, 2, 106, 18, ENAMEL["lit"])
     art.ell(4, 4, 100, 14, ENAMEL["shade"])
     art.ell(6, 5, 96, 12, ENAMEL["deep"])
     return inked(art.im), (54 + 1, 11 + 1), (48, 6)
+
+
+def bucket_front(im, mouth, half):
+    """The bucket's front wall alone, to draw over what falls into it: every pixel of the
+    picture below the mouth's middle row, less the mouth's inside. A stream or a heap of honey
+    lower than the brim is then hidden behind the near wall, as it would be."""
+    out = im.copy()
+    px = out.load()
+    mx, my = mouth
+    hx, hy = half
+    for y in range(out.height):
+        for x in range(out.width):
+            if y <= my:
+                px[x, y] = (0, 0, 0, 0)
+                continue
+            dx = (x + 0.5 - mx) / hx
+            dy = (y + 0.5 - my) / hy
+            if dx * dx + dy * dy < 1.0:
+                px[x, y] = (0, 0, 0, 0)
+    return out
+
+
+# The open hive the queen is looked for in (2026-10-04, Richard: "should feel like I'm looking
+# inside the bee hive box, not a hanging rack"): seen down into at a tilt, the whole room's
+# grid (640 x 360). Rows of frame top bars run across it, the box's walls round them, and the
+# middle frame is the step's own `frame_brood`, tipped back so its comb face shows between its
+# neighbours. Two layers: `well_back` (the inside, the back wall, the bars behind the frame)
+# drawn under the frame, `well_front` (the bars in front of it and the near wall) over it.
+WELL_W, WELL_H = 640, 360
+WELL_BACK_Y = 14           # the back wall's top edge, inside
+WELL_SIDES = ((92, 548), (30, 610))   # the inside's left and right at the back and at y 360
+WELL_FRAME_FOOT = 222      # where the bars in front of the tipped frame begin
+WELL_BARS_BACK = ((26, 3), (34, 4))
+WELL_BARS_FRONT = ((222, 10), (237, 12), (254, 14), (274, 16), (297, 18), (323, 20), (349, 12))
+# The comb of the next frame back, glimpsed either side of the tipped one, darkened this much.
+WELL_BEYOND_DARK = 0.32
+WELL_DARK = (40, 26, 16, 255)
+WELL_DEEPER = (28, 18, 12, 255)
+
+
+def _well_x(y):
+    t = (y - WELL_BACK_Y) / float(WELL_H - WELL_BACK_Y)
+    (l0, r0), (l1, r1) = WELL_SIDES
+    return l0 + (l1 - l0) * t, r0 + (r1 - r0) * t
+
+
+def _well_bar(a, y, h, rng):
+    """A frame's top bar from wall to wall at row `y`, `h` tall: pine, lit along its top,
+    shaded under, with propolis smudges and a burr of wax here and there."""
+    l, r = _well_x(y + h)
+    l, r = int(l) + 2, int(r) - 2
+    a.rect(l, y, r - l, h, PINE)
+    a.rect(l, y, r - l, max(1, h // 4), PINE_LIT)
+    a.rect(l, y + h - max(1, h // 4), r - l, max(1, h // 4), PINE_SHADE)
+    for k in range(int((r - l) / 26)):
+        x = rng.randint(l + 4, r - 10)
+        a.rect(x, y + rng.randint(1, max(1, h - 2)), rng.randint(3, 7), 1, PINE_DEEP)
+        if rng.random() < 0.35:
+            a.rect(x + 2, y - 1, rng.randint(2, 4), 2, WAX_SHADE)
+    # The ends sit in the wall's rebate: a dark notch each side.
+    a.rect(l - 2, y, 2, h, PINE_DEEP)
+    a.rect(r, y, 2, h, PINE_DEEP)
+    return l, r
+
+
+def _well_gap(a, y0, y1, rng):
+    """The dark between two bars, with the tops of the combs under them glimpsed: a broken
+    row of honey and brood far down."""
+    for y in range(y0, y1):
+        l, r = _well_x(y)
+        a.rect(int(l), y, int(r - l), 1, WELL_DEEPER if y > y0 + 2 else WELL_DARK)
+    if y1 - y0 >= 4:
+        y = y0 + 1
+        l, r = _well_x(y)
+        x = int(l) + 3
+        while x < int(r) - 3:
+            col = rng.choice((HONEY_DEEP, CELL_DEEP, CELL_EMPTY, BROOD_SHADE))
+            a.rect(x, y, rng.randint(2, 5), 1, col)
+            x += rng.randint(3, 8)
+
+
+def _well_walls(a, y0, y1, paint):
+    """The box's side walls from row y0 to y1: the inner face in shade, the raw top edge, the
+    painted outside beyond it."""
+    lit, base, shade, deep = paint
+    for y in range(y0, y1):
+        l, r = _well_x(y)
+        l, r = int(l), int(r)
+        wall = 6 + int(10 * (y / WELL_H))
+        a.rect(l - wall - 6, y, 6, 1, base)
+        a.rect(l - wall, y, wall, 1, PINE_LIT if y % 9 else PINE)
+        a.rect(l, y, 3, 1, PINE_DEEP)
+        a.rect(r - 3, y, 3, 1, PINE_DEEP)
+        a.rect(r, y, wall, 1, PINE)
+        a.rect(r + wall, y, 6, 1, shade)
+
+
+def hive_well(paint):
+    """The open hive from above at a tilt, in its two layers (see `WELL_*`). Returns the back
+    and the front, inked, and the bars as `(left, right, top, tall)` on the grid."""
+    rng = random.Random(77)
+    lit, base, shade, deep = paint
+    back = Art(WELL_W, WELL_H)
+    # the inside, darkest at the bottom of the box
+    for y in range(WELL_BACK_Y, WELL_H):
+        l, r = _well_x(y)
+        back.rect(int(l), y, int(r - l), 1, WELL_DEEPER if y > 60 else WELL_DARK)
+    # the back wall: its inner face, its raw top edge, the painted back beyond
+    l0, r0 = _well_x(WELL_BACK_Y)
+    back.rect(int(l0) - 16, 0, int(r0 - l0) + 32, 6, base)
+    back.rect(int(l0) - 16, 0, int(r0 - l0) + 32, 2, lit)
+    back.rect(int(l0) - 16, 6, int(r0 - l0) + 32, WELL_BACK_Y - 6, PINE)
+    back.rect(int(l0) - 16, 6, int(r0 - l0) + 32, 2, PINE_LIT)
+    back.rect(int(l0), WELL_BACK_Y, int(r0 - l0), 10, DARK_WOOD_LO)
+    back.rect(int(l0), WELL_BACK_Y + 9, int(r0 - l0), 1, WELL_DARK)
+    # Beyond the tipped frame, down in the box: the next frame's comb, dim.
+    l1, r1 = _well_x(WELL_FRAME_FOOT)
+    beyond = Art(WELL_W, WELL_H)
+    comb(beyond, int(l1), 40, int(r1), WELL_FRAME_FOOT,
+         lambda x, y, r: r.choice(("honey", "wax", "brood", "empty", "brood")), seed=31)
+    for y in range(40, WELL_FRAME_FOOT):
+        l, r = _well_x(y)
+        for x in range(int(l), int(r)):
+            c = beyond.im.getpixel((x, y))
+            if c[3]:
+                back.px(x, y, tuple(int(v * WELL_BEYOND_DARK) for v in c[:3]) + (255,))
+    _well_walls(back, WELL_BACK_Y, WELL_H, paint)
+    bars = []
+    prev = WELL_BACK_Y + 10
+    for y, h in WELL_BARS_BACK:
+        _well_gap(back, prev, y, rng)
+        l, r = _well_bar(back, y, h, rng)
+        bars.append((l, r, y, h))
+        prev = y + h
+    _well_gap(back, prev, prev + 6, rng)
+    front = Art(WELL_W, WELL_H)
+    prev = WELL_FRAME_FOOT
+    for y, h in WELL_BARS_FRONT:
+        if y > prev:
+            _well_gap(front, prev, y, rng)
+        l, r = _well_bar(front, y, h, rng)
+        bars.append((l, r, y, h))
+        prev = y + h
+    _well_gap(front, prev, WELL_H, rng)
+    _well_walls(front, WELL_FRAME_FOOT, WELL_H, paint)
+    return inked(back.im), inked(front.im), bars
 
 
 def bottling_table():
@@ -1763,6 +1956,8 @@ def room_pieces():
     im, hang = branch_with_swarm(swarm=False)
     out["branch"] = _crop(im, {"hang": list(hang), "grip": [151, 34]})
     out["smoker"] = _crop(smoker(), {"nozzle": [15, 19], "bellows": [80, 66]})
+    out["smoker_half"] = _crop(smoker(0.5), {"nozzle": [15, 19], "bellows": [80, 66]})
+    out["smoker_shut"] = _crop(smoker(1.0), {"nozzle": [15, 19], "bellows": [80, 66]})
 
     # The three frames share one geometry, so one crop: the comb's rows line up across them.
     frames = {"frame_brood": brood_frame(300, 180, seed=9, cell=CELL_BIG),
@@ -1825,12 +2020,24 @@ def room_pieces():
     out["rest"] = _crop(im, {"frame_tl": list(tl), "feet": [tl[0] + 150, foot]})
     im = queen_long()
     out["queen_long"] = _crop(im, {"c": _middle(im)}, (0, 0, im.width, im.height))
+    lay = queen_long(laying=True)
+    out["queen_lay"] = _crop(lay, {"c": _middle(im)}, (0, 0, lay.width, lay.height))
     body = [JAR2_W // 2 + 2, JAR2_TOP + JAR2_H + 1]
     for part, im in jar2_parts().items():
         out["jar2_" + part] = _crop(im, {"feet": body, "tl": [0, 0]}, (0, 0, im.width, im.height))
     im, mouth, half = honey_bucket_bare()
     out["bucket"] = _crop(im, {"mouth": list(mouth), "half": list(half), "feet": _feet(im, 55)},
                           (0, 0, im.width, im.height))
+    front = bucket_front(im, mouth, (half[0] + 2, half[1] + 1))
+    out["bucket_front"] = _crop(front, {"mouth": list(mouth), "feet": _feet(im, 55)},
+                                (0, 0, im.width, im.height))
+    back, fore, bars = hive_well(PAINTS["sky"])
+    marks = {"tl": [1, 1]}
+    for k, (l, r, y, h) in enumerate(bars):
+        marks["bar%d_l" % k] = [l + 1, y + 1]
+        marks["bar%d_r" % k] = [r + 1, y + 1 + h]
+    out["well_back"] = _crop(back, marks, (0, 0, back.width, back.height))
+    out["well_front"] = _crop(fore, marks, (0, 0, fore.width, fore.height))
     im = bottling_table()
     out["table"] = _crop(im, {"top": [16 + 50 + 1, 76 + 1]})
     im = bottling_gate()

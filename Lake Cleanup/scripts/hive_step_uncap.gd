@@ -4,18 +4,18 @@
 ##
 ## **No hands.** The frame stands upright in the pine uncapping rest; the knife follows the
 ## pointer down the comb. **The step Richard singled out: it must be smooth and very
-## satisfying.** So nothing in it snaps but the one thing that should. The knife glides after
-## the pointer on an exponential ease (`EASE`) held under a top speed (`MOST_SPEED`) and only
-## goes down; the wax it lifts rolls up on the blade and thickens as it goes; **the cut line
+## satisfying.** So nothing in it snaps but the one thing that should. The knife drags after
+## the pointer through the wax on a slow exponential ease (`EASE`) held under a low top speed
+## (`MOST_SPEED`), only goes down, and strains when pulled ahead of (`STRAIN_*`, 2026-10-04); the wax it lifts rolls up on the blade and thickens as it goes; **the cut line
 ## snaps to the comb's rows**, each popping open whole with a flash, a glint, a crumb of wax off
 ## the blade and a crackle.
 ##
 ## **The honey is the payoff** (`_drive_honey` and below): it runs off the cut as glossy
-## curtains into a thin tin gutter slung on a slant under the frame, rides down it thicker than
-## the tin, bulging over the rim and spilling over the lip in places, and falls off the low end
-## as a heavy rope — fat, necking, a bead swelling until it lets go, a thread springing back —
-## into the bucket, where it folds into coils and the level rises. **The level is kept**: the
-## pour step's bucket starts where this one ends (`HiveRoom.honey`).
+## curtains into a rounded tin gutter slung on a slant under the frame, rides down it thicker
+## than the tin, rippling, glinting and carrying bubbles, bulging over the rim and spilling over
+## the lip in places, and falls off the low end as one stream while it runs — drips only once it
+## has stopped — into the bucket, where it folds into coils and the level rises from empty.
+## **The level is kept**: the pour step's bucket starts where this one ends (`HiveRoom.honey`).
 ##
 ## **The reveal is two pictures, not a mask**: `frame_open` drawn whole and `frame_capped`
 ## only from the cut row down (`HiveArt.draw_region`). **One face**, not two: the frame's turn
@@ -37,15 +37,23 @@ enum Phase { CUT, FACE_DONE, FLIP, SWEEP, DONE }
 ## the glove on it stand clear of the right edge.
 const FRAME_AT := Vector2(157.0, 38.0)
 
-## The knife's ease after the pointer, a second (the contract's 18), and the most it may move
-## in a second, painted pixels. The cap is what keeps a flung pointer a stroke rather than a
-## jump: a face is 165 px, so no face is over in less than a second and a bit.
-const EASE := 18.0
-const MOST_SPEED := 150.0
+## The knife's ease after the pointer, a second, and the most it may move in a second, painted
+## pixels. **The wax holds it back** (2026-10-04, Richard: "some tension to bring it down, so
+## player needs to do it slowly"): a face is 165 px, so it takes three seconds at the least
+## (was 18 and 150: a second and a bit). Pull the pointer more than `STRAIN_FROM` ahead of the
+## blade and it strains, full at `STRAIN_FROM + STRAIN_SPAN`: the blade shudders up to
+## `SHUDDER` px, the sizzle crackles every `STRAIN_CRACKLE` and a taut line runs from the
+## handle to the pointer. It never fails and never goes faster.
+const EASE := 5.0
+const MOST_SPEED := 55.0
+const STRAIN_FROM := 10.0
+const STRAIN_SPAN := 50.0
+const SHUDDER := 1.0
+const STRAIN_CRACKLE := 0.22
 ## The pad: how far a full push of the stick draws the knife in a second, and the steady
-## glide RT or A held gives on its own. Both painted pixels a second.
-const PAD_PACE := 120.0
-const GLIDE_PACE := 72.0
+## glide RT or A held gives on its own. Both painted pixels a second, under the same cap.
+const PAD_PACE := 55.0
+const GLIDE_PACE := 45.0
 ## The least push of the stick that counts, so a stick resting off centre does not creep.
 const PAD_DEAD := 0.15
 
@@ -69,7 +77,6 @@ const SWEEP_HOLD := 0.6
 ## After the sweep, the honey still running is waited on at most this long.
 const DRAIN_WAIT := 6.0
 const SWEEP_STARS := 3
-const BURST_STARS := 14
 
 ## A row popping: its flash, the stars on it, and the most stars alive at once (a harness
 ## cutting a whole face in one call pops two dozen rows in a frame).
@@ -125,7 +132,7 @@ const POOL_MOST := 6.0
 ## (painted pixels a second), the simmer while the tool is only held on the wax, and how fast
 ## it comes and goes. The contract's `move_toward`, the wash hiss's own 0.06 s.
 const SIZZLE_DB := -13.0
-const SIZZLE_FULL := 90.0
+const SIZZLE_FULL := 45.0
 const SIZZLE_SIMMER := 0.22
 const SIZZLE_ATTACK := 0.06
 
@@ -139,8 +146,10 @@ const SHIMMER_DOTS := 46
 ## A glint runs along the blade's top edge this often while it waits, three times as often
 ## while it is held.
 const GLINT_EVERY := 2.2
-## Bees drifting over the frame, for the honey.
-const BEES := 5
+## Bees wandering the air for the honey (`HiveStep.wanderers`), behind the frame and the
+## knife, over the whole scene.
+const BEES := 7
+const BEES_BOX := Rect2(20.0, 10.0, 600.0, 200.0)
 
 ## The builder's steel and the hot edge (`tools/build_hive.py` `STEEL`, the knife's line).
 const STEEL_HI := Color(240 / 255.0, 246 / 255.0, 250 / 255.0)
@@ -179,6 +188,9 @@ var _rows_cut_all := 0
 var _knife := 0.0
 var _want := 0.0
 var _speed := 0.0
+## How hard the hand is pulling ahead of the blade, 0..1, eased; the crackle's clock.
+var _strain := 0.0
+var _crackle_in := 0.0
 var _clock := 0.0
 var _need_release := false
 var _was_down := false
@@ -216,7 +228,6 @@ var _beads: Array[Dictionary] = []
 var _runs: Array[Dictionary] = []
 var _crumbs: Array[Dictionary] = []
 var _heap: Array[Dictionary] = []
-var _bees: Array[Dictionary] = []
 var _trail: Array[Vector2] = []
 ## The sheet on its way down to the tray, or empty.
 var _drop := {}
@@ -324,6 +335,8 @@ func _reset() -> void:
 	_knife = _inner.position.y
 	_want = _knife
 	_speed = 0.0
+	_strain = 0.0
+	_crackle_in = 0.0
 	_clock = 0.0
 	_need_release = false
 	_was_down = false
@@ -351,17 +364,7 @@ func _reset() -> void:
 	_drips.clear()
 	for slot: float in DRIP_SLOTS:
 		_drips.append(_new_drip(slot))
-	_bees.clear()
-	for k in BEES:
-		_bees.append({
-			"home": Vector2(
-				_roll.randf_range(FRAME_AT.x + 30.0, FRAME_AT.x + _frame.x - 30.0),
-				_roll.randf_range(FRAME_AT.y - 6.0, FRAME_AT.y + 8.0)
-			),
-			"w1": _roll.randf_range(0.9, 1.6), "w2": _roll.randf_range(1.7, 2.8),
-			"r1": _roll.randf_range(14.0, 30.0), "r2": _roll.randf_range(4.0, 9.0),
-			"p1": _roll.randf() * TAU, "p2": _roll.randf() * TAU,
-		})
+	wanderers(BEES, BEES_BOX, SEED + 7)
 
 
 func _new_drip(slot: float) -> Dictionary:
@@ -468,6 +471,12 @@ func _drive_knife(delta: float) -> void:
 	_knife += step
 	_roll_phase += step * SHEET_ROLL
 	_speed = lerpf(_speed, step / delta, 1.0 - exp(-20.0 * delta))
+	var pull := clampf((gap - STRAIN_FROM) / STRAIN_SPAN, 0.0, 1.0)
+	_strain = lerpf(_strain, pull, 1.0 - exp(-10.0 * delta))
+	_crackle_in -= delta
+	if _strain > 0.4 and _crackle_in <= 0.0:
+		_crackle_in = STRAIN_CRACKLE
+		_say(&"hive_crackle", -12.0 + 6.0 * _strain)
 	_follow_rows()
 
 
@@ -592,18 +601,8 @@ func _drive_sweep() -> void:
 	if t >= 1.0 and not _burst_done:
 		_burst_done = true
 		_settle = 0.0
-		var box := Rect2(FRAME_AT, _frame).grow(6.0)
-		for k in BURST_STARS:
-			var edge := _roll.randi() % 4
-			var along := _roll.randf()
-			var at := box.position + Vector2(along * box.size.x, 0.0)
-			if edge == 1:
-				at = box.position + Vector2(along * box.size.x, box.size.y)
-			elif edge == 2:
-				at = box.position + Vector2(0.0, along * box.size.y)
-			elif edge == 3:
-				at = box.position + Vector2(box.size.x, along * box.size.y)
-			_add_star(at, 2 + _roll.randi() % 2, -_roll.randf_range(0.0, 0.25), STAR_LIFE * 1.2)
+		# The shared ending over the opened comb (`HiveStep.payoff`, 2026-10-04).
+		payoff(FRAME_AT + Vector2(_frame.x * 0.5, _frame.y * 0.45), _frame.x * 0.6)
 
 
 func _drive_settle(delta: float) -> void:
@@ -780,6 +779,7 @@ func _drive_sizzle(delta: float, down: bool) -> void:
 		want = clampf(_speed / SIZZLE_FULL, 0.0, 1.0)
 		if down and awake() and not _need_release:
 			want = maxf(want, SIZZLE_SIMMER)
+		want = maxf(want, _strain)
 		want = maxf(want, _sizzle_kick)
 	_sizzle_level = move_toward(_sizzle_level, want, delta / SIZZLE_ATTACK)
 	if _sizzle_level <= 0.0:
@@ -789,7 +789,7 @@ func _drive_sizzle(delta: float, down: bool) -> void:
 	if not _sizzle.playing:
 		_sizzle.play()
 	_sizzle.volume_db = lerpf(Prefs.BUS_SILENT, SIZZLE_DB, sqrt(_sizzle_level))
-	var pitch := 0.92 + 0.18 * _sizzle_level
+	var pitch := 0.92 + 0.18 * _sizzle_level - 0.1 * _strain
 	_sizzle.pitch_scale = lerpf(_sizzle.pitch_scale, pitch, clampf(delta * 14.0, 0.0, 1.0))
 
 
@@ -810,6 +810,7 @@ static func _say(what: StringName, db := 0.0) -> void:
 func _draw() -> void:
 	if not _laid:
 		return
+	draw_wanderers()
 	HiveArt.draw(self, &"rest", to_canvas(FRAME_AT), &"frame_tl")
 	var lift := Vector2(0.0, roundf(_bob))
 	# The turn: squashed about the frame's middle, a whole number of painted pixels wide.
@@ -834,8 +835,8 @@ func _draw() -> void:
 	_draw_falling()
 	for star: Dictionary in _stars:
 		_draw_star(star)
-	_draw_bees()
 	_draw_guide()
+	draw_payoff()
 
 
 func _draw_frame(lift: Vector2, tint: Color) -> void:
@@ -885,11 +886,18 @@ func _draw_face_life(lift: Vector2) -> void:
 
 func _draw_knife() -> void:
 	var y := floorf(_knife) - roundf(_grip)
-	var blade := Vector2(_inner.position.x, y)
+	var shake := Vector2.ZERO
+	if _phase == Phase.CUT and _strain > 0.05:
+		shake = Vector2(
+			roundf(sin(age * 41.0) * SHUDDER * _strain), roundf(sin(age * 57.0 + 1.3) * SHUDDER * _strain)
+		)
+	var blade := Vector2(_inner.position.x, y) + shake
+	y = blade.y
 	var alpha := _knife_alpha
 	if _phase == Phase.CUT:
 		_draw_ghosts(blade.x)
 		_draw_shimmer(blade, alpha)
+		_draw_taut(blade, alpha)
 	var drawn := HiveArt.draw(self, &"knife", to_canvas(blade), &"blade_l", false, alpha)
 	if drawn.size == Vector2.ZERO:
 		# No sheet (a harness before an import): a plain steel bar where the blade would be.
@@ -911,6 +919,27 @@ func _draw_knife() -> void:
 	var curl := alpha * clampf(_thick / 3.0, 0.0, 1.0)
 	if curl > 0.01:
 		HiveArt.draw(self, &"wax_curl", to_canvas(blade + Vector2(-3.0, -1.0)), &"root", false, curl)
+
+
+## The pull the wax is holding back: a taut dashed line from the handle to the pointer, as
+## strong as the strain, its dashes crawling towards the blade. Mouse only: on the pad there is
+## no pointer to pull from.
+func _draw_taut(blade: Vector2, alpha: float) -> void:
+	if _strain < 0.05 or Pad.is_pad() or not is_inside_tree():
+		return
+	var from := blade + (_handle - _blade_l)
+	var to := art_mouse()
+	var gap := to - from
+	var long := gap.length()
+	if long < 4.0:
+		return
+	var dir := gap / long
+	var ink := _ink(HiveArt.HONEY_SHINE, 0.55 * _strain * alpha)
+	var crawl := fposmod(-age * 30.0, 6.0)
+	var d := crawl
+	while d < long:
+		_box((from + dir * d).floor(), Vector2(2.0, 1.0) if absf(dir.x) > absf(dir.y) else Vector2(1.0, 2.0), ink)
+		d += 6.0
 
 
 ## The glide: the blade's edge where it was a moment ago, fainter the longer ago, and only as
@@ -1046,17 +1075,6 @@ func _draw_star(star: Dictionary) -> void:
 	HiveArt.star(self, to_canvas(star["at"] as Vector2), arm, alpha)
 
 
-## A few bees over the frame for the honey, each on its own slow figure, wings beating.
-func _draw_bees() -> void:
-	for k in _bees.size():
-		var bee: Dictionary = _bees[k]
-		var a1 := age * float(bee["w1"]) + float(bee["p1"])
-		var a2 := age * float(bee["w2"]) + float(bee["p2"])
-		var at: Vector2 = (bee["home"] as Vector2) + Vector2(sin(a1) * float(bee["r1"]), sin(a2) * float(bee["r2"]))
-		var piece := &"bee_r" if (int(age * 14.0) + k) % 2 == 0 else &"bee_r_rest"
-		HiveArt.draw(self, piece, to_canvas(at.floor()), &"c", cos(a1) < 0.0)
-
-
 ## The mouse's promise: with the knife waiting and the pointer below it, a faint gold dashed
 ## line where a press would draw it to.
 func _draw_guide() -> void:
@@ -1090,16 +1108,30 @@ static func _hash(a: int, b: int) -> float:
 	return float(h % 10007) / 10007.0
 
 
-# --- The honey: curtains off the cut, the gutter, the rope, the bucket --------------------
+# --- The honey: curtains off the cut, the gutter, the stream, the bucket ------------------
 #
 # The second pass (2026-09-30, Richard): the honey the knife frees runs off the cut as glossy
-# curtains into a thin tin gutter slung under the frame on a slant; it is thicker than the tin
-# is deep, so it rides down it bulging over the rim, swelling where each curtain feeds it and
-# spilling over the lip here and there; off the low end it falls as a heavy rope — fat where it
-# leaves, necking thin, a bead swelling at its foot until it lets go, a thread left behind that
-# springs back up — into the bucket, where it folds into coils on the pool. **Every unit of
-# honey is kept**: what the rows free goes curtain, gutter, rope, bucket, and the bucket's level
-# is what reached it, handed on to the pour (`HiveRoom.honey`).
+# curtains into a tin gutter slung under the frame on a slant; it is thicker than the tin is
+# deep, so it rides down it bulging over the rim, swelling where each curtain feeds it and
+# spilling over the lip here and there. **Every unit of honey is kept**: what the rows free
+# goes curtain, gutter, stream, bucket, and the bucket's level is what reached it, handed on to
+# the pour (`HiveRoom.honey`).
+#
+# The third pass (2026-10-04, Richard: the gutter "not so juicy", the bucket "drops" should be
+# "a constant flow of honey, drips only at the end", and the bucket "fills as the honey drops,
+# it doesn't start full"):
+# - **The gutter is a rounded tin channel**: a back wall, a rolled front rim the honey sits
+#   behind, iron straps up to the frame, an end cap with a pouring lip, and honey smeared down
+#   its face wherever it spilled (`_smears`, kept for the visit).
+# - **The honey in it moves**: a lit top edge and an amber core, ripples travelling downhill,
+#   glints sliding down with the flow (`GLINTS`), and air bubbles riding along and popping at
+#   the low end (`_bubbles`).
+# - **Off the lip it is one stream while the gutter runs** (`_stream`): its head falls to the
+#   pool, it wobbles and necks, and it folds into coils where it lands. When the flow dies the
+#   stream lets go of the lip, its tail falls in after it, and only then does what is left on
+#   the lip gather into beads and drip (the old rope's spring).
+# - **The bucket fills from empty**: the honey's surface starts down inside it, under the front
+#   rim, and rises to the mouth with what has landed (`POOL_DEEP`).
 
 ## The gutter's two ends on the art grid, from the frame (the mockup's `fx - 12, fy + fh + 10`
 ## and `fx + fw + 42, fy + fh + 44`, fw 300 the comb and fh the frame's height).
@@ -1107,6 +1139,9 @@ const GUTTER_IN := Vector2(-12.0, 8.0)
 const GUTTER_OUT := Vector2(342.0, 40.0)
 ## The bucket's mouth, painted pixels, under the gutter's low end.
 const BUCKET_MOUTH := Vector2(508.0, 300.0)
+## How far down inside the bucket the honey's surface starts, painted pixels under the mouth:
+## an empty bucket shows its dark inside, and the honey rises up it to the brim.
+const POOL_DEEP := 12.0
 ## The curtains: across the frame (from its left), and their widths where they leave the blade
 ## and where they reach the tin.
 const CURTAINS: Array[Vector3] = [
@@ -1118,9 +1153,20 @@ const CURTAINS: Array[Vector3] = [
 const ROW_HONEY := 70.0
 const RELEASE := 0.9
 const RELEASE_LEAST := 40.0
-## A curtain grows down at this pace and, once it stops being fed, its tail falls at this.
+## A curtain grows down at this pace and, once it stops being fed, its tail falls at this. Its
+## tip is a teardrop (`TIP_*`), and a falling tail necks to a thread over its top rows.
 const CURTAIN_GROW := 90.0
 const CURTAIN_FALL := 120.0
+const NECK := 6.0
+## A falling foot is a teardrop of the curtain over its last `TIP_LEAST`..`TIP_MOST` rows,
+## swelling `TIP_SWELL` before it rounds off. A curtain on the tin sinks `SINK` px into the
+## honey there, flaring `FLARE_WIDE` px wider over its last `FLARE` rows.
+const TIP_LEAST := 4.0
+const TIP_MOST := 9.0
+const TIP_SWELL := 0.3
+const SINK := 2.0
+const FLARE := 4.0
+const FLARE_WIDE := 5.0
 ## The gutter: honey runs down it at `RUN_BASE` plus `RUN_DEEP` a pixel of depth (thick honey
 ## runs faster), and spreads a little (`SPREAD_RATE`). Deeper than `SPILL_AT` it spills over
 ## the lip; drawn no deeper than `DEEP_MOST`.
@@ -1130,15 +1176,45 @@ const SPREAD_RATE := 6.0
 const DEEP_MOST := 11.0
 ## The tin's rim is this deep: honey over it bulges above the rim.
 const RIM := 3.0
-## The rope: its bead hangs `ROPE_REST + ROPE_PER * sqrt(mass)` under the lip, sprung at
-## `ROPE_K` with `ROPE_DAMP`, and lets go when it hangs past `SNAP_AT` of the way to the pool
-## or weighs `SNAP_MASS`; `KEEP` of it stays on the lip, flicked back up at `RECOIL`.
+## Ripples travelling down the honey: their height, length and pace.
+const RIPPLE_TALL := 0.8
+const RIPPLE_LONG := 0.2
+const RIPPLE_PACE := 6.0
+## Glints sliding down the honey's top with the flow: how many and how fast.
+const GLINTS := 6
+const GLINT_PACE := 46.0
+## Air bubbles in the gutter: the odds a feed lets one in per unit poured, the most at once, and
+## how fast they ride (a share of the honey's own pace).
+const BUBBLE_ODDS := 0.004
+const BUBBLES_MOST := 14
+const BUBBLE_RIDE := 0.45
+## The iron straps the gutter hangs from, across the frame (from its left).
+const STRAPS: Array[float] = [40.0, 160.0, 280.0]
+## The stream: it starts once the flow off the lip passes `STREAM_ON` a second and the lip holds
+## `STREAM_MASS`, takes at least `STREAM_LEAST` a second while it runs, and lets go once the flow
+## is under `STREAM_OFF` and the lip is down to `DRIP_KEEP`. Its width off the flow, its wobble.
+const STREAM_ON := 25.0
+const STREAM_OFF := 10.0
+const STREAM_MASS := 6.0
+const STREAM_LEAST := 30.0
+const DRIP_KEEP := 2.0
+const STREAM_WIDE := Vector2(2.0, 7.0)
+const STREAM_WOBBLE := 1.2
+const COIL_EVERY := 0.07
+## The rings spreading from where the stream lands: how many at once, a cycle a second, and how
+## far out they go, painted px.
+const LANDING_RINGS := 2
+const LANDING_RING_PACE := 0.9
+const LANDING_RING_REACH := 22.0
+## The drips at the end: a bead sprung under the lip, `ROPE_REST + ROPE_PER * sqrt(mass)` down,
+## at `ROPE_K` with `ROPE_DAMP`, letting go past `SNAP_AT` of the way to the pool or at
+## `SNAP_MASS`; `KEEP` of it stays on the lip, flicked back up at `RECOIL`.
 const ROPE_REST := 3.0
 const ROPE_PER := 2.4
 const ROPE_K := 70.0
 const ROPE_DAMP := 5.0
 const SNAP_AT := 0.62
-const SNAP_MASS := 150.0
+const SNAP_MASS := 10.0
 const KEEP := 0.18
 const RECOIL := 60.0
 ## A falling drop, and the coils it folds into on the pool.
@@ -1146,10 +1222,12 @@ const DROP_FALL := 420.0
 const COIL_LIFE := 0.9
 ## A thread left after a snap springs up over this long.
 const THREAD_LIFE := 0.35
-## Honey on the gutter's lip: a spill grows at this and drops its bead at this long.
+## Honey on the gutter's lip: a spill grows at this and drops its bead at this long; what it
+## leaves smeared down the tin stays, up to `SMEARS_MOST`.
 const SPILL_GROW := 14.0
 const SPILL_LONG := Vector2(5.0, 12.0)
 const SPILLS_MOST := 8
+const SMEARS_MOST := 14
 
 var _h: PackedFloat32Array = []
 var _g0 := Vector2.ZERO
@@ -1164,11 +1242,23 @@ var _rope_v := 0.0
 var _rope_in := 0.0
 var _thread := 0.0
 var _thread_from := 0.0
+## The flow off the lip a second, eased; the stream: whether it runs, how far its head and its
+## tail have fallen from the lip, their speeds, what is in it on the way down, the coils' clock.
+var _flow := 0.0
+var _stream := false
+var _head := 0.0
+var _head_v := 0.0
+var _tail := 0.0
+var _tail_v := 0.0
+var _stream_mass := 0.0
+var _coil_in := 0.0
 ## `{y, v, mass, x}` falling drops; `{x, age, w}` coils on the pool; `{x, len, most, mass}`
-## spills on the lip.
+## spills on the lip; `{x, len}` smears left down the tin; `{x, r}` bubbles in the honey.
 var _falls: Array[Dictionary] = []
 var _coils: Array[Dictionary] = []
 var _spills: Array[Dictionary] = []
+var _smears: Array[Dictionary] = []
+var _bubbles: Array[Dictionary] = []
 var _landed := 0.0
 var _total := 1.0
 
@@ -1190,9 +1280,19 @@ func _lay_honey() -> void:
 	_rope_v = 0.0
 	_rope_in = 0.0
 	_thread = 0.0
+	_flow = 0.0
+	_stream = false
+	_head = 0.0
+	_head_v = 0.0
+	_tail = 0.0
+	_tail_v = 0.0
+	_stream_mass = 0.0
+	_coil_in = 0.0
 	_falls.clear()
 	_coils.clear()
 	_spills.clear()
+	_smears.clear()
+	_bubbles.clear()
 	_landed = 0.0
 	_total = maxf(float(_rows_total) * ROW_HONEY, 1.0)
 	_tray = Rect2(Vector2(_g0.x, _g0.y - 4.0), Vector2(_g1.x - _g0.x, 60.0))
@@ -1208,9 +1308,15 @@ func bucket_level() -> float:
 	return clampf(_landed / _total, 0.0, 1.0)
 
 
-## Honey still on its way: in the curtains' store, the gutter, the rope and the air.
+## Whether the honey is running off the lip as one stream this moment. For the harness and the
+## probe.
+func streaming() -> bool:
+	return _stream
+
+
+## Honey still on its way: in the curtains' store, the gutter, the lip, the stream and the air.
 func honey_left() -> float:
-	var n := _pending + _rope_mass
+	var n := _pending + _rope_mass + _stream_mass
 	for v in _h:
 		n += v
 	for f: Dictionary in _falls:
@@ -1225,9 +1331,12 @@ func _drain_all() -> void:
 	_landed += honey_left()
 	_pending = 0.0
 	_rope_mass = 0.0
+	_stream_mass = 0.0
+	_stream = false
 	_h.fill(0.0)
 	_falls.clear()
 	_spills.clear()
+	_bubbles.clear()
 	_curtain_top.fill(-1.0)
 	_curtain_bot.fill(-1.0)
 	_push_level()
@@ -1316,11 +1425,14 @@ func _drive_honey(delta: float) -> void:
 	for s: Dictionary in _spills:
 		s["len"] = float(s["len"]) + SPILL_GROW * delta
 		if float(s["len"]) >= float(s["most"]):
-			# Its bead drops off the lip and back into the gutter's low end, so nothing is lost.
+			# Its bead drops off the lip and back into the gutter's low end, so nothing is lost;
+			# a smear of it stays down the tin.
 			_rope_in += float(s["mass"])
+			_smear(float(s["x"]), float(s["most"]))
 			continue
 		kept.append(s)
 	_spills = kept
+	_drive_bubbles(delta)
 	_drive_rope(delta)
 	_push_level()
 
@@ -1333,27 +1445,97 @@ func _pour_into(x: float, amount: float) -> void:
 	for d in range(-6, 7):
 		var i := clampi(at + d, 0, _h.size() - 1)
 		_h[i] += amount * exp(-float(d * d) / 18.0) / weight
+	if _bubbles.size() < BUBBLES_MOST and _roll.randf() < amount * BUBBLE_ODDS * 10.0:
+		_bubbles.append({"x": x + _roll.randf_range(-4.0, 4.0), "r": 1 + _roll.randi() % 2})
 
 
-## The rope off the gutter's low end: a bead sprung under the lip, swelling with what comes
-## down, necking as it sinks, letting go, and a thread left to spring back.
+func _smear(x: float, long: float) -> void:
+	for s: Dictionary in _smears:
+		if absf(float(s["x"]) - x) < 3.0:
+			s["len"] = maxf(float(s["len"]), long * 0.7)
+			return
+	if _smears.size() >= SMEARS_MOST:
+		_smears.remove_at(0)
+	_smears.append({"x": floorf(x), "len": long * 0.7})
+
+
+## The bubbles ride down the gutter at a share of the honey's pace there and pop at the low end
+## with a glint; one left on a column run dry pops where it is.
+func _drive_bubbles(delta: float) -> void:
+	var kept: Array[Dictionary] = []
+	for b: Dictionary in _bubbles:
+		var i := int(clampf(float(b["x"]) - _g0.x, 0.0, _h.size() - 1))
+		var v := _h[i]
+		if v < 0.6:
+			continue
+		b["x"] = float(b["x"]) + (RUN_BASE + RUN_DEEP * v / 6.0) * BUBBLE_RIDE * delta
+		if float(b["x"]) >= _g1.x - 2.0:
+			_add_star(Vector2(_g1.x, _gut(_g1.x) - RIM - 4.0), 1, 0.0, STAR_LIFE * 0.6)
+			continue
+		kept.append(b)
+	_bubbles = kept
+
+
+## Off the lip: one stream while the gutter runs, its head falling to the pool and its tail
+## letting go when the flow dies; then beads sprung under the lip that swell and drip.
 func _drive_rope(delta: float) -> void:
 	_rope_mass += _rope_in
 	var inflow := _rope_in / maxf(delta, 0.0001)
 	_rope_in = 0.0
+	_flow = lerpf(_flow, inflow, 1.0 - exp(-4.0 * delta))
 	var lip := _lip()
-	var fall := BUCKET_MOUTH.y - lip.y
-	var rest := ROPE_REST + ROPE_PER * sqrt(_rope_mass) + minf(inflow * 0.02, 10.0)
-	_rope_v += (ROPE_K * (rest - _rope_y) - ROPE_DAMP * _rope_v) * delta
-	_rope_y = clampf(_rope_y + _rope_v * delta, 1.0, fall)
-	if (_rope_y > fall * SNAP_AT or _rope_mass > SNAP_MASS) and _rope_mass > 8.0:
-		var go := _rope_mass * (1.0 - KEEP)
-		_rope_mass -= go
-		_falls.append({"x": lip.x, "y": lip.y + _rope_y, "v": maxf(_rope_v, 20.0), "mass": go})
-		_thread_from = _rope_y
-		_thread = THREAD_LIFE
-		_rope_y = ROPE_REST + ROPE_PER * sqrt(_rope_mass)
-		_rope_v = -RECOIL
+	var fall := maxf(_pool_y() - lip.y, 4.0)
+	if not _stream and _flow > STREAM_ON and _rope_mass > STREAM_MASS:
+		_stream = true
+		_head = _rope_y
+		_head_v = maxf(_rope_v, 20.0)
+		_tail = 0.0
+		_tail_v = 0.0
+		_stream_mass = 0.0
+	if _stream:
+		if _tail <= 0.0:
+			var take := minf(maxf(_rope_mass - DRIP_KEEP, 0.0), maxf(_flow, STREAM_LEAST) * delta)
+			_rope_mass -= take
+			_stream_mass += take
+			if _flow < STREAM_OFF and _rope_mass <= DRIP_KEEP + 0.5:
+				_tail = 0.01
+				_tail_v = 0.0
+		else:
+			_tail_v += DROP_FALL * delta
+			_tail += _tail_v * delta
+		if _head < fall:
+			_head_v += DROP_FALL * delta
+			_head = minf(_head + _head_v * delta, fall)
+		if _head >= fall:
+			_landed += _stream_mass
+			_stream_mass = 0.0
+			_coil_in -= delta
+			if _coil_in <= 0.0 and _tail < fall:
+				_coil_in = COIL_EVERY
+				_coils.append({
+					"x": lip.x + _roll.randf_range(-2.0, 2.0), "age": 0.0,
+					"w": 6.0 + _stream_wide() * 1.6 + _roll.randf_range(-1.0, 2.0),
+				})
+		if _tail >= _head:
+			_landed += _stream_mass
+			_stream_mass = 0.0
+			_stream = false
+			_rope_y = ROPE_REST
+			_rope_v = -RECOIL * 0.5
+			_thread_from = minf(_head, 14.0)
+			_thread = THREAD_LIFE
+	else:
+		var rest := ROPE_REST + ROPE_PER * sqrt(_rope_mass)
+		_rope_v += (ROPE_K * (rest - _rope_y) - ROPE_DAMP * _rope_v) * delta
+		_rope_y = clampf(_rope_y + _rope_v * delta, 1.0, fall)
+		if (_rope_y > fall * SNAP_AT or _rope_mass > SNAP_MASS) and _rope_mass > 2.5:
+			var go := _rope_mass * (1.0 - KEEP)
+			_rope_mass -= go
+			_falls.append({"x": lip.x, "y": lip.y + _rope_y, "v": maxf(_rope_v, 20.0), "mass": go})
+			_thread_from = _rope_y
+			_thread = THREAD_LIFE
+			_rope_y = ROPE_REST + ROPE_PER * sqrt(_rope_mass)
+			_rope_v = -RECOIL
 	_thread = maxf(_thread - delta, 0.0)
 	var kept: Array[Dictionary] = []
 	for f: Dictionary in _falls:
@@ -1361,9 +1543,9 @@ func _drive_rope(delta: float) -> void:
 		f["y"] = float(f["y"]) + float(f["v"]) * delta
 		if float(f["y"]) >= _pool_y():
 			_landed += float(f["mass"])
-			for k in 3:
+			for k in 2:
 				_coils.append({"x": float(f["x"]) + _roll.randf_range(-2.0, 2.0), "age": -k * 0.08,
-					"w": 16.0 - k * 4.0 + sqrt(float(f["mass"])) * 0.4})
+					"w": 8.0 - k * 3.0 + sqrt(float(f["mass"])) * 0.6})
 			continue
 		kept.append(f)
 	_falls = kept
@@ -1379,84 +1561,182 @@ func _lip() -> Vector2:
 	return Vector2(_g1.x + 4.0, _g1.y + 1.0)
 
 
+## The honey's surface in the bucket, painted pixels: down inside it while empty, at the mouth
+## once full.
 func _pool_y() -> float:
-	return BUCKET_MOUTH.y + 3.0 - bucket_level() * 3.0
+	return BUCKET_MOUTH.y + (1.0 - bucket_level()) * POOL_DEEP
 
 
-## The gutter, the honey in it and over it, the rope, the drops, the bucket and its coils.
+## The stream's width off the flow.
+func _stream_wide() -> float:
+	return clampf(STREAM_WIDE.x + sqrt(maxf(_flow, 0.0)) * 0.3, STREAM_WIDE.x, STREAM_WIDE.y)
+
+
+## The gutter, the honey in it and over it, the stream, the drops, the bucket and its coils.
 func _draw_honey() -> void:
 	if _h.is_empty():
 		return
 	var n := _h.size()
-	# The bucket first: the rope falls into it from above.
+	# The bucket first: the stream falls into it from above.
 	HiveArt.draw(self, &"bucket", to_canvas(BUCKET_MOUTH), &"mouth")
 	_draw_pool()
-	# The tin's back wall.
+	# The iron straps the gutter hangs from, up to the frame's foot.
+	var frame_foot := FRAME_AT.y + _frame.y - 2.0
+	for s: float in STRAPS:
+		var x := _g0.x + s
+		var y := floorf(_gut(x)) - 6.0
+		_box(Vector2(x - 1.0, frame_foot), Vector2(4.0, y - frame_foot + 1.0), HiveArt.OUT)
+		_box(Vector2(x, frame_foot), Vector2(2.0, y - frame_foot), STEEL_SHADE)
+		_box(Vector2(x, frame_foot), Vector2(1.0, y - frame_foot), STEEL_BASE)
+	# The tin's back wall: its rolled top edge lit, the inside in shade.
 	for i in n:
 		var x := _g0.x + i
 		var y := floorf(_gut(x))
-		_box(Vector2(x, y - 6.0), Vector2(1.0, 4.0), STEEL_SHADE)
-	# The curtains, over the capped face, down to the tin.
+		_box(Vector2(x, y - 7.0), Vector2.ONE, HiveArt.OUT)
+		_box(Vector2(x, y - 6.0), Vector2.ONE, STEEL_LIT)
+		_box(Vector2(x, y - 5.0), Vector2(1.0, 3.0), STEEL_SHADE)
+	# The honey riding the channel, fatter than the tin: a rounded glossy body with ripples
+	# running down it, the front rim drawn over its foot.
+	var tops := PackedFloat32Array()
+	tops.resize(n)
+	for i in n:
+		var v := _h[i]
+		tops[i] = INF
+		if v < 0.4:
+			continue
+		var x := _g0.x + i
+		var y := floorf(_gut(x))
+		var tall := minf(3.0 + sqrt(v) * 2.0, DEEP_MOST)
+		tall += sin(x * RIPPLE_LONG - age * RIPPLE_PACE) * RIPPLE_TALL * clampf(v / 8.0, 0.0, 1.0)
+		var top := roundf(y - RIM - tall + 1.0)
+		tops[i] = top
+		var foot := y + 1.0
+		var span := foot - top
+		_box(Vector2(x, top - 1.0), Vector2.ONE, HiveArt.HONEY_DEEP)
+		_span_ink(x, top, top + ceilf(span * 0.14), HiveArt.HONEY_SHINE)
+		_span_ink(x, top + ceilf(span * 0.14), top + ceilf(span * 0.32), HiveArt.HONEY_LIGHT)
+		_span_ink(x, top + ceilf(span * 0.32), top + ceilf(span * 0.62), HiveArt.HONEY)
+		_span_ink(x, top + ceilf(span * 0.62), top + ceilf(span * 0.85), HiveArt.HONEY_MID)
+		_span_ink(x, top + ceilf(span * 0.85), foot, HiveArt.HONEY_DEEP)
+	# The curtains, over the capped face, down into the honey: drawn after the honey in the tin
+	# so a curtain that has reached it sinks into it with a soft flare rather than standing on
+	# it with a seam (2026-10-04, Richard).
 	for k in CURTAINS.size():
 		if _curtain_top[k] < 0.0:
 			continue
 		var c := CURTAINS[k]
 		var flow := _curtain_flow[k]
-		_curtain(FRAME_AT.x + c.x, _curtain_top[k], _curtain_bot[k], maxf(c.y * (0.4 + 0.6 * flow), 3.0),
-			maxf(c.z * (0.4 + 0.6 * flow), 2.0), k)
-	# The tin, lit along its lip.
-	for i in n:
-		var x := _g0.x + i
-		var y := floorf(_gut(x))
-		_box(Vector2(x, y - 3.0), Vector2(1.0, 7.0), HiveArt.OUT)
-		_box(Vector2(x, y - 2.0), Vector2(1.0, 5.0), STEEL_BASE)
-		_box(Vector2(x, y - 2.0), Vector2.ONE, STEEL_HI)
-		_box(Vector2(x, y - 1.0), Vector2.ONE, STEEL_LIT)
-		_box(Vector2(x, y + 2.0), Vector2(1.0, 1.0), STEEL_SHADE)
-	_box(Vector2(_g0.x - 2.0, floorf(_gut(_g0.x)) - 7.0), Vector2(3.0, 12.0), STEEL_SHADE)
-	# The honey riding it, fatter than the tin: a rounded glossy body over the rim.
-	for i in n:
-		var v := _h[i]
-		if v < 0.4:
+		var x := FRAME_AT.x + c.x
+		var at_floor := _curtain_bot[k] >= _gut(x) - 2.5
+		var i := int(clampf(x - _g0.x, 0.0, n - 1))
+		var join := tops[i] if tops[i] != INF else floorf(_gut(x)) - RIM
+		_curtain(x, _curtain_top[k], _curtain_bot[k], maxf(c.y * (0.4 + 0.6 * flow), 3.0),
+			maxf(c.z * (0.4 + 0.6 * flow), 2.0), k, at_floor, flow < 0.5, join)
+	# Glints sliding down with the flow.
+	for g in GLINTS:
+		var at := fposmod(age * GLINT_PACE + g * float(n) / GLINTS, float(n))
+		var i := int(at)
+		if i >= n or tops[i] == INF or _h[i] < 1.5:
 			continue
 		var x := _g0.x + i
+		_box(Vector2(x, tops[i] + 1.0), Vector2(2.0, 1.0), HiveArt.STAR_WHITE)
+		_box(Vector2(x - 2.0, tops[i] + 1.0), Vector2(2.0, 1.0), _ink(HiveArt.STAR_WHITE, 0.45))
+	# Bubbles riding in it.
+	for b: Dictionary in _bubbles:
+		var i := int(clampf(float(b["x"]) - _g0.x, 0.0, n - 1))
+		if tops[i] == INF:
+			continue
+		var at := Vector2(_g0.x + i, tops[i] + 3.0)
+		if int(b["r"]) <= 1:
+			_box(at, Vector2.ONE, HiveArt.HONEY_SHINE)
+		else:
+			_box(at + Vector2(-1.0, 0.0), Vector2.ONE, HiveArt.HONEY_SHINE)
+			_box(at + Vector2(1.0, 0.0), Vector2.ONE, HiveArt.HONEY_SHINE)
+			_box(at + Vector2(0.0, -1.0), Vector2.ONE, HiveArt.STAR_WHITE)
+			_box(at + Vector2(0.0, 1.0), Vector2.ONE, HiveArt.HONEY_LIGHT)
+	# The front rim: rolled over at the top, lit, rounding under into shade.
+	for i in n:
+		var x := _g0.x + i
 		var y := floorf(_gut(x))
-		var tall := minf(3.0 + sqrt(v) * 2.0, DEEP_MOST) + sin(x * 0.11 + age * 1.5) * 0.6
-		var top := roundf(y - RIM - tall + 2.0)
-		var foot := y + 2.0
-		var span := foot - top
-		_box(Vector2(x, top - 1.0), Vector2.ONE, HiveArt.HONEY_DEEP)
-		_span_ink(x, top, top + ceilf(span * 0.14), HiveArt.HONEY_SHINE)
-		_span_ink(x, top + ceilf(span * 0.14), top + ceilf(span * 0.32), HiveArt.HONEY_LIGHT)
-		_span_ink(x, top + ceilf(span * 0.32), top + ceilf(span * 0.7), HiveArt.HONEY)
-		_span_ink(x, top + ceilf(span * 0.7), foot, HiveArt.HONEY_MID)
-		_box(Vector2(x, foot), Vector2.ONE, HiveArt.HONEY_DEEP)
-		if int(x) % 9 < 3 and v < 30.0:
-			_box(Vector2(x, top + 1.0), Vector2.ONE, Color(1.0, 1.0, 0.96))
-	# Honey over the lip, running down the tin's face.
+		_box(Vector2(x, y - 3.0), Vector2(1.0, 8.0), HiveArt.OUT)
+		_box(Vector2(x, y - 2.0), Vector2.ONE, STEEL_HI)
+		_box(Vector2(x, y - 1.0), Vector2.ONE, STEEL_LIT)
+		_box(Vector2(x, y), Vector2(1.0, 2.0), STEEL_BASE)
+		_box(Vector2(x, y + 2.0), Vector2(1.0, 2.0), STEEL_SHADE)
+		# Honey standing deep laps over the rim.
+		if _h[i] > 6.0:
+			_box(Vector2(x, y - 2.0), Vector2.ONE, HiveArt.HONEY_LIGHT)
+	# The high end's cap, and the low end's cap with its pouring lip.
+	var hi_y := floorf(_gut(_g0.x))
+	_box(Vector2(_g0.x - 3.0, hi_y - 8.0), Vector2(3.0, 14.0), HiveArt.OUT)
+	_box(Vector2(_g0.x - 2.0, hi_y - 7.0), Vector2(1.0, 12.0), STEEL_SHADE)
+	var lo := _lip()
+	var lo_y := floorf(_gut(_g1.x))
+	_box(Vector2(_g1.x + 1.0, lo_y - 6.0), Vector2(1.0, 11.0), HiveArt.OUT)
+	_box(Vector2(_g1.x + 1.0, lo_y - 1.0), Vector2(4.0, 1.0), HiveArt.OUT)
+	_box(Vector2(_g1.x + 1.0, lo_y), Vector2(4.0, 2.0), STEEL_LIT)
+	_box(Vector2(_g1.x + 1.0, lo_y + 2.0), Vector2(4.0, 1.0), HiveArt.OUT)
+	if _stream or _rope_mass > 0.5 or _h[n - 1] > 0.4:
+		_box(Vector2(_g1.x + 1.0, lo_y), Vector2(4.0, 1.0), HiveArt.HONEY_LIGHT)
+	# Honey smeared down the tin's face where it spilled, and the spills still running.
+	for s: Dictionary in _smears:
+		var x := float(s["x"])
+		var long := float(s["len"])
+		var y0 := floorf(_gut(x)) + 3.0
+		_box(Vector2(x, y0), Vector2(1.0, long), _ink(HiveArt.HONEY_MID, 0.85))
+		_box(Vector2(x - 1.0, y0 + long), Vector2(3.0, 1.0), _ink(HiveArt.HONEY, 0.85))
+		_box(Vector2(x, y0 + long), Vector2.ONE, _ink(HiveArt.HONEY_SHINE, 0.85))
 	for s: Dictionary in _spills:
 		var x := float(s["x"])
 		HiveArt.drip(self, to_canvas(Vector2(x, floorf(_gut(x)) + 3.0)), float(s["len"]))
+	_draw_stream(lo)
 	_draw_rope()
 	for f: Dictionary in _falls:
-		var r := 2.0 + sqrt(float(f["mass"])) * 0.5
+		var r := 1.5 + sqrt(float(f["mass"])) * 0.5
 		var stretch := clampf(float(f["v"]) / 400.0, 0.0, 0.8)
 		_blob(Vector2(float(f["x"]), float(f["y"])), Vector2(r * (1.0 - stretch * 0.3), r * (1.0 + stretch)))
+	# The bucket's near wall over whatever has fallen below its brim (2026-10-04, Richard: the
+	# drip was "clipping through"): the stream ends on the honey, behind the wall.
+	HiveArt.draw(self, &"bucket_front", to_canvas(BUCKET_MOUTH), &"mouth")
 
 
-## The pool in the bucket's mouth, rising, glossy, with the coils folding into it.
+## The bucket's inside: its dark wall down to the honey, and the honey's surface clipped to the
+## mouth, a crescent at the foot of it while there is little and the whole mouth at the brim.
+## The coils fold on it.
 func _draw_pool() -> void:
 	var level := bucket_level()
-	if level <= 0.01:
+	if level <= 0.002:
 		return
 	var half := HiveArt.anchor(&"bucket", &"half") if HiveArt.knows(&"bucket") else Vector2(48.0, 6.0)
-	var lift := (1.0 - level) * 3.0
-	var middle := BUCKET_MOUTH + Vector2(0.0, lift)
-	var h := half - Vector2(1.0, 1.0 + lift * 0.5)
-	_ellipse_rows(middle, h, HiveArt.HONEY_MID)
-	_ellipse_rows(middle + Vector2(0.0, 0.5), h - Vector2(2.0, 1.5), HiveArt.HONEY)
-	_box(middle + Vector2(-34.0, -h.y + 2.0), Vector2(34.0, 1.0), HiveArt.HONEY_LIGHT)
-	_box(middle + Vector2(-28.0, -h.y + 3.0), Vector2(14.0, 1.0), HiveArt.HONEY_SHINE)
+	var mouth := BUCKET_MOUTH
+	var mouth_half := half - Vector2(1.0, 0.0)
+	var surface := Vector2(mouth.x, _pool_y())
+	var top := floori(mouth.y - mouth_half.y)
+	for y in range(top, ceili(mouth.y + mouth_half.y) + 1):
+		var a := _row_span(mouth, mouth_half, y)
+		var b := _row_span(surface, mouth_half, y)
+		if a.y <= a.x or b.y <= b.x:
+			continue
+		var l := maxf(a.x, b.x)
+		var r := minf(a.y, b.y)
+		if r <= l:
+			continue
+		var dy := float(y) + 0.5 - surface.y
+		var ink := HiveArt.HONEY
+		if dy < -mouth_half.y * 0.55:
+			ink = HiveArt.HONEY_LIGHT
+		elif dy > mouth_half.y * 0.45:
+			ink = HiveArt.HONEY_MID
+		_box(Vector2(l, y), Vector2(r - l, 1.0), ink)
+		# The edge where the honey meets the bucket's wall, darker.
+		_box(Vector2(l, y), Vector2.ONE, HiveArt.HONEY_DEEP)
+		_box(Vector2(r - 1.0, y), Vector2.ONE, HiveArt.HONEY_DEEP)
+	# A shine across the surface's far side once there is enough of it to see.
+	if level > 0.35:
+		var shine_y := floorf(surface.y - mouth_half.y * 0.6)
+		var s := _row_span(mouth, mouth_half, int(shine_y))
+		if s.y > s.x:
+			_box(Vector2(maxf(s.x + 8.0, mouth.x - 32.0), shine_y), Vector2(14.0, 1.0), HiveArt.HONEY_SHINE)
 	for c: Dictionary in _coils:
 		var t := float(c["age"])
 		if t < 0.0:
@@ -1465,29 +1745,107 @@ func _draw_pool() -> void:
 		var w := float(c["w"]) * (1.0 - 0.5 * k)
 		var up := (1.0 - k) * 3.0
 		var steps := int(w * 2.0)
+		for st in steps:
+			var ang := TAU * st / steps
+			var at := Vector2(float(c["x"]) + cos(ang) * w * 0.5, surface.y - up + sin(ang) * w * 0.16).floor()
+			if not _on_pool(at + Vector2(0.5, 0.5), surface, mouth_half):
+				continue
+			_box(at, Vector2.ONE, _ink(HiveArt.HONEY_SHINE if st % 2 else HiveArt.HONEY_LIGHT, 1.0 - k))
+
+
+## Where an ellipse's row `y` runs, as (left, right); empty (right <= left) off it.
+func _row_span(middle: Vector2, half: Vector2, y: int) -> Vector2:
+	var dy := (float(y) + 0.5 - middle.y) / half.y
+	if absf(dy) >= 1.0:
+		return Vector2.ZERO
+	var w := half.x * sqrt(1.0 - dy * dy)
+	return Vector2(roundf(middle.x - w), roundf(middle.x + w))
+
+
+static func _in_ellipse(p: Vector2, middle: Vector2, half: Vector2) -> bool:
+	var d := (p - middle) / half
+	return d.length_squared() < 1.0
+
+
+## The stream off the lip: fat where it leaves, necking to its own width, wobbling more the
+## further it falls, a round head while it is still falling, a heap where it lands; once it
+## lets go of the lip, its top necks to a thread.
+func _draw_stream(lip: Vector2) -> void:
+	if not _stream:
+		return
+	var ws := _stream_wide()
+	var wtop := clampf(4.0 + _h[_h.size() - 1] * 0.25, ws, 12.0)
+	var fall := maxf(_pool_y() - lip.y, 4.0)
+	var from := int(maxf(_tail, 0.0))
+	var to := int(_head)
+	var landed := _head >= fall - 0.5
+	for y in range(from, to):
+		var t := float(y) / fall
+		var w := ws + (wtop - ws) * exp(-float(y) / 5.0) if _tail <= 0.0 else ws
+		w += sin(float(y) * 0.5 - age * 9.0) * 0.4
+		if _tail > 0.0 and float(y) - _tail < NECK:
+			w = lerpf(1.0, w, clampf((float(y) - _tail) / NECK, 0.0, 1.0))
+		var tip := clampf(ws * 0.9 + 3.0, TIP_LEAST, TIP_MOST)
+		if not landed and float(to - y) <= tip:
+			w = _tip_width(w, 1.0 - float(to - y) / tip)
+		var cx := lip.x + sin(float(y) * 0.13 - age * 6.0) * STREAM_WOBBLE * t
+		_rope_row(cx, lip.y + y, w)
+	if landed:
+		_draw_landing(lip.x, ws)
+
+
+## Where the stream meets the honey (2026-10-04, Richard: "end on the bucket pool and spread
+## out seamlessly"): a low mound in the pool's own colours, lit on top, and rings of light
+## spreading out from it through the surface, all clipped to what of the surface shows in the
+## mouth, so nothing is drawn on the bucket.
+func _draw_landing(x: float, ws: float) -> void:
+	var half := HiveArt.anchor(&"bucket", &"half") if HiveArt.knows(&"bucket") else Vector2(48.0, 6.0)
+	var mouth_half := half - Vector2(1.0, 0.0)
+	var surface := Vector2(BUCKET_MOUTH.x, _pool_y())
+	var mound := Vector2(x, surface.y)
+	var mound_half := Vector2(ws * 1.4 + 2.0, 2.0)
+	for y in range(floori(mound.y - mound_half.y), ceili(mound.y + mound_half.y)):
+		var span := _row_span(mound, mound_half, y)
+		for px in range(int(span.x), int(span.y)):
+			var p := Vector2(px, y)
+			if not _on_pool(p + Vector2(0.5, 0.5), surface, mouth_half):
+				continue
+			var top := float(y) < mound.y - mound_half.y * 0.3
+			_box(p, Vector2.ONE, HiveArt.HONEY_LIGHT if top else HiveArt.HONEY)
+	# The rings: two at once, each opening out from the mound and fading into the honey.
+	for k in LANDING_RINGS:
+		var t := fposmod(age * LANDING_RING_PACE + float(k) / LANDING_RINGS, 1.0)
+		var r := mound_half.x + t * LANDING_RING_REACH
+		var steps := int(r * 3.0) + 8
 		for s in steps:
 			var ang := TAU * s / steps
-			var at := Vector2(float(c["x"]) + cos(ang) * w * 0.5, _pool_y() - up + sin(ang) * w * 0.16)
-			_box(at.floor(), Vector2.ONE, _ink(HiveArt.HONEY_SHINE if s % 2 else HiveArt.HONEY_LIGHT, 1.0 - k))
+			var p := (mound + Vector2(cos(ang) * r, sin(ang) * r * 0.16)).floor()
+			if _on_pool(p + Vector2(0.5, 0.5), surface, mouth_half):
+				_box(p, Vector2.ONE, _ink(HiveArt.HONEY_LIGHT if sin(ang) < 0.0 else HiveArt.HONEY_MID, 0.7 * (1.0 - t)))
+	_box((mound + Vector2(-1.0, -mound_half.y + 0.5)).floor(), Vector2(2.0, 1.0), HiveArt.HONEY_SHINE)
 
 
-## The rope: fat off the lip, necking, the bead at its foot; after a snap, a thread springing
-## back up to the lip.
+## Whether a point is on the honey's surface as it shows: inside the mouth and on the surface.
+func _on_pool(p: Vector2, surface: Vector2, half: Vector2) -> bool:
+	return _in_ellipse(p, BUCKET_MOUTH, half) and _in_ellipse(p, surface, half)
+
+
+## The drips once the stream has gone: a bead sprung under the lip, swelling until it lets go;
+## after a snap, a thread springing back up to the lip.
 func _draw_rope() -> void:
-	var lip := _lip()
-	var flowing := _rope_mass > 1.0 or _h[_h.size() - 1] > 0.5
-	if not flowing and _thread <= 0.0:
+	if _stream:
 		return
-	var wtop := clampf(4.0 + _h[_h.size() - 1] * 0.25, 4.0, 14.0)
-	var bead_r := 2.0 + sqrt(_rope_mass) * 0.55
-	var reach := _rope_y
+	var lip := _lip()
+	if _rope_mass <= 0.6 and _thread <= 0.0:
+		return
+	var bead_r := 1.5 + sqrt(maxf(_rope_mass, 0.0)) * 0.55
+	var reach := maxf(_rope_y - bead_r, 0.0)
 	for y in int(reach):
 		var t := float(y) / maxf(reach, 1.0)
-		var neck := maxf(1.0, wtop * 0.22)
-		var w := lerpf(wtop, neck, sin(minf(1.0, t * 1.15) * PI * 0.5))
+		var w := lerpf(3.0, 1.0, sin(minf(1.0, t * 1.15) * PI * 0.5))
 		_rope_row(lip.x, lip.y + y, w)
-	if _rope_mass > 1.0:
-		_blob(lip + Vector2(0.0, reach + bead_r * 0.6), Vector2(bead_r, bead_r * 1.1))
+	if _rope_mass > 0.6:
+		_blob(lip + Vector2(0.0, reach + bead_r * 0.5), Vector2(bead_r, bead_r * 1.15))
 	if _thread > 0.0:
 		var k := _thread / THREAD_LIFE
 		var long := _thread_from * k
@@ -1518,15 +1876,57 @@ func _blob(middle: Vector2, half: Vector2) -> void:
 
 
 ## A glossy sheet of honey (mockup2 `curtain`): wobbling at its edges, dark down its left, a
-## bright streak a third of the way in, narrowing from `w0` to `w1` as it falls.
-func _curtain(x: float, y0: float, y1: float, w0: float, w1: float, k: int) -> void:
+## bright streak a third of the way in, narrowing from `w0` to `w1` as it falls. Once it is no
+## longer fed its top necks to a thread rather than ending in a flat cut. **On its way down its
+## foot is a teardrop of the curtain itself** (`_tip_width`: it swells a little and rounds
+## off, the same colours, a glint on it), where it was a ringed bead stuck on the end; **once
+## it reaches the tin it sinks `SINK` px into the honey there and flares into it** in the
+## honey's own top colours, no dark edge (2026-10-04, Richard: no seam where it meets the
+## gutter's honey, and a natural drop).
+func _curtain(
+	x: float, y0: float, y1: float, w0: float, w1: float, k: int, at_floor: bool, necking: bool,
+	join: float
+) -> void:
 	var ph := float(k) * 1.7
-	var tall := maxf(y1 - y0, 1.0)
-	for yy in range(int(y0), int(y1)):
+	var end := join + SINK if at_floor else y1
+	var tall := maxf(end - y0, 1.0)
+	var tip := clampf(w1 * 0.9 + 3.0, TIP_LEAST, TIP_MOST)
+	var cx := x
+	for yy in range(int(y0), int(end)):
 		var t := (yy - y0) / tall
 		var w := maxf(2.0, w0 + (w1 - w0) * pow(t, 0.8) + sin(yy * 0.21 + ph + age * 2.0) * 1.3)
-		var cx := x + sin(yy * 0.06 + ph + age * 0.8) * 1.5
+		if necking and float(yy) - y0 < NECK:
+			w = lerpf(1.0, w, clampf((float(yy) - y0) / NECK, 0.0, 1.0))
+		cx = x + sin(yy * 0.06 + ph + age * 0.8) * 1.5
+		var left := end - float(yy)
+		if at_floor and left <= FLARE:
+			var u := 1.0 - left / FLARE
+			_soft_row(cx, yy, w + u * u * FLARE_WIDE)
+			continue
+		if not at_floor and left <= tip and end - y0 > tip:
+			w = _tip_width(w, 1.0 - left / tip)
 		_rope_row(cx, yy, w)
+	if not at_floor and end - y0 > tip:
+		_box(Vector2(roundf(cx - 1.0), floorf(end - tip * 0.45)), Vector2.ONE, HiveArt.HONEY_SHINE)
+
+
+## A falling foot's width down its last rows, `u` 0 where the tip begins to 1 at its very end:
+## a little swell, then rounded off to a single pixel, so it reads as a drop of the same honey.
+static func _tip_width(w: float, u: float) -> float:
+	var swell := 1.0 + TIP_SWELL * sin(minf(u / 0.6, 1.0) * PI * 0.5)
+	var round := 1.0 if u < 0.55 else sqrt(maxf(1.0 - pow((u - 0.55) / 0.45, 2.0), 0.0))
+	return maxf(w * swell * round, 1.0)
+
+
+## A row of a curtain where it sinks into the honey in the tin: the honey's own top colours,
+## light across with a shine down its middle, and no dark edge, so it has no seam.
+func _soft_row(cx: float, y: float, w: float) -> void:
+	var l := roundf(cx - w * 0.5)
+	var r := roundf(cx + w * 0.5)
+	_box(Vector2(l, y), Vector2(maxf(r - l + 1.0, 1.0), 1.0), HiveArt.HONEY_LIGHT)
+	var span := r - l
+	if span >= 3.0:
+		_box(Vector2(l + ceilf(span * 0.3), y), Vector2(maxf(ceilf(span * 0.25), 1.0), 1.0), HiveArt.HONEY_SHINE)
 
 
 func _ellipse_rows(middle: Vector2, half: Vector2, ink: Color) -> void:

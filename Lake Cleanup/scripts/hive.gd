@@ -36,6 +36,8 @@
 class_name Hive
 extends Node2D
 
+const Style := preload("res://scripts/style.gd")
+
 signal changed
 
 ## SETTLE (2026-09-30, the second pass) is a colony caught and not yet smoked and crowned:
@@ -77,15 +79,20 @@ const DONE_SHARE := 0.35
 ## The ready mark bobs this many world pixels over its spot, at this many radians a second.
 const READY_BOB := 2.0
 const READY_RATE := 2.4
-## The lamp stands this far over the ready mark when both show (the contract's 8 px), so the
-## two never sit in one spot.
-const LAMP_OVER := 8.0
+## The key chip the mark turns into with the angler in reach: the shed room's E prompt, a
+## square of wood `CHIP` world px with the bound key written on it.
+const CHIP := 18.0
 
 ## Bees: the flying ones at the island's own bee (`Flora.BEE_COLOR`), one art pixel each, so
 ## the island has one bee and not two.
 const COMMUTERS := 8
 const CROWD := 6
-const SWARM_SPECKS := 10
+const SWARM_SPECKS := 22
+## The swarm's bees fly loose (2026-10-04, Richard: "messier, not all concentrated"): each
+## circles its own spot round the cluster, out to `SWARM_REACH` world px, and now and then
+## peels off on a wide loop `SWARM_PEEL` px out and comes back.
+const SWARM_REACH := Vector2(26.0, 16.0)
+const SWARM_PEEL := 30.0
 ## World px a second a commuter covers, and the least time a leg may take however close the
 ## flower is: a bee that turns round in a frame reads as a flicker.
 const BEE_SPEED := 44.0
@@ -109,7 +116,7 @@ const PX := 2.0
 const HONEY := Color8(238, 164, 38)
 const GOLD := Color8(255, 204, 77)
 const OUT := Color8(24, 18, 17)
-## The pump's lamp.
+## The pump's lamp, over the post drawn when there is no picture.
 const LAMP := Color(1.0, 0.92, 0.62, 0.9)
 const LAMP_GLOW := Color(1.0, 0.92, 0.62, 0.25)
 
@@ -125,7 +132,8 @@ static var _contract := {}
 static var _contract_read := false
 
 var day: DayCycle
-## The angler is close enough to work it and there is something to do: the pump's lamp.
+## The angler is close enough to work it and there is something to do: the ready mark turns
+## into the key chip (with no picture, the pump's lamp over the post).
 var lit := false:
 	set(value):
 		if value != lit:
@@ -374,6 +382,15 @@ func actionable() -> bool:
 	return stage == Stage.SWARM or stage == Stage.READY or stage == Stage.SETTLE
 
 
+## What stands over the roof: the gold mark over anything with something to do (a swarm, a
+## colony to settle, honey ready), turned into the key chip that opens the room while the angler
+## is in reach (2026-10-04, Richard), or nothing.
+func mark() -> StringName:
+	if not actionable():
+		return &""
+	return &"chip" if lit else &"orb"
+
+
 ## The room's steps for this visit, in order. Empty when there is nothing to do.
 func plan() -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -505,16 +522,6 @@ func ready_point() -> Vector2:
 	return Vector2(box.get_center().x, box.position.y - 12.0)
 
 
-## Where the lamp goes: over the roof peak, or `LAMP_OVER` over the ready mark (clear of its
-## bob) when the mark is up.
-func lamp_point() -> Vector2:
-	var at := ready_point()
-	if stage == Stage.READY:
-		var mark := _rect(contract().get("ready"), Rect2(0, 0, 9, 9))
-		at.y -= mark.size.y * ART_SCALE * 0.5 + READY_BOB + LAMP_OVER
-	return at
-
-
 ## The ready mark's bob this moment: 0 at rest down to `-READY_BOB` at the top.
 func ready_bob() -> float:
 	return -READY_BOB * 0.5 * (1.0 - cos(_clock * READY_RATE))
@@ -605,10 +612,11 @@ func _draw() -> void:
 			_draw_swarm()
 	if stage == Stage.READY or stage == Stage.SETTLE:
 		_draw_crowd()
-	if stage == Stage.READY:
-		_draw_ready()
-	if lit:
-		_draw_lamp(lamp_point())
+	match mark():
+		&"chip":
+			_draw_chip()
+		&"orb":
+			_draw_ready()
 
 
 ## Draw the commuting bees on the air layer.
@@ -748,11 +756,19 @@ func _draw_swarm() -> void:
 		var h1 := _roll(i, 11.0)
 		var h2 := _roll(i, 12.0)
 		var h3 := _roll(i, 13.0)
-		var a := _clock * (2.0 + h1 * 1.4) + h2 * TAU
-		var at := middle + Vector2(
-			cos(a) * (9.0 + 7.0 * h3) + sin(a * 2.3) * 2.0,
-			sin(a * 1.6) * (6.0 + 5.0 * h1)
+		var h4 := _roll(i, 14.0)
+		# Its own spot round the cluster, wandering, and its own loop about it.
+		var spot := middle + Vector2(
+			(h3 * 2.0 - 1.0) * SWARM_REACH.x + sin(_clock * (0.4 + 0.3 * h4) + h1 * 7.0) * 6.0,
+			(h4 * 2.0 - 1.0) * SWARM_REACH.y + cos(_clock * (0.35 + 0.3 * h3) + h2 * 5.0) * 4.0
 		)
+		var a := _clock * (2.0 + h1 * 2.4) * (1.0 if h2 < 0.5 else -1.0) + h2 * TAU
+		var r := 4.0 + 6.0 * h1
+		# Now and then a long loop out and back, eased so it leaves and returns smoothly.
+		var peel_phase := fposmod(_clock / (5.0 + 6.0 * h3) + h4, 1.0)
+		var peel := sin(clampf((peel_phase - 0.7) / 0.3, 0.0, 1.0) * PI)
+		r += peel * SWARM_PEEL * (0.6 + 0.4 * h2)
+		var at := spot + Vector2(cos(a) * r + sin(a * 2.7) * 2.0, sin(a * 1.3) * r * 0.6)
 		_bee(at, -signf(sin(a)), flick, seen)
 	_bees_flush(self)
 
@@ -786,6 +802,19 @@ func _draw_ready() -> void:
 		return
 	draw_circle(at, 8.0, OUT)
 	draw_circle(at, 6.0, GOLD)
+
+
+## The key chip in the ready mark's place: the shed room's prompt, the interact key named as
+## this keyboard prints it, or the pad's button in pad mode.
+func _draw_chip() -> void:
+	var at := ready_point()
+	var box := Rect2((at - Vector2(CHIP, CHIP) * 0.5).floor(), Vector2(CHIP, CHIP))
+	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.9))
+	draw_rect(box, Style.INK_DIM, false, 1.0)
+	var key := Binds.shown(&"interact", Pad.is_pad())
+	var size := Style.TEXT_SMALL
+	var wide := Style.font().get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	Style.write(self, key, size, box.position + Vector2((CHIP - wide) * 0.5, 14.0), Style.INK)
 
 
 func _draw_lamp(at: Vector2) -> void:

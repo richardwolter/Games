@@ -68,6 +68,16 @@ const SEED_CROWN := 6257
 const SEED_SIZZLE := 6263
 const SEED_WHIRR := 6269
 const SEED_POUR := 6271
+const SEED_WHOOMP := 6277
+## The swarm poured into the box (2026-10-04, Richard: "a satisfying sound when dragging the
+## bees to the box and releasing"): a soft thump of air `WHOOMP_LENGTH` long, a sine falling
+## `WHOOMP_FROM` to `WHOOMP_TO` hertz under a breath of dark noise; and a warm chime the catch
+## step rings a step higher for each clump boxed, a struck note with its octave.
+const WHOOMP_LENGTH := 0.5
+const WHOOMP_FROM := 150.0
+const WHOOMP_TO := 55.0
+const CHIME_LENGTH := 1.2
+const CHIME_HZ := 880.0
 
 ## The colony. Three workers a few hertz apart, so the hum beats slowly against itself the way
 ## a box of bees does rather than sitting on one note. Each is a multiple of half a hertz, so
@@ -124,8 +134,19 @@ const WHIRR_LENGTH := 1.0
 const WHIRR_DRUM := 96.0
 const WHIRR_TURNS := 4.0
 const WHIRR_TEETH := 24.0
-const POUR_LENGTH := 1.2
-const POUR_GLUGS := [0.08, 0.31, 0.53, 0.79, 0.97]
+## The pour (2026-10-04, Richard: "awful, it should sound more bubbly and gooey"): a loop this
+## long, so the bubbles do not come round in a beat a second; a bubble every `POUR_GAP`
+## seconds, each rising from `POUR_PITCH` by `POUR_RISE` over its own length, `POUR_DOUBLE` of
+## them followed by a smaller one, `POUR_GLOP` of them sat on a low thick glop; and the bed
+## under them low and thick, breathing `POUR_BREATHS` times a loop, at `POUR_BED` of the peak.
+const POUR_LENGTH := 2.4
+const POUR_GAP := Vector2(0.07, 0.2)
+const POUR_PITCH := Vector2(220.0, 520.0)
+const POUR_RISE := Vector2(1.5, 2.4)
+const POUR_DOUBLE := 0.3
+const POUR_GLOP := 0.4
+const POUR_BREATHS := 3.0
+const POUR_BED := 0.22
 
 ## The loops built so far, by name, so a room opened twice builds nothing the second time.
 static var _cache := {}
@@ -168,6 +189,10 @@ static func make(name: StringName, take: int = 0) -> AudioStreamWAV:
 			return _whirr()
 		&"hive_pour":
 			return _pour()
+		&"hive_whoomp":
+			return _whoomp()
+		&"hive_chime":
+			return _chime()
 	return null
 
 
@@ -511,6 +536,41 @@ static func _done() -> AudioStreamWAV:
 	return _wav(_faded(out, 0.1, LOW_RATE), false, LOW_RATE)
 
 
+## The swarm let into the box: a low sine sinking in pitch and a puff of dark noise, both
+## swelling in over a few milliseconds and dying away, so it lands as a soft thump of air.
+static func _whoomp() -> AudioStreamWAV:
+	var roll := _roll(SEED_WHOOMP)
+	var count := int(WHOOMP_LENGTH * RATE)
+	var out := PackedFloat32Array()
+	out.resize(count)
+	var phase := 0.0
+	var low := 0.0
+	var lower := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var u := t / WHOOMP_LENGTH
+		phase += TAU * lerpf(WHOOMP_FROM, WHOOMP_TO, sqrt(u)) / RATE
+		var swell := minf(t / 0.008, 1.0) * exp(-t / 0.12)
+		var white := roll.randf() * 2.0 - 1.0
+		low += (white - low) * 0.06
+		lower += (low - lower) * 0.06
+		var breath := minf(t / 0.02, 1.0) * exp(-t / 0.09)
+		out[i] = sin(phase) * swell + lower * 6.0 * breath
+	return _wav(_faded(out, 0.05, RATE), false)
+
+
+## A warm chime: one struck note and its octave, a soft glassy partial over them, ringing out.
+static func _chime() -> AudioStreamWAV:
+	var roll := _roll(SEED_WHOOMP + 1)
+	var out := PackedFloat32Array()
+	out.resize(int(CHIME_LENGTH * RATE))
+	out = _strike(out, RATE, 0.0, CHIME_HZ, 3.5, 1.0)
+	out = _strike(out, RATE, 0.0, CHIME_HZ * 2.0, 9.0, 0.3)
+	out = _strike(out, RATE, 0.0, CHIME_HZ * 2.76, 30.0, 0.12)
+	out = _tick(out, RATE, 0.0, 0.05, roll)
+	return _wav(_faded(out, 0.1, RATE), false)
+
+
 # --- The room's loops ---------------------------------------------------------------------
 
 ## The hot knife on wax: a hiss with the bottom taken off, bubbling as its level wanders a
@@ -599,47 +659,73 @@ static func _whirr() -> AudioStreamWAV:
 	return _wav(out, true)
 
 
-## Honey running thick out of a gate: a low rush of noise (the stream) breathing at a whole
-## number of wobbles a loop, with a glug now and then — a bubble of air let go under the
-## honey, its pitch climbing as it rises and gone in a tenth of a second. The glugs sit clear
-## of the seam and are laid on after the rush has been crossfaded, so none is ever cut in two.
+## Honey running thick out of a gate: bubbles of air coming up through it and popping, over a
+## low, thick bed. No hiss: the rush of mid-band noise the first cut had read as a tap, not as
+## honey. Each bubble is a soft sine whose pitch climbs as it rises (the catch pop's rule),
+## eased in so it never clicks; some pop twice, some sit on a low glop. The bubbles sit clear
+## of the seam and are laid on after the bed has been crossfaded, so none is ever cut in two.
 static func _pour() -> AudioStreamWAV:
 	var roll := _roll(SEED_POUR)
 	var count := int(POUR_LENGTH * RATE)
-	var cross := int(0.06 * RATE)
+	var cross := int(0.08 * RATE)
 	var total := count + cross
 	var raw := PackedFloat32Array()
 	raw.resize(total)
-	var deep := 0.0
-	var deeper := 0.0
-	var mid := 0.0
-	var under := 0.0
-	var i := 0
-	while i < total:
+	var low := 0.0
+	var lower := 0.0
+	var peak := 0.000001
+	for i in total:
 		var t := float(i) / RATE
-		var breathe := 0.8 + 0.2 * sin(TAU * 2.5 * t)
-		var end := mini(i + BLOCK, total)
-		while i < end:
-			var white := roll.randf() * 2.0 - 1.0
-			deep += (white - deep) * 0.05
-			deeper += (deep - deeper) * 0.008
-			mid += (white - mid) * 0.15
-			under += (mid - under) * 0.05
-			raw[i] = ((deep - deeper) * 3.0 + (mid - under) * 0.5) * breathe
-			i += 1
+		var breathe := 0.7 + 0.3 * sin(TAU * POUR_BREATHS / POUR_LENGTH * t)
+		var white := roll.randf() * 2.0 - 1.0
+		low += (white - low) * 0.02
+		lower += (low - lower) * 0.02
+		raw[i] = lower * breathe
+		peak = maxf(peak, absf(raw[i]))
+	for i in total:
+		raw[i] *= POUR_BED / peak
 	var out := _seam(raw, count, cross, true)
-	var window := int(0.12 * RATE)
-	for when: float in POUR_GLUGS:
-		var start := int((when + roll.randf_range(-0.02, 0.02)) * RATE)
-		var from := roll.randf_range(140.0, 190.0)
-		var loud := roll.randf_range(0.55, 0.8)
-		var phase := 0.0
-		for k in mini(window, count - start):
-			var u := float(k) / RATE
-			phase += TAU * from * (1.0 + 1.1 * minf(u / 0.07, 1.0)) / RATE
-			var swell := minf(u / 0.006, 1.0) * exp(-u / 0.03)
-			out[start + k] += sin(phase) * swell * loud
+	var when := roll.randf_range(0.02, 0.08)
+	var last := POUR_LENGTH - 0.2
+	while when < last:
+		_bubble(out, when, roll.randf_range(POUR_PITCH.x, POUR_PITCH.y),
+			roll.randf_range(POUR_RISE.x, POUR_RISE.y), roll.randf_range(0.04, 0.09),
+			roll.randf_range(0.4, 0.85))
+		if roll.randf() < POUR_DOUBLE:
+			_bubble(out, when + roll.randf_range(0.035, 0.07), roll.randf_range(380.0, 700.0),
+				roll.randf_range(1.4, 2.0), roll.randf_range(0.03, 0.05), roll.randf_range(0.25, 0.45))
+		if roll.randf() < POUR_GLOP:
+			_glop(out, when, roll.randf_range(70.0, 130.0), roll.randf_range(0.35, 0.6))
+		when += roll.randf_range(POUR_GAP.x, POUR_GAP.y)
 	return _wav(out, true)
+
+
+## One bubble added into `out` at `at` seconds: a sine from `hz` climbing to `hz * rise` over
+## `long` seconds, eased in over four milliseconds and dying away.
+static func _bubble(
+	out: PackedFloat32Array, at: float, hz: float, rise: float, long: float, loud: float
+) -> void:
+	var start := int(at * RATE)
+	var span := mini(int(long * 3.0 * RATE), out.size() - start)
+	var phase := 0.0
+	for k in span:
+		var u := float(k) / RATE
+		var climb := pow(minf(u / long, 1.0), 0.7)
+		phase += TAU * hz * (1.0 + (rise - 1.0) * climb) / RATE
+		var swell := minf(u / 0.004, 1.0) * exp(-u / (long * 0.45))
+		out[start + k] += sin(phase) * swell * loud
+
+
+## A low thick glop under a bubble: a sine sagging a little in pitch, soft at both ends.
+static func _glop(out: PackedFloat32Array, at: float, hz: float, loud: float) -> void:
+	var start := int(at * RATE)
+	var span := mini(int(0.12 * RATE), out.size() - start)
+	var phase := 0.0
+	for k in span:
+		var u := float(k) / RATE
+		phase += TAU * hz * (1.0 - 0.25 * minf(u / 0.08, 1.0)) / RATE
+		var swell := minf(u / 0.008, 1.0) * exp(-u / 0.035)
+		out[start + k] += sin(phase) * swell * loud
 
 
 # --- The workshop -------------------------------------------------------------------------

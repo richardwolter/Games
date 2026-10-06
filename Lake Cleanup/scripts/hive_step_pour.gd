@@ -27,6 +27,9 @@ class_name HiveStepPour
 extends HiveStep
 
 const JARS := 3
+## A few loose bees in the air behind the table (`HiveStep.wanderers`), after the honey.
+const AIR := 6
+const AIR_BOX := Rect2(20.0, 20.0, 600.0, 150.0)
 ## A full-open gate fills this share of a jar a second.
 const RATE := 0.42
 ## Let go at or over this and the jar is done; the line is drawn at `LINE_AT`; honey crowns
@@ -67,6 +70,14 @@ const WOBBLE := 1.2
 ## The coils where it lands: one every this while it pours, living this long.
 const COIL_EVERY := 0.09
 const COIL_LIFE := 0.7
+## The mound where the stream lands and each fold's humps, painted px tall, and how far a
+## fold's swirl sinks under the surface over its life.
+const MOUND_TALL := 2.0
+const FOLD_TALL := 2.0
+const SINK_DEEP := 7.0
+## How far down inside the bucket the honey's surface is once it is all poured, painted px:
+## the bucket empties as the jars fill (2026-10-04, Richard), the surface sinking inside it.
+const POOL_DEEP := 12.0
 
 ## A done jar: the lid falls on over `LID_TIME` from `LID_FROM` up, then it slides to the
 ## board over `SLIDE`; the next slides in over `SLIDE_IN`.
@@ -75,7 +86,10 @@ const LID_FROM := 14.0
 const SLIDE := 0.5
 const SLIDE_IN := 0.45
 const HOP := 5.0
-const FINALE_WAIT := 0.9
+const FINALE_WAIT := 1.8
+## The shared ending over the three jars on the board (`HiveStep.payoff`).
+const FINALE_AT := Vector2(460.0, 262.0)
+const FINALE_WIDE := 110.0
 const STAR_LIFE := 0.7
 const GLUG_DB := -14.0
 const GLUG_FADE := 0.08
@@ -149,6 +163,7 @@ func begin() -> void:
 	_stars.clear()
 	_finale = -1.0
 	_start_level = room.honey if room != null and room.honey > 0.05 else 1.0
+	wanderers(AIR, AIR_BOX, 5307)
 
 
 # --- the harness's hooks ------------------------------------------------------------------
@@ -256,6 +271,7 @@ func _hand_off() -> void:
 	_in = 0.0
 	if _jars_done >= JARS:
 		_finale = 0.0
+		payoff(FINALE_AT, FINALE_WIDE)
 		HiveStep.sound(&"hive_crown")
 
 
@@ -444,6 +460,7 @@ func _draw_jar(feet: Vector2, f: float, sealed: bool, lid_up: float, lid_alpha: 
 # --- drawing ------------------------------------------------------------------------------
 
 func _draw() -> void:
+	draw_wanderers()
 	# The table, the bucket on it with its level, the gate and its lever.
 	_ellipse(
 		Vector2(320.0, 300.0) + Shade.drop(null, CONTACT_RISE), Vector2(75.0, 6.0),
@@ -486,23 +503,55 @@ func _draw() -> void:
 			continue
 		var bright := sin(clampf(t / STAR_LIFE, 0.0, 1.0) * PI)
 		HiveArt.star(self, to_canvas(s["at"]), int(roundf(float(s["arm"]) * bright)), bright)
+	draw_payoff()
 
 
-## The bucket's honey through its mouth, drawn down by each jar filled.
+## The bucket's honey: its surface sinking inside the bucket as the jars fill, clipped to the
+## mouth, the whole mouth while it is full and a crescent at its foot near the end (the uncap
+## step's own picture of a level). It used to sit at the brim and move three pixels.
 func _draw_level() -> void:
 	var used := (float(_jars_done) + clampf(_fill, 0.0, 1.0)) / float(JARS)
-	var level := clampf(_start_level * (1.0 - used * 0.85), 0.05, 1.0)
+	var level := clampf(_start_level * (1.0 - used), 0.0, 1.0)
+	if level <= 0.002:
+		return
 	var mouth := TABLE_TOP + Vector2(0.0, 1.0) - HiveArt.anchor(&"bucket", &"feet") + HiveArt.anchor(&"bucket", &"mouth")
 	var half := HiveArt.anchor(&"bucket", &"half") if HiveArt.knows(&"bucket") else Vector2(48.0, 6.0)
-	var lift := (1.0 - level) * 3.0
-	var h := half - Vector2(1.0, 1.0 + lift * 0.5)
-	_ellipse(mouth + Vector2(0.0, lift), h, HiveArt.HONEY_MID)
-	_ellipse(mouth + Vector2(0.0, lift + 0.5), h - Vector2(2.0, 1.5), HiveArt.HONEY)
-	_box(mouth + Vector2(-34.0, lift - h.y + 2.0), Vector2(34.0, 1.0), HiveArt.HONEY_LIGHT)
-	_box(mouth + Vector2(-28.0, lift - h.y + 3.0), Vector2(14.0, 1.0), HiveArt.HONEY_SHINE)
-	# The draw-off: a dimple over the gate while it pours.
+	half -= Vector2(1.0, 0.0)
+	var surface := mouth + Vector2(0.0, (1.0 - level) * POOL_DEEP)
+	for y in range(floori(mouth.y - half.y), ceili(mouth.y + half.y) + 1):
+		var a := _row_of(mouth, half, y)
+		var b := _row_of(surface, half, y)
+		var l := maxf(a.x, b.x)
+		var r := minf(a.y, b.y)
+		if r <= l:
+			continue
+		var dy := float(y) + 0.5 - surface.y
+		var ink := HiveArt.HONEY
+		if dy < -half.y * 0.55:
+			ink = HiveArt.HONEY_LIGHT
+		elif dy > half.y * 0.45:
+			ink = HiveArt.HONEY_MID
+		_box(Vector2(l, y), Vector2(r - l, 1.0), ink)
+		_box(Vector2(l, y), Vector2.ONE, HiveArt.HONEY_DEEP)
+		_box(Vector2(r - 1.0, y), Vector2.ONE, HiveArt.HONEY_DEEP)
+	# The draw-off: a dimple in the surface over the gate while it pours.
 	if _turn > 0.1:
-		_ellipse(mouth + Vector2(0.0, lift + 1.0), Vector2(6.0 * _turn, 1.5), HiveArt.HONEY_MID)
+		var dimple := Vector2(surface.x, surface.y + 1.0)
+		var d := _row_of(dimple, Vector2(6.0 * _turn, 1.5), int(dimple.y))
+		var m := _row_of(mouth, half, int(dimple.y))
+		var l := maxf(d.x, m.x)
+		var r := minf(d.y, m.y)
+		if r > l:
+			_box(Vector2(l, floorf(dimple.y)), Vector2(r - l, 1.0), HiveArt.HONEY_MID)
+
+
+## Where an ellipse's row `y` runs, as (left, right); empty (right <= left) off it.
+static func _row_of(middle: Vector2, half: Vector2, y: int) -> Vector2:
+	var dy := (float(y) + 0.5 - middle.y) / half.y
+	if absf(dy) >= 1.0:
+		return Vector2.ZERO
+	var w := half.x * sqrt(1.0 - dy * dy)
+	return Vector2(roundf(middle.x - w), roundf(middle.x + w))
 
 
 ## The lever: a brass bar off the gate's pivot, a wooden grip at its end, turned `_turn` of a
@@ -576,21 +625,45 @@ func _rope_row(cx: float, y: float, w: float) -> void:
 	_box(Vector2(r, y), Vector2.ONE, HiveArt.HONEY_DEEP)
 
 
-## Coils folding on the honey where the stream lands: rings that shrink and sink.
+## Where the stream meets the honey in the jar, in the honey itself (2026-10-04, Richard:
+## "should feel more integrated and seamless"; it was rings floating over the surface): a low
+## mound in the surface's own light where the stream lands, each fold of the rope a pair of
+## humps sliding out along the surface and settling into it, and what it folded under sinking
+## as a darker swirl. Everything held inside the glass.
 func _draw_coils() -> void:
-	if _in < 1.0 or _lid_age >= 0.0:
+	if _in < 1.0 or _lid_age >= 0.0 or _fill <= 0.0:
 		return
-	var y := _surface_y()
+	var tl := (JAR_FEET - JAR_FEET_AT).floor()
+	var y := floorf(_surface_y())
 	var x := _spout().x
+	var row := _span_of(int(y - tl.y))
+	if row.y < row.x:
+		return
+	var left := tl.x + row.x
+	var right := tl.x + row.y
+	if _head > 0.5 and _tail <= 0.0:
+		var half := lerpf(WIDE_LEAST, WIDE_MOST, clampf(_turn, 0.0, 1.0)) * 0.8 + 1.0
+		for px in range(int(x - half), int(x + half) + 1):
+			if px < left or px > right:
+				continue
+			var u := absf(px - x) / half
+			var lift := int(roundf((1.0 - u * u) * MOUND_TALL))
+			for h in lift:
+				_box(Vector2(px, y - 1.0 - h), Vector2.ONE, HiveArt.HONEY_SHINE if h == lift - 1 else HiveArt.HONEY_LIGHT)
 	for c: Dictionary in _coils:
 		var k := clampf(float(c["age"]) / COIL_LIFE, 0.0, 1.0)
-		var w := float(c["w"]) * (1.0 - 0.5 * k)
-		var up := (1.0 - k) * 4.0
-		var steps := int(w * 2.0) + 4
-		for s in steps:
-			var ang := TAU * s / steps
-			var at := Vector2(x + float(c["x"]) + cos(ang) * w * 0.5, y - up + sin(ang) * w * 0.18)
-			_box(at.floor(), Vector2.ONE, _ink(HiveArt.HONEY_DEEP if sin(ang) > 0.3 else HiveArt.HONEY_LIGHT, 1.0 - k))
+		var spread := float(c["w"]) * (0.3 + 0.7 * k)
+		var tall := int(roundf((1.0 - k) * FOLD_TALL))
+		for side: float in [-1.0, 1.0]:
+			var hx := floorf(x + float(c["x"]) + side * spread * 0.5)
+			if hx < left or hx > right - 1.0:
+				continue
+			for h in tall:
+				_box(Vector2(hx, y - 1.0 - h), Vector2(2.0, 1.0), HiveArt.HONEY_SHINE if h == tall - 1 else HiveArt.HONEY_LIGHT)
+		var sink := Vector2(floorf(x + float(c["x"]) + sin(k * 5.0 + float(c["w"])) * 2.0), floorf(y + 2.0 + k * SINK_DEEP))
+		var under := _span_of(int(sink.y - tl.y))
+		if under.y >= under.x and sink.x >= tl.x + under.x and sink.x + 1.0 <= tl.x + under.y:
+			_box(sink, Vector2(2.0, 1.0), _ink(HiveArt.HONEY_MID, 0.8 * (1.0 - k)))
 
 
 ## The gold dashed line at `LINE_AT` of the jar, glowing as the honey nears it.
