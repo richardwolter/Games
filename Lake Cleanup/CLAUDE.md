@@ -569,8 +569,7 @@ Keeping one representation (layout instead of physics) eliminates these entirely
   (was 38.9 / 24.3 / 16.5 / 8.8 / 11.5), the ring all tier 0. `test_lake`'s `TIER_PRICED`
   follows; `PAY_PRICED` did not move. No new kinds: a tier's share is the roll, not its
   kind count. Out of scope, by decision: `FLOAT_STEP`, the ring, light-on-top depth, the
-  shop and the sim. **`SAVE_VERSION` 22**, v21 refused; the v21 save is
-  `_builds/lake_cleanup_v21_20261003.save`.
+  shop and the sim. **`SAVE_VERSION` 22**, v21 refused (its backup save was deleted 2026-10-06).
 - **Known**: the measured table is not light-on-top: its surface row is heavier than its
   floor row, because the old fitted lightness had stopped sorting by weight. What the
   player sees is still light, because `_dress_surface` breaks ties `FLOAT_STEP` (0.7) a
@@ -1112,7 +1111,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     headings are back as `ShopSkin._draw_group`'s own drawing (the words in the clean water's
     blue, a carved rule running to the far edge) and the rows are all `Style.BOARD_ROW`. A
     colour on this board is free to mean something again. `ROW_SOUND`/`ROW_SCREEN`/`ROW_SAVE`
-    stay in `Style` for `controls_skin.gd` and `menu_confirm.gd`, which are their own pass.
+    were deleted from `Style` on 2026-10-06, nothing reading them any more.
   - **A heading stands in the section gap, not over it** (`GROUP_TALL`, `wanted_tall`). The
     board wants 662 design pixels and the smallest frame leaves it **680** — height never goes
     under 720 — so headings drawn above the gaps they separate (24 px each) would not have
@@ -4069,7 +4068,7 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
 - **Coins fly over the hung purse** (`CoinFly.fly_from` moves the node last in the HUD
   layer; each coin re-aims at `coin_centre` every frame), so they land on its coin.
 - **Head cards** (`shop_card.gd`): the dogs' strip has no ferry; the boats' card is water
-  and ferry only (`CLEAN_PIECES` 0); the net's card floats 6 pieces (`DIRTY_PIECES`), its
+  and ferry only; the net's card floats 6 pieces (`DIRTY_PIECES`), its
   water lifted `NET_WATER_LIFT` towards the lightest step, and the net and its catch are
   drawn `ShopSkin.NET_GROW` 1.5 times bigger (**superseded 2026-10-02**: the card draws the
   lake's own net across its width, see The Net Drawn by Rule); the luck box starts with a heap
@@ -7385,7 +7384,8 @@ tells you to use one of the things below.
   `shot_wash_place`, `film_devlog`), `shot_buttons` (it drove the tuner), builders for
   retired art (`build_consoles`, `build_lake_objects`, `recolor_shed`, `recolor_box`,
   `downres_shed`, `trim_box_sides`), and scratch (`specks/`, `hd_rubbish/`, `menu_bg/`,
-  `cursor/`, every `last_*` and stray log). `tools/film/` stays.
+  `cursor/`, every `last_*` and stray log). `tools/film/` stays (its frames were deleted
+  on 2026-10-06, 22 GB; only `.gdignore`, `beats.json` and `beats.py` are kept).
 - **Probe output never reaches git**: `.gitignore` takes every picture, film, sound and log in
   `tools/` and every subfolder but `bases/` and `film/`.
 - **The rubbish's source**: see Rubbish Sheets, rewritten. The section said a PSD and 81

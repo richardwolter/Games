@@ -41,11 +41,9 @@ var skin: Node = null
 
 ## Art pixel: every scene is drawn on this grid.
 const PIXEL := 2.0
-## Rubbish afloat on the net's filthy card and on the ferry's clean one.
-## Six on the net's card (2026-09-27, was sixteen): the net is what the card is about. The
-## boats' card carries none now, water and ferry only.
+## Rubbish afloat on the net's filthy card: six (2026-09-27, was sixteen), the net is what
+## the card is about. The boats' card carries none, water and ferry only.
 const DIRTY_PIECES := 6
-const CLEAN_PIECES := 0
 ## How much the water behind the net is lifted towards its lightest step, so the black mesh
 ## stands off it (2026-09-27).
 const NET_WATER_LIFT := 0.45

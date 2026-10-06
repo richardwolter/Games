@@ -19,7 +19,7 @@
 ##
 ## **Harness hooks, never gated on `awake`**: `smoke_ring(i, seconds)` (only the lit stop takes
 ## smoke: an out-of-order ask does nothing), `calm(i)`, `rings_done()`, `ring_count()`,
-## `stop_now()`, `ring_pos(i)`, `aim(p)` (the smoker held there for a picture) and `settle()`.
+## `stop_now()`, `aim(p)` (the smoker held there for a picture) and `settle()`.
 class_name HiveStepSmoke
 extends HiveStep
 
@@ -170,10 +170,6 @@ static func _entrance() -> Vector2:
 
 func ring_count() -> int:
 	return RINGS.size()
-
-
-func ring_pos(i: int) -> Vector2:
-	return RINGS[clampi(i, 0, RINGS.size() - 1)]
 
 
 ## The lit stop, or `ring_count()` once all are quiet.

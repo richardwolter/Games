@@ -9195,8 +9195,8 @@ func _check_ten_fixes(skin: Node) -> void:
 	# 3-6. The head cards.
 	var card_src := FileAccess.get_file_as_string("res://scripts/shop_card.gd")
 	_check(not card_src.contains("_ferry"), "the dogs' card has no ferry crossing", "")
-	_check(ShopSkin.ShopCard.CLEAN_PIECES == 0 and ShopSkin.ShopCard.DIRTY_PIECES == 6,
-		"the boats' card floats nothing and the net's six", "")
+	_check(ShopSkin.ShopCard.DIRTY_PIECES == 6,
+		"the net's card floats six pieces", "")
 	_check(ShopSkin.ShopCard.NET_FILL > 0.8 and ShopSkin.ShopCard.NET_WATER_LIFT > 0.0
 			and card_src.contains("CastNet.NetMesh"),
 		"the net card draws the lake's own net across the card, over lighter water", "")

@@ -116,15 +116,8 @@ const PAPER_RULE := Color(0.698, 0.612, 0.451)
 const PAPER_INK := Color(0.196, 0.141, 0.110)
 const PAPER_HEAD := Color(0.451, 0.157, 0.102)
 const PAPER_SOFT := Color(0.369, 0.302, 0.235)
-## The settings board's rows, one tone a section so the eye finds a section by colour:
-## sound on the murky water, the screen on the meter's scum green, the saves on oak like a
-## price tag, and the quit on that same oak with its warning in the ink alone (a red plank
-## was tried and did not work). A switch that is "on" is lit in the
-## money's gold; a slider's played length is clean water — a volume is a level, and gold
-## read as a price.
-const ROW_SOUND := Color(0.22, 0.40, 0.38)
-const ROW_SCREEN := Color(0.227, 0.353, 0.141)
-const ROW_SAVE := Color(0.62, 0.46, 0.36)
+## The bind board's capture cell is lit in the money's gold; a switch that is "on" and a
+## slider's played length are clean water — a volume is a level, and gold read as a price.
 const ON_GOLD := Color(0.72, 0.52, 0.14)
 const ON_WATER := Color(0.353, 0.525, 0.678)
 

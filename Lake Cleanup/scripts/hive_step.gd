@@ -139,10 +139,6 @@ func wanderer_count() -> int:
 	return _wander_pos.size()
 
 
-func wanderer_at(k: int) -> Vector2:
-	return _wander_pos[k]
-
-
 func _wander_spot() -> Vector2:
 	return _wander_box.position + Vector2(
 		_wander_roll.randf() * _wander_box.size.x, _wander_roll.randf() * _wander_box.size.y
