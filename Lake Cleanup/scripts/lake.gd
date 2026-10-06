@@ -6534,6 +6534,8 @@ func _grow_nature() -> void:
 	_wildlife.walker_threats = _wildlife_walkers
 	_wildlife.ear = func() -> Vector2: return Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
 	_wildlife.obstacles = _wildlife_obstacles
+	_wildlife.grounds = _grounds
+	_wildlife.buildings = _wildlife_buildings
 	_wildlife.music = MusicStation.main()
 	_flora.music = _wildlife.music
 	add_child(_wildlife)
@@ -6571,6 +6573,24 @@ func _wildlife_walkers() -> PackedVector2Array:
 		out.append(_tornado.base())
 		return out
 	return _wildlife_moving
+
+
+## The buildings' drawn boxes, world px: the hut, the crate, the pump, the hive and the
+## piers. No land animal stands where its drawing would overlap one (Wildlife._blocked).
+func _wildlife_buildings() -> Array:
+	var out: Array = []
+	if _shed_art != null:
+		out.append(_shed_picture())
+	for thing in [_yard, _pump, _hive]:
+		if thing != null:
+			var roof: Dictionary = thing.roof()
+			if not roof.is_empty():
+				out.append(roof["rect"])
+	for stop in _dropoffs:
+		var roof := stop.roof()
+		if not roof.is_empty():
+			out.append(roof["rect"])
+	return out
 
 
 func _wildlife_obstacles() -> PackedVector2Array:

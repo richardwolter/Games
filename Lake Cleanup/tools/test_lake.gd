@@ -7536,20 +7536,65 @@ func _check_wildlife() -> void:
 	wild.stage = saved_stage
 
 
-## Rabbits and foxes (2026-09-25): on the outer bank's sand only, never the island; rabbits
-## from the first clean shore, foxes only once the meter reads LATE_FROM cleared; both run
-## off into the trees when someone comes near. Asked with the meter at 0.9.
+## The land animals (2026-10-05): bunnies, fox, wolf, snakes, capybara pairs and the
+## peacock, each at its own gate, each where it lives; the ones that run, run; the calm ones
+## step aside and are walked round; none stands wrongly against a tree, a rock or a
+## building. Asked with the meter at 0.9.
 func _check_land_animals(wild: Wildlife) -> void:
-	_check(wild.rabbit_count() > 0 and wild.rabbit_count() <= Wildlife.RABBITS_MOST,
-		"rabbits on the bank", "%d" % wild.rabbit_count())
-	_check(wild.fox_count() > 0 and wild.fox_count() <= Wildlife.FOXES_MOST,
-		"a fox or two once the lake is mostly clean", "%d" % wild.fox_count())
-	var island := 0
+	# Every picture a land animal can ask for is on the sheet.
+	var table: Dictionary = wild.get(&"_table")
+	var missing := 0
+	for coat in Wildlife.BUNNY_COATS:
+		for k in 12:
+			missing += 0 if table.has("bunny_%s_idle%d" % [coat, k]) else 1
+		for k in 8:
+			missing += 0 if table.has("bunny_%s_run%d" % [coat, k]) else 1
+	for coat in Wildlife.SNAKE_COATS:
+		for k in 7:
+			missing += 0 if table.has("snake_%s_%d" % [coat, k]) else 1
+	for name in ["fox_idle3", "fox_run3", "wolf_idle3", "wolf_run5", "capy_walk4", "capy_fwalk4",
+			"capy_bwalk4", "capy_idle4", "capy_sit4", "capy_stand4", "capy_run4",
+			"peacock_fold_side3", "peacock_fold_front3", "peacock_fold_back3",
+			"peacock_open_side2", "peacock_open_front2", "peacock_open_back2"]:
+		missing += 0 if table.has(name) else 1
+	_check(missing == 0, "every land animal's frame is on the sheet", "%d missing" % missing)
+	_check(not table.has("rabbit_sit0") and not table.has("fox_trot0"), "the rule-built rabbit and fox are gone", "")
+	_check(wild.bunny_count() > 0 and wild.bunny_count() <= Wildlife.BUNNIES_MOST,
+		"bunnies on the bank", "%d" % wild.bunny_count())
+	_check(wild.kind_count(&"fox") > 0 and wild.kind_count(&"fox") <= Wildlife.FOXES_MOST
+		and wild.kind_count(&"wolf") > 0 and wild.kind_count(&"wolf") <= Wildlife.WOLVES_MOST,
+		"foxes and wolves once the lake is mostly clean", "%d %d" % [wild.kind_count(&"fox"), wild.kind_count(&"wolf")])
+	_check(wild.kind_count(&"snake") > 0 and wild.kind_count(&"snake") <= Wildlife.SNAKES_MOST,
+		"snakes on the sand", "%d" % wild.kind_count(&"snake"))
+	var leads := 0
+	var lost := 0
 	for c: Dictionary in wild.land_animals():
-		if (c["spot"] as Dictionary)["side"] != "bank":
-			island += 1
-	_check(island == 0, "no rabbit or fox on the island", "%d" % island)
-	# The south wood is drawn again over them, the north wood is not.
+		if c["kind"] != &"capy":
+			continue
+		if c.has("lead"):
+			if not wild.land_animals().has(c["lead"]):
+				lost += 1
+		else:
+			leads += 1
+	_check(leads > 0 and leads <= Wildlife.CAPY_PAIRS and wild.kind_count(&"capy") == leads * 2 and lost == 0,
+		"capybaras come in pairs", "%d leads of %d" % [leads, wild.kind_count(&"capy")])
+	_check(wild.bunny_count(true) > 0 and wild.bunny_count(true) <= Wildlife.ISLE_BUNNIES_MOST,
+		"a bunny or two on the island late on", "%d" % wild.bunny_count(true))
+	_check(wild.kind_count(&"peacock") == 1, "one peacock", "%d" % wild.kind_count(&"peacock"))
+	var hut := Iso.tile_to_world(Iso.ISLAND_CENTRE.x, Iso.ISLAND_CENTRE.y)
+	var wrong_zone := 0
+	for c: Dictionary in wild.land_animals():
+		var kind: StringName = c["kind"]
+		var side: String = (c["spot"] as Dictionary)["side"]
+		if kind in [&"fox", &"wolf", &"capy", &"snake"] and side != "bank":
+			wrong_zone += 1
+		if kind == &"bunny" and (side == "bank") != (c["zone"] == "bank"):
+			wrong_zone += 1
+		if kind == &"peacock" and (c["zone"] != "isle" or (c["at"] as Vector2).y <= hut.y):
+			wrong_zone += 1
+	_check(wrong_zone == 0, "each lives where it should: no snake on the island, the peacock in front of the hut", "%d" % wrong_zone)
+	# Trees and rocks: a point in a north-wood tree's drawing, behind it, clashes; standing
+	# well in front of it does not.
 	var bank: Ground = null
 	for g: Ground in _main.get(&"_grounds"):
 		if g.layer == Ground.Layer.OUTSIDE:
@@ -7563,25 +7608,178 @@ func _check_land_animals(wild: Wildlife) -> void:
 		_check(Ground.COVER_LAYER > int((wild.get(&"_ground") as Node2D).z_index)
 			and Ground.COVER_LAYER < Lake.IN_FRONT,
 			"over the animals and under the walkers", "")
+		var behind := false
+		var in_front := true
+		var tried := 0
+		var standing: Dictionary = bank.get(&"_standing")
+		for cell: Vector2i in standing.keys():
+			var foot := Iso.tile_to_world(float(cell.x) + 0.5, float(cell.y) + 0.5)
+			if bank.covers_at(foot) or tried > 0:
+				continue
+			# Nothing standing in front of it (down the screen), so only it can answer there.
+			var clear := true
+			for dx in range(-3, 9):
+				for dy in range(-3, 9):
+					if dx + dy > 0 and standing.has(cell + Vector2i(dx, dy)):
+						clear = false
+			if not clear:
+				continue
+			tried += 1
+			behind = bank.clashes(foot + Vector2(0.0, -Iso.TILE_H * 0.9), 8.0, 16.0)
+			in_front = bank.clashes(foot + Vector2(0.0, Iso.TILE_H * 1.5), 8.0, 16.0)
+		_check(tried > 0 and behind and not in_front, "an animal behind a tree clashes, one in front does not",
+			"%d tried, %s %s; %d standing" % [tried, behind, in_front, standing.size()])
+	# Run them a while; none stands wrongly against a tree, a rock or a building.
+	for i in 600:
+		wild._process(1.0 / 60.0)
+	var clashing := PackedStringArray()
+	for c: Dictionary in wild.land_animals():
+		if int(c["state"]) != Wildlife.Land.FLEE and not c.get("trip", false) and not c.get("arriving", false) \
+				and float(c["fade"]) > 0.0 and wild._blocked(c, c["at"]):
+			clashing.append("%s/%s/%d" % [c["kind"], c["zone"], int(c["state"])])
+	_check(clashing.is_empty(), "no land animal stands in a tree, a rock or a building", ", ".join(clashing))
+	# A plant in front of an animal is drawn again over it, one behind is not.
+	var flora: Flora = _main.get(&"_flora")
+	var plant := -1
+	var quads: PackedInt32Array = flora.get(&"_quad_at")
+	for k in quads.size():
+		if quads[k] >= 0:
+			plant = k
+			break
+	if plant >= 0:
+		var foot: Vector2 = (flora.get(&"_foot") as PackedVector2Array)[plant]
+		flora.cover([Wildlife._body(foot + Vector2(0.0, -3.0), 10.0, 18.0)])
+		var over_behind: bool = (flora.get(&"_over_keys") as PackedInt32Array).has(plant)
+		flora.cover([Wildlife._body(foot + Vector2(0.0, 6.0), 10.0, 18.0)])
+		var over_front: bool = (flora.get(&"_over_keys") as PackedInt32Array).has(plant)
+		_check(over_behind and not over_front, "a plant is drawn over an animal behind it, not one in front of it",
+			"%s %s" % [over_behind, over_front])
+		_check(int((flora.get(&"_over") as Node2D).z_index) > int((wild.get(&"_ground") as Node2D).z_index)
+			and Flora.OVER_LAYER < Lake.IN_FRONT, "over the animals and under the walkers", "")
+	else:
+		_check(false, "a grown plant to test the plants over the animals with", "none")
+	var calm: PackedVector2Array = Dog.calm
+	_check(calm.size() > 0, "the dogs are told where the capybaras and the peacock are", "%d" % calm.size())
+	# The calm ones do not run from a net landing.
+	var capy: Dictionary = {}
+	var peacock: Dictionary = {}
+	for c: Dictionary in wild.land_animals():
+		if c["kind"] == &"capy" and not c.has("lead") and capy.is_empty():
+			capy = c
+		if c["kind"] == &"peacock":
+			peacock = c
+	if not capy.is_empty():
+		wild.scare(capy["at"])
+		_check(int(capy["state"]) != Wildlife.Land.FLEE, "a capybara never runs", "")
+	wild.set(&"_still", PackedVector2Array())
+	if not peacock.is_empty():
+		# Caught mid step aside from the real angler, it would finish that first.
+		peacock["making_room"] = false
+		peacock["state"] = Wildlife.Land.SIT
+		# And out from behind the box already: one still walking out fans nothing.
+		peacock["arriving"] = false
+		peacock["fade"] = 1.0
+		wild._land_step(peacock, 1.0 / 60.0, PackedVector2Array([(peacock["at"] as Vector2) + Vector2(0.0, Iso.tile_circle_extent(1.8))]))
+		_check(int(peacock["state"]) == Wildlife.Land.DISPLAY and peacock["view"] == "front"
+			and wild._land_frame(peacock).begins_with("peacock_open_front"),
+			"the peacock fans its tail at someone in front of it", wild._land_frame(peacock))
+		for i in int(Wildlife.PEACOCK_HOLD * 60.0) + 10:
+			wild._land_step(peacock, 1.0 / 60.0, PackedVector2Array())
+		_check(int(peacock["state"]) != Wildlife.Land.DISPLAY, "and folds it once they have gone", "")
+	# A capybara pair swims to the island and lands there, the follower with it.
+	if not capy.is_empty():
+		var spot: Dictionary = capy["spot"]
+		var isle: Dictionary = wild._isle_spot_for(spot)
+		capy["at"] = spot["land"]
+		capy["path"] = [isle["water"], isle["land"]]
+		capy["trip"] = true
+		capy["trip_to"] = "isle"
+		capy["to"] = spot["water"]
+		capy["state"] = Wildlife.Land.MOVE
+		capy["pose"] = "idle"
+		for f: Dictionary in wild._followers_of(capy):
+			f["at"] = (spot["land"] as Vector2) + Vector2(10.0, 6.0)
+		var swam := false
+		for i in 60 * 120:
+			wild._process(1.0 / 60.0)
+			swam = swam or bool(capy["wet"])
+			if capy["zone"] == "isle" and not capy.get("trip", false):
+				break
+		var follower: Dictionary = wild._followers_of(capy)[0] if not wild._followers_of(capy).is_empty() else {}
+		_check(swam and capy["zone"] == "isle", "a capybara swims to the island", "%s %s" % [swam, capy["zone"]])
+		_check(not follower.is_empty() and follower["zone"] == "isle"
+			and (follower["at"] as Vector2).distance_to(capy["at"]) < 60.0,
+			"and its partner comes with it", "")
+		_check(wild._land_frame(capy) != "" and wild.get(&"_streaks").size() > 0, "it swims with a streak behind it", "")
+	# Every bank animal comes out of the forest, unseen until it is clear of the trees.
+	var fresh := wild._new_land(&"fox", wild.get(&"_bank_ring")[0])
+	var at0 := Iso.world_to_tile(fresh["at"])
+	var home0 := Iso.world_to_tile(fresh["home"])
+	_check(Ground.out_of_water(at0.x, at0.y) > Ground.WOOD_FROM and Ground.out_of_water(home0.x, home0.y) < Ground.WOOD_FROM
+		and fresh.get("arriving", false), "a new animal sets off from inside the forest towards a home out of it", "")
+	wild.land_animals().append(fresh)
+	for i in 60:
+		wild._land_step(fresh, 1.0 / 60.0, PackedVector2Array())
+	_check(float(fresh["fade"]) == 0.0 or not fresh.get("arriving", false), "and is not seen among the trees", "%.2f" % float(fresh["fade"]))
+	wild.land_animals().erase(fresh)
+	# The island's animals walk out from behind the recycle box, unseen until they are out.
+	var box: Rect2 = wild._crate_box()
+	if box.size != Vector2.ZERO and not wild.get(&"_peacock_spots").is_empty():
+		var bird: Dictionary = wild._out_of_the_box(&"peacock", "", wild.get(&"_peacock_spots")[0])
+		var behind: bool = box.has_point(bird["at"]) and bird.get("arriving", false)
+		wild.land_animals().append(bird)
+		var hidden_while_behind := true
+		for i in 60 * 20:
+			wild._land_step(bird, 1.0 / 60.0, PackedVector2Array())
+			if wild._blocked(bird, bird["at"]) and float(bird["fade"]) > 0.0:
+				hidden_while_behind = false
+			if not bird.get("arriving", false) and float(bird["fade"]) >= 1.0:
+				break
+		_check(behind and hidden_while_behind and not bird.get("arriving", false) and float(bird["fade"]) > 0.9,
+			"the peacock walks out from behind the box, unseen until it is clear of it",
+			"%s %s %.2f" % [behind, hidden_while_behind, float(bird["fade"])])
+		wild.land_animals().erase(bird)
+	else:
+		_check(false, "the recycle box is known to the animals", "")
+	var snake_size: Rect2 = wild._region("snake_blue_0")
+	_check(snake_size.size.x <= 33.0 and snake_size.size.y <= 18.0, "snakes are drawn 15% smaller than painted", "%s" % snake_size.size)
+	# Gates: at 0.3 cleared, bunnies and snakes but no fox, wolf, capybara, island bunny or peacock.
 	var kept := wild.land_animals().duplicate()
 	var cleared := wild.cleared
 	wild.land_animals().clear()
-	wild.cleared = Wildlife.LATE_FROM - 0.1
+	wild.cleared = 0.3
 	wild.call(&"_reckon")
-	_check(wild.fox_count() == 0 and wild.rabbit_count() > 0, "rabbits early, no fox before the meter says so",
-		"%d rabbits %d foxes" % [wild.rabbit_count(), wild.fox_count()])
+	_check(wild.bunny_count() > 0 and wild.kind_count(&"snake") > 0 and wild.kind_count(&"fox") == 0
+		and wild.kind_count(&"wolf") == 0 and wild.kind_count(&"capy") == 0 and wild.bunny_count(true) == 0
+		and wild.kind_count(&"peacock") == 0,
+		"bunnies and snakes early, the rest wait for the meter", "%d bunnies %d foxes" % [wild.bunny_count(), wild.kind_count(&"fox")])
 	wild.cleared = cleared
+	var bun: Dictionary = {}
+	var snake: Dictionary = {}
+	for c: Dictionary in wild.land_animals():
+		if c["kind"] == &"bunny" and bun.is_empty():
+			bun = c
+		if c["kind"] == &"snake" and snake.is_empty():
+			snake = c
 	for i in 240:
-		wild._land_step(wild.land_animals()[0], 1.0 / 60.0, PackedVector2Array())
-	var c: Dictionary = wild.land_animals()[0]
-	wild._land_step(c, 0.016, PackedVector2Array([(c["at"] as Vector2) + Vector2(8.0, 0.0)]))
-	_check(int(c["state"]) == Wildlife.Land.FLEE, "a rabbit walked up to runs off", "")
-	var from: Vector2 = c["at"]
+		wild._land_step(bun, 1.0 / 60.0, PackedVector2Array())
+	wild._land_step(bun, 0.016, PackedVector2Array([(bun["at"] as Vector2) + Vector2(8.0, 0.0)]))
+	_check(int(bun["state"]) == Wildlife.Land.FLEE, "a bunny walked up to runs off", "")
+	var from: Vector2 = bun["at"]
 	for i in 240:
-		if c.get("gone", false):
+		if bun.get("gone", false):
 			break
-		wild._land_step(c, 1.0 / 60.0, PackedVector2Array())
-	_check(c.get("gone", false), "and is gone into the trees", "%.0f px" % from.distance_to(c["at"]))
+		wild._land_step(bun, 1.0 / 60.0, PackedVector2Array())
+	_check(bun.get("gone", false), "and is gone into the trees", "%.0f px" % from.distance_to(bun["at"]))
+	if not snake.is_empty():
+		var sat: Vector2 = snake["at"]
+		wild._land_step(snake, 0.016, PackedVector2Array([sat + Vector2(8.0, 0.0)]))
+		for i in 600:
+			wild._land_step(snake, 1.0 / 60.0, PackedVector2Array())
+		_check(not snake.get("gone", false) and (snake["at"] as Vector2).distance_to(sat) > 4.0
+			and wild._walkable(snake, snake["at"]),
+			"a snake slithers a short way off and stays", "%.0f px, sand %s, gone %s" % [sat.distance_to(snake["at"]),
+			wild._walkable(snake, snake["at"]), snake.get("gone", false)])
 	wild.land_animals().clear()
 	for k: Dictionary in kept:
 		wild.land_animals().append(k)
@@ -7712,10 +7910,31 @@ func _check_beat(wild: Wildlife) -> void:
 			f["test_was"] = state
 	_check(landings > 0 and off_beat == 0, "frogs' hops land on the beat",
 		"%d landings, %d off the beat" % [landings, off_beat])
-	# A resting turtle's head is up for the first half of every beat, down for the second.
-	var t0 := {"clock": 0.0, "nod_seed": 0.0}
-	var up := "_up" if fposmod(wild.beat(), 1.0) < 0.5 else ""
-	_check(wild._nod(t0) == up, "a resting turtle nods up on the beat and down off it", up)
+	# A resting turtle's head bobs on the beat: one idle cycle a beat, the head up at its start.
+	var t0 := {"clock": 0.0, "nod_seed": 0.0, "state": Wildlife.Turtle.BASK, "pose": "idle"}
+	var want := "turtle_idle%d" % mini(int(fposmod(wild.beat(), 1.0) * 8.0), 7)
+	_check(wild._turtle_frame(t0) == want, "a resting turtle bobs its head on the beat", want)
+	t0["nod_seed"] = 0.5
+	var half := "turtle_idle%d" % mini(int(fposmod(wild.beat() + 0.5, 1.0) * 8.0), 7)
+	_check(wild._turtle_frame(t0) == half, "and half of them half a beat behind", half)
+	# The pack turtle's frames, and the hide played into the shell and out again.
+	var sheet_table: Dictionary = wild.get(&"_table")
+	var turtle_missing := 0
+	for anim: String in ["idle", "sit", "sleep", "hide", "walk"]:
+		var n: int = {"idle": 8, "sit": 7, "sleep": 12, "hide": 13, "walk": 8}[anim]
+		for k in n:
+			turtle_missing += 0 if sheet_table.has("turtle_%s%d" % [anim, k]) else 1
+	_check(turtle_missing == 0 and not sheet_table.has("turtle_tuck") and not sheet_table.has("turtle_swim0"),
+		"the pack turtle's five animations replace the drawn one", "%d missing" % turtle_missing)
+	var tuck := {"clock": 0.0, "state": Wildlife.Turtle.TUCK, "timer": Wildlife.TURTLE_TUCK, "tuck_t": 0.0}
+	var first := wild._turtle_frame(tuck)
+	tuck["tuck_t"] = 1.5
+	tuck["timer"] = 1.5
+	var held := wild._turtle_frame(tuck)
+	tuck["timer"] = 0.01
+	var last := wild._turtle_frame(tuck)
+	_check(first == "turtle_hide0" and held == "turtle_hide12" and last == "turtle_hide0",
+		"a frightened turtle hides in its shell and comes back out", "%s %s %s" % [first, held, last])
 	wild.music = had
 	wild.threats = had_threats
 

@@ -703,6 +703,9 @@ func _plant(mid: Vector2, art: Texture2D) -> void:
 	var uv: Rect2 = _prop_uv[art]
 	_lay_shadow(mid, size, uv, float(_prop_pad.get(art, 0)) * SCALE)
 	var box := Rect2(mid - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+	if art.resource_path.contains("/Leaves/"):
+		_tuft_quads.append(_prop_points.size())
+		_tuft_feet.append(mid + Vector2(0.0, Iso.TILE_H * 0.5))
 	# The island's tufts lean with the water, like Flora's plants (2026-10-02): this layer's
 	# batch wears Flora's sway shader, and a tuft's top corners carry its foot packed in.
 	_prop_quad(
@@ -809,6 +812,10 @@ func _lay_props() -> void:
 	_cover_uvs.resize(0)
 	_cover_colors.resize(0)
 	_cover_indices.resize(0)
+	_tuft_quads.resize(0)
+	_tuft_feet.resize(0)
+	_tufts_by_cell.clear()
+	_over_stale = true
 	if _props.is_empty():
 		return
 	if _placed.is_empty():
@@ -1041,6 +1048,142 @@ func hidden_by_prop(world: Vector2, grow: float = 2.0) -> bool:
 						if q.x >= 0 and q.y >= 0 and q.x < img.get_width() and q.y < img.get_height() \
 								and img.get_pixel(q.x, q.y).a > 0.0:
 							return true
+	return false
+
+
+## The tufts standing in front of an animal, drawn again over it: Flora.cover's rule for
+## the ground's own leaves (2026-10-05, Richard: "make sure animals go behind the bushes and
+## vegetation"). Trees and rocks are `clashes`' and the cover layer's; this is the tufts.
+## `_tuft_quads` is each tuft's first point in the batch, `_tuft_feet` its foot (world).
+var _tuft_quads := PackedInt32Array()
+var _tuft_feet := PackedVector2Array()
+var _tufts_by_cell: Dictionary = {}
+const CELL_KEY := Flora.CELL_KEY
+var _over: Node2D
+var _over_keys := PackedInt32Array()
+var _over_stale := true
+var _over_points := PackedVector2Array()
+var _over_uvs := PackedVector2Array()
+var _over_colors := PackedColorArray()
+var _over_indices := PackedInt32Array()
+
+
+func cover(bodies: Array) -> void:
+	if _prop_atlas == null:
+		return
+	if _over == null:
+		_over = Node2D.new()
+		_over.name = &"Over"
+		_over.z_index = Flora.OVER_LAYER
+		_over.z_as_relative = false
+		_over.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_over.material = material
+		_over.draw.connect(_draw_over)
+		add_child(_over)
+	if _tufts_by_cell.is_empty():
+		for i in _tuft_feet.size():
+			var t := Iso.world_to_tile(_tuft_feet[i])
+			var cell := int(floor(t.x)) * CELL_KEY + int(floor(t.y))
+			if not _tufts_by_cell.has(cell):
+				_tufts_by_cell[cell] = []
+			(_tufts_by_cell[cell] as Array).append(i)
+	var picked := PackedInt32Array()
+	var seen := {}
+	for b: Array in bodies:
+		var body: Rect2 = b[0]
+		var feet_y: float = b[1]
+		var t := Iso.world_to_tile(Vector2(body.get_center().x, feet_y))
+		var cx := int(floor(t.x))
+		var cy := int(floor(t.y))
+		# A plant can only be over an animal if its foot is lower on the screen, within a
+		# picture's height: a tile behind to two in front.
+		for dx in range(-1, 3):
+			for dy in range(-1, 3):
+				var cell := (cx + dx) * CELL_KEY + cy + dy
+				if not _tufts_by_cell.has(cell):
+					continue
+				for i in (_tufts_by_cell[cell] as Array):
+					if seen.has(i) or _tuft_feet[i].y <= feet_y:
+						continue
+					var q := _tuft_quads[i]
+					if Rect2(_prop_points[q], _prop_points[q + 2] - _prop_points[q]).intersects(body):
+						seen[i] = true
+						picked.append(i)
+	picked.sort()
+	if picked == _over_keys and not _over_stale:
+		return
+	_over_keys = picked
+	_over_stale = false
+	_over_points.resize(0)
+	_over_uvs.resize(0)
+	_over_colors.resize(0)
+	_over_indices.resize(0)
+	for i in picked:
+		var q := _tuft_quads[i]
+		var base := _over_points.size()
+		for c in 4:
+			_over_points.append(_prop_points[q + c])
+			_over_uvs.append(_prop_uvs[q + c])
+			_over_colors.append(_prop_colors[q + c])
+		_over_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	_over.queue_redraw()
+
+
+func _draw_over() -> void:
+	if _over_indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(
+		_over.get_canvas_item(), _over_indices, _over_points, _over_colors, _over_uvs,
+		PackedInt32Array(), PackedFloat32Array(), _prop_atlas.get_rid()
+	)
+
+
+func over_count() -> int:
+	return _over_keys.size()
+
+
+## Would an animal standing at `feet` (world), its drawing `half` px either side and `tall` px
+## up, be drawn wrongly against a tree or a rock (2026-10-05, Richard: "have the wildlife mind
+## the trees and rocks"). The animals are one layer over the ground's props, and the south
+## wood is drawn again over them (`covers_at`), so the clash is any of: the feet in a prop's
+## own tile; the drawing over a prop's ink with the feet above its base (behind it, but drawn
+## in front); the drawing under a south-wood tree's ink with the feet below its base (in front
+## of it, but drawn behind). Trees and rocks only: the leaves lie under everything.
+var _prop_ink: Dictionary = {}
+
+
+func clashes(feet: Vector2, half: float, tall: float) -> bool:
+	var tile := Iso.world_to_tile(feet)
+	var cx := int(floor(tile.x))
+	var cy := int(floor(tile.y))
+	var body := Rect2(feet.x - half, feet.y - tall, half * 2.0, tall)
+	for dx in range(-3, 7):
+		for dy in range(-3, 7):
+			var cell := Vector2i(cx + dx, cy + dy)
+			if not _standing.has(cell) or not _props.has(cell):
+				continue
+			if Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5).distance_to(tile) < 0.6:
+				return true
+			var entry: Array = (_props[cell] as Array).back()
+			var art: Texture2D = entry[0]
+			var foot: Vector2 = entry[1]
+			var size := Vector2(art.get_width(), art.get_height()) * SCALE
+			var box := Rect2(foot - Vector2(size.x * 0.5, size.y - Iso.TILE_H * 0.5), size)
+			if not _prop_ink.has(art):
+				var img := art.get_image()
+				if img.is_compressed():
+					img.decompress()
+				_prop_ink[art] = Rect2(img.get_used_rect())
+			var used: Rect2 = _prop_ink[art]
+			var ink := Rect2(box.position + used.position * SCALE, used.size * SCALE)
+			if not ink.intersects(body):
+				continue
+			var base := ink.end.y
+			if covers_at(foot):
+				if feet.y > base:
+					return true
+			elif feet.y < base:
+				return true
 	return false
 
 

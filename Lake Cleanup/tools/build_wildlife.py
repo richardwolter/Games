@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Draws the wildlife sheets that come back to the lake as it is cleaned (scripts/wildlife.gd):
-the frogs, recoloured off the Pixel Frog pack onto the palette, and the turtles, ducks,
-ducklings and the frog's swimming shadow, built here by rule.
+the frogs, recoloured off the Pixel Frog pack onto the palette, the ducks, ducklings and
+the frog's swimming shadow, built here by rule, and the pack animals (see FAUNA).
 
 Everything is at one painted pixel to one and drawn by the game at 2 (Lake.ART_PIXEL), off
 palette.tres swatches lifted or mixed, and outlined the pack's way (a dark ring on the
@@ -171,60 +171,6 @@ SKIN = mix(GRASS_LIGHT, SAND, 0.35)
 SKIN_DARK = mix(SKIN, GRASS_DARK, 0.45)
 
 
-# Where the two seen legs stand in each walk frame: (front x, back x). Frame 0 is the pose a
-# resting turtle holds; the walk steps the front leg forward, back to rest, then the back
-# leg back, back to rest — one leg at a time, never both.
-TURTLE_STRIDE = [(3, 8), (2, 8), (3, 8), (3, 9)]
-
-
-def turtle(pose: str, step: int = 0, head_up: bool = False) -> Image.Image:
-    """Side on, facing left: a domed shell on four stubby legs (two seen), the head held
-    ahead. `step` is a frame of TURTLE_STRIDE when walking; sitting and tucked stand on frame
-    0, so at rest nothing moves but the head. `head_up` lifts the head a painted pixel, the
-    slow nod the game plays at rest and on the walk."""
-    w, h = 12, 7
-    img = canvas(w, h)
-    d = ImageDraw.Draw(img)
-    swim = pose == "swim"
-    top = 1 if not swim else 2
-    bottom = h - 3 if not swim else h - 1
-    hy = (2 if not swim else 3) - (1 if head_up else 0)
-    if pose != "tuck":
-        d.rectangle((0, hy - 1, 3, hy + 1), fill=SKIN)
-        # The neck stays joined to the shell when the head is up.
-        d.rectangle((2, hy, 4, hy + 2), fill=SKIN)
-    d.ellipse((3, top, w - 2, bottom + 3), fill=SHELL)
-    d.rectangle((3, bottom + 1, w - 2, bottom + 3), fill=(0, 0, 0, 0))
-    if not swim:
-        put(img, w - 2, bottom, SKIN_DARK)
-    img = outline(img, OUTLINE)
-    for px_ in (5, 7, 9):
-        for y in range(top + 2, bottom + 1):
-            if img.getpixel((px_, y))[3] and img.getpixel((px_, y)) != OUTLINE:
-                put(img, px_, y, SHELL_PLATE)
-    for x in range(5, 9):
-        if img.getpixel((x, top + 1))[3] and img.getpixel((x, top + 1)) != OUTLINE:
-            put(img, x, top + 1, SHELL_LIT)
-    if pose != "tuck":
-        put(img, 1, hy, OUTLINE)
-    if swim:
-        # Flippers just breaking the surface either side, paddling by turns.
-        fx = (2, 10) if step == 0 else (3, 9)
-        for x in fx:
-            put(img, x, h - 1, SKIN_DARK)
-        return img
-    # Legs under the shell's rim, after the ring so the ring does not eat them: two pixels
-    # wide, a dark foot under each.
-    front, back = TURTLE_STRIDE[step if pose == "walk" else 0]
-    for lx in (front, back):
-        for y in range(bottom + 1, bottom + 3):
-            put(img, lx, y, SKIN)
-            put(img, lx + 1, y, SKIN_DARK)
-        put(img, lx, bottom + 2, OUTLINE)
-        put(img, lx + 1, bottom + 2, OUTLINE)
-    return img
-
-
 # Ducks: a drake (green head, grey body) and a hen (mottled brown).
 DRAKE = {
     "head": mix(lift(GRASS_DARK, 1.2), WATER_DEEP, 0.35), "head_lit": mix(lift(LEAF, 1.4), WATER_CLEAN, 0.3),
@@ -303,149 +249,220 @@ def duckling(pose: str) -> Image.Image:
 
 
 
-# Rabbits and foxes (2026-09-25): the outer bank's land animals, side on facing left like
-# the turtle and the ducks, in the palette's own browns, the pack's dark ring round them.
-RABBIT = mix(WOOD, SAND, 0.62)
-RABBIT_DARK = mix(WOOD, SAND, 0.38)
-RABBIT_BELLY = mix(SAND, FOAM, 0.55)
-FOX = mix(WOOD, ORANGE, 0.35)
-FOX_LIT = lift(mix(WOOD, ORANGE, 0.5), 1.18)
-FOX_DARK = mix(WOOD, BLACK, 0.35)
-FOX_WHITE = mix(FOAM, SAND, 0.2)
-
-
-# A rabbit is small enough to draw by hand: rows of letters, B body, D shade, W the white
-# of the tail and belly, E the eye, blank is empty. The dark ring goes on after.
-RABBIT_POSES = {
-    "sit0": [
-        " B B       ",
-        " B B       ",
-        " BBB       ",
-        "BEBBB      ",
-        "BBBBBB     ",
-        "  BBBBBB   ",
-        "  BBBBBBBW ",
-        "  WBDDDBB  ",
-        "  BB  BBB  ",
-    ],
-    "sit1": [
-        "           ",
-        " B  BB     ",
-        " BBB  B    ",
-        "BEBBB      ",
-        "BBBBBB     ",
-        "  BBBBBB   ",
-        "  BBBBBBBW ",
-        "  WBDDDBB  ",
-        "  BB  BBB  ",
-    ],
-    "hop0": [
-        "           ",
-        "   B B     ",
-        "   BBB     ",
-        "  BEBBB    ",
-        "  BBBBBBB  ",
-        "   BBBBBBW ",
-        "   WDDDBB  ",
-        "   BB BBB  ",
-        "           ",
-    ],
-    "hop1": [
-        "  BB       ",
-        "   BB      ",
-        " BBBBB     ",
-        "BEBBBBBBB  ",
-        "BBBBBBBBBW ",
-        "  WDDDDBB  ",
-        " BB    BBB ",
-        "B        BB",
-        "           ",
-    ],
+# The land animals (2026-10-05, `/grill-me` with Richard): bought packs in art_source/Fauna,
+# cut whole into one picture a frame, every one facing LEFT (the sheet's rule), at their own
+# painted grain. Attack, death, howl, jump, hurt, kick and stomp rows are left out.
+#   Bunnies (Toffeecraft): Brown2Color, BunnyBlack, WhiteBunny; idle 12 and run 8, 32 cells.
+#   Snakes (Carysaurus): SnakeBlue, SnakeCorn; a 7-frame slither, 32 cells.
+#   Fox (Original) and wolf (Metal) (LapizWCG): idle row 0 and run row 1, 32 cells.
+#   Capybara (Rainloaf): no grid, so every drawing is found on the sheet by its outline and
+#       set on its feet; side walk, front walk, back walk, idle, sit, run, stand (from lying).
+#   Peacock (folded 36x38 cells, open 32): walk side / front / back, folded and tail open.
+# Each group of frames shares one crop centred on the first frame's feet (`_stood`), so the
+# game's foot, the middle of the bottom row, is where the animal stands in every frame.
+FAUNA = os.path.join("art_source", "Fauna")
+BUNNY_COATS = {"brown": "Brown2Color", "black": "BunnyBlack", "white": "WhiteBunny"}
+SNAKE_COATS = {"blue": "SnakeBlue", "corn": "SnakeCorn"}
+CANID_SHEETS = {
+    "fox": os.path.join("Wolf&Fox_by_LapizWCG", "MiniFox", "MiniFox [Original].png"),
+    "wolf": os.path.join("Wolf&Fox_by_LapizWCG", "MiniWolf", "MiniWolf [Metal].png"),
+}
+# (sheet row, frames) by animation; the fox's and the wolf's own rows.
+CANID_ROWS = {"fox": {"idle": (0, 4), "run": (1, 4)}, "wolf": {"idle": (0, 4), "run": (1, 6)}}
+# The capybara's rows on its sheet: the top of each band in px, and the view it is.
+CAPY_ROWS = {
+    "walk": (89, "side"), "fwalk": (123, "front"), "bwalk": (155, "back"),
+    "idle": (192, "side"), "sit": (225, "side"), "run": (257, "side"), "stand": (289, "side"),
+}
+CAPY_BAND = 24
+# The peacock: its two sheets, their cell, frames down a column, and which column is which
+# view (each column is a direction, each row a walking frame; "side" is the one facing left).
+PEACOCK = {
+    "fold": ("Peacock-folded-tail-Sheet.png", (36, 38), 4, {"front": 0, "back": 2, "side": 3}),
+    "open": ("Peacock-walk-Sheet.png", (32, 32), 3, {"front": 1, "back": 2, "side": 3}),
 }
 
 
-def rabbit(pose: str) -> Image.Image:
-    """Poses: sit0 (ears up), sit1 (one ear laid back), hop0 (bunched), hop1 (stretched)."""
-    rows = RABBIT_POSES[pose]
-    img = canvas(len(rows[0]), len(rows))
-    inks = {"B": RABBIT, "D": RABBIT_DARK, "W": RABBIT_BELLY, "E": RABBIT}
-    for y, row in enumerate(rows):
-        for x, ch in enumerate(row):
-            if ch in inks:
-                put(img, x, y, inks[ch])
-    img = outline(img, OUTLINE_BROWN)
-    for y, row in enumerate(rows):
-        for x, ch in enumerate(row):
-            if ch == "E":
-                put(img, x, y, OUTLINE_BROWN)
-            elif ch == "W":
-                put(img, x, y, RABBIT_BELLY)
-    return img
+def _cells(sheet: Image.Image, cell: tuple[int, int], row: int, count: int, col0: int = 0,
+        down: bool = False) -> list[Image.Image]:
+    """`count` cells of a grid sheet, along a row (or down a column when `down`)."""
+    w, h = cell
+    out = []
+    for k in range(count):
+        cx, cy = (col0, row + k) if down else (col0 + k, row)
+        out.append(sheet.crop((cx * w, cy * h, (cx + 1) * w, (cy + 1) * h)))
+    return out
 
 
-# A fox's leg is one pixel wide and bends (Richard, 2026-09-25: the first cut's were "too
-# thick and stiff/straight"): hip, joint, foot, three rows down. Each step of the trot swings
-# the near and far legs of a pair opposite ways, `FOX_SWING` pixels at the foot and half that
-# at the joint; the hind leg's hock kicks back a pixel. The far legs draw in the shade.
-FOX_SWING = [0, 1, 0, -1]
-FOX_STRIDE = FOX_SWING
-FOX_LEGS = ((3, False), (5, True), (11, False), (13, True))  # (hip x, is a far leg)
+def _foot_x(img: Image.Image) -> int:
+    """The middle of the lowest opaque row: where the animal stands."""
+    p = img.load()
+    for y in range(img.height - 1, -1, -1):
+        xs = [x for x in range(img.width) if p[x, y][3] > 0]
+        if xs:
+            return (xs[0] + xs[-1] + 1) // 2
+    return img.width // 2
 
 
-def fox(pose: str, step: int = 0) -> Image.Image:
-    """Poses: sit, trot (four steps of FOX_STRIDE), run (the stretched trot)."""
-    w, h = 18, 10
-    img = canvas(w, h)
-    d = ImageDraw.Draw(img)
-    base = h - 1
-    if pose == "sit":
-        d.ellipse((5, base - 6, 10, base), fill=FOX)
-        d.ellipse((2, base - 8, 6, base - 5), fill=FOX)
-        d.line((0, base - 6, 2, base - 6), fill=FOX)
-        d.polygon([(10, base), (15, base - 1), (16, base - 3), (11, base - 2)], fill=FOX)
-        put(img, 3, base - 9, FOX)
-        put(img, 5, base - 9, FOX)
-        img = outline(img, OUTLINE_BROWN)
-        put(img, 16, base - 2, FOX_WHITE)
-        put(img, 15, base - 2, FOX_WHITE)
-        for y in range(base - 4, base):
-            put(img, 5, y, FOX_WHITE)
-        put(img, 3, base - 7, OUTLINE_BROWN)
-        put(img, 0, base - 6, OUTLINE_BROWN)
-        return img
-    run = pose == "run"
-    back = base - 3
-    d.rectangle((4, back - 3, 12, back), fill=FOX)
-    d.ellipse((1, back - 5, 5, back - 1), fill=FOX)
-    d.line((0, back - 3, 1, back - 3), fill=FOX)
-    put(img, 2, back - 6, FOX)
-    put(img, 4, back - 6, FOX)
-    tail_up = back - 4 if run else back - 3
-    d.polygon([(12, back - 3), (17, tail_up), (17, tail_up + 2), (12, back - 1)], fill=FOX)
-    img = outline(img, OUTLINE_BROWN)
-    swing = (2 if step % 2 == 0 else -2) if run else FOX_SWING[step]
-    for hip, far in FOX_LEGS:
-        hind = hip > 8
-        # A pair's two legs swing opposite ways; front and hind pairs are half a stride apart.
-        s = (-swing if far else swing) * (-1 if hind else 1)
-        joint = hip + (s // 2 if s >= 0 else -((-s) // 2)) + (1 if hind else 0)
-        foot = hip + s
-        ink = mix(FOX_DARK, BLACK, 0.35) if far else FOX_DARK
-        put(img, hip, back + 1, ink)
-        put(img, joint, back + 2, ink)
-        put(img, foot, base, ink)
-        if run and abs(s) >= 2:
-            # Stretched out at a gallop the leg lies longer: fill the gap between the joint
-            # and the foot so it reads as one limb, not two dots.
-            put(img, (joint + foot) // 2, base, ink)
-    for x in range(5, 12):
-        put(img, x, back - 3, FOX_LIT)
-    put(img, 17, tail_up + 1, FOX_WHITE)
-    put(img, 16, tail_up + 1, FOX_WHITE)
-    put(img, 2, back - 3, OUTLINE_BROWN)
-    for x in (2, 3):
-        put(img, x, back - 1, FOX_WHITE)
-    return img
+def _stood(frames: list[Image.Image]) -> list[Image.Image]:
+    """One crop for a group of frames, centred on the first frame's feet and as tall as the
+    tallest, its bottom row the ground."""
+    anchor = _foot_x(frames[0])
+    left, top, right, bottom = 10 ** 6, 10 ** 6, -1, -1
+    for im in frames:
+        b = im.getbbox()
+        if b is None:
+            continue
+        left, top, right, bottom = min(left, b[0]), min(top, b[1]), max(right, b[2]), max(bottom, b[3])
+    half = max(anchor - left, right - anchor)
+    out = []
+    for im in frames:
+        cell = Image.new("RGBA", (half * 2, bottom - top), (0, 0, 0, 0))
+        cell.alpha_composite(im.crop((anchor - half, top, anchor + half, bottom)))
+        out.append(cell)
+    return out
+
+
+def _left(frames: list[Image.Image]) -> list[Image.Image]:
+    return [im.transpose(Image.FLIP_LEFT_RIGHT) for im in frames]
+
+
+# The turtle (2026-10-05, Richard bought the TurtlePaid pack; supersedes the rule-built
+# turtle): five of its sheets, 32 cells, side on, mirrored to face left, all on one crop.
+# Attack, Die, Hurt, Jump and LieDown are not used.
+TURTLE_SRC = os.path.join(FAUNA, "TurtlePaid", "TurtlePaid")
+TURTLE_ANIMS = {"idle": "Idle", "sit": "Sit", "sleep": "Sleep", "hide": "Hide", "walk": "Walking"}
+
+
+def turtles() -> list[tuple[str, Image.Image]]:
+    names, frames = [], []
+    for anim, file in TURTLE_ANIMS.items():
+        sheet = Image.open(os.path.join(TURTLE_SRC, f"{file}.png")).convert("RGBA")
+        for k, im in enumerate(_left(_cells(sheet, (32, 32), 0, sheet.width // 32))):
+            names.append(f"turtle_{anim}{k}")
+            frames.append(im)
+    return list(zip(names, _stood(frames)))
+
+
+def bunnies() -> list[tuple[str, Image.Image]]:
+    out = []
+    for coat, folder in BUNNY_COATS.items():
+        root = os.path.join(FAUNA, "AllBunniesFree", "AllBunniesFree", folder)
+        idle = Image.open(os.path.join(root, "Idle.png")).convert("RGBA")
+        run = Image.open(os.path.join(root, "Running.png")).convert("RGBA")
+        n_idle = idle.width // 32
+        frames = _stood(_left(_cells(idle, (32, 32), 0, n_idle)) + _left(_cells(run, (32, 32), 0, run.width // 32)))
+        for k, im in enumerate(frames):
+            name = f"bunny_{coat}_idle{k}" if k < n_idle else f"bunny_{coat}_run{k - n_idle}"
+            out.append((name, im))
+    return out
+
+
+# The snakes are drawn 15% smaller than painted (Richard, 2026-10-05: "make snakes smaller, at
+# least 15%"), picked off tools/last_snake_sizes.png: box-filtered, alpha cut at
+# SNAKE_ALPHA_CUT, every pixel snapped back to the picture's own colours. Nearest dropped
+# whole rows of the thin body and broke its bands.
+SNAKE_SHRINK = 0.85
+SNAKE_ALPHA_CUT = 110
+
+
+def _shrink(img: Image.Image, share: float) -> Image.Image:
+    """Pixel art made smaller without dropping its lines: averaged down, cut hard at the
+    alpha, and each colour put back onto the nearest colour the picture already had."""
+    w, h = round(img.width * share), round(img.height * share)
+    pal = list({c for c in img.getdata() if c[3] > 0})
+    out = img.resize((w, h), Image.BOX)
+    p = out.load()
+    for y in range(h):
+        for x in range(w):
+            c = p[x, y]
+            if c[3] <= SNAKE_ALPHA_CUT:
+                p[x, y] = (0, 0, 0, 0)
+                continue
+            p[x, y] = min(pal, key=lambda q: (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2)
+    return out
+
+
+def snakes() -> list[tuple[str, Image.Image]]:
+    out = []
+    for coat, stem in SNAKE_COATS.items():
+        sheet = Image.open(os.path.join(FAUNA, "PixelSnakes_Free_Carysaurus", "PixelSnakes_Free_Carysaurus",
+            f"{stem}-Walk.png")).convert("RGBA")
+        cells = [_shrink(im, SNAKE_SHRINK) for im in _left(_cells(sheet, (32, 32), 0, sheet.width // 32))]
+        for k, im in enumerate(_stood(cells)):
+            out.append((f"snake_{coat}_{k}", im))
+    return out
+
+
+def canids() -> list[tuple[str, Image.Image]]:
+    out = []
+    for kind, path in CANID_SHEETS.items():
+        sheet = Image.open(os.path.join(FAUNA, path)).convert("RGBA")
+        names, frames = [], []
+        for anim, (row, count) in CANID_ROWS[kind].items():
+            for k, im in enumerate(_left(_cells(sheet, (32, 32), row, count))):
+                names.append(f"{kind}_{anim}{k}")
+                frames.append(im)
+        out.extend(zip(names, _stood(frames)))
+    return out
+
+
+def _capy_sheet() -> Image.Image:
+    """The capybara's sheet with its flat background taken out."""
+    sheet = Image.open(os.path.join(FAUNA, "mini capy.png")).convert("RGBA")
+    bg = sheet.getpixel((0, 0))
+    p = sheet.load()
+    for y in range(sheet.height):
+        for x in range(sheet.width):
+            if p[x, y][:3] == bg[:3]:
+                p[x, y] = (0, 0, 0, 0)
+    return sheet
+
+
+def _drawings(sheet: Image.Image, top: int, band: int) -> list[Image.Image]:
+    """Every drawing in a band of the sheet, left to right: columns of the band holding ink,
+    split where a column holds none."""
+    strip = sheet.crop((0, top - 2, sheet.width, top + band))
+    p = strip.load()
+    inked = [any(p[x, y][3] > 0 for y in range(strip.height)) for x in range(strip.width)]
+    out, x = [], 0
+    while x < strip.width:
+        if not inked[x]:
+            x += 1
+            continue
+        start = x
+        while x < strip.width and inked[x]:
+            x += 1
+        piece = strip.crop((start, 0, x, strip.height))
+        if piece.getbbox() and (x - start) > 4:
+            out.append(piece)
+    return out
+
+
+def capybara() -> list[tuple[str, Image.Image]]:
+    sheet = _capy_sheet()
+    by_view: dict[str, list[tuple[str, Image.Image]]] = {}
+    for anim, (top, view) in CAPY_ROWS.items():
+        for k, d in enumerate(_drawings(sheet, top, CAPY_BAND)):
+            # Set on its feet in a 32 cell: bottom row the ground, feet in the middle.
+            d = d.crop(d.getbbox())
+            cell = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+            cell.alpha_composite(d, (16 - _foot_x(d), 32 - d.height))
+            by_view.setdefault(view, []).append((f"capy_{anim}{k}", cell))
+    out = []
+    for view, pairs in by_view.items():
+        out.extend(zip([n for n, _ in pairs], _stood([im for _, im in pairs])))
+    return out
+
+
+def peacock() -> list[tuple[str, Image.Image]]:
+    out = []
+    for mode, (file, cell, count, cols) in PEACOCK.items():
+        sheet = Image.open(os.path.join(FAUNA, file)).convert("RGBA")
+        for view, col in cols.items():
+            for k, im in enumerate(_stood(_cells(sheet, cell, 0, count, col, down=True))):
+                out.append((f"peacock_{mode}_{view}{k}", im))
+    return out
 
 
 def frog_swim(heading: float, frame: int) -> Image.Image:
@@ -707,26 +724,17 @@ def pack() -> None:
         frogs[colour] = recolour_frog(colour)
         frogs[colour].save(os.path.join(OUT_DIR, f"frog_{colour}.png"))
     items: list[tuple[str, Image.Image]] = []
-    for up in (False, True):
-        tag = "_up" if up else ""
-        items.append((f"turtle_sit{tag}", turtle("sit", 0, up)))
-        for step in range(len(TURTLE_STRIDE)):
-            items.append((f"turtle_walk{step}{tag}", turtle("walk", step, up)))
-    items.append(("turtle_tuck", turtle("tuck")))
-    for step in (0, 1):
-        items.append((f"turtle_swim{step}", turtle("swim", step)))
+    items.extend(turtles())
     for name, kind in (("drake", DRAKE), ("hen", HEN)):
         for pose in ("swim0", "swim1", "dabble", "fly0", "fly1", "fly2"):
             items.append((f"{name}_{pose}", duck(kind, pose)))
     for pose in ("swim0", "swim1", "fly0", "fly1"):
         items.append((f"duckling_{pose}", duckling(pose)))
-    for pose in ("sit0", "sit1", "hop0", "hop1"):
-        items.append((f"rabbit_{pose}", rabbit(pose)))
-    items.append(("fox_sit", fox("sit")))
-    for step in range(len(FOX_STRIDE)):
-        items.append((f"fox_trot{step}", fox("trot", step)))
-    for step in (0, 1):
-        items.append((f"fox_run{step}", fox("run", step)))
+    items.extend(bunnies())
+    items.extend(snakes())
+    items.extend(canids())
+    items.extend(capybara())
+    items.extend(peacock())
     for k in range(8):
         for f in range(2):
             items.append((f"crayfish_{k}_{f}", crayfish(k * math.tau / 8.0, f)))
@@ -737,7 +745,7 @@ def pack() -> None:
                 items.append((f"frogdive_{colour}_{k}_{f}", frog_dive(k * math.tau / 8.0, f, colour)))
     for species in BIRD_SPECIES:
         items.extend(songbird(species))
-    gutter, wide = 1, 160
+    gutter, wide = 1, 512
     x, y, shelf = gutter, gutter, 0
     spots = {}
     for name, im in items:

@@ -393,6 +393,12 @@ static var pack: Array = []
 var _voice_next: float = 0.0
 static var _pack_hush: float = 0.0
 
+## Where the capybaras and the peacock stand, world px (2026-10-05): animals that never run,
+## so a dog walks round them, pushed off them the way it gives way to the angler. Set by
+## Wildlife every frame. See `CALM_REACH`.
+static var calm := PackedVector2Array()
+const CALM_REACH := 0.7
+
 ## Where the angler stood last frame, for which way they are walking when they meet a dog.
 var _angler_was := Vector2.INF
 ## The corner the dog is making for to get round a building, or INF on a straight line.
@@ -651,6 +657,13 @@ func _speak(what: StringName, far: bool = false) -> void:
 ## the path steps aside rather than being driven ahead of them; straight away when they
 ## are standing. Only onto ground it may stand on, so a nudge never puts a dog in the hut.
 func _give_way(delta: float) -> void:
+	for at in calm:
+		var off := tile_pos - Iso.world_to_tile(at)
+		var gap := off.length()
+		if gap < CALM_REACH:
+			var wanted := tile_pos + (off / gap if gap > 0.0001 else Vector2(1.0, 0.0)) * NUDGE_SPEED * delta
+			if _may_stand(wanted):
+				tile_pos = wanted
 	if angler == null:
 		return
 	var here := angler.tile_pos

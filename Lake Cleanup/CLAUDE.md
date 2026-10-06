@@ -4532,6 +4532,129 @@ cardinal. **The cockatoo and the parrot are not used, by decision.** `Wildlife` 
   `tools/shot_nature.tscn`'s "birds" stage saves `tools/last_nature_bird_<species>.png` and
   `last_nature_bird_fly.png`.
 
+### The Land Animals From Packs (2026-10-05, `/grill-me` with Richard)
+Bought and free packs in `art_source/Fauna`, cut by `tools/build_wildlife.py` (`bunnies`,
+`snakes`, `canids`, `capybara`, `peacock`) onto `critters.png`. **Supersedes the rule-built
+rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`fox_*`,
+`RABBITS_MOST`, `FOXES_MOST`, the fox's bent legs and the rabbit's drawn rows are gone).
+`Wildlife`'s "the land animals" section, one list, `KINDS` a table per kind.
+- **Art**: bunnies (Toffeecraft: Brown2Color, BunnyBlack, WhiteBunny, idle 12 and run 8),
+  snakes (Carysaurus: SnakeBlue, SnakeCorn, a 7-frame slither), fox (MiniFox Original) and
+  wolf (MiniWolf Metal) (LapizWCG off LYASeeK: idle row 0, run row 1), capybara (Rainloaf: side,
+  front and back walk, idle, sit, run, the lie-down; no grid, so each drawing is found by its
+  ink and set on its feet in a 32 cell), peacock (walk side, front and back, tail folded and
+  open; Pixeline). Attack, death, howl, jump, hurt, kick and stomp rows are not cut. Every group shares
+  one crop centred on its first frame's feet (`_stood`), every picture faces left, front and
+  back views are never mirrored. Facing through `Flock.facing_of`.
+- **Sizes, by decision** (Richard's pick C off `tools/last_fauna_lineup.png`): everything at
+  one world px a painted px (`KINDS` `scale` 0.5) but the fox and wolf at two (`scale` 1.0):
+  painted, they were smaller than the bunny. The folded peacock's tail is 35 px long and kept
+  whole.
+- **Where and when** (a spot opens only by honestly clean water; counts follow the clean
+  share, `_want`, or the meter, `_want_from`): bunnies the bank's lawn by the trees, 14, from
+  the first clean shore, and 2 on the island's lawn from 70% cleaned (`ISLE_BUNNY_FROM`);
+  fox 5 and wolf 5 from 40% (`CANID_FROM`, was 60% for the fox), each new one on the clean
+  bank spot furthest from the others (`_spread_spot`), patrolling along the beach a waypoint
+  every `PATROL_STRIDE` shore spots so it never cuts across the water; snakes 8 on the bank's sand from the first clean shore, **never the island** (Richard:
+  "no snake on main isle"); capybaras 3 pairs from 50% (`CAPY_FROM`); the
+  peacock 1 from 80% (`PEACOCK_FROM`), on the island's lawn in front of the hut
+  (`_peacock_spots`).
+- **Out of the forest, and up onto the grass** (same day, Richard: "animals should come from
+  the forest like they are rediscovering the lake, and they should also be around the grass
+  and forest sometimes, not just on the beach"): every bank animal, snakes included, starts
+  `FOREST_FROM` tiles past `Ground.WOOD_FROM` and walks out to its home, **unseen until it
+  steps clear of the trees at the woods' edge** (`arriving`; its fade held at 0 while past
+  `WOOD_FROM` or in a tree's clash), so it is never drawn wrongly against the trunks it walks
+  through; a capybara follower stays hidden while its lead does. The first-wildlife moment
+  frames that edge (`edge`), not the home. The bank's ground reaches `FOREST_REACH` (2.5)
+  tiles into the woods, and each rest a bank animal may wander up onto the grass or to the
+  forest's edge (`INLAND_ODDS` by kind: bunny 0.15, fox and wolf 0.35, capybara 0.2, snake 0.3)
+  and then back to its ways. A snake's home is on the sand or up on the grass (`SNAKE_HOME`
+  0.5-5 tiles out) and it walks the bank's ground, not only the sand. **The island's bunnies and
+  the peacock walk out from behind the recycle box** (Richard: "peacock and bunnies can spawn
+  behind the box and just come out walking"; `_out_of_the_box`, `_crate_box`), unseen while
+  their drawing overlaps the box's, on their way to their spot. Until it is out it neither
+  fans its tail nor steps aside for a walker (`arriving`).
+- **Snakes 15% smaller** (Richard, same day): `build_wildlife.py` `_shrink` (`SNAKE_SHRINK`
+  0.85), box-filtered, alpha cut, snapped back to the picture's own colours, picked off
+  `tools/last_snake_sizes.png` over nearest, which broke the thin body's bands. 32x18 a frame.
+- **Behaviour**: a bunny runs (bank: into the trees, fading; island: across the island); the
+  fox and the wolf trot off into the trees; a snake slithers `SNAKE_AWAY` tiles along the sand
+  and stays. **A capybara and the peacock never run**: they walk out of a walker's way
+  (`_make_room`, inside `ROOM` tiles), and the dogs walk round them (`Dog.calm`, pushed clear
+  the way a dog gives way to the angler, `CALM_REACH`). A net landing frightens neither.
+- **Capybaras are pairs**: a lead and a follower (`"lead"`), the follower behind and beside,
+  catching up at a run. Each rest the lead may set off for the island (`CAPY_VISIT_ODDS`):
+  down to its spot's water, straight across to the island's spot facing it
+  (`_isle_spot_for`), up onto the island, `CAPY_STAY` there, and back. They swim the dogs'
+  way: cut at the waterline (`CAPY_SINK`), bobbing, a foam collar, the ferry's HullFoam streak
+  (`_lay_streaks`, `Dog.STREAK_LONG`/`WIDE`) and one ring going in (`Dog.ENTRY_SPAN`). Rest
+  poses idle, sit or lie, settling in and getting up through the sheet's own frames.
+- **The peacock fans its tail** at the angler or a dog inside `PEACOCK_NEAR`, turned to them
+  (front, back or side, the open-tail frames strutting at `PEACOCK_STRUT_FPS`), and folds it
+  `PEACOCK_HOLD` after they leave.
+- **Trees, rocks and buildings** (Richard: "mind the trees and rocks, so they dont clip or
+  overlap the sprite incorrectly"): `Ground.clashes(feet, half, tall)` is true for feet in a
+  tree's or rock's tile, a drawing over a prop's ink with the feet behind its base, or a
+  drawing under a south-wood tree's ink with the feet in front of it (the cover layer). Every
+  step and every target asks `Wildlife._blocked`, which also refuses any overlap with the
+  buildings' drawn boxes (`Lake._wildlife_buildings`: hut, crate, pump, hive, piers), since
+  the island's animals are on a layer the walkers' sorting does not reach. A blocked step is
+  turned `SIDESTEPS`; blocked every way, the walk gives up after `STUCK_TIME`. A fleeing bank
+  animal and a capybara's swim ignore it.
+- **Animals go behind the plants** (same day, Richard: "make sure animals go behind the
+  bushes and vegetation"): Flora is one batch at z 3 under every animal, so each frame
+  `Wildlife._cover_plants` hands every grounded animal's drawn box (land animals, frogs and
+  turtles out of the water, songbirds on the ground) to `Flora.cover` and each
+  `Ground.cover`, and every land plant or ground tuft whose foot is lower on the screen than
+  the animal's feet and whose picture overlaps it is drawn a second time on an `Over` child
+  at `Flora.OVER_LAYER` (7): over the animals (6), under the walkers (9). The same quads,
+  colours and sway material as the batch, so the copy lies on the plant; floating pads are
+  never redrawn, standing reeds are. Only rebuilt when the set changes. **Known**: a plant
+  between two animals is drawn over the one in front of it too; rare, accepted. Trees and
+  rocks stay `clashes`' and the cover layer's.
+- **Cost** (`bench_frames` `BENCH_CLEAN=1`, RTX 5060 Ti, 1080p): 7.4 ms mean, the wildlife
+  about 1.2 ms of it (`BENCH_OFF=wild` 6.2). The plant pass alone was about 1 ms until it
+  was held to the animals on screen, a 4x4 cell window and int cell keys (`Flora.CELL_KEY`).
+- **The turtle is Toffeecraft's TurtlePaid pack** (same day, Richard bought it; supersedes the rule-built
+  turtle, its `turtle_sit`/`_up`/`walk`/`tuck`/`swim` frames, `_nod` and the drawn flippers
+  `_turtle_flippers`, in The Lake Fills With Life and The Lakebed Through Clean Water). Idle,
+  Sit, Sleep, Hide and Walking (`build_wildlife.py` `turtles`, one crop), drawn at one world
+  px a painted px (`TURTLE_ART`). **The head bobs to the song**: idle and sit play one cycle a
+  beat (`_beat_frame`), the sheets' head up at the cycle's start, half of them half a beat
+  behind (`nod_seed`), the old nod's rule. At rest it rolls idle, sit or sleep
+  (`TURTLE_POSES`, `_turtle_rest`); sleep breathes at `TURTLE_SLEEP_FPS` with the pack's Z's.
+  A fright on land plays Hide into the shell, holds, and plays it back out over the tuck's
+  last stretch (`TURTLE_HIDE_FPS`). On the water it swims the dogs' and the capybaras' way:
+  cut at the waterline (`TURTLE_SINK` of `TURTLE_INK`, the walking turtle's own 15 px: the
+  crop is padded for the Z's), bobbing, a foam collar, the ferry's streak (`_lay_streaks`
+  takes the turtles too) and one ring going in. Dived (`UNDER`) it is its walking frame drawn
+  through the water as before, its bed shadow the same picture. Attack, Die, Hurt, Jump and
+  LieDown are not cut.
+  **Slow, and mostly still** (Richard: "walk much slower to match the feet animation... idle
+  much more than walk and swim"): a walk cycle carries the body about 2 painted px, so the walk
+  is `TURTLE_WALK` 2.5 px/s with a frame every `TURTLE_STEP_PX` 0.3 px; swimming 5 px/s,
+  paddling on the clock (`TURTLE_PADDLE_FPS` 6). Basks run `TURTLE_BASK` 25-60 s, a bask ends
+  in the water only `TURTLE_TO_WATER` (0.2) of the time and a short shuffle along the sand
+  otherwise, and a turtle in the water paddles on only `TURTLE_PADDLE_ON` (0.25) of the time.
+- **Shadows**: `Shade.lying` in the land ink; a swimming capybara's cut picture in the water
+  ink at `FLOAT_SHADE`. Every new kind counts for the first-wildlife moment.
+- Nothing saved, no `SAVE_VERSION` bump. **Out of scope, by decision**: sounds, catching or
+  paying, the packs' other coats, animals reacting to each other, dogs chasing.
+- **Licences**: the bunnies and the turtle are Toffeecraft's paid packs, bought by Richard. See
+  `docs/CREDITS.md`. Carysaurus and Rainloaf require
+  credit; both are on the board with Toffeecraft, LYASeeK, LapizWCG and Pixeline (the peacock,
+  pixeline-k.itch.io, commercial use allowed).
+- All numbers first guesses. `test_lake`'s `_check_land_animals` guards every frame on the
+  sheet, the old art gone, counts and caps, the pairs, the zones, the peacock in front of the
+  hut, a tree clash behind and none in front, no animal standing in a prop or a building,
+  `Dog.calm`, the calm ones not running, the fan and the fold, a pair swimming to the island
+  together, the gates at 30% cleaned, a bunny running off and a snake slithering away and
+  staying, and a plant drawn over an animal behind it and not one in front. Probe:
+  `tools/shot_fauna.tscn` (desktop build, own save, under its own node) saves
+  `tools/last_fauna_{bunny,bunny_isle,fox,wolf,snake,capy,peacock,behind_plant,turtle,turtle_swim,capy_swim}.png` and
+  `last_fauna.log`.
+
 ### The Lakebed Through Clean Water (2026-09-30, `/grill-me` with Richard, after Spilled!)
 Clean water is see-through to a lakebed of sand, rocks, branches, water plants and shells. The
 bottom showing is the reward for clearing a bay, the way oil lifting is in Spilled!. Picked

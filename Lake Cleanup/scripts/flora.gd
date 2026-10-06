@@ -198,6 +198,14 @@ func _ready() -> void:
 	_bees.name = &"Bees"
 	_bees.flora = self
 	add_child(_bees)
+	_over = Over.new()
+	_over.name = &"Over"
+	_over.flora = self
+	_over.z_index = OVER_LAYER
+	_over.z_as_relative = false
+	_over.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_over.material = material
+	add_child(_over)
 	_sheet = load(SHEET) as Texture2D
 	if FileAccess.file_exists(TABLE):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(TABLE))
@@ -749,6 +757,9 @@ func _lay() -> void:
 		_sun_stretch = sun.stretch
 		shade_across(material as ShaderMaterial, sun.lean, sun.stretch)
 	var sheet_size := Vector2(_sheet.get_width(), _sheet.get_height())
+	_quad_at.resize(_foot.size())
+	_quad_at.fill(-1)
+	_over_stale = true
 	for k in _foot.size():
 		if _age[k] < 0.0:
 			continue
@@ -789,6 +800,8 @@ func _lay() -> void:
 			var near := LakeGrid.pack_anchor(foot.x, AFLOAT if afloat else FOOT, flag)
 			_shade_quad(_corners(lie, Rect2(Vector2(-w * 0.5, -h), Vector2(w, h))), uv, far, near)
 		var base := _points.size()
+		if not afloat or standing:
+			_quad_at[k] = base
 		_points.append_array(_corners(Transform2D.IDENTITY, box))
 		_uvs.append(uv.position)
 		_uvs.append(Vector2(uv.end.x, uv.position.y))
@@ -857,6 +870,101 @@ func _draw() -> void:
 		get_canvas_item(), _indices, _points, _colors, _uvs,
 		PackedInt32Array(), PackedFloat32Array(), _sheet.get_rid()
 	)
+
+
+## Plants standing in front of an animal, drawn again over it (2026-10-05, Richard: "make
+## sure animals go behind the bushes and vegetation"). Flora is one batch under every animal
+## (z 3), so a rabbit behind a shrub was drawn over the shrub. Each frame Wildlife hands over
+## its animals' drawn boxes (`cover`), and every land plant whose foot is lower on the screen
+## than an animal's feet and whose picture overlaps it is drawn a second time on `Over`, at
+## OVER_LAYER: over the animals (Wildlife's ground layer, 6), under the walkers (9). The same
+## quads, colours and sway material as the batch, so the copy lies exactly on the plant.
+## Floating pads are not redrawn (an animal is never behind one); standing reeds are.
+const OVER_LAYER := 7
+## A tile cell as one int key, x * CELL_KEY + y: cheaper to hash than a Vector2i.
+const CELL_KEY := 4096
+var _quad_at := PackedInt32Array()
+var _by_cell: Dictionary = {}
+var _over: Over
+var _over_keys := PackedInt32Array()
+var _over_stale := true
+var _over_points := PackedVector2Array()
+var _over_uvs := PackedVector2Array()
+var _over_colors := PackedColorArray()
+var _over_indices := PackedInt32Array()
+
+
+class Over:
+	extends Node2D
+	var flora: Flora
+
+	func _draw() -> void:
+		if flora == null or flora._sheet == null or flora._over_indices.is_empty():
+			return
+		RenderingServer.canvas_item_add_triangle_array(
+			get_canvas_item(), flora._over_indices, flora._over_points, flora._over_colors,
+			flora._over_uvs, PackedInt32Array(), PackedFloat32Array(), flora._sheet.get_rid()
+		)
+
+
+## The plants over these animals: `bodies` is a list of [drawn box, feet's y], world px.
+func cover(bodies: Array) -> void:
+	if _over == null or _foot.is_empty():
+		return
+	if _by_cell.is_empty():
+		for k in _foot.size():
+			var t := Iso.world_to_tile(_foot[k])
+			var cell := int(floor(t.x)) * CELL_KEY + int(floor(t.y))
+			if not _by_cell.has(cell):
+				_by_cell[cell] = []
+			(_by_cell[cell] as Array).append(k)
+	var picked := PackedInt32Array()
+	var seen := {}
+	for b: Array in bodies:
+		var body: Rect2 = b[0]
+		var feet_y: float = b[1]
+		var t := Iso.world_to_tile(Vector2(body.get_center().x, feet_y))
+		var cx := int(floor(t.x))
+		var cy := int(floor(t.y))
+		# A plant can only be over an animal if its foot is lower on the screen, within a
+		# picture's height: a tile behind to two in front.
+		for dx in range(-1, 3):
+			for dy in range(-1, 3):
+				var cell := (cx + dx) * CELL_KEY + cy + dy
+				if not _by_cell.has(cell):
+					continue
+				for k in (_by_cell[cell] as Array):
+					if seen.has(k) or k >= _quad_at.size():
+						continue
+					var q := _quad_at[k]
+					if q < 0 or _foot[k].y <= feet_y:
+						continue
+					if Rect2(_points[q], _points[q + 2] - _points[q]).intersects(body):
+						seen[k] = true
+						picked.append(k)
+	picked.sort()
+	if picked == _over_keys and not _over_stale:
+		return
+	_over_keys = picked
+	_over_stale = false
+	_over_points.resize(0)
+	_over_uvs.resize(0)
+	_over_colors.resize(0)
+	_over_indices.resize(0)
+	for k in picked:
+		var q := _quad_at[k]
+		var base := _over_points.size()
+		for i in 4:
+			_over_points.append(_points[q + i])
+			_over_uvs.append(_uvs[q + i])
+			_over_colors.append(_colors[q + i])
+		_over_indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	_over.queue_redraw()
+
+
+## How many plants are drawn over an animal this frame. For the harness.
+func over_count() -> int:
+	return _over_keys.size()
 
 
 ## Under the water plants, behind them: the pads' shadows on the bed (`shade`, its own

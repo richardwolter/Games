@@ -86,6 +86,34 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   redistribute the assets themselves." Credit is not asked for; given anyway as
   "Kelano Studio", the Kipperfalcon rule.
 
+- **Land animals** (`art_source/Fauna/` → cut into `assets/wildlife/critters.png` by
+  `tools/build_wildlife.py`, the fauna pass of 2026-10-05):
+  - Bunnies (`bunny_<coat>_*`: Brown2Color, BunnyBlack, WhiteBunny) — "Bunny Pixel
+    Animations Mega Pack" by Toffeecraft (https://toffeecraft.itch.io/bunny-pixel-animations-mega-pack).
+    ✅ Cleared: Richard bought the paid pack (2026-10-05), "For commercial or personal use",
+    no redistribution or resale. The frames are cut from the `AllBunniesFree` folder, the same
+    drawings. Credit not asked for, given as "Toffeecraft".
+  - Turtle (`turtle_<anim>*`: Idle, Sit, Sleep, Hide, Walking, from `art_source/Fauna/TurtlePaid`)
+    — Toffeecraft's turtle pack (https://toffeecraft.itch.io/), the bunnies' artist. ✅ Bought
+    by Richard (2026-10-05), the paid pack. Credited with the bunnies, "Toffeecraft".
+  - Snakes (`snake_<coat>_*`: SnakeBlue, SnakeCorn) — "Snake Sprites" by Carysaurus
+    (https://carysaurus.itch.io/snake-sprites). ✅ Free and commercial; no redistribution or
+    resale. **Credit must be given**: "Carysaurus" on the board.
+  - Fox and wolf (`fox_*`: MiniFox [Original], `wolf_*`: MiniWolf [Metal]) — "Wolf and Fox
+    Forest Animals Mod" by LapizWCG (https://lapizwcg.itch.io/wolf-and-fox-forest-animals-mod-by-lapizwcg),
+    recoloured from "MiniFolks - Forest Animals" by LYASeeK (https://lyaseek.itch.io/miniffanimals).
+    ✅ "You can use this asset as you like, just don't resell it." Credit not required;
+    given to both, "LYASeeK" and "LapizWCG".
+  - Capybara (`capy_*`) — "Capybara Sprite Sheet" by Rainloaf
+    (https://rainloaf.itch.io/capybara-sprite-sheet). ✅ Free or commercial work "with credit
+    to me (Rainloaf)": "Rainloaf" on the board.
+  - Peacock (`peacock_*`, `Peacock-folded-tail-Sheet.png`, `Peacock-walk-Sheet.png`) —
+    "Pixel Art Creature Animal - Peacock (Free)" by Pixeline
+    (https://pixeline-k.itch.io/pixel-art-creature-animal-peacock-free). ✅ "You can use this
+    asset for personal and commercial purpose (excluding printing and reditribiuting on
+    physical objects)"; may be edited, not resold or redistributed. Credit not asked for;
+    given as "Pixeline", the Kipperfalcon rule.
+
 - **Net_Cast_spritesheet.jpg, Net_Closing_Drag.jpg, Net_Upgrades_Menu.jpg** — AI-generated.
   The two net sheets are retired (2026-10-02): the net is drawn by rule in code
   (`scripts/net_shape.gd`, `shaders/net_mesh.gdshader`), and the JPEGs sit in
