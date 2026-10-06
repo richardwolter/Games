@@ -583,7 +583,7 @@ def _ellipse(cx, cy, rx, ry, n=14):
     return [(cx + math.cos(2 * math.pi * i / n) * rx, cy + math.sin(2 * math.pi * i / n) * ry) for i in range(n)]
 
 
-def crayfish(heading: float, frame: int) -> Image.Image:
+def crayfish(heading: float, frame: int, size: float = 1.1) -> Image.Image:
     """Seen from above at the game's view, squashed a little less than the plane (0.78) so the
     claws read: carapace and rostrum, five tail segments and a fan, two claws on bent arms with
     a dark gap in each pincer, walking legs and long feelers. Frame 1 has the claws open wider
@@ -608,7 +608,7 @@ def crayfish(heading: float, frame: int) -> Image.Image:
     shapes.append(("fan", "poly", [(-7, 0), (-8.8, -2), (-9.4, -.8), (-9.4, .8), (-8.8, 2)]))
     shapes.append(("shell", "poly", _ellipse(1.2, 0, 2.6, 1.7, 18)))
     shapes.append(("rostrum", "poly", [(3.4, -.6), (5.2, 0), (3.4, .6)]))
-    lab = _raster(shapes, heading, .78, 1.1)
+    lab = _raster(shapes, heading, .78, size)
     cells = set(lab)
     body = {k for k, v in lab.items() if v not in ("feeler", "leg", "gap")}
     xs = [k[0] for k in lab] + [k[0] + 1 for k in body] + [k[0] - 1 for k in body]
@@ -639,7 +639,7 @@ def crayfish(heading: float, frame: int) -> Image.Image:
     for sh in shapes:
         if sh[0] not in ("feeler", "leg"):
             continue
-        pts = [((p[0] * ca - p[1] * sa) * 1.1, (p[0] * sa + p[1] * ca) * .78 * 1.1) for p in sh[2]]
+        pts = [((p[0] * ca - p[1] * sa) * size, (p[0] * sa + p[1] * ca) * .78 * size) for p in sh[2]]
         for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
             n = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 1
             for i in range(n + 1):

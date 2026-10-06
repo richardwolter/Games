@@ -7974,7 +7974,13 @@ func _check_land_animals(wild: Wildlife) -> void:
 		and wild.kind_count(&"wolf") > 0 and wild.kind_count(&"wolf") <= Wildlife.WOLVES_MOST,
 		"foxes and wolves once the lake is mostly clean", "%d %d" % [wild.kind_count(&"fox"), wild.kind_count(&"wolf")])
 	_check(wild.kind_count(&"snake") > 0 and wild.kind_count(&"snake") <= Wildlife.SNAKES_MOST,
-		"snakes on the sand", "%d" % wild.kind_count(&"snake"))
+		"snakes on the bank", "%d" % wild.kind_count(&"snake"))
+	# Snakes live on the grass and at the woods' edge, never the sand (2026-10-06).
+	var sandy_snakes := 0
+	for c: Dictionary in wild.land_animals():
+		if c["kind"] == &"snake" and (not wild._walkable(c, c["home"]) or wild._past_lawn(c["home"]) <= 0.0):
+			sandy_snakes += 1
+	_check(sandy_snakes == 0, "every snake's home is on the grass, none on the sand", "%d" % sandy_snakes)
 	var leads := 0
 	var lost := 0
 	for c: Dictionary in wild.land_animals():
@@ -8068,7 +8074,7 @@ func _check_land_animals(wild: Wildlife) -> void:
 	else:
 		_check(false, "a grown plant to test the plants over the animals with", "none")
 	var calm: PackedVector2Array = Dog.calm
-	_check(calm.size() > 0, "the dogs are told where the capybaras and the peacock are", "%d" % calm.size())
+	_check(calm.size() > 0, "the dogs are told where the capybaras are", "%d" % calm.size())
 	# The calm ones do not run from a net landing.
 	var capy: Dictionary = {}
 	var peacock: Dictionary = {}
@@ -8080,11 +8086,45 @@ func _check_land_animals(wild: Wildlife) -> void:
 	if not capy.is_empty():
 		wild.scare(capy["at"])
 		_check(int(capy["state"]) != Wildlife.Land.FLEE, "a capybara never runs", "")
+		# Its follower walks along behind it without flickering between its walk and its rest
+		# (2026-10-06, Richard: "jiggly and bugged when walking").
+		var follows: Array = wild._followers_of(capy)
+		if not follows.is_empty():
+			var fol: Dictionary = follows[0]
+			var spot: Dictionary = capy["spot"]
+			var along := Vector2(-(spot["normal"] as Vector2).y, (spot["normal"] as Vector2).x)
+			var keep_at: Vector2 = capy["at"]
+			var keep_fol: Vector2 = fol["at"]
+			capy["path"] = []
+			capy["to"] = (capy["at"] as Vector2) + along * 120.0
+			capy["state"] = Wildlife.Land.MOVE
+			capy["pose"] = "idle"
+			var flips := 0
+			var moving_was := int(fol["state"]) == Wildlife.Land.MOVE
+			for i in 360:
+				wild._land_step(capy, 1.0 / 60.0, PackedVector2Array())
+				wild._land_step(fol, 1.0 / 60.0, PackedVector2Array())
+				var moving := int(fol["state"]) == Wildlife.Land.MOVE
+				if moving != moving_was:
+					flips += 1
+				moving_was = moving
+			_check(flips <= 4, "a capybara's follower walks behind it without flickering", "%d flips" % flips)
+			capy["at"] = keep_at
+			fol["at"] = keep_fol
 	wild.set(&"_still", PackedVector2Array())
 	if not peacock.is_empty():
-		# Caught mid step aside from the real angler, it would finish that first.
+		# The peacock collides with no walker (2026-10-06): the dogs are not told of it, and
+		# somebody standing on it sends it nowhere.
+		_check(not calm.has(peacock["at"]), "the dogs walk through the peacock", "")
+		_check(not wild._minds_walkers(peacock), "and the peacock through the walkers", "")
 		peacock["making_room"] = false
 		peacock["state"] = Wildlife.Land.SIT
+		peacock["arriving"] = false
+		peacock["timer"] = 5.0
+		wild._land_step(peacock, 1.0 / 60.0, PackedVector2Array([peacock["at"]]))
+		_check(not peacock.get("making_room", false), "no stepping aside for a walker standing on it", "")
+		peacock["state"] = Wildlife.Land.SIT
+		peacock["view"] = "side"
 		# And out from behind the box already: one still walking out fans nothing.
 		peacock["arriving"] = false
 		peacock["fade"] = 1.0
@@ -8175,11 +8215,19 @@ func _check_land_animals(wild: Wildlife) -> void:
 	wild._land_step(bun, 0.016, PackedVector2Array([(bun["at"] as Vector2) + Vector2(8.0, 0.0)]))
 	_check(int(bun["state"]) == Wildlife.Land.FLEE, "a bunny walked up to runs off", "")
 	var from: Vector2 = bun["at"]
-	for i in 240:
+	# Gone only once off the screen, never faded where it is seen (2026-10-06).
+	var faded_seen := 0
+	var fade_was := float(bun["fade"])
+	for i in 3600:
 		if bun.get("gone", false):
 			break
 		wild._land_step(bun, 1.0 / 60.0, PackedVector2Array())
-	_check(bun.get("gone", false), "and is gone into the trees", "%.0f px" % from.distance_to(bun["at"]))
+		if float(bun["fade"]) < fade_was and wild._in_view(bun["at"]):
+			faded_seen += 1
+		fade_was = float(bun["fade"])
+	_check(bun.get("gone", false) and not wild._in_view(bun["at"]), "and is gone into the trees, off the screen",
+		"%.0f px, in view %s" % [from.distance_to(bun["at"]), wild._in_view(bun["at"])])
+	_check(faded_seen == 0, "and never fades where it can be seen", "%d frames" % faded_seen)
 	if not snake.is_empty():
 		var sat: Vector2 = snake["at"]
 		wild._land_step(snake, 0.016, PackedVector2Array([sat + Vector2(8.0, 0.0)]))
@@ -8187,8 +8235,20 @@ func _check_land_animals(wild: Wildlife) -> void:
 			wild._land_step(snake, 1.0 / 60.0, PackedVector2Array())
 		_check(not snake.get("gone", false) and (snake["at"] as Vector2).distance_to(sat) > 4.0
 			and wild._walkable(snake, snake["at"]),
-			"a snake slithers a short way off and stays", "%.0f px, sand %s, gone %s" % [sat.distance_to(snake["at"]),
+			"a snake slithers a short way off and stays, on the grass", "%.0f px, grass %s, gone %s" % [sat.distance_to(snake["at"]),
 			wild._walkable(snake, snake["at"]), snake.get("gone", false)])
+	# A fox on the beach walking at the water does not step into it (2026-10-06, Richard:
+	# "foxes are walking over water"): every step stays on its ground.
+	var bank_spots: Array = wild.get(&"_bank_ring")
+	if not bank_spots.is_empty():
+		var sp: Dictionary = bank_spots[0]
+		var fox: Dictionary = wild._animal(&"fox", "", sp["land"], sp["water"], sp, "bank")
+		var wet_steps := 0
+		for i in 120:
+			fox["at"] = wild._step_to(fox, (sp["water"] as Vector2) + (sp["normal"] as Vector2) * 80.0, 1.5)
+			if not wild._walkable(fox, fox["at"]):
+				wet_steps += 1
+		_check(wet_steps == 0, "a fox walking at the water stays on the beach", "%d steps off it" % wet_steps)
 	wild.land_animals().clear()
 	for k: Dictionary in kept:
 		wild.land_animals().append(k)

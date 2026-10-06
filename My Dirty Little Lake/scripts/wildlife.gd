@@ -32,9 +32,21 @@ const CRITTERS := "res://assets/wildlife/critters.png"
 const CRITTER_TABLE := "res://assets/wildlife/critters.json"
 ## World px to a painted px, the game's own.
 const SCALE := 2.0
+## Nothing goes away where it can be seen (2026-10-06, Richard: "wildlife suddenly
+## disappearing or fading out, it should not happen where player can see"). An animal leaving
+## (a fleeing bank animal, a songbird or a brood flying off, a crayfish or a fish school whose
+## water turned) is only taken off once it is this far outside the view, world px; until then
+## it keeps going, at full strength. `_in_view`.
+const VIEW_MARGIN := 48.0
+const BROOD_VIEW_MARGIN := 160.0
 ## A frog cell is 16 painted px square (the pack halved); feet on row 15, column 8.
 const FROG_CELL := 16.0
 const FROG_FOOT := Vector2(8.0, 15.0)
+## Frogs are drawn 1.2x smaller than their art's grain (2026-10-06, Richard), sitting,
+## hopping and swimming: drawn smaller, not rebaked, picked off tools/last_shrink_sheet.png
+## (the rebake lost the face and mangled the swimming shape). Fractional pixels, accepted.
+const FROG_DRAWN := 1.0 / 1.2
+const FROG_ART := SCALE * FROG_DRAWN
 
 ## How many of each at a fully clean lake; `ceil(most * stage)` from the first clean water.
 const FROGS_MOST := 30
@@ -86,6 +98,9 @@ const RECKON_EVERY := 2.0
 ## world px a second, how long they rest and crawl, and how near a threat has to come, in
 ## tiles. They flee backwards, tail first, the way a crayfish does.
 const CRAYFISH_MOST := 12
+## Crayfish are drawn 1.5x smaller than their art's grain (2026-10-06, Richard), drawn smaller
+## rather than rebaked or redrawn (Richard's pick off tools/last_shrink_sheet.png).
+const CRAY_DRAWN := 1.0 / 1.5
 ## 2026-10-01 (Richard): off the shallows, into the middle and deep bands, and they never
 ## dart from anything — not walkers, hulls or nets. `_cray_fright` is unused now.
 const CRAY_SHALLOWEST := 0.3
@@ -115,9 +130,9 @@ const FROG_CROAK_BEATS := 2.0
 const CUE_MISSED := 0.25
 const FROG_HOP_TIME := 0.45
 const FROG_HOP_REACH := 0.5
-const FROG_HOP_HIGH := 5.0
+const FROG_HOP_HIGH := 5.0 * FROG_DRAWN
 const FROG_JUMP_TIME := 0.62
-const FROG_JUMP_HIGH := 14.0
+const FROG_JUMP_HIGH := 14.0 * FROG_DRAWN
 const FROG_SWIM_SPEED := 22.0
 const FROG_SWIM_FPS := 6.0
 ## How far a frog will swim for a pad, tiles.
@@ -130,8 +145,8 @@ const FROG_PAD_REACH := 7.0
 ## (`TURTLE_PADDLE_FPS`). And it rests far more than it moves ("it should idle much more than
 ## walk and swim"): long basks, rarely down to the water (`TURTLE_TO_WATER`), and a short
 ## paddle (`TURTLE_PADDLE_ON`) before it comes out again.
-const TURTLE_WALK := 2.5
-const TURTLE_SWIM := 5.0
+const TURTLE_WALK := 2.5 * TURTLE_DRAWN
+const TURTLE_SWIM := 5.0 * TURTLE_DRAWN
 const TURTLE_BASK := Vector2(25.0, 60.0)
 const TURTLE_TO_WATER := 0.2
 const TURTLE_PADDLE_ON := 0.25
@@ -141,7 +156,7 @@ const TURTLE_UNDER := Vector2(2.0, 4.0)
 ## The walk is paced by ground covered, not by the clock: a turtle's legs step once for
 ## every TURTLE_STEP_PX world px it moves, so a turtle that is not going anywhere does not
 ## move its legs. Four frames, one leg at a time (tools/build_wildlife.py TURTLE_STRIDE).
-const TURTLE_STEP_PX := 0.3
+const TURTLE_STEP_PX := 0.3 * TURTLE_DRAWN
 const TURTLE_STEPS := 8
 ## The pack turtle (2026-10-05, Richard bought TurtlePaid; supersedes the rule-built turtle):
 ## drawn at one world px a painted px. At rest it idles or sits with its head bobbing to the
@@ -149,7 +164,11 @@ const TURTLE_STEPS := 8
 ## land plays Hide into the shell and back out (`TURTLE_HIDE_FPS`). On the water it swims the
 ## dogs' and the capybaras' way: cut at the waterline (`TURTLE_SINK`), bobbing, a foam collar,
 ## the ferry's streak and one ring going in.
-const TURTLE_ART := 0.5
+## Drawn 1.3x smaller than that since 2026-10-06 (Richard), drawn smaller rather than rebaked,
+## the bunnies' and snakes' pick (`TURTLE_DRAWN`): its walk, its stride, its swim, its streak,
+## its rings and its plant-cover box come in with it, so the feet still carry the body.
+const TURTLE_DRAWN := 1.0 / 1.3
+const TURTLE_ART := 0.5 * TURTLE_DRAWN
 const TURTLE_POSES := {"idle": 0.45, "sit": 0.35, "sleep": 0.2}
 const TURTLE_SLEEP_FPS := 5.0
 const TURTLE_HIDE_FPS := 20.0
@@ -200,7 +219,7 @@ const FLY_HOVER_BEATS := Vector2i(1, 5)
 const FOAM := Color(0.933, 0.965, 0.984, 0.8)
 ## How far over the bed a crayfish's shadow is thrown from, world px: it walks on the bed,
 ## so only its own height. About the 3 px it always fell at midday.
-const CRAY_SHADE_UP := 16.0
+const CRAY_SHADE_UP := 16.0 * CRAY_DRAWN
 ## Tracks in the sand (2026-09-22, Richard): a frog's hop leaves a pair of dents where it
 ## lands, a turtle leaves two rows of footprints either side of the drag of its shell. They
 ## fade over TRACK_LIFE; at most TRACKS_MOST are kept, oldest dropped. Sand only.
@@ -332,7 +351,7 @@ func _paint_bed_shade(on: CanvasItem) -> void:
 		var r := _region(_cray_frame(c))
 		var at: Vector2 = c["at"]
 		if r.size.x > 0.0 and Fish.bed_shows(grid, at):
-			on.draw_texture_rect_region(_critters, Rect2(at + Shade.drop(day, CRAY_SHADE_UP) - r.size * SCALE * 0.5, r.size * SCALE), r,
+			on.draw_texture_rect_region(_critters, Rect2(at + Shade.drop(day, CRAY_SHADE_UP) - r.size * SCALE * CRAY_DRAWN * 0.5, r.size * SCALE * CRAY_DRAWN), r,
 				Shade.tint_on(day, Shade.On.BED, float(c["fade"])))
 
 
@@ -343,7 +362,7 @@ func _paint_bed(on: CanvasItem) -> void:
 		var r := _region(_cray_frame(c))
 		if r.size.x <= 0.0 or not Fish.bed_shows(grid, at):
 			continue
-		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
+		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * CRAY_DRAWN * 0.5, r.size * SCALE * CRAY_DRAWN), r,
 			Fish.through_tint(at, float(c["fade"]), 0.38, 0.52, 0.72))
 
 
@@ -503,10 +522,11 @@ func _process(delta: float) -> void:
 	for c: Dictionary in _critters_on_land:
 		_land_step(c, delta, seen)
 	_lay_streaks(delta)
-	# What the dogs walk round: the capybaras and the peacock, which never run (Dog.calm).
+	# What the dogs walk round: the capybaras, which never run (Dog.calm). Not the peacock
+	# (2026-10-06, Richard: "no collision with peacock, its buggy").
 	_calm = PackedVector2Array()
 	for c: Dictionary in _critters_on_land:
-		if (c["kind"] == &"capy" or c["kind"] == &"peacock") and not bool(c["wet"]):
+		if c["kind"] == &"capy" and not bool(c["wet"]):
 			_calm.append(c["at"])
 	Dog.calm = _calm
 	_bird_in -= delta
@@ -543,10 +563,10 @@ func _cover_plants() -> void:
 			bodies.append(_body(c["at"], float(k["half"]), float(k["tall"])))
 	for f: Dictionary in _frogs:
 		if int(f["state"]) != Frog.SWIM and view.has_point(f["at"]):
-			bodies.append(_body(f["at"], 10.0, 18.0))
+			bodies.append(_body(f["at"], 10.0 * FROG_DRAWN, 18.0 * FROG_DRAWN))
 	for t: Dictionary in _turtles:
 		if int(t["state"]) != Turtle.UNDER and view.has_point(t["at"]):
-			bodies.append(_body(t["at"], 14.0, 21.0))
+			bodies.append(_body(t["at"], 14.0 * TURTLE_DRAWN, 21.0 * TURTLE_DRAWN))
 	for s: Dictionary in _birds:
 		if float(s["alt"]) <= 0.5 and view.has_point(s["at"]):
 			bodies.append(_body(s["at"], 8.0, 14.0))
@@ -746,7 +766,8 @@ func _reckon() -> void:
 			follower["lead"] = lead
 			_critters_on_land.append(lead)
 			_critters_on_land.append(follower)
-	# The bank's sand only (Richard, 2026-10-05: "no snake on main isle").
+	# The bank only (Richard, 2026-10-05: "no snake on main isle"), off one of its beaches'
+	# shore spots, though it lives on the grass behind it (2026-10-06).
 	var sandy := bank.filter(func(sp: Dictionary) -> bool: return _on_sand(sp["land"], "bank"))
 	if not sandy.is_empty():
 		for n in maxi(_want(SNAKES_MOST) - kind_count(&"snake"), 0):
@@ -1181,16 +1202,17 @@ func _turtle_step(t: Dictionary, delta: float, seen: PackedVector2Array) -> void
 					_turtle_prints(t["at"], step.normalized())
 			var now_wet := _wet(t["at"])
 			if now_wet != wet and splash != null:
-				_ripple(t["at"], 12.0)
+				_ripple(t["at"], 12.0 * TURTLE_DRAWN)
 			t["state"] = Turtle.SWIM if now_wet else Turtle.WALK
 			t["fade"] = minf(float(t["fade"]) + delta, 1.0)
 		Turtle.UNDER:
 			t["timer"] = float(t["timer"]) - delta
 			if float(t["timer"]) <= 0.0:
+				# Its fade is kept: it was seen under the water, and reset it blinked out as it
+				# came up (2026-10-06, nothing goes away on screen).
 				t["state"] = t["then"]
-				t["fade"] = 0.0
 				if splash != null:
-					_ripple(at, 10.0)
+					_ripple(at, 10.0 * TURTLE_DRAWN)
 
 
 ## A turtle's prints: a foot each side of the line it walks, and the shell's drag between.
@@ -1254,7 +1276,7 @@ func _turtle_fright(t: Dictionary, _from: Vector2) -> void:
 		t["timer"] = _rng.randf_range(TURTLE_UNDER.x, TURTLE_UNDER.y)
 		t["then"] = Turtle.SWIM
 		if splash != null:
-			_ripple(t["at"], 12.0)
+			_ripple(t["at"], 12.0 * TURTLE_DRAWN)
 		var spot: Dictionary = t["spot"]
 		t["at"] = (t["at"] as Vector2) + (spot["normal"] as Vector2) * 24.0
 		t["to"] = spot["water"]
@@ -1272,11 +1294,13 @@ func _turtle_fright(t: Dictionary, _from: Vector2) -> void:
 #   bunny   the bank's lawn by the trees (14), and from ISLE_BUNNY_FROM a pair on the island
 #   fox     the bank's beaches, patrolling along them (5 each, spread round the lake)
 #   wolf      "
-#   snake   the bank's sand, slithering slowly and basking (8); never the island
+#   snake   the bank's lawn and the woods' edge, slithering slowly and basking (8); never
+#           the sand (2026-10-06) and never the island
 #   capy    pairs on the bank's shore, swimming to the island now and then (3 pairs)
 #   peacock the island's lawn in front of the hut, fanning its tail at the angler (1)
-# Bunnies, the fox and the wolf run; a snake slithers a short way off; a capybara and the
-# peacock never run, they step out of a walker's way. Every one keeps off the trees and rocks
+# Bunnies, the fox and the wolf run; a snake slithers a short way off; a capybara never runs,
+# it steps out of a walker's way; the peacock never runs and pays the walkers no mind at all
+# (`_minds_walkers`). Every one keeps off the trees and rocks
 # (`Ground.clashes`) and off the island's buildings, so none is drawn over a thing it stands
 # behind or under a thing it stands in front of.
 
@@ -1286,12 +1310,14 @@ enum Land { SIT, MOVE, FLEE, RISE, DISPLAY }
 ## What one kind of land animal is: how big its picture is drawn (`scale`, 0.5 is one world
 ## px a painted px), how fast it walks and runs (world px a second), how near a moving
 ## walker may come (tiles), and the box its drawing takes (world px: half wide, tall), which
-## is what the trees, the rocks and the buildings are tested against.
+## is what the trees, the rocks and the buildings are tested against. Bunnies and snakes are
+## drawn 1.5x smaller than their art (2026-10-06, Richard), drawn smaller rather than rebaked
+## (his pick off tools/last_shrink_sheet.png), with their boxes come in to match.
 const KINDS := {
-	&"bunny": {"scale": 0.5, "walk": 26.0, "run": 80.0, "shy": 2.2, "half": 10.0, "tall": 18.0},
+	&"bunny": {"scale": 0.5 / 1.5, "walk": 26.0, "run": 80.0, "shy": 2.2, "half": 7.0, "tall": 12.0},
 	&"fox": {"scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 18.0, "tall": 24.0},
 	&"wolf": {"scale": 1.0, "walk": 30.0, "run": 90.0, "shy": 3.0, "half": 20.0, "tall": 26.0},
-	&"snake": {"scale": 0.5, "walk": 8.0, "run": 16.0, "shy": 1.4, "half": 14.0, "tall": 17.0},
+	&"snake": {"scale": 0.5 / 1.5, "walk": 8.0, "run": 16.0, "shy": 1.4, "half": 9.5, "tall": 11.5},
 	&"capy": {"scale": 0.5, "walk": 14.0, "run": 30.0, "shy": 0.0, "half": 13.0, "tall": 22.0},
 	&"peacock": {"scale": 0.5, "walk": 12.0, "run": 12.0, "shy": 0.0, "half": 17.0, "tall": 32.0},
 }
@@ -1330,8 +1356,12 @@ const FOREST_FROM := Vector2(1.5, 3.5)
 const FOREST_REACH := 2.5
 const INLAND := Vector2(2.0, 3.0)
 const INLAND_ODDS := {&"bunny": 0.15, &"fox": 0.35, &"wolf": 0.35, &"capy": 0.2, &"snake": 0.3}
-## A snake's home is on the sand or up on the grass, this many tiles out of the water.
-const SNAKE_HOME := Vector2(0.5, 5.0)
+## A snake's home is on the grass, this many tiles past the lawn's line (2026-10-06,
+## Richard: "not on sand but only forest and grass"; it was 0.5-5 tiles out of the water,
+## sand included). It never steps onto the sand: `_walkable` holds it to `SNAKE_GRASS_IN`
+## tiles past the line, so its drawing does not lie out over the beach.
+const SNAKE_HOME := Vector2(0.4, 5.5)
+const SNAKE_GRASS_IN := 0.25
 ## Frames a second: a bunny's idle loop and its run, a canid's idle and its run, which at
 ## walking pace is played slower. A snake, a capybara and the peacock step by ground covered.
 const BUNNY_IDLE_FPS := 6.0
@@ -1339,7 +1369,7 @@ const BUNNY_RUN_FPS := 12.0
 const CANID_IDLE_FPS := 4.0
 const CANID_WALK_FPS := 6.0
 const CANID_RUN_FPS := 12.0
-const SNAKE_STEP_PX := 1.5
+const SNAKE_STEP_PX := 1.0  # 1.5 until the snake was drawn 1.5x smaller (2026-10-06)
 const CAPY_STEP_PX := 3.0
 const PEACOCK_STEP_PX := 3.0
 ## A fox or a wolf patrols the bank's beach: from its shore spot, along the ring of spots by
@@ -1357,6 +1387,9 @@ const SNAKE_AWAY := Vector2(1.4, 2.4)
 const CAPY_BEHIND := 14.0
 const CAPY_BESIDE := 8.0
 const CAPY_CATCH_UP := 40.0
+const CAPY_GO := 10.0
+const CAPY_STOP := 2.0
+const CAPY_KEEP_UP := 1.15
 const CAPY_VISIT_ODDS := 0.3
 const CAPY_STAY := Vector2(40.0, 90.0)
 ## Rest poses a capybara rolls (idle, sit, lie) and how long it takes to sit or lie down.
@@ -1449,7 +1482,7 @@ func _free_spot(kind: StringName, spots: Array) -> Vector2:
 	var probe := _animal(kind, "", Vector2.ZERO, Vector2.ZERO, {}, "isle")
 	for n in 8:
 		var at: Vector2 = spots[_rng.randi_range(0, spots.size() - 1)]
-		if not _taken_by_still(at) and not _blocked(probe, at):
+		if (not _minds_walkers(probe) or not _taken_by_still(at)) and not _blocked(probe, at):
 			return at
 	return Vector2.INF
 
@@ -1495,12 +1528,12 @@ func _new_land(kind: StringName, spot: Dictionary, coat: String = "") -> Diction
 		if kind == &"bunny":
 			home = _inland_to(spot["land"], inland, _rng.randf_range(LAND_HOME.x, LAND_HOME.y))
 		elif kind == &"snake":
-			home = _inland_to(spot["land"], inland, _rng.randf_range(SNAKE_HOME.x, SNAKE_HOME.y))
+			home = _to_grass(spot["land"], inland, _rng.randf_range(SNAKE_HOME.x, SNAKE_HOME.y))
 		else:
 			home = _inland_to(spot["land"], inland, _rng.randf_range(0.6, PATROL_INLAND))
-		if not _blocked(probe, home):
+		if not _blocked(probe, home) and (kind != &"snake" or _walkable(probe, home)):
 			break
-		home = spot["land"]
+		home = spot["land"] if kind != &"snake" else _to_grass(spot["land"], inland, SNAKE_HOME.x)
 	# Out of the trees behind its bit of shore, rediscovering the lake: it fades in among the
 	# trunks and walks out to its home. A snake comes at its quicker pace, or it would be a
 	# minute on the way.
@@ -1553,8 +1586,7 @@ func _crate_box() -> Rect2:
 	return Rect2()
 
 
-## One that simply appears where it lives, fading in: a snake on the sand, a bunny or the
-## peacock on the island (nowhere to have walked from).
+## One that simply appears where it lives, fading in: a bunny or the peacock on the island (nowhere to have walked from).
 func _appears(kind: StringName, coat: String, at: Vector2, spot: Dictionary, zone: String) -> Dictionary:
 	var c := _animal(kind, coat, at, at, spot, zone)
 	c["state"] = Land.SIT
@@ -1582,10 +1614,35 @@ func _on_bank(at: Vector2) -> bool:
 	return out > 0.3 and out < Ground.WOOD_FROM + FOREST_REACH
 
 
-## Ground this animal may stand on, by where it lives and where it is going.
+## Tiles past the bank's lawn line at a spot: positive on the grass, negative on the sand. The
+## outer ground's own answer, which is what the shader draws by; with no ground known, the
+## line's plain ellipse.
+func _past_lawn(at: Vector2) -> float:
+	var tile := Iso.world_to_tile(at)
+	for g in grounds:
+		if g.layer == Ground.Layer.OUTSIDE:
+			return g.coverage_at(tile)
+	return Ground.out_of_water(tile.x, tile.y) - Ground.SAND_OUT
+
+
+## From a point on the bank's sand, straight inland until the ground is `past` tiles past the
+## lawn's line. World in, world out.
+func _to_grass(from: Vector2, inland: Vector2, past: float) -> Vector2:
+	var at := from
+	for i in 160:
+		if _past_lawn(at) >= past:
+			break
+		at += inland * 4.0
+	return at
+
+
+## Ground this animal may stand on, by where it lives and where it is going. A snake only on
+## the grass and the woods' edge, never the sand (2026-10-06).
 func _walkable(c: Dictionary, at: Vector2) -> bool:
 	if c["zone"] == "isle":
 		return _on_isle(at)
+	if c["kind"] == &"snake":
+		return _on_bank(at) and _past_lawn(at) > SNAKE_GRASS_IN
 	return _on_bank(at)
 
 
@@ -1609,19 +1666,40 @@ func _blocked(c: Dictionary, at: Vector2) -> bool:
 	return false
 
 
+## Is a world point on the screen, or within `margin` world px of it.
+func _in_view(at: Vector2, margin: float = VIEW_MARGIN) -> bool:
+	if not is_inside_tree():
+		return false
+	var view := get_canvas_transform().affine_inverse() * get_viewport_rect()
+	return view.grow(margin).has_point(at)
+
+
+## Does this animal keep out of the walkers' way: slide round a still angler or dog, refuse a
+## spot inside one's room. Not the peacock (2026-10-06, Richard: "no collision with peacock,
+## its buggy"): the angler and the dogs walk through it and it through them. It still keeps off
+## the buildings, the trees and the rocks (`_blocked`).
+func _minds_walkers(c: Dictionary) -> bool:
+	return c["kind"] != &"peacock"
+
+
 ## A step towards `to`, `go` px long, turned off whatever would block it. Returns where the
 ## animal ends up; standing still means every way was blocked.
 func _step_to(c: Dictionary, to: Vector2, go: float, forced: bool = false) -> Vector2:
 	var at: Vector2 = c["at"]
 	var dir := (to - at).normalized() if at.distance_to(to) > 0.01 else Vector2.ZERO
 	var next := at + dir * minf(go, at.distance_to(to))
-	if not forced:
+	if not forced and _minds_walkers(c):
 		next = _round(at, next)
-	if not _blocked(c, next) or _blocked(c, at):
+	# On its own ground it does not step off it: a fox or a wolf patrolling between two beach
+	# spots does not cut across the water (2026-10-06, Richard: "foxes are walking over
+	# water"), and a snake on its grass does not cross a sandy bay. Sidestepped instead. A
+	# capybara's swim and a fleeing animal are forced and go where they go.
+	var keep: bool = not forced and _walkable(c, at)
+	if (not _blocked(c, next) or _blocked(c, at)) and (not keep or _walkable(c, next)):
 		return next
 	for turn in SIDESTEPS:
 		var side := at + dir.rotated(turn) * go
-		if not _blocked(c, side):
+		if not _blocked(c, side) and (not keep or _walkable(c, side)):
 			return side
 	return next if forced else at
 
@@ -1644,8 +1722,9 @@ func _land_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 			if p.distance_to(at) < reach:
 				_land_fright(c, p)
 				return
-	# The calm ones step out of a walker's way, moving or still.
-	if (kind == &"capy" or kind == &"peacock") and not bool(c["wet"]) and c["path"].is_empty():
+	# The capybaras step out of a walker's way, moving or still. The peacock does not: it
+	# ignores the walkers altogether (`_minds_walkers`).
+	if kind == &"capy" and not bool(c["wet"]) and c["path"].is_empty():
 		if _make_room(c, seen):
 			return
 	if kind == &"peacock" and _peacock_display(c, seen, delta):
@@ -1712,7 +1791,7 @@ func _land_choose(c: Dictionary) -> void:
 			if not _peacock_spots.is_empty():
 				to = _peacock_spots[_rng.randi_range(0, _peacock_spots.size() - 1)]
 				to = at + (to - at).limit_length(_rng.randf_range(20.0, 50.0))
-	if not c["path"].is_empty() or (_walkable(c, to) and not _taken_by_still(to) and not _blocked(c, to)):
+	if not c["path"].is_empty() or (_walkable(c, to) and not (_minds_walkers(c) and _taken_by_still(to)) and not _blocked(c, to)):
 		_set_off(c, to)
 	else:
 		c["timer"] = 1.0
@@ -1741,8 +1820,8 @@ func _land_move(c: Dictionary, delta: float, flee: bool) -> void:
 		speed = float(k["walk"]) * 1.2
 	var go := speed * delta
 	if flee:
-		c["fade"] = maxf(float(c["fade"]) - delta / 1.4, 0.0) if c["zone"] == "bank" and kind != &"snake" else 1.0
-		if float(c["fade"]) <= 0.0:
+		# Runs on at full strength; it is gone only once off the screen (`VIEW_MARGIN`).
+		if c["zone"] == "bank" and kind != &"snake" and not _in_view(at):
 			c["gone"] = true
 			return
 	else:
@@ -1790,6 +1869,11 @@ static func _view_of(v: Vector2) -> String:
 
 func _arrived(c: Dictionary, flee: bool) -> void:
 	if flee and c["zone"] == "bank" and c["kind"] != &"snake":
+		# Still on the screen: on the same way, another stretch, until it is off it.
+		if _in_view(c["at"]):
+			var away: Vector2 = c.get("flee_dir", Vector2.UP)
+			c["to"] = (c["at"] as Vector2) + away * FLEE_REACH
+			return
 		c["gone"] = true
 		return
 	c.erase("speed")
@@ -1818,7 +1902,7 @@ func _rest(c: Dictionary) -> void:
 
 
 ## Off, away from whatever came near: a bank animal into the trees behind the beach, fading
-## as it goes; an island bunny across the island; a snake a short way along the sand.
+## as it goes; an island bunny across the island; a snake a short way along the grass.
 func _land_fright(c: Dictionary, from: Vector2) -> void:
 	if int(c["state"]) == Land.FLEE:
 		return
@@ -1832,7 +1916,7 @@ func _land_fright(c: Dictionary, from: Vector2) -> void:
 		var along := Vector2(-n.y, n.x)
 		if along.dot(away) < 0.0:
 			along = -along
-		# Along the sand, bent towards the shore's own curve if the straight line leaves it.
+		# Along the grass, bent towards the lawn's own curve if the straight line leaves it.
 		var to := at
 		var reach := Iso.tile_circle_extent(_rng.randf_range(SNAKE_AWAY.x, SNAKE_AWAY.y))
 		for turn: float in [0.0, 0.3, -0.3, 0.6, -0.6, PI]:
@@ -1857,7 +1941,8 @@ func _land_fright(c: Dictionary, from: Vector2) -> void:
 		c["state"] = Land.FLEE
 		return
 	var inland := -((c["spot"] as Dictionary)["normal"] as Vector2)
-	c["to"] = at + (inland * 1.3 + away).normalized() * FLEE_REACH
+	c["flee_dir"] = (inland * 1.3 + away).normalized()
+	c["to"] = at + (c["flee_dir"] as Vector2) * FLEE_REACH
 	c["state"] = Land.FLEE
 	c["speed"] = _rng.randf_range(FLEE_SPEED.x, FLEE_SPEED.y)
 
@@ -1984,8 +2069,14 @@ func _capy_follow(c: Dictionary, delta: float) -> void:
 			goal = lat + off
 			break
 	var gap := at.distance_to(goal)
-	if gap > 4.0:
-		var speed := float(KINDS[&"capy"]["run"] if gap > CAPY_CATCH_UP else KINDS[&"capy"]["walk"]) * (1.25 if lead.get("trip", false) else 1.0)
+	# Sets off once its place is `CAPY_GO` away and walks until it is within `CAPY_STOP`: one
+	# threshold had it starting and stopping every few frames behind a walking lead, swapping
+	# its walk and rest pictures (2026-10-06, Richard: "jiggly and bugged when walking"). It
+	# walks a little quicker than its lead so it closes the gap rather than holding it.
+	var going := int(c["state"]) == Land.MOVE
+	if gap > (CAPY_STOP if going else CAPY_GO):
+		var speed := float(KINDS[&"capy"]["run"]) if gap > CAPY_CATCH_UP else float(KINDS[&"capy"]["walk"]) * CAPY_KEEP_UP
+		speed *= 1.25 if lead.get("trip", false) else 1.0
 		var next := _step_to(c, goal, speed * delta, bool(lead.get("trip", false)))
 		c["facing"] = Flock.facing_of(at, next) if absf(next.x - at.x) > 0.05 else float(c["facing"])
 		c["view"] = _view_of(next - at)
@@ -2010,7 +2101,7 @@ func _capy_water(c: Dictionary) -> void:
 	c["wet"] = wet
 
 
-## Out of a walker's way, calmly: a capybara or the peacock with somebody inside `ROOM` walks
+## Out of a walker's way, calmly: a capybara with somebody inside `ROOM` walks
 ## to a spot `ROOM_OFF` away from them. True when it set off.
 func _make_room(c: Dictionary, seen: PackedVector2Array) -> bool:
 	if c.get("arriving", false):
@@ -2166,19 +2257,20 @@ func _lay_streaks(delta: float) -> void:
 	var swimmers: Array = []
 	for c: Dictionary in _critters_on_land:
 		if c["kind"] == &"capy":
-			swimmers.append([c, bool(c["wet"])])
+			swimmers.append([c, bool(c["wet"]), 1.0])
 	for t: Dictionary in _turtles:
-		swimmers.append([t, int(t["state"]) == Turtle.SWIM])
+		swimmers.append([t, int(t["state"]) == Turtle.SWIM, TURTLE_DRAWN])
 	for pair: Array in swimmers:
 		var c: Dictionary = pair[0]
 		var swimming: bool = pair[1]
+		var small: float = pair[2]
 		var id: int = c.get_or_add("id", _rng.randi())
 		alive[id] = true
 		var streak: HullFoam = _streaks.get(id)
 		if streak == null:
 			streak = HullFoam.new()
-			streak.half_length = Dog.STREAK_LONG
-			streak.half_width = Dog.STREAK_WIDE
+			streak.half_length = Dog.STREAK_LONG * small
+			streak.half_width = Dog.STREAK_WIDE * small
 			streak.show_behind_parent = true
 			_ground.add_child(streak)
 			_streaks[id] = streak
@@ -2281,12 +2373,14 @@ func _bird_step(s: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 		var t := minf(float(s["t"]), 1.0)
 		s["at"] = (s["from"] as Vector2).lerp(s["to"], t)
 		s["alt"] = lerpf(float(s["alt_from"]), float(s["alt_to"]), t) + float(s["arc"]) * sin(t * PI)
-		if bool(s.get("leaving", false)):
-			s["fade"] = clampf((1.0 - t) / 0.3, 0.0, 1.0)
-		else:
-			s["fade"] = minf(float(s["fade"]) + delta / 0.6, 1.0)
+		s["fade"] = minf(float(s["fade"]) + delta / 0.6, 1.0)
 		if t >= 1.0:
 			if bool(s.get("leaving", false)):
+				# Flies on the way it was going until it is off the screen.
+				if _in_view(s["at"]):
+					var on := ((s["to"] as Vector2) - (s["from"] as Vector2)).normalized()
+					_bird_fly(s, (s["at"] as Vector2) + on * BIRD_FROM, float(s["alt"]), float(s["alt"]), 0.0)
+					return
 				s["gone"] = true
 				return
 			s["state"] = Bird.GROUND
@@ -2569,7 +2663,7 @@ func _brood_step(b: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 			b["at"] = at + vel * speed * delta
 			b["alt"] = minf(float(b["alt"]) + delta * (40.0 + float(b["t"]) * 60.0), DUCK_ALT * 1.3)
 			_kids_fly(b)
-			if (b["at"] as Vector2).distance_to(b["from"]) > DUCK_FROM:
+			if (b["at"] as Vector2).distance_to(b["from"]) > DUCK_FROM and not _in_view(b["at"], BROOD_VIEW_MARGIN):
 				b["gone"] = true
 
 
@@ -2847,8 +2941,12 @@ func _new_cray() -> Dictionary:
 func _cray_step(c: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 	var at: Vector2 = c["at"]
 	var ok := _cray_ok(at)
-	c["fade"] = clampf(float(c["fade"]) + (delta if ok else -delta) / 0.8, 0.0, 1.0)
-	if not ok and float(c["fade"]) <= 0.0:
+	# Off clean water it fades away only where nobody sees it: on the screen, through water
+	# that still shows the bed, it holds and crawls on.
+	var held := not ok and Fish.bed_shows(grid, at) and _in_view(at)
+	if not held:
+		c["fade"] = clampf(float(c["fade"]) + (delta if ok else -delta) / 0.8, 0.0, 1.0)
+	if not ok and not held and float(c["fade"]) <= 0.0:
 		c["gone"] = true
 		return
 	c["timer"] = float(c["timer"]) - delta
@@ -2899,7 +2997,7 @@ func _paint_under(on: CanvasItem) -> void:
 			continue
 		var frame: int = [0, 1, 2, 1][int(float(f["clock"]) * FROG_SWIM_FPS) % 4]
 		var at: Vector2 = f["at"]
-		_shadow_of(on, "frogswim_%d_%d" % [int(f["row"]), frame], at, 1.0, float(f["fade"]))
+		_shadow_of(on, "frogswim_%d_%d" % [int(f["row"]), frame], at, 1.0, float(f["fade"]), FROG_DRAWN)
 	for t: Dictionary in _turtles:
 		var state := int(t["state"])
 		if state == Turtle.UNDER or state == Turtle.SWIM:
@@ -2959,7 +3057,7 @@ func _paint_submerged(on: CanvasItem) -> void:
 		var r := _region("frogdive_%s_%d_%d" % [colour, int(f["row"]), frame])
 		if r.size.x <= 0.0:
 			continue
-		on.draw_texture_rect_region(_critters, Rect2(at - r.size * SCALE * 0.5, r.size * SCALE), r,
+		on.draw_texture_rect_region(_critters, Rect2(at - r.size * FROG_ART * 0.5, r.size * FROG_ART), r,
 			Fish.through_tint(at, float(f["fade"]), 0.18, 0.36, 0.5))
 	for t: Dictionary in _turtles:
 		if int(t["state"]) != Turtle.UNDER:
@@ -3052,10 +3150,10 @@ func _draw_frog(on: CanvasItem, f: Dictionary) -> void:
 	var surface := Shade.On.WATER if bool(f["on_pad"]) or _wet(ground) else Shade.On.LAND
 	var sun := _sun()
 	on.draw_set_transform_matrix(Shade.lying(ground.round(), sun.x, sun.y))
-	on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * SCALE, Vector2(FROG_CELL, FROG_CELL) * SCALE), src,
+	on.draw_texture_rect_region(sheet, Rect2(-FROG_FOOT * FROG_ART, Vector2(FROG_CELL, FROG_CELL) * FROG_ART), src,
 		Shade.tint_on(day, surface, float(f["fade"])))
 	on.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var box := Rect2((at - FROG_FOOT * SCALE - Vector2(0.0, lift)).round(), Vector2(FROG_CELL, FROG_CELL) * SCALE)
+	var box := Rect2((at - FROG_FOOT * FROG_ART - Vector2(0.0, lift)).round(), Vector2(FROG_CELL, FROG_CELL) * FROG_ART)
 	on.draw_texture_rect_region(sheet, box, src, Color(1.0, 1.0, 1.0, float(f["fade"])))
 
 

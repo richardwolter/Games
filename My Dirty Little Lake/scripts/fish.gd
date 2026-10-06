@@ -71,8 +71,12 @@ const FLEE_SPEED := 3.0
 const FLEE_TIME := 1.6
 ## The spread of a school round its leader, in world px, per unit of its shadow's length.
 const SPREAD := 1.6
-## A school that has left the clean water fades out and is replaced.
+## A school that has left the clean water fades out and is replaced, but only off the screen
+## (2026-10-06, Richard: wildlife must not disappear where the player can see): on it, a
+## school boxed in by foul water slows and turns, and one whose water turned under it swims
+## on at full strength (`_in_view`, `Wildlife.VIEW_MARGIN`).
 const FADE := 0.8
+const BOXED_SLOW := 0.2
 
 var grid: LakeGrid
 var splash: WaterSplash
@@ -261,15 +265,20 @@ func _swim(s: Dictionary, delta: float) -> void:
 			if turned:
 				break
 		if not turned:
-			s["fade"] = maxf(float(s["fade"]) - delta / FADE, 0.0)
 			s["rising"] = false
+			if _in_view(at):
+				heading = _turn(heading, TURN * delta * 3.0)
+				speed *= BOXED_SLOW
+			else:
+				s["fade"] = maxf(float(s["fade"]) - delta / FADE, 0.0)
 	s["heading"] = heading
 	at += heading * speed * delta
 	s["at"] = at
 	# Where the school is now: still clean? Otherwise fade away, and something new will come.
 	if not _swimmable(Iso.world_to_tile(at)):
 		s["rising"] = false
-		s["fade"] = maxf(float(s["fade"]) - delta / FADE, 0.0)
+		if not _in_view(at):
+			s["fade"] = maxf(float(s["fade"]) - delta / FADE, 0.0)
 	elif bool(s["rising"]):
 		s["fade"] = minf(float(s["fade"]) + delta / FADE, 1.0)
 	# The rings: one from the leader every so often, more often while fleeing.
@@ -285,6 +294,14 @@ func _swim(s: Dictionary, delta: float) -> void:
 			if rings.size() < WaterSplash.MAX_RIPPLES / 2:
 				splash.ripple(at + who, float(spec["span"]))
 	s["ripple"] = clock
+
+
+## Is a world point on the screen, or near enough to it that a fish there could be seen.
+func _in_view(at: Vector2) -> bool:
+	if not is_inside_tree():
+		return false
+	var view := get_canvas_transform().affine_inverse() * get_viewport_rect()
+	return view.grow(Wildlife.VIEW_MARGIN).has_point(at)
 
 
 ## Turn a heading on the plane (the 2:1 squash taken out and put back).

@@ -4563,7 +4563,7 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   the first clean shore, and 2 on the island's lawn from 70% cleaned (`ISLE_BUNNY_FROM`);
   fox 5 and wolf 5 from 40% (`CANID_FROM`, was 60% for the fox), each new one on the clean
   bank spot furthest from the others (`_spread_spot`), patrolling along the beach a waypoint
-  every `PATROL_STRIDE` shore spots so it never cuts across the water; snakes 8 on the bank's sand from the first clean shore, **never the island** (Richard:
+  every `PATROL_STRIDE` shore spots so it never cuts across the water; snakes 8 on the bank (on its grass since 2026-10-06, see Wildlife Sizes below) from the first clean shore, **never the island** (Richard:
   "no snake on main isle"); capybaras 3 pairs from 50% (`CAPY_FROM`); the
   peacock 1 from 80% (`PEACOCK_FROM`), on the island's lawn in front of the hut
   (`_peacock_spots`).
@@ -4577,8 +4577,8 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   frames that edge (`edge`), not the home. The bank's ground reaches `FOREST_REACH` (2.5)
   tiles into the woods, and each rest a bank animal may wander up onto the grass or to the
   forest's edge (`INLAND_ODDS` by kind: bunny 0.15, fox and wolf 0.35, capybara 0.2, snake 0.3)
-  and then back to its ways. A snake's home is on the sand or up on the grass (`SNAKE_HOME`
-  0.5-5 tiles out) and it walks the bank's ground, not only the sand. **The island's bunnies and
+  and then back to its ways. A snake's home is on the grass, never the sand (2026-10-06, see
+  Wildlife Sizes below). **The island's bunnies and
   the peacock walk out from behind the recycle box** (Richard: "peacock and bunnies can spawn
   behind the box and just come out walking"; `_out_of_the_box`, `_crate_box`), unseen while
   their drawing overlaps the box's, on their way to their spot. Until it is out it neither
@@ -4588,9 +4588,10 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   `tools/last_snake_sizes.png` over nearest, which broke the thin body's bands. 32x18 a frame.
 - **Behaviour**: a bunny runs (bank: into the trees, fading; island: across the island); the
   fox and the wolf trot off into the trees; a snake slithers `SNAKE_AWAY` tiles along the sand
-  and stays. **A capybara and the peacock never run**: they walk out of a walker's way
-  (`_make_room`, inside `ROOM` tiles), and the dogs walk round them (`Dog.calm`, pushed clear
-  the way a dog gives way to the angler, `CALM_REACH`). A net landing frightens neither.
+  and stays. **A capybara and the peacock never run**: a capybara walks out of a walker's way
+  (`_make_room`, inside `ROOM` tiles), and the dogs walk round it (`Dog.calm`, pushed clear
+  the way a dog gives way to the angler, `CALM_REACH`); the peacock does neither since
+  2026-10-06 (see Wildlife Sizes below). A net landing frightens neither.
 - **Capybaras are pairs**: a lead and a follower (`"lead"`), the follower behind and beside,
   catching up at a run. Each rest the lead may set off for the island (`CAPY_VISIT_ODDS`):
   down to its spot's water, straight across to the island's spot facing it
@@ -4662,6 +4663,55 @@ rabbits and fox** (Seven Visual Fixes, Eight More Fixes: their art, `rabbit_*`/`
   `tools/shot_fauna.tscn` (desktop build, own save, under its own node) saves
   `tools/last_fauna_{bunny,bunny_isle,fox,wolf,snake,capy,peacock,behind_plant,turtle,turtle_swim,capy_swim}.png` and
   `last_fauna.log`.
+
+### Wildlife Sizes and the Peacock (2026-10-06, `/grill-me` with Richard)
+- **The peacock collides with no walker** (Richard: "its buggy"): it does not step out of the
+  angler's or a dog's way (`_make_room` is the capybaras' alone), still walkers are not
+  obstacles to it (`_minds_walkers`), and it is not in `Dog.calm`, so the dogs walk through
+  it. It still keeps off the buildings, trees and rocks, walks out from behind the crate and
+  fans its tail at whoever is near.
+- **Smaller, drawn smaller, not rebaked** (Richard's picks off `tools/last_shrink_sheet.png`,
+  `tools/shrink_sheet.py`, which also shows a rebake and, for the crayfish, a rule redraw):
+  bunnies and snakes 1.5x (`KINDS` `scale` 0.5 / 1.5, their `half`/`tall` boxes in to match,
+  `SNAKE_STEP_PX` 1.5 to 1.0), crayfish 1.5x (`CRAY_DRAWN`, shadow and `CRAY_SHADE_UP` with
+  it), frogs 1.2x (`FROG_DRAWN`, `FROG_ART`: sitting, hopping, the swim shadow and the frog
+  seen swimming, the hop and jump heights and the plant-cover box). **Fractional pixels,
+  accepted**: the art is untouched and draws uneven, and may shimmer in motion. The rebake
+  lost the snake's bands and the frog's swimming shape. `critters.png` and the frog sheets
+  did not change.
+- **Snakes live on the grass and the woods' edge, never the sand**: home `SNAKE_HOME`
+  (0.4-5.5) tiles past the lawn's line (`_to_grass`, `_past_lawn`, the outer ground's
+  `coverage_at`), `_walkable` holds a snake `SNAKE_GRASS_IN` (0.25) past the line, and a snake
+  on its grass will not step onto sand (`_step_to`), so a straight line across a sandy bay is
+  sidestepped. A fright slithers it along the grass. Still never the island.
+- **Nothing goes away where it can be seen** (same day, Richard: "wildlife suddenly
+  disappearing or fading out, it should not happen where player can see"; `Wildlife._in_view`,
+  `VIEW_MARGIN` 48, `BROOD_VIEW_MARGIN` 160). A bank animal running off keeps running at full
+  strength, another `FLEE_REACH` the same way (`flee_dir`) each time it arrives still on
+  screen, and is gone only off it (it used to fade over 1.4 s); a songbird leaving flies on
+  until off screen (it faded over the last 30% of its flight); a brood taking off is gone
+  past `DUCK_FROM` only off screen; a crayfish off clean water holds where the bed shows on
+  screen; a fish school boxed in by foul water slows (`Fish.BOXED_SLOW`) and turns on screen,
+  and one whose water turned under it swims on, both fading only off screen. **Fading in is
+  untouched.**
+- **The capybara follower no longer flickers** (Richard: "jiggly and bugged when walking"):
+  it switched between walk and rest every few frames behind a walking lead, one 4 px threshold
+  for both (`tools/probe_capy.tscn`, headless, counted 86 and 148 flips a minute). Now it sets
+  off at `CAPY_GO` (10 px) and stops within `CAPY_STOP` (2), walking `CAPY_KEEP_UP` (1.15) of
+  the lead's pace so it closes the gap: 0 flips.
+- **No land animal steps off its ground onto the water** (Richard: "foxes are walking over
+  water"): a fox's or wolf's patrol runs between waypoints on the outer bank, and the chord
+  between two of them cuts across the lake. `_step_to` now refuses, and sidesteps, a step from
+  walkable ground to unwalkable for every land animal, the snake's grass rule folded in.
+  Forced steps (a capybara's swim, a bank animal fleeing) are untouched.
+- **Turtles 1.3x smaller** (same day, Richard; `TURTLE_DRAWN`, `TURTLE_ART` 0.5 / 1.3), drawn
+  smaller like the rest. Walk and swim speed and `TURTLE_STEP_PX` come in with it, so the feet
+  still carry the body at the same frame rate; the streak, the rings and the plant-cover box
+  too. **A turtle surfacing from a dive keeps its fade**: it was reset to 0 and blinked out.
+- Out of scope, by decision: fox, wolf, capybara, peacock, songbird and duck sizes; snake
+  counts and gates.
+- `test_lake` guards the peacock out of `Dog.calm`, not minding walkers and not stepping
+  aside, every snake's home on the grass, and a frightened snake ending on the grass.
 
 ### The Wood and the Pack Plants (2026-10-05, `/grill-me` with Richard)
 More tree and plant variety from Toffeecraft's animated trees and lake plants (bought in the

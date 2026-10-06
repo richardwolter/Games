@@ -393,7 +393,7 @@ static var pack: Array = []
 var _voice_next: float = 0.0
 static var _pack_hush: float = 0.0
 
-## Where the capybaras and the peacock stand, world px (2026-10-05): animals that never run,
+## Where the capybaras stand, world px (2026-10-05; the peacock left it 2026-10-06): animals that never run,
 ## so a dog walks round them, pushed off them the way it gives way to the angler. Set by
 ## Wildlife every frame. See `CALM_REACH`.
 static var calm := PackedVector2Array()
