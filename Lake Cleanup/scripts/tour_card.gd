@@ -42,7 +42,6 @@ var _card := Rect2()
 var _skip := Rect2()
 var _clock := 0.0
 var _mouse: Texture2D = _load("mouse_click")
-var _a: Texture2D = _load("pad_a")
 var _arrow: Texture2D = _load("arrow_up")
 
 
@@ -146,7 +145,7 @@ func _draw() -> void:
 	var pad_in := FirstSteps.NOTE_PAD
 	var lines := FirstSteps._wrap(text, face, size_px, wide - pad_in.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
-	var icon := _a if pad else _mouse
+	var icon := Glyphs.confirm() if pad else _mouse
 	var icon_size := icon.get_size() * px if icon != null else Vector2.ZERO
 	var foot_tall := maxf(line_tall, icon_size.y) if count > 0 else 0.0
 	var head := line_tall if count > 0 else 0.0
@@ -167,8 +166,9 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_RIGHT, inner.size.x, size_px, Style.PAPER_SOFT)
 	var y := inner.position.y + head + ascent
 	for line in lines:
-		draw_string(face, Vector2(card.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER, card.size.x,
-			size_px, Style.PAPER_INK)
+		# Through `Style.write`, which draws a pad glyph where a line carries one.
+		Style.write(self, line, size_px, Vector2(card.position.x, y), Style.PAPER_INK,
+			HORIZONTAL_ALIGNMENT_CENTER, card)
 		y += line_tall
 	if count <= 0:
 		return
@@ -218,11 +218,15 @@ func _px() -> float:
 func pad_focus() -> Array:
 	if not is_card() or _card.size == Vector2.ZERO:
 		return []
-	var out: Array = []
+	# **A card whose lit target takes the click gives the stick to the room under it**
+	# (issue #33 audit): the tray's rows, the shelf, the nozzle. Picked as one stop, the
+	# target was its middle, and A clicked whatever happened to be there. Doing the thing the
+	# card asks is what moves it on, with the pad as with the mouse.
 	if through:
-		out.append({"box": target, "key": &"target", "first": true})
+		return []
+	var out: Array = []
 	var go := Rect2(_card.position, Vector2(_card.size.x, _card.size.y * 0.5))
-	out.append({"box": _card, "at": go.get_center(), "key": &"next", "first": not through})
+	out.append({"box": _card, "at": go.get_center(), "key": &"next", "first": true})
 	if _skip.size != Vector2.ZERO:
 		out.append({"box": _skip, "key": &"skip"})
 	return out

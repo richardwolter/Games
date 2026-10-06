@@ -426,8 +426,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Start is the pad's way to the settings, as on the lake. Everything else on the menu is
 	# the pad's pointer (scripts/pad.gd): A clicks a plank, B is Escape.
 	if event is InputEventJoypadButton and event.is_action_pressed(&"open_settings"):
-		_show_settings(not _settings.visible)
 		get_viewport().set_input_as_handled()
+		# Not under another board: Start put the settings beneath the credits or the letter,
+		# where nothing could reach them (issue #33 audit).
+		for over: Control in [_controls, _credits, _letter, _languages, _confirm]:
+			if over.visible:
+				return
+		_show_settings(not _settings.visible)
 		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:

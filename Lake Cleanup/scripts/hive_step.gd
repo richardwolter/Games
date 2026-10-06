@@ -327,13 +327,20 @@ func pad_mark() -> Rect2:
 
 
 ## The pad's stick moves the hidden pointer, the wash room's nozzle rule
-## (`WashRoom._pad_aim`). Only in pad mode, so a mouse left resting is never pulled.
+## (`WashRoom._pad_aim`): the right stick first, as aiming is everywhere, the left when the
+## right is still. Only in pad mode, so a mouse left resting is never pulled.
 func pad_move(delta: float) -> void:
 	if not Pad.is_pad():
 		return
-	Pad.move_cursor(
-		Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down"), delta
-	)
+	Pad.move_cursor(aim_stick(), delta)
+
+
+## The aiming stick: the right one, else the left.
+static func aim_stick() -> Vector2:
+	var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")
+	if stick == Vector2.ZERO:
+		stick = Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down")
+	return stick
 
 
 ## Say `finished`, once. A second call — the last clump landing after the harness already

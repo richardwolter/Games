@@ -181,10 +181,11 @@ const CARD_RIM := 3.0
 ## A board's two row faces, [affordable, drawn back].
 static func tones_of(board: StringName) -> Array:
 	return TONES.get(board, [Style.BOARD_ROW, Style.BOARD_ROW_OFF])
-## The blurb's plate: how wide its writing may run, its padding, and the gap off the "?".
+## The blurb's plate: how wide its writing may run, and its padding.
 const BLURB_WIDE := 250.0
 const BLURB_PAD := 12.0
-const BLURB_OFF := Vector2(10.0, 4.0)
+## The gap between a row's board and the blurb standing beside it.
+const BLURB_SIDE := 6.0
 
 ## The legend under the shortest boards (the ferry's and the dog's, which stand in the
 ## middle): the weight tiers with their sell rates, the yards, the bonus and the pay rule.
@@ -266,8 +267,6 @@ var _hovered: int = -1
 ## Every drawn row's "?" box, parallel to `_row_boxes`, and which row's is under the
 ## pointer, or -1.
 var _help_boxes: Array[Rect2] = []
-## Where the mouse last was over the shop: the blurb follows it across.
-var _mouse_at := Vector2.ZERO
 var _help_hovered: int = -1
 
 ## Every drawn row's price tag, parallel to `_row_boxes`: the only part of a row that buys
@@ -359,7 +358,6 @@ var _tour_skip := Rect2()
 ## The tour's card as last drawn, for the pad's stick.
 var _tour_card := Rect2()
 var _prompt_mouse: Texture2D = load("res://assets/ui/prompts/mouse_click.png") if ResourceLoader.exists("res://assets/ui/prompts/mouse_click.png") else null
-var _prompt_a: Texture2D = load("res://assets/ui/prompts/pad_a.png") if ResourceLoader.exists("res://assets/ui/prompts/pad_a.png") else null
 var _prompt_arrow: Texture2D = load("res://assets/ui/prompts/arrow_up.png") if ResourceLoader.exists("res://assets/ui/prompts/arrow_up.png") else null
 
 
@@ -615,7 +613,6 @@ func _gui_input(event: InputEvent) -> void:
 		var was := _hovered
 		var was_help := _help_hovered
 		var at := (event as InputEventMouseMotion).position
-		_mouse_at = at
 		_hovered = _row_under(at)
 		_help_hovered = _help_under(at)
 		# On the pad a row picked is a row being read: its blurb comes up with it, there being
@@ -688,9 +685,7 @@ static func help_box_of(row_box: Rect2) -> Rect2:
 
 
 func _paint_key() -> int:
-	# The blurb follows the pointer across, so while one is up the pointer moves the picture.
-	var follow := _mouse_at.round() if _help_hovered >= 0 else Vector2.ZERO
-	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame, follow])
+	return hash([rows.hash(), legend.hash(), _hovered, _help_hovered, roundi(_sparkle * 120.0), _dog_frame])
 
 
 func _draw() -> void:
@@ -1475,7 +1470,7 @@ func _draw_tour() -> void:
 	var pad := FirstSteps.NOTE_PAD
 	var lines := FirstSteps._wrap(Text.of(String(TOUR[tour][1])), face, size_px, wide - pad.x * 2.0)
 	var line_tall := face.get_height(size_px) + 1.0
-	var icon := _prompt_a if tour_pad else _prompt_mouse
+	var icon := Glyphs.confirm() if tour_pad else _prompt_mouse
 	var icon_size := icon.get_size() * px if icon != null else Vector2.ZERO
 	var foot_tall := maxf(line_tall, icon_size.y)
 	var tall := pad.y * 2.0 + line_tall * float(lines.size() + 1) + 4.0 + foot_tall
@@ -1559,15 +1554,20 @@ func pad_focus() -> Array:
 	return out
 
 
-## Where a blurb of `wanted` size stands for a row (2026-09-26, Richard: it covered the row
-## being hovered). **Never over the row**: its top is `BLURB_OFF.y` under the row's foot, or
-## its foot as far over the row's top when there is no room below. Across, it follows the
-## mouse, starting `BLURB_OFF.x` right of it; on the pad, with no pointer, it lines up with
-## the row's left edge. Held on the window either way.
+## Where a blurb of `wanted` size stands for a row. **Beside the row's whole board, over the
+## board next to it** (2026-10-06, Richard: under the pointer it covered the column being read,
+## and the prices below the row with it): its top level with the row, on the right of the
+## board where there is room, else the left. Mouse and pad alike. Held on the window.
+## Supersedes 2026-09-26's "under the row, following the mouse".
 func blurb_at(row: Rect2, wanted: Vector2) -> Vector2:
-	var x := row.position.x if Pad.is_pad() else _mouse_at.x + BLURB_OFF.x
-	var y := row.end.y + BLURB_OFF.y
-	if y + wanted.y > size.y - 4.0:
-		y = row.position.y - BLURB_OFF.y - wanted.y
+	var column := row
+	for board: Rect2 in _boards.values():
+		if board.has_point(row.get_center()):
+			column = board
+			break
+	var x := column.end.x + BLURB_SIDE
+	if x + wanted.x > size.x - 4.0:
+		x = column.position.x - BLURB_SIDE - wanted.x
 	x = clampf(x, 4.0, maxf(size.x - wanted.x - 4.0, 4.0))
-	return Vector2(x, maxf(y, 4.0))
+	var y := clampf(row.position.y, 4.0, maxf(size.y - wanted.y - 4.0, 4.0))
+	return Vector2(x, y)

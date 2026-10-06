@@ -161,7 +161,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_roll.randomize()
-	for tile: String in ["mouse_click", "pad_a", "pad_rt"]:
+	for tile: String in ["mouse_click"]:
 		var path := FirstSteps.PROMPTS % tile
 		if ResourceLoader.exists(path):
 			_prompts[tile] = load(path)
@@ -483,15 +483,16 @@ func _hint_of(key: StringName) -> String:
 	return Text.of("HIVE_HINT_" + String(key).to_upper())
 
 
-## The prompt for the device in hand: the mouse's click, or on the pad A for the queen (a
-## click to find her) and RT for the rest (held or pumped). None on the done card.
+## The prompt for the device in hand: the mouse's click, or on the pad the confirm button for
+## the queen (a click to find her) and the cast button for the rest (held or pumped), as
+## glyphs of the pad in hand. None on the done card.
 func _prompt_of(key: StringName) -> Texture2D:
 	if key == &"done" or key == &"settled" or key == &"":
 		return null
-	var tile := "mouse_click"
 	if Pad.is_pad():
-		tile = "pad_a" if key == &"queen" else "pad_rt"
-	return _prompts.get(tile) as Texture2D
+		# In the family in hand, and whatever the two verbs are bound to (issue #33).
+		return Glyphs.confirm() if key == &"queen" else Glyphs.of_action(&"cast")
+	return _prompts.get("mouse_click") as Texture2D
 
 
 ## Words and whether each is in the head ink: the words between asterisks are.

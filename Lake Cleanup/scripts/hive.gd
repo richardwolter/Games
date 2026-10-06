@@ -809,12 +809,23 @@ func _draw_ready() -> void:
 func _draw_chip() -> void:
 	var at := ready_point()
 	var box := Rect2((at - Vector2(CHIP, CHIP) * 0.5).floor(), Vector2(CHIP, CHIP))
+	var key := Binds.shown(&"interact", Pad.is_pad())
+	# A pad button is its own glyph, a button already: drawn alone, not inside a chip.
+	var glyph := Glyphs.lone(key)
+	if glyph != null:
+		Glyphs.draw_centred(self, glyph, box.get_center(), Glyphs.prompt_px() * _world_px())
+		return
 	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.9))
 	draw_rect(box, Style.INK_DIM, false, 1.0)
-	var key := Binds.shown(&"interact", Pad.is_pad())
 	var size := Style.TEXT_SMALL
-	var wide := Style.font().get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var wide := Style.measure(key, size).x
 	Style.write(self, key, size, box.position + Vector2((CHIP - wide) * 0.5, 14.0), Style.INK)
+
+
+## World pixels to a canvas pixel: the camera's zoom undone, so a glyph drawn here is the
+## same size on the screen at every zoom stop.
+func _world_px() -> float:
+	return 1.0 / maxf(get_canvas_transform().get_scale().x, 0.01)
 
 
 func _draw_lamp(at: Vector2) -> void:

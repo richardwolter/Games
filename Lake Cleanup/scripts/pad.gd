@@ -25,6 +25,13 @@ extends Node
 enum Mode { MOUSE, PAD }
 
 signal mode_changed(mode: Mode)
+## The glyph family on screen moved: a pad of the other make was pressed, or the player
+## changed the Controls board's chooser (issue #33).
+signal family_changed
+## The last pad went away while the player was holding it (`pad_lost`), or a pad came back
+## (`pad_found`). The lake pauses on the first and lets go on the second.
+signal pad_lost
+signal pad_found
 
 ## The device id on every event this node makes.
 const SYNTH_DEVICE := 0x5AD
@@ -118,10 +125,18 @@ var ring: FocusRing = null
 
 ## Who the stick is picking on and what: the board, the control's key, and its middle in
 ## canvas pixels (what a re-layout that lost the key is matched back against).
+## The pad last pressed, or -1.
+var _device: int = -1
+## The DualSense's light bar (issue #33): the lake hands its colour over as it clears, and it
+## is laid on every pad that has one, including one plugged in later. Xbox pads have none.
+var _light := Color(0, 0, 0, 0)
+
 var _focus_owner: Node = null
 var _focus_key: Variant = null
 var _focus_at := Vector2.INF
 var _nav_dir := Vector2i.ZERO
+## Whether the player has stepped on the board listening, since it came up.
+var _stepped := false
 var _nav_wait := 0.0
 
 
@@ -137,6 +152,10 @@ func _ready() -> void:
 	ring = FocusRing.new()
 	over.add_child(ring)
 	add_child(over)
+	Input.joy_connection_changed.connect(_on_joy_connection)
+	var pads := Input.get_connected_joypads()
+	if not pads.is_empty():
+		Glyphs.detected = Glyphs.family_of(pads[0])
 
 
 ## Put the wooden arrow on. Missing art leaves the system pointer alone rather than
@@ -170,6 +189,70 @@ func set_mode(to: Mode) -> void:
 	mode = to
 	_cursor = Vector2.INF
 	mode_changed.emit(mode)
+	# Every prompt on screen says mouse or pad, and most boards draw only when something
+	# moves: the switch is redrawn everywhere at once, as a language change is.
+	redraw_all()
+
+
+## The pad an event came from, noted so the glyphs follow the make in hand. A press on a
+## PlayStation pad after an Xbox one swaps every glyph on screen.
+func note_device(device: int) -> void:
+	if device == _device or device < 0 or device == SYNTH_DEVICE:
+		return
+	_device = device
+	var was := Glyphs.family()
+	Glyphs.detected = Glyphs.family_of(device)
+	if Glyphs.family() != was:
+		family_moved()
+
+
+## The family on screen changed: every board redraws, and anything holding a layout listens.
+func family_moved() -> void:
+	family_changed.emit()
+	redraw_all()
+
+
+func redraw_all() -> void:
+	if is_inside_tree():
+		Prefs._redraw_all(get_tree().root)
+
+
+## A pad plugged in or pulled out. **Only the last pad going while it is the hand in use is a
+## loss**: a second pad dropping off a desk is nobody's business, and nor is a pad nobody was
+## holding. The game falls back to the mouse either way, so the arrow is up to answer it.
+func _on_joy_connection(device: int, connected: bool) -> void:
+	if connected:
+		_lay_light(device)
+		if _device < 0:
+			var was := Glyphs.family()
+			Glyphs.detected = Glyphs.family_of(device)
+			if Glyphs.family() != was:
+				family_moved()
+		pad_found.emit()
+		return
+	if device == _device:
+		_device = -1
+	if not Input.get_connected_joypads().is_empty():
+		return
+	var held := mode == Mode.PAD
+	set_mode(Mode.MOUSE)
+	if held:
+		pad_lost.emit()
+
+
+## The light bar's colour, laid on every pad that has one. Only when it moves, so the lake
+## can hand it over every frame.
+func set_light(colour: Color) -> void:
+	if colour.is_equal_approx(_light):
+		return
+	_light = colour
+	for device: int in Input.get_connected_joypads():
+		_lay_light(device)
+
+
+func _lay_light(device: int) -> void:
+	if _light.a > 0.0 and Input.has_joy_light(device):
+		Input.set_joy_light(device, Color(_light.r, _light.g, _light.b))
 
 
 func _input(event: InputEvent) -> void:
@@ -184,9 +267,11 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventJoypadButton:
 		if (event as InputEventJoypadButton).pressed:
+			note_device(event.device)
 			set_mode(Mode.PAD)
 	elif event is InputEventJoypadMotion:
 		if absf((event as InputEventJoypadMotion).axis_value) >= WAKE_AXIS:
+			note_device(event.device)
 			set_mode(Mode.PAD)
 	elif event is InputEventMouseMotion:
 		if Time.get_ticks_msec() - _warped_at >= WARP_QUIET_MS \
@@ -219,6 +304,11 @@ func _input(event: InputEvent) -> void:
 	elif button.is_action(&"pad_back"):
 		_queue.append(_key(KEY_ESCAPE, true))
 		_queue.append(_key(KEY_ESCAPE, false))
+	elif (button.is_action(&"zoom_in") or button.is_action(&"zoom_out")) and _owner_free():
+		# A board reading the stick itself (the shed walking, the wash stand) gives the
+		# shoulders their own meaning; a wheel turned under them scrolled the shed's shelf a
+		# row as the same press opened it (issue #33 audit).
+		return
 	elif button.is_action(&"zoom_in"):
 		_queue.append(_click(MOUSE_BUTTON_WHEEL_UP, true))
 		_queue.append(_click(MOUSE_BUTTON_WHEEL_UP, false))
@@ -339,6 +429,11 @@ func focus_owner() -> Node:
 	return best
 
 
+func _owner_free() -> bool:
+	var owner := focus_owner()
+	return owner != null and _is_free(owner)
+
+
 ## A board that wants the stick for itself right now: the shed while the angler walks or a
 ## piece is carried, the wash stand while a find is on it. No stops and no pointer of ours;
 ## the board reads the stick, and `pad_mark` may say what A would act on.
@@ -383,16 +478,23 @@ func _drive_focus(delta: float) -> bool:
 		return true
 	var entries := _focus_entries(owner)
 	var index := -1
-	if owner == _focus_owner:
+	if owner != _focus_owner:
+		_stepped = false
+	elif _stepped:
 		index = _find_again(entries)
+	# **Until the player steps, the board's own first control is the pick** (2026-10-06): on
+	# the frame a board opens its rows may not be laid out yet, and the stick settled on the
+	# one control that was (the shop's close cross) and stayed there.
 	if index < 0:
-		index = 0
+		var flagged := -1
 		for i in entries.size():
 			if entries[i]["first"]:
-				index = i
+				flagged = i
 				break
-		# A board coming up does not take a stick already held as a step.
-		_nav_dir = Vector2i(9, 9)
+		index = flagged if flagged >= 0 else maxi(_find_again(entries), 0)
+		if owner != _focus_owner:
+			# A board coming up does not take a stick already held as a step.
+			_nav_dir = Vector2i(9, 9)
 	_focus_owner = owner
 
 	var held := owner.has_method(&"pad_hold") and bool(owner.call(&"pad_hold"))
@@ -408,6 +510,7 @@ func _drive_focus(delta: float) -> bool:
 				spent = true
 			elif next >= 0:
 				index = next
+				_stepped = true
 		if spent:
 			entries = _focus_entries(owner)
 			index = _find_again(entries)
@@ -428,7 +531,10 @@ func _drive_focus(delta: float) -> bool:
 ## The control picked last frame in a fresh list: by key, else the nearest to where it was.
 func _find_again(entries: Array[Dictionary]) -> int:
 	for i in entries.size():
-		if entries[i]["key"] == _focus_key:
+		# Keys are ints on one board and names on another, often both on one: compared as
+		# like with like, or GDScript stops on int == StringName.
+		var key: Variant = entries[i]["key"]
+		if typeof(key) == typeof(_focus_key) and key == _focus_key:
 			return i
 	if _focus_at == Vector2.INF:
 		return -1

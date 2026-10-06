@@ -80,7 +80,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	for piece: String in [
 		"mouse_idle", "mouse_click", "key_w", "key_a", "key_s", "key_d", "key_z", "key_q",
-		"stick", "stick_dirs", "pad_rt", "arrow_up",
+		"stick", "stick_dirs", "arrow_up",
 	]:
 		var path := PROMPTS % piece
 		if ResourceLoader.exists(path):
@@ -123,7 +123,7 @@ func _draw() -> void:
 				_ring(xf, water, water_wide)
 				_arrow(xf * water, px)
 			if head != Vector2.INF:
-				var tile := "pad_rt" if pad else _blink("mouse_idle", "mouse_click")
+				var tile := "pad_cast" if pad else _blink("mouse_idle", "mouse_click")
 				_prompt(tile, _on_screen(xf * head), px, true)
 		Step.NOTE:
 			if crate != Vector2.INF:
@@ -177,8 +177,9 @@ func _move_prompts(at: Vector2, px: float) -> void:
 
 
 ## One tile, centred on `at` (or with its foot on it when `centred` is false).
+## `pad_cast` is whatever the cast is bound to on the pad, in the family in hand (issue #33).
 func _prompt(tile: String, at: Vector2, px: float, centred: bool) -> void:
-	var tex: Texture2D = _tex.get(tile)
+	var tex: Texture2D = Glyphs.of_action(&"cast") if tile == "pad_cast" else _tex.get(tile)
 	if tex == null:
 		return
 	var size := tex.get_size() * px
@@ -249,7 +250,8 @@ static func _wrap(text: String, face: Font, size_px: int, wide: float) -> Array[
 	var line := ""
 	for word in text.split(" "):
 		var tried := word if line.is_empty() else line + " " + word
-		if face.get_string_size(tried, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px).x > wide \
+		# Glyphs counted as their pictures: a token's own characters are not what is drawn.
+		if Glyphs.measure(tried, face, size_px).x > wide \
 				and not line.is_empty():
 			lines.append(line)
 			line = word

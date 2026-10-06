@@ -94,6 +94,9 @@ var window_mode: int = WindowMode.WINDOWED
 var window_size: Vector2i = LEAST_WINDOW
 var vsync: int = DisplayServer.VSYNC_ENABLED
 var fps_cap: int = 0
+## Which pad's glyphs the prompts wear: `Glyphs.Choice` — follow the pad, or always Xbox, or
+## always PlayStation (issue #33, the Controls board's column head).
+var pad_prompts: int = Glyphs.Choice.AUTO
 
 ## The languages the game ships, in the order the flag board lays them out, each with the
 ## flag it wears (`assets/ui/flags/<code>.png`, ISO 3166) and its own name in itself.
@@ -183,6 +186,9 @@ func load_prefs() -> void:
 	if not (fps_cap in FPS_CAPS):
 		fps_cap = 0
 
+	pad_prompts = clampi(int(cfg.get_value(SECTION, "pad_prompts", pad_prompts)), 0, Glyphs.Choice.PLAYSTATION)
+	Glyphs.choice = pad_prompts as Glyphs.Choice
+
 	Binds.load_from(cfg)
 	Binds.install()
 
@@ -205,6 +211,7 @@ func save_prefs() -> void:
 	cfg.set_value(SECTION, "window_size", window_size)
 	cfg.set_value(SECTION, "vsync", vsync)
 	cfg.set_value(SECTION, "fps_cap", fps_cap)
+	cfg.set_value(SECTION, "pad_prompts", pad_prompts)
 	Binds.save_to(cfg)
 	cfg.save(PATH)
 
@@ -254,6 +261,12 @@ func _take(key: StringName, value: Variant) -> bool:
 			vsync = int(value)
 		&"fps_cap":
 			fps_cap = int(value)
+		&"pad_prompts":
+			pad_prompts = clampi(int(value), 0, Glyphs.Choice.PLAYSTATION)
+			var was := Glyphs.family()
+			Glyphs.choice = pad_prompts as Glyphs.Choice
+			if Glyphs.family() != was:
+				Pad.family_moved()
 		_:
 			push_error("Prefs.store: no such setting '%s'" % key)
 			return false

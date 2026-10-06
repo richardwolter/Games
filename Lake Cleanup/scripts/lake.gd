@@ -188,9 +188,9 @@ const PAD_ANGLER_INSET := 0.15
 ## drag, in screen pixels. A tap recentres the view on the angler.
 const PAN_TAP := 4.0
 
-## The button the view is dragged with. Not a bound verb: a drag is a gesture, not something
-## the player asks for once, and `recentre` is the verb the bind board moves.
-const PAN_BUTTON := MOUSE_BUTTON_MIDDLE
+## How fast the pad's right stick moves the view while `camera_pan` is held (LT), in view
+## heights a second at full push: `EDGE_SPEED`'s rule, the same on screen at every zoom.
+const PAD_PAN_SPEED := 1.1
 
 ## How quickly a cast takes the view back, as a fraction of the offset a second. Throwing
 ## the net is asking to watch it, so the pan is handed back and the cast's own follow takes
@@ -1475,6 +1475,9 @@ func _ready() -> void:
 	_open_upgrades.pressed.connect(_set_menu.bind(true))
 	_room.close_asked.connect(_shut.bind(_set_shed))
 	_room.wash_asked.connect(_shed_to_wash)
+	# The pad going away in the player's hands, and coming back (issue #33).
+	Pad.pad_lost.connect(_on_pad_lost)
+	Pad.pad_found.connect(_on_pad_found)
 	_open_settings.pressed.connect(_set_settings.bind(true))
 	# Last of the HUD's children, so it lies over the shed rather than under it. The shed
 	# fills the screen now, and a settings panel drawn beneath that is a settings panel
@@ -2279,17 +2282,33 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Behind the menu, and on the way down out of it, the lake reads nothing: the menu's own
 	# boards answer Escape and F11, and a click meant for a plank must not also be a cast.
 	# Nor while the wildlife moment has the view: the player's hands are held for it.
-	if _fronted() or _arrive != Arrive.OFF or _moment >= 0.0:
+	# The letter that ends the arrival is the one board up during it, and Escape (the pad's B)
+	# closes it as its cross does (issue #33 audit).
+	if _fronted() or (_arrive != Arrive.OFF and not _letter_open) or _moment >= 0.0:
 		return
 	if _extra_input(event):
 		return
 	var key := event as InputEventKey
+	# A key bound to the pan holds it: the mouse moved while it is down drags the view.
+	if key != null and not key.echo and key.is_action(&"camera_pan"):
+		if key.pressed:
+			_start_pan()
+		else:
+			_panning = false
+		return
+	if key != null and key.pressed and not key.echo and key.is_action(&"camera_lock") 			and not _panelled():
+		_toggle_free_view()
+		return
 	if key != null and key.pressed and not key.echo:
 		match key.keycode:
 			KEY_ESCAPE:
 				# One key backing out of whatever is open, innermost first: the shed, then
 				# the shop board, and only on open water does it mean the settings.
-				if _letter_open:
+				if _pad_lost_up:
+					_show_pad_lost(false)
+				elif _farewell != null and not _settings_open:
+					_farewell.back()
+				elif _letter_open:
 					_shut(_set_letter)
 				elif _controls_open:
 					_shut(_set_controls)
@@ -2357,7 +2376,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _desk_pressed(event, &"open_shed") and not _panelled():
 		_set_shed(true)
 		return
-	if _desk_pressed(event, &"open_upgrades") and not _shed_open and not _settings_open 			and not _controls_open and not _hive_open:
+	if _desk_pressed(event, &"open_upgrades") and not _shed_open and not _settings_open \
+			and not _controls_open and not _hive_open and not _wash_open and not _letter_open:
 		_set_menu(not _menu_open)
 		return
 	if _desk_pressed(event, &"open_settings") and not _panelled():
@@ -2368,18 +2388,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if click == null:
 		return
 
-	# The middle button drags the view off the angler. Tapping it without dragging puts the
-	# view back on them, which is the way out of having panned somewhere and lost yourself.
-	# The drag is the button's, not a verb's: `recentre` is what the bind board moves, and a
-	# binding that is not a mouse button acts on the press instead of on a tap.
-	if click.button_index == PAN_BUTTON:
+	# `camera_pan`'s button (the middle one by default) drags the view off the angler.
+	# Tapping it without dragging puts the view back on them, when `recentre` shares the
+	# button, which is the way out of having panned somewhere and lost yourself. A bound verb
+	# since 2026-10-06 (issue #33): the Controls board lists it, and it can move.
+	if click.is_action(&"camera_pan") and not (click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]):
 		if click.pressed:
-			_panning = true
-			_pan_moved = 0.0
-			_pan_yielded = false
+			_start_pan()
 		else:
 			_panning = false
-			if _pan_moved < PAN_TAP and not _panelled():
+			if _pan_moved < PAN_TAP and not _panelled() 					and Binds.bound(&"recentre", "key") == Binds.bound(&"camera_pan", "key"):
 				_recentre()
 		return
 
@@ -2492,7 +2510,7 @@ func _pad_tick(delta: float) -> void:
 	_pad_was = pad
 	var busy := pad_cursor_wanted()
 	if pad:
-		if not busy:
+		if not busy and not _pad_pan(delta):
 			var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")
 			_aim.step(delta, stick, _visible_world_rect(), _net)
 		_aim.hold_in(_visible_world_rect(), _camera.zoom.x)
@@ -2511,6 +2529,10 @@ func _pad_buttons(busy: bool) -> void:
 	# and B (a synthetic Escape) is what closes it.
 	if _hive_open:
 		return
+	# Nothing opens under the ending's words, the arrival or the letter: Start and Y there
+	# put a board beneath them, where it paused the world out of sight (issue #33 audit).
+	if _farewell != null or _letter_open or _arrive != Arrive.OFF:
+		return
 	if Input.is_action_just_pressed(&"open_settings"):
 		_set_settings(not _settings_open)
 		return
@@ -2523,7 +2545,16 @@ func _pad_buttons(busy: bool) -> void:
 		if Input.is_action_just_pressed(&"shed_rotate"):
 			_room.turn_carried()
 		if Input.is_action_just_pressed(&"shed_switch"):
-			_room.switch_near()
+			# The record player's menu is up: the button that put it up puts it away, as E
+			# does on the keyboard, rather than reaching past it to the player again.
+			if _room.record_up():
+				_room.close_record()
+			else:
+				_room.switch_near()
+		return
+	# The wash room is closed back into the shed first; the shop on top of it left B to close
+	# the room underneath.
+	if _wash_open:
 		return
 	if Input.is_action_just_pressed(&"open_upgrades"):
 		_set_menu(not _menu_open)
@@ -2544,8 +2575,11 @@ func _pad_buttons(busy: bool) -> void:
 		elif _dog_in_reach() != null:
 			_pet_dog(_dog_in_reach())
 		return
+	if Input.is_action_just_pressed(&"camera_lock"):
+		_toggle_free_view()
 	if Input.is_action_just_pressed(&"recentre"):
 		_aim.at = _angler.position
+		_recentre()
 	if Input.is_action_just_pressed(&"zoom_in"):
 		_zoom_by(ZOOM_STEP, aim_point())
 	if Input.is_action_just_pressed(&"zoom_out"):
@@ -3279,7 +3313,7 @@ func _set_settings(open: bool) -> void:
 		_settings.pull_prefs()
 	_settings_open = open
 	_settings.visible = open
-	_pause_world(open and not _in_menu)
+	_repause()
 	# Available on every screen except itself now, not just when the shed happens to be
 	# closed — the shed check here was dead in practice anyway (nothing re-ran this when the
 	# shed opened or closed on its own), and the button being covered while the shed was open
@@ -3312,6 +3346,78 @@ func _pause_world(on: bool) -> void:
 	var mode := Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
 	for node in _world_frozen():
 		node.process_mode = mode
+
+
+## The pause, from whatever is holding it: the settings board (not behind the menu, which is
+## a pose of its own) or the card a lost pad puts up.
+func _repause() -> void:
+	_pause_world((_settings_open and not _in_menu) or _pad_lost_up)
+
+
+## The pad went away in the player's hands (issue #33, `/grill-me` 2026-10-06). **On the
+## bare lake the world pauses under a card** until the pad comes back or the mouse is picked
+## up: a battery dying mid-haul should not cost the player the haul's worth of the run
+## running on without them. **On a board, or behind the menu, nothing is put up**: `Pad` has
+## already dropped to the mouse, and a board is a pause of its own. Only the game's own lake.
+var _pad_lost_up := false
+var _pad_lost_card: PadLostCard
+
+
+func _on_pad_lost() -> void:
+	if get_parent() != get_tree().root and not force_front:
+		return
+	if _in_menu or _panelled() or _farewell != null or _pad_lost_up:
+		return
+	_show_pad_lost(true)
+
+
+func _on_pad_found() -> void:
+	if _pad_lost_up:
+		_show_pad_lost(false)
+
+
+func _show_pad_lost(on: bool) -> void:
+	if on and _pad_lost_card == null:
+		_pad_lost_card = PadLostCard.new()
+		_pad_lost_card.name = &"PadLost"
+		_settings.get_parent().add_child(_pad_lost_card)
+	_pad_lost_up = on
+	if _pad_lost_card != null:
+		_pad_lost_card.visible = on
+	_repause()
+	_hold_the_angler()
+
+
+## Is the lake held by the lost pad's card. The harness asks.
+func pad_lost_up() -> bool:
+	return _pad_lost_up
+
+
+## The mouse picked up lets go of the lost pad's card: the player has chosen to go on with it.
+func _input(event: InputEvent) -> void:
+	if not _pad_lost_up or event.device == Pad.SYNTH_DEVICE:
+		return
+	var moved := event as InputEventMouseMotion
+	var click := event as InputEventMouseButton
+	if (moved != null and moved.relative.length() >= Pad.MOUSE_WAKE) or (click != null and click.pressed):
+		_show_pad_lost(false)
+		if click != null:
+			get_viewport().set_input_as_handled()
+
+
+## The DualSense's light bar follows the lake (issue #33): the murky green of a filthy lake,
+## the clear blue of a clean one, in `LIGHT_STEPS` steps so the pad is told only when it
+## moves. Xbox pads have no light and ignore it. Only the game's own lake sets it.
+const LIGHT_DIRTY := Color(0.30, 0.55, 0.06)
+const LIGHT_CLEAN := Color(0.04, 0.50, 1.0)
+const LIGHT_STEPS := 24.0
+
+
+func _push_pad_light() -> void:
+	if get_parent() != get_tree().root:
+		return
+	var clean := roundf(clampf(1.0 - pollution, 0.0, 1.0) * LIGHT_STEPS) / LIGHT_STEPS
+	Pad.set_light(LIGHT_DIRTY.lerp(LIGHT_CLEAN, clean))
 
 
 ## The nodes a paused game switches off. Whatever moves the run on and is not the water.
@@ -3766,7 +3872,10 @@ func _decor_tour_step(delta: float) -> void:
 			if _panelled() or _fronted():
 				_tour_card.show_card(off)
 			else:
-				_tour_card.show_card(_skin.shed_box(), Text.TOUR_DECOR_HINT)
+				_tour_card.show_card(_skin.shed_box(), (
+					Text.TOUR_DECOR_HINT_PAD % Binds.shown(&"open_shed", true) if Pad.is_pad()
+					else Text.TOUR_DECOR_HINT
+				))
 		DecorTour.PLANK:
 			_tour_card.show_card(room.call(_room.wash_plank_box()) if _shed_open else off, Text.TOUR_DECOR_PLANK, 1, DECOR_TOUR_CARDS, true)
 		DecorTour.PLANK_WAIT, DecorTour.WASHING:
@@ -3796,7 +3905,12 @@ func _decor_tour_step(delta: float) -> void:
 		DecorTour.SHELF:
 			var words := Text.TOUR_DECOR_SHELF % Binds.shown(&"shed_rotate", false)
 			if pad:
-				words = Text.TOUR_DECOR_SHELF_PAD % ["A", Binds.shown(&"shed_rotate", true)]
+				# The shelf is opened with a shoulder on the pad, which the card has to say:
+				# nothing on the screen does (issue #33 audit).
+				words = Text.TOUR_DECOR_SHELF_PAD % [
+					Binds.shown(&"zoom_in", true), Binds.shown(&"interact", true),
+					Binds.shown(&"shed_rotate", true),
+				]
 			# A piece put down on the floor is the step done: the room's card follows.
 			if _decor_tour_placed < 0:
 				_decor_tour_placed = _room.decor.size()
@@ -5395,11 +5509,12 @@ func _drive_view(delta: float) -> void:
 		_glide_to(_clamped_view(_watching()), _home_cap, delta, time)
 
 
-## Whether the view is the player's own this frame: the toggle is on and the mouse is the
-## device. The pad's reticle leans the view and is held inside the window by it, so in pad
-## mode the view follows as ever and free mode waits for the mouse to come back.
+## Whether the view is the player's own this frame: the toggle is on. **The pad too, since
+## 2026-10-06** (issue #33): its `camera_lock` (Create / View) unlocks the view and LT with
+## the right stick moves it, the reticle held inside the window as it always was. Until
+## then free mode waited for the mouse to come back.
 func _free_now() -> bool:
-	return _free_view and not Pad.is_pad()
+	return _free_view
 
 
 ## How long the spring takes to catch up, seconds (`_glide_to`). About the time the old
@@ -5443,6 +5558,30 @@ func _glide_to(to: Vector2, most: float, delta: float, time := FOLLOW_TIME) -> v
 	_cam_left = at
 
 
+func _start_pan() -> void:
+	_panning = true
+	_pan_moved = 0.0
+	_pan_yielded = false
+
+
+## The pad's pan (issue #33, Richard's pick): while `camera_pan` is held (LT / L2) the right
+## stick moves the view instead of the reticle, the same move a mouse drag makes — into the
+## pan the follow gives back on a walk or a cast, or the free camera's own spot. Eased by the
+## follow's spring, not snapped: a stick is a speed, not a hand on the picture. True while
+## it is held, so the reticle stands still.
+func _pad_pan(delta: float) -> bool:
+	if not Input.is_action_pressed(&"camera_pan"):
+		return false
+	var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")
+	var move := stick * PAD_PAN_SPEED * get_viewport_rect().size.y / _camera.zoom.y * delta
+	if _free_now():
+		_free_at = _clamped_view(_free_at + move)
+	else:
+		_pan += move
+		_pan_yielded = false
+	return true
+
+
 ## The toggle beside the gear. On, the view is pinned where it stands; off, the follow eases
 ## it home from wherever it was left, with no pan to unwind.
 func _toggle_free_view() -> void:
@@ -5483,7 +5622,9 @@ func _drive_free_view(delta: float) -> void:
 ## middle button has the view, or while the pointer is on a HUD button — the corner buttons
 ## are inside the margin, and a hand going for one would slide the lake out from under it.
 func _edge_scroll() -> Vector2:
-	if not _mouse_inside or not get_window().has_focus() or _panelled() or _panning:
+	# Not in pad mode: the hidden pointer stays wherever the mouse was left, and left at an
+	# edge it would scroll the view for ever under a player holding the pad.
+	if not _mouse_inside or not get_window().has_focus() or _panelled() or _panning or Pad.is_pad():
 		return Vector2.ZERO
 	var at := get_viewport().get_mouse_position()
 	if _over_hud(at):
@@ -6691,6 +6832,7 @@ func _push_water_colours() -> void:
 
 func _update_hud() -> void:
 	_skin.pollution = pollution
+	_push_pad_light()
 	_skin.money = sludge
 	_skin.stock = _yard.held.size()
 	var affordable := _affordable()

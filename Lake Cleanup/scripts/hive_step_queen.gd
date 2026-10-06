@@ -412,7 +412,7 @@ func _drive_lens(delta: float) -> void:
 
 
 func _stick() -> Vector2:
-	return Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down")
+	return aim_stick()
 
 
 ## The pad's gentle pull (see the header): only while the stick is pushed.

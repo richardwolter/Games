@@ -215,6 +215,8 @@ func _ready() -> void:
 	add_child(_close)
 	resized.connect(_lay_out)
 	Prefs.language_changed.connect(_lay_out)
+	# A list left dropped is not waiting there the next time the board opens.
+	visibility_changed.connect(func() -> void: _listing = &"")
 	set_process(false)
 	_lay_out()
 
@@ -469,6 +471,21 @@ func _process(delta: float) -> void:
 		return
 	if _confirm != null and ceili(_revert_at) != was:
 		_confirm.words = _revert_words()
+
+
+## Escape, and the pad's B with it, folds a dropped list back up rather than closing the
+## whole board under it (issue #33 audit). The board is under the lake in the tree, so this
+## hears the key first.
+func _unhandled_input(event: InputEvent) -> void:
+	if _listing == &"" or not is_visible_in_tree():
+		return
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo or key.keycode != KEY_ESCAPE:
+		return
+	get_viewport().set_input_as_handled()
+	_listing = &""
+	Sfx.ui(&"ui_close")
+	queue_redraw()
 
 
 ## A click while the resolution's list is dropped.

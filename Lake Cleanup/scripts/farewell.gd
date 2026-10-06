@@ -521,4 +521,16 @@ func pad_focus() -> Array:
 	var out: Array = []
 	if _menu_rect.size != Vector2.ZERO:
 		out.append({"box": _menu_rect, "key": &"menu", "first": true})
+	# The other answer, keep fishing, is a click anywhere off the door: a stop over the
+	# closing words, so a pad-only player has both (issue #33 audit).
+	var band := _message_band()
+	out.append({"box": Rect2(size.x * 0.25, band.x, size.x * 0.5, band.y - band.x), "key": &"stay"})
 	return out
+
+
+## Escape and the pad's B: run the credits off if they are climbing, else keep fishing.
+func back() -> void:
+	if _rolling:
+		skip_roll()
+	else:
+		dismiss()

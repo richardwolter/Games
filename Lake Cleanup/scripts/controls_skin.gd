@@ -37,17 +37,20 @@ static var TITLE: String:
 ## the hint stands beside the column names in a band that already exists. At 560 the left
 ## half of that band was 234 px and nothing that said the whole gesture fitted; at 640 it is
 ## 314 against the hint's 296.
-const BOARD_WIDE := 640.0
+## 664 since the pad column grew to carry the prompt chooser (issue #33): 24 more across
+## keeps the hint's room at the 314 it was measured against.
+const BOARD_WIDE := 664.0
 const BOARD_PAD := 14.0
 const FRAME := 12.0
 const RIBBON_TALL := 36.0
 const RIBBON_OVERHANG := 10.0
 const CHIPS := 3
 
-## Fifteen verbs, five headings and the way back have to stand inside the 720-line design
+## Sixteen verbs, five headings and the way back have to stand inside the 720-line design
 ## frame with the board's own wood round them, so the rows are shorter than the settings
-## board's: at 28 and a 3 px gap the last plank fell off the bottom.
-const ROW_TALL := 26.0
+## board's: at 28 and a 3 px gap the last plank fell off the bottom, and 26 went to 25 when
+## the camera's two verbs joined (2026-10-06).
+const ROW_TALL := 25.0
 const HEAD_TALL := 20.0
 const ROW_GAP := 2.0
 const ROW_INSET := 10.0
@@ -56,7 +59,9 @@ const BUTTON_TALL := 32.0
 
 ## The two cells, hard against the row's right edge.
 const KEY_WIDE := 150.0
-const PAD_WIDE := 96.0
+const PAD_WIDE := 120.0
+## The prompt chooser's arrows, standing at the ends of the pad column's head.
+const CHOOSER_ARROW := 14.0
 const CELL_GAP := 6.0
 const CELL_TALL := 22.0
 
@@ -76,9 +81,15 @@ static var PAD_HEAD: String:
 	get: return Text.CONTROLS_COL_PAD
 static var HINT: String:
 	get: return Text.CONTROLS_HINT
-## The same gesture said for the pad: A captures, X restores the picked cell.
+## The same gesture said for the pad, with the two buttons as glyphs: the confirm button
+## captures, the left face button (`_pad_restore`) restores the picked cell.
 static var HINT_PAD: String:
-	get: return Text.of("CONTROLS_HINT_PAD")
+	get: return Text.of("CONTROLS_HINT_PAD") % [Binds.shown(&"interact", true), Glyphs.token("pad:2")]
+
+## What the pad column's head says it is showing (issue #33): the glyph family, the pad's
+## own unless picked. The makers' names are names and stay as they are in every language.
+static var CHOOSER_WORDS: Array:
+	get: return [Text.CONTROLS_PROMPTS_AUTO, "Xbox", "PlayStation"]
 
 ## Putting every key back throws away fifteen rows of somebody's own arrangement, so it asks
 ## (Richard, 2026-09-17). The board next door's own question board.
@@ -221,6 +232,12 @@ func _input(event: InputEvent) -> void:
 	var button := event as InputEventJoypadButton
 	if button != null and not button.pressed:
 		return
+	# The pad's B is its Escape: it cancels the capture rather than being bound, so a
+	# pad-only player has a way off a cell that is listening (issue #33 audit).
+	if button != null and button.is_action(&"pad_back"):
+		_stop_capture()
+		get_viewport().set_input_as_handled()
+		return
 	if not Binds.bindable(event, _capture_column):
 		return
 	var written := Binds.write(event)
@@ -289,6 +306,11 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 	Sfx.ui(&"ui_click")
 	var cell: Dictionary = _cells[under]
+	if cell["kind"] == &"prompts":
+		_stop_capture()
+		var box: Rect2 = cell["box"]
+		step_prompts(-1 if click.position.x < box.position.x + CHOOSER_ARROW else 1)
+		return
 	if cell["kind"] == &"reset":
 		_stop_capture()
 		if Binds.changed():
@@ -374,11 +396,11 @@ func _draw_columns(box: Rect2) -> void:
 	var key_box := Rect2(
 		Vector2(pad_box.position.x - CELL_GAP - KEY_WIDE, mid), Vector2(KEY_WIDE, CELL_TALL)
 	)
-	for pair: Array in [[key_box, KEY_HEAD], [pad_box, PAD_HEAD]]:
-		Style.write(
-			self, String(pair[1]), Style.TEXT_SMALL, Vector2(0.0, base), Style.PAPER_HEAD,
-			HORIZONTAL_ALIGNMENT_CENTER, pair[0]
-		)
+	Style.write(
+		self, KEY_HEAD, Style.TEXT_SMALL, Vector2(0.0, base), Style.PAPER_HEAD,
+		HORIZONTAL_ALIGNMENT_CENTER, key_box
+	)
+	_draw_chooser(pad_box, base)
 	if not Binds.changed():
 		return
 	# Said only where it fits whole: a gesture explained halfway is not explained.
@@ -390,6 +412,45 @@ func _draw_columns(box: Rect2) -> void:
 		self, hint, Style.TEXT_TINY, Vector2(box.position.x, base), Style.PAPER_SOFT
 	)
 	hint_shown = true
+
+
+## The pad column's head is the glyph chooser (issue #33, Richard's pick): the arrows step
+## Auto / Xbox / PlayStation, a click on the words steps on. With Auto the words wear the
+## glyph of the pad in hand, so the player sees what Auto has picked. One stop for the stick,
+## left and right stepping it (`pad_nudge`).
+func _draw_chooser(box: Rect2, base: float) -> void:
+	var at := _cells.size()
+	var focused: Variant = Pad.focus_key()
+	var lit: bool = _hovered == at or (Pad.is_pad() and focused is StringName and focused == &"prompts")
+	if lit:
+		draw_rect(box, Style.FRAME_SHADOW.lerp(Style.ON_WATER, 0.25), true)
+	_cells.append({"kind": &"prompts", "action": &"", "column": "pad", "box": box})
+	var arrow := Vector2(CHOOSER_ARROW, box.size.y)
+	for step: int in [-1, 1]:
+		var hit := Rect2(Vector2(box.position.x if step < 0 else box.end.x - arrow.x, box.position.y), arrow)
+		var mid := hit.get_center()
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(mid.x + 3.0 * step, mid.y),
+			Vector2(mid.x - 3.0 * step, mid.y - 4.0),
+			Vector2(mid.x - 3.0 * step, mid.y + 4.0),
+		]), Style.PAPER_HEAD)
+	var words := String(CHOOSER_WORDS[Glyphs.choice])
+	if Glyphs.choice == Glyphs.Choice.AUTO:
+		words = Glyphs.token("pad:0") + " " + words
+	var room := Rect2(box.position + Vector2(arrow.x, 0.0), box.size - Vector2(arrow.x * 2.0, 0.0))
+	var size_px := Style.TEXT_SMALL if Style.measure(words, Style.TEXT_SMALL).x <= room.size.x else Style.TEXT_TINY
+	Style.write(
+		self, words, size_px, Vector2(0.0, base), Style.PAPER_HEAD,
+		HORIZONTAL_ALIGNMENT_CENTER, room
+	)
+
+
+## Step the glyph chooser, and keep it.
+func step_prompts(step: int) -> void:
+	var count := Glyphs.Choice.size()
+	Prefs.store(&"pad_prompts", posmod(Glyphs.choice + step, count))
+	Sfx.ui(&"ui_click")
+	queue_redraw()
 
 
 func _draw_head(box: Rect2, label: String) -> void:
@@ -444,6 +505,15 @@ func _draw_cell(box: Rect2, action: StringName, column: String) -> void:
 		face = Style.FRAME_SHADOW.lerp(Style.ON_WATER, 0.4)
 	draw_rect(box, face, true)
 	var written := Binds.bound(action, column)
+	# The pad's column shows the button itself, as a glyph of the pad in hand (issue #33);
+	# the walking rows' stick likewise. Words only where the pack has no picture.
+	if column == "pad" and not taking:
+		var glyph := Glyphs.texture(written) if not written.is_empty() else null
+		if glyph == null and written.is_empty() and not Binds.standing_label(action, column).is_empty():
+			glyph = Glyphs.texture("stick")
+		if glyph != null:
+			Glyphs.draw_centred(self, glyph, box.get_center())
+			return
 	var words := CAPTURE_WORDS if taking else Binds.label_of(written)
 	# Dark on the lit cell: cream on that gold read 2.40:1, which is the least legible thing
 	# on the board at the one moment the player is looking straight at it.
@@ -507,11 +577,34 @@ func _pad_restore(event: InputEvent) -> void:
 ## Every cell and the reset plank for the pad's stick, and the close cross.
 func pad_focus() -> Array:
 	var out: Array = []
+	if _confirm != null and _confirm.visible:
+		return out
+	var first := true
 	for i in _cells.size():
-		out.append({"box": _cells[i]["box"], "key": i, "first": i == 0})
+		if _cells[i]["kind"] == &"prompts":
+			out.append({"box": _cells[i]["box"], "key": &"prompts"})
+			continue
+		out.append({"box": _cells[i]["box"], "key": i, "first": first})
+		first = false
 	if _close != null and _close.visible:
 		out.append({"box": _close.get_rect(), "key": &"close"})
 	return out
+
+
+## Left and right on the glyph chooser step it.
+func pad_nudge(key: Variant, step: int) -> bool:
+	if key is StringName and key == &"prompts":
+		step_prompts(step)
+		return true
+	return false
+
+
+## A on the glyph chooser steps it on.
+func pad_press(key: Variant) -> bool:
+	if key is StringName and key == &"prompts":
+		step_prompts(1)
+		return true
+	return false
 
 
 ## While a cell is listening for its new binding, the stick and the D-pad are what is being

@@ -1923,7 +1923,8 @@ and the letter's re-shot stills are later passes.
 - **Not a string, by decision**: `ARROW`, and figures wearing marks (`%d%%`, `$%d`, `%ds`).
   `%`, `$` and `s` are marks rather than words, which is the shop's own settled rule. And
   **the gamepad button names** (`A`, `LB`, `D-Pad Up`, `Left click`): Xbox's own printed
-  legends, not translated on the hardware either. Keyboard keys already come from
+  legends, not translated on the hardware either (since 2026-10-06 a pad button is drawn as
+  its glyph, Xbox or PlayStation: see The PlayStation Pad). Keyboard keys already come from
   `DisplayServer.keyboard_get_label_from_physical` and involve no string at all.
 - **The 17 shop blurbs are translated as they stand**, placeholders and all (Richard,
   2026-09-20: he rewrites them in the artifact). Their EN is known to be provisional.
@@ -3990,9 +3991,9 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
 - `test_lake` guards the four facings, no turn without the pose, and both closes.
 
 ### The Blurb and the Nozzle Wait (2026-09-26, `/grill-me` with Richard)
-- **A shop blurb never covers its own row** (`ShopSkin.blurb_at`): its top is `BLURB_OFF.y`
-  under the row's foot (over the row's top when there is no room below); across, it follows
-  the mouse (`_mouse_at`), or on the pad lines up with the row's left edge.
+- **A shop blurb never covers its own row** (`ShopSkin.blurb_at`). **Superseded 2026-10-06**
+  (see The PlayStation Pad, second pass): it stands beside the row's whole board, level with
+  the row, so the column being read stays clear. `BLURB_OFF` and `_mouse_at` are gone.
 - **The wash nozzle waits** (`WashStand.awake`, `WAKE_AFTER` 0.4 s): a find put on the stand
   parks the aim on its middle, and the player's paths (`_gui_input`, `WashRoom._pad_aim`) are
   deaf until the choosing press is let go and the wait has run. `spray` itself is not gated,
@@ -5316,7 +5317,7 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   `NAV_REPEAT`; a push held as a board comes up waits to be let go). **The pick drives the
   real pointer, hidden**: it is warped onto the control and A is the same left click, so
   every board's own hover wash, swell and sound come for nothing. Over that, one gold ring
-  (`FocusRing`, `Pad.RING_LAYER` 39, a dark line under it for the paper). Optional hooks:
+  (`FocusRing`, `Pad.RING_LAYER` 39; a shining halo since 2026-10-06, see The PlayStation Pad). Optional hooks:
   `pad_press(key)` (A taken by the board), `pad_nudge(key, step)` (left/right spent on the
   control), `pad_scroll(step)` (a step off a scrolling list's end), `pad_hold()` (stick
   frozen), `pad_free()` + `pad_mark()` (the board reads the stick itself; the ring marks what
@@ -5351,6 +5352,7 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   the net by `CastNet._draw` so the next throw can be lined up, with the same green/red
   verdict (`in_reach` is `can_cast_to` without the idle check). Not on the double cast's
   second net. The laid-net ghost is still idle only, and the assist works during a cast too.
+- **Superseded in part 2026-10-06** (see The PlayStation Pad below): button glyph art is in.
 - **Out of scope for now**: focus navigation, button glyph art, rumble, a Steam Deck pass,
   an aim-assist setting.
 - **Tests**: `test_lake`'s `_stage_pad` covers the input map, mode switching, the reticle,
@@ -5358,6 +5360,97 @@ A trial of full controller support, to decide keep or drop after playtesting. Xb
   `tools/probe_pad_cursor.tscn` (desktop build, not `--headless`) checks that the pad's
   click, wheel and Escape land where the pointer is in a stretched window
   (`tools/last_pad_cursor.log`).
+
+### The PlayStation Pad (issue #33, 2026-10-06, `/grill-me` with Richard)
+The DualSense joins the Xbox pad, every pad button on screen is a glyph, and a pad-only
+player can reach every board. **Supersedes** the Xbox text names on screen (`Binds.PAD_NAMES`
+is now only the fallback) and, in Every Word Is a Key, "the gamepad button names ... Xbox's
+own printed legends".
+- **Glyphs everywhere, never words** (`scripts/glyphs.gd`, `Glyphs`): the bind board's pad
+  cells, the tour cards, the hive and shed key chips, the first steps, the letter's net card,
+  the shop tour's foot. Kenney's Input Prompts Pixel, cut by `tools/build_prompts.py`: `xb_*`,
+  `ps_*`, and the sticks and D-pad shared. **The pack's PlayStation faces are cut in two**
+  (the symbol's right half in the next tile) and are laid one over the other by the builder.
+  `pad_a`/`pad_rt` are retired: the cast and confirm prompts follow the bindings.
+- **A glyph in a sentence is a token** (`Glyphs.token`, two private-use characters round the
+  written binding). `Binds.shown(action, true)` returns one, and `Style.write` /
+  `Style.measure` / `FirstSteps._wrap` / `Glyphs.draw_line` draw and measure it as the
+  picture, so a `%s` filled with it needs nothing else. A token reaching a plain
+  `draw_string` shows as tofu, by design. Inline glyphs are whole screen pixels to a pixel of
+  the pack's (`inline_px`, about `INLINE_GROW` of the text); a glyph alone is 2 (`prompt_px`).
+  A key chip holding a lone glyph draws the glyph only (`Glyphs.lone`).
+- **Family: auto, with an override** (`Glyphs.detected` from `Pad.note_device`: Sony's vendor
+  0x054C, or a Sony word in the pad's name, is PlayStation, anything else Xbox; the last pad
+  pressed decides). **The Controls board's pad column head is the chooser** (`◂ Auto ▸` /
+  Xbox / PlayStation, Auto wearing the detected family's confirm glyph), saved as
+  `pad_prompts` in `settings.cfg` (`Prefs`, `Glyphs.choice`). The board went 640 to 664 and
+  its pad column 96 to 120 to carry it. A change redraws every canvas item (`Pad.redraw_all`,
+  also on a mouse/pad switch).
+- **Cross confirms and Circle backs out everywhere**, Japanese included (positions, not
+  letters: Cross is A). **B is never bound** (`Binds.bindable`) and cancels a capture on the
+  bind board, the pad's Escape.
+- **Steam: opt out of Steam Input**, decided. In Steamworks declare Xbox and PlayStation
+  support and turn Steam Input off for them, so SDL sees the real DualSense; a DualSense under
+  forced Steam Input reaches the game as a virtual Xbox pad and gets Xbox glyphs, which the
+  override fixes. Set in Steamworks by Richard on 2026-10-06. The Deck's own controls arrive as a virtual
+  Xbox pad and get Xbox glyphs.
+- **Light bar follows the lake** (`Lake._push_pad_light`, `LIGHT_DIRTY` murky green to
+  `LIGHT_CLEAN` clear blue in `LIGHT_STEPS`, `Pad.set_light`, `Input.set_joy_light`, laid on a
+  pad plugged in later too). Game's own lake only. Xbox pads have none.
+- **A lost pad pauses the lake** (`Pad.pad_lost`/`pad_found`, `Lake._on_pad_lost`,
+  `PadLostCard`): the last pad going while it is the hand in use drops to the mouse, and on the
+  bare lake the world pauses (`_repause`, the settings pause) under "Controller disconnected"
+  until the pad comes back, the mouse is moved or clicked, or Escape. On a board or behind the
+  menu nothing is put up.
+- **Audit fixes** (every screen walked by an agent for pad-only gaps): `MenuConfirm` answers
+  the stick ("keep" first) and Escape/B is "keep" there; the farewell has a "keep fishing"
+  stop and Escape/B runs the roll off or dismisses (`Farewell.back`); Start, Y and X open
+  nothing under the farewell, the arrival or the letter, and Escape/B closes the arrival's
+  letter; nothing opens the shop over the wash room (pad Y and the U key); the resolution list
+  folds up on Escape/B and is never left dropped; the record menu closes on the pad's Y; a tour
+  card whose target takes the click gives the stick to the room under it (the tray, the shelf,
+  the nozzle) instead of clicking the target's middle; the shelf card names the shoulder that
+  opens the shelf (`TOUR_DECOR_SHELF_PAD`, three glyphs); the find hint names the pad's open
+  button (`TOUR_DECOR_HINT_PAD`); the letter's net card says the cast button
+  (`LETTER_NET_TEXT_PAD`); the shelf's shoulder chip is drawn by the shelf (drawn by the room
+  it was under the shelf and was never seen); the shoulders send no wheel under a board reading
+  the stick itself (the shelf opened a row down); `Pad._find_again` compares keys like with like.
+- **Known, accepted**: the shop is not reached from inside the shed on the pad (Y is the
+  shed's switch there): B, then Y. The hive hints say "Drag" and "Slide" beside the cast glyph.
+  The tour cards' Skip is not reachable while a pass-through card is up; doing the thing moves
+  it on. New strings are machine drafts for the seven other languages.
+- **Second pass, off Richard's first DualSense run** (same day):
+  - **Washing aims with the right stick** (`WashRoom._pad_aim`), the left still works; the
+    hive's tools likewise (`HiveStep.aim_stick`: right stick, else left).
+  - **The shelf's R1 is the loudest glyph on the plank** (`ShedShelf.KEY_PX` 3 screen px a
+    texel, against 2 elsewhere), standing proud of its left end.
+  - **The focus mark is a shining halo** (`FocusRing`): a gold glow breathing outward from the
+    box (a gradient round it, never over it), a gold edge with a pale lip, two glints running
+    round it, the finds' stars twinkling at its corners in turn, and a glide from pick to
+    pick. Supersedes the two-pixel gold rectangle.
+  - **The camera has two bound verbs** (`Binds`, `BIND_GROUP_VIEW`, Richard's picks):
+    `camera_pan`, held (middle drag on the desk, a key held drags with the mouse; **LT + right
+    stick** on the pad, `Lake._pad_pan`, `PAD_PAN_SPEED`, into the pan the follow gives back,
+    or the free camera's spot; the reticle stands still while it is held), and `camera_lock`
+    (**L / Create-View**, the camera button by the gear). The pan shares the middle button
+    with `recentre` by design (`Binds.SHARED`); a tap of it recentres only while they share.
+    `PAN_BUTTON` is gone. The Controls board's rows went 26 to 25 to fit sixteen verbs at
+    1280x720. R3 now also puts the view back on the angler.
+  - **The upgrade blurb stands beside its row's board** (`ShopSkin.blurb_at`, `BLURB_SIDE`),
+    level with the row, over the next board: the column being read stays clear.
+  - **A board just opened keeps the stick on its own first control until the player steps**
+    (`Pad._stepped`): the shop's rows are laid out a frame after it opens, and the stick had
+    settled on the close cross.
+- **Out of scope, by decision**: rumble, the touchpad as a button, adaptive triggers and HD
+  haptics, aim speed / assist / deadzone rows, Nintendo and Deck glyphs, the Steam Input API.
+- `test_lake`'s `_check_glyphs` and `_check_pad_audit` (in `_stage_pad`) guard every tile cut,
+  every default pad binding having a glyph in both families, the override, a prompt being a
+  glyph and never words, PlayStation words for the fallback, the measuring and wrapping, the
+  hint's two glyphs, the letter's two wordings, B unbindable, the light API, the question
+  board's stick and Escape, the pass-through card, and the lost-pad pause and its two ways
+  out. Probe: `tools/shot_glyphs.tscn` (desktop build, own save, `Glyphs.choice` set directly
+  so `settings.cfg` is untouched) saves `tools/last_glyphs_{controls,tour,letter,shed,lost}_
+  {ps,xbox}.png`.
 
 ### The Camera Glides on a Spring (2026-10-05, `/grill-me` with Richard)
 Richard: the haul home stuttered in steps, worst zoomed out on a long cast near the edge.
@@ -5416,11 +5509,12 @@ the cursor and nothing takes the view back.
   aiming at water near the window's edge slides the view.
 - **Recentre stays free** (`_recentre`, the middle tap and the verb): the view jumps to the
   angler and the mode does not change.
-- **Session only, mouse only, no key, by decision**: not in `Prefs`, not in the save, every
-  launch and every trip to the menu starts following (`_enter_menu` switches it off — the
-  glide down onto the angler is a thing a pinned view cannot do). In pad mode `_free_now()`
-  is false and the view follows as ever, because the reticle's lean and `hold_in` need it;
-  free mode resumes when the mouse is picked up. No bind: the Controls board is 666 of 680.
+- **Session only, by decision**: not in `Prefs`, not in the save, every launch and every
+  trip to the menu starts following (`_enter_menu` switches it off — the glide down onto the
+  angler is a thing a pinned view cannot do). **"Mouse only, no key" is superseded
+  2026-10-06** (The PlayStation Pad, second pass): `camera_lock` (L / Create-View) toggles it
+  on both devices, `camera_pan` (middle drag / LT + right stick) moves it, and `_free_now()`
+  is true in pad mode too.
 - **The button** is a `PlankButton` at the gear's size to its left (`%FreeCamera`,
   `mark = &"camera"`, `_draw_camera`, `_draw_lock`): a video icon (a chamfered box with a
   wedge on its right) with a padlock over its bottom-right corner, on whole pixels (2026-09-29,

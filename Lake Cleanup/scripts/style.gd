@@ -469,6 +469,8 @@ static func write(
 	alpha: float = 1.0,
 	cut_in: bool = false
 ) -> Vector2:
+	if Glyphs.has_tokens(text):
+		return _write_glyphs(on, text, size_px, at, ink, align, within, alpha, cut_in)
 	var face := font()
 	var span := face.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
 	if alpha <= 0.0:
@@ -519,7 +521,39 @@ static func write(
 
 ## What a line of text takes up, without drawing it.
 static func measure(text: String, size_px: int) -> Vector2:
+	if Glyphs.has_tokens(text):
+		return Glyphs.measure(text, font(), size_px)
 	return font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size_px)
+
+
+## A line carrying pad glyphs (`Glyphs.token`, issue #33): each run of words written the
+## ordinary way, shade and all, and each glyph drawn as its picture between them.
+static func _write_glyphs(
+	on: CanvasItem, text: String, size_px: int, at: Vector2, ink: Color, align: int,
+	within: Rect2, alpha: float, cut_in: bool
+) -> Vector2:
+	var span := Glyphs.measure(text, font(), size_px)
+	if alpha <= 0.0:
+		return span
+	var x := at.x
+	if within.size.x > 0.0:
+		x = within.position.x
+		if align == HORIZONTAL_ALIGNMENT_CENTER:
+			x = within.position.x + (within.size.x - span.x) * 0.5
+		elif align == HORIZONTAL_ALIGNMENT_RIGHT:
+			x = within.end.x - span.x
+	var px := Glyphs.inline_px(size_px)
+	for piece: Variant in Glyphs.pieces(text):
+		if piece is Texture2D:
+			var tex := piece as Texture2D
+			var box := tex.get_size() * px
+			var corner := Glyphs.snap(Vector2(x + 0.5, at.y - float(size_px) * 0.36 - box.y * 0.5))
+			on.draw_texture_rect(tex, Rect2(corner, box), false, Color(1, 1, 1, ink.a * alpha))
+			x += box.x + 1.0
+		else:
+			var words := String(piece)
+			x += write(on, words, size_px, Vector2(x, at.y), ink, HORIZONTAL_ALIGNMENT_LEFT, Rect2(), alpha, cut_in).x
+	return span
 
 
 

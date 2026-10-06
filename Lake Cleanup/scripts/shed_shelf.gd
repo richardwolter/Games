@@ -37,6 +37,10 @@ var rows: Array[Dictionary] = []
 var row_height := 56.0
 var scroll := 0.0
 var hovered := -1
+## The button that opens the shelf on the pad, as `Binds.shown` says it, or "".
+var key := ""
+## Screen pixels to a pixel of the glyph's: half as big again as `Glyphs.PROMPT_PX`.
+const KEY_PX := 3.0
 
 ## How much of the sprite's square a row gives it, and where the name starts.
 const SPRITE_PAD := 6.0
@@ -74,6 +78,34 @@ func _draw() -> void:
 	if Style.measure(title, head).x > room:
 		head = Style.TEXT_SMALL
 	Style.board_ribbon(self, ribbon, title, chips, head, title_box)
+	_draw_key()
+
+
+## The pad's shoulder at the left end of the title plank: its glyph alone, a button already,
+## or a chip with its name where the pack has no picture.
+func _draw_key() -> void:
+	if key.is_empty():
+		return
+	var side := 22.0
+	var box := Rect2(
+		Vector2(ribbon.position.x + 6.0, ribbon.get_center().y - side * 0.5).round(),
+		Vector2(side + 6.0, side)
+	)
+	var glyph := Glyphs.lone(key)
+	if glyph != null:
+		# Bigger than any other glyph (2026-10-06, Richard: "make the R1 bigger to signal
+		# decoration selection"): the one way to the finds on the pad, so it is the loudest
+		# thing on the plank, standing proud of its left end.
+		var px := KEY_PX / Glyphs.stretch()
+		var half := glyph.get_size() * px * 0.5
+		Glyphs.draw_centred(self, glyph, Vector2(ribbon.position.x + half.x - 2.0, ribbon.get_center().y), px)
+		return
+	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.9))
+	draw_rect(box, Style.INK_DIM, false, 1.0)
+	Style.write(
+		self, key, Style.TEXT_SMALL, Vector2(box.position.x, box.end.y - 6.0), Style.INK,
+		HORIZONTAL_ALIGNMENT_CENTER, box
+	)
 
 
 ## The rows, whole ones only. A row that starts inside the face and ends outside it used to

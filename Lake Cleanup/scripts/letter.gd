@@ -92,7 +92,12 @@ static var CARDS: Array:
 		{
 			"head": Text.LETTER_NET_HEAD,
 			"rows": 4,
-			"text": Text.LETTER_NET_TEXT,
+			# The pad's own button in pad mode (issue #33): "Left click" told a player holding
+			# a DualSense to reach for a mouse.
+			"text": (
+				Text.LETTER_NET_TEXT_PAD % Binds.shown(&"cast", true) if Pad.is_pad()
+				else Text.LETTER_NET_TEXT
+			),
 			"snaps": [
 				["net_catch", Text.LETTER_NET_GREEN, &"ok"],
 				["net_nothing", Text.LETTER_NET_RED, &"no"],
@@ -261,6 +266,9 @@ func _ready() -> void:
 	Prefs.language_changed.connect(func() -> void:
 		_door.label = DOOR_LABEL
 		_lay_out())
+	# The net card says the mouse's click or the pad's button, in the pad's own glyphs.
+	Pad.mode_changed.connect(func(_mode: int) -> void: _lay_out())
+	Pad.family_changed.connect(_lay_out)
 	_door.accent = true
 	_door.size = DOOR
 	_door.pressed.connect(func() -> void: close_asked.emit())
@@ -794,8 +802,8 @@ func _ink_marked(row: Dictionary, px: int, base: float, within: Rect2, align: in
 	for i in words.size():
 		for seg: Array in (words[i] as Dictionary)["segs"]:
 			var text := String(seg[0])
-			draw_string(Style.font(), Vector2(x, base), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
-				px, HEAD_INK if bool(seg[1]) else INK)
+			# Through `Glyphs`, which draws a pad button's picture where the text holds one.
+			Glyphs.draw_line(self, Style.font(), Vector2(x, base), text, px, HEAD_INK if bool(seg[1]) else INK)
 			x += Style.measure(text, px).x
 		if i < words.size() - 1:
 			x += space

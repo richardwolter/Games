@@ -573,13 +573,18 @@ class HoseRow:
 
 
 ## The pad in the wash room (2026-09-26, `/grill-me` with Richard). With nothing on the
-## stand the tray is a list the stick walks and A picks from. **With a find on it the stick
-## is the nozzle's**: it carries the pointer the jet follows, and RT or a held A sprays. B
-## puts the find back on the tray, the way walking away from it does: nothing paid, coat and all.
+## stand the tray is a list the stick walks and A picks from. **With a find on it the right
+## stick is the nozzle's** (2026-10-06, Richard: aiming is the right stick's, as the cast
+## reticle is on the lake; the left still works for a hand that reaches for it): it carries
+## the pointer the jet follows, and RT or a held A sprays. B puts the find back on the tray,
+## the way walking away from it does: nothing paid, coat and all.
 func _pad_aim(delta: float) -> void:
 	if not Pad.is_pad() or _on_stand == &"" or not _stand.awake():
 		return
-	Pad.move_cursor(Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down"), delta)
+	var stick := Input.get_vector(&"aim_left", &"aim_right", &"aim_up", &"aim_down")
+	if stick == Vector2.ZERO:
+		stick = Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down")
+	Pad.move_cursor(stick, delta)
 	var at := _stand.get_local_mouse_position()
 	var firing := Input.is_action_pressed(&"cast") or Input.is_action_pressed(&"interact")
 	_stand.spray(at, firing)

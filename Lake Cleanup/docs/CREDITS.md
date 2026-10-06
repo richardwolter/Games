@@ -56,7 +56,8 @@ pack stands under; nothing about an art pack goes anywhere else on that board.
   AI training are not. Credit is appreciated, not required — given anyway as "Kipperfalcon".
 
 - **Input prompts** (`assets/ui/prompts/`, cut by `tools/build_prompts.py` off
-  `art_source/kenney_inputPromptsPixel16×/`; the first-steps hints) — "Input Prompts Pixel 16×"
+  `art_source/kenney_inputPromptsPixel16×/`; the first-steps hints and every pad button glyph,
+  Xbox and PlayStation) — "Input Prompts Pixel 16×"
   by Kenney (https://kenney.nl). ✅ **CC0**, `License.txt` beside the tiles. Credit is not
   required; given anyway as "Kenney", the Kipperfalcon rule.
 

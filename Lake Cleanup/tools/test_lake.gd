@@ -5639,6 +5639,8 @@ func _stage_pad() -> void:
 				found = true
 		_check(found, "%s answers to its stick" % pair[0], "")
 	_check_pad_focus(pad)
+	_check_glyphs(pad)
+	_check_pad_audit(pad)
 	_check_blurb_and_wake()
 	for pair: Array in [
 		[&"interact", JOY_BUTTON_A], [&"pad_back", JOY_BUTTON_B], [&"open_shed", JOY_BUTTON_X],
@@ -11283,6 +11285,147 @@ func _check_language(menu: MainMenu) -> void:
 ## Pad focus (2026-09-26): the stick snaps between a board's controls. Guards the step rule,
 ## the held-push repeat, the main menu and the confirm offering their doors, a pointer board
 ## blocking the focus board under it, and a slider taking A as nothing.
+## Issue #33: the pad's buttons are glyphs of the pad in hand, Xbox or PlayStation.
+func _check_glyphs(pad: Node) -> void:
+	var families := [Glyphs.Family.XBOX, Glyphs.Family.PLAYSTATION]
+	var missing: Array = []
+	for table: Dictionary in [Glyphs.XBOX, Glyphs.PLAYSTATION, Glyphs.SHARED]:
+		for tile: String in table.values():
+			if not ResourceLoader.exists(Glyphs.DIR % tile):
+				missing.append(tile)
+	_check(missing.is_empty(), "every glyph tile is cut and imported", str(missing))
+	var bare: Array = []
+	for row: Dictionary in Binds.ACTIONS:
+		var written := String(row["pad"])
+		if written.is_empty():
+			continue
+		for family: int in families:
+			if Glyphs.texture_in(written, family) == null:
+				bare.append("%s %s" % [row["action"], family])
+	_check(bare.is_empty(), "every default pad binding has a glyph on both pads", str(bare))
+	_check(Glyphs.texture_in("pad:0", Glyphs.Family.PLAYSTATION) != Glyphs.texture_in("pad:0", Glyphs.Family.XBOX),
+		"Cross is not A", "")
+	_check(Glyphs.texture_in("pad:11", Glyphs.Family.PLAYSTATION) == Glyphs.texture_in("pad:11", Glyphs.Family.XBOX),
+		"the D-pad is one picture on both", "")
+	var choice_was := Glyphs.choice
+	var detected_was := Glyphs.detected
+	Glyphs.detected = Glyphs.Family.XBOX
+	Glyphs.choice = Glyphs.Choice.AUTO
+	_check(Glyphs.family() == Glyphs.Family.XBOX, "auto follows the pad", "")
+	Glyphs.choice = Glyphs.Choice.PLAYSTATION
+	_check(Glyphs.family() == Glyphs.Family.PLAYSTATION, "the chooser overrides the pad", "")
+	var shown := Binds.shown(&"interact", true)
+	_check(Glyphs.has_tokens(shown) and Glyphs.lone(shown) == Glyphs.texture_in("pad:0", Glyphs.Family.PLAYSTATION),
+		"a pad prompt is the glyph of the pad in hand", "")
+	var words: Array = []
+	for row: Dictionary in Binds.ACTIONS:
+		var said := Binds.shown(row["action"], true)
+		if not Binds.bound(row["action"], "pad").is_empty() and not Glyphs.has_tokens(said):
+			words.append(said)
+	_check(words.is_empty(), "no pad prompt falls back to words", str(words))
+	_check(Binds.label_of("pad:0") == "Cross" and Binds.label_of("axis:5:1") == "R2",
+		"a PlayStation button's words are its own", Binds.label_of("pad:0"))
+	_check(Style.measure("Hold " + shown, Style.TEXT_SMALL).x > Style.measure("Hold ", Style.TEXT_SMALL).x + 5.0,
+		"a glyph is measured as its picture", "")
+	_check(Glyphs.pieces("a" + shown + "b").size() == 3, "a token cuts a line in three", "")
+	var hint := ControlsSkin.HINT_PAD
+	_check(Glyphs.pieces(hint).filter(func(p: Variant) -> bool: return p is Texture2D).size() == 2,
+		"the bind board's pad hint carries two glyphs", hint)
+	var first := FirstSteps._wrap("Press %s to cast the net out over the water" % shown, Style.font(), 10, 120.0)
+	_check(first.size() >= 2 and Glyphs.has_tokens(first[0]), "a line with a glyph wraps around it", str(first.size()))
+	pad.call(&"set_mode", 1)
+	var net_card: Dictionary = Letter.CARDS[1]
+	_check(Glyphs.has_tokens(String(net_card["text"])), "the letter's net card names the pad's button", "")
+	pad.call(&"set_mode", 0)
+	_check(not Glyphs.has_tokens(String(Letter.CARDS[1]["text"])), "and the mouse's click without one", "")
+	Glyphs.choice = choice_was
+	Glyphs.detected = detected_was
+	_check(Glyphs.inline_px(Style.TEXT_SMALL) > 0.0 and Glyphs.prompt_px() > 0.0, "glyphs have a size", "")
+	_check(not Binds.bindable(_pad_press(JOY_BUTTON_B), "pad") and Binds.bindable(_pad_press(JOY_BUTTON_Y), "pad"),
+		"B is never bound: it is the pad's way back", "")
+	_check(Input.has_method(&"set_joy_light") and Input.has_method(&"has_joy_light"),
+		"the engine can light a DualSense", "")
+	_check(_main.get(&"LIGHT_DIRTY") != _main.get(&"LIGHT_CLEAN"), "the light bar has two ends", "")
+
+
+func _pad_press(button: JoyButton) -> InputEventJoypadButton:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button
+	event.pressed = true
+	return event
+
+
+## Issue #33's audit: what a pad-only player could not reach.
+func _check_pad_audit(pad: Node) -> void:
+	var confirm := MenuConfirm.new()
+	add_child(confirm)
+	_check(confirm.is_in_group(Pad.FOCUS_GROUP), "a question board answers the stick", "")
+	var cancelled := [false]
+	confirm.cancelled.connect(func() -> void: cancelled[0] = true)
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	confirm._unhandled_input(escape)
+	_check(cancelled[0], "Escape (the pad's B) answers a question with keep", "")
+	confirm.free()
+	var card := TourCard.new()
+	add_child(card)
+	card.show_card(Rect2(10, 10, 200, 100), "words", 2, 5, true)
+	_check(card.pad_focus().is_empty(), "a card whose target takes the click leaves the stick to the room", "")
+	card.free()
+	_check(not _main.call(&"pad_lost_up"), "no lost-pad card to start", "")
+	_main.call(&"_show_pad_lost", true)
+	_check(_main.call(&"pad_lost_up") and _main.call(&"world_paused"), "a lost pad pauses the lake under its card", "")
+	var moved := InputEventMouseMotion.new()
+	moved.relative = Vector2(10, 0)
+	_main.call(&"_input", moved)
+	_check(not _main.call(&"pad_lost_up") and not _main.call(&"world_paused"), "and the mouse picked up lets it go", "")
+	_main.call(&"_show_pad_lost", true)
+	_main.call(&"_on_pad_found")
+	_check(not _main.call(&"pad_lost_up") and not _main.call(&"world_paused"), "as does the pad coming back", "")
+	var controls := ControlsSkin.new()
+	add_child(controls)
+	_check(controls.pad_nudge(&"cell", 1) == false, "the bind board's cells are not stepped sideways", "")
+	controls.free()
+
+	# 2026-10-06, Richard's notes off the first DualSense run.
+	var shop := ShopSkin.new()
+	shop.size = Vector2(1280.0, 720.0)
+	var board := Rect2(40, 80, 280, 560)
+	shop.set(&"_boards", {&"net": board, &"luck": Rect2(330, 80, 280, 560)})
+	var row := Rect2(60, 300, 240, 40)
+	var at := shop.blurb_at(row, Vector2(260, 120))
+	_check(not Rect2(at, Vector2(260, 120)).intersects(board) and is_equal_approx(at.y, row.position.y),
+		"a blurb stands beside its row's board, level with the row", str(at))
+	shop.free()
+	_check(Binds.bound(&"camera_pan", "pad") == "axis:4:1" and Binds.bound(&"camera_lock", "pad") == "pad:4",
+		"the camera's pan is LT and its lock Create / View on the pad", "")
+	_check(Binds.bound(&"camera_pan", "key") == "mouse:3" and Binds.bound(&"camera_lock", "key") == "key:76",
+		"and the middle drag and L on the desk", "")
+	_check(Binds.holder_of(&"camera_pan", "key", "mouse:3") == &"",
+		"the pan and the recentre share the middle button by design", "")
+	var free_was: bool = _main.get(&"_free_view")
+	_main.set(&"_free_view", true)
+	pad.call(&"set_mode", 1)
+	_check(_main.call(&"_free_now"), "the pad's view can be unlocked too", "")
+	_check(_main.call(&"_edge_scroll") == Vector2.ZERO, "and the hidden pointer scrolls no edge", "")
+	pad.call(&"set_mode", 0)
+	_main.set(&"_free_view", free_was)
+	_check(not _main.call(&"_pad_pan", 0.1), "no pan without the trigger", "")
+	Input.action_press(&"camera_pan")
+	_check(_main.call(&"_pad_pan", 0.1), "the trigger held turns the right stick to the view", "")
+	Input.action_release(&"camera_pan")
+	var ring := FocusRing.new()
+	add_child(ring)
+	ring.box = Rect2(100, 100, 80, 30)
+	ring.box = Rect2(140, 100, 80, 30)
+	var from: Rect2 = ring.get(&"_shown")
+	ring._process(1.0)
+	var to: Rect2 = ring.get(&"_shown")
+	_check(from.position.x < 120.0 and absf(to.position.x - 140.0) < 0.5, "the focus halo glides to a new pick", "%s %s" % [from, to])
+	ring.free()
+
+
 func _check_pad_focus(pad: Node) -> void:
 	var grid: Array = []
 	for y in 3:
@@ -11352,7 +11495,6 @@ func _check_blurb_and_wake() -> void:
 	shop.size = Vector2(1280.0, 720.0)
 	var wanted := Vector2(260.0, 120.0)
 	for row: Rect2 in [Rect2(100, 120, 200, 40), Rect2(900, 660, 200, 40)]:
-		shop.set(&"_mouse_at", row.get_center())
 		var at := shop.blurb_at(row, wanted)
 		_check(not Rect2(at, wanted).intersects(row), "the blurb stands clear of its row",
 			"%s against %s" % [Rect2(at, wanted), row])

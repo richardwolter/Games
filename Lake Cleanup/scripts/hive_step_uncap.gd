@@ -437,7 +437,7 @@ func _drive_hand(delta: float, down: bool) -> void:
 	var pad := Pad.is_pad()
 	var push := 0.0
 	if pad:
-		push = Input.get_vector(&"walk_left", &"walk_right", &"walk_up", &"walk_down").y
+		push = aim_stick().y
 	if _need_release:
 		if not down and push <= PAD_DEAD:
 			_need_release = false

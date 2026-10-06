@@ -2189,6 +2189,12 @@ func record_up() -> bool:
 	return _record != null and _record.visible
 
 
+## Put the record player's menu away: the pad's switch button, the menu's own E.
+func close_record() -> void:
+	if record_up():
+		_record.close()
+
+
 ## Lift the record player's lid and put its menu up.
 func _open_record(at: int) -> void:
 	var row: Dictionary = decor[at]
@@ -2974,7 +2980,6 @@ func _draw() -> void:
 	draw_rect(_shed_rect(), ROOM_DIM)
 	_draw_hands(floor_box)
 	_draw_prompt(floor_box)
-	_draw_shelf_key()
 	_dress_shelf()
 
 	# The piece in hand off the room — over the shelf, say — follows the cursor over
@@ -3023,6 +3028,11 @@ func _dress_shelf() -> void:
 	_shelf.atlas = sheets.atlas
 	_shelf.scroll = _scroll
 	_shelf.hovered = -1 if not carrying.is_empty() else _hovered_row()
+	# On the pad, the shoulder that opens the shelf, at the left end of its title plank: the
+	# shelf is not reached by walking, so something has to say how it is reached. Drawn by
+	# the shelf, over its own plank: drawn by the room it was under the shelf, a child, and
+	# had never been seen (issue #33 audit).
+	_shelf.key = Binds.shown(&"zoom_in", true) if Pad.is_pad() and not _pad_shelf and carrying.is_empty() else ""
 	var rows: Array[Dictionary] = []
 	for piece in store:
 		rows.append({
@@ -3494,23 +3504,6 @@ func _pool_tone(light: StringName) -> Color:
 ## The fireplace and the fridge are the only two things in the game worked by standing
 ## rather than clicking, so there is no chance of learning the verb anywhere else: without
 ## this the player walks past a fireplace they own and never finds out it lights.
-## On the pad, the shoulder that opens the shelf, on a chip at the left end of its title
-## plank: the shelf is not reached by walking, so something has to say how it is reached.
-func _draw_shelf_key() -> void:
-	if not Pad.is_pad() or _pad_shelf or not carrying.is_empty():
-		return
-	var plank := _ribbon_rect()
-	var side := 22.0
-	var box := Rect2(
-		Vector2(plank.position.x + 6.0, plank.get_center().y - side * 0.5).round(),
-		Vector2(side + 6.0, side)
-	)
-	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.9))
-	draw_rect(box, Style.INK_DIM, false, 1.0)
-	Style.write(
-		self, Binds.shown(&"zoom_in", true), Style.TEXT_SMALL,
-		Vector2(box.position.x, box.end.y - 6.0), Style.INK, HORIZONTAL_ALIGNMENT_CENTER, box
-	)
 
 
 ## The pointing hand over every switch of a kind never worked (2026-10-02): drawn over the
@@ -3721,6 +3714,10 @@ func _draw_prompt(floor_box: Rect2) -> void:
 		)
 	var side := 18.0
 	var box := Rect2(over - Vector2(side, side) * 0.5, Vector2(side, side))
+	var glyph := Glyphs.lone(Binds.shown(&"shed_switch", Pad.is_pad()))
+	if glyph != null:
+		Glyphs.draw_centred(self, glyph, box.get_center())
+		return
 	draw_rect(box, Color(Style.WOOD.r, Style.WOOD.g, Style.WOOD.b, 0.85))
 	draw_rect(box, Style.INK_DIM, false, 1.0)
 	# What the switch is actually bound to, named as this keyboard prints it — the pad's

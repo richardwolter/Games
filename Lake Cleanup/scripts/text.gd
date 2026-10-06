@@ -140,6 +140,9 @@ static var CONTROLS_HINT: String:
 static var CONTROLS_HINT_PAD: String:
 	get: return TranslationServer.translate(&"CONTROLS_HINT_PAD")
 
+static var CONTROLS_PROMPTS_AUTO: String:
+	get: return TranslationServer.translate(&"CONTROLS_PROMPTS_AUTO")
+
 static var CONTROLS_MOVED: String:
 	get: return TranslationServer.translate(&"CONTROLS_MOVED")
 
@@ -187,6 +190,12 @@ static var VERB_ZOOM_OUT: String:
 
 static var VERB_RECENTRE: String:
 	get: return TranslationServer.translate(&"VERB_RECENTRE")
+
+static var VERB_CAMERA_PAN: String:
+	get: return TranslationServer.translate(&"VERB_CAMERA_PAN")
+
+static var VERB_CAMERA_LOCK: String:
+	get: return TranslationServer.translate(&"VERB_CAMERA_LOCK")
 
 static var VERB_SHED_ROTATE: String:
 	get: return TranslationServer.translate(&"VERB_SHED_ROTATE")
@@ -611,6 +620,9 @@ static var TOUR_CONTINUE: String:
 static var TOUR_DECOR_HINT: String:
 	get: return TranslationServer.translate(&"TOUR_DECOR_HINT")
 
+static var TOUR_DECOR_HINT_PAD: String:
+	get: return TranslationServer.translate(&"TOUR_DECOR_HINT_PAD")
+
 static var TOUR_DECOR_PLANK: String:
 	get: return TranslationServer.translate(&"TOUR_DECOR_PLANK")
 
@@ -667,6 +679,9 @@ static var LETTER_WELCOME_TEXT: String:
 
 static var LETTER_NET_TEXT: String:
 	get: return TranslationServer.translate(&"LETTER_NET_TEXT")
+
+static var LETTER_NET_TEXT_PAD: String:
+	get: return TranslationServer.translate(&"LETTER_NET_TEXT_PAD")
 
 static var LETTER_UPGRADES_NET: String:
 	get: return TranslationServer.translate(&"LETTER_UPGRADES_NET")
@@ -937,3 +952,9 @@ static var DECOR_PK_RUNNER_RUG: String:
 
 static var DECOR_PK_DECORATED_TABLE: String:
 	get: return TranslationServer.translate(&"DECOR_PK_DECORATED_TABLE")
+
+static var PAD_LOST_HEAD: String:
+	get: return TranslationServer.translate(&"PAD_LOST_HEAD")
+
+static var PAD_LOST_TEXT: String:
+	get: return TranslationServer.translate(&"PAD_LOST_TEXT")

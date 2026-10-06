@@ -75,6 +75,11 @@ var _hovered: StringName = &""
 
 
 func _ready() -> void:
+	# Walked with the pad's stick (scripts/pad.gd). It had no stops of its own until
+	# 2026-10-06 (issue #33): a pad-only player asked "Start over?", "Set to default?" or
+	# whether to keep a window mode had nothing to step to, and A clicked wherever the hidden
+	# pointer happened to be under the board.
+	add_to_group(Pad.FOCUS_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	resized.connect(_lay_out)
 	_lay_out()
@@ -105,6 +110,19 @@ func _door_under(at: Vector2) -> StringName:
 		if (door["box"] as Rect2).has_point(at):
 			return door["key"]
 	return &""
+
+
+## Escape, and the pad's B with it, is "keep": the question is closed, not the board under it.
+## Said here rather than by each caller, so the bind board's and the settings' questions do
+## not leave Escape to the lake, which shut the whole board with the question still unasked.
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_visible_in_tree():
+		return
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo or key.keycode != KEY_ESCAPE:
+		return
+	get_viewport().set_input_as_handled()
+	cancelled.emit()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -152,6 +170,17 @@ func _draw() -> void:
 	var wide := (face.size.x - BOARD_PAD * 2.0 - ROW_GAP) * 0.5
 	_draw_door(Rect2(left, y, wide, ROW_TALL), &"yes", Text.of(yes_label), true)
 	_draw_door(Rect2(left + wide + ROW_GAP, y, wide, ROW_TALL), &"no", Text.of(no_label), false)
+
+
+## The two doors for the pad's stick, the safe one ("keep", "no") picked first: a press that
+## was not meant as an answer is the one that loses nothing.
+func pad_focus() -> Array:
+	var out: Array = []
+	if not is_visible_in_tree():
+		return out
+	for door: Dictionary in _doors:
+		out.append({"box": door["box"], "key": door["key"], "first": door["key"] == &"no"})
+	return out
 
 
 ## A door: the settings board's dark foot plate, ringed in the seam and lit along the top.

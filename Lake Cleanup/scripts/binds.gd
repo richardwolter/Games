@@ -99,6 +99,19 @@ const ACTIONS := [
 		"action": &"recentre", "label": "VERB_RECENTRE", "group": "BIND_GROUP_VIEW",
 		"contexts": [CONTEXT_LAKE], "key": "mouse:3", "pad": "pad:8", "extra": [],
 	},
+	# The camera's two verbs (2026-10-06, issue #33, Richard: "no button for camera pan with
+	# drag and unlock"). The pan is held: the mouse's button is dragged with, a key held moves
+	# the view with the mouse, and the pad's trigger turns the right stick from the reticle
+	# to the view. It shares the middle button with `recentre` by design (`SHARED`): a tap of
+	# it recentres, a drag pans. The lock is the camera button beside the gear.
+	{
+		"action": &"camera_pan", "label": "VERB_CAMERA_PAN", "group": "BIND_GROUP_VIEW",
+		"contexts": [CONTEXT_LAKE], "key": "mouse:3", "pad": "axis:4:1", "extra": [],
+	},
+	{
+		"action": &"camera_lock", "label": "VERB_CAMERA_LOCK", "group": "BIND_GROUP_VIEW",
+		"contexts": [CONTEXT_LAKE], "key": "key:76", "pad": "pad:4", "extra": [],
+	},
 	{
 		"action": &"shed_rotate", "label": "VERB_SHED_ROTATE", "group": "BIND_GROUP_SHED",
 		"contexts": [CONTEXT_SHED], "key": "key:82", "pad": "pad:2", "extra": [],
@@ -130,8 +143,8 @@ static var _set: Dictionary = {}
 static var STICK_NAME: String:
 	get: return Text.BIND_STICK
 
-## Xbox names, because that is the pad the game was built against and the one the prompts
-## already say. Index is `JoyButton`.
+## Xbox names: the words a pad binding falls back to where no glyph can be drawn, on an Xbox
+## pad (`Glyphs.PS_NAMES` on a PlayStation one). Index is `JoyButton`.
 const PAD_NAMES := {
 	0: "A", 1: "B", 2: "X", 3: "Y",
 	4: "Back", 5: "Guide", 6: "Start",
@@ -193,6 +206,11 @@ static func restore(action: StringName, column: String) -> void:
 	install()
 
 
+## Pairs of verbs one binding may serve at once, by design: the middle button's drag pans
+## and its tap recentres. Neither takes the other's binding away.
+const SHARED := {&"camera_pan": [&"recentre"], &"recentre": [&"camera_pan"]}
+
+
 ## Who else, in a context this action shares, is bound to `event` on this column.
 static func holder_of(action: StringName, column: String, event: String) -> StringName:
 	if event.is_empty():
@@ -200,7 +218,7 @@ static func holder_of(action: StringName, column: String, event: String) -> Stri
 	var mine: Array = row_of(action).get("contexts", [])
 	for row: Dictionary in ACTIONS:
 		var other: StringName = row["action"]
-		if other == action:
+		if other == action or other in SHARED.get(action, []):
 			continue
 		if bound(other, column) != event:
 			continue
@@ -364,9 +382,13 @@ static func label_of(written: String) -> String:
 			return key_name(int(parts[1]) as Key)
 		"mouse":
 			return String(MOUSE_NAMES.get(int(parts[1]), "Mouse %s" % parts[1]))
-		"pad":
-			return String(PAD_NAMES.get(int(parts[1]), "Pad %s" % parts[1]))
-		"axis":
+		"pad", "axis":
+			# Said in the family on screen (issue #33): Cross, not A, on a PlayStation pad.
+			var words := Glyphs.pad_words(written)
+			if not words.is_empty():
+				return words
+			if parts[0] == "pad":
+				return String(PAD_NAMES.get(int(parts[1]), "Pad %s" % parts[1]))
 			var pair := "%s:%s" % [parts[1], parts[2]] if parts.size() > 2 else ""
 			return String(AXIS_NAMES.get(pair, "Axis %s" % parts[1]))
 	return "—"
@@ -401,17 +423,22 @@ static func key_name(physical: Key) -> String:
 
 
 ## What an action is called on screen, for a prompt in the world: the pad's button in pad
-## mode, the key otherwise.
+## mode, the key otherwise. **The pad's button is its glyph** (issue #33): a token
+## `Style.write` draws as the picture, or the button's words where the pack has no tile.
 static func shown(action: StringName, pad: bool) -> String:
-	return label_of(bound(action, "pad" if pad else "key"))
+	if pad:
+		return Glyphs.token(bound(action, "pad"))
+	return label_of(bound(action, "key"))
 
 
 ## Whether this event is one the board may take for a column. The sticks are never bound
 ## (axes 0 to 3) and a modifier on its own is not a binding.
 static func bindable(event: InputEvent, column: String) -> bool:
 	if column == "pad":
+		# B is the pad's way back (`FIXED`'s `pad_back`) and what cancels a capture, the
+		# pad's Escape: never a binding.
 		if event is InputEventJoypadButton:
-			return true
+			return (event as InputEventJoypadButton).button_index != JOY_BUTTON_B
 		var motion := event as InputEventJoypadMotion
 		return motion != null and motion.axis >= JOY_AXIS_TRIGGER_LEFT \
 			and absf(motion.axis_value) >= 0.5
