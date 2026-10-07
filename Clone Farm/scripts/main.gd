@@ -1,5 +1,5 @@
-## The farm, built in code: ground, light, isometric camera, the farmer, the garden beds
-## and a minimal HUD. Graybox only, per docs/scope.md: shapes and flat colours, no Synty.
+## The farm, built in code: ground, light, isometric camera, the farmer, the garden beds,
+## the cloning machine (and the clones it makes) and a minimal HUD. Graybox only, per docs/scope.md: shapes and flat colours, no Synty.
 extends Node3D
 
 const GROUND_SIZE := 24.0
@@ -10,23 +10,30 @@ const BED_ROWS := 2
 const BED_GAP := 1.4
 ## Where the bed grid's centre sits, a few steps from where the farmer starts.
 const BEDS_AT := Vector3(0.0, 0.0, -4.0)
+const MACHINE_AT := Vector3(5.5, 0.0, 1.0)
+## Produção at the start, enough for the first clone right away.
+const START_STOCK := 5
 
 ## What the HUD calls each task (the game speaks Portuguese).
 const TASK_LABELS := {
 	Bed.PLANT: "plantar",
 	Bed.WATER: "regar",
 	Bed.HARVEST: "colher",
+	Machine.CLONE: "clonar",
 }
 const WORKING_LABELS := {
 	Bed.PLANT: "plantando",
 	Bed.WATER: "regando",
 	Bed.HARVEST: "colhendo",
+	Machine.CLONE: "clonando",
 }
 
 var farmer: Farmer
 var beds: Array[Bed] = []
-## Harvested produce, waiting for its use (machine, trough, sale come with Carregar).
-var stock := 0
+var machine: Machine
+var clones: Array[Clone] = []
+## Harvested produce, spent on clones; trough and sale come with Carregar.
+var stock := START_STOCK
 
 var _stock_label: Label
 var _hint_label: Label
@@ -37,20 +44,57 @@ func _ready() -> void:
 	_build_ground()
 	_build_light()
 	_build_beds()
+	_build_machine()
 	farmer = _build_farmer()
 	_build_camera()
 	_build_hud()
 
 
 func _process(_delta: float) -> void:
-	_stock_label.text = "Produção: %d" % stock
-	var bed := farmer.nearest_bed()
-	var task: StringName = bed.next_task() if bed != null else &""
+	_stock_label.text = "Produção: %d   Clones: %d" % [stock, clones.size()]
+	_hint_label.text = _hint()
+
+
+## What the farmer is doing or what E would do, for the HUD.
+func _hint() -> String:
 	if farmer.is_working():
-		_hint_label.text = "%s... %d%%   (E: cancelar)" % [WORKING_LABELS[farmer.work_task],
+		return "%s... %d%%   (E: cancelar)" % [WORKING_LABELS[farmer.work_task],
 				roundi(farmer.work_progress() * 100.0)]
-	else:
-		_hint_label.text = "E: %s" % TASK_LABELS[task] if task != &"" else ""
+	if farmer.choosing != null:
+		return "Função de %s:  1 Plantar   2 Regar   3 Colher   0 nenhuma   (E: fechar)" \
+				% farmer.choosing.name
+	var target := farmer.nearest_target()
+	if target is Clone:
+		return "E: dar função a %s" % target.name
+	if target is Machine:
+		if target.next_task() == &"":
+			return "Máquina: precisa de %d produção" % Machine.COST
+		return "E: clonar (custa %d produção)" % Machine.COST
+	if target is Bed:
+		var task: StringName = target.next_task()
+		return "E: %s" % TASK_LABELS[task] if task != &"" else "crescendo..."
+	return ""
+
+
+func _build_machine() -> void:
+	machine = Machine.new()
+	machine.name = "Machine"
+	machine.position = MACHINE_AT
+	machine.can_afford = func() -> bool: return stock >= Machine.COST
+	machine.cloned.connect(_spawn_clone)
+	add_child(machine)
+
+
+## Pays for and places a new clone beside the machine, with no role yet.
+func _spawn_clone() -> void:
+	stock -= Machine.COST
+	var clone := Clone.new()
+	clone.name = "Clone%d" % (clones.size() + 1)
+	var row := clones.size() % 3
+	clone.position = MACHINE_AT + Vector3(Machine.SIZE, 1.0, -1.0 + row * 1.0)
+	_dress_worker(clone, Color(0.35, 0.55, 0.90))
+	add_child(clone)
+	clones.append(clone)
 
 
 func _build_beds() -> void:
@@ -117,16 +161,21 @@ func _build_farmer() -> Farmer:
 	var f := Farmer.new()
 	f.name = "Farmer"
 	f.position = Vector3(0.0, 1.0, 0.0)
+	_dress_worker(f, Color(0.85, 0.35, 0.25))
+	add_child(f)
+	return f
+
+
+## A capsule body (the "Body" the Worker animates) and its collision shape.
+func _dress_worker(worker: Worker, color: Color) -> void:
 	var mesh := MeshInstance3D.new()
 	mesh.name = "Body"
 	mesh.mesh = CapsuleMesh.new()
-	mesh.material_override = _flat(Color(0.85, 0.35, 0.25))
-	f.add_child(mesh)
+	mesh.material_override = _flat(color)
+	worker.add_child(mesh)
 	var shape := CollisionShape3D.new()
 	shape.shape = CapsuleShape3D.new()
-	f.add_child(shape)
-	add_child(f)
-	return f
+	worker.add_child(shape)
 
 
 func _build_camera() -> void:

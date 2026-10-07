@@ -1,22 +1,24 @@
-## Anyone who works the farm: the farmer now, the clones later. Holds the task logic so both
-## behave the same: the worker steps to a fixed spot beside the bed, faces it, and stays
-## locked there, visibly working, until the task's work time runs out. Nothing happens to a
-## bed from a distance. Subclasses decide what to do next by overriding _think().
+## Anyone who works the farm: the farmer and the clones. Holds the task logic so both
+## behave the same: the worker steps to a fixed spot beside a Workplace (bed, machine), faces
+## it, and stays locked there, visibly working, until the task's work time runs out. Nothing
+## happens to a place from a distance. Subclasses decide what to do next by overriding _think().
 class_name Worker
 extends CharacterBody3D
 
 const SPEED := 6.0
-## How far (on the ground) a worker reaches to pick a bed, from the bed's centre.
-const REACH := 1.6
-## How far outside the bed's edge the work spot sits.
+## How far (on the ground) a worker reaches to pick a place, from the place's edge.
+const REACH := 0.8
+## How far outside the place's edge the work spot sits.
 const SPOT_GAP := 0.35
 const ARRIVED := 0.05
+## Physics layer workers live on: they stand on the ground but walk through each other.
+const LAYER := 2
 
 ## Multiplies how fast every task goes (Ferramentas upgrades and traits will change it).
 var work_speed := 1.0
-## The task in progress, the bed it's on, where the worker stands for it and the seconds of
-## work left (at speed 1).
-var work_bed: Bed = null
+## The task in progress, the place it's on, where the worker stands for it and the seconds
+## of work left (at speed 1).
+var work_place: Workplace = null
 var work_task := &""
 var work_spot := Vector3.ZERO
 var work_left := 0.0
@@ -26,6 +28,9 @@ var _bar: MeshInstance3D
 
 
 func _ready() -> void:
+	add_to_group("workers")
+	collision_layer = LAYER
+	collision_mask = 1
 	_bar = MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = Vector3(1.0, 0.15, 0.15)
@@ -63,24 +68,26 @@ func wanted_move() -> Vector3:
 	return Vector3.ZERO
 
 
-## Starts the nearest bed's next task. Returns false if there's nothing to do or a task is
+## Starts `place`'s next task (the nearest place in reach when null). The worker walks up
+## to the place first, however far. Returns false if there's nothing to do or a task is
 ## already going.
-func work() -> bool:
+func work(place: Workplace = null) -> bool:
 	if is_working():
 		return false
-	var bed := nearest_bed()
-	if bed == null or bed.next_task() == &"":
+	if place == null:
+		place = nearest_workplace()
+	if place == null or place.next_task() == &"":
 		return false
-	work_bed = bed
-	work_task = bed.next_task()
-	work_left = Bed.WORK_TIME[work_task]
-	work_spot = spot_beside(bed)
+	work_place = place
+	work_task = place.next_task()
+	work_left = place.work_time(work_task)
+	work_spot = spot_beside(place)
 	_work_clock = 0.0
 	return true
 
 
 func is_working() -> bool:
-	return work_bed != null
+	return work_place != null
 
 
 func is_at_spot() -> bool:
@@ -91,47 +98,47 @@ func is_at_spot() -> bool:
 func work_progress() -> float:
 	if not is_working():
 		return 0.0
-	return 1.0 - work_left / Bed.WORK_TIME[work_task]
+	return 1.0 - work_left / work_place.work_time(work_task)
 
 
 func cancel_work() -> void:
-	work_bed = null
+	work_place = null
 	work_task = &""
 	work_left = 0.0
 	velocity = Vector3.ZERO
 
 
-## The spot just outside the side of `bed` the worker is nearest to (toward the camera when
-## standing in the middle).
-func spot_beside(bed: Bed) -> Vector3:
-	var off := _ground(global_position - bed.global_position)
+## The spot just outside the side of `place` the worker is nearest to (toward the camera
+## when standing in the middle).
+func spot_beside(place: Workplace) -> Vector3:
+	var off := _ground(global_position - place.global_position)
 	var side := Vector3(0.0, 0.0, 1.0)
 	if absf(off.x) > absf(off.z):
 		side = Vector3(signf(off.x), 0.0, 0.0)
 	elif off.z < 0.0:
 		side = Vector3(0.0, 0.0, -1.0)
-	var spot := bed.global_position + side * (Bed.SIZE / 2.0 + SPOT_GAP)
+	var spot := place.global_position + side * (place.half_size() + SPOT_GAP)
 	spot.y = global_position.y
 	return spot
 
 
-## The closest bed within REACH on the ground, or null.
-func nearest_bed() -> Bed:
-	var best: Bed = null
-	var best_d := REACH
-	for node in get_tree().get_nodes_in_group("beds"):
-		var bed := node as Bed
-		var d := _ground(bed.global_position - global_position).length()
-		if d <= best_d:
-			best = bed
+## The closest place whose edge is within REACH on the ground, or null.
+func nearest_workplace() -> Workplace:
+	var best: Workplace = null
+	var best_d := INF
+	for node in get_tree().get_nodes_in_group("workplaces"):
+		var place := node as Workplace
+		var d := _ground(place.global_position - global_position).length()
+		if d <= place.half_size() + REACH and d < best_d:
+			best = place
 			best_d = d
 	return best
 
 
 ## Walk to the work spot first; the clock only runs once the worker stands there.
 func _advance_work(delta: float) -> void:
-	# Someone else did this task first: nothing left to do here.
-	if work_bed.next_task() != work_task:
+	# Someone else did this task first, or it can't be done any more: stop.
+	if work_place.next_task() != work_task:
 		cancel_work()
 		return
 	var to := _ground(work_spot - global_position)
@@ -141,17 +148,17 @@ func _advance_work(delta: float) -> void:
 		velocity.z = v.z
 		return
 	velocity = Vector3.ZERO
-	var target := work_bed.global_position
+	var target := work_place.global_position
 	target.y = global_position.y
 	look_at(target)
 	work_left -= delta * work_speed
 	if work_left <= 0.0:
-		work_bed.perform(work_task)
+		work_place.perform(work_task)
 		cancel_work()
 
 
 ## The progress bar over the head and a lean-and-bob loop on the "Body" child while the
-## worker stands at the bed, so the result never just appears.
+## worker stands at the place, so the result never just appears.
 func _show_work(delta: float) -> void:
 	var at := is_at_spot()
 	_bar.visible = at

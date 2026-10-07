@@ -33,7 +33,12 @@ fazendeiro (cápsula) andando com WASD.
 planta, rega e colhe com E (ou Espaço) no canteiro mais perto. Cada ação tem tempo de
 trabalho, e o trabalhador anda até o canteiro e fica fixo lá trabalhando; E de novo cancela
 ([decisão](docs/decisoes/2026-10-07-tempo-de-trabalho.md)). A colheita soma em "Produção"
-no HUD. Ainda sem clones, máquina, Carregar, lojas nem dia.
+no HUD.
+
+**Fase 2, segunda fatia feita:** máquina de clonagem (E, 2 s, custa 3 de produção; começa
+com 5) e clones com função (E no clone, depois 1/2/3/0) que trabalham os canteiros sozinhos
+com as mesmas regras ([decisão](docs/decisoes/2026-10-07-maquina-e-primeiro-clone.md),
+números a confirmar). Ainda sem características, comida, Carregar, reciclar, lojas nem dia.
 
 ## Design decidido (protótipo 1)
 
@@ -58,20 +63,28 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
 - `scripts/controls.gd` registra as teclas no `InputMap` (jogo e harness usam o mesmo).
 - Câmera olha pela diagonal; o fazendeiro converte a entrada pela base da câmera
   (`screen_to_ground`) para W ser cima na tela.
+- `scripts/workplace.gd` (`Workplace`): onde se trabalha (canteiro, máquina): `next_task()`,
+  `work_time()`, `perform()`, `half_size()` (o trabalhador fica fora da borda).
+- `scripts/machine.gd` (`Machine`): tarefa `clone`; a fazenda (`main.gd`) diz se dá pra
+  pagar e cria o clone no sinal `cloned`.
+- `scripts/clone.gd` (`Clone`): `Worker` com `role`; escolhe o canteiro mais perto que quer
+  a função e que nenhum outro trabalhador pegou.
 - `scripts/bed.gd` (`Bed`): canteiro vazio → plantado → crescendo → maduro. `next_task()` diz
   o que ele espera, `perform(task)` faz. Não sabe quem trabalha: os clones vão chamar as mesmas
   funções que o fazendeiro. `Bed.WORK_TIME` dá o tempo de cada tarefa.
 - `scripts/worker.gd` (`Worker`): quem trabalha (fazendeiro agora, clones depois). `work()`
   escolhe o canteiro, anda até o ponto ao lado dele, vira, fica travado contando o tempo
   (`work_speed` multiplica) e só então chama `perform`. O filho decide o que fazer em
-  `_think()`/`wanted_move()`; o `Farmer` lê WASD e E. A animação mexe no filho "Body".
+  `_think()`/`wanted_move()`; o `Farmer` lê WASD, E e 0-3. A animação mexe no filho "Body".
+  Trabalhadores ficam na camada física 2 e se atravessam.
 - Produção colhida fica em `main.stock` (via sinal `Bed.harvested`) até existir o Carregar.
 - Renderer: Forward+ (3D, pensando nos assets Synty depois).
 
 ## Testes
 
 - `tools/test_smoke.tscn` (headless): a fazenda monta, o fazendeiro anda, e um canteiro faz
-  o ciclo inteiro (direto e pelo fazendeiro).
+  o ciclo inteiro (direto e pelo fazendeiro), a máquina cobra e cria um clone, e o clone
+  com função planta sozinho.
   `Godot --headless --path . res://tools/test_smoke.tscn --quit-after 600`
   O resultado está em `tools/last_test.log`; a última linha tem que ser `smoke: PASS`.
   Erro de script não muda o código de saída: confie no log, não no exit code.

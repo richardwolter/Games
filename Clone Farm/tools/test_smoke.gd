@@ -1,7 +1,8 @@
 ## Headless smoke check: the farm builds, the farmer walks, and a bed goes through its
 ## whole cycle (plant, water, grow, harvest) both called directly and by the farmer, who
 ## steps to a spot beside the bed, is locked there while the work time runs, and cancels
-## with E again.
+## with E again. Then the machine: it costs produção, makes a clone, and a clone given a
+## role works beds on its own.
 ##
 ## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 600
 ##
@@ -17,6 +18,8 @@ const GROW_FRAMES := 15
 const STEP_FRAMES := 30
 const LOCK_FRAMES := 2
 const WORK_FRAMES := 40
+const CLONE_FRAMES := 40
+const CLONE_WORK_FRAMES := 150
 
 var _locked_at: Vector3
 
@@ -37,6 +40,8 @@ func _ready() -> void:
 	_check(_main.farmer != null, "farmer built")
 	_check(_main.beds.size() == 6, "6 beds built (got %d)" % _main.beds.size())
 	_check(_main.get_node_or_null("Hud") != null, "HUD built")
+	_check(_main.machine != null, "machine built")
+	_check(_main.stock == 5, "the farm starts with 5 produção (got %d)" % _main.stock)
 
 
 func _physics_process(_delta: float) -> void:
@@ -70,6 +75,12 @@ func _physics_process(_delta: float) -> void:
 				"the farmer stays put while working")
 	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES:
 		_finish_farmer_work()
+		_start_cloning()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES:
+		_check_clone_made()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
+			+ CLONE_WORK_FRAMES:
+		_check_clone_worked()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
 
@@ -105,10 +116,10 @@ func _start_farmer_work() -> void:
 	var farmer: Farmer = _main.farmer
 	var bed: Bed = _main.beds[1]
 	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
-	_check(farmer.nearest_bed() == null and not farmer.work(), "no bed in reach, no work")
+	_check(farmer.nearest_workplace() == null and not farmer.work(), "no bed in reach, no work")
 	farmer.global_position = Vector3(bed.global_position.x, farmer.global_position.y,
 			bed.global_position.z)
-	_check(farmer.nearest_bed() == bed, "farmer finds the bed underfoot")
+	_check(farmer.nearest_workplace() == bed, "farmer finds the bed underfoot")
 	_check(farmer.work() and farmer.work_task == Bed.PLANT, "farmer starts planting")
 	_check(not farmer.work(), "a second start while working starts nothing")
 	_check(not farmer.is_at_spot(), "from the bed's middle the farmer must step aside first")
@@ -157,6 +168,53 @@ func _check_screen_directions() -> void:
 		var on_screen := (cam.unproject_position(to) - cam.unproject_position(from)).normalized()
 		_check(on_screen.dot(want) > 0.95, "%s moves %s on screen (got %s)" % [key, want, on_screen])
 
+
+
+## The machine won't clone short of COST; with enough, the farmer works it and pays.
+func _start_cloning() -> void:
+	var farmer: Farmer = _main.farmer
+	var machine: Machine = _main.machine
+	_main.stock = Machine.COST - 1
+	_check(machine.next_task() == &"", "machine won't clone below %d produção" % Machine.COST)
+	_main.stock = Machine.COST
+	farmer.global_position = machine.global_position + Vector3(0.0, 0.0, 1.4)
+	_check(farmer.nearest_target() == machine, "E by the machine picks the machine")
+	farmer.interact()
+	_check(farmer.is_working() and farmer.work_task == Machine.CLONE, "farmer starts cloning")
+	_check(_main.clones.is_empty(), "the clone takes work time, not instant")
+	farmer.work_left = 0.05
+
+
+## The new clone stands idle with no role; E by it opens the choice, 1 gives it Plantar.
+func _check_clone_made() -> void:
+	var farmer: Farmer = _main.farmer
+	_check(_main.clones.size() == 1, "machine made a clone")
+	_check(_main.stock == 0, "the clone cost %d produção (left %d)" % [Machine.COST, _main.stock])
+	if _main.clones.is_empty():
+		return
+	var clone: Clone = _main.clones[0]
+	_check(clone.role == &"" and not clone.is_working(), "a new clone has no role and idles")
+	farmer.global_position = clone.global_position + Vector3(0.5, 0.0, 0.0)
+	_check(farmer.nearest_target() == clone, "E by a clone picks the clone")
+	farmer.interact()
+	_check(farmer.choosing == clone, "E opens the clone's role choice")
+	farmer.pick_role(1)
+	_check(clone.role == Bed.PLANT and farmer.choosing == null, "1 gives it Plantar")
+	clone.work_speed = 10.0
+	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
+
+
+## The clone planted empty beds by itself, standing at each, and left the others alone.
+func _check_clone_worked() -> void:
+	var planted := 0
+	for bed: Bed in _main.beds:
+		if bed.state == Bed.State.PLANTED:
+			planted += 1
+	# Bed 1 was planted by the farmer; any other planted bed is the clone's work.
+	_check(planted >= 3, "the clone planted beds on its own (%d planted)" % planted)
+	var clone: Clone = _main.clones[0] if not _main.clones.is_empty() else null
+	_check(clone != null and (not clone.is_working() or clone.work_task == Bed.PLANT),
+			"the clone only does its role")
 
 func _check(ok: bool, what: String) -> void:
 	if not ok:

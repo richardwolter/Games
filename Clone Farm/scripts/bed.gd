@@ -1,8 +1,8 @@
 ## A garden bed, the thing every farm task acts on. It cycles empty -> planted -> growing
 ## -> ripe -> (harvest) -> empty. The task functions don't know who is working, so the
-## farmer now and the clones later call the same ones.
+## farmer and the clones call the same ones.
 class_name Bed
-extends Node3D
+extends Workplace
 
 enum State { EMPTY, PLANTED, GROWING, RIPE }
 
@@ -38,6 +38,7 @@ var _plant_mat: StandardMaterial3D
 
 
 func _ready() -> void:
+	super()
 	add_to_group("beds")
 	var soil := MeshInstance3D.new()
 	var box := BoxMesh.new()
@@ -62,6 +63,14 @@ func _process(delta: float) -> void:
 	if grow_left <= 0.0:
 		state = State.RIPE
 	_refresh()
+
+
+func half_size() -> float:
+	return SIZE / 2.0
+
+
+func work_time(task: StringName) -> float:
+	return WORK_TIME[task]
 
 
 ## The task this bed is waiting for, or &"" while it grows on its own.

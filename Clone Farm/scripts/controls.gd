@@ -9,6 +9,10 @@ const BINDINGS := {
 	"move_up": [KEY_W, KEY_UP],
 	"move_down": [KEY_S, KEY_DOWN],
 	"interact": [KEY_E, KEY_SPACE],
+	"role_0": [KEY_0, KEY_KP_0],
+	"role_1": [KEY_1, KEY_KP_1],
+	"role_2": [KEY_2, KEY_KP_2],
+	"role_3": [KEY_3, KEY_KP_3],
 }
 
 
