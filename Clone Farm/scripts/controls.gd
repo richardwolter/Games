@@ -8,6 +8,7 @@ const BINDINGS := {
 	"move_right": [KEY_D, KEY_RIGHT],
 	"move_up": [KEY_W, KEY_UP],
 	"move_down": [KEY_S, KEY_DOWN],
+	"interact": [KEY_E, KEY_SPACE],
 }
 
 

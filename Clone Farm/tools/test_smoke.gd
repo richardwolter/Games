@@ -1,4 +1,5 @@
-## Headless smoke check: the farm builds and the farmer walks.
+## Headless smoke check: the farm builds, the farmer walks, and a bed goes through its
+## whole cycle (plant, water, grow, harvest) both called directly and by the farmer.
 ##
 ## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 600
 ##
@@ -9,6 +10,7 @@ extends Node
 
 const LOG_PATH := "res://tools/last_test.log"
 const WALK_FRAMES := 30
+const GROW_FRAMES := 15
 
 var _log: FileAccess
 var _main: Node3D
@@ -25,6 +27,8 @@ func _ready() -> void:
 	_check(_main.get_node_or_null("Ground") != null, "ground built")
 	_check(_main.get_node_or_null("Camera") != null, "camera built")
 	_check(_main.farmer != null, "farmer built")
+	_check(_main.beds.size() == 6, "6 beds built (got %d)" % _main.beds.size())
+	_check(_main.get_node_or_null("Hud") != null, "HUD built")
 
 
 func _physics_process(_delta: float) -> void:
@@ -38,8 +42,52 @@ func _physics_process(_delta: float) -> void:
 		_check(moved > 1.0, "farmer walks (moved %.2f)" % moved)
 		_check(absf(_main.farmer.global_position.y - _start.y) < 0.2, "farmer stays on the ground")
 		_check_screen_directions()
+		_start_bed_cycle()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES:
+		_finish_bed_cycle()
+		_check_farmer_works()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
+
+
+## Bed 0 by direct calls: tasks out of order do nothing, plant then water starts growth.
+## The grow timer is cut short so the bed ripens within GROW_FRAMES.
+func _start_bed_cycle() -> void:
+	var bed: Bed = _main.beds[0]
+	_check(bed.next_task() == Bed.PLANT, "empty bed wants planting")
+	_check(bed.perform(Bed.WATER) == 0 and bed.state == Bed.State.EMPTY,
+			"watering an empty bed does nothing")
+	bed.perform(Bed.PLANT)
+	_check(bed.state == Bed.State.PLANTED and bed.next_task() == Bed.WATER,
+			"planted bed wants water")
+	bed.perform(Bed.WATER)
+	_check(bed.state == Bed.State.GROWING and bed.next_task() == &"",
+			"watered bed grows on its own")
+	_check(bed.perform(Bed.HARVEST) == 0, "a growing bed can't be harvested")
+	bed.grow_left = 0.05
+
+
+func _finish_bed_cycle() -> void:
+	var bed: Bed = _main.beds[0]
+	_check(bed.state == Bed.State.RIPE, "bed ripens when its timer runs out")
+	var before: int = _main.stock
+	_check(bed.perform(Bed.HARVEST) == Bed.YIELD, "harvest yields %d" % Bed.YIELD)
+	_check(_main.stock == before + Bed.YIELD, "harvest goes into the stock")
+	_check(bed.state == Bed.State.EMPTY, "harvested bed is empty again")
+
+
+## The farmer works the bed underfoot, and nothing when no bed is in reach.
+func _check_farmer_works() -> void:
+	var farmer: Farmer = _main.farmer
+	var bed: Bed = _main.beds[1]
+	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
+	_check(farmer.nearest_bed() == null and farmer.work() == 0, "no bed in reach, no work")
+	farmer.global_position = Vector3(bed.global_position.x, farmer.global_position.y,
+			bed.global_position.z)
+	_check(farmer.nearest_bed() == bed, "farmer finds the bed underfoot")
+	farmer.work()
+	farmer.work()
+	_check(bed.state == Bed.State.GROWING, "farmer plants and waters with two presses")
 
 
 ## Each key must move the farmer the way it points on screen: project the step through the

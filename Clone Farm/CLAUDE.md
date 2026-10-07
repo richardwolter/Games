@@ -27,7 +27,13 @@ distribui funções aos clones e corre atrás dos desastres deles.
 ## Estado atual
 
 **Fase 0 (setup) feita.** Projeto 3D em cinza: chão, luz, câmera ortográfica isométrica e o
-fazendeiro (cápsula) andando com WASD. Próximo: Fase 2, o loop cinza de `docs/scope.md`.
+fazendeiro (cápsula) andando com WASD.
+
+**Fase 2 (loop cinza de `docs/scope.md`), primeira fatia feita:** 6 canteiros; o fazendeiro
+planta, rega e colhe com E (ou Espaço) no canteiro mais perto; a colheita soma em "Produção"
+no HUD. Ainda sem clones, máquina, Carregar, lojas nem dia.
+**A confirmar com Richard:** tecla E, crescimento de 8 s, 1 de produção por colheita,
+tarefas instantâneas (sem tempo de trabalho).
 
 ## Design decidido (protótipo 1)
 
@@ -50,15 +56,23 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
 - `scripts/main.gd` monta a cena em código (chão, luz, câmera, fazendeiro). `scenes/main.tscn`
   só aponta para ele. Preferir montar em código a editar `.tscn` à mão.
 - `scripts/controls.gd` registra as teclas no `InputMap` (jogo e harness usam o mesmo).
-- Câmera olha pela diagonal; o fazendeiro gira a entrada em -45° para "cima" ser cima na tela.
+- Câmera olha pela diagonal; o fazendeiro converte a entrada pela base da câmera
+  (`screen_to_ground`) para W ser cima na tela.
+- `scripts/bed.gd` (`Bed`): canteiro vazio → plantado → crescendo → maduro. `next_task()` diz
+  o que ele espera, `perform(task)` faz. Não sabe quem trabalha: os clones vão chamar as mesmas
+  funções que o fazendeiro (`Farmer.work()` no canteiro mais perto).
+- Produção colhida fica em `main.stock` (via sinal `Bed.harvested`) até existir o Carregar.
 - Renderer: Forward+ (3D, pensando nos assets Synty depois).
 
 ## Testes
 
-- `tools/test_smoke.tscn` (headless): a fazenda monta e o fazendeiro anda.
+- `tools/test_smoke.tscn` (headless): a fazenda monta, o fazendeiro anda, e um canteiro faz
+  o ciclo inteiro (direto e pelo fazendeiro).
   `Godot --headless --path . res://tools/test_smoke.tscn --quit-after 600`
   O resultado está em `tools/last_test.log`; a última linha tem que ser `smoke: PASS`.
   Erro de script não muda o código de saída: confie no log, não no exit code.
+  Script novo com `class_name`: rode antes `Godot --headless --path . --import`, senão o
+  harness não acha a classe (e o `last_test.log` antigo fica lá parecendo PASS).
 - Cada sistema novo do loop ganha checagens no harness.
 - Playtest: logs e notas do Richard em `docs/playtests/`.
 

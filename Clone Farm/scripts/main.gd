@@ -1,18 +1,72 @@
-## The farm, built in code: ground, light, isometric camera and the farmer. Graybox only,
-## per docs/scope.md: shapes and flat colours, no Synty.
+## The farm, built in code: ground, light, isometric camera, the farmer, the garden beds
+## and a minimal HUD. Graybox only, per docs/scope.md: shapes and flat colours, no Synty.
 extends Node3D
 
 const GROUND_SIZE := 24.0
+const BED_COLUMNS := 3
+const BED_ROWS := 2
+const BED_GAP := 0.6
+## Where the bed grid's centre sits, a few steps from where the farmer starts.
+const BEDS_AT := Vector3(0.0, 0.0, -4.0)
+
+## What the HUD calls each task (the game speaks Portuguese).
+const TASK_LABELS := {
+	Bed.PLANT: "plantar",
+	Bed.WATER: "regar",
+	Bed.HARVEST: "colher",
+}
 
 var farmer: Farmer
+var beds: Array[Bed] = []
+## Harvested produce, waiting for its use (machine, trough, sale come with Carregar).
+var stock := 0
+
+var _stock_label: Label
+var _hint_label: Label
 
 
 func _ready() -> void:
 	Controls.ensure()
 	_build_ground()
 	_build_light()
+	_build_beds()
 	farmer = _build_farmer()
 	_build_camera()
+	_build_hud()
+
+
+func _process(_delta: float) -> void:
+	_stock_label.text = "Produção: %d" % stock
+	var bed := farmer.nearest_bed()
+	var task: StringName = bed.next_task() if bed != null else &""
+	_hint_label.text = "E: %s" % TASK_LABELS[task] if task != &"" else ""
+
+
+func _build_beds() -> void:
+	var step := Bed.SIZE + BED_GAP
+	var origin := BEDS_AT - Vector3((BED_COLUMNS - 1) * step, 0.0, (BED_ROWS - 1) * step) / 2.0
+	for row in BED_ROWS:
+		for col in BED_COLUMNS:
+			var bed := Bed.new()
+			bed.name = "Bed%d" % beds.size()
+			bed.position = origin + Vector3(col * step, 0.0, row * step)
+			bed.harvested.connect(func(amount: int) -> void: stock += amount)
+			add_child(bed)
+			beds.append(bed)
+
+
+func _build_hud() -> void:
+	var hud := CanvasLayer.new()
+	hud.name = "Hud"
+	_stock_label = Label.new()
+	_stock_label.position = Vector2(16, 12)
+	_stock_label.add_theme_font_size_override("font_size", 24)
+	hud.add_child(_stock_label)
+	_hint_label = Label.new()
+	_hint_label.position = Vector2(16, 44)
+	_hint_label.add_theme_font_size_override("font_size", 20)
+	hud.add_child(_hint_label)
+	add_child(hud)
 
 
 func _build_ground() -> void:
