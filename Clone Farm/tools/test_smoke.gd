@@ -1,6 +1,7 @@
 ## Headless smoke check: the farm builds, the farmer walks, and a bed goes through its
-## whole cycle (plant, water, grow, harvest) both called directly and by the farmer, whose
-## tasks take work time and are cancelled by walking away.
+## whole cycle (plant, water, grow, harvest) both called directly and by the farmer, who
+## steps to a spot beside the bed, is locked there while the work time runs, and cancels
+## with E again.
 ##
 ## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 600
 ##
@@ -12,7 +13,12 @@ extends Node
 const LOG_PATH := "res://tools/last_test.log"
 const WALK_FRAMES := 30
 const GROW_FRAMES := 15
-const WORK_FRAMES := 15
+## Long enough to walk from a bed's centre to its work spot.
+const STEP_FRAMES := 30
+const LOCK_FRAMES := 2
+const WORK_FRAMES := 40
+
+var _locked_at: Vector3
 
 var _log: FileAccess
 var _main: Node3D
@@ -50,14 +56,20 @@ func _physics_process(_delta: float) -> void:
 		_start_farmer_work()
 	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + 1:
 		_check(_main.beds[1].state == Bed.State.EMPTY, "planting takes time, not instant")
-		_main.farmer.work_left = 0.05
-	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + WORK_FRAMES:
-		_finish_farmer_work()
+		_check(_main.farmer.work_left == Bed.WORK_TIME[Bed.PLANT],
+				"the clock waits until the farmer reaches the bed")
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES:
+		_check_at_spot()
+		_main.farmer.work_left = 0.5
+		_locked_at = _main.farmer.global_position
 		Input.action_press("move_right")
-	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + WORK_FRAMES + 2:
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + LOCK_FRAMES:
 		Input.action_release("move_right")
-		_check(not _main.farmer.is_working(), "walking cancels the task")
-		_check(_main.beds[1].state == Bed.State.PLANTED, "a cancelled task leaves the bed as it was")
+		_check(_main.farmer.is_working(), "walking keys don't cancel the task")
+		_check(_main.farmer.global_position.distance_to(_locked_at) < 0.01,
+				"the farmer stays put while working")
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES:
+		_finish_farmer_work()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
 
@@ -98,16 +110,36 @@ func _start_farmer_work() -> void:
 			bed.global_position.z)
 	_check(farmer.nearest_bed() == bed, "farmer finds the bed underfoot")
 	_check(farmer.work() and farmer.work_task == Bed.PLANT, "farmer starts planting")
-	_check(not farmer.work(), "a second press while working starts nothing")
+	_check(not farmer.work(), "a second start while working starts nothing")
+	_check(not farmer.is_at_spot(), "from the bed's middle the farmer must step aside first")
 
 
-## Planting finished once its work ran out; then watering starts, to be walked away from.
+## The farmer stands just outside the bed's edge, facing it.
+func _check_at_spot() -> void:
+	var farmer: Farmer = _main.farmer
+	var bed: Bed = _main.beds[1]
+	_check(farmer.is_at_spot(), "farmer reached the work spot")
+	var off := farmer.global_position - bed.global_position
+	off.y = 0.0
+	var want := Bed.SIZE / 2.0 + Worker.SPOT_GAP
+	_check(absf(off.length() - want) < 0.06,
+			"work spot is beside the bed (%.2f from its centre, want %.2f)" % [off.length(), want])
+	var facing := -farmer.global_basis.z
+	facing.y = 0.0
+	_check(facing.normalized().dot(-off.normalized()) > 0.95, "farmer faces the bed")
+
+
+## Planting finished once its work ran out; then E starts watering and E again cancels it.
 func _finish_farmer_work() -> void:
 	var farmer: Farmer = _main.farmer
 	var bed: Bed = _main.beds[1]
 	_check(bed.state == Bed.State.PLANTED and not farmer.is_working(),
 			"bed planted when the work time runs out")
-	_check(farmer.work() and farmer.work_task == Bed.WATER, "farmer starts watering")
+	farmer.interact()
+	_check(farmer.is_working() and farmer.work_task == Bed.WATER, "E starts watering")
+	farmer.interact()
+	_check(not farmer.is_working(), "E again cancels the task")
+	_check(bed.state == Bed.State.PLANTED, "a cancelled task leaves the bed as it was")
 
 
 ## Each key must move the farmer the way it points on screen: project the step through the

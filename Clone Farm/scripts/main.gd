@@ -5,7 +5,9 @@ extends Node3D
 const GROUND_SIZE := 24.0
 const BED_COLUMNS := 3
 const BED_ROWS := 2
-const BED_GAP := 0.6
+## Wide enough that a work spot (Worker.SPOT_GAP out from one bed) is clearly nearer
+## that bed than the one across the aisle.
+const BED_GAP := 1.4
 ## Where the bed grid's centre sits, a few steps from where the farmer starts.
 const BEDS_AT := Vector3(0.0, 0.0, -4.0)
 
@@ -14,6 +16,11 @@ const TASK_LABELS := {
 	Bed.PLANT: "plantar",
 	Bed.WATER: "regar",
 	Bed.HARVEST: "colher",
+}
+const WORKING_LABELS := {
+	Bed.PLANT: "plantando",
+	Bed.WATER: "regando",
+	Bed.HARVEST: "colhendo",
 }
 
 var farmer: Farmer
@@ -40,7 +47,7 @@ func _process(_delta: float) -> void:
 	var bed := farmer.nearest_bed()
 	var task: StringName = bed.next_task() if bed != null else &""
 	if farmer.is_working():
-		_hint_label.text = "%s... %d%%" % [TASK_LABELS[farmer.work_task],
+		_hint_label.text = "%s... %d%%   (E: cancelar)" % [WORKING_LABELS[farmer.work_task],
 				roundi(farmer.work_progress() * 100.0)]
 	else:
 		_hint_label.text = "E: %s" % TASK_LABELS[task] if task != &"" else ""
@@ -111,6 +118,7 @@ func _build_farmer() -> Farmer:
 	f.name = "Farmer"
 	f.position = Vector3(0.0, 1.0, 0.0)
 	var mesh := MeshInstance3D.new()
+	mesh.name = "Body"
 	mesh.mesh = CapsuleMesh.new()
 	mesh.material_override = _flat(Color(0.85, 0.35, 0.25))
 	f.add_child(mesh)
