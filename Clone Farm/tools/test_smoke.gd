@@ -281,29 +281,47 @@ func _check_traits() -> void:
 	_check_panel()
 
 
-## The HUD's trait lines and role ratings come from the trait data.
+## The role ratings follow the model in docs/decisoes/2026-10-07-painel-do-clone.md, checked
+## against values worked out by hand (6 beds, walk 3 m at 6 m/s = 0.5 s, 1 s per task, 8 s
+## to grow; a plain farm: T = 1.5 s per task, bed cycle 12.5 s, 6/12.5 = 0.48 tasks/s).
 func _check_panel() -> void:
-	var plain := Traits.combine([])
-	_check(is_equal_approx(Traits.role_rating(plain, Bed.PLANT), 1.0), "no traits rates 100%")
-	var quick := Traits.combine([&"apressado"])
-	_check(is_equal_approx(Traits.role_rating(quick, Bed.PLANT), 1.5 * 0.75),
-			"Apressado plants at 112%% (got %.3f)" % Traits.role_rating(quick, Bed.PLANT))
-	var careful_green := Traits.combine([&"caprichoso", &"dedo_verde"])
-	_check(is_equal_approx(Traits.role_rating(careful_green, Bed.HARVEST), 0.6 * 0.33 * 2.0),
-			"Caprichoso + Dedo Verde harvests at 40%% (got %.3f)"
-			% Traits.role_rating(careful_green, Bed.HARVEST))
-	var chatty := Traits.combine([&"animado"])
-	_check(is_equal_approx(Traits.role_rating(chatty, Bed.WATER), 0.75),
-			"Animado loses a quarter to chatting (got %.3f)" % Traits.role_rating(chatty, Bed.WATER))
-	_check(Traits.describe(&"apressado").contains("+50% anda")
-			and Traits.describe(&"apressado").contains("-pula 25%"),
-			"Apressado's line: %s" % Traits.describe(&"apressado"))
-	_check(Traits.describe(&"dedo_verde").contains("-67% colhe"),
-			"Dedo Verde's line: %s" % Traits.describe(&"dedo_verde"))
-	var clone := _test_clone([&"caprichoso", &"dedo_verde"], Vector3(-9.0, 1.0, -8.0))
-	var panel: String = _main.clone_panel(clone, true)
-	_check(panel.contains("Plantar") and panel.contains("60%") and panel.contains("(melhor)"),
-			"the role panel rates each role and marks the best")
+	var cases := [
+		# traits, role, hand-computed rating
+		[[], Bed.PLANT, 1.0],
+		# T_plant = (0.5/1.5 + 1/1.5) / 0.75 = 1.333; cycle 12.333; 6/12.333 / 0.48
+		[[&"apressado"], Bed.PLANT, (6.0 / 12.3333) / 0.48],
+		# growth 2x: cycle 4.5 + 4 = 8.5, beds give 0.706/s but each stage caps at 0.667/s
+		[[&"dedo_verde"], Bed.PLANT, (1.0 / 1.5) / 0.48],
+		# T_harvest = 0.5 + 1/0.33 = 3.530; stage 0.2833/s is the cap
+		[[&"dedo_verde"], Bed.HARVEST, (1.0 / (0.5 + 1.0 / 0.33)) / 0.48],
+		# T_harvest = 0.5 + 1/0.6 = 2.1667; cycle 13.1667; 6/13.1667 = 0.4557/s, x2 yield
+		[[&"caprichoso"], Bed.HARVEST, (6.0 / 13.16667) * 2.0 / 0.48],
+		# pauses 2 s in 8: T_water = 1.5 / 0.75 = 2; cycle 13
+		[[&"animado"], Bed.WATER, (6.0 / 13.0) / 0.48],
+	]
+	for c: Array in cases:
+		var names: Array[StringName] = []
+		names.assign(c[0])
+		var got := Traits.role_rating(Traits.combine(names), c[1], 6)
+		_check(absf(got - c[2]) < 0.002, "%s in %s rates %.3f (hand: %.3f)" % [
+				names, c[1], got, c[2]])
+	var rows := Traits.stat_rows(Traits.combine([&"apressado"]), [&"apressado"])
+	_check(rows.size() == 3 and rows[0].begins_with("Vel. de movimento")
+			and rows[1].begins_with("Vel. de trabalho") and rows[2].begins_with("Chance de falha"),
+			"Apressado's sheet: %s" % [rows])
+	var mixed := _test_clone([&"caprichoso", &"dedo_verde"], Vector3(-9.0, 1.0, -8.0))
+	var mixed_panel: String = _main.clone_panel(mixed, true)
+	_say("panel example:
+" + mixed_panel)
+	_check(mixed_panel.contains("Rendimento") and mixed_panel.contains("Crescimento")
+			and not mixed_panel.contains("(melhor)"),
+			"Caprichoso + Dedo Verde: sheet shown, Plantar and Regar tie so no pick")
+	var careful := _test_clone([&"caprichoso"], Vector3(-9.0, 1.0, -7.0))
+	_check(_main.clone_panel(careful, true).contains("Colher  [color=%s]190%%[/color]  (melhor)"
+			% Traits.GOOD), "Caprichoso: Colher is the clear best")
+	var plain := _test_clone([], Vector3(-9.0, 1.0, -6.0))
+	_check(not _main.clone_panel(plain, true).contains("(melhor)"),
+			"no recommendation when the roles are close")
 
 
 ## Animado stops to chat (even with a task going) and shows it.

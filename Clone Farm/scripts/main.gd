@@ -79,32 +79,35 @@ func _hint() -> String:
 	return ""
 
 
-## What a clone's traits do and how good it is at each role, so picking a role is quick.
-## Ratings come from Traits.role_rating (100% = a clone with no traits); the best is marked.
+## A clone's stat sheet and how much it adds to the farm in each role, so picking a role
+## is quick. "(melhor)" only when the best role beats the next by RECOMMEND_GAP points.
+const RECOMMEND_GAP := 10
+
 func clone_panel(clone: Clone, choosing: bool) -> String:
 	var lines: PackedStringArray = []
-	lines.append("[b]%s[/b]  (agora: %s)" % [clone.name, Clone.ROLE_LABELS[clone.role]])
-	for name in clone.traits:
-		lines.append(Traits.describe(name))
-	var best := &""
-	var best_rating := -1.0
-	for role in Clone.ROLES:
-		if role != &"" and Traits.role_rating(clone.stats, role) > best_rating:
-			best = role
-			best_rating = Traits.role_rating(clone.stats, role)
+	var names := Traits.labels(clone.traits) if not clone.traits.is_empty() else "sem características"
+	var role_now: String = Clone.ROLE_LABELS[clone.role] if clone.role != &"" else "nenhuma"
+	lines.append("[b]%s[/b]  %s  (função: %s)" % [clone.name, names, role_now])
+	lines.append_array(Traits.stat_rows(clone.stats, clone.traits))
+	var pcts := {}
+	for i in range(1, Clone.ROLES.size()):
+		pcts[Clone.ROLES[i]] = roundi(Traits.role_rating(clone.stats, Clone.ROLES[i],
+				beds.size()) * 100.0)
+	var ranked: Array = pcts.keys()
+	ranked.sort_custom(func(x: StringName, y: StringName) -> bool: return pcts[x] > pcts[y])
+	var best: StringName = ranked[0] if pcts[ranked[0]] - pcts[ranked[1]] >= RECOMMEND_GAP \
+			else &""
+	lines.append("Produção da fazenda com ele em cada função (100% = clone comum):")
 	for i in range(1, Clone.ROLES.size()):
 		var role := Clone.ROLES[i]
-		var pct := roundi(Traits.role_rating(clone.stats, role) * 100.0)
+		var pct: int = pcts[role]
 		var color := Traits.GOOD if pct > 100 else (Traits.BAD if pct < 100 else "#ffffff")
 		var line := "%s %s  [color=%s]%d%%[/color]" % [
 				str(i) if choosing else "-", Clone.ROLE_LABELS[role], color, pct]
 		if role == best:
 			line = "[b]%s  (melhor)[/b]" % line
 		lines.append(line)
-	if choosing:
-		lines.append("0 nenhuma      (E: fechar)")
-	else:
-		lines.append("E: dar função")
+	lines.append("0 nenhuma      (E: fechar)" if choosing else "E: dar função")
 	return "\n".join(lines)
 
 

@@ -17,7 +17,7 @@
 ##   chat_time     ...and how long each stop lasts
 ## Forte, Glutão, Beliscador and Preguiçoso wait for carrying and food, which they act on.
 ##
-## The HUD text (describe, role_rating) is computed from these same modifiers, never written
+## The HUD text (stat_rows, role_rating) is computed from these same modifiers, never written
 ## by hand, so it stays right when a number or a trait changes.
 class_name Traits
 extends RefCounted
@@ -98,59 +98,103 @@ static func labels(names: Array[StringName]) -> String:
 const GOOD := "#8be07a"
 const BAD := "#ff8a6a"
 
+## Stat names, one per stat, used the same everywhere (panel, docs).
+const MOVE_SPEED := "Vel. de movimento"
+const WORK_SPEED := "Vel. de trabalho"
+const FAIL_CHANCE := "Chance de falha"
+const YIELD_BONUS := "Rendimento"
+const GROWTH := "Crescimento"
+const PAUSES := "Pausas"
+const AURA := "Aura"
 
-## One short line for the HUD: each modifier of the trait as a coloured +/- effect.
-static func describe(name: StringName) -> String:
-	var t: Dictionary = LIST[name]
-	var parts: PackedStringArray = []
-	if t.has("move"):
-		parts.append(_factor("anda", t.move))
-	if t.has("work"):
-		parts.append(_factor("trabalha", t.work))
-	var per_task: Dictionary = t.get("task", {})
-	for task: StringName in per_task:
-		parts.append(_factor(TASK_VERBS[task], per_task[task]))
-	if t.get("grow_boost", 1.0) != 1.0:
-		parts.append(_factor("plantas que toca crescem", t.grow_boost))
-	if t.get("harvest_bonus", 0) != 0:
-		parts.append(_color(GOOD, "+%d produção por colheita" % t.harvest_bonus))
-	if t.get("careful", false):
-		parts.append(_color(GOOD, "+nunca erra"))
-	if t.get("skip", 0.0) > 0.0:
-		parts.append(_color(BAD, "-pula %d%% das tarefas" % roundi(t.skip * 100.0)))
-	if t.get("cheer", 1.0) != 1.0:
-		parts.append(_color(GOOD, "+%d%% para clones a %s m" % [
-				roundi((t.cheer - 1.0) * 100.0), _num(t.cheer_radius)]))
-	if t.get("chat_every", 0.0) > 0.0:
-		parts.append(_color(BAD, "-para %s s a cada %s s para conversar" % [
-				_num(t.chat_time), _num(t.chat_every)]))
-	return "%s: %s" % [t.label, ", ".join(parts)]
-
-
-const TASK_VERBS := {
-	Bed.PLANT: "planta",
-	Bed.WATER: "rega",
-	Bed.HARVEST: "colhe",
+const ROLE_NAMES := {
+	Bed.PLANT: "Plantar",
+	Bed.WATER: "Regar",
+	Bed.HARVEST: "Colher",
 }
+## Assumed walk between two tasks in the rating: one bed step (Bed.SIZE + the bed gap).
+const RATING_WALK := 3.0
 
 
-## How much of `role` a clone with these stats gets done per second of work, as a fraction
-## of a clone with no traits: task speed, times the share of tasks it doesn't skip, times
-## the share of time it isn't chatting, times the harvest's extra yield. Walking and the
-## cheer of other clones are left out (they depend on where it stands).
-static func role_rating(stats: Dictionary, role: StringName) -> float:
-	var rating: float = stats.work * stats.task.get(role, 1.0) * (1.0 - stats.skip)
+## The clone's stat sheet for the HUD: one row per stat its traits change, good in green,
+## bad in red. Rows marked "fora da %" can't be folded into the role rating honestly.
+static func stat_rows(stats: Dictionary, names: Array[StringName]) -> PackedStringArray:
+	var rows: PackedStringArray = []
+	if stats.move != 1.0:
+		rows.append("%s  %s" % [MOVE_SPEED, _pct(stats.move)])
+	var speeds := {}
+	for role: StringName in ROLE_NAMES:
+		speeds[role] = stats.work * stats.task.get(role, 1.0)
+	var uniform: bool = speeds.values().all(func(v: float) -> bool:
+		return is_equal_approx(v, speeds[Bed.PLANT]))
+	if uniform and speeds[Bed.PLANT] != 1.0:
+		rows.append("%s  %s" % [WORK_SPEED, _pct(speeds[Bed.PLANT])])
+	elif not uniform:
+		var parts: PackedStringArray = []
+		for role: StringName in ROLE_NAMES:
+			parts.append("%s %s" % [ROLE_NAMES[role], _pct(speeds[role])])
+		rows.append("%s  %s" % [WORK_SPEED, "  ".join(parts)])
+	if stats.skip > 0.0:
+		rows.append("%s  %s" % [FAIL_CHANCE, _color(BAD, "%d%%" % roundi(stats.skip * 100.0))])
+	elif stats.careful and names.any(func(n: StringName) -> bool: return LIST[n].has("skip")):
+		rows.append("%s  %s" % [FAIL_CHANCE, _color(GOOD, "0% (nunca falha)")])
+	if stats.harvest_bonus != 0:
+		rows.append("%s  %s" % [YIELD_BONUS, _color(GOOD,
+				"+%d produção por colheita" % stats.harvest_bonus)])
+	if stats.grow_boost != 1.0:
+		rows.append("%s  %s nos canteiros que ele planta ou rega" % [GROWTH,
+				_pct(stats.grow_boost)])
 	if stats.chat_every > 0.0:
-		rating *= 1.0 - stats.chat_time / stats.chat_every
-	if role == Bed.HARVEST:
-		rating *= float(Bed.YIELD + stats.harvest_bonus) / Bed.YIELD
-	return rating
+		rows.append("%s  %s" % [PAUSES, _color(BAD, "para %s s a cada %s s (com clone perto)"
+				% [_num(stats.chat_time), _num(stats.chat_every)])])
+	if stats.cheer > 1.0:
+		rows.append("%s  %s, fora da %%" % [AURA, _color(GOOD,
+				"+%d%% %s dos clones a até %s m" % [roundi((stats.cheer - 1.0) * 100.0),
+				WORK_SPEED.to_lower(), _num(stats.cheer_radius)])])
+	return rows
 
 
-static func _factor(what: String, factor: float) -> String:
+## The farm's produção per minute with a clone of these stats in `role` and plain workers in
+## the other two roles, as a fraction of the same farm with a plain clone in `role`.
+## Steady-state model (docs/decisoes/2026-10-07-painel-do-clone.md):
+##   time per finished task  T = (RATING_WALK / walk speed + work time / work speed)
+##                               / (1 - fail chance) / (1 - pause share)
+##   one bed's cycle         C = T_plant + T_water + T_harvest + GROW_TIME / growth
+##   tasks per second        R = min(1/T_plant, 1/T_water, 1/T_harvest, beds / C)
+##   produção per second       = R * yield per harvest
+## Aura is left out: it depends on where the clones stand.
+static func role_rating(stats: Dictionary, role: StringName, beds: int) -> float:
+	return _farm_rate(stats, role, beds) / _farm_rate(combine([]), role, beds)
+
+
+static func _farm_rate(stats: Dictionary, role: StringName, beds: int) -> float:
+	var plain := combine([])
+	var cycle := 0.0
+	var rate := INF
+	for r: StringName in ROLE_NAMES:
+		var t := _task_time(stats if r == role else plain, r)
+		cycle += t
+		rate = minf(rate, 1.0 / t)
+	var growth: float = stats.grow_boost if role != Bed.HARVEST else 1.0
+	cycle += Bed.GROW_TIME / growth
+	rate = minf(rate, beds / cycle)
+	var per_harvest: int = Bed.YIELD + (stats.harvest_bonus if role == Bed.HARVEST else 0)
+	return rate * per_harvest
+
+
+static func _task_time(stats: Dictionary, role: StringName) -> float:
+	var t: float = RATING_WALK / (Worker.SPEED * stats.move) \
+			+ Bed.WORK_TIME[role] / (stats.work * stats.task.get(role, 1.0))
+	t /= 1.0 - stats.skip
+	if stats.chat_every > 0.0:
+		t /= 1.0 - stats.chat_time / stats.chat_every
+	return t
+
+
+## "+50%" in green or "-40%" in red, from a multiplier.
+static func _pct(factor: float) -> String:
 	var pct := roundi((factor - 1.0) * 100.0)
-	return _color(GOOD if pct > 0 else BAD, "%s%d%% %s" % ["+" if pct > 0 else "", pct, what]) \
-			if pct != 0 else what
+	return _color(GOOD if pct > 0 else BAD, "%s%d%%" % ["+" if pct > 0 else "", pct])
 
 
 static func _color(color: String, text: String) -> String:
