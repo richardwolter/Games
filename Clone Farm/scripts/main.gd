@@ -39,7 +39,11 @@ func _process(_delta: float) -> void:
 	_stock_label.text = "Produção: %d" % stock
 	var bed := farmer.nearest_bed()
 	var task: StringName = bed.next_task() if bed != null else &""
-	_hint_label.text = "E: %s" % TASK_LABELS[task] if task != &"" else ""
+	if farmer.is_working():
+		_hint_label.text = "%s... %d%%" % [TASK_LABELS[farmer.work_task],
+				roundi(farmer.work_progress() * 100.0)]
+	else:
+		_hint_label.text = "E: %s" % TASK_LABELS[task] if task != &"" else ""
 
 
 func _build_beds() -> void:

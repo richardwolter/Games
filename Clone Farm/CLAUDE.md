@@ -30,10 +30,11 @@ distribui funções aos clones e corre atrás dos desastres deles.
 fazendeiro (cápsula) andando com WASD.
 
 **Fase 2 (loop cinza de `docs/scope.md`), primeira fatia feita:** 6 canteiros; o fazendeiro
-planta, rega e colhe com E (ou Espaço) no canteiro mais perto; a colheita soma em "Produção"
-no HUD. Ainda sem clones, máquina, Carregar, lojas nem dia.
+planta, rega e colhe com E (ou Espaço) no canteiro mais perto; cada ação tem tempo de
+trabalho ([decisão](docs/decisoes/2026-10-07-tempo-de-trabalho.md)) e andar cancela; a
+colheita soma em "Produção" no HUD. Ainda sem clones, máquina, Carregar, lojas nem dia.
 **A confirmar com Richard:** tecla E, crescimento de 8 s, 1 de produção por colheita,
-tarefas instantâneas (sem tempo de trabalho).
+1 s de trabalho por ação, aperto único (não segurar).
 
 ## Design decidido (protótipo 1)
 
@@ -60,7 +61,8 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
   (`screen_to_ground`) para W ser cima na tela.
 - `scripts/bed.gd` (`Bed`): canteiro vazio → plantado → crescendo → maduro. `next_task()` diz
   o que ele espera, `perform(task)` faz. Não sabe quem trabalha: os clones vão chamar as mesmas
-  funções que o fazendeiro (`Farmer.work()` no canteiro mais perto).
+  funções que o fazendeiro. `Bed.WORK_TIME` dá o tempo de cada tarefa; quem trabalha conta o
+  tempo (`Farmer.work()` começa, `work_speed` multiplica) e só então chama `perform`.
 - Produção colhida fica em `main.stock` (via sinal `Bed.harvested`) até existir o Carregar.
 - Renderer: Forward+ (3D, pensando nos assets Synty depois).
 

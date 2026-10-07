@@ -11,6 +11,13 @@ const PLANT := &"plant"
 const WATER := &"water"
 const HARVEST := &"harvest"
 
+## Seconds of work each task takes a worker at speed 1 (tools and traits scale the speed).
+const WORK_TIME := {
+	PLANT: 1.0,
+	WATER: 1.0,
+	HARVEST: 1.0,
+}
+
 const SIZE := 1.6
 const GROW_TIME := 8.0
 const YIELD := 1
@@ -66,7 +73,7 @@ func next_task() -> StringName:
 	return &""
 
 
-## Does `task` if the bed is waiting for it. Returns what the task produced (only a
+## Finishes `task` (the worker has already spent its work time) if the bed is waiting for it. Returns what the task produced (only a
 ## harvest produces anything); a task the bed isn't waiting for does nothing.
 func perform(task: StringName) -> int:
 	if task != next_task():
