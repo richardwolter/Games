@@ -24,6 +24,7 @@ func work_time(_task: StringName) -> float:
 	return 1.0
 
 
-## Finishes `task` (the worker has already spent its work time). Returns what it produced.
-func perform(_task: StringName) -> int:
+## Finishes `task` (the worker `by` has already spent its work time; null when called
+## directly). Returns what it produced.
+func perform(_task: StringName, _by: Worker = null) -> int:
 	return 0

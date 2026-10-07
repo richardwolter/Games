@@ -31,6 +31,8 @@ signal harvested(amount: int)
 
 var state := State.EMPTY
 var grow_left := 0.0
+## How fast the plant grows (a Dedo Verde clone that planted or watered it raises it).
+var grow_rate := 1.0
 
 var _soil_mat: StandardMaterial3D
 var _plant: MeshInstance3D
@@ -59,7 +61,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if state != State.GROWING:
 		return
-	grow_left -= delta
+	grow_left -= delta * grow_rate
 	if grow_left <= 0.0:
 		state = State.RIPE
 	_refresh()
@@ -82,22 +84,28 @@ func next_task() -> StringName:
 	return &""
 
 
-## Finishes `task` (the worker has already spent its work time) if the bed is waiting for it. Returns what the task produced (only a
-## harvest produces anything); a task the bed isn't waiting for does nothing.
-func perform(task: StringName) -> int:
+## Finishes `task` (the worker `by` has already spent its work time) if the bed is waiting
+## for it. Returns what the task produced (only a harvest produces anything); a task the bed
+## isn't waiting for does nothing. The worker's traits can boost growth and the harvest.
+func perform(task: StringName, by: Worker = null) -> int:
 	if task != next_task():
 		return 0
+	var boost := by.grow_boost() if by != null else 1.0
 	match task:
 		PLANT:
 			state = State.PLANTED
+			grow_rate = boost
 		WATER:
 			state = State.GROWING
 			grow_left = GROW_TIME
+			grow_rate = maxf(grow_rate, boost)
 		HARVEST:
+			var amount := YIELD + (by.harvest_bonus() if by != null else 0)
 			state = State.EMPTY
-			harvested.emit(YIELD)
+			grow_rate = 1.0
+			harvested.emit(amount)
 			_refresh()
-			return YIELD
+			return amount
 	_refresh()
 	return 0
 

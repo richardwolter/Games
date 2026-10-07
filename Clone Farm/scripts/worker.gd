@@ -47,10 +47,12 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_think()
-	if is_working():
+	if is_paused():
+		velocity = Vector3.ZERO
+	elif is_working():
 		_advance_work(delta)
 	else:
-		var dir := wanted_move()
+		var dir := wanted_move() * move_mult()
 		velocity.x = dir.x * SPEED
 		velocity.z = dir.z * SPEED
 	move_and_slide()
@@ -66,6 +68,38 @@ func _think() -> void:
 ## a task is going.
 func wanted_move() -> Vector3:
 	return Vector3.ZERO
+
+
+# Hooks a clone's traits override; the farmer has no weak side and keeps the defaults.
+
+## Multiplies walking speed.
+func move_mult() -> float:
+	return 1.0
+
+
+## How fast this worker does `task` (1 = the task's work time as written).
+func task_speed(_task: StringName) -> float:
+	return work_speed
+
+
+## Extra produção this worker gets out of a harvest.
+func harvest_bonus() -> int:
+	return 0
+
+
+## Multiplies how fast a bed grows once this worker planted or watered it.
+func grow_boost() -> float:
+	return 1.0
+
+
+## True while the worker stands still on its own (a clone chatting), task clock stopped.
+func is_paused() -> bool:
+	return false
+
+
+## Called when the work time runs out; does the task.
+func _finish_task() -> void:
+	work_place.perform(work_task, self)
 
 
 ## Starts `place`'s next task (the nearest place in reach when null). The worker walks up
@@ -143,7 +177,7 @@ func _advance_work(delta: float) -> void:
 		return
 	var to := _ground(work_spot - global_position)
 	if to.length() > ARRIVED:
-		var v := to.normalized() * minf(SPEED, to.length() / delta)
+		var v := to.normalized() * minf(SPEED * move_mult(), to.length() / delta)
 		velocity.x = v.x
 		velocity.z = v.z
 		return
@@ -151,9 +185,9 @@ func _advance_work(delta: float) -> void:
 	var target := work_place.global_position
 	target.y = global_position.y
 	look_at(target)
-	work_left -= delta * work_speed
+	work_left -= delta * task_speed(work_task)
 	if work_left <= 0.0:
-		work_place.perform(work_task)
+		_finish_task()
 		cancel_work()
 
 

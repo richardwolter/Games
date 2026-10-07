@@ -13,6 +13,8 @@ const BEDS_AT := Vector3(0.0, 0.0, -4.0)
 const MACHINE_AT := Vector3(5.5, 0.0, 1.0)
 ## Produção at the start, enough for the first clone right away.
 const START_STOCK := 5
+## Traits each new clone rolls (Máquina upgrades will add more).
+const TRAIT_SLOTS := 2
 
 ## What the HUD calls each task (the game speaks Portuguese).
 const TASK_LABELS := {
@@ -34,6 +36,7 @@ var machine: Machine
 var clones: Array[Clone] = []
 ## Harvested produce, spent on clones; trough and sale come with Carregar.
 var stock := START_STOCK
+var rng := RandomNumberGenerator.new()
 
 var _stock_label: Label
 var _hint_label: Label
@@ -41,6 +44,7 @@ var _hint_label: Label
 
 func _ready() -> void:
 	Controls.ensure()
+	rng.randomize()
 	_build_ground()
 	_build_light()
 	_build_beds()
@@ -85,13 +89,14 @@ func _build_machine() -> void:
 	add_child(machine)
 
 
-## Pays for and places a new clone beside the machine, with no role yet.
+## Pays for and places a new clone beside the machine, with random traits and no role.
 func _spawn_clone() -> void:
 	stock -= Machine.COST
 	var clone := Clone.new()
 	clone.name = "Clone%d" % (clones.size() + 1)
 	var row := clones.size() % 3
 	clone.position = MACHINE_AT + Vector3(Machine.SIZE, 1.0, -1.0 + row * 1.0)
+	clone.set_traits(Traits.roll(rng, TRAIT_SLOTS))
 	_dress_worker(clone, Color(0.35, 0.55, 0.90))
 	add_child(clone)
 	clones.append(clone)

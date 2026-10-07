@@ -48,7 +48,7 @@ func work_time(_task: StringName) -> float:
 	return WORK_TIME
 
 
-func perform(task: StringName) -> int:
+func perform(task: StringName, _by: Worker = null) -> int:
 	if task == CLONE and can_afford.call():
 		cloned.emit()
 	return 0

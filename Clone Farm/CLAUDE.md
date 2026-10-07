@@ -37,8 +37,9 @@ no HUD.
 
 **Fase 2, segunda fatia feita:** máquina de clonagem (E, 2 s, custa 3 de produção; começa
 com 5) e clones com função (E no clone, depois 1/2/3/0) que trabalham os canteiros sozinhos
-com as mesmas regras ([decisão](docs/decisoes/2026-10-07-maquina-e-primeiro-clone.md),
-números a confirmar). Ainda sem características, comida, Carregar, reciclar, lojas nem dia.
+com as mesmas regras, cada um com 2 características sorteadas (Apressado, Caprichoso,
+Dedo Verde, Animado) ([decisão](docs/decisoes/2026-10-07-maquina-e-primeiro-clone.md),
+números a confirmar). Ainda sem comida, Carregar, reciclar, lojas nem dia.
 
 ## Design decidido (protótipo 1)
 
@@ -67,8 +68,11 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
   `work_time()`, `perform()`, `half_size()` (o trabalhador fica fora da borda).
 - `scripts/machine.gd` (`Machine`): tarefa `clone`; a fazenda (`main.gd`) diz se dá pra
   pagar e cria o clone no sinal `cloned`.
-- `scripts/clone.gd` (`Clone`): `Worker` com `role`; escolhe o canteiro mais perto que quer
-  a função e que nenhum outro trabalhador pegou.
+- `scripts/clone.gd` (`Clone`): `Worker` com `role` e `traits`; escolhe o canteiro mais perto
+  que quer a função e que nenhum outro trabalhador pegou. Balão mostra o lado ruim.
+- `scripts/traits.gd` (`Traits`): características como dados (modificadores);
+  `combine()` recalcula do zero. O `Worker` tem ganchos (`move_mult`, `task_speed`,
+  `harvest_bonus`, `grow_boost`, `is_paused`, `_finish_task`) que o clone sobrescreve.
 - `scripts/bed.gd` (`Bed`): canteiro vazio → plantado → crescendo → maduro. `next_task()` diz
   o que ele espera, `perform(task)` faz. Não sabe quem trabalha: os clones vão chamar as mesmas
   funções que o fazendeiro. `Bed.WORK_TIME` dá o tempo de cada tarefa.
@@ -84,7 +88,7 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
 
 - `tools/test_smoke.tscn` (headless): a fazenda monta, o fazendeiro anda, e um canteiro faz
   o ciclo inteiro (direto e pelo fazendeiro), a máquina cobra e cria um clone, e o clone
-  com função planta sozinho.
+  com função planta sozinho, e os dois lados de cada característica.
   `Godot --headless --path . res://tools/test_smoke.tscn --quit-after 600`
   O resultado está em `tools/last_test.log`; a última linha tem que ser `smoke: PASS`.
   Erro de script não muda o código de saída: confie no log, não no exit code.

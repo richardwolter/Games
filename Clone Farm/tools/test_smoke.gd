@@ -2,7 +2,7 @@
 ## whole cycle (plant, water, grow, harvest) both called directly and by the farmer, who
 ## steps to a spot beside the bed, is locked there while the work time runs, and cancels
 ## with E again. Then the machine: it costs produção, makes a clone, and a clone given a
-## role works beds on its own.
+## role works beds on its own. Last, each trait's good and bad side.
 ##
 ## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 600
 ##
@@ -81,6 +81,10 @@ func _physics_process(_delta: float) -> void:
 	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
 			+ CLONE_WORK_FRAMES:
 		_check_clone_worked()
+		_check_traits()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
+			+ CLONE_WORK_FRAMES + 3:
+		_check_chat()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
 
@@ -194,6 +198,8 @@ func _check_clone_made() -> void:
 		return
 	var clone: Clone = _main.clones[0]
 	_check(clone.role == &"" and not clone.is_working(), "a new clone has no role and idles")
+	_check(clone.traits.size() == 2 and clone.traits[0] != clone.traits[1],
+			"a new clone has 2 different traits (%s)" % [clone.traits])
 	farmer.global_position = clone.global_position + Vector3(0.5, 0.0, 0.0)
 	_check(farmer.nearest_target() == clone, "E by a clone picks the clone")
 	farmer.interact()
@@ -201,6 +207,7 @@ func _check_clone_made() -> void:
 	farmer.pick_role(1)
 	_check(clone.role == Bed.PLANT and farmer.choosing == null, "1 gives it Plantar")
 	clone.work_speed = 10.0
+	clone.set_traits([])
 	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
 
 
@@ -215,6 +222,69 @@ func _check_clone_worked() -> void:
 	var clone: Clone = _main.clones[0] if not _main.clones.is_empty() else null
 	_check(clone != null and (not clone.is_working() or clone.work_task == Bed.PLANT),
 			"the clone only does its role")
+
+
+var _chatty: Clone
+
+
+## A clone with the given traits, out of the way of the beds, with no role.
+func _test_clone(names: Array[StringName], at: Vector3) -> Clone:
+	var clone := Clone.new()
+	clone.name = "Test" + "_".join(names)
+	clone.set_traits(names)
+	clone.position = at
+	_main.add_child(clone)
+	return clone
+
+
+func _check_traits() -> void:
+	for clone: Clone in _main.clones:
+		clone.set_role(&"")
+	var bed: Bed = _main.beds[2]
+	var far := Vector3(-9.0, 1.0, 8.0)
+
+	var quick := _test_clone([&"apressado"], far)
+	_check(quick.move_mult() > 1.0 and quick.task_speed(Bed.PLANT) > 1.0,
+			"Apressado walks and works faster")
+	quick.roll = func() -> float: return 0.0
+	bed.state = Bed.State.EMPTY
+	quick.work_place = bed
+	quick.work_task = Bed.PLANT
+	quick._finish_task()
+	quick.cancel_work()
+	_check(bed.state == Bed.State.EMPTY and quick.pick_bed() != bed,
+			"Apressado sometimes skips a bed and leaves it for a while")
+
+	var careful := _test_clone([&"caprichoso"], far)
+	_check(careful.task_speed(Bed.PLANT) < 1.0, "Caprichoso works slower")
+	bed.state = Bed.State.RIPE
+	_check(bed.perform(Bed.HARVEST, careful) == Bed.YIELD + 1, "Caprichoso's harvest yields more")
+	var both := _test_clone([&"apressado", &"caprichoso"], far)
+	_check(both.stats.skip == 0.0, "Caprichoso never errs, even when Apressado")
+
+	var green := _test_clone([&"dedo_verde"], far)
+	bed.state = Bed.State.EMPTY
+	bed.perform(Bed.PLANT, green)
+	bed.perform(Bed.WATER)
+	_check(bed.grow_rate > 1.0, "a bed Dedo Verde planted grows faster")
+	_check(green.task_speed(Bed.HARVEST) < 0.5 and green.task_speed(Bed.PLANT) == 1.0,
+			"Dedo Verde harvests very slowly, only that")
+
+	var cheery := _test_clone([&"animado"], far + Vector3(4.0, 0.0, 0.0))
+	var buddy := _test_clone([], far + Vector3(5.0, 0.0, 0.0))
+	var alone := _test_clone([], far)
+	_check(buddy.task_speed(Bed.PLANT) > 1.0 and alone.task_speed(Bed.PLANT) == 1.0,
+			"Animado speeds up clones near it, not far ones")
+	_check(cheery.task_speed(Bed.PLANT) == 1.0, "Animado doesn't speed up itself")
+	cheery._chat_wait = 0.0
+	_chatty = cheery
+
+
+## Animado stops to chat (even with a task going) and shows it.
+func _check_chat() -> void:
+	_check(_chatty.is_chatting() and _chatty.is_paused(), "Animado stops to chat with a clone near it")
+	_check(_chatty._bubble.visible and _chatty._bubble.text.begins_with("conversando"),
+			"the chat shows in a bubble")
 
 func _check(ok: bool, what: String) -> void:
 	if not ok:
