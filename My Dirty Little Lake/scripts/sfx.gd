@@ -35,9 +35,10 @@ const RATE := 22050
 const VOICES := 12
 const UI_VOICES := 3
 
-## The colony's hum at the hive itself, when the lake says the angler is right beside a
-## swarm or a hive ready to harvest (`set_hive_hum`). A built loop, peak-normalised rather than
-## levelled, so this is by ear and not the builder's: about as far under the mix as the bee.
+## The colony's hum, as the hive room's catch step loops it (`HiveSounds`). The lake's own
+## bed of it by the hive is gone (issue #29, 2026-10-06, Richard: "remove the constant
+## buzzing close to the beehive"); the name stays loaded for the room. A built loop,
+## peak-normalised rather than levelled, so this is by ear and not the builder's.
 const HIVE_HUM_DB := -26.0
 
 ## Every recording: its loudness against the others in decibels, and how far its pitch is
@@ -63,7 +64,12 @@ const SOUNDS := {
 	&"ferry_bell": [-20.9, 0.02],
 	&"boat_move": [-15.3, 0.05],
 	&"net_throw": [-11.0, 0.06],
+	## A lucky cast and a double cast (2026-10-06, Richard), each on top of the throw.
+	&"lucky_cast": [-11.0, 0.0],
+	&"double_cast": [-11.0, 0.0],
 	&"net_splash": [-17.8, 0.04],
+	## A landing that caught (issue #29): six mixed takes, the empty landing's level.
+	&"net_land": [-17.8, 0.03],
 	&"piece_splash": [-13.9, 0.0],
 	&"drip": [-14.0, 0.05],
 	&"haul": [-13.0, 0.0],
@@ -88,7 +94,7 @@ const SOUNDS := {
 	## A piece landing in the island crate: three takes of Richard's own recording, one of
 	## which is played per drop. A small roll on top of three real drops, where one take
 	## pitched about needed a whole ladder of steps to stop being a metronome.
-	&"pop": [-21.0, 0.03],
+	&"pop": [-18.0, 0.03],
 	&"drop_small": [-10.2, 0.08],
 	## The second batch (2026-09-28, `/grill-me` with Richard). Every file is levelled to
 	## the same loudness, so these are the mix: the doors a little under the click, the
@@ -101,6 +107,9 @@ const SOUNDS := {
 	&"duck": [-13.0, 0.04],
 	&"geese": [-17.0, 0.03],
 	&"forest": [-18.0, 0.0],
+	## Issue #29 (2026-10-06): the cardinal's song, for the cardinal songbird, played at
+	## `SONGBIRD_DB` on top like the forest takes the other three sing with.
+	&"cardinal": [-18.0, 0.03],
 	&"bee": [-17.0, 0.04],
 	## The hive (2026-09-30): built in code by `HiveSounds` until a recording takes the name.
 	## **Not levelled like everything above**: a built take is peak-normalised to 0.8, which
@@ -176,7 +185,10 @@ const FROG_FRIGHT_ODDS := 1.0 / 3.0
 ## off a fraction of a second in.
 const CHANNELS := {
 	&"net_splash": 2,
+	&"net_land": 2,
 	&"net_throw": 1,
+	&"lucky_cast": 1,
+	&"double_cast": 1,
 	&"haul": 3,
 	&"ferry_bell": 1,
 	&"boat_move": 1,
@@ -199,7 +211,8 @@ const CHANNELS := {
 ## player does (net, money, ferry, crate, steps, interface) stays on SFX. One place decides:
 ## `play` routes each voice by this set, the dedicated players read it too.
 const AMBIENT := [
-	&"frog", &"duck", &"geese", &"forest", &"bee", &"pigeon_fly", &"pigeon_coo",
+	&"frog", &"duck", &"geese", &"forest", &"cardinal", &"crickets", &"bee", &"pigeon_fly",
+	&"pigeon_coo",
 	&"bark", &"sniff", &"wading", &"fireplace", &"lake_ambient", &"rain", &"thunder",
 	# The colony is the world going on; the player's hands in the hive room stay on SFX.
 	&"hive_swarm", &"hive_hum",
@@ -243,6 +256,12 @@ const WHILE_INDOORS := [
 const NET_SPLASH_CAUGHT: Array[float] = [0.62, 0.68, 0.74, 0.81, 0.88, 0.95]
 const NET_SPLASH_EMPTY: Array[float] = [1.0, 1.06, 1.12, 1.18, 1.24, 1.3]
 const EMPTY_SPLASH_DB := -5.0
+## **A landing that caught is a different recording each time** (issue #29, 2026-10-06,
+## Richard: "more variation to the sound of the net splashing when hit the water with
+## objects"): `net_land`'s six takes are the net's splash with another of the lake's
+## recordings laid under it, never the take played last, still on the caught half of the
+## ladder above, and rolled this many decibels either way.
+const LAND_DB_ROLL := 1.5
 
 ## What a catch is answered with: **one swell, then water draining off the mesh**
 ## (2026-09-18, second `/grill-me` the same day, Richard: "too scripted, it feels the same
@@ -322,7 +341,25 @@ const FIRE_DB := -5.5
 const WADE_EVERY := 1.0
 
 ## The held loops. Read from a file each, and each set to loop on the way in.
-const BEDS: Array[StringName] = [&"lake_ambient", &"fireplace"]
+const BEDS: Array[StringName] = [&"lake_ambient", &"fireplace", &"crickets"]
+
+## **Crickets in the late afternoon** (issue #29, 2026-10-06, `/grill-me` with Richard: "a
+## little bit of texture to lake ambient, but it shouldn't be too constant or repetitive").
+## Only once the day's sun is past `CRICKET_FROM` (0 first light, 1 dusk; the loop runs it
+## 0.15 to 0.8, so about a quarter of each loop), and then in spells: a wait of `CRICKET_GAP`,
+## then `CRICKET_SPELL` seconds of the loop from a random point in it, eased in and out over
+## `CRICKET_EASE`. Never in the shed. Ambience bus. All first guesses for Richard's ear.
+const CRICKET_FROM := 0.62
+const CRICKET_GAP := Vector2(15.0, 40.0)
+const CRICKET_SPELL := Vector2(4.0, 10.0)
+const CRICKET_EASE := 1.5
+const CRICKET_DB := -26.0
+
+## **Each dog barks at its own pitch** (issue #29, 2026-10-06), by its pack slot (`Dog.slot`,
+## the breed's rule): dark brown lowest, then yellow, tan-and-white, orange. By size was the
+## ask, and the four sheets are one silhouette (575 px of ink each), so the darker coat
+## takes the deeper voice. `SOUNDS`' own roll rides on top.
+const BARK_PITCHES: Array[float] = [0.94, 1.18, 1.06, 0.82]
 ## How far the lake goes under while the shed is open: heard through its wall.
 const AMBIENCE_DUCK := -14.0
 
@@ -403,9 +440,13 @@ var _fire_player: AudioStreamPlayer
 var _fire_on: bool = false
 var _fire_at: float = SILENT
 ## The colony's hum: the level the lake last asked for and the level it has eased to.
-var _hive_player: AudioStreamPlayer
-var _hive_want: float = SILENT
-var _hive_at: float = SILENT
+var _cricket_player: AudioStreamPlayer
+## Where the day's sun is, pushed by the lake (`set_sun`); under nought, no day.
+var _sun: float = -1.0
+## Seconds until the next spell starts (or, during one, until it eases out).
+var _cricket_wait: float = -1.0
+var _cricket_on: bool = false
+var _cricket_at: float = SILENT
 var _wade_on: bool = false
 ## Who is in the shallows: the angler and any dog, as a set. See `set_wading`.
 var _wading: Dictionary = {}
@@ -471,7 +512,7 @@ func _ready() -> void:
 	_start_player = _player()
 	_ambience_player = _player(_first(&"lake_ambient"), bus_of(&"lake_ambient"))
 	_fire_player = _player(_first(&"fireplace"), bus_of(&"fireplace"))
-	_hive_player = _player(_first(&"hive_hum"), bus_of(&"hive_hum"))
+	_cricket_player = _player(_first(&"crickets"), bus_of(&"crickets"))
 
 
 ## Every voice goes to the SFX bus, which is where the player's slider now is. The lake's
@@ -565,11 +606,7 @@ func _process(delta: float) -> void:
 		ambience_want = AMBIENCE_DB + (AMBIENCE_DUCK if _ambience_duck else 0.0)
 	_ambience_at = _bed(_ambience_player, _ambience_at, ambience_want, delta)
 	_fire_at = _bed(_fire_player, _fire_at, FIRE_DB if _fire_on else SILENT, delta)
-	# The colony. `_bed` asks nothing of where the player is, so the gate is here: behind the
-	# upgrades board and inside the shed the hive is out of earshot like the rest of the lake.
-	# The hive room is outdoors and is not `indoors`, so the hum goes on under it.
-	var hive_want := _hive_want if (not shopping and not indoors) else SILENT
-	_hive_at = _bed(_hive_player, _hive_at, hive_want, delta)
+	_tick_crickets(delta)
 	# The held sounds go quiet with the rest of the lake while the board is up. The ambience
 	# above does not: it is the bed the lake plays under everything, board or no board.
 	# The wading wash: while the boots are moving water, play it, let it finish, wait
@@ -614,7 +651,9 @@ func hush() -> void:
 	_ambience_on = false
 	_ambience_duck = false
 	_fire_on = false
-	_hive_want = SILENT
+	_sun = -1.0
+	_cricket_on = false
+	_cricket_wait = -1.0
 	_wade_on = false
 	_wade_wait = 0.0
 
@@ -670,9 +709,9 @@ func may_play(name: StringName) -> bool:
 ## its backdrop answer the jet. Not on `WHILE_INDOORS` — put there, the lake's real pack,
 ## which goes on barking behind the room, would be let through with them. The room's own
 ## call is what is let through, not the name.
-func room_bark() -> void:
+func room_bark(slot: int = -1) -> void:
 	_from_room = true
-	play_bark()
+	play_bark(slot)
 	_from_room = false
 
 
@@ -736,7 +775,14 @@ func _gap(name: StringName, gap: float) -> bool:
 ## A thrown net landing. `caught` is whether the landing's own sweep took anything, so the
 ## sweep has to have run first. See NET_SPLASH_CAUGHT.
 func play_landing(caught: bool) -> void:
-	if caught:
+	if caught and _count(&"net_land") > 0:
+		play(
+			&"net_land",
+			_rng.randf_range(-LAND_DB_ROLL, LAND_DB_ROLL),
+			_next_pitch(&"net_splash_caught", NET_SPLASH_CAUGHT),
+			next_step(&"net_land", _count(&"net_land"))
+		)
+	elif caught:
 		play(&"net_splash", 0.0, _next_pitch(&"net_splash_caught", NET_SPLASH_CAUGHT))
 	else:
 		play(
@@ -954,6 +1000,21 @@ func play_throw() -> void:
 	play(&"net_throw", 0.0, _next_pitch(&"net_throw", NET_THROW_PITCHES))
 
 
+## What the luck roll made of a cast, on top of its throw (2026-10-06, Richard): the lucky
+## cast's own sound, the double cast's hit, or both when it is both. `double` only when the
+## second net really flies.
+## Neither is rolled in pitch (Richard, same day); the lucky one is played lower, at
+## `LUCKY_PITCH`.
+const LUCKY_PITCH := 0.85
+
+
+func play_luck(lucky: bool, double: bool) -> void:
+	if lucky:
+		play(&"lucky_cast", 0.0, LUCKY_PITCH)
+	if double:
+		play(&"double_cast")
+
+
 ## A piece of rubbish landing in a box. One of three takes of the same drop, never the one
 ## played last: this is a sound the player hears a thousand times, and it has its own
 ## recording rather than the shed's furniture thud pitched down (2026-09-17).
@@ -1150,10 +1211,12 @@ func play_forest() -> void:
 		play(&"forest", 0.0, 1.0, next_step(&"forest", _count(&"forest")))
 
 
-## A songbird within earshot singing: one of the forest's takes, on the songbirds' own gap.
-func play_songbird() -> void:
-	if may_play(&"forest") and _due(&"songbird", SONGBIRD_GAP):
-		play(&"forest", SONGBIRD_DB, 1.0, next_step(&"forest", _count(&"forest")))
+## A songbird within earshot singing, on the songbirds' own gap: a cardinal sings the
+## cardinal's own song (issue #29), the other three one of the forest's takes.
+func play_songbird(species: String = "") -> void:
+	var name := &"cardinal" if species == "cardinal" and _count(&"cardinal") > 0 else &"forest"
+	if may_play(name) and _due(&"songbird", SONGBIRD_GAP):
+		play(name, SONGBIRD_DB, 1.0, next_step(name, _count(name)))
 
 
 ## A songbird flushed within earshot: the pigeon's wings, quieter, on their own gap.
@@ -1168,8 +1231,14 @@ func play_bee() -> void:
 		play(&"bee")
 
 
-func play_bark() -> void:
-	play(&"bark")
+## A bark. `slot` is the dog's pack slot, which picks its voice (`BARK_PITCHES`); under nought,
+## true pitch. `db` is added to the balance, for the faint bark from across the island.
+func play_bark(slot: int = -1, db: float = 0.0) -> void:
+	play(&"bark", db, bark_pitch(slot))
+
+
+static func bark_pitch(slot: int) -> float:
+	return 1.0 if slot < 0 else BARK_PITCHES[posmod(slot, BARK_PITCHES.size())]
 
 
 func play_sniff() -> void:
@@ -1186,17 +1255,48 @@ func set_fireplace(lit: bool) -> void:
 	_fire_on = lit
 
 
-## How loud the colony is where the angler stands, 0 to 1 of `HIVE_HUM_DB`: pushed every
-## frame by the lake off the distance to the hive (1 beside a swarm or a hive ready to harvest,
-## less for a colony at work, nothing for an empty hive or one out of earshot). A share, not
-## decibels, so the lake's falloff is a straight line and this is the one place that turns it
-## into a level. Nought, or anything the ear cannot hear, is silence, and the bed stops.
-func set_hive_hum(share: float) -> void:
-	var loud := clampf(share, 0.0, 1.0)
-	if loud <= 0.0:
-		_hive_want = SILENT
+## Where the day's sun is (`DayCycle.sun`), pushed every frame by the lake: what the crickets
+## wait on. Under nought, no day and no crickets.
+func set_sun(sun: float) -> void:
+	_sun = sun
+
+
+## Whether the crickets may be heard now: a late afternoon on a lake the player is out on.
+func crickets_due() -> bool:
+	return _sun >= CRICKET_FROM and _ambience_on and not indoors
+
+
+## One frame of the crickets: a wait, a spell from a random point in the loop, a wait again.
+## Out of the late afternoon a spell under way eases out and the next wait is rolled afresh.
+func _tick_crickets(delta: float) -> void:
+	if _cricket_player == null or _cricket_player.stream == null:
+		return
+	if not crickets_due():
+		_cricket_on = false
+		_cricket_wait = -1.0
 	else:
-		_hive_want = maxf(HIVE_HUM_DB + linear_to_db(loud), SILENT)
+		if _cricket_wait < 0.0:
+			_cricket_wait = _rng.randf_range(CRICKET_GAP.x, CRICKET_GAP.y)
+		_cricket_wait -= delta
+		if _cricket_wait <= 0.0:
+			_cricket_on = not _cricket_on
+			if _cricket_on:
+				_cricket_wait = _rng.randf_range(CRICKET_SPELL.x, CRICKET_SPELL.y)
+				if not _cricket_player.playing:
+					_cricket_player.volume_db = SILENT
+					_cricket_player.play(
+						_rng.randf_range(0.0, _cricket_player.stream.get_length())
+					)
+			else:
+				_cricket_wait = _rng.randf_range(CRICKET_GAP.x, CRICKET_GAP.y)
+	var want := CRICKET_DB if _cricket_on else SILENT
+	var rate := (CRICKET_DB - SILENT) / CRICKET_EASE
+	_cricket_at = move_toward(_cricket_at, want, rate * delta)
+	if _cricket_at <= SILENT + 0.01:
+		if _cricket_player.playing:
+			_cricket_player.stop()
+		return
+	_cricket_player.volume_db = _cricket_at
 
 
 ## One of the hive's one-shots, for the room and the lake. A name with takes (the puff, the

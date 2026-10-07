@@ -93,7 +93,15 @@ PLAN = {
     # off `--split`'s scratch cuts: takes 5, 18 and 24. The game plays one of the three at
     # random, never the one it played last, so the variety is three real drops rather than one
     # take pitched about — which is why `POP_PITCH` and `POP_PITCHES` went with this change.
-    "pop": ("Object_in_box.wav", ("takes", [(3.040, 3.620), (14.160, 15.140), (20.390, 22.410)])),
+    # Superseded 2026-10-06 (issue #29, `/grill-me` with Richard): the crate's thump is
+    # `Thump_Plastic.wav`, a plastic drop recorded 36 times. Six takes picked by rule off
+    # the onset finder: a clean single hit each (the three whose gap holds a second sound
+    # are left out), spread from the dullest to the brightest by zero crossings over the
+    # first 80 ms. No muffle on this one: its own tone, judged in play.
+    "pop": ("../Thump_Plastic.wav", ("takes", [
+        (7.07, 7.77), (32.98, 33.68), (67.78, 68.48),
+        (74.25, 74.95), (76.82, 77.52), (87.43, 88.13),
+    ])),
     "fireplace": ("Fireplace_On.wav", ("loop", 10.0, 30.0)),
     "step_grass": ("Grass_Steps.wav", ("steps", 0.25, 0.34)),
     "step_sand": ("Sand_Steps.wav", ("steps", 0.3, 0.34)),
@@ -107,8 +115,24 @@ PLAN = {
     # Retired as steps with it: WaterSteps2's drip, Boatmove's tail and Water_Steps.wav.
     "wading": ("WaterSteps3.flac", ("loop", 1.11, 2.2, 0.5)),
     "haul": ("Haul_Sound.wav", ("span", 0.2, 1.8)),
-    "lake_ambient": ("Lake_Ambient.wav", ("loop", 1.0, 236.0)),
+    # Issue #29 (2026-10-06): the old bed carried a splash that recurs and read as the angler
+    # wading in. Richard's new recording replaces it; `Lake_Ambient.wav` is no longer read.
+    "lake_ambient": ("../Ambient_LAke.wav", ("loop", 1.0, 88.0)),
+    # The empty landing keeps the one recording; a landing with a catch picks one of
+    # `net_land`'s takes.
     "net_splash": ("Net_Splash.wav", ("trim", 1.3)),
+    # A net landing with a catch (issue #29, 2026-10-06): six takes, each the net's own
+    # splash with another of the lake's recordings laid in under it, so no two landings in a
+    # row are the same water. Layers are (source, start, end, at, gain), mixed then levelled.
+    "net_land": ("Net_Splash.wav", ("mixes", [
+        [("Net_Splash.wav", 0.0, 1.8, 0.0, 1.0)],
+        [("Net_Splash.wav", 0.0, 1.8, 0.0, 1.0), ("Boatmove_water_steps.wav", 0.0, 0.5, 0.06, 0.7)],
+        [("Net_Splash.wav", 0.0, 1.8, 0.0, 1.0), ("WaterSteps2.wav", 0.12, 0.42, 0.03, 0.8)],
+        [("Net_Splash.wav", 0.0, 1.8, 0.0, 1.0),
+         (NEW + "ESM_Fantasy_Game_Footsteps_Water_2.wav", 0.0, 0.45, 0.0, 1.0)],
+        [("Object_Splash.wav", 0.0, 1.2, 0.0, 1.0), ("Net_Splash.wav", 0.0, 1.8, 0.05, 0.6)],
+        [("Water_Steps.wav", 0.0, 0.4, 0.0, 0.8), ("Net_Splash.wav", 0.1, 1.8, 0.02, 1.0)],
+    ])),
     "game_start": ("NewGame_Continue_Sound.wav", ("trim", 2.8)),
     "piece_splash": ("Object_Splash.wav", ("trim", 1.1)),
     # The catch's pop (2026-10-01): Ben Paramore's bubble from freesound, a 30 ms take,
@@ -159,6 +183,18 @@ PLAN = {
                ("takes", [(15.8, 19.6), (21.2, 22.8), (25.3, 28.2), (46.8, 48.6)])),
     # A bee passing, panned from the left ear to the right (`PAN_SWEEP`).
     "bee": (NEW + "BeeFlyBy_BU01.26.wav", ("trim", 3.1)),
+    # Issue #29 (2026-10-06). The cardinal's song, for the cardinal songbird alone: its
+    # whistled runs and its trills, each a take of its own off the onset finder.
+    "cardinal": ("../Cardinal_Call.wav", ("takes", [
+        (0.40, 4.95), (5.00, 9.55), (9.55, 12.55), (12.55, 18.75), (18.75, 24.60),
+    ])),
+    # Crickets for the late afternoon: one loop, played by the game in short spells from a
+    # random point in it, never as a held bed.
+    "crickets": ("../Crickets.wav", ("loop", 0.4, 14.0, 1.5)),
+    # A lucky cast and a double cast, each on top of the throw (2026-10-06, Richard). The
+    # double's recording is a run of whooshes and then a hit; only the hit, from 1.6 s.
+    "lucky_cast": ("../Lucky_Net_Cast.mp3", ("trim", 1.9)),
+    "double_cast": ("../DoubleNet_Cast.wav", ("span", 1.6, 3.92, 0.4)),
 }
 
 ## Names whose low end is rolled off and whose start is eased in: brought up to level, the
@@ -171,7 +207,8 @@ LOOP_WAV = {"wading"}  # also a plain sound now: the game leaves a gap between p
 SMOOTH = {"step_water"}
 ## Names muffled by a low pass at this many Hz (two one-pole passes): the crate's and the
 ## hold's thud, softened (2026-09-28, Richard: "softer thump, muffle it a little bit").
-MUFFLE = {"pop": 2500.0}
+## (`pop` was here at 2500 Hz for Object_in_box; Thump_Plastic is not muffled, 2026-10-06.)
+MUFFLE = {}
 SMOOTH_HZ = 500.0
 SMOOTH_IN = 0.03
 ## The faintest onset in a footstep take that is still a footstep, against the loudest.
@@ -413,6 +450,27 @@ def takes(samples, spans):
     return out
 
 
+def mixed(layers, cache):
+    """Layers of recordings summed into one take: (source, start_s, end_s, at_s, gain).
+    Each layer gets a short fade either end so a cut into the middle of a sound does not
+    click; the sum is trimmed to its own tail like a take."""
+    parts = []
+    for source, a_s, b_s, at_s, gain in layers:
+        if source not in cache:
+            cache[source] = decode(os.path.join(SRC, source))
+        parts.append((fade(cut(cache[source], a_s, b_s), 0.002, FADE_OUT), at_s, gain))
+    frames = max(int(at * RATE) + len(clip) // 2 for clip, at, _g in parts)
+    acc = [0.0] * (frames * 2)
+    for clip, at_s, gain in parts:
+        base = int(at_s * RATE) * 2
+        for i, v in enumerate(clip):
+            acc[base + i] += v * gain
+    loudest = max(abs(v) for v in acc) or 1.0
+    scale = min(1.0, 32000.0 / loudest)
+    out = array.array("h", (int(v * scale) for v in acc))
+    return takes(out, [(0.0, frames / RATE)])[0]
+
+
 def steps(samples, rel, most_s):
     env = envelope(samples, 0.01)
     peak = max(env)
@@ -562,6 +620,9 @@ def main():
             cuts = [(name, fade(clip, SMOOTH_IN if name in SMOOTH else FADE_IN, out_s), "wav")]
         elif kind == "peak":
             cuts = [(name, from_peak(samples, how[1]), "wav")]
+        elif kind == "mixes":
+            cuts = [("%s_%d" % (name, i + 1), mixed(layers, cache), "wav")
+                    for i, layers in enumerate(how[1])]
         elif kind == "takes":
             cuts = [("%s_%d" % (name, i + 1), s, "wav")
                     for i, s in enumerate(takes(samples, how[1]))]

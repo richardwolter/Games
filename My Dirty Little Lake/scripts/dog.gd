@@ -648,9 +648,9 @@ func _speak(what: StringName, far: bool = false) -> void:
 	if what == &"sniff":
 		sound.play_sniff()
 	elif far:
-		sound.play(&"bark", FAR_DB)
+		sound.play_bark(slot, FAR_DB)
 	else:
-		sound.play_bark()
+		sound.play_bark(slot)
 
 
 ## Pushed clear of the angler. Sideways off their walk when they are moving, so a dog in

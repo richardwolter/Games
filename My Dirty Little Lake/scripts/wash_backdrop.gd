@@ -506,7 +506,7 @@ func sprayed_at(point: Vector2) -> void:
 			_bark_in = BARK_GAP
 			var sound := Sfx.main()
 			if sound != null:
-				sound.room_bark()
+				sound.room_bark(dog.slot)
 
 
 # --- Ferries -----------------------------------------------------------------------------

@@ -74,14 +74,20 @@ var sfx: Sfx
 
 ## Pieces in the air, as `{def, from, lead, to, follow, tag, age, wait, spin, lift}`.
 var _flying: Array = []
-## How many of `_flying` are drawn. See `SHOWN_MOST`.
+## How many throws into the island crate are in the air and drawn now. See `SHOWN_MOST`.
 var _shown := 0
 
 ## The most throws into the island crate drawn in the air at once (2026-10-05, Richard: a
 ## maxed lucky double stuttered). A catch past it still flies — same timing, same landing,
 ## same sale — it is just not drawn: nobody counts the hundred-and-thirtieth piece of a
 ## heap in the air, and every one drawn is a few microseconds of script a frame. Throws to a
-## hull or a pier are always drawn: those are a handful.
+## hull or a pier are always drawn and are not counted.
+##
+## **Decided as a piece leaves the hand, not when it is queued** (2026-10-06, Richard:
+## "sometimes objects are not showing flying from player to box"). Decided at the queue, a
+## volley's tail was hidden although the head had long landed by the time it flew, and a
+## ferry loading at the same moment counted against the crate's throws, so a catch of a
+## dozen could go up unseen.
 const SHOWN_MOST := 48
 
 ## When the last pop was heard, on the engine's own clock. A stamp rather than a countdown
@@ -159,11 +165,10 @@ func send(
 		Vector2.ZERO if follow != null
 		else Vector2(_rng.randf_range(-reach.x, reach.x), _rng.randf_range(-reach.y, reach.y))
 	)
-	var hidden := tag == null and _shown >= SHOWN_MOST
-	if not hidden:
-		_shown += 1
 	_flying.append({
-		"hidden": hidden,
+		# Whether it is drawn, decided the frame it leaves the hand (`_launch`).
+		"hidden": false,
+		"started": false,
 		"def": def_index,
 		# Held as an offset from whatever it is coming off, so it goes on coming off it.
 		"from": from - lead.position if lead != null else from,
@@ -292,11 +297,13 @@ func _process(delta: float) -> void:
 		if float(piece["wait"]) > 0.0:
 			piece["wait"] = float(piece["wait"]) - delta
 			continue
+		if not bool(piece["started"]):
+			_launch(piece)
 		piece["age"] = float(piece["age"]) + delta
 		if float(piece["age"]) >= FLIGHT:
 			_pop(piece["tag"])
 			arrived.emit(int(piece["def"]), piece["tag"])
-			if not piece["hidden"]:
+			if _counted(piece):
 				_shown -= 1
 			_flying.remove_at(i)
 			landing = landing or _into_box(piece["tag"])
@@ -307,6 +314,23 @@ func _process(delta: float) -> void:
 	if _flying.is_empty():
 		set_process(false)
 	queue_redraw()
+
+
+## A piece leaving the hand: a throw into the crate is drawn while fewer than `SHOWN_MOST`
+## of them are in the air and drawn.
+func _launch(piece: Dictionary) -> void:
+	piece["started"] = true
+	if piece["tag"] != null:
+		return
+	if _shown >= SHOWN_MOST:
+		piece["hidden"] = true
+	else:
+		_shown += 1
+
+
+## Whether a piece holds one of `_shown`'s places.
+static func _counted(piece: Dictionary) -> bool:
+	return bool(piece["started"]) and piece["tag"] == null and not bool(piece["hidden"])
 
 
 ## The knock of a piece hitting the pile, no more than once every `POP_GAP`.

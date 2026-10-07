@@ -357,9 +357,6 @@ const HIVE_REFILL_LEAST := 5.0
 const HIVE_HOSTS_FULL := 40.0
 ## The gate and the refill are asked this often, in seconds: nothing about them is quick.
 const HIVE_TICK := 1.0
-## The colony's hum at the hive, as a share of `Sfx.HIVE_HUM_DB`: loudest while there is
-## something to do there (a swarm, a harvest), half while the colony is just living in it.
-const HIVE_HUM_BUSY := 0.5
 
 ## How art is sized when it is floating in the lake.
 ##
@@ -2717,16 +2714,21 @@ func _face_the_net() -> void:
 ## throws the second net at a spot near the first with rubbish on it — none found, no
 ## second net: luck that lands on bare water is a net thrown at nothing.
 func _roll_luck(where: Vector2) -> void:
+	var lucky := false
 	if _luck_rng.randf() < lucky_chance():
 		_net.luck_power = 1
 		_net.luck_hold = LUCKY_EXTRA
-	if _net2 == null or _net2.state != CastNet.State.IDLE:
-		return
-	if _luck_rng.randf() >= double_cast_chance():
-		return
-	var spot := _double_spot(Iso.world_to_tile(where))
-	if spot != Vector2.INF:
-		_net2.cast_to(Iso.tile_to_world(spot.x, spot.y))
+		lucky = true
+	var double := false
+	if (_net2 != null and _net2.state == CastNet.State.IDLE
+			and _luck_rng.randf() < double_cast_chance()):
+		var spot := _double_spot(Iso.world_to_tile(where))
+		if spot != Vector2.INF:
+			_net2.cast_to(Iso.tile_to_world(spot.x, spot.y))
+			double = true
+	# Heard on top of the throw (2026-10-06, Richard).
+	if _sfx != null and (lucky or double):
+		_sfx.play_luck(lucky, double)
 
 
 ## Somewhere for the second net to land: a tile within `DOUBLE_NEAR` of the first net's
@@ -3035,25 +3037,12 @@ func _mark_swarm_seen() -> void:
 		_hive.moment_seen = true
 
 
-## The colony's hum, every frame: silent while the hive is empty, and otherwise its share
-## (full for a swarm or a harvest waiting, `HIVE_HUM_BUSY` for a colony just living there)
-## falling off with the angler's distance from the entrance over the dogs' hearing.
-func _push_hive_hum() -> void:
-	if _sfx == null:
-		return
-	var share := 0.0
-	if _hive != null and Hive.tile != Vector2.INF:
-		var loud := 0.0
-		match _hive.stage:
-			Hive.Stage.SWARM, Hive.Stage.READY, Hive.Stage.SETTLE:
-				loud = 1.0
-			Hive.Stage.BUSY, Hive.Stage.DONE:
-				loud = HIVE_HUM_BUSY
-		if loud > 0.0:
-			var ear := Iso.tile_to_world(_angler.tile_pos.x, _angler.tile_pos.y)
-			var gap := ear.distance_to(_hive.position + _hive.entrance_point())
-			share = loud * clampf(1.0 - gap / Iso.tile_circle_extent(Dog.HEAR), 0.0, 1.0)
-	_sfx.set_hive_hum(share)
+## The day's sun to the sound board, every frame: the crickets wait on the late afternoon.
+## (This was the hive's hum by distance until issue #29, 2026-10-06: the lake no longer
+## hums by the hive in any stage, by Richard's call. The gold mark says what is to do.)
+func _push_sun() -> void:
+	if _sfx != null:
+		_sfx.set_sun(_day.sun if _day != null else -1.0)
 
 
 ## Zoom by a factor, keeping the world point under the cursor under the cursor.
@@ -5859,10 +5848,10 @@ func _process(delta: float) -> void:
 	_haul_count_step()
 	_achievements_step(delta)
 	# The hive's lamp, here and not in a draw callback (the pump's is set from the hut's draw
-	# and can land a frame late), and its hum.
+	# and can land a frame late).
 	if _hive != null:
 		_hive.lit = _at_hive() and not _menu_open and not _hive_open
-	_push_hive_hum()
+	_push_sun()
 	if _net2 != null:
 		_net2.visible = _net2.state != CastNet.State.IDLE
 	_face_the_net()

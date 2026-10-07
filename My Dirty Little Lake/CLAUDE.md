@@ -969,7 +969,7 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
   lake before the grime sets in again"). The map is presence-only, and most casts lift the top
   piece off a stack with junk still under it, so most casts moved no water at all. Now every
   sweep that takes something (`CastNet.swept`, one per sweep, after its `caught`s) opens a
-  patch of clean water at the mouth: the mouth's own extent plus `PATCH_REACH` (3) tiles in
+  patch of clean water at the mouth: the mouth's own extent plus `PATCH_REACH` (0.5) tiles in
   proportion to how much of the hold it took, opening over `PATCH_IN` (0.4 s, the closing
   run backwards), whole for `PATCH_HOLD` of `PATCH_LIFE` (4 s) and then closing, both ends
   eased. **The numbers here were wrong until 2026-09-16**: this note said 8 patches, 5 s
@@ -6139,6 +6139,42 @@ levelled like the rest; `SOUNDS` holds the mix. All spans, levels and gaps are f
 - Bus only, by decision: no level, gap or indoors/shopping gating moved. Ambience at zero now
   also silences thunder, accepted. `test_lake`'s `_check_buses` guards the split.
 
+### The Issue #29 Sound Pass (2026-10-06, `/grill-me` with Richard)
+Four new recordings in `art_source/` (not `SFX/`, so `PLAN` names them `../`), cut by
+`tools/build_sfx.py`. **Supersedes** the crate's three `Object_in_box` takes and its
+`MUFFLE` (The crate's thud, above), `Lake_Ambient.wav` as the bed, and the lake's hive hum
+(The Beehive). All levels and gaps are first guesses for Richard's ear.
+- **The crate's thump is `Thump_Plastic.wav`**, six takes (`pop_1`..`6`) picked by rule:
+  single clean hits (three takes whose gap held a second sound left out), spread dull to
+  bright by zero crossings over the first 80 ms. Not muffled. Never the take played last.
+- **A catching landing is `net_land`**, six takes built by a new `mixes` cut: the net's
+  splash with another lake recording laid under it (the boat's push, a WaterSteps2 splash,
+  the puddle step, Object_Splash leading, Water_Steps leading), each levelled. Never the
+  take before, on the caught pitch ladder, rolled `LAND_DB_ROLL` (1.5 dB). The empty landing
+  keeps `net_splash`.
+- **The bed is `Ambient_LAke.wav`** (an 88 s loop): the old one carried a recurring splash
+  that read as the angler wading in.
+- **The cardinal sings `Cardinal_Call.wav`** (`cardinal_1`..`5`, its whistled runs and
+  trills); `Sfx.play_songbird(species)` gives the other three songbirds the forest takes.
+- **Crickets in the late afternoon only** (`crickets` loop, `Sfx.CRICKET_*`): with the sun
+  past `CRICKET_FROM` 0.62 (`Lake._push_sun` every frame), spells of 4-10 s from a random
+  point in the loop, eased in and out, 15-40 s apart, at -26 dB. Not in the shed.
+- **Each dog barks at its own pitch** (`Sfx.BARK_PITCHES` by slot, `bark_pitch`): dark brown
+  0.82, yellow 0.94, tan-and-white 1.06, orange 1.18. "By size" was the ask, but the four
+  sheets are one silhouette, so the darker coat has the deeper voice. Far barks and the
+  wash room's hounds use it too.
+- **No hum on the lake by the hive in any stage**: `Lake._push_hive_hum`, `HIVE_HUM_BUSY`,
+  `Sfx.set_hive_hum` and its bed player are deleted. The gold mark is the cue. The room's
+  catch-step buzz and the bees at flowers stay.
+- **A lucky or double cast sounds on top of the throw** (same day, second pass):
+  `lucky_cast` (`Lucky_Net_Cast.mp3`) when the roll makes the cast lucky, `double_cast`
+  (`DoubleNet_Cast.wav` from 1.6 s, its final hit only) when the second net really flies,
+  both when both (`Sfx.play_luck`, from `Lake._roll_luck`). SFX bus, own players, -11 dB, no pitch roll on either, the lucky one at `LUCKY_PITCH` 0.85.
+- **The crate's thump came up 3 dB** (`SOUNDS[&"pop"]` -21 to -18).
+- `test_lake`'s `_check_issue_29_sounds` guards the six takes of both, no repeat, the
+  cardinal, the crickets' hours and spells, four distinct bark pitches; the hive stage
+  guards the hum being gone.
+
 ### Four End-Game Fixes (2026-10-05, `/grill-me` with Richard)
 - **A piece lifted off the dry beach throws sand, not a crown** (`CastNet._take_from`,
   `SAND_PUFF`, `CastNet.dust` = the lake's `KickDust`): a `grid.dry` tile puffs whole-pixel
@@ -7688,7 +7724,7 @@ overlay logs every frame over 20 ms to `user://last_frames.log` with the rebuild
 - `LakeGrid._settle_shoves` restamped every shoved tile every frame as it drifted back, about 300 on a maxed haul, ~3 ms. Now a tile is restamped only once its offset moved `SHOVE_STAMP` (0.5 world px) since it was drawn (`_stamp_shove`, `_shove_drawn`).
 - `shove_to` asked `_shoved.has()` per piece (a list of 300); now a flag array (`_is_shoved`).
 - `CastNet._shove_aside` went through `_reach`, which runs the exact drawing-touch test on every tile and sorts the result, twice when the net is full; ~1-2 ms per net per frame. It walks the tiles itself now, cut by the same distance it already used (`_shove_one`). Behaviour: a piece is pushed when its middle is inside the mouth plus `SHOVE_CLEAR`, no longer also asking that its drawing touch the mouth; the same pieces in practice.
-- **Caps on huge catches, by Richard's call ("subtle thinning OK")**: `WaterSplash.CROWNS_MOST` 24 crowns on the water at once (`CROWNS_HEAVY` 32 for a piece at `HEAVY_FROM` 0.6 strength); `LakeGrid.RISING_MOST` 48 tiles rising after a take, past it the piece under is simply there; `Haul.SHOWN_MOST` 48 throws into the island crate drawn in the air, past it a piece flies undrawn with the same timing, landing and sale (hull and pier throws always drawn). An ordinary cast meets none of them.
+- **Caps on huge catches, by Richard's call ("subtle thinning OK")**: `WaterSplash.CROWNS_MOST` 24 crowns on the water at once (`CROWNS_HEAVY` 32 for a piece at `HEAVY_FROM` 0.6 strength); `LakeGrid.RISING_MOST` 48 tiles rising after a take, past it the piece under is simply there; `Haul.SHOWN_MOST` 48 throws into the island crate drawn in the air, past it a piece flies undrawn with the same timing, landing and sale (hull and pier throws always drawn). **Decided as each piece leaves the hand and counting the crate's throws only** (2026-10-06, Richard: "sometimes objects are not showing flying from player to box"): decided at the queue, a volley's tail stayed hidden after its head had landed, and a ferry loading from the crate (up to 64 tagged throws) counted against the cap and hid a whole catch. An ordinary cast meets none of them.
 After, two runs each: plain far 7.7 ms mean, **0 frames over**; lucky double far 9.3-9.7 mean, p99 16.5-16.6, **0.7-0.8% over** (was 20%). Near lucky double (`BENCH_CAST BENCH_BIG`) before the last two fixes 11.4 / 3.2%. All caps first guesses for Richard's eye.
 
 Measured 2026-09-11, RTX 5060 Ti: 15.0 ms -> 2.2 ms mean standing, worst walking frame

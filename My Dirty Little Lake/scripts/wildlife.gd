@@ -2399,7 +2399,7 @@ func _bird_step(s: Dictionary, delta: float, seen: PackedVector2Array) -> void:
 			_bird_away(s, p)
 			break
 	if hears(at) and Sfx.main() != null and _rng.randf() < delta * 0.5:
-		Sfx.main().play_songbird()
+		Sfx.main().play_songbird(String(s["species"]))
 	match int(s["pose"]):
 		Pose.IDLE:
 			if s.has("cue"):

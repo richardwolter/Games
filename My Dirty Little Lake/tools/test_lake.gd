@@ -1850,7 +1850,7 @@ func _stage_dog_manners(dogs: Array) -> void:
 	_check(src.find("static var _voice_next") < 0 and src.find("var _voice_next") >= 0,
 		"the voice gap is each dog's own", "")
 	_check(Dog.VOICE_GAP_MOST < 18.0, "and shorter than it was", "%.0f" % Dog.VOICE_GAP_MOST)
-	_check(src.find("play(&\"bark\", FAR_DB)") >= 0 and Dog.FAR_DB < -8.0, "a far bark is played faint", "")
+	_check(src.find("play_bark(slot, FAR_DB)") >= 0 and Dog.FAR_DB < -8.0, "a far bark is played faint", "")
 	if Sfx.main() != null:
 		var two := dogs[1] as Dog
 		dog.set(&"_voice_next", 0.0)
@@ -6164,6 +6164,43 @@ func _check_audio_pass(sound: Sfx) -> void:
 		var off: Vector2 = (piece["to"] as Vector2) - Vector2(200.0, 0.0)
 		inside = inside and absf(off.x) <= Haul.BOX_SCATTER.x and absf(off.y) <= Haul.BOX_SCATTER.y
 	_check(inside, "a piece thrown into the crate lands inside its mouth", "")
+	# The draw cap is decided as a piece leaves the hand and counts the crate's throws only
+	# (2026-10-06): a long volley's tail is drawn once its head has landed, and a ferry
+	# loading at the same moment hides nothing of a catch.
+	var cap_haul := Haul.new()
+	cap_haul.grid = _grid
+	add_child(cap_haul)
+	var hull_tag := Node2D.new()
+	add_child(hull_tag)
+	for i in 64:
+		cap_haul.send(arted, Vector2.ZERO, Vector2(0.0, 300.0), i, 64, null, hull_tag)
+	for i in 12:
+		cap_haul.send(arted, Vector2.ZERO, Vector2(200.0, 0.0), i, 12)
+	for _f in 40:
+		cap_haul._process(1.0 / 60.0)
+	var crate_hidden := 0
+	for piece: Dictionary in cap_haul.get(&"_flying"):
+		if piece["tag"] == null and bool(piece["hidden"]):
+			crate_hidden += 1
+	_check(crate_hidden == 0, "a ferry loading hides none of a catch's throws", "%d hidden" % crate_hidden)
+	cap_haul.land_all()
+	var long_volley := 120
+	for i in long_volley:
+		cap_haul.send(arted, Vector2.ZERO, Vector2(200.0, 0.0), i, 1)
+	var drawn := 0
+	var most_aloft := 0
+	for _f in 900:
+		cap_haul._process(1.0 / 60.0)
+		most_aloft = maxi(most_aloft, int(cap_haul.get(&"_shown")))
+		for piece: Dictionary in cap_haul.get(&"_flying"):
+			if bool(piece["started"]) and not bool(piece["hidden"]) and not piece.has("seen"):
+				piece["seen"] = true
+				drawn += 1
+	_check(drawn == long_volley and most_aloft <= Haul.SHOWN_MOST,
+		"a long volley at the stagger is drawn to its last piece, the cap only holding the air",
+		"%d of %d drawn, %d aloft at most" % [drawn, long_volley, most_aloft])
+	cap_haul.queue_free()
+	hull_tag.queue_free()
 	var lone: Dictionary = (box_haul.get(&"_flying") as Array)[0]
 	lone["age"] = Haul.FLIGHT * (Haul.LAND_FROM + 0.1)
 	lone["wait"] = 0.0
@@ -6179,17 +6216,17 @@ func _check_audio_pass(sound: Sfx) -> void:
 	_check(Angler.HAND_HEIGHT < 0.45, "the rope leaves the angler's chest, not the neck",
 		"%.2f" % Angler.HAND_HEIGHT)
 
-	# The crate's thud is its own recording, in three takes, one of which is played per drop
-	# and never the one played last (2026-09-17). The shed's furniture thud is untouched and
-	# is still its own file.
-	_check(sound.call(&"_count", &"pop") == 3,
-		"the crate's thud loaded its three takes", "%d" % sound.call(&"_count", &"pop"))
+	# The crate's thud is its own recording, in six takes of Thump_Plastic since issue #29
+	# (2026-10-06), one of which is played per drop and never the one played last. The shed's
+	# furniture thud is untouched and is still its own file.
+	_check(sound.call(&"_count", &"pop") == 6,
+		"the crate's thud loaded its six takes", "%d" % sound.call(&"_count", &"pop"))
 	_check(sound._first(&"pop") != sound._first(&"drop_big"),
 		"and the shed's furniture thud is still a recording of its own", "")
 	var repeated := false
 	var picked := -1
 	for i in 40:
-		var step := int(sound.call(&"next_step", &"pop", 3))
+		var step := int(sound.call(&"next_step", &"pop", 6))
 		if step == picked:
 			repeated = true
 		picked = step
@@ -6222,6 +6259,7 @@ func _check_audio_pass(sound: Sfx) -> void:
 		"a landing on bare water steps the empty ladder alone", "")
 	sound.play_landing(true)
 	_check(steps.has(&"net_splash_caught"), "and one that caught steps the other", "")
+	_check_issue_29_sounds(sound)
 	var net_source := FileAccess.get_file_as_string("res://scripts/net.gd")
 	var sweep_at := net_source.find("_sweep(true)")
 	var landing_at := net_source.find("sfx.play_landing(")
@@ -10827,34 +10865,12 @@ func _stage_hive() -> void:
 		"an old save mid-ceremony reads as a caught colony, an old harvest as a harvest", "")
 	mapped.free()
 
-	# The hum: loud by a ready hive, silent far off, silent behind the shop and in the shed.
+	# No hum on the lake by the hive in any stage (issue #29, 2026-10-06): the bed and the
+	# lake's push of it are gone, and the room's catch step keeps its own loop of the buzz.
 	if sound != null:
-		_main.call(&"_push_hive_hum")
-		_check(float(sound.get(&"_hive_want")) > Sfx.SILENT, "the colony hums beside a ready hive", "")
-		_angler.tile_pos = room_mid + Vector2(12.0, 12.0)
-		_main.call(&"_push_hive_hum")
-		_check(float(sound.get(&"_hive_want")) <= Sfx.SILENT, "and not out of earshot", "")
-		var shopping_was := sound.shopping
-		var indoors_was := sound.indoors
-		var hum: AudioStreamPlayer = sound.get(&"_hive_player")
-		sound.set_hive_hum(1.0)
-		sound.indoors = true
-		sound.shopping = false
-		sound.call(&"_process", 10.0)
-		var in_shed := float(sound.get(&"_hive_at")) <= Sfx.SILENT + 0.01 and (hum == null or not hum.playing)
-		sound.indoors = false
-		sound.shopping = true
-		sound.call(&"_process", 10.0)
-		var in_shop := float(sound.get(&"_hive_at")) <= Sfx.SILENT + 0.01 and (hum == null or not hum.playing)
-		sound.shopping = false
-		sound.call(&"_process", 10.0)
-		var by_it := float(sound.get(&"_hive_at")) > Sfx.SILENT
-		_check(in_shed and in_shop and by_it, "the hum is silent in the shed and behind the shop, and heard out by the hive",
-			"shed %s shop %s out %s" % [in_shed, in_shop, by_it])
-		sound.set_hive_hum(0.0)
-		sound.call(&"_process", 10.0)
-		sound.shopping = shopping_was
-		sound.indoors = indoors_was
+		_check(not sound.has_method(&"set_hive_hum") and not _main.has_method(&"_push_hive_hum")
+				and sound.get(&"_hive_player") == null,
+			"the lake does not hum by the hive", "")
 		var unbuilt: Array[StringName] = []
 		for name: StringName in HiveSounds.BOOT:
 			if int(sound.call(&"_count", name)) < 1:
@@ -11836,6 +11852,77 @@ func _check_wash_sizes() -> void:
 
 ## 2026-10-05: a piece lifted off the dry beach throws sand, not a crown; the last thirty
 ## are marked with grouped arrows, and a shrinking mark is no rebuild.
+## Issue #29 (2026-10-06): the catch's landing takes, the cardinal's own song, the late
+## afternoon's crickets and a voice for every dog.
+func _check_issue_29_sounds(sound: Sfx) -> void:
+	_check(int(sound.call(&"_count", &"net_land")) == 6,
+		"a landing that caught has six takes of its own", "%d" % sound.call(&"_count", &"net_land"))
+	var heard: Array[String] = []
+	var took := func(path: String, _db: float, _pitch: float) -> void: heard.append(path)
+	sound.played.connect(took)
+	for i in 6:
+		sound.play_landing(true)
+	var repeats := 0
+	for i in range(1, heard.size()):
+		if heard[i] == heard[i - 1]:
+			repeats += 1
+	_check(heard.size() == 6 and repeats == 0 and heard[0].contains("net_land"),
+		"and no catching landing repeats the one before", str(heard))
+	heard.clear()
+	sound.set(&"_next_due", {})
+	sound.play_songbird("cardinal")
+	var cardinal_sang := heard.size() == 1 and heard[0].contains("cardinal")
+	sound.set(&"_next_due", {})
+	sound.play_songbird("sparrow")
+	var sparrow_sang := heard.size() == 2 and heard[1].contains("forest")
+	sound.played.disconnect(took)
+	_check(int(sound.call(&"_count", &"cardinal")) >= 3 and cardinal_sang and sparrow_sang,
+		"a cardinal sings its own song and the other songbirds the woods'", str(heard))
+	# Crickets: none in the morning, spells in the late afternoon, none in the shed.
+	var ambience_was: bool = sound.get(&"_ambience_on")
+	sound.set(&"_ambience_on", true)
+	sound.set_sun(0.3)
+	sound.set(&"_cricket_wait", 0.01)
+	sound.call(&"_tick_crickets", 1.0)
+	var morning := not bool(sound.get(&"_cricket_on")) and not sound.crickets_due()
+	sound.set_sun(0.7)
+	sound.set(&"_cricket_wait", 0.01)
+	sound.call(&"_tick_crickets", 0.05)
+	var afternoon := bool(sound.get(&"_cricket_on"))
+	sound.indoors = true
+	var indoors := not sound.crickets_due()
+	sound.indoors = false
+	_check(morning and afternoon and indoors and Sfx.CRICKET_SPELL.y < Sfx.CRICKET_GAP.x,
+		"crickets come in spells shorter than their gaps, late afternoon only, never in the shed",
+		"morning %s afternoon %s indoors %s" % [morning, afternoon, indoors])
+	sound.set_sun(-1.0)
+	sound.call(&"_tick_crickets", 10.0)
+	sound.set(&"_ambience_on", ambience_was)
+	var pitches := {}
+	for slot in DogArt.BREEDS.size():
+		pitches[Sfx.bark_pitch(slot)] = true
+	_check(pitches.size() == DogArt.BREEDS.size() and is_equal_approx(Sfx.bark_pitch(-1), 1.0),
+		"every dog in the pack barks at its own pitch", str(pitches.keys()))
+	# A lucky and a double cast each have a sound on top of the throw, both when both, and
+	# the double's only once its second net flies (2026-10-06).
+	var luck_heard: Array[String] = []
+	var luck_took := func(path: String, _db: float, _pitch: float) -> void: luck_heard.append(path)
+	sound.played.connect(luck_took)
+	sound.play_luck(false, false)
+	var none := luck_heard.is_empty()
+	sound.play_luck(true, true)
+	sound.played.disconnect(luck_took)
+	_check(none and luck_heard.size() == 2 and luck_heard[0].contains("lucky_cast")
+			and luck_heard[1].contains("double_cast"),
+		"a lucky and a double cast each sound on top of the throw", str(luck_heard))
+	var lake_source := FileAccess.get_file_as_string("res://scripts/lake.gd")
+	var roll_at := lake_source.find("func _roll_luck")
+	var fly_at := lake_source.find("_net2.cast_to(", roll_at)
+	var said_at := lake_source.find("play_luck(lucky, double)", roll_at)
+	_check(roll_at >= 0 and fly_at > roll_at and said_at > fly_at,
+		"and the double's sound waits for the second net to fly", "")
+
+
 func _check_end_fixes() -> void:
 	var splash: WaterSplash = _net.splash
 	var dust: KickDust = _net.dust
