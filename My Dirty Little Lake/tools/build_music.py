@@ -31,7 +31,7 @@ PLAN = {
     "save_me": ("Save ME #sketch.mp3", None, True, True),
     "goin": ("Goin (edit2)#2.2.mp3", None, True, True),
     "indie_boi": ("INDIE BOI #sketch.mp3", None, True, True),
-    "habibs": ("Habibs 2#1.mp3", None, True, True),
+    "habibs": ("Habibs 3 #4.2.mp3", None, True, True),
 }
 
 # Trailing silence under this is taken off the end.

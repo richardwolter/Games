@@ -71,7 +71,7 @@ const GAIN_DB := {
 	&"save_me": -0.7,
 	&"goin": 0.0,
 	&"indie_boi": 1.6,
-	&"habibs": -2.7,
+	&"habibs": -2.4,
 }
 
 ## Under this a player is not heard at all: a song that is not the one playing, or the one

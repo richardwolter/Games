@@ -5834,6 +5834,9 @@ purpose. What the audit settled, against the shipped design:
   `assets/audio/` describes a hand-off, and the hand-off is `art_source/SFX` at 24-bit
   96 kHz, which exceeds it. What the game imports is 16-bit 44.1 kHz in `assets/sfx/` and
   `assets/music/`, by design.
+- **The SFX side of #1 is done** (2026-10-07, Richard: "done with the audio assets and
+  application of them"). Everything since the audit is a recording in `assets/sfx/` or a
+  written decision below. **#1 stays open only for Nuven's mastered songs**; see The Music.
 
 - **Every cut is levelled, and `SOUNDS` is the mix** (2026-09-16, `tools/build_sfx.py`
   `loudness`/`level`, report in `tools/last_sfx.log`): the takes were delivered up to twenty
@@ -6266,6 +6269,19 @@ menu's own player (both gone, with `%Music` in both scenes and `assets/music_goi
   baked file, not a bus, because the web export runs no bus effects.
 - **Pipeline**: songs stay in `art_source/Music`; `python tools/build_music.py` writes
   `assets/music/` (35 MB). **Reimport after a re-run.**
+- **Habibs is an interim take, 3 #4.2** (2026-10-07, `/grill-me` with Richard, issue #1):
+  `art_source/Music/Habibs 3 #4.2.mp3`, 170 s built, -8.7 LUFS, so `GAIN_DB` -2.4 (was
+  -2.7); beat grid re-measured, 144 BPM, offset 0.3819. **The game only**: `Habibs 2#1.mp3`
+  stays beside it because every trailer cut (`shots.json`, `shots2.json`,
+  `shots_vertical.json`, 143.55 BPM, song in at 4.0 s) reads it by name. Don't delete it.
+- **Nuven's mixed and mastered songs are owed** (expected the week of 2026-10-12, issue #1
+  stays open for them). When they land: ask for **24-bit WAV**; point each `PLAN` entry at
+  the master; **keep the levelling** (re-measure the built files with `ebur128` and re-fit
+  `GAIN_DB` to Goin's level, whatever the masters' own targets); re-run
+  `tools/measure_beats.py` (base python with the psd-extract venv's site-packages) and check
+  by ear with `tools/beat_click.py`; reimport; run `test_lake`. **beatgucci is built whole
+  first and Richard judges where it ends** — the 2:12 cut holds until then. **The trailers
+  are re-cut once, on the final Habibs master**, not on interim takes.
 - **Tests**: `test_lake`'s `_stage_music` drives its own station by hand: the order, the 2:12
   cut, the equal-power handover, shed and radio over a running playlist, the end song in and
   out, and the lake telling the autoload.
