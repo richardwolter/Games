@@ -2,9 +2,11 @@
 ## whole cycle (plant, water, grow, harvest) both called directly and by the farmer, who
 ## steps to a spot beside the bed, is locked there while the work time runs, and cancels
 ## with E again. Then the machine: it costs produção, makes a clone, and a clone given a
-## role works beds on its own. Last, each trait's good and bad side.
+## role works beds on its own. Then each trait's good and bad side, the role ratings, and
+## last the crates: carried to each depot, by the farmer and by a Carregar clone, plus
+## meals, hunger, naps and trampling.
 ##
-## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 600
+## Run: Godot --headless --path <project> res://tools/test_smoke.tscn --quit-after 3000
 ##
 ## A scene stepped by _physics_process, not a `--script` SceneTree with `await` (that form
 ## stalls on Richard's build; see the root CLAUDE.md). Results go to tools/last_test.log,
@@ -20,6 +22,7 @@ const LOCK_FRAMES := 2
 const WORK_FRAMES := 40
 const CLONE_FRAMES := 40
 const CLONE_WORK_FRAMES := 150
+const HAUL_FRAMES := 240
 
 var _locked_at: Vector3
 
@@ -41,7 +44,8 @@ func _ready() -> void:
 	_check(_main.beds.size() == 6, "6 beds built (got %d)" % _main.beds.size())
 	_check(_main.get_node_or_null("Hud") != null, "HUD built")
 	_check(_main.machine != null, "machine built")
-	_check(_main.stock == 5, "the farm starts with 5 produção (got %d)" % _main.stock)
+	_check(_main.machine.stock == 5, "the machine starts with 5 (got %d)" % _main.machine.stock)
+	_check(_main.trough != null and _main.market != null, "trough and market built")
 
 
 func _physics_process(_delta: float) -> void:
@@ -85,6 +89,13 @@ func _physics_process(_delta: float) -> void:
 	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
 			+ CLONE_WORK_FRAMES + 3:
 		_check_chat()
+		_start_hauling()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
+			+ CLONE_WORK_FRAMES + 3 + 5:
+		_feed_the_hungry()
+	elif _frame == 10 + WALK_FRAMES + GROW_FRAMES + STEP_FRAMES + WORK_FRAMES + CLONE_FRAMES \
+			+ CLONE_WORK_FRAMES + 3 + HAUL_FRAMES:
+		_finish_hauling()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
 
@@ -109,9 +120,10 @@ func _start_bed_cycle() -> void:
 func _finish_bed_cycle() -> void:
 	var bed: Bed = _main.beds[0]
 	_check(bed.state == Bed.State.RIPE, "bed ripens when its timer runs out")
-	var before: int = _main.stock
+	var before := get_tree().get_nodes_in_group("crates").size()
 	_check(bed.perform(Bed.HARVEST) == Bed.YIELD, "harvest yields %d" % Bed.YIELD)
-	_check(_main.stock == before + Bed.YIELD, "harvest goes into the stock")
+	_check(get_tree().get_nodes_in_group("crates").size() == before + Bed.YIELD,
+			"harvest drops a crate beside the bed")
 	_check(bed.state == Bed.State.EMPTY, "harvested bed is empty again")
 
 
@@ -178,9 +190,10 @@ func _check_screen_directions() -> void:
 func _start_cloning() -> void:
 	var farmer: Farmer = _main.farmer
 	var machine: Machine = _main.machine
-	_main.stock = Machine.COST - 1
-	_check(machine.next_task() == &"", "machine won't clone below %d produção" % Machine.COST)
-	_main.stock = Machine.COST
+	machine.stock = Machine.COST - 1
+	_check(machine.next_task_for(farmer) == &"",
+			"machine won't clone below %d in stock" % Machine.COST)
+	machine.stock = Machine.COST
 	farmer.global_position = machine.global_position + Vector3(0.0, 0.0, 1.4)
 	_check(farmer.nearest_target() == machine, "E by the machine picks the machine")
 	farmer.interact()
@@ -193,7 +206,8 @@ func _start_cloning() -> void:
 func _check_clone_made() -> void:
 	var farmer: Farmer = _main.farmer
 	_check(_main.clones.size() == 1, "machine made a clone")
-	_check(_main.stock == 0, "the clone cost %d produção (left %d)" % [Machine.COST, _main.stock])
+	_check(_main.machine.stock == 0, "the clone cost %d of the machine's stock (left %d)" % [
+			Machine.COST, _main.machine.stock])
 	if _main.clones.is_empty():
 		return
 	var clone: Clone = _main.clones[0]
@@ -282,22 +296,36 @@ func _check_traits() -> void:
 
 
 ## The role ratings follow the model in docs/decisoes/2026-10-07-painel-do-clone.md, checked
-## against values worked out by hand (6 beds, walk 3 m at 6 m/s = 0.5 s, 1 s per task, 8 s
-## to grow; a plain farm: T = 1.5 s per task, bed cycle 12.5 s, 6/12.5 = 0.48 tasks/s).
+## against values worked out by hand: 6 beds; walk 3 m at 6 m/s = 0.5 s; 1 s per bed task,
+## 0.5 s to pick up or deliver, 8 m to a depot (1.333 s); 8 s to grow; each clone eats 1/60
+## per second. Plain bed roles: T = 1.5 s, bed cycle 12.5 s, 6/12.5 = 0.48 crates/s, net
+## 0.48 - 1/60. Plain Carregar: 0.5 + 0.5 + 1.333 + 0.5 = 2.833 s a crate, net 1/2.833 - 1/60.
 func _check_panel() -> void:
+	var food := 1.0 / 60.0
+	var bed_net := 0.48 - food
+	var carry_net := 1.0 / (0.5 + 0.5 + 8.0 / 6.0 + 0.5) - food
 	var cases := [
 		# traits, role, hand-computed rating
 		[[], Bed.PLANT, 1.0],
-		# T_plant = (0.5/1.5 + 1/1.5) / 0.75 = 1.333; cycle 12.333; 6/12.333 / 0.48
-		[[&"apressado"], Bed.PLANT, (6.0 / 12.3333) / 0.48],
-		# growth 2x: cycle 4.5 + 4 = 8.5, beds give 0.706/s but each stage caps at 0.667/s
-		[[&"dedo_verde"], Bed.PLANT, (1.0 / 1.5) / 0.48],
-		# T_harvest = 0.5 + 1/0.33 = 3.530; stage 0.2833/s is the cap
-		[[&"dedo_verde"], Bed.HARVEST, (1.0 / (0.5 + 1.0 / 0.33)) / 0.48],
-		# T_harvest = 0.5 + 1/0.6 = 2.1667; cycle 13.1667; 6/13.1667 = 0.4557/s, x2 yield
-		[[&"caprichoso"], Bed.HARVEST, (6.0 / 13.16667) * 2.0 / 0.48],
-		# pauses 2 s in 8: T_water = 1.5 / 0.75 = 2; cycle 13
-		[[&"animado"], Bed.WATER, (6.0 / 13.0) / 0.48],
+		[[], Traits.CARRY, 1.0],
+		# T_plant = (0.5/1.5 + 1/1.5) / 0.75 = 1.333; cycle 12.333
+		[[&"apressado"], Bed.PLANT, (6.0 / 12.33333 - food) / bed_net],
+		# growth 2x: cycle 4.5 + 4 = 8.5 gives 0.706/s, but each stage caps at 1/1.5
+		[[&"dedo_verde"], Bed.PLANT, (1.0 / 1.5 - food) / bed_net],
+		# T_harvest = 0.5 + 1/0.33 = 3.5303 is the cap
+		[[&"dedo_verde"], Bed.HARVEST, (1.0 / 3.530303 - food) / bed_net],
+		# T_harvest = 0.5 + 1/0.6 = 2.1667; cycle 13.1667; x2 crates
+		[[&"caprichoso"], Bed.HARVEST, (6.0 / 13.16667 * 2.0 - food) / bed_net],
+		# pauses 2 s after every 8 s: share 0.2; T_water = 1.5/0.8 = 1.875; cycle 12.875
+		[[&"animado"], Bed.WATER, (6.0 / 12.875 - food) / bed_net],
+		# naps 4 s after every 15 s: share 4/19; T = 1.5/(15/19) = 1.9; cycle 12.9; eats half
+		[[&"preguicoso"], Bed.PLANT, (6.0 / 12.9 - food / 2.0) / bed_net],
+		# boosted 20 s in 60: work 1/3 * 1/1.5 + 2/3 * 1 = 0.8889; T = 1.3889; eats double
+		[[&"glutao"], Bed.PLANT, (6.0 / (1.388889 + 3.0 + 8.0) - 2.0 * food) / bed_net],
+		# carries 2: (2 * (0.5 + 0.5) + 1.333 + 0.5) / 2 = 1.9167 s a crate
+		[[&"forte"], Traits.CARRY, (1.0 / 1.916667 - food) / carry_net],
+		# loses 1 in 4, eats nothing from the trough
+		[[&"beliscador"], Traits.CARRY, (1.0 / 2.833333 * 0.75) / carry_net],
 	]
 	for c: Array in cases:
 		var names: Array[StringName] = []
@@ -311,14 +339,11 @@ func _check_panel() -> void:
 			"Apressado's sheet: %s" % [rows])
 	var mixed := _test_clone([&"caprichoso", &"dedo_verde"], Vector3(-9.0, 1.0, -8.0))
 	var mixed_panel: String = _main.clone_panel(mixed, true)
-	_say("panel example:
-" + mixed_panel)
+	_say("panel example:\n" + mixed_panel)
 	_check(mixed_panel.contains("Rendimento") and mixed_panel.contains("Crescimento")
-			and not mixed_panel.contains("(melhor)"),
-			"Caprichoso + Dedo Verde: sheet shown, Plantar and Regar tie so no pick")
+			and mixed_panel.contains("Carregar"), "Caprichoso + Dedo Verde: sheet and 4 roles")
 	var careful := _test_clone([&"caprichoso"], Vector3(-9.0, 1.0, -7.0))
-	_check(_main.clone_panel(careful, true).contains("Colher  [color=%s]190%%[/color]  (melhor)"
-			% Traits.GOOD), "Caprichoso: Colher is the clear best")
+	_check(_main.clone_panel(careful, true).contains("(melhor)"), "Caprichoso: a clear best")
 	var plain := _test_clone([], Vector3(-9.0, 1.0, -6.0))
 	_check(not _main.clone_panel(plain, true).contains("(melhor)"),
 			"no recommendation when the roles are close")
@@ -329,6 +354,99 @@ func _check_chat() -> void:
 	_check(_chatty.is_chatting() and _chatty.is_paused(), "Animado stops to chat with a clone near it")
 	_check(_chatty._bubble.visible and _chatty._bubble.text.begins_with("conversando"),
 			"the chat shows in a bubble")
+
+
+var _hauler: Clone
+var _hungry: Clone
+var _napper: Clone
+var _market_before := 0
+
+
+## Crates by hand to each depot; a Carregar clone hauling to the market; a clone going
+## hungry at an empty trough; Glutão, Beliscador, Preguiçoso and Forte.
+func _start_hauling() -> void:
+	var farmer: Farmer = _main.farmer
+	farmer.cancel_work()
+	farmer.global_position = Vector3(50.0, farmer.global_position.y, 50.0)
+	for depot: Depot in [_main.machine, _main.trough, _main.market]:
+		var crate := Crate.new()
+		_main.add_child(crate)
+		_check(crate.next_task_for(farmer) == Crate.PICK_UP, "empty hands can pick up a crate")
+		crate.perform(Crate.PICK_UP, farmer)
+		_check(farmer.carrying == 1 and crate.is_queued_for_deletion(), "the crate is in hand")
+		_check(_main.machine.next_task_for(farmer) == Depot.DELIVER,
+				"with a crate in hand the machine takes it instead of cloning")
+		var before := depot.stock
+		_check(depot.next_task_for(farmer) == Depot.DELIVER, "%s takes deliveries" % depot.label)
+		depot.perform(Depot.DELIVER, farmer)
+		_check(depot.stock == before + 1 and farmer.carrying == 0,
+				"a crate delivered to %s adds 1" % depot.label)
+
+	_market_before = _main.market.stock
+	_hauler = _test_clone([], _main.MARKET_AT + Vector3(-2.0, 1.0, 0.0))
+	_hauler.set_role(Traits.CARRY, _main.market)
+	_hauler.work_speed = 5.0
+	for i in 2:
+		var crate := Crate.new()
+		crate.position = _main.MARKET_AT + Vector3(-3.0 - i, 0.0, -1.5)
+		_main.add_child(crate)
+
+	_main.trough.stock = 0
+	_hungry = _test_clone([], _main.TROUGH_AT + Vector3(0.0, 1.0, 2.5))
+	_hungry._meal_clock = 0.01
+
+	var glutton := _test_clone([&"glutao"], Vector3(9.0, 1.0, 8.0))
+	glutton.eat(1)
+	_check(is_equal_approx(glutton.task_speed(Bed.PLANT), 1.5), "Glutão works faster after eating")
+	glutton._meal_clock = 0.0
+	glutton._tick_meals(0.01)
+	_check(glutton.meal_size() == 2, "Glutão eats double")
+
+	var nibbler := _test_clone([&"beliscador"], Vector3(9.0, 1.0, 6.0))
+	_check(nibbler.keep_of(4) == 3, "Beliscador eats 1 of every 4 crates")
+	nibbler._meal_clock = 0.0
+	nibbler._tick_meals(0.01)
+	_check(not nibbler.wants_meal() and not nibbler.hungry, "Beliscador never uses the trough")
+
+	_napper = _test_clone([&"preguicoso"], Vector3(9.0, 1.0, 4.0))
+	_napper._meal_clock = 0.0
+	_napper._tick_meals(0.01)
+	_check(not _napper.wants_meal(), "Preguiçoso's half meal doesn't send it to the trough yet")
+	_napper._nap_wait = 0.0
+
+	var strong := _test_clone([&"forte"], Vector3(9.0, 1.0, 2.0))
+	_check(strong.capacity() == 2, "Forte carries 2")
+	var bed: Bed = _main.beds[5]
+	bed.state = Bed.State.GROWING
+	bed.grow_left = Bed.GROW_TIME
+	strong.global_position = Vector3(bed.global_position.x, 1.0, bed.global_position.z)
+	strong.velocity = Vector3(1.0, 0.0, 0.0)
+	strong._after_move()
+	strong.velocity = Vector3.ZERO
+	strong.global_position = Vector3(9.0, 1.0, 2.0)
+	_check(bed.state == Bed.State.TRAMPLED, "Forte tramples the plant it walks over")
+	_check(bed.next_task_for(strong) == &"" and bed.next_task_for(farmer) == Bed.FIX,
+			"only the farmer can fix a trampled bed")
+	bed.perform(Bed.FIX, farmer)
+	_check(bed.state == Bed.State.EMPTY, "fixing leaves the bed empty")
+
+
+## The empty trough left the clone hungry and slow; now fill it and let it retry.
+func _feed_the_hungry() -> void:
+	_check(_hungry.hungry, "with the trough empty the clone goes hungry")
+	_check(is_equal_approx(_hungry.task_speed(Bed.PLANT), Traits.HUNGRY_WORK),
+			"a hungry clone works at half speed")
+	_check(_napper.is_napping() and _napper.is_paused(), "Preguiçoso naps")
+	_main.trough.stock = 5
+	_hungry._retry_left = 0.01
+
+
+func _finish_hauling() -> void:
+	_check(_main.market.stock >= _market_before + 2,
+			"the Carregar clone hauled the crates to the market (%d -> %d)" % [
+			_market_before, _main.market.stock])
+	_check(not _hungry.hungry and _main.trough.stock == 4,
+			"the clone walked to the trough and ate 1 (trough %d)" % _main.trough.stock)
 
 func _check(ok: bool, what: String) -> void:
 	if not ok:

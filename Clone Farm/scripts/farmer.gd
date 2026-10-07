@@ -1,7 +1,9 @@
-## The farmer: the one worker with no weak side. Walks with WASD on the ground plane. E on
-## the nearest thing: a bed or the machine starts its task (the Worker steps up to it and
-## stays locked there until done; E again cancels); a clone opens the role choice, picked
-## with 1-3 (0 = no role). Fixing the clones' messes comes later.
+## The farmer: the one worker with no weak side, and the only one who fixes a trampled bed.
+## Walks with WASD on the ground plane. E on the nearest thing: a bed, a crate (pick it up),
+## the machine, trough or market (deliver what's in hand; empty-handed at the machine,
+## clone) starts its task (the Worker steps up to it and stays locked there until done; E
+## again cancels); a clone opens the role choice, picked with 1-4 (0 = no role), and
+## Carregar then asks the destination with 1-3.
 class_name Farmer
 extends Worker
 
@@ -10,6 +12,8 @@ const CLONE_REACH := 1.6
 
 ## The clone whose role is being chosen, or null.
 var choosing: Clone = null
+## True once Carregar was picked and the destination is being chosen.
+var choosing_dest := false
 
 
 func _think() -> void:
@@ -19,11 +23,14 @@ func _think() -> void:
 		return
 	for i in Clone.ROLES.size():
 		if Input.is_action_just_pressed("role_%d" % i):
-			pick_role(i)
+			if choosing_dest:
+				pick_dest(i)
+			else:
+				pick_role(i)
 			return
 	# Walked off: the choice closes.
 	if _ground(choosing.global_position - global_position).length() > CLONE_REACH * 2.0:
-		choosing = null
+		close_choice()
 
 
 ## E: cancel the task going, close the role choice, or act on the nearest thing.
@@ -31,21 +38,43 @@ func interact() -> void:
 	if is_working():
 		cancel_work()
 	elif choosing != null:
-		choosing = null
+		close_choice()
 	else:
 		var target := nearest_target()
 		if target is Clone:
 			choosing = target
+			choosing_dest = false
 		elif target is Workplace:
 			work(target)
 
 
-## Gives the clone being chosen the role at `index` in Clone.ROLES.
+func close_choice() -> void:
+	choosing = null
+	choosing_dest = false
+
+
+## Gives the clone being chosen the role at `index` in Clone.ROLES; Carregar first asks
+## where to.
 func pick_role(index: int) -> void:
-	if choosing == null:
+	if choosing == null or index >= Clone.ROLES.size():
+		return
+	if Clone.ROLES[index] == Traits.CARRY:
+		choosing_dest = true
 		return
 	choosing.set_role(Clone.ROLES[index])
-	choosing = null
+	close_choice()
+
+
+## Sends the Carregar clone being chosen to the depot with this slot number.
+func pick_dest(slot: int) -> void:
+	if choosing == null:
+		return
+	for node in get_tree().get_nodes_in_group("depots"):
+		var depot := node as Depot
+		if depot.slot == slot:
+			choosing.set_role(Traits.CARRY, depot)
+			close_choice()
+			return
 
 
 ## What E acts on: the nearer of the workplace in reach and the clone in reach, or null.

@@ -1,21 +1,24 @@
-## A garden bed, the thing every farm task acts on. It cycles empty -> planted -> growing
-## -> ripe -> (harvest) -> empty. The task functions don't know who is working, so the
-## farmer and the clones call the same ones.
+## A garden bed. It cycles empty -> planted -> growing -> ripe -> (harvest) -> empty, and a
+## harvest drops crates beside it for someone to carry. A Forte clone walking over a plant
+## tramples it; only the farmer fixes a trampled bed (back to empty). The task functions
+## don't know who is working, so the farmer and the clones call the same ones.
 class_name Bed
 extends Workplace
 
-enum State { EMPTY, PLANTED, GROWING, RIPE }
+enum State { EMPTY, PLANTED, GROWING, RIPE, TRAMPLED }
 
-## Task names, one per farm function in docs/scope.md (Carregar comes with the stock trips).
+## Task names, one per farm function in docs/scope.md (Carregar acts on crates).
 const PLANT := &"plant"
 const WATER := &"water"
 const HARVEST := &"harvest"
+const FIX := &"fix"
 
 ## Seconds of work each task takes a worker at speed 1 (tools and traits scale the speed).
 const WORK_TIME := {
 	PLANT: 1.0,
 	WATER: 1.0,
 	HARVEST: 1.0,
+	FIX: 2.0,
 }
 
 const SIZE := 1.6
@@ -26,7 +29,9 @@ const SOIL_DRY := Color(0.55, 0.40, 0.25)
 const SOIL_WET := Color(0.32, 0.22, 0.14)
 const PLANT_GREEN := Color(0.30, 0.65, 0.25)
 const PLANT_RIPE := Color(0.95, 0.75, 0.20)
+const PLANT_TRAMPLED := Color(0.45, 0.38, 0.25)
 
+## `amount` crates to drop beside the bed.
 signal harvested(amount: int)
 
 var state := State.EMPTY
@@ -81,12 +86,42 @@ func next_task() -> StringName:
 		State.EMPTY: return PLANT
 		State.PLANTED: return WATER
 		State.RIPE: return HARVEST
+		State.TRAMPLED: return FIX
 	return &""
 
 
+## Only the farmer fixes a trampled bed; clones leave it alone.
+func next_task_for(worker: Worker) -> StringName:
+	var task := next_task()
+	if task == FIX and not worker is Farmer:
+		return &""
+	return task
+
+
+## True while there is a plant to trample.
+func has_plant() -> bool:
+	return state == State.PLANTED or state == State.GROWING or state == State.RIPE
+
+
+## A Forte clone walked over it: the plant is lost until the farmer fixes the bed.
+func trample() -> bool:
+	if not has_plant():
+		return false
+	state = State.TRAMPLED
+	grow_rate = 1.0
+	_refresh()
+	return true
+
+
+## True when `point` (on the ground) is over the soil.
+func covers(point: Vector3) -> bool:
+	return absf(point.x - global_position.x) < SIZE / 2.0 \
+			and absf(point.z - global_position.z) < SIZE / 2.0
+
+
 ## Finishes `task` (the worker `by` has already spent its work time) if the bed is waiting
-## for it. Returns what the task produced (only a harvest produces anything); a task the bed
-## isn't waiting for does nothing. The worker's traits can boost growth and the harvest.
+## for it. Returns what the task produced (crates; only a harvest produces any); a task the
+## bed isn't waiting for does nothing. The worker's traits can boost growth and the harvest.
 func perform(task: StringName, by: Worker = null) -> int:
 	if task != next_task():
 		return 0
@@ -101,11 +136,15 @@ func perform(task: StringName, by: Worker = null) -> int:
 			grow_rate = maxf(grow_rate, boost)
 		HARVEST:
 			var amount := YIELD + (by.harvest_bonus() if by != null else 0)
+			if by != null:
+				amount = by.keep_of(amount)
 			state = State.EMPTY
 			grow_rate = 1.0
 			harvested.emit(amount)
 			_refresh()
 			return amount
+		FIX:
+			state = State.EMPTY
 	_refresh()
 	return 0
 
@@ -114,6 +153,11 @@ func _refresh() -> void:
 	var wet := state == State.GROWING or state == State.RIPE
 	_soil_mat.albedo_color = SOIL_WET if wet else SOIL_DRY
 	_plant.visible = state != State.EMPTY
+	if state == State.TRAMPLED:
+		_plant.scale = Vector3(1.1, 0.15, 1.1)
+		_plant.position.y = 0.25
+		_plant_mat.albedo_color = PLANT_TRAMPLED
+		return
 	var grown := 1.0
 	if state == State.PLANTED:
 		grown = 0.0

@@ -1,7 +1,8 @@
 ## Anyone who works the farm: the farmer and the clones. Holds the task logic so both
-## behave the same: the worker steps to a fixed spot beside a Workplace (bed, machine), faces
-## it, and stays locked there, visibly working, until the task's work time runs out. Nothing
-## happens to a place from a distance. Subclasses decide what to do next by overriding _think().
+## behave the same: the worker steps to a fixed spot beside a Workplace (bed, crate, machine,
+## trough, market), faces it, and stays locked there, visibly working, until the task's work
+## time runs out. Nothing happens to a place from a distance. Crates picked up ride over the
+## worker's head until delivered. Subclasses decide what to do next by overriding _think().
 class_name Worker
 extends CharacterBody3D
 
@@ -22,9 +23,12 @@ var work_place: Workplace = null
 var work_task := &""
 var work_spot := Vector3.ZERO
 var work_left := 0.0
+## Crates in hand.
+var carrying := 0
 
 var _work_clock := 0.0
 var _bar: MeshInstance3D
+var _carried: MeshInstance3D
 
 
 func _ready() -> void:
@@ -43,6 +47,15 @@ func _ready() -> void:
 	_bar.top_level = true
 	_bar.visible = false
 	add_child(_bar)
+	_carried = MeshInstance3D.new()
+	var crate := BoxMesh.new()
+	crate.size = Vector3(Crate.SIZE, Crate.SIZE, Crate.SIZE)
+	_carried.mesh = crate
+	var crate_mat := StandardMaterial3D.new()
+	crate_mat.albedo_color = Color(0.80, 0.62, 0.30)
+	_carried.material_override = crate_mat
+	_carried.visible = false
+	add_child(_carried)
 
 
 func _physics_process(delta: float) -> void:
@@ -56,11 +69,17 @@ func _physics_process(delta: float) -> void:
 		velocity.x = dir.x * SPEED
 		velocity.z = dir.z * SPEED
 	move_and_slide()
+	_after_move()
 	_show_work(delta)
 
 
 ## Hook for subclasses: read input or decide on a task. Called first every physics frame.
 func _think() -> void:
+	pass
+
+
+## Hook for subclasses: called after each step (a Forte clone tramples what it walks on).
+func _after_move() -> void:
 	pass
 
 
@@ -92,7 +111,18 @@ func grow_boost() -> float:
 	return 1.0
 
 
-## True while the worker stands still on its own (a clone chatting), task clock stopped.
+## Crates it can hold at once.
+func capacity() -> int:
+	return 1
+
+
+## Of `amount` crates harvested or picked up, how many make it (Beliscador eats some).
+func keep_of(amount: int) -> int:
+	return amount
+
+
+## True while the worker stands still on its own (a clone chatting or napping), task clock
+## stopped.
 func is_paused() -> bool:
 	return false
 
@@ -102,18 +132,18 @@ func _finish_task() -> void:
 	work_place.perform(work_task, self)
 
 
-## Starts `place`'s next task (the nearest place in reach when null). The worker walks up
-## to the place first, however far. Returns false if there's nothing to do or a task is
-## already going.
+## Starts `place`'s next task for this worker (the nearest place in reach when null). The
+## worker walks up to the place first, however far. Returns false if there's nothing to do
+## or a task is already going.
 func work(place: Workplace = null) -> bool:
 	if is_working():
 		return false
 	if place == null:
 		place = nearest_workplace()
-	if place == null or place.next_task() == &"":
+	if place == null or place.next_task_for(self) == &"":
 		return false
 	work_place = place
-	work_task = place.next_task()
+	work_task = place.next_task_for(self)
 	work_left = place.work_time(work_task)
 	work_spot = spot_beside(place)
 	_work_clock = 0.0
@@ -162,6 +192,8 @@ func nearest_workplace() -> Workplace:
 	var best_d := INF
 	for node in get_tree().get_nodes_in_group("workplaces"):
 		var place := node as Workplace
+		if place.is_queued_for_deletion():
+			continue
 		var d := _ground(place.global_position - global_position).length()
 		if d <= place.half_size() + REACH and d < best_d:
 			best = place
@@ -172,7 +204,8 @@ func nearest_workplace() -> Workplace:
 ## Walk to the work spot first; the clock only runs once the worker stands there.
 func _advance_work(delta: float) -> void:
 	# Someone else did this task first, or it can't be done any more: stop.
-	if work_place.next_task() != work_task:
+	if not is_instance_valid(work_place) or work_place.is_queued_for_deletion() \
+			or work_place.next_task_for(self) != work_task:
 		cancel_work()
 		return
 	var to := _ground(work_spot - global_position)
@@ -191,8 +224,8 @@ func _advance_work(delta: float) -> void:
 		cancel_work()
 
 
-## The progress bar over the head and a lean-and-bob loop on the "Body" child while the
-## worker stands at the place, so the result never just appears.
+## The progress bar over the head, the crates carried, and a lean-and-bob loop on the
+## "Body" child while the worker stands at the place, so the result never just appears.
 func _show_work(delta: float) -> void:
 	var at := is_at_spot()
 	_bar.visible = at
@@ -204,6 +237,9 @@ func _show_work(delta: float) -> void:
 		angle = atan2(-cam.global_basis.x.z, cam.global_basis.x.x)
 	_bar.global_basis = Basis(Vector3.UP, angle).scaled(
 			Vector3(maxf(work_progress(), 0.01), 1.0, 1.0))
+	_carried.visible = carrying > 0
+	_carried.scale = Vector3(1.0, maxf(carrying, 1), 1.0)
+	_carried.position = Vector3(0.0, 1.1 + Crate.SIZE * maxf(carrying, 1) / 2.0, 0.0)
 	var body := get_node_or_null("Body") as Node3D
 	if body == null:
 		return

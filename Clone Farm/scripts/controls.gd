@@ -13,6 +13,7 @@ const BINDINGS := {
 	"role_1": [KEY_1, KEY_KP_1],
 	"role_2": [KEY_2, KEY_KP_2],
 	"role_3": [KEY_3, KEY_KP_3],
+	"role_4": [KEY_4, KEY_KP_4],
 }
 
 

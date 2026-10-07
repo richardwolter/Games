@@ -1,5 +1,6 @@
 ## The farm, built in code: ground, light, isometric camera, the farmer, the garden beds,
-## the cloning machine (and the clones it makes) and a minimal HUD. Graybox only, per docs/scope.md: shapes and flat colours, no Synty.
+## the three depots (machine, trough, market), the crates harvests drop, the clones and a
+## minimal HUD. Graybox only, per docs/scope.md: shapes and flat colours, no Synty.
 extends Node3D
 
 const GROUND_SIZE := 24.0
@@ -11,7 +12,9 @@ const BED_GAP := 1.4
 ## Where the bed grid's centre sits, a few steps from where the farmer starts.
 const BEDS_AT := Vector3(0.0, 0.0, -4.0)
 const MACHINE_AT := Vector3(5.5, 0.0, 1.0)
-## Produção at the start, enough for the first clone right away.
+const TROUGH_AT := Vector3(-5.5, 0.0, 1.0)
+const MARKET_AT := Vector3(0.0, 0.0, 4.5)
+## Machine stock at the start, enough for the first clone right away.
 const START_STOCK := 5
 ## Traits each new clone rolls (Máquina upgrades will add more).
 const TRAIT_SLOTS := 2
@@ -21,21 +24,27 @@ const TASK_LABELS := {
 	Bed.PLANT: "plantar",
 	Bed.WATER: "regar",
 	Bed.HARVEST: "colher",
+	Bed.FIX: "consertar",
+	Crate.PICK_UP: "pegar caixote",
+	Depot.DELIVER: "entregar",
 	Machine.CLONE: "clonar",
 }
 const WORKING_LABELS := {
 	Bed.PLANT: "plantando",
 	Bed.WATER: "regando",
 	Bed.HARVEST: "colhendo",
+	Bed.FIX: "consertando",
+	Crate.PICK_UP: "pegando",
+	Depot.DELIVER: "entregando",
 	Machine.CLONE: "clonando",
 }
 
 var farmer: Farmer
 var beds: Array[Bed] = []
 var machine: Machine
+var trough: Depot
+var market: Depot
 var clones: Array[Clone] = []
-## Harvested produce, spent on clones; trough and sale come with Carregar.
-var stock := START_STOCK
 var rng := RandomNumberGenerator.new()
 
 var _stock_label: Label
@@ -48,14 +57,15 @@ func _ready() -> void:
 	_build_ground()
 	_build_light()
 	_build_beds()
-	_build_machine()
+	_build_depots()
 	farmer = _build_farmer()
 	_build_camera()
 	_build_hud()
 
 
 func _process(_delta: float) -> void:
-	_stock_label.text = "Produção: %d   Clones: %d" % [stock, clones.size()]
+	_stock_label.text = "Dinheiro: $%d    Máquina: %d    Cocho: %d    Clones: %d" % [
+			market.stock, machine.stock, trough.stock, clones.size()]
 	_hint_label.text = _hint()
 
 
@@ -64,19 +74,23 @@ func _hint() -> String:
 	if farmer.is_working():
 		return "%s... %d%%   (E: cancelar)" % [WORKING_LABELS[farmer.work_task],
 				roundi(farmer.work_progress() * 100.0)]
+	if farmer.choosing != null and farmer.choosing_dest:
+		return "Carregar para onde?  1 Máquina   2 Cocho   3 Venda      (E: fechar)"
 	if farmer.choosing != null:
 		return clone_panel(farmer.choosing, true)
+	var hands := "Nas mãos: %d caixote\n" % farmer.carrying if farmer.carrying > 0 else ""
 	var target := farmer.nearest_target()
 	if target is Clone:
-		return clone_panel(target, false)
-	if target is Machine:
-		if target.next_task() == &"":
-			return "Máquina: precisa de %d produção" % Machine.COST
-		return "E: clonar (custa %d produção)" % Machine.COST
-	if target is Bed:
-		var task: StringName = target.next_task()
-		return "E: %s" % TASK_LABELS[task] if task != &"" else "crescendo..."
-	return ""
+		return hands + clone_panel(target, false)
+	if target is Workplace:
+		var task: StringName = target.next_task_for(farmer)
+		if task != &"":
+			return hands + "E: %s" % TASK_LABELS[task]
+		if target is Machine:
+			return hands + "Máquina: precisa de %d (tem %d)" % [Machine.COST, machine.stock]
+		if target is Bed and target.state == Bed.State.GROWING:
+			return hands + "crescendo..."
+	return hands
 
 
 ## A clone's stat sheet and how much it adds to the farm in each role, so picking a role
@@ -87,6 +101,10 @@ func clone_panel(clone: Clone, choosing: bool) -> String:
 	var lines: PackedStringArray = []
 	var names := Traits.labels(clone.traits) if not clone.traits.is_empty() else "sem características"
 	var role_now: String = Clone.ROLE_LABELS[clone.role] if clone.role != &"" else "nenhuma"
+	if clone.role == Traits.CARRY and clone.dest != null:
+		role_now += " > " + clone.dest.label
+	if clone.hungry:
+		role_now += ", [color=%s]COM FOME[/color]" % Traits.BAD
 	lines.append("[b]%s[/b]  %s  (função: %s)" % [clone.name, names, role_now])
 	lines.append_array(Traits.stat_rows(clone.stats, clone.traits))
 	var pcts := {}
@@ -111,18 +129,33 @@ func clone_panel(clone: Clone, choosing: bool) -> String:
 	return "\n".join(lines)
 
 
-func _build_machine() -> void:
+func _build_depots() -> void:
 	machine = Machine.new()
 	machine.name = "Machine"
 	machine.position = MACHINE_AT
-	machine.can_afford = func() -> bool: return stock >= Machine.COST
+	machine.stock = START_STOCK
+	machine.slot = 1
 	machine.cloned.connect(_spawn_clone)
 	add_child(machine)
+	trough = Depot.new()
+	trough.name = "Trough"
+	trough.label = "Cocho"
+	trough.color = Color(0.45, 0.60, 0.35)
+	trough.slot = 2
+	trough.position = TROUGH_AT
+	trough.add_to_group("troughs")
+	add_child(trough)
+	market = Depot.new()
+	market.name = "Market"
+	market.label = "Venda ($)"
+	market.color = Color(0.85, 0.80, 0.35)
+	market.slot = 3
+	market.position = MARKET_AT
+	add_child(market)
 
 
-## Pays for and places a new clone beside the machine, with random traits and no role.
+## Places a new clone beside the machine (already paid for), with random traits and no role.
 func _spawn_clone() -> void:
-	stock -= Machine.COST
 	var clone := Clone.new()
 	clone.name = "Clone%d" % (clones.size() + 1)
 	var row := clones.size() % 3
@@ -133,6 +166,15 @@ func _spawn_clone() -> void:
 	clones.append(clone)
 
 
+## `amount` crates on the ground at the bed's outer corner, side by side.
+func _drop_crates(bed: Bed, amount: int) -> void:
+	var corner := bed.position + Vector3(Bed.SIZE / 2.0 + 0.45, 0.0, Bed.SIZE / 2.0 + 0.45)
+	for i in amount:
+		var crate := Crate.new()
+		crate.position = corner + Vector3(-i * (Crate.SIZE + 0.15), 0.0, 0.0)
+		add_child(crate)
+
+
 func _build_beds() -> void:
 	var step := Bed.SIZE + BED_GAP
 	var origin := BEDS_AT - Vector3((BED_COLUMNS - 1) * step, 0.0, (BED_ROWS - 1) * step) / 2.0
@@ -141,7 +183,7 @@ func _build_beds() -> void:
 			var bed := Bed.new()
 			bed.name = "Bed%d" % beds.size()
 			bed.position = origin + Vector3(col * step, 0.0, row * step)
-			bed.harvested.connect(func(amount: int) -> void: stock += amount)
+			bed.harvested.connect(func(amount: int) -> void: _drop_crates(bed, amount))
 			add_child(bed)
 			beds.append(bed)
 
