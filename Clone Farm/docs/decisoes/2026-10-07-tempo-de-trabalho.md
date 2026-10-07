@@ -19,7 +19,7 @@ características que mexem na velocidade (Apressado, Caprichoso, Glutão).
   Ao apertar E, ele anda até um ponto fixo ao lado do canteiro, vira para ele, e só então o
   tempo corre. Enquanto trabalha, WASD é ignorado; ele se inclina e balança no ritmo do
   trabalho, com barra amarela na cabeça e "plantando... 40%" no HUD.
-- **E de novo cancela** e o canteiro fica como estava (padrão escolhido por nós, a confirmar).
+- **E de novo cancela** e o canteiro fica como estava (confirmado por Richard, 2026-10-07).
 - Tudo isso mora em `Worker` (`scripts/worker.gd`), que o fazendeiro estende; os clones vão
   estender o mesmo.
 

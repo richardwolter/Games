@@ -34,7 +34,6 @@ planta, rega e colhe com E (ou Espaço) no canteiro mais perto. Cada ação tem 
 trabalho, e o trabalhador anda até o canteiro e fica fixo lá trabalhando; E de novo cancela
 ([decisão](docs/decisoes/2026-10-07-tempo-de-trabalho.md)). A colheita soma em "Produção"
 no HUD. Ainda sem clones, máquina, Carregar, lojas nem dia.
-**A confirmar com Richard:** E de novo para cancelar.
 
 ## Design decidido (protótipo 1)
 
