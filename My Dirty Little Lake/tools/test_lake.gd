@@ -6641,7 +6641,7 @@ func _check_cues() -> void:
 	_check(parts_ok and worst >= 4.5, "every cue theme has a tab, a mark, an ink, an icon and an entrance; its ink reads",
 		"worst %.2f" % worst)
 	_check(bands.size() == CueCard.THEMES.size(), "no two cue themes share a tab colour", str(bands.size()))
-	for kind: StringName in [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry"]:
+	for kind: StringName in [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]:
 		_check(CueCard.THEMES.has(kind), "the %s cue has a theme" % kind, "")
 	# Marked words: the keyword is its own unit, no asterisk reaches the paper, and a hint
 	# wraps inside its card.
@@ -6659,7 +6659,7 @@ func _check_cues() -> void:
 	for row: Array in narrow:
 		fits = fits and CueCard._row_wide(row, Style.TEXT_SMALL) <= CueCard.WIDE_HINT + 0.5
 	_check(narrow.size() >= 2 and fits, "a hint wraps inside its card", str(narrow.size()))
-	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
+	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "CUE_METER", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
 		var words := Text.of(key)
 		_check(words != key and words.count("*") >= 2 and words.count("*") % 2 == 0,
 			"%s has words with its keywords marked" % key, words)
@@ -6785,6 +6785,22 @@ func _check_cues() -> void:
 	yard.held = held_was
 	for i in boats.size():
 		(boats[i] as Boat).state = states[i]
+	# The meter's: owed the first time it moves, pointed at the meter.
+	seen.erase(&"meter")
+	var pollution_now: float = _main.pollution
+	_main.pollution = 1.0
+	_main.call(&"_watch_the_ferries", 0.0)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_check(StringName(_main.get(&"_hint_up")) != &"meter", "a meter that has not moved owes no hint", "")
+	_main.pollution = 0.99
+	hint._process(CueCard.FADE + 0.05)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	var meter_at := (skin.get_global_transform() * skin.meter_box()).get_center()
+	_check(hint.kind == &"meter" and hint.text == Text.CUE_METER
+		and hint.target.get_center().distance_to(meter_at) < 1.0,
+		"the meter's first move owes its hint, pointed at the meter", str(hint.target))
+	_main.call(&"_end_hint", false)
+	_main.pollution = pollution_now
 	var source := FileAccess.get_file_as_string("res://scripts/lake.gd")
 	_check(source.contains('"cues_seen": _cues_seen.keys()') and source.contains('save.get("cues_seen", [])'),
 		"the save carries the cues seen, and a save without them has seen none", "")

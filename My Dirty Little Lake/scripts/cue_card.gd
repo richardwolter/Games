@@ -76,6 +76,8 @@ const THEMES := {
 		"ink": Color(0.22, 0.10, 0.42), "icon": &"nets", "entrance": &"ghost"},
 	&"pigeon": {"band": Color(0.46, 0.48, 0.56), "mark": Color(1.0, 0.82, 0.36),
 		"ink": Color(0.32, 0.17, 0.0), "icon": &"coin", "entrance": &"hop"},
+	&"meter": {"band": Color(0.50, 0.46, 0.18), "mark": Color(0.80, 0.86, 0.40),
+		"ink": Color(0.18, 0.32, 0.02), "icon": &"meter", "entrance": &"rise"},
 	&"ferry": {"band": Color(0.22, 0.48, 0.62), "mark": Color(0.60, 0.82, 0.94),
 		"ink": Color(0.02, 0.21, 0.34), "icon": &"boat", "entrance": &"sail"},
 }
@@ -488,6 +490,9 @@ func _pose(entrance: StringName, t: float, card: Rect2) -> Dictionary:
 			out["at"] = Vector2(0.0, card.size.y * 0.5 * (1.0 - grow))
 		&"buzz":
 			out["at"] = Vector2(90.0 * (1.0 - s), sin(t * 34.0) * 6.0 * (1.0 - minf(s, 1.0)))
+		&"rise":
+			# Up from below, the way the clean water rises along the meter.
+			out["at"] = Vector2(0.0, 80.0 * (1.0 - s))
 		&"drip":
 			out["at"] = Vector2(0.0, -70.0 * (1.0 - s))
 			out["scale"] = Vector2(1.0 - 0.12 * (1.0 - s), 1.0 + 0.2 * (1.0 - s))
@@ -563,6 +568,14 @@ func _draw_fx(look: Dictionary, t: float, card: Rect2) -> void:
 					_dot(at, 2.0, Color(0.95, 0.75, 0.16, a))
 					_dot(at + Vector2(2.0, 0.0), 2.0, Color(0.1, 0.08, 0.06, a))
 					_dot(at + Vector2(0.0, -2.0), 2.0, Color(1.0, 1.0, 1.0, a * 0.8))
+		&"rise":
+			# Bubbles of clean water rising off the top edge.
+			if t < FX_LONG + 0.3:
+				var k := t / (FX_LONG + 0.3)
+				for i in 9:
+					var x := c.x - half.x + (float(i) + 0.5) * card.size.x / 9.0 + sin(t * 6.0 + float(i)) * 3.0
+					var y := c.y - half.y - 2.0 - (12.0 + 10.0 * float(posmod(hash(i * 7), 3))) * k
+					_dot(Vector2(x, y), 2.0 if i % 3 else 4.0, Color(0.70, 0.88, 1.0, 1.0 - k))
 		&"drip":
 			# A drop of honey gathering under the card's foot and falling.
 			var loop := fmod(maxf(t - 0.3, 0.0), 2.4)
@@ -650,6 +663,20 @@ func _draw_icon(look: Dictionary, strip: Rect2, t: float, alpha: float) -> void:
 			_draw_rows(rows, mid + Vector2(0.0, roundf(sin(t * 5.0)) * cell), cell, band, alpha)
 		&"jar":
 			_draw_rows(ROWS[&"jar"], mid, cell, band, alpha)
+		&"meter":
+			# The meter in little: a framed bar, murky on the left and clean on the right, its
+			# seam rocking to and fro, and the garbage circle at its left end.
+			var wide := 11.0
+			var tall := 5.0
+			var o := (mid - Vector2(wide, tall) * cell * 0.5).round() + Vector2(cell, 0.0)
+			draw_rect(Rect2(o, Vector2(wide, tall) * cell), Color(0.08, 0.06, 0.06, alpha), true)
+			var seam := 5.0 + roundf(sin(t * 1.6) * 2.0)
+			draw_rect(Rect2(o + Vector2(cell, cell), Vector2(seam - 1.0, tall - 2.0) * cell), Color(0.40, 0.46, 0.20, alpha), true)
+			draw_rect(Rect2(o + Vector2(seam, 1.0) * cell, Vector2(wide - 1.0 - seam, tall - 2.0) * cell), Color(0.36, 0.64, 0.88, alpha), true)
+			draw_rect(Rect2(o + Vector2(seam, 1.0) * cell, Vector2(1.0, 1.0) * cell), Color(0.92, 0.97, 1.0, alpha), true)
+			var ring := o + Vector2(-1.0, -1.0) * cell
+			draw_rect(Rect2(ring, Vector2(4.0, 7.0) * cell), Color(0.08, 0.06, 0.06, alpha), true)
+			draw_rect(Rect2(ring + Vector2(1.0, 1.0) * cell, Vector2(2.0, 5.0) * cell), Color(0.62, 0.50, 0.30, alpha), true)
 
 
 ## A plus-star in cells about `mid`.

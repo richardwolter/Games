@@ -973,3 +973,6 @@ static var CUE_PIGEON: String:
 
 static var CUE_FERRY: String:
 	get: return TranslationServer.translate(&"CUE_FERRY")
+
+static var CUE_METER: String:
+	get: return TranslationServer.translate(&"CUE_METER")

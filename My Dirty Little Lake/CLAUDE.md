@@ -4056,7 +4056,11 @@ Every mechanic a player meets mid-run is named the first time it happens.
   **ferries** ("Boats wait to be filled to set sail. Upgrade Capacity to carry more.") at
   the Waiting plate, once every hull has sat docked with pieces short of a load for
   `FERRY_HINT_AFTER` (20 s) of play. The Capacity line was kept on Richard's call after the
-  pushback that a bigger hold waits longer.
+  pushback that a bigger hold waits longer. The **pollution meter** ("This trash meter shows
+  how much of the lake still needs cleaning.", `CUE_METER`, Richard, same day) at the meter,
+  the first time it moves; on a new game that is the first catch, and the hint waits behind
+  the first steps' note. Its theme is olive, a little meter for its icon, rising in with
+  bubbles. **Closes issue #24**, the onboarding.
 - **One card pattern, a theme each** (`scripts/cue_card.gd`, `CueCard`; Richard: "share a
   pattern ... font highlights/coloring on keywords, similar to the trailer, but not
   entirely"): the recycle note's paper, a coloured tab down the left with a whole-pixel icon

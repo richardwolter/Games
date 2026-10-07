@@ -870,6 +870,11 @@ func money_drawn_box() -> Rect2:
 	return purse_over if _purse_up() else _money_box
 
 
+## Where the pollution meter is, in the skin's own coordinates: its hint points at it.
+func meter_box() -> Rect2:
+	return _meter_box
+
+
 ## Where the Waiting plate is, in the skin's own coordinates: the ferries' hint points at it.
 func stock_box() -> Rect2:
 	return _stock_box

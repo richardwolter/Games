@@ -863,8 +863,9 @@ const HINT_TEXT := {
 	&"double": "CUE_DOUBLE",
 	&"pigeon": "CUE_PIGEON",
 	&"ferry": "CUE_FERRY",
+	&"meter": "CUE_METER",
 }
-const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry"]
+const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]
 var _cues_seen: Dictionary = {}
 var _hints: Array[StringName] = []
 var _hint_up: StringName = &""
@@ -5790,6 +5791,10 @@ func _hint_held() -> bool:
 ## hidden while something holds it), or the next owed one put up.
 func _hint_step(delta: float) -> void:
 	_watch_the_ferries(delta)
+	# The meter's hint (2026-10-07, Richard): the first time it moves, a piece out of the
+	# water; it waits behind the first steps' note like any hint.
+	if pollution < 0.9999 and not _cues_seen.has(&"meter"):
+		_owe_hint(&"meter")
 	if _hint_up == &"" and _hints.is_empty():
 		return
 	if _settings == null:
@@ -5839,6 +5844,8 @@ func _hint_target(kind: StringName) -> Rect2:
 			return _skin.get_global_transform() * _skin.money_drawn_box()
 		&"ferry":
 			return _skin.get_global_transform() * _skin.stock_box()
+		&"meter":
+			return _skin.get_global_transform() * _skin.meter_box()
 	return Rect2()
 
 
