@@ -44,6 +44,15 @@
         "--project",
         "C:/Users/Administrador/Documents/Games/Roguelite Football Manager"
       ]
+    },
+    "godot-clone-farm": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/tmp/godot-mcp/dist/index.js",
+        "--project",
+        "C:/Users/Administrador/Documents/Games/Clone Farm"
+      ]
     }
   }
 }

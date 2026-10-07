@@ -11,6 +11,7 @@ This is a monorepo holding 5 independent Godot 4.7+ game prototypes under develo
 - **Semi Secret Wars** — (status: active, CLAUDE.md at `Semi Secret Wars/CLAUDE.md`)
 - **Roguelite Football Manager** — (status: active, CLAUDE.md at `Roguelite Football Manager/CLAUDE.md`)
 - **Crow Funding** — crows fly trips from a balcony to steal shiny loot, pen-and-ink art (CLAUDE.md at `Crow Funding/CLAUDE.md`)
+- **Clone Farm** — 3D farm where the farmer runs a cloning machine and assigns clones with trade-off traits; graybox prototype (CLAUDE.md at `Clone Farm/CLAUDE.md`, design in `Clone Farm/docs/`)
 
 ---
 

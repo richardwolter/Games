@@ -1,0 +1,22 @@
+# Godot 4 auto-generated
+.godot/
+/android/
+
+# Exported builds
+/build/
+*.exe
+*.pck
+*.zip
+
+# Headless test output
+/tools/last_*.log
+
+# Synty assets: the licence forbids distributing them and this repo is public.
+# Bought or subscribed packs live here, on disk only.
+/assets/synty/
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.bak
+__pycache__/
