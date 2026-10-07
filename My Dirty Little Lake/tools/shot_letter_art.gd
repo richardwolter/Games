@@ -12,7 +12,7 @@ extends Node
 ## **These are baked, and baked things drift** (2026-09-19, Richard's call over drawing the
 ## cards in code): a repainted aim ring, lake, shop or HUD means running this again. That is
 ## the whole cost of the cards showing the real game, and this file is what keeps it to one
-## command. They carry the game's English UI as it stands; a language pass re-shoots them.
+## command. The stills with the UI's words in them are shot in every language (below).
 ##
 ## **A pose is found, not written down.** Where the ring reads green, where it reads red and
 ## where a find floats are asked of the net and the grid each run, so a changed fill or a
@@ -24,6 +24,17 @@ extends Node
 ## shed's). The ring is photographed calm (`CastNet.calm_ring`): no halo caught half
 ## dissolved, no dash caught mid-march.
 ##
+## **The stills that carry words are shot once per language** (2026-10-07, `/grill-me` with
+## Richard: a Portuguese card with an English shop board on it): the three boards and the
+## Strength row, as `name.png` in English and `name.<locale>.png` in every other language
+## `Prefs` offers. `Letter._still` takes the locale's file and falls back to English. The
+## language is set by hand, as test_lake does: nothing here writes `settings.cfg`.
+##
+## **The house and the wash stand are Richard's room** (same pass): `user://play_decor.save`
+## (laid out in `tools/play_decor.tscn`) is copied, its version raised as
+## `tools/shot_wash_place.gd` does, and a second lake is loaded from the copy. The original is
+## never written.
+##
 ## On a save of its own and under its own node, like every probe since `shot_ending`. The
 ## view is held from `_process` at priority 100 — after the lake's own, which would put the
 ## camera and the aim back — the way `tools/film_trailer.gd` does it.
@@ -32,6 +43,14 @@ const OUT := "res://assets/letter/%s.png"
 const SHEET := "res://tools/last_letter_art.png"
 const LOG := "res://tools/last_letter_art.log"
 const SAVE := "user://probe_letter_art.save"
+## Richard's furnished house, copied to `DECOR_SAVE` and loaded from there.
+const FROM_DECOR := "user://play_decor.save"
+const DECOR_SAVE := "user://probe_letter_decor.save"
+## The find on the wash stand, and the others waiting on the tray beside it.
+const WASH_PIECE := &"decor_pk_white_sofa"
+const WASH_MORE := [&"decor_pk_armchair", &"decor_pk_floor_lamp", &"decor_pk_globe"]
+## The stills that carry the UI's words, shot once per language.
+const WORDED := ["upgrades_net", "upgrades_boats", "upgrades_dogs", "weight_strength"]
 
 ## Seconds a pose is held before it is photographed: the camera's ease, the first frames of
 ## a board, a ring's redraw.
@@ -47,18 +66,6 @@ const BOARD_PAD := 8.0
 const BOARD_PLANK := 17.0
 const BOARD_TOP := 250.0
 const ROW_PAD := 6
-## `shot_shed`'s room, in cells: bookcase and fridge on the wall, paintings, table and pot,
-## chairs, sofa on rug, the hearth. Kept here rather than read from that probe, since a
-## probe is a scene and not a library.
-const SHED_LAYOUT := [
-	[&"decor_bookcase_tall", 1, -4], [&"decor_fridge", 9, -4],
-	[&"decor_painting_a", 14, -3], [&"decor_painting_b", 18, -4],
-	[&"decor_kitchen_counter", 22, -2], [&"decor_stove", 32, -3],
-	[&"decor_big_table", 4, 8], [&"decor_flower_pot", 6, 6], [&"decor_globe", 9, 5],
-	[&"decor_dining_chair", 12, 10], [&"decor_dining_chair", 14, 10],
-	[&"decor_pet_bed", 24, 14], [&"decor_big_rug", 20, 6], [&"decor_sofa", 22, 8],
-	[&"decor_loveseat", 34, 8], [&"decor_fireplace", 30, 2],
-]
 const ROW_CONTEXT := 38.0
 ## The whole lake from the far stop, in window pixels: its piers and a rim of bank.
 const LAKE_CROP := Vector2i(1900, 1000)
@@ -76,6 +83,10 @@ var _step := 0
 var _look := Vector2.INF
 var _aim := Vector2.INF
 var _made: Array = []
+## Which language the shop is being photographed in, by index into `Prefs.languages()`.
+var _lang := 0
+## The language every shot is named for: empty for English.
+var _suffix := ""
 
 
 func _ready() -> void:
@@ -187,16 +198,28 @@ func _physics_process(delta: float) -> void:
 			(_main.get(&"_skin") as Control).visible = false
 			_main.set(&"sludge", 1500.0)
 			_main.call(&"_set_menu", true)
+			_stage_dogs()
 		7:
 			_shoot_shop()
+			_lang += 1
+			if _lang < Prefs.languages().size():
+				_speak(String(Prefs.languages()[_lang]["locale"]))
+				return
+			_speak("en")
 			_main.call(&"_set_menu", false)
 			(_main.get(&"_skin") as Control).visible = true
-			_furnish_shed()
+			_load_house()
 		8:
+			# The house's lake has built; one more hold for its first frames.
+			if _main == null or not _main.is_inside_tree():
+				return
+		9:
+			_open_shed()
+		10:
 			_shoot_shed()
 			_main.call(&"_set_shed", false)
 			_open_wash()
-		9:
+		11:
 			# Sprayed until the find is about half out of its coat, however long that takes:
 			# the card is a before-and-after in one picture. `WASH_MOST` is the way out.
 			var washing: WashRoom = _main.get(&"_wash")
@@ -205,19 +228,23 @@ func _physics_process(delta: float) -> void:
 				return
 			_say("washed to %.2f in %.1f s" % [washing.stand().share_clean(), _washed_for])
 			_spraying = false
-		10:
+		12:
 			var room: WashRoom = _main.get(&"_wash")
 			var piece := room.stand().piece_box()
 			# The stand's own coordinates: the piece's box is the stand's, not the room's.
+			# The whole find with room round it, at the crop's shape: a sofa is wider than
+			# the old crop and came out cut at both arms.
+			var crop := Vector2(WASH_CROP)
+			crop *= maxf(1.0, maxf(piece.size.x * 1.45 / crop.x, piece.size.y * 1.6 / crop.y))
 			_crop_canvas("decor_wash", Rect2(
-				room.stand().global_position + piece.get_center()
-					- Vector2(WASH_CROP) * Vector2(0.5, 0.55),
-				Vector2(WASH_CROP)
+				room.stand().global_position + piece.get_center() - crop * Vector2(0.5, 0.52), crop
 			))
 			_main.call(&"_set_wash", false)
 			_contact_sheet()
-			if FileAccess.file_exists(SAVE):
-				DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
+			for path in [SAVE, DECOR_SAVE]:
+				for end in ["", ".bak", ".tmp"]:
+					if FileAccess.file_exists(path + end):
+						DirAccess.remove_absolute(ProjectSettings.globalize_path(path + end))
 			_log.close()
 			get_tree().quit()
 			return
@@ -367,27 +394,84 @@ func _shoot_shop() -> void:
 	_say("NO strength row on the shop")
 
 
-## The shed, furnished the way `tools/shot_shed.gd` lays it out (the same list, in cells),
-## with no dogs in it and every switchable piece on: the last card's picture of the room.
-func _furnish_shed() -> void:
+## The dogs' head card with the pack staged across its middle and held there (2026-10-07,
+## Richard: the dogs ran in from the edges and the still caught them at the side).
+func _stage_dogs() -> void:
+	var shop: ShopSkin = _main.get(&"_shop_skin")
+	var cards: Dictionary = shop.get(&"_cards")
+	if cards.has(&"dog"):
+		(cards[&"dog"] as Node).call(&"stage_dogs")
+	else:
+		_say("NO dogs card on the shop")
+
+
+## A language for the stills, set by hand: `Prefs.set_language` would write the player's file.
+func _speak(locale: String) -> void:
+	TranslationServer.set_locale(locale)
+	preload("res://scripts/style.gd").set_locale(locale)
+	Prefs.call(&"_redraw_all", get_tree().root)
+	Prefs.language_changed.emit()
+	_suffix = "" if locale == "en" else "." + locale
+	_say("speaking %s" % locale)
+
+
+## The second lake: Richard's furnished house, from a copy of its save.
+func _load_house() -> void:
+	if not FileAccess.file_exists(FROM_DECOR):
+		_say("NO decorated house at %s: run tools/play_decor.tscn first" % FROM_DECOR)
+		return
+	for end in ["", ".bak", ".tmp"]:
+		if FileAccess.file_exists(DECOR_SAVE + end):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(DECOR_SAVE + end))
+	DirAccess.copy_absolute(ProjectSettings.globalize_path(FROM_DECOR), ProjectSettings.globalize_path(DECOR_SAVE))
+	_raise_version(DECOR_SAVE)
+	_net = null
+	_main.queue_free()
+	_main = load("res://scenes/main.tscn").instantiate()
+	_main.set(&"save_path", DECOR_SAVE)
+	_main.set(&"autoload_save", true)
+	add_child.call_deferred(_main)
+
+
+## The copy's saved version raised to the game's own, as `tools/shot_wash_place.gd` does: only
+## the lake's stacks changed meaning since that save, and nothing here is judged by them.
+func _raise_version(path: String) -> void:
+	var bytes := FileAccess.get_file_as_bytes(path)
+	var key := "version".to_utf8_buffer()
+	for i in bytes.size() - 20:
+		if bytes.slice(i, i + key.size()) != key:
+			continue
+		var at := i + 8
+		if bytes.decode_u32(at) == 2:
+			var was := bytes.decode_u32(at + 4)
+			bytes.encode_u32(at + 4, Lake.SAVE_VERSION)
+			var f := FileAccess.open(path, FileAccess.WRITE)
+			f.store_buffer(bytes)
+			f.close()
+			_say("house save version %d raised to %d" % [was, Lake.SAVE_VERSION])
+		return
+
+
+## Richard's room, open, with no dogs in it and every switchable piece on.
+func _open_shed() -> void:
+	_net = _main.get(&"_net")
+	_angler = _main.get(&"_angler")
+	_camera = _main.get(&"_camera")
+	_main.set(&"_in_menu", false)
 	var room: ShedRoom = _main.get_node(^"HUD/Shed/Pad/Lines/Room")
-	var decor: Array = _main.get(&"decor")
-	decor.clear()
-	room.decor = decor
-	for want: Array in SHED_LAYOUT:
-		if room.sheets.has(want[0]):
-			var at := Vector2i(int(want[1]), int(want[2])) * ShedRoom.CELL
-			if not room.place(want[0], at):
-				_say("shed: %s refused at %s,%s" % want)
 	for k in room.decor.size():
 		var row: Dictionary = room.decor[k]
 		var piece := StringName(row["piece"])
 		var on := room.sheets.switched(piece, int(row.get("view", 0)))
 		if on >= 0 and not room.sheets.is_on(piece, int(row.get("view", 0))):
 			row["view"] = on
+	# Every switch counted as tried, or each wears its pointing hand in the picture.
+	for row: Dictionary in room.decor:
+		if not room.switch_tried.has(String(row["piece"])):
+			room.switch_tried.append(String(row["piece"]))
 	_main.call(&"_set_shed", true)
 	room.dogs().clear()
-	_say("shed furnished with %d pieces" % room.decor.size())
+	_say("house open with %d pieces" % room.decor.size())
 
 
 func _shoot_shed() -> void:
@@ -396,20 +480,20 @@ func _shoot_shed() -> void:
 	_crop_canvas("decor_shed", Rect2(room.global_position + box.position, box.size))
 
 
-## A find on the stand, and the jet left running on it.
+## A pack find on the stand, and the jet left running on it.
 func _open_wash() -> void:
 	var sheets: Sheets = _main.get(&"_sheets")
 	var waiting: Array = _main.get(&"unwashed")
-	for name in ["decor_loveseat", "decor_lamp", "decor_pet_bed"]:
-		if sheets.has(StringName(name)) and not waiting.has(name):
-			waiting.append(name)
+	for name: StringName in [WASH_PIECE] + WASH_MORE:
+		if sheets.has(name) and not waiting.has(String(name)):
+			waiting.append(String(name))
 	_main.set(&"sludge", 500.0)
 	_main.call(&"_set_wash", true)
 	var room: WashRoom = _main.get(&"_wash")
-	for name: String in waiting:
-		if room.pick(StringName(name)):
-			_say("washing %s" % name)
-			break
+	if room.pick(WASH_PIECE):
+		_say("washing %s" % WASH_PIECE)
+	else:
+		_say("NO %s on the stand" % WASH_PIECE)
 	_spraying = true
 
 
@@ -474,10 +558,15 @@ func _write(name: String, picture: Image) -> void:
 	if not only.is_empty() and not only.has(name):
 		_say("%-16s left alone: not in LETTER_ONLY" % name)
 		return
+	# A worded still carries the language it was shot in; the rest are the same in all.
+	if not WORDED.has(name) and not _suffix.is_empty():
+		return
+	var file := name + (_suffix if WORDED.has(name) else "")
 	picture.convert(Image.FORMAT_RGB8)
-	picture.save_png(ProjectSettings.globalize_path(OUT % name))
-	_made.append({"name": name, "picture": picture})
-	_say("%-16s %dx%d" % [name, picture.get_width(), picture.get_height()])
+	picture.save_png(ProjectSettings.globalize_path(OUT % file))
+	if _suffix.is_empty():
+		_made.append({"name": name, "picture": picture})
+	_say("%-24s %dx%d" % [file, picture.get_width(), picture.get_height()])
 
 
 ## Every still side by side on magenta, for judging the crops without opening nine files.

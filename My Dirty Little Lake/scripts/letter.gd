@@ -17,7 +17,8 @@
 ## `assets/letter/*.png`). This **supersedes the first cut's "every picture is drawn in code,
 ## so nothing can drift"**: a ring drawn on a flat face explained nothing, because what a
 ## ring means is what is under it. The cost, taken knowingly: a repainted ring, lake, shop or
-## HUD means re-running the probe, and the stills carry the game's English UI as it stands.
+## HUD means re-running the probe. The stills with the UI's words in them are shot once per
+## language (2026-10-07) and the card takes the one in play.
 ##
 ## **The greeting is the first card's alone**, and the other three give its room to their
 ## pictures. **One height whatever card is up**: the board is laid out from the top —
@@ -69,7 +70,10 @@ const GREETING_SIZES := [
 	[Style.TEXT_TINY, Style.TEXT_SMALL],
 ]
 
-## Where the stills live. One PNG a snapshot, named as the cards name them.
+## Where the stills live. One PNG a snapshot, named as the cards name them. A still that
+## carries the UI's words has one per language, `name.<locale>.png`, beside the English
+## `name.png` it falls back to (2026-10-07, Richard: the cards' pictures read in the card's
+## language). `tools/shot_letter_art.gd` writes them.
 const ART := "res://assets/letter/%s.png"
 
 ## The cards, in order. `text` is the sentence, wrapped to at most `SENTENCE_ROWS` rows (or
@@ -84,8 +88,10 @@ static var CARDS: Array:
 		{
 			"head": "",
 			"title": Text.LETTER_WELCOME_TITLE,
-			"rows": 5,
+			"rows": 4,
 			"letter": true,
+			# Under the greeting and over the picture (2026-10-07, Richard).
+			"lead": Text.LETTER_WELCOME_LEAD,
 			"text": Text.LETTER_WELCOME_TEXT,
 			"snaps": [["lake_whole", "", &""]],
 		},
@@ -214,6 +220,7 @@ var _board := Rect2()
 var _sheet := Rect2()
 var _close: CloseButton
 var _door: PlankButton
+var _pond: LetterDoor
 var _back := Rect2()
 var _on := Rect2()
 var _dots: Array[Rect2] = []
@@ -261,6 +268,10 @@ func _ready() -> void:
 	_close = CloseButton.new()
 	_close.pressed.connect(func() -> void: close_asked.emit())
 	add_child(_close)
+	# The pond the door floats on, behind it (see `letter_door.gd`).
+	_pond = LetterDoor.new()
+	_pond.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_pond)
 	_door = PlankButton.new()
 	_door.label = DOOR_LABEL
 	Prefs.language_changed.connect(func() -> void:
@@ -272,6 +283,7 @@ func _ready() -> void:
 	_door.accent = true
 	_door.size = DOOR
 	_door.pressed.connect(func() -> void: close_asked.emit())
+	_door.mouse_entered.connect(_pond.kick)
 	add_child(_door)
 	resized.connect(_lay_out)
 	_lay_out()
@@ -280,10 +292,17 @@ func _ready() -> void:
 ## A still, loaded once. Null when the probe has not been run or its output not imported,
 ## and the snapshot draws a blank print rather than nothing.
 func _still(name: String) -> Texture2D:
-	if not _art.has(name):
-		var path := ART % name
-		_art[name] = load(path) as Texture2D if ResourceLoader.exists(path) else null
-	return _art[name]
+	var locale := TranslationServer.get_locale()
+	var key := name + "." + locale
+	if not _art.has(key):
+		var picked: Texture2D = null
+		for file in [name + "." + locale, name + "." + locale.get_slice("_", 0), name]:
+			var path := ART % file
+			if ResourceLoader.exists(path):
+				picked = load(path) as Texture2D
+				break
+		_art[key] = picked
+	return _art[key]
 
 
 ## Every still the cards name, and whether it is there. For the harness: a card with a
@@ -328,6 +347,23 @@ func _greeting_wide(lead_px: int, name_px: int) -> float:
 
 func _greeting_tall() -> float:
 	return float(int(greeting_sizes()[1])) + LINE_STEP + GAP
+
+
+## The first card's line under the greeting, wrapped: `{rows, px}`.
+func _lead_fit() -> Dictionary:
+	var lead := String(CARDS[0].get("lead", ""))
+	if lead.is_empty():
+		return {"rows": [], "px": Style.TEXT_BODY}
+	var fit := _fit_marked(lead, text_wide(), 2.0)
+	if fit.is_empty():
+		fit = {"rows": _wrap_marked(_tokens(lead), Style.TEXT_TINY, text_wide()), "px": Style.TEXT_TINY}
+	return fit
+
+
+## What the greeting and the line under it take, top down, on the first card.
+func _top_tall() -> float:
+	var rows: Array = _lead_fit()["rows"]
+	return _greeting_tall() + float(rows.size()) * (float(Style.TEXT_BODY) + LINE_STEP) + (GAP if not rows.is_empty() else 0.0)
 
 
 ## How tall the board wants to be. One number whatever card is up, by construction.
@@ -470,6 +506,9 @@ func overruns() -> PackedStringArray:
 	var wide := text_wide()
 	if _greeting_wide(int(greeting_sizes()[0]), int(greeting_sizes()[1])) > wide:
 		out.append("greeting: %s" % GREETING)
+	var lead := String(CARDS[0].get("lead", ""))
+	if not lead.is_empty() and _fit_marked(lead, wide, 2.0).is_empty():
+		out.append("lead: %s" % lead)
 	for card: Dictionary in CARDS:
 		var snaps: Array = card["snaps"]
 		var each := (wide - SNAP_GAP * float(snaps.size() - 1)) / float(maxi(snaps.size(), 1))
@@ -515,6 +554,8 @@ func _lay_out() -> void:
 		inside.position.x + (inside.size.x - DOOR.x) * 0.5, row + (PAGER_TALL - DOOR.y) * 0.5
 	).floor()
 	_door.visible = last
+	_pond.door = _door.get_rect()
+	_pond.visible = last
 	_dots.clear()
 	var span := float(CARDS.size() - 1) * DOT_GAP
 	# Centred on the sheet on every card that has them.
@@ -533,8 +574,8 @@ func _lay_out() -> void:
 func _art_box(inside: Rect2) -> Rect2:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if bool(card.get("letter", false)):
-		# The letter's picture stands under the greeting, over the paragraphs (2026-09-24).
-		var under := inside.position.y + _greeting_tall() + GAP
+		# The letter's picture stands under the greeting and its line, over the paragraphs.
+		var under := inside.position.y + _top_tall() + GAP
 		return Rect2(inside.position.x, under, inside.size.x, LETTER_ART_TALL)
 	var top := _text_foot(inside) + GAP
 	# The pager's row on every card but the last, the door's on that one: the same row.
@@ -545,7 +586,7 @@ func _art_box(inside: Rect2) -> Rect2:
 ## Where the heading's baseline is, top down. A card with no pictures stands its words in
 ## the middle of the room they would have taken, rather than leaving that room bare.
 func _head_base(inside: Rect2) -> float:
-	var base := inside.position.y + (_greeting_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
+	var base := inside.position.y + (_top_tall() if page == 0 else 0.0) + float(Style.TEXT_HEAD)
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if not (card["snaps"] as Array).is_empty() and not bool(card.get("letter", false)):
 		return base
@@ -560,13 +601,17 @@ func _head_base(inside: Rect2) -> float:
 	return floorf(base + maxf(foot - base - words, 0.0) * 0.5)
 
 
-## Where the sentence's rows end: the heading, a gap, then every reserved row. A blurbed
-## card has no sentence block — its words stand under its pictures.
+## Where the sentence's rows end: the heading, a gap, then the rows the sentence really
+## takes. A blurbed card has no sentence block — its words stand under its pictures. The rows
+## written, not the rows reserved (2026-10-07, Richard): a two-row sentence under four
+## reserved rows left the pictures hanging low with paper bare over them.
 func _text_foot(inside: Rect2) -> float:
 	var card: Dictionary = CARDS[clampi(page, 0, CARDS.size() - 1)]
 	if bool(card.get("blurbs", false)):
 		return _head_base(inside)
-	return _head_base(inside) + GAP + float(_rows_of(card)) * (float(Style.TEXT_BODY) + LINE_STEP)
+	var fit := _rows(card)
+	var used := float(_rows_of(card)) if fit.is_empty() else _rows_tall(fit["rows"])
+	return _head_base(inside) + GAP + used * (float(Style.TEXT_BODY) + LINE_STEP)
 
 
 ## Pin this card's photographs in a row: one height for all of them, each as wide as its own
@@ -731,6 +776,11 @@ func _draw() -> void:
 	var inside := _sheet.grow(-SHEET_PAD)
 	if page == 0:
 		_draw_greeting(inside)
+		var lead := _lead_fit()
+		var y_lead := inside.position.y + _greeting_tall()
+		for row: Dictionary in lead["rows"]:
+			_ink_marked(row, int(lead["px"]), y_lead + float(lead["px"]), inside, 0)
+			y_lead += float(Style.TEXT_BODY) + LINE_STEP
 	# Top down: the heading with its rules, then the sentence, then the pictures' captions.
 	var head_base := _head_base(inside)
 	var head := String(card["head"])

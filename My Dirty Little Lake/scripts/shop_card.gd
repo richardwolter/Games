@@ -365,11 +365,36 @@ func _draw_lake_pieces(lake: Rect2) -> void:
 		draw_texture_rect_region(art["sheet"], Rect2(at, Vector2(drawn.x, roundf(drawn.y * 0.8))), shown)
 
 
+## Probes only (`tools/shot_letter_art.gd`, 2026-10-07): the pack spread across the
+## card's middle, two running each way at staggered depths, held where they stand while their
+## legs run on, so the letter's still has every dog in the frame.
+var _staged := false
+const STAGED := [[0.2, 0.7, 1.0], [0.4, 0.95, -1.0], [0.6, 0.78, 1.0], [0.8, 0.9, -1.0]]
+
+
+func stage_dogs() -> void:
+	_staged = true
+	for i in _dogs.size():
+		var pose: Array = STAGED[i % STAGED.size()]
+		var dog: Dictionary = _dogs[i]
+		dog["fx"] = float(pose[0])
+		dog["y"] = float(pose[1])
+		dog["way"] = float(pose[2])
+		dog["tall"] = lerpf(DOG_TALL.x, DOG_TALL.y, (float(pose[1]) - 0.6) / 0.4)
+		dog["wait"] = 0.0
+	queue_redraw()
+
+
 func _step_dogs(delta: float) -> void:
 	for i in _dogs.size():
 		var dog: Dictionary = _dogs[i]
 		if float(dog["wait"]) > 0.0:
 			dog["wait"] = float(dog["wait"]) - delta
+			continue
+		if _staged:
+			# Laid out against the card as it is now: staged as the shop opens, it has no size.
+			dog["x"] = size.x * float(dog.get("fx", 0.5))
+			dog["age"] = float(dog["age"]) + delta
 			continue
 		dog["x"] = float(dog["x"]) + float(dog["way"]) * float(dog["speed"]) * delta
 		dog["age"] = float(dog["age"]) + delta

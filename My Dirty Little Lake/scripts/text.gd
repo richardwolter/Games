@@ -677,6 +677,9 @@ static var LETTER_GAME_NAME: String:
 static var LETTER_WELCOME_TEXT: String:
 	get: return TranslationServer.translate(&"LETTER_WELCOME_TEXT")
 
+static var LETTER_WELCOME_LEAD: String:
+	get: return TranslationServer.translate(&"LETTER_WELCOME_LEAD")
+
 static var LETTER_NET_TEXT: String:
 	get: return TranslationServer.translate(&"LETTER_NET_TEXT")
 

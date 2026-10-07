@@ -11584,6 +11584,33 @@ func _stage_letter() -> void:
 	var blank := letter.missing_stills()
 	_check(blank.is_empty(), "every card's snapshots have been shot and imported",
 		", ".join(blank))
+	# The last card's door floats on a pond laid round it, behind it (2026-10-07).
+	letter.page = Letter.CARDS.size() - 1
+	letter.call(&"_lay_out")
+	var pond: LetterDoor = letter.get(&"_pond")
+	var door_button: PlankButton = letter.get(&"_door")
+	_check(pond != null and pond.visible and pond.door == door_button.get_rect()
+		and pond.get_index() < door_button.get_index(),
+		"the door floats on its pond, drawn behind it", "")
+	letter.page = 0
+	letter.call(&"_lay_out")
+	_check(not pond.visible, "and the pond is the last card's alone", "")
+	# A still with the UI's words in it has one per language (2026-10-07).
+	var unshot := []
+	for still: String in ["upgrades_net", "upgrades_boats", "upgrades_dogs", "weight_strength"]:
+		for entry: Dictionary in Prefs.languages():
+			var locale := String(entry["locale"])
+			var file := still if locale == "en" else "%s.%s" % [still, locale]
+			if not ResourceLoader.exists(Letter.ART % file):
+				unshot.append(file)
+	_check(unshot.is_empty(), "the worded stills are shot in every language", ", ".join(unshot))
+	# The welcome's line stands under the greeting and over the picture.
+	var lead_rows: Array = (letter.call(&"_lead_fit") as Dictionary)["rows"]
+	_check(String(Letter.CARDS[0].get("lead", "")).begins_with("The lake has been abandoned")
+		and lead_rows.size() == 1,
+		"the welcome's abandoned line is one row under the greeting", "%d rows" % lead_rows.size())
+	_check(String(Text.LETTER_NET_TEXT).begins_with("*Left mouse-click*"),
+		"the net card says left mouse-click", String(Text.LETTER_NET_TEXT).get_slice("\n", 0))
 	var crowded := []
 	for card: Dictionary in Letter.CARDS:
 		var pinned: Array = card["snaps"]
@@ -11592,8 +11619,8 @@ func _stage_letter() -> void:
 	_check(crowded.is_empty(), "one to three to a card, the welcome's lake included",
 		", ".join(crowded))
 	var welcome: Array = (letter.call(&"_rows", Letter.CARDS[0]) as Dictionary).get("rows", [])
-	_check(welcome.size() >= 3 and bool(welcome[welcome.size() - 1]["para"]),
-		"the welcome card carries its three sentences whole, each its own paragraph",
+	_check(welcome.size() >= 2 and bool(welcome[welcome.size() - 1]["para"]),
+		"the welcome card carries its two sentences whole, each its own paragraph",
 		"%d rows" % welcome.size())
 	# The greeting is the first card's, and the others give its room to their pictures.
 	var inside := sheet.grow(-Letter.SHEET_PAD)

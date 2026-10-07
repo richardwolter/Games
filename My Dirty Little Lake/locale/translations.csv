@@ -220,52 +220,38 @@ TOUR_SHOP_LEGEND,shop_skin.gd,10,10,0,"Shop tour card 6, pointing at the pricing
 LETTER_WELCOME_TITLE,letter.gd,20,16,300,The plank over the first card of the instructions.,Welcome,Boas-Vindas,Bienvenida,Willkommen,Bienvenue,ようこそ,欢迎,환영해요,Welcome,Welcome,Welcome,Welcome,Welcome,Welcome,Welcome
 LETTER_GREETING_LEAD,letter.gd,16,11,0,"First card, one line with LETTER_GAME_NAME drawn right after it (keep the trailing space). The lead and the name share a line of about 678 px.",You are the new owner of ,Você é o mais novo proprietário do ,Eres el nuevo propietario de ,Du bist der neue Besitzer von ,Tu es le nouveau propriétaire de ,新しい持ち主はあなた：,你是这片湖的新主人：,새 주인은 바로 당신: ,You are the new owner of ,You are the new owner of ,You are the new owner of ,You are the new owner of ,The new owner is you: ,You are the new owner of this lake: ,The new owner is you: 
 LETTER_GAME_NAME,letter.gd,20,13,0,"The game's name, a size up after LETTER_GREETING_LEAD. Do not translate.",Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake.,Dirty Little Lake. (untranslated),Dirty Little Lake. (untranslated),Dirty Little Lake. (untranslated),Dirty Little Lake. (untranslated),Dirty Little Lake. (untranslated),Dirty Little Lake. (untranslated)
-LETTER_WELCOME_TEXT,letter.gd,16,11,0,"Three paragraphs, one per line break; keep the line breaks. Words between *asterisks* are drawn in red: keep the asterisks round the matching words. Wraps.","It has been abandoned and neglected for too long.
-Your goal is to *catch objects with your net, recycle and bring life back to the lake.*
-The following instructions will *teach you how it works.*","Ele foi abandonado e esquecido por tempo demais.
-Seu objetivo é *pegar objetos com a rede, reciclar e trazer vida de volta ao lago.*
-As instruções a seguir vão *te ensinar como funciona.*","Ha estado abandonado y olvidado demasiado tiempo.
-Tu objetivo es *atrapar objetos con la red, reciclar y devolverle la vida al lago.*
-Las siguientes instrucciones te *enseñarán cómo funciona.*","Er war zu lange verlassen und vergessen.
-Dein Ziel: *Objekte mit dem Netz fangen, recyceln und den See wieder zum Leben erwecken.*
-Die folgenden Hinweise *zeigen dir, wie es geht.*","Il a été abandonné et négligé trop longtemps.
-Ton but : *attraper des objets avec ton filet, recycler et rendre la vie au lac.*
-Les instructions suivantes vont *t'apprendre comment ça marche.*","長いあいだ、放っておかれていました。
-目標は*網でものを取り、リサイクルして、湖に命を取り戻すこと。*
-この先の説明で*やり方がわかります。*","它被遗弃、荒废了太久。
-你的目标是*用网捞起物品，回收利用，让湖泊重获生机。*
-接下来的说明会*教你怎么玩。*","너무 오랫동안 버려지고 방치되었어요.
-목표는 *그물로 물건을 잡고, 재활용해서 호수에 생명을 되찾아 주는 것.*
-다음 안내가 *방법을 알려 줄 거예요.*","It has been abandoned and neglected for too long.
-Your goal is to *catch objects with your net, recycle and bring life back to the lake.*
-The following instructions will *teach you how it works.*","It has been abandoned and forgotten for too long.
-Your goal is to *catch objects with the net, recycle and bring life back to the lake.*
-The following instructions will *teach you how it works.*","It was abandoned and forgotten for too long.
-Your goal: *catch objects with the net, recycle and bring the lake back to life.*
-The following notes *show you how.*","It was abandoned and neglected too long.
-Your goal: *catch objects with your net, recycle and bring life back to the lake.*
-The following instructions will *teach you how it works.*","It was left alone for a long time.
-The goal is *to take things with the net, recycle, and restore life to the lake.*
-The explanations ahead *show you how.*","It was abandoned and neglected for too long.
-Your goal is to *catch items with the net, recycle, and bring the lake back to life.*
-The following instructions *teach you how to play.*","It was abandoned and neglected for too long.
-The goal is *catching things with the net, recycling, and giving life back to the lake.*
+LETTER_WELCOME_TEXT,letter.gd,16,11,0,"Two paragraphs, one per line break; keep the line breaks. Words between *asterisks* are drawn in red: keep the asterisks round the matching words. Wraps.","Your goal is to *catch objects with your net, recycle and bring life back to the lake.*
+The following instructions will *teach you how it works.*","Seu objetivo é *pegar objetos com a rede, reciclar e trazer vida de volta ao lago.*
+As instruções a seguir vão *te ensinar como funciona.*","Tu objetivo es *atrapar objetos con la red, reciclar y devolverle la vida al lago.*
+Las siguientes instrucciones te *enseñarán cómo funciona.*","Dein Ziel: *Objekte mit dem Netz fangen, recyceln und den See wieder zum Leben erwecken.*
+Die folgenden Hinweise *zeigen dir, wie es geht.*","Ton but : *attraper des objets avec ton filet, recycler et rendre la vie au lac.*
+Les instructions suivantes vont *t'apprendre comment ça marche.*","目標は*網でものを取り、リサイクルして、湖に命を取り戻すこと。*
+この先の説明で*やり方がわかります。*","你的目标是*用网捞起物品，回收利用，让湖泊重获生机。*
+接下来的说明会*教你怎么玩。*","목표는 *그물로 물건을 잡고, 재활용해서 호수에 생명을 되찾아 주는 것.*
+다음 안내가 *방법을 알려 줄 거예요.*","Your goal is to *catch objects with your net, recycle and bring life back to the lake.*
+The following instructions will *teach you how it works.*","Your goal is to *catch objects with the net, recycle and bring life back to the lake.*
+The following instructions will *teach you how it works.*","Your goal: *catch objects with the net, recycle and bring the lake back to life.*
+The following notes *show you how.*","Your goal: *catch objects with your net, recycle and bring life back to the lake.*
+The following instructions will *teach you how it works.*","The goal is *to take things with the net, recycle, and restore life to the lake.*
+The explanations ahead *show you how.*","Your goal is to *catch items with the net, recycle, and bring the lake back to life.*
+The following instructions *teach you how to play.*","The goal is *catching things with the net, recycling, and giving life back to the lake.*
 The next guide *will show you how.*"
-LETTER_NET_TEXT,letter.gd,16,11,0,"Two paragraphs, one per line break; keep it. *Asterisks* mark words drawn in red. The circles are the aim ring pictured below.","*Left click* to cast your net and catch objects floating.
-The *circles below* indicate how your cast will go.","*Clique esquerdo* para lançar a rede e pegar objetos boiando.
-Os *círculos abaixo* mostram como vai ser o lançamento.","*Clic izquierdo* para lanzar la red y atrapar objetos flotantes.
-Los *círculos de abajo* indican cómo será tu lanzamiento.","*Linksklick*, um dein Netz auszuwerfen und treibende Objekte zu fangen.
-Die *Kreise unten* zeigen, wie dein Wurf ausgeht.","*Clic gauche* pour lancer ton filet et attraper les objets qui flottent.
-Les *cercles ci-dessous* montrent comment ton lancer va se passer.","*左クリック*で網を投げて、浮いているものを取ろう。
-*下の円*は投げた結果の目安です。","*左键点击*撒网，捞起漂浮的物品。
-*下方的圆圈*显示这一网的结果。","*왼쪽 클릭*으로 그물을 던져 떠 있는 물건을 잡아요.
-*아래 원*은 던진 결과를 알려 줘요.","*Left click* to throw the net and catch floating objects.
-The *circles below* show how the throw will be.","*Left click* to throw the net and catch floating objects.
-The *circles below* indicate how your throw will be.","*Left click* to cast your net and catch floating objects.
-The *circles below* show how your throw turns out.","*Left click* to cast your net and catch the floating objects.
-The *circles below* show how your throw will go.","Throw the net with *left click* and take floating things.
-The *circles below* are a guide to the throw result.","*Left click* to cast the net and fish up floating items.
-The *circles below* show the result of this cast.","Throw the net with *left click* and catch floating items.
+LETTER_WELCOME_LEAD,letter.gd,16,11,0,"First card, the line under the greeting and over the lake picture. Wraps to two rows at most.",The lake has been abandoned and neglected for too long.,O lago foi abandonado e esquecido por tempo demais.,El lago ha estado abandonado y olvidado demasiado tiempo.,Der See war zu lange verlassen und vergessen.,Le lac a été abandonné et négligé trop longtemps.,湖は長いあいだ、放っておかれていました。,这片湖被遗弃、荒废了太久。,호수는 너무 오랫동안 버려지고 방치되었어요.,The lake was abandoned and forgotten for too long.,The lake has been abandoned and forgotten too long.,The lake was abandoned and forgotten for too long.,The lake has been abandoned and neglected too long.,The lake had been left alone for a long time.,This lake has been abandoned and neglected for too long.,The lake has been abandoned and neglected for too long.
+LETTER_NET_TEXT,letter.gd,16,11,0,"Two paragraphs, one per line break; keep it. *Asterisks* mark words drawn in red. The circles are the aim ring pictured below.","*Left mouse-click* to cast your net and catch objects floating.
+The *circles below* indicate how your cast will go.","*Clique com o botão esquerdo do mouse* para lançar a rede e pegar objetos boiando.
+Os *círculos abaixo* mostram como vai ser o lançamento.","*Clic izquierdo del ratón* para lanzar la red y atrapar objetos flotantes.
+Los *círculos de abajo* indican cómo será tu lanzamiento.","*Linksklick mit der Maus*, um dein Netz auszuwerfen und treibende Objekte zu fangen.
+Die *Kreise unten* zeigen, wie dein Wurf ausgeht.","*Clic gauche de la souris* pour lancer ton filet et attraper les objets qui flottent.
+Les *cercles ci-dessous* montrent comment ton lancer va se passer.","*マウスの左クリック*で網を投げて、浮いているものを取ろう。
+*下の円*は投げた結果の目安です。","*鼠标左键点击*撒网，捞起漂浮的物品。
+*下方的圆圈*显示这一网的结果。","*마우스 왼쪽 클릭*으로 그물을 던져 떠 있는 물건을 잡아요.
+*아래 원*은 던진 결과를 알려 줘요.","Click with the left mouse button to cast the net and catch floating objects.
+The *circles below* show how the throw will be.","Left mouse click to cast the net and catch floating objects.
+The *circles below* indicate how your throw will be.","Left click with the mouse to cast your net and catch drifting objects.
+The *circles below* show how your throw turns out.","Left mouse click to cast your net and catch floating objects.
+The *circles below* show how your throw will go.","Left-click the mouse to throw the net and take floating things.
+The *circles below* are a guide to the throw result.","Left-click the mouse to cast the net and scoop up floating items.
+The *circles below* show the result of this cast.","Left-click the mouse to throw the net and catch floating things.
 The *circles below* tell the throw result."
 LETTER_NET_TEXT_PAD,letter.gd,16,11,0,"Gamepad version of LETTER_NET_TEXT. %s is drawn as the cast button's picture. Two paragraphs, one per line break; keep it. *Asterisks* mark words drawn in red.","*Press %s* to cast your net and catch objects floating.
 The *circles below* indicate how your cast will go.","*Aperte %s* para lançar a rede e pegar objetos boiando.

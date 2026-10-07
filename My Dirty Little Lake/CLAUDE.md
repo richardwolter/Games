@@ -1443,7 +1443,8 @@ open** for the hints still to come.
   counted, and `test_lake` asks for none, captions included.
 - **Out of scope, by decision**: contextual hints, unlock pacing, a goal readout, a skip
   key, new painted art, loops or animation on the cards, a live viewport onto the lake,
-  per-language stills, and any tutorial quest or checklist.
+  per-language stills (superseded 2026-10-07, see The Cards in Every Language), and any
+  tutorial quest or checklist.
 - **Probes**: `tools/shot_letter.tscn` (desktop build, `--fixed-fps 60`, its own save path
   and no file at it, `Lake.force_front` + `Lake.force_intro`) saves
   `tools/last_letter_{sailing,walking,card_*}.png` and `last_letter.log`. **A page turned is
@@ -1657,6 +1658,38 @@ A wording and layout pass over the onboarding cards, off Richard's first-time-pl
 - `test_lake`'s `_stage_letter` guards the heads, the title, the one-line greeting with the
   name a size up, the three caption inks and their contrast, heading over words over
   pictures, the door centred above the dots and its row reserved, and the rest as before.
+
+### The Cards in Every Language (2026-10-07, `/grill-me` with Richard)
+- **Welcome**: greeting, then "The lake has been abandoned and neglected for too long."
+  (`LETTER_WELCOME_LEAD`, the card's `lead`, `_lead_fit`, `_top_tall`), then the lake
+  picture, then the goal and instructions paragraphs (`LETTER_WELCOME_TEXT` lost its first
+  paragraph). PT source "O lago foi abandonado e esquecido por tempo demais."
+- **Net**: "*Left mouse-click* to cast..." in every language; the pad wording is unchanged.
+- **Pictures stand under the rows really written** (`_text_foot`), not the rows reserved, and
+  are centred between them and the pager: a two-row sentence under four reserved rows left
+  them hanging low. Every pictured card, not only the Net one.
+- **The worded stills are shot per language** (`tools/shot_letter_art.gd` `WORDED`,
+  `_speak`): the three boards and the Strength row as `name.png` (English) and
+  `name.<locale>.png`; `Letter._still` takes the locale's, then its language's, then
+  English. **Supersedes "per-language stills" out of scope** above. Wordless stills stay
+  single. The language is set by hand; `settings.cfg` is never written.
+- **The dogs still has the pack staged across the card** (`ShopCard.stage_dogs`, probes
+  only: four dogs held in place, legs running).
+- **The house and wash stills are Richard's room**: `user://play_decor.save` copied to
+  `user://probe_letter_decor.save`, version raised (shot_wash_place's rule), a second lake
+  loaded from it, every switch on and counted as tried (no pointing hands), dogs out; the
+  white sofa half washed. `play_decor.save` was copied over once from the old Lake Cleanup
+  folder, which `Prefs._bring_old_files` does not carry.
+- **"Start cleaning" floats on a pond** (`scripts/letter_door.gd`, `LetterDoor`, picked A off
+  `tools/last_door_mockup.png`, `tools/door_mockup.py`): clean water behind the whole plank
+  and in a strip past both ends (`REACH`, `STRIP_FROM`, `UNDER`), so **the plank's bites
+  show the lake, not the paper** (Richard, on the mockup); reeds and cattails at both ends,
+  a pad, a lily, a bottle and a can (`DRESS`), pack art at 2 design px an art px. Stepped
+  bands and a torn foam lip at `PIXEL_FPS`, pieces bob a whole art px, reeds lean by rows; a
+  hover kicks foam rings out from the plank's corners, a double bob and a swing over
+  `KICK_TIME`. No sound. All numbers first guesses.
+- `test_lake`'s `_stage_letter` guards the worded stills in all eight languages, the lead
+  line, the net wording, and the pond behind the door on the last card only.
 
 ### The Boards Are Paper (2026-09-20, `/grill-me` with Richard, issue #7)
 The last UI pass, and what closes #7: every board that opens shares one face. Richard's four
