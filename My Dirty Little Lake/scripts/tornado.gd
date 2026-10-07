@@ -34,6 +34,9 @@ signal remap_owed
 ## A hit put `pieces` of what it carried into `net` (the lake's storm tally). Sent on every
 ## hit, nought included.
 signal netted_into(net: Node, pieces: int)
+## It has come down onto the water (the end of the brew), at `at`: the lake's first-tornado
+## moment glides to it.
+signal touched_down(at: Vector2)
 
 # --- The schedule ----------------------------------------------------------------------
 ## Four a run, one as the meter passes each of these cleaned shares (1 - pollution), each
@@ -154,6 +157,11 @@ var count := 0
 var most := MARKS.size()
 var next_in := -1.0
 var _calm := 0.0
+## Held by the lake while its first-tornado moment is owed or playing (2026-10-07, Richard:
+## "freeze its clock"): it spins, lifts and flings as ever, but neither hunts across the
+## water nor counts down its life, so the player loses no taming time to being shown it.
+var held := false
+var _held_t := 0.0
 ## Hits this one takes to tame, set at `start`.
 var _need := 3
 var _size := SIZE_START
@@ -310,6 +318,7 @@ func start(angle: float = NAN) -> void:
 	_active = true
 	_clock = 0.0
 	_t = -1.0
+	_held_t = 0.0
 	_phase = "brew"
 	_phase_t = 0.0
 	_strength = 0.0
@@ -422,6 +431,7 @@ func _process(delta: float) -> void:
 		if weather != null:
 			weather.strike()
 		_start_wind()
+		touched_down.emit(_base)
 	else:
 		_t += delta
 	_step(delta)
@@ -436,7 +446,9 @@ func _set_phase(p: String) -> void:
 
 func _step(delta: float) -> void:
 	var t := _t
-	if _end_at < 0.0 and t >= TOUCH_END + life():
+	if held and _end_at < 0.0:
+		_held_t += delta
+	if _end_at < 0.0 and t - _held_t >= TOUCH_END + life():
 		_begin_end(false)
 	if _end_at >= 0.0:
 		if t >= _end_at + GONE_AFTER:
@@ -455,7 +467,8 @@ func _step(delta: float) -> void:
 	_hit_flash = maxf(_hit_flash - delta * 2.2, 0.0)
 	_spin += delta * lerpf(3.0, 7.0, _strength)
 
-	match _phase:
+	match _phase if not held else "held":
+		"held": pass
 		"touchdown": _hunt(delta, SPEED_TOUCH)
 		"hit": pass
 		"collapse": _hunt(delta, SPEED_COLLAPSE)

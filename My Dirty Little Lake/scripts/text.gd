@@ -958,3 +958,18 @@ static var PAD_LOST_HEAD: String:
 
 static var PAD_LOST_TEXT: String:
 	get: return TranslationServer.translate(&"PAD_LOST_TEXT")
+
+static var TORNADO_FIRST: String:
+	get: return TranslationServer.translate(&"TORNADO_FIRST")
+
+static var CUE_LUCKY: String:
+	get: return TranslationServer.translate(&"CUE_LUCKY")
+
+static var CUE_DOUBLE: String:
+	get: return TranslationServer.translate(&"CUE_DOUBLE")
+
+static var CUE_PIGEON: String:
+	get: return TranslationServer.translate(&"CUE_PIGEON")
+
+static var CUE_FERRY: String:
+	get: return TranslationServer.translate(&"CUE_FERRY")

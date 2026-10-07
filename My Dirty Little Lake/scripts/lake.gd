@@ -842,6 +842,35 @@ var _moment: float = -1.0
 var _moment_at: Vector2 = Vector2.INF
 var _moments: Array[Dictionary] = []
 var _moment_card: MomentCard
+## The kind of the moment running (`&"wildlife"`, `&"tornado"`...), empty while none is.
+var _moment_kind: StringName = &""
+
+## The first-time cues (2026-10-07, `/grill-me` with Richard: "guarantee all mechanics are
+## presented properly ... when it happens"). The first tornado is a moment (above); the first
+## lucky cast, the first double cast, the first pigeon netted and the ferries first sitting
+## docked for want of a full load are hints: a themed `CueCard` beside the thing, an arrow at
+## it, the game running on under it, gone on a click on its paper or after `HINT_HOLD`
+## seconds of being up. One at a time, in the order owed; a hint waits while a board, the
+## menu, a tour, a moment, the arrival or the ending is up. Saved together as `cues_seen`
+## (the kinds once seen); **a save without the key has seen none** (the camera tip's rule,
+## Richard's call), so a run past its first tornado gets the moment on its next one.
+const HINT_HOLD := 8.0
+## The ferry's hint: every hull docked with pieces in the box short of a load, for this many
+## seconds of play running.
+const FERRY_HINT_AFTER := 20.0
+const HINT_TEXT := {
+	&"lucky": "CUE_LUCKY",
+	&"double": "CUE_DOUBLE",
+	&"pigeon": "CUE_PIGEON",
+	&"ferry": "CUE_FERRY",
+}
+const CUE_KINDS: Array[StringName] = [&"tornado", &"lucky", &"double", &"pigeon", &"ferry"]
+var _cues_seen: Dictionary = {}
+var _hints: Array[StringName] = []
+var _hint_up: StringName = &""
+var _hint_left := 0.0
+var _hint_card: CueCard
+var _ferry_wait := 0.0
 ## Edge arrows at the last few pieces (`LastArrows`), made when first needed.
 var _last_arrows: LastArrows
 
@@ -2729,6 +2758,11 @@ func _roll_luck(where: Vector2) -> void:
 	# Heard on top of the throw (2026-10-06, Richard).
 	if _sfx != null and (lucky or double):
 		_sfx.play_luck(lucky, double)
+	# The first of each is named (2026-10-07): lucky first when a cast is both.
+	if lucky:
+		_owe_hint(&"lucky")
+	if double:
+		_owe_hint(&"double")
 
 
 ## Somewhere for the second net to land: a tile within `DOUBLE_NEAR` of the first net's
@@ -4273,6 +4307,8 @@ func _raise_front(loaded: bool) -> void:
 			_shop_tour_done = true
 			_decor_tour_done = true
 			_camera_tip_seen = true
+			for kind in CUE_KINDS:
+				_cues_seen[kind] = true
 		force_intro = false
 		if not force_front:
 			return
@@ -4631,6 +4667,7 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 func _on_bird_caught(at: Vector2) -> void:
 	sludge += bird_pay()
 	birds_caught += 1
+	_owe_hint(&"pigeon")
 	if _splash != null:
 		_splash.splash(at, 0.55)
 	# And, on some catches, the bird itself: the head at the side of the screen and the coo
@@ -5732,6 +5769,103 @@ func _camera_tip_step(delta: float) -> void:
 	_camera_tip.show_card(_free_camera.get_global_rect(), Text.CAMERA_TIP)
 
 
+## A first-time hint is owed (see `HINT_HOLD`): queued once, shown when nothing holds it.
+func _owe_hint(kind: StringName) -> void:
+	if _cues_seen.has(kind) or kind in _hints or _hint_up == kind:
+		return
+	_hints.append(kind)
+
+
+## What holds a hint back: anything that is already talking to the player, or covering the
+## thing it would point at.
+func _hint_held() -> bool:
+	return (
+		_panelled() or _fronted() or _farewell != null or _moment >= 0.0 or not _moments.is_empty()
+		or _arrive != Arrive.OFF or _letter_open or not _steps_done or _glide >= 0.0
+		or (_tour_card != null and _tour_card.visible) or _camera_tip_left >= 0.0
+	)
+
+
+## One frame of the hints: the ferry's watch, then the one up (moved to its target, timed,
+## hidden while something holds it), or the next owed one put up.
+func _hint_step(delta: float) -> void:
+	_watch_the_ferries(delta)
+	if _hint_up == &"" and _hints.is_empty():
+		return
+	if _settings == null:
+		return
+	if _hint_card == null:
+		_hint_card = CueCard.new()
+		_hint_card.name = &"HintCard"
+		_settings.get_parent().add_child(_hint_card)
+		_hint_card.closed.connect(_end_hint.bind(true))
+	_settings.get_parent().move_child(_hint_card, _settings.get_parent().get_child_count() - 1)
+	var held := _hint_held()
+	if _hint_up == &"":
+		# The last one's fade is let finish before the next comes in.
+		if held or _hint_card.age() >= 0.0:
+			return
+		_hint_up = _hints.pop_front()
+		_hint_left = HINT_HOLD
+		_cues_seen[_hint_up] = true
+	var target := _hint_target(_hint_up)
+	if held or target.size.x <= 0.0:
+		_hint_card.hide_hint(true)
+		return
+	if not _hint_card.showing():
+		_hint_card.show_hint(_hint_up, Text.of(String(HINT_TEXT[_hint_up])), target)
+	_hint_card.target = target
+	_hint_left -= delta
+	if _hint_left <= 0.0:
+		_end_hint(true)
+
+
+## The hint up is done: faded out, or (`gently` false, for a load) gone at once.
+func _end_hint(gently: bool) -> void:
+	_hint_up = &""
+	_hint_left = 0.0
+	if _hint_card != null:
+		_hint_card.hide_hint(not gently)
+
+
+## Where a hint points, in the HUD layer's pixels: the count over the angler for the luck,
+## the money plate for a pigeon's pay, the Waiting plate for the ferries.
+func _hint_target(kind: StringName) -> Rect2:
+	match kind:
+		&"lucky", &"double":
+			var at := get_viewport().get_canvas_transform() * (_angler.position + Vector2(0.0, -HaulCount.HEAD_UP))
+			return Rect2(at - Vector2(34.0, 16.0), Vector2(68.0, 22.0))
+		&"pigeon":
+			return _skin.get_global_transform() * _skin.money_drawn_box()
+		&"ferry":
+			return _skin.get_global_transform() * _skin.stock_box()
+	return Rect2()
+
+
+## The ferries' hint is owed once every hull has sat docked with pieces in the box short of
+## a load for `FERRY_HINT_AFTER` seconds of play: what a new player reads as broken boats.
+func _watch_the_ferries(delta: float) -> void:
+	if _cues_seen.has(&"ferry") or &"ferry" in _hints or _hint_up == &"ferry":
+		return
+	var waiting := _yard.held.size() if _yard != null else 0
+	var load_least := 1 << 30
+	var all_in := not _held_for_tornado
+	var hulls := 0
+	for boat in _boats:
+		if not boat.visible:
+			continue
+		hulls += 1
+		if boat.state != Boat.State.DOCKED:
+			all_in = false
+		load_least = mini(load_least, maxi(boat.capacity, 1))
+	if all_in and hulls > 0 and waiting > 0 and waiting < load_least:
+		_ferry_wait += delta
+	else:
+		_ferry_wait = 0.0
+	if _ferry_wait >= FERRY_HINT_AFTER:
+		_owe_hint(&"ferry")
+
+
 ## The camera tip is read: down for good on this save.
 func _end_camera_tip() -> void:
 	_camera_tip_seen = true
@@ -5749,6 +5883,13 @@ func _start_owed_moment() -> void:
 	):
 		return
 	var owed: Dictionary = _moments.pop_front()
+	# A tornado gone before its moment could run (settled by a save, or wandered off behind
+	# a long board) is not shown over empty water; its flag stays unseen for the next one.
+	while owed["kind"] == &"tornado" and (_tornado == null or not _tornado.down()):
+		if _moments.is_empty():
+			return
+		owed = _moments.pop_front()
+	_moment_kind = owed["kind"]
 	_moment_at = owed["at"]
 	var seen: Callable = owed["seen"]
 	if seen.is_valid():
@@ -5760,9 +5901,13 @@ func _start_owed_moment() -> void:
 		_moment_card = MomentCard.new()
 		_moment_card.name = &"MomentCard"
 		_settings.get_parent().add_child(_moment_card)
+	_moment_card.kind = _moment_kind
 	_moment_card.text = Text.of(String(owed["text"]))
 	_moment_card.show_for(MOMENT_IN * 0.6, MOMENT_HOLD + MOMENT_IN * 0.4)
-	save_game()
+	# Not for the tornado's: a save settles a tornado (`save_game`), which would end the very
+	# thing the moment is showing. Its flag goes in with the next save after it.
+	if _moment_kind != &"tornado":
+		save_game()
 
 
 ## How far along the moment is towards its spot: 0 at either end, 1 while it holds.
@@ -5787,6 +5932,7 @@ func _moment_step(delta: float) -> void:
 	if _moment < MOMENT_IN + MOMENT_HOLD + MOMENT_OUT:
 		return
 	_moment = -1.0
+	_moment_kind = &""
 	_push_zoom()
 	_hold_the_angler()
 
@@ -5844,9 +5990,12 @@ func _process(delta: float) -> void:
 		_first_steps_step(delta)
 		_decor_tour_step(delta)
 		_camera_tip_step(delta)
+		_hint_step(delta)
 		_hive_step(delta)
 	_haul_count_step()
 	_achievements_step(delta)
+	if _tornado != null:
+		_tornado.held = _tornado_moment_holds()
 	# The hive's lamp, here and not in a draw callback (the pump's is set from the hut's draw
 	# and can land a frame late).
 	if _hive != null:
@@ -6473,6 +6622,7 @@ func _start_tornado() -> void:
 	_tornado.began.connect(_on_tornado_began)
 	_tornado.ended.connect(_on_tornado_ended)
 	_tornado.netted_into.connect(_on_tornado_netted)
+	_tornado.touched_down.connect(_on_tornado_touched_down)
 	add_child(_tornado)
 	for net: CastNet in [_net, _net2]:
 		net.touched_down.connect(_on_net_touched_down.bind(net))
@@ -6532,6 +6682,29 @@ func _on_tornado_ended(tamed: bool) -> void:
 	for dog in _dogs:
 		dog.doze(false)
 	_ask_the_end()
+
+
+## The first tornado of a save comes down: its moment, the view gliding to it with "A tornado
+## on the lake, tame it with your net." Its clock is held from now until the moment is over
+## (`_tornado_moment_holds`), behind a board included.
+func _on_tornado_touched_down(at: Vector2) -> void:
+	if _cues_seen.has(&"tornado") or _cleaned:
+		return
+	_owe_moment(&"tornado", at, "TORNADO_FIRST", _mark_tornado_seen)
+
+
+func _mark_tornado_seen() -> void:
+	_cues_seen[&"tornado"] = true
+
+
+## Whether the tornado's moment is owed or running: the tornado holds its clock while it is.
+func _tornado_moment_holds() -> bool:
+	if _moment >= 0.0 and _moment_kind == &"tornado":
+		return true
+	for owed: Dictionary in _moments:
+		if owed["kind"] == &"tornado":
+			return true
+	return false
 
 
 func _on_net_touched_down(at: Vector2, mouth: float, net: CastNet) -> void:
@@ -6957,6 +7130,7 @@ func save_game() -> bool:
 		"decor_tour": _decor_tour_done,
 		"wildlife_seen": _wildlife_seen,
 		"camera_tip": _camera_tip_seen,
+		"cues_seen": _cues_seen.keys().map(func(k: StringName) -> String: return String(k)),
 		# The beehive, all under one key (2026-09-30). Absent reads as the empty hive.
 		"hive": _hive.to_save() if _hive != null else {},
 		"showers": _weather.showers if _weather != null else 0,
@@ -7163,6 +7337,14 @@ func load_game() -> bool:
 	# enough, and a load would otherwise fire the moment the stock refills the lake.
 	_wildlife_seen = bool(save.get("wildlife_seen", true))
 	_camera_tip_seen = bool(save.get("camera_tip", false))
+	# Absent means none seen (the camera tip's rule, 2026-10-07).
+	_cues_seen.clear()
+	for k: Variant in save.get("cues_seen", []):
+		if StringName(str(k)) in CUE_KINDS:
+			_cues_seen[StringName(str(k))] = true
+	_hints.clear()
+	_end_hint(false)
+	_ferry_wait = 0.0
 	# A moment owed before the load is the old sitting's: the flags it would mark are the
 	# file's now, and a swarm owed its moment is owed it again by `_hive_step`.
 	_moments.clear()

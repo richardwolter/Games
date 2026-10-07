@@ -388,6 +388,7 @@ func _stage_build() -> void:
 	_check_free_view(cam)
 	_check_camera_tip()
 	_check_signals(cam)
+	_check_cues()
 	_check_end_fixes()
 	cam.zoom = Vector2(0.62, 0.62)
 
@@ -6621,6 +6622,176 @@ func _check_camera_tip() -> void:
 		"the save carries the flag, and a save without it reads as not seen", "")
 	_main.set(&"_play", was_play)
 	_main.set(&"_camera_tip_seen", was_seen)
+
+
+## The first-time cues (2026-10-07): one card pattern with a theme each, the first tornado's
+## moment holding its clock, and the four hints, each shown once and saved.
+func _check_cues() -> void:
+	# The pattern: every theme carries the five parts, and its keyword ink clears 4.5:1 on the
+	# paper and on its own highlighter.
+	var bands := {}
+	var parts_ok := true
+	var worst := 99.0
+	for kind: StringName in CueCard.THEMES:
+		var look: Dictionary = CueCard.THEMES[kind]
+		parts_ok = parts_ok and look.has(&"band") and look.has(&"mark") and look.has(&"ink")
+		parts_ok = parts_ok and look.has(&"icon") and look.has(&"entrance")
+		worst = minf(worst, minf(_contrast(look[&"ink"], Style.PAPER), _contrast(look[&"ink"], look[&"mark"])))
+		bands[(look[&"band"] as Color).to_html()] = true
+	_check(parts_ok and worst >= 4.5, "every cue theme has a tab, a mark, an ink, an icon and an entrance; its ink reads",
+		"worst %.2f" % worst)
+	_check(bands.size() == CueCard.THEMES.size(), "no two cue themes share a tab colour", str(bands.size()))
+	for kind: StringName in [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry"]:
+		_check(CueCard.THEMES.has(kind), "the %s cue has a theme" % kind, "")
+	# Marked words: the keyword is its own unit, no asterisk reaches the paper, and a hint
+	# wraps inside its card.
+	var rows := CueCard.lay_out("A *tornado* on the lake", Style.TEXT_HEAD, 900.0)
+	var marked := ""
+	for row: Array in rows:
+		for unit: Dictionary in row:
+			if bool(unit["marked"]):
+				marked += String(unit["text"])
+	_check(marked == "tornado" and CueCard.plain(rows) == "A tornado on the lake",
+		"a marked keyword is its own unit, no asterisk drawn", CueCard.plain(rows))
+	var narrow := CueCard.lay_out("Boats wait to be *filled* to set sail. Upgrade *Capacity* to carry more.",
+		Style.TEXT_SMALL, CueCard.WIDE_HINT)
+	var fits := true
+	for row: Array in narrow:
+		fits = fits and CueCard._row_wide(row, Style.TEXT_SMALL) <= CueCard.WIDE_HINT + 0.5
+	_check(narrow.size() >= 2 and fits, "a hint wraps inside its card", str(narrow.size()))
+	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
+		var words := Text.of(key)
+		_check(words != key and words.count("*") >= 2 and words.count("*") % 2 == 0,
+			"%s has words with its keywords marked" % key, words)
+
+	# The first tornado: its touchdown owes the moment, which holds its clock and its hunt.
+	var t: Node2D = _main.get(&"_tornado")
+	var seen: Dictionary = _main.get(&"_cues_seen")
+	var seen_was := seen.duplicate()
+	var count_was: int = t.count
+	var next_was: float = t.next_in
+	var mode_was := t.process_mode
+	# The field as it was: a tornado lifts and flings pieces, and the stages after this one
+	# read the fill as it was dealt.
+	var grid: LakeGrid = _main.get(&"_grid")
+	var stacks_was: Array = []
+	for stack: PackedInt32Array in grid.stacks:
+		stacks_was.append(PackedInt32Array(stack))
+	var filth_was: float = _main.get(&"_filth_left")
+	var pollution_was: float = _main.pollution
+	t.process_mode = Node.PROCESS_MODE_DISABLED
+	seen.erase(&"tornado")
+	t.count = 0
+	t.start(0.4)
+	for i in int((t.BREW + 0.1) * 60.0):
+		t._process(1.0 / 60.0)
+	_check(bool(_main.call(&"_tornado_moment_holds")), "the first tornado's touchdown owes its moment", "")
+	if float(_main.get(&"_moment")) < 0.0:
+		_main.call(&"_start_owed_moment")
+	var card: MomentCard = _main.get(&"_moment_card")
+	_check(float(_main.get(&"_moment")) >= 0.0 and StringName(_main.get(&"_moment_kind")) == &"tornado"
+		and card != null and card.kind == &"tornado" and card.text == Text.TORNADO_FIRST
+		and seen.has(&"tornado") and t.active(),
+		"its moment glides to it in the tornado's card, and the tornado is still there",
+		card.text if card != null else "<none>")
+	t.held = bool(_main.call(&"_tornado_moment_holds"))
+	var path_was: Vector2 = t.get(&"_path")
+	for i in 600:
+		t._process(1.0 / 60.0)
+	var moved := Vector2(t.get(&"_path")).distance_to(path_was)
+	_check(t.held and absf(float(t.get(&"_held_t")) - 10.0) < 0.1 and moved < 0.5,
+		"while it is shown the tornado neither hunts nor counts down its life",
+		"held %.2f, moved %.1f" % [float(t.get(&"_held_t")), moved])
+	_hive_run_moment()
+	t.held = bool(_main.call(&"_tornado_moment_holds"))
+	_check(not t.held, "and once the moment is over it runs again", "")
+	t.settle_now()
+	t.start(0.4)
+	for i in int((t.BREW + 0.1) * 60.0):
+		t._process(1.0 / 60.0)
+	_check(not bool(_main.call(&"_tornado_moment_holds")), "the second tornado has no moment", "")
+	t.settle_now()
+	t.held = false
+	grid.restore(stacks_was)
+	_main.set(&"_filth_left", filth_was)
+	_main.pollution = pollution_was
+	t.count = count_was
+	t.next_in = next_was
+	t.process_mode = mode_was
+
+	# The hints: owed, one at a time, each with its words and its target; read once.
+	for kind: StringName in [&"lucky", &"double", &"pigeon", &"ferry"]:
+		seen.erase(kind)
+	_main.call(&"_owe_hint", &"lucky")
+	_main.call(&"_owe_hint", &"double")
+	_main.call(&"_owe_hint", &"lucky")
+	_check((_main.get(&"_hints") as Array).size() == 2, "a hint owed twice is queued once", "")
+	_check(not bool(_main.call(&"_hint_held")), "nothing holds the hints in the harness's lake", "")
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	var hint: CueCard = _main.get(&"_hint_card")
+	_check(hint != null and hint.showing() and hint.kind == &"lucky" and hint.text == Text.CUE_LUCKY
+		and hint.target.size.x > 0.0 and seen.has(&"lucky"),
+		"the lucky cast's hint is up first, in gold, at the count over the angler",
+		str(hint.target) if hint != null else "")
+	_main.set(&"_moment", 0.0)
+	_check(bool(_main.call(&"_hint_held")), "a moment holds a hint back", "")
+	_main.set(&"_moment", -1.0)
+	for i in int((Lake.HINT_HOLD + 0.2) * 60.0):
+		_main.call(&"_hint_step", 1.0 / 60.0)
+	_check(StringName(_main.get(&"_hint_up")) == &"", "it goes by itself after its hold", "")
+	hint._process(CueCard.FADE + 0.05)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	_check(hint.showing() and hint.kind == &"double" and hint.text == Text.CUE_DOUBLE,
+		"then the double cast's", String(hint.kind))
+	hint.closed.emit()
+	_check(StringName(_main.get(&"_hint_up")) == &"" and seen.has(&"double"), "a click on its paper takes it down", "")
+	hint._process(CueCard.FADE + 0.05)
+	_main.call(&"_owe_hint", &"lucky")
+	_check((_main.get(&"_hints") as Array).is_empty(), "a hint seen is never owed again", "")
+	# The pigeon's: owed by the first bird netted, pointed at the money plate.
+	var sludge_was: float = _main.get(&"sludge")
+	var birds_was: int = _main.get(&"birds_caught")
+	_main.call(&"_on_bird_caught", Vector2.ZERO)
+	_check(&"pigeon" in (_main.get(&"_hints") as Array), "the first pigeon netted owes its hint", "")
+	_main.set(&"sludge", sludge_was)
+	_main.set(&"birds_caught", birds_was)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	var skin: HudSkin = _main.get(&"_skin")
+	var money_at := (skin.get_global_transform() * skin.money_drawn_box()).get_center()
+	_check(hint.kind == &"pigeon" and hint.target.get_center().distance_to(money_at) < 1.0,
+		"and it points at the money plate", str(hint.target))
+	_main.call(&"_end_hint", false)
+	# The ferries': every hull docked, pieces short of a load, twenty seconds.
+	var yard: Yard = _main.get(&"_yard")
+	var held_was := yard.held
+	var boats: Array = _main.get(&"_boats")
+	var states := []
+	for boat: Boat in boats:
+		states.append(boat.state)
+		boat.state = Boat.State.DOCKED
+	yard.held = PackedInt32Array([0])
+	_main.set(&"_ferry_wait", 0.0)
+	for i in int(Lake.FERRY_HINT_AFTER) - 1:
+		_main.call(&"_watch_the_ferries", 1.0)
+	_check(not (&"ferry" in (_main.get(&"_hints") as Array)), "the ferries' hint waits its twenty seconds", "")
+	_main.call(&"_watch_the_ferries", 1.5)
+	_check(&"ferry" in (_main.get(&"_hints") as Array), "and then is owed", "")
+	hint._process(CueCard.FADE + 0.05)
+	_main.call(&"_hint_step", 1.0 / 60.0)
+	var stock_at := (skin.get_global_transform() * skin.stock_box()).get_center()
+	_check(hint.kind == &"ferry" and hint.target.get_center().distance_to(stock_at) < 1.0,
+		"pointing at the Waiting plate", str(hint.target))
+	_main.call(&"_end_hint", false)
+	yard.held = held_was
+	for i in boats.size():
+		(boats[i] as Boat).state = states[i]
+	var source := FileAccess.get_file_as_string("res://scripts/lake.gd")
+	_check(source.contains('"cues_seen": _cues_seen.keys()') and source.contains('save.get("cues_seen", [])'),
+		"the save carries the cues seen, and a save without them has seen none", "")
+	(_main.get(&"_hints") as Array).clear()
+	_main.set(&"_ferry_wait", 0.0)
+	seen.clear()
+	seen.merge(seen_was)
 
 
 func _check_signals(cam: Camera2D) -> void:

@@ -870,6 +870,11 @@ func money_drawn_box() -> Rect2:
 	return purse_over if _purse_up() else _money_box
 
 
+## Where the Waiting plate is, in the skin's own coordinates: the ferries' hint points at it.
+func stock_box() -> Rect2:
+	return _stock_box
+
+
 ## The money plate's own size, for the shop to find it a spot.
 func money_size() -> Vector2:
 	return _money_box.size

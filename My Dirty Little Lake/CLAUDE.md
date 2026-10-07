@@ -4036,6 +4036,54 @@ more kinds of plant, and beds of pads and reeds out on the open water. `scripts/
   catch.
 - All numbers first guesses. `test_lake`'s `_check_signals` guards all five.
 
+### First-Time Cues (2026-10-07, `/grill-me` with Richard)
+Every mechanic a player meets mid-run is named the first time it happens.
+- **The first tornado is a moment** (`Lake._on_tornado_touched_down`, `Tornado.touched_down`):
+  at touchdown the view glides to the funnel with "A tornado on the lake, tame it with your
+  net." (`Text.TORNADO_FIRST`), the wildlife moment's queue and treatment. **Its clock is
+  held** (`Tornado.held`, `_held_t`, `Lake._tornado_moment_holds`) from touchdown until the
+  moment is over, a wait behind a board included: it spins, lifts and flings, but neither
+  hunts nor counts down its life. **No count of hits left, by decision**: the card and the
+  funnel shrinking teach it. The tornado's moment does not `save_game` (a save settles the
+  tornado); a tornado gone before its moment runs is dropped and stays unseen.
+- **Four hints** (`Lake._owe_hint`, `_hint_step`, `HINT_TEXT`): a card beside the thing with
+  an arrow at it, the game running on, gone on a click on its paper or after `HINT_HOLD`
+  (8 s) up; one at a time; held by the camera tip's conditions (and a moment owed), shown in
+  pad mode too (it times out). The **first lucky cast** ("Your lucky cast catches more and
+  heavier objects.") and the **first double cast** ("Double cast throws a copy of your
+  current net."), both at the count over the angler, lucky first on a cast that is both;
+  the **first pigeon netted** ("Pigeons earn money when caught.") at the money plate; the
+  **ferries** ("Boats wait to be filled to set sail. Upgrade Capacity to carry more.") at
+  the Waiting plate, once every hull has sat docked with pieces short of a load for
+  `FERRY_HINT_AFTER` (20 s) of play. The Capacity line was kept on Richard's call after the
+  pushback that a bigger hold waits longer.
+- **One card pattern, a theme each** (`scripts/cue_card.gd`, `CueCard`; Richard: "share a
+  pattern ... font highlights/coloring on keywords, similar to the trailer, but not
+  entirely"): the recycle note's paper, a coloured tab down the left with a whole-pixel icon
+  (funnel, sprout, bee on its striped coat, honey jar, four-point star, two nets, the coin,
+  the boat) keeping a small loop, keywords between `*asterisks*` in the string drawn in the
+  theme's ink over a ragged highlighter swipe that wipes in after the card lands, and a
+  themed entrance (swirl with wind specks, sprout from its foot, buzz with bees, drop with a
+  hanging drip, pop in the finds' stars, a ghost copy merging, a hop shedding feathers, a
+  glide on the swell). **`MomentCard` extends it**, so the wildlife, swarm and honey moments
+  wear their themes too. Hint lines are evened out (no word alone on a row); CJK is broken
+  by letters. Every ink clears 4.5:1 on the paper and on its swipe (`test_lake`).
+- **Saved as `cues_seen`** (the kinds seen); **a save without it has seen none** (the camera
+  tip's rule), so a run past its first tornado gets the moment on its next. No
+  `SAVE_VERSION` bump. A borrowed lake is marked all seen.
+- **Strings**: `TORNADO_FIRST`, `CUE_LUCKY`, `CUE_DOUBLE`, `CUE_PIGEON`, `CUE_FERRY`, and
+  asterisks added to `WILDLIFE_BACK`, `HIVE_SWARM`, `HIVE_READY`. Machine drafts in every
+  language but English, PT included (Richard's source rule: review them).
+- **Out of scope, by decision**: hit pips on the tornado, a find's gold beam, the untamed
+  tornado leaving, the Recycle Bonus, rests in the shed, the hose upgrade.
+- All colours, timings and entrances are first guesses for Richard's eye. Probe:
+  `tools/shot_cues.tscn` (desktop build, `--fixed-fps 60`, no lake) saves
+  `tools/last_cues.png` (every theme across its entrance) and `last_cues_<kind>.png`.
+  `test_lake`'s `_check_cues` guards the themes and inks, the marked units and wrap, every
+  key's marks, the tornado's moment and held clock, the second tornado having none, the
+  hint queue, holds, hold time and close, the pigeon's and ferries' triggers and targets,
+  and the save rule.
+
 ### Weight in the Walk (2026-09-26, `/grill-me` with Richard)
 - **The angler slips** (`Angler._vel`, `SLIP_TIME` 0.1, `STOP_TIME` 0.09, `_move_by`): the walk
   is a velocity eased towards the input, so a turn curves and letting go glides about a fifth
