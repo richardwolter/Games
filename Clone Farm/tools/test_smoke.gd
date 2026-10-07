@@ -278,6 +278,32 @@ func _check_traits() -> void:
 	_check(cheery.task_speed(Bed.PLANT) == 1.0, "Animado doesn't speed up itself")
 	cheery._chat_wait = 0.0
 	_chatty = cheery
+	_check_panel()
+
+
+## The HUD's trait lines and role ratings come from the trait data.
+func _check_panel() -> void:
+	var plain := Traits.combine([])
+	_check(is_equal_approx(Traits.role_rating(plain, Bed.PLANT), 1.0), "no traits rates 100%")
+	var quick := Traits.combine([&"apressado"])
+	_check(is_equal_approx(Traits.role_rating(quick, Bed.PLANT), 1.5 * 0.75),
+			"Apressado plants at 112%% (got %.3f)" % Traits.role_rating(quick, Bed.PLANT))
+	var careful_green := Traits.combine([&"caprichoso", &"dedo_verde"])
+	_check(is_equal_approx(Traits.role_rating(careful_green, Bed.HARVEST), 0.6 * 0.33 * 2.0),
+			"Caprichoso + Dedo Verde harvests at 40%% (got %.3f)"
+			% Traits.role_rating(careful_green, Bed.HARVEST))
+	var chatty := Traits.combine([&"animado"])
+	_check(is_equal_approx(Traits.role_rating(chatty, Bed.WATER), 0.75),
+			"Animado loses a quarter to chatting (got %.3f)" % Traits.role_rating(chatty, Bed.WATER))
+	_check(Traits.describe(&"apressado").contains("+50% anda")
+			and Traits.describe(&"apressado").contains("-pula 25%"),
+			"Apressado's line: %s" % Traits.describe(&"apressado"))
+	_check(Traits.describe(&"dedo_verde").contains("-67% colhe"),
+			"Dedo Verde's line: %s" % Traits.describe(&"dedo_verde"))
+	var clone := _test_clone([&"caprichoso", &"dedo_verde"], Vector3(-9.0, 1.0, -8.0))
+	var panel: String = _main.clone_panel(clone, true)
+	_check(panel.contains("Plantar") and panel.contains("60%") and panel.contains("(melhor)"),
+			"the role panel rates each role and marks the best")
 
 
 ## Animado stops to chat (even with a task going) and shows it.

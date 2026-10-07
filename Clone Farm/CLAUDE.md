@@ -39,7 +39,9 @@ no HUD.
 com 5) e clones com função (E no clone, depois 1/2/3/0) que trabalham os canteiros sozinhos
 com as mesmas regras, cada um com 2 características sorteadas (Apressado, Caprichoso,
 Dedo Verde, Animado) ([decisão](docs/decisoes/2026-10-07-maquina-e-primeiro-clone.md),
-números a confirmar). Ainda sem comida, Carregar, reciclar, lojas nem dia.
+números a confirmar). Perto de um clone, o HUD mostra cada efeito com +/- e uma nota
+em % por função ([painel](docs/decisoes/2026-10-07-painel-do-clone.md)). Ainda sem comida,
+Carregar, reciclar, lojas nem dia.
 
 ## Design decidido (protótipo 1)
 
@@ -71,7 +73,8 @@ Resumo; detalhes e descartes em `docs/decisoes/2026-10-07-nucleo.md`.
 - `scripts/clone.gd` (`Clone`): `Worker` com `role` e `traits`; escolhe o canteiro mais perto
   que quer a função e que nenhum outro trabalhador pegou. Balão mostra o lado ruim.
 - `scripts/traits.gd` (`Traits`): características como dados (modificadores);
-  `combine()` recalcula do zero. O `Worker` tem ganchos (`move_mult`, `task_speed`,
+  `combine()` recalcula do zero; `describe()` e `role_rating()` geram o texto e a nota do
+  painel a partir dos mesmos dados (`main.clone_panel`). O `Worker` tem ganchos (`move_mult`, `task_speed`,
   `harvest_bonus`, `grow_boost`, `is_paused`, `_finish_task`) que o clone sobrescreve.
 - `scripts/bed.gd` (`Bed`): canteiro vazio → plantado → crescendo → maduro. `next_task()` diz
   o que ele espera, `perform(task)` faz. Não sabe quem trabalha: os clones vão chamar as mesmas

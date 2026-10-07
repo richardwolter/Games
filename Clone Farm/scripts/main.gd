@@ -39,7 +39,7 @@ var stock := START_STOCK
 var rng := RandomNumberGenerator.new()
 
 var _stock_label: Label
-var _hint_label: Label
+var _hint_label: RichTextLabel
 
 
 func _ready() -> void:
@@ -65,11 +65,10 @@ func _hint() -> String:
 		return "%s... %d%%   (E: cancelar)" % [WORKING_LABELS[farmer.work_task],
 				roundi(farmer.work_progress() * 100.0)]
 	if farmer.choosing != null:
-		return "Função de %s:  1 Plantar   2 Regar   3 Colher   0 nenhuma   (E: fechar)" \
-				% farmer.choosing.name
+		return clone_panel(farmer.choosing, true)
 	var target := farmer.nearest_target()
 	if target is Clone:
-		return "E: dar função a %s" % target.name
+		return clone_panel(target, false)
 	if target is Machine:
 		if target.next_task() == &"":
 			return "Máquina: precisa de %d produção" % Machine.COST
@@ -78,6 +77,35 @@ func _hint() -> String:
 		var task: StringName = target.next_task()
 		return "E: %s" % TASK_LABELS[task] if task != &"" else "crescendo..."
 	return ""
+
+
+## What a clone's traits do and how good it is at each role, so picking a role is quick.
+## Ratings come from Traits.role_rating (100% = a clone with no traits); the best is marked.
+func clone_panel(clone: Clone, choosing: bool) -> String:
+	var lines: PackedStringArray = []
+	lines.append("[b]%s[/b]  (agora: %s)" % [clone.name, Clone.ROLE_LABELS[clone.role]])
+	for name in clone.traits:
+		lines.append(Traits.describe(name))
+	var best := &""
+	var best_rating := -1.0
+	for role in Clone.ROLES:
+		if role != &"" and Traits.role_rating(clone.stats, role) > best_rating:
+			best = role
+			best_rating = Traits.role_rating(clone.stats, role)
+	for i in range(1, Clone.ROLES.size()):
+		var role := Clone.ROLES[i]
+		var pct := roundi(Traits.role_rating(clone.stats, role) * 100.0)
+		var color := Traits.GOOD if pct > 100 else (Traits.BAD if pct < 100 else "#ffffff")
+		var line := "%s %s  [color=%s]%d%%[/color]" % [
+				str(i) if choosing else "-", Clone.ROLE_LABELS[role], color, pct]
+		if role == best:
+			line = "[b]%s  (melhor)[/b]" % line
+		lines.append(line)
+	if choosing:
+		lines.append("0 nenhuma      (E: fechar)")
+	else:
+		lines.append("E: dar função")
+	return "\n".join(lines)
 
 
 func _build_machine() -> void:
@@ -122,9 +150,17 @@ func _build_hud() -> void:
 	_stock_label.position = Vector2(16, 12)
 	_stock_label.add_theme_font_size_override("font_size", 24)
 	hud.add_child(_stock_label)
-	_hint_label = Label.new()
+	_hint_label = RichTextLabel.new()
+	_hint_label.bbcode_enabled = true
+	_hint_label.fit_content = true
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_label.position = Vector2(16, 44)
-	_hint_label.add_theme_font_size_override("font_size", 20)
+	_hint_label.size = Vector2(1100, 0)
+	_hint_label.add_theme_font_size_override("normal_font_size", 20)
+	_hint_label.add_theme_font_size_override("bold_font_size", 20)
+	_hint_label.add_theme_constant_override("outline_size", 6)
+	_hint_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	hud.add_child(_hint_label)
 	add_child(hud)
 
