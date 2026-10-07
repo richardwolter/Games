@@ -37,8 +37,25 @@ func _physics_process(_delta: float) -> void:
 		var moved: float = _main.farmer.global_position.distance_to(_start)
 		_check(moved > 1.0, "farmer walks (moved %.2f)" % moved)
 		_check(absf(_main.farmer.global_position.y - _start.y) < 0.2, "farmer stays on the ground")
+		_check_screen_directions()
 		_say("smoke: %s, %d failed" % ["PASS" if _failed == 0 else "FAIL", _failed])
 		get_tree().quit(1 if _failed > 0 else 0)
+
+
+## Each key must move the farmer the way it points on screen: project the step through the
+## camera and compare with the key's screen direction.
+func _check_screen_directions() -> void:
+	var cam: Camera3D = _main.get_node("Camera")
+	var farmer: Farmer = _main.farmer
+	var keys := {
+		"W": Vector2(0, -1), "S": Vector2(0, 1), "A": Vector2(-1, 0), "D": Vector2(1, 0),
+	}
+	for key: String in keys:
+		var want: Vector2 = keys[key]
+		var from := farmer.global_position
+		var to := from + farmer.screen_to_ground(want)
+		var on_screen := (cam.unproject_position(to) - cam.unproject_position(from)).normalized()
+		_check(on_screen.dot(want) > 0.95, "%s moves %s on screen (got %s)" % [key, want, on_screen])
 
 
 func _check(ok: bool, what: String) -> void:
