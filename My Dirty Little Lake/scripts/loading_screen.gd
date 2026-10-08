@@ -32,11 +32,17 @@ const LOGO := preload("res://assets/mdll_logo_stacked.png")
 
 ## What is left of the picture's light. By eye on `tools/last_loading.png`.
 const DARKEN := Color(0.50, 0.55, 0.53)
-## The logo's width as a share of the window's, and where down the window its middle stands.
-## **Above the island, not on it**: the island is the middle of the picture, and the first
-## layout stood the lockup straight over the hut. The island shows between the two.
-const LOGO_WIDE := 0.46
-const LOGO_AT := 0.27
+## The sticker's solid box inside the logo's picture, in its pixels: the letters and their
+## cream outline, without the shadow's halo round them. The logo is laid out by this box,
+## never by the picture's edges, so a shadow reaching further does not move or shrink the
+## letters (2026-10-08, v3: a halo falling down-left). **Re-measure on a re-render**
+## (`Marketing/My Dirty Little Lake/logo/make_logo.py --v3`): alpha 250 and up.
+const LOGO_INK := Rect2(163.0, 143.0, 2093.0, 579.0)
+## The sticker's width as a share of the window's, and where down the window its middle
+## stands. **Above the island, not on it**: the island is the middle of the picture, and the
+## first layout stood the lockup straight over the hut. The island shows between the two.
+const LOGO_WIDE := 0.43
+const LOGO_AT := 0.261
 ## The bar: where down the window its middle stands. **Its size is the HUD meter's own**
 ## (`HudSkin.meter_scale`), by Richard's call on the first look — drawn at a third of the
 ## window's width it was the meter's art at three times its size, stretched and soft: "we
@@ -108,10 +114,9 @@ func _fit() -> void:
 	for part: Control in [_fill, _picture]:
 		part.position = Vector2.ZERO
 		part.size = size
-	var wide := floorf(size.x * LOGO_WIDE)
-	var tall := floorf(wide * float(LOGO.get_height()) / float(LOGO.get_width()))
-	_logo.size = Vector2(wide, tall)
-	_logo.position = Vector2((size.x - wide) * 0.5, size.y * LOGO_AT - tall * 0.5).floor()
+	var px := size.x * LOGO_WIDE / LOGO_INK.size.x
+	_logo.size = (Vector2(LOGO.get_size()) * px).floor()
+	_logo.position = (Vector2(size.x * 0.5, size.y * LOGO_AT) - LOGO_INK.get_center() * px).floor()
 	_bar.wide = floorf(HudSkin.METER_FRAME.size.x * HudSkin.meter_scale(size.y))
 	_bar.position = Vector2(
 		(size.x - _bar.box().x) * 0.5, size.y * BAR_AT - _bar.box().y * 0.5

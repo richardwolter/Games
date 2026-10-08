@@ -57,14 +57,14 @@ const FLAG_INSET := Vector2(24.0, 24.0)
 ## logo's foot and the first plank, in the design frame.
 const PLANK := Vector2(232.0, 56.0)
 const GAP := 12.0
-const DROP := 24.0
-## The logo, in the design frame: its width as a share of the window, and its top-left
-## corner. Anchored to the corner rather than to the stack, which grows and shrinks with
+const DROP := 46.0
+## The logo, in the design frame: its sticker's width as a share of the window, and the
+## sticker's top-left corner (`LoadingScreen.LOGO_INK`: the halo round it is not counted). Anchored to the corner rather than to the stack, which grows and shrinks with
 ## Continue — a title that moved when a save appeared would read as a bug. Smaller than it
 ## stood on the baked picture (0.50): that picture was there to carry a title, and the lake
 ## behind this one is the thing to be looked at. By eye on `tools/last_menu_main.png`.
-const LOGO_WIDE := 0.40
-const LOGO_AT := Vector2(56.0, 40.0)
+const LOGO_WIDE := 0.374
+const LOGO_AT := Vector2(69.0, 51.0)
 
 ## The dark the logo and the planks stand on: a band down the left of the window, full at
 ## the edge and gone by `SCRIM_TO` of the width. **Drawn, not baked**: the old menu's
@@ -232,10 +232,10 @@ func _fill() -> void:
 func _lay_out() -> void:
 	# The logo first: its own corner, in proportion to the window, whatever the stack does.
 	var frame := size.x / 1280.0
-	var wide := size.x * LOGO_WIDE
-	var tall := wide * float(LOGO.get_height()) / float(LOGO.get_width())
-	_logo.position = (LOGO_AT * frame).floor()
-	_logo.size = Vector2(wide, tall).floor()
+	var ink := LoadingScreen.LOGO_INK
+	var px := size.x * LOGO_WIDE / ink.size.x
+	_logo.position = (LOGO_AT * frame - ink.position * px).floor()
+	_logo.size = (Vector2(LOGO.get_size()) * px).floor()
 	_flag.flag = LanguageBoard.flag_of(Prefs.current_entry())
 	_flag.size = FLAG_BUTTON
 	_flag.position = Vector2(size.x - FLAG_INSET.x - FLAG_BUTTON.x, FLAG_INSET.y).floor()
@@ -248,11 +248,11 @@ func _lay_out() -> void:
 		plank.queue_redraw()
 		if plank.visible:
 			shown.append(plank)
-	# Under the logo, on its axis. Both come off `_logo`'s own drawn box rather than off
-	# `LOGO_AT` and `LOGO_WIDE` again, so the stack cannot drift from the picture it hangs
-	# under when either is retuned.
-	var middle := _logo.position.x + _logo.size.x * 0.5
-	var y := _logo.position.y + _logo.size.y + DROP * frame
+	# Under the logo, on its axis. Both come off `_logo`'s own drawn box (its sticker, not
+	# its halo) rather than off `LOGO_AT` and `LOGO_WIDE` again, so the stack cannot drift
+	# from the picture it hangs under when either is retuned.
+	var middle := _logo.position.x + (ink.position.x + ink.size.x * 0.5) * px
+	var y := _logo.position.y + ink.end.y * px + DROP * frame
 	for plank: PlankButton in shown:
 		plank.size = PLANK
 		plank.position = Vector2(middle - PLANK.x * 0.5, y).floor()

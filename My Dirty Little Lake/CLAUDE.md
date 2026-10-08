@@ -1171,6 +1171,9 @@ effects behind it. Shared rules in `shaders/pixel.gdshaderinc`:
     `LOGO_AT` in the design frame — **anchored to the top-left corner, not to the plank
     stack**, which grows and shrinks with Continue; a title that moved when a save appeared
     would read as a bug. Both numbers are by eye on `tools/last_menu_main.png`.
+    **Since v3 (2026-10-08, see The Logo, v3) both name the sticker, not the picture**
+    (`LoadingScreen.LOGO_INK`): 0.374 of the window and (69, 51), which is where v1's 0.40 at
+    (56, 40) put the letters. `DROP` went 24 to 46 for the same reason.
 
   **The four doors stand centred under the logo** (2026-09-17, Richard), not in the bottom-left
   corner: `menu.gd`'s `DROP` is the gap under the logo's foot and the stack takes the logo's
@@ -8046,6 +8049,33 @@ the files they replaced are in `candidates/old_20261002/`.
 - **`s_bignet`** (`01_cast`): one plain net at Width 20 thrown north, saved as PNGs through the
   flight in `tools/film/s_bignet_png/`; `big_06` is the still. Replaces the double-net still.
 - All numbers first guesses for Richard's eye.
+
+### The Logo, v3 (2026-10-08, `/grill-me` with Richard)
+The trailer's logo read soft and its shadow looked cut out. **Both were the pixel file**:
+`shots3.json` laid `logo/v1/mdll_logo_stacked_pixel.png`, which `make_logo.py`'s `pixelate`
+shrinks to 640 px, cuts to 64 colours and thresholds to on/off alpha (the soft shadow became
+a hard dark band), then the trailer resized that 1280 px picture to 1190 by nearest.
+**The trailer fix is owed** (Richard, to do with his other trailer fixes): point it at the
+hi-res `logo/v3/mdll_logo_stacked.png` and keep it smooth, like the HD captions. The
+vertical cut is out of scope.
+- **v3 is the hi-res logo with a new shadow**, picked off a mock (`logo/mock_shadows.py`,
+  `tools/logo_check/shadow_sheet.png`; three styles, two directions, over the end card, the
+  loading lake and two capsules): option **C, halo, down-left**: the sticker's outline swept
+  `SHADOW_DROP` (0.08 of the font size) down-left (the game's sun) as a solid dark slab, over
+  a wide soft dark glow. Supersedes v1's faint blur off down-right. Also fixes a pale strip
+  inside the A's hole (`DROWN_BEVEL`: no top-lit bevel under LAKE's waterline). Letters,
+  colours and outline are v1's.
+- **Built by `Marketing/My Dirty Little Lake/logo/make_logo.py --v3 stacked compact`**
+  (git-ignored, the logo venv) into `logo/v3/`, hi-res only. Without `--v3` it still makes
+  v1. **The halo makes the picture bigger round the same letters** (2403x885 against
+  2237x723), so everything lays the logo by the sticker's box, alpha 250 and up:
+  `LoadingScreen.LOGO_INK` (163, 143, 2093 x 579) in the game, `V1_BOX`/`V3_INK` in
+  `capsules_v2.py`. **Re-measure both on a re-render.**
+- **Where it is**: `assets/mdll_logo_stacked.png` (menu and loading screen, letters where
+  v1's stood), `assets/boot_splash.png` (re-shot, `SHOT_SPLASH=1`; the loading lake has no
+  logo and was not), and every capsule (`capsules_v2.py` reads `logo/v3`; the old set is in
+  `capsules_v2/old_20261008/`). The library logo stays 1280 wide, so its letters are 7%
+  smaller there.
 
 ### The Icon (2026-10-03, `/grill-me` with Richard, `tools/build_icon.py`)
 The game's own icon, in place of Godot's: the orange dog (slot 1, `dog_02`) sitting, mouth
