@@ -299,6 +299,7 @@ func _window(size: Vector2i, canvas: Vector2i) -> void:
 	win.size = size
 	win.position = Vector2i.ZERO
 	win.content_scale_size = canvas
+	_fixed_stretch = minf(float(size.x) / float(canvas.x), float(size.y) / float(canvas.y))
 
 
 ## The folder a shot's frames go to.
@@ -362,7 +363,7 @@ func _process(_delta: float) -> void:
 
 func _remember_camera() -> void:
 	_cam_was = _camera.get_screen_center_position()
-	_cam_scale_was = _camera.zoom.x * float(_main.call(&"_stretch"))
+	_cam_scale_was = _camera.zoom.x * _stretch()
 
 
 func _setup() -> void:
@@ -446,12 +447,12 @@ func _aim() -> void:
 	if _follow != null:
 		at = _follow.position
 	if at == Vector2.INF:
-		_main.call(&"_snap_camera")
+		_snap()
 		return
 	_main.set(&"_pan", at - _angler.position)
 	_main.set(&"_panning", true)
 	_camera.position = _main.call(&"_clamped_view", at)
-	_main.call(&"_snap_camera")
+	_snap()
 
 
 ## Zoom to `level` screen pixels an art pixel (on 1080p; the game's own wheel stops at 4).
@@ -486,7 +487,7 @@ func _zoom(level: int) -> void:
 
 
 func _push_camera_zoom() -> void:
-	var zoom: float = float(_zoom_level) / (Lake.ART_PIXEL * _main.call(&"_stretch"))
+	var zoom: float = float(_zoom_level) / (Lake.ART_PIXEL * _stretch())
 	_camera.zoom = Vector2(zoom, zoom)
 
 
@@ -784,8 +785,24 @@ func _plates() -> void:
 	_hide_hud_buttons()
 
 
+## The window's stretch, worked out from the sizes the probe set rather than read off the
+## viewport each frame (2026-10-08): under Movie Maker the reading went wrong for a few frames
+## while the window settled, and the game's pixel snap threw the held camera hundreds of
+## pixels about (the first scene's zoom-in jumped).
+var _fixed_stretch := 1.5
+
+
 func _stretch() -> float:
-	return float(_main.call(&"_stretch"))
+	return _fixed_stretch
+
+
+## The game's own pixel snap of the camera, on the fixed stretch.
+func _snap() -> void:
+	var per := _camera.zoom.x * _stretch()
+	if per <= 0.0:
+		return
+	var drawn := (_camera.position * per).round() / per
+	_camera.offset = drawn - _camera.position
 
 
 func _shop_open(buys: Array) -> void:
