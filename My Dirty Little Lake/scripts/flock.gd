@@ -156,6 +156,11 @@ var day: DayCycle
 ## Optional — with no net, nothing is rimmed.
 var net: CastNet
 
+## World points no bird may pick a perch near (`AVOID_TILES`): the tornado's foot while it is
+## down (2026-10-08), so a pigeon never sits down beside a waterspout.
+var avoid: Callable
+const AVOID_TILES := 4.0
+
 ## Every bird, as a row of the flock. Small enough to be an array of dictionaries and clear
 ## enough to be worth it.
 var birds: Array = []
@@ -329,6 +334,42 @@ func take(index: int) -> Vector2:
 	netted.emit(at)
 	queue_redraw()
 	return at
+
+
+## Where a bird is over the water: its feet if perched, the point under its arc if flying.
+func ground_of(bird: Dictionary) -> Vector2:
+	var at: Vector2 = bird["at"]
+	if int(bird["state"]) == State.PERCHED:
+		return at
+	return at + Vector2(0.0, sin(float(bird["travel"]) * PI) * ARC_HEIGHT)
+
+
+## Take a bird out of the flock without the net having it: the tornado's whirl (2026-10-08).
+## No `netted` and no pay; the tornado pays it if a net hits the funnel, or `release`s it.
+func pull(index: int) -> Dictionary:
+	if index < 0 or index >= birds.size():
+		return {}
+	var bird: Dictionary = birds[index]
+	birds.remove_at(index)
+	queue_redraw()
+	return bird
+
+
+## A bird the whirl let go, at `at`: back in the flock, flying off and away.
+func release(bird: Dictionary, at: Vector2) -> void:
+	if bird.is_empty():
+		return
+	bird["at"] = at
+	bird["travel"] = 0.0
+	_send_away(bird)
+	birds.append(bird)
+	queue_redraw()
+
+
+## Frightened off the lake: the bird at `index` takes off and leaves.
+func flush(index: int) -> void:
+	if index >= 0 and index < birds.size() and int(birds[index]["state"]) != State.LEAVING:
+		_send_away(birds[index])
 
 
 ## Put a bird on the water, flying in from off screen towards a perch. Used by the flock
@@ -530,6 +571,7 @@ func _free_perch() -> int:
 	var box := grid.view
 	if box.size.x <= 0.0 or box.size.y <= 0.0:
 		return -1
+	var keep_off: Array = avoid.call() if avoid.is_valid() else []
 	for attempt in 24:
 		var at := box.position + Vector2(
 			_rng.randf() * box.size.x, _rng.randf() * box.size.y
@@ -540,6 +582,13 @@ func _free_perch() -> int:
 		if Iso.island_fraction(float(grid.tile_of(tile).x), float(grid.tile_of(tile).y)) < 1.0:
 			continue
 		if bird_on(tile) >= 0 or _claimed(tile):
+			continue
+		var near := false
+		for point: Vector2 in keep_off:
+			if Vector2(grid.tile_of(tile)).distance_to(Iso.world_to_tile(point)) < AVOID_TILES:
+				near = true
+				break
+		if near:
 			continue
 		return tile
 	return -1

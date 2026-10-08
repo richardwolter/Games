@@ -15,6 +15,9 @@ uniform float art_px = 2.0;
 
 // The window: where it is on the quad, which way the light travels from it, how strong.
 uniform vec2 window_at = vec2(0.0, 40.0);
+// The room inside its moulding, on the quad (left, top, right, bottom): nothing is lit outside
+// it, so the planks round the room (the walls' tops) never glow (2026-10-08).
+uniform vec4 inside = vec4(0.0, 0.0, 100000.0, 100000.0);
 uniform vec2 sun_dir = vec2(0.85, 0.52);
 uniform float sun_power = 0.5;
 uniform vec3 sun_tone : source_color = vec3(1.0, 0.82, 0.52);
@@ -77,5 +80,9 @@ void fragment() {
 		light += lamp_tones[i] * lamps[i].w * pool * flicker(float(i), t);
 	}
 
+	vec2 px = UV * box_px;
+	if (px.x < inside.x || px.y < inside.y || px.x > inside.z || px.y > inside.w) {
+		light = vec3(0.0);
+	}
 	COLOR = vec4(light, 1.0);
 }

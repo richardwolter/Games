@@ -6623,6 +6623,11 @@ func _start_tornado() -> void:
 	_tornado.day = _day
 	_tornado.angler = _angler
 	_tornado.fish = _fish
+	_tornado.flock = _flock
+	_tornado.bird_netted.connect(_on_bird_caught)
+	if _flock != null:
+		_flock.avoid = func() -> Array:
+			return [_tornado.base()] if _tornado != null and _tornado.down() else []
 	_tornado.net_range = func() -> float: return _net.range_tiles
 	_tornado.filth_moved.connect(_tornado_filth)
 	_tornado.remap_owed.connect(func() -> void: _filth_stale = true)

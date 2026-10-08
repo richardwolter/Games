@@ -3194,6 +3194,14 @@ func _dress_light(floor_box: Rect2) -> void:
 	lit.set_shader_parameter(&"box_px", shed.size)
 	lit.set_shader_parameter(&"art_px", _zoom())
 	lit.set_shader_parameter(&"window_at", _window_at() - shed.position)
+	# No light on the room's own planks (2026-10-08, Richard: the window's glow sat on top of
+	# the left wall, "it should come from below the roof"): only inside the moulding.
+	var zoom := _zoom()
+	var side := BORDER_VERTICAL.get_width() * zoom
+	lit.set_shader_parameter(&"inside", Vector4(
+		side, BORDER_HORIZONTAL.get_height() * zoom,
+		shed.size.x - side, shed.size.y - BORDER_SILL.get_height() * zoom
+	))
 	lit.set_shader_parameter(&"sun_dir", CONE_AXIS)
 	# A shower outside (2026-09-25, `Weather`): the shaft through the window thins to a grey
 	# glow, and a flash of lightning throws it in white for a moment.
@@ -3258,9 +3266,13 @@ func _build_shade_layers() -> void:
 
 ## Where the light comes in, in the room's own space: the round window half way down the
 ## floor's left edge, the point the shaft is drawn from (`window_at` in `_dress_light`).
+## On the inner edge of the left wall's plank, not its outer edge (2026-10-08): the light
+## comes in under the roof, so nothing of its source shows on the wall's top.
 func _window_at() -> Vector2:
 	var floor_box := _floor_rect()
-	return Vector2(floor_box.position.x, floor_box.get_center().y)
+	return Vector2(
+		floor_box.position.x + BORDER_VERTICAL.get_width() * _zoom(), floor_box.get_center().y
+	)
 
 
 ## The way a shadow falls from a caster standing at `feet` (room space): straight away from

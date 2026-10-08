@@ -7518,6 +7518,55 @@ func _stage_tornado() -> void:
 	_check(boats_free and dogs_free, "and the fleet and the pack are let go", "")
 	_check(t.count == 1, "a tamed tornado counts", str(t.count))
 
+	# Pigeons (2026-10-08): a bird at the foot is sucked into the whirl, one a little way off is
+	# frightened away, none is counted as carried, a hit pays every bird in the whirl, and the
+	# end lets the rest fly off. A bird's new perch keeps off the foot.
+	var flock: Flock = _main.get(&"_flock")
+	var birds_was: Array = flock.birds.duplicate()
+	flock.birds.clear()
+	t.start(0.8)
+	step.call(t.BREW + t.TOUCH_END + 0.5)
+	var put_bird := func(world: Vector2) -> Dictionary:
+		var b := {"kind": 0, "state": Flock.State.PERCHED, "tile": grid.tile_at(world), "at": world,
+			"from": world, "to": world, "travel": 1.0, "span": 1.0, "facing": 1.0, "phase": 0.0,
+			"pose": 0, "pose_for": 5.0, "rest": 30.0}
+		flock.birds.append(b)
+		return b
+	var bt := Iso.world_to_tile(t.base())
+	var near_bird: Dictionary = put_bird.call(t.base())
+	var off_bird: Dictionary = put_bird.call(Iso.tile_to_world(bt.x + 2.6, bt.y))
+	var carried_was: int = t.carrying()
+	t._process(1.0 / 60.0)
+	_check(t.birds_carried() == 1 and not flock.birds.has(near_bird),
+		"a pigeon at the foot is sucked into the whirl", "whirl %d" % t.birds_carried())
+	_check(int(off_bird["state"]) == Flock.State.LEAVING,
+		"one a little way off is frightened away, not left sitting", str(off_bird["state"]))
+	_check(t.carrying() <= carried_was + 1 and t.pulled_birds == 1,
+		"a whirled pigeon is not a carried piece", "%d -> %d" % [carried_was, t.carrying()])
+	var keep_off: Array = flock.avoid.call() if flock.avoid.is_valid() else []
+	_check(keep_off.size() == 1, "while it is down, perches keep off its foot", str(keep_off.size()))
+	step.call(1.0)
+	var caught_was: int = _main.birds_caught
+	var sludge_was: float = _main.sludge
+	net.catch = PackedInt32Array()
+	t.net_down(net, t.base(), 40.0)
+	_check(t.birds_carried() == 0 and t.netted_birds == 1 and _main.birds_caught == caught_was + 1
+		and _main.sludge > sludge_was, "a hit nets the pigeon and pays it",
+		"netted %d, caught %d" % [t.netted_birds, _main.birds_caught - caught_was])
+	for d in net.catch:
+		var at := grid.tile_at(t.base())
+		grid.insert(at, grid.height_of(at), d)
+	net.catch = PackedInt32Array()
+	step.call(1.5)
+	var late_bird: Dictionary = put_bird.call(t.base())
+	t._process(1.0 / 60.0)
+	t.settle_now()
+	_check(flock.birds.has(late_bird) and int(late_bird["state"]) == Flock.State.LEAVING,
+		"untamed or settled, a whirled pigeon flies off", str(late_bird.get("state")))
+	flock.birds.clear()
+	flock.birds.append_array(birds_was)
+	t.count = 1
+
 	# Untamed, it wanders off after its life and drops everything on the water.
 	total = grid.piece_count()
 	var pol_was: float = _main.pollution

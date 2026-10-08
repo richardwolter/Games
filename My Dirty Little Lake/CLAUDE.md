@@ -4485,6 +4485,24 @@ Tornado named at its head.
   CCW shader lines, the carry at size, a goal in the band, every hit netting all it carried
   past the room, the storm tally, the shrink, the flee, and the rest as before.
 
+### Pigeons in the Tornado and the Shed's Window (2026-10-08, `/grill-me` with Richard)
+Fixed for the trailer re-shoot (a pigeon sat beside a funnel), in the game itself.
+- **A pigeon at the foot is sucked into the whirl** (`Tornado._pull_birds`, `BIRD_PULL` 1.8
+  tiles, `BIRDS_MOST` 4): taken out of the flock (`Flock.pull`, no pay), it orbits on the
+  debris' own fields, flapping `BIRD_FLAP` times faster, drawn by the look among the debris
+  through the dict's `paint` callable (`_paint_bird`). **One sitting within `BIRD_FLUSH` (3.5) that
+  cannot be taken is frightened off** (`Flock.flush`), and while the funnel is down no bird
+  picks a perch within `Flock.AVOID_TILES` (4) of the foot (`Flock.avoid`, set by the lake).
+- **A hit nets every bird in the whirl and pays it** (`bird_netted` -> `Lake._on_bird_caught`:
+  bird pay, coin, the head pop at its odds). The untamed end, a save or the menu's pose let
+  them go flying off (`_let_birds_go`, `Flock.release`). Not carried pieces: `carrying()`, the
+  ending and the carry cap ignore them.
+- **The shed's window light starts under the roof** (Richard: the glow sat on top of the left
+  wall's plank): `_window_at` is the plank's inner edge, and `shed_light.gdshader`'s `inside`
+  cuts every light to inside the room's moulding, so no plank round the room glows.
+- `test_lake`'s `_stage_tornado` guards the pull, the flush, not carried, the perch rule, the
+  hit paying and the release.
+
 ### The Ground Has Volume (2026-10-01, `/grill-me` with Richard)
 The lawn and the beach read flat: one green with sparse blades, one sand. Picked off
 `tools/last_ground_volume_mockup3.png`, panel **1b** (`tools/ground_volume_mockup.py`, offline,
@@ -8047,6 +8065,32 @@ left, clean `water_clean` top-right. Picked off `tools/last_icon_sheet.png`.
   square 23 px backing x8) go to `Marketing/My Dirty Little Lake/steam/icons/`.
 - Re-run with `--write` (base python, the psd-extract site-packages on `PYTHONPATH`) after the
   dog sheet or the water swatches change, then reimport. Out of scope: the web/PWA icons.
+
+### Trailer v3: Habibs 3, New Order, Real Sound (2026-10-08, `/grill-me` with Richard)
+Before the store goes public. `marketing/.../trailer/shots3.json` through `build_trailer2.py`;
+v2's `shots2.json` is kept as the record. Landscape only; the vertical cut waits for this one.
+- **Song**: `Habibs 3 #4.2` (the interim take), 144.0 BPM. Its arrangement is 2#1's to the
+  sample: the drop hits at 6.70 s in both, so `first_beat` 0.0333 puts the drop on beat 16
+  (`song_in` 4.0 rounds to 4.2, the drop on trailer beat 6). v2's 143.55 / 0.093 grid drifted
+  about 0.1 s by the end. Re-cut once more on Nuven's master.
+- **Order**: cast (cut to 9 beats: net home and the first pieces into the crate) -> upgrade,
+  cast, upgrade, gold -> Wash & decorate -> Tame the elements -> Clean with friends ->
+  Recycle for money -> wildlife -> logo, held 2 s longer (beauty 25 beats, `t2_beauty` filmed
+  24 s).
+- **The game's own sound is recorded** (`tools/film_audio.gd`): the films run under Movie
+  Maker (`--write-movie`, the throwaway AVI kept small by an `override.cfg` holding
+  `editor/movie_writer/mjpeg_quality` 0.05, deleted after), which mixes one frame of sound a
+  frame, and `AudioEffectRecord` on the SFX and Ambience buses writes `sfx.wav` and
+  `ambience.wav` per shot from its first kept frame (music bus muted, buses at Prefs'
+  defaults, `settings.cfg` untouched). Checked in step: a bark logged on kept frame 51 starts
+  at 0.86 s. The cut lays the stems on every stretch shown at real speed, the event log
+  (`sfx.txt`, which now also hears `play_ui`, the coo and the start sound) on slowed or sped
+  stretches, and the ambience stem at real speed everywhere. `"sfx_stem": false` keeps a cut on
+  the log (the pier, whose coins and bell stay the hand-laid roll). The hand-laid rain and
+  hose beds are gone; the thunder hits, the bell, the coin roll and the Wishlist chime stay.
+- **Probe fixes**: the dogs set off before the first kept frame (`PACK_SIT` -40); the angler
+  turns to the funnel before every throw (`_turn_to`).
+- Runs: the three `film_trailer` runs and `shot_wash_place`, each with `--write-movie`.
 
 ### The Vertical Trailer (2026-10-05, `/grill-me` with Richard)
 The wishlist trailer (v2, `shots2.json`) for TikTok, Reels, Stories and Shorts: the same edit,

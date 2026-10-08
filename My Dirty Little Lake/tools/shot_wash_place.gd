@@ -18,6 +18,7 @@ extends Node
 ## only the lake's stacks changed meaning, and nothing here is judged by them.
 
 const Style := preload("res://scripts/style.gd")
+const FilmAudio := preload("res://tools/film_audio.gd")
 const FROM_SAVE := "user://play_decor.save"
 const SAVE_PATH := "user://shot_wash_place.save"
 var _tall := OS.get_environment("FILM_TALL") != ""
@@ -68,6 +69,8 @@ var _aim := Vector2.INF
 var _goal := Vector2.ZERO
 var _path: Array[Vector2] = []
 var _pointers: FileAccess
+## The sound, recorded under Movie Maker (`film_audio.gd`): `sfx.wav` and `ambience.wav`.
+var _audio: RefCounted
 
 
 func _ready() -> void:
@@ -81,9 +84,9 @@ func _ready() -> void:
 		win.content_scale_size = Vector2i(720, 1280)
 	else:
 		DisplayServer.window_set_size(Vector2i(1920, 1080))
-	_log = FileAccess.open(LOG, FileAccess.WRITE)
 	var dir := ProjectSettings.globalize_path(OUT)
 	DirAccess.make_dir_recursive_absolute(dir)
+	_log = FileAccess.open(LOG, FileAccess.WRITE)
 	for old in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir.path_join(old))
 	for path in [SAVE_PATH, SAVE_PATH + ".bak", SAVE_PATH + ".tmp"]:
@@ -94,6 +97,7 @@ func _ready() -> void:
 		get_tree().quit()
 		return
 	_pointers = FileAccess.open(POINTER_LOG, FileAccess.WRITE)
+	_audio = FilmAudio.new()
 	DirAccess.copy_absolute(ProjectSettings.globalize_path(FROM_SAVE), ProjectSettings.globalize_path(SAVE_PATH))
 	_raise_version(SAVE_PATH)
 	_main = load("res://scenes/main.tscn").instantiate()
@@ -167,6 +171,7 @@ func _process(_delta: float) -> void:
 		room.set(&"_pointer", _from)
 	_capture()
 	if _down_at >= 0 and _frames - _down_at >= HOLD:
+		_audio.finish(ProjectSettings.globalize_path(OUT))
 		_say("frames %d" % _saved)
 		get_tree().quit()
 
@@ -185,6 +190,13 @@ func _open_wash() -> void:
 			_target_view = int(row.get("view", 0))
 			decor.remove_at(i)
 	room.decor = decor
+	# No pointing hands in a trailer (2026-10-08): every switch counted as tried.
+	var tried: Array[String] = _main.get(&"switch_tried")
+	for row: Dictionary in decor:
+		if not tried.has(String(row["piece"])):
+			tried.append(String(row["piece"]))
+	if not tried.has(String(PIECE)):
+		tried.append(String(PIECE))
 	var unlocked: Array = _main.get(&"unlocked")
 	unlocked.erase(String(PIECE))
 	var waiting: Array = _main.get(&"unwashed")
@@ -328,6 +340,8 @@ func _placed_row() -> Variant:
 
 
 func _capture() -> void:
+	if _saved == 0:
+		_audio.begin()
 	var image := get_viewport().get_texture().get_image()
 	var scale := Vector2(image.get_size()) / get_viewport().get_visible_rect().size
 	var at := Vector2.INF

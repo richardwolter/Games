@@ -760,6 +760,7 @@ func play_ui(name: StringName) -> void:
 	voice.volume_db = float(tune[0])
 	voice.pitch_scale = _rng.randf_range(1.0 - spread, 1.0 + spread)
 	voice.play()
+	played.emit(voice.stream.resource_path, voice.volume_db, voice.pitch_scale)
 
 
 ## Whether `gap` seconds have passed since `name` last got through, and if so, marks now.
@@ -1096,6 +1097,7 @@ func play_coo() -> void:
 	_coo_player.volume_db = float(tune[0])
 	_coo_player.pitch_scale = _rng.randf_range(1.0 - tune[1], 1.0 + tune[1])
 	_coo_player.play()
+	played.emit(_coo_player.stream.resource_path, _coo_player.volume_db, _coo_player.pitch_scale)
 
 
 ## The net being hauled. `effort` is how much water it is moving; zero stops the haul
@@ -1327,6 +1329,7 @@ func play_start() -> void:
 	_start_player.stream = list[0]
 	_start_player.volume_db = float(SOUNDS[&"game_start"][0])
 	_start_player.play()
+	played.emit(_start_player.stream.resource_path, _start_player.volume_db, _start_player.pitch_scale)
 
 
 ## Float buffer to a 16-bit mono wave, clipped rather than normalised so a sound that was

@@ -1,6 +1,7 @@
 extends Node
 
 const Style := preload("res://scripts/style.gd")
+const FilmAudio := preload("res://tools/film_audio.gd")
 ## Films the shots the trailer is cut from: opens the lake on a real 1080p window, poses each
 ## shot (how clean the water is, where the angler stands, how wide the net is, how many hulls
 ## and dogs), and dumps every rendered frame as a JPEG so the edit can pick its cuts on the
@@ -80,6 +81,8 @@ var _shots: Array = []
 var _shot := -1
 var _shot_frame := 0
 var _kept := 0
+## The shot's sound, recorded per bus under Movie Maker (`film_audio.gd`).
+var _audio: RefCounted
 var _hold := Vector2.INF
 var _follow: Node2D = null
 var _zoom_level := 3
@@ -254,7 +257,7 @@ func _plan() -> void:
 			_run_tornado(f)],
 		# Grime to beauty: the lake cleaned outwards from the island in a wave while the life
 		# comes back and the hut mends, held long after for the end card. No hive colony.
-		["t2_beauty", 21.0, func() -> void:
+		["t2_beauty", 24.0, func() -> void:
 			_pose_beauty(),
 		func(f: int) -> void:
 			_run_beauty(f)],
@@ -280,6 +283,7 @@ func _ready() -> void:
 	_fps = float(OS.get_environment("FILM_FPS")) if OS.get_environment("FILM_FPS") != "" else 60.0
 	if Sfx.main() != null:
 		Sfx.main().played.connect(_on_played)
+	_audio = FilmAudio.new()
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	add_child(_main)
@@ -333,6 +337,8 @@ func _process(_delta: float) -> void:
 						str(Iso.world_to_tile(_net.world_pos()).round()), _net.strength(), _net.mouth_extent()])
 		_net_was = _net.state
 	if _shot_frame >= _settle_of(shot[0]):
+		if _kept == 0 and _audio != null:
+			_audio.begin()
 		var image := get_viewport().get_texture().get_image()
 		image.save_jpg(ProjectSettings.globalize_path(OUT % [_dir_of(shot[0]), _kept]), JPG_QUALITY)
 		# The camera the saved picture was drawn with: the viewport hands back the frame drawn
@@ -393,6 +399,8 @@ func _next() -> void:
 	if _sfx_log != null:
 		_sfx_log.close()
 		_sfx_log = null
+	if _audio != null and _shot >= 0 and _shot < _shots.size():
+		_audio.finish(ProjectSettings.globalize_path("res://tools/film/%s" % _dir_of(_shots[_shot][0])))
 	if _pointer_log != null:
 		_pointer_log.close()
 		_pointer_log = null
@@ -912,7 +920,9 @@ func _near_sticks() -> Array:
 ## the kept frames it sits for before the first breaks for the water, the next `PACK_EVERY`
 ## after.
 const PACK_SEATS := [Vector2(0.7, 0.7), Vector2(-0.7, -0.7), Vector2(-0.3, 1.2), Vector2(-1.2, 0.3)]
-const PACK_SIT := 70
+## Negative since 2026-10-08 (Richard: the dogs sat waiting, then moved): every dog has set
+## off before the first kept frame, so the pack is running from the first frame shown.
+const PACK_SIT := -40
 const PACK_EVERY := 16
 
 
@@ -1202,6 +1212,7 @@ func _pose_tornado() -> void:
 	_torn_landed_at = -1.0
 	_torn_fed = 0.0
 	_torn_ended = false
+	_angler.call(&"_turn_to", foot)
 	_zoom(TORN_ZOOM)
 	_phase = DAY_PHASE
 	_hold = _torn_frame(t)
@@ -1232,6 +1243,10 @@ func _run_tornado(f: int) -> void:
 	t.set(&"_theta", TORN_ANGLE)
 	t.set(&"_grow", TORN_OUT)
 	_hold = _torn_frame(t)
+	# Facing the funnel before every throw (2026-10-08, Richard: he stood facing away from it
+	# until the cast turned him).
+	if _net.state == CastNet.State.IDLE:
+		_angler.call(&"_turn_to", Iso.world_to_tile(t.call(&"base")))
 	if since >= 1.5 and since - _torn_fed >= TORN_FEED_EVERY:
 		_torn_fed = since
 		_feed_tornado(t)

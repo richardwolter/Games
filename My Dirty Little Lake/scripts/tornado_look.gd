@@ -1443,6 +1443,10 @@ func _paint_debris(on: Node2D, front: bool) -> void:
 		if hs > 4.0:
 			var theirs: Vector2 = axis_at.call(clampf(h / hs, 0.0, 1.0))
 			at.x += (_axis(h).x - theirs.x) * DEBRIS_FOLLOW
+		# A pigeon in the whirl (2026-10-08) draws itself, through the tornado.
+		if d.has("paint"):
+			(d["paint"] as Callable).call(on, at, d)
+			continue
 		DebrisDraw.draw_piece(on, d["def"], at, float(d["rot"]), float(d["scale"]), float(d["alpha"]))
 
 

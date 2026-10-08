@@ -37,6 +37,8 @@ signal netted_into(net: Node, pieces: int)
 ## It has come down onto the water (the end of the brew), at `at`: the lake's first-tornado
 ## moment glides to it.
 signal touched_down(at: Vector2)
+## A net hit the funnel with a pigeon in its whirl: paid as a bird in the net (2026-10-08).
+signal bird_netted(at: Vector2)
 
 # --- The schedule ----------------------------------------------------------------------
 ## Four a run, one as the meter passes each of these cleaned shares (1 - pollution), each
@@ -136,6 +138,16 @@ const BUMP_REACH := 1.8
 const REMAP_EVERY := 0.5
 const SCARE_EVERY := 0.5
 
+## Pigeons (2026-10-08, `/grill-me` with Richard): a bird within `BIRD_PULL` tiles of the foot
+## is sucked into the whirl like a piece, at most `BIRDS_MOST` at once; one sitting within
+## `BIRD_FLUSH` that cannot be taken is frightened off. A hit nets every bird in the whirl and
+## pays it; the end lets them go, flying away. Never counted as carried (the ending ignores
+## them) and never against the pieces' cap.
+const BIRD_PULL := 1.8
+const BIRD_FLUSH := 3.5
+const BIRDS_MOST := 4
+const BIRD_FLAP := 1.8
+
 ## The wind's loop, when Nuven records one: played on the Ambience bus while a tornado is
 ## down. Silent until the file exists.
 const WIND_SOUND := "res://assets/sfx/wind.ogg"
@@ -147,6 +159,7 @@ var weather: Weather
 var day: DayCycle
 var angler: Node2D
 var fish: Node
+var flock: Flock
 ## `func() -> float`: the net's range in tiles.
 var net_range: Callable
 
@@ -201,6 +214,8 @@ var _knock := Vector2.ZERO
 
 var _debris: Array[Dictionary] = []
 var _flung: Array[Dictionary] = []
+## Pigeons in the whirl: the debris' orbit fields plus `bird`, the flock's own dictionary.
+var _birds: Array[Dictionary] = []
 var _lifted_at := {}
 var _lift_in := 0.0
 var _fling_in := FLING_EVERY
@@ -223,6 +238,8 @@ var _state := {}
 var lifted := 0
 var landed := 0
 var netted := 0
+var pulled_birds := 0
+var netted_birds := 0
 
 
 func _ready() -> void:
@@ -302,6 +319,11 @@ func carrying() -> int:
 	return _debris.size() + _flung.size()
 
 
+## Pigeons in the whirl now.
+func birds_carried() -> int:
+	return _birds.size()
+
+
 func hits() -> int:
 	return _hits
 
@@ -333,8 +355,11 @@ func start(angle: float = NAN) -> void:
 	_lean = Vector2.ZERO
 	_debris.clear()
 	_flung.clear()
+	_birds.clear()
 	_lifted_at.clear()
 	lifted = 0
+	pulled_birds = 0
+	netted_birds = 0
 	landed = 0
 	netted = 0
 	_seed = _rng.randf() * TAU
@@ -371,6 +396,7 @@ func _finish() -> void:
 	for f in _flung:
 		_land(f)
 	_flung.clear()
+	_let_birds_go()
 	_drop_look()
 	if weather != null:
 		weather.clear_storm()
@@ -494,6 +520,7 @@ func _step(delta: float) -> void:
 	_track_carried(delta)
 	if _strength > 0.35 and _end_at < 0.0:
 		_lift(delta)
+		_pull_birds()
 		_fling_now(delta)
 	_tick_flung(delta)
 	_tick_collapse(delta)
@@ -698,6 +725,10 @@ func _into_net(net: Node) -> int:
 	var n := _debris.size()
 	_debris.clear()
 	net.set(&"catch", held)
+	for b: Dictionary in _birds:
+		netted_birds += 1
+		bird_netted.emit(_base + (b["local"] as Vector2))
+	_birds.clear()
 	return n
 
 
@@ -708,6 +739,7 @@ func _begin_end(tamed: bool) -> void:
 		return
 	_end_at = _t
 	_end_from = maxf(_strength, 0.3)
+	_let_birds_go()
 	_look_hits = 3
 	_hit_at = _t
 	_collapse_in = 0.15
@@ -778,8 +810,72 @@ func _lift(delta: float) -> void:
 	splash.ripple(from, 10.0)
 
 
+## Pigeons near the foot: into the whirl while there is room, frightened off when there is
+## not, so no bird ever sits beside the funnel.
+func _pull_birds() -> void:
+	if flock == null:
+		return
+	var here := Iso.world_to_tile(_base)
+	for i in range(flock.birds.size() - 1, -1, -1):
+		var bird: Dictionary = flock.birds[i]
+		if int(bird["state"]) == Flock.State.LEAVING:
+			continue
+		var at := flock.ground_of(bird)
+		var dd := Iso.world_to_tile(at).distance_to(here)
+		if dd > BIRD_FLUSH:
+			continue
+		if dd > BIRD_PULL or _birds.size() >= BIRDS_MOST:
+			# Only a sitting bird is frightened off: one flying past keeps going, and is
+			# sucked in if its way brings it near the foot.
+			if int(bird["state"]) == Flock.State.PERCHED:
+				flock.flush(i)
+			continue
+		var taken := flock.pull(i)
+		if taken.is_empty():
+			continue
+		taken["state"] = Flock.State.FLYING
+		var rel := (bird["at"] as Vector2) - _base
+		var circ := Vector2(rel.x, rel.y * 2.0)
+		_birds.append({
+			"bird": taken, "def": null, "state": "lift", "age": 0.0,
+			"angle": atan2(circ.y, circ.x), "r0": circ.length(), "radius": circ.length(),
+			"height": maxf(-rel.y, 0.0), "band": _rng.randf_range(0.3, 0.8),
+			"margin": _rng.randf_range(10.0, 26.0), "seed": _rng.randf() * TAU,
+			"whirl": _rng.randf_range(0.85, 1.2), "rot": 0.0, "spin_rate": 0.0,
+			"scale": 1.0, "alpha": 1.0, "local": rel, "front": rel.y > 0.0, "depth": rel.y,
+			"ground": rel, "paint": _paint_bird,
+		})
+		pulled_birds += 1
+		splash.ripple(at, 8.0)
+
+
+## Every bird in the whirl let go where it is, flying off (the untamed end, a save).
+func _let_birds_go() -> void:
+	for b: Dictionary in _birds:
+		if flock != null:
+			flock.release(b["bird"], _base + (b["local"] as Vector2))
+	_birds.clear()
+
+
+## One whirled pigeon, drawn by the look among the debris (`paint`): the flock's own flap,
+## faster, facing the way the whirl carries it.
+func _paint_bird(on: Node2D, at: Vector2, d: Dictionary) -> void:
+	if flock == null or flock.sheet() == null:
+		return
+	var bird: Dictionary = d["bird"]
+	var frame := flock.frame_of(bird)
+	var a := float(d["angle"])
+	# The angle runs down (counter-clockwise), so the ring point moves along (sin a, -cos a / 2).
+	var facing := Flock.facing_of(Vector2.ZERO, Vector2(sin(a), 0.0))
+	var foot := at + Vector2(0.0, frame.size.y * Flock.SCALE * 0.5)
+	Flock.stamp(on, flock.sheet(), frame, foot, facing, Color(1.0, 1.0, 1.0, float(d["alpha"])))
+
+
 func _track_carried(delta: float) -> void:
-	for d: Dictionary in _debris:
+	for b: Dictionary in _birds:
+		var bird: Dictionary = b["bird"]
+		bird["phase"] = float(bird["phase"]) + delta * BIRD_FLAP / Flock.FLY_FRAME
+	for d: Dictionary in _debris + _birds:
 		d["age"] = float(d["age"]) + delta
 		var hf := 0.0
 		var rr := 0.0
@@ -1005,7 +1101,7 @@ func _push_state(delta: float) -> void:
 		"hit_flash": _hit_flash, "velocity": _velocity, "spin": _spin, "height": HEIGHT * _size,
 		"size": _size, "hit_no": _hits,
 		"weak": lerpf(1.0, 0.65, clampf(float(_hits - 1) / float(maxi(_need - 1, 1)), 0.0, 1.0)),
-		"lean": _lean, "base": _base, "debris": _debris, "flung": _flung,
+		"lean": _lean, "base": _base, "debris": _debris + _birds, "flung": _flung,
 		"axis_at": axis_at, "radius_at": radius_at, "net": {},
 		"since_hit": _t - _hit_at,
 		"collapse": clampf((_t - _end_at) / COLLAPSE_LONG, 0.0, 1.0) if _end_at >= 0.0 else 0.0,
@@ -1033,6 +1129,13 @@ func _draw_shadows(on: Node2D) -> void:
 		var w := maxf(def.size.x * 0.4, 4.0) * lerpf(1.0, 0.6, high)
 		DebrisDraw.draw_shadow(
 			on, _base + (d["ground"] as Vector2) + Shade.drop(day, h), w,
+			Shade.tint_on(day, Shade.On.WATER, lerpf(1.0, 0.375, high))
+		)
+	for b: Dictionary in _birds:
+		var h: float = b["height"]
+		var high := clampf(h / HEIGHT, 0.0, 1.0)
+		DebrisDraw.draw_shadow(
+			on, _base + (b["ground"] as Vector2) + Shade.drop(day, h), 6.0 * lerpf(1.0, 0.6, high),
 			Shade.tint_on(day, Shade.On.WATER, lerpf(1.0, 0.375, high))
 		)
 	for f: Dictionary in _flung:
