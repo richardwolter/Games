@@ -5214,6 +5214,32 @@ func _stage_pigeon_look() -> void:
 	_check(float(_main.get(&"sludge")) > purse, "and the purse is paid for it", "")
 	coins.clear()
 
+	# The catch that brings up the pigeon's cue card always shows the head, held longer
+	# (2026-10-09); the next catch is back to the roll and the short hold.
+	var seen: Dictionary = (_main.get(&"_cues_seen") as Dictionary).duplicate()
+	var owed: Array = (_main.get(&"_hints") as Array).duplicate()
+	var up: StringName = _main.get(&"_hint_up")
+	(_main.get(&"_cues_seen") as Dictionary).erase(&"pigeon")
+	(_main.get(&"_hints") as Array).clear()
+	_main.set(&"_hint_up", &"")
+	_main.call(&"_on_bird_caught", _grid.surface_pos(perch))
+	_check(bool(pop.get(&"_showing")), "the first pigeon always shows its head", "")
+	_check(is_equal_approx(float(pop.get(&"_hold")), Lake.FIRST_POP_HOLD),
+		"and holds it longer", "%.2f s" % float(pop.get(&"_hold")))
+	for i in 8:
+		pop.call(&"_process", 0.2)
+	_check(pop.call(&"_shown") == 1.0, "still up well past the usual hold", "")
+	pop.set(&"_showing", false)
+	pop.set(&"_hold", PigeonPop.HOLD)
+	_main.call(&"_on_bird_caught", _grid.surface_pos(perch))
+	_check(is_equal_approx(float(pop.get(&"_hold")), PigeonPop.HOLD),
+		"a later catch holds the usual time", "%.2f s" % float(pop.get(&"_hold")))
+	pop.call(&"_process", 9.0)
+	_main.set(&"_cues_seen", seen)
+	_main.set(&"_hints", owed)
+	_main.set(&"_hint_up", up)
+	coins.clear()
+
 
 ## Every opaque colour in one cut of the pigeon sheet, as a set. A bird's palette.
 func _bird_tones(shot: Image, box: Rect2) -> Dictionary:
@@ -9516,6 +9542,19 @@ func _check_board_tones() -> void:
 		_check(up.g < maxf(up.r, up.b) or up.g < 0.3, "no board is green (green is max)", String(board))
 		_check(_contrast(Style.BOARD_INK, pair[0]) >= 4.5, "ink clears 4.5:1 on a board's row", String(board))
 		_check(_contrast(ShopSkin.INK_DIM, pair[1]) >= 4.5, "dim ink clears 4.5:1 on a drawn-back row", String(board))
+		# Drawn back is greyed and darker (2026-10-09), with a hint of its hue left.
+		var raw: Color = ShopSkin.TONES[board][1]
+		var off: Color = pair[1]
+		_check(off.s < raw.s and off.s > 0.0 and off.v < raw.v,
+			"a drawn-back row is greyed and darker, not grey", String(board))
+	_check(HudSkin.money_text(12345) == "$12345", "money reads $12345", HudSkin.money_text(12345))
+	_check(
+		HudSkin.fitted_size("$870000", Style.TEXT_HEAD, Style.measure("$870000", Style.TEXT_SMALL).x)
+		== Style.TEXT_SMALL,
+		"a long purse drops a rung rather than run off", ""
+	)
+	var hud_src := FileAccess.get_file_as_string("res://scripts/hud_skin.gd")
+	_check(hud_src.contains("\"-\" + money_text("), "the spend tag wears its $ too", "")
 	var green := ShopSkin.MAX_FACE
 	_check(green.g > green.r and green.g > green.b, "a maxed row is green", str(green))
 	_check(_contrast(Style.BOARD_INK, green) >= 4.5, "ink clears 4.5:1 on a maxed row", "")

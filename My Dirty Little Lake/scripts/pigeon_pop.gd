@@ -90,6 +90,8 @@ signal arrived(at: Vector2)
 
 var _head: Texture2D
 var _paid: int = 0
+## This pop's hold: `HOLD`, or longer on the first catch (`Lake.FIRST_POP_HOLD`).
+var _hold: float = HOLD
 var _showing: bool = false
 var _age: float = 0.0
 ## Whether this pop has already said it arrived. One coin a head, however many frames the
@@ -180,10 +182,11 @@ func _fill() -> void:
 ## player had stopped finding it funny.
 ## Returns false when there is no art: the caller then knows no bird is coming and can
 ## fall back, rather than waiting for an `arrived` that will never be emitted.
-func pop(paid: int) -> bool:
+func pop(paid: int, hold := HOLD) -> bool:
 	if _head == null:
 		return false
 	_paid = paid
+	_hold = hold
 	_age = 0.0
 	_showing = true
 	_announced = false
@@ -197,7 +200,7 @@ func _process(delta: float) -> void:
 	if not _announced and _age >= RISE:
 		_announced = true
 		arrived.emit(coin_from())
-	if _age >= RISE + HOLD + LEAVE:
+	if _age >= RISE + _hold + LEAVE:
 		_showing = false
 		set_process(false)
 	queue_redraw()
@@ -218,9 +221,9 @@ func _shown() -> float:
 	if _age < RISE:
 		var through := _age / RISE
 		return 1.0 - (1.0 - through) * (1.0 - through)
-	if _age < RISE + HOLD:
+	if _age < RISE + _hold:
 		return 1.0
-	return clampf(1.0 - (_age - RISE - HOLD) / LEAVE, 0.0, 1.0)
+	return clampf(1.0 - (_age - RISE - _hold) / LEAVE, 0.0, 1.0)
 
 
 ## How big the painting draws, before the lean.

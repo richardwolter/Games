@@ -1059,12 +1059,30 @@ func _draw_available() -> void:
 	HudButtons.badge(self, face, str(available), available > 0, pulse_amount(&"upgrades"))
 
 
+## What the money plate's figure is kept clear of, both ends together, in canvas px.
+const MONEY_PAD := 8.0
+
+
+## A sum of money as the HUD writes it: "$12345".
+static func money_text(amount: int) -> String:
+	return "$%d" % amount
+
+
+## The largest rung at or under `height` that writes `text` inside `room`, `TEXT_TINY` at least.
+static func fitted_size(text: String, height: int, room: float) -> int:
+	for rung in [Style.TEXT_TITLE, Style.TEXT_HEAD, Style.TEXT_BODY, Style.TEXT_SMALL]:
+		if rung <= height and Style.measure(text, rung).x <= room:
+			return rung
+	return Style.TEXT_TINY
+
+
 ## The money plate: the coin, the sunken panel, and the live figure on it.
 func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
 	var plate := HudButtons.draw_money(on, box, wash, swell)
-	var height := Style.step(plate.size.y * 0.72)
-	# The running figure, not the real one: the plate is meant to be watched climbing.
-	var shown := "%d" % roundi(_shown_money)
+	# The running figure, not the real one: the plate is meant to be watched climbing. It
+	# wears its "$" (2026-10-09, Richard), and drops a rung rather than run off the panel.
+	var shown := money_text(roundi(_shown_money))
+	var height := fitted_size(shown, Style.step(plate.size.y * 0.72), plate.size.x - MONEY_PAD)
 	var baseline := plate.position.y + plate.size.y * 0.5 + float(height) * 0.35
 	# Lit from behind while it is climbing, which is what turns a number going up into
 	# something being handed over.
@@ -1094,7 +1112,7 @@ func _draw_money(on: CanvasItem, box: Rect2, wash: Color, swell: float) -> void:
 		var fade := 1.0 - t * t
 		Style.write(
 			on,
-			"-%d" % int(tag["amount"]),
+			"-" + money_text(int(tag["amount"])),
 			Style.step(float(height) * 0.8),
 			Vector2(0.0, baseline + plate.size.y * 0.75 + fall),
 			Color(SPENT_INK.r, SPENT_INK.g, SPENT_INK.b, fade),

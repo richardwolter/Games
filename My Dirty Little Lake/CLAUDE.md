@@ -4280,6 +4280,22 @@ Every mechanic a player meets mid-run is named the first time it happens.
   minutes, up on the button after, gone for good on a click, the save rule), a shed dog
   walking round a sofa, and the card's faded group.
 
+### Greyed Rows, the Dogs' Wood, the First Pigeon, the $ (2026-10-09, `/grill-me` with Richard)
+- **A row that cannot be bought is greyed** (`ShopSkin.drawn_back`, `OFF_SATURATION` 0.55,
+  `OFF_VALUE` 0.85; pick C of three rendered off the real shop): the plate (`tones_of`'s second
+  face, so the wash room's hose row too), the price tag and the price's ink. The writing on the
+  plate is untouched; the lit edge still marks affordable and Strength keeps its gold rim.
+- **The dogs card's far wood is a wall** (`ShopCard.WOOD_TALL` 0.7, `WOOD_LEAST` 0.75,
+  `WOOD_BASE`; pick D over the wash room's painted wood): the blocks were a few px with sky
+  through every gap.
+- **The catch that brings up the pigeon's cue card always shows the head and holds it**
+  `Lake.FIRST_POP_HOLD` (2 s, `PigeonPop.pop`'s `hold`); later catches keep the roll and
+  `PigeonPop.HOLD`.
+- **The money plate reads "$12345"** and its spend tag "-$1700" (`HudSkin.money_text`), corner
+  plate and the purse over the shop alike; the figure drops a rung rather than run off its
+  panel (`fitted_size`, `MONEY_PAD`). The coin stays.
+- `test_lake` guards all four.
+
 ### Rain (2026-09-25, `/grill-me` with Richard)
 Up to five showers a run, **atmosphere only**: no catch, pay, price, boat or dog changes, and
 the sim is untouched. `scripts/weather.gd` (`Weather`, z 22 over the birds) and

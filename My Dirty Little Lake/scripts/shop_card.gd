@@ -67,8 +67,14 @@ const DOG_LAKE_PIECES := 5
 ## Only pieces no bigger than this, in art px, float on the dogs' card: the card is a few
 ## dozen pixels tall and a bottle at the lake's grain would stand half as tall as the lake.
 const DOG_PIECE_MOST := 9.0
-## The far wood's crowns: how tall the tallest stands over the horizon, as a share of it.
-const WOOD_TALL := 0.42
+## The far wood's crowns: how tall the tallest stands over the horizon, as a share of it, and
+## the shortest as a share of the tallest. Under them a solid band `WOOD_BASE` of the horizon
+## tall, so no sky shows between crowns (2026-10-09, Richard: "does not have the tree line,
+## it looks weird with the sky"; pick D, the blocks taller and solid, was 0.42 and 0.55 with
+## sky through every gap).
+const WOOD_TALL := 0.7
+const WOOD_LEAST := 0.75
+const WOOD_BASE := 0.45
 ## A dog's run: pixels a second, and the wait off frame before it comes back.
 const DOG_SPEED := Vector2(70.0, 120.0)
 const DOG_WAIT := Vector2(0.4, 2.6)
@@ -271,7 +277,9 @@ func _draw_strip(box: Rect2) -> void:
 	var k := 0
 	while x < w:
 		var wide := _snap(8.0 + float((k * 37) % 7) * 2.0)
-		var tall := _snap(horizon * WOOD_TALL * (0.55 + 0.45 * float((k * 53) % 5) / 4.0))
+		var tall := _snap(horizon * WOOD_TALL * (WOOD_LEAST + (1.0 - WOOD_LEAST) * float((k * 53) % 5) / 4.0))
+		var base := _snap(horizon * WOOD_BASE)
+		draw_rect(Rect2(x, horizon - base, wide, base), _bank[0], true)
 		draw_rect(Rect2(x, horizon - tall, wide, tall), _bank[0] if k % 3 == 0 else _bank[1], true)
 		draw_rect(Rect2(x + PIXEL, horizon - tall, PIXEL * 2.0, PIXEL), _grass[0], true)
 		x += wide - PIXEL * 2.0

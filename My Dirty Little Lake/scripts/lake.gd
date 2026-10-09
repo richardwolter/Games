@@ -942,6 +942,8 @@ var _trophy: Trophy
 ## to be part of what netting a bird is, rare enough that it is not a receipt.
 var _pigeon: PigeonPop
 const POP_ODDS := 0.5
+## How long the head holds on the catch that brings up the pigeon's cue card, in seconds.
+const FIRST_POP_HOLD := 2.0
 var _pop_rng := RandomNumberGenerator.new()
 
 ## Coins flying from a sale at a pier to the money plate, on the HUD's layer.
@@ -4668,6 +4670,10 @@ func _on_haul_arrived(def_index: int, tag: Variant) -> void:
 func _on_bird_caught(at: Vector2) -> void:
 	sludge += bird_pay()
 	birds_caught += 1
+	# The catch that brings up the pigeon's cue card always shows the head, and holds it
+	# `FIRST_POP_HOLD` (2026-10-09, Richard): the card says pigeons pay, and the head is the
+	# pigeon saying it. Asked before `_owe_hint`, which is what makes the next catch not first.
+	var first := not (_cues_seen.has(&"pigeon") or &"pigeon" in _hints or _hint_up == &"pigeon")
 	_owe_hint(&"pigeon")
 	if _splash != null:
 		_splash.splash(at, 0.55)
@@ -4675,9 +4681,11 @@ func _on_bird_caught(at: Vector2) -> void:
 	# that goes with it, both off the one roll. They are halves of the same joke — a coo with
 	# no bird is a noise from nowhere, and a bird with no coo is a picture — so either both
 	# happen or neither does. The money is not part of the bargain and arrives every time.
-	var showing := _pop_rng.randf() < POP_ODDS
+	var showing := first or _pop_rng.randf() < POP_ODDS
 	if showing:
-		showing = _pigeon != null and _pigeon.pop(roundi(bird_pay()))
+		showing = _pigeon != null and _pigeon.pop(
+			roundi(bird_pay()), FIRST_POP_HOLD if first else PigeonPop.HOLD
+		)
 		if _sfx != null:
 			_sfx.play_coo()
 	# And a coin to the purse, the way a sale at a yard sends one (2026-09-16). A pigeon is

@@ -178,9 +178,24 @@ const HEAD_DARK := 0.45
 const CARD_RIM := 3.0
 
 
-## A board's two row faces, [affordable, drawn back].
+## How far a row that cannot be bought is greyed and darkened (2026-10-09, `/grill-me` with
+## Richard, pick C of three rendered off the real shop): its plate, its price tag and the
+## price's ink keep `OFF_SATURATION` of their colour and `OFF_VALUE` of their brightness, so a
+## hint of the board's hue stays and the row reads as not yet. The writing on the plate is not
+## touched: the plate going darker only lifts its contrast.
+const OFF_SATURATION := 0.55
+const OFF_VALUE := 0.85
+
+
+## A colour as a row that cannot be bought wears it.
+static func drawn_back(c: Color) -> Color:
+	return Color.from_hsv(c.h, c.s * OFF_SATURATION, c.v * OFF_VALUE, c.a)
+
+
+## A board's two row faces, [affordable, drawn back]. The second is already greyed.
 static func tones_of(board: StringName) -> Array:
-	return TONES.get(board, [Style.BOARD_ROW, Style.BOARD_ROW_OFF])
+	var pair: Array = TONES.get(board, [Style.BOARD_ROW, Style.BOARD_ROW_OFF])
+	return [pair[0], drawn_back(pair[1])]
 ## The blurb's plate: how wide its writing may run, and its padding.
 const BLURB_WIDE := 250.0
 const BLURB_PAD := 12.0
@@ -1333,7 +1348,7 @@ static func draw_tag_on(
 		return
 	if lit:
 		tag = tag.grow(TAG_SWELL)
-	var face := Style.FRAME if afford else Style.FRAME_LOW
+	var face := Style.FRAME if afford else drawn_back(Style.FRAME_LOW)
 	if lit:
 		face = Color(
 			face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
@@ -1346,7 +1361,7 @@ static func draw_tag_on(
 	Style.write(
 		canvas, cost, height,
 		Vector2(0.0, tag.position.y + tag.size.y * 0.5 + float(height) * 0.34),
-		Style.PRICE_INK if afford else Style.PRICE_INK.lerp(Style.FRAME_LOW, 0.5),
+		Style.PRICE_INK if afford else drawn_back(Style.PRICE_INK.lerp(Style.FRAME_LOW, 0.5)),
 		HORIZONTAL_ALIGNMENT_CENTER, tag
 	)
 
