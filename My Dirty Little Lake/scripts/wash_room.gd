@@ -333,6 +333,15 @@ func hose_label() -> String:
 	return "%s %s %s" % [Text.HOSE_NAME, hose_value(), hose_cost()]
 
 
+## Where a tray row's price tag may stand: the shop's slot, a share of the row's width at its
+## right end, inset as the shop's rows are. The tag itself shrinks onto the figure inside it.
+static func price_slot(box: Rect2) -> Rect2:
+	var wide := box.size.x * ShopSkin.TAG_SHARE
+	return Rect2(
+		Vector2(box.end.x - wide - 6.0, box.position.y + 8.0), Vector2(wide, box.size.y - 16.0)
+	)
+
+
 ## The hose row's price tag, in the room's coordinates: the one part of the row that buys.
 func hose_tag_box() -> Rect2:
 	var box := hose_box()
@@ -433,16 +442,24 @@ class Tray:
 			box.position += off
 			_draw_row(box, StringName(room.waiting[room._scroll + k]), k == _hover)
 
+	## A row in the shelf's own plate and the shop's price tag (2026-10-09, `/grill-me` with
+	## Richard: the flat boxes were "square and ugly"). The whole row still picks: putting a
+	## find on the stand is not paying for it, the soap is taken when it comes clean. A row
+	## the purse cannot cover is greyed the shop's way, plate and tag.
 	func _draw_row(box: Rect2, piece: StringName, hovered: bool) -> void:
 		var can := room.can_afford(piece)
 		var standing := piece == room.on_stand()
-		var face := Style.BOARD_ROW if can else Style.BOARD_ROW_OFF
+		var face := Style.BOARD_ROW if can else ShopSkin.drawn_back(Style.BOARD_ROW_OFF)
 		if standing:
 			face = Style.ON_WATER
-		draw_rect(box, face)
+		elif hovered and can:
+			face = Color(
+				face.r * Style.HOVER_WASH.r, face.g * Style.HOVER_WASH.g, face.b * Style.HOVER_WASH.b
+			)
+		Style.plate(self, box, face)
 		if can and (hovered or standing):
 			Style.lit_edge(self, box, face)
-		var ink := Style.BOARD_INK if can else Style.BOARD_INK_SOFT
+		var ink := Style.BOARD_INK if can else ShopSkin.INK_DIM
 		# The find as the lake showed it: grimy. What it looks like clean is the reward.
 		var cut := room.sheets.region_of(piece)
 		var fit := minf(ICON / cut.size.x, ICON / cut.size.y)
@@ -453,9 +470,10 @@ class Tray:
 		)
 		var soap := room.soap_of(piece)
 		var price := "$%d" % soap if soap > 0 else Text.WASH_FREE
-		var price_wide := Style.measure(price, Style.TEXT_BODY).x
+		var tag_slot := WashRoom.price_slot(box)
+		var tag := ShopSkin.tag_box_of(box, tag_slot.size.x, price, Style.TEXT_BODY)
 		var words := Rect2(
-			slot.end.x + 8.0, box.position.y, box.size.x - ICON - 30.0 - price_wide, box.size.y
+			slot.end.x + 8.0, box.position.y, tag.position.x - 6.0 - (slot.end.x + 8.0), box.size.y
 		)
 		# A long name drops a size before it is cut (2026-10-02, Richard: "Kitchen Coun…"),
 		# the shop's own ladder.
@@ -463,20 +481,19 @@ class Tray:
 		var name_px := Style.TEXT_SMALL
 		if Style.measure(title, name_px).x > words.size.x:
 			name_px = Style.TEXT_TINY
+		var name_y := box.position.y + (box.size.y + float(name_px) * 0.62) * 0.5
+		if standing:
+			name_y = box.position.y + 22.0
 		Style.write(
 			self, _cut_to(title, name_px, words.size.x), name_px,
-			Vector2(0.0, box.position.y + 22.0), ink, HORIZONTAL_ALIGNMENT_LEFT, words
+			Vector2(0.0, name_y), ink, HORIZONTAL_ALIGNMENT_LEFT, words
 		)
 		if standing:
 			Style.write(
 				self, Text.WASH_WASHING, Style.TEXT_TINY,
 				Vector2(0.0, box.position.y + 39.0), ink, HORIZONTAL_ALIGNMENT_LEFT, words
 			)
-		Style.write(
-			self, price, Style.TEXT_BODY,
-			Vector2(box.end.x - price_wide - 8.0, box.position.y + 31.0),
-			Style.PRICE_INK if can else ink
-		)
+		ShopSkin.draw_tag_on(self, tag_slot, price, Style.TEXT_BODY, can, hovered and can)
 
 	## A name that does not fit is cut with an ellipsis: `Style.write` has no clip box.
 	func _cut_to(text: String, size_px: int, room_wide: float) -> String:

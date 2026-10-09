@@ -55,8 +55,10 @@ const PLACE_COLS := COLS * CELL
 const PLACE_ROWS := ROWS * CELL
 
 ## How wide the inventory column down the right is, in pixels, and how tall one row of it
-## is. A row holds one find: its picture and its name.
-const LIST_WIDTH := 210
+## is. A row holds one find: its picture and its name. 250 since 2026-10-09 (Richard: more
+## room for the names); the house and the column are centred as one block, so the house
+## moves left by half of what the column gains.
+const LIST_WIDTH := 250
 const ROW_HEIGHT := 56
 
 ## The shelf is a board of the shop's oak, standing beside the room rather than drawn into
@@ -2692,12 +2694,15 @@ func _floor_rect() -> Rect2:
 func _list_rect() -> Rect2:
 	var board := _board_rect()
 	var face := Style.board_face(board, SHELF_FRAME)
-	var rows := Rect2(
-		face.position + Vector2(SHELF_PAD, SHELF_PAD),
-		face.size - Vector2(SHELF_PAD * 2.0 + SHELF_BAR + SHELF_BAR_GAP, SHELF_PAD * 2.0)
-	)
 	# The scrollbar's lane is taken whether or not there is anything to scroll, so a row
-	# does not change width the moment the shelf fills up.
+	# does not change width the moment the shelf fills up; and the same width is left free
+	# on the left (2026-10-09, Richard: "look at the spacing on the right"), so the rows
+	# stand in the middle of the card and the bar rides in the right-hand margin.
+	var side := SHELF_PAD + SHELF_BAR + SHELF_BAR_GAP
+	var rows := Rect2(
+		face.position + Vector2(side, SHELF_PAD),
+		face.size - Vector2(side * 2.0, SHELF_PAD * 2.0)
+	)
 	return Rect2(rows.position, Vector2(maxf(rows.size.x, 1.0), maxf(rows.size.y, 1.0)))
 
 

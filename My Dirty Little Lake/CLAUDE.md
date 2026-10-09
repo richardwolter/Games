@@ -1909,6 +1909,19 @@ ribbon titles are carved.
   tone per board, none green, the inks, the max face and badge, the rows' `maxed`, the coin
   sheet's nine frames and the carve.
 
+### The Shelf Centred and the Tray in Plates (2026-10-09, `/grill-me` with Richard)
+- **The Decorate column is 250 wide** (`ShedRoom.LIST_WIDTH`, was 210): the house and the
+  column are centred as one block, so the house moves left by half of it. The Deck check
+  (`keep_clear`) still passes at 1280 x 800.
+- **The rows stand in the middle of the card** (`_list_rect`): the scrollbar's lane is still
+  reserved on the right whether or not it scrolls, and the same width is now left free on
+  the left, 20 px a side (it was 8 left, 20 right).
+- **The wash tray's rows are the shelf's plates** (`WashRoom.Tray._draw_row`: `Style.plate`,
+  the hover wash, the lit edge) **with the shop's price tag** (`ShopSkin.draw_tag_on` in
+  `WashRoom.price_slot`, "Free" on it too); a row the purse cannot cover is greyed the
+  shop's way, plate and tag. The whole row still picks: putting a find on the stand is not
+  paying, the soap is taken when it comes clean. Supersedes the flat `draw_rect` rows.
+
 ### What Is Drawn Is What Clicks (2026-09-25, `/grill-me` with Richard)
 The shop and the settings board answer only on their drawn controls, not on a whole plate.
 - **Shop**: only a row's price tag buys (`ShopSkin._tag_boxes`, the same `_tag_of` sum the
