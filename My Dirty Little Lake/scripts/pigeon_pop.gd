@@ -293,7 +293,7 @@ func _draw() -> void:
 	# on it, not off the edge.
 	var box := head_box(out)
 	var height := PAID_TEXT
-	var label := "+%d$" % _paid
+	var label := "+" + HudSkin.money_text(_paid)
 	var words := Style.measure(label, height)
 	var tag := Rect2(
 		Vector2(

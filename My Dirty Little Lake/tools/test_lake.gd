@@ -9555,6 +9555,9 @@ func _check_board_tones() -> void:
 	)
 	var hud_src := FileAccess.get_file_as_string("res://scripts/hud_skin.gd")
 	_check(hud_src.contains("\"-\" + money_text("), "the spend tag wears its $ too", "")
+	var pop_src := FileAccess.get_file_as_string("res://scripts/pigeon_pop.gd")
+	_check(pop_src.contains("\"+\" + HudSkin.money_text(") and not pop_src.contains("%d$"),
+		"the pigeon's tag puts its $ first", "")
 	var green := ShopSkin.MAX_FACE
 	_check(green.g > green.r and green.g > green.b, "a maxed row is green", str(green))
 	_check(_contrast(Style.BOARD_INK, green) >= 4.5, "ink clears 4.5:1 on a maxed row", "")
