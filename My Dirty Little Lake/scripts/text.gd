@@ -458,6 +458,15 @@ static var END_LINE_2: String:
 static var END_BACK: String:
 	get: return TranslationServer.translate(&"END_BACK")
 
+static var DEMO_LINE_1: String:
+	get: return TranslationServer.translate(&"DEMO_LINE_1")
+
+static var DEMO_LINE_2: String:
+	get: return TranslationServer.translate(&"DEMO_LINE_2")
+
+static var DEMO_WISHLIST: String:
+	get: return TranslationServer.translate(&"DEMO_WISHLIST")
+
 static var MATERIAL_PLASTIC: String:
 	get: return TranslationServer.translate(&"MATERIAL_PLASTIC")
 

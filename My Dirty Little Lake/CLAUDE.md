@@ -6737,6 +6737,31 @@ sheet Richard enters on Steamworks.
   `lake_cleanup_tree.save` and the other retired saves named in history), git history, and the
   `Lake` class and its code names. "Lake Cleanup" in a note older than this one is the game.
 
+### The Steam Demo (2026-10-09, `/grill-me` with Richard)
+A separate Steam demo app (no festival), about 25 minutes. `scripts/demo.gd` (`Demo`), the
+lake's "demo's finale" block, and the **Windows Demo** export preset.
+- **One codebase**: the preset's `demo` feature tag is the demo (`Demo.on()`; `Demo.forced`
+  for tests). Its own save, `user://my_dirty_little_lake_demo.save`; nothing carries into the
+  full game, by decision. No achievements and no Steam calls in the demo (`_owns_achievements`).
+- **Cut by caps** (`Demo.CAPS`, read by `Lake._level_cap`): every track stops short (Range 4,
+  Strength 1, Catch 3, ...), so only the water round the island is worked. A capped row reads
+  MAX; nothing says what is locked, by decision. `Demo.PRICES` overrides prices
+  (`Lake.cost_of`); **empty, so the demo runs on the full game's prices until its economy
+  pass** (the sim with a demo spec, then a logged run).
+- **The finale** (`_demo_step`, `demo_bought_out`, `_end_demo`): the last level bought brings
+  down one tornado (the run's first, 3 hits); when it ends, tamed or not, the farewell comes
+  up with the demo's words (`DEMO_LINE_1/2`), the credits and a **Wishlist** door
+  (`Farewell.wishlist`, `open_store`, `Demo.STORE_URL`) beside Back to menu. `_farewell_shown`
+  is the demo's done flag. A save or the menu's pose settles the tornado without `ended`, so
+  the finale is owed again.
+- **Off in the demo**: the tornado schedule, the hive's swarm (the hive stands as scenery).
+- **Finds** are dealt only within `Demo.REACH` (9) tiles of the shelf and up to tier
+  `Demo.FIND_TIER` (1), never under heavier rubbish; the rest are not dealt.
+- Machine drafts for the three new strings. All caps and reach first guesses.
+- **Open**: the demo economy (prices, the 25 minutes), what Continue does on a finished demo
+  save, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the
+  bought-out rule, the finale and its hold, the owed finale, and the ending's door.
+
 ### Archive
 - The earlier `_pipeline/tools/generate_art.ps1` (ComfyUI pipeline) and EBC photo approach are archived.
 - Do not resurrect unless vertical slice changes scope to explicitly include photoreal art.

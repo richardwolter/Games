@@ -121,6 +121,10 @@ var _age: float = 0.0
 ## Where the menu door was last drawn, so a click is tested against what the player saw.
 var _menu_rect := Rect2()
 var _menu_hot: bool = false
+## The demo's ending (2026-10-09) also offers the store page, a door left of the menu's.
+var wishlist: bool = false
+var _wish_rect := Rect2()
+var _wish_hot: bool = false
 
 ## The credit roll: whether it is running, how far up it has climbed in pixels, whether a
 ## click has told it to hurry, and the rows themselves. Empty until `roll_credits`.
@@ -419,10 +423,12 @@ func _gui_input(event: InputEvent) -> void:
 	var moved := event as InputEventMouseMotion
 	if moved != null:
 		var home := not _rolling and _menu_rect.has_point(moved.position)
-		if home != _menu_hot:
-			if home:
+		var wish := not _rolling and _wish_rect.has_point(moved.position)
+		if home != _menu_hot or wish != _wish_hot:
+			if (home and not _menu_hot) or (wish and not _wish_hot):
 				Sfx.ui(&"ui_hover")
 			_menu_hot = home
+			_wish_hot = wish
 			queue_redraw()
 		return
 	var click := event as InputEventMouseButton
@@ -434,6 +440,10 @@ func _gui_input(event: InputEvent) -> void:
 	if not _rolling and _menu_rect.has_point(click.position):
 		Sfx.ui(&"ui_click")
 		take_menu()
+		return
+	if not _rolling and _wish_rect.has_point(click.position):
+		Sfx.ui(&"ui_click")
+		open_store()
 		return
 	# While the credits are climbing, a click runs them off rather than closing the screen:
 	# a player who clicks to skip the roll has not asked to leave the lake yet, and the
@@ -481,6 +491,7 @@ func _draw() -> void:
 	# and the credits pass over exactly the band they stand in.
 	if _rolling:
 		_menu_rect = Rect2()
+		_wish_rect = Rect2()
 		return
 	_draw_menu_door(under, float(Style.TEXT_BODY), fade, shade)
 
@@ -488,17 +499,36 @@ func _draw() -> void:
 ## The way home: a box under the words, in the frame's deep brown rather than the danger's
 ## red.
 func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> void:
-	var wide := Style.measure(MENU_LABEL, int(height)).x
-	var box := Vector2(wide, height) + ONWARD_PAD * 2.0
-	_menu_rect = Rect2(Vector2((size.x - box.x) * 0.5, under + height * ONWARD_DROP), box)
-	var lit := 0.22 if _menu_hot else 0.12
+	var box := Vector2(Style.measure(MENU_LABEL, int(height)).x, height) + ONWARD_PAD * 2.0
+	var top := under + height * ONWARD_DROP
+	if not wishlist:
+		_wish_rect = Rect2()
+		_menu_rect = Rect2(Vector2((size.x - box.x) * 0.5, top), box)
+		_door(_menu_rect, MENU_LABEL, height, _menu_hot, fade, shade)
+		return
+	var wish := Vector2(Style.measure(Text.DEMO_WISHLIST, int(height)).x, height) + ONWARD_PAD * 2.0
+	var gap := height * 1.5
+	var left := (size.x - wish.x - gap - box.x) * 0.5
+	_wish_rect = Rect2(Vector2(left, top), wish)
+	_menu_rect = Rect2(Vector2(left + wish.x + gap, top), box)
+	_door(_wish_rect, Text.DEMO_WISHLIST, height, _wish_hot, fade, shade)
+	_door(_menu_rect, MENU_LABEL, height, _menu_hot, fade, shade)
+
+
+func _door(rect: Rect2, label: String, height: float, hot: bool, fade: float, shade: Color) -> void:
+	var lit := 0.22 if hot else 0.12
 	var face := Style.FRAME_DEEP
-	Style.plaque(self, _menu_rect, Color(face.r, face.g, face.b, minf(1.0, 0.55 + lit)), fade)
-	_line(
-		MENU_LABEL, int(height),
-		_menu_rect.position.y + ONWARD_PAD.y + height * 0.82,
-		Color(Style.INK.r, Style.INK.g, Style.INK.b, fade), shade
+	Style.plaque(self, rect, Color(face.r, face.g, face.b, minf(1.0, 0.55 + lit)), fade)
+	Style.write(
+		self, label, int(height), Vector2(rect.position.x, rect.position.y + ONWARD_PAD.y + height * 0.82),
+		Color(Style.INK.r, Style.INK.g, Style.INK.b, 1.0), HORIZONTAL_ALIGNMENT_CENTER,
+		Rect2(rect.position.x, 0.0, rect.size.x, 1.0), fade
 	)
+
+
+## The demo's store page. The screen stays up, so the player can still take the menu door.
+func open_store() -> void:
+	OS.shell_open(Demo.STORE_URL)
 
 
 ## One line, centred, with a shadow under it. The shadow is what lets pale text sit over
@@ -519,8 +549,10 @@ func pad_focus() -> Array:
 	if _rolling:
 		return [{"box": Rect2(Vector2.ZERO, size), "key": &"skip", "ring": false}]
 	var out: Array = []
+	if _wish_rect.size != Vector2.ZERO:
+		out.append({"box": _wish_rect, "key": &"wish", "first": true})
 	if _menu_rect.size != Vector2.ZERO:
-		out.append({"box": _menu_rect, "key": &"menu", "first": true})
+		out.append({"box": _menu_rect, "key": &"menu", "first": _wish_rect.size == Vector2.ZERO})
 	# The other answer, keep fishing, is a click anywhere off the door: a stop over the
 	# closing words, so a pad-only player has both (issue #33 audit).
 	var band := _message_band()

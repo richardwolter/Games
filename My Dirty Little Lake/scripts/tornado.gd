@@ -167,6 +167,8 @@ var net_range: Callable
 ## `count` is how many of `MARKS` are behind (had or skipped); `next_in` the rolled cleaned
 ## share of the next, -1 unrolled; `most` is always `MARKS.size()`.
 var count := 0
+## The last end came from `settle_now` (a save or the menu's pose), not from the event.
+var settled := false
 var most := MARKS.size()
 var next_in := -1.0
 var _calm := 0.0
@@ -338,6 +340,7 @@ func start(angle: float = NAN) -> void:
 	if _active or grid == null:
 		return
 	_active = true
+	settled = false
 	_clock = 0.0
 	_t = -1.0
 	_held_t = 0.0
@@ -416,6 +419,7 @@ func _finish() -> void:
 func settle_now() -> void:
 	if not _active:
 		return
+	settled = true
 	for d in _debris:
 		var idx := _landing_tile(_base + (d["ground"] as Vector2), Vector2(cos(float(d["angle"])), sin(float(d["angle"]))), 1.5, int(d["from_tile"]))
 		_put_back(idx, int(d["def_index"]))

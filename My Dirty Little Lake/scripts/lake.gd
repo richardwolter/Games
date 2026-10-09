@@ -503,7 +503,8 @@ const AUTOSAVE_EVERY := 20.0
 ## Where this run is saved, and whether it picks up where the last one left off. Both are
 ## settable before the scene enters the tree, which is how the test harness runs against a
 ## save file of its own instead of the player's.
-var save_path: String = SAVE_PATH
+## The demo keeps its own file (`Demo.SAVE_PATH`).
+var save_path: String = Demo.SAVE_PATH if Demo.on() else SAVE_PATH
 var autoload_save: bool = true
 
 ## For a probe that follows the lake across a scene change (`tools/shot_reload.gd`): the path
@@ -2120,10 +2121,16 @@ func _hide_treasures() -> void:
 		# fallback always had it: any deep tile in the lake that is clear. Only then the
 		# roomiest tile in the band. `test_lake` allows two finds out of their band.
 		var early := EARLY_FINDS.has(def.piece)
+		# The demo deals only what its capped net can reach and lift, under nothing heavier
+		# (`Demo.REACH`, `Demo.FIND_TIER`); the rest of the collection is the full game's.
+		if Demo.on():
+			if def.tier > Demo.FIND_TIER:
+				continue
+			early = true
 		var spots := _find_spots(def, early, _find_band(def))
 		_shuffle(spots, rng)
 		var pick := _clear_spot(spots, planted_at)
-		if pick < 0:
+		if pick < 0 and not Demo.on():
 			var anywhere := _find_spots(def, early, Vector2(0.0, INF))
 			_shuffle(anywhere, rng)
 			pick = _clear_spot(anywhere, planted_at)
@@ -2135,8 +2142,10 @@ func _hide_treasures() -> void:
 					roomiest = room
 					pick = index
 		if pick < 0:
-			# A collection that cannot be completed is the worse failure.
-			_plant_anywhere(i)
+			# A collection that cannot be completed is the worse failure. The demo's is not
+			# a collection, so a find with no room in reach is simply not dealt.
+			if not Demo.on():
+				_plant_anywhere(i)
 			continue
 		var down := 0 if early else rng.randi_range(0, 2)
 		_grid.insert(pick, maxi(_grid.height_of(pick) - 1 - down, 0), i)
@@ -2174,6 +2183,8 @@ func _shuffle(spots: PackedInt32Array, rng: RandomNumberGenerator) -> void:
 ## The band a find is hidden in, as tiles past the island's shelf (from, to).
 func _find_band(def: TrashDef) -> Vector2:
 	var near := Iso.SHELF_TILES + Iso.SHELF_CLEAR
+	if Demo.on():
+		return Vector2(maxf(near, LakeGrid.RING_OUT * 0.5), Demo.REACH)
 	if EARLY_FINDS.has(def.piece):
 		# Not in the ring's inner half: it was two deep and skipped by `height < 3` until the
 		# ring thickened (2026-09-29), and a find there is scooped on the first casts.
@@ -3022,7 +3033,7 @@ func _hive_step(delta: float) -> void:
 	_hive.play_now = _play
 	match _hive.stage:
 		Hive.Stage.EMPTY:
-			if not _hive.held and _swarm_due():
+			if not _hive.held and not Demo.on() and _swarm_due():
 				_hive.set_stage(Hive.Stage.SWARM)
 				_owe_swarm()
 				save_game()
@@ -3630,6 +3641,9 @@ func _show_farewell() -> void:
 	_farewell = Farewell.new()
 	_farewell.dismissed.connect(_drop_farewell)
 	_farewell.to_menu.connect(_quit)
+	if Demo.on():
+		_farewell.lines = [Text.DEMO_LINE_1, Text.DEMO_LINE_2]
+		_farewell.wishlist = true
 	# The cleaned lake is the end of the game, so the credits roll under the words
 	# (2026-09-16).
 	_farewell.roll_credits()
@@ -5134,13 +5148,13 @@ static func sky_low(at: float) -> Color:
 ## Cost of the next level on a track.
 func cost_of(what: StringName) -> float:
 	var track: UpgradeTrack = _upgrades.get(what)
-	return track.cost(_level_of(what)) if track != null else INF
+	return Demo.cost(what, track, _level_of(what)) if track != null else INF
 
 
 ## Where a track stops. resources/upgrades/*.tres.
 func _level_cap(what: StringName) -> int:
 	var track: UpgradeTrack = _upgrades.get(what)
-	return track.level_cap if track != null else 0
+	return Demo.cap(what, track.level_cap) if track != null else 0
 
 
 func _level_of(what: StringName) -> int:
@@ -6661,10 +6675,51 @@ func _tornado_step(delta: float) -> void:
 	var held := _rain_held() or _panelled() or _cleaned or _glide >= 0.0 or _moment >= 0.0
 	# Only the game's own lake rolls tornadoes by itself; a harness or a probe's lake starts
 	# one when it asks (`Tornado.start`), or sets `tornado_schedule`.
-	if tornado_schedule or get_parent() == get_tree().root:
+	# The demo rolls none: its one tornado is the finale (`_demo_step`).
+	if Demo.on():
+		_demo_step(held)
+	elif tornado_schedule or get_parent() == get_tree().root:
 		_tornado.tick_schedule(delta, 1.0 - pollution, held)
 	if _held_for_tornado:
 		_hold_for_tornado()
+
+
+## The demo's finale (2026-10-09): buying the last level the demo sells brings down its one
+## tornado; when it ends, tamed or not, the demo ends (`_end_demo`). A save settles a
+## tornado, so a demo quit mid-finale gets the finale again on its way back in.
+var _demo_finale := false
+
+
+func _demo_step(held: bool) -> void:
+	# A tornado settled by a save or the menu's pose ends without `ended`: the finale is
+	# owed again.
+	if _demo_finale and not _tornado.active():
+		_demo_finale = false
+	if _farewell_shown or _demo_finale or _tornado.active() or held or _in_menu:
+		return
+	if not demo_bought_out():
+		return
+	_demo_finale = true
+	_tornado.start()
+
+
+## Whether every track is at the demo's cap.
+func demo_bought_out() -> bool:
+	for what: StringName in TRACKS:
+		if not is_maxed(what):
+			return false
+	return true
+
+
+## The thanks, the credits and the Wishlist door, once a save; the farewell flag is the
+## demo's "done" (Habibs on the record player comes with it, as it does for a cleaned lake).
+func _end_demo() -> void:
+	_demo_finale = false
+	if _farewell_shown:
+		return
+	_farewell_shown = true
+	_show_farewell()
+	save_game()
 
 
 ## A piece lifted into the funnel (negative) or landed back on the water (positive). The meter
@@ -6694,6 +6749,13 @@ func _on_tornado_began() -> void:
 func _on_tornado_ended(tamed: bool) -> void:
 	_held_for_tornado = false
 	_note_tornado_end(tamed)
+	if _demo_finale:
+		if _tornado.settled:
+			# A save or the menu's pose: the finale is owed again, as the run's first.
+			_demo_finale = false
+			_tornado.count = 0
+		else:
+			_end_demo()
 	# The menu's pose keeps its own hold (it settles the tornado first, then moors).
 	if _in_menu:
 		return
@@ -7478,7 +7540,8 @@ const ACH_EVERY := 1.0
 ## The game, not a harness or a probe: hung off the root, on the player's own save path. A
 ## probe that makes its lake the current scene (`shot_reload`) still has a path of its own.
 func _owns_achievements() -> bool:
-	return get_parent() == get_tree().root and save_path == SAVE_PATH 		and session_save_path.is_empty()
+	# The demo is another Steam app with no achievements of its own.
+	return get_parent() == get_tree().root and save_path == SAVE_PATH 		and session_save_path.is_empty() and not Demo.on()
 
 
 func _earn(id: String) -> void:

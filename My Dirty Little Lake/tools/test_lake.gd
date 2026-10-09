@@ -2199,12 +2199,58 @@ func _stage_save() -> void:
 		"%.5f" % float(_main.get(&"pollution")))
 	_check_save_hardening()
 	_check_achievements()
+	_check_demo()
 	_advance()
 
 
 ## Steam's achievements (2026-10-06): what the save proves is earned on an audit, the two
 ## moments where they happen, the pets tallied from both places, and a harness lake never
 ## reaching Steam. Everything set here is put back.
+## The Steam demo (2026-10-09): caps, the bought-out finale, and the ending's Wishlist door.
+func _check_demo() -> void:
+	Demo.forced = true
+	var tornado: Node2D = _main.get(&"_tornado")
+	var levels := {}
+	for what: StringName in Lake.TRACKS:
+		levels[what] = int(_main.get(String(what) + "_level"))
+	_check(int(_main.call(&"_level_cap", &"net_strength")) == 1, "the demo caps Strength at 1", "")
+	_check(int(_main.call(&"_level_cap", &"net_range")) == Demo.CAPS[&"net_range"],
+		"the demo caps Range", "")
+	for what: StringName in Lake.TRACKS:
+		_main.set(String(what) + "_level", int(Demo.CAPS.get(what, 0)))
+	_check(bool(_main.call(&"demo_bought_out")), "every track at its demo cap is bought out", "")
+	_main.set("reel_level", int(Demo.CAPS[&"reel"]) - 1)
+	_check(not bool(_main.call(&"demo_bought_out")), "one level short is not bought out", "")
+	_main.set("reel_level", int(Demo.CAPS[&"reel"]))
+	var shown_was: bool = _main.get(&"_farewell_shown")
+	_main.set(&"_farewell_shown", false)
+	_main.call(&"_demo_step", true)
+	_check(not tornado.active(), "the finale waits while held", "")
+	_main.call(&"_demo_step", false)
+	_check(tornado.active(), "buying the demo out brings the tornado down", "")
+	tornado.settle_now()
+	_main.call(&"_demo_step", false)
+	_check(tornado.active(), "a finale settled by a save is owed again", "")
+	_check(not bool(_main.get(&"_farewell_shown")), "a settled finale does not end the demo", "")
+	tornado.settle_now()
+	_main.set(&"_demo_finale", true)
+	tornado.set(&"settled", false)
+	_main.call(&"_on_tornado_ended", false)
+	var farewell: Farewell = _main.get(&"_farewell")
+	_check(bool(_main.get(&"_farewell_shown")) and farewell != null and farewell.wishlist,
+		"the finale's end raises the thanks with a Wishlist door", "")
+	if farewell != null:
+		_check(farewell.lines.size() == 2 and String(farewell.lines[0]) == Text.DEMO_LINE_1,
+			"the demo's own words", str(farewell.lines))
+		farewell.get_parent().queue_free()
+		_main.call(&"_drop_farewell")
+	_main.set(&"_farewell_shown", shown_was)
+	for what: StringName in levels:
+		_main.set(String(what) + "_level", levels[what])
+	Demo.forced = false
+	_check(int(_main.call(&"_level_cap", &"net_strength")) == 4, "the full game's cap back", "")
+
+
 func _check_achievements() -> void:
 	var steam := Achievements.main() as Achievements
 	_check(steam != null, "the Achievements autoload is hung off the root", "")
@@ -9225,6 +9271,13 @@ func _stage_paper() -> void:
 	var board: Rect2 = room.call(&"_board_rect")
 	_check(absf(board.end.y - shed.end.y) < 0.6, "and its foot is the shed's foot",
 		"%.1f against %.1f" % [board.end.y, shed.end.y])
+	# The rows stand in the middle of the card, the scrollbar's lane mirrored on the left
+	# (2026-10-09, Richard: "look at the spacing on the right").
+	var shelf_face := Style.board_face(board, ShedRoom.SHELF_FRAME)
+	var shelf_rows: Rect2 = room.call(&"_list_rect")
+	_check(absf((shelf_rows.position.x - shelf_face.position.x) - (shelf_face.end.x - shelf_rows.end.x)) < 0.6,
+		"the shelf's rows have even margins on the card",
+		"%.1f left, %.1f right" % [shelf_rows.position.x - shelf_face.position.x, shelf_face.end.x - shelf_rows.end.x])
 	# The Steam Deck's 1280 x 800 (2026-10-06): the room steps up a zoom, and its shelf ran
 	# under the shed's own Upgrades button in the corner. It steps back down instead.
 	var size_was := room.size
@@ -10059,6 +10112,12 @@ func _stage_wash() -> void:
 	var tray_rows := room.row_boxes()
 	_check(tray_rows.size() == 1 and tray_face.encloses(tray_rows[0].grow(1.0)),
 		"a single find on the tray stands inside its face", "%s in %s" % [tray_rows, tray_face])
+	# A tray row wears the shelf's plate and the shop's price tag (2026-10-09).
+	_check(tray_rows[0].encloses(WashRoom.price_slot(tray_rows[0])),
+		"the tray row's price tag stands inside its row", str(WashRoom.price_slot(tray_rows[0])))
+	var wash_src := FileAccess.get_file_as_string("res://scripts/wash_room.gd")
+	_check(not wash_src.contains("draw_rect(box, face)") and wash_src.contains("ShopSkin.draw_tag_on(self, tag_slot"),
+		"the tray rows are plates with the shop's tag, not flat boxes", "")
 	# What is behind the stand: the view from the pump, its water the lake's own.
 	var back := room.backdrop()
 	_check(back != null and back.is_painted() and back.get_index() < room.stand().get_index()
