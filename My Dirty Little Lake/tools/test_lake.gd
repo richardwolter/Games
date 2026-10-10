@@ -6557,24 +6557,36 @@ func _check_record_player(room: ShedRoom, sheets: Sheets) -> void:
 		_check(menu.press(&"sync") and station.synced != synced, "the switch syncs the two", "")
 		_check(not menu.press(&"tick:shed:goin"), "synced, the shed's ticks are not the player's", "")
 		menu.press(&"sync")
-		# The label says Nuven, in the case's brown, and the word turns with the record.
+		# The label is red and says NUVEN in cream (2026-10-10). The word turns with the record and
+		# stays whole at every step: the baked word is 56 pixels, a few under the spindle ring.
+		# Four steps on it is the first turned a right angle, exactly.
 		var disc: Array = menu.get(&"_disc")
-		var inked := 0
-		var moved := false
-		if disc.size() >= 5:
-			var one: Image = disc[0].get_image()
-			var other: Image = disc[4].get_image()
+		var counts: Array[int] = []
+		var red := 0
+		var square := true
+		if disc.size() == RecordMenu.SPIN_FRAMES:
 			var c := RecordMenu.DISC_R
-			for y in range(c - 16, c + 17):
-				for x in range(c - 16, c + 17):
-					var q := Vector2(x - c, y - c).length()
-					if q < 7.0 or q > 15.5:
-						continue
-					if one.get_pixel(x, y).is_equal_approx(RecordMenu.OUT):
-						inked += 1
-					if one.get_pixel(x, y) != other.get_pixel(x, y):
-						moved = true
-		_check(inked >= 25 and moved, "the label reads Nuven in brown and turns", "%d px" % inked)
+			var first: Image = disc[0].get_image()
+			var turned: Image = disc[4].get_image()
+			for f in RecordMenu.SPIN_FRAMES:
+				var img: Image = disc[f].get_image()
+				var n := 0
+				for y in img.get_height():
+					for x in img.get_width():
+						if img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK):
+							n += 1
+						if f == 0 and img.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL):
+							red += 1
+				counts.append(n)
+			for y in first.get_height():
+				for x in first.get_width():
+					var ink := first.get_pixel(x, y).is_equal_approx(RecordMenu.LABEL_INK)
+					var there := turned.get_pixel(2 * c - y, x).is_equal_approx(RecordMenu.LABEL_INK)
+					if ink != there:
+						square = false
+		var whole: bool = not counts.is_empty() and counts.min() >= 48 and counts.max() <= 60
+		_check(whole and red > 200 and square, "the red label reads NUVEN and turns whole",
+			"ink %s, red %d, right angle exact %s" % [counts, red, square])
 		var ticked := station.ticked(MusicStation.SHED, &"goin")
 		menu.press(&"tick:shed:goin")
 		_check(station.ticked(MusicStation.SHED, &"goin") != ticked, "a tick in the shed's column", "")

@@ -4,7 +4,7 @@
 ## own song into the shed; the song playing now and a skip, under a record that turns.
 ##
 ## Drawn in the record player's own colours — the lid's mauve lining for the face, walnut
-## for the case, the label's amber for what is lit — on whole art pixels of `UNIT` design
+## for the case, silver for what is lit — on whole art pixels of `UNIT` design
 ## pixels, laid out in those pixels off the mockup it was picked from
 ## (`tools/build_record_menu_mockup.py`, option A).
 ##
@@ -54,21 +54,20 @@ const TITLES := {
 
 ## The record: its middle and radius in art pixels, and how fast it turns — 33 and a third,
 ## stepped at the lake's own `pixel_fps` so it turns in pixel-art beats.
-## The label says who made the music (2026-09-29, Richard): "Nuven" in a 3x5 hand-set face,
-## a pixel between letters, laid round the top of the label with its tops outward and baked
-## into every spin frame, so it turns with the record. A name, not translated.
-const LABEL_WORD := [
-	["#.#", "###", "###", "#.#", "#.#"],
-	["...", "#.#", "#.#", "#.#", "###"],
-	["...", "#.#", "#.#", "#.#", ".#."],
-	["...", "###", "###", "#..", "###"],
-	["...", "##.", "#.#", "#.#", "#.#"],
-]
-## The letters' tops and the arc their middle runs along, in art pixels from the disc's middle.
-const LABEL_TOP := 15.5
-## Art pixels a letter pixel covers: 1.5 reads where 1 was a smudge (2026-09-29).
-const LABEL_SCALE := 1.5
-const LABEL_MID := 11.75
+## The label says who made the music (2026-10-10, `/grill-me` with Richard; supersedes the grey
+## label with "Nuven" curved round its top): a cherry red label, the one spot of colour on the
+## grey turntable, with NUVEN in cream straight across it above the hole and a shadow a pixel
+## straight down the screen. The word turns with the record. Turned by rule it broke up at the
+## in-between steps, so `tools/build_record_label.py` bakes it at the first four steps of the
+## turn (RotSprite letter by letter, the worst letters drawn by hand) into `LABEL_ART`; every
+## other step is one of those turned by whole right angles, exact on the grid. A name, not
+## translated.
+const LABEL_ART := "res://assets/record_label.png"
+const LABEL_R := 16
+const LABEL := Color8(178, 48, 44)
+const LABEL_LO := Color8(112, 26, 26)
+const LABEL_HI := Color8(214, 92, 70)
+const LABEL_INK := Color8(240, 232, 210)
 
 const DISC_AT := Vector2(52, 56)
 const DISC_R := 31
@@ -341,14 +340,15 @@ func needle_up() -> bool:
 	return _arm > 0.01
 
 
-## The record, one picture a step of its turn: grooves and a mark on the label that goes round,
-## the amber label. Whole art pixels, baked once.
+## The record, one picture a step of its turn: grooves, the red label and the name turning on it.
+## Whole art pixels, baked once.
 func _bake_disc() -> void:
 	_disc.clear()
+	var word := _label_word()
+	var hole := DISC_R * 0.12
 	var side := DISC_R * 2 + 1
 	for f in SPIN_FRAMES:
 		var img := Image.create(side, side, false, Image.FORMAT_RGBA8)
-		var turn := float(f) / SPIN_FRAMES * TAU
 		for y in range(-DISC_R, DISC_R + 1):
 			for x in range(-DISC_R, DISC_R + 1):
 				var q := Vector2(x, y).length()
@@ -365,31 +365,43 @@ func _bake_disc() -> void:
 						c = GAP_TONE
 					else:
 						c = VINYL_HI if int(q) % 2 == 0 else GROOVE_TONE
-				var a := fposmod(atan2(y, x) - turn, TAU)
-				if q <= 16.0:
-					c = AMBER if q > DISC_R * 0.12 else OUT
-					if DISC_R * 0.12 < q and q <= DISC_R * 0.2:
-						c = AMBER_HI
-					# The name, which is also what shows the label turning.
-					if label_ink(q, a):
+				if q <= LABEL_R:
+					c = LABEL_LO if q > LABEL_R - 1.0 else LABEL
+					if q <= hole + 1.6:
+						c = LABEL_HI
+					if word != null and q > hole:
+						if label_ink(word, f, x, y):
+							c = LABEL_INK
+						elif label_ink(word, f, x, y - 1):
+							c = LABEL_LO
+					if q <= hole:
 						c = OUT
 				img.set_pixel(x + DISC_R, y + DISC_R, c)
 		_disc.append(ImageTexture.create_from_image(img))
 
 
-## Whether a label pixel at `q` from the middle and turned-back angle `a` is a letter's.
-## Rows count in from `LABEL_TOP`; columns along the arc, centred on the top of the label
-## (3 pi / 2 on screen, clockwise as atan2 runs with y down).
-static func label_ink(q: float, a: float) -> bool:
-	var row := int(floorf((LABEL_TOP - q) / LABEL_SCALE))
-	if row < 0 or row > 4:
+## The baked word, four steps of the turn side by side, or null with no art (a bare label).
+static func _label_word() -> Image:
+	if not ResourceLoader.exists(LABEL_ART):
+		return null
+	var tex := load(LABEL_ART) as Texture2D
+	return tex.get_image() if tex != null else null
+
+
+## Whether the name is on art pixel (x, y) off the record's middle at turn step `frame`: the
+## step's quarter turn undone a right angle at a time, then looked up in that step's cell.
+static func label_ink(word: Image, frame: int, x: int, y: int) -> bool:
+	var cell := word.get_height()
+	var step := frame % 4
+	for i in frame / 4:
+		var t := x
+		x = y
+		y = -t
+	var u := step * cell + x + cell / 2
+	var v := y + cell / 2
+	if x < -cell / 2 or x > cell / 2 or v < 0 or v >= cell:
 		return false
-	var wide := LABEL_WORD.size() * 4 - 1
-	var along := wrapf(a - PI * 1.5, -PI, PI) * LABEL_MID / LABEL_SCALE
-	var col := int(floorf(along + wide * 0.5))
-	if col < 0 or col >= wide or col % 4 == 3:
-		return false
-	return String(LABEL_WORD[col / 4][row])[col % 4] == "#"
+	return word.get_pixel(u, v).a > 0.5
 
 
 func _draw() -> void:

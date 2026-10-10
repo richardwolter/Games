@@ -6452,10 +6452,21 @@ now only the defaults.
   superseding a needle that crept in with the song's progress). The
   record keeps turning through a skip (2026-09-29; it used to spin down), stepped at
   8 fps off 16 baked frames. **No white sheen on the disc**, by Richard's call.
-- **The label reads "Nuven"** (2026-09-29, `/grill-me` with Richard, `LABEL_WORD`,
-  `label_ink`): a 3x5 hand-set face at `LABEL_SCALE` 1.5 in `OUT` brown on a label grown to 16 art px (grooves from 17), curved round the top of the label, tops
-  outward, baked into every spin frame so it turns with the record. Replaces the amber mark.
-  Not translated.
+- **A cherry red label reading NUVEN** (2026-10-10, `/grill-me` with Richard, picked A off
+  `tools/last_label_mockup.png`; supersedes the grey label with "Nuven" curved round its top in
+  a 3x5 face at 1.5 art px a pixel, which smeared): `LABEL` red with a darker rim and a light
+  ring round the spindle, the one spot of colour on the grey turntable (the board, needle,
+  ticks and skip stay grey, by decision). NUVEN in cream, a bolder 4-5 px wide face at one art
+  pixel a pixel, straight across 8 px above the hole, its shadow one pixel straight down the
+  screen. **It turns with the record at 33 rpm, by decision** (holding it upright and slowing
+  the spin were offered). Turned by rule a five-pixel word breaks up at in-between angles, so
+  `tools/build_record_label.py` (base python with the psd-extract site-packages, **reimport
+  after**) bakes it at the first four of the 16 steps into `assets/record_label.png`: each
+  letter turned on its own with RotSprite at the sub-pixel phase that came out cleanest
+  (`PHASES`, `--search` prints them; a whole-word RotSprite, coverage sampling, stroke lines
+  and forward mapping were all tried and read worse), the first N at steps 1 and 2 drawn by
+  hand (`DRAWN`). `RecordMenu.label_ink` turns those by right angles for the other twelve,
+  exact on the grid. Close-up: `tools/last_record_label.png`. Not translated.
 - **Saved in the run's save as `records`** (`picks`/`take_picks`); a save without it reads
   as the old fixed lists. No `SAVE_VERSION` bump. **Always applies**, placed or not.
 - **The lid is only a picture**: E opens it and it stays open after the menu closes
