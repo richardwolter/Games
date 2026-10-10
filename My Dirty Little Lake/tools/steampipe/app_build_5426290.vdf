@@ -1,0 +1,28 @@
+"AppBuild"
+{
+	// My Dirty Little Lake Demo. Run through upload_demo.bat, which passes -desc
+	// (date and commit) and, with "preview", -preview. No SetLive: Richard sets the
+	// build live on default by hand in Steamworks (SteamPipe > Builds).
+	"AppID" "5426290"
+	"Desc" "My Dirty Little Lake Demo"
+	"verbose" "0"
+	"preview" "0"
+
+	// Relative to this file: the demo preset's export folder, read in place.
+	"ContentRoot" "..\..\build\windows_demo\"
+	"BuildOutput" "..\..\build\steampipe\"
+
+	"Depots"
+	{
+		"5426291" // My Dirty Little Lake Demo Content (Windows, 64-bit)
+		{
+			"FileMapping"
+			{
+				"LocalPath" "*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+			"FileExclusion" "*.pdb"
+		}
+	}
+}

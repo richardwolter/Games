@@ -80,6 +80,7 @@ art_source/packs_local/
 /tools/*/
 !/tools/bases/
 !/tools/film/
+!/tools/steampipe/
 /tools/film/*.log
 
 # Zip leftovers from macOS-made packs

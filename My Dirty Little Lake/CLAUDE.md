@@ -6887,7 +6887,14 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
 - **The ending's doors are Wishlist now and Back to lake** (`Farewell.lake_door`,
   `DEMO_BACK_LAKE`): back to lake closes the words, so the player can finish washing and
   decorating. The menu is reached from the settings board.
-- **Open**: a logged demo run to judge the 25 minutes, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the
+- **Uploading** (2026-10-10, `/grill-me` with Richard): demo app **5426290**, depot **5426291**
+  (Windows, 64-bit, all languages), launch option `MyDirtyLittleLakeDemo.exe`. Export the
+  "Windows Demo" preset from the editor, then run `tools/steampipe/upload_demo.bat` (or
+  `upload_demo.bat preview` to list the files and upload nothing): steamcmd from the SDK on the
+  Desktop, account `fxknox`, password and Steam Guard typed into steamcmd itself, the vdf reading
+  `build/windows_demo/` in place, logs in `build/steampipe/`, the description the date and
+  commit. **No SetLive, by decision**: Richard sets the build live on default in Steamworks.
+- **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
 ### Archive
