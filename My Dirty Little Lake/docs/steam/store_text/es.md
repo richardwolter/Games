@@ -14,17 +14,17 @@ Lanza tu red, limpia un lago sucio y haz que vuelva la naturaleza en este juego 
 ```
 [h2][b][i]Un juego acogedor, relajante y satisfactorio.[/i][/b][/h2]
 [p][i][b]Mejora tu red[/b][/i]
-Aumenta su fuerza, su tamaño, su suerte, el lanzamiento doble y más para atrapar todos los objetos del lago.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+Aumenta su fuerza, su tamaño, su suerte, el lanzamiento doble y más para atrapar todos los objetos del lago.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
 [p][b][i]No todo lo que encuentras es basura.[/i][/b]
 Lava tesoros escondidos y decora tu acogedora casa.
-[video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
 [p][b][i]De la mugre a la belleza.[/i][/b]
 Mira cómo la vida silvestre recupera su lugar mientras limpias el lago.[/p]
-[p][video mp4="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.mp4" webm="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.webm" poster="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.poster.avif" autoplay="true" controls="false"][/video]
+[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
 
 [i][b]Enfréntate a los elementos.[/b][/i]
 Doma un tornado con tu red.
-[video mp4="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.mp4" webm="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.webm" poster="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
 [p][b][i]Características[/i][/b]
 
 - Juega a tu ritmo. En este juego no hay ninguna prisa.

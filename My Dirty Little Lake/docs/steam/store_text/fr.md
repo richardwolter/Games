@@ -14,17 +14,17 @@ Lance ton filet, nettoie un lac crasseux et ramène la nature dans ce jeu cosy e
 ```
 [h2][b][i]Un jeu cosy, relaxant et satisfaisant.[/i][/b][/h2]
 [p][i][b]Améliore ton filet[/b][/i]
-Augmente sa force, sa taille, sa chance, le lancer double et bien plus pour attraper tous les objets du lac.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+Augmente sa force, sa taille, sa chance, le lancer double et bien plus pour attraper tous les objets du lac.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
 [p][b][i]Tout n'est pas bon à jeter.[/i][/b]
 Lave des trésors cachés et décore ta maison douillette.
-[video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
 [p][b][i]De la crasse à la beauté.[/i][/b]
 Regarde la faune reprendre sa place à mesure que tu nettoies le lac.[/p]
-[p][video mp4="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.mp4" webm="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.webm" poster="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.poster.avif" autoplay="true" controls="false"][/video]
+[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
 
 [i][b]Affronte les éléments.[/b][/i]
 Dompte une tornade avec ton filet.
-[video mp4="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.mp4" webm="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.webm" poster="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
 [p][b][i]Fonctionnalités[/i][/b]
 
 - Joue à ton rythme. Rien dans le jeu ne viendra te presser.

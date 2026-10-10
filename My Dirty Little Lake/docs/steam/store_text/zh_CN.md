@@ -15,17 +15,17 @@ the English field's.
 ```
 [h2][b][i]轻松解压的温馨游戏。[/i][/b][/h2]
 [p][i][b]升级你的渔网[/b][/i]
-提升力量、尺寸、幸运、双网等能力，把湖里的物品统统捞上来。[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+提升力量、尺寸、幸运、双网等能力，把湖里的物品统统捞上来。[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
 [p][b][i]捞到的不全是垃圾。[/i][/b]
 清洗藏在湖里的宝物，装饰你温馨的房子。
-[video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
 [p][b][i]从污浊到美景。[/i][/b]
 随着你清理湖泊，看野生动物重回家园。[/p]
-[p][video mp4="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.mp4" webm="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.webm" poster="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.poster.avif" autoplay="true" controls="false"][/video]
+[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
 
 [i][b]迎战风雨。[/b][/i]
 用你的渔网驯服龙卷风。
-[video mp4="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.mp4" webm="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.webm" poster="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
 [p][b][i]游戏特色[/i][/b]
 
 - 按自己的节奏来玩，游戏里没有任何事会催促你。

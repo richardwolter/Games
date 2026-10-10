@@ -14,17 +14,17 @@ Wirf dein Netz aus, mach einen verdreckten See sauber und hol die Natur zurück 
 ```
 [h2][b][i]Ein gemütliches Spiel zum Entspannen und Wohlfühlen.[/i][/b][/h2]
 [p][i][b]Verbessere dein Netz[/b][/i]
-Steigere Stärke, Größe, Glück, Doppelwurf und mehr, um alle Objekte im See zu fangen.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+Steigere Stärke, Größe, Glück, Doppelwurf und mehr, um alle Objekte im See zu fangen.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
 [p][b][i]Nicht jeder Fund ist Müll.[/i][/b]
 Wasch versteckte Schätze und dekoriere dein gemütliches Haus.
-[video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
 [p][b][i]Vom Dreck zur Pracht.[/i][/b]
 Sieh zu, wie sich die Tierwelt ihren Platz zurückholt, während du den See sauber machst.[/p]
-[p][video mp4="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.mp4" webm="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.webm" poster="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.poster.avif" autoplay="true" controls="false"][/video]
+[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
 
 [i][b]Trotze den Elementen.[/b][/i]
 Bändige einen Tornado mit deinem Netz.
-[video mp4="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.mp4" webm="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.webm" poster="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
 [p][b][i]Features[/i][/b]
 
 - Spiel in deinem eigenen Tempo. Nichts im Spiel setzt dich unter Druck.

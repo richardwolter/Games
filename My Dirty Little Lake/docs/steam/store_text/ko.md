@@ -14,17 +14,17 @@ Translated 2026-10-10 from `en.md`. Paste each block into the matching Steamwork
 ```
 [h2][b][i]느긋하고 속 시원한 힐링 게임.[/i][/b][/h2]
 [p][i][b]그물을 업그레이드해요[/b][/i]
-힘, 크기, 행운, 쌍그물 등을 강화해서 호수에 있는 물건을 모두 잡아요.[video mp4="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.mp4" webm="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.webm" poster="{STEAM_APP_IMAGE}/extras/fbdd021108c853c82b6665cb58c471ec.poster.avif" autoplay="true" controls="false"][/video][/p]
+힘, 크기, 행운, 쌍그물 등을 강화해서 호수에 있는 물건을 모두 잡아요.[img src="{STEAM_APP_IMAGE}/extras/01_cast_west"][/img][/p]
 [p][b][i]건져 올린 게 다 쓰레기는 아니에요.[/i][/b]
 숨은 보물을 씻어서 아늑한 집을 꾸며요.
-[video mp4="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.mp4" webm="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.webm" poster="{STEAM_APP_IMAGE}/extras/e42907505f6800775e2db8fb3ee2ab2d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/06_wash_place"][/img][/p]
 [p][b][i]구정물에서 아름다운 호수로.[/i][/b]
 호수를 치울수록 야생 동물이 제자리를 되찾아요.[/p]
-[p][video mp4="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.mp4" webm="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.webm" poster="{STEAM_APP_IMAGE}/extras/ed5eeb2f67e3b9a7d6ed11d137cc16c0.poster.avif" autoplay="true" controls="false"][/video]
+[p][img src="{STEAM_APP_IMAGE}/extras/08_grime_to_beauty"][/img]
 
 [i][b]자연의 힘에 맞서요.[/b][/i]
 그물로 토네이도를 길들여요.
-[video mp4="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.mp4" webm="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.webm" poster="{STEAM_APP_IMAGE}/extras/6f3b5dd1de6130437f1fb34a8b96eb6d.poster.avif" autoplay="true" controls="false"][/video][/p]
+[img src="{STEAM_APP_IMAGE}/extras/09_tornado_orbit"][/img][/p]
 [p][b][i]특징[/i][/b]
 
 - 내 속도대로 즐겨요. 게임이 재촉하는 일은 없어요.
