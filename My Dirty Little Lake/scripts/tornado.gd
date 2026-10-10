@@ -179,6 +179,8 @@ var held := false
 var _held_t := 0.0
 ## Hits this one takes to tame, set at `start`.
 var _need := 3
+## Hits the next `start` asks for, over the run's own ladder; 0 keeps the ladder. Spent by it.
+var need_next := 0
 var _size := SIZE_START
 var _goal_theta := 0.0
 var _goal_grow := 4.0
@@ -367,6 +369,9 @@ func start(angle: float = NAN) -> void:
 	netted = 0
 	_seed = _rng.randf() * TAU
 	_need = HITS_NEEDED[clampi(count, 0, HITS_NEEDED.size() - 1)]
+	if need_next > 0:
+		_need = need_next
+	need_next = 0
 	_size = SIZE_START
 	_goal_set = false
 	_goal_at = Vector2.ZERO

@@ -3658,6 +3658,7 @@ func _show_farewell() -> void:
 	if Demo.on():
 		_farewell.lines = [Text.DEMO_LINE_1, Text.DEMO_LINE_2]
 		_farewell.wishlist = true
+		_farewell.lake_door = true
 	# The cleaned lake is the end of the game, so the credits roll under the words
 	# (2026-09-16).
 	_farewell.roll_credits()
@@ -6723,6 +6724,7 @@ func _demo_step(held: bool) -> void:
 	if not demo_bought_out():
 		return
 	_demo_finale = true
+	_tornado.need_next = Demo.TORNADO_HITS
 	_tornado.start()
 
 

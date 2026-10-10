@@ -2207,6 +2207,36 @@ func _stage_save() -> void:
 ## moments where they happen, the pets tallied from both places, and a harness lake never
 ## reaching Steam. Everything set here is put back.
 ## The Steam demo (2026-10-09): caps, the bought-out finale, and the ending's Wishlist door.
+## The demo's water in reach is light: same pieces, heavy ones traded out past the reach.
+func _check_demo_fill() -> void:
+	var counts := []
+	var heavy_near := 0
+	var light_near := 0
+	for demo: bool in [false, true]:
+		Demo.forced = demo
+		var grid := LakeGrid.new()
+		grid.build(_grid.defs, 1234)
+		var total := 0
+		for ty in Iso.ROWS:
+			for tx in Iso.COLS:
+				var stack: PackedInt32Array = grid.stacks[grid.index_of(tx, ty)]
+				total += stack.size()
+				if demo and Iso.past_shelf(Vector2(tx, ty)) < Demo.FULL_REACH:
+					for d in stack:
+						if grid.defs[d].keepsake:
+							continue
+						if grid.defs[d].tier > Demo.LIGHT_TIER:
+							heavy_near += 1
+						else:
+							light_near += 1
+		counts.append(total)
+		grid.free()
+	Demo.forced = true
+	_check(counts[0] == counts[1], "the demo's fill holds the same pieces", str(counts))
+	_check(light_near > 0 and heavy_near * 50 < light_near, "the demo's reach is tier 0-1",
+		"%d heavy, %d light" % [heavy_near, light_near])
+
+
 func _check_demo() -> void:
 	Demo.forced = true
 	var tornado: Node2D = _main.get(&"_tornado")
@@ -2249,6 +2279,8 @@ func _check_demo() -> void:
 	_check(not tornado.active(), "the finale waits while held", "")
 	_main.call(&"_demo_step", false)
 	_check(tornado.active(), "buying the demo out brings the tornado down", "")
+	_check(int(tornado.hits_needed()) == Demo.TORNADO_HITS, "the demo's finale takes five hits",
+		str(tornado.hits_needed()))
 	tornado.settle_now()
 	_main.call(&"_demo_step", false)
 	_check(tornado.active(), "a finale settled by a save is owed again", "")
@@ -2263,11 +2295,14 @@ func _check_demo() -> void:
 	if farewell != null:
 		_check(farewell.lines.size() == 2 and String(farewell.lines[0]) == Text.DEMO_LINE_1,
 			"the demo's own words", str(farewell.lines))
+		_check(farewell.lake_door and farewell._home_label() == Text.DEMO_BACK_LAKE,
+			"the demo's ending goes back to the lake", farewell._home_label())
 		farewell.get_parent().queue_free()
 		_main.call(&"_drop_farewell")
 	_main.set(&"_farewell_shown", shown_was)
 	for what: StringName in levels:
 		_main.set(String(what) + "_level", levels[what])
+	_check_demo_fill()
 	Demo.forced = false
 	_check(int(_main.call(&"_level_cap", &"net_strength")) == 4, "the full game's cap back", "")
 

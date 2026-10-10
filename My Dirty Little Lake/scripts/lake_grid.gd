@@ -1867,6 +1867,8 @@ func build(from_defs: Array[TrashDef], lake_seed: int, fill: bool = true) -> voi
 				ring_tiles.append(index)
 	if fill:
 		_lighten_ring(ring_tiles)
+		if Demo.on():
+			_lighten_reach()
 		_bait_tops.clear()
 		for ty in Iso.ROWS:
 			for tx in Iso.COLS:
@@ -1978,6 +1980,54 @@ func _lighten_ring(ring_tiles: PackedInt32Array) -> void:
 		for k in stack.size():
 			var tier := defs[stack[k]].tier
 			if tier == 0 or (tier <= RING_TIER and _rng.randf() < RING_BAIT):
+				continue
+			var partner := Vector2i(-1, -1)
+			var bin := _up_bin(k, stack.size())
+			for tries in light.size():
+				var b: Array = light[(bin + tries) % light.size()]
+				if not b.is_empty():
+					partner = b.pop_back()
+					break
+			if partner.x < 0:
+				continue
+			var other := stacks[partner.x]
+			var piece := other[partner.y]
+			other[partner.y] = stack[k]
+			stack[k] = piece
+			stacks[partner.x] = other
+		stacks[index] = stack
+
+
+## The demo's trade: inside `Demo.FULL_REACH` every rubbish piece over `Demo.LIGHT_TIER` is
+## swapped with a light one from past it, matched by depth band like the ring's. The piece count
+## and the lake's tier shares are untouched; only where they lie moves.
+func _lighten_reach() -> void:
+	var near: Array[int] = []
+	var light: Array = [[], [], [], []]
+	for ty in Iso.ROWS:
+		for tx in Iso.COLS:
+			var index := index_of(tx, ty)
+			var stack := stacks[index]
+			if stack.is_empty():
+				continue
+			if Iso.past_shelf(Vector2(tx, ty)) < Demo.FULL_REACH:
+				near.append(index)
+				continue
+			for k in stack.size():
+				var def := defs[stack[k]]
+				if not def.keepsake and def.tier <= Demo.LIGHT_TIER:
+					light[_up_bin(k, stack.size())].append(Vector2i(index, k))
+	for bin: Array in light:
+		for n in range(bin.size() - 1, 0, -1):
+			var j := _rng.randi_range(0, n)
+			var held: Vector2i = bin[n]
+			bin[n] = bin[j]
+			bin[j] = held
+	for index in near:
+		var stack := stacks[index]
+		for k in stack.size():
+			var def := defs[stack[k]]
+			if def.keepsake or def.tier <= Demo.LIGHT_TIER:
 				continue
 			var partner := Vector2i(-1, -1)
 			var bin := _up_bin(k, stack.size())

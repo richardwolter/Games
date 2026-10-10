@@ -123,6 +123,8 @@ var _menu_rect := Rect2()
 var _menu_hot: bool = false
 ## The demo's ending (2026-10-09) also offers the store page, a door left of the menu's.
 var wishlist: bool = false
+## The home door reads "Back to lake" and only closes the words (the demo's ending).
+var lake_door: bool = false
 var _wish_rect := Rect2()
 var _wish_hot: bool = false
 
@@ -403,11 +405,18 @@ func _roll_start(row: Dictionary, text: String, px: int) -> float:
 	return (size.x - span - float(row["icon"])) * 0.5 + float(row["icon"])
 
 
+func _home_label() -> String:
+	return Text.DEMO_BACK_LAKE if lake_door else MENU_LABEL
+
+
 ## The player has taken the door home. Fades out like the others; the lake changes scene.
 func take_menu() -> void:
 	if _leaving or _age < SETTLE:
 		return
 	_leaving = true
+	if lake_door:
+		dismissed.emit()
+		return
 	to_menu.emit()
 
 
@@ -499,12 +508,12 @@ func _draw() -> void:
 ## The way home: a box under the words, in the frame's deep brown rather than the danger's
 ## red.
 func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> void:
-	var box := Vector2(Style.measure(MENU_LABEL, int(height)).x, height) + ONWARD_PAD * 2.0
+	var box := Vector2(Style.measure(_home_label(), int(height)).x, height) + ONWARD_PAD * 2.0
 	var top := under + height * ONWARD_DROP
 	if not wishlist:
 		_wish_rect = Rect2()
 		_menu_rect = Rect2(Vector2((size.x - box.x) * 0.5, top), box)
-		_door(_menu_rect, MENU_LABEL, height, _menu_hot, fade, shade)
+		_door(_menu_rect, _home_label(), height, _menu_hot, fade, shade)
 		return
 	var wish := Vector2(Style.measure(Text.DEMO_WISHLIST, int(height)).x, height) + ONWARD_PAD * 2.0
 	var gap := height * 1.5
@@ -512,7 +521,7 @@ func _draw_menu_door(under: float, height: float, fade: float, shade: Color) -> 
 	_wish_rect = Rect2(Vector2(left, top), wish)
 	_menu_rect = Rect2(Vector2(left + wish.x + gap, top), box)
 	_door(_wish_rect, Text.DEMO_WISHLIST, height, _wish_hot, fade, shade)
-	_door(_menu_rect, MENU_LABEL, height, _menu_hot, fade, shade)
+	_door(_menu_rect, _home_label(), height, _menu_hot, fade, shade)
 
 
 func _door(rect: Rect2, label: String, height: float, hot: bool, fade: float, shade: Color) -> void:

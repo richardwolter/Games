@@ -458,6 +458,9 @@ static var END_LINE_2: String:
 static var END_BACK: String:
 	get: return TranslationServer.translate(&"END_BACK")
 
+static var DEMO_BACK_LAKE: String:
+	get: return TranslationServer.translate(&"DEMO_BACK_LAKE")
+
 static var DEMO_LINE_1: String:
 	get: return TranslationServer.translate(&"DEMO_LINE_1")
 

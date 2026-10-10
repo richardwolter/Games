@@ -6807,6 +6807,14 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   `Demo.TEASE_SHOWN` (0.4) of them lie on top of their stacks with their beams up, a tease.
 - Machine drafts for the three new strings. All caps and reach first guesses.
 - **Continue on a finished demo** loads the lake as left, everything bought (Richard's call).
+- **Full nets in reach** (2026-10-10, `/grill-me` with Richard): inside `Demo.FULL_REACH` (13
+  tiles, the capped Range of 12 from the beach and a little over) every rubbish piece over tier
+  1 is traded for a tier 0-1 piece from past it (`LakeGrid._lighten_reach`, the ring's trade).
+  Same piece count, no re-pricing, by decision: the demo will likely run shorter.
+- **The finale tornado takes 5 hits** (`Demo.TORNADO_HITS`, `Tornado.need_next`).
+- **The ending's doors are Wishlist now and Back to lake** (`Farewell.lake_door`,
+  `DEMO_BACK_LAKE`): back to lake closes the words, so the player can finish washing and
+  decorating. The menu is reached from the settings board.
 - **Open**: a logged demo run to judge the 25 minutes, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 

@@ -46,6 +46,14 @@ const FIND_TIER := 1
 const FINDS := 15
 const TEASE_FROM := 14.0
 const TEASE_SHOWN := 0.4
+## Inside this many tiles past the island's shelf (the capped Range of 12 tiles from the beach,
+## and a little over) every piece heavier than `LIGHT_TIER` is traded for a lighter one from
+## further out, so a cast in reach comes home full (Richard, 2026-10-10). Same piece count, the
+## island ring's own trade (`LakeGrid._lighten_reach`).
+const FULL_REACH := 13.0
+const LIGHT_TIER := 1
+## Net hits to tame the finale tornado.
+const TORNADO_HITS := 5
 
 ## Prices the demo sets for itself, `track: [price_base, price_mult]`. A track missing here
 ## keeps the full game's price. Written by `docs/progression/price_demo.py --write`, then
