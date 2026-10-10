@@ -123,7 +123,7 @@ PIECES = [
         (2208, None, F, 0, 0, 0), (2209, None, "front_open", 0, 1, 0), (2210, None, B, 1, 0, 0)]),
     ("corner_desk", "Small Desk", "ROTATE", "floor", "", [
         (1158, None, F, 0, 0, 0), (1159, None, "front_open", 0, 1, 0), (1160, None, B, 1, 0, 0)]),
-    ("drawer", "Chest of Drawers", "ROTATE", "floor", "", [
+    ("drawer", "Drawer", "ROTATE", "floor", "", [
         (2150, None, F, 0, 0, 0), (2149, None, "front_open", 0, 1, 0), (2151, None, S, 1, 0, 1)]),
     ("drawer_desk", "Corner Desk", "ROTATE", "floor", "", [
         (412, None, F, 0, 0, 0), (413, None, "front_open", 0, 1, 0), (414, None, B, 2, 0, 0)]),
