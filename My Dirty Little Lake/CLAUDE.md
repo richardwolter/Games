@@ -6894,6 +6894,8 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   Desktop, account `fxknox`, password and Steam Guard typed into steamcmd itself, the vdf reading
   `build/windows_demo/` in place, logs in `build/steampipe/`, the description the date and
   commit. **No SetLive, by decision**: Richard sets the build live on default in Steamworks.
+  First build uploaded, installed through Steam and played through by Richard, and submitted
+  for Valve's review on 2026-10-10.
 - **Open**: a logged demo run to judge the 25 minutes. `test_lake`'s `_check_demo` guards the caps, the
   bought-out rule, the finale and its hold, the owed finale, and the ending's door.
 
