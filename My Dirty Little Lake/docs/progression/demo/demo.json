@@ -328,12 +328,12 @@
    "name": "Width",
    "ranks": 6,
    "cost": [
-    130.0,
-    244.4,
-    459.5,
-    863.8,
-    1624.0,
-    3053.0
+    120.0,
+    195.6,
+    318.8,
+    519.7,
+    847.1,
+    1380.8
    ],
    "effects": [
     {
@@ -365,7 +365,7 @@
    "name": "Strength",
    "ranks": 1,
    "cost": [
-    700.0
+    450.0
    ],
    "effects": [
     {
@@ -387,10 +387,10 @@
    "name": "Range",
    "ranks": 4,
    "cost": [
-    110.0,
-    325.6,
-    963.8,
-    2852.8
+    95.0,
+    223.2,
+    524.6,
+    1232.9
    ],
    "effects": [
     {
@@ -412,52 +412,15 @@
    ]
   },
   {
-   "id": "reel",
-   "tree": "net",
-   "group": "reel",
-   "name": "Reel",
-   "ranks": 6,
-   "cost": [
-    130.0,
-    244.4,
-    459.5,
-    863.8,
-    1624.0,
-    3053.0
-   ],
-   "effects": [
-    {
-     "stat": "reel",
-     "add": [
-      1.2,
-      1.2,
-      1.2,
-      1.2,
-      1.2,
-      1.2
-     ]
-    }
-   ],
-   "tags": [],
-   "schedule": [
-    0.8,
-    4.2,
-    7.7,
-    11.1,
-    14.6,
-    18.0
-   ]
-  },
-  {
    "id": "net_hold",
    "tree": "net",
    "group": "net_hold",
    "name": "Catch",
    "ranks": 3,
    "cost": [
-    95.0,
-    332.5,
-    1163.8
+    90.0,
+    315.0,
+    1102.5
    ],
    "effects": [
     {
@@ -483,9 +446,9 @@
    "name": "Lucky cast",
    "ranks": 3,
    "cost": [
-    95.0,
-    332.5,
-    1163.8
+    90.0,
+    315.0,
+    1102.5
    ],
    "effects": [
     {
@@ -511,9 +474,9 @@
    "name": "Double cast",
    "ranks": 3,
    "cost": [
-    95.0,
-    332.5,
-    1163.8
+    90.0,
+    315.0,
+    1102.5
    ],
    "effects": [
     {
@@ -539,11 +502,11 @@
    "name": "Sailing",
    "ranks": 5,
    "cost": [
-    120.0,
-    267.6,
-    596.7,
-    1330.7,
-    2967.6
+    100.0,
+    187.0,
+    349.7,
+    653.9,
+    1222.8
    ],
    "effects": [
     {
@@ -567,41 +530,13 @@
    ]
   },
   {
-   "id": "cargo",
-   "tree": "ferry",
-   "group": "cargo",
-   "name": "Hold",
-   "ranks": 3,
-   "cost": [
-    95.0,
-    332.5,
-    1163.8
-   ],
-   "effects": [
-    {
-     "stat": "cargo",
-     "add": [
-      6,
-      6,
-      6
-     ]
-    }
-   ],
-   "tags": [],
-   "schedule": [
-    0.8,
-    9.4,
-    18.0
-   ]
-  },
-  {
    "id": "fleet",
    "tree": "ferry",
    "group": "fleet",
    "name": "Fleet",
    "ranks": 1,
    "cost": [
-    160.0
+    150.0
    ],
    "effects": [
     {
@@ -623,7 +558,7 @@
    "name": "Loading",
    "ranks": 1,
    "cost": [
-    900.0
+    500.0
    ],
    "effects": [
     {
@@ -639,57 +574,13 @@
    ]
   },
   {
-   "id": "dog_fetch",
-   "tree": "dog",
-   "group": "dog_fetch",
-   "name": "Fetch",
-   "ranks": 1,
-   "cost": [
-    850.0
-   ],
-   "effects": [
-    {
-     "stat": "dog_fetch",
-     "add": [
-      1
-     ]
-    }
-   ],
-   "tags": [],
-   "schedule": [
-    9.4
-   ]
-  },
-  {
-   "id": "dog_wait",
-   "tree": "dog",
-   "group": "dog_wait",
-   "name": "Keenness",
-   "ranks": 1,
-   "cost": [
-    850.0
-   ],
-   "effects": [
-    {
-     "stat": "dog_wait_cut",
-     "add": [
-      2
-     ]
-    }
-   ],
-   "tags": [],
-   "schedule": [
-    9.4
-   ]
-  },
-  {
    "id": "dog_count",
    "tree": "dog",
    "group": "dog_count",
    "name": "Pack",
    "ranks": 1,
    "cost": [
-    250.0
+    200.0
    ],
    "effects": [
     {
@@ -711,7 +602,7 @@
    "name": "Carry",
    "ranks": 1,
    "cost": [
-    1100.0
+    650.0
    ],
    "effects": [
     {
@@ -731,24 +622,21 @@
    "tree": "luck",
    "group": "recycle_bonus",
    "name": "Bonus yard",
-   "ranks": 2,
+   "ranks": 1,
    "cost": [
-    75.0,
-    262.5
+    500.0
    ],
    "effects": [
     {
      "stat": "recycle_bonus",
      "add": [
-      0.25,
       0.25
      ]
     }
    ],
    "tags": [],
    "schedule": [
-    0.8,
-    18.0
+    9.4
    ]
   },
   {
@@ -756,18 +644,14 @@
    "tree": "luck",
    "group": "bird_worth",
    "name": "Pigeons",
-   "ranks": 3,
+   "ranks": 1,
    "cost": [
-    95.0,
-    332.5,
-    1163.8
+    500.0
    ],
    "effects": [
     {
      "stat": "bird_worth",
      "add": [
-      0.3,
-      0.3,
       0.3
      ]
     }
@@ -776,9 +660,7 @@
     "utility"
    ],
    "schedule": [
-    0.8,
-    9.4,
-    18.0
+    9.4
    ]
   }
  ],

@@ -2101,6 +2101,7 @@ func _hide_treasures() -> void:
 	# has something for the shed within its first few casts (Richard, 2026-09-13). Planted
 	# first so the rest keep their distance from it, not the other way round.
 	var first := _first_find_tile(rng)
+	var dealt := 1 if first >= 0 else 0
 	for i in _grid.defs.size():
 		var def := _grid.defs[i]
 		if not def.keepsake:
@@ -2123,11 +2124,17 @@ func _hide_treasures() -> void:
 		var early := EARLY_FINDS.has(def.piece)
 		# The demo deals only what its capped net can reach and lift, under nothing heavier
 		# (`Demo.REACH`, `Demo.FIND_TIER`); the rest of the collection is the full game's.
+		# The rest are the full game's, spread out past the reach, some of them on top with
+		# their beams up, as a tease (Richard, 2026-10-09: "some be completely visible").
+		var tease := false
 		if Demo.on():
-			if def.tier > Demo.FIND_TIER:
-				continue
-			early = true
-		var spots := _find_spots(def, early, _find_band(def))
+			if def.tier > Demo.FIND_TIER or dealt >= Demo.FINDS:
+				tease = true
+			else:
+				early = true
+				dealt += 1
+		var band := Vector2(Demo.TEASE_FROM, INF) if tease else _find_band(def)
+		var spots := _find_spots(def, early, band)
 		_shuffle(spots, rng)
 		var pick := _clear_spot(spots, planted_at)
 		if pick < 0 and not Demo.on():
@@ -2148,6 +2155,13 @@ func _hide_treasures() -> void:
 				_plant_anywhere(i)
 			continue
 		var down := 0 if early else rng.randi_range(0, 2)
+		if tease:
+			# Shown is on top of its stack; the rest buried as in the full game.
+			down = -1 if rng.randf() < Demo.TEASE_SHOWN else rng.randi_range(0, 2)
+			if down < 0:
+				_grid.insert(pick, _grid.height_of(pick), i)
+				planted_at.append(Vector2(_grid.tile_of(pick)))
+				continue
 		_grid.insert(pick, maxi(_grid.height_of(pick) - 1 - down, 0), i)
 		planted_at.append(Vector2(_grid.tile_of(pick)))
 
@@ -4996,6 +5010,15 @@ func _shop_rows() -> Array:
 		var now: String = reads.call(level)
 		var said := now if full else "%s %s %s" % [now, ARROW, reads.call(level + 1)]
 		said = prefix + said + suffix
+		# Not sold in the demo: the row stands, drawn back, and says so in place of its figure.
+		if Demo.locked(key):
+			out.append({
+				"key": key, "board": line[1], "name": line[2], "level": "0",
+				"value": Text.DEMO_LOCKED,
+				"blurb": Text.of(String(BLURBS[key])) if BLURBS.has(key) else "",
+				"cost": "", "afford": false, "maxed": false, "locked": true,
+			})
+			continue
 		out.append({
 			"key": key,
 			"board": line[1],

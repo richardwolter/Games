@@ -13,24 +13,25 @@ const STORE_URL := "https://store.steampowered.com/app/5375170/My_Dirty_Little_L
 ## Its own save, so a demo run never meets a full game's file.
 const SAVE_PATH := "user://my_dirty_little_lake_demo.save"
 
-## Where each track stops in the demo. A track missing here is not sold at all (cap 0).
+## Where each track stops in the demo. A track missing here, or at 0, is not sold at all and
+## its row reads "Not on Demo" (`Text.DEMO_LOCKED`).
 ## First guesses, for the demo's economy pass and Richard's logged run.
 const CAPS := {
 	&"net_width": 6,
 	&"net_strength": 1,
 	&"net_range": 4,
-	&"reel": 6,
+	&"reel": 0,
 	&"net_hold": 3,
 	&"boat_speed": 5,
-	&"cargo": 3,
+	&"cargo": 0,
 	&"boat_volley": 1,
 	&"fleet": 1,
-	&"dog_fetch": 1,
-	&"dog_wait": 1,
+	&"dog_fetch": 0,
+	&"dog_wait": 0,
 	&"dog_strength": 1,
 	&"dog_count": 1,
-	&"recycle_bonus": 2,
-	&"bird_worth": 3,
+	&"recycle_bonus": 1,
+	&"bird_worth": 1,
 	&"lucky_haul": 3,
 	&"double_cast": 3,
 }
@@ -39,27 +40,33 @@ const CAPS := {
 ## beach) and only up to this tier (the capped Strength). First guesses.
 const REACH := 9.0
 const FIND_TIER := 1
+## How many finds the demo deals within reach (the record player among them). Every other
+## find is dealt past `TEASE_FROM` tiles, out of the capped net's reach, `TEASE_SHOWN` of them
+## on top of their stacks with their beams up.
+const FINDS := 15
+const TEASE_FROM := 14.0
+const TEASE_SHOWN := 0.4
 
 ## Prices the demo sets for itself, `track: [price_base, price_mult]`. A track missing here
 ## keeps the full game's price. Written by `docs/progression/price_demo.py --write`.
 const PRICES := {
-	&"net_width": [130, 1.88],
-	&"net_strength": [700, 3.47],
-	&"net_range": [110, 2.96],
-	&"reel": [130, 1.88],
-	&"net_hold": [95, 3.5],
-	&"boat_speed": [120, 2.23],
-	&"cargo": [95, 3.5],
-	&"boat_volley": [900, 2.49],
-	&"fleet": [160, 2.5],
-	&"dog_fetch": [850, 1.8],
-	&"dog_wait": [850, 2.2],
-	&"dog_strength": [1100, 2.2],
-	&"dog_count": [250, 2],
-	&"recycle_bonus": [75, 3.5],
-	&"bird_worth": [95, 3.5],
-	&"lucky_haul": [95, 3.5],
-	&"double_cast": [95, 3.5],
+	&"net_width": [120, 1.63],
+	&"net_strength": [450, 3.47],
+	&"net_range": [95, 2.35],
+	&"reel": [450, 1.18],
+	&"net_hold": [90, 3.5],
+	&"boat_speed": [100, 1.87],
+	&"cargo": [40, 2.5],
+	&"boat_volley": [500, 2.49],
+	&"fleet": [150, 2.5],
+	&"dog_fetch": [500, 1.8],
+	&"dog_wait": [600, 2.2],
+	&"dog_strength": [650, 2.2],
+	&"dog_count": [200, 2],
+	&"recycle_bonus": [500, 1.61],
+	&"bird_worth": [500, 1.8],
+	&"lucky_haul": [90, 3.5],
+	&"double_cast": [90, 3.5],
 }
 
 ## A test may switch the demo on by hand; otherwise the export's feature tag decides.
@@ -71,6 +78,11 @@ static func on() -> bool:
 
 
 ## Where a track stops: the demo's cap, never past the full game's own.
+## Whether a track is not sold in the demo at all.
+static func locked(what: StringName) -> bool:
+	return on() and int(CAPS.get(what, 0)) <= 0
+
+
 static func cap(what: StringName, full: int) -> int:
 	if not on():
 		return full

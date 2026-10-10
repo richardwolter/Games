@@ -467,6 +467,9 @@ static var DEMO_LINE_2: String:
 static var DEMO_WISHLIST: String:
 	get: return TranslationServer.translate(&"DEMO_WISHLIST")
 
+static var DEMO_LOCKED: String:
+	get: return TranslationServer.translate(&"DEMO_LOCKED")
+
 static var MATERIAL_PLASTIC: String:
 	get: return TranslationServer.translate(&"MATERIAL_PLASTIC")
 

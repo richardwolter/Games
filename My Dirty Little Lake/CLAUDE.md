@@ -6781,8 +6781,16 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   is the demo's done flag. A save or the menu's pose settles the tornado without `ended`, so
   the finale is owed again.
 - **Off in the demo**: the tornado schedule, the hive's swarm (the hive stands as scenery).
-- **Finds** are dealt only within `Demo.REACH` (9) tiles of the shelf and up to tier
-  `Demo.FIND_TIER` (1), never under heavier rubbish; the rest are not dealt.
+- **Not on Demo** (second pass the same day, Richard): Reel, Capacity (`cargo`), Fetch and
+  Keenness are not sold (cap 0, `Demo.locked`): the row stands drawn back with "Not on Demo"
+  (`DEMO_LOCKED`) in place of its figure and no tag. Pigeons and $ Bonus one level each; the
+  hose stops at level 2 (`WashRoom.hose_most`). Re-priced: every level by minute 15 in the
+  sim, income held near 24/s by the boats at their base hold (16), so Waiting grows; judge
+  it in play.
+- **Finds**: `Demo.FINDS` (15, the record player among them) are dealt within `Demo.REACH`
+  (9) tiles of the shelf, tier `Demo.FIND_TIER` (1) or under, never under heavier rubbish.
+  Every other find is dealt past `Demo.TEASE_FROM` (14) tiles, out of reach, and
+  `Demo.TEASE_SHOWN` (0.4) of them lie on top of their stacks with their beams up, a tease.
 - Machine drafts for the three new strings. All caps and reach first guesses.
 - **Continue on a finished demo** loads the lake as left, everything bought (Richard's call).
 - **Open**: a logged demo run to judge the 25 minutes, the demo's Steam app id and depot. `test_lake`'s `_check_demo` guards the caps, the

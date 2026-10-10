@@ -2229,6 +2229,14 @@ func _check_demo() -> void:
 	_check(demo_total > 10000.0 and demo_total < 60000.0, "the demo's whole shop costs a demo's worth",
 		str(round(demo_total)))
 	_check(Demo.STORE_URL.contains("5375170"), "the Wishlist door goes to the game's store page", "")
+	var locked_row := {}
+	for row: Dictionary in _main.call(&"_shop_rows"):
+		if row["key"] == &"reel":
+			locked_row = row
+	_check(bool(locked_row.get("locked", false)) and String(locked_row.get("value", "")) == Text.DEMO_LOCKED
+		and String(locked_row.get("cost", "x")).is_empty(), "a track the demo does not sell reads Not on Demo",
+		str(locked_row))
+	_check(WashRoom.hose_most() == 2, "the demo's hose stops at level 2", "")
 	for what: StringName in Lake.TRACKS:
 		_main.set(String(what) + "_level", int(Demo.CAPS.get(what, 0)))
 	_check(bool(_main.call(&"demo_bought_out")), "every track at its demo cap is bought out", "")

@@ -30,6 +30,11 @@ signal hose_bought(level: int, cost: int)
 ## Strength buy and then mid-run). See `WashStand.HOSE_GROW` for what a level does.
 const HOSE_PRICES := [1500, 6000]
 const HOSE_MOST := 3
+
+
+## The hose's top level: two in the Steam demo (2026-10-09, Richard).
+static func hose_most() -> int:
+	return 2 if Demo.on() else HOSE_MOST
 ## The plank under the tray, and the gap over it.
 const HOSE_TALL := 52.0
 const HOSE_GAP := 22.0
@@ -313,19 +318,19 @@ func hose_box() -> Rect2:
 
 
 func hose_price() -> int:
-	return int(HOSE_PRICES[hose_level - 1]) if hose_level < HOSE_MOST else 0
+	return int(HOSE_PRICES[hose_level - 1]) if hose_level < hose_most() else 0
 
 
 ## The hose row's second line: the level now and the next, or the level alone at the top.
 func hose_value() -> String:
-	if hose_level >= HOSE_MOST:
+	if hose_level >= hose_most():
 		return "%d" % hose_level
 	return "%d %s %d" % [hose_level, Lake.ARROW, hose_level + 1]
 
 
 ## The hose row's tag: the price, or MAX at the top.
 func hose_cost() -> String:
-	return Text.SHOP_MAX if hose_level >= HOSE_MOST else "$%d" % hose_price()
+	return Text.SHOP_MAX if hose_level >= hose_most() else "$%d" % hose_price()
 
 
 ## What the hose row says, as one line: for logs and the harness.
@@ -349,7 +354,7 @@ func hose_tag_box() -> Rect2:
 
 
 func can_buy_hose() -> bool:
-	if hose_level >= HOSE_MOST:
+	if hose_level >= hose_most():
 		return false
 	var held := float(purse.call()) if purse.is_valid() else 0.0
 	return held >= float(hose_price())
@@ -546,7 +551,7 @@ class HoseRow:
 
 	func _draw() -> void:
 		var box := Rect2(Vector2.ZERO, size)
-		var maxed := room.hose_level >= WashRoom.HOSE_MOST
+		var maxed := room.hose_level >= WashRoom.hose_most()
 		var afford := room.can_buy_hose()
 		var tones := ShopSkin.tones_of(&"net")
 		var face: Color = tones[0] if afford else tones[1]
