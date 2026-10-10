@@ -2233,7 +2233,7 @@ func _check_demo_fill() -> void:
 		grid.free()
 	Demo.forced = true
 	_check(counts[0] == counts[1], "the demo's fill holds the same pieces", str(counts))
-	_check(light_near > 0 and heavy_near * 50 < light_near, "the demo's reach is tier 0-1",
+	_check(heavy_near > 0 and heavy_near * 8 < light_near, "the demo's reach is mostly tier 0-1, a few heavier",
 		"%d heavy, %d light" % [heavy_near, light_near])
 
 

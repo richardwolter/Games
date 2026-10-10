@@ -2027,7 +2027,7 @@ func _lighten_reach() -> void:
 		var stack := stacks[index]
 		for k in stack.size():
 			var def := defs[stack[k]]
-			if def.keepsake or def.tier <= Demo.LIGHT_TIER:
+			if def.keepsake or def.tier <= Demo.LIGHT_TIER or _rng.randf() < Demo.HEAVY_KEEP:
 				continue
 			var partner := Vector2i(-1, -1)
 			var bin := _up_bin(k, stack.size())

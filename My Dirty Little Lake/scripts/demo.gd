@@ -17,9 +17,9 @@ const SAVE_PATH := "user://my_dirty_little_lake_demo.save"
 ## its row reads "Not on Demo" (`Text.DEMO_LOCKED`).
 ## First guesses, for the demo's economy pass and Richard's logged run.
 const CAPS := {
-	&"net_width": 5,
+	&"net_width": 4,
 	&"net_strength": 1,
-	&"net_range": 5,
+	&"net_range": 4,
 	&"reel": 0,
 	&"net_hold": 3,
 	&"boat_speed": 5,
@@ -46,12 +46,15 @@ const FIND_TIER := 1
 const FINDS := 15
 const TEASE_FROM := 14.0
 const TEASE_SHOWN := 0.4
-## Inside this many tiles past the island's shelf (the capped Range of 12 tiles from the beach,
+## Inside this many tiles past the island's shelf (the capped Range of 10.4 tiles from the beach,
 ## and a little over) every piece heavier than `LIGHT_TIER` is traded for a lighter one from
 ## further out, so a cast in reach comes home full (Richard, 2026-10-10). Same piece count, the
 ## island ring's own trade (`LakeGrid._lighten_reach`).
-const FULL_REACH := 13.0
+const FULL_REACH := 11.0
 const LIGHT_TIER := 1
+## Share of the heavier pieces in reach left where they were rolled, sprinkled about so no
+## ring round the island is ever wholly cleared: a tease of what Strength buys.
+const HEAVY_KEEP := 0.12
 ## Net hits to tame the finale tornado.
 const TORNADO_HITS := 5
 

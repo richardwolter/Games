@@ -6807,9 +6807,11 @@ lake's "demo's finale" block, and the **Windows Demo** export preset.
   `Demo.TEASE_SHOWN` (0.4) of them lie on top of their stacks with their beams up, a tease.
 - Machine drafts for the three new strings. All caps and reach first guesses.
 - **Continue on a finished demo** loads the lake as left, everything bought (Richard's call).
-- **Full nets in reach** (2026-10-10, `/grill-me` with Richard): inside `Demo.FULL_REACH` (13
-  tiles, the capped Range of 12 from the beach and a little over) every rubbish piece over tier
-  1 is traded for a tier 0-1 piece from past it (`LakeGrid._lighten_reach`, the ring's trade).
+- **Full nets in reach** (2026-10-10, `/grill-me` with Richard): inside `Demo.FULL_REACH` (11
+  tiles, the capped Range of 10.4 from the beach and a little over) every rubbish piece over tier
+  1 is traded for a tier 0-1 piece from past it (`LakeGrid._lighten_reach`, the ring's trade),
+  bar `Demo.HEAVY_KEEP` (12%) left sprinkled where rolled, so no ring is ever wholly cleared.
+  Range and Width stop at level 4 in the demo.
   Same piece count, no re-pricing, by decision: the demo will likely run shorter.
 - **The finale tornado takes 5 hits** (`Demo.TORNADO_HITS`, `Tornado.need_next`).
 - **The ending's doors are Wishlist now and Back to lake** (`Farewell.lake_door`,
