@@ -2124,6 +2124,31 @@ pipeline and English only"** in Every Word Is a Key above.
 - **Out of scope, by decision**: the letter stills (still English), the siege, the credits'
   pack lines, the Steam page, widening boards.
 
+### Every Wrapper Breaks Japanese and Chinese (2026-10-10, `/grill-me` with Richard)
+Richard saw Japanese running across the whole screen: the game's seven wrappers broke rows on
+spaces only, and a Japanese or Chinese sentence has none, so it reached them as one "word".
+- **One place decides where a row may break** (`scripts/wrap.gd`, `Wrap`): on spaces, and
+  between any two Japanese or Chinese characters (`is_cjk`: Han, kana, CJK marks, full-width
+  forms), held by kinsoku (`NO_START`: no row opens with `。、」` a small kana, `ー` and the
+  like; `NO_END`: none ends on `「（`). Hangul keeps its spaces.
+- `Wrap.lines` serves the shop blurbs, the tours and the first steps' note, the farewell
+  and the credits; `Letter._tokens` cuts CJK runs into words marked `glue` (joined with no
+  space by `_row_plain`, `_ink_marked` and `CueCard.lay_out`), so the letter, the cue and
+  moment cards wrap the same way. A cue card no longer leaves a word's full stop alone on a
+  row: the break is asked once per word.
+- **Probe**: `tools/probe_wrap.tscn` (headless, a scene because the letter reaches `Pad`)
+  lays out every wrapped string in every locale with the game's own wrapper and box width,
+  and reports rows too wide, too many rows, kinsoku breaks, double or end spaces, CJK spaces,
+  paragraph counts against English, and French ordinary spaces before `! ? : ;` (French
+  takes U+00A0 there). `tools/last_wrap.log`. **Its box widths are written in it**: re-read
+  them when a board is resized. `test_lake`'s `_check_cjk_wrap` guards the breaking.
+- `shot_cues` and `shot_letter` take `CUES_LOCALE` / `LETTER_LOCALE` to photograph the cards
+  in a language, set on `TranslationServer` and `Style` by hand, never through `Prefs`.
+- **The final translation pass** (same session): Richard writes the final PT in the PT
+  rewrite artifact (db collection `final`), then every other language is retranslated from
+  it by translator and adversarial reviewer agents with back-translation, under
+  `docs/l10n/style_guide.md` and a glossary. No human native check, by Richard's call.
+
 ### Portuguese Is the Source (2026-09-29, Richard)
 Richard rewrote 85 strings in Portuguese in an artifact (see memory `lake-pt-rewrite-artifact`);
 `tools/pt_source_pass.py` merged them and retranslated en and the six others from his meaning.

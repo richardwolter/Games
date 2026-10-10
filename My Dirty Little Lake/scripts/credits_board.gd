@@ -143,21 +143,11 @@ func _icon_room() -> float:
 	return icon_room()
 
 
-## One line of `LINES` broken into the rows it is drawn as. Greedy on spaces; a single word
+## One line of `LINES` broken into the rows it is drawn as. Greedy on spaces (and between Japanese or Chinese characters, `Wrap`); a single word
 ## too wide for the face is left long rather than cut, since none of these strings may be
 ## shortened.
 func _wrap(text: String, px: int, wide: float) -> PackedStringArray:
-	var rows := PackedStringArray()
-	var row := ""
-	for word in text.split(" ", false):
-		var tried := word if row.is_empty() else row + " " + word
-		if not row.is_empty() and Style.measure(tried, px).x > wide:
-			rows.append(row)
-			row = word
-		else:
-			row = tried
-	rows.append(row)
-	return rows
+	return PackedStringArray(Wrap.lines(text, func(s: String) -> float: return Style.measure(s, px).x, wide))
 
 
 ## The rows the board draws, measured against a face of this width: the text, its size, its

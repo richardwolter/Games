@@ -246,17 +246,7 @@ func _note(box_at: Vector2) -> void:
 
 
 static func _wrap(text: String, face: Font, size_px: int, wide: float) -> Array[String]:
-	var lines: Array[String] = []
-	var line := ""
-	for word in text.split(" "):
-		var tried := word if line.is_empty() else line + " " + word
-		# Glyphs counted as their pictures: a token's own characters are not what is drawn.
-		if Glyphs.measure(tried, face, size_px).x > wide \
-				and not line.is_empty():
-			lines.append(line)
-			line = word
-		else:
-			line = tried
-	if not line.is_empty():
-		lines.append(line)
-	return lines
+	if text.strip_edges().is_empty():
+		return []
+	# Glyphs counted as their pictures: a token's own characters are not what is drawn.
+	return Wrap.lines(text, func(s: String) -> float: return Glyphs.measure(s, face, size_px).x, wide)

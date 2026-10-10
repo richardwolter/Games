@@ -389,30 +389,47 @@ func _wrap(text: String, px: int, wide: float) -> PackedStringArray:
 
 ## Marked-up text as words: each word a list of [segment, marked] pairs, an asterisk
 ## toggling the mark, a newline starting a paragraph. "*Left click* to" is three words.
+## Japanese and Chinese, which write no spaces, are cut where `Wrap` lets a row break: each
+## piece is a word of its own with `glue` set, joined to the one before with no space.
 static func _tokens(text: String) -> Array:
 	var words: Array = []
 	var segs: Array = []
 	var seg := ""
 	var marked := false
 	var para := false
+	var glue := false
+	var before := ""
 	for ch in text + " ":
 		if ch == "*":
 			if not seg.is_empty():
 				segs.append([seg, marked])
 				seg = ""
 			marked = not marked
-		elif ch == " " or ch == "\n":
+		elif ch == " " or ch == "
+":
 			if not seg.is_empty():
 				segs.append([seg, marked])
 				seg = ""
 			if not segs.is_empty():
-				words.append({"segs": segs.duplicate(), "para": para})
+				words.append({"segs": segs.duplicate(), "para": para, "glue": glue})
 				segs.clear()
 				para = false
-			if ch == "\n":
+			glue = false
+			before = ""
+			if ch == "
+":
 				para = true
 		else:
+			if Wrap.breaks_before(before, ch) and (not seg.is_empty() or not segs.is_empty()):
+				if not seg.is_empty():
+					segs.append([seg, marked])
+					seg = ""
+				words.append({"segs": segs.duplicate(), "para": para, "glue": glue})
+				segs.clear()
+				para = false
+				glue = true
 			seg += ch
+			before = ch
 	return words
 
 
@@ -424,10 +441,12 @@ static func _word_plain(word: Dictionary) -> String:
 
 
 static func _row_plain(row: Dictionary) -> String:
-	var parts := PackedStringArray()
+	var out := ""
 	for word: Dictionary in row["words"]:
-		parts.append(_word_plain(word))
-	return " ".join(parts)
+		if not out.is_empty() and not bool(word.get("glue", false)):
+			out += " "
+		out += _word_plain(word)
+	return out
 
 
 ## Words wrapped greedily into rows of `{words, para}`; a paragraph word always opens a row.
@@ -855,7 +874,7 @@ func _ink_marked(row: Dictionary, px: int, base: float, within: Rect2, align: in
 			# Through `Glyphs`, which draws a pad button's picture where the text holds one.
 			Glyphs.draw_line(self, Style.font(), Vector2(x, base), text, px, HEAD_INK if bool(seg[1]) else INK)
 			x += Style.measure(text, px).x
-		if i < words.size() - 1:
+		if i < words.size() - 1 and not bool((words[i + 1] as Dictionary).get("glue", false)):
 			x += space
 
 

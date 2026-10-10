@@ -7,7 +7,9 @@ extends Node
 ##
 ##     <exe> --path . --fixed-fps 60 res://tools/shot_cues.tscn
 ##
-## No lake is made, so nothing in `user://` is touched.
+## No lake is made, so nothing in `user://` is touched. `CUES_LOCALE=ja` (any shipped
+## locale) shoots the cards in that language, set by hand on `TranslationServer` and `Style`
+## and never through `Prefs`, so `settings.cfg` is not written; files then end `_<locale>`.
 
 const KINDS: Array[StringName] = [&"tornado", &"wildlife", &"swarm", &"honey", &"lucky", &"double", &"pigeon", &"ferry", &"meter"]
 const KEYS := {
@@ -37,7 +39,17 @@ var _sheet: Image
 var _busy := false
 
 
+const Style := preload("res://scripts/style.gd")
+
+var _tag := ""
+
+
 func _ready() -> void:
+	var locale := OS.get_environment("CUES_LOCALE")
+	if not locale.is_empty():
+		TranslationServer.set_locale(locale)
+		Style.set_locale(locale)
+		_tag = "_" + locale
 	var back := TextureRect.new()
 	back.texture = load("res://assets/loading_lake.png")
 	back.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -99,14 +111,14 @@ func _grab() -> void:
 	if _shot == AGES.size() - 1:
 		var whole := Rect2i(Vector2i((box.grow(40.0).position * scale).floor()), Vector2i((box.grow(40.0).size * scale).ceil()))
 		whole = whole.intersection(Rect2i(Vector2i.ZERO, Vector2i(shot.get_width(), shot.get_height())))
-		shot.get_region(whole).save_png("res://tools/last_cues_%s.png" % KINDS[_kind])
+		shot.get_region(whole).save_png("res://tools/last_cues_%s%s.png" % [KINDS[_kind], _tag])
 	_shot += 1
 	if _shot < AGES.size():
 		return
 	_card.hide_hint(true)
 	_kind += 1
 	if _kind >= KINDS.size():
-		_sheet.save_png("res://tools/last_cues.png")
+		_sheet.save_png("res://tools/last_cues%s.png" % _tag)
 		get_tree().quit()
 		return
 	_begin()

@@ -1304,18 +1304,9 @@ func purse_box(wanted: Vector2) -> Rect2:
 	)
 ## Words folded onto lines no wider than `wide`. `Style.write` has no wrap of its own.
 static func _wrap(text: String, height: int, wide: float) -> Array[String]:
-	var out: Array[String] = []
-	var line := ""
-	for word in text.split(" ", false):
-		var trial := word if line.is_empty() else line + " " + word
-		if not line.is_empty() and Style.measure(trial, height).x > wide:
-			out.append(line)
-			line = word
-		else:
-			line = trial
-	if not line.is_empty():
-		out.append(line)
-	return out
+	if text.strip_edges().is_empty():
+		return []
+	return Wrap.lines(text, func(s: String) -> float: return Style.measure(s, height).x, wide)
 
 
 ## The price, on an oak tag shrunk onto the number in the money plate's gold, so a cost

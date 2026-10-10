@@ -17,6 +17,7 @@ extends Node
 
 const SHOT := "res://tools/last_letter_%s.png"
 const LOG := "res://tools/last_letter.log"
+const Style := preload("res://scripts/style.gd")
 const SAVE := "user://lake_cleanup_shot_letter.save"
 
 ## Frames to let the lake build before the glide is asked for.
@@ -35,9 +36,17 @@ var _busy := false
 ## Frames to let a turned page be drawn before it is photographed.
 const TURN_SETTLE := 4
 var _wait := TURN_SETTLE
+var _tag := ""
 
 
 func _ready() -> void:
+	# `LETTER_LOCALE=ja` (any shipped locale): the cards in that language, set by hand on
+	# `TranslationServer` and `Style`, never through `Prefs`, so `settings.cfg` is untouched.
+	var locale := OS.get_environment("LETTER_LOCALE")
+	if not locale.is_empty():
+		TranslationServer.set_locale(locale)
+		Style.set_locale(locale)
+		_tag = "_" + locale
 	if FileAccess.file_exists(SAVE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	_main = load("res://scenes/main.tscn").instantiate()
@@ -122,7 +131,7 @@ func _shoot(name: String, line: String) -> void:
 	_busy = true
 	await RenderingServer.frame_post_draw
 	var shot := get_viewport().get_texture().get_image()
-	shot.save_png(ProjectSettings.globalize_path(SHOT % name))
+	shot.save_png(ProjectSettings.globalize_path(SHOT % (name + _tag)))
 	_say("%-14s %s" % [name, line])
 	_busy = false
 	if _card >= 0:

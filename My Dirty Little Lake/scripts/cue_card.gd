@@ -757,8 +757,12 @@ static func lay_out(marked_text: String, px: int, wide: float) -> Array:
 		var first := true
 		for unit: Dictionary in units:
 			var w := Style.measure(String(unit["text"]), px).x
-			var lead := space if (first and not row.is_empty() and whole <= wide) else 0.0
-			if not row.is_empty() and row_wide + lead + w > wide:
+			var lead := space if (first and not row.is_empty() and whole <= wide
+					and not bool(word.get("glue", false))) else 0.0
+			# A word that fits a row is kept whole: the break is asked before its first
+			# unit, for all of it, so "*heavier*." never leaves its full stop alone below.
+			var needs := (lead + whole) if whole <= wide else (lead + w)
+			if (first or whole > wide) and not row.is_empty() and row_wide + needs > wide:
 				rows.append(row)
 				row = []
 				row_wide = 0.0

@@ -6799,6 +6799,7 @@ func _check_cues() -> void:
 	for row: Array in narrow:
 		fits = fits and CueCard._row_wide(row, Style.TEXT_SMALL) <= CueCard.WIDE_HINT + 0.5
 	_check(narrow.size() >= 2 and fits, "a hint wraps inside its card", str(narrow.size()))
+	_check_cjk_wrap()
 	for key in ["TORNADO_FIRST", "CUE_LUCKY", "CUE_DOUBLE", "CUE_PIGEON", "CUE_FERRY", "CUE_METER", "WILDLIFE_BACK", "HIVE_SWARM", "HIVE_READY"]:
 		var words := Text.of(key)
 		_check(words != key and words.count("*") >= 2 and words.count("*") % 2 == 0,
@@ -7203,6 +7204,43 @@ func _check_free_view(cam: Camera2D) -> void:
 	_angler.tile_pos = stood
 	_main.set(&"_pan", Vector2.ZERO)
 	_main.set(&"_mouse_inside", true)
+
+
+## Japanese and Chinese break between characters, not on spaces (2026-10-10: a Japanese
+## sentence ran across the whole screen, being one "word" to every wrapper). Measured in the
+## Japanese face, then put back: `Style.set_locale` is the face, nothing reaches `Prefs`.
+func _check_cjk_wrap() -> void:
+	Style.set_locale("ja")
+	var ja := "ラッキーキャストは、*もっと重い*ゴミをたくさんとれます。ネットを投げてみよう！"
+	var measure := func(s: String) -> float: return Style.measure(s, Style.TEXT_SMALL).x
+	var lines := Wrap.lines(ja.replace("*", ""), measure, 120.0)
+	var inside := true
+	var rule := true
+	for i in lines.size():
+		inside = inside and float(measure.call(lines[i])) <= 120.5
+		rule = rule and (i == 0 or not Wrap.NO_START.contains(lines[i][0]))
+		rule = rule and not Wrap.NO_END.contains(lines[i][lines[i].length() - 1])
+	_check(lines.size() >= 3 and inside and rule,
+		"a Japanese line breaks between characters, inside its box, never before a closing mark",
+		" | ".join(lines))
+	var rows := CueCard.lay_out(ja, Style.TEXT_SMALL, 120.0)
+	var first_ok := true
+	for r in range(1, rows.size()):
+		var opens := String((rows[r][0] as Dictionary)["text"])
+		first_ok = first_ok and not Wrap.NO_START.contains(opens[0])
+	_check(rows.size() >= 3 and first_ok and CueCard.plain(rows).replace("\n", "") == ja.replace("*", ""),
+		"a Japanese cue card wraps with no space added and no row opened by a full stop",
+		CueCard.plain(rows))
+	var words := Letter._tokens(ja)
+	var row_text := ""
+	for row: Dictionary in Letter._wrap_marked(words, Style.TEXT_SMALL, 2000.0):
+		row_text += Letter._row_plain(row)
+	_check(row_text == ja.replace("*", ""), "the letter joins Japanese pieces with no space", row_text)
+	Style.set_locale("en")
+	var en := Wrap.lines("Strength catches heavier objects.", func(s: String) -> float:
+		return Style.measure(s, Style.TEXT_SMALL).x, 2000.0)
+	_check(en.size() == 1 and en[0] == "Strength catches heavier objects.",
+		"a Latin line keeps its words whole and its spaces", str(en))
 
 
 func _check(ok: bool, what: String, detail: String) -> void:
